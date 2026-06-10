@@ -56,7 +56,8 @@ describe('createCircleDispatch — routing', () => {
     expect(interpret).toHaveBeenCalledTimes(1);
     // the bot tag is stripped before it reaches the interpreter
     expect(interpret.mock.calls[0][0]).not.toMatch(/@helper/i);
-    expect(dispatched).toEqual(['/addTask --title=milk']);
+    // the LLM path dispatches by {opId,args} (like a button tap), not a fabricated slash string
+    expect(dispatched).toEqual([{ opId: 'addTask', args: { title: 'milk' } }]);
     expect(posted).toEqual([]);
   });
 

@@ -19,7 +19,7 @@ import { selectLlmClient } from './llmPicker.js';
  * @param {{llmTool?:'off'|'local'|'cloud'}|null} [a.policy]   the circle policy
  * @param {{local?:object,cloud?:object}|null} [a.llmProviders] host-supplied LlmClients
  * @param {(text:string, opts:{catalog,llm}) => Promise<{opId:string,args?:object}|null>} [a.interpret]  NL→slash
- * @param {(slash:string, ctx:object) => any|Promise<any>} a.dispatch      run a slash string (the shell's pipeline)
+ * @param {(input:string|{opId:string,args:object}, ctx:object) => any|Promise<any>} a.dispatch  run a typed slash STRING (user) or an {opId,args} route (LLM/structured) — the shell resolves both, as it already does for typed input vs button taps
  * @param {(text:string, ctx:object) => any|Promise<any>} a.postToKring    post a normal kring message
  * @param {string} [a.botName]      the assistant's address/name for @-tag detection (default 'assistant')
  */
@@ -44,7 +44,7 @@ export function createCircleDispatch({ catalog, policy, llmProviders, interpret,
       if (llm && typeof interpret === 'function' && addressesBot(trimmed, botName)) {
         const cmd = await interpret(stripBotTag(trimmed, botName), { catalog, llm });   // → {opId,args} | null
         if (cmd && cmd.opId) {
-          await dispatch(toSlash(cmd), ctx);
+          await dispatch({ opId: cmd.opId, args: cmd.args && typeof cmd.args === 'object' ? cmd.args : {} }, ctx);
           return { via: 'llm', cmd };
         }
         // the LLM couldn't map it to a command → fall through to a normal post.
@@ -72,14 +72,6 @@ function stripBotTag(text, botName) {
     .replace(new RegExp('(^|\\s)@?' + escapeRe(botName) + '\\b[:,]?', 'ig'), ' ')
     .trim();
   return out || text;
-}
-
-/** {opId, args} → a slash string the shell's dispatch pipeline understands. */
-function toSlash(cmd) {
-  const args = cmd.args && typeof cmd.args === 'object' && Object.keys(cmd.args).length
-    ? ' ' + Object.entries(cmd.args).map(([k, v]) => `--${k}=${v}`).join(' ')
-    : '';
-  return `/${cmd.opId}${args}`;
 }
 
 function escapeRe(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }

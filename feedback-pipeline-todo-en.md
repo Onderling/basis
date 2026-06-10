@@ -295,8 +295,13 @@ Design docs: `docs/STORAGE-SECURITY-MENUKAART.md` (posture decision layer) ·
 - [~] **Membership → pod access** — the SUBSTRATE is DONE: `createControlAgent` (ACL grant/revoke +
       group-key rotation on join/leave, ≥1-admin + break-glass) + `createPodKeyStore` (key resource on
       the pod) + `readGroupKey`, proven by `podBinding.integration.test.js` (full loop: join → key on
-      pod → unwrap → sealed content → leave rotates). Remaining (app side): drive `addMember`/`removeMember`
-      from stoop's actual group join/leave events + supply members' public keys (a roster pubkey source).
+      pod → unwrap → sealed content → leave rotates). Roster pubkey source also built:
+      `createMemberSealingIdentity` (vault-held X25519 keypair → `rosterEntry({webId, publicKey, role})`).
+      Remaining (app side, needs a design call): (1) WHERE members publish their sealing public key
+      (membership-redemption item? `/.keys/members/` on the pod? WebID profile?); (2) hook
+      `controlAgent.addMember`/`removeMember` into stoop's `addMember` / `leaveGroup` skills
+      (`apps/stoop/src/skills/index.js`). Stoop identity = webid + NKN transport pubKey; the sealing key
+      is a SEPARATE family (hence the member-identity bridge).
 - [ ] **Sender-writes to the REAL shared pod** (today stoop writes pseudo-pod) + **offline catch-up by
       polling the pod** (swap `getMessagesSince` local read → a pod read).
 - [ ] **Text dual-write** (peer + pod; folio's file→pod→link is the file-side template).

@@ -13,3 +13,4 @@ export {
   queryIndex, semanticQuery, serializeIndex, parseIndex, shardKeyFor,
 } from './sealedIndex.js';
 export { createControlAgent } from './controlAgent.js';
+export { createPodKeyStore, readGroupKey } from './podKeyStore.js';

@@ -21,9 +21,16 @@ export function buildCircleLlmProviders({ localBaseUrl = null, model, audit } = 
   const providers = {};
   if (localBaseUrl) {
     providers.local = new LlmClient({
-      provider: ollamaProvider({ baseUrl: localBaseUrl, ...(model ? { model } : {}) }),
+      provider: ollamaProvider({ baseUrl: normalizeBase(localBaseUrl), ...(model ? { model } : {}) }),
       ...(typeof audit === 'function' ? { audit } : {}),
     });
   }
   return providers;
+}
+
+// The provider appends `/v1/chat/completions` itself, so it wants the HOST base. Accept either the
+// host (`http://h:11434`) or an already-`/v1` route (the feedback-app convention) — strip a trailing
+// `/v1` so both forms work without a double `/v1` 404.
+export function normalizeBase(url) {
+  return String(url).replace(/\/+$/, '').replace(/\/v1$/, '');
 }

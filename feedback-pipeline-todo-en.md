@@ -288,9 +288,12 @@ Design docs: `docs/STORAGE-SECURITY-MENUKAART.md` (posture decision layer) ·
 - [~] **NL→slash interpreter + `@tag` router** (the shared core with the feedback v2 rewire) — the
       circle's slash catalog is the tool list; `selectLlmClient(policy, providers)` picks the route.
       **Core built** (2026-06-10): `canopy-chat/src/v2/circleDispatch.js` (slash / llm / kring router +
-      `addressesBot`) + `interpretCommand.js` (`buildToolDescriptors` + `interpretToCommand` → `{opId,args}`),
-      17 tests. Remaining: web wiring (C, `main.js` unknown-seam), mobile rewire (B, `CircleLauncherScreen`),
-      per-circle LLM provider hookup.
+      `addressesBot`) + `interpretCommand.js` (`buildToolDescriptors` + `interpretToCommand` → `{opId,args}`).
+      **C (web) DONE + LIVE-PROVEN** (2026-06-10): `circleTurn.js` wired at `main.js`'s unknown-seam +
+      `circleLlmProviders.js` (host seam, `VITE_CIRCLE_LLM_BASEURL`). `scripts/circle-bot-smoke.mjs`
+      against real `qwen2.5:7b-instruct` dispatched addTask/markComplete/listOpen from EN **and Dutch**
+      free text; bystander/un-addressed turns correctly fell through. 33 unit tests. Remaining: mobile
+      rewire (B, `CircleLauncherScreen`), per-circle policy-store hookup, clarification turn.
 - [ ] **Circle-scoped dispatch + clarification** (NEW, 2026-06-10) — the interpreted command must be
       **confined to the active circle's task/list space**: the same label (`/done afval wegbrengen`) can
       exist in multiple circles, so resolution happens **within the circle's store, not globally**. On web

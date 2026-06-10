@@ -273,8 +273,11 @@ Design docs: `docs/STORAGE-SECURITY-MENUKAART.md` (posture decision layer) ·
 - [~] **Coordinate with `pod-client/sharing`** — the group-key grant/revoke MECHANISM is built (above);
       remaining: tie it to `sharing` ACL `grant()`/`revoke()` + a household **control-agent** that applies
       key-rotation + ACL together on membership events.
-- [ ] **Sealed index** (per container) — pseudonym→meaning + queryable metadata; shardable; decrypted
-      client-side for local search (P2). Doubles as pseudonym decoder + query + RAG.
+- [x] **Sealed index** — DONE 2026-06-10. `sealing/sealedIndex.js` (PORTABLE — runs client-side for P2):
+      `queryIndex` (type/tag/text, newest-first) + `decodePseudonym` (id→meaning) + `semanticQuery`
+      (cosine over caller-supplied embeddings = RAG) + `shardKeyFor` (FNV-1a). Stored sealed (serialize
+      → seal → one blob); round-trips through `sealWithGroupKey`. 9 tests. Remaining for RAG: the
+      embedding MODEL (caller supplies vectors today) — slots into the token-gate/RAG circle item.
 - [ ] **In-enclave hooks** (P1) + **encrypted-backup** (whole-blob overlay) — later tiers.
 
 ### Storage-security postures (menukaart) — per-circle policy

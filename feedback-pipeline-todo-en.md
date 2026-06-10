@@ -292,8 +292,18 @@ Design docs: `docs/STORAGE-SECURITY-MENUKAART.md` (posture decision layer) ·
       **C (web) DONE + LIVE-PROVEN** (2026-06-10): `circleTurn.js` wired at `main.js`'s unknown-seam +
       `circleLlmProviders.js` (host seam, `VITE_CIRCLE_LLM_BASEURL`). `scripts/circle-bot-smoke.mjs`
       against real `qwen2.5:7b-instruct` dispatched addTask/markComplete/listOpen from EN **and Dutch**
-      free text; bystander/un-addressed turns correctly fell through. 33 unit tests. Remaining: mobile
-      rewire (B, `CircleLauncherScreen`), per-circle policy-store hookup, clarification turn.
+      free text; bystander/un-addressed turns correctly fell through. 33 unit tests.
+      **B (mobile) CODE-COMPLETE** (2026-06-10): `createCircleDispatch` wired into `CircleDetail`'s kring
+      composer in `CircleLauncherScreen.js` (slash → dispatch via `bundle.catalog`+`runDispatch`,
+      scoped to the circle; addressed free text → interpret → dispatch; else → normal kring post). Bot
+      replies render as kring bubbles (`circle.bot.*` locales en+nl). LLM via `@canopy/llm-client`
+      (metro `extraNodeModules` + subpath alias added; `EXPO_PUBLIC_CIRCLE_LLM_BASEURL`). Verified:
+      esbuild parse + the shared modules' 1189 v2 tests. **NOT yet bundle/device-verified** — the
+      `expo` package is missing from mobile `node_modules` (pre-existing broken `pnpm install`:
+      `@canopy/webid-discovery` "*" spec in pod-onboarding), so metro/expo can't run here. This is the
+      M6 device checkpoint. Remaining: fix the install → metro bundle → device run; mobile clarification
+      UI (interactive candidate buttons in the kring stream — B1 dispatches but doesn't yet ask);
+      per-circle policy-store hookup.
 - [x] **Circle-scoped dispatch + clarification** (NEW, 2026-06-10 → DONE web + live-proven) —
       `clarifyTargets.js` (ready / clarify / unresolved for id-like `pickerSource` params; exact-id +
       circle-scoped label lookup) + `clarifyingDispatch.js` (per-scope pending question; pick re-runs).

@@ -1427,6 +1427,28 @@
         "text": "Buurten beginnen prikbord-eerst: open chat staat uit, en een gesprek verschijnt pas als iemand op een vraag of aanbod reageert.",
         "doc": "N1 — neutral buurt chat default note."
       }
+    },
+    "bot": {
+      "done": {
+        "text": "Klaar.",
+        "doc": "Circle bot — generic confirmation after a command runs with no text reply."
+      },
+      "failed": {
+        "text": "Dat lukte niet: {{msg}}",
+        "doc": "Circle bot — a dispatched command errored."
+      },
+      "listed": {
+        "text": "{{n}} item(s) gevonden.",
+        "doc": "Circle bot — summary when a command returns a list."
+      },
+      "needsInfo": {
+        "text": "Ik heb daar iets meer detail voor nodig.",
+        "doc": "Circle bot — the command needs more args than the message gave."
+      },
+      "unknown": {
+        "text": "Ik kon daar geen actie van maken.",
+        "doc": "Circle bot — could not turn the message into a command."
+      }
     }
   },
   "app": {

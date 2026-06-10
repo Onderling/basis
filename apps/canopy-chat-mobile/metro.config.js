@@ -54,6 +54,8 @@ module.exports = withCanopyPreset({
     path.resolve(repoRoot, 'packages/skill-match'),
     path.resolve(repoRoot, 'packages/manifest-host'),
     path.resolve(repoRoot, 'packages/app-manifest'),
+    // @canopy/llm-client — the circle bot's NL→slash LLM client (ollama provider).
+    path.resolve(repoRoot, 'packages/llm-client'),
   ],
 
   // Block apps/<app>/node_modules — server / CLI / web-only deps the
@@ -115,6 +117,9 @@ module.exports = withCanopyPreset({
     '@canopy/notifier':          path.resolve(repoRoot, 'packages/notifier'),
     '@canopy/skill-match':       path.resolve(repoRoot, 'packages/skill-match'),
     '@canopy/manifest-host':     path.resolve(repoRoot, 'packages/manifest-host'),
+    // @canopy/llm-client — bare import resolves via its package.json main (src/index.js); the
+    // /providers/ollama subpath goes through extraSubpathResolvers (package-exports is disabled).
+    '@canopy/llm-client':        path.resolve(repoRoot, 'packages/llm-client'),
   },
 
   // Subpath resolvers — Trap 2 escape hatch.
@@ -163,6 +168,15 @@ module.exports = withCanopyPreset({
       if (eldMatch) {
         return {
           filePath: path.resolve(repoRoot, 'apps/feedback-pipeline/node_modules/eld/src/entries', `static.${eldMatch[1]}.js`),
+          type:     'sourceFile',
+        };
+      }
+
+      // 5. @canopy/llm-client provider subpaths (circle bot). Package-exports disabled → map directly.
+      const llmMatch = moduleName.match(/^@canopy\/llm-client\/providers\/(ollama|mock)$/);
+      if (llmMatch) {
+        return {
+          filePath: path.resolve(repoRoot, 'packages/llm-client/src/providers', `${llmMatch[1]}.js`),
           type:     'sourceFile',
         };
       }

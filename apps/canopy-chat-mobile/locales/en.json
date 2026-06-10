@@ -1427,6 +1427,28 @@
         "text": "Buurten start noticeboard-first: open chat is off, and a thread appears only when someone reacts to a vraag or aanbod.",
         "doc": "N1 — neutral buurt chat default note."
       }
+    },
+    "bot": {
+      "done": {
+        "text": "Done.",
+        "doc": "Circle bot — generic confirmation after a command runs with no text reply."
+      },
+      "failed": {
+        "text": "That didn’t work: {{msg}}",
+        "doc": "Circle bot — a dispatched command errored."
+      },
+      "listed": {
+        "text": "Found {{n}} item(s).",
+        "doc": "Circle bot — summary when a command returns a list."
+      },
+      "needsInfo": {
+        "text": "I need a bit more detail for that.",
+        "doc": "Circle bot — the command needs more args than the message gave."
+      },
+      "unknown": {
+        "text": "I couldn’t turn that into an action.",
+        "doc": "Circle bot — could not turn the message into a command."
+      }
     }
   },
   "app": {

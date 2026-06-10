@@ -51,7 +51,14 @@ import {
   setActiveScreen, updateScreen, materializeScreen,
   // δ.2 — per-message delivery state for optimistic kring chat sends.
   createDeliveryStateMap,
+  // B (circle bot) — dispatch primitives to run an interpreted command in the kring.
+  parseInput, resolveDispatch, runDispatch, scopeReadyDispatch,
 } from '@canopy-app/canopy-chat';
+// B (circle bot) — v2 free-text→LLM→command surface (shared with web). Deep-imported like the other
+// v2 modules (kringChatReceiver etc.) since they're not on the canopy-chat barrel.
+import { createCircleDispatch } from '../../../../canopy-chat/src/v2/circleDispatch.js';
+import { interpretToCommand } from '../../../../canopy-chat/src/v2/interpretCommand.js';
+import { buildCircleLlmProviders } from '../../../../canopy-chat/src/v2/circleLlmProviders.js';
 import { formatNearbyLabel } from '../../core/nearbyLabel.js';
 import { t } from '../../core/localisation.js';
 import {
@@ -85,6 +92,13 @@ import CircleTabBar from './CircleTabBar.js';
 import CircleScreenView from './CircleScreenView.js';
 import CircleRecipeEditorScreen from './CircleRecipeEditorScreen.js';
 import CircleScreensPickerScreen from './CircleScreensPickerScreen.js';
+
+// B (circle bot) — host LLM route for NL→command in the kring. Mirrors web's VITE_CIRCLE_LLM_BASEURL
+// + the feedback mobile EXPO_PUBLIC_FEEDBACK_LLM_BASEURL pattern. Unset → no provider → the LLM branch
+// stays inert (slash commands + plain kring chat still work).
+const CIRCLE_LLM_BASEURL = process.env.EXPO_PUBLIC_CIRCLE_LLM_BASEURL || null;
+const CIRCLE_LLM_MODEL   = process.env.EXPO_PUBLIC_CIRCLE_LLM_MODEL || undefined;
+const CIRCLE_BOT_NAME    = process.env.EXPO_PUBLIC_CIRCLE_BOT_NAME || 'assistant';
 
 // D1 (§5A) — per-circle action-frequency counter behind the quickActions
 // row.  Module singleton (shared across kring opens), hydrated once from
@@ -978,6 +992,7 @@ export default function CircleLauncherScreen({
         circle={selected}
         items={items}
         callSkill={callSkill}
+        catalog={bundle?.catalog}
         policy={selectedPolicy}
         myListTasks={myListTasks}
         eventLog={eventLog}
@@ -1295,8 +1310,20 @@ function LauncherTile({ circle: c, preview, pending, isPinned = false, isMuted =
 // scaffolding as the per-circle landing surface.  Admin actions
 // (Settings, Mine, ViewAs, …) collapse into a `⋯` overflow menu in the
 // header, gated on the Functies axis (same gates the old grid used).
+// B (circle bot) — a short kring-bubble text from a runDispatch reply. The kring stream renders plain
+// chat bubbles (no rich cards), so commands surface as a one-line confirmation; the command's real
+// effect (task added, etc.) propagates through the substrate to all members.
+function circleReplyText(reply) {
+  if (reply?.error) return t('circle.bot.failed', { msg: reply.error.message || '' });
+  const p = reply?.payload;
+  if (typeof p === 'string' && p.trim()) return p;
+  if (p && typeof p.text === 'string' && p.text.trim()) return p.text;
+  if (p && Array.isArray(p.items)) return t('circle.bot.listed', { n: p.items.length });
+  return t('circle.bot.done');
+}
+
 function CircleDetail({
-  circle, items, callSkill, policy, myListTasks = [],
+  circle, items, callSkill, catalog, policy, myListTasks = [],
   eventLog, circles = [],
   recipeStore = null,
   onBack, onSettings, onMine, onViewAs, onAdvisor, onSkills, onFiles, onRules, onRecipes,
@@ -1442,28 +1469,62 @@ function CircleDetail({
       });
   }, [callSkill, circle?.id]);
 
-  // SP-13.2.1 — kring chat send: optimistic local eventLog append +
-  // best-effort fan-out via stoop's broadcastKringMessage (which also
-  // mirrors to itemStore for durable history).  The msgId is shared so
-  // receiver-side dedup suppresses any echo if a peer's mirror bounces.
-  // δ.2 — also tracks delivery state (pending → sent | failed).
-  const sendKringChat = useCallback(() => {
-    const text = composerText.trim();
-    if (!text || !eventLog?.append || !circle?.id) return;
+  // SP-13.2.1 — append a kring chat bubble to the local eventLog (optimistic). Returns {msgId, ts}
+  // so the caller can fan out the same id (receiver-side dedup suppresses any mirrored echo).
+  const appendKringMessage = useCallback(({ actor, text }) => {
+    if (!eventLog?.append || !circle?.id) return null;
     const msgId = `kring-${circle.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const ts    = Date.now();
     eventLog.append({
-      id:    msgId,
-      ts,
-      app:   'kring',
-      type:  'chat-message',
-      actor: 'me',
+      id: msgId, ts, app: 'kring', type: 'chat-message', actor,
       payload: { circleId: circle.id, text, kind: 'chat-message' },
     });
-    setComposerText('');
     setStreamTick((n) => n + 1);
-    broadcastFanOut({ msgId, text, ts });
-  }, [composerText, eventLog, circle?.id, broadcastFanOut]);
+    return { msgId, ts };
+  }, [eventLog, circle?.id]);
+
+  // B (circle bot) — run an interpreted command (slash string OR {opId,args}) against the circle's
+  // catalog, scoped to THIS circle, and post a one-line bot reply. Local-only (the bot turn isn't
+  // fanned out; the command's substrate effect reaches members on its own).
+  const runCircleCommand = useCallback(async (input) => {
+    if (!catalog) { appendKringMessage({ actor: 'bot', text: t('circle.bot.unknown') }); return; }
+    let dispatch;
+    try {
+      const parse = typeof input === 'string'
+        ? parseInput(input, catalog)
+        : { kind: 'slash', opId: input.opId, args: input.args || {}, command: '(bot)', body: '' };
+      dispatch = resolveDispatch(parse, catalog);
+    } catch { appendKringMessage({ actor: 'bot', text: t('circle.bot.unknown') }); return; }
+    if (dispatch.kind === 'needsForm') { appendKringMessage({ actor: 'bot', text: t('circle.bot.needsInfo') }); return; }
+    if (dispatch.kind !== 'ready')     { appendKringMessage({ actor: 'bot', text: t('circle.bot.unknown') }); return; }
+    const scoped = scopeReadyDispatch(dispatch, { id: circle?.id });
+    let reply;
+    try { reply = await runDispatch(scoped, callSkill); }
+    catch (e) { appendKringMessage({ actor: 'bot', text: t('circle.bot.failed', { msg: e?.message ?? String(e) }) }); return; }
+    appendKringMessage({ actor: 'bot', text: circleReplyText(reply) });
+  }, [catalog, callSkill, circle?.id, appendKringMessage]);
+
+  // B (circle bot) — the kring composer router: slash command → dispatch; free text addressed to the
+  // bot (when the circle's LLM route is on) → interpret → dispatch; everything else → normal kring
+  // post (fan-out the already-echoed message). Shared core with web (createCircleDispatch).
+  const circleBot = useMemo(() => createCircleDispatch({
+    catalog,
+    policy: { llmTool: CIRCLE_LLM_BASEURL ? 'local' : 'off' },
+    llmProviders: buildCircleLlmProviders({ localBaseUrl: CIRCLE_LLM_BASEURL, model: CIRCLE_LLM_MODEL }),
+    interpret: interpretToCommand,
+    botName: CIRCLE_BOT_NAME,
+    dispatch: (cmd) => runCircleCommand(cmd),
+    postToKring: (text, ctx) => { if (ctx?.msgId) broadcastFanOut({ msgId: ctx.msgId, text, ts: ctx.ts ?? Date.now() }); },
+  }), [catalog, runCircleCommand, broadcastFanOut]);
+
+  // SP-13.2.1 / B — kring chat send: echo the user's message locally, then route it (command vs chat).
+  const sendKringChat = useCallback(() => {
+    const text = composerText.trim();
+    if (!text || !eventLog?.append || !circle?.id) return;
+    const appended = appendKringMessage({ actor: 'me', text });
+    setComposerText('');
+    circleBot.handle(text, { id: circle.id, msgId: appended?.msgId, ts: appended?.ts });
+  }, [composerText, eventLog, circle?.id, appendKringMessage, circleBot]);
 
   // δ.2 — tap-to-retry on the failed icon.  Looks up the original
   // text from the eventLog so we don't have to remember it elsewhere.

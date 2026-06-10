@@ -297,11 +297,14 @@ Design docs: `docs/STORAGE-SECURITY-MENUKAART.md` (posture decision layer) ·
       the pod) + `readGroupKey`, proven by `podBinding.integration.test.js` (full loop: join → key on
       pod → unwrap → sealed content → leave rotates). Roster pubkey source also built:
       `createMemberSealingIdentity` (vault-held X25519 keypair → `rosterEntry({webId, publicKey, role})`).
-      Remaining (app side, needs a design call): (1) WHERE members publish their sealing public key
-      (membership-redemption item? `/.keys/members/` on the pod? WebID profile?); (2) hook
-      `controlAgent.addMember`/`removeMember` into stoop's `addMember` / `leaveGroup` skills
-      (`apps/stoop/src/skills/index.js`). Stoop identity = webid + NKN transport pubKey; the sealing key
-      is a SEPARATE family (hence the member-identity bridge).
+      App wiring DONE 2026-06-10 (`feat/household-membership-wiring`): decision = **membership-redemption
+      item** carries `source.sealingPublicKey`; stoop's `redeemMembershipCode` / `verifyMembershipCodeForPeer`
+      → `controlAgent.addMember`, `leaveGroup` → `removeMember` (optional `controlAgent` forwarded through
+      `createNeighborhoodAgent`; gated + best-effort, non-breaking). 7 tests; stoop suite 688 green.
+      **Remaining (deployment/composition):** (1) the joiner's client passes `sealingPublicKey` when
+      redeeming (from `createMemberSealingIdentity`); (2) compose a REAL control-agent (pod `keyStore` via
+      SealedPodClient + `sharing` + the admin's controller key) and pass it to `createNeighborhoodAgent` on
+      the admin instance; (3) the circle's content reads/writes via a `SealedPodClient` under the group key.
 - [ ] **Sender-writes to the REAL shared pod** (today stoop writes pseudo-pod) + **offline catch-up by
       polling the pod** (swap `getMessagesSince` local read → a pod read).
 - [ ] **Text dual-write** (peer + pod; folio's file→pod→link is the file-side template).

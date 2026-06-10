@@ -104,6 +104,10 @@ export async function createNeighborhoodAgent({
   members:       initialMembers,
   pod:           podCfg,
   itemBackend,
+  // Optional household sealed-pod control-agent (@canopy/pod-client `createControlAgent`). When
+  // supplied, membership skills drive pod ACL + group-key grant/revoke on join/leave. Omitted by
+  // instances without a sealed household pod — the hooks no-op.
+  controlAgent,
   cache:         useCache = true,
   /**
    * Stoop V1 Phase 15 (2026-05-06): when set, wire a Node fs–backed
@@ -509,6 +513,7 @@ export async function createNeighborhoodAgent({
       notifier: providedNotifier,
       reveals,
       members,
+      controlAgent,   // household sealed-pod membership hooks (no-op when absent)
       muted,
       localActor: skillMatchOpts.localActor,
       groupId:    skillMatchOpts.group,

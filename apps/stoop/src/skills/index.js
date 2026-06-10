@@ -328,12 +328,32 @@ async function hydrateItems(items, ctx) {
  * @param {string} [args.localActor]                          this member's webid (used as recipient for lend reminders)
  * @returns {Array<object>} array of `defineSkill` definitions
  */
+// Household sealed-pod membership hooks. Best-effort + gated: no-op without a control-agent (instances
+// that don't run a sealed pod) or without the joiner's sealing public key. A failure here never breaks
+// the membership audit — key management is recoverable, the redemption record is the source of truth.
+async function grantPodAccess(controlAgent, { webId, sealingPublicKey, role = 'member', metrics }) {
+  if (!controlAgent || !sealingPublicKey || !webId) return;
+  try { await controlAgent.addMember({ webId, publicKey: sealingPublicKey, role }); }
+  catch { metrics?.record?.('control-agent-grant-failed'); }
+}
+async function revokePodAccess(controlAgent, { webId, force = false, metrics }) {
+  if (!controlAgent || !webId) return;
+  try { await controlAgent.removeMember({ webId, force }); }
+  catch { metrics?.record?.('control-agent-revoke-failed'); }
+}
+
 export function buildSkills({
   store,
   skillMatch,
   notifier,
   reveals,
   members,
+  // Household sealed-pod control-agent (optional). When present, membership events drive pod
+  // ACL + group-key grant/revoke: redeem → addMember (seal the group key to the joiner's sealing
+  // public key, carried in the redemption item); leaveGroup → removeMember (revoke + rotate). Absent
+  // on instances that don't run a sealed household pod — the calls are simply skipped (non-breaking).
+  // The sealing key is a SEPARATE family from the member's transport identity (NKN/p2p/relay).
+  controlAgent,
   muted,
   localActor,
   groupId: explicitGroupId,
@@ -1616,10 +1636,14 @@ export function buildSkills({
           redeemedBy: from,
           redeemedAt: now,
           expiresAt:  valid.source.expiresAt,
+          // Sealing public key the joiner publishes so the household control-agent can wrap the
+          // group key to them (distinct from their transport identity).
+          ...(a.sealingPublicKey ? { sealingPublicKey: a.sealingPublicKey } : {}),
         },
         visibility: 'household',
       }], { actor: from });
       metrics?.record?.('group-code-redeemed');
+      await grantPodAccess(controlAgent, { webId: from, sealingPublicKey: a.sealingPublicKey, metrics });
       return {
         redemptionId: item.id,
         groupId:      a.groupId,
@@ -1687,10 +1711,14 @@ export function buildSkills({
           // stays star-routed via admin.
           ...(a.shareCard ? { shareCard: true } : {}),
           ...(typeof a.peerDisplay === 'string' && a.peerDisplay ? { peerDisplay: a.peerDisplay } : {}),
+          // The joiner's sealing public key (forwarded by the peer bridge) → the control-agent wraps
+          // the group key to them. Admin-side: this is where the sealed household pod grants access.
+          ...(a.sealingPublicKey ? { sealingPublicKey: a.sealingPublicKey } : {}),
         },
         visibility: 'household',
       }], { actor: from });
       metrics?.record?.('group-code-redeemed-peer');
+      await grantPodAccess(controlAgent, { webId: a.requesterWebid, sealingPublicKey: a.sealingPublicKey, metrics });
       return {
         redemptionId: item.id,
         codeId:       valid.id,
@@ -2385,6 +2413,9 @@ export function buildSkills({
         }],
         { actor: from },
       );
+
+      // Sealed household pod: revoke the leaver's ACL + rotate the group key (forward secrecy). Gated.
+      await revokePodAccess(controlAgent, { webId: from, metrics });
 
       let deleted = 0;
       if (a.deletePosts) {

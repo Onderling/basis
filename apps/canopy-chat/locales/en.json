@@ -1591,6 +1591,20 @@
         "text": "Buurten start noticeboard-first: open chat is off, and a thread appears only when someone reacts to a vraag or aanbod.",
         "doc": "N1 — neutral buurt chat default note."
       }
+    },
+    "clarify": {
+      "which": {
+        "text": "Which “{{query}}” did you mean?",
+        "doc": "Circle bot asks which item, when a free-text command matches MULTIPLE items in the circle (clarification turn)."
+      },
+      "pick": {
+        "text": "Choose",
+        "doc": "Button label on each candidate in the clarification list."
+      },
+      "notFound": {
+        "text": "I couldn’t find “{{query}}” in this circle.",
+        "doc": "Circle bot reply when a free-text command target matches NO item in the circle."
+      }
     }
   },
   "common": {

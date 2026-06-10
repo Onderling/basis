@@ -75,6 +75,7 @@ import { createLocalBuiltins }       from '../src/core/localBuiltins.js';
 import { createFeedbackSurface, parseFeedbackInvite, feedbackContactItem } from '../src/feedback/feedbackSurface.js';
 import { createCircleTurn } from '../src/v2/circleTurn.js';
 import { buildCircleLlmProviders } from '../src/v2/circleLlmProviders.js';
+import { createClarifyingDispatch } from '../src/v2/clarifyingDispatch.js';
 import * as podAuth                  from '../src/web/podAuth.js';
 import {
   createPodWriter, discoverPodRoot,
@@ -2131,6 +2132,37 @@ const CIRCLE_LLM_BASEURL = import.meta.env?.VITE_CIRCLE_LLM_BASEURL ?? null;
 const CIRCLE_LLM_MODEL   = import.meta.env?.VITE_CIRCLE_LLM_MODEL ?? undefined;
 const CIRCLE_BOT_NAME    = import.meta.env?.VITE_CIRCLE_BOT_NAME ?? 'assistant';
 const _circleLlmProviders = buildCircleLlmProviders({ localBaseUrl: CIRCLE_LLM_BASEURL, model: CIRCLE_LLM_MODEL });
+// Dispatch a fully-resolved {opId,args} like a follow-up/button tap, scoped to the circle thread.
+async function dispatchReadyCircleCommand({ opId, args }, thread) {
+  const parse = { kind: 'slash', opId, args: args ?? {}, threadId: thread.id, command: '(bot)', body: '' };
+  const route = resolveDispatch(parse, catalog);
+  if (route.kind === 'needsForm') { renderFormElicitation(route, thread); return; }
+  if (route.kind === 'ready')     { await dispatchAndRender(route, thread); return; }
+  feedbackNote(thread, t('reply.unknown_command', { input: `@${CIRCLE_BOT_NAME} ${opId}` }));
+}
+
+// The clarification turn — when an interpreted command's id-like target matches MULTIPLE items in the
+// circle (screens are filtered views, so a label can be ambiguous even inside one circle), the bot
+// asks which one instead of guessing; a tapped candidate (`circlePick:<id>` → onButtonTap) re-runs the
+// command bound to that id. Lookup is the circle-thread's own listing → resolution stays circle-scoped.
+const _circleClarify = createClarifyingDispatch({
+  catalog: () => catalog,
+  lookup: (listOp, _query, thread) => thread?.lastListingFor?.(listOp)?.items ?? [],
+  dispatchReady: dispatchReadyCircleCommand,
+  ask: ({ query, candidates }, thread) => {
+    feedbackNote(thread, t('circle.clarify.which', { query }));
+    const items = candidates.map((c) => ({
+      id: c.id,
+      label: c.hint ? `${c.label} — ${c.hint}` : c.label,
+      buttons: [{ label: t('circle.clarify.pick'), callbackData: `circlePick:${c.id}` }],
+    }));
+    thread.addShellMessage(renderReply({ payload: { items }, shape: 'list', threadId: thread.id },
+      { t, manifests: catalog?.manifests }));
+    renderActiveStream();
+  },
+  askMissing: ({ query }, thread) => { feedbackNote(thread, t('circle.clarify.notFound', { query })); },
+});
+
 const handleCircleTurn = createCircleTurn({
   // Per-circle llmTool policy lands with the policy store (todo); until then a configured route means
   // "on" (local), no route means "off" — and an off policy never reaches the LLM regardless.
@@ -2138,15 +2170,8 @@ const handleCircleTurn = createCircleTurn({
   llmProviders: _circleLlmProviders,
   catalog: () => catalog,
   botName: CIRCLE_BOT_NAME,
-  // Dispatch the interpreted {opId,args} like a follow-up/button tap, scoped to the circle thread.
-  // A missing/ambiguous required arg surfaces the form-gate — the first rung of "ask for clarification".
-  dispatchCommand: async ({ opId, args }, thread) => {
-    const parse = { kind: 'slash', opId, args: args ?? {}, threadId: thread.id, command: '(bot)', body: '' };
-    const route = resolveDispatch(parse, catalog);
-    if (route.kind === 'needsForm') { renderFormElicitation(route, thread); return; }
-    if (route.kind === 'ready')     { await dispatchAndRender(route, thread); return; }
-    feedbackNote(thread, t('reply.unknown_command', { input: `@${CIRCLE_BOT_NAME} ${opId}` }));
-  },
+  // Route the interpreted command through the clarification turn (unique → dispatch; ambiguous → ask).
+  dispatchCommand: (cmd, thread) => _circleClarify.run(cmd, thread),
 });
 
 async function handleUserText(text, thread) {
@@ -2590,6 +2615,13 @@ async function onButtonTap(opId, itemId, extra) {
     if (handled) return;
     // Fall through to generic dispatch if we couldn't resolve the
     // post (defensive — should be rare).
+  }
+
+  // Circle clarification turn — a tapped candidate re-runs the pending command bound to that id
+  // (within the active circle thread). See _circleClarify.
+  if (opId === 'circlePick') {
+    await _circleClarify.pick(itemId, t0);
+    return;
   }
 
   // M2 — the feedback 'agent' contact's action: open its own thread and enter feedback mode

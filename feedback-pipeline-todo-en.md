@@ -294,7 +294,14 @@ Design docs: `docs/STORAGE-SECURITY-MENUKAART.md` (posture decision layer) ·
       against real `qwen2.5:7b-instruct` dispatched addTask/markComplete/listOpen from EN **and Dutch**
       free text; bystander/un-addressed turns correctly fell through. 33 unit tests. Remaining: mobile
       rewire (B, `CircleLauncherScreen`), per-circle policy-store hookup, clarification turn.
-- [ ] **Circle-scoped dispatch + clarification** (NEW, 2026-06-10) — the interpreted command must be
+- [x] **Circle-scoped dispatch + clarification** (NEW, 2026-06-10 → DONE web + live-proven) —
+      `clarifyTargets.js` (ready / clarify / unresolved for id-like `pickerSource` params; exact-id +
+      circle-scoped label lookup) + `clarifyingDispatch.js` (per-scope pending question; pick re-runs).
+      Wired in `main.js`: ambiguous → list of candidate buttons (`circlePick:<id>` → onButtonTap re-runs
+      bound to that id), not-found → `circle.clarify.notFound`. Locales en+nl. 13 tests; smoke proved
+      "mark the dishes" → ASK[wash|dry] → pick → dispatch on real qwen2.5. Mobile (B) inherits the same
+      core. Original note retained below:
+      The interpreted command must be
       **confined to the active circle's task/list space**: the same label (`/done afval wegbrengen`) can
       exist in multiple circles, so resolution happens **within the circle's store, not globally**. On web
       this falls out of thread-scoped dispatch (`dispatchAndRender(route, thread)` resolves against the

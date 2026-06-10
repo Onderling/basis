@@ -15,8 +15,13 @@ from M10 to **M15**, with **crisis-response last** (everything else ships withou
       (`catalog.opsById`) on web AND mobile (shared manifest). Execution stays intercepted in
       `main.js handleUserText` (never dispatched via the catalog). 3 tests; full canopy-chat suite 2231
       green; web build ✓.
-- [ ] **M12 — Review buttons as click-to-inject chips** in canopy-chat (today the NL path). The circle
-      bot's kring candidate-chip pattern (`payload.buttons` → tap handler) is the reusable template.
+- [x] **M12 — Review buttons as click-to-inject chips** — DONE (web) 2026-06-10 (`feat/feedback-chips`).
+      The bot already emits buttons (`{id, label}`); `main.js`'s feedback emit now renders them as
+      INTERACTIVE chips (a one-row list payload via `feedbackButtonItems`) instead of text bullets — tap
+      → `onButtonTap('fpTap')` → `feedbackSurface.tapButton(controlId)`. The `fp:*` control ids contain
+      colons (would break the shell's `opId:itemId` split) so they're URI-encoded in callbackData +
+      decoded on tap. 4 tests; feedback suite 20 green; web build ✓. Mobile M12 rides on **M6** (the
+      mobile feedback bot is still in the orphaned ChatScreen).
 - [ ] **M13 — Curator UI surface** + wire `release` to **publish/persist the report artifact** + **route
       the signals** to their configured destinations.
 - [ ] **M14 — Deployment readiness** (config, not code): Edgeless/Privatemode **account + key**; set

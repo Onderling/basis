@@ -72,7 +72,10 @@ import { mockTasksManifest,
          mockFolioManifest }         from '../src/core/manifests/mockManifests.js';
 import { calendarManifest }          from '@canopy-app/calendar/manifest';
 import { createLocalBuiltins }       from '../src/core/localBuiltins.js';
-import { createFeedbackSurface, parseFeedbackInvite, feedbackContactItem } from '../src/feedback/feedbackSurface.js';
+import {
+  createFeedbackSurface, parseFeedbackInvite, feedbackContactItem,
+  feedbackButtonItems, decodeFeedbackButton, FEEDBACK_BUTTON_OP,
+} from '../src/feedback/feedbackSurface.js';
 import { createCircleTurn } from '../src/v2/circleTurn.js';
 import { createUserLlmDefaultStore, localStorageUserLlmIo } from '../src/v2/userLlmDefault.js';
 import { localStoragePolicyIo } from '../src/v2/circlePolicyStore.js';
@@ -2107,10 +2110,13 @@ function feedback(podOverride) {
       emit: ({ chatId, text, buttons }) => {
         const thread = store.getThread(chatId) || store.getActiveThread();
         if (!thread) return;
-        // show the reply + any quick-reply buttons (interactive button rendering + onButtonTap
-        // → feedbackSurface.tapButton is the remaining M2 shell wiring).
-        const body = buttons?.length ? `${text}\n${buttons.map((b) => `• ${b.label}`).join('\n')}` : text;
-        thread.addShellMessage(renderReply({ payload: body, shape: 'text', threadId: chatId }, { t }));
+        // M12 — the bot's text bubble + its actions as INTERACTIVE chips (tap → onButtonTap 'fpTap'
+        // → feedbackSurface.tapButton). Falls back to a plain text bubble when there are no buttons.
+        if (text) thread.addShellMessage(renderReply({ payload: text, shape: 'text', threadId: chatId }, { t }));
+        const chipPayload = feedbackButtonItems(buttons);
+        if (chipPayload) {
+          thread.addShellMessage(renderReply({ payload: chipPayload, shape: 'list', threadId: chatId }, { t }));
+        }
         if (store.getActiveThread()?.id === thread.id) renderActiveStream();
       },
     });
@@ -2646,6 +2652,13 @@ async function onButtonTap(opId, itemId, extra) {
   // (within the active circle thread). See _circleClarify.
   if (opId === 'circlePick') {
     await _circleClarify.pick(itemId, t0);
+    return;
+  }
+
+  // M12 — a feedback action chip: re-send the (URI-decoded) control id to the bot.
+  if (opId === FEEDBACK_BUTTON_OP) {
+    await feedback().tapButton(decodeFeedbackButton(itemId), t0.id);
+    renderActiveStream();
     return;
   }
 

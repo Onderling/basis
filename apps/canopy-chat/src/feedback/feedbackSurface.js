@@ -119,3 +119,30 @@ export function feedbackContactItem({ label = 'Feedback assistant', openLabel = 
     buttons: [{ label: openLabel, callbackData: 'openFeedback:fp-bot' }],
   };
 }
+
+/** callbackData opId for a feedback action chip (M12). */
+export const FEEDBACK_BUTTON_OP = 'fpTap';
+
+/**
+ * M12 — turn the bot's emitted buttons (`{id, label}`, the review/consent/escalate actions) into
+ * INTERACTIVE chips instead of plain text bullets. Returns a one-row list payload (`{items}`) whose
+ * buttons re-send the control id to the bot on tap. The control id (`fp:*`) contains colons, which the
+ * shell's `opId:itemId` callbackData split would mangle — so it's URI-encoded here and decoded by
+ * `decodeFeedbackButton` in the tap handler. Returns null when there are no buttons.
+ */
+export function feedbackButtonItems(buttons) {
+  const list = (Array.isArray(buttons) ? buttons : []).filter((b) => b && b.id && b.label);
+  if (list.length === 0) return null;
+  return {
+    items: [{
+      id:      'fp-actions',
+      label:   '',
+      buttons: list.map((b) => ({ label: b.label, callbackData: `${FEEDBACK_BUTTON_OP}:${encodeURIComponent(b.id)}` })),
+    }],
+  };
+}
+
+/** Decode a feedback chip's `itemId` (URI-encoded control id) back to the bot control id. */
+export function decodeFeedbackButton(itemId) {
+  try { return decodeURIComponent(String(itemId ?? '')); } catch { return String(itemId ?? ''); }
+}

@@ -24,13 +24,14 @@ Core is BUILT + tested (Tier 1–3 `[x]`; 246 tests + M10 mockup smoke green). W
 **Checkpoints owed (canopy-bot M phases) — see "Checkpoints owed" section:** M6 (mobile bot v2-rewire
 + retarget Detox helper), M7/M8 (TEE hardware). M9 (agent runtime) is a separate track.
 
-- [ ] **PRE-EXISTING web build break (since `53f051fc`)** — `vite build` fails: `project-seal.js`
-      imports Node crypto (`createPublicKey`/`generateKeyPairSync`/`hkdfSync`/`createCipheriv`…) that
-      `src/web/shims/node/crypto.js` doesn't provide, and it's pulled into the browser bundle via
-      `feedbackPod` ← `feedbackSurface` (eager import at `main.js`). Vitest is unaffected (no browser
-      bundle), so the 2195-test suite is green, but the deployable web build and any in-browser live
-      proof are blocked. Fix = keep the node-sealing path OUT of the browser bundle (lazy/dynamic
-      `import()` of `feedbackPod`, or a browser-crypto seal impl). Blocks the circle-bot **C** live run.
+- [x] **PRE-EXISTING web build break (since `53f051fc`)** — FIXED 2026-06-10. `vite build` failed:
+      `project-seal.js` imports Node crypto (`createPublicKey`/`createPrivateKey`/`diffieHellman`/
+      `hkdfSync`) reached eagerly via `feedbackSurface` → `central-pod` (`isSealed`). The web crypto
+      shim (`src/web/shims/node/crypto.js`) is a deliberate throwing-stub layer; it just lacked those 4
+      exports. Added them as stubs (the eager path only calls the pure `isSealed`, never crypto; real
+      seal/open run server-side). `✓ built in 23.55s`. NOTE: real **in-browser** sealing is still
+      unimplemented (a stub throws if invoked) — if a browser path ever needs to seal, build a
+      WebCrypto/`subtle`-backed seal impl. C's live run is now unblocked.
 
 **Menukaart breadth (⬜ in `docs/MENUKAART.md` — per-client / scenario-readiness, optional):**
 per-scenario safety tuning + scenario tests · voice intake (STT) · other channels (WhatsApp/Signal/

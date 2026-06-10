@@ -45,6 +45,14 @@ export const generateKeyPair = browserStub('generateKeyPair');
 export const generateKeyPairSync = browserStub('generateKeyPairSync');
 export const sign         = browserStub('sign');
 export const verify       = browserStub('verify');
+// feedback-pipeline's project-seal (node-only envelope sealing) imports these. Reachable in the
+// browser bundle only via the guarded feedback path (central-pod's `isSealed` is a pure format check
+// that never calls crypto; real seal/open run server-side / in the dynamic pod path), so stubs keep
+// the bundle building and surface a clear error if browser sealing is ever actually invoked.
+export const createPublicKey  = browserStub('createPublicKey');
+export const createPrivateKey = browserStub('createPrivateKey');
+export const diffieHellman    = browserStub('diffieHellman');
+export const hkdfSync         = browserStub('hkdfSync');
 export const webcrypto    = globalThis.crypto ?? { subtle: undefined };
 
 // Browser-native equivalents — delegate when available.
@@ -72,6 +80,10 @@ export default {
   generateKeyPairSync,
   sign,
   verify,
+  createPublicKey,
+  createPrivateKey,
+  diffieHellman,
+  hkdfSync,
   webcrypto,
   randomUUID,
   subtle,

@@ -29,9 +29,15 @@ importers:
       '@canopy/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@canopy/llm-client':
+        specifier: workspace:*
+        version: link:../../packages/llm-client
       '@canopy/manifest-host':
         specifier: workspace:*
         version: link:../../packages/manifest-host
+      '@canopy/pod-client':
+        specifier: workspace:*
+        version: link:../../packages/pod-client
       '@canopy/secure-agent':
         specifier: workspace:*
         version: link:../../packages/secure-agent

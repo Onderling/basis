@@ -15,3 +15,4 @@ export {
 export { createControlAgent } from './controlAgent.js';
 export { createPodKeyStore, readGroupKey } from './podKeyStore.js';
 export { createMemberSealingIdentity } from './memberIdentity.js';
+export { resolveCircleStorage, circleStorageClient } from './resolveCircleStorage.js';

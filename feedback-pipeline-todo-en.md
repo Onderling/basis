@@ -287,7 +287,14 @@ Design docs: `docs/STORAGE-SECURITY-MENUKAART.md` (posture decision layer) ·
 ### Storage-security postures (menukaart) — per-circle policy
 - [x] Documented — `docs/STORAGE-SECURITY-MENUKAART.md` (P0/P1/P2/P3 + backups; posture + granularity
       axes; decision heuristic; search-per-posture).
-- [ ] **Wire posture as a per-circle config** (default OFF unless chosen). Household default = P2.
+- [x] **Wire posture as a per-circle config** — DONE 2026-06-10 (`feat/circle-storage-posture`). New
+      `circlePolicy.storagePosture` axis `[p0,p1,p2,p3]`, default `p0` (sealing OFF unless chosen);
+      settable in circle settings (`ENUM_AXES` + en/nl labels) + carried by kring templates (so a
+      household template sets `p2`). Resolver `@canopy/pod-client` `resolveCircleStorage({posture,
+      groupKey,recipients,privateKey})` → SealedPodClient strategy (p2 group / p3 recipient) or null
+      (p0/p1 plaintext) + `circleStorageClient(podClient, …)` (seal-or-plain). Fail-safe (null when keys
+      missing). 7 tests; v2 1211 + pod-client 248 green; web build ✓. Remaining: the household app sets
+      `p2` on its circles + the content path calls `circleStorageClient` (the real-pod content item).
 
 ### Household circle build (the journey)
 - [ ] **Pod ↔ circle binding** — a circle whose shared store is a household pod (members write via

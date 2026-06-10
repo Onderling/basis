@@ -26,7 +26,7 @@ import { renderRecipeConflictResolver } from './recipeConflictResolver.js';
 // 'cross-stream'); making it editable here lets an admin pick which surface
 // a member lands on when they open the circle.  Listed first so it stays
 // the most prominent setting.
-const ENUM_AXES = ['view', 'llmTool', 'agents', 'revealPolicy', 'pod'];
+const ENUM_AXES = ['view', 'llmTool', 'storagePosture', 'agents', 'revealPolicy', 'pod'];
 
 /**
  * @param {HTMLElement} container

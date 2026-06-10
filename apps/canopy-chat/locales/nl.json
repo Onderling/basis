@@ -827,6 +827,22 @@
         "hybrid": {
           "text": "Hybride",
           "doc": "Option label."
+        },
+        "p0": {
+          "text": "Vertrouwde host (leesbaar)",
+          "doc": "Storage posture option (p0)."
+        },
+        "p1": {
+          "text": "Enclave (host ziet niets)",
+          "doc": "Storage posture option (p1)."
+        },
+        "p2": {
+          "text": "End-to-end verzegeld",
+          "doc": "Storage posture option (p2)."
+        },
+        "p3": {
+          "text": "Verzegeld in rust",
+          "doc": "Storage posture option (p3)."
         }
       },
       "conflict": {
@@ -834,6 +850,10 @@
           "text": "Twee van jullie hebben de instellingen bewerkt",
           "doc": "γ.4 — modal heading when an incoming policy diverges from local; every other resolver locale string is reused from circle.recipe.conflict.*."
         }
+      },
+      "storagePosture": {
+        "text": "Opslag (in rust)",
+        "doc": "Kring-instellingen — opslaghouding in rust (menukaart P0–P3)."
       }
     },
     "override": {

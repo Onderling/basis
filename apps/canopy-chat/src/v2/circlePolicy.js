@@ -19,6 +19,11 @@ export const CIRCLE_POLICY_ENUMS = {
   // (privacy hard-stop, even if a member wants one); 'local'/'cloud' mandate that route for everyone;
   // 'user' = "user decides" → defer to each member's personal default LLM (see resolveCircleLlm).
   llmTool:              ['off', 'local', 'cloud', 'user'],
+  // storagePosture — at-rest posture for the circle's shared content (the menukaart, per-circle).
+  // 'p0' trusted host / plaintext (default — sealing OFF unless chosen); 'p1' TEE enclave (host-blind);
+  // 'p2' client-side E2E group-key seal (household default); 'p3' sealed-at-rest, opened for processing.
+  // Resolved by `@canopy/pod-client` `resolveCircleStorage` → a SealedPodClient strategy (or none for p0).
+  storagePosture:       ['p0', 'p1', 'p2', 'p3'],
   agents:               ['yes', 'admin-approval', 'no'],
   revealPolicy:         ['pairwise', 'open'],
   pod:                  ['none', 'shared', 'personal', 'hybrid'],
@@ -55,6 +60,7 @@ export const DEFAULT_CIRCLE_POLICY = {
   // out to the classic shell.
   view:             'screen',
   llmTool:          'off',
+  storagePosture:   'p0',   // sealing OFF by default; the household app sets 'p2' on its circles
   agents:           'admin-approval',
   revealPolicy:     'pairwise',
   pod:              'none',
@@ -137,6 +143,7 @@ export function normalizeCirclePolicy(stored = {}) {
     features,
     view:               pickEnum('view'),
     llmTool:            pickEnum('llmTool'),
+    storagePosture:     pickEnum('storagePosture'),
     agents:             pickEnum('agents'),
     revealPolicy:       pickEnum('revealPolicy'),
     pod:                pickEnum('pod'),

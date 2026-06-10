@@ -7,11 +7,11 @@ const t = (k) => k;
 function mount() { const el = document.createElement('div'); document.body.appendChild(el); return el; }
 
 describe('renderCircleSettings', () => {
-  it('renders 8 feature toggles + 5 enum axes reflecting the policy (5.9a: + view)', () => {
+  it('renders 8 feature toggles + 6 enum axes reflecting the policy (5.9a: + view, + storagePosture)', () => {
     const el = mount();
     renderCircleSettings(el, { policy: DEFAULT_CIRCLE_POLICY, t });
     expect(el.querySelectorAll('.circle-settings__feature input[type=checkbox]')).toHaveLength(8);
-    expect(el.querySelectorAll('.circle-settings__axis')).toHaveLength(5);
+    expect(el.querySelectorAll('.circle-settings__axis')).toHaveLength(6);
     expect(el.querySelector('input[data-feature=chat]').checked).toBe(true);
     expect(el.querySelector('.circle-settings__axis[data-axis=pod] input[value=none]').checked).toBe(true);
     // 5.9a — view axis is editable; default flipped to 'screen' so
@@ -80,10 +80,10 @@ describe('renderCircleSettings', () => {
     const el = mount();
     const tc = (k) => (k.startsWith('circle.settings.consequence.') ? `why ${k.split('.').pop()}` : k);
     renderCircleSettings(el, { policy: DEFAULT_CIRCLE_POLICY, t: tc });
-    // 5.9a — 3 view + 4 llmTool (off/local/cloud/user) + 3 agents + 2 revealPolicy + 4 pod = 16 enum options
-    expect(el.querySelectorAll('.circle-settings__info')).toHaveLength(16);
+    // 3 view + 4 llmTool + 4 storagePosture (p0–p3) + 3 agents + 2 revealPolicy + 4 pod = 20 enum options
+    expect(el.querySelectorAll('.circle-settings__info')).toHaveLength(20);
     const panels = el.querySelectorAll('.circle-settings__consequence');
-    expect(panels).toHaveLength(16);
+    expect(panels).toHaveLength(20);
     for (const p of panels) expect(p.hidden).toBe(true);
   });
 

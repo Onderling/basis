@@ -219,7 +219,7 @@ export function recommendChat({ kind = null, size = null } = {}) {
  */
 export function unknownKeysFor(tpl) {
   const allowedTop = new Set([
-    'features', 'revealPolicy', 'pod', 'llmTool', 'agents', 'consensusRequired',
+    'features', 'revealPolicy', 'pod', 'llmTool', 'storagePosture', 'agents', 'consensusRequired',
   ]);
   const bad = [];
   for (const k of Object.keys(tpl)) {
@@ -232,7 +232,7 @@ export function unknownKeysFor(tpl) {
     }
   }
   // Enum values must be in CIRCLE_POLICY_ENUMS where present.
-  for (const ax of ['revealPolicy', 'pod', 'llmTool', 'agents']) {
+  for (const ax of ['revealPolicy', 'pod', 'llmTool', 'storagePosture', 'agents']) {
     if (tpl[ax] !== undefined && !CIRCLE_POLICY_ENUMS[ax].includes(tpl[ax])) {
       bad.push(`${ax}=${tpl[ax]}`);
     }

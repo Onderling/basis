@@ -54,6 +54,7 @@ export {
   createSealedIndex, upsertEntry, removeEntry, getEntry, decodePseudonym,
   queryIndex, semanticQuery, serializeIndex, parseIndex, shardKeyFor,
   createControlAgent, createPodKeyStore, readGroupKey, createMemberSealingIdentity,
+  resolveCircleStorage, circleStorageClient,
 } from './sealing/index.js';
 
 // A6 — Delete-scope primitive (TombstoneStore + per-platform adapters).

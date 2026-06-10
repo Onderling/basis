@@ -827,6 +827,22 @@
         "hybrid": {
           "text": "Hybrid",
           "doc": "Option label."
+        },
+        "p0": {
+          "text": "Trusted host (readable)",
+          "doc": "Storage posture option (p0)."
+        },
+        "p1": {
+          "text": "Enclave (host-blind)",
+          "doc": "Storage posture option (p1)."
+        },
+        "p2": {
+          "text": "End-to-end sealed",
+          "doc": "Storage posture option (p2)."
+        },
+        "p3": {
+          "text": "Sealed at rest",
+          "doc": "Storage posture option (p3)."
         }
       },
       "conflict": {
@@ -834,6 +850,10 @@
           "text": "Two of you edited the settings",
           "doc": "γ.4 — modal heading when an incoming policy diverges from local; every other resolver locale string is reused from circle.recipe.conflict.*."
         }
+      },
+      "storagePosture": {
+        "text": "Storage (at rest)",
+        "doc": "Circle settings — at-rest storage posture axis (menukaart P0–P3)."
       }
     },
     "override": {

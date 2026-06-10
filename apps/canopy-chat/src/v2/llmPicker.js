@@ -45,3 +45,31 @@ export function selectLlmClient(policy, providers) {
   const client = providers[mode];
   return client ?? null;
 }
+
+/**
+ * Resolve the effective LLM for a circle, honouring the two-level policy:
+ *
+ *   1. The **circle policy** is authoritative. `'off'` forbids any LLM here (a privacy hard-stop —
+ *      it wins even if the member set a personal default); `'local'`/`'cloud'` mandate that route for
+ *      everyone in the circle; `'user'` delegates to the member's own default.
+ *   2. The **user default** (`{ mode: 'off'|'local'|'cloud' }`) is the member's personal preference for
+ *      their private/business use — consulted ONLY when the circle says `'user'`.
+ *
+ * The chosen mode is then resolved against the host-supplied `{local, cloud}` providers via
+ * `selectLlmClient`, so `null` still means "no LLM" (off, unconfigured provider, or a malformed value).
+ *
+ * @param {object} a
+ * @param {{llmTool?: 'off'|'local'|'cloud'|'user'}|null|undefined} a.circlePolicy
+ * @param {{mode?: 'off'|'local'|'cloud'}|null|undefined} [a.userDefault]
+ * @param {{local?: object|null, cloud?: object|null}|null|undefined} a.providers
+ * @returns {object|null}
+ */
+export function resolveCircleLlm({ circlePolicy, userDefault, providers } = {}) {
+  const circleMode = circlePolicy && typeof circlePolicy.llmTool === 'string' ? circlePolicy.llmTool : 'off';
+  // The circle delegating to the member is the ONLY path the personal default is consulted; a circle
+  // 'off' never falls through to the user (privacy: the circle can forbid regardless of preference).
+  const effectiveMode = circleMode === 'user'
+    ? (userDefault && typeof userDefault.mode === 'string' ? userDefault.mode : 'off')
+    : circleMode;
+  return selectLlmClient({ llmTool: effectiveMode }, providers);
+}

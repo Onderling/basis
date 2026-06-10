@@ -15,7 +15,10 @@ export const CIRCLE_FEATURES = [
 
 export const CIRCLE_POLICY_ENUMS = {
   view:                 ['chat', 'screen', 'cross-stream'],
-  llmTool:              ['off', 'local', 'cloud'],
+  // llmTool — the circle's LLM posture, AUTHORITATIVE within the circle: 'off' forbids any LLM here
+  // (privacy hard-stop, even if a member wants one); 'local'/'cloud' mandate that route for everyone;
+  // 'user' = "user decides" → defer to each member's personal default LLM (see resolveCircleLlm).
+  llmTool:              ['off', 'local', 'cloud', 'user'],
   agents:               ['yes', 'admin-approval', 'no'],
   revealPolicy:         ['pairwise', 'open'],
   pod:                  ['none', 'shared', 'personal', 'hybrid'],

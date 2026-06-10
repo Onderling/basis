@@ -3,7 +3,7 @@ import { createCircleTurn } from '../../src/v2/circleTurn.js';
 
 const CATALOG = { opsById: new Map([['addTask', { op: { id: 'addTask', params: [{ name: 'title', kind: 'string', required: true }] } }]]) };
 
-function setup({ llmTool = 'local', providers = { local: { invoke: vi.fn() } }, interpret, userDefault } = {}) {
+function setup({ llmTool = 'local', providers = { local: { invoke: vi.fn() } }, interpret, userDefault, gate } = {}) {
   const dispatched = [];
   const handle = createCircleTurn({
     policyFor: (scope) => scope?.policy ?? { llmTool },
@@ -11,6 +11,7 @@ function setup({ llmTool = 'local', providers = { local: { invoke: vi.fn() } }, 
     catalog: () => CATALOG,
     botName: 'helper',
     userDefault,
+    gate,
     interpret: interpret ?? (async () => ({ opId: 'addTask', args: { title: 'milk' } })),
     dispatchCommand: (cmd, scope) => { dispatched.push({ cmd, scope }); },
   });
@@ -61,6 +62,33 @@ describe('createCircleTurn (web interceptor)', () => {
 
   it('requires dispatchCommand', () => {
     expect(() => createCircleTurn({})).toThrow();
+  });
+
+  it('token gate: a rule routes a command directly, without the LLM', async () => {
+    const interpret = vi.fn();
+    const gate = { evaluate: async () => ({ via: 'rule', command: { opId: 'listOpen', args: {} } }) };
+    const { handle, dispatched } = setup({ interpret, gate });
+    expect(await handle('@helper what is open', {})).toBe(true);
+    expect(interpret).not.toHaveBeenCalled();                 // LLM saved
+    expect(dispatched[0].cmd).toEqual({ opId: 'listOpen', args: {} });
+  });
+
+  it('token gate: a skip falls through without the LLM', async () => {
+    const interpret = vi.fn();
+    const gate = { evaluate: async () => ({ via: 'skip' }) };
+    const { handle, dispatched } = setup({ interpret, gate });
+    expect(await handle('@helper just chatting', {})).toBe(false);
+    expect(interpret).not.toHaveBeenCalled();
+    expect(dispatched).toEqual([]);
+  });
+
+  it('token gate: llm verdict still interprets', async () => {
+    const interpret = vi.fn(async () => ({ opId: 'addTask', args: { title: 'milk' } }));
+    const gate = { evaluate: async () => ({ via: 'llm', context: [] }) };
+    const { handle, dispatched } = setup({ interpret, gate });
+    expect(await handle('@helper add milk', {})).toBe(true);
+    expect(interpret).toHaveBeenCalled();
+    expect(dispatched[0].cmd.opId).toBe('addTask');
   });
 
   it("circle 'user' delegates to the member's default (mode local → dispatches)", async () => {

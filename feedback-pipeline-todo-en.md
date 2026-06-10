@@ -379,7 +379,14 @@ Design docs: `docs/STORAGE-SECURITY-MENUKAART.md` (posture decision layer) ·
       rather than guess (the existing `needsForm` form-gate is the first rung; a bot-asks-back turn is the
       richer form). Design + implement after C/B land.
 - [ ] **Per-circle LLM route config** (starter sets local / proxy / cloud + endpoint).
-- [ ] **Token gate** (rules → local embedding → LLM) + **RAG** (local sealed index for P2; in-enclave
-      for the hosted tier). Run the gate locally even when the LLM is remote.
+- [~] **Token gate** (rules → local embedding → LLM) + **RAG** — core DONE 2026-06-10
+      (`feat/circle-token-gate`). `canopy-chat/src/v2/tokenGate.js` (`createTokenGate`): ordered rules
+      run LOCALLY before the (possibly remote) LLM — a rule ROUTES a command directly (no LLM) or SKIPS
+      the LLM; else `via:'llm'` with RAG context from an injected `retrieve` (e.g. `sealedIndex.semanticQuery`,
+      capped at `maxContext`). Wired as an OPTIONAL `gate` into `circleTurn` + `circleDispatch` (absent →
+      identical behaviour; present → saves the interpret call on rule/skip). 8 + integration tests; v2
+      suite 1223 green; web build ✓. Remaining: the host supplies the rule set + the embedding-backed
+      `retrieve` (the embedding MODEL — the sealed index takes caller vectors today); feed `g.context`
+      into the interpret prompt; in-enclave RAG for the hosted tier.
 - [ ] **Interfaces (web-first):** ship ONE end-to-end (Telegram or mobile) on the local route, then add
       the proxy route, then the others.

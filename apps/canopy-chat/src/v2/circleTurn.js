@@ -27,7 +27,7 @@ import { interpretToCommand } from './interpretCommand.js';
  * @param {Function} [a.interpret]                              override the NL→slash interpreter (tests)
  * @returns {(text:string, scope:object) => Promise<boolean>}
  */
-export function createCircleTurn({ policyFor, llmProviders, catalog, dispatchCommand, userDefault, botName = 'assistant', interpret = interpretToCommand }) {
+export function createCircleTurn({ policyFor, llmProviders, catalog, dispatchCommand, userDefault, gate, botName = 'assistant', interpret = interpretToCommand }) {
   if (typeof dispatchCommand !== 'function') throw new Error('createCircleTurn: dispatchCommand required');
   const policy = typeof policyFor === 'function' ? policyFor : () => null;
   const getCatalog = typeof catalog === 'function' ? catalog : () => catalog;
@@ -39,7 +39,18 @@ export function createCircleTurn({ policyFor, llmProviders, catalog, dispatchCom
     const circlePolicy = await policy(scope);                       // policyFor may load the circle's policy async
     const llm = resolveCircleLlm({ circlePolicy, userDefault: getUserDefault(), providers: llmProviders });
     if (!llm || !addressesBot(trimmed, botName)) return false;      // off, or not addressed → fall through
-    const cmd = await interpret(stripBotTag(trimmed, botName), { catalog: getCatalog(), llm });
+    const stripped = stripBotTag(trimmed, botName);
+    // Token gate (optional) — a cheap LOCAL pass before the (possibly remote) LLM: a rule can route a
+    // command directly or skip the LLM entirely. 'llm' falls through to interpret as usual.
+    if (gate && typeof gate.evaluate === 'function') {
+      const g = await gate.evaluate(stripped, scope);
+      if (g.via === 'rule' && g.command?.opId) {
+        await dispatchCommand({ opId: g.command.opId, args: g.command.args || {} }, scope);
+        return true;
+      }
+      if (g.via === 'skip') return false;
+    }
+    const cmd = await interpret(stripped, { catalog: getCatalog(), llm });
     if (!cmd || !cmd.opId) return false;                            // no command fits → fall through
     await dispatchCommand({ opId: cmd.opId, args: cmd.args && typeof cmd.args === 'object' ? cmd.args : {} }, scope);
     return true;

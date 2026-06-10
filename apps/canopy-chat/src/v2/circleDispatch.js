@@ -24,7 +24,7 @@ import { resolveCircleLlm } from './llmPicker.js';
  * @param {(text:string, ctx:object) => any|Promise<any>} a.postToKring    post a normal kring message
  * @param {string} [a.botName]      the assistant's address/name for @-tag detection (default 'assistant')
  */
-export function createCircleDispatch({ catalog, policy, userDefault, llmProviders, interpret, dispatch, postToKring, botName = 'assistant' }) {
+export function createCircleDispatch({ catalog, policy, userDefault, llmProviders, interpret, dispatch, postToKring, gate, botName = 'assistant' }) {
   if (typeof dispatch !== 'function' || typeof postToKring !== 'function') {
     throw new Error('createCircleDispatch: dispatch + postToKring are required');
   }
@@ -43,7 +43,18 @@ export function createCircleDispatch({ catalog, policy, userDefault, llmProvider
       // 2. free text + the circle's LLM is enabled + the bot is addressed → interpret → dispatch.
       const llm = resolveCircleLlm({ circlePolicy: policy, userDefault, providers: llmProviders });
       if (llm && typeof interpret === 'function' && addressesBot(trimmed, botName)) {
-        const cmd = await interpret(stripBotTag(trimmed, botName), { catalog, llm });   // → {opId,args} | null
+        const stripped = stripBotTag(trimmed, botName);
+        // Token gate (optional) — a cheap LOCAL pass before the (possibly remote) LLM: a rule routes a
+        // command directly (no LLM); a skip treats the turn as normal chat (→ kring); else interpret.
+        if (gate && typeof gate.evaluate === 'function') {
+          const g = await gate.evaluate(stripped, ctx);
+          if (g.via === 'rule' && g.command?.opId) {
+            await dispatch({ opId: g.command.opId, args: g.command.args || {} }, ctx);
+            return { via: 'rule', cmd: g.command };
+          }
+          if (g.via === 'skip') { await postToKring(trimmed, ctx); return { via: 'kring' }; }
+        }
+        const cmd = await interpret(stripped, { catalog, llm });   // → {opId,args} | null
         if (cmd && cmd.opId) {
           await dispatch({ opId: cmd.opId, args: cmd.args && typeof cmd.args === 'object' ? cmd.args : {} }, ctx);
           return { via: 'llm', cmd };

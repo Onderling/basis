@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { createCircleDispatch, addressesBot } from '../../src/v2/circleDispatch.js';
 
 // A minimal harness: records what the shell would have done.
-function harness({ policy = { llmTool: 'off' }, providers = {}, interpret, botName, userDefault } = {}) {
+function harness({ policy = { llmTool: 'off' }, providers = {}, interpret, botName, userDefault, gate } = {}) {
   const dispatched = [];
   const posted = [];
   const cd = createCircleDispatch({
@@ -11,6 +11,7 @@ function harness({ policy = { llmTool: 'off' }, providers = {}, interpret, botNa
     llmProviders: providers,
     interpret,
     botName,
+    gate,
     dispatch: (slash) => { dispatched.push(slash); },
     postToKring: (text) => { posted.push(text); },
   });
@@ -81,6 +82,25 @@ describe('createCircleDispatch — routing', () => {
     // user mode off → no LLM, posts to kring
     const off = harness({ policy: { llmTool: 'user' }, providers: { local: { invoke: vi.fn() } }, interpret: vi.fn(), userDefault: { mode: 'off' }, botName: 'helper' });
     expect((await off.cd.handle('@helper add milk')).via).toBe('kring');
+  });
+
+  it('token gate: a rule routes directly (via rule, no interpret); a skip → kring', async () => {
+    const providers = { local: { invoke: vi.fn() } };
+    const interpretRule = vi.fn();
+    const rule = harness({ policy: { llmTool: 'local' }, providers, interpret: interpretRule, botName: 'helper',
+      gate: { evaluate: async () => ({ via: 'rule', command: { opId: 'listOpen', args: {} } }) } });
+    const r1 = await rule.cd.handle('@helper open?');
+    expect(r1.via).toBe('rule');
+    expect(rule.dispatched).toEqual([{ opId: 'listOpen', args: {} }]);
+    expect(interpretRule).not.toHaveBeenCalled();
+
+    const interpretSkip = vi.fn();
+    const skip = harness({ policy: { llmTool: 'local' }, providers, interpret: interpretSkip, botName: 'helper',
+      gate: { evaluate: async () => ({ via: 'skip' }) } });
+    const r2 = await skip.cd.handle('@helper hi there');
+    expect(r2.via).toBe('kring');
+    expect(skip.posted).toEqual(['@helper hi there']);
+    expect(interpretSkip).not.toHaveBeenCalled();
   });
 
   it('treats blank input as a no-op', async () => {

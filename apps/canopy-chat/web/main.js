@@ -73,6 +73,8 @@ import { mockTasksManifest,
 import { calendarManifest }          from '@canopy-app/calendar/manifest';
 import { createLocalBuiltins }       from '../src/core/localBuiltins.js';
 import { createFeedbackSurface, parseFeedbackInvite, feedbackContactItem } from '../src/feedback/feedbackSurface.js';
+import { createCircleTurn } from '../src/v2/circleTurn.js';
+import { buildCircleLlmProviders } from '../src/v2/circleLlmProviders.js';
 import * as podAuth                  from '../src/web/podAuth.js';
 import {
   createPodWriter, discoverPodRoot,
@@ -2117,6 +2119,36 @@ function feedbackNote(thread, msg) {
   renderActiveStream();
 }
 
+// ── v2 circle bot: free text addressed to the bot → LLM → slash command (web wiring, "C") ──
+// In a circle conversation, "@assistant add milk to the list" is interpreted as a command and
+// dispatched — SCOPED to the active thread's circle, since dispatch runs against that thread's
+// catalog/listing. Slash commands are unaffected (the shell still routes them). Inert until a route
+// is configured: with no base URL the providers map is empty → selectLlmClient is null → fall through.
+//   VITE_CIRCLE_LLM_BASEURL  browser-reachable LLM route for the circle bot (don't ship keys)
+//   VITE_CIRCLE_LLM_MODEL    model id (optional)
+//   VITE_CIRCLE_BOT_NAME     the bot's address for @-tag detection (default 'assistant')
+const CIRCLE_LLM_BASEURL = import.meta.env?.VITE_CIRCLE_LLM_BASEURL ?? null;
+const CIRCLE_LLM_MODEL   = import.meta.env?.VITE_CIRCLE_LLM_MODEL ?? undefined;
+const CIRCLE_BOT_NAME    = import.meta.env?.VITE_CIRCLE_BOT_NAME ?? 'assistant';
+const _circleLlmProviders = buildCircleLlmProviders({ localBaseUrl: CIRCLE_LLM_BASEURL, model: CIRCLE_LLM_MODEL });
+const handleCircleTurn = createCircleTurn({
+  // Per-circle llmTool policy lands with the policy store (todo); until then a configured route means
+  // "on" (local), no route means "off" — and an off policy never reaches the LLM regardless.
+  policyFor: () => ({ llmTool: CIRCLE_LLM_BASEURL ? 'local' : 'off' }),
+  llmProviders: _circleLlmProviders,
+  catalog: () => catalog,
+  botName: CIRCLE_BOT_NAME,
+  // Dispatch the interpreted {opId,args} like a follow-up/button tap, scoped to the circle thread.
+  // A missing/ambiguous required arg surfaces the form-gate — the first rung of "ask for clarification".
+  dispatchCommand: async ({ opId, args }, thread) => {
+    const parse = { kind: 'slash', opId, args: args ?? {}, threadId: thread.id, command: '(bot)', body: '' };
+    const route = resolveDispatch(parse, catalog);
+    if (route.kind === 'needsForm') { renderFormElicitation(route, thread); return; }
+    if (route.kind === 'ready')     { await dispatchAndRender(route, thread); return; }
+    feedbackNote(thread, t('reply.unknown_command', { input: `@${CIRCLE_BOT_NAME} ${opId}` }));
+  },
+});
+
 async function handleUserText(text, thread) {
   const trimmed = text.trim();
   const fb = trimmed.match(/^\/feedback(?:\s+(\S+))?$/);
@@ -2156,6 +2188,7 @@ async function handleUserText(text, thread) {
 
   if (route.kind === 'unknown') {
     if (await feedback().handle(text, thread.id)) return;   // feedback-mode thread → the bot
+    if (await handleCircleTurn(text, thread)) return;       // C — addressed free text → LLM → command
     const rendered = renderReply({
       payload:  t('reply.unknown_command', { input: text }),
       shape:    'text', threadId: thread.id,

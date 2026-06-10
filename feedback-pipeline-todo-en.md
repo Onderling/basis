@@ -24,6 +24,14 @@ Core is BUILT + tested (Tier 1–3 `[x]`; 246 tests + M10 mockup smoke green). W
 **Checkpoints owed (canopy-bot M phases) — see "Checkpoints owed" section:** M6 (mobile bot v2-rewire
 + retarget Detox helper), M7/M8 (TEE hardware). M9 (agent runtime) is a separate track.
 
+- [ ] **PRE-EXISTING web build break (since `53f051fc`)** — `vite build` fails: `project-seal.js`
+      imports Node crypto (`createPublicKey`/`generateKeyPairSync`/`hkdfSync`/`createCipheriv`…) that
+      `src/web/shims/node/crypto.js` doesn't provide, and it's pulled into the browser bundle via
+      `feedbackPod` ← `feedbackSurface` (eager import at `main.js`). Vitest is unaffected (no browser
+      bundle), so the 2195-test suite is green, but the deployable web build and any in-browser live
+      proof are blocked. Fix = keep the node-sealing path OUT of the browser bundle (lazy/dynamic
+      `import()` of `feedbackPod`, or a browser-crypto seal impl). Blocks the circle-bot **C** live run.
+
 **Menukaart breadth (⬜ in `docs/MENUKAART.md` — per-client / scenario-readiness, optional):**
 per-scenario safety tuning + scenario tests · voice intake (STT) · other channels (WhatsApp/Signal/
 web) · fuller feedback-to-participant loop (block H) · Klai integration (2b/2a/1) · Lingua/LiteLLM
@@ -276,8 +284,21 @@ Design docs: `docs/STORAGE-SECURITY-MENUKAART.md` (posture decision layer) ·
       polling the pod** (swap `getMessagesSince` local read → a pod read).
 - [ ] **Text dual-write** (peer + pod; folio's file→pod→link is the file-side template).
 - [ ] **Bot as an agent MEMBER** of the circle (mDNS/loopback, relay/NKN, or Telegram bridge).
-- [ ] **NL→slash interpreter + `@tag` router** (the shared core with the feedback v2 rewire) — the
+- [~] **NL→slash interpreter + `@tag` router** (the shared core with the feedback v2 rewire) — the
       circle's slash catalog is the tool list; `selectLlmClient(policy, providers)` picks the route.
+      **Core built** (2026-06-10): `canopy-chat/src/v2/circleDispatch.js` (slash / llm / kring router +
+      `addressesBot`) + `interpretCommand.js` (`buildToolDescriptors` + `interpretToCommand` → `{opId,args}`),
+      17 tests. Remaining: web wiring (C, `main.js` unknown-seam), mobile rewire (B, `CircleLauncherScreen`),
+      per-circle LLM provider hookup.
+- [ ] **Circle-scoped dispatch + clarification** (NEW, 2026-06-10) — the interpreted command must be
+      **confined to the active circle's task/list space**: the same label (`/done afval wegbrengen`) can
+      exist in multiple circles, so resolution happens **within the circle's store, not globally**. On web
+      this falls out of thread-scoped dispatch (`dispatchAndRender(route, thread)` resolves against the
+      circle-thread's cached listing); the mobile rewire must pass the same circle scope. **Screens are
+      filtered selections of a circle**, so ambiguity can survive even inside one circle (which screen's
+      item?) → when the target is **ambiguous or missing**, the local bot must **ask for clarification**
+      rather than guess (the existing `needsForm` form-gate is the first rung; a bot-asks-back turn is the
+      richer form). Design + implement after C/B land.
 - [ ] **Per-circle LLM route config** (starter sets local / proxy / cloud + endpoint).
 - [ ] **Token gate** (rules → local embedding → LLM) + **RAG** (local sealed index for P2; in-enclave
       for the hosted tier). Run the gate locally even when the LLM is remote.

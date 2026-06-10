@@ -2584,5 +2584,25 @@
         "doc": "N3 — role template string."
       }
     }
+  },
+  "settings": {
+    "userLlm": {
+      "title": {
+        "text": "My assistant (when a circle lets me choose)",
+        "doc": "Heading of the member personal-default-LLM control (applies when a circle delegates with policy=user)."
+      },
+      "off": {
+        "text": "Off",
+        "doc": "User LLM default: no assistant."
+      },
+      "local": {
+        "text": "On — local",
+        "doc": "User LLM default: local route."
+      },
+      "cloud": {
+        "text": "On — cloud/proxy",
+        "doc": "User LLM default: cloud/proxy route."
+      }
+    }
   }
 }

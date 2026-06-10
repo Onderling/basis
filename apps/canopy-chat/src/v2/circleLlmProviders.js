@@ -17,14 +17,16 @@ import { ollamaProvider } from '@canopy/llm-client/providers/ollama';
  * @param {(entry:object)=>void} [cfg.audit] optional audit hook (every invoke flows through it)
  * @returns {{local?: object, cloud?: object}}
  */
-export function buildCircleLlmProviders({ localBaseUrl = null, model, audit } = {}) {
+export function buildCircleLlmProviders({ localBaseUrl = null, model, audit, cloudBaseUrl = null, localModel, cloudModel } = {}) {
+  const mk = (baseUrl, m) => new LlmClient({
+    provider: ollamaProvider({ baseUrl: normalizeBase(baseUrl), ...(m ? { model: m } : {}) }),
+    ...(typeof audit === 'function' ? { audit } : {}),
+  });
   const providers = {};
-  if (localBaseUrl) {
-    providers.local = new LlmClient({
-      provider: ollamaProvider({ baseUrl: normalizeBase(localBaseUrl), ...(model ? { model } : {}) }),
-      ...(typeof audit === 'function' ? { audit } : {}),
-    });
-  }
+  // local + cloud both speak the OpenAI-compatible `/v1/chat/completions` protocol (ollama, the
+  // confidential proxy, OpenAI-compatible cloud), so the same client serves both — only the endpoint differs.
+  if (localBaseUrl) providers.local = mk(localBaseUrl, localModel || model);
+  if (cloudBaseUrl) providers.cloud = mk(cloudBaseUrl, cloudModel || model);
   return providers;
 }
 

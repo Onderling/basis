@@ -41,7 +41,8 @@ export function createCircleTurn({ policyFor, llmProviders, catalog, dispatchCom
     if (!llm || !addressesBot(trimmed, botName)) return false;      // off, or not addressed → fall through
     const stripped = stripBotTag(trimmed, botName);
     // Token gate (optional) — a cheap LOCAL pass before the (possibly remote) LLM: a rule can route a
-    // command directly or skip the LLM entirely. 'llm' falls through to interpret as usual.
+    // command directly or skip the LLM entirely. 'llm' carries RAG context into interpret.
+    let context;
     if (gate && typeof gate.evaluate === 'function') {
       const g = await gate.evaluate(stripped, scope);
       if (g.via === 'rule' && g.command?.opId) {
@@ -49,8 +50,9 @@ export function createCircleTurn({ policyFor, llmProviders, catalog, dispatchCom
         return true;
       }
       if (g.via === 'skip') return false;
+      context = g.context;
     }
-    const cmd = await interpret(stripped, { catalog: getCatalog(), llm });
+    const cmd = await interpret(stripped, { catalog: getCatalog(), llm, context });
     if (!cmd || !cmd.opId) return false;                            // no command fits → fall through
     await dispatchCommand({ opId: cmd.opId, args: cmd.args && typeof cmd.args === 'object' ? cmd.args : {} }, scope);
     return true;

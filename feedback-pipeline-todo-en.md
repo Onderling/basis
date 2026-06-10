@@ -378,7 +378,16 @@ Design docs: `docs/STORAGE-SECURITY-MENUKAART.md` (posture decision layer) ·
       item?) → when the target is **ambiguous or missing**, the local bot must **ask for clarification**
       rather than guess (the existing `needsForm` form-gate is the first rung; a bot-asks-back turn is the
       richer form). Design + implement after C/B land.
-- [ ] **Per-circle LLM route config** (starter sets local / proxy / cloud + endpoint).
+- [x] **Per-circle LLM route config** (starter sets local / proxy / cloud + endpoint) — DONE 2026-06-10
+      (`feat/circle-bot-polish`). `circleLlmRoutes.js`: `CIRCLE_LLM_ROUTE_PRESETS` (off / local-ollama /
+      confidential-proxy / openai-compatible) + `resolveRoutePreset(name, {baseUrl, model})` +
+      `buildProvidersFromRoutes` → the `{local, cloud}` map; `buildCircleLlmProviders` extended with a
+      cloud route (same OpenAI-compatible client). 9 tests.
+- [x] **Polish (2026-06-10, `feat/circle-bot-polish`):** (a) the token gate's RAG `g.context` is now woven
+      into the interpret system prompt (`interpretToCommand` `context` param — strings/entries/{entry,score};
+      circleTurn + circleDispatch pass it). (b) **user-LLM-default settings UI** — `web/v2/userLlmSettings.js`
+      (`renderUserLlmSettings` + `mountUserLlmSettings` over the store; mode radios off/local/cloud, en+nl).
+      v2 suite 1235 green; web build ✓.
 - [~] **Token gate** (rules → local embedding → LLM) + **RAG** — core DONE 2026-06-10
       (`feat/circle-token-gate`). `canopy-chat/src/v2/tokenGate.js` (`createTokenGate`): ordered rules
       run LOCALLY before the (possibly remote) LLM — a rule ROUTES a command directly (no LLM) or SKIPS

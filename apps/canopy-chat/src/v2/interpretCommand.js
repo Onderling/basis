@@ -51,17 +51,18 @@ export function buildToolDescriptors(catalog) {
  * `null` (chat / no command). Signature matches what `createCircleDispatch` calls as `interpret`.
  *
  * @param {string} text
- * @param {{catalog?: object, llm?: {invoke: Function}, system?: string, options?: object}} [opts]
+ * @param {{catalog?: object, llm?: {invoke: Function}, system?: string, options?: object, context?: any[]}} [opts]
+ *        `context` = RAG items (e.g. from the token gate's `retrieve`) woven into the system prompt.
  * @returns {Promise<{opId:string, args:object}|null>}
  */
-export async function interpretToCommand(text, { catalog, llm, system, options } = {}) {
+export async function interpretToCommand(text, { catalog, llm, system, options, context } = {}) {
   const q = String(text ?? '').trim();
   if (!q || !llm || typeof llm.invoke !== 'function') return null;
   const tools = buildToolDescriptors(catalog);
   if (tools.length === 0) return null;                       // nothing dispatchable → never call the LLM
 
   const result = await llm.invoke({
-    system: system || DEFAULT_INTERPRET_SYSTEM,
+    system: withContext(system || DEFAULT_INTERPRET_SYSTEM, context),
     messages: [{ role: 'user', content: q }],
     tools,
     ...(options ? { options } : {}),
@@ -70,4 +71,19 @@ export async function interpretToCommand(text, { catalog, llm, system, options }
   const call = result && result.toolCall;
   if (!call || !call.id) return null;                        // noise / free reply → no command
   return { opId: String(call.id), args: call.args && typeof call.args === 'object' ? call.args : {} };
+}
+
+/** Append a compact RAG-context block to the (LLM-facing) system prompt. No-op without context. */
+function withContext(system, context) {
+  const lines = (Array.isArray(context) ? context : []).map(contextLine).filter(Boolean);
+  if (lines.length === 0) return system;
+  return `${system}\n\nRelevant items already in this circle (reference only — do NOT invent commands from them):\n${lines.map((l) => `- ${l}`).join('\n')}`;
+}
+
+/** A context item may be a raw index entry, a string, or a semanticQuery `{entry, score}` wrapper. */
+function contextLine(c) {
+  const e = c && typeof c === 'object' && c.entry ? c.entry : c;
+  if (e == null) return null;
+  if (typeof e === 'string') return e.trim() || null;
+  return e.meaning || e.label || e.text || e.id || null;
 }

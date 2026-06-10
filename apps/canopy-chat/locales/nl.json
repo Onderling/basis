@@ -2584,5 +2584,25 @@
         "doc": "N3 — role template string."
       }
     }
+  },
+  "settings": {
+    "userLlm": {
+      "title": {
+        "text": "Mijn assistent (als een kring mij laat kiezen)",
+        "doc": "Heading of the member personal-default-LLM control (applies when a circle delegates with policy=user)."
+      },
+      "off": {
+        "text": "Uit",
+        "doc": "User LLM default: no assistant."
+      },
+      "local": {
+        "text": "Aan — lokaal",
+        "doc": "User LLM default: local route."
+      },
+      "cloud": {
+        "text": "Aan — cloud/proxy",
+        "doc": "User LLM default: cloud/proxy route."
+      }
+    }
   }
 }

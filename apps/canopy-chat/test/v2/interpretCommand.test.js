@@ -72,4 +72,25 @@ describe('interpretToCommand', () => {
     const cmd = await interpretToCommand('what is open?', { catalog: CHORES, llm });
     expect(cmd).toEqual({ opId: 'listOpen', args: {} });
   });
+
+  it('weaves RAG context into the system prompt (strings, entries, and {entry,score})', async () => {
+    let seenSystem = null;
+    const llm = llmInspecting((req) => { seenSystem = req.system; });
+    await interpretToCommand('add milk', { catalog: CHORES, llm, context: [
+      'wash the dishes',
+      { meaning: 'buy bread' },
+      { entry: { label: 'take out bins' }, score: 0.8 },
+    ] });
+    expect(seenSystem).toMatch(/Relevant items already in this circle/);
+    expect(seenSystem).toMatch(/wash the dishes/);
+    expect(seenSystem).toMatch(/buy bread/);
+    expect(seenSystem).toMatch(/take out bins/);
+  });
+
+  it('no context → the base system prompt is unchanged', async () => {
+    let seenSystem = null;
+    const llm = llmInspecting((req) => { seenSystem = req.system; });
+    await interpretToCommand('x', { catalog: CHORES, llm });
+    expect(seenSystem).not.toMatch(/Relevant items/);
+  });
 });

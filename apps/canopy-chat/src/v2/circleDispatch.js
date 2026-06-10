@@ -45,7 +45,9 @@ export function createCircleDispatch({ catalog, policy, userDefault, llmProvider
       if (llm && typeof interpret === 'function' && addressesBot(trimmed, botName)) {
         const stripped = stripBotTag(trimmed, botName);
         // Token gate (optional) — a cheap LOCAL pass before the (possibly remote) LLM: a rule routes a
-        // command directly (no LLM); a skip treats the turn as normal chat (→ kring); else interpret.
+        // command directly (no LLM); a skip treats the turn as normal chat (→ kring); else interpret
+        // with RAG context.
+        let context;
         if (gate && typeof gate.evaluate === 'function') {
           const g = await gate.evaluate(stripped, ctx);
           if (g.via === 'rule' && g.command?.opId) {
@@ -53,8 +55,9 @@ export function createCircleDispatch({ catalog, policy, userDefault, llmProvider
             return { via: 'rule', cmd: g.command };
           }
           if (g.via === 'skip') { await postToKring(trimmed, ctx); return { via: 'kring' }; }
+          context = g.context;
         }
-        const cmd = await interpret(stripped, { catalog, llm });   // → {opId,args} | null
+        const cmd = await interpret(stripped, { catalog, llm, context });   // → {opId,args} | null
         if (cmd && cmd.opId) {
           await dispatch({ opId: cmd.opId, args: cmd.args && typeof cmd.args === 'object' ? cmd.args : {} }, ctx);
           return { via: 'llm', cmd };

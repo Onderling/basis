@@ -66,7 +66,7 @@ export function addressesBot(text, botName) {
   return t.includes('@' + n) || t.startsWith(n + ' ') || t.startsWith(n + ',');
 }
 
-function stripBotTag(text, botName) {
+export function stripBotTag(text, botName) {
   const out = String(text)
     .replace(/(^|\s)@?(bot|assistent|assistant)\b[:,]?/ig, ' ')
     .replace(new RegExp('(^|\\s)@?' + escapeRe(botName) + '\\b[:,]?', 'ig'), ' ')

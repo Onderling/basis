@@ -257,15 +257,22 @@ Design docs: `docs/STORAGE-SECURITY-MENUKAART.md` (posture decision layer) ·
 `docs/V2-LLM-IN-CIRCLE.md` (the shared NL→slash capability + the feedback v2 rewire).
 
 ### Sealing substrate — `@canopy/pod-client/sealing` (OPT-IN primitive, NOT a forced default)
-- [ ] **Lift + generalize `src/pod/project-seal.js` → `packages/pod-client/src/sealing/`** — envelope
-      encryption (per-resource CEK + recipient/group-key wrap; `seal`/`open`/`recipientId`), with
-      tests. Additive; feedback's `project-seal` becomes a thin re-export (no behaviour change).
-- [ ] **`SealedPodClient` wrapper** — transparent seal-on-write / open-on-read over `PodClient`, with
-      a recipient strategy (group-key or per-recipient) + `@canopy/vault` key custody. Tests.
-- [ ] **Coordinate with `pod-client/sharing`** — `grant()` re-wraps the CEK (or wraps the group key
-      once); `revoke()` rotates. Driven by a key-holder (the household control-agent).
-- [ ] **Versioned key resources on the pod** (`/.keys/group-vN.json`, wrapped per current member) —
-      offline-safe distribution (reconnect → read → unwrap with local private key); rotate on leave.
+- [x] **Lift + generalize `src/pod/project-seal.js` → `packages/pod-client/src/sealing/`** — DONE
+      2026-06-10 (`feat/household-sealing`). `sealing/envelope.js`: verbatim recipient-mode crypto
+      (per-resource CEK + X25519→HKDF, same `fp1:` format) + NEW group-key mode
+      (`sealWithGroupKey`/`openWithGroupKey`; modes reject each other). feedback's `project-seal` is now
+      a thin re-export (no behaviour change; feedback 246/246 + web build green). 11 tests.
+- [x] **`SealedPodClient` wrapper** — DONE. `sealing/SealedPodClient.js`: seal-on-write / open-on-read
+      over any PodClient; bodies sealed, structure cleartext; pluggable `recipientStrategy` /
+      `groupKeyStrategy`; legacy plaintext passes through; append seals per line. 7 tests. (Key custody
+      is injected as the strategy; wiring `@canopy/vault` as the custody source is app-side.)
+- [x] **Versioned key resources** — DONE. `sealing/groupKeyResource.js`: a version's group key sealed to
+      all members in one envelope (`/.keys/group-vN.json`); `grantMember` (O(1) re-seal, same version) +
+      `rotateGroupKeyResource` (new key+version, forward secrecy on leave). Offline-safe (read pod →
+      unwrap). 4 tests. Pure — the control-agent drives the pod I/O + roster.
+- [~] **Coordinate with `pod-client/sharing`** — the group-key grant/revoke MECHANISM is built (above);
+      remaining: tie it to `sharing` ACL `grant()`/`revoke()` + a household **control-agent** that applies
+      key-rotation + ACL together on membership events.
 - [ ] **Sealed index** (per container) — pseudonym→meaning + queryable metadata; shardable; decrypted
       client-side for local search (P2). Doubles as pseudonym decoder + query + RAG.
 - [ ] **In-enclave hooks** (P1) + **encrypted-backup** (whole-blob overlay) — later tiers.

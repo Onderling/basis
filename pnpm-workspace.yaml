@@ -1,0 +1,9 @@
+# pnpm workspace — lets every `workspace:*` dependency across the monorepo resolve to the local
+# package instead of the npm registry. apps/* + packages/* covers all 17 apps and 38 packages
+# (no package.json lives outside those two trees). Reconstructed 2026-06-10: the file was absent from
+# the repo + git history, but the committed per-app lockfiles carry `version: link:../<pkg>` entries,
+# which pnpm only writes when resolving against a workspace — so a definition like this existed when
+# the apps were originally installed and tested.
+packages:
+  - 'apps/*'
+  - 'packages/*'

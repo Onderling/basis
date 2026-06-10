@@ -8,3 +8,7 @@ export { createSealedPodClient, recipientStrategy, groupKeyStrategy } from './Se
 export {
   buildGroupKeyResource, unwrapGroupKey, grantMember, rotateGroupKeyResource,
 } from './groupKeyResource.js';
+export {
+  createSealedIndex, upsertEntry, removeEntry, getEntry, decodePseudonym,
+  queryIndex, semanticQuery, serializeIndex, parseIndex, shardKeyFor,
+} from './sealedIndex.js';

@@ -11,19 +11,20 @@
 // (mobile `CircleLauncherScreen`) and is shared by the household bot + the feedback v2 rewire — the
 // difference between them is only the catalog/interpreter (slash commands vs feedback intents).
 
-import { selectLlmClient } from './llmPicker.js';
+import { resolveCircleLlm } from './llmPicker.js';
 
 /**
  * @param {object} a
  * @param {object} [a.catalog]      dispatch catalog (slash commands = the LLM tool list); passed to interpret
- * @param {{llmTool?:'off'|'local'|'cloud'}|null} [a.policy]   the circle policy
+ * @param {{llmTool?:'off'|'local'|'cloud'|'user'}|null} [a.policy]   the circle policy (authoritative)
+ * @param {{mode?:'off'|'local'|'cloud'}|null} [a.userDefault]   the member's personal default — used only when policy is 'user'
  * @param {{local?:object,cloud?:object}|null} [a.llmProviders] host-supplied LlmClients
  * @param {(text:string, opts:{catalog,llm}) => Promise<{opId:string,args?:object}|null>} [a.interpret]  NL→slash
  * @param {(input:string|{opId:string,args:object}, ctx:object) => any|Promise<any>} a.dispatch  run a typed slash STRING (user) or an {opId,args} route (LLM/structured) — the shell resolves both, as it already does for typed input vs button taps
  * @param {(text:string, ctx:object) => any|Promise<any>} a.postToKring    post a normal kring message
  * @param {string} [a.botName]      the assistant's address/name for @-tag detection (default 'assistant')
  */
-export function createCircleDispatch({ catalog, policy, llmProviders, interpret, dispatch, postToKring, botName = 'assistant' }) {
+export function createCircleDispatch({ catalog, policy, userDefault, llmProviders, interpret, dispatch, postToKring, botName = 'assistant' }) {
   if (typeof dispatch !== 'function' || typeof postToKring !== 'function') {
     throw new Error('createCircleDispatch: dispatch + postToKring are required');
   }
@@ -40,7 +41,7 @@ export function createCircleDispatch({ catalog, policy, llmProviders, interpret,
       }
 
       // 2. free text + the circle's LLM is enabled + the bot is addressed → interpret → dispatch.
-      const llm = selectLlmClient(policy, llmProviders);
+      const llm = resolveCircleLlm({ circlePolicy: policy, userDefault, providers: llmProviders });
       if (llm && typeof interpret === 'function' && addressesBot(trimmed, botName)) {
         const cmd = await interpret(stripBotTag(trimmed, botName), { catalog, llm });   // → {opId,args} | null
         if (cmd && cmd.opId) {

@@ -74,6 +74,7 @@ import { calendarManifest }          from '@canopy-app/calendar/manifest';
 import { createLocalBuiltins }       from '../src/core/localBuiltins.js';
 import { createFeedbackSurface, parseFeedbackInvite, feedbackContactItem } from '../src/feedback/feedbackSurface.js';
 import { createCircleTurn } from '../src/v2/circleTurn.js';
+import { createUserLlmDefaultStore, localStorageUserLlmIo } from '../src/v2/userLlmDefault.js';
 import { buildCircleLlmProviders } from '../src/v2/circleLlmProviders.js';
 import { createClarifyingDispatch } from '../src/v2/clarifyingDispatch.js';
 import * as podAuth                  from '../src/web/podAuth.js';
@@ -2128,10 +2129,21 @@ function feedbackNote(thread, msg) {
 //   VITE_CIRCLE_LLM_BASEURL  browser-reachable LLM route for the circle bot (don't ship keys)
 //   VITE_CIRCLE_LLM_MODEL    model id (optional)
 //   VITE_CIRCLE_BOT_NAME     the bot's address for @-tag detection (default 'assistant')
+//   VITE_CIRCLE_LLM_POLICY   default circle posture off|local|cloud|user (default 'user' = each member decides)
 const CIRCLE_LLM_BASEURL = import.meta.env?.VITE_CIRCLE_LLM_BASEURL ?? null;
 const CIRCLE_LLM_MODEL   = import.meta.env?.VITE_CIRCLE_LLM_MODEL ?? undefined;
 const CIRCLE_BOT_NAME    = import.meta.env?.VITE_CIRCLE_BOT_NAME ?? 'assistant';
+const CIRCLE_LLM_POLICY  = import.meta.env?.VITE_CIRCLE_LLM_POLICY ?? 'user';
 const _circleLlmProviders = buildCircleLlmProviders({ localBaseUrl: CIRCLE_LLM_BASEURL, model: CIRCLE_LLM_MODEL });
+
+// Two-level LLM policy (resolveCircleLlm): the CIRCLE policy is authoritative; when it's 'user' the
+// member's PERSONAL default decides. The personal default persists in localStorage; until a settings
+// UI lands, seed it from the configured route so a deployment that wires VITE_CIRCLE_LLM_BASEURL works
+// out of the box (a stored preference always wins once set). Circle policy source is global for now
+// (VITE_CIRCLE_LLM_POLICY); the per-circle policy store plugs in here once threads carry a circleId.
+const _userLlmStore = createUserLlmDefaultStore(localStorageUserLlmIo());
+let _userLlmDefault = { mode: CIRCLE_LLM_BASEURL ? 'local' : 'off' };
+_userLlmStore.get().then((v) => { if (v && v.mode !== 'off') _userLlmDefault = v; }).catch(() => {});
 // Dispatch a fully-resolved {opId,args} like a follow-up/button tap, scoped to the circle thread.
 async function dispatchReadyCircleCommand({ opId, args }, thread) {
   const parse = { kind: 'slash', opId, args: args ?? {}, threadId: thread.id, command: '(bot)', body: '' };
@@ -2164,9 +2176,10 @@ const _circleClarify = createClarifyingDispatch({
 });
 
 const handleCircleTurn = createCircleTurn({
-  // Per-circle llmTool policy lands with the policy store (todo); until then a configured route means
-  // "on" (local), no route means "off" — and an off policy never reaches the LLM regardless.
-  policyFor: () => ({ llmTool: CIRCLE_LLM_BASEURL ? 'local' : 'off' }),
+  // Circle policy is authoritative; 'user' (the default) delegates to the member's personal default.
+  // Per-circle override plugs in here once threads carry a circleId (replace the global default).
+  policyFor: () => ({ llmTool: CIRCLE_LLM_POLICY }),
+  userDefault: () => _userLlmDefault,
   llmProviders: _circleLlmProviders,
   catalog: () => catalog,
   botName: CIRCLE_BOT_NAME,

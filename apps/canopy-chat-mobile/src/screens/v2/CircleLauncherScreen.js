@@ -60,6 +60,7 @@ import { createCircleDispatch } from '../../../../canopy-chat/src/v2/circleDispa
 import { interpretToCommand } from '../../../../canopy-chat/src/v2/interpretCommand.js';
 import { buildCircleLlmProviders } from '../../../../canopy-chat/src/v2/circleLlmProviders.js';
 import { createClarifyingDispatch } from '../../../../canopy-chat/src/v2/clarifyingDispatch.js';
+import { createUserLlmDefaultStore, asyncStorageUserLlmIo } from '../../../../canopy-chat/src/v2/userLlmDefault.js';
 import { formatNearbyLabel } from '../../core/nearbyLabel.js';
 import { t } from '../../core/localisation.js';
 import {
@@ -100,6 +101,8 @@ import CircleScreensPickerScreen from './CircleScreensPickerScreen.js';
 const CIRCLE_LLM_BASEURL = process.env.EXPO_PUBLIC_CIRCLE_LLM_BASEURL || null;
 const CIRCLE_LLM_MODEL   = process.env.EXPO_PUBLIC_CIRCLE_LLM_MODEL || undefined;
 const CIRCLE_BOT_NAME    = process.env.EXPO_PUBLIC_CIRCLE_BOT_NAME || 'assistant';
+// Default circle posture (off|local|cloud|user); 'user' = each member's personal default decides.
+const CIRCLE_LLM_POLICY  = process.env.EXPO_PUBLIC_CIRCLE_LLM_POLICY || 'user';
 
 // D1 (§5A) — per-circle action-frequency counter behind the quickActions
 // row.  Module singleton (shared across kring opens), hydrated once from
@@ -1527,12 +1530,26 @@ function CircleDetail({
     if (button?.id) clarify.pick(button.id, { id: circle?.id });
   }, [clarify, circle?.id]);
 
+  // B (two-level LLM policy) — the member's PERSONAL default, consulted when the circle policy is
+  // 'user'. Persisted via AsyncStorage; seeded from the configured route until a settings UI lands
+  // (a stored preference always wins once set).
+  const [userLlmDefault, setUserLlmDefault] = useState({ mode: CIRCLE_LLM_BASEURL ? 'local' : 'off' });
+  useEffect(() => {
+    let alive = true;
+    createUserLlmDefaultStore(asyncStorageUserLlmIo(AsyncStorage)).get()
+      .then((v) => { if (alive && v && v.mode !== 'off') setUserLlmDefault(v); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
   // B (circle bot) — the kring composer router: slash command → dispatch; free text addressed to the
   // bot (when the circle's LLM route is on) → interpret → dispatch; everything else → normal kring
   // post (fan-out the already-echoed message). Shared core with web (createCircleDispatch).
   const circleBot = useMemo(() => createCircleDispatch({
     catalog,
-    policy: { llmTool: CIRCLE_LLM_BASEURL ? 'local' : 'off' },
+    // Circle policy is authoritative; 'user' (default) delegates to the member's personal default.
+    policy: { llmTool: CIRCLE_LLM_POLICY },
+    userDefault: userLlmDefault,
     llmProviders: buildCircleLlmProviders({ localBaseUrl: CIRCLE_LLM_BASEURL, model: CIRCLE_LLM_MODEL }),
     interpret: interpretToCommand,
     botName: CIRCLE_BOT_NAME,
@@ -1548,7 +1565,7 @@ function CircleDetail({
       return clarify.run(cmd, { id: circle?.id });
     },
     postToKring: (text, ctx) => { if (ctx?.msgId) broadcastFanOut({ msgId: ctx.msgId, text, ts: ctx.ts ?? Date.now() }); },
-  }), [catalog, clarify, circle?.id, appendKringMessage, broadcastFanOut]);
+  }), [catalog, clarify, circle?.id, appendKringMessage, broadcastFanOut, userLlmDefault]);
 
   // SP-13.2.1 / B — kring chat send: echo the user's message locally, then route it (command vs chat).
   const sendKringChat = useCallback(() => {

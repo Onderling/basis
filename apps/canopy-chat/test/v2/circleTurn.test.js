@@ -3,13 +3,14 @@ import { createCircleTurn } from '../../src/v2/circleTurn.js';
 
 const CATALOG = { opsById: new Map([['addTask', { op: { id: 'addTask', params: [{ name: 'title', kind: 'string', required: true }] } }]]) };
 
-function setup({ llmTool = 'local', providers = { local: { invoke: vi.fn() } }, interpret } = {}) {
+function setup({ llmTool = 'local', providers = { local: { invoke: vi.fn() } }, interpret, userDefault } = {}) {
   const dispatched = [];
   const handle = createCircleTurn({
     policyFor: (scope) => scope?.policy ?? { llmTool },
     llmProviders: providers,
     catalog: () => CATALOG,
     botName: 'helper',
+    userDefault,
     interpret: interpret ?? (async () => ({ opId: 'addTask', args: { title: 'milk' } })),
     dispatchCommand: (cmd, scope) => { dispatched.push({ cmd, scope }); },
   });
@@ -60,5 +61,36 @@ describe('createCircleTurn (web interceptor)', () => {
 
   it('requires dispatchCommand', () => {
     expect(() => createCircleTurn({})).toThrow();
+  });
+
+  it("circle 'user' delegates to the member's default (mode local → dispatches)", async () => {
+    const { handle, dispatched } = setup({ providers: { local: { invoke: vi.fn() } }, userDefault: { mode: 'local' } });
+    expect(await handle('@helper add milk', { policy: { llmTool: 'user' } })).toBe(true);
+    expect(dispatched).toHaveLength(1);
+  });
+
+  it("circle 'user' with no member default → falls through (off)", async () => {
+    const interpret = vi.fn();
+    const { handle, dispatched } = setup({ providers: { local: { invoke: vi.fn() } }, interpret });
+    expect(await handle('@helper add milk', { policy: { llmTool: 'user' } })).toBe(false);
+    expect(interpret).not.toHaveBeenCalled();
+    expect(dispatched).toEqual([]);
+  });
+
+  it("circle 'off' beats the member default (privacy hard-stop)", async () => {
+    const interpret = vi.fn();
+    const { handle, dispatched } = setup({ providers: { local: { invoke: vi.fn() } }, interpret, userDefault: { mode: 'local' } });
+    expect(await handle('@helper add milk', { policy: { llmTool: 'off' } })).toBe(false);
+    expect(interpret).not.toHaveBeenCalled();
+    expect(dispatched).toEqual([]);
+  });
+
+  it('accepts userDefault as a getter (read fresh each turn)', async () => {
+    let mode = 'off';
+    const { handle, dispatched } = setup({ providers: { local: { invoke: vi.fn() } }, userDefault: () => ({ mode }) });
+    expect(await handle('@helper add milk', { policy: { llmTool: 'user' } })).toBe(false);  // off
+    mode = 'local';
+    expect(await handle('@helper add milk', { policy: { llmTool: 'user' } })).toBe(true);   // now on
+    expect(dispatched).toHaveLength(1);
   });
 });

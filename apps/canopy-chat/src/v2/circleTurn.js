@@ -12,29 +12,31 @@
 // to. Both share the same core (`selectLlmClient` + `addressesBot` + `interpretToCommand`); they
 // differ only in what "everything else" means (web: the shell's existing pipeline; mobile: a kring post).
 
-import { selectLlmClient } from './llmPicker.js';
+import { resolveCircleLlm } from './llmPicker.js';
 import { addressesBot, stripBotTag } from './circleDispatch.js';
 import { interpretToCommand } from './interpretCommand.js';
 
 /**
  * @param {object} a
- * @param {(scope:object) => ({llmTool?:'off'|'local'|'cloud'}|null)} a.policyFor  the circle policy for a scope (thread)
+ * @param {(scope:object) => ({llmTool?:'off'|'local'|'cloud'|'user'}|null)} a.policyFor  the circle policy for a scope (thread)
  * @param {{local?:object,cloud?:object}|null} a.llmProviders   host-supplied LlmClients
  * @param {() => object} a.catalog                              getter for the CURRENT merged catalog
  * @param {(cmd:{opId:string,args:object}, scope:object) => any|Promise<any>} a.dispatchCommand  dispatch {opId,args} within the circle scope
+ * @param {{mode?:'off'|'local'|'cloud'}|(() => {mode?:string})} [a.userDefault]  the member's personal default — used only when the circle policy is 'user'
  * @param {string} [a.botName]                                  the bot's address for @-tag detection
  * @param {Function} [a.interpret]                              override the NL→slash interpreter (tests)
  * @returns {(text:string, scope:object) => Promise<boolean>}
  */
-export function createCircleTurn({ policyFor, llmProviders, catalog, dispatchCommand, botName = 'assistant', interpret = interpretToCommand }) {
+export function createCircleTurn({ policyFor, llmProviders, catalog, dispatchCommand, userDefault, botName = 'assistant', interpret = interpretToCommand }) {
   if (typeof dispatchCommand !== 'function') throw new Error('createCircleTurn: dispatchCommand required');
   const policy = typeof policyFor === 'function' ? policyFor : () => null;
   const getCatalog = typeof catalog === 'function' ? catalog : () => catalog;
+  const getUserDefault = typeof userDefault === 'function' ? userDefault : () => userDefault;
 
   return async function handleCircleTurn(text, scope = {}) {
     const trimmed = String(text ?? '').trim();
     if (!trimmed || trimmed.startsWith('/')) return false;          // slashes are the shell's job
-    const llm = selectLlmClient(policy(scope), llmProviders);
+    const llm = resolveCircleLlm({ circlePolicy: policy(scope), userDefault: getUserDefault(), providers: llmProviders });
     if (!llm || !addressesBot(trimmed, botName)) return false;      // off, or not addressed → fall through
     const cmd = await interpret(stripBotTag(trimmed, botName), { catalog: getCatalog(), llm });
     if (!cmd || !cmd.opId) return false;                            // no command fits → fall through

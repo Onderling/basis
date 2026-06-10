@@ -2,11 +2,12 @@ import { describe, it, expect, vi } from 'vitest';
 import { createCircleDispatch, addressesBot } from '../../src/v2/circleDispatch.js';
 
 // A minimal harness: records what the shell would have done.
-function harness({ policy = { llmTool: 'off' }, providers = {}, interpret, botName } = {}) {
+function harness({ policy = { llmTool: 'off' }, providers = {}, interpret, botName, userDefault } = {}) {
   const dispatched = [];
   const posted = [];
   const cd = createCircleDispatch({
     policy,
+    userDefault,
     llmProviders: providers,
     interpret,
     botName,
@@ -70,6 +71,16 @@ describe('createCircleDispatch — routing', () => {
     expect(r.via).toBe('kring');
     expect(dispatched).toEqual([]);
     expect(posted).toEqual(['@bot what do you think of the weather']);
+  });
+
+  it("circle 'user' delegates to the member's default", async () => {
+    const interpret = vi.fn(async () => ({ opId: 'addTask', args: { title: 'milk' } }));
+    // user mode local + provider present → interprets
+    const on = harness({ policy: { llmTool: 'user' }, providers: { local: { invoke: vi.fn() } }, interpret, userDefault: { mode: 'local' }, botName: 'helper' });
+    expect((await on.cd.handle('@helper add milk')).via).toBe('llm');
+    // user mode off → no LLM, posts to kring
+    const off = harness({ policy: { llmTool: 'user' }, providers: { local: { invoke: vi.fn() } }, interpret: vi.fn(), userDefault: { mode: 'off' }, botName: 'helper' });
+    expect((await off.cd.handle('@helper add milk')).via).toBe('kring');
   });
 
   it('treats blank input as a no-op', async () => {

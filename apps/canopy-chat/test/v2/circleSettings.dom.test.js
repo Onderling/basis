@@ -80,10 +80,10 @@ describe('renderCircleSettings', () => {
     const el = mount();
     const tc = (k) => (k.startsWith('circle.settings.consequence.') ? `why ${k.split('.').pop()}` : k);
     renderCircleSettings(el, { policy: DEFAULT_CIRCLE_POLICY, t: tc });
-    // 5.9a — 3 view + 3 llmTool + 3 agents + 2 revealPolicy + 4 pod = 15 enum options
-    expect(el.querySelectorAll('.circle-settings__info')).toHaveLength(15);
+    // 5.9a — 3 view + 4 llmTool (off/local/cloud/user) + 3 agents + 2 revealPolicy + 4 pod = 16 enum options
+    expect(el.querySelectorAll('.circle-settings__info')).toHaveLength(16);
     const panels = el.querySelectorAll('.circle-settings__consequence');
-    expect(panels).toHaveLength(15);
+    expect(panels).toHaveLength(16);
     for (const p of panels) expect(p.hidden).toBe(true);
   });
 

@@ -50,6 +50,7 @@ export {
   seal, open, sealWithGroupKey, openWithGroupKey,
   makeSealer, makeOpener, makeGroupSealer, makeGroupOpener,
   createSealedPodClient, recipientStrategy, groupKeyStrategy,
+  buildGroupKeyResource, unwrapGroupKey, grantMember, rotateGroupKeyResource,
 } from './sealing/index.js';
 
 // A6 — Delete-scope primitive (TombstoneStore + per-platform adapters).

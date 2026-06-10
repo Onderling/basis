@@ -5,3 +5,6 @@ export {
   makeSealer, makeOpener, makeGroupSealer, makeGroupOpener,
 } from './envelope.js';
 export { createSealedPodClient, recipientStrategy, groupKeyStrategy } from './SealedPodClient.js';
+export {
+  buildGroupKeyResource, unwrapGroupKey, grantMember, rotateGroupKeyResource,
+} from './groupKeyResource.js';

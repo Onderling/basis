@@ -44,6 +44,13 @@ export { ConflictResolver } from './ConflictResolver.js';
 export { createClientSharing, _setInruptModuleForTests } from './sharing/index.js';
 export { probeCapabilities, parseSharingLinkHeader }     from './sharing/capabilities.js';
 
+// Opt-in at-rest envelope encryption (recipient-wrap + group-key modes). Node-side (node:crypto).
+export {
+  recipientId, generateKeypair, generateGroupKey, isSealed,
+  seal, open, sealWithGroupKey, openWithGroupKey,
+  makeSealer, makeOpener, makeGroupSealer, makeGroupOpener,
+} from './sealing/index.js';
+
 // A6 — Delete-scope primitive (TombstoneStore + per-platform adapters).
 export { TombstoneStore }         from './TombstoneStore.js';
 export { MemoryTombstones }       from './tombstones/MemoryTombstones.js';

@@ -270,9 +270,13 @@ Design docs: `docs/STORAGE-SECURITY-MENUKAART.md` (posture decision layer) ·
       all members in one envelope (`/.keys/group-vN.json`); `grantMember` (O(1) re-seal, same version) +
       `rotateGroupKeyResource` (new key+version, forward secrecy on leave). Offline-safe (read pod →
       unwrap). 4 tests. Pure — the control-agent drives the pod I/O + roster.
-- [~] **Coordinate with `pod-client/sharing`** — the group-key grant/revoke MECHANISM is built (above);
-      remaining: tie it to `sharing` ACL `grant()`/`revoke()` + a household **control-agent** that applies
-      key-rotation + ACL together on membership events.
+- [x] **Coordinate with `pod-client/sharing` + control-agent** — DONE 2026-06-10.
+      `sealing/controlAgent.js` (`createControlAgent`): `addMember` grants ACL (`sharing.grant`) + O(1)
+      key re-wrap (or bootstraps the first key); `removeMember` revokes ACL + rotates the key (forward
+      secrecy). Enforces ≥1-admin (force = pod-owner break-glass). Pure orchestration — pod I/O injected
+      (`sharing` + a `keyStore` {read,write}). 8 tests; pod-client suite 233 green. Remaining wiring:
+      point `keyStore` at a real pod resource (SealedPodClient) + drive it from the circle's join/leave
+      (the household-circle "Membership → pod access" item below).
 - [x] **Sealed index** — DONE 2026-06-10. `sealing/sealedIndex.js` (PORTABLE — runs client-side for P2):
       `queryIndex` (type/tag/text, newest-first) + `decodePseudonym` (id→meaning) + `semanticQuery`
       (cosine over caller-supplied embeddings = RAG) + `shardKeyFor` (FNV-1a). Stored sealed (serialize

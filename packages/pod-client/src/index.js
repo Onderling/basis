@@ -53,6 +53,7 @@ export {
   buildGroupKeyResource, unwrapGroupKey, grantMember, rotateGroupKeyResource,
   createSealedIndex, upsertEntry, removeEntry, getEntry, decodePseudonym,
   queryIndex, semanticQuery, serializeIndex, parseIndex, shardKeyFor,
+  createControlAgent,
 } from './sealing/index.js';
 
 // A6 — Delete-scope primitive (TombstoneStore + per-platform adapters).

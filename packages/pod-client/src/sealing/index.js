@@ -12,3 +12,4 @@ export {
   createSealedIndex, upsertEntry, removeEntry, getEntry, decodePseudonym,
   queryIndex, semanticQuery, serializeIndex, parseIndex, shardKeyFor,
 } from './sealedIndex.js';
+export { createControlAgent } from './controlAgent.js';

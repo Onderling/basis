@@ -35,6 +35,41 @@ export const canopyChatManifest = {
     },
 
     /**
+     * `/feedback [code]` / `/feedback-stop` — enter / leave the feedback bot (M11).
+     *
+     * Declared here purely for DISCOVERABILITY: with these on the manifest, `/feedback` shows in
+     * `/help` and the slash autosuggest. EXECUTION is intercepted upstream in `main.js handleUserText`
+     * (a `/feedback` / `/feedback-stop` match runs before catalog dispatch — it needs the pod session
+     * + the feedback surface), so these ops are never dispatched through the catalog.
+     */
+    {
+      id:    'feedback',
+      verb:  'add',
+      params: [
+        { name: 'code', kind: 'string', required: false },
+      ],
+      surfaces: {
+        slash: { command: '/feedback', body: 'code?' },
+        chat:  {
+          reply: 'text',
+          hint:  'start the feedback assistant (optional participation code)',
+        },
+      },
+    },
+    {
+      id:    'feedback-stop',
+      verb:  'add',
+      params: [],
+      surfaces: {
+        slash: { command: '/feedback-stop' },
+        chat:  {
+          reply: 'text',
+          hint:  'leave feedback mode',
+        },
+      },
+    },
+
+    /**
      * `/newthread <name>` — create a new chat thread.
      *
      * Default filter is wildcard ({}); the user can refine via the

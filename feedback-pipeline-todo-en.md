@@ -9,7 +9,12 @@ Core is BUILT + tested (Tier 1–3 `[x]`; 246 tests + M10 mockup smoke green). T
 work is now **folded into the M-phase sequence** (2026-06-10, by request) — the canopy-bot plan extends
 from M10 to **M15**, with **crisis-response last** (everything else ships without it):
 
-- [ ] **M11 — Surface `/feedback` in the command menu / manifest** (discoverability; small).
+- [x] **M11 — Surface `/feedback` in the command menu / manifest** — DONE 2026-06-10
+      (`feat/feedback-in-menu`). Added `/feedback [code]` + `/feedback-stop` ops to canopy-chat's
+      `manifest.js`, so they surface in `/help` (`catalog.commandMenu`) + slash autosuggest
+      (`catalog.opsById`) on web AND mobile (shared manifest). Execution stays intercepted in
+      `main.js handleUserText` (never dispatched via the catalog). 3 tests; full canopy-chat suite 2231
+      green; web build ✓.
 - [ ] **M12 — Review buttons as click-to-inject chips** in canopy-chat (today the NL path). The circle
       bot's kring candidate-chip pattern (`payload.buttons` → tap handler) is the reusable template.
 - [ ] **M13 — Curator UI surface** + wire `release` to **publish/persist the report artifact** + **route

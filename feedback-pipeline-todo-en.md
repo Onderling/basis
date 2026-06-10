@@ -292,9 +292,11 @@ Design docs: `docs/STORAGE-SECURITY-MENUKAART.md` (posture decision layer) ·
 ### Household circle build (the journey)
 - [ ] **Pod ↔ circle binding** — a circle whose shared store is a household pod (members write via
       the circle). Reuse `HouseholdPod` + `pod-routing` `'centralised'`.
-- [ ] **Membership → pod access** — `sharing.grant()` on join (~10 lines after `addMember`) + a small
-      `leaveGroup`/`removeMember` skill → `revoke()`. Map admin role → pod `control`; a **control-agent**
-      auto-applies grant/revoke + group-key (≥1-admin invariant; pod-owner break-glass).
+- [~] **Membership → pod access** — the SUBSTRATE is DONE: `createControlAgent` (ACL grant/revoke +
+      group-key rotation on join/leave, ≥1-admin + break-glass) + `createPodKeyStore` (key resource on
+      the pod) + `readGroupKey`, proven by `podBinding.integration.test.js` (full loop: join → key on
+      pod → unwrap → sealed content → leave rotates). Remaining (app side): drive `addMember`/`removeMember`
+      from stoop's actual group join/leave events + supply members' public keys (a roster pubkey source).
 - [ ] **Sender-writes to the REAL shared pod** (today stoop writes pseudo-pod) + **offline catch-up by
       polling the pod** (swap `getMessagesSince` local read → a pod read).
 - [ ] **Text dual-write** (peer + pod; folio's file→pod→link is the file-side template).

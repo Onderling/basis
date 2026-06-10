@@ -1449,6 +1449,16 @@
         "text": "I couldn’t turn that into an action.",
         "doc": "Circle bot — could not turn the message into a command."
       }
+    },
+    "clarify": {
+      "which": {
+        "text": "Which “{{query}}” did you mean?",
+        "doc": "Circle bot asks which item when a command matches MULTIPLE circle items (clarification turn)."
+      },
+      "notFound": {
+        "text": "I couldn’t find “{{query}}” in this circle.",
+        "doc": "Circle bot reply when a command target matches NO item in the circle."
+      }
     }
   },
   "app": {

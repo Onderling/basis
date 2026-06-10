@@ -59,6 +59,7 @@ import {
 import { createCircleDispatch } from '../../../../canopy-chat/src/v2/circleDispatch.js';
 import { interpretToCommand } from '../../../../canopy-chat/src/v2/interpretCommand.js';
 import { buildCircleLlmProviders } from '../../../../canopy-chat/src/v2/circleLlmProviders.js';
+import { createClarifyingDispatch } from '../../../../canopy-chat/src/v2/clarifyingDispatch.js';
 import { formatNearbyLabel } from '../../core/nearbyLabel.js';
 import { t } from '../../core/localisation.js';
 import {
@@ -1471,29 +1472,26 @@ function CircleDetail({
 
   // SP-13.2.1 — append a kring chat bubble to the local eventLog (optimistic). Returns {msgId, ts}
   // so the caller can fan out the same id (receiver-side dedup suppresses any mirrored echo).
-  const appendKringMessage = useCallback(({ actor, text }) => {
+  const appendKringMessage = useCallback(({ actor, text, buttons }) => {
     if (!eventLog?.append || !circle?.id) return null;
     const msgId = `kring-${circle.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const ts    = Date.now();
     eventLog.append({
       id: msgId, ts, app: 'kring', type: 'chat-message', actor,
-      payload: { circleId: circle.id, text, kind: 'chat-message' },
+      payload: { circleId: circle.id, text, kind: 'chat-message', ...(buttons?.length ? { buttons } : {}) },
     });
     setStreamTick((n) => n + 1);
     return { msgId, ts };
   }, [eventLog, circle?.id]);
 
-  // B (circle bot) — run an interpreted command (slash string OR {opId,args}) against the circle's
-  // catalog, scoped to THIS circle, and post a one-line bot reply. Local-only (the bot turn isn't
-  // fanned out; the command's substrate effect reaches members on its own).
-  const runCircleCommand = useCallback(async (input) => {
+  // B (circle bot) — run a FULLY-RESOLVED command ({opId, args}) against the circle's catalog, scoped
+  // to THIS circle, and post a one-line bot reply. Local-only (the command's substrate effect reaches
+  // members on its own). Target resolution / ambiguity is handled upstream by the clarifying dispatch.
+  const runCircleCommandResolved = useCallback(async ({ opId, args }) => {
     if (!catalog) { appendKringMessage({ actor: 'bot', text: t('circle.bot.unknown') }); return; }
     let dispatch;
     try {
-      const parse = typeof input === 'string'
-        ? parseInput(input, catalog)
-        : { kind: 'slash', opId: input.opId, args: input.args || {}, command: '(bot)', body: '' };
-      dispatch = resolveDispatch(parse, catalog);
+      dispatch = resolveDispatch({ kind: 'slash', opId, args: args || {}, command: '(bot)', body: '' }, catalog);
     } catch { appendKringMessage({ actor: 'bot', text: t('circle.bot.unknown') }); return; }
     if (dispatch.kind === 'needsForm') { appendKringMessage({ actor: 'bot', text: t('circle.bot.needsInfo') }); return; }
     if (dispatch.kind !== 'ready')     { appendKringMessage({ actor: 'bot', text: t('circle.bot.unknown') }); return; }
@@ -1504,6 +1502,31 @@ function CircleDetail({
     appendKringMessage({ actor: 'bot', text: circleReplyText(reply) });
   }, [catalog, callSkill, circle?.id, appendKringMessage]);
 
+  // B (clarification) — candidate source for id-like params: the circle's own items (already loaded +
+  // circle-scoped), so resolution stays confined to this circle. clarifyCommandTargets filters by label.
+  const circleLookup = useCallback(() => (Array.isArray(items)
+    ? items.map((it) => ({ id: String(it?.id ?? ''), label: String(it?.label ?? it?.title ?? it?.text ?? it?.id ?? '') }))
+    : []), [items]);
+
+  // B (clarification) — wraps dispatch: a unique target dispatches; an ambiguous one posts a bot
+  // message with candidate BUTTONS (tapping → pick → re-run bound to that id); a missing one asks.
+  const clarify = useMemo(() => createClarifyingDispatch({
+    catalog: () => catalog,
+    lookup: circleLookup,
+    dispatchReady: runCircleCommandResolved,
+    ask: ({ query, candidates }) => appendKringMessage({
+      actor: 'bot',
+      text: t('circle.clarify.which', { query }),
+      buttons: candidates.map((c) => ({ id: c.id, label: c.hint ? `${c.label} — ${c.hint}` : c.label })),
+    }),
+    askMissing: ({ query }) => appendKringMessage({ actor: 'bot', text: t('circle.clarify.notFound', { query }) }),
+  }), [catalog, circleLookup, runCircleCommandResolved, appendKringMessage]);
+
+  // B — a tapped candidate button → bind the id + re-run (may resolve, or clarify a further param).
+  const onBubbleButton = useCallback((button) => {
+    if (button?.id) clarify.pick(button.id, { id: circle?.id });
+  }, [clarify, circle?.id]);
+
   // B (circle bot) — the kring composer router: slash command → dispatch; free text addressed to the
   // bot (when the circle's LLM route is on) → interpret → dispatch; everything else → normal kring
   // post (fan-out the already-echoed message). Shared core with web (createCircleDispatch).
@@ -1513,9 +1536,19 @@ function CircleDetail({
     llmProviders: buildCircleLlmProviders({ localBaseUrl: CIRCLE_LLM_BASEURL, model: CIRCLE_LLM_MODEL }),
     interpret: interpretToCommand,
     botName: CIRCLE_BOT_NAME,
-    dispatch: (cmd) => runCircleCommand(cmd),
+    // A slash command is parsed to {opId,args}; the LLM already yields {opId,args}. Both then flow
+    // through the clarifying dispatch (unique → run; ambiguous → ask with buttons).
+    dispatch: (input) => {
+      let cmd = input;
+      if (typeof input === 'string') {
+        const parsed = catalog ? parseInput(input, catalog) : null;
+        cmd = parsed && parsed.kind === 'slash' && parsed.opId ? { opId: parsed.opId, args: parsed.args || {} } : null;
+      }
+      if (!cmd || !cmd.opId) { appendKringMessage({ actor: 'bot', text: t('circle.bot.unknown') }); return; }
+      return clarify.run(cmd, { id: circle?.id });
+    },
     postToKring: (text, ctx) => { if (ctx?.msgId) broadcastFanOut({ msgId: ctx.msgId, text, ts: ctx.ts ?? Date.now() }); },
-  }), [catalog, runCircleCommand, broadcastFanOut]);
+  }), [catalog, clarify, circle?.id, appendKringMessage, broadcastFanOut]);
 
   // SP-13.2.1 / B — kring chat send: echo the user's message locally, then route it (command vs chat).
   const sendKringChat = useCallback(() => {
@@ -1673,6 +1706,7 @@ function CircleDetail({
             deliveryStateFor,
             localActor: 'me',
             onRetryDelivery,
+            onBubbleButton,
           })
         )}
       </ScrollView>
@@ -1768,6 +1802,9 @@ function renderBubble(row, t, deliveryOpts = null) {
   const kind = (typeof kindRaw === 'string' && kindRaw && kindRaw !== 'message' && kindRaw !== 'chat-message')
     ? kindRaw.toUpperCase() : null;
   const actions = actionsForStreamRow(row);
+  // B (clarification) — per-message candidate buttons carried in the payload (e.g. "which item?").
+  const msgButtons = Array.isArray(payload.buttons) ? payload.buttons : [];
+  const onBubbleButton = typeof deliveryOpts?.onBubbleButton === 'function' ? deliveryOpts.onBubbleButton : null;
   // δ.2 — delivery-state icon for locally-sent chat messages only.
   // Mirrors web circleKring renderer's gate.
   const deliveryStateFor = typeof deliveryOpts?.deliveryStateFor === 'function'
@@ -1796,6 +1833,21 @@ function renderBubble(row, t, deliveryOpts = null) {
               onPress={() => console.info('[kring] action', a.action, row.id)}
             >
               <Text style={styles.rowActionText}>{t(a.label)}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+      {msgButtons.length > 0 ? (
+        <View style={styles.rowActions}>
+          {msgButtons.map((b) => (
+            <Pressable
+              key={b.id}
+              style={styles.rowActionBtn}
+              accessibilityRole="button"
+              testID={`kring-msgbtn-${b.id}`}
+              onPress={() => { if (onBubbleButton) onBubbleButton(b); }}
+            >
+              <Text style={styles.rowActionText}>{b.label}</Text>
             </Pressable>
           ))}
         </View>

@@ -299,11 +299,20 @@ Design docs: `docs/STORAGE-SECURITY-MENUKAART.md` (posture decision layer) ·
       replies render as kring bubbles (`circle.bot.*` locales en+nl). LLM via `@canopy/llm-client`
       (metro `extraNodeModules` + subpath alias added; `EXPO_PUBLIC_CIRCLE_LLM_BASEURL`). Verified:
       esbuild parse + the shared modules' 1189 v2 tests. **NOT yet bundle/device-verified** — the
-      `expo` package is missing from mobile `node_modules` (pre-existing broken `pnpm install`:
-      `@canopy/webid-discovery` "*" spec in pod-onboarding), so metro/expo can't run here. This is the
-      M6 device checkpoint. Remaining: fix the install → metro bundle → device run; mobile clarification
-      UI (interactive candidate buttons in the kring stream — B1 dispatches but doesn't yet ask);
-      per-circle policy-store hookup.
+      `expo` package is missing from mobile `node_modules` so metro/expo can't run **in this checkout**.
+      Root cause is NOT a single dep spec: there is **no `pnpm-workspace.yaml`** anywhere, so `pnpm
+      install` can't resolve the apps' `workspace:*` deps at all (and `.pnpm` store is empty → the 698
+      modules are an npm-style/partial install). The user's own environment builds + runs the app, so
+      this is a checkout-provisioning gap, not a code defect. (A stray `@canopy/llm-client: workspace:*`
+      I had added to mobile package.json — which WOULD break a healthy install — was removed; the bundler
+      resolves llm-client via the metro `extraNodeModules` alias instead.)
+      **Mobile clarification turn DONE (code)** 2026-06-10: reuses the kring bubble's existing action-chip
+      UI (whose onPress was a `console.info` stub) — candidate buttons now render from `payload.buttons`
+      and tap → `clarifyingDispatch.pick` → re-run. Candidate source = the circle's own `items` (scoped).
+      `circle.clarify.*` locales en+nl. Parse-verified + the shared clarifyingDispatch/clarifyTargets 30
+      tests. Web clarification buttons confirmed functional (domAdapter list-item buttons → onButtonTap →
+      circlePick). Remaining: device run (metro bundle once the checkout install is sorted); per-circle
+      policy-store hookup; richer command-reply rendering in the kring (lists/cards, not just one-line text).
 - [x] **Circle-scoped dispatch + clarification** (NEW, 2026-06-10 → DONE web + live-proven) —
       `clarifyTargets.js` (ready / clarify / unresolved for id-like `pickerSource` params; exact-id +
       circle-scoped label lookup) + `clarifyingDispatch.js` (per-scope pending question; pick re-runs).

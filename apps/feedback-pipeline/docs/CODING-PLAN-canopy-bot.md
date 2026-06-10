@@ -222,10 +222,36 @@ a mid-sequence checkpoint.
   quarantined → curator release → 4 participants notified. `ByoCentralPod` gained a release registry
   (`markIncluded`/`getStatus`) so curator release+notify works on BYO without holding raw.
 
+### M11 — surface `/feedback` in the command menu / manifest *(discoverability; small)*
+Today a participant must know to type `/feedback <code>`. Add it to the merged command menu / manifest so it
+shows in `/help` + autosuggest. Web first, then mobile. Small.
+
+### M12 — review buttons as click-to-inject chips
+The review step currently rides the NL path. Render the review actions as interactive chips that inject the
+slash on tap. The circle bot's kring candidate-chip pattern (`payload.buttons` → tap handler → re-dispatch) is
+the reusable template (web `domAdapter` list-item buttons → `onButtonTap`; mobile kring bubble chips).
+
+### M13 — curator UI surface + report publish + signal routing
+A curator-facing surface to review the aggregated themes and trigger `release`; wire `release` to **publish /
+persist the report artifact** (to the central/curator pod) and **route the signals** (crisis / threshold / theme)
+to their configured destinations. `ByoCentralPod`'s release registry (`markIncluded`/`getStatus`) already
+backs the no-raw release; this is the UI + the publish/routing wiring.
+
+### M14 — deployment readiness *(config, not code)*
+Edgeless/Privatemode **account + key**; set `FP_LLM_BASEURL`/`FP_LLM_APIKEY`, `FEEDBACK_ACTIVATION_URL`; **pin
+images by `@sha256`**; fill real **restic target creds**. Gating for a real single-scenario launch.
+
+### M15 — crisis-response protocol *(LAST phase; blocks launch)*
+M4 built the **detection** floors; the **response** is undesigned — who is notified, on what consent, how fast,
+duty-to-act vs. anonymity. A **design call first** (see `SECURITY-MODEL.md` open questions), then build the
+routing + escalation. Deliberately the final phase: every other phase ships without it.
+
 ## Sequencing
 Build the milestones **M0 → M1 → M2 → M3 → M4 → M5 (external) → M6 (mobile) → M7 + M8 (TEE, together)**, with
 **M9 (agent runtime) on its own non-gating track**. Then **M10 — the full testable mockup — is assembled and run
-at the END**, exercising the whole system in one runnable project. Each build milestone has its own vitest
+at the END**, exercising the whole system in one runnable project. **M11–M15 (2026-06-10) extend the plan with the
+feedback-app completion work** — M11 (`/feedback` menu) → M12 (review chips) → M13 (curator UI + publish/signals) →
+M14 (deployment config) → **M15 (crisis-response, LAST, design-gated)**. Each build milestone has its own vitest
 `Verify`; **M10 is the single end-to-end integration deliverable, not a mid-sequence checkpoint.** Web first
 throughout; mobile at M6. M0 is a day; M1 is load-bearing but small (the channel layer already exists).
 

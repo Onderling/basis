@@ -5,24 +5,24 @@ ethics docs. Updated 2026-06-10.*
 
 ## Feedback app — what's left (2026-06-10 review)
 
-Core is BUILT + tested (Tier 1–3 `[x]`; 246 tests + M10 mockup smoke green). What remains:
+Core is BUILT + tested (Tier 1–3 `[x]`; 246 tests + M10 mockup smoke green). The remaining feedback-app
+work is now **folded into the M-phase sequence** (2026-06-10, by request) — the canopy-bot plan extends
+from M10 to **M15**, with **crisis-response last** (everything else ships without it):
 
-**Design call (blocks a real launch):**
-- [ ] **Crisis-response protocol** — see Open Questions below. Detection is built; the *response*
-      (who's notified, on what consent, how fast, duty-to-act vs anonymity) is undesigned.
-
-**Polish / wiring (not blocking) — pulled out of the `[x]` follow-up notes:**
-- [ ] **Curator UI surface** + wire `release` to **publish/persist the report artifact** + **route
+- [ ] **M11 — Surface `/feedback` in the command menu / manifest** (discoverability; small).
+- [ ] **M12 — Review buttons as click-to-inject chips** in canopy-chat (today the NL path). The circle
+      bot's kring candidate-chip pattern (`payload.buttons` → tap handler) is the reusable template.
+- [ ] **M13 — Curator UI surface** + wire `release` to **publish/persist the report artifact** + **route
       the signals** to their configured destinations.
-- [ ] **Review buttons as click-to-inject chips** in canopy-chat (today it uses the NL path).
-- [ ] **Surface `/feedback` in the command menu / manifest.**
+- [ ] **M14 — Deployment readiness** (config, not code): Edgeless/Privatemode **account + key**; set
+      `FP_LLM_BASEURL`/`FP_LLM_APIKEY`, `FEEDBACK_ACTIVATION_URL`; **pin images by `@sha256`**; fill real
+      **restic target creds**.
+- [ ] **M15 — Crisis-response protocol (LAST phase, blocks launch).** Detection is built; the *response*
+      (who's notified, on what consent, how fast, duty-to-act vs anonymity) is **undesigned** → a design
+      call first (see Open Questions below), then build. Deliberately the final phase.
 
-**Deployment readiness (secrets/config, not code):**
-- [ ] Edgeless/Privatemode **account + key**; set `FP_LLM_BASEURL`/`FP_LLM_APIKEY`,
-      `FEEDBACK_ACTIVATION_URL`; **pin images by `@sha256`**; fill real **restic target creds**.
-
-**Checkpoints owed (canopy-bot M phases) — see "Checkpoints owed" section:** M6 (mobile bot v2-rewire
-+ retarget Detox helper), M7/M8 (TEE hardware). M9 (agent runtime) is a separate track.
+**Owed earlier M phases — see "Checkpoints owed" section:** M6 (mobile feedback-bot v2-rewire + retarget
+Detox helper), M7/M8 (TEE hardware). M9 (agent runtime) is a separate track.
 
 - [x] **PRE-EXISTING web build break (since `53f051fc`)** — FIXED 2026-06-10. `vite build` failed:
       `project-seal.js` imports Node crypto (`createPublicKey`/`createPrivateKey`/`diffieHellman`/

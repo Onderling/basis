@@ -26,7 +26,6 @@
     "@canopy-app/tasks-v0": "file:../tasks-v0",
     "@canopy/app-manifest": "file:../../packages/app-manifest",
     "@canopy/core": "file:../../packages/core",
-    "@canopy/llm-client": "workspace:*",
     "@canopy/local-store": "file:../../packages/local-store",
     "@canopy/manifest-host": "file:../../packages/manifest-host",
     "@canopy/oidc-session": "file:../../packages/oidc-session",

@@ -1542,13 +1542,30 @@ function CircleDetail({
     return () => { alive = false; };
   }, []);
 
+  // B (per-circle policy) — THIS circle's llmTool is authoritative (same cc.circlePolicy.<id> store the
+  // settings screen writes). Unset → the deployment default CIRCLE_LLM_POLICY. Reloads per circle.
+  const [circleLlmPolicy, setCircleLlmPolicy] = useState(CIRCLE_LLM_POLICY);
+  useEffect(() => {
+    let alive = true;
+    if (!circle?.id) { setCircleLlmPolicy(CIRCLE_LLM_POLICY); return undefined; }
+    AsyncStorage.getItem(`cc.circlePolicy.${circle.id}`)
+      .then((s) => {
+        if (!alive) return;
+        let raw = null;
+        try { raw = s ? JSON.parse(s) : null; } catch { raw = null; }
+        setCircleLlmPolicy(raw && typeof raw.llmTool === 'string' ? raw.llmTool : CIRCLE_LLM_POLICY);
+      })
+      .catch(() => { if (alive) setCircleLlmPolicy(CIRCLE_LLM_POLICY); });
+    return () => { alive = false; };
+  }, [circle?.id]);
+
   // B (circle bot) — the kring composer router: slash command → dispatch; free text addressed to the
   // bot (when the circle's LLM route is on) → interpret → dispatch; everything else → normal kring
   // post (fan-out the already-echoed message). Shared core with web (createCircleDispatch).
   const circleBot = useMemo(() => createCircleDispatch({
     catalog,
-    // Circle policy is authoritative; 'user' (default) delegates to the member's personal default.
-    policy: { llmTool: CIRCLE_LLM_POLICY },
+    // Circle policy is authoritative (this circle's own llmTool); 'user' delegates to the member default.
+    policy: { llmTool: circleLlmPolicy },
     userDefault: userLlmDefault,
     llmProviders: buildCircleLlmProviders({ localBaseUrl: CIRCLE_LLM_BASEURL, model: CIRCLE_LLM_MODEL }),
     interpret: interpretToCommand,
@@ -1565,7 +1582,7 @@ function CircleDetail({
       return clarify.run(cmd, { id: circle?.id });
     },
     postToKring: (text, ctx) => { if (ctx?.msgId) broadcastFanOut({ msgId: ctx.msgId, text, ts: ctx.ts ?? Date.now() }); },
-  }), [catalog, clarify, circle?.id, appendKringMessage, broadcastFanOut, userLlmDefault]);
+  }), [catalog, clarify, circle?.id, appendKringMessage, broadcastFanOut, userLlmDefault, circleLlmPolicy]);
 
   // SP-13.2.1 / B — kring chat send: echo the user's message locally, then route it (command vs chat).
   const sendKringChat = useCallback(() => {

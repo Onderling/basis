@@ -75,6 +75,7 @@ import { createLocalBuiltins }       from '../src/core/localBuiltins.js';
 import { createFeedbackSurface, parseFeedbackInvite, feedbackContactItem } from '../src/feedback/feedbackSurface.js';
 import { createCircleTurn } from '../src/v2/circleTurn.js';
 import { createUserLlmDefaultStore, localStorageUserLlmIo } from '../src/v2/userLlmDefault.js';
+import { localStoragePolicyIo } from '../src/v2/circlePolicyStore.js';
 import { buildCircleLlmProviders } from '../src/v2/circleLlmProviders.js';
 import { createClarifyingDispatch } from '../src/v2/clarifyingDispatch.js';
 import * as podAuth                  from '../src/web/podAuth.js';
@@ -2175,10 +2176,21 @@ const _circleClarify = createClarifyingDispatch({
   askMissing: ({ query }, thread) => { feedbackNote(thread, t('circle.clarify.notFound', { query })); },
 });
 
+// Per-circle policy source: the active circle's own llmTool (set via circle settings, same
+// `cc.circlePolicy.<id>` store the settings UI writes) is authoritative. A circle with no explicit
+// llmTool falls back to the deployment default CIRCLE_LLM_POLICY; non-circle threads use it too.
+const _circlePolicyIo = localStoragePolicyIo();
+async function circleLlmPolicyFor() {
+  const id = getActiveCircle();
+  if (!id) return { llmTool: CIRCLE_LLM_POLICY };
+  let raw = null;
+  try { raw = await _circlePolicyIo.load(id); } catch { /* defaults */ }
+  return { llmTool: raw && typeof raw.llmTool === 'string' ? raw.llmTool : CIRCLE_LLM_POLICY };
+}
+
 const handleCircleTurn = createCircleTurn({
-  // Circle policy is authoritative; 'user' (the default) delegates to the member's personal default.
-  // Per-circle override plugs in here once threads carry a circleId (replace the global default).
-  policyFor: () => ({ llmTool: CIRCLE_LLM_POLICY }),
+  // Circle policy is authoritative (loaded per active circle); 'user' delegates to the member default.
+  policyFor: circleLlmPolicyFor,
   userDefault: () => _userLlmDefault,
   llmProviders: _circleLlmProviders,
   catalog: () => catalog,

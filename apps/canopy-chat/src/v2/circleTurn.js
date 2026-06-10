@@ -18,7 +18,7 @@ import { interpretToCommand } from './interpretCommand.js';
 
 /**
  * @param {object} a
- * @param {(scope:object) => ({llmTool?:'off'|'local'|'cloud'|'user'}|null)} a.policyFor  the circle policy for a scope (thread)
+ * @param {(scope:object) => ({llmTool?:'off'|'local'|'cloud'|'user'}|null|Promise<object>)} a.policyFor  the circle policy for a scope (thread); may be async (e.g. load from a store)
  * @param {{local?:object,cloud?:object}|null} a.llmProviders   host-supplied LlmClients
  * @param {() => object} a.catalog                              getter for the CURRENT merged catalog
  * @param {(cmd:{opId:string,args:object}, scope:object) => any|Promise<any>} a.dispatchCommand  dispatch {opId,args} within the circle scope
@@ -36,7 +36,8 @@ export function createCircleTurn({ policyFor, llmProviders, catalog, dispatchCom
   return async function handleCircleTurn(text, scope = {}) {
     const trimmed = String(text ?? '').trim();
     if (!trimmed || trimmed.startsWith('/')) return false;          // slashes are the shell's job
-    const llm = resolveCircleLlm({ circlePolicy: policy(scope), userDefault: getUserDefault(), providers: llmProviders });
+    const circlePolicy = await policy(scope);                       // policyFor may load the circle's policy async
+    const llm = resolveCircleLlm({ circlePolicy, userDefault: getUserDefault(), providers: llmProviders });
     if (!llm || !addressesBot(trimmed, botName)) return false;      // off, or not addressed → fall through
     const cmd = await interpret(stripBotTag(trimmed, botName), { catalog: getCatalog(), llm });
     if (!cmd || !cmd.opId) return false;                            // no command fits → fall through

@@ -12,8 +12,19 @@
 
 import { buildManifest } from '../pod/manifest.js';
 import { transparencyCounters } from './transparency.js';
+import { routeSignals } from './signalRouting.js';
 
-export function createCuratorWorkspace({ aggregate, pod, reportId = 'report', notifier }) {
+/**
+ * @param {object} a
+ * @param {object} a.aggregate
+ * @param {object} [a.pod]
+ * @param {string} [a.reportId]
+ * @param {object} [a.notifier]
+ * @param {{ put: (reportId:string, artifact:object) => any }} [a.reportStore]  M13 — persists the published report
+ * @param {Record<string,string>} [a.signalDestinations]   M13 — signal → destination (config.signal.destinations)
+ * @param {Function} [a.sendSignal]                         M13 — the injected signal transport
+ */
+export function createCuratorWorkspace({ aggregate, pod, reportId = 'report', notifier, reportStore, signalDestinations, sendSignal }) {
   if (!aggregate) throw new Error('createCuratorWorkspace: aggregate required');
 
   const included = new Map(aggregate.statistical.map((t) => [t.theme, true]));    // theme -> included?
@@ -87,7 +98,18 @@ export function createCuratorWorkspace({ aggregate, pod, reportId = 'report', no
         counters: c,
       };
       const manifest = buildManifest({ reportId, createdAt: now, includedContributionIds: ids });
-      return { report, manifest, counters: c };
+
+      // M13 — route confirmed signals to their configured destinations (best-effort; recorded).
+      const routedSignals = await routeSignals({
+        signals: aggregate.signals, destinations: signalDestinations, send: sendSignal, reportId, now,
+      });
+
+      // M13 — publish/persist the report artifact (the curator's release deliverable). Surfaced (not
+      // swallowed): if the report can't be persisted, the curator must know it didn't publish.
+      const artifact = { report, manifest, counters: c, routedSignals };
+      if (reportStore) await reportStore.put(reportId, artifact);
+
+      return { report, manifest, counters: c, routedSignals };
     },
   };
 }

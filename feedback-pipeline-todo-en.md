@@ -22,8 +22,16 @@ from M10 to **M15**, with **crisis-response last** (everything else ships withou
       colons (would break the shell's `opId:itemId` split) so they're URI-encoded in callbackData +
       decoded on tap. 4 tests; feedback suite 20 green; web build ✓. Mobile M12 rides on **M6** (the
       mobile feedback bot is still in the orphaned ChatScreen).
-- [ ] **M13 — Curator UI surface** + wire `release` to **publish/persist the report artifact** + **route
-      the signals** to their configured destinations.
+- [~] **M13 — Curator UI surface + publish/persist + route signals** — backend + view DONE 2026-06-10
+      (`feat/curator-release`). `release()` now (1) **persists** the report artifact to an injected
+      `reportStore` (surfaced — a publish failure throws), and (2) **routes** the aggregate's confirmed
+      signals to the config's `signal.destinations` via `routeSignals` (best-effort + recorded;
+      severity/`*` fallback). `renderCuratorView` (curator/render.js) is the localised REVIEW surface
+      (theme include/exclude status · quarantine held/released · each signal → its destination · release
+      hint), en+nl. 8 tests; feedback suite 254 green. Remaining: the **live interactive portal page** —
+      a curator route that renders `renderCuratorView` + POST handlers calling
+      `includeTheme`/`releaseQuarantine`/`release` (portal/server.js), and the real `reportStore`/
+      `sendSignal` adapters (pod write + meldpunt transport). Crisis TIMING is M15.
 - [ ] **M14 — Deployment readiness** (config, not code): Edgeless/Privatemode **account + key**; set
       `FP_LLM_BASEURL`/`FP_LLM_APIKEY`, `FEEDBACK_ACTIVATION_URL`; **pin images by `@sha256`**; fill real
       **restic target creds**.

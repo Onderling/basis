@@ -65,5 +65,14 @@ export default {
       `${c.themesBelowThreshold} thema's te klein om te tonen (drempel ${c.kThreshold})` + (c.quarantined ? `, waarvan ${c.quarantined} apart beoordeeld` : '') + (c.quarantineReleased ? ` (${c.quarantineReleased} alsnog opgenomen)` : '') + '.',
       `${c.signals} signalen doorgegeven, ${c.rejected} berichten geweigerd.`,
     ].map((l) => `• ${l}`).join('\n'),
+    // M13 — de beoordeel-weergave van de redacteur (vóór publicatie)
+    reviewTitle: (id) => `Rapport ${id} — beoordeling`,
+    statusIncluded: 'opgenomen', statusExcluded: 'weggelaten',
+    quarantineHeading: 'Apart beoordeeld (onder de drempel)',
+    statusHeld: 'vastgehouden', statusReleased: 'vrijgegeven',
+    signalsHeading: 'Signalen → bestemmingen',
+    signalLine: (signal, severity, dest, confirmed) => `• ${signal} (${severity}${confirmed ? '' : ', onbevestigd'}) → ${dest}`,
+    noDestination: '(geen bestemming ingesteld)',
+    releaseHint: 'Publiceren maakt het rapport openbaar en stuurt de signalen naar hun bestemmingen.',
   },
 };

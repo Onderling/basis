@@ -60,5 +60,14 @@ export default {
       `${c.themesBelowThreshold} themes too small to show (threshold ${c.kThreshold})` + (c.quarantined ? `, ${c.quarantined} of them reviewed separately` : '') + (c.quarantineReleased ? ` (${c.quarantineReleased} included after all)` : '') + '.',
       `${c.signals} signals passed on, ${c.rejected} messages rejected.`,
     ].map((l) => `• ${l}`).join('\n'),
+    // M13 — the curator's REVIEW surface (before release)
+    reviewTitle: (id) => `Report ${id} — review`,
+    statusIncluded: 'included', statusExcluded: 'left out',
+    quarantineHeading: 'Held for review (below threshold)',
+    statusHeld: 'held', statusReleased: 'released',
+    signalsHeading: 'Signals → destinations',
+    signalLine: (signal, severity, dest, confirmed) => `• ${signal} (${severity}${confirmed ? '' : ', unconfirmed'}) → ${dest}`,
+    noDestination: '(no destination configured)',
+    releaseHint: 'Release publishes the report and routes the signals to their destinations.',
   },
 };

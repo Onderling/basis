@@ -93,16 +93,26 @@ the slash menu, AND the LLM tool list at once.**
 
 ---
 
-## Part E — Inline menus (later — after A–C)
-**Why:** you want the small inline menus (buttons) for ops in chat, once chat is solid.
-**What:** project `surfaces.ui.control` / the chat inline-keyboard affordance into per-op inline menus
-(`renderChat` already exposes `inlineKeyboardFor(item)`). **Part B's coverage scan shows which ops have /
-lack an inline-menu counterpart**, so this is a fill-the-gaps pass, not a guess.
+## Part F — LLM-path polish (small)
+**Why:** the gate handles declared verbs; everything else hits the LLM (`interpretCommand`). Today that
+call carries no context and faces the full op set, so it mis-picks (the device-run `/me`).
+**What:** (1) feed the gate's existing `retrieve` (RAG context) into `interpretCommand` — the hook
+exists, the circle bot passes nothing; (2) tighten the tool descriptors / system prompt. Pairs with
+**Part D** (scoping) — together they make the LLM half reliable.
 
 ---
 
-## Sequencing
-**B (coverage scan)** first — cheap, makes the rest legible. Then **A (gate substrate)** → **C (per-app
-fixes, scan-driven)** → **D (scoping)** → **E (inline menus, later)**. A and B are independent and can
-overlap. Global guardrails: household 588 + byte-equivalence green; circle gate behaviour identical;
+## Sequencing — two goals, two orders
+The parts are the same; the order depends on the goal.
+
+- **Goal = canopy-chat working + LLM-reliable (current focus, 2026-06-11):** **B → D → C → F**, then device
+  re-verify. **Part A is DEFERRED** — it's codebase unification (household engine-parity), not a
+  functional requirement for the LLM to work. **Part E** (inline menus) also later.
+  - B (coverage scan) = the map · D (catalog scoping) = the #1 LLM-reliability lever (LLM picks among
+    ~10 relevant ops, not 125) · C (gate verbs for stoop/household/folio) = common actions stay
+    deterministic · F (RAG context into the interpret call) = the LLM remainder is informed.
+- **Goal = unification toward dissolve-apps:** **B → A → C → D → E**. Bring in Part A (lift household's
+  gate routing into `@canopy/manifest-host`) when consolidating the engine is the priority.
+
+Global guardrails (both): household 588 + byte-equivalence green; circle gate behaviour identical;
 back-compat re-exports; each step verified before the next.

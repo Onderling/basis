@@ -96,27 +96,34 @@ One `manifest.js` = source of truth for every surface (gate · slash · chat/LLM
 menus), with a scannable coverage view. Foundation already done: `renderGate` projector + the circle
 gate is manifest-driven. Remaining parts:
 
-- **Part B — surface coverage scan** **[code-ready, do early]** — `renderCoverage(manifest)` + a
+- **Part B — surface coverage scan** **[code-ready, do FIRST]** — `renderCoverage(manifest)` + a
   `npm run coverage` matrix (op × chat/slash/gate/web/mobile/inline-menu) so we can scan what's wired
   where. Cheap; drives Parts C + E.
-- **Part A — gate runtime → substrate (`createGate` in `@canopy/manifest-host`)** **[code-ready]** — lift
-  household's proven routing (multi-item + LLM fallback) + canopy's skip/rule/llm + RAG-retrieve into one
-  substrate engine; both apps consume it. Guarded by household 588 + byte-equivalence.
+- **Part D — per-circle catalog scoping** **[code-ready, LLM-critical]** — scope the merged manifest per
+  circle; gate + slash + LLM all narrow together. **The #1 LLM-reliability lever** (LLM picks among ~10
+  relevant ops, not 125).
 - **Part C — per-app `match` fixes + cross-app resolution** **[code-ready, per-app]** — stoop's gate
   declarations are dormant/incorrect (audited 2026-06-11); fix `arg`/`pickerSource`/the invalid `reject`
   body, generalize the circle's clarify lookup per-app, then add each manifest to `renderGate([…])`.
-- **Part D — per-circle catalog scoping** **[code-ready]** — scope the merged manifest per circle; gate +
-  slash + LLM all narrow together (it's all one projection).
-- **Part E — inline menus** **[later, after A–C]** — project `surfaces.ui.control` / chat inline keyboards
-  into per-op inline menus; the coverage scan (B) shows the gaps to fill.
+- **Part F — LLM-path polish** **[code-ready, small]** — feed the gate's existing `retrieve` (RAG context)
+  into `interpretCommand`; tighten tool descriptors. Makes the LLM remainder reliable (pairs with D).
+- **Part A — gate runtime → substrate (`createGate` in `@canopy/manifest-host`)** **[DEFERRED]** — lift
+  household's routing + canopy's skip/rule/llm + RAG-retrieve into one substrate engine. **Codebase
+  unification (dissolve-apps), NOT required for canopy-chat to work with an LLM** — defer until
+  consolidation is the priority. Guarded by household 588 + byte-equivalence.
+- **Part E — inline menus** **[later]** — project `surfaces.ui.control` / chat inline keyboards into
+  per-op inline menus; the coverage scan (B) shows the gaps to fill.
 
-Sequencing: **B → A → C → D → E** (A and B can overlap).
+**Sequencing (current goal = working + LLM-reliable): B → D → C → F**, then device re-verify. A deferred,
+E later. (Unification order would be B → A → C → D → E — see the plan doc.)
 
 ---
 
 ## Fastest code-ready next moves (no creds/decisions needed)
-1. **Gate + surfaces §7** — start with **Part B** (coverage scan, cheap + high-leverage), then **Part A**
-   (gate substrate). The active thread; concrete and sequenced.
+1. **Gate + surfaces §7 (active thread — goal: canopy-chat working + LLM-reliable)** — **Part B** (coverage
+   scan) → **Part D** (catalog scoping, the LLM lever) → **Part C** (gate verbs for more apps) → **Part F**
+   (RAG context into the interpret call) → device re-verify. **Part A (engine-parity) deferred** — it's
+   unification, not needed for the LLM to work.
 2. **M6 mobile feedback rewire** (§1) — reuses the shared circle dispatch.
 3. **P3 3.3c app-wiring** (§4) — substrate is built, this is the wiring.
 4. **Household chat-agent prompt** (§3) — small, self-contained.

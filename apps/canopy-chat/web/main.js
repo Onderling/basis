@@ -76,6 +76,10 @@ import {
   createFeedbackSurface, parseFeedbackInvite, feedbackContactItem,
   feedbackButtonItems, decodeFeedbackButton, FEEDBACK_BUTTON_OP,
 } from '../src/feedback/feedbackSurface.js';
+// Phase 1 (web↔mobile consolidation) — the SHARED feedback routing mount (the same one mobile uses).
+// Web wraps its rich surface with it so /feedback, /feedback-stop, the bot's own slash cmds (/klaar
+// review, /help, /done, /review) and free-text-while-active all route identically on both platforms.
+import { createFeedbackMount } from '../src/feedback/feedbackMount.js';
 import { createCircleTurn } from '../src/v2/circleTurn.js';
 import { createTokenGate } from '../src/v2/tokenGate.js';
 import { circleGateRules } from '../src/v2/circleGate.js';
@@ -2129,6 +2133,18 @@ function feedbackNote(thread, msg) {
   thread.addShellMessage(renderReply({ payload: msg, shape: 'text', threadId: thread.id }, { t }));
   renderActiveStream();
 }
+// Phase 1 — the shared routing mount over web's CURRENT surface. Built lazily each turn so it tracks
+// the surface after a `/feedback <code>` pod re-activation (the mount is stateless glue; the active-set
+// lives in the surface). appendUserBubble is a no-op because the shell already rendered the user's
+// message (`addUserMessage`); appendBotBubble is unused because we pass `surface`, which keeps web's
+// rich M12-chip emit (the auto-emit that flattens buttons to text is only for the no-surface path).
+function feedbackMount() {
+  return createFeedbackMount({
+    surface:          feedback(),
+    appendUserBubble: () => {},
+    appendBotBubble:  () => {},
+  });
+}
 
 // ── v2 circle bot: free text addressed to the bot → LLM → slash command (web wiring, "C") ──
 // In a circle conversation, "@assistant add milk to the list" is interpreted as a command and
@@ -2213,26 +2229,25 @@ const handleCircleTurn = createCircleTurn({
 
 async function handleUserText(text, thread) {
   const trimmed = text.trim();
-  const fb = trimmed.match(/^\/feedback(?:\s+(\S+))?$/);
-  if (fb) {
-    const code = fb[1];
-    if (code && FEEDBACK_ACTIVATION_URL) {
-      // real participant pod: activate (cohort code + the session WebID) → write with browser keys
-      const session = podAuth.getCurrentSession();
-      if (!session) { feedbackNote(thread, 'Log eerst in op je pod om mee te doen.'); return; }
-      try {
-        const { buildFeedbackPod, getOrCreateRecoveryHash } = await import('../src/feedback/feedbackPod.js');
-        const pod = await buildFeedbackPod({ session, activationUrl: FEEDBACK_ACTIVATION_URL, projectId: FEEDBACK_PROJECT_ID, code, recoveryHash: await getOrCreateRecoveryHash() });
-        await feedback(pod).start(thread.id);
-      } catch (e) { feedbackNote(thread, `Activatie mislukt: ${e.message}`); }
-      return;
-    }
-    await feedback().start(thread.id);   // in-memory demo (no code / not configured)
+  // Feedback (Phase 1) — web keeps its real-pod ACTIVATION branch (`/feedback <code>`, web-specific),
+  // then delegates ALL feedback routing to the SHARED mount: `/feedback` (demo), `/feedback-stop`, the
+  // bot's own slash cmds (/klaar review, /help, /done, /review) and free-text-while-active. This makes
+  // web's routing identical to mobile's and robust (the bot's `/klaar` used to reach the bot only by
+  // accident — via the "unknown" bucket — and would break if `/done` etc. were a real command).
+  const fbCode = trimmed.match(/^\/feedback\s+(\S+)$/);
+  if (fbCode && FEEDBACK_ACTIVATION_URL) {
+    // real participant pod: activate (cohort code + the session WebID) → write with browser keys
+    const session = podAuth.getCurrentSession();
+    if (!session) { feedbackNote(thread, 'Log eerst in op je pod om mee te doen.'); return; }
+    try {
+      const { buildFeedbackPod, getOrCreateRecoveryHash } = await import('../src/feedback/feedbackPod.js');
+      const pod = await buildFeedbackPod({ session, activationUrl: FEEDBACK_ACTIVATION_URL, projectId: FEEDBACK_PROJECT_ID, code: fbCode[1], recoveryHash: await getOrCreateRecoveryHash() });
+      await feedback(pod).start(thread.id);
+    } catch (e) { feedbackNote(thread, `Activatie mislukt: ${e.message}`); }
     return;
   }
-  if (trimmed === '/feedback-stop') {
-    feedback().stop(thread.id);
-    feedbackNote(thread, 'Feedbackmodus uit.');
+  if (await feedbackMount().tryHandle(text, thread.id)) {
+    if (trimmed === '/feedback-stop') feedbackNote(thread, 'Feedbackmodus uit.');   // web's localised confirmation
     return;
   }
 
@@ -2249,7 +2264,7 @@ async function handleUserText(text, thread) {
   const route = resolveDispatch(parse, catalog);
 
   if (route.kind === 'unknown') {
-    if (await feedback().handle(text, thread.id)) return;   // feedback-mode thread → the bot
+    // (feedback free-text-while-active is now owned by feedbackMount().tryHandle at the top — Phase 1)
     if (await handleCircleTurn(text, thread)) return;       // C — addressed free text → LLM → command
     const rendered = renderReply({
       payload:  t('reply.unknown_command', { input: text }),

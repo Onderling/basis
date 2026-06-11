@@ -36,10 +36,10 @@ Detail: `feedback-pipeline-todo-en.md` · `apps/feedback-pipeline/docs/`
 - **Category floors** **[mostly DONE — audit 2026-06-11]** — the TODO's "open" lexicons are in fact
   **all BUILT** in `src/categories.js`: harassment/sexual-misconduct, discrimination + **pay**,
   retaliation, fraud/integrity, medical-emergency, child-safety (+ crisis in signals.js), wired into
-  `triage.js`; 5 unit tests + 76-test deterministic validation on the B dataset. **Remaining:** (1) the
-  **e2e re-run through the full LLM pipeline** (validated in isolation only); (2) extend
-  `detectSensitiveContent` for below-threshold quarantine (pay-inequality, health-condition,
-  financial-hardship, child-welfare); (3) two minor PII floors (licence plate, KvK toggle).
+  `triage.js`; tests + 76-test deterministic validation on the B dataset. **Code bits closed 2026-06-11**
+  (`e0a07b7a`): sensitive-content quarantine extension (pay-inequality/health/financial/child-welfare) +
+  the kenteken PII floor (KvK deliberately deferred — identifies an org). **Only remaining = the e2e
+  re-run through the full LLM pipeline** (validated in isolation; needs an Ollama run on the scenarios).
 - **Menukaart breadth** **[optional]** — `docs/MENUKAART.md`: per-scenario safety tuning + scenario
   tests · voice intake (STT) · WhatsApp/Signal/web channels · fuller feedback-to-participant loop
   (block H) · Klai integration · Lingua/LiteLLM borrows · real-data evaluation · participant-editable

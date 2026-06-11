@@ -92,6 +92,8 @@ export { buildKringTabs, DEFAULT_KRING_TAB, featureActionLabelKey, featureTabId,
 export { createDeliveryStateMap } from './v2/deliveryState.js';
 // Phase 2 — shared kring chat send primitives (optimistic event + best-effort fan-out) for web + mobile.
 export { kringChatMessageEvent, broadcastKringFanOut } from './v2/kringBroadcast.js';
+// Phase 3 — the shared circle label→candidate lookup (live fetch + base), web + mobile.
+export { makeCircleLookup } from './v2/circleLookup.js';
 // E3 — shared record-panel auto-refresh helpers (web EventRouter + mobile post-mutation).
 export {
   REFRESHABLE_VERBS, panelMatchesItemRef, itemRefFromReply, collectStalePanels,

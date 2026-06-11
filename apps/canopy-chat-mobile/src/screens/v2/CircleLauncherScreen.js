@@ -53,6 +53,8 @@ import {
   createDeliveryStateMap,
   // Phase 2 — shared kring chat send primitives (optimistic event + best-effort fan-out).
   kringChatMessageEvent, broadcastKringFanOut,
+  // Phase 3 — the shared circle label→candidate lookup (base items + app-qualified live fetch).
+  makeCircleLookup,
   // B (circle bot) — dispatch primitives to run an interpreted command in the kring.
   parseInput, resolveDispatch, runDispatch, scopeReadyDispatch,
 } from '@canopy-app/canopy-chat';
@@ -1510,27 +1512,13 @@ function CircleDetail({
   // auto-resolving callSkill (makeResolvingCallSkill probes the right app by opId), so labels for item
   // types NOT in the preloaded set — folio files (listFiles), calendar events (listEvents) — resolve
   // too. Scoped to the circle (crewId/circleId/groupId); deduped by id; best-effort (failures keep base).
-  const circleLookup = useCallback(async (listOp, _query, scope, app) => {
-    const toCand = (it) => ({ id: String(it?.id ?? ''), label: String(it?.label ?? it?.title ?? it?.name ?? it?.text ?? it?.id ?? '') });
-    const base = Array.isArray(items) ? items.map(toCand) : [];
-    if (!listOp || !callSkill) return base;
-    try {
-      const sid = scope?.id;
-      const scopeArgs = sid ? { crewId: sid, circleId: sid, groupId: sid } : {};
-      // App-qualify when the op's owning app is known (rawCallSkill = bundle.callSkill, 3-arg) so a
-      // shared op name like `listOpen` resolves on the RIGHT app, not probe-first-origin (= stoop).
-      const r = (app && typeof rawCallSkill === 'function')
-        ? await rawCallSkill(app, listOp, scopeArgs)
-        : await callSkill(listOp, scopeArgs);
-      const arr = Array.isArray(r) ? r
-        : Array.isArray(r?.items) ? r.items : Array.isArray(r?.tasks) ? r.tasks
-        : Array.isArray(r?.posts) ? r.posts : Array.isArray(r?.files) ? r.files
-        : Array.isArray(r?.events) ? r.events : [];
-      const seen = new Set(base.map((c) => c.id));
-      for (const it of arr) { const c = toCand(it); if (c.id && !seen.has(c.id)) { seen.add(c.id); base.push(c); } }
-    } catch { /* keep base */ }
-    return base;
-  }, [items, callSkill, rawCallSkill]);
+  // B (clarification) — the SHARED circle lookup (Phase 3, src/v2/circleLookup): base = the circle's
+  // already-loaded items (tasks + stoop posts), plus the op's OWN list via the app-qualified
+  // rawCallSkill (so `listOpen` resolves on the right app, not probe-first-origin). Was an inline copy.
+  const circleLookup = useMemo(
+    () => makeCircleLookup({ getBase: () => items, appCallSkill: rawCallSkill }),
+    [items, rawCallSkill],
+  );
 
   // B (clarification) — wraps dispatch: a unique target dispatches; an ambiguous one posts a bot
   // message with candidate BUTTONS (tapping → pick → re-run bound to that id); a missing one asks.

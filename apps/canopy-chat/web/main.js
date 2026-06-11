@@ -87,6 +87,10 @@ import { createUserLlmDefaultStore, localStorageUserLlmIo } from '../src/v2/user
 import { localStoragePolicyIo } from '../src/v2/circlePolicyStore.js';
 import { buildCircleLlmProviders } from '../src/v2/circleLlmProviders.js';
 import { createClarifyingDispatch } from '../src/v2/clarifyingDispatch.js';
+// Phase 3 — the SHARED circle lookup + resolver. Web adopts mobile's LIVE lookup (cache base + an
+// app-qualified live fetch); clarifyCommandTargets is the one resolver for both the slash + LLM paths.
+import { makeCircleLookup } from '../src/v2/circleLookup.js';
+import { clarifyCommandTargets } from '../src/v2/clarifyTargets.js';
 import * as podAuth                  from '../src/web/podAuth.js';
 import {
   createPodWriter, discoverPodRoot,
@@ -2064,30 +2068,15 @@ function updateLangButtons() {
  * alphanumeric chars) — those are correctly-typed ids, no
  * resolution needed.
  */
-function resolveTextArgsInPlace(parse, thread) {
-  const entry = catalog?.opsById?.get(parse.opId);
-  const params = entry?.op?.params ?? [];
-  for (const p of params) {
-    const listOp = p?.pickerSource?.listOp;
-    if (!listOp) continue;
-    const raw = parse.args[p.name];
-    if (typeof raw !== 'string' || raw === '') continue;
-    // Already a ulid-looking id?  Skip resolution.
-    if (/^[0-9A-Z]{20,}$/.test(raw)) continue;
-    const listing = thread.lastListingFor(listOp);
-    const items = listing?.items ?? [];
-    if (items.length === 0) continue;
-    const needle = raw.toLowerCase();
-    const hits = items.filter(it => {
-      const label = String(it?.label ?? '').toLowerCase();
-      return label.includes(needle);
-    });
-    if (hits.length === 1) {
-      parse.args[p.name] = hits[0].id;
-    }
-    // Ambiguous (>1) or no match (0): leave as-is.  The substrate
-    // surfaces a clearer "not-found" + the user retries.
-  }
+// Phase 3 — bind human labels (`/done dishwasher`) to ids via the SHARED resolver
+// (`clarifyCommandTargets`) + the shared LIVE lookup (`_circleLookup`: cache base + app-qualified
+// fetch). "Bind-unique" mode: the resolver binds every uniquely-matched picker param in `r.args`, and
+// leaves ambiguous / no-match params as their label — so applying `r.args` reproduces the old per-param
+// behaviour (the typed-slash path keeps NO clarification turn; that's the LLM path's job). Now web also
+// resolves labels the user never listed this session (the live fetch), which the cache could not.
+async function resolveTextArgsInPlace(parse, thread) {
+  const r = await clarifyCommandTargets({ opId: parse.opId, args: parse.args }, { catalog, lookup: _circleLookup, scope: thread });
+  if (r?.args) parse.args = r.args;
 }
 
 // --- feedback-pipeline surface ------------------------------------------------------
@@ -2178,13 +2167,24 @@ async function dispatchReadyCircleCommand({ opId, args }, thread) {
   feedbackNote(thread, t('reply.unknown_command', { input: `@${CIRCLE_BOT_NAME} ${opId}` }));
 }
 
+// Phase 3 — the shared circle lookup for web: BASE = the circle-thread's last-listing cache, PLUS an
+// app-qualified LIVE fetch of the op's own list (so a label the user never listed this session still
+// resolves — the gap mobile didn't have). Best-effort: a live-fetch failure keeps the cache base, so
+// web degrades to its prior behaviour. The fetch scope is pinned to the ACTIVE CIRCLE id (a string;
+// `getActiveCircle()`), not the thread id.
+const _circleLookup = makeCircleLookup({
+  getBase: (thread, listOp) => thread?.lastListingFor?.(listOp)?.items ?? [],
+  appCallSkill: callSkill,
+  scopeId: () => getActiveCircle(),
+});
+
 // The clarification turn — when an interpreted command's id-like target matches MULTIPLE items in the
 // circle (screens are filtered views, so a label can be ambiguous even inside one circle), the bot
 // asks which one instead of guessing; a tapped candidate (`circlePick:<id>` → onButtonTap) re-runs the
-// command bound to that id. Lookup is the circle-thread's own listing → resolution stays circle-scoped.
+// command bound to that id. Lookup stays circle-scoped (cache + circle-scoped live fetch).
 const _circleClarify = createClarifyingDispatch({
   catalog: () => catalog,
-  lookup: (listOp, _query, thread) => thread?.lastListingFor?.(listOp)?.items ?? [],
+  lookup: _circleLookup,
   dispatchReady: dispatchReadyCircleCommand,
   ask: ({ query, candidates }, thread) => {
     feedbackNote(thread, t('circle.clarify.which', { query }));
@@ -2259,7 +2259,7 @@ async function handleUserText(text, thread) {
   // the arg in place.  Ambiguity / no match → leave as-is and
   // let dispatch surface the error normally.
   if (parse?.kind === 'slash' && parse.opId && parse.args) {
-    resolveTextArgsInPlace(parse, thread);
+    await resolveTextArgsInPlace(parse, thread);   // Phase 3 — now async (live lookup)
   }
   const route = resolveDispatch(parse, catalog);
 

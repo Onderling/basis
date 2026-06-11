@@ -192,8 +192,18 @@ export function resolveDispatch(parseResult, catalog) {
   };
 }
 
-/** Verbs whose dispatch creates a new item that belongs to a scope. */
-const SCOPE_VERBS = new Set(['add', 'post']);
+/** Verbs whose dispatch CREATES a new item that belongs to a scope (the item inherits the open circle). */
+const CREATE_VERBS = new Set(['add', 'post']);
+
+/**
+ * Id-targeted MUTATION verbs that must ROUTE to the active circle's crew/group to FIND their target.
+ * canopy-chat is multi-pod — each circle has its own tasks/stoop peer + item-store — so a mutation
+ * dispatched WITHOUT the scope keys lands on the wrong crew and the store reports "item not found".
+ * (Device-verify 2026-06-11: `@assistant done <task>` resolved the right id via the circle-scoped
+ * `listOpen`, but `completeTask` carried no scope → wrong crew → it silently completed nothing.) The
+ * circle bot always resolves the target FROM the active circle's listing, so binding it is correct.
+ */
+const MUTATE_VERBS = new Set(['complete', 'claim', 'submit', 'approve', 'reject', 'remove']);
 
 /**
  * The scope arg keys the substrate resolvers read.  All four share the
@@ -217,10 +227,10 @@ const SCOPE_KEYS = ['circleId', 'crewId', 'groupId', '_scope'];
  * Scope is injected ONLY when:
  *   - the dispatch is `ready` (forms / confirms / errors are untouched),
  *   - a circle is active (`activeCircleId` truthy),
- *   - the verb is item-creating (`add` / `post`) — NOT `create` (which
- *     makes a new container, e.g. createGroup, and must not inherit the
- *     open circle) and NOT id-targeted mutations (claim / complete /
- *     remove act on an existing item that already carries its scope),
+ *   - the verb is item-creating (`add` / `post` — the item inherits the circle) OR an id-targeted
+ *     MUTATION (`complete` / `claim` / `submit` / `approve` / `reject` — which must route to the
+ *     circle's crew/group to FIND the item; see MUTATE_VERBS). NOT `create` (makes a new container,
+ *     e.g. createGroup, must not inherit the open circle) and NOT read verbs.
  *   - the caller hasn't already chosen a scope (an explicit `--crew=` /
  *     picked group wins wholesale).
  *
@@ -228,11 +238,10 @@ const SCOPE_KEYS = ['circleId', 'crewId', 'groupId', '_scope'];
  * `callSkill` calls (inbound remote posts) — which never pass through
  * here — are not mis-scoped to the locally-open circle.
  *
- * NB: canopy-chat's tasks integration currently runs single-crew
- * topology (one CrewState wired at boot), so for tasks the scope arg is
- * delivered to the substrate but does not yet split storage per circle;
- * stoop is per-call group-aware, and a future multi-crew tasks topology
- * consumes the same arg.  The binding is the forward-compatible plumbing.
+ * NB (corrected 2026-06-11): canopy-chat is MULTI-POD in practice — each circle has its own
+ * tasks/stoop peer + item-store — so the scope arg is load-bearing for routing, not just a forward-
+ * compatible tag. A mutation dispatched without it lands on the wrong crew (device-verified
+ * "item not found" on `done <task>`). stoop is per-call group-aware; tasks routes by crewId.
  *
  * Pure: the host reads `getActiveCircle()` and passes the id in.
  *
@@ -242,7 +251,9 @@ const SCOPE_KEYS = ['circleId', 'crewId', 'groupId', '_scope'];
  */
 export function scopeReadyDispatch(ready, activeCircleId) {
   if (!ready || ready.kind !== 'ready' || !activeCircleId) return ready;
-  if (!SCOPE_VERBS.has(ready.verb)) return ready;
+  // CREATE verbs: the new item inherits the open circle. MUTATE verbs: route to the circle's crew/group
+  // so the store can find the target (multi-pod — see MUTATE_VERBS). Everything else is untouched.
+  if (!CREATE_VERBS.has(ready.verb) && !MUTATE_VERBS.has(ready.verb)) return ready;
 
   const args = ready.args ?? {};
   const alreadyScoped = SCOPE_KEYS.some(

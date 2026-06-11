@@ -261,11 +261,19 @@ describe('scopeReadyDispatch — F1 active-circle binding (5.3)', () => {
     expect(scopeReadyDispatch(input, 'c1')).toBe(input);
   });
 
-  it('does NOT scope id-targeted mutations (claim/complete/remove/approve)', () => {
-    for (const v of ['claim', 'complete', 'remove', 'set', 'approve']) {
-      const input = ready(v, { id: 'task-9' });
-      expect(scopeReadyDispatch(input, 'c1')).toBe(input);
+  it('DOES scope id-targeted mutations to the active circle (multi-pod crew routing)', () => {
+    // canopy-chat is multi-pod: a mutation needs the circle's crew/group to FIND its target item,
+    // else the wrong crew reports "item not found" (device-verified on `done <task>`).
+    for (const v of ['claim', 'complete', 'submit', 'approve', 'reject', 'remove']) {
+      const r = scopeReadyDispatch(ready(v, { id: 'task-9' }), 'c1');
+      expect(itemCircleId(r.args)).toBe('c1');     // crewId/circleId/groupId now bound to the active circle
+      expect(r.args.id).toBe('task-9');            // the target id is preserved
     }
+  });
+
+  it('does NOT scope a non-create/mutate verb (e.g. set)', () => {
+    const input = ready('set', { id: 'task-9' });
+    expect(scopeReadyDispatch(input, 'c1')).toBe(input);   // untouched (same ref)
   });
 
   it('is a no-op when no circle is active', () => {

@@ -78,11 +78,18 @@ resolution = the remaining slice** (next). Added 22 gate verbs across tasks/stoo
 collisions (share→folio, accept→calendar, reject→tasks, cancel→calendar) + extras found in verify
 (tasks shadows household add/done → household-mock EXCLUDED from the circle gate; dropped ambiguous
 `ik kom`). `circleGate.js` now `renderGate([tasks, stoop, folio, calendar])`. Coverage gate 17→25.
-Suite 2277. **Remaining:** generalize the circle clarify lookup to call each op's `listOp` per-app
-(`callSkill(appOrigin, listOp, …)`) so stoop/folio/calendar labels resolve to real ids (today only
-tasks resolve, via the circle's loaded items). Agent-investigated change plan in hand: `clarifyTargets.js`
-passes appOrigin (from `pickerSource.appOrigin` or `catalog.opsById.get(listOp).appOrigin`) to `lookup`;
-mobile `circleLookup` + web lookup become async `callSkill`-backed with result-shape normalization.
+Suite 2277. **Remaining = cross-app label→id resolution (narrower than first thought):**
+- `loadCircleItems` (DEFAULT_SOURCES) already pulls **stoop posts + tasks** into the circle's `items`,
+  and `circleLookup` returns them → **tasks + stoop labels likely already resolve**. Only **folio files**
+  + **calendar events** aren't loaded.
+- `makeResolvingCallSkill` already **auto-resolves the app from the opId** (probes origins, skips via
+  catalog) — so NO `appOrigin` plumbing in `clarifyTargets.js` is needed (lower blast radius than the
+  agent's first plan).
+- **Minimal fix:** add `getFiles → folio.listFiles` + `getEvents → calendar.listEvents` to
+  `DEFAULT_SOURCES` (matching the existing pattern), OR make `circleLookup`/web-lookup `callSkill(listOp,
+  {crewId/circleId/groupId})` with result-shape normalization + an `items` fallback.
+- **Needs a live web/device run** to confirm the per-app id/label shapes + circle-scoping (`keepForCircle`
+  on folio/calendar items) — do NOT claim it works without that. tasks stays correct via the existing path.
 
 **Why:** only `tasks` had correct gate (`match`) declarations. `stoop`'s are **dormant + incorrect**
 (2026-06-11 audit): `markReturned`/`getItemTree`/`reportPost` use `body:'match'`→`args.match` but the

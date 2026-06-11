@@ -20,8 +20,21 @@ describe('Slice F.1 — folio manifest validation', () => {
     expect(ok, JSON.stringify(errors, null, 2)).toBe(true);
   });
 
-  it('declares the "file" itemType', () => {
-    expect(folioManifest.itemTypes).toEqual(['file']);
+  it('declares the "note" + "file" itemTypes (Part G dissolve)', () => {
+    expect(folioManifest.itemTypes).toEqual(['note', 'file']);
+  });
+
+  it('carries the merged op set (7 app ops + 7 chat-shell ops = 14)', () => {
+    const ids = folioManifest.operations.map((o) => o.id);
+    expect(ids).toEqual([
+      // folio's own app ops
+      'deleteFromPod', 'deleteLocally', 'forceRepush',
+      'syncOnce', 'watchStart', 'watchStop', 'verifyPodState',
+      // chat-shell ops folded in from the former mockFolioManifest
+      'readNote', 'shareFolder', 'getFileSnapshot',
+      'downloadFile', 'saveToMyPod', 'folioStatus', 'listFiles',
+    ]);
+    expect(folioManifest.operations).toHaveLength(14);
   });
 
   it('declares a "files" view with shape: list + listFiles dataSource', () => {
@@ -42,6 +55,8 @@ describe('Slice F.1 — folio Q27 confirm declarations', () => {
       severity: 'danger',
       message:  'Permanently delete this file from your Solid pod?  This cannot be undone.',
     });
+    // Part G curation — destructive ops are withheld from the circle LLM.
+    expect(op.surfaces).not.toHaveProperty('chat');
   });
 
   it('deleteLocally declares Q27 confirm with severity:info', () => {
@@ -52,6 +67,8 @@ describe('Slice F.1 — folio Q27 confirm declarations', () => {
       severity: 'info',
       message:  'Remove local copy?  Pod copy survives.',
     });
+    // Part G curation — destructive ops are withheld from the circle LLM.
+    expect(op.surfaces).not.toHaveProperty('chat');
   });
 
   it('forceRepush declares Q27 confirm with severity:warn + section-header placement', () => {
@@ -64,6 +81,8 @@ describe('Slice F.1 — folio Q27 confirm declarations', () => {
       severity: 'warn',
       message:  'Force-push the local folder to the pod?  This overwrites any concurrent edits on the pod side.',
     });
+    // Part G curation — destructive ops are withheld from the circle LLM.
+    expect(op.surfaces).not.toHaveProperty('chat');
   });
 
   it('non-destructive ops carry NO confirm (syncOnce, watchStart, watchStop, verifyPodState)', () => {

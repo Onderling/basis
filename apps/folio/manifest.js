@@ -3,16 +3,19 @@
  *
  * Slice F.1 (V0.8, 2026-05-21) — folio's first NavModel manifest.
  *
- * **Slash-command policy: LLM-only** (SP-12 audit 2026-05-24, #246).
- * Folio's audience is "I want to save this note" intent users, not
- * power users running `/share-folder /list-files`.  Natural-language
- * chat with the LLM picking the skill fits the information-
- * management mental model better than a CLI surface.  Power users
- * who want slash get it via `apps/canopy-chat/src/core/manifests/
- * mockManifests.js` (mockFolioManifest declares /share /save-to-pod
- * /download-file /folio-status at the chat-shell layer).  Same
- * convention tasks-v0 uses (SP-3 V0).  See `Project Files/canopy-
- * chat/slash-coverage-audit-2026-05-24.md` for the full audit.
+ * **Part G dissolve (2026-06-11):** this is now the ONE folio manifest.
+ * canopy-chat's former `mockFolioManifest` (the chat-shell slash/gate
+ * surface for the REAL folio skills) was folded in here and re-exported
+ * as `mockFolioManifest` for back-compat.  So the app's web/mobile
+ * screens AND the chat shell (circle LLM + deterministic gate) now read
+ * a single source of truth — the calendar-style target model.
+ *
+ * **Slash surface:** the chat-shell ops below declare `/readnote /share
+ * /sync /watch /files /folio-status` (+ Part-C gate `match` verbs).  The
+ * structurally-distinct destructive ops (deleteFromPod / deleteLocally /
+ * forceRepush) DELIBERATELY carry NO `surfaces.chat` — the circle LLM
+ * must never propose deleting a shared file (Part G curation decision).
+ * See `Project Files/canopy-chat/slash-coverage-audit-2026-05-24.md`.
  *
  * Folio is structurally different from the item-store apps (tasks-v0,
  * stoop, household): it doesn't have an ItemStore + crew-scoped items.
@@ -61,8 +64,11 @@
 export const folioManifest = {
   app:       'folio',
   itemTypes: [
-    // Markdown files mirrored between local folder and Solid pod.  The
-    // local rel-path is the item identity (e.g. 'notes/today.md').
+    // Markdown notes + the files mirrored between local folder and Solid
+    // pod.  The local rel-path is the item identity (e.g. 'notes/today.md').
+    // Part G (2026-06-11): 'note' folded in from the former mockFolioManifest
+    // (readNote / getFileSnapshot operate on notes-as-files).
+    'note',
     'file',
   ],
 
@@ -81,7 +87,11 @@ export const folioManifest = {
         { name: 'relPath', kind: 'string', required: true },
       ],
       surfaces: {
-        chat: { hint: 'Permanently delete a file from your Solid pod.  Cannot be undone — pod-side delete is irreversible.' },
+        // Part G curation (2026-06-11): NO chat surface.  Destructive
+        // ops are deliberately withheld from the circle LLM tool list
+        // so the model can never propose deleting a shared file.  The
+        // `buildToolDescriptors` chat-surface filter then hides this op
+        // from the model; it stays reachable via the UI (button+confirm).
         ui: {
           control: 'button',
           label:   'Delete from pod',
@@ -104,7 +114,7 @@ export const folioManifest = {
         { name: 'relPath', kind: 'string', required: true },
       ],
       surfaces: {
-        chat: { hint: 'Remove the local copy via a tombstone.  Pod copy survives; the file re-appears locally on the next sync if still present on the pod.' },
+        // Part G curation (2026-06-11): NO chat surface (destructive — withheld from the circle LLM).
         ui: {
           control: 'button',
           label:   'Delete locally',
@@ -131,7 +141,7 @@ export const folioManifest = {
       // pick it up automatically.
       appliesTo: { type: '*' },
       surfaces: {
-        chat: { hint: 'Force-push every local file to the pod, overwriting concurrent pod-side edits.  Disaster-recovery only.' },
+        // Part G curation (2026-06-11): NO chat surface (destructive — withheld from the circle LLM).
         ui: {
           control:   'button',
           label:     'Force re-push',
@@ -155,7 +165,13 @@ export const folioManifest = {
       // V0.2 Q8 wildcard — folder-wide; surfaces on every view's header.
       appliesTo: { type: '*' },
       surfaces: {
-        chat: { hint: 'Run one bi-directional sync between the local folder and the pod.' },
+        // Part G merge (2026-06-11): real ui (section-header sync button)
+        // + the mock chat-shell's slash/gate surface for the circle bot.
+        // Part C gate — no-arg action (sidecar only; runtime:'node'
+        // filters it from the browser bundle).
+        slash: { command: '/sync',
+          match: { verbs: ['sync', 'synchroniseer', 'synchroniseren'], body: 'none' } },
+        chat: { reply: 'text', hint: 'force a one-shot sync (sidecar only)' },
         ui: {
           control:   'button',
           label:     'Sync now',
@@ -172,7 +188,10 @@ export const folioManifest = {
       params:    [],
       appliesTo: { type: '*' },
       surfaces: {
-        chat: { hint: 'Start the local-folder watcher.  Edits fire `runOnce` after a stability+grace window.' },
+        // Part G merge (2026-06-11): real ui + mock chat-shell slash/gate.
+        slash: { command: '/watch',
+          match: { verbs: ['watch', ['watch', 'folder'], ['let', 'op'], 'bewaak', ['bewaak', 'map']], body: 'none' } },
+        chat: { reply: 'text', hint: 'start the folder watcher (sidecar only)' },
         ui: {
           control:   'button',
           label:     'Start watching',
@@ -214,9 +233,128 @@ export const folioManifest = {
         ui:   { control: 'button', label: 'Verify on pod' },
       },
     },
+
+    /* ── Chat-shell ops (Part G dissolve, 2026-06-11) ───────────────────
+     * Folded in from canopy-chat's former `mockFolioManifest`.  These are
+     * the circle/chat-shell surface for the REAL folio skills
+     * (handlers via createBrowserFolioAgent / realAgent).  Each declares
+     * `surfaces.chat` (and most a Part-C gate `match`), so the circle
+     * LLM + the deterministic gate read them straight from this one
+     * manifest.  The destructive ops above deliberately carry NO chat. */
+
+    {
+      id:    'readNote', verb: 'list',
+      params: [{ name: 'path', kind: 'string', required: true }],
+      runtime: 'browser',
+      surfaces: {
+        slash: { command: '/readnote' },
+        // #194 (B9, 2026-05-23) — record reply so frontmatter `embeds`
+        // ("See also" refs to tasks / events / posts) can render as
+        // clickable chips alongside the body text.
+        chat:  { reply: 'record', hint: 'read a folio note' },
+      },
+    },
+    {
+      id:    'shareFolder', verb: 'add',
+      params: [
+        { name: 'folder', kind: 'string', required: true },
+        { name: 'with',   kind: 'webid',  required: true },
+      ],
+      runtime: 'browser',
+      surfaces: {
+        // Part C gate — owns 'share'/'deel'. PARTIAL: binds `folder` from the body; the required
+        // recipient `with` (a webid) is then form-elicited (a one-line command can't carry it).
+        slash: { command: '/share', body: 'flags',
+          match: { verbs: ['share', 'deel'], body: 'text-only', arg: 'folder', dropTrailing: ['with', 'to', 'met', 'aan'] } },
+        chat:  { reply: 'text', hint: 'share a folio folder with a contact' },
+      },
+    },
+    /**
+     * `getFileSnapshot(path)` — Q29 cardSnapshotSkill for /embed-file
+     * when the user picks an existing folio file by name/path.
+     */
+    {
+      id:    'getFileSnapshot', verb: 'list',
+      appliesTo: { type: 'file' },
+      params: [{ name: 'path', kind: 'string', required: true }],
+      runtime: 'browser',
+      surfaces: { chat: { hint: 'snapshot a folio file for embedding' } },
+    },
+    /**
+     * `[Download]` button on file-cards.  appliesTo:{type:'file'}
+     * means the chat-shell's appliesTo-gated renderer auto-surfaces
+     * this on every file-card embed.
+     */
+    {
+      id:    'downloadFile', verb: 'list',
+      appliesTo: { type: 'file' },
+      params: [{ name: 'path', kind: 'string', required: true,
+        pickerSource: { listOp: 'listFiles' } }],          // Part C — label→path resolution
+      runtime: 'browser',
+      surfaces: {
+        // Part C gate — "download X" → downloadFile{path}.
+        slash: { match: { verbs: ['download', 'haal', ['haal', 'op'], ['download', 'bestand']], body: 'match', arg: 'path' } },
+        ui:   { control: 'button', label: 'Download' },
+        // Declare `reply: 'text'` so the chat-shell renders the
+        // skill's `{ok, message}` reply as text — without this the
+        // verb:'list' default renders as an empty list ('(no items)').
+        chat: { reply: 'text', hint: 'download a file from the sender\'s pod' },
+      },
+    },
+    /**
+     * `[Save to my pod]` cross-pod copy.  Reads the sender's bytes
+     * (or inline payload), writes to the receiver's own pod under
+     * /shared-with-me/<name>.
+     */
+    {
+      id:    'saveToMyPod', verb: 'add',
+      appliesTo: { type: 'file' },
+      params: [
+        { name: 'path', kind: 'string', required: false,
+          pickerSource: { listOp: 'listFiles' } },         // Part C — label→path resolution
+        { name: 'name', kind: 'string', required: false },
+      ],
+      runtime: 'browser',
+      surfaces: {
+        // Part C gate — "save X [to my pod]" → saveToMyPod{path}.
+        slash: { match: { verbs: ['save', 'bewaar', ['save', 'to', 'my', 'pod'], 'opslaan', ['bewaar', 'in', 'mijn', 'pod']], body: 'match', arg: 'path' } },
+        ui:   { control: 'button', label: 'Save to my pod' },
+        chat: { hint: 'save a shared file to your own pod' },
+      },
+    },
+    /**
+     * `/folio-status` — record reply: last sync, conflict count,
+     * current sharing.  Mirrors `bin/folio status`.
+     */
+    {
+      id:    'folioStatus', verb: 'list',
+      params: [],
+      runtime: 'browser',
+      surfaces: {
+        slash: { command: '/folio-status' },
+        chat:  { reply: 'record', hint: 'show folio sync status' },
+      },
+    },
+    /**
+     * `/files` lists every folio file in the current in-process index.
+     * No-arg, list reply so each row renders with file-card action
+     * buttons (Download / Save to my pod) via appliesTo:{type:'file'}.
+     */
+    {
+      id:    'listFiles', verb: 'list',
+      params: [],
+      runtime: 'browser',
+      surfaces: {
+        slash: { command: '/files' },
+        chat:  { reply: 'list', hint: 'list files in folio' },
+      },
+    },
   ],
 
   views: [
+    // The notes view — Part G (2026-06-11), folded in from the former
+    // mockFolioManifest.  Markdown notes (readNote / search / brief).
+    { id: 'notes', title: 'Notes', type: 'note' },
     // The files view — list of locally-tracked markdown files.  Today
     // populated by folio's `/files` HTTP route + folio-mobile's
     // NotesListScreen; the manifest's `dataSource.skillId` is

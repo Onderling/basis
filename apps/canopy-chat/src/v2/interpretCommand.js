@@ -30,6 +30,10 @@ export function buildToolDescriptors(catalog) {
   for (const [key, entry] of opsById) {
     const op = entry && entry.op ? entry.op : entry;
     if (!op) continue;
+    // Part G enabler — only ops that declare a chat surface are LLM tools. No-op for the current
+    // catalog (every op has surfaces.chat); it lets a merged REAL manifest carry internal/destructive
+    // ops (deleteFromPod, forceRepush, …) without the model ever proposing them.
+    if (!op.surfaces || !op.surfaces.chat) continue;
     const params = Array.isArray(op.params) ? op.params : [];
     const properties = {};
     const required = [];

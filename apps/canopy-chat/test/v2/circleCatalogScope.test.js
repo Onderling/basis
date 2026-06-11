@@ -3,12 +3,13 @@ import { scopeCatalogToApps } from '../../src/v2/circleCatalogScope.js';
 import { buildToolDescriptors } from '../../src/v2/interpretCommand.js';
 
 function makeCatalog() {
+  const ch = { chat: { hint: 'x' } };                       // every real op has a chat surface
   const opsById = new Map([
-    ['me',           { op: { id: 'me', verb: 'list' },     appOrigin: 'canopy-chat' }],
-    ['transportMode',{ op: { id: 'transportMode' },        appOrigin: 'canopy-chat' }],
-    ['addTask',      { op: { id: 'addTask', verb: 'add' }, appOrigin: 'tasks-v0' }],
-    ['addItem',      { op: { id: 'addItem', verb: 'add' }, appOrigin: 'household' }],
-    ['markReturned', { op: { id: 'markReturned' },         appOrigin: 'stoop' }],
+    ['me',           { op: { id: 'me', verb: 'list', surfaces: ch },     appOrigin: 'canopy-chat' }],
+    ['transportMode',{ op: { id: 'transportMode', surfaces: ch },        appOrigin: 'canopy-chat' }],
+    ['addTask',      { op: { id: 'addTask', verb: 'add', surfaces: ch }, appOrigin: 'tasks-v0' }],
+    ['addItem',      { op: { id: 'addItem', verb: 'add', surfaces: ch }, appOrigin: 'household' }],
+    ['markReturned', { op: { id: 'markReturned', surfaces: ch },         appOrigin: 'stoop' }],
   ]);
   const commandMenu = [
     { command: '/me',      opId: 'me',      appOrigin: 'canopy-chat' },

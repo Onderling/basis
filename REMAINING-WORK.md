@@ -139,9 +139,10 @@ gate is manifest-driven. Remaining parts:
 - **Part D — per-circle catalog scoping** **[✅ DONE 2026-06-11]** — `scopeCatalogToApps` scopes the LLM
   tool list by the circle's apps; default drops canopy-chat's 37 infra ops (`/me` etc.). LLM tools
   **125 → 88** default **→ 40** for a household circle. Next (small): UI to set `policy.apps` per circle.
-- **Part C — per-app `match` fixes + cross-app resolution** **[code-ready, per-app]** — stoop's gate
-  declarations are dormant/incorrect (audited 2026-06-11); fix `arg`/`pickerSource`/the invalid `reject`
-  body, generalize the circle's clarify lookup per-app, then add each manifest to `renderGate([…])`.
+- **Part C — gate verbs all apps + fixes + cross-app resolution** **[✅ DONE 2026-06-11]** — 22 gate verbs
+  across tasks/stoop/folio/calendar, stoop's 5 broken declarations fixed, 6 cross-app collisions resolved;
+  cross-app label→id resolution wired on mobile (`circleLookup` pulls the op's list via the auto-resolving
+  callSkill). **Needs device verify** + web folio/calendar resolution is a follow-up.
 - **Part F — LLM-path polish** **[code-ready, small]** — feed the gate's existing `retrieve` (RAG context)
   into `interpretCommand`; tighten tool descriptors. Makes the LLM remainder reliable (pairs with D).
 - **Part A — gate runtime → substrate (`createGate` in `@canopy/manifest-host`)** **[DEFERRED]** — lift
@@ -150,6 +151,14 @@ gate is manifest-driven. Remaining parts:
   consolidation is the priority. Guarded by household 588 + byte-equivalence.
 - **Part E — inline menus** **[later]** — project `surfaces.ui.control` / chat inline keyboards into
   per-op inline menus; the coverage scan (B) shows the gaps to fill.
+- **Part G — mock↔real manifest reconcile (dissolve core)** **[STARTED 2026-06-11]** — the enabler is
+  ✅ DONE: `buildToolDescriptors` now filters the LLM tool list to ops with `surfaces.chat` (no-op today —
+  chat 127/127 — but lets a merged real manifest hide its internal/destructive ops). **Remainder (per-app,
+  verify each):** (1) reconcile the **dangerous param drift** on shared ops (tasks `rejectTask` reason↔note,
+  `addTask` params; stoop `postRequest` kind↔intent, `markReturned` itemId↔requestId; household
+  `markComplete` choreId↔match) — a live bug class, do first; (2) merge **folio** → real manifest (cleanest);
+  (3) **tasks-v0**; (4) **stoop + household** (dedupe slash + itemTypes); drop the mocks. Full strategy +
+  drift table in `PLAN-manifest-gate-surfaces.md` Part G + `apps/canopy-chat/docs/part-g-reconciliation-map.md`.
 
 **Sequencing (current goal = working + LLM-reliable): B → D → C → F**, then device re-verify. A deferred,
 E later. (Unification order would be B → A → C → D → E — see the plan doc.)

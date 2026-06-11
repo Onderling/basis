@@ -145,9 +145,39 @@ slash) but **DRIFTED** (2026-06-11 audit): tasks-v0 real 25 ops vs mock 32 (only
 14 vs mock 30 with the shared ops declaring `slash` in **both** (duplicated, free to diverge). calendar
 already uses its real manifest (the target model). See `[[reference-mock-vs-real-manifests]]`.
 **What:** converge to ONE manifest per app that both the app and the chat shell read (calendar-style);
-dedupe stoop's slash; rename `mock*Manifest → *SlashManifest` (the header already plans this). This is
-the concrete core of the dissolve-into-canopy-chat direction — do it before/with the broad SP-3b/SP-6
-work. **[code-ready, larger]**
+dedupe stoop's slash; rename `mock*Manifest → *SlashManifest`. The concrete core of dissolve-into-canopy-chat.
+
+### Findings (investigated 2026-06-11)
+- **The catalog includes EVERY op, surface-unfiltered.** `manifestMerge.js:182` `opsById.set(...)` adds
+  all ops (only a *runtime* filter at :143); `commandMenu` is the only surface-filtered projection (ops
+  with `slash.command`). So `buildToolDescriptors` (the LLM tool list) surfaced ALL ops — meaning a naive
+  "import the real manifest" would expose its **internal/destructive ops** (folio `deleteFromPod`,
+  `forceRepush`, …; tasks `removeTask`, `revokeTask`) to the model. THIS is why the curated mocks exist.
+- **Dangerous param drift on SHARED ops** (chat shell ≠ real skill — see `docs/part-g-reconciliation-map.md`):
+  tasks `addTask` (assignee/requiredSkill vs notes/dueAt/definitionOfDone), `rejectTask` (mock `reason`
+  optional vs real `note` REQUIRED → chat can under-specify → skill fails), `approveTask` (real has note);
+  stoop `postRequest` (`kind` ask/borrow/share/report/event vs `intent` ask/offer/lend), `markReturned`
+  (`itemId` vs `requestId`), `leaveGroup` (`confirm` vs required `groupId`); household `markComplete`
+  (`choreId`+pickerSource vs `match`). itemTypes diverge in every app.
+- All four real manifests are **pure-data → bundle clean** (audit) → using them directly is feasible.
+
+### Enabler ✅ DONE 2026-06-11 (`buildToolDescriptors` chat-surface filter)
+The LLM tool list now only includes ops with a `surfaces.chat` declaration (`interpretCommand.js`).
+**No-op today** (the coverage scan shows chat 127/127 — every current op has chat), so it's safe; it's
+ALSO correct semantics (the model should only propose chat ops). This is the structural unlock: a merged
+real manifest can carry internal/destructive ops (no `surfaces.chat`) and the model will never see them.
+
+### Remainder — the per-app dissolve (sequenced)
+1. **Reconcile the dangerous param drift FIRST** (it's a live bug class, contained): align each mock
+   shared-op's params to the real skill's (verify against `apps/<app>/manifest.js` + the real skill),
+   updating the gate/slash/tests. Highest value, smallest blast radius; makes a later merge safe.
+2. **folio** (cleanest: real omits slash): move the chat ops + surfaces (chat/slash/gate) INTO
+   `apps/folio/manifest.js`; its destructive ops stay (no `surfaces.chat` → not surfaced, per the
+   enabler); `composeManifests`/`circleGate` import the real folio; drop `mockFolioManifest`.
+3. **tasks-v0** (real omits slash): same pattern, after the param reconcile.
+4. **stoop + household** (slash duplicated + heavy drift): dedupe slash, reconcile itemTypes, then merge.
+5. Each step: regenerate the surface-coverage snapshot; `validateManifest` strict; full suite + web build.
+**[code-ready, larger — do per-app, verify each]**
 
 ---
 

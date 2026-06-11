@@ -16,7 +16,7 @@ const CHORES = catalogOf([
     surfaces: { chat: { hint: 'add a task to the list' } } },
   { id: 'markComplete', verb: 'complete', params: [{ name: 'choreId', kind: 'string', required: true }],
     surfaces: { slash: { command: '/done' }, chat: { hint: 'mark a chore complete' } } },
-  { id: 'listOpen', params: [] },
+  { id: 'listOpen', params: [], surfaces: { chat: { reply: 'list' } } },
 ]);
 
 describe('buildToolDescriptors', () => {

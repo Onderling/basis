@@ -116,6 +116,14 @@
  *                                                 and 'type+text'.
  * @property {Call}                   [onEmpty]    fallback Call when the body
  *                                                 parser yields nothing.
+ * @property {string}                 [arg]        F-SP2 (2026-06-11): target the body at this arg
+ *                                                 name instead of the default ('match' for 'match',
+ *                                                 'text' for 'text-only'/'type+text'). E.g. `'id'`
+ *                                                 for ops whose param is `id`. Inert if absent.
+ * @property {string[]}               [dropTrailing] F-SP2: strip a trailing connector clause from
+ *                                                 the body — words like ['to','op','toe'] turn
+ *                                                 "milk to the list" → "milk". Applies to 'match',
+ *                                                 'text-only', 'type+text'. Inert if absent.
  */
 
 /** @typedef {{ skillId: string, args: object }} Call */

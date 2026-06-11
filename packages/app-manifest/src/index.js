@@ -23,6 +23,9 @@ export {
 export { paramsToJsonSchema } from './paramsToJsonSchema.js';
 export { renderChat }          from './renderChat.js';
 export { renderSlash }         from './renderSlash.js';
+// renderGate — manifest → deterministic token-gate rules (the pre-LLM half; shared by the
+// household TG-bot + the canopy-chat circle bot). Wraps renderSlash into the gate rule shape.
+export { renderGate }          from './renderGate.js';
 // Slice A.1 (2026-05-20) — web/mobile surface projection.
 // See DESIGN-navmodel-sketch.md for the NavModel shape +
 // PLAN-gui-chat-uplift.md Slice A for the consumer roadmap.

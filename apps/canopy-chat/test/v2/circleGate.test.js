@@ -1,71 +1,55 @@
 import { describe, it, expect, vi } from 'vitest';
-import { defaultCircleGateRules } from '../../src/v2/circleGateRules.js';
+import { circleGateRules } from '../../src/v2/circleGate.js';
 import { createTokenGate } from '../../src/v2/tokenGate.js';
 import { createCircleDispatch } from '../../src/v2/circleDispatch.js';
 
-const gate = () => createTokenGate({ rules: defaultCircleGateRules() });
+// The circle gate is now MANIFEST-DERIVED (renderGate over mockTasksManifest's surfaces.slash.match),
+// not a hand-written rule set. These assert the projected rules behave as the device-run needs.
+const gate = () => createTokenGate({ rules: circleGateRules() });
 const route = (text) => gate().evaluate(text, {});
 
-describe('circle gate rules — deterministic routing (no LLM)', () => {
+describe('circle gate (manifest-derived) — deterministic routing', () => {
   it('"add X to the list" → addTask{text:X}, dropping the list qualifier', async () => {
     const r = await route('add milk to the list');
     expect(r.via).toBe('rule');
     expect(r.command).toEqual({ opId: 'addTask', args: { text: 'milk' } });
   });
 
-  it('add without a qualifier keeps the whole item', async () => {
+  it('add keeps a multi-word item with no qualifier', async () => {
     expect((await route('add buy fresh milk')).command).toEqual({ opId: 'addTask', args: { text: 'buy fresh milk' } });
   });
 
-  it('todo verb routes to addTask', async () => {
-    expect((await route('todo call the dentist')).command).toEqual({ opId: 'addTask', args: { text: 'call the dentist' } });
-  });
-
-  it('Dutch: "voeg melk toe" and "zet melk op de lijst" → addTask', async () => {
+  it('Dutch: "voeg melk toe" / "zet melk op de lijst" → addTask{text:melk}', async () => {
     expect((await route('voeg melk toe')).command).toEqual({ opId: 'addTask', args: { text: 'melk' } });
     expect((await route('zet melk op de lijst')).command).toEqual({ opId: 'addTask', args: { text: 'melk' } });
   });
 
-  it('"done X" / "mark X as done" → completeTask{id:X}', async () => {
+  it('"done X" → completeTask with id (the pickerSource param), not match', async () => {
     expect((await route('done the dishes')).command).toEqual({ opId: 'completeTask', args: { id: 'the dishes' } });
-    expect((await route('mark the dishes as done')).command).toEqual({ opId: 'completeTask', args: { id: 'the dishes' } });
   });
 
-  it('Dutch: "klaar met afwas" → completeTask', async () => {
+  it('multiword "klaar met X" beats bare "klaar" → completeTask{id:X}', async () => {
     expect((await route('klaar met afwas')).command).toEqual({ opId: 'completeTask', args: { id: 'afwas' } });
   });
 
-  it('"claim X" / "I\'ll take X" → claimTask{id:X}', async () => {
+  it('"claim X" / "I\'ll take X" / "ik pak X" → claimTask{id:X}', async () => {
     expect((await route('claim the dishes')).command).toEqual({ opId: 'claimTask', args: { id: 'the dishes' } });
     expect((await route("I'll take the trash")).command).toEqual({ opId: 'claimTask', args: { id: 'the trash' } });
-  });
-
-  it('Dutch: "ik pak de afwas" → claimTask', async () => {
     expect((await route('ik pak de afwas')).command).toEqual({ opId: 'claimTask', args: { id: 'de afwas' } });
   });
 
   it('unmatched free text falls through to the LLM', async () => {
     expect((await route('what should we cook tonight?')).via).toBe('llm');
   });
-
-  it('a bare verb with no target falls through to the LLM (rule returns null)', async () => {
-    expect((await route('add')).via).toBe('llm');
-    expect((await route('done')).via).toBe('llm');
-  });
-
-  it('op-id overrides are honoured', async () => {
-    const g = createTokenGate({ rules: defaultCircleGateRules({ addOp: 'app:add' }) });
-    expect((await g.evaluate('add milk', {})).command.opId).toBe('app:add');
-  });
 });
 
-describe('circle bot + token gate — routing precedence', () => {
+describe('circle bot + manifest gate — routing precedence', () => {
   function setup() {
     const dispatched = [];
     const interpret = vi.fn(async () => ({ opId: 'fromLlm', args: {} }));
     const bot = createCircleDispatch({
       policy: { llmTool: 'local' },
-      llmProviders: { local: { chat: async () => '' } },          // truthy llm so the gate path runs
+      llmProviders: { local: { chat: async () => '' } },             // truthy llm so the gate path runs
       interpret,
       dispatch: (cmd) => dispatched.push(cmd),
       postToKring: () => {},

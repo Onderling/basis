@@ -1,15 +1,19 @@
 # Circle bot — token-gate wiring (TODO for a fresh session)
 
-**Status:** ✅ BUILT 2026-06-11 (`feat/circle-bot-token-gate`). `src/v2/circleGateRules.js`
-(add/done/claim, en+nl) wired via `createTokenGate` into BOTH surfaces — web (`main.js`
-`createCircleTurn`) and mobile (`CircleLauncherScreen` `circleBot`). 13 new tests (rules +
-gate-routing precedence over the LLM); full canopy-chat suite 2275 green; web build ✓.
-Key correction to the plan below: the catalog the bot dispatches against is the **mock** tasks
-manifest (`src/core/manifests/mockManifests.js`, shared by mobile via `composeManifests`), whose
-`completeTask`/`claimTask` `id` params ALREADY carry `pickerSource:{listOp:'listMine'}` — so
-done/claim resolve via the existing clarify path with NO manifest change. **Remaining: device
-re-verify (step 5)** — confirm "add milk to the list" lands `via:'rule'` + the item actually
-appears in the tasks list. Per-circle catalog scoping is still the separate follow-up.
+**Status:** ✅ BUILT 2026-06-11, then **MADE MANIFEST-DRIVEN** the same day (`feat/circle-bot-token-gate`).
+The hand-written `circleGateRules.js` was retired in favour of the SHARED substrate projection: the
+task ops declare `surfaces.slash.match` (mockManifests.js) and `@canopy/app-manifest`'s new
+`renderGate` projects them into the token-gate rules (`src/v2/circleGate.js`). This is the SAME
+`renderSlash` matcher household's TG-bot uses — so the deterministic gate, the slash surface, and the
+LLM tool surface (`renderChat`) all read one source of truth, no parallel hand-written copy. Two
+additive `renderSlash` options were added (`arg` for a custom arg name → `id`; `dropTrailing` to strip
+"… to the list"); both inert unless declared, household byte-equivalence intact. Wired into web
+(`main.js`) + mobile (`CircleLauncherScreen`). Tests: app-manifest renderGate 11; canopy-chat
+circleGate 9; full suites green (app-manifest 261 · household 588 · canopy-chat 2271); web build ✓.
+**Remaining: device re-verify** ("add milk to the list" lands `via:'rule'` + the item shows in the
+list). **Follow-ups:** (a) optionally route household's `HouseholdAgent` through `createTokenGate(
+renderGate(...))` too for an identical ENGINE (it already shares the matcher); (b) project more circle
+apps by adding their manifests to `renderGate([...])`; (c) per-circle catalog scoping.
 
 ## Why
 Device run (2026-06-10, Fairphone) **verified the mobile circle-bot wiring end-to-end**:

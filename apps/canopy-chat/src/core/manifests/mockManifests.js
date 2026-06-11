@@ -46,7 +46,15 @@ export const mockTasksManifest = {
         { name: 'requiredSkill', kind: 'string', required: false },
       ],
       surfaces: {
-        slash: { command: '/addtask', body: 'flags' },
+        slash: { command: '/addtask', body: 'flags',
+          // F-SP2 (2026-06-11) — the deterministic NL gate (renderSlash/renderGate): "add X" routes
+          // here without the LLM. `text-only` → the body is the task text; dropTrailing strips the
+          // "… to/op the list" qualifier so "add milk to the list" → text "milk".
+          match: {
+            verbs:        ['add', 'todo', ['new', 'task'], 'voeg', 'zet', ['maak', 'taak'], ['nieuwe', 'taak']],
+            body:         'text-only',
+            dropTrailing: ['to', 'aan', 'op', 'toe'],
+          } },
         chat:  { reply: 'text', hint: 'add a task' },
       },
     },
@@ -73,7 +81,14 @@ export const mockTasksManifest = {
         pickerSource: { listOp: 'listMine' },
       }],
       surfaces: {
-        slash: { command: '/claim' },
+        slash: { command: '/claim',
+          // NL gate — "claim X" / "I'll take X" / "ik pak X" → claimTask{id}. `arg:'id'` targets the
+          // pickerSource param so the clarifying dispatch resolves the label → a real task id.
+          match: {
+            verbs: ['claim', 'pak', 'neem', ["i'll", 'take'], ["i'll", 'do'], ['ik', 'pak'], ['ik', 'doe'], ['ik', 'neem']],
+            body:  'match',
+            arg:   'id',
+          } },
         ui:    { control: 'button', label: 'Claim' },
         chat:  { hint: 'compare-and-swap claim a task' },
       },
@@ -87,7 +102,14 @@ export const mockTasksManifest = {
         pickerSource: { listOp: 'listMine' },
       }],
       surfaces: {
-        slash: { command: '/complete-task' },
+        slash: { command: '/complete-task',
+          // NL gate — "done X" / "klaar met X" → completeTask{id}. Multiword phrases first so
+          // "klaar met afwas" beats the bare "klaar". `arg:'id'` for the pickerSource resolution.
+          match: {
+            verbs: [['klaar', 'met'], ['done', 'with'], 'done', 'complete', 'completed', 'finished', 'klaar', 'voltooid', 'gedaan'],
+            body:  'match',
+            arg:   'id',
+          } },
         ui:    { control: 'button', label: 'Mark complete' },
         chat:  { hint: 'mark a claimed task complete' },
       },

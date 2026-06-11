@@ -53,6 +53,13 @@ export function renderSlash(manifest) {
       body:       m.body ?? 'none',
       splitItems: !!m.splitItems,
       onEmpty:    m.onEmpty ?? null,
+      // F-SP2 (2026-06-11): two additive options so canopy-chat's task ops project cleanly —
+      //   arg          — target the body at a custom arg name (e.g. 'id' for completeTask/claimTask
+      //                  whose param is `id`, not the default 'match'/'text').
+      //   dropTrailing — strip a trailing connector clause ("add milk TO THE LIST" → "milk").
+      // Both inert unless declared, so household's slash byte-equivalence is untouched.
+      arg:          typeof m.arg === 'string' ? m.arg : null,
+      dropTrailing: Array.isArray(m.dropTrailing) && m.dropTrailing.length ? m.dropTrailing : null,
     });
   }
 
@@ -96,15 +103,16 @@ function applyBody(mch, body, ctx) {
       return { skillId: mch.skillId, args: {} };
 
     case 'match': {
-      const trimmed = body.replace(TRAILING_PUNCT_RE, '').trim();
+      const trimmed = dropTrailing(body.replace(TRAILING_PUNCT_RE, '').trim(), mch.dropTrailing);
       if (!trimmed) return mch.onEmpty ? cloneCall(mch.onEmpty) : null;
+      const key = mch.arg ?? 'match';
       if (mch.splitItems) {
         const items = splitItems(trimmed);
         if (items.length === 0) return mch.onEmpty ? cloneCall(mch.onEmpty) : null;
-        if (items.length === 1) return { skillId: mch.skillId, args: { match: items[0] } };
-        return items.map((it) => ({ skillId: mch.skillId, args: { match: it } }));
+        if (items.length === 1) return { skillId: mch.skillId, args: { [key]: items[0] } };
+        return items.map((it) => ({ skillId: mch.skillId, args: { [key]: it } }));
       }
-      return { skillId: mch.skillId, args: { match: trimmed } };
+      return { skillId: mch.skillId, args: { [key]: trimmed } };
     }
 
     case 'type-only': {
@@ -116,15 +124,18 @@ function applyBody(mch, body, ctx) {
 
     case 'type+text': {
       if (!body) return mch.onEmpty ? cloneCall(mch.onEmpty) : null;
-      const { type, rest } = peelType(body, ctx.typeAliases, ctx.defaultType);
+      const peeled = peelType(body, ctx.typeAliases, ctx.defaultType);
+      const type = peeled.type;
+      const rest = dropTrailing(peeled.rest, mch.dropTrailing);
       if (!rest) return mch.onEmpty ? cloneCall(mch.onEmpty) : null;
+      const key = mch.arg ?? 'text';
       if (mch.splitItems) {
         const items = splitItems(rest);
         if (items.length === 0) return mch.onEmpty ? cloneCall(mch.onEmpty) : null;
-        if (items.length === 1) return { skillId: mch.skillId, args: { type, text: items[0] } };
-        return items.map((it) => ({ skillId: mch.skillId, args: { type, text: it } }));
+        if (items.length === 1) return { skillId: mch.skillId, args: { type, [key]: items[0] } };
+        return items.map((it) => ({ skillId: mch.skillId, args: { type, [key]: it } }));
       }
-      return { skillId: mch.skillId, args: { type, text: rest } };
+      return { skillId: mch.skillId, args: { type, [key]: rest } };
     }
 
     // F-SP2-a (locked 2026-05-20): body is the whole `text` arg, no
@@ -132,15 +143,16 @@ function applyBody(mch, body, ctx) {
     // slash form is "<verb> <text>" (no type slot).  `splitItems`
     // honoured the same way as 'match' / 'type+text'.
     case 'text-only': {
-      const trimmed = body.replace(TRAILING_PUNCT_RE, '').trim();
+      const trimmed = dropTrailing(body.replace(TRAILING_PUNCT_RE, '').trim(), mch.dropTrailing);
       if (!trimmed) return mch.onEmpty ? cloneCall(mch.onEmpty) : null;
+      const key = mch.arg ?? 'text';
       if (mch.splitItems) {
         const items = splitItems(trimmed);
         if (items.length === 0) return mch.onEmpty ? cloneCall(mch.onEmpty) : null;
-        if (items.length === 1) return { skillId: mch.skillId, args: { text: items[0] } };
-        return items.map((it) => ({ skillId: mch.skillId, args: { text: it } }));
+        if (items.length === 1) return { skillId: mch.skillId, args: { [key]: items[0] } };
+        return items.map((it) => ({ skillId: mch.skillId, args: { [key]: it } }));
       }
-      return { skillId: mch.skillId, args: { text: trimmed } };
+      return { skillId: mch.skillId, args: { [key]: trimmed } };
     }
 
     default:
@@ -149,6 +161,17 @@ function applyBody(mch, body, ctx) {
 }
 
 function cloneCall(c) { return { skillId: c.skillId, args: { ...(c.args ?? {}) } }; }
+
+/**
+ * Strip a trailing connector clause: given words like ['to','aan','op'], turn
+ * "milk to the list" → "milk".  No-op when `words` is null (the default), so
+ * ops that don't declare `dropTrailing` are unchanged.
+ */
+function dropTrailing(text, words) {
+  if (!words) return text;
+  const alt = words.map(escapeRe).join('|');
+  return text.replace(new RegExp(`\\s+(?:${alt})\\b.*$`, 'i'), '').trim();
+}
 
 const TRAILING_PUNCT_RE = /[!?.,;:]+$/;
 

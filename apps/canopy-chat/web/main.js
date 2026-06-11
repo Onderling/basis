@@ -78,7 +78,7 @@ import {
 } from '../src/feedback/feedbackSurface.js';
 import { createCircleTurn } from '../src/v2/circleTurn.js';
 import { createTokenGate } from '../src/v2/tokenGate.js';
-import { defaultCircleGateRules } from '../src/v2/circleGateRules.js';
+import { circleGateRules } from '../src/v2/circleGate.js';
 import { createUserLlmDefaultStore, localStorageUserLlmIo } from '../src/v2/userLlmDefault.js';
 import { localStoragePolicyIo } from '../src/v2/circlePolicyStore.js';
 import { buildCircleLlmProviders } from '../src/v2/circleLlmProviders.js';
@@ -2203,9 +2203,9 @@ const handleCircleTurn = createCircleTurn({
   llmProviders: _circleLlmProviders,
   catalog: () => catalog,
   botName: CIRCLE_BOT_NAME,
-  // Deterministic pre-LLM gate: "add X" / "done X" / "claim X" route to the task op WITHOUT the
-  // (unreliable) small-model tool pick; everything else falls through to interpret.
-  gate: createTokenGate({ rules: defaultCircleGateRules() }),
+  // Deterministic pre-LLM gate (manifest-derived via renderGate): "add X" / "done X" / "claim X" route
+  // to the task op WITHOUT the (unreliable) small-model tool pick; everything else falls to interpret.
+  gate: createTokenGate({ rules: circleGateRules() }),
   // Route the interpreted command through the clarification turn (unique → dispatch; ambiguous → ask).
   dispatchCommand: (cmd, thread) => _circleClarify.run(cmd, thread),
 });

@@ -24,14 +24,12 @@ Detail: `feedback-pipeline-todo-en.md` · `apps/feedback-pipeline/docs/`
 - **M15 — crisis-response protocol** **[blocked: design decision] → then [code-ready]** — LAST phase,
   blocks launch. Detection + routing are built; the *response* is undesigned: **who** is notified, on
   **what consent**, **how fast**, duty-to-act vs anonymity. Needs a design call, then build.
-- **M6 — mobile feedback-bot v2-rewire** **[code-ready, SMALL — substrate already built]** — audit
-  2026-06-11: the substrate is DONE + shared. `feedbackSurface` + `feedbackMount` (createFeedbackMount,
-  tryHandle/open/contactItem) live in `apps/canopy-chat/src/feedback/` and the web already uses them;
-  the orphaned mobile `ChatScreen.js` ALSO already uses `createFeedbackMount`. Remaining = thin wiring
-  into the v2 `CircleDetail` (CircleLauncherScreen): a lazy `feedbackMount` ref, `tryHandle(text, circle.id)`
-  BEFORE `circleBot.handle` in `sendKringChat`, route the M12 `FEEDBACK_BUTTON_OP` taps in `onBubbleButton`,
-  + the contact item. Sites located (sendKringChat ~L1609, onBubbleButton ~L1547). Blockers (Phase-2,
-  non-gating): mobile pod-auth (Phase-1 = in-memory demo), file-picker + identity-signature deferred.
+- **M6 — mobile feedback-bot v2-rewire** **[✅ DONE (wiring) 2026-06-11 — needs device verify]** — wired
+  into the v2 `CircleDetail` (`efbbf092`): lazy `createFeedbackMount` (bubbles → appendKringMessage),
+  `sendKringChat` gives the feedback mount first refusal (`tryHandle` owns /feedback, /feedback-stop,
+  free text while active) before the circle bot. Substrate was already shared (feedback tests 23 green).
+  **Follow-ups (non-gating):** interactive M12 chips on mobile (currently text button-labels), the
+  /contacts feedback contact item, mobile pod-auth (Phase-1 = in-memory demo), file-picker/identity.
 - **M7 / M8 — TEE hardware checkpoints** **[blocked: hardware]** — attested-enclave aggregation on real
   TEE hardware (Phase 2 of the aggregation-placement design).
 - **M9 — agent runtime** **[separate track]** — the project's own agent runtime; deferred, own thread.

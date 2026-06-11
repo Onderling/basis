@@ -89,14 +89,18 @@ kind — would throw**); `listOpen` is `type-only` but has no `type` param. So w
 
 ---
 
-## Part D — Per-circle catalog scoping
+## Part D — Per-circle catalog scoping — ✅ DONE 2026-06-11
 **Why:** the circle bot sees all ~125 ops; a household circle shouldn't be choosing among every app's ops
 (mis-picks, noise). **Because every surface is a manifest projection, scoping the manifest scopes the gate,
 the slash menu, AND the LLM tool list at once.**
 
-**What:** a circle→apps mapping; filter the merged manifest per circle *before* projecting (catalog +
-`renderGate` rules + `renderChat` tools). Additive: default = all apps; per-circle override narrows.
-**Guard:** unscoped behaviour unchanged when no override is set.
+**Built:** `scopeCatalogToApps(catalog, apps)` in `src/v2/circleCatalogScope.js` (named to avoid the
+existing `circleScope.js` = item circle-scoping) filters `opsById`/`commandMenu` by `appOrigin`;
+`circleTurn` (web) + `circleDispatch` (mobile) scope the catalog the LLM interpret sees by
+`circlePolicy.apps`. **Default = `DEFAULT_CIRCLE_ORIGINS`** (the 5 circle apps — drops canopy-chat's 37
+infra ops, where the device-run `/me` lived); per-circle `policy.apps` narrows further. **Effect:** LLM
+tools **125 → 88** (default) **→ 40** for a household circle. Gate/dispatch unaffected. 6 tests; suite 2277.
+**Next (small):** a way to *set* `policy.apps` per circle (the override; default already wins today).
 
 ---
 

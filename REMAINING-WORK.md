@@ -100,9 +100,9 @@ gate is manifest-driven. Remaining parts:
   (canopy-chat) + snapshot `apps/canopy-chat/docs/surface-coverage.md`. Finding: across 118 ops, **gate
   = 17** (chat 118 · slash 111 · web/mobile 59 · inline 25) — deterministic verbs are the sparsest
   surface; that 17 is the Part C list. **Keep the snapshot updated after manifest changes** (`npm run coverage`).
-- **Part D — per-circle catalog scoping** **[code-ready, LLM-critical]** — scope the merged manifest per
-  circle; gate + slash + LLM all narrow together. **The #1 LLM-reliability lever** (LLM picks among ~10
-  relevant ops, not 125).
+- **Part D — per-circle catalog scoping** **[✅ DONE 2026-06-11]** — `scopeCatalogToApps` scopes the LLM
+  tool list by the circle's apps; default drops canopy-chat's 37 infra ops (`/me` etc.). LLM tools
+  **125 → 88** default **→ 40** for a household circle. Next (small): UI to set `policy.apps` per circle.
 - **Part C — per-app `match` fixes + cross-app resolution** **[code-ready, per-app]** — stoop's gate
   declarations are dormant/incorrect (audited 2026-06-11); fix `arg`/`pickerSource`/the invalid `reject`
   body, generalize the circle's clarify lookup per-app, then add each manifest to `renderGate([…])`.

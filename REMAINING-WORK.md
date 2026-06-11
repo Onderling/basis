@@ -96,9 +96,10 @@ One `manifest.js` = source of truth for every surface (gate · slash · chat/LLM
 menus), with a scannable coverage view. Foundation already done: `renderGate` projector + the circle
 gate is manifest-driven. Remaining parts:
 
-- **Part B — surface coverage scan** **[code-ready, do FIRST]** — `renderCoverage(manifest)` + a
-  `npm run coverage` matrix (op × chat/slash/gate/web/mobile/inline-menu) so we can scan what's wired
-  where. Cheap; drives Parts C + E.
+- **Part B — surface coverage scan** **[✅ DONE 2026-06-11]** — `renderCoverage` + `npm run coverage`
+  (canopy-chat) + snapshot `apps/canopy-chat/docs/surface-coverage.md`. Finding: across 118 ops, **gate
+  = 17** (chat 118 · slash 111 · web/mobile 59 · inline 25) — deterministic verbs are the sparsest
+  surface; that 17 is the Part C list. **Keep the snapshot updated after manifest changes** (`npm run coverage`).
 - **Part D — per-circle catalog scoping** **[code-ready, LLM-critical]** — scope the merged manifest per
   circle; gate + slash + LLM all narrow together. **The #1 LLM-reliability lever** (LLM picks among ~10
   relevant ops, not 125).

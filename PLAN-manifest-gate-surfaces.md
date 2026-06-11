@@ -47,9 +47,16 @@ Rule-first (deterministic, MULTI-command); else `llm` with optional retrieved co
 
 ---
 
-## Part B — Surface coverage scan (`renderCoverage`) — *do this early, it's cheap + drives C/E*
+## Part B — Surface coverage scan (`renderCoverage`) — ✅ DONE 2026-06-11
 **Why:** you want to scan, per op, which surfaces it has a counterpart on — to find gaps and to plan
 the inline menus. A map turns "is this wired?" from spelunking into a glance.
+
+**Built:** `renderCoverage` + `coverageGaps` + `formatCoverageMarkdown` in `@canopy/app-manifest`
+(7 tests); `npm run coverage` (canopy-chat) prints the matrix + a committed snapshot at
+`apps/canopy-chat/docs/surface-coverage.md`. **Finding (118 ops):** chat 118/118 · slash 111 ·
+web/mobile 59 · inline 25 · **gate only 17** — deterministic verbs are by far the sparsest surface.
+That 17 is the Part C work-list; household (8 correct verbs) is the model, stoop's 5 are the
+dormant/incorrect ones.
 
 **What:** a pure analysis in `@canopy/app-manifest`:
 `renderCoverage(manifest | mergedManifest) -> rows[{ op, app, chat, slash, gate, web, mobile, inlineMenu }]`

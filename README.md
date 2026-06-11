@@ -56,6 +56,13 @@ declaration into four surfaces:
   used by household's TG-bot and canopy-chat's circle bot).
 - **`@canopy/manifest-host`** composes *N* apps' manifests at runtime —
   collision detection across command namespaces + reply-shape lookup.
+- **`renderCoverage`** — a scan of which surfaces each op is wired for
+  (op × chat/slash/gate/web·mobile/inline). Run `npm run coverage` in
+  `apps/canopy-chat`; the snapshot lives at
+  `apps/canopy-chat/docs/surface-coverage.md`. **⚠️ Keep it updated:**
+  whenever you change a `manifest.js` (add/remove an op or a
+  `surfaces.*` declaration), regenerate the snapshot (`npm run coverage`)
+  and commit it, so the surface map never drifts from the manifests.
 
 So canopy-chat's command bar is not a switch statement over apps; it is a
 projection of the merged manifest.  Adding an operation to an app's

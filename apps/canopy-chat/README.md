@@ -10,6 +10,13 @@
 > other canopy apps' manifests.  Static web deployable; mesh agent
 > runs browser-side.
 
+> **⚠️ Surface coverage — keep it updated.** `npm run coverage` prints (and
+> `docs/surface-coverage.md` snapshots) the op × surface matrix
+> (chat/slash/gate/web·mobile/inline). **Whenever you change a `manifest.js`**
+> (add/remove an op or a `surfaces.*` declaration, e.g. adding gate verbs),
+> **regenerate + commit the snapshot** (`npm run coverage > docs/surface-coverage.md`)
+> so the map never drifts from the manifests.
+
 | | |
 |---|---|
 | **Status** | v0.1.0-dev (in progress — see `/Project Files/canopy-chat/coding-plan.md`) |

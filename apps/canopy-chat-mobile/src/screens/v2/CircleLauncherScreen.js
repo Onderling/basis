@@ -60,6 +60,9 @@ import { createCircleDispatch } from '../../../../canopy-chat/src/v2/circleDispa
 import { createTokenGate } from '../../../../canopy-chat/src/v2/tokenGate.js';
 import { circleGateRules } from '../../../../canopy-chat/src/v2/circleGate.js';
 import { interpretToCommand } from '../../../../canopy-chat/src/v2/interpretCommand.js';
+// M6 — the feedback bot rides the SHARED mount (web uses the same one). tryHandle routes /feedback +
+// /feedback-stop + free text while active, before the circle bot; bubbles render via appendKringMessage.
+import { createFeedbackMount } from '../../../../canopy-chat/src/feedback/feedbackMount.js';
 import { buildCircleLlmProviders } from '../../../../canopy-chat/src/v2/circleLlmProviders.js';
 import { createClarifyingDispatch } from '../../../../canopy-chat/src/v2/clarifyingDispatch.js';
 import { createUserLlmDefaultStore, asyncStorageUserLlmIo } from '../../../../canopy-chat/src/v2/userLlmDefault.js';
@@ -103,6 +106,8 @@ import CircleScreensPickerScreen from './CircleScreensPickerScreen.js';
 const CIRCLE_LLM_BASEURL = process.env.EXPO_PUBLIC_CIRCLE_LLM_BASEURL || null;
 const CIRCLE_LLM_MODEL   = process.env.EXPO_PUBLIC_CIRCLE_LLM_MODEL || undefined;
 const CIRCLE_BOT_NAME    = process.env.EXPO_PUBLIC_CIRCLE_BOT_NAME || 'assistant';
+// M6 — feedback bot's LLM route (cleans/anonymizes participant input). Unset → in-memory demo mode.
+const FEEDBACK_LLM_BASEURL = process.env.EXPO_PUBLIC_FEEDBACK_LLM_BASEURL || undefined;
 // Default circle posture (off|local|cloud|user); 'user' = each member's personal default decides.
 const CIRCLE_LLM_POLICY  = process.env.EXPO_PUBLIC_CIRCLE_LLM_POLICY || 'user';
 
@@ -1354,6 +1359,7 @@ function CircleDetail({
   // bubble render reads through `deliveryStateFor`) to force re-renders
   // when state flips.  The map itself isn't deps-tracked.
   const deliveryStateMapRef = useRef(null);
+  const feedbackMountRef = useRef(null);   // M6 — lazy feedback mount (created on first kring send)
   if (deliveryStateMapRef.current == null) deliveryStateMapRef.current = createDeliveryStateMap();
   const [deliveryTick, setDeliveryTick] = useState(0);
   const deliveryStateFor = useCallback((msgId) => {
@@ -1605,12 +1611,23 @@ function CircleDetail({
     postToKring: (text, ctx) => { if (ctx?.msgId) broadcastFanOut({ msgId: ctx.msgId, text, ts: ctx.ts ?? Date.now() }); },
   }), [catalog, clarify, circle?.id, appendKringMessage, broadcastFanOut, userLlmDefault, circleLlmPolicy]);
 
-  // SP-13.2.1 / B — kring chat send: echo the user's message locally, then route it (command vs chat).
-  const sendKringChat = useCallback(() => {
+  // SP-13.2.1 / B / M6 — kring chat send: the feedback bot gets first refusal (it owns the turn only
+  // for /feedback, /feedback-stop, and free text while active); otherwise echo + route to the circle bot.
+  const sendKringChat = useCallback(async () => {
     const text = composerText.trim();
     if (!text || !eventLog?.append || !circle?.id) return;
-    const appended = appendKringMessage({ actor: 'me', text });
     setComposerText('');
+    // M6 — lazy shared feedback mount; its appendUserBubble/appendBotBubble render into the kring. Text
+    // bubbles (incl. the bot's button labels); interactive M12 chips on mobile are a follow-up.
+    if (!feedbackMountRef.current) {
+      feedbackMountRef.current = createFeedbackMount({
+        llmBaseURL: FEEDBACK_LLM_BASEURL,
+        appendUserBubble: (_tid, t) => appendKringMessage({ actor: 'me', text: t }),
+        appendBotBubble:  (_tid, t) => appendKringMessage({ actor: 'bot', text: t }),
+      });
+    }
+    if (await feedbackMountRef.current.tryHandle(text, circle.id)) return;   // feedback owned the turn
+    const appended = appendKringMessage({ actor: 'me', text });
     circleBot.handle(text, { id: circle.id, msgId: appended?.msgId, ts: appended?.ts });
   }, [composerText, eventLog, circle?.id, appendKringMessage, circleBot]);
 

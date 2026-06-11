@@ -90,9 +90,15 @@ Detail: `[[project-p3-pod-storage-roadmap]]` · `[[project-p3-sync-engine-absorp
 - **3.3c app-wiring** **[code-ready, 3 small integration points]** — only **stoop** membership join/leave
   is wired (✅, `controlAgent` in redeem/leave skills, 7 tests). Remaining = pure integration (substrate
   exists): (b) **household** membership → pass a controlAgent + grant/rotate on add/remove (~2–3d);
-  (c) **circle storage** → call `resolveCircleStorage` in the circle create/update path, wrap the pod
-  client per posture p0–p3 (~1–2d); (d) **chat semantic search** → wire `sealedIndex.semanticQuery` into
-  the RAG retriever for p2 circles (~1d). (d) directly feeds **§7 Part F-retrieve.**
+  (c) **circle storage** → **NOT a quick wire (investigated 2026-06-11)** — the circle is mesh by
+  default (`pod:'none'`); its pod content is the config (`circlePolicyStore`/`circle.<id>.json`) +
+  folio files (Drive `PodClient`, `main.js:961`). Blockers: sealing the **config is circular**
+  (`storagePosture` lives in it); the real target is **folio content**, not config; and the **group-key
+  flow isn't plumbed into circles** (only stoop has `controlAgent`/`podKeyStore`), so a p2 wrap would be
+  **inert** today. Needs: a decision (seal folio content, out-of-band posture) + the circle group-key
+  flow + a real-pod verify. **Do `(b)` household first** (it has a clear membership boundary). (d) below
+  is the verifiable slice; (d) **chat semantic search** → wire `sealedIndex.semanticQuery` into the RAG
+  retriever for p2 circles (~1d) — directly **= §7 Part F-retrieve** (one job, two todos).
 - **"2-pod verify" / "Phase 4"** **[scope unclear]** — NOT found in the sealing roadmap; likely
   product-level acceptance or the Hub track (P4 = Hub-Android). Clarify scope before treating as work.
 

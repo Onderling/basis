@@ -1507,11 +1507,27 @@ function CircleDetail({
     appendKringMessage({ actor: 'bot', text: circleReplyText(reply) });
   }, [catalog, callSkill, circle?.id, appendKringMessage]);
 
-  // B (clarification) — candidate source for id-like params: the circle's own items (already loaded +
-  // circle-scoped), so resolution stays confined to this circle. clarifyCommandTargets filters by label.
-  const circleLookup = useCallback(() => (Array.isArray(items)
-    ? items.map((it) => ({ id: String(it?.id ?? ''), label: String(it?.label ?? it?.title ?? it?.text ?? it?.id ?? '') }))
-    : []), [items]);
+  // B (clarification) — candidate source for an id-like param. Base = the circle's already-loaded
+  // items (tasks + stoop posts, circle-scoped). Part C cross-app: ALSO pull the op's OWN list via the
+  // auto-resolving callSkill (makeResolvingCallSkill probes the right app by opId), so labels for item
+  // types NOT in the preloaded set — folio files (listFiles), calendar events (listEvents) — resolve
+  // too. Scoped to the circle (crewId/circleId/groupId); deduped by id; best-effort (failures keep base).
+  const circleLookup = useCallback(async (listOp, _query, scope) => {
+    const toCand = (it) => ({ id: String(it?.id ?? ''), label: String(it?.label ?? it?.title ?? it?.name ?? it?.text ?? it?.id ?? '') });
+    const base = Array.isArray(items) ? items.map(toCand) : [];
+    if (!listOp || !callSkill) return base;
+    try {
+      const sid = scope?.id;
+      const r = await callSkill(listOp, sid ? { crewId: sid, circleId: sid, groupId: sid } : {});
+      const arr = Array.isArray(r) ? r
+        : Array.isArray(r?.items) ? r.items : Array.isArray(r?.tasks) ? r.tasks
+        : Array.isArray(r?.posts) ? r.posts : Array.isArray(r?.files) ? r.files
+        : Array.isArray(r?.events) ? r.events : [];
+      const seen = new Set(base.map((c) => c.id));
+      for (const it of arr) { const c = toCand(it); if (c.id && !seen.has(c.id)) { seen.add(c.id); base.push(c); } }
+    } catch { /* keep base */ }
+    return base;
+  }, [items, callSkill]);
 
   // B (clarification) — wraps dispatch: a unique target dispatches; an ambiguous one posts a bot
   // message with candidate BUTTONS (tapping → pick → re-run bound to that id); a missing one asks.

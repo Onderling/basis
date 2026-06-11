@@ -88,8 +88,14 @@ Suite 2277. **Remaining = cross-app label→id resolution (narrower than first t
 - **Minimal fix:** add `getFiles → folio.listFiles` + `getEvents → calendar.listEvents` to
   `DEFAULT_SOURCES` (matching the existing pattern), OR make `circleLookup`/web-lookup `callSkill(listOp,
   {crewId/circleId/groupId})` with result-shape normalization + an `items` fallback.
-- **Needs a live web/device run** to confirm the per-app id/label shapes + circle-scoping (`keepForCircle`
-  on folio/calendar items) — do NOT claim it works without that. tasks stays correct via the existing path.
+- **Implemented (mobile) 2026-06-11:** `circleLookup` (CircleLauncherScreen) is now async + additive —
+  base = the circle's loaded items (tasks + stoop posts), PLUS the op's own list via the auto-resolving
+  `callSkill(listOp, {crewId/circleId/groupId})`, deduped, best-effort. Covers folio files + calendar
+  events without an `appOrigin` change. **Needs a live DEVICE run to confirm** the per-app id/label
+  shapes + scoping — do NOT claim it works without that. tasks/stoop stay correct via the base path.
+- **Web follow-up:** the web lookup still uses `thread.lastListingFor` (covers tasks/stoop cached); web
+  folio/calendar resolution is deferred because web's dispatch is non-uniform (calendar via the
+  `household`→`calendar_*` prefix), so a resolving callSkill there needs more care.
 
 **Why:** only `tasks` had correct gate (`match`) declarations. `stoop`'s are **dormant + incorrect**
 (2026-06-11 audit): `markReturned`/`getItemTree`/`reportPost` use `body:'match'`→`args.match` but the

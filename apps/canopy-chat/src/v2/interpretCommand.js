@@ -7,10 +7,11 @@
 
 /** Default tool-selection prompt. Internal (LLM-facing), not a user-visible string. */
 export const DEFAULT_INTERPRET_SYSTEM =
-  'You turn a household member\'s message into AT MOST ONE of the available tools (commands). '
-  + 'If the message clearly maps to a command, call that tool with the right arguments drawn from '
-  + 'the message. If it is ordinary chat, a question, or nothing fits, do NOT call any tool — say '
-  + 'nothing. Never invent arguments that are not present in the message.';
+  'You turn a member\'s message in a shared circle into AT MOST ONE of the available tools (commands). '
+  + 'Call a tool ONLY when the message is clearly a request to perform that exact action, with arguments '
+  + 'taken verbatim from the message. If the message is ordinary chat, a question, a greeting, or no tool '
+  + 'clearly fits, call NO tool. When in doubt, call nothing — a missed command is better than a wrong '
+  + 'one. Never invent arguments the message does not contain.';
 
 const KIND_TO_JSON_TYPE = { string: 'string', number: 'number', integer: 'integer', boolean: 'boolean' };
 

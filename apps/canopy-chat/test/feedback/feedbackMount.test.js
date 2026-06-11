@@ -45,10 +45,25 @@ test('free text while active routes to the bot', async () => {
   expect(surface.calls).toContainEqual(['handle', 'de ggz-wachtlijst is te lang', 'th']);
 });
 
-test('other slash commands pass through even while active (returns false)', async () => {
+test('genuine circle slash commands pass through even while active (returns false)', async () => {
   const { mount } = mk();
   await mount.tryHandle('/feedback', 'th');
-  expect(await mount.tryHandle('/help', 'th')).toBe(false);   // caller dispatches /help normally
+  expect(await mount.tryHandle('/show', 'th')).toBe(false);    // a circle command → caller dispatches it
+  expect(await mount.tryHandle('/tasks', 'th')).toBe(false);
+});
+
+test("the bot's OWN slash commands reach the bot while active (/klaar review, /help, /done)", async () => {
+  const { mount, surface } = mk();
+  await mount.tryHandle('/feedback', 'th');
+  expect(await mount.tryHandle('/klaar', 'th')).toBe(true);    // the review/submit step — must reach the bot
+  expect(surface.calls).toContainEqual(['handle', '/klaar', 'th']);
+  expect(await mount.tryHandle('/help', 'th')).toBe(true);
+  expect(await mount.tryHandle('/done', 'th')).toBe(true);
+});
+
+test("the bot's slash commands do NOT reach the bot when feedback is INACTIVE (pass through)", async () => {
+  const { mount } = mk();
+  expect(await mount.tryHandle('/klaar', 'th')).toBe(false);   // not in feedback → circle bot handles it
 });
 
 test('/feedback-stop leaves feedback mode (no UI text emitted by the mount)', async () => {

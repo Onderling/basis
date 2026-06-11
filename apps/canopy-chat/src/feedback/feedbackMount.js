@@ -8,6 +8,12 @@
 
 import { createFeedbackSurface, feedbackContactItem } from './feedbackSurface.js';
 
+// The feedback BOT's own slash commands — forwarded to the bot while a session is active (instead of
+// passing through to the circle bot). Mirrors apps/feedback-pipeline/src/channel/actions.js
+// (`/help` → help; `/klaar` | `/done` | `/review` → review). `/klaar` is the review/submit step the
+// bot's guidance tells users to type, so it MUST reach the bot.
+const FEEDBACK_BOT_SLASH = new Set(['/klaar', '/done', '/review', '/help']);
+
 /**
  * @param {object} a
  * @param {object} [a.surface]            a pre-built feedback surface (else one is created from the
@@ -43,10 +49,18 @@ export function createFeedbackMount({ surface, appendUserBubble, appendBotBubble
       const trimmed = String(text ?? '').trim();
       if (/^\/feedback(?:\s+\S+)?$/.test(trimmed)) { appendUserBubble(threadId, trimmed); await fb.start(threadId); return true; }
       if (trimmed === '/feedback-stop') { fb.stop(threadId); return true; }
-      if (trimmed && !trimmed.startsWith('/') && fb.isActive(threadId)) {
-        appendUserBubble(threadId, trimmed);
-        await fb.handle(trimmed, threadId);
-        return true;
+      // While active, forward to the bot: free text, AND the bot's OWN slash commands (the most
+      // important being `/klaar` — the review/submit step its guidance advertises). Previously the
+      // `!startsWith('/')` guard sent ALL slash commands to the circle bot, so `/klaar` (and `/help`,
+      // `/done`, `/review`) were unreachable inside canopy-chat (device-verify 2026-06-11). Genuine
+      // circle commands (anything not in FEEDBACK_BOT_SLASH) still pass through (return false).
+      if (trimmed && fb.isActive(threadId)) {
+        const head = trimmed.split(/\s+/)[0].toLowerCase();
+        if (!trimmed.startsWith('/') || FEEDBACK_BOT_SLASH.has(head)) {
+          appendUserBubble(threadId, trimmed);
+          await fb.handle(trimmed, threadId);
+          return true;
+        }
       }
       return false;
     },

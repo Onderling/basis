@@ -1456,11 +1456,14 @@ function CircleDetail({
   // tap-to-retry handler for failed bubbles.  Re-fires with the
   // SAME msgId so receiver-side dedup suppresses duplicates.
   const broadcastFanOut = useCallback(({ msgId, text, ts }) => {
-    if (typeof callSkill !== 'function') return;
+    // RAW 3-arg callSkill(app, op, args): broadcastKringMessage is app-targeted at stoop. The 2-arg
+    // resolving callSkill would arg-shift (op→'stoop', real op→args) and never deliver the message
+    // (device-verify 2026-06-11: logs showed `[callSkill] stoop →` across peers, no fan-out).
+    if (typeof rawCallSkill !== 'function') return;
     deliveryStateMapRef.current.set(msgId, 'pending');
     setDeliveryTick((n) => n + 1);
     Promise.resolve()
-      .then(() => callSkill('stoop', 'broadcastKringMessage', {
+      .then(() => rawCallSkill('stoop', 'broadcastKringMessage', {
         groupId: circle.id, text, msgId, ts,
       }))
       .then((r) => {
@@ -1480,7 +1483,7 @@ function CircleDetail({
         deliveryStateMapRef.current.set(msgId, 'failed');
         setDeliveryTick((n) => n + 1);
       });
-  }, [callSkill, circle?.id]);
+  }, [rawCallSkill, circle?.id]);
 
   // SP-13.2.1 — append a kring chat bubble to the local eventLog (optimistic). Returns {msgId, ts}
   // so the caller can fan out the same id (receiver-side dedup suppresses any mirrored echo).

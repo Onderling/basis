@@ -24,10 +24,15 @@ Detail: `feedback-pipeline-todo-en.md` · `apps/feedback-pipeline/docs/`
 - **M15 — crisis-response protocol** **[blocked: design decision] → then [code-ready]** — LAST phase,
   blocks launch. Detection + routing are built; the *response* is undesigned: **who** is notified, on
   **what consent**, **how fast**, duty-to-act vs anonymity. Needs a design call, then build.
-- **M6 — mobile feedback-bot v2-rewire** **[✅ DONE (wiring) 2026-06-11 — needs device verify]** — wired
-  into the v2 `CircleDetail` (`efbbf092`): lazy `createFeedbackMount` (bubbles → appendKringMessage),
-  `sendKringChat` gives the feedback mount first refusal (`tryHandle` owns /feedback, /feedback-stop,
-  free text while active) before the circle bot. Substrate was already shared (feedback tests 23 green).
+- **M6 — mobile feedback-bot v2-rewire** **[✅ DONE + device-verified 2026-06-11 (`4f5114a8`)]** — wired
+  into the v2 `CircleDetail` (`efbbf092`): lazy `createFeedbackMount`, `sendKringChat` gives the feedback
+  mount first refusal before the circle bot. **Device verify (Fairphone) confirmed the full flow** —
+  `/feedback → text → /klaar (review) → /feedback-stop` — and fixed **two bugs it surfaced:** (a) the
+  feedback bot's OWN slash commands (`/klaar` review, `/help`, `/done`, `/review`) were unreachable
+  because the mount only forwarded non-slash text → now forwarded via `FEEDBACK_BOT_SLASH` while active
+  (genuine circle slashes still pass through); (b) `broadcastFanOut` had the dispatch arg-shift bug → kring
+  messages never fanned out and were falsely marked "sent" → fixed to `rawCallSkill` (delivery status now
+  honest: seed/demo members w/o NKN pubkey correctly report `recipient-pubkey-unknown`, not a bug).
   **Follow-ups (non-gating):** interactive M12 chips on mobile (currently text button-labels), the
   /contacts feedback contact item, mobile pod-auth (Phase-1 = in-memory demo), file-picker/identity.
 - **M7 / M8 — TEE hardware checkpoints** **[blocked: hardware]** — attested-enclave aggregation on real
@@ -53,13 +58,16 @@ Detail: `feedback-pipeline-todo-en.md` · `apps/feedback-pipeline/docs/`
 ## 2. Canopy-chat — v2 circle bot
 Detail: `apps/canopy-chat/docs/circle-bot-token-gate-TODO.md` · `[[project-circle-bot-device-run]]`
 
-- **Token-gate wiring** **[✅ DONE 2026-06-11]** — built, then made **manifest-driven**: the hand-written
-  rules were retired for `renderGate(manifest)` (the same projector household uses). add/done/claim route
-  deterministically on web + mobile. Device re-verify still pending. See `[[project-circle-bot-device-run]]`.
+- **Token-gate wiring** **[✅ DONE + device-verified 2026-06-11]** — manifest-driven via `renderGate`.
+  **Device verify was decisive:** the gate ROUTED but commands never EXECUTED on mobile — **4 dispatch
+  bugs** (arity / app-qualified picker / `listMine→listOpen` / scope), all fixed + re-verified e2e
+  (`22681c7e`). Plus a **per-locale trailing-verb gate** ("X done"/"afwas klaar") + an **ollama request
+  timeout** (`5c0c1c84`). add/done/claim now actually work on mobile. See `[[project-circle-bot-device-run]]`.
 - **Gate + surface unification** → see **§7** (`PLAN-manifest-gate-surfaces.md`). Progress: **B (coverage
-  scan) ✅ · D (catalog scoping) ✅ · C (gate verbs all apps + fixes + collisions) ✅ · C cross-app
-  resolution mobile ✅ (needs device verify) · F-prompt ✅**. Remaining: F-retrieve, A (engine-parity,
-  deferred), E (inline menus), G (mock↔real reconcile — mapped). Web cross-app resolution = follow-up.
+  scan) ✅ · D (catalog scoping) ✅ · C (gate verbs + the 4 dispatch fixes) ✅ device-verified · trailing
+  gate ✅ · ollama timeout ✅ · F-prompt ✅**. Remaining: **web cross-app resolution + the A–D fixes ported
+  to web** (mobile-only so far), F-retrieve, A (engine-parity, deferred), E (inline menus), G (mock↔real
+  reconcile — folio branch `824d766b` unverified).
 - **Smoke checkpoints owed** **[blocked: device/manual]** — web smoke for the 2026-05-24 wave
   (#218/#219/#231.*), first canopy-chat-mobile Android boot, tasks/stoop-mobile screens (#226–#228).
   (Mobile circle-bot boot now DONE — device run 2026-06-10.)
@@ -167,14 +175,22 @@ E later. (Unification order would be B → A → C → D → E — see the plan 
 ---
 
 ## Fastest code-ready next moves (no creds/decisions needed)
-1. **Gate + surfaces §7 (active thread — goal: canopy-chat working + LLM-reliable)** — **Part B** (coverage
-   scan) → **Part D** (catalog scoping, the LLM lever) → **Part C** (gate verbs for more apps) → **Part F**
-   (RAG context into the interpret call) → device re-verify. **Part A (engine-parity) deferred** — it's
-   unification, not needed for the LLM to work.
-2. **M6 mobile feedback rewire** (§1) — reuses the shared circle dispatch.
-3. **P3 3.3c app-wiring** (§4) — substrate is built, this is the wiring.
-4. **Household chat-agent prompt** (§3) — small, self-contained.
-5. **Category floors lexicons** (§1) — deterministic, well-scoped.
+*The mobile circle bot + M6 are now device-verified working (2026-06-11). Updated priorities:*
+1. **Port the mobile circle-bot fixes to web** (§2/§7 Part C tail) — the 4 dispatch fixes + the
+   app-qualified cross-app resolution are **mobile-only**. Web uses `thread.lastListingFor` + a
+   non-uniform dispatch (calendar via `household`→`calendar_*`); check whether web has the same
+   arity/app-qualification bugs and port the fixes. **Highest value** (web is the other half of parity).
+2. **Verify the folio dissolve branch** (§7 Part G) — `824d766b` (`feat/folio-dissolve-part-g`) is
+   code-complete but **unverified** (its worktree had no deps); run `vitest` + `npm run coverage` in the
+   main tree, then merge if green. Also delete its stray `.git-commit-msg-folio-dissolve.txt`.
+3. **P3 3.3c-b** (§4) — wire **household** membership → controlAgent grant/rotate (substrate built, clear
+   boundary). 3.3c-c (circle storage) is NOT a quick wire (investigated).
+4. **Category-floors e2e LLM re-run** (§1) — only remaining bit; needs an Ollama run on the scenarios.
+5. **Household chat-agent prompt** (§3) — a *decision* (make v3 the freeform-V2 default?), not a write.
+*Then the deferred gate/surface parts:* **F-retrieve** (= P3 sealedIndex semanticQuery), **E** (inline
+menus), **A** (engine-parity → `@canopy/manifest-host`), **G** remaining apps (tasks-v0, stoop+household).
+*Non-blocking polish:* `makeResolvingCallSkill` catalog-blind probe-storm + NKN noise; `getMyTasks`
+task-less circle base; distinguish permanent `recipient-pubkey-unknown` from transient send failures.
 
 ## Blocked on you
 - **M14 creds** (§1) — paste + run preflight.

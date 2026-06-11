@@ -72,30 +72,49 @@ inlineMenu = `surfaces.ui.control === 'button'` / a chat inline-keyboard afforda
 ---
 
 ## Part C — Per-app `match` declarations + cross-app target resolution
-**Status (2026-06-11):** manifest declarations + gate wiring ✅ DONE (workflow-audited); **cross-app
-resolution = the remaining slice** (next). Added 22 gate verbs across tasks/stoop/folio/calendar
+**Status:** ✅ **DONE + device-verified 2026-06-11** (`feat/circle-bot-token-gate`). The device run was
+decisive — it revealed the gate ROUTED correctly (`via:'rule'`) but **no circle-bot command had ever
+actually EXECUTED on mobile**, and that several Part-C assumptions below were wrong. See the
+**Device-verify findings** block. Manifest declarations + gate wiring done earlier. Added 22 gate
+verbs across tasks/stoop/folio/calendar
 (`mockManifests.js` + `apps/calendar/manifest.js`), fixed stoop's 5 broken blocks, resolved 6 cross-app
 collisions (share→folio, accept→calendar, reject→tasks, cancel→calendar) + extras found in verify
 (tasks shadows household add/done → household-mock EXCLUDED from the circle gate; dropped ambiguous
 `ik kom`). `circleGate.js` now `renderGate([tasks, stoop, folio, calendar])`. Coverage gate 17→25.
-Suite 2277. **Remaining = cross-app label→id resolution (narrower than first thought):**
-- `loadCircleItems` (DEFAULT_SOURCES) already pulls **stoop posts + tasks** into the circle's `items`,
-  and `circleLookup` returns them → **tasks + stoop labels likely already resolve**. Only **folio files**
-  + **calendar events** aren't loaded.
-- `makeResolvingCallSkill` already **auto-resolves the app from the opId** (probes origins, skips via
-  catalog) — so NO `appOrigin` plumbing in `clarifyTargets.js` is needed (lower blast radius than the
-  agent's first plan).
-- **Minimal fix:** add `getFiles → folio.listFiles` + `getEvents → calendar.listEvents` to
-  `DEFAULT_SOURCES` (matching the existing pattern), OR make `circleLookup`/web-lookup `callSkill(listOp,
-  {crewId/circleId/groupId})` with result-shape normalization + an `items` fallback.
-- **Implemented (mobile) 2026-06-11:** `circleLookup` (CircleLauncherScreen) is now async + additive —
-  base = the circle's loaded items (tasks + stoop posts), PLUS the op's own list via the auto-resolving
-  `callSkill(listOp, {crewId/circleId/groupId})`, deduped, best-effort. Covers folio files + calendar
-  events without an `appOrigin` change. **Needs a live DEVICE run to confirm** the per-app id/label
-  shapes + scoping — do NOT claim it works without that. tasks/stoop stay correct via the base path.
-- **Web follow-up:** the web lookup still uses `thread.lastListingFor` (covers tasks/stoop cached); web
-  folio/calendar resolution is deferred because web's dispatch is non-uniform (calendar via the
-  `household`→`calendar_*` prefix), so a resolving callSkill there needs more care.
+Suite 2277.
+
+### Device-verify findings + fixes (2026-06-11, Fairphone — `22681c7e` + `5c0c1c84`)
+The live run found the gate routed but **commands silently no-op'd**. Four bugs (all fixed, re-verified
+e2e: "add X" lands, "done X"/"X done" completes via the gate ~1s, no LLM):
+- **A (critical) — dispatch arity.** `runDispatch` calls `callSkill(appOrigin, opId, args)` (RAW 3-arg)
+  but `CircleDetail` passed the 2-arg **resolving** callSkill → args shifted (appOrigin→opId), the
+  dispatched op was literally `'tasks-v0'`, nothing executed. Fix: thread `bundle.callSkill` in as a
+  `rawCallSkill` prop; pass it to `runDispatch`. Tell from logs: `[callSkill] addTask →` (good) vs
+  `tasks-v0 →` (bug).
+- **B — the "no `appOrigin` plumbing needed" assumption above was WRONG.** `makeResolvingCallSkill`
+  resolves by **bare op name, probe-first-origin**, and `listOpen` is declared by BOTH stoop and
+  tasks-v0 → stoop won → "done X" searched the buurt feed, never the tasks. Fix: `clarifyCommandTargets`
+  now passes the op's `appOrigin` (4th lookup arg); mobile `circleLookup` uses the app-qualified
+  `rawCallSkill` when given. (So `clarifyTargets.js` DID need the plumbing.)
+- **C — `claimTask`/`completeTask` picked from `listMine`** → a freshly-added unassigned task was never
+  in "my" tasks. → `listOpen` (completeTask is self-mark mode per tasks-v0 `bot.markComplete`).
+- **D — `scopeReadyDispatch`** got an `{id}` object instead of the circle-id string.
+- Same arg-shift bug also hit **`broadcastFanOut`** (kring message fan-out) — fixed to `rawCallSkill`
+  (`4f5114a8`); delivery status is now honest (was falsely "sent").
+
+### Trailing-verb gate (`5c0c1c84`)
+The gate only matched a verb at the START ("done X"); casual "X done"/"afwas klaar" skipped the gate →
+the weak LLM (which mis-picked household `markComplete` for a tasks "done"). `renderSlash` now does a
+TRAILING pass after leading fails. Per-locale verbs in `circleGateLexicon.js` (en|nl by `currentLang`;
+nl includes code-switched english); opt-in via `match.trailing='<intent>'` (completeTask only); leading
+stays a mixed manifest list; slash stays strict. Device-verified "sok done" → gate in ~1.2s.
+
+### Still open (Part C tail)
+- **Web cross-app resolution** — the web lookup still uses `thread.lastListingFor` (tasks/stoop cached);
+  folio/calendar + the app-qualified-lookup fix are NOT yet ported to web (web dispatch is non-uniform —
+  calendar via the `household`→`calendar_*` prefix). The mobile fixes (A–D) should be checked on web too.
+- `loadCircleItems` `getMyTasks` alias returns null on mobile → the circle item base shows stoop posts
+  but no tasks (resolution still works via the app-qualified listOpen fetch; the base is just incomplete).
 
 **Why:** only `tasks` had correct gate (`match`) declarations. `stoop`'s are **dormant + incorrect**
 (2026-06-11 audit): `markReturned`/`getItemTree`/`reportPost` use `body:'match'`→`args.match` but the
@@ -135,6 +154,10 @@ call carries no context and faces the full op set, so it mis-picks (the device-r
 **What:** (1) feed the gate's existing `retrieve` (RAG context) into `interpretCommand` — the hook
 exists, the circle bot passes nothing; (2) tighten the tool descriptors / system prompt. Pairs with
 **Part D** (scoping) — together they make the LLM half reliable.
+**F-prompt ✅ DONE** (system prompt tightened). **Ollama request timeout ✅ DONE 2026-06-11** (`5c0c1c84`):
+the provider had no timeout, so a stalled endpoint (a dropped `adb reverse` to local ollama) hung the
+turn for minutes — added an `AbortController` (12s default, per-call `options.timeoutMs` override) so it
+fails fast + gracefully. **F-retrieve still open** (= P3 §4 `sealedIndex.semanticQuery` wiring).
 
 ---
 

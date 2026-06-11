@@ -81,11 +81,24 @@ gate/interpret/scope/addressesBot — only the shell glue differs. Back-compat: 
 thin wrapper re-exporting the unified engine until web's call-site is migrated, then delete it. Verify:
 web DM-shell circle bot + mobile kring bot identical behaviour; suite green.
 
-### Phase 5 — close the web kring-composer feature gap *(feature work, optional/last)*
-Web's GESPREK composer (`circleApp.js onSend`) only fans out plain messages; wire the unified turn
-engine (Phase 4) + the feedback mount (Phase 1) into it so `@assistant …` and `/feedback` work *in the
-kring view* on web, matching mobile. This is net-new web functionality, not just dedup — schedule
-separately.
+### Phase 5 — close the web kring-composer feature gap *(NET-NEW web feature; do WITH a browser)*
+Web's GESPREK composer (`circleApp.js onSend`, ~line 961) only fans out plain messages. Give that page
+its own bot + feedback, mirroring mobile `CircleLauncherScreen` but assembling the now-SHARED pieces.
+**Scoped (2026-06-11):** `circleApp.js` today has only the agent (`createRealHouseholdAgent` →
+`rawCallSkill`/`resolveCallSkill`), `eventLog`, `deliveryStateMap`, `policy`, and the kring stream. It
+has NO catalog/LLM/gate/feedback. Build, in `circleApp.js` (the v2 launcher is browser-check-flagged —
+verify in a browser as you go):
+1. **Catalog** — replicate `main.js`: `mergeManifests([...the same manifest set...])` → `filterCatalog(rawCatalog, appRegistry)`.
+2. **LLM providers** — `buildCircleLlmProviders({ localBaseUrl: import.meta.env.VITE_CIRCLE_LLM_BASEURL, model })`.
+3. **Gate** — `createTokenGate({ rules: circleGateRules(currentLang()) })`.
+4. **Feedback** — `createFeedbackSurface(...)` + `createFeedbackMount({ surface, appendUserBubble, appendBotBubble })` where the bubbles `eventLog.append(kringChatMessageEvent({...actor:'bot'...}))` into the kring stream.
+5. **Lookup** — `makeCircleLookup({ getBase: () => <loaded kring items>, appCallSkill: rawCallSkill, scopeId: () => id })`.
+6. **Clarify** — `createClarifyingDispatch({ catalog: () => catalog, lookup, dispatchReady: <runDispatch + render a 'bot' kring bubble>, ask/askMissing: <kring bubble + candidate buttons> })`.
+7. **Bot** — `createCircleDispatch({ catalog: () => catalog, policy: { llmTool }, userDefault, llmProviders, interpret: interpretToCommand, dispatch: <parseInput→clarify.run | clarify.run>, gate, botName, postToKring: <the EXISTING optimistic-append + broadcastFanOut> })`.
+8. **onSend rewire** — `async (text) => { if (await feedbackMount.tryHandle(text, id)) return; await bot.handle(text, { id }); }`. The bot's `postToKring` sink = the current append+fan-out, so a plain message still fans out exactly as today.
+9. **Dispatch rendering** — id-mutations now need the circle scope (router.js MUTATE_VERBS, already shared) — pass `scopeReadyDispatch(route, id)` in the clarify `dispatchReady`, like mobile.
+**Verify (browser, v2 launcher / index.html):** `@assistant add X`→addTask · `done X`→completeTask (no "item not found") · `/feedback → text → /klaar → /feedback-stop` · a plain message still fans out.
+**Risk:** net-new on a browser-check-flagged page; ~150 lines of assembly. Low *logic* risk (every piece is shared + tested) but real *integration* risk → must be browser-verified, not shipped blind.
 
 ---
 

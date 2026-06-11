@@ -68,6 +68,14 @@ Detail: `apps/canopy-chat/docs/circle-bot-token-gate-TODO.md` · `[[project-circ
   gate ✅ · ollama timeout ✅ · F-prompt ✅**. Remaining: **web cross-app resolution + the A–D fixes ported
   to web** (mobile-only so far), F-retrieve, A (engine-parity, deferred), E (inline menus), G (mock↔real
   reconcile — folio branch `824d766b` unverified).
+- **Web↔mobile divergence consolidation** **[code-ready, sequenced]** — deep-dive audit 2026-06-11
+  (3 agents) confirmed: most substrates ARE shared (via the `@canopy-app/canopy-chat` barrel), but **4
+  duplicated-logic pairs** remain where mobile/web reimplement instead of share — and that's exactly
+  where this session's bugs lived. Targets: (1) `circleTurn.js`↔`circleDispatch.js` (one turn engine);
+  (2) `resolveTextArgsInPlace`↔`circleLookup` (→ `clarifyTargets`); (3) web adopt `createFeedbackMount`
+  (web's `/klaar` works only by accident); (4) shared `broadcastFanOut`. Plus: web kring composer lacks
+  bot/feedback (feature gap); 2 dead modules (`circleLlmRoutes`, `groupsIndex`). **Sequenced plan:**
+  `apps/canopy-chat/docs/web-mobile-consolidation-plan.md`. Goal: mobile = RN UI + transport adapter only.
 - **Smoke checkpoints owed** **[blocked: device/manual]** — web smoke for the 2026-05-24 wave
   (#218/#219/#231.*), first canopy-chat-mobile Android boot, tasks/stoop-mobile screens (#226–#228).
   (Mobile circle-bot boot now DONE — device run 2026-06-10.)

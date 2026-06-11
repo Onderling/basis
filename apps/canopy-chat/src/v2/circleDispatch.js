@@ -1,52 +1,69 @@
-// v2 circle free-text → dispatch — the decision a typed turn in a circle conversation goes through:
-//   1. a slash command                                  → dispatch it
-//   2. free text + the circle's `llmTool` is on + the bot is ADDRESSED (@tag / name)
-//                                                        → interpret it as a slash command via the
-//                                                          circle's LLM → dispatch the result
-//   3. otherwise                                         → post it to the kring as a normal message
+// v2 circle free-text → dispatch — the ONE platform-neutral turn engine for a typed turn in a circle
+// (web↔mobile consolidation Phase 4: web's circleTurn is now a thin adapter over this; the
+// gate→interpret→dispatch loop lives here ONCE):
+//   1. an explicit /slash command       → dispatch it (unless `dispatchSlash:false` — the web shell
+//                                          already routes slash upstream, so it defers via onUnhandled)
+//   2. free text + the circle's LLM on + the bot ADDRESSED (@tag/name) → gate (rule → dispatch; skip →
+//                                          unhandled) else interpret via the circle LLM → dispatch
+//   3. otherwise                         → the injected sink (mobile: post to the kring; web: defer)
 //
-// Platform-neutral: the shell injects HOW to dispatch a slash string, HOW to post to the kring, the
-// command catalog (the LLM's "tool list"), the per-circle LLM providers, and the NL→slash
-// `interpret`. Web's classic shell already does step 1; this unifies 1–3 for the v2 circle surface
-// (mobile `CircleLauncherScreen`) and is shared by the household bot + the feedback v2 rewire — the
-// difference between them is only the catalog/interpreter (slash commands vs feedback intents).
+// Platform-neutral: the shell injects HOW to dispatch (slash string OR {opId,args}), the "unhandled"
+// sink, the catalog, per-circle LLM providers, the policy (static OR a per-scope getter), and the
+// NL→slash interpret. The household bot + the feedback v2 rewire reuse the same core — they differ only
+// in the catalog/interpret.
 
 import { resolveCircleLlm } from './llmPicker.js';
 import { scopeCatalogToApps } from './circleCatalogScope.js';
 
 /**
  * @param {object} a
- * @param {object} [a.catalog]      dispatch catalog (slash commands = the LLM tool list); passed to interpret
- * @param {{llmTool?:'off'|'local'|'cloud'|'user'}|null} [a.policy]   the circle policy (authoritative)
- * @param {{mode?:'off'|'local'|'cloud'}|null} [a.userDefault]   the member's personal default — used only when policy is 'user'
+ * @param {object|(()=>object)} [a.catalog]   the dispatch catalog (LLM tool list); static or a getter
+ * @param {object|((ctx:object)=>object|Promise<object>)} [a.policy]  the circle policy; static OR a per-scope getter (web's `policyFor`)
+ * @param {object|(()=>object)} [a.userDefault]   the member's personal default (only when policy is 'user'); static or a getter
  * @param {{local?:object,cloud?:object}|null} [a.llmProviders] host-supplied LlmClients
- * @param {(text:string, opts:{catalog,llm}) => Promise<{opId:string,args?:object}|null>} [a.interpret]  NL→slash
- * @param {(input:string|{opId:string,args:object}, ctx:object) => any|Promise<any>} a.dispatch  run a typed slash STRING (user) or an {opId,args} route (LLM/structured) — the shell resolves both, as it already does for typed input vs button taps
- * @param {(text:string, ctx:object) => any|Promise<any>} a.postToKring    post a normal kring message
- * @param {string} [a.botName]      the assistant's address/name for @-tag detection (default 'assistant')
+ * @param {(text:string, opts:{catalog,llm,context}) => Promise<{opId:string,args?:object}|null>} [a.interpret]  NL→slash
+ * @param {(input:string|{opId:string,args:object}, ctx:object) => any} a.dispatch  run a typed slash STRING or an {opId,args} route
+ * @param {(text:string, ctx:object) => any} [a.postToKring]  back-compat sink: posts a kring message (→ the default onUnhandled, reports 'kring')
+ * @param {(text:string, ctx:object) => (string|Promise<string>)} [a.onUnhandled]  handle slash(when dispatchSlash:false)/skip/no-match/not-addressed; returns the `via` ('kring' | 'defer' | 'none' | …)
+ * @param {boolean} [a.dispatchSlash=true]  when false, a /command is NOT dispatched here (left to onUnhandled — the web shell routes slash itself)
+ * @param {object} [a.gate]   optional token gate ({ evaluate })
+ * @param {string} [a.botName='assistant']
  */
-export function createCircleDispatch({ catalog, policy, userDefault, llmProviders, interpret, dispatch, postToKring, gate, botName = 'assistant' }) {
-  if (typeof dispatch !== 'function' || typeof postToKring !== 'function') {
-    throw new Error('createCircleDispatch: dispatch + postToKring are required');
+export function createCircleDispatch({ catalog, policy, userDefault, llmProviders, interpret, dispatch, postToKring, onUnhandled, dispatchSlash = true, gate, botName = 'assistant' }) {
+  if (typeof dispatch !== 'function') {
+    throw new Error('createCircleDispatch: dispatch is required');
   }
+  const getCatalog     = typeof catalog === 'function' ? catalog : () => catalog;
+  const getPolicy      = typeof policy === 'function' ? policy : () => policy;
+  const getUserDefault = typeof userDefault === 'function' ? userDefault : () => userDefault;
+  // The "everything-else" sink: an explicit onUnhandled, else a `postToKring` (back-compat → posts +
+  // reports 'kring'), else a no-op reporting 'none'.
+  const unhandled = typeof onUnhandled === 'function'
+    ? onUnhandled
+    : (typeof postToKring === 'function'
+        ? async (text, ctx) => { await postToKring(text, ctx); return 'kring'; }
+        : () => 'none');
+  const sink = async (text, ctx) => (await unhandled(text, ctx)) ?? 'none';
+
   return {
-    /** Route one typed turn. Returns `{ via: 'slash'|'llm'|'kring'|'none', cmd? }`. */
+    /** Route one typed turn. Returns `{ via: 'slash'|'rule'|'llm'|'kring'|'defer'|'none', cmd? }`. */
     async handle(text, ctx = {}) {
       const trimmed = String(text ?? '').trim();
       if (!trimmed) return { via: 'none' };
 
-      // 1. explicit slash command → dispatch verbatim (the shell's normal slash pipeline).
+      // 1. explicit slash command → dispatch verbatim (unless the shell handles slash upstream).
       if (trimmed.startsWith('/')) {
-        await dispatch(trimmed, ctx);
-        return { via: 'slash' };
+        if (dispatchSlash) { await dispatch(trimmed, ctx); return { via: 'slash' }; }
+        return { via: await sink(trimmed, ctx) };
       }
 
-      // 2. free text + the circle's LLM is enabled + the bot is addressed → interpret → dispatch.
-      const llm = resolveCircleLlm({ circlePolicy: policy, userDefault, providers: llmProviders });
+      // 2. free text + the circle's LLM enabled + the bot addressed → gate / interpret → dispatch.
+      const circlePolicy = await getPolicy(ctx);
+      const llm = resolveCircleLlm({ circlePolicy, userDefault: getUserDefault(), providers: llmProviders });
       if (llm && typeof interpret === 'function' && addressesBot(trimmed, botName)) {
         const stripped = stripBotTag(trimmed, botName);
         // Token gate (optional) — a cheap LOCAL pass before the (possibly remote) LLM: a rule routes a
-        // command directly (no LLM); a skip treats the turn as normal chat (→ kring); else interpret
+        // command directly (no LLM); a skip treats the turn as normal chat (→ the sink); else interpret
         // with RAG context.
         let context;
         if (gate && typeof gate.evaluate === 'function') {
@@ -55,23 +72,22 @@ export function createCircleDispatch({ catalog, policy, userDefault, llmProvider
             await dispatch({ opId: g.command.opId, args: g.command.args || {} }, ctx);
             return { via: 'rule', cmd: g.command };
           }
-          if (g.via === 'skip') { await postToKring(trimmed, ctx); return { via: 'kring' }; }
+          if (g.via === 'skip') return { via: await sink(trimmed, ctx) };
           context = g.context;
         }
-        // Part D — scope the LLM's tool list to the circle's apps (default: the circle apps, not
-        // canopy-chat's infra ops; `policy.apps` narrows further). Gate/dispatch unaffected.
-        const scopedCatalog = scopeCatalogToApps(catalog, policy?.apps);
+        // Part D — scope the LLM's tool list to the circle's apps (default: the circle apps;
+        // `policy.apps` narrows further). Gate/dispatch unaffected.
+        const scopedCatalog = scopeCatalogToApps(getCatalog(), circlePolicy?.apps);
         const cmd = await interpret(stripped, { catalog: scopedCatalog, llm, context });   // → {opId,args} | null
         if (cmd && cmd.opId) {
           await dispatch({ opId: cmd.opId, args: cmd.args && typeof cmd.args === 'object' ? cmd.args : {} }, ctx);
           return { via: 'llm', cmd };
         }
-        // the LLM couldn't map it to a command → fall through to a normal post.
+        // the LLM couldn't map it to a command → fall through to the sink.
       }
 
-      // 3. otherwise → post to the kring.
-      await postToKring(trimmed, ctx);
-      return { via: 'kring' };
+      // 3. everything else → the injected sink.
+      return { via: await sink(trimmed, ctx) };
     },
   };
 }

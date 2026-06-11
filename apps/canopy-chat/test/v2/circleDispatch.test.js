@@ -111,9 +111,9 @@ describe('createCircleDispatch — routing', () => {
     expect(posted).toEqual([]);
   });
 
-  it('requires dispatch + postToKring', () => {
-    expect(() => createCircleDispatch({ dispatch: () => {} })).toThrow();
-    expect(() => createCircleDispatch({ postToKring: () => {} })).toThrow();
+  it('requires dispatch (the unhandled sink — postToKring/onUnhandled — is optional)', () => {
+    expect(() => createCircleDispatch({ postToKring: () => {} })).toThrow();      // no dispatch → throws
+    expect(() => createCircleDispatch({ dispatch: () => {} })).not.toThrow();     // dispatch alone is enough now
   });
 });
 

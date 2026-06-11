@@ -1,64 +1,43 @@
-// Web turn-interceptor for the v2 circle free-text surface.
-//
-// The web shell (`main.js handleUserText`) ALREADY routes slash commands and, for non-slash text,
-// falls through to its "unknown command" handling. This interceptor slots in at that seam and adds
-// ONLY the missing branch: when the circle's `llmTool` is on AND the bot is addressed, interpret the
-// free text as a command (`interpretCommand`) and dispatch it — SCOPED to the active circle, because
-// the host's `dispatchCommand` runs it against the current circle thread. Returns `true` when it
-// dispatched (the shell stops), `false` to fall through to the shell's normal handling.
-//
-// Mobile (`CircleLauncherScreen`) instead uses `createCircleDispatch` — a fresh turn-handler with a
-// real "post to the kring" — because there the kring input has no pre-existing slash routing to defer
-// to. Both share the same core (`selectLlmClient` + `addressesBot` + `interpretToCommand`); they
-// differ only in what "everything else" means (web: the shell's existing pipeline; mobile: a kring post).
+// Web turn-interceptor for the v2 circle free-text surface — now a THIN ADAPTER over the shared
+// `createCircleDispatch` (web↔mobile consolidation Phase 4: the gate→interpret→dispatch loop lives once
+// in circleDispatch.js). The web shell (`main.js handleUserText`) already routes slash commands and
+// falls through to its own "unknown command" handling, so this adapter:
+//   - does NOT dispatch slash (`dispatchSlash:false`) — the shell handles it,
+//   - DEFERS everything it doesn't take (`onUnhandled → 'defer'`) so the shell continues,
+//   - returns a BOOLEAN (true = it dispatched a command and the shell should stop).
+// Mobile uses the same engine directly, with a post-to-kring sink and slash dispatch on.
 
-import { resolveCircleLlm } from './llmPicker.js';
-import { addressesBot, stripBotTag } from './circleDispatch.js';
+import { createCircleDispatch } from './circleDispatch.js';
 import { interpretToCommand } from './interpretCommand.js';
-import { scopeCatalogToApps } from './circleCatalogScope.js';
 
 /**
  * @param {object} a
- * @param {(scope:object) => ({llmTool?:'off'|'local'|'cloud'|'user'}|null|Promise<object>)} a.policyFor  the circle policy for a scope (thread); may be async (e.g. load from a store)
+ * @param {(scope:object) => ({llmTool?:'off'|'local'|'cloud'|'user'}|null|Promise<object>)} a.policyFor  the circle policy for a scope (may be async, e.g. load from a store)
  * @param {{local?:object,cloud?:object}|null} a.llmProviders   host-supplied LlmClients
- * @param {() => object} a.catalog                              getter for the CURRENT merged catalog
+ * @param {object|(() => object)} a.catalog                     the merged catalog (static or getter)
  * @param {(cmd:{opId:string,args:object}, scope:object) => any|Promise<any>} a.dispatchCommand  dispatch {opId,args} within the circle scope
  * @param {{mode?:'off'|'local'|'cloud'}|(() => {mode?:string})} [a.userDefault]  the member's personal default — used only when the circle policy is 'user'
+ * @param {object} [a.gate]                                     optional token gate ({ evaluate })
  * @param {string} [a.botName]                                  the bot's address for @-tag detection
  * @param {Function} [a.interpret]                              override the NL→slash interpreter (tests)
  * @returns {(text:string, scope:object) => Promise<boolean>}
  */
 export function createCircleTurn({ policyFor, llmProviders, catalog, dispatchCommand, userDefault, gate, botName = 'assistant', interpret = interpretToCommand }) {
   if (typeof dispatchCommand !== 'function') throw new Error('createCircleTurn: dispatchCommand required');
-  const policy = typeof policyFor === 'function' ? policyFor : () => null;
-  const getCatalog = typeof catalog === 'function' ? catalog : () => catalog;
-  const getUserDefault = typeof userDefault === 'function' ? userDefault : () => userDefault;
-
+  const engine = createCircleDispatch({
+    catalog,
+    policy: typeof policyFor === 'function' ? policyFor : () => null,
+    userDefault,
+    llmProviders,
+    interpret,
+    dispatch: dispatchCommand,
+    gate,
+    botName,
+    dispatchSlash: false,        // the web shell routes slash itself
+    onUnhandled: () => 'defer',  // defer everything-else to the shell's existing pipeline
+  });
   return async function handleCircleTurn(text, scope = {}) {
-    const trimmed = String(text ?? '').trim();
-    if (!trimmed || trimmed.startsWith('/')) return false;          // slashes are the shell's job
-    const circlePolicy = await policy(scope);                       // policyFor may load the circle's policy async
-    const llm = resolveCircleLlm({ circlePolicy, userDefault: getUserDefault(), providers: llmProviders });
-    if (!llm || !addressesBot(trimmed, botName)) return false;      // off, or not addressed → fall through
-    const stripped = stripBotTag(trimmed, botName);
-    // Token gate (optional) — a cheap LOCAL pass before the (possibly remote) LLM: a rule can route a
-    // command directly or skip the LLM entirely. 'llm' carries RAG context into interpret.
-    let context;
-    if (gate && typeof gate.evaluate === 'function') {
-      const g = await gate.evaluate(stripped, scope);
-      if (g.via === 'rule' && g.command?.opId) {
-        await dispatchCommand({ opId: g.command.opId, args: g.command.args || {} }, scope);
-        return true;
-      }
-      if (g.via === 'skip') return false;
-      context = g.context;
-    }
-    // Part D — scope the LLM's tool list to the circle's apps (default: the circle apps, not
-    // canopy-chat's infra ops; `circlePolicy.apps` narrows further). The gate/dispatch are unaffected.
-    const scopedCatalog = scopeCatalogToApps(getCatalog(), circlePolicy?.apps);
-    const cmd = await interpret(stripped, { catalog: scopedCatalog, llm, context });
-    if (!cmd || !cmd.opId) return false;                            // no command fits → fall through
-    await dispatchCommand({ opId: cmd.opId, args: cmd.args && typeof cmd.args === 'object' ? cmd.args : {} }, scope);
-    return true;
+    const { via } = await engine.handle(text, scope);
+    return via === 'rule' || via === 'llm';   // handled (shell stops) iff the turn dispatched a command
   };
 }

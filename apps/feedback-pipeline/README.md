@@ -1,5 +1,11 @@
 # @canopy-app/feedback-pipeline
 
+> **Direction (decided 2026-06-11):** this app will **dissolve into canopy-chat**. Its manifest/ops
+> stay (the source of truth all projectors read), but the `feedback` name becomes a **navigation label**
+> for this functionality inside the unified chat surface — not a separate app/build/shell. (The
+> server-side pipeline/portal stay deployable; it's the user-facing surface that unifies.) See the root
+> README's *Direction* note.
+
 > **Layer: app (experiment / pre-DD).** A local-LLM pipeline that cleans,
 > anonymizes and dedup-summarizes chat messages. Self-contained today (talks to
 > Ollama over HTTP, no `@canopy/*` dependency) so the experiment runs with zero

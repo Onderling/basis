@@ -1,5 +1,10 @@
 # @canopy-app/stoop
 
+> **Direction (decided 2026-06-11):** this app will **dissolve into canopy-chat**. Its `manifest.js`
+> stays (the source of truth all projectors read), but the `stoop` name becomes a **navigation label**
+> for this functionality inside the unified chat surface — not a separate app/build/shell. See the root
+> README's *Direction* note.
+
 > **Layer: app.** Composes substrates from `packages/{item-store, skill-match, identity-resolver, agent-ui, notifier, chat-agent, ...}`. Direct SDK use is allowed only when justified in this README's `## Direct SDK use` section (per [`app-readme-scheme.md`](../../Project%20Files/conventions/app-readme-scheme.md)). See [`Project Files/conventions/architectural-layering.md`](../../Project%20Files/conventions/architectural-layering.md).
 >
 > **Manifest + tier policy.** Stoop's surface is declared in

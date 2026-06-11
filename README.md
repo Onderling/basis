@@ -47,8 +47,13 @@ declaration into four surfaces:
   system prompt      grammar             + forms           (screens/nav)
 ```
 
-- **`@canopy/app-manifest`** ships the schema, the validator, and the four
-  projectors (`renderChat` / `renderSlash` / `renderWeb` / `renderMobile`).
+- **`@canopy/app-manifest`** ships the schema, the validator, and the
+  projectors (`renderChat` / `renderSlash` / `renderWeb` / `renderMobile`,
+  plus **`renderGate`** — the deterministic *pre-LLM* half: it projects each
+  op's `surfaces.slash.match` verbs into token-gate rules so common phrases
+  ("add X", "done X") route without the model. `renderChat` is the LLM half;
+  `renderGate`/`renderSlash` are the deterministic half — same manifest, both
+  used by household's TG-bot and canopy-chat's circle bot).
 - **`@canopy/manifest-host`** composes *N* apps' manifests at runtime —
   collision detection across command namespaces + reply-shape lookup.
 
@@ -60,6 +65,20 @@ once.  Design intent:
 [`DESIGN-canopy-chat.md`](./DESIGN-canopy-chat.md).  Page-rendering policy
 (when a surface is substrate-rendered vs. hand-coded):
 [`DESIGN-tier-policy.md`](./DESIGN-tier-policy.md).
+
+### Direction — apps dissolve into canopy-chat (decided 2026-06-11)
+
+The manifest-per-app split is an **engineering** boundary, not a product one.
+The chosen direction is to **dissolve the separate apps (stoop, tasks-v0,
+feedback, …) into canopy-chat**: their `manifest.js` declarations stay (they
+are the source of truth every projector reads), but the app *names* become
+**navigation / reference labels** for groups of shared functionality inside
+one unified chat surface — not separate apps, builds, or shells. Everything
+already routes through the merged manifest, so this is a consolidation of
+shells and packaging, not a rewrite. Treat new work as **adding manifests +
+projectors to canopy-chat**, not standing up new app silos. This is why the
+gate/slash/web/mobile/LLM surfaces are all manifest projections: one
+declaration, every surface, one front door.
 
 ---
 

@@ -1,5 +1,11 @@
 # canopy-chat
 
+> **Direction (decided 2026-06-11):** the separate apps (stoop, tasks-v0, feedback, …) are to
+> **dissolve INTO canopy-chat** — their `manifest.js` declarations stay (the source of truth every
+> projector reads), but the app names become **navigation/reference labels** for shared functionality
+> inside this one chat surface, not separate apps/builds/shells. New work = add manifests + projectors
+> here, not new app silos. See the root README's *Direction* note.
+
 > **Layer: app.** Command-first unified chat shell that consumes
 > other canopy apps' manifests.  Static web deployable; mesh agent
 > runs browser-side.

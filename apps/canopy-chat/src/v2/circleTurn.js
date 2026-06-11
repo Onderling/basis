@@ -15,6 +15,7 @@
 import { resolveCircleLlm } from './llmPicker.js';
 import { addressesBot, stripBotTag } from './circleDispatch.js';
 import { interpretToCommand } from './interpretCommand.js';
+import { scopeCatalogToApps } from './circleCatalogScope.js';
 
 /**
  * @param {object} a
@@ -52,7 +53,10 @@ export function createCircleTurn({ policyFor, llmProviders, catalog, dispatchCom
       if (g.via === 'skip') return false;
       context = g.context;
     }
-    const cmd = await interpret(stripped, { catalog: getCatalog(), llm, context });
+    // Part D — scope the LLM's tool list to the circle's apps (default: the circle apps, not
+    // canopy-chat's infra ops; `circlePolicy.apps` narrows further). The gate/dispatch are unaffected.
+    const scopedCatalog = scopeCatalogToApps(getCatalog(), circlePolicy?.apps);
+    const cmd = await interpret(stripped, { catalog: scopedCatalog, llm, context });
     if (!cmd || !cmd.opId) return false;                            // no command fits → fall through
     await dispatchCommand({ opId: cmd.opId, args: cmd.args && typeof cmd.args === 'object' ? cmd.args : {} }, scope);
     return true;

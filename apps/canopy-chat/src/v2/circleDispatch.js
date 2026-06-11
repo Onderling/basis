@@ -12,6 +12,7 @@
 // difference between them is only the catalog/interpreter (slash commands vs feedback intents).
 
 import { resolveCircleLlm } from './llmPicker.js';
+import { scopeCatalogToApps } from './circleCatalogScope.js';
 
 /**
  * @param {object} a
@@ -57,7 +58,10 @@ export function createCircleDispatch({ catalog, policy, userDefault, llmProvider
           if (g.via === 'skip') { await postToKring(trimmed, ctx); return { via: 'kring' }; }
           context = g.context;
         }
-        const cmd = await interpret(stripped, { catalog, llm, context });   // → {opId,args} | null
+        // Part D — scope the LLM's tool list to the circle's apps (default: the circle apps, not
+        // canopy-chat's infra ops; `policy.apps` narrows further). Gate/dispatch unaffected.
+        const scopedCatalog = scopeCatalogToApps(catalog, policy?.apps);
+        const cmd = await interpret(stripped, { catalog: scopedCatalog, llm, context });   // → {opId,args} | null
         if (cmd && cmd.opId) {
           await dispatch({ opId: cmd.opId, args: cmd.args && typeof cmd.args === 'object' ? cmd.args : {} }, ctx);
           return { via: 'llm', cmd };

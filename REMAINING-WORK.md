@@ -62,20 +62,37 @@ Detail: `apps/canopy-chat/docs/circle-bot-token-gate-TODO.md` · `[[project-circ
   **Device verify was decisive:** the gate ROUTED but commands never EXECUTED on mobile — **4 dispatch
   bugs** (arity / app-qualified picker / `listMine→listOpen` / scope), all fixed + re-verified e2e
   (`22681c7e`). Plus a **per-locale trailing-verb gate** ("X done"/"afwas klaar") + an **ollama request
-  timeout** (`5c0c1c84`). add/done/claim now actually work on mobile. See `[[project-circle-bot-device-run]]`.
+  timeout** (`5c0c1c84`) + M6 feedback fixes (`4f5114a8`). add/done/claim now actually work on mobile.
+- **`done X` actually COMPLETES** **[✅ DONE + device-verified 2026-06-11 (`f952bc9f`)]** — the earlier
+  "done X works" was DISPATCH-ONLY: completeTask returned `item-store: item not found` (caught only by
+  checking the SKILL result, not just that the dispatch fired). Root cause: multi-pod (per-circle
+  peer/store), but `scopeReadyDispatch` scoped only CREATE verbs — the unscoped mutation hit the wrong
+  crew. Fix: scope id-targeted MUTATION verbs (complete/claim/submit/approve/reject/remove) to the
+  active circle too. See `[[project-circle-bot-device-run]]`.
 - **Gate + surface unification** → see **§7** (`PLAN-manifest-gate-surfaces.md`). Progress: **B (coverage
   scan) ✅ · D (catalog scoping) ✅ · C (gate verbs + the 4 dispatch fixes) ✅ device-verified · trailing
   gate ✅ · ollama timeout ✅ · F-prompt ✅**. Remaining: **web cross-app resolution + the A–D fixes ported
   to web** (mobile-only so far), F-retrieve, A (engine-parity, deferred), E (inline menus), G (mock↔real
   reconcile — folio branch `824d766b` unverified).
-- **Web↔mobile divergence consolidation** **[code-ready, sequenced]** — deep-dive audit 2026-06-11
-  (3 agents) confirmed: most substrates ARE shared (via the `@canopy-app/canopy-chat` barrel), but **4
-  duplicated-logic pairs** remain where mobile/web reimplement instead of share — and that's exactly
-  where this session's bugs lived. Targets: (1) `circleTurn.js`↔`circleDispatch.js` (one turn engine);
-  (2) `resolveTextArgsInPlace`↔`circleLookup` (→ `clarifyTargets`); (3) web adopt `createFeedbackMount`
-  (web's `/klaar` works only by accident); (4) shared `broadcastFanOut`. Plus: web kring composer lacks
-  bot/feedback (feature gap); 2 dead modules (`circleLlmRoutes`, `groupsIndex`). **Sequenced plan:**
-  `apps/canopy-chat/docs/web-mobile-consolidation-plan.md`. Goal: mobile = RN UI + transport adapter only.
+- **Web↔mobile divergence consolidation** **[Phases 1–4 ✅ DONE; Phase 5 spec'd]** — deep-dive audit
+  2026-06-11 (3 agents) found 4 duplicated-logic pairs (where this session's bugs lived). **All 4 now
+  SHARED + verified:** P1 web adopts `createFeedbackMount` (`12d27b14`); P2 shared `kringBroadcast`
+  (`broadcastKringFanOut`+`kringChatMessageEvent`); P3 shared `makeCircleLookup` (mobile's live lookup
+  → web); **P4 one turn engine** — `circleDispatch` is the core, `circleTurn` a thin adapter
+  (`d1d35281`). Suite 2296, web build, mobile device — all green. The **dedup goal is met.** P0 SKIPPED
+  (the 2 "dead" modules `circleLlmRoutes`/`groupsIndex` are tested-but-unwired — KEPT per Frits).
+  **Remaining = Phase 5 only** (below) + 2 web browser-smokes. Plan + P5 assembly spec:
+  `apps/canopy-chat/docs/web-mobile-consolidation-plan.md`.
+- **Consolidation Phase 5 — bot+feedback in web's kring composer** **[code-ready spec; NEEDS A BROWSER]**
+  — NET-NEW web feature (not dedup): `circleApp.js` (the v2 launcher / index.html) has the agent + kring
+  fan-out but NO bot stack. Assemble the now-shared pieces (catalog/LLM/gate/feedback mount/lookup/
+  clarify/`createCircleDispatch`) into its `onSend`, rendering bot output into the kring stream — the web
+  analog of mobile `CircleLauncherScreen` (~150 lines). Logic risk low (all pieces shared+tested),
+  integration risk real → **must be browser-verified, not shipped blind.** Precise 9-step assembly spec
+  + 4-line smoke in the plan doc (Phase 5). Do it WITH a browser open.
+- **Web browser-smokes owed** **[needs a desktop browser]** — (a) P1 feedback flow
+  (`/feedback → text → /klaar → /feedback-stop`); (b) P3 `/done <label>` (web typed-slash now uses the
+  shared live resolver). Both low-risk by design; just unverified because web has no headless harness here.
 - **Smoke checkpoints owed** **[blocked: device/manual]** — web smoke for the 2026-05-24 wave
   (#218/#219/#231.*), first canopy-chat-mobile Android boot, tasks/stoop-mobile screens (#226–#228).
   (Mobile circle-bot boot now DONE — device run 2026-06-10.)
@@ -183,18 +200,20 @@ E later. (Unification order would be B → A → C → D → E — see the plan 
 ---
 
 ## Fastest code-ready next moves (no creds/decisions needed)
-*The mobile circle bot + M6 are now device-verified working (2026-06-11). Updated priorities:*
-1. **Port the mobile circle-bot fixes to web** (§2/§7 Part C tail) — the 4 dispatch fixes + the
-   app-qualified cross-app resolution are **mobile-only**. Web uses `thread.lastListingFor` + a
-   non-uniform dispatch (calendar via `household`→`calendar_*`); check whether web has the same
-   arity/app-qualification bugs and port the fixes. **Highest value** (web is the other half of parity).
-2. **Verify the folio dissolve branch** (§7 Part G) — `824d766b` (`feat/folio-dissolve-part-g`) is
+*Mobile circle bot works e2e (add/done/claim + completion lands); web↔mobile consolidation Phases 1–4
+done. Updated priorities (2026-06-11):*
+1. **Consolidation Phase 5 — bot+feedback in web's kring composer** (§2) — **NEEDS A BROWSER** (the v2
+   launcher is browser-check-flagged). ~150-line assembly of shared pieces into `circleApp.js onSend`;
+   precise 9-step spec + 4-line smoke in `web-mobile-consolidation-plan.md`. Do it WITH a browser open.
+2. **Web browser-smokes** (§2) — P1 feedback (`/feedback → /klaar → /feedback-stop`) + P3 `/done <label>`.
+   Quick manual checks; needed because there's no headless web harness here. Pair with #1 (same browser).
+3. **Verify the folio dissolve branch** (§7 Part G) — `824d766b` (`feat/folio-dissolve-part-g`) is
    code-complete but **unverified** (its worktree had no deps); run `vitest` + `npm run coverage` in the
    main tree, then merge if green. Also delete its stray `.git-commit-msg-folio-dissolve.txt`.
-3. **P3 3.3c-b** (§4) — wire **household** membership → controlAgent grant/rotate (substrate built, clear
+4. **P3 3.3c-b** (§4) — wire **household** membership → controlAgent grant/rotate (substrate built, clear
    boundary). 3.3c-c (circle storage) is NOT a quick wire (investigated).
-4. **Category-floors e2e LLM re-run** (§1) — only remaining bit; needs an Ollama run on the scenarios.
-5. **Household chat-agent prompt** (§3) — a *decision* (make v3 the freeform-V2 default?), not a write.
+5. **Category-floors e2e LLM re-run** (§1) — only remaining bit; needs an Ollama run on the scenarios.
+6. **Household chat-agent prompt** (§3) — a *decision* (make v3 the freeform-V2 default?), not a write.
 *Then the deferred gate/surface parts:* **F-retrieve** (= P3 sealedIndex semanticQuery), **E** (inline
 menus), **A** (engine-parity → `@canopy/manifest-host`), **G** remaining apps (tasks-v0, stoop+household).
 *Non-blocking polish:* `makeResolvingCallSkill` catalog-blind probe-storm + NKN noise; `getMyTasks`

@@ -154,11 +154,12 @@ gate is manifest-driven. Remaining parts:
 - **Part G — mock↔real manifest reconcile (dissolve core)** **[STARTED 2026-06-11]** — the enabler is
   ✅ DONE: `buildToolDescriptors` now filters the LLM tool list to ops with `surfaces.chat` (no-op today —
   chat 127/127 — but lets a merged real manifest hide its internal/destructive ops). **Remainder (per-app,
-  verify each):** (1) reconcile the **dangerous param drift** on shared ops (tasks `rejectTask` reason↔note,
-  `addTask` params; stoop `postRequest` kind↔intent, `markReturned` itemId↔requestId; household
-  `markComplete` choreId↔match) — a live bug class, do first; (2) merge **folio** → real manifest (cleanest);
-  (3) **tasks-v0**; (4) **stoop + household** (dedupe slash + itemTypes); drop the mocks. Full strategy +
-  drift table in `PLAN-manifest-gate-surfaces.md` Part G + `apps/canopy-chat/docs/part-g-reconciliation-map.md`.
+  verify each):** (1) ~~param-drift reconcile~~ **NOT a task — verified the "drift" is bridged by the
+  realAgent adapter** (`rejectTask reason→note` @809, `markReturned itemId→requestId` @980; stoop
+  `postRequest` skill accepts both `kind`+`intent`); the real prerequisite is a **per-app adapter-layer
+  decision** (who bridges chat→skill vocab after the merge); (2) merge **folio** → real manifest (cleanest);
+  (3) **tasks-v0**; (4) **stoop + household** (dedupe slash + itemTypes); drop the mocks. Full strategy in
+  `PLAN-manifest-gate-surfaces.md` Part G + `apps/canopy-chat/docs/part-g-reconciliation-map.md`.
 
 **Sequencing (current goal = working + LLM-reliable): B → D → C → F**, then device re-verify. A deferred,
 E later. (Unification order would be B → A → C → D → E — see the plan doc.)

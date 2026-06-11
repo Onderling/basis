@@ -1,5 +1,13 @@
 # Part G — mock ↔ real manifest reconciliation map (2026-06-11)
 
+> **⚠️ CORRECTION (2026-06-11, verified in `realAgent.js`):** the "**dangerous param drift**" table below
+> is SUPERSEDED — those param differences are **NOT bugs**. The runtime path is mock → **realAgent adapter**
+> → real skill, and the adapter bridges the chat vocabulary: `rejectTask reason→note` (realAgent.js:809),
+> `markReturned itemId→requestId` (:980), `submitTask` note-default (:817); and some real skills accept the
+> chat vocab directly (stoop `postRequest` takes both `kind`+`intent`). So the mock params are correct for
+> the runtime path; **aligning them would break the bridges.** The real Part-G hard part is the **adapter
+> layer** (who bridges chat→skill vocab after a merge), not the param names. See PLAN Part G.
+
 Agent-investigated (read-only). See `[[reference-mock-vs-real-manifests]]`. The "mock" manifests are
 canopy-chat's chat-shell surface for the REAL apps; they've **drifted** from `apps/<app>/manifest.js`.
 calendar (used directly, no mock) is the target model.

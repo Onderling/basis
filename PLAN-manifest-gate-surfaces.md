@@ -153,12 +153,15 @@ dedupe stoop's slash; rename `mock*Manifest → *SlashManifest`. The concrete co
   with `slash.command`). So `buildToolDescriptors` (the LLM tool list) surfaced ALL ops — meaning a naive
   "import the real manifest" would expose its **internal/destructive ops** (folio `deleteFromPod`,
   `forceRepush`, …; tasks `removeTask`, `revokeTask`) to the model. THIS is why the curated mocks exist.
-- **Dangerous param drift on SHARED ops** (chat shell ≠ real skill — see `docs/part-g-reconciliation-map.md`):
-  tasks `addTask` (assignee/requiredSkill vs notes/dueAt/definitionOfDone), `rejectTask` (mock `reason`
-  optional vs real `note` REQUIRED → chat can under-specify → skill fails), `approveTask` (real has note);
-  stoop `postRequest` (`kind` ask/borrow/share/report/event vs `intent` ask/offer/lend), `markReturned`
-  (`itemId` vs `requestId`), `leaveGroup` (`confirm` vs required `groupId`); household `markComplete`
-  (`choreId`+pickerSource vs `match`). itemTypes diverge in every app.
+- **The "param drift" is NOT bugs — it's bridged adapter vocabulary** (verified 2026-06-11, supersedes the
+  reconciliation-map's drift table). The runtime path is mock → **realAgent adapter** → real skill, and the
+  adapter bridges the chat-friendly param names: `realAgent.js` line **809** `rejectTask reason→note`, line
+  **980** `markReturned itemId→requestId`, line **817** `submitTask` note-default; and some real skills
+  accept the chat vocab directly (stoop `postRequest` real skill takes **both** `kind` and `intent` →
+  `intentToCanonicalDraft(intent, kind)`, `apps/stoop/src/skills/index.js:420`). So the mock params are
+  CORRECT for the runtime path; aligning them to the real app manifest would **break/duplicate the bridges**.
+  ⇒ the dissolve cannot be a manifest-only merge — it must account for the **realAgent adapter layer**
+  (keep the chat vocab + adapter, OR eliminate the adapter and align mock+real+skills — a bigger change).
 - All four real manifests are **pure-data → bundle clean** (audit) → using them directly is feasible.
 
 ### Enabler ✅ DONE 2026-06-11 (`buildToolDescriptors` chat-surface filter)
@@ -168,10 +171,13 @@ ALSO correct semantics (the model should only propose chat ops). This is the str
 real manifest can carry internal/destructive ops (no `surfaces.chat`) and the model will never see them.
 
 ### Remainder — the per-app dissolve (sequenced)
-1. **Reconcile the dangerous param drift FIRST** (it's a live bug class, contained): align each mock
-   shared-op's params to the real skill's (verify against `apps/<app>/manifest.js` + the real skill),
-   updating the gate/slash/tests. Highest value, smallest blast radius; makes a later merge safe.
-2. **folio** (cleanest: real omits slash): move the chat ops + surfaces (chat/slash/gate) INTO
+1. ~~Reconcile param drift~~ **— NOT a task (verified 2026-06-11): the drift is bridged by the realAgent
+   adapter / accepted by the real skills; aligning would break the bridges.** The real prerequisite is a
+   **decision on the adapter layer**: when a mock dissolves into its real manifest, who bridges the
+   chat→skill vocab? Either (a) the real manifest declares the chat-vocab params + the skills/adapter
+   accept them (keep bridging), or (b) drop the chat vocab and the adapter (touches the real skills).
+   Decide this per app BEFORE merging — it's the actual hard part, not the param names.
+2. **folio** (cleanest: real omits slash + minimal adapter): move the chat ops + surfaces (chat/slash/gate) INTO
    `apps/folio/manifest.js`; its destructive ops stay (no `surfaces.chat` → not surfaced, per the
    enabler); `composeManifests`/`circleGate` import the real folio; drop `mockFolioManifest`.
 3. **tasks-v0** (real omits slash): same pattern, after the param reconcile.

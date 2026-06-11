@@ -57,6 +57,8 @@ import {
 // B (circle bot) — v2 free-text→LLM→command surface (shared with web). Deep-imported like the other
 // v2 modules (kringChatReceiver etc.) since they're not on the canopy-chat barrel.
 import { createCircleDispatch } from '../../../../canopy-chat/src/v2/circleDispatch.js';
+import { createTokenGate } from '../../../../canopy-chat/src/v2/tokenGate.js';
+import { defaultCircleGateRules } from '../../../../canopy-chat/src/v2/circleGateRules.js';
 import { interpretToCommand } from '../../../../canopy-chat/src/v2/interpretCommand.js';
 import { buildCircleLlmProviders } from '../../../../canopy-chat/src/v2/circleLlmProviders.js';
 import { createClarifyingDispatch } from '../../../../canopy-chat/src/v2/clarifyingDispatch.js';
@@ -1570,6 +1572,9 @@ function CircleDetail({
     llmProviders: buildCircleLlmProviders({ localBaseUrl: CIRCLE_LLM_BASEURL, model: CIRCLE_LLM_MODEL }),
     interpret: interpretToCommand,
     botName: CIRCLE_BOT_NAME,
+    // Deterministic pre-LLM gate: "add X" / "done X" / "claim X" route to the task op WITHOUT the
+    // (unreliable) small-model tool pick; everything else falls through to interpret.
+    gate: createTokenGate({ rules: defaultCircleGateRules() }),
     // A slash command is parsed to {opId,args}; the LLM already yields {opId,args}. Both then flow
     // through the clarifying dispatch (unique → run; ambiguous → ask with buttons).
     dispatch: (input) => {

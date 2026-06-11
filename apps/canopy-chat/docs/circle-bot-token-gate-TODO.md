@@ -1,7 +1,15 @@
 # Circle bot — token-gate wiring (TODO for a fresh session)
 
-**Status:** designed, NOT started. Branch `feat/circle-bot-token-gate` was created then
-abandoned empty; start fresh off `feat/circle-bot-polish` (or wherever current).
+**Status:** ✅ BUILT 2026-06-11 (`feat/circle-bot-token-gate`). `src/v2/circleGateRules.js`
+(add/done/claim, en+nl) wired via `createTokenGate` into BOTH surfaces — web (`main.js`
+`createCircleTurn`) and mobile (`CircleLauncherScreen` `circleBot`). 13 new tests (rules +
+gate-routing precedence over the LLM); full canopy-chat suite 2275 green; web build ✓.
+Key correction to the plan below: the catalog the bot dispatches against is the **mock** tasks
+manifest (`src/core/manifests/mockManifests.js`, shared by mobile via `composeManifests`), whose
+`completeTask`/`claimTask` `id` params ALREADY carry `pickerSource:{listOp:'listMine'}` — so
+done/claim resolve via the existing clarify path with NO manifest change. **Remaining: device
+re-verify (step 5)** — confirm "add milk to the list" lands `via:'rule'` + the item actually
+appears in the tasks list. Per-circle catalog scoping is still the separate follow-up.
 
 ## Why
 Device run (2026-06-10, Fairphone) **verified the mobile circle-bot wiring end-to-end**:

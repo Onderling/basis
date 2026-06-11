@@ -177,10 +177,26 @@ real manifest can carry internal/destructive ops (no `surfaces.chat`) and the mo
    chat→skill vocab? Either (a) the real manifest declares the chat-vocab params + the skills/adapter
    accept them (keep bridging), or (b) drop the chat vocab and the adapter (touches the real skills).
    Decide this per app BEFORE merging — it's the actual hard part, not the param names.
-2. **folio** (cleanest: real omits slash + minimal adapter): move the chat ops + surfaces (chat/slash/gate) INTO
-   `apps/folio/manifest.js`; its destructive ops stay (no `surfaces.chat` → not surfaced, per the
-   enabler); `composeManifests`/`circleGate` import the real folio; drop `mockFolioManifest`.
-3. **tasks-v0** (real omits slash): same pattern, after the param reconcile.
+2. **folio — FULLY SCOPED + ready to execute (2026-06-11):**
+   - **Blast radius is small:** `folioManifest` is consumed ONLY by `apps/folio/test/manifest.test.js`
+     (validation; asserts `surfaces.ui.confirm`, NOT chat) — folio's own web/mobile don't import it. The
+     chat ops' SKILLS already exist (`createBrowserFolioAgent` implements readNote/shareFolder/
+     downloadFile/saveToMyPod/listFiles/getFileSnapshot/verifyPodState).
+   - **Real folioManifest (7 ops):** deleteFromPod, deleteLocally, forceRepush, syncOnce, watchStart,
+     watchStop, verifyPodState — ALL declare `surfaces.chat`. **Mock (9):** readNote, shareFolder,
+     getFileSnapshot, downloadFile, saveToMyPod, folioStatus, listFiles (+ shared syncOnce, watchStart).
+   - **CURATION DECISION (the crux):** the real manifest's `deleteFromPod`/`deleteLocally`/`forceRepush`
+     have a chat surface → naively merging would let the **circle LLM propose deleting a shared file**
+     (the mock excluded them on purpose). **Remove `surfaces.chat` from those 3** (keep their ui+confirm);
+     the enabler then hides them from the model.
+   - **Steps:** (a) add the 7 mock chat ops to `folioManifest` with their surfaces (incl. the Part-C gate
+     `match`); merge `syncOnce`/`watchStart` (real chat+ui + mock gate); curate the 3 destructive ops;
+     `itemTypes ['file'] → ['note','file']`. (b) replace `mockFolioManifest` in `mockManifests.js` with
+     `export const mockFolioManifest = folioManifest` (re-export → consumers/composeManifests/navModel/
+     circleGate keep working, drift gone), then rename call-sites + drop the alias later. (c) fix tests:
+     `apps/folio/test/manifest.test.js` (itemTypes ['note','file'], op count, renderWeb nav), canopy-chat
+     `folioOps`/`chatRender`. (d) regenerate coverage; full suite + web build.
+3. **tasks-v0** (real omits slash; param "drift" already bridged — see Findings): same merge pattern.
 4. **stoop + household** (slash duplicated + heavy drift): dedupe slash, reconcile itemTypes, then merge.
 5. Each step: regenerate the surface-coverage snapshot; `validateManifest` strict; full suite + web build.
 **[code-ready, larger — do per-app, verify each]**

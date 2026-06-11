@@ -2205,7 +2205,8 @@ const handleCircleTurn = createCircleTurn({
   botName: CIRCLE_BOT_NAME,
   // Deterministic pre-LLM gate (manifest-derived via renderGate): "add X" / "done X" / "claim X" route
   // to the task op WITHOUT the (unreliable) small-model tool pick; everything else falls to interpret.
-  gate: createTokenGate({ rules: circleGateRules() }),
+  // Built for the user's locale so trailing verbs ("kaas done"/"afwas klaar") match per-language.
+  gate: createTokenGate({ rules: circleGateRules(currentLang()) }),
   // Route the interpreted command through the clarification turn (unique → dispatch; ambiguous → ask).
   dispatchCommand: (cmd, thread) => _circleClarify.run(cmd, thread),
 });

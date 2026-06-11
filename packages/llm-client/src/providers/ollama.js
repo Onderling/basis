@@ -52,6 +52,11 @@ export function ollamaProvider({
   model          = DEFAULT_MODEL,
   fetchFn        = globalThis.fetch,
   defaultOptions = null,
+  // Abort the request after this many ms so an unreachable / stalled endpoint (e.g. a dropped
+  // `adb reverse` to a local ollama) fails FAST and gracefully instead of hanging the turn for
+  // minutes (device-verify 2026-06-11: a flaky reverse hung an interpret call ~5 min). 0/false
+  // disables the timeout. Per-call `options.timeoutMs` overrides.
+  timeoutMs      = 12000,
 } = {}) {
   return {
     id: 'ollama',
@@ -73,11 +78,20 @@ export function ollamaProvider({
       const hasTools = Array.isArray(tools) && tools.length > 0;
       const url      = `${baseUrl.replace(/\/$/, '')}/v1/chat/completions`;
 
-      const post = (body) => fetchFn(url, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body:    JSON.stringify(body),
-      });
+      // Per-call timeout override; 0/false disables. An AbortController fires after the budget so a
+      // stalled endpoint rejects fast (→ the gate path / a graceful "couldn't reach the assistant"
+      // rather than a multi-minute hang). The timer is cleared on every settle.
+      const budget = options?.timeoutMs ?? timeoutMs;
+      const post = (body) => {
+        const ctl = budget ? new AbortController() : null;
+        const timer = ctl ? setTimeout(() => ctl.abort(), budget) : null;
+        return fetchFn(url, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body:    JSON.stringify(body),
+          ...(ctl ? { signal: ctl.signal } : {}),
+        }).finally(() => { if (timer) clearTimeout(timer); });
+      };
 
       // First attempt — with tools (if any).
       let res = await post(hasTools ? { ...baseBody, tools: tools.map(toOpenAITool) } : baseBody);

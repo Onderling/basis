@@ -245,3 +245,46 @@ describe('renderSlash — none body (help)', () => {
     expect(r.parse('help')).toEqual({ skillId: 'help', args: {} });
   });
 });
+
+describe('renderSlash — trailing-verb pass (per-locale, opt-in)', () => {
+  const trailFixture = {
+    app: 'tasks',
+    operations: [{
+      id: 'completeTask', verb: 'complete',
+      surfaces: { slash: { command: '/done', match: {
+        verbs: ['done', 'klaar'], body: 'match', arg: 'id', trailing: 'complete',
+      } } },
+    }],
+  };
+  // nl deliberately carries the code-switched english "done".
+  const LEX = { en: { complete: ['done', 'finished'] }, nl: { complete: ['klaar', 'gedaan', 'done'] } };
+
+  it('matches the verb TRAILING the object when locale + lexicon are supplied', () => {
+    const rs = renderSlash(trailFixture, { locale: 'en', trailLexicon: LEX });
+    expect(rs.parse('the dishes done')).toEqual({ skillId: 'completeTask', args: { id: 'the dishes' } });
+    expect(rs.parse('the dishes finished')).toEqual({ skillId: 'completeTask', args: { id: 'the dishes' } });
+  });
+
+  it('a LEADING verb still wins (leading pass runs first)', () => {
+    const rs = renderSlash(trailFixture, { locale: 'en', trailLexicon: LEX });
+    expect(rs.parse('done the dishes')).toEqual({ skillId: 'completeTask', args: { id: 'the dishes' } });
+  });
+
+  it('per-locale: nl trailing verbs incl. code-switched english', () => {
+    const rs = renderSlash(trailFixture, { locale: 'nl', trailLexicon: LEX });
+    expect(rs.parse('afwas klaar')).toEqual({ skillId: 'completeTask', args: { id: 'afwas' } });
+    expect(rs.parse('afwas done')).toEqual({ skillId: 'completeTask', args: { id: 'afwas' } });
+  });
+
+  it('is INERT without opts — trailing not matched, leading unchanged (slash callers untouched)', () => {
+    const rs = renderSlash(trailFixture);
+    expect(rs.parse('the dishes done')).toBeNull();
+    expect(rs.parse('done the dishes')).toEqual({ skillId: 'completeTask', args: { id: 'the dishes' } });
+  });
+
+  it('only single-word lexicon verbs trail, and a non-empty body is required', () => {
+    const rs = renderSlash({ ...trailFixture }, { locale: 'en', trailLexicon: { en: { complete: ['done', 'all done'] } } });
+    expect(rs.parse('milk done')).toEqual({ skillId: 'completeTask', args: { id: 'milk' } });
+    expect(rs.parse('all done')).toEqual({ skillId: 'completeTask', args: { id: 'all' } });   // matches single 'done', body 'all'
+  });
+});

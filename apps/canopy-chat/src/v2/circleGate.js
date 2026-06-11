@@ -21,13 +21,22 @@
 import { renderGate } from '../../../../packages/app-manifest/src/renderGate.js';
 import { mockTasksManifest, mockStoopManifest, mockFolioManifest } from '../core/manifests/mockManifests.js';
 import { calendarManifest } from '../../../calendar/manifest.js';
+import { CIRCLE_GATE_TRAIL, DEFAULT_GATE_LOCALE } from './circleGateLexicon.js';
 
-/** Token-gate rules for the circle bot, projected from the circle apps' manifests. */
-export function circleGateRules() {
+/**
+ * Token-gate rules for the circle bot, projected from the circle apps' manifests.
+ *
+ * `locale` (the user's language, 'en' | 'nl') enables the per-locale TRAILING-verb pass so casual
+ * phrasing like "kaas done" / "afwas klaar" routes through the deterministic gate instead of falling
+ * to the (unreliable) small LLM. Leading verbs are language-neutral on the manifest; only trailing is
+ * locale-scoped (circleGateLexicon). Defaults to English.
+ */
+export function circleGateRules(locale = DEFAULT_GATE_LOCALE) {
+  const loc = CIRCLE_GATE_TRAIL[locale] ? locale : DEFAULT_GATE_LOCALE;
   return renderGate([
     mockTasksManifest,
     mockStoopManifest,
     mockFolioManifest,
     calendarManifest,
-  ]);
+  ], { locale: loc, trailLexicon: CIRCLE_GATE_TRAIL });
 }

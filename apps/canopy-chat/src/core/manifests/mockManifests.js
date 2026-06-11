@@ -115,6 +115,9 @@ export const mockTasksManifest = {
             verbs: [['klaar', 'met'], ['done', 'with'], 'done', 'complete', 'completed', 'finished', 'klaar', 'voltooid', 'gedaan'],
             body:  'match',
             arg:   'id',
+            // Also match the verb TRAILING the object ("kaas done", "afwas klaar") — the per-locale
+            // 'complete' verb list (circleGateLexicon) is tried after the leading verbs above fail.
+            trailing: 'complete',
           } },
         ui:    { control: 'button', label: 'Mark complete' },
         chat:  { hint: 'mark a claimed task complete' },

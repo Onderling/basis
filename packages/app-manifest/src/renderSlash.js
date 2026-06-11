@@ -26,7 +26,13 @@
  *
  * @param {import('./schema.js').Manifest} manifest
  */
-export function renderSlash(manifest) {
+export function renderSlash(manifest, opts = {}) {
+  // Per-locale TRAILING-verb support (opt-in via opts, used by renderGate for the circle bot): an op
+  // whose `match.trailing` names an intent ALSO matches that intent's verbs at the END of the text
+  // ("X done"), resolved from `opts.trailLexicon[opts.locale][intent]`. Tried only after every
+  // leading match fails. Inert when opts/locale/lexicon are absent → slash callers are unchanged.
+  const trailLexicon = (opts && typeof opts.trailLexicon === 'object') ? opts.trailLexicon : null;
+  const trailLocale  = (opts && typeof opts.locale === 'string') ? opts.locale : null;
   const grammar     = manifest?.slashGrammar ?? {};
   const prefixes    = (grammar.addressedPrefixes ?? []).map((src) => new RegExp(`^${src}`, 'i'));
   const specials    = (grammar.specials ?? []).map((s) => ({
@@ -60,6 +66,10 @@ export function renderSlash(manifest) {
       // Both inert unless declared, so household's slash byte-equivalence is untouched.
       arg:          typeof m.arg === 'string' ? m.arg : null,
       dropTrailing: Array.isArray(m.dropTrailing) && m.dropTrailing.length ? m.dropTrailing : null,
+      // Trailing pass — `<body> <verb>` matched at the END ("kaas done"). Verbs come from the
+      // per-locale lexicon by the `match.trailing` intent key; SINGLE words only. Empty unless
+      // the op declares `trailing` AND a lexicon+locale were supplied.
+      trailVerbRes: buildTrailVerbRes(m.trailing, trailLexicon, trailLocale),
     });
   }
 
@@ -92,9 +102,36 @@ export function renderSlash(manifest) {
           return applyBody(mch, body, { typeAliases, defaultType });
         }
       }
+
+      // Trailing-verb pass — only AFTER every leading match failed, so "done X" always beats "X done".
+      // Matches `<body> <verb>` with the verb at the end ("kaas done"); requires a non-empty body.
+      for (const mch of matchers) {
+        if (!mch.trailVerbRes.length) continue;
+        for (const re of mch.trailVerbRes) {
+          const m = s.match(re);
+          if (!m) continue;
+          const body = (m[1] ?? '').trim();
+          if (!body) continue;
+          return applyBody(mch, body, { typeAliases, defaultType });
+        }
+      }
       return null;
     },
   };
+}
+
+/**
+ * Build the trailing-verb regexes for an op: `<body> <verb>$` for each single-word verb of the
+ * `intent` in the locale lexicon. Returns [] unless the op declares a `trailing` intent AND a
+ * lexicon + locale were supplied (so the feature is fully opt-in).
+ */
+function buildTrailVerbRes(trailing, trailLexicon, locale) {
+  if (typeof trailing !== 'string' || !trailLexicon || !locale) return [];
+  const words = trailLexicon?.[locale]?.[trailing];
+  if (!Array.isArray(words) || !words.length) return [];
+  return words
+    .filter((w) => typeof w === 'string' && w && !/\s/.test(w))   // single words only
+    .map((w) => new RegExp(`^(.+?)\\s+${escapeRe(w)}\\b\\s*$`, 'i'));
 }
 
 function applyBody(mch, body, ctx) {

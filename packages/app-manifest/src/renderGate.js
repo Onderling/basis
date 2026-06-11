@@ -18,10 +18,12 @@
  */
 import { renderSlash } from './renderSlash.js';
 
-export function renderGate(manifestOrList) {
+// opts ({ locale, trailLexicon }) is forwarded to renderSlash to enable the per-locale TRAILING-verb
+// pass ("X done" / "afwas klaar"); inert when omitted, so existing callers are unchanged.
+export function renderGate(manifestOrList, opts = {}) {
   const manifests = Array.isArray(manifestOrList) ? manifestOrList : [manifestOrList];
   return manifests.filter(Boolean).map((manifest, i) => {
-    const matcher = renderSlash(manifest);
+    const matcher = renderSlash(manifest, opts);
     const name = `manifest:${manifest.appId ?? manifest.id ?? i}`;
     return {
       name,

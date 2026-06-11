@@ -67,7 +67,7 @@ import { buildCircleLlmProviders } from '../../../../canopy-chat/src/v2/circleLl
 import { createClarifyingDispatch } from '../../../../canopy-chat/src/v2/clarifyingDispatch.js';
 import { createUserLlmDefaultStore, asyncStorageUserLlmIo } from '../../../../canopy-chat/src/v2/userLlmDefault.js';
 import { formatNearbyLabel } from '../../core/nearbyLabel.js';
-import { t } from '../../core/localisation.js';
+import { t, lang } from '../../core/localisation.js';
 import {
   makeCirclePolicyStoreRN, makeMemberOverrideStoreRN, makeAvailabilityStoreRN,
   // P6.2 — persisted multi-admin proposals.
@@ -1610,7 +1610,8 @@ function CircleDetail({
     botName: CIRCLE_BOT_NAME,
     // Deterministic pre-LLM gate (manifest-derived via renderGate): "add X" / "done X" / "claim X"
     // route to the task op WITHOUT the (unreliable) small-model tool pick; else falls to interpret.
-    gate: createTokenGate({ rules: circleGateRules() }),
+    // Gate built for the user's locale so trailing verbs ("kaas done"/"afwas klaar") match per-language.
+    gate: createTokenGate({ rules: circleGateRules(lang()) }),
     // A slash command is parsed to {opId,args}; the LLM already yields {opId,args}. Both then flow
     // through the clarifying dispatch (unique → run; ambiguous → ask with buttons).
     dispatch: (input) => {

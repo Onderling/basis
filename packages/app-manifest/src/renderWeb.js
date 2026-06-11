@@ -391,7 +391,9 @@ import { paramsToJsonSchema } from './paramsToJsonSchema.js';
  * real manifests.  Keep the list small — every entry expands the
  * adapter's affordance-rendering surface implicitly.
  */
-const CREATIVE_VERBS = new Set(['add', 'register']);
+// Exported so renderCoverage detects the web/mobile surface with the SAME rule (no drift):
+// a creative verb auto-surfaces even without `surfaces.ui`.
+export const CREATIVE_VERBS = new Set(['add', 'register']);
 
 /**
  * @param {object} manifest

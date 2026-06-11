@@ -46,7 +46,8 @@
     "test:browser:headed": "playwright test --headed",
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "coverage": "node scripts/surface-coverage.mjs"
   },
   "dependencies": {
     "@canopy-app/calendar": "workspace:*",

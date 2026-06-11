@@ -1003,6 +1003,7 @@ export default function CircleLauncherScreen({
         circle={selected}
         items={items}
         callSkill={callSkill}
+        rawCallSkill={bundle?.callSkill}
         catalog={bundle?.catalog}
         policy={selectedPolicy}
         myListTasks={myListTasks}
@@ -1334,7 +1335,7 @@ function circleReplyText(reply) {
 }
 
 function CircleDetail({
-  circle, items, callSkill, catalog, policy, myListTasks = [],
+  circle, items, callSkill, rawCallSkill, catalog, policy, myListTasks = [],
   eventLog, circles = [],
   recipeStore = null,
   onBack, onSettings, onMine, onViewAs, onAdvisor, onSkills, onFiles, onRules, onRecipes,
@@ -1506,25 +1507,38 @@ function CircleDetail({
     } catch { appendKringMessage({ actor: 'bot', text: t('circle.bot.unknown') }); return; }
     if (dispatch.kind === 'needsForm') { appendKringMessage({ actor: 'bot', text: t('circle.bot.needsInfo') }); return; }
     if (dispatch.kind !== 'ready')     { appendKringMessage({ actor: 'bot', text: t('circle.bot.unknown') }); return; }
-    const scoped = scopeReadyDispatch(dispatch, { id: circle?.id });
+    // scopeReadyDispatch takes the active-circle id STRING (it writes it into the scope arg keys);
+    // an {id} object would land as the literal scope value (device-verify 2026-06-11).
+    const scoped = scopeReadyDispatch(dispatch, circle?.id);
+    if (typeof rawCallSkill !== 'function') { appendKringMessage({ actor: 'bot', text: t('circle.bot.unknown') }); return; }
     let reply;
-    try { reply = await runDispatch(scoped, callSkill); }
+    // runDispatch calls callSkill(appOrigin, opId, args) — the RAW 3-arg shape, with appOrigin from
+    // resolveDispatch. Pass the raw `rawCallSkill` (bundle.callSkill) DIRECTLY. The 2-arg *resolving*
+    // callSkill (used for the picker lookup) silently arg-shifts here: appOrigin→opId, opId→args, real
+    // args dropped — so the dispatched op was literally 'tasks-v0' and NO circle-bot command ever
+    // executed on mobile (device-verify 2026-06-11: logs showed `[callSkill] tasks-v0 →` not `addTask →`).
+    try { reply = await runDispatch(scoped, rawCallSkill); }
     catch (e) { appendKringMessage({ actor: 'bot', text: t('circle.bot.failed', { msg: e?.message ?? String(e) }) }); return; }
     appendKringMessage({ actor: 'bot', text: circleReplyText(reply) });
-  }, [catalog, callSkill, circle?.id, appendKringMessage]);
+  }, [catalog, circle?.id, rawCallSkill, appendKringMessage]);
 
   // B (clarification) — candidate source for an id-like param. Base = the circle's already-loaded
   // items (tasks + stoop posts, circle-scoped). Part C cross-app: ALSO pull the op's OWN list via the
   // auto-resolving callSkill (makeResolvingCallSkill probes the right app by opId), so labels for item
   // types NOT in the preloaded set — folio files (listFiles), calendar events (listEvents) — resolve
   // too. Scoped to the circle (crewId/circleId/groupId); deduped by id; best-effort (failures keep base).
-  const circleLookup = useCallback(async (listOp, _query, scope) => {
+  const circleLookup = useCallback(async (listOp, _query, scope, app) => {
     const toCand = (it) => ({ id: String(it?.id ?? ''), label: String(it?.label ?? it?.title ?? it?.name ?? it?.text ?? it?.id ?? '') });
     const base = Array.isArray(items) ? items.map(toCand) : [];
     if (!listOp || !callSkill) return base;
     try {
       const sid = scope?.id;
-      const r = await callSkill(listOp, sid ? { crewId: sid, circleId: sid, groupId: sid } : {});
+      const scopeArgs = sid ? { crewId: sid, circleId: sid, groupId: sid } : {};
+      // App-qualify when the op's owning app is known (rawCallSkill = bundle.callSkill, 3-arg) so a
+      // shared op name like `listOpen` resolves on the RIGHT app, not probe-first-origin (= stoop).
+      const r = (app && typeof rawCallSkill === 'function')
+        ? await rawCallSkill(app, listOp, scopeArgs)
+        : await callSkill(listOp, scopeArgs);
       const arr = Array.isArray(r) ? r
         : Array.isArray(r?.items) ? r.items : Array.isArray(r?.tasks) ? r.tasks
         : Array.isArray(r?.posts) ? r.posts : Array.isArray(r?.files) ? r.files
@@ -1533,7 +1547,7 @@ function CircleDetail({
       for (const it of arr) { const c = toCand(it); if (c.id && !seen.has(c.id)) { seen.add(c.id); base.push(c); } }
     } catch { /* keep base */ }
     return base;
-  }, [items, callSkill]);
+  }, [items, callSkill, rawCallSkill]);
 
   // B (clarification) — wraps dispatch: a unique target dispatches; an ambiguous one posts a bot
   // message with candidate BUTTONS (tapping → pick → re-run bound to that id); a missing one asks.
@@ -1628,7 +1642,9 @@ function CircleDetail({
     }
     if (await feedbackMountRef.current.tryHandle(text, circle.id)) return;   // feedback owned the turn
     const appended = appendKringMessage({ actor: 'me', text });
-    circleBot.handle(text, { id: circle.id, msgId: appended?.msgId, ts: appended?.ts });
+    // Fire-and-forget: the bot posts its own reply bubble; swallow rejections so a failed turn can't
+    // surface as an unhandled promise rejection.
+    Promise.resolve(circleBot.handle(text, { id: circle.id, msgId: appended?.msgId, ts: appended?.ts })).catch(() => {});
   }, [composerText, eventLog, circle?.id, appendKringMessage, circleBot]);
 
   // δ.2 — tap-to-retry on the failed icon.  Looks up the original

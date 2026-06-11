@@ -25,6 +25,11 @@
 export async function clarifyCommandTargets({ opId, args }, { catalog, lookup, scope } = {}) {
   const entry = catalog && catalog.opsById ? catalog.opsById.get(opId) : null;
   const op = entry && entry.op ? entry.op : entry;
+  // The op's owning app — passed to `lookup` so the picker's `listOp` resolves on the SAME app as the
+  // op, not by probe-first-origin. Without it a shared op name (e.g. `listOpen`, declared by both
+  // stoop and tasks-v0) resolves to the wrong app — "done <task>" searched stoop's buurt feed and
+  // never found the task (device-verify 2026-06-11). Lookups ignoring the 4th arg keep prior behaviour.
+  const appOrigin = entry && entry.appOrigin ? entry.appOrigin : null;
   const params = (op && Array.isArray(op.params)) ? op.params : [];
   const resolved = { ...(args || {}) };
 
@@ -39,7 +44,7 @@ export async function clarifyCommandTargets({ opId, args }, { catalog, lookup, s
     }
     if (isIdLike(raw)) continue;                             // already a concrete (ULID-ish) id
 
-    const items = (typeof lookup === 'function' ? await lookup(listOp, raw, scope) : null) || [];
+    const items = (typeof lookup === 'function' ? await lookup(listOp, raw, scope, appOrigin) : null) || [];
     // Exact id match wins (e.g. the value is a candidate id the user just PICKED) — authoritative,
     // skip the fuzzy label match. Also covers short/non-ULID ids that isIdLike wouldn't catch.
     const exact = items.find((it) => it && it.id === raw);

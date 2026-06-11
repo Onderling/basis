@@ -78,7 +78,10 @@ export const mockTasksManifest = {
       params: [{
         name: 'id', kind: 'string', required: true,
         // v0.7.Q34 — bare `/claim` → form shows clickable task list.
-        pickerSource: { listOp: 'listMine' },
+        // Resolve the label against OPEN tasks: claim applies to state:['open'], and listMine
+        // excludes the unclaimed tasks you'd actually be claiming (device-verify 2026-06-11 — a
+        // freshly-added task was never in listMine, so "claim X" never resolved → "couldn't find X").
+        pickerSource: { listOp: 'listOpen' },
       }],
       surfaces: {
         slash: { command: '/claim',
@@ -98,8 +101,11 @@ export const mockTasksManifest = {
       appliesTo: { type: 'task', state: ['claimed'] },
       params: [{
         name: 'id', kind: 'string', required: true,
-        // v0.7.Q34 — bare `/complete-task` → form shows claimed tasks.
-        pickerSource: { listOp: 'listMine' },
+        // v0.7.Q34 — bare `/complete-task` → form picks from open tasks. completeTask is self-mark
+        // mode (tasks-v0 `bot.markComplete` completes by label with NO prior claim), so resolve the
+        // label against listOpen — listMine misses freshly-added unassigned tasks (device-verify
+        // 2026-06-11 — "done socks" → listMine:[] → "couldn't find socks in this circle").
+        pickerSource: { listOp: 'listOpen' },
       }],
       surfaces: {
         slash: { command: '/complete-task',

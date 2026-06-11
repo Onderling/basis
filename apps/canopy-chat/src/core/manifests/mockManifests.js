@@ -182,7 +182,9 @@ export const mockTasksManifest = {
         { name: 'note', kind: 'string', required: false },
       ],
       surfaces: {
-        slash: { command: '/submit', body: 'flags' },
+        slash: { command: '/submit', body: 'flags',
+          // Part C gate — "submit X" → submitTask{id}; id already has pickerSource:listMine.
+          match: { verbs: ['submit', ['hand', 'in'], 'indienen', 'inleveren', ['ter', 'review']], body: 'match', arg: 'id' } },
         chat:  { reply: 'text', hint: 'submit a task for review (DoD gate)' },
         // #184 — appliesTo-gated row button: shows up on claimed tasks
         // in /mytasks lists.  Same auto-render path household uses for
@@ -196,9 +198,12 @@ export const mockTasksManifest = {
     {
       id:    'approveTask', verb: 'approve',
       appliesTo: { type: 'task', state: ['submitted'] },
-      params: [{ name: 'id', kind: 'string', required: true }],
+      params: [{ name: 'id', kind: 'string', required: true,
+        pickerSource: { listOp: 'listMine' } }],          // Part C — label→id resolution for the gate
       surfaces: {
-        slash: { command: '/approve' },
+        // Part C gate — bare 'accept' is calendar.rsvpAccept's (collision); approveTask keeps approve/goedkeuren/akkoord.
+        slash: { command: '/approve',
+          match: { verbs: ['approve', 'goedkeuren', 'akkoord'], body: 'match', arg: 'id' } },
         chat:  { reply: 'text', hint: 'approve a submitted task' },
         // #184 — appliesTo-gated row button on submitted tasks (approver view).
         ui:    { control: 'button', label: 'Approve' },
@@ -212,11 +217,14 @@ export const mockTasksManifest = {
       id:    'rejectTask', verb: 'reject',
       appliesTo: { type: 'task', state: ['submitted'] },
       params: [
-        { name: 'id',     kind: 'string', required: true },
+        { name: 'id',     kind: 'string', required: true,
+          pickerSource: { listOp: 'listMine' } },          // Part C — label→id resolution
         { name: 'reason', kind: 'string', required: false },
       ],
       surfaces: {
-        slash: { command: '/reject', body: 'flags' },
+        // Part C gate — rejectTask owns reject/afwijzen (collision vs calendar.rsvpDecline, which keeps 'decline').
+        slash: { command: '/reject', body: 'flags',
+          match: { verbs: ['reject', 'afkeuren', 'afwijzen', 'weiger'], body: 'match', arg: 'id' } },
         chat:  { reply: 'text', hint: 'reject a submitted task' },
         // #184 — appliesTo-gated row button on submitted tasks (approver view).
         ui:    { control: 'button', label: 'Reject' },
@@ -576,7 +584,10 @@ export const mockStoopManifest = {
         { name: 'kind', kind: 'string', required: false, enum: ['ask', 'borrow', 'share', 'report', 'event'] },
       ],
       surfaces: {
-        slash: { command: '/post', body: 'flags' },
+        // Part C gate — "post/ask/borrow X" → postRequest{text}. Bare 'share'/'deel' belong to
+        // folio.shareFolder (collision); the post `kind` flag stays slash/LLM-only.
+        slash: { command: '/post', body: 'flags',
+          match: { verbs: ['post', 'ask', 'borrow', 'vraag', 'plaats', 'leen', ['bied', 'aan']], body: 'text-only', dropTrailing: ['to', 'aan', 'op', 'in', 'voor'] } },
         chat:  {
           reply: 'text', hint: 'post a skill-request to your buurt',
           followUps: [
@@ -629,7 +640,8 @@ export const mockStoopManifest = {
       id:    'respondToItem', verb: 'claim',
       appliesTo: { type: 'post', state: ['open'] },
       params: [
-        { name: 'itemId', kind: 'string', required: true },
+        { name: 'itemId', kind: 'string', required: true,
+          pickerSource: { listOp: 'listFeed' } },          // Part C — label→id resolution
         // 2026-05-24 — body is required by the substrate; mark it
         // required here so [Help with] click triggers form-elicitation
         // ("what help are you offering?") instead of dispatching with
@@ -637,6 +649,9 @@ export const mockStoopManifest = {
         { name: 'body',   kind: 'string', required: true },
       ],
       surfaces: {
+        // Part C gate — "help with X" / "ik help X" → respondToItem{itemId}; PARTIAL gate (binds
+        // itemId by label; `body` "what help?" is then form-elicited as today).
+        slash: { match: { verbs: [['help', 'with'], ['respond', 'to'], 'offer', ['ik', 'help'], ['help', 'met'], ['reageer', 'op'], ['bied', 'hulp']], body: 'match', arg: 'itemId' } },
         chat: { reply: 'text', hint: 'offer help on a request' },
         // appliesTo-gated row button on /feed posts.  Click → form
         // prompts for body, then dispatches.  Future Slice: spawn a
@@ -660,15 +675,18 @@ export const mockStoopManifest = {
       id:    'markReturned', verb: 'complete',
       appliesTo: { type: 'post', state: ['open'] },
       params: [
-        { name: 'itemId', kind: 'string', required: true },
+        { name: 'itemId', kind: 'string', required: true,
+          pickerSource: { listOp: 'listFeed' } },          // Part C — label→id resolution
       ],
       surfaces: {
         chat: { reply: 'text', hint: 'Mark a lend item as returned; cancels its return reminder.' },
+        // Part C — FIX: bind the body to `itemId` (was the default `match`, which dropped the label).
         slash: {
           command: '/lend-return',
           match: {
-            verbs:   ['returned', 'teruggebracht', 'terug'],
+            verbs:   ['returned', 'teruggebracht', 'terug', ['mark', 'returned']],
             body:    'match',
+            arg:     'itemId',
             onEmpty: { skillId: 'markReturned', args: {} },
           },
         },
@@ -983,14 +1001,9 @@ export const mockStoopManifest = {
       ],
       surfaces: {
         chat:  { hint: "Walk an item's embeds/deps tree, materialising cross-pod refs (Phase 3.3c decentralised read path)." },
-        slash: {
-          command: '/tree',
-          match: {
-            verbs:   ['tree', 'boom'],
-            body:    'match',
-            onEmpty: { skillId: 'getItemTree', args: {} },
-          },
-        },
+        // Part C — removed the gate `match` (a debug tree-walk, not an NL user command; the
+        // body:'match' also dropped the label since the param is itemId). Literal /tree stays.
+        slash: { command: '/tree' },
       },
     },
     /**
@@ -1004,14 +1017,10 @@ export const mockStoopManifest = {
       params: [],
       surfaces: {
         chat:  { hint: 'Sign out of the current Solid pod session.  Mid-sync state may be dropped; the user can sign back in any time.' },
-        slash: {
-          command: '/sign-out',
-          match: {
-            verbs:   ['sign-out', 'signout', 'uitloggen'],
-            body:    'reject',
-            onEmpty: { skillId: 'signOutOfPod', args: {} },
-          },
-        },
+        // Part C — removed the gate `match`: body:'reject' is NOT a valid renderSlash body kind
+        // (would throw), and sign-out is a session op, not an NL one-liner. Literal /sign-out + the
+        // confirm-gated button stay.
+        slash: { command: '/sign-out' },
         ui: {
           control: 'button',
           label:   'Uitloggen',
@@ -1026,16 +1035,19 @@ export const mockStoopManifest = {
       id:        'reportPost', verb: 'report',
       appliesTo: { type: 'report' },
       params: [
-        { name: 'itemId', kind: 'string', required: true },
+        { name: 'itemId', kind: 'string', required: true,
+          pickerSource: { listOp: 'listFeed' } },          // Part C — label→id resolution
         { name: 'reason', kind: 'string' },
       ],
       surfaces: {
         chat:  { hint: 'File a report on another item; visible to admins of the group.' },
+        // Part C — FIX: bind the body to `itemId` (was the default `match`); `reason` stays optional.
         slash: {
           command: '/report',
           match: {
             verbs:   ['report', 'rapporteer', 'flag'],
             body:    'match',
+            arg:     'itemId',
             onEmpty: { skillId: 'reportPost', args: {} },
           },
         },
@@ -1050,14 +1062,12 @@ export const mockStoopManifest = {
       ],
       surfaces: {
         chat:  { hint: 'List open requests; optional `skill` + `intent` filters.' },
+        // Part C — removed the gate `match`: body:'type-only' mapped against a nonexistent `type`
+        // param (this op's enum is `intent`) with no typeAliases declared — mis-wired. List op,
+        // slash/screen only. Literal /bulletin stays.
         slash: {
           command: '/bulletin',
           shape:   '/bulletin [ask|offer|lend]',
-          match: {
-            verbs:   ['bulletin', 'board', 'posts', 'open', 'prikbord', 'buurt'],
-            body:    'type-only',
-            onEmpty: { skillId: 'listOpen', args: {} },
-          },
         },
       },
     },
@@ -1100,7 +1110,10 @@ export const mockFolioManifest = {
       ],
       runtime: 'browser',
       surfaces: {
-        slash: { command: '/share', body: 'flags' },
+        // Part C gate — owns 'share'/'deel'. PARTIAL: binds `folder` from the body; the required
+        // recipient `with` (a webid) is then form-elicited (a one-line command can't carry it).
+        slash: { command: '/share', body: 'flags',
+          match: { verbs: ['share', 'deel'], body: 'text-only', arg: 'folder', dropTrailing: ['with', 'to', 'met', 'aan'] } },
         chat:  { reply: 'text', hint: 'share a folio folder with a contact' },
       },
     },
@@ -1108,7 +1121,9 @@ export const mockFolioManifest = {
       id:    'syncOnce', verb: 'add', params: [],
       runtime: 'node',                                   // ← filtered in browser
       surfaces: {
-        slash: { command: '/sync' },
+        // Part C gate — no-arg action (sidecar only; runtime:'node' filters it from the browser bundle).
+        slash: { command: '/sync',
+          match: { verbs: ['sync', 'synchroniseer', 'synchroniseren'], body: 'none' } },
         chat:  { reply: 'text', hint: 'force a one-shot sync (sidecar only)' },
       },
     },
@@ -1116,7 +1131,8 @@ export const mockFolioManifest = {
       id:    'watchStart', verb: 'add', params: [],
       runtime: 'node',                                   // ← filtered in browser
       surfaces: {
-        slash: { command: '/watch' },
+        slash: { command: '/watch',
+          match: { verbs: ['watch', ['watch', 'folder'], ['let', 'op'], 'bewaak', ['bewaak', 'map']], body: 'none' } },
         chat:  { reply: 'text', hint: 'start the folder watcher (sidecar only)' },
       },
     },
@@ -1140,9 +1156,12 @@ export const mockFolioManifest = {
     {
       id:    'downloadFile', verb: 'list',
       appliesTo: { type: 'file' },
-      params: [{ name: 'path', kind: 'string', required: true }],
+      params: [{ name: 'path', kind: 'string', required: true,
+        pickerSource: { listOp: 'listFiles' } }],          // Part C — label→path resolution
       runtime: 'browser',
       surfaces: {
+        // Part C gate — "download X" → downloadFile{path}.
+        slash: { match: { verbs: ['download', 'haal', ['haal', 'op'], ['download', 'bestand']], body: 'match', arg: 'path' } },
         ui:   { control: 'button', label: 'Download' },
         // Declare `reply: 'text'` so the chat-shell renders the
         // skill's `{ok, message}` reply as text — without this the
@@ -1160,11 +1179,14 @@ export const mockFolioManifest = {
       id:    'saveToMyPod', verb: 'add',
       appliesTo: { type: 'file' },
       params: [
-        { name: 'path', kind: 'string', required: false },
+        { name: 'path', kind: 'string', required: false,
+          pickerSource: { listOp: 'listFiles' } },         // Part C — label→path resolution
         { name: 'name', kind: 'string', required: false },
       ],
       runtime: 'browser',
       surfaces: {
+        // Part C gate — "save X [to my pod]" → saveToMyPod{path}.
+        slash: { match: { verbs: ['save', 'bewaar', ['save', 'to', 'my', 'pod'], 'opslaan', ['bewaar', 'in', 'mijn', 'pod']], body: 'match', arg: 'path' } },
         ui:   { control: 'button', label: 'Save to my pod' },
         chat: { hint: 'save a shared file to your own pod' },
       },

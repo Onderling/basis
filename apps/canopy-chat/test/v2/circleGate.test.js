@@ -43,6 +43,48 @@ describe('circle gate (manifest-derived) — deterministic routing', () => {
   });
 });
 
+describe('circle gate — Part C: multi-app verbs, collisions, removed declarations', () => {
+  const op = async (text) => (await route(text)).command?.opId ?? null;
+
+  it('routes each app\'s user-action verbs to the right op', async () => {
+    expect(await op('submit the report')).toBe('submitTask');
+    expect(await op('post a ladder')).toBe('postRequest');
+    expect(await op('help with the drill')).toBe('respondToItem');
+    expect(await op('returned the ladder')).toBe('markReturned');
+    expect(await op('report the spam')).toBe('reportPost');
+    expect(await op('download budget.xlsx')).toBe('downloadFile');
+    expect(await op('sync')).toBe('syncOnce');
+    expect(await op('schedule lunch')).toBe('addEvent');
+  });
+
+  it('resolves each cross-app collision to its single owner', async () => {
+    expect(await op('share the deck')).toBe('shareFolder');      // not stoop.postRequest
+    expect(await op('deel de fotos')).toBe('shareFolder');
+    expect(await op('accept the invite')).toBe('rsvpAccept');    // not tasks.approveTask
+    expect(await op('reject the draft')).toBe('rejectTask');     // not calendar.rsvpDecline
+    expect(await op('decline the invite')).toBe('rsvpDecline');  // calendar keeps 'decline'
+    expect(await op('cancel event Demo')).toBe('cancelEvent');   // not household.removeChore
+    expect(await op('approve the report')).toBe('approveTask');  // tasks keeps 'approve'
+  });
+
+  it('honours multiword-before-bare precedence', async () => {
+    expect(await op('cancel appointment Lunch')).toBe('cancelEvent');
+    expect(await op('klaar met afwas')).toBe('completeTask');
+  });
+
+  it('removed/invalid declarations do NOT route (fall to the LLM)', async () => {
+    expect(await op('sign-out')).toBe(null);        // signOutOfPod: invalid body:'reject' removed
+    expect(await op('tree the item')).toBe(null);   // getItemTree: debug op, match removed
+    expect(await op('bulletin ask')).toBe(null);    // stoop.listOpen: mis-wired type-only removed
+  });
+
+  it('the gate never throws on any input (renderSlash body kinds all valid)', async () => {
+    for (const t of ['', '/', 'random words', 'sign-out now', 'cancel', 'ik kom niet']) {
+      await expect(route(t)).resolves.toBeDefined();
+    }
+  });
+});
+
 describe('circle bot + manifest gate — routing precedence', () => {
   function setup() {
     const dispatched = [];

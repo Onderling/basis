@@ -8,13 +8,26 @@
 // Relative import of the substrate (not the '@canopy/app-manifest' alias) so the same module resolves
 // under both vite (web) and metro (mobile imports this file from canopy-chat/src/v2).
 //
-// v1 projects the tasks manifest (the verbs the circle bot already acted on). Lighting up more apps is
-// `renderGate([mockTasksManifest, mockStoopManifest, …])` once their match arg-shapes are verified.
+// Part C (2026-06-11): projects the circle apps' manifests so the gate covers tasks/stoop/folio/
+// calendar user-action verbs. Cross-app verb collisions (share/accept/reject/cancel) were resolved at
+// the manifest level (each verb has one owner; losers dropped the bare token). renderGate is
+// first-match-wins across the flattened rules, preserving each op's verb order (multiword before bare).
+//
+// household-mock is DELIBERATELY EXCLUDED from the circle gate: the circle's items are TASKS (not
+// household chores), so its add/done verbs would be shadowed by tasks and its remove/list verbs would
+// mis-target a chore. Household ops still reach the LLM path; household's own gate verbs serve the
+// household TG-bot surface (its real manifest), not the circle.
 
 import { renderGate } from '../../../../packages/app-manifest/src/renderGate.js';
-import { mockTasksManifest } from '../core/manifests/mockManifests.js';
+import { mockTasksManifest, mockStoopManifest, mockFolioManifest } from '../core/manifests/mockManifests.js';
+import { calendarManifest } from '../../../calendar/manifest.js';
 
-/** Token-gate rules for the circle bot, projected from the manifest. */
+/** Token-gate rules for the circle bot, projected from the circle apps' manifests. */
 export function circleGateRules() {
-  return renderGate([mockTasksManifest]);
+  return renderGate([
+    mockTasksManifest,
+    mockStoopManifest,
+    mockFolioManifest,
+    calendarManifest,
+  ]);
 }

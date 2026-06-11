@@ -47,7 +47,9 @@ export const mockHouseholdManifest = {
       verb:  'list',
       params: [],
       surfaces: {
-        slash: { command: '/mine' },
+        // Part C gate — "list/show/mine" → listOpen (no arg).
+        slash: { command: '/mine',
+          match: { verbs: ['list', 'show', 'mine', 'lijst', 'toon'], body: 'none' } },
         chat:  { reply: 'list', hint: 'list open chores' },
       },
     },
@@ -61,7 +63,9 @@ export const mockHouseholdManifest = {
         pickerSource: { listOp: 'listOpen' },
       }],
       surfaces:  {
-        slash: { command: '/done' },
+        // Part C gate — "done X" / "klaar met X" → markComplete{choreId} (choreId has pickerSource).
+        slash: { command: '/done',
+          match: { verbs: [['klaar', 'met'], 'done', 'complete', 'did', 'finished', 'bought', 'klaar', 'gedaan', 'gekocht'], body: 'match', arg: 'choreId', splitItems: true } },
         chat:  { reply: 'text', hint: 'mark a chore complete' },
         ui:    { control: 'button', label: 'Mark done' },
       },
@@ -91,7 +95,9 @@ export const mockHouseholdManifest = {
       id:    'addMember', verb: 'add',
       params: [{ name: 'name', kind: 'string', required: true }],
       surfaces: {
-        slash: { command: '/addmember' },
+        // Part C gate — "register X" / "add member X" → addMember{name}.
+        slash: { command: '/addmember',
+          match: { verbs: ['register', ['add', 'member'], 'registreer', 'naam', ['lid', 'toevoegen']], body: 'text-only', arg: 'name' } },
         chat:  {
           reply: 'text', hint: 'add a member to the household',
           followUps: [
@@ -109,7 +115,9 @@ export const mockHouseholdManifest = {
       id:    'addChore', verb: 'add',
       params: [{ name: 'label', kind: 'string', required: true }],
       surfaces: {
-        slash: { command: '/add-chore' },
+        // Part C gate — "add X" / "voeg X toe" → addChore{label}; drops a "… to/op the list" clause.
+        slash: { command: '/add-chore',
+          match: { verbs: ['add', ['new', 'chore'], 'toevoegen', 'noteer', ['voeg', 'toe']], body: 'text-only', arg: 'label', dropTrailing: ['to', 'op', 'aan', 'toe'], splitItems: true } },
         chat:  { reply: 'text', hint: 'add a new chore' },
       },
     },
@@ -145,7 +153,9 @@ export const mockHouseholdManifest = {
         { name: 'confirm', kind: 'boolean', required: false },
       ],
       surfaces: {
-        slash: { command: '/remove-chore', body: 'flags' },
+        // Part C gate — "remove X" → removeChore{choreId}; bare 'cancel' is calendar.cancelEvent's.
+        slash: { command: '/remove-chore', body: 'flags',
+          match: { verbs: ['remove', 'delete', 'nope', 'verwijder', 'weg'], body: 'match', arg: 'choreId', splitItems: true } },
         chat:  { reply: 'text', hint: 'remove a chore (asks to confirm)' },
       },
     },

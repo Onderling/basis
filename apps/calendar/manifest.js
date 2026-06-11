@@ -47,7 +47,10 @@ export const calendarManifest = {
         { name: 'attendees-nkn', kind: 'string', required: false },
       ],
       surfaces: {
-        slash: { command: '/addappt', body: 'flags' },
+        // Part C gate — "schedule X" / "afspraak X" → addEvent{title}. PARTIAL: binds title; the
+        // required `when` (a date) is form-elicited.
+        slash: { command: '/addappt', body: 'flags',
+          match: { verbs: ['schedule', ['add', 'event'], ['new', 'event'], ['add', 'appointment'], ['new', 'appointment'], 'afspraak', 'plan', ['zet', 'afspraak'], ['nieuwe', 'afspraak']], body: 'text-only', arg: 'title', dropTrailing: ['to', 'with', 'op', 'met'] } },
         chat:  { reply: 'text', hint: 'create an appointment' },
       },
     },
@@ -94,7 +97,10 @@ export const calendarManifest = {
           pickerSource: { listOp: 'listEvents' } },
       ],
       surfaces: {
-        slash: { command: '/accept' },
+        // Part C gate — owns 'accept' (collision vs tasks.approveTask, which keeps approve/goedkeuren).
+        slash: { command: '/accept',
+          // 'ik kom' dropped — it's a prefix of rsvpDecline's 'ik kom niet' (would eat the decline).
+          match: { verbs: ['accept', ['accept', 'invite'], 'yes', 'accepteer', 'ja'], body: 'match', arg: 'id' } },
         ui:    { control: 'button', label: 'Accept' },
         chat:  { hint: 'accept an invitation' },
       },
@@ -110,7 +116,9 @@ export const calendarManifest = {
           pickerSource: { listOp: 'listEvents' } },
       ],
       surfaces: {
-        slash: { command: '/decline' },
+        // Part C gate — keeps 'decline' (bare 'reject'/'afwijzen' belong to tasks.rejectTask).
+        slash: { command: '/decline',
+          match: { verbs: ['decline', ['decline', 'invite'], 'no', ['wijs', 'af'], 'nee', ['ik', 'kom', 'niet']], body: 'match', arg: 'id' } },
         ui:    { control: 'button', label: 'Decline' },
         chat:  { hint: 'decline an invitation' },
       },
@@ -126,7 +134,9 @@ export const calendarManifest = {
           pickerSource: { listOp: 'listEvents' } },
       ],
       surfaces: {
-        slash: { command: '/tentative' },
+        // Part C gate — "tentative/maybe X" → rsvpTentative{id}.
+        slash: { command: '/tentative',
+          match: { verbs: ['tentative', 'maybe', 'misschien', ['onder', 'voorbehoud']], body: 'match', arg: 'id' } },
         ui:    { control: 'button', label: 'Tentative' },
         chat:  { hint: 'mark as tentative' },
       },
@@ -142,7 +152,9 @@ export const calendarManifest = {
           pickerSource: { listOp: 'listEvents' } },
       ],
       surfaces: {
-        slash: { command: '/cancelappt' },
+        // Part C gate — owns 'cancel' (multiword 'cancel event' before bare 'cancel'; vs household.removeChore).
+        slash: { command: '/cancelappt',
+          match: { verbs: [['cancel', 'event'], ['cancel', 'appointment'], 'cancel', ['annuleer', 'afspraak'], 'annuleer', ['zeg', 'af']], body: 'match', arg: 'id' } },
         ui:    {
           control: 'button',
           label:   'Cancel event',

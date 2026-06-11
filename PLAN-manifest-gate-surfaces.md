@@ -71,8 +71,20 @@ inlineMenu = `surfaces.ui.control === 'button'` / a chat inline-keyboard afforda
 
 ---
 
-## Part C — Per-app `match` declarations + cross-app target resolution (stoop first, then folio/calendar)
-**Why:** only `tasks` has correct gate (`match`) declarations. `stoop`'s are **dormant + incorrect**
+## Part C — Per-app `match` declarations + cross-app target resolution
+**Status (2026-06-11):** manifest declarations + gate wiring ✅ DONE (workflow-audited); **cross-app
+resolution = the remaining slice** (next). Added 22 gate verbs across tasks/stoop/folio/calendar
+(`mockManifests.js` + `apps/calendar/manifest.js`), fixed stoop's 5 broken blocks, resolved 6 cross-app
+collisions (share→folio, accept→calendar, reject→tasks, cancel→calendar) + extras found in verify
+(tasks shadows household add/done → household-mock EXCLUDED from the circle gate; dropped ambiguous
+`ik kom`). `circleGate.js` now `renderGate([tasks, stoop, folio, calendar])`. Coverage gate 17→25.
+Suite 2277. **Remaining:** generalize the circle clarify lookup to call each op's `listOp` per-app
+(`callSkill(appOrigin, listOp, …)`) so stoop/folio/calendar labels resolve to real ids (today only
+tasks resolve, via the circle's loaded items). Agent-investigated change plan in hand: `clarifyTargets.js`
+passes appOrigin (from `pickerSource.appOrigin` or `catalog.opsById.get(listOp).appOrigin`) to `lookup`;
+mobile `circleLookup` + web lookup become async `callSkill`-backed with result-shape normalization.
+
+**Why:** only `tasks` had correct gate (`match`) declarations. `stoop`'s are **dormant + incorrect**
 (2026-06-11 audit): `markReturned`/`getItemTree`/`reportPost` use `body:'match'`→`args.match` but the
 param is `itemId` (wrong arg, no `pickerSource`); `signOutOfPod` has `body:'reject'` (**not a valid body
 kind — would throw**); `listOpen` is `type-only` but has no `type` param. So we can't just switch them on.
@@ -110,6 +122,19 @@ call carries no context and faces the full op set, so it mis-picks (the device-r
 **What:** (1) feed the gate's existing `retrieve` (RAG context) into `interpretCommand` — the hook
 exists, the circle bot passes nothing; (2) tighten the tool descriptors / system prompt. Pairs with
 **Part D** (scoping) — together they make the LLM half reliable.
+
+---
+
+## Part G — Reconcile mock ↔ real manifest drift (the dissolve core)
+**Why:** canopy-chat's `mock*Manifest` files are the chat shell's slash/gate surface for the REAL apps
+(handlers real via `realAgent.js`); intended complementary to `apps/<app>/manifest.js` (which omits
+slash) but **DRIFTED** (2026-06-11 audit): tasks-v0 real 25 ops vs mock 32 (only 14 shared); stoop real
+14 vs mock 30 with the shared ops declaring `slash` in **both** (duplicated, free to diverge). calendar
+already uses its real manifest (the target model). See `[[reference-mock-vs-real-manifests]]`.
+**What:** converge to ONE manifest per app that both the app and the chat shell read (calendar-style);
+dedupe stoop's slash; rename `mock*Manifest → *SlashManifest` (the header already plans this). This is
+the concrete core of the dissolve-into-canopy-chat direction — do it before/with the broad SP-3b/SP-6
+work. **[code-ready, larger]**
 
 ---
 

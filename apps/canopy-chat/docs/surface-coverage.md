@@ -41,6 +41,14 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `signout` | remove | ✅ | ✅ | · | · | · |  |
 |  | `apps` | list | ✅ | ✅ | · | · | · |  |
 |  | `sendto` | add | ✅ | ✅ | · | ✅ | · |  |
+| **household** | `listOpen` | list | ✅ | ✅ | ✅ | · | · | list, show, mine, lijst, toon |
+|  | `markComplete` | complete | ✅ | ✅ | ✅ | ✅ | ✅ | klaar met, done, complete, did, finished, bought, klaar, gedaan, gekocht |
+|  | `getProfile` | list | ✅ | ✅ | · | · | · |  |
+|  | `addMember` | add | ✅ | ✅ | ✅ | ✅ | · | register, add member, registreer, naam, lid toevoegen |
+|  | `addChore` | add | ✅ | ✅ | ✅ | ✅ | · | add, new chore, toevoegen, noteer, voeg toe |
+|  | `nudgePeer` | add | ✅ | ✅ | · | ✅ | · |  |
+|  | `removeChore` | remove | ✅ | ✅ | ✅ | · | · | remove, delete, nope, verwijder, weg |
+|  | `getChoreSnapshot` | list | ✅ | · | · | · | · |  |
 | **tasks** | `addTask` | add | ✅ | ✅ | ✅ | ✅ | · | add, todo, new task, voeg, zet, maak taak, nieuwe taak |
 |  | `listMine` | list | ✅ | ✅ | · | · | · |  |
 |  | `claimTask` | claim | ✅ | ✅ | ✅ | ✅ | ✅ | claim, pak, neem, i'll take, i'll do, ik pak, ik doe, ik neem |
@@ -48,9 +56,9 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `editTask` | edit | ✅ | ✅ | · | ✅ | ✅ |  |
 |  | `getTaskSnapshot` | list | ✅ | · | · | · | · |  |
 |  | `provisionMyCrew` | add | ✅ | ✅ | · | ✅ | · |  |
-|  | `submitTask` | submit | ✅ | ✅ | · | ✅ | ✅ |  |
-|  | `approveTask` | approve | ✅ | ✅ | · | ✅ | ✅ |  |
-|  | `rejectTask` | reject | ✅ | ✅ | · | ✅ | ✅ |  |
+|  | `submitTask` | submit | ✅ | ✅ | ✅ | ✅ | ✅ | submit, hand in, indienen, inleveren, ter review |
+|  | `approveTask` | approve | ✅ | ✅ | ✅ | ✅ | ✅ | approve, goedkeuren, akkoord |
+|  | `rejectTask` | reject | ✅ | ✅ | ✅ | ✅ | ✅ | reject, afkeuren, afwijzen, weiger |
 |  | `myInbox` | list | ✅ | ✅ | · | · | · |  |
 |  | `getMyAvailability` | list | ✅ | ✅ | · | · | · |  |
 |  | `setMyAvailability` | submit | ✅ | ✅ | · | · | · |  |
@@ -74,11 +82,11 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `declineSubtaskProposal` | reject | ✅ | ✅ | · | ✅ | ✅ |  |
 |  | `forceSpawnSubtask` | add | ✅ | ✅ | · | ✅ | · |  |
 | **stoop** | `listFeed` | list | ✅ | ✅ | · | · | · |  |
-|  | `postRequest` | add | ✅ | ✅ | · | ✅ | · |  |
+|  | `postRequest` | add | ✅ | ✅ | ✅ | ✅ | · | post, ask, borrow, vraag, plaats, leen, bied aan |
 |  | `getStoopProfile` | list | ✅ | ✅ | · | · | · |  |
 |  | `revealPeer` | add | ✅ | ✅ | · | ✅ | · |  |
-|  | `respondToItem` | claim | ✅ | · | · | ✅ | ✅ |  |
-|  | `markReturned` | complete | ✅ | ✅ | ✅ | ✅ | ✅ | returned, teruggebracht, terug |
+|  | `respondToItem` | claim | ✅ | · | ✅ | ✅ | ✅ | help with, respond to, offer, ik help, help met, reageer op, bied hulp |
+|  | `markReturned` | complete | ✅ | ✅ | ✅ | ✅ | ✅ | returned, teruggebracht, terug, mark returned |
 |  | `startDm` | add | ✅ | · | · | ✅ | ✅ |  |
 |  | `setHolidayMode` | submit | ✅ | ✅ | · | · | · |  |
 |  | `getHolidayMode` | list | ✅ | ✅ | · | · | · |  |
@@ -99,34 +107,35 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `getContactShareQr` | list | ✅ | ✅ | · | · | · |  |
 |  | `assignLend` | reassign | ✅ | ✅ | · | · | · |  |
 |  | `setMySkills` | set | ✅ | ✅ | · | · | · |  |
-|  | `getItemTree` | tree | ✅ | ✅ | ✅ | · | · | tree, boom |
-|  | `signOutOfPod` | remove | ✅ | ✅ | ✅ | ✅ | ✅ | sign-out, signout, uitloggen |
+|  | `getItemTree` | tree | ✅ | ✅ | · | · | · |  |
+|  | `signOutOfPod` | remove | ✅ | ✅ | · | ✅ | ✅ |  |
 |  | `reportPost` | report | ✅ | ✅ | ✅ | ✅ | ✅ | report, rapporteer, flag |
-|  | `listOpen` | list | ✅ | ✅ | ✅ | · | · | bulletin, board, posts, open, prikbord, buurt |
+|  | `listOpen` | list | ✅ | ✅ | · | · | · |  |
 | **folio** | `readNote` | list | ✅ | ✅ | · | · | · |  |
-|  | `shareFolder` | add | ✅ | ✅ | · | ✅ | · |  |
-|  | `syncOnce` | add | ✅ | ✅ | · | ✅ | · |  |
-|  | `watchStart` | add | ✅ | ✅ | · | ✅ | · |  |
+|  | `shareFolder` | add | ✅ | ✅ | ✅ | ✅ | · | share, deel |
+|  | `syncOnce` | add | ✅ | ✅ | ✅ | ✅ | · | sync, synchroniseer, synchroniseren |
+|  | `watchStart` | add | ✅ | ✅ | ✅ | ✅ | · | watch, watch folder, let op, bewaak, bewaak map |
 |  | `getFileSnapshot` | list | ✅ | · | · | · | · |  |
-|  | `downloadFile` | list | ✅ | · | · | ✅ | ✅ |  |
-|  | `saveToMyPod` | add | ✅ | · | · | ✅ | ✅ |  |
+|  | `downloadFile` | list | ✅ | · | ✅ | ✅ | ✅ | download, haal, haal op, download bestand |
+|  | `saveToMyPod` | add | ✅ | · | ✅ | ✅ | ✅ | save, bewaar, save to my pod, opslaan, bewaar in mijn pod |
 |  | `folioStatus` | list | ✅ | ✅ | · | · | · |  |
 |  | `listFiles` | list | ✅ | ✅ | · | · | · |  |
-| **household** | `addItem` | add | ✅ | ✅ | ✅ | ✅ | · | add, toevoegen, noteer, voeg toe |
-|  | `listOpen` | list | ✅ | ✅ | ✅ | · | · | list, show, lijst, toon |
-|  | `markComplete` | complete | ✅ | ✅ | ✅ | ✅ | ✅ | done, complete, bought, did, finished, klaar, gedaan, gekocht |
-|  | `removeItem` | remove | ✅ | ✅ | ✅ | ✅ | ✅ | remove, delete, cancel, nope, verwijder, weg |
-|  | `help` | help | ✅ | ✅ | ✅ | · | · | help, hulp |
-|  | `addTask` | add | ✅ | ✅ | ✅ | ✅ | · | task, taak |
-|  | `listTasks` | list | ✅ | ✅ | ✅ | · | · | tasks, taken |
-|  | `claim` | claim | ✅ | ✅ | ✅ | ✅ | ✅ | claim, pak, neem |
-|  | `reassign` | reassign | ✅ | · | · | · | · |  |
-|  | `registerName` | register | ✅ | ✅ | ✅ | ✅ | · | register, registreer, naam |
+| **calendar** | `addEvent` | add | ✅ | ✅ | ✅ | ✅ | · | schedule, add event, new event, add appointment, new appointment, afspraak, plan, zet afspraak, nieuwe afspraak |
+|  | `listEvents` | list | ✅ | ✅ | · | · | · |  |
+|  | `rsvpAccept` | claim | ✅ | ✅ | ✅ | ✅ | ✅ | accept, accept invite, yes, accepteer, ja |
+|  | `rsvpDecline` | reject | ✅ | ✅ | ✅ | ✅ | ✅ | decline, decline invite, no, wijs af, nee, ik kom niet |
+|  | `rsvpTentative` | submit | ✅ | ✅ | ✅ | ✅ | ✅ | tentative, maybe, misschien, onder voorbehoud |
+|  | `cancelEvent` | remove | ✅ | ✅ | ✅ | ✅ | ✅ | cancel event, cancel appointment, cancel, annuleer afspraak, annuleer, zeg af |
+|  | `getEventSnapshot` | list | ✅ | · | · | · | · |  |
+|  | `briefSummary` | list | ✅ | · | · | · | · |  |
+|  | `searchEvents` | list | ✅ | · | · | · | · |  |
+|  | `podStatus` | list | ✅ | ✅ | · | · | · |  |
+|  | `getIcsFeed` | list | ✅ | ✅ | · | · | · |  |
 |---|---|---|---|---|---|---|---|---|
-| **totals** | 118 ops | | 118 | 111 | 17 | 59 | 25 | |
+| **totals** | 127 ops | | 127 | 117 | 25 | 62 | 27 | |
 
 ## Gaps for the gate/LLM + inline-menu work
 
-- **missing gate** (101/118): canopy-chat:help, canopy-chat:feedback, canopy-chat:feedback-stop, canopy-chat:newthread, canopy-chat:help-with, canopy-chat:threads, canopy-chat:startDm, canopy-chat:embed, canopy-chat:embed-file, canopy-chat:embed-time, canopy-chat:logs, canopy-chat:scanQr, canopy-chat:find, canopy-chat:brief, canopy-chat:signin, canopy-chat:reset-thread, canopy-chat:whoami, canopy-chat:me, canopy-chat:send-file, canopy-chat:lookup-peer, canopy-chat:publish-nkn, canopy-chat:rotate-identity, canopy-chat:security-status, canopy-chat:set-relay, canopy-chat:transport-mode, canopy-chat:transports, canopy-chat:settings, canopy-chat:mute, canopy-chat:unmute, canopy-chat:muted, canopy-chat:debug-dump, canopy-chat:audit-tail, canopy-chat:peer-connect, canopy-chat:test-peer, canopy-chat:signout, canopy-chat:apps, canopy-chat:sendto, tasks:listMine, tasks:editTask, tasks:getTaskSnapshot …
-- **missing inline** (93/118): canopy-chat:help, canopy-chat:feedback, canopy-chat:feedback-stop, canopy-chat:newthread, canopy-chat:help-with, canopy-chat:threads, canopy-chat:startDm, canopy-chat:embed, canopy-chat:embed-file, canopy-chat:embed-time, canopy-chat:logs, canopy-chat:scanQr, canopy-chat:find, canopy-chat:brief, canopy-chat:signin, canopy-chat:reset-thread, canopy-chat:whoami, canopy-chat:me, canopy-chat:send-file, canopy-chat:lookup-peer, canopy-chat:publish-nkn, canopy-chat:rotate-identity, canopy-chat:security-status, canopy-chat:set-relay, canopy-chat:transport-mode, canopy-chat:transports, canopy-chat:settings, canopy-chat:mute, canopy-chat:unmute, canopy-chat:muted, canopy-chat:debug-dump, canopy-chat:audit-tail, canopy-chat:peer-connect, canopy-chat:test-peer, canopy-chat:signout, canopy-chat:apps, canopy-chat:sendto, tasks:addTask, tasks:listMine, tasks:getTaskSnapshot …
-- **missing chat** (0/118): 
+- **missing gate** (102/127): canopy-chat:help, canopy-chat:feedback, canopy-chat:feedback-stop, canopy-chat:newthread, canopy-chat:help-with, canopy-chat:threads, canopy-chat:startDm, canopy-chat:embed, canopy-chat:embed-file, canopy-chat:embed-time, canopy-chat:logs, canopy-chat:scanQr, canopy-chat:find, canopy-chat:brief, canopy-chat:signin, canopy-chat:reset-thread, canopy-chat:whoami, canopy-chat:me, canopy-chat:send-file, canopy-chat:lookup-peer, canopy-chat:publish-nkn, canopy-chat:rotate-identity, canopy-chat:security-status, canopy-chat:set-relay, canopy-chat:transport-mode, canopy-chat:transports, canopy-chat:settings, canopy-chat:mute, canopy-chat:unmute, canopy-chat:muted, canopy-chat:debug-dump, canopy-chat:audit-tail, canopy-chat:peer-connect, canopy-chat:test-peer, canopy-chat:signout, canopy-chat:apps, canopy-chat:sendto, household:getProfile, household:nudgePeer, household:getChoreSnapshot …
+- **missing inline** (100/127): canopy-chat:help, canopy-chat:feedback, canopy-chat:feedback-stop, canopy-chat:newthread, canopy-chat:help-with, canopy-chat:threads, canopy-chat:startDm, canopy-chat:embed, canopy-chat:embed-file, canopy-chat:embed-time, canopy-chat:logs, canopy-chat:scanQr, canopy-chat:find, canopy-chat:brief, canopy-chat:signin, canopy-chat:reset-thread, canopy-chat:whoami, canopy-chat:me, canopy-chat:send-file, canopy-chat:lookup-peer, canopy-chat:publish-nkn, canopy-chat:rotate-identity, canopy-chat:security-status, canopy-chat:set-relay, canopy-chat:transport-mode, canopy-chat:transports, canopy-chat:settings, canopy-chat:mute, canopy-chat:unmute, canopy-chat:muted, canopy-chat:debug-dump, canopy-chat:audit-tail, canopy-chat:peer-connect, canopy-chat:test-peer, canopy-chat:signout, canopy-chat:apps, canopy-chat:sendto, household:listOpen, household:getProfile, household:addMember …
+- **missing chat** (0/127): 

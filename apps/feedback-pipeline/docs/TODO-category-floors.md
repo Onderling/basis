@@ -45,14 +45,21 @@ fixed precedence (crisis > abuse/violence > safety > harassment > integrity >
 discrimination > retaliation), and into `sensitivityFlags` / quarantine.
 
 ## Sensitive-content extension (quarantine of below-threshold)
-- [ ] add health-condition, financial-hardship, pay-inequality, child-welfare to
+- [x] add health-condition, financial-hardship, pay-inequality, child-welfare to
       `detectSensitiveContent` so single-user sensitive grievances (e.g. e4 pay
-      discrimination) go to `review`, not `dropped`.
+      discrimination) go to `review`, not `dropped`. — DONE 2026-06-11 (4 patterns added to
+      `SENSITIVE_CONTENT`; `test/category-floors-extension.test.js`).
 
 ## Scenario PII floors (`redact.js`)
-- [ ] UWV/justice case-number, klacht-id, MRN/dossiernummer
-- [ ] student number, employee number, date-of-birth, licence plate
-- [ ] (optional, policy) KvK redaction toggle
+- [x] UWV/justice case-number, klacht-id, MRN/dossiernummer — DONE (labelled `dossier` rule)
+- [x] student number, employee number, date-of-birth, **licence plate** — DONE (DOB via `date` rule;
+      student/case via `dossier`; **kenteken** added 2026-06-11 across the main Dutch sidecodes).
+- [ ] (optional, policy) KvK redaction toggle — DEFERRED ON PURPOSE: a KvK number identifies an
+      ORGANISATION, which the "keep organisation names" policy keeps by default; only add behind an
+      explicit opt-in toggle, not the default RULES.
+
+> Remaining for the whole category-floors track: the **e2e re-run through the full LLM pipeline**
+> (everything above is validated in isolation; needs an LLM/Ollama run on the scenario datasets).
 
 ## Also from the OR full-session audit
 - [ ] identifier-pass token discipline — use "iemand"/"someone"/a role only;

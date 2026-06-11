@@ -25,6 +25,7 @@ export const PLACEHOLDER = {
   bsn:      '[bsn]',
   date:     '[datum]',
   dossier:  '[dossiernummer]',
+  kenteken: '[kenteken]',
 };
 
 // BSN (Dutch burgerservicenummer) — a personal national ID, so it's redacted
@@ -69,6 +70,10 @@ const RULES = [
   // labelled case/dossier/student number ("dossiernummer is 84422190", "student number 1234567",
   // "case no. 84422"). The keyword prefix keeps the false-positive rate low. (M4 scenario floors.)
   { type: 'dossier', re: /\b(?:dossiernummer|zaaknummer|klachtnummer|pati[eë]ntnummer|studentnummer|leerlingnummer|kenmerk|referentienummer|case\s*(?:number|no\.?|#)|reference\s*(?:number|no\.?|#)|student\s*(?:number|id|no\.?)|file\s*(?:number|no\.?))(?:\s*(?:is|:|nummer|number|=|#))?\s*\d{4,12}\b/gi },
+  // Dutch licence plate (kenteken) — the main dash-separated sidecodes. Uppercase + the specific
+  // letter/digit arrangements keep the false-positive rate low; the `date` rule above already consumed
+  // dd-mm-yyyy so a plate like 12-34-AB (no 4-digit tail) can't be mis-read as a date.
+  { type: 'kenteken', re: /\b(?:[A-Z]{2}-\d{2}-\d{2}|\d{2}-\d{2}-[A-Z]{2}|\d{2}-[A-Z]{2}-\d{2}|[A-Z]{2}-\d{2}-[A-Z]{2}|[A-Z]{2}-[A-Z]{2}-\d{2}|\d{2}-[A-Z]{2}-[A-Z]{2}|\d{2}-[A-Z]{3}-\d|\d-[A-Z]{3}-\d{2}|[A-Z]-\d{3}-[A-Z]{2}|[A-Z]{3}-\d{2}-[A-Z])\b/g },
   // Capitalised street name ending in a known suffix, followed by a number.
   { type: 'address',  re: new RegExp(`\\b[A-ZÀ-Ý][a-zà-ÿ]*?(?:${STREET})\\s+\\d+[a-zA-Z]?\\b`, 'g') },
 ];

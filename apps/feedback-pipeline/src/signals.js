@@ -136,6 +136,15 @@ const SENSITIVE_CONTENT = [
   /\b(fraude|fraud|corrupt|omkop|steekpenning|bribe|vervals|falsif|witwas|embezzl|vriendjespolitiek|belangenverstrengeling|diefstal|stealing)/i,
   // retaliation / threats
   /\b(represaille|retaliat|bedreig|\bthreat|wraak)/i,
+  // health-condition — a disclosed medical / mental-health condition or disability (a sensitive
+  // personal grievance, not an emergency → REVIEW, don't drop below threshold).
+  /\b(diagnos|chronische?\s+ziekte|aandoening|burn.?out|depress|psychisch|geestelijke gezondheid|mental health|disabilit|arbeidsongeschikt|chronic(?:ally)?\s+ill|medical condition)/i,
+  // financial-hardship
+  /\b(schulden|loonbeslag|armoede|bijstand|niet\s+(?:kunnen\s+)?rondkomen|financi[eë]le?\s+(?:nood|problem)|\bdebt\b|poverty|can'?t afford|financial hardship)/i,
+  // pay-inequality (single-user version of the discrimination floor — keeps grievances like e4 in review)
+  /\b(loonkloof|ongelijke?\s+(?:loon|beloning|betaling)|onderbetaald|salarisverschil|voor hetzelfde werk\s+\w+\s+(?:minder|meer)|pay gap|underpaid|unequal pay|paid less)/i,
+  // child-welfare — a welfare CONCERN about a minor (not any mention of children)
+  /\b(jeugdzorg|kinderbescherming|verwaarloos|kindermishandel|child\s+(?:welfare|protection|neglect)|onveilig\w*\W+\w*kind|kind\w*\W+\w*onveilig)/i,
 ];
 
 // A message that is mostly "contact me directly" + contact details and no real

@@ -23,6 +23,8 @@ import { EventLog } from '../../src/eventLog.js';
 // Sibling of the EventLog (which stays append-only); read at render
 // time by circleKring to surface pending/failed icons.
 import { createDeliveryStateMap } from '../../src/v2/deliveryState.js';
+// Phase 2 — shared kring chat send primitives (optimistic event + best-effort fan-out), web + mobile.
+import { kringChatMessageEvent, broadcastKringFanOut } from '../../src/v2/kringBroadcast.js';
 import {
   buildCircleStream, buildKringStream,
 } from '../../src/v2/circleStream.js';
@@ -894,27 +896,8 @@ function showKring(id, circle, policy) {
   // msgId on retry so receiver-side dedup suppresses any duplicate
   // delivery (the EventLog already idempotents on id).
   function broadcastFanOut({ msgId, text, ts }) {
-    if (typeof rawCallSkill !== 'function') return;
-    deliveryStateMap.set(msgId, 'pending');
-    rerender();
-    rawCallSkill('stoop', 'broadcastKringMessage', {
-      groupId: id, text, msgId, ts,
-    }).then((r) => {
-      if (r?.error) {
-        console.warn('[kring-chat] fan-out skipped:', r.error);
-        deliveryStateMap.set(msgId, 'failed');
-      } else if ((r?.errors?.length ?? 0) > 0) {
-        console.info('[kring-chat] fan-out partial:', r);
-        deliveryStateMap.set(msgId, 'failed');
-      } else {
-        deliveryStateMap.set(msgId, 'sent');
-      }
-      rerender();
-    }).catch((err) => {
-      console.warn('[kring-chat] fan-out failed:', err?.message ?? err);
-      deliveryStateMap.set(msgId, 'failed');
-      rerender();
-    });
+    // Shared fan-out (Phase 2); onChange = web's rerender.
+    broadcastKringFanOut({ rawCallSkill, circleId: id, msgId, text, ts, deliveryStateMap, onChange: rerender });
   }
 
   const rerender = () => {
@@ -983,14 +966,7 @@ function showKring(id, circle, policy) {
         // so the bubble surfaces a clock / warning icon.
         const msgId = `kring-${id}-${Date.now()}-${(seq += 1).toString(36)}`;
         const ts    = Date.now();
-        eventLog.append({
-          id:    msgId,
-          ts,
-          app:   'kring',
-          type:  'chat-message',
-          actor: LOCAL_ACTOR,
-          payload: { circleId: id, text, kind: 'chat-message' },
-        });
+        eventLog.append(kringChatMessageEvent({ msgId, ts, circleId: id, actor: LOCAL_ACTOR, text }));
         broadcastFanOut({ msgId, text, ts });
       },
       onAction: (action /*, row */) => {

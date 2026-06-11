@@ -51,6 +51,8 @@ import {
   setActiveScreen, updateScreen, materializeScreen,
   // δ.2 — per-message delivery state for optimistic kring chat sends.
   createDeliveryStateMap,
+  // Phase 2 — shared kring chat send primitives (optimistic event + best-effort fan-out).
+  kringChatMessageEvent, broadcastKringFanOut,
   // B (circle bot) — dispatch primitives to run an interpreted command in the kring.
   parseInput, resolveDispatch, runDispatch, scopeReadyDispatch,
 } from '@canopy-app/canopy-chat';
@@ -1456,33 +1458,14 @@ function CircleDetail({
   // tap-to-retry handler for failed bubbles.  Re-fires with the
   // SAME msgId so receiver-side dedup suppresses duplicates.
   const broadcastFanOut = useCallback(({ msgId, text, ts }) => {
-    // RAW 3-arg callSkill(app, op, args): broadcastKringMessage is app-targeted at stoop. The 2-arg
-    // resolving callSkill would arg-shift (op→'stoop', real op→args) and never deliver the message
-    // (device-verify 2026-06-11: logs showed `[callSkill] stoop →` across peers, no fan-out).
-    if (typeof rawCallSkill !== 'function') return;
-    deliveryStateMapRef.current.set(msgId, 'pending');
-    setDeliveryTick((n) => n + 1);
-    Promise.resolve()
-      .then(() => rawCallSkill('stoop', 'broadcastKringMessage', {
-        groupId: circle.id, text, msgId, ts,
-      }))
-      .then((r) => {
-        if (r?.error) {
-          console.warn('[kring-chat] fan-out skipped:', r.error);
-          deliveryStateMapRef.current.set(msgId, 'failed');
-        } else if ((r?.errors?.length ?? 0) > 0) {
-          console.info('[kring-chat] fan-out partial:', r);
-          deliveryStateMapRef.current.set(msgId, 'failed');
-        } else {
-          deliveryStateMapRef.current.set(msgId, 'sent');
-        }
-        setDeliveryTick((n) => n + 1);
-      })
-      .catch((err) => {
-        console.warn('[kring-chat] fan-out failed:', err?.message ?? err);
-        deliveryStateMapRef.current.set(msgId, 'failed');
-        setDeliveryTick((n) => n + 1);
-      });
+    // Shared fan-out (Phase 2). RAW 3-arg callSkill (app-targeted at stoop) — the 2-arg resolving one
+    // arg-shifts (op→'stoop') and never delivers. The helper marks δ.2 delivery state; onChange = the
+    // RN rerender tick.
+    broadcastKringFanOut({
+      rawCallSkill, circleId: circle?.id, msgId, text, ts,
+      deliveryStateMap: deliveryStateMapRef.current,
+      onChange: () => setDeliveryTick((n) => n + 1),
+    });
   }, [rawCallSkill, circle?.id]);
 
   // SP-13.2.1 — append a kring chat bubble to the local eventLog (optimistic). Returns {msgId, ts}
@@ -1491,10 +1474,7 @@ function CircleDetail({
     if (!eventLog?.append || !circle?.id) return null;
     const msgId = `kring-${circle.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const ts    = Date.now();
-    eventLog.append({
-      id: msgId, ts, app: 'kring', type: 'chat-message', actor,
-      payload: { circleId: circle.id, text, kind: 'chat-message', ...(buttons?.length ? { buttons } : {}) },
-    });
+    eventLog.append(kringChatMessageEvent({ msgId, ts, circleId: circle.id, actor, text, buttons }));
     setStreamTick((n) => n + 1);
     return { msgId, ts };
   }, [eventLog, circle?.id]);

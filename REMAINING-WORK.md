@@ -1,8 +1,16 @@
-# Remaining work — master index (2026-06-10)
+# Remaining work — master index (2026-06-11)
 
 One place that points at everything still open across the tracks. Per-track detail lives in the
 linked docs; this is the index. Legend: **[code-ready]** = I can build it now · **[blocked]** = needs
 creds / a decision / hardware / a device · **[optional]** = breadth, not launch-gating.
+
+> **Substrate audit 2026-06-11** (parallel agents) — recurring finding: **the substrates are further
+> along than the todos claimed**, so the "remaining" column shrank across the board. Corrected this pass:
+> M6 (substrate built, thin wiring left) · category-floors (lexicons all built; only e2e re-run remains)
+> · household prompt (already v3-polished) · P3 sealing (substrate 100% done + stoop wired; 3 small
+> integration points left) · web/mobile parity (all 3 prioritized gaps CLOSED). The genuinely-unstarted
+> items are: M15 design, the household memory/tool-use uplift (research), and the M14/TEE/2-pod
+> blocked-on-env items.
 
 ---
 
@@ -16,15 +24,24 @@ Detail: `feedback-pipeline-todo-en.md` · `apps/feedback-pipeline/docs/`
 - **M15 — crisis-response protocol** **[blocked: design decision] → then [code-ready]** — LAST phase,
   blocks launch. Detection + routing are built; the *response* is undesigned: **who** is notified, on
   **what consent**, **how fast**, duty-to-act vs anonymity. Needs a design call, then build.
-- **M6 — mobile feedback-bot v2-rewire** **[code-ready]** — the mobile feedback bot is still in the
-  orphaned `ChatScreen`; rewire onto the v2 circle surface (rides on the same shared `circleDispatch`),
-  retarget the Detox helper.
+- **M6 — mobile feedback-bot v2-rewire** **[code-ready, SMALL — substrate already built]** — audit
+  2026-06-11: the substrate is DONE + shared. `feedbackSurface` + `feedbackMount` (createFeedbackMount,
+  tryHandle/open/contactItem) live in `apps/canopy-chat/src/feedback/` and the web already uses them;
+  the orphaned mobile `ChatScreen.js` ALSO already uses `createFeedbackMount`. Remaining = thin wiring
+  into the v2 `CircleDetail` (CircleLauncherScreen): a lazy `feedbackMount` ref, `tryHandle(text, circle.id)`
+  BEFORE `circleBot.handle` in `sendKringChat`, route the M12 `FEEDBACK_BUTTON_OP` taps in `onBubbleButton`,
+  + the contact item. Sites located (sendKringChat ~L1609, onBubbleButton ~L1547). Blockers (Phase-2,
+  non-gating): mobile pod-auth (Phase-1 = in-memory demo), file-picker + identity-signature deferred.
 - **M7 / M8 — TEE hardware checkpoints** **[blocked: hardware]** — attested-enclave aggregation on real
   TEE hardware (Phase 2 of the aggregation-placement design).
 - **M9 — agent runtime** **[separate track]** — the project's own agent runtime; deferred, own thread.
-- **Category floors — remaining lexicons** **[code-ready]** — `docs/TODO-category-floors.md`: core built
-  + deterministically validated, but the per-category lexicons (harassment/sexual-misconduct,
-  discrimination/pay, …) are partly open and it hasn't been re-run through the full LLM pipeline e2e.
+- **Category floors** **[mostly DONE — audit 2026-06-11]** — the TODO's "open" lexicons are in fact
+  **all BUILT** in `src/categories.js`: harassment/sexual-misconduct, discrimination + **pay**,
+  retaliation, fraud/integrity, medical-emergency, child-safety (+ crisis in signals.js), wired into
+  `triage.js`; 5 unit tests + 76-test deterministic validation on the B dataset. **Remaining:** (1) the
+  **e2e re-run through the full LLM pipeline** (validated in isolation only); (2) extend
+  `detectSensitiveContent` for below-threshold quarantine (pay-inequality, health-condition,
+  financial-hardship, child-welfare); (3) two minor PII floors (licence plate, KvK toggle).
 - **Menukaart breadth** **[optional]** — `docs/MENUKAART.md`: per-scenario safety tuning + scenario
   tests · voice intake (STT) · WhatsApp/Signal/web channels · fuller feedback-to-participant loop
   (block H) · Klai integration · Lingua/LiteLLM borrows · real-data evaluation · participant-editable
@@ -41,8 +58,10 @@ Detail: `apps/canopy-chat/docs/circle-bot-token-gate-TODO.md` · `[[project-circ
 - **Token-gate wiring** **[✅ DONE 2026-06-11]** — built, then made **manifest-driven**: the hand-written
   rules were retired for `renderGate(manifest)` (the same projector household uses). add/done/claim route
   deterministically on web + mobile. Device re-verify still pending. See `[[project-circle-bot-device-run]]`.
-- **Gate + surface unification** **[code-ready, multi-part]** → see **§7** (`PLAN-manifest-gate-surfaces.md`).
-  Per-circle **catalog scoping** now lives there as **Part D**.
+- **Gate + surface unification** → see **§7** (`PLAN-manifest-gate-surfaces.md`). Progress: **B (coverage
+  scan) ✅ · D (catalog scoping) ✅ · C (gate verbs all apps + fixes + collisions) ✅ · C cross-app
+  resolution mobile ✅ (needs device verify) · F-prompt ✅**. Remaining: F-retrieve, A (engine-parity,
+  deferred), E (inline menus), G (mock↔real reconcile — mapped). Web cross-app resolution = follow-up.
 - **Smoke checkpoints owed** **[blocked: device/manual]** — web smoke for the 2026-05-24 wave
   (#218/#219/#231.*), first canopy-chat-mobile Android boot, tasks/stoop-mobile screens (#226–#228).
   (Mobile circle-bot boot now DONE — device run 2026-06-10.)
@@ -52,31 +71,44 @@ Detail: `apps/canopy-chat/docs/circle-bot-token-gate-TODO.md` · `[[project-circ
 ## 3. Household app + chat agent
 Detail: `apps/household/docs/TODO.md` · `NOTES ON IMPROVING CHAT AGENT.md` · `PROMPT-EXPERIMENTATION.md`
 
-- **Chat-agent prompt** **[code-ready]** — `TODO.md`: "verwerk chat-agent prompt" — fold the
-  prompt-experimentation findings into the shipped system prompt.
-- **Memory + tool-use uplift** **[code-ready, larger]** — the plan in `NOTES ON IMPROVING CHAT AGENT.md`:
-  persistent memory (Mem0 → local vector store), clarify-when-ambiguous, optional tool calling. A
-  research-shaped track; size before committing. Default LLM stays Qwen2.5 ([[feedback-llm-default-qwen25]]).
+- **Chat-agent prompt** **[mostly DONE — audit 2026-06-11]** — the shipped `SYSTEM_PROMPT_CLASSIFY`
+  (`src/llm/prompts.js`, PROMPT_VERSION 3) is **already polished** (precision-over-recall, tool-selection
+  + type-boundary examples, noise handling). "verwerk chat-agent prompt" is now a *decision* (make v3
+  the freeform-V2 default?), not a write.
+- **Memory + tool-use uplift** **[research-only — NOTHING built]** — audit confirms **no** memory layer
+  exists (no Mem0/vector-store in `apps/household` or `packages/`); tool-use is the basic manifest→ChatAgent
+  bridge. The whole 6-step plan in `NOTES ON IMPROVING CHAT AGENT.md` (Ollama/Qwen → bare loop → Mem0 →
+  prompt → tools → session scope) is unstarted. A from-scratch research track. Default LLM stays Qwen2.5
+  ([[feedback-llm-default-qwen25]]).
 
 ---
 
 ## 4. P3 — pod storage / sealing (cross-app)
 Detail: `[[project-p3-pod-storage-roadmap]]` · `[[project-p3-sync-engine-absorption]]` (authoritative TODO is off-master)
 
-- **3.3c — app-wiring (web + mobile)** **[code-ready]** — wire the sealed pod-storage substrate into the
-  apps' web + mobile surfaces (the sealing substrate itself is DONE: envelope / SealedPodClient /
-  sealedIndex / controlAgent, ~54 tests; membership→pod wiring in stoop).
-- **2-pod verify** **[blocked: real pods/env]** — end-to-end verification across two real pods.
-- **Phase 4** **[code-ready after 3.3c]** — the remaining roadmap phase past app-wiring.
+- **Substrate** **[✅ DONE — audit 2026-06-11]** — all 9 sealing modules complete + tested (34 tests:
+  envelope / SealedPodClient / sealedIndex / groupKeyResource / controlAgent / podKeyStore /
+  memberIdentity / resolveCircleStorage). Zero stubs.
+- **3.3c app-wiring** **[code-ready, 3 small integration points]** — only **stoop** membership join/leave
+  is wired (✅, `controlAgent` in redeem/leave skills, 7 tests). Remaining = pure integration (substrate
+  exists): (b) **household** membership → pass a controlAgent + grant/rotate on add/remove (~2–3d);
+  (c) **circle storage** → call `resolveCircleStorage` in the circle create/update path, wrap the pod
+  client per posture p0–p3 (~1–2d); (d) **chat semantic search** → wire `sealedIndex.semanticQuery` into
+  the RAG retriever for p2 circles (~1d). (d) directly feeds **§7 Part F-retrieve.**
+- **"2-pod verify" / "Phase 4"** **[scope unclear]** — NOT found in the sealing roadmap; likely
+  product-level acceptance or the Hub track (P4 = Hub-Android). Clarify scope before treating as work.
 
 ---
 
 ## 5. Web ≡ mobile parity gaps (cross-app)
 Detail: `[[project-web-mobile-parity-gaps]]` (2026-05-18 audit) · `[[feedback-platform-parity]]`
 
-- **[code-ready]** prioritized gap list: tasks-v0 web invites · folio-mobile history · stoop web
-  `markReturned` · … (every app: web ≡ mobile, neither is the primitive one; wire via shared
-  device-independent paths).
+- **[✅ essentially DONE — audit 2026-06-11]** — all three prioritized gaps are **CLOSED**: tasks-v0
+  invites (issue+redeem on both, shared `multiCrewOnboarding` skills), folio-mobile history
+  (`VersionsScreen` + tests), stoop `markReturned` (both surfaces). A broader sweep found **no remaining
+  web-only/mobile-only ops** in the tasks/stoop/folio pairs (high parity). household + calendar are
+  web-only **by design** (no mobile counterpart). canopy-chat parity converges via §7 (manifest-driven),
+  not duplication.
 
 ---
 

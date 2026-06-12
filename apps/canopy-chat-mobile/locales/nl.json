@@ -809,6 +809,10 @@
         "text": "Schrijf naar de kring…",
         "doc": "SP-13.2 — composer placeholder."
       },
+      "chat_disabled": {
+        "text": "Chat staat uit in deze kring.",
+        "doc": "Permission gate — getoond in plaats van de composer als de 'chat'-functie van de kring uit staat."
+      },
       "send": {
         "text": "Verstuur",
         "doc": "SP-13.2 — composer send button a11y label."

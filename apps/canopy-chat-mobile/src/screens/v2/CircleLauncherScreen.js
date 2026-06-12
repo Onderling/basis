@@ -57,6 +57,8 @@ import {
   makeCircleLookup,
   // Composer parity — the classic shell's slash-command suggest, shared so mobile renders the same set.
   suggestCommands,
+  // Conversational follow-up for needsForm (shared) — ask for a missing field, next message answers.
+  beginFollowUp, completeFollowUp,
   // B (circle bot) — dispatch primitives to run an interpreted command in the kring.
   parseInput, resolveDispatch, runDispatch, scopeReadyDispatch,
 } from '@canopy-app/canopy-chat';
@@ -1375,6 +1377,8 @@ function CircleDetail({
     return deliveryStateMapRef.current.get(msgId);
   }, [deliveryTick]);
   const [composerText, setComposerText] = useState('');
+  // Conversational follow-up: a single-field needsForm awaiting the user's next message (shared followUp).
+  const [pendingFollowUp, setPendingFollowUp] = useState(null);
   // Composer parity — slash-command auto-suggest off the merged catalog (shared `suggestCommands`,
   // same logic + set as web's dropdown). Tapping a row fills the command; the bash-style ArrowUp/Down
   // history that web also has is a keyboard affordance with no touch-gesture equivalent, so it's
@@ -1383,6 +1387,8 @@ function CircleDetail({
     () => (catalog ? suggestCommands(catalog, composerText) : []),
     [catalog, composerText],
   );
+  // Permission gate (classic shell's `allowCommands` analog): chat disabled for this circle ⇒ read-only.
+  const canPost = isFeatureEnabled(policy, 'chat');
   // SP-13.3 — per-kring bottom tabs derived from policy.features.
   const tabs = useMemo(() => buildKringTabs(policy, t), [policy]);
   const [activeTab, setActiveTab] = useState(DEFAULT_KRING_TAB);
@@ -1500,7 +1506,14 @@ function CircleDetail({
     try {
       dispatch = resolveDispatch({ kind: 'slash', opId, args: args || {}, command: '(bot)', body: '' }, catalog);
     } catch { appendKringMessage({ actor: 'bot', text: t('circle.bot.unknown') }); return; }
-    if (dispatch.kind === 'needsForm') { appendKringMessage({ actor: 'bot', text: t('circle.bot.needsInfo') }); return; }
+    if (dispatch.kind === 'needsForm') {
+      // Conversational elicitation (parity with web): single missing field → ask in the kring + capture
+      // the user's next message (sendKringChat's pending branch). Multi-field keeps the "needs info" bubble.
+      const pending = beginFollowUp({ dispatch, t });
+      if (pending) { setPendingFollowUp(pending); appendKringMessage({ actor: 'bot', text: pending.promptText }); }
+      else { appendKringMessage({ actor: 'bot', text: t('circle.bot.needsInfo') }); }
+      return;
+    }
     if (dispatch.kind !== 'ready')     { appendKringMessage({ actor: 'bot', text: t('circle.bot.unknown') }); return; }
     // scopeReadyDispatch takes the active-circle id STRING (it writes it into the scope arg keys);
     // an {id} object would land as the literal scope value (device-verify 2026-06-11).
@@ -1613,6 +1626,16 @@ function CircleDetail({
     const text = composerText.trim();
     if (!text || !eventLog?.append || !circle?.id) return;
     setComposerText('');
+    // Conversational follow-up: the bot asked for a missing field (needsForm); THIS message is the answer.
+    // Append it, complete the pending dispatch, and run it — don't route to feedback or re-interpret.
+    if (pendingFollowUp) {
+      const pending = pendingFollowUp;
+      setPendingFollowUp(null);
+      appendKringMessage({ actor: 'me', text });
+      const ready = completeFollowUp({ pending, text });
+      await runCircleCommandResolved({ opId: ready.opId, args: ready.args });
+      return;
+    }
     // M6 — lazy shared feedback mount; its appendUserBubble/appendBotBubble render into the kring. Text
     // bubbles (incl. the bot's button labels); interactive M12 chips on mobile are a follow-up.
     if (!feedbackMountRef.current) {
@@ -1627,7 +1650,7 @@ function CircleDetail({
     // Fire-and-forget: the bot posts its own reply bubble; swallow rejections so a failed turn can't
     // surface as an unhandled promise rejection.
     Promise.resolve(circleBot.handle(text, { id: circle.id, msgId: appended?.msgId, ts: appended?.ts })).catch(() => {});
-  }, [composerText, eventLog, circle?.id, appendKringMessage, circleBot]);
+  }, [composerText, eventLog, circle?.id, appendKringMessage, circleBot, pendingFollowUp, runCircleCommandResolved]);
 
   // δ.2 — tap-to-retry on the failed icon.  Looks up the original
   // text from the eventLog so we don't have to remember it elsewhere.
@@ -1787,7 +1810,12 @@ function CircleDetail({
           deeper follow-up (would need the chat-shell composition).
           SP-13.4 — composer suppressed in scherm-mode (recept page is
           not a chat surface). */}
-      {viewMode !== 'scherm' ? (
+      {viewMode !== 'scherm' && !canPost ? (
+        /* Permission gate — chat disabled for this circle; read-only note in place of the composer. */
+        <Text style={styles.composerDisabled} testID="circle-detail-composer-disabled">
+          {t('circle.kring.chat_disabled')}
+        </Text>
+      ) : viewMode !== 'scherm' ? (
       <>
         {/* Slash-command auto-suggest — sits above the composer, mirrors the web dropdown. Tap a row
             to fill the command + a trailing space (then keep typing args). Hidden when there's no
@@ -2141,6 +2169,8 @@ const styles = StyleSheet.create({
   suggestItem:      { flexDirection: 'row', alignItems: 'baseline', gap: 10, paddingVertical: 6, paddingHorizontal: 12 },
   suggestCmd:       { fontFamily: theme.font?.mono ?? undefined, color: theme.color.accent, fontWeight: '600', fontSize: 13 },
   suggestHint:      { color: theme.color.inkSoft, fontSize: 12, flexShrink: 1 },
+  // Permission gate — read-only note shown when the circle's chat feature is off.
+  composerDisabled: { paddingTop: 12, paddingBottom: 6, marginTop: 4, borderTopWidth: 1, borderTopColor: theme.color.line, color: theme.color.inkSoft, fontSize: 13, fontStyle: 'italic', textAlign: 'center' },
   // SP-13.3 — per-kring bottom tab bar + tab-coming placeholder.
   kringTabs:        { flexDirection: 'row', borderTopWidth: 1, borderTopColor: theme.color.line, marginTop: 4 },
   kringTab:         { flex: 1, paddingVertical: 12, alignItems: 'center', borderTopWidth: 2, borderTopColor: 'transparent', marginTop: -1 },

@@ -809,6 +809,10 @@
         "text": "Write to the kring…",
         "doc": "SP-13.2 — inline composer placeholder."
       },
+      "chat_disabled": {
+        "text": "Chat isn't enabled in this circle.",
+        "doc": "Permission gate — shown in place of the composer when the circle's `chat` feature is off."
+      },
       "send": {
         "text": "Send",
         "doc": "SP-13.2 — composer send button a11y label."

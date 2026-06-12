@@ -466,9 +466,11 @@ async function refreshLauncherMutes() {
   launcherMutedMap = next;
 }
 
-function showLauncher() {
-  setActiveCircle(null);
-  try { sessionStorage.removeItem('cc.activeCircle'); } catch { /* ignore */ }
+// β.5 — paint the launcher tiles (previews + pin/mute/proposal state). PURE render, no async
+// re-scheduling — so it's safe to call from the pins/mutes refresh `.then` WITHOUT re-entering
+// showLauncher (which would re-schedule that refresh and loop forever; that infinite re-render
+// starved the main thread and hung the headless e2e, 2026-06-11).
+function paintLauncher() {
   // P6.3 — project the EventLog into per-circle previews; tiles show a
   // chat-style subtitle + unread badge when there's recent activity.
   const previews = buildTilePreviews({
@@ -476,9 +478,6 @@ function showLauncher() {
     circles: circlesCache,
     seenAt:  readSeenAt(),
   });
-  // β.1 — Stream/Availability/Hop/Nearby/My-things buttons are gone from
-  // the launcher; those surfaces are reachable via the Schermen + Mij tabs.
-  // The `show*` functions stay defined below — the tab bar still calls them.
   // β.5 — per-tile context menu handlers (pin / mute / settings / leave).
   renderCircleLauncher(rootEl, {
     circles: circlesCache,
@@ -494,15 +493,22 @@ function showLauncher() {
     onSettings:   (id) => showSettings(id),
     onLeave:      onLeaveCircle,
   });
+}
+
+function showLauncher() {
+  setActiveCircle(null);
+  try { sessionStorage.removeItem('cc.activeCircle'); } catch { /* ignore */ }
+  // β.1 — Stream/Availability/Hop/Nearby/My-things buttons are gone from the launcher; those surfaces
+  // are reachable via the Schermen + Mij tabs. The `show*` functions stay defined below.
+  paintLauncher();
   showTabBar('kringen');
-  // Refresh proposal counts in the background so the next launcher
-  // render shows yellow badges where consensus is waiting.  Async so
-  // the first paint isn't blocked.
+  // Refresh proposal counts in the background so the next launcher render shows yellow badges where
+  // consensus is waiting. Async so the first paint isn't blocked.
   refreshLauncherProposals().catch(() => { /* ignore */ });
-  // β.5 — pull fresh pin + mute state.  Re-render once they resolve so
-  // a just-toggled state shows immediately on the next launcher entry.
+  // β.5 — pull fresh pin + mute state, then RE-PAINT (not re-enter showLauncher — see paintLauncher)
+  // so a just-toggled state shows immediately, without looping.
   Promise.all([refreshLauncherPins(), refreshLauncherMutes()])
-    .then(() => { if (getActiveCircle() == null) showLauncher(); })
+    .then(() => { if (getActiveCircle() == null) paintLauncher(); })
     .catch(() => { /* tolerate */ });
 }
 

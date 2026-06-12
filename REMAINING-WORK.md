@@ -83,27 +83,29 @@ Detail: `apps/canopy-chat/docs/circle-bot-token-gate-TODO.md` · `[[project-circ
   (the 2 "dead" modules `circleLlmRoutes`/`groupsIndex` are tested-but-unwired — KEPT per Frits).
   **Remaining = Phase 5 only** (below) + 2 web browser-smokes. Plan + P5 assembly spec:
   `apps/canopy-chat/docs/web-mobile-consolidation-plan.md`.
-- **Consolidation Phase 5 — bot in web's kring composer** **[✅ BOT DONE + browser-verified 2026-06-11
-  (`fce0d68d`); feedback DEFERRED]** — `circleApp.js` (v2 launcher) now assembles the shared engine
-  (catalog/LLM/gate/`makeCircleLookup`/clarify/`createCircleDispatch`) into its `onSend`, rendering bot
-  replies into the kring stream via a per-circle `_kringRender` bridge. **Headless Playwright-verified
-  by Claude** (not blind): `@assistant add X` → user bubble + `bot ✓ X` (addTask dispatched);
-  `@assistant done X` → resolved + completed, no "item not found". **Verification became possible after
-  fixing a real bug** — `showLauncher` infinitely re-rendered (self-recursion) and hung headless
-  (`7f88714c`). **Kring FEEDBACK is deferred** — importing the feedback surface pulls in the
-  feedback-pipeline chain which isn't browser-safe (crashed circleApp at boot); see next item.
-- **Feedback-pipeline browser-safety** **[code-ready; BLOCKS P1 + P3 + kring feedback]** — the browser
-  feedback surface statically imports the feedback-pipeline chain, which is Node-oriented and crashes
-  the web shell at boot. Two issues: (1) `config.js` `process.env` — **FIXED** (`dc36e1b5`, browser
-  guard); (2) `Buffer` in `pod/signing.js`/`css-auth.js` — **PENDING** (find the top-level eval, guard
-  it like ollama.js; check for further Node-isms). Fixing it unblocks all three: classic-shell P1/P3
-  smokes + Phase-5 kring feedback (wire `createFeedbackMount` into `circleApp.js` onSend — the code is
-  ready, just gated on this). master's classic shell is broken the same way today.
-- **Web browser-smokes** **[smokes WRITTEN; blocked on feedback-pipeline browser-safety]** — P1
-  (`test-browser/feedback-mount.spec.js`) + P3 (`done-resolver.spec.js`) drive `/classic.html` but fail
-  at their boot guard (the shell crashes — see above). Static analysis confirmed both wirings correct;
-  they should pass once the chain is browser-safe. P3 note: the classic typed-slash is `/complete-task
-  <label>` (literal `/done` is an NL-gate verb, unmatched-by-design). The Playwright HARNESS itself now
+- **Consolidation Phase 5 — bot + feedback in web's kring composer** **[✅ COMPLETE + browser-verified
+  2026-06-11 (`fce0d68d` bot, `9b62b285` feedback)]** — `circleApp.js` (v2 launcher) assembles the shared
+  engine (catalog/LLM/gate/`makeCircleLookup`/clarify/`createCircleDispatch`) + `createFeedbackMount`
+  into its `onSend`, rendering bot/feedback replies into the kring stream via a per-circle `_kringRender`
+  bridge. **Headless Playwright-verified by Claude** (4 green smokes, `circle-kring-bot.spec.js`):
+  `@assistant add X` → `bot ✓ X` (addTask); `@assistant done X` → resolved + completed, no "item not
+  found"; `/feedback` → the feedback bot's guidance bubble. Enabled by fixing a real launcher
+  infinite-loop bug (`7f88714c`).
+- **Feedback-pipeline browser-safety** **[✅ DONE 2026-06-11]** — the browser feedback surface statically
+  pulls in a Node-oriented chain that crashed the web shell at boot. Both top-level browser-incompats
+  fixed: `config.js` `process.env` (`dc36e1b5`) + `pod-client/sealing/envelope.js` top-level `Buffer.from`
+  → `TextEncoder` (`73a642ed`, byte-identical, sealing 248 tests green). The feedback surface now LOADS in
+  the browser → classic shell BOOTS + kring feedback works. NB the sealing FUNCTIONS stay Node-only (a
+  browser-WebCrypto tier is future work) — fine for code that never seals (the feedback demo).
+- **Web browser-smokes** **[harness ✅; classic shell BOOTS; P1/P3 now FAIL ON ASSERTIONS — new findings]**
+  — with the chain browser-safe, P1 (`feedback-mount.spec.js`) + P3 (`done-resolver.spec.js`) get PAST
+  the boot guard but fail on behaviour: **(P1)** `/feedback` in the CLASSIC shell shows no guidance bubble
+  — yet the SAME mount works in the v2 launcher (my Phase-5 `/feedback` is green), so the classic shell's
+  inline feedback wiring (main.js `handleUserText`/`feedback()` emit) likely has its own bug; **(P3)**
+  `/complete-task <label>` adds the task but the resolver returns not-found — likely a scope mismatch
+  (no active circle → `getActiveCircle()` null → the live lookup isn't scoped to where the task landed).
+  Both need a focused debug pass (separate from the browser-safety fix). P3 note: literal `/done` is an
+  NL-gate verb, unmatched-by-design in the classic shell. The Playwright HARNESS itself now
   works (the loop fix) — `test-browser/circle-kring-bot.spec.js` is the green Phase-5 example.
 - **Smoke checkpoints owed** **[blocked: device/manual]** — web smoke for the 2026-05-24 wave
   (#218/#219/#231.*), first canopy-chat-mobile Android boot, tasks/stoop-mobile screens (#226–#228).

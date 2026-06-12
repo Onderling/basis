@@ -45,7 +45,22 @@ export default defineConfig({
   // hoists per-app copies under `apps/<x>/node_modules/.pnpm/...`)
   // can be served as source.  Required when `optimizeDeps.exclude`
   // bypasses the per-package .vite/deps bundle.
-  server: { fs: { allow: ['..', '../..'] } },
+  server: {
+    fs: { allow: ['..', '../..'] },
+    // Dev-only same-origin proxy for a LOCAL OpenAI-compatible LLM (a Privatemode proxy or Ollama), so
+    // the BROWSER circle bot / feedback bot avoid cross-origin CORS (a local model server usually doesn't
+    // send Access-Control-Allow-Origin). Point `VITE_CIRCLE_LLM_BASEURL=/llm` (and/or
+    // `VITE_FEEDBACK_LLM_BASEURL=/llm`) and run the model server on `LLM_PROXY_TARGET`
+    // (default the Privatemode proxy at :8080; set `LLM_PROXY_TARGET=http://localhost:11434` for Ollama).
+    // The provider appends `/v1/chat/completions`, so `/llm/v1/chat/completions` → `<target>/v1/chat/completions`.
+    proxy: {
+      '/llm': {
+        target: process.env.LLM_PROXY_TARGET || 'http://localhost:8080',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/llm/, ''),
+      },
+    },
+  },
   // Skip esbuild pre-bundling for `@canopy/core`: its index.js uses
   // the renamed re-export form `export { encode as b64encode } from
   // './crypto/b64.js'`, which esbuild's pre-bundler drops when

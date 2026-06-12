@@ -23,7 +23,12 @@ import {
 
 const SENTINEL = 'fp1:';               // kept stable: feedback's existing on-pod envelopes start with it
 const ALG = 'aes-256-gcm';
-const INFO = Buffer.from('fp1-kek');   // HKDF context
+// HKDF context. A Uint8Array (not Buffer.from) so this MODULE evaluates without `Buffer` in a browser —
+// it's statically pulled into the browser graph via the feedback pod, and a top-level `Buffer.from`
+// crashed the web shell at boot (2026-06-11). hkdfSync accepts a TypedArray for `info`. The sealing
+// FUNCTIONS below are still Node-only (node:crypto + Buffer) — a browser WebCrypto tier is future work;
+// this only stops the load-time crash so browser code that never calls sealing (the feedback demo) boots.
+const INFO = new TextEncoder().encode('fp1-kek');
 
 const b64u = (buf) => Buffer.from(buf).toString('base64url');
 const unb64u = (s) => Buffer.from(s, 'base64url');

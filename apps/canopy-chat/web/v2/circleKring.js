@@ -37,6 +37,7 @@
 
 import { actionsForStreamRow } from '../../src/v2/streamActions.js';
 import { renderCircleScreen } from './circleScreen.js';
+import { suggestCommands } from '../../src/v2/commandSuggest.js';
 
 export function renderCircleKring(container, {
   circle = {},
@@ -75,6 +76,12 @@ export function renderCircleKring(container, {
   deliveryStateFor = null,
   localActor = null,
   onRetryDelivery = null,
+  // Composer affordances (web↔mobile parity, ported from the classic shell). Both optional — without
+  // them the composer renders exactly as before.
+  //   `catalog`  the merged dispatch catalog → drives the slash-command auto-suggest dropdown.
+  //   `history`  a `createInputHistory()` instance (host-owned so it survives re-renders) → ArrowUp/Down.
+  catalog = null,
+  history = null,
   t,
 } = {}) {
   const tr = typeof t === 'function' ? t : (k) => k;
@@ -222,6 +229,15 @@ export function renderCircleKring(container, {
     form.className = 'circle-kring__composer';
     form.setAttribute('autocomplete', 'off');
 
+    // Slash-command auto-suggest dropdown (rendered first, positioned ABOVE the input via CSS). Hidden
+    // until the user types a "/command" word; populated from the injected catalog. Mirrors the classic
+    // shell (#cmd-suggest); behaviour ported into the shared `suggestCommands`.
+    const suggestEl = document.createElement('ul');
+    suggestEl.className = 'circle-kring__suggest';
+    suggestEl.setAttribute('role', 'listbox');
+    suggestEl.hidden = true;
+    form.appendChild(suggestEl);
+
     const input = document.createElement('input');
     input.type = 'text';
     input.className = 'circle-kring__composer-input';
@@ -236,12 +252,81 @@ export function renderCircleKring(container, {
     send.textContent = '↑';
     form.appendChild(send);
 
+    // ── suggest state (local to this render; `history` is host-owned + persists across re-renders) ──
+    let entries = [];
+    let activeIdx = -1;
+
+    const paintSuggest = (matches) => {
+      suggestEl.innerHTML = '';
+      entries = matches;
+      if (!matches.length) { suggestEl.hidden = true; activeIdx = -1; return; }
+      if (activeIdx < 0 || activeIdx >= matches.length) activeIdx = 0;
+      matches.forEach((m, i) => {
+        const li = document.createElement('li');
+        li.className = `circle-kring__suggest-item${i === activeIdx ? ' is-active' : ''}`;
+        li.setAttribute('role', 'option');
+        li.setAttribute('aria-selected', i === activeIdx ? 'true' : 'false');
+        const cmd = document.createElement('span');
+        cmd.className = 'circle-kring__suggest-cmd';
+        cmd.textContent = m.command;
+        li.appendChild(cmd);
+        if (m.hint) {
+          const hint = document.createElement('span');
+          hint.className = 'circle-kring__suggest-hint';
+          hint.textContent = m.hint;
+          li.appendChild(hint);
+        }
+        // mousedown (not click) so it fires before the input's blur closes the list.
+        li.addEventListener('mousedown', (ev) => { ev.preventDefault(); acceptSuggest(i); });
+        suggestEl.appendChild(li);
+      });
+      suggestEl.hidden = false;
+    };
+    const refreshSuggest = () => paintSuggest(catalog ? suggestCommands(catalog, input.value) : []);
+    const acceptSuggest = (i) => {
+      const m = entries[i];
+      if (!m) return;
+      input.value = `${m.command} `;          // full command + trailing space → keep typing args
+      paintSuggest([]);
+      input.focus();
+    };
+
+    if (catalog) {
+      input.addEventListener('input', () => { if (history) history.reset(); refreshSuggest(); });
+      input.addEventListener('focus', refreshSuggest);
+      // Defer so a click/mousedown on a suggestion item fires before the list closes.
+      input.addEventListener('blur', () => setTimeout(() => paintSuggest([]), 120));
+    }
+
+    input.addEventListener('keydown', (e) => {
+      const open = catalog && !suggestEl.hidden && entries.length > 0;
+      if (open) {
+        // Dropdown navigation takes the arrow/Tab/Enter/Escape keys (classic parity).
+        if (e.key === 'ArrowDown') { e.preventDefault(); activeIdx = (activeIdx + 1) % entries.length; paintSuggest(entries); return; }
+        if (e.key === 'ArrowUp')   { e.preventDefault(); activeIdx = (activeIdx - 1 + entries.length) % entries.length; paintSuggest(entries); return; }
+        if (e.key === 'Tab' || (e.key === 'Enter' && activeIdx >= 0)) { e.preventDefault(); acceptSuggest(activeIdx); return; }
+        if (e.key === 'Escape')    { e.preventDefault(); paintSuggest([]); return; }
+      }
+      // Bash-style history navigation — only when the dropdown is closed.
+      if (history && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        if (e.key === 'ArrowUp') {
+          const v = history.prev(input.value);
+          if (v != null) { e.preventDefault(); input.value = v; setTimeout(() => input.setSelectionRange(input.value.length, input.value.length), 0); }
+        } else {
+          const v = history.next();
+          if (v != null) { e.preventDefault(); input.value = v; }
+        }
+      }
+    });
+
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       const text = input.value.trim();
       if (!text) return;
+      if (history) history.push(text);
       onSend(text);
       input.value = '';
+      paintSuggest([]);
       // Keep focus so a quick burst of messages feels native.
       input.focus();
     });

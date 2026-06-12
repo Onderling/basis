@@ -120,6 +120,33 @@ verify in a browser as you go):
 
 ---
 
+## Composer parity audit (2026-06-12) — classic shell → v2 kring composer
+
+A full audit of the CLASSIC shell composer (`web/main.js` input region) vs the v2 kring composer
+(`circleKring.js` / `circleApp.js` / mobile `CircleLauncherScreen.js`) found the kring composer was
+missing the classic shell's composer-UX affordances. Triaged into **ported** vs **deliberately-not**:
+
+**✅ PORTED (web + mobile, shared `src/v2/commandSuggest.js` — write-once):**
+- **Slash-command auto-suggest dropdown** — type `/pre…` → ranked command list w/ hints; Tab/Enter
+  accept, ↑/↓ navigate, Esc dismiss (web); tap-to-fill (mobile). `suggestCommands(catalog, input)`.
+- **Bash-style input history** — ↑/↓ recall prior sends + draft restore, de-dup, cap.
+  `createInputHistory()`. **Web only by nature** — arrow-key recall has no touch-gesture equivalent;
+  mobile gets the suggest list (the tappable parity surface) but not key-history.
+- Tests: `commandSuggest.test.js` (11 unit) + `circle-kring-suggest.spec.js` (4 browser). Mobile UI is
+  a Detox/manual checkpoint (no RN component-render tooling in-repo; shared logic is unit-covered).
+
+**⛔ DELIBERATELY NOT PORTED (design-divergent — classic shell routing semantics, not circle UX):**
+| Classic feature | Why it doesn't belong in the kring composer |
+|---|---|
+| **DM routing** (`filter.dm===true` → `sendDmMessage`) | A circle is a broadcast surface, not a 1:1 DM channel. No DM mode by design. |
+| **Pending-response dispatch** (`pendingResponse` → first reply = response body) | A "Help with"-spawned-DM mechanic tied to the classic thread model; circles don't spawn DM threads. |
+| **Label resolution inline** (`resolveTextArgsInPlace`) | The kring composer resolves labels via the **circle bot + `clarifyCommandTargets`** instead (and now its typed-slash bugs are fixed — see the 2026-06-12 status block). |
+| **Permission gate** (`allowCommands===false`) | Worth revisiting IF read-only circles land; today every circle is writable. **Open question, not a regression.** |
+| **Form-elicitation** (`needsForm` → `renderFormElicitation`) | The bot currently answers `needsForm` with a "needs more info" bubble rather than an inline form. A richer in-kring form is a **possible follow-up**, not a parity gap. |
+
+The two "open question" rows (permission gate, form-elicitation) are the only candidates for future
+work; the rest are correct divergences from the circle redesign.
+
 ## After this
 The mobile screens shrink to RN UI + the `bundle.callSkill` transport adapter; the web shells shrink to
 DOM rendering + their dispatcher. Every circle-bot/feedback/kring decision lives in shared `src/`

@@ -94,6 +94,8 @@ export { createDeliveryStateMap } from './v2/deliveryState.js';
 export { kringChatMessageEvent, broadcastKringFanOut } from './v2/kringBroadcast.js';
 // Phase 3 — the shared circle label→candidate lookup (live fetch + base), web + mobile.
 export { makeCircleLookup } from './v2/circleLookup.js';
+// Shared composer affordances — slash-suggest pool/filter + bash-style input history (web + mobile).
+export { buildCommandPool, suggestCommands, createInputHistory } from './v2/commandSuggest.js';
 // E3 — shared record-panel auto-refresh helpers (web EventRouter + mobile post-mutation).
 export {
   REFRESHABLE_VERBS, panelMatchesItemRef, itemRefFromReply, collectStalePanels,

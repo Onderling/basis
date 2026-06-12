@@ -30,6 +30,7 @@ import { interpretToCommand } from '../../src/v2/interpretCommand.js';
 import { createCircleDispatch } from '../../src/v2/circleDispatch.js';
 import { createClarifyingDispatch } from '../../src/v2/clarifyingDispatch.js';
 import { makeCircleLookup } from '../../src/v2/circleLookup.js';
+import { createInputHistory } from '../../src/v2/commandSuggest.js';
 import { createFeedbackSurface } from '../../src/feedback/feedbackSurface.js';
 import { createFeedbackMount } from '../../src/feedback/feedbackMount.js';
 // (localStoragePolicyIo is already imported below with createCirclePolicyStore)
@@ -424,7 +425,11 @@ const FEEDBACK_LLM_BASEURL = import.meta.env?.VITE_FEEDBACK_LLM_BASEURL ?? undef
 let circleBot = null;            // createCircleDispatch instance (handle(text, ctx) → {via,cmd})
 let circleFeedbackMount = null;  // createFeedbackMount (tryHandle(text, threadId))
 let circleClarify = null;        // createClarifyingDispatch (for candidate-button picks, later)
+let circleCatalog = null;        // the merged dispatch catalog (built in buildCircleBot) — feeds the composer slash-suggest
 let _kringRender = null;         // { circleId, botBubble(text), fanOut(msgId,text,ts) } — set by showKring
+// One bash-style command history for the kring composer, module-level so it survives showKring re-renders
+// (the classic shell keeps a single global history too). Web↔mobile parity via the shared helper.
+const kringInputHistory = createInputHistory();
 
 /** Short one-line bot reply from a runDispatch result (the substrate effect reaches members on its own). */
 function kringReplyText(reply) {
@@ -448,7 +453,8 @@ function buildCircleBot(agent) {
   const appRegistry = new AppRegistry();
   appRegistry.syncWithCatalog(rawCatalog.appOrigins);
   let catalog = filterCatalog(rawCatalog, appRegistry);
-  appRegistry.subscribe(() => { catalog = filterCatalog(rawCatalog, appRegistry); });
+  circleCatalog = catalog;        // expose to showKring's composer (slash-suggest)
+  appRegistry.subscribe(() => { catalog = filterCatalog(rawCatalog, appRegistry); circleCatalog = catalog; });
 
   const llmProviders = buildCircleLlmProviders({ localBaseUrl: CIRCLE_LLM_BASEURL, model: CIRCLE_LLM_MODEL });
   const policyIo = localStoragePolicyIo();
@@ -1051,6 +1057,9 @@ function showKring(id, circle, policy) {
       tabs, activeTab,
       viewMode,
       screenBlocks,
+      // Composer affordances (classic-shell parity): slash-suggest off the merged catalog + bash history.
+      catalog: circleCatalog,
+      history: kringInputHistory,
       // δ.2 — read function so the renderer can look up state per row
       // without us having to pass a fresh snapshot through every prop.
       // Locally-sent bubbles read this to decide which icon to render.

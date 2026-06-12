@@ -10,6 +10,11 @@ creds / a decision / hardware / a device · **[optional]** = breadth, not launch
 > shipped (slash-suggest dropdown · input history · permission gate · conversational form-elicitation), web
 > + mobile, on shared modules. Whole chromium browser suite green (17 passed). Top remaining moves are now
 > #3–#6 below (folio-dissolve verify · P3 3.3c-b household · category-floors e2e · household prompt decision).
+> **Follow-up (a real-run review of the kring bot) fixed 5 more issues** (`fa81f7d4` web · `c3e205c9`
+> mobile): missing web circle.bot.* strings (raw key shown) · infra ops like /me reaching+failing the bot
+> (now `scopeCatalogToApps`) · bare `/complete-task` saying «couldn't find ''» (now lists options) ·
+> feedback not echoing the user's messages (web `appendUserBubble` no-op) · add/complete replies identical
+> (now verb-aware Added:/Completed:, on a shared `kringReply.js`). +9 unit + 4 browser smokes.
 
 > **Substrate audit 2026-06-11** (parallel agents) — recurring finding: **the substrates are further
 > along than the todos claimed**, so the "remaining" column shrank across the board. Corrected this pass:

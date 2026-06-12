@@ -1,8 +1,15 @@
-# Remaining work — master index (2026-06-11)
+# Remaining work — master index (2026-06-12)
 
 One place that points at everything still open across the tracks. Per-track detail lives in the
 linked docs; this is the index. Legend: **[code-ready]** = I can build it now · **[blocked]** = needs
 creds / a decision / hardware / a device · **[optional]** = breadth, not launch-gating.
+
+> **Session update 2026-06-12** — the two top "fastest moves" are now CLOSED: **Phase 5 web kring
+> bot+feedback** is browser-verified AND the **web browser-smokes (P1 + P3)** are green — debugging them
+> surfaced + fixed **2 real resolver bugs** (`e9e26ceb`). Bonus, beyond the list: **kring composer parity**
+> shipped (slash-suggest dropdown · input history · permission gate · conversational form-elicitation), web
+> + mobile, on shared modules. Whole chromium browser suite green (17 passed). Top remaining moves are now
+> #3–#6 below (folio-dissolve verify · P3 3.3c-b household · category-floors e2e · household prompt decision).
 
 > **Substrate audit 2026-06-11** (parallel agents) — recurring finding: **the substrates are further
 > along than the todos claimed**, so the "remaining" column shrank across the board. Corrected this pass:
@@ -97,16 +104,33 @@ Detail: `apps/canopy-chat/docs/circle-bot-token-gate-TODO.md` · `[[project-circ
   → `TextEncoder` (`73a642ed`, byte-identical, sealing 248 tests green). The feedback surface now LOADS in
   the browser → classic shell BOOTS + kring feedback works. NB the sealing FUNCTIONS stay Node-only (a
   browser-WebCrypto tier is future work) — fine for code that never seals (the feedback demo).
-- **Web browser-smokes** **[harness ✅; classic shell BOOTS; P1/P3 now FAIL ON ASSERTIONS — new findings]**
-  — with the chain browser-safe, P1 (`feedback-mount.spec.js`) + P3 (`done-resolver.spec.js`) get PAST
-  the boot guard but fail on behaviour: **(P1)** `/feedback` in the CLASSIC shell shows no guidance bubble
-  — yet the SAME mount works in the v2 launcher (my Phase-5 `/feedback` is green), so the classic shell's
-  inline feedback wiring (main.js `handleUserText`/`feedback()` emit) likely has its own bug; **(P3)**
-  `/complete-task <label>` adds the task but the resolver returns not-found — likely a scope mismatch
-  (no active circle → `getActiveCircle()` null → the live lookup isn't scoped to where the task landed).
-  Both need a focused debug pass (separate from the browser-safety fix). P3 note: literal `/done` is an
-  NL-gate verb, unmatched-by-design in the classic shell. The Playwright HARNESS itself now
-  works (the loop fix) — `test-browser/circle-kring-bot.spec.js` is the green Phase-5 example.
+- **Web browser-smokes** **[✅ DONE 2026-06-12 — both green; 2 real resolver bugs fixed + harness self-contained (`e9e26ceb`)]**
+  — P1 (`feedback-mount.spec.js`) + P3 (`done-resolver.spec.js`) now pass. Debug findings: **(P1)** was a
+  TEST-interaction bug — the classic `#199` command-suggest dropdown swallows a lone Enter (accepts the
+  highlighted suggestion instead of submitting); `/feedback` guidance was always correct (fix = press Escape
+  first). **(P3)** was TWO stacked REAL bugs in web's typed-slash label resolver: (1) `circleLookup` leaked
+  the THREAD id ('main') as a crewId when `getActiveCircle()` is null on a non-circle thread → the live fetch
+  hit a non-existent crew → "item not found"; fix = `scopeId` authoritative when provided (null = default
+  crew). (2) the parser's positional `_match` was bound to the id-param only in `resolveDispatch`, AFTER the
+  resolver ran → the label never got looked up; fix = bind `_match` first (`bindMatchArg`, now exported).
+  Both regression-tested. Also corrected: `/done <label>` IS a registered command (mockAgent `markComplete`)
+  that resolves labels — not "unknown". Harness now self-contained — `playwright.config.js` injects a dummy
+  `VITE_CIRCLE_LLM_BASEURL` so the circle-bot gate smokes run without a hand-prepped server.
+- **Kring composer parity (classic shell → v2 kring composer)** **[✅ DONE 2026-06-12 — web + mobile]** —
+  audited the classic composer vs the v2 kring composer and closed the gaps with SHARED logic (write-once,
+  per `[[canopy-chat-unifier-principle]]`): **(1) slash-command auto-suggest dropdown** (shared
+  `src/v2/commandSuggest.js` `suggestCommands`) — web dropdown w/ Tab/Enter/Esc/↑↓, mobile tappable list;
+  **(2) bash-style input history** (`createInputHistory`, ↑/↓ + draft restore) — web only (keyboard
+  affordance, no touch equivalent); **(3) permission gate** — composer respects `isFeatureEnabled(policy,
+  'chat')`, chat-off ⇒ read-only note (the circle analog of classic `allowCommands`, existing axis, no new
+  axis invented); **(4) conversational form-elicitation** — a single-field `needsForm` asks in the kring
+  (`chat.followup_prompt`) and the user's NEXT message answers + dispatches, on the SHARED `src/v2/followUp.js`
+  (lifted from mobile's `core/followUp.js`, which now re-exports it). Commits `dc536027`/`1c373db9`
+  (suggest+history) · `66a211eb`/`76edef32` (gate+form) · `f46ce375` (3 stale smokes fixed → whole suite
+  green). Tests: +11 `commandSuggest` + 6 `circleKring.dom` unit + 3 browser smokes (`circle-kring-suggest`,
+  `circle-kring-followup`). DELIBERATELY NOT ported (design-divergent classic routing, documented): DM
+  routing, pending-response dispatch, inline label-resolution (the circle bot does it). Detail: the
+  "Composer parity audit" section in `web-mobile-consolidation-plan.md`.
 - **Smoke checkpoints owed** **[blocked: device/manual]** — web smoke for the 2026-05-24 wave
   (#218/#219/#231.*), first canopy-chat-mobile Android boot, tasks/stoop-mobile screens (#226–#228).
   (Mobile circle-bot boot now DONE — device run 2026-06-10.)
@@ -214,20 +238,18 @@ E later. (Unification order would be B → A → C → D → E — see the plan 
 ---
 
 ## Fastest code-ready next moves (no creds/decisions needed)
-*Mobile circle bot works e2e (add/done/claim + completion lands); web↔mobile consolidation Phases 1–4
-done. Updated priorities (2026-06-11):*
-1. **Consolidation Phase 5 — bot+feedback in web's kring composer** (§2) — **NEEDS A BROWSER** (the v2
-   launcher is browser-check-flagged). ~150-line assembly of shared pieces into `circleApp.js onSend`;
-   precise 9-step spec + 4-line smoke in `web-mobile-consolidation-plan.md`. Do it WITH a browser open.
-2. **Web browser-smokes** (§2) — P1 feedback (`/feedback → /klaar → /feedback-stop`) + P3 `/done <label>`.
-   Quick manual checks; needed because there's no headless web harness here. Pair with #1 (same browser).
-3. **Verify the folio dissolve branch** (§7 Part G) — `824d766b` (`feat/folio-dissolve-part-g`) is
+*Phase 5 + the web browser-smokes are DONE (2026-06-12); kring composer parity shipped. The remaining
+code-ready moves (was #3–#6, now the top of the list):*
+1. **Verify the folio dissolve branch** (§7 Part G) — `824d766b` (`feat/folio-dissolve-part-g`) is
    code-complete but **unverified** (its worktree had no deps); run `vitest` + `npm run coverage` in the
    main tree, then merge if green. Also delete its stray `.git-commit-msg-folio-dissolve.txt`.
-4. **P3 3.3c-b** (§4) — wire **household** membership → controlAgent grant/rotate (substrate built, clear
+2. **P3 3.3c-b** (§4) — wire **household** membership → controlAgent grant/rotate (substrate built, clear
    boundary). 3.3c-c (circle storage) is NOT a quick wire (investigated).
-5. **Category-floors e2e LLM re-run** (§1) — only remaining bit; needs an Ollama run on the scenarios.
-6. **Household chat-agent prompt** (§3) — a *decision* (make v3 the freeform-V2 default?), not a write.
+3. **Category-floors e2e LLM re-run** (§1) — only remaining bit; needs an Ollama run on the scenarios.
+4. **Household chat-agent prompt** (§3) — a *decision* (make v3 the freeform-V2 default?), not a write.
+5. **Multi-field inline form in the kring** (§2) — the one composer-parity follow-up left: a 2+-missing
+   `needsForm` still shows a "needs more info" bubble; lift mobile's `MultiFieldFormBubble` to render an
+   inline form. Small. (Single-field elicitation already ships.)
 *Then the deferred gate/surface parts:* **F-retrieve** (= P3 sealedIndex semanticQuery), **E** (inline
 menus), **A** (engine-parity → `@canopy/manifest-host`), **G** remaining apps (tasks-v0, stoop+household).
 *Non-blocking polish:* `makeResolvingCallSkill` catalog-blind probe-storm + NKN noise; `getMyTasks`

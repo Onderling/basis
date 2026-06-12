@@ -30,10 +30,8 @@ import { interpretToCommand } from '../../src/v2/interpretCommand.js';
 import { createCircleDispatch } from '../../src/v2/circleDispatch.js';
 import { createClarifyingDispatch } from '../../src/v2/clarifyingDispatch.js';
 import { makeCircleLookup } from '../../src/v2/circleLookup.js';
-// NOTE: feedback (createFeedbackSurface/Mount) is intentionally NOT imported here — the
-// feedback-pipeline chain is not yet browser-safe (process.env [fixed] + Buffer in pod/signing), which
-// crashes the page at boot. Kring feedback is deferred until that chain is browser-safe (it also blocks
-// the classic shell's P1). The circle BOT below works without it.
+import { createFeedbackSurface } from '../../src/feedback/feedbackSurface.js';
+import { createFeedbackMount } from '../../src/feedback/feedbackMount.js';
 // (localStoragePolicyIo is already imported below with createCirclePolicyStore)
 import { createUserLlmDefaultStore, localStorageUserLlmIo } from '../../src/v2/userLlmDefault.js';
 import { createRealHouseholdAgent } from '../../src/web/realAgent.js';
@@ -422,7 +420,9 @@ const CIRCLE_LLM_BASEURL   = import.meta.env?.VITE_CIRCLE_LLM_BASEURL ?? null;
 const CIRCLE_LLM_MODEL     = import.meta.env?.VITE_CIRCLE_LLM_MODEL ?? undefined;
 const CIRCLE_BOT_NAME      = import.meta.env?.VITE_CIRCLE_BOT_NAME ?? 'assistant';
 const CIRCLE_LLM_POLICY    = import.meta.env?.VITE_CIRCLE_LLM_POLICY ?? 'user';
+const FEEDBACK_LLM_BASEURL = import.meta.env?.VITE_FEEDBACK_LLM_BASEURL ?? undefined;
 let circleBot = null;            // createCircleDispatch instance (handle(text, ctx) → {via,cmd})
+let circleFeedbackMount = null;  // createFeedbackMount (tryHandle(text, threadId))
 let circleClarify = null;        // createClarifyingDispatch (for candidate-button picks, later)
 let _kringRender = null;         // { circleId, botBubble(text), fanOut(msgId,text,ts) } — set by showKring
 
@@ -463,7 +463,18 @@ function buildCircleBot(agent) {
     return { llmTool: raw && typeof raw.llmTool === 'string' ? raw.llmTool : CIRCLE_LLM_POLICY };
   }
 
-  // (Kring feedback deferred — see the import note; the feedback-pipeline chain isn't browser-safe yet.)
+  // Feedback — bubbles render into the kring stream (the mount wraps a surface; appendBotBubble routes
+  // to the current kring's botBubble). The composer already shows the user's line, so appendUserBubble
+  // is a no-op (parity with web's classic-shell adoption).
+  const feedbackSurface = createFeedbackSurface({
+    llmBaseURL: FEEDBACK_LLM_BASEURL,
+    emit: ({ text }) => { if (text) _kringRender?.botBubble(text); },
+  });
+  circleFeedbackMount = createFeedbackMount({
+    surface: feedbackSurface,
+    appendUserBubble: () => {},
+    appendBotBubble:  (_tid, text) => _kringRender?.botBubble(text),
+  });
 
   // Live, app-qualified label→candidate lookup (no preloaded base here — the kring stream isn't an item
   // list; the live fetch + the op's appOrigin do the work, scoped to the active circle).
@@ -1090,9 +1101,10 @@ function showKring(id, circle, policy) {
       onSend:   async (text) => {
         const line = String(text ?? '').trim();
         if (!line) return;
-        // Phase 5 — the circle bot routes the turn (gate → interpret → dispatch), with plain messages
-        // fanning out. Bot replies render into the kring stream via _kringRender. (Kring /feedback is
-        // deferred — the feedback-pipeline chain isn't browser-safe yet; see the import note.)
+        // Phase 5 — the feedback bot gets first refusal (owns /feedback, /feedback-stop, the bot's own
+        // slash cmds + free text while active); else the circle bot routes the turn (gate → interpret →
+        // dispatch), with plain messages fanning out. Both render into the kring stream via _kringRender.
+        if (circleFeedbackMount && await circleFeedbackMount.tryHandle(line, id)) { rerender(); return; }
         // Optimistic local append + best-effort peer fan-out. The msgId is shared so receiver-side dedup
         // suppresses any echo. δ.2 tracks delivery state (pending → sent | failed) for the bubble icon.
         const msgId = `kring-${id}-${Date.now()}-${(seq += 1).toString(36)}`;

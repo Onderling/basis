@@ -135,17 +135,28 @@ missing the classic shell's composer-UX affordances. Triaged into **ported** vs 
 - Tests: `commandSuggest.test.js` (11 unit) + `circle-kring-suggest.spec.js` (4 browser). Mobile UI is
   a Detox/manual checkpoint (no RN component-render tooling in-repo; shared logic is unit-covered).
 
+**✅ ALSO PORTED (2026-06-12, web + mobile — the two former "open questions"):**
+- **Permission gate** — the kring composer now respects the circle-level `chat` feature
+  (`isFeatureEnabled(policy, 'chat')`, the existing axis; kringTemplates ship `chat:false` circles). When
+  off, the composer renders a read-only note (`circle.kring.chat_disabled`) instead of the input — the
+  faithful circle analog of the classic shell's admin-imposed `allowCommands`. No new policy axis invented.
+- **Form-elicitation** — a `needsForm` with ONE missing field now elicits it **conversationally** (the
+  chat-native path): the bot asks in the kring (`chat.followup_prompt`) and the user's NEXT message
+  answers + dispatches. Built on the shared `src/v2/followUp.js` — mobile's pure `core/followUp.js` was
+  LIFTED to the shared package (the mobile file now re-exports it), so web `circleApp.js` + mobile
+  `CircleLauncherScreen.js` elicit identically rather than diverging (web modal form vs mobile inline).
+  Multi-field `needsForm` keeps the "needs more info" bubble for now (an inline multi-field form is a
+  small follow-up; mobile already has `MultiFieldFormBubble` to lift later).
+
 **⛔ DELIBERATELY NOT PORTED (design-divergent — classic shell routing semantics, not circle UX):**
 | Classic feature | Why it doesn't belong in the kring composer |
 |---|---|
 | **DM routing** (`filter.dm===true` → `sendDmMessage`) | A circle is a broadcast surface, not a 1:1 DM channel. No DM mode by design. |
 | **Pending-response dispatch** (`pendingResponse` → first reply = response body) | A "Help with"-spawned-DM mechanic tied to the classic thread model; circles don't spawn DM threads. |
 | **Label resolution inline** (`resolveTextArgsInPlace`) | The kring composer resolves labels via the **circle bot + `clarifyCommandTargets`** instead (and now its typed-slash bugs are fixed — see the 2026-06-12 status block). |
-| **Permission gate** (`allowCommands===false`) | Worth revisiting IF read-only circles land; today every circle is writable. **Open question, not a regression.** |
-| **Form-elicitation** (`needsForm` → `renderFormElicitation`) | The bot currently answers `needsForm` with a "needs more info" bubble rather than an inline form. A richer in-kring form is a **possible follow-up**, not a parity gap. |
 
-The two "open question" rows (permission gate, form-elicitation) are the only candidates for future
-work; the rest are correct divergences from the circle redesign.
+These are correct divergences from the circle redesign. The only remaining composer follow-up is the
+multi-field inline form (above).
 
 ## After this
 The mobile screens shrink to RN UI + the `bundle.callSkill` transport adapter; the web shells shrink to

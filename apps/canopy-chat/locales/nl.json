@@ -285,6 +285,10 @@
         "text": "Schrijf naar de kring…",
         "doc": "SP-13.2 — composer placeholder (hosts kunnen kring-specifieke tekst meegeven)."
       },
+      "chat_disabled": {
+        "text": "Chat staat uit in deze kring.",
+        "doc": "Permission gate — getoond in plaats van de composer als de 'chat'-functie van de kring uit staat (analoog aan allowCommands in de klassieke shell)."
+      },
       "send": {
         "text": "Verstuur",
         "doc": "SP-13.2 — composer send button a11y label (visueel een ↑)."
@@ -2382,6 +2386,14 @@
     }
   },
   "chat": {
+    "followup_prompt": {
+      "text": "Wat is je {{param}}? (voor /{{opId}})",
+      "doc": "Generieke prompt als een kring-commando needsForm geeft met één ontbrekend veld — de bot vraagt, het volgende bericht is het antwoord (gedeeld src/v2/followUp.js)."
+    },
+    "followup_prompt_respond_to_item_body": {
+      "text": "Welke hulp bied je aan?",
+      "doc": "Vriendelijkere prompt voor respondToItem.body (via pickPromptKey)."
+    },
     "file": {
       "open": {
         "text": "Openen",

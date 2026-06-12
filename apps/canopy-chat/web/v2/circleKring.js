@@ -82,6 +82,10 @@ export function renderCircleKring(container, {
   //   `history`  a `createInputHistory()` instance (host-owned so it survives re-renders) → ArrowUp/Down.
   catalog = null,
   history = null,
+  // Permission gate (classic shell's `allowCommands` analog): when the circle's `chat` feature is off,
+  // the composer is read-only — `canPost=false` renders a disabled note instead of the input. The host
+  // computes it from `isFeatureEnabled(policy, 'chat')`.
+  canPost = true,
   t,
 } = {}) {
   const tr = typeof t === 'function' ? t : (k) => k;
@@ -224,7 +228,14 @@ export function renderCircleKring(container, {
   // Composer — text input + send button.  Suppressed in scherm-mode
   // because the recept'd page isn't a chat surface; user flips back
   // to Chat to write something.
-  if (typeof onSend === 'function' && viewMode !== 'scherm') {
+  if (typeof onSend === 'function' && viewMode !== 'scherm' && !canPost) {
+    // Permission gate — chat is disabled for this circle; show a read-only note in place of the composer.
+    const note = document.createElement('div');
+    note.className = 'circle-kring__composer-disabled';
+    note.setAttribute('role', 'note');
+    note.textContent = tr('circle.kring.chat_disabled');
+    container.appendChild(note);
+  } else if (typeof onSend === 'function' && viewMode !== 'scherm') {
     const form = document.createElement('form');
     form.className = 'circle-kring__composer';
     form.setAttribute('autocomplete', 'off');

@@ -285,6 +285,10 @@
         "text": "Write to the kring…",
         "doc": "SP-13.2 — inline composer placeholder; hosts can pass a kring-specific one (e.g. 'Schrijf naar de buurt…')."
       },
+      "chat_disabled": {
+        "text": "Chat isn't enabled in this circle.",
+        "doc": "Permission gate — shown in place of the composer when the circle's `chat` feature is off (classic shell's allowCommands analog)."
+      },
       "send": {
         "text": "Send",
         "doc": "SP-13.2 — composer send button a11y label (visual is an ↑ glyph)."
@@ -2382,6 +2386,14 @@
     }
   },
   "chat": {
+    "followup_prompt": {
+      "text": "What's your {{param}}? (for /{{opId}})",
+      "doc": "Generic prompt when a kring command trips needsForm with a single missing field — the bot asks, the user's next message answers (shared src/v2/followUp.js)."
+    },
+    "followup_prompt_respond_to_item_body": {
+      "text": "What help are you offering?",
+      "doc": "Friendlier prompt for respondToItem.body (picked via pickPromptKey)."
+    },
     "file": {
       "open": {
         "text": "Open",

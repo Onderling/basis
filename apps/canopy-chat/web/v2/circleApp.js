@@ -31,6 +31,7 @@ import { createCircleDispatch } from '../../src/v2/circleDispatch.js';
 import { createClarifyingDispatch } from '../../src/v2/clarifyingDispatch.js';
 import { makeCircleLookup } from '../../src/v2/circleLookup.js';
 import { createInputHistory } from '../../src/v2/commandSuggest.js';
+import { beginFollowUp, completeFollowUp } from '../../src/v2/followUp.js';
 import { createFeedbackSurface } from '../../src/feedback/feedbackSurface.js';
 import { createFeedbackMount } from '../../src/feedback/feedbackMount.js';
 // (localStoragePolicyIo is already imported below with createCirclePolicyStore)
@@ -426,6 +427,8 @@ let circleBot = null;            // createCircleDispatch instance (handle(text, 
 let circleFeedbackMount = null;  // createFeedbackMount (tryHandle(text, threadId))
 let circleClarify = null;        // createClarifyingDispatch (for candidate-button picks, later)
 let circleCatalog = null;        // the merged dispatch catalog (built in buildCircleBot) — feeds the composer slash-suggest
+let circleDispatchReady = null;  // buildCircleBot's dispatchReady({opId,args}) — used to run a completed follow-up
+let circlePendingFollowUp = null;// a single-field needsForm awaiting the user's next message (conversational elicitation)
 let _kringRender = null;         // { circleId, botBubble(text), fanOut(msgId,text,ts) } — set by showKring
 // One bash-style command history for the kring composer, module-level so it survives showKring re-renders
 // (the classic shell keeps a single global history too). Web↔mobile parity via the shared helper.
@@ -491,13 +494,22 @@ function buildCircleBot(agent) {
     let route;
     try { route = resolveDispatch({ kind: 'slash', opId, args: args || {}, command: '(bot)', body: '' }, catalog); }
     catch { _kringRender?.botBubble(t('circle.bot.unknown')); return; }
-    if (route.kind === 'needsForm') { _kringRender?.botBubble(t('circle.bot.needsInfo')); return; }
+    if (route.kind === 'needsForm') {
+      // Conversational elicitation (chat-native, parity with mobile): a single missing field → ask for
+      // it in the kring and capture the user's NEXT message (onSend's pending-follow-up branch). Multi-
+      // field needsForm keeps the simpler "needs more info" bubble for now (the inline form is a follow-up).
+      const pending = beginFollowUp({ dispatch: route, t });
+      if (pending) { circlePendingFollowUp = pending; _kringRender?.botBubble(pending.promptText); }
+      else { _kringRender?.botBubble(t('circle.bot.needsInfo')); }
+      return;
+    }
     if (route.kind !== 'ready')     { _kringRender?.botBubble(t('circle.bot.unknown')); return; }
     let reply;
     try { reply = await runDispatch(scopeReadyDispatch(route, getActiveCircle()), rawCallSkill); }
     catch (e) { _kringRender?.botBubble(t('circle.bot.failed', { msg: e?.message ?? String(e) })); return; }
     _kringRender?.botBubble(kringReplyText(reply));
   }
+  circleDispatchReady = dispatchReady;   // expose so onSend can run a completed follow-up
 
   circleClarify = createClarifyingDispatch({
     catalog: () => catalog,
@@ -1060,6 +1072,8 @@ function showKring(id, circle, policy) {
       // Composer affordances (classic-shell parity): slash-suggest off the merged catalog + bash history.
       catalog: circleCatalog,
       history: kringInputHistory,
+      // Permission gate — chat disabled for this circle ⇒ read-only composer (classic `allowCommands` analog).
+      canPost: isFeatureEnabled(policy, 'chat'),
       // δ.2 — read function so the renderer can look up state per row
       // without us having to pass a fresh snapshot through every prop.
       // Locally-sent bubbles read this to decide which icon to render.
@@ -1110,6 +1124,19 @@ function showKring(id, circle, policy) {
       onSend:   async (text) => {
         const line = String(text ?? '').trim();
         if (!line) return;
+        // Conversational follow-up: the bot previously asked for a missing field (needsForm → beginFollowUp);
+        // THIS message is the answer. Append it, complete the pending dispatch, and run it — don't route it
+        // to feedback or re-interpret it as a new command.
+        if (circlePendingFollowUp) {
+          const pending = circlePendingFollowUp;
+          circlePendingFollowUp = null;
+          const fMsgId = `kring-${id}-${Date.now()}-${(seq += 1).toString(36)}`;
+          eventLog.append(kringChatMessageEvent({ msgId: fMsgId, ts: Date.now(), circleId: id, actor: LOCAL_ACTOR, text: line }));
+          rerender();
+          const ready = completeFollowUp({ pending, text: line });
+          if (circleDispatchReady) await circleDispatchReady({ opId: ready.opId, args: ready.args });
+          return;
+        }
         // Phase 5 — the feedback bot gets first refusal (owns /feedback, /feedback-stop, the bot's own
         // slash cmds + free text while active); else the circle bot routes the turn (gate → interpret →
         // dispatch), with plain messages fanning out. Both render into the kring stream via _kringRender.

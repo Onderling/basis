@@ -96,6 +96,9 @@ export { kringChatMessageEvent, broadcastKringFanOut } from './v2/kringBroadcast
 export { makeCircleLookup } from './v2/circleLookup.js';
 // Shared composer affordances — slash-suggest pool/filter + bash-style input history (web + mobile).
 export { buildCommandPool, suggestCommands, createInputHistory } from './v2/commandSuggest.js';
+// Conversational follow-up for `needsForm` dispatches — shared so the kring composers elicit a missing
+// field the same chat-native way (web + mobile); the mobile core/followUp.js re-exports these.
+export { beginFollowUp, beginFormFollowUp, completeFollowUp, completeMultiFieldFollowUp, pickPromptKey } from './v2/followUp.js';
 // E3 — shared record-panel auto-refresh helpers (web EventRouter + mobile post-mutation).
 export {
   REFRESHABLE_VERBS, panelMatchesItemRef, itemRefFromReply, collectStalePanels,

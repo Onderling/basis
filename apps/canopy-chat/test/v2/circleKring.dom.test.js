@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from 'vitest';
 import { renderCircleKring } from '../../web/v2/circleKring.js';
+import { createInputHistory } from '../../src/v2/commandSuggest.js';
 
 const t = (key, params) =>
   params && params.count != null ? `${key}:${params.count}` : key;
@@ -383,5 +384,72 @@ describe('renderCircleKring · SP-13.2 chat-style kring view', () => {
     const el = mount();
     renderCircleKring(el, { circle, rows: [localRow], t });
     expect(el.querySelector('.circle-kring__bubble-delivery')).toBeNull();
+  });
+});
+
+describe('renderCircleKring · composer parity (slash-suggest + permission gate)', () => {
+  const catalog = { opsById: new Map([
+    ['addTask',      { op: { id: 'addTask',      surfaces: { slash: { command: '/addtask' },       chat: { hint: 'add a task' } } } }],
+    ['completeTask', { op: { id: 'completeTask', surfaces: { slash: { command: '/complete-task' }, chat: { hint: 'finish a task' } } } }],
+  ]) };
+
+  it('permission gate: canPost=false renders a read-only note in place of the composer', () => {
+    const el = mount();
+    renderCircleKring(el, { circle, rows, t, onSend: () => {}, canPost: false });
+    expect(el.querySelector('.circle-kring__composer')).toBeNull();
+    const note = el.querySelector('.circle-kring__composer-disabled');
+    expect(note).not.toBeNull();
+    expect(note.textContent).toBe('circle.kring.chat_disabled');
+  });
+
+  it('permission gate: canPost (default) renders the composer form, no note', () => {
+    const el = mount();
+    renderCircleKring(el, { circle, rows, t, onSend: () => {} });
+    expect(el.querySelector('.circle-kring__composer')).not.toBeNull();
+    expect(el.querySelector('.circle-kring__composer-disabled')).toBeNull();
+  });
+
+  it('slash-suggest: typing "/" opens the dropdown; a space (into args) closes it', () => {
+    const el = mount();
+    renderCircleKring(el, { circle, rows, t, onSend: () => {}, catalog });
+    const input = el.querySelector('.circle-kring__composer-input');
+    const suggest = el.querySelector('.circle-kring__suggest');
+    input.value = '/';
+    input.dispatchEvent(new Event('input'));
+    expect(suggest.hidden).toBe(false);
+    expect(el.querySelectorAll('.circle-kring__suggest-item').length).toBe(2);
+    input.value = '/addtask milk';
+    input.dispatchEvent(new Event('input'));
+    expect(suggest.hidden).toBe(true);
+  });
+
+  it('slash-suggest: a prefix filters the list', () => {
+    const el = mount();
+    renderCircleKring(el, { circle, rows, t, onSend: () => {}, catalog });
+    const input = el.querySelector('.circle-kring__composer-input');
+    input.value = '/comp';
+    input.dispatchEvent(new Event('input'));
+    expect([...el.querySelectorAll('.circle-kring__suggest-cmd')].map((n) => n.textContent)).toEqual(['/complete-task']);
+  });
+
+  it('no catalog → no suggest dropdown wiring (composer still works)', () => {
+    const el = mount();
+    renderCircleKring(el, { circle, rows, t, onSend: () => {} });
+    const input = el.querySelector('.circle-kring__composer-input');
+    input.value = '/';
+    input.dispatchEvent(new Event('input'));
+    expect(el.querySelector('.circle-kring__suggest').hidden).toBe(true);
+  });
+
+  it('history: submit records the message into the injected history (ArrowUp would recall it)', () => {
+    const el = mount();
+    const history = createInputHistory();
+    const onSend = vi.fn();
+    renderCircleKring(el, { circle, rows, t, onSend, catalog, history });
+    const input = el.querySelector('.circle-kring__composer-input');
+    input.value = 'hello kring';
+    el.querySelector('.circle-kring__composer').dispatchEvent(new Event('submit'));
+    expect(onSend).toHaveBeenCalledWith('hello kring');
+    expect(history.prev()).toBe('hello kring');
   });
 });

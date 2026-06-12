@@ -456,6 +456,9 @@
 .circle-kring__suggest-cmd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--accent); font-weight: 600; font-size: 13px; }
 .circle-kring__suggest-hint { color: var(--ink-soft); font-size: 12px; }
 
+/* Permission gate — chat disabled for the circle: read-only note in place of the composer. */
+.circle-kring__composer-disabled { padding: 12px 0 6px; margin-top: 4px; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 13px; font-style: italic; text-align: center; }
+
 /* SP-13.3 — per-kring bottom tab bar + tab-coming placeholder. */
 .circle-kring__tabs { display: flex; justify-content: space-around; align-items: stretch; border-top: 1px solid var(--line); margin-top: 4px; }
 .circle-kring__tab { flex: 1; padding: 12px 6px; background: none; border: none; font: inherit; font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--ink-soft); cursor: pointer; border-top: 2px solid transparent; margin-top: -1px; }

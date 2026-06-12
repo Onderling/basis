@@ -30,6 +30,10 @@ const HELP_SUBSTR = 'Zo werkt het';  // start of the feedback bot's /help guidan
 async function send(page, text, settleMs = 1500) {
   const input = page.locator('#chat-input');
   await input.fill(text);
+  // Dismiss the command-suggest dropdown first: when it's open with a highlighted entry, the shell's
+  // keydown handler treats Enter as "accept the suggestion" (preventDefault) instead of submitting the
+  // form (main.js ~1974). A single Enter on a slash command would be swallowed → no message sent.
+  await input.press('Escape');
   await input.press('Enter');
   await page.waitForTimeout(settleMs);
 }

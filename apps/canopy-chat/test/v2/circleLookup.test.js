@@ -26,6 +26,16 @@ describe('makeCircleLookup', () => {
     expect(appCallSkill).toHaveBeenCalledWith('tasks-v0', 'listOpen', { crewId: 'active-circle', circleId: 'active-circle', groupId: 'active-circle' });
   });
 
+  it('scopeId() returning null → no-circle scope (empty fetch args), NOT the thread id (web non-circle thread)', async () => {
+    // Web's classic shell on the `main` thread: getActiveCircle() is null, scope is the THREAD whose
+    // id 'main' is NOT a crew id. The fetch must go out unscoped (default crew) so labels still resolve,
+    // not scoped to a non-existent crew 'main' (which returned nothing → `/complete-task` "item not found").
+    const appCallSkill = vi.fn(async () => []);
+    const lookup = makeCircleLookup({ appCallSkill, scopeId: () => null });
+    await lookup('listOpen', 'x', { id: 'main' }, 'tasks-v0');
+    expect(appCallSkill).toHaveBeenCalledWith('tasks-v0', 'listOpen', {});
+  });
+
   it('a live-fetch throw keeps the base (best-effort degrade)', async () => {
     const lookup = makeCircleLookup({ getBase: () => [{ id: 'a', label: 'Wash' }], appCallSkill: async () => { throw new Error('offline'); } });
     expect(await lookup('listOpen', 'wash', { id: 'c1' }, 'tasks-v0')).toEqual([{ id: 'a', label: 'Wash' }]);

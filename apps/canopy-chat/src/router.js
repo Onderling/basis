@@ -298,7 +298,7 @@ function firstTargetParam(op) {
   );
 }
 
-function bindMatchArg(args, op) {
+export function bindMatchArg(args, op) {
   if (args._match === undefined) return { ...args };
   const target = firstTargetParam(op);
   if (!target) {

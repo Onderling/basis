@@ -52,5 +52,12 @@ export default defineConfig({
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
+    /* Circle-bot smokes (circle-kring-bot.spec.js) need a circle LLM provider to EXIST so the bot
+     * "engages" — the deterministic gate path (`@assistant add/done X`) never CALLS it, so a dummy
+     * loopback URL is enough. Without this the server boots with no provider, the bot stays inert,
+     * `@assistant …` just fans out, and the gate smokes fail. Injected here so the harness is
+     * self-contained (no manually-prepped `VITE_CIRCLE_LLM_BASEURL=… pnpm dev` required).
+     * NB: only applied when Playwright STARTS the server; a reused pre-existing server keeps its env. */
+    env: { VITE_CIRCLE_LLM_BASEURL: 'http://127.0.0.1:9999' },
   },
 });

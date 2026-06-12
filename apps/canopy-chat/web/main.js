@@ -16,7 +16,7 @@
  */
 
 import {
-  parseInput, mergeManifests, resolveDispatch, runDispatch, scopeReadyDispatch,
+  parseInput, mergeManifests, resolveDispatch, runDispatch, scopeReadyDispatch, bindMatchArg,
   getActiveCircle, setActiveCircle,
   renderReply, ThreadStore, createDefaultThreadStore, createEventRouter,
   REFRESHABLE_VERBS, executeBulkDispatch,
@@ -2075,6 +2075,15 @@ function updateLangButtons() {
 // behaviour (the typed-slash path keeps NO clarification turn; that's the LLM path's job). Now web also
 // resolves labels the user never listed this session (the live fetch), which the cache could not.
 async function resolveTextArgsInPlace(parse, thread) {
+  // The parser leaves a positional slash body under `_match` (e.g. `/complete-task dishwasher` →
+  // {_match:'dishwasher'}); the router binds it to the op's first required string param only later, in
+  // `resolveDispatch`. Bind it HERE first (canonical `bindMatchArg`) so the label sits under the real
+  // param name — `clarifyCommandTargets` matches a picker by PARAM NAME, so without this the label
+  // stayed under `_match`, resolved nothing, and the raw label hit the item store ("item not found",
+  // 2026-06-12). Idempotent: after binding `_match` is gone, so resolveDispatch's own bind is a no-op.
+  const entry = catalog?.opsById?.get(parse.opId);
+  const op = entry?.op ?? entry;
+  if (op && parse.args && parse.args._match !== undefined) parse.args = bindMatchArg(parse.args, op);
   const r = await clarifyCommandTargets({ opId: parse.opId, args: parse.args }, { catalog, lookup: _circleLookup, scope: thread });
   if (r?.args) parse.args = r.args;
 }

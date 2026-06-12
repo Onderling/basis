@@ -5,18 +5,20 @@
  * (main.js). `resolveTextArgsInPlace`'s body was retired in favour of the shared
  * resolver.
  *
- * IMPORTANT routing fact established while writing this smoke:
- *   In the CLASSIC shell, the typed-slash that exercises the shared resolver is
- *   `/complete-task <label>` — NOT `/done <label>`. The completeTask op declares
- *   `surfaces.slash.command = '/complete-task'` (mockManifests.js:111); 'done' is
- *   only an NL-gate VERB, and `parseSlash` matches the literal command token
- *   against commandMenu exactly (parser.js:98). With no LLM, the NL gate never
- *   runs, so a literal `/done dishwasher` is an UNMATCHED slash → "unknown
- *   command" (by design, not a bug). The shared resolver lives on the
- *   typed-slash path (parse.kind==='slash' → resolveTextArgsInPlace, main.js:2261),
- *   which `/complete-task` takes and `/done` does not. This spec therefore drives
- *   the resolver via `/complete-task`, and separately documents `/done`'s
- *   unknown-by-design behavior.
+ * Routing fact (corrected 2026-06-12, browser-verified — the original note here was wrong):
+ *   BOTH `/complete-task <label>` (tasks-v0 `completeTask`) AND `/done <label>` (mockAgent
+ *   `markComplete`, a household-chore complete) are REGISTERED slash commands whose id-param declares
+ *   a `pickerSource.listOp` (`completeTask.id` / `markComplete.choreId`, both `listOpen`). So BOTH
+ *   take the typed-slash resolver path (`parse.kind==='slash'` → `resolveTextArgsInPlace`, main.js)
+ *   and resolve a human label → an id with no LLM. The earlier claim that `/done` was an "unmatched /
+ *   unknown" slash was a mis-read — mockAgent declares `/done` (mockAgent.js:67). This spec drives the
+ *   resolver via `/complete-task` (tasks-v0) and separately confirms `/done` is handled the same way.
+ *
+ * Two stacked resolver bugs this smoke now guards (both fixed 2026-06-12):
+ *   • circleLookup leaked the THREAD id as a crewId when `getActiveCircle()` was null (web non-circle
+ *     thread) → the live fetch hit a non-existent crew → nothing resolved. Fix: `scopeId` authoritative.
+ *   • the parser leaves the positional body under `_match`; the router bound it to the id-param only
+ *     AFTER the resolver ran. Fix: bind `_match` first in `resolveTextArgsInPlace`.
  *
  * Flow (no LLM needed — add/list/complete are deterministic in-browser ops):
  *   1. `/addtask dishwasher`           → creates the task (in the default crew).
@@ -37,6 +39,10 @@ const LABEL = 'dishwasher';
 async function send(page, text, settleMs = 1800) {
   const input = page.locator('#chat-input');
   await input.fill(text);
+  // Dismiss the command-suggest dropdown first: when it's open with a highlighted entry, the shell's
+  // keydown handler treats Enter as "accept the suggestion" (preventDefault) instead of submitting the
+  // form (main.js ~1974). A single Enter on a slash command would be swallowed → no message sent.
+  await input.press('Escape');
   await input.press('Enter');
   await page.waitForTimeout(settleMs);
 }
@@ -93,7 +99,7 @@ test('P3: typed-slash /complete-task <label> resolves the label to a task id and
   expect(latest).not.toMatch(new RegExp(`▢\\s*${LABEL}`, 'i'));
 });
 
-test('P3 (documentation): literal /done <label> is an UNMATCHED slash in the classic shell (unknown-by-design, not the resolver path)', async ({ page }) => {
+test('P3: /done <label> is ALSO a registered label-resolving command (mockAgent markComplete) — handled, never "unknown command"', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', (e) => pageErrors.push(e.message));
 
@@ -104,11 +110,18 @@ test('P3 (documentation): literal /done <label> is an UNMATCHED slash in the cla
     `classic shell threw at boot — the JS never wired up (shell is dead): ${pageErrors.join(' | ')}`,
   ).toEqual([]);
 
-  // `/done` is NOT a registered slash command (only `/complete-task` is); 'done'
-  // is an NL-gate verb that needs an LLM-addressed turn. So `/done x` must route
-  // to the shell's unknown-command path and must NOT crash the shell.
-  await send(page, `/done ${LABEL}`, 2000);
-  expect(await streamText(page)).toMatch(/unknown command|onbekend commando/i);
+  // `/done` IS registered — mockAgent's `markComplete` (a household-chore complete), whose `choreId`
+  // param declares `pickerSource: { listOp: 'listOpen' }`. So `/done <label>` takes the SAME typed-slash
+  // resolver path as `/complete-task` (the label binds via `_match` → `choreId`, then resolves to a
+  // chore id). It must therefore be HANDLED — never the shell's "unknown command" bucket — and must not
+  // crash the shell. (Whether a given label hits a chore is data-dependent; what's invariant is that the
+  // command is recognised and the resolver runs, so "unknown command" must NOT appear.)
+  await send(page, `/done ${LABEL}`, 2500);
+  const afterDone = await streamText(page);
+  expect(
+    afterDone,
+    `/done ${LABEL} surfaced "unknown command" — it should route to mockAgent.markComplete, not the unknown bucket`,
+  ).not.toMatch(/unknown command|onbekend commando/i);
   // Shell still responsive afterwards:
   await send(page, '/me', 2000);
   await expect(page.locator('#messages')).toContainText(/pubKey/i, { timeout: 5_000 });

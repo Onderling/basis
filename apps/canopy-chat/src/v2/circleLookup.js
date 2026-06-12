@@ -33,7 +33,8 @@ function normalizeList(r) {
  * @param {(scope:any, listOp:string)=>any[]} [a.getBase]       platform base candidates (mobile loaded items; web thread cache)
  * @param {(app:string, op:string, args:object)=>Promise<any>} [a.appCallSkill]  3-arg app-routed callSkill for the live fetch
  * @param {()=>(string|null)} [a.scopeId]  override the scope id used for the fetch (web pins this to the active-circle id;
- *                                          mobile omits it → falls back to `scope.id`)
+ *                                          AUTHORITATIVE when provided: null → no-circle scope (default crew,
+ *                                          empty fetch args), never the thread id. Mobile omits it → falls back to `scope.id`.)
  * @returns {(listOp:string, query:string, scope:any, app?:string)=>Promise<Array<{id:string,label:string}>>}
  */
 export function makeCircleLookup({ getBase, appCallSkill, scopeId } = {}) {
@@ -42,8 +43,15 @@ export function makeCircleLookup({ getBase, appCallSkill, scopeId } = {}) {
     const base = (Array.isArray(baseRaw) ? baseRaw : []).map(toCand);
     if (!listOp || !app || typeof appCallSkill !== 'function') return base;
     try {
-      const sid = (typeof scopeId === 'function' ? scopeId() : null)
-        ?? scope?.id ?? (typeof scope === 'string' ? scope : null);
+      // When `scopeId` is PROVIDED (web), its result is AUTHORITATIVE: null means "no circle scope"
+      // (resolve against the member's default crew → empty fetch args), and must NOT fall through to
+      // `scope?.id`. On web `scope` is the THREAD, whose id (e.g. 'main') is not a crew id, so the
+      // old fallback mis-scoped the fetch to a non-existent crew and resolved nothing — the classic
+      // shell's `/complete-task <label>` returned "item not found" (2026-06-12). The `scope?.id`
+      // fallback is only for callers that OMIT `scopeId` (mobile, where `scope` IS the circle).
+      const sid = (typeof scopeId === 'function')
+        ? scopeId()
+        : (scope?.id ?? (typeof scope === 'string' ? scope : null));
       const scopeArgs = sid ? { crewId: sid, circleId: sid, groupId: sid } : {};
       const arr = normalizeList(await appCallSkill(app, listOp, scopeArgs));
       const seen = new Set(base.map((c) => c.id));

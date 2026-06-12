@@ -3,16 +3,31 @@
 *Created 2026-06-11, after a 3-agent deep-dive audit of web (`web/main.js` + `web/v2/circleApp.js`)
 vs mobile (`apps/canopy-chat-mobile/src/screens/`) vs the shared `apps/canopy-chat/src/`.*
 
-> **STATUS 2026-06-11 — the 4 duplicated pairs are SHARED (dedup met); Phase 5 BOT shipped + verified.**
-> Phase 0 SKIPPED. **P1 ✅** `createFeedbackMount` (`12d27b14`). **P2 ✅** `kringBroadcast`. **P3 ✅**
-> `makeCircleLookup` (mobile→web). **P4 ✅** one engine — `circleDispatch` core, `circleTurn` adapter
-> (`d1d35281`). **P5 — BOT ✅ done + headless-Playwright-verified by Claude** (`fce0d68d`): the circle
-> bot runs in `circleApp.js`'s kring composer (`@assistant add/done X` → dispatch + reply). Enabled by
-> fixing a real infinite-loop bug (`showLauncher` self-recursion, `7f88714c`) that hung the headless
-> harness. **P5 FEEDBACK deferred + the 2 web browser-smokes (P1/P3) BLOCKED** on one thing:
-> **feedback-pipeline browser-safety** — the feedback surface's chain isn't browser-safe (`process.env`
-> fixed `dc36e1b5`; `Buffer` in pod/signing pending) and crashes the web shell at boot. Fix it → P1, P3,
-> and P5 kring feedback all unblock (the P5 feedback wiring is written, just gated on it).
+> **STATUS 2026-06-12 — all phases SHARED + browser-verified; P1/P3/P5 smokes green; 2 resolver bugs fixed.**
+> Phase 0 SKIPPED. **P1 ✅** `createFeedbackMount` (`12d27b14`) — browser-smoke green (`feedback-mount.spec.js`).
+> **P2 ✅** `kringBroadcast`. **P3 ✅** `makeCircleLookup` (mobile→web) — browser-smoke green (`done-resolver.spec.js`).
+> **P4 ✅** one engine — `circleDispatch` core, `circleTurn` adapter (`d1d35281`). **P5 ✅** circle bot +
+> feedback in `circleApp.js`'s kring composer, all 4 `circle-kring-bot.spec.js` smokes green.
+>
+> **2026-06-12 — feedback-pipeline browser-safety DONE** (`process.env` `dc36e1b5`; `Buffer`→`TextEncoder`
+> in `pod-client/sealing/envelope.js` `73a642ed`) so the web shell boots. With the shell finally booting
+> headlessly, the P1/P3 smokes ran their bodies for the FIRST time (they used to die at the boot guard)
+> and surfaced **two stacked real bugs** in web's typed-slash label resolver, both now fixed + regression-
+> tested:
+> 1. **circleLookup scope leak** — on a non-circle thread `getActiveCircle()` is null, and the
+>    `?? scope?.id` fallback leaked the THREAD id ('main') as a crewId → live fetch hit a non-existent
+>    crew → `/complete-task <label>` returned "item not found". Fix: `scopeId` is authoritative when
+>    provided (null = default crew). (`circleLookup.js` + unit test.)
+> 2. **`_match` bound too late** — the parser leaves the positional body under `_match`; the router bound
+>    it to the id-param only in `resolveDispatch`, AFTER `resolveTextArgsInPlace` ran, so the resolver saw
+>    no id-param value and never looked the label up. Fix: bind `_match` first in `resolveTextArgsInPlace`
+>    (canonical `bindMatchArg`, now exported).
+>
+> Harness: `playwright.config.js` now injects a dummy `VITE_CIRCLE_LLM_BASEURL` so the circle-bot gate
+> smokes are self-contained (the bot only "engages" when a provider exists; the gate never calls it). Two
+> test-only gaps also fixed: the smokes' `send()` now presses `Escape` before `Enter` (the command-suggest
+> dropdown was swallowing the submit), and the `/done` "documentation" test's premise was corrected (`/done`
+> IS a registered command — mockAgent `markComplete` — that also resolves labels, not an "unknown" slash).
 
 ## The principle (the test of "done")
 The intended model: **logic is written once in `src/` and both shells inject only platform adapters.**

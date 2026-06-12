@@ -1452,6 +1452,18 @@
       "unknown": {
         "text": "I couldn’t turn that into an action.",
         "doc": "Circle bot — could not turn the message into a command."
+      },
+      "ok": {
+        "text": "✓ {{label}}",
+        "doc": "Generic one-line confirmation (verbs other than add/complete)."
+      },
+      "added": {
+        "text": "Added: {{label}}",
+        "doc": "Reply after the circle bot adds an item (verb=add/create)."
+      },
+      "completed": {
+        "text": "Completed: {{label}}",
+        "doc": "Reply after the circle bot completes an item (verb=complete) — distinct from Added."
       }
     },
     "clarify": {
@@ -1462,6 +1474,14 @@
       "notFound": {
         "text": "I couldn’t find “{{query}}” in this circle.",
         "doc": "Circle bot reply when a command target matches NO item in the circle."
+      },
+      "whichMissing": {
+        "text": "Which one do you mean?",
+        "doc": "Circle bot asks the user to choose when a picker command was given with NO value (bare /complete-task); a candidate list follows."
+      },
+      "noneToPick": {
+        "text": "There’s nothing to pick here yet.",
+        "doc": "Shown after whichMissing when the picker's list is empty."
       }
     }
   },

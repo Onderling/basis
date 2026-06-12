@@ -59,6 +59,8 @@ import {
   suggestCommands,
   // Conversational follow-up for needsForm (shared) — ask for a missing field, next message answers.
   beginFollowUp, completeFollowUp,
+  // Shared one-line bot reply (verb-aware Added:/Completed:) + Part D catalog scoping (drops /me etc.).
+  kringReplyText, scopeCatalogToApps,
   // B (circle bot) — dispatch primitives to run an interpreted command in the kring.
   parseInput, resolveDispatch, runDispatch, scopeReadyDispatch,
 } from '@canopy-app/canopy-chat';
@@ -1330,24 +1332,21 @@ function LauncherTile({ circle: c, preview, pending, isPinned = false, isMuted =
 // scaffolding as the per-circle landing surface.  Admin actions
 // (Settings, Mine, ViewAs, …) collapse into a `⋯` overflow menu in the
 // header, gated on the Functies axis (same gates the old grid used).
-// B (circle bot) — a short kring-bubble text from a runDispatch reply. The kring stream renders plain
-// chat bubbles (no rich cards), so commands surface as a one-line confirmation; the command's real
-// effect (task added, etc.) propagates through the substrate to all members.
-function circleReplyText(reply) {
-  if (reply?.error) return t('circle.bot.failed', { msg: reply.error.message || '' });
-  const p = reply?.payload;
-  if (typeof p === 'string' && p.trim()) return p;
-  if (p && typeof p.text === 'string' && p.text.trim()) return p.text;
-  if (p && Array.isArray(p.items)) return t('circle.bot.listed', { n: p.items.length });
-  return t('circle.bot.done');
-}
+// B (circle bot) — the one-line kring-bubble reply text is now the SHARED `kringReplyText` (verb-aware
+// Added:/Completed: phrasing); web + mobile use it so add/complete no longer read identically.
 
 function CircleDetail({
-  circle, items, callSkill, rawCallSkill, catalog, policy, myListTasks = [],
+  circle, items, callSkill, rawCallSkill, catalog: rawCatalog, policy, myListTasks = [],
   eventLog, circles = [],
   recipeStore = null,
   onBack, onSettings, onMine, onViewAs, onAdvisor, onSkills, onFiles, onRules, onRecipes,
 }) {
+  // Part D — scope the bot/suggest catalog to the circle's apps: drops canopy-chat's infra ops (/me etc.)
+  // that the circle bot can't run (they threw `circle.bot.failed`) and keeps them out of the suggest list.
+  const catalog = useMemo(
+    () => (rawCatalog ? scopeCatalogToApps(rawCatalog, policy?.apps) : rawCatalog),
+    [rawCatalog, policy],
+  );
   // P6.1 — Functies-axis gating for the overflow menu items.
   const showRules    = isFeatureEnabled(policy, 'houseRules');
   const showViewAs   = isFeatureEnabled(policy, 'memberDirectory');
@@ -1527,7 +1526,9 @@ function CircleDetail({
     // executed on mobile (device-verify 2026-06-11: logs showed `[callSkill] tasks-v0 →` not `addTask →`).
     try { reply = await runDispatch(scoped, rawCallSkill); }
     catch (e) { appendKringMessage({ actor: 'bot', text: t('circle.bot.failed', { msg: e?.message ?? String(e) }) }); return; }
-    appendKringMessage({ actor: 'bot', text: circleReplyText(reply) });
+    // The op's verb drives Added:/Completed: phrasing (a bare "✓ X" was identical for add + complete).
+    const verb = catalog?.opsById?.get(dispatch.opId)?.op?.verb;
+    appendKringMessage({ actor: 'bot', text: kringReplyText(reply, { verb, t }) });
   }, [catalog, circle?.id, rawCallSkill, appendKringMessage]);
 
   // B (clarification) — candidate source for an id-like param. Base = the circle's already-loaded
@@ -1554,8 +1555,21 @@ function CircleDetail({
       text: t('circle.clarify.which', { query }),
       buttons: candidates.map((c) => ({ id: c.id, label: c.hint ? `${c.label} — ${c.hint}` : c.label })),
     }),
-    askMissing: ({ query }) => appendKringMessage({ actor: 'bot', text: t('circle.clarify.notFound', { query }) }),
-  }), [catalog, circleLookup, runCircleCommandResolved, appendKringMessage]);
+    askMissing: async ({ opId, param, query }) => {
+      // A non-empty label that matched nothing → "couldn't find X". A picker command given with NO value
+      // (bare /complete-task) shouldn't say «couldn't find ''» — list the options to choose from.
+      if (query && query.trim()) { appendKringMessage({ actor: 'bot', text: t('circle.clarify.notFound', { query }) }); return; }
+      const entry = catalog?.opsById?.get(opId);
+      const listOp = (entry?.op?.params || []).find((p) => p.name === param)?.pickerSource?.listOp;
+      let cand = [];
+      try { if (listOp) cand = (await circleLookup(listOp, '', circle?.id, entry?.appOrigin)) || []; } catch { /* keep empty */ }
+      if (cand.length) {
+        appendKringMessage({ actor: 'bot', text: `${t('circle.clarify.whichMissing')}\n${cand.map((c) => `• ${c.label}`).join('\n')}` });
+      } else {
+        appendKringMessage({ actor: 'bot', text: t('circle.clarify.noneToPick') });
+      }
+    },
+  }), [catalog, circleLookup, runCircleCommandResolved, appendKringMessage, circle?.id]);
 
   // B — a tapped candidate button → bind the id + re-run (may resolve, or clarify a further param).
   const onBubbleButton = useCallback((button) => {

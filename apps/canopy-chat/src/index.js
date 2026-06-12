@@ -101,6 +101,8 @@ export { buildCommandPool, suggestCommands, createInputHistory } from './v2/comm
 export { beginFollowUp, beginFormFollowUp, completeFollowUp, completeMultiFieldFollowUp, pickPromptKey } from './v2/followUp.js';
 // Shared one-line kring bot reply text (web + mobile) — verb-aware Added:/Completed: phrasing.
 export { kringReplyText } from './v2/kringReply.js';
+// Part D — scope a circle's catalog to its apps (drops canopy-chat infra ops like /me); web + mobile.
+export { scopeCatalogToApps } from './v2/circleCatalogScope.js';
 // E3 — shared record-panel auto-refresh helpers (web EventRouter + mobile post-mutation).
 export {
   REFRESHABLE_VERBS, panelMatchesItemRef, itemRefFromReply, collectStalePanels,

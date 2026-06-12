@@ -16,7 +16,26 @@
  * are covered by tests).
  */
 
-import { initLocalisation, t, detectDeviceLang } from '../../src/index.js';
+import { initLocalisation, t, detectDeviceLang, currentLang,
+  parseInput, mergeManifests, resolveDispatch, runDispatch, scopeReadyDispatch,
+  canopyChatManifest, AppRegistry, filterCatalog } from '../../src/index.js';
+// Phase 5 — bot + feedback in the kring composer (mirrors mobile CircleLauncherScreen, on the shared
+// engine). The circle bot stack:
+import { mockTasksManifest, mockStoopManifest, mockFolioManifest } from '../../src/core/manifests/mockManifests.js';
+import { calendarManifest } from '@canopy-app/calendar/manifest';
+import { buildCircleLlmProviders } from '../../src/v2/circleLlmProviders.js';
+import { createTokenGate } from '../../src/v2/tokenGate.js';
+import { circleGateRules } from '../../src/v2/circleGate.js';
+import { interpretToCommand } from '../../src/v2/interpretCommand.js';
+import { createCircleDispatch } from '../../src/v2/circleDispatch.js';
+import { createClarifyingDispatch } from '../../src/v2/clarifyingDispatch.js';
+import { makeCircleLookup } from '../../src/v2/circleLookup.js';
+// NOTE: feedback (createFeedbackSurface/Mount) is intentionally NOT imported here — the
+// feedback-pipeline chain is not yet browser-safe (process.env [fixed] + Buffer in pod/signing), which
+// crashes the page at boot. Kring feedback is deferred until that chain is browser-safe (it also blocks
+// the classic shell's P1). The circle BOT below works without it.
+// (localStoragePolicyIo is already imported below with createCirclePolicyStore)
+import { createUserLlmDefaultStore, localStorageUserLlmIo } from '../../src/v2/userLlmDefault.js';
 import { createRealHouseholdAgent } from '../../src/web/realAgent.js';
 import { EventLog } from '../../src/eventLog.js';
 // δ.2 — per-message delivery state for optimistic kring chat sends.
@@ -393,6 +412,110 @@ let circlesCache = [];
 let sources = {};
 let resolveCallSkill = null; // (opId, args) => Promise<object|null>
 let rawCallSkill = null;     // (appOrigin, opId, args) — for createGroupV2
+
+// ── Phase 5 — circle bot + feedback in the kring composer ───────────────────────────────────────
+// Mirrors mobile CircleLauncherScreen on the SHARED engine: createCircleDispatch (gate→interpret→
+// dispatch) + createClarifyingDispatch (label→id) + makeCircleLookup (live fetch) + the token gate +
+// createFeedbackMount. Built once post-agent-boot (buildCircleBot). The bot/feedback render INTO the
+// kring stream via `_kringRender`, a small per-circle bridge that showKring sets each time it opens.
+const CIRCLE_LLM_BASEURL   = import.meta.env?.VITE_CIRCLE_LLM_BASEURL ?? null;
+const CIRCLE_LLM_MODEL     = import.meta.env?.VITE_CIRCLE_LLM_MODEL ?? undefined;
+const CIRCLE_BOT_NAME      = import.meta.env?.VITE_CIRCLE_BOT_NAME ?? 'assistant';
+const CIRCLE_LLM_POLICY    = import.meta.env?.VITE_CIRCLE_LLM_POLICY ?? 'user';
+let circleBot = null;            // createCircleDispatch instance (handle(text, ctx) → {via,cmd})
+let circleClarify = null;        // createClarifyingDispatch (for candidate-button picks, later)
+let _kringRender = null;         // { circleId, botBubble(text), fanOut(msgId,text,ts) } — set by showKring
+
+/** Short one-line bot reply from a runDispatch result (the substrate effect reaches members on its own). */
+function kringReplyText(reply) {
+  if (reply?.error?.message) return t('circle.bot.failed', { msg: reply.error.message });
+  const p = reply?.payload;
+  const label = p?.task?.text ?? p?.title ?? p?.text ?? p?.item?.label ?? p?.name;
+  return label ? `✓ ${label}` : t('circle.bot.done', {}) ;
+}
+
+// Build the bot + feedback once the agent is up (rawCallSkill bound). Stores into the module vars above.
+function buildCircleBot(agent) {
+  // Merged catalog (the LLM tool list + dispatch catalog) — mirrors main.js.
+  const rawCatalog = mergeManifests([
+    { manifest: canopyChatManifest },
+    { manifest: agent.manifest },
+    { manifest: mockTasksManifest },
+    { manifest: mockStoopManifest },
+    { manifest: mockFolioManifest },
+    { manifest: calendarManifest },
+  ], { runtime: 'browser' });
+  const appRegistry = new AppRegistry();
+  appRegistry.syncWithCatalog(rawCatalog.appOrigins);
+  let catalog = filterCatalog(rawCatalog, appRegistry);
+  appRegistry.subscribe(() => { catalog = filterCatalog(rawCatalog, appRegistry); });
+
+  const llmProviders = buildCircleLlmProviders({ localBaseUrl: CIRCLE_LLM_BASEURL, model: CIRCLE_LLM_MODEL });
+  const policyIo = localStoragePolicyIo();
+  let userDefault = { mode: CIRCLE_LLM_BASEURL ? 'local' : 'off' };
+  createUserLlmDefaultStore(localStorageUserLlmIo()).get()
+    .then((v) => { if (v && v.mode !== 'off') userDefault = v; }).catch(() => {});
+  async function policyFor() {
+    const cid = getActiveCircle();
+    if (!cid) return { llmTool: CIRCLE_LLM_POLICY };
+    let raw = null;
+    try { raw = await policyIo.load(cid); } catch { /* defaults */ }
+    return { llmTool: raw && typeof raw.llmTool === 'string' ? raw.llmTool : CIRCLE_LLM_POLICY };
+  }
+
+  // (Kring feedback deferred — see the import note; the feedback-pipeline chain isn't browser-safe yet.)
+
+  // Live, app-qualified label→candidate lookup (no preloaded base here — the kring stream isn't an item
+  // list; the live fetch + the op's appOrigin do the work, scoped to the active circle).
+  const lookup = makeCircleLookup({ getBase: () => [], appCallSkill: rawCallSkill, scopeId: () => getActiveCircle() });
+
+  // Run a fully-resolved {opId,args} against the catalog, scoped to the active circle, then post a reply.
+  async function dispatchReady({ opId, args }) {
+    let route;
+    try { route = resolveDispatch({ kind: 'slash', opId, args: args || {}, command: '(bot)', body: '' }, catalog); }
+    catch { _kringRender?.botBubble(t('circle.bot.unknown')); return; }
+    if (route.kind === 'needsForm') { _kringRender?.botBubble(t('circle.bot.needsInfo')); return; }
+    if (route.kind !== 'ready')     { _kringRender?.botBubble(t('circle.bot.unknown')); return; }
+    let reply;
+    try { reply = await runDispatch(scopeReadyDispatch(route, getActiveCircle()), rawCallSkill); }
+    catch (e) { _kringRender?.botBubble(t('circle.bot.failed', { msg: e?.message ?? String(e) })); return; }
+    _kringRender?.botBubble(kringReplyText(reply));
+  }
+
+  circleClarify = createClarifyingDispatch({
+    catalog: () => catalog,
+    lookup,
+    dispatchReady,
+    // V0: render candidates as text in the kring (interactive candidate buttons are a follow-up).
+    ask: ({ query, candidates }) => _kringRender?.botBubble(
+      `${t('circle.clarify.which', { query })}\n${candidates.map((c) => `• ${c.label}`).join('\n')}`),
+    askMissing: ({ query }) => _kringRender?.botBubble(t('circle.clarify.notFound', { query })),
+  });
+
+  circleBot = createCircleDispatch({
+    catalog: () => catalog,
+    policy: policyFor,
+    userDefault: () => userDefault,
+    llmProviders,
+    interpret: interpretToCommand,
+    // A slash STRING → parse to {opId,args}; the LLM yields {opId,args}. Both flow through the
+    // clarifying dispatch (unique → run; ambiguous → ask).
+    dispatch: (input, ctx) => {
+      let cmd = input;
+      if (typeof input === 'string') {
+        const parsed = catalog ? parseInput(input, catalog) : null;
+        cmd = parsed && parsed.kind === 'slash' && parsed.opId ? { opId: parsed.opId, args: parsed.args || {} } : null;
+      }
+      if (!cmd || !cmd.opId) { _kringRender?.botBubble(t('circle.bot.unknown')); return undefined; }
+      return circleClarify.run(cmd, ctx);
+    },
+    // A normal (non-command) message: fan out the ALREADY-appended optimistic bubble (onSend appended it
+    // + passed its msgId in ctx) — same as mobile.
+    postToKring: (text, ctx) => { if (ctx?.msgId) _kringRender?.fanOut(ctx.msgId, text, ctx.ts); },
+    gate: createTokenGate({ rules: circleGateRules(currentLang()) }),
+    botName: CIRCLE_BOT_NAME,
+  });
+}
 
 // Top-level tab bar (Kringen / Stroom / Mij). Shown on the three top-level
 // surfaces; hidden inside a circle + its sub-screens.
@@ -964,16 +1087,20 @@ function showKring(id, circle, policy) {
         loadScherm();
       },
       onBack:   showLauncher,
-      onSend:   (text) => {
-        // SP-13.2 / SP-13.2.1 — optimistic local append + best-effort
-        // peer fan-out.  The msgId is shared so receiver-side dedup
-        // suppresses any echo if a peer's pseudo-pod re-mirrors.
-        // δ.2 — also tracks delivery state (pending → sent | failed)
-        // so the bubble surfaces a clock / warning icon.
+      onSend:   async (text) => {
+        const line = String(text ?? '').trim();
+        if (!line) return;
+        // Phase 5 — the circle bot routes the turn (gate → interpret → dispatch), with plain messages
+        // fanning out. Bot replies render into the kring stream via _kringRender. (Kring /feedback is
+        // deferred — the feedback-pipeline chain isn't browser-safe yet; see the import note.)
+        // Optimistic local append + best-effort peer fan-out. The msgId is shared so receiver-side dedup
+        // suppresses any echo. δ.2 tracks delivery state (pending → sent | failed) for the bubble icon.
         const msgId = `kring-${id}-${Date.now()}-${(seq += 1).toString(36)}`;
         const ts    = Date.now();
-        eventLog.append(kringChatMessageEvent({ msgId, ts, circleId: id, actor: LOCAL_ACTOR, text }));
-        broadcastFanOut({ msgId, text, ts });
+        eventLog.append(kringChatMessageEvent({ msgId, ts, circleId: id, actor: LOCAL_ACTOR, text: line }));
+        rerender();
+        if (circleBot) { await circleBot.handle(line, { id, msgId, ts }); }
+        else { broadcastFanOut({ msgId, text: line, ts }); }   // fallback before the bot is built
       },
       onAction: (action /*, row */) => {
         // V0: per-row actions just log.  Wiring each (Ik help / Ik doe ze /
@@ -982,6 +1109,17 @@ function showKring(id, circle, policy) {
       },
       more,
     });
+  };
+  // Phase 5 — bridge the (module-level) circle bot + feedback to THIS circle's kring stream, so their
+  // replies render here. Reset each time showKring opens a circle.
+  _kringRender = {
+    circleId: id,
+    botBubble: (text) => {
+      const mid = `kring-${id}-${Date.now()}-${(seq += 1).toString(36)}-bot`;
+      eventLog.append(kringChatMessageEvent({ msgId: mid, ts: Date.now(), circleId: id, actor: 'bot', text }));
+      rerender();
+    },
+    fanOut: (msgId, text, ts) => broadcastFanOut({ msgId, text, ts: ts ?? Date.now() }),
   };
   rerender();
   // EventLog has no subscribe seam yet; SP-13.2.1 will poll-on-event so
@@ -1476,6 +1614,8 @@ async function boot() {
       rawCallSkill = agent.callSkill;
       resolveCallSkill = makeResolvingCallSkill(agent.callSkill);
       sources = circleSourcesFromAgent({ callSkill: resolveCallSkill, circlesStore: agent.circlesStore });
+      // Phase 5 — build the kring composer's bot + feedback now that the agent (and its manifest) is up.
+      try { buildCircleBot(agent); } catch (err) { console.warn('[circleApp] circle bot setup failed:', err?.message ?? err); }
       // SP-13.2.1 — register a peer-router with the kring-chat-message
       // handler + connect the NKN transport (best-effort; no-op when
       // nkn-sdk failed to load).  The ingest hook mirrors the envelope

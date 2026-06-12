@@ -55,6 +55,8 @@ import {
   kringChatMessageEvent, broadcastKringFanOut,
   // Phase 3 — the shared circle label→candidate lookup (base items + app-qualified live fetch).
   makeCircleLookup,
+  // Composer parity — the classic shell's slash-command suggest, shared so mobile renders the same set.
+  suggestCommands,
   // B (circle bot) — dispatch primitives to run an interpreted command in the kring.
   parseInput, resolveDispatch, runDispatch, scopeReadyDispatch,
 } from '@canopy-app/canopy-chat';
@@ -1373,6 +1375,14 @@ function CircleDetail({
     return deliveryStateMapRef.current.get(msgId);
   }, [deliveryTick]);
   const [composerText, setComposerText] = useState('');
+  // Composer parity — slash-command auto-suggest off the merged catalog (shared `suggestCommands`,
+  // same logic + set as web's dropdown). Tapping a row fills the command; the bash-style ArrowUp/Down
+  // history that web also has is a keyboard affordance with no touch-gesture equivalent, so it's
+  // intentionally desktop-only (the suggest list is the mobile parity surface).
+  const suggestMatches = useMemo(
+    () => (catalog ? suggestCommands(catalog, composerText) : []),
+    [catalog, composerText],
+  );
   // SP-13.3 — per-kring bottom tabs derived from policy.features.
   const tabs = useMemo(() => buildKringTabs(policy, t), [policy]);
   const [activeTab, setActiveTab] = useState(DEFAULT_KRING_TAB);
@@ -1778,26 +1788,47 @@ function CircleDetail({
           SP-13.4 — composer suppressed in scherm-mode (recept page is
           not a chat surface). */}
       {viewMode !== 'scherm' ? (
-      <View style={styles.composer} testID="circle-detail-composer">
-        <TextInput
-          style={styles.composerInput}
-          value={composerText}
-          onChangeText={setComposerText}
-          placeholder={t('circle.kring.composer_placeholder')}
-          accessibilityLabel={t('circle.kring.composer_placeholder')}
-          returnKeyType="send"
-          onSubmitEditing={sendKringChat}
-        />
-        <Pressable
-          style={styles.composerSend}
-          accessibilityRole="button"
-          accessibilityLabel={t('circle.kring.send')}
-          testID="circle-detail-composer-send"
-          onPress={sendKringChat}
-        >
-          <Text style={styles.composerSendText}>↑</Text>
-        </Pressable>
-      </View>
+      <>
+        {/* Slash-command auto-suggest — sits above the composer, mirrors the web dropdown. Tap a row
+            to fill the command + a trailing space (then keep typing args). Hidden when there's no
+            "/command" prefix match (suggestCommands closes once a space is typed). */}
+        {suggestMatches.length > 0 ? (
+          <View style={styles.suggest} testID="circle-detail-suggest">
+            {suggestMatches.map((m) => (
+              <Pressable
+                key={m.command}
+                style={styles.suggestItem}
+                accessibilityRole="button"
+                testID={`circle-detail-suggest-${m.opId}`}
+                onPress={() => setComposerText(`${m.command} `)}
+              >
+                <Text style={styles.suggestCmd}>{m.command}</Text>
+                {m.hint ? <Text style={styles.suggestHint} numberOfLines={1}>{m.hint}</Text> : null}
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+        <View style={styles.composer} testID="circle-detail-composer">
+          <TextInput
+            style={styles.composerInput}
+            value={composerText}
+            onChangeText={setComposerText}
+            placeholder={t('circle.kring.composer_placeholder')}
+            accessibilityLabel={t('circle.kring.composer_placeholder')}
+            returnKeyType="send"
+            onSubmitEditing={sendKringChat}
+          />
+          <Pressable
+            style={styles.composerSend}
+            accessibilityRole="button"
+            accessibilityLabel={t('circle.kring.send')}
+            testID="circle-detail-composer-send"
+            onPress={sendKringChat}
+          >
+            <Text style={styles.composerSendText}>↑</Text>
+          </Pressable>
+        </View>
+      </>
       ) : null}
 
       {/* SP-13.3 — per-kring bottom tab bar (derived from policy.features).
@@ -2105,6 +2136,11 @@ const styles = StyleSheet.create({
   composerInput:    { flex: 1, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: theme.color.line, borderRadius: 22, backgroundColor: theme.color.white, fontSize: 14, color: theme.color.ink },
   composerSend:     { width: 36, height: 36, borderRadius: 18, backgroundColor: theme.color.accent, alignItems: 'center', justifyContent: 'center' },
   composerSendText: { color: theme.color.white, fontSize: 18, fontWeight: '700' },
+  // Slash-command auto-suggest list above the composer (web↔mobile parity with the classic dropdown).
+  suggest:          { borderWidth: 1, borderColor: theme.color.line, borderRadius: 12, backgroundColor: theme.color.card, paddingVertical: 4, marginBottom: 6 },
+  suggestItem:      { flexDirection: 'row', alignItems: 'baseline', gap: 10, paddingVertical: 6, paddingHorizontal: 12 },
+  suggestCmd:       { fontFamily: theme.font?.mono ?? undefined, color: theme.color.accent, fontWeight: '600', fontSize: 13 },
+  suggestHint:      { color: theme.color.inkSoft, fontSize: 12, flexShrink: 1 },
   // SP-13.3 — per-kring bottom tab bar + tab-coming placeholder.
   kringTabs:        { flexDirection: 'row', borderTopWidth: 1, borderTopColor: theme.color.line, marginTop: 4 },
   kringTab:         { flex: 1, paddingVertical: 12, alignItems: 'center', borderTopWidth: 2, borderTopColor: 'transparent', marginTop: -1 },

@@ -55,6 +55,10 @@ import { householdManifest }                       from '../manifest.js';
 import { HouseholdAgent }                          from '../src/HouseholdAgent.js';
 import { MockBridge }                              from '../src/bridges/MockBridge.js';
 import { InMemoryStore }                           from '../src/storage/InMemoryStore.js';
+import { LlmClient }                               from '../src/llm/LlmClient.js';
+import { ollamaProvider }                          from '../src/llm/providers/ollama.js';
+import { openaiProvider }                          from '../src/llm/providers/openai.js';
+import { anthropicProvider }                       from '../src/llm/providers/anthropic.js';
 import {
   addItem,
   listOpen,
@@ -328,6 +332,34 @@ async function loadWebAdapterFiles() {
 }
 
 // ── CLI entry ─────────────────────────────────────────────────────────
+// Build an LlmClient from the HOUSEHOLD_LLM_* env (the SAME contract as the CLI/smoke scripts —
+// cli-freetext.js, tg-smoke.js), so `npm run web` can drive free-text chat through a real model.
+// For a local Privatemode proxy: HOUSEHOLD_LLM_PROVIDER=openai, HOUSEHOLD_LLM_BASE_URL=http://localhost:8080/v1,
+// OPENAI_API_KEY=<any non-empty — the proxy holds the project key>. Null when HOUSEHOLD_DISABLE_LLM=1
+// (or provider build fails upstream) → the chat skill stays on the regex fast-path (the pre-A.4 V0).
+function buildLlmFromEnv() {
+  if (process.env.HOUSEHOLD_DISABLE_LLM === '1') return null;
+  const id = (process.env.HOUSEHOLD_LLM_PROVIDER ?? 'ollama').toLowerCase();
+  let provider;
+  if (id === 'ollama') {
+    provider = ollamaProvider({ baseUrl: process.env.HOUSEHOLD_LLM_BASE_URL, model: process.env.HOUSEHOLD_LLM_MODEL });
+  } else if (id === 'openai') {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) throw new Error('OPENAI_API_KEY required when HOUSEHOLD_LLM_PROVIDER=openai (for a local Privatemode proxy any non-empty value works — the proxy holds the project key).');
+    provider = openaiProvider({ apiKey, baseUrl: process.env.HOUSEHOLD_LLM_BASE_URL, model: process.env.HOUSEHOLD_LLM_MODEL });
+  } else if (id === 'anthropic') {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) throw new Error('ANTHROPIC_API_KEY required when HOUSEHOLD_LLM_PROVIDER=anthropic');
+    provider = anthropicProvider({ apiKey, baseUrl: process.env.HOUSEHOLD_LLM_BASE_URL, model: process.env.HOUSEHOLD_LLM_MODEL });
+  } else {
+    throw new Error(`Unknown HOUSEHOLD_LLM_PROVIDER: ${id} (ollama | openai | anthropic)`);
+  }
+  return new LlmClient({
+    provider,
+    audit: (e) => console.error(`[llm.audit ${e.kind === 'llm.invoke.error' ? 'ERR' : 'OK '}] ${e.providerId} ${e.kind}`),
+  });
+}
+
 const isMain = fileURLToPath(import.meta.url) === process.argv[1];
 if (isMain) {
   const { values } = parseArgs({
@@ -340,10 +372,12 @@ if (isMain) {
   const port  = values.port ? Number(values.port) : 0;
   const actor = values.actor ?? DEFAULT_ACTOR;
 
-  const handle = await startHouseholdWeb({ port, actor });
+  const llm = buildLlmFromEnv();
+  const handle = await startHouseholdWeb({ port, actor, llm });
   console.log(`Household web UI ready at ${handle.url}`);
   console.log(`  actor:    ${actor}`);
   console.log(`  app:      ${handle.navModel.app}`);
+  console.log(`  llm:      ${llm ? `${process.env.HOUSEHOLD_LLM_PROVIDER ?? 'ollama'} / ${process.env.HOUSEHOLD_LLM_MODEL ?? '(provider default)'}${process.env.HOUSEHOLD_LLM_BASE_URL ? ` @ ${process.env.HOUSEHOLD_LLM_BASE_URL}` : ''}` : 'OFF (regex fast-path only — set HOUSEHOLD_LLM_PROVIDER)'}`);
   console.log(`  sections: ${handle.navModel.sections.map((s) => s.id).join(', ')}`);
 
   process.on('SIGINT',  shutdown);

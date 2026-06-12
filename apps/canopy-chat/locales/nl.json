@@ -1628,7 +1628,25 @@
       "notFound": {
         "text": "Ik kon “{{query}}” niet vinden in deze kring.",
         "doc": "Circle bot reply when a free-text command target matches NO item in the circle."
+      },
+      "whichMissing": {
+        "text": "Welke bedoel je?",
+        "doc": "Circle bot asks the user to choose when a picker command was given with NO value; a candidate list follows."
+      },
+      "noneToPick": {
+        "text": "Er is hier nog niets om uit te kiezen.",
+        "doc": "Shown after whichMissing when the picker's list is empty."
       }
+    },
+    "bot": {
+      "ok":        { "text": "✓ {{label}}", "doc": "Generic one-line confirmation (verbs other than add/complete)." },
+      "added":     { "text": "Toegevoegd: {{label}}", "doc": "Reply after the circle bot adds an item (verb=add/create)." },
+      "completed": { "text": "Afgerond: {{label}}", "doc": "Reply after the circle bot completes an item (verb=complete)." },
+      "done":      { "text": "Klaar.", "doc": "Circle-bot confirmation when the reply has no specific label." },
+      "listed":    { "text": "{{n}} item(s) gevonden.", "doc": "Circle-bot reply for a list command." },
+      "failed":    { "text": "Dat lukte niet: {{msg}}", "doc": "Circle-bot reply when the dispatch threw." },
+      "needsInfo": { "text": "Ik heb daar iets meer detail voor nodig.", "doc": "Circle-bot reply for a multi-field needsForm." },
+      "unknown":   { "text": "Ik kon daar geen actie van maken.", "doc": "Circle-bot reply when the input didn't resolve to a known command." }
     }
   },
   "common": {

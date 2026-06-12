@@ -1628,7 +1628,25 @@
       "notFound": {
         "text": "I couldn’t find “{{query}}” in this circle.",
         "doc": "Circle bot reply when a free-text command target matches NO item in the circle."
+      },
+      "whichMissing": {
+        "text": "Which one do you mean?",
+        "doc": "Circle bot asks the user to choose when a picker command was given with NO value (bare /complete-task); a candidate list follows."
+      },
+      "noneToPick": {
+        "text": "There’s nothing to pick here yet.",
+        "doc": "Shown after whichMissing when the picker's list is empty (no open items to choose)."
       }
+    },
+    "bot": {
+      "ok":        { "text": "✓ {{label}}", "doc": "Generic one-line confirmation for a dispatched circle-bot command (verbs other than add/complete)." },
+      "added":     { "text": "Added: {{label}}", "doc": "Reply after the circle bot adds an item (verb=add/create)." },
+      "completed": { "text": "Completed: {{label}}", "doc": "Reply after the circle bot completes an item (verb=complete) — distinct from Added." },
+      "done":      { "text": "Done.", "doc": "Circle-bot confirmation when the reply has no specific label." },
+      "listed":    { "text": "Found {{n}} item(s).", "doc": "Circle-bot reply for a list command." },
+      "failed":    { "text": "That didn’t work: {{msg}}", "doc": "Circle-bot reply when the dispatch threw (e.g. an infra op like /me that a circle can't run)." },
+      "needsInfo": { "text": "I need a bit more detail for that.", "doc": "Circle-bot reply for a multi-field needsForm (single-field uses the conversational follow-up)." },
+      "unknown":   { "text": "I couldn’t turn that into an action.", "doc": "Circle-bot reply when the input didn't resolve to a known command." }
     }
   },
   "common": {

@@ -32,6 +32,8 @@ import { createClarifyingDispatch } from '../../src/v2/clarifyingDispatch.js';
 import { makeCircleLookup } from '../../src/v2/circleLookup.js';
 import { createInputHistory } from '../../src/v2/commandSuggest.js';
 import { beginFollowUp, completeFollowUp } from '../../src/v2/followUp.js';
+import { kringReplyText } from '../../src/v2/kringReply.js';
+import { scopeCatalogToApps } from '../../src/v2/circleCatalogScope.js';
 import { createFeedbackSurface } from '../../src/feedback/feedbackSurface.js';
 import { createFeedbackMount } from '../../src/feedback/feedbackMount.js';
 // (localStoragePolicyIo is already imported below with createCirclePolicyStore)
@@ -434,13 +436,7 @@ let _kringRender = null;         // { circleId, botBubble(text), fanOut(msgId,te
 // (the classic shell keeps a single global history too). Web↔mobile parity via the shared helper.
 const kringInputHistory = createInputHistory();
 
-/** Short one-line bot reply from a runDispatch result (the substrate effect reaches members on its own). */
-function kringReplyText(reply) {
-  if (reply?.error?.message) return t('circle.bot.failed', { msg: reply.error.message });
-  const p = reply?.payload;
-  const label = p?.task?.text ?? p?.title ?? p?.text ?? p?.item?.label ?? p?.name;
-  return label ? `✓ ${label}` : t('circle.bot.done', {}) ;
-}
+// (kringReplyText is now the shared `src/v2/kringReply.js` — verb-aware Added:/Completed: phrasing.)
 
 // Build the bot + feedback once the agent is up (rawCallSkill bound). Stores into the module vars above.
 function buildCircleBot(agent) {
@@ -455,9 +451,12 @@ function buildCircleBot(agent) {
   ], { runtime: 'browser' });
   const appRegistry = new AppRegistry();
   appRegistry.syncWithCatalog(rawCatalog.appOrigins);
-  let catalog = filterCatalog(rawCatalog, appRegistry);
+  // Scope to the circle apps (Part D) — drops canopy-chat's account/transport INFRA ops (`/me` etc.) that
+  // the circle bot can't actually run (they threw `circle.bot.failed` when dispatched, 2026-06-12) and
+  // keeps them out of the slash-suggest dropdown. Default scope = the 5 circle apps (DEFAULT_CIRCLE_ORIGINS).
+  let catalog = scopeCatalogToApps(filterCatalog(rawCatalog, appRegistry));
   circleCatalog = catalog;        // expose to showKring's composer (slash-suggest)
-  appRegistry.subscribe(() => { catalog = filterCatalog(rawCatalog, appRegistry); circleCatalog = catalog; });
+  appRegistry.subscribe(() => { catalog = scopeCatalogToApps(filterCatalog(rawCatalog, appRegistry)); circleCatalog = catalog; });
 
   const llmProviders = buildCircleLlmProviders({ localBaseUrl: CIRCLE_LLM_BASEURL, model: CIRCLE_LLM_MODEL });
   const policyIo = localStoragePolicyIo();
@@ -473,15 +472,17 @@ function buildCircleBot(agent) {
   }
 
   // Feedback — bubbles render into the kring stream (the mount wraps a surface; appendBotBubble routes
-  // to the current kring's botBubble). The composer already shows the user's line, so appendUserBubble
-  // is a no-op (parity with web's classic-shell adoption).
+  // to the current kring's botBubble). appendUserBubble ECHOES the user's line (matches mobile): in this
+  // composer the feedback mount gets first refusal BEFORE the optimistic append, so without this the
+  // user's feedback messages vanished until /feedback-stop (2026-06-12). The echo is local-only (not
+  // fanned out to peers), so a private feedback message isn't broadcast to the circle.
   const feedbackSurface = createFeedbackSurface({
     llmBaseURL: FEEDBACK_LLM_BASEURL,
     emit: ({ text }) => { if (text) _kringRender?.botBubble(text); },
   });
   circleFeedbackMount = createFeedbackMount({
     surface: feedbackSurface,
-    appendUserBubble: () => {},
+    appendUserBubble: (_tid, text) => { if (text) _kringRender?.userBubble(text); },
     appendBotBubble:  (_tid, text) => _kringRender?.botBubble(text),
   });
 
@@ -507,7 +508,9 @@ function buildCircleBot(agent) {
     let reply;
     try { reply = await runDispatch(scopeReadyDispatch(route, getActiveCircle()), rawCallSkill); }
     catch (e) { _kringRender?.botBubble(t('circle.bot.failed', { msg: e?.message ?? String(e) })); return; }
-    _kringRender?.botBubble(kringReplyText(reply));
+    // The op's verb drives Added:/Completed: phrasing (a bare "✓ X" was identical for add + complete).
+    const verb = catalog?.opsById?.get(route.opId)?.op?.verb;
+    _kringRender?.botBubble(kringReplyText(reply, { verb, t }));
   }
   circleDispatchReady = dispatchReady;   // expose so onSend can run a completed follow-up
 
@@ -518,7 +521,20 @@ function buildCircleBot(agent) {
     // V0: render candidates as text in the kring (interactive candidate buttons are a follow-up).
     ask: ({ query, candidates }) => _kringRender?.botBubble(
       `${t('circle.clarify.which', { query })}\n${candidates.map((c) => `• ${c.label}`).join('\n')}`),
-    askMissing: ({ query }) => _kringRender?.botBubble(t('circle.clarify.notFound', { query })),
+    askMissing: async ({ opId, param, query }) => {
+      // A non-empty label that matched nothing → "couldn't find X". But a picker command given with NO
+      // value (bare `/complete-task`) shouldn't say "couldn't find '' " — list the options to choose from.
+      if (query && query.trim()) { _kringRender?.botBubble(t('circle.clarify.notFound', { query })); return; }
+      const entry = catalog?.opsById?.get(opId);
+      const listOp = (entry?.op?.params || []).find((p) => p.name === param)?.pickerSource?.listOp;
+      let items = [];
+      try { if (listOp) items = (await lookup(listOp, '', getActiveCircle(), entry?.appOrigin)) || []; } catch { /* keep empty */ }
+      if (items.length) {
+        _kringRender?.botBubble(`${t('circle.clarify.whichMissing')}\n${items.map((c) => `• ${c.label}`).join('\n')}`);
+      } else {
+        _kringRender?.botBubble(t('circle.clarify.noneToPick'));
+      }
+    },
   });
 
   circleBot = createCircleDispatch({
@@ -1165,6 +1181,13 @@ function showKring(id, circle, policy) {
     botBubble: (text) => {
       const mid = `kring-${id}-${Date.now()}-${(seq += 1).toString(36)}-bot`;
       eventLog.append(kringChatMessageEvent({ msgId: mid, ts: Date.now(), circleId: id, actor: 'bot', text }));
+      rerender();
+    },
+    // Local echo of the user's own line (used by the feedback mount, which consumes the message before the
+    // composer's optimistic append). Local-only — NOT fanned out to peers.
+    userBubble: (text) => {
+      const mid = `kring-${id}-${Date.now()}-${(seq += 1).toString(36)}-me`;
+      eventLog.append(kringChatMessageEvent({ msgId: mid, ts: Date.now(), circleId: id, actor: LOCAL_ACTOR, text }));
       rerender();
     },
     fanOut: (msgId, text, ts) => broadcastFanOut({ msgId, text, ts: ts ?? Date.now() }),

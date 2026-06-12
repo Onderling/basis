@@ -3,13 +3,16 @@
 *Created 2026-06-11, after a 3-agent deep-dive audit of web (`web/main.js` + `web/v2/circleApp.js`)
 vs mobile (`apps/canopy-chat-mobile/src/screens/`) vs the shared `apps/canopy-chat/src/`.*
 
-> **STATUS 2026-06-11 — the 4 duplicated pairs are now SHARED; the dedup goal is met.**
-> Phase 0 SKIPPED (modules kept — tested, not dead). **Phase 1 ✅** web adopts `createFeedbackMount`
-> (`12d27b14`). **Phase 2 ✅** shared `kringBroadcast` (`broadcastKringFanOut`+`kringChatMessageEvent`).
-> **Phase 3 ✅** shared `makeCircleLookup` (mobile's live lookup → web). **Phase 4 ✅** one engine —
-> `circleDispatch` is the core, `circleTurn` a thin adapter (`d1d35281`). All verified (suite 2296,
-> web build, mobile device). **Phase 5 (web kring composer bot/feedback) is the only remainder — it's
-> NET-NEW web feature work, not dedup.** Owed: 2 web browser smokes (P1 feedback, P3 `/done <label>`).
+> **STATUS 2026-06-11 — the 4 duplicated pairs are SHARED (dedup met); Phase 5 BOT shipped + verified.**
+> Phase 0 SKIPPED. **P1 ✅** `createFeedbackMount` (`12d27b14`). **P2 ✅** `kringBroadcast`. **P3 ✅**
+> `makeCircleLookup` (mobile→web). **P4 ✅** one engine — `circleDispatch` core, `circleTurn` adapter
+> (`d1d35281`). **P5 — BOT ✅ done + headless-Playwright-verified by Claude** (`fce0d68d`): the circle
+> bot runs in `circleApp.js`'s kring composer (`@assistant add/done X` → dispatch + reply). Enabled by
+> fixing a real infinite-loop bug (`showLauncher` self-recursion, `7f88714c`) that hung the headless
+> harness. **P5 FEEDBACK deferred + the 2 web browser-smokes (P1/P3) BLOCKED** on one thing:
+> **feedback-pipeline browser-safety** — the feedback surface's chain isn't browser-safe (`process.env`
+> fixed `dc36e1b5`; `Buffer` in pod/signing pending) and crashes the web shell at boot. Fix it → P1, P3,
+> and P5 kring feedback all unblock (the P5 feedback wiring is written, just gated on it).
 
 ## The principle (the test of "done")
 The intended model: **logic is written once in `src/` and both shells inject only platform adapters.**

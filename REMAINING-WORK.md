@@ -83,16 +83,28 @@ Detail: `apps/canopy-chat/docs/circle-bot-token-gate-TODO.md` · `[[project-circ
   (the 2 "dead" modules `circleLlmRoutes`/`groupsIndex` are tested-but-unwired — KEPT per Frits).
   **Remaining = Phase 5 only** (below) + 2 web browser-smokes. Plan + P5 assembly spec:
   `apps/canopy-chat/docs/web-mobile-consolidation-plan.md`.
-- **Consolidation Phase 5 — bot+feedback in web's kring composer** **[code-ready spec; NEEDS A BROWSER]**
-  — NET-NEW web feature (not dedup): `circleApp.js` (the v2 launcher / index.html) has the agent + kring
-  fan-out but NO bot stack. Assemble the now-shared pieces (catalog/LLM/gate/feedback mount/lookup/
-  clarify/`createCircleDispatch`) into its `onSend`, rendering bot output into the kring stream — the web
-  analog of mobile `CircleLauncherScreen` (~150 lines). Logic risk low (all pieces shared+tested),
-  integration risk real → **must be browser-verified, not shipped blind.** Precise 9-step assembly spec
-  + 4-line smoke in the plan doc (Phase 5). Do it WITH a browser open.
-- **Web browser-smokes owed** **[needs a desktop browser]** — (a) P1 feedback flow
-  (`/feedback → text → /klaar → /feedback-stop`); (b) P3 `/done <label>` (web typed-slash now uses the
-  shared live resolver). Both low-risk by design; just unverified because web has no headless harness here.
+- **Consolidation Phase 5 — bot in web's kring composer** **[✅ BOT DONE + browser-verified 2026-06-11
+  (`fce0d68d`); feedback DEFERRED]** — `circleApp.js` (v2 launcher) now assembles the shared engine
+  (catalog/LLM/gate/`makeCircleLookup`/clarify/`createCircleDispatch`) into its `onSend`, rendering bot
+  replies into the kring stream via a per-circle `_kringRender` bridge. **Headless Playwright-verified
+  by Claude** (not blind): `@assistant add X` → user bubble + `bot ✓ X` (addTask dispatched);
+  `@assistant done X` → resolved + completed, no "item not found". **Verification became possible after
+  fixing a real bug** — `showLauncher` infinitely re-rendered (self-recursion) and hung headless
+  (`7f88714c`). **Kring FEEDBACK is deferred** — importing the feedback surface pulls in the
+  feedback-pipeline chain which isn't browser-safe (crashed circleApp at boot); see next item.
+- **Feedback-pipeline browser-safety** **[code-ready; BLOCKS P1 + P3 + kring feedback]** — the browser
+  feedback surface statically imports the feedback-pipeline chain, which is Node-oriented and crashes
+  the web shell at boot. Two issues: (1) `config.js` `process.env` — **FIXED** (`dc36e1b5`, browser
+  guard); (2) `Buffer` in `pod/signing.js`/`css-auth.js` — **PENDING** (find the top-level eval, guard
+  it like ollama.js; check for further Node-isms). Fixing it unblocks all three: classic-shell P1/P3
+  smokes + Phase-5 kring feedback (wire `createFeedbackMount` into `circleApp.js` onSend — the code is
+  ready, just gated on this). master's classic shell is broken the same way today.
+- **Web browser-smokes** **[smokes WRITTEN; blocked on feedback-pipeline browser-safety]** — P1
+  (`test-browser/feedback-mount.spec.js`) + P3 (`done-resolver.spec.js`) drive `/classic.html` but fail
+  at their boot guard (the shell crashes — see above). Static analysis confirmed both wirings correct;
+  they should pass once the chain is browser-safe. P3 note: the classic typed-slash is `/complete-task
+  <label>` (literal `/done` is an NL-gate verb, unmatched-by-design). The Playwright HARNESS itself now
+  works (the loop fix) — `test-browser/circle-kring-bot.spec.js` is the green Phase-5 example.
 - **Smoke checkpoints owed** **[blocked: device/manual]** — web smoke for the 2026-05-24 wave
   (#218/#219/#231.*), first canopy-chat-mobile Android boot, tasks/stoop-mobile screens (#226–#228).
   (Mobile circle-bot boot now DONE — device run 2026-06-10.)

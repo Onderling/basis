@@ -17,6 +17,8 @@ test('launcher renders + "+ new circle" creates a circle that then appears', asy
   page.on('dialog', (d) => d.accept('Test Circle'));
 
   await page.goto('/');
+  // '/' lands on the Stroom (screens) tab; the launcher lives under the Kringen tab.
+  await page.locator('[data-tab="kringen"]').click();
   await expect(page.locator('.circle-launcher__title')).toBeVisible({ timeout: LONG });
 
   await page.locator('.circle-launcher__new').click();
@@ -32,6 +34,8 @@ test('opening a circle shows its detail and back returns to the launcher', async
   page.on('dialog', (d) => d.accept('Detail Circle'));
 
   await page.goto('/');
+  // '/' lands on the Stroom (screens) tab; the launcher lives under the Kringen tab.
+  await page.locator('[data-tab="kringen"]').click();
   await expect(page.locator('.circle-launcher__title')).toBeVisible({ timeout: LONG });
   await page.locator('.circle-launcher__new').click();
 
@@ -39,7 +43,9 @@ test('opening a circle shows its detail and back returns to the launcher', async
   await expect(tile).toBeVisible({ timeout: LONG });
   await tile.click();
 
-  await expect(page.locator('.circle-detail__title')).toBeVisible();
-  await page.locator('.circle-detail__back').click();
-  await expect(page.locator('.circle-launcher__title')).toBeVisible();
+  // SP-13: a tile opens the KRING view (chat IS the kring view); the old action-grid CircleDetail
+  // (.circle-detail__*) was replaced as the per-circle landing surface by showKring.
+  await expect(page.locator('.circle-kring__title')).toBeVisible({ timeout: LONG });
+  await page.locator('.circle-kring__back').click();
+  await expect(page.locator('.circle-launcher__title')).toBeVisible({ timeout: LONG });
 });

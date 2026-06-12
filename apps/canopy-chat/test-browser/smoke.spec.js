@@ -28,6 +28,9 @@ test('chat shell loads + dispatches /me', async ({ page }) => {
   // exact content (identity changes per run); just that a reply
   // bubble lands.
   await input.fill('/me');
+  // The classic shell's command-suggest dropdown (#199) swallows a lone Enter — it accepts the
+  // highlighted suggestion instead of submitting. Dismiss it first so the form actually submits.
+  await input.press('Escape');
   await input.press('Enter');
 
   // Wait up to 5s for SOME message text containing 'pubKey' (the

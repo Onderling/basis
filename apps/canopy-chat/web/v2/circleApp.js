@@ -557,6 +557,8 @@ function buildCircleBot(agent) {
     // A normal (non-command) message: fan out the ALREADY-appended optimistic bubble (onSend appended it
     // + passed its msgId in ctx) — same as mobile.
     postToKring: (text, ctx) => { if (ctx?.msgId) _kringRender?.fanOut(ctx.msgId, text, ctx.ts); },
+    // Addressed the bot, but the LLM mapped it to no tool → reply instead of going silent.
+    onNoMatch: () => { _kringRender?.botBubble(t('circle.bot.unknown')); },
     gate: createTokenGate({ rules: circleGateRules(currentLang()) }),
     botName: CIRCLE_BOT_NAME,
   });

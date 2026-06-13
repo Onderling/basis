@@ -29,7 +29,7 @@ import { scopeCatalogToApps } from './circleCatalogScope.js';
  * @param {object} [a.gate]   optional token gate ({ evaluate })
  * @param {string} [a.botName='assistant']
  */
-export function createCircleDispatch({ catalog, policy, userDefault, llmProviders, interpret, dispatch, postToKring, onUnhandled, dispatchSlash = true, gate, botName = 'assistant' }) {
+export function createCircleDispatch({ catalog, policy, userDefault, llmProviders, interpret, dispatch, postToKring, onUnhandled, onNoMatch, dispatchSlash = true, gate, botName = 'assistant' }) {
   if (typeof dispatch !== 'function') {
     throw new Error('createCircleDispatch: dispatch is required');
   }
@@ -83,6 +83,10 @@ export function createCircleDispatch({ catalog, policy, userDefault, llmProvider
           await dispatch({ opId: cmd.opId, args: cmd.args && typeof cmd.args === 'object' ? cmd.args : {} }, ctx);
           return { via: 'llm', cmd };
         }
+        // The LLM ran but mapped the message to NO tool. Don't go silent — the user addressed the bot and
+        // deserves an answer. Let the shell reply ("I couldn't turn that into an action") via onNoMatch;
+        // only fall through to the chat sink if the shell didn't wire one (back-compat).
+        if (typeof onNoMatch === 'function') { await onNoMatch(stripped, ctx); return { via: 'llm-nomatch' }; }
         // the LLM couldn't map it to a command → fall through to the sink.
       }
 

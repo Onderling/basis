@@ -26,6 +26,61 @@ creds / a decision / hardware / a device · **[optional]** = breadth, not launch
 
 ---
 
+## Roadmap themes (categorized) — 2026-06-13
+*A "why / in what order" lens over the tactical §1–§7 below, with new directional ideas folded in
+(Frits 2026-06-13). The §§ keep the per-item status; this groups them + states the north star.*
+
+### A. Vision — from apps to building blocks *(explorative; reframes everything else)*
+The shift from **app-oriented** to **function / building-block-oriented** (`functie/bouwsteen-georiënteerd`).
+A user should never open a "feedback app" or type `/feedback` — instead **everything a capability needs is
+already integrated, client-side, into the canopy-chat surface.** Feedback (and tasks, stoop, folio, …)
+stop being separate shells and become functions woven into the chat/kring. This is the north star the
+manifest endgame (§6) and dissolve-apps direction ([[project-dissolve-apps-into-canopy-chat]],
+[[reference-mock-vs-real-manifests]]) already aim at — now stated as the organizing principle. It ranks
+the §6/§7 work and the "no more `/feedback`" reframing. *Status: direction, not a single task.*
+
+### B. AI as the interface *(the path that makes A usable)*
+Rather than (only) mini-menus + slash commands, an **AI/chatbot leads the user through** — especially the
+harder surfaces. Two concrete shapes:
+- **Guided setup via a settings chatbot** *(new)* — in the canopy-app **settings**, a bot walks you
+  through configuration, driven by **templates that canopy HQ updates remotely (open source).** So the
+  onboarding/config flows + copy improve without shipping an app release.
+- **AI-assist where the mini-menus are** *(new)* — wherever there's an inline mini-menu today (the
+  `surfaces.ui` / inline-keyboard surface = §7 Part E), offer **AI assistance instead of / beside it,
+  depending on the user** (novice → the AI guides; power user → keeps menus/slash). Same manifest op,
+  a different rendered affordance per user. Rides on §7 (manifest-driven surfaces, Part E) + the
+  circle-bot LLM plumbing built this session.
+
+### C. Circle-bot UX & trust *(near-term; makes the bot feel natural + safe)*
+- **Conversation context (memory)** — follow-ups ("en schoenen ook", "remove the milk", "that one")
+  resolve by threading recent kring turns into `interpret`'s existing `context`. §2; the #1 UX lever, and
+  the small circle-bot-local slice of the household memory uplift (§3 / F below).
+- **AI bubble scope — "only you" vs "whole kring"** *(new)* — an AI reply must make clear **whether it's
+  private to you or posted to the entire kring.** Today bot reply bubbles render LOCALLY (not fanned out —
+  verified), but a confidential answer and a broadcast one look identical, and a bot ACTION (`addItem`)
+  still propagates to members via the substrate even when its bubble doesn't. Add a visible scope marker
+  (e.g. an "only you" vs "kring" tag/icon) on AI bubbles. Trust + privacy, not polish.
+- **Multi-field inline form** — the one composer-parity follow-up (lift mobile's `MultiFieldFormBubble`).
+
+### D. Engineering — code-ready, momentum *(no creds/decisions)*
+Folio-dissolve verify (§7-G) · P3 3.3c-b household membership (§4) · category-floors e2e LLM re-run (§1) ·
+consolidate the **remaining** shared locale blocks (`chat`/`common`/`reply`/… the same way `circle` was).
+Quick wins that keep the substrate clean.
+
+### E. Decisions & blocked-on-you
+- **Decision:** household chat-agent prompt — make v3 the freeform default? (§3)
+- **Blocked:** M14 creds · M15 crisis-response design call (launch-gating) · 2-pod verify (env) · M7/M8 TEE (hardware).
+
+### F. Foundational / large *(the substrate A + B ride on)*
+- **§6 manifest endgame (SP-3b/6)** — every surface (web/mobile/chat) manifest-driven. The technical
+  enabler of "building-block-oriented" (A) and per-user affordances (B).
+- **§7 gate/surface unification** — Part A (engine → `@canopy/manifest-host`), E (inline menus ← feeds B),
+  G (reconcile real↔mock manifests — the "no separate apps" plumbing ← feeds A), F-retrieve.
+- **Household memory/tool-use uplift (§3)** — the research track (store / vector) behind conversation
+  context (C) and a smarter AI interface (B).
+
+---
+
 ## 1. Feedback pipeline (M-phases)
 Detail: `feedback-pipeline-todo-en.md` · `apps/feedback-pipeline/docs/`
 

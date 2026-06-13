@@ -134,6 +134,12 @@ Each workstream is gated by the enforcement (W0) so the seams stay honest as we 
 - **W6 · Personal-server placement** *(opt-in topology above)* — the placement spectrum; the mobile-perf +
   user-installable-add-ons endpoint. Default stays local.
 
+- **Capabilities & where functionality lives** — the personal-server topology (W6) and the *kring-admin-apps*
+  idea (admin installs a bundle → it joins the kring as an agent → ops run at the admin OR decompose to members'
+  atomic capabilities; private apps = a kring of one) unify into ONE model: capabilities granted within a kring,
+  atoms placed by trust + latency. Worked out (with the Google-Play/App-Store read + realisation steps) in
+  **`future-thoughts.md`**.
+
 Themes A–C below are the genuinely-new *what*; this spine is the *how + order*. **Step 0 (fitness functions) is the first move.**
 
 ### A. Building blocks = `{opId,args}` + a manifest *(this IS the model, not a separate task)*

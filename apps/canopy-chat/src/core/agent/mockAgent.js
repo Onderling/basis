@@ -38,19 +38,40 @@ const SEED_CHORES = [
  * manifest's relevant ops; declarations only — the mock agent
  * provides the skill implementations.
  */
+// SP-1 household list types (shopping/errand/repair/schedule) — the real household app's `addItem`
+// feature, now surfaced in the circle so the bot can drive shopping lists etc. (not just chores).
+export const HH_LIST_TYPES = ['shopping', 'errand', 'repair', 'schedule'];
+
 export const mockHouseholdManifest = {
   app:        'household',
-  itemTypes:  ['chore'],
+  itemTypes:  ['chore', ...HH_LIST_TYPES],
   operations: [
     {
       id:    'listOpen',
       verb:  'list',
-      params: [],
+      params: [
+        // Optional: a specific household list to show. Omit → open chores (back-compat).
+        { name: 'type', kind: 'enum', of: ['chore', ...HH_LIST_TYPES], required: false },
+      ],
       surfaces: {
         // Part C gate — "list/show/mine" → listOpen (no arg).
         slash: { command: '/mine',
           match: { verbs: ['list', 'show', 'mine', 'lijst', 'toon'], body: 'none' } },
-        chat:  { reply: 'list', hint: 'list open chores' },
+        chat:  { reply: 'list', hint: 'List open household items. Omit type for chores, or pass a list to show it: shopping, errand, repair, or schedule (e.g. "what is on the shopping list?" → listOpen type=shopping).' },
+      },
+    },
+    {
+      id:    'addItem',
+      verb:  'add',
+      params: [
+        { name: 'type', kind: 'enum',   of: HH_LIST_TYPES, required: true },
+        { name: 'text', kind: 'string', required: true },
+      ],
+      surfaces: {
+        // A DISTINCT slash (no gate `match`): the deterministic "add" verb already routes to a TASK, so
+        // this op is reached via the LLM path (free text → the right household list) or `/add-item`.
+        slash: { command: '/add-item' },
+        chat:  { reply: 'text', hint: 'Add an item to a household LIST: shopping, errand, repair, or schedule. Use this for shopping/grocery/list requests — e.g. "put bread on the shopping list" → addItem(type=shopping, text=bread); "add milk to the groceries" → addItem(type=shopping, text=milk).' },
       },
     },
     {

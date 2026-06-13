@@ -1643,7 +1643,8 @@
       "added":     { "text": "Toegevoegd: {{label}}", "doc": "Reply after the circle bot adds an item (verb=add/create)." },
       "completed": { "text": "Afgerond: {{label}}", "doc": "Reply after the circle bot completes an item (verb=complete)." },
       "done":      { "text": "Klaar.", "doc": "Circle-bot confirmation when the reply has no specific label." },
-      "listed":    { "text": "{{n}} item(s) gevonden.", "doc": "Circle-bot reply for a list command." },
+      "listed":    { "text": "{{n}} item(s) gevonden.", "doc": "Circle-bot reply for a list command (fallback when items have no labels)." },
+      "listEmpty": { "text": "Niks open hier.", "doc": "Circle-bot reply for an empty list." },
       "failed":    { "text": "Dat lukte niet: {{msg}}", "doc": "Circle-bot reply when the dispatch threw." },
       "needsInfo": { "text": "Ik heb daar iets meer detail voor nodig.", "doc": "Circle-bot reply for a multi-field needsForm." },
       "unknown":   { "text": "Ik kon daar geen actie van maken.", "doc": "Circle-bot reply when the input didn't resolve to a known command." }

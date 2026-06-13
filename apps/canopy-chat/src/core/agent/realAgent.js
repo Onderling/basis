@@ -88,6 +88,10 @@ const SEED_CHORES = [
  */
 export async function createRealHouseholdAgent(opts = {}) {
   let chores = SEED_CHORES.map((c) => ({ ...c }));
+  // Household list items (shopping/errand/repair/schedule) — parallel to chores; backs the `addItem`
+  // op + the typed `listOpen` so the circle bot can drive shopping lists, not only chores.
+  const HH_LIST_TYPES = ['shopping', 'errand', 'repair', 'schedule'];
+  let listItems = [];
 
   // v0.7.12 — multi-pod RSVP coordination (simulated for the demo).
   // calendar.addEvent calls this when attendees are present; default
@@ -216,7 +220,13 @@ export async function createRealHouseholdAgent(opts = {}) {
   // `{parts}` per @canopy/core convention; we transport args via a
   // DataPart and reply with another DataPart whose `.data` is the
   // canopy-chat payload shape.
-  hostAgent.register('listOpen', async () => {
+  hostAgent.register('listOpen', async ({ parts }) => {
+    // A specific household list (shopping/errand/repair/schedule) → its open items; else open chores.
+    const type = String(parts?.[0]?.data?.type ?? '').trim().toLowerCase();
+    if (type && HH_LIST_TYPES.includes(type)) {
+      const open = listItems.filter((it) => it.type === type && it.state === 'open');
+      return [DataPart({ items: open.map((it) => ({ id: it.id, label: it.text, type: it.type })), _sync: simulateSync() })];
+    }
     const open = chores.filter((c) => c.state === 'open');
     // v0.6 — annotate every-other row with synthetic _lastSync so the
     // per-row 'stale Xh ago' badge has something to render.
@@ -319,6 +329,26 @@ export async function createRealHouseholdAgent(opts = {}) {
       // suffix below the bubble.
       _sync:   simulateSync(),
     })];
+  });
+
+  /* ─── household list items (shopping/errand/repair/schedule) — addItem ─── */
+
+  hostAgent.register('addItem', async ({ parts }) => {
+    const args = parts?.[0]?.data ?? {};
+    const type = String(args.type ?? '').trim().toLowerCase();
+    const text = String(args.text ?? '').trim();
+    if (!HH_LIST_TYPES.includes(type)) return [DataPart({ ok: false, error: `type must be one of: ${HH_LIST_TYPES.join(', ')}` })];
+    if (!text) return [DataPart({ ok: false, error: 'text required' })];
+    const id = `i-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    listItems.push({ id, type, text, state: 'open' });
+    publishEvent({
+      app: 'household', type: 'item-changed',
+      actor: 'webid:local-demo-user',
+      itemRef: { app: 'household', type, id },
+      payload: { message: `✓ Added to ${type}: ${text}` },
+    });
+    // `text` in the payload so the verb-aware kring reply reads "Added: <text>".
+    return [DataPart({ ok: true, message: `✓ Added to ${type}: ${text}`, text, itemId: id, _sync: simulateSync() })];
   });
 
   /* ─── v0.7.cc — household: add-chore / nudge / remove-chore ─── */

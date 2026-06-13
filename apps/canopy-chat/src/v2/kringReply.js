@@ -28,6 +28,13 @@ export function kringReplyText(reply, { verb, t } = {}) {
     if (verb === 'add' || verb === 'create') return tr('circle.bot.added', { label });
     return tr('circle.bot.ok', { label });        // "✓ {{label}}" — other verbs
   }
-  if (p && Array.isArray(p.items)) return tr('circle.bot.listed', { n: p.items.length });
+  if (p && Array.isArray(p.items)) {
+    if (p.items.length === 0) return tr('circle.bot.listEmpty');
+    // Enumerate the items (a "what's on the shopping list?" answer should SHOW them, not just count).
+    const labels = p.items.map((it) => (it && (it.label ?? it.text ?? it.title ?? it.name ?? it.id)) || '').filter(Boolean);
+    if (!labels.length) return tr('circle.bot.listed', { n: p.items.length });
+    const shown = labels.slice(0, 12).map((l) => `• ${l}`).join('\n');
+    return labels.length > 12 ? `${shown}\n…(+${labels.length - 12} more)` : shown;
+  }
   return tr('circle.bot.done');
 }

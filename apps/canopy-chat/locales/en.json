@@ -1643,7 +1643,8 @@
       "added":     { "text": "Added: {{label}}", "doc": "Reply after the circle bot adds an item (verb=add/create)." },
       "completed": { "text": "Completed: {{label}}", "doc": "Reply after the circle bot completes an item (verb=complete) — distinct from Added." },
       "done":      { "text": "Done.", "doc": "Circle-bot confirmation when the reply has no specific label." },
-      "listed":    { "text": "Found {{n}} item(s).", "doc": "Circle-bot reply for a list command." },
+      "listed":    { "text": "Found {{n}} item(s).", "doc": "Circle-bot reply for a list command (fallback when items have no labels)." },
+      "listEmpty": { "text": "Nothing open here.", "doc": "Circle-bot reply for an empty list (e.g. an empty shopping list)." },
       "failed":    { "text": "That didn’t work: {{msg}}", "doc": "Circle-bot reply when the dispatch threw (e.g. an infra op like /me that a circle can't run)." },
       "needsInfo": { "text": "I need a bit more detail for that.", "doc": "Circle-bot reply for a multi-field needsForm (single-field uses the conversational follow-up)." },
       "unknown":   { "text": "I couldn’t turn that into an action.", "doc": "Circle-bot reply when the input didn't resolve to a known command." }

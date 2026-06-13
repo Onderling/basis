@@ -19,8 +19,10 @@ describe('kringReplyText', () => {
   it('surfaces an error via circle.bot.failed with the message', () => {
     expect(kringReplyText({ error: { message: 'boom' } }, { t })).toBe('circle.bot.failed:{"msg":"boom"}');
   });
-  it('a list payload → listed(n); no label → done', () => {
-    expect(kringReplyText({ payload: { items: [1, 2, 3] } }, { t })).toBe('circle.bot.listed:{"n":3}');
+  it('a list payload with labels → enumerated bullets; empty → listEmpty; no labels → listed(n)', () => {
+    expect(kringReplyText({ payload: { items: [{ label: 'bread' }, { text: 'milk' }] } }, { t })).toBe('• bread\n• milk');
+    expect(kringReplyText({ payload: { items: [] } }, { t })).toBe('circle.bot.listEmpty');
+    expect(kringReplyText({ payload: { items: [1, 2, 3] } }, { t })).toBe('circle.bot.listed:{"n":3}');  // no labels → count
     expect(kringReplyText({ payload: {} }, { t })).toBe('circle.bot.done');
     expect(kringReplyText(null, { t })).toBe('circle.bot.done');
   });

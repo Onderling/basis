@@ -91,9 +91,48 @@ The model (opId+args · manifests · projectors · adapters) is **right and stay
   3. **sandboxed-local-code apps (WASM)** — **[FUTURE IDEA]** download the handler into a capability sandbox
      limited to the granted ops + pod paths; enables *offline* custom logic; a real security/engineering lift.
 
+- **Placement spectrum — the opt-in personal-server topology** *(NEW exploration, Frits 2026-06-13; resolves
+  mobile perf WITHOUT breaking local-first):* the waist already abstracts WHERE a handler runs, so the SAME
+  bundle is **placeable per-op**. Key move: **"local-first" really means "user-controlled-first"** — a
+  **personal server you own** (your keys, single-tenant) is a trust-domain *extension* (the Solid-pod model for
+  DATA, extended to COMPUTE), NOT a third party. Architecturally it's not a new design — it's a deployment
+  topology of the waist: "personal server" = your agent running server-side, `callSkill` routes `{opId,args}`
+  to it identically ([[feedback-agent-is-just-a-user]] — your server-hosted agent is just *you*). Spectrum
+  (user's choice per op; **default = fully local**):
+  1. **fully local** — max privacy, heaviest device (= the mobile-slow case).
+  2. **your personal server** *(opt-in)* — thin fast client: collect input + custody keys on-device → dispatch
+     `{opId,args}` (+ data) → server processes (pod access) → returns. **The concrete mobile-perf answer**:
+     heavy ops (LLM, aggregation) off-device on YOUR server; only route ops where compute ≫ data-transfer.
+  3. **your personal server in an attested enclave** — provider-blind (the Privatemode/TEE design we already
+     have) — for when even your *host* shouldn't see plaintext. *Never an untrusted shared server.*
+  Reframes **core vs bundle**: *core / always-on-device* = thin client (render + input) + keys/data-custody +
+  transport; *functionality bundles are **placed*** (device or your server), not "client" or "server"; the
+  kring-host too (on-device when local, on your server when remote). *User installs add-ons via the mobile
+  interface* = the plugin manager (tier-1/2 above) made a user-facing product feature. Needs a **managed
+  personal-server** option (most won't self-host): stay-local · managed (single-tenant, your keys) · self-host;
+  enclave = managed-but-provider-blind.
+
 *(Open naming question — Frits: rename `canopy` → `rhizome`/`raizo`? "Rhizome" — a horizontal, non-hierarchical
 root network — fits the decentralized / no-central-server ethos better than "canopy" (a forest's top crown);
 weigh against the rename cost across `@canopy/*`, the apps, and the "Onderling" public name. Parked.)*
+
+### Migration — concrete workstreams *(the actionable plan: the spine's order, as work)*
+Each workstream is gated by the enforcement (W0) so the seams stay honest as we cut.
+- **W0 · Fitness functions** *(step 0, do first)* — no-dup-key scan · "shell-has-no-dispatch-logic" dep-rule ·
+  coverage-scan-as-failing-check · web≡mobile-by-construction. Makes drift fail CI instead of review.
+- **W1 · Finish consolidation** — remaining shared locale blocks · cross-app dup · real↔mock manifest
+  reconcile (§7-G / [[reference-mock-vs-real-manifests]]).
+- **W2 · Extract the kring-host substrate** — pull the per-circle host/scope/permission/compose machinery
+  (`scopeCatalogToApps`, mergeManifests, the circle/v2 engine) out of canopy-chat into a core substrate;
+  canopy-chat becomes a skin on it.
+- **W3 · Carve app-bundles** — household+tasks · neighborhood · folio · feedback as `manifest` + handlers
+  grounded in substrates, plugging in like third-party (first-party-as-third-party dogfoods the API).
+- **W4 · Editions + the composition seam** — "which apps" as data: per-circle `policy.apps` (exists) +
+  per-build editions (lean/full). One shell, N editions.
+- **W5 · Repo split** — platform · app-bundles · feedback · infra · (thin) editions. Mechanical once W0–W4
+  enforce the seams.
+- **W6 · Personal-server placement** *(opt-in topology above)* — the placement spectrum; the mobile-perf +
+  user-installable-add-ons endpoint. Default stays local.
 
 Themes A–C below are the genuinely-new *what*; this spine is the *how + order*. **Step 0 (fitness functions) is the first move.**
 

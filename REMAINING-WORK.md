@@ -30,6 +30,37 @@ creds / a decision / hardware / a device · **[optional]** = breadth, not launch
 *A "why / in what order" lens over the tactical §1–§7 below, with new directional ideas folded in
 (Frits 2026-06-13). The §§ keep the per-item status; this groups them + states the north star.*
 
+### ★ Architectural spine — *enforce the model, then split* (the organizing principle)
+The model (opId+args · manifests · projectors · adapters) is **right and stays** — the problem is the
+**code drifted from it** (two locale files, mobile reimplementing web, cross-app dup). So the spine is:
+**make the architecture self-enforcing; then the repo boundaries are just where the enforced seams already are.**
+
+- **The waist.** Every interface — AI, GUI, slash, gate — compiles to the SAME `{opId, args}` and hands it
+  to `callSkill`; the **manifest is the contract.** AI and GUI are *peer compilers*, neither privileged.
+  Functionality resolves wherever `{opId}` points — local handler · external agent · a model · the pod · MCP · a job.
+- **Sequence.**
+  - **0. Fitness functions** *(step 0 — small, immediate, unblocks the rest):* turn each invariant into a
+    CI check so drift **can't merge** — (a) no key/string defined in >1 bundle (locales, …); (b) a web/mobile
+    shell may import shared `src/` but MUST NOT contain dispatch/resolution logic (dependency-cruiser rule);
+    (c) the coverage scan (§7-B) **fails** on manifest↔surface drift, not just reports; (d) web≡mobile shared
+    keys/ops present in both *by construction* (like the merged-locale tests now are, `8f31a447`).
+  - **1. Consolidate the remaining dup** (Theme D + §6 / §7-G) — locales (`chat`/`common`/…), the cross-app
+    reimplementations, real↔mock manifests. The fitness functions keep it from re-diverging.
+  - **2. Split the repos** along the now-enforced seams (below). *You can't cleanly cut what isn't cleanly enforced.*
+- **Repo cut-lines** (after 0–1):
+  - **clients** — web + mobile; thin; the manifest is their *only* API into functionality.
+  - **substrate / functionality** — packages, dispatch, transport, pods, sealing + the already-server-side
+    bits (pod-hosting, proxy, private LLM) as their own deploy unit. NB "server-side" here = **extraction**
+    of code that already exists; sensitive compute stays client-side or in an **attested enclave** — placed
+    by **trust + latency**, never default-to-server (corrects an earlier mis-framing of this as a "tension").
+  - **feedback app → its own repo** for its app-specific surface (project-start, KLAI compat), depending on
+    the substrate as a package.
+  - **third-party apps** *(long game)* — external devs build against the **Solid pod + the agent SDK**
+    (pod **ACPs** are the access contract) without touching the main repo; the agent-browser renders such an
+    app. This is the SDK's whole point; [[feedback-agent-is-just-a-user]] already encodes "an app/agent is a user."
+
+Themes A–F below are the *what*; this spine is the *how + order*. **Step 0 (fitness functions) is the first move.**
+
 ### A. Vision — from apps to building blocks *(explorative; reframes everything else)*
 The shift from **app-oriented** to **function / building-block-oriented** (`functie/bouwsteen-georiënteerd`).
 A user should never open a "feedback app" or type `/feedback` — instead **everything a capability needs is
@@ -312,6 +343,11 @@ E later. (Unification order would be B → A → C → D → E — see the plan 
 ## Fastest code-ready next moves (no creds/decisions needed)
 *Phase 5 + the web browser-smokes are DONE (2026-06-12); kring composer parity shipped. The remaining
 code-ready moves (was #3–#6, now the top of the list):*
+0. **Architectural fitness functions** (the spine's step 0 — do FIRST) — make drift fail CI so the model
+   enforces itself: (a) a no-duplicate-key scan across the locale bundles; (b) a dependency-cruiser rule
+   that a web/mobile shell may not contain dispatch/resolution logic; (c) turn the `npm run coverage`
+   surface scan into a **failing** check on manifest↔surface drift. Small, immediate, unblocks the dedup +
+   the eventual repo split. See "★ Architectural spine" above.
 1. **Verify the folio dissolve branch** (§7 Part G) — `824d766b` (`feat/folio-dissolve-part-g`) is
    code-complete but **unverified** (its worktree had no deps); run `vitest` + `npm run coverage` in the
    main tree, then merge if green. Also delete its stray `.git-commit-msg-folio-dissolve.txt`.

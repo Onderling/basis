@@ -73,6 +73,24 @@ once.  Design intent:
 (when a surface is substrate-rendered vs. hand-coded):
 [`DESIGN-tier-policy.md`](./DESIGN-tier-policy.md).
 
+### The thin waist — `{opId, args}`
+
+The projectors are the *output* side; the input side mirrors them. Every interface compiles **down to the
+same intermediate** and hands it to `callSkill`:
+
+```
+AI (LLM)  ─┐
+GUI tap   ─┤→   { opId, args }   →  resolveDispatch → runDispatch → callSkill  →  functionality
+slash     ─┤         ▲ the manifest is the contract            (local handler · agent · model · pod · MCP · job)
+gate verb ─┘
+```
+
+AI and GUI are **peer compilers** to this waist — neither is privileged; both are pass-throughs
+(*doorgeefluik*) to functionality. *Where* the op resolves is a separate axis: some functionality is baked
+into the app (internal handlers/screens), some routes elsewhere (an external agent, a model, an MCP service,
+the pod). This is the seam the repo will eventually split on — thin **interface** clients above the waist,
+**functionality/substrate** below it, the manifest between.
+
 ### Direction — apps dissolve into canopy-chat (decided 2026-06-11)
 
 The manifest-per-app split is an **engineering** boundary, not a product one.
@@ -86,6 +104,20 @@ shells and packaging, not a rewrite. Treat new work as **adding manifests +
 projectors to canopy-chat**, not standing up new app silos. This is why the
 gate/slash/web/mobile/LLM surfaces are all manifest projections: one
 declaration, every surface, one front door.
+
+### Direction — enforce the model, then split (2026-06-13)
+
+The manifest model is settled; the active work is **enforcing** it so the code stops drifting from it —
+duplicated locales, mobile reimplementing web, and cross-app copy-paste are *un-enforced invariants*, not
+model problems. The plan, in order: **(0)** architectural *fitness functions* — turn each invariant into a CI
+check so drift can't merge; **(1)** consolidate the remaining duplication; **(2)** split the repos along the
+now-enforced seams — thin **clients** (web + mobile) · **substrate/functionality** (the packages + the
+already-server-side pod-hosting / proxy / private-LLM) · the **feedback app** in its own repo (project-start,
+KLAI compat) · **third-party apps** that build against the Solid pod + agent SDK (pod **ACPs** are the access
+contract) without touching this repo. Sensitive compute stays client-side or in an **attested enclave** —
+functionality is placed by *trust + latency*, never default-to-server. The contract at every seam is the
+manifest (for surfaces) and the SDK + pod ACPs (for external apps). See `REMAINING-WORK.md` →
+"★ Architectural spine" and `CLAUDE.md`. *(This README gets a full rewrite once the repos are split.)*
 
 ---
 

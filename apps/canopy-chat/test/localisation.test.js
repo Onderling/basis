@@ -23,6 +23,23 @@ describe('initLocalisation + t', () => {
     expect(t('common.error')).toBe('Error');
   });
 
+  // Guards the locale consolidation: the `circle.*` block now lives in the SHARED source
+  // (src/locales/), merged by the loader. Every key the shared src/v2 modules reference must
+  // resolve to a real string (not the raw key) — this is the exact drift that hid `circle.bot.*`
+  // from web before (→ `/me` showed "circle.bot.failed"). Fails loudly if a key goes missing.
+  it('resolves the shared circle.* keys the shared modules reference (en + nl)', async () => {
+    const keys = [
+      'circle.bot.failed', 'circle.bot.unknown', 'circle.bot.added', 'circle.bot.completed',
+      'circle.bot.ok', 'circle.bot.done', 'circle.bot.listed', 'circle.bot.listEmpty', 'circle.bot.needsInfo',
+      'circle.clarify.notFound', 'circle.clarify.which', 'circle.clarify.whichMissing', 'circle.clarify.noneToPick',
+      'circle.kring.chat_disabled', 'circle.kring.composer_placeholder',
+    ];
+    await setLang('en');
+    for (const k of keys) expect(t(k), `${k} (en) did not resolve — raw key returned`).not.toBe(k);
+    await setLang('nl');
+    for (const k of keys) expect(t(k), `${k} (nl) did not resolve — raw key returned`).not.toBe(k);
+  });
+
   it("switches language to 'nl' via setLang", async () => {
     await setLang('nl');
     expect(currentLang()).toBe('nl');

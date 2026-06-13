@@ -158,17 +158,20 @@ missing the classic shell's composer-UX affordances. Triaged into **ported** vs 
 These are correct divergences from the circle redesign. The only remaining composer follow-up is the
 multi-field inline form (above).
 
-## Known gap — locale duplication (TODO, 2026-06-13)
+## Locale consolidation — `circle` block ✅ DONE (2026-06-13)
 Web (`apps/canopy-chat/locales/{en,nl}.json`, loaded by `src/localisation.js`) and mobile
-(`apps/canopy-chat-mobile/locales/`, loaded by `App.js initLocalisation`) are **separate bundles**, but
-~11 top-level keys overlap (`circle`, `chat`, `common`, `reply`, `dm`, `sync`, …) and have **DRIFTED**
-— the `circle` block is not identical. The shared `src/v2/*` modules reference `t('circle.*')` keys both
-apps must define, so every shared string is edited TWICE and can silently diverge. This already caused a
-bug: `circle.bot.*` lived on mobile but not web → `/me` rendered the raw key `circle.bot.failed` (fixed
-`fa81f7d4`). **Fix:** lift the shared key blocks (`circle`/`chat`/`common`/`reply`/…) into one source
-(e.g. `src/locales/{en,nl}.js`, barrel-exported); each loader merges `{...shared, ...platformOnly}`; add
-a test asserting every `t('circle.*')` key the shared modules use resolves. Ends the double-editing +
-the drift class of bugs. Same write-once principle as the rest of this plan.
+(`apps/canopy-chat-mobile/locales/`, loaded by `core/localisation.js`) are separate bundles, but the
+shared **`circle.*`** v2 surface used to be **copy-pasted into both** and had **drifted** — which caused
+a real bug (`circle.bot.*` was on mobile but not web → `/me` rendered the raw key `circle.bot.failed`,
+fixed `fa81f7d4`). **Now consolidated:** the canonical `circle` block lives ONCE in
+`src/locales/circle.{en,nl}.json` (exported as `sharedCircleLocale` from the barrel); both loaders merge
+`{ ...appLocale, circle: sharedCircleLocale.<lng> }`, and `circle` is **stripped** from both app bundles.
+The merge was a clean union (the two copies had **0 value conflicts**; web was the superset + mobile's
+`circle.nearby`). A guard test (`localisation.test.js`) asserts every `circle.*` key the shared modules
+use resolves (not the raw key). Web 2319 + mobile 264 green; web build clean.
+**Still duplicated (same pattern, follow-up):** the other overlapping blocks — `chat`, `common`, `reply`,
+`dm`, `sync`, `consequence`, `role`, `threads`, `logs`, `scan_qr`. Move each to `src/locales/` the same
+way (extend `sharedCircleLocale` → a `sharedLocale` map) when convenient; `circle` was the hot one.
 
 ## After this
 The mobile screens shrink to RN UI + the `bundle.callSkill` transport adapter; the web shells shrink to

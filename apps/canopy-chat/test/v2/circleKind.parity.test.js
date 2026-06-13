@@ -12,10 +12,16 @@
  * smoke alongside the DOM tests.
  */
 import { describe, it, expect } from 'vitest';
-import enWeb from '../../locales/en.json' with { type: 'json' };
-import nlWeb from '../../locales/nl.json' with { type: 'json' };
-import enMob from '../../../canopy-chat-mobile/locales/en.json' with { type: 'json' };
-import nlMob from '../../../canopy-chat-mobile/locales/nl.json' with { type: 'json' };
+import enWebRaw from '../../locales/en.json' with { type: 'json' };
+import nlWebRaw from '../../locales/nl.json' with { type: 'json' };
+import enMobRaw from '../../../canopy-chat-mobile/locales/en.json' with { type: 'json' };
+import nlMobRaw from '../../../canopy-chat-mobile/locales/nl.json' with { type: 'json' };
+import { sharedCircleLocale } from '../../src/locales/index.js';
+// `circle.*` is now the SHARED source both shells merge — so web ≡ mobile for circle by construction.
+const enWeb = { ...enWebRaw, circle: sharedCircleLocale.en };
+const nlWeb = { ...nlWebRaw, circle: sharedCircleLocale.nl };
+const enMob = { ...enMobRaw, circle: sharedCircleLocale.en };
+const nlMob = { ...nlMobRaw, circle: sharedCircleLocale.nl };
 
 function flatKeys(obj, prefix = '') {
   const out = [];

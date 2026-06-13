@@ -262,3 +262,5 @@ export {
   initLocalisation, t, setLang, currentLang,
   detectDeviceLang, isInitialised,
 } from './localisation.js';
+// Shared locale blocks (the `circle.*` v2 surface) — both shells merge these so they can't drift.
+export { sharedCircleLocale } from './locales/index.js';

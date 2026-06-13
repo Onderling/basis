@@ -6,8 +6,12 @@
  * resolution issue that breaks localisation.test.js — pre-existing.)
  */
 import { describe, it, expect } from 'vitest';
-import en from '../../locales/en.json' with { type: 'json' };
-import nl from '../../locales/nl.json' with { type: 'json' };
+import enRaw from '../../locales/en.json' with { type: 'json' };
+import nlRaw from '../../locales/nl.json' with { type: 'json' };
+import { sharedCircleLocale } from '../../src/locales/index.js';
+// `circle.*` now lives in the shared source; merge it back to check the effective bundle.
+const en = { ...enRaw, circle: sharedCircleLocale.en };
+const nl = { ...nlRaw, circle: sharedCircleLocale.nl };
 
 function flatKeys(node, prefix = '', out = []) {
   for (const [k, v] of Object.entries(node)) {

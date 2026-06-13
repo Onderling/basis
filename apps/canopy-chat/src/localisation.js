@@ -15,6 +15,8 @@ import i18next from 'i18next';
 
 import en from '../locales/en.json' with { type: 'json' };
 import nl from '../locales/nl.json' with { type: 'json' };
+// The shared `circle` block lives in ONE place (src/locales/) so web + mobile can't drift; merge it in.
+import { sharedCircleLocale } from './locales/index.js';
 
 let initialised = false;
 
@@ -54,8 +56,8 @@ export async function initLocalisation({ lng = 'en', fallbackLng = 'en' } = {}) 
     lng,
     fallbackLng,
     resources: {
-      en: { translation: unwrapLeaves(en) },
-      nl: { translation: unwrapLeaves(nl) },
+      en: { translation: unwrapLeaves({ ...en, circle: sharedCircleLocale.en }) },
+      nl: { translation: unwrapLeaves({ ...nl, circle: sharedCircleLocale.nl }) },
     },
     interpolation: { escapeValue: false },
   });

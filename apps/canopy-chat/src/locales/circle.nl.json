@@ -1,0 +1,1688 @@
+{
+  "title": {
+    "text": "Jouw kringen",
+    "doc": "Heading of the circle launcher (board 1B)."
+  },
+  "tab": {
+    "screens": {
+      "text": "Schermen",
+      "doc": "α.3 — primary tab."
+    },
+    "kringen": {
+      "text": "Kringen",
+      "doc": "Bottom-nav tab → the circle list (board 1)."
+    },
+    "stroom": {
+      "text": "Stroom",
+      "doc": "Bottom-nav tab → the cross-circle stream (board 5)."
+    },
+    "mij": {
+      "text": "Mij",
+      "doc": "Bottom-nav tab → personal availability/quiet-hours/hopping (board 6C)."
+    }
+  },
+  "new": {
+    "text": "+ nieuwe kring",
+    "doc": "Create-a-new-circle entry on the launcher."
+  },
+  "create_unavailable": {
+    "text": "Nog geen kring aan te maken — de app is nog aan het starten.",
+    "doc": "SP-13.1 — surfaced when createCircle is invoked before the agent bundle has booted."
+  },
+  "members": {
+    "text": "{{count}} leden",
+    "doc": "Member count on a circle tile; {{count}} interpolated."
+  },
+  "tile_unread": {
+    "text": "{{count}} ongelezen",
+    "doc": "Accessible label for the unread badge on a circle tile (P6.3)."
+  },
+  "tile_proposals": {
+    "text": "{{count}} openstaande voorstel(len)",
+    "doc": "Accessible label for the voorstellen badge on a circle tile (P6.2 #341)."
+  },
+  "tile": {
+    "menu": {
+      "pin": {
+        "text": "Vastzetten boven",
+        "doc": "β.5 — context-menu item: float this kring to the top of its section."
+      },
+      "unpin": {
+        "text": "Losmaken",
+        "doc": "β.5 — context-menu item: undo pin-to-top."
+      },
+      "mute": {
+        "text": "Dempen",
+        "doc": "β.5 — context-menu item: silence this kring (toggles per-member chatOff override)."
+      },
+      "unmute": {
+        "text": "Dempen opheffen",
+        "doc": "β.5 — context-menu item: re-enable chat for this kring."
+      },
+      "settings": {
+        "text": "Instellingen",
+        "doc": "β.5 — context-menu item: open this kring's settings screen."
+      },
+      "leave": {
+        "text": "Kring verlaten",
+        "doc": "β.5 — context-menu item: leave this kring (dispatches /leave-group)."
+      },
+      "leave_confirm": {
+        "text": "{{name}} verlaten? Dit kan niet ongedaan worden.",
+        "doc": "β.5 — confirm() text before dispatching /leave-group."
+      }
+    }
+  },
+  "kind": {
+    "household": {
+      "text": "Huishouden",
+      "doc": "β.3 — launcher section header for kind='household' circles."
+    },
+    "buurt": {
+      "text": "Buurt",
+      "doc": "β.3 — launcher section header for kind='buurt' circles."
+    },
+    "vriendenkring": {
+      "text": "Vriendenkring",
+      "doc": "β.3 — launcher section header for kind='vriendenkring' circles."
+    },
+    "other": {
+      "text": "Overig",
+      "doc": "β.3 — launcher section header for circles whose kind isn't household/buurt/vriendenkring."
+    }
+  },
+  "empty": {
+    "text": "Nog geen kringen.",
+    "doc": "Shown when the launcher has no circles."
+  },
+  "loading": {
+    "text": "Kringen laden…",
+    "doc": "Shown while circles are being fetched."
+  },
+  "back": {
+    "text": "← kringen",
+    "doc": "Back link from a circle detail view to the launcher."
+  },
+  "detail_empty": {
+    "text": "Nog niks hier.",
+    "doc": "Empty state inside a circle detail view."
+  },
+  "on_your_list": {
+    "text": "Op jouw lijst",
+    "doc": "Heading for the claim-router mirror section on CircleDetail (P6.5 #342)."
+  },
+  "stream": {
+    "title": {
+      "text": "Stroom",
+      "doc": "Heading of the cross-circle Stream tab (board 5B)."
+    },
+    "open": {
+      "text": "Stroom",
+      "doc": "Launcher entry that opens the cross-circle Stream."
+    },
+    "empty": {
+      "text": "Nog niks uit je kringen.",
+      "doc": "Empty state for the Stream."
+    },
+    "untagged": {
+      "text": "—",
+      "doc": "Tag shown on a Stream row that isn't tied to a circle."
+    },
+    "compose_placeholder_default": {
+      "text": "Reageer in de tijdlijn",
+      "doc": "Pinned compose placeholder (P6.M3)."
+    },
+    "compose_placeholder_targeted": {
+      "text": "Reageer in {{circle}}",
+      "doc": "Pinned compose with circle context."
+    }
+  },
+  "chat": {
+    "quick_reply": {
+      "fallback_label": {
+        "text": "Antwoord",
+        "doc": "α.5a (audit #3) — default label for an inline-keuze quick-reply pill when the reply envelope supplies a slash but no label."
+      }
+    },
+    "delivery": {
+      "pending": {
+        "text": "Bezig met versturen…",
+        "doc": "δ.2 — bubble icon caption while the kring fan-out (broadcastKringMessage) is in flight."
+      },
+      "sent": {
+        "text": "Verstuurd",
+        "doc": "δ.2 — bubble icon caption after a successful kring fan-out.  Currently never surfaced (the happy path renders nothing) but reserved for future use."
+      },
+      "failed": {
+        "text": "Versturen mislukt (tik om opnieuw te proberen)",
+        "doc": "δ.2 — bubble icon caption + accessible label when the kring fan-out rejected or returned errors; tapping re-fires broadcastKringMessage with the same msgId."
+      }
+    },
+    "catch_up": {
+      "requesting": {
+        "text": "Bijwerken…",
+        "doc": "ε.5 — chat-shell pill while a negotiated catch-up is in flight."
+      },
+      "streaming_progress": {
+        "text": "Bijwerken… {{count}}/{{total}}",
+        "doc": "ε.5 — chat-shell pill during streaming."
+      },
+      "done": {
+        "text": "Bijgewerkt",
+        "doc": "ε.5 — terminal pill after successful catch-up; auto-hides."
+      },
+      "no_offers": {
+        "text": "Niemand online om bij te werken",
+        "doc": "ε.5 — terminal pill when the offer window elapsed without replies."
+      },
+      "provider_request_title": {
+        "text": "{{name}} wil bijwerken in {{kring}}",
+        "doc": "ε.5 — provider-side notification card title."
+      },
+      "provider_request_size": {
+        "text": "{{count}} berichten · ongeveer {{kb}} KB",
+        "doc": "ε.5 — provider-side notification card size summary."
+      },
+      "provider_send_all": {
+        "text": "Stuur alles",
+        "doc": "ε.5 — provider-side approve-with-mode action."
+      },
+      "provider_send_last_50": {
+        "text": "Stuur laatste 50",
+        "doc": "ε.5 — provider-side approve-with-mode action."
+      },
+      "provider_send_last_7d": {
+        "text": "Stuur laatste 7 dagen",
+        "doc": "ε.5 — provider-side approve-with-mode action."
+      },
+      "provider_decline": {
+        "text": "Weigeren",
+        "doc": "ε.5 — provider-side decline action."
+      },
+      "chooser_title": {
+        "text": "Bijwerken in {{kring}}",
+        "doc": "ε.6 — multi-offer chooser modal heading."
+      },
+      "chooser_subtitle": {
+        "text": "{{count}} bronnen willen berichten sturen",
+        "doc": "ε.6 — chooser modal subheading."
+      },
+      "chooser_msg_count": {
+        "text": "{{count}} berichten",
+        "doc": "ε.6 — per-offer card: how many messages the source is offering."
+      },
+      "chooser_size_kb": {
+        "text": "~{{kb}} KB",
+        "doc": "ε.6 — per-offer card: total size estimate."
+      },
+      "chooser_recent": {
+        "text": "meest recent {{when}}",
+        "doc": "ε.6 — per-offer card: relative time of the newest offered message."
+      },
+      "chooser_all": {
+        "text": "Alles",
+        "doc": "ε.6 — per-offer accept button: send everything."
+      },
+      "chooser_last_50": {
+        "text": "Laatste 50",
+        "doc": "ε.6 — per-offer accept button: tail 50 messages."
+      },
+      "chooser_last_7d": {
+        "text": "Laatste 7 dagen",
+        "doc": "ε.6 — per-offer accept button: last 7 days."
+      },
+      "chooser_cancel": {
+        "text": "Annuleren",
+        "doc": "ε.6 — chooser modal global cancel."
+      },
+      "chooser_unknown_provider": {
+        "text": "Onbekende bron",
+        "doc": "ε.6 — fallback name."
+      }
+    }
+  },
+  "tabs": {
+    "gesprek": {
+      "text": "Gesprek",
+      "doc": "SP-13.3 — kring bottom-tab."
+    },
+    "prikbord": {
+      "text": "Prikbord",
+      "doc": "SP-13.3."
+    },
+    "taken": {
+      "text": "Taken",
+      "doc": "SP-13.3."
+    },
+    "lijsten": {
+      "text": "Lijsten",
+      "doc": "SP-13.3."
+    },
+    "notities": {
+      "text": "Notities",
+      "doc": "SP-13.3."
+    },
+    "agenda": {
+      "text": "Agenda",
+      "doc": "SP-13.3."
+    },
+    "leden": {
+      "text": "Leden",
+      "doc": "SP-13.3."
+    }
+  },
+  "kring": {
+    "more": {
+      "text": "Meer",
+      "doc": "SP-13 — overflow menu trigger."
+    },
+    "empty": {
+      "text": "Nog niks hier — schrijf als eerste.",
+      "doc": "SP-13.2 — empty state."
+    },
+    "composer_placeholder": {
+      "text": "Schrijf naar de kring…",
+      "doc": "SP-13.2 — composer placeholder (hosts kunnen kring-specifieke tekst meegeven)."
+    },
+    "chat_disabled": {
+      "text": "Chat staat uit in deze kring.",
+      "doc": "Permission gate — getoond in plaats van de composer als de 'chat'-functie van de kring uit staat (analoog aan allowCommands in de klassieke shell)."
+    },
+    "send": {
+      "text": "Verstuur",
+      "doc": "SP-13.2 — composer send button a11y label (visueel een ↑)."
+    },
+    "day_today": {
+      "text": "vandaag",
+      "doc": "SP-13.2 — day-divider."
+    },
+    "day_yesterday": {
+      "text": "gisteren",
+      "doc": "SP-13.2 — day-divider."
+    },
+    "tab_coming": {
+      "text": "{{tab}} komt in een vervolg-slice.",
+      "doc": "SP-13.3 — placeholder voor tabs zonder eigen scherm (yet)."
+    },
+    "tabs_label": {
+      "text": "Kring-tabs",
+      "doc": "SP-13.3 — a11y label on de tab-balk."
+    },
+    "view_chat": {
+      "text": "Chat",
+      "doc": "SP-13.4 — Chat ↔ Scherm header toggle (v2 §4)."
+    },
+    "view_scherm": {
+      "text": "Scherm",
+      "doc": "SP-13.4 — scherm-mode label."
+    },
+    "view_toggle_label": {
+      "text": "Wissel tussen chat en scherm",
+      "doc": "SP-13.4 — a11y group label."
+    },
+    "scherm_coming": {
+      "text": "Scherm-weergave (admin-recept) komt in een vervolg-slice.",
+      "doc": "SP-13.4 — placeholder."
+    }
+  },
+  "screen": {
+    "empty": {
+      "text": "De admin heeft nog geen scherm ingericht.",
+      "doc": "α.1c — empty book."
+    },
+    "loading": {
+      "text": "Laden…",
+      "doc": "Shown while materialize is still resolving — distinct from the empty state."
+    },
+    "refreshing": {
+      "text": "Verversen…",
+      "doc": "δ.1 — subtle pip tooltip while a cached screen is rendered and a fresh materialize runs in the background."
+    },
+    "block_empty": {
+      "text": "{{type}}: nog niets om te tonen.",
+      "doc": "α.1c — per-block empty fallback."
+    },
+    "block_error": {
+      "text": "{{type}}: laden mislukt",
+      "doc": "α.1c — per-block error fallback."
+    },
+    "block_unknown": {
+      "text": "Onbekend bloktype: {{type}}",
+      "doc": "α.1c — forward-compat fallback."
+    }
+  },
+  "screens": {
+    "picker_title": {
+      "text": "Schermen",
+      "doc": "α.3 — picker heading."
+    },
+    "no_screens": {
+      "text": "Nog geen schermen. Voeg er hieronder een toe.",
+      "doc": "α.3 — empty book."
+    },
+    "untitled": {
+      "text": "(zonder naam)",
+      "doc": "α.3 — placeholder."
+    },
+    "active": {
+      "text": "actief",
+      "doc": "α.3 — badge."
+    },
+    "rename": {
+      "text": "Hernoem",
+      "doc": "α.3 — rename."
+    },
+    "rename_prompt": {
+      "text": "Nieuwe naam voor dit scherm:",
+      "doc": "α.3 — prompt."
+    },
+    "set_active": {
+      "text": "Maak actief",
+      "doc": "α.3 — switch active."
+    },
+    "delete": {
+      "text": "Verwijder",
+      "doc": "α.3 — delete."
+    },
+    "delete_confirm": {
+      "text": "Verwijder scherm \"{{name}}\"?",
+      "doc": "α.3 — confirm."
+    },
+    "add": {
+      "text": "Voeg toe",
+      "doc": "α.3 — add button."
+    },
+    "add_placeholder": {
+      "text": "Naam van nieuw scherm…",
+      "doc": "α.3 — add input."
+    },
+    "filter_all": {
+      "text": "alle kringen",
+      "doc": "α.3 — filter summary."
+    },
+    "filter_one": {
+      "text": "1 kring",
+      "doc": "α.3 — filter summary."
+    },
+    "filter_n": {
+      "text": "{{count}} kringen",
+      "doc": "α.3 — filter summary."
+    },
+    "seed_name": {
+      "text": "Stroom",
+      "doc": "α.3 — name of the auto-seeded default screen."
+    },
+    "seed_my_things": {
+      "text": "Mijn dingen",
+      "doc": "α.4 — seeded screen aggregating tasks."
+    },
+    "seed_my_calendar": {
+      "text": "Mijn agenda",
+      "doc": "α.4 — seeded screen aggregating events."
+    }
+  },
+  "recipe": {
+    "block": {
+      "quickActions": {
+        "text": "Veel gebruikt",
+        "doc": "D1 §5A — block palette label for the Veel-gebruikt action row."
+      },
+      "announcement": {
+        "text": "Aankondiging",
+        "doc": "α.1b — block palette label."
+      },
+      "noticeboard": {
+        "text": "Prikbord",
+        "doc": "α.1b — block palette label."
+      },
+      "agenda": {
+        "text": "Agenda",
+        "doc": "α.1b — block palette label."
+      },
+      "tasks": {
+        "text": "Taken",
+        "doc": "α.4 — block palette label."
+      },
+      "rules": {
+        "text": "Huisregels",
+        "doc": "α.1b — block palette label."
+      },
+      "photo": {
+        "text": "Foto",
+        "doc": "α.1b — block palette label."
+      },
+      "text": {
+        "text": "Tekst",
+        "doc": "α.1b — block palette label."
+      }
+    },
+    "editor": {
+      "book_title": {
+        "text": "Schermen",
+        "doc": "α.1d — editor BOOK-mode heading."
+      },
+      "no_recipes": {
+        "text": "Nog geen schermen. Voeg er hieronder een toe.",
+        "doc": "α.1d — empty book."
+      },
+      "untitled": {
+        "text": "(zonder naam)",
+        "doc": "α.1d — placeholder."
+      },
+      "active": {
+        "text": "actief",
+        "doc": "α.1d — badge."
+      },
+      "rename": {
+        "text": "Hernoem",
+        "doc": "α.1d — rename."
+      },
+      "rename_prompt": {
+        "text": "Nieuwe naam voor dit scherm:",
+        "doc": "α.1d — prompt."
+      },
+      "set_active": {
+        "text": "Maak actief",
+        "doc": "α.1d — switch active."
+      },
+      "delete": {
+        "text": "Verwijder",
+        "doc": "α.1d — delete."
+      },
+      "delete_confirm": {
+        "text": "Verwijder scherm \"{{name}}\"?",
+        "doc": "α.1d — confirm."
+      },
+      "add_recipe": {
+        "text": "Voeg toe",
+        "doc": "α.1d — add button."
+      },
+      "add_recipe_placeholder": {
+        "text": "Naam van nieuw scherm…",
+        "doc": "α.1d — add input."
+      },
+      "back_to_book": {
+        "text": "← alle schermen",
+        "doc": "α.1d — back to book."
+      },
+      "recipe_missing": {
+        "text": "Dit scherm bestaat niet meer.",
+        "doc": "α.1d — stale id."
+      },
+      "no_blocks": {
+        "text": "Nog geen blokken. Kies er hieronder een.",
+        "doc": "α.1d — empty recipe."
+      },
+      "add_block_title": {
+        "text": "Voeg een blok toe",
+        "doc": "α.1d — palette heading."
+      },
+      "move_up": {
+        "text": "Verplaats omhoog",
+        "doc": "α.1d — block ↑ a11y."
+      },
+      "move_down": {
+        "text": "Verplaats omlaag",
+        "doc": "α.1d — block ↓ a11y."
+      },
+      "remove_block": {
+        "text": "Verwijder blok",
+        "doc": "α.1d — block × a11y."
+      },
+      "announcement_placeholder": {
+        "text": "Aankondigingstekst…",
+        "doc": "α.1d — announcement textarea."
+      },
+      "text_placeholder": {
+        "text": "Tekst…",
+        "doc": "α.1d — text textarea."
+      },
+      "photo_src_placeholder": {
+        "text": "Afbeelding-URL of folio:// verwijzing…",
+        "doc": "α.1d — photo src."
+      },
+      "photo_caption_placeholder": {
+        "text": "Bijschrift (optioneel)…",
+        "doc": "α.1d — photo caption."
+      },
+      "noticeboard_limit_label": {
+        "text": "Hoeveel recente posts?",
+        "doc": "α.1d — noticeboard limit."
+      },
+      "agenda_limit_label": {
+        "text": "Hoeveel evenementen?",
+        "doc": "α.1d — agenda limit."
+      },
+      "agenda_horizon_label": {
+        "text": "Toon evenementen binnen (dagen)",
+        "doc": "α.1d — agenda horizon."
+      },
+      "rules_hint": {
+        "text": "Toont de huidige huisregels van de kring.",
+        "doc": "α.1d — rules block."
+      }
+    },
+    "compact_label": {
+      "label": {
+        "text": "Compact",
+        "doc": "α.5c — checkbox label for the compact-rows toggle on list-shaped blocks."
+      },
+      "hint": {
+        "text": "Smallere regels, kleinere tekst",
+        "doc": "α.5c — hint under the Compact checkbox."
+      }
+    },
+    "conflict": {
+      "title": {
+        "text": "Twee van jullie hebben dit scherm bewerkt",
+        "doc": "γ.3 — modal heading when an incoming recipe diverges from local."
+      },
+      "instructions": {
+        "text": "Kies voor elk onderdeel welke versie behouden moet worden.",
+        "doc": "γ.3 — modal subhead explaining the picker."
+      },
+      "block_label": {
+        "text": "Blok: {{name}}",
+        "doc": "γ.3 — per-block row label."
+      },
+      "meta_label": {
+        "text": "Veld: {{path}}",
+        "doc": "γ.3 — meta-conflict row label."
+      },
+      "meta_section": {
+        "text": "Overige wijzigingen",
+        "doc": "γ.3 — section header above the meta-conflict list."
+      },
+      "keep_yours": {
+        "text": "Houd jouw versie",
+        "doc": "γ.3 — picker choice: keep local version."
+      },
+      "take_theirs": {
+        "text": "Neem hun versie",
+        "doc": "γ.3 — picker choice: take incoming version."
+      },
+      "keep_both": {
+        "text": "Houd beide",
+        "doc": "γ.3 — picker choice (blocks only): keep both."
+      },
+      "apply": {
+        "text": "Toepassen",
+        "doc": "γ.3 — confirm picks + save the merged recipe."
+      },
+      "cancel": {
+        "text": "Annuleren",
+        "doc": "γ.3 — discard incoming; keep local as-is."
+      }
+    }
+  },
+  "streamAction": {
+    "help": {
+      "text": "Ik help",
+      "doc": "Stream row action."
+    },
+    "offer": {
+      "text": "Ik heb 'm",
+      "doc": "Stream row action — borrow offer."
+    },
+    "take": {
+      "text": "Ik neem 'm",
+      "doc": "Stream row action — accept offer."
+    },
+    "claim": {
+      "text": "Ik doe ze",
+      "doc": "Stream row action — claim chore."
+    },
+    "done": {
+      "text": "Klaar",
+      "doc": "Stream row action — reminder done."
+    },
+    "snooze": {
+      "text": "Uitstellen",
+      "doc": "Stream row action."
+    },
+    "ignore": {
+      "text": "Negeer",
+      "doc": "Stream row action."
+    }
+  },
+  "settings": {
+    "title": {
+      "text": "Kring-instellingen",
+      "doc": "Settings screen heading (board 4A)."
+    },
+    "save": {
+      "text": "Opslaan",
+      "doc": "Save the circle settings."
+    },
+    "features": {
+      "text": "Functies",
+      "doc": "Settings axis: which features the circle has."
+    },
+    "llmTool": {
+      "text": "LLM als gereedschap",
+      "doc": "Settings axis: LLM assist mode."
+    },
+    "agents": {
+      "text": "Agents toegestaan",
+      "doc": "Settings axis: whether LLM agents may join."
+    },
+    "revealPolicy": {
+      "text": "Onthul-beleid",
+      "doc": "Settings axis: who sees real names."
+    },
+    "pod": {
+      "text": "Waar leeft de data?",
+      "doc": "Settings axis: pod storage policy."
+    },
+    "consensus": {
+      "text": "Consensus tussen admins",
+      "doc": "Settings section: co-admin approval for changes."
+    },
+    "consensus_label": {
+      "text": "Wijzigingen vereisen goedkeuring van mede-admins",
+      "doc": "consensusRequired toggle label."
+    },
+    "consequence_aria": {
+      "text": "Wat deze keuze betekent",
+      "doc": "Accessible label for the per-option ⓘ consequence toggle."
+    },
+    "consequence": {
+      "off": {
+        "text": "Geen AI-hulp in deze kring — er wordt niets naar een model gestuurd.",
+        "doc": "Consequence of llmTool=off."
+      },
+      "local": {
+        "text": "AI draait op de eigen computer van een lid (Ollama). Berichten blijven op het apparaat; niets gaat naar de cloud.",
+        "doc": "Consequence of llmTool=local."
+      },
+      "cloud": {
+        "text": "AI draait op een onafhankelijk cloudmodel. Je berichten gaan naar die aanbieder zodra je iets vraagt.",
+        "doc": "Consequence of llmTool=cloud."
+      },
+      "yes": {
+        "text": "Iedereen kan een AI-agent als deelnemer toevoegen. Agents kunnen lezen wat de kring deelt.",
+        "doc": "Consequence of agents=yes."
+      },
+      "admin-approval": {
+        "text": "AI-agents mogen pas meedoen na goedkeuring van een admin — een controlepunt voordat een agent kringinhoud ziet.",
+        "doc": "Consequence of agents=admin-approval."
+      },
+      "no": {
+        "text": "Er mogen geen AI-agents meedoen. Alleen mensen nemen deel aan deze kring.",
+        "doc": "Consequence of agents=no."
+      },
+      "pairwise": {
+        "text": "Echte namen worden één-op-één onthuld. Elk lid kiest zelf wie zijn identiteit mag zien.",
+        "doc": "Consequence of revealPolicy=pairwise."
+      },
+      "open": {
+        "text": "Alle leden zien elkaars echte naam. Er is geen verberging per persoon.",
+        "doc": "Consequence of revealPolicy=open."
+      },
+      "none": {
+        "text": "Er wordt niets in een pod opgeslagen. Gegevens staan alleen op de apparaten van leden en gaan verloren als ze die wissen.",
+        "doc": "Consequence of pod=none."
+      },
+      "shared": {
+        "text": "Eén gedeelde pod bewaart de gegevens van de kring — elk lid leest en schrijft dezelfde opslag.",
+        "doc": "Consequence of pod=shared."
+      },
+      "personal": {
+        "text": "Elk lid houdt zijn eigen pod en de kring verwijst ernaar. Je houdt zelf de controle over je eigen kopie.",
+        "doc": "Consequence of pod=personal."
+      },
+      "hybrid": {
+        "text": "Een gedeelde pod plus persoonlijke pods: gemeenschappelijke items worden gedeeld, privé-items blijven bij elk lid.",
+        "doc": "Consequence of pod=hybrid."
+      }
+    },
+    "send_proposal": {
+      "text": "Voorstel sturen →",
+      "doc": "Save-button label when consensus is required."
+    },
+    "pending": {
+      "text": "Wijzigingen moeten eerst door mede-admins worden goedgekeurd.",
+      "doc": "Footer note when consensus is active."
+    },
+    "pending_waiting": {
+      "text": "Wachten op {{who}}.",
+      "doc": "Footer note when a proposal is outstanding; {{who}} is the approver list."
+    },
+    "feat": {
+      "chat": {
+        "text": "Chat",
+        "doc": "Feature label."
+      },
+      "noticeboard": {
+        "text": "Prikbord",
+        "doc": "Feature label."
+      },
+      "tasks": {
+        "text": "Taken",
+        "doc": "Feature label."
+      },
+      "lists": {
+        "text": "Lijsten",
+        "doc": "Feature label."
+      },
+      "calendar": {
+        "text": "Agenda",
+        "doc": "Feature label."
+      },
+      "notes": {
+        "text": "Notities",
+        "doc": "Feature label."
+      },
+      "houseRules": {
+        "text": "Huisregels",
+        "doc": "Feature label."
+      },
+      "memberDirectory": {
+        "text": "Ledenkaart",
+        "doc": "Feature label."
+      }
+    },
+    "opt": {
+      "off": {
+        "text": "Uit",
+        "doc": "Option label."
+      },
+      "local": {
+        "text": "Lokaal (Ollama)",
+        "doc": "Option label."
+      },
+      "cloud": {
+        "text": "Onafhankelijke cloud",
+        "doc": "Option label."
+      },
+      "yes": {
+        "text": "Ja — iedereen",
+        "doc": "Option label."
+      },
+      "admin-approval": {
+        "text": "Met admin-OK",
+        "doc": "Option label."
+      },
+      "no": {
+        "text": "Geen agents",
+        "doc": "Option label."
+      },
+      "pairwise": {
+        "text": "1-op-1",
+        "doc": "Option label."
+      },
+      "open": {
+        "text": "Open — alle leden",
+        "doc": "Option label."
+      },
+      "none": {
+        "text": "Geen pod",
+        "doc": "Option label."
+      },
+      "shared": {
+        "text": "Eén gedeelde pod",
+        "doc": "Option label."
+      },
+      "personal": {
+        "text": "Persoonlijke pods + verwijzingen",
+        "doc": "Option label."
+      },
+      "hybrid": {
+        "text": "Hybride",
+        "doc": "Option label."
+      },
+      "p0": {
+        "text": "Vertrouwde host (leesbaar)",
+        "doc": "Storage posture option (p0)."
+      },
+      "p1": {
+        "text": "Enclave (host ziet niets)",
+        "doc": "Storage posture option (p1)."
+      },
+      "p2": {
+        "text": "End-to-end verzegeld",
+        "doc": "Storage posture option (p2)."
+      },
+      "p3": {
+        "text": "Verzegeld in rust",
+        "doc": "Storage posture option (p3)."
+      }
+    },
+    "conflict": {
+      "title": {
+        "text": "Twee van jullie hebben de instellingen bewerkt",
+        "doc": "γ.4 — modal heading when an incoming policy diverges from local; every other resolver locale string is reused from circle.recipe.conflict.*."
+      }
+    },
+    "storagePosture": {
+      "text": "Opslag (in rust)",
+      "doc": "Kring-instellingen — opslaghouding in rust (menukaart P0–P3)."
+    }
+  },
+  "override": {
+    "title": {
+      "text": "Mijn instellingen voor deze kring",
+      "doc": "Personal override sheet heading (board 6A)."
+    },
+    "chatOff": {
+      "text": "Chat uitzetten",
+      "doc": "Override: silence this circle's chat for me."
+    },
+    "revealOpen": {
+      "text": "Mijn naam tonen aan alle leden",
+      "doc": "Override: reveal my real name circle-wide."
+    },
+    "agentsMayContactMe": {
+      "text": "Agents mogen mij aanspreken",
+      "doc": "Override: allow LLM agents to address me."
+    },
+    "push": {
+      "text": "Pushmeldingen",
+      "doc": "Override section (P6.M4)."
+    },
+    "pushOnMention": {
+      "text": "Pushmelding bij @jou",
+      "doc": "Push when mentioned — default on."
+    },
+    "pushOnEveryMessage": {
+      "text": "Pushmelding bij elk bericht",
+      "doc": "Push on every message — default off."
+    },
+    "flowThrough": {
+      "text": "Doorstroom naar Mijn dingen",
+      "doc": "Override section: route circle items into my personal circle."
+    },
+    "tasksToPersonal": {
+      "text": "Taken → Mijn dingen",
+      "doc": "Override: claimed circle tasks land in my personal list."
+    },
+    "calendarToPersonal": {
+      "text": "Agenda → mijn agenda",
+      "doc": "Override: circle events also show in my calendar."
+    }
+  },
+  "member": {
+    "notifications": {
+      "section_title": {
+        "text": "Meldingen",
+        "doc": "α.5b · audit #6 — heading of the per-kring push-toggles block on the personal override sheet (board 6A)."
+      },
+      "on_mention": {
+        "text": "Bij @-vermelding",
+        "doc": "α.5b — push toggle: notify me when someone @-mentions me in this circle (default on)."
+      },
+      "on_message": {
+        "text": "Bij elk bericht",
+        "doc": "α.5b — push toggle: notify me for every new chat message in this circle (default off — noisy)."
+      },
+      "on_new_item": {
+        "text": "Bij nieuw item",
+        "doc": "α.5b — push toggle: notify me when a new noticeboard / agenda / task / announcement item is added in this circle (default on)."
+      },
+      "on_proposal": {
+        "text": "Bij nieuw voorstel",
+        "doc": "α.5b — push toggle: notify me when a multi-admin voorstel (P6.2) is created in this circle (default on)."
+      }
+    }
+  },
+  "availability": {
+    "title": {
+      "text": "Beschikbaarheid",
+      "doc": "Cross-circle availability screen heading (board 6C)."
+    },
+    "holiday": {
+      "text": "Vakantiestand",
+      "doc": "Availability section: away until a date."
+    },
+    "holiday_on": {
+      "text": "Vakantiestand aan",
+      "doc": "Holiday toggle label."
+    },
+    "holiday_until": {
+      "text": "Tot en met",
+      "doc": "Holiday end-date label."
+    },
+    "extend_7": {
+      "text": "+ 7 dagen",
+      "doc": "Extension shortcut (P6.M5)."
+    },
+    "extend_14": {
+      "text": "+ 14 dagen",
+      "doc": "Extension shortcut (P6.M5)."
+    },
+    "edit_end": {
+      "text": "Einddatum aanpassen",
+      "doc": "Opens absolute date picker."
+    },
+    "quietHours": {
+      "text": "Stilte-uren",
+      "doc": "Availability section: defer pushes in a window."
+    },
+    "quiet_on": {
+      "text": "Pushmeldingen uitstellen tijdens stilte-uren",
+      "doc": "Quiet-hours toggle label."
+    },
+    "from": {
+      "text": "Van",
+      "doc": "Quiet-hours start time label."
+    },
+    "to": {
+      "text": "Tot",
+      "doc": "Quiet-hours end time label."
+    },
+    "weekends": {
+      "text": "In het weekend ook overdag",
+      "doc": "Quiet-hours weekend toggle label."
+    }
+  },
+  "holiday": {
+    "autoReply": {
+      "text": "{{name}} is t/m {{until}} niet bereikbaar.",
+      "doc": "Outgoing auto-reply (P6.M5)."
+    },
+    "autoReplyAnon": {
+      "text": "Deze persoon is t/m {{until}} niet bereikbaar.",
+      "doc": "Anon form."
+    },
+    "autoReplyNoEnd": {
+      "text": "{{name}} is niet bereikbaar.",
+      "doc": "No-end form."
+    },
+    "autoReplyAnonNoEnd": {
+      "text": "Deze persoon is niet bereikbaar.",
+      "doc": "Anon + no-end."
+    }
+  },
+  "viewAs": {
+    "title": {
+      "text": "Bekijk als…",
+      "doc": "Heading of the View-as reveal preview (board 4C)."
+    },
+    "stranger": {
+      "text": "Een vreemde",
+      "doc": "View-as viewer option: a non-member."
+    },
+    "agent": {
+      "text": "Een agent",
+      "doc": "View-as viewer option: an LLM agent."
+    },
+    "empty": {
+      "text": "Nog geen leden om te bekijken.",
+      "doc": "Empty state for View-as."
+    },
+    "revealed": {
+      "text": "naam zichtbaar",
+      "doc": "Badge: this member's real name is visible to the chosen viewer."
+    },
+    "hidden": {
+      "text": "naam verborgen",
+      "doc": "Badge: this member shows only a handle to the chosen viewer."
+    }
+  },
+  "advisor": {
+    "title": {
+      "text": "Raadgever",
+      "doc": "Heading of the circle Advisor (board 3D)."
+    },
+    "none": {
+      "text": "Nu niets om te melden.",
+      "doc": "Advisor: calm state, no advice."
+    },
+    "too_busy_btn": {
+      "text": "Ik heb het te druk",
+      "doc": "Advisor: member logs a 'too busy' strain signal."
+    },
+    "too_busy_logged": {
+      "text": "Genoteerd — bedankt voor het signaal.",
+      "doc": "Confirmation after logging a too-busy signal."
+    },
+    "advice_too_busy": {
+      "text": "Deze kring kreeg {{count}} 'te druk'-signalen in twee weken terwijl het drukker wordt. Overweeg de last te delen — voeg een mede-admin toe of splits een deelkring af.",
+      "doc": "Advice card for the too-busy + growth rule; {{count}} interpolated."
+    },
+    "dismiss": {
+      "text": "Sluiten",
+      "doc": "Dismiss the advice card."
+    }
+  },
+  "hop": {
+    "title": {
+      "text": "Hoppen",
+      "doc": "Heading of the hopping screen (board 7)."
+    },
+    "global_label": {
+      "text": "Laat vertrouwde contacten mijn vraag één stap doorgeven",
+      "doc": "Global hop-mode toggle (Stoop allowHopThrough)."
+    },
+    "explain": {
+      "text": "Als je iets vraagt dat niemand dichtbij heeft, kan een contact die dat toestaat je vraag één stap verder doorgeven — aan hún contacten. Maximaal één hop, en de doorgifte is anoniem.",
+      "doc": "Explanation of how hopping works."
+    },
+    "ask_relay": {
+      "text": "Vraag om door te geven",
+      "doc": "Button: ask the gate contact to relay the request one hop."
+    },
+    "over_limit": {
+      "text": "Te veel hops — vragen reizen maximaal één stap.",
+      "doc": "Shown when a chain exceeds max-one-hop."
+    },
+    "per_contact_title": {
+      "text": "Per contact",
+      "doc": "Board 7B section (P6.M6)."
+    },
+    "mode_always": {
+      "text": "Altijd",
+      "doc": "Per-contact mode."
+    },
+    "mode_withOk": {
+      "text": "Met mijn OK",
+      "doc": "Per-contact mode."
+    },
+    "mode_off": {
+      "text": "Uit",
+      "doc": "Per-contact mode."
+    },
+    "default_label": {
+      "text": "Standaard",
+      "doc": "Chip for global-stance fallback."
+    }
+  },
+  "skills": {
+    "editor_title": {
+      "text": "Vaardigheid",
+      "doc": "Skill editor heading (board 8)."
+    },
+    "matches_title": {
+      "text": "Matches",
+      "doc": "Skill match-list heading."
+    },
+    "no_matches": {
+      "text": "Nog geen matches",
+      "doc": "Empty state for the skill match list."
+    },
+    "axis": {
+      "openness": {
+        "text": "Openheid",
+        "doc": "Skill axis: how openly it is shared."
+      },
+      "posture": {
+        "text": "Houding",
+        "doc": "Skill axis: fixed vs negotiable offer."
+      },
+      "status": {
+        "text": "Status",
+        "doc": "Skill axis: lifecycle."
+      },
+      "radius": {
+        "text": "Bereik",
+        "doc": "Skill axis: how far it reaches."
+      }
+    },
+    "opt": {
+      "private": {
+        "text": "Privé",
+        "doc": "Openness option."
+      },
+      "circle": {
+        "text": "Deze kring",
+        "doc": "Openness option."
+      },
+      "contacts": {
+        "text": "Contacten",
+        "doc": "Openness option."
+      },
+      "public": {
+        "text": "Openbaar",
+        "doc": "Openness option."
+      },
+      "always": {
+        "text": "Altijd",
+        "doc": "Posture option."
+      },
+      "negotiable": {
+        "text": "Bespreekbaar",
+        "doc": "Posture option."
+      },
+      "active": {
+        "text": "Actief",
+        "doc": "Status option."
+      },
+      "paused": {
+        "text": "Gepauzeerd",
+        "doc": "Status option."
+      },
+      "archived": {
+        "text": "Gearchiveerd",
+        "doc": "Status option."
+      },
+      "home": {
+        "text": "Thuis",
+        "doc": "Radius option."
+      },
+      "street": {
+        "text": "Straat",
+        "doc": "Radius option."
+      },
+      "neighbourhood": {
+        "text": "Buurt",
+        "doc": "Radius option."
+      },
+      "city": {
+        "text": "Stad",
+        "doc": "Radius option."
+      }
+    },
+    "source": {
+      "human": {
+        "text": "Persoon",
+        "doc": "Match source badge: a human."
+      },
+      "agent": {
+        "text": "Agent",
+        "doc": "Match source badge: an LLM agent."
+      },
+      "via-hop": {
+        "text": "Via contact",
+        "doc": "Match source badge: reached via a one-hop relay."
+      }
+    }
+  },
+  "folio": {
+    "title": {
+      "text": "Bestanden",
+      "doc": "Circle file-browser heading (board 10B)."
+    },
+    "all": {
+      "text": "Alles",
+      "doc": "File filter: all files."
+    },
+    "favourites": {
+      "text": "Favorieten",
+      "doc": "File filter: favourited files."
+    },
+    "recent": {
+      "text": "Recent",
+      "doc": "File filter: recently changed files."
+    },
+    "empty": {
+      "text": "Nog geen bestanden in deze kring.",
+      "doc": "Empty state for the circle file browser."
+    },
+    "empty_folder": {
+      "text": "Deze map is leeg.",
+      "doc": "N5 — empty state when a folder has no subfolders or files."
+    },
+    "root": {
+      "text": "Bestanden",
+      "doc": "N5 — root breadcrumb label for the Folio folder tree."
+    },
+    "folder_count": {
+      "text": "{{count}} item(s)",
+      "doc": "N5 — file count badge on a folder row; {{count}} interpolated."
+    },
+    "source_index": {
+      "text": "In de app",
+      "doc": "N5 — Folio source toggle: the in-app file index."
+    },
+    "source_pod": {
+      "text": "Mijn pod",
+      "doc": "N5 — Folio source toggle: the user's real signed-in pod."
+    },
+    "connect_pod": {
+      "text": "Verbind je pod om hier je bestanden te bekijken.",
+      "doc": "N5 — shown when the pod source is picked but no pod is signed in."
+    },
+    "my_things_title": {
+      "text": "Mijn dingen",
+      "doc": "Board 10A heading (P6.M7)."
+    },
+    "my_things_empty": {
+      "text": "Nog niets — wat je voor jezelf houdt komt hier.",
+      "doc": "Empty state on the My-things notes-list."
+    },
+    "shared_by_me": {
+      "text": "Door mij gedeeld",
+      "doc": "Board 10B filter (P6.M8)."
+    },
+    "shared_with_me": {
+      "text": "Met mij gedeeld",
+      "doc": "Board 10B filter (P6.M8)."
+    },
+    "shared_by_me_empty": {
+      "text": "Je hebt nog niets gedeeld.",
+      "doc": "Empty state for the Shared-by-me filter."
+    },
+    "shared_with_me_empty": {
+      "text": "Niemand heeft nog iets met je gedeeld.",
+      "doc": "Empty state for the Shared-with-me filter."
+    }
+  },
+  "pol": {
+    "title": {
+      "text": "Locatiebewijs",
+      "doc": "PoL row heading (board 10C, slice 5.9d)."
+    },
+    "notConfigured": {
+      "text": "Niet geconfigureerd",
+      "doc": "Empty state for the PoL row."
+    },
+    "attestedAt": {
+      "text": "Bevestigd op {{time}}",
+      "doc": "Populated PoL state with {{time}} substitution."
+    }
+  },
+  "wederkerigheid": {
+    "unavailable": {
+      "text": "{{name}} ontvangt geen chat-berichten in {{circle}}.",
+      "doc": "Board 5C notice (P6.4)."
+    },
+    "unavailable_anon": {
+      "text": "Deze persoon ontvangt geen chat-berichten in deze kring.",
+      "doc": "Anon form of the notice."
+    },
+    "save": {
+      "text": "Bewaar bericht",
+      "doc": "Queue-for-later CTA."
+    },
+    "withdraw": {
+      "text": "Trek bericht in",
+      "doc": "Discard the typed message."
+    },
+    "no_delivery_note": {
+      "text": "{{name}} krijgt geen melding dat je iets probeerde.",
+      "doc": "Board 5C non-event clarification."
+    }
+  },
+  "hopPrompt": {
+    "title": {
+      "text": "Verder zoeken?",
+      "doc": "Board 7A auto-hop-prompt card heading (P6.6)."
+    },
+    "body": {
+      "text": "Niemand in je kringen matcht \"{{skill}}\". Wil je verder zoeken via je {{count}} contact(en)?",
+      "doc": "Card body."
+    },
+    "body_anon": {
+      "text": "Niemand in je kringen matcht. Wil je verder zoeken via je {{count}} contact(en)?",
+      "doc": "Anon body."
+    },
+    "accept": {
+      "text": "Ja, één stap verder",
+      "doc": "Primary CTA."
+    },
+    "dismiss": {
+      "text": "Laat maar",
+      "doc": "Secondary CTA."
+    }
+  },
+  "skillMatches": {
+    "title": {
+      "text": "Leden met passende vaardigheden:",
+      "doc": "Heading for the inline skill-match list (P6.7 #345)."
+    }
+  },
+  "nearbyScreen": {
+    "title": {
+      "text": "In de buurt",
+      "doc": "Board 8C — heading of the `HIER` screen (P6.8)."
+    },
+    "header": {
+      "text": "{{sharing}} van {{total}} delen skills met jou",
+      "doc": "Header line."
+    },
+    "header_empty": {
+      "text": "Op dit moment niemand in de buurt.",
+      "doc": "Empty state."
+    },
+    "anon_peer": {
+      "text": "iemand",
+      "doc": "Fallback row label."
+    },
+    "own_profile": {
+      "text": "Wat anderen van jou zien",
+      "doc": "Footer heading."
+    },
+    "own_profile_empty": {
+      "text": "Je hebt nog geen skills gepubliceerd.",
+      "doc": "Empty-skills footer."
+    }
+  },
+  "viewAsSplit": {
+    "sees": {
+      "text": "Wat {{viewer}} ziet",
+      "doc": "Board 4C column header."
+    },
+    "sees_anon": {
+      "text": "Wat ze zien",
+      "doc": "Anon form."
+    },
+    "hides": {
+      "text": "Wat {{viewer}} niet ziet",
+      "doc": "Board 4C column header."
+    },
+    "hides_anon": {
+      "text": "Wat ze niet zien",
+      "doc": "Anon hidden form."
+    },
+    "header": {
+      "text": "{{visible}} van {{total}} attributen zichtbaar",
+      "doc": "Optional summary."
+    },
+    "openness": {
+      "public": {
+        "text": "Publiek",
+        "doc": "Openness chip."
+      },
+      "public-locale": {
+        "text": "Publiek · in mijn omgeving",
+        "doc": "Openness chip."
+      },
+      "members": {
+        "text": "Leden",
+        "doc": "Openness chip."
+      },
+      "circle-members": {
+        "text": "Alleen deze kring",
+        "doc": "Openness chip."
+      },
+      "pairwise": {
+        "text": "1-op-1 onthuld",
+        "doc": "Openness chip."
+      },
+      "family": {
+        "text": "Familie",
+        "doc": "Openness chip."
+      },
+      "private": {
+        "text": "Privé",
+        "doc": "Openness chip."
+      }
+    }
+  },
+  "podMigration": {
+    "same": {
+      "text": "Geen wijziging.",
+      "doc": "Internal."
+    },
+    "unknown": {
+      "text": "Onbekende pod-keuze.",
+      "doc": "Defensive fallback."
+    },
+    "up_empty": {
+      "text": "Nog niets te migreren — de kring is leeg.",
+      "doc": "Going up + empty."
+    },
+    "up_with_content": {
+      "text": "Bestaande inhoud wordt naar de nieuwe opslag verplaatst.",
+      "doc": "Going up + has content."
+    },
+    "down_with_content": {
+      "text": "Teruggaan voegt inhoud samen — items die niet meer passen worden samengevoegd of verdwijnen. Vraag de andere admin eerst.",
+      "doc": "Going down (non-none)."
+    },
+    "down_to_none": {
+      "text": "Terug naar \"geen pod\" kan niet zodra er inhoud in een pod staat. Vraag de andere admin als je echt opnieuw wil beginnen.",
+      "doc": "Going to none (blocked)."
+    }
+  },
+  "agentRequest": {
+    "title": {
+      "text": "{{requester}} wil een agent toevoegen",
+      "doc": "Board 4B card heading (P6.10)."
+    },
+    "title_anon": {
+      "text": "Een agent wacht op admin-goedkeuring",
+      "doc": "Anon form."
+    },
+    "who": {
+      "text": "Wie",
+      "doc": "Label."
+    },
+    "whoBody": {
+      "text": "{{name}}",
+      "doc": "Agent identity body."
+    },
+    "what": {
+      "text": "Wat doet 'ie",
+      "doc": "Capabilities label."
+    },
+    "access": {
+      "text": "Toegang",
+      "doc": "Access-levels label."
+    },
+    "approve": {
+      "text": "Goedkeur",
+      "doc": "Primary CTA."
+    },
+    "reject": {
+      "text": "Weiger",
+      "doc": "Secondary CTA."
+    },
+    "ask": {
+      "text": "Vragen…",
+      "doc": "Tertiary CTA."
+    },
+    "pending": {
+      "text": "In afwachting — wachten op {{who}}.",
+      "doc": "Pending status."
+    },
+    "blocked": {
+      "text": "Deze kring staat geen agents toe.",
+      "doc": "Blocked state."
+    }
+  },
+  "rules": {
+    "title": {
+      "text": "Huisregels",
+      "doc": "Rules editor heading (board 3B)."
+    },
+    "save": {
+      "text": "Regels opslaan",
+      "doc": "Save the rules document."
+    },
+    "preview": {
+      "text": "Voorbeeld (zoals een nieuw lid het ziet)",
+      "doc": "Open the consent preview."
+    },
+    "required_note": {
+      "text": "Vul een doel en de afspraken in om op te slaan.",
+      "doc": "Shown when required rules fields are blank."
+    },
+    "consent_title": {
+      "text": "Voordat je meedoet",
+      "doc": "Rules consent screen heading (board 3C)."
+    },
+    "consent_empty": {
+      "text": "Deze kring heeft nog geen regels opgeschreven.",
+      "doc": "Consent screen with an empty rules doc."
+    },
+    "agree": {
+      "text": "Ik ga akkoord",
+      "doc": "Consent: accept the rules + join."
+    },
+    "decline": {
+      "text": "Nu niet",
+      "doc": "Consent: decline the rules."
+    },
+    "q": {
+      "purpose": {
+        "text": "Waar is deze kring voor?",
+        "doc": "Rules question: purpose."
+      },
+      "admins": {
+        "text": "Wie beheert hem, en wat mogen zij zelf beslissen?",
+        "doc": "Rules question: admins."
+      },
+      "agreements": {
+        "text": "Waar gaat iedereen mee akkoord?",
+        "doc": "Rules question: agreements."
+      },
+      "conflict": {
+        "text": "Hoe los je het op als mensen het oneens zijn?",
+        "doc": "Rules question: conflict approach."
+      },
+      "admission": {
+        "text": "Hoe komt iemand nieuw erbij?",
+        "doc": "Rules question: admission."
+      },
+      "leaving": {
+        "text": "Als iemand vertrekt, wat gebeurt er met hun spullen en taken?",
+        "doc": "Rules question: leaving."
+      },
+      "responsibility": {
+        "text": "Wie is waarvoor verantwoordelijk?",
+        "doc": "Rules field: responsibility (folded into agreements; shown if filled)."
+      }
+    },
+    "field": {
+      "purpose": {
+        "text": "Doel",
+        "doc": "α.1c — rules block short field label."
+      },
+      "admins": {
+        "text": "Beheerders",
+        "doc": "α.1c — rules block short field label."
+      },
+      "agreements": {
+        "text": "Afspraken",
+        "doc": "α.1c — rules block short field label."
+      },
+      "conflict": {
+        "text": "Conflict",
+        "doc": "α.1c — rules block short field label."
+      },
+      "admission": {
+        "text": "Toetreding",
+        "doc": "α.1c — rules block short field label."
+      },
+      "leaving": {
+        "text": "Vertrek",
+        "doc": "α.1c — rules block short field label."
+      },
+      "responsibility": {
+        "text": "Verantwoordelijkheid",
+        "doc": "α.1c — rules block short field label."
+      }
+    },
+    "conflict": {
+      "title": {
+        "text": "Twee van jullie hebben de regels bewerkt",
+        "doc": "γ.4 — modal heading when an incoming rules doc diverges from local; every other resolver locale string is reused from circle.recipe.conflict.*."
+      }
+    }
+  },
+  "create": {
+    "template": {
+      "applied_hint": {
+        "text": "Standaardwaarden ingevuld voor {{kind}}",
+        "doc": "β.4 — confirmation shown after picking a kind in the C1 create-circle wizard; the matching kringTemplate has just pre-filled the policy axes. {{kind}} is the picked kind id (household / buurt / vriendenkring / team)."
+      }
+    }
+  },
+  "kindPicker": {
+    "text": "Soort kring",
+    "doc": "N1+E8 — kind picker legend in the create wizard."
+  },
+  "size": {
+    "label": {
+      "text": "Hoe groot wordt deze buurt?",
+      "doc": "N1 — buurt size question driving the chat advice."
+    },
+    "small": {
+      "text": "Klein (een paar huishoudens)",
+      "doc": "N1 — small buurt size option."
+    },
+    "large": {
+      "text": "Groot (een hele buurt)",
+      "doc": "N1 — large buurt size option."
+    }
+  },
+  "chatToggle": {
+    "text": "Open chat in deze kring",
+    "doc": "N1 — the chat-feature toggle in the create wizard."
+  },
+  "chatAdvice": {
+    "buurtLarge": {
+      "text": "Voor een grotere buurt raden we open chat AF te laten — een drukke iedereen-met-iedereen-chat overweldigt mensen. Reacties op een bericht starten alsnog een gericht gesprek.",
+      "doc": "N1 — advice for a large buurt (chat off)."
+    },
+    "buurtSmall": {
+      "text": "Voor een kleine buurt kan het allebei — open chat kan werken. Standaard staat het uit (prikbord-eerst); zet het aan als jullie dat willen.",
+      "doc": "N1 — advice for a small buurt (ask)."
+    },
+    "buurtDefault": {
+      "text": "Buurten beginnen prikbord-eerst: open chat staat uit, en een gesprek verschijnt pas als iemand op een vraag of aanbod reageert.",
+      "doc": "N1 — neutral buurt chat default note."
+    }
+  },
+  "clarify": {
+    "which": {
+      "text": "Welke “{{query}}” bedoel je?",
+      "doc": "Circle bot asks which item, when a free-text command matches MULTIPLE items in the circle (clarification turn)."
+    },
+    "pick": {
+      "text": "Kies",
+      "doc": "Button label on each candidate in the clarification list."
+    },
+    "notFound": {
+      "text": "Ik kon “{{query}}” niet vinden in deze kring.",
+      "doc": "Circle bot reply when a free-text command target matches NO item in the circle."
+    },
+    "whichMissing": {
+      "text": "Welke bedoel je?",
+      "doc": "Circle bot asks the user to choose when a picker command was given with NO value; a candidate list follows."
+    },
+    "noneToPick": {
+      "text": "Er is hier nog niets om uit te kiezen.",
+      "doc": "Shown after whichMissing when the picker's list is empty."
+    }
+  },
+  "bot": {
+    "ok": {
+      "text": "✓ {{label}}",
+      "doc": "Generic one-line confirmation (verbs other than add/complete)."
+    },
+    "added": {
+      "text": "Toegevoegd: {{label}}",
+      "doc": "Reply after the circle bot adds an item (verb=add/create)."
+    },
+    "completed": {
+      "text": "Afgerond: {{label}}",
+      "doc": "Reply after the circle bot completes an item (verb=complete)."
+    },
+    "done": {
+      "text": "Klaar.",
+      "doc": "Circle-bot confirmation when the reply has no specific label."
+    },
+    "listed": {
+      "text": "{{n}} item(s) gevonden.",
+      "doc": "Circle-bot reply for a list command (fallback when items have no labels)."
+    },
+    "listEmpty": {
+      "text": "Niks open hier.",
+      "doc": "Circle-bot reply for an empty list."
+    },
+    "failed": {
+      "text": "Dat lukte niet: {{msg}}",
+      "doc": "Circle-bot reply when the dispatch threw."
+    },
+    "needsInfo": {
+      "text": "Ik heb daar iets meer detail voor nodig.",
+      "doc": "Circle-bot reply for a multi-field needsForm."
+    },
+    "unknown": {
+      "text": "Ik kon daar geen actie van maken.",
+      "doc": "Circle-bot reply when the input didn't resolve to a known command."
+    }
+  },
+  "nearby": {
+    "label": {
+      "text": "In de buurt",
+      "doc": "Label for the passive local-network 'who's here' row on the v2 launcher (5.9c)."
+    },
+    "count": {
+      "text": "{{count}} apparaten",
+      "doc": "Device count formatted by formatNearbyLabel; {{count}} interpolated."
+    }
+  }
+}

@@ -14,8 +14,12 @@
 import { describe, it, expect } from 'vitest';
 
 import { normalizeQuickReplies } from '../src/core/quickReplies.js';
-import en from '../locales/en.json' with { type: 'json' };
-import nl from '../locales/nl.json' with { type: 'json' };
+import enRaw from '../locales/en.json' with { type: 'json' };
+import nlRaw from '../locales/nl.json' with { type: 'json' };
+import { sharedCircleLocale } from '../src/locales/index.js';
+// `circle.*` now lives in the shared source; merge it back to check the effective bundle.
+const en = { ...enRaw, circle: sharedCircleLocale.en };
+const nl = { ...nlRaw, circle: sharedCircleLocale.nl };
 
 describe('normalizeQuickReplies — empty / absent input', () => {
   it('returns undefined when input is absent', () => {

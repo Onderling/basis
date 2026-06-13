@@ -28,9 +28,12 @@ adds a **capability layer** that says *who may invoke which atom, in which kring
 ## Three building blocks
 
 1. **Atomic capabilities — the platform's "instruction set."** The primitives every node exposes and a user
-   actually trusts at the bottom: *create-task · send-message · start-stream · connect (mDNS / BT) · authenticate
-   · pod read/write · schedule-job · call-LLM.* These are the lowest waist ops. They are device-independent and
-   exist once, in the substrates.
+   actually trusts at the bottom: *create-task · send-message · start-stream · negotiate (a2a) · connect (mDNS /
+   BT) · authenticate · pod read/write · schedule-job · call-LLM.* These are the lowest waist ops, device-
+   independent, defined once. **They already exist in the core SDK** (`packages/core/src/protocol/` —
+   `messaging`, `streaming`, `taskExchange`/`Task`, `pubSub`, `fileSharing`, `session`; `a2a/` — agent-to-agent
+   negotiation; `skills/` — `defineSkill`/`SkillRegistry`/`capabilities`, the op-registration mechanism). The atom
+   set is **discovered, not invented** — see "the atom set already exists" below.
 2. **App ops = compositions.** A manifest op (`feedback.submit`, `household.addItem`) is a composition that
    ultimately bottoms out in atomic capabilities (write a pod doc, send a message, start a stream…). The manifest
    declares the composite; the substrate provides the atoms.
@@ -49,7 +52,18 @@ capability may touch.
 
 Two design choices carry this whole idea, and both have well-trodden prior art.
 
-**The atom set is an instruction set (ISA) — treat it like one.** What makes it right:
+**Correction (Frits, 2026-06-13): you already have the atoms — don't invent a new ISA.** The core SDK already
+ships tasks, streams, messages, negotiation (a2a), pub/sub, file-sharing and sessions as atomic primitives
+(`packages/core/src/{protocol,a2a,skills}`). They **stay part of canopy-chat**; *forms* is the main gap to add.
+So the atom set is **discovered, not designed** — and the real work is **strict mapping**: a slash-command refers
+to *(a set of)* opIDs, and every opID must **always** bottom out in these basal SDK primitives. That's *mostly*
+true today but not *enforced* — making it strict is precisely what unlocks safe **external / downloadable
+slash-commands**, because a composition can then only reference opIDs that bottom out in granted atoms.
+**Consequence (kijken hoe dit kan):** the current app ops (feedback, household, …) must be realigned to *compose
+over the atoms* rather than carry bespoke logic — an audit + refactor, tied to W3 (carve app-bundles).
+
+**Treat that SDK atom set as an instruction set (ISA).** The properties to hold it to (and that the strict
+mapping must preserve):
 - **Small + stable.** Like a VM's opcode set or eBPF's fixed helper functions — you rarely *add* atoms, you
   *compose* them. Churn at this layer breaks every downloaded composition, so the bar to add an atom is high.
 - **Independently grantable.** Each atom is a capability you can grant / deny / attenuate on its own
@@ -183,24 +197,27 @@ bundles; 3 is opt-in-later; 4 is the escape valve.
 
 These extend `REMAINING-WORK.md` W0–W6; none start until the user says go.
 
-1. **Name the atomic-capability instruction set + the composition format.** Enumerate the substrate primitives
-   (create-task, send-message, start-stream, connect-mDNS/BT, authenticate, pod r/w, schedule, call-LLM) as the
-   canonical atom list; define the composition data-format (sequence / branch / bind-args over atom calls) **and a
-   verifier that a composition references only declared atoms** — the sandbox-by-construction guarantee. (Builds
-   on W2 — the kring-host substrate.)
-2. **Capability-grant model (ocap).** Scoped, revocable, attenuable grant tokens pinned to a kring; the
+1. **Catalogue the SDK atom set + make the opID→atom mapping strict.** The atoms already exist
+   (`packages/core/src/{protocol,a2a,skills}`: tasks, streams, messages, a2a-negotiation, pub/sub, file-sharing,
+   sessions) — *catalogue* them, **add forms** (the one gap, kept in canopy-chat), define the composition
+   data-format (sequence / branch / bind-args over atom calls) **+ a verifier that every opID decomposes only to
+   declared atoms** (the sandbox-by-construction guarantee, enforced as a **W0 fitness function**). (Builds on W2.)
+2. **Realign current ops to the atoms.** Audit feedback / household / tasks / stoop ops and refactor any that
+   carry bespoke logic so each is a *composition over the SDK atoms* — the precondition for placing their
+   slash-commands externally. *Kijken hoe dit kan.* (Part of W3.)
+3. **Capability-grant model (ocap).** Scoped, revocable, attenuable grant tokens pinned to a kring; the
    op→atom decomposition tree; "grant high implies subtree." Likely an extension of the existing ACP/agent-browser
    grant path, not a new protocol.
-3. **kring-admin install flow.** Admin installs a bundle → it joins the kring as an agent → members are prompted to
+4. **kring-admin install flow.** Admin installs a bundle → it joins the kring as an agent → members are prompted to
    grant the atoms it needs → its ops appear via the manifest projectors (slash + chat + gate). (Tier 1 first.)
-4. **Per-atom placement.** Let each atom resolve to *local* (member's node) or *central* (admin / personal server)
+5. **Per-atom placement.** Let each atom resolve to *local* (member's node) or *central* (admin / personal server)
    by trust + latency — the W6 placement spectrum, now per-atom inside a shared kring.
-5. **Managed personal-server option.** For the N = 1 case + non-self-hosters: single-tenant, user-keyed hosting
+6. **Managed personal-server option.** For the N = 1 case + non-self-hosters: single-tenant, user-keyed hosting
    (managed-Solid-pod model extended to compute); enclave variant = provider-blind. (W6.)
-6. **Plugin-manager UI (mobile-first) with AI-explained grants.** Install / grant / revoke / inspect-capabilities,
+7. **Plugin-manager UI (mobile-first) with AI-explained grants.** Install / grant / revoke / inspect-capabilities,
    in the app — with the consent step driven by the assistant (see "AI-mediated consent" below), not a raw
    permission wall. The user-facing face of tiers 1–2.
-7. **Store-compliance pass.** Tier-1/2 in the Play/Apple builds; tier-3 (WASM) gated behind a policy review and a
+8. **Store-compliance pass.** Tier-1/2 in the Play/Apple builds; tier-3 (WASM) gated behind a policy review and a
    hard capability sandbox; web/self-host channel for anything code-carrying; Data Safety + permissions audit.
 
 ---
@@ -236,5 +253,8 @@ because the stakes (a clear, honest consent) are exactly where plain language ea
   trust *explicit and visible*, never implicit.
 - **Revocation + offline.** Revoking a capability must propagate even though members are local-first/offline;
   define the semantics (lease/expiry vs. push-revoke).
+- **Op realignment is unscoped.** We don't yet know how many current feedback/household/tasks/stoop ops are
+  *already* clean compositions over the SDK atoms vs. carry bespoke logic. The strict-mapping audit (step 2) has
+  to come back before "external slash-commands" is a real promise — *kijken hoe dit kan*.
 - **Tier-3 is a genuine security + policy lift** — keep it parked until tiers 1–2 prove the model.
 - **Naming.** If `canopy → rhizome` happens, the capability/kring vocabulary should be settled in the same pass.

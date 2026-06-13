@@ -1443,7 +1443,11 @@
       },
       "listed": {
         "text": "Found {{n}} item(s).",
-        "doc": "Circle bot — summary when a command returns a list."
+        "doc": "Circle bot — summary when a command returns a list (fallback when items have no labels)."
+      },
+      "listEmpty": {
+        "text": "Nothing open here.",
+        "doc": "Circle bot — reply for an empty list."
       },
       "needsInfo": {
         "text": "I need a bit more detail for that.",

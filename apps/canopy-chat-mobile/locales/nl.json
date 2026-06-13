@@ -1445,6 +1445,10 @@
         "text": "{{n}} item(s) gevonden.",
         "doc": "Circle bot — summary when a command returns a list."
       },
+      "listEmpty": {
+        "text": "Niks open hier.",
+        "doc": "Circle bot — reply for an empty list."
+      },
       "needsInfo": {
         "text": "Ik heb daar iets meer detail voor nodig.",
         "doc": "Circle bot — the command needs more args than the message gave."

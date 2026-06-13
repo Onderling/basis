@@ -70,6 +70,16 @@ The model (opId+args · manifests · projectors · adapters) is **right and stay
   - **external third-party apps** — same bundle shape, built against the **Solid pod + agent SDK** (pod **ACPs**
     are the access contract), rendered by the same generic client; never touch the main repo.
     [[feedback-agent-is-just-a-user]] already encodes "an app/agent is a user."
+  - **composition / "editions"** *(where "the whole" gets integrated — NOT baked into the shell):* the shell
+    (kring-host + renderer + look) hosts *whatever apps are registered* and knows nothing about household/buurt
+    specifically. The composition **machinery** (merge manifests · scope/permission per circle · register apps)
+    is the core **kring-host / `manifest-host` substrate** (+ `scopeCatalogToApps`); the **choice** of which
+    apps is **data** at three levels — **per-circle** (`policy.apps`, the live default: a household-kring loads
+    household, a buurt-kring neighborhood, a mixed kring both — *already exists*) · per-deployment · per-build
+    **edition** (a pre-bundled set so a lean build skips apps it won't load). So **canopy-chat is ONE shell;
+    "lean" vs "full" are two *editions*** (a meta-manifest of `{shell, theme, apps}` — data), **not two forks**.
+    Unifies with apps-as-data: an *app* = manifest+handlers; an *edition* = a manifest-of-manifests; a *circle*
+    = a runtime selection — three composition levels, one machinery, all data (an edition could even be downloaded).
 
 - **Apps-as-data — plugin spectrum** *(exploration; manifests are data, and so is `{opId,args}` — the call;
   the handler is the question):*

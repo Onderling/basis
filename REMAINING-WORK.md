@@ -139,6 +139,18 @@ Detail: `apps/canopy-chat/docs/circle-bot-token-gate-TODO.md` · `[[project-circ
 - **Smoke checkpoints owed** **[blocked: device/manual]** — web smoke for the 2026-05-24 wave
   (#218/#219/#231.*), first canopy-chat-mobile Android boot, tasks/stoop-mobile screens (#226–#228).
   (Mobile circle-bot boot now DONE — device run 2026-06-10.)
+- **Circle bot conversation context (memory)** **[code-ready, moderate — highest-value UX next]** — the
+  circle bot's `interpretToCommand` is STATELESS: each addressed turn is interpreted on its own, so
+  follow-ups that depend on the previous turn fail. Surfaced 2026-06-13 testing the new in-circle household
+  shopping-lists against a Privatemode model (kimi): `@assistant kun je kaas op de lijst zetten` → addItem
+  ✅, but `@assistant en schoenen ook` ("and shoes too") → no-match, because it has nothing to attach to.
+  The bot ALREADY accepts `interpret(text, { …, context })` (today fed the gate's RAG retrieve); thread the
+  **last few KRING TURNS** into that context so the model sees the recent exchange → "and X too" / "remove
+  the milk" / "that one" start working. Connects to §3's memory uplift but is a much smaller, circle-bot-
+  local change (no store / vector-DB). Verify live against an LLM. NB groundwork already landed: in-circle
+  household shopping-lists work (`addItem` + typed `listOpen` + LLM-friendly descriptors, `ac539492`); the
+  bot no longer goes silent on a no-tool turn (`onNoMatch` reply, `031e124b`/`ed37de4c`); the list reply
+  enumerates items; and the shared `circle.*` locale block was consolidated (`8f31a447`/`0f1fa404`).
 
 ---
 
@@ -255,6 +267,9 @@ code-ready moves (was #3–#6, now the top of the list):*
 5. **Multi-field inline form in the kring** (§2) — the one composer-parity follow-up left: a 2+-missing
    `needsForm` still shows a "needs more info" bubble; lift mobile's `MultiFieldFormBubble` to render an
    inline form. Small. (Single-field elicitation already ships.)
+6. **Circle bot conversation context** (§2) — **highest-value UX next.** Thread the last few kring turns
+   into `interpretToCommand`'s existing `context` param so follow-ups ("en schoenen ook", "remove the
+   milk", "that one") resolve. Circle-bot-local (no store); verify live against an LLM. See §2 detail.
 *Then the deferred gate/surface parts:* **F-retrieve** (= P3 sealedIndex semanticQuery), **E** (inline
 menus), **A** (engine-parity → `@canopy/manifest-host`), **G** remaining apps (tasks-v0, stoop+household).
 *Non-blocking polish:* `makeResolvingCallSkill` catalog-blind probe-storm + NKN noise; `getMyTasks`

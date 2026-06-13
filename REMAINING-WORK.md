@@ -47,21 +47,39 @@ The model (opId+args · manifests · projectors · adapters) is **right and stay
   - **1. Consolidate the remaining dup** (= §6 / §7-G + the code-ready cleanups) — locales (`chat`/`common`/…),
     the cross-app reimplementations, real↔mock manifests. Fitness functions keep it from re-diverging.
   - **2. Split the repos** along the now-enforced seams (below). *You can't cleanly cut what isn't cleanly enforced.*
-- **Repo cut-lines** (after 0–1):
-  - **clients** — web + mobile; thin **generic renderers** of whatever manifest they're handed + a transport
-    adapter. The manifest is the contract but is **authored core-side** (below), *not* owned by the client —
-    which is exactly what lets a third-party app ship a manifest the same client renders. *(Frits: right — so
-    manifests belong with the core, not the thin layer.)*
-  - **substrate / functionality = the agent SDK + substrates (`@canopy/*`)** — core, packages, dispatch,
-    transport, pods, sealing, **and the manifests** (a manifest is the functionality declaring itself), + the
-    already-server-side bits (pod-hosting, proxy, private LLM) as a deploy unit. "Server-side" here =
-    **extraction** of code that already exists; sensitive compute stays client-side or in an **attested
-    enclave** — placed by **trust + latency**, never default-to-server. *(Frits: yes — this repo IS the agent SDK.)*
-  - **feedback app → its own repo** for its app-specific surface (project-start, KLAI compat), depending on
-    the SDK/substrate as a package.
-  - **third-party apps** *(long game)* — external devs build against the **Solid pod + the agent SDK** (pod
-    **ACPs** are the access contract) without touching the main repo; the agent-browser renders such an app.
-    The SDK's whole point; [[feedback-agent-is-just-a-user]] already encodes "an app/agent is a user."
+- **Repo cut-lines — platform + app-bundles** (Frits's preferred cut, after 0–1; a developer needs the SDK
+  AND a renderer to build, so client+core stay TOGETHER; apps are what plug in):
+  - **`platform`** *(one workspace)* — client (web + mobile, **generic renderers** of whatever manifest
+    they're handed) + core + the agent SDK + substrates (`@canopy/*`) + manifest infra + the **kring host**
+    (the per-circle container that scopes + permissions ops = the **safety boundary**; core *because* it's a
+    security primitive, ACP-family) + the **calendar capability** (scheduling is cross-cutting). The thing a
+    dev clones; publishes the substrate API. Manifests are authored core-side, not in a thin client.
+  - **app bundles** — each = a `manifest.js` + its `{opId,args}` handlers **grounded in the substrates**, no
+    platform internals; first-party but plug in **exactly like third-party** (dogfoods the extensibility API —
+    no privileged backdoor). Grouped by domain: **household + tasks** · **neighborhood (stoop)** · **feedback**
+    (project-start, KLAI compat) · **folio — *its own app, loosely connected*** (files; depends on the pod +
+    SDK but little else — looser than household/neighborhood).
+  - **canopy-chat = a privileged app / skin, NOT core.** The kring *host* is the core substrate (above);
+    canopy-chat is the reference **look** on the generic client. Trajectory: a theming seam now → **look-as-data**
+    (a theme the client consumes — swappable + HQ-updatable, same mechanism as downloadable apps/templates) →
+    keep canopy-chat itself an app bundle so it dogfoods the host. The "encompassing + safe" kring part is core;
+    the "very looks" are not. *(Open: theming seam (`_chrome.css`/design-system) now vs. full look-as-data later.)*
+  - **`infra`** — the already-server-side deploy units (pod-hosting/CSS · relay · Privatemode/LLM gateway ·
+    proxy). "Server-side" = **extraction** of code that already exists; sensitive compute stays client-side or
+    in an **attested enclave** — placed by **trust + latency**, never default-to-server.
+  - **external third-party apps** — same bundle shape, built against the **Solid pod + agent SDK** (pod **ACPs**
+    are the access contract), rendered by the same generic client; never touch the main repo.
+    [[feedback-agent-is-just-a-user]] already encodes "an app/agent is a user."
+
+- **Apps-as-data — plugin spectrum** *(exploration; manifests are data, and so is `{opId,args}` — the call;
+  the handler is the question):*
+  1. **pure-manifest apps** — recompose ops the substrates already expose; 100% data, safe, downloadable
+     (= the same mechanism as remote templates + theming). The new, very buildable tier.
+  2. **remote-handler apps** — manifest downloaded; the handler runs in the plugin's OWN agent; you dispatch
+     `{opId,args}` over the transport + grant scoped pod access via **ACP** (the agent-browser model; supported
+     in principle today). You never run their code.
+  3. **sandboxed-local-code apps (WASM)** — **[FUTURE IDEA]** download the handler into a capability sandbox
+     limited to the granted ops + pod paths; enables *offline* custom logic; a real security/engineering lift.
 
 *(Open naming question — Frits: rename `canopy` → `rhizome`/`raizo`? "Rhizome" — a horizontal, non-hierarchical
 root network — fits the decentralized / no-central-server ethos better than "canopy" (a forest's top crown);

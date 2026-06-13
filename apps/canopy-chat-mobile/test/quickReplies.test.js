@@ -18,8 +18,12 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { normalizeQuickReplies } from '../../canopy-chat/src/core/quickReplies.js';
-import en from '../locales/en.json' with { type: 'json' };
-import nl from '../locales/nl.json' with { type: 'json' };
+import enRaw from '../locales/en.json' with { type: 'json' };
+import nlRaw from '../locales/nl.json' with { type: 'json' };
+import { sharedCircleLocale } from '@canopy-app/canopy-chat';
+// `circle.*` now lives in the shared canopy-chat source; merge it back to check the effective bundle.
+const en = { ...enRaw, circle: sharedCircleLocale.en };
+const nl = { ...nlRaw, circle: sharedCircleLocale.nl };
 
 describe('mobile bubble — quickReplies pass-through (α.5a)', () => {
   it('normaliser produces two pills with labels Ja / Nee + slashes /yes /no', () => {

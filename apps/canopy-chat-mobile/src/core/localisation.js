@@ -10,6 +10,9 @@
  */
 import en from '../../locales/en.json';
 import nl from '../../locales/nl.json';
+// The shared `circle` block lives in ONE place in the canopy-chat package (src/locales/) so web + mobile
+// can't drift; merge it over the mobile-only keys below.
+import { sharedCircleLocale } from '@canopy-app/canopy-chat';
 
 function unwrapLeaves(node) {
   if (node === null || typeof node !== 'object') return node;
@@ -24,8 +27,8 @@ function unwrapLeaves(node) {
 }
 
 const BUNDLES = {
-  en: unwrapLeaves(en),
-  nl: unwrapLeaves(nl),
+  en: unwrapLeaves({ ...en, circle: sharedCircleLocale.en }),
+  nl: unwrapLeaves({ ...nl, circle: sharedCircleLocale.nl }),
 };
 
 let currentLang = 'en';

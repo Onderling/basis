@@ -9,8 +9,12 @@
 import { describe, it, expect } from 'vitest';
 
 import { folioLevel, glyphForFile, formatFileSize } from '@canopy-app/canopy-chat';
-import en from '../locales/en.json';
-import nl from '../locales/nl.json';
+import enRaw from '../locales/en.json';
+import nlRaw from '../locales/nl.json';
+import { sharedCircleLocale } from '@canopy-app/canopy-chat';
+// `circle.*` now lives in the shared canopy-chat source; merge it back to check the effective bundle.
+const en = { ...enRaw, circle: sharedCircleLocale.en };
+const nl = { ...nlRaw, circle: sharedCircleLocale.nl };
 
 // Mirrors the browser folio seed shape (id carries the pod path).
 const ROWS = [

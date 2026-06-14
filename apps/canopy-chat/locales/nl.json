@@ -762,6 +762,38 @@
       "text": "Welke hulp bied je aan?",
       "doc": "Vriendelijkere prompt voor respondToItem.body (via pickPromptKey)."
     },
+    "form_title": {
+      "text": "Voltooi /{{opId}}",
+      "doc": "Titel boven het multi-field kring-formulier (2+ ontbrekende velden → beginFormFollowUp). Spiegelt canopy-chat-mobile zodat web≡mobile."
+    },
+    "form_submit": {
+      "text": "Verstuur",
+      "doc": "Submit-knop op het multi-field kring-formulier."
+    },
+    "form_label_body": {
+      "text": "Bericht",
+      "doc": "Label voor 'body' veld — gebruikt door respondToItem enz."
+    },
+    "form_label_title": {
+      "text": "Titel",
+      "doc": "Label voor 'title' veld."
+    },
+    "form_label_name": {
+      "text": "Naam",
+      "doc": "Label voor 'name' veld."
+    },
+    "form_label_text": {
+      "text": "Tekst",
+      "doc": "Label voor 'text' veld."
+    },
+    "form_label_when": {
+      "text": "Wanneer",
+      "doc": "Label voor 'when' veld — kalender/beschikbaarheid."
+    },
+    "form_label_audience": {
+      "text": "Publiek",
+      "doc": "Label voor 'audience' veld."
+    },
     "file": {
       "open": {
         "text": "Openen",

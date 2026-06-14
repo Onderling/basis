@@ -453,3 +453,77 @@ describe('renderCircleKring · composer parity (slash-suggest + permission gate)
     expect(history.prev()).toBe('hello kring');
   });
 });
+
+describe('renderCircleKring · multi-field inline form (mobile MultiFieldFormBubble parity)', () => {
+  const pendingForm = {
+    kind: 'multi',
+    opId: 'respondToItem',
+    appOrigin: 'stoop',
+    threadId: null,
+    replyShape: 'text',
+    prefilledArgs: { itemId: 'i-7' },
+    fields: [
+      { name: 'body', kind: 'string', label: 'Body' },
+      { name: 'when', kind: 'string', label: 'When' },
+    ],
+    title: 'Complete /respondToItem',
+  };
+
+  it('renders a titled form with one labelled input per missing field', () => {
+    const el = mount();
+    renderCircleKring(el, { circle, rows, t, onSend: vi.fn(), pendingForm, onFormSubmit: vi.fn() });
+    const form = el.querySelector('.circle-kring__form');
+    expect(form).toBeTruthy();
+    expect(form.querySelector('.circle-kring__form-title').textContent).toBe('Complete /respondToItem');
+    const inputs = form.querySelectorAll('.circle-kring__form-input');
+    expect(inputs).toHaveLength(2);
+    expect([...form.querySelectorAll('.circle-kring__form-label')].map((l) => l.textContent)).toEqual(['Body', 'When']);
+    expect(inputs[0].dataset.field).toBe('body');
+    expect(inputs[1].dataset.field).toBe('when');
+  });
+
+  it('keeps submit disabled until every field is filled', () => {
+    const el = mount();
+    renderCircleKring(el, { circle, rows, t, onSend: vi.fn(), pendingForm, onFormSubmit: vi.fn() });
+    const submit = el.querySelector('.circle-kring__form-submit');
+    const [bodyInput, whenInput] = el.querySelectorAll('.circle-kring__form-input');
+    expect(submit.disabled).toBe(true);
+    bodyInput.value = 'I can help'; bodyInput.dispatchEvent(new Event('input'));
+    expect(submit.disabled).toBe(true);          // still one empty
+    whenInput.value = 'Friday';     whenInput.dispatchEvent(new Event('input'));
+    expect(submit.disabled).toBe(false);         // all filled
+  });
+
+  it('submits the collected values to onFormSubmit', () => {
+    const el = mount();
+    const onFormSubmit = vi.fn();
+    renderCircleKring(el, { circle, rows, t, onSend: vi.fn(), pendingForm, onFormSubmit });
+    const [bodyInput, whenInput] = el.querySelectorAll('.circle-kring__form-input');
+    bodyInput.value = 'I can help'; bodyInput.dispatchEvent(new Event('input'));
+    whenInput.value = 'Friday';     whenInput.dispatchEvent(new Event('input'));
+    el.querySelector('.circle-kring__form').dispatchEvent(new Event('submit'));
+    expect(onFormSubmit).toHaveBeenCalledWith({ body: 'I can help', when: 'Friday' });
+  });
+
+  it('does not submit while a field is still empty (gated)', () => {
+    const el = mount();
+    const onFormSubmit = vi.fn();
+    renderCircleKring(el, { circle, rows, t, onSend: vi.fn(), pendingForm, onFormSubmit });
+    const [bodyInput] = el.querySelectorAll('.circle-kring__form-input');
+    bodyInput.value = 'I can help'; bodyInput.dispatchEvent(new Event('input'));
+    el.querySelector('.circle-kring__form').dispatchEvent(new Event('submit'));
+    expect(onFormSubmit).not.toHaveBeenCalled();
+  });
+
+  it('renders no form when pendingForm is null', () => {
+    const el = mount();
+    renderCircleKring(el, { circle, rows, t, onSend: vi.fn() });
+    expect(el.querySelector('.circle-kring__form')).toBeNull();
+  });
+
+  it('suppresses the form in scherm view-mode (not a chat surface)', () => {
+    const el = mount();
+    renderCircleKring(el, { circle, rows, t, onSend: vi.fn(), pendingForm, onFormSubmit: vi.fn(), viewMode: 'scherm' });
+    expect(el.querySelector('.circle-kring__form')).toBeNull();
+  });
+});

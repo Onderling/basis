@@ -459,6 +459,18 @@
 /* Permission gate — chat disabled for the circle: read-only note in place of the composer. */
 .circle-kring__composer-disabled { padding: 12px 0 6px; margin-top: 4px; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 13px; font-style: italic; text-align: center; }
 
+/* Multi-field inline form (mobile MultiFieldFormBubble parity) — sits between the stream and composer when
+   a kring dispatch trips needsForm with 2+ missing fields. */
+.circle-kring__form { display: flex; flex-direction: column; gap: 10px; padding: 14px; margin-top: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--accent-soft, rgba(0,0,0,0.03)); }
+.circle-kring__form-title { font-weight: 600; font-size: 14px; color: var(--ink); }
+.circle-kring__form-field { display: flex; flex-direction: column; gap: 4px; }
+.circle-kring__form-label { font-size: 12px; color: var(--ink-soft); }
+.circle-kring__form-input { padding: 9px 12px; font: inherit; font-size: 14px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); }
+.circle-kring__form-input:focus { outline: none; border-color: var(--accent); }
+.circle-kring__form-submit { align-self: flex-start; padding: 8px 18px; border: none; border-radius: 18px; background: var(--accent); color: #fff; font: inherit; font-size: 14px; cursor: pointer; }
+.circle-kring__form-submit:hover { opacity: 0.92; }
+.circle-kring__form-submit:disabled { background: var(--line); color: var(--ink-soft); cursor: not-allowed; }
+
 /* SP-13.3 — per-kring bottom tab bar + tab-coming placeholder. */
 .circle-kring__tabs { display: flex; justify-content: space-around; align-items: stretch; border-top: 1px solid var(--line); margin-top: 4px; }
 .circle-kring__tab { flex: 1; padding: 12px 6px; background: none; border: none; font: inherit; font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--ink-soft); cursor: pointer; border-top: 2px solid transparent; margin-top: -1px; }

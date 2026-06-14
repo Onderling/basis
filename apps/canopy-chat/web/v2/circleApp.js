@@ -31,7 +31,7 @@ import { createCircleDispatch } from '../../src/v2/circleDispatch.js';
 import { createClarifyingDispatch } from '../../src/v2/clarifyingDispatch.js';
 import { makeCircleLookup } from '../../src/v2/circleLookup.js';
 import { createInputHistory } from '../../src/v2/commandSuggest.js';
-import { beginFollowUp, completeFollowUp } from '../../src/v2/followUp.js';
+import { beginFollowUp, completeFollowUp, beginFormFollowUp, completeMultiFieldFollowUp } from '../../src/v2/followUp.js';
 import { kringReplyText } from '../../src/v2/kringReply.js';
 import { scopeCatalogToApps } from '../../src/v2/circleCatalogScope.js';
 import { createFeedbackSurface } from '../../src/feedback/feedbackSurface.js';
@@ -431,6 +431,7 @@ let circleClarify = null;        // createClarifyingDispatch (for candidate-butt
 let circleCatalog = null;        // the merged dispatch catalog (built in buildCircleBot) — feeds the composer slash-suggest
 let circleDispatchReady = null;  // buildCircleBot's dispatchReady({opId,args}) — used to run a completed follow-up
 let circlePendingFollowUp = null;// a single-field needsForm awaiting the user's next message (conversational elicitation)
+let circlePendingFormFollowUp = null; // a 2+-field needsForm → inline multi-field form (mobile parity); cleared on submit
 let _kringRender = null;         // { circleId, botBubble(text), fanOut(msgId,text,ts) } — set by showKring
 // One bash-style command history for the kring composer, module-level so it survives showKring re-renders
 // (the classic shell keeps a single global history too). Web↔mobile parity via the shared helper.
@@ -497,11 +498,16 @@ function buildCircleBot(agent) {
     catch { _kringRender?.botBubble(t('circle.bot.unknown')); return; }
     if (route.kind === 'needsForm') {
       // Conversational elicitation (chat-native, parity with mobile): a single missing field → ask for
-      // it in the kring and capture the user's NEXT message (onSend's pending-follow-up branch). Multi-
-      // field needsForm keeps the simpler "needs more info" bubble for now (the inline form is a follow-up).
+      // it in the kring and capture the user's NEXT message (onSend's pending-follow-up branch).
       const pending = beginFollowUp({ dispatch: route, t });
-      if (pending) { circlePendingFollowUp = pending; _kringRender?.botBubble(pending.promptText); }
-      else { _kringRender?.botBubble(t('circle.bot.needsInfo')); }
+      if (pending) { circlePendingFollowUp = pending; _kringRender?.botBubble(pending.promptText); return; }
+      // 2+ missing fields → render an inline multi-field form (mobile's MultiFieldFormBubble parity), on
+      // the shared followUp.js. The host owns the pending state; renderCircleKring draws the form and
+      // onFormSubmit completes the dispatch. rerender() so the form appears immediately.
+      const form = beginFormFollowUp({ dispatch: route, t });
+      if (form) { circlePendingFormFollowUp = form; _kringRender?.rerender(); return; }
+      // Neither single nor multi (e.g. no missing param names) → the simple "needs more info" bubble.
+      _kringRender?.botBubble(t('circle.bot.needsInfo'));
       return;
     }
     if (route.kind !== 'ready')     { _kringRender?.botBubble(t('circle.bot.unknown')); return; }
@@ -1092,6 +1098,24 @@ function showKring(id, circle, policy) {
       history: kringInputHistory,
       // Permission gate — chat disabled for this circle ⇒ read-only composer (classic `allowCommands` analog).
       canPost: isFeatureEnabled(policy, 'chat'),
+      // Multi-field inline form (mobile parity). When a kring dispatch trips needsForm with 2+ missing
+      // fields, `circlePendingFormFollowUp` holds the shared `PendingFormFollowUp`; the view renders an
+      // inline labelled form. onFormSubmit completes + runs the dispatch, then clears the pending form.
+      pendingForm: circlePendingFormFollowUp,
+      onFormSubmit: async (values) => {
+        const pending = circlePendingFormFollowUp;
+        if (!pending) return;
+        circlePendingFormFollowUp = null;
+        // Echo the user's filled values as a kring bubble (mirrors mobile's form→summary replacement),
+        // then complete + dispatch via the same path a typed command takes.
+        const summary = (pending.fields || [])
+          .map((f) => `${f.label || f.name}: ${values?.[f.name] ?? ''}`)
+          .join(' · ');
+        if (summary) _kringRender?.userBubble(summary);
+        const ready = completeMultiFieldFollowUp({ pending, values });
+        if (circleDispatchReady) await circleDispatchReady({ opId: ready.opId, args: ready.args });
+        else rerender();
+      },
       // δ.2 — read function so the renderer can look up state per row
       // without us having to pass a fresh snapshot through every prop.
       // Locally-sent bubbles read this to decide which icon to render.
@@ -1193,6 +1217,9 @@ function showKring(id, circle, policy) {
       rerender();
     },
     fanOut: (msgId, text, ts) => broadcastFanOut({ msgId, text, ts: ts ?? Date.now() }),
+    // Repaint without appending a bubble — used when module-level kring state changes outside a message
+    // (e.g. a multi-field needsForm sets `circlePendingFormFollowUp` and the inline form must appear).
+    rerender: () => rerender(),
   };
   rerender();
   // EventLog has no subscribe seam yet; SP-13.2.1 will poll-on-event so

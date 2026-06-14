@@ -762,6 +762,38 @@
       "text": "What help are you offering?",
       "doc": "Friendlier prompt for respondToItem.body (picked via pickPromptKey)."
     },
+    "form_title": {
+      "text": "Complete /{{opId}}",
+      "doc": "Title at the top of the multi-field kring form bubble (2+ missing fields → beginFormFollowUp). Mirrors canopy-chat-mobile so web≡mobile."
+    },
+    "form_submit": {
+      "text": "Submit",
+      "doc": "Submit button on the multi-field kring form bubble."
+    },
+    "form_label_body": {
+      "text": "Body",
+      "doc": "Label for the 'body' field — used by respondToItem etc."
+    },
+    "form_label_title": {
+      "text": "Title",
+      "doc": "Label for the 'title' field."
+    },
+    "form_label_name": {
+      "text": "Name",
+      "doc": "Label for the 'name' field."
+    },
+    "form_label_text": {
+      "text": "Text",
+      "doc": "Label for the 'text' field."
+    },
+    "form_label_when": {
+      "text": "When",
+      "doc": "Label for the 'when' field — calendar/availability ops."
+    },
+    "form_label_audience": {
+      "text": "Audience",
+      "doc": "Label for the 'audience' field."
+    },
     "file": {
       "open": {
         "text": "Open",

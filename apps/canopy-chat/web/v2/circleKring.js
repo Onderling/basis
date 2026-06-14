@@ -86,6 +86,13 @@ export function renderCircleKring(container, {
   // the composer is read-only — `canPost=false` renders a disabled note instead of the input. The host
   // computes it from `isFeatureEnabled(policy, 'chat')`.
   canPost = true,
+  // Multi-field inline form (web↔mobile parity with mobile's `MultiFieldFormBubble`). When a kring
+  // dispatch trips `needsForm` with 2+ missing params, the host sets `pendingForm` to the
+  // `PendingFormFollowUp` (shared `src/v2/followUp.js` `beginFormFollowUp`) and the composer renders an
+  // inline labelled form above it. `onFormSubmit(values)` runs the completed dispatch. Single-missing-field
+  // needsForm still elicits conversationally (one bubble + the next message); this is the 2+ case only.
+  pendingForm = null,
+  onFormSubmit = null,
   t,
 } = {}) {
   const tr = typeof t === 'function' ? t : (k) => k;
@@ -224,6 +231,13 @@ export function renderCircleKring(container, {
     }
   }
   container.appendChild(body);
+
+  // Multi-field inline form (mobile parity). Rendered between the stream and the composer when the host
+  // has a `pendingForm` (a 2+-missing-field needsForm). Pure render: the host owns the pending state and
+  // the submit handler. Suppressed in scherm-mode (not a chat surface). See `renderPendingForm`.
+  if (pendingForm && viewMode !== 'scherm' && typeof onFormSubmit === 'function') {
+    container.appendChild(renderPendingForm(pendingForm, { tr, onFormSubmit }));
+  }
 
   // Composer — text input + send button.  Suppressed in scherm-mode
   // because the recept'd page isn't a chat surface; user flips back
@@ -468,6 +482,75 @@ function renderBubble(row, {
   }
 
   return el;
+}
+
+/**
+ * Inline multi-field form bubble (web analog of mobile's `MultiFieldFormBubble`). Renders a titled card
+ * with one labelled input per missing field + a submit button that stays disabled until every field has a
+ * value. On submit it calls `onFormSubmit(values)` — the host completes the dispatch via
+ * `completeMultiFieldFollowUp`. Pure DOM; no module state.
+ *
+ * @param {import('../../src/v2/followUp.js').PendingFormFollowUp} pending
+ * @param {{ tr: function, onFormSubmit: (values: Object<string,string>) => void }} ctx
+ */
+function renderPendingForm(pending, { tr, onFormSubmit }) {
+  const fields = Array.isArray(pending?.fields) ? pending.fields : [];
+  const values = Object.create(null);
+
+  const form = document.createElement('form');
+  form.className = 'circle-kring__form';
+  form.setAttribute('autocomplete', 'off');
+
+  if (pending?.title) {
+    const title = document.createElement('div');
+    title.className = 'circle-kring__form-title';
+    title.textContent = pending.title;
+    form.appendChild(title);
+  }
+
+  const submit = document.createElement('button');
+  submit.type = 'submit';
+  submit.className = 'circle-kring__form-submit';
+  submit.textContent = tr('chat.form_submit');
+
+  // All fields are required (they're the op's missing required params) → submit enabled only once every
+  // field is non-empty. Mirrors mobile's MultiFieldFormBubble gating.
+  const refreshSubmit = () => {
+    const allFilled = fields.every((f) => String(values[f.name] ?? '').trim() !== '');
+    submit.disabled = !allFilled;
+  };
+
+  for (const f of fields) {
+    const wrap = document.createElement('label');
+    wrap.className = 'circle-kring__form-field';
+
+    const label = document.createElement('span');
+    label.className = 'circle-kring__form-label';
+    label.textContent = f.label || f.name;
+    wrap.appendChild(label);
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'circle-kring__form-input';
+    input.name = f.name;
+    input.dataset.field = f.name;
+    if (f.placeholder) input.placeholder = f.placeholder;
+    input.addEventListener('input', () => { values[f.name] = input.value; refreshSubmit(); });
+    wrap.appendChild(input);
+
+    form.appendChild(wrap);
+  }
+
+  form.appendChild(submit);
+  refreshSubmit();
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (submit.disabled) return;
+    onFormSubmit({ ...values });
+  });
+
+  return form;
 }
 
 function renderDayDivider(ts, tr) {

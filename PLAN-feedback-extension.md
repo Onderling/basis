@@ -97,6 +97,20 @@ The missing primitive that makes "a slash-command that is merely a composite" re
   (what it can do, why, what-if-deny); default-deny; grant scoped to the circle/thread; revocable.
 - **Acceptance:** both journeys pass through an AI-explained consent step; deny blocks; revoke removes surfaces.
 
+### Phase 7 — Extract the feedback repo *(the acceptance test for the whole vertical)*
+Move `apps/feedback-pipeline` (+ its mapping/config) into **its own repo** = the **`external third-party apps`**
+cut-line in `REMAINING-WORK.md` (built against the published `@canopy/*` SDK + substrate API + pod **ACPs**, never
+touching platform internals). Comes **last** because (a) you can't cleanly cut a repo until the seam (the P0–P4
+extensibility API) is enforced — REMAINING-WORK's own rule *"you can't cleanly cut what isn't cleanly enforced"* —
+and (b) feedback-as-external-repo *is* the proof the API needed nothing privileged. Until P7, develop feedback
+in-repo **but strictly against the published API** (no platform-internal imports), so the extraction is mechanical.
+- **Acceptance:** feedback builds + all its tests pass with **zero imports from platform internals**.
+
+> **Repo boundary:** generic machinery (redact atom, composite runner, mappings loader, skill→manifest bridge,
+> diff op + curation renderer, consent UI) → **platform**. Feedback's project-specific logic + all its config/data
+> (k-anon, curator, central-pod, project-config, bot/`PeerBridge`, the pipeline composites, the NL `RedactConfig`,
+> the mapping manifest) → **feedback repo**. See `DESIGN-feedback-extension.md §2.1`.
+
 ### Acceptance test — the feedback exemplar (hybrid)
 End-to-end of the **real** feedback shape: Mode-2 manifest for the local curation UI + Mode-1 bot for the
 sensitive/remote pipeline. If a *third party* can integrate functionality this way with no new app, the

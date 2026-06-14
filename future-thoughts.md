@@ -42,6 +42,11 @@ adds a **capability layer** that says *who may invoke which atom, in which kring
    It's **hierarchical** because ops decompose into a tree of atoms: a grant attached high in the tree implies its
    subtree; a member can instead grant only individual leaves. The kring is the scope every grant is pinned to.
 
+**Invariant — an atom lives in a substrate/core, never in an app (Frits, 2026-06-13).** If an app needs an
+irreducible op that doesn't exist yet, that op **graduates into a substrate** and the app merely composes it.
+Apps are compositions; they are not homes for primitives. (This is just CLAUDE.md invariants #1 "logic lives once"
+and #5 "three-layer dependency" applied to atoms — and it's what keeps the atom set shared and the apps thin.)
+
 This is the formalisation of the long-standing intuition that **the kring is the capability/safety boundary that
 "almost encompasses" the other apps** — not just a chat scope, but the container that decides what an installed
 capability may touch.
@@ -190,6 +195,73 @@ Ranked safest-first; each is something an app *already on Play/App Store* does t
 **web / PWA / self-host / F-Droid** channel that no app store gates. Same waist, two distribution channels — the
 thin client makes store compliance easy *by construction*. Patterns 1–2 cover the overwhelming majority of real
 bundles; 3 is opt-in-later; 4 is the escape valve.
+
+---
+
+## Worked example — feedback as an *extension*, not an app
+
+**Framing (Frits, 2026-06-13).** We treat `apps/feedback-pipeline` as an **external project** and a **design
+exemplar / acceptance test**: the goal is *not* "build feedback into canopy-chat," it's *"make canopy-chat able
+to absorb a third party's functionality the way feedback needs — with no new app installed."* If feedback can be
+delivered as *{a contact-bot + a loaded manifest/mapping}*, so can anyone's functionality. Feedback is how we
+**dogfood** the whole model.
+
+**Privacy atoms graduate to core.** The 2026-06-13 code verification showed feedback's client pipeline is *mostly
+composition* over things that already exist: `seal` (X25519) + `sign` (Ed25519) are already core crypto atoms;
+`call-LLM` is already an atom (`llm-client`); `clean` / `triage` are **composites** over `call-LLM`. The only
+genuinely-new irreducible pieces are the **PII-redaction floor** (deterministic) and the **k-anonymity filter**.
+Per the invariant above, those two **graduate into a substrate (privacy/security), not the feedback app** — after
+which feedback's client side *is* expressible as composites + a manifest. So "feedback has bespoke atoms" was
+never a blocker; it's "graduate two atoms, then it's a mapping."
+
+**Two delivery modes canopy-chat must support** (a real project may use both):
+
+- **Mode 1 — bot-exposed skills** *(new capability for canopy-chat).* The project bot is a contact; the
+  slash-commands it exposes **are skills** (`skillDiscovery` / `a2aDiscover`). Adding the contact makes its skills
+  appear as local slash-commands + menus; the sensitive/project compute (k-anon aggregation, central pod, the
+  enclave LLM route) runs **behind the bot** (remote-handler / tier-2). *Needs:* a **discovered-skill → manifest
+  bridge** (a contact's SkillCards → a virtual manifest merged into the catalog; dispatch routes `{opId,args}` →
+  `sendA2ATask`).
+- **Mode 2 — composite + manifest** *(data).* The project ships a **mapping**: a manifest declaring its commands
+  as **composites of existing ops** + a curation renderer, all pure data. Adding it writes a ref into the pod
+  `mappings/` folder and merges the manifest. *Needs:* a **composite-op runner** (run a new opId as a declared
+  sequence of existing opIds) + the **mappings-folder startup scan**.
+
+**User journey A — bot.** Maaike uses canopy-chat for her household + buurt circles. She gets a link *"Geef
+feedback op het buurtplan,"* opens it (mobile or web). Canopy-chat shows a consent card: *add 'Buurtplan-feedback'
+as a contact (a bot)? It can offer: /feedback · /review · /consent* — the bot's advertised skills, **AI-explained**
+(which atoms, why, what-if-deny). On consent the bot is added (a WebID agent over the transport), its SkillCards
+become a virtual manifest merged into her catalog, and the new slash-commands + a menu appear **in the chat with
+the bot**. `/feedback` runs the journey; the project pipeline (clean / k-anon / seal) runs bot-side; she sees the
+before/after curation rendered locally. **Nothing was installed.** Project ends → she removes the contact → the
+commands vanish.
+
+**User journey B — composite + manifest.** Same invite, but the project ships a *mapping* (data, no remote logic
+on the client path). She opens the link → a consent card lists the **atoms the mapping needs** (`call-LLM`,
+`redaction-floor`, `write-pod`, the `compare` op) — AI-explained. On consent a ref is written to her pod
+`mappings/` folder, the manifest merges, and new slash-commands + clickable menus appear. The **composite-op
+runner** executes `/feedback` as the declared sequence (collect → floor → clean → review → consent-write), reusing
+folio's `diff()` behind a **curation renderer** for the before/after. Because it's all data + core atoms, it
+behaves identically on web + mobile (the startup scan reloads it from the pod). Done → she deletes the mapping ref
+→ surfaces revert.
+
+*(Real feedback is the **hybrid**: Mode-2 manifest for the local UI/curation, Mode-1 bot for the sensitive/remote
+bits — the client carries data + bindings, sensitive compute stays behind the bot/enclave. This matches the code:
+client-side floor + server-side aggregation.)*
+
+**Grounded status (2026-06-13 verification).** *Already there:* dynamic manifest merge
+(`packages/manifest-host` · `apps/canopy-chat/src/manifestMerge.js`), pod config-read at startup
+(`packages/pod-routing/src/configResource.js`), per-circle surface scoping (`scopeCatalogToApps`), re-keyed menus
+(`inlineKeyboardFor`), remote skill discovery + invocation (`skillDiscovery` · `a2aDiscover` · `a2aTaskSend` ·
+`taskExchange.callSkill`), bot-as-contact (`apps/canopy-chat/src/feedback/feedbackSurface.js`,
+`apps/feedback-pipeline/docs/MENUKAART.md §4B`), and folio's reusable pure `diff()`
+(`packages/sync-engine/src/diff.js`). *Missing (small, bounded — this is the feedback slice of the plan):*
+1. **composite-op runner** (data-defined `{id, steps:[{appOrigin,opId,args}]}` → sequenced dispatch);
+2. **discovered-skill → manifest bridge** (PeerGraph upsert → virtual manifest → merge → route to `sendA2ATask`);
+3. **pod `mappings/` folder scan** at startup (small extension of `configResource.js`);
+4. **expose folio `diff()` as a manifest op + a curation renderer** (compute reused; new "look");
+5. **graduate `redaction-floor` + `k-anon` atoms** into a privacy/security substrate;
+6. **finish the bot `PeerBridge`** (the server-run / unsigned tier; `InternalBusBridge` is already real).
 
 ---
 

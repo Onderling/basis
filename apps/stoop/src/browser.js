@@ -42,6 +42,17 @@ import { createNeighborhoodAgent } from './Agent.js';
  *                                               adapter from slice 2a);
  *                                               omit for in-memory only
  * @param {string}         [args.label='StoopAgent']
+ * @param {object}         [args.controlAgent]   optional sealed-pod control-agent
+ *                                               (`@canopy/pod-client` `createControlAgent`). When
+ *                                               present, membership events drive the group-key flow:
+ *                                               `redeemMembershipCode` → `addMember` (seal the group key
+ *                                               to the joiner's sealing public key) and `leaveGroup` →
+ *                                               `removeMember` (revoke + rotate). Absent on instances
+ *                                               that don't run a sealed pod — the calls are simply
+ *                                               skipped (non-breaking). canopy-chat uses Stoop as its
+ *                                               circle-membership substrate, so this is the seam through
+ *                                               which a circle's sealed-pod control-agent reaches the
+ *                                               redeem/leave hooks the underlying agent already exposes.
  * @returns {Promise<{
  *   bundle: ReturnType<typeof createNeighborhoodAgent>,
  *   address: string,
@@ -56,6 +67,7 @@ export async function createBrowserStoopAgent({
   members,
   persistDb,
   label = 'StoopAgent',
+  controlAgent,
 }) {
   if (!bus)           throw new TypeError('createBrowserStoopAgent: bus required');
   if (!identityVault) throw new TypeError('createBrowserStoopAgent: identityVault required');
@@ -81,6 +93,7 @@ export async function createBrowserStoopAgent({
     skillMatch: { group, localActor },
     persistDb,
     label,
+    controlAgent,   // sealed-pod membership hooks (no-op when absent) — see the param doc above
   });
 
   return {

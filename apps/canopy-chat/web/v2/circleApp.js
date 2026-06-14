@@ -34,6 +34,10 @@ import { createInputHistory } from '../../src/v2/commandSuggest.js';
 import { beginFollowUp, completeFollowUp, beginFormFollowUp, completeMultiFieldFollowUp } from '../../src/v2/followUp.js';
 import { kringReplyText } from '../../src/v2/kringReply.js';
 import { scopeCatalogToApps } from '../../src/v2/circleCatalogScope.js';
+// feedback-extension P2c — load downloadable extension mappings + the load-time sandbox gate.
+import { loadMappings } from '@canopy/pod-routing/mappings';
+import { localStorageMappingsStore, WEB_MAPPINGS_DEVICE } from '../../src/v2/mappingsStore.js';
+import { verifyMappings, mappingsToSources } from '../../src/mappings.js';
 import { createFeedbackSurface } from '../../src/feedback/feedbackSurface.js';
 import { createFeedbackMount } from '../../src/feedback/feedbackMount.js';
 // (localStoragePolicyIo is already imported below with createCirclePolicyStore)
@@ -442,14 +446,15 @@ const kringInputHistory = createInputHistory();
 // Build the bot + feedback once the agent is up (rawCallSkill bound). Stores into the module vars above.
 function buildCircleBot(agent) {
   // Merged catalog (the LLM tool list + dispatch catalog) — mirrors main.js.
-  const rawCatalog = mergeManifests([
+  const baseSources = [
     { manifest: canopyChatManifest },
     { manifest: agent.manifest },
     { manifest: mockTasksManifest },
     { manifest: mockStoopManifest },
     { manifest: mockFolioManifest },
     { manifest: calendarManifest },
-  ], { runtime: 'browser' });
+  ];
+  let rawCatalog = mergeManifests(baseSources, { runtime: 'browser' });
   const appRegistry = new AppRegistry();
   appRegistry.syncWithCatalog(rawCatalog.appOrigins);
   // Scope to the circle apps (Part D) — drops canopy-chat's account/transport INFRA ops (`/me` etc.) that
@@ -457,7 +462,22 @@ function buildCircleBot(agent) {
   // keeps them out of the slash-suggest dropdown. Default scope = the 5 circle apps (DEFAULT_CIRCLE_ORIGINS).
   let catalog = scopeCatalogToApps(filterCatalog(rawCatalog, appRegistry));
   circleCatalog = catalog;        // expose to showKring's composer (slash-suggest)
-  appRegistry.subscribe(() => { catalog = scopeCatalogToApps(filterCatalog(rawCatalog, appRegistry)); circleCatalog = catalog; });
+  const rescopeCatalog = () => { catalog = scopeCatalogToApps(filterCatalog(rawCatalog, appRegistry)); circleCatalog = catalog; };
+  appRegistry.subscribe(rescopeCatalog);
+  // Extension mappings (feedback-extension P2c) — scanned at boot from the V0 localStorage store, verified
+  // against the base catalog (sandbox-by-construction: a mapping referencing an unknown opId is refused), then
+  // merged in + re-scoped. Best-effort: extensions never block boot. Swap the store for a real pseudo-pod when
+  // the web pod layer (P3 3.3c) lands — `loadMappings` is store-agnostic.
+  loadMappings({ pseudoPod: localStorageMappingsStore(), deviceId: WEB_MAPPINGS_DEVICE })
+    .then(({ mappings }) => {
+      const { accepted } = verifyMappings(mappings, rawCatalog);
+      const { sources } = mappingsToSources(accepted);
+      if (!sources.length) return;
+      rawCatalog = mergeManifests([...baseSources, ...sources], { runtime: 'browser' });
+      appRegistry.syncWithCatalog(rawCatalog.appOrigins);
+      rescopeCatalog();
+    })
+    .catch(() => { /* extensions are best-effort — a bad store/mapping must not break the kring */ });
 
   const llmProviders = buildCircleLlmProviders({ localBaseUrl: CIRCLE_LLM_BASEURL, model: CIRCLE_LLM_MODEL });
   const policyIo = localStoragePolicyIo();

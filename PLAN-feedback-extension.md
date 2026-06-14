@@ -35,14 +35,18 @@ independent and can swap. Each phase: **web first, then mobile** as separate com
 Playwright/Detox at phase boundaries. Implementation lands on **its own branch per phase** (branch-per-logical-
 unit); this plan doc stays on the exploration branch.
 
-### Phase 0 — Graduate the privacy atoms to a substrate
-Move the two genuinely-new irreducible ops out of the app (invariant: atoms live in substrates, never apps).
-- Extract **`redaction-floor`** (deterministic PII; today `apps/feedback-pipeline/src/pipeline.js:redactMessage`)
-  and the **`k-anon` filter** (`apps/feedback-pipeline/src/aggregation/*`) into a `privacy`/`security` substrate.
-- Leave `seal`/`sign` (already core crypto) and `call-LLM` (already `llm-client`) alone; `clean`/`triage` stay
-  **composites** over `call-LLM`.
-- **Acceptance:** feedback imports both atoms from the substrate; no privacy logic remains in the app; existing
-  feedback tests green.
+### Phase 0 — Classify feedback's ops by placement (NOT a blanket graduation)
+"Irreducible" ≠ "graduate to the client substrate." Sort each op into **(a) client atom**, **(b) client
+composite**, or **(c) server/remote behind the bot**. Only (a) graduates.
+- **(c) server/remote — stays feedback's own, behind the bot:** the **k-anon filter** + curator + central-pod
+  aggregation (`apps/feedback-pipeline/src/aggregation/*`, `src/curator/*`). Cross-participant + project-specific
+  (threshold `aggregation.k`); a client can't run it on its own data → **not a client atom**, never graduates.
+- **(a) client-atom candidate:** the **`redaction-floor`** (deterministic PII;
+  `apps/feedback-pipeline/src/pipeline.js:redactMessage`) runs local-first → graduate to a `privacy`/`security`
+  substrate **only if it proves reusable** (rule of three); else it stays a feedback client op. `seal`/`sign`
+  (core crypto) + `call-LLM` (`llm-client`) already exist; `clean`/`triage` are **(b) composites** over `call-LLM`.
+- **Acceptance:** a short placement table for feedback's ops; anything graduated is imported from a substrate with
+  no logic left in the app; **k-anon explicitly stays server-side**.
 
 ### Phase 1 — Composite-op runner (Mode 2 core)
 The missing primitive that makes "a slash-command that is merely a composite" real.

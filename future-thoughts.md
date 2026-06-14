@@ -206,13 +206,21 @@ to absorb a third party's functionality the way feedback needs — with no new a
 delivered as *{a contact-bot + a loaded manifest/mapping}*, so can anyone's functionality. Feedback is how we
 **dogfood** the whole model.
 
-**Privacy atoms graduate to core.** The 2026-06-13 code verification showed feedback's client pipeline is *mostly
-composition* over things that already exist: `seal` (X25519) + `sign` (Ed25519) are already core crypto atoms;
-`call-LLM` is already an atom (`llm-client`); `clean` / `triage` are **composites** over `call-LLM`. The only
-genuinely-new irreducible pieces are the **PII-redaction floor** (deterministic) and the **k-anonymity filter**.
-Per the invariant above, those two **graduate into a substrate (privacy/security), not the feedback app** — after
-which feedback's client side *is* expressible as composites + a manifest. So "feedback has bespoke atoms" was
-never a blocker; it's "graduate two atoms, then it's a mapping."
+**Placement, not blanket graduation (refined — Frits, 2026-06-13).** "Irreducible" does NOT imply "graduate to the
+client substrate." Three placements, and **only the first graduates**:
+- **(a) client atom → substrate** — *if* it runs on the user's node AND is reusable (rule of three).
+- **(b) client composite → the mapping** — feedback's journey (`handleMessage → review → consent`).
+- **(c) server/remote → behind the bot** — cross-participant or project-specific; placed remotely by trust + latency.
+
+The 2026-06-13 verification showed feedback's pipeline is *mostly composition*: `seal` (X25519) + `sign` (Ed25519)
+are already core crypto, `call-LLM` is already an atom (`llm-client`), and `clean` / `triage` are **composites**
+over `call-LLM`. The **k-anonymity filter is (c), not an atom** — it runs server-side in the curator/aggregation
+(`apps/feedback-pipeline/src/aggregation/*`, `src/curator/*`) over the *whole* contribution set, with a
+project-specific threshold (`aggregation.k`); a client cannot run it on its own data. It **stays feedback's
+server-side functionality, behind the bot** — exactly the "project/remote stuff unique to feedback." The only
+client-side new irreducible is the **PII-redaction floor** (deterministic; runs local-first) — a graduation
+*candidate* (a) **only if it proves reusable**, else it stays a feedback client op. So "feedback has bespoke atoms"
+was never a blocker: classify by placement, and most of it is composition.
 
 **Two delivery modes canopy-chat must support** (a real project may use both):
 
@@ -262,7 +270,8 @@ client-side floor + server-side aggregation.)*
 2. **discovered-skill → manifest bridge** (PeerGraph upsert → virtual manifest → merge → route to `sendA2ATask`);
 3. **pod `mappings/` folder scan** at startup (small extension of `configResource.js`);
 4. **expose folio `diff()` as a manifest op + a curation renderer** (compute reused; new "look");
-5. **graduate `redaction-floor` + `k-anon` atoms** into a privacy/security substrate;
+5. **classify feedback's ops by placement** — `redaction-floor` (client-side) graduates to a substrate *only if
+   reusable*; the **k-anon filter / curator / central-pod aggregation stay server-side behind the bot** (not client atoms);
 6. **finish the bot `PeerBridge`** (the server-run / unsigned tier; `InternalBusBridge` is already real).
 
 ---

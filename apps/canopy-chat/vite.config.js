@@ -72,6 +72,13 @@ export default defineConfig({
   // See slice-4 smoke fix (2026-05-23).
   optimizeDeps: {
     exclude: ['@canopy/core'],
+    // `@canopy/core` is served as SOURCE (excluded above), so Vite resolves its
+    // transitive CJS crypto deps (tweetnacl/ed2curve, imported by AgentIdentity)
+    // at request time. When they resolve to a workspace copy OUTSIDE the app root
+    // (served raw via `@fs/`), a `default` import fails — "doesn't provide an
+    // export named default". Force-optimizing them applies the CJS→ESM interop
+    // (the synthetic default), independent of which copy resolves.
+    include: ['tweetnacl', 'ed2curve'],
   },
   // OQ-1.C resolution: @canopy/core transports use runtime detection
   // (`typeof WebSocket !== 'undefined'` etc.) and fall back to Node-

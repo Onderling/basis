@@ -39,6 +39,8 @@ import { loadMappings } from '@canopy/pod-routing/mappings';
 import { localStorageMappingsStore, WEB_MAPPINGS_DEVICE } from '../../src/v2/mappingsStore.js';
 import { verifyMappings, mappingsToSources } from '../../src/mappings.js';
 import { DEFAULT_CIRCLE_ORIGINS } from '../../src/v2/circleSources.js';
+import { buildConsentModel, installMapping } from '../../src/v2/extensionInstall.js';
+import { showConsentCard } from '../../src/web/extensionConsentCard.js';
 import { createFeedbackSurface } from '../../src/feedback/feedbackSurface.js';
 import { createFeedbackMount } from '../../src/feedback/feedbackMount.js';
 // (localStoragePolicyIo is already imported below with createCirclePolicyStore)
@@ -465,17 +467,19 @@ function buildCircleBot(agent) {
   // scoping — DEFAULT_CIRCLE_ORIGINS alone would drop them. (V0: treat all accepted mappings as app-scoped;
   // per-circle scope is a later refinement.)
   let mappingOrigins = [];
+  const mappingsStore = localStorageMappingsStore();   // V0 web store; swap for a pseudo-pod at P3 3.3c
   const allowedApps = () => (mappingOrigins.length ? [...DEFAULT_CIRCLE_ORIGINS, ...mappingOrigins] : undefined);
   let catalog = scopeCatalogToApps(filterCatalog(rawCatalog, appRegistry), allowedApps());
   circleCatalog = catalog;        // expose to showKring's composer (slash-suggest)
   const rescopeCatalog = () => { catalog = scopeCatalogToApps(filterCatalog(rawCatalog, appRegistry), allowedApps()); circleCatalog = catalog; };
   appRegistry.subscribe(rescopeCatalog);
-  // Extension mappings (feedback-extension P2c) — scanned at boot from the V0 localStorage store, verified
-  // against the base catalog (sandbox-by-construction: a mapping referencing an unknown opId is refused), then
-  // merged in + re-scoped. Best-effort: extensions never block boot. Swap the store for a real pseudo-pod when
-  // the web pod layer (P3 3.3c) lands — `loadMappings` is store-agnostic.
-  loadMappings({ pseudoPod: localStorageMappingsStore(), deviceId: WEB_MAPPINGS_DEVICE })
-    .then(({ mappings }) => {
+  // Extension mappings (feedback-extension P2c) — scanned from the V0 localStorage store, verified against the
+  // base catalog (sandbox-by-construction: a mapping referencing an unknown opId is refused), then merged in +
+  // re-scoped. Best-effort: extensions never block boot. Callable so an install can refresh the catalog. Swap the
+  // store for a real pseudo-pod when the web pod layer (P3 3.3c) lands — `loadMappings` is store-agnostic.
+  async function loadAndMergeMappings() {
+    try {
+      const { mappings } = await loadMappings({ pseudoPod: mappingsStore, deviceId: WEB_MAPPINGS_DEVICE });
       const { accepted } = verifyMappings(mappings, rawCatalog);
       const { sources } = mappingsToSources(accepted);
       if (!sources.length) return;
@@ -483,8 +487,34 @@ function buildCircleBot(agent) {
       rawCatalog = mergeManifests([...baseSources, ...sources], { runtime: 'browser' });
       appRegistry.syncWithCatalog(rawCatalog.appOrigins);
       rescopeCatalog();
-    })
-    .catch(() => { /* extensions are best-effort — a bad store/mapping must not break the kring */ });
+    } catch { /* extensions are best-effort — a bad store/mapping must not break the kring */ }
+  }
+  loadAndMergeMappings();
+
+  // Install entry (P2c-3) — open a link/paste → plain consent card → on Add writeMapping + refresh the catalog.
+  // Accepts a Mapping object, a JSON string, or a base64-encoded JSON string (a `?install=` link).
+  async function installExtensionFromLink(input) {
+    let mapping = input;
+    if (typeof input === 'string') {
+      const s = input.trim();
+      try { mapping = JSON.parse(s.startsWith('{') ? s : atob(s)); } catch { return; }
+    }
+    if (!mapping || typeof mapping !== 'object') return;
+    const result = buildConsentModel(mapping, rawCatalog);
+    showConsentCard(result, {
+      onAdd: async () => {
+        const r = await installMapping({ store: mappingsStore, deviceId: WEB_MAPPINGS_DEVICE, mapping, catalog: rawCatalog });
+        if (r.ok) await loadAndMergeMappings();
+      },
+    });
+  }
+  if (typeof window !== 'undefined') {
+    window.canopyInstallExtension = installExtensionFromLink;   // manual / programmatic install
+    try {
+      const enc = new URLSearchParams(window.location.search).get('install');
+      if (enc) installExtensionFromLink(enc);                   // ?install=<base64 mapping JSON>
+    } catch { /* no install param */ }
+  }
 
   const llmProviders = buildCircleLlmProviders({ localBaseUrl: CIRCLE_LLM_BASEURL, model: CIRCLE_LLM_MODEL });
   const policyIo = localStoragePolicyIo();

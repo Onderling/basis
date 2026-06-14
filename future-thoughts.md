@@ -246,7 +246,7 @@ feedback.) So "feedback has bespoke atoms" was never a blocker: classify by plac
 
 **User journey A — bot.** Maaike uses canopy-chat for her household + buurt circles. She gets a link *"Geef
 feedback op het buurtplan,"* opens it (mobile or web). Canopy-chat shows a consent card: *add 'Buurtplan-feedback'
-as a contact (a bot)? It can offer: /feedback · /review · /consent* — the bot's advertised skills, **AI-explained**
+as a contact (a bot)? It can offer: /feedback · /review · /consent* — the bot's advertised skills, listed plainly
 (which atoms, why, what-if-deny). On consent the bot is added (a WebID agent over the transport), its SkillCards
 become a virtual manifest merged into her catalog, and the new slash-commands + a menu appear **in the chat with
 the bot**. `/feedback` runs the journey; the project pipeline (clean / k-anon / seal) runs bot-side; she sees the
@@ -255,7 +255,7 @@ commands vanish.
 
 **User journey B — composite + manifest.** Same invite, but the project ships a *mapping* (data, no remote logic
 on the client path). She opens the link → a consent card lists the **atoms the mapping needs** (`call-LLM`,
-`redaction-floor`, `write-pod`, the `compare` op) — AI-explained. On consent a ref is written to her pod
+`redaction-floor`, `write-pod`, the `compare` op) — in plain language. On consent a ref is written to her pod
 `mappings/` folder, the manifest merges, and new slash-commands + clickable menus appear. The **composite-op
 runner** executes `/feedback` as the declared sequence (collect → floor → clean → review → consent-write), reusing
 folio's `diff()` behind a **curation renderer** for the before/after. Because it's all data + core atoms, it
@@ -304,40 +304,32 @@ These extend `REMAINING-WORK.md` W0–W6; none start until the user says go.
    by trust + latency — the W6 placement spectrum, now per-atom inside a shared kring.
 6. **Managed personal-server option.** For the N = 1 case + non-self-hosters: single-tenant, user-keyed hosting
    (managed-Solid-pod model extended to compute); enclave variant = provider-blind. (W6.)
-7. **Plugin-manager UI (mobile-first) with AI-explained grants.** Install / grant / revoke / inspect-capabilities,
-   in the app — with the consent step driven by the assistant (see "AI-mediated consent" below), not a raw
-   permission wall. The user-facing face of tiers 1–2.
+7. **Plugin-manager UI (mobile-first).** Install / grant / revoke / inspect-capabilities, in the app, via a plain
+   consent card that lists the atoms + scope + "what if I deny?". The user-facing face of tiers 1–2.
 8. **Store-compliance pass.** Tier-1/2 in the Play/Apple builds; tier-3 (WASM) gated behind a policy review and a
    hard capability sandbox; web/self-host channel for anything code-carrying; Data Safety + permissions audit.
 
 ---
 
-## AI-mediated consent (grants, explained)
+## Consent (plain card)
 
-A capability model is only as safe as its *consent step*. A wall of "Grant `create-task`? Grant `read-pod`?" gets
-rubber-stamped, which defeats the entire point of fine-grained capabilities. The fix is the **AI-as-interface**
-theme ([[project-ai-as-interface-direction]]) pointed straight at consent: instead of a permission list, the
-assistant **explains, in plain language, what an installed bundle will actually be able to do, why it asks for
-each atom, and what the worst case is** — and answers *"what happens if I deny this one?"* before you decide.
+A capability model is only as safe as its *consent step*. The consent card is a **plain card**: it lists the
+atoms an extension needs, with **scope** ("can post to *this* kring and read *your* shopping list — nothing
+else"), and answers *"what happens if I deny this?"* before you decide. Because a composition is
+sandboxed-by-construction (it can only call atoms), the card can **enumerate the exact atom set** a bundle will
+ever touch — concrete, not hand-waving. Underneath, grants stay object-capability-strict: default-deny, scoped to
+the kring, attenuable, revocable.
 
-Crucially this changes the *interface*, not the *model*: underneath, grants stay object-capability-strict —
-default-deny, scoped to the kring, attenuable, revocable. The AI is the doorgeefluik *to* the grant model, the
-same way it's becoming the interface to settings and to ops — it never widens what a grant means, it just makes
-the decision legible. Because a composition is sandboxed-by-construction (it can only call atoms), the assistant
-can even **enumerate the exact atom set a bundle will ever touch** and explain it concretely ("this can post to
-*this* kring and read *your* shopping list — nothing else"), rather than hand-waving.
-
-This is the design element most likely to make capabilities *usable* rather than merely *correct* — it turns the
-security model from a friction wall into a conversation, and it's the natural first home for AI-as-interface
-because the stakes (a clear, honest consent) are exactly where plain language earns its keep.
+*(An **optional, later** enhancement could let the AI-as-interface theme [[project-ai-as-interface-direction]]
+explain a grant conversationally — but that is NOT in scope and not a dependency; the plain card is the design.)*
 
 ---
 
 ## Open questions / risks
 
 - **Grant UX vs. fatigue.** A hierarchical capability model is only safe if members actually understand grants;
-  too many prompts and they rubber-stamp. *Direction:* AI-mediated consent (above) — default-deny + an assistant
-  that explains each grant — rather than a raw permission wall.
+  too many prompts and they rubber-stamp. *Direction:* default-deny + a plain consent card that enumerates the
+  exact atom set + scope, rather than a raw permission wall.
 - **Admin trust in shared kringen.** "Runs at the admin" means the admin sees plaintext for central ops — the
   enclave tier exists for when that's unacceptable, but most kringen will just trust their admin. Make that
   trust *explicit and visible*, never implicit.

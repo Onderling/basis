@@ -102,7 +102,7 @@ ExtensionLink = {
 - **Title + issuer** + a **trust badge** — verified WebID? signed (anti-sybil)? or ⚠ unknown/unsigned.
 - **What it is** — one line: *"A feedback project — adds a bot contact + the commands /feedback, /review,
   /consent"* **or** *"Adds 3 commands to **this circle**."*
-- **What it can do (AI-explained)** — plain-language summary derived from `needs`, **with scope**: *"can post in
+- **What it can do** — a plain-language summary derived from `needs`, **with scope**: *"can post in
   **this conversation**," "can read **your shopping list**," "runs an LLM on your device"* — plus worst case and
   **"what if I deny?"**. A **Details** expander lists the exact atoms/skills.
 - **Scope line** — bot → *"these commands live only in the chat with this bot"*; mapping → *"these appear in
@@ -127,7 +127,7 @@ curation renderer.
 **Step 4 — Decline / not now.** Nothing is written; the card is dismissed; the link can be re-opened later.
 
 **Step 5 — Manage / revoke (the extensions panel — P6/P7).** A list of installed extensions + bots, each with the
-same AI-explained summary and **Remove/Revoke**: bot → remove the contact; mapping → delete the pod ref. Surfaces
+same plain summary and **Remove/Revoke**: bot → remove the contact; mapping → delete the pod ref. Surfaces
 revert immediately. Re-opening an already-installed link → *"already added"* → opens manage.
 
 **Two install contexts.**
@@ -143,8 +143,12 @@ revert immediately. Re-opening an already-installed link → *"already added"* �
 - **Bot unreachable on mobile** — *"this bot isn't reachable on mobile yet"* (the NKN-on-RN caveat, P5).
 - **Offline** — Mode-2 (local composites) still works; Mode-1 (bot) needs connectivity.
 
-**Where it's built:** the link → card → write flow is **P2** (web first, then mobile); the AI-explained consent,
-the manage/revoke panel, and two-layer circle consent are **P6**; the scope affordance threads through P2/P4.
+**Where it's built:** the link → card → write flow is **P2** (web first, then mobile); the consent card, the
+manage/revoke panel, and two-layer circle consent are **P6**; the scope affordance threads through P2/P4.
+
+*(The consent card is a plain card — it lists the capabilities + scope + "what if I deny?" directly. An
+assistant-driven explanation is **not** in scope; if ever wanted it's a later optional enhancement, not a
+dependency.)*
 
 ---
 
@@ -161,7 +165,7 @@ the manage/revoke panel, and two-layer circle consent are **P6**; the scope affo
 | Manifest merge at scope | **platform** | `packages/manifest-host`, `apps/canopy-chat/src/manifestMerge.js` |
 | Folio `diff()` op + **generic** curation renderer | **platform** | `packages/sync-engine` (op) + a shared projector |
 | Discovered-skill → manifest bridge | **platform** | `apps/canopy-chat/src/` (PeerGraph listener) |
-| Consent/grant UI (AI-explained) | **platform** | `apps/canopy-chat/src/` |
+| Consent/grant UI (plain card) | **platform** | `apps/canopy-chat/src/` |
 | k-anon · curator · central-pod · aggregation | **feedback repo** | (server-side, behind the bot) |
 | project-config · the bot handler · `PeerBridge` | **feedback repo** | |
 | the pipeline state-machine **composites** | **feedback repo** | (as a Mapping, data) |
@@ -189,6 +193,9 @@ the **dogfood proof** that the extensibility API is real (no privileged backdoor
   a folder scan of pod `mappings/`; feed loaded `Mapping`s into `mergeManifests` at their declared scope; build the
   *open-link → consent → write ref to pod `mappings/`* flow (web first, then mobile). *Acceptance:* drop a mapping →
   reload → commands+menus appear at the right scope → delete → revert; identical web/mobile.
+  **NB — the pseudo-pod must work on web.** The loader reads from a pseudo-pod; today the *web* app has none
+  (P3 3.3c), so P2c ships a **localStorage V0 store as a stopgap only**. The real `@canopy/pseudo-pod` running on
+  web is the proper store and a prerequisite for the non-V0 path — localStorage is not the end state.
 - **P3 — folio diff op + curation renderer.** Expose `packages/sync-engine/src/diff.js` as a manifest op
   (`compare`) with surfaces; build a **generic** before/after curation renderer (a shared projector, not
   feedback-specific) that consumes the diff output; reuse `conflictText.js`/`conflicts.js` extractors. *Acceptance:*
@@ -199,8 +206,8 @@ the **dogfood proof** that the extensibility API is real (no privileged backdoor
   commands appear only in that thread; invoking routes to the bot; removing the contact removes them.
 - **P5 — `PeerBridge` + mobile parity.** Finish `PeerBridge` (server/unsigned tier; `InternalBusBridge` is real);
   NKN-on-RN reachability. *Acceptance:* journey A works on web AND mobile.
-- **P6 — consent + grants (AI-explained).** Consent card lists `Mapping.needs` (Mode 2) / SkillCards (Mode 1),
-  AI-explained; default-deny, scoped, revocable. *Acceptance:* both journeys pass an AI-explained consent step;
+- **P6 — consent + grants.** A plain consent card lists `Mapping.needs` (Mode 2) / SkillCards (Mode 1) +
+  scope + "what if I deny?"; default-deny, scoped, revocable. *Acceptance:* both journeys pass a consent step;
   deny blocks; revoke removes surfaces.
 - **P7 — extract the feedback repo.** Move `apps/feedback-pipeline` (+ its mapping/config) into its own repo
   consuming only the published `@canopy/*` API + pod ACPs. *Acceptance:* feedback builds + its tests pass with **no

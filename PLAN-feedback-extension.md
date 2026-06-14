@@ -71,6 +71,10 @@ The missing primitive that makes "a slash-command that is merely a composite" re
 - "Open link → preview/consent card → write a mapping ref into pod `mappings/`" flow (web first, then mobile).
   The full receive-and-consent UX (what the card shows/asks, scope affordance, manage/revoke, error paths) is
   **`DESIGN-feedback-extension.md §1.5`**.
+- **NB — the pseudo-pod must work on web.** The web app has no pseudo-pod yet (P3 3.3c), so this ships a
+  **localStorage V0 store as a stopgap**; the real `@canopy/pseudo-pod` on web is the proper store and the
+  prerequisite for the non-V0 path. localStorage is not the end state — keep `loadMappings` store-agnostic so the
+  swap is one line.
 - **Acceptance:** drop a mapping in the pod → reload → new slash-commands + clickable menus appear at the right
   scope; delete the ref → surfaces revert. Identical on web + mobile.
 
@@ -95,9 +99,9 @@ The missing primitive that makes "a slash-command that is merely a composite" re
 - **Acceptance:** user journey A (bot) works on **both** web and mobile.
 
 ### Phase 6 — Consent + capability grants (cross-cutting)
-- The **consent card**: lists the atoms (Mode 2) or skills (Mode 1) the extension needs, **AI-explained**
-  (what it can do, why, what-if-deny); default-deny; grant scoped to the circle/thread; revocable.
-- **Acceptance:** both journeys pass through an AI-explained consent step; deny blocks; revoke removes surfaces.
+- The **consent card** (a plain card, not assistant-driven): lists the atoms (Mode 2) or skills (Mode 1) the
+  extension needs + scope + "what if I deny?"; default-deny; grant scoped to the circle/thread; revocable.
+- **Acceptance:** both journeys pass through a consent step; deny blocks; revoke removes surfaces.
 
 ### Phase 7 — Extract the feedback repo *(the acceptance test for the whole vertical)*
 Move `apps/feedback-pipeline` (+ its mapping/config) into **its own repo** = the **`external third-party apps`**

@@ -218,10 +218,12 @@ never a blocker; it's "graduate two atoms, then it's a mapping."
 
 - **Mode 1 — bot-exposed skills** *(new capability for canopy-chat).* The project bot is a contact; the
   slash-commands it exposes **are skills** (`skillDiscovery` / `a2aDiscover`). Adding the contact makes its skills
-  appear as local slash-commands + menus; the sensitive/project compute (k-anon aggregation, central pod, the
-  enclave LLM route) runs **behind the bot** (remote-handler / tier-2). *Needs:* a **discovered-skill → manifest
-  bridge** (a contact's SkillCards → a virtual manifest merged into the catalog; dispatch routes `{opId,args}` →
-  `sendA2ATask`).
+  appear as slash-commands + menus **scoped to the conversation with that bot — not the global app catalog**: its
+  handler *is* the bot, so it can't be surfaced app-wide without shipping the bot's internal functionality locally
+  (which is impossible). The sensitive/project compute (k-anon aggregation, central pod, the enclave LLM route)
+  runs **behind the bot** (remote-handler / tier-2). *Needs:* a **discovered-skill → manifest bridge** that injects
+  a contact's SkillCards as a virtual manifest **at contact-thread scope**; dispatch in that thread routes
+  `{opId,args}` → `sendA2ATask(thatContact, skillId, args)`.
 - **Mode 2 — composite + manifest** *(data).* The project ships a **mapping**: a manifest declaring its commands
   as **composites of existing ops** + a curation renderer, all pure data. Adding it writes a ref into the pod
   `mappings/` folder and merges the manifest. *Needs:* a **composite-op runner** (run a new opId as a declared

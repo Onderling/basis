@@ -17,6 +17,8 @@ export { runDispatch, runCompositeDispatch } from './dispatch.js';
 export { runCompositeOp, verifyComposite, resolvePath } from './composite.js';
 // P2b (feedback-extension) — extension-mapping load-time verify gate.
 export { verifyMapping, verifyMappings, mappingToManifest, mappingsToSources } from './mappings.js';
+// P2c-3 — extension install: plain consent-card model + install/uninstall.
+export { buildConsentModel, installMapping, uninstallMapping } from './v2/extensionInstall.js';
 export { renderReply, formatText }   from './renderer.js';
 export { Thread, newThread }         from './thread.js';
 export {

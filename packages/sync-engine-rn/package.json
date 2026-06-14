@@ -15,7 +15,7 @@
   "peerDependencies": {
     "@canopy/core": "^0.1.0",
     "@canopy/pod-client": "^0.1.0",
-    "@canopy/sync-engine": "^0.1.0",
+    "@canopy/sync-engine": "workspace:*",
     "react": ">=18"
   },
   "peerDependenciesMeta": {

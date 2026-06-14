@@ -14,7 +14,7 @@
   "peerDependencies": {
     "@canopy/core": "^0.1.0",
     "@canopy/identity-resolver": "^0.1.0",
-    "@canopy/item-store": "^0.1.0"
+    "@canopy/item-store": "workspace:*"
   },
   "peerDependenciesMeta": {
     "@canopy/identity-resolver": { "optional": true },

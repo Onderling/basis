@@ -46,8 +46,11 @@ function manifestList({ householdManifest } = {}) {
  *                                             agent bundle has booted)
  * @returns {object}  raw merged catalog
  */
-export function composeManifests({ householdManifest } = {}) {
-  const entries = manifestList({ householdManifest }).map((manifest) => ({ manifest }));
+export function composeManifests({ householdManifest, extraSources = [] } = {}) {
+  const entries = [
+    ...manifestList({ householdManifest }).map((manifest) => ({ manifest })),
+    ...extraSources,   // extension-mapping sources (feedback-extension P2) — merged at the same waist
+  ];
   // runtime:'browser' matches what canopy-chat web passes — the
   // manifest validator uses it to gate browser-only ops.  RN is
   // closer to browser than to Node for these purposes (fetch,

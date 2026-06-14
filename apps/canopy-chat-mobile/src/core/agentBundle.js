@@ -28,6 +28,8 @@
  * boot-failure error or the real factory's reply).
  */
 import { composeManifests, buildManifestsByOrigin } from './composeManifests.js';
+// Shared extension-mapping loader (feedback-extension P2) — web≡mobile core.
+import { loadVerifyMappings } from '../../../canopy-chat/src/v2/mappingsLoader.js';
 
 // `createRealHouseholdAgent` is loaded LAZILY (dynamic import below)
 // so importing agentBundle.js doesn't transitively pull in
@@ -88,7 +90,20 @@ async function loadMdnsTransport() {
  * }>}
  */
 export async function bootAgentBundle(opts = {}) {
-  const catalog           = composeManifests({ householdManifest: opts.householdManifest });
+  let catalog             = composeManifests({ householdManifest: opts.householdManifest });
+  // Extension mappings (feedback-extension P2 mobile parity) — OPT-IN via opts.mappingsStore so node-vitest
+  // boots (no store passed) skip the AsyncStorage path. Best-effort: verify each against the base catalog
+  // (sandbox-by-construction; unknown-op mappings refused), then re-merge the accepted ones. Never blocks boot.
+  if (opts.mappingsStore) {
+    try {
+      const { sources } = await loadVerifyMappings({
+        store: opts.mappingsStore, deviceId: opts.mappingsDeviceId || 'mobile', catalog,
+      });
+      if (sources.length) {
+        catalog = composeManifests({ householdManifest: opts.householdManifest, extraSources: sources });
+      }
+    } catch { /* extensions never block boot */ }
+  }
   // Same source-of-truth as the catalog — used by renderReply opts so
   // list bubbles get per-row inline-keyboard buttons (see
   // docs/manifest-pipeline.md + test/chatRender.test.js).

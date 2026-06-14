@@ -18,6 +18,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { View, Pressable, Text, StyleSheet, BackHandler } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { asyncStorageMappingsStore, MAPPINGS_DEVICE } from './src/core/mappingsStoreRN.js';
 import * as SecureStore from 'expo-secure-store';
 import {
   useFonts, SourceSerif4_400Regular, SourceSerif4_600SemiBold,
@@ -282,6 +283,10 @@ export default function App() {
           // identity keypair — stays stable across reboots (otherwise a
           // peer's cached nknAddr from a /share-my-contact QR breaks).
           asyncStorage: AsyncStorage,
+          // Extension mappings (feedback-extension P2) — load installed extensions from AsyncStorage at boot,
+          // verify them against the base catalog, and merge the accepted ones into the dispatch catalog.
+          mappingsStore:    asyncStorageMappingsStore(AsyncStorage),
+          mappingsDeviceId: MAPPINGS_DEVICE,
           // Skip the demo seed on warm boot.  Saves ~2.5s of boot time.
           seedTasks:        !alreadySeeded,
           seedStoopProfile: !alreadySeeded,

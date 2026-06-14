@@ -1684,5 +1684,18 @@
       "text": "{{count}} apparaten",
       "doc": "Device count formatted by formatNearbyLabel; {{count}} interpolated."
     }
+  },
+  "extension": {
+    "title":        { "text": "“{{title}}” toevoegen?", "doc": "Consent-card heading for installing a downloadable extension mapping (P2c-3)." },
+    "adds":         { "text": "Voegt deze opdrachten toe:", "doc": "Consent card — label above the list of slash-commands the extension adds." },
+    "invokes":      { "text": "gebruikt {{ops}}", "doc": "Consent card — per-command line: the existing ops a command invokes." },
+    "needs":        { "text": "Nodig: {{atoms}}", "doc": "Consent card — the atoms/capabilities the extension declares it needs." },
+    "scope_app":    { "text": "Overal beschikbaar", "doc": "Consent card — scope line for an app-scoped extension." },
+    "scope_circle": { "text": "Beschikbaar in deze kring", "doc": "Consent card — scope line for a circle-scoped extension." },
+    "what_if_deny": { "text": "Als je weigert, wordt er niets toegevoegd of gewijzigd.", "doc": "Consent card — the 'what if I deny?' reassurance." },
+    "add":          { "text": "Toevoegen", "doc": "Consent card — confirm/install button." },
+    "decline":      { "text": "Weigeren", "doc": "Consent card — cancel button." },
+    "added":        { "text": "“{{title}}” toegevoegd.", "doc": "Toast after an extension is installed." },
+    "refused":      { "text": "Deze extensie heeft mogelijkheden nodig die hier niet beschikbaar zijn: {{missing}}", "doc": "Shown when the sandbox verifier refuses a mapping (references unknown opIds)." }
   }
 }

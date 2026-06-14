@@ -29,6 +29,11 @@ const nodeOs      = fileURLToPath(new URL('./src/web/shims/node/os.js',     impo
 const nodeHttp    = fileURLToPath(new URL('./src/web/shims/node/http.js',   import.meta.url));
 const wsShim      = fileURLToPath(new URL('./src/web/shims/wsShim.js',      import.meta.url));
 const relayShim   = fileURLToPath(new URL('./src/web/shims/relayShim.js',   import.meta.url));
+// Pin @canopy/core to the real workspace package. Under pnpm hoisting there are
+// stray copies in other apps' node_modules (e.g. apps/folio/node_modules/@canopy/
+// core); without this, Vite can resolve @canopy/core — and thus its tweetnacl/
+// ed2curve crypto deps — to the WRONG copy, yielding 500s + a blank screen.
+const canopyCore  = fileURLToPath(new URL('../../packages/core',            import.meta.url));
 // Resolve the npm `events` polyfill once, by absolute path.  Transitive
 // importers (packages/webid-discovery, etc.) lose the bare-specifier
 // resolution chain when they're served as source under pnpm hoisting;
@@ -93,6 +98,13 @@ export default defineConfig({
   // take a different branch and don't hit these shims.
   resolve: {
     alias: {
+      // Pin @canopy/core to the real workspace package so its transitive crypto
+      // deps (tweetnacl/ed2curve) resolve from packages/core/node_modules — ONE
+      // consistent copy — instead of a stray app copy (apps/folio/node_modules/
+      // @canopy/core), which caused folio-path raw serving + 500s + a blank
+      // screen. (NB: do NOT add tweetnacl/ed2curve to resolve.dedupe — that forces
+      // resolution from the canopy-chat root, which has no tweetnacl, breaking it.)
+      '@canopy/core': canopyCore,
       // `ws` is Node-only; the relay's WsServerTransport statically
       // imports `WebSocketServer` from it.  Shim carries the named
       // export so Rollup is happy; classes throw at construction if

@@ -217,10 +217,17 @@ are already core crypto, `call-LLM` is already an atom (`llm-client`), and `clea
 over `call-LLM`. The **k-anonymity filter is (c), not an atom** — it runs server-side in the curator/aggregation
 (`apps/feedback-pipeline/src/aggregation/*`, `src/curator/*`) over the *whole* contribution set, with a
 project-specific threshold (`aggregation.k`); a client cannot run it on its own data. It **stays feedback's
-server-side functionality, behind the bot** — exactly the "project/remote stuff unique to feedback." The only
-client-side new irreducible is the **PII-redaction floor** (deterministic; runs local-first) — a graduation
-*candidate* (a) **only if it proves reusable**, else it stays a feedback client op. So "feedback has bespoke atoms"
-was never a blocker: classify by placement, and most of it is composition.
+server-side functionality, behind the bot** — exactly the "project/remote stuff unique to feedback." The client-side floor (**PII-redaction**) graduates as a **generic, config-driven `redact(text, config)` atom** (a).
+Today it's `redact.js` (ordered regex `RULES` + replacements + small validators: BSN 11-proef, NL-phone) +
+`names.js` (first-name gazetteer + honorific/surname heuristics) — **engine generic, content NL-specific**. So the
+atom carries the generic engine (ordered regex rules + replacements + optional gazetteer + a **registry of named
+validators** — `bsn-11proef`, `nl-phone`, `iban`, `luhn` — the config selects), and **feedback ships its NL ruleset
++ name list as DATA** in its mapping. That's the config-driven-atom pattern (generic atom + project data): it
+graduates because it's *generic* (so reusable), and it keeps "no separate app" (engine in the substrate, config
+over the wire). Scope: the atom is the deterministic **floor** — structured PII reliable, **names best-effort**;
+the name/tone guarantee stays an **LLM composite** (`call-LLM`) + human review, and k-anon stays server-side.
+(A *custom* validator beyond the named registry falls to the LLM composite or a remote handler — not the case for
+feedback.) So "feedback has bespoke atoms" was never a blocker: classify by placement, and most of it is composition.
 
 **Two delivery modes canopy-chat must support** (a real project may use both):
 

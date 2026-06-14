@@ -41,10 +41,15 @@ composite**, or **(c) server/remote behind the bot**. Only (a) graduates.
 - **(c) server/remote — stays feedback's own, behind the bot:** the **k-anon filter** + curator + central-pod
   aggregation (`apps/feedback-pipeline/src/aggregation/*`, `src/curator/*`). Cross-participant + project-specific
   (threshold `aggregation.k`); a client can't run it on its own data → **not a client atom**, never graduates.
-- **(a) client-atom candidate:** the **`redaction-floor`** (deterministic PII;
-  `apps/feedback-pipeline/src/pipeline.js:redactMessage`) runs local-first → graduate to a `privacy`/`security`
-  substrate **only if it proves reusable** (rule of three); else it stays a feedback client op. `seal`/`sign`
-  (core crypto) + `call-LLM` (`llm-client`) already exist; `clean`/`triage` are **(b) composites** over `call-LLM`.
+- **(a) client atom — graduates as a GENERIC config-driven redactor:** the floor today is `redact.js` (ordered
+  regex `RULES` + replacements + small validators: BSN 11-proef, NL-phone) + `names.js` (first-name gazetteer +
+  honorific/surname heuristics) — **engine generic, content NL-specific**. Graduate a **`redact(text, config)`
+  atom** to a `privacy`/`security` substrate: ordered regex rules + replacements + optional gazetteer + a
+  **registry of named validators** (`bsn-11proef`, `nl-phone`, `iban`, `luhn`) the config selects. **Feedback ships
+  its NL ruleset + gazetteer as DATA** in its mapping (config-driven-atom pattern → keeps "no separate app"). The
+  atom is the deterministic **floor** only; name/tone stay a **(b) composite** over `call-LLM` (`softenClean`) +
+  human review; **k-anon stays (c)**. A custom validator beyond the registry → LLM composite or remote handler
+  (not needed for feedback). `seal`/`sign` (core crypto) already exist.
 - **Acceptance:** a short placement table for feedback's ops; anything graduated is imported from a substrate with
   no logic left in the app; **k-anon explicitly stays server-side**.
 

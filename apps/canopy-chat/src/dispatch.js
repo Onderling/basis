@@ -14,7 +14,14 @@
  * passes a stub for tests.
  *
  * Phase v0.1 sub-slice 1.7 per `/Project Files/canopy-chat/coding-plan.md`.
+ *
+ * P1 (feedback-extension) adds the `'composite'` dispatch kind beside
+ * `ready`/`needsForm`/`bulk`: when the resolved op carries `steps`, the
+ * router emits a `composite` dispatch and `runCompositeDispatch` runs the
+ * sequence via `runCompositeOp` (see `composite.js`).
  */
+
+import { runCompositeOp } from './composite.js';
 
 /**
  * @typedef {object} Reply
@@ -88,4 +95,69 @@ export async function runDispatch(ready, callSkill) {
       },
     };
   }
+}
+
+/**
+ * Run a `composite` dispatch (from the router) — P1, feedback-extension.
+ *
+ * Delegates to the shared `runCompositeOp` runner (sequential steps,
+ * `argRef` threading, `onError`).  Wraps the aggregate into the same
+ * `Reply` envelope the renderer consumes, so a composite renders exactly
+ * like a single op: success → the last step's payload at the op's
+ * declared `replyShape`; failure → the first failing step's error on the
+ * error-bubble path.  The full per-step breakdown rides along on
+ * `reply.composite` for renderers that want to show the chain.
+ *
+ * @param {import('./router.js').CompositeDispatch} composite
+ * @param {CallSkill}                               callSkill
+ * @returns {Promise<Reply>}
+ */
+export async function runCompositeDispatch(composite, callSkill) {
+  if (!composite || composite.kind !== 'composite') {
+    throw new Error(
+      `runCompositeDispatch: expected composite dispatch, got kind=${composite?.kind ?? '(none)'}`,
+    );
+  }
+  if (typeof callSkill !== 'function') {
+    throw new TypeError('runCompositeDispatch: callSkill must be a function');
+  }
+
+  const { op, args, threadId, replyShape } = composite;
+
+  let result;
+  try {
+    // The dispatch-level args (positional body / flags / injected scope)
+    // thread into every step as ctx; a step's own args win over ctx.
+    result = await runCompositeOp(op, callSkill, args ?? {});
+  } catch (err) {
+    return {
+      payload:  null,
+      shape:    'text',
+      threadId: threadId ?? null,
+      error: {
+        code:    err?.code ?? 'composite-error',
+        message: err?.message ?? String(err),
+      },
+    };
+  }
+
+  if (!result.ok) {
+    return {
+      payload:   null,
+      shape:     'text',
+      threadId:  threadId ?? null,
+      composite: result,
+      error: {
+        code:    result.error?.code ?? 'composite-error',
+        message: result.error?.message ?? 'Composite failed',
+      },
+    };
+  }
+
+  return {
+    payload:   result.payload,
+    shape:     replyShape,
+    threadId:  threadId ?? null,
+    composite: result,
+  };
 }

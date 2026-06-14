@@ -78,8 +78,20 @@ const BULK_READ_VERBS = new Set([
  */
 
 /**
+ * @typedef {object} CompositeDispatch
+ * @property {'composite'}     kind
+ * @property {string}          opId
+ * @property {object}          op           the composite op (carries `steps`/`onError`)
+ * @property {object}          args         positional/flag args (threaded as ctx into steps)
+ * @property {string}          appOrigin
+ * @property {string|null}     threadId
+ * @property {string}          replyShape
+ * @property {string|null}     verb
+ */
+
+/**
  * @typedef {ReadyDispatch | NeedsFormDispatch | NeedsConfirmDispatch
- *          | UnknownInput | ErrorInput} RouteResult
+ *          | CompositeDispatch | UnknownInput | ErrorInput} RouteResult
  */
 
 /**
@@ -122,6 +134,26 @@ export function resolveDispatch(parseResult, catalog) {
     };
   }
   const { op, appOrigin } = entry;
+
+  // P1 (feedback-extension) — composite op.  When the resolved op is a
+  // pure-data sequence of existing opIds (`op.steps`), return a
+  // `composite` dispatch; the host runs `runCompositeOp` over the steps.
+  // The positional slash body (`_match`) is forwarded as `args` so a
+  // composite's first step can bind it like any other op would.
+  if (Array.isArray(op.steps) && op.steps.length > 0) {
+    const { _match, ...rest } = rawArgs ?? {};
+    const args = _match !== undefined ? { ...rest, _match } : rest;
+    return {
+      kind:       'composite',
+      opId,
+      op,
+      args,
+      appOrigin,
+      threadId:   threadId ?? null,
+      replyShape: effectiveReplyShape(opId, op, catalog),
+      verb:       op?.verb ?? null,
+    };
+  }
 
   // E2 — bulk fan-out.  When the positional body is a bulk keyword
   // (`/done all`) and the op targets an item id with a mutation verb,

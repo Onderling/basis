@@ -66,6 +66,14 @@ export const CHAT_REPLY_SHAPES = Object.freeze([
  */
 export const RUNTIME_VALUES = Object.freeze(['browser', 'node', 'both']);
 
+/**
+ * P1 (feedback-extension DESIGN §1.3) — frozen allow-list of an
+ * `Operation.onError` policy for composite ops.  'stop' (default when
+ * absent) halts the composite on the first failing step; 'continue'
+ * runs every step best-effort.  No rollback either way (v0 non-goal).
+ */
+export const COMPOSITE_ON_ERROR = Object.freeze(['stop', 'continue']);
+
 /** @param {string} verb */
 export function isCanonicalVerb(verb) { return VERB_SET.has(verb); }
 
@@ -434,6 +442,72 @@ function validateOperation(op, path, manifest, errors, idSet) {
         message: 'surfaces.chat.embed.cardSnapshotSkill must be a non-empty string',
       });
     }
+  }
+
+  // P1 (feedback-extension DESIGN §1.3) — `op.steps` makes this op a
+  // COMPOSITE: a pure-data sequence of EXISTING opIds run by
+  // `runCompositeOp`.  Validate STRUCTURE here (each step has a string
+  // appOrigin + opId; `args`/`argRef` are well-shaped).  The CATALOG-
+  // level check — "every step's opId actually resolves" — is the
+  // verifier's job (`verifyComposite`, sandbox-by-construction), because
+  // it needs the merged cross-app catalog, not a single manifest.
+  if (op.steps !== undefined) {
+    if (!Array.isArray(op.steps)) {
+      errors.push({ path: `${path}/steps`, message: 'op.steps must be an array if present' });
+    } else if (op.steps.length === 0) {
+      errors.push({ path: `${path}/steps`, message: 'op.steps must not be empty when present' });
+    } else {
+      op.steps.forEach((step, j) => {
+        const sp = `${path}/steps/${j}`;
+        if (!step || typeof step !== 'object' || Array.isArray(step)) {
+          errors.push({ path: sp, message: 'composite step must be an object' });
+          return;
+        }
+        if (typeof step.appOrigin !== 'string' || step.appOrigin === '') {
+          errors.push({ path: `${sp}/appOrigin`, message: 'step.appOrigin must be a non-empty string' });
+        }
+        if (typeof step.opId !== 'string' || step.opId === '') {
+          errors.push({ path: `${sp}/opId`, message: 'step.opId must be a non-empty string' });
+        }
+        if (step.args !== undefined
+            && (!step.args || typeof step.args !== 'object' || Array.isArray(step.args))) {
+          errors.push({ path: `${sp}/args`, message: 'step.args must be an object if present' });
+        }
+        if (step.argRef !== undefined) {
+          const ar = step.argRef;
+          if (!ar || typeof ar !== 'object' || Array.isArray(ar)) {
+            errors.push({ path: `${sp}/argRef`, message: 'step.argRef must be an object if present' });
+          } else {
+            if (!Number.isInteger(ar.from) || ar.from < 0 || ar.from >= j) {
+              errors.push({
+                path:    `${sp}/argRef/from`,
+                message: `step.argRef.from must be an integer index of a PRIOR step (0..${j - 1})`,
+              });
+            }
+            if (typeof ar.path !== 'string' || ar.path === '') {
+              errors.push({ path: `${sp}/argRef/path`, message: 'step.argRef.path must be a non-empty dot-path string' });
+            }
+            if (ar.as !== undefined && (typeof ar.as !== 'string' || ar.as === '')) {
+              errors.push({ path: `${sp}/argRef/as`, message: 'step.argRef.as must be a non-empty string if present' });
+            }
+          }
+        }
+      });
+    }
+  }
+  if (op.onError !== undefined && !COMPOSITE_ON_ERROR.includes(op.onError)) {
+    errors.push({
+      path:    `${path}/onError`,
+      message: `op.onError must be one of ${COMPOSITE_ON_ERROR.map((s) => `'${s}'`).join(' | ')}`,
+    });
+  }
+  // `onError` is only meaningful on a composite — flag it on a plain op
+  // so authors don't think a non-composite honours it.
+  if (op.onError !== undefined && op.steps === undefined) {
+    errors.push({
+      path:    `${path}/onError`,
+      message: 'op.onError is only meaningful when op.steps is present (composite op)',
+    });
   }
 
   if (op.appliesTo !== undefined) {

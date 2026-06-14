@@ -11,7 +11,10 @@ export { canopyChatManifest } from '../manifest.js';
 export { parseInput, parseSlash }    from './parser.js';
 export { mergeManifests }            from './manifestMerge.js';
 export { resolveDispatch, scopeReadyDispatch, bindMatchArg } from './router.js';
-export { runDispatch }               from './dispatch.js';
+export { runDispatch, runCompositeDispatch } from './dispatch.js';
+// P1 (feedback-extension) — composite-op runner + the sandbox-by-
+// construction verifier (a fitness-function seed for CI).
+export { runCompositeOp, verifyComposite, resolvePath } from './composite.js';
 export { renderReply, formatText }   from './renderer.js';
 export { Thread, newThread }         from './thread.js';
 export {

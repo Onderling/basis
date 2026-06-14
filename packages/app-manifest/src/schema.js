@@ -47,6 +47,47 @@
  * @property {string}                 [role]       RolePolicy key (passed through;
  *                                                 not interpreted here).
  * @property {Surfaces}               [surfaces]
+ * @property {CompositeStep[]}        [steps]      P1 (feedback-extension DESIGN §1.3):
+ *                                                 when present, this op is a COMPOSITE —
+ *                                                 a pure-data sequence of EXISTING opIds
+ *                                                 run by `runCompositeOp`. An op with
+ *                                                 `steps` declares no own handler; its
+ *                                                 functionality is the composition of its
+ *                                                 steps. Bottoms out in already-present
+ *                                                 atoms (the verifier enforces this →
+ *                                                 sandbox-by-construction).
+ * @property {'stop'|'continue'}      [onError]    P1: composite failure policy. 'stop'
+ *                                                 (default) halts on the first failing step;
+ *                                                 'continue' runs every step best-effort.
+ *                                                 Best-effort only — NO implicit rollback (v0).
+ */
+
+/**
+ * One step of a composite Operation (P1).  Each step names an EXISTING op
+ * (`appOrigin` + `opId`) and the args to invoke it with.  `args` are
+ * literal; `argRef` threads a prior step's RESULT into this step's args.
+ *
+ * @typedef {object} CompositeStep
+ * @property {string}                 appOrigin    which app's agent owns the step's op
+ * @property {string}                 opId         the existing op to call (verified in scope)
+ * @property {object}                 [args]       literal args merged into the call
+ * @property {ArgRef}                 [argRef]     pull a value from a prior step's result
+ *                                                 and merge it into this step's args
+ */
+
+/**
+ * Threads a value from an earlier step's result into a later step's args (P1).
+ *
+ * @typedef {object} ArgRef
+ * @property {number}                 from         index (0-based) of a PRIOR step whose
+ *                                                 result to read from (must be < this step).
+ * @property {string}                 path         dot-path into that step's result
+ *                                                 (e.g. `'item.id'`); the resolved value is
+ *                                                 merged into args under the LAST path segment
+ *                                                 (`'item.id'` → `args.id`), or under
+ *                                                 `as` when given.
+ * @property {string}                 [as]         arg name to bind the resolved value to
+ *                                                 (overrides the last path segment).
  */
 
 /**

@@ -18,6 +18,8 @@ export {
   VERBS,
   isCanonicalVerb,
   classifyItemTypes,
+  // P1 (feedback-extension) — composite-op `onError` policy allow-list.
+  COMPOSITE_ON_ERROR,
 } from './validate.js';
 
 export { paramsToJsonSchema } from './paramsToJsonSchema.js';

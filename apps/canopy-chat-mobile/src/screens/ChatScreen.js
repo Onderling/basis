@@ -109,6 +109,10 @@ import MultiFieldFormBubble from '../rn/MultiFieldFormBubble.js';
 // @canopy/react-native/qr/view wraps react-native-qrcode-svg.
 import { QrCodeView }     from '@canopy/react-native/qr/view';
 import QrScannerModal     from '../rn/QrScannerModal.js';
+// Extension install (feedback-extension P2 mobile parity) — consent sheet + controller.
+import ExtensionConsentSheet from './v2/ExtensionConsentSheet.js';
+import { useExtensionInstall } from '../core/extensionInstallRN.js';
+import { asyncStorageMappingsStore, MAPPINGS_DEVICE } from '../core/mappingsStoreRN.js';
 // ε.6 — multi-offer chooser modal (opt-in via policy.catchUpChooserMode='prompt').
 import CircleCatchUpChooserScreen from './v2/CircleCatchUpChooserScreen.js';
 // ε.6 follow-up — read the same per-kring policy the launcher writes so
@@ -348,6 +352,15 @@ export default function ChatScreen({
       sessionRef,
     });
   }, [bootState, podAuth]);
+
+  // Extension install (feedback-extension P2) — the consent sheet + its controller. Uses the shared
+  // buildConsentModel/installMapping (sandbox gate + store write). Trigger via globalThis.canopyInstallExtension
+  // (set by the hook). V0: the mapping persists to AsyncStorage and surfaces as a slash-command on the next boot.
+  const extStore = useMemo(() => asyncStorageMappingsStore(AsyncStorage), []);
+  const extCatalog = bootState.kind === 'ready' ? bootState.bundle.catalog : { opsById: new Map() };
+  const { consentResult, confirm: confirmExtInstall, decline: declineExtInstall } = useExtensionInstall({
+    store: extStore, deviceId: MAPPINGS_DEVICE, catalog: extCatalog, onInstalled: () => {},
+  });
 
   // M1 (2026-05-29) — the agent bundle is booted ONCE in App.js and
   // shared with the circle launcher (so mobile circle screens can
@@ -1748,6 +1761,9 @@ export default function ChatScreen({
         onResult={(res) => onQrScanResult(res)}
         t={t}
       />
+
+      {/* Extension install consent sheet (feedback-extension P2 mobile parity). */}
+      <ExtensionConsentSheet result={consentResult} onAdd={confirmExtInstall} onDecline={declineExtInstall} />
 
       {/* ε.6 — multi-offer catch-up chooser.  Only mounted while a
           chooseOffer() invocation is in flight; the resolver is

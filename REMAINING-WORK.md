@@ -336,7 +336,16 @@ Detail: `[[project-p3-pod-storage-roadmap]]` · `[[project-p3-sync-engine-absorp
   memberIdentity / resolveCircleStorage). Zero stubs.
 - **3.3c app-wiring** **[code-ready, 3 small integration points]** — only **stoop** membership join/leave
   is wired (✅, `controlAgent` in redeem/leave skills, 7 tests). Remaining = pure integration (substrate
-  exists): (b) **household** membership → pass a controlAgent + grant/rotate on add/remove (~2–3d);
+  exists): (b) **household** membership → **REFRAMED 2026-06-14 (Frits): household ≡ a canopy-chat circle**
+  (like stoop/tasks), so there is NO household-internal membership op to wire — the boundary is the SHARED
+  circle-membership layer, and the join/leave wizard already dispatches `stoop.redeemMembershipCode` /
+  `stoop.leaveGroup`, which already call grant/revokePodAccess. **The hooks were DORMANT** because the
+  canopy-chat seam dropped the control-agent. **Seam now opened (✅ `668c80ed`):** `createBrowserStoopAgent`
+  forwards an optional `controlAgent` → the redeem/leave hooks fire (4 browser-factory tests). **Still
+  blocked (the producer):** canopy-chat builds ONE shared Stoop agent (not per-circle) and the per-circle
+  sealed-pod plumbing (`resolveCircleStorage` → `SealedPodClient` → `createControlAgent` + `podKeyStore` +
+  controller-key custody) is unbuilt — *constructing* a real per-circle control-agent needs that substrate
+  + a real-pod verify (same class of blocker as 3.3c-c; don't mis-wire sealing blind, per `b51ef9f4`);
   (c) **circle storage** → **NOT a quick wire (investigated 2026-06-11)** — the circle is mesh by
   default (`pod:'none'`); its pod content is the config (`circlePolicyStore`/`circle.<id>.json`) +
   folio files (Drive `PodClient`, `main.js:961`). Blockers: sealing the **config is circular**
@@ -424,8 +433,11 @@ code-ready moves (was #3–#6, now the top of the list):*
 1. **Verify the folio dissolve branch** (§7 Part G) — `824d766b` (`feat/folio-dissolve-part-g`) is
    code-complete but **unverified** (its worktree had no deps); run `vitest` + `npm run coverage` in the
    main tree, then merge if green. Also delete its stray `.git-commit-msg-folio-dissolve.txt`.
-2. **P3 3.3c-b** (§4) — wire **household** membership → controlAgent grant/rotate (substrate built, clear
-   boundary). 3.3c-c (circle storage) is NOT a quick wire (investigated).
+2. **P3 3.3c-b** (§4) — **REFRAMED + partly done 2026-06-14:** household ≡ a circle, so membership lives
+   at the SHARED circle layer (already routed through stoop's redeem/leave hooks). The canopy-chat seam is
+   now open (`createBrowserStoopAgent` forwards `controlAgent`, `668c80ed`); the remaining step is the
+   **producer** — per-circle sealed-pod control-agent construction — which is BLOCKED on the per-circle
+   sealed-pod plumbing + real-pod verify (same blocker class as 3.3c-c). Not a quick wire after all.
 3. **Category-floors e2e LLM re-run** (§1) — only remaining bit; needs an Ollama run on the scenarios.
 4. **Household chat-agent prompt** (§3) — a *decision* (make v3 the freeform-V2 default?), not a write.
 5. **Multi-field inline form in the kring** (§2) — the one composer-parity follow-up left: a 2+-missing

@@ -76,9 +76,10 @@ export default defineConfig({
     // transitive CJS crypto deps (tweetnacl/ed2curve, imported by AgentIdentity)
     // at request time. When they resolve to a workspace copy OUTSIDE the app root
     // (served raw via `@fs/`), a `default` import fails — "doesn't provide an
-    // export named default". Force-optimizing them applies the CJS→ESM interop
-    // (the synthetic default), independent of which copy resolves.
-    include: ['tweetnacl', 'ed2curve'],
+    // export named default". The `parent > child` form force-bundles a nested
+    // dep of the EXCLUDED parent, so @canopy/core's own source import resolves to
+    // the optimized copy (with a default) instead of the raw @fs/ file.
+    include: ['@canopy/core > tweetnacl', '@canopy/core > ed2curve'],
   },
   // OQ-1.C resolution: @canopy/core transports use runtime detection
   // (`typeof WebSocket !== 'undefined'` etc.) and fall back to Node-

@@ -38,6 +38,9 @@ importers:
       '@canopy/pod-client':
         specifier: workspace:*
         version: link:../../packages/pod-client
+      '@canopy/pod-routing':
+        specifier: workspace:*
+        version: link:../../packages/pod-routing
       '@canopy/secure-agent':
         specifier: workspace:*
         version: link:../../packages/secure-agent

@@ -20,6 +20,7 @@
  */
 
 import { verifyComposite } from './composite.js';
+import { validateManifest } from '@canopy/app-manifest';
 
 /** A mapping op is a remote-skill binding (handler is a contact/bot, not a local atom). */
 function isRemoteBinding(op) {
@@ -65,4 +66,43 @@ export function verifyMappings(mappings, catalog) {
     else rejected.push({ id: mapping?.id, missing });
   }
   return { accepted, rejected };
+}
+
+/**
+ * Convert a mapping into a `mergeManifests` source manifest. A Mode-2 mapping
+ * needs NO special `callSkill`: its composite ops carry `steps`, so the router
+ * emits a `composite` dispatch and `runCompositeOp` (P1) runs the steps through
+ * the existing global `callSkill` — which already routes each step by its
+ * `appOrigin`. So the mapping's ops just need to land in the catalog.
+ *
+ * @param {import('@canopy/pod-routing').Mapping} mapping
+ * @returns {{ app: string, operations: object[] }}
+ */
+export function mappingToManifest(mapping) {
+  return {
+    app: mapping.id,
+    itemTypes: Array.isArray(mapping.itemTypes) ? mapping.itemTypes : [],  // required by validateManifest
+    operations: (mapping.ops ?? []).map((op) => ({ ...op })),
+  };
+}
+
+/**
+ * Build `mergeManifests` sources from VERIFIED mappings, validating each one's
+ * manifest and DROPPING any that's structurally invalid (so one bad mapping
+ * can't throw the whole merge). Pair with `verifyMappings` first (the catalog
+ * gate); this is the manifest-shape gate.
+ *
+ * @param {Array<import('@canopy/pod-routing').Mapping>} mappings
+ * @returns {{ sources: Array<{manifest: object}>, dropped: Array<{id: string, errors: object[]}> }}
+ */
+export function mappingsToSources(mappings) {
+  const sources = [];
+  const dropped = [];
+  for (const mapping of mappings ?? []) {
+    const manifest = mappingToManifest(mapping);
+    const { ok, errors } = validateManifest(manifest);
+    if (ok) sources.push({ manifest });
+    else dropped.push({ id: mapping?.id, errors });
+  }
+  return { sources, dropped };
 }

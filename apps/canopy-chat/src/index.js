@@ -16,7 +16,7 @@ export { runDispatch, runCompositeDispatch } from './dispatch.js';
 // construction verifier (a fitness-function seed for CI).
 export { runCompositeOp, verifyComposite, resolvePath } from './composite.js';
 // P2b (feedback-extension) — extension-mapping load-time verify gate.
-export { verifyMapping, verifyMappings } from './mappings.js';
+export { verifyMapping, verifyMappings, mappingToManifest, mappingsToSources } from './mappings.js';
 export { renderReply, formatText }   from './renderer.js';
 export { Thread, newThread }         from './thread.js';
 export {

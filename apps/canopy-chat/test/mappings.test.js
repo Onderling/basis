@@ -5,7 +5,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { verifyMapping, verifyMappings } from '../src/mappings.js';
+import { verifyMapping, verifyMappings, mappingToManifest, mappingsToSources } from '../src/mappings.js';
+import { mergeManifests } from '../src/manifestMerge.js';
 
 // Minimal catalog: opsById keyed bare + app-qualified, like mergeManifests produces.
 const catalog = {
@@ -62,5 +63,32 @@ describe('verifyMappings', () => {
 
   it('tolerates an empty / nullish list', () => {
     expect(verifyMappings(undefined, catalog)).toEqual({ accepted: [], rejected: [] });
+  });
+});
+
+describe('mappingToManifest / mappingsToSources', () => {
+  it('converts a mapping to an {app, operations} manifest', () => {
+    const m = { id: 'fb', ops: [composite('feedback', [{ appOrigin: 'household', opId: 'addItem' }])] };
+    const manifest = mappingToManifest(m);
+    expect(manifest.app).toBe('fb');
+    expect(manifest.operations[0].id).toBe('feedback');
+    expect(manifest.operations[0].steps).toHaveLength(1);
+  });
+
+  it('drops a structurally-invalid mapping (op missing verb) instead of throwing', () => {
+    const good = { id: 'good', ops: [composite('a', [{ appOrigin: 'household', opId: 'addItem' }])] };
+    const bad = { id: 'bad', ops: [{ id: 'noVerb' /* missing verb */ }] };
+    const { sources, dropped } = mappingsToSources([good, bad]);
+    expect(sources.map((s) => s.manifest.app)).toEqual(['good']);
+    expect(dropped.map((d) => d.id)).toEqual(['bad']);
+    expect(dropped[0].errors.length).toBeGreaterThan(0);
+  });
+
+  it("a mapping's composite op lands in the merged catalog (dispatchable)", () => {
+    const base = { manifest: { app: 'household', itemTypes: [], operations: [{ id: 'addItem', verb: 'add' }] } };
+    const mapping = { id: 'fb', scope: 'app', ops: [composite('feedback', [{ appOrigin: 'household', opId: 'addItem' }])] };
+    const { sources } = mappingsToSources([mapping]);
+    const cat = mergeManifests([base, ...sources]);
+    expect(cat.opsById.has('feedback') || cat.opsById.has('fb/feedback')).toBe(true);
   });
 });

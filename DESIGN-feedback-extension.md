@@ -80,6 +80,72 @@ injected at `contact-thread` scope.
 Transactional/rollback composites (best-effort only); arbitrary downloaded *code* (tier-3 WASM stays parked);
 custom redaction validators beyond the named registry (→ LLM backstop or remote handler); paid bundles / billing.
 
+### 1.5 Receiving an extension — the UX journey *(what canopy-chat shows and asks)*
+The missing piece between "a project ships a mapping/bot" and "the commands appear." Same flow for both modes; the
+**consent card** is the heart of it. Builds on existing gates (`agentsMayContactMe`, circle `policy.apps`, inline
+keyboards).
+
+**The link / descriptor (data).** A user receives an **extension link** — pasted in a chat, a deep link (URL/QR),
+or an email that opens the app — carrying:
+```
+ExtensionLink = {
+  kind: 'bot' | 'mapping' | 'hybrid',
+  title, issuer: { webId?, name, verified: boolean, signed: boolean },
+  bot?:     { contactCard /* WebID + address */ },
+  mapping?: { url | ref, scope: 'app' | 'circle' },
+  needs:    string[],     // atoms/skills → drives BOTH the consent explanation and the verifier
+}
+```
+
+**Step 1 — Recognise → preview & consent card (nothing applied yet).** Canopy-chat intercepts the link and shows a
+**consent card** (in-chat bubble or modal):
+- **Title + issuer** + a **trust badge** — verified WebID? signed (anti-sybil)? or ⚠ unknown/unsigned.
+- **What it is** — one line: *"A feedback project — adds a bot contact + the commands /feedback, /review,
+  /consent"* **or** *"Adds 3 commands to **this circle**."*
+- **What it can do (AI-explained)** — plain-language summary derived from `needs`, **with scope**: *"can post in
+  **this conversation**," "can read **your shopping list**," "runs an LLM on your device"* — plus worst case and
+  **"what if I deny?"**. A **Details** expander lists the exact atoms/skills.
+- **Scope line** — bot → *"these commands live only in the chat with this bot"*; mapping → *"these appear in
+  [circle X / everywhere you use canopy-chat]."*
+- **Actions** — **Add** · **Decline** · (Details). Unknown/unsigned issuers **default-deny** with a louder warning.
+
+**Step 2 — On Add (consent granted).**
+- **Mode 1 (bot):** add the contact (`relation:'agent'`, through `agentsMayContactMe`) → discover its skills →
+  synthesize a virtual manifest at **contact-thread scope** → open the conversation. **System bubble:**
+  *"Buurtplan-feedback added. Try /feedback."* The new commands appear in the composer's slash-suggest **inside
+  that thread** + a menu.
+- **Mode 2 (mapping):** write the mapping ref to pod `mappings/` → merge at the declared scope → new
+  slash-commands + clickable menus appear. System bubble confirms + a usage hint.
+- A **consent record** is stored (revocable).
+
+**Step 3 — Using it.** Commands carry a **scope affordance** — a bot badge/avatar in the slash-suggest for
+bot-only commands; the *global* composer never shows them (the scope-legibility guard). Invoking dispatches
+normally: bot → `sendA2ATask`, replies render in-thread with the **only-you vs whole-kring** indicator
+([[project-ai-as-interface-direction]]); composite → `runCompositeOp`, the before/after curation renders via the
+curation renderer.
+
+**Step 4 — Decline / not now.** Nothing is written; the card is dismissed; the link can be re-opened later.
+
+**Step 5 — Manage / revoke (the extensions panel — P6/P7).** A list of installed extensions + bots, each with the
+same AI-explained summary and **Remove/Revoke**: bot → remove the contact; mapping → delete the pod ref. Surfaces
+revert immediately. Re-opening an already-installed link → *"already added"* → opens manage.
+
+**Two install contexts.**
+- **Personal** — you open a link → it affects *your* contacts / *your* pod mappings / *your* surfaces.
+- **Admin-into-a-circle** — a circle admin adds a mapping at **circle scope** (≈ adding to `policy.apps`): the
+  commands become *available* to the circle, but **each member still consents to the atoms a command invokes on
+  their behalf** (two-layer consent: admin chooses availability, each member grants capability). Never silent.
+
+**Error / edge paths (all user-facing).**
+- **Verifier fail** — a mapping references an opId/atom not present → **refuse to load**: *"This extension needs
+  capabilities not available here."* (Sandbox-by-construction, surfaced honestly.)
+- **Unknown/unsigned issuer** — louder warning, default-deny.
+- **Bot unreachable on mobile** — *"this bot isn't reachable on mobile yet"* (the NKN-on-RN caveat, P5).
+- **Offline** — Mode-2 (local composites) still works; Mode-1 (bot) needs connectivity.
+
+**Where it's built:** the link → card → write flow is **P2** (web first, then mobile); the AI-explained consent,
+the manage/revoke panel, and two-layer circle consent are **P6**; the scope affordance threads through P2/P4.
+
 ---
 
 ## 2. Implementation design

@@ -68,7 +68,9 @@ The missing primitive that makes "a slash-command that is merely a composite" re
 - Extend the `packages/pod-routing/src/configResource.js` pattern from single-file to a **folder scan** of pod
   `mappings/` at startup (`PodClient.list` + `read`).
 - Merge each loaded mapping manifest into the catalog **at its declared scope** (`app`/`circle`).
-- "Open link → consent → write a mapping ref into pod `mappings/`" flow (web first, then mobile).
+- "Open link → preview/consent card → write a mapping ref into pod `mappings/`" flow (web first, then mobile).
+  The full receive-and-consent UX (what the card shows/asks, scope affordance, manage/revoke, error paths) is
+  **`DESIGN-feedback-extension.md §1.5`**.
 - **Acceptance:** drop a mapping in the pod → reload → new slash-commands + clickable menus appear at the right
   scope; delete the ref → surfaces revert. Identical on web + mobile.
 

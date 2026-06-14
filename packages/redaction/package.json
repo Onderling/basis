@@ -1,0 +1,19 @@
+{
+  "name": "@canopy/redaction",
+  "version": "0.1.0",
+  "description": "Generic, config-driven redaction atom. redact(text, config) → {text, hits}: ordered regex rules + named-validator registry (bsn-11proef, nl-phone, iban, luhn) + an optional gazetteer name-pass. Locale-agnostic — all locale content is data the caller supplies. Extracted from feedback-pipeline's redact.js + names.js (P0).",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./validators": "./src/validators.js",
+    "./gazetteer": "./src/gazetteer.js"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.0"
+  }
+}

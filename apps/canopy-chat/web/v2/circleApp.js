@@ -38,6 +38,7 @@ import { scopeCatalogToApps } from '../../src/v2/circleCatalogScope.js';
 import { loadMappings } from '@canopy/pod-routing/mappings';
 import { localStorageMappingsStore, WEB_MAPPINGS_DEVICE } from '../../src/v2/mappingsStore.js';
 import { verifyMappings, mappingsToSources } from '../../src/mappings.js';
+import { DEFAULT_CIRCLE_ORIGINS } from '../../src/v2/circleSources.js';
 import { createFeedbackSurface } from '../../src/feedback/feedbackSurface.js';
 import { createFeedbackMount } from '../../src/feedback/feedbackMount.js';
 // (localStoragePolicyIo is already imported below with createCirclePolicyStore)
@@ -460,9 +461,14 @@ function buildCircleBot(agent) {
   // Scope to the circle apps (Part D) — drops canopy-chat's account/transport INFRA ops (`/me` etc.) that
   // the circle bot can't actually run (they threw `circle.bot.failed` when dispatched, 2026-06-12) and
   // keeps them out of the slash-suggest dropdown. Default scope = the 5 circle apps (DEFAULT_CIRCLE_ORIGINS).
-  let catalog = scopeCatalogToApps(filterCatalog(rawCatalog, appRegistry));
+  // Extension-mapping origins (the mapping ids) are added to the allowed scope so their merged ops survive
+  // scoping — DEFAULT_CIRCLE_ORIGINS alone would drop them. (V0: treat all accepted mappings as app-scoped;
+  // per-circle scope is a later refinement.)
+  let mappingOrigins = [];
+  const allowedApps = () => (mappingOrigins.length ? [...DEFAULT_CIRCLE_ORIGINS, ...mappingOrigins] : undefined);
+  let catalog = scopeCatalogToApps(filterCatalog(rawCatalog, appRegistry), allowedApps());
   circleCatalog = catalog;        // expose to showKring's composer (slash-suggest)
-  const rescopeCatalog = () => { catalog = scopeCatalogToApps(filterCatalog(rawCatalog, appRegistry)); circleCatalog = catalog; };
+  const rescopeCatalog = () => { catalog = scopeCatalogToApps(filterCatalog(rawCatalog, appRegistry), allowedApps()); circleCatalog = catalog; };
   appRegistry.subscribe(rescopeCatalog);
   // Extension mappings (feedback-extension P2c) — scanned at boot from the V0 localStorage store, verified
   // against the base catalog (sandbox-by-construction: a mapping referencing an unknown opId is refused), then
@@ -473,6 +479,7 @@ function buildCircleBot(agent) {
       const { accepted } = verifyMappings(mappings, rawCatalog);
       const { sources } = mappingsToSources(accepted);
       if (!sources.length) return;
+      mappingOrigins = sources.map((s) => s.manifest.app);
       rawCatalog = mergeManifests([...baseSources, ...sources], { runtime: 'browser' });
       appRegistry.syncWithCatalog(rawCatalog.appOrigins);
       rescopeCatalog();

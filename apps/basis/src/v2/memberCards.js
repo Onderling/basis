@@ -41,6 +41,7 @@
 
 import {
   createDisclosurePolicy, applyRevealPreset, isDisclosed, revealPresetOf, REVEAL_PRESETS,
+  setDisclosure, isSealedMediaRef,
 } from '@onderling/agent-registry';
 import { splitViewAsAttributes, viewAsCounts } from './viewAsAttributes.js';
 import { VIEWER_KINDS } from './circleViewAs.js';
@@ -84,7 +85,14 @@ export function memberRevealState({ member, policy = 'pairwise', contextId = PER
   const m = member && typeof member === 'object' ? member : {};
   const realNameShared = policy === 'open' || (Array.isArray(m.reveals) && m.reveals.length > 0);
   const preset = realNameShared ? 'full' : 'handle';
-  return applyRevealPreset(createDisclosurePolicy(), contextId, preset, { keysFor: personaPresetKeys });
+  let pol = applyRevealPreset(createDisclosurePolicy(), contextId, preset, { keysFor: personaPresetKeys });
+  // A profile picture present on the row was disclosed by the member (propagation is
+  // reveal-gated), so enable its key independently of the realName preset — it then
+  // renders only when the VIEWER is also entitled (the view-as gate still applies).
+  if (isSealedMediaRef(m.profilePicture)) {
+    pol = setDisclosure(pol, contextId, 'profilePicture', { enabled: true });
+  }
+  return pol;
 }
 
 /**
@@ -149,6 +157,15 @@ export function personaAttributes(member) {
     out.push({ key: 'handle', labelKey: 'circle.memberCard.attr.handle', value: `@${m.handle}`, openness: 'public' });
   }
   out.push({ key: 'realName', labelKey: 'circle.memberCard.attr.realName', value: m.realName ?? null, openness: 'pairwise' });
+  // Profile picture — a media-typed attribute whose value is a SEALED media ref
+  // (the same shape chat photos ride). Present on the row ⇒ disclosed to this circle
+  // (propagation is reveal-gated); `media: true` flags it for the img render path.
+  if (isSealedMediaRef(m.profilePicture)) {
+    out.push({
+      key: 'profilePicture', labelKey: 'circle.memberCard.attr.profilePicture',
+      value: m.profilePicture, openness: 'pairwise', media: true,
+    });
+  }
   return out;
 }
 

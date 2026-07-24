@@ -2250,6 +2250,10 @@
       "realName": {
         "text": "Real name",
         "doc": "Persona attribute label — the member's real name (revealed per the reveal rules)."
+      },
+      "profilePicture": {
+        "text": "Profile picture",
+        "doc": "Persona attribute label — the member's profile picture (a sealed media ref, shown per the reveal rules)."
       }
     }
   },

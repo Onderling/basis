@@ -30,7 +30,7 @@ import { revealPresetLabelKey } from '../../src/v2/memberCards.js';
  * @param {function} opts.t
  * @param {function} [opts.onBack]
  */
-export function renderMemberPersonaCard(container, { member = {}, split = { sees: [], hides: [] }, t, onBack } = {}) {
+export function renderMemberPersonaCard(container, { member = {}, split = { sees: [], hides: [] }, t, onBack, resolvePicture } = {}) {
   const tr = typeof t === 'function' ? t : (k) => k;
   container.innerHTML = '';
   container.classList.add('circle-membercard');
@@ -55,8 +55,8 @@ export function renderMemberPersonaCard(container, { member = {}, split = { sees
   const badge = presetBadge(tr, split.preset);
   if (badge) container.appendChild(badge);
 
-  container.appendChild(attrColumn(tr, 'sees', split.sees));
-  container.appendChild(attrColumn(tr, 'hides', split.hides));
+  container.appendChild(attrColumn(tr, 'sees', split.sees, resolvePicture));
+  container.appendChild(attrColumn(tr, 'hides', split.hides, resolvePicture));
   return container;
 }
 
@@ -73,7 +73,7 @@ export function renderMemberPersonaCard(container, { member = {}, split = { sees
  */
 export function renderSelfViewCard(container, {
   me = {}, members = [], viewer = { kind: 'stranger' }, split = { sees: [], hides: [] },
-  t, onPickViewer, onBack,
+  t, onPickViewer, onBack, resolvePicture,
 } = {}) {
   const tr = typeof t === 'function' ? t : (k) => k;
   const pick = (v) => { if (typeof onPickViewer === 'function') onPickViewer(v); };
@@ -120,8 +120,8 @@ export function renderSelfViewCard(container, {
   const badge = presetBadge(tr, split.preset);
   if (badge) container.appendChild(badge);
 
-  container.appendChild(attrColumn(tr, 'sees', split.sees));
-  container.appendChild(attrColumn(tr, 'hides', split.hides));
+  container.appendChild(attrColumn(tr, 'sees', split.sees, resolvePicture));
+  container.appendChild(attrColumn(tr, 'hides', split.hides, resolvePicture));
   return container;
 }
 
@@ -162,7 +162,7 @@ function backButton(tr, onBack) {
  * shows the attribute's label (via its `labelKey`) + — for a visible one — its
  * value; a hidden one shows a muted "verborgen" marker instead.
  */
-function attrColumn(tr, kind, attrs) {
+function attrColumn(tr, kind, attrs, resolvePicture) {
   const col = document.createElement('div');
   col.className = `circle-membercard__col circle-membercard__col--${kind}`;
   col.dataset.col = kind;
@@ -191,11 +191,25 @@ function attrColumn(tr, kind, attrs) {
     label.textContent = a.labelKey ? tr(a.labelKey) : (a.label || a.key || '');
     row.appendChild(label);
 
-    const value = document.createElement('span');
-    value.className = 'circle-membercard__attr-value';
-    if (kind === 'sees') value.textContent = a.value != null && a.value !== '' ? String(a.value) : '—';
-    else value.textContent = tr('circle.memberCard.hidden_marker');
-    row.appendChild(value);
+    if (a.media && kind === 'sees') {
+      // A media-typed attribute (the profile picture): render the SEALED ref as an
+      // <img>, resolving ref→url via the injected host resolver (fetch + unseal +
+      // object-url through the circle media gateway). No resolver / a failure leaves
+      // an empty <img> — never the raw ref object as text, never plaintext bytes.
+      const img = document.createElement('img');
+      img.className = 'circle-membercard__attr-pic';
+      img.alt = a.labelKey ? tr(a.labelKey) : (a.key || '');
+      if (typeof resolvePicture === 'function' && a.value) {
+        Promise.resolve(resolvePicture(a.value)).then((url) => { if (url) img.src = url; }).catch(() => { /* keep empty */ });
+      }
+      row.appendChild(img);
+    } else {
+      const value = document.createElement('span');
+      value.className = 'circle-membercard__attr-value';
+      if (kind === 'sees') value.textContent = a.value != null && a.value !== '' ? String(a.value) : '—';
+      else value.textContent = tr('circle.memberCard.hidden_marker');
+      row.appendChild(value);
+    }
 
     col.appendChild(row);
   }

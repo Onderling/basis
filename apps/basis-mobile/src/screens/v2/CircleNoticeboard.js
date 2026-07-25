@@ -28,7 +28,7 @@ const INTENTS = ['ask', 'offer', 'lend'];
 // `media` — THIS circle's sealed-media composition (or null for a p0/p1 circle). Threaded from
 // CircleLauncherScreen (web parity `kringMedia`): gates the 📎 attach affordance (sealed-only —
 // hidden when null) and opens sealed full images through the per-circle gateway on tap.
-export default function CircleNoticeboard({ callSkill, onStoopEvent, onEmbedOpen, media = null }) {
+export default function CircleNoticeboard({ callSkill, onStoopEvent, onEmbedOpen, media = null, onReportPost = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [posts, setPosts] = useState([]);
@@ -156,7 +156,9 @@ export default function CircleNoticeboard({ callSkill, onStoopEvent, onEmbedOpen
       if (action === 'respond') { setReplyingTo(post.id); setReplyText(''); return; }
       if (action === 'assign') { setAssigningTo(post.id); setAssignText(''); return; }
       if (action === 'cancel') await callSkill('stoop', 'cancelRequest', { requestId: post.id });
-      else if (action === 'report') await callSkill('stoop', 'reportPost', { itemId: post.id });
+      // §8 unification — a post report is now a governance report event (propagates + shows
+      // in the governance Reports section), not the older reportPost item. Falls back if unwired.
+      else if (action === 'report') { if (typeof onReportPost === 'function') onReportPost(post); else await callSkill('stoop', 'reportPost', { itemId: post.id }); }
       else if (action === 'markReturned') await callSkill('stoop', 'markReturned', { requestId: post.id });
       else if (action === 'mute' && post.addedBy) await callSkill('stoop', 'mutePeer', { peerWebid: post.addedBy });
     } catch { /* reload reflects the real state */ }

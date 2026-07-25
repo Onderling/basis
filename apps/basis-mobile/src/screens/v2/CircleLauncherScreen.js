@@ -589,6 +589,24 @@ export default function CircleLauncherScreen({
     encodeImage:    encodePickedImage,
     localActor: getCircleActorWebId() || 'me',
   }), [getSelfMediaComposition]);
+  // §8 unification — the ONE report write path (member · post · message) → the governance
+  // report host, so every report propagates + shows in the governance Reports section (folds
+  // the older reportPost). Best-effort; scoped to the active circle.
+  const fileCircleReportMobile = useCallback(async (targetType, targetRef, targetLabel = null, reason = '') => {
+    const circleId = selected?.id; if (!circleId || !targetRef) return;
+    try {
+      const broadcast = (channel, cid, event) => {
+        const op = channel === 'report' ? 'broadcastKringReport' : 'broadcastKringGovernance';
+        const msgId = channel === 'report' ? reportEntryId(event) : governanceEntryId(event);
+        bundle?.callSkill?.('stoop', op, { groupId: cid, event, msgId, ts: Date.now() })?.catch?.(() => {});
+      };
+      const gov = bindCircleGovernance({
+        eventLog, callSkill: bundle?.callSkill, getPolicy: (cid) => policyStore.get(cid),
+        myRef: getCircleActorWebId() || '', genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`, broadcast,
+      });
+      await gov.reports.file({ circleId, targetType, targetRef, targetLabel, reason });
+    } catch { /* best-effort */ }
+  }, [selected, bundle, eventLog, policyStore]);
   const overrideStore     = useMemo(() => makeMemberOverrideStoreRN(AsyncStorage), []);
   // Objective D — mirror the pref to the user's pod so other agents read it.
   // getPodWriter is a thunk: null while unsigned (→ local-only), a live
@@ -1598,21 +1616,8 @@ export default function CircleLauncherScreen({
         onSettings={() => setView('settings')}
         onAdmin={() => setView('admin')}
         onGovernance={() => setView('governance')}
-        onReportMember={async (m) => {
-          const ref = m?.webid || m?.id; if (!ref || !selected?.id) return;
-          try {
-            const _bc = (channel, circleId, event) => {
-              const op = channel === 'report' ? 'broadcastKringReport' : 'broadcastKringGovernance';
-              const msgId = channel === 'report' ? reportEntryId(event) : governanceEntryId(event);
-              bundle?.callSkill?.('stoop', op, { groupId: circleId, event, msgId, ts: Date.now() })?.catch?.(() => {});
-            };
-            const gov = bindCircleGovernance({
-              eventLog, callSkill: bundle?.callSkill, getPolicy: (cid) => policyStore.get(cid),
-              myRef: getCircleActorWebId() || '', genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`, broadcast: _bc,
-            });
-            await gov.reports.file({ circleId: selected.id, targetType: 'member', targetRef: ref, targetLabel: m?.handle || m?.realName || ref, reason: '' });
-          } catch { /* best-effort */ }
-        }}
+        onReportMember={(m) => { const ref = m?.webid || m?.id; if (ref) fileCircleReportMobile('member', ref, m?.handle || m?.realName || ref); }}
+        onReportPost={(post) => { if (post?.id) fileCircleReportMobile('post', post.id, (post.text || '').slice(0, 48)); }}
         onMine={() => setView('override')}
         onViewAs={async () => {
           const p = await policyStore.get(selected.id);
@@ -1985,7 +1990,7 @@ function CircleDetail({
   recipeStore = null, onStoopEvent, sendPersonaUpdate, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null,
   // Task #13 — onboarding first-run flags (shared store) + the create-flow handoff.
   onboardingFlags = null, onCreateCircle = null,
-  onBack, onSettings, onMine, onViewAs, onAdvisor, onSkills, onFiles, onRules, onRecipes, onAdmin, onLists, onShare, onInvite, onGovernance, onReportMember,
+  onBack, onSettings, onMine, onViewAs, onAdvisor, onSkills, onFiles, onRules, onRecipes, onAdmin, onLists, onShare, onInvite, onGovernance, onReportMember, onReportPost,
 }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -3288,6 +3293,7 @@ function CircleDetail({
           // S1 #1 — the buurt noticeboard (its own composer + post list), scoped to
           // the open circle (S4 per-circle restructure — see stoopCall above).
           <CircleNoticeboard callSkill={stoopCall} onStoopEvent={onStoopEvent} media={circleMedia}
+            onReportPost={onReportPost}
             onEmbedOpen={({ screen, ref }) => { if (screen) setScreenPanel({ screen, highlightRef: ref }); }} />
         ) : activeTab === 'leden' ? (
           // LEDEN — the circle's member roster (listGroupMembers → normalizeCircleMembers). web≡mobile.

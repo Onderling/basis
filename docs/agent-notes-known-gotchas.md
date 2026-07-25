@@ -186,3 +186,13 @@ link: `apps/basis/node_modules/@onderling/attribute-charter -> ../../../../packa
   Metro watches `../feedback` (metro.config.js) so mobile hot-reload crosses the repo boundary. The e2e-journeys
   import it by relative path (`../../../../feedback/...`) with a soft-skip when absent. Replaced by versioned deps
   at the SDK publish swap.
+- **Mobile bundle 500s on the feedback chain — TWO missing Metro resolvers (fixed 2026-07-25).** Surfaced when
+  actually bundling for a device. (1) `onderling-feedback/public` had NO hand-resolver (Metro exports-off), so the
+  bundle failed immediately — added `resolveRequest` cases mapping `onderling-feedback/{public,testing}` to the
+  sibling checkout (`../feedback/src/public/index.js`, `../feedback/test/helpers/mock-llm.js`). (2) The `eld`
+  language-detector resolver pointed at `apps/feedback-pipeline/node_modules/eld` (never installed there) — `eld`
+  is HOISTED to the ROOT `node_modules/eld`; repointed the resolver + added `node_modules/eld` to `watchFolders`
+  (else Metro "Failed to get the SHA-1"). With both, `apps/basis-mobile` bundles (2591 modules). Only THEN does the
+  next layer show: the connected **dev-client APK is stale** — missing native modules (ExpoSecureStore →
+  ExpoWebBrowser → expo-auth-session → …). Do NOT shim these one-by-one (cascade + degrades auth/secure-store);
+  **rebuild the dev client** (`expo run:android`) so it carries the app's current native deps.

@@ -18,7 +18,7 @@ import { memberPersonaView, selfViewSplit, VIEWER_KINDS } from '@onderling-app/b
 import { t } from '../../core/localisation.js';
 
 export default function CircleMemberCardScreen({
-  member = {}, self = false, roster = [], myWebid = null, policy = 'pairwise', onBack,
+  member = {}, self = false, roster = [], myWebid = null, policy = 'pairwise', onBack, onReport,
 }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -69,6 +69,11 @@ export default function CircleMemberCardScreen({
         <Pressable onPress={onBack} accessibilityRole="button" testID="circle-membercard-back">
           <Text style={styles.back}>{t('circle.back')}</Text>
         </Pressable>
+        {!self && typeof onReport === 'function' ? (
+          <Pressable onPress={() => onReport(member)} accessibilityRole="button" testID="circle-membercard-report">
+            <Text style={styles.back}>{t('circle.governance.report_member')}</Text>
+          </Pressable>
+        ) : null}
       </View>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.lede}>{lede}</Text>

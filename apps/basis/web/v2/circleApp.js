@@ -5455,7 +5455,21 @@ async function showMemberPersona(id, member) {
   const split = memberPersonaView({ member, viewerWebid: myWebid || null, policy, circleId: id });
   const _comp = await getCircleMediaComposition(id, policy).catch(() => null);
   const resolvePicture = makeCirclePictureResolver(_comp?.mediaGateway?.opener);
-  renderMemberPersonaCard(rootEl, { member, split, t, onBack: () => showDetail(id), resolvePicture });
+  renderMemberPersonaCard(rootEl, {
+    member, split, t, onBack: () => showDetail(id), resolvePicture,
+    // §8 — file a report against this member (goes to the circle's admins).
+    onReport: (m) => {
+      const ref = m?.webid || m?.id;
+      if (!ref) return;
+      const reason = (typeof window !== 'undefined' && window.prompt) ? (window.prompt(t('circle.governance.report_reason_prompt')) ?? '') : '';
+      const gov = bindCircleGovernance({
+        eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
+        myRef: myWebid, genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`,
+      });
+      gov.reports.file({ circleId: id, targetType: 'member', targetRef: ref, targetLabel: m?.handle || m?.realName || ref, reason })
+        .then(() => showDetail(id)).catch(() => {});
+    },
+  });
 }
 
 // Resolve a profile-picture SEALED media ref → an object-URL of its sealed inline
@@ -5523,8 +5537,13 @@ async function showGovernance(id) {
     };
     let view = { open: [], closed: [] };
     try { view = await gov.view(id, { labelForSubject }); } catch { /* */ }
+    // §8 — the admin's open reports (member↔admin lane).
+    let reports = [];
+    if (isAdmin) { try { reports = (await gov.reports.list(id)).open; } catch { /* */ } }
     renderGovernancePanel(host, {
-      view, t, policy: ctx.policy, isAdmin,
+      view, t, policy: ctx.policy, isAdmin, reports,
+      onDismissReport: async (reportId) => { try { await gov.reports.dismiss({ circleId: id, reportId }); } catch { /* */ } await rerender(); },
+      onActReport:     async (reportId) => { try { await gov.reports.act({ circleId: id, reportId }); } catch { /* */ } await rerender(); },
       onVote: async (proposalId, choice) => {
         try { await gov.vote({ circleId: id, proposalId, voter: myWebid, choice }); } catch { /* */ }
         await rerender();

@@ -110,6 +110,33 @@ describe('renderGovernancePanel', () => {
     expect(onSetClass).toHaveBeenCalledWith('removeMember', 'any-admin');
   });
 
+  it('§8: an admin sees open reports with dismiss/act wired', () => {
+    const c = document.createElement('div');
+    const onDismissReport = vi.fn(); const onActReport = vi.fn();
+    renderGovernancePanel(c, {
+      view: { open: [], closed: [] }, t: (k) => k, isAdmin: true, onSetClass: () => {},
+      reports: [{ reportId: 'r1', targetType: 'member', targetRef: 'm2', targetLabel: 'Kees', reason: 'spam' }],
+      onDismissReport, onActReport,
+    });
+    const card = c.querySelector('.circle-governance__report[data-report="r1"]');
+    expect(card).toBeTruthy();
+    expect(c.textContent).toContain('Kees');
+    expect(c.textContent).toContain('spam');
+    c.querySelector('.circle-governance__report-act').click();
+    expect(onActReport).toHaveBeenCalledWith('r1');
+    c.querySelector('.circle-governance__report-dismiss').click();
+    expect(onDismissReport).toHaveBeenCalledWith('r1');
+  });
+
+  it('a non-admin sees no reports section', () => {
+    const c = document.createElement('div');
+    renderGovernancePanel(c, {
+      view: { open: [], closed: [] }, t: (k) => k, isAdmin: false,
+      reports: [{ reportId: 'r1', targetType: 'member', targetRef: 'm2' }],
+    });
+    expect(c.querySelector('.circle-governance__reports')).toBeNull();
+  });
+
   it('a non-admin never sees the settings control', () => {
     const c = document.createElement('div');
     renderGovernancePanel(c, { view: { open: [], closed: [] }, t: (k) => k, policy: normalizeCirclePolicy({}), isAdmin: false, onSetClass: () => {} });

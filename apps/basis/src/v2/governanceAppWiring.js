@@ -10,6 +10,8 @@
 import { makeCircleGovernance } from './governanceHost.js';
 import { GOVERNANCE_KIND } from './governanceLog.js';
 import { chainEvent, authorHead } from './governanceChain.js';
+import { makeCircleReports } from './reportHost.js';
+import { REPORT_KIND } from './reportModel.js';
 
 /** The author of a governance event — the voter (a vote) or the proposer/enactor (propose/resolve). */
 function authorOf(event) {
@@ -70,8 +72,22 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
   };
   const getMembers = (circleId) => readCircleMembers({ callSkill, circleId, myRef, getPolicy });
 
-  return makeCircleGovernance({
+  const governance = makeCircleGovernance({
     callSkill, readGovernanceEvents, appendGovernanceEvent, getPolicy, getMembers,
     localActorRef: myRef, newProposalId: genId, now,
   });
+
+  // §8 reporting — rides the same log (kind `report`, unchained: admin records, not votes);
+  // a member-target ban routes through the governance handle above (its removeMember class).
+  const readReportEvents = async (circleId) => eventLog
+    .query({})
+    .filter((e) => e && e.type === REPORT_KIND && e.circleId === circleId && e.payload)
+    .map((e) => e.payload);
+  const appendReportEvent = async (circleId, event) =>
+    eventLog.appendSilentEntry({ circleId, kind: REPORT_KIND, payload: event });
+  const reports = makeCircleReports({
+    readReportEvents, appendReportEvent, governance, newReportId: genId, localActorRef: myRef, now,
+  });
+
+  return { ...governance, reports };
 }

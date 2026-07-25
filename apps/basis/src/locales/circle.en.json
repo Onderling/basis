@@ -3712,6 +3712,16 @@
     "awaiting_enactment": { "text": "awaiting an admin", "doc": "Governance — approved, waiting for an admin/caretaker device to enact it (Decision A)." },
     "disputed_line": { "text": "conflicting history from {who} — evidence attached", "doc": "Governance L3 — equivocation (fork-proof) alert." },
     "review_remove": { "text": "Review & remove", "doc": "Governance L3 — open a removeMember review on a disputed member." },
+    "report_member": { "text": "Report member", "doc": "Governance §8 — the button on a member card to report them to the admins." },
+    "report_reason_prompt": { "text": "Why are you reporting this member?", "doc": "Governance §8 — prompt for the report reason." },
+    "reports_title": { "text": "Reports", "doc": "Governance §8 — heading over the member-to-admin report lane (admin-only)." },
+    "report_target": {
+      "member": { "text": "Member", "doc": "Report target type — a member." },
+      "post": { "text": "Post", "doc": "Report target type — a noticeboard post." },
+      "message": { "text": "Message", "doc": "Report target type — a chat message." }
+    },
+    "report_dismiss": { "text": "Dismiss", "doc": "Report action — close the report with no action." },
+    "report_act": { "text": "Act", "doc": "Report action — act on it (a member routes through the removeMember class)." },
     "settings_title": { "text": "Who decides", "doc": "Governance settings — heading over the per-action decision-class controls (admin-only)." }
   },
   "mij": {

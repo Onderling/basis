@@ -31,8 +31,11 @@ function el(tag, cls, text) {
  * @param {boolean} [opts.isAdmin]      show the admin-only decision-class settings
  * @param {(action:string, cls:string)=>void} [opts.onSetClass]  change a governed action's class
  * @param {(ref:string)=>void} [opts.onReviewDisputed]  open a removeMember proposal for an equivocator (L3)
+ * @param {object[]} [opts.reports]   open reports (admin-only, the member↔admin lane §8)
+ * @param {(reportId:string)=>void} [opts.onDismissReport]
+ * @param {(reportId:string)=>void} [opts.onActReport]
  */
-export function renderGovernancePanel(container, { view = { open: [], closed: [] }, t, onVote, onOverride, policy = null, isAdmin = false, onSetClass, onReviewDisputed } = {}) {
+export function renderGovernancePanel(container, { view = { open: [], closed: [] }, t, onVote, onOverride, policy = null, isAdmin = false, onSetClass, onReviewDisputed, reports = [], onDismissReport, onActReport } = {}) {
   const tr = typeof t === 'function' ? t : (k) => k;
   container.innerHTML = '';
   container.classList.add('circle-governance');
@@ -120,6 +123,32 @@ export function renderGovernancePanel(container, { view = { open: [], closed: []
       hist.appendChild(line);
     }
     container.appendChild(hist);
+  }
+
+  // §8 — the member↔admin lane: open reports an admin can dismiss or act on. Acting on a
+  // member routes through the removeMember class; on a post/message it closes it actioned.
+  if (isAdmin && reports.length) {
+    const box = el('div', 'circle-governance__reports');
+    box.appendChild(el('h3', 'circle-governance__reports-title', tr('circle.governance.reports_title')));
+    for (const r of reports) {
+      const card = el('div', 'circle-governance__report');
+      card.dataset.report = r.reportId;
+      const targetLabel = r.targetLabel || r.targetRef || '';
+      card.appendChild(el('span', 'circle-governance__report-what',
+        `${tr(`circle.governance.report_target.${r.targetType}`)}${targetLabel ? `: ${targetLabel}` : ''}`));
+      if (r.reason) card.appendChild(el('span', 'circle-governance__report-reason', r.reason));
+      const acts = el('div', 'circle-governance__report-actions');
+      const dismiss = el('button', 'circle-governance__report-dismiss', tr('circle.governance.report_dismiss'));
+      dismiss.type = 'button';
+      dismiss.addEventListener('click', () => onDismissReport?.(r.reportId));
+      const act = el('button', 'circle-governance__report-act', tr('circle.governance.report_act'));
+      act.type = 'button';
+      act.addEventListener('click', () => onActReport?.(r.reportId));
+      acts.appendChild(dismiss); acts.appendChild(act);
+      card.appendChild(acts);
+      box.appendChild(card);
+    }
+    container.appendChild(box);
   }
 
   // Admin-only "who decides what" settings — the decision-class per governed action.

@@ -45,7 +45,10 @@ export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy,
     };
     let view = { open: [], closed: [] };
     try { view = await gov.view(circleId, { labelForSubject }); } catch { /* */ }
-    setModel({ view, isAdmin: me?.role === 'admin', policy: ctx.policy });
+    const isAdmin = me?.role === 'admin';
+    let reports = [];
+    if (isAdmin) { try { reports = (await gov.reports.list(circleId)).open; } catch { /* */ } }
+    setModel({ view, isAdmin, policy: ctx.policy, reports });
   }, [callSkill, eventLog, getPolicy, circleId]);
 
   useEffect(() => { load(); }, [load]);
@@ -73,6 +76,15 @@ export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy,
   const onReviewDisputed = useCallback(async (ref) => {
     const { gov, myWebid } = ctxRef.current;
     try { await gov?.propose({ circleId, action: 'removeMember', subject: ref, actor: { ref: myWebid } }); } catch { /* */ }
+    await load();
+  }, [circleId, load]);
+
+  const onDismissReport = useCallback(async (reportId) => {
+    try { await ctxRef.current.gov?.reports.dismiss({ circleId, reportId }); } catch { /* */ }
+    await load();
+  }, [circleId, load]);
+  const onActReport = useCallback(async (reportId) => {
+    try { await ctxRef.current.gov?.reports.act({ circleId, reportId }); } catch { /* */ }
     await load();
   }, [circleId, load]);
 
@@ -147,6 +159,28 @@ export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy,
                 {t(`circle.governance.action.${row.action}`)}{row.subjectLabel ? `: ${row.subjectLabel}` : ''}
               </Text>
               <Text style={[styles.status, styles[`status_${statusKey(row)}`]]}>{t(`circle.governance.status.${statusKey(row)}`)}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {model.isAdmin && (model.reports ?? []).length ? (
+        <View style={styles.settings}>
+          <Text style={styles.settingsTitle}>{t('circle.governance.reports_title')}</Text>
+          {model.reports.map((r) => (
+            <View key={r.reportId} style={styles.card} testID={`gov-report-${r.reportId}`}>
+              <Text style={styles.action}>
+                {t(`circle.governance.report_target.${r.targetType}`)}{(r.targetLabel || r.targetRef) ? `: ${r.targetLabel || r.targetRef}` : ''}
+              </Text>
+              {r.reason ? <Text style={styles.tally}>{r.reason}</Text> : null}
+              <View style={styles.actions}>
+                <Pressable onPress={() => onDismissReport(r.reportId)} accessibilityRole="button" style={styles.voteBtn}>
+                  <Text style={styles.voteText}>{t('circle.governance.report_dismiss')}</Text>
+                </Pressable>
+                <Pressable onPress={() => onActReport(r.reportId)} accessibilityRole="button" style={styles.override}>
+                  <Text style={styles.overrideText}>{t('circle.governance.report_act')}</Text>
+                </Pressable>
+              </View>
             </View>
           ))}
         </View>

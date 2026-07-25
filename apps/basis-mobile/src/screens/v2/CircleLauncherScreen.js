@@ -222,6 +222,7 @@ import CircleAdminPanelScreen from './CircleAdminPanelScreen.js';
 import CircleMyDataScreen from './CircleMyDataScreen.js';
 import CircleMijScreen from './CircleMijScreen.js';   // mij#personas — the "Mij → persona's" surface (replaces the single-persona About-me content, web parity with openAboutMePanel)
 import CircleGovernanceScreen from './CircleGovernanceScreen.js';   // Wave C §5 — governance surface (web≡mobile)
+import { bindCircleGovernance } from '../../../../basis/src/v2/governanceAppWiring.js';   // §8 — report filing
 import SharedWithMeScreen from './SharedWithMeScreen.js';   // SILENT out-of-circle delivery — personal "shared with me" inbox (web≡mobile)
 
 // B (circle bot) — host LLM route for NL→command in the kring. Mirrors web's VITE_CIRCLE_LLM_BASEURL
@@ -1595,6 +1596,16 @@ export default function CircleLauncherScreen({
         onSettings={() => setView('settings')}
         onAdmin={() => setView('admin')}
         onGovernance={() => setView('governance')}
+        onReportMember={async (m) => {
+          const ref = m?.webid || m?.id; if (!ref || !selected?.id) return;
+          try {
+            const gov = bindCircleGovernance({
+              eventLog, callSkill: bundle?.callSkill, getPolicy: (cid) => policyStore.get(cid),
+              myRef: getCircleActorWebId() || '', genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`,
+            });
+            await gov.reports.file({ circleId: selected.id, targetType: 'member', targetRef: ref, targetLabel: m?.handle || m?.realName || ref, reason: '' });
+          } catch { /* best-effort */ }
+        }}
         onMine={() => setView('override')}
         onViewAs={async () => {
           const p = await policyStore.get(selected.id);
@@ -1964,7 +1975,7 @@ function CircleDetail({
   recipeStore = null, onStoopEvent, sendPersonaUpdate, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null,
   // Task #13 — onboarding first-run flags (shared store) + the create-flow handoff.
   onboardingFlags = null, onCreateCircle = null,
-  onBack, onSettings, onMine, onViewAs, onAdvisor, onSkills, onFiles, onRules, onRecipes, onAdmin, onLists, onShare, onInvite, onGovernance,
+  onBack, onSettings, onMine, onViewAs, onAdvisor, onSkills, onFiles, onRules, onRecipes, onAdmin, onLists, onShare, onInvite, onGovernance, onReportMember,
 }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -3436,6 +3447,7 @@ function CircleDetail({
                 myWebid={mandateViewer.viewerWebid ?? null}
                 policy={policy?.revealPolicy ?? 'pairwise'}
                 onBack={() => setMemberCard(null)}
+                onReport={onReportMember ? (m) => { onReportMember(m); setMemberCard(null); } : undefined}
               />
             ) : null}
           </View>

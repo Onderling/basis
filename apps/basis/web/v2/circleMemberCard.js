@@ -30,12 +30,23 @@ import { revealPresetLabelKey } from '../../src/v2/memberCards.js';
  * @param {function} opts.t
  * @param {function} [opts.onBack]
  */
-export function renderMemberPersonaCard(container, { member = {}, split = { sees: [], hides: [] }, t, onBack, resolvePicture } = {}) {
+export function renderMemberPersonaCard(container, { member = {}, split = { sees: [], hides: [] }, t, onBack, resolvePicture, onReport } = {}) {
   const tr = typeof t === 'function' ? t : (k) => k;
   container.innerHTML = '';
   container.classList.add('circle-membercard');
 
   container.appendChild(backButton(tr, onBack));
+
+  // §8 — report this member to the circle's admins (the member↔admin lane). The admin then
+  // dismisses or acts; acting routes through the removeMember decision-class.
+  if (typeof onReport === 'function') {
+    const report = document.createElement('button');
+    report.type = 'button';
+    report.className = 'circle-membercard__report';
+    report.textContent = tr('circle.governance.report_member');
+    report.addEventListener('click', () => onReport(member));
+    container.appendChild(report);
+  }
 
   const title = document.createElement('h2');
   title.className = 'circle-membercard__title';

@@ -52,6 +52,9 @@ export function renderMij(container, {
   onCreatePersona,
   onToggleDisclosure,
   onShareToCircle,
+  onSetPicture,
+  resolvePicture,
+  currentPicture = null,
 } = {}) {
   if (!container) return container;
   const tr = typeof t === 'function' ? t : (k) => k;
@@ -63,16 +66,43 @@ export function renderMij(container, {
     return container;
   }
 
-  container.appendChild(renderGeneral(tr, model, { onSetProperty, onAddOffering }));
+  container.appendChild(renderGeneral(tr, model, { onSetProperty, onAddOffering, onSetPicture, resolvePicture, currentPicture }));
   container.appendChild(renderPersonas(tr, model, { onCreatePersona }));
   container.appendChild(renderCircles(tr, model, { onToggleDisclosure, onShareToCircle }));
   return container;
 }
 
 // ── 1 · MIJN ALGEMENE PERSONA — de waarheidslaag ────────────────────────────
-function renderGeneral(tr, model, { onSetProperty, onAddOffering }) {
+function renderGeneral(tr, model, { onSetProperty, onAddOffering, onSetPicture, resolvePicture, currentPicture }) {
   const sec = section(tr, 'circle.mij.general_eyebrow', 'circle.mij.general_tagline');
   const panel = el('div', 'cc-mij__panel');
+
+  // Profile picture — a media-typed persona attribute. Pick an image → the host
+  // seals + stores it (and re-seals it per circle on disclosure). The preview
+  // resolves the sealed inline thumbnail via the injected resolver. Only shown
+  // when the host wires the seam (a sealed-capable circle) — no unsealed upload.
+  if (typeof onSetPicture === 'function') {
+    const picRow = el('div', 'cc-mij__row cc-mij__row--picture');
+    picRow.dataset.key = 'profilePicture';
+    picRow.appendChild(el('span', 'cc-mij__key', tr('circle.mij.profilePicture')));
+    const preview = document.createElement('img');
+    preview.className = 'cc-mij__picture-preview';
+    preview.alt = tr('circle.mij.profilePicture');
+    if (currentPicture && typeof resolvePicture === 'function') {
+      Promise.resolve(resolvePicture(currentPicture)).then((u) => { if (u) preview.src = u; }).catch(() => { /* keep empty */ });
+    }
+    picRow.appendChild(preview);
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'image/*';
+    fileInput.className = 'cc-mij__picture-input';
+    fileInput.addEventListener('change', () => {
+      const f = fileInput.files && fileInput.files[0];
+      if (f) onSetPicture(f);
+    });
+    picRow.appendChild(fileInput);
+    panel.appendChild(picRow);
+  }
 
   for (const p of (model.general?.properties || [])) {
     const row = el('div', 'cc-mij__row');

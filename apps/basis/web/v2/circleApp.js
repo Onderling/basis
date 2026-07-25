@@ -3931,8 +3931,34 @@ async function openAboutMePanel(personaId) {
       callSkill: rawCallSkill, personaId: id, circles: circlesCache,
       activeCircleId: getActiveCircle(),
     });
+    // Profile picture (media persona attribute) — the active circle's media
+    // composition seals it on set; the preview resolves the sealed inline thumb.
+    // B1: sealed via the active circle. The per-circle RE-SEAL on disclosure — so
+    // the pic opens in EVERY circle it's shared to (Frits: option (a)) — is B2, at
+    // propagation (personaPropsUpdate/getPersonaRelease), reusing the copy-reseal.
+    const _picCircle = getActiveCircle();
+    let _picPolicy = null; try { _picPolicy = await policyStore.get(_picCircle); } catch { /* */ }
+    const _picComp = _picCircle ? await getCircleMediaComposition(_picCircle, _picPolicy).catch(() => null) : null;
+    let currentPicture = null;
+    try {
+      const _props = (await rawCallSkill('agents', 'getProfileProperties', { id: model.defaultId ?? 'default' }))?.properties ?? {};
+      const _entry = _props.profilePicture;
+      currentPicture = (_entry && typeof _entry === 'object' && _entry.value !== undefined) ? _entry.value : (_entry ?? null);
+    } catch { /* no picture set */ }
     renderMij(body, {
       model, t, lang: currentLang(),
+      resolvePicture: makeCirclePictureResolver(_picComp?.mediaGateway?.opener),
+      currentPicture,
+      onSetPicture: _picComp ? async (file) => {
+        try {
+          const embed = await createMediaEmbed({}, {
+            file, mediaGateway: _picComp.mediaGateway, encodeImage: encodeImageFile, localActor: LOCAL_ACTOR, t,
+          });
+          const src = (embed && embed.ok !== false) ? (embed.snapshot?.source ?? null) : null;
+          if (src) await rawCallSkill('agents', 'setProfileProperty', { id: model.defaultId ?? 'default', key: 'profilePicture', value: src });
+        } catch { /* upload failed — the picker stays */ }
+        await draw();
+      } : undefined,
       // Section 1 edits target the GENERAL persona — the truth layer.
       onSetProperty: async (key, value) => {
         try { await rawCallSkill('agents', 'setProfileProperty', { id: model.defaultId ?? 'default', key, value }); } catch { /* */ }

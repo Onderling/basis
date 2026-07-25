@@ -3689,6 +3689,10 @@
       "text": "Mij — persona's",
       "doc": "mij#personas — kop van het Mij→persona's-overzicht (vervangt de Over-mij-overlay)."
     },
+    "profilePicture": {
+      "text": "Profielfoto",
+      "doc": "mij#personas — the profile-picture persona attribute; pick an image (sealed, re-sealed per circle on disclosure)."
+    },
     "unavailable": {
       "text": "Je persona's zijn niet beschikbaar.",
       "doc": "mij#personas — de profielen konden niet geladen worden (registry niet bereikbaar)."

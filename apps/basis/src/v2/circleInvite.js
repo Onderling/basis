@@ -17,7 +17,7 @@
  */
 
 import { encodeMembershipCodeUrl } from '../core/wizards/createGroupState.js';
-import { initialState, decodeInvite, finalSubmit } from '../core/wizards/joinGroupState.js';
+import { initialState, decodeInvite, finalSubmit, existingSelvesFrom, setLinkChoice } from '../core/wizards/joinGroupState.js';
 
 /**
  * Build a `stoop-invite://` URI for an EXISTING circle so the admin can show it as a QR.
@@ -84,11 +84,25 @@ export async function buildCircleInviteUri({ callSkill, circleId, adminPeerAddr 
 /**
  * Join a circle from a scanned/pasted invite URI, reusing the classic no-pod join chain.
  *
- * @param {{ inviteUri:(string|object), callSkill:Function, sendPeerRedeem?:Function,
- *           handle:string, shareAddress?:boolean }} a
+ * Cross-circle linkability (SENSITIVE — NOTE-identity-and-linkability, Decision B): the join
+ * defaults to a FRESH, unlinkable per-circle key. A caller may CONTINUE as an existing self by
+ * passing `linkChoice = <sourceCircleId>` PLUS the same two seams the wizards pass — `circleAddressFor`
+ * (present that source circle's per-circle key) and `signCircleLink` (prove control of it, signed by
+ * the source circle's identity, bound to the joining circle). `circles` scopes the choice: an unknown
+ * source id falls back to fresh (deny-by-default). Without the seams the proof is absent and the admin
+ * drops the linkage — so an existing-self claim only lands when it is genuinely provable. Fully
+ * additive: default args ⇒ exactly the previous fresh-only behaviour.
+ *
+ * @param {{ inviteUri:(string|object), callSkill:Function, sendPeerRedeem?:Function, handle:string,
+ *           shareAddress?:boolean, linkChoice?:string, circles?:Array<{id:string,name?:string}>,
+ *           circleAddressFor?:(circleId:string)=>(string|null),
+ *           signCircleLink?:(sourceCircleId:string, groupId:string, address:string)=>(any) }} a
  * @returns {Promise<{ ok:true, circleId:string, message?:string, handle?:string } | { error:string }>}
  */
-export async function joinCircleFromInvite({ inviteUri, callSkill, sendPeerRedeem, handle, shareAddress = true } = {}) {
+export async function joinCircleFromInvite({
+  inviteUri, callSkill, sendPeerRedeem, handle, shareAddress = true,
+  linkChoice = 'fresh', circles = null, circleAddressFor = null, signCircleLink = null,
+} = {}) {
   const h = String(handle ?? '').trim();
   if (!h) return { error: 'handle-required' };
   const state = initialState();
@@ -97,7 +111,13 @@ export async function joinCircleFromInvite({ inviteUri, callSkill, sendPeerRedee
   if (!state.invite || !state.invite.groupId) return { error: 'bad-invite' };
   state.handle = h;
   state.shareAddress = shareAddress !== false;
-  const { result, state: out } = await finalSubmit({ state, callSkill, sendPeerRedeem });
+  // Wave B — the "continue as an existing self" choice (default fresh/unlinkable). Populate the
+  // existing-selves list so setLinkChoice VALIDATES the chosen source circle before honouring it
+  // (an unknown/absent choice ⇒ fresh). The signing proof is generated inside finalSubmit from the
+  // circleAddressFor + signCircleLink seams; a missing seam ⇒ no proof ⇒ the admin drops the link.
+  state.existingSelves = existingSelvesFrom(Array.isArray(circles) ? circles : [], state.invite.groupId);
+  setLinkChoice(state, linkChoice);
+  const { result, state: out } = await finalSubmit({ state, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink });
   if (!result) return { error: out?.submitError || 'join-failed' };
   return { ok: true, circleId: result.groupId, message: result.message, handle: result.handle };
 }

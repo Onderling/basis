@@ -108,4 +108,55 @@ describe('joinCircleFromInvite', () => {
     expect(bad.error).toBeTruthy();
     expect(callSkill).not.toHaveBeenCalled();
   });
+
+  // ── Cross-circle linkability parity with the wizards (Decision B) ──────────
+  const buildJoinFixture = async () => {
+    const issuer = vi.fn(async (app, op) => (op === 'getCurrentMembershipCode' ? { code: 'CODE-9', expiresAt: 9 } : {}));
+    const { uri } = await buildCircleInviteUri({ callSkill: issuer, circleId: 'kaas', adminPeerAddr: 'a' });
+    const joinSkill = vi.fn(async (app, op) => (op === 'setMyHandle' || op === 'redeemMembershipCode' ? { ok: true } : {}));
+    const redeemArgs = () => joinSkill.mock.calls.find(([, op]) => op === 'redeemMembershipCode')?.[2] ?? {};
+    return { uri, joinSkill, redeemArgs };
+  };
+
+  it('continue-as-existing-self: presents the source circle key + a signing PROOF to the redeem', async () => {
+    const { uri, joinSkill, redeemArgs } = await buildJoinFixture();
+    const circleAddressFor = vi.fn((cid) => (cid === 'brood' ? 'ADDR-BROOD' : null));
+    const signCircleLink = vi.fn((src, gid, addr) => `PROOF(${src},${gid},${addr})`);
+    const r = await joinCircleFromInvite({
+      inviteUri: uri, callSkill: joinSkill, handle: 'frits',
+      linkChoice: 'brood', circles: [{ id: 'brood', name: 'Brood' }], circleAddressFor, signCircleLink,
+    });
+    expect(r.ok).toBe(true);
+    expect(circleAddressFor).toHaveBeenCalledWith('brood');
+    expect(signCircleLink).toHaveBeenCalledWith('brood', 'kaas', 'ADDR-BROOD');
+    expect(redeemArgs()).toMatchObject({ circleAddress: 'ADDR-BROOD', circleAddressProof: 'PROOF(brood,kaas,ADDR-BROOD)' });
+  });
+
+  it('default is fresh/unlinkable — no circleAddress or proof reaches the redeem (back-compat)', async () => {
+    const { uri, joinSkill, redeemArgs } = await buildJoinFixture();
+    await joinCircleFromInvite({ inviteUri: uri, callSkill: joinSkill, handle: 'frits' });
+    expect('circleAddress' in redeemArgs()).toBe(false);
+    expect('circleAddressProof' in redeemArgs()).toBe(false);
+  });
+
+  it('deny-by-default: an unknown source circle falls back to fresh (no key presented)', async () => {
+    const { uri, joinSkill, redeemArgs } = await buildJoinFixture();
+    const circleAddressFor = vi.fn(() => 'X');
+    await joinCircleFromInvite({
+      inviteUri: uri, callSkill: joinSkill, handle: 'frits',
+      linkChoice: 'a-circle-im-not-in', circles: [{ id: 'brood' }], circleAddressFor, signCircleLink: () => 'P',
+    });
+    expect(circleAddressFor).not.toHaveBeenCalled();
+    expect('circleAddress' in redeemArgs()).toBe(false);
+  });
+
+  it('existing-self WITHOUT the signing seam: presents the key but NO proof (admin drops the link)', async () => {
+    const { uri, joinSkill, redeemArgs } = await buildJoinFixture();
+    await joinCircleFromInvite({
+      inviteUri: uri, callSkill: joinSkill, handle: 'frits',
+      linkChoice: 'brood', circles: [{ id: 'brood' }], circleAddressFor: () => 'ADDR-BROOD',
+    });
+    expect(redeemArgs().circleAddress).toBe('ADDR-BROOD');
+    expect('circleAddressProof' in redeemArgs()).toBe(false);
+  });
 });

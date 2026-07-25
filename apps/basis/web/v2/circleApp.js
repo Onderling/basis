@@ -3533,6 +3533,12 @@ async function showJoinCircle(inviteArg) {
     // the merged manifest sources let the wizard build the join-time capability consent
     // model from the invite's embedded freedom template.
     sources: circleBaseSources,
+    // #4 — the "continue as an existing self" key choice: the joiner's other circles feed
+    // the picker; the per-circle address presenter + its signing-proof seam let a chosen link
+    // be PROVEN (Decision B). All from the agent; absent ⇒ the picker just doesn't show.
+    circles: circlesCache,
+    circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
+    signCircleLink: (cid, gid, addr) => agent.signCircleLink?.(cid, gid, addr) ?? null,
     onDispatched: async (reply) => {
       const gid = reply?.groupId ?? reply?.joinedGroupId ?? null;
       if (gid) { try { await feedHouseholdRosterForCircle?.(gid); } catch { /* best-effort */ } }

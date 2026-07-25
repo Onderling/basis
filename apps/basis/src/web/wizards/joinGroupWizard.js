@@ -48,6 +48,8 @@ import {
   setPersona,
   applyCharterOfferingsDefault,
   setShareOfferingsAtJoin,
+  prepareJoinIdentity,
+  setLinkChoice,
 } from '../../core/wizards/joinGroupState.js';
 import { RULES_FIELDS } from '../../v2/circleRules.js';
 import { t } from '../../localisation.js';
@@ -68,7 +70,8 @@ const PRIVACY_NOTICE_EN = PRIVACY_NOTICE.en;
  * @param {Function}    [opts.onDispatched]  fired after final success with the redeemInvite reply
  */
 export function renderJoinGroupWizard(opts) {
-  const { container, doc, args, callSkill, onClose, onDispatched, sendPeerRedeem, sources } = opts;
+  const { container, doc, args, callSkill, onClose, onDispatched, sendPeerRedeem, sources,
+    circles, circleAddressFor, signCircleLink } = opts;
 
   // Wizard state — kept in-scope, re-renders rebuild the DOM from it.
   const state = initialState();
@@ -95,6 +98,9 @@ export function renderJoinGroupWizard(opts) {
     // the step-3 picker is populated by the time the joiner reaches it. Failure
     // is silent (empty list → picker offers only "join minimally").
     loadPersonas({ callSkill }).then((personas) => { state.personas = personas; rerender(); }).catch(() => {});
+    // #4 — background-load the join-time identity inputs (prior handles + the existing-selves
+    // list for the "continue as an existing self" key choice). Failure leaves safe defaults.
+    prepareJoinIdentity({ state, callSkill, circles }).then(rerender).catch(() => {});
   }
 
   rerender();
@@ -110,7 +116,7 @@ export function renderJoinGroupWizard(opts) {
     if (state.step === 2) renderPrivacyStep(container, doc, state, () => { state.step = 3; rerender(); }, () => { state.step = 1; rerender(); }, onClose, rerender);
     if (state.step === 3) renderHandleStep(container, doc, state, async () => {
       rerender(); // show submitting state
-      const { result } = await finalSubmit({ state, callSkill, sendPeerRedeem });
+      const { result } = await finalSubmit({ state, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink });
       if (result) {
         if (typeof onDispatched === 'function') {
           try { onDispatched(result); } catch { /* swallow */ }
@@ -350,6 +356,39 @@ function renderHandleStep(container, doc, state, onSubmit, onBack, onCancel, rer
     suggestions.appendChild(chip);
   }
   wrap.appendChild(suggestions);
+
+  // #4 — SENSITIVE: continue as an existing self? Default is a FRESH, unlinkable key (same
+  // name in two circles = coincidence). Choosing an existing self presents THAT circle's key
+  // + a signing proof → provably the same person to anyone in both circles. Shown only when
+  // the joiner already belongs to other circles.
+  if (Array.isArray(state.existingSelves) && state.existingSelves.length) {
+    const lWrap = doc.createElement('div');
+    lWrap.className = 'cc-wizard-link';
+    const lLabel = doc.createElement('div');
+    lLabel.className = 'cc-wizard-field-label';
+    lLabel.textContent = 'Continue as';
+    lWrap.appendChild(lLabel);
+    const lSelect = doc.createElement('select');
+    lSelect.className = 'cc-wizard-link-select';
+    const fresh = doc.createElement('option');
+    fresh.value = 'fresh';
+    fresh.textContent = 'A fresh identity (unlinkable)';
+    lSelect.appendChild(fresh);
+    for (const self of state.existingSelves) {
+      const opt = doc.createElement('option');
+      opt.value = self.circleId;
+      opt.textContent = `The same person as in ${self.name}`;
+      lSelect.appendChild(opt);
+    }
+    lSelect.value = state.linkChoice || 'fresh';
+    lSelect.addEventListener('change', () => { setLinkChoice(state, lSelect.value); rerender(); });
+    lWrap.appendChild(lSelect);
+    const lHint = doc.createElement('p');
+    lHint.className = 'cc-wizard-blurb';
+    lHint.textContent = 'A fresh identity keeps this circle unlinkable from your others. Continuing as an existing self proves you are the same person to anyone in both circles.';
+    lWrap.appendChild(lHint);
+    wrap.appendChild(lWrap);
+  }
 
   // Property layer — join-with-persona. Choose a persona whose per-circle
   // disclosure applies here, or "join minimally" (the protective default: share

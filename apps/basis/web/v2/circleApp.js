@@ -133,6 +133,7 @@ import { encodeImageFile } from '../../src/v2/attachmentEncoder.js';
 // Solid verifier) is recorded in circleMediaGateway.js.
 import { createCircleMediaComposition, makeDevMediaBucket } from '../../src/v2/circleMediaGateway.js';
 import { createMediaEmbed } from '../../src/core/handlers/mediaEmbed.js';
+import { openThumbnail } from '@onderling/blob-gateway';
 // S6.A — manifest-driven inline buttons on bot replies (the resurrected "inline menu").
 import { embedButtonsForReply, embedsFromReply } from '../../src/v2/replyEmbeds.js';
 // S6.C — per-user preference selecting which projection (inline / screen / minimal) renders.
@@ -5419,7 +5420,25 @@ async function showMemberPersona(id, member) {
   // circleId is the reveal-state context: the member's per-circle disclosure
   // (Peer.revealState) is derived/keyed under it, then the view-as gate layers on top.
   const split = memberPersonaView({ member, viewerWebid: myWebid || null, policy, circleId: id });
-  renderMemberPersonaCard(rootEl, { member, split, t, onBack: () => showDetail(id) });
+  const _comp = await getCircleMediaComposition(id, policy).catch(() => null);
+  const resolvePicture = makeCirclePictureResolver(_comp?.mediaGateway?.opener);
+  renderMemberPersonaCard(rootEl, { member, split, t, onBack: () => showDetail(id), resolvePicture });
+}
+
+// Resolve a profile-picture SEALED media ref → an object-URL of its sealed inline
+// thumbnail (avatar-sized; no gate/fetch — the thumb ships in the manifest line),
+// via the circle's content opener. Undefined when no opener; null when no thumb /
+// unseal fails (the card then leaves an empty <img>, never plaintext).
+function makeCirclePictureResolver(opener) {
+  if (typeof opener !== 'function') return undefined;
+  return (ref) => {
+    try {
+      const bytes = openThumbnail({ line: ref, opener });
+      if (!bytes) return null;
+      const mime = (ref && ref.enc && ref.enc.mime) || 'image/jpeg';
+      return URL.createObjectURL(new Blob([bytes], { type: mime }));
+    } catch { return null; }
+  };
 }
 
 // §2 self-view — tap your own row → "how others see me": pick a viewer (a member /
@@ -5435,12 +5454,15 @@ async function showSelfView(id) {
   const me = roster.find((m) => m.id === myWebid) ?? { id: myWebid || null, handle: null, realName: null, reveals: [] };
   const others = roster.filter((m) => m.id && m.id !== myWebid);
   let viewer = { kind: 'stranger' };
+  const _comp = await getCircleMediaComposition(id, policy).catch(() => null);
+  const resolvePicture = makeCirclePictureResolver(_comp?.mediaGateway?.opener);
   const rerender = () => renderSelfViewCard(rootEl, {
     me, members: others, viewer,
     split: selfViewSplit({ me, viewer, policy, circleId: id }),
     t,
     onPickViewer: (v) => { viewer = v; rerender(); },
     onBack: () => showDetail(id),
+    resolvePicture,
   });
   rerender();
 }

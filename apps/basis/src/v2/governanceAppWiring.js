@@ -57,7 +57,7 @@ export async function readCircleMembers({ callSkill, circleId, myRef, getPolicy 
  *   fan a just-appended event to the circle's members (the shell wires it to the stoop
  *   broadcastKring{Governance,Report} skill). Absent ⇒ local-only (single-device).
  */
-export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, genId, now = () => Date.now(), broadcast = null }) {
+export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, genId, now = () => Date.now(), broadcast = null, removeReported = null }) {
   const fan = (channel, circleId, event) => {
     if (typeof broadcast !== 'function') return;
     try { broadcast(channel, circleId, event); } catch { /* fan is best-effort — never block the local write */ }
@@ -99,7 +99,7 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
     return entry;
   };
   const reports = makeCircleReports({
-    readReportEvents, appendReportEvent, governance, newReportId: genId, localActorRef: myRef, now,
+    readReportEvents, appendReportEvent, governance, removeReported, newReportId: genId, localActorRef: myRef, now,
   });
 
   return { ...governance, reports };

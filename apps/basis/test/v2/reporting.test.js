@@ -70,12 +70,20 @@ describe('makeCircleReports', () => {
     expect((await reports.list('c1')).openCount).toBe(0);
   });
 
-  it('act on a POST does NOT call governance (the shell removes the item), just closes actioned', async () => {
-    const { reports, governance } = harness();
+  it('act on a POST removes the item via the injected remover (not governance), closes actioned', async () => {
+    const events = [];
+    const governance = { propose: vi.fn() };
+    const removeReported = vi.fn(async () => ({ ok: true }));
+    let n = 0;
+    const reports = makeCircleReports({
+      readReportEvents: async () => events, appendReportEvent: async (_c, e) => { events.push(e); },
+      governance, removeReported, newReportId: () => `r${(n += 1)}`, localActorRef: 'admin0', now: () => 1,
+    });
     const { reportId } = await reports.file({ circleId: 'c1', targetType: 'post', targetRef: 'post-9' });
     const r = await reports.act({ circleId: 'c1', reportId });
     expect(r.status).toBe('actioned');
     expect(governance.propose).not.toHaveBeenCalled();
+    expect(removeReported).toHaveBeenCalledWith('c1', 'post', 'post-9');
   });
 
   it('act on a missing report is refused', async () => {

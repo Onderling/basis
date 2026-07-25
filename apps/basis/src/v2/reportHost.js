@@ -14,11 +14,13 @@ import { reportEvent, resolveReportEvent, foldReports, REPORT_STATUS } from './r
  * @param {(circleId:string)=>Promise<Array<object>>} deps.readReportEvents
  * @param {(circleId:string, event:object)=>Promise<*>} deps.appendReportEvent
  * @param {{propose:Function}} deps.governance   the governance handle (for member bans)
+ * @param {(circleId:string, targetType:string, targetRef:string)=>Promise<*>} [deps.removeReported]
+ *   remove the reported post/message (the shell's delete op); called when an admin ACTS on one.
  * @param {()=>string} deps.newReportId
  * @param {string} deps.localActorRef
  * @param {()=>number} [deps.now]
  */
-export function makeCircleReports({ readReportEvents, appendReportEvent, governance = null, newReportId, localActorRef, now = () => 0 }) {
+export function makeCircleReports({ readReportEvents, appendReportEvent, governance = null, removeReported = null, newReportId, localActorRef, now = () => 0 }) {
   async function list(circleId) {
     const events = await readReportEvents(circleId);
     return foldReports(Array.isArray(events) ? events : []);
@@ -40,13 +42,16 @@ export function makeCircleReports({ readReportEvents, appendReportEvent, governa
     const r = open.find((x) => x.reportId === reportId);
     if (!r) return { ok: false, reason: 'no-open-report' };
     // A member target → the governance removeMember class decides the ban. A post/message
-    // target → just close it actioned (the shell removes the item via its own op).
+    // target → remove the reported item (the injected shell op), then close it actioned.
     let governanceResult = null;
+    let removed = null;
     if (r.targetType === 'member' && governance && typeof governance.propose === 'function') {
       governanceResult = await governance.propose({ circleId, action: 'removeMember', subject: r.targetRef, actor: { ref: localActorRef } });
+    } else if ((r.targetType === 'post' || r.targetType === 'message') && typeof removeReported === 'function') {
+      try { removed = await removeReported(circleId, r.targetType, r.targetRef); } catch { removed = { ok: false }; }
     }
     await appendReportEvent(circleId, resolveReportEvent({ reportId, outcome: REPORT_STATUS.ACTIONED, by: localActorRef, at: now() }));
-    return { ok: true, status: REPORT_STATUS.ACTIONED, governance: governanceResult };
+    return { ok: true, status: REPORT_STATUS.ACTIONED, governance: governanceResult, removed };
   }
 
   return { list, file, dismiss, act };

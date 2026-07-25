@@ -20,6 +20,7 @@ import { useTheme } from './themeContext.js';
 import { bindCircleGovernance } from '../../../../basis/src/v2/governanceAppWiring.js';
 import { governanceEntryId } from '../../../../basis/src/v2/governanceLog.js';
 import { reportEntryId } from '../../../../basis/src/v2/reportModel.js';
+import { buildSubjectLabeler } from '../../../../basis/src/v2/governanceView.js';
 import { mergeCirclePolicy, GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES, decisionClassFor } from '../../../../basis/src/v2/circlePolicy.js';
 
 const CLASS_KEY = { 'any-admin': 'any_admin', 'admin-quorum': 'admin_quorum', 'member-vote': 'member_vote' };
@@ -46,10 +47,13 @@ export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy,
     let ctx = { policy: {}, members: [] };
     try { ctx = await gov.getContext(circleId); } catch { /* */ }
     const me = (ctx.members || []).find((m) => m.ref === myWebid) || null;
-    const labelForSubject = (s) => {
-      const m = (ctx.members || []).find((x) => x.ref === s);
-      return (m && (m.handle || m.name)) || (s == null ? '' : String(s));
-    };
+    // Resolve subject refs to member NAMES from the real roster — the governance
+    // context carries only {ref, role} (no names), so read handle/displayName from
+    // listGroupMembers; unresolved falls back to the raw ref.
+    let roster = [];
+    try { roster = (await callSkill('stoop', 'listGroupMembers', { groupId: circleId }))?.members ?? []; } catch { /* */ }
+    const nameOf = buildSubjectLabeler(roster);
+    const labelForSubject = (s) => nameOf(s) ?? (s == null ? '' : String(s));
     let view = { open: [], closed: [] };
     try { view = await gov.view(circleId, { labelForSubject }); } catch { /* */ }
     const isAdmin = me?.role === 'admin';

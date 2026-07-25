@@ -952,7 +952,14 @@ export function buildSkills({
   }
 
   async function broadcastToCircle({ circleId, kind, from, body = '', extras = {}, metric = null, envelope = null }) {
-    const reliableSend = (envelope && typeof bundle?.reliableSend === 'function') ? bundle.reliableSend : null;
+    // Prefer the RELIABLE sender for EVERY broadcast, not just chat (which passes an
+    // `envelope`). It resolves webid→pubKey + hold-forwards; the bus-local `chat.send`
+    // fallback cannot resolve the mesh address, so a control-plane broadcast (policy / rules /
+    // recipe / governance / report — no `envelope`) failed "No pubKey registered" over the
+    // mesh. When there is no `envelope`, we synthesise a wire one from `subtype + extras` so
+    // the receiver routes + ingests it identically. `chat.send` stays the fallback when no
+    // reliable sender is wired.
+    const reliableSend = (typeof bundle?.reliableSend === 'function') ? bundle.reliableSend : null;
     if (!reliableSend && !chat?.send) return { error: 'chat-unavailable', sent: 0, attempted: 0, errors: [] };
     if (!members)                     return { error: 'members-unavailable', sent: 0, attempted: 0, errors: [] };
 
@@ -1010,8 +1017,12 @@ export function buildSkills({
       // write is absent or failed.
     }
 
+    // The wire object the reliable path sends: chat passes a real `envelope`; a control-plane
+    // broadcast has none, so synthesise `{ subtype: kind, ...extras }` — the same shape the
+    // chat.send fallback would produce as the receiver's payload (routed by `subtype`).
+    const wire = envelope ?? { subtype: kind, ...extras };
     const { sent, attempted, errors } = reliableSend
-      ? await _fanOutViaReliableSend({ members, reliableSend, selfWebid: from, envelope })
+      ? await _fanOutViaReliableSend({ members, reliableSend, selfWebid: from, envelope: wire })
       : await _fanOutToMembers({ members, chat, selfWebid: from, subtype: kind, threadId: circleId, body, extras });
     if (metric) metrics?.record?.(metric);
     return { sent, attempted, errors };

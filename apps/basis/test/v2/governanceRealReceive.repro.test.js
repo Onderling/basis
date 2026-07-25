@@ -17,14 +17,11 @@ async function warmMesh(A, B, groupId) {
 // the REAL peer router + governance receiver, over a genuine transport (InternalTransport).
 // This is the two-device replication the unit tests SIMULATE, exercised end-to-end.
 //
-// SKIPPED — surfaced a PRE-EXISTING gap this headless extension caught: broadcastToCircle
-// (the shared fan behind ALL broadcastKring* siblings — policy/rules/recipe AND these) sends
-// to each member's WEBID, but the secure mesh keys recipients by their chat pubKey. Only
-// broadcastKringMessage's own fan resolves webid→pubKey; broadcastToCircle does not, so every
-// sibling fails "No pubKey registered — send HI first" over the mesh (chat succeeds in the
-// same run). The receivers + harness wiring below are correct and ready; un-skip once
-// broadcastToCircle resolves the transport address like the chat fan. See REMAINING-WORK.
-describe.skip('governance/report propagation via the REAL receiver (InternalTransport)', () => {
+// (Previously skipped: this journey CAUGHT a pre-existing gap — broadcastToCircle, the shared
+// fan behind ALL broadcastKring* siblings, sent to member webids while the mesh keys by chat
+// pubKey. Fixed by routing every broadcast through the reliable sender (webid→pubKey +
+// hold-forward), synthesising a wire envelope for the control-plane broadcasts. Now green.)
+describe('governance/report propagation via the REAL receiver (InternalTransport)', () => {
   it('broadcastKringGovernance A -> B ingests the vote event into B\'s log', async () => {
     const A = await bootRealAgentNode('A');
     const B = await bootRealAgentNode('B');

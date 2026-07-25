@@ -43,7 +43,10 @@ export function resolveEvent({ proposalId, status, by = null, at = 0 }) {
  * @returns {{proposals: Array<{proposalId, action, subject, by, deadline, votes, closed,
  *            status, decision}>}}
  */
-export function foldGovernance(events, { policy, members = [], actor = null, now = 0 } = {}) {
+export function foldGovernance(events, { policy, members = [], actor = null, now = 0, disputed = null } = {}) {
+  // L3: a disputed author (caught equivocating) has their votes discounted — an equivocator
+  // must not be able to sway a decision. `disputed` is a Set of author refs (foldDisputes).
+  const isDisputed = disputed instanceof Set ? (ref) => disputed.has(ref) : () => false;
   const byId = new Map();
   const get = (id) => {
     if (!byId.has(id)) byId.set(id, { proposalId: id, action: null, subject: null, by: null, deadline: null, votes: [], closed: false, closedStatus: null, closedBy: null, _proposedAt: 0 });
@@ -59,7 +62,7 @@ export function foldGovernance(events, { policy, members = [], actor = null, now
         p.deadline = e.deadline ?? null; p._proposedAt = e.at ?? 0;
       }
     } else if (e.event === GOV_EVENT.VOTE) {
-      if (typeof e.voter === 'string' && (e.choice === 'yes' || e.choice === 'no')) {
+      if (typeof e.voter === 'string' && (e.choice === 'yes' || e.choice === 'no') && !isDisputed(e.voter)) {
         p.votes.push({ voter: e.voter, choice: e.choice, at: e.at ?? 0 });
       }
     } else if (e.event === GOV_EVENT.RESOLVE) {

@@ -9,6 +9,12 @@
  */
 import { makeCircleGovernance } from './governanceHost.js';
 import { GOVERNANCE_KIND } from './governanceLog.js';
+import { chainEvent, authorHead } from './governanceChain.js';
+
+/** The author of a governance event — the voter (a vote) or the proposer/enactor (propose/resolve). */
+function authorOf(event) {
+  return (event && (event.voter ?? event.by)) || null;
+}
 
 /**
  * The FULL circle membership as `{ref, role}` — the roster's other members plus me.
@@ -51,8 +57,17 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
     .query({})
     .filter((e) => e && e.type === GOVERNANCE_KIND && e.circleId === circleId && e.payload)
     .map((e) => e.payload);
-  const appendGovernanceEvent = async (circleId, event) =>
-    eventLog.appendSilentEntry({ circleId, kind: GOVERNANCE_KIND, payload: event });
+  // L3: hash-chain each event to its author's previous head before it lands, so equivocation
+  // (two events by one author from the same parent) is detectable across replicas.
+  const appendGovernanceEvent = async (circleId, event) => {
+    const author = authorOf(event);
+    let payload = event;
+    if (author) {
+      const existing = await readGovernanceEvents(circleId);
+      payload = chainEvent(event, { author, parentHash: authorHead(existing, author) });
+    }
+    return eventLog.appendSilentEntry({ circleId, kind: GOVERNANCE_KIND, payload });
+  };
   const getMembers = (circleId) => readCircleMembers({ callSkill, circleId, myRef, getPolicy });
 
   return makeCircleGovernance({

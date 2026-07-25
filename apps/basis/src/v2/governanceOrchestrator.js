@@ -34,7 +34,8 @@ export function makeGovernanceOrchestrator({ appendEvent, enact, getContext, new
   // Re-read the log, resolve the proposal's status, and act on a terminal result.
   async function tally({ circleId, proposalId, enactor = null }) {
     const ctx = await getContext(circleId);
-    const fold = foldGovernance(ctx.events, { policy: ctx.policy, members: ctx.members, now: now() });
+    // L3: discount any equivocating author's votes (ctx.disputed from the host's foldDisputes).
+    const fold = foldGovernance(ctx.events, { policy: ctx.policy, members: ctx.members, now: now(), disputed: ctx.disputed });
     const p = (fold.proposals ?? []).find((x) => x.proposalId === proposalId);
     if (!p) return { ok: false, reason: 'no-proposal' };
     if (p.closed) return { ok: true, status: p.status, proposalId, closed: true };
@@ -85,7 +86,7 @@ export function makeGovernanceOrchestrator({ appendEvent, enact, getContext, new
   // The admin past-deadline valve (escape-hatch b): force a still-pending member-vote.
   async function override({ circleId, proposalId, actor = null }) {
     const ctx = await getContext(circleId);
-    const fold = foldGovernance(ctx.events, { policy: ctx.policy, members: ctx.members, actor, now: now() });
+    const fold = foldGovernance(ctx.events, { policy: ctx.policy, members: ctx.members, actor, now: now(), disputed: ctx.disputed });
     const p = (fold.proposals ?? []).find((x) => x.proposalId === proposalId);
     if (!p || p.closed) return { ok: false, reason: 'no-open-proposal' };
     const d = resolveGovernance({

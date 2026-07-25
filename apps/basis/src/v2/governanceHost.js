@@ -15,6 +15,7 @@
 import { makeGovernanceOrchestrator } from './governanceOrchestrator.js';
 import { foldGovernance } from './governanceLog.js';
 import { buildGovernanceView } from './governanceView.js';
+import { foldDisputes } from './governanceChain.js';
 
 /**
  * @param {object} deps
@@ -47,7 +48,10 @@ export function makeCircleGovernance({
     const [policy, members, events] = await Promise.all([
       getPolicy(circleId), getMembers(circleId), readGovernanceEvents(circleId),
     ]);
-    return { policy, members: Array.isArray(members) ? members : [], events: Array.isArray(events) ? events : [] };
+    const evts = Array.isArray(events) ? events : [];
+    // L3: the set of authors caught equivocating on the chained governance events.
+    const disputed = foldDisputes({ events: evts });
+    return { policy, members: Array.isArray(members) ? members : [], events: evts, disputed };
   }
 
   // Decision A: an admin (or the appointed caretaker, who is an admin in the roster) enacts.
@@ -61,8 +65,11 @@ export function makeCircleGovernance({
   async function view(circleId, { labelForSubject } = {}) {
     const ctx = await getContext(circleId);
     const me = (ctx.members || []).find((m) => m && m.ref === localActorRef) || null;
-    const fold = foldGovernance(ctx.events, { policy: ctx.policy, members: ctx.members, now: now() });
-    return buildGovernanceView({ fold, viewer: me, labelForSubject });
+    const fold = foldGovernance(ctx.events, { policy: ctx.policy, members: ctx.members, now: now(), disputed: ctx.disputed });
+    const base = buildGovernanceView({ fold, viewer: me, labelForSubject });
+    // L3: surface the disputed authors (equivocators) so the shell can prompt "review & remove".
+    const disputed = [...ctx.disputed].map((ref) => ({ ref, label: labelForSubject ? labelForSubject(ref, 'removeMember') : ref }));
+    return { ...base, disputed, hasDisputed: disputed.length > 0 };
   }
 
   return { propose: orch.propose, vote: orch.vote, override: orch.override, tally: orch.tally, view, getContext };

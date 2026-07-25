@@ -17,8 +17,8 @@ const members5 = [
   { ref: 'm2', role: 'member' }, { ref: 'm3', role: 'member' },
 ];
 
-/** Build an orchestrator over an in-memory log; `now` and the governance policy are injectable. */
-function harness({ governance = {}, clock = { t: 0 } } = {}) {
+/** Build an orchestrator over an in-memory log; `now`, the policy, and enact-authority are injectable. */
+function harness({ governance = {}, clock = { t: 0 }, canEnact = () => true } = {}) {
   const events = [];
   const policy = normalizeCirclePolicy({ governance });
   const enact = vi.fn(async () => ({ ok: true }));
@@ -29,6 +29,7 @@ function harness({ governance = {}, clock = { t: 0 } } = {}) {
     getContext: async () => ({ policy, members: members5, events }),
     newProposalId: () => `p${(n += 1)}`,
     now: () => clock.t,
+    canEnact,
   });
   return { orch, events, enact, clock };
 }
@@ -69,6 +70,17 @@ describe('member-vote — proposal, tally, enact on threshold', () => {
     expect(third).toMatchObject({ status: DECISION_STATUS.APPROVED, enacted: true });
     expect(enact).toHaveBeenCalledTimes(1);
     expect(enact).toHaveBeenCalledWith('c1', 'removeMember', 'm3');
+  });
+
+  it('Decision A: a non-admin device does NOT enact an approved vote — it awaits the admin', async () => {
+    // canEnact false = this device is not an admin/caretaker.
+    const { orch, enact, events } = harness({ governance: { removeMember: 'member-vote' }, canEnact: () => false });
+    const { proposalId } = await orch.propose({ circleId: 'c1', action: 'removeMember', subject: 'm3', actor: { ref: 'admin0' }, deadline: 100 });
+    await orch.vote({ circleId: 'c1', proposalId, voter: 'm0', choice: 'yes' });
+    const tipping = await orch.vote({ circleId: 'c1', proposalId, voter: 'm1', choice: 'yes' });  // 3/5 → approved
+    expect(tipping).toMatchObject({ status: DECISION_STATUS.APPROVED, awaitingEnactment: true });
+    expect(enact).not.toHaveBeenCalled();                      // the op is left to an admin device
+    expect(events.some((e) => e.event === 'resolve')).toBe(false); // and it isn't closed here
   });
 
   it('a no-majority rejects and closes the proposal without enacting', async () => {

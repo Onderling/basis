@@ -1,0 +1,69 @@
+/**
+ * basis v2 — governance host factory (Phase 4 §5, L4 slice 3 — shared wiring).
+ *
+ * Binds the pure orchestrator to the real circle substrate so both shells drive governance
+ * the same way (invariant 1 — the wiring lives once). It maps each governed action to the
+ * EXISTING op (removeMember / editGroupRules via callSkill; policy + key rotation via
+ * injected seams — it never reimplements them), reads the context (policy + full roster +
+ * the governance events folded off the one log stream), and gates enactment to admins.
+ *
+ * Decision A (docs/decisions.md 2026-07-25): only an admin/caretaker device enacts an
+ * approved decision. `canEnact` is "am I an admin in the current roster" — and because a
+ * newly-appointed caretaker IS an admin in that roster, the same rule makes it the enactor
+ * with no special case.
+ */
+import { makeGovernanceOrchestrator } from './governanceOrchestrator.js';
+import { foldGovernance } from './governanceLog.js';
+import { buildGovernanceView } from './governanceView.js';
+
+/**
+ * @param {object} deps
+ * @param {(origin:string, op:string, args:object)=>Promise<*>} deps.callSkill
+ * @param {(circleId:string)=>Promise<Array<object>>} deps.readGovernanceEvents  governance entries off the log
+ * @param {(circleId:string, event:object)=>Promise<*>} deps.appendGovernanceEvent  write to the log stream
+ * @param {(circleId:string)=>Promise<object>} deps.getPolicy
+ * @param {(circleId:string)=>Promise<Array<{ref:string, role?:string}>>} deps.getMembers  full roster
+ * @param {string} deps.localActorRef                 this device's member ref (enact-authority check)
+ * @param {(circleId:string, patch:object)=>Promise<*>} [deps.setPolicy]   enactor for changeRule/changePolicy
+ * @param {(circleId:string)=>Promise<*>} [deps.rotateKey]                 enactor for rotateKey
+ * @param {()=>string} deps.newProposalId
+ * @param {()=>number} [deps.now]
+ */
+export function makeCircleGovernance({
+  callSkill, readGovernanceEvents, appendGovernanceEvent, getPolicy, getMembers,
+  localActorRef, setPolicy = null, rotateKey = null, newProposalId, now = () => 0,
+}) {
+  // Map a governed action to the REAL op. removeMember/editGroupRules are stoop skills;
+  // policy + key rotation are injected seams (their routing isn't a plain callSkill op).
+  async function enact(circleId, action, subject) {
+    if (action === 'removeMember') return callSkill('stoop', 'removeMember', { groupId: circleId, memberWebid: subject, policy: 'graceful' });
+    if (action === 'changeRule')   return callSkill('stoop', 'editGroupRules', { groupId: circleId, rules: subject });
+    if (action === 'changePolicy') return setPolicy ? setPolicy(circleId, subject) : { ok: false, error: 'no-setPolicy' };
+    if (action === 'rotateKey')    return rotateKey ? rotateKey(circleId) : { ok: false, error: 'no-rotateKey' };
+    return { ok: false, error: 'unknown-action' };
+  }
+
+  async function getContext(circleId) {
+    const [policy, members, events] = await Promise.all([
+      getPolicy(circleId), getMembers(circleId), readGovernanceEvents(circleId),
+    ]);
+    return { policy, members: Array.isArray(members) ? members : [], events: Array.isArray(events) ? events : [] };
+  }
+
+  // Decision A: an admin (or the appointed caretaker, who is an admin in the roster) enacts.
+  const canEnact = (ctx) => (ctx.members || []).some((m) => m && m.ref === localActorRef && m.role === 'admin');
+
+  const orch = makeGovernanceOrchestrator({
+    appendEvent: appendGovernanceEvent, enact, getContext, newProposalId, now, canEnact,
+  });
+
+  /** The current governance view-model for a circle (the shells render this). */
+  async function view(circleId, { labelForSubject } = {}) {
+    const ctx = await getContext(circleId);
+    const me = (ctx.members || []).find((m) => m && m.ref === localActorRef) || null;
+    const fold = foldGovernance(ctx.events, { policy: ctx.policy, members: ctx.members, now: now() });
+    return buildGovernanceView({ fold, viewer: me, labelForSubject });
+  }
+
+  return { propose: orch.propose, vote: orch.vote, override: orch.override, tally: orch.tally, view, getContext };
+}

@@ -20,7 +20,7 @@
 import { resolveGovernance, DECISION_STATUS } from './governanceDecision.js';
 import { proposeEvent, voteEvent, resolveEvent, foldGovernance } from './governanceLog.js';
 
-export function makeGovernanceOrchestrator({ appendEvent, enact, getContext, newProposalId, now = () => 0 } = {}) {
+export function makeGovernanceOrchestrator({ appendEvent, enact, getContext, newProposalId, now = () => 0, canEnact = () => true } = {}) {
   async function enactAndClose(circleId, proposal, by) {
     let ok = true;
     try { const r = await enact(circleId, proposal.action, proposal.subject); ok = r?.ok !== false; }
@@ -38,11 +38,16 @@ export function makeGovernanceOrchestrator({ appendEvent, enact, getContext, new
     const p = (fold.proposals ?? []).find((x) => x.proposalId === proposalId);
     if (!p) return { ok: false, reason: 'no-proposal' };
     if (p.closed) return { ok: true, status: p.status, proposalId, closed: true };
+    // Decision A: only an admin/caretaker device enacts + closes. A non-admin whose vote
+    // tipped the tally sees the terminal status but leaves the op + resolve to the admin.
+    const mayEnact = canEnact(ctx);
     if (p.status === DECISION_STATUS.APPROVED) {
+      if (!mayEnact) return { ok: true, status: DECISION_STATUS.APPROVED, proposalId, awaitingEnactment: true };
       const ok = await enactAndClose(circleId, p, enactor);
       return { ok, status: DECISION_STATUS.APPROVED, proposalId, enacted: ok };
     }
     if (p.status === DECISION_STATUS.REJECTED) {
+      if (!mayEnact) return { ok: true, status: DECISION_STATUS.REJECTED, proposalId, awaitingClose: true };
       await appendEvent(circleId, resolveEvent({ proposalId, status: DECISION_STATUS.REJECTED, by: enactor, at: now() }));
       return { ok: true, status: DECISION_STATUS.REJECTED, proposalId, closed: true };
     }

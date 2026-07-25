@@ -8,13 +8,16 @@
  * membership-redemption item AND the MemberMap row, and surfaced by
  * listGroupMembers — mirroring `sealingPublicKey`.
  *
- * Unlike the signing pubKey (bound to the AUTHENTICATED `from`), the circle
- * address is self-asserted in the body: it is the member declaring the address
- * THEY present here, not a claim about another member — so recording it verbatim
- * is safe (a joiner can only speak for their own circle address).
+ * Wave B (SENSITIVE): a presented circle address is now recorded only when the joiner PROVES
+ * control of the key behind it — a signature (by that key) over a challenge bound to the
+ * joining circle (Decision B). A co-member who has merely SEEN the address can't forge it, so
+ * an unproven address is DROPPED rather than recorded as a false linkage. (The circle CREATE
+ * path still records the creator's own address without a proof — they're establishing the
+ * circle, not claiming an existing self.)
  */
 import { describe, it, expect } from 'vitest';
 import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderling/core';
+import { Bootstrap, deriveCircleAddress, signCircleLinkFromSeed } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { createNeighborhoodAgent } from '../src/index.js';
 
@@ -23,9 +26,12 @@ const BOB   = 'https://id.example/bob';
 const GROUP = 'oosterpoort';
 const RULES = { purpose: 'buurt', admins: [ADMIN], houseRules: ['wees aardig'] };
 
-// Stand-in per-circle addresses (in production these come from deriveCircleAddress).
+// Real per-circle addresses + the join-link proof for BOB (the key behind BOB_ADDR signs the
+// challenge bound to GROUP). ADMIN presents their own (create-path, no proof needed).
+const _bobSeed   = Bootstrap.fromMnemonic(Bootstrap.create().mnemonic).deriveAgentSeed('bob');
 const ADMIN_ADDR = 'circle-addr-admin-oosterpoort';
-const BOB_ADDR   = 'circle-addr-bob-oosterpoort';
+const BOB_ADDR   = deriveCircleAddress(_bobSeed, GROUP);
+const BOB_PROOF  = signCircleLinkFromSeed(_bobSeed, GROUP, GROUP, BOB_ADDR);
 
 async function callSkill(agent, skillId, args, from = ADMIN) {
   const def = agent.skills.get(skillId);
@@ -50,7 +56,7 @@ describe('redeem → capture joiner per-circle address', () => {
     const bundle = await buildBundle();
     const r = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
     await callSkill(bundle.agent, 'redeemMembershipCode',
-      { groupId: GROUP, code: r.code, circleAddress: BOB_ADDR }, BOB);
+      { groupId: GROUP, code: r.code, circleAddress: BOB_ADDR, circleAddressProof: BOB_PROOF }, BOB);
 
     const row = await bundle.members.resolveByWebid(BOB);
     expect(row.circleAddress).toBe(BOB_ADDR);
@@ -73,7 +79,7 @@ describe('redeem → capture joiner per-circle address', () => {
     const r = await callSkill(bundle.agent, 'createGroupV2',
       { groupId: GROUP, name: 'X', rules: RULES, circleAddress: ADMIN_ADDR });
     await callSkill(bundle.agent, 'redeemMembershipCode',
-      { groupId: GROUP, code: r.code, circleAddress: BOB_ADDR }, BOB);
+      { groupId: GROUP, code: r.code, circleAddress: BOB_ADDR, circleAddressProof: BOB_PROOF }, BOB);
 
     const out = await callSkill(bundle.agent, 'listGroupMembers', { groupId: GROUP });
     const adminRow = out.members.find((m) => m.webid === ADMIN);
@@ -86,7 +92,7 @@ describe('redeem → capture joiner per-circle address', () => {
     const bundle = await buildBundle();
     const r = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
     await callSkill(bundle.agent, 'redeemMembershipCode',
-      { groupId: GROUP, code: r.code, circleAddress: BOB_ADDR }, BOB);
+      { groupId: GROUP, code: r.code, circleAddress: BOB_ADDR, circleAddressProof: BOB_PROOF }, BOB);
 
     // Reload where the roster row lost its circleAddress but the redemption item survives.
     await bundle.members.addMember({ webid: BOB, circleAddress: null });
@@ -95,6 +101,20 @@ describe('redeem → capture joiner per-circle address', () => {
     const out = await callSkill(bundle.agent, 'listGroupMembers', { groupId: GROUP });
     const bobRow = out.members.find((m) => m.webid === BOB);
     expect(bobRow?.circleAddress).toBe(BOB_ADDR);
+  });
+
+  it('SENSITIVE: an address presented WITHOUT a valid proof is DROPPED (no false linkage)', async () => {
+    const bundle = await buildBundle();
+    const r = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
+    // an attacker presents BOB's address but no proof (they've only SEEN it)
+    await callSkill(bundle.agent, 'redeemMembershipCode', { groupId: GROUP, code: r.code, circleAddress: BOB_ADDR }, BOB);
+    expect((await bundle.members.resolveByWebid(BOB)).circleAddress).toBeNull();
+
+    // and a proof for a DIFFERENT joining circle doesn't count either (no cross-circle replay)
+    const r2 = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
+    const wrongProof = signCircleLinkFromSeed(_bobSeed, GROUP, 'another-circle', BOB_ADDR);
+    await callSkill(bundle.agent, 'redeemMembershipCode', { groupId: GROUP, code: r2.code, circleAddress: BOB_ADDR, circleAddressProof: wrongProof }, BOB);
+    expect((await bundle.members.resolveByWebid(BOB)).circleAddress).toBeNull();
   });
 
   it('back-compat: a redeem WITHOUT a circle address still works + records none', async () => {

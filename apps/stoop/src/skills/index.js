@@ -57,7 +57,7 @@
  * (nothing for `wireSkill` to derive from).
  */
 
-import { defineSkill, validateMnemonic, mnemonicToSeed, AgentIdentity, roleRank, ROLES } from '@onderling/core';
+import { defineSkill, validateMnemonic, mnemonicToSeed, AgentIdentity, roleRank, ROLES, verifyCircleLink } from '@onderling/core';
 import { wireSkill } from '@onderling/sdk';
 import { stoopManifest } from '../../manifest.js';
 import nacl from 'tweetnacl';
@@ -2312,6 +2312,15 @@ export function buildSkills({
       // kring fan-out (`wireChat.send` → `MemberMap.resolveByWebid(webid).pubKey`)
       // route to a code-redeemer instead of returning `recipient-pubkey-unknown`.
       const signingPubKey = (typeof from === 'string' && from) ? from : null;
+      // Wave B (SENSITIVE — cross-circle linkability): a presented per-circle address must be
+      // PROVEN, not asserted. "Continue as an existing self" = present the address you already
+      // use in another circle; anyone who has SEEN that address (a co-member there) could assert
+      // it, so we require a signature by the key BEHIND the address over a challenge bound to
+      // THIS join (Decision B — the signing proof). Deny-by-default: an unproven or forged
+      // address is DROPPED — the join still succeeds, just WITHOUT the cross-circle linkage.
+      const verifiedCircleAddress = (a.circleAddress
+        && verifyCircleLink({ groupId: a.groupId, address: a.circleAddress, proof: a.circleAddressProof }))
+        ? a.circleAddress : null;
       const [item] = await store.addItems([{
         type:       'membership-redemption',
         text:       `${from} redeemed membership code for ${a.groupId}`,
@@ -2328,15 +2337,19 @@ export function buildSkills({
           // Signing pubKey (the joiner's transport/chat-agent identity) — mirror
           // of sealingPublicKey but for the OTHER key family: fan-out routing.
           ...(signingPubKey ? { signingPublicKey: signingPubKey } : {}),
-          // Per-circle ADDRESS the joiner presents in THIS circle (identity
-          // step 5B/C — deriveCircleAddress). Self-asserted like sealingPublicKey
-          // (it's the joiner declaring the unlinkable address they present here,
-          // NOT a claim about another member), so we record it verbatim.
-          ...(a.circleAddress ? { circleAddress: a.circleAddress } : {}),
+          // Per-circle ADDRESS the joiner presents in THIS circle (identity step 5B/C —
+          // deriveCircleAddress). Recorded ONLY when the signing proof verified above
+          // (`verifiedCircleAddress`): a "continue as an existing self" linkage is provable,
+          // never a bare claim a co-member could forge. Unproven ⇒ omitted (join still succeeds).
+          ...(verifiedCircleAddress ? { circleAddress: verifiedCircleAddress } : {}),
           // Property layer — the coarse background values the joiner CHOSE to disclose in THIS circle when
           // joining AS a persona (getPersonaRelease). Self-asserted like circleAddress; opt-in (absent = shared
           // nothing). A map {key: coarseValue}.
           ...(a.personaProperties && Object.keys(a.personaProperties).length ? { personaProperties: a.personaProperties } : {}),
+          // Handle the joiner presented in THIS circle (Wave B). Recorded on the
+          // JOINER's own redemption too so `listMyHandles` can surface it as a prior
+          // handle next time (your own info; self-asserted like circleAddress).
+          ...(typeof a.peerDisplay === 'string' && a.peerDisplay ? { peerDisplay: a.peerDisplay } : {}),
         },
         visibility: 'household',
       }], { actor: from });
@@ -2350,7 +2363,7 @@ export function buildSkills({
           await members.addMember({
             webid: from,
             pubKey: signingPubKey,
-            ...(a.circleAddress ? { circleAddress: a.circleAddress } : {}),
+            ...(verifiedCircleAddress ? { circleAddress: verifiedCircleAddress } : {}),
             ...(a.personaProperties && Object.keys(a.personaProperties).length ? { personaProperties: a.personaProperties } : {}),
           });
         }
@@ -2405,6 +2418,13 @@ export function buildSkills({
       );
       if (!valid) return { error: 'invalid-or-expired-code' };
 
+      // Wave B (SENSITIVE) — the peer path's copy of the cross-circle link proof check
+      // (mirrors redeemMembershipCode): a presented per-circle address is recorded ONLY when
+      // the joiner proved control of the key behind it. Deny-by-default; unproven ⇒ dropped.
+      const verifiedCircleAddress = (a.circleAddress
+        && verifyCircleLink({ groupId: a.groupId, address: a.circleAddress, proof: a.circleAddressProof }))
+        ? a.circleAddress : null;
+
       // Per-circle handle uniqueness (Phase 4 Wave B — pinned rule: no duplicate
       // handles within a single circle), enforced HERE on the admin/host side —
       // the authority that owns the circle roster. The joiner's chosen handle
@@ -2453,9 +2473,9 @@ export function buildSkills({
           // The joiner's sealing public key (forwarded by the peer bridge) → the control-agent wraps
           // the group key to them. Admin-side: this is where the sealed household pod grants access.
           ...(a.sealingPublicKey ? { sealingPublicKey: a.sealingPublicKey } : {}),
-          // Per-circle ADDRESS the joiner presents in THIS circle (identity
-          // step 5B/C) — forwarded by the peer bridge, recorded like sealingPublicKey.
-          ...(a.circleAddress ? { circleAddress: a.circleAddress } : {}),
+          // Per-circle ADDRESS the joiner presents in THIS circle (identity step 5B/C) —
+          // forwarded by the peer bridge, recorded ONLY when its cross-circle link proof verified.
+          ...(verifiedCircleAddress ? { circleAddress: verifiedCircleAddress } : {}),
           // Property layer — the joiner's disclosed persona properties (forwarded by the peer bridge).
           ...(a.personaProperties && Object.keys(a.personaProperties).length ? { personaProperties: a.personaProperties } : {}),
         },
@@ -2469,7 +2489,7 @@ export function buildSkills({
           await members.addMember({
             webid: a.requesterWebid,
             pubKey: peerSigningPubKey,
-            ...(a.circleAddress ? { circleAddress: a.circleAddress } : {}),
+            ...(verifiedCircleAddress ? { circleAddress: verifiedCircleAddress } : {}),
             ...(a.personaProperties && Object.keys(a.personaProperties).length ? { personaProperties: a.personaProperties } : {}),
           });
         }
@@ -2522,6 +2542,9 @@ export function buildSkills({
           expiresAt:   a.expiresAt ?? null,
           confirmedBy: a.confirmedBy ?? null,
           channel:     'peer',
+          // Handle presented in THIS circle (Wave B) — recorded joiner-side so
+          // `listMyHandles` can surface it as a prior handle later.
+          ...(typeof a.peerDisplay === 'string' && a.peerDisplay ? { peerDisplay: a.peerDisplay } : {}),
         },
         visibility: 'household',
       }], { actor: from });
@@ -2797,6 +2820,38 @@ export function buildSkills({
       return { buurts: [...ids], _sync: simulateSync() };
     }, {
       description: 'List the buurt groupIds the calling actor is a member or admin of.',
+      visibility:  'authenticated',
+    }),
+
+    /**
+     * listMyHandles()
+     *   — Phase 4 Wave B (NOTE-identity-and-linkability, Decision B).
+     *
+     *   Returns the DISTINCT handles the calling actor has used across the circles
+     *   they belong to, drawn from the caller's OWN `membership-redemption` rows
+     *   (`source.peerDisplay` where `redeemedBy === from`). This is the source for
+     *   the join wizard's prior-handle suggestion dropdown — your own information
+     *   only, so surfacing it leaks nothing about anyone else, and it lets you re-use
+     *   a handle you like. Case-folded + de-duplicated; newest first.
+     *
+     *   Returns: { handles: [string, ...] }
+     */
+    defineSkill('listMyHandles', async ({ from }) => {
+      const redemptions = await store.listOpen({ type: 'membership-redemption' });
+      const mine = redemptions
+        .filter((it) => it?.source?.redeemedBy === from && typeof it?.source?.peerDisplay === 'string' && it.source.peerDisplay)
+        .sort((p, q) => (q?.source?.redeemedAt ?? 0) - (p?.source?.redeemedAt ?? 0));
+      const seen = new Set();
+      const handles = [];
+      for (const it of mine) {
+        const h = String(it.source.peerDisplay).trim().toLowerCase();
+        if (!h || seen.has(h)) continue;
+        seen.add(h);
+        handles.push(h);
+      }
+      return { handles, _sync: simulateSync() };
+    }, {
+      description: 'List the DISTINCT handles the calling actor has used across their circles (own info).',
       visibility:  'authenticated',
     }),
 

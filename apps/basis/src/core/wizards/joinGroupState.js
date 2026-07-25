@@ -11,9 +11,10 @@
  * without an explicit polyfill check.
  */
 
-import { normalizeDriverKind } from '@onderling/agent-registry';
+import { normalizeDriverKind, REVEAL_PRESETS, isRevealPreset } from '@onderling/agent-registry';
 
 import { buildJoinConsentModel, optOutsFromDeclined } from '../../v2/circleConsent.js';
+import { personaPresetKeys } from '../../v2/memberCards.js';
 
 /* ─── Locale strings ────────────────────────────────────────── */
 
@@ -41,16 +42,53 @@ export function privacyNoticeFor(lang) {
 /* ─── Handle helpers ───────────────────────────────────────── */
 
 /**
- * Suggest 3 handle candidates based on the user's existing display
- * name.  Used to populate clickable chips below the handle input.
+ * Suggest handle candidates for the join field.
+ *
+ * Wave B (NOTE-identity-and-linkability, Decision B): the PRIMARY source is the
+ * joiner's OWN prior handles — the handles you've used in circles you're already
+ * in (`loadPriorHandles` → `stoop.listMyHandles`). That is your own information,
+ * so surfacing it leaks nothing, and it lets you re-use a handle you like. Only
+ * when you have no prior handles yet do we fall back to display-name-derived
+ * candidates (the pre-Wave-B behaviour).
+ *
+ * Polymorphic for back-compat: a STRING first arg is the legacy display-name seed
+ * (`handleSuggestions(displayName)`); an ARRAY first arg is the prior-handle list
+ * (`handleSuggestions(priorHandles, displayName)`).
  */
-export function handleSuggestions(existingDisplayName) {
-  const base = String(existingDisplayName ?? 'me').toLowerCase().replace(/[^a-z0-9]/g, '-');
+export function handleSuggestions(priorOrName, existingDisplayName) {
+  let priorHandles = priorOrName;
+  let displayName = existingDisplayName;
+  if (typeof priorOrName === 'string') { priorHandles = []; displayName = priorOrName; }
+  const prior = Array.isArray(priorHandles)
+    ? [...new Set(priorHandles.map((h) => String(h ?? '').trim().toLowerCase()).filter(isValidHandle))]
+    : [];
+  if (prior.length) return prior.slice(0, 8);        // your own prior handles — no leak
+  const base = String(displayName ?? 'me').toLowerCase().replace(/[^a-z0-9]/g, '-');
   return [
     base,
     `${base}-${Math.floor(Math.random() * 90 + 10)}`,
     `${base}.${new Date().getFullYear()}`,
   ];
+}
+
+/**
+ * Load the joiner's OWN prior handles for the suggestion dropdown — the distinct
+ * handles they've used across the circles they belong to (`stoop.listMyHandles`).
+ * Pure read; on any failure returns `[]` so the field simply falls back to
+ * display-name-derived candidates. Your own info only — nothing about anyone else.
+ *
+ * @param {{callSkill:Function}} a
+ * @returns {Promise<string[]>}
+ */
+export async function loadPriorHandles({ callSkill } = {}) {
+  if (typeof callSkill !== 'function') return [];
+  try {
+    const reply = await callSkill('stoop', 'listMyHandles', {});
+    const arr = Array.isArray(reply?.handles) ? reply.handles : [];
+    return arr.filter((h) => typeof h === 'string' && h);
+  } catch {
+    return [];
+  }
 }
 
 /** Validate a buurt handle: lowercase, digits, _ / -; 3-30 chars. */
@@ -295,6 +333,175 @@ export function setPersona(state, personaId) {
   return state;
 }
 
+/* ─── Reveal-state default at join (C7 · NOTE-reveal-state-and-profile-updates §1.6) ─ */
+
+/** The personal-default fallback when the joiner has set no usual level yet. */
+export const REVEAL_JOIN_FALLBACK = 'profile';
+
+/**
+ * Resolve the reveal preset the join starts at (§1.6): a per-circle `override`
+ * wins; else the joiner's `personalDefault` ("your usual level") is honoured;
+ * else the fallback. The circle-suggested level is NEVER an input here — it is
+ * shown as a non-binding hint (`state.circleSuggestedReveal`), never forced.
+ *
+ * @param {{personalDefault?:string, override?:string}} a
+ * @returns {'handle'|'profile'|'full'}
+ */
+export function resolveJoinRevealPreset({ personalDefault, override } = {}) {
+  if (isRevealPreset(override)) return override;
+  if (isRevealPreset(personalDefault)) return personalDefault;
+  return REVEAL_JOIN_FALLBACK;
+}
+
+/**
+ * Load the joiner's personal-default reveal level from their `default` profile
+ * (`reveal.default` property). Best-effort; falls back to the join fallback.
+ * This is your own usual level — read-only here (a settings surface sets it).
+ *
+ * @param {{callSkill:Function}} a
+ * @returns {Promise<'handle'|'profile'|'full'>}
+ */
+export async function loadPersonalRevealDefault({ callSkill } = {}) {
+  if (typeof callSkill !== 'function') return REVEAL_JOIN_FALLBACK;
+  try {
+    const props = (await callSkill('agents', 'getProfileProperties', { id: 'default' }))?.properties ?? {};
+    const entry = props['reveal.default'];
+    const preset = typeof entry === 'string' ? entry : entry?.value;
+    return isRevealPreset(preset) ? preset : REVEAL_JOIN_FALLBACK;
+  } catch {
+    return REVEAL_JOIN_FALLBACK;
+  }
+}
+
+/** Record the joiner's per-circle reveal-preset choice (adjustable, floors at `handle`). */
+export function setJoinReveal(state, preset) {
+  if (isRevealPreset(preset)) state.revealPreset = preset;
+  return state;
+}
+
+/**
+ * Enact the chosen reveal preset for `contextId` (the joined circle) onto the
+ * effective persona's per-circle disclosure BEFORE the join release is computed,
+ * so the release honours the preset. ENABLE every attribute in tiers ≤ the chosen
+ * preset, DISABLE those above (the same amount-cumulative rule as
+ * `applyRevealPreset`, applied over the persona tier keys). Only the `enabled`
+ * axis is touched. Best-effort per key. No-op when no preset is set.
+ *
+ * @param {{state:object, callSkill:Function, contextId:string}} a
+ * @returns {Promise<{applied:boolean, preset?:string}>}
+ */
+export async function applyJoinRevealState({ state, callSkill, contextId } = {}) {
+  const preset = state?.revealPreset;
+  if (!isRevealPreset(preset) || typeof callSkill !== 'function' || !contextId) return { applied: false };
+  const personaId = state.persona ?? 'default';
+  const idx = REVEAL_PRESETS.indexOf(preset);
+  const seen = new Set();
+  for (let i = 0; i < REVEAL_PRESETS.length; i++) {
+    for (const key of personaPresetKeys(REVEAL_PRESETS[i])) {
+      if (typeof key !== 'string' || !key || seen.has(key)) continue;
+      seen.add(key);
+      try {
+        await callSkill('agents', 'setProfileDisclosure', {
+          id: personaId, contextId, key, enabled: i <= idx,
+        });
+      } catch { /* best-effort — one failed key must not block the join */ }
+    }
+  }
+  return { applied: true, preset };
+}
+
+/* ─── Cross-circle linkability — the KEY choice (NOTE-identity-and-linkability, Decision B) ─
+ *
+ * SENSITIVE — this touches key custody. Linkability is a conscious JOIN-TIME choice:
+ * present a FRESH per-circle key (unlinkable coincidence — the DEFAULT), or CONTINUE as
+ * one of your existing selves by presenting the SAME per-circle key you use in another
+ * circle (provably the same person to anyone in BOTH circles). No new crypto: the key you
+ * present is `deriveCircleAddress(profileSeed, <sourceCircleId>)`, the spine's existing
+ * per-circle address — "continue as self in circle X" = present circle X's address here.
+ * A fresh key is `deriveCircleAddress(profileSeed, <this circle>)`, which the callSkill seam
+ * derives by default; presenting a chosen existing key is the explicit opt-in that OVERRIDES it.
+ */
+
+/**
+ * Build the "continue as an existing self?" option list from the circles the joiner
+ * already belongs to (each circle you're in is one existing self, labelled by where
+ * it lives). Excludes the circle being joined. `[{ circleId, name }]`.
+ *
+ * @param {Array<{id:string,name?:string}>} circles  the joiner's existing circles
+ * @param {string} joiningCircleId                    the circle being joined (excluded)
+ * @returns {Array<{circleId:string,name:string}>}
+ */
+export function existingSelvesFrom(circles, joiningCircleId) {
+  if (!Array.isArray(circles)) return [];
+  return circles
+    .filter((c) => c && typeof c.id === 'string' && c.id && c.id !== joiningCircleId)
+    .map((c) => ({ circleId: c.id, name: c.name || c.id }));
+}
+
+/**
+ * Record the linkability choice. `'fresh'` (the default) = a fresh, unlinkable key;
+ * any other string = a source circleId whose key to CONTINUE presenting (linkable to
+ * that circle). Guarded so only a known existing-self circleId can be chosen.
+ */
+export function setLinkChoice(state, choice) {
+  if (typeof choice !== 'string' || !choice || choice === 'fresh') {
+    state.linkChoice = 'fresh';
+    return state;
+  }
+  const known = Array.isArray(state.existingSelves)
+    && state.existingSelves.some((s) => s.circleId === choice);
+  state.linkChoice = known ? choice : 'fresh';
+  return state;
+}
+
+/** True when the joiner chose to continue as an existing self (a linkable key). */
+export function isLinkableChoice(state) {
+  return typeof state?.linkChoice === 'string' && state.linkChoice !== 'fresh';
+}
+
+/**
+ * The per-circle ADDRESS the join should present, given the link choice. `undefined`
+ * for the fresh/unlinkable default (the callSkill seam then derives this circle's own
+ * address); for "continue as self in X" it is `circleAddressFor(X)` — the SAME key X
+ * already records, which is what makes the two circles linkable. No new derivation.
+ *
+ * @param {object} state
+ * @param {(circleId:string)=>(string|null)} circleAddressFor  the spine presenter
+ * @returns {string|undefined}
+ */
+export function presentedCircleAddress(state, circleAddressFor) {
+  if (!isLinkableChoice(state) || typeof circleAddressFor !== 'function') return undefined;
+  try { return circleAddressFor(state.linkChoice) ?? undefined; }
+  catch { return undefined; }
+}
+
+/**
+ * Bootstrap the join-time identity inputs in the background so step 3 is ready:
+ * the joiner's prior handles (suggestion source), their personal-default reveal
+ * level (→ the starting preset, honouring §1.6), the non-binding circle-suggested
+ * level from the invite, and the existing-selves list for the key choice. Mutates
+ * + returns state. Every part is best-effort — a failure just leaves a safe default.
+ *
+ * @param {{state:object, callSkill:Function, circles?:Array}} a
+ * @returns {Promise<object>} the mutated state
+ */
+export async function prepareJoinIdentity({ state, callSkill, circles } = {}) {
+  const [priorHandles, personalDefault] = await Promise.all([
+    loadPriorHandles({ callSkill }),
+    loadPersonalRevealDefault({ callSkill }),
+  ]);
+  state.priorHandles = priorHandles;
+  state.personalRevealDefault = personalDefault;
+  // Circle-suggested level rides the invite; shown, NEVER forced.
+  const suggested = state.invite?.suggestedReveal;
+  state.circleSuggestedReveal = isRevealPreset(suggested) ? suggested : null;
+  // Starting preset = personal default (override is null on first resolve).
+  state.revealPreset = resolveJoinRevealPreset({ personalDefault });
+  // Existing selves = the circles you're already in (each a presentable key).
+  state.existingSelves = existingSelvesFrom(Array.isArray(circles) ? circles : [], state.invite?.groupId ?? null);
+  return state;
+}
+
 /* ─── Charter-driven skill-sharing default (fold-in phase C) ──── */
 
 /**
@@ -392,6 +599,26 @@ export function initialState() {
     // default-withhold).
     offeringsMatching:    false,
     shareOfferingsAtJoin: false,
+    // Wave B — prior-handle suggestions (your own handles; loadPriorHandles).
+    priorHandles:     [],
+    // Wave B — handle-uniqueness rejection surfaced back on the handle step so the
+    // joiner can pick another. `handleRejected` flags it; `submitErrorKey` is the
+    // localisable key the shell renders via t() (invariant #8), null = no i18n key.
+    handleRejected:   false,
+    submitErrorKey:   null,
+    // Wave B — reveal-state default (C7 · §1.6). `revealPreset` = the chosen
+    // in-circle disclosure level (handle|profile|full), starting at the personal
+    // default; `personalRevealDefault` = your usual level (loaded, overridable);
+    // `circleSuggestedReveal` = the admin's NON-BINDING hint from the invite (shown).
+    revealPreset:            null,
+    personalRevealDefault:   REVEAL_JOIN_FALLBACK,
+    circleSuggestedReveal:   null,
+    // Wave B — cross-circle linkability key choice (SENSITIVE). `'fresh'` (default) =
+    // a fresh, unlinkable per-circle key; a circleId = continue as the self living
+    // there (present that circle's key → provably linkable). `existingSelves` = the
+    // circles you're already in, each a presentable existing self.
+    linkChoice:       'fresh',
+    existingSelves:   [],
     submitting:       false,
     submitError:      null,
   };
@@ -408,12 +635,18 @@ export function initialState() {
  *
  * Path B — legacy GroupManager invite: redeemInviteWithGate →
  *   setMyHandle → redeemInvite.
+ *
+ * `circleAddressFor(circleId)` (optional) is the spine's per-circle address
+ * presenter; it lets the SENSITIVE "continue as an existing self" choice present a
+ * chosen existing key instead of the fresh (this-circle) default. Absent → fresh.
  */
-export async function finalSubmit({ state, callSkill, sendPeerRedeem }) {
-  state.submitting  = true;
-  state.submitError = null;
+export async function finalSubmit({ state, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink }) {
+  state.submitting    = true;
+  state.submitError   = null;
+  state.submitErrorKey = null;
+  state.handleRejected = false;
   try {
-    const result = await runFinalSubmitChain(state, callSkill, sendPeerRedeem);
+    const result = await runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink);
     // carry the joiner's declined caps out with the success envelope so the host records
     // them into the member's prefs (`override.capabilityOptOuts`), feeding the gate's admin ∩ user set.
     if (result && Array.isArray(state.capabilityOptOuts) && state.capabilityOptOuts.length) {
@@ -422,18 +655,51 @@ export async function finalSubmit({ state, callSkill, sendPeerRedeem }) {
     state.submitting = false;
     return { result, state };
   } catch (err) {
-    state.submitError = err?.message ?? String(err);
-    state.submitting  = false;
+    // Handle-uniqueness rejection (Decision C): surface it as a localisable prompt to
+    // pick another handle, and keep the joiner on the handle step. Any other error is
+    // reported verbatim (raw substrate string) as before.
+    if (err?.reason === 'handle-taken' || /handle-taken/.test(String(err?.message ?? ''))) {
+      state.handleRejected = true;
+      state.submitErrorKey = 'circle.errors.invalid_handle.handle-taken';
+      state.step = 3;
+    } else {
+      state.submitError = err?.message ?? String(err);
+    }
+    state.submitting = false;
     return { state };
   }
 }
 
-async function runFinalSubmitChain(state, callSkill, sendPeerRedeem) {
+/** Throw a typed handle-taken error the finalSubmit catch maps to the localised prompt. */
+function handleTakenError() {
+  const e = new Error('handle-taken');
+  e.reason = 'handle-taken';
+  return e;
+}
+
+async function runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink) {
   const inv = state.invite;
+  // SENSITIVE — the presented per-circle KEY. undefined = fresh/unlinkable (the seam
+  // derives this circle's own address); a value = the chosen existing self's key.
+  const circleAddress = presentedCircleAddress(state, circleAddressFor);
+  // Signing PROOF that the joiner controls that key (Decision B — the "continue as an
+  // existing self" claim must be PROVABLE, not merely asserted: a co-member who has seen
+  // the source address cannot forge this signature). Signed by the SOURCE circle's identity
+  // (state.linkChoice) over a challenge bound to the JOINING circle. The admin verifies it
+  // and drops the linkage if it's missing/invalid. Absent seam ⇒ no proof ⇒ admin drops it.
+  let circleAddressProof = null;
+  if (circleAddress && typeof signCircleLink === 'function') {
+    try { circleAddressProof = (await signCircleLink(state.linkChoice, inv?.groupId, circleAddress)) ?? null; }
+    catch { circleAddressProof = null; }
+  }
+  const circleAddressArg = circleAddress
+    ? { circleAddress, ...(circleAddressProof ? { circleAddressProof } : {}) }
+    : {};
 
   if (inv?.kind === 'membershipCode' && inv.code && inv.groupId) {
     // Path A — membershipCode.
     const handle = await callSkill('stoop', 'setMyHandle', { handle: state.handle });
+    if (handle?.reason === 'handle-taken') throw handleTakenError();
     if (handle?.ok === false || handle?.error) {
       throw new Error(handle.error ?? "Couldn't set handle.");
     }
@@ -443,18 +709,25 @@ async function runFinalSubmitChain(state, callSkill, sendPeerRedeem) {
     // default must still work for a joiner who never made personas (setShareOfferingsAtJoin(false)
     // — unchecking the visible line — keeps everything withheld, exactly as before).
     await applyOfferingsDisclosureAtJoin({ state, callSkill, contextId: inv.groupId });
+    // Wave B — enact the chosen reveal preset (C7 · §1.6) onto the persona's per-circle
+    // disclosure BEFORE the release, so the join release honours the reveal-state default.
+    await applyJoinRevealState({ state, callSkill, contextId: inv.groupId });
     // Property layer — join AS a chosen persona: release what that persona discloses in THIS circle
     // (getPersonaRelease) and carry it so the roster records it. No persona / nothing disclosed → absent (withhold).
     let personaProperties;
-    const releasePersona = state.persona ?? (state.shareOfferingsAtJoin === true ? 'default' : null);
+    const releasePersona = state.persona
+      ?? ((state.shareOfferingsAtJoin === true || isRevealPreset(state.revealPreset)) ? 'default' : null);
     if (releasePersona) {
       try { personaProperties = (await callSkill('agents', 'getPersonaRelease', { id: releasePersona, contextId: inv.groupId }))?.released; }
       catch { personaProperties = undefined; }
     }
     const personaArg = (personaProperties && Object.keys(personaProperties).length) ? { personaProperties } : {};
     const redeem = await callSkill('stoop', 'redeemMembershipCode', {
-      groupId: inv.groupId, code: inv.code, ...personaArg,
+      groupId: inv.groupId, code: inv.code,
+      ...(state.handle ? { peerDisplay: state.handle } : {}),
+      ...personaArg, ...circleAddressArg,
     });
+    if (redeem?.error === 'handle-taken') throw handleTakenError();
     // Cross-instance fallback.
     if (redeem?.error === 'invalid-or-expired-code' && inv.adminPeerAddr && typeof sendPeerRedeem === 'function') {
       const peerReply = await sendPeerRedeem({
@@ -464,7 +737,9 @@ async function runFinalSubmitChain(state, callSkill, sendPeerRedeem) {
         shareCard:   !!state.shareAddress,
         peerDisplay: state.handle,
         ...personaArg,
+        ...circleAddressArg,
       });
+      if (peerReply?.error === 'handle-taken') throw handleTakenError();
       if (!peerReply || peerReply.error) {
         throw new Error(peerReply?.error
           ?? "Admin's substrate did not confirm the code. They may be offline — try again, or ask for a fresh code.");
@@ -475,6 +750,7 @@ async function runFinalSubmitChain(state, callSkill, sendPeerRedeem) {
         codeId:      peerReply.codeId ?? null,
         expiresAt:   peerReply.validUntil ?? null,
         confirmedBy: inv.adminPeerAddr,
+        ...(state.handle ? { peerDisplay: state.handle } : {}),
         ...(inv.rules && typeof inv.rules === 'object' ? { rules: inv.rules } : {}),
       });
       return {
@@ -505,6 +781,7 @@ async function runFinalSubmitChain(state, callSkill, sendPeerRedeem) {
     throw new Error(gate.error ?? 'Gate refused the redeem.');
   }
   const handle = await callSkill('stoop', 'setMyHandle', { handle: state.handle });
+  if (handle?.reason === 'handle-taken') throw handleTakenError();
   if (handle?.ok === false || handle?.error) {
     throw new Error(handle.error ?? "Couldn't set handle.");
   }

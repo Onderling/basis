@@ -37,6 +37,7 @@ export { KeyRotation }        from './identity/KeyRotation.js';
 export { Bootstrap }          from './identity/Bootstrap.js';
 // identity step 3 — per-circle addresses (unlinkability layer)
 export { deriveCircleSeed, deriveCircleAddress, circleIdentity } from './identity/circleAddress.js';
+export { circleLinkMessage, signCircleLink, signCircleLinkFromSeed, verifyCircleLink } from './identity/circleLink.js';
 export { hashHex } from './hashHex.js';
 // NOTE: IdentityPodStore, IdentitySync and migrateVaultToPod were extracted OUT
 // of core into `@onderling/pod-client` — they store/migrate/sync identity ON a pod

@@ -25,7 +25,7 @@
 
 import {
   Agent, AgentIdentity, Bootstrap, InternalBus, InternalTransport, DataPart, TokenRegistry,
-  PolicyEngine, TrustRegistry, deriveCircleAddress,
+  PolicyEngine, TrustRegistry, deriveCircleAddress, signCircleLinkFromSeed,
 } from '@onderling/core';
 import { VaultMemory, VaultLocalStorage } from '@onderling/vault';
 import { wireSkill } from '@onderling/sdk';
@@ -2991,5 +2991,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     // Step 5B/C — the per-circle ADDRESS this device presents in a circle (unlinkable-by-default),
     // derived from the default profile seed. The substrate the roster-recording wire consumes.
     circleAddressFor: (circleId) => deriveCircleAddress(defaultProfileSeed, circleId),
+    // Decision B (SENSITIVE) — sign the cross-circle link challenge with the SOURCE circle's
+    // key (seed-derived, no vault) so a "continue as an existing self" claim is PROVABLE. The
+    // join wizard passes this on the redeem seam; the admin verifies it before recording.
+    signCircleLink: (circleId, groupId, address) => signCircleLinkFromSeed(defaultProfileSeed, circleId, groupId, address),
   };
 }

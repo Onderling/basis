@@ -394,7 +394,11 @@ export default function CircleLauncherScreen({
   // the SAME handlers the /set-relay + /transport-mode composer built-ins use (invariants #1/#2).
   const onCircleControl = useCallback(async (opId, args) => {
     if (opId === 'set-relay') {
-      try { await asyncStorageRelayIo(AsyncStorage).set(args?.clear ? '' : String(args?.url ?? '')); } catch { /* best-effort */ }
+      // asyncStorageRelayIo exposes { load, save } (the raw IO) — NOT { get, set } (that's the
+      // createRelayPrefStore wrapper). Calling `.set` here threw `TypeError: .set is not a function`,
+      // which the best-effort catch swallowed, so the relay URL was never persisted and the phone
+      // never dialled the relay. Use `.save` (mirrors the `.load` on line 386). load-side normalises.
+      try { await asyncStorageRelayIo(AsyncStorage).save(args?.clear ? '' : String(args?.url ?? '')); } catch { /* best-effort */ }
       try { await bundle?.reconnectPeer?.(); } catch { /* best-effort */ }
     } else if (opId === 'transport-mode' && ['nkn', 'relay', 'both'].includes(String(args?.mode))) {
       try { await AsyncStorage.setItem('cc-transport-mode', args.mode); } catch { /* best-effort */ }

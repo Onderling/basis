@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 //
-// Governance panel render (Phase 4 §5 L4 slice 3): the web view over buildGovernanceView.
+// Governance panel render (Phase 4 §5 L4): the web view over buildGovernanceView.
 // A member-vote proposal renders its tally + vote buttons (wired to onVote); an admin past
 // the deadline gets an override button; a closed proposal shows in history, not as votable.
 import { describe, it, expect, vi } from 'vitest';
@@ -69,6 +69,22 @@ describe('renderGovernancePanel', () => {
     ], { ref: 'm0', role: 'member' }, 200);
     renderGovernancePanel(c, { view, t: (k) => k });
     expect(c.querySelector('.circle-governance__override')).toBeNull();
+  });
+
+  it('L3: a disputed author shows an equivocation alert with a review→remove button', () => {
+    const c = document.createElement('div');
+    const onReviewDisputed = vi.fn();
+    renderGovernancePanel(c, {
+      view: { open: [], closed: [], disputed: [{ ref: 'm0@id', label: 'Jan' }], hasDisputed: true },
+      t: (k, p) => (p ? `${k}:${JSON.stringify(p)}` : k),
+      onReviewDisputed,
+    });
+    const warn = c.querySelector('.circle-governance__disputed');
+    expect(warn).toBeTruthy();
+    expect(warn.dataset.disputed).toBe('m0@id');
+    expect(c.textContent).toContain('Jan');
+    c.querySelector('.circle-governance__disputed-review').click();
+    expect(onReviewDisputed).toHaveBeenCalledWith('m0@id');
   });
 
   it('empty state when there are no open proposals', () => {

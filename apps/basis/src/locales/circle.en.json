@@ -3710,6 +3710,8 @@
     "tally": { "text": "{yes} of {need} needed · {of} members", "doc": "Governance — the running vote tally." },
     "deadline": { "text": "has a deadline", "doc": "Governance — this vote has a closing deadline." },
     "awaiting_enactment": { "text": "awaiting an admin", "doc": "Governance — approved, waiting for an admin/caretaker device to enact it (Decision A)." },
+    "disputed_line": { "text": "conflicting history from {who} — evidence attached", "doc": "Governance L3 — equivocation (fork-proof) alert." },
+    "review_remove": { "text": "Review & remove", "doc": "Governance L3 — open a removeMember review on a disputed member." },
     "settings_title": { "text": "Who decides", "doc": "Governance settings — heading over the per-action decision-class controls (admin-only)." }
   },
   "mij": {

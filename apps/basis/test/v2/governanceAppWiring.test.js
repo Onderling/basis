@@ -1,5 +1,5 @@
 /**
- * Governance app wiring (Phase 4 §5, L4 slice 3) — the shared shell binder.
+ * Governance app wiring (Phase 4 §5, L4) — the shared shell binder.
  *
  * Locks the substrate binding both shells depend on: governance events round-trip through
  * the EventLog (append as a governance-kind silent entry → read back by circle), and the

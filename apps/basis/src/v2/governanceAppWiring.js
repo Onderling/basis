@@ -1,5 +1,5 @@
 /**
- * basis v2 — governance app wiring (Phase 4 §5, L4 slice 3 — shared shell binder).
+ * basis v2 — governance app wiring (Phase 4 §5, L4 — shared shell binder).
  *
  * Binds the governance host factory to the concrete circle substrate ONCE (invariant 1),
  * so the web shell (circleApp) and the mobile shell (CircleLauncher) drive governance

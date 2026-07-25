@@ -1,5 +1,5 @@
 /**
- * basis v2 — governance orchestrator (Phase 4 §5, L4 slice 2).
+ * basis v2 — governance orchestrator (Phase 4 §5, L4).
  *
  * The member-side handler that routes a governed action through its decision-class instead
  * of straight to the op. Pure orchestration over injected seams (like shareDisclosureToCircle):

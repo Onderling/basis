@@ -1,5 +1,5 @@
 /**
- * Governance proposals — the event model + fold (Phase 4 §5, L4 slice 1).
+ * Governance proposals — the event model + fold (Phase 4 §5, L4).
  *
  * The fold groups governance events into proposals and resolves each live status through
  * the (separately-tested) decision resolver. Locks: grouping by proposal, votes flowing to

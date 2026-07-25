@@ -1,5 +1,5 @@
 /**
- * Governance host factory (Phase 4 §5, L4 slice 3) — the shared wiring both shells use.
+ * Governance host factory (Phase 4 §5, L4) — the shared wiring both shells use.
  *
  * Locks: each action maps to the REAL op (removeMember → stoop removeMember, changeRule →
  * editGroupRules); the admin gate (Decision A) lets an admin device enact but not a member

@@ -1,5 +1,5 @@
 /**
- * basis v2 — governance proposals: the event model + the fold (Phase 4 §5, L4 slice 1).
+ * basis v2 — governance proposals: the event model + the fold (Phase 4 §5, L4).
  *
  * Governance rides the ONE circle log stream (`eventLog.js`) as typed entries; this module
  * is the PURE reducer over those entries — no storage, no transport. The host reads the

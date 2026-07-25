@@ -1,5 +1,5 @@
 /**
- * basis-mobile v2 — governance surface (RN, Wave C §5 L4 slice 3).
+ * basis-mobile v2 — governance surface (RN, Wave C §5 L4).
  *
  * RN mirror of web's circleGovernancePanel over the SAME shared model
  * (buildGovernanceView via the shared bindCircleGovernance host; web ≡ mobile by
@@ -70,6 +70,12 @@ export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy,
     await load();
   }, [getPolicy, updatePolicy, circleId, load]);
 
+  const onReviewDisputed = useCallback(async (ref) => {
+    const { gov, myWebid } = ctxRef.current;
+    try { await gov?.propose({ circleId, action: 'removeMember', subject: ref, actor: { ref: myWebid } }); } catch { /* */ }
+    await load();
+  }, [circleId, load]);
+
   const statusKey = (row) => (row.approved ? 'approved' : row.rejected ? 'rejected' : 'pending');
 
   return (
@@ -78,6 +84,15 @@ export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy,
         <Text style={styles.backText}>{`← ${t('circle.back')}`}</Text>
       </Pressable>
       <Text style={styles.title}>{t('circle.governance.title')}</Text>
+
+      {(model.view.disputed ?? []).map((d) => (
+        <View key={d.ref} style={styles.disputed} testID={`gov-disputed-${d.ref}`}>
+          <Text style={styles.disputedLine}>{t('circle.governance.disputed_line', { who: d.label || d.ref })}</Text>
+          <Pressable onPress={() => onReviewDisputed(d.ref)} accessibilityRole="button" style={styles.disputedBtn}>
+            <Text style={styles.disputedBtnText}>{t('circle.governance.review_remove')}</Text>
+          </Pressable>
+        </View>
+      ))}
 
       {!model.view.open.length ? (
         <Text style={styles.empty}>{t('circle.governance.none')}</Text>
@@ -175,6 +190,11 @@ const makeStyles = (theme) => {
     backText: { fontSize: 13, color: c.inkSoft },
     title: { fontFamily: theme.font.mono, fontSize: 13, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.2, color: c.accentInk, borderTopWidth: 3, borderTopColor: c.ink, paddingTop: 6 },
     empty: { fontSize: 13, color: c.inkSoft, fontStyle: 'italic' },
+
+    disputed: { borderWidth: 2, borderColor: c.accentInk, backgroundColor: c.paper, padding: theme.space.sm + 2, gap: 6 },
+    disputedLine: { fontSize: 12.5, fontWeight: '700', color: c.accentInk },
+    disputedBtn: { alignSelf: 'flex-start', paddingVertical: 5, paddingHorizontal: theme.space.md, borderWidth: 1, borderColor: c.accentInk },
+    disputedBtnText: { fontSize: 12, fontWeight: '700', color: c.accentInk },
 
     card: { backgroundColor: c.card, borderWidth: 2, borderColor: c.ink, padding: theme.space.md, gap: 6 },
     head: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: theme.space.sm, flexWrap: 'wrap' },

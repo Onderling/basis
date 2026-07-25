@@ -1,5 +1,5 @@
 /**
- * Governance surface view-model (Phase 4 §5, L4 slice 3) — the shared read-model.
+ * Governance surface view-model (Phase 4 §5, L4) — the shared read-model.
  *
  * Locks the viewer-relative affordances both shells render off: open vs closed split,
  * this viewer's own vote, who may vote (member on an open member-vote), and when the admin

@@ -1,5 +1,5 @@
 /**
- * basis v2 — governance host factory (Phase 4 §5, L4 slice 3 — shared wiring).
+ * basis v2 — governance host factory (Phase 4 §5, L4 — shared wiring).
  *
  * Binds the pure orchestrator to the real circle substrate so both shells drive governance
  * the same way (invariant 1 — the wiring lives once). It maps each governed action to the

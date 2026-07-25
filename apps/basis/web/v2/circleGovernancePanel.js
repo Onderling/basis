@@ -1,5 +1,5 @@
 /**
- * basis v2 — governance panel (web DOM renderer, Phase 4 §5 L4 slice 3).
+ * basis v2 — governance panel (web DOM renderer, Phase 4 §5 L4).
  *
  * A thin renderer over the shared `buildGovernanceView` model (web ≡ mobile — the mobile
  * screen renders the SAME model). Draws each open proposal: what it is, its decision-class,
@@ -30,13 +30,28 @@ function el(tag, cls, text) {
  * @param {object} [opts.policy]        the circle policy (its governance map drives the settings control)
  * @param {boolean} [opts.isAdmin]      show the admin-only decision-class settings
  * @param {(action:string, cls:string)=>void} [opts.onSetClass]  change a governed action's class
+ * @param {(ref:string)=>void} [opts.onReviewDisputed]  open a removeMember proposal for an equivocator (L3)
  */
-export function renderGovernancePanel(container, { view = { open: [], closed: [] }, t, onVote, onOverride, policy = null, isAdmin = false, onSetClass } = {}) {
+export function renderGovernancePanel(container, { view = { open: [], closed: [] }, t, onVote, onOverride, policy = null, isAdmin = false, onSetClass, onReviewDisputed } = {}) {
   const tr = typeof t === 'function' ? t : (k) => k;
   container.innerHTML = '';
   container.classList.add('circle-governance');
 
   container.appendChild(el('h2', 'circle-governance__title', tr('circle.governance.title')));
+
+  // L3 — equivocation alert: authors caught telling different peers different things. The
+  // fork-proof is self-verifying; the circle reviews + removes via the normal removeMember class.
+  const disputed = view?.disputed ?? [];
+  for (const d of disputed) {
+    const warn = el('div', 'circle-governance__disputed');
+    warn.dataset.disputed = d.ref;
+    warn.appendChild(el('span', 'circle-governance__disputed-line', tr('circle.governance.disputed_line', { who: d.label || d.ref })));
+    const rb = el('button', 'circle-governance__disputed-review', tr('circle.governance.review_remove'));
+    rb.type = 'button';
+    rb.addEventListener('click', () => onReviewDisputed?.(d.ref));
+    warn.appendChild(rb);
+    container.appendChild(warn);
+  }
 
   const open = view?.open ?? [];
   if (!open.length) {

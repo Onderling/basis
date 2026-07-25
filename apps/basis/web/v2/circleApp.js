@@ -5540,6 +5540,11 @@ async function showGovernance(id) {
         } catch { /* */ }
         await rerender();
       },
+      // L3 — "review & remove" an equivocator: open a removeMember decision (its class applies).
+      onReviewDisputed: async (ref) => {
+        try { await gov.propose({ circleId: id, action: 'removeMember', subject: ref, actor: { ref: myWebid } }); } catch { /* */ }
+        await rerender();
+      },
     });
   };
   await rerender();

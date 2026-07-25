@@ -1,5 +1,5 @@
 /**
- * basis v2 — governance surface view-model (Phase 4 §5, L4 slice 3, shared).
+ * basis v2 — governance surface view-model (Phase 4 §5, L4, shared).
  *
  * The pure read-model both shells project (web ≡ mobile by construction, like
  * buildMijViewModel). Turns a governance fold into UI-ready rows: what a proposal is, its

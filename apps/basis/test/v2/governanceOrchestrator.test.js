@@ -1,5 +1,5 @@
 /**
- * Governance orchestrator (Phase 4 §5, L4 slice 2) — routing an action through its class.
+ * Governance orchestrator (Phase 4 §5, L4) — routing an action through its class.
  *
  * An in-memory event log + a spy enactor + a fixed roster stand in for the injected seams.
  * Locks: any-admin enacts immediately (once, via the real op); member-vote opens a proposal

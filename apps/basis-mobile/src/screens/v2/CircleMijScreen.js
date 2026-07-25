@@ -201,7 +201,7 @@ export default function CircleMijScreen({ callSkill, sendPersonaUpdate, lastShar
                         style={styles.input}
                         defaultValue={p.value ?? ''}
                         placeholder={t('circle.aboutme.place_placeholder')}
-                        placeholderTextColor={c.inkSoft}
+                        placeholderTextColor={theme.color.inkSoft}
                         onChangeText={(v) => setPropDrafts((d) => ({ ...d, [p.key]: v }))}
                       />
                       <Pressable
@@ -234,7 +234,7 @@ export default function CircleMijScreen({ callSkill, sendPersonaUpdate, lastShar
                             style={styles.input}
                             defaultValue={p.when ?? ''}
                             placeholder={t('circle.mij.availability_when_ph')}
-                            placeholderTextColor={c.inkSoft}
+                            placeholderTextColor={theme.color.inkSoft}
                             onChangeText={(v) => setPropDrafts((d) => ({ ...d, [`${p.key}__when`]: v }))}
                           />
                           <Pressable
@@ -286,14 +286,14 @@ export default function CircleMijScreen({ callSkill, sendPersonaUpdate, lastShar
                 style={styles.input}
                 value={offeringForm.text}
                 placeholder={t('circle.mij.offering_text_ph')}
-                placeholderTextColor={c.inkSoft}
+                placeholderTextColor={theme.color.inkSoft}
                 onChangeText={(v) => setOfferingForm((s) => ({ ...s, text: v }))}
               />
               <TextInput
                 style={styles.input}
                 value={offeringForm.tags}
                 placeholder={t('circle.mij.offering_tags_ph')}
-                placeholderTextColor={c.inkSoft}
+                placeholderTextColor={theme.color.inkSoft}
                 onChangeText={(v) => setOfferingForm((s) => ({ ...s, tags: v }))}
               />
               <View style={styles.formActions}>
@@ -350,7 +350,7 @@ export default function CircleMijScreen({ callSkill, sendPersonaUpdate, lastShar
               style={styles.input}
               value={personaForm.name}
               placeholder={t('circle.mij.new_persona_ph')}
-              placeholderTextColor={c.inkSoft}
+              placeholderTextColor={theme.color.inkSoft}
               onChangeText={(v) => setPersonaForm({ name: v })}
             />
             <View style={styles.formActions}>

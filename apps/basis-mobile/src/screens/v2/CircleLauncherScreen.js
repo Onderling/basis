@@ -898,8 +898,10 @@ export default function CircleLauncherScreen({
 
   const callSkill = useMemo(
     // Pass a catalog getter so the resolver skips origins that don't declare the op
-    // (no probe-storm). Lazy → read at dispatch time, after `catalog` is defined below.
-    () => (bundle?.callSkill ? makeResolvingCallSkill(bundle.callSkill, undefined, () => catalog) : null),
+    // (no probe-storm). Lazy → read at dispatch time. The launcher-level resolver uses
+    // the RAW merged catalog (`bundle.catalog`); per-circle app scoping happens in
+    // CircleDetail. (`catalog` is CircleDetail-local — not in scope here.)
+    () => (bundle?.callSkill ? makeResolvingCallSkill(bundle.callSkill, undefined, () => bundle?.catalog) : null),
     [bundle],
   );
 
@@ -1607,6 +1609,9 @@ export default function CircleLauncherScreen({
         disclosureShareMemo={bundle?.disclosureShareMemo}
         resealMediaForCircle={resealMediaForCircle}
         profilePicture={profilePicture}
+        coreIdentity={bundle?.coreAgent?.identity ?? null}
+        onCircleControl={onCircleControl}
+        circleTransport={circleTransport}
         /* Task #13 — first-run flags (shared with the launcher's provisioner) + the onboarding
            "Ja, help me" handoff → the mobile create flow (close the help circle, open "+ new circle"). */
         onboardingFlags={onboardingFlags}
@@ -1988,7 +1993,8 @@ function LauncherTile({ circle: c, preview, pending, isPinned = false, isMuted =
 function CircleDetail({
   circle, items, callSkill, rawCallSkill, catalog: rawCatalog, policy, myListTasks = [],
   eventLog, circles = [],
-  recipeStore = null, onStoopEvent, sendPersonaUpdate, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null,
+  recipeStore = null, onStoopEvent, sendPersonaUpdate, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null, coreIdentity = null,
+  onCircleControl = null, circleTransport = null,
   // Task #13 — onboarding first-run flags (shared store) + the create-flow handoff.
   onboardingFlags = null, onCreateCircle = null,
   onBack, onSettings, onMine, onViewAs, onAdvisor, onSkills, onFiles, onRules, onRecipes, onAdmin, onLists, onShare, onInvite, onGovernance, onReportMember, onReportPost, onReportMessage,
@@ -2286,7 +2292,7 @@ function CircleDetail({
       llmBaseURL: FEEDBACK_LLM_BASEURL,
       pod: pods.ownPod,
       ...(pods.centralPod ? { centralPod: pods.centralPod, controlStore: pods.controlStore, verify: true } : {}),
-      identityFor: () => signerForIdentity(bundle?.coreAgent?.identity),
+      identityFor: () => signerForIdentity(coreIdentity),
       emit: ({ kind, text: btext, buttons, points, labels, logText }) => {
         if (kind === 'review' && Array.isArray(points)) appendKringMessage({ actor: 'bot', review: { intro: btext, points, labels } });
         else if (kind === 'report') appendKringMessage({ actor: 'bot', text: `${btext}\n\n${logText || ''}`.trimEnd() });
@@ -2298,7 +2304,7 @@ function CircleDetail({
       appendUserBubble: (_tid, txt) => appendKringMessage({ actor: 'me', text: txt }),
       appendBotBubble:  () => {},   // unused: the pre-built surface owns its emit above
     });
-  }, [appendKringMessage, bundle]);
+  }, [appendKringMessage, coreIdentity]);
 
   // Offer the OTHER languages as tappable bubble-buttons (web-kring parity). Prompt + label are read from the
   // locale files IN each TARGET language (t(key, {}, l)) — a speaker of that language recognises the invite; NO
@@ -3029,7 +3035,7 @@ function CircleDetail({
     const builtin = parseCircleBuiltin(text);
     if (builtin) {
       setComposerText('');
-      if (builtin.opId === 'settings') { setView('settings'); return; }
+      if (builtin.opId === 'settings') { onSettings?.(); return; }
       if (builtin.opId === 'set-relay') {
         await onCircleControl('set-relay', builtin.args);
         appendKringMessage({ actor: 'bot', text: builtin.args?.clear
@@ -3106,7 +3112,7 @@ function CircleDetail({
       if (feedbackMountRef.current?.circleId !== circle.id) {
         const pods = makeNoLoginFeedbackPods({
           collectorUrl: FEEDBACK_COLLECTOR_URL,
-          participantKey: bundle?.coreAgent?.identity?.pubKey,
+          participantKey: coreIdentity?.pubKey,
           storage: AsyncStorage,
           podKey: `fp.ownpod.${circle.id}`,
         });
@@ -3148,7 +3154,7 @@ function CircleDetail({
       // so a newly-created task appears there without a manual reload.
       if (activeTab === 'taken') setTasksReloadTick((n) => n + 1);
     }).catch(() => {});
-  }, [composerText, eventLog, circle?.id, appendKringMessage, circleBot, pendingFollowUp, runCircleCommandResolved, awaitingBotReply, noteBotTurn, manifestsByOrigin, buildFeedbackMount, emitFeedbackLangOptions, postHelpTopicChips, answerHelpMessage, activeTab, onCircleControl, circleTransport, setView, t]);
+  }, [composerText, eventLog, circle?.id, appendKringMessage, circleBot, pendingFollowUp, runCircleCommandResolved, awaitingBotReply, noteBotTurn, manifestsByOrigin, buildFeedbackMount, emitFeedbackLangOptions, postHelpTopicChips, answerHelpMessage, activeTab, onCircleControl, circleTransport, onSettings, t]);
 
   // δ.2 — tap-to-retry on the failed icon.  Looks up the original
   // text from the eventLog so we don't have to remember it elsewhere.

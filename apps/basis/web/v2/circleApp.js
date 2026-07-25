@@ -132,6 +132,7 @@ import { encodeImageFile } from '../../src/v2/attachmentEncoder.js';
 // the kring composer shows NO attach affordance. Swap point for real infra (S3/R2 +
 // Solid verifier) is recorded in circleMediaGateway.js.
 import { createCircleMediaComposition, makeDevMediaBucket } from '../../src/v2/circleMediaGateway.js';
+import { buildSelfMediaComposition, makeResealMediaForCircle } from '../../src/v2/profileMediaReseal.js';
 import { createMediaEmbed } from '../../src/core/handlers/mediaEmbed.js';
 import { openThumbnail } from '@onderling/blob-gateway';
 // S6.A — manifest-driven inline buttons on bot replies (the resurrected "inline menu").
@@ -3931,14 +3932,13 @@ async function openAboutMePanel(personaId) {
       callSkill: rawCallSkill, personaId: id, circles: circlesCache,
       activeCircleId: getActiveCircle(),
     });
-    // Profile picture (media persona attribute) — the active circle's media
-    // composition seals it on set; the preview resolves the sealed inline thumb.
-    // B1: sealed via the active circle. The per-circle RE-SEAL on disclosure — so
-    // the pic opens in EVERY circle it's shared to (Frits: option (a)) — is B2, at
-    // propagation (personaPropsUpdate/getPersonaRelease), reusing the copy-reseal.
-    const _picCircle = getActiveCircle();
-    let _picPolicy = null; try { _picPolicy = await policyStore.get(_picCircle); } catch { /* */ }
-    const _picComp = _picCircle ? await getCircleMediaComposition(_picCircle, _picPolicy).catch(() => null) : null;
+    // Profile picture (media persona attribute). The Mij editor edits the GENERAL
+    // persona — the truth layer — so the picture is sealed to the OWNER'S OWN key
+    // (the self-sealed source copy), never to a circle. The per-circle RE-SEAL on
+    // disclosure — so the pic opens in EVERY circle it's shared to (Frits: option
+    // (a)) — happens at propagation (shareDisclosureToCircle's injected
+    // resealMediaForCircle), reusing the shared seal path (profileMediaReseal.js).
+    const _selfComp = await getSelfMediaComposition();
     let currentPicture = null;
     try {
       const _props = (await rawCallSkill('agents', 'getProfileProperties', { id: model.defaultId ?? 'default' }))?.properties ?? {};
@@ -3947,12 +3947,12 @@ async function openAboutMePanel(personaId) {
     } catch { /* no picture set */ }
     renderMij(body, {
       model, t, lang: currentLang(),
-      resolvePicture: makeCirclePictureResolver(_picComp?.mediaGateway?.opener),
+      resolvePicture: makeCirclePictureResolver(_selfComp?.mediaGateway?.opener),
       currentPicture,
-      onSetPicture: _picComp ? async (file) => {
+      onSetPicture: _selfComp ? async (file) => {
         try {
           const embed = await createMediaEmbed({}, {
-            file, mediaGateway: _picComp.mediaGateway, encodeImage: encodeImageFile, localActor: LOCAL_ACTOR, t,
+            file, mediaGateway: _selfComp.mediaGateway, encodeImage: encodeImageFile, localActor: LOCAL_ACTOR, t,
           });
           const src = (embed && embed.ok !== false) ? (embed.snapshot?.source ?? null) : null;
           if (src) await rawCallSkill('agents', 'setProfileProperty', { id: model.defaultId ?? 'default', key: 'profilePicture', value: src });
@@ -3992,6 +3992,9 @@ async function openAboutMePanel(personaId) {
         // announces its own row's pull-me; otherwise the remote admin announces.
         // (the member ref comes back from the roster write itself — `result.memberWebid`).
         announceRosterUpdate,
+        // Media props (profilePicture) leave RE-SEALED to this circle (option (a)):
+        // the self-sealed source copy → a copy sealed with the circle's own key.
+        resealMediaForCircle: resealPersonaMediaForCircle,
       }),
     });
   };
@@ -5466,6 +5469,26 @@ function makeCirclePictureResolver(opener) {
     } catch { return null; }
   };
 }
+
+// The profile-picture seal path lives ONCE in the shared module (web ≡ mobile);
+// this shell only injects its identity + dev bucket + per-circle composition getter.
+// `getSelfMediaComposition` memoises the owner-sealed SOURCE composition (sealed to my
+// own key, opened with my self-opener — circle-INDEPENDENT). `resealMediaForCircle` is
+// the injected disclosure re-sealer that turns the source into each circle's own copy.
+let _selfMediaComp;
+function getSelfMediaComposition() {
+  if (_selfMediaComp === undefined) {
+    _selfMediaComp = buildSelfMediaComposition({
+      identity: circleCoreAgent?.identity, bucket: devMediaBucket, localActor: LOCAL_ACTOR,
+    }).catch(() => null);
+  }
+  return _selfMediaComp;
+}
+const resealPersonaMediaForCircle = makeResealMediaForCircle({
+  getSelfComposition:   getSelfMediaComposition,
+  getCircleComposition: getCircleMediaComposition,
+  getPolicy:            (circleId) => policyStore.get(circleId),
+});
 
 // §2 self-view — tap your own row → "how others see me": pick a viewer (a member /
 // a stranger / an agent) and feel exactly what you expose. The sees/hides split

@@ -273,6 +273,7 @@ export function makeHandlePersonaPropsAck({ pendingMap, logger = console } = {})
  */
 export async function shareDisclosureToCircle({
   callSkill, sendPersonaUpdate, circleId, personaId, lastShared, announceRosterUpdate, selfRef,
+  resealMediaForCircle,
 }) {
   if (typeof callSkill !== 'function') return { ok: false, reason: 'callSkill-required' };
   if (!circleId || !personaId) return { ok: false, reason: 'missing-args' };
@@ -285,7 +286,9 @@ export async function shareDisclosureToCircle({
     personaProperties = (rel?.released && typeof rel.released === 'object') ? rel.released : {};
   } catch { personaProperties = {}; }
 
-  // 2. DIFF-GATE — open-the-editor-and-save-unchanged must do nothing at all.
+  // 2. DIFF-GATE — open-the-editor-and-save-unchanged must do nothing at all. Runs on the
+  //    self-sealed SOURCE release (the stable refs), BEFORE any re-seal — so an unchanged
+  //    picture short-circuits here and never triggers a needless open+reseal+upload.
   let changedKeys = null;
   if (lastShared && typeof lastShared.get === 'function') {
     const previous = await lastShared.get(circleId, personaId);
@@ -295,10 +298,23 @@ export async function shareDisclosureToCircle({
     changedKeys = previous === null ? null : changedReleaseKeys(previous, personaProperties);
   }
   // No memo (or nothing recorded yet) ⇒ we can't name the changed keys locally; the roster —
-  // the source of truth — names them, and gates again if nothing actually moved.
+  // the source of truth — names them, and gates again if nothing actually moved. The memo keeps
+  // the stable SOURCE refs (never the re-sealed copy) so the next unchanged save still no-ops.
   const remember = async () => {
     try { await lastShared?.set?.(circleId, personaId, personaProperties); } catch { /* best-effort */ }
   };
+
+  // 2b. Media props (e.g. profilePicture) are RE-SEALED to THIS circle before they leave
+  //     (Frits: option (a)): the injected resealer returns a COPY whose media refs are
+  //     sealed with the circle's OWN key — so members can open them and no cross-circle
+  //     key ever crosses. Only this outbound copy carries the circle-sealed refs; the
+  //     diff-gate + memo above stay on the self-sealed source, so re-seal runs only on a
+  //     real change.
+  let toSend = personaProperties;
+  if (typeof resealMediaForCircle === 'function') {
+    try { toSend = (await resealMediaForCircle(personaProperties, circleId)) || personaProperties; }
+    catch { toSend = personaProperties; }
+  }
 
   // 3. Find the circle admin (excluded from listGroupRoster when it's ME → drives local-vs-peer).
   let adminAddr = null;
@@ -311,7 +327,7 @@ export async function shareDisclosureToCircle({
   //     my own row (nobody else will — the pull-me always follows the roster WRITE).
   if (!adminAddr) {
     try {
-      const r = await callSkill('stoop', 'recordMemberPersonaProperties', { groupId: circleId, personaProperties });
+      const r = await callSkill('stoop', 'recordMemberPersonaProperties', { groupId: circleId, personaProperties: toSend });
       if (r?.ok === false) return { ok: false, reason: r.reason ?? 'record-failed' };
       await remember();
       if (r?.unchanged === true) return { ok: true, via: 'local', unchanged: true, changedKeys: [] };
@@ -326,7 +342,7 @@ export async function shareDisclosureToCircle({
   // 4b. Remote admin ⇒ push over peer. The ADMIN announces the pull-me after ITS roster write.
   if (typeof sendPersonaUpdate !== 'function') return { ok: false, reason: 'admin-unreachable' };
   try {
-    const r = await sendPersonaUpdate({ adminPeerAddr: adminAddr, groupId: circleId, personaProperties });
+    const r = await sendPersonaUpdate({ adminPeerAddr: adminAddr, groupId: circleId, personaProperties: toSend });
     if (r && r.error) return { ok: false, reason: r.error };
     await remember();
     return { ok: true, via: 'peer', ...(r?.unchanged === true ? { unchanged: true, changedKeys: [] } : {}) };

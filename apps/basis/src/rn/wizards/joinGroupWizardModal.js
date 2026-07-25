@@ -14,7 +14,7 @@ import { Modal, View, ScrollView, StyleSheet, Pressable, Text } from 'react-nati
 
 import {
   initialState, decodeInvite, fetchGroupRules,
-  handleSuggestions, isValidHandle, privacyNoticeFor,
+  handleSuggestions, isValidHandle,
   finalSubmit, loadPersonas, setPersona,
   prepareJoinIdentity, setLinkChoice,
 } from '../../core/wizards/joinGroupState.js';
@@ -71,9 +71,9 @@ export default function JoinGroupWizardModal({
           <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}
                      testID="join-group-wizard">
             <ScrollView style={styles.scroll}>
-              <Body title="Invite error" intro={state.inviteParseError} />
+              <Body title={t('circle.join.wizard.invite_error')} intro={state.inviteParseError} />
             </ScrollView>
-            <Actions buttons={[{ label: t('common.done'), onPress: onClose, kind: 'primary' }]} />
+            <Actions buttons={[{ label: t('circle.join.wizard.close'), onPress: onClose, kind: 'primary' }]} />
           </Pressable>
         </Pressable>
       </Modal>
@@ -90,12 +90,12 @@ export default function JoinGroupWizardModal({
           onPress={(e) => e.stopPropagation()}
           testID="join-group-wizard"
         >
-          <Steps labels={['Rules', 'Privacy', 'Handle']} current={state.step} />
+          <Steps labels={[t('circle.join.wizard.steps.rules'), t('circle.join.wizard.steps.privacy'), t('circle.join.wizard.steps.handle')]} current={state.step} />
           <ScrollView style={styles.scroll}>
             {state.step === 1 && (
               <Body
-                title={`Join buurt: ${state.invite?.groupId ?? ''}`}
-                intro="These are the rules of the buurt. Read them before joining."
+                title={t('circle.join.wizard.rules.title', { circle: state.invite?.groupId ?? '' })}
+                intro={t('circle.join.wizard.rules.intro')}
               >
                 {/* 5.5b — structured v2 doc when the invite carries it, with the
                     question/answer shape the create-wizard authored.  Older
@@ -121,26 +121,26 @@ export default function JoinGroupWizardModal({
                     <Text style={styles.rulesText}>{state.rulesText}</Text>
                   </View>
                 ) : state.rulesError ? (
-                  <ErrorBanner message={`Could not load rules: ${state.rulesError}`} />
+                  <ErrorBanner message={t('circle.join.wizard.rules.load_error', { error: state.rulesError })} />
                 ) : (
-                  <Text style={styles.loading}>Loading rules…</Text>
+                  <Text style={styles.loading}>{t('circle.join.wizard.rules.loading')}</Text>
                 )}
                 <Checkbox
-                  label="I have read and accept the rules."
+                  label={t('circle.join.wizard.rules.accept')}
                   checked={state.rulesAccepted}
                   onToggle={(v) => setState((s) => ({ ...s, rulesAccepted: v }))}
                 />
               </Body>
             )}
             {state.step === 2 && (
-              <Body title="Privacy" intro={privacyNoticeFor('en')}>
+              <Body title={t('circle.join.wizard.privacy.title')} intro={t('circle.join.wizard.privacy.notice')}>
                 <Checkbox
-                  label="I understand."
+                  label={t('circle.join.wizard.privacy.accept')}
                   checked={state.privacyAccepted}
                   onToggle={(v) => setState((s) => ({ ...s, privacyAccepted: v }))}
                 />
                 <Checkbox
-                  label="Share my address with the buurt admins (mesh consent — recommended for catch-up)."
+                  label={t('circle.join.wizard.privacy.mesh')}
                   checked={state.shareAddress}
                   onToggle={(v) => setState((s) => ({ ...s, shareAddress: v }))}
                 />
@@ -148,17 +148,17 @@ export default function JoinGroupWizardModal({
             )}
             {state.step === 3 && (
               <Body
-                title="Pick a handle"
-                intro="Your handle is how other members address you in this buurt. Lowercase letters, digits, underscore or dash; 3-30 chars."
+                title={t('circle.join.wizard.handle.title')}
+                intro={t('circle.join.wizard.handle.intro')}
               >
                 <Field
-                  label="Handle"
+                  label={t('circle.join.wizard.handle.label')}
                   value={state.handle}
                   onChangeText={(v) => setState((s) => ({ ...s, handle: v }))}
-                  placeholder="e.g. alice"
+                  placeholder={t('circle.join.wizard.handle.placeholder')}
                   monospace
                 />
-                <Text style={styles.subLabel}>Suggestions</Text>
+                <Text style={styles.subLabel}>{t('circle.join.wizard.handle.suggestions')}</Text>
                 <Chips
                   items={suggestions}
                   onPress={(v) => setState((s) => ({ ...s, handle: v }))}
@@ -170,14 +170,14 @@ export default function JoinGroupWizardModal({
                     the circle as; adjust its sharing later in "About me". */}
                 {Array.isArray(state.personas) && state.personas.length ? (
                   <RadioGroup
-                    label="Join as"
+                    label={t('circle.join.wizard.persona.label')}
                     value={state.persona ?? ''}
                     onChange={(id) => setState((s) => setPersona({ ...s }, id))}
                     options={[
-                      { id: '', label: 'Join minimally (share no background)' },
+                      { id: '', label: t('circle.join.wizard.persona.minimal') },
                       ...state.personas.map((p) => ({
                         id: p.id,
-                        label: p.id === 'default' ? `${p.name} (default persona)` : p.name,
+                        label: p.id === 'default' ? t('circle.join.wizard.persona.default_suffix', { name: p.name }) : p.name,
                       })),
                     ]}
                   />
@@ -187,39 +187,39 @@ export default function JoinGroupWizardModal({
                     same person to anyone in both circles). Shown only when you're in others. */}
                 {Array.isArray(state.existingSelves) && state.existingSelves.length ? (
                   <RadioGroup
-                    label="Continue as"
+                    label={t('circle.join.wizard.link.label')}
                     value={state.linkChoice || 'fresh'}
                     onChange={(cid) => setState((s) => setLinkChoice({ ...s }, cid))}
                     options={[
-                      { id: 'fresh', label: 'A fresh identity (unlinkable)' },
+                      { id: 'fresh', label: t('circle.join.wizard.link.fresh') },
                       ...state.existingSelves.map((self) => ({
                         id: self.circleId,
-                        label: `The same person as in ${self.name}`,
+                        label: t('circle.join.wizard.link.same_person', { name: self.name }),
                       })),
                     ]}
                   />
                 ) : null}
                 <ErrorBanner message={state.submitError} />
-                <Submitting visible={state.submitting} label="Joining…" />
+                <Submitting visible={state.submitting} label={t('circle.join.wizard.submitting')} />
               </Body>
             )}
           </ScrollView>
           <Actions buttons={(() => {
             if (state.step === 1) return [
-              { label: t('common.cancel'), onPress: onClose, kind: 'secondary' },
-              { label: t('common.next'),   onPress: () => setStep(2), kind: 'primary',
+              { label: t('circle.join.wizard.cancel'), onPress: onClose, kind: 'secondary' },
+              { label: t('circle.join.wizard.next'),   onPress: () => setStep(2), kind: 'primary',
                 disabled: !state.rulesAccepted || !state.rulesText },
             ];
             if (state.step === 2) return [
-              { label: t('common.back'),   onPress: () => setStep(1), kind: 'secondary' },
-              { label: t('common.cancel'), onPress: onClose, kind: 'secondary' },
-              { label: t('common.next'),   onPress: () => setStep(3), kind: 'primary',
+              { label: t('circle.join.wizard.back'),   onPress: () => setStep(1), kind: 'secondary' },
+              { label: t('circle.join.wizard.cancel'), onPress: onClose, kind: 'secondary' },
+              { label: t('circle.join.wizard.next'),   onPress: () => setStep(3), kind: 'primary',
                 disabled: !state.privacyAccepted },
             ];
             return [
-              { label: t('common.back'),   onPress: () => setStep(2), kind: 'secondary', disabled: state.submitting },
-              { label: t('common.cancel'), onPress: onClose, kind: 'secondary', disabled: state.submitting },
-              { label: 'Join',             onPress: onJoin, kind: 'primary',
+              { label: t('circle.join.wizard.back'),   onPress: () => setStep(2), kind: 'secondary', disabled: state.submitting },
+              { label: t('circle.join.wizard.cancel'), onPress: onClose, kind: 'secondary', disabled: state.submitting },
+              { label: t('circle.join.wizard.join'),   onPress: onJoin, kind: 'primary',
                 disabled: !isValidHandle(state.handle) || state.submitting },
             ];
           })()} />

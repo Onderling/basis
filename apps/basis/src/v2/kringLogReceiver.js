@@ -8,27 +8,38 @@
  * double-appends. Registered on the peer router under the two broadcast subtypes, next to the
  * chat/policy/rules handlers. `onChange` lets the shell re-render an open governance panel.
  */
-import { GOVERNANCE_KIND, governanceEntryId } from './governanceLog.js';
+import { GOVERNANCE_KIND, governanceEntryId, governanceWakeHint } from './governanceLog.js';
 import { REPORT_KIND, reportEntryId } from './reportModel.js';
 
-function makeIngestHandler({ eventLog, subtype, kind, idFor, onChange }) {
+function makeIngestHandler({ eventLog, subtype, kind, idFor, onChange, notify, wakeHint }) {
   return async function onKringLogBroadcast(_fromPeerAddr, payload) {
     if (!payload || payload.subtype !== subtype) return;
     const { circleId, event, ts } = payload;
     if (typeof circleId !== 'string' || !circleId || !event || typeof event !== 'object') return;
+    // Idempotency + not-mine: only nudge if this is genuinely NEW to us (not already logged)
+    // and worth attention (wakeHint) — an already-seen re-delivery re-appends to the same id
+    // and must NOT re-notify.
+    const id = idFor(event);
+    const isNew = eventLog.query({}).every((e) => e.id !== id);
     try {
-      eventLog.appendSilentEntry({ circleId, kind, payload: event, id: idFor(event), ts });
+      eventLog.appendSilentEntry({ circleId, kind, payload: event, id, ts });
       try { onChange?.(circleId); } catch { /* re-render is best-effort */ }
+      if (isNew && typeof notify === 'function' && (typeof wakeHint !== 'function' || wakeHint(event))) {
+        try { notify(circleId, event); } catch { /* in-app nudge is best-effort */ }
+      }
     } catch { /* ingest is best-effort — never throw on a peer message */ }
   };
 }
 
-/** Peer handler for `kring-governance-broadcast` → ingest the vote/proposal event locally. */
-export function makeKringGovernancePeerHandler({ eventLog, onChange } = {}) {
-  return makeIngestHandler({ eventLog, subtype: 'kring-governance-broadcast', kind: GOVERNANCE_KIND, idFor: governanceEntryId, onChange });
+/** Peer handler for `kring-governance-broadcast` → ingest the vote/proposal event locally.
+ *  `notify(circleId, event)` fires an IN-APP nudge for wake-worthy events (a decision opened),
+ *  not every vote (governanceWakeHint). */
+export function makeKringGovernancePeerHandler({ eventLog, onChange, notify } = {}) {
+  return makeIngestHandler({ eventLog, subtype: 'kring-governance-broadcast', kind: GOVERNANCE_KIND, idFor: governanceEntryId, onChange, notify, wakeHint: governanceWakeHint });
 }
 
-/** Peer handler for `kring-report-broadcast` → ingest the report event locally. */
-export function makeKringReportPeerHandler({ eventLog, onChange } = {}) {
-  return makeIngestHandler({ eventLog, subtype: 'kring-report-broadcast', kind: REPORT_KIND, idFor: reportEntryId, onChange });
+/** Peer handler for `kring-report-broadcast` → ingest the report event locally. `notify` fires
+ *  on every report (an admin should see them). */
+export function makeKringReportPeerHandler({ eventLog, onChange, notify } = {}) {
+  return makeIngestHandler({ eventLog, subtype: 'kring-report-broadcast', kind: REPORT_KIND, idFor: reportEntryId, onChange, notify });
 }

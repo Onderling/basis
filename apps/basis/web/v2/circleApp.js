@@ -5523,6 +5523,17 @@ const resealPersonaMediaForCircle = makeResealMediaForCircle({
 // When the governance panel is open, an ingested peer event re-renders it live (set by
 // showGovernance's rerender; nulled on back). null ⇒ panel closed, nothing to refresh.
 let _govRerender = null;
+// In-app nudge when a DECISION OPENS on another device (governanceWakeHint gates this to
+// `propose`, not every vote). Lands in the /logs + Stream notification firehose. The OS
+// wake (backgrounded device) rides the relay fan separately (see REMAINING-WORK).
+function govNotify(circleId, event) {
+  try {
+    eventLog.append({
+      id: `gov-notif-${governanceEntryId(event)}`, ts: Date.now(), app: 'basis', type: 'notification', circleId,
+      payload: { message: t('circle.governance.notify_vote_opened', { action: t(`circle.governance.action.${event.action}`) }) },
+    });
+  } catch { /* best-effort */ }
+}
 function govBroadcast(channel, circleId, event) {
   const op = channel === 'report' ? 'broadcastKringReport' : 'broadcastKringGovernance';
   const msgId = channel === 'report' ? reportEntryId(event) : governanceEntryId(event);
@@ -6252,7 +6263,7 @@ async function boot() {
           'kring-policy-broadcast':  kringPolicyHandler,
           // Wave C tail A — ingest fanned governance/report events into the one log so a
           // vote/report raised on another device shows here; re-render an open panel.
-          'kring-governance-broadcast': makeKringGovernancePeerHandler({ eventLog, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); } }),
+          'kring-governance-broadcast': makeKringGovernancePeerHandler({ eventLog, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); }, notify: govNotify }),
           'kring-report-broadcast':     makeKringReportPeerHandler({ eventLog, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); } }),
           // ε.4 — negotiated catch-up subtypes.
           'catch-up-request':        catchUpProvider.handler,

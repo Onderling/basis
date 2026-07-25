@@ -3714,6 +3714,7 @@
     "review_remove": { "text": "Review & remove", "doc": "Governance L3 — open a removeMember review on a disputed member." },
     "report_member": { "text": "Report member", "doc": "Governance §8 — the button on a member card to report them to the admins." },
     "report_reason_prompt": { "text": "Why are you reporting this member?", "doc": "Governance §8 — prompt for the report reason." },
+    "notify_vote_opened": { "text": "A decision opened: {action} — your vote may be needed", "doc": "Governance — in-app nudge when a decision opens on another device (governanceWakeHint gates to propose)." },
     "reports_title": { "text": "Reports", "doc": "Governance §8 — heading over the member-to-admin report lane (admin-only)." },
     "report_target": {
       "member": { "text": "Member", "doc": "Report target type — a member." },

@@ -3714,6 +3714,7 @@
     "review_remove": { "text": "Bekijk & verwijder", "doc": "Governance L3 — open a removeMember review on a disputed member." },
     "report_member": { "text": "Lid melden", "doc": "Governance §8 — the button on a member card to report them to the admins." },
     "report_reason_prompt": { "text": "Waarom meld je dit lid?", "doc": "Governance §8 — prompt for the report reason." },
+    "notify_vote_opened": { "text": "Er is een besluit geopend: {action} — je stem is misschien nodig", "doc": "Governance — in-app nudge when a decision opens on another device (governanceWakeHint gates to propose)." },
     "reports_title": { "text": "Meldingen", "doc": "Governance §8 — heading over the member-to-admin report lane (admin-only)." },
     "report_target": {
       "member": { "text": "Lid", "doc": "Report target type — a member." },

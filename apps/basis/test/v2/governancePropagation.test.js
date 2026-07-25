@@ -75,6 +75,19 @@ describe('governance propagation (A → B)', () => {
     expect(row.status).toBe(DECISION_STATUS.APPROVED);
   });
 
+  it('in-app nudge: a PROPOSE notifies once; a vote does not; a re-delivery does not re-notify', async () => {
+    const logB = new EventLog({ initial: [] });
+    const notify = vi.fn();
+    const ingest = makeKringGovernancePeerHandler({ eventLog: logB, notify });
+    const propose = { kind: 'governance', event: 'propose', proposalId: 'p1', action: 'removeMember', by: 'admin0', hash: 'h1', author: 'admin0', parentHash: null };
+    const vote = { kind: 'governance', event: 'vote', proposalId: 'p1', voter: 'm0', choice: 'yes', hash: 'h2', author: 'm0', parentHash: null };
+    await ingest(null, { subtype: 'kring-governance-broadcast', circleId: 'c1', event: propose, ts: Date.now() });
+    await ingest(null, { subtype: 'kring-governance-broadcast', circleId: 'c1', event: propose, ts: Date.now() }); // re-delivery
+    await ingest(null, { subtype: 'kring-governance-broadcast', circleId: 'c1', event: vote, ts: Date.now() });
+    expect(notify).toHaveBeenCalledTimes(1);                 // only the first propose
+    expect(notify).toHaveBeenCalledWith('c1', propose);
+  });
+
   it('a report fanned from A lands in B', async () => {
     const { logB, govA } = twoDevices();
     await govA.reports.file({ circleId: 'c1', targetType: 'member', targetRef: 'm2', reason: 'spam' });

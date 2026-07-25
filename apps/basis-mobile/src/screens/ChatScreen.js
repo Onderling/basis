@@ -64,6 +64,7 @@ import { makeKringRecipePeerHandler } from '../../../basis/src/v2/kringRecipeRec
 import { makeKringRulesPeerHandler }  from '../../../basis/src/v2/kringRulesReceiver.js';
 import { makeKringPolicyPeerHandler } from '../../../basis/src/v2/kringPolicyReceiver.js';
 import { makeKringGovernancePeerHandler, makeKringReportPeerHandler } from '../../../basis/src/v2/kringLogReceiver.js';
+import { governanceEntryId } from '../../../basis/src/v2/governanceLog.js';
 import { makeHandleChatMessage }
                                from '../../../basis/src/core/handlers/chatMessage.js';
 import { makeHandleBuurtPeerIntro }
@@ -675,7 +676,18 @@ export default function ChatScreen({
       } : {}),
       // Wave C tail A — ingest fanned governance/report events into the one log so a
       // vote/report raised on another device replicates here (deduped by the stable id).
-      'kring-governance-broadcast': makeKringGovernancePeerHandler({ eventLog: eventLogRef.current }),
+      // notify: an in-app nudge when a decision OPENS (governanceWakeHint gates to propose).
+      'kring-governance-broadcast': makeKringGovernancePeerHandler({
+        eventLog: eventLogRef.current,
+        notify: (circleId, event) => {
+          try {
+            eventLogRef.current?.append({
+              id: `gov-notif-${governanceEntryId(event)}`, ts: Date.now(), app: 'basis', type: 'notification', circleId,
+              payload: { message: t('circle.governance.notify_vote_opened', { action: t(`circle.governance.action.${event.action}`) }) },
+            });
+          } catch { /* best-effort */ }
+        },
+      }),
       'kring-report-broadcast':     makeKringReportPeerHandler({ eventLog: eventLogRef.current }),
     };
     const defaultHandler = makeHandleChatMessage({

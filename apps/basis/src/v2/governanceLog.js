@@ -93,6 +93,16 @@ export function openProposals(fold) {
 }
 
 /**
+ * Is this governance event worth NUDGING a member about? A decision OPENING (`propose`) is —
+ * it may need their vote. Individual votes + resolves are routine and must not spam every
+ * member. The in-app notifier + (future) the relay wake-gate both read this so an open vote
+ * nudges, but a busy vote doesn't. (§5 / the `shouldWakeForEntry` intent, governance-specific.)
+ */
+export function governanceWakeHint(event) {
+  return !!event && event.event === GOV_EVENT.PROPOSE;
+}
+
+/**
  * A STABLE EventLog entry id for a governance event, so the LOCAL append and any
  * fanned/received copy collapse to the same entry (the EventLog dedups by id). A chained
  * event carries its content hash; fall back to its identity fields otherwise.

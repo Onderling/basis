@@ -888,6 +888,7 @@ export const basisManifest = {
     { id: 'rules',    labelKey: 'circle.rules.title',          target: { kind: 'nav', to: 'rules' },     requires: ['houseRules'] },
     { id: 'recipes',  labelKey: 'circle.recipe.editor.book_title', target: { kind: 'nav', to: 'recipes' } },
     { id: 'admin',    labelKey: 'circle.admin.title',          target: { kind: 'nav', to: 'admin' } },
+    { id: 'governance', labelKey: 'circle.governance.title',   target: { kind: 'nav', to: 'governance' } },
     { id: 'share',    labelKey: 'circle.share.screen_title',   target: { kind: 'nav', to: 'share' },     platforms: ['mobile'] },
   ],
 };

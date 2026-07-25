@@ -133,6 +133,8 @@ import { encodeImageFile } from '../../src/v2/attachmentEncoder.js';
 // Solid verifier) is recorded in circleMediaGateway.js.
 import { createCircleMediaComposition, makeDevMediaBucket } from '../../src/v2/circleMediaGateway.js';
 import { buildSelfMediaComposition, makeResealMediaForCircle } from '../../src/v2/profileMediaReseal.js';
+import { bindCircleGovernance } from '../../src/v2/governanceAppWiring.js';
+import { renderGovernancePanel } from './circleGovernancePanel.js';
 import { createMediaEmbed } from '../../src/core/handlers/mediaEmbed.js';
 import { openThumbnail } from '@onderling/blob-gateway';
 // S6.A — manifest-driven inline buttons on bot replies (the resurrected "inline menu").
@@ -4327,6 +4329,8 @@ function showKring(id, circle, policy) {
     // admin-gated server-side; shown to everyone for V0 (a non-admin's action is
     // refused with a notice). Role-gating the menu entry is a follow-up.
     admin:    () => showAdmin(id),
+    // Wave C §5 — the governance surface (open decisions + votes + who-decides settings).
+    governance: () => showGovernance(id),
   };
   // per-kring bottom tabs derived from policy.features.
   const tabs = buildKringTabs(policy, t);
@@ -5489,6 +5493,57 @@ const resealPersonaMediaForCircle = makeResealMediaForCircle({
   getCircleComposition: getCircleMediaComposition,
   getPolicy:            (circleId) => policyStore.get(circleId),
 });
+
+// Wave C §5 — the governance surface: open decisions (vote / admin override) + the
+// admin-only "who decides" decision-class settings. Wired to the shared governance host
+// (bindCircleGovernance): events ride the one EventLog, enactment routes to the real ops.
+async function showGovernance(id) {
+  let myWebid = '';
+  try { const r = await rawCallSkill('stoop', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
+  const gov = bindCircleGovernance({
+    eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
+    myRef: myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`,
+  });
+  rootEl.innerHTML = '';
+  const back = document.createElement('button');
+  back.type = 'button'; back.className = 'cc-governance__back'; back.textContent = `← ${t('circle.back')}`;
+  back.addEventListener('click', () => showDetail(id));
+  rootEl.appendChild(back);
+  const host = document.createElement('div');
+  rootEl.appendChild(host);
+
+  const rerender = async () => {
+    let ctx = { policy: {}, members: [] };
+    try { ctx = await gov.getContext(id); } catch { /* empty view on read failure */ }
+    const me = (ctx.members || []).find((m) => m.ref === myWebid) || null;
+    const isAdmin = me?.role === 'admin';
+    const labelForSubject = (s) => {
+      const m = (ctx.members || []).find((x) => x.ref === s);
+      return (m && (m.handle || m.name)) || (s == null ? '' : String(s));
+    };
+    let view = { open: [], closed: [] };
+    try { view = await gov.view(id, { labelForSubject }); } catch { /* */ }
+    renderGovernancePanel(host, {
+      view, t, policy: ctx.policy, isAdmin,
+      onVote: async (proposalId, choice) => {
+        try { await gov.vote({ circleId: id, proposalId, voter: myWebid, choice }); } catch { /* */ }
+        await rerender();
+      },
+      onOverride: async (proposalId) => {
+        try { await gov.override({ circleId: id, proposalId, actor: { ref: myWebid } }); } catch { /* */ }
+        await rerender();
+      },
+      onSetClass: async (action, cls) => {
+        try {
+          const cur = (await policyStore.get(id)) ?? {};
+          await policyStore.update(id, mergeCirclePolicy(cur, { governance: { [action]: cls } }));
+        } catch { /* */ }
+        await rerender();
+      },
+    });
+  };
+  await rerender();
+}
 
 // §2 self-view — tap your own row → "how others see me": pick a viewer (a member /
 // a stranger / an agent) and feel exactly what you expose. The sees/hides split

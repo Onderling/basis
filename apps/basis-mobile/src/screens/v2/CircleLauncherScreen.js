@@ -1737,6 +1737,9 @@ export default function CircleLauncherScreen({
             callSkill={bundle?.callSkill}
             sendPeerRedeem={bundle?.sendPeerRedeem}
             t={t}
+            circles={circles}
+            circleAddressFor={(cid) => bundle?.agent?.circleAddressFor?.(cid) ?? null}
+            signCircleLink={(cid, gid, addr) => bundle?.agent?.signCircleLink?.(cid, gid, addr) ?? null}
             onClose={() => setJoinArgs(null)}
             onDispatched={(r) => {
               setJoinArgs(null);

@@ -16,6 +16,7 @@ import {
   initialState, decodeInvite, fetchGroupRules,
   handleSuggestions, isValidHandle, privacyNoticeFor,
   finalSubmit, loadPersonas, setPersona,
+  prepareJoinIdentity, setLinkChoice,
 } from '../../core/wizards/joinGroupState.js';
 import { RULES_FIELDS } from '../../v2/circleRules.js';
 
@@ -25,6 +26,7 @@ import {
 
 export default function JoinGroupWizardModal({
   visible, args, callSkill, onClose, onDispatched, t, sendPeerRedeem,
+  circles, circleAddressFor, signCircleLink,
 }) {
   const [state, setState] = useState(() => {
     const s = initialState();
@@ -41,6 +43,8 @@ export default function JoinGroupWizardModal({
       // Property layer — populate the join-with-persona options for the step-3
       // picker. Failure is silent (empty → picker offers only "join minimally").
       next.personas = await loadPersonas({ callSkill });
+      // #4 — load the existing-selves list for the "continue as an existing self" key choice.
+      try { await prepareJoinIdentity({ state: next, callSkill, circles }); } catch { /* safe defaults */ }
       if (active) setState(next);
     })();
     return () => { active = false; };
@@ -52,7 +56,7 @@ export default function JoinGroupWizardModal({
   const onJoin = useCallback(async () => {
     let next = { ...state, submitting: true, submitError: null };
     setState(next);
-    const { result, state: after } = await finalSubmit({ state: next, callSkill, sendPeerRedeem });
+    const { result, state: after } = await finalSubmit({ state: next, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink });
     setState({ ...after });
     if (result && typeof onDispatched === 'function') {
       try { onDispatched({ ok: true, ...result }); } catch {}
@@ -174,6 +178,23 @@ export default function JoinGroupWizardModal({
                       ...state.personas.map((p) => ({
                         id: p.id,
                         label: p.id === 'default' ? `${p.name} (default persona)` : p.name,
+                      })),
+                    ]}
+                  />
+                ) : null}
+                {/* #4 — continue as an existing self? Default FRESH (unlinkable); choosing an
+                    existing self presents that circle's key + a signing proof (provably the
+                    same person to anyone in both circles). Shown only when you're in others. */}
+                {Array.isArray(state.existingSelves) && state.existingSelves.length ? (
+                  <RadioGroup
+                    label="Continue as"
+                    value={state.linkChoice || 'fresh'}
+                    onChange={(cid) => setState((s) => setLinkChoice({ ...s }, cid))}
+                    options={[
+                      { id: 'fresh', label: 'A fresh identity (unlinkable)' },
+                      ...state.existingSelves.map((self) => ({
+                        id: self.circleId,
+                        label: `The same person as in ${self.name}`,
                       })),
                     ]}
                   />

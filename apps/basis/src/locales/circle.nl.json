@@ -3684,6 +3684,33 @@
       }
     }
   },
+  "governance": {
+    "title": { "text": "Besluiten", "doc": "Governance panel heading — the circle's open + settled governed decisions (Phase 4 §5 L4)." },
+    "none": { "text": "Geen openstaande besluiten.", "doc": "Governance panel — empty state when nothing is up for decision." },
+    "history": { "text": "Afgehandeld", "doc": "Governance panel — heading over the closed (approved/rejected) proposals." },
+    "action": {
+      "removeMember": { "text": "Lid verwijderen", "doc": "Governed action — remove a member from the circle." },
+      "rotateKey": { "text": "Sleutel roteren", "doc": "Governed action — rotate the circle's group key." },
+      "changeRule": { "text": "Regel wijzigen", "doc": "Governed action — change a circle rule (house rules)." },
+      "changePolicy": { "text": "Instelling wijzigen", "doc": "Governed action — change a circle policy setting." }
+    },
+    "class": {
+      "any_admin": { "text": "een beheerder beslist", "doc": "Decision-class — any admin may resolve this unilaterally." },
+      "admin_quorum": { "text": "meerderheid beheerders", "doc": "Decision-class — a majority of admins must agree." },
+      "member_vote": { "text": "stemming leden", "doc": "Decision-class — a majority of the whole circle must agree." }
+    },
+    "status": {
+      "approved": { "text": "Aangenomen", "doc": "Governance status — the decision passed." },
+      "pending": { "text": "Open", "doc": "Governance status — still awaiting the threshold." },
+      "rejected": { "text": "Afgewezen", "doc": "Governance status — the decision did not pass." }
+    },
+    "vote_yes": { "text": "Ja", "doc": "Governance vote button — vote in favour." },
+    "vote_no": { "text": "Nee", "doc": "Governance vote button — vote against." },
+    "override": { "text": "Nu beslissen", "doc": "Governance — an admin forces a stuck member-vote once past its deadline (escape-hatch b)." },
+    "tally": { "text": "{yes} van {need} nodig · {of} leden", "doc": "Governance — the running vote tally." },
+    "deadline": { "text": "heeft een deadline", "doc": "Governance — this vote has a closing deadline." },
+    "awaiting_enactment": { "text": "wacht op een beheerder", "doc": "Governance — approved, waiting for an admin/caretaker device to enact it (Decision A)." }
+  },
   "mij": {
     "title": {
       "text": "Mij — persona's",

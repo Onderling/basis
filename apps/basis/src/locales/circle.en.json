@@ -3684,6 +3684,33 @@
       }
     }
   },
+  "governance": {
+    "title": { "text": "Decisions", "doc": "Governance panel heading — the circle's open + settled governed decisions (Phase 4 §5 L4)." },
+    "none": { "text": "No open decisions.", "doc": "Governance panel — empty state when nothing is up for decision." },
+    "history": { "text": "Settled", "doc": "Governance panel — heading over the closed (approved/rejected) proposals." },
+    "action": {
+      "removeMember": { "text": "Remove member", "doc": "Governed action — remove a member from the circle." },
+      "rotateKey": { "text": "Rotate key", "doc": "Governed action — rotate the circle's group key." },
+      "changeRule": { "text": "Change rule", "doc": "Governed action — change a circle rule (house rules)." },
+      "changePolicy": { "text": "Change setting", "doc": "Governed action — change a circle policy setting." }
+    },
+    "class": {
+      "any_admin": { "text": "an admin decides", "doc": "Decision-class — any admin may resolve this unilaterally." },
+      "admin_quorum": { "text": "admin majority", "doc": "Decision-class — a majority of admins must agree." },
+      "member_vote": { "text": "member vote", "doc": "Decision-class — a majority of the whole circle must agree." }
+    },
+    "status": {
+      "approved": { "text": "Approved", "doc": "Governance status — the decision passed." },
+      "pending": { "text": "Open", "doc": "Governance status — still awaiting the threshold." },
+      "rejected": { "text": "Rejected", "doc": "Governance status — the decision did not pass." }
+    },
+    "vote_yes": { "text": "Yes", "doc": "Governance vote button — vote in favour." },
+    "vote_no": { "text": "No", "doc": "Governance vote button — vote against." },
+    "override": { "text": "Decide now", "doc": "Governance — an admin forces a stuck member-vote once past its deadline (escape-hatch b)." },
+    "tally": { "text": "{yes} of {need} needed · {of} members", "doc": "Governance — the running vote tally." },
+    "deadline": { "text": "has a deadline", "doc": "Governance — this vote has a closing deadline." },
+    "awaiting_enactment": { "text": "awaiting an admin", "doc": "Governance — approved, waiting for an admin/caretaker device to enact it (Decision A)." }
+  },
   "mij": {
     "title": {
       "text": "Me — personas",

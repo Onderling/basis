@@ -394,17 +394,32 @@ export default function CircleLauncherScreen({
   // the SAME handlers the /set-relay + /transport-mode composer built-ins use (invariants #1/#2).
   const onCircleControl = useCallback(async (opId, args) => {
     if (opId === 'set-relay') {
-      // asyncStorageRelayIo exposes { load, save } (the raw IO) — NOT { get, set } (that's the
-      // createRelayPrefStore wrapper). Calling `.set` here threw `TypeError: .set is not a function`,
-      // which the best-effort catch swallowed, so the relay URL was never persisted and the phone
-      // never dialled the relay. Use `.save` (mirrors the `.load` on line 386). load-side normalises.
-      try { await asyncStorageRelayIo(AsyncStorage).save(args?.clear ? '' : String(args?.url ?? '')); } catch { /* best-effort */ }
-      try { await bundle?.reconnectPeer?.(); } catch { /* best-effort */ }
-    } else if (opId === 'transport-mode' && ['nkn', 'relay', 'both'].includes(String(args?.mode))) {
+      // Mirror web's applyRelayUrl (circleApp.js): persist → read the STORED value BACK (so the
+      // confirmation reflects what was saved, never the raw input) → live-reconnect → return
+      // {ok, effective, error} so the caller reports the truth. Failures are SURFACED, not
+      // swallowed — a swallowed `.set` TypeError is exactly what hid the never-persisted bug
+      // (commit 7de8b661). asyncStorageRelayIo is the raw IO { load, save } (NOT { get, set }).
+      const io = asyncStorageRelayIo(AsyncStorage);
+      let saveError = null;
+      try { await io.save(args?.clear ? '' : String(args?.url ?? '')); }
+      catch (err) { saveError = err?.message ?? String(err); }
+      let effective = '';
+      try { effective = resolveRelayUrl(await io.load(), process.env.EXPO_PUBLIC_CIRCLE_RELAY_URL) || ''; }
+      catch { /* read-back best-effort */ }
+      let reconnect = { ok: true };
+      if (!saveError) {
+        try { reconnect = (await bundle?.reconnectPeer?.()) ?? { ok: true }; }
+        catch (err) { reconnect = { ok: false, error: err?.message ?? String(err) }; }
+      }
+      loadCircleTransport();
+      return { ok: !saveError && reconnect?.ok !== false, effective, error: saveError ?? reconnect?.error ?? null };
+    }
+    if (opId === 'transport-mode' && ['nkn', 'relay', 'both'].includes(String(args?.mode))) {
       try { await AsyncStorage.setItem('cc-transport-mode', args.mode); } catch { /* best-effort */ }
       try { bundle?.agent?.setTransportMode?.(args.mode); } catch { /* best-effort */ }
     }
     loadCircleTransport();
+    return null;
   }, [bundle, loadCircleTransport]);
   // the contact (bot/peer) whose DM thread is open under the Contacten tab.
   const [contactThread, setContactThread] = useState(null);
@@ -3041,10 +3056,12 @@ function CircleDetail({
       setComposerText('');
       if (builtin.opId === 'settings') { onSettings?.(); return; }
       if (builtin.opId === 'set-relay') {
-        await onCircleControl('set-relay', builtin.args);
-        appendKringMessage({ actor: 'bot', text: builtin.args?.clear
-          ? t('circle.settings.relay_applied', { url: t('circle.settings.transports_none') })
-          : t('circle.settings.relay_applied', { url: builtin.args?.url || '—' }) });
+        // web≡mobile: report the STORED/effective relay + whether the reconnect actually
+        // succeeded — not a blind echo of the typed URL (circleApp.js set-relay builtin).
+        const r = await onCircleControl('set-relay', builtin.args);
+        appendKringMessage({ actor: 'bot', text: r?.ok
+          ? t('circle.settings.relay_applied', { url: r.effective || t('circle.settings.transports_none') })
+          : t('circle.settings.relay_failed', { error: r?.error ?? 'unknown' }) });
         return;
       }
       if (builtin.opId === 'transport-mode') {

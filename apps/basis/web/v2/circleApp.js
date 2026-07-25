@@ -4632,7 +4632,10 @@ function showKring(id, circle, policy) {
       } else if (action === 'cancel') {
         await stoopCall('stoop', 'cancelRequest', { requestId: post.id });
       } else if (action === 'report') {
-        await stoopCall('stoop', 'reportPost', { itemId: post.id });
+        // §8 unification — a post report is now a governance report event (propagates +
+        // shows in the governance Reports section + act→remove), not the older reportPost item.
+        const reason = (globalThis.prompt?.(t('circle.governance.report_reason_prompt')) ?? '') || '';
+        await fileCircleReport(id, 'post', post.id, (post.text || '').slice(0, 48), reason);
       } else if (action === 'markReturned') {
         await stoopCall('stoop', 'markReturned', { requestId: post.id });
       } else if (action === 'mute') {
@@ -5471,12 +5474,7 @@ async function showMemberPersona(id, member) {
       const ref = m?.webid || m?.id;
       if (!ref) return;
       const reason = (typeof window !== 'undefined' && window.prompt) ? (window.prompt(t('circle.governance.report_reason_prompt')) ?? '') : '';
-      const gov = bindCircleGovernance({
-        eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
-        myRef: myWebid, genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
-      });
-      gov.reports.file({ circleId: id, targetType: 'member', targetRef: ref, targetLabel: m?.handle || m?.realName || ref, reason })
-        .then(() => showDetail(id)).catch(() => {});
+      fileCircleReport(id, 'member', ref, m?.handle || m?.realName || ref, reason).then(() => showDetail(id)).catch(() => {});
     },
   });
 }
@@ -5540,6 +5538,28 @@ function govBroadcast(channel, circleId, event) {
   rawCallSkill('stoop', op, { groupId: circleId, event, msgId, ts: Date.now() }).catch(() => {});
 }
 
+// Remove a reported post/message when an admin ACTS on it (the §8 report host's `act` calls
+// this for non-member targets). Best-effort; a missing op just leaves the item (the report
+// still closes actioned). Members route through the governance removeMember class instead.
+function removeReportedItem(circleId, targetType, targetRef) {
+  return rawCallSkill('stoop', 'deleteKringItem', { groupId: circleId, itemId: targetRef })
+    .catch(() => rawCallSkill('stoop', 'cancelRequest', { requestId: targetRef }).catch(() => ({ ok: false })));
+}
+
+// The ONE write path for reporting anything (member · post · message) — folds the older
+// `reportPost` into the §8 governance report host so every report lands as a propagated
+// report event and shows in the governance panel's Reports section (Frits: unify on §8).
+async function fileCircleReport(circleId, targetType, targetRef, targetLabel = null, reason = '') {
+  let myWebid = '';
+  try { const r = await rawCallSkill('stoop', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
+  const gov = bindCircleGovernance({
+    eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
+    myRef: myWebid, genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
+  });
+  try { return await gov.reports.file({ circleId, targetType, targetRef, targetLabel, reason }); }
+  catch { return { ok: false }; }
+}
+
 // Wave C §5 — the governance surface: open decisions (vote / admin override) + the
 // admin-only "who decides" decision-class settings. Wired to the shared governance host
 // (bindCircleGovernance): events ride the one EventLog, enactment routes to the real ops.
@@ -5549,6 +5569,7 @@ async function showGovernance(id) {
   const gov = bindCircleGovernance({
     eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
     myRef: myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
+    removeReported: removeReportedItem,
   });
   rootEl.innerHTML = '';
   const back = document.createElement('button');

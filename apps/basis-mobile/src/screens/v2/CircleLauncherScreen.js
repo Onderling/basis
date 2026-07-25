@@ -1618,6 +1618,7 @@ export default function CircleLauncherScreen({
         onGovernance={() => setView('governance')}
         onReportMember={(m) => { const ref = m?.webid || m?.id; if (ref) fileCircleReportMobile('member', ref, m?.handle || m?.realName || ref); }}
         onReportPost={(post) => { if (post?.id) fileCircleReportMobile('post', post.id, (post.text || '').slice(0, 48)); }}
+        onReportMessage={(row) => { if (row?.id) fileCircleReportMobile('message', row.id, (row?.event?.payload?.text || '').slice(0, 48)); }}
         onMine={() => setView('override')}
         onViewAs={async () => {
           const p = await policyStore.get(selected.id);
@@ -1990,7 +1991,7 @@ function CircleDetail({
   recipeStore = null, onStoopEvent, sendPersonaUpdate, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null,
   // Task #13 — onboarding first-run flags (shared store) + the create-flow handoff.
   onboardingFlags = null, onCreateCircle = null,
-  onBack, onSettings, onMine, onViewAs, onAdvisor, onSkills, onFiles, onRules, onRecipes, onAdmin, onLists, onShare, onInvite, onGovernance, onReportMember, onReportPost,
+  onBack, onSettings, onMine, onViewAs, onAdvisor, onSkills, onFiles, onRules, onRecipes, onAdmin, onLists, onShare, onInvite, onGovernance, onReportMember, onReportPost, onReportMessage,
 }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -3389,6 +3390,8 @@ function CircleDetail({
             // Entrust (mandate) — owner-visibility signals + the row-action dispatcher (opens the picker).
             mandateViewer: { ...mandateViewer, localActor: 'me' },
             onRowAction,
+            // §8 — report another member's message (a governance `message` report).
+            onReportMessage,
           }, styles)
         )}
       </ScrollView>
@@ -3767,6 +3770,12 @@ function renderBubble(row, t, deliveryOpts = null, styles) {
           ))}
         </View>
       ) : null}
+      {/* §8 — report another member's human message (a governance `message` report). */}
+      {typeof deliveryOpts?.onReportMessage === 'function' && !isMine && !isBotRow && payload.kind === 'chat-message' ? (
+        <Pressable onPress={() => deliveryOpts.onReportMessage(row)} hitSlop={6} testID={`kring-report-${row.id}`}>
+          <Text style={styles.bubbleReport}>{t('circle.governance.report_message')}</Text>
+        </Pressable>
+      ) : null}
       {msgButtons.length > 0 ? (
         <View style={styles.rowActions}>
           {msgButtons.map((b) => {
@@ -4023,6 +4032,7 @@ const makeStyles = (theme) => StyleSheet.create({
   bubbleText:       { fontSize: 14, color: theme.color.ink },
   bubbleKind:       { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, color: theme.color.accent },
   bubbleMore:       { marginTop: 4, fontSize: 12, fontWeight: '700', color: theme.color.accent },
+  bubbleReport:     { marginTop: 4, fontSize: 11, color: theme.color.inkSoft },
   // embeds[] — cross-object "See also" chips on a kring message.
   bubbleEmbeds:     { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
   bubbleEmbed:      { borderWidth: 1, borderColor: theme.color.line, backgroundColor: theme.color.card, borderRadius: 999, paddingVertical: 2, paddingHorizontal: 9 },

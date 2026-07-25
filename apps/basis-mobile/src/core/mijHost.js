@@ -48,3 +48,61 @@ export async function createPersona({ callSkill, name }) {
 export async function toggleDisclosure({ callSkill, personaId, defaultId, contextId, key, enabled }) {
   try { await callSkill('agents', 'setProfileDisclosure', { id: personaId ?? (defaultId ?? 'default'), contextId, key, enabled }); } catch { /* */ }
 }
+
+// ── Profile picture (media persona attribute) — the SET/read/preview wiring ──
+// The picker/encode/seal seam is INJECTED by the launcher (the shell owns platform
+// UI + the self-sealed media gateway); the op SEQUENCE lives here (web ≡ mobile: the
+// web shell runs the identical createMediaEmbed → setProfileProperty). The picture is
+// sealed to the OWNER'S OWN key (the self composition) — never a circle — so it is the
+// GENERAL persona's truth layer; the per-circle re-seal happens later on disclosure
+// (shareDisclosureToCircle's resealMediaForCircle — profileMediaReseal.js).
+import { createMediaEmbed } from '../../../basis/src/core/handlers/mediaEmbed.js';
+import { openThumbnail } from '@onderling/blob-gateway';
+import { bytesToStdB64 } from './mediaCardModel.js';
+
+/**
+ * Open the picker, seal the chosen image to the OWNER'S media gateway, and record it as
+ * the general persona's `profilePicture`. Returns `{ok, source}` — `{ok:false}` on a
+ * cancelled pick, a missing gateway (a sealed-only p0/p1 self comp), or a failed op.
+ * @param {{callSkill:Function, defaultId?:string, mediaGateway:object,
+ *          openFilePicker:Function, encodeImage?:Function, localActor?:string, t:Function}} a
+ */
+export async function setProfilePicture({ callSkill, defaultId, mediaGateway, openFilePicker, encodeImage, localActor, t }) {
+  if (!mediaGateway || typeof openFilePicker !== 'function') return { ok: false };
+  let embed;
+  try {
+    embed = await createMediaEmbed({}, { openFilePicker, mediaGateway, encodeImage, localActor, t });
+  } catch { return { ok: false }; }
+  const source = (embed && embed.ok !== false) ? (embed.snapshot?.source ?? null) : null;
+  if (!source) return { ok: false };                       // cancelled pick or encode/seal failure
+  try {
+    await callSkill('agents', 'setProfileProperty', { id: defaultId ?? 'default', key: 'profilePicture', value: source });
+  } catch { return { ok: false }; }
+  return { ok: true, source };
+}
+
+/** Read the general persona's current `profilePicture` ref (null when unset). */
+export async function loadCurrentPicture({ callSkill, defaultId }) {
+  try {
+    const props = (await callSkill('agents', 'getProfileProperties', { id: defaultId ?? 'default' }))?.properties ?? {};
+    const entry = props.profilePicture;
+    return (entry && typeof entry === 'object' && entry.value !== undefined) ? entry.value : (entry ?? null);
+  } catch { return null; }
+}
+
+/**
+ * Sealed picture ref → a `data:` URI for RN `<Image source={{uri}}>` (RN has no
+ * object-URLs). Opens the inline sealed thumbnail with the owner's self-opener; null on
+ * a wrong key / missing thumb / absent opener (the preview then shows its placeholder).
+ * @param {object} ref                  the sealed media manifest line ({type,ref,enc})
+ * @param {(sealedText:string)=>string} opener
+ */
+export function resolveSealedThumbUri(ref, opener) {
+  if (!ref || typeof opener !== 'function') return null;
+  try {
+    const bytes = openThumbnail({ ref, opener });
+    if (!bytes || bytes.length === 0) return null;
+    const mime = (ref.enc && ref.enc.mime) || 'image/jpeg';
+    return `data:${mime};base64,${bytesToStdB64(bytes)}`;
+  } catch { return null; }
+}

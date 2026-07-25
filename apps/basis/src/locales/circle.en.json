@@ -3693,6 +3693,10 @@
       "text": "Profile picture",
       "doc": "mij#personas — the profile-picture persona attribute; pick an image (sealed, re-sealed per circle on disclosure)."
     },
+    "picture_add": {
+      "text": "Add a photo",
+      "doc": "mij#personas — the empty profile-picture placeholder prompt (tap to pick an image)."
+    },
     "unavailable": {
       "text": "Your personas aren't available.",
       "doc": "mij#personas — the profiles couldn't be loaded (registry unreachable)."

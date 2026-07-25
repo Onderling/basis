@@ -138,6 +138,7 @@ import { scopeStoopCallSkill } from '../../../../basis/src/v2/circleStoopScope.j
 // image seals per-circle instead of being refused. Do NOT reimplement sealing in the shell.
 import { createCircleMediaComposition, makeDevMediaBucket } from '../../../../basis/src/v2/circleMediaGateway.js';
 import { buildSelfMediaComposition, makeResealMediaForCircle } from '../../../../basis/src/v2/profileMediaReseal.js';
+import { openMediaFilePicker, encodePickedImage } from '../../core/mediaPicker.js';
 import { getCircleSealStrategy, seedCircleRosterFor, getCirclePodFetch, getCircleActorWebId } from '../../core/circlePods.js';
 // M6 — the feedback bot rides the SHARED mount (web uses the same one). tryHandle routes /feedback +
 // /feedback-stop + free text while active, before the circle bot; bubbles render via appendKringMessage.
@@ -551,14 +552,14 @@ export default function CircleLauncherScreen({
   // M3 — AsyncStorage-backed circle stores (keys match web's localStorage
   // convention).  Created once; the sub-screens load/save through them.
   const policyStore       = useMemo(() => makeCirclePolicyStoreRN(AsyncStorage), []);
-  // Profile-picture disclosure re-sealer (SHARED seal path — web ≡ mobile): turns the
-  // owner-sealed source picture into a per-circle copy on share (Frits: option (a)).
-  // Injected into shareDisclosureToCircle via CircleMijScreen; reuses this shell's dev
-  // media bucket + the module's per-circle composition cache. Rebuilt if identity changes.
-  const resealMediaForCircle = useMemo(() => {
+  // The OWNER-sealed source media composition (SHARED seal path — web ≡ mobile): the
+  // picture is sealed to my OWN key, so it is circle-independent (the general/truth
+  // layer). Memoised once per identity; both the picture SET/preview and the disclosure
+  // re-sealer draw from it. Reuses this shell's dev media bucket.
+  const getSelfMediaComposition = useMemo(() => {
     const identity = bundle?.coreAgent?.identity ?? null;
     let selfCompPromise;
-    const getSelfComposition = () => {
+    return () => {
       if (!selfCompPromise) {
         selfCompPromise = buildSelfMediaComposition({
           identity, bucket: circleMediaBucket, localActor: getCircleActorWebId() || 'me',
@@ -566,12 +567,24 @@ export default function CircleLauncherScreen({
       }
       return selfCompPromise;
     };
-    return makeResealMediaForCircle({
-      getSelfComposition,
-      getCircleComposition: getCircleMediaComposition,
-      getPolicy: (circleId) => policyStore.get(circleId),
-    });
-  }, [bundle?.coreAgent?.identity, policyStore]);
+  }, [bundle?.coreAgent?.identity]);
+  // Profile-picture disclosure re-sealer: turns the owner-sealed source picture into a
+  // per-circle copy on share (Frits: option (a)). Injected into shareDisclosureToCircle.
+  const resealMediaForCircle = useMemo(() => makeResealMediaForCircle({
+    getSelfComposition:   getSelfMediaComposition,
+    getCircleComposition: getCircleMediaComposition,
+    getPolicy:            (circleId) => policyStore.get(circleId),
+  }), [getSelfMediaComposition, policyStore]);
+  // The picture SET/preview seam handed to CircleMijScreen (thin RN row → host helpers).
+  // `pick()` opens the picker + seals to the self gateway; `resolve()` renders the sealed
+  // thumb as a data: URI. Both no-op safely when the self composition is unavailable.
+  const profilePicture = useMemo(() => ({
+    getGateway: async () => (await getSelfMediaComposition())?.mediaGateway ?? null,
+    getOpener:  async () => (await getSelfMediaComposition())?.mediaGateway?.opener ?? null,
+    openFilePicker: openMediaFilePicker,
+    encodeImage:    encodePickedImage,
+    localActor: getCircleActorWebId() || 'me',
+  }), [getSelfMediaComposition]);
   const overrideStore     = useMemo(() => makeMemberOverrideStoreRN(AsyncStorage), []);
   // Objective D — mirror the pref to the user's pod so other agents read it.
   // getPodWriter is a thunk: null while unsigned (→ local-only), a live
@@ -1558,6 +1571,7 @@ export default function CircleLauncherScreen({
         sendPersonaUpdate={bundle?.sendPersonaUpdate}
         disclosureShareMemo={bundle?.disclosureShareMemo}
         resealMediaForCircle={resealMediaForCircle}
+        profilePicture={profilePicture}
         /* Task #13 — first-run flags (shared with the launcher's provisioner) + the onboarding
            "Ja, help me" handoff → the mobile create flow (close the help circle, open "+ new circle"). */
         onboardingFlags={onboardingFlags}
@@ -1932,7 +1946,7 @@ function LauncherTile({ circle: c, preview, pending, isPinned = false, isMuted =
 function CircleDetail({
   circle, items, callSkill, rawCallSkill, catalog: rawCatalog, policy, myListTasks = [],
   eventLog, circles = [],
-  recipeStore = null, onStoopEvent, sendPersonaUpdate, disclosureShareMemo = null, resealMediaForCircle = null,
+  recipeStore = null, onStoopEvent, sendPersonaUpdate, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null,
   // Task #13 — onboarding first-run flags (shared store) + the create-flow handoff.
   onboardingFlags = null, onCreateCircle = null,
   onBack, onSettings, onMine, onViewAs, onAdvisor, onSkills, onFiles, onRules, onRecipes, onAdmin, onLists, onShare, onInvite,
@@ -3423,7 +3437,7 @@ function CircleDetail({
               </Pressable>
             </View>
             {aboutMePersona ? (
-              <CircleMijScreen callSkill={rawCallSkill} sendPersonaUpdate={sendPersonaUpdate} lastShared={disclosureShareMemo} resealMediaForCircle={resealMediaForCircle} personaId={aboutMePersona} circles={circles} />
+              <CircleMijScreen callSkill={rawCallSkill} sendPersonaUpdate={sendPersonaUpdate} lastShared={disclosureShareMemo} resealMediaForCircle={resealMediaForCircle} profilePicture={profilePicture} personaId={aboutMePersona} circles={circles} />
             ) : null}
           </View>
         </View>

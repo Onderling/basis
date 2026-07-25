@@ -21,12 +21,13 @@
  * This file renders + re-loads after each edit (persisted state, not the tap).
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, TextInput, Image } from 'react-native';
 import { t, lang } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
 import {
   loadMijModel, setGeneralProperty, addGeneralOffering, createPersona,
   toggleDisclosure, shareDisclosureToCircle,
+  setProfilePicture, loadCurrentPicture, resolveSealedThumbUri,
 } from '../../core/mijHost.js';
 
 /* Mobile t() falls back to the FULL key on a miss (no defaultValue param like
@@ -59,10 +60,11 @@ function Section({ eyebrowKey, taglineKey, children }) {
   );
 }
 
-export default function CircleMijScreen({ callSkill, sendPersonaUpdate, lastShared = null, resealMediaForCircle = null, personaId, circles = [] }) {
+export default function CircleMijScreen({ callSkill, sendPersonaUpdate, lastShared = null, resealMediaForCircle = null, profilePicture = null, personaId, circles = [] }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [model, setModel] = useState(null);
+  const [picUri, setPicUri] = useState(null);             // current profile picture as a data: URI (or null)
   const [openEditor, setOpenEditor] = useState(null);     // property key whose inline editor is open
   const [propDrafts, setPropDrafts] = useState({});       // free-text property edits before save
   const [offeringForm, setOfferingForm] = useState(null);       // {text, tags} | null — the dashed add-offering form
@@ -71,10 +73,33 @@ export default function CircleMijScreen({ callSkill, sendPersonaUpdate, lastShar
   const [shareState, setShareState] = useState({});       // `${circleId}:${personaId}` → 'sharing' | 'ok' | reason
 
   const load = useCallback(async () => {
-    setModel(await loadMijModel({ callSkill, personaId, circles }));
-  }, [callSkill, personaId, circles]);
+    const m = await loadMijModel({ callSkill, personaId, circles });
+    setModel(m);
+    // Resolve the general persona's current picture to a preview URI (owner self-opener).
+    if (profilePicture) {
+      const [ref, opener] = await Promise.all([
+        loadCurrentPicture({ callSkill, defaultId: m?.defaultId }),
+        profilePicture.getOpener?.() ?? null,
+      ]);
+      setPicUri(ref && opener ? resolveSealedThumbUri(ref, opener) : null);
+    }
+  }, [callSkill, personaId, circles, profilePicture]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Section-1 profile picture — open the picker, seal to the OWNER's gateway, record it
+  // on the general persona (host helper), then re-read so the preview reflects state.
+  const onSetPicture = useCallback(async () => {
+    if (!profilePicture) return;
+    const mediaGateway = await profilePicture.getGateway?.();
+    if (!mediaGateway) return;                             // sealed-only / no identity → row stays inert
+    await setProfilePicture({
+      callSkill, defaultId: model?.defaultId, mediaGateway,
+      openFilePicker: profilePicture.openFilePicker, encodeImage: profilePicture.encodeImage,
+      localActor: profilePicture.localActor, t,
+    });
+    await load();
+  }, [callSkill, model?.defaultId, profilePicture, load]);
 
   // ── the op callbacks — the same sequence the web host fires, then re-read ──
   const onSetProperty = useCallback(async (key, value) => {
@@ -133,6 +158,22 @@ export default function CircleMijScreen({ callSkill, sendPersonaUpdate, lastShar
       {/* ── 1 · MIJN ALGEMENE PERSONA — de waarheidslaag ─────────────────── */}
       <Section eyebrowKey="circle.mij.general_eyebrow" taglineKey="circle.mij.general_tagline">
         <View style={styles.panel}>
+          {/* profile picture (media attribute) — sealed to the owner's own key; the
+              per-circle re-seal happens later on disclosure (option (a)). */}
+          {profilePicture ? (
+            <View style={styles.picRow} testID="mij-profile-picture">
+              <Text style={styles.key}>{t('circle.mij.profilePicture')}</Text>
+              <Pressable style={styles.picBtn} accessibilityRole="button" onPress={onSetPicture}>
+                {picUri ? (
+                  <Image source={{ uri: picUri }} style={styles.picPreview} accessibilityLabel={t('circle.mij.profilePicture')} />
+                ) : (
+                  <View style={[styles.picPreview, styles.picPlaceholder]}>
+                    <Text style={styles.picPlaceholderText}>{t('circle.mij.picture_add')}</Text>
+                  </View>
+                )}
+              </Pressable>
+            </View>
+          ) : null}
           {(model.general?.properties || []).map((p) => {
             // A property may carry an `l10n` prefix (e.g. availability) so its
             // value + bucket options localise; charter attributes show raw values.
@@ -436,6 +477,12 @@ const makeStyles = (theme) => {
   /* section-1 panel */
   panel: { backgroundColor: c.card, borderWidth: 2, borderColor: c.ink, paddingVertical: theme.space.md, paddingHorizontal: theme.space.md + 2, gap: theme.space.sm },
   propRow: { paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: c.line, gap: 6 },
+  /* section-1 profile picture row */
+  picRow: { flexDirection: 'row', alignItems: 'center', gap: theme.space.sm + 2, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: c.line },
+  picBtn: { marginLeft: 'auto' },
+  picPreview: { width: 56, height: 56, borderRadius: 4, borderWidth: 1, borderColor: c.ink, backgroundColor: c.paper },
+  picPlaceholder: { alignItems: 'center', justifyContent: 'center', borderStyle: 'dashed', borderColor: c.inkSoft },
+  picPlaceholderText: { fontSize: 10, color: c.inkSoft, textAlign: 'center' },
   propLine: { flexDirection: 'row', alignItems: 'baseline', gap: theme.space.sm + 2, flexWrap: 'wrap' },
   key: { fontFamily: theme.font.mono, fontSize: 10.5, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, color: c.ink },
   valueBtn: { flexShrink: 1 },

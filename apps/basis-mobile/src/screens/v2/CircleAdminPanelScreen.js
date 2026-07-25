@@ -2,9 +2,13 @@
  * basis-mobile v2 — circle admin panel (RN, S3 parity).
  *
  * RN mirror of web's circleAdminPanel: member roster (+ remove), announcements,
- * moderation reports (read-only), and muted peers (+ unmute). Self-contained:
- * loads listGroupMembers/listReports/listMutedPeers + dispatches the admin-gated
- * stoop ops via the injected `callSkill` (a refusal surfaces a notice).
+ * and muted peers (+ unmute). Self-contained: loads listGroupMembers/listMutedPeers
+ * + dispatches the admin-gated stoop ops via the injected `callSkill` (a refusal
+ * surfaces a notice).
+ *
+ * Reports are NOT here: moderation reports live on the ONE §8 surface — the
+ * governance "Decisions" panel's Reports section (file · dismiss · act→remove),
+ * which supersedes the old read-only `listReports` view this screen used to carry.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, StyleSheet } from 'react-native';
@@ -15,21 +19,18 @@ export default function CircleAdminPanelScreen({ callSkill, groupId, onBack }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [members, setMembers] = useState([]);
-  const [reports, setReports] = useState([]);
   const [muted, setMuted] = useState([]);
   const [announce, setAnnounce] = useState('');
   const [notice, setNotice] = useState(null);
 
   const load = useCallback(async () => {
     if (typeof callSkill !== 'function') return;
-    const [mem, rep, mut] = await Promise.all([
+    const [mem, mut] = await Promise.all([
       callSkill('stoop', 'listGroupMembers', { groupId }).catch(() => null),
-      callSkill('stoop', 'listReports', { groupId }).catch(() => null),
       callSkill('stoop', 'listMutedPeers', {}).catch(() => null),
     ]);
     setMembers(Array.isArray(mem?.members) ? mem.members : []);
-    setReports(Array.isArray(rep?.reports) ? rep.reports : []);
-    setMuted(Array.isArray(mut?.peers) ? mut.peers : []);
+    setMuted(Array.isArray(mut?.peers) ? mut.peers : []);   // reports moved to §8 governance Reports
   }, [callSkill, groupId]);
 
   useEffect(() => { load(); }, [load]);
@@ -74,11 +75,7 @@ export default function CircleAdminPanelScreen({ callSkill, groupId, onBack }) {
         <Pressable style={styles.primary} onPress={postAnnounce} testID="admin-announce-post"><Text style={styles.primaryText}>{t('circle.admin.announce_post')}</Text></Pressable>
       </Section>
 
-      <Section title={t('circle.admin.reports')}>
-        {reports.length === 0 ? <Text style={styles.muted}>{t('circle.admin.no_reports')}</Text> : reports.map((r) => (
-          <Text key={r.id} style={styles.report}>{t('circle.admin.report_row', { target: r.source?.reportTarget ?? r.itemId ?? '', reason: r.source?.reason || t('circle.admin.no_reason') })}</Text>
-        ))}
-      </Section>
+      {/* reports moved to the §8 governance "Decisions" Reports section — see the header note */}
 
       <Section title={t('circle.admin.muted')}>
         {muted.length === 0 ? <Text style={styles.muted}>{t('circle.admin.no_muted')}</Text> : muted.map((key) => (
@@ -115,7 +112,6 @@ const makeStyles = (theme) => StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   name: { flex: 1, fontSize: 14, color: theme.color.ink },
   role: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', color: theme.color.accent },
-  report: { fontSize: 13, color: theme.color.ink },
   muted: { fontSize: 13, color: theme.color.inkSoft },
   area: { fontSize: 14, paddingVertical: 9, paddingHorizontal: 12, borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.md, color: theme.color.ink, backgroundColor: theme.color.white, minHeight: 56, textAlignVertical: 'top' },
   primary: { paddingVertical: 9, paddingHorizontal: 16, borderRadius: theme.radius.md, backgroundColor: theme.color.accent, alignSelf: 'flex-start' },

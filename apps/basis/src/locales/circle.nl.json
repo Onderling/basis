@@ -3418,22 +3418,6 @@
       "text": "opslaan…",
       "doc": "S3 — transient state."
     },
-    "reports": {
-      "text": "Meldingen",
-      "doc": "S3 — moderation reports section."
-    },
-    "no_reports": {
-      "text": "Geen meldingen.",
-      "doc": "S3 — empty reports."
-    },
-    "report_row": {
-      "text": "Melding over {{target}} — {{reason}}",
-      "doc": "S3 — a report row."
-    },
-    "no_reason": {
-      "text": "geen reden opgegeven",
-      "doc": "S3 — fallback when a report has no reason."
-    },
     "muted": {
       "text": "Gedempte peers",
       "doc": "S3 — muted-peers section."

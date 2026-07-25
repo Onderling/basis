@@ -134,6 +134,7 @@ import { encodeImageFile } from '../../src/v2/attachmentEncoder.js';
 import { createCircleMediaComposition, makeDevMediaBucket } from '../../src/v2/circleMediaGateway.js';
 import { buildSelfMediaComposition, makeResealMediaForCircle } from '../../src/v2/profileMediaReseal.js';
 import { bindCircleGovernance } from '../../src/v2/governanceAppWiring.js';
+import { buildSubjectLabeler } from '../../src/v2/governanceView.js';
 import { governanceEntryId } from '../../src/v2/governanceLog.js';
 import { reportEntryId } from '../../src/v2/reportModel.js';
 import { makeKringGovernancePeerHandler, makeKringReportPeerHandler } from '../../src/v2/kringLogReceiver.js';
@@ -5590,10 +5591,13 @@ async function showGovernance(id) {
     try { ctx = await gov.getContext(id); } catch { /* empty view on read failure */ }
     const me = (ctx.members || []).find((m) => m.ref === myWebid) || null;
     const isAdmin = me?.role === 'admin';
-    const labelForSubject = (s) => {
-      const m = (ctx.members || []).find((x) => x.ref === s);
-      return (m && (m.handle || m.name)) || (s == null ? '' : String(s));
-    };
+    // Resolve subject refs to member NAMES from the real roster — the governance
+    // context carries only {ref, role} (no names), so read handle/displayName from
+    // listGroupMembers; unresolved falls back to the raw ref. (web ≡ mobile)
+    let roster = [];
+    try { roster = (await rawCallSkill('stoop', 'listGroupMembers', { groupId: id }))?.members ?? []; } catch { /* */ }
+    const nameOf = buildSubjectLabeler(roster);
+    const labelForSubject = (s) => nameOf(s) ?? (s == null ? '' : String(s));
     let view = { open: [], closed: [] };
     try { view = await gov.view(id, { labelForSubject }); } catch { /* */ }
     // §8 — the admin's open reports (member↔admin lane).

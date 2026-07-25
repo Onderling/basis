@@ -6,7 +6,7 @@
  * override shows (member-vote, admin, past deadline).
  */
 import { describe, it, expect } from 'vitest';
-import { buildGovernanceView } from '../../src/v2/governanceView.js';
+import { buildGovernanceView, buildSubjectLabeler } from '../../src/v2/governanceView.js';
 import { foldGovernance, proposeEvent, voteEvent, resolveEvent } from '../../src/v2/governanceLog.js';
 import { normalizeCirclePolicy } from '../../src/v2/circlePolicy.js';
 import { DECISION_STATUS } from '../../src/v2/governanceDecision.js';
@@ -60,5 +60,33 @@ describe('buildGovernanceView', () => {
     const v = buildGovernanceView({ fold, viewer: { ref: 'm0', role: 'member' } });
     expect(v.open).toHaveLength(0);
     expect(v.closed[0]).toMatchObject({ closed: true, approved: true, canVote: false });
+  });
+});
+
+describe('buildSubjectLabeler — subject ref → member name', () => {
+  const roster = [
+    { webid: 'wid-alice', stableId: 'sid-alice', handle: 'alice', displayName: 'Alice A.' },
+    { webid: 'wid-bob', handle: 'bob' },                 // no displayName → handle is the name
+    { id: 'wid-carol', realName: 'Carol C.' },           // normalizeCircleMembers shape (id/realName)
+    { webid: 'wid-nameless' },                           // no name at all → skipped
+  ];
+  const nameOf = buildSubjectLabeler(roster);
+
+  it('resolves a subject ref to displayName/realName, falling back to handle', () => {
+    expect(nameOf('wid-alice')).toBe('Alice A.');   // displayName wins
+    expect(nameOf('wid-bob')).toBe('bob');          // handle when no display name
+    expect(nameOf('wid-carol')).toBe('Carol C.');   // normalized (id + realName) shape
+  });
+
+  it('keys by every identifier a row exposes (webid · stableId · handle)', () => {
+    expect(nameOf('sid-alice')).toBe('Alice A.');   // stableId
+    expect(nameOf('alice')).toBe('Alice A.');       // handle
+  });
+
+  it('returns null when unresolved, so the caller keeps the raw-ref fallback', () => {
+    expect(nameOf('wid-unknown')).toBeNull();
+    expect(nameOf('wid-nameless')).toBeNull();      // present but no name → not resolvable
+    expect(nameOf(null)).toBeNull();
+    expect(buildSubjectLabeler(null)('x')).toBeNull();
   });
 });

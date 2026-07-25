@@ -9,6 +9,32 @@
  */
 import { DECISION_STATUS } from './governanceDecision.js';
 
+/**
+ * Build a subject → human-NAME resolver from a circle roster (listGroupMembers rows,
+ * raw or `normalizeCircleMembers`-normalized). Governance/report subjects are member
+ * REFS, and the governance context only carries `{ref, role}` (no names) — so a
+ * `labelForSubject` reading THAT can never resolve a name and always shows the raw ref.
+ * Resolve from the real roster instead: key by every identifier a row exposes (id ·
+ * webid · stableId · ref · addr · handle) so whatever ref shape the subject uses
+ * matches; the name is `realName ?? displayName ?? handle`. Returns null when
+ * unresolved, so the caller keeps the raw-ref fallback. One shared builder → web ≡ mobile.
+ *
+ * @param {Array<object>} members  roster rows
+ * @returns {(ref:any)=>(string|null)}
+ */
+export function buildSubjectLabeler(members) {
+  const byId = new Map();
+  for (const m of Array.isArray(members) ? members : []) {
+    if (!m || typeof m !== 'object') continue;
+    const name = m.realName || m.displayName || m.handle || null;
+    if (!name) continue;
+    for (const key of [m.id, m.webid, m.stableId, m.ref, m.addr, m.handle]) {
+      if (typeof key === 'string' && key) byId.set(key, name);
+    }
+  }
+  return (ref) => ((typeof ref === 'string' && byId.get(ref)) || null);
+}
+
 /** This voter's last choice on a proposal ('yes' | 'no' | null). */
 function lastVoteOf(votes, ref) {
   let choice = null; let at = -Infinity;

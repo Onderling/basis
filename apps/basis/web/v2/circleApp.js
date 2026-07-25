@@ -134,6 +134,9 @@ import { encodeImageFile } from '../../src/v2/attachmentEncoder.js';
 import { createCircleMediaComposition, makeDevMediaBucket } from '../../src/v2/circleMediaGateway.js';
 import { buildSelfMediaComposition, makeResealMediaForCircle } from '../../src/v2/profileMediaReseal.js';
 import { bindCircleGovernance } from '../../src/v2/governanceAppWiring.js';
+import { governanceEntryId } from '../../src/v2/governanceLog.js';
+import { reportEntryId } from '../../src/v2/reportModel.js';
+import { makeKringGovernancePeerHandler, makeKringReportPeerHandler } from '../../src/v2/kringLogReceiver.js';
 import { renderGovernancePanel } from './circleGovernancePanel.js';
 import { createMediaEmbed } from '../../src/core/handlers/mediaEmbed.js';
 import { openThumbnail } from '@onderling/blob-gateway';
@@ -5470,7 +5473,7 @@ async function showMemberPersona(id, member) {
       const reason = (typeof window !== 'undefined' && window.prompt) ? (window.prompt(t('circle.governance.report_reason_prompt')) ?? '') : '';
       const gov = bindCircleGovernance({
         eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
-        myRef: myWebid, genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`,
+        myRef: myWebid, genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
       });
       gov.reports.file({ circleId: id, targetType: 'member', targetRef: ref, targetLabel: m?.handle || m?.realName || ref, reason })
         .then(() => showDetail(id)).catch(() => {});
@@ -5514,6 +5517,18 @@ const resealPersonaMediaForCircle = makeResealMediaForCircle({
   getPolicy:            (circleId) => policyStore.get(circleId),
 });
 
+// Wave C tail A — fan a just-appended governance/report event to the circle's members so
+// the one log replicates (receivers ingest it into their own EventLog). Best-effort; the
+// stable entry id is the msgId so re-delivery dedups. Injected into bindCircleGovernance.
+// When the governance panel is open, an ingested peer event re-renders it live (set by
+// showGovernance's rerender; nulled on back). null ⇒ panel closed, nothing to refresh.
+let _govRerender = null;
+function govBroadcast(channel, circleId, event) {
+  const op = channel === 'report' ? 'broadcastKringReport' : 'broadcastKringGovernance';
+  const msgId = channel === 'report' ? reportEntryId(event) : governanceEntryId(event);
+  rawCallSkill('stoop', op, { groupId: circleId, event, msgId, ts: Date.now() }).catch(() => {});
+}
+
 // Wave C §5 — the governance surface: open decisions (vote / admin override) + the
 // admin-only "who decides" decision-class settings. Wired to the shared governance host
 // (bindCircleGovernance): events ride the one EventLog, enactment routes to the real ops.
@@ -5522,12 +5537,12 @@ async function showGovernance(id) {
   try { const r = await rawCallSkill('stoop', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
   const gov = bindCircleGovernance({
     eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
-    myRef: myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`,
+    myRef: myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
   });
   rootEl.innerHTML = '';
   const back = document.createElement('button');
   back.type = 'button'; back.className = 'cc-governance__back'; back.textContent = `← ${t('circle.back')}`;
-  back.addEventListener('click', () => showDetail(id));
+  back.addEventListener('click', () => { _govRerender = null; showDetail(id); });
   rootEl.appendChild(back);
   const host = document.createElement('div');
   rootEl.appendChild(host);
@@ -5572,6 +5587,7 @@ async function showGovernance(id) {
       },
     });
   };
+  _govRerender = rerender;   // let an ingested peer vote/report refresh the open panel live
   await rerender();
 }
 
@@ -6234,6 +6250,10 @@ async function boot() {
           'kring-recipe-broadcast':  kringRecipeHandler,
           'kring-rules-broadcast':   kringRulesHandler,
           'kring-policy-broadcast':  kringPolicyHandler,
+          // Wave C tail A — ingest fanned governance/report events into the one log so a
+          // vote/report raised on another device shows here; re-render an open panel.
+          'kring-governance-broadcast': makeKringGovernancePeerHandler({ eventLog, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); } }),
+          'kring-report-broadcast':     makeKringReportPeerHandler({ eventLog, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); } }),
           // ε.4 — negotiated catch-up subtypes.
           'catch-up-request':        catchUpProvider.handler,
           'catch-up-accept':         catchUpProvider.onAccept,

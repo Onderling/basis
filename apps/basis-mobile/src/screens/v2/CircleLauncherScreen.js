@@ -223,6 +223,8 @@ import CircleMyDataScreen from './CircleMyDataScreen.js';
 import CircleMijScreen from './CircleMijScreen.js';   // mij#personas — the "Mij → persona's" surface (replaces the single-persona About-me content, web parity with openAboutMePanel)
 import CircleGovernanceScreen from './CircleGovernanceScreen.js';   // Wave C §5 — governance surface (web≡mobile)
 import { bindCircleGovernance } from '../../../../basis/src/v2/governanceAppWiring.js';   // §8 — report filing
+import { governanceEntryId } from '../../../../basis/src/v2/governanceLog.js';
+import { reportEntryId } from '../../../../basis/src/v2/reportModel.js';
 import SharedWithMeScreen from './SharedWithMeScreen.js';   // SILENT out-of-circle delivery — personal "shared with me" inbox (web≡mobile)
 
 // B (circle bot) — host LLM route for NL→command in the kring. Mirrors web's VITE_CIRCLE_LLM_BASEURL
@@ -1599,9 +1601,14 @@ export default function CircleLauncherScreen({
         onReportMember={async (m) => {
           const ref = m?.webid || m?.id; if (!ref || !selected?.id) return;
           try {
+            const _bc = (channel, circleId, event) => {
+              const op = channel === 'report' ? 'broadcastKringReport' : 'broadcastKringGovernance';
+              const msgId = channel === 'report' ? reportEntryId(event) : governanceEntryId(event);
+              bundle?.callSkill?.('stoop', op, { groupId: circleId, event, msgId, ts: Date.now() })?.catch?.(() => {});
+            };
             const gov = bindCircleGovernance({
               eventLog, callSkill: bundle?.callSkill, getPolicy: (cid) => policyStore.get(cid),
-              myRef: getCircleActorWebId() || '', genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`,
+              myRef: getCircleActorWebId() || '', genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`, broadcast: _bc,
             });
             await gov.reports.file({ circleId: selected.id, targetType: 'member', targetRef: ref, targetLabel: m?.handle || m?.realName || ref, reason: '' });
           } catch { /* best-effort */ }

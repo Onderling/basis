@@ -91,3 +91,13 @@ export function foldGovernance(events, { policy, members = [], actor = null, now
 export function openProposals(fold) {
   return (fold?.proposals ?? []).filter((p) => !p.closed);
 }
+
+/**
+ * A STABLE EventLog entry id for a governance event, so the LOCAL append and any
+ * fanned/received copy collapse to the same entry (the EventLog dedups by id). A chained
+ * event carries its content hash; fall back to its identity fields otherwise.
+ */
+export function governanceEntryId(event) {
+  if (event && typeof event.hash === 'string' && event.hash) return `gov:${event.hash}`;
+  return `gov:${event?.proposalId ?? ''}:${event?.event ?? ''}:${event?.voter ?? event?.by ?? ''}:${event?.at ?? ''}`;
+}

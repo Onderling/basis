@@ -18,6 +18,8 @@ import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
 import { bindCircleGovernance } from '../../../../basis/src/v2/governanceAppWiring.js';
+import { governanceEntryId } from '../../../../basis/src/v2/governanceLog.js';
+import { reportEntryId } from '../../../../basis/src/v2/reportModel.js';
 import { mergeCirclePolicy, GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES, decisionClassFor } from '../../../../basis/src/v2/circlePolicy.js';
 
 const CLASS_KEY = { 'any-admin': 'any_admin', 'admin-quorum': 'admin_quorum', 'member-vote': 'member_vote' };
@@ -32,8 +34,13 @@ export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy,
   const load = useCallback(async () => {
     let myWebid = '';
     try { const r = await callSkill('stoop', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
+    const broadcast = (channel, circleId, event) => {
+      const op = channel === 'report' ? 'broadcastKringReport' : 'broadcastKringGovernance';
+      const msgId = channel === 'report' ? reportEntryId(event) : governanceEntryId(event);
+      callSkill('stoop', op, { groupId: circleId, event, msgId, ts: Date.now() }).catch(() => {});
+    };
     const gov = bindCircleGovernance({
-      eventLog, callSkill, getPolicy, myRef: myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`,
+      eventLog, callSkill, getPolicy, myRef: myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast,
     });
     ctxRef.current = { gov, myWebid };
     let ctx = { policy: {}, members: [] };

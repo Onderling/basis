@@ -63,3 +63,8 @@ export function foldReports(events) {
   rows.sort((a, b) => (a.closed === b.closed ? (a.at ?? 0) - (b.at ?? 0) : (a.closed ? 1 : -1)));
   return { open: rows.filter((r) => !r.closed), resolved: rows.filter((r) => r.closed), openCount: rows.filter((r) => !r.closed).length };
 }
+
+/** A STABLE EventLog entry id for a report event (local + fanned copies collapse to one). */
+export function reportEntryId(event) {
+  return `rep:${event?.reportId ?? ''}:${event?.event ?? ''}`;
+}

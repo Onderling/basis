@@ -3760,6 +3760,51 @@ export function buildSkills({
     }),
 
     /**
+     * broadcastKringGovernance({groupId, event, msgId, ts?})
+     *   — Wave C: fan a governance event (a propose / vote / resolve) out to every member
+     *   so the one circle log replicates. Receivers ingest it into their local EventLog
+     *   (deduped by the event's stable id). Sibling of broadcastKringPolicy; same plumbing.
+     */
+    defineSkill('broadcastKringGovernance', async ({ parts, from }) => {
+      const a = dataArgs(parts);
+      const _groupId = a.groupId ?? groupId;
+      if (!_groupId)                                                  return { error: 'groupId-required' };
+      if (!a.event || typeof a.event !== 'object')                    return { error: 'event-required' };
+      if (typeof a.msgId !== 'string' || !a.msgId)                    return { error: 'msgId-required' };
+      const ts = typeof a.ts === 'number' && Number.isFinite(a.ts) ? a.ts : Date.now();
+      return broadcastToCircle({
+        circleId: _groupId, kind: 'kring-governance-broadcast', from,
+        extras: { circleId: _groupId, msgId: a.msgId, ts, event: a.event },
+        metric: 'kring-governance-fanout',
+      });
+    }, {
+      description: 'Fan a governance event (propose/vote/resolve) to every other member via chat.send subtype:kring-governance-broadcast; receivers ingest it into their local EventLog.',
+      visibility:  'authenticated',
+    }),
+
+    /**
+     * broadcastKringReport({groupId, event, msgId, ts?})
+     *   — Wave C §8: fan a report event to every member (so an admin on another device sees
+     *   it). Same plumbing as broadcastKringGovernance; subtype kring-report-broadcast.
+     */
+    defineSkill('broadcastKringReport', async ({ parts, from }) => {
+      const a = dataArgs(parts);
+      const _groupId = a.groupId ?? groupId;
+      if (!_groupId)                                                  return { error: 'groupId-required' };
+      if (!a.event || typeof a.event !== 'object')                    return { error: 'event-required' };
+      if (typeof a.msgId !== 'string' || !a.msgId)                    return { error: 'msgId-required' };
+      const ts = typeof a.ts === 'number' && Number.isFinite(a.ts) ? a.ts : Date.now();
+      return broadcastToCircle({
+        circleId: _groupId, kind: 'kring-report-broadcast', from,
+        extras: { circleId: _groupId, msgId: a.msgId, ts, event: a.event },
+        metric: 'kring-report-fanout',
+      });
+    }, {
+      description: 'Fan a report event to every other member via chat.send subtype:kring-report-broadcast; receivers ingest it into their local EventLog.',
+      visibility:  'authenticated',
+    }),
+
+    /**
      * broadcastRosterUpdated({groupId, memberRef, keys?, msgId, ts?})
      *   — the roster "pull-me" signal. Sibling of the `broadcastKring*`
      *   family (same fan-out plumbing, subtype `roster-updated`), with one

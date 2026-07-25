@@ -63,6 +63,7 @@ import { createChatMessageInbox } from '../../../basis/src/v2/chatMessageInbox.j
 import { makeKringRecipePeerHandler } from '../../../basis/src/v2/kringRecipeReceiver.js';
 import { makeKringRulesPeerHandler }  from '../../../basis/src/v2/kringRulesReceiver.js';
 import { makeKringPolicyPeerHandler } from '../../../basis/src/v2/kringPolicyReceiver.js';
+import { makeKringGovernancePeerHandler, makeKringReportPeerHandler } from '../../../basis/src/v2/kringLogReceiver.js';
 import { makeHandleChatMessage }
                                from '../../../basis/src/core/handlers/chatMessage.js';
 import { makeHandleBuurtPeerIntro }
@@ -672,6 +673,10 @@ export default function ChatScreen({
           dedup:        kringPolicyDedup,
         }),
       } : {}),
+      // Wave C tail A — ingest fanned governance/report events into the one log so a
+      // vote/report raised on another device replicates here (deduped by the stable id).
+      'kring-governance-broadcast': makeKringGovernancePeerHandler({ eventLog: eventLogRef.current }),
+      'kring-report-broadcast':     makeKringReportPeerHandler({ eventLog: eventLogRef.current }),
     };
     const defaultHandler = makeHandleChatMessage({
       ensureDmThread:    handleDmThreadOpen,

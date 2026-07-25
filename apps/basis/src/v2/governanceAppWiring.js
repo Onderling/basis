@@ -8,10 +8,10 @@
  * plus this device's own row (listGroupRoster excludes the caller).
  */
 import { makeCircleGovernance } from './governanceHost.js';
-import { GOVERNANCE_KIND } from './governanceLog.js';
+import { GOVERNANCE_KIND, governanceEntryId } from './governanceLog.js';
 import { chainEvent, authorHead } from './governanceChain.js';
 import { makeCircleReports } from './reportHost.js';
-import { REPORT_KIND } from './reportModel.js';
+import { REPORT_KIND, reportEntryId } from './reportModel.js';
 
 /** The author of a governance event — the voter (a vote) or the proposer/enactor (propose/resolve). */
 function authorOf(event) {
@@ -53,14 +53,22 @@ export async function readCircleMembers({ callSkill, circleId, myRef, getPolicy 
  * @param {string} deps.myRef            this device's member ref (webid)
  * @param {()=>string} deps.genId        fresh proposal ids
  * @param {()=>number} [deps.now]
+ * @param {(channel:'governance'|'report', circleId:string, event:object)=>void} [deps.broadcast]
+ *   fan a just-appended event to the circle's members (the shell wires it to the stoop
+ *   broadcastKring{Governance,Report} skill). Absent ⇒ local-only (single-device).
  */
-export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, genId, now = () => Date.now() }) {
+export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, genId, now = () => Date.now(), broadcast = null }) {
+  const fan = (channel, circleId, event) => {
+    if (typeof broadcast !== 'function') return;
+    try { broadcast(channel, circleId, event); } catch { /* fan is best-effort — never block the local write */ }
+  };
   const readGovernanceEvents = async (circleId) => eventLog
     .query({})
     .filter((e) => e && e.type === GOVERNANCE_KIND && e.circleId === circleId && e.payload)
     .map((e) => e.payload);
   // L3: hash-chain each event to its author's previous head before it lands, so equivocation
-  // (two events by one author from the same parent) is detectable across replicas.
+  // (two events by one author from the same parent) is detectable across replicas. A STABLE
+  // entry id (from the chain hash) lets the local copy + any fanned/received copy collapse.
   const appendGovernanceEvent = async (circleId, event) => {
     const author = authorOf(event);
     let payload = event;
@@ -68,7 +76,9 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
       const existing = await readGovernanceEvents(circleId);
       payload = chainEvent(event, { author, parentHash: authorHead(existing, author) });
     }
-    return eventLog.appendSilentEntry({ circleId, kind: GOVERNANCE_KIND, payload });
+    const entry = eventLog.appendSilentEntry({ circleId, kind: GOVERNANCE_KIND, payload, id: governanceEntryId(payload) });
+    fan('governance', circleId, payload);   // propagate to members (best-effort)
+    return entry;
   };
   const getMembers = (circleId) => readCircleMembers({ callSkill, circleId, myRef, getPolicy });
 
@@ -83,8 +93,11 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
     .query({})
     .filter((e) => e && e.type === REPORT_KIND && e.circleId === circleId && e.payload)
     .map((e) => e.payload);
-  const appendReportEvent = async (circleId, event) =>
-    eventLog.appendSilentEntry({ circleId, kind: REPORT_KIND, payload: event });
+  const appendReportEvent = async (circleId, event) => {
+    const entry = eventLog.appendSilentEntry({ circleId, kind: REPORT_KIND, payload: event, id: reportEntryId(event) });
+    fan('report', circleId, event);
+    return entry;
+  };
   const reports = makeCircleReports({
     readReportEvents, appendReportEvent, governance, newReportId: genId, localActorRef: myRef, now,
   });

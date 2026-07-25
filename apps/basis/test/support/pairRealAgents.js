@@ -58,6 +58,7 @@ import { makePropagateMeshIntros, makeHandleBuurtPeerIntro } from '../../src/cor
 import { EventLog } from '../../src/eventLog.js';
 import { createChatMessageInbox } from '../../src/v2/chatMessageInbox.js';
 import { makeKringChatPeerHandler } from '../../src/v2/kringChatReceiver.js';
+import { makeKringGovernancePeerHandler, makeKringReportPeerHandler } from '../../src/v2/kringLogReceiver.js';
 
 import {
   initialState as createGroupInitialState,
@@ -159,6 +160,11 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     'group-key-event': makeHandleGroupKeyEvent({ recordKeyEvent: (gid, event) => keyEventStore.record(gid, event), logger: QUIET }),
     // Sealed content still lands in a plain list (transport/hold-forward — out of scope for the key-event work).
     'sealed-content':  (_from, payload) => { if (payload?.env) sealedContent.push(payload); },
+    // Wave C tail A — the REAL governance/report ingest handlers (the exact wiring the shells
+    // use): a fanned vote/report lands in THIS node's EventLog, so a headless two-agent run can
+    // assert cross-device replication over a genuine transport (not a simulated fan).
+    'kring-governance-broadcast': makeKringGovernancePeerHandler({ eventLog: chatEventLog }),
+    'kring-report-broadcast':     makeKringReportPeerHandler({ eventLog: chatEventLog }),
   };
   const sendPeerRedeem = makeSendGroupRedeemRequest({
     sendPeer,

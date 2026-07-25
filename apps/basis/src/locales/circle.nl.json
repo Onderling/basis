@@ -3709,7 +3709,8 @@
     "override": { "text": "Nu beslissen", "doc": "Governance — an admin forces a stuck member-vote once past its deadline (escape-hatch b)." },
     "tally": { "text": "{yes} van {need} nodig · {of} leden", "doc": "Governance — the running vote tally." },
     "deadline": { "text": "heeft een deadline", "doc": "Governance — this vote has a closing deadline." },
-    "awaiting_enactment": { "text": "wacht op een beheerder", "doc": "Governance — approved, waiting for an admin/caretaker device to enact it (Decision A)." }
+    "awaiting_enactment": { "text": "wacht op een beheerder", "doc": "Governance — approved, waiting for an admin/caretaker device to enact it (Decision A)." },
+    "settings_title": { "text": "Wie beslist", "doc": "Governance settings — heading over the per-action decision-class controls (admin-only)." }
   },
   "mij": {
     "title": {

@@ -3709,7 +3709,8 @@
     "override": { "text": "Decide now", "doc": "Governance — an admin forces a stuck member-vote once past its deadline (escape-hatch b)." },
     "tally": { "text": "{yes} of {need} needed · {of} members", "doc": "Governance — the running vote tally." },
     "deadline": { "text": "has a deadline", "doc": "Governance — this vote has a closing deadline." },
-    "awaiting_enactment": { "text": "awaiting an admin", "doc": "Governance — approved, waiting for an admin/caretaker device to enact it (Decision A)." }
+    "awaiting_enactment": { "text": "awaiting an admin", "doc": "Governance — approved, waiting for an admin/caretaker device to enact it (Decision A)." },
+    "settings_title": { "text": "Who decides", "doc": "Governance settings — heading over the per-action decision-class controls (admin-only)." }
   },
   "mij": {
     "title": {

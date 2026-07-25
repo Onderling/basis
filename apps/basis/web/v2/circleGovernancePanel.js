@@ -8,6 +8,8 @@
  * governance host factory + re-invokes on each action. Unit-testable under happy-dom.
  */
 
+import { GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES, decisionClassFor } from '../../src/v2/circlePolicy.js';
+
 /** decision-class / action / status → a locale key (values carry hyphens; keys don't). */
 const CLASS_KEY = { 'any-admin': 'any_admin', 'admin-quorum': 'admin_quorum', 'member-vote': 'member_vote' };
 
@@ -25,8 +27,11 @@ function el(tag, cls, text) {
  * @param {function} opts.t
  * @param {(proposalId:string, choice:'yes'|'no')=>void} [opts.onVote]
  * @param {(proposalId:string)=>void} [opts.onOverride]
+ * @param {object} [opts.policy]        the circle policy (its governance map drives the settings control)
+ * @param {boolean} [opts.isAdmin]      show the admin-only decision-class settings
+ * @param {(action:string, cls:string)=>void} [opts.onSetClass]  change a governed action's class
  */
-export function renderGovernancePanel(container, { view = { open: [], closed: [] }, t, onVote, onOverride } = {}) {
+export function renderGovernancePanel(container, { view = { open: [], closed: [] }, t, onVote, onOverride, policy = null, isAdmin = false, onSetClass } = {}) {
   const tr = typeof t === 'function' ? t : (k) => k;
   container.innerHTML = '';
   container.classList.add('circle-governance');
@@ -100,6 +105,29 @@ export function renderGovernancePanel(container, { view = { open: [], closed: []
       hist.appendChild(line);
     }
     container.appendChild(hist);
+  }
+
+  // Admin-only "who decides what" settings — the decision-class per governed action.
+  if (isAdmin && typeof onSetClass === 'function') {
+    const settings = el('div', 'circle-governance__settings');
+    settings.appendChild(el('h3', 'circle-governance__settings-title', tr('circle.governance.settings_title')));
+    for (const action of GOVERNANCE_ACTIONS) {
+      const current = decisionClassFor(policy, action);
+      const row = el('div', 'circle-governance__setting');
+      row.dataset.action = action;
+      row.appendChild(el('span', 'circle-governance__setting-action', tr(`circle.governance.action.${action}`)));
+      const select = el('select', 'circle-governance__setting-select');
+      for (const cls of GOVERNANCE_CLASSES) {
+        const opt = el('option', null, tr(`circle.governance.class.${CLASS_KEY[cls]}`));
+        opt.value = cls;
+        select.appendChild(opt);
+      }
+      select.value = current;   // reflect the current class (set after options exist)
+      select.addEventListener('change', () => onSetClass(action, select.value));
+      row.appendChild(select);
+      settings.appendChild(row);
+    }
+    container.appendChild(settings);
   }
   return container;
 }

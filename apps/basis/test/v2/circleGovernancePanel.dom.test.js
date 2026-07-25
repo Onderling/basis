@@ -78,6 +78,28 @@ describe('renderGovernancePanel', () => {
     expect(c.querySelector('.circle-governance__card')).toBeNull();
   });
 
+  it('admin-only decision-class settings render and fire onSetClass on change', () => {
+    const c = document.createElement('div');
+    const onSetClass = vi.fn();
+    const policy = normalizeCirclePolicy({ governance: { removeMember: 'member-vote' } });
+    renderGovernancePanel(c, { view: { open: [], closed: [] }, t: (k) => k, policy, isAdmin: true, onSetClass });
+    const settings = c.querySelector('.circle-governance__settings');
+    expect(settings).toBeTruthy();
+    const removeRow = c.querySelector('.circle-governance__setting[data-action="removeMember"]');
+    expect(removeRow).toBeTruthy();
+    const select = removeRow.querySelector('select');
+    expect(select.value).toBe('member-vote');           // reflects the current policy
+    select.value = 'any-admin';
+    select.dispatchEvent(new window.Event('change'));
+    expect(onSetClass).toHaveBeenCalledWith('removeMember', 'any-admin');
+  });
+
+  it('a non-admin never sees the settings control', () => {
+    const c = document.createElement('div');
+    renderGovernancePanel(c, { view: { open: [], closed: [] }, t: (k) => k, policy: normalizeCirclePolicy({}), isAdmin: false, onSetClass: () => {} });
+    expect(c.querySelector('.circle-governance__settings')).toBeNull();
+  });
+
   it('a closed proposal appears in history, not as a votable card', () => {
     const c = document.createElement('div');
     const view = viewFor([

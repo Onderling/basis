@@ -457,6 +457,33 @@ contact who allows it — it never appears in this reachability ladder.
 
 Transport details: [project overview → Reachability](../README.md#reachability--transports).
 
+### Consistency & governance
+
+A circle's state lives in **one signed log stream** (the `EventLog`) — chat, membership, key rotations, and
+governance events all ride it; no central server arbitrates. Four layers keep it consistent under partitions
+and bad actors, weakest concern to strongest:
+
+- **L1 · concurrent edits** — benign divergence (two people editing offline) is a deterministic merge, not a
+  conflict; eventual connectivity converges. (The full content-merge policy lands later with folio versioning.)
+- **L2 · forgery** — every event is signed by the author's **per-circle key** + proof-of-membership, so
+  non-members can't inject and members can't forge each other's events.
+- **L3 · equivocation** — a member signing two contradictory events (telling different peers different things —
+  double-voting, key-splitting) is caught by a **per-author hash-chain**: each governance-spine event carries a
+  `parentHash`, so two events sharing a parent are a self-verifying **fork-proof**. Any replica holding both
+  halves mints it; the fold marks the author **disputed**, which resolves via L4. *Scope: the hash-chain covers
+  only the governance/membership/key event types — chat stays on the mergeable L1 path (forking chat isn't an
+  attack).*
+- **L4 · governance** — each governed action maps to a **decision-class** in the circle policy
+  (`governance: { removeMember, rotateKey, changeRule, changePolicy } → any-admin | admin-quorum | member-vote`).
+  A `member-vote` tallies `governance` events over the **full proof-derived membership** (not the reachable
+  subset), so a partition can't unilaterally decide; an unreachable threshold **pends** (safety over liveness),
+  with an **admin-override** valve once a vote sits past its deadline. If the **last admin** departs, a
+  **deterministic caretaker** is appointed — the member the whole circle independently computes from the log (a
+  hash-of-the-departure pick, next-in-line if unreachable), never a locally-rolled random that would itself fork.
+
+Anything that must be *agreed* is computed identically everywhere (the tally, the caretaker), never decided
+locally — the same discipline the hash-chain enforces. Full record: [decisions.md](decisions.md) (2026-07-25).
+
 ---
 
 ## 5 · Direction

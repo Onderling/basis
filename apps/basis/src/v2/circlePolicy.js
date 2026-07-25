@@ -13,6 +13,22 @@ export const CIRCLE_FEATURES = [
   'chat', 'noticeboard', 'tasks', 'lists', 'calendar', 'notes', 'houseRules', 'memberDirectory',
 ];
 
+// Connectivity Phase 4 §5 (L4) — the governed actions + their decision-classes.
+// Each governed action maps to WHO may resolve it. "An admin removed someone" and
+// "the circle voted someone out" are the SAME action under different classes — not two
+// features. The tally + threshold live in governanceDecision.js (this file only holds
+// the policy shape). See docs/decisions.md (2026-07-25).
+export const GOVERNANCE_ACTIONS = ['removeMember', 'rotateKey', 'changeRule', 'changePolicy'];
+export const GOVERNANCE_CLASSES = ['any-admin', 'admin-quorum', 'member-vote'];
+// Defaults: the mechanical/safety actions are an admin's call; rule/policy changes want
+// admin agreement; member-vote is opt-in per circle for any action.
+export const DEFAULT_GOVERNANCE = {
+  removeMember: 'any-admin',
+  rotateKey:    'any-admin',
+  changeRule:   'admin-quorum',
+  changePolicy: 'admin-quorum',
+};
+
 export const CIRCLE_POLICY_ENUMS = {
   view:                 ['chat', 'screen', 'cross-stream'],
   // llmTool — the circle's LLM posture, AUTHORITATIVE within the circle: 'off' forbids any LLM here
@@ -110,6 +126,9 @@ export const DEFAULT_CIRCLE_POLICY = {
   catchUpChooserMode: 'auto',
   admins:           [],
   consensusRequired: false,
+  // Phase 4 §5 (L4) — per-action decision-class map (admin-set). Absent action ⇒ its
+  // DEFAULT_GOVERNANCE class. See governanceDecision.js for the resolver.
+  governance:       { ...DEFAULT_GOVERNANCE },
   // Connectivity Phase 4 §7/§9 — member↔member private chat (prikbord/DM). Off by default
   // (conservative); the settings surface only lets an admin enable it when the circle's route
   // supports a peer pairwise key (relay/rendezvous available), greyed under pod-only (no relay).
@@ -183,6 +202,24 @@ export function defaultViewModeFromPolicy(policy) {
   return VIEW_AXIS_TO_MODE[axis] ?? 'chat';
 }
 
+/** Coerce a stored partial `governance` map into the full action→class map (invalid ⇒ default). */
+export function normalizeGovernance(stored = {}) {
+  const g = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
+  const out = {};
+  for (const action of GOVERNANCE_ACTIONS) {
+    out[action] = GOVERNANCE_CLASSES.includes(g[action]) ? g[action] : DEFAULT_GOVERNANCE[action];
+  }
+  return out;
+}
+
+/** The decision-class for a governed action on a (possibly partial) policy. */
+export function decisionClassFor(policy, action) {
+  if (!GOVERNANCE_ACTIONS.includes(action)) return null;
+  const g = policy && typeof policy === 'object' ? policy.governance : null;
+  const cls = g && typeof g === 'object' ? g[action] : undefined;
+  return GOVERNANCE_CLASSES.includes(cls) ? cls : DEFAULT_GOVERNANCE[action];
+}
+
 /** Coerce any stored partial into a complete, valid policy (invalid values fall back to defaults). */
 export function normalizeCirclePolicy(stored = {}) {
   const p = stored && typeof stored === 'object' ? stored : {};
@@ -207,6 +244,9 @@ export function normalizeCirclePolicy(stored = {}) {
     admins:             Array.isArray(p.admins) ? p.admins.filter((x) => typeof x === 'string') : [],
     consensusRequired:
       typeof p.consensusRequired === 'boolean' ? p.consensusRequired : DEFAULT_CIRCLE_POLICY.consensusRequired,
+    // §5 (L4) — decision-class per governed action; each falls back to DEFAULT_GOVERNANCE,
+    // and only the known actions/classes survive (an unknown class → the action's default).
+    governance:         normalizeGovernance(p.governance),
     // Phase 4 §7/§9 — member↔member private chat toggle (route-gated in the settings surface).
     privateDm:
       typeof p.privateDm === 'boolean' ? p.privateDm : DEFAULT_CIRCLE_POLICY.privateDm,
@@ -232,6 +272,7 @@ export function mergeCirclePolicy(base, patch = {}) {
     // shallow-merge at the entry-key level (a patch replaces the whole row/value for a key).
     capabilities: { ...nb.capabilities, ...(patch.capabilities || {}) },
     settings:     { ...nb.settings, ...(patch.settings || {}) },
+    governance:   { ...nb.governance, ...(patch.governance || {}) },
   };
   return normalizeCirclePolicy(merged);
 }

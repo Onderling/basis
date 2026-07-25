@@ -469,3 +469,48 @@ in a 1:1 — you would have to tag a bot you are plainly talking to alone.
 
 **Consequences:** one shared gate (`botIsAddressed` / `oneToOneBotLabel`) is used by both web and mobile,
 so the addressing behaviour and the header cannot drift between platforms.
+
+---
+
+## 2026-07-25 — Circle consistency & governance: one log, four layers, decision-classes
+
+**Status:** settled (design of record); building (Wave C — L4 first, then L3). Substrate: the one-stream
+`EventLog`, the per-circle signing key, key-rotation-on-membership-change (Phases 1–3) already exist.
+
+**Context:** a circle's shared state is a signed log with **no central arbiter**. It must stay consistent
+under network partitions and misbehaving members, and a circle must be able to *govern itself* — remove a
+member, rotate a key, change a rule — without a server to adjudicate and without deadlocking.
+
+**Decision.** State lives in **one log stream**; consistency is four layers (weakest concern → strongest):
+- **L1 concurrent edits** — deterministic merge (full content-merge deferred to folio versioning).
+- **L2 forgery** — every event signed by the author's per-circle key + proof-of-membership. (Already true.)
+- **L3 equivocation** — a **per-author hash-chain**: each governance-spine event carries a `parentHash`; two
+  events sharing a parent are a self-verifying **fork-proof**, folded → author **disputed** → resolved by L4.
+  **Scope: only the governance / membership / key event types are chained** — chat stays on the mergeable L1
+  path (forking chat is normal, not an attack), so the machinery sits exactly where equivocation does harm.
+- **L4 governance** — a per-action **decision-class** map in the circle policy: `governance = { removeMember,
+  rotateKey, changeRule, changePolicy }`, each `any-admin | admin-quorum | member-vote`. So "an admin removed
+  someone" and "the circle voted someone out" are the **same action** with a different *who-decides* knob —
+  not two features. A `member-vote` tallies signed `governance` events over the **full proof-derived
+  membership** (not the reachable subset) so a partition can't unilaterally decide; an unreachable threshold
+  **pends** (safety over liveness), with an **admin-override valve** once the vote passes its deadline.
+- **Last-admin** — if the last admin departs (self-removal or vote-out), a **deterministic caretaker** is
+  appointed immediately (not a fresh vote — that needs quorum and leaves an adminless gap). The successor is
+  computed identically by every replica from the log (member whose per-circle address hashes closest to the
+  departing admin's final event hash; next-in-line if that member is unreachable/declines), so the appointment
+  can never itself fork. It is a **caretaker** — a member-vote circle can reassign admin afterward.
+
+**Alternatives / why.** Central-server arbitration — rejected (the whole point is no central trust).
+Hash-chaining *all* events including chat — rejected: cost with no security gain, and it complicates the
+mergeable chat path; equivocation only harms decisions, so chain the decisions, not the conversation.
+Reachable-subset thresholds — rejected: a partition could then railroad a decision. Pure pend with no valve —
+rejected: a sparse circle would deadlock on governance; the deadline + admin-override trades a small trust
+cost for liveness. Truly-random caretaker — rejected: independent local dice diverge, so the *fix* would be a
+new fork; deterministic-agreed is the only partition-safe pick.
+
+**Consequences.** The **guiding invariant**: anything that must be *agreed* — the tally, the caretaker, the
+fork verdict — is computed identically everywhere from the log, never decided locally. The decision-class map
+is admin-set per circle and defaults to `removeMember/rotateKey → any-admin`, `changeRule/changePolicy →
+admin-quorum`, member-vote opt-in. Reporting (a member↔admin lane → ban) is a governance action, so it rides
+L4. This layer is invisible to `deliver`/the `Peer`/the event shapes — it's how the fold resolves, plus a
+`parentHash` field on the governance-spine events.

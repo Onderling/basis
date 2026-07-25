@@ -72,17 +72,17 @@ describe('join wizard — consent-at-join', () => {
     accept.checked = true;
     accept.dispatchEvent(new Event('change'));
     // Next → (step 2)
-    clickByLabel(el, 'Next →');
+    clickByLabel(el, 'circle.join.wizard.next');
     // privacy accept → Next (step 3)
     const privacy = el.querySelector('.cc-wizard-check input[type=checkbox]');
     privacy.checked = true;
     privacy.dispatchEvent(new Event('change'));
-    clickByLabel(el, 'Next →');
+    clickByLabel(el, 'circle.join.wizard.next');
     // pick handle + join
     const handle = el.querySelector('.cc-wizard-handle-input');
     handle.value = 'anne';
     handle.dispatchEvent(new Event('input'));
-    clickByLabel(el, 'Join circle');
+    clickByLabel(el, 'circle.join.wizard.join');
 
     await vi.waitFor(() => expect(onDispatched).toHaveBeenCalled());
     const reply = onDispatched.mock.calls[0][0];

@@ -127,6 +127,53 @@
         "text": "Alleen de categorie wordt gedeeld, nooit de tekst of tags. Vink uit als je je aanbod hier niet wilt delen — later aanpassen kan bij Mij → persona's.",
         "doc": "Fold-in phase C (Q3) — explains the coarse rung + how to change it later; shown under the pre-checked line."
       }
+    },
+    "wizard": {
+      "steps": {
+        "rules": { "text": "Regels", "doc": "Join wizard — step 1 label." },
+        "privacy": { "text": "Privacy", "doc": "Join wizard — step 2 label." },
+        "handle": { "text": "Naam", "doc": "Join wizard — step 3 label (pick a handle)." }
+      },
+      "cancel": { "text": "Annuleren", "doc": "Join wizard — cancel button." },
+      "next": { "text": "Volgende", "doc": "Join wizard — advance a step." },
+      "back": { "text": "Terug", "doc": "Join wizard — go back a step." },
+      "join": { "text": "Word lid", "doc": "Join wizard — final submit." },
+      "close": { "text": "Sluiten", "doc": "Join wizard — close the error view." },
+      "submitting": { "text": "Bezig met deelnemen…", "doc": "Join wizard — submit-in-progress status." },
+      "invite_error": { "text": "Uitnodigingsfout", "doc": "Join wizard — bad-invite heading." },
+      "rules": {
+        "title": { "text": "Word lid van {{circle}}", "doc": "Join wizard — rules step heading (the circle id)." },
+        "intro": { "text": "Dit zijn de regels van de kring. Lees ze voordat je lid wordt.", "doc": "Join wizard — rules step intro." },
+        "loading": { "text": "Regels laden…", "doc": "Join wizard — rules still loading." },
+        "load_error": { "text": "Kon de regels niet laden: {{error}}", "doc": "Join wizard — rules fetch failed." },
+        "accept": { "text": "Ik heb de regels gelezen en ga akkoord.", "doc": "Join wizard — rules-accept checkbox." }
+      },
+      "privacy": {
+        "title": { "text": "Privacy", "doc": "Join wizard — privacy step heading." },
+        "notice": { "text": "Lid worden van een kring betekent dat andere leden je posts kunnen zien, je kunnen aanspreken en — afhankelijk van de regels van de kring — kunnen meebeslissen bij conflicten. Kring-admins hebben geen toegang tot je privé-chats, alleen tot wat je publiek post.", "doc": "Join wizard — the privacy notice (folded from the PRIVACY_NOTICE constant)." },
+        "accept": { "text": "Ik begrijp het.", "doc": "Join wizard — privacy-accept checkbox." },
+        "mesh": { "text": "Deel mijn adres zodat andere leden me rechtstreeks kunnen bereiken (aanbevolen voor bijwerken).", "doc": "Join wizard — mesh address-sharing consent checkbox." },
+        "mesh_hint": { "text": "Uit = de admin geeft alles door; je bent alleen via hen bereikbaar.", "doc": "Join wizard — mesh consent hint." }
+      },
+      "handle": {
+        "title": { "text": "Kies een naam", "doc": "Join wizard — handle step heading." },
+        "intro": { "text": "Je naam is hoe andere leden je aanspreken in deze kring. Kleine letters, cijfers, liggend streepje of underscore; 3–30 tekens.", "doc": "Join wizard — handle step intro." },
+        "label": { "text": "Naam", "doc": "Join wizard — handle input label." },
+        "placeholder": { "text": "bijv. alice", "doc": "Join wizard — handle input placeholder." },
+        "suggestions": { "text": "Suggesties", "doc": "Join wizard — handle suggestions sublabel." }
+      },
+      "link": {
+        "label": { "text": "Ga verder als", "doc": "Join wizard — cross-circle linkability choice label." },
+        "fresh": { "text": "Een nieuwe identiteit (niet te koppelen)", "doc": "Join wizard — fresh/unlinkable key option." },
+        "same_person": { "text": "Dezelfde persoon als in {{name}}", "doc": "Join wizard — continue-as-existing-self option." },
+        "hint": { "text": "Een nieuwe identiteit houdt deze kring los van je andere kringen. Als dezelfde persoon verdergaan bewijst dat je dezelfde bent voor iedereen in beide kringen.", "doc": "Join wizard — linkability explanation." }
+      },
+      "persona": {
+        "label": { "text": "Doe mee als", "doc": "Join wizard — persona choice label." },
+        "minimal": { "text": "Doe minimaal mee (deel geen achtergrond)", "doc": "Join wizard — join-minimally persona option." },
+        "default_suffix": { "text": "{{name}} (standaardpersona)", "doc": "Join wizard — default persona option label." },
+        "hint": { "text": "Alleen wat deze persona in deze kring deelt, wordt gedeeld — niets bij een eerste keer. Later aanpassen kan bij Mij → persona's.", "doc": "Join wizard — persona disclosure hint." }
+      }
     }
   },
   "invite": {

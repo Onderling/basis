@@ -26,11 +26,11 @@ function advanceToHandleStep(el) {
   const accept = el.querySelector('.cc-wizard-check input[type=checkbox]');
   accept.checked = true;
   accept.dispatchEvent(new Event('change'));
-  clickByLabel(el, 'Next →');
+  clickByLabel(el, 'circle.join.wizard.next');
   const privacy = el.querySelector('.cc-wizard-check input[type=checkbox]');
   privacy.checked = true;
   privacy.dispatchEvent(new Event('change'));
-  clickByLabel(el, 'Next →');
+  clickByLabel(el, 'circle.join.wizard.next');
 }
 
 describe('join wizard — charter-driven offering-sharing default', () => {
@@ -75,7 +75,7 @@ describe('join wizard — charter-driven offering-sharing default', () => {
     const handle = el.querySelector('.cc-wizard-handle-input');
     handle.value = 'anne';
     handle.dispatchEvent(new Event('input'));
-    clickByLabel(el, 'Join circle');
+    clickByLabel(el, 'circle.join.wizard.join');
     await vi.waitFor(() => expect(onDispatched).toHaveBeenCalled());
     // No disclosure enacted, no release computed. (listAgents may fire — that's
     // the persona PICKER loading its options, not a share.)

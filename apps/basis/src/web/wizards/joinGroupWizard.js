@@ -35,7 +35,6 @@
 // PRIVACY_NOTICE) moved to ../../core/wizards/joinGroupState.js
 // so basis-mobile's RN wizard can reuse them.
 import {
-  PRIVACY_NOTICE,
   handleSuggestions as HANDLE_SUGGESTIONS,
   decodeInvite,
   isValidHandle,
@@ -53,9 +52,6 @@ import {
 } from '../../core/wizards/joinGroupState.js';
 import { RULES_FIELDS } from '../../v2/circleRules.js';
 import { t } from '../../localisation.js';
-
-const PRIVACY_NOTICE_NL = PRIVACY_NOTICE.nl;
-const PRIVACY_NOTICE_EN = PRIVACY_NOTICE.en;
 
 /**
  * Wizard renderer for /join-group.  Wired via openPagePanel's
@@ -137,7 +133,7 @@ function renderStepHeader(container, doc, state) {
   for (let n = 1; n <= 3; n++) {
     const dot = doc.createElement('span');
     dot.className = `cc-wizard-step ${n === state.step ? 'cc-wizard-step-active' : ''} ${n < state.step ? 'cc-wizard-step-done' : ''}`;
-    dot.textContent = ['Rules', 'Privacy', 'Handle'][n - 1];
+    dot.textContent = [t('circle.join.wizard.steps.rules'), t('circle.join.wizard.steps.privacy'), t('circle.join.wizard.steps.handle')][n - 1];
     header.appendChild(dot);
   }
   container.appendChild(header);
@@ -148,12 +144,12 @@ function renderRulesStep(container, doc, state, onNext, onCancel, rerender) {
   wrap.className = 'cc-wizard-body';
 
   const heading = doc.createElement('h3');
-  heading.textContent = `Circle: ${state.invite?.groupId ?? '(unknown)'}`;
+  heading.textContent = t('circle.join.wizard.rules.title', { circle: state.invite?.groupId ?? '(unknown)' });
   wrap.appendChild(heading);
 
   const blurb = doc.createElement('p');
   blurb.className = 'cc-wizard-blurb';
-  blurb.textContent = 'Read the group\'s rules below. Accepting them is required to join.';
+  blurb.textContent = t('circle.join.wizard.rules.intro');
   wrap.appendChild(blurb);
 
   // 5.5b — when the invite carries a v2 structured rules doc, render
@@ -185,8 +181,8 @@ function renderRulesStep(container, doc, state, onNext, onCancel, rerender) {
     const rulesBox = doc.createElement('pre');
     rulesBox.className = 'cc-wizard-rules';
     rulesBox.textContent = state.rulesError
-      ? `(could not load rules: ${state.rulesError})`
-      : state.rulesText ?? '(loading rules…)';
+      ? t('circle.join.wizard.rules.load_error', { error: state.rulesError })
+      : state.rulesText ?? t('circle.join.wizard.rules.loading');
     wrap.appendChild(rulesBox);
   }
 
@@ -200,7 +196,7 @@ function renderRulesStep(container, doc, state, onNext, onCancel, rerender) {
     rerender();
   });
   checkRow.appendChild(check);
-  checkRow.appendChild(doc.createTextNode(' I have read and accept the rules.'));
+  checkRow.appendChild(doc.createTextNode(` ${t('circle.join.wizard.rules.accept')}`));
   wrap.appendChild(checkRow);
 
   // consent-at-join: the circle's OPT-OUTABLE capabilities. Rendered as part of the
@@ -210,8 +206,8 @@ function renderRulesStep(container, doc, state, onNext, onCancel, rerender) {
 
   container.appendChild(wrap);
   renderActions(container, doc, [
-    { label: 'Decline', onClick: onCancel, kind: 'secondary' },
-    { label: 'Next →', onClick: onNext, disabled: !state.rulesAccepted, kind: 'primary' },
+    { label: t('circle.join.wizard.cancel'), onClick: onCancel, kind: 'secondary' },
+    { label: t('circle.join.wizard.next'), onClick: onNext, disabled: !state.rulesAccepted, kind: 'primary' },
   ]);
 }
 
@@ -265,12 +261,12 @@ function renderPrivacyStep(container, doc, state, onNext, onBack, onCancel, rere
   wrap.className = 'cc-wizard-body';
 
   const heading = doc.createElement('h3');
-  heading.textContent = 'Privacy notice';
+  heading.textContent = t('circle.join.wizard.privacy.title');
   wrap.appendChild(heading);
 
   const notice = doc.createElement('p');
   notice.className = 'cc-wizard-privacy';
-  notice.textContent = PRIVACY_NOTICE_EN;
+  notice.textContent = t('circle.join.wizard.privacy.notice');
   wrap.appendChild(notice);
 
   const checkRow = doc.createElement('label');
@@ -283,7 +279,7 @@ function renderPrivacyStep(container, doc, state, onNext, onBack, onCancel, rere
     rerender();
   });
   checkRow.appendChild(check);
-  checkRow.appendChild(doc.createTextNode(' I understand and accept.'));
+  checkRow.appendChild(doc.createTextNode(` ${t('circle.join.wizard.privacy.accept')}`));
   wrap.appendChild(checkRow);
 
   // mesh address-sharing consent. When on,
@@ -300,18 +296,18 @@ function renderPrivacyStep(container, doc, state, onNext, onBack, onCancel, rere
     state.shareAddress = meshBox.checked;
   });
   meshRow.appendChild(meshBox);
-  meshRow.appendChild(doc.createTextNode(' Let other circle members contact me directly (DM).'));
+  meshRow.appendChild(doc.createTextNode(` ${t('circle.join.wizard.privacy.mesh')}`));
   wrap.appendChild(meshRow);
   const meshHint = doc.createElement('div');
   meshHint.className = 'cc-wizard-field-hint';
-  meshHint.textContent = 'Off = admin relays everything; you stay reachable only via them.';
+  meshHint.textContent = t('circle.join.wizard.privacy.mesh_hint');
   wrap.appendChild(meshHint);
 
   container.appendChild(wrap);
   renderActions(container, doc, [
-    { label: '← Back',  onClick: onBack,   kind: 'secondary' },
-    { label: 'Cancel',  onClick: onCancel, kind: 'secondary' },
-    { label: 'Next →',  onClick: onNext, disabled: !state.privacyAccepted, kind: 'primary' },
+    { label: t('circle.join.wizard.back'),   onClick: onBack,   kind: 'secondary' },
+    { label: t('circle.join.wizard.cancel'), onClick: onCancel, kind: 'secondary' },
+    { label: t('circle.join.wizard.next'),   onClick: onNext, disabled: !state.privacyAccepted, kind: 'primary' },
   ]);
 }
 
@@ -320,19 +316,19 @@ function renderHandleStep(container, doc, state, onSubmit, onBack, onCancel, rer
   wrap.className = 'cc-wizard-body';
 
   const heading = doc.createElement('h3');
-  heading.textContent = 'Pick a handle';
+  heading.textContent = t('circle.join.wizard.handle.title');
   wrap.appendChild(heading);
 
   const blurb = doc.createElement('p');
   blurb.className = 'cc-wizard-blurb';
-  blurb.textContent = 'How you appear to other circle members. Lowercase letters, digits, and hyphens.';
+  blurb.textContent = t('circle.join.wizard.handle.intro');
   wrap.appendChild(blurb);
 
   const input = doc.createElement('input');
   input.type = 'text';
   input.className = 'cc-wizard-handle-input';
   input.value = state.handle;
-  input.placeholder = 'handle';
+  input.placeholder = t('circle.join.wizard.handle.placeholder');
   input.addEventListener('input', () => {
     state.handle = input.value.trim();
     // Don't re-render on every keystroke to preserve focus + caret;
@@ -366,18 +362,18 @@ function renderHandleStep(container, doc, state, onSubmit, onBack, onCancel, rer
     lWrap.className = 'cc-wizard-link';
     const lLabel = doc.createElement('div');
     lLabel.className = 'cc-wizard-field-label';
-    lLabel.textContent = 'Continue as';
+    lLabel.textContent = t('circle.join.wizard.link.label');
     lWrap.appendChild(lLabel);
     const lSelect = doc.createElement('select');
     lSelect.className = 'cc-wizard-link-select';
     const fresh = doc.createElement('option');
     fresh.value = 'fresh';
-    fresh.textContent = 'A fresh identity (unlinkable)';
+    fresh.textContent = t('circle.join.wizard.link.fresh');
     lSelect.appendChild(fresh);
     for (const self of state.existingSelves) {
       const opt = doc.createElement('option');
       opt.value = self.circleId;
-      opt.textContent = `The same person as in ${self.name}`;
+      opt.textContent = t('circle.join.wizard.link.same_person', { name: self.name });
       lSelect.appendChild(opt);
     }
     lSelect.value = state.linkChoice || 'fresh';
@@ -385,7 +381,7 @@ function renderHandleStep(container, doc, state, onSubmit, onBack, onCancel, rer
     lWrap.appendChild(lSelect);
     const lHint = doc.createElement('p');
     lHint.className = 'cc-wizard-blurb';
-    lHint.textContent = 'A fresh identity keeps this circle unlinkable from your others. Continuing as an existing self proves you are the same person to anyone in both circles.';
+    lHint.textContent = t('circle.join.wizard.link.hint');
     lWrap.appendChild(lHint);
     wrap.appendChild(lWrap);
   }
@@ -400,19 +396,19 @@ function renderHandleStep(container, doc, state, onSubmit, onBack, onCancel, rer
 
     const pLabel = doc.createElement('div');
     pLabel.className = 'cc-wizard-field-label';
-    pLabel.textContent = 'Join as';
+    pLabel.textContent = t('circle.join.wizard.persona.label');
     pWrap.appendChild(pLabel);
 
     const select = doc.createElement('select');
     select.className = 'cc-wizard-persona-select';
     const none = doc.createElement('option');
     none.value = '';
-    none.textContent = 'Join minimally (share no background)';
+    none.textContent = t('circle.join.wizard.persona.minimal');
     select.appendChild(none);
     for (const p of state.personas) {
       const opt = doc.createElement('option');
       opt.value = p.id;
-      opt.textContent = p.id === 'default' ? `${p.name} (default persona)` : p.name;
+      opt.textContent = p.id === 'default' ? t('circle.join.wizard.persona.default_suffix', { name: p.name }) : p.name;
       select.appendChild(opt);
     }
     select.value = state.persona ?? '';
@@ -421,7 +417,7 @@ function renderHandleStep(container, doc, state, onSubmit, onBack, onCancel, rer
 
     const pHint = doc.createElement('div');
     pHint.className = 'cc-wizard-field-hint';
-    pHint.textContent = 'Only what this persona discloses in this circle is shared — nothing on first join. Adjust later in “About me”.';
+    pHint.textContent = t('circle.join.wizard.persona.hint');
     pWrap.appendChild(pHint);
     wrap.appendChild(pWrap);
   }
@@ -459,15 +455,15 @@ function renderHandleStep(container, doc, state, onSubmit, onBack, onCancel, rer
   if (state.submitting) {
     const status = doc.createElement('div');
     status.className = 'cc-wizard-submitting';
-    status.textContent = 'Joining circle…';
+    status.textContent = t('circle.join.wizard.submitting');
     wrap.appendChild(status);
   }
 
   container.appendChild(wrap);
   renderActions(container, doc, [
-    { label: '← Back',          onClick: onBack,                                kind: 'secondary', disabled: state.submitting },
-    { label: 'Cancel',          onClick: onCancel,                              kind: 'secondary', disabled: state.submitting },
-    { label: 'Join circle',      onClick: onSubmit,
+    { label: t('circle.join.wizard.back'),   onClick: onBack,   kind: 'secondary', disabled: state.submitting },
+    { label: t('circle.join.wizard.cancel'), onClick: onCancel, kind: 'secondary', disabled: state.submitting },
+    { label: t('circle.join.wizard.join'),   onClick: onSubmit,
       disabled: !isValidHandle(state.handle) || state.submitting,
       kind: 'primary', className: 'cc-wizard-submit' },
   ]);
@@ -482,7 +478,7 @@ function renderError(container, doc, message, onClose) {
   wrap.appendChild(err);
   container.appendChild(wrap);
   renderActions(container, doc, [
-    { label: 'Close', onClick: onClose, kind: 'secondary' },
+    { label: t('circle.join.wizard.close'), onClick: onClose, kind: 'secondary' },
   ]);
 }
 

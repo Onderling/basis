@@ -137,6 +137,7 @@ import { scopeStoopCallSkill } from '../../../../basis/src/v2/circleStoopScope.j
 // no DOM). Mobile reuses it verbatim — same seal path as web's stoop noticeboard — so a prikbord
 // image seals per-circle instead of being refused. Do NOT reimplement sealing in the shell.
 import { createCircleMediaComposition, makeDevMediaBucket } from '../../../../basis/src/v2/circleMediaGateway.js';
+import { buildSelfMediaComposition, makeResealMediaForCircle } from '../../../../basis/src/v2/profileMediaReseal.js';
 import { getCircleSealStrategy, seedCircleRosterFor, getCirclePodFetch, getCircleActorWebId } from '../../core/circlePods.js';
 // M6 — the feedback bot rides the SHARED mount (web uses the same one). tryHandle routes /feedback +
 // /feedback-stop + free text while active, before the circle bot; bubbles render via appendKringMessage.
@@ -550,6 +551,27 @@ export default function CircleLauncherScreen({
   // M3 — AsyncStorage-backed circle stores (keys match web's localStorage
   // convention).  Created once; the sub-screens load/save through them.
   const policyStore       = useMemo(() => makeCirclePolicyStoreRN(AsyncStorage), []);
+  // Profile-picture disclosure re-sealer (SHARED seal path — web ≡ mobile): turns the
+  // owner-sealed source picture into a per-circle copy on share (Frits: option (a)).
+  // Injected into shareDisclosureToCircle via CircleMijScreen; reuses this shell's dev
+  // media bucket + the module's per-circle composition cache. Rebuilt if identity changes.
+  const resealMediaForCircle = useMemo(() => {
+    const identity = bundle?.coreAgent?.identity ?? null;
+    let selfCompPromise;
+    const getSelfComposition = () => {
+      if (!selfCompPromise) {
+        selfCompPromise = buildSelfMediaComposition({
+          identity, bucket: circleMediaBucket, localActor: getCircleActorWebId() || 'me',
+        }).catch(() => null);
+      }
+      return selfCompPromise;
+    };
+    return makeResealMediaForCircle({
+      getSelfComposition,
+      getCircleComposition: getCircleMediaComposition,
+      getPolicy: (circleId) => policyStore.get(circleId),
+    });
+  }, [bundle?.coreAgent?.identity, policyStore]);
   const overrideStore     = useMemo(() => makeMemberOverrideStoreRN(AsyncStorage), []);
   // Objective D — mirror the pref to the user's pod so other agents read it.
   // getPodWriter is a thunk: null while unsigned (→ local-only), a live
@@ -1535,6 +1557,7 @@ export default function CircleLauncherScreen({
         onStoopEvent={bundle?.onStoopEvent}
         sendPersonaUpdate={bundle?.sendPersonaUpdate}
         disclosureShareMemo={bundle?.disclosureShareMemo}
+        resealMediaForCircle={resealMediaForCircle}
         /* Task #13 — first-run flags (shared with the launcher's provisioner) + the onboarding
            "Ja, help me" handoff → the mobile create flow (close the help circle, open "+ new circle"). */
         onboardingFlags={onboardingFlags}
@@ -1909,7 +1932,7 @@ function LauncherTile({ circle: c, preview, pending, isPinned = false, isMuted =
 function CircleDetail({
   circle, items, callSkill, rawCallSkill, catalog: rawCatalog, policy, myListTasks = [],
   eventLog, circles = [],
-  recipeStore = null, onStoopEvent, sendPersonaUpdate, disclosureShareMemo = null,
+  recipeStore = null, onStoopEvent, sendPersonaUpdate, disclosureShareMemo = null, resealMediaForCircle = null,
   // Task #13 — onboarding first-run flags (shared store) + the create-flow handoff.
   onboardingFlags = null, onCreateCircle = null,
   onBack, onSettings, onMine, onViewAs, onAdvisor, onSkills, onFiles, onRules, onRecipes, onAdmin, onLists, onShare, onInvite,
@@ -3400,7 +3423,7 @@ function CircleDetail({
               </Pressable>
             </View>
             {aboutMePersona ? (
-              <CircleMijScreen callSkill={rawCallSkill} sendPersonaUpdate={sendPersonaUpdate} lastShared={disclosureShareMemo} personaId={aboutMePersona} circles={circles} />
+              <CircleMijScreen callSkill={rawCallSkill} sendPersonaUpdate={sendPersonaUpdate} lastShared={disclosureShareMemo} resealMediaForCircle={resealMediaForCircle} personaId={aboutMePersona} circles={circles} />
             ) : null}
           </View>
         </View>

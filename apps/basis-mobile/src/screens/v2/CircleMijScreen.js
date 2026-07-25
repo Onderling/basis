@@ -59,7 +59,7 @@ function Section({ eyebrowKey, taglineKey, children }) {
   );
 }
 
-export default function CircleMijScreen({ callSkill, sendPersonaUpdate, lastShared = null, personaId, circles = [] }) {
+export default function CircleMijScreen({ callSkill, sendPersonaUpdate, lastShared = null, resealMediaForCircle = null, personaId, circles = [] }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [model, setModel] = useState(null);
@@ -111,10 +111,10 @@ export default function CircleMijScreen({ callSkill, sendPersonaUpdate, lastShar
     const k = `${circleId}:${forPersonaId}`;
     setShareState((s) => ({ ...s, [k]: 'sharing' }));
     let res;
-    try { res = await shareDisclosureToCircle({ callSkill, sendPersonaUpdate, lastShared, circleId, personaId: forPersonaId }); }
+    try { res = await shareDisclosureToCircle({ callSkill, sendPersonaUpdate, lastShared, resealMediaForCircle, circleId, personaId: forPersonaId }); }
     catch (err) { res = { ok: false, reason: err?.message ?? String(err) }; }
     setShareState((s) => ({ ...s, [k]: res?.ok ? 'ok' : (res?.reason ?? 'failed') }));
-  }, [callSkill, sendPersonaUpdate, lastShared]);
+  }, [callSkill, sendPersonaUpdate, lastShared, resealMediaForCircle]);
 
   // A whenField property (availability) can carry an optional free-text "when" note (the
   // descriptor's finest 'detail' rung). Compose { state, when } when a when is present; a bare

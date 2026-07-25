@@ -106,6 +106,31 @@ mobile's package.json — e.g. `src/core/mediaCardModel.js` → blob-gateway (20
 `rendezvousRtcLib` import. Works in vitest/Node; on-device Metro needs the path inside `nodeModulesPaths`/watchFolders
 (check metro.config.js) or the dep declared + linked. **Tell:** green tests but a device-only "module not found".
 
+## Cross-scope reference leaks in RN shell siblings → on-device `ReferenceError`
+
+**Tell.** A screen opens fine in the old dev client but red-boxes on a *fresh* build with
+`ReferenceError: Property '<name>' doesn't exist` — e.g. `bundle`, `onCircleControl`,
+`circleTransport`. Green vitest, clean bundle, crash only on device.
+
+**Root cause.** The big shell components are SEPARATE top-level functions, not nested. In
+`CircleLauncherScreen.js`, `CircleDetail` is a *sibling* of `CircleLauncherScreen` — so the parent's
+props/state (`bundle`, `onCircleControl`, `setView`, …) are **not** in `CircleDetail`'s scope. When
+chat/command/feedback logic is moved into the sibling, references to the parent's scope compile fine
+(they look like they'll resolve "from the outer function") but throw the instant the component's
+render or a `useX` **dependency array** is evaluated. A *lazy* leak (a `() => catalog` getter, a
+`c.inkSoft` inside a `<TextInput placeholderTextColor>`) survives longer — it only throws when the
+closure runs — so it hides from a quick smoke test. The stale dev client masked all of these because
+it was running old JS; the rebuild is what surfaced them (found 5 across 2 files, 2026-07-25).
+
+**Fix.** Thread the parent value in as a **PROP** (e.g. `coreIdentity={bundle?.coreAgent?.identity}`,
+`onCircleControl={onCircleControl}`), or move the declaration into the component. Reuse an existing
+handler prop where one already wraps the parent action (`onSettings` = `() => setView('settings')`).
+
+**Guard.** `npm run lint:scope` (`scripts/lint-scope-leaks.mjs`) is `no-undef` scoped to the RN shell
+via real Babel scope analysis: any *referenced* identifier inside a shell component that resolves to
+no binding in its scope chain (and isn't a runtime global) fails CI. `npm run test:scope` locks in
+the clean tree. Add new runtime globals to `RUNTIME_GLOBALS` if a legit one is ever flagged.
+
 ## better-sqlite3 native binding not built → relay suite 5 failures (cold clone)
 
 `packages/relay` uses **better-sqlite3** (Sqlite queue store + the blob-gate ACL store). It's a NATIVE

@@ -20,6 +20,8 @@
     "test:deps": "vitest run scripts/lint-dep-boundaries.test.mjs",
     "lint:codenames": "node scripts/lint-codenames.mjs",
     "test:codenames": "vitest run scripts/lint-codenames.test.mjs",
+    "lint:scope": "node scripts/lint-scope-leaks.mjs",
+    "test:scope": "vitest run scripts/lint-scope-leaks.test.mjs",
     "changeset": "npx @changesets/cli",
     "version-packages": "npx @changesets/cli version",
     "release": "pnpm -r publish --access public",
@@ -28,6 +30,8 @@
     "api-fitness": "node scripts/api-fitness.mjs"
   },
   "devDependencies": {
+    "@babel/parser": "^7.29.3",
+    "@babel/traverse": "^7.29.0",
     "@changesets/cli": "^2.27.10",
     "@playwright/test": "^1.60.0",
     "playwright": "^1.60.0"

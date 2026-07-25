@@ -28,7 +28,7 @@ describe('D / Surface 2 — mobile CircleDetail action roster from the manifest 
     // for the detail bar — the ⋯ menus filter it out in-shell).
     expect(ids).toEqual([
       'back', 'invite', 'settings', 'lists', 'contacts', 'override', 'viewAs',
-      'advisor', 'skills', 'rules', 'recipes', 'admin', 'share',
+      'advisor', 'skills', 'rules', 'recipes', 'admin', 'governance', 'share',
     ]);
     // files hidden (lists+notes off by default); share present (mobile platform).
     expect(ids).not.toContain('files');

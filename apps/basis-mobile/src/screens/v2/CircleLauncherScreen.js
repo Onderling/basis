@@ -221,6 +221,7 @@ import CircleProfileScreen from './CircleProfileScreen.js';
 import CircleAdminPanelScreen from './CircleAdminPanelScreen.js';
 import CircleMyDataScreen from './CircleMyDataScreen.js';
 import CircleMijScreen from './CircleMijScreen.js';   // mij#personas — the "Mij → persona's" surface (replaces the single-persona About-me content, web parity with openAboutMePanel)
+import CircleGovernanceScreen from './CircleGovernanceScreen.js';   // Wave C §5 — governance surface (web≡mobile)
 import SharedWithMeScreen from './SharedWithMeScreen.js';   // SILENT out-of-circle delivery — personal "shared with me" inbox (web≡mobile)
 
 // B (circle bot) — host LLM route for NL→command in the kring. Mirrors web's VITE_CIRCLE_LLM_BASEURL
@@ -1154,6 +1155,7 @@ export default function CircleLauncherScreen({
       if (view === 'mydata') { setView('profile'); return true; }
       // S3 — admin panel is a sub-view of the circle detail.
       if (selected && view === 'admin') { setView('detail'); return true; }
+      if (selected && view === 'governance') { setView('detail'); return true; }
       // Top-level tab screens → back to launcher list.
       if (view === 'availability' || view === 'stream' || view === 'profile'
           || view === 'nearby' || view === 'mythings') {
@@ -1345,6 +1347,18 @@ export default function CircleLauncherScreen({
       <CircleAdminPanelScreen
         callSkill={bundle?.callSkill}
         groupId={selected.id}
+        onBack={() => setView('detail')}
+      />
+    );
+  }
+  if (selected && view === 'governance') {   // Wave C §5 — governance surface (web≡mobile)
+    return (
+      <CircleGovernanceScreen
+        callSkill={bundle?.callSkill}
+        eventLog={eventLog}
+        getPolicy={(cid) => policyStore.get(cid)}
+        updatePolicy={(cid, next) => policyStore.update(cid, next)}
+        circleId={selected.id}
         onBack={() => setView('detail')}
       />
     );
@@ -1580,6 +1594,7 @@ export default function CircleLauncherScreen({
         onInvite={() => openCircleInvite(selected.id)}
         onSettings={() => setView('settings')}
         onAdmin={() => setView('admin')}
+        onGovernance={() => setView('governance')}
         onMine={() => setView('override')}
         onViewAs={async () => {
           const p = await policyStore.get(selected.id);
@@ -1949,7 +1964,7 @@ function CircleDetail({
   recipeStore = null, onStoopEvent, sendPersonaUpdate, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null,
   // Task #13 — onboarding first-run flags (shared store) + the create-flow handoff.
   onboardingFlags = null, onCreateCircle = null,
-  onBack, onSettings, onMine, onViewAs, onAdvisor, onSkills, onFiles, onRules, onRecipes, onAdmin, onLists, onShare, onInvite,
+  onBack, onSettings, onMine, onViewAs, onAdvisor, onSkills, onFiles, onRules, onRecipes, onAdmin, onLists, onShare, onInvite, onGovernance,
 }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -3188,6 +3203,7 @@ function CircleDetail({
                 contacts: () => setScreenPanel({ screen: 'contacts' }),   // filterable list-screen
                 override: onMine, viewAs: onViewAs, advisor: onAdvisor, skills: onSkills,
                 files: onFiles, rules: onRules, recipes: onRecipes, admin: onAdmin, share: onShare,
+                governance: onGovernance,
               };
               const on = handlers[action.id];
               const token = { override: 'mine', viewAs: 'viewas' }[action.id] ?? action.id;

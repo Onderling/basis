@@ -29,7 +29,7 @@ function fullMore() {
   return {
     invite: vi.fn(), settings: vi.fn(), lists: vi.fn(), contacts: vi.fn(),
     override: vi.fn(), viewAs: vi.fn(), advisor: vi.fn(), skills: vi.fn(),
-    files: vi.fn(), rules: vi.fn(), recipes: vi.fn(), admin: vi.fn(), share: vi.fn(),
+    files: vi.fn(), rules: vi.fn(), recipes: vi.fn(), admin: vi.fn(), governance: vi.fn(), share: vi.fn(),
   };
 }
 

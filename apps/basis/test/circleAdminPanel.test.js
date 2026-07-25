@@ -48,14 +48,14 @@ describe('renderCircleAdminPanel', () => {
     expect(onBack).toHaveBeenCalled();
   });
 
-  it('lists reports + muted peers; unmute fires onUnmute (S3 moderation)', () => {
+  it('lists muted peers; unmute fires onUnmute (S3 moderation)', () => {
     const onUnmute = vi.fn();
     const el = renderCircleAdminPanel(document.createElement('div'), {
       t, members: [], onUnmute,
-      reports: [{ id: 'r1', source: { reportTarget: 'post-9', reason: 'spam' } }],
       muted: ['webid:https://bob.example/me', 'stable-7'],
     });
-    expect(el.querySelector('.cc-admin__report').textContent).toContain('circle.admin.report_row');
+    // Reports are NOT in the admin panel — they live on the §8 governance Reports surface.
+    expect(el.querySelector('.cc-admin__report')).toBeNull();
     const muted = el.querySelectorAll('.cc-admin__muted');
     expect(muted).toHaveLength(2);
     expect(muted[0].querySelector('.cc-admin__muted-key').textContent).toBe('https://bob.example/me'); // webid: stripped

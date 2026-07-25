@@ -5697,7 +5697,6 @@ async function showOverride(id) {
 async function showAdmin(id) {
   hideCircleTabBar(tabBarEl);
   let members = [];
-  let reports = [];
   let muted = [];
   let outboundShares = [];          // objective L — this circle's outbound canonical shares (Stop-sharing rows)
   let outboundCanonical = false;    // circle-level posture gate: only a `canonical` circle can revoke in place
@@ -5705,14 +5704,12 @@ async function showAdmin(id) {
   let notice = null;
 
   async function load() {
-    const [mem, rep, mut] = await Promise.all([
+    const [mem, mut] = await Promise.all([
       rawCallSkill('stoop', 'listGroupMembers', { groupId: id }).catch(() => null),
-      rawCallSkill('stoop', 'listReports', { groupId: id }).catch(() => null),
       rawCallSkill('stoop', 'listMutedPeers', {}).catch(() => null),
     ]);
     members = Array.isArray(mem?.members) ? mem.members : [];
-    reports = Array.isArray(rep?.reports) ? rep.reports : [];   // admin-only; {error} → []
-    muted = Array.isArray(mut?.peers) ? mut.peers : [];
+    muted = Array.isArray(mut?.peers) ? mut.peers : [];   // reports moved to §8 governance Reports
     // objective L — enumerate what THIS circle has shared OUT (across the known circles) + whether its posture
     // is `canonical` (the only revocable-in-place posture). Both best-effort — a failure just hides the section.
     try {
@@ -5728,7 +5725,7 @@ async function showAdmin(id) {
     rerender();
   }
   const rerender = () => renderCircleAdminPanel(rootEl, {
-    members, reports, muted, outboundShares, outboundCanonical, busy, notice, t,
+    members, muted, outboundShares, outboundCanonical, busy, notice, t,
     onBack: () => showDetail(id),
     // objective L — "Stop sharing": revoke ONE canonical share in place (rotate key + ACP-revoke). Reuses the
     // same revoke path the /unshareitem slash uses (unshareItemFromCircle → revokeItemShare). Since a

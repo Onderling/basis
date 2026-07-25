@@ -6,11 +6,14 @@
  * (`circleApp.js` showAdmin) loads `listGroupMembers` and dispatches the
  * admin-gated stoop ops (`removeMember`, `postAnnouncement`); a non-admin's
  * dispatch is refused server-side, surfaced as a notice.
+ *
+ * Reports are NOT here: moderation reports live on the ONE §8 surface — the
+ * governance "Decisions" panel's Reports section (file · dismiss · act→remove),
+ * which supersedes the old read-only `listReports` view this panel used to carry.
  */
 
 export function renderCircleAdminPanel(container, {
   members = [],
-  reports = [],
   muted = [],
   outboundShares = [],
   outboundCanonical = false,
@@ -122,32 +125,7 @@ export function renderCircleAdminPanel(container, {
   annSection.appendChild(form);
   container.appendChild(annSection);
 
-  // ── reports (moderation, read-only) ───────────────────────────────────────
-  const repSection = document.createElement('section');
-  repSection.className = 'cc-admin__section';
-  const repTitle = document.createElement('h3');
-  repTitle.className = 'cc-admin__section-title';
-  repTitle.textContent = tr('circle.admin.reports');
-  repSection.appendChild(repTitle);
-  if (!reports.length) {
-    const empty = document.createElement('p');
-    empty.className = 'cc-admin__empty';
-    empty.textContent = tr('circle.admin.no_reports');
-    repSection.appendChild(empty);
-  } else {
-    const list = document.createElement('ul');
-    list.className = 'cc-admin__report-list';
-    for (const r of reports) {
-      const li = document.createElement('li');
-      li.className = 'cc-admin__report';
-      const target = r.source?.reportTarget ?? r.itemId ?? '';
-      const reason = r.source?.reason ?? r.reason ?? '';
-      li.textContent = tr('circle.admin.report_row', { target, reason: reason || tr('circle.admin.no_reason') });
-      list.appendChild(li);
-    }
-    repSection.appendChild(list);
-  }
-  container.appendChild(repSection);
+  // (reports moved to the §8 governance "Decisions" Reports section — see the header note)
 
   // ── muted peers ───────────────────────────────────────────────────────────
   const mutSection = document.createElement('section');

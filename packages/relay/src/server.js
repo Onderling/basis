@@ -92,6 +92,7 @@ import { MultiRecipientQueue }               from './MultiRecipientQueue.js';
 import { ForwardQueue }                       from './ForwardQueue.js';
 import { GroupAuthVerifier }                 from './GroupAuthVerifier.js';
 import { PushTokenRegistry }                 from './push/PushTokenRegistry.js';
+import { envelopeSuppressesWake }            from './push/wakePayload.js';
 import { mountBlobGate }                     from './blobGateMount.js';
 import { logHop }                            from './verbose.js';
 
@@ -372,7 +373,15 @@ export async function startRelay(opts = {}) {
    * buffered delivery).
    */
   const deliverOrEnqueue = (to, envelope, topic) =>
-    forwardQueue.deliverOrEnqueue(to, envelope, { socket: clients.get(to) ?? null, topic });
+    forwardQueue.deliverOrEnqueue(to, envelope, {
+      socket: clients.get(to) ?? null,
+      topic,
+      // Per-message wake-gate: an envelope stamped `noWake` (routine governance
+      // votes/resolves, reports — the sender consulted `governanceWakeHint`) is
+      // still hold-forwarded, but must NOT fire a push wake. Only a decision
+      // OPENING wakes an offline device. Absent flag ⇒ wake exactly as before.
+      wake:   !envelopeSuppressesWake(envelope),
+    });
 
   const tryWakePush = (address) => {
     if (!pushSender || !tokenRegistry) return;

@@ -121,6 +121,45 @@ describe('relay — push wake (E2c)', () => {
     bob.close();
   });
 
+  it('no-wake flag: hold-forwards WITHOUT a push, while a normal message DOES wake', async () => {
+    const url = `ws://127.0.0.1:${relay.port}`;
+    // Two offline peers, each with a push token registered.
+    for (const [addr, tok] of [['nw-alice', 'tok-nw'], ['w-dave', 'tok-w']]) {
+      const c = await openClient(url);
+      send(c, { type: 'register', address: addr });
+      await waitFor(() => c.messages.some((m) => m.type === 'registered'));
+      send(c, { type: 'register-push-token', token: tok, platform: 'ios' });
+      await waitFor(() => c.messages.some((m) => m.type === 'push-token-registered'));
+      c.close();
+      await waitFor(() => c.readyState === c.CLOSED);
+    }
+
+    const bob = await openClient(url);
+    send(bob, { type: 'register', address: 'bob' });
+    await waitFor(() => bob.messages.some((m) => m.type === 'registered'));
+
+    // A routine governance vote (envelope stamped `noWake`) → hold-forwarded, NO push.
+    send(bob, { type: 'send', to: 'nw-alice', envelope: { _p: 'OW', noWake: true, subtype: 'kring-governance-broadcast' } });
+    // A normal message to a different offline peer → DOES push.
+    send(bob, { type: 'send', to: 'w-dave', envelope: { _p: 'OW' } });
+
+    await waitFor(() => pushSender.calls.length >= 1, 500);
+    // Give any spurious (no-wake) push a tick to (not) fire.
+    await new Promise((r) => setTimeout(r, 40));
+    expect(pushSender.calls).toHaveLength(1);
+    expect(pushSender.calls[0].token).toBe('tok-w');   // only dave woke; alice did not
+
+    // The no-wake message was still BUFFERED — alice receives it on reconnect
+    // (hold-forward is preserved; only the wake was suppressed).
+    const alice = await openClient(url);
+    send(alice, { type: 'register', address: 'nw-alice' });
+    await waitFor(() => alice.messages.some((m) => m.type === 'message'));
+    const got = alice.messages.find((m) => m.type === 'message');
+    expect(got.envelope).toMatchObject({ noWake: true });
+
+    bob.close(); alice.close();
+  });
+
   it('does NOT fire push when target is online', async () => {
     const alice = await openClient(`ws://127.0.0.1:${relay.port}`);
     send(alice, { type: 'register', address: 'alice' });

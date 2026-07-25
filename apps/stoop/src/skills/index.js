@@ -951,7 +951,17 @@ export function buildSkills({
     } catch { return 'fan-out-full'; }
   }
 
-  async function broadcastToCircle({ circleId, kind, from, body = '', extras = {}, metric = null, envelope = null }) {
+  async function broadcastToCircle({ circleId, kind, from, body = '', extras = {}, metric = null, envelope = null, noWake = false }) {
+    // Relay wake-gate (§ residual server-side wake work): a broadcast marked
+    // `noWake` is hold-forwarded to offline members but must NOT fire an OS push
+    // wake — routine governance events (individual votes/resolves) and reports
+    // are noise; only a decision OPENING wakes a device. We stamp the wire flag
+    // the relay honours (`envelope.noWake`, see @onderling/relay wakePayload
+    // `envelopeSuppressesWake`) onto BOTH transport shapes: the synthesised wire
+    // envelope (reliable-send path) AND `extras` (the chat.send fallback rebuilds
+    // its payload from subtype+extras). Chat/policy/rules/recipe never set it, so
+    // they wake as before — fully backward compatible.
+    if (noWake) extras = { ...extras, noWake: true };
     // Prefer the RELIABLE sender for EVERY broadcast, not just chat (which passes an
     // `envelope`). It resolves webid→pubKey + hold-forwards; the bus-local `chat.send`
     // fallback cannot resolve the mesh address, so a control-plane broadcast (policy / rules /
@@ -2087,7 +2097,12 @@ export function buildSkills({
       // Promote caller to admin in MemberMap (idempotent).  Also record the
       // creator's own per-circle ADDRESS for this circle (identity step 5B/C)
       // when supplied — the admin is a member too, so the roster carries the
-      // unlinkable address they present here just like a joiner's.
+      // unlinkable address they present here just like a joiner's. No proof gate
+      // here (unlike the redeem path): this is the creator's OWN fresh per-circle
+      // address for a circle they own, not a cross-circle "existing self" CLAIM
+      // that a separate admin must verify — the creator IS the authority, so
+      // there is no counterparty to prove it to. Create-time linkability (if ever
+      // offered) would STORE a proof for members to verify on READ, not gate here.
       if (members) {
         const me = (await members.resolveByWebid(from)) ?? { webid: from };
         await members.addMember({
@@ -3783,13 +3798,21 @@ export function buildSkills({
       if (!a.event || typeof a.event !== 'object')                    return { error: 'event-required' };
       if (typeof a.msgId !== 'string' || !a.msgId)                    return { error: 'msgId-required' };
       const ts = typeof a.ts === 'number' && Number.isFinite(a.ts) ? a.ts : Date.now();
+      // Wake-gate: only a decision OPENING (`propose`) may wake an offline device;
+      // an individual vote/resolve is routine and must not. This mirrors basis
+      // `governanceWakeHint` (governanceLog.js) — the canonical "which governance
+      // events nudge" signal — read here off the event's own wire discriminator
+      // (stoop can't import basis/app code, invariant #5). Keep the two in
+      // lock-step: `propose` wakes, everything else is no-wake.
+      const wakes = !!a.event && a.event.event === 'propose';
       return broadcastToCircle({
         circleId: _groupId, kind: 'kring-governance-broadcast', from,
         extras: { circleId: _groupId, msgId: a.msgId, ts, event: a.event },
         metric: 'kring-governance-fanout',
+        noWake: !wakes,
       });
     }, {
-      description: 'Fan a governance event (propose/vote/resolve) to every other member via chat.send subtype:kring-governance-broadcast; receivers ingest it into their local EventLog.',
+      description: 'Fan a governance event (propose/vote/resolve) to every other member via chat.send subtype:kring-governance-broadcast; receivers ingest it into their local EventLog. Only a propose wakes an offline device (governanceWakeHint).',
       visibility:  'authenticated',
     }),
 
@@ -3805,13 +3828,16 @@ export function buildSkills({
       if (!a.event || typeof a.event !== 'object')                    return { error: 'event-required' };
       if (typeof a.msgId !== 'string' || !a.msgId)                    return { error: 'msgId-required' };
       const ts = typeof a.ts === 'number' && Number.isFinite(a.ts) ? a.ts : Date.now();
+      // Wake-gate: a report is a silent-lane event — it's hold-forwarded so an
+      // admin sees it on their next presence, but it must never OS-wake a device.
       return broadcastToCircle({
         circleId: _groupId, kind: 'kring-report-broadcast', from,
         extras: { circleId: _groupId, msgId: a.msgId, ts, event: a.event },
         metric: 'kring-report-fanout',
+        noWake: true,
       });
     }, {
-      description: 'Fan a report event to every other member via chat.send subtype:kring-report-broadcast; receivers ingest it into their local EventLog.',
+      description: 'Fan a report event to every other member via chat.send subtype:kring-report-broadcast; receivers ingest it into their local EventLog. Never wakes an offline device (silent lane).',
       visibility:  'authenticated',
     }),
 

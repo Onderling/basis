@@ -32,6 +32,32 @@
 export const CONTENTLESS_WAKE = Object.freeze({ wake: true, hint: 'message-pending' });
 
 /**
+ * The per-message wire flag that SUPPRESSES the offline push-wake. A message is
+ * still hold-forwarded (buffered + replayed on the recipient's next presence),
+ * but the OS push wake is NOT fired for it.
+ *
+ * WHY: routine governance events — individual VOTES, resolves — and reports are
+ * noise for an offline device. Only a decision OPENING (a governance `propose`,
+ * per basis `governanceWakeHint`) is worth waking someone up for. The sender (the
+ * governance/report fan) stamps `envelope.noWake = true` on the wire envelope for
+ * the events that must NOT wake; the relay honours it in the enqueue→wake path.
+ * Absent/false ⇒ wake as before — fully backward compatible.
+ */
+export const NO_WAKE_FIELD = 'noWake';
+
+/**
+ * Does this wire envelope ask the relay to SKIP the offline push-wake? True only
+ * when the sender explicitly stamped `noWake: true`. Any other shape (absent,
+ * false, non-object) ⇒ false ⇒ the relay wakes exactly as it always has.
+ *
+ * @param {object|null|undefined} envelope
+ * @returns {boolean}
+ */
+export function envelopeSuppressesWake(envelope) {
+  return !!envelope && typeof envelope === 'object' && envelope[NO_WAKE_FIELD] === true;
+}
+
+/**
  * Generic placeholder alert for the RELIABLE (NSE) path. Names nobody and
  * nothing; the NSE rewrites it after it fetches + decrypts the sealed blob.
  * Frozen so a caller can't accidentally leak content in through here.

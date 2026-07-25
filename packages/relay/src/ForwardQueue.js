@@ -95,16 +95,21 @@ export class ForwardQueue {
    * @param {object} [opts]
    * @param {object|null} [opts.socket]  the recipient's live socket, or null
    * @param {string|null} [opts.topic]
+   * @param {boolean} [opts.wake=true]   fire `onWake` when this envelope is
+   *   buffered for an offline recipient. Pass `false` to hold-forward WITHOUT a
+   *   push wake — the relay's per-message no-wake gate for routine events
+   *   (governance votes/resolves, reports). The buffering itself is unchanged;
+   *   only the wake is suppressed.
    * @returns {'delivered'|'queued'}
    */
-  deliverOrEnqueue(to, envelope, { socket = null, topic = null } = {}) {
+  deliverOrEnqueue(to, envelope, { socket = null, topic = null, wake = true } = {}) {
     if (socket && socket.readyState === WS_OPEN) {
       try { socket.send(ForwardQueue.messageFrame(envelope)); }
       catch { /* socket may have raced a close */ }
       return 'delivered';
     }
     this.enqueue(to, envelope, topic);
-    if (this.#onWake) this.#onWake(to);
+    if (wake && this.#onWake) this.#onWake(to);
     return 'queued';
   }
 

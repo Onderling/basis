@@ -4671,6 +4671,12 @@ function showKring(id, circle, policy) {
     });
     renderCircleKring(rootEl, {
       circle, rows, t,
+      // §8 — report another member's message to the admins (a governance `message` report).
+      onReportMessage: (msgId, row) => {
+        const reason = (globalThis.prompt?.(t('circle.governance.report_reason_prompt')) ?? '') || '';
+        const label = (row?.event?.payload?.text || row?.text || '').slice(0, 48);
+        fileCircleReport(id, 'message', msgId, label, reason);
+      },
       // 1:1-bot chat gate — the assistant-header strip shows ONLY when this circle is
       // you + exactly one participant, and that participant is a bot (relation==='agent').
       // Computed from THIS circle's raw roster (kringMembers, best-effort on open) + my

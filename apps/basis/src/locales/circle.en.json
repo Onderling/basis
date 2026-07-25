@@ -3712,6 +3712,7 @@
     "awaiting_enactment": { "text": "awaiting an admin", "doc": "Governance — approved, waiting for an admin/caretaker device to enact it (Decision A)." },
     "disputed_line": { "text": "conflicting history from {who} — evidence attached", "doc": "Governance L3 — equivocation (fork-proof) alert." },
     "review_remove": { "text": "Review & remove", "doc": "Governance L3 — open a removeMember review on a disputed member." },
+    "report_message": { "text": "Report message", "doc": "Governance §8 — the per-bubble button to report a chat message to the admins." },
     "report_member": { "text": "Report member", "doc": "Governance §8 — the button on a member card to report them to the admins." },
     "report_reason_prompt": { "text": "Why are you reporting this member?", "doc": "Governance §8 — prompt for the report reason." },
     "notify_vote_opened": { "text": "A decision opened: {action} — your vote may be needed", "doc": "Governance — in-app nudge when a decision opens on another device (governanceWakeHint gates to propose)." },

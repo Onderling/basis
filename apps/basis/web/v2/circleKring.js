@@ -65,6 +65,7 @@ export function renderCircleKring(container, {
   onEmbedButton = null,   // S6.A — tap an inline manifest button on a bot reply
   onEmbedOpen = null,     // tap a "See also" embed chip → open the item's screen
   onReview = null,        // convergence — tap a feedback review card button (send/edit/cancel)
+  onReportMessage = null, // §8 — report a message to the circle's admins (per-bubble affordance)
   more = null,
   composerPlaceholder = null,
   composerPrefill = null,   // convergence — the ✏ edit opens the composer with the point's current text
@@ -343,6 +344,7 @@ export function renderCircleKring(container, {
         onEmbedButton, onEmbedOpen, onReview,
         media,
         viewerWebid, viewerIsAdmin,
+        onReportMessage,
       }));
     }
   }
@@ -705,6 +707,8 @@ function renderBubble(row, {
   media = null,
   // Mandate — viewer identity signals for the owner-only "entrust" action.
   viewerWebid = null, viewerIsAdmin = false,
+  // §8 — report this message to the circle's admins (shown on others' human messages).
+  onReportMessage = null,
 } = {}) {
   const el = document.createElement('div');
   el.className = 'circle-kring__bubble';
@@ -844,6 +848,17 @@ function renderBubble(row, {
       actRow.appendChild(btn);
     }
     el.appendChild(actRow);
+  }
+
+  // §8 — report affordance on ANOTHER member's human message (not own, not a bot). Files a
+  // `message` report into the governance report host (→ the admin Reports section).
+  if (typeof onReportMessage === 'function' && !rowIsOwn && row?.actor !== 'bot' && row?.id) {
+    const rep = document.createElement('button');
+    rep.type = 'button';
+    rep.className = 'circle-kring__bubble-report';
+    rep.textContent = tr('circle.governance.report_message');
+    rep.addEventListener('click', () => onReportMessage(row.id, row));
+    el.appendChild(rep);
   }
 
   // Mandate legibility — when a task row carries issued mandates

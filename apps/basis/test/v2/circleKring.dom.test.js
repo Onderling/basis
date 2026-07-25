@@ -721,3 +721,38 @@ describe('renderCircleKring · help Q&A seams (transparency badge + consent card
     expect(el.querySelector('.circle-kring__consent-btn--secondary')).not.toBeNull();
   });
 });
+
+describe('renderCircleKring · §8 message report affordance', () => {
+  const chatRows = [{
+    id: 'm1', ts: Date.now(), app: 'household', type: 'chat-message', actor: 'Pieter', circleId: 'g1',
+    event: { id: 'm1', type: 'chat-message', payload: { text: 'iets vervelends', senderDisplay: 'Pieter' } },
+  }];
+  const botRows = [{
+    id: 'b1', ts: Date.now(), app: 'household', type: 'chat-message', actor: 'bot', circleId: 'g1',
+    event: { id: 'b1', type: 'chat-message', payload: { text: 'hoi' } },
+  }];
+
+  it("shows a report button on ANOTHER member's message and fires onReportMessage", () => {
+    const el = mount();
+    const onReportMessage = vi.fn();
+    renderCircleKring(el, { circle, rows: chatRows, t, localActor: 'me', onReportMessage });
+    const rep = el.querySelector('.circle-kring__bubble-report');
+    expect(rep).toBeTruthy();
+    rep.click();
+    expect(onReportMessage).toHaveBeenCalledWith('m1', expect.objectContaining({ id: 'm1' }));
+  });
+
+  it('no report button on your OWN message, or on a bot message, or when unwired', () => {
+    const own = mount();
+    renderCircleKring(own, { circle, rows: chatRows, t, localActor: 'Pieter', onReportMessage: () => {} });
+    expect(own.querySelector('.circle-kring__bubble-report')).toBeNull();
+
+    const bot = mount();
+    renderCircleKring(bot, { circle, rows: botRows, t, localActor: 'me', onReportMessage: () => {} });
+    expect(bot.querySelector('.circle-kring__bubble-report')).toBeNull();
+
+    const unwired = mount();
+    renderCircleKring(unwired, { circle, rows: chatRows, t, localActor: 'me' });
+    expect(unwired.querySelector('.circle-kring__bubble-report')).toBeNull();
+  });
+});

@@ -28,9 +28,13 @@ import { makeResourceUriResolver, sharedRefResourceUri } from '@onderling/pod-on
  *        group-key resource (`keyStore`) + live origin roster (`members()`) feed the canonical controller.
  * @param {{publicKey?:string, privateKey?:string}|null} [deps.idKey]  this device's per-circle sealing identity
  *        (already a group-key recipient) — the canonical controller key. Absent ⇒ no canonical hooks.
+ * @param {(webid:string)=>(string|null|Promise<string|null>)} [deps.sealingKeyForRecipient]  resolve an
+ *        OUT-OF-CIRCLE recipient's sealing public key from their WebID (the shells build it from the Contacten
+ *        roster via `recipientSealingKeyResolver`). Lets a revoke evict exactly the named grantee instead of
+ *        collaterally dropping the others. Absent ⇒ revoke stays conservative (roster-only rotation).
  * @returns {object|null}  the enforcement binder, or null when the pod path is inactive.
  */
-export function buildCircleShareEnforcement({ sharing, strategy, podRoot, controlAgent, idKey } = {}) {
+export function buildCircleShareEnforcement({ sharing, strategy, podRoot, controlAgent, idKey, sealingKeyForRecipient } = {}) {
   if (!podRoot) return null;                                   // not signed in → memory path
   // Require BOTH a real ACP sharing surface AND a resolved seal strategy (p2/p3). p0/p1 or an unprovisioned
   // group key → null (decline the pod path rather than grant against plaintext).
@@ -91,6 +95,49 @@ export function buildCircleShareEnforcement({ sharing, strategy, podRoot, contro
     return out;
   };
 
+  // ── REVOKE-side audience: evict EXACTLY the named party, nobody else ────────────────────────────────
+  //
+  // Rotating to the roster evicts the revokee — but also every unrelated OUT-OF-CIRCLE grantee, who is by
+  // definition not in the roster (confirmed bug, story 1.2 in NOTE-multi-device-user-stories.md: revoke Bram
+  // → Cato loses access too). The precise answer is "every current key-holder MINUS the revokee", which needs
+  // the revokee's SEALING KEY — they are named by WebID, and the holder list is sealing keys.
+  //
+  // That mapping needs NO new bookkeeping; it is already derivable from two durable sources:
+  //   • a circle MEMBER → the control agent's roster carries `{webId, publicKey}` directly.
+  //   • an OUT-OF-CIRCLE grantee → their sealing key was DERIVED at grant time from their published Ed25519
+  //     network key (`sealingPublicKeyFromNetworkKey`), a PURE deterministic map. Re-deriving it from the
+  //     same contact reproduces exactly the key that was granted — hence the injected `sealingKeyForRecipient`
+  //     (the shells build it from the Contacten roster; see `recipientSealingKeyResolver` in shareRecipients.js).
+  const sealingKeyForWebid = async (webid) => {
+    if (!webid) return null;
+    try {
+      for (const m of controlAgent?.members?.() ?? []) {
+        if (m?.webId === webid && m.publicKey) return m.publicKey;
+      }
+    } catch { /* roster unresolvable — fall through */ }
+    if (typeof sealingKeyForRecipient === 'function') {
+      try { return (await sealingKeyForRecipient(webid)) || null; } catch { return null; }
+    }
+    return null;
+  };
+
+  // Current holders MINUS the revokee(s). FAIL-SAFE: if ANY revokee's key can't be resolved we cannot prove
+  // they'd be excluded from the widened holder set, so we fall back to the conservative roster-only rotation —
+  // which definitely evicts them (at the cost of also dropping other out-of-circle grantees, the old
+  // behaviour). Never the other way round: a revoke must never leave the revoked party holding the key.
+  const revokeRecipients = async (revokeeWebids = []) => {
+    const who = Array.isArray(revokeeWebids) ? revokeeWebids.filter(Boolean) : [];
+    if (who.length === 0) return currentRecipients();
+    const drop = new Set();
+    for (const webid of who) {
+      const key = await sealingKeyForWebid(webid);
+      if (!key) return currentRecipients();              // unresolvable → conservative, safe, lossy
+      drop.add(key);
+    }
+    const holders = await grantRecipients();             // roster ∪ the key resource's own recipients
+    return holders.filter((k) => !drop.has(k));
+  };
+
   // Enforcement `seal` is OMITTED on purpose: the cross-circle recipient re-seal (copy postures) is layered
   // ABOVE this binder in `shareItemAcrossCircles`. On read, `open: strategy.open` unseals a group-key source;
   // `composeReaderOpen` (in circleShare) adds the reader's own opener. `currentRecipients` re-wraps the group
@@ -98,8 +145,9 @@ export function buildCircleShareEnforcement({ sharing, strategy, podRoot, contro
   const enforcement = makeCircleShareEnforcement({
     sharing, resourceUriFor, open: strategy.open,
     canonicalShare,
-    currentRecipients,   // roster-only — the revoke-side default (must never include a revocable recipient)
+    currentRecipients,   // roster-only — the conservative fallback (must never include a revocable recipient)
     grantRecipients,     // roster ∪ current key-holders — so an earlier out-of-circle grantee isn't dropped
+    revokeRecipients,    // current holders MINUS the named revokee(s) — evict exactly one, not the bystanders
   });
 
   // Phase 2 (objective L follow-up) — grant an OUT-OF-CIRCLE recipient (NOT in the origin roster) revocable

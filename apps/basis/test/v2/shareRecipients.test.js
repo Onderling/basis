@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { peerToContactRow, stoopContactToRow } from '../../src/v2/contactsSource.js';
-import { pickableRecipients, outOfCircleLinkWarning } from '../../src/v2/shareRecipients.js';
+import { pickableRecipients, outOfCircleLinkWarning, recipientSealingKeyResolver } from '../../src/v2/shareRecipients.js';
 
 describe('pickableRecipients — the out-of-circle recipient selector', () => {
   it('maps contacts that carry a network key to recipient rows; the key IS recipientNetworkKey', () => {
@@ -74,5 +74,45 @@ describe('outOfCircleLinkWarning — warn iff the pick grants by network key', (
     ]);
     expect(outOfCircleLinkWarning(rows)).toBeTruthy();
     expect(rows.map((r) => r.name)).toEqual(['Ada', 'Bo']);   // unchanged — nothing is blocked
+  });
+});
+
+// Story 1.2 — resolving an out-of-circle grantee's SEALING key from their WebID, so a revoke can evict exactly
+// that grantee. No stored grant record: the key is RE-DERIVED from the contact's published network key, the
+// same pure map `shareToPublishedKey` used at grant time.
+describe('recipientSealingKeyResolver — WebID → sealing key, re-derived from the contact', () => {
+  const contacts = [
+    stoopContactToRow({ webid: 'did:ada', displayName: 'Ada', pubKey: 'NET_ADA' }),
+    peerToContactRow({ pubKey: 'NET_PEER', name: 'Peer' }),
+  ];
+  const derive = (netKey) => `SEAL(${netKey})`;   // stands in for sealingPublicKeyFromNetworkKey (pure)
+
+  it('re-derives the SAME key the grant used, from the same contact', async () => {
+    const resolve = recipientSealingKeyResolver({ contacts: () => contacts, deriveSealingKey: derive });
+    expect(await resolve('did:ada')).toBe('SEAL(NET_ADA)');
+    // Determinism is the whole basis of the fix: same input ⇒ same key, no record needed.
+    expect(await resolve('did:ada')).toBe(derive('NET_ADA'));
+  });
+
+  it('returns null for an unknown recipient — the caller must then FAIL SAFE', async () => {
+    const resolve = recipientSealingKeyResolver({ contacts: () => contacts, deriveSealingKey: derive });
+    expect(await resolve('did:nobody')).toBeNull();
+    expect(await resolve(null)).toBeNull();
+  });
+
+  it('returns null (never throws) when the contact list or the derivation blows up', async () => {
+    const boom = recipientSealingKeyResolver({
+      contacts: () => { throw new Error('contacts unavailable'); }, deriveSealingKey: derive,
+    });
+    expect(await boom('did:ada')).toBeNull();
+    const badKey = recipientSealingKeyResolver({
+      contacts: () => contacts, deriveSealingKey: () => { throw new Error('not an Ed25519 key'); },
+    });
+    expect(await badKey('did:ada')).toBeNull();
+  });
+
+  it('accepts a plain array as well as a thunk (read-live or snapshot)', async () => {
+    const resolve = recipientSealingKeyResolver({ contacts, deriveSealingKey: derive });
+    expect(await resolve('did:ada')).toBe('SEAL(NET_ADA)');
   });
 });

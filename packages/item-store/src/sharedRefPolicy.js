@@ -230,28 +230,36 @@ export function makeShareGrantHook({ sharing, resourceUriFor, mode = 'read', sea
  *        PUBLIC KEYS (the origin circle's members already holding the group key). Passed to `grantMember` so a
  *        grant re-wraps the SAME key to the roster PLUS the new recipient — omitting it would drop the origin
  *        members from the resource. A thunk is resolved at share time (the live roster). Default: none.
- *        ALSO the revoke-side default for `remainingRecipients` — so it must NOT include anyone revocable.
+ *        ALSO the revoke-side FALLBACK when no `revokeRecipients` is given — so it must NOT include anyone revocable.
  * @param {string[]|(()=>string[]|Promise<string[]>)} [opts.grantRecipients]  GRANT-side base, when it should be
  *        WIDER than the roster: "everyone who currently holds this item's key" (roster ∪ the key resource's own
  *        `recipients`), so an earlier out-of-circle grantee survives a later grant. Defaults to
- *        `currentRecipients`. Never used for revoke (see the note at `grantBaseKeys`).
+ *        `currentRecipients`.
+ * @param {(revokeeWebids: string[]) => (string[]|Promise<string[]>)} [opts.revokeRecipients]  REVOKE-side base:
+ *        given the WebIDs being revoked, return the sealing keys that should KEEP the key — i.e. every current
+ *        holder MINUS the revokee(s). Lets a revoke evict exactly the named party instead of rotating to the
+ *        roster and collaterally evicting unrelated out-of-circle grantees. Absent → `currentRecipients`.
  * @returns {{ onShare: Function, revoke: Function }}
  */
-export function makeCanonicalShareHook({ canonicalShare, currentRecipients, grantRecipients } = {}) {
+export function makeCanonicalShareHook({ canonicalShare, currentRecipients, grantRecipients, revokeRecipients } = {}) {
   if (!canonicalShare || typeof canonicalShare.share !== 'function' || typeof canonicalShare.revoke !== 'function') {
     throw new Error('makeCanonicalShareHook: a canonicalShare with { share, revoke } is required');
   }
-  const resolveKeys = async (src) => {
-    const base = typeof src === 'function' ? await src() : src;
+  const resolveKeys = async (src, arg) => {
+    const base = typeof src === 'function' ? await src(arg) : src;
     return Array.isArray(base) ? base.filter(Boolean) : [];
   };
   const rosterKeys = () => resolveKeys(currentRecipients);
   // GRANT-side base — defaults to the roster, but a caller may widen it to "everyone who currently holds this
   // item's key" (roster ∪ the key resource's own recipients) so an EARLIER out-of-circle grantee isn't dropped
-  // when a LATER one is granted (grantMember REPLACES the recipient set). Deliberately NOT used for revoke:
-  // there the revokee is named by WebID while this list is sealing keys, so a widened base would rotate the
-  // key back TO the very recipient being revoked. Revoke keeps the conservative roster-only default.
+  // when a LATER one is granted (grantMember REPLACES the recipient set).
   const grantBaseKeys = () => resolveKeys(grantRecipients ?? currentRecipients);
+  // REVOKE-side base — "everyone who currently holds the key, MINUS the party being revoked". It takes the
+  // revokee WebIDs because that subtraction needs a WebID→sealing-key resolution the caller owns; a widened
+  // base without the subtraction would rotate the key back TO the revokee (a silent-revocation hole), so the
+  // two must be computed together or not at all. Absent → the conservative roster-only default, which evicts
+  // the revokee but also every OTHER out-of-circle grantee (safe, lossy — that was the only behaviour before).
+  const revokeBaseKeys = (who) => resolveKeys(revokeRecipients ?? currentRecipients, who);
   const recipientsOf = (recipient, recipients) =>
     (Array.isArray(recipients) && recipients.length ? recipients : (recipient ? [recipient] : []));
 
@@ -278,7 +286,9 @@ export function makeCanonicalShareHook({ canonicalShare, currentRecipients, gran
     async revoke({ ref, recipient, recipients, remainingRecipients } = {}) {
       const who = recipientsOf(recipient, recipients);
       if (who.length === 0) throw new Error('makeCanonicalShareHook: at least one recipient is required to revoke');
-      const remaining = Array.isArray(remainingRecipients) ? remainingRecipients.filter(Boolean) : (await rosterKeys());
+      const remaining = Array.isArray(remainingRecipients)
+        ? remainingRecipients.filter(Boolean)
+        : (await revokeBaseKeys(who));
       for (const agent of who) {
         await canonicalShare.revoke({ recipient: agent, remainingRecipients: remaining, ref });
       }
@@ -314,10 +324,12 @@ export function makeCanonicalShareHook({ canonicalShare, currentRecipients, gran
  *        the canonical hook (see makeCanonicalShareHook). Also the revoke-side default.
  * @param {string[]|(()=>string[]|Promise<string[]>)} [opts.grantRecipients]  optional WIDER grant-side base
  *        (roster ∪ the key resource's current recipients) so earlier out-of-circle grantees aren't dropped.
+ * @param {(revokeeWebids: string[]) => (string[]|Promise<string[]>)} [opts.revokeRecipients]  optional precise
+ *        revoke-side base (current holders MINUS the named revokee(s)); see makeCanonicalShareHook.
  * @param {string} [opts.mode='read']  the access mode granted + required. Must match on both sides.
  * @returns {{ onShare: Function, policy: { checkGrant: Function, open?: Function }, onShareCanonical?: Function, revokeCanonical?: Function }}
  */
-export function makeCircleShareEnforcement({ sharing, resourceUriFor, recipient, open, seal, canonicalShare, currentRecipients, grantRecipients, mode = 'read' } = {}) {
+export function makeCircleShareEnforcement({ sharing, resourceUriFor, recipient, open, seal, canonicalShare, currentRecipients, grantRecipients, revokeRecipients, mode = 'read' } = {}) {
   if (!sharing || typeof sharing.grant !== 'function' || typeof sharing.list !== 'function') {
     throw new Error('makeCircleShareEnforcement: a { grant, list } sharing surface (client.sharing) is required');
   }
@@ -326,7 +338,7 @@ export function makeCircleShareEnforcement({ sharing, resourceUriFor, recipient,
     policy:  makeSharedRefPolicy({ sharing, open, recipient, resourceUriFor, mode }),
   };
   if (canonicalShare) {
-    const canon = makeCanonicalShareHook({ canonicalShare, currentRecipients, grantRecipients });
+    const canon = makeCanonicalShareHook({ canonicalShare, currentRecipients, grantRecipients, revokeRecipients });
     out.onShareCanonical = canon.onShare;
     out.revokeCanonical  = canon.revoke;
   }

@@ -26,6 +26,7 @@ import { createCirclePodSharing } from '../../../basis/src/v2/circlePodSharing.j
 // the SHARED cross-circle SHARE logic + the platform-neutral enforcement assembly.
 // Mobile calls the SAME builder + ops as web (circleApp.js) — invariant #1/#2, no mobile fork.
 import { buildCircleShareEnforcement } from '../../../basis/src/v2/circleShareEnforcement.js';
+import { recipientSealingKeyResolver } from '../../../basis/src/v2/shareRecipients.js';
 import { shareItemAcrossCircles, shareItemToPublishedKey as sharedShareItemToPublishedKey, listSharedResolved, revokeItemShare } from '../../../basis/src/v2/circleShare.js';
 import { buildHouseholdDataSource } from '../../../household/src/index.js';
 // objective L follow-up — the mobile per-circle policy store (AsyncStorage-backed, `cc.circlePolicy.<id>`
@@ -53,6 +54,13 @@ export function initCirclePods(asyncStorage) {
 /** Share the App-owned OidcSessionRN (a ref or the session). When signed in, sealed circles
  *  route to the user's REAL pod via the session's authenticated fetch (else the pseudo-pod). */
 export function setCirclePodSession(sessionOrRef) { podSessionRef = sessionOrRef; }
+
+// Story 1.2 — the Contacten roster, injected by the shell (the launcher owns the bundle/peerGraph; this module
+// doesn't). It backs `sealingKeyForRecipient`: an out-of-circle grantee's sealing key is RE-DERIVED from their
+// published network key, so a revoke can evict exactly that grantee instead of rotating away from all of them.
+// Absent ⇒ the enforcement falls back to the conservative roster-only rotation (safe, lossy).
+let _contactsSource = null;
+export function setCircleContactsSource(fn) { _contactsSource = typeof fn === 'function' ? fn : null; }
 
 /** The signed-in user's AUTHED fetch (OidcSessionRN bearer), or null when signed
  *  out. embed-ref resolution uses it to read the user's OWN private-pod items. */
@@ -239,7 +247,14 @@ export async function getCircleShareEnforcement(circleId, policy) {
         try { idKey = prod?.sealingIdentity ? await prod.sealingIdentity.ensure() : null; } catch { idKey = null; }
         // The SAME platform-neutral builder web uses — requires a real ACP sharing + seal strategy, wires the
         // canonical controller from the control agent's group-key resource + this device's sealing identity.
-        return buildCircleShareEnforcement({ sharing, strategy, podRoot, controlAgent: prod?.controlAgent, idKey });
+        return buildCircleShareEnforcement({
+          sharing, strategy, podRoot, controlAgent: prod?.controlAgent, idKey,
+          // web parity — the same shared resolver, over the shell-injected Contacten roster.
+          sealingKeyForRecipient: recipientSealingKeyResolver({
+            contacts: () => (_contactsSource ? _contactsSource() : []),
+            deriveSealingKey: podSealingPublicKeyFromNetworkKey,
+          }),
+        });
       } catch (err) {
         if (typeof console !== 'undefined') console.warn('[circlePods] share enforcement unavailable:', err?.message ?? err);
         return null;

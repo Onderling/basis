@@ -140,7 +140,7 @@ import { createCircleMediaComposition, makeDevMediaBucket } from '../../../../ba
 import { buildSelfMediaComposition, makeResealMediaForCircle } from '../../../../basis/src/v2/profileMediaReseal.js';
 import { openMediaFilePicker, encodePickedImage } from '../../core/mediaPicker.js';
 import { resolveSealedThumbUri } from '../../core/mijHost.js';
-import { getCircleSealStrategy, seedCircleRosterFor, getCirclePodFetch, getCircleActorWebId } from '../../core/circlePods.js';
+import { getCircleSealStrategy, seedCircleRosterFor, getCirclePodFetch, getCircleActorWebId, setCircleContactsSource } from '../../core/circlePods.js';
 // M6 — the feedback bot rides the SHARED mount (web uses the same one). tryHandle routes /feedback +
 // /feedback-stop + free text while active, before the circle bot; bubbles render via appendKringMessage.
 import { createFeedbackMount } from '../../../../basis/src/feedback/feedbackMount.js';
@@ -992,7 +992,11 @@ export default function CircleLauncherScreen({
         (typeof bundle?.callSkill === 'function' ? bundle.callSkill('stoop', 'listContacts', {}) : Promise.resolve(null)).catch(() => null),
       ]);
       const stoopRows = (Array.isArray(stoopRes?.contacts) ? stoopRes.contacts : []).map(stoopContactToRow).filter(Boolean);
-      setShareContacts(mergeContacts(peerRows, stoopRows));
+      const merged = mergeContacts(peerRows, stoopRows);
+      setShareContacts(merged);
+      // Story 1.2 — hand the roster to the pod layer so a canonical REVOKE can re-derive an out-of-circle
+      // grantee's sealing key and evict exactly that grantee (instead of rotating away from all of them).
+      setCircleContactsSource(() => merged);
     } catch { setShareContacts([]); }
   }, [bundle]);
 

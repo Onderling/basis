@@ -105,6 +105,7 @@ import { buildConsentModel, installMapping } from '../../src/v2/extensionInstall
 import { createContactSkillRegistry } from '../../src/v2/contactSkillsLive.js';
 import { createContactThreadChannel } from '../../src/v2/contactThreadChannel.js';
 import { listContacts, mergeContacts, stoopContactToRow } from '../../src/v2/contactsSource.js';
+import { recipientSealingKeyResolver } from '../../src/v2/shareRecipients.js';
 import { addBotToGraph } from '../../src/v2/addBot.js';
 import { createLocalStoragePeerBackend } from '../../src/web/localStoragePeerBackend.js';
 import { renderContactsRoster } from './contactsRoster.js';
@@ -430,6 +431,14 @@ async function getCircleShareEnforcement(circleId, policy) {
           sharing, strategy, podRoot,
           controlAgent: prod?.controlAgent,
           idKey,
+          // Story 1.2 — let a revoke evict EXACTLY the named grantee. An out-of-circle recipient's sealing key
+          // is re-derived from their contact's published network key (the same pure map the grant used), so
+          // rotating away from one grantee no longer drops the others. Unresolvable ⇒ the enforcement falls
+          // back to the conservative roster-only rotation.
+          sealingKeyForRecipient: recipientSealingKeyResolver({
+            contacts: loadAllContacts,
+            deriveSealingKey: podSealingPublicKeyFromNetworkKey,
+          }),
         });
       } catch (err) {
         if (typeof console !== 'undefined') console.warn('[circleApp] share enforcement unavailable:', err?.message ?? err);
@@ -5758,13 +5767,15 @@ async function showAdmin(id) {
       } catch { notice = t('circle.admin.refused'); }
       // objective L — auto-revoke: on a SUCCESSFUL removal, rotate this circle's outbound canonical shares away
       // from the departing member (reuses revokeAllForMember → revokeItemShare). BEST-EFFORT — a revoke failure
-      // must NOT block the removal; surface a count notice instead. remainingRecipients = the remaining members'
-      // origin-circle sealing keys (best-effort; empty ⇒ omit and let the enforcement default to the origin roster).
+      // must NOT block the removal; surface a count notice instead.
+      //
+      // `remainingRecipients` is deliberately NOT computed here any more (story 1.6). It used to be "the
+      // remaining MEMBERS' sealing keys", which rotated the key away from every unrelated OUT-OF-CIRCLE
+      // grantee as collateral. The enforcement now derives the precise base itself — every current key-holder
+      // MINUS the departing member — so omitting it is what keeps those grantees' access intact. One audience
+      // rule, in the shared enforcement, instead of a roster-only copy here.
       if (removed && m.webid) {
         try {
-          const remaining = (await Promise.all(
-            members.filter((x) => x.webid && x.webid !== m.webid).map((x) => recipientSealKeyFor(id, x.webid)),
-          )).filter(Boolean);
           const res = await revokeAllForMember({
             resolveService: _circleServiceFor,
             enforcementFor: _shareEnforcementFor,
@@ -5772,7 +5783,6 @@ async function showAdmin(id) {
             fromCircleId: id,
             circleIds: circlesCache.map((c) => c.id),
             recipient: m.webid,
-            remainingRecipients: remaining.length ? remaining : undefined,
           });
           if (res.revoked > 0) notice = t('circle.share.member_revoked', { count: res.revoked });
           if (res.failed.length > 0) notice = t('circle.share.member_revoke_failed', { count: res.failed.length });

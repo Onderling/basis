@@ -21,6 +21,38 @@ function networkKeyOf(contact) {
 }
 
 /**
+ * Resolve an OUT-OF-CIRCLE recipient's SEALING public key from their WebID — the map a revoke needs to evict
+ * exactly the named grantee instead of rotating to the roster and collaterally dropping the others (the
+ * confirmed story-1.2 bug).
+ *
+ * It needs NO stored grant record. `shareToPublishedKey` derived the grantee's sealing key from their
+ * published Ed25519 network key at grant time, and that derivation is PURE and deterministic — so re-deriving
+ * it from the SAME contact reproduces exactly the key that was granted. The contact roster is the durable
+ * source; nothing new has to be persisted or kept in sync.
+ *
+ * `deriveSealingKey` is INJECTED (`sealingPublicKeyFromNetworkKey` from `@onderling/pod-client`) so this module
+ * stays pure and importable by `apps/basis-mobile`, which does not depend on pod-client. A recipient with no
+ * contact (or a derivation that throws) yields null — the caller must then fail SAFE, never assume.
+ *
+ * @param {object} deps
+ * @param {() => (Array<object>|Promise<Array<object>>)} deps.contacts  the Contacten roster (thunk — read live).
+ * @param {(networkKey: string) => string} deps.deriveSealingKey       `sealingPublicKeyFromNetworkKey`.
+ * @returns {(webid: string) => Promise<string|null>}
+ */
+export function recipientSealingKeyResolver({ contacts, deriveSealingKey } = {}) {
+  return async function sealingKeyFor(webid) {
+    if (!webid || typeof deriveSealingKey !== 'function') return null;
+    let rows = [];
+    try { rows = pickableRecipients(typeof contacts === 'function' ? await contacts() : contacts); }
+    catch { return null; }
+    const match = rows.find((r) => r.id === webid);
+    if (!match) return null;
+    try { return deriveSealingKey(match.recipientNetworkKey) || null; }
+    catch { return null; }                                  // not a valid Ed25519 key → unresolvable, fail safe
+  };
+}
+
+/**
  * The out-of-circle LINK warning (grants-over-Peer D7). Granting someone access by their published network
  * key is a deliberate 1:1 link: you are choosing to connect your circle-side identity to that external
  * identity, and BOTH sides can see it. That is legitimate and user-chosen — so this is informed consent,

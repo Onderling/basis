@@ -1,3 +1,11 @@
+/* ⚠ NOT LOADED — this stylesheet is referenced by NO html file in this app.
+ *
+ * `web/index.html` links only `v2/theme.css` + `v2/circle.css`. Rules here reach nobody. The wizard chrome
+ * (`.cc-wizard-*`) that used to live here rendered as bare browser chrome for that reason — it has been
+ * PORTED to `v2/circle.css` (onto the theme tokens + the one `.cc-btn` family) and is guarded by
+ * `test/fitness/wizardStylesLoaded.test.js`. Do not add or edit rules here expecting them to apply; add them
+ * to a sheet index.html actually links. Kept only as provenance for the classic shell — safe to delete.
+ */
 /* basis — v0.1.4 demo styles.  Minimal; replaceable. */
 
 :root {

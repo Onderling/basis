@@ -80,7 +80,8 @@
    Ink is the action colour; quiet/chip buttons wear a hard 1.5px ink border +
    pill radius; rust (--danger) for destructive. Dialogs/modals use these
    instead of inline cssText. */
-.cc-btn {
+.cc-btn,
+.cc-wizard-btn {
   font: inherit;
   font-size: 13.5px;
   font-weight: 700;
@@ -89,14 +90,19 @@
   cursor: pointer;
   border: 1.5px solid transparent;
 }
-.cc-btn--primary { background: var(--accent); color: var(--accent-contrast); }
-.cc-btn--primary:hover { background: var(--accent-ink); }
-.cc-btn--quiet { background: none; color: var(--ink); border-color: var(--ink); border-radius: 999px; }
-.cc-btn--quiet:hover { background: var(--ink); color: var(--accent-contrast); }
+.cc-btn--primary,
+.cc-wizard-btn-primary { background: var(--accent); color: var(--accent-contrast); }
+.cc-btn--primary:hover,
+.cc-wizard-btn-primary:hover { background: var(--accent-ink); }
+.cc-btn--quiet,
+.cc-wizard-btn-secondary { background: none; color: var(--ink); border-color: var(--ink); border-radius: 999px; }
+.cc-btn--quiet:hover,
+.cc-wizard-btn-secondary:hover { background: var(--ink); color: var(--accent-contrast); }
 .cc-btn--danger { background: var(--danger); color: var(--accent-contrast); }
 .cc-btn--ghost { background: none; color: var(--ink-soft); border: none; }
 .cc-btn--ghost:hover { text-decoration: underline; }
-.cc-btn:disabled { opacity: .5; cursor: default; }
+.cc-btn:disabled,
+.cc-wizard-btn:disabled { opacity: .5; cursor: default; }
 /* chosen/active state (e.g. conflict-resolver pick buttons) */
 .cc-btn.is-active { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); }
 
@@ -1157,3 +1163,107 @@
 .cc-mij__share-status { font-size: 11px; color: var(--ink-soft); margin-left: 6px; }
 .cc-mij__empty { color: var(--ink-soft); font-style: italic; }
 .cc-mij__empty-note { margin: 0; font-size: 13px; color: var(--ink-soft); }
+
+/* ── Wizards (join · create · settings · backup · restore · post-audience · dispute) ────────────────────
+ *
+ * The wizard chrome USED to live in `web/style.css` — which no HTML file loads any more, so every wizard in
+ * this app rendered as bare browser chrome (the "buttons don't match the look/feel" demo report, 2026-07-22).
+ * Ported here, onto the theme tokens, so wizards inherit light/dark and the rust accent like everything else.
+ * The BUTTONS are not restyled here: `.cc-wizard-btn*` is aliased onto the `.cc-btn` family above, so there is
+ * one source of truth for button visuals (the old copy hardcoded `white` and a pre-rust `#4a90e2` blue).
+ */
+
+/* Step rail */
+.cc-wizard-steps { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+.cc-wizard-step {
+  font-size: 12px; color: var(--ink-soft); padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--card);
+}
+.cc-wizard-step-active { color: var(--accent-contrast); background: var(--accent); border-color: var(--accent); font-weight: 700; }
+.cc-wizard-step-done   { color: var(--ink); border-color: var(--ink); }
+
+/* Body + copy */
+.cc-wizard-body { margin-bottom: 14px; }
+.cc-wizard-body h3 { margin: 0 0 6px; font-size: 16px; font-family: var(--font-serif); color: var(--ink); }
+.cc-wizard-blurb { margin: 0 0 10px; font-size: 13px; color: var(--ink-soft); line-height: 1.5; }
+.cc-wizard-advice { font-size: 12.5px; color: var(--ink-soft); line-height: 1.5; margin: 6px 0; }
+.cc-wizard-warn { font-size: 12.5px; color: var(--danger); margin: 6px 0; }
+.cc-wizard-link { color: var(--accent); text-decoration: underline; cursor: pointer; }
+
+/* Panels that quote something (rules, privacy notice, context) */
+.cc-wizard-rules, .cc-wizard-privacy, .cc-wizard-context-card, .cc-wizard-review {
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 10px 12px; font-size: 13px; color: var(--ink); line-height: 1.5;
+}
+.cc-wizard-rules-doc { display: flex; flex-direction: column; gap: 2px; }
+.cc-wizard-rules-doc-field { margin-bottom: 8px; }
+.cc-wizard-rules-doc-q { font-weight: 600; margin-bottom: 2px; }
+.cc-wizard-rules-doc-a { color: var(--ink-soft); }
+.cc-wizard-context-quote { font-style: italic; color: var(--ink-soft); }
+.cc-wizard-review-pre { white-space: pre-wrap; font-family: var(--font-mono); font-size: 12px; margin: 0; }
+
+/* Fields */
+.cc-wizard-field { margin-bottom: 12px; }
+.cc-wizard-field-label { display: block; font-size: 12px; font-weight: 600; color: var(--ink-soft); margin-bottom: 4px; }
+.cc-wizard-field-hint { font-size: 12px; color: var(--ink-soft); margin-top: 4px; line-height: 1.45; }
+.cc-wizard-input, .cc-wizard-textarea, .cc-wizard-handle-input,
+.cc-wizard-persona-select, .cc-wizard-reveal-select, .cc-wizard-link-select {
+  width: 100%; box-sizing: border-box; font: inherit; font-size: 13.5px;
+  padding: 7px 10px; color: var(--ink); background: var(--paper);
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+}
+.cc-wizard-input:focus, .cc-wizard-textarea:focus, .cc-wizard-handle-input:focus,
+.cc-wizard-persona-select:focus, .cc-wizard-reveal-select:focus, .cc-wizard-link-select:focus {
+  outline: none; border-color: var(--accent);
+}
+.cc-wizard-input-mono, .cc-wizard-handle-input { font-family: var(--font-mono); }
+.cc-wizard-textarea { resize: vertical; min-height: 72px; }
+
+/* Choices */
+.cc-wizard-check, .cc-wizard-toggle, .cc-wizard-radio, .cc-wizard-offerings-default, .cc-wizard-persona, .cc-wizard-reveal {
+  display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--ink); line-height: 1.45; margin: 6px 0;
+}
+.cc-wizard-radio-group { display: flex; flex-direction: column; gap: 4px; margin: 6px 0; }
+.cc-wizard-offerings-default-box { margin-top: 2px; flex: none; }
+.cc-wizard-offerings-default-hint, .cc-wizard-reveal-suggested {
+  font-size: 12px; color: var(--ink-soft); margin: 2px 0 8px; line-height: 1.45;
+}
+.cc-wizard-suggestions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.cc-wizard-suggestion {
+  font: inherit; font-size: 12px; cursor: pointer; padding: 3px 10px; border-radius: 999px;
+  color: var(--ink); background: var(--card); border: 1px solid var(--line);
+}
+.cc-wizard-suggestion:hover { background: var(--ink); color: var(--accent-contrast); border-color: var(--ink); }
+.cc-wizard-distance-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.cc-wizard-distance {
+  font: inherit; font-size: 12px; cursor: pointer; padding: 4px 12px; border-radius: 999px;
+  color: var(--ink); background: var(--card); border: 1px solid var(--line);
+}
+.cc-wizard-distance-active { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); font-weight: 700; }
+
+/* Consent card (dashed rust — the shared consent grammar) */
+.cc-wizard-consent {
+  border: 1px dashed var(--accent); background: var(--consent-bg, var(--card));
+  border-radius: var(--radius-sm); padding: 10px 12px; margin: 8px 0;
+}
+.cc-wizard-consent-title { font-weight: 700; font-size: 13px; color: var(--ink); margin-bottom: 4px; }
+.cc-wizard-consent-blurb { font-size: 12.5px; color: var(--ink-soft); line-height: 1.5; }
+.cc-wizard-consent-cap { font-size: 12px; color: var(--ink-soft); margin-top: 6px; }
+
+/* Codes + rows */
+.cc-wizard-code-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 6px 0; }
+.cc-wizard-code {
+  font-family: var(--font-mono); font-size: 13px; color: var(--ink);
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6px 10px;
+  word-break: break-all;
+}
+.cc-wizard-offering-row { display: flex; gap: 8px; align-items: center; margin: 4px 0; font-size: 13px; }
+
+/* Status + action row */
+.cc-wizard-error { color: var(--danger); font-size: 12.5px; margin: 8px 0; }
+.cc-wizard-submitting { color: var(--ink-soft); font-size: 12.5px; font-style: italic; margin: 8px 0; }
+.cc-wizard-actions {
+  display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap;
+  border-top: 1px solid var(--line); padding-top: 12px; margin-top: 14px;
+}
+.cc-wizard-submit, .cc-wizard-cta-secondary { margin-top: 8px; }

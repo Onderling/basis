@@ -315,7 +315,7 @@ export function renderCircleKring(container, {
     });
   } else if (effectiveTab === 'leden') {
     // G16 — the real member roster (trail-derived), one tappable row per member.
-    renderLedenTab(body, { members, selfWebid, tr, onMemberTap });
+    renderLedenTab(body, { members, selfWebid, revealPolicy, tr, onMemberTap });
   } else if (effectiveTab !== 'gesprek') {
     const placeholder = document.createElement('div');
     placeholder.className = 'circle-kring__placeholder';
@@ -639,7 +639,7 @@ function renderTakenTab(body, { tasks = [], tr, onAction, onAddTask, viewerWebid
  *
  * `members === null` → loading; `[]` → empty; otherwise the rows.
  */
-function renderLedenTab(body, { members = null, selfWebid = null, tr, onMemberTap } = {}) {
+function renderLedenTab(body, { members = null, selfWebid = null, revealPolicy = 'pairwise', tr, onMemberTap } = {}) {
   const wrap = document.createElement('div');
   wrap.className = 'circle-kring__leden';
 

@@ -95,6 +95,14 @@ export function wireChat({
   agent, itemStore, members, muted, metrics, localActor, localStableId,
   evictionRoster = null,
   dataSource     = null,
+  // Connectivity Phase 2 / Wave B — host-injected hold-forward sender (basis's
+  // `sa.peer.sendTo(..., {guarantee:'hold-forward'})`). When wired, a 1:1 DM to a
+  // briefly-offline peer is HELD locally and flushed on reconnect (the offline-ladder
+  // rung-1), the same reliable choke circle broadcasts already ride. `sa.peer.sendTo`
+  // passes the wire straight to `tx.sendOneWay`, so the payload is byte-identical to the
+  // bare-transport path. Absent → the bare per-peer transport (unchanged: an unreachable
+  // peer soft-fails). See `send` below.
+  reliableSend   = null,
   // Phase 6 substrate parameters (Tasks V1 lift):
   emitEnvelopeType      = DEFAULT_EMIT_ENVELOPE_TYPE,
   acceptedEnvelopeTypes = DEFAULT_ACCEPTED_ENVELOPE_TYPES,
@@ -203,6 +211,14 @@ export function wireChat({
     // later persist error (that still throws, as before).
     send: async (to, wire) => {
       try {
+        // Prefer the host-injected hold-forward sender: a briefly-offline peer has the
+        // DM HELD + flushed on reconnect (it returns `{held:true}` rather than throwing),
+        // so the turn still persists locally and delivers later — the offline-ladder rung-1,
+        // mirroring the circle-broadcast reliable choke. Absent → the bare per-peer transport
+        // (`agent.transportFor(to).sendOneWay`), where an unreachable peer soft-fails as before.
+        if (typeof reliableSend === 'function') {
+          return await reliableSend(to, wire, { guarantee: 'hold-forward' });
+        }
         const t = await agent.transportFor(to);
         return await t.sendOneWay(to, wire);
       } catch (err) {

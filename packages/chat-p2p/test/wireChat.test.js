@@ -179,3 +179,43 @@ describe('wireChat — byte-identity after routing through the shared deliver co
     expect(data.trustOffer).toBe('bekend');
   });
 });
+
+describe('wireChat — host-injected hold-forward sender (Wave B: route DMs through deliver)', () => {
+  it('routes the send through reliableSend (with guarantee) instead of the bare transport', async () => {
+    const reliableCalls = [];
+    const reliableSend = vi.fn(async (to, wire, opts) => { reliableCalls.push({ to, wire, opts }); return { held: false, delivered: true, msgId: 'm1' }; });
+    const h = buildHarness({ reliableSend });
+
+    const res = await h.ctrl.send({ toPubKey: 'peer-1', threadId: 't1', body: 'hoi', subtype: 'chat-message' });
+    expect(res).toEqual({ ok: true, itemId: 'id-0' });
+
+    // The reliable sender got the SAME wire the bare transport would have (byte-identical),
+    // plus the hold-forward guarantee; the bare per-peer transport was NOT used.
+    expect(reliableCalls).toHaveLength(1);
+    expect(reliableCalls[0].to).toBe('peer-1');
+    expect(reliableCalls[0].opts).toEqual({ guarantee: 'hold-forward' });
+    const data = reliableCalls[0].wire.parts[0].data;
+    expect(data.subtype).toBe('chat-message');
+    expect(data.body).toBe('hoi');
+    expect(h.oneWayCalls).toHaveLength(0);              // did not fall back to transportFor
+    expect(h.addItemsCalls).toHaveLength(1);            // still persisted the outbound turn
+  });
+
+  it('a HELD send (offline peer) still persists the turn and reports ok — the DM is not lost', async () => {
+    // hold-forward returns { held:true } rather than throwing when the peer is unreachable.
+    const reliableSend = vi.fn(async () => ({ held: true, delivered: false, msgId: 'm2', pending: 1 }));
+    const h = buildHarness({ reliableSend });
+
+    const res = await h.ctrl.send({ toPubKey: 'peer-offline', threadId: 't1', body: 'later', subtype: 'chat-message' });
+    expect(res.ok).toBe(true);                          // held counts as sent (flushes on reconnect)
+    expect(res.itemId).toBe('id-0');
+    expect(h.addItemsCalls).toHaveLength(1);            // the turn is durable locally
+  });
+
+  it('falls back to the bare per-peer transport when no reliableSend is injected (unchanged)', async () => {
+    const h = buildHarness();                           // no reliableSend override
+    await h.ctrl.send({ toPubKey: 'peer-1', threadId: 't1', body: 'hoi', subtype: 'chat-message' });
+    expect(h.oneWayCalls).toHaveLength(1);              // the pre-Wave-B path
+    expect(h.oneWayCalls[0].toPubKey).toBe('peer-1');
+  });
+});

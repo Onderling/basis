@@ -121,9 +121,20 @@ export function createControlAgent({ sharing, containerUri, keyStore, controller
       await sharing.revoke({ containerUri, agent: target.webId, modes });
       const remaining = members.filter((x) => x.webId !== target.webId);
       const cur = await keyStore.read();
+      // Rotate to EVERY CURRENT KEY-HOLDER minus the departing member — not to the roster alone.
+      //
+      // This resource can hold recipients who are NOT roster members: an out-of-circle CANONICAL SHARE
+      // (`createCanonicalShare.share`) grants by adding the recipient's sealing key here. Rotating to
+      // `remaining` alone therefore evicted every such grantee as collateral whenever ANY member was removed
+      // — a silent loss of access for someone unrelated to the removal (the same class as the grant-side drop
+      // fixed in item-store/circleShareEnforcement; this is the third place it appeared, so the rule is:
+      // a rotation's audience is derived from the CURRENT HOLDERS minus the departing party, never from the
+      // roster alone). `cur.recipients` IS that holder set — every prior rotation already pruned it.
+      const holders = new Set([...(cur?.recipients ?? []), ...remaining.map((x) => x.publicKey)]);
+      holders.delete(target.publicKey);          // the one party this rotation is meant to evict
       let next = rotateGroupKeyResource({
         previous: cur,
-        recipients: recipientsWithController(remaining.map((x) => x.publicKey)),
+        recipients: recipientsWithController([...holders]),
       });
       if (policy === 'ban') {
         next = banFromHistory(next, { excludePubKey: target.publicKey, controllerPrivateKey: controllerKey.privateKey });

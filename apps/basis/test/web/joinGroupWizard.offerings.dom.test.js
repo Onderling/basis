@@ -77,9 +77,39 @@ describe('join wizard — charter-driven offering-sharing default', () => {
     handle.dispatchEvent(new Event('input'));
     clickByLabel(el, 'circle.join.wizard.join');
     await vi.waitFor(() => expect(onDispatched).toHaveBeenCalled());
-    // No disclosure enacted, no release computed. (listAgents may fire — that's
-    // the persona PICKER loading its options, not a share.)
-    const shareOps = ['getProfileDrivers', 'setProfileDisclosure', 'getPersonaRelease'];
-    expect(calls.filter((c) => shareOps.includes(c.op))).toEqual([]);
+    // No OFFERINGS disclosure: applyOfferingsDisclosureAtJoin ran as a no-op — its tell is
+    // `getProfileDrivers` (it fetches the offering-kind driver keys to enable). A reveal-preset
+    // release (getPersonaRelease / rung-less setProfileDisclosure) MAY still fire — that's the
+    // SEPARATE, now user-visible reveal-level default (the reveal picker in step 3), not offerings.
+    expect(calls.some((c) => c.op === 'getProfileDrivers')).toBe(false);
+  });
+});
+
+describe('join wizard — reveal-level picker (§1.6, no longer silent)', () => {
+  it('renders the reveal-level picker on the handle step with all presets, defaulting to the resolved level', () => {
+    const el = mount();
+    renderJoinGroupWizard({
+      container: el, doc: document, args: { invite: plainInvite },
+      callSkill: vi.fn().mockResolvedValue({ ok: true }), onClose: vi.fn(), onDispatched: vi.fn(),
+    });
+    advanceToHandleStep(el);
+    const sel = el.querySelector('.cc-wizard-reveal-select');
+    expect(sel).toBeTruthy();   // the level is CHOSEN here now, not silently applied
+    expect([...sel.options].map((o) => o.value)).toEqual(['handle', 'profile', 'full']);
+    expect(sel.value).toBe('profile');   // fallback (this mock has no saved personal default)
+  });
+
+  it('shows the circle-suggested level as a non-binding hint when the invite carries one', async () => {
+    const el = mount();
+    renderJoinGroupWizard({
+      container: el, doc: document,
+      args: { invite: { kind: 'membershipCode', groupId: 'b3', code: 'c3', suggestedReveal: 'handle' } },
+      callSkill: vi.fn().mockResolvedValue({ ok: true }), onClose: vi.fn(), onDispatched: vi.fn(),
+    });
+    advanceToHandleStep(el);
+    // prepareJoinIdentity (async) reads the invite's suggestedReveal → state.circleSuggestedReveal, then rerenders.
+    await vi.waitFor(() => expect(el.querySelector('.cc-wizard-reveal-suggested')).toBeTruthy());
+    // the hint resolves via t() (uninitialised here → the locale KEY, proving no hardcoded copy)
+    expect(el.querySelector('.cc-wizard-reveal-suggested').textContent).toContain('circle.join.wizard.reveal.suggested');
   });
 });

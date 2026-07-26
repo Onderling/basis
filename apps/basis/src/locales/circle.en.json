@@ -173,6 +173,11 @@
         "minimal": { "text": "Join minimally (share no background)", "doc": "Join wizard — join-minimally persona option." },
         "default_suffix": { "text": "{{name}} (default persona)", "doc": "Join wizard — default persona option label." },
         "hint": { "text": "Only what this persona discloses in this circle is shared — nothing on first join. Adjust later under Me → personas.", "doc": "Join wizard — persona disclosure hint." }
+      },
+      "reveal": {
+        "label": { "text": "How much you show", "doc": "Join wizard — reveal-level picker heading (§1.6)." },
+        "hint": { "text": "Choose what other members see of you in this circle. You can change this anytime.", "doc": "Join wizard — reveal-level picker hint." },
+        "suggested": { "text": "This circle suggests: {{level}}", "doc": "Join wizard — the circle's non-binding suggested reveal level (shown as a hint, never forced)." }
       }
     }
   },

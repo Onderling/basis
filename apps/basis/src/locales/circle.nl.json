@@ -173,6 +173,11 @@
         "minimal": { "text": "Doe minimaal mee (deel geen achtergrond)", "doc": "Join wizard — join-minimally persona option." },
         "default_suffix": { "text": "{{name}} (standaardpersona)", "doc": "Join wizard — default persona option label." },
         "hint": { "text": "Alleen wat deze persona in deze kring deelt, wordt gedeeld — niets bij een eerste keer. Later aanpassen kan bij Mij → persona's.", "doc": "Join wizard — persona disclosure hint." }
+      },
+      "reveal": {
+        "label": { "text": "Hoeveel je laat zien", "doc": "Join wizard — reveal-level picker heading (§1.6)." },
+        "hint": { "text": "Kies wat andere leden van je zien in deze kring. Je kunt dit altijd aanpassen.", "doc": "Join wizard — reveal-level picker hint." },
+        "suggested": { "text": "Deze kring stelt voor: {{level}}", "doc": "Join wizard — the circle's non-binding suggested reveal level (shown as a hint, never forced)." }
       }
     }
   },

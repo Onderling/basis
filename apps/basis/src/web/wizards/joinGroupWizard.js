@@ -49,6 +49,8 @@ import {
   setShareOfferingsAtJoin,
   prepareJoinIdentity,
   setLinkChoice,
+  setJoinReveal,
+  REVEAL_PRESETS,
 } from '../../core/wizards/joinGroupState.js';
 import { RULES_FIELDS } from '../../v2/circleRules.js';
 import { t } from '../../localisation.js';
@@ -420,6 +422,42 @@ function renderHandleStep(container, doc, state, onSubmit, onBack, onCancel, rer
     pHint.textContent = t('circle.join.wizard.persona.hint');
     pWrap.appendChild(pHint);
     wrap.appendChild(pWrap);
+  }
+
+  // Reveal level (§1.6 · NOTE-reveal-state-and-profile-updates) — how much of your persona other
+  // members see in THIS circle. The joiner PICKS it here (default = the resolved preset from
+  // prepareJoinIdentity: your saved "usual level", else the fallback); the circle's suggested level
+  // is a NON-BINDING hint, never forced. This is what makes the join release VISIBLE + yours to set
+  // instead of silently applying the fallback (the reveal-at-join UI the wizard used to omit).
+  {
+    const rWrap = doc.createElement('div');
+    rWrap.className = 'cc-wizard-reveal';
+    const rLabel = doc.createElement('div');
+    rLabel.className = 'cc-wizard-field-label';
+    rLabel.textContent = t('circle.join.wizard.reveal.label');
+    rWrap.appendChild(rLabel);
+    const rSelect = doc.createElement('select');
+    rSelect.className = 'cc-wizard-reveal-select';
+    for (const level of REVEAL_PRESETS) {
+      const opt = doc.createElement('option');
+      opt.value = level;
+      opt.textContent = t(`circle.reveal.preset.${level}`);
+      rSelect.appendChild(opt);
+    }
+    rSelect.value = state.revealPreset || 'profile';
+    rSelect.addEventListener('change', () => { setJoinReveal(state, rSelect.value); });
+    rWrap.appendChild(rSelect);
+    const rHint = doc.createElement('div');
+    rHint.className = 'cc-wizard-field-hint';
+    rHint.textContent = t('circle.join.wizard.reveal.hint');
+    rWrap.appendChild(rHint);
+    if (state.circleSuggestedReveal) {
+      const rSug = doc.createElement('div');
+      rSug.className = 'cc-wizard-field-hint cc-wizard-reveal-suggested';
+      rSug.textContent = t('circle.join.wizard.reveal.suggested', { level: t(`circle.reveal.preset.${state.circleSuggestedReveal}`) });
+      rWrap.appendChild(rSug);
+    }
+    wrap.appendChild(rWrap);
   }
 
   // Fold-in phase C — the charter-driven offering-sharing default, VISIBLE and

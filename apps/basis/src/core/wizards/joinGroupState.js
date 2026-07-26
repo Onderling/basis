@@ -13,6 +13,11 @@
 
 import { normalizeDriverKind, REVEAL_PRESETS, isRevealPreset } from '@onderling/agent-registry';
 
+// Re-export so the wizards render the reveal-level picker off ONE import (they already
+// pull setJoinReveal/state from here) without reaching into @onderling/agent-registry
+// directly (keeps the RN metro subpath surface small).
+export { REVEAL_PRESETS };
+
 import { buildJoinConsentModel, optOutsFromDeclined } from '../../v2/circleConsent.js';
 import { personaPresetKeys } from '../../v2/memberCards.js';
 

@@ -170,6 +170,33 @@ export function createResourceKeyGrant({
     hasResource(resourceId) { return keyring.has(resourceId); },
 
     /**
+     * ROTATE — re-seal a resource under a FRESH CEK (the revoke-side honesty half, grants-over-Peer D4).
+     *
+     * Revoking a CEK grant denies FUTURE `releaseKey` calls, but a grantee who already fetched the key
+     * cannot be made to un-see it — so, exactly like the circle's ban→rotate, a revoke that must bite
+     * re-seals the resource under a new key. Holders whose grants are still live simply obtain the new CEK
+     * on their next `releaseKey`; the revoked holder's token is denied, so their old CEK opens only the
+     * ciphertext they already had.
+     *
+     * The broker holds the current CEK, so it opens and re-seals internally — the caller passes the stored
+     * ciphertext and stores what comes back, and PLAINTEXT NEVER LEAVES this function.
+     *
+     * @param {string} resourceId
+     * @param {{sealed: string}} opts  the resource's CURRENT sealed body (from the pod/bucket).
+     * @returns {{resourceId: string, sealed: string, rotated: true}}  the re-sealed body to persist.
+     * @throws {Error} when the broker holds no CEK for the resource, or the body doesn't open under it.
+     */
+    rotateResource(resourceId, { sealed } = {}) {
+      const key = keyring.get(resourceId);
+      if (!key) throw new Error(`rotateResource: unknown resource "${resourceId}" (sealResource first)`);
+      if (typeof sealed !== 'string' || !sealed) throw new Error('rotateResource: the current sealed body is required');
+      const plaintext = openWithGroupKey(sealed, key);      // throws if the body isn't under the held CEK
+      const fresh = generateGroupKey();
+      keyring.set(resourceId, fresh);
+      return { resourceId, sealed: sealWithGroupKey(plaintext, fresh), rotated: true };
+    },
+
+    /**
      * Issue a CapabilityToken granting READ of exactly one resource to `subject`.
      * @param {object} opts
      * @param {string} opts.subject     — recipient's identity pubkey (base64url); binds the grant.

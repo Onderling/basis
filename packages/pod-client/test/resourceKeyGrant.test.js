@@ -183,3 +183,41 @@ describe('resourceKeyGrant — per-resource CEK grant, gated by CapabilityToken'
     expect(res.reason).toBe('acl');
   });
 });
+
+// rotateResource — the revoke-side honesty half (grants-over-Peer D4). A released CEK can't be un-seen, so a
+// revoke that must bite re-seals the resource under a fresh key (the ban→rotate posture, per-resource).
+describe('rotateResource — re-seal under a fresh CEK', () => {
+  it('re-seals the same plaintext under a NEW key: the old CEK no longer opens it, a fresh release does', async () => {
+    const custodian = await AgentIdentity.generate(new VaultMemory());
+    const broker = createResourceKeyGrant({ identity: custodian });
+    const { sealed } = broker.sealResource('doc-1', 'geheim');
+
+    const holderId   = await AgentIdentity.generate(new VaultMemory());
+    const holderSeal = generateKeypair();
+    const token = await broker.issueGrant({ subject: holderId.pubKey, resourceId: 'doc-1' });
+    const before = await broker.releaseKey({
+      token, requesterPubKey: holderId.pubKey, resourceId: 'doc-1', requesterSealPubKey: holderSeal.publicKey,
+    });
+    expect(openGrantedResource({ wrappedKey: before.wrappedKey, sealPrivateKey: holderSeal.privateKey, sealed })).toBe('geheim');
+
+    const rotated = broker.rotateResource('doc-1', { sealed });
+    expect(rotated.rotated).toBe(true);
+    expect(rotated.sealed).not.toBe(sealed);
+
+    // The retained old wrapped key opens neither the new body...
+    expect(() => openGrantedResource({ wrappedKey: before.wrappedKey, sealPrivateKey: holderSeal.privateKey, sealed: rotated.sealed })).toThrow();
+    // ...while a still-valid grant obtains the NEW key and reads the content unchanged.
+    const after = await broker.releaseKey({
+      token, requesterPubKey: holderId.pubKey, resourceId: 'doc-1', requesterSealPubKey: holderSeal.publicKey,
+    });
+    expect(openGrantedResource({ wrappedKey: after.wrappedKey, sealPrivateKey: holderSeal.privateKey, sealed: rotated.sealed })).toBe('geheim');
+  });
+
+  it('refuses an unknown resource or a missing body (never silently mints a key)', async () => {
+    const custodian = await AgentIdentity.generate(new VaultMemory());
+    const broker = createResourceKeyGrant({ identity: custodian });
+    expect(() => broker.rotateResource('nope', { sealed: 'x' })).toThrow(/unknown resource/);
+    broker.sealResource('doc-2', 'v');
+    expect(() => broker.rotateResource('doc-2', {})).toThrow(/current sealed body is required/);
+  });
+});

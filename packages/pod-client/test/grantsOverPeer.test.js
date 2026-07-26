@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { AgentIdentity, TaskGrantManager, TokenRegistry, PodCapabilityToken, CapabilityToken } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
-import { createResourceKeyGrant, resourceScope, generateKeypair, SEAL_SCHEMES } from '../src/sealing/index.js';
+import { createResourceKeyGrant, resourceScope, generateKeypair, SEAL_SCHEMES, openGrantedResource } from '../src/sealing/index.js';
 import { createGrantsOverPeer, GRANT_MODE, assertScopedScheme, SCOPED_SEAL_SCHEMES } from '../src/grants/index.js';
 
 const POD = 'https://pod.example/alice/';
@@ -118,6 +118,125 @@ describe('grantsOverPeer — mandate (skill scope, task-bound) → TaskGrant', (
     const { facade } = await setup();
     const peer = await makePeer();
     await expect(facade.grant(peer, 'calendar.write', { kind: 'skill' })).rejects.toThrow(/task id is required/);
+  });
+});
+
+describe('grantsOverPeer — D4: a CEK revoke ROTATES the resource (a released key cannot be un-seen)', () => {
+  /** A tiny pod double: the sealed body the broker seals/re-seals, stored outside the broker. */
+  function podFor(resourceBroker, resourceId, plaintext) {
+    const store = new Map();
+    const { sealed } = resourceBroker.sealResource(resourceId, plaintext);
+    store.set(resourceId, sealed);
+    return {
+      readSealed:  async (id) => store.get(id) ?? null,
+      writeSealed: async (id, s) => { store.set(id, s); },
+      current:     () => store.get(resourceId),
+    };
+  }
+
+  it('re-seals under a FRESH key: the revoked holder\'s old CEK no longer opens the stored body', async () => {
+    const granter        = await AgentIdentity.generate(new VaultMemory());
+    const tokenRegistry  = new TokenRegistry(new VaultMemory());
+    const resourceBroker = createResourceKeyGrant({ identity: granter, tokenRegistry });
+    const pod = podFor(resourceBroker, 'doc-9', 'geheim');
+    const facade = createGrantsOverPeer({
+      identity: granter, podRoot: POD, resourceBroker, tokenRegistry,
+      readSealed: pod.readSealed, writeSealed: pod.writeSealed,
+    });
+    const peer = await makePeer();
+
+    // Grant + actually fetch the key, as a real grantee would.
+    const { grantId, token } = await facade.grant(peer, 'doc-9', { policy: { offline: true } });
+    const released = await resourceBroker.releaseKey({
+      token, requesterPubKey: peer.pubKey, resourceId: 'doc-9', requesterSealPubKey: peer.sealingPublicKey,
+    });
+    expect(openGrantedResource({ wrappedKey: released.wrappedKey, sealPrivateKey: peer._seal.privateKey, sealed: pod.current() }))
+      .toBe('geheim');
+    const staleWrappedKey = released.wrappedKey;   // the grantee kept this — it cannot be un-seen
+
+    const res = await facade.revoke(grantId);
+    expect(res.rotated).toBe(true);
+
+    // The stored body is now under a NEW key: the retained old key no longer opens it.
+    expect(() => openGrantedResource({ wrappedKey: staleWrappedKey, sealPrivateKey: peer._seal.privateKey, sealed: pod.current() }))
+      .toThrow();
+  });
+
+  it('a STILL-LIVE grantee picks up the new key on their next releaseKey (rotation does not lock them out)', async () => {
+    const granter        = await AgentIdentity.generate(new VaultMemory());
+    const tokenRegistry  = new TokenRegistry(new VaultMemory());
+    const resourceBroker = createResourceKeyGrant({ identity: granter, tokenRegistry });
+    const pod = podFor(resourceBroker, 'doc-9', 'geheim');
+    const facade = createGrantsOverPeer({
+      identity: granter, podRoot: POD, resourceBroker, tokenRegistry,
+      readSealed: pod.readSealed, writeSealed: pod.writeSealed,
+    });
+    const gone = await makePeer();
+    const stays = await makePeer();
+    const { grantId } = await facade.grant(gone, 'doc-9', { policy: { offline: true } });
+    const { token: stayToken } = await facade.grant(stays, 'doc-9', { policy: { offline: true } });
+
+    await facade.revoke(grantId);                       // rotates
+
+    const fresh = await resourceBroker.releaseKey({
+      token: stayToken, requesterPubKey: stays.pubKey, resourceId: 'doc-9', requesterSealPubKey: stays.sealingPublicKey,
+    });
+    expect(openGrantedResource({ wrappedKey: fresh.wrappedKey, sealPrivateKey: stays._seal.privateKey, sealed: pod.current() }))
+      .toBe('geheim');
+  });
+
+  it('without the read/write seams the revoke still REVOKES, honestly reporting rotated:false', async () => {
+    const { facade, resourceBroker } = await setup();     // no readSealed/writeSealed wired
+    resourceBroker.sealResource('doc-9', 'geheim');
+    const peer = await makePeer();
+    const { grantId, token } = await facade.grant(peer, 'doc-9', { policy: { offline: true } });
+
+    const res = await facade.revoke(grantId);
+    expect(res.rotated).toBe(false);                      // no false claim of rotation
+    const denied = await resourceBroker.releaseKey({
+      token, requesterPubKey: peer.pubKey, resourceId: 'doc-9', requesterSealPubKey: peer.sealingPublicKey,
+    });
+    expect(denied.denied).toBe(true);                     // future access still denied
+  });
+});
+
+describe('grantsOverPeer — D3: the governance/permission-log event (circle resources only)', () => {
+  it('emits granted + revoked for a CIRCLE resource, following the permission-log convention', async () => {
+    const events = [];
+    const granter = await AgentIdentity.generate(new VaultMemory());
+    const facade = createGrantsOverPeer({ identity: granter, podRoot: POD, onGrantEvent: (e) => events.push(e) });
+    const peer = await makePeer();
+
+    const { grantId } = await facade.grant(peer, 'note-42', { circleId: 'circle-1' });
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      logKind: 'resource-granted', event: 'resource-granted',
+      circleId: 'circle-1', resourceId: 'note-42', peer: peer.pubKey, mode: GRANT_MODE.BROKER, by: granter.pubKey,
+    });
+
+    await facade.revoke(grantId);
+    expect(events[1]).toMatchObject({ logKind: 'resource-revoked', circleId: 'circle-1', resourceId: 'note-42' });
+  });
+
+  it('emits NOTHING for an out-of-circle share of the granter\'s OWN content (D3 split — stays private)', async () => {
+    const events = [];
+    const granter = await AgentIdentity.generate(new VaultMemory());
+    const facade = createGrantsOverPeer({ identity: granter, podRoot: POD, onGrantEvent: (e) => events.push(e) });
+    const peer = await makePeer();
+
+    const { grantId } = await facade.grant(peer, 'my-note');   // no circleId → the private local path
+    await facade.revoke(grantId);
+    expect(events).toEqual([]);
+  });
+
+  it('an emitter that throws never fails the grant (best-effort)', async () => {
+    const granter = await AgentIdentity.generate(new VaultMemory());
+    const facade = createGrantsOverPeer({
+      identity: granter, podRoot: POD, onGrantEvent: () => { throw new Error('log down'); },
+    });
+    const peer = await makePeer();
+    const res = await facade.grant(peer, 'note-42', { circleId: 'circle-1' });
+    expect(res.grantId).toBeTruthy();                    // the grant landed regardless
   });
 });
 

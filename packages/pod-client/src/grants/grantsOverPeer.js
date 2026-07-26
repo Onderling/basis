@@ -112,6 +112,14 @@ function peerKeys(peer) {
  * @param {(peerPubKey: string) => boolean} [deps.isMember]  circle membership — a member always `mayDecrypt`.
  * @param {Map<string, object>} [deps.grants]  the local grant registry (grantId → record). Injectable for tests.
  * @param {() => number} [deps.now]            clock (expiry checks); injectable for tests.
+ * @param {(event: object) => any} [deps.onGrantEvent]  D3 — the governance/permission-log emitter, called ONLY
+ *   for a grant against a CIRCLE resource (one issued with `{circleId}`); an out-of-circle share of the
+ *   granter's OWN content stays private to the local registry. Injected from the composition root so this
+ *   module stays transport-free (invariant 5); BEST-EFFORT — an emitter failure never fails the grant/revoke.
+ *   The payload follows the existing `permission-log` convention (`{logKind, event, …}`).
+ * @param {(resourceId: string) => (string|null|Promise<string|null>)} [deps.readSealed]  D4 — read a resource's
+ *   CURRENT sealed body, for revoke→rotate. With `writeSealed`, a CEK revoke re-seals under a fresh key.
+ * @param {(resourceId: string, sealed: string) => any} [deps.writeSealed]  D4 — persist the re-sealed body.
  */
 export function createGrantsOverPeer({
   identity,
@@ -122,12 +130,39 @@ export function createGrantsOverPeer({
   isMember = () => false,
   grants = new Map(),
   now = () => Date.now(),
+  onGrantEvent = null,
+  readSealed = null,
+  writeSealed = null,
 } = {}) {
   if (!identity || typeof identity.pubKey !== 'string') {
     throw new Error('createGrantsOverPeer: identity (the granter) is required');
   }
 
   function record(id, rec) { grants.set(id, { grantId: id, ...rec }); }
+
+  /**
+   * D3 — emit the governance/permission-log event for a CIRCLE-resource grant. A grant carrying no
+   * `circleId` is an out-of-circle share of the granter's own content: it stays in the local registry and
+   * emits NOTHING (their call, nobody else's business). Best-effort by design — the grant has already
+   * landed, so a logging hiccup must never fail it or be reported as failure.
+   */
+  async function emitGrantEvent(kind, rec) {
+    if (typeof onGrantEvent !== 'function' || !rec?.circleId) return;
+    try {
+      await onGrantEvent({
+        logKind: kind,                       // 'resource-granted' | 'resource-revoked'
+        event:   kind,
+        circleId: rec.circleId,
+        resourceId: rec.resourceId ?? rec.scope ?? null,
+        scope:    rec.scope ?? null,
+        peer:     rec.peerPubKey ?? null,
+        mode:     rec.mode ?? null,
+        grantId:  rec.grantId ?? null,
+        by:       identity.pubKey,
+        ...(rec.expiresAt != null ? { expiresAt: rec.expiresAt } : {}),
+      });
+    } catch { /* best-effort — never fails the grant/revoke */ }
+  }
 
   /** Live (not expired, not revoked-and-dropped) grants for a resource. */
   function liveGrants(resourceId) {
@@ -152,10 +187,13 @@ export function createGrantsOverPeer({
    * @param {'resource'|'skill'} [opts.kind='resource']
    * @param {{offline?: boolean}} [opts.policy]  D1 scheme selector for a resource grant.
    * @param {string} [opts.task]    task id — REQUIRED for a `skill` (mandate) grant.
+   * @param {string} [opts.circleId]  D3 — set when the scope is a CIRCLE resource: the grant is then also
+   *   emitted to the governance/permission log (co-admins see it). Omit for an out-of-circle share of the
+   *   granter's own content, which stays private to the local registry.
    * @param {number} [opts.expiresIn]
    * @returns {Promise<{grantId: string, token: object, mode: string}>}
    */
-  async function grant(peer, scope, { kind = 'resource', policy = {}, task, expiresIn } = {}) {
+  async function grant(peer, scope, { kind = 'resource', policy = {}, task, circleId = null, expiresIn } = {}) {
     const { pubKey, sealingPublicKey } = peerKeys(peer);
     if (!pubKey) throw new Error('grant: a grantee pubKey is required');
     if (typeof scope !== 'string' || !scope) throw new Error('grant: a scope (resource id or skill id) is required');
@@ -168,7 +206,8 @@ export function createGrantsOverPeer({
         taskId: task, memberPubKey: pubKey, grant: { skill: scope },
         ...(expiresIn != null ? { expiresIn } : {}),
       });
-      record(token.id, { peerPubKey: pubKey, sealingPublicKey, kind, scope, mode: GRANT_MODE.MANDATE, task, expiresAt: token.expiresAt ?? null });
+      record(token.id, { peerPubKey: pubKey, sealingPublicKey, kind, scope, mode: GRANT_MODE.MANDATE, task, circleId, expiresAt: token.expiresAt ?? null });
+      await emitGrantEvent('resource-granted', grants.get(token.id));
       return { grantId: token.id, token, mode: GRANT_MODE.MANDATE };
     }
 
@@ -188,7 +227,8 @@ export function createGrantsOverPeer({
         ...(expiresIn != null ? { expiresIn } : {}),
       });
     }
-    record(token.id, { peerPubKey: pubKey, sealingPublicKey, kind, scope: resourceId, resourceId, mode, task, expiresAt: token.expiresAt ?? null });
+    record(token.id, { peerPubKey: pubKey, sealingPublicKey, kind, scope: resourceId, resourceId, mode, task, circleId, expiresAt: token.expiresAt ?? null });
+    await emitGrantEvent('resource-granted', grants.get(token.id));
     return { grantId: token.id, token, mode };
   }
 
@@ -197,24 +237,51 @@ export function createGrantsOverPeer({
    * future open/releaseKey denies (instant, nothing to rotate); CEK-backed → same registry revoke here, plus
    * the resource re-seal/rotate is the step-3 addition (a released CEK can't be un-seen). Drops the local row.
    *
+   * D4 — a CEK-backed revoke also ROTATES when `readSealed`/`writeSealed` are wired: the resource is
+   * re-sealed under a fresh CEK, because a grantee who already fetched the old key cannot be made to
+   * un-see it (the same honesty as the circle's ban→rotate). Still-live grantees pick the new key up on
+   * their next `releaseKey`; the revoked one is denied. Without those seams the revoke is registry-only —
+   * honest, but future-access-only — and that is reported back as `rotated: false`.
+   *
    * @param {string | {grantId?: string, task?: string}} arg
-   * @returns {Promise<{revoked: string[]}>}
+   * @returns {Promise<{revoked: string[], rotated: boolean}>}
    */
   async function revoke(arg) {
     if (arg && typeof arg === 'object' && arg.task) {
       const res = taskGrants?.revokeTaskGrants(arg.task) ?? { revokedTokenIds: [] };
-      for (const [id, rec] of grants) if (rec.task === arg.task) grants.delete(id);
-      return { revoked: res.revokedTokenIds ?? [] };
+      const dropped = [];
+      for (const [id, rec] of grants) if (rec.task === arg.task) { dropped.push(rec); grants.delete(id); }
+      for (const rec of dropped) await emitGrantEvent('resource-revoked', rec);
+      return { revoked: res.revokedTokenIds ?? [], rotated: false };
     }
     const grantId = typeof arg === 'string' ? arg : arg?.grantId;
     if (!grantId) throw new Error('revoke: a grantId or { task } is required');
     const rec = grants.get(grantId);
     if (tokenRegistry) await tokenRegistry.revoke(grantId);
-    if (rec?.mode === GRANT_MODE.CEK && resourceBroker && typeof resourceBroker.revoke === 'function') {
-      try { await resourceBroker.revoke({ tokenId: grantId, resourceId: rec.resourceId }); } catch { /* registry revoke already denies */ }
+
+    let rotated = false;
+    if (rec?.mode === GRANT_MODE.CEK && resourceBroker) {
+      if (typeof resourceBroker.revoke === 'function') {
+        try { await resourceBroker.revoke({ tokenId: grantId, resourceId: rec.resourceId }); } catch { /* registry revoke already denies */ }
+      }
+      // D4 rotate — re-seal under a fresh CEK so the revoked holder's copy of the old key opens only what
+      // they already had. Requires both seams; a rotation failure must NOT undo the revocation above, so it
+      // is caught and reported as `rotated: false` rather than thrown.
+      if (typeof readSealed === 'function' && typeof writeSealed === 'function'
+          && typeof resourceBroker.rotateResource === 'function' && rec.resourceId) {
+        try {
+          const sealed = await readSealed(rec.resourceId);
+          if (typeof sealed === 'string' && sealed) {
+            const next = resourceBroker.rotateResource(rec.resourceId, { sealed });
+            await writeSealed(rec.resourceId, next.sealed);
+            rotated = true;
+          }
+        } catch { rotated = false; }
+      }
     }
     grants.delete(grantId);
-    return { revoked: [grantId] };
+    if (rec) await emitGrantEvent('resource-revoked', rec);
+    return { revoked: [grantId], rotated };
   }
 
   /**

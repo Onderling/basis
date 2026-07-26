@@ -84,7 +84,7 @@ export { createCirclePodProducer, createCircleControlAgentRouter, seedCircleRost
 export { realPodRouting, podRootFromWebid }           from './v2/circleRealPod.js';
 export { getActiveCircle, setActiveCircle, subscribeActiveCircle } from './v2/activeCircle.js';
 export {
-  CIRCLE_FEATURES, CIRCLE_POLICY_ENUMS,
+  CIRCLE_FEATURES, CIRCLE_POLICY_ENUMS, SETTINGS_ENUM_AXES, decisionDeadlineDays,
   DEFAULT_CIRCLE_POLICY, normalizeCirclePolicy, mergeCirclePolicy,
   // feature-flag consumption seam.
   isFeatureEnabled, enabledFeatures,

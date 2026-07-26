@@ -1238,6 +1238,10 @@
     }
   },
   "settings": {
+    "decisionDeadline": {
+      "text": "Deciding time",
+      "doc": "Settings axis label — how long a governed decision stays open before an admin may force it."
+    },
     "appSettings": {
       "text": "App settings",
       "doc": "B/S2 Q1 — manifest-driven per-app settings form heading."
@@ -1431,6 +1435,22 @@
       "doc": "Accessible label for the per-option ⓘ consequence toggle."
     },
     "consequence": {
+      "1d": {
+        "text": "After a day, an admin can decide on their own if not enough people have voted.",
+        "doc": "decisionDeadline consequence — 1d."
+      },
+      "7d": {
+        "text": "After a week, an admin can decide on their own if not enough people have voted. This keeps a decision from being stuck forever when people don't respond.",
+        "doc": "decisionDeadline consequence — 7d."
+      },
+      "30d": {
+        "text": "After a month, an admin can decide on their own. Decisions can sit open for a long time.",
+        "doc": "decisionDeadline consequence — 30d."
+      },
+      "open-ended": {
+        "text": "An admin can never force a decision. If not enough people vote, it stays open indefinitely — nothing is decided until the circle decides it.",
+        "doc": "decisionDeadline consequence — open-ended."
+      },
       "off": {
         "text": "No AI assistance in this circle — nothing is sent to any model.",
         "doc": "Consequence of llmTool=off."
@@ -1595,6 +1615,30 @@
       }
     },
     "opt": {
+      "1d": {
+        "text": "One day",
+        "doc": "decisionDeadline — a decision an admin may force after a day. Fast; suits a household."
+      },
+      "3d": {
+        "text": "Three days",
+        "doc": "decisionDeadline — a short window for a small, active circle."
+      },
+      "7d": {
+        "text": "A week",
+        "doc": "decisionDeadline — the default. Long enough that people on holiday still get a vote."
+      },
+      "14d": {
+        "text": "Two weeks",
+        "doc": "decisionDeadline — a slower circle where people check in occasionally."
+      },
+      "30d": {
+        "text": "A month",
+        "doc": "decisionDeadline — a large or formal circle; an association-paced decision."
+      },
+      "open-ended": {
+        "text": "No time limit",
+        "doc": "decisionDeadline — the hatch is disabled: a decision stands open until it is decided."
+      },
       "chat": {
         "text": "Chat",
         "doc": "B/Q1 — view-axis option: land on the conversation pane."

@@ -190,9 +190,10 @@ describe('3.3 — the deadline override is an ADMIN escape hatch, never a member
   });
 
   // ✅ FIXED 2026-07-26. No shell ever passed a `deadline`, so `expired` was never true and a proposal short
-  // of quorum stayed open forever. The default now comes from the circle's own policy
-  // (`decisionDeadlineDays`, default 7) and is applied in `makeGovernanceOrchestrator.propose` — in the
-  // MODEL, so both shells inherit it rather than each remembering to pass one.
+  // of quorum stayed open forever. The default now comes from the circle's own policy — the
+  // `decisionDeadline` enum axis (default '7d'), resolved by `decisionDeadlineDays` and applied in
+  // `makeGovernanceOrchestrator.propose`. In the MODEL, so both shells inherit it rather than each
+  // remembering to pass one; and an ENUM so it lands in the shared settings radio surface an admin can use.
   it('a proposal opened the way the SHELLS open it can eventually be overridden', async () => {
     const h = threeDevices({ clock: 1 });
     const proposalId = await openProposal(h, null);       // exactly what the shells pass
@@ -203,10 +204,10 @@ describe('3.3 — the deadline override is an ADMIN escape hatch, never a member
     expect((await h.rowOn('m0', proposalId)).canOverride).toBe(false);       // still admin-only
   });
 
-  it('a circle may opt OUT of the hatch with `decisionDeadlineDays: 0` — open-ended, as before', async () => {
+  it('a circle may opt OUT of the hatch with `decisionDeadline: open-ended`', async () => {
     const h = threeDevices({
       clock: 1,
-      policy: normalizeCirclePolicy({ governance: { removeMember: 'member-vote' }, decisionDeadlineDays: 0 }),
+      policy: normalizeCirclePolicy({ governance: { removeMember: 'member-vote' }, decisionDeadline: 'open-ended' }),
     });
     const proposalId = await openProposal(h, null);
     h.setClock(10_000_000_000);

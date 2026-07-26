@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from 'vitest';
 import { renderCircleSettings } from '../../web/v2/circleSettings.js';
-import { DEFAULT_CIRCLE_POLICY, mergeCirclePolicy } from '../../src/v2/circlePolicy.js';
+import { SETTINGS_ENUM_AXES, CIRCLE_POLICY_ENUMS, DEFAULT_CIRCLE_POLICY, mergeCirclePolicy } from '../../src/v2/circlePolicy.js';
 import { pageForOp } from '../../src/v2/pageProjection.js';
 import { basisManifest } from '../../manifest.js';
 
@@ -9,11 +9,16 @@ const t = (k) => k;
 function mount() { const el = document.createElement('div'); document.body.appendChild(el); return el; }
 
 describe('renderCircleSettings', () => {
-  it('renders 8 feature toggles + 7 enum axes reflecting the policy (5.9a: + view, + storagePosture; obj L: + sharePosture)', () => {
+  // The axis COUNT is derived from the shared list rather than hardcoded: adding an axis is a one-line
+  // change in `circlePolicy.js`, and this test should verify the surface renders them all, not re-state how
+  // many there are. `settingsAxesParity.test.js` guards that the list is shared and fully localised.
+  it('renders 8 feature toggles + every shared enum axis, reflecting the policy', () => {
     const el = mount();
     renderCircleSettings(el, { policy: DEFAULT_CIRCLE_POLICY, t });
     expect(el.querySelectorAll('.circle-settings__feature input[type=checkbox]')).toHaveLength(8);
-    expect(el.querySelectorAll('.circle-settings__axis')).toHaveLength(7);
+    expect(el.querySelectorAll('.circle-settings__axis')).toHaveLength(SETTINGS_ENUM_AXES.length);
+    expect([...el.querySelectorAll('.circle-settings__axis')].map((s) => s.dataset.axis))
+      .toEqual([...SETTINGS_ENUM_AXES]);
     expect(el.querySelector('input[data-feature=chat]').checked).toBe(true);
     expect(el.querySelector('.circle-settings__axis[data-axis=pod] input[value=none]').checked).toBe(true);
     // obj L — sharePosture axis is editable; default 'closed' reflects DEFAULT_CIRCLE_POLICY.
@@ -156,10 +161,13 @@ describe('renderCircleSettings', () => {
     const el = mount();
     const tc = (k) => (k.startsWith('circle.settings.consequence.') ? `why ${k.split('.').pop()}` : k);
     renderCircleSettings(el, { policy: DEFAULT_CIRCLE_POLICY, t: tc });
-    // 3 view + 4 llmTool + 4 storagePosture (p0–p3) + 5 sharePosture + 3 agents + 2 revealPolicy + 4 pod = 25 enum options
-    expect(el.querySelectorAll('.circle-settings__info')).toHaveLength(25);
+    // One ⓘ per option across every shared axis. Derived rather than hardcoded: this `t` returns
+    // consequence copy for EVERY key, so the expected count is simply "all options".
+    const totalOptions = SETTINGS_ENUM_AXES.reduce((n, ax) => n + CIRCLE_POLICY_ENUMS[ax].length, 0);
+    expect(totalOptions).toBeGreaterThan(20);        // non-vacuous: the axes really did resolve
+    expect(el.querySelectorAll('.circle-settings__info')).toHaveLength(totalOptions);
     const panels = el.querySelectorAll('.circle-settings__consequence');
-    expect(panels).toHaveLength(25);
+    expect(panels).toHaveLength(totalOptions);
     for (const p of panels) expect(p.hidden).toBe(true);
   });
 

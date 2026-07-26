@@ -70,6 +70,13 @@ export const CIRCLE_POLICY_ENUMS = {
   //              notices OUT of the main board. (That logging section is DEFERRED; the post just
   //              carries the forward-compatible tag today.)
   notifyOutOfCircle:    ['admins', 'post'],
+  // decisionDeadline — how long a governed decision (member-vote / admin-quorum) stays open before an ADMIN
+  // may force it through the "Decide now" escape hatch (§5 L4, story 3.3). The values are deliberately
+  // coarse: this is a governance knob an admin picks from a list, not a dial. `open-ended` disables the
+  // hatch, so a decision stands until it is decided — the pre-2026-07-26 behaviour, now opt-in rather
+  // than accidental. Values are globally unique across the opt locale namespace (`circle.settings.opt.*`),
+  // which is shared by every axis — `none` was already taken.
+  decisionDeadline:     ['1d', '3d', '7d', '14d', '30d', 'open-ended'],
   agents:               ['yes', 'admin-approval', 'no'],
   revealPolicy:         ['pairwise', 'open'],
   pod:                  ['none', 'shared', 'personal', 'hybrid'],
@@ -121,10 +128,12 @@ export const DEFAULT_CIRCLE_POLICY = {
   // §5 escape hatch (story 3.3) — how long a member-vote stays open before an ADMIN may force it
   // ("Decide now"). Until 2026-07-26 no shell ever passed a deadline to `propose()`, so `expired` was never
   // true and a proposal that stalled short of quorum stayed open FOREVER with no way to resolve it. The
-  // default now lives HERE and `makeGovernanceOrchestrator` applies it, so both shells inherit it by
-  // construction rather than each remembering to pass one (invariant 1). `0` disables the hatch entirely —
-  // a circle that wants decisions to stand open indefinitely can still say so.
-  decisionDeadlineDays: 7,
+  // default lives HERE and `makeGovernanceOrchestrator` applies it, so both shells inherit it by
+  // construction rather than each remembering to pass one (invariant 1).
+  // An ENUM rather than a raw number of days, deliberately: it drops straight into the shared settings
+  // radio/consequence renderer, so an admin can actually CHANGE it — a bare number would have needed a new
+  // control type and would have stayed admin-invisible. `open-ended` keeps a decision open forever.
+  decisionDeadline: '7d',
   revealPolicy:     'pairwise',
   pod:              'none',
   // ε.6 — see CIRCLE_POLICY_ENUMS.catchUpChooserMode docstring above.
@@ -228,6 +237,37 @@ export function decisionClassFor(policy, action) {
 }
 
 /** Coerce any stored partial into a complete, valid policy (invalid values fall back to defaults). */
+/** decisionDeadline → days. `open-ended` is 0, which the orchestrator reads as "no deadline". */
+const DEADLINE_DAYS = Object.freeze({ '1d': 1, '3d': 3, '7d': 7, '14d': 14, '30d': 30, 'open-ended': 0 });
+
+/**
+ * How many days a governed decision stays open for THIS circle — 0 meaning open-ended.
+ * The one place the enum is turned into time, so a shell never does the arithmetic.
+ *
+ * @param {object} policy  a circle policy (normalized or raw)
+ * @returns {number} days, 0 for open-ended
+ */
+export function decisionDeadlineDays(policy) {
+  const v = policy?.decisionDeadline;
+  return Object.prototype.hasOwnProperty.call(DEADLINE_DAYS, v)
+    ? DEADLINE_DAYS[v]
+    : DEADLINE_DAYS[DEFAULT_CIRCLE_POLICY.decisionDeadline];
+}
+
+/**
+ * The policy axes the settings surface offers as radio groups, in display order.
+ *
+ * SHARED because it was duplicated and had already drifted: the web list carried `storagePosture` and
+ * `sharePosture` while the mobile copy did not (same copy-pasted comment above each, no reason given), so a
+ * mobile admin simply could not set either — a silent web≢mobile capability gap (invariants 1/2/3). One
+ * list now, imported by both shells, guarded by `test/v2/settingsAxesParity.test.js`.
+ *
+ * `view` stays first so it remains the most prominent setting (5.9a).
+ */
+export const SETTINGS_ENUM_AXES = Object.freeze([
+  'view', 'llmTool', 'storagePosture', 'sharePosture', 'agents', 'revealPolicy', 'pod', 'decisionDeadline',
+]);
+
 export function normalizeCirclePolicy(stored = {}) {
   const p = stored && typeof stored === 'object' ? stored : {};
   const features = {};
@@ -249,12 +289,7 @@ export function normalizeCirclePolicy(stored = {}) {
     pod:                pickEnum('pod'),
     catchUpChooserMode: pickEnum('catchUpChooserMode'),
     admins:             Array.isArray(p.admins) ? p.admins.filter((x) => typeof x === 'string') : [],
-    // A non-negative finite number of days; anything else (missing, negative, NaN, a string) falls back to
-    // the default rather than silently disabling or extending the escape hatch.
-    decisionDeadlineDays:
-      (typeof p.decisionDeadlineDays === 'number' && Number.isFinite(p.decisionDeadlineDays) && p.decisionDeadlineDays >= 0)
-        ? p.decisionDeadlineDays
-        : DEFAULT_CIRCLE_POLICY.decisionDeadlineDays,
+    decisionDeadline:   pickEnum('decisionDeadline'),
     consensusRequired:
       typeof p.consensusRequired === 'boolean' ? p.consensusRequired : DEFAULT_CIRCLE_POLICY.consensusRequired,
     // §5 (L4) — decision-class per governed action; each falls back to DEFAULT_GOVERNANCE,

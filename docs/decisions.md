@@ -530,8 +530,12 @@ the answer to a sparse circle deadlocking. It was built and role-gated correctly
 shell ever passed a `deadline` to `propose()`, so `expired` was never true, `canOverride` never true, and a
 proposal short of quorum stayed open **forever**. The valve existed and could never open.
 
-**Decision.** The default lives in the circle policy (`decisionDeadlineDays`, default **7**) and is applied
-in `makeGovernanceOrchestrator.propose`. `0` opts out, leaving decisions open-ended.
+**Decision.** The default lives in the circle policy and is applied in `makeGovernanceOrchestrator.propose`.
+**Amended same day:** it is an ENUM axis `decisionDeadline` ∈ `1d|3d|7d|14d|30d|open-ended` (default **7d**),
+resolved to days by `decisionDeadlineDays(policy)` — not a raw number. The reason is reachability: a bare
+number needs a bespoke control, so it would have stayed admin-INVISIBLE, which is the same failure as the
+unreachable valve this decision exists to fix. The enum drops into the shared settings radio/consequence
+renderer, so an admin can actually change it. `open-ended` disables the hatch.
 
 **Alternatives / why.** A hardcoded constant in the orchestrator — rejected: circles differ (a household
 decides in a day, a neighbourhood association in a month), and this is exactly the kind of knob an admin
@@ -542,7 +546,9 @@ the model keeps web ≡ mobile by construction (invariant 1/2) rather than by vi
 
 **Consequences.** Every member-vote/admin-quorum proposal now carries a deadline unless a circle opts out, so
 the override valve is live for the first time. Existing open proposals (deadline `null`) stay open-ended —
-the default applies at propose time, not retroactively.
+the default applies at propose time, not retroactively. The enum trades expressiveness (a circle cannot ask
+for exactly 5 days) for a surface an admin can reach; **the DEFAULT VALUE itself is still Frits' call** —
+tracked as REMAINING-WORK P4 item 12a.
 
 ### 2. A report is fanned to the admins UNION the reporter — never to the person reported
 

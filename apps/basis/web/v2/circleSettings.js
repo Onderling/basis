@@ -34,6 +34,7 @@ import { renderRecipeConsentCard } from './recipeConsentCard.js';
 // manifest PAGE projection (`renderWeb(manifest).pages[].labelKey`) via t(),
 // not a hardcoded tr('circle.settings.title') call.  Pure selector in shared src.
 import { pageLabel } from '../../src/v2/pageProjection.js';
+import { SETTINGS_ENUM_AXES } from '../../src/v2/circlePolicy.js';
 
 // 5.9a — `view` is the per-circle default-pane axis ('chat' / 'screen' /
 // 'cross-stream'); making it editable here lets an admin pick which surface
@@ -44,7 +45,11 @@ import { pageLabel } from '../../src/v2/pageProjection.js';
 // `sharePosture` sits right after `storagePosture`: both are the circle's
 // content-boundary axes (at-rest vs. shared-out). It reuses the SAME generic
 // radio/consequence renderer below — no bespoke control (see CIRCLE_POLICY_ENUMS.sharePosture).
-export const ENUM_AXES = ['view', 'llmTool', 'storagePosture', 'sharePosture', 'agents', 'revealPolicy', 'pod'];
+//
+// The LIST now lives in shared src (`SETTINGS_ENUM_AXES`) because this copy and the mobile one had already
+// drifted — mobile was missing storagePosture + sharePosture, so a mobile admin could not set either.
+// Re-exported under the old name so existing importers (the locale-coverage fitness guard) are unaffected.
+export { SETTINGS_ENUM_AXES as ENUM_AXES } from '../../src/v2/circlePolicy.js';
 
 /**
  * @param {HTMLElement} container
@@ -236,7 +241,7 @@ export function renderCircleSettings(container, {
   container.appendChild(appsSection);
 
   // Axes 2-5 — single-choice radio groups
-  for (const axis of ENUM_AXES) {
+  for (const axis of SETTINGS_ENUM_AXES) {
     const sec = section(tr(`circle.settings.${axis}`));
     sec.classList.add('circle-settings__axis');
     sec.dataset.axis = axis;

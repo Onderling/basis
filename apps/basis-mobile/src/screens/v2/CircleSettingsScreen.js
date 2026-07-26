@@ -20,7 +20,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, Pressable, ScrollView, Switch, TextInput, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
 import {
-  CIRCLE_FEATURES, CIRCLE_POLICY_ENUMS, mergeCirclePolicy, makeProposal, DEFAULT_CIRCLE_ORIGINS,
+  CIRCLE_FEATURES, CIRCLE_POLICY_ENUMS, SETTINGS_ENUM_AXES, mergeCirclePolicy, makeProposal, DEFAULT_CIRCLE_ORIGINS,
   detectPolicyConflicts, applyPolicyResolution,
 } from '@onderling-app/basis';
 // the shared manifest-driven settings form + per-skill freedom matrix (web≡mobile).
@@ -60,7 +60,10 @@ const SETTINGS_TEMPLATE_URL = process.env.EXPO_PUBLIC_SETTINGS_TEMPLATE_URL || u
 // 'cross-stream'); making it editable here lets an admin pick which surface
 // a member lands on when they open the circle.  Listed first so it stays
 // the most prominent setting.
-const ENUM_AXES = ['view', 'llmTool', 'agents', 'revealPolicy', 'pod'];
+// Was a LOCAL copy that had drifted from web's — it omitted `storagePosture` and `sharePosture`, so a
+// mobile admin could not set either (invariants 1/2/3). Now the ONE shared list; guarded by
+// apps/basis/test/v2/settingsAxesParity.test.js.
+const ENUM_AXES = SETTINGS_ENUM_AXES;
 
 // D / consumer-switch (MOBILE) — the projected PAGE surface for the
 // `settings` op, selected once from the static basisManifest via the shared

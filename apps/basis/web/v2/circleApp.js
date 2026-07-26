@@ -5549,10 +5549,13 @@ function govNotify(circleId, event) {
     });
   } catch { /* best-effort */ }
 }
-function govBroadcast(channel, circleId, event) {
+function govBroadcast(channel, circleId, event, opts) {
   const op = channel === 'report' ? 'broadcastKringReport' : 'broadcastKringGovernance';
   const msgId = channel === 'report' ? reportEntryId(event) : governanceEntryId(event);
-  rawCallSkill('stoop', op, { groupId: circleId, event, msgId, ts: Date.now() }).catch(() => {});
+  // `opts.to` narrows the fan — the report channel passes the circle's admins, so a report never lands on
+  // the device of the person it is about (story 3.6). Undefined for governance: those fan to everyone.
+  const to = Array.isArray(opts?.to) ? opts.to : undefined;
+  rawCallSkill('stoop', op, { groupId: circleId, event, msgId, ts: Date.now(), ...(to ? { to } : {}) }).catch(() => {});
 }
 
 // Remove a reported post/message when an admin ACTS on it (the §8 report host's `act` calls

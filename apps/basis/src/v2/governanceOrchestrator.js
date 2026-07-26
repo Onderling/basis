@@ -71,8 +71,16 @@ export function makeGovernanceOrchestrator({ appendEvent, enact, getContext, new
     }
 
     // admin-quorum / member-vote — open the proposal, auto-cast the proposer's yes, then tally.
+    // The DEADLINE defaults from the circle's own policy when the caller gives none. This is what arms the
+    // admin escape hatch (story 3.3): no shell has ever passed a deadline, so before 2026-07-26 `expired`
+    // was never true and a proposal short of quorum stayed open forever with nothing able to resolve it.
+    // Deriving it HERE — rather than asking each shell to remember — keeps web ≡ mobile by construction.
+    // `decisionDeadlineDays: 0` opts out and leaves the proposal open-ended, as before.
     const proposalId = newProposalId();
-    await appendEvent(circleId, proposeEvent({ proposalId, action, subject, by: actor?.ref, deadline, at: t }));
+    const days = ctx.policy?.decisionDeadlineDays;
+    const defaultDeadline = (typeof days === 'number' && days > 0) ? t + (days * 86_400_000) : null;
+    const effectiveDeadline = deadline ?? defaultDeadline;
+    await appendEvent(circleId, proposeEvent({ proposalId, action, subject, by: actor?.ref, deadline: effectiveDeadline, at: t }));
     if (actor?.ref) await appendEvent(circleId, voteEvent({ proposalId, voter: actor.ref, choice: 'yes', at: t }));
     return tally({ circleId, proposalId, enactor: actor?.ref });
   }

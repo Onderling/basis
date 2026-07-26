@@ -118,6 +118,13 @@ export const DEFAULT_CIRCLE_POLICY = {
   // option: ping the admins rather than land a post on the (shared) board. See CIRCLE_POLICY_ENUMS.
   notifyOutOfCircle: 'admins',
   agents:           'admin-approval',
+  // §5 escape hatch (story 3.3) — how long a member-vote stays open before an ADMIN may force it
+  // ("Decide now"). Until 2026-07-26 no shell ever passed a deadline to `propose()`, so `expired` was never
+  // true and a proposal that stalled short of quorum stayed open FOREVER with no way to resolve it. The
+  // default now lives HERE and `makeGovernanceOrchestrator` applies it, so both shells inherit it by
+  // construction rather than each remembering to pass one (invariant 1). `0` disables the hatch entirely —
+  // a circle that wants decisions to stand open indefinitely can still say so.
+  decisionDeadlineDays: 7,
   revealPolicy:     'pairwise',
   pod:              'none',
   // ε.6 — see CIRCLE_POLICY_ENUMS.catchUpChooserMode docstring above.
@@ -242,6 +249,12 @@ export function normalizeCirclePolicy(stored = {}) {
     pod:                pickEnum('pod'),
     catchUpChooserMode: pickEnum('catchUpChooserMode'),
     admins:             Array.isArray(p.admins) ? p.admins.filter((x) => typeof x === 'string') : [],
+    // A non-negative finite number of days; anything else (missing, negative, NaN, a string) falls back to
+    // the default rather than silently disabling or extending the escape hatch.
+    decisionDeadlineDays:
+      (typeof p.decisionDeadlineDays === 'number' && Number.isFinite(p.decisionDeadlineDays) && p.decisionDeadlineDays >= 0)
+        ? p.decisionDeadlineDays
+        : DEFAULT_CIRCLE_POLICY.decisionDeadlineDays,
     consensusRequired:
       typeof p.consensusRequired === 'boolean' ? p.consensusRequired : DEFAULT_CIRCLE_POLICY.consensusRequired,
     // §5 (L4) — decision-class per governed action; each falls back to DEFAULT_GOVERNANCE,

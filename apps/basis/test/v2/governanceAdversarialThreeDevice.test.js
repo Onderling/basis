@@ -20,6 +20,7 @@ import { describe, it, expect } from 'vitest';
 import { chainEvent, authorHead, detectForks, verifyForkProof, foldDisputes } from '../../src/v2/governanceChain.js';
 import { voteEvent, GOVERNANCE_KIND } from '../../src/v2/governanceLog.js';
 import { DECISION_STATUS } from '../../src/v2/governanceDecision.js';
+import { normalizeCirclePolicy } from '../../src/v2/circlePolicy.js';
 import { threeDevices, openProposal } from './helpers/threeDeviceGovernance.js';
 
 /** Read the governance event payloads out of a device's log — the same view the fold gets. */
@@ -188,18 +189,29 @@ describe('3.3 — the deadline override is an ADMIN escape hatch, never a member
     expect((await h.rowOn('admin0', proposalId)).status).toBe(DECISION_STATUS.PENDING);
   });
 
-  // 🟠 THE GAP THIS STORY EXISTS TO FIND. Every property above is driven by a deadline the TEST supplies.
-  // No shell ever supplies one (`circleApp.js:5637`, `CircleGovernanceScreen.js:89`, `reportHost.js:49` all
-  // call propose() without `deadline`), so in production `deadline` is null, `expired` is never true, and
-  // the escape hatch can never arm. A proposal that stalls short of quorum stays open forever with no way
-  // to resolve it. The fix is a product call (what default? per-action? per-circle policy?), so it is
-  // pinned rather than guessed.
-  it.fails('a proposal opened the way the SHELLS open it can eventually be overridden', async () => {
+  // ✅ FIXED 2026-07-26. No shell ever passed a `deadline`, so `expired` was never true and a proposal short
+  // of quorum stayed open forever. The default now comes from the circle's own policy
+  // (`decisionDeadlineDays`, default 7) and is applied in `makeGovernanceOrchestrator.propose` — in the
+  // MODEL, so both shells inherit it rather than each remembering to pass one.
+  it('a proposal opened the way the SHELLS open it can eventually be overridden', async () => {
     const h = threeDevices({ clock: 1 });
     const proposalId = await openProposal(h, null);       // exactly what the shells pass
-    h.setClock(10_000_000);                               // however long anyone waits
+    expect((await h.rowOn('admin0', proposalId)).canOverride).toBe(false);   // not yet — the week is running
 
+    h.setClock(1 + 8 * 86_400_000);                       // eight days later
     expect((await h.rowOn('admin0', proposalId)).canOverride).toBe(true);
+    expect((await h.rowOn('m0', proposalId)).canOverride).toBe(false);       // still admin-only
+  });
+
+  it('a circle may opt OUT of the hatch with `decisionDeadlineDays: 0` — open-ended, as before', async () => {
+    const h = threeDevices({
+      clock: 1,
+      policy: normalizeCirclePolicy({ governance: { removeMember: 'member-vote' }, decisionDeadlineDays: 0 }),
+    });
+    const proposalId = await openProposal(h, null);
+    h.setClock(10_000_000_000);
+    expect((await h.rowOn('admin0', proposalId)).canOverride).toBe(false);
+    expect((await h.rowOn('admin0', proposalId)).deadline).toBe(null);
   });
 });
 
@@ -238,15 +250,13 @@ describe('3.6 — a report reaches the admin; it must not reach the person repor
     expect(mine).toHaveLength(1);
   });
 
-  // 🟠 THE LEAK. `appendReportEvent` fans on the `report` channel to EVERY member, and
-  // `makeKringReportPeerHandler` ingests it into every recipient's log — including the device of the person
-  // being reported. The only thing standing between Bram and "Cato reported you for harassment" is an
-  // `if (isAdmin)` in the SHELL (`circleApp.js:5615`), which is presentation, not access control: the
-  // payload (reporter ref + free-text reason + target) is sitting in Bram's local log.
-  // Same class as the members-list name leak and the profile-picture leak: the data layer hands out more
-  // than the surface shows. Pinned rather than fixed — the fix is a routing decision (send reports only to
-  // admins? seal them to the admin set?) with a real trade-off, since admins can change over time.
-  it.fails('Bram — the person reported — does not hold the report payload', async () => {
+  // ✅ FIXED 2026-07-26, in two layers. (1) ROUTING: `appendReportEvent` now fans only to the circle's admin
+  // refs (`opts.to`, threaded through both shells into `broadcastKringReport`), so the payload never reaches
+  // the reported person's device at all. (2) ACCESS: `reports.list` is viewer-scoped — admin sees all,
+  // anyone else sees only what they filed — so a report that lands on a device anyway (an admin demoted
+  // after delivery, a replayed log) still is not served. The shells' `if (isAdmin)` is now redundant rather
+  // than load-bearing.
+  it('Bram — the person reported — does not hold the report payload', async () => {
     const h = threeDevices();
     await fileReport(h.devices.m1);
 
@@ -254,15 +264,53 @@ describe('3.6 — a report reaches the admin; it must not reach the person repor
     expect(open.map((r) => r.targetRef)).not.toContain('post-7');
   });
 
-  it('the leak is REAL, not theoretical — the reason text and reporter are on Bram\'s device', async () => {
-    // The positive statement of the same fact, asserted so it cannot quietly change without notice.
-    // When the leak is fixed, THIS test is the one that must be updated (and the `it.fails` above flipped).
+  it('layer 1 (routing): the report event never lands in a non-admin\'s log', async () => {
     const h = threeDevices();
     await fileReport(h.devices.m1);
 
-    const { open } = await h.devices.m0.gov.reports.list('c1');
+    // Bram is neither the reporter nor an admin — his raw log must not carry the event at all.
+    const bramsReports = h.devices.m0.log.query({}).filter((e) => e.type === 'report');
+    expect(bramsReports).toHaveLength(0);
+    // Anna (admin) does hold it — proving the fan still works and the empty log above is not vacuous.
+    expect(h.devices.admin0.log.query({}).filter((e) => e.type === 'report').length).toBeGreaterThan(0);
+  });
+
+  it('layer 2 (access): even holding the event, a non-admin is not served it', async () => {
+    const h = threeDevices();
+    await fileReport(h.devices.m1);
+
+    // Force the event onto Bram's device, bypassing the narrowed fan — the demoted-admin / replay case.
+    const ev = h.devices.admin0.log.query({}).find((e) => e.type === 'report').payload;
+    h.devices.m0.ingestReport(null, { subtype: 'kring-report-broadcast', circleId: 'c1', event: ev, ts: Date.now() });
+    expect(h.devices.m0.log.query({}).filter((e) => e.type === 'report')).toHaveLength(1);   // he holds it…
+
+    const { open, scope } = await h.devices.m0.gov.reports.list('c1');
+    expect(scope).toBe('own');                                       // …but is served only his own
+    expect(open).toHaveLength(0);
+  });
+
+  it('the REPORTER learns the outcome — narrowing the fan must not strand them', async () => {
+    // The regression narrowing the fan introduces if the recipient set is admins ALONE: the resolve event
+    // never reaches Cato, so his own report sits "open" on his device forever. The fan is admins ∪ reporter.
+    const h = threeDevices();
+    const { reportId } = await fileReport(h.devices.m1);
+    expect((await h.devices.m1.gov.reports.list('c1')).open.map((r) => r.reportId)).toEqual([reportId]);
+
+    await h.devices.admin0.gov.reports.act({ circleId: 'c1', reportId });
+
+    const cato = await h.devices.m1.gov.reports.list('c1');
+    expect(cato.open).toHaveLength(0);                               // it closed on his device too
+    expect(cato.resolved.map((r) => r.reportId)).toContain(reportId);
+    // …and Bram, who is neither, still holds nothing at all.
+    expect(h.devices.m0.log.query({}).filter((e) => e.type === 'report')).toHaveLength(0);
+  });
+
+  it('an admin still sees the whole picture — the scope marker says so', async () => {
+    const h = threeDevices();
+    await fileReport(h.devices.m1);
+    const { open, scope } = await h.devices.admin0.gov.reports.list('c1');
+    expect(scope).toBe('all');
     expect(open).toHaveLength(1);
-    expect(open[0].by).toBe('m1');                                   // …who reported them
-    expect(open[0].reason).toContain('harassment');                  // …and the free text about them
+    expect(open[0].reason).toContain('harassment');
   });
 });

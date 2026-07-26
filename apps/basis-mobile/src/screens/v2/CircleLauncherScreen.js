@@ -616,10 +616,12 @@ export default function CircleLauncherScreen({
   const fileCircleReportMobile = useCallback(async (targetType, targetRef, targetLabel = null, reason = '') => {
     const circleId = selected?.id; if (!circleId || !targetRef) return;
     try {
-      const broadcast = (channel, cid, event) => {
+      const broadcast = (channel, cid, event, opts) => {
         const op = channel === 'report' ? 'broadcastKringReport' : 'broadcastKringGovernance';
         const msgId = channel === 'report' ? reportEntryId(event) : governanceEntryId(event);
-        bundle?.callSkill?.('stoop', op, { groupId: cid, event, msgId, ts: Date.now() })?.catch?.(() => {});
+        // `opts.to` narrows the fan to the circle's admins on the report channel (story 3.6) — web parity.
+        const to = Array.isArray(opts?.to) ? opts.to : undefined;
+        bundle?.callSkill?.('stoop', op, { groupId: cid, event, msgId, ts: Date.now(), ...(to ? { to } : {}) })?.catch?.(() => {});
       };
       const gov = bindCircleGovernance({
         eventLog, callSkill: bundle?.callSkill, getPolicy: (cid) => policyStore.get(cid),

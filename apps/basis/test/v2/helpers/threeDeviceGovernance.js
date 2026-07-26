@@ -61,14 +61,19 @@ export function threeDevices({ policy = defaultPolicy(), clock = 1 } = {}) {
 
   /** Fan an event from `fromRef` to the OTHER two devices (holding for the partitioned).
    *  Channel-aware: the report channel carries its own subtype and its own ingest handler. */
-  const broadcastFrom = (fromRef) => (channel, circleId, event) => {
+  const broadcastFrom = (fromRef) => (channel, circleId, event, opts = undefined) => {
     const subtype = channel === 'report' ? 'kring-report-broadcast' : 'kring-governance-broadcast';
+    // `opts.to` NARROWS the recipient set — what `broadcastKringReport`'s `to` does on the wire. Modelled
+    // here so a report genuinely does not reach a non-admin's log; without it the harness would fan to
+    // everyone and quietly contradict the shipped routing.
+    const allow = Array.isArray(opts?.to) ? new Set(opts.to) : null;
     // `ts` is the DELIVERY timestamp, deliberately NOT the governance clock: `EventLog` prunes by a
     // retention window, so stamping a fanned entry with a small logical clock (1) dates it to 1970 and the
     // receiver silently drops it — the fan appears to work and every replica stays empty.
     const payload = { subtype, circleId, event, ts: Date.now() };
     for (const ref of Object.keys(devices)) {
       if (ref === fromRef) continue;
+      if (allow && !allow.has(ref)) continue;
       if (devices[ref].online) deliver(devices[ref], payload);
       else held[ref].push(payload);
     }

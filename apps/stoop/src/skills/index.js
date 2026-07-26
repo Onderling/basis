@@ -467,12 +467,14 @@ async function revokePodAccess(controlAgent, { webId, force = false, policy = 'g
  * @param {object} [a.extras]           chat.send extras payload
  * @returns {Promise<{sent:number, attempted:number, errors:Array<{webid:string,reason:string}>}>}
  */
-async function _fanOutToMembers({ members, chat, selfWebid, subtype, threadId, body = '', extras = {} }) {
+async function _fanOutToMembers({ members, chat, selfWebid, subtype, threadId, body = '', extras = {}, only = null }) {
   const list = await members.list();
+  const allow = only instanceof Set ? only : (Array.isArray(only) ? new Set(only) : null);
   const webids = new Set();
   for (const m of list ?? []) {
     const w = typeof m === 'string' ? m : (m?.webid ?? m?.webId ?? null);
     if (!w || w === selfWebid) continue;
+    if (allow && !allow.has(w)) continue;      // narrowed fan (e.g. reports → admins only)
     webids.add(w);
   }
   let sent = 0;
@@ -514,13 +516,15 @@ async function _fanOutToMembers({ members, chat, selfWebid, subtype, threadId, b
  * @param {object} a.envelope          the conforming kring-chat-message wire envelope
  * @returns {Promise<{sent:number, attempted:number, errors:Array<{webid:string,reason:string}>}>}
  */
-async function _fanOutViaReliableSend({ members, reliableSend, selfWebid, envelope }) {
+async function _fanOutViaReliableSend({ members, reliableSend, selfWebid, envelope, only = null }) {
   const list = await members.list();
+  const allow = only instanceof Set ? only : (Array.isArray(only) ? new Set(only) : null);
   const targets = new Map();      // routable address → webid (dedupe by address)
   const unresolved = [];
   for (const m of list ?? []) {
     const webid = typeof m === 'string' ? m : (m?.webid ?? m?.webId ?? null);
     if (!webid || webid === selfWebid) continue;
+    if (allow && !allow.has(webid)) continue;  // narrowed fan (e.g. reports → admins only)
     let addr = (m && typeof m === 'object' && typeof m.pubKey === 'string' && m.pubKey) ? m.pubKey : null;
     if (!addr) {
       try { const peer = await members.resolveByWebid(webid); addr = peer?.pubKey ?? null; } catch { addr = null; }
@@ -972,7 +976,7 @@ export function buildSkills({
     } catch { return 'fan-out-full'; }
   }
 
-  async function broadcastToCircle({ circleId, kind, from, body = '', extras = {}, metric = null, envelope = null, noWake = false }) {
+  async function broadcastToCircle({ circleId, kind, from, body = '', extras = {}, metric = null, envelope = null, noWake = false, only = null }) {
     // Relay wake-gate (§ residual server-side wake work): a broadcast marked
     // `noWake` is hold-forwarded to offline members but must NOT fire an OS push
     // wake — routine governance events (individual votes/resolves) and reports
@@ -1053,8 +1057,8 @@ export function buildSkills({
     // chat.send fallback would produce as the receiver's payload (routed by `subtype`).
     const wire = envelope ?? { subtype: kind, ...extras };
     const { sent, attempted, errors } = reliableSend
-      ? await _fanOutViaReliableSend({ members, reliableSend, selfWebid: from, envelope: wire })
-      : await _fanOutToMembers({ members, chat, selfWebid: from, subtype: kind, threadId: circleId, body, extras });
+      ? await _fanOutViaReliableSend({ members, reliableSend, selfWebid: from, envelope: wire, only })
+      : await _fanOutToMembers({ members, chat, selfWebid: from, subtype: kind, threadId: circleId, body, extras, only });
     if (metric) metrics?.record?.(metric);
     return { sent, attempted, errors };
   }
@@ -3869,14 +3873,19 @@ export function buildSkills({
       const ts = typeof a.ts === 'number' && Number.isFinite(a.ts) ? a.ts : Date.now();
       // Wake-gate: a report is a silent-lane event — it's hold-forwarded so an
       // admin sees it on their next presence, but it must never OS-wake a device.
+      // `to` NARROWS the fan to the circle's admins (basis passes them). A report used to go to every
+      // member, which put the reporter's identity and the reason onto the REPORTED person's own device.
+      // Absent `to`, the fan is unnarrowed — older callers behave as before.
+      const only = Array.isArray(a.to) ? a.to.filter((x) => typeof x === 'string' && x) : null;
       return broadcastToCircle({
         circleId: _groupId, kind: 'kring-report-broadcast', from,
         extras: { circleId: _groupId, msgId: a.msgId, ts, event: a.event },
         metric: 'kring-report-fanout',
         noWake: true,
+        only,
       });
     }, {
-      description: 'Fan a report event to every other member via chat.send subtype:kring-report-broadcast; receivers ingest it into their local EventLog. Never wakes an offline device (silent lane).',
+      description: 'Fan a report event via chat.send subtype:kring-report-broadcast; receivers ingest it into their local EventLog. Pass `to` (the circle admins) to narrow the fan — a report must not reach the person it is about. Never wakes an offline device (silent lane).',
       visibility:  'authenticated',
     }),
 

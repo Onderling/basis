@@ -35,10 +35,12 @@ export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy,
   const load = useCallback(async () => {
     let myWebid = '';
     try { const r = await callSkill('stoop', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
-    const broadcast = (channel, circleId, event) => {
+    const broadcast = (channel, circleId, event, opts) => {
       const op = channel === 'report' ? 'broadcastKringReport' : 'broadcastKringGovernance';
       const msgId = channel === 'report' ? reportEntryId(event) : governanceEntryId(event);
-      callSkill('stoop', op, { groupId: circleId, event, msgId, ts: Date.now() }).catch(() => {});
+      // `opts.to` narrows the fan to the circle's admins on the report channel (story 3.6) — web parity.
+      const to = Array.isArray(opts?.to) ? opts.to : undefined;
+      callSkill('stoop', op, { groupId: circleId, event, msgId, ts: Date.now(), ...(to ? { to } : {}) }).catch(() => {});
     };
     const gov = bindCircleGovernance({
       eventLog, callSkill, getPolicy, myRef: myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast,

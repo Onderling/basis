@@ -25,6 +25,32 @@ import { shareIntoAudience, resolveSharedRef, listShared, unsealItem, isCanonica
 import { normalizeCirclePolicy } from './circlePolicy.js';
 
 /**
+ * The storage postures that PROMISE client-side sealing (`circlePolicy.storagePosture`). p0 (trusted host)
+ * and p1 (TEE) promise no client-side seal, so the in-memory / no-pod path is their honest behaviour.
+ */
+const SEALING_POSTURES = new Set(['p2', 'p3']);
+
+/**
+ * Would this share silently break the circle's own posture promise?
+ *
+ * The pod-tier `enforcement` is what performs the seal + the ACP grant; `buildCircleShareEnforcement` returns
+ * NULL whenever there is no podRoot — which is exactly what a device looks like after the person signs out of
+ * their pod mid-flow. Without this check the share still succeeds: `shareOneResolved` passes
+ * `enforcement?.onShare*` (undefined), `shareIntoAudience` writes a PLAIN `shared-ref`, and the caller is told
+ * `{ok:true}` — indistinguishable from a sealed, granted share (story 7.3).
+ *
+ * The refusal is scoped to circles that actually made the promise. A p0/p1 circle — including the DEFAULT,
+ * `p0` — is unaffected, so the deliberate no-pod/in-memory mode keeps working exactly as before.
+ *
+ * @param {object} policy       the normalized SOURCE circle policy
+ * @param {object|null} enforcement  the pod-tier binder (null ⇒ no pod session)
+ * @returns {boolean}
+ */
+function sealPromiseUnmet(policy, enforcement) {
+  return SEALING_POSTURES.has(policy?.storagePosture) && !enforcement;
+}
+
+/**
  * Which share postures ride the COPY re-seal mechanism (a SEPARATE object sealed to the recipient(s), source
  * untouched). Decision "option 2": `trusted` and `registered` currently share the SAME copy mechanism as
  * `copy` — the only difference between the three is WHO MAY INITIATE (the slice-2 initiator gate), which is
@@ -151,6 +177,11 @@ export async function shareItemAcrossCircles({
   // Pod-active source? build the WRITE-side onShare (ACP grant + optional re-seal) for the SOURCE item's pod.
   // Null ⇒ memory path: shareIntoAudience just writes the ref (unchanged behaviour).
   const enforcement = typeof enforcementFor === 'function' ? await enforcementFor(fromCircleId) : null;
+  // A circle that promised sealing (p2/p3) must not fall through to the plaintext write when the pod session
+  // is gone — refuse LOUDLY instead of reporting a success that did not seal or grant anything (story 7.3).
+  if (sealPromiseUnmet(policy, enforcement)) {
+    return { ok: false, error: 'seal-unavailable', posture: policy.storagePosture };
+  }
 
   return shareOneResolved({
     stores, itemId, fromCircleId, toCircleId, by, posture,
@@ -273,6 +304,9 @@ export async function shareContainerAcrossCircles({
   ]));
 
   const enforcement = typeof enforcementFor === 'function' ? await enforcementFor(fromCircleId) : null;
+  if (sealPromiseUnmet(policy, enforcement)) {          // same promise, checked once for the whole subtree
+    return { ok: false, error: 'seal-unavailable', posture: policy.storagePosture };
+  }
 
   // Fan the SAME single-item write path over the subtree (container first, children in order; idempotent).
   return shareContainerTree(stores, {

@@ -146,7 +146,7 @@ describe('7.1 — content shared out of one circle does not appear in a third', 
 
 describe('7.3 — the pod goes away between two shares', () => {
   /** One circle, one policy, two shares — the ONLY difference is whether the device still has a pod. */
-  async function shareTwice({ secondEnforcement }) {
+  async function shareTwice({ secondEnforcement = null, storagePosture = 'p0', keepPod = false }) {
     const svc = makeCircleLists();
     const resolveService = async () => svc;
     const controllerKey = generateKeypair();
@@ -158,7 +158,7 @@ describe('7.3 — the pod goes away between two shares', () => {
       sharing, keyStore, controllerKey, currentRecipients: () => [anna.publicKey],
     });
 
-    const policyOf = async () => ({ sharePosture: 'canonical' });
+    const policyOf = async () => ({ sharePosture: 'canonical', storagePosture });
     const one = await svc.createList('X', 'first body', 'anna');
     const two = await svc.createList('X', 'second body', 'anna');
 
@@ -171,7 +171,7 @@ describe('7.3 — the pod goes away between two shares', () => {
     // …Anna signs out of her pod here. `buildCircleShareEnforcement` returns null without a podRoot, so the
     // shell's `enforcementFor` yields null — the ONLY change.
     const second = await shareItemAcrossCircles({
-      resolveService, enforcementFor: async () => secondEnforcement, policyOf,
+      resolveService, enforcementFor: async () => (keepPod ? live : secondEnforcement), policyOf,
       itemId: two.id, fromCircleId: 'X', toCircleId: 'Y', by: 'anna',
       recipients: ['did:bram'], recipientKeys: [bram.publicKey],
     });
@@ -180,57 +180,42 @@ describe('7.3 — the pod goes away between two shares', () => {
   }
 
   it('the FIRST share (pod live) is sealed and granted — the control', async () => {
-    const { first, sharing, keyStore, bram, refs } = await shareTwice({ secondEnforcement: null });
+    const { first, sharing, keyStore, bram, refs } = await shareTwice({});
     expect(first.ok).toBe(true);
     const uri = resourceUriFor((await refs())[0]);
     expect(sharing.has(uri, 'did:bram')).toBe(true);                       // ACP grant landed
     expect(unwrapGroupKey(keyStore.current(), bram.privateKey)).toBeTruthy(); // key re-wrapped to Bram
   });
 
-  // 🟠 THE GAP. The second share reports `{ok:true}` exactly like the first, but nothing was sealed and
-  // nothing was granted: `shareOneResolved` passes `enforcement?.onShareCanonical` — `undefined` on the
-  // signed-out path — and `shareIntoAudience` falls through to a plain `shared-ref` write. The circle's
-  // posture said the content is sealed to its roster; after a sign-out it silently is not, and the person
-  // sharing is told it worked. That is precisely the "silent posture downgrade" 7.3 exists to catch.
-  // Not auto-fixed: refusing outright would break the deliberate no-pod/in-memory mode (a real supported
-  // configuration), so the choice — fail loudly · return a `degraded` flag the shells surface · or gate on
-  // the circle's storagePosture — is a product call.
-  it.fails('the second share does NOT silently report success after sign-out', async () => {
-    const { second } = await shareTwice({ secondEnforcement: null });
-    // Either honest outcome would satisfy this: refuse outright, or succeed while SAYING it degraded.
-    // Today it does neither — plain `{ok:true}`, indistinguishable from the sealed-and-granted first share.
-    expect(second.ok === false || second.degraded === true).toBe(true);
+  // ✅ FIXED 2026-07-26. The share now REFUSES when the circle's own `storagePosture` promised sealing
+  // (p2/p3) and the pod-tier enforcement is absent — `{ok:false, error:'seal-unavailable'}`. The refusal is
+  // scoped to circles that made the promise, so a p0/p1 circle (including the DEFAULT, p0) still takes the
+  // deliberate in-memory path exactly as before; see the p0 test below.
+  it('a sealed circle REFUSES the share after sign-out rather than writing plaintext', async () => {
+    const { second, sharing, refs } = await shareTwice({ secondEnforcement: null, storagePosture: 'p3' });
+    expect(second).toMatchObject({ ok: false, error: 'seal-unavailable', posture: 'p3' });
+
+    // Nothing was written and nothing was granted — the refusal is complete, not cosmetic.
+    expect(await refs()).toHaveLength(1);            // only the FIRST share's ref
+    expect(sharing.grantCount()).toBe(1);
   });
 
-  it('the downgrade is REAL: the post-sign-out ref carries no grant and no key wrap', async () => {
-    // The positive statement of the same fact, pinned so it cannot change unnoticed. When the gap is
-    // closed, THIS is the test that must be rewritten alongside the `it.fails` above.
-    const { second, sharing, keyStore, bram, refs } = await shareTwice({ secondEnforcement: null });
-    expect(second.ok).toBe(true);                                   // …reported as success
-
-    const all = await refs();
-    expect(all).toHaveLength(2);                                    // both refs are in the target circle
-    const secondUri = resourceUriFor(all.find((r) => r.sourceId !== all[0].sourceId) ?? all[1]);
-    expect(sharing.has(secondUri, 'did:bram')).toBe(false);         // …with NO ACP grant
-
-    // The group-key resource still holds only what the FIRST share wrapped — the second share added nobody.
-    const wrapped = keyStore.current();
-    expect(unwrapGroupKey(wrapped, bram.privateKey)).toBeTruthy();   // from share #1, not #2
-    expect(sharing.grantCount()).toBe(1);                            // exactly one grant across both shares
+  it('p2 refuses too — both sealing postures are covered, not just the one', async () => {
+    const { second } = await shareTwice({ secondEnforcement: null, storagePosture: 'p2' });
+    expect(second).toMatchObject({ ok: false, error: 'seal-unavailable', posture: 'p2' });
   });
 
-  it('a MID-FLOW sign-out is indistinguishable from never having had a pod — no signal either way', async () => {
-    // Both runs return the same shape, which is the root of the problem: the caller cannot tell "no pod
-    // configured" (a supported mode) from "the pod vanished under me" (a broken promise).
-    const signedOut = await shareTwice({ secondEnforcement: null });
-    const neverHadOne = await shareTwice({ secondEnforcement: undefined });
+  it('a p0 circle is UNAFFECTED — the no-pod in-memory mode still works', async () => {
+    // The control that keeps the fix honest: p0 promises no client-side seal, so the plain `shared-ref`
+    // write IS its correct behaviour. If this ever starts refusing, the fix has over-reached.
+    const { second, refs } = await shareTwice({ secondEnforcement: null, storagePosture: 'p0' });
+    expect(second.ok).toBe(true);
+    expect(await refs()).toHaveLength(2);
+  });
 
-    // Compare the SHAPE, not the identity — ids and timestamps differ by construction between runs.
-    const shape = (r) => ({ ok: r.ok, keys: Object.keys(r).sort(), refKeys: Object.keys(r.ref ?? {}).sort() });
-    expect(shape(signedOut.second)).toEqual(shape(neverHadOne.second));
-    // Nothing in either result names the difference: no `degraded`, no `sealed`, no `enforcement` marker.
-    for (const r of [signedOut.second, neverHadOne.second]) {
-      expect(Object.keys(r)).toEqual(['ok', 'ref']);
-    }
+  it('a sealed circle with the pod STILL LIVE is unaffected — it is the absence that refuses', async () => {
+    const { first, second } = await shareTwice({ storagePosture: 'p3', keepPod: true });
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);                    // enforcement present ⇒ no refusal
   });
 });

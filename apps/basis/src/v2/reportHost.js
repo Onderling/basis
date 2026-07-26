@@ -6,6 +6,13 @@
  * **member** target routes through the governance `removeMember` decision-class (any-admin
  * bans immediately; a member-vote circle opens a vote) — reusing L4, never a bespoke ban.
  * Acting on a post/message closes the report `actioned`; the shell wires the item removal.
+ *
+ * VISIBILITY (2026-07-26, story 3.6). `list` is VIEWER-SCOPED: an admin sees every report, anyone else sees
+ * only the ones they filed themselves. Until this change `list` returned every report to every caller and the
+ * only barrier was an `if (isAdmin)` in each shell — presentation, not access control — so a member's device
+ * would hand over the reporter's identity and the free-text reason about them on request. The fan is now
+ * admin-only too (see `governanceAppWiring`), which stops the payload arriving; this is the second layer, so
+ * a report that reaches a device anyway (an admin demoted after delivery, a replayed log) still is not served.
  */
 import { reportEvent, resolveReportEvent, foldReports, REPORT_STATUS } from './reportModel.js';
 
@@ -20,8 +27,31 @@ import { reportEvent, resolveReportEvent, foldReports, REPORT_STATUS } from './r
  * @param {string} deps.localActorRef
  * @param {()=>number} [deps.now]
  */
-export function makeCircleReports({ readReportEvents, appendReportEvent, governance = null, removeReported = null, newReportId, localActorRef, now = () => 0 }) {
+export function makeCircleReports({ readReportEvents, appendReportEvent, governance = null, removeReported = null, newReportId, localActorRef, now = () => 0, isAdmin = null }) {
+  /** May THIS device's user see everyone's reports? Absent an `isAdmin` seam, assume not (deny-by-default). */
+  async function viewerIsAdmin(circleId) {
+    if (typeof isAdmin !== 'function') return false;
+    try { return !!(await isAdmin(circleId)); } catch { return false; }
+  }
+
+  /**
+   * The reports this viewer may see. Admin ⇒ all; anyone else ⇒ only their own.
+   * `{ scope: 'all' | 'own' }` is returned so a surface can say WHY a list is short rather than implying
+   * the circle is quiet.
+   */
   async function list(circleId) {
+    const events = await readReportEvents(circleId);
+    const folded = foldReports(Array.isArray(events) ? events : []);
+    if (await viewerIsAdmin(circleId)) return { ...folded, scope: 'all' };
+    const mine = (rs) => (Array.isArray(rs) ? rs.filter((r) => r && r.by === localActorRef) : []);
+    const open = mine(folded.open);
+    return { ...folded, open, resolved: mine(folded.resolved), openCount: open.length, scope: 'own' };
+  }
+
+  /** The UNFILTERED fold — for the code paths that act on a report the viewer is entitled to act on.
+   *  Kept private: `act`/`dismiss` are already admin affordances in the shells, and scoping them through
+   *  `list` would make an admin unable to act on a report they can plainly see. */
+  async function listAll(circleId) {
     const events = await readReportEvents(circleId);
     return foldReports(Array.isArray(events) ? events : []);
   }
@@ -38,7 +68,7 @@ export function makeCircleReports({ readReportEvents, appendReportEvent, governa
   }
 
   async function act({ circleId, reportId }) {
-    const { open } = await list(circleId);
+    const { open } = await listAll(circleId);
     const r = open.find((x) => x.reportId === reportId);
     if (!r) return { ok: false, reason: 'no-open-report' };
     // A member target → the governance removeMember class decides the ban. A post/message

@@ -11,7 +11,7 @@ import { makeCircleGovernance } from './governanceHost.js';
 import { GOVERNANCE_KIND, governanceEntryId } from './governanceLog.js';
 import { chainEvent, authorHead } from './governanceChain.js';
 import { makeCircleReports } from './reportHost.js';
-import { REPORT_KIND, reportEntryId } from './reportModel.js';
+import { REPORT_KIND, REPORT_EVENT, reportEntryId } from './reportModel.js';
 
 /** The author of a governance event — the voter (a vote) or the proposer/enactor (propose/resolve). */
 function authorOf(event) {
@@ -53,14 +53,16 @@ export async function readCircleMembers({ callSkill, circleId, myRef, getPolicy 
  * @param {string} deps.myRef            this device's member ref (webid)
  * @param {()=>string} deps.genId        fresh proposal ids
  * @param {()=>number} [deps.now]
- * @param {(channel:'governance'|'report', circleId:string, event:object)=>void} [deps.broadcast]
+ * @param {(channel:'governance'|'report', circleId:string, event:object, opts?:{to?:string[]})=>void} [deps.broadcast]
  *   fan a just-appended event to the circle's members (the shell wires it to the stoop
  *   broadcastKring{Governance,Report} skill). Absent ⇒ local-only (single-device).
+ *   `opts.to` NARROWS the recipient set — the report channel passes the circle's admin refs, so a report
+ *   never lands on the device of the person it is about.
  */
 export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, genId, now = () => Date.now(), broadcast = null, removeReported = null }) {
-  const fan = (channel, circleId, event) => {
+  const fan = (channel, circleId, event, opts = undefined) => {
     if (typeof broadcast !== 'function') return;
-    try { broadcast(channel, circleId, event); } catch { /* fan is best-effort — never block the local write */ }
+    try { broadcast(channel, circleId, event, opts); } catch { /* fan is best-effort — never block the local write */ }
   };
   const readGovernanceEvents = async (circleId) => eventLog
     .query({})
@@ -93,13 +95,42 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
     .query({})
     .filter((e) => e && e.type === REPORT_KIND && e.circleId === circleId && e.payload)
     .map((e) => e.payload);
+  // The circle's ADMIN refs — who a report may be shown to. Read from the same membership the governance
+  // fold uses, so "admin" means one thing in this file.
+  const adminRefsOf = async (circleId) => {
+    try { return (await getMembers(circleId)).filter((m) => m.role === 'admin').map((m) => m.ref).filter(Boolean); }
+    catch { return []; }
+  };
+  const iAmAdmin = async (circleId) => (await adminRefsOf(circleId)).includes(myRef);
+
+  // A report is fanned ONLY to the circle's admins (story 3.6). It used to go to every member, which put the
+  // reporter's identity and the free-text reason about the REPORTED person onto that person's own device —
+  // the `if (isAdmin)` in each shell was hiding it, not withholding it. `to` narrows the recipient set at the
+  // broadcast seam; an empty admin list means nobody but the local writer holds it, which is the safe end.
+  /** Who filed the report this event concerns — the REPORT event carries it directly; a RESOLVE event only
+   *  names the reportId, so we look the original up in the local log. */
+  const reporterOf = async (circleId, event) => {
+    if (typeof event?.by === 'string' && event.event === REPORT_EVENT.REPORT) return event.by;
+    if (typeof event?.reportId !== 'string') return null;
+    const events = await readReportEvents(circleId);
+    const original = events.find((e) => e?.event === REPORT_EVENT.REPORT && e.reportId === event.reportId);
+    return typeof original?.by === 'string' ? original.by : null;
+  };
+
+  // Admins ∪ the REPORTER. Admins because the report is for them to act on; the reporter because otherwise
+  // narrowing the fan silently strands them — they would never learn their own report was actioned or
+  // dismissed, and it would sit "open" on their device forever. Everyone ELSE (in particular the person
+  // being reported) is excluded, which is the point (story 3.6).
   const appendReportEvent = async (circleId, event) => {
     const entry = eventLog.appendSilentEntry({ circleId, kind: REPORT_KIND, payload: event, id: reportEntryId(event) });
-    fan('report', circleId, event);
+    const reporter = await reporterOf(circleId, event);
+    const to = [...new Set([...(await adminRefsOf(circleId)), ...(reporter ? [reporter] : [])])];
+    fan('report', circleId, event, { to });
     return entry;
   };
   const reports = makeCircleReports({
     readReportEvents, appendReportEvent, governance, removeReported, newReportId: genId, localActorRef: myRef, now,
+    isAdmin: iAmAdmin,
   });
 
   return { ...governance, reports };

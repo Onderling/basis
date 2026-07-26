@@ -12,7 +12,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { appointCaretaker, caretakerOrder, needsCaretaker } from '../src/v2/governanceCaretaker.js';
-import { viewAsDirectory } from '../src/v2/circleViewAs.js';
+import { viewAsDirectory, revealedMemberLabel } from '../src/v2/circleViewAs.js';
 import { memberPersonaView } from '../src/v2/memberCards.js';
 import { foldGovernance } from '../src/v2/governanceLog.js';
 import { normalizeCirclePolicy } from '../src/v2/circlePolicy.js';
@@ -203,34 +203,41 @@ describe('6.1 / 6.3 — a person\'s own two devices', () => {
   });
 });
 
-// ── 🟠 FOUND 2026-07-26 — the LEDEN members list bypasses the reveal gate ─────────────────────────────
+// ── ✅ FIXED 2026-07-26 — the members list is reveal-gated (Frits's call) ────────────────────────────
 //
-// `normalizeCircleMembers` (the LEDEN roster) carries `realName` UNGATED — it is the MemberMap display
-// cache, which holds names regardless of whether the member ever revealed to this viewer (that is exactly
-// why `hydrateItem`/`resolveMember` gate item-author names at READ time via the Reveals store). The web
-// members list then renders it directly:
-//
-//     circleKring.js:671  primary   = m.handle ? `@${handle}` : (m.realName || m.id)
-//     circleKring.js:678  secondary = m.realName
-//
-// So a member who never revealed can still have their real name shown in the main member list — the same
-// bypass class as the profile picture, on the primary identifier. `viewAsDirectory` already computes the
-// correct answer (`revealed` + `displayName`); the list simply does not use it.
-//
-// NOT fixed here: it CHANGES WHAT NAMES PEOPLE SEE (in the safe direction — it hides), so it is Frits's
-// call, exactly like the picture. `it.fails` documents the intent and flips green when it lands.
-describe('5.2b — the members list must respect the reveal gate (FOUND, pending decision)', () => {
+// `normalizeCircleMembers` carries `realName` UNGATED (the MemberMap display cache holds names whether or
+// not the member revealed — why item-author names are gated at READ time). Both members lists rendered it
+// straight, so an unrevealed member's real name could appear in the main list. `revealedMemberLabel` now
+// computes the label ONCE for both shells.
+describe('5.2b — the members list respects the reveal gate', () => {
   const unrevealed = { id: 'bram', handle: 'fox', realName: 'Bram de Vries', reveals: [] };
+  const revealed   = { id: 'cato', handle: 'heron', realName: 'Cato Jansen', reveals: ['me'] };
 
-  it.fails('a roster row for an UNREVEALED member should not carry their real name to the shell', () => {
-    // What the LEDEN list is handed today. The shell has no way to know it must not render this.
-    expect(unrevealed.realName).toBeFalsy();
+  it('an UNREVEALED member shows their handle — never their name, in either line', () => {
+    const l = revealedMemberLabel(unrevealed, { viewerId: 'me', policy: 'pairwise' });
+    expect(l.primary).toBe('@fox');
+    expect(l.secondary).toBeNull();
+    expect(JSON.stringify(l)).not.toContain('Vries');
   });
 
-  it('the gated projection already has the right answer — the list just needs to use it', () => {
-    const [row] = viewAsDirectory({ members: [unrevealed], viewer: { kind: 'member', id: 'cato' }, policy: 'pairwise' });
-    expect(row.revealed).toBe(false);
-    expect(row.displayName).toBe('fox');            // the handle, not the name
-    expect(row.displayName).not.toContain('Vries');
+  it('a member who revealed TO ME shows the name as the secondary line', () => {
+    const l = revealedMemberLabel(revealed, { viewerId: 'me', policy: 'pairwise' });
+    expect(l.primary).toBe('@heron');
+    expect(l.secondary).toBe('Cato Jansen');
+  });
+
+  it('with NO handle it falls back to the id, never to the withheld name', () => {
+    const l = revealedMemberLabel({ id: 'did:bram', realName: 'Bram de Vries', reveals: [] }, { viewerId: 'me' });
+    expect(l.primary).toBe('did:bram');
+    expect(l.primary).not.toContain('Vries');
+  });
+
+  it('an `open` circle shows names, and my OWN row always shows mine', () => {
+    expect(revealedMemberLabel(unrevealed, { viewerId: 'me', policy: 'open' }).secondary).toBe('Bram de Vries');
+    expect(revealedMemberLabel({ ...unrevealed, id: 'me' }, { viewerId: 'me' }).secondary).toBe('Bram de Vries');
+  });
+
+  it('a viewer with no identity yet (null) sees nothing revealed — fail-closed', () => {
+    expect(revealedMemberLabel(unrevealed, { viewerId: null }).secondary).toBeNull();
   });
 });

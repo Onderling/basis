@@ -94,6 +94,7 @@ import { resolveChatAi } from '../../../../basis/src/v2/chatAi.js';
 import { surfacePrefStore } from '../../core/surfacePrefStore.js';
 import MultiFieldFormBubble from '../../rn/MultiFieldFormBubble.js';   // 2+-field inline form (parity with web)
 import { createCircleDispatch, addressesBot, stripBotTag } from '../../../../basis/src/v2/circleDispatch.js';
+import { revealedMemberLabel } from '../../../../basis/src/v2/circleViewAs.js';
 import { resolveCircleLlm } from '../../../../basis/src/v2/llmPicker.js';
 // Phase 4 §9/§10 — the settings-surface transport state (relayPref) + the shared composer built-in classifier (G17).
 import { resolveRelayUrl, asyncStorageRelayIo } from '../../../../basis/src/v2/relayPref.js';
@@ -3343,8 +3344,15 @@ function CircleDetail({
                   onPress={() => setMemberCard({ member: m, self: isSelf })}
                 >
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.memberHandle} numberOfLines={1}>{m.handle ? `@${m.handle}` : (m.realName || m.id)}</Text>
-                    {m.realName && m.handle ? <Text style={styles.memberName} numberOfLines={1}>{m.realName}</Text> : null}
+                    {/* Reveal-gated via the SHARED helper (web parity): the roster row carries `realName`
+                        ungated, so an unrevealed member must show their handle, never their name. */}
+                    <Text style={styles.memberHandle} numberOfLines={1}>
+                      {revealedMemberLabel(m, { viewerId: mandateViewer.viewerWebid ?? null, policy: policy?.revealPolicy ?? 'pairwise' }).primary}
+                    </Text>
+                    {(() => {
+                      const sec = revealedMemberLabel(m, { viewerId: mandateViewer.viewerWebid ?? null, policy: policy?.revealPolicy ?? 'pairwise' }).secondary;
+                      return sec ? <Text style={styles.memberName} numberOfLines={1}>{sec}</Text> : null;
+                    })()}
                   </View>
                   {isSelf ? <Text style={styles.memberYou}>{t('circle.leden_tab.you')}</Text> : null}
                 </Pressable>

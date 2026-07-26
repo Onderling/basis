@@ -36,6 +36,7 @@
  */
 
 import { actionsForStreamRow } from '../../src/v2/streamActions.js';
+import { revealedMemberLabel } from '../../src/v2/circleViewAs.js';
 import { renderMandateLegibility } from './mandatePicker.js';
 // media — the sealed media-card chip renders via the existing shared
 // domAdapter branch (renderToDom → renderMediaCard), NOT a re-implementation.
@@ -152,6 +153,7 @@ export function renderCircleKring(container, {
   // the host routes by comparing `member.id` to `selfWebid`.
   members = null,
   selfWebid = null,
+  revealPolicy = 'pairwise',   // the circle's realName reveal rule; gates the member labels
   onMemberTap = null,
   // media — the sealed media path (live wiring). Both optional; without them the
   // composer + bubbles render exactly as before.
@@ -666,16 +668,19 @@ function renderLedenTab(body, { members = null, selfWebid = null, tr, onMemberTa
     row.dataset.memberId = m.id ?? '';
     if (self) row.dataset.self = 'true';
 
+    // Reveal-gated (shared with mobile): the roster row carries `realName` ungated, so the label must be
+    // computed, never read straight off the row — an unrevealed member shows their handle, not their name.
+    const label = revealedMemberLabel(m, { viewerId: selfWebid, policy: revealPolicy });
     const primary = document.createElement('span');
     primary.className = 'circle-kring__member-primary';
-    primary.textContent = m.handle ? `@${m.handle}` : (m.realName || m.id || '');
+    primary.textContent = label.primary;
     row.appendChild(primary);
 
-    // Show the real name as a secondary line only when it's distinct from the handle.
-    if (m.realName && m.handle) {
+    // The real name as a secondary line — only when this viewer may actually see it.
+    if (label.secondary) {
       const secondary = document.createElement('span');
       secondary.className = 'circle-kring__member-secondary';
-      secondary.textContent = m.realName;
+      secondary.textContent = label.secondary;
       row.appendChild(secondary);
     }
 

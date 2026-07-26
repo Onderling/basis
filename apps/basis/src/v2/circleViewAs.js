@@ -58,3 +58,36 @@ export function viewAsDirectory({ members = [], viewer = {}, policy = 'pairwise'
       };
     });
 }
+
+/**
+ * The reveal-gated LABEL for one roster row — what a members list may actually show.
+ *
+ * `normalizeCircleMembers` hands the shells `realName` UNGATED: it comes from the MemberMap display cache,
+ * which holds names whether or not that member ever revealed to this viewer (exactly why item-author names
+ * are gated at READ time via the Reveals store). Both members lists rendered it straight —
+ * `handle ? '@handle' : (realName || id)` plus a secondary `realName` line — so an unrevealed member's real
+ * name could appear in the main list. `viewAsDirectory` already knew better; the lists just didn't ask.
+ *
+ * One helper so web and mobile can never diverge on it (invariants #1/#2). Same rule as the directory:
+ * your own row always shows your name, an `open` circle shows names to members, and otherwise only a
+ * pairwise reveal TO THIS VIEWER does.
+ *
+ * @param {{id?:string, handle?:string|null, realName?:string|null, reveals?:string[]}} member
+ * @param {{viewerId?:string|null, policy?:'open'|'pairwise'}} [opts]
+ * @returns {{primary:string, secondary:string|null, revealed:boolean}}
+ *   `primary` is always safe to render; `secondary` is the real name ONLY when it may be shown.
+ */
+export function revealedMemberLabel(member, { viewerId = null, policy = 'pairwise' } = {}) {
+  const m = member && typeof member === 'object' ? member : {};
+  const self = viewerId != null && m.id === viewerId;
+  const revealedToViewer = viewerId != null && Array.isArray(m.reveals) && m.reveals.includes(viewerId);
+  const revealed = !!(self || policy === 'open' || revealedToViewer);
+  const handle = m.handle ?? null;
+  const realName = m.realName ?? null;
+  return {
+    revealed,
+    // Never fall back to the real name for an unrevealed member — the id is the honest last resort.
+    primary: handle ? `@${handle}` : ((revealed && realName) ? realName : (m.id ?? '')),
+    secondary: (revealed && realName && handle) ? realName : null,
+  };
+}

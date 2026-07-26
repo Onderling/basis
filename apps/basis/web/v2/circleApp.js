@@ -4715,6 +4715,8 @@ function showKring(id, circle, policy) {
       // G16 — the LEDEN tab's trail-roster + the viewer's own webid (badges "jij").
       // The view only reads these when the leden tab is active.
       members: kringRoster,
+      // the circle's realName rule — the members list gates each label with it (never renders raw realName)
+      revealPolicy: policy?.revealPolicy ?? 'pairwise',
       selfWebid: myWebid || null,
       // §2 — tap a member row → their persona card; tap your own row → self-view.
       onMemberTap: (m) => {

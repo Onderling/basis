@@ -514,3 +514,75 @@ is admin-set per circle and defaults to `removeMember/rotateKey → any-admin`, 
 admin-quorum`, member-vote opt-in. Reporting (a member↔admin lane → ban) is a governance action, so it rides
 L4. This layer is invisible to `deliver`/the `Peer`/the event shapes — it's how the fold resolves, plus a
 `parentHash` field on the governance-spine events.
+
+---
+
+## 2026-07-26 — Three decisions from the three-device adversarial stories
+
+**Status:** settled + built (`58a085fc`). Each closed off a live alternative, so each is recorded rather than
+left in a commit message. All three surfaced the same way: a multi-actor story exposing a promise that was
+never kept, invisible to 4000+ single-actor tests.
+
+### 1. A governed decision has a DEADLINE by default — `circlePolicy.decisionDeadlineDays`, default 7
+
+**Context.** The L4 design (above) specifies an "admin-override valve once the vote passes its deadline" as
+the answer to a sparse circle deadlocking. It was built and role-gated correctly — and was unreachable: no
+shell ever passed a `deadline` to `propose()`, so `expired` was never true, `canOverride` never true, and a
+proposal short of quorum stayed open **forever**. The valve existed and could never open.
+
+**Decision.** The default lives in the circle policy (`decisionDeadlineDays`, default **7**) and is applied
+in `makeGovernanceOrchestrator.propose`. `0` opts out, leaving decisions open-ended.
+
+**Alternatives / why.** A hardcoded constant in the orchestrator — rejected: circles differ (a household
+decides in a day, a neighbourhood association in a month), and this is exactly the kind of knob an admin
+should own. Per-action deadlines — rejected for now: no evidence anyone wants `removeMember` and `changeRule`
+to expire differently, and the axis can be widened later without a migration. **Passing it from the shells —
+rejected outright: that is how it broke.** Three call sites each had to remember; none did. Deriving it in
+the model keeps web ≡ mobile by construction (invariant 1/2) rather than by vigilance.
+
+**Consequences.** Every member-vote/admin-quorum proposal now carries a deadline unless a circle opts out, so
+the override valve is live for the first time. Existing open proposals (deadline `null`) stay open-ended —
+the default applies at propose time, not retroactively.
+
+### 2. A report is fanned to the admins UNION the reporter — never to the person reported
+
+**Context.** §8 reporting fanned each report event to **every** circle member, and every device ingested it.
+The person being reported therefore held the reporter's identity and the free-text reason about themselves;
+the only thing between them and it was an `if (isAdmin)` in each shell. That is presentation, not access
+control — the same class as the members-list name leak and the profile-picture leak.
+
+**Decision.** Two layers. **Routing:** `appendReportEvent` fans only to the circle's admins ∪ the reporter
+(`opts.to` → `broadcastKringReport`'s `to` → `only` in the fan-out helpers). **Access:** `reports.list` is
+viewer-scoped — admin sees all, anyone else only what they filed — and returns `scope: 'all' | 'own'`.
+
+**Alternatives / why.** Fan to admins ALONE — rejected once it broke a real property: the reporter never
+receives the `actioned`/`dismissed` event, so their own report sits open on their device forever. Sealing
+reports to the admin set instead of narrowing the fan — rejected as heavier for the same result, and it does
+not survive the admin set changing (a key sealed to yesterday's admins is the wrong shape for a mutable
+role). Filtering only in `list` — rejected: the payload would still be on the reported person's disk, which
+is the actual leak. Filtering only in the fan — rejected: a demoted admin or a replayed log still holds it,
+so the read path must refuse independently.
+
+**Consequences.** The shells' `isAdmin` check is now redundant rather than load-bearing. `act`/`dismiss` read
+an unfiltered `listAll` so an admin can still act on what they can see. A circle with **no** admins fans a
+report to the reporter only — the safe end, not a broadcast.
+
+### 3. A share REFUSES when the circle's posture promised sealing and the pod is gone
+
+**Context.** `buildCircleShareEnforcement` returns `null` without a podRoot — which is what a device looks
+like after the person signs out mid-flow. The share then fell through to a plain `shared-ref` write and
+returned `{ok:true}`, byte-identical to a sealed, granted share: no ACP grant, no key wrap, and the person
+sharing was told it worked. A mid-flow sign-out was indistinguishable from never having had a pod.
+
+**Decision.** Both cross-circle share ops refuse with `{ok:false, error:'seal-unavailable', posture}` when the
+source circle's `storagePosture` is p2/p3 (the postures that promise client-side sealing) and the enforcement
+is absent.
+
+**Alternatives / why.** Refuse whenever enforcement is absent — rejected: it would break the deliberate
+no-pod/in-memory mode, which is a supported configuration and the DEFAULT (p0). Return a `degraded: true`
+flag and write anyway — rejected: the content would still be sitting in plaintext under a policy that
+promised otherwise; a flag the shells might not render is not consent. Gate on whether a pod was *ever*
+configured — rejected: that describes the device, and the promise belongs to the **circle**.
+
+**Consequences.** The refusal is scoped to circles that made the promise, so p0/p1 are untouched (guarded by
+a control test against over-reach). `storagePosture` becomes load-bearing at share time, not only at rest.

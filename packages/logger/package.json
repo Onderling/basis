@@ -7,6 +7,10 @@
   "exports": {
     ".": "./src/index.js"
   },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
   "license": "Apache-2.0",
   "publishConfig": {
     "access": "public"
@@ -18,5 +22,8 @@
   },
   "files": [
     "src"
-  ]
+  ],
+  "devDependencies": {
+    "vitest": "^2.1.0"
+  }
 }

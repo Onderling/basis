@@ -7,7 +7,7 @@
  * recipientNetworkKey: row.recipientNetworkKey })`. No share/seal logic lives here; the selector + the op
  * are shared, this file is platform DOM only (web≡mobile: RN mirrors the SAME selector).
  */
-import { pickableRecipients } from '../../src/v2/shareRecipients.js';
+import { pickableRecipients, outOfCircleLinkWarning } from '../../src/v2/shareRecipients.js';
 
 export function renderRecipientPicker(container, {
   contacts = [],
@@ -55,6 +55,17 @@ export function renderRecipientPicker(container, {
     empty.textContent = tr('circle.share.no_contacts');
     container.appendChild(empty);
     return container;
+  }
+
+  // D7 — the out-of-circle LINK warning. Picking here grants by published network key, which is a
+  // deliberate 1:1 link both sides can see; say so BEFORE the pick. Informed consent, never a block —
+  // the rule (warn iff the pick grants by network key) lives in the shared selector, not here.
+  const linkWarning = outOfCircleLinkWarning(recipients);
+  if (linkWarning) {
+    const w = document.createElement('p');
+    w.className = 'cc-recipient-picker__link-warning';
+    w.textContent = tr(linkWarning.key);
+    container.appendChild(w);
   }
 
   const list = document.createElement('ul');

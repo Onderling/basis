@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { peerToContactRow, stoopContactToRow } from '../../src/v2/contactsSource.js';
-import { pickableRecipients } from '../../src/v2/shareRecipients.js';
+import { pickableRecipients, outOfCircleLinkWarning } from '../../src/v2/shareRecipients.js';
 
 describe('pickableRecipients — the out-of-circle recipient selector', () => {
   it('maps contacts that carry a network key to recipient rows; the key IS recipientNetworkKey', () => {
@@ -48,5 +48,31 @@ describe('pickableRecipients — the out-of-circle recipient selector', () => {
     expect(pickableRecipients()).toEqual([]);
     expect(pickableRecipients(null)).toEqual([]);
     expect(pickableRecipients([null, undefined, {}])).toEqual([]);
+  });
+});
+
+// D7 (grants-over-Peer) — the out-of-circle LINK warning rule. Informed consent before the pick: granting
+// by published network key is a deliberate 1:1 link both sides can see. The RULE lives in the shared
+// selector so web and mobile can never disagree about when to warn.
+describe('outOfCircleLinkWarning — warn iff the pick grants by network key', () => {
+  it('returns the locale key when any recipient would be granted by network key', () => {
+    const rows = pickableRecipients([peerToContactRow({ pubKey: 'KEY_A', name: 'Ada' })]);
+    expect(outOfCircleLinkWarning(rows)).toEqual({ key: 'circle.share.link_warning' });
+  });
+
+  it('returns null when there is nobody to warn about (empty / no network key)', () => {
+    expect(outOfCircleLinkWarning([])).toBeNull();
+    expect(outOfCircleLinkWarning()).toBeNull();
+    // A row with no network key carries no new link — it must NOT warn (the rule, not the list length).
+    expect(outOfCircleLinkWarning([{ id: 'x', name: 'No Key' }])).toBeNull();
+  });
+
+  it('is a WARNING, not a gate: it never filters or reorders the pickable recipients', () => {
+    const rows = pickableRecipients([
+      peerToContactRow({ pubKey: 'KEY_A', name: 'Ada' }),
+      peerToContactRow({ pubKey: 'KEY_B', name: 'Bo' }),
+    ]);
+    expect(outOfCircleLinkWarning(rows)).toBeTruthy();
+    expect(rows.map((r) => r.name)).toEqual(['Ada', 'Bo']);   // unchanged — nothing is blocked
   });
 });

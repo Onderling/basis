@@ -21,6 +21,25 @@ function networkKeyOf(contact) {
 }
 
 /**
+ * The out-of-circle LINK warning (grants-over-Peer D7). Granting someone access by their published network
+ * key is a deliberate 1:1 link: you are choosing to connect your circle-side identity to that external
+ * identity, and BOTH sides can see it. That is legitimate and user-chosen — so this is informed consent,
+ * NOT a block: nothing is prevented, the person is simply told before they pick.
+ *
+ * The RULE lives here (invariant #1) rather than in either shell: warn iff the pick would grant by network
+ * key. Today every pickable row is network-key-granted by construction, but encoding the rule keeps it
+ * correct if the picker later also admits roster-based (already-in-circle) recipients, which carry no new
+ * link and must NOT warn.
+ *
+ * @param {Array<{recipientNetworkKey?: string}>} recipients  rows from `pickableRecipients`
+ * @returns {{key: string}|null}  the locale key to render via `t()`, or null when nothing warrants a warning.
+ */
+export function outOfCircleLinkWarning(recipients = []) {
+  const any = (Array.isArray(recipients) ? recipients : []).some((r) => !!networkKeyOf(r));
+  return any ? { key: 'circle.share.link_warning' } : null;
+}
+
+/**
  * The pickable out-of-circle recipients: the contacts that carry a published network key, mapped to the
  * recipient rows the picker renders + `shareItemToPublishedKey` targets. De-duped by id (a contact merged
  * from two sources appears once). Contacts without a network key are dropped (nothing to grant a key to).

@@ -2698,6 +2698,10 @@
       "text": "No contacts with a network address to share to.",
       "doc": "objective L Phase 2 — empty state when no contact carries a published network key."
     },
+    "link_warning": {
+      "text": "These people are outside this circle. Sharing creates a link between you and them that both sides can see.",
+      "doc": "grants-over-Peer D7 — out-of-circle link warning on the recipient picker. Informed consent, not a block: granting by published network key is a deliberate 1:1 link both sides can see."
+    },
     "pick_cancel": {
       "text": "Cancel",
       "doc": "objective L Phase 2 — cancel/close the recipient picker."

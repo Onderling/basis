@@ -2698,6 +2698,10 @@
       "text": "Geen contacten met een netwerkadres om mee te delen.",
       "doc": "objective L Phase 2 — empty state when no contact carries a published network key."
     },
+    "link_warning": {
+      "text": "Deze mensen zitten buiten deze kring. Delen legt een verbinding tussen jullie die beide kanten kunnen zien.",
+      "doc": "grants-over-Peer D7 — waarschuwing bij delen buiten de kring, op de ontvangerskiezer. Informatie vooraf, geen blokkade: delen via een gepubliceerde netwerksleutel legt bewust een 1-op-1 verbinding die beide kanten zien."
+    },
     "pick_cancel": {
       "text": "Annuleren",
       "doc": "objective L Phase 2 — cancel/close the recipient picker."

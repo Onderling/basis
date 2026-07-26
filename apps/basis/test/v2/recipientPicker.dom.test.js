@@ -72,3 +72,34 @@ describe('renderRecipientPicker — the out-of-circle recipient picker (web DOM)
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 });
+
+// D7 (grants-over-Peer) — the out-of-circle LINK warning, rendered before the pick.
+describe('renderRecipientPicker — the out-of-circle link warning (D7)', () => {
+  it('renders the warning above the list, resolved through t() (no hardcoded copy)', () => {
+    const el = mount();
+    renderRecipientPicker(el, { contacts, t, onPick: vi.fn() });
+    const warn = el.querySelector('.cc-recipient-picker__link-warning');
+    expect(warn).toBeTruthy();
+    expect(warn.textContent).toBe('circle.share.link_warning');
+    // It precedes the list — the person is told BEFORE choosing, not after.
+    const list = el.querySelector('.cc-recipient-picker__list');
+    expect(warn.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('does NOT warn when there is nobody grantable (empty state — nothing to link to)', () => {
+    const el = mount();
+    renderRecipientPicker(el, { contacts: [peerToContactRow({ url: 'https://bot.example/a', name: 'Bot' })], t, onPick: vi.fn() });
+    expect(el.querySelector('.cc-recipient-picker__link-warning')).toBeNull();
+    expect(el.querySelector('.cc-recipient-picker__empty')).toBeTruthy();
+  });
+
+  it('is informational only: every grantable contact is still listed and pickable', () => {
+    const el = mount();
+    const onPick = vi.fn();
+    renderRecipientPicker(el, { contacts, t, onPick });
+    expect(el.querySelectorAll('.cc-recipient-picker__contact')).toHaveLength(2);   // unchanged by the warning
+    el.querySelector('.cc-recipient-picker__pick').click();
+    expect(onPick).toHaveBeenCalled();                                              // nothing is blocked
+  });
+});
+

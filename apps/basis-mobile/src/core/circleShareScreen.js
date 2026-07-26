@@ -20,6 +20,7 @@ import {
 // objective L · Phase 2 — the SHARED (web≡mobile) out-of-circle recipient selector. Mobile uses the SAME
 // selector web's `renderRecipientPicker` does — no mobile fork (invariants #1/#2).
 import { pickableRecipients, outOfCircleLinkWarning } from '../../../basis/src/v2/shareRecipients.js';
+import { shareErrorStatusKey } from '../../../basis/src/v2/circleShare.js';
 
 /** The default wrapper set — the live composition root. Tests inject a fake `deps` in its place. */
 export const defaultShareDeps = {
@@ -110,12 +111,14 @@ export async function shareOut({
 } = {}) {
   const target = String(toCircleId ?? '').trim();
   if (!itemId || !fromCircleId || !target) return status(false, 'circle.share.failed', { error: 'missing' });
-  if (target === fromCircleId) return status(false, 'circle.share.failed', { error: 'same-circle' });
+  if (target === fromCircleId) return status(false, shareErrorStatusKey('same-circle'), { error: 'same-circle' });
   let r;
   try { r = await deps.shareItemIntoCircle({ itemId, fromCircleId, toCircleId: target, by, recipient, policyOf }); }
   catch (e) { return status(false, 'circle.share.failed', { error: e?.message ?? 'error' }); }
   if (r?.ok) return status(true, 'circle.share.done', { item: itemId, circle: target });
-  return status(false, 'circle.share.failed', { error: r?.error ?? 'unknown' });
+  // The KEY carries the explanation for a known code ("your pod is not connected…"), so a refusal reads as
+  // something the person can act on rather than as a raw machine code. Unknown codes keep the old template.
+  return status(false, shareErrorStatusKey(r?.error), { error: r?.error ?? 'unknown' });
 }
 
 /**

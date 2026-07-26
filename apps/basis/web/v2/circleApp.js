@@ -289,6 +289,7 @@ import { makeCircleLists } from '@onderling/kring-host/circleLists';  // composa
 import { sealItem, isCanonicalPosture, createCircleStores, memoryDataSource } from '@onderling/item-store';
 import {
   shareItemAcrossCircles, shareItemToPublishedKey, listSharedResolved, revokeItemShare, listOutboundShares, revokeAllForMember,
+  shareErrorStatusKey,
 } from '../../src/v2/circleShare.js';
 // objective L · Phase 2 — the out-of-circle recipient picker (thin DOM over the SHARED `pickableRecipients`).
 import { renderRecipientPicker } from './recipientPicker.js';
@@ -4919,7 +4920,7 @@ function showKring(id, circle, policy) {
           const r = await shareItemIntoCircle({ itemId, fromCircleId: id, toCircleId });
           kringNote(r?.ok
             ? t('circle.share.done', { item: itemId, circle: toCircleId })
-            : t('circle.share.failed', { error: r?.error ?? 'unknown' }));
+            : t(shareErrorStatusKey(r?.error), { error: r?.error ?? 'unknown' }));
           return;
         }
         // objective L · Phase 2 — share an item OUT to an out-of-circle PERSON (a contact), ALONGSIDE the

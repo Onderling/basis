@@ -2618,6 +2618,44 @@
     }
   },
   "share": {
+    "error": {
+      "seal_unavailable": {
+        "text": "Deze kring houdt inhoud versleuteld en je pod is niet verbonden — er is dus niets gedeeld. Log in op je pod en probeer het opnieuw.",
+        "doc": "Share refused (2026-07-26): the circle's storagePosture (p2/p3) promises client-side sealing, but there is no pod session to seal or grant with. Refusing beats writing plaintext under a policy that promised otherwise."
+      },
+      "sharing_closed": {
+        "text": "Delen buiten deze kring staat uit.",
+        "doc": "Share refused: the circle's sharePosture is 'closed'."
+      },
+      "sharing_admin_only": {
+        "text": "Alleen een beheerder van deze kring kan items naar buiten delen.",
+        "doc": "Share refused: sharePosture 'registered' — admin-only initiation."
+      },
+      "share_prohibited": {
+        "text": "Deze kring staat delen met mensen buiten de kring niet toe.",
+        "doc": "Share refused: shareOutOfCircle is 'prohibit'."
+      },
+      "posture_floor": {
+        "text": "De ontvangende kring is minder beschermd dan dit item vereist.",
+        "doc": "Share refused: the target circle's posture is below the item's required floor."
+      },
+      "no_stores": {
+        "text": "Een van deze kringen kon niet worden geopend; er is niets gedeeld.",
+        "doc": "Share failed: a circle's item store did not resolve."
+      },
+      "same_circle": {
+        "text": "Dat item zit al in deze kring.",
+        "doc": "Share refused: source and target circle are the same."
+      },
+      "missing_args": {
+        "text": "Er ontbrak iets, dus er is niets gedeeld.",
+        "doc": "Share refused: a required argument was absent."
+      },
+      "not_canonical": {
+        "text": "Dit item kan niet ongedaan worden gemaakt, omdat het als kopie is gedeeld.",
+        "doc": "Revoke refused: only the canonical posture shares revocably."
+      }
+    },
     "done": {
       "text": "\"{{item}}\" gedeeld met {{circle}}.",
       "doc": "cluster K cross-circle share — success note for /shareitem."

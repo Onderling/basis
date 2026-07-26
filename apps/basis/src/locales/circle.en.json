@@ -2618,6 +2618,44 @@
     }
   },
   "share": {
+    "error": {
+      "seal_unavailable": {
+        "text": "This circle keeps its content sealed, and your pod is not connected — so nothing was shared. Sign in to your pod and try again.",
+        "doc": "Share refused (2026-07-26): the circle's storagePosture (p2/p3) promises client-side sealing, but there is no pod session to seal or grant with. Refusing beats writing plaintext under a policy that promised otherwise."
+      },
+      "sharing_closed": {
+        "text": "Sharing out of this circle is switched off.",
+        "doc": "Share refused: the circle's sharePosture is 'closed'."
+      },
+      "sharing_admin_only": {
+        "text": "Only an admin of this circle can share items out of it.",
+        "doc": "Share refused: sharePosture 'registered' — admin-only initiation."
+      },
+      "share_prohibited": {
+        "text": "This circle does not allow sharing with people outside it.",
+        "doc": "Share refused: shareOutOfCircle is 'prohibit'."
+      },
+      "posture_floor": {
+        "text": "The receiving circle is less protected than this item requires.",
+        "doc": "Share refused: the target circle's posture is below the item's required floor."
+      },
+      "no_stores": {
+        "text": "One of these circles could not be opened, so nothing was shared.",
+        "doc": "Share failed: a circle's item store did not resolve."
+      },
+      "same_circle": {
+        "text": "That item is already in this circle.",
+        "doc": "Share refused: source and target circle are the same."
+      },
+      "missing_args": {
+        "text": "Something was missing, so nothing was shared.",
+        "doc": "Share refused: a required argument was absent."
+      },
+      "not_canonical": {
+        "text": "This item cannot be un-shared, because it was shared as a copy.",
+        "doc": "Revoke refused: only the canonical posture shares revocably."
+      }
+    },
     "done": {
       "text": "Shared \"{{item}}\" into {{circle}}.",
       "doc": "cluster K cross-circle share — success note for /shareitem."

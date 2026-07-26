@@ -51,6 +51,26 @@ function sealPromiseUnmet(policy, enforcement) {
 }
 
 /**
+ * The locale key that EXPLAINS a share failure, for the one place a user meets it.
+ *
+ * Every share op returns a machine code (`seal-unavailable`, `sharing-closed`, …) and both shells used to
+ * interpolate that code raw into "Share failed: {error}." — so a refusal read as `Share failed:
+ * seal-unavailable.`, which tells someone nothing about what to do next. Each known code now has a full
+ * sentence; an unknown code still falls back to the old generic template, so a new error can never render
+ * as a missing string.
+ *
+ * @param {string} code  the `error` field of a failed share result
+ * @returns {string} a locale key — a complete sentence for known codes, the generic template otherwise
+ */
+export function shareErrorStatusKey(code) {
+  const known = new Set([
+    'seal-unavailable', 'sharing-closed', 'sharing-admin-only', 'share-prohibited',
+    'posture-floor', 'no-stores', 'same-circle', 'missing-args', 'not-canonical',
+  ]);
+  return known.has(code) ? `circle.share.error.${String(code).replace(/-/g, '_')}` : 'circle.share.failed';
+}
+
+/**
  * Which share postures ride the COPY re-seal mechanism (a SEPARATE object sealed to the recipient(s), source
  * untouched). Decision "option 2": `trusted` and `registered` currently share the SAME copy mechanism as
  * `copy` — the only difference between the three is WHO MAY INITIATE (the slice-2 initiator gate), which is

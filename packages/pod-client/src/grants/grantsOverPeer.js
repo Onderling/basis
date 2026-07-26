@@ -98,6 +98,42 @@ function peerKeys(peer) {
 }
 
 /**
+ * The on-disk shape of the grant registry — a plain array of records, so a consumer persists JSON and never
+ * has to know this module's internals. Paired with `hydrateGrants`; keep the two symmetric.
+ *
+ * Deliberately NOT the token itself: a record is bookkeeping (who, what, which mode, when it expires). The
+ * token lives with the grantee and its revocation lives in the `TokenRegistry`, so a stolen registry file
+ * grants nobody anything — it only reveals THAT a grant exists, which the governance log already records
+ * for circle resources.
+ *
+ * @param {Map<string, object>} grants
+ * @returns {Array<object>}
+ */
+export function serializeGrants(grants) {
+  return [...(grants?.values?.() ?? [])].map((r) => ({ ...r }));
+}
+
+/**
+ * Rebuild the registry Map from `serializeGrants` output, for passing straight back in as `grants`.
+ *
+ * Tolerant by design — a record without a `grantId` is dropped rather than throwing. A corrupt or truncated
+ * store must degrade to "fewer grants known", which fails CLOSED (a peer is denied and re-asks), not to a
+ * crash at construction that takes the whole agent down with it.
+ *
+ * @param {Array<object>|string|null} records  the array, or its JSON text
+ * @returns {Map<string, object>}
+ */
+export function hydrateGrants(records) {
+  let list = records;
+  if (typeof list === 'string') { try { list = JSON.parse(list); } catch { list = []; } }
+  const map = new Map();
+  for (const r of Array.isArray(list) ? list : []) {
+    if (r && typeof r.grantId === 'string' && r.grantId) map.set(r.grantId, { ...r });
+  }
+  return map;
+}
+
+/**
  * Build the grant façade for ONE granter.
  *
  * @param {object} deps
@@ -120,6 +156,13 @@ function peerKeys(peer) {
  * @param {(resourceId: string) => (string|null|Promise<string|null>)} [deps.readSealed]  D4 — read a resource's
  *   CURRENT sealed body, for revoke→rotate. With `writeSealed`, a CEK revoke re-seals under a fresh key.
  * @param {(resourceId: string, sealed: string) => any} [deps.writeSealed]  D4 — persist the re-sealed body.
+ * @param {(records: Array<object>) => any} [deps.persist]  DURABILITY — called after EVERY mutation with the
+ *   full record set, so the registry survives a reload. Without it the registry is in-process only: after a
+ *   restart `mayDecrypt` would deny a peer who still holds a valid, unexpired token, and `liveGrants` would
+ *   under-report — i.e. the seal-side audience would silently shrink and a grantee would stop being able to
+ *   read what they were granted. Best-effort BY DESIGN: a persistence failure never fails the grant, because
+ *   the token has already been issued and pretending otherwise would be the bigger lie. Pair it with
+ *   `hydrateGrants` at construction (this factory stays synchronous; loading is the caller's async concern).
  */
 export function createGrantsOverPeer({
   identity,
@@ -133,12 +176,23 @@ export function createGrantsOverPeer({
   onGrantEvent = null,
   readSealed = null,
   writeSealed = null,
+  persist = null,
 } = {}) {
   if (!identity || typeof identity.pubKey !== 'string') {
     throw new Error('createGrantsOverPeer: identity (the granter) is required');
   }
 
   function record(id, rec) { grants.set(id, { grantId: id, ...rec }); }
+
+  /**
+   * Persist the whole record set. Best-effort: the grant/revoke it follows has ALREADY happened, so a
+   * storage hiccup must never be reported as a failed grant. Awaited so a caller with a real store gets
+   * back-pressure rather than an unobserved rejection.
+   */
+  async function flush() {
+    if (typeof persist !== 'function') return;
+    try { await persist(serializeGrants(grants)); } catch { /* durability is best-effort, see the doc */ }
+  }
 
   /**
    * D3 — emit the governance/permission-log event for a CIRCLE-resource grant. A grant carrying no
@@ -207,6 +261,7 @@ export function createGrantsOverPeer({
         ...(expiresIn != null ? { expiresIn } : {}),
       });
       record(token.id, { peerPubKey: pubKey, sealingPublicKey, kind, scope, mode: GRANT_MODE.MANDATE, task, circleId, expiresAt: token.expiresAt ?? null });
+      await flush();
       await emitGrantEvent('resource-granted', grants.get(token.id));
       return { grantId: token.id, token, mode: GRANT_MODE.MANDATE };
     }
@@ -228,6 +283,7 @@ export function createGrantsOverPeer({
       });
     }
     record(token.id, { peerPubKey: pubKey, sealingPublicKey, kind, scope: resourceId, resourceId, mode, task, circleId, expiresAt: token.expiresAt ?? null });
+    await flush();
     await emitGrantEvent('resource-granted', grants.get(token.id));
     return { grantId: token.id, token, mode };
   }
@@ -251,6 +307,7 @@ export function createGrantsOverPeer({
       const res = taskGrants?.revokeTaskGrants(arg.task) ?? { revokedTokenIds: [] };
       const dropped = [];
       for (const [id, rec] of grants) if (rec.task === arg.task) { dropped.push(rec); grants.delete(id); }
+      if (dropped.length) await flush();
       for (const rec of dropped) await emitGrantEvent('resource-revoked', rec);
       return { revoked: res.revokedTokenIds ?? [], rotated: false };
     }
@@ -280,6 +337,7 @@ export function createGrantsOverPeer({
       }
     }
     grants.delete(grantId);
+    if (rec) await flush();
     if (rec) await emitGrantEvent('resource-revoked', rec);
     return { revoked: [grantId], rotated };
   }
@@ -359,7 +417,23 @@ export function createGrantsOverPeer({
     return liveGrants(resourceId).some((r) => r.peerPubKey === peerPubKey);
   }
 
-  return { grant, revoke, effectiveAudience, effectiveSealingKeys, mayDecrypt, liveGrants, GRANT_MODE, SCOPED_SEAL_SCHEMES };
+  /**
+   * Drop records whose expiry has passed and persist the result. `liveGrants` already IGNORES them, so this
+   * changes no decision — it stops a durable store growing forever with grants that can never matter again.
+   * Returns how many went, so a caller can log or schedule it sensibly.
+   */
+  async function pruneExpired() {
+    const t = now();
+    const dead = [...grants.values()].filter((r) => r.expiresAt != null && r.expiresAt <= t);
+    for (const r of dead) grants.delete(r.grantId);
+    if (dead.length) await flush();
+    return dead.length;
+  }
+
+  return {
+    grant, revoke, effectiveAudience, effectiveSealingKeys, mayDecrypt, liveGrants, pruneExpired,
+    GRANT_MODE, SCOPED_SEAL_SCHEMES,
+  };
 }
 
 export default createGrantsOverPeer;

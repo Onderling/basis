@@ -93,7 +93,7 @@ export {
 // (connectivity Phase 4 §4). A thin façade composing PodCapabilityToken (broker default) / resourceKeyGrant
 // (CEK offline) / TaskGrantManager (mandate) + the seal audience — no new crypto.
 export {
-  createGrantsOverPeer, chooseGrantMode, GRANT_MODE,
+  createGrantsOverPeer, chooseGrantMode, GRANT_MODE, serializeGrants, hydrateGrants,
   assertScopedScheme, SCOPED_SEAL_SCHEMES,   // D2 — a grant may never extend a group-key audience
 } from './grants/index.js';
 

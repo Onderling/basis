@@ -72,5 +72,34 @@ export function makeCircleGovernance({
     return { ...base, disputed, hasDisputed: disputed.length > 0 };
   }
 
-  return { propose: orch.propose, vote: orch.vote, override: orch.override, tally: orch.tally, view, getContext };
+  /**
+   * SETTLE — enact any decision that is already APPROVED but was never enacted (Decision B, 2026-07-26).
+   *
+   * Enactment only ever ran as a side effect of a LOCAL `vote()`/`override()`. So when the tipping vote was
+   * cast on a MEMBER's device and merely fanned here, this device folded APPROVED and stopped: every screen
+   * read "Approved" while the member was never actually removed (three-device story 3.2).
+   *
+   * The chosen fix is an EXPLICIT admin sweep rather than enacting on ingest — a received message must not
+   * by itself cause this device to remove someone; a human stays in the loop for the irreversible act. On a
+   * non-admin device this is a no-op by construction: `tally` returns `awaitingEnactment` without acting.
+   *
+   * Idempotent: a proposal already closed is skipped, so calling it repeatedly (e.g. whenever the panel
+   * opens) is safe.
+   *
+   * @param {string} circleId
+   * @returns {Promise<{enacted: number, results: object[]}>}
+   */
+  async function settle(circleId) {
+    const ctx = await getContext(circleId);
+    const fold = foldGovernance(ctx.events, { policy: ctx.policy, members: ctx.members, now: now(), disputed: ctx.disputed });
+    const open = (fold.proposals ?? []).filter((p) => p && !p.closed);
+    const results = [];
+    for (const p of open) {
+      try { results.push(await orch.tally({ circleId, proposalId: p.proposalId, enactor: localActorRef })); }
+      catch { /* one bad proposal must not block the rest */ }
+    }
+    return { enacted: results.filter((r) => r?.enacted === true).length, results };
+  }
+
+  return { propose: orch.propose, vote: orch.vote, override: orch.override, tally: orch.tally, view, settle, getContext };
 }

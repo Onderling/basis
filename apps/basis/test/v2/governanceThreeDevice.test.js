@@ -150,20 +150,22 @@ describe('3.2 — a non-admin tipping vote does not enact; the admin does, exact
     expect(h.devices.m0.enacted).toEqual([]);
   });
 
-  // ⚠ KNOWN GAP (found 2026-07-26 by this very story — see REMAINING-WORK). `it.fails` asserts the test
-  // below currently FAILS: enactment only ever runs as a side effect of a LOCAL `vote()`/`override()`, and
-  // `view()` is a pure read, so when the TIPPING vote is cast on a member's device and merely FANS to the
-  // admin, the admin folds APPROVED but never performs the op. The decision reads "Approved" on every screen
-  // while the member is never actually removed. When that is fixed, this flips to passing and `.fails` must
-  // be dropped — which is exactly the signal we want.
-  it.fails('the real-world removal fires EXACTLY ONCE across all three devices (on the admin, not per voter)', async () => {
+  // ✅ FIXED 2026-07-26 (Decision B: an explicit admin `settle()`, not enact-on-ingest). Enactment used to
+  // run ONLY as a side effect of a local vote()/override(), so a tipping vote that merely FANNED here left
+  // the decision approved-but-unenacted forever. `settle()` sweeps the open proposals and enacts the ones
+  // this device may enact; on a member device it is a no-op by construction.
+  it('the real-world removal fires EXACTLY ONCE across all three devices (on the admin, not per voter)', async () => {
     const h = threeDevices();
     const proposalId = await openProposal(h);
     await h.devices.admin0.gov.vote({ circleId: 'c1', proposalId, voter: 'm0', choice: 'yes' });
     await h.devices.m1.gov.vote({ circleId: 'c1', proposalId, voter: 'm1', choice: 'yes' });        // approved
 
-    // Every device now folds an APPROVED proposal. Only the admin may turn that into the actual op.
-    for (const ref of ['admin0', 'm0', 'm1']) await h.devices[ref].gov.view('c1');
+    // Every device folds an APPROVED proposal; each also SETTLES. Only the admin may turn that into the op —
+    // the member devices' settle() is a no-op, which is the property under test.
+    for (const ref of ['admin0', 'm0', 'm1']) {
+      await h.devices[ref].gov.view('c1');
+      await h.devices[ref].gov.settle('c1');
+    }
 
     const removals = h.enactsEverywhere().filter((e) => /remove/i.test(e.op));
     expect(removals.map((r) => r.by)).toEqual(['admin0']);          // exactly one, and on the ADMIN

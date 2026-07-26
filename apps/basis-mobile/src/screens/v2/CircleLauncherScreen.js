@@ -118,6 +118,7 @@ import { answerHelpViaLlm } from '../../../../basis/src/v2/help/helpLlm.js';
 import { helpDeck } from '../../../../basis/src/v2/help/kaartjes.js';
 // OBJ-2 membership — reuse the classic RN join wizard + the camera scanner + the shared invite glue.
 import JoinGroupWizardModal from '../../../../basis/src/rn/wizards/joinGroupWizardModal.js';
+import CreateGroupWizardModal from '../../../../basis/src/rn/wizards/createGroupWizardModal.js';
 import QrScannerModal from '../../rn/QrScannerModal.js';
 import { QrCodeView } from '@onderling/react-native/qr/view';
 import { buildCircleInviteUri } from '../../../../basis/src/v2/circleInvite.js';
@@ -469,7 +470,6 @@ export default function CircleLauncherScreen({
   const [screenViewRefreshing, setScreenViewRefreshing] = useState(false);
   const [items, setItems] = useState([]);
   const [creating, setCreating] = useState(false);
-  const [newName, setNewName] = useState('');
   // OBJ-2 — join a circle: scan an invite QR → run the shared join wizard. Invite modal: show this
   // circle's membership QR. Both reuse the classic membership core; nothing new below the surface.
   const [joinScanOpen, setJoinScanOpen] = useState(false);
@@ -1181,7 +1181,7 @@ export default function CircleLauncherScreen({
       // is on top.
       if (menuCircle) { setMenuCircle(null); return true; }
       // Inline cancel: creating-circle input row.
-      if (creating) { setCreating(false); setNewName(''); return true; }
+      if (creating) { setCreating(false); return true; }   // back closes the create wizard
       // α.3 — viewing a screen (Schermen tab "view" sub-mode) → back to
       // the picker (the screens-tab equivalent of returning from a
       // sub-view to the list).
@@ -1227,17 +1227,6 @@ export default function CircleLauncherScreen({
     else if (id === 'contacten') { setContactThread(null); setView('contacten'); }
     else if (id === 'mij') setView('profile');   // S2 — Mij is now the profile
   };
-
-  const submitCreate = useCallback(async () => {
-    const name = newName.trim();
-    if (!name || !bundle?.callSkill) { setCreating(false); setNewName(''); return; }
-    try {
-      await quickCreateCircle({ callSkill: bundle.callSkill, name });
-    } catch { /* surfaced by reload showing no new circle */ }
-    setCreating(false);
-    setNewName('');
-    load();
-  }, [newName, bundle, load]);
 
   // OBJ-2 — scanned a circle invite QR → hand it to the shared join wizard.
   const onJoinScan = useCallback((res) => {
@@ -1737,22 +1726,9 @@ export default function CircleLauncherScreen({
               }, styles)
             )}
 
-            {creating ? (
-              <View style={styles.createRow}>
-                <TextInput
-                  style={styles.input}
-                  value={newName}
-                  onChangeText={setNewName}
-                  placeholder={t('circle.new')}
-                  autoFocus
-                  onSubmitEditing={submitCreate}
-                  returnKeyType="done"
-                />
-                <Pressable style={styles.createBtn} accessibilityRole="button" onPress={submitCreate}>
-                  <Text style={styles.createBtnText}>✓</Text>
-                </Pressable>
-              </View>
-            ) : (
+            {/* The inline name row is gone — "+ new circle" now opens the 5-step wizard (mounted below),
+                so the button stays visible while the wizard is up. */}
+            {(
               <Pressable
                 style={styles.newBtn}
                 accessibilityRole="button"
@@ -1786,6 +1762,26 @@ export default function CircleLauncherScreen({
             onDispatched={(r) => {
               setJoinArgs(null);
               const gid = r?.groupId ?? r?.joinedGroupId ?? null;
+              if (gid) feedHouseholdRoster({ agent: bundle?.agent, circleId: gid }).catch(() => {});
+              load();
+            }}
+          />
+        ) : null}
+        {/* Starting a circle opens the RICH 5-step wizard (identity · governance · rules · offerings · tech
+            → review) — web parity (2026-07-26). It used to render a bare inline name row, so the wizard we
+            built was reachable only through the onboarding handoff and every governance/rules/offerings
+            choice silently defaulted. `quickCreateCircle` stays the PROGRAMMATIC create (help circle). */}
+        {creating ? (
+          <CreateGroupWizardModal
+            visible
+            callSkill={bundle?.callSkill}
+            t={t}
+            getMyPeerAddr={() => bundle?.agent?.peer?.address ?? null}
+            persistPolicy={(groupId, patch) => policyStore.update?.(groupId, patch)}
+            onClose={() => setCreating(false)}
+            onDispatched={(r) => {
+              setCreating(false);
+              const gid = r?.groupId ?? null;
               if (gid) feedHouseholdRoster({ agent: bundle?.agent, circleId: gid }).catch(() => {});
               load();
             }}

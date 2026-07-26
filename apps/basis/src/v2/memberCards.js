@@ -110,6 +110,29 @@ function revealStateFromSeen(seenKeys) {
 }
 
 /**
+ * What a member's pairwise reveal COVERS — the attribute keys a viewer they revealed to may see.
+ *
+ * `reveals[]` is one act ("I show this person who I am"), not a per-attribute list, so it covers every
+ * attribute the member disclosed at the pairwise level: the real name AND a profile picture they put on
+ * their row (a picture is only ever there because they shared it — propagation is reveal-gated).
+ *
+ * This used to be hardcoded to `['realName']`, which made a shared picture UNREACHABLE under the default
+ * `pairwise` policy: the member's own reveal-state enabled `profilePicture` (correctly, independent of the
+ * name), but the viewer-entitlement gate could never clear it, so every picture render fell into `hides`
+ * and only an `open` circle ever showed one. Layer (a) — the member's disclosure — still decides whether the
+ * attribute exists at all, so this never widens anything the member didn't share.
+ *
+ * @param {{profilePicture?: any}} member
+ * @returns {string[]} attribute keys a pairwise-revealed viewer clears
+ */
+export function pairwiseRevealCovers(member) {
+  const m = member && typeof member === 'object' ? member : {};
+  const keys = ['realName'];
+  if (isSealedMediaRef(m.profilePicture)) keys.push('profilePicture');
+  return keys;
+}
+
+/**
  * The full persona projection — the TWO layers combined. Layer (a) MEMBER-DISCLOSURE:
  * an attribute is disclosed for the circle iff it's the handle floor (always) or the
  * member's `revealState` marks its key `enabled` (read via `isDisclosed`). Layer (b)
@@ -190,7 +213,7 @@ export function memberPersonaView({ member, viewerWebid = null, policy = 'pairwi
   const m = member && typeof member === 'object' ? member : {};
   const memberState = revealState ?? memberRevealState({ member: m, policy, contextId: circleId });
   const revealedToMe = (viewerWebid && Array.isArray(m.reveals) && m.reveals.includes(viewerWebid))
-    ? ['realName'] : [];
+    ? pairwiseRevealCovers(m) : [];
   const viewer = { kind: 'member', id: viewerWebid ?? null, revealedToMe };
   return projectPersona({ attributes: personaAttributes(m), memberState, contextId: circleId, viewer, policy });
 }
@@ -215,7 +238,7 @@ export function selfViewSplit({ me, viewer = { kind: 'stranger' }, policy = 'pai
   const v = viewer && typeof viewer === 'object' ? viewer : {};
   const memberState = revealState ?? memberRevealState({ member: m, policy, contextId: circleId });
   const revealedToMe = (v.kind === 'member' && v.id && Array.isArray(m.reveals) && m.reveals.includes(v.id))
-    ? ['realName'] : [];
+    ? pairwiseRevealCovers(m) : [];
   const enrichedViewer = { ...v, revealedToMe };
   return projectPersona({ attributes: personaAttributes(m), memberState, contextId: circleId, viewer: enrichedViewer, policy });
 }

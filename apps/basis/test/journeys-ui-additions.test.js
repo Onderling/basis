@@ -197,26 +197,14 @@ describe('J-UI-5 — the member-persona card respects the disclosure split', () 
     expect(row.textContent).not.toContain('blob://');     // the sealed ref must never be shown as text
   });
 
-  // ⚠ FOUND BY THIS JOURNEY (2026-07-26) — the picture is UNREACHABLE under the default policy.
-  //
-  // The member disclosed the picture (it is on the roster; propagation is reveal-gated) and their own
-  // reveal-state enables it independently of realName — but layer (b), the view-as gate, treats it as
-  // `openness: 'pairwise'` while `memberPersonaView` only ever passes `revealedToMe: ['realName']`. So a
-  // pairwise viewer can never be entitled and the picture always lands in `hides`: every profile-picture
-  // render (web AND the mobile parity added the same day) is dead unless the circle is `open`.
-  //
-  // NOT fixed here — widening it changes DISCLOSURE semantics (a picture becomes visible to everyone the
-  // member revealed their name to), which is Frits's call. `it.fails` documents the intent and flips green
-  // the moment it is decided + implemented.
-  it.fails('a viewer the member revealed to should also see the picture (pairwise, the default)', () => {
+  // ✅ FIXED 2026-07-26 (Frits's call). A pairwise reveal is ONE act — "I show this person who I am" —
+  // not a per-attribute list, so it covers the picture the member put on their row too (a picture is only
+  // ever there because they shared it). Layer (a), the member's own disclosure, still decides whether the
+  // attribute exists at all, so nothing the member did not share is widened.
+  it('a viewer the member revealed to now sees the picture under the DEFAULT pairwise policy', () => {
     const split = memberPersonaView({ member: withPic, viewerWebid: 'me', policy: 'pairwise' });
     expect(split.sees.map((a) => a.key)).toContain('profilePicture');
-  });
-
-  it('documents the CURRENT behaviour: under pairwise the picture is withheld, not leaked', () => {
-    const split = memberPersonaView({ member: withPic, viewerWebid: 'me', policy: 'pairwise' });
-    expect(split.hides.map((a) => a.key)).toContain('profilePicture');
-    // Whatever we decide, it must never leak to a viewer with NO reveal at all.
+    // …and it still must never leak to a viewer with NO reveal at all.
     const stranger = memberPersonaView({ member: { ...withPic, reveals: [] }, viewerWebid: 'nobody', policy: 'pairwise' });
     expect(stranger.sees.map((a) => a.key)).not.toContain('profilePicture');
   });

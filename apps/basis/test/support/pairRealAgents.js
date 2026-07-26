@@ -170,6 +170,8 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     sendPeer,
     pendingMap,
     circleAddressFor: agent.circleAddressFor,
+    // …and prove it (web ≡ mobile ≡ harness): a fresh per-circle address is signed with its own key.
+    signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
     // The redeem is a full round-trip (request → admin → response). Over a mesh
     // transport (real NKN) each leg pays a several-second cold-start, so the
     // in-process default (8s) is too tight; the NKN gate boots with a larger

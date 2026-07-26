@@ -489,6 +489,9 @@ export async function bootAgentBundle(opts = {}) {
     pendingMap:      pendingPeerRedeems,
     // Identity 5B/C — present this device's per-circle address on the peer redeem path (parity with web).
     circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,
+    // …and PROVE it: a fresh per-circle address is signed with its own key (source circle == the
+    // circle being joined), so the admin records it instead of dropping it as unproven.
+    signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
   });
 
   // personas#2 — post-join persona-property push: ONE shared pending-map + sender (parity with the

@@ -113,7 +113,7 @@ export function makeHandleGroupRedeemRequest({
  * @returns {(args: {adminPeerAddr: string, groupId: string, code: string, shareCard?: boolean, peerDisplay?: string}) => Promise<{ok?: boolean, codeId?: string, validUntil?: number, error?: string}>}
  */
 export function makeSendGroupRedeemRequest({
-  sendPeer, isPeerConnected, pendingMap, circleAddressFor, timeoutMs = 30_000, logger = console,
+  sendPeer, isPeerConnected, pendingMap, circleAddressFor, signCircleAddress, timeoutMs = 30_000, logger = console,
 } = {}) {
   if (typeof sendPeer !== 'function') {
     throw new Error('makeSendGroupRedeemRequest: sendPeer required');
@@ -131,17 +131,34 @@ export function makeSendGroupRedeemRequest({
     if (!peerUp()) {
       throw new Error('Peer transport not connected. Try /peer-connect first.');
     }
-    // Wave B (SENSITIVE — cross-circle linkability): present a per-circle address ONLY for a
-    // deliberate "continue as an existing self" (linkable) choice, and ONLY together with its
-    // cross-circle link PROOF (the caller — finalSubmit — signs it with the source circle's
-    // key). Deny-by-default: no proof ⇒ no linkage sent, since the admin drops an unproven one
-    // anyway. A fresh join presents NO address here (its self-assertion isn't consumed, and an
-    // unproven fresh address would only be dropped). `circleAddressFor` (kept for the host
-    // binding) is no longer used to synthesise an unproven fresh default.
-    const circleAddress = (typeof presentedCircleAddress === 'string' && presentedCircleAddress)
+    // Wave B (SENSITIVE — cross-circle linkability): a presented per-circle address is always PROVEN,
+    // never merely asserted — `verifyCircleLink` is proof-of-POSSESSION (a signature by the key behind
+    // the address), so an address someone merely SAW cannot be replayed to fake a link.
+    //
+    // Two cases, both proven:
+    //   • "continue as an existing self" — the caller (finalSubmit) presents the address it already uses
+    //     in the SOURCE circle plus a proof signed with that circle's key. A deliberate, provable link.
+    //   • a FRESH join — present this circle's own freshly-derived address (`circleAddressFor`) signed
+    //     with ITS key. This claims nothing about any other circle: the address is derived per-circle from
+    //     a secret profile seed, so it is uncorrelatable, and proving possession of your OWN new address
+    //     leaks nothing.
+    //
+    // Wave B briefly dropped the fresh case entirely ("an unproven fresh address would only be dropped"),
+    // which left every peer-redeemed member with NO per-circle address on the roster while the circle
+    // CREATOR got one — the per-circle identity layer silently degraded to webid for exactly those
+    // members. The fix is to PROVE the fresh address, not to omit it. Deny-by-default still holds: an
+    // address we cannot sign for is not sent, and the admin drops anything unproven or forged.
+    let circleAddress = (typeof presentedCircleAddress === 'string' && presentedCircleAddress)
       ? presentedCircleAddress : null;
-    const linkArg = (circleAddress && typeof circleAddressProof === 'string' && circleAddressProof)
-      ? { circleAddress, circleAddressProof } : {};
+    let proof = (typeof circleAddressProof === 'string' && circleAddressProof) ? circleAddressProof : null;
+    if (!circleAddress && typeof circleAddressFor === 'function' && typeof signCircleAddress === 'function') {
+      try {
+        const fresh = circleAddressFor(groupId);
+        const sig = fresh ? signCircleAddress(groupId, fresh) : null;
+        if (fresh && sig) { circleAddress = fresh; proof = sig; }
+      } catch { /* no fresh address available → send none, exactly as before */ }
+    }
+    const linkArg = (circleAddress && proof) ? { circleAddress, circleAddressProof: proof } : {};
     const requestId = `gr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
     const promise = new Promise((resolve, reject) => {
       const timer = setTimeout(() => {

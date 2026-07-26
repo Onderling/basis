@@ -19,7 +19,7 @@ import {
 } from './circlePods.js';
 // objective L · Phase 2 — the SHARED (web≡mobile) out-of-circle recipient selector. Mobile uses the SAME
 // selector web's `renderRecipientPicker` does — no mobile fork (invariants #1/#2).
-import { pickableRecipients } from '../../../basis/src/v2/shareRecipients.js';
+import { pickableRecipients, outOfCircleLinkWarning } from '../../../basis/src/v2/shareRecipients.js';
 
 /** The default wrapper set — the live composition root. Tests inject a fake `deps` in its place. */
 export const defaultShareDeps = {
@@ -30,8 +30,9 @@ export const defaultShareDeps = {
   getCircleLists: defaultGetCircleLists,
 };
 
-// Re-export the shared selector so the RN view imports its ONE recipient projection from the screen model.
-export { pickableRecipients };
+// Re-export the shared selector + the D7 out-of-circle link-warning RULE so the RN view imports its ONE
+// recipient projection (and one warning rule) from the screen model — web ≡ mobile by construction.
+export { pickableRecipients, outOfCircleLinkWarning };
 
 /**
  * The source circle's own items that can be shared OUT — resolved through the SAME lists service the

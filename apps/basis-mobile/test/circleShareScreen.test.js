@@ -12,6 +12,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   loadShareableItems, loadSharedRows, shareRowFrom, shareOut, stopSharing, pickableCircles,
+  outOfCircleLinkWarning, pickableRecipients,
 } from '../src/core/circleShareScreen.js';
 
 // A fake lists service exposing only the store surface loadShareableItems reads.
@@ -128,3 +129,20 @@ describe('circle share screen model (objective L)', () => {
     expect(s).toEqual({ ok: false, statusKey: 'circle.share.not_revocable', params: undefined });
   });
 });
+
+// D7 (grants-over-Peer) — the out-of-circle link-warning RULE reaches the RN screen through the SAME shared
+// selector web uses. RN screens aren't rendered by vitest, so this pins the seam the screen imports: one rule,
+// web ≡ mobile by construction (a mobile-local copy would drift the moment either side changed).
+describe('outOfCircleLinkWarning — re-exported for the RN screen (web parity)', () => {
+  it('is the SHARED rule, re-exported verbatim from the basis selector', async () => {
+    const shared = await import('../../basis/src/v2/shareRecipients.js');
+    expect(outOfCircleLinkWarning).toBe(shared.outOfCircleLinkWarning);
+  });
+
+  it('warns for a network-key recipient and stays silent when there is nobody to link to', () => {
+    const rows = pickableRecipients([{ contactId: 'did:ada', name: 'Ada', pubKey: 'KEY_ADA' }]);
+    expect(outOfCircleLinkWarning(rows)).toEqual({ key: 'circle.share.link_warning' });
+    expect(outOfCircleLinkWarning([])).toBeNull();
+  });
+});
+

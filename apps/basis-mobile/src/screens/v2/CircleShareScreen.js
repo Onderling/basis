@@ -15,7 +15,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { t } from '../../core/localisation.js';
 import { useTheme } from './themeContext.js';
-import { loadShareableItems, loadSharedRows, shareOut, shareToRecipient, stopSharing, pickableCircles, pickableRecipients } from '../../core/circleShareScreen.js';
+import { loadShareableItems, loadSharedRows, shareOut, shareToRecipient, stopSharing, pickableCircles, pickableRecipients, outOfCircleLinkWarning } from '../../core/circleShareScreen.js';
 
 export default function CircleShareScreen({ circleId, policy, by, recipient, circles, contacts, onBack }) {
   const theme = useTheme();
@@ -29,6 +29,8 @@ export default function CircleShareScreen({ circleId, policy, by, recipient, cir
   // objective L · Phase 2 — the pickable OUT-OF-CIRCLE recipients: the SAME shared selector web uses, over the
   // Contacten roster. A contact carries the published network key on `pubKey`/`peerAddr` → `recipientNetworkKey`.
   const recipients = useMemo(() => pickableRecipients(contacts), [contacts]);
+  // D7 — whether picking here would create a visible out-of-circle link (shared rule; web parity).
+  const linkWarning = useMemo(() => outOfCircleLinkWarning(recipients), [recipients]);
   const [status, setStatus] = useState(null);    // { statusKey, params }
   const policyOf = useCallback(async () => policy || {}, [policy]);
 
@@ -118,6 +120,12 @@ export default function CircleShareScreen({ circleId, policy, by, recipient, cir
                         Enabled once a target circle is picked (the pointer sink); selecting a contact grants
                         them the canonical item in place via shareItemToPublishedKey. */}
                     <Text style={styles.pickLabel}>{t('circle.share.to_person_heading')}</Text>
+                    {/* D7 — the out-of-circle LINK warning, BEFORE the pick (web parity). Granting by
+                        published network key is a deliberate 1:1 link both sides can see; the rule for when
+                        to warn lives in the shared selector, this only draws it. Informed consent, no gate. */}
+                    {linkWarning ? (
+                      <Text style={styles.linkWarning} testID={`share-link-warning-${it.id}`}>{t(linkWarning.key)}</Text>
+                    ) : null}
                     {recipients.length === 0 ? (
                       <Text style={styles.muted} testID={`share-people-empty-${it.id}`}>{t('circle.share.no_contacts')}</Text>
                     ) : recipients.map((r) => (
@@ -188,6 +196,8 @@ const makeStyles = (theme) => StyleSheet.create({
   chipText: { fontSize: 12, fontWeight: '600', color: theme.color.accent },
   picker: { gap: 8 },
   pickLabel: { fontSize: 12, fontWeight: '600', color: theme.color.inkSoft },
+  // D7 — the out-of-circle link warning: readable, not alarming (informed consent, not an error).
+  linkWarning: { fontSize: 12, color: theme.color.inkSoft, lineHeight: 17, paddingVertical: 4 },
   pickOption: { paddingVertical: 9, paddingHorizontal: 12, borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.md, backgroundColor: theme.color.white },
   pickOptionChosen: { borderColor: theme.color.accent, backgroundColor: theme.color.paper },
   pickOptionText: { fontSize: 14, color: theme.color.ink },

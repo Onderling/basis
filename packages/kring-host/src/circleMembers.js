@@ -37,9 +37,11 @@
  * reshape (basis) births shape 2; both now read the projector rather than
  * re-shaping a member by hand.
  *
- * (`reveals` — the pairwise reveal list — isn't surfaced by the op yet, so it
- * defaults to [], which means View-as hides real names under pairwise unless
- * the policy is 'open'. That's the safe/correct default.)
+ * (`reveals` — the pairwise reveal list — IS surfaced by `listGroupMembers` as a
+ * VIEWER-SCOPED projection (Wave B): a member row carries `reveals:[viewerWebid]`
+ * iff the calling viewer has opted (via their own `Reveals` store) to see that
+ * member's real name; else `[]`, which means View-as hides real names under
+ * pairwise unless the policy is 'open'. Default-withhold; no new network exposure.)
  *
  * @typedef {object} Member
  * @property {string|null} webid        the member's WebID (roster identity).

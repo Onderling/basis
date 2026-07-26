@@ -660,10 +660,31 @@ async function getGroupRulesCore(scope, a, ctx) {
 }
 
 async function listGroupMembersCore(scope, a, ctx) {
-  const { store, members, groupId } = scope;
+  const { store, members, reveals, groupId } = scope;
   const _groupId = a.groupId ?? groupId;
   if (!members) return { members: [] };
   const list = await members.list();
+
+  // Wave B — surface the pairwise reveal list so the member-persona card's
+  // per-circle real-name collapse resolves. `reveals[]` on a row means "the
+  // webids this member's real name is shown to"; the card checks
+  // `m.reveals.includes(viewerWebid)`. The reveal state that actually lives on
+  // THIS device is the viewer's OWN `Reveals` store (the same store that already
+  // gates item-author display names via `resolveMember`/`hydrateItem`), so the
+  // projection is viewer-scoped: mark a member `reveals:[viewerWebid]` iff this
+  // viewer has opted to see that member's name (`reveals.decide` — peer override
+  // wins, then group default; default withhold). No new network exposure — the
+  // name is already locally known; this only gates whether the card shows it.
+  const viewerWebid = ctx?.from ?? null;
+  const withViewerReveals = (rows) => {
+    if (!reveals || !viewerWebid || !Array.isArray(rows)) return rows;
+    return rows.map((m) => {
+      const wid = m?.webid ?? m?.id ?? null;
+      if (!wid || wid === viewerWebid) return m;
+      const show = !!reveals.decide({ peerWebid: wid, groupId: _groupId })?.showDisplayName;
+      return show ? { ...m, reveals: [viewerWebid] } : m;
+    });
+  };
   // B1 fix (C2) — proof-derived membership: the roster is a PROJECTION of the
   // durable, signed `membership-redemption` trail (the same source EvictionRoster
   // reduces), NOT `MemberMap.list() ∩ trail`. The MemberMap is a lossy in-memory
@@ -679,7 +700,7 @@ async function listGroupMembersCore(scope, a, ctx) {
   // Legacy back-compat (unchanged): a group with NO redemption trail (a seeded
   // single-buurt roster from before code-minting) has no durable source to
   // project from — fall back to the full MemberMap so those setups are unchanged.
-  if (forGroup.length === 0) return { groupId: _groupId, members: list };
+  if (forGroup.length === 0) return { groupId: _groupId, members: withViewerReveals(list) };
 
   // Founder(s) — the creator never redeems their own code. Derive them from two
   // sources so the roster survives a cold MemberMap:
@@ -706,7 +727,7 @@ async function listGroupMembersCore(scope, a, ctx) {
     founderWebids: [...founderWebids],
     memberMapForDisplay: list,
   });
-  return { groupId: _groupId, members: scoped };
+  return { groupId: _groupId, members: withViewerReveals(scoped) };
 }
 
 async function respondToItemCore(scope, a, ctx) {

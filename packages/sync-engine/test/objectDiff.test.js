@@ -39,20 +39,20 @@ describe('objectDiff — one-sided changes', () => {
     const out = objectDiff({ a: 'new' }, { a: 'old' }, { a: 'old' });
     expect(out.identical).toBe(false);
     expect(out.conflicts).toEqual([]);
-    expect(out.toMerge).toEqual([{ path: ['a'], yours: 'new', theirs: 'old' }]);
+    expect(out.toMerge).toEqual([{ path: ['a'], yours: 'new', theirs: 'old', side: 'local' }]);
   });
 
   it('only pod changed (local === base) → toMerge with theirs=pod', () => {
     const out = objectDiff({ a: 'old' }, { a: 'new' }, { a: 'old' });
     expect(out.identical).toBe(false);
     expect(out.conflicts).toEqual([]);
-    expect(out.toMerge).toEqual([{ path: ['a'], yours: 'old', theirs: 'new' }]);
+    expect(out.toMerge).toEqual([{ path: ['a'], yours: 'old', theirs: 'new', side: 'incoming' }]);
   });
 
   it('local-only addition (key absent in pod & base) → toMerge', () => {
     const out = objectDiff({ a: 1, b: 2 }, { a: 1 }, { a: 1 });
     expect(out.toMerge).toEqual([
-      { path: ['b'], yours: 2, theirs: undefined },
+      { path: ['b'], yours: 2, theirs: undefined, side: 'local' },
     ]);
     expect(out.conflicts).toEqual([]);
   });
@@ -60,7 +60,7 @@ describe('objectDiff — one-sided changes', () => {
   it('pod-only addition (key absent in local & base) → toMerge', () => {
     const out = objectDiff({ a: 1 }, { a: 1, b: 2 }, { a: 1 });
     expect(out.toMerge).toEqual([
-      { path: ['b'], yours: undefined, theirs: 2 },
+      { path: ['b'], yours: undefined, theirs: 2, side: 'incoming' },
     ]);
     expect(out.conflicts).toEqual([]);
   });
@@ -94,7 +94,7 @@ describe('objectDiff — nested paths', () => {
     );
     expect(out.conflicts).toEqual([]);
     expect(out.toMerge).toEqual([
-      { path: ['a', 'b', 'c'], yours: 2, theirs: 1 },
+      { path: ['a', 'b', 'c'], yours: 2, theirs: 1, side: 'local' },
     ]);
   });
 
@@ -128,6 +128,7 @@ describe('objectDiff — arrays keyed by id', () => {
         path: ['blocks', 'b2'],
         yours: { id: 'b2', type: 'recipe', config: { title: 'New' } },
         theirs: undefined,
+        side: 'local',
       },
     ]);
   });
@@ -155,7 +156,7 @@ describe('objectDiff — arrays keyed by id', () => {
     const out = objectDiff(local, pod, base);
     expect(out.conflicts).toEqual([]);
     expect(out.toMerge).toEqual([
-      { path: ['blocks', 'b2'], yours: undefined, theirs: { id: 'b2' } },
+      { path: ['blocks', 'b2'], yours: undefined, theirs: { id: 'b2' }, side: 'local' },
     ]);
   });
 
@@ -172,11 +173,13 @@ describe('objectDiff — arrays keyed by id', () => {
       path: ['blocks', 'b2'],
       yours: { id: 'b2', x: 1 },
       theirs: undefined,
+      side: 'local',
     });
     expect(byId.b3).toEqual({
       path: ['blocks', 'b3'],
       yours: undefined,
       theirs: { id: 'b3', y: 2 },
+      side: 'incoming',
     });
   });
 });
@@ -190,7 +193,7 @@ describe('objectDiff — opaque arrays (no `id`)', () => {
     );
     expect(out.conflicts).toEqual([]);
     expect(out.toMerge).toEqual([
-      { path: ['tags'], yours: ['a', 'b', 'c'], theirs: ['a', 'b'] },
+      { path: ['tags'], yours: ['a', 'b', 'c'], theirs: ['a', 'b'], side: 'local' },
     ]);
   });
 
@@ -202,7 +205,7 @@ describe('objectDiff — opaque arrays (no `id`)', () => {
     );
     expect(out.conflicts).toEqual([]);
     expect(out.toMerge).toEqual([
-      { path: ['rows'], yours: [{ x: 1 }, { x: 2 }], theirs: [{ x: 1 }] },
+      { path: ['rows'], yours: [{ x: 1 }, { x: 2 }], theirs: [{ x: 1 }], side: 'local' },
     ]);
   });
 
@@ -236,7 +239,7 @@ describe('objectDiff — missing base', () => {
     const out = objectDiff({ a: 1, b: 2 }, { a: 1 }, null);
     expect(out.conflicts).toEqual([]);
     expect(out.toMerge).toEqual([
-      { path: ['b'], yours: 2, theirs: undefined },
+      { path: ['b'], yours: 2, theirs: undefined, side: 'local' },
     ]);
   });
 
@@ -257,7 +260,7 @@ describe('objectDiff — primitives', () => {
 
   it('bool change → toMerge', () => {
     const out = objectDiff({ b: true }, { b: false }, { b: false });
-    expect(out.toMerge).toEqual([{ path: ['b'], yours: true, theirs: false }]);
+    expect(out.toMerge).toEqual([{ path: ['b'], yours: true, theirs: false, side: 'local' }]);
   });
 
   it('null vs undefined are distinct', () => {
@@ -265,7 +268,7 @@ describe('objectDiff — primitives', () => {
     // x was `null` on base + local, became `undefined` on pod → pod-only change.
     expect(out.conflicts).toEqual([]);
     expect(out.toMerge).toEqual([
-      { path: ['x'], yours: null, theirs: undefined },
+      { path: ['x'], yours: null, theirs: undefined, side: 'incoming' },
     ]);
   });
 });
@@ -292,7 +295,7 @@ describe('objectDiff — deletions', () => {
     const out = objectDiff({ a: 1 }, { a: 1, b: 2 }, { a: 1, b: 2 });
     expect(out.conflicts).toEqual([]);
     expect(out.toMerge).toEqual([
-      { path: ['b'], yours: undefined, theirs: 2 },
+      { path: ['b'], yours: undefined, theirs: 2, side: 'local' },
     ]);
   });
 

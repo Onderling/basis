@@ -139,13 +139,18 @@ function walk(local, pod, base, path, toMerge, conflicts) {
   const localChanged = !deepEqual(local, baseHere);
   const podChanged   = !deepEqual(pod,   baseHere);
 
+  // `side` names WHICH side diverged from base. Both directions are auto-mergeable, but they resolve to
+  // OPPOSITE values, and without this a consumer cannot tell them apart from the entry shape alone — which
+  // let a stale replica silently REVERT a fresher local edit (the caller took `theirs` for every toMerge).
+  // Additive: existing consumers that ignore it are unaffected.
   if (localChanged && !podChanged) {
-    // local edited; pod stayed at base (which may itself be missing).
-    toMerge.push({ path, yours: local, theirs: pod });
+    // local edited; pod stayed at base (which may itself be missing) → resolving to `yours` keeps the edit.
+    toMerge.push({ path, yours: local, theirs: pod, side: 'local' });
     return;
   }
   if (podChanged && !localChanged) {
-    toMerge.push({ path, yours: local, theirs: pod });
+    // pod edited; local stayed at base → resolving to `theirs` takes the incoming change.
+    toMerge.push({ path, yours: local, theirs: pod, side: 'incoming' });
     return;
   }
   // Both changed (or no base, and they differ) → conflict.

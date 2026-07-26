@@ -26,3 +26,4 @@ const { detect: detectRulesConflicts, apply: applyRulesResolution } =
   makeKringFlatDocConflict({ deepIncoming: false });
 
 export { detectRulesConflicts, applyRulesResolution };
+export { decisionsForMerges } from './kringKindFactory.js';

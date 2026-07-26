@@ -19,7 +19,7 @@ import { View, Text, Pressable, ScrollView, TextInput, StyleSheet } from 'react-
 import { useTheme } from './themeContext.js';
 import {
   RULES_QUESTIONS, normalizeRulesDoc, isRulesComplete,
-  detectRulesConflicts, applyRulesResolution,
+  detectRulesConflicts, applyRulesResolution, decisionsForMerges,
 } from '@onderling-app/basis';
 import { t } from '../../core/localisation.js';
 import CircleRecipeConflictScreen from './CircleRecipeConflictScreen.js';
@@ -63,9 +63,12 @@ export default function CircleRulesScreen({
       if (!live) return;
       setLocalForCompare(working);
 
+      // Web parity (story 6.2): resolve each auto-merge to the side that ACTUALLY changed. `apply` defaults
+      // unlisted paths to `theirs`, so `{}` here silently reverted a fresher LOCAL edit whenever the
+      // divergence was ours — a stale second device coming back overwrote the newer doc with no prompt.
       if (report.identical
           || (report.blockConflicts.length === 0 && report.metaConflicts.length === 0)) {
-        const merged = applyRulesResolution(working, incomingRules, {});
+        const merged = applyRulesResolution(working, incomingRules, decisionsForMerges(report.toMerge));
         try {
           if (rulesStore && typeof rulesStore.set === 'function' && circleId) {
             await rulesStore.set(circleId, merged);

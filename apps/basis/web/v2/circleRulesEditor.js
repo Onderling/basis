@@ -16,7 +16,7 @@
  * heading via the resolver's `title` opt).
  */
 import { RULES_QUESTIONS, isRulesComplete } from '../../src/v2/circleRules.js';
-import { detectRulesConflicts, applyRulesResolution } from '../../src/v2/rulesConflict.js';
+import { detectRulesConflicts, applyRulesResolution, decisionsForMerges } from '../../src/v2/rulesConflict.js';
 import { renderRecipeConflictResolver } from './recipeConflictResolver.js';
 
 // 5.5d — `onPreview` removed: the join wizard now inlines the consent
@@ -140,10 +140,13 @@ async function maybeRenderRulesConflict(container, {
   } catch { /* best-effort — fall back to null base */ }
 
   const report = detectRulesConflicts(doc, incomingRules, base);
-  // Identical or one-sided changes → no UI; apply incoming cleanly.
+  // Identical or one-sided changes → no UI. Resolve each auto-merge to the side that ACTUALLY changed:
+  // `apply` defaults unlisted paths to `theirs`, so passing `{}` here silently reverted a fresher LOCAL edit
+  // whenever the divergence was ours — a stale replica (an offline second device coming back) overwrote the
+  // newer document with no conflict and no prompt (story 6.2). `decisionsForMerges` keeps each side's change.
   if (report.identical
       || (report.blockConflicts.length === 0 && report.metaConflicts.length === 0)) {
-    const merged = applyRulesResolution(doc, incomingRules, {});
+    const merged = applyRulesResolution(doc, incomingRules, decisionsForMerges(report.toMerge));
     await persistMergedRules({ rulesStore, circleId, merged });
     if (typeof onIncomingApplied === 'function') onIncomingApplied(merged);
     return;

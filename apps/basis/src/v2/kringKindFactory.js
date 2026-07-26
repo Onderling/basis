@@ -197,6 +197,28 @@ export function makeKringKindPendingLocalIo(keyPrefix, storage = globalThis.loca
  * @param {boolean} [opts.deepIncoming=false]  deep-clone incoming before merge
  * @returns {{ detect: Function, apply: Function }}
  */
+/**
+ * Decisions that resolve every AUTO-MERGEABLE difference to the side that actually changed.
+ *
+ * `toMerge` carries both directions — "I edited, they didn't" and "they edited, I didn't" — and they resolve
+ * to OPPOSITE values. `apply()` defaults every unlisted path to `theirs`, so applying a toMerge set blindly
+ * REVERTS the caller's own fresher edit whenever the divergence was local: exactly the stale-device overwrite
+ * of story 6.2. Feed these decisions into `apply()` for the no-conflict fast path so each side keeps whatever
+ * genuinely changed. Entries without a `side` (older diffs) fall through to the `theirs` default, unchanged.
+ *
+ * @param {Array<{path: string[], side?: 'local'|'incoming'}>} toMerge
+ * @returns {Record<string, 'yours'|'theirs'>} decisions keyed by `path.join('.')`
+ */
+export function decisionsForMerges(toMerge = []) {
+  const out = {};
+  for (const m of Array.isArray(toMerge) ? toMerge : []) {
+    if (!m || !Array.isArray(m.path) || m.path.length === 0) continue;
+    if (m.side === 'local') out[m.path.join('.')] = 'yours';
+    else if (m.side === 'incoming') out[m.path.join('.')] = 'theirs';
+  }
+  return out;
+}
+
 export function makeKringFlatDocConflict({ deepIncoming = false } = {}) {
   /**
    * Detect conflicts against `base` (3-way merge ancestor; may be null).

@@ -50,13 +50,11 @@ describe('1.5 — two admins grant the same item concurrently', () => {
     expect(canOpen(h.current(), h.bram.privateKey)).toBe(true);
   });
 
-  // ⚠ KNOWN GAP (found 2026-07-26 by this story — see REMAINING-WORK). `it.fails` asserts the test below
-  // currently FAILS: with both admins reading the SAME base before either writes, the later write is computed
-  // without the earlier grantee and silently overwrites it — the first grantee never gets access, with no
-  // error on either side. Widening the grant base cannot fix this (the first grant isn't in the resource yet
-  // when the second reads); it needs real concurrency control. When that lands, this flips to passing and
-  // `.fails` must be dropped.
-  it.fails('CONCURRENT grants both survive — neither admin\'s grantee is lost', async () => {
+  // ✅ FIXED 2026-07-26 (Frits's call: CAS detects the race, the union resolves it). Re-reading before the
+  // write was NOT enough — both callers can re-read before either writes (TOCTOU), which is how this
+  // reproduced. The grant critical section is now serialised per KEY STORE, and each attempt recomputes on
+  // the newest base, so a grant is a pure union and none can be lost.
+  it('CONCURRENT grants both survive — neither admin\'s grantee is lost', async () => {
     const h = twoAdmins();
     const cato = generateKeypair();
     const dirk = generateKeypair();
@@ -71,20 +69,23 @@ describe('1.5 — two admins grant the same item concurrently', () => {
     expect(canOpen(h.current(), dirk.privateKey)).toBe(true);
   });
 
-  it('documents the CURRENT behaviour: exactly one grantee survives, the members are never harmed', async () => {
+  it('a whole batch of concurrent grants all survive (the queue is not just a two-way fix)', async () => {
     const h = twoAdmins();
-    const cato = generateKeypair();
-    const dirk = generateKeypair();
+    const peers = [generateKeypair(), generateKeypair(), generateKeypair(), generateKeypair()];
     const base = h.current().recipients;
 
-    await Promise.all([
-      h.annaShare.share({ recipient: 'cato', recipientKey: cato.publicKey, currentRecipients: base }),
-      h.bramShare.share({ recipient: 'dirk', recipientKey: dirk.publicKey, currentRecipients: base }),
-    ]);
+    await Promise.all(peers.map((p, i) => (i % 2 ? h.bramShare : h.annaShare)
+      .share({ recipient: `p${i}`, recipientKey: p.publicKey, currentRecipients: base })));
 
-    // The failure is a silent LOST GRANT, not corruption: one grantee lands, the circle keeps its own access.
-    const survivors = [cato, dirk].filter((g) => canOpen(h.current(), g.privateKey));
-    expect(survivors).toHaveLength(1);
+    for (const p of peers) expect(canOpen(h.current(), p.privateKey)).toBe(true);
+    expect(canOpen(h.current(), h.anna.privateKey)).toBe(true);
+    expect(canOpen(h.current(), h.bram.privateKey)).toBe(true);
+  });
+
+  it('the members are never harmed by a concurrent grant', async () => {
+    const h = twoAdmins();
+    const cato = generateKeypair();
+    await h.annaShare.share({ recipient: 'cato', recipientKey: cato.publicKey, currentRecipients: h.current().recipients });
     expect(canOpen(h.current(), h.anna.privateKey)).toBe(true);
     expect(canOpen(h.current(), h.bram.privateKey)).toBe(true);
   });

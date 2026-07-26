@@ -70,6 +70,26 @@ import { generateGroupKey, sealWithGroupKey, sealingPublicKeyFromNetworkKey } fr
  * @param {(ref:object)=>(string|null)} [a.resourceUriFor]  maps a shared-ref → the canonical resource URI.
  * @param {string} [a.mode='read']  the ACP mode granted/revoked (canonical sharing is read-only by design).
  */
+/**
+ * One promise-chain per KEY STORE, so every controller writing the same group-key resource in this process
+ * takes the grant critical section in turn. A chain is enough: each call waits for the previous to settle
+ * before it reads, so no two grants compute from the same stale base. Errors are contained, so one failed
+ * grant cannot wedge the queue. Cross-DEVICE races still need a store that can compare-and-swap
+ * (`keyStore.writeIfUnchanged`) — see the note in the grant core.
+ */
+const _grantChains = new WeakMap();
+function _serializerFor(keyStore) {
+  return (fn) => {
+    const prev = _grantChains.get(keyStore) ?? Promise.resolve();
+    const run = prev.then(fn, fn);
+    _grantChains.set(keyStore, run.then(() => undefined, () => undefined));
+    return run;
+  };
+}
+
+/** Bounded optimistic-concurrency retries for a grant (story 1.5); a grant is a pure union, so retrying is safe. */
+const MAX_GRANT_ATTEMPTS = 4;
+
 export function createCanonicalShare({ sharing, keyStore, controllerKey, resourceUri, resourceUriFor, mode = 'read' } = {}) {
   if (!sharing || typeof sharing.grant !== 'function' || typeof sharing.revoke !== 'function') {
     throw new Error('createCanonicalShare: sharing with grant/revoke required');
@@ -96,25 +116,65 @@ export function createCanonicalShare({ sharing, keyStore, controllerKey, resourc
      * the first resource) + ACP-grant read on the canonical resource. Not exposed — callers use the two
      * fronts below so the *source* of the sealing key stays explicit.
      */
+  // Serialise the grant critical section (read → modify → write) within this process, keyed on the KEY STORE
+  // rather than on this controller — two admins acting on one circle are two `createCanonicalShare`
+  // instances over the SAME store, so an instance-local queue would not serialise them against each other.
+  const _serialize = _serializerFor(keyStore);
+
   const _grantSealingKey = async ({ recipient, recipientKey, currentRecipients, uri, includeHistory = false }) => {
       // 1. KEY GRANT — add the recipient's sealing key to the item's group-key resource. O(1) re-wrap of the
       //    SAME key at the SAME version (grantMember), or bootstrap the first resource if none exists yet.
       //    `includeHistory` (default false) ALSO re-wraps the retained historic versions to the recipient
       //    (grantMember's `extra` envelopes) — an EXPLICIT opt-in; the default gives the current version only.
-      const cur = await keyStore.read();
-      const next = cur
-        ? grantMember(cur, {
+      //
+      //    CONCURRENCY (story 1.5). This is a read → modify → write on ONE resource, so two admins granting
+      //    in the same window both computed from a base that predated the other and the second write silently
+      //    dropped the first grantee. Guarded here by OPTIMISTIC CONCURRENCY, using the resource itself as
+      //    the version — no backend support required:
+      //      • re-read immediately before writing; if the stored recipient set changed under us, recompute the
+      //        grant on top of the LATEST resource (which unions in whoever landed meanwhile) and retry;
+      //      • a store that CAN do a real compare-and-swap may expose `writeIfUnchanged(next, prev)` returning
+      //        false on conflict — it is used when present, closing the window entirely.
+      //    A grant only ever ADDS a recipient and keeps the same group key at the same version, so recomputing
+      //    on the newest base is a pure union: no grant can be lost by retrying.
+      const compute = (base) => (base
+        ? grantMember(base, {
             newRecipient: recipientKey,
             granterPrivateKey: controllerKey.privateKey,
-            currentRecipients: withController(currentRecipients),
+            // Union the caller's view with whatever the resource ALREADY holds, so a concurrent grantee that
+            // landed between our read and our write is carried forward rather than overwritten.
+            currentRecipients: withController([...new Set([...(base.recipients ?? []), ...currentRecipients])]),
             includeHistory,
           })
         : buildGroupKeyResource({
             version: 1,
             groupKey: generateGroupKey(),
             recipients: withController([...currentRecipients, recipientKey]),
-          });
-      await keyStore.write(next);
+          }));
+
+      // The read → modify → write must be ATOMIC. Re-reading before writing is not enough: two callers can
+      // both re-read before either writes (TOCTOU), which is exactly how the bug reproduced. So the section
+      // is serialised through a per-controller queue — correct for concurrent grants in THIS process — and,
+      // when the store can do a real compare-and-swap (`writeIfUnchanged`), that closes the CROSS-DEVICE
+      // window too. Without such a store, simultaneous grants from two DEVICES remain racy; the union in
+      // `compute` still limits the damage (each write carries forward whoever it can see).
+      const next = await _serialize(async () => {
+        for (let attempt = 0; attempt < MAX_GRANT_ATTEMPTS; attempt += 1) {
+          const cur = await keyStore.read();
+          const candidate = compute(cur);
+          if (typeof keyStore.writeIfUnchanged === 'function') {
+            const wrote = await keyStore.writeIfUnchanged(candidate, cur);
+            if (wrote !== false) return candidate;
+            continue;                                                   // another writer won — recompute
+          }
+          await keyStore.write(candidate);
+          return candidate;
+        }
+        // Exhausted CAS retries: recompute once more on the newest base so the grant is never simply dropped.
+        const latest = compute(await keyStore.read());
+        await keyStore.write(latest);
+        return latest;
+      });
 
       // 2. ACP READ GRANT on the canonical resource. Throws SHARING_GRANT_NOOP if nothing landed — we let it
       //    propagate so a share that didn't actually grant is never reported as success.

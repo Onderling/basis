@@ -4093,23 +4093,22 @@ async function showAvailability() {
   showTabBar('mij');
 }
 
-async function createCircle() {
+// Starting a circle opens the RICH 5-step wizard (identity · governance · rules · offerings · tech →
+// review) — the same one the onboarding "Ja, help me" handoff opens.
+//
+// It used to raise a native `globalThis.prompt()` for the name and create the circle immediately. That was
+// a deliberate "quick path", but it meant the wizard we actually built was reachable ONLY through the
+// help-bot handoff: anyone pressing "+ new circle" got a bare browser dialog and none of the governance /
+// rules / offerings choices, silently defaulting all of them. `quickCreateCircle` stays the PROGRAMMATIC
+// create (help-circle provisioning, the feedback-circle attach) — it is just no longer the human path.
+function createCircle() {
   if (!rawCallSkill) {
     // no chat-shell fallback. Without an agent the bundle
     // hasn't booted yet; surface that as an error and bail.
     globalThis.alert?.(t('circle.create_unavailable'));
     return;
   }
-  const name = (globalThis.prompt?.(t('circle.new')) || '').trim();
-  if (!name) return;
-  try {
-    await quickCreateCircle({ callSkill: rawCallSkill, name });
-    circlesCache = await loadCircles(sources);
-  } catch (err) {
-    console.warn('[circleApp] create failed', err);
-    globalThis.alert?.(String(err?.message ?? err));
-  }
-  showLauncher();
+  openCreateCircleWizard();
 }
 
 // ── In-app onboarding (task #13, Phase 1) ─────────────────────────────────────────

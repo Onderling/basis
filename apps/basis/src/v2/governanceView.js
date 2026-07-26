@@ -80,6 +80,11 @@ export function buildGovernanceView({ fold, viewer = null, labelForSubject = (s)
       approved: p.status === DECISION_STATUS.APPROVED,
       rejected: p.status === DECISION_STATUS.REJECTED,
       pending: p.status === DECISION_STATUS.PENDING,
+      // Approved but not yet ENACTED — a proposal only closes once an admin/caretaker device performs the
+      // op (Decision A), so this window is real and both shells already render "awaiting an admin" for it.
+      // It was dead until 2026-07-26: the flag existed only on `tally()`'s return value, never on a row,
+      // so `row.awaitingEnactment` was always undefined and the chip never appeared on either platform.
+      awaitingEnactment: p.status === DECISION_STATUS.APPROVED && !p.closed,
     };
   });
 

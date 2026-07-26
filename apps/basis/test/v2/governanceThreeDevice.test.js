@@ -10,83 +10,12 @@
  *
  * Cast: Anna (admin0, admin) · Bram (m0, member) · Cato (m1, member — the partitioned / tipping one).
  */
-import { describe, it, expect, vi } from 'vitest';
-import { bindCircleGovernance } from '../../src/v2/governanceAppWiring.js';
-import { makeKringGovernancePeerHandler } from '../../src/v2/kringLogReceiver.js';
-import { EventLog } from '../../src/eventLog.js';
-import { normalizeCirclePolicy } from '../../src/v2/circlePolicy.js';
+import { describe, it, expect } from 'vitest';
 import { DECISION_STATUS } from '../../src/v2/governanceDecision.js';
+import { threeDevices, openProposal } from './helpers/threeDeviceGovernance.js';
 
-const FULL = [
-  { addr: 'admin0', role: 'admin' },
-  { addr: 'm0', role: 'member' },
-  { addr: 'm1', role: 'member' },
-  { addr: 'm2', role: 'member' },
-];
-const rosterExcluding = (ref) => ({ members: FULL.filter((m) => m.addr !== ref) });
-const policy = normalizeCirclePolicy({ governance: { removeMember: 'member-vote' } });
-
-/**
- * Three devices on one bus, each with its own log + ingest. A device may be PARTITIONED: events addressed
- * to it are held (as the relay's hold-forward would) and flushed on reconnect — offline is a first-class
- * state here, not an error path.
- */
-function threeDevices() {
-  const devices = {};
-  const held = {};                                   // ref → [payload] while partitioned
-
-  for (const ref of ['admin0', 'm0', 'm1']) {
-    const log = new EventLog({ initial: [] });
-    devices[ref] = { ref, log, online: true, enacted: [], ingest: makeKringGovernancePeerHandler({ eventLog: log }) };
-    held[ref] = [];
-  }
-
-  /** Fan an event from `fromRef` to the OTHER two devices (holding for the partitioned). */
-  const broadcastFrom = (fromRef) => (_channel, circleId, event) => {
-    const payload = { subtype: 'kring-governance-broadcast', circleId, event, ts: Date.now() };
-    for (const ref of Object.keys(devices)) {
-      if (ref === fromRef) continue;
-      if (devices[ref].online) devices[ref].ingest(null, payload);
-      else held[ref].push(payload);
-    }
-  };
-
-  let n = 0;
-  for (const ref of Object.keys(devices)) {
-    const d = devices[ref];
-    d.gov = bindCircleGovernance({
-      eventLog: d.log,
-      callSkill: vi.fn(async (app, op, args) => {
-        if (op === 'listGroupRoster') return rosterExcluding(ref);
-        // Every non-roster op is a real-world side effect — record WHICH device performed it.
-        d.enacted.push({ op, args });
-        return { ok: true };
-      }),
-      getPolicy: async () => policy,
-      myRef: ref,
-      genId: () => `p${(n += 1)}`,
-      now: () => 1,
-      broadcast: broadcastFrom(ref),
-    });
-  }
-
-  return {
-    devices,
-    partition: (ref) => { devices[ref].online = false; },
-    reconnect: (ref) => {                            // flush everything held while away, in order
-      devices[ref].online = true;
-      const queue = held[ref].splice(0, held[ref].length);
-      for (const p of queue) devices[ref].ingest(null, p);
-    },
-    /** Every enact side effect that fired anywhere, tagged with the device that fired it. */
-    enactsEverywhere: () => Object.values(devices).flatMap((d) => d.enacted.map((e) => ({ by: d.ref, ...e }))),
-  };
-}
-
-const openProposal = async (h, deadline = 100) =>
-  (await h.devices.admin0.gov.propose({
-    circleId: 'c1', action: 'removeMember', subject: 'm2', actor: { ref: 'admin0' }, deadline,
-  })).proposalId;
+// The harness (three devices, hold-forward partitions, both fan channels, a mutable clock) lives in
+// `helpers/threeDeviceGovernance.js` — shared with the 3.3/3.5/3.6 suite so both drive ONE substrate.
 
 describe('3.1 — a partitioned voter converges to the same tally, without double-counting', () => {
   it('Cato is offline through the vote, then reconnects to the SAME tally the others already had', async () => {
@@ -169,5 +98,27 @@ describe('3.2 — a non-admin tipping vote does not enact; the admin does, exact
 
     const removals = h.enactsEverywhere().filter((e) => /remove/i.test(e.op));
     expect(removals.map((r) => r.by)).toEqual(['admin0']);          // exactly one, and on the ADMIN
+  });
+
+  // The chip that TELLS the voter what 3.2 guarantees. Both shells render `row.approved &&
+  // row.awaitingEnactment` ("awaiting an admin" / "wacht op een beheerder"), but until 2026-07-26 the flag
+  // lived only on `tally()`'s return value and was never set on a view row — so the chip was dead on web AND
+  // mobile, and a member who cast the tipping vote saw "Approved" with no hint that anything was pending.
+  it('the voter is TOLD they are waiting for an admin — the chip has a value to read', async () => {
+    const h = threeDevices();
+    const proposalId = await openProposal(h);
+    await h.devices.admin0.gov.vote({ circleId: 'c1', proposalId, voter: 'm0', choice: 'yes' });
+    await h.devices.m1.gov.vote({ circleId: 'c1', proposalId, voter: 'm1', choice: 'yes' });   // approved
+
+    const cato = await h.rowOn('m1', proposalId);
+    expect(cato.approved).toBe(true);
+    expect(cato.awaitingEnactment).toBe(true);          // …so the chip renders
+
+    // Once the admin actually enacts, the proposal closes and the chip must go away — otherwise it would
+    // sit there forever claiming a wait that already ended.
+    await h.devices.admin0.gov.settle('c1');
+    const annaAfter = await h.rowOn('admin0', proposalId);
+    expect(annaAfter.closed).toBe(true);
+    expect(annaAfter.awaitingEnactment).toBe(false);
   });
 });

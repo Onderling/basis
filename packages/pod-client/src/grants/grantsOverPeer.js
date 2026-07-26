@@ -254,6 +254,33 @@ export function createGrantsOverPeer({
   }
 
   /**
+   * Seal-side unifier in SEALING-KEY space — the same union as `effectiveAudience`, but over raw X25519
+   * sealing public keys, which is the vocabulary the per-resource group-key resource speaks
+   * (`groupKeyResource.recipients`, `grantMember({currentRecipients})`). Same D2 gate.
+   *
+   * WHY THIS EXISTS: `grantMember` REPLACES the recipient set with `[...currentRecipients, newRecipient]`.
+   * A caller that passes only the origin roster therefore DROPS every previously-granted out-of-circle
+   * recipient on the next grant (proven: they can no longer unwrap). Passing
+   * `effectiveSealingKeys(roster ∪ resource.recipients, resourceId)` keeps prior grantees by construction.
+   *
+   * @param {Array<string|object>} baseKeys  raw sealing pubkeys (or peer descriptors — `sealingPublicKey` is read).
+   * @param {string} resourceId
+   * @param {{scheme?: string, policy?: object}} opts  D2 — required, as for `effectiveAudience`.
+   * @returns {string[]} deduped sealing public keys.
+   */
+  function effectiveSealingKeys(baseKeys, resourceId, { scheme, policy } = {}) {
+    assertScopedScheme(scheme ?? (policy !== undefined ? chooseSealScheme(policy) : null));
+    const out = [];
+    const seen = new Set();
+    const add = (k) => { if (typeof k === 'string' && k && !seen.has(k)) { seen.add(k); out.push(k); } };
+    for (const b of Array.isArray(baseKeys) ? baseKeys : []) {
+      add(typeof b === 'string' ? b : (b?.sealingPublicKey ?? b?.sealingKey ?? null));
+    }
+    for (const rec of liveGrants(resourceId)) add(rec.sealingPublicKey);
+    return out;
+  }
+
+  /**
    * Read-side gate — may this peer decrypt this resource? A member reads via the group key; a non-member
    * reads iff they hold a live grant covering the resource.
    * @param {string} peerPubKey
@@ -265,7 +292,7 @@ export function createGrantsOverPeer({
     return liveGrants(resourceId).some((r) => r.peerPubKey === peerPubKey);
   }
 
-  return { grant, revoke, effectiveAudience, mayDecrypt, liveGrants, GRANT_MODE, SCOPED_SEAL_SCHEMES };
+  return { grant, revoke, effectiveAudience, effectiveSealingKeys, mayDecrypt, liveGrants, GRANT_MODE, SCOPED_SEAL_SCHEMES };
 }
 
 export default createGrantsOverPeer;

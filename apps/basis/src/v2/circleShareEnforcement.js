@@ -58,9 +58,37 @@ export function buildCircleShareEnforcement({ sharing, strategy, podRoot, contro
   // The live origin roster's sealing PUBLIC KEYS — re-wrapped to on every canonical grant so the origin
   // members never lose access (and seeded as `currentRecipients` on a published-key grant / rotated to on a
   // revoke). Best-effort: a control agent whose roster isn't resolvable yields an empty set.
+  //
+  // ROSTER-ONLY BY DESIGN — this is ALSO the revoke-side default for `remainingRecipients`, and a revokee is
+  // named by WebID while this list is sealing keys. Widening it here would rotate the key back TO the very
+  // recipient being revoked (a silent revocation failure). The grant-side widening lives in `grantRecipients`.
   const currentRecipients = () => {
     try { return (controlAgent?.members?.() ?? []).map((m) => m.publicKey).filter(Boolean); }
     catch { return []; }
+  };
+
+  // GRANT-side audience (grants-over-Peer step 2) — everyone who currently HOLDS this item's key:
+  // the origin roster ∪ the group-key resource's own `recipients`, which includes out-of-circle recipients
+  // granted EARLIER (who are, by definition, not in the roster).
+  //
+  // This fixes a real drop, verified against the real primitives: `grantMember` REPLACES the recipient set
+  // with `[...currentRecipients, newRecipient]`, so passing the roster alone meant granting a SECOND
+  // out-of-circle recipient silently revoked the FIRST (the earlier grantee could no longer unwrap the key).
+  // The key resource is the durable record of who holds the key, so unioning it in is both the fix and the
+  // honest source of truth — no extra bookkeeping to drift.
+  //
+  // Only the GRANT path uses this (see `grantRecipients` in makeCanonicalShareHook); revoke keeps the
+  // conservative roster-only default above.
+  const grantRecipients = async () => {
+    const out = [];
+    const seen = new Set();
+    const add = (k) => { if (typeof k === 'string' && k && !seen.has(k)) { seen.add(k); out.push(k); } };
+    for (const k of currentRecipients()) add(k);
+    try {
+      const cur = await controlAgent?.keyStore?.read?.();
+      for (const k of (cur?.recipients ?? [])) add(k);
+    } catch { /* no resource yet — the first grant bootstraps it */ }
+    return out;
   };
 
   // Enforcement `seal` is OMITTED on purpose: the cross-circle recipient re-seal (copy postures) is layered
@@ -70,7 +98,8 @@ export function buildCircleShareEnforcement({ sharing, strategy, podRoot, contro
   const enforcement = makeCircleShareEnforcement({
     sharing, resourceUriFor, open: strategy.open,
     canonicalShare,
-    currentRecipients,
+    currentRecipients,   // roster-only — the revoke-side default (must never include a revocable recipient)
+    grantRecipients,     // roster ∪ current key-holders — so an earlier out-of-circle grantee isn't dropped
   });
 
   // Phase 2 (objective L follow-up) — grant an OUT-OF-CIRCLE recipient (NOT in the origin roster) revocable
@@ -85,7 +114,9 @@ export function buildCircleShareEnforcement({ sharing, strategy, podRoot, contro
   // revoke. The origin roster is seeded as `currentRecipients` (default; a caller may override per-call).
   if (canonicalShare && typeof canonicalShare.shareToPublishedKey === 'function') {
     enforcement.onShareToPublishedKey = async ({ recipient, recipientNetworkKey, currentRecipients: roster, verify, ref, includeHistory = false } = {}) => {
-      const cur = Array.isArray(roster) ? roster.filter(Boolean) : await currentRecipients();
+      // A GRANT — so the base is the widened one (roster ∪ current key-holders); an explicit per-call
+      // `currentRecipients` still overrides. Roster-only here would drop earlier out-of-circle grantees.
+      const cur = Array.isArray(roster) ? roster.filter(Boolean) : await grantRecipients();
       // `includeHistory` (default false) is threaded straight through — the op decides; the substrate re-wraps
       // the retained historic versions to the recipient only when explicitly opted in (see grantMember).
       return canonicalShare.shareToPublishedKey({ recipient, recipientNetworkKey, currentRecipients: cur, verify, ref, includeHistory });

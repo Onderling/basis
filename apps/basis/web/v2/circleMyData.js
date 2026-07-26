@@ -11,6 +11,7 @@
  */
 
 import { renderUserLlmSettings } from './userLlmSettings.js';
+import { renderThemeToggle } from './themeToggle.js';
 
 export function renderCircleMyData(container, {
   dataLocation = {},
@@ -227,21 +228,7 @@ export function renderCircleMyData(container, {
   // live (systeem = remove, so prefers-color-scheme wins) — wired in circleApp.
   if (typeof onSetTheme === 'function') {
     const sec = section(tr('circle.mydata.theme'));
-    const toggle = document.createElement('div');
-    toggle.className = 'cc-mydata__theme-toggle';
-    toggle.setAttribute('role', 'group');
-    toggle.setAttribute('aria-label', tr('circle.mydata.theme'));
-    for (const th of ['system', 'light', 'dark']) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = `cc-mydata__theme-btn${th === themePref ? ' is-active' : ''}`;
-      b.dataset.theme = th;
-      b.setAttribute('aria-pressed', th === themePref ? 'true' : 'false');
-      b.textContent = tr(`circle.mydata.theme_${th}`);
-      b.addEventListener('click', () => onSetTheme(th));
-      toggle.appendChild(b);
-    }
-    sec.appendChild(toggle);
+    renderThemeToggle(sec, { themePref, onSetTheme, t: tr });   // ONE renderer — settings shows the same control
     container.appendChild(sec);
   }
 

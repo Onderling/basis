@@ -1304,6 +1304,10 @@
       "text": "Circle settings",
       "doc": "Settings screen heading (board 4A)."
     },
+    "theme_hint": {
+      "text": "Applies to this device only — it is not part of the circle's settings.",
+      "doc": "Settings — hint under the display-theme toggle; clarifies it is a per-device preference, not saved policy."
+    },
     "save": {
       "text": "Save",
       "doc": "Save the circle settings."

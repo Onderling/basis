@@ -19,6 +19,7 @@
  * `title` opt).
  */
 import { CIRCLE_FEATURES, CIRCLE_POLICY_ENUMS } from '../../src/v2/circlePolicy.js';
+import { renderThemeToggle } from './themeToggle.js';
 // Phase 4 §9 — the settings-surface CONTROLS + the `enabledWhen` fold (route × capability).
 import { resolveControlEnablement } from '../../src/v2/circleSettingsControls.js';
 import { DEFAULT_CIRCLE_ORIGINS } from '../../src/v2/circleSources.js';   // S6.C — composable apps
@@ -66,6 +67,9 @@ export const ENUM_AXES = ['view', 'llmTool', 'storagePosture', 'sharePosture', '
  */
 export function renderCircleSettings(container, {
   policy, t, onChange, onBack, onSave, saveLabel, note,
+  // Display theme — surfaced HERE as well as in "Mijn gegevens", where nobody looked for it (2026-07-22
+  // demo feedback). Same shared renderer, so the two can't drift; absent deps ⇒ the block is simply omitted.
+  themePref, onSetTheme,
   incomingPolicy = null,
   policyStore,
   circleId,
@@ -326,6 +330,10 @@ export function renderCircleSettings(container, {
   save.textContent = saveLabel || tr('circle.settings.save');
   save.addEventListener('click', () => { if (typeof onSave === 'function') onSave(); });
   container.appendChild(save);
+
+  // Per-DEVICE display preference — after the save button on purpose: it is not part of the policy document
+  // and applies instantly, so it must not read as something the Save button commits.
+  appendThemeSection(container, { tr, themePref, onSetTheme });
 
   // γ.4 — conflict resolver.  Opt-in via `incomingPolicy`.  When set, we
   // fetch the latest captured version (γ.2 versions adapter) through
@@ -651,5 +659,26 @@ function renderCapabilitiesSection(container, { matrix, tr, emit }) {
       sec.appendChild(el);
     }
   }
+  container.appendChild(sec);
+}
+
+/**
+ * Display theme (systeem / licht / donker) — a per-DEVICE preference, so it sits apart from the circle's
+ * policy fields above and is never part of the saved policy document. Rendered through the shared
+ * `renderThemeToggle`, identical to the one in "Mijn gegevens".
+ */
+function appendThemeSection(container, { tr, themePref, onSetTheme }) {
+  if (typeof onSetTheme !== 'function') return;
+  const sec = document.createElement('section');
+  sec.className = 'circle-settings__section circle-settings__section--theme';
+  const h = document.createElement('h3');
+  h.className = 'circle-settings__section-title';
+  h.textContent = tr('circle.mydata.theme');
+  sec.appendChild(h);
+  const hint = document.createElement('p');
+  hint.className = 'circle-settings__hint';
+  hint.textContent = tr('circle.settings.theme_hint');
+  sec.appendChild(hint);
+  renderThemeToggle(sec, { themePref, onSetTheme, t: tr });
   container.appendChild(sec);
 }

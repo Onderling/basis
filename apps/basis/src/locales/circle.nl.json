@@ -1304,6 +1304,10 @@
       "text": "Kring-instellingen",
       "doc": "Settings screen heading (board 4A)."
     },
+    "theme_hint": {
+      "text": "Geldt alleen voor dit apparaat — het hoort niet bij de instellingen van de kring.",
+      "doc": "Settings — uitleg onder de weergavethema-schakelaar; verduidelijkt dat het een voorkeur per apparaat is, geen opgeslagen beleid."
+    },
     "save": {
       "text": "Opslaan",
       "doc": "Save the circle settings."

@@ -5852,6 +5852,10 @@ async function showSettings(id) {
   const rerender = () => renderCircleSettings(rootEl, {
     policy: working,
     t,
+    // Display theme — the SAME per-device preference "Mijn gegevens" shows, surfaced here too because this
+    // is where people look for it. `onSetTheme` persists + stamps live and rerenders the app (defined above).
+    themePref: getThemePref(),
+    onSetTheme,
     // the projected PAGE surface drives the header label (labelKey via t).
     settingsPage,
     // Phase 4 §9 — the manifest-declared Connection & transport controls + the device transport

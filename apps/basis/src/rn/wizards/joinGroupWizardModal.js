@@ -17,6 +17,7 @@ import {
   handleSuggestions, isValidHandle,
   finalSubmit, loadPersonas, setPersona,
   prepareJoinIdentity, setLinkChoice,
+  setJoinReveal, REVEAL_PRESETS,
 } from '../../core/wizards/joinGroupState.js';
 import { RULES_FIELDS } from '../../v2/circleRules.js';
 
@@ -182,6 +183,15 @@ export default function JoinGroupWizardModal({
                     ]}
                   />
                 ) : null}
+                {/* Reveal level (§1.6) — how much of your persona this circle sees. You pick it
+                    (default = your resolved usual level, else the fallback); adjustable down to
+                    handle. Makes the join release VISIBLE + yours to set, not a silent default. */}
+                <RadioGroup
+                  label={t('circle.join.wizard.reveal.label')}
+                  value={state.revealPreset || 'profile'}
+                  onChange={(lvl) => setState((s) => setJoinReveal({ ...s }, lvl))}
+                  options={REVEAL_PRESETS.map((lvl) => ({ id: lvl, label: t(`circle.reveal.preset.${lvl}`) }))}
+                />
                 {/* #4 — continue as an existing self? Default FRESH (unlinkable); choosing an
                     existing self presents that circle's key + a signing proof (provably the
                     same person to anyone in both circles). Shown only when you're in others. */}

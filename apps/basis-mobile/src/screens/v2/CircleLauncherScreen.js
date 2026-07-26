@@ -139,6 +139,7 @@ import { scopeStoopCallSkill } from '../../../../basis/src/v2/circleStoopScope.j
 import { createCircleMediaComposition, makeDevMediaBucket } from '../../../../basis/src/v2/circleMediaGateway.js';
 import { buildSelfMediaComposition, makeResealMediaForCircle } from '../../../../basis/src/v2/profileMediaReseal.js';
 import { openMediaFilePicker, encodePickedImage } from '../../core/mediaPicker.js';
+import { resolveSealedThumbUri } from '../../core/mijHost.js';
 import { getCircleSealStrategy, seedCircleRosterFor, getCirclePodFetch, getCircleActorWebId } from '../../core/circlePods.js';
 // M6 — the feedback bot rides the SHARED mount (web uses the same one). tryHandle routes /feedback +
 // /feedback-stop + free text while active, before the circle bot; bubbles render via appendKringMessage.
@@ -3494,6 +3495,7 @@ function CircleDetail({
                 policy={policy?.revealPolicy ?? 'pairwise'}
                 onBack={() => setMemberCard(null)}
                 onReport={onReportMember ? (m) => { onReportMember(m); setMemberCard(null); } : undefined}
+                resolvePicture={(ref) => resolveSealedThumbUri(ref, circleMedia?.mediaGateway?.opener)}
               />
             ) : null}
           </View>

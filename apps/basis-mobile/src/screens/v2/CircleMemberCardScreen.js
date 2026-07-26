@@ -11,14 +11,15 @@
  * Pure render + local picked-viewer state; the host passes the tapped member, the
  * roster (for the self-view viewer chips), my webid + the circle's reveal policy.
  */
-import React, { useMemo, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
+import React, { useMemo, useState, useEffect } from 'react';
+import { View, Text, Pressable, ScrollView, StyleSheet, Image } from 'react-native';
 import { useTheme } from './themeContext.js';
 import { memberPersonaView, selfViewSplit, VIEWER_KINDS } from '@onderling-app/basis';
 import { t } from '../../core/localisation.js';
 
 export default function CircleMemberCardScreen({
   member = {}, self = false, roster = [], myWebid = null, policy = 'pairwise', onBack, onReport,
+  resolvePicture = null,
 }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -29,6 +30,25 @@ export default function CircleMemberCardScreen({
   const split = self
     ? selfViewSplit({ me, viewer, policy })
     : memberPersonaView({ member, viewerWebid: myWebid, policy });
+
+  // Media-typed attributes the viewer clears (the profile picture): resolve each SEALED
+  // ref → a displayable uri via the injected host resolver (web parity with circleMemberCard's
+  // `resolvePicture`: fetch + unseal through the circle media gateway). Keyed by a stable
+  // signature so the async resolve doesn't re-fire every render; a null resolver / failure
+  // leaves the row an empty placeholder — never the raw ref as text, never plaintext bytes.
+  const seesMedia = (split.sees || []).filter((a) => a.media && a.value);
+  const mediaSig = seesMedia.map((a) => `${a.key}:${JSON.stringify(a.value)}`).join('|');
+  const [picUris, setPicUris] = useState({});
+  useEffect(() => {
+    if (typeof resolvePicture !== 'function' || seesMedia.length === 0) { setPicUris({}); return; }
+    let alive = true;
+    Promise.all(seesMedia.map(async (a) => {
+      try { return [a.key, await Promise.resolve(resolvePicture(a.value))]; }
+      catch { return [a.key, null]; }
+    })).then((pairs) => { if (alive) setPicUris(Object.fromEntries(pairs.filter(([, u]) => u))); });
+    return () => { alive = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mediaSig, resolvePicture]);
 
   // Never leak the real name in the title when the split hid it from this viewer.
   const realNameVisible = (split.sees || []).some((a) => a.key === 'realName');
@@ -53,11 +73,17 @@ export default function CircleMemberCardScreen({
       ) : attrs.map((a) => (
         <View key={a.key} style={styles.attr} testID={`membercard-attr-${a.key}`}>
           <Text style={styles.attrLabel}>{a.labelKey ? t(a.labelKey) : (a.label || a.key)}</Text>
-          <Text style={[styles.attrValue, kind === 'hides' && styles.attrValueHidden]}>
-            {kind === 'sees'
-              ? (a.value != null && a.value !== '' ? String(a.value) : '—')
-              : t('circle.memberCard.hidden_marker')}
-          </Text>
+          {a.media && kind === 'sees' ? (
+            picUris[a.key]
+              ? <Image source={{ uri: picUris[a.key] }} style={styles.attrPic} accessibilityLabel={a.labelKey ? t(a.labelKey) : (a.key || '')} testID={`membercard-attr-${a.key}-img`} />
+              : <View style={styles.attrPicEmpty} testID={`membercard-attr-${a.key}-img`} />
+          ) : (
+            <Text style={[styles.attrValue, kind === 'hides' && styles.attrValueHidden]}>
+              {kind === 'sees'
+                ? (a.value != null && a.value !== '' ? String(a.value) : '—')
+                : t('circle.memberCard.hidden_marker')}
+            </Text>
+          )}
         </View>
       ))}
     </View>
@@ -127,5 +153,7 @@ const makeStyles = (theme) => StyleSheet.create({
   attrLabel:   { fontSize: 14, color: theme.color.inkSoft },
   attrValue:   { fontSize: 14, color: theme.color.ink },
   attrValueHidden: { color: theme.color.inkSoft, fontStyle: 'italic' },
+  attrPic:      { width: 48, height: 48, borderRadius: 8, backgroundColor: theme.color.line },
+  attrPicEmpty: { width: 48, height: 48, borderRadius: 8, backgroundColor: theme.color.line },
   none:        { color: theme.color.inkSoft, fontStyle: 'italic', paddingVertical: 4 },
 });

@@ -2976,8 +2976,26 @@ export function buildSkills({
     defineSkill('recordMemberPersonaProperties', async ({ parts, from }) => {
       const a = dataArgs(parts);
       if (typeof a.groupId !== 'string' || !a.groupId) return { ok: false, reason: 'groupId-required' };
-      const webid = (typeof a.memberWebid === 'string' && a.memberWebid) ? a.memberWebid : from;
+      // WHOSE row may this call write?
+      //
+      // The doc above states the invariant — "a member can only speak for their own row, never overwrite
+      // another's" — but it was enforced only by CONVENTION at one call site: the admin's peer handler
+      // substitutes the authenticated `fromAddr`. This skill is `visibility:'authenticated'`, so it is also
+      // reachable DIRECTLY over the wire, where `from` is the remote caller and `memberWebid` is whatever
+      // they typed. A member could therefore overwrite ANOTHER member's disclosed persona on the admin's
+      // roster — a forgery, not just a lost update.
+      //
+      // So: a REMOTE caller may only ever write their own row (`memberWebid` is ignored, `from` wins). The
+      // LOCAL path keeps honouring `memberWebid`, because that is exactly where the trusted substitution
+      // happens: the admin's `handlePersonaPropsUpdate` passes the authenticated peer address, and the
+      // admin adjusting their own row passes their own. Deny-by-default: when we cannot tell, use `from`.
+      const isLocalCall = !!localActor && from === localActor;
+      const requested = (typeof a.memberWebid === 'string' && a.memberWebid) ? a.memberWebid : null;
+      const webid = (isLocalCall && requested) ? requested : from;
       if (!webid) return { ok: false, reason: 'member-unresolved' };
+      if (requested && requested !== webid) {
+        return { ok: false, reason: 'may-only-write-own-row' };   // honest refusal, never a silent no-op
+      }
       const props = (a.personaProperties && typeof a.personaProperties === 'object' && !Array.isArray(a.personaProperties))
         ? a.personaProperties : null;
       if (props === null) return { ok: false, reason: 'personaProperties-required' };

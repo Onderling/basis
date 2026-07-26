@@ -69,7 +69,7 @@ import { changedReleaseKeys } from '@onderling/agent-registry';
 import { treeOf, createCrossPodRefResolver, chatEnvelopeFromStoreItem, toWireEnvelope, toWireRefEnvelope } from '@onderling/item-store';
 import { validateStoopItem, intentToCanonicalDraft } from '../lib/canonicalAdapter.js';
 
-import { validateHandle, findHandleCollision } from '../lib/handle.js';
+import { validateHandle, findHandleCollision, withHandleClaim } from '../lib/handle.js';
 import { getPrivacyNotice } from '../lib/privacyNotice.js';
 import { categoryFor, TAXONOMY } from '../lib/offeringsMatch.js';
 import { findNearDuplicate } from '../lib/dupCheck.js';
@@ -1722,12 +1722,16 @@ export function buildSkills({
       // claimant re-setting their OWN current handle is not a collision (excluded
       // by webid). Cross-circle reuse still passes: `collectCircleHandles`
       // filters the trail to this `groupId`, and the MemberMap is circle-local.
-      const taken = await collectCircleHandles({ store, members, groupId });
-      if (findHandleCollision({ candidate: v.handle, claimantWebid: from, taken })) {
-        return { error: 'invalid-handle', reason: 'handle-taken' };
-      }
-      const updated = await members.addMember({ webid: from, handle: v.handle });
-      return { handle: v.handle, member: updated, _sync: simulateSync() };
+      // SERIALISED per (circle, handle): the check and the write are separated by awaits, so two members
+      // renaming to the same handle at once would both read a free handle and both write it (story 2.1).
+      return withHandleClaim(store, groupId, v.handle, async () => {
+        const taken = await collectCircleHandles({ store, members, groupId });
+        if (findHandleCollision({ candidate: v.handle, claimantWebid: from, taken })) {
+          return { error: 'invalid-handle', reason: 'handle-taken' };
+        }
+        const updated = await members.addMember({ webid: from, handle: v.handle });
+        return { handle: v.handle, member: updated, _sync: simulateSync() };
+      });
     }, {
       description: 'Set the calling actor\'s handle (lowercase, 3–32 chars).',
       visibility:  'authenticated',
@@ -2484,13 +2488,6 @@ export function buildSkills({
       // rather than silently admitting a duplicate. The joiner re-presenting
       // their OWN handle (a re-send) is not a collision — excluded by
       // `requesterWebid`. Absent `peerDisplay` = no handle claimed → skip.
-      if (typeof a.peerDisplay === 'string' && a.peerDisplay) {
-        const takenHandles = await collectCircleHandles({ store, members, groupId: a.groupId });
-        if (findHandleCollision({ candidate: a.peerDisplay, claimantWebid: a.requesterWebid, taken: takenHandles })) {
-          return { error: 'handle-taken', reason: 'handle-taken' };
-        }
-      }
-
       // Signing pubKey for the peer path — the joiner's authenticated identity
       // is `requesterWebid`, which the admin-side basis handler
       // (`makeHandleGroupRedeemRequest`) sets from the AUTHENTICATED NKN
@@ -2499,39 +2496,57 @@ export function buildSkills({
       // (code/shareCard/…) but not `fromAddr`, so they cannot bind another
       // member's key.  In this architecture webid == the secure-mesh signing
       // address, so the joiner's signing pubKey IS `requesterWebid`.
+      // Declared OUTSIDE the handle-claim section below, which it outlives (roster upsert reads it).
       const peerSigningPubKey = a.requesterWebid;
-      const [item] = await store.addItems([{
-        type:       'membership-redemption',
-        text:       `${a.requesterWebid} redeemed (via peer) membership code for ${a.groupId}`,
-        source:     {
-          groupId:        a.groupId,
-          code:           a.code,
-          codeId:         valid.id,
-          redeemedBy:     a.requesterWebid,
-          redeemedAt:     now,
-          expiresAt:      valid.source.expiresAt,
-          confirmedBy:    from,
-          channel:        'peer',
-          // Signing pubKey (fan-out routing) — see note above; mirrors sealingPublicKey.
-          ...(peerSigningPubKey ? { signingPublicKey: peerSigningPubKey } : {}),
-          // joiner's mesh-consent token.
-          // When true, admin propagates this peer's address to
-          // other members (+ propagates other consenting members'
-          // addresses to this joiner).  When false, the joiner
-          // stays star-routed via admin.
-          ...(a.shareCard ? { shareCard: true } : {}),
-          ...(typeof a.peerDisplay === 'string' && a.peerDisplay ? { peerDisplay: a.peerDisplay } : {}),
-          // The joiner's sealing public key (forwarded by the peer bridge) → the control-agent wraps
-          // the group key to them. Admin-side: this is where the sealed household pod grants access.
-          ...(a.sealingPublicKey ? { sealingPublicKey: a.sealingPublicKey } : {}),
-          // Per-circle ADDRESS the joiner presents in THIS circle (identity step 5B/C) —
-          // forwarded by the peer bridge, recorded ONLY when its cross-circle link proof verified.
-          ...(verifiedCircleAddress ? { circleAddress: verifiedCircleAddress } : {}),
-          // Property layer — the joiner's disclosed persona properties (forwarded by the peer bridge).
-          ...(a.personaProperties && Object.keys(a.personaProperties).length ? { personaProperties: a.personaProperties } : {}),
-        },
-        visibility: 'household',
-      }], { actor: from });
+
+      // SERIALISED per (circle, handle) — the uniqueness check and the redemption write are separated by
+      // awaits, so two joiners redeeming the same invite and both claiming `@jan` each read a roster with
+      // no `jan` and each wrote one (story 2.1: three concurrent claims produced three members named jan).
+      // The lock is per (circle, handle), so unrelated joins still run concurrently.
+      const claimed = await withHandleClaim(store, a.groupId, a.peerDisplay, async () => {
+        if (typeof a.peerDisplay === 'string' && a.peerDisplay) {
+          const takenHandles = await collectCircleHandles({ store, members, groupId: a.groupId });
+          if (findHandleCollision({ candidate: a.peerDisplay, claimantWebid: a.requesterWebid, taken: takenHandles })) {
+            return { error: 'handle-taken', reason: 'handle-taken' };
+          }
+        }
+
+        const [item] = await store.addItems([{
+          type:       'membership-redemption',
+          text:       `${a.requesterWebid} redeemed (via peer) membership code for ${a.groupId}`,
+          source:     {
+            groupId:        a.groupId,
+            code:           a.code,
+            codeId:         valid.id,
+            redeemedBy:     a.requesterWebid,
+            redeemedAt:     now,
+            expiresAt:      valid.source.expiresAt,
+            confirmedBy:    from,
+            channel:        'peer',
+            // Signing pubKey (fan-out routing) — see note above; mirrors sealingPublicKey.
+            ...(peerSigningPubKey ? { signingPublicKey: peerSigningPubKey } : {}),
+            // joiner's mesh-consent token.
+            // When true, admin propagates this peer's address to
+            // other members (+ propagates other consenting members'
+            // addresses to this joiner).  When false, the joiner
+            // stays star-routed via admin.
+            ...(a.shareCard ? { shareCard: true } : {}),
+            ...(typeof a.peerDisplay === 'string' && a.peerDisplay ? { peerDisplay: a.peerDisplay } : {}),
+            // The joiner's sealing public key (forwarded by the peer bridge) → the control-agent wraps
+            // the group key to them. Admin-side: this is where the sealed household pod grants access.
+            ...(a.sealingPublicKey ? { sealingPublicKey: a.sealingPublicKey } : {}),
+            // Per-circle ADDRESS the joiner presents in THIS circle (identity step 5B/C) —
+            // forwarded by the peer bridge, recorded ONLY when its cross-circle link proof verified.
+            ...(verifiedCircleAddress ? { circleAddress: verifiedCircleAddress } : {}),
+            // Property layer — the joiner's disclosed persona properties (forwarded by the peer bridge).
+            ...(a.personaProperties && Object.keys(a.personaProperties).length ? { personaProperties: a.personaProperties } : {}),
+          },
+          visibility: 'household',
+        }], { actor: from });
+        return { item };
+      });
+      if (claimed?.error) return claimed;
+      const item = claimed.item;
       metrics?.record?.('group-code-redeemed-peer');
       // Populate the admin's MemberMap so the admin (and, via mesh-intro
       // propagation, other members) can fan out to the new joiner.  Best-effort.

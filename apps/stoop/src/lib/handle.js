@@ -79,6 +79,45 @@ export function findHandleCollision({ candidate, claimantWebid, taken = [] }) {
   return null;
 }
 
+/**
+ * Serialise a handle CLAIM for one circle, so the uniqueness rule survives concurrency.
+ *
+ * Found 2026-07-26 (story 2.1). Every claim path is read-then-write —
+ * `collectCircleHandles()` … `await` … `store.addItems()` — with awaits in between. Two joiners redeeming
+ * the same invite and both picking `@jan` therefore BOTH read a roster without `jan` and BOTH wrote: three
+ * concurrent claims produced three members named `jan`. The rule is mandatory precisely because there is no
+ * disambiguation afterwards (`NOTE-identity-and-linkability.md`), so a duplicate is unresolvable — two
+ * people simply answer to one name.
+ *
+ * A promise chain per `(circleId, handle)` — not per circle — so unrelated joins still run concurrently and
+ * a busy circle does not serialise its whole join flow. Keyed by the OWNING object (the store), so two
+ * circles hosted by one admin, and two admins in one test process, keep separate chains.
+ *
+ * SCOPE, deliberately stated: this makes the claim atomic within ONE admin process, which is where the
+ * roster lives — the admin/host is the authority that owns it. It does NOT coordinate two DIFFERENT admins
+ * of the same circle admitting joiners while partitioned from each other; that is the L3/L4 governance
+ * problem (a duplicate would surface as a divergence to reconcile), not something a local lock can solve.
+ *
+ * @param {object} owner        the roster-owning object (the item store) — identifies the chain
+ * @param {string} circleId
+ * @param {string} handle       the claimed handle (case-folded internally, so `Jan`/`jan` share a chain)
+ * @param {() => Promise<T>} fn the read-check-write critical section
+ * @returns {Promise<T>}
+ * @template T
+ */
+const _claimChains = new WeakMap();   // owner → Map<`${circleId}\n${foldedHandle}`, Promise>
+export function withHandleClaim(owner, circleId, handle, fn) {
+  if (!owner || typeof fn !== 'function') return Promise.resolve().then(() => fn?.());
+  if (!_claimChains.has(owner)) _claimChains.set(owner, new Map());
+  const chains = _claimChains.get(owner);
+  const key = `${circleId ?? ''}\n${foldHandle(handle) ?? ''}`;
+  const prev = chains.get(key) ?? Promise.resolve();
+  // The chain must never break on a rejection, or one failed claim would wedge every later one.
+  const next = prev.catch(() => {}).then(fn);
+  chains.set(key, next.catch(() => {}));
+  return next;
+}
+
 /** Constants exported for UI form-validation hints + localisation. */
 export const HANDLE_RULES = Object.freeze({
   minLen: MIN_LEN,

@@ -257,6 +257,10 @@ export {
 } from './v2/nearbyAsks.js';
 export { createAskChannel, ASK_MESSAGE, ANSWER_MESSAGE, ASK_MAX_TAGS }
                                                 from './v2/nearbyAskChannel.js';
+export {
+  roomAllows, createCard, receiveCard, createChatMessage, receiveChatMessage, createRoomChat,
+  CARD_MESSAGE, CHAT_MESSAGE, CARD_MAX_LABEL, CARD_MAX_LINE, CARD_MAX_TAGS, CHAT_MAX_TEXT,
+} from './v2/nearbyRoom.js';
 export { makeSharedCirclePeerScope } from './v2/sharedCirclePeerScope.js';
 // agent-add admin approval: proposal-like flow for
 // joining an LLM agent to a circle whose `agents` axis is admin-approval.

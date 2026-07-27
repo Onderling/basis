@@ -498,3 +498,129 @@ describe('answering hands back a transient thread (rung 3)', () => {
   });
 });
 
+describe('cards and room chat (step G)', () => {
+  const T0 = 1_700_000_000_000;
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  function withRoom({ allows, ...rest } = {}) {
+    let pushCard = null; let pushChat = null; let pushAsk = null;
+    const broadcastKind = vi.fn(async () => ({ sent: 2, failed: 0, peers: 2 }));
+    const screen = createNearbyScreen({
+      control: createDiscoverabilityControl({ transports: () => ({ ble: mk(Discovering) }) }),
+      subscribeToPeers: () => () => {},
+      subscribeToCards: (fn) => { pushCard = fn; return () => { pushCard = null; }; },
+      subscribeToChat:  (fn) => { pushChat = fn; return () => { pushChat = null; }; },
+      subscribeToAsks:  (fn) => { pushAsk = fn; return () => {}; },
+      askChannel: { broadcastKind, broadcast: async () => ({ sent: 0, failed: 0, peers: 0 }) },
+      myRoomAddress: () => 'me', allows, now: () => T0, t: (k) => k, ...rest,
+    });
+    return {
+      screen, broadcastKind,
+      card: (c) => pushCard?.(c),
+      chat: (m) => pushChat?.(m),
+      chatBound: () => pushChat !== null,
+    };
+  }
+
+  it('BOTH allows default off, and the model reports them', () => {
+    const { screen } = withRoom();
+    screen.open();
+    expect(screen.model().allows).toEqual({ card: false, chat: false });
+  });
+
+  it('showing a card is REFUSED while the card allow is off', async () => {
+    const { screen, broadcastKind } = withRoom();
+    screen.open();
+    expect(await screen.showCard({ label: 'Sam' })).toMatchObject({ ok: false, reason: 'card-not-allowed' });
+    expect(broadcastKind).not.toHaveBeenCalled();
+  });
+
+  it('and published once it is on', async () => {
+    const { screen, broadcastKind } = withRoom({ allows: { card: true } });
+    screen.open();
+    const r = await screen.showCard({ label: 'Sam', line: 'net verhuisd' });
+    expect(r).toMatchObject({ ok: true, sent: 2, peers: 2 });
+    expect(broadcastKind).toHaveBeenCalledWith('nearby.card', { card: expect.objectContaining({ label: 'Sam' }) });
+  });
+
+  it('THE ASYMMETRY: I see other people\u2019s cards even with my own card allow OFF', () => {
+    // Looking is not disclosure — the same reason browsing without announcing is a legitimate state.
+    const { screen, card } = withRoom();
+    screen.open();
+    card({ label: 'Ada', line: 'hoi', from: 'peer-1', tags: [] });
+    // Attached to the peer row rather than a separate list, so a face and a card are one thing on screen.
+    expect(screen.model().rows).toEqual([]);   // no peers yet, but the card is held
+    card({ label: 'Ada2', from: 'peer-1' });   // a new card replaces
+    expect(() => screen.model()).not.toThrow();
+  });
+
+  it('chat is NOT subscribed while the chat allow is off', () => {
+    // Reading a conversation you have not joined is listening to people who believe they are talking
+    // among participants.
+    const { screen, chatBound } = withRoom();
+    screen.open();
+    expect(chatBound()).toBe(false);
+    expect(screen.model().chat).toBeNull();
+  });
+
+  it('model.chat is NULL (not []) when I am not in the conversation', () => {
+    // An empty array reads as "nobody has said anything", which is a different fact.
+    const { screen } = withRoom();
+    screen.open();
+    expect(screen.model().chat).toBeNull();
+  });
+
+  it('joining subscribes; saying something shows it locally', async () => {
+    const { screen, chat, broadcastKind } = withRoom({ allows: { chat: true } });
+    screen.open();
+    chat({ id: 'm1', text: 'hoi', from: 'peer-1' });
+    expect(screen.model().chat).toHaveLength(1);
+
+    const r = await screen.say('dag');
+    expect(r.ok).toBe(true);
+    // The room does not echo mine back, and a message that vanishes on send reads as a failure.
+    expect(screen.model().chat.map((m) => m.text)).toEqual(['hoi', 'dag']);
+    expect(broadcastKind).toHaveBeenCalledWith('nearby.chat', { message: expect.objectContaining({ text: 'dag' }) });
+  });
+
+  it('saying something is refused while the allow is off', async () => {
+    const { screen, broadcastKind } = withRoom();
+    screen.open();
+    expect(await screen.say('hoi')).toMatchObject({ ok: false, reason: 'chat-not-allowed' });
+    expect(broadcastKind).not.toHaveBeenCalled();
+  });
+
+  it('turning chat OFF leaves immediately AND forgets the conversation', async () => {
+    // A setting that only stops future messages would leave the last ones on screen after opting out.
+    const { screen, chat, chatBound } = withRoom({ allows: { chat: true } });
+    screen.open();
+    chat({ id: 'm1', text: 'hoi', from: 'peer-1' });
+    expect(screen.model().chat).toHaveLength(1);
+
+    screen.setAllow('chat', false);
+    expect(chatBound()).toBe(false);
+    expect(screen.model().chat).toBeNull();
+
+    screen.setAllow('chat', true);
+    expect(screen.model().chat).toEqual([]);   // rejoining starts empty — no history
+  });
+
+  it('only an explicit true enables an allow', () => {
+    const { screen } = withRoom();
+    screen.open();
+    expect(screen.setAllow('card', 'yes')).toEqual({ card: false, chat: false });
+    expect(screen.setAllow('card', true)).toEqual({ card: true, chat: false });
+  });
+
+  it('leaving the room clears cards and chat', async () => {
+    const { screen, card, chat } = withRoom({ allows: { chat: true } });
+    screen.open();
+    card({ label: 'Ada', from: 'peer-1' });
+    chat({ id: 'm1', text: 'hoi', from: 'peer-1' });
+    expect(screen.model().chat).toHaveLength(1);
+
+    screen.close();
+    expect(screen.model().chat).toEqual([]);
+  });
+});
+

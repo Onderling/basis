@@ -50,13 +50,27 @@ export function createAskChannel({ listPeers = () => [], sendTo, now = () => Dat
      */
     async broadcast(ask) {
       if (!ask?.id || !isAskLive(ask, now)) return { sent: 0, failed: 0, peers: 0 };
+      return this.broadcastKind(ASK_MESSAGE, { ask });
+    },
+
+    /**
+     * Fan any room message out to everyone present.
+     *
+     * `broadcast` above is this with the ask's liveness check; cards and chat (step G) use this directly.
+     * One fan-out path rather than one per message kind, so "reaching most of a café is normal, not an
+     * error" is decided once.
+     *
+     * @param {string} kind     the namespaced message kind
+     * @param {object} body     the rest of the payload
+     */
+    async broadcastKind(kind, body) {
       const peers = listPeers() ?? [];
       let sent = 0; let failed = 0;
       for (const peer of peers) {
         const address = peer?.pubKey ?? peer?.id ?? null;
         if (!address || typeof sendTo !== 'function') { failed += 1; continue; }
-        try { await sendTo(address, { kind: ASK_MESSAGE, ask }); sent += 1; }
-        catch (err) { failed += 1; report(err, 'broadcastAsk'); }
+        try { await sendTo(address, { kind, ...body }); sent += 1; }
+        catch (err) { failed += 1; report(err, `broadcast:${kind}`); }
       }
       return { sent, failed, peers: peers.length };
     },

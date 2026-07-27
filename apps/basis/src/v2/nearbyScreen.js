@@ -28,6 +28,9 @@ import { createNetworkChangeWatcher }    from './networkChangeWatcher.js';
 import {
   evaluateIncomingAsk, isAskLive, askActions, createAsk, answerAsk, nearbyThreadDescriptor,
 } from './nearbyAsks.js';
+import {
+  roomAllows, createCard, createChatMessage, createRoomChat, CARD_MESSAGE, CHAT_MESSAGE,
+} from './nearbyRoom.js';
 
 /**
  * Row action id → locale key.
@@ -77,6 +80,9 @@ export function nearbyVisibilityKey(visibility) {
  * @param {string[]} [deps.supportedActions]  which actions this host can actually SERVICE. Defaults to all.
  * @param {(onAsk: (ask: object) => void) => (() => void)} [deps.subscribeToAsks]  incoming room asks
  * @param {object} [deps.askChannel]     from `createAskChannel` — how an ask reaches the room
+ * @param {object} [deps.allows]         per-device room allows `{card, chat}` — BOTH default off (step G)
+ * @param {(onCard: (card: object) => void) => (() => void)} [deps.subscribeToCards]
+ * @param {(onMessage: (m: object) => void) => (() => void)} [deps.subscribeToChat]
  * @param {() => string|null} [deps.myRoomAddress]  the ephemeral address I present here
  * @param {() => Promise<Record<string,object>>} [deps.getDrivers]  MY drivers — read on-device, never sent
  * @param {Function} [deps.judge]        optional injected LLM judge for semantic matching
@@ -97,6 +103,9 @@ export function createNearbyScreen({
   supportedActions = null,
   subscribeToAsks = null,
   askChannel = null,
+  allows: allowsInput = null,
+  subscribeToCards = null,
+  subscribeToChat = null,
   myRoomAddress = () => null,
   getDrivers = null,
   judge,
@@ -138,6 +147,17 @@ export function createNearbyScreen({
   /** askId → { ask, resonant, reason } */
   const asks = new Map();
   let unsubscribeAsks = null;
+
+  // ── Cards + room chat (step G) ─────────────────────────────────────────────
+  // Both behind their own per-device allow, both defaulting OFF. The allows are held here rather than read
+  // per render so a stale prop cannot re-enable a disclosure the user turned off.
+  let allows = roomAllows(allowsInput);
+  /** peer address → their card. One card per person; a new one replaces. */
+  const cards = new Map();
+  const chat = createRoomChat();
+  let unsubscribeCards = null;
+  let unsubscribeChat = null;
+  chat.subscribe(() => emit());
 
   async function ingestAsk(ask) {
     if (!ask?.id || !isAskLive(ask, now)) return;
@@ -220,7 +240,21 @@ export function createNearbyScreen({
         ...askActions(entry.ask, { resonant: entry.resonant, now }),
       }));
 
-    return { ...built, rows, asks: askRows, visibility: visibility(), isOpen: session.isOpen() };
+    // Cards are attached to the peer row they belong to, so a face and a card are one thing on screen
+    // rather than two lists the user has to reconcile.
+    const withCards = rows.map((row) => (cards.has(row.id) ? { ...row, card: cards.get(row.id) } : row));
+
+    return {
+      ...built,
+      rows: withCards,
+      asks: askRows,
+      allows,
+      // Only present when I have joined the conversation. An empty array would read as "nobody has said
+      // anything", which is a different fact from "I am not in this chat".
+      chat: allows.chat ? chat.list() : null,
+      visibility: visibility(),
+      isOpen: session.isOpen(),
+    };
   }
 
   return {
@@ -231,6 +265,22 @@ export function createNearbyScreen({
       if (typeof subscribeToAsks === 'function' && !unsubscribeAsks) {
         try { unsubscribeAsks = subscribeToAsks((ask) => { ingestAsk(ask); }) ?? null; }
         catch (err) { unsubscribeAsks = null; try { onError?.(err, 'subscribeToAsks'); } catch { /* */ } }
+      }
+      // Cards are RECEIVED regardless of my own card allow — looking is not disclosure, exactly as
+      // browsing without announcing is not (ghost mode). The allow governs publishing mine.
+      if (typeof subscribeToCards === 'function' && !unsubscribeCards) {
+        try {
+          unsubscribeCards = subscribeToCards((card) => {
+            if (card?.from) { cards.set(card.from, card); emit(); }
+          }) ?? null;
+        } catch (err) { unsubscribeCards = null; try { onError?.(err, 'subscribeToCards'); } catch { /* */ } }
+      }
+      // Chat is different on purpose: the allow governs PARTICIPATING, both directions. Reading a room
+      // conversation you have not joined is listening to people who believe they are talking among
+      // participants.
+      if (allows.chat && typeof subscribeToChat === 'function' && !unsubscribeChat) {
+        try { unsubscribeChat = subscribeToChat((m) => chat.add(m)) ?? null; }
+        catch (err) { unsubscribeChat = null; try { onError?.(err, 'subscribeToChat'); } catch { /* */ } }
       }
       emit();
     },
@@ -248,6 +298,14 @@ export function createNearbyScreen({
       // Asks are dropped with the room, for the same reason the peer list is: a closed screen holding what
       // strangers needed is a quiet record of where someone has been.
       asks.clear();
+      for (const [unsub, name] of [[unsubscribeCards, 'cards'], [unsubscribeChat, 'chat']]) {
+        if (!unsub) continue;
+        try { unsub(); } catch (err) { try { onError?.(err, `unsubscribe:${name}`); } catch { /* */ } }
+      }
+      unsubscribeCards = null;
+      unsubscribeChat = null;
+      cards.clear();
+      chat.clear();     // leaving the room forgets the conversation — there is no history to come back to
       session.close();
       emit();
     },
@@ -302,6 +360,63 @@ export function createNearbyScreen({
         peer: entry.ask.from,
         thread: nearbyThreadDescriptor(entry.ask.from),
       };
+    },
+
+    /** The per-device allows, as they stand. */
+    allows: () => allows,
+
+    /**
+     * Change an allow. Turning chat OFF leaves the conversation immediately and forgets it — a setting that
+     * only stops future messages would leave the last ones on screen after you opted out.
+     */
+    setAllow(key, value) {
+      const next = roomAllows({ ...allows, [key]: value === true });
+      const wasChat = allows.chat;
+      allows = next;
+      if (wasChat && !allows.chat) {
+        if (unsubscribeChat) {
+          try { unsubscribeChat(); } catch { /* best-effort */ }
+          unsubscribeChat = null;
+        }
+        chat.clear();
+      } else if (!wasChat && allows.chat && session.isOpen() && typeof subscribeToChat === 'function') {
+        try { unsubscribeChat = subscribeToChat((m) => chat.add(m)) ?? null; }
+        catch (err) { try { onError?.(err, 'subscribeToChat'); } catch { /* */ } }
+      }
+      emit();
+      return allows;
+    },
+
+    /** Publish my card to the room. Refused unless the card allow is on. */
+    async showCard({ label, line, tags } = {}) {
+      if (!allows.card) return { ok: false, reason: 'card-not-allowed' };
+      const built = createCard({ label, line, tags, from: safeCall(myRoomAddress, null), now });
+      if (!built.ok) return built;
+      if (!askChannel?.broadcastKind) return { ok: false, reason: 'no-channel', card: built.card };
+      try {
+        const result = await askChannel.broadcastKind(CARD_MESSAGE, { card: built.card });
+        return { ok: true, card: built.card, ...result };
+      } catch (err) {
+        try { onError?.(err, 'showCard'); } catch { /* */ }
+        return { ok: false, reason: err?.message ?? 'broadcast-failed' };
+      }
+    },
+
+    /** Say something in the room chat. The allow is enforced in `createChatMessage`, not here. */
+    async say(text) {
+      const built = createChatMessage({ text, from: safeCall(myRoomAddress, null), allows, now });
+      if (!built.ok) return built;
+      if (!askChannel?.broadcastKind) return { ok: false, reason: 'no-channel' };
+      try {
+        const result = await askChannel.broadcastKind(CHAT_MESSAGE, { message: built.message });
+        // Mine appears locally: the room does not echo it back, and a message that vanishes on send reads
+        // as a failure.
+        chat.add(built.message);
+        return { ok: true, message: built.message, ...result };
+      } catch (err) {
+        try { onError?.(err, 'say'); } catch { /* */ }
+        return { ok: false, reason: err?.message ?? 'broadcast-failed' };
+      }
     },
 
     /** Hide an ask for me. Tells the asker nothing — that is the whole point of dismissing. */

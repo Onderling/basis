@@ -276,3 +276,26 @@ directory there means the tree is broken.
 *(A silver lining: running the relink also fixed pre-existing breakage — `apps/stoop-mobile` went from 3
 failing test files to 940/940, and it had been that way for a while.)*
 
+## Mobile screens have NO test coverage — `vitest` excludes `src/screens/**`
+
+`apps/basis-mobile` (and the other RN shells) exclude `src/screens/**` from vitest: there is no JSX loader
+and no RN runtime, and the config's tagline is that a stray `import 'react-native'` should fail loud. That
+is a reasonable trade, but be clear about what it costs:
+
+**A typo in a screen is not caught by anything.** Not a test, not a linter, not a type checker — only by
+reading, or by running the app. Two real cases in the Nearby work (2026-07-27): `setTab(...)` and
+`circleAgent` / `openCircle`, all identifiers that simply do not exist in those files. Both were found by
+grepping before commit; nothing else would have.
+
+**So when you touch a `src/screens/**` file:**
+
+1. grep every identifier you introduce against the file you put it in — especially state setters and
+   navigation helpers, which are the ones that read plausibly and are named differently per screen;
+2. push the logic OUT of the screen into a non-JSX module and test THAT (the convention this repo already
+   follows — see `nearbyRow.test.js` and `nearbyScreenSeams.test.js`, which test the seam a screen consumes
+   rather than the screen);
+3. treat the screen file as a projector: if it contains a decision, that decision has no test.
+
+The web side does not have this gap — `apps/basis/web/**` is testable under happy-dom (`*.dom.test.js`), so
+a web renderer CAN be covered. Prefer putting a shared rule in a module both consume, and cover it there.
+

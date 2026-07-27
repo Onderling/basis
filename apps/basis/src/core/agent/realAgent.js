@@ -138,6 +138,7 @@ import { buildHouseholdDataSource }        from '../../../../household/src/stora
 import { householdManifest }               from '../../../../household/manifest.js';
 import { createSecureMeshEnvelopeAdapter } from '../sync/secureMeshEnvelopeAdapter.js';
 import { isGenericOpId, decodeGenericOpId } from '@onderling/app-manifest';
+import { makeSharedCirclePeerScope }        from '../../v2/sharedCirclePeerScope.js';
 
 // Deterministic seed for the real household store.  Three open items across
 // list types so `/list shopping` + the brief demo are non-empty out of the
@@ -1321,6 +1322,40 @@ export async function createRealHouseholdAgent(opts = {}) {
    * rosters to address when the caller didn't pin an explicit
    * group.  Dedupes + skips empty.
    */
+  // ── G7: live presence, scoped to what a caller already knows ────────────────
+  //
+  // `reachable-peers` answers "which peers can this device reach directly?" with a SIGNED list — which is a
+  // contact graph, not neutral routing metadata. The skill is `authenticated`, so before it is enabled the
+  // host must say what each CALLER may learn; `registerReachablePeersSkill` discloses nothing without a
+  // scope (deny-by-default, see packages/core/src/skills/reachablePeers.js).
+  //
+  // basis's answer: **you learn only about peers you already share a circle with.** A co-member already
+  // holds that roster, so telling them "I can reach Bram" adds a reachability fact rather than an identity.
+  // Everyone else learns nothing, and a withheld peer is ABSENT rather than marked, so a stranger cannot
+  // tell whether this device has peers at all.
+  //
+  // Enabled AFTER the roster seams below exist, and idempotent — `enableReachabilityOracle` returns early
+  // if the skill is already registered.
+  function _enableReachabilityOracle() {
+    try {
+      chatAgent.enableReachabilityOracle({
+        peerScope: makeSharedCirclePeerScope({
+          myCircleIds: () => _listMyKnownBuurts(),
+          rosterOf: async (circleId) => {
+            const reply = await chatAgent.invoke(
+              stoopAgent.address, 'listGroupRoster', [DataPart({ groupId: circleId })],
+            );
+            return reply?.[0]?.data?.members ?? [];
+          },
+        }),
+      });
+    } catch (err) {
+      // Presence is an enhancement, never a boot dependency: a device that cannot answer "who can I reach"
+      // still sends and receives. Log rather than fail the agent.
+      console.info('[realAgent] reachability oracle not enabled:', err?.message ?? err);
+    }
+  }
+
   async function _listMyKnownBuurts() {
     try {
       const result = await chatAgent.invoke(
@@ -2688,6 +2723,9 @@ export async function createRealHouseholdAgent(opts = {}) {
   const llmProviders = (opts.llmProviders && typeof opts.llmProviders === 'object')
     ? opts.llmProviders
     : {};
+
+  // G7 — turn on live presence now that `_listMyKnownBuurts` + the roster invoke exist. Idempotent.
+  _enableReachabilityOracle();
 
   return {
     // Part G — the REAL household app manifest (item/task vocab) is now the

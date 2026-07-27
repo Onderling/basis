@@ -21,7 +21,7 @@
  */
 
 import { matchesFilter } from './filter.js';
-import { ENTRY_KINDS, isSystemKind, kindWakes } from '@onderling/item-store';
+import { ENTRY_KINDS, isSystemKind, isAuditKind, kindWakes } from '@onderling/item-store';
 
 /** 14 days in ms — OQ-7.B retention default. */
 export const RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
@@ -168,6 +168,9 @@ export class EventLog {
   /** @type {Set<string>} */
   #mutedKeys;
 
+  /** Monotonic storage handle, assigned on append and never accepted from a caller. */
+  #seq = 0;
+
   /**
    * @param {object}                          [opts]
    * @param {LoggedEvent[]}                   [opts.initial=[]]
@@ -190,26 +193,50 @@ export class EventLog {
   }
 
   /**
-   * Append an event.  Idempotent on `id`: re-appends with the same
-   * id overwrite the existing entry (covers EventRouter re-deliveries
-   * during in-flight wake).  Prunes on every append.
+   * Append an event.
+   *
+   * `id` is the caller's **dedup key**, not a storage handle: re-appending the same id is how an
+   * idempotent re-delivery collapses (the EventRouter replays during an in-flight wake, and hold-forward
+   * flushes replay too). What happens on a repeat depends on the entry's KIND:
+   *
+   *   • **auditable kinds** (`isAuditKind` — governance, reports, key events, the agent trail):
+   *     **FIRST WRITE WINS.** The existing entry stands and the repeat is dropped. This is invariant 4b —
+   *     a bot must not be able to rewrite history. Before 2026-07-27 a repeat REPLACED the entry, so any
+   *     actor who knew an id could silently change what it said.
+   *   • **everything else** (chat and friends): replace, exactly as before. Chat relies on this — a
+   *     re-delivered message must collapse rather than duplicate.
+   *
+   * `seq` is assigned HERE and can never be supplied by a caller: separating the storage handle from the
+   * dedup key is what makes "append" mean append. A caller-supplied seq would put the ordering of the log
+   * back in the caller's hands.
+   *
+   * Prunes on every append.
    *
    * @param {LoggedEvent} event
+   * @returns {LoggedEvent|undefined} the stored entry, or undefined when nothing was written
    */
   append(event) {
-    if (!event || typeof event !== 'object') return;
-    if (typeof event.id !== 'string' || event.id === '') return;
-    // De-dup on id.
+    if (!event || typeof event !== 'object') return undefined;
+    if (typeof event.id !== 'string' || event.id === '') return undefined;
+    // De-dup on the caller's id.
     const existing = this.#events.findIndex((e) => e.id === event.id);
-    if (existing !== -1) this.#events.splice(existing, 1);
-    // Most-recent first.
-    this.#events.unshift({ ...event });
+    if (existing !== -1) {
+      // Invariant 4b: an auditable entry is immutable once written. Return the ORIGINAL so a caller that
+      // reads the result still gets a truthful entry rather than the version it hoped to write.
+      if (isAuditKind(event.type)) return this.#events[existing];
+      this.#events.splice(existing, 1);
+    }
+    // Most-recent first. `seq` is ours: strip any caller-supplied one before stamping.
+    const { seq: _ignored, ...rest } = event;
+    const stored = { ...rest, seq: (this.#seq += 1) };
+    this.#events.unshift(stored);
     this.prune();
     // Persist async — caller doesn't await.
     this.#persist(this.#events.slice()).catch(() => {});
     for (const fn of this.#subscribers) {
-      try { fn(event); } catch { /* swallow */ }
+      try { fn(stored); } catch { /* swallow */ }
     }
+    return stored;
   }
 
   /**

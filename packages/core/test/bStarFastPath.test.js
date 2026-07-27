@@ -167,3 +167,49 @@ describe('B★ fast-path — gate-parity (wire ≡ fast)', () => {
     await alice.stop(); await bob.stop();
   });
 });
+
+// ── 3. the fast path respects canReach ──────────────────────────────────────
+
+describe('B★ fast-path — an unreachable peer is NOT reachable in-process', () => {
+  // Note what is and is NOT asserted below: the change routes an unreachable peer to the WIRE, it does not
+  // make the call fail. On a bare InternalBus the wire then succeeds anyway, because the bus delivers by
+  // address and never consults `canReach` — so asserting a rejection here would be asserting something this
+  // change does not do. Whether the wire fails is the transport's business: in the Lab it does, because the
+  // chaos muzzle is on `_send`, which is exactly the path the fast path used to skip.
+  it('a transport reporting canReach:false sends the call to the wire path', async () => {
+    // The defect this pins: sharing a process is not the same as being connected. The shortcut used to
+    // deliver over a transport that was disconnected, partitioned or disabled — a partition that did not
+    // partition — and INVISIBLY, because the wire path it skipped is the one that would have failed.
+    // Found via three `integration-tests` chaos tests that had been green-by-accident.
+    const { alice, bob } = await makePair();
+    bob.register('greet', async () => [TextPart('hi')], { visibility: 'public' });
+
+    // Control: reachable ⇒ fast path, no wire traffic.
+    const requestSpy = vi.spyOn(alice.transport, 'request');
+    expect(Parts.text(await alice.invoke(bob.address, 'greet', []))).toBe('hi');
+    expect(requestSpy).not.toHaveBeenCalled();
+
+    // Now the peer's transport says it cannot be reached.
+    const bobTransport = bob.transport;
+    const original = bobTransport.canReach.bind(bobTransport);
+    bobTransport.canReach = () => false;
+    try {
+      await alice.invoke(bob.address, 'greet', [], { timeout: 2_000 });
+      // The load-bearing assertion: it went to the wire instead of running in-process.
+      expect(requestSpy).toHaveBeenCalled();
+    } finally {
+      bobTransport.canReach = original;
+    }
+  });
+
+  it('a SELF-call still takes the fast path — there is no transport to be unreachable on', async () => {
+    const { alice } = await makePair();
+    alice.register('mine', async () => [TextPart('self')], { visibility: 'public' });
+    alice.transport.canReach = () => false;
+
+    // A self-call never touches a transport in either path, so reachability is not the question being
+    // asked. Making it fail here would break in-process work for a device that is merely offline.
+    expect(Parts.text(await alice.invoke(alice.address, 'mine', []))).toBe('self');
+  });
+});
+

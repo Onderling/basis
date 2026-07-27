@@ -680,6 +680,16 @@ export class Lab {
       }
       return currentSend.call(wrapped, to, envelope);
     };
+
+    // …and the same predicate on `canReach`, or the partition is invisible to anything that ASKS before
+    // sending. `invokeAgentSkill`'s in-process fast path does exactly that: same bus + reachable ⇒ run the
+    // skill directly, never touching `_send`. Dropping packets a caller never sends is not a partition.
+    //
+    // Per-target, unlike the blanket muzzle in ToggleableTransport: a partition splits the mesh, so a peer
+    // in my own group stays reachable and only the ones across the split do not.
+    const currentCanReach = wrapped.canReach?.bind(wrapped) ?? (() => true);
+    wrapped.__lab_originalCanReach_partition = currentCanReach;
+    wrapped.canReach = (to) => (predicate(to) ? currentCanReach(to) : false);
   }
 
   #removePartitionFilter(tt) {
@@ -687,6 +697,10 @@ export class Lab {
     if (wrapped.__lab_originalSend_partition) {
       wrapped._send = wrapped.__lab_originalSend_partition;
       delete wrapped.__lab_originalSend_partition;
+    }
+    if (wrapped.__lab_originalCanReach_partition) {
+      wrapped.canReach = wrapped.__lab_originalCanReach_partition;
+      delete wrapped.__lab_originalCanReach_partition;
     }
   }
 }

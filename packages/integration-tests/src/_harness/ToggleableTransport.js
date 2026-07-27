@@ -41,6 +41,7 @@ export class ToggleableTransport {
   #wrapped;
   #originalSend;
   #originalReceive;
+  #originalCanReach;
   #enabled = true;
   #latencyMs = 0;
   #name;
@@ -75,6 +76,19 @@ export class ToggleableTransport {
       if (!this.#enabled) return;  // silently drop
       // No latency on receive — the sender already paid the latency cost.
       return this.#originalReceive(rawEnvelope);
+    };
+
+    // Reachability muzzle: a disabled transport must also SAY it cannot reach anyone.
+    //
+    // The `_send`/`_receive` patches only cover traffic that reaches the wire, and not all of it does:
+    // `invokeAgentSkill` has an in-process fast path that runs a skill directly when both agents share a
+    // bus. It consults `canReach` (and nothing else) before taking that shortcut, so without this a
+    // partitioned pair kept talking and every chaos scenario silently passed. Muzzling the wire without
+    // muzzling the claim is what made `partitionMesh` and `dropTransport` look correct while doing nothing.
+    this.#originalCanReach = wrappedTransport.canReach?.bind(wrappedTransport) ?? (() => true);
+    wrappedTransport.canReach = (peerAddress) => {
+      if (!this.#enabled) return false;
+      return this.#originalCanReach(peerAddress);
     };
   }
 
@@ -111,10 +125,11 @@ export class ToggleableTransport {
     this.#latencyMs = ms;
   }
 
-  /** Restore the wrapped transport's original `_send` / `_receive`. */
+  /** Restore the wrapped transport's original `_send` / `_receive` / `canReach`. */
   restore() {
     this.#wrapped._send    = this.#originalSend;
     this.#wrapped._receive = this.#originalReceive;
+    this.#wrapped.canReach = this.#originalCanReach;
     this.#enabled = true;
     this.#latencyMs = 0;
   }

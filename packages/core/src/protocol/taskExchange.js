@@ -174,10 +174,19 @@ function _fastPathTarget(callerAgent, peerId, skillId, t, opts) {
 
   let targetAgent;
   if (peerId === callerAgent.address) {
-    targetAgent = callerAgent;                       // self-call
+    targetAgent = callerAgent;                       // self-call — no transport involved either way
   } else {
     const peerT = t.peerTransport?.(peerId);
     if (!peerT || peerT.bus !== t.bus) return null;  // not a same-bus peer
+    // The transport says it cannot reach this peer, so neither can we.
+    //
+    // Sharing a process is not the same as being connected. Without this check the shortcut delivers over a
+    // transport that is disconnected, partitioned or disabled — a partition that does not partition — and it
+    // does so INVISIBLY, because the wire path it skipped is the one that would have failed. `canReach` is
+    // the port's own answer to "can I deliver to that peer right now", and an optimisation is only allowed
+    // to be faster, never to be reachable where the thing it optimises is not.
+    if (typeof peerT.canReach === 'function' && !peerT.canReach(peerId)) return null;
+    if (typeof t.canReach     === 'function' && !t.canReach(peerId))     return null;
     targetAgent = peerT._ownerAgent;
   }
   if (!targetAgent || typeof targetAgent.skills?.get !== 'function') return null;

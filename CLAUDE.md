@@ -73,6 +73,11 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
 - **Record a decision** when a choice closes off alternatives / would be re-litigated / shapes architecture (→ `docs/decisions.md`) or org (→ private) — [`decision-log.md`](docs/conventions/decision-log.md).
 
 ## How to work
+- **Go through the SURFACE, never the transport.** App/shell code must not construct or drive
+  `MdnsTransport` / `BleTransport` / `NknTransport` directly. Transports are adapters behind the mesh
+  builder (`buildMeshTransports` → `createMeshAgent`) and the `Peer` façade; discoverability, advertising
+  and routing are properties the surface exposes, not knobs an app reaches past it to set. Reaching for a
+  transport is the signal that the surface is missing an affordance — add it there.
 - **An idea is only dropped when Frits drops it.** Silence is not rejection. If you raise an option, a
   caveat, or a finding and it goes unanswered, it stays OPEN — carry it into the design/plan doc as an open
   item rather than quietly dropping it because the conversation moved on. When a thread has accumulated more

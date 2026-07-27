@@ -70,6 +70,10 @@ import { treeOf, createCrossPodRefResolver, chatEnvelopeFromStoreItem, toWireEnv
 import { validateStoopItem, intentToCanonicalDraft } from '../lib/canonicalAdapter.js';
 
 import { validateHandle, findHandleCollision, withHandleClaim } from '../lib/handle.js';
+import { resolveMemberAddress, makeFallbackReporter } from '../lib/memberAddress.js';
+
+/** G13 — one reporter per process, deduping per (circle, member, reason) so the signal stays readable. */
+const _reportAddressFallback = makeFallbackReporter();
 import { getPrivacyNotice } from '../lib/privacyNotice.js';
 import { categoryFor, TAXONOMY } from '../lib/offeringsMatch.js';
 import { findNearDuplicate } from '../lib/dupCheck.js';
@@ -516,7 +520,7 @@ async function _fanOutToMembers({ members, chat, selfWebid, subtype, threadId, b
  * @param {object} a.envelope          the conforming kring-chat-message wire envelope
  * @returns {Promise<{sent:number, attempted:number, errors:Array<{webid:string,reason:string}>}>}
  */
-async function _fanOutViaReliableSend({ members, reliableSend, selfWebid, envelope, only = null }) {
+async function _fanOutViaReliableSend({ members, reliableSend, selfWebid, envelope, only = null, circleId = null }) {
   const list = await members.list();
   const allow = only instanceof Set ? only : (Array.isArray(only) ? new Set(only) : null);
   const targets = new Map();      // routable address → webid (dedupe by address)
@@ -525,14 +529,15 @@ async function _fanOutViaReliableSend({ members, reliableSend, selfWebid, envelo
     const webid = typeof m === 'string' ? m : (m?.webid ?? m?.webId ?? null);
     if (!webid || webid === selfWebid) continue;
     if (allow && !allow.has(webid)) continue;  // narrowed fan (e.g. reports → admins only)
-    let addr = (m && typeof m === 'object' && typeof m.pubKey === 'string' && m.pubKey) ? m.pubKey : null;
-    if (!addr) {
-      try { const peer = await members.resolveByWebid(webid); addr = peer?.pubKey ?? null; } catch { addr = null; }
-    }
-    // basis circles bind webid === the member's chat pubKey (the routable secure-agent
-    // address the harness/prod route on), so a webid is a valid fallback address when the
-    // (lossy) MemberMap has no captured pubKey — strictly more reachable than chat.send.
-    if (!addr && typeof webid === 'string' && webid) addr = webid;
+    // G13 step C — prefer the member's PER-CIRCLE address, so a relay no longer sees one identity across
+    // every circle. `resolveMemberAddress` owns the ladder (circleAddress → pubKey → webid) so the two fan
+    // paths cannot drift, and it REPORTS each fallback: that report is how we learn when step D (dropping
+    // the fallback) is safe rather than a guess.
+    const { addr } = await resolveMemberAddress(m, {
+      circleId,
+      resolveByWebid: (w) => members.resolveByWebid(w),
+      onFallback: _reportAddressFallback,
+    });
     if (!addr) { unresolved.push(webid); continue; }
     if (!targets.has(addr)) targets.set(addr, webid);
   }
@@ -1057,7 +1062,7 @@ export function buildSkills({
     // chat.send fallback would produce as the receiver's payload (routed by `subtype`).
     const wire = envelope ?? { subtype: kind, ...extras };
     const { sent, attempted, errors } = reliableSend
-      ? await _fanOutViaReliableSend({ members, reliableSend, selfWebid: from, envelope: wire, only })
+      ? await _fanOutViaReliableSend({ members, reliableSend, selfWebid: from, envelope: wire, only, circleId })
       : await _fanOutToMembers({ members, chat, selfWebid: from, subtype: kind, threadId: circleId, body, extras, only });
     if (metric) metrics?.record?.(metric);
     return { sent, attempted, errors };

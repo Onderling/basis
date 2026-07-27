@@ -94,13 +94,33 @@ export class InternalTransport extends Transport {
   async connect() {
     (this.#bus.__peers ??= new Map()).set(this.address, this);
     this.#bus.on(`msg:${this.address}`, this.#listener);
+    // G13 — re-bind every alias. Same rule as every other transport: a (re)connect must restore the
+    // per-circle addresses too, or a device is reachable per-circle exactly once.
+    await this._rebindAddresses();
     this.emit('connect', { address: this.address });
   }
 
   async disconnect() {
-    this.#bus.__peers?.delete(this.address);
-    this.#bus.off(`msg:${this.address}`, this.#listener);
+    for (const addr of this.addresses) {
+      this.#bus.__peers?.delete(addr);
+      this.#bus.off(`msg:${addr}`, this.#listener);
+    }
     this.emit('disconnect');
+  }
+
+  // ── G13 aliases ─────────────────────────────────────────────────────────────
+  // The set + public API live in the base `Transport`; binding on this bus is exactly what `connect()`
+  // does for the primary address — one map entry and one listener — so there is no second mechanism.
+  get supportsAliases() { return true; }
+
+  async _bindAddress(address) {
+    (this.#bus.__peers ??= new Map()).set(address, this);
+    this.#bus.on(`msg:${address}`, this.#listener);
+  }
+
+  _unbindAddress(address) {
+    this.#bus.__peers?.delete(address);
+    this.#bus.off(`msg:${address}`, this.#listener);
   }
 
   async _put(to, envelope) {

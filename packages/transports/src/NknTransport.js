@@ -64,6 +64,20 @@ export class NknTransport extends Transport {
     };
   }
 
+  // ── G13 aliases — DELIBERATELY UNSUPPORTED (2026-07-27) ─────────────────────
+  //
+  // An NKN client IS an address: `MultiClient` is constructed from one seed, and a per-circle address is
+  // derived from a DIFFERENT seed (`deriveCircleSeed`). So answering at N addresses means N clients — N
+  // sets of websocket connections to NKN nodes, N sub-client fan-outs — which on a phone is a real battery
+  // and memory cost, not a detail.
+  //
+  // That is a decision to take deliberately, not to make by accident, so this transport leaves
+  // `supportsAliases` false and `addAddress()` reports `{ok:false, reason:'aliases-unsupported'}`. A caller
+  // wiring per-circle addressing can therefore SEE that this path is not ready, rather than sending to an
+  // address nobody answers — which is exactly the silent hole that gated step C.
+  //
+  // Implementing it later means one client per circle address, and should be measured before it ships.
+
   async connect() {
     // Lazy-load nkn-sdk if not injected (Node.js path).
     this.#nknLib = this.#opts.nknLib

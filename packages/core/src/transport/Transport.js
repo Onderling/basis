@@ -81,6 +81,9 @@ const REQ_TIMEOUT = 30_000;  // ms
  */
 export class Transport extends Emitter {
   #address;
+
+  /** G13 — extra addresses this transport answers to (per-circle / per-contact). */
+  #aliases = new Set();
   #identity;
   #securityLayer        = null;
   #receiveHandler       = null;
@@ -106,6 +109,66 @@ export class Transport extends Emitter {
 
   // Allow subclasses to set address after construction (e.g. after connect()).
   _setAddress(addr) { this.#address = addr; }
+
+  // ── Additional addresses (G13) ───────────────────────────────────────────────
+  //
+  // A member presents a DIFFERENT address in every circle, so a device has to be reachable at several at
+  // once. That is a property of the PORT, not of one adapter — putting it here means there is one alias
+  // set, one public API and one replay rule, and an adapter only says HOW to bind. Implementing it per
+  // transport would be three subtly different answers to the same question.
+  //
+  // An adapter opts in by overriding `supportsAliases` + `_bindAddress`/`_unbindAddress`, and calls
+  // `_rebindAddresses()` after a (re)connect — a fresh connection knows nothing about the last one, so
+  // without replay a device is reachable per-circle exactly once, until the first blip.
+
+  /** Does this transport actually support extra addresses? Adapters that implement binding override this. */
+  get supportsAliases() { return false; }
+
+  /** Every address this transport answers to — the primary first, then aliases in insertion order. */
+  get addresses() { return [this.#address, ...this.#aliases]; }
+
+  /**
+   * Also answer at `address`.
+   *
+   * Returns a RESULT rather than throwing, because "this transport cannot do aliases" is a normal
+   * configuration fact a caller needs to branch on (per-circle addressing can only be enabled once every
+   * transport a recipient listens on can bind one) — not an error.
+   *
+   * @param {string} address
+   * @returns {Promise<{ok: boolean, reason?: string}>}
+   */
+  async addAddress(address) {
+    if (typeof address !== 'string' || !address) return { ok: false, reason: 'invalid-address' };
+    if (address === this.#address) return { ok: true };            // the primary is already ours
+    if (!this.supportsAliases) return { ok: false, reason: 'aliases-unsupported' };
+    if (this.#aliases.has(address)) return { ok: true };            // idempotent
+    this.#aliases.add(address);
+    try { await this._bindAddress(address); } catch (err) {
+      // Keep it in the set: a bind can fail because we are offline, and the replay on reconnect is
+      // precisely what should fix that. Report so a caller is not told it worked.
+      return { ok: false, reason: err?.message ?? 'bind-failed' };
+    }
+    return { ok: true };
+  }
+
+  /** Stop answering at `address`. Idempotent. */
+  removeAddress(address) {
+    if (!this.#aliases.delete(address)) return;
+    try { this._unbindAddress(address); } catch { /* unbinding is best-effort; it is gone from the set */ }
+  }
+
+  /** Re-bind every alias — adapters call this after a (re)connect. */
+  async _rebindAddresses() {
+    for (const alias of this.#aliases) {
+      try { await this._bindAddress(alias); } catch { /* a failed replay is retried on the next connect */ }
+    }
+  }
+
+  /** @protected adapters override: start listening at `address`. */
+  async _bindAddress(_address) {}
+
+  /** @protected adapters override: stop listening at `address`. */
+  _unbindAddress(_address) {}
 
   // ── Security layer ──────────────────────────────────────────────────────────
 

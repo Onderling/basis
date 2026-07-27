@@ -35,9 +35,6 @@ const PUSH_ACK_TIMEOUT_MS = 5_000;
 export class RelayTransport extends Transport {
   #ws        = null;
   #relayUrl;
-
-  /** G13 — additional addresses this device answers to (per-circle / per-contact), replayed on reconnect. */
-  #aliases = new Set();
   #backoffMs = 1_000;
   #stopped   = false;
   #connectPromise = Promise.resolve();  // starts resolved; reset on close
@@ -58,33 +55,19 @@ export class RelayTransport extends Transport {
     this.#relayUrl = opts.relayUrl;
   }
 
-  /**
-   * G13 step B — ALSO be reachable at a per-circle (or per-contact) address.
-   *
-   * A member presents a different address in every circle; those addresses are derived, proven at join and
-   * stored on the roster, but were never routable. Registering them here is what makes them so. The relay
-   * accepts several per socket (step A), and the primary — this device's own pubKey — stays registered, so
-   * nothing that addresses it the old way breaks while senders migrate (step C).
-   *
-   * Idempotent, and safe before the socket is open: unregistered aliases are replayed on every (re)connect,
-   * which is also what makes them survive a reconnect without the caller re-asking.
-   *
-   * @param {string} address  a derived address (`deriveCircleAddress(profileSeed, 'circle:<id>')`, …)
-   */
-  async addAddress(address) {
-    if (typeof address !== 'string' || !address || address === this.address) return;
-    if (this.#aliases.has(address)) return;
-    this.#aliases.add(address);
-    if (this.connected) this.#ws.send(JSON.stringify({ type: 'register', address }));
+  // G13 — extra addresses. The alias SET, the public API and the replay rule live in the base `Transport`
+  // (one implementation for every adapter); this only says how a relay binds one: another `register` frame
+  // on the same socket, which the relay accepts (step A).
+  get supportsAliases() { return true; }
+
+  async _bindAddress(address) {
+    if (!this.connected) return;      // replayed by `_rebindAddresses()` on the next connect
+    this.#ws.send(JSON.stringify({ type: 'register', address }));
   }
 
-  /** Stop being reachable at an alias. Takes effect on the relay only after a reconnect — a socket cannot
-   *  un-register one address today, and inventing a message for it would need a relay change we do not
-   *  need yet. Removing it here stops it being replayed. */
-  removeAddress(address) { this.#aliases.delete(address); }
-
-  /** Every address this transport answers to — the primary plus its aliases. */
-  get addresses() { return [this.address, ...this.#aliases]; }
+  // A socket cannot un-register a single address today, so removal takes effect on the next reconnect —
+  // the base class has already dropped it from the replay set, which is what makes that true.
+  _unbindAddress(_address) {}
 
   /** True when the WebSocket is open and registered with the relay. */
   get connected() { return this.#ws?.readyState === 1; }
@@ -255,11 +238,8 @@ export class RelayTransport extends Transport {
     ws.onopen = () => {
       this.#backoffMs = 1_000;
       ws.send(JSON.stringify({ type: 'register', address: this.address }));
-      // Replay every alias on each (re)connect — a new socket knows nothing about the last one, so this is
-      // what makes per-circle reachability survive a drop rather than quietly ending at the first one.
-      for (const alias of this.#aliases) {
-        ws.send(JSON.stringify({ type: 'register', address: alias }));
-      }
+      // Replay every alias — a new socket knows nothing about the last one.
+      this._rebindAddresses();
     };
 
     ws.onmessage = (event) => {

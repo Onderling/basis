@@ -1122,6 +1122,24 @@ export default function CircleLauncherScreen({
 
   const closeCircle = () => { setActiveCircle(null); setSelected(null); setItems([]); setView('list'); };
 
+  /**
+   * Open the pairwise channel an answer created — rung 3 of the escalation ladder.
+   *
+   * A TRANSIENT thread, deliberately not written to contacts. Rung 3 is "we are talking now"; rung 4 is
+   * "I can reach you from home", and that is a deliberate exchange of the transport→address map the user
+   * has not made. Persisting a café encounter into the contact list climbs a rung nobody chose.
+   */
+  const openNearbyThread = useCallback((thread) => {
+    if (!thread?.peerAddress) return;
+    setContactThread({
+      contactId: thread.peerAddress,
+      name: thread.label,
+      peerAddr: thread.peerAddress,
+      transient: true,
+    });
+    setView('contacten');
+  }, []);
+
   // Nearby row actions (Nearby step E, host wiring).
   //
   // Only the two the app can actually carry out are offered — `supportedActions` in `NearbyScreenHost`
@@ -1532,6 +1550,7 @@ export default function CircleLauncherScreen({
         bundle={bundle}
         onBack={() => setView('list')}
         onAction={handleNearbyAction}
+        onOpenThread={openNearbyThread}
       />
     );
   }
@@ -3957,8 +3976,13 @@ function subscribeToNetworkChange(fn) {
 // it is deliberately tied to the React lifecycle rather than to a button, because the failure mode is a
 // user who *thinks* they left. Navigating away, backgrounding, or a crash mid-render all unmount, and all
 // must stop the announcement.
-function NearbyScreenHost({ bundle, onBack, onAction, onAskAction, onCompose }) {
+function NearbyScreenHost({ bundle, onBack, onAction, onOpenThread }) {
   const [model, setModel] = useState(null);
+  // View state, not model state: whether THIS device currently has a text box open says nothing about
+  // the room. `answering` holds the ask id being replied to.
+  const [composing, setComposing] = useState(false);
+  const [answering, setAnswering] = useState(null);
+  const [notice, setNotice] = useState(null);
 
   const screen = useMemo(() => createNearbyScreen({
     control:            bundle?.discoverability ?? null,
@@ -3978,13 +4002,41 @@ function NearbyScreenHost({ bundle, onBack, onAction, onAskAction, onCompose }) 
     return () => { off(); screen.close(); };
   }, [screen]);
 
+  const submitAsk = useCallback(async (text) => {
+    const r = await screen.askRoom({ text });
+    setComposing(false);
+    // Names the REAL reach — "asked 3 of 5 nearby" — rather than implying the whole room heard it.
+    setNotice(r.ok ? { key: 'ask_sent', vars: { sent: r.sent, peers: r.peers } } : { key: 'ask_expired' });
+  }, [screen]);
+
+  const submitAnswer = useCallback(async (text) => {
+    const askId = answering;
+    setAnswering(null);
+    const r = await screen.answer(askId, text);
+    if (!r.ok) { setNotice({ key: 'ask_expired' }); return; }
+    // Say plainly what just happened: answering is the disclosure.
+    setNotice({ key: 'answer_sent' });
+    if (r.thread) onOpenThread?.(r.thread);
+  }, [screen, answering, onOpenThread]);
+
+  const askAction = useCallback((action, ask) => {
+    if (action === 'dismiss-ask') { screen.dismissAsk(ask?.id); return; }
+    if (action === 'answer-ask')  { setNotice(null); setAnswering(ask?.id ?? null); }
+  }, [screen]);
+
   return (
     <NearbyScreen
       model={model}
       onBack={onBack}
       onAction={onAction}
-      onAskAction={onAskAction}
-      onCompose={onCompose}
+      onAskAction={askAction}
+      onCompose={() => { setNotice(null); setComposing(true); }}
+      composing={composing}
+      answering={!!answering}
+      notice={notice}
+      onSubmitAsk={submitAsk}
+      onSubmitAnswer={submitAnswer}
+      onCancel={() => { setComposing(false); setAnswering(null); }}
     />
   );
 }
@@ -4000,7 +4052,7 @@ function NearbyScreenHost({ bundle, onBack, onAction, onAskAction, onCompose }) 
 
 // `NEARBY_ACTION_LABELS` + `nearbyVisibilityKey` are imported from the basis app above — one definition,
 // so web and mobile cannot drift on what a row offers or on when the "still visible" warning fires.
-function NearbyScreen({ model, onBack, onAction, onAskAction, onCompose }) {
+function NearbyScreen({ model, onBack, onAction, onAskAction, onCompose, composing, notice, onSubmitAsk, answering, onSubmitAnswer, onCancel }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const rows       = Array.isArray(model?.rows) ? model.rows : [];
@@ -4008,6 +4060,9 @@ function NearbyScreen({ model, onBack, onAction, onAskAction, onCompose }) {
   const headerText = model?.headerLabel ?? '';
   const visKey     = nearbyVisibilityKey(model?.visibility);
   const asks       = Array.isArray(model?.asks) ? model.asks : [];
+  const [draft, setDraft] = useState('');
+  // Cleared whenever the composer opens or closes, so a previous question is never re-sent by accident.
+  useEffect(() => { setDraft(''); }, [composing, answering]);
   return (
     <View style={styles.page} testID="circle-nearby-screen">
       <View style={styles.bar}>
@@ -4072,9 +4127,45 @@ function NearbyScreen({ model, onBack, onAction, onAskAction, onCompose }) {
           would make it a recommender, and would leak my own drivers into what I am able to see. */}
       <View style={styles.nearbyAsks} testID="nearby-asks">
         <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.asks_title')}</Text>
-        <Pressable onPress={onCompose} accessibilityRole="button" testID="nearby-ask-compose" style={styles.nearbyAction}>
-          <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.ask_compose')}</Text>
-        </Pressable>
+        {composing || answering ? (
+          // Inline, not a modal: the room stays visible while you type. You are about to say something out
+          // loud in a place where you can see who is standing there.
+          <View style={styles.nearbyComposer} testID="nearby-ask-composer">
+            <TextInput
+              style={styles.nearbyInput}
+              value={draft}
+              onChangeText={setDraft}
+              maxLength={280}
+              placeholder={t('circle.nearbyScreen.ask_placeholder')}
+              testID="nearby-ask-input"
+              autoFocus
+            />
+            <Pressable
+              onPress={() => {
+                const text = draft.trim();
+                if (!text) return;
+                if (answering) onSubmitAnswer?.(text); else onSubmitAsk?.(text);
+              }}
+              accessibilityRole="button"
+              testID="nearby-ask-send"
+              style={styles.nearbyAction}
+            >
+              <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.ask_send')}</Text>
+            </Pressable>
+            <Pressable onPress={onCancel} accessibilityRole="button" testID="nearby-ask-cancel" style={styles.nearbyAction}>
+              <Text style={styles.nearbyActionText}>{t('circle.back')}</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable onPress={onCompose} accessibilityRole="button" testID="nearby-ask-compose" style={styles.nearbyAction}>
+            <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.ask_compose')}</Text>
+          </Pressable>
+        )}
+        {notice ? (
+          <Text style={styles.muted} accessibilityRole="text" testID={`nearby-notice-${notice.key}`}>
+            {t(`circle.nearbyScreen.${notice.key}`, notice.vars ?? {})}
+          </Text>
+        ) : null}
         {asks.length === 0 ? (
           <Text style={styles.muted}>{t('circle.nearbyScreen.asks_empty')}</Text>
         ) : asks.map((entry) => (
@@ -4311,6 +4402,8 @@ const makeStyles = (theme) => StyleSheet.create({
   nearbyActions:     { flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 },
   nearbyAsks:        { marginTop: 12, paddingHorizontal: 2 },
   nearbyAsk:         { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: theme.color.line },
+  nearbyComposer:    { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginTop: 6 },
+  nearbyInput:       { flexGrow: 1, minWidth: 160, paddingVertical: 6, paddingHorizontal: 8, borderWidth: 1, borderColor: theme.color.line, borderRadius: 6, color: theme.color.ink, marginRight: 6 },
   nearbyAction:      { paddingVertical: 6, paddingHorizontal: 10, marginRight: 6, marginTop: 4, borderRadius: 6, borderWidth: 1, borderColor: theme.color.line },
   nearbyActionText:  { fontSize: 13, color: theme.color.ink },
   // "ON YOUR LIST" section on CircleDetail.

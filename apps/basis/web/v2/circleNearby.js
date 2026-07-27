@@ -24,6 +24,7 @@
  */
 
 import { NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, nearbyVisibilityKey } from '../../src/v2/nearbyScreen.js';
+import { ASK_MAX_TEXT } from '../../src/v2/nearbyAsks.js';
 
 export function renderCircleNearby(container, {
   model = null,
@@ -32,6 +33,9 @@ export function renderCircleNearby(container, {
   onAction = null,
   onAskAction = null,
   onCompose = null,
+  composing = false,
+  onSubmitAsk = null,
+  notice = null,
 } = {}) {
   const tr = typeof t === 'function' ? t : (k) => k;
   container.innerHTML = '';
@@ -159,12 +163,52 @@ export function renderCircleNearby(container, {
   asksTitle.textContent = tr('circle.nearbyScreen.asks_title');
   asksBlock.appendChild(asksTitle);
 
-  const askBtn = document.createElement('button');
-  askBtn.type = 'button';
-  askBtn.className = 'circle-nearby__ask-compose';
-  askBtn.textContent = tr('circle.nearbyScreen.ask_compose');
-  askBtn.addEventListener('click', () => { if (typeof onCompose === 'function') onCompose(); });
-  asksBlock.appendChild(askBtn);
+  if (composing) {
+    // Inline, not a modal: the room stays visible while you type, which is the honest framing — you are
+    // about to say something out loud in a place where you can see who is standing there.
+    const form = document.createElement('form');
+    form.className = 'circle-nearby__ask-form';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'circle-nearby__ask-input';
+    input.maxLength = ASK_MAX_TEXT;
+    input.placeholder = tr('circle.nearbyScreen.ask_placeholder');
+    form.appendChild(input);
+
+    const send = document.createElement('button');
+    send.type = 'submit';
+    send.className = 'circle-nearby__ask-send';
+    send.textContent = tr('circle.nearbyScreen.ask_send');
+    form.appendChild(send);
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+      if (typeof onSubmitAsk === 'function') onSubmitAsk(text);
+    });
+    asksBlock.appendChild(form);
+    // Focus after append, so opening the composer puts the caret where the user is already looking.
+    try { input.focus(); } catch { /* not focusable in a detached container */ }
+  } else {
+    const askBtn = document.createElement('button');
+    askBtn.type = 'button';
+    askBtn.className = 'circle-nearby__ask-compose';
+    askBtn.textContent = tr('circle.nearbyScreen.ask_compose');
+    askBtn.addEventListener('click', () => { if (typeof onCompose === 'function') onCompose(); });
+    asksBlock.appendChild(askBtn);
+  }
+
+  // Result of the last action — the real reach of a broadcast, or that an answer just made me visible.
+  if (notice) {
+    const el = document.createElement('div');
+    el.className = 'circle-nearby__notice';
+    el.dataset.notice = notice.key;
+    el.setAttribute('role', 'status');
+    el.textContent = tr(`circle.nearbyScreen.${notice.key}`, notice.vars ?? {});
+    asksBlock.appendChild(el);
+  }
 
   if (!asks.length) {
     const none = document.createElement('div');

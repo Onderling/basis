@@ -3076,15 +3076,68 @@ function showNearby() {
     onError: (err, phase) => console.warn(`[nearby] ${phase}:`, err?.message ?? err),
   });
 
+  // Composer + last-action notice are view state, not model state — the controller is about the room, not
+  // about whether this browser currently has a text box open.
+  let composing = false;
+  let notice = null;
+
   const draw = (model) => renderCircleNearby(rootEl, {
-    model, t,
+    model, t, composing, notice,
     onBack: () => { closeNearby(); showLauncher(); },
     onAction: handleNearbyAction,
+    onCompose: () => { composing = true; notice = null; draw(nearbyScreen.model()); },
+    onSubmitAsk: async (text) => {
+      const r = await nearbyScreen.askRoom({ text });
+      composing = false;
+      // Name the REAL reach. "Asked 3 of 5 nearby" is true; "sent" implies the whole room heard it.
+      notice = r.ok
+        ? { key: 'ask_sent', vars: { sent: r.sent, peers: r.peers } }
+        : { key: 'ask_expired' };
+      draw(nearbyScreen.model());
+    },
+    onAskAction: handleNearbyAskAction,
   });
+
+  // Answering is what reveals me, so it needs its own handler rather than riding the row actions.
+  async function handleNearbyAskAction(action, ask) {
+    if (action === 'dismiss-ask') { nearbyScreen.dismissAsk(ask?.id); return; }
+    if (action !== 'answer-ask') return;
+
+    const text = typeof window !== 'undefined' && typeof window.prompt === 'function'
+      ? window.prompt(t('circle.nearbyScreen.ask_placeholder'))
+      : null;
+    if (!text || !text.trim()) return;          // cancelling must not disclose
+
+    const r = await nearbyScreen.answer(ask?.id, text.trim());
+    if (!r.ok) { notice = { key: 'ask_expired' }; draw(nearbyScreen.model()); return; }
+
+    notice = { key: 'answer_sent' };
+    draw(nearbyScreen.model());
+    if (r.thread) openNearbyThread(r.thread);
+  }
 
   nearbyScreen.subscribe(draw);
   nearbyScreen.open();
   draw(nearbyScreen.model());
+}
+
+/**
+ * Open the pairwise channel an answer created — rung 3 of the escalation ladder.
+ *
+ * Seeded straight into the in-memory thread cache and NOT written to contacts. That is the whole
+ * distinction: rung 3 is "we are talking now", rung 4 is "I can reach you from home", and the second is a
+ * deliberate exchange of the transport→address map that the user has not made yet. Saving a café encounter
+ * into the contact list would climb a rung nobody chose.
+ */
+function openNearbyThread(thread) {
+  if (!thread?.peerAddress) return;
+  if (!contactThreads.has(thread.peerAddress)) {
+    contactThreads.set(thread.peerAddress, {
+      name: thread.label, peerAddr: thread.peerAddress, messages: [], transient: true,
+    });
+  }
+  closeNearby();
+  showContactThread(thread.peerAddress);
 }
 
 function closeNearby() {

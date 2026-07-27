@@ -478,3 +478,23 @@ describe('acting on asks (step F)', () => {
   });
 });
 
+describe('answering hands back a transient thread (rung 3)', () => {
+  const T0 = 1_700_000_000_000;
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  it('the answer result carries a TRANSIENT thread for the host to open', async () => {
+    let pushAsk = null;
+    const screen = createNearbyScreen({
+      subscribeToAsks: (fn) => { pushAsk = fn; return () => {}; },
+      askChannel: { broadcast: async () => ({ sent: 1, failed: 0, peers: 1 }), sendAnswer: async () => ({ ok: true }) },
+      myRoomAddress: () => 'me', now: () => T0, t: (k) => k,
+    });
+    screen.open();
+    pushAsk({ id: 'ask-1', text: 'pump?', tags: [], from: 'them-addr', createdAt: T0, expiresAt: T0 + 60_000 });
+    await flush();
+
+    const r = await screen.answer('ask-1', 'ik heb er een');
+    expect(r.thread).toMatchObject({ peerAddress: 'them-addr', transient: true, origin: 'nearby-answer' });
+  });
+});
+

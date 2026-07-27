@@ -211,3 +211,54 @@ describe('asks in the room (step F)', () => {
   });
 });
 
+describe('the ask composer', () => {
+  it('shows the compose button when closed, and the input when open', () => {
+    expect(render(model({ asks: [] })).querySelector('.circle-nearby__ask-form')).toBeNull();
+
+    const el = render(model({ asks: [] }), { composing: true });
+    expect(el.querySelector('.circle-nearby__ask-input').placeholder)
+      .toBe('circle.nearbyScreen.ask_placeholder');
+    expect(el.querySelector('.circle-nearby__ask-compose')).toBeNull();
+  });
+
+  it('the room stays visible while composing — you can see who is standing there', () => {
+    const el = render(model({
+      asks: [{ ask: { id: 'a1', text: 'wifi code?' }, resonant: false, actions: [] }],
+    }), { composing: true });
+    expect(el.querySelector('.circle-nearby__ask-form')).toBeTruthy();
+    expect(el.querySelectorAll('.circle-nearby__ask')).toHaveLength(1);
+  });
+
+  it('submitting reports the text; an empty submit does nothing', () => {
+    const onSubmitAsk = vi.fn();
+    const el = render(model(), { composing: true, onSubmitAsk });
+    const form = el.querySelector('.circle-nearby__ask-form');
+    const input = el.querySelector('.circle-nearby__ask-input');
+
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    expect(onSubmitAsk).not.toHaveBeenCalled();     // nothing typed → nothing said
+
+    input.value = '  anyone got a pump?  ';
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    expect(onSubmitAsk).toHaveBeenCalledWith('anyone got a pump?');
+  });
+
+  it('caps the input at the ask length so the limit is felt, not discovered', () => {
+    const el = render(model(), { composing: true });
+    expect(el.querySelector('.circle-nearby__ask-input').maxLength).toBe(280);
+  });
+
+  it('the notice names the REAL reach, and is announced', () => {
+    const el = render(model(), { notice: { key: 'ask_sent', vars: { sent: 3, peers: 5 } } });
+    const n = el.querySelector('.circle-nearby__notice');
+    expect(n.dataset.notice).toBe('ask_sent');
+    expect(n.getAttribute('role')).toBe('status');
+    expect(n.textContent).toBe('circle.nearbyScreen.ask_sent');
+  });
+
+  it('after answering, the notice says plainly that I am now visible', () => {
+    const el = render(model(), { notice: { key: 'answer_sent' } });
+    expect(el.querySelector('.circle-nearby__notice').dataset.notice).toBe('answer_sent');
+  });
+});
+

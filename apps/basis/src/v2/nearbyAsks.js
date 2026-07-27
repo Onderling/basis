@@ -149,6 +149,29 @@ export function answerAsk({ ask, text, from = null, now = () => Date.now() } = {
   };
 }
 
+/**
+ * What answering OPENS — rung 3 of the escalation ladder, described once so both shells open the same
+ * thing.
+ *
+ * **`transient: true` is the load-bearing field.** Answering opens a pairwise channel with the person's
+ * EPHEMERAL room address; it does not make them a contact. Rung 4 — becoming reachable from home — is the
+ * deliberate exchange of the `{transport → address}` map, and quietly saving a café encounter into the
+ * contact list would skip a rung the user never chose to climb. A shell that persists this is the bug.
+ *
+ * @param {string} peerAddress   the address the answer went to (from the WIRE, never a payload)
+ * @param {object} [opts]
+ * @param {string} [opts.label]  what to call them on screen — a chosen face, not an identity
+ */
+export function nearbyThreadDescriptor(peerAddress, { label = null } = {}) {
+  if (!peerAddress) return null;
+  return Object.freeze({
+    peerAddress,
+    label: label || peerAddress.slice(0, 8),
+    transient: true,
+    origin: 'nearby-answer',
+  });
+}
+
 // ── helpers ─────────────────────────────────────────────────────────────────
 
 /** Coarse, deduped, lowercased. Coarse on purpose: a precise tag is an identifier. */

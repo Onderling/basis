@@ -25,7 +25,9 @@ import { buildNearbyModel, }             from './circleNearby.js';
 import { createProximitySession, nearbyActions } from './circleProximity.js';
 import { makeNearbySessionAdapter }      from './nearbyDiscoverability.js';
 import { createNetworkChangeWatcher }    from './networkChangeWatcher.js';
-import { evaluateIncomingAsk, isAskLive, askActions, createAsk, answerAsk } from './nearbyAsks.js';
+import {
+  evaluateIncomingAsk, isAskLive, askActions, createAsk, answerAsk, nearbyThreadDescriptor,
+} from './nearbyAsks.js';
 
 /**
  * Row action id → locale key.
@@ -292,7 +294,14 @@ export function createNearbyScreen({
       // Answering is a one-way door for THIS ask: I have already revealed myself, so it leaves the room.
       asks.delete(askId);
       emit();
-      return { ok: true, opensDirectChannel: true, peer: entry.ask.from };
+      // The host opens this. It is TRANSIENT by construction — answering climbs to rung 3 (a pairwise
+      // channel), not rung 4 (a contact you can reach from home).
+      return {
+        ok: true,
+        opensDirectChannel: true,
+        peer: entry.ask.from,
+        thread: nearbyThreadDescriptor(entry.ask.from),
+      };
     },
 
     /** Hide an ask for me. Tells the asker nothing — that is the whole point of dismissing. */

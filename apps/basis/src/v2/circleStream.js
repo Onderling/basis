@@ -88,47 +88,95 @@ export function buildCircleStream({ events = [], circles = [] } = {}) {
  * @param {?string}  [opts.kindFilter=null] one of KIND_CHIPS keys, or null
  * @returns {ReturnType<typeof buildCircleStream>}
  */
-export function buildKringStream({
-  events = [], circles = [], circleId = null, kindFilter = null,
+/**
+ * THE projector — every circle surface is this function with different arguments.
+ *
+ * Two axes, and naming them is half the point. Before this there were three functions whose names hid what
+ * differed — and two of them were the same word in two languages (`buildCircleStream` / `buildKringStream`;
+ * *kring* IS circle), so a reader could not tell which selected a SCOPE and which selected CONTENT.
+ *
+ *   • **scope**   — `circleId`: one circle, a LIST of them, or null for all
+ *   • **content** — `lane` (human vs system) and/or `kinds` (specific entry types)
+ *
+ * A combine-and-filter surface is then just a control that sets these two, not a new query path. Screens
+ * (`userScreens.js`) already express exactly this shape — `kringFilter` is scope, `blocks` is content — so
+ * accepting a circle LIST here is what lets `userScreenBlocks` stop looping per circle and merging by hand.
+ *
+ * @param {object}   [opts]
+ * @param {object[]} [opts.events]    LoggedEvent[] (newest-first)
+ * @param {object[]} [opts.circles]   normalized circles, for the tag
+ * @param {?string|string[]} [opts.circleId]  null = every circle
+ * @param {?string}  [opts.kindFilter]  one of KRING_STREAM_KIND_FILTERS, or null
+ * @param {?string[]} [opts.kinds]      explicit entry kinds to keep (null = any)
+ * @param {?string}  [opts.lane]        'human' keeps conversation only; null = both lanes
+ * @returns {ReturnType<typeof buildCircleStream>}
+ */
+export function projectEntries({
+  events = [], circles = [], circleId = null, kindFilter = null, kinds = null, lane = null,
 } = {}) {
   const rows = buildCircleStream({ events, circles });
-  const scoped = circleId == null ? rows : rows.filter((r) => r.circleId === circleId);
-  if (!kindFilter || kindFilter === 'all') return scoped;
-  const wanted = String(kindFilter).toLowerCase();
-  return scoped.filter((r) => {
-    const p = r.event?.payload && typeof r.event.payload === 'object' ? r.event.payload : {};
-    const cands = [p.kind, r.event?.type, r.type, r.event?.kind];
-    return cands.some((c) => typeof c === 'string' && c.toLowerCase() === wanted);
-  });
+
+  // scope
+  let out = rows;
+  if (circleId != null) {
+    const wanted = Array.isArray(circleId) ? new Set(circleId) : new Set([circleId]);
+    out = out.filter((r) => wanted.has(r.circleId));
+  }
+
+  // content — lane first (the cheap structural cut), then kinds
+  if (lane === 'human') out = out.filter((r) => !isSilentEntry(r.event));
+  if (Array.isArray(kinds)) {
+    const keep = new Set(kinds);
+    out = out.filter((r) => keep.has(r.event?.type));
+  }
+  if (kindFilter && kindFilter !== 'all') {
+    const wanted = String(kindFilter).toLowerCase();
+    out = out.filter((r) => {
+      const p = r.event?.payload && typeof r.event.payload === 'object' ? r.event.payload : {};
+      return [p.kind, r.event?.type, r.type, r.event?.kind]
+        .some((c) => typeof c === 'string' && c.toLowerCase() === wanted);
+    });
+  }
+  return out;
+}
+
+/* ── Named wrappers ──────────────────────────────────────────────────────────
+ * Thin, and named for WHAT THEY SELECT rather than for a synonym of "circle". They exist so a call site
+ * reads clearly; all three are `projectEntries` with different arguments.
+ */
+
+/** Every circle, every kind — the cross-circle firehose. */
+export function allCircleRows(opts = {}) {
+  return projectEntries({ ...opts, circleId: null });
+}
+
+/** One circle (or several), any lane — the circle timeline. */
+export function circleRows(opts = {}) {
+  return projectEntries(opts);
 }
 
 /**
- * Per-circle CHAT projection (C15). The chat is a projection of the ONE
- * canonical log — but chat stays a chat: it IGNORES the log's silent system
- * lane (`isSilentEntry`). The cross-circle Stream tab (`buildCircleStream` /
- * `buildKringStream`) is the firehose and still shows silent entries; only the
- * chat excludes them. Same scoping args as `buildKringStream` (per-circle when
- * `circleId` is set).
+ * One circle, conversation only — the chat surface.
  *
- * The silent lane is LIVE (stale note corrected 2026-07-27 — it used to say nothing
- * appended one). Four paths do: governance events and §8 reports
- * (`governanceAppWiring`), the roster "pull-me" signal (`rosterUpdated`), and
- * every one of those arriving from a peer (`kringLogReceiver`). So this filter is
- * load-bearing now, not a placeholder: without it a vote, a report and a roster
- * ping would all appear as chat messages.
- *
- * C15 TAIL: narrowing the chat further to project ONLY `type:'chat-message'`
- * (today the GESPREK surface renders a "chat-style MIXED stream" — task/buurt
- * rows included) is part of the wider peer-router → one-stream migration, NOT
- * done here; excluding the silent lane is the additive, behaviour-preserving
- * slice.
- *
- * @param {object}   [opts]  same shape as `buildKringStream`
- * @returns {ReturnType<typeof buildKringStream>}
+ * Today "conversation" means *not the silent system lane*, which is exactly the pre-existing behaviour.
+ * C15's tail is to narrow this further to the conversation KINDS (`conversationKinds()` from the shared
+ * table), which would drop tasks and buurt rows out of GESPREK — a product call, deliberately NOT taken
+ * here. When it is, this wrapper is the only place that changes.
  */
-export function buildCircleChat(opts = {}) {
-  return buildKringStream(opts).filter((r) => !isSilentEntry(r.event));
+export function chatRows(opts = {}) {
+  return projectEntries({ ...opts, lane: 'human' });
 }
+
+/* ── Back-compat aliases ─────────────────────────────────────────────────────
+ * The old names, kept so this stays a rename rather than a migration. `buildKringStream`/`buildCircleChat`
+ * are re-pointed at the wrappers; call sites move over as they are touched.
+ */
+
+/** @deprecated use `circleRows` — the name says which axis it selects. */
+export const buildKringStream = circleRows;
+
+/** @deprecated use `chatRows`. */
+export const buildCircleChat = chatRows;
 
 /** Kind keys the filter strip exposes, in render order. */
 export const KRING_STREAM_KIND_FILTERS = ['all', 'vraag', 'aanbod', 'leen'];

@@ -35,7 +35,7 @@ import {
   // "My things" private notes-list.
   myThingsFromListFiles,
   // kring-scoped event stream + per-row action chips.
-  buildCircleChat, actionsForStreamRow,
+  chatRows, actionsForStreamRow,
   // Taken (tasks) tab — task-store item → stream-row projection (shared web≡mobile).
   buildTaskRows,
   // per-kring bottom tabs from policy.features (v2 §1).
@@ -2093,7 +2093,7 @@ function CircleDetail({
   const [streamTick, setStreamTick] = useState(0);
   // C15 — a CHAT projection: the log's silent system lane (the `roster-updated` pull-me and
   // friends) never surfaces here; the cross-circle Stream tab is the firehose. Web parity.
-  const rows = useMemo(() => buildCircleChat({
+  const rows = useMemo(() => chatRows({
     events:    eventLog?.query ? eventLog.query({ excludeMuted: true }) : [],
     circles,
     circleId:  circle?.id ?? null,

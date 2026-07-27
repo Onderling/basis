@@ -220,7 +220,7 @@ import { makeKeyEventLogSink, recipientAddrsFromRoster } from '@onderling/kring-
 // "only you" vs "whole kring" — message scope (a data property; the badge renders it).
 import { scopeForReply } from '../../src/v2/messageScope.js';
 import {
-  buildCircleStream, buildKringStream, buildCircleChat,
+  allCircleRows, circleRows, chatRows,
 } from '../../src/v2/circleStream.js';
 // profile-update propagation — the silent roster "pull-me" signal (announce on a real roster
 // write; receive → re-read the changed rows). No values on the wire, no chat bubble, no wake.
@@ -2062,7 +2062,7 @@ function buildCircleBot(agent) {
     interpret: interpretToCommand,
     // Conversation memory — the recent kring turns, so follow-ups resolve against context.
     recentTurns: () => recentKringTurns({
-      rows: buildKringStream({ events: eventLog.query({ excludeMuted: true }), circles: circlesCache, circleId: getActiveCircle() }),
+      rows: circleRows({ events: eventLog.query({ excludeMuted: true }), circles: circlesCache, circleId: getActiveCircle() }),
       limit: 6,
     }),
     // A slash STRING → parse to {opId,args}; the LLM yields {opId,args}. Both flow through the
@@ -3256,7 +3256,7 @@ async function _showActiveScreen() {
 }
 
 function showStream() {
-  const rows = buildCircleStream({
+  const rows = allCircleRows({
     events: eventLog.query({ excludeMuted: true }),
     circles: circlesCache,
   });
@@ -4674,7 +4674,7 @@ function showKring(id, circle, policy) {
   const rerender = () => {
     // C15 — the per-circle surface is a CHAT projection: it excludes the log's silent system lane
     // (the `roster-updated` pull-me and friends). The cross-circle Stream tab is the firehose.
-    const rows = buildCircleChat({
+    const rows = chatRows({
       events:    eventLog.query({ excludeMuted: true }),
       circles:   circlesCache,
       circleId:  id,

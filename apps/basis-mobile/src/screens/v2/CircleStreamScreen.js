@@ -2,7 +2,7 @@
  * basis-mobile v2 — cross-circle Stream (RN screen).
  *
  * RN counterpart of web's circleStream over the SAME shared projection
- * (`buildCircleStream`): one timeline interleaving every circle's inbound
+ * (`allCircleRows`): one timeline interleaving every circle's inbound
  * events by time, each row carrying a circle-tag.  Reads the shared
  * EventLog (lifted to App.js in M1) — an unfiltered projection, no
  * per-circle filter.  Tapping a circle-tagged row jumps to that circle.
@@ -10,7 +10,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
-import { buildCircleStream } from '@onderling-app/basis';
+import { allCircleRows } from '@onderling-app/basis';
 import { t } from '../../core/localisation.js';
 
 export default function CircleStreamScreen({ eventLog, circles = [], onBack, onOpenCircle }) {
@@ -18,7 +18,7 @@ export default function CircleStreamScreen({ eventLog, circles = [], onBack, onO
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const rows = useMemo(() => {
     const events = eventLog?.query ? eventLog.query({ excludeMuted: true }) : [];
-    return buildCircleStream({ events, circles });
+    return allCircleRows({ events, circles });
   }, [eventLog, circles]);
 
   return (

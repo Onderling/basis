@@ -124,6 +124,7 @@ export {
   eventCircleId, buildCircleStream,
   // kring-scoped stream + chip filters.
   buildKringStream, KRING_STREAM_KIND_FILTERS,
+  projectEntries, allCircleRows, circleRows, chatRows,
   // C15 — per-circle chat projection (excludes the silent system lane).
   buildCircleChat,
 } from './v2/circleStream.js';

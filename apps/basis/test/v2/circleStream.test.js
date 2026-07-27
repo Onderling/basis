@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   eventCircleId, buildCircleStream, buildCircleChat,
   buildKringStream, KRING_STREAM_KIND_FILTERS,
+  projectEntries, allCircleRows, circleRows, chatRows,
 } from '../../src/v2/circleStream.js';
 import { makeSilentEntry } from '../../src/eventLog.js';
 
@@ -164,5 +165,71 @@ describe('buildKringStream (SP-13)', () => {
 
   it('unknown circle → no rows', () => {
     expect(buildKringStream({ events, circles, circleId: 'ghost' })).toEqual([]);
+  });
+});
+
+/**
+ * One projector, two axes (C15 slice 2, 2026-07-27).
+ *
+ * There used to be three functions whose names hid what differed — and two were the same word in two
+ * languages (`buildCircleStream` / `buildKringStream`; *kring* IS circle), so a reader could not tell which
+ * selected a SCOPE and which selected CONTENT. These pin the axes, and that the wrappers are genuinely the
+ * same function with different arguments.
+ */
+describe('projectEntries — scope × content', () => {
+  const circles = [{ id: 'x', name: 'X' }, { id: 'y', name: 'Y' }];
+  const ev = (id, circleId, type, extra = {}) => ({ id, ts: id.length, app: 'a', type, circleId, ...extra });
+  const events = [
+    ev('m1', 'x', 'chat-message'),
+    ev('m22', 'y', 'chat-message'),
+    { ...ev('g333', 'x', 'governance'), silent: true },
+    ev('t4444', 'y', 'task'),
+  ];
+
+  it('scope: null = every circle', () => {
+    expect(projectEntries({ events, circles }).map((r) => r.id).sort())
+      .toEqual(['g333', 'm1', 'm22', 't4444']);
+  });
+
+  it('scope: one circle', () => {
+    expect(projectEntries({ events, circles, circleId: 'x' }).map((r) => r.id).sort()).toEqual(['g333', 'm1']);
+  });
+
+  it('scope: a LIST of circles — one call, no hand-rolled merge', () => {
+    // This is what let `userScreenBlocks` stop looping per circle and merging by hand.
+    const rows = projectEntries({ events, circles, circleId: ['x', 'y'] });
+    expect(rows).toHaveLength(4);
+  });
+
+  it('content: lane human drops the system lane', () => {
+    expect(projectEntries({ events, circles, lane: 'human' }).map((r) => r.id)).not.toContain('g333');
+  });
+
+  it('content: explicit kinds', () => {
+    expect(projectEntries({ events, circles, kinds: ['task'] }).map((r) => r.id)).toEqual(['t4444']);
+  });
+
+  it('the two axes compose', () => {
+    expect(projectEntries({ events, circles, circleId: 'y', kinds: ['chat-message'] }).map((r) => r.id))
+      .toEqual(['m22']);
+  });
+});
+
+describe('the wrappers are the projector with arguments', () => {
+  const circles = [{ id: 'x', name: 'X' }];
+  const events = [
+    { id: 'a', ts: 2, app: 'k', type: 'chat-message', circleId: 'x' },
+    { id: 'b', ts: 1, app: 'k', type: 'governance', circleId: 'x', silent: true },
+  ];
+
+  it('allCircleRows ignores scope; chatRows drops the system lane; circleRows keeps both', () => {
+    expect(allCircleRows({ events, circles }).map((r) => r.id)).toEqual(['a', 'b']);
+    expect(circleRows({ events, circles, circleId: 'x' }).map((r) => r.id)).toEqual(['a', 'b']);
+    expect(chatRows({ events, circles, circleId: 'x' }).map((r) => r.id)).toEqual(['a']);
+  });
+
+  it('the old names still work — this is a rename, not a migration', () => {
+    expect(buildKringStream({ events, circles, circleId: 'x' })).toEqual(circleRows({ events, circles, circleId: 'x' }));
+    expect(buildCircleChat({ events, circles, circleId: 'x' })).toEqual(chatRows({ events, circles, circleId: 'x' }));
   });
 });

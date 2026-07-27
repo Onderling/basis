@@ -27,7 +27,7 @@
  */
 
 import { effectiveKringIds, isAllKringen } from './userScreens.js';
-import { buildKringStream } from './circleStream.js';
+import { circleRows } from './circleStream.js';
 import { normalizeRulesDoc, isRulesEmpty } from './circleRules.js';
 import { materializeBlock as _materializeKringBlock } from './kringRecipeBlocks.js';
 
@@ -100,16 +100,13 @@ function materializeNoticeboard(block, activeCircleIds, { eventLog, circles } = 
     return { blockId: block.id, type: 'noticeboard', status: 'empty', content: { items: [] } };
   }
   const events = eventLog.query({ excludeMuted: true });
-  // buildKringStream filters per circleId; collect per-circle then merge
-  // by ts (newest-first), cap.  Each row keeps its `circleId` so the
-  // renderer can show a tag.
-  const merged = [];
-  for (const cid of activeCircleIds) {
-    const stream = buildKringStream({ events, circles: circles ?? [], circleId: cid });
-    for (const row of stream) merged.push(row);
-  }
-  merged.sort((a, b) => (b.ts ?? 0) - (a.ts ?? 0));
-  const items = merged.slice(0, limit);
+  // The projector takes a circle LIST, so a multi-circle Screen is one call. This used to loop per circle
+  // and merge by hand — hand-rolling the very thing a Screen expresses (`kringFilter` IS a scope), which is
+  // what made the missing list-scope obvious. Rows stay newest-first and each keeps its `circleId` for the
+  // tag, exactly as before.
+  const items = circleRows({ events, circles: circles ?? [], circleId: activeCircleIds })
+    .sort((a, b) => (b.ts ?? 0) - (a.ts ?? 0))
+    .slice(0, limit);
   return {
     blockId: block.id, type: 'noticeboard',
     status: items.length > 0 ? 'ok' : 'empty',

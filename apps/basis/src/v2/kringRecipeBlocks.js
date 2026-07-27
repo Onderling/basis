@@ -30,7 +30,7 @@
  */
 
 import { BLOCK_TYPES } from './kringRecipe.js';
-import { buildKringStream } from './circleStream.js';
+import { circleRows } from './circleStream.js';
 import { normalizeRulesDoc, isRulesEmpty } from './circleRules.js';
 import { enabledFeatures } from './circlePolicy.js';
 import { enrichEmbedsWithTitles } from './embedResolve.js';
@@ -199,8 +199,8 @@ async function materializeNoticeboard(block, circleId, { callSkill, eventLog, ci
   // back, or the stream re-surfaces the very system/bookkeeping rows we just filtered out.
   if (!listOpenSucceeded && rows.length === 0 && eventLog?.query && circleId) {
     const events = eventLog.query({ excludeMuted: true });
-    const stream = buildKringStream({ events, circles: circles ?? [], circleId });
-    // buildKringStream returns newest-first; cap to `limit`.
+    const stream = circleRows({ events, circles: circles ?? [], circleId });
+    // circleRows returns newest-first; cap to `limit`.
     rows = stream.slice(0, limit);
   }
   return {

@@ -46,7 +46,7 @@ export const DEFAULT_MAX_PEERS          = 256;
  * @param {number}  [opts.refreshBeforeMs]
  * @param {number}  [opts.maxPeers]
  * @param {object}  [opts.seqStore]          — forwarded to signReachabilityClaim
- * @param {(callerPubKey: string, peers: string[]) => string[]} [opts.peerScope]
+ * @param {(callerPubKey: string, peers: string[]) => string[]|Promise<string[]>} [opts.peerScope]
  *   Which of this device's direct peers THIS caller may learn about. Absent ⇒ none are disclosed (see the
  *   disclosure note above). Pass `(_caller, peers) => peers` to opt into the old open behaviour.
  */
@@ -81,7 +81,10 @@ export function registerReachablePeersSkill(agent, opts = {}) {
     // quietly, so the operator needs to know it is a configuration choice and not a network condition.
     let peers;
     if (peerScope) {
-      const scoped = peerScope(from ?? null, all);
+      // AWAITED: a real scope is a membership question ("peers I share a circle with"), and membership
+      // lives behind an async roster lookup. A sync-only seam would have forced every host to keep a
+      // hand-rolled cache just to answer it. `await` on a plain array is free, so sync scopes still work.
+      const scoped = await peerScope(from ?? null, all);
       peers = Array.isArray(scoped) ? scoped.filter((p) => all.includes(p)) : [];
     } else {
       peers = [];

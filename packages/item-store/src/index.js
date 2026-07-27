@@ -109,3 +109,13 @@ export {
   chatTurnsFromItems,
   DM_ITEM_TYPE,
 } from './addressedDeliver.js';
+
+// ── Entry kinds (C15 / one-log) ──────────────────────────────────────────────
+// The ONE table saying how a logged entry behaves — lane, wake, retention, auditability. Lives here rather
+// than in an app because stoop and basis each need it and stoop cannot import basis (invariant 5); before
+// this the wake rule existed twice and was held together by a fitness test.
+export {
+  ENTRY_KINDS, LANE, RETAIN, UNKNOWN_KIND,
+  entryKind, isSystemKind, isAuditKind, retentionOf,
+  conversationKinds, kindWakes, governanceWakes,
+} from './entryKinds.js';

@@ -21,6 +21,7 @@
  */
 
 import { matchesFilter } from './filter.js';
+import { ENTRY_KINDS, isSystemKind, kindWakes } from '@onderling/item-store';
 
 /** 14 days in ms — OQ-7.B retention default. */
 export const RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
@@ -83,7 +84,18 @@ export const SYSTEM_APP = 'system';
  * @returns {boolean}
  */
 export function isSilentEntry(entry) {
-  return !!entry && typeof entry === 'object' && entry.silent === true;
+  if (!entry || typeof entry !== 'object') return false;
+  // DERIVED from the shared kind table (2026-07-27) rather than read off a flag someone remembered to
+  // stamp — so a new system kind cannot arrive in a conversation because one append site forgot it.
+  //
+  // ONLY for kinds the table KNOWS. The log holds entries whose types predate this registry (`buurt`,
+  // reactions, app-specific rows); treating an unlisted type as "system" would silently delete them from
+  // every conversation — caught by `eventLog.test.js` when I first wrote it the other way. So an unknown
+  // type falls back to the flag, which is the old behaviour exactly. The conservative UNKNOWN_KIND default
+  // still applies where a kind is asked about directly (it must never let an unrecognised kind WAKE a
+  // device); it must not reclassify existing content.
+  if (typeof entry.type === 'string' && entry.type in ENTRY_KINDS) return isSystemKind(entry.type);
+  return entry.silent === true;
 }
 
 /**
@@ -106,6 +118,12 @@ export function isSilentEntry(entry) {
  */
 export function shouldWakeForEntry(entry) {
   if (!entry || typeof entry !== 'object') return false;
+  // The kind decides — including the ONE per-event exception (`governance`: a decision opening wakes, the
+  // votes that follow do not), which `kindWakes` owns so stoop and basis stop each deriving it.
+  if (typeof entry.type === 'string' && entry.type in ENTRY_KINDS) {
+    return kindWakes(entry.type, entry.payload);
+  }
+  // An entry of an unregistered kind falls back to the pre-registry rule.
   return !isSilentEntry(entry);
 }
 

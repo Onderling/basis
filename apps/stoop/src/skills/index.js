@@ -71,6 +71,7 @@ import { validateStoopItem, intentToCanonicalDraft } from '../lib/canonicalAdapt
 
 import { validateHandle, findHandleCollision, withHandleClaim } from '../lib/handle.js';
 import { resolveMemberAddress, makeFallbackReporter } from '../lib/memberAddress.js';
+import { kindWakes } from '@onderling/item-store';
 
 /** G13 — one reporter per process, deduping per (circle, member, reason) so the signal stays readable. */
 const _reportAddressFallback = makeFallbackReporter();
@@ -3872,13 +3873,11 @@ export function buildSkills({
       if (!a.event || typeof a.event !== 'object')                    return { error: 'event-required' };
       if (typeof a.msgId !== 'string' || !a.msgId)                    return { error: 'msgId-required' };
       const ts = typeof a.ts === 'number' && Number.isFinite(a.ts) ? a.ts : Date.now();
-      // Wake-gate: only a decision OPENING (`propose`) may wake an offline device;
-      // an individual vote/resolve is routine and must not. This mirrors basis
-      // `governanceWakeHint` (governanceLog.js) — the canonical "which governance
-      // events nudge" signal — read here off the event's own wire discriminator
-      // (stoop can't import basis/app code, invariant #5). Keep the two in
-      // lock-step: `propose` wakes, everything else is no-wake.
-      const wakes = !!a.event && a.event.event === 'propose';
+      // Wake-gate: only a decision OPENING may wake an offline device; an individual vote/resolve is
+      // routine and must not. This used to be re-derived here because stoop cannot import basis app code
+      // (invariant #5), which meant the rule existed TWICE and was held together by a fitness test. It now
+      // comes from the shared substrate table (`@onderling/item-store` entryKinds), so there is one rule.
+      const wakes = kindWakes('governance', a.event);
       return broadcastToCircle({
         circleId: _groupId, kind: 'kring-governance-broadcast', from,
         extras: { circleId: _groupId, msgId: a.msgId, ts, event: a.event },

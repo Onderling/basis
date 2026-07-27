@@ -415,7 +415,16 @@ export async function startRelay(opts = {}) {
   };
 
   wss.on('connection', (socket) => {
+    // G13 — ONE socket may own SEVERAL addresses: a device presents a different address per circle, and
+    // (decisions.md 2026-07-27) since the relay can correlate them anyway via the shared push token, one
+    // connection carrying N addresses is both the cheap and the correct shape. `registeredAddress` stays as
+    // the socket's PRIMARY identity — the first one registered — because sender-side concerns (rate limits,
+    // group-publish membership, multi-recipient responses, logs) are about the DEVICE, not the circle it is
+    // speaking in. `registeredAddresses` is the routing set.
     let registeredAddress = null;
+    const registeredAddresses = new Set();
+    /** The push token this socket registered, if any — reapplied to every address it later registers. */
+    let socketPushToken = null;
     // J-security: per-connection message rate limit (flood defense). One
     // bucket per socket — absorbs bursts, throttles a sustained flood. Null
     // when disabled via `messageRateLimit: false`.
@@ -458,7 +467,11 @@ export async function startRelay(opts = {}) {
         // leave residual state.
         const cfg = auth.group;
         const maxConns = cfg?.quotas?.maxConnections;
-        if (typeof maxConns === 'number' && cfg?.groupId) {
+        // A REPEAT register on the same socket (a second circle address) is not a new connection, so it
+        // must not consume connection quota — otherwise a member of N circles would exhaust a cap meant to
+        // count devices.
+        const alreadyOwned = registeredAddresses.has(address);
+        if (typeof maxConns === 'number' && cfg?.groupId && !alreadyOwned) {
           const currentSize = clientsByGroup.get(cfg.groupId)?.size ?? 0;
           if (currentSize >= maxConns) {
             socket.send(JSON.stringify({ type: 'error', message: 'OVER_QUOTA_CONNECTIONS' }));
@@ -468,8 +481,16 @@ export async function startRelay(opts = {}) {
           }
         }
 
-        registeredAddress = address;
+        if (registeredAddress === null) registeredAddress = address;   // first one is the primary
+        registeredAddresses.add(address);
         clients.set(address, socket);
+
+        // Decision 2(a): a push token registered on this socket covers EVERY address it owns — including
+        // ones registered later. Registering per-address would give N chances to forget one, and a
+        // forgotten address is a circle whose offline members silently stop being woken (the G15 failure).
+        if (tokenRegistry && socketPushToken) {
+          tokenRegistry.register(address, socketPushToken);
+        }
 
         // Phase 7 step 5: track group-membership for `group-publish` fan-out.
         // `auth.group` is null in open mode; otherwise it's the matched
@@ -485,8 +506,10 @@ export async function startRelay(opts = {}) {
         socket.send(JSON.stringify({ type: 'registered' }));
         logLine(`[relay] registered   ${shortId(address)}`);
 
-        // Drain any queued messages. `onEach` preserves the verbose hop log
-        // for the drain — the on-the-wire record even when the recipient was
+        // Drain any queued messages for THIS address. Decision 3: draining per REGISTRATION rather than
+        // per socket means there is no assumption about which address registers first, and no window where
+        // a drain runs before the address it belongs to exists.
+        // `onEach` preserves the verbose hop log — the on-the-wire record even when the recipient was
         // offline at send time. (Eviction is timer-driven, so no evictFirst.)
         forwardQueue.drain(address, socket, {
           onEach: (envelope) => logHop({ kind: 'send-queued', from: '?', to: address, envelope }),
@@ -629,7 +652,10 @@ export async function startRelay(opts = {}) {
           return;
         }
         try {
-          tokenRegistry.register(registeredAddress, { token, platform });
+          // Decision 2(a): cover EVERY address this socket owns, not just the primary. A device in three
+          // circles has three addresses and one token; a wake for any of them must reach this device.
+          socketPushToken = { token, platform };
+          for (const addr of registeredAddresses) tokenRegistry.register(addr, socketPushToken);
         } catch (err) {
           socket.send(JSON.stringify({ type: 'error', message: err?.message ?? 'register-push-token failed' }));
           return;
@@ -641,7 +667,9 @@ export async function startRelay(opts = {}) {
 
       if (msg.type === 'unregister-push-token') {
         if (!registeredAddress || !tokenRegistry) return;
-        tokenRegistry.unregister(registeredAddress);
+        // Symmetric with register: turning notifications off turns them off for every circle.
+        socketPushToken = null;
+        for (const addr of registeredAddresses) tokenRegistry.unregister(addr);
         socket.send(JSON.stringify({ type: 'push-token-unregistered' }));
         logLine(`[relay] push-tok-unreg ${shortId(registeredAddress)}`);
         return;
@@ -739,15 +767,17 @@ export async function startRelay(opts = {}) {
 
     socket.on('close', () => {
       if (registeredAddress) {
-        clients.delete(registeredAddress);
+        // Every address this socket owned goes with it — leaving one behind would route to a dead socket.
+        for (const addr of registeredAddresses) clients.delete(addr);
         // Drop from any group-membership sets (Phase 7 step 5).
         for (const [gid, set] of clientsByGroup) {
-          set.delete(registeredAddress);
+          for (const addr of registeredAddresses) set.delete(addr);
           if (set.size === 0) clientsByGroup.delete(gid);
         }
         // Phase 2A — also drop the reverse lookup so maxConnections
         // accounting + per-day-msg gating don't leak stale slots.
-        groupByAddress.delete(registeredAddress);
+        for (const addr of registeredAddresses) groupByAddress.delete(addr);
+        registeredAddresses.clear();
         logLine(`[relay] disconnected ${shortId(registeredAddress)}`);
         _broadcastPeerList(clients);
       }

@@ -82,48 +82,143 @@ class MdnsModule(reactContext: ReactApplicationContext)
 
     // ── JS API ─────────────────────────────────────────────────────────────────
 
+    /**
+     * Announcing and browsing, in one call — the original API, kept so an older JS bundle keeps working.
+     * Now expressed in terms of the two halves below rather than duplicating them.
+     */
     @ReactMethod
     fun start(serviceType: String, serviceName: String, pubKey: String, promise: Promise) {
         executor.submit {
             try {
-                running = true
-
-                // TCP server on an OS-assigned port
-                val server = ServerSocket(0).also { serverSocket = it }
-                val port   = server.localPort
-
-                // Accept loop
-                executor.submit {
-                    while (running && !server.isClosed) {
-                        try {
-                            val client = server.accept()
-                            val id     = "in_${idCounter.incrementAndGet()}"
-                            onNewSocket(id, client)
-                        } catch (_: Exception) {}
-                    }
-                }
-
-                // mDNS registration
-                val info = NsdServiceInfo().apply {
-                    this.serviceName = serviceName
-                    this.serviceType = "$serviceType._tcp."
-                    this.port        = port
-                    setAttribute("pubKey", pubKey)
-                }
-                registrationListener = makeRegistrationListener(port)
-                nsdManager.registerService(info, NsdManager.PROTOCOL_DNS_SD, registrationListener)
-
-                // mDNS discovery
-                discoveryListener = makeDiscoveryListener(serviceType)
-                nsdManager.discoverServices(
-                    "$serviceType._tcp.", NsdManager.PROTOCOL_DNS_SD, discoveryListener
-                )
-
+                val port = ensureAdvertising(serviceType, serviceName, pubKey)
+                ensureDiscovery(serviceType)
                 promise.resolve(port)
             } catch (e: Exception) {
                 promise.reject("MDNS_START_FAILED", e.message, e)
             }
         }
+    }
+
+    // ── The split (Nearby step B) ──────────────────────────────────────────────
+    //
+    // `start()` did four things at once — TCP server, accept loop, NSD registration, NSD discovery — so
+    // there was no way to watch the network without joining it. That made "ghost mode" impossible and made
+    // the passive "N devices nearby" count cost you being counted back.
+    //
+    // The split is along ANNOUNCE vs LISTEN, and it deliberately leaves the DATA plane out of both:
+    //
+    //   • advertising  = the NSD service record (plus the listening socket it points at)
+    //   • discovery    = the NSD browse
+    //   • connections  = neither; they live until stop()
+    //
+    // That last line is the point. Advertising is how people FIND you, not how they REACH you. Unregistering
+    // the record must not drop sockets that are already open, or "go unlisted" would silently mean
+    // "disconnect from everyone you are talking to" — which is exactly why the JS layer could not previously
+    // rest in a non-announcing state.
+
+    /** Announce this device. Idempotent. @returns the TCP port being advertised. */
+    @ReactMethod
+    fun startAdvertising(serviceType: String, serviceName: String, pubKey: String, promise: Promise) {
+        executor.submit {
+            try {
+                promise.resolve(ensureAdvertising(serviceType, serviceName, pubKey))
+            } catch (e: Exception) {
+                promise.reject("MDNS_ADVERTISE_FAILED", e.message, e)
+            }
+        }
+    }
+
+    /**
+     * Stop announcing — ghost mode.
+     *
+     * Unregisters the service record ONLY. The listening socket and every open connection stay up: someone
+     * who already found you can still reach you, and a peer you are mid-conversation with does not get
+     * dropped because you stopped advertising. Re-advertising later reuses the same port.
+     */
+    @ReactMethod
+    fun stopAdvertising(promise: Promise) {
+        try {
+            registrationListener?.let { runCatching { nsdManager.unregisterService(it) } }
+            registrationListener = null
+            promise.resolve(null)
+        } catch (e: Exception) {
+            promise.reject("MDNS_STOP_ADVERTISE_FAILED", e.message, e)
+        }
+    }
+
+    /**
+     * Browse for peers without announcing.
+     *
+     * Opens no listening socket: a device in ghost mode should not be accepting inbound connections either.
+     * It reaches peers by connecting OUT, which `connect()` does independently — and because nobody can
+     * discover it, the JS layer must always be the initiator (see MdnsTransport's tiebreaker).
+     */
+    @ReactMethod
+    fun startDiscovery(serviceType: String, promise: Promise) {
+        executor.submit {
+            try {
+                ensureDiscovery(serviceType)
+                promise.resolve(null)
+            } catch (e: Exception) {
+                promise.reject("MDNS_DISCOVERY_FAILED", e.message, e)
+            }
+        }
+    }
+
+    /** Stop browsing. Leaves advertising and open connections alone. */
+    @ReactMethod
+    fun stopDiscovery(promise: Promise) {
+        try {
+            discoveryListener?.let { runCatching { nsdManager.stopServiceDiscovery(it) } }
+            discoveryListener = null
+            promise.resolve(null)
+        } catch (e: Exception) {
+            promise.reject("MDNS_STOP_DISCOVERY_FAILED", e.message, e)
+        }
+    }
+
+    // ── Internals shared by the halves ─────────────────────────────────────────
+
+    /** Start (or reuse) the TCP server + accept loop. @returns the bound port. */
+    private fun ensureServer(): Int {
+        serverSocket?.let { if (!it.isClosed) return it.localPort }
+
+        running = true
+        val server = ServerSocket(0).also { serverSocket = it }
+        executor.submit {
+            while (running && !server.isClosed) {
+                try {
+                    val client = server.accept()
+                    val id     = "in_${idCounter.incrementAndGet()}"
+                    onNewSocket(id, client)
+                } catch (_: Exception) {}
+            }
+        }
+        return server.localPort
+    }
+
+    private fun ensureAdvertising(serviceType: String, serviceName: String, pubKey: String): Int {
+        val port = ensureServer()
+        if (registrationListener != null) return port   // already announced
+
+        val info = NsdServiceInfo().apply {
+            this.serviceName = serviceName
+            this.serviceType = "$serviceType._tcp."
+            this.port        = port
+            setAttribute("pubKey", pubKey)
+        }
+        registrationListener = makeRegistrationListener(port)
+        nsdManager.registerService(info, NsdManager.PROTOCOL_DNS_SD, registrationListener)
+        return port
+    }
+
+    private fun ensureDiscovery(serviceType: String) {
+        if (discoveryListener != null) return           // already browsing
+        running = true
+        discoveryListener = makeDiscoveryListener(serviceType)
+        nsdManager.discoverServices(
+            "$serviceType._tcp.", NsdManager.PROTOCOL_DNS_SD, discoveryListener
+        )
     }
 
     @ReactMethod

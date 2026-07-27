@@ -10,19 +10,21 @@
  * mDNS or BLE today, so the control it is handed simply has no discovering transports and every call is a
  * truthful no-op — which is better than web having a different code path.
  *
- * ── A constraint found while building this, NOT a decision taken ─────────────────────────────────────────
- * Rule (c) cannot be fully honoured over mDNS until the native split (Nearby step B), and the reason is not
- * laziness:
+ * ── Why the resting state is `browse` ───────────────────────────────────────────────────────────────────
+ * Before the mDNS native split (Nearby step B), rule (c) could not be honoured here at all:
  *
- *   • `MdnsNative.start()` publishes AND browses in one call, so `browse` degrades to `browse+publish`.
- *   • The obvious fix — rest at `off` — is worse, because **mDNS is also the LAN data channel**. Turning it
- *     off does not just stop advertising; it drops every TCP connection to peers on the network. Closing the
- *     Nearby view would disconnect you from people you are talking to.
+ *   • `MdnsNative.start()` published AND browsed in one call, so `browse` degraded to `browse+publish`.
+ *   • The obvious fix — rest at `off` — was worse, because **mDNS is also the LAN data channel**. Turning it
+ *     off did not merely stop advertising; it dropped every TCP connection to peers on the network, so
+ *     closing the Nearby view would disconnect you from people you were talking to.
  *
- * So on today's transports the resting state is a genuine trade: keep the data channel and stay announced,
- * or go quiet and lose LAN messaging. This module rests at `browse`, keeps the channel, and reports the
- * degradation loudly through `onDegraded` rather than letting a user believe they went quiet. Step B removes
- * the trade entirely. → `plans/PLAN-nearby.md`.
+ * The split removed the trade. `stopAdvertising()` unregisters the service record and leaves the listening
+ * socket and every open connection up — advertising is how people FIND you, not how they REACH you. So
+ * resting at `browse` now means genuinely unlisted, with the channel intact, which is why it is the default.
+ *
+ * The old behaviour still exists on a device running an **older Android build** whose `MdnsModule` lacks the
+ * split. There the transport reports `browse+publish` when asked for `browse` and `onDegraded` fires — the
+ * user is told they are still visible rather than left to assume otherwise. → `plans/PLAN-nearby.md`.
  */
 import { DISCOVERABILITY } from '@onderling/core';
 

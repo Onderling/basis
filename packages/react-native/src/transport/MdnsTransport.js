@@ -59,6 +59,9 @@ export class MdnsTransport extends Transport {
 
   #eventSubs    = [];
   #started      = false;
+  // Whether the NSD service record is currently published. Distinct from #started: since the native split
+  // a transport can be running and browsing while announcing nothing.
+  #advertising  = false;
 
   /**
    * Returns false if the native module is not compiled into the app.
@@ -97,6 +100,7 @@ export class MdnsTransport extends Transport {
         setTimeout(() => reject(new Error('MdnsTransport: start timed out (WiFi off?)')), 6_000)
       ),
     ]);
+    this.#advertising = true;   // the combined start() always announces
     console.log('[MdnsTransport] service started');
   }
 
@@ -113,20 +117,54 @@ export class MdnsTransport extends Transport {
 
   get supportsDiscoverability() { return true; }
 
+  /** Does the compiled native module have the split (Nearby step B), or only the combined `start()`? */
+  static supportsSplit() {
+    return typeof MdnsNative?.startAdvertising === 'function'
+        && typeof MdnsNative?.startDiscovery   === 'function';
+  }
+
+  /** Are we currently announcing ourselves? Read by the tiebreaker — see `#setupEvents`. */
+  get isAdvertising() { return this.#advertising; }
+
   /** @protected */
   async _applyDiscoverability(state) {
     if (state === DISCOVERABILITY.OFF) {
       await this.disconnect();
       return DISCOVERABILITY.OFF;
     }
-    if (state === DISCOVERABILITY.BROWSE) {
-      console.warn(
-        '[MdnsTransport] browse-only requested, but MdnsModule.start() publishes and browses in one call ' +
-        '— advertising ANYWAY. Ghost mode over mDNS needs the native split (Nearby step B).',
-      );
+
+    // Old native build: one call does both, so honour the request as far as it goes and SAY the rest.
+    if (!MdnsTransport.supportsSplit()) {
+      if (state === DISCOVERABILITY.BROWSE) {
+        console.warn(
+          '[MdnsTransport] browse-only requested, but this build of MdnsModule has no startDiscovery() ' +
+          '— advertising ANYWAY. Rebuild the Android app to get ghost mode.',
+        );
+      }
+      await this.connect();
+      this.#advertising = true;
+      return DISCOVERABILITY.PUBLISH;
     }
-    await this.connect();
-    return DISCOVERABILITY.PUBLISH;   // whatever was asked, this is what the device is doing
+
+    this.#setupEvents();
+    await MdnsNative.startDiscovery(SERVICE_TYPE);
+    this.#started = true;
+
+    if (state === DISCOVERABILITY.PUBLISH) {
+      await MdnsNative.startAdvertising(SERVICE_TYPE, this.#hostname, this.#pubKey);
+      this.#advertising = true;
+      return DISCOVERABILITY.PUBLISH;
+    }
+
+    // Ghost mode. Note what is NOT torn down: open connections and the listening socket survive, because
+    // going unlisted is about who can FIND you, not who can reach you. That is what makes `browse` a usable
+    // resting state — before the split, the only way to stop announcing was to stop the transport, which
+    // dropped every LAN peer you were talking to.
+    if (this.#advertising) {
+      await MdnsNative.stopAdvertising();
+      this.#advertising = false;
+    }
+    return DISCOVERABILITY.BROWSE;
   }
 
   /**
@@ -137,13 +175,28 @@ export class MdnsTransport extends Transport {
    * short-circuits. Tearing down first is what makes the re-announce actually reach the new network.
    */
   async _reannounce(state) {
+    // With the split we can re-publish the service record without touching the data plane — so a Wi-Fi
+    // change no longer costs you the connections you already have. Without it, a full restart is the only
+    // way to get past `connect()`'s `#started` short-circuit.
+    if (MdnsTransport.supportsSplit() && this.#started) {
+      if (this.#advertising) {
+        await MdnsNative.stopAdvertising().catch(() => {});
+        this.#advertising = false;
+      }
+      await MdnsNative.stopDiscovery().catch(() => {});
+      this.#eventSubs.forEach((sub) => sub.remove());
+      this.#eventSubs = [];
+      this.#started = false;
+      return this._applyDiscoverability(state);
+    }
     await this.disconnect();
     return this._applyDiscoverability(state);
   }
 
   async disconnect() {
     if (!this.#started) return;
-    this.#started = false;
+    this.#started    = false;
+    this.#advertising = false;
     for (const sub of this.#eventSubs) sub.remove();
     this.#eventSubs = [];
     await MdnsNative.stop().catch(() => {});
@@ -226,7 +279,14 @@ export class MdnsTransport extends Transport {
         console.log('[MdnsTransport] ServiceDiscovered:', pubKey?.slice(0,12), host, port);
         if (pubKey === this.#pubKey) { console.log('[MdnsTransport] skipping self'); return; }
         if (this.#pubKeyToConn.has(pubKey)) { console.log('[MdnsTransport] already connected'); return; }
-        if (this.#pubKey > pubKey) { console.log('[MdnsTransport] responder side, waiting for inbound'); return; }
+        // Tiebreaker — but only when BOTH sides can see each other. It exists to stop two peers opening
+        // duplicate sockets, and that can only happen if they can each discover the other. In ghost mode
+        // nobody can discover us, so deferring to the peer means waiting for a connection that will never
+        // come: we would list the room and connect to only the half of it that sorts above us.
+        if (this.#advertising && this.#pubKey > pubKey) {
+          console.log('[MdnsTransport] responder side, waiting for inbound');
+          return;
+        }
 
         console.log('[MdnsTransport] initiating TCP connect to', host, port);
         try {

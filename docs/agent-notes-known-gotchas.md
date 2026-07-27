@@ -221,3 +221,19 @@ link: `apps/basis/node_modules/@onderling/attribute-charter -> ../../../../packa
   next layer show: the connected **dev-client APK is stale** — missing native modules (ExpoSecureStore →
   ExpoWebBrowser → expo-auth-session → …). Do NOT shim these one-by-one (cascade + degrades auth/secure-store);
   **rebuild the dev client** (`expo run:android`) so it carries the app's current native deps.
+
+## mDNS: the native module gained a split — an old app binary silently cannot do ghost mode
+
+`MdnsModule` (Android, `packages/react-native/android/src/main/java/com/canopy/mdns/MdnsModule.kt`) used to
+expose one `start()` that registered the service AND began browsing. It now also exposes `startAdvertising` /
+`stopAdvertising` / `startDiscovery` / `stopDiscovery`, and `MdnsTransport` feature-detects them via
+`MdnsTransport.supportsSplit()`.
+
+**The trap:** JS is bundled at runtime, native is not. Run the new JS against an app binary built before this
+change and `supportsSplit()` is false — ghost mode falls back to advertising, `setDiscoverability('browse')`
+returns `{ effective: 'browse+publish', degraded: true }`, and the device is discoverable when the UI may
+suggest otherwise. That is deliberate (it is reported, not hidden), but it reads as a JS bug until you
+remember the binary. **Rebuild the Android app** after taking this change.
+
+`start()` / `stop()` are unchanged and still work, so nothing breaks — it degrades, loudly.
+

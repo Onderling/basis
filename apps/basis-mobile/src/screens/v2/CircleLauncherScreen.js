@@ -16,6 +16,10 @@ import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, BackHandler, Modal, Alert, findNodeHandle } from 'react-native';
 import { useTheme } from './themeContext.js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+// Network-change sources for the Nearby re-announce. AppState is always available; netinfo is an OPTIONAL
+// peer, so it is loaded defensively — a shell without it keeps foreground-return detection and simply loses
+// the in-foreground Wi-Fi-switch case.
+import { subscribeToNetworkChange as subscribeAppState, combineSources } from '@onderling/react-native';
 import {
   loadCircles, circleSourcesFromAgent, makeResolvingCallSkill,
   loadCircleItems, quickCreateCircle, setActiveCircle, normalizeCircleMembers,
@@ -31,7 +35,7 @@ import {
   // claim-router hook (mirror claimed tasks to my own circle).
   makeAfterClaimHook,
   // Nearby model + label helpers (the action map + banner rule are SHARED with web — invariant 3).
-  buildNearbyModel, NEARBY_ACTION_LABELS, nearbyVisibilityKey,
+  buildNearbyModel, NEARBY_ACTION_LABELS, nearbyVisibilityKey, createNearbyScreen,
   // "My things" private notes-list.
   myThingsFromListFiles,
   // kring-scoped event stream + per-row action chips.
@@ -1118,6 +1122,38 @@ export default function CircleLauncherScreen({
 
   const closeCircle = () => { setActiveCircle(null); setSelected(null); setItems([]); setView('list'); };
 
+  // Nearby row actions (Nearby step E, host wiring).
+  //
+  // Only the two the app can actually carry out are offered — `supportedActions` in `NearbyScreenHost`
+  // withholds `request-join`, which needs the ask/invite exchange (steps F + H). This handler is therefore
+  // allowed to assume it can service what it receives; an id it does not know is logged rather than
+  // silently swallowed, so a new shared action shows up as a gap instead of a dead button.
+  const handleNearbyAction = useCallback(async (action, row) => {
+    const peerId = row?.id ?? null;
+    if (!peerId) return;
+
+    if (action === 'open-shared-circle') {
+      // The row says "member" because the ROSTER said so. Find a circle we actually share, and open it —
+      // never invent one from the fact that we can see each other.
+      const shared = circlesRef.current.find((c) =>
+        Array.isArray(c?.members) && c.members.some((m) => (m?.pubKey ?? m?.id ?? m) === peerId));
+      if (shared) { await openCircle(shared); return; }
+      // The roster said member and no circle matched: a stale row, not a reason to open something else.
+      console.warn('[nearby] open-shared-circle: no shared circle found for', peerId.slice(0, 12));
+      return;
+    }
+
+    if (action === 'invite-to-circle') {
+      // Invites are per-circle, so this needs a circle chosen first. Sending the user to the list to pick
+      // one is honest; guessing which circle they meant is not.
+      setView('list');
+      return;
+    }
+
+    console.warn('[nearby] unhandled action:', action);
+  }, [openCircle]);
+
+
   // β.5 — context-menu handlers (long-press a tile to open).  Pin / Mute
   // are local toggles; Settings reuses the existing per-circle Settings
   // sub-screen; Leave fires /leave-group (via stoop.leaveGroup) after a
@@ -1487,11 +1523,17 @@ export default function CircleLauncherScreen({
     return <CircleHopScreen callSkill={callSkill} onBack={() => setView('availability')} />;
   }
   if (view === 'nearby') {
-    // Nearby/HIER screen. Pulls peers from bundle.mdns when
-    // wired; otherwise renders the empty-state copy from the substrate.
-    const peers = bundle?.mdns?.peers ?? [];
-    const model = buildNearbyModel({ peers, mySkills: [], t });
-    return <NearbyScreen model={model} onBack={() => setView('list')} />;
+    // Nearby screen. Driven by `createNearbyScreen` (shared with web), fed from the SURFACE — the
+    // discoverability control + merged peer source on the bundle — never from `bundle.mdns` directly.
+    // On a device with no discovering transport the surface is honest about it rather than silent:
+    // the banner says "unavailable" instead of the screen looking like an empty room.
+    return (
+      <NearbyScreenHost
+        bundle={bundle}
+        onBack={() => setView('list')}
+        onAction={handleNearbyAction}
+      />
+    );
   }
   if (view === 'mythings') {
     // Mijn dingen (private kring as notes-list).
@@ -3891,6 +3933,52 @@ function formatDayLabel(ts, t) {
   if (sameDay) return t('circle.kring.day_today');
   if (isYest)  return t('circle.kring.day_yesterday');
   return d.toLocaleDateString();
+}
+
+// Compose the network sources ONCE. netinfo lives behind its own subpath because it imports a native
+// module; if the binary predates it, `require` throws and we fall back to AppState alone rather than
+// failing to render the screen.
+let _netSource = null;
+function subscribeToNetworkChange(fn) {
+  if (!_netSource) {
+    let netinfo = null;
+    try {
+      // eslint-disable-next-line global-require
+      netinfo = require('@onderling/react-native/netinfo').subscribeToNetInfo;
+    } catch { netinfo = null; }
+    _netSource = netinfo ? combineSources([subscribeAppState, netinfo]) : subscribeAppState;
+  }
+  return _netSource(fn);
+}
+
+// Host for the Nearby screen: owns the controller's lifecycle so the screen component stays a projector.
+//
+// Mounting is what makes the device discoverable and unmounting is what stops it, which is rule (c) — and
+// it is deliberately tied to the React lifecycle rather than to a button, because the failure mode is a
+// user who *thinks* they left. Navigating away, backgrounding, or a crash mid-render all unmount, and all
+// must stop the announcement.
+function NearbyScreenHost({ bundle, onBack, onAction }) {
+  const [model, setModel] = useState(null);
+
+  const screen = useMemo(() => createNearbyScreen({
+    control:            bundle?.discoverability ?? null,
+    subscribeToPeers:   bundle?.nearbyPeers ? (fn) => bundle.nearbyPeers.subscribe(fn) : null,
+    subscribeToNetwork: (fn) => subscribeToNetworkChange(fn),
+    mySkills:           () => [],
+    t,
+    // Only what this host can actually carry out today. `request-join` needs the ask/invite exchange
+    // (Nearby steps F + H) and is deliberately NOT offered until it works.
+    supportedActions:   ['invite-to-circle', 'open-shared-circle'],
+    onError: (err, phase) => console.warn(`[nearby] ${phase}:`, err?.message ?? err),
+  }), [bundle]);
+
+  useEffect(() => {
+    const off = screen.subscribe(setModel);
+    screen.open();
+    return () => { off(); screen.close(); };
+  }, [screen]);
+
+  return <NearbyScreen model={model} onBack={onBack} onAction={onAction} />;
 }
 
 // Nearby screen. Renders the model `createNearbyScreen` produces — the same model the

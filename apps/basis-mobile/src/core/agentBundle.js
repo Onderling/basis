@@ -43,6 +43,11 @@ import { makeSendGroupRedeemRequest } from '../../../basis/src/core/handlers/gro
 // personas#2 — post-join "share to this circle" sender (member → admin roster-property push).
 import { makeSendPersonaPropsUpdate, createDisclosureShareMemo } from '../../../basis/src/core/handlers/personaPropsUpdate.js';
 import { sendA2ATask } from '@onderling/core';
+// The Nearby SURFACE — one control over every discovering transport, and one merged peer list. App code
+// must go through these rather than reaching into `bundle.mdns` (`CLAUDE.md`): reaching for a transport is
+// the signal the surface is missing an affordance, and the Nearby screen doing exactly that is why it was
+// mDNS-only and blind to BLE.
+import { createDiscoverabilityControl, createNearbyPeerSource } from '@onderling/core';
 import { PeerGraph } from '@onderling/core';
 import { AsyncStorageAdapter } from '@onderling/react-native/storage/AsyncStorageAdapter';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -315,6 +320,19 @@ export async function bootAgentBundle(opts = {}) {
   // Go) or the start times out (Wi-Fi off), `bundle.mdns` simply stays
   // unset and the UI row hides itself.
   let mdns = null;
+
+  // Built BEFORE the transport exists, deliberately: both take a lazy thunk, so they simply start empty and
+  // pick mDNS up when the fire-and-forget block below lands it (or never, on iOS / Expo Go / Wi-Fi off).
+  // That keeps the surface a stable object the UI can hold from boot.
+  const meshTransports = () => ({ mdns });
+  const discoverability = createDiscoverabilityControl({
+    transports: meshTransports,
+    onDegraded: (r) => console.warn(
+      `[cc/boot] discoverability: asked for '${r.requested}', actually '${r.effective}'`,
+    ),
+  });
+  const nearbyPeers = createNearbyPeerSource({ transports: meshTransports });
+
   (async () => {
     try {
       const MdnsTransport = await loadMdnsTransport();
@@ -552,6 +570,9 @@ export async function bootAgentBundle(opts = {}) {
     sharedWithMeStore,
     sharedWithMeOpener,
     get mdns() { return mdns; },
+    // The surface. Prefer these over `mdns` in app code — see the import comment above.
+    discoverability,
+    nearbyPeers,
     attachPeerWiring,
     dispose: async () => {
       try { contactSkills.dispose(); } catch { /* defensive */ }

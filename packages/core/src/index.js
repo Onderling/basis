@@ -96,6 +96,7 @@ export {
   normalizeDiscoverability, publishes, browses, maxExposure,
   createDiscoverabilityControl,
 } from './transport/discoverability.js';
+export { createNearbyPeerSource }         from './transport/nearbyPeers.js';
 export { InternalBus, InternalTransport } from './transport/InternalTransport.js';
 export { HubDelegateTransport }           from './transport/HubDelegateTransport.js';
 export { LocalTransport }                 from './transport/LocalTransport.js';

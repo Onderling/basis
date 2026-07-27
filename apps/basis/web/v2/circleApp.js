@@ -652,7 +652,8 @@ import { myThingsFromListFiles } from '../../src/v2/folioMyThings.js';
 import {
   sharedFilesFromListFiles, FOLIO_SHARE_FILTERS,
 } from '../../src/v2/folioSharedFilters.js';
-import { buildNearbyModel } from '../../src/v2/circleNearby.js';
+import { createNearbyScreen } from '../../src/v2/nearbyScreen.js';
+import { subscribeToNetworkChange } from '../../src/web/networkChangeSource.js';
 import { renderCircleStream } from './circleStream.js';
 import { renderCircleNearby } from './circleNearby.js';
 import { renderCircleMyThings } from './circleMyThings.js';
@@ -3047,10 +3048,75 @@ async function refreshLauncherProposals() {
 // (substrate path is mobile-only today), so peers stay [] and the
 // screen renders an honest empty state + the user's own published
 // skills footer so they can see what others would see.
+// Nearby, driven by the shared controller (same brain as mobile — invariant 2).
+//
+// Web has no discovering transport today, so the surface is EMPTY rather than absent: the controller sees
+// no transports, reports `unavailable`, and the screen says so. That is the honest render — an empty room
+// and "this device cannot find others" are different facts, and only one of them is true here.
+//
+// The controller is torn down on leaving. Nothing is being announced on web yet, but wiring close() now
+// means the day a browser transport appears, navigating away already stops it.
+let nearbyScreen = null;
+
 function showNearby() {
   hideCircleTabBar(tabBarEl);
-  const model = buildNearbyModel({ peers: [], mySkills: [], t });
-  renderCircleNearby(rootEl, { model, t, onBack: showLauncher });
+  closeNearby();
+
+  // Web has no mesh agent today, so both are null and the controller reports `unavailable` — which is the
+  // point: an empty room and "this device cannot find others" are different facts. When a browser transport
+  // lands, it is these two lines that change and nothing else.
+  const mesh = null;
+  nearbyScreen = createNearbyScreen({
+    control:            mesh?.discoverability ?? null,
+    subscribeToPeers:   mesh?.nearbyPeers ? (fn) => mesh.nearbyPeers.subscribe(fn) : null,
+    subscribeToNetwork: (fn) => subscribeToNetworkChange(fn),
+    t,
+    // Only what this host can carry out; `request-join` needs the ask/invite exchange (Nearby F + H).
+    supportedActions:   ['invite-to-circle', 'open-shared-circle'],
+    onError: (err, phase) => console.warn(`[nearby] ${phase}:`, err?.message ?? err),
+  });
+
+  const draw = (model) => renderCircleNearby(rootEl, {
+    model, t,
+    onBack: () => { closeNearby(); showLauncher(); },
+    onAction: handleNearbyAction,
+  });
+
+  nearbyScreen.subscribe(draw);
+  nearbyScreen.open();
+  draw(nearbyScreen.model());
+}
+
+function closeNearby() {
+  if (!nearbyScreen) return;
+  nearbyScreen.close();
+  nearbyScreen = null;
+}
+
+// Row actions. Only the two `supportedActions` admits reach here; an unknown id is logged rather than
+// silently swallowed, so a new shared action surfaces as a gap instead of a dead button.
+function handleNearbyAction(action, row) {
+  const peerId = row?.id ?? null;
+  if (!peerId) return;
+
+  if (action === 'open-shared-circle') {
+    // "Member" came from the ROSTER. Find a circle actually shared with them; never infer one from the
+    // fact that we can see each other.
+    const shared = (circlesCache ?? []).find((c) =>
+      Array.isArray(c?.members) && c.members.some((m) => (m?.pubKey ?? m?.id ?? m) === peerId));
+    if (shared) { closeNearby(); showDetail(shared); return; }
+    console.warn('[nearby] open-shared-circle: no shared circle for', peerId.slice(0, 12));
+    return;
+  }
+
+  if (action === 'invite-to-circle') {
+    // An invite is per-circle, so the user picks one first. Guessing which circle they meant is not honest.
+    closeNearby();
+    showLauncher();
+    return;
+  }
+
+  console.warn('[nearby] unhandled action:', action);
 }
 
 // Mijn dingen notes-list (private kring). Files

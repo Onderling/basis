@@ -27,10 +27,10 @@
  * @param {string}  [opts.discoverability='browse+publish'] — the initial discovery state (Nearby step A).
  *   Both consumers get a `discoverability` CONTROL back, which is the one surface an app may use to change
  *   it later — never the transports directly (`CLAUDE.md`).
- * @returns {Promise<{ mdns, ble, relay, perms, discoverability }>}
+ * @returns {Promise<{ mdns, ble, relay, perms, discoverability, nearbyPeers }>}
  */
 import { RelayTransport }                             from '@onderling/transports';
-import { DISCOVERABILITY, createDiscoverabilityControl } from '@onderling/core';
+import { DISCOVERABILITY, createDiscoverabilityControl, createNearbyPeerSource } from '@onderling/core';
 
 import { MdnsTransport }          from './transport/MdnsTransport.js';
 import { BleTransport }           from './transport/BleTransport.js';
@@ -121,7 +121,12 @@ export async function buildMeshTransports({
   // mDNS was pre-connected above (publishing); BLE's halves were passed to its constructor.
   await control.set(discoverability);
 
-  return { mdns, ble, relay, perms, discoverability: control };
+  // Who is around, merged across every discovering transport. Built here for the same reason the
+  // discoverability control is: an app must not reach into one adapter to answer a question the surface
+  // owns — that is how the Nearby screen ended up mDNS-only and blind to BLE.
+  const nearbyPeers = createNearbyPeerSource({ transports: () => ({ mdns, ble }) });
+
+  return { mdns, ble, relay, perms, discoverability: control, nearbyPeers };
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

@@ -62,6 +62,7 @@ export function nearbyVisibilityKey(visibility) {
  * @param {string} [deps.myPseudonym]
  * @param {(peerId: string) => boolean} [deps.isKnownMember]  the ROSTER answer, never proximity
  * @param {() => boolean} [deps.canInvite]
+ * @param {string[]} [deps.supportedActions]  which actions this host can actually SERVICE. Defaults to all.
  * @param {string} [deps.restingState]   passed through to the session adapter
  * @param {function} [deps.t]
  * @param {(err: Error, phase: string) => void} [deps.onError]
@@ -75,6 +76,7 @@ export function createNearbyScreen({
   myPseudonym = null,
   isKnownMember = () => false,
   canInvite = () => false,
+  supportedActions = null,
   restingState,
   t,
   onError = null,
@@ -149,10 +151,20 @@ export function createNearbyScreen({
     });
     // Actions are attached per row rather than computed in the renderer, so web and mobile cannot drift on
     // what proximity entitles someone to.
-    const rows = built.rows.map((row) => ({
-      ...row,
-      ...nearbyActions(row, { isKnownMember: safeIsKnownMember, canInvite: !!safeCall(canInvite, false) }),
-    }));
+    const rows = built.rows.map((row) => {
+      const decided = nearbyActions(row, {
+        isKnownMember: safeIsKnownMember,
+        canInvite: !!safeCall(canInvite, false),
+      });
+      // Do not offer what this host cannot do. `nearbyActions` says what proximity ENTITLES someone to;
+      // whether the surrounding app can carry it out is a separate question, and a button that quietly does
+      // nothing is worse than an absent one — it teaches people the app is broken rather than incomplete.
+      // The note stays either way: a stranger is still labelled a stranger.
+      const actions = Array.isArray(supportedActions)
+        ? decided.actions.filter((a) => supportedActions.includes(a))
+        : decided.actions;
+      return { ...row, ...decided, actions };
+    });
     return { ...built, rows, visibility: visibility(), isOpen: session.isOpen() };
   }
 

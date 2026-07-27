@@ -17,6 +17,9 @@
  * directly, which is the recovery `docs/agent-notes-known-gotchas.md` has always prescribed by hand.
  *
  * ── What it does ─────────────────────────────────────────────────────────────────────────────────────────
+ *   0. any workspace package sitting there as a real DIRECTORY (a copy) → replaced by a symlink. This is
+ *      the trap's main symptom and the one that bites twice: a copy keeps working until shared code gains a
+ *      NEW FILE, which the copy does not have, and then fails as `Cannot find module …/<newfile>.js`;
  *   1. every DECLARED `@onderling*` dep (dependencies + devDependencies + peerDependencies) → symlink;
  *   2. every IMPORTED-but-undeclared `@onderling*` package found in `src/` + `test/` → symlink. Several
  *      packages import siblings they never declared; a hoisted tree hid that, symlinks expose it;
@@ -25,7 +28,8 @@
  *      store. Creating the directory interrupts Node's walk-up, so packages that resolved fine from the
  *      root suddenly cannot (this is how `ws` disappears for `@onderling/relay`).
  *
- * Idempotent, additive, and never deletes: an existing entry — link, directory or file — is left alone.
+ * Idempotent. It only ever REMOVES a copied workspace package (step 0) — anything else already in place,
+ * link or file, is left alone.
  *
  * Usage:  node scripts/relink-workspace.mjs [--dry]
  *
@@ -33,7 +37,7 @@
  * still install normally. And if the relay sqlite suites fail after this, that is the separate documented
  * one: `npm rebuild better-sqlite3`.
  */
-import { readFileSync, existsSync, mkdirSync, symlinkSync, lstatSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync, symlinkSync, lstatSync, readdirSync, statSync, rmSync } from 'node:fs';
 import { join, dirname, relative, resolve, basename } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
@@ -62,9 +66,21 @@ function workspaces() {
 let made = 0;
 const byHome = new Map();
 
+let replaced = 0;
+
 function link(home, name, target) {
   const dest = join(home, 'node_modules', ...name.split('/'));
-  if (exists(dest)) return false;
+  if (exists(dest)) {
+    // A real directory where a workspace package belongs is a COPY left by a broken install. Leaving it is
+    // worse than it looks: it keeps working until shared code gains a new file, then fails with a
+    // `Cannot find module` naming a path that exists perfectly well at the real location.
+    let isCopy = false;
+    try { isCopy = !lstatSync(dest).isSymbolicLink() && statSync(dest).isDirectory(); } catch { isCopy = false; }
+    if (!isCopy) return false;
+    if (DRY) { replaced += 1; return true; }
+    rmSync(dest, { recursive: true, force: true });
+    replaced += 1;
+  }
   if (!DRY) {
     mkdirSync(dirname(dest), { recursive: true });
     symlinkSync(relative(dirname(dest), target), dest);
@@ -82,7 +98,7 @@ function importedNames(home) {
     if (!existsSync(dir)) continue;
     let out = '';
     try {
-      out = execFileSync('grep', ['-rhoE', "@onderling(-app)?/[a-z0-9-]+", dir],
+      out = execFileSync('grep', ['-rhoEI', "@onderling(-app)?/[a-z0-9-]+", dir],
         { encoding: 'utf8', timeout: 120_000, maxBuffer: 64 * 1024 * 1024 });
     } catch { /* grep exits 1 when nothing matches */ }
     for (const m of out.split('\n')) if (m.trim()) found.add(m.trim());
@@ -116,7 +132,8 @@ for (const [, home] of ws) {
   }
 }
 
-console.log(`${DRY ? '[dry] would create' : 'created'} ${made} symlink(s) across ${byHome.size} workspace(s)`);
+console.log(`${DRY ? '[dry] would create' : 'created'} ${made} symlink(s) across ${byHome.size} workspace(s)`
+  + (replaced ? ` (${replaced} were COPIES, now symlinked)` : ''));
 for (const [home, names] of [...byHome].sort()) {
   console.log(`  ${home} → ${names.sort().join(', ')}`);
 }

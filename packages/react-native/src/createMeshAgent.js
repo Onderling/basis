@@ -99,7 +99,7 @@ export async function createMeshAgent(opts = {}) {
   // sa.addSecureTransport instead of registering on a bare agent). It returns
   // the live ones; each is `null` when its native module is absent or the
   // mDNS pre-connect timed out.
-  const { mdns, ble, relay, discoverability: discoverabilityControl } = await buildMeshTransports({
+  const { mdns, ble, relay, discoverability: discoverabilityControl, nearbyPeers } = await buildMeshTransports({
     identity,
     enable:         transportEnabled,
     relayUrl,
@@ -279,6 +279,8 @@ export async function createMeshAgent(opts = {}) {
   // The discoverability SURFACE. Attached to the agent because that is what an app holds — and the rule is
   // that an app goes through the surface, never the transport (`CLAUDE.md`). One control, all transports.
   agent.discoverability = discoverabilityControl;
+  // The other half of the same surface: who is around, merged across transports.
+  agent.nearbyPeers = nearbyPeers;
 
   if (autoStart) await agent.start();
   return agent;

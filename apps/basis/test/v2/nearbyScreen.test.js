@@ -217,3 +217,50 @@ describe('lifecycle', () => {
     expect(screen.model().ownProfile.publishedSkills).toEqual([]);
   });
 });
+
+describe('supportedActions — do not offer what the host cannot do', () => {
+  it('withholds an action this host cannot service', async () => {
+    // `request-join` needs the ask/invite exchange (Nearby F + H). Offering a button that quietly does
+    // nothing is worse than an absent one: it teaches people the app is broken rather than incomplete.
+    const { screen, setPeers } = build({
+      canInvite: () => true,
+      supportedActions: ['invite-to-circle', 'open-shared-circle'],
+    });
+    screen.open();
+    setPeers([peer('stranger')]);
+
+    const [row] = screen.model().rows;
+    expect(row.actions).toEqual(['invite-to-circle']);
+    expect(row.actions).not.toContain('request-join');
+  });
+
+  it('but the stranger NOTE survives — withholding a button must not hide the relationship', async () => {
+    const { screen, setPeers } = build({ supportedActions: [] });
+    screen.open();
+    setPeers([peer('stranger')]);
+
+    const [row] = screen.model().rows;
+    expect(row.actions).toEqual([]);
+    expect(row.note).toBe('nearby-not-member');
+    expect(row.isMember).toBe(false);
+  });
+
+  it('omitting supportedActions offers everything (unchanged default)', async () => {
+    const { screen, setPeers } = build({ canInvite: () => true });
+    screen.open();
+    setPeers([peer('x')]);
+    expect(screen.model().rows[0].actions).toEqual(['invite-to-circle', 'request-join']);
+  });
+
+  it('a supported action still requires the entitlement — it filters, it does not grant', async () => {
+    // Declaring you can open a shared circle does not make a stranger a member.
+    const { screen, setPeers } = build({
+      isKnownMember: () => false,
+      supportedActions: ['open-shared-circle', 'request-join'],
+    });
+    screen.open();
+    setPeers([peer('stranger')]);
+    expect(screen.model().rows[0].actions).toEqual(['request-join']);
+  });
+});
+

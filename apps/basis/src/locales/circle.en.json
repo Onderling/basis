@@ -2232,6 +2232,54 @@
     }
   },
   "nearbyScreen": {
+    "visible_title": {
+      "text": "You are visible here",
+      "doc": "Visibility banner heading while announcing (Nearby step E)."
+    },
+    "visible_body": {
+      "text": "People nearby can see your name and published offerings while this screen is open.",
+      "doc": "Visibility banner body while announcing — says exactly what is shared."
+    },
+    "hidden_title": {
+      "text": "You are hidden",
+      "doc": "Visibility banner heading in ghost mode."
+    },
+    "hidden_body": {
+      "text": "You can see who is around; they cannot see you.",
+      "doc": "Visibility banner body in ghost mode."
+    },
+    "still_visible_title": {
+      "text": "Still visible",
+      "doc": "Banner heading when the device could NOT honour \"hidden\" (older native build)."
+    },
+    "still_visible_body": {
+      "text": "This device cannot look around without announcing itself, so others can still see you. Updating the app fixes this.",
+      "doc": "Banner body for the degraded case — never let someone believe they are hidden."
+    },
+    "unavailable_title": {
+      "text": "Nearby is unavailable",
+      "doc": "Banner heading when no transport can discover at all."
+    },
+    "unavailable_body": {
+      "text": "This device cannot find others on the local network.",
+      "doc": "Banner body for the no-radio/no-permission case. An explanation, not a warning."
+    },
+    "action_invite": {
+      "text": "Invite to a circle",
+      "doc": "Row action — invite this stranger into a circle I admin."
+    },
+    "action_request": {
+      "text": "Ask to join theirs",
+      "doc": "Row action — ask to join a circle of theirs."
+    },
+    "action_open": {
+      "text": "Open shared circle",
+      "doc": "Row action — shown ONLY when the roster says we already share a circle."
+    },
+    "not_member_note": {
+      "text": "Nearby, not a member — being on the same network is not a connection.",
+      "doc": "Row note making rule (b) explicit: discovery is not membership."
+    },
     "title": {
       "text": "Nearby",
       "doc": "Board 8C — heading of the dedicated `HIER` screen (P6.8)."

@@ -2232,6 +2232,54 @@
     }
   },
   "nearbyScreen": {
+    "visible_title": {
+      "text": "Je bent hier zichtbaar",
+      "doc": "Visibility banner heading while announcing (Nearby step E)."
+    },
+    "visible_body": {
+      "text": "Mensen in de buurt zien je naam en gepubliceerde aanbod zolang dit scherm open staat.",
+      "doc": "Visibility banner body while announcing — says exactly what is shared."
+    },
+    "hidden_title": {
+      "text": "Je bent verborgen",
+      "doc": "Visibility banner heading in ghost mode."
+    },
+    "hidden_body": {
+      "text": "Jij ziet wie er is; zij zien jou niet.",
+      "doc": "Visibility banner body in ghost mode."
+    },
+    "still_visible_title": {
+      "text": "Nog steeds zichtbaar",
+      "doc": "Banner heading when the device could NOT honour \"hidden\" (older native build)."
+    },
+    "still_visible_body": {
+      "text": "Dit apparaat kan niet rondkijken zonder zichzelf aan te kondigen, dus anderen kunnen je nog steeds zien. De app bijwerken lost dit op.",
+      "doc": "Banner body for the degraded case — never let someone believe they are hidden."
+    },
+    "unavailable_title": {
+      "text": "In de buurt is niet beschikbaar",
+      "doc": "Banner heading when no transport can discover at all."
+    },
+    "unavailable_body": {
+      "text": "Dit apparaat kan anderen op het lokale netwerk niet vinden.",
+      "doc": "Banner body for the no-radio/no-permission case. An explanation, not a warning."
+    },
+    "action_invite": {
+      "text": "Uitnodigen voor een kring",
+      "doc": "Row action — invite this stranger into a circle I admin."
+    },
+    "action_request": {
+      "text": "Vragen om mee te doen",
+      "doc": "Row action — ask to join a circle of theirs."
+    },
+    "action_open": {
+      "text": "Gedeelde kring openen",
+      "doc": "Row action — shown ONLY when the roster says we already share a circle."
+    },
+    "not_member_note": {
+      "text": "In de buurt, geen lid — op hetzelfde netwerk zitten is geen connectie.",
+      "doc": "Row note making rule (b) explicit: discovery is not membership."
+    },
     "title": {
       "text": "In de buurt",
       "doc": "Board 8C — heading of the `HIER` screen (P6.8)."

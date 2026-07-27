@@ -224,6 +224,25 @@ export class BleTransport extends Transport {
     return this.#advertisingNow() ? DISCOVERABILITY.PUBLISH : DISCOVERABILITY.BROWSE;
   }
 
+  /**
+   * @protected — BLE does not ride a network interface, so a Wi-Fi change is not its problem. But the two
+   * things that DO go stale are: the scanner's de-dup filter (which suppresses re-reports of a device it
+   * thinks it has already seen) and a peripheral advertisement that Android quietly stopped while
+   * backgrounded. Both are fixed by restarting the halves, and neither needs the GATT links dropped —
+   * so this restarts announcement and scanning while leaving live connections alone.
+   */
+  async _reannounce(state) {
+    if (state === DISCOVERABILITY.OFF) return DISCOVERABILITY.OFF;
+    if (this.#scanningNow()) this.#restartScan();
+    if (this.#advertisingNow()) {
+      await BlePeripheral.stop().catch(() => {});
+      this.#advertisingActive = false;
+      await BlePeripheral.start(SERVICE_UUID, CHARACTERISTIC_UUID);
+      this.#advertisingActive = true;
+    }
+    return this.#advertisingNow() ? DISCOVERABILITY.PUBLISH : DISCOVERABILITY.BROWSE;
+  }
+
   #advertisingNow() { return this.#started && this.#advertise && !!BlePeripheral && this.#advertisingActive; }
   #scanningNow()    { return this.#started && this.#scan; }
 

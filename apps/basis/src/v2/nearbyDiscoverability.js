@@ -71,7 +71,7 @@ export function makeNearbySessionAdapter({
       .catch((err) => { try { onError?.(err, phase); } catch { /* diagnostics only */ } });
   };
 
-  return {
+  const adapter = {
     /** Opening Nearby — the ONLY thing in basis that asks to be announced. */
     startAdvertising() { apply(DISCOVERABILITY.PUBLISH, 'start'); },
 
@@ -82,5 +82,27 @@ export function makeNearbySessionAdapter({
     lastReport() { return last ? { ...last } : (control?.report?.() ?? null); },
 
     restingState,
+
+    /**
+     * The network changed — re-announce at whatever state we are already in (Nearby step C).
+     *
+     * A shell calls this from its network-change event. It deliberately does NOT open the session or raise
+     * the state: switching Wi-Fi must never make a device that is resting start announcing itself. If the
+     * view is closed we are at the resting state, and re-announcing that is a no-op or a browse restart.
+     */
+    onNetworkChange() {
+      if (!control?.reannounce) return;
+      let result;
+      try { result = control.reannounce(); }
+      catch (err) { try { onError?.(err, 'reannounce'); } catch { /* diagnostics only */ } return; }
+      Promise.resolve(result)
+        .then((report) => {
+          last = report;
+          if (report?.degraded) { try { onDegraded?.(report); } catch { /* diagnostics only */ } }
+        })
+        .catch((err) => { try { onError?.(err, 'reannounce'); } catch { /* diagnostics only */ } });
+    },
   };
+
+  return adapter;
 }

@@ -155,3 +155,64 @@ describe('honesty when the transport cannot comply', () => {
     expect(adapter.lastReport()).toBeNull();
   });
 });
+
+describe('a network change (Nearby step C)', () => {
+  /** Mirrors mDNS: applying an already-applied state does nothing, so only reannounce restarts. */
+  class ShortCircuiting extends Transport {
+    starts = 0;
+    #on = false;
+    get supportsDiscoverability() { return true; }
+    async _applyDiscoverability(state) {
+      if (state === DISCOVERABILITY.OFF) { this.#on = false; return state; }
+      if (!this.#on) { this.starts++; this.#on = true; }
+      return DISCOVERABILITY.PUBLISH;
+    }
+    async _reannounce(state) {
+      await this._applyDiscoverability(DISCOVERABILITY.OFF);
+      return this._applyDiscoverability(state);
+    }
+    async _put() {}
+  }
+
+  it('re-announces while the view is open — the Wi-Fi-switch case', async () => {
+    const mdns = mk(ShortCircuiting);
+    const { adapter, session } = wire({ transports: { mdns } });
+
+    session.open();
+    await settle();
+    expect(mdns.starts).toBe(1);
+
+    adapter.onNetworkChange();
+    await settle();
+    expect(mdns.starts).toBe(2);          // without this the device is silently invisible on the new network
+    expect(session.isOpen()).toBe(true);  // and the view is untouched
+  });
+
+  it('does NOT start announcing when the view is CLOSED', async () => {
+    // The dangerous direction: joining a café Wi-Fi must not announce a device that never opened Nearby.
+    const mdns = mk(ShortCircuiting);
+    const { control, adapter } = wire({ transports: { mdns }, restingState: DISCOVERABILITY.OFF });
+    await control.set(DISCOVERABILITY.OFF);
+
+    adapter.onNetworkChange();
+    await settle();
+
+    expect(mdns.starts).toBe(0);
+    expect(control.isPublishing).toBe(false);
+  });
+
+  it('reports a failed re-announce rather than assuming it worked', async () => {
+    const onError = vi.fn();
+    const control = { reannounce: () => Promise.reject(new Error('interface gone')), report: () => null };
+    const adapter = makeNearbySessionAdapter({ control, onError });
+    adapter.onNetworkChange();
+    await settle();
+    expect(onError).toHaveBeenCalledWith(expect.any(Error), 'reannounce');
+  });
+
+  it('a control without reannounce is a no-op, not a crash', () => {
+    const adapter = makeNearbySessionAdapter({ control: { set: () => Promise.resolve({}) } });
+    expect(() => adapter.onNetworkChange()).not.toThrow();
+  });
+});
+

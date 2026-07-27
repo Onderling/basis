@@ -243,6 +243,48 @@ export class Transport extends Emitter {
    */
   async _applyDiscoverability(state) { return state; }
 
+  /**
+   * Re-announce at the CURRENT state (Nearby step C).
+   *
+   * Discovery announcements are tied to a network interface, so switching Wi-Fi, coming back from
+   * airplane mode, or waking from a long background invalidates them without any of our code being told.
+   * Nothing throws, nothing reconnects, and the state we report stays correct — we ARE set to publish. We
+   * are just publishing to a network that no longer exists. To everyone else the device silently vanished.
+   *
+   * `setDiscoverability` cannot fix this, because it short-circuits: adapters skip work when the state is
+   * already applied. So this is a separate verb meaning "the same state, from scratch".
+   *
+   * @returns {Promise<{ok:boolean, effective:string, reason?:string}>}
+   */
+  async reannounce() {
+    if (!this.supportsDiscoverability) {
+      return { ok: true, effective: DISCOVERABILITY.OFF, reason: 'discoverability-unsupported' };
+    }
+    if (this.#discoverability === DISCOVERABILITY.OFF) {
+      // Nothing to re-announce, and re-announcing would be the bug: a network change must never make a
+      // device that chose to be invisible start announcing itself.
+      return { ok: true, effective: DISCOVERABILITY.OFF, reason: 'not-discovering' };
+    }
+    const state = this.#discoverability;
+    try {
+      const applied = await this._reannounce(state);
+      const effective = isDiscoverability(applied) ? applied : state;
+      this.#discoverability = effective;
+      return { ok: true, effective };
+    } catch (err) {
+      // A failed re-announce leaves us in whatever state the old interface left behind — which we cannot
+      // know. Keep reporting the more exposed reading rather than claiming a clean restart.
+      return { ok: false, effective: state, reason: err?.message ?? 'reannounce-failed' };
+    }
+  }
+
+  /**
+   * @protected adapters override: re-establish the announcement at `state` from scratch.
+   * The default is a plain re-apply, which is correct for an adapter whose `_applyDiscoverability` is not
+   * short-circuiting; adapters that skip already-applied work must override this to actually restart.
+   */
+  async _reannounce(state) { return this._applyDiscoverability(state); }
+
   // ── Security layer ──────────────────────────────────────────────────────────
 
   /** Attach a SecurityLayer (or A2ATLSLayer for A2ATransport). */

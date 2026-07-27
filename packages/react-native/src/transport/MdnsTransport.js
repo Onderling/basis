@@ -129,6 +129,18 @@ export class MdnsTransport extends Transport {
     return DISCOVERABILITY.PUBLISH;   // whatever was asked, this is what the device is doing
   }
 
+  /**
+   * @protected — a real restart, because `connect()` returns early on `#started`.
+   *
+   * This is the whole point of the verb: after a Wi-Fi switch the service is registered against an
+   * interface that no longer exists, `#started` is still true, and every "make sure we are announcing" path
+   * short-circuits. Tearing down first is what makes the re-announce actually reach the new network.
+   */
+  async _reannounce(state) {
+    await this.disconnect();
+    return this._applyDiscoverability(state);
+  }
+
   async disconnect() {
     if (!this.#started) return;
     this.#started = false;

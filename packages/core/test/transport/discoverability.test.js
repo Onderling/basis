@@ -228,3 +228,101 @@ describe('the surface (aggregate over transports)', () => {
     expect(() => createDiscoverabilityControl({ transports: { ble: null } })).toThrow(TypeError);
   });
 });
+
+describe('reannounce (Nearby step C)', () => {
+  /** An adapter whose apply SHORT-CIRCUITS, like mDNS's connect() does on `#started`. */
+  class ShortCircuiting extends Transport {
+    starts = 0;
+    stops  = 0;
+    #on = false;
+    get supportsDiscoverability() { return true; }
+    async _applyDiscoverability(state) {
+      if (state === DISCOVERABILITY.OFF) { if (this.#on) { this.stops++; this.#on = false; } return state; }
+      if (!this.#on) { this.starts++; this.#on = true; }   // ← the short-circuit
+      return DISCOVERABILITY.PUBLISH;
+    }
+    async _reannounce(state) {
+      await this._applyDiscoverability(DISCOVERABILITY.OFF);
+      return this._applyDiscoverability(state);
+    }
+    async _put() {}
+  }
+
+  it('THE BUG IT FIXES: re-applying the same state does nothing, re-announcing restarts', async () => {
+    const t = mk(ShortCircuiting);
+    await t.setDiscoverability(DISCOVERABILITY.PUBLISH);
+    expect(t.starts).toBe(1);
+
+    await t.setDiscoverability(DISCOVERABILITY.PUBLISH);   // a Wi-Fi switch would leave us here: invisible
+    expect(t.starts).toBe(1);
+
+    await t.reannounce();
+    expect(t.starts).toBe(2);
+    expect(t.stops).toBe(1);
+  });
+
+  it('does NOT announce a transport that is resting off', async () => {
+    // The dangerous direction: a network event must never make an invisible device visible.
+    const t = mk(ShortCircuiting);
+    const r = await t.reannounce();
+    expect(r).toMatchObject({ ok: true, effective: 'off', reason: 'not-discovering' });
+    expect(t.starts).toBe(0);
+  });
+
+  it('a non-discovering transport is a no-op', async () => {
+    const r = await mk(NonDiscovering).reannounce();
+    expect(r).toMatchObject({ ok: true, effective: 'off' });
+  });
+
+  it('a failed re-announce keeps reporting the exposed state, not a clean restart', async () => {
+    class FailsToRestart extends ShortCircuiting {
+      async _reannounce() { throw new Error('interface gone'); }
+    }
+    const t = mk(FailsToRestart);
+    await t.setDiscoverability(DISCOVERABILITY.PUBLISH);
+    const r = await t.reannounce();
+    expect(r).toMatchObject({ ok: false, effective: 'browse+publish' });
+    expect(t.discoverability).toBe('browse+publish');
+  });
+
+  it('the surface re-announces every transport without changing the requested state', async () => {
+    const a = mk(ShortCircuiting);
+    const b = mk(ShortCircuiting);
+    const c = createDiscoverabilityControl({ transports: () => ({ a, b }) });
+    await c.set(DISCOVERABILITY.PUBLISH);
+
+    const r = await c.reannounce();
+    expect(a.starts).toBe(2);
+    expect(b.starts).toBe(2);
+    expect(r.requested).toBe('browse+publish');   // unchanged
+    expect(c.state).toBe('browse+publish');
+  });
+
+  it('the surface re-announcing while resting off leaves everything off', async () => {
+    const a = mk(ShortCircuiting);
+    const c = createDiscoverabilityControl({ transports: () => ({ a }) });
+    await c.set(DISCOVERABILITY.OFF);
+    await c.reannounce();
+    expect(a.starts).toBe(0);
+    expect(c.isPublishing).toBe(false);
+  });
+
+  it('one transport failing to re-announce does not stop the others', async () => {
+    class Bad extends Transport {
+      get supportsDiscoverability() { return true; }
+      async _applyDiscoverability(s) { return s; }
+      async _reannounce() { throw new Error('nope'); }
+      async _put() {}
+    }
+    const good = mk(ShortCircuiting);
+    // Hoisted deliberately: `transports` is called on EVERY operation, so constructing inline would hand
+    // out a fresh instance each time and nothing would ever be in the state the previous call set.
+    const bad = mk(Bad);
+    const c = createDiscoverabilityControl({ transports: () => ({ good, bad }) });
+    await c.set(DISCOVERABILITY.PUBLISH);
+    const r = await c.reannounce();
+    expect(good.starts).toBe(2);
+    expect(r.perTransport.find((p) => p.name === 'bad').ok).toBe(false);
+  });
+});
+

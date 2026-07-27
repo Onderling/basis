@@ -160,6 +160,41 @@ export function createDiscoverabilityControl({ transports, onChange = null, onDe
       return report;
     },
 
+    /**
+     * Re-announce on every discovering transport at the state they are already in (Nearby step C).
+     *
+     * The caller for this is a network change — a Wi-Fi switch, airplane mode off, a long background. The
+     * device believes it is discoverable and is technically correct; the announcement is just bound to an
+     * interface that is gone. Without this, you are invisible until something happens to restart a
+     * transport, and nothing routinely does.
+     *
+     * It deliberately does NOT change the requested state: a transport resting at `off` stays off. A
+     * network event must never be able to make a device that chose invisibility start announcing.
+     */
+    async reannounce() {
+      const named = Object.entries(transports() ?? {}).filter(([, t]) => t && t.supportsDiscoverability);
+      const results = [];
+      for (const [name, t] of named) {
+        try {
+          const r = await t.reannounce();
+          results.push({ name, requested, ...r, degraded: false });
+        } catch (err) {
+          results.push({
+            name, ok: false, requested, effective: t.discoverability ?? effective,
+            degraded: false, reason: err?.message ?? 'threw',
+          });
+        }
+      }
+      if (results.length) {
+        perTransport = results;
+        effective = results.reduce((acc, r) => maxExposure(acc, r.effective), DISCOVERABILITY.OFF);
+      }
+      const report = buildReport();
+      notify(onChange, report);
+      if (report.degraded) notify(onDegraded, report);
+      return report;
+    },
+
     /** What the device is ACTUALLY doing, across all transports. */
     get state() { return effective; },
 

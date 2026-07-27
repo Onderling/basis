@@ -197,6 +197,30 @@ separate surface KIND, parked). The compose/trigger loop (open-screen button ↔
 *What the system actually models: one algebra of circles, types, and capabilities — and how every kind of
 sharing is a move over a single sealed resource.*
 
+### One log, many projections
+
+The same instinct applies to what a circle *records*. There is **one append-only event log per device** — not
+one per circle and not one per surface. Every entry carries a **kind**, an **actor**, and (usually) a
+`circleId`; the log is the canonical record, and **chat, the cross-circle stream, and the activity views are
+all projections of it**, not separate stores.
+
+A projection selects on two axes, and it is worth naming them because the function names alone do not:
+
+- **scope** — one circle, or all of them;
+- **content** — which entry *kinds* (`chat-message`, `task`, `governance`, `report`, …), and therefore which
+  lane: the human-facing kinds, or also the silent system ones.
+
+So the per-circle chat is `scope = this circle, content = the conversation kinds`, and the cross-circle
+stream is `scope = all, content = everything`. A combine-and-filter surface is just a control that sets those
+two arguments — not a new query path.
+
+The entry **kind** is also what the attention gate keys off: silent system kinds (membership, key events,
+delivery state, a roster ping) never wake an offline device; only human-facing kinds may. Deriving that from
+the kind — rather than stamping a flag at each write site — is what keeps the rule from drifting.
+
+*(Being completed: the projector functions and the kind registry are converging on exactly this shape — see
+the private roadmap. The principle above is the design of record.)*
+
 ### Circles, types, and capabilities — one algebra
 
 A few concepts are deliberately *the same thing*, so that data, permissions, and audience line up instead of

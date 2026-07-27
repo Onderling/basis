@@ -21,6 +21,8 @@ export { NknTransport, HI_RACE_PATTERNS }
 export { requestMeshPermissions } from './src/permissions.js';
 export { buildMeshTransports }    from './src/buildMeshTransports.js';
 export { createMeshAgent }        from './src/createMeshAgent.js';
+export { subscribeToNetworkChange, combineSources }
+                                  from './src/networkChangeSource.js';
 export { MobilePushBridge }       from './src/transport/MobilePushBridge.js';
 export { PushAdapter }            from './src/transport/pushAdapters/PushAdapter.js';
 // ExpoNotificationsAdapter is intentionally NOT re-exported from the barrel —

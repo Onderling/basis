@@ -247,6 +247,8 @@ export {
   pickPeerLabel as pickNearbyPeerLabel,
 } from './v2/circleNearby.js';
 export { createProximitySession, nearbyActions } from './v2/circleProximity.js';
+export { makeNearbySessionAdapter }             from './v2/nearbyDiscoverability.js';
+export { createNetworkChangeWatcher }           from './v2/networkChangeWatcher.js';
 export { makeSharedCirclePeerScope } from './v2/sharedCirclePeerScope.js';
 // agent-add admin approval: proposal-like flow for
 // joining an LLM agent to a circle whose `agents` axis is admin-approval.

@@ -592,3 +592,48 @@ configured — rejected: that describes the device, and the promise belongs to t
 
 **Consequences.** The refusal is scoped to circles that made the promise, so p0/p1 are untouched (guarded by
 a control test against over-reach). `storagePosture` becomes load-bearing at share time, not only at rest.
+
+---
+
+## 2026-07-27 — What per-circle addressing actually promises
+
+**Status:** settled (design of record); not built. Relates to `PLAN-peer-connectivity.md` G12/G13.
+
+**Context.** A member presents a different address in every circle, derived from a secret profile seed
+(`deriveCircleSeed` → HKDF). The intent is that two circles cannot correlate the same person. Today those
+addresses are derived, proven at join and stored on the roster — but **never used for routing**; every send
+resolves to the member's global signing key, so a relay sees one identity across all their circles.
+
+Fixing that requires the relay to accept several addresses for one device, and **every shape of that leaks
+to the relay**. One socket carrying N addresses correlates them outright. N separate sockets do not — but a
+device has exactly **one push token**, and the wake path must map *address → token*, so registering N
+addresses writes N rows carrying the same token. A push token cannot be fragmented: the OS issues one per
+device.
+
+**Decision.** The promise is:
+
+> **Your circles are unlinkable to everyone except the one relay you chose — and you can choose yourself.**
+
+Concretely: unlinkable to other members, to anyone observing the wire, and to every relay you did not use.
+The relay you do use can correlate your circle addresses and **can read nothing**.
+
+Because the relay correlates anyway, the cheap implementation is also the right one: **one socket carrying
+several registered addresses**, not N connections.
+
+**Alternatives considered.**
+- *Per-circle opt-out of push* (no token ⇒ nothing to correlate) and *polling instead of push* — both trade
+  wake for unlinkability, per circle, and both fit the existing per-circle policy pattern. **Parked**, not
+  rejected: they add real complexity for a property the next option delivers outright.
+- *Running your own relay / companion node* — **this is the real answer.** If the relay is yours, "the relay
+  correlates" stops mattering, and the promise above becomes unconditional. It is already a planned
+  direction (`NOTE-companion-node.md`), so the honest framing is that per-circle addressing is
+  meaningfully private today and *fully* private once you host your own connection point.
+- *Doing nothing* — rejected: the current state is worse than either, because the design implies a property
+  the system does not have.
+
+**Consequences.** Product copy must not claim unlinkability against the relay; it may claim it against
+members, the wire and other relays, and it may point at self-hosting for the rest. The per-circle address
+becomes load-bearing at the transport, so hold-forward, the push-token registry and the ForwardQueue all
+multiply per (member × circle). Migration is dual-addressing with a webid fallback, dropped last — the
+fallback is not only a safety net: members who joined before the address-proof work have no per-circle
+address at all.

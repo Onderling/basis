@@ -187,9 +187,13 @@ describe('Group Y — mesh scenario', () => {
     await gossipOnce(m.alice, m.pubKeys.bob);    // alice learns carol (hops:1, via:bob)
 
     // All three enable the oracle so there's a claim to publish.
-    m.alice.enableReachabilityOracle({ ttlMs: 60_000 });
-    m.bob.enableReachabilityOracle({ ttlMs: 60_000 });
-    m.carol.enableReachabilityOracle({ ttlMs: 60_000 });
+    // An open mesh with no social graph to protect, stated explicitly: since G7 (2026-07-27) the oracle
+    // discloses nothing unless the caller says what each peer may learn. A real app passes a circle-aware
+    // scope; this scenario is precisely the case where "everyone learns everyone" is the intent.
+    const OPEN = (_caller, peers) => peers;
+    m.alice.enableReachabilityOracle({ ttlMs: 60_000, peerScope: OPEN });
+    m.bob.enableReachabilityOracle({ ttlMs: 60_000, peerScope: OPEN });
+    m.carol.enableReachabilityOracle({ ttlMs: 60_000, peerScope: OPEN });
 
     // One "oracle gossip" round — alice pulls Bob's signed claim.
     const ok = await gossipOracle(m.alice, m.pubKeys.bob);

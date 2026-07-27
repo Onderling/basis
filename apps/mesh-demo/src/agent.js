@@ -69,7 +69,10 @@ export async function createAgent({ relayUrl } = {}) {
   // through any relay bridge, so the bridge cannot read the payload.
   // Tunnel (Group CC) — this phone can act as a bridge for other peers'
   // streaming / IR / cancel calls AND can be the target of sealed tunnels.
-  agent.enableReachabilityOracle();
+  // A demo mesh has no social graph to protect, so it opts into the OPEN scope explicitly. Since G7
+  // (2026-07-27) the oracle discloses nothing unless a caller says what each peer may learn — a real app
+  // passes a circle-aware scope here instead.
+  agent.enableReachabilityOracle({ peerScope: (_caller, peers) => peers });
   registerCapabilitiesSkill(agent);
   agent.enableSealedForwardFor('mesh');
   agent.enableTunnelForward({ policy: 'authenticated' });

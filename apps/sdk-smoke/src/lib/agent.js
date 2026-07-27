@@ -58,7 +58,10 @@ export async function getSmokeAgent({ relayUrl = RELAY_URL } = {}) {
     agent.enableAutoHello({ pullPeers: true });
     agent.startDiscovery({ gossipIntervalMs: 60_000 });
 
-    agent.enableReachabilityOracle();
+    // A demo mesh has no social graph to protect, so it opts into the OPEN scope explicitly. Since G7
+  // (2026-07-27) the oracle discloses nothing unless a caller says what each peer may learn — a real app
+  // passes a circle-aware scope here instead.
+  agent.enableReachabilityOracle({ peerScope: (_caller, peers) => peers });
     registerCapabilitiesSkill(agent);
     agent.enableSealedForwardFor('mesh');
     agent.enableTunnelForward({ policy: 'authenticated' });

@@ -8,6 +8,23 @@
  *   (b) the cached claim's TTL has less than `refreshBeforeMs` left, OR
  *   (c) there is no cached claim yet.
  *
+ * ── DISCLOSURE (2026-07-27, audit item G7) ───────────────────────────────────
+ * The claim's body is **this device's contact graph**: the pubKey of every peer it is directly connected
+ * to, signed. That is not neutral routing metadata — in a social product it is who someone knows.
+ *
+ * The skill is `authenticated`, so before this change any known peer could ask a device "who are you
+ * connected to?" and receive a signed answer. Acceptable in a mesh demo with no social graph to protect;
+ * not acceptable in an app with users in neighbourhood circles.
+ *
+ * So the ANSWER is now scoped per caller, not just the gate. `peerScope(callerPubKey, peers)` decides what
+ * a given caller may learn — the same lesson as the report-visibility fix (`docs/decisions.md` 2026-07-26
+ * §2): a gate controls WHO ASKS, never WHAT THEY LEARN, so the narrowing has to happen at the data.
+ *
+ * **Deny-by-default:** with no `peerScope` the claim discloses NOTHING and a warning is logged once. A
+ * caller that wants the old open behaviour states it (`peerScope: (_c, peers) => peers`), which is the
+ * honest thing for a mesh demo to say out loud. Core stays circle-agnostic (invariant 5) — the scoper is
+ * injected by whoever knows what a circle is.
+ *
  * See Design-v3/oracle-bridge-selection.md §3 and CODING-PLAN.md Group T3.
  */
 import { DataPart }                        from '../Parts.js';
@@ -29,6 +46,9 @@ export const DEFAULT_MAX_PEERS          = 256;
  * @param {number}  [opts.refreshBeforeMs]
  * @param {number}  [opts.maxPeers]
  * @param {object}  [opts.seqStore]          — forwarded to signReachabilityClaim
+ * @param {(callerPubKey: string, peers: string[]) => string[]} [opts.peerScope]
+ *   Which of this device's direct peers THIS caller may learn about. Absent ⇒ none are disclosed (see the
+ *   disclosure note above). Pass `(_caller, peers) => peers` to opt into the old open behaviour.
  */
 export function registerReachablePeersSkill(agent, opts = {}) {
   if (agent.skills.get('reachable-peers')) return;  // idempotent
@@ -44,20 +64,44 @@ export function registerReachablePeersSkill(agent, opts = {}) {
   const refreshBeforeMs = resolve('refreshBeforeMs', DEFAULT_REFRESH_BEFORE_MS);
   const maxPeers        = resolve('maxPeers',        DEFAULT_MAX_PEERS);
   const seqStore        = opts.seqStore;   // undefined → helper's default store
+  const peerScope       = typeof opts.peerScope === 'function' ? opts.peerScope : null;
+  let warnedNoScope     = false;
 
-  /** @type {{ claim: object, signedAt: number, peerSetKey: string } | null} */
-  let cache = null;
+  /**
+   * Cache keyed by CALLER, not global. A single-slot cache would hand a claim minted for one caller to the
+   * next one — which under per-caller scoping is precisely the leak this change exists to prevent.
+   * @type {Map<string, { claim: object, signedAt: number, peerSetKey: string }>}
+   */
+  const cacheByCaller = new Map();
 
-  agent.register('reachable-peers', async () => {
-    const peers    = await _directPeerPubKeys(agent, maxPeers);
+  agent.register('reachable-peers', async ({ from } = {}) => {
+    const all      = await _directPeerPubKeys(agent, maxPeers);
+
+    // Scope the ANSWER. No scoper ⇒ disclose nothing, and say so once: an empty claim degrades hop routing
+    // quietly, so the operator needs to know it is a configuration choice and not a network condition.
+    let peers;
+    if (peerScope) {
+      const scoped = peerScope(from ?? null, all);
+      peers = Array.isArray(scoped) ? scoped.filter((p) => all.includes(p)) : [];
+    } else {
+      peers = [];
+      if (!warnedNoScope) {
+        warnedNoScope = true;
+        console.warn('[reachable-peers] no `peerScope` configured — disclosing no peers. '
+          + 'Pass peerScope(callerPubKey, peers) to choose what each caller may learn.');
+      }
+    }
+
+    const cacheKey = from ?? '<anonymous>';
     const setKey   = peers.join(',');
     const now      = Date.now();
     const ageLimit = ttlMs - refreshBeforeMs;
+    const cached   = cacheByCaller.get(cacheKey);
 
     const stale =
-      !cache
-      || cache.peerSetKey !== setKey
-      || (now - cache.signedAt) >= ageLimit;
+      !cached
+      || cached.peerSetKey !== setKey
+      || (now - cached.signedAt) >= ageLimit;
 
     if (stale) {
       const claim = await signReachabilityClaim(
@@ -65,10 +109,11 @@ export function registerReachablePeersSkill(agent, opts = {}) {
         peers,
         { ttlMs, seqStore },
       );
-      cache = { claim, signedAt: now, peerSetKey: setKey };
+      cacheByCaller.set(cacheKey, { claim, signedAt: now, peerSetKey: setKey });
+      return [DataPart(claim)];
     }
 
-    return [DataPart(cache.claim)];
+    return [DataPart(cached.claim)];
   }, {
     visibility:  'authenticated',
     description: 'Return a signed list of directly reachable peers',

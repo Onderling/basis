@@ -18,6 +18,15 @@ import {
   DEFAULT_MAX_PEERS,
 }                                 from '../src/skills/reachablePeers.js';
 
+/**
+ * The open scope, stated explicitly. Every case below is about CLAIM MECHANICS (ttl / seq / caching), not
+ * about disclosure — so they opt into "every caller learns every peer", which since 2026-07-27 (G7) a
+ * caller must say out loud rather than get by omission. Disclosure itself is covered in
+ * `reachablePeersScope.test.js`.
+ */
+const OPEN = (_caller, peers) => peers;
+
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function makeAgent({ peers = new PeerGraph(), config } = {}) {
@@ -58,7 +67,7 @@ describe('reachable-peers skill — basic behaviour', () => {
     const peers = new PeerGraph();
     await seedDirectPeers(peers, 3);
     const agent = await makeAgent({ peers });
-    agent.enableReachabilityOracle({ ttlMs: 60_000 });
+    agent.enableReachabilityOracle({ peerScope: OPEN, ttlMs: 60_000 });
 
     const parts = await invokeSelf(agent);
     const data  = Parts.data(parts);
@@ -80,7 +89,7 @@ describe('reachable-peers skill — basic behaviour', () => {
     await peers.upsert({ pubKey: agent.pubKey, hops: 0, reachable: true });
     await peers.upsert({ pubKey: 'pkOther', hops: 0, reachable: true });
 
-    agent.enableReachabilityOracle({ ttlMs: 60_000 });
+    agent.enableReachabilityOracle({ peerScope: OPEN, ttlMs: 60_000 });
     const data = Parts.data(await invokeSelf(agent));
     expect(data.body.p).toEqual(['pkOther']);  // self filtered out
     await agent.stop();
@@ -91,7 +100,7 @@ describe('reachable-peers skill — basic behaviour', () => {
     await peers.upsert({ pubKey: 'direct',   hops: 0, reachable: true });
     await peers.upsert({ pubKey: 'indirect', hops: 1, reachable: true });
     const agent = await makeAgent({ peers });
-    agent.enableReachabilityOracle({ ttlMs: 60_000 });
+    agent.enableReachabilityOracle({ peerScope: OPEN, ttlMs: 60_000 });
 
     const data = Parts.data(await invokeSelf(agent));
     expect(data.body.p).toEqual(['direct']);
@@ -103,7 +112,7 @@ describe('reachable-peers skill — basic behaviour', () => {
     await peers.upsert({ pubKey: 'on',  hops: 0, reachable: true  });
     await peers.upsert({ pubKey: 'off', hops: 0, reachable: false });
     const agent = await makeAgent({ peers });
-    agent.enableReachabilityOracle({ ttlMs: 60_000 });
+    agent.enableReachabilityOracle({ peerScope: OPEN, ttlMs: 60_000 });
 
     const data = Parts.data(await invokeSelf(agent));
     expect(data.body.p).toEqual(['on']);
@@ -117,7 +126,7 @@ describe('reachable-peers skill — caching', () => {
     const peers = new PeerGraph();
     await seedDirectPeers(peers, 2);
     const agent = await makeAgent({ peers });
-    agent.enableReachabilityOracle({ ttlMs: 60_000, refreshBeforeMs: 10_000 });
+    agent.enableReachabilityOracle({ peerScope: OPEN, ttlMs: 60_000, refreshBeforeMs: 10_000 });
 
     const a = Parts.data(await invokeSelf(agent));
     const b = Parts.data(await invokeSelf(agent));
@@ -130,7 +139,7 @@ describe('reachable-peers skill — caching', () => {
     const peers = new PeerGraph();
     await seedDirectPeers(peers, 2);
     const agent = await makeAgent({ peers });
-    agent.enableReachabilityOracle({ ttlMs: 60_000, refreshBeforeMs: 10_000 });
+    agent.enableReachabilityOracle({ peerScope: OPEN, ttlMs: 60_000, refreshBeforeMs: 10_000 });
 
     const first = Parts.data(await invokeSelf(agent));
     expect(first.body.p).toEqual(['pk000', 'pk001']);
@@ -148,7 +157,7 @@ describe('reachable-peers skill — caching', () => {
     const peers = new PeerGraph();
     await seedDirectPeers(peers, 2);
     const agent = await makeAgent({ peers });
-    agent.enableReachabilityOracle({ ttlMs: 60_000, refreshBeforeMs: 10_000 });
+    agent.enableReachabilityOracle({ peerScope: OPEN, ttlMs: 60_000, refreshBeforeMs: 10_000 });
 
     const first = Parts.data(await invokeSelf(agent));
     expect(first.body.p).toEqual(['pk000', 'pk001']);
@@ -164,7 +173,7 @@ describe('reachable-peers skill — caching', () => {
     const peers = new PeerGraph();
     await seedDirectPeers(peers, 1);
     const agent = await makeAgent({ peers });
-    agent.enableReachabilityOracle({ ttlMs: 60_000, refreshBeforeMs: 40_000 });
+    agent.enableReachabilityOracle({ peerScope: OPEN, ttlMs: 60_000, refreshBeforeMs: 40_000 });
 
     const realNow = Date.now;
     const t0      = realNow();
@@ -195,7 +204,7 @@ describe('reachable-peers skill — maxPeers truncation', () => {
     const peers = new PeerGraph();
     await seedDirectPeers(peers, 10);   // pk000..pk009
     const agent = await makeAgent({ peers });
-    agent.enableReachabilityOracle({ ttlMs: 60_000, maxPeers: 5 });
+    agent.enableReachabilityOracle({ peerScope: OPEN, ttlMs: 60_000, maxPeers: 5 });
 
     const data = Parts.data(await invokeSelf(agent));
     expect(data.body.p).toEqual(['pk000', 'pk001', 'pk002', 'pk003', 'pk004']);
@@ -212,7 +221,10 @@ describe('reachable-peers skill — config resolution', () => {
       overrides: { oracle: { ttlMs: 30_000, refreshBeforeMs: 5_000, maxPeers: 3 } },
     });
     const agent = await makeAgent({ peers, config });
-    agent.enableReachabilityOracle();   // no args — should pull from config
+    // `peerScope` is deliberately NOT config-resolvable — it is a function, so it can only be passed at the
+    // call site, which is the right place for a disclosure decision to be visible. The numeric options are
+    // what this case is about, and they still come from AgentConfig.
+    agent.enableReachabilityOracle({ peerScope: OPEN });
 
     const data = Parts.data(await invokeSelf(agent));
     expect(data.body.t).toBe(30_000);
@@ -227,7 +239,7 @@ describe('reachable-peers skill — config resolution', () => {
       overrides: { oracle: { ttlMs: 30_000, maxPeers: 3 } },
     });
     const agent = await makeAgent({ peers, config });
-    agent.enableReachabilityOracle({ ttlMs: 99_000, maxPeers: 2 });
+    agent.enableReachabilityOracle({ peerScope: OPEN, ttlMs: 99_000, maxPeers: 2 });
 
     const data = Parts.data(await invokeSelf(agent));
     expect(data.body.t).toBe(99_000);

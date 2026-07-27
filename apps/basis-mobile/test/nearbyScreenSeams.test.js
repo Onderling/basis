@@ -11,7 +11,7 @@
  * locales (invariant 8) — a renamed locale key breaks here rather than on a device.
  */
 import { describe, it, expect } from 'vitest';
-import { NEARBY_ACTION_LABELS, nearbyVisibilityKey } from '@onderling-app/basis';
+import { NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, nearbyVisibilityKey } from '@onderling-app/basis';
 import { initLocalisation, setLang, t }              from '../src/core/localisation.js';
 
 describe('nearbyVisibilityKey — the shared banner rule', () => {
@@ -56,6 +56,10 @@ describe('NEARBY_ACTION_LABELS — one definition, resolvable in both languages'
 
       const keys = [
         ...Object.values(NEARBY_ACTION_LABELS),
+        ...Object.values(NEARBY_ASK_LABELS),
+        ...['asks_title', 'asks_empty', 'ask_resonant', 'ask_disclosure', 'ask_compose',
+            'ask_placeholder', 'ask_send', 'ask_sent', 'ask_expired', 'answer_sent']
+          .map((k) => `circle.nearbyScreen.${k}`),
         ...['visible', 'hidden', 'still_visible', 'unavailable']
           .flatMap((k) => [`circle.nearbyScreen.${k}_title`, `circle.nearbyScreen.${k}_body`]),
         'circle.nearbyScreen.not_member_note',
@@ -70,3 +74,17 @@ describe('NEARBY_ACTION_LABELS — one definition, resolvable in both languages'
     });
   }
 });
+
+describe('NEARBY_ASK_LABELS — the ask actions, shared', () => {
+  it('covers exactly what askActions can produce, and no more', () => {
+    // Critically it does NOT contain a notify-the-asker action: that would disclose on the responder's
+    // behalf, which is the one thing step F forbids. An unlisted id is skipped by both renderers, so this
+    // list is also the last line of defence against one appearing.
+    expect(Object.keys(NEARBY_ASK_LABELS).sort()).toEqual(['answer-ask', 'dismiss-ask']);
+  });
+
+  it('is frozen', () => {
+    expect(Object.isFrozen(NEARBY_ASK_LABELS)).toBe(true);
+  });
+});
+

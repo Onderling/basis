@@ -142,3 +142,72 @@ describe('invariant 8 — every string is translated', () => {
     expect(onBack).toHaveBeenCalled();
   });
 });
+
+describe('asks in the room (step F)', () => {
+  const askEntry = (over = {}) => ({
+    ask: { id: 'ask-1', text: 'anyone got a bike pump?', tags: ['fiets'] },
+    resonant: false, reason: null, actions: ['answer-ask', 'dismiss-ask'], note: null, ...over,
+  });
+
+  it('renders every live ask, matching or not', () => {
+    // Filtering the room to what resonates would make it a recommender AND leak my drivers into what I see.
+    const el = render(model({ asks: [askEntry(), askEntry({ ask: { id: 'ask-2', text: 'wifi code?' } })] }));
+    expect(el.querySelectorAll('.circle-nearby__ask')).toHaveLength(2);
+  });
+
+  it('marks a resonant ask and names the SHARED reason', () => {
+    const el = render(model({ asks: [askEntry({ resonant: true, reason: 'you both care about: fiets' })] }));
+    const ask = el.querySelector('.circle-nearby__ask');
+    expect(ask.classList.contains('is-resonant')).toBe(true);
+    expect(ask.querySelector('.circle-nearby__ask-reason').textContent)
+      .toBe('circle.nearbyScreen.ask_resonant');
+  });
+
+  it('THE LOAD-BEARING LINE: every ask says that only answering reveals you', () => {
+    // If this ever renders conditionally, someone answers without knowing what it costs.
+    const el = render(model({ asks: [askEntry(), askEntry({ resonant: true, reason: 'x', ask: { id: 'a2', text: 'y' } })] }));
+    const notes = [...el.querySelectorAll('.circle-nearby__ask-disclosure')];
+    expect(notes).toHaveLength(2);
+    expect(notes[0].textContent).toBe('circle.nearbyScreen.ask_disclosure');
+  });
+
+  it('answer + dismiss are offered, and clicking reports the ask', () => {
+    const onAskAction = vi.fn();
+    const el = render(model({ asks: [askEntry()] }), { onAskAction });
+    const actions = [...el.querySelectorAll('.circle-nearby__ask-action')].map((b) => b.dataset.action);
+    expect(actions).toEqual(['answer-ask', 'dismiss-ask']);
+
+    el.querySelector('.circle-nearby__ask-action--answer-ask').click();
+    expect(onAskAction).toHaveBeenCalledWith('answer-ask', expect.objectContaining({ id: 'ask-1' }));
+  });
+
+  it('an unknown ask action is skipped rather than shown raw', () => {
+    const el = render(model({ asks: [askEntry({ actions: ['notify-asker', 'dismiss-ask'] })] }));
+    const actions = [...el.querySelectorAll('.circle-nearby__ask-action')].map((b) => b.dataset.action);
+    expect(actions).toEqual(['dismiss-ask']);
+  });
+
+  it('an expired ask (no actions) renders no action bar', () => {
+    const el = render(model({ asks: [askEntry({ actions: [] })] }));
+    expect(el.querySelector('.circle-nearby__ask-actions')).toBeNull();
+  });
+
+  it('the compose button is always available, even in an empty room', () => {
+    const onCompose = vi.fn();
+    const el = render(model({ asks: [] }), { onCompose });
+    expect(el.querySelector('.circle-nearby__asks-empty').textContent)
+      .toBe('circle.nearbyScreen.asks_empty');
+    el.querySelector('.circle-nearby__ask-compose').click();
+    expect(onCompose).toHaveBeenCalled();
+  });
+
+  it('still no untranslated strings once asks are on screen', () => {
+    const el = render(model({ asks: [askEntry({ resonant: true, reason: 'you both care about: fiets' })] }));
+    const strings = [...el.querySelectorAll('.circle-nearby__asks-title, .circle-nearby__ask-compose, .circle-nearby__ask-reason, .circle-nearby__ask-disclosure, .circle-nearby__ask-action')]
+      .map((n) => n.textContent.trim()).filter(Boolean);
+    for (const s of strings) {
+      expect(s.startsWith('circle.'), `untranslated: "${s}"`).toBe(true);
+    }
+  });
+});
+

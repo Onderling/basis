@@ -35,7 +35,7 @@ import {
   // claim-router hook (mirror claimed tasks to my own circle).
   makeAfterClaimHook,
   // Nearby model + label helpers (the action map + banner rule are SHARED with web — invariant 3).
-  buildNearbyModel, NEARBY_ACTION_LABELS, nearbyVisibilityKey, createNearbyScreen,
+  buildNearbyModel, NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, nearbyVisibilityKey, createNearbyScreen,
   // "My things" private notes-list.
   myThingsFromListFiles,
   // kring-scoped event stream + per-row action chips.
@@ -3957,7 +3957,7 @@ function subscribeToNetworkChange(fn) {
 // it is deliberately tied to the React lifecycle rather than to a button, because the failure mode is a
 // user who *thinks* they left. Navigating away, backgrounding, or a crash mid-render all unmount, and all
 // must stop the announcement.
-function NearbyScreenHost({ bundle, onBack, onAction }) {
+function NearbyScreenHost({ bundle, onBack, onAction, onAskAction, onCompose }) {
   const [model, setModel] = useState(null);
 
   const screen = useMemo(() => createNearbyScreen({
@@ -3978,7 +3978,15 @@ function NearbyScreenHost({ bundle, onBack, onAction }) {
     return () => { off(); screen.close(); };
   }, [screen]);
 
-  return <NearbyScreen model={model} onBack={onBack} onAction={onAction} />;
+  return (
+    <NearbyScreen
+      model={model}
+      onBack={onBack}
+      onAction={onAction}
+      onAskAction={onAskAction}
+      onCompose={onCompose}
+    />
+  );
 }
 
 // Nearby screen. Renders the model `createNearbyScreen` produces — the same model the
@@ -3992,13 +4000,14 @@ function NearbyScreenHost({ bundle, onBack, onAction }) {
 
 // `NEARBY_ACTION_LABELS` + `nearbyVisibilityKey` are imported from the basis app above — one definition,
 // so web and mobile cannot drift on what a row offers or on when the "still visible" warning fires.
-function NearbyScreen({ model, onBack, onAction }) {
+function NearbyScreen({ model, onBack, onAction, onAskAction, onCompose }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const rows       = Array.isArray(model?.rows) ? model.rows : [];
   const own        = model?.ownProfile ?? {};
   const headerText = model?.headerLabel ?? '';
   const visKey     = nearbyVisibilityKey(model?.visibility);
+  const asks       = Array.isArray(model?.asks) ? model.asks : [];
   return (
     <View style={styles.page} testID="circle-nearby-screen">
       <View style={styles.bar}>
@@ -4059,6 +4068,42 @@ function NearbyScreen({ model, onBack, onAction }) {
           ))}
         </ScrollView>
       )}
+      {/* Asks (step F). Every live ask shows, matching or not — filtering the room to what resonates
+          would make it a recommender, and would leak my own drivers into what I am able to see. */}
+      <View style={styles.nearbyAsks} testID="nearby-asks">
+        <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.asks_title')}</Text>
+        <Pressable onPress={onCompose} accessibilityRole="button" testID="nearby-ask-compose" style={styles.nearbyAction}>
+          <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.ask_compose')}</Text>
+        </Pressable>
+        {asks.length === 0 ? (
+          <Text style={styles.muted}>{t('circle.nearbyScreen.asks_empty')}</Text>
+        ) : asks.map((entry) => (
+          <View key={entry.ask?.id} style={styles.nearbyAsk} testID={`nearby-ask-${entry.ask?.id}`}>
+            <Text style={styles.rowName}>{entry.ask?.text}</Text>
+            {entry.resonant && entry.reason ? (
+              // Names the SHARED tags only; my unmatched drivers never appear here.
+              <Text style={styles.rowMeta}>{t('circle.nearbyScreen.ask_resonant', { reason: entry.reason })}</Text>
+            ) : null}
+            {/* Shown to me, sent nowhere — the reminder that replying is what reveals me. */}
+            <Text style={styles.rowMeta}>{t('circle.nearbyScreen.ask_disclosure')}</Text>
+            {Array.isArray(entry.actions) && entry.actions.some((a) => NEARBY_ASK_LABELS[a]) ? (
+              <View style={styles.nearbyActions}>
+                {entry.actions.filter((a) => NEARBY_ASK_LABELS[a]).map((action) => (
+                  <Pressable
+                    key={action}
+                    onPress={() => { if (typeof onAskAction === 'function') onAskAction(action, entry.ask); }}
+                    accessibilityRole="button"
+                    testID={`nearby-ask-action-${action}-${entry.ask?.id}`}
+                    style={styles.nearbyAction}
+                  >
+                    <Text style={styles.nearbyActionText}>{t(NEARBY_ASK_LABELS[action])}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+          </View>
+        ))}
+      </View>
       <View style={styles.ownProfile}>
         <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.own_profile')}</Text>
         <Text style={styles.muted}>
@@ -4264,6 +4309,8 @@ const makeStyles = (theme) => StyleSheet.create({
   nearbyBannerAlert: { borderColor: theme.color.warn ?? theme.color.ink, borderWidth: 2 },
   nearbyBannerTitle: { fontSize: 13, fontWeight: '600', color: theme.color.ink, marginBottom: 2 },
   nearbyActions:     { flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 },
+  nearbyAsks:        { marginTop: 12, paddingHorizontal: 2 },
+  nearbyAsk:         { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: theme.color.line },
   nearbyAction:      { paddingVertical: 6, paddingHorizontal: 10, marginRight: 6, marginTop: 4, borderRadius: 6, borderWidth: 1, borderColor: theme.color.line },
   nearbyActionText:  { fontSize: 13, color: theme.color.ink },
   // "ON YOUR LIST" section on CircleDetail.

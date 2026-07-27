@@ -371,3 +371,110 @@ describe('asks in the room (step F)', () => {
   });
 });
 
+describe('acting on asks (step F)', () => {
+  const T0 = 1_700_000_000_000;
+  const anAsk = (over = {}) => Object.freeze({
+    id: 'ask-1', text: 'anyone got a bike pump?', tags: ['fiets'],
+    from: 'asker-addr', createdAt: T0, expiresAt: T0 + 60_000, ...over,
+  });
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  function withChannel({ broadcast, sendAnswer } = {}) {
+    let pushAsk = null;
+    const askChannel = {
+      broadcast: broadcast ?? vi.fn(async () => ({ sent: 3, failed: 1, peers: 4 })),
+      sendAnswer: sendAnswer ?? vi.fn(async () => ({ ok: true })),
+    };
+    const screen = createNearbyScreen({
+      control: createDiscoverabilityControl({ transports: () => ({ ble: mk(Discovering) }) }),
+      subscribeToAsks: (fn) => { pushAsk = fn; return () => { pushAsk = null; }; },
+      askChannel,
+      myRoomAddress: () => 'my-room-addr',
+      now: () => T0,
+      t: (k) => k,
+    });
+    return { screen, askChannel, ask: (a) => pushAsk?.(a) };
+  }
+
+  it('asking reports the REAL reach, not "sent"', async () => {
+    // "Asked 3 of 4 nearby" is honest; a bare success implies everyone in the café heard it.
+    const { screen } = withChannel();
+    screen.open();
+    const r = await screen.askRoom({ text: 'anyone got a pump?', tags: ['Fiets'] });
+    expect(r).toMatchObject({ ok: true, sent: 3, failed: 1, peers: 4 });
+    expect(r.ask.tags).toEqual(['fiets']);
+    expect(r.ask.from).toBe('my-room-addr');
+  });
+
+  it('my own ask does NOT appear in my room list', async () => {
+    // The room is what other people asked. Echoing my own question back is noise, and it would also make
+    // "someone nearby needs this" indistinguishable from "I said this".
+    const { screen } = withChannel();
+    screen.open();
+    await screen.askRoom({ text: 'anyone got a pump?' });
+    expect(screen.model().asks).toEqual([]);
+  });
+
+  it('refuses an empty ask before touching the room', async () => {
+    const { screen, askChannel } = withChannel();
+    screen.open();
+    expect(await screen.askRoom({ text: '  ' })).toMatchObject({ ok: false, reason: 'empty-ask' });
+    expect(askChannel.broadcast).not.toHaveBeenCalled();
+  });
+
+  it('answering goes to the ASKER alone and opens the channel', async () => {
+    const { screen, askChannel, ask } = withChannel();
+    screen.open();
+    ask(anAsk());
+    await flush();
+
+    const r = await screen.answer('ask-1', 'ik heb er een');
+    expect(r).toMatchObject({ ok: true, opensDirectChannel: true, peer: 'asker-addr' });
+    expect(askChannel.sendAnswer).toHaveBeenCalledWith(
+      expect.objectContaining({ askId: 'ask-1', text: 'ik heb er een' }), 'asker-addr',
+    );
+  });
+
+  it('an answered ask leaves the room — the disclosure is a one-way door', async () => {
+    const { screen, ask } = withChannel();
+    screen.open();
+    ask(anAsk());
+    await flush();
+    await screen.answer('ask-1', 'ja');
+    expect(screen.model().asks).toEqual([]);
+  });
+
+  it('a FAILED answer leaves the ask in place rather than pretending', async () => {
+    const { screen, ask } = withChannel({ sendAnswer: vi.fn(async () => ({ ok: false, reason: 'offline' })) });
+    screen.open();
+    ask(anAsk());
+    await flush();
+
+    expect(await screen.answer('ask-1', 'ja')).toMatchObject({ ok: false, reason: 'offline' });
+    expect(screen.model().asks).toHaveLength(1);
+  });
+
+  it('cannot answer an ask that is not in the room', async () => {
+    const { screen } = withChannel();
+    screen.open();
+    expect(await screen.answer('nope', 'hi')).toMatchObject({ ok: false, reason: 'unknown-ask' });
+  });
+
+  it('dismissing removes it for me and sends NOTHING', async () => {
+    const { screen, askChannel, ask } = withChannel();
+    screen.open();
+    ask(anAsk());
+    await flush();
+
+    screen.dismissAsk('ask-1');
+    expect(screen.model().asks).toEqual([]);
+    expect(askChannel.sendAnswer).not.toHaveBeenCalled();
+  });
+
+  it('with no channel, asking fails honestly instead of silently doing nothing', async () => {
+    const screen = createNearbyScreen({ now: () => T0, t: (k) => k });
+    screen.open();
+    expect(await screen.askRoom({ text: 'hello' })).toMatchObject({ ok: false, reason: 'no-channel' });
+  });
+});
+

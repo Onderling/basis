@@ -2232,6 +2232,54 @@
     }
   },
   "nearbyScreen": {
+    "asks_title": {
+      "text": "Hier gevraagd",
+      "doc": "Heading above the list of open asks in the room (Nearby step F)."
+    },
+    "asks_empty": {
+      "text": "Nog niemand heeft iets gevraagd.",
+      "doc": "Shown when the room carries no live asks."
+    },
+    "ask_resonant": {
+      "text": "Dit past bij jou: {{reason}}",
+      "doc": "Match signal on an ask. The reason names the SHARED tags only — never your own driver text."
+    },
+    "ask_disclosure": {
+      "text": "Alleen antwoorden laat jou zien. Kijken kost niets.",
+      "doc": "The load-bearing line of step F: replying is the disclosure."
+    },
+    "action_answer": {
+      "text": "Antwoorden",
+      "doc": "Ask action — reply, which opens a direct channel with the asker."
+    },
+    "action_dismiss": {
+      "text": "Wegklikken",
+      "doc": "Ask action — hide this ask for me. Tells the asker nothing."
+    },
+    "ask_compose": {
+      "text": "Vraag het de ruimte",
+      "doc": "Button that opens the ask composer."
+    },
+    "ask_placeholder": {
+      "text": "Wat heb je nu nodig?",
+      "doc": "Composer placeholder. Phrased as a NEED, since an ask is a question, not a profile."
+    },
+    "ask_send": {
+      "text": "Vragen",
+      "doc": "Composer submit."
+    },
+    "ask_sent": {
+      "text": "Aan {{sent}} van {{peers}} in de buurt gevraagd",
+      "doc": "Broadcast result. Names the real reach rather than claiming everyone heard it."
+    },
+    "ask_expired": {
+      "text": "Deze vraag is verlopen.",
+      "doc": "Shown if an ask lapses while it is on screen."
+    },
+    "answer_sent": {
+      "text": "Antwoord verstuurd — je bent nu zichtbaar voor die persoon.",
+      "doc": "Confirmation after answering. States the disclosure plainly rather than just \"sent\"."
+    },
     "visible_title": {
       "text": "Je bent hier zichtbaar",
       "doc": "Visibility banner heading while announcing (Nearby step E)."

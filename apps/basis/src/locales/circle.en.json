@@ -2232,6 +2232,54 @@
     }
   },
   "nearbyScreen": {
+    "asks_title": {
+      "text": "Asked here",
+      "doc": "Heading above the list of open asks in the room (Nearby step F)."
+    },
+    "asks_empty": {
+      "text": "Nobody has asked anything yet.",
+      "doc": "Shown when the room carries no live asks."
+    },
+    "ask_resonant": {
+      "text": "This matches you: {{reason}}",
+      "doc": "Match signal on an ask. The reason names the SHARED tags only — never your own driver text."
+    },
+    "ask_disclosure": {
+      "text": "Only answering reveals you. Looking costs nothing.",
+      "doc": "The load-bearing line of step F: replying is the disclosure."
+    },
+    "action_answer": {
+      "text": "Answer",
+      "doc": "Ask action — reply, which opens a direct channel with the asker."
+    },
+    "action_dismiss": {
+      "text": "Dismiss",
+      "doc": "Ask action — hide this ask for me. Tells the asker nothing."
+    },
+    "ask_compose": {
+      "text": "Ask the room",
+      "doc": "Button that opens the ask composer."
+    },
+    "ask_placeholder": {
+      "text": "What do you need right now?",
+      "doc": "Composer placeholder. Phrased as a NEED, since an ask is a question, not a profile."
+    },
+    "ask_send": {
+      "text": "Ask",
+      "doc": "Composer submit."
+    },
+    "ask_sent": {
+      "text": "Asked {{sent}} of {{peers}} nearby",
+      "doc": "Broadcast result. Names the real reach rather than claiming everyone heard it."
+    },
+    "ask_expired": {
+      "text": "This ask has expired.",
+      "doc": "Shown if an ask lapses while it is on screen."
+    },
+    "answer_sent": {
+      "text": "Answer sent — you are now visible to them.",
+      "doc": "Confirmation after answering. States the disclosure plainly rather than just \"sent\"."
+    },
     "visible_title": {
       "text": "You are visible here",
       "doc": "Visibility banner heading while announcing (Nearby step E)."

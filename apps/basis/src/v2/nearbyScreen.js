@@ -25,7 +25,7 @@ import { buildNearbyModel, }             from './circleNearby.js';
 import { createProximitySession, nearbyActions } from './circleProximity.js';
 import { makeNearbySessionAdapter }      from './nearbyDiscoverability.js';
 import { createNetworkChangeWatcher }    from './networkChangeWatcher.js';
-import { evaluateIncomingAsk, isAskLive, askActions } from './nearbyAsks.js';
+import { evaluateIncomingAsk, isAskLive, askActions, createAsk, answerAsk } from './nearbyAsks.js';
 
 /**
  * Row action id → locale key.
@@ -38,6 +38,15 @@ export const NEARBY_ACTION_LABELS = Object.freeze({
   'invite-to-circle':   'circle.nearbyScreen.action_invite',
   'request-join':       'circle.nearbyScreen.action_request',
   'open-shared-circle': 'circle.nearbyScreen.action_open',
+});
+
+/**
+ * Ask action id → locale key. Shared with both renderers for the same reason `NEARBY_ACTION_LABELS` is:
+ * a copy per platform is how one shell starts offering something the other does not.
+ */
+export const NEARBY_ASK_LABELS = Object.freeze({
+  'answer-ask':  'circle.nearbyScreen.action_answer',
+  'dismiss-ask': 'circle.nearbyScreen.action_dismiss',
 });
 
 /**
@@ -65,6 +74,8 @@ export function nearbyVisibilityKey(visibility) {
  * @param {() => boolean} [deps.canInvite]
  * @param {string[]} [deps.supportedActions]  which actions this host can actually SERVICE. Defaults to all.
  * @param {(onAsk: (ask: object) => void) => (() => void)} [deps.subscribeToAsks]  incoming room asks
+ * @param {object} [deps.askChannel]     from `createAskChannel` — how an ask reaches the room
+ * @param {() => string|null} [deps.myRoomAddress]  the ephemeral address I present here
  * @param {() => Promise<Record<string,object>>} [deps.getDrivers]  MY drivers — read on-device, never sent
  * @param {Function} [deps.judge]        optional injected LLM judge for semantic matching
  * @param {() => number} [deps.now]
@@ -83,6 +94,8 @@ export function createNearbyScreen({
   canInvite = () => false,
   supportedActions = null,
   subscribeToAsks = null,
+  askChannel = null,
+  myRoomAddress = () => null,
   getDrivers = null,
   judge,
   now = () => Date.now(),
@@ -240,6 +253,52 @@ export function createNearbyScreen({
     isOpen: () => session.isOpen(),
     model,
     visibility,
+
+    /**
+     * Put an ask into the room.
+     *
+     * Composing and broadcasting are one call because a half-broadcast ask is not a state worth modelling:
+     * either it went out or the room did not hear it, and the result says which. It is NOT added to my own
+     * ask list — the room is what other people asked; my own question is not news to me.
+     */
+    async askRoom({ text, tags = [], ttlMs } = {}) {
+      const built = createAsk({ text, tags, ttlMs, from: safeCall(myRoomAddress, null), now });
+      if (!built.ok) return { ok: false, reason: built.reason };
+      if (!askChannel?.broadcast) return { ok: false, reason: 'no-channel', ask: built.ask };
+      try {
+        const result = await askChannel.broadcast(built.ask);
+        // Reports the REAL reach. "Asked 3 of 5 nearby" is honest; "sent" implies everyone heard it.
+        return { ok: true, ask: built.ask, ...result };
+      } catch (err) {
+        try { onError?.(err, 'askRoom'); } catch { /* diagnostics only */ }
+        return { ok: false, reason: err?.message ?? 'broadcast-failed', ask: built.ask };
+      }
+    },
+
+    /**
+     * Answer an ask — the disclosure, and the only thing here that reveals me.
+     *
+     * Point-to-point to the asker. Deliberately no "and tell the room I answered".
+     */
+    async answer(askId, text) {
+      const entry = asks.get(askId);
+      if (!entry) return { ok: false, reason: 'unknown-ask' };
+      const built = answerAsk({ ask: entry.ask, text, from: safeCall(myRoomAddress, null), now });
+      if (!built.ok) return { ok: false, reason: built.reason };
+      if (!askChannel?.sendAnswer) return { ok: false, reason: 'no-channel' };
+
+      const sent = await askChannel.sendAnswer(built.answer, entry.ask.from);
+      if (!sent.ok) return sent;
+      // Answering is a one-way door for THIS ask: I have already revealed myself, so it leaves the room.
+      asks.delete(askId);
+      emit();
+      return { ok: true, opensDirectChannel: true, peer: entry.ask.from };
+    },
+
+    /** Hide an ask for me. Tells the asker nothing — that is the whole point of dismissing. */
+    dismissAsk(askId) {
+      if (asks.delete(askId)) emit();
+    },
 
     /** Actions for one row id, for a host that renders rows itself. */
     actionsFor(rowId) {

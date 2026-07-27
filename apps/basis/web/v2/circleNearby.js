@@ -23,13 +23,15 @@
  *     web and mobile cannot drift on what proximity entitles a stranger to.
  */
 
-import { NEARBY_ACTION_LABELS, nearbyVisibilityKey } from '../../src/v2/nearbyScreen.js';
+import { NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, nearbyVisibilityKey } from '../../src/v2/nearbyScreen.js';
 
 export function renderCircleNearby(container, {
   model = null,
   t,
   onBack,
   onAction = null,
+  onAskAction = null,
+  onCompose = null,
 } = {}) {
   const tr = typeof t === 'function' ? t : (k) => k;
   container.innerHTML = '';
@@ -48,7 +50,7 @@ export function renderCircleNearby(container, {
   container.appendChild(head);
 
   const safeModel = model && typeof model === 'object' ? model : { rows: [], counts: { total: 0, sharingAny: 0 }, ownProfile: {}, headerLabel: '' };
-  const { rows = [], ownProfile = {}, headerLabel = '', visibility = null } = safeModel;
+  const { rows = [], ownProfile = {}, headerLabel = '', visibility = null, asks = [] } = safeModel;
 
   // ── Visibility banner ──────────────────────────────────────────────────────
   // Ordered by what a person most needs to know, not by what we asked for:
@@ -145,6 +147,78 @@ export function renderCircleNearby(container, {
     }
     container.appendChild(list);
   }
+
+  // ── Asks (step F) ──────────────────────────────────────────────────────────
+  // Every live ask is shown, matching or not. Filtering the room to what resonates with me would make it a
+  // recommender — and would leak my own drivers into what I am able to see.
+  const asksBlock = document.createElement('div');
+  asksBlock.className = 'circle-nearby__asks';
+
+  const asksTitle = document.createElement('div');
+  asksTitle.className = 'circle-nearby__asks-title';
+  asksTitle.textContent = tr('circle.nearbyScreen.asks_title');
+  asksBlock.appendChild(asksTitle);
+
+  const askBtn = document.createElement('button');
+  askBtn.type = 'button';
+  askBtn.className = 'circle-nearby__ask-compose';
+  askBtn.textContent = tr('circle.nearbyScreen.ask_compose');
+  askBtn.addEventListener('click', () => { if (typeof onCompose === 'function') onCompose(); });
+  asksBlock.appendChild(askBtn);
+
+  if (!asks.length) {
+    const none = document.createElement('div');
+    none.className = 'circle-nearby__asks-empty';
+    none.textContent = tr('circle.nearbyScreen.asks_empty');
+    asksBlock.appendChild(none);
+  } else {
+    for (const entry of asks) {
+      const el = document.createElement('div');
+      el.className = 'circle-nearby__ask';
+      if (entry.resonant) el.classList.add('is-resonant');
+      el.dataset.askId = entry.ask?.id || '';
+
+      const text = document.createElement('div');
+      text.className = 'circle-nearby__ask-text';
+      text.textContent = entry.ask?.text ?? '';
+      el.appendChild(text);
+
+      if (entry.resonant && entry.reason) {
+        const why = document.createElement('div');
+        why.className = 'circle-nearby__ask-reason';
+        // Names the SHARED tags only. My own unmatched drivers never appear here.
+        why.textContent = tr('circle.nearbyScreen.ask_resonant', { reason: entry.reason });
+        el.appendChild(why);
+      }
+
+      // Shown to me, sent nowhere: the reminder that replying is what reveals me.
+      const disclosure = document.createElement('div');
+      disclosure.className = 'circle-nearby__ask-disclosure';
+      disclosure.textContent = tr('circle.nearbyScreen.ask_disclosure');
+      el.appendChild(disclosure);
+
+      const bar = document.createElement('div');
+      bar.className = 'circle-nearby__ask-actions';
+      for (const action of Array.isArray(entry.actions) ? entry.actions : []) {
+        const labelKey = NEARBY_ASK_LABELS[action];
+        if (!labelKey) continue;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `circle-nearby__ask-action circle-nearby__ask-action--${action}`;
+        btn.dataset.action = action;
+        btn.dataset.askId = entry.ask?.id || '';
+        btn.textContent = tr(labelKey);
+        btn.addEventListener('click', () => {
+          if (typeof onAskAction === 'function') onAskAction(action, entry.ask);
+        });
+        bar.appendChild(btn);
+      }
+      if (bar.childElementCount) el.appendChild(bar);
+
+      asksBlock.appendChild(el);
+    }
+  }
+  container.appendChild(asksBlock);
 
   const footer = document.createElement('div');
   footer.className = 'circle-nearby__own';

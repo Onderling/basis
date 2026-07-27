@@ -110,10 +110,12 @@ export function buildKringStream({
  * chat excludes them. Same scoping args as `buildKringStream` (per-circle when
  * `circleId` is set).
  *
- * Behaviour-preserving: silent entries are a NEW lane (nothing appends them in
- * the shipped paths yet), so today this returns exactly what `buildKringStream`
- * returns. It's the seam the chat surfaces adopt so the system lane can never
- * leak into a conversation.
+ * The silent lane is LIVE (stale note corrected 2026-07-27 — it used to say nothing
+ * appended one). Four paths do: governance events and §8 reports
+ * (`governanceAppWiring`), the roster "pull-me" signal (`rosterUpdated`), and
+ * every one of those arriving from a peer (`kringLogReceiver`). So this filter is
+ * load-bearing now, not a placeholder: without it a vote, a report and a roster
+ * ping would all appear as chat messages.
  *
  * C15 TAIL: narrowing the chat further to project ONLY `type:'chat-message'`
  * (today the GESPREK surface renders a "chat-style MIXED stream" — task/buurt

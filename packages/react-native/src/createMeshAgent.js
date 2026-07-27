@@ -62,6 +62,10 @@ import { loadRendezvousRtcLib }  from './transport/rendezvousRtcLib.js';
  *                                              Shape: `{ webid, mnemonic, podClient, podRoot,
  *                                              intervalMs?, bootstrap? }`.  See
  *                                              `attachIdentityToAgent` for full opt docs.
+ * @param {string} [opts.discoverability]     — initial discovery state, one of `DISCOVERABILITY`
+ *                                              ('off' | 'browse' | 'browse+publish'). The returned agent
+ *                                              carries `agent.discoverability` — the ONE control an app may
+ *                                              use to change it (never a transport directly).
  * @returns {Promise<import('@onderling/core').Agent>}
  */
 export async function createMeshAgent(opts = {}) {
@@ -75,6 +79,7 @@ export async function createMeshAgent(opts = {}) {
     autoStart         = true,
     configOverrides,
     rendezvous:       enableRdv = false,
+    discoverability,
     pod:              podOpt,
   } = opts;
 
@@ -94,12 +99,13 @@ export async function createMeshAgent(opts = {}) {
   // sa.addSecureTransport instead of registering on a bare agent). It returns
   // the live ones; each is `null` when its native module is absent or the
   // mDNS pre-connect timed out.
-  const { mdns, ble, relay } = await buildMeshTransports({
+  const { mdns, ble, relay, discoverability: discoverabilityControl } = await buildMeshTransports({
     identity,
     enable:         transportEnabled,
     relayUrl,
     mdnsTimeoutMs,
     hostnamePrefix: 'dw',
+    ...(discoverability ? { discoverability } : {}),
   });
 
   // ── PeerGraph (persisted) ──────────────────────────────────────────────────
@@ -270,6 +276,10 @@ export async function createMeshAgent(opts = {}) {
   // microtask gap would make a capabilities snapshot with those skills
   // reporting as `false`, and that stale snapshot gets baked into the
   // peer's PeerGraph record on the other side.
+  // The discoverability SURFACE. Attached to the agent because that is what an app holds — and the rule is
+  // that an app goes through the surface, never the transport (`CLAUDE.md`). One control, all transports.
+  agent.discoverability = discoverabilityControl;
+
   if (autoStart) await agent.start();
   return agent;
 }

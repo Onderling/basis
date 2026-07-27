@@ -24,9 +24,13 @@
  * @param {number}  [opts.mdnsTimeoutMs=6000]   — mDNS pre-connect timeout
  * @param {string}  [opts.hostnamePrefix='dw']  — mDNS hostname prefix (`<prefix>-<pubKey[0..8]>`)
  * @param {object}  [opts.permissions]          — pre-fetched perms (skips a second prompt); else requested here
- * @returns {Promise<{ mdns:object|null, ble:object|null, relay:object|null, perms:object }>}
+ * @param {string}  [opts.discoverability='browse+publish'] — the initial discovery state (Nearby step A).
+ *   Both consumers get a `discoverability` CONTROL back, which is the one surface an app may use to change
+ *   it later — never the transports directly (`CLAUDE.md`).
+ * @returns {Promise<{ mdns, ble, relay, perms, discoverability }>}
  */
-import { RelayTransport } from '@onderling/transports';
+import { RelayTransport }                             from '@onderling/transports';
+import { DISCOVERABILITY, createDiscoverabilityControl } from '@onderling/core';
 
 import { MdnsTransport }          from './transport/MdnsTransport.js';
 import { BleTransport }           from './transport/BleTransport.js';
@@ -39,6 +43,7 @@ export async function buildMeshTransports({
   mdnsTimeoutMs = 6_000,
   hostnamePrefix = 'dw',
   permissions,
+  discoverability = DISCOVERABILITY.PUBLISH,
 } = {}) {
   if (!identity?.pubKey) {
     throw new TypeError('buildMeshTransports: an identity with a pubKey is required');
@@ -68,7 +73,12 @@ export async function buildMeshTransports({
   let ble = null;
   if (enableBle && perms?.ble) {
     try {
-      ble = new BleTransport({ identity, advertise: true, scan: true });
+      // The initial halves come from the requested state; the control below owns every change after that.
+      ble = new BleTransport({
+        identity,
+        advertise: discoverability === DISCOVERABILITY.PUBLISH,
+        scan:      discoverability !== DISCOVERABILITY.OFF,
+      });
     } catch (e) {
       _warn('BleTransport init failed:', e);
     }
@@ -94,7 +104,24 @@ export async function buildMeshTransports({
     }
   }
 
-  return { mdns, ble, relay, perms };
+  // ── The surface ────────────────────────────────────────────────────────────
+  // Built here rather than in either consumer, because both need it and neither should be the one that
+  // knows how to fan a state across transports. It re-reads `mdns`/`ble` on every call, so a transport that
+  // was dropped above (Wi-Fi off) simply is not part of the answer.
+  const control = createDiscoverabilityControl({
+    transports: () => ({ mdns, ble }),
+    onDegraded: (r) => _warn(
+      `discoverability: asked for '${r.requested}', actually '${r.effective}' — ` +
+      r.perTransport.filter((p) => p.degraded).map((p) => `${p.name}:${p.effective}`).join(', '),
+      null,
+    ),
+  });
+
+  // Reflect what construction already did, so `control.state` is truthful before anyone calls `set()`.
+  // mDNS was pre-connected above (publishing); BLE's halves were passed to its constructor.
+  await control.set(discoverability);
+
+  return { mdns, ble, relay, perms, discoverability: control };
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

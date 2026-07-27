@@ -67,6 +67,9 @@
  */
 import { Emitter }               from '../Emitter.js';
 import { mkEnvelope, P, REPLY_CODES } from '../Envelope.js';
+import {
+  DISCOVERABILITY, isDiscoverability, normalizeDiscoverability, maxExposure,
+} from './discoverability.js';
 
 const ACK_TIMEOUT = 10_000;  // ms
 const REQ_TIMEOUT = 30_000;  // ms
@@ -84,6 +87,9 @@ export class Transport extends Emitter {
 
   /** G13 — extra addresses this transport answers to (per-circle / per-contact). */
   #aliases = new Set();
+
+  /** Nearby step A — what this transport is actually doing about discovery. */
+  #discoverability = DISCOVERABILITY.OFF;
   #identity;
   #securityLayer        = null;
   #receiveHandler       = null;
@@ -169,6 +175,73 @@ export class Transport extends Emitter {
 
   /** @protected adapters override: stop listening at `address`. */
   _unbindAddress(_address) {}
+
+  // ── Discoverability (Nearby step A) ──────────────────────────────────────────
+  //
+  // Whether this transport LISTENS for nearby peers and whether it ANNOUNCES us to them. Same reasoning as
+  // aliases above: it is a property of the PORT — one state machine, one public API, one honesty rule — and
+  // an adapter only says HOW to apply it. See `discoverability.js` for the three states and why the
+  // aggregate takes the MOST exposed answer.
+  //
+  // An adapter opts in by overriding `supportsDiscoverability` + `_applyDiscoverability`, and may report a
+  // DEGRADED result: mDNS cannot browse without publishing until the native split, so it answers `browse`
+  // with an effective `browse+publish`. That degradation is reported, never absorbed — a device that thinks
+  // it is unlisted while it is announcing is the one failure this whole surface exists to prevent.
+
+  /** Does this transport participate in discovery at all? Discovering adapters (mDNS, BLE) override this. */
+  get supportsDiscoverability() { return false; }
+
+  /**
+   * What this transport is ACTUALLY doing — not what was asked for.
+   * A non-discovering transport is `off`: a relay socket neither browses nor announces.
+   */
+  get discoverability() { return this.#discoverability; }
+
+  /**
+   * Set the discovery state.
+   *
+   * Returns a result rather than throwing, for the same reason `addAddress` does: "this transport does not
+   * discover" is a configuration fact to branch on, and a partial/degraded apply is a normal outcome that
+   * the caller must be able to SHOW a user, not an error to swallow.
+   *
+   * @param {string} state  one of `DISCOVERABILITY`
+   * `degraded` means MORE exposed than asked (the dangerous direction). A transport that ends up LESS
+   * exposed — no radio, Wi-Fi off — is not degraded; it simply is not offering discovery.
+   *
+   * @returns {Promise<{ok:boolean, requested:string, effective:string, degraded:boolean, reason?:string}>}
+   */
+  async setDiscoverability(state) {
+    const norm = normalizeDiscoverability(state);
+    const requested = norm.value;
+    if (!norm.ok) {
+      return { ok: false, requested, effective: this.#discoverability, degraded: false, reason: norm.reason };
+    }
+    if (!this.supportsDiscoverability) {
+      // Not a failure to report upward as breakage — this transport was never part of the answer.
+      return { ok: true, requested, effective: DISCOVERABILITY.OFF, degraded: false, reason: 'discoverability-unsupported' };
+    }
+    let effective = requested;
+    try {
+      const applied = await this._applyDiscoverability(requested);
+      if (isDiscoverability(applied)) effective = applied;
+    } catch (err) {
+      // The state is unknown after a failed apply, so assume the worst: report what we last knew we were
+      // doing, at least as exposed as the request. Claiming the request succeeded would be the lie.
+      const effectiveOnError = maxExposure(this.#discoverability, requested);
+      return { ok: false, requested, effective: effectiveOnError, degraded: true, reason: err?.message ?? 'apply-failed' };
+    }
+    this.#discoverability = effective;
+    return {
+      ok: true, requested, effective,
+      degraded: effective !== requested && maxExposure(effective, requested) === effective,
+    };
+  }
+
+  /**
+   * @protected adapters override: apply `state`, and RETURN the state actually achieved.
+   * Returning a different state than asked is how an adapter declares a degradation honestly.
+   */
+  async _applyDiscoverability(state) { return state; }
 
   // ── Security layer ──────────────────────────────────────────────────────────
 

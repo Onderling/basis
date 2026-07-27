@@ -34,7 +34,7 @@
  * react-native-zeroconf and react-native-tcp-socket are no longer needed.
  */
 import { NativeModules, NativeEventEmitter } from 'react-native';
-import { Transport }                         from '@onderling/core';
+import { Transport, DISCOVERABILITY }        from '@onderling/core';
 import { b64Encode, b64Decode }              from '../utils/base64.js';
 
 const MdnsNative = NativeModules.MdnsModule ?? null;
@@ -98,6 +98,35 @@ export class MdnsTransport extends Transport {
       ),
     ]);
     console.log('[MdnsTransport] service started');
+  }
+
+  // ── Discoverability (Nearby step A) ─────────────────────────────────────────
+  //
+  // mDNS is the transport this surface exists FOR, and also the one that cannot yet honour it: a single
+  // `MdnsNative.start()` registers the service AND begins browsing, so there is no way to watch the room
+  // without joining it. Splitting that native call is Nearby step B.
+  //
+  // Until then `browse` is applied as `browse+publish` and SAID SO — the method returns the state actually
+  // achieved, the surface aggregates on the most-exposed answer, and the warn below leaves a trace. The
+  // alternative (accepting `browse` and quietly advertising) is the exact failure the three states exist to
+  // prevent: a user in ghost mode announcing themselves to the café.
+
+  get supportsDiscoverability() { return true; }
+
+  /** @protected */
+  async _applyDiscoverability(state) {
+    if (state === DISCOVERABILITY.OFF) {
+      await this.disconnect();
+      return DISCOVERABILITY.OFF;
+    }
+    if (state === DISCOVERABILITY.BROWSE) {
+      console.warn(
+        '[MdnsTransport] browse-only requested, but MdnsModule.start() publishes and browses in one call ' +
+        '— advertising ANYWAY. Ghost mode over mDNS needs the native split (Nearby step B).',
+      );
+    }
+    await this.connect();
+    return DISCOVERABILITY.PUBLISH;   // whatever was asked, this is what the device is doing
   }
 
   async disconnect() {

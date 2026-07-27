@@ -33,7 +33,7 @@
  */
 import { BleManager, State }             from 'react-native-ble-plx';
 import { NativeModules, NativeEventEmitter } from 'react-native';
-import { Transport }                     from '@onderling/core';
+import { Transport, DISCOVERABILITY }    from '@onderling/core';
 import { b64Encode, b64Decode }          from '../utils/base64.js';
 
 export const SERVICE_UUID        = 'a8f0e4d2-0001-4b3f-8c9a-1e2d3f4a5b6c';
@@ -49,6 +49,9 @@ export class BleTransport extends Transport {
   #manager;
   #advertise;
   #scan;
+  // Whether the peripheral (advertising) half is actually RUNNING — distinct from #advertise, which is
+  // only the intent. connect() can want to advertise and fail to, when the native module is absent.
+  #advertisingActive = false;
 
   // Central-mode peers: pubKey → { device, char, mtu, rxBuffer }
   #centralPeers  = new Map();
@@ -125,6 +128,7 @@ export class BleTransport extends Transport {
       } else {
         await BlePeripheral.start(SERVICE_UUID, CHARACTERISTIC_UUID);
         this.#setupPeripheralEvents();
+        this.#advertisingActive = true;
       }
     }
   }
@@ -145,9 +149,10 @@ export class BleTransport extends Transport {
     this.#centralPeers.clear();
 
     // Stop peripheral
-    if (this.#advertise && BlePeripheral) {
+    if (this.#advertisingActive && BlePeripheral) {
       await BlePeripheral.stop().catch(() => {});
     }
+    this.#advertisingActive = false;
     this.#peripheralByAddress.clear();
     this.#peripheralByPubKey.clear();
     this.#pendingForPeer.clear();
@@ -161,6 +166,66 @@ export class BleTransport extends Transport {
     // hostile state lingers, and a fresh scan on the new transport
     // works immediately.
   }
+
+  // ── Discoverability (Nearby step A) ─────────────────────────────────────────
+  //
+  // BLE is the transport that can already honour all three states: `advertise` and `scan` are separate
+  // halves here, so ghost mode works TODAY. What this adds is the ability to change them at runtime — until
+  // now both were fixed at construction, which means "stop advertising when the Nearby view closes" was
+  // only expressible by tearing the transport down and losing every live GATT connection with it.
+  //
+  // Note the asymmetry with mDNS: BLE advertising has NO network boundary. mDNS is confined to a LAN; a BLE
+  // peripheral announces to anyone within radio range, including people who are not on your Wi-Fi and never
+  // will be. That is why the room's defaults must be tighter here, and why enabling BLE in basis is gated
+  // behind its own design pass (Nearby step J) rather than following mDNS by default.
+
+  get supportsDiscoverability() { return true; }
+
+  /** @protected */
+  async _applyDiscoverability(state) {
+    const wantScan      = state !== DISCOVERABILITY.OFF;
+    const wantAdvertise = state === DISCOVERABILITY.PUBLISH;
+
+    if (state === DISCOVERABILITY.OFF) {
+      this.#advertise = false;
+      this.#scan      = false;
+      await this.disconnect();
+      return DISCOVERABILITY.OFF;
+    }
+
+    // Not started yet: record the halves and let connect() apply them.
+    this.#scan      = wantScan;
+    this.#advertise = wantAdvertise;
+    if (!this.#started) {
+      await this.connect();
+      // connect() may have warned that the peripheral module is missing — re-read what we actually got.
+      return this.#advertisingNow() ? DISCOVERABILITY.PUBLISH : DISCOVERABILITY.BROWSE;
+    }
+
+    // Already running: move only the half that changed.
+    if (wantScan && !this.#scanningNow()) this.#restartScan();
+
+    if (wantAdvertise && !this.#advertisingNow()) {
+      if (!BlePeripheral) {
+        console.warn('[BleTransport] browse+publish requested but BlePeripheralModule is absent — browsing only.');
+        this.#advertise = false;
+      } else {
+        await BlePeripheral.start(SERVICE_UUID, CHARACTERISTIC_UUID);
+        this.#setupPeripheralEvents();
+        this.#advertisingActive = true;
+      }
+    } else if (!wantAdvertise && this.#advertisingNow()) {
+      // Stop announcing but KEEP scanning and keep existing GATT links — going quiet must not drop the
+      // people you are already talking to.
+      await BlePeripheral.stop().catch(() => {});
+      this.#advertisingActive = false;
+    }
+
+    return this.#advertisingNow() ? DISCOVERABILITY.PUBLISH : DISCOVERABILITY.BROWSE;
+  }
+
+  #advertisingNow() { return this.#started && this.#advertise && !!BlePeripheral && this.#advertisingActive; }
+  #scanningNow()    { return this.#started && this.#scan; }
 
   _hasPeer(pubKey) {
     return this.#centralPeers.has(pubKey) || this.#peripheralByPubKey.has(pubKey);

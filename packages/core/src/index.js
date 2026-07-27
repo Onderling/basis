@@ -91,6 +91,11 @@ export {
 // adapter implements (extend it, override `_put`). See docs/conventions/ports.md
 // and test/conformance/transportConformance.js.
 export { Transport }                      from './transport/Transport.js';
+export {
+  DISCOVERABILITY, DISCOVERABILITY_ORDER, isDiscoverability,
+  normalizeDiscoverability, publishes, browses, maxExposure,
+  createDiscoverabilityControl,
+} from './transport/discoverability.js';
 export { InternalBus, InternalTransport } from './transport/InternalTransport.js';
 export { HubDelegateTransport }           from './transport/HubDelegateTransport.js';
 export { LocalTransport }                 from './transport/LocalTransport.js';

@@ -73,6 +73,10 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
 - **Record a decision** when a choice closes off alternatives / would be re-litigated / shapes architecture (→ `docs/decisions.md`) or org (→ private) — [`decision-log.md`](docs/conventions/decision-log.md).
 
 ## How to work
+- **An idea is only dropped when Frits drops it.** Silence is not rejection. If you raise an option, a
+  caveat, or a finding and it goes unanswered, it stays OPEN — carry it into the design/plan doc as an open
+  item rather than quietly dropping it because the conversation moved on. When a thread has accumulated more
+  open points than a reply can hold, **ask** which to keep rather than deciding for him.
 - **Prefer a fitness function to a manual check.** When you fix drift, add the test/lint that makes the same
   drift FAIL CI next time. This is the roadmap's step 0 — see `REMAINING-WORK.md` "★ Architectural spine".
 - **New functionality = add a manifest + projectors**, not a new app silo. Apps are dissolving into

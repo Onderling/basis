@@ -135,8 +135,18 @@ export class PolicyEngine {
       throw new PolicyDeniedError('DISABLED', `Skill "${skillId}" is disabled`);
     }
 
-    const callerLevel = TIER_LEVEL[tier]              ?? 1;
-    const required    = TIER_LEVEL[skill.visibility]  ?? 1;
+    // Unknown values fail CLOSED, in opposite directions (2026-07-27).
+    //
+    // An unrecognised CALLER tier is treated as the lowest (`public`): we do not know who they are, so they
+    // get the least. An unrecognised SKILL visibility is treated as the highest (`private`): we do not know
+    // what it guards, so it is guarded most.
+    //
+    // Both used to default to 1 (`authenticated`). `defineSkill` validates visibility against the same four
+    // tiers, so a registry built through it cannot contain an unknown one — but a hand-built registry (a
+    // test, a future host, a typo in a migration) could, and the failure would have been silent and OPEN:
+    // a skill nobody could name would have been reachable by any known peer.
+    const callerLevel = TIER_LEVEL[tier]              ?? TIER_LEVEL.public;
+    const required    = TIER_LEVEL[skill.visibility]  ?? TIER_LEVEL.private;
 
     if (callerLevel < required) {
       throw new PolicyDeniedError(

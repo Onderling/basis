@@ -25,6 +25,7 @@ import { buildNearbyModel, }             from './circleNearby.js';
 import { createProximitySession, nearbyActions } from './circleProximity.js';
 import { makeNearbySessionAdapter }      from './nearbyDiscoverability.js';
 import { createNetworkChangeWatcher }    from './networkChangeWatcher.js';
+import { evaluateIncomingAsk, isAskLive, askActions } from './nearbyAsks.js';
 
 /**
  * Row action id → locale key.
@@ -63,6 +64,10 @@ export function nearbyVisibilityKey(visibility) {
  * @param {(peerId: string) => boolean} [deps.isKnownMember]  the ROSTER answer, never proximity
  * @param {() => boolean} [deps.canInvite]
  * @param {string[]} [deps.supportedActions]  which actions this host can actually SERVICE. Defaults to all.
+ * @param {(onAsk: (ask: object) => void) => (() => void)} [deps.subscribeToAsks]  incoming room asks
+ * @param {() => Promise<Record<string,object>>} [deps.getDrivers]  MY drivers — read on-device, never sent
+ * @param {Function} [deps.judge]        optional injected LLM judge for semantic matching
+ * @param {() => number} [deps.now]
  * @param {string} [deps.restingState]   passed through to the session adapter
  * @param {function} [deps.t]
  * @param {(err: Error, phase: string) => void} [deps.onError]
@@ -77,6 +82,10 @@ export function createNearbyScreen({
   isKnownMember = () => false,
   canInvite = () => false,
   supportedActions = null,
+  subscribeToAsks = null,
+  getDrivers = null,
+  judge,
+  now = () => Date.now(),
   restingState,
   t,
   onError = null,
@@ -104,6 +113,27 @@ export function createNearbyScreen({
   });
 
   session.subscribeToPeers(() => emit());
+
+  // ── Asks (step F) ──────────────────────────────────────────────────────────
+  // Held here rather than in the session because an ask outlives a peer row: someone can ask and walk out
+  // of range, and the question is still worth answering until it expires.
+  //
+  // Each incoming ask is matched against MY drivers on THIS device. The result kept is a signal — resonant
+  // or not, plus the shared-tag reason — never the drivers themselves and never the match internals.
+  /** askId → { ask, resonant, reason } */
+  const asks = new Map();
+  let unsubscribeAsks = null;
+
+  async function ingestAsk(ask) {
+    if (!ask?.id || !isAskLive(ask, now)) return;
+    let evaluated = { resonant: false, reason: null };
+    if (typeof getDrivers === 'function') {
+      try { evaluated = await evaluateIncomingAsk({ ask, getDrivers, judge, now }); }
+      catch (err) { try { onError?.(err, 'evaluateAsk'); } catch { /* diagnostics only */ } }
+    }
+    asks.set(ask.id, { ask, resonant: !!evaluated.resonant, reason: evaluated.reason ?? null });
+    emit();
+  }
 
   function emit() {
     const snapshot = model();
@@ -165,14 +195,28 @@ export function createNearbyScreen({
         : decided.actions;
       return { ...row, ...decided, actions };
     });
-    return { ...built, rows, visibility: visibility(), isOpen: session.isOpen() };
+    // Live asks only, newest first. An expired one is not "greyed out" — it is gone, because the room has
+    // moved on and an answer to it would arrive to nobody.
+    const askRows = [...asks.values()]
+      .filter((entry) => isAskLive(entry.ask, now))
+      .sort((a, b) => b.ask.createdAt - a.ask.createdAt)
+      .map((entry) => ({
+        ...entry,
+        ...askActions(entry.ask, { resonant: entry.resonant, now }),
+      }));
+
+    return { ...built, rows, asks: askRows, visibility: visibility(), isOpen: session.isOpen() };
   }
 
   return {
-    /** Enter the screen: announce, listen for peers, watch for network changes. */
+    /** Enter the screen: announce, listen for peers and asks, watch for network changes. */
     open() {
       session.open();      // advertising + peer subscription
       watcher.start();     // only while the screen is up: a closed screen has nothing to re-announce for
+      if (typeof subscribeToAsks === 'function' && !unsubscribeAsks) {
+        try { unsubscribeAsks = subscribeToAsks((ask) => { ingestAsk(ask); }) ?? null; }
+        catch (err) { unsubscribeAsks = null; try { onError?.(err, 'subscribeToAsks'); } catch { /* */ } }
+      }
       emit();
     },
 
@@ -182,6 +226,13 @@ export function createNearbyScreen({
      */
     close() {
       watcher.stop();
+      if (unsubscribeAsks) {
+        try { unsubscribeAsks(); } catch (err) { try { onError?.(err, 'unsubscribeAsks'); } catch { /* */ } }
+        unsubscribeAsks = null;
+      }
+      // Asks are dropped with the room, for the same reason the peer list is: a closed screen holding what
+      // strangers needed is a quiet record of where someone has been.
+      asks.clear();
       session.close();
       emit();
     },

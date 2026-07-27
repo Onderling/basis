@@ -251,6 +251,10 @@ export { makeNearbySessionAdapter }             from './v2/nearbyDiscoverability
 export { createNetworkChangeWatcher }           from './v2/networkChangeWatcher.js';
 export { createNearbyScreen, NEARBY_ACTION_LABELS, nearbyVisibilityKey }
                                                 from './v2/nearbyScreen.js';
+export {
+  createAsk, isAskLive, evaluateIncomingAsk, askActions, answerAsk,
+  ASK_DEFAULT_TTL_MS, ASK_MAX_TTL_MS, ASK_MAX_TEXT,
+} from './v2/nearbyAsks.js';
 export { makeSharedCirclePeerScope } from './v2/sharedCirclePeerScope.js';
 // agent-add admin approval: proposal-like flow for
 // joining an LLM agent to a circle whose `agents` axis is admin-approval.

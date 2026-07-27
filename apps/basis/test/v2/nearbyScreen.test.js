@@ -264,3 +264,110 @@ describe('supportedActions — do not offer what the host cannot do', () => {
   });
 });
 
+describe('asks in the room (step F)', () => {
+  const T0 = 1_700_000_000_000;
+  const drivers = (tags) => async () => Object.fromEntries(
+    tags.map((tag) => [tag, { kind: 'offering', text: `ik kan ${tag}`, tags: [tag] }]),
+  );
+  const anAsk = (over = {}) => Object.freeze({
+    id: 'ask-1', text: 'anyone got a bike pump?', tags: ['fiets'],
+    from: 'room-1', createdAt: T0, expiresAt: T0 + 60_000, ...over,
+  });
+
+  function withAsks({ getDrivers, nowMs = T0, ...rest } = {}) {
+    let pushAsk = null;
+    const control = createDiscoverabilityControl({ transports: () => ({ ble: mk(Discovering) }) });
+    const screen = createNearbyScreen({
+      control,
+      subscribeToAsks: (fn) => { pushAsk = fn; return () => { pushAsk = null; }; },
+      getDrivers, now: () => nowMs, t: (k) => k, ...rest,
+    });
+    return { screen, ask: (a) => pushAsk?.(a) };
+  }
+
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  it('an incoming ask appears, matched on MY device', async () => {
+    const { screen, ask } = withAsks({ getDrivers: drivers(['fiets']) });
+    screen.open();
+    ask(anAsk());
+    await flush();
+
+    const [row] = screen.model().asks;
+    expect(row.ask.text).toBe('anyone got a bike pump?');
+    expect(row.resonant).toBe(true);
+    expect(row.reason).toContain('fiets');
+    expect(row.actions).toEqual(['answer-ask', 'dismiss-ask']);
+    expect(row.note).toBe('answer-is-disclosure');
+  });
+
+  it('a non-matching ask still SHOWS — the room is not filtered to my interests', async () => {
+    // Hiding asks I do not match would make the room a recommender, and would also leak my drivers into
+    // what I can see. Everyone hears the question; only matching is private.
+    const { screen, ask } = withAsks({ getDrivers: drivers(['tuinieren']) });
+    screen.open();
+    ask(anAsk());
+    await flush();
+
+    const [row] = screen.model().asks;
+    expect(row.resonant).toBe(false);
+    expect(row.reason).toBeNull();
+    expect(row.actions).toEqual(['answer-ask', 'dismiss-ask']);   // I can still answer
+  });
+
+  it('with no drivers configured, asks show and simply never resonate', async () => {
+    const { screen, ask } = withAsks({ getDrivers: null });
+    screen.open();
+    ask(anAsk());
+    await flush();
+    expect(screen.model().asks[0]).toMatchObject({ resonant: false, reason: null });
+  });
+
+  it('an EXPIRED ask never enters the room', async () => {
+    const { screen, ask } = withAsks({ getDrivers: drivers(['fiets']), nowMs: T0 + 120_000 });
+    screen.open();
+    ask(anAsk());
+    await flush();
+    expect(screen.model().asks).toEqual([]);
+  });
+
+  it('newest first', async () => {
+    const { screen, ask } = withAsks({ getDrivers: null });
+    screen.open();
+    ask(anAsk({ id: 'old', createdAt: T0 - 1_000 }));
+    ask(anAsk({ id: 'new', createdAt: T0 }));
+    await flush();
+    expect(screen.model().asks.map((a) => a.ask.id)).toEqual(['new', 'old']);
+  });
+
+  it('closing the room DROPS the asks', async () => {
+    // A closed screen holding what strangers needed is a quiet record of where someone has been.
+    const { screen, ask } = withAsks({ getDrivers: null });
+    screen.open();
+    ask(anAsk());
+    await flush();
+    expect(screen.model().asks).toHaveLength(1);
+
+    screen.close();
+    expect(screen.model().asks).toEqual([]);
+  });
+
+  it('a failing driver read leaves the ask visible but unmatched', async () => {
+    const onError = vi.fn();
+    const { screen, ask } = withAsks({
+      getDrivers: async () => { throw new Error('vault locked'); }, onError,
+    });
+    screen.open();
+    ask(anAsk());
+    await flush();
+    // The matcher swallows its own failures, so the ask lands unmatched rather than vanishing.
+    expect(screen.model().asks[0]).toMatchObject({ resonant: false });
+  });
+
+  it('no ask source ⇒ an empty ask list, not a crash', () => {
+    const { screen } = build();
+    screen.open();
+    expect(screen.model().asks).toEqual([]);
+  });
+});
+

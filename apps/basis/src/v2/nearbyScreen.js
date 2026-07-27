@@ -27,6 +27,33 @@ import { makeNearbySessionAdapter }      from './nearbyDiscoverability.js';
 import { createNetworkChangeWatcher }    from './networkChangeWatcher.js';
 
 /**
+ * Row action id → locale key.
+ *
+ * Shared because BOTH renderers need it and neither may own it: a copy in each is how web starts offering a
+ * stranger something mobile does not (invariant 3). A renderer skips ids missing from this map rather than
+ * printing them, so a new action from shared code cannot leak an internal identifier into the UI.
+ */
+export const NEARBY_ACTION_LABELS = Object.freeze({
+  'invite-to-circle':   'circle.nearbyScreen.action_invite',
+  'request-join':       'circle.nearbyScreen.action_request',
+  'open-shared-circle': 'circle.nearbyScreen.action_open',
+});
+
+/**
+ * Which visibility banner to show, given `model.visibility`.
+ *
+ * Ordered by what a person most needs to know, not by what the screen asked for: being announced after
+ * asking to be hidden outranks everything, and "this device cannot discover" is an explanation rather than
+ * a warning. Returns null when there is nothing to say.
+ */
+export function nearbyVisibilityKey(visibility) {
+  if (!visibility) return null;
+  if (visibility.degraded)    return 'still_visible';
+  if (visibility.unavailable) return 'unavailable';
+  return visibility.publishing ? 'visible' : 'hidden';
+}
+
+/**
  * @param {object} deps
  * @param {object} [deps.control]        the discoverability control (`createDiscoverabilityControl`)
  * @param {(onPeers: (peers: object[]) => void) => (() => void)} [deps.subscribeToPeers]

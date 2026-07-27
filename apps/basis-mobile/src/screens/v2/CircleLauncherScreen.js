@@ -30,8 +30,8 @@ import {
   buildTilePreviews, bumpSeenAt,
   // claim-router hook (mirror claimed tasks to my own circle).
   makeAfterClaimHook,
-  // Nearby/HIER model + label helpers.
-  buildNearbyModel,
+  // Nearby model + label helpers (the action map + banner rule are SHARED with web — invariant 3).
+  buildNearbyModel, NEARBY_ACTION_LABELS, nearbyVisibilityKey,
   // "My things" private notes-list.
   myThingsFromListFiles,
   // kring-scoped event stream + per-row action chips.
@@ -3893,15 +3893,24 @@ function formatDayLabel(ts, t) {
   return d.toLocaleDateString();
 }
 
-// Nearby/HIER screen. Renders the buildNearbyModel output:
-// peer rows with shared-skills + proximity, header line, and an own-profile
-// footer.  Self-contained so vitest can target it without RN test renderer.
-function NearbyScreen({ model, onBack }) {
+// Nearby screen. Renders the model `createNearbyScreen` produces — the same model the
+// web renderer draws (invariant 2), so the two cannot drift on what proximity entitles a stranger to.
+// Self-contained so vitest can target it without the RN test renderer.
+//
+// Step E added two things the row list could not say:
+//   • a VISIBILITY banner — what the device is actually doing, from the transports rather than from what
+//     the screen asked for. The disagreement case ("hidden" but still announcing) outranks the rest.
+//   • per-row ACTIONS, already decided on the row by `nearbyActions`. This renderer only labels them.
+
+// `NEARBY_ACTION_LABELS` + `nearbyVisibilityKey` are imported from the basis app above — one definition,
+// so web and mobile cannot drift on what a row offers or on when the "still visible" warning fires.
+function NearbyScreen({ model, onBack, onAction }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const rows       = Array.isArray(model?.rows) ? model.rows : [];
   const own        = model?.ownProfile ?? {};
   const headerText = model?.headerLabel ?? '';
+  const visKey     = nearbyVisibilityKey(model?.visibility);
   return (
     <View style={styles.page} testID="circle-nearby-screen">
       <View style={styles.bar}>
@@ -3910,6 +3919,16 @@ function NearbyScreen({ model, onBack }) {
         </Pressable>
       </View>
       <Text style={styles.title}>{t('circle.nearbyScreen.title')}</Text>
+      {visKey ? (
+        <View
+          style={[styles.nearbyBanner, visKey === 'still_visible' ? styles.nearbyBannerAlert : null]}
+          testID={`nearby-visibility-${visKey}`}
+          accessibilityRole={visKey === 'still_visible' ? 'alert' : undefined}
+        >
+          <Text style={styles.nearbyBannerTitle}>{t(`circle.nearbyScreen.${visKey}_title`)}</Text>
+          <Text style={styles.muted}>{t(`circle.nearbyScreen.${visKey}_body`)}</Text>
+        </View>
+      ) : null}
       <Text style={styles.muted}>{headerText}</Text>
       {rows.length === 0 ? (
         <Text style={styles.muted}>{t('circle.nearbyScreen.header_empty')}</Text>
@@ -3926,6 +3945,28 @@ function NearbyScreen({ model, onBack }) {
                 <Text style={styles.rowMeta}>{row.sharedSkills.join(', ')}</Text>
               ) : null}
               {row.proximity ? <Text style={styles.rowMeta}>{row.proximity}</Text> : null}
+              {/* Rule (b): a stranger you can see is still a stranger — say it, rather than letting the
+                  absence of an "open" button be the only hint. */}
+              {row.note === 'nearby-not-member' ? (
+                <Text style={styles.rowMeta} testID={`nearby-note-${row.id || row.pseudonym}`}>
+                  {t('circle.nearbyScreen.not_member_note')}
+                </Text>
+              ) : null}
+              {Array.isArray(row.actions) && row.actions.some((a) => NEARBY_ACTION_LABELS[a]) ? (
+                <View style={styles.nearbyActions}>
+                  {row.actions.filter((a) => NEARBY_ACTION_LABELS[a]).map((action) => (
+                    <Pressable
+                      key={action}
+                      onPress={() => { if (typeof onAction === 'function') onAction(action, row); }}
+                      accessibilityRole="button"
+                      testID={`nearby-action-${action}-${row.id || row.pseudonym}`}
+                      style={styles.nearbyAction}
+                    >
+                      <Text style={styles.nearbyActionText}>{t(NEARBY_ACTION_LABELS[action])}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
             </View>
           ))}
         </ScrollView>
@@ -4129,6 +4170,14 @@ const makeStyles = (theme) => StyleSheet.create({
   deliveryUndeliverable: { marginTop: 4, fontSize: 11, color: theme.color.inkSoft },
   ownProfile: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: theme.color.line },
   ownProfileTitle: { fontSize: 13, fontWeight: '600', color: theme.color.ink, marginBottom: 4 },
+  // Nearby visibility banner (step E). The alert variant is for the ONE case that matters: the device is
+  // announcing itself after being asked not to, so it must not look like the ordinary states.
+  nearbyBanner:      { marginTop: 8, marginBottom: 4, padding: 10, borderRadius: 8, backgroundColor: theme.color.surfaceSoft ?? theme.color.surface, borderWidth: 1, borderColor: theme.color.line },
+  nearbyBannerAlert: { borderColor: theme.color.warn ?? theme.color.ink, borderWidth: 2 },
+  nearbyBannerTitle: { fontSize: 13, fontWeight: '600', color: theme.color.ink, marginBottom: 2 },
+  nearbyActions:     { flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 },
+  nearbyAction:      { paddingVertical: 6, paddingHorizontal: 10, marginRight: 6, marginTop: 4, borderRadius: 6, borderWidth: 1, borderColor: theme.color.line },
+  nearbyActionText:  { fontSize: 13, color: theme.color.ink },
   // "ON YOUR LIST" section on CircleDetail.
   onYourList:       { marginTop: 8, paddingHorizontal: 2, paddingVertical: 8 },
   onYourListTitle:  { fontSize: 11, letterSpacing: 1.0, color: theme.color.inkSoft, textTransform: 'uppercase', marginBottom: 6 },

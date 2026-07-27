@@ -23,12 +23,7 @@
  *     web and mobile cannot drift on what proximity entitles a stranger to.
  */
 
-/** Row actions → locale key. Unknown ids are skipped rather than shown raw. */
-const ACTION_LABELS = {
-  'invite-to-circle':   'circle.nearbyScreen.action_invite',
-  'request-join':       'circle.nearbyScreen.action_request',
-  'open-shared-circle': 'circle.nearbyScreen.action_open',
-};
+import { NEARBY_ACTION_LABELS, nearbyVisibilityKey } from '../../src/v2/nearbyScreen.js';
 
 export function renderCircleNearby(container, {
   model = null,
@@ -59,10 +54,7 @@ export function renderCircleNearby(container, {
   // Ordered by what a person most needs to know, not by what we asked for:
   // being visible when you asked to be hidden outranks everything else here.
   if (visibility) {
-    const key = visibility.degraded    ? 'still_visible'
-              : visibility.unavailable ? 'unavailable'
-              : visibility.publishing  ? 'visible'
-              :                          'hidden';
+    const key = nearbyVisibilityKey(visibility);
     const banner = document.createElement('div');
     banner.className = `circle-nearby__visibility is-${key.replace(/_/g, '-')}`;
     banner.dataset.visibility = key;
@@ -133,7 +125,7 @@ export function renderCircleNearby(container, {
         const bar = document.createElement('div');
         bar.className = 'circle-nearby__actions';
         for (const action of actions) {
-          const labelKey = ACTION_LABELS[action];
+          const labelKey = NEARBY_ACTION_LABELS[action];
           if (!labelKey) continue;   // an action the renderer does not know is not shown raw
           const btn = document.createElement('button');
           btn.type = 'button';

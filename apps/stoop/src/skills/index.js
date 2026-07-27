@@ -520,7 +520,9 @@ async function _fanOutToMembers({ members, chat, selfWebid, subtype, threadId, b
  * @param {object} a.envelope          the conforming kring-chat-message wire envelope
  * @returns {Promise<{sent:number, attempted:number, errors:Array<{webid:string,reason:string}>}>}
  */
-async function _fanOutViaReliableSend({ members, reliableSend, selfWebid, envelope, only = null, circleId = null }) {
+async function _fanOutViaReliableSend({
+  members, reliableSend, selfWebid, envelope, only = null, circleId = null, preferCircleAddress = false,
+}) {
   const list = await members.list();
   const allow = only instanceof Set ? only : (Array.isArray(only) ? new Set(only) : null);
   const targets = new Map();      // routable address → webid (dedupe by address)
@@ -535,6 +537,7 @@ async function _fanOutViaReliableSend({ members, reliableSend, selfWebid, envelo
     // the fallback) is safe rather than a guess.
     const { addr } = await resolveMemberAddress(m, {
       circleId,
+      preferCircleAddress,
       resolveByWebid: (w) => members.resolveByWebid(w),
       onFallback: _reportAddressFallback,
     });
@@ -890,6 +893,12 @@ export function buildSkills({
   localActor,
   groupId: explicitGroupId,
   dataLocationConfig,
+  // G13 step C — route circle traffic to each member's PER-CIRCLE address instead of their one global
+  // signing key. OFF by default and threaded from the host, because turning it on is a DEPLOYMENT-level
+  // choice, not a per-message one: every participant must be on a build whose transport can bind aliases
+  // (`Transport.supportsAliases` — relay + internal yes, NKN deliberately not), or messages route to an
+  // address nobody answers. There are no existing users to migrate, so this can flip once NKN is decided.
+  preferCircleAddress = false,
   chat,           // Phase 14: wireChat controller (chat.send / chat.detach)
   metrics,        // Phase 18: UsageMetrics; record() called from key handlers
   bundle,         // Phase 20: factory hands itself in for sign-in skills
@@ -1062,7 +1071,9 @@ export function buildSkills({
     // chat.send fallback would produce as the receiver's payload (routed by `subtype`).
     const wire = envelope ?? { subtype: kind, ...extras };
     const { sent, attempted, errors } = reliableSend
-      ? await _fanOutViaReliableSend({ members, reliableSend, selfWebid: from, envelope: wire, only, circleId })
+      ? await _fanOutViaReliableSend({
+        members, reliableSend, selfWebid: from, envelope: wire, only, circleId, preferCircleAddress,
+      })
       : await _fanOutToMembers({ members, chat, selfWebid: from, subtype: kind, threadId: circleId, body, extras, only });
     if (metric) metrics?.record?.(metric);
     return { sent, attempted, errors };

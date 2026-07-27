@@ -36,6 +36,7 @@
     "./mnemonic":                     "./src/mnemonic/index.js",
     "./mnemonic/view":                "./src/mnemonic/MnemonicView.jsx",
     "./push":                         "./src/push/index.js",
+    "./netinfo": "./src/netinfoSource.js",
     "./localisation":                         "./src/localisation/index.js",
 
     "./deepLinks":                    "./src/deepLinks/index.js",
@@ -53,6 +54,7 @@
     "@onderling/vault": "^0.1.0",
     "@react-native-async-storage/async-storage": "*",
     "react-native-ble-plx": "*",
+    "@react-native-community/netinfo": "*",
     "react-native-keychain": "*",
     "react-native-get-random-values": "*",
     "buffer": "*",
@@ -62,6 +64,7 @@
   "peerDependenciesMeta": {
     "@react-native-async-storage/async-storage": { "optional": false },
     "react-native-ble-plx": { "optional": false },
+    "@react-native-community/netinfo": { "optional": true },
     "react-native-keychain": { "optional": false },
     "react-native-get-random-values": { "optional": false },
     "buffer": { "optional": false },

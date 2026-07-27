@@ -62,6 +62,10 @@ const ALLOW = [
   'platform/',                 // polyfills + platform selection
   'mnemonic/',                 // clipboard/native leaf
   'deepLinks/',                // deep-link native leaf
+  // The netinfo half of the network-change source. Isolated in its own file precisely BECAUSE it imports a
+  // native module: it sits behind the `./netinfo` subpath export so a shell that has not installed the
+  // (optional) dependency never resolves it, and the AppState half in `networkChangeSource.js` stays clean.
+  'netinfoSource.js',          // @react-native-community/netinfo
 ];
 
 function isAllowed(rel) {

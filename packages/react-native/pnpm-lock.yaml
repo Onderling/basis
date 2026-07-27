@@ -17,6 +17,9 @@ importers:
       '@react-native-async-storage/async-storage':
         specifier: '*'
         version: 3.1.1(react-native@0.86.0(@babel/core@7.29.7)(react@19.2.7))(react@19.2.7)
+      '@react-native-community/netinfo':
+        specifier: '*'
+        version: 12.0.1(react-native@0.86.0(@babel/core@7.29.7)(react@19.2.7))(react@19.2.7)
       buffer:
         specifier: '*'
         version: 6.0.3
@@ -39,6 +42,9 @@ importers:
       '@onderling/core':
         specifier: file:../core
         version: file:../core
+      '@onderling/pod-client':
+        specifier: file:../pod-client
+        version: file:../pod-client
       react:
         specifier: ^19.0.0
         version: 19.2.7
@@ -126,9 +132,6 @@ packages:
   '@bergos/jsonparse@1.4.2':
     resolution: {integrity: sha512-qUt0QNJjvg4s1zk+AuLM6s/zcsQ8MvGn7+1f0vPuxvpCYa08YtTryuDInngbEyW5fNGGYe2znKt61RMGd5HnXg==}
     engines: {'0': node >= 0.2.0}
-
-  '@onderling/core@file:../core':
-    resolution: {directory: ../core, type: directory}
 
   '@esbuild/aix-ppc64@0.21.5':
     resolution: {integrity: sha512-1SDgH6ZSPTlggy1yI6+Dbkiz8xzpHJEVAlF/AM1tHPLsf5STom9rwtjE4hKAF20FfXXNTFqEYXyJNWh1GiZedQ==}
@@ -326,6 +329,17 @@ packages:
     resolution: {integrity: sha512-IYqDGiTXab6FniAgnSdZwgWbomxpy9FtYvLKs7wCUs2a8RkITG+DFGO1DM9cr+E3/RgADRpFjrKVaJ1z6sjtEg==}
     engines: {node: '>= 20.19.0'}
 
+  '@onderling/core@file:../core':
+    resolution: {directory: ../core, type: directory}
+
+  '@onderling/pod-client@file:../pod-client':
+    resolution: {directory: ../pod-client, type: directory}
+    peerDependencies:
+      '@onderling/pseudo-pod': workspace:^
+    peerDependenciesMeta:
+      '@onderling/pseudo-pod':
+        optional: true
+
   '@rdfjs/data-model@1.3.4':
     resolution: {integrity: sha512-iKzNcKvJotgbFDdti7GTQDCYmL7GsGldkYStiP0K8EYtN7deJu5t7U11rKTz+nR7RtesUggT+lriZ7BakFv8QQ==}
     hasBin: true
@@ -342,6 +356,12 @@ packages:
     peerDependencies:
       react: '*'
       react-native: '*'
+
+  '@react-native-community/netinfo@12.0.1':
+    resolution: {integrity: sha512-P/3caXIvfYSJG8AWJVefukg+ZGRPs+M4Lp3pNJtgcTYoJxCjWrKQGNnCkj/Cz//zWa/avGed0i/wzm0T8vV2IQ==}
+    peerDependencies:
+      react: '*'
+      react-native: '>=0.59'
 
   '@react-native/assets-registry@0.86.0':
     resolution: {integrity: sha512-nIaXbm2jX1OTYp0qbviJ3O6KZivoE8z3BnhUQ2LsqfZSWRoOK/n1qsiAr6oALiNKWnXY3j2KPwtYORnZzp8xew==}
@@ -2018,18 +2038,6 @@ snapshots:
     dependencies:
       buffer: 6.0.3
 
-  '@onderling/core@file:../core':
-    dependencies:
-      '@inrupt/solid-client': 3.0.0
-      '@inrupt/solid-client-authn-node': 4.0.0
-      '@noble/hashes': 2.2.0
-      '@scure/bip39': 1.6.0
-      ed2curve: 0.3.0
-      tweetnacl: 1.0.3
-      tweetnacl-util: 0.15.1
-    optionalDependencies:
-      node-datachannel: 0.32.3
-
   '@esbuild/aix-ppc64@0.21.5':
     optional: true
 
@@ -2177,6 +2185,28 @@ snapshots:
 
   '@noble/hashes@2.2.0': {}
 
+  '@onderling/core@file:../core':
+    dependencies:
+      '@inrupt/solid-client': 3.0.0
+      '@inrupt/solid-client-authn-node': 4.0.0
+      '@noble/hashes': 2.2.0
+      '@scure/bip39': 1.6.0
+      ed2curve: 0.3.0
+      tweetnacl: 1.0.3
+      tweetnacl-util: 0.15.1
+    optionalDependencies:
+      node-datachannel: 0.32.3
+
+  '@onderling/pod-client@file:../pod-client':
+    dependencies:
+      '@inrupt/solid-client': 3.0.0
+      '@onderling/core': link:../core
+      '@onderling/logger': link:../logger
+      '@onderling/oidc-session': link:../oidc-session
+      '@onderling/vault': link:../vault
+      ed2curve: 0.3.0
+      tweetnacl: 1.0.3
+
   '@rdfjs/data-model@1.3.4':
     dependencies:
       '@rdfjs/types': 2.0.1
@@ -2192,6 +2222,11 @@ snapshots:
   '@react-native-async-storage/async-storage@3.1.1(react-native@0.86.0(@babel/core@7.29.7)(react@19.2.7))(react@19.2.7)':
     dependencies:
       idb: 8.0.3
+      react: 19.2.7
+      react-native: 0.86.0(@babel/core@7.29.7)(react@19.2.7)
+
+  '@react-native-community/netinfo@12.0.1(react-native@0.86.0(@babel/core@7.29.7)(react@19.2.7))(react@19.2.7)':
+    dependencies:
       react: 19.2.7
       react-native: 0.86.0(@babel/core@7.29.7)(react@19.2.7)
 

@@ -237,3 +237,42 @@ remember the binary. **Rebuild the Android app** after taking this change.
 
 `start()` / `stop()` are unchanged and still work, so nothing breaks — it degrades, loudly.
 
+## ⚠ A partial `pnpm install --filter …` shreds workspace symlinks REPO-WIDE
+
+**Found the hard way, 2026-07-27, adding one dependency.** This is the most expensive trap in this file:
+the blast radius is nothing like the command you typed.
+
+`.npmrc` sets `node-linker=hoisted` + per-app lockfiles. A filtered install that aborts partway — the usual
+way is `ERR_PNPM_MISSING_HOISTED_LOCATIONS` — leaves the tree half-materialized:
+
+- workspace packages become **copies instead of symlinks**, so their relative cross-package imports
+  (`../../packages/sync-engine/…`) resolve against `node_modules/packages/…` and fail;
+- sibling links get **pruned from packages you never filtered for**. Adding one dep to `basis-mobile` took
+  out `packages/core`'s `@onderling/vault` + `@onderling/transports` devDep links, dropping its suite from
+  1373 tests to 572 — *collection* failures, so the count silently shrinks rather than going red.
+
+**Tell:** a flood of `Cannot find package '@onderling/…'` / `Could not resolve "@onderling/x" imported by
+"@onderling/y"` in apps you did not touch, and suite TOTALS that drop. Check the totals, not just the
+red/green — a suite that collects half its files still reports "all passed".
+
+**Fix:** `node scripts/relink-workspace.mjs`. Re-running the install usually does NOT help (it is what
+produced the state). Then `npm rebuild better-sqlite3` if the relay sqlite suites are red (separate,
+documented above).
+
+**Two second-order effects worth knowing:**
+
+1. **Creating a `node_modules/` dir shadows Node's walk-up.** A package that had none resolved third-party
+   deps from the repo root; give it one and it stops. This is how `ws` vanishes for `@onderling/relay`. The
+   relink script handles it, but if you hand-materialize a link, materialize the third-party deps too.
+2. **Symlinks expose undeclared deps that a hoisted tree hid.** `apps/basis` imports
+   `@onderling/sync-engine` without declaring it; it worked only because the flat tree happened to contain
+   it. Worth fixing properly, but do not be surprised when it surfaces.
+
+**Prefer, for a new dependency:** edit `package.json` by hand and let the next full install pick it up, or
+run the install and check the totals of the neighbouring suites immediately. And note the shells resolve
+`file:` workspace deps as **symlinks** — verify with `ls -la apps/<app>/node_modules/@onderling/core`; a real
+directory there means the tree is broken.
+
+*(A silver lining: running the relink also fixed pre-existing breakage — `apps/stoop-mobile` went from 3
+failing test files to 940/940, and it had been that way for a while.)*
+

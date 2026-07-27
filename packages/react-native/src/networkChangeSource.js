@@ -10,17 +10,17 @@
  * the café, walk home, and open the app again on a different network. The mDNS service registered against
  * the café's interface is dead, and coming back to the foreground is exactly when that matters.
  *
- * **It does not detect a Wi-Fi switch while the app is in the FOREGROUND.** React Native core has had no
- * network-state API since `NetInfo` was extracted in 0.60, and `@react-native-community/netinfo` is not a
- * dependency of this repo. Adding it is a real decision — a native module, a rebuild, an ongoing dependency
- * — so it is left to be chosen rather than acquired silently.
+ * **It does not detect a Wi-Fi switch while the app is in the FOREGROUND** — `AppState` structurally cannot
+ * see one. That case is covered by the netinfo source in `netinfoSource.js`, kept separate because it
+ * statically imports a native module (the repo's pattern for those; see `BleTransport`). Compose them:
  *
- * **The seam is ready if that decision goes the other way:** this returns an unsubscribe from a plain
- * `subscribe(onEvent)` contract, so a netinfo-backed source is a drop-in replacement, or can be composed:
+ *     import { subscribeToNetworkChange, combineSources } from '@onderling/react-native';
+ *     import { subscribeToNetInfo }                        from '@onderling/react-native/netinfo';
  *
- *     const stop = combineSources([subscribeToNetworkChange, subscribeToNetInfo]);
+ *     const subscribe = combineSources([subscribeToNetworkChange, subscribeToNetInfo]);
  *
- * Until then the gap is a known one rather than an invisible one. → `plans/PLAN-nearby.md`.
+ * Both together is the intended wiring, and they overlap harmlessly — the watcher coalesces the burst, so a
+ * change both sources notice still re-announces once. → `plans/PLAN-nearby.md`.
  */
 import { AppState } from 'react-native';
 

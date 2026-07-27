@@ -248,8 +248,21 @@ export async function startRelay(opts = {}) {
 
   // E2c: token registry exists whenever `pushSender` is configured; otherwise
   // we still allow callers to inject one for advanced setups.
+  // G15 (2026-07-27): if the caller wired a durable store on the registry, rehydrate it BEFORE serving —
+  // otherwise the relay comes back up having forgotten every sleeping device it is supposed to wake, and
+  // nothing anywhere reports it. A store failure must not stop the relay booting: online peers are still
+  // served over their sockets; only wakes degrade, so it is logged and startup continues.
   const tokenRegistry = pushTokenRegistry
     ?? (pushSender ? new PushTokenRegistry() : null);
+  if (tokenRegistry && typeof tokenRegistry.hydrate === 'function') {
+    try {
+      const restored = await tokenRegistry.hydrate();
+      if (restored > 0) console.info(`[relay] restored ${restored} push-token registration(s)`);
+    } catch (err) {
+      console.warn('[relay] push-token store unavailable — sleeping devices cannot be woken until it '
+        + `recovers: ${err?.message ?? err}`);
+    }
+  }
 
   // Q-E.2: optional group-membership gate.  Open mode (no acceptedGroups)
   // preserves the legacy behavior — every existing relay test still passes.

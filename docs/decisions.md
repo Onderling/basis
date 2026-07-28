@@ -662,3 +662,96 @@ own — quietly converting a per-relay concession into a global one. The connect
 (`circlesFor(url)`) is the scoping source; a circle with no recorded point rides the deployment default
 and registers there alone.
 
+
+## An agent is owned by a KEY, and a circle's authority over it is scoped (2026-07-28, Frits)
+
+Frits' proposal: *ownership is a secret key on the agent, given to it in order to control it — maybe
+rotate it at handover. Or is joining a circle enough for the agent to follow instructions?*
+
+Both, as two tiers — with one refinement that removes the leak surface: make it **asymmetric**. If the
+agent held a shared secret, the agent would be the weakest link (anyone who reads its storage owns it),
+and the secret cannot be shown to it without also being leakable by it. So:
+
+1. **Owner = whoever signs with the agent's OWNER key.** The agent stores only the owner's PUBLIC key,
+   stamped at provisioning; agent-wide control ops must arrive signed by it. "Giving the key to the
+   agent" becomes "stamping a pubkey" — nothing on the agent to leak. This is what answers *who owns an
+   agent that sits in no circle*: the key does, with no circle involved.
+2. **Handover = rotation**: the old key signs a replace-owner instruction carrying the new pubkey, so
+   the previous owner provably loses control.
+3. **A circle gets SCOPED authority only** — its admins govern what the agent exposes *in that circle*,
+   never agent-wide. Membership-as-full-control would let circle B's admins reach into circle A: the
+   cross-circle authority leak the identity design exists to prevent.
+
+Details: a per-agent owner keypair (not the reused identity key), so owning an agent does not advertise
+the owner's global identity to every circle it joins; lost-key recovery is re-stamping with physical
+access to where the agent runs (possession is root, as with any device). The registry's existing
+`ownerFingerprint` is tier 1 — no new identity concept was needed. The agent trail's `via: 'owner'` now
+has a definition: signed by the owner key.
+
+## If another app version can get it anyway, it is not enforcement (2026-07-28, Frits)
+
+*"Could someone with a different app version get what they want anyway? If so, we shouldn't act as if we
+have power to enforce it."*
+
+A UI that promises what a modified client can ignore produces false confidence, which is worse than an
+honest "this is a convention". The rule is therefore: name client-side controls as conventions or
+filters, and put the real gate where it holds regardless of the other side's client — the seal, the key,
+the roster, the relay.
+
+First consequences, both built:
+- **Per-skill exposure is a discovery FILTER, not access control.** Hiding a skill removes it from the
+  cards and catalogs others read and stops nothing; someone who knows the skill id can still dispatch.
+  What refuses an unauthorised call is the grant/token check. Hiding therefore also does **not** revoke:
+  a hidden skill keeps its grant on the card, because telling someone they had revoked something they
+  had not would be the same lie in the other direction.
+- **C13's fast rung stays unilateral.** Adding a contact is a note in my own address book; *reachability*
+  is the other side's to govern, because that is enforceable on their device.
+
+## A conversation is a projection the reader narrows — chat included (2026-07-28, Frits)
+
+The long-open product call ("does a conversation mean only `chat-message`, or chat + tasks + questions?")
+is answered by neither option: *"everything should be filterable, even chat itself — in case you have an
+automated agents chat and you are not interested in their interactions."*
+
+So the conversation is not a fixed set of kinds decided once; it is a **projection the reader narrows**,
+and `chat-message` is itself one of the filterable kinds.
+
+His example forces a second axis. "Agent chatter I don't want to read" cannot be expressed as a kind
+filter — those rows are the same kind and differ only by **who wrote them**. Hence:
+- **kinds** — what the row is (chat / tasks / questions / offers …);
+- **authors** — people vs agents (and the inverse, for auditing what the agents said).
+
+The circle's own `conversationKinds` remains the **ceiling**: a reader narrows within it, never past it,
+so "what this circle is" stays an admin question while "what I want to read" stays the reader's. The
+filter is device-local and never fanned — a filter that told the circle what you skip would be a new
+disclosure. Two guarantees keep it from eating the conversation: the last remaining kind cannot be
+switched off, and an actor that cannot be resolved counts as a person (a roster hiccup must never make
+people disappear).
+
+## Retention exposes ONE control, because the other two would be dishonest (2026-07-28)
+
+Retention is per-kind underneath (`short` plumbing · `chat` · `audit`). The **setting** offers only the
+chat window (7/14/30/90 days, default 14).
+
+Why not three controls: plumbing retention is an implementation detail nobody should have to reason
+about, and an "audit window" control would **promise a deletion it does not perform** — audit entries
+(governance, reports, the agent trail) compact into a counted summary rather than disappearing, because
+a trail that quietly forgets looks complete. One number therefore governs all three honestly: chat takes
+the choice, plumbing follows it (never longer than the conversation it describes), and audit uses it as
+the *detail* window. The user-facing note says exactly that, since "older messages are removed" alone
+would be untrue about decisions and reports.
+
+## Naming: no "canopy" identifiers anywhere; backwards compatibility is not required pre-launch (2026-07-28, Frits)
+
+Product and platform naming in code, comments, labels, schemes, storage keys, namespaces and
+key-derivation inputs is **onderling**. Nothing is live — no external users, no data worth migrating —
+so the rename landed as a **clean break**: no dual-write windows, no legacy read-fallbacks, no
+deprecated aliases, since those are dead weight that reads as caution while hiding which path is real.
+
+This included inputs that would otherwise be frozen forever (HKDF/PRF salts, export info strings): they
+are hashed and never displayed, but renaming them re-derives every per-circle address and orphans
+sealed data. Accepted, because pre-launch is exactly when that is cheap.
+
+**The no-backwards-compatibility licence is dated: it expires 2026-07-31**, after which breaking a
+persisted or wire format needs an explicit decision again. A standing "compat doesn't matter" would
+quietly outlive the condition that made it true.

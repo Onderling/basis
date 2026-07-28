@@ -10,15 +10,28 @@
 import { describe, it, expect } from 'vitest';
 import * as mod from '../../src/v2/deliveryState.js';
 import {
-  DELIVERY, DELIVERY_ORDER, DELIVERY_LABELS, deliveryStates, isDeliveryState,
+  DELIVERY, DELIVERY_ORDER, DELIVERY_TERMINAL, DELIVERY_LABELS, deliveryStates, isDeliveryState,
   advanceDelivery, deliveryAfterSend, receiptPolicy, shouldSendReceipt,
   receiveReceipt, RECEIPT_MESSAGE,
 } from '../../src/v2/deliveryState.js';
 
 describe('the ladder', () => {
-  it('names four states, weakest to strongest, and no read receipt', () => {
-    expect(DELIVERY_ORDER).toEqual(['sent', 'maybe-received', 'reached-device', 'stored']);
+  it('is ONE ladder with the states that already existed, not a second vocabulary', () => {
+    // The chat bubble already had pending/sent/failed/undeliverable. They compose with the new far-end
+    // states rather than competing: `sent` is the hinge, and everything shares `circle.chat.delivery.*`.
+    expect(DELIVERY_ORDER).toEqual(['pending', 'sent', 'maybe-received', 'reached-device', 'stored']);
     expect(DELIVERY_ORDER.some((s) => /read|seen|viewed/i.test(s))).toBe(false);
+  });
+
+  it('every label lives in the EXISTING namespace, so the wording has one home', () => {
+    for (const key of Object.values(DELIVERY_LABELS)) {
+      expect(key).toMatch(/^circle\.chat\.delivery\./);
+    }
+  });
+
+  it('the terminal states are where a message STOPPED, not rungs', () => {
+    expect(DELIVERY_TERMINAL).toEqual(['failed', 'undeliverable']);
+    expect(DELIVERY_ORDER).not.toContain('failed');
   });
 
   it('every state has a label, and they are shared', () => {
@@ -56,7 +69,7 @@ describe('the ladder only goes up', () => {
     expect(advanceDelivery(DELIVERY.REACHED, DELIVERY.REACHED)).toBe(DELIVERY.REACHED);
     expect(advanceDelivery(DELIVERY.REACHED, 'nonsense')).toBe(DELIVERY.REACHED);
     expect(advanceDelivery('nonsense', DELIVERY.SENT)).toBe(DELIVERY.SENT);
-    expect(advanceDelivery(undefined, undefined)).toBe(DELIVERY.SENT);
+    expect(advanceDelivery(undefined, undefined)).toBe(DELIVERY.PENDING);
   });
 
   it('rejects unknown states', () => {
@@ -125,3 +138,23 @@ describe('an inbound receipt is untrusted', () => {
     expect(receiveReceipt(null, 'them')).toBeNull();
   });
 });
+
+describe('terminal states', () => {
+  it('a failure REPLACES whatever the ladder had reached', () => {
+    expect(advanceDelivery(DELIVERY.SENT, DELIVERY.FAILED)).toBe(DELIVERY.FAILED);
+    expect(advanceDelivery(DELIVERY.PENDING, DELIVERY.UNDELIVERABLE)).toBe(DELIVERY.UNDELIVERABLE);
+  });
+
+  it('and nothing resurrects it — a stale ack must not un-fail a message', () => {
+    // The user was told it did not go. A late confirmation arriving afterwards is not a reason to quietly
+    // change that story.
+    expect(advanceDelivery(DELIVERY.FAILED, DELIVERY.REACHED)).toBe(DELIVERY.FAILED);
+    expect(advanceDelivery(DELIVERY.UNDELIVERABLE, DELIVERY.STORED)).toBe(DELIVERY.UNDELIVERABLE);
+  });
+
+  it('they are still valid states, so a renderer can label them', () => {
+    expect(isDeliveryState(DELIVERY.FAILED)).toBe(true);
+    expect(DELIVERY_LABELS[DELIVERY.FAILED]).toBe('circle.chat.delivery.failed');
+  });
+});
+

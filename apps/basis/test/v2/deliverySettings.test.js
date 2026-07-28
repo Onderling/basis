@@ -67,8 +67,9 @@ describe('the two settings pull in opposite directions', () => {
 
 describe('what a row shows', () => {
   it('labels my own message with its state', () => {
-    expect(deliveryLabelFor(DELIVERY.REACHED)).toBe('circle.nearbyScreen.delivery_reached_device');
-    expect(deliveryLabelFor(DELIVERY.MAYBE)).toBe('circle.nearbyScreen.delivery_maybe');
+    // One namespace for the wording — the states share a home with the ones that already existed.
+    expect(deliveryLabelFor(DELIVERY.REACHED)).toBe('circle.chat.delivery.reached_device');
+    expect(deliveryLabelFor(DELIVERY.MAYBE)).toBe('circle.chat.delivery.maybe_received');
   });
 
   it('THE RULE: an unknown state renders NOTHING, never an "unknown" badge', () => {

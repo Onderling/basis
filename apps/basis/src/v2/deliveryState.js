@@ -16,6 +16,22 @@
  *
  * There is deliberately no read receipt. Frits: *"reading confirmation is not important now."*
  *
+ * ── This EXTENDS the existing vocabulary; it does not replace it ─────────────────────────────────────────
+ * The chat bubble already had delivery states — `pending` (fan-out in flight), `sent`, `failed`,
+ * `undeliverable` — with their own locale keys under `circle.chat.delivery.*`. Writing this I nearly added
+ * a second, parallel set, which is exactly the drift this repo keeps having to undo.
+ *
+ * They compose into ONE ladder rather than competing, because they describe different halves of the same
+ * journey:
+ *
+ *   pending ──▶ sent ──▶ maybe-received ──▶ reached-device ──▶ stored
+ *      │
+ *      ├─▶ failed          (the send itself did not go; retryable)
+ *      └─▶ undeliverable   (no address to send to at all)
+ *
+ * So the old states are the *near* end and the new ones the *far* end, `sent` is the hinge, and everything
+ * lives under `circle.chat.delivery.*`. One vocabulary, one place to change the wording.
+ *
  * ── Two rules that are easy to get wrong ─────────────────────────────────────────────────────────────────
  *
  * **1. The ladder only goes up.** Acks and receipts arrive out of order, and a late transport-ack after an
@@ -31,29 +47,42 @@
  */
 
 export const DELIVERY = Object.freeze({
+  // The near end — the local send attempt. These already existed.
+  PENDING: 'pending',
+  FAILED: 'failed',
+  UNDELIVERABLE: 'undeliverable',
+  // The hinge, and the far end.
   SENT: 'sent',
   MAYBE: 'maybe-received',
   REACHED: 'reached-device',
   STORED: 'stored',
 });
 
+/** The terminal negatives. Not on the ladder: they are where a message stopped, not how far it got. */
+export const DELIVERY_TERMINAL = Object.freeze([DELIVERY.FAILED, DELIVERY.UNDELIVERABLE]);
+
 /** Ordered weakest → strongest. The order IS the semantics; see rule 1. */
 export const DELIVERY_ORDER = Object.freeze([
-  DELIVERY.SENT, DELIVERY.MAYBE, DELIVERY.REACHED, DELIVERY.STORED,
+  DELIVERY.PENDING, DELIVERY.SENT, DELIVERY.MAYBE, DELIVERY.REACHED, DELIVERY.STORED,
 ]);
 
 /** Every state → its locale key. Shared, so web and mobile cannot word the same fact differently. */
 export const DELIVERY_LABELS = Object.freeze({
-  [DELIVERY.SENT]:    'circle.nearbyScreen.delivery_sent',
-  [DELIVERY.MAYBE]:   'circle.nearbyScreen.delivery_maybe',
-  [DELIVERY.REACHED]: 'circle.nearbyScreen.delivery_reached_device',
-  [DELIVERY.STORED]:  'circle.nearbyScreen.delivery_stored',
+  [DELIVERY.PENDING]:       'circle.chat.delivery.pending',
+  [DELIVERY.FAILED]:        'circle.chat.delivery.failed',
+  [DELIVERY.UNDELIVERABLE]: 'circle.chat.delivery.undeliverable',
+  [DELIVERY.SENT]:          'circle.chat.delivery.sent',
+  [DELIVERY.MAYBE]:         'circle.chat.delivery.maybe_received',
+  [DELIVERY.REACHED]:       'circle.chat.delivery.reached_device',
+  [DELIVERY.STORED]:        'circle.chat.delivery.stored',
 });
 
 /** The states that exist. Exported so a test can assert nothing was added that leaks a setting. */
 export function deliveryStates() { return [...DELIVERY_ORDER]; }
 
-export function isDeliveryState(v) { return DELIVERY_ORDER.includes(v); }
+export function isDeliveryState(v) {
+  return DELIVERY_ORDER.includes(v) || DELIVERY_TERMINAL.includes(v);
+}
 
 /**
  * Move a message's state forward, never back.
@@ -62,9 +91,15 @@ export function isDeliveryState(v) { return DELIVERY_ORDER.includes(v); }
  * the transport ack and can overtake it. Taking the max is the only rule that survives that.
  */
 export function advanceDelivery(current, next) {
+  // A terminal state is where a message STOPPED, so it is not compared on the ladder: it replaces whatever
+  // came before (a send that fails after "pending" is failed), and nothing on the ladder replaces it —
+  // a stale ack must not resurrect a message the user was told did not go.
+  if (DELIVERY_TERMINAL.includes(current)) return current;
+  if (DELIVERY_TERMINAL.includes(next)) return next;
+
   const a = DELIVERY_ORDER.indexOf(current);
   const b = DELIVERY_ORDER.indexOf(next);
-  if (b < 0) return isDeliveryState(current) ? current : DELIVERY.SENT;
+  if (b < 0) return isDeliveryState(current) ? current : DELIVERY.PENDING;
   if (a < 0) return next;
   return b > a ? next : current;
 }

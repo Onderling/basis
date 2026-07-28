@@ -70,6 +70,8 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
 - **Cross-pod references** use the `embeds: [{type, ref}]` field + a permission handshake, never inlined pod URLs — [`cross-pod-refs.md`](docs/conventions/cross-pod-refs.md).
 - **Pod storage layout** is canonical, owned by `@onderling/pod-onboarding` — [`storage-layout.md`](docs/conventions/storage-layout.md).
 - **This file's scope + size budget** — what belongs in `CLAUDE.md` vs `docs/`, and when to compress/enlarge it — [`doc-structure.md`](docs/conventions/doc-structure.md).
+- **Shared vocabularies** (delivery states, entry kinds, roles, label maps) — the index of what already
+  exists, and the rule that a new one needs a home + a guard — [`shared-vocabularies.md`](docs/conventions/shared-vocabularies.md).
 - **Record a decision** when a choice closes off alternatives / would be re-litigated / shapes architecture (→ `docs/decisions.md`) or org (→ private) — [`decision-log.md`](docs/conventions/decision-log.md).
 
 ## How to work
@@ -82,10 +84,20 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
   caveat, or a finding and it goes unanswered, it stays OPEN — carry it into the design/plan doc as an open
   item rather than quietly dropping it because the conversation moved on. When a thread has accumulated more
   open points than a reply can hold, **ask** which to keep rather than deciding for him.
+- **Check whether it already exists — the locale file is the fastest index.** Before adding a set of states,
+  a label map, or any small closed vocabulary, grep `apps/basis/src/locales/circle.en.json` for the word a
+  user would see: if the product can already say it, the concept already exists in code. Then check
+  [`shared-vocabularies.md`](docs/conventions/shared-vocabularies.md). Duplicate vocabularies do not break
+  anything — they just make two parts of the app describe one fact differently — so nothing catches them.
+- **Grep every identifier you introduce against the file you put it in**, especially state setters and
+  navigation helpers: they read plausibly and are named differently per screen. `src/screens/**` has no test
+  coverage, so nothing else will catch a typo there (→ `docs/agent-notes-known-gotchas.md`).
 - **Prefer a fitness function to a manual check.** When you fix drift, add the test/lint that makes the same
   drift FAIL CI next time. This is the roadmap's step 0 — see `REMAINING-WORK.md` "★ Architectural spine".
-- **New functionality = add a manifest + projectors**, not a new app silo. Apps are dissolving into
-  the basis app: their `manifest.js` stays the source of truth, the app *name* becomes a nav/reference label.
+- **New functionality = add a manifest + projectors**, not a new app silo. Most apps dissolve into basis —
+  their `manifest.js` stays the source of truth and the app *name* becomes a nav label. **The test is whether
+  it needs its own interaction model** (Frits, 2026-07-28): stoop and tasks do not, so they reduce to close
+  to a manifest; **folio does** — basis is a poor file manager — so it keeps a surface of its own.
 - **Ship web first, then mobile** as separate steps/commits; don't bundle both platforms in one commit.
 - **Verify the RESULT, not just the dispatch** — check the skill's return value, not only that a command
   fired (the device-run lesson; a gate can route while the op silently fails).

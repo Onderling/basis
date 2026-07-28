@@ -26,6 +26,9 @@ export function renderCircleMyData(container, {
   onRestore,
   notifications,
   onToggleNotifications,
+  // The two delivery settings (2026-07-28). One object, because they are two knobs on one question.
+  delivery,               // { sendReceipts, allowFallback } — absent ⇒ the section is omitted
+  onSetDelivery,          // (patch) => void
   surfacePref,            // S6.C — current 'inline' | 'screen' | 'chat'
   chatAi,                 // S6.D — { enriched, reason } for the active circle (shown under "chat")
   onSetSurfacePref,       // (value) => void
@@ -179,6 +182,54 @@ export function renderCircleMyData(container, {
       notif.appendChild(toggle);
     }
     container.appendChild(notif);
+  }
+
+  // ── delivery (2026-07-28) ───────────────────────────────────────────────────
+  // Both lines describe WHAT HAPPENS, not which switch is where. And note what is NOT said: nothing tells
+  // you what other people see about your receipt setting, because nothing in the model reveals it — a
+  // "others cannot tell" reassurance here would be the first place that leaked.
+  if (typeof onSetDelivery === 'function' && delivery) {
+    const sec = section(tr('circle.nearbyScreen.delivery_section'));
+
+    const receiptsLine = document.createElement('p');
+    receiptsLine.className = 'cc-mydata__delivery-receipts';
+    receiptsLine.textContent = tr(delivery.sendReceipts
+      ? 'circle.nearbyScreen.delivery_receipts_on'
+      : 'circle.nearbyScreen.delivery_receipts_off');
+    sec.appendChild(receiptsLine);
+
+    const receiptsBtn = document.createElement('button');
+    receiptsBtn.type = 'button';
+    receiptsBtn.className = 'cc-mydata__action cc-mydata__delivery-receipts-toggle';
+    receiptsBtn.textContent = tr(delivery.sendReceipts
+      ? 'circle.nearbyScreen.delivery_receipts_toggle_on'
+      : 'circle.nearbyScreen.delivery_receipts_toggle_off');
+    receiptsBtn.addEventListener('click', () => onSetDelivery({ sendReceipts: !delivery.sendReceipts }));
+    sec.appendChild(receiptsBtn);
+
+    const fallbackLine = document.createElement('p');
+    fallbackLine.className = 'cc-mydata__delivery-fallback';
+    fallbackLine.textContent = tr(delivery.allowFallback
+      ? 'circle.nearbyScreen.delivery_fallback_on'
+      : 'circle.nearbyScreen.delivery_fallback_off');
+    sec.appendChild(fallbackLine);
+
+    // The cost rides WITH the option to turn it on — never the fix alone.
+    const fallbackCost = document.createElement('p');
+    fallbackCost.className = 'cc-mydata__delivery-fallback-cost';
+    fallbackCost.textContent = tr('circle.nearbyScreen.delivery_fallback_cost');
+    sec.appendChild(fallbackCost);
+
+    const fallbackBtn = document.createElement('button');
+    fallbackBtn.type = 'button';
+    fallbackBtn.className = 'cc-mydata__action cc-mydata__delivery-fallback-toggle';
+    fallbackBtn.textContent = tr(delivery.allowFallback
+      ? 'circle.nearbyScreen.delivery_fallback_toggle_on'
+      : 'circle.nearbyScreen.delivery_fallback_toggle_off');
+    fallbackBtn.addEventListener('click', () => onSetDelivery({ allowFallback: !delivery.allowFallback }));
+    sec.appendChild(fallbackBtn);
+
+    container.appendChild(sec);
   }
 
   // ── how the bot shows actions (S6.C surface preference) ─────────────────────

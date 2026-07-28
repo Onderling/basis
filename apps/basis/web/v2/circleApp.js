@@ -116,6 +116,10 @@ import { renderContactsRoster } from './contactsRoster.js';
 import { renderCircleProfile } from './circleProfile.js';
 import { renderCircleAdminPanel } from './circleAdminPanel.js';
 import { renderCircleMyData } from './circleMyData.js';
+import {
+  createDeliverySettingsStore, localStorageDeliveryIo, withDelivery, recordDelivery,
+} from '../../src/v2/deliverySettings.js';
+import { resolveConversationKinds } from '../../src/v2/conversationKinds.js';
 // S5 — key management: reuse the existing encrypted-backup + restore wizards
 // (the slash/page renderers) inside My-data, mounted in a lightweight overlay.
 import { renderEncryptedBackupWizard } from '../../src/web/wizards/encryptedBackupWizard.js';
@@ -1125,6 +1129,10 @@ const CIRCLE_EMBED_APIKEY  = import.meta.env?.VITE_CIRCLE_EMBED_APIKEY ?? CIRCLE
 // boot-time tryConnectPeerTransport reads it. Empty setting ⇒ env fallback. `applyRelayUrl` reconnects live.
 const CIRCLE_RELAY_ENV     = import.meta.env?.VITE_CIRCLE_RELAY_URL ?? null;
 const relayPrefStore       = createRelayPrefStore(localStorageRelayIo());
+// The two delivery settings, and the per-message state map they govern the display of.
+const deliverySettingsStore = createDeliverySettingsStore(localStorageDeliveryIo());
+let   deliverySettingsCache = { sendReceipts: true, allowFallback: false };
+let   deliveryByMessageId   = new Map();
 let   CIRCLE_RELAY_URL      = resolveRelayUrl(localStorageRelayIo().load(), CIRCLE_RELAY_ENV);
 let   _peerAgent           = null;   // captured at boot so a relay-setting change can reconnect live
 let   _peerRouter          = null;
@@ -3555,6 +3563,7 @@ async function showSharedWithMe() {
 // S5 — "My data": where your data lives (pod/relay) + privacy + usage + key
 // management (back up · reveal recovery phrase · restore). A sub-screen of Mij.
 async function showMyData() {
+  try { deliverySettingsCache = await deliverySettingsStore.get(); } catch { /* keep the defaults */ }
   hideCircleTabBar(tabBarEl);
   let dataLocation = {}; let podStatus = {}; let privacy = []; let metrics = {};
   // S4 — the actual pod sign-in state (reuses podAuth), + a sign-in button when local-only.
@@ -3662,7 +3671,12 @@ async function showMyData() {
       backTo: { returnTo: getActiveCircle() || 'chat', label: t('circle.mydata.back'), onNavigate: () => {} },
     });
   };
-  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij, onSignIn, onBackup, onViewMnemonic, onRestore, notifications, onToggleNotifications, surfacePref: circleSurfacePref.get(), onSetSurfacePref, appLang: currentLang(), onSetAppLang, themePref: getThemePref(), onSetTheme, chatAi, userLlm: userLlmCfg, onSaveUserLlm, validateUserLlm: validateUserLlmConfig,
+  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij, onSignIn, onBackup, onViewMnemonic, onRestore, notifications, onToggleNotifications,
+    delivery: deliverySettingsCache,
+    onSetDelivery: async (patch) => {
+      try { deliverySettingsCache = await deliverySettingsStore.set(patch); } catch { /* keep the old view */ }
+      rerender();
+    }, surfacePref: circleSurfacePref.get(), onSetSurfacePref, appLang: currentLang(), onSetAppLang, themePref: getThemePref(), onSetTheme, chatAi, userLlm: userLlmCfg, onSaveUserLlm, validateUserLlm: validateUserLlmConfig,
     // in-app relay setting (no rebuild): the field shows the saved setting; env is the placeholder fallback.
     // Objective D / Surface 4: onOpenRelayPanel routes editing into the docked side-panel (openPagePanel).
     relayUrl: resolveRelayUrl(localStorageRelayIo().load(), ''), relayEnvUrl: CIRCLE_RELAY_ENV, onSaveRelay: applyRelayUrl, onOpenRelayPanel: openRelayPanel });
@@ -4861,11 +4875,21 @@ function showKring(id, circle, policy) {
   const rerender = () => {
     // C15 — the per-circle surface is a CHAT projection: it excludes the log's silent system lane
     // (the `roster-updated` pull-me and friends). The cross-circle Stream tab is the firehose.
-    const rows = chatRows({
-      events:    eventLog.query({ excludeMuted: true }),
-      circles:   circlesCache,
-      circleId:  id,
+    // The conversation shows what this circle chose — its admin setting, else its template's, else the
+    // permissive default (`conversationKinds.js`). A filter, never a data change.
+    const kinds = resolveConversationKinds({
+      circleSetting: circle?.conversationKinds ?? null,
+      templateKind:  circle?.kind ?? null,
     });
+    const rows = withDelivery(
+      chatRows({
+        events:    eventLog.query({ excludeMuted: true }),
+        circles:   circlesCache,
+        circleId:  id,
+        kinds,
+      }),
+      deliveryByMessageId,
+    );
     renderCircleKring(rootEl, {
       circle, rows, t,
       // §8 — report another member's message to the admins (a governance `message` report).

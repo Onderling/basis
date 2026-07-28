@@ -341,6 +341,18 @@
       }
     },
     "delivery": {
+      "maybe_received": {
+        "text": "Maybe received",
+        "doc": "We asked for confirmation, got none, and sent it anyway (fire-and-forget). It may have arrived and the confirmation may have been lost — genuinely unknown, and \"Sent\" would over-claim. (Frits, 2026-07-28.)"
+      },
+      "reached_device": {
+        "text": "Reached their device",
+        "doc": "The peer TRANSPORT acknowledged. Sent before their app sees it, so it does NOT mean stored."
+      },
+      "stored": {
+        "text": "Their app has it",
+        "doc": "The receiving APP accepted and stored it. The strongest claim we make; deliberately not a read receipt."
+      },
       "pending": {
         "text": "Sending…",
         "doc": "δ.2 — bubble icon caption while the kring fan-out (broadcastKringMessage) is in flight."
@@ -2232,21 +2244,37 @@
     }
   },
   "nearbyScreen": {
-    "delivery_maybe": {
-      "text": "Maybe received",
-      "doc": "Frits, 2026-07-28. We asked for confirmation and got none, then sent it anyway (fire-and-forget). It may have arrived and the confirmation may have been lost — genuinely unknown, and \"Sent\" would over-claim."
+    "delivery_section": {
+      "text": "Delivery",
+      "doc": "My-data section for the two delivery settings."
     },
-    "delivery_sent": {
-      "text": "Sent",
-      "doc": "Rung 1 — handed to our own transport. The weakest claim; it does NOT mean anyone received it."
+    "delivery_receipts_on": {
+      "text": "You confirm when you receive a message",
+      "doc": "Receipts ON — phrased as what YOU emit, since that is what the setting controls."
     },
-    "delivery_reached_device": {
-      "text": "Reached their device",
-      "doc": "Rung 2 — the peer TRANSPORT acknowledged (the AK envelope). Sent before their app sees it, so it does not mean stored."
+    "delivery_receipts_toggle_on": {
+      "text": "Stop confirming",
+      "doc": "Turn receipts off."
     },
-    "delivery_stored": {
-      "text": "Their app has it",
-      "doc": "Rung 3 — the receiving APP accepted and stored it. The strongest claim we make; deliberately NOT a read receipt."
+    "delivery_receipts_toggle_off": {
+      "text": "Start confirming",
+      "doc": "Turn receipts on."
+    },
+    "delivery_fallback_on": {
+      "text": "Your main address may be used as a fallback",
+      "doc": "Fallback ON."
+    },
+    "delivery_fallback_off": {
+      "text": "Only your per-circle addresses are used",
+      "doc": "Fallback OFF — the default. Phrased as what happens, not as \"a setting is off\"."
+    },
+    "delivery_fallback_toggle_on": {
+      "text": "Stop allowing fallback",
+      "doc": "Turn fallback off."
+    },
+    "delivery_fallback_toggle_off": {
+      "text": "Allow fallback",
+      "doc": "Turn fallback on."
     },
     "delivery_receipts_off": {
       "text": "Delivery updates are off",

@@ -26,6 +26,11 @@ import { ThemeProvider } from './src/screens/v2/themeContext.js';
 
 import ChatScreen from './src/screens/ChatScreen.js';
 import CircleLauncherScreen from './src/screens/v2/CircleLauncherScreen.js';
+// Delivery honesty (2026-07-28) — the ONE per-message delivery map, lifted here so ChatScreen's
+// peer-router (inbound receipts) and CircleLauncherScreen's bubbles (rendering) share an instance.
+// Two maps would mean receipts advancing a state no bubble reads.
+import { createDeliveryStateMap } from '@onderling/kring-host/deliveryState';
+import { makeReceiptSender, asyncStorageDeliveryIo, createDeliverySettingsStore } from '@onderling-app/basis';
 import FirstRunWelcomeScreen from './src/screens/FirstRunWelcomeScreen.js';
 import MnemonicEntryScreen from './src/screens/MnemonicEntryScreen.js';
 import MnemonicCreateScreen from './src/screens/MnemonicCreateScreen.js';
@@ -116,6 +121,12 @@ export default function App() {
   // the inbox before the bundle boots — ChatScreen / launcher both
   // read `inbox` via props from boot, no second pass needed.
   const bundleRef = useRef(null);
+  const deliveryStateMapRef = useRef(null);
+  if (!deliveryStateMapRef.current) deliveryStateMapRef.current = createDeliveryStateMap();
+  const deliverySettingsStoreRef = useRef(null);
+  if (!deliverySettingsStoreRef.current) {
+    deliverySettingsStoreRef.current = createDeliverySettingsStore(asyncStorageDeliveryIo(AsyncStorage));
+  }
   const kringChatInboxRef = useRef(null);
   if (!kringChatInboxRef.current) {
     kringChatInboxRef.current = createChatMessageInbox({
@@ -131,6 +142,15 @@ export default function App() {
         }
       },
       logger: console,
+      // Delivery honesty — a LIVE insert answers the sender with a receipt. Policy is entirely inside
+      // `makeReceiptSender` (only source 'receiver' · setting read per message · fail-closed on a broken
+      // read). The send reads `bundleRef` lazily, like `ingest` above, because the bundle boots later.
+      onStored: makeReceiptSender({
+        getSettings: () => deliverySettingsStoreRef.current.get(),
+        sendTo: (to, payload) => (typeof bundleRef.current?.sendPeer === 'function'
+          ? bundleRef.current.sendPeer(to, payload)
+          : Promise.reject(new Error('no peer send yet'))),
+      }),
     });
   }
   // γ-next.recipe — shared kring-recipe-broadcast pending store.
@@ -452,6 +472,7 @@ export default function App() {
             bootError={bootError}
             eventLog={eventLogRef.current}
             kringChatInbox={kringChatInboxRef.current}
+            deliveryStateMap={deliveryStateMapRef.current}
             kringRecipePendingStore={kringRecipePendingStoreRef.current}
             kringRecipeDedup={kringRecipeDedupRef.current}
             kringRulesPendingStore={kringRulesPendingStoreRef.current}
@@ -465,6 +486,7 @@ export default function App() {
         </View>
         <CircleLauncherScreen
           bundle={bundle}
+          deliveryStateMap={deliveryStateMapRef.current}
           sessionRef={sessionRef}
           podAuth={podAuth}
           eventLog={eventLogRef.current}

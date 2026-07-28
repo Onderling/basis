@@ -42,6 +42,7 @@ import {
   myThingsFromListFiles,
   // kring-scoped event stream + per-row action chips.
   chatRows, actionsForStreamRow, resolveConversationKinds,
+  deliveryPresentation,
   // Taken (tasks) tab — task-store item → stream-row projection (shared web≡mobile).
   buildTaskRows,
   // per-kring bottom tabs from policy.features (v2 §1).
@@ -345,6 +346,8 @@ function WithTabBar({ active, onSelect, children }) {
 
 export default function CircleLauncherScreen({
   bundle,
+  // Delivery honesty — the shared per-message map (App.js owns it; ChatScreen's router feeds it).
+  deliveryStateMap = null,
   // cluster J — the OidcSessionRN ref (App.js:187), needed to activate the feedback verify pods.
   sessionRef = null,
   // cluster J — podAuth (lifted from the hidden ChatScreen) so the "Me" screen can drive pod sign-in.
@@ -1680,6 +1683,7 @@ export default function CircleLauncherScreen({
     return (
       <CircleDetail
         circle={selected}
+        deliveryStateMap={deliveryStateMap}
         items={items}
         callSkill={callSkill}
         rawCallSkill={bundle?.callSkill}
@@ -2084,6 +2088,7 @@ function LauncherTile({ circle: c, preview, pending, isPinned = false, isMuted =
 
 function CircleDetail({
   circle, items, callSkill, rawCallSkill, catalog: rawCatalog, policy, myListTasks = [],
+  deliveryStateMap = null,
   eventLog, circles = [],
   recipeStore = null, onStoopEvent, sendPersonaUpdate, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null, coreIdentity = null,
   onCircleControl = null, circleTransport = null,
@@ -2190,7 +2195,11 @@ function CircleDetail({
     const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n;
   }), []);
   const lastKringListingRef = useRef(null); // { appOrigin, items } from the last list reply, for bulk "/done all"
-  if (deliveryStateMapRef.current == null) deliveryStateMapRef.current = createDeliveryStateMap();
+  // Prefer the SHARED map from App.js — inbound receipts land there. The local fallback keeps older
+  // callers/tests working, but a private map here means receipts advance a state no bubble reads.
+  if (deliveryStateMapRef.current == null) {
+    deliveryStateMapRef.current = deliveryStateMap ?? createDeliveryStateMap();
+  }
   const [deliveryTick, setDeliveryTick] = useState(0);
   const deliveryStateFor = useCallback((msgId) => {
     // eslint-disable-next-line no-unused-expressions
@@ -3913,41 +3922,36 @@ function renderBubble(row, t, deliveryOpts = null, styles) {
           })}
         </View>
       ) : null}
-      {deliveryState === 'pending' ? (
-        <Text
-          style={styles.deliveryPending}
-          accessibilityLabel={t('circle.chat.delivery.pending')}
-          accessibilityRole="text"
-          testID={`kring-delivery-pending-${row.id}`}
-        >
-          ⏱ {t('circle.chat.delivery.pending')}
-        </Text>
-      ) : null}
-      {deliveryState === 'failed' ? (
-        <Pressable
-          style={styles.deliveryFailed}
-          accessibilityRole="button"
-          accessibilityLabel={t('circle.chat.delivery.failed')}
-          testID={`kring-delivery-failed-${row.id}`}
-          onPress={() => { if (onRetryDelivery) onRetryDelivery(row.id); }}
-        >
-          <Text style={styles.deliveryFailedText}>
-            ⚠ {t('circle.chat.delivery.failed')}
+      {/* Delivery state, driven by the SHARED presentation table (deliverySettings.js) — the same one
+          the web bubble reads, replacing a three-state chain that knew nothing of the far-end states
+          (`maybe-received` / `reached-device` / `stored` would have rendered as silence here). Retryable
+          states are a Pressable; the rest a static Text with role=text. */}
+      {(() => {
+        const p = deliveryPresentation(deliveryState);
+        if (!p) return null;
+        const label = t(p.labelKey);
+        const line = `${p.glyph} ${label}`;
+        return p.retryable ? (
+          <Pressable
+            style={styles.deliveryFailed}
+            accessibilityRole="button"
+            accessibilityLabel={label}
+            testID={`kring-delivery-${p.state}-${row.id}`}
+            onPress={() => { if (onRetryDelivery) onRetryDelivery(row.id); }}
+          >
+            <Text style={styles.deliveryFailedText}>{line}</Text>
+          </Pressable>
+        ) : (
+          <Text
+            style={styles.deliveryPending}
+            accessibilityLabel={label}
+            accessibilityRole="text"
+            testID={`kring-delivery-${p.state}-${row.id}`}
+          >
+            {line}
           </Text>
-        </Pressable>
-      ) : null}
-      {deliveryState === 'undeliverable' ? (
-        // permanent (e.g. a member has no published key) — show it, but NO retry.
-        // A static Text, not a Pressable (retrying can't help).
-        <Text
-          style={styles.deliveryUndeliverable}
-          accessibilityLabel={t('circle.chat.delivery.undeliverable')}
-          accessibilityRole="text"
-          testID={`kring-delivery-undeliverable-${row.id}`}
-        >
-          ⊘ {t('circle.chat.delivery.undeliverable')}
-        </Text>
-      ) : null}
+        );
+      })()}
     </View>
   );
 }

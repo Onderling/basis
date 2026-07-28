@@ -47,7 +47,7 @@ import { initialState, decodeInvite, finalSubmit, existingSelvesFrom, setLinkCho
  *           capabilities?:object|null, apps?:string[]|null, offeringsMatching?:boolean|null }} a
  * @returns {Promise<{uri:string, expiresAt?:number} | {error:string}>}
  */
-export async function buildCircleInviteUri({ callSkill, circleId, adminPeerAddr = null, adminNknAddr = null, capabilities = null, apps = null, offeringsMatching = null, podBacked = null } = {}) {
+export async function buildCircleInviteUri({ callSkill, circleId, adminPeerAddr = null, adminNknAddr = null, capabilities = null, apps = null, offeringsMatching = null, podBacked = null, podUrl = null } = {}) {
   if (typeof callSkill !== 'function' || !circleId) return { error: 'missing-args' };
   let res;
   try { res = await callSkill('stoop', 'getCurrentMembershipCode', { groupId: circleId }); }
@@ -82,6 +82,11 @@ export async function buildCircleInviteUri({ callSkill, circleId, adminPeerAddr 
     // that disclosure on the joiner's behalf is exactly the pattern the disclosure model exists to prevent.
     // Same additive rule as offeringsMatching: explicit true or absent, so older invites are unchanged.
     ...(podBacked === true ? { podBacked: true } : {}),
+    // …and WHERE (Frits' invite-carries-endpoint decision, applied to the pod case): without a common
+    // connection point the joiner cannot reach the circle at all, and the pod IS that point here. Only
+    // ever alongside `podBacked` — a pod URL on a non-pod invite would be noise claiming to be a place.
+    ...(podBacked === true && typeof podUrl === 'string' && /^https:\/\/\S+$/.test(podUrl)
+      ? { podUrl } : {}),
   };
   return { uri: encodeMembershipCodeUrl(invite), expiresAt };
 }

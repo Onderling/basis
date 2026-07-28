@@ -57,6 +57,7 @@ import {
   ensureDmThread, updatePeerDisplay,
 } from '../core/threadState.js';
 import { makePeerRouter }      from '../../../basis/src/core/handlers/peerRouter.js';
+import { applyReceipt }        from '../../../basis/src/v2/deliverySettings.js';
 import { pushContactReply }    from '../core/contactReplyInbox.js';
 import { makeKringChatPeerHandler } from '../../../basis/src/v2/kringChatReceiver.js';
 import { createChatMessageInbox } from '../../../basis/src/v2/chatMessageInbox.js';
@@ -193,6 +194,8 @@ export default function ChatScreen({
   // share the same instance so dedup state is unified.  Pre-ε.1 prop name
   // `kringChatDedup` no longer exists — App.js owns the inbox now.
   kringChatInbox = null,
+  // Delivery honesty — the shared per-message map (App.js owns it); inbound receipts advance it here.
+  deliveryStateMap = null,
   // γ-next.recipe — pending-recipe cache + dedup, plumbed from App.js
   // so the launcher's editor sees the same store the receiver writes to.
   kringRecipePendingStore = null,
@@ -646,6 +649,11 @@ export default function ChatScreen({
       'kring-chat-message':    makeKringChatPeerHandler({
         inbox: kringChatInbox ?? makeFallbackInbox(eventLogRef.current, callSkill),
       }),
+      // Delivery honesty — the peer's app stored our message. `applyReceipt` validates (rebuilt, `from`
+      // off the wire) and the shared map's monotonic rule orders it; absent map ⇒ handler still safe.
+      'delivery-receipt': (from, payload) => {
+        if (deliveryStateMap) applyReceipt(payload, from, deliveryStateMap);
+      },
       // γ-next.recipe — kring scherm recipe broadcast.  Caches the
       // inbound recipe per-kring; the editor pulls on next open and
       // passes via γ.3's `incomingRecipe` opt.  No bubble UI.

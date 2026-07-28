@@ -254,6 +254,7 @@ import { makeHandlePersonaPropsUpdate, makeHandlePersonaPropsAck, makeSendPerson
 // drivers #5 (b) — flag noticeboard posts that resonate with my private drivers (on-device match).
 import { annotateResonantPosts } from '../../src/core/handlers/driverMatchNotify.js';
 import { buildCircleInviteUri, joinCircleFromInvite } from '../../src/v2/circleInvite.js';
+import { loadCircleStoragePod } from '../../src/v2/circleStoragePolicy.js';
 // connectivity — populate the app PeerGraph with the admin's per-transport
 // addresses from a decoded invite BEFORE the redeem, so the secure router resolves
 // the relay/nkn wire address (`addressesOf`) instead of degrading to the bare pubKey.
@@ -3759,9 +3760,11 @@ async function showJoinCircle(inviteArg) {
   // resolves the relay (pubKey) + nkn native address via `addressesOf` on the
   // redeem send, instead of falling back to the un-routable bare pubKey. Best-effort:
   // a bad/relay-only invite just populates nothing and the join proceeds unchanged.
+  let decodedInvite = null;
   try {
     const decoded = {};
     decodeInviteForPopulate(invite, decoded);
+    decodedInvite = decoded.invite ?? null;
     if (decoded.invite) await populateAdminAddressesFromInvite({ peerGraph: circlePeerGraph, invite: decoded.invite });
   } catch { /* population must never block the join */ }
   mountMyDataWizard(renderJoinGroupWizard, {
@@ -3785,6 +3788,13 @@ async function showJoinCircle(inviteArg) {
       if (gid && Array.isArray(reply?.capabilityOptOuts) && reply.capabilityOptOuts.length) {
         try { await overrideStore.update(gid, { capabilityOptOuts: reply.capabilityOptOuts }); }
         catch { /* best-effort — a failed prefs write must not break the join */ }
+      }
+      // NKN+pod circle, rule 1 — joining a pod-backed circle records its POD as the circle's connection
+      // point (J-NP1), so "what breaks if I remove this" has an answer for circles with no relay. The
+      // invite carried the url; a join without it simply adds nothing (the list is a convenience — it
+      // must never block a join).
+      if (gid && decodedInvite?.podBacked === true && typeof decodedInvite?.podUrl === 'string') {
+        try { getConnectionPoints().addPodPoint(decodedInvite.podUrl, gid); } catch { /* best-effort */ }
       }
       try { circlesCache = await loadCircles(sources); showLauncher(); } catch { /* */ }
     },
@@ -3810,6 +3820,13 @@ async function showCircleInvite(circleId) {
     const s = localStorage.getItem(skillKey(circleId));
     inviteOfferingsMatching = !!s && offeringsMatchingEnabled(JSON.parse(s));
   } catch { inviteOfferingsMatching = false; }
+  // NKN+pod circle — read the circle's storage posture so a pod-backed invite says so (J-NP3) and carries
+  // its pod as the connection point (rule 1: joining populates the list). Best-effort: a policy read
+  // failing yields a plain invite, never a blocked one.
+  let inviteStorage = null;
+  try { inviteStorage = await loadCircleStoragePod({ callSkill: rawCallSkill, circleId }); }
+  catch { inviteStorage = null; }
+  const invitePodBacked = inviteStorage?.pod === 'shared' || inviteStorage?.pod === 'hybrid';
   let r;
   try {
     r = await buildCircleInviteUri({
@@ -3817,6 +3834,8 @@ async function showCircleInvite(circleId) {
       capabilities: invitePolicy.capabilities,
       apps:         invitePolicy.apps,
       offeringsMatching: inviteOfferingsMatching,
+      podBacked: invitePodBacked,
+      podUrl:    invitePodBacked ? (inviteStorage?.groupPodUri ?? null) : null,
     });
   }
   catch { r = { error: 'failed' }; }

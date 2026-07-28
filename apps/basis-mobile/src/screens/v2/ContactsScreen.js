@@ -70,13 +70,21 @@ export default function ContactsScreen({ bundle, onOpen, feedbackStore = null })
         ? feedbackBotFromInput(input, FEEDBACK_COLLECTOR_URL ? { collectorUrl: FEEDBACK_COLLECTOR_URL } : { activationUrl: FEEDBACK_ACTIVATION_URL })
         : null;
       if (fb) { await feedbackStore.add(fb); }
-      else { await addBotToGraph({ input, peerGraph, coreAgent: bundle?.coreAgent, discover: bundle?.discoverA2A }); }
+      else {
+        await addBotToGraph({
+          input, peerGraph, coreAgent: bundle?.coreAgent, discover: bundle?.discoverA2A,
+          // C13 fast rung — a stoop-contact:// card routes to stoop's addContactFromQr (the one
+          // decoder); the unified roster merges the ContactBook, so the person appears DM-ready.
+          addContact: callSkill ? (payload) => callSkill('stoop', 'addContactFromQr', { payload }) : undefined,
+        });
+      }
       setAddText(''); setAddOpen(false);
       reload();
-    } catch {
-      setError(true);
+    } catch (err) {
+      // A circle invite pasted here is the VERIFIED rung — point at the join flow instead of failing mutely.
+      setError(err?.code === 'circle-invite' ? 'invite' : true);
     }
-  }, [addText, peerGraph, bundle, reload, feedbackStore]);
+  }, [addText, peerGraph, bundle, callSkill, reload, feedbackStore]);
 
   return (
     <View style={styles.wrap} testID="contacts-screen">
@@ -105,7 +113,7 @@ export default function ContactsScreen({ bundle, onOpen, feedbackStore = null })
           </Pressable>
         </View>
       )}
-      {error && <Text style={styles.error}>{t('circle.contacts.add_failed')}</Text>}
+      {error && <Text style={styles.error}>{t(error === 'invite' ? 'circle.contacts.invite_not_contact' : 'circle.contacts.add_failed')}</Text>}
 
       {contacts.length === 0 ? (
         <Text style={styles.empty}>{t('circle.contacts.empty')}</Text>

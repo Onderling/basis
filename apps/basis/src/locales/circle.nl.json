@@ -2232,6 +2232,10 @@
     }
   },
   "nearbyScreen": {
+    "delivery_maybe": {
+      "text": "Misschien aangekomen",
+      "doc": "Frits, 2026-07-28. We asked for confirmation and got none, then sent it anyway (fire-and-forget). It may have arrived and the confirmation may have been lost — genuinely unknown, and \"Sent\" would over-claim."
+    },
     "delivery_sent": {
       "text": "Verstuurd",
       "doc": "Rung 1 — handed to our own transport. The weakest claim; it does NOT mean anyone received it."

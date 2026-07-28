@@ -271,6 +271,11 @@ export {
   createFallbackPrefStore, localStorageFallbackIo, asyncStorageFallbackIo,
   createFallbackOffer, OFFER_AFTER_PEERS, OFFER_COOLDOWN_MS,
 } from './v2/addressFallback.js';
+export {
+  DELIVERY, DELIVERY_ORDER, DELIVERY_LABELS, deliveryStates, isDeliveryState,
+  advanceDelivery, deliveryAfterSend, receiptPolicy, shouldSendReceipt,
+  receiveReceipt, RECEIPT_MESSAGE,
+} from './v2/deliveryState.js';
 export { makeSharedCirclePeerScope } from './v2/sharedCirclePeerScope.js';
 // agent-add admin approval: proposal-like flow for
 // joining an LLM agent to a circle whose `agents` axis is admin-approval.

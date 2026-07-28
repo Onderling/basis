@@ -4,6 +4,7 @@ import { AgentIdentity }              from '../src/identity/AgentIdentity.js';
 import { VaultMemory }                from '@onderling/vault';
 import { InternalBus, InternalTransport } from '../src/transport/InternalTransport.js';
 import { TextPart, DataPart, Parts }  from '../src/Parts.js';
+import { sendMessage }                from '../src/protocol/messaging.js';
 
 async function makePair() {
   const bus   = new InternalBus();
@@ -74,3 +75,45 @@ describe('Agent.message (one-way)', () => {
     expect(Parts.data(parts).key).toBe('value');
   });
 });
+
+describe('sendMessage reports what actually happened (G8/G9/G10)', () => {
+  it('an acknowledged send reports acked', async () => {
+    const { alice, bob } = await makePair();
+    const onDelivery = vi.fn();
+    await sendMessage(alice, bob.address, 'hoi', { onDelivery });
+    expect(onDelivery).toHaveBeenCalledWith({ acked: true, downgraded: false });
+  });
+
+  it('THE CASE THAT MATTERED: a timed-out ack reports DOWNGRADED, not success', async () => {
+    // The message still goes out fire-and-forget — delivery beats bookkeeping — but the caller is told,
+    // so it can show "maybe received" instead of a checkmark that means "we tried".
+    const { alice, bob } = await makePair();
+    const t = await alice.transportFor(bob.address);
+    vi.spyOn(t, 'sendAck').mockRejectedValue(new Error('ack timeout'));
+    const oneWay = vi.spyOn(t, 'sendOneWay');
+
+    const onDelivery = vi.fn();
+    await sendMessage(alice, bob.address, 'hoi', { onDelivery });
+
+    expect(oneWay).toHaveBeenCalled();                                   // still delivered
+    expect(onDelivery).toHaveBeenCalledWith({ acked: false, downgraded: true });
+  });
+
+  it('requireAck throws and claims nothing', async () => {
+    const { alice, bob } = await makePair();
+    const t = await alice.transportFor(bob.address);
+    vi.spyOn(t, 'sendAck').mockRejectedValue(new Error('ack timeout'));
+
+    const onDelivery = vi.fn();
+    await expect(sendMessage(alice, bob.address, 'hoi', { requireAck: true, onDelivery })).rejects.toThrow();
+    expect(onDelivery).not.toHaveBeenCalled();
+  });
+
+  it('a throwing reporter does not break the send', async () => {
+    const { alice, bob } = await makePair();
+    await expect(sendMessage(alice, bob.address, 'hoi', {
+      onDelivery: () => { throw new Error('bad handler'); },
+    })).resolves.not.toThrow();
+  });
+});
+

@@ -57,7 +57,7 @@ import { buildCirclePodWriter } from './src/core/circleStoresRN.js';
 // One store per app; shared between ChatScreen (receiver) and
 // CircleLauncherScreen (editor pull + send-side clear).
 import { makeKringRecipePendingStoreRN } from './src/core/kringRecipePendingStorageRN.js';
-import { initCirclePods, circleControlAgentRouter, setCirclePodSession } from './src/core/circlePods.js';
+import { initCirclePods, circleControlAgentRouter, setCirclePodSession, setCircleKeyEventWiring } from './src/core/circlePods.js';
 import { discoverPodRoot } from '../basis/src/web/podStorage.js';
 // γ-next.rules — per-kring pending-rules cache (AsyncStorage-backed).
 // Mirrors the recipe wire: ChatScreen writes via the receiver,
@@ -374,6 +374,9 @@ export default function App() {
           getSharedWithMePodWriter: getCirclePodWriter,
           // S4 — multi-member sealing: route stoop redeem/leave to the circle's producer.
           stoopControlAgent: circleControlAgentRouter,
+          // G11 — the no-pod key-event fan's transport (a REMOVE → rotation fans the new key to the
+          // remaining members). The bundle injects its peer sender + skill dispatch at boot.
+          setKeyEventWiring: setCircleKeyEventWiring,
           // Extension mappings (feedback-extension) — load installed extensions from AsyncStorage at boot,
           // verify them against the base catalog, and merge the accepted ones into the dispatch catalog.
           mappingsStore:    asyncStorageMappingsStore(AsyncStorage),

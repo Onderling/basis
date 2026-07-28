@@ -20,6 +20,8 @@ import { PodClient, generateKeypair as podGenerateKeypair, SolidOidcAuth,
   sealingPublicKeyFromNetworkKey as podSealingPublicKeyFromNetworkKey } from '@onderling/pod-client';
 import { sealItem } from '@onderling/item-store';
 import { makeCircleLists } from '@onderling/kring-host/circleLists';
+import { makeKeyEventLogSink, recipientAddrsFromRoster } from '@onderling/kring-host/keyEventLogSink';
+import { createKeyEventStore, wrapStrategyWithKeyEventFold } from '../../../basis/src/v2/keyEventStore.js';
 import { createCirclePodProducer, createCircleControlAgentRouter, seedCircleRoster } from '../../../basis/src/v2/circlePodProducer.js';
 import { realPodRouting } from '../../../basis/src/v2/circleRealPod.js';
 import { createCirclePodSharing } from '../../../basis/src/v2/circlePodSharing.js';
@@ -61,6 +63,47 @@ export function setCirclePodSession(sessionOrRef) { podSessionRef = sessionOrRef
 // Absent ⇒ the enforcement falls back to the conservative roster-only rotation (safe, lossy).
 let _contactsSource = null;
 export function setCircleContactsSource(fn) { _contactsSource = typeof fn === 'function' ? fn : null; }
+
+// ── No-pod group-key rotation (G11, RN parity with web circleApp.js) ────────────────────────────────
+// The LOCAL per-circle key-event log this device holds: its OWN emitted key-events (recorded by the sink's
+// `recordLocal` below) + every event fanned to it by another member (the `group-key-event` receive handler
+// in ChatScreen's peer router → `recordCircleKeyEvent`). A content read folds these into the key chain, so
+// a sealed circle stays readable with NO pod, and a removed member — never sent the rotation event —
+// cannot open post-removal content. Same shared store module + handler as web (invariants #1/#2).
+const circleKeyEventStore = createKeyEventStore();
+export function recordCircleKeyEvent(groupId, event) { return circleKeyEventStore.record(groupId, event); }
+
+// The EMIT side's transport wiring — the peer sender + skill dispatch live in the agent bundle, which this
+// module doesn't own; the bundle injects them at boot (mirror of web's lazy `_peerAgent`/`rawCallSkill`
+// refs). The sink only fires on a later membership change, so late injection is safe; absent ⇒ the sink
+// records locally and fans to nobody (single-device behaviour, unchanged).
+let _keyEventWiring = null;   // { sendPeer(addr,payload,opts), callSkill(origin,opId,args) }
+export function setCircleKeyEventWiring(wiring) { _keyEventWiring = wiring ?? null; }
+
+/** The no-pod distribution sink for ONE circle — a membership change (notably a REMOVE → rotation) fans the
+ * new versioned key AS a log key-event to the circle's REMAINING members over the SAME peer channel content
+ * rides — sealed to them only, so the departed cannot open post-removal content with no shared pod. The pod
+ * key resource is still written (defense-in-depth); the log is the source for a no-pod circle. */
+function makeCircleKeyEventLog(circleId) {
+  return makeKeyEventLogSink({
+    groupId: circleId,
+    recordLocal: (event) => circleKeyEventStore.record(circleId, event),
+    sendPeer: (addr, payload, opts) => (typeof _keyEventWiring?.sendPeer === 'function'
+      ? _keyEventWiring.sendPeer(addr, payload, opts)
+      : Promise.resolve()),
+    // Held (not lost) for an offline member, flushed on reconnect — the same channel content fans over.
+    sendOptions: { hold: true, firstSendTimeoutMs: 0, retryDelays: [] },
+    resolveRecipientAddrs: async (event) => {
+      if (typeof _keyEventWiring?.callSkill !== 'function') return [];
+      let members = [];
+      try {
+        const r = await _keyEventWiring.callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+        members = Array.isArray(r?.members) ? r.members : [];
+      } catch { return []; }
+      return recipientAddrsFromRoster(event, members);
+    },
+  });
+}
 
 /** The signed-in user's AUTHED fetch (OidcSessionRN bearer), or null when signed
  *  out. embed-ref resolution uses it to read the user's OWN private-pod items. */
@@ -138,6 +181,8 @@ export async function ensureCirclePod(circleId, policy) {
       makePodClient: routing ? routing.makePodClient : makeCirclePodClient,
       circleRootUri: routing ? routing.circleRootUri(circleId) : undefined,
       sharing,
+      // G11 — no-pod key distribution: rotations fan as log key-events (web parity, see makeCircleKeyEventLog).
+      keyEventLog: makeCircleKeyEventLog(circleId),
     });
   } catch (err) {
     if (typeof console !== 'undefined') console.warn('[circlePods] ensureCirclePod failed:', err?.message ?? err);
@@ -167,6 +212,13 @@ export async function getCircleSealStrategy(circleId, policy) {
     if (prod?.controlAgent && prod.sealingIdentity) {
       const idKey = await prod.sealingIdentity.ensure();
       strat = await prod.controlAgent.sealingStrategy(idKey.privateKey);
+      // G11 — no-pod defense-in-depth: content sealed under a version carried only in the key-event LOG
+      // (a rotation fanned to this device) still opens. Shared wrapper; lazy read at open time (web parity).
+      if (strat && idKey?.privateKey) {
+        strat = wrapStrategyWithKeyEventFold(strat, {
+          listEvents: () => circleKeyEventStore.list(circleId), groupId: circleId, privateKey: idKey.privateKey,
+        });
+      }
     }
   } catch { strat = null; }
   circleSealStrategies.set(circleId, strat);

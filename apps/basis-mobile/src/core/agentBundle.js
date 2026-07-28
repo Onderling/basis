@@ -531,6 +531,17 @@ export async function bootAgentBundle(opts = {}) {
     publishEvent: opts.publishEvent,
   });
 
+  // G11 — wire the no-pod key-event fan's transport (circlePods' sink reads these lazily; the sink only
+  // fires on a membership change, e.g. a REMOVE → rotation, so wiring here at boot is always in time).
+  // Injected as an opts hook so this module keeps zero RN/screen imports; App.js passes circlePods'
+  // setCircleKeyEventWiring. Absent (tests / stub boots) ⇒ single-device behaviour, unchanged.
+  opts.setKeyEventWiring?.({
+    sendPeer: (addr, payload, sendOpts) => (typeof agent.sendPeerMessage === 'function'
+      ? agent.sendPeerMessage(addr, payload, sendOpts)
+      : Promise.resolve()),
+    callSkill,
+  });
+
   // OBJ-2 membership — ONE shared peer-redeem pending-map + sender. ChatScreen wires the response
   // handler against this map (and uses this sender for the classic join wizard); the v2 launcher uses
   // the same sender, so a v2 join correlates with the already-wired response handler. No double-wiring.

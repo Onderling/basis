@@ -70,6 +70,11 @@ import { makeHandleChatMessage }
                                from '../../../basis/src/core/handlers/chatMessage.js';
 import { makeHandleBuurtPeerIntro }
                                from '../../../basis/src/core/handlers/meshIntros.js';
+// G11 — no-pod group-key rotation, RECEIVE side: record an inbound key-event into the local per-circle
+// log (circlePods' store); a content read folds it into the key chain. Same shared handler as web.
+import { makeHandleGroupKeyEvent }
+                               from '../../../basis/src/core/handlers/groupKeyEvent.js';
+import { recordCircleKeyEvent } from '../core/circlePods.js';
 import {
   makeHandleCatchUpRequest, makeRequestCatchUpFromKnownPeers,
 } from '../../../basis/src/core/handlers/catchUp.js';
@@ -549,6 +554,8 @@ export default function ChatScreen({
       // Substrate-only handlers — no UI bubble; just persist local
       // state + publish a notification for /logs.
       'buurt-peer-intro':      makeHandleBuurtPeerIntro({ callSkill }),
+      // G11 — a group-key rotation fanned by another member lands in the local key-event log (web parity).
+      'group-key-event':       makeHandleGroupKeyEvent({ recordKeyEvent: recordCircleKeyEvent }),
       // Legacy peer-poll path kept as fallback for callers / tests
       // that still drive it.  The new ε.4 'catch-up-request' subtype
       // is registered alongside via catchUpProvider.handler.

@@ -89,7 +89,7 @@ describe('the expiry ceiling', () => {
 });
 
 describe('an inbound invite is untrusted', () => {
-  const inbound = (invite) => ({ kind: INVITE_MESSAGE, invite });
+  const inbound = (invite) => ({ subtype: INVITE_MESSAGE, invite });
   const live = (over = {}) => ({ uri: URI, circleId: 'c1', circleName: 'Buurt', expiresAt: T0 + 60_000, ...over });
 
   it('`from` comes from the WIRE — a broadcast cannot attribute a circle to someone else', () => {
@@ -114,7 +114,7 @@ describe('an inbound invite is untrusted', () => {
     expect(receiveInvite(inbound(live({ expiresAt: T0 - 1 })), 'them', at(0))).toBeNull();
     expect(receiveInvite(inbound(live({ uri: '' })), 'them', at(0))).toBeNull();
     expect(receiveInvite(inbound(live({ circleId: '' })), 'them', at(0))).toBeNull();
-    expect(receiveInvite({ kind: 'nearby.ask', invite: live() }, 'them', at(0))).toBeNull();
+    expect(receiveInvite({ kind: 'nearby-ask', invite: live() }, 'them', at(0))).toBeNull();
     expect(receiveInvite(null, 'them', at(0))).toBeNull();
   });
 

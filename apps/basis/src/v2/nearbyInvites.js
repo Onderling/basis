@@ -22,7 +22,7 @@
 
 /** A broadcast invite expires fast. A QR you hand someone can live for hours; a shout to a café cannot. */
 export const BROADCAST_INVITE_MAX_TTL_MS = 15 * 60_000;
-export const INVITE_MESSAGE = 'nearby.invite';
+export const INVITE_MESSAGE = 'nearby-invite';
 export const INVITE_MAX_NAME = 60;
 export const INVITE_MAX_URI  = 2048;
 
@@ -106,7 +106,7 @@ export function isInviteLive(invite, now = () => Date.now()) {
  * be — **redeeming runs the full gate.** A forged invite fails at redemption, which is where it should.
  */
 export function receiveInvite(payload, fromAddress, now = () => Date.now()) {
-  if (payload?.kind !== INVITE_MESSAGE) return null;
+  if (payload?.subtype !== INVITE_MESSAGE) return null;
   const raw = payload.invite;
   if (!raw || typeof raw !== 'object') return null;
 

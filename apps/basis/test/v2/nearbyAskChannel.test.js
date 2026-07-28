@@ -22,14 +22,14 @@ const liveAsk = (over = {}) => ({
   createdAt: T0, expiresAt: T0 + 60_000, from: 'them', ...over,
 });
 
-const inbound = (ask) => ({ kind: ASK_MESSAGE, ask });
+const inbound = (ask) => ({ subtype: ASK_MESSAGE, ask });
 
 describe('broadcasting', () => {
   it('fans out to every visible peer — there is no room server', async () => {
     const { ch, sendTo } = build();
     const r = await ch.broadcast(liveAsk());
     expect(r).toEqual({ sent: 2, failed: 0, peers: 2 });
-    expect(sendTo).toHaveBeenCalledWith('a', { kind: ASK_MESSAGE, ask: expect.any(Object) });
+    expect(sendTo).toHaveBeenCalledWith('a', { subtype: ASK_MESSAGE, ask: expect.any(Object) });
   });
 
   it('one unreachable peer does not abort the rest', async () => {
@@ -58,7 +58,7 @@ describe('answering is point-to-point', () => {
     const r = await ch.sendAnswer({ askId: 'ask-1', text: 'ik heb er een' }, 'them');
     expect(r).toEqual({ ok: true });
     expect(sendTo).toHaveBeenCalledTimes(1);
-    expect(sendTo).toHaveBeenCalledWith('them', { kind: ANSWER_MESSAGE, answer: expect.any(Object) });
+    expect(sendTo).toHaveBeenCalledWith('them', { subtype: ANSWER_MESSAGE, answer: expect.any(Object) });
   });
 
   it('refuses with no recipient', async () => {
@@ -126,7 +126,7 @@ describe('an inbound ask is untrusted', () => {
 
   it('ignores messages that are not asks at all', () => {
     const { ch } = build();
-    expect(ch.receiveAsk({ kind: 'chat-message', ask: liveAsk() }, 'them')).toBeNull();
+    expect(ch.receiveAsk({ subtype: 'kring-chat-message', ask: liveAsk() }, 'them')).toBeNull();
     expect(ch.receiveAsk(null, 'them')).toBeNull();
     expect(ch.receiveAsk(inbound('not-an-object'), 'them')).toBeNull();
   });
@@ -142,22 +142,22 @@ describe('an inbound ask is untrusted', () => {
 describe('an inbound answer is untrusted too', () => {
   it('takes `from` from the wire and opens the channel with THAT sender', () => {
     const { ch } = build();
-    const a = ch.receiveAnswer({ kind: ANSWER_MESSAGE, answer: { askId: 'ask-1', text: 'ja', from: 'someone-else' } }, 'real');
+    const a = ch.receiveAnswer({ subtype: ANSWER_MESSAGE, answer: { askId: 'ask-1', text: 'ja', from: 'someone-else' } }, 'real');
     expect(a.from).toBe('real');
     expect(a.opensDirectChannel).toBe(true);
   });
 
   it('rejects a malformed answer', () => {
     const { ch } = build();
-    expect(ch.receiveAnswer({ kind: ANSWER_MESSAGE, answer: { askId: 'x' } }, 'them')).toBeNull();
-    expect(ch.receiveAnswer({ kind: ANSWER_MESSAGE, answer: { text: 'hi' } }, 'them')).toBeNull();
-    expect(ch.receiveAnswer({ kind: ASK_MESSAGE, answer: { askId: 'x', text: 'y' } }, 'them')).toBeNull();
+    expect(ch.receiveAnswer({ subtype: ANSWER_MESSAGE, answer: { askId: 'x' } }, 'them')).toBeNull();
+    expect(ch.receiveAnswer({ subtype: ANSWER_MESSAGE, answer: { text: 'hi' } }, 'them')).toBeNull();
+    expect(ch.receiveAnswer({ subtype: ASK_MESSAGE, answer: { askId: 'x', text: 'y' } }, 'them')).toBeNull();
   });
 
   it('carries no match details — an answer says who and what, never why', () => {
     const { ch } = build();
     const a = ch.receiveAnswer({
-      kind: ANSWER_MESSAGE,
+      subtype: ANSWER_MESSAGE,
       answer: { askId: 'ask-1', text: 'ja', matches: [{ tags: ['fiets'] }] },
     }, 'them');
     expect(Object.keys(a).sort()).toEqual(['askId', 'from', 'opensDirectChannel', 'receivedAt', 'text']);

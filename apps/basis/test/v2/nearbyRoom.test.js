@@ -62,7 +62,7 @@ describe('a card is AUTHORED, never derived', () => {
 });
 
 describe('an inbound card is untrusted', () => {
-  const inbound = (card) => ({ kind: CARD_MESSAGE, card });
+  const inbound = (card) => ({ subtype: CARD_MESSAGE, card });
 
   it('`from` comes from the WIRE — a card must not name someone else as its author', () => {
     const c = receiveCard(inbound({ label: 'Sam', from: 'victim' }), 'actual-sender', now);
@@ -83,7 +83,7 @@ describe('an inbound card is untrusted', () => {
   it('rejects a card with no usable face, or the wrong message kind', () => {
     expect(receiveCard(inbound({ label: '' }), 'them', now)).toBeNull();
     expect(receiveCard(inbound({ label: 'x'.repeat(CARD_MAX_LABEL + 1) }), 'them', now)).toBeNull();
-    expect(receiveCard({ kind: CHAT_MESSAGE, card: { label: 'Sam' } }, 'them', now)).toBeNull();
+    expect(receiveCard({ subtype: CHAT_MESSAGE, card: { label: 'Sam' } }, 'them', now)).toBeNull();
     expect(receiveCard(null, 'them', now)).toBeNull();
   });
 });
@@ -112,7 +112,7 @@ describe('chat is gated by the allow, in the LOGIC not the UI', () => {
 
   it('an inbound message takes `from` from the wire and is rebuilt', () => {
     const m = receiveChatMessage(
-      { kind: CHAT_MESSAGE, message: { id: 'm1', text: 'hoi', from: 'someone-else', admin: true } },
+      { subtype: CHAT_MESSAGE, message: { id: 'm1', text: 'hoi', from: 'someone-else', admin: true } },
       'real', now,
     );
     expect(m.from).toBe('real');
@@ -120,9 +120,9 @@ describe('chat is gated by the allow, in the LOGIC not the UI', () => {
   });
 
   it('rejects a malformed inbound message', () => {
-    expect(receiveChatMessage({ kind: CHAT_MESSAGE, message: { text: 'hi' } }, 'them', now)).toBeNull();
-    expect(receiveChatMessage({ kind: CHAT_MESSAGE, message: { id: 'm1', text: '' } }, 'them', now)).toBeNull();
-    expect(receiveChatMessage({ kind: CARD_MESSAGE, message: { id: 'm1', text: 'hi' } }, 'them', now)).toBeNull();
+    expect(receiveChatMessage({ subtype: CHAT_MESSAGE, message: { text: 'hi' } }, 'them', now)).toBeNull();
+    expect(receiveChatMessage({ subtype: CHAT_MESSAGE, message: { id: 'm1', text: '' } }, 'them', now)).toBeNull();
+    expect(receiveChatMessage({ subtype: CARD_MESSAGE, message: { id: 'm1', text: 'hi' } }, 'them', now)).toBeNull();
   });
 });
 

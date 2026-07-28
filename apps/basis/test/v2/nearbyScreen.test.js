@@ -540,7 +540,7 @@ describe('cards and room chat (step G)', () => {
     screen.open();
     const r = await screen.showCard({ label: 'Sam', line: 'net verhuisd' });
     expect(r).toMatchObject({ ok: true, sent: 2, peers: 2 });
-    expect(broadcastKind).toHaveBeenCalledWith('nearby.card', { card: expect.objectContaining({ label: 'Sam' }) });
+    expect(broadcastKind).toHaveBeenCalledWith('nearby-card', { card: expect.objectContaining({ label: 'Sam' }) });
   });
 
   it('THE ASYMMETRY: I see other people\u2019s cards even with my own card allow OFF', () => {
@@ -580,7 +580,7 @@ describe('cards and room chat (step G)', () => {
     expect(r.ok).toBe(true);
     // The room does not echo mine back, and a message that vanishes on send reads as a failure.
     expect(screen.model().chat.map((m) => m.text)).toEqual(['hoi', 'dag']);
-    expect(broadcastKind).toHaveBeenCalledWith('nearby.chat', { message: expect.objectContaining({ text: 'dag' }) });
+    expect(broadcastKind).toHaveBeenCalledWith('nearby-chat', { message: expect.objectContaining({ text: 'dag' }) });
   });
 
   it('saying something is refused while the allow is off', async () => {
@@ -657,7 +657,7 @@ describe('broadcast circle invites (step H)', () => {
     screen.open();
     const r = await screen.publishInvite({ uri: URI, circleId: 'c1', circleName: 'Buurt' });
     expect(r).toMatchObject({ ok: true, sent: 4, peers: 4 });
-    expect(broadcastKind).toHaveBeenCalledWith('nearby.invite', { invite: expect.objectContaining({ circleId: 'c1' }) });
+    expect(broadcastKind).toHaveBeenCalledWith('nearby-invite', { invite: expect.objectContaining({ circleId: 'c1' }) });
   });
 
   it('the allow is PER CIRCLE — allowing one does not allow another', async () => {

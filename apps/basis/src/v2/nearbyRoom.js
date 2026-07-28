@@ -35,8 +35,8 @@ export const CHAT_MAX_TEXT  = 500;
 /** Room chat is ephemeral. This is a render cap, not a store — nothing is persisted anywhere. */
 export const CHAT_MAX_KEPT  = 100;
 
-export const CARD_MESSAGE = 'nearby.card';
-export const CHAT_MESSAGE = 'nearby.chat';
+export const CARD_MESSAGE = 'nearby-card';
+export const CHAT_MESSAGE = 'nearby-chat';
 
 /**
  * The per-device allows. **Both default off** — a room you walk into must not start publishing for you.
@@ -88,7 +88,7 @@ export function createCard({ label, line = '', tags = [], from = null, now = () 
  * network with no relationship, so it is REBUILT rather than trusted, and `from` comes from the wire.
  */
 export function receiveCard(payload, fromAddress, now = () => Date.now()) {
-  if (payload?.kind !== CARD_MESSAGE) return null;
+  if (payload?.subtype !== CARD_MESSAGE) return null;
   const raw = payload.card;
   if (!raw || typeof raw !== 'object') return null;
 
@@ -131,7 +131,7 @@ export function createChatMessage({ text, from = null, allows = roomAllows(), no
 
 /** Validate an inbound chat message. */
 export function receiveChatMessage(payload, fromAddress, now = () => Date.now()) {
-  if (payload?.kind !== CHAT_MESSAGE) return null;
+  if (payload?.subtype !== CHAT_MESSAGE) return null;
   const raw = payload.message;
   if (!raw || typeof raw !== 'object') return null;
 

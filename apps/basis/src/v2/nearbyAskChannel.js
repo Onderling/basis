@@ -22,8 +22,8 @@
 import { ASK_MAX_TEXT, ASK_MAX_TTL_MS, isAskLive } from './nearbyAsks.js';
 
 /** Message kind on the wire. Namespaced so a room message cannot be confused with app traffic. */
-export const ASK_MESSAGE = 'nearby.ask';
-export const ANSWER_MESSAGE = 'nearby.answer';
+export const ASK_MESSAGE = 'nearby-ask';
+export const ANSWER_MESSAGE = 'nearby-answer';
 
 /** A room ask is a shout, not a mailing list — cap the tags so it cannot become a profile. */
 export const ASK_MAX_TAGS = 8;
@@ -63,14 +63,14 @@ export function createAskChannel({ listPeers = () => [], sendTo, now = () => Dat
      * @param {string} kind     the namespaced message kind
      * @param {object} body     the rest of the payload
      */
-    async broadcastKind(kind, body) {
+    async broadcastKind(subtype, body) {
       const peers = listPeers() ?? [];
       let sent = 0; let failed = 0;
       for (const peer of peers) {
         const address = peer?.pubKey ?? peer?.id ?? null;
         if (!address || typeof sendTo !== 'function') { failed += 1; continue; }
-        try { await sendTo(address, { kind, ...body }); sent += 1; }
-        catch (err) { failed += 1; report(err, `broadcast:${kind}`); }
+        try { await sendTo(address, { subtype, ...body }); sent += 1; }
+        catch (err) { failed += 1; report(err, `broadcast:${subtype}`); }
       }
       return { sent, failed, peers: peers.length };
     },
@@ -86,7 +86,7 @@ export function createAskChannel({ listPeers = () => [], sendTo, now = () => Dat
         return { ok: false, reason: 'no-recipient' };
       }
       try {
-        await sendTo(toAddress, { kind: ANSWER_MESSAGE, answer });
+        await sendTo(toAddress, { subtype: ANSWER_MESSAGE, answer });
         return { ok: true };
       } catch (err) {
         report(err, 'sendAnswer');
@@ -101,7 +101,7 @@ export function createAskChannel({ listPeers = () => [], sendTo, now = () => Dat
      * @param {string} fromAddress  the address it ACTUALLY arrived from — authoritative
      */
     receiveAsk(payload, fromAddress) {
-      if (payload?.kind !== ASK_MESSAGE) return null;
+      if (payload?.subtype !== ASK_MESSAGE) return null;
       const raw = payload.ask;
       if (!raw || typeof raw !== 'object') return null;
 
@@ -136,7 +136,7 @@ export function createAskChannel({ listPeers = () => [], sendTo, now = () => Dat
 
     /** Validate an inbound answer, with the same rules. */
     receiveAnswer(payload, fromAddress) {
-      if (payload?.kind !== ANSWER_MESSAGE) return null;
+      if (payload?.subtype !== ANSWER_MESSAGE) return null;
       const raw = payload.answer;
       if (!raw || typeof raw !== 'object') return null;
 

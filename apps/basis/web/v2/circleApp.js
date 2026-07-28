@@ -2653,11 +2653,17 @@ async function addBotFromInput(input) {
   }
   if (!circlePeerGraph) return;
   try {
-    const rec = await addBotToGraph({ input, peerGraph: circlePeerGraph, coreAgent: circleCoreAgent, discover: discoverA2A });
-    globalThis.alert?.(t('circle.contacts.added', { name: rec?.name ?? rec?.url ?? rec?.pubKey ?? '' }));
+    const rec = await addBotToGraph({
+      input, peerGraph: circlePeerGraph, coreAgent: circleCoreAgent, discover: discoverA2A,
+      // C13 fast rung — a stoop-contact:// card routes to stoop's addContactFromQr (the one decoder);
+      // the unified roster merges the ContactBook, so the person appears DM-ready right away.
+      addContact: (payload) => rawCallSkill('stoop', 'addContactFromQr', { payload }),
+    });
+    globalThis.alert?.(t('circle.contacts.added', { name: rec?.name ?? rec?.displayName ?? rec?.handle ?? rec?.url ?? rec?.pubKey ?? '' }));
   } catch (err) {
     console.warn('[circleApp] add bot failed:', err?.message ?? err);
-    globalThis.alert?.(t('circle.contacts.add_failed'));
+    // A circle invite pasted in the contact box is the VERIFIED rung — point at the join flow.
+    globalThis.alert?.(t(err?.code === 'circle-invite' ? 'circle.contacts.invite_not_contact' : 'circle.contacts.add_failed'));
   }
   showContacts();
 }

@@ -130,54 +130,162 @@
     },
     "wizard": {
       "steps": {
-        "rules": { "text": "Rules", "doc": "Join wizard — step 1 label." },
-        "privacy": { "text": "Privacy", "doc": "Join wizard — step 2 label." },
-        "handle": { "text": "Name", "doc": "Join wizard — step 3 label (pick a handle)." }
+        "rules": {
+          "text": "Rules",
+          "doc": "Join wizard — step 1 label."
+        },
+        "privacy": {
+          "text": "Privacy",
+          "doc": "Join wizard — step 2 label."
+        },
+        "handle": {
+          "text": "Name",
+          "doc": "Join wizard — step 3 label (pick a handle)."
+        }
       },
-      "cancel": { "text": "Cancel", "doc": "Join wizard — cancel button." },
-      "next": { "text": "Next", "doc": "Join wizard — advance a step." },
-      "back": { "text": "Back", "doc": "Join wizard — go back a step." },
-      "join": { "text": "Join", "doc": "Join wizard — final submit." },
-      "close": { "text": "Close", "doc": "Join wizard — close the error view." },
-      "submitting": { "text": "Joining…", "doc": "Join wizard — submit-in-progress status." },
-      "invite_error": { "text": "Invite error", "doc": "Join wizard — bad-invite heading." },
+      "cancel": {
+        "text": "Cancel",
+        "doc": "Join wizard — cancel button."
+      },
+      "next": {
+        "text": "Next",
+        "doc": "Join wizard — advance a step."
+      },
+      "back": {
+        "text": "Back",
+        "doc": "Join wizard — go back a step."
+      },
+      "join": {
+        "text": "Join",
+        "doc": "Join wizard — final submit."
+      },
+      "close": {
+        "text": "Close",
+        "doc": "Join wizard — close the error view."
+      },
+      "submitting": {
+        "text": "Joining…",
+        "doc": "Join wizard — submit-in-progress status."
+      },
+      "invite_error": {
+        "text": "Invite error",
+        "doc": "Join wizard — bad-invite heading."
+      },
       "rules": {
-        "title": { "text": "Join {{circle}}", "doc": "Join wizard — rules step heading (the circle id)." },
-        "intro": { "text": "These are the circle's rules. Read them before joining.", "doc": "Join wizard — rules step intro." },
-        "loading": { "text": "Loading rules…", "doc": "Join wizard — rules still loading." },
-        "load_error": { "text": "Could not load rules: {{error}}", "doc": "Join wizard — rules fetch failed." },
-        "accept": { "text": "I have read and accept the rules.", "doc": "Join wizard — rules-accept checkbox." }
+        "title": {
+          "text": "Join {{circle}}",
+          "doc": "Join wizard — rules step heading (the circle id)."
+        },
+        "intro": {
+          "text": "These are the circle's rules. Read them before joining.",
+          "doc": "Join wizard — rules step intro."
+        },
+        "loading": {
+          "text": "Loading rules…",
+          "doc": "Join wizard — rules still loading."
+        },
+        "load_error": {
+          "text": "Could not load rules: {{error}}",
+          "doc": "Join wizard — rules fetch failed."
+        },
+        "accept": {
+          "text": "I have read and accept the rules.",
+          "doc": "Join wizard — rules-accept checkbox."
+        }
       },
       "privacy": {
-        "title": { "text": "Privacy", "doc": "Join wizard — privacy step heading." },
-        "notice": { "text": "Joining a circle means other members can see your posts, contact you, and — depending on the circle's rules — weigh in on conflicts. Circle admins have no access to your private chats, only to what you post publicly.", "doc": "Join wizard — the privacy notice (folded from the PRIVACY_NOTICE constant)." },
-        "accept": { "text": "I understand.", "doc": "Join wizard — privacy-accept checkbox." },
-        "mesh": { "text": "Share my address so other members can reach me directly (recommended for catch-up).", "doc": "Join wizard — mesh address-sharing consent checkbox." },
-        "mesh_hint": { "text": "Off = the admin relays everything; you stay reachable only via them.", "doc": "Join wizard — mesh consent hint." }
+        "title": {
+          "text": "Privacy",
+          "doc": "Join wizard — privacy step heading."
+        },
+        "notice": {
+          "text": "Joining a circle means other members can see your posts, contact you, and — depending on the circle's rules — weigh in on conflicts. Circle admins have no access to your private chats, only to what you post publicly.",
+          "doc": "Join wizard — the privacy notice (folded from the PRIVACY_NOTICE constant)."
+        },
+        "accept": {
+          "text": "I understand.",
+          "doc": "Join wizard — privacy-accept checkbox."
+        },
+        "mesh": {
+          "text": "Share my address so other members can reach me directly (recommended for catch-up).",
+          "doc": "Join wizard — mesh address-sharing consent checkbox."
+        },
+        "mesh_hint": {
+          "text": "Off = the admin relays everything; you stay reachable only via them.",
+          "doc": "Join wizard — mesh consent hint."
+        }
       },
       "handle": {
-        "title": { "text": "Pick a name", "doc": "Join wizard — handle step heading." },
-        "intro": { "text": "Your name is how other members address you in this circle. Lowercase letters, digits, underscore or dash; 3–30 characters.", "doc": "Join wizard — handle step intro." },
-        "label": { "text": "Name", "doc": "Join wizard — handle input label." },
-        "placeholder": { "text": "e.g. alice", "doc": "Join wizard — handle input placeholder." },
-        "suggestions": { "text": "Suggestions", "doc": "Join wizard — handle suggestions sublabel." }
+        "title": {
+          "text": "Pick a name",
+          "doc": "Join wizard — handle step heading."
+        },
+        "intro": {
+          "text": "Your name is how other members address you in this circle. Lowercase letters, digits, underscore or dash; 3–30 characters.",
+          "doc": "Join wizard — handle step intro."
+        },
+        "label": {
+          "text": "Name",
+          "doc": "Join wizard — handle input label."
+        },
+        "placeholder": {
+          "text": "e.g. alice",
+          "doc": "Join wizard — handle input placeholder."
+        },
+        "suggestions": {
+          "text": "Suggestions",
+          "doc": "Join wizard — handle suggestions sublabel."
+        }
       },
       "link": {
-        "label": { "text": "Continue as", "doc": "Join wizard — cross-circle linkability choice label." },
-        "fresh": { "text": "A fresh identity (unlinkable)", "doc": "Join wizard — fresh/unlinkable key option." },
-        "same_person": { "text": "The same person as in {{name}}", "doc": "Join wizard — continue-as-existing-self option." },
-        "hint": { "text": "A fresh identity keeps this circle unlinkable from your others. Continuing as an existing self proves you are the same person to anyone in both circles.", "doc": "Join wizard — linkability explanation." }
+        "label": {
+          "text": "Continue as",
+          "doc": "Join wizard — cross-circle linkability choice label."
+        },
+        "fresh": {
+          "text": "A fresh identity (unlinkable)",
+          "doc": "Join wizard — fresh/unlinkable key option."
+        },
+        "same_person": {
+          "text": "The same person as in {{name}}",
+          "doc": "Join wizard — continue-as-existing-self option."
+        },
+        "hint": {
+          "text": "A fresh identity keeps this circle unlinkable from your others. Continuing as an existing self proves you are the same person to anyone in both circles.",
+          "doc": "Join wizard — linkability explanation."
+        }
       },
       "persona": {
-        "label": { "text": "Join as", "doc": "Join wizard — persona choice label." },
-        "minimal": { "text": "Join minimally (share no background)", "doc": "Join wizard — join-minimally persona option." },
-        "default_suffix": { "text": "{{name}} (default persona)", "doc": "Join wizard — default persona option label." },
-        "hint": { "text": "Only what this persona discloses in this circle is shared — nothing on first join. Adjust later under Me → personas.", "doc": "Join wizard — persona disclosure hint." }
+        "label": {
+          "text": "Join as",
+          "doc": "Join wizard — persona choice label."
+        },
+        "minimal": {
+          "text": "Join minimally (share no background)",
+          "doc": "Join wizard — join-minimally persona option."
+        },
+        "default_suffix": {
+          "text": "{{name}} (default persona)",
+          "doc": "Join wizard — default persona option label."
+        },
+        "hint": {
+          "text": "Only what this persona discloses in this circle is shared — nothing on first join. Adjust later under Me → personas.",
+          "doc": "Join wizard — persona disclosure hint."
+        }
       },
       "reveal": {
-        "label": { "text": "How much you show", "doc": "Join wizard — reveal-level picker heading (§1.6)." },
-        "hint": { "text": "Choose what other members see of you in this circle. You can change this anytime.", "doc": "Join wizard — reveal-level picker hint." },
-        "suggested": { "text": "This circle suggests: {{level}}", "doc": "Join wizard — the circle's non-binding suggested reveal level (shown as a hint, never forced)." }
+        "label": {
+          "text": "How much you show",
+          "doc": "Join wizard — reveal-level picker heading (§1.6)."
+        },
+        "hint": {
+          "text": "Choose what other members see of you in this circle. You can change this anytime.",
+          "doc": "Join wizard — reveal-level picker hint."
+        },
+        "suggested": {
+          "text": "This circle suggests: {{level}}",
+          "doc": "Join wizard — the circle's non-binding suggested reveal level (shown as a hint, never forced)."
+        }
       }
     }
   },
@@ -3317,12 +3425,16 @@
       "doc": "P5 — button on the contacts roster to add a bot by URL/address."
     },
     "add_prompt": {
-      "text": "Bot address — an https URL (agent card) or a peer address",
-      "doc": "P5 — prompt when adding a bot."
+      "text": "Bot address — an https URL (agent card), a peer address, or a stoop-contact:// contact card",
+      "doc": "P5 — prompt when adding a bot or a contact card (C13 fast rung)."
     },
     "add_failed": {
       "text": "Couldn’t add that bot — check the URL/address.",
       "doc": "P5 — shown when discoverA2A / add fails."
+    },
+    "invite_not_contact": {
+      "text": "That is a circle invite, not a contact card — use “Join a circle” for it.",
+      "doc": "C13 — a stoop-invite:// pasted in the contact-add box: the VERIFIED rung belongs to the join flow."
     },
     "added": {
       "text": "Added {{name}}.",
@@ -4155,46 +4267,142 @@
     }
   },
   "governance": {
-    "title": { "text": "Decisions", "doc": "Governance panel heading — the circle's open + settled governed decisions (Phase 4 §5 L4)." },
-    "none": { "text": "No open decisions.", "doc": "Governance panel — empty state when nothing is up for decision." },
-    "history": { "text": "Settled", "doc": "Governance panel — heading over the closed (approved/rejected) proposals." },
+    "title": {
+      "text": "Decisions",
+      "doc": "Governance panel heading — the circle's open + settled governed decisions (Phase 4 §5 L4)."
+    },
+    "none": {
+      "text": "No open decisions.",
+      "doc": "Governance panel — empty state when nothing is up for decision."
+    },
+    "history": {
+      "text": "Settled",
+      "doc": "Governance panel — heading over the closed (approved/rejected) proposals."
+    },
     "action": {
-      "removeMember": { "text": "Remove member", "doc": "Governed action — remove a member from the circle." },
-      "rotateKey": { "text": "Rotate key", "doc": "Governed action — rotate the circle's group key." },
-      "changeRule": { "text": "Change rule", "doc": "Governed action — change a circle rule (house rules)." },
-      "changePolicy": { "text": "Change setting", "doc": "Governed action — change a circle policy setting." }
+      "removeMember": {
+        "text": "Remove member",
+        "doc": "Governed action — remove a member from the circle."
+      },
+      "rotateKey": {
+        "text": "Rotate key",
+        "doc": "Governed action — rotate the circle's group key."
+      },
+      "changeRule": {
+        "text": "Change rule",
+        "doc": "Governed action — change a circle rule (house rules)."
+      },
+      "changePolicy": {
+        "text": "Change setting",
+        "doc": "Governed action — change a circle policy setting."
+      }
     },
     "class": {
-      "any_admin": { "text": "an admin decides", "doc": "Decision-class — any admin may resolve this unilaterally." },
-      "admin_quorum": { "text": "admin majority", "doc": "Decision-class — a majority of admins must agree." },
-      "member_vote": { "text": "member vote", "doc": "Decision-class — a majority of the whole circle must agree." }
+      "any_admin": {
+        "text": "an admin decides",
+        "doc": "Decision-class — any admin may resolve this unilaterally."
+      },
+      "admin_quorum": {
+        "text": "admin majority",
+        "doc": "Decision-class — a majority of admins must agree."
+      },
+      "member_vote": {
+        "text": "member vote",
+        "doc": "Decision-class — a majority of the whole circle must agree."
+      }
     },
     "status": {
-      "approved": { "text": "Approved", "doc": "Governance status — the decision passed." },
-      "pending": { "text": "Open", "doc": "Governance status — still awaiting the threshold." },
-      "rejected": { "text": "Rejected", "doc": "Governance status — the decision did not pass." }
+      "approved": {
+        "text": "Approved",
+        "doc": "Governance status — the decision passed."
+      },
+      "pending": {
+        "text": "Open",
+        "doc": "Governance status — still awaiting the threshold."
+      },
+      "rejected": {
+        "text": "Rejected",
+        "doc": "Governance status — the decision did not pass."
+      }
     },
-    "vote_yes": { "text": "Yes", "doc": "Governance vote button — vote in favour." },
-    "vote_no": { "text": "No", "doc": "Governance vote button — vote against." },
-    "override": { "text": "Decide now", "doc": "Governance — an admin forces a stuck member-vote once past its deadline (escape-hatch b)." },
-    "tally": { "text": "{yes} of {need} needed · {of} members", "doc": "Governance — the running vote tally." },
-    "deadline": { "text": "has a deadline", "doc": "Governance — this vote has a closing deadline." },
-    "awaiting_enactment": { "text": "awaiting an admin", "doc": "Governance — approved, waiting for an admin/caretaker device to enact it (Decision A)." },
-    "disputed_line": { "text": "conflicting history from {who} — evidence attached", "doc": "Governance L3 — equivocation (fork-proof) alert." },
-    "review_remove": { "text": "Review & remove", "doc": "Governance L3 — open a removeMember review on a disputed member." },
-    "report_message": { "text": "Report message", "doc": "Governance §8 — the per-bubble button to report a chat message to the admins." },
-    "report_member": { "text": "Report member", "doc": "Governance §8 — the button on a member card to report them to the admins." },
-    "report_reason_prompt": { "text": "Why are you reporting this member?", "doc": "Governance §8 — prompt for the report reason." },
-    "notify_vote_opened": { "text": "A decision opened: {action} — your vote may be needed", "doc": "Governance — in-app nudge when a decision opens on another device (governanceWakeHint gates to propose)." },
-    "reports_title": { "text": "Reports", "doc": "Governance §8 — heading over the member-to-admin report lane (admin-only)." },
+    "vote_yes": {
+      "text": "Yes",
+      "doc": "Governance vote button — vote in favour."
+    },
+    "vote_no": {
+      "text": "No",
+      "doc": "Governance vote button — vote against."
+    },
+    "override": {
+      "text": "Decide now",
+      "doc": "Governance — an admin forces a stuck member-vote once past its deadline (escape-hatch b)."
+    },
+    "tally": {
+      "text": "{yes} of {need} needed · {of} members",
+      "doc": "Governance — the running vote tally."
+    },
+    "deadline": {
+      "text": "has a deadline",
+      "doc": "Governance — this vote has a closing deadline."
+    },
+    "awaiting_enactment": {
+      "text": "awaiting an admin",
+      "doc": "Governance — approved, waiting for an admin/caretaker device to enact it (Decision A)."
+    },
+    "disputed_line": {
+      "text": "conflicting history from {who} — evidence attached",
+      "doc": "Governance L3 — equivocation (fork-proof) alert."
+    },
+    "review_remove": {
+      "text": "Review & remove",
+      "doc": "Governance L3 — open a removeMember review on a disputed member."
+    },
+    "report_message": {
+      "text": "Report message",
+      "doc": "Governance §8 — the per-bubble button to report a chat message to the admins."
+    },
+    "report_member": {
+      "text": "Report member",
+      "doc": "Governance §8 — the button on a member card to report them to the admins."
+    },
+    "report_reason_prompt": {
+      "text": "Why are you reporting this member?",
+      "doc": "Governance §8 — prompt for the report reason."
+    },
+    "notify_vote_opened": {
+      "text": "A decision opened: {action} — your vote may be needed",
+      "doc": "Governance — in-app nudge when a decision opens on another device (governanceWakeHint gates to propose)."
+    },
+    "reports_title": {
+      "text": "Reports",
+      "doc": "Governance §8 — heading over the member-to-admin report lane (admin-only)."
+    },
     "report_target": {
-      "member": { "text": "Member", "doc": "Report target type — a member." },
-      "post": { "text": "Post", "doc": "Report target type — a noticeboard post." },
-      "message": { "text": "Message", "doc": "Report target type — a chat message." }
+      "member": {
+        "text": "Member",
+        "doc": "Report target type — a member."
+      },
+      "post": {
+        "text": "Post",
+        "doc": "Report target type — a noticeboard post."
+      },
+      "message": {
+        "text": "Message",
+        "doc": "Report target type — a chat message."
+      }
     },
-    "report_dismiss": { "text": "Dismiss", "doc": "Report action — close the report with no action." },
-    "report_act": { "text": "Act", "doc": "Report action — act on it (a member routes through the removeMember class)." },
-    "settings_title": { "text": "Who decides", "doc": "Governance settings — heading over the per-action decision-class controls (admin-only)." }
+    "report_dismiss": {
+      "text": "Dismiss",
+      "doc": "Report action — close the report with no action."
+    },
+    "report_act": {
+      "text": "Act",
+      "doc": "Report action — act on it (a member routes through the removeMember class)."
+    },
+    "settings_title": {
+      "text": "Who decides",
+      "doc": "Governance settings — heading over the per-action decision-class controls (admin-only)."
+    }
   },
   "mij": {
     "title": {

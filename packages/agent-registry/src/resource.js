@@ -26,6 +26,7 @@
  */
 
 import { normaliseProperties } from './profileProperties.js';
+import { normalizeExposure } from './skillExposure.js';
 
 // v3 (identity step 2) — added per-profile `properties` (own/inherit graph) + `ownerFingerprint`
 // (the owner-root binding). Additive + forward-compatible: v2 entries simply lack them (→ {} / null).
@@ -110,6 +111,9 @@ function _normaliseAgent(a) {
     // (what this persona shares, per circle/context). Additive; absent → empty. Shape mirrors
     // @onderling/agent-registry disclosure.js ({ perContext: { ctx: { key: {enabled, rung} } } }).
     disclosure:       _normaliseDisclosure(a.disclosure),
+    // Per-skill EXPOSURE (which skills this agent ADVERTISES, per circle). Additive; absent → nothing
+    // hidden. A discovery filter only — the dispatch grant is the enforcement. → src/skillExposure.js.
+    exposure:         normalizeExposure(a.exposure),
   });
 }
 
@@ -175,5 +179,6 @@ function emptyAgent() {
     properties: {},
     ownerFingerprint: null,
     disclosure: { perContext: {} },
+    exposure: { hidden: [], perCircle: {} },
   };
 }

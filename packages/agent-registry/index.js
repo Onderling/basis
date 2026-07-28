@@ -20,6 +20,14 @@ export {
   own, inherit, normaliseProperties, resolveProperty, effectiveProperties, setOwn, setInherit,
 } from './src/profileProperties.js';
 export { createProfile, profilePubKey, profileCircleAddress } from './src/createProfile.js';
+
+// Per-skill EXPOSURE — which of an agent's skills are advertised, per circle. A discovery FILTER, not
+// access control (the dispatch grant is the enforcement); owner-key gated agent-wide, with circles able
+// to narrow but never widen. → src/skillExposure.js for the reasoning.
+export {
+  EMPTY_EXPOSURE, normalizeExposure, isSkillExposed, filterExposedSkills,
+  setSkillExposure, setCircleSkillExposure,
+} from './src/skillExposure.js';
 export { loadProfile } from './src/loadProfile.js';
 // identity step 5A — encrypted-file/DB export of the profile set
 export { exportProfileRegistry, importProfileRegistry, restoreProfilesInto } from './src/exportRegistry.js';

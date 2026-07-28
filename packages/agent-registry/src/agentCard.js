@@ -12,6 +12,8 @@
  * strongly advised but optional per A2A — the registry doesn't carry
  * them yet, so the card is valid without.
  */
+import { filterExposedSkills } from './skillExposure.js';
+
 
 const CARD_VERSION = '1.0';
 
@@ -21,12 +23,20 @@ const CARD_VERSION = '1.0';
  * de-duplicated union of grant skills and coarse capabilities. Throws INVALID_ARGUMENT when
  * `entry` / `entry.agentId` is missing.
  *
+ * Skills the entry's `exposure` policy HIDES are left off the card — the card is what other people
+ * read, so this is where "hide a skill" takes effect. It is a discovery filter and nothing more: the
+ * grants that authorise a dispatch are unchanged and still listed, because a grant a reader holds is
+ * theirs to know about. Omitting a skill does not stop anyone who knows its id from calling it — the
+ * token check at dispatch does that (→ src/skillExposure.js).
+ *
  * @param {object} entry            — a registry agent entry (v2 shape)
  * @param {object} [opts]
  * @param {string} [opts.owner]     — owner webid/key; defaults to entry.webid
+ * @param {string} [opts.circleId]  — project the card AS SEEN IN this circle (applies that circle's
+ *                                    narrowing on top of the agent-wide policy); omitted → agent-wide
  * @returns {object} frozen A2A agent card
  */
-export function projectAgentCard(entry, { owner } = {}) {
+export function projectAgentCard(entry, { owner, circleId = null } = {}) {
   if (!entry || typeof entry !== 'object') {
     throw Object.assign(
       new Error('projectAgentCard: entry is required'),
@@ -43,11 +53,16 @@ export function projectAgentCard(entry, { owner } = {}) {
   const grants       = Array.isArray(entry.grants)       ? entry.grants       : [];
   const capabilities = Array.isArray(entry.capabilities) ? entry.capabilities : [];
 
-  // Skill ids = dedup union of grant skills + coarse capabilities, sorted.
-  const skillIds = [...new Set([
-    ...grants.map(g => g?.skill).filter(s => typeof s === 'string' && s.length > 0),
-    ...capabilities.filter(c => typeof c === 'string' && c.length > 0),
-  ])].sort();
+  // Skill ids = dedup union of grant skills + coarse capabilities, sorted — minus whatever this
+  // agent's exposure policy hides (agent-wide, plus this circle's own narrowing).
+  const skillIds = filterExposedSkills({
+    skills: [...new Set([
+      ...grants.map(g => g?.skill).filter(s => typeof s === 'string' && s.length > 0),
+      ...capabilities.filter(c => typeof c === 'string' && c.length > 0),
+    ])].sort(),
+    exposure: entry.exposure,
+    circleId,
+  });
 
   const extensionBlock = Object.freeze({
     id:       entry.agentId,

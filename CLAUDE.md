@@ -85,6 +85,11 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
   builder (`buildMeshTransports` → `createMeshAgent`) and the `Peer` façade; discoverability, advertising
   and routing are properties the surface exposes, not knobs an app reaches past it to set. Reaching for a
   transport is the signal that the surface is missing an affordance — add it there.
+- **The enforceability test** (Frits, 2026-07-29): *could someone running a different app version get
+  what they want anyway?* If yes, do NOT present it as enforcement. Everything client-side is a
+  convention — say so, and put the real gate where it holds (the seal, the key, the roster, the relay).
+  A UI that promises what a modified client can ignore is lying to the user, not protecting them.
+  Example: hiding a skill is a discovery FILTER; the grant check at dispatch is the enforcement.
 - **An idea is only dropped when Frits drops it.** Silence is not rejection. If you raise an option, a
   caveat, or a finding and it goes unanswered, it stays OPEN — carry it into the design/plan doc as an open
   item rather than quietly dropping it because the conversation moved on. When a thread has accumulated more

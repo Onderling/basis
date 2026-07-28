@@ -24,13 +24,18 @@
  * @param {number}  [opts.mdnsTimeoutMs=6000]   — mDNS pre-connect timeout
  * @param {string}  [opts.hostnamePrefix='dw']  — mDNS hostname prefix (`<prefix>-<pubKey[0..8]>`)
  * @param {object}  [opts.permissions]          — pre-fetched perms (skips a second prompt); else requested here
+ * @param {string}  [opts.bleDiscoverability='browse'] — BLE's OWN initial state, defaulting TIGHTER than
+ *   the rest (Nearby step J / R1+R2). mDNS is confined to a LAN; BLE advertising has no boundary, so it
+ *   must be asked for rather than inherited.
  * @param {string}  [opts.discoverability='browse+publish'] — the initial discovery state (Nearby step A).
  *   Both consumers get a `discoverability` CONTROL back, which is the one surface an app may use to change
  *   it later — never the transports directly (`CLAUDE.md`).
  * @returns {Promise<{ mdns, ble, relay, perms, discoverability, nearbyPeers }>}
  */
 import { RelayTransport }                             from '@onderling/transports';
-import { DISCOVERABILITY, createDiscoverabilityControl, createNearbyPeerSource } from '@onderling/core';
+import {
+  DISCOVERABILITY, DISCOVERABILITY_ORDER, createDiscoverabilityControl, createNearbyPeerSource,
+} from '@onderling/core';
 
 import { MdnsTransport }          from './transport/MdnsTransport.js';
 import { BleTransport }           from './transport/BleTransport.js';
@@ -44,6 +49,7 @@ export async function buildMeshTransports({
   hostnamePrefix = 'dw',
   permissions,
   discoverability = DISCOVERABILITY.PUBLISH,
+  bleDiscoverability = DISCOVERABILITY.BROWSE,
 } = {}) {
   if (!identity?.pubKey) {
     throw new TypeError('buildMeshTransports: an identity with a pubKey is required');
@@ -70,14 +76,28 @@ export async function buildMeshTransports({
     }
   }
 
+  // Hoisted: the initial per-transport apply below needs it, and BLE may fail to construct.
+  const bleState = DISCOVERABILITY_ORDER.includes(bleDiscoverability)
+    ? bleDiscoverability
+    : DISCOVERABILITY.BROWSE;
+
   let ble = null;
   if (enableBle && perms?.ble) {
     try {
-      // The initial halves come from the requested state; the control below owns every change after that.
+      // BLE gets its OWN state, and it defaults TIGHTER (Nearby step J).
+      //
+      // mDNS is confined to a LAN, so "publish" there means visible to people who already joined this
+      // network. A BLE advertisement has no boundary: it reaches the flat upstairs, the pavement outside,
+      // and any passive scanner in range — including people in no room at all. Inheriting the general
+      // `discoverability` would mean a phone beacons from boot because a mesh demo wanted to be findable.
+      //
+      // So BLE advertises only when a caller asks for it by name. The surface can still raise it later —
+      // this is the resting state, not a ceiling.
       ble = new BleTransport({
         identity,
-        advertise: discoverability === DISCOVERABILITY.PUBLISH,
-        scan:      discoverability !== DISCOVERABILITY.OFF,
+        advertise: bleState === DISCOVERABILITY.PUBLISH,
+        // …but never scan when the overall state is off: an off device does not listen either.
+        scan:      bleState !== DISCOVERABILITY.OFF && discoverability !== DISCOVERABILITY.OFF,
       });
     } catch (e) {
       _warn('BleTransport init failed:', e);
@@ -119,7 +139,14 @@ export async function buildMeshTransports({
 
   // Reflect what construction already did, so `control.state` is truthful before anyone calls `set()`.
   // mDNS was pre-connected above (publishing); BLE's halves were passed to its constructor.
-  await control.set(discoverability);
+  //
+  // Applied per transport, because BLE's resting state is deliberately tighter than the rest and a single
+  // `control.set(discoverability)` would raise it straight back to publishing — undoing the whole point.
+  // Optional-called: a transport that predates the discoverability port (or a test double) simply has no
+  // such method, and must not break boot for it.
+  try { await mdns?.setDiscoverability?.(discoverability); } catch (e) { _warn('mDNS discoverability:', e); }
+  try { await ble?.setDiscoverability?.(bleState); }         catch (e) { _warn('BLE discoverability:', e); }
+  control.refresh();
 
   // Who is around, merged across every discovering transport. Built here for the same reason the
   // discoverability control is: an app must not reach into one adapter to answer a question the surface

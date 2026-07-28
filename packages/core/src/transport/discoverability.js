@@ -195,6 +195,24 @@ export function createDiscoverabilityControl({ transports, onChange = null, onDe
       return report;
     },
 
+    /**
+     * Recompute from what the transports currently ARE, without applying anything.
+     *
+     * Needed because a caller may set transports individually — Nearby step J does exactly that, since
+     * BLE's resting state is deliberately tighter than the rest and one blanket `set()` would raise it
+     * straight back to publishing. Without this the surface would report a state nobody is in.
+     */
+    refresh() {
+      const named = Object.entries(transports() ?? {}).filter(([, t]) => t && t.supportsDiscoverability);
+      perTransport = named.map(([name, t]) => ({
+        name, ok: true, requested, effective: t.discoverability, degraded: false,
+      }));
+      effective = perTransport.reduce((acc, r) => maxExposure(acc, r.effective), DISCOVERABILITY.OFF);
+      const report = buildReport();
+      notify(onChange, report);
+      return report;
+    },
+
     /** What the device is ACTUALLY doing, across all transports. */
     get state() { return effective; },
 

@@ -7,6 +7,7 @@
  * module is absent / pre-connect times out / a ctor throws — never aborting.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
 
 // ── Mock MdnsTransport (+ isAvailable) ────────────────────────────────────────
 const mdnsState = { available: true, connectImpl: async () => {} };
@@ -62,9 +63,29 @@ describe('buildMeshTransports', () => {
     expect(mdns).toBeTruthy();
     expect(mdns.hostname).toBe('dw-PUBKEY_a');          // `<prefix>-<pubKey[0..8]>`
     expect(ble).toBeTruthy();
-    expect(ble.advertise && ble.scan).toBe(true);
+    // CHANGED deliberately (Nearby step J, R1): BLE now SCANS but does not ADVERTISE by default. A BLE
+    // advertisement has no network boundary, so it is opted into rather than inherited.
+    expect(ble.scan).toBe(true);
+    expect(ble.advertise).toBe(false);
     expect(relay).toBeTruthy();
     expect(perms.ble).toBe(true);
+  });
+
+  it('advertises over BLE only when asked for BY NAME', async () => {
+    const { ble } = await buildMeshTransports({ identity, bleDiscoverability: 'browse+publish' });
+    expect(ble.advertise).toBe(true);
+    expect(ble.scan).toBe(true);
+  });
+
+  it('a general browse+publish does NOT raise BLE — that is the whole point', async () => {
+    const { ble } = await buildMeshTransports({ identity, discoverability: 'browse+publish' });
+    expect(ble.advertise).toBe(false);
+  });
+
+  it('an OFF overall state stops BLE listening too', async () => {
+    const { ble } = await buildMeshTransports({ identity, discoverability: 'off' });
+    expect(ble.scan).toBe(false);
+    expect(ble.advertise).toBe(false);
   });
 
   it('honours a custom hostnamePrefix', async () => {
@@ -117,3 +138,22 @@ describe('buildMeshTransports', () => {
     await expect(buildMeshTransports({ identity: {} })).rejects.toThrow(/pubKey/);
   });
 });
+
+describe('BLE defaults TIGHTER than the rest (Nearby step J, R1+R2)', () => {
+  // mDNS is confined to a LAN; a BLE advertisement has no boundary — it reaches the flat upstairs, the
+  // pavement outside, and any passive scanner in range. Inheriting the general `discoverability` would
+  // mean a phone beacons from boot because a mesh demo wanted to be findable.
+  it('is documented as an explicit opt-in, not an inherited state', () => {
+    const src = readFileSync(new URL('../src/buildMeshTransports.js', import.meta.url), 'utf8');
+    expect(src).toMatch(/bleDiscoverability\s*=\s*DISCOVERABILITY\.BROWSE/);
+    // advertise must be derived from BLE's OWN state, never from the general one.
+    expect(src).toMatch(/advertise:\s*bleState === DISCOVERABILITY\.PUBLISH/);
+    expect(src).not.toMatch(/advertise:\s*discoverability === DISCOVERABILITY\.PUBLISH/);
+  });
+
+  it('an OFF overall state still stops BLE scanning', () => {
+    const src = readFileSync(new URL('../src/buildMeshTransports.js', import.meta.url), 'utf8');
+    expect(src).toMatch(/discoverability !== DISCOVERABILITY\.OFF/);
+  });
+});
+

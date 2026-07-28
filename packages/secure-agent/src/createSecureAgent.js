@@ -1533,6 +1533,17 @@ export async function createSecureAgent(opts = {}) {
       get address() { return relayState.address; },
       get url()     { return relayState.url;     },
       get error()   { return relayState.error;   },
+      // G13 — the alias half of the transport PORT, surfaced here so a host registers per-circle
+      // addresses through the facade it already holds instead of reaching for the transport (the
+      // anti-pattern the surface rule exists to stop). Quacks like the port: `registerCircleAddresses`
+      // accepts this object unchanged. Before connect: no aliases, adds report not-connected — and the
+      // port KEEPS a failed bind for replay, so an early add is deferred, not lost.
+      get supportsAliases() { return relayTransport?.supportsAliases ?? false; },
+      get addresses()       { return relayTransport?.addresses ?? []; },
+      addAddress: (a) => (relayTransport
+        ? relayTransport.addAddress(a)
+        : Promise.resolve({ ok: false, reason: 'not-connected' })),
+      removeAddress: (a) => { try { relayTransport?.removeAddress(a); } catch { /* best-effort */ } },
     },
     get transportMode() { return transportMode; },
     setTransportMode,

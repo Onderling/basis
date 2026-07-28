@@ -62,6 +62,7 @@ import { createTokenGate } from '../../src/v2/tokenGate.js';
 import { circleGateRules } from '../../src/v2/circleGate.js';
 import { interpretToCommand } from '../../src/v2/interpretCommand.js';
 import { createRelayPrefStore, localStorageRelayIo, resolveRelayUrl } from '../../src/v2/relayPref.js';
+import { registerCircleAddresses, unregisterCircleAddresses } from '../../src/v2/circleAddressRegistration.js';
 import {
   createConnectionPoints, adoptExistingRelay, localStorageConnectionPointsIo,
 } from '../../src/v2/connectionPoints.js';
@@ -770,9 +771,38 @@ async function tryConnectPeerTransport(agent, peerMessageRouter) {
     });
     const routes = [nknLib && 'nkn', CIRCLE_RELAY_URL && 'relay'].filter(Boolean).join(' + ');
     console.info(`[circleApp] peer transport connected (${routes}, routed) + rendezvous`);
+    registerCirclePresence(agent);   // G13 — fire-and-forget; see the helper for why boot never waits
   } catch (err) {
     console.warn('[circleApp] peer connect failed — kring chat is local-only:', err?.message ?? err);
   }
+}
+
+// G13 — register this device's per-circle addresses on the connected relay, SCOPED to the relay-diversity
+// rule (docs/decisions.md): a circle's address goes only to relays that circle rides, so relays that don't
+// share a circle can never link two of someone's addresses. Fire-and-forget BY DESIGN, never awaited by
+// boot: registering is harmless before the `preferCircleAddress` flip (the A/B-parallel design), the port
+// replays aliases on reconnect of the same socket, `applyRelayUrl`'s NEW socket re-runs this via
+// tryConnectPeerTransport, and the relay holds messages sent to a not-yet-registered address and drains
+// them per registration — so nothing is lost to timing. Same principle as the reachability oracle:
+// an enhancement, not a boot dependency.
+//
+// Called on connect (circlesCache may still be empty then — the post-load call covers it) and again once
+// circles are known / change. Idempotent, so calling twice is free.
+function registerCirclePresence(agent = _peerAgent) {
+  if (!CIRCLE_RELAY_URL || !agent?.relay?.supportsAliases) return;
+  const points = getConnectionPoints();
+  const circlesForPoint = (url) => points.circlesFor(url);
+  circlesForPoint.pointsFor = (cid) => points.pointsFor(cid);   // the reverse view the scoper duck-types
+  registerCircleAddresses({
+    transport: agent.relay,   // the facade quacks like the port's alias half — never the transport itself
+    relayUrl: CIRCLE_RELAY_URL,
+    circleIds: circlesCache.map((c) => c?.id).filter(Boolean),
+    circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
+    circlesForPoint,
+    // The relay this device connects to IS the deployment default — unmapped circles land here alone.
+    defaultRelayUrl: CIRCLE_RELAY_URL,
+    onError: (err, cid) => console.warn(`[circleApp] circle-address register failed (${cid}):`, err?.message ?? err),
+  }).catch((err) => console.warn('[circleApp] circle-address registration failed:', err?.message ?? err));
 }
 
 // In-app relay setting (Settings → Mij): persist the URL, update the resolved value, and RECONNECT the
@@ -3078,6 +3108,14 @@ async function onLeaveCircle(id, circle) {
   }
   try { circlesCache = await loadCircles(sources); }
   catch { /* keep cache */ }
+  // J-R4 — the relay a left circle rode stops receiving its registration, and learns nothing else.
+  // Best-effort: on a dead socket the facade no-ops, and the next boot simply won't re-register it.
+  try {
+    await unregisterCircleAddresses({
+      transport: _peerAgent?.relay, circleIds: [id],
+      circleAddressFor: (cid) => _peerAgent?.circleAddressFor?.(cid) ?? null,
+    });
+  } catch { /* best-effort */ }
   // Drop the pin if the circle is gone — the map otherwise keeps a
   // dangling key that the partition would happily filter out anyway,
   // but cleanup keeps storage tidy.
@@ -3811,7 +3849,7 @@ async function showJoinCircle(inviteArg) {
       if (gid && decodedInvite?.podBacked === true && typeof decodedInvite?.podUrl === 'string') {
         try { getConnectionPoints().addPodPoint(decodedInvite.podUrl, gid); } catch { /* best-effort */ }
       }
-      try { circlesCache = await loadCircles(sources); showLauncher(); } catch { /* */ }
+      try { circlesCache = await loadCircles(sources); registerCirclePresence(); showLauncher(); } catch { /* */ }
     },
   });
 }
@@ -4461,7 +4499,7 @@ function openCreateCircleWizard() {
     onDispatched: async (reply) => {
       const gid = reply?.groupId ?? null;
       if (gid) { try { await feedHouseholdRosterForCircle?.(gid); } catch { /* best-effort */ } }
-      try { circlesCache = await loadCircles(sources); showLauncher(); } catch { /* keep current view */ }
+      try { circlesCache = await loadCircles(sources); registerCirclePresence(); showLauncher(); } catch { /* keep current view */ }
     },
   });
 }
@@ -6748,6 +6786,7 @@ async function boot() {
 
   try {
     circlesCache = await loadCircles(sources);
+    registerCirclePresence();   // G13 — the connect-time call may have run before circles were known
   } catch (err) {
     console.warn('[circleApp] loadCircles failed', err);
     circlesCache = [];

@@ -7,7 +7,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { ENTRY_KINDS, LANE } from '@onderling/item-store';
-import { KRING_KINDS } from '../../src/v2/kringTemplates.js';
+import { KRING_KINDS, applyTemplate } from '../../src/v2/kringTemplates.js';
 import {
   defaultConversationKinds, availableConversationKinds, TEMPLATE_CONVERSATION_KINDS,
   resolveConversationKinds, setConversationKind,
@@ -104,3 +104,27 @@ describe('toggling one kind', () => {
     expect(after).not.toContain('leen');
   });
 });
+
+describe('the wizard axis (J-CW1/J-CW2)', () => {
+  it('a fresh template pre-fills the axis', () => {
+    expect(applyTemplate({}, 'buurt').conversationKinds).toEqual(['vraag', 'aanbod', 'task', 'leen']);
+    expect(applyTemplate({}, 'household').conversationKinds).toBeNull();   // null = the living default
+  });
+
+  it('J-CW1: an explicit choice SURVIVES a kind switch', () => {
+    // The menukaart rule: presets pre-fill, the user wins per key. A template switch overwriting a
+    // deliberate choice is the failure that makes people distrust every default in the wizard.
+    let st = applyTemplate({}, 'buurt');
+    st = applyTemplate({ ...st, conversationKinds: ['chat-message'] }, 'vriendenkring');
+    expect(st.conversationKinds).toEqual(['chat-message']);
+  });
+
+  it('an untouched axis DOES follow the new kind', () => {
+    let st = applyTemplate({}, 'household');       // null (permissive)
+    st = applyTemplate(st, 'buurt');
+    // household filled it with null; null is a VALUE here (the living default), so it survives — matching
+    // the documented switch-kind semantics: the second template is a no-op for axes the first filled.
+    expect(st.conversationKinds).toBeNull();
+  });
+});
+

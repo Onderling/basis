@@ -25,7 +25,15 @@
  * user made along the way (even by virtue of an earlier template) and
  * avoids surprise overwrites.  Design call documented inline below.
  */
+// ── These templates ARE the "menukaart" for circles ─────────────────────────────────────────────────────
+// The concept comes from the strategy side (proces_en_menukaart: one stack, many configurations; a
+// deployment picks from a card of options, and the recurring scenarios are PRESET MENUS). Applied here:
+// the policy axes in `circlePolicy.js` are the card ("the menukaart, per-circle" — its own words for
+// storagePosture), a KIND below is a preset menu, and the create wizard is the serving surface. Two rules
+// carry over from the concept: presets only pre-fill — every axis stays tunable, the user wins per key —
+// and some things are NOT on the card at all (invariants ship regardless of kind).
 import { CIRCLE_FEATURES, CIRCLE_POLICY_ENUMS } from './circlePolicy.js';
+import { TEMPLATE_CONVERSATION_KINDS } from './conversationKinds.js';
 
 /**
  * @typedef {{
@@ -158,6 +166,14 @@ export function applyTemplate(state, kind) {
     llmTool:           s.llmTool           !== undefined ? s.llmTool           : t.llmTool,
     agents:            s.agents            !== undefined ? s.agents            : t.agents,
     consensusRequired: s.consensusRequired !== undefined ? s.consensusRequired : t.consensusRequired,
+    // Conversation kinds (2026-07-28) — what this circle's conversation will SHOW. One more item on the
+    // menukaart, same rule as the rest: the template pre-fills, the user's explicit choice survives a
+    // kind switch. The default lives in `conversationKinds.js` (TEMPLATE_CONVERSATION_KINDS), keyed by
+    // kind, so this only resolves it when the user has not chosen. `null` means "the permissive default,
+    // whatever the registry says by then" — deliberately not a frozen copy of today's list.
+    conversationKinds: s.conversationKinds !== undefined
+      ? s.conversationKinds
+      : (TEMPLATE_CONVERSATION_KINDS[kind] ?? null),
   };
 }
 

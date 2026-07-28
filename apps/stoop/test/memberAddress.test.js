@@ -165,3 +165,23 @@ describe('the per-user fallback setting (2026-07-28)', () => {
   });
 });
 
+describe('the reporter hands the STRUCTURED report to the offer (2026-07-28)', () => {
+  it('onReport receives the raw info — including `blocked` — post-dedup', () => {
+    const onReport = vi.fn();
+    const reporter = makeFallbackReporter(() => {}, { onReport });
+    reporter({ circleId: 'c1', webid: 'w1', via: 'blocked-by-setting', blocked: true });
+    reporter({ circleId: 'c1', webid: 'w1', via: 'blocked-by-setting', blocked: true });   // dedup
+    reporter({ circleId: 'c1', webid: 'w2', via: 'pubkey' });
+
+    expect(onReport).toHaveBeenCalledTimes(2);
+    // `blocked` survives — the console string drops it, and the offer needs exactly that field.
+    expect(onReport.mock.calls[0][0]).toMatchObject({ blocked: true, webid: 'w1' });
+    expect(onReport.mock.calls[1][0].blocked).toBeUndefined();
+  });
+
+  it('a throwing offer hook never breaks a send', () => {
+    const reporter = makeFallbackReporter(() => {}, { onReport: () => { throw new Error('bad hook'); } });
+    expect(() => reporter({ circleId: 'c', webid: 'w', via: 'pubkey' })).not.toThrow();
+  });
+});
+

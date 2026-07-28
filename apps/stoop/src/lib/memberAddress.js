@@ -106,12 +106,17 @@ function report(onFallback, info) {
  * @param {(msg: string) => void} [sink]
  * @returns {(info: {circleId, webid, via}) => void}
  */
-export function makeFallbackReporter(sink = (msg) => console.info(msg)) {
+export function makeFallbackReporter(sink = (msg) => console.info(msg), { onReport = null } = {}) {
   const seen = new Set();
-  return function reportFallback({ circleId, webid, via }) {
+  return function reportFallback(info) {
+    const { circleId, webid, via } = info ?? {};
     const key = `${circleId ?? '?'}\n${webid ?? '?'}\n${via}`;
     if (seen.has(key)) return;
     seen.add(key);
+    // The STRUCTURED report, post-dedup — this is what the fallback OFFER consumes (`addressFallback.js`).
+    // The console line below loses `blocked`, and the offer needs exactly that field: a `blocked` report
+    // means the per-user setting cost someone a message, which is the only thing worth offering about.
+    try { onReport?.({ ...info }); } catch { /* an offer hook must never break a send */ }
     sink(`[addressing] G13 fallback: circle=${circleId ?? '?'} member=${String(webid ?? '?').slice(0, 16)}… `
       + `reached via ${via} (no per-circle address). Step D cannot drop the fallback while this appears.`);
   };

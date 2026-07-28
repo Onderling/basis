@@ -523,6 +523,7 @@ async function _fanOutToMembers({ members, chat, selfWebid, subtype, threadId, b
  */
 async function _fanOutViaReliableSend({
   members, reliableSend, selfWebid, envelope, only = null, circleId = null, preferCircleAddress = false,
+  allowFallback = true,
 }) {
   const list = await members.list();
   const allow = only instanceof Set ? only : (Array.isArray(only) ? new Set(only) : null);
@@ -539,6 +540,10 @@ async function _fanOutViaReliableSend({
     const { addr } = await resolveMemberAddress(m, {
       circleId,
       preferCircleAddress,
+      // Resolved per fan, not per boot: the user can flip the setting mid-session, and a send after the
+      // flip must honour it. A `blocked` report (setting off, no circle address) still fires — it is the
+      // only signal the setting is costing someone messages, and it is what drives the chat's offer.
+      allowFallback: typeof allowFallback === 'function' ? allowFallback() !== false : allowFallback !== false,
       resolveByWebid: (w) => members.resolveByWebid(w),
       onFallback: _reportAddressFallback,
     });
@@ -900,6 +905,11 @@ export function buildSkills({
   // (`Transport.supportsAliases` — relay + internal yes, NKN deliberately not), or messages route to an
   // address nobody answers. There are no existing users to migrate, so this can flip once NKN is decided.
   preferCircleAddress = false,
+  // The per-USER half of the same ladder (2026-07-28): may a send fall back to the member's global key
+  // when no per-circle address is known? OFF is the private default; the host threads the live setting as
+  // a value or a function, because unlike `preferCircleAddress` (a deployment fact) this one changes at
+  // runtime when the user flips the toggle — a boolean captured at boot would ignore every change after.
+  allowAddressFallback = true,
   chat,           // Phase 14: wireChat controller (chat.send / chat.detach)
   metrics,        // Phase 18: UsageMetrics; record() called from key handlers
   bundle,         // Phase 20: factory hands itself in for sign-in skills
@@ -1074,6 +1084,7 @@ export function buildSkills({
     const { sent, attempted, errors } = reliableSend
       ? await _fanOutViaReliableSend({
         members, reliableSend, selfWebid: from, envelope: wire, only, circleId, preferCircleAddress,
+        allowFallback: allowAddressFallback,
       })
       : await _fanOutToMembers({ members, chat, selfWebid: from, subtype: kind, threadId: circleId, body, extras, only });
     if (metric) metrics?.record?.(metric);

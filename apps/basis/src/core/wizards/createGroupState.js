@@ -317,6 +317,15 @@ export function encodeMembershipCodeUrl(result) {
     // signal; the join wizard turns it into the visible pre-checked share-offerings default. Only
     // ever an explicit true; absent on older invites / non-matching circles (default-withhold).
     ...(result.offeringsMatching === true ? { offeringsMatching: true } : {}),
+    // NKN+pod circle (J-NP3) — the pod disclosure + its url must ride the WIRE, not just the invite
+    // object: this encoder whitelists, and until 2026-07-28 it silently DROPPED both fields, so a
+    // joiner from a real pasted/scanned URI never saw the disclosure the object-path tests proved.
+    // Url only ever beside the flag (a pod url on a non-pod invite is noise claiming to be a place).
+    ...(result.podBacked === true ? { podBacked: true } : {}),
+    ...(result.podBacked === true && typeof result.podUrl === 'string' ? { podUrl: result.podUrl } : {}),
+    // The RELAY endpoint (invite-carries-endpoint decision) — how a pasted-invite joiner learns where
+    // the circle lives; rule 1 records it on their device at join.
+    ...(typeof result.relayUrl === 'string' ? { relayUrl: result.relayUrl } : {}),
   };
   const json = JSON.stringify(payload);
   if (typeof globalThis.btoa !== 'function') return `stoop-invite://${json}`;

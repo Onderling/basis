@@ -271,6 +271,30 @@ function isUrl(url, kind = POINT_KIND.RELAY) {
     : /^wss?:\/\/\S+$/.test(url.trim());
 }
 
+/**
+ * Rule 1, applied to a JOIN — record the joined circle's connection point(s) from what the invite
+ * carried: its pod (`podBacked`+`podUrl`) and/or its relay (`relayUrl`). One helper so web and mobile
+ * record identically (invariants #1/#2). Best-effort by design: the list is a convenience — a malformed
+ * or missing url adds nothing and must never break a join. Returns which kinds were recorded.
+ *
+ * @param {object} a
+ * @param {object} a.store     a `createConnectionPoints` store.
+ * @param {object} a.invite    the DECODED invite (`podBacked`/`podUrl`/`relayUrl` are the fields read).
+ * @param {string} a.circleId  the joined circle.
+ * @returns {{recorded: Array<'pod'|'relay'>}}
+ */
+export function recordJoinedCirclePoints({ store, invite, circleId } = {}) {
+  const recorded = [];
+  if (!store || !invite || !circleId) return { recorded };
+  if (invite.podBacked === true && typeof invite.podUrl === 'string') {
+    try { if (store.addPodPoint(invite.podUrl, circleId)?.ok) recorded.push('pod'); } catch { /* best-effort */ }
+  }
+  if (typeof invite.relayUrl === 'string') {
+    try { if (store.addFromJoin(invite.relayUrl, circleId)?.ok) recorded.push('relay'); } catch { /* best-effort */ }
+  }
+  return { recorded };
+}
+
 // ── Persistence + migration ─────────────────────────────────────────────────
 
 const POINTS_STORAGE_KEY = 'cc.connectionPoints';

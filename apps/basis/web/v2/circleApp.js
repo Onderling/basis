@@ -64,7 +64,7 @@ import { interpretToCommand } from '../../src/v2/interpretCommand.js';
 import { createRelayPrefStore, localStorageRelayIo, resolveRelayUrl } from '../../src/v2/relayPref.js';
 import { registerCircleAddresses, unregisterCircleAddresses } from '../../src/v2/circleAddressRegistration.js';
 import {
-  createConnectionPoints, adoptExistingRelay, localStorageConnectionPointsIo,
+  createConnectionPoints, adoptExistingRelay, localStorageConnectionPointsIo, recordJoinedCirclePoints,
 } from '../../src/v2/connectionPoints.js';
 import { renderConnectionPoints } from './circleConnectionPoints.js';
 import { createCircleDispatch, addressesBot } from '../../src/v2/circleDispatch.js';
@@ -3839,12 +3839,13 @@ async function showJoinCircle(inviteArg) {
         try { await overrideStore.update(gid, { capabilityOptOuts: reply.capabilityOptOuts }); }
         catch { /* best-effort — a failed prefs write must not break the join */ }
       }
-      // NKN+pod circle, rule 1 — joining a pod-backed circle records its POD as the circle's connection
-      // point (J-NP1), so "what breaks if I remove this" has an answer for circles with no relay. The
-      // invite carried the url; a join without it simply adds nothing (the list is a convenience — it
-      // must never block a join).
-      if (gid && decodedInvite?.podBacked === true && typeof decodedInvite?.podUrl === 'string') {
-        try { getConnectionPoints().addPodPoint(decodedInvite.podUrl, gid); } catch { /* best-effort */ }
+      // Rule 1 — record the joined circle's connection point(s) from what the invite carried: its POD
+      // (J-NP1) and/or its RELAY (the invite-carries-endpoint decision — a pasted invite has no
+      // deep-link context to learn the relay from). Shared recorder, so mobile records identically.
+      // Best-effort: the list is a convenience — it must never block a join.
+      if (gid && decodedInvite) {
+        try { recordJoinedCirclePoints({ store: getConnectionPoints(), invite: decodedInvite, circleId: gid }); }
+        catch { /* best-effort */ }
       }
       try { circlesCache = await loadCircles(sources); registerCirclePresence(); showLauncher(); } catch { /* */ }
     },
@@ -3877,6 +3878,14 @@ async function showCircleInvite(circleId) {
   try { inviteStorage = await loadCircleStoragePod({ callSkill: rawCallSkill, circleId }); }
   catch { inviteStorage = null; }
   const invitePodBacked = inviteStorage?.pod === 'shared' || inviteStorage?.pod === 'hybrid';
+  // The RELAY endpoint (invite-carries-endpoint decision): the relay THIS circle rides per the
+  // connection-points mapping, else the device's live relay. A pasted invite has no deep-link context,
+  // so this is how the joiner learns where the circle lives; rule 1 records it on their device at join.
+  let inviteRelayUrl = null;
+  try {
+    const relayPoint = getConnectionPoints().pointsFor(circleId).find((p) => (p?.kind ?? 'relay') === 'relay');
+    inviteRelayUrl = relayPoint?.url ?? CIRCLE_RELAY_URL ?? null;
+  } catch { inviteRelayUrl = CIRCLE_RELAY_URL ?? null; }
   let r;
   try {
     r = await buildCircleInviteUri({
@@ -3886,6 +3895,7 @@ async function showCircleInvite(circleId) {
       offeringsMatching: inviteOfferingsMatching,
       podBacked: invitePodBacked,
       podUrl:    invitePodBacked ? (inviteStorage?.groupPodUri ?? null) : null,
+      relayUrl:  inviteRelayUrl,
     });
   }
   catch { r = { error: 'failed' }; }

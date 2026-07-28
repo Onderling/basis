@@ -48,6 +48,35 @@ describe('buildCircleInviteUri', () => {
     expect(decoded.apps).toEqual(['tasks']);
   });
 
+  it('the pod disclosure rides the ENCODED URI, not just the invite object (the encoder-whitelist bug)', async () => {
+    const callSkill = vi.fn(async (app, op) =>
+      (op === 'getCurrentMembershipCode' ? { code: 'C', expiresAt: 1 } : {}));
+    const decode = (uri) => JSON.parse(Buffer.from(
+      uri.replace(/^stoop-invite:\/\//, '').replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString());
+    // encodeMembershipCodeUrl WHITELISTS fields; until 2026-07-28 it dropped podBacked/podUrl, so a
+    // real pasted/scanned invite never carried the J-NP3 disclosure the object-path tests proved.
+    const r = await buildCircleInviteUri({
+      callSkill, circleId: 'c', podBacked: true, podUrl: 'https://pod.example/circles/c',
+    });
+    const d = decode(r.uri);
+    expect(d.podBacked).toBe(true);
+    expect(d.podUrl).toBe('https://pod.example/circles/c');
+  });
+
+  it('carries the RELAY endpoint when passed; junk or absent relay stays off the invite', async () => {
+    const callSkill = vi.fn(async (app, op) =>
+      (op === 'getCurrentMembershipCode' ? { code: 'C', expiresAt: 1 } : {}));
+    const decode = (uri) => JSON.parse(Buffer.from(
+      uri.replace(/^stoop-invite:\/\//, '').replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString());
+    // a pasted invite has no deep-link context — the relay endpoint must ride the invite itself (rule 1).
+    const withRelay = await buildCircleInviteUri({ callSkill, circleId: 'c', relayUrl: ' wss://relay.example ' });
+    expect(decode(withRelay.uri).relayUrl).toBe('wss://relay.example');   // trimmed
+    for (const bad of [null, '', 'https://not-a-socket', 'relay.example']) {
+      const r = await buildCircleInviteUri({ callSkill, circleId: 'c', relayUrl: bad });
+      expect('relayUrl' in decode(r.uri)).toBe(false);
+    }
+  });
+
   it('B/S4 — omits the template when there is none (invite unchanged for un-configured circles)', async () => {
     const callSkill = vi.fn(async (app, op) =>
       (op === 'getCurrentMembershipCode' ? { code: 'C', expiresAt: 1 } : {}));

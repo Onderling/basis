@@ -8,7 +8,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   createConnectionPoints, POINT_SOURCE, POINT_KIND, adoptExistingRelay,
-  localStorageConnectionPointsIo, asyncStorageConnectionPointsIo,
+  localStorageConnectionPointsIo, asyncStorageConnectionPointsIo, recordJoinedCirclePoints,
 } from '../../src/v2/connectionPoints.js';
 
 const A = 'wss://a.example';
@@ -339,3 +339,37 @@ describe('the pod as a connection point (NKN+pod circle, J-NP1/J-NP6)', () => {
   });
 });
 
+// ── Rule 1 on a JOIN — the shared recorder both shells call ─────────────────────────────────────────
+describe('recordJoinedCirclePoints', () => {
+  const POD = 'https://pod.example/circles/c1';
+
+  it('records the pod AND the relay the invite carried', () => {
+    const cp = build();
+    const out = recordJoinedCirclePoints({ store: cp, invite: { podBacked: true, podUrl: POD, relayUrl: A }, circleId: 'c1' });
+    expect(out.recorded.sort()).toEqual(['pod', 'relay']);
+    expect(cp.list().map((p) => p.url).sort()).toEqual([POD, A].sort());
+    expect(cp.circlesFor(A)).toContain('c1');       // G13 scoping reads this mapping
+    expect(cp.circlesFor(POD)).toContain('c1');
+  });
+
+  it('relay-only invite records just the relay; pod fields absent add nothing', () => {
+    const cp = build();
+    const out = recordJoinedCirclePoints({ store: cp, invite: { relayUrl: B }, circleId: 'c2' });
+    expect(out.recorded).toEqual(['relay']);
+    expect(cp.list()).toHaveLength(1);
+  });
+
+  it('a podUrl WITHOUT podBacked is not recorded (the invite contract: url only ever beside the flag)', () => {
+    const cp = build();
+    const out = recordJoinedCirclePoints({ store: cp, invite: { podUrl: POD }, circleId: 'c3' });
+    expect(out.recorded).toEqual([]);
+    expect(cp.list()).toHaveLength(0);
+  });
+
+  it('malformed urls + a missing store are safe no-ops (a join must never break on this)', () => {
+    const cp = build();
+    expect(recordJoinedCirclePoints({ store: cp, invite: { relayUrl: 'http://not-a-socket', podBacked: true, podUrl: 'ftp://x' }, circleId: 'c4' }).recorded).toEqual([]);
+    expect(recordJoinedCirclePoints({ invite: { relayUrl: A }, circleId: 'c4' }).recorded).toEqual([]);
+    expect(recordJoinedCirclePoints({ store: cp, circleId: 'c4' }).recorded).toEqual([]);
+  });
+});

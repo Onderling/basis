@@ -47,7 +47,7 @@ import { initialState, decodeInvite, finalSubmit, existingSelvesFrom, setLinkCho
  *           capabilities?:object|null, apps?:string[]|null, offeringsMatching?:boolean|null }} a
  * @returns {Promise<{uri:string, expiresAt?:number} | {error:string}>}
  */
-export async function buildCircleInviteUri({ callSkill, circleId, adminPeerAddr = null, adminNknAddr = null, capabilities = null, apps = null, offeringsMatching = null, podBacked = null, podUrl = null } = {}) {
+export async function buildCircleInviteUri({ callSkill, circleId, adminPeerAddr = null, adminNknAddr = null, capabilities = null, apps = null, offeringsMatching = null, podBacked = null, podUrl = null, relayUrl = null } = {}) {
   if (typeof callSkill !== 'function' || !circleId) return { error: 'missing-args' };
   let res;
   try { res = await callSkill('stoop', 'getCurrentMembershipCode', { groupId: circleId }); }
@@ -87,6 +87,12 @@ export async function buildCircleInviteUri({ callSkill, circleId, adminPeerAddr 
     // ever alongside `podBacked` — a pod URL on a non-pod invite would be noise claiming to be a place.
     ...(podBacked === true && typeof podUrl === 'string' && /^https:\/\/\S+$/.test(podUrl)
       ? { podUrl } : {}),
+    // …and the RELAY endpoint (the same invite-carries-endpoint decision, the relay case): a pasted
+    // invite has no deep-link context, so without this the joiner reaches the circle only if their
+    // device happens to ride the same default relay. Rule 1 (join populates the connection-point list)
+    // needs the url ON the invite. Additive: older invites simply omit it.
+    ...(typeof relayUrl === 'string' && /^wss?:\/\/\S+$/.test(relayUrl.trim())
+      ? { relayUrl: relayUrl.trim() } : {}),
   };
   return { uri: encodeMembershipCodeUrl(invite), expiresAt };
 }

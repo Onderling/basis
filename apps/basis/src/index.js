@@ -196,7 +196,7 @@ export {
 // γ.3 — recipe conflict detection + resolution (Phase 9 sync absorption).
 export { detectRecipeConflicts, applyResolution } from './v2/recipeConflict.js';
 // γ.4 — rules-doc + circle-policy conflict detection + resolution (same flow).
-export { detectRulesConflicts,  applyRulesResolution  } from './v2/rulesConflict.js';
+export { detectRulesConflicts,  applyRulesResolution, decisionsForMerges } from './v2/rulesConflict.js';
 export { detectPolicyConflicts, applyPolicyResolution } from './v2/policyConflict.js';
 // γ-next.recipe — receiver + pending-cache substrate for the recipe broadcast.
 export { makeKringRecipePeerHandler }              from './v2/kringRecipeReceiver.js';
@@ -267,8 +267,14 @@ export {
 } from './v2/nearbyInvites.js';
 export { registerCircleAddresses, unregisterCircleAddresses }
                                                 from './v2/circleAddressRegistration.js';
-export { createConnectionPoints, POINT_SOURCE, POINT_SOURCE_LABELS }
-                                                from './v2/connectionPoints.js';
+export {
+  createConnectionPoints, POINT_SOURCE, POINT_SOURCE_LABELS, POINT_KIND,
+  // The RN launcher consumes these three via this entry — they were MISSING here (Metro interop turns a
+  // missing named export into `undefined`, so the points screen crashed only when opened; the
+  // basisIndexExports guard in basis-mobile now pins every launcher import against this entry).
+  adoptExistingRelay, asyncStorageConnectionPointsIo, localStorageConnectionPointsIo,
+  recordJoinedCirclePoints,
+} from './v2/connectionPoints.js';
 export {
   createFallbackPrefStore, localStorageFallbackIo, asyncStorageFallbackIo,
   createFallbackOffer, OFFER_AFTER_PEERS, OFFER_COOLDOWN_MS,

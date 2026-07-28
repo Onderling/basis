@@ -1,6 +1,6 @@
 export { createNeighborhoodAgent }     from './Agent.js';
 export { createNeighborhoodCluster }   from './cluster.js';
-export { buildSkills }                 from './skills/index.js';
+export { buildSkills, setAddressFallbackReportHook } from './skills/index.js';
 export { buildOnboardingSkills }       from './onboarding.js';
 /**
  * Phase 52.9.2 / Q-B (2026-05-14) — groupMirror retired in favour of

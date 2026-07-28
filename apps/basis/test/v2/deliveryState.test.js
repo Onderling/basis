@@ -119,22 +119,22 @@ describe('the receipt setting', () => {
 describe('an inbound receipt is untrusted', () => {
   it('takes `from` from the WIRE', () => {
     // Otherwise a peer marks someone else's messages as delivered.
-    const r = receiveReceipt({ kind: RECEIPT_MESSAGE, messageId: 'm1', from: 'someone-else' }, 'real');
+    const r = receiveReceipt({ subtype: RECEIPT_MESSAGE, messageId: 'm1', from: 'someone-else' }, 'real');
     expect(r.from).toBe('real');
   });
 
   it('is rebuilt — nothing smuggled survives', () => {
-    const r = receiveReceipt({ kind: RECEIPT_MESSAGE, messageId: 'm1', state: 'read', admin: true }, 'them');
+    const r = receiveReceipt({ subtype: RECEIPT_MESSAGE, messageId: 'm1', state: 'read', admin: true }, 'them');
     expect(Object.keys(r).sort()).toEqual(['from', 'messageId', 'receivedAt']);
     // In particular a peer cannot assert a state — least of all one we do not have.
     expect(r.state).toBeUndefined();
   });
 
   it('rejects a malformed or wrong-kind message', () => {
-    expect(receiveReceipt({ kind: RECEIPT_MESSAGE }, 'them')).toBeNull();
-    expect(receiveReceipt({ kind: RECEIPT_MESSAGE, messageId: '' }, 'them')).toBeNull();
-    expect(receiveReceipt({ kind: RECEIPT_MESSAGE, messageId: 'x'.repeat(200) }, 'them')).toBeNull();
-    expect(receiveReceipt({ kind: 'chat-message', messageId: 'm1' }, 'them')).toBeNull();
+    expect(receiveReceipt({ subtype: RECEIPT_MESSAGE }, 'them')).toBeNull();
+    expect(receiveReceipt({ subtype: RECEIPT_MESSAGE, messageId: '' }, 'them')).toBeNull();
+    expect(receiveReceipt({ subtype: RECEIPT_MESSAGE, messageId: 'x'.repeat(200) }, 'them')).toBeNull();
+    expect(receiveReceipt({ subtype: 'kring-chat-message', messageId: 'm1' }, 'them')).toBeNull();
     expect(receiveReceipt(null, 'them')).toBeNull();
   });
 });

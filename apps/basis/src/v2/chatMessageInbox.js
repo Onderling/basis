@@ -69,6 +69,11 @@ export function createChatMessageInbox({
   resolveRef    = null,
   dedupCap      = DEFAULT_DEDUP_CAP,
   logger        = console,
+  // Delivery honesty (2026-07-28): called AFTER a genuine insert with `{ msgId, fromPeerAddr, source }`.
+  // This is the "their app stored it" moment — the inbox is the one gate every inbound path goes through,
+  // so a receipt hooked anywhere else either misses a path or fires twice. The hook only OBSERVES; whether
+  // a receipt actually goes back is the host's policy (`makeReceiptSender`), not the inbox's business.
+  onStored      = null,
 } = {}) {
   if (!eventLog || typeof eventLog.append !== 'function') {
     throw new Error('createChatMessageInbox: eventLog.append required');
@@ -191,6 +196,10 @@ export function createChatMessageInbox({
       ...(media ? { media } : {}),
     }));
     logger.info?.('[kring-chat] received', envelope.msgId, 'circle=' + envelope.circleId, 'source=' + source);
+    if (typeof onStored === 'function') {
+      try { onStored({ msgId: envelope.msgId, fromPeerAddr, source }); }
+      catch (err) { logger.warn?.('[kring-chat] onStored hook threw', err?.message ?? err); }
+    }
     return { result: 'inserted' };
   }
 

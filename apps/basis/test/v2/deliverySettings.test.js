@@ -10,8 +10,11 @@ import * as mod from '../../src/v2/deliverySettings.js';
 import {
   deliverySettings, createDeliverySettingsStore,
   localStorageDeliveryIo, asyncStorageDeliveryIo,
-  deliveryLabelFor, withDelivery,
+  deliveryLabelFor, withDelivery, makeReceiptSender, applyReceipt,
 } from '../../src/v2/deliverySettings.js';
+import { RECEIPT_MESSAGE } from '../../src/v2/deliveryState.js';
+import { createDeliveryStateMap } from '@onderling/kring-host/deliveryState';
+import { vi } from 'vitest';
 import { DELIVERY } from '../../src/v2/deliveryState.js';
 
 describe('the two settings pull in opposite directions', () => {
@@ -128,3 +131,81 @@ describe('there is no second delivery store here', () => {
     expect(Object.keys(mod).filter((k) => looksLikeAStore.test(k))).toEqual([]);
   });
 });
+
+describe('the receipt sender (inbox onStored → wire)', () => {
+  const stored = (over = {}) => ({ msgId: 'm1', fromPeerAddr: 'peer-a', source: 'receiver', ...over });
+
+  it('confirms a live receive when the setting is on', async () => {
+    const sendTo = vi.fn(async () => {});
+    await makeReceiptSender({ getSettings: () => ({ sendReceipts: true }), sendTo })(stored());
+    expect(sendTo).toHaveBeenCalledWith('peer-a', { subtype: RECEIPT_MESSAGE, messageId: 'm1' });
+  });
+
+  it('THE REPLAY RULE: rehydrate / catch-up / pod inserts send NOTHING', async () => {
+    // Receipts there would confirm months of history to peers on every boot — and to people long gone.
+    const sendTo = vi.fn(async () => {});
+    const send = makeReceiptSender({ getSettings: () => ({ sendReceipts: true }), sendTo });
+    for (const source of ['rehydrator', 'catchUp', 'pod', 'unknown']) await send(stored({ source }));
+    expect(sendTo).not.toHaveBeenCalled();
+  });
+
+  it('the setting is read PER MESSAGE — flipping it takes effect on the next one', async () => {
+    const sendTo = vi.fn(async () => {});
+    let on = true;
+    const send = makeReceiptSender({ getSettings: () => ({ sendReceipts: on }), sendTo });
+    await send(stored());
+    on = false;
+    await send(stored({ msgId: 'm2' }));
+    expect(sendTo).toHaveBeenCalledTimes(1);
+  });
+
+  it('a failing settings read means NO receipt — silence is the safe direction', async () => {
+    // Defaulting to "send" on error would leak after the user opted out.
+    const sendTo = vi.fn(async () => {});
+    await makeReceiptSender({ getSettings: () => { throw new Error('store gone'); }, sendTo })(stored());
+    expect(sendTo).not.toHaveBeenCalled();
+  });
+
+  it('a failing SEND never breaks the receive path', async () => {
+    const send = makeReceiptSender({
+      getSettings: () => ({ sendReceipts: true }),
+      sendTo: async () => { throw new Error('offline'); },
+      logger: { warn: () => {} },
+    });
+    await expect(send(stored())).resolves.toBeUndefined();
+  });
+
+  it('nothing without a sender address or id', async () => {
+    const sendTo = vi.fn(async () => {});
+    const send = makeReceiptSender({ getSettings: () => ({ sendReceipts: true }), sendTo });
+    await send(stored({ fromPeerAddr: null }));
+    await send(stored({ msgId: null }));
+    expect(sendTo).not.toHaveBeenCalled();
+  });
+});
+
+describe('applying an inbound receipt', () => {
+  it('advances the SHARED map to stored', () => {
+    const map = createDeliveryStateMap();
+    map.set('m1', 'reached-device');
+    expect(applyReceipt({ subtype: RECEIPT_MESSAGE, messageId: 'm1' }, 'peer-a', map)).toBe(true);
+    expect(map.get('m1')).toBe('stored');
+  });
+
+  it('rejects junk without touching the map', () => {
+    const map = createDeliveryStateMap();
+    expect(applyReceipt({ subtype: 'kring-chat-message', messageId: 'm1' }, 'peer-a', map)).toBe(false);
+    expect(applyReceipt(null, 'peer-a', map)).toBe(false);
+    expect(map.size()).toBe(0);
+  });
+
+  it('a receipt cannot resurrect a failed message', () => {
+    // The user was told it did not go; a receipt arriving later (some recipient got a copy another way)
+    // must not quietly rewrite that.
+    const map = createDeliveryStateMap();
+    map.set('m1', 'failed');
+    applyReceipt({ subtype: RECEIPT_MESSAGE, messageId: 'm1' }, 'peer-a', map);
+    expect(map.get('m1')).toBe('failed');
+  });
+});
+

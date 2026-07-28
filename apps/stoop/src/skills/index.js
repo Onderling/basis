@@ -74,7 +74,18 @@ import { resolveMemberAddress, makeFallbackReporter } from '../lib/memberAddress
 import { kindWakes } from '@onderling/item-store';
 
 /** G13 — one reporter per process, deduping per (circle, member, reason) so the signal stays readable. */
-const _reportAddressFallback = makeFallbackReporter();
+let _fallbackReportHook = null;
+/**
+ * Let a HOST observe the structured fallback reports (2026-07-28) — the `blocked: true` ones are what
+ * drive the chat's offer to enable the per-user fallback setting. Settable because the reporter is
+ * per-process and the host arrives later; one hook, last-set wins, null to detach.
+ */
+export function setAddressFallbackReportHook(fn) {
+  _fallbackReportHook = typeof fn === 'function' ? fn : null;
+}
+const _reportAddressFallback = makeFallbackReporter(undefined, {
+  onReport: (info) => { try { _fallbackReportHook?.(info); } catch { /* host hook must never break a send */ } },
+});
 import { getPrivacyNotice } from '../lib/privacyNotice.js';
 import { categoryFor, TAXONOMY } from '../lib/offeringsMatch.js';
 import { findNearDuplicate } from '../lib/dupCheck.js';

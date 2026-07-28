@@ -145,8 +145,14 @@ export function shouldSendReceipt(policy) {
   return receiptPolicy(policy).sendReceipts === true;
 }
 
-/** The message kind an app-level receipt travels as. Namespaced like the room messages. */
-export const RECEIPT_MESSAGE = 'delivery.receipt';
+/**
+ * The wire subtype an app-level receipt travels as.
+ *
+ * `subtype`, kebab-case — the HOUSE wire convention: the peer router (`makePeerRouter`) dispatches on
+ * `payload.subtype`, as every existing peer message does (`kring-chat-message`, `catch-up-offer`, …).
+ * The first draft said `kind: 'delivery.receipt'`, which no router would ever have dispatched.
+ */
+export const RECEIPT_MESSAGE = 'delivery-receipt';
 
 /**
  * Validate an inbound receipt. Same discipline as the room messages: rebuilt not spread, and `from` comes
@@ -154,7 +160,7 @@ export const RECEIPT_MESSAGE = 'delivery.receipt';
  * messages as delivered.
  */
 export function receiveReceipt(payload, fromAddress, now = () => Date.now()) {
-  if (payload?.kind !== RECEIPT_MESSAGE) return null;
+  if (payload?.subtype !== RECEIPT_MESSAGE) return null;
   const id = typeof payload.messageId === 'string' && payload.messageId.length > 0
     && payload.messageId.length <= 128 ? payload.messageId : null;
   if (!id) return null;

@@ -19,7 +19,9 @@
  * receipts off is precisely the disclosure `deliveryState.js` refuses to make — it would let anyone spot
  * the setting by looking at a conversation.
  */
-import { DELIVERY_LABELS, isDeliveryState } from './deliveryState.js';
+import {
+  DELIVERY, DELIVERY_LABELS, isDeliveryState, shouldSendReceipt, receiveReceipt, RECEIPT_MESSAGE,
+} from './deliveryState.js';
 
 /** Both settings, with their defaults. Only an explicit boolean changes one. */
 export function deliverySettings(stored = {}) {
@@ -152,3 +154,55 @@ export function deliveryPresentation(state, { mine = true } = {}) {
  *     map.set(msgId, deliveryAfterSend(outcome));   // monotonic, retry-aware
  *     map.get(msgId);                               // → a state for `deliveryLabelFor`
  */
+
+/**
+ * The receipt SENDER — wired to the inbox's `onStored` hook.
+ *
+ * Policy lives here, not in the inbox, and two refusals carry it:
+ *
+ *   • **only `source: 'receiver'`.** The inbox also inserts from the rehydrator, catch-up and pod replay —
+ *     firing receipts there would confirm months of history to peers on every boot, and to people who have
+ *     long since left. A receipt is about a message that just ARRIVED, once.
+ *   • **the setting is read PER MESSAGE**, not captured at wiring time, so flipping "stop confirming"
+ *     takes effect on the very next message — and reading it can fail without breaking the receive path.
+ *
+ * @param {object} deps
+ * @param {() => Promise<object>|object} deps.getSettings   → `{ sendReceipts }` (the delivery store's get)
+ * @param {(address: string, payload: object) => Promise<any>} deps.sendTo
+ * @param {{warn?: Function}} [deps.logger]
+ * @returns {(stored: { msgId, fromPeerAddr, source }) => Promise<void>}
+ */
+export function makeReceiptSender({ getSettings, sendTo, logger = console } = {}) {
+  return async function onStored({ msgId, fromPeerAddr, source } = {}) {
+    if (source !== 'receiver' || !msgId || !fromPeerAddr) return;
+    // If the settings cannot be READ, no receipt goes out. The store's default is ON, but "we could not
+    // check" is not "on": a user who turned receipts off and then hit a broken store would otherwise start
+    // confirming again — an error leaking a choice. Silence is recoverable; a sent receipt is not.
+    let settings;
+    try { settings = await (typeof getSettings === 'function' ? getSettings() : getSettings); }
+    catch { return; }
+    if (!settings || !shouldSendReceipt(settings)) return;
+    try { await sendTo(fromPeerAddr, { subtype: RECEIPT_MESSAGE, messageId: msgId }); }
+    catch (err) { logger?.warn?.('[delivery] receipt send failed (best-effort):', err?.message ?? err); }
+  };
+}
+
+/**
+ * Apply an inbound receipt to the shared per-message map.
+ *
+ * Validation first (`receiveReceipt`: rebuilt, `from` off the wire), then advance to `stored` — the map's
+ * own monotonic rule handles ordering.
+ *
+ * ⚠️ **Group semantics, stated rather than hidden:** the δ.2 map is per-MESSAGE, so in a circle of five,
+ * `stored` means *at least one member's app stored it*. That is honest for a pairwise chat and an
+ * approximation for a group; per-recipient states are a refinement recorded in DECISIONS-FOR-REVIEW, not
+ * quietly implied by the label.
+ *
+ * @returns {boolean} whether a valid receipt was applied
+ */
+export function applyReceipt(payload, fromAddress, deliveryMap) {
+  const receipt = receiveReceipt(payload, fromAddress);
+  if (!receipt || typeof deliveryMap?.set !== 'function') return false;
+  deliveryMap.set(receipt.messageId, DELIVERY.STORED);
+  return true;
+}

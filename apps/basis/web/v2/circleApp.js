@@ -117,8 +117,10 @@ import { renderCircleProfile } from './circleProfile.js';
 import { renderCircleAdminPanel } from './circleAdminPanel.js';
 import { renderCircleMyData } from './circleMyData.js';
 import {
-  createDeliverySettingsStore, localStorageDeliveryIo, withDelivery,
+  createDeliverySettingsStore, localStorageDeliveryIo, withDelivery, makeReceiptSender, applyReceipt,
 } from '../../src/v2/deliverySettings.js';
+import { createFallbackOffer } from '../../src/v2/addressFallback.js';
+import { setAddressFallbackReportHook } from '@onderling-app/stoop';
 import { resolveConversationKinds } from '../../src/v2/conversationKinds.js';
 // S5 — key management: reuse the existing encrypted-backup + restore wizards
 // (the slash/page renderers) inside My-data, mounted in a lightweight overlay.
@@ -1135,6 +1137,24 @@ let   deliverySettingsCache = { sendReceipts: true, allowFallback: false };
 // Per-message state lives in the SHARED map (δ.2, both shells) — see deliverySettings.js for why there is
 // no second store.
 const deliveryByMessageId  = { get: (id) => deliveryStateMap.get(id) };
+
+// The fallback OFFER (2026-07-28) — the chat notices when the per-user setting is costing someone
+// messages and says so, with the cost, once. DORMANT until per-circle addressing (`preferCircleAddress`)
+// is enabled: with the gate off there is no circle address to prefer, so no `blocked` report ever fires.
+// Wired now so flipping the gate lights the whole chain rather than leaving a silent stub.
+//
+// `botBubble` is text-only, so v1 offers in words and points at the toggle; the one-tap accept is polish,
+// recorded in DECISIONS-FOR-REVIEW. After showing we arm the cooldown (`decline()`), so the offer repeats
+// at most once per cooldown while the problem persists — informative, not nagging.
+const fallbackOffer = createFallbackOffer({
+  onOffer: () => {
+    _kringRender?.botBubble(
+      `${t('circle.nearbyScreen.delivery_fallback_hint')} ${t('circle.nearbyScreen.delivery_fallback_cost')}`,
+    );
+    fallbackOffer.decline();
+  },
+});
+setAddressFallbackReportHook((info) => fallbackOffer.report(info));
 let   CIRCLE_RELAY_URL      = resolveRelayUrl(localStorageRelayIo().load(), CIRCLE_RELAY_ENV);
 let   _peerAgent           = null;   // captured at boot so a relay-setting change can reconnect live
 let   _peerRouter          = null;
@@ -6408,6 +6428,15 @@ async function boot() {
       const kringChatInbox = createChatMessageInbox({
         eventLog,
         ingest: ingestKringMessage,
+        // Delivery honesty — a LIVE insert ("their app stored it", from our side of the mirror) answers
+        // the sender with a receipt. Policy is entirely in `makeReceiptSender`: only source 'receiver',
+        // setting read per message, fail-closed on a broken settings read.
+        onStored: makeReceiptSender({
+          getSettings: () => deliverySettingsStore.get(),
+          sendTo: (to, payload) => (typeof _peerAgent?.sendPeerMessage === 'function'
+            ? _peerAgent.sendPeerMessage(to, payload)
+            : Promise.reject(new Error('no peer agent'))),
+        }),
         // Connectivity Phase 3 (receiver side) — resolve a pod-signal REF envelope (a pod-row pointer,
         // no body) into the full chat message by reading + unsealing the circle's shared pod. Absent a
         // pod / group key → the inbox skips the ref (deferred), never crashes the receive loop.
@@ -6521,6 +6550,9 @@ async function boot() {
       const peerMessageRouter = makePeerRouter({
         handlers: {
           'kring-chat-message':      kringChatHandler,
+          // Delivery honesty — the peer's app stored our message; advance the shared δ.2 map to `stored`.
+          // `applyReceipt` validates (rebuilt, `from` off the wire) and the map's monotonic rule orders it.
+          'delivery-receipt':        (from, payload) => applyReceipt(payload, from, deliveryStateMap),
           'kring-recipe-broadcast':  kringRecipeHandler,
           'kring-rules-broadcast':   kringRulesHandler,
           'kring-policy-broadcast':  kringPolicyHandler,

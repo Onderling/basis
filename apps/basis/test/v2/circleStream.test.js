@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   eventCircleId, buildCircleStream, buildCircleChat,
   buildKringStream, KRING_STREAM_KIND_FILTERS,
-  projectEntries, allCircleRows, circleRows, chatRows,
+  projectEntries, allCircleRows, circleRows, chatRows, agentTrailRows,
 } from '../../src/v2/circleStream.js';
-import { makeSilentEntry } from '../../src/eventLog.js';
+import { makeSilentEntry, makeAgentTrailEntry } from '../../src/eventLog.js';
 
 const circles = [
   { id: 'circle-1', name: 'Garden circle' },
@@ -231,5 +231,35 @@ describe('the wrappers are the projector with arguments', () => {
   it('the old names still work — this is a rename, not a migration', () => {
     expect(buildKringStream({ events, circles, circleId: 'x' })).toEqual(circleRows({ events, circles, circleId: 'x' }));
     expect(buildCircleChat({ events, circles, circleId: 'x' })).toEqual(chatRows({ events, circles, circleId: 'x' }));
+  });
+});
+
+/* ── The agent-trail LENS (one-log step E): the same log, narrowed to one actor ─────────────────────── */
+
+describe('agentTrailRows — the trail is a lens, not a second store (J-L6/J-L7)', () => {
+  const events = [
+    makeAgentTrailEntry({ actor: 'bot-x', op: 'addItems', via: 'grant:g9', circleId: 'c1', ts: 30, id: 't1' }),
+    makeAgentTrailEntry({ actor: 'bot-x', op: 'setRelayUrl', kind: 'settings-change', via: 'mandate:task-7', circleId: null, ts: 20, id: 't2' }),
+    makeAgentTrailEntry({ actor: 'bot-y', op: 'addItems', via: 'owner', circleId: 'c1', ts: 10, id: 't3' }),
+    { id: 'm1', ts: 5, app: 'kring', type: 'chat-message', actor: 'anna', payload: { circleId: 'c1', text: 'hoi' } },
+  ];
+  const circles = [{ id: 'c1', name: 'Kring 1' }];
+
+  it("one actor's rows, every circle + the un-scoped ones, newest first, via readable per row", () => {
+    const rows = agentTrailRows({ events, circles, actor: 'bot-x' });
+    expect(rows.map((r) => r.id)).toEqual(['t1', 't2']);
+    expect(rows[0].circleName).toBe('Kring 1');
+    expect(rows[1].circleId).toBeNull();               // a non-circle action still shows in the trail
+    // J-L7 — `via` records the AUTHORITY, so the answer survives the grant's revocation.
+    expect(rows.map((r) => r.event.payload.via)).toEqual(['grant:g9', 'mandate:task-7']);
+  });
+
+  it('no actor = no trail — never the whole firehose', () => {
+    expect(agentTrailRows({ events, circles })).toEqual([]);
+  });
+
+  it('projectEntries composes actor with the other narrowings (scope × kinds still work)', () => {
+    const rows = projectEntries({ events, circles, actor: 'bot-x', kinds: ['agent-action'] });
+    expect(rows.map((r) => r.id)).toEqual(['t1']);
   });
 });

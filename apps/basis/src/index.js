@@ -124,7 +124,7 @@ export {
   eventCircleId, buildCircleStream,
   // kring-scoped stream + chip filters.
   buildKringStream, KRING_STREAM_KIND_FILTERS,
-  projectEntries, allCircleRows, circleRows, chatRows,
+  projectEntries, allCircleRows, circleRows, chatRows, agentTrailRows,
   // C15 — per-circle chat projection (excludes the silent system lane).
   buildCircleChat,
 } from './v2/circleStream.js';
@@ -382,7 +382,7 @@ export { buildPersonaViewModel, buildMijViewModel } from './v2/personaView.js';
 export { loadMijModel } from './v2/mijLoader.js';
 export { migrateRosterOfferings, offeringKeyFor, OFFERINGS_MIGRATION_KEY } from './core/offeringsMigration.js';
 export { runFind } from './find.js';
-export { EventLog, createEventLog, RETENTION_MS } from './eventLog.js';
+export { EventLog, createEventLog, RETENTION_MS, RETENTION_DEFAULTS, makeAgentTrailEntry } from './eventLog.js';
 export {
   buildFormSpec, pickStrategy, validateAndCoerce,
 } from './forms/buildFormSpec.js';

@@ -112,7 +112,7 @@ export function buildCircleStream({ events = [], circles = [] } = {}) {
  * @returns {ReturnType<typeof buildCircleStream>}
  */
 export function projectEntries({
-  events = [], circles = [], circleId = null, kindFilter = null, kinds = null, lane = null,
+  events = [], circles = [], circleId = null, kindFilter = null, kinds = null, lane = null, actor = null,
 } = {}) {
   const rows = buildCircleStream({ events, circles });
 
@@ -122,6 +122,9 @@ export function projectEntries({
     const wanted = Array.isArray(circleId) ? new Set(circleId) : new Set([circleId]);
     out = out.filter((r) => wanted.has(r.circleId));
   }
+  // The agent-trail lens (one-log step E): the SAME log, narrowed to one actor — an agent's activity
+  // card is `projectEntries({ actor })`, not a second store. Exact match on the entry's stamped actor.
+  if (actor != null) out = out.filter((r) => r.actor === actor);
 
   // content — lane first (the cheap structural cut), then kinds
   if (lane === 'human') out = out.filter((r) => !isSilentEntry(r.event));
@@ -165,6 +168,19 @@ export function circleRows(opts = {}) {
  */
 export function chatRows(opts = {}) {
   return projectEntries({ ...opts, lane: 'human' });
+}
+
+/**
+ * One actor, every circle — the AGENT TRAIL (one-log step E, the box the agent-management surface was
+ * stuck on). Answers "what did this agent do?" as a projection over the one log — the entries' `via`
+ * (`grant:<id>` | `mandate:<task>` | `owner`) says what authority each action used, which is what keeps
+ * "what did that revoked delegation reach?" answerable after the grant is gone. Owner activity is NOT
+ * shown by default anywhere — a bot-audit surface must not become self-surveillance (product call #2's
+ * lean, recorded in the plan); the caller chooses whose trail to open.
+ */
+export function agentTrailRows({ actor, ...opts } = {}) {
+  if (actor == null) return [];   // no actor = no trail — never fall open into the whole firehose
+  return projectEntries({ ...opts, actor });
 }
 
 /* ── Back-compat aliases ─────────────────────────────────────────────────────

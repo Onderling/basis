@@ -63,6 +63,13 @@ export const ENTRY_KINDS = Object.freeze({
   // ── the agent trail (per-agent action log) ────────────────────────────────
   'agent-action':    K(LANE.SYSTEM, false, RETAIN.AUDIT, true),
   'settings-change': K(LANE.SYSTEM, false, RETAIN.AUDIT, true),
+
+  // ── compaction output ─────────────────────────────────────────────────────
+  // What old audit entries FOLD into instead of being dropped (retention step D): `{from, to, counts,
+  // actors, foldedCount}` — the shape of what happened survives, and says how much it folded. Auditable
+  // itself so an external append cannot rewrite it (the log's own compactor merges internally, not via
+  // append); never pruned — a summary that expires would be the silent forgetting it exists to prevent.
+  'audit-summary':   K(LANE.SYSTEM, false, RETAIN.AUDIT, true),
 });
 
 /** The conservative default for an unregistered kind — never wakes, never reads as conversation. */

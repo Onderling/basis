@@ -21,10 +21,27 @@
  */
 
 import { matchesFilter } from './filter.js';
-import { ENTRY_KINDS, isSystemKind, isAuditKind, kindWakes } from '@onderling/item-store';
+import { ENTRY_KINDS, isSystemKind, isAuditKind, kindWakes, retentionOf } from '@onderling/item-store';
 
-/** 14 days in ms — OQ-7.B retention default. */
+/** 14 days in ms — OQ-7.B retention default (the `chat` class). */
 export const RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
+
+/**
+ * Per-CLASS retention defaults (one-log step D). "Retention of what?" is the right question — one number
+ * for chat, roster pings and an audit trail is wrong for all three. The classes come from the kind
+ * registry (`retentionOf`); the durations are a per-user setting with these defaults:
+ *
+ *   • `short` — pure plumbing (roster pings, delivery state): 7 days.
+ *   • `chat`  — the conversation: 14 days (today's number, unchanged).
+ *   • `audit` — governance, reports, key events, the agent trail: the number is the DETAIL window;
+ *     entries past it COMPACT into an `audit-summary` instead of dropping, so the shape of what
+ *     happened survives — and says how many it folded. A trail that quietly forgets looks complete.
+ */
+export const RETENTION_DEFAULTS = Object.freeze({
+  short: 7  * 24 * 60 * 60 * 1000,
+  chat:  RETENTION_MS,
+  audit: RETENTION_MS,
+});
 
 /**
  * @typedef {object} LoggedEvent
@@ -154,6 +171,46 @@ export function makeSilentEntry({ circleId, kind, payload, id, ts, actor } = {})
   };
 }
 
+/**
+ * Shape an AGENT-TRAIL entry (one-log step E) — the record of an agent acting, or a settings change.
+ *
+ * The field set is a WHITELIST by construction: `{op, target:{kind,ref}, outcome, via}` and nothing
+ * else. Deliberately no arguments, message bodies or file contents — a log holding contents becomes a
+ * second copy of the data under different access rules (the leak shape found twice in July 2026). The
+ * trail says THAT an agent wrote to a file; version history says what.
+ *
+ * `via` is what makes "what did that revoked delegation reach?" answerable after the grant is gone:
+ * `grant:<id>` | `mandate:<task>` | `owner`. Read the trail back with `agentTrailRows({ actor })`.
+ *
+ * @param {object} a
+ * @param {string} a.actor                     the acting agent (pubKey / stable id) — required
+ * @param {string} a.op                        what was done (an opId-shaped name) — required
+ * @param {{kind?: string, ref?: string}} [a.target]   what it acted on (a POINTER, never content)
+ * @param {string} [a.outcome]                 'ok' | an error label
+ * @param {string} [a.via='owner']             the authority used
+ * @param {string} [a.circleId]                when it happened inside a circle; null otherwise
+ * @param {'agent-action'|'settings-change'} [a.kind='agent-action']
+ * @param {string} [a.id]  @param {number} [a.ts]
+ * @returns {LoggedEvent|null}  null when actor/op are missing — an unattributed trail row is noise
+ */
+export function makeAgentTrailEntry({
+  actor, op, target = null, outcome = null, via = 'owner', circleId = null,
+  kind = 'agent-action', id, ts,
+} = {}) {
+  if (!actor || typeof op !== 'string' || !op) return null;
+  const k = kind === 'settings-change' ? 'settings-change' : 'agent-action';
+  return makeSilentEntry({
+    circleId, kind: k, actor, id, ts,
+    payload: {
+      op,
+      ...(target && typeof target === 'object'
+        ? { target: { kind: target.kind ?? null, ref: target.ref ?? null } } : {}),
+      ...(outcome != null ? { outcome: String(outcome) } : {}),
+      via: typeof via === 'string' && via ? via : 'owner',
+    },
+  });
+}
+
 export class EventLog {
   /** @type {LoggedEvent[]} most-recent first */
   #events;
@@ -161,8 +218,6 @@ export class EventLog {
   #persist;
   /** @type {() => number} */
   #now;
-  /** @type {number} */
-  #retentionMs;
   /** @type {Set<(event: LoggedEvent) => void>} */
   #subscribers;
   /** @type {Set<string>} */
@@ -171,12 +226,20 @@ export class EventLog {
   /** Monotonic storage handle, assigned on append and never accepted from a caller. */
   #seq = 0;
 
+  /** @type {{short: number, chat: number, audit: number}} */
+  #retention;
+
   /**
    * @param {object}                          [opts]
    * @param {LoggedEvent[]}                   [opts.initial=[]]
    * @param {(events: LoggedEvent[]) => Promise<void>} [opts.persist]
    * @param {() => number}                    [opts.now=Date.now]
    * @param {number}                          [opts.retentionMs=RETENTION_MS]
+   *   back-compat: overrides the `chat` class (it was the one number everything used). `short` scales
+   *   with it (half, floor 0) so tests/hosts that shrink the window shrink the whole log as before;
+   *   `audit` uses it as the DETAIL window (entries past it compact, never silently drop).
+   * @param {{short?: number, chat?: number, audit?: number}} [opts.retention]
+   *   per-class durations (ms) — the user-settable knobs of one-log step D. Wins over `retentionMs`.
    * @param {string[]}                        [opts.muted=[]]
    *   `<app>:<type>`-keyed entries.  Events matching a muted key
    *   are STILL logged (audit trail) but `query({excludeMuted: true})`
@@ -186,8 +249,10 @@ export class EventLog {
     this.#events = Array.isArray(opts.initial) ? [...opts.initial] : [];
     this.#persist = typeof opts.persist === 'function' ? opts.persist : async () => {};
     this.#now = typeof opts.now === 'function' ? opts.now : Date.now;
-    this.#retentionMs = typeof opts.retentionMs === 'number'
-      ? opts.retentionMs : RETENTION_MS;
+    const legacy = typeof opts.retentionMs === 'number' ? {
+      chat: opts.retentionMs, audit: opts.retentionMs, short: Math.floor(opts.retentionMs / 2),
+    } : {};
+    this.#retention = { ...RETENTION_DEFAULTS, ...legacy, ...(opts.retention ?? {}) };
     this.#subscribers = new Set();
     this.#mutedKeys = new Set(Array.isArray(opts.muted) ? opts.muted : []);
   }
@@ -259,15 +324,77 @@ export class EventLog {
   }
 
   /**
-   * Prune events older than retentionMs.  Returns the number pruned.
+   * Prune by the entry's retention CLASS (one-log step D). Three fates:
+   *
+   *   • `short` / `chat` entries older than their window are DROPPED (as before — one window each).
+   *   • `audit` entries older than the audit window COMPACT: they fold into one `audit-summary` entry
+   *     per circle (`{from, to, counts, actors, foldedCount}`) instead of vanishing — the trail keeps
+   *     the shape of what happened and says how much it folded. The summary itself is never pruned.
+   *
+   * Compaction happens HERE, by direct mutation — deliberately not via `append`: `audit-summary` is an
+   * auditable kind, so an EXTERNAL append with its id is dropped by first-write-wins (a bot cannot
+   * rewrite the fold), while the log's own compactor merges freely. A bot cannot trigger compaction
+   * either — nothing exposes it beyond append's own housekeeping.
+   *
+   * Returns the number of entries removed from the array (compacted audit entries count — they left the
+   * detail log — but the summaries they fold into do not).
    *
    * @returns {number}
    */
   prune() {
-    const cutoff = this.#now() - this.#retentionMs;
+    const now = this.#now();
     const before = this.#events.length;
-    this.#events = this.#events.filter((e) => e.ts >= cutoff);
+    const keep = [];
+    const fold = [];
+    for (const e of this.#events) {
+      if (e.type === 'audit-summary') { keep.push(e); continue; }   // a fold never expires
+      const cls = retentionOf(e.type);
+      const cutoff = now - (this.#retention[cls] ?? this.#retention.chat);
+      if (e.ts >= cutoff) { keep.push(e); continue; }
+      if (cls === 'audit') fold.push(e);   // past the detail window → compact, don't drop
+      // short/chat past their window: dropped.
+    }
+    this.#events = keep;
+    for (const e of fold) this.#foldIntoSummary(e);
     return before - this.#events.length;
+  }
+
+  /**
+   * Fold one expired audit entry into its circle's `audit-summary` (creating it if absent). Counts are
+   * keyed by the entry's op when it has one (`payload.op` — the agent-trail shape — else `payload.event`,
+   * the governance shape) and by the entry KIND otherwise, so a summary reads "what happened how often"
+   * rather than one opaque number.
+   */
+  #foldIntoSummary(e) {
+    const circleId = e.circleId ?? null;
+    const id = `audit-summary:${circleId ?? 'global'}`;
+    const countKey = `${e.type}${typeof e.payload?.op === 'string' ? `:${e.payload.op}`
+      : typeof e.payload?.event === 'string' ? `:${e.payload.event}` : ''}`;
+    const idx = this.#events.findIndex((s) => s.id === id);
+    const prev = idx !== -1 ? this.#events[idx] : null;
+    const p = prev?.payload ?? { from: e.ts, to: e.ts, counts: {}, actors: [], foldedCount: 0 };
+    const actors = new Set(Array.isArray(p.actors) ? p.actors : []);
+    if (e.actor != null) actors.add(e.actor);
+    const summary = {
+      id,
+      // keep the summary's ts current so nothing sorts it into pruned-looking territory; the honest
+      // time RANGE it covers lives in the payload.
+      ts: this.#now(),
+      app: prev?.app ?? 'system',
+      type: 'audit-summary',
+      silent: true,
+      circleId,
+      payload: {
+        from: Math.min(p.from ?? e.ts, e.ts),
+        to:   Math.max(p.to   ?? e.ts, e.ts),
+        counts: { ...p.counts, [countKey]: (p.counts?.[countKey] ?? 0) + 1 },
+        actors: [...actors],
+        foldedCount: (p.foldedCount ?? 0) + 1,
+      },
+      seq: prev?.seq ?? (this.#seq += 1),
+    };
+    if (idx !== -1) this.#events[idx] = summary;
+    else this.#events.unshift(summary);
   }
 
   /**

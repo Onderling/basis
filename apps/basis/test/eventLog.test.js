@@ -5,7 +5,7 @@ import { describe, it, expect, vi } from 'vitest';
 
 import {
   EventLog, RETENTION_MS, SYSTEM_APP,
-  makeSilentEntry, isSilentEntry, shouldWakeForEntry,
+  makeSilentEntry, makeAgentTrailEntry, RETENTION_DEFAULTS, isSilentEntry, shouldWakeForEntry,
 } from '../src/eventLog.js';
 import { EventRouter } from '../src/events.js';
 import { ThreadStore } from '../src/threadStore.js';
@@ -288,5 +288,114 @@ describe('EventLog — C15 silent system-entry lane', () => {
     expect(shouldWakeForEntry(silent)).toBe(false);
     expect(shouldWakeForEntry(chat)).toBe(true);
     expect(shouldWakeForEntry(null)).toBe(false);
+  });
+});
+
+/* ── One-log step D — per-kind retention + audit compaction (J-L10) ─────────────────────────────────── */
+
+describe('EventLog — per-kind retention', () => {
+  const mk = (over) => ev({ app: 'kring', type: 'chat-message', ...over });
+
+  it('J-L10 — audit outlives chat: past the chat window, chat is gone and governance still answers', () => {
+    let clock = 0;
+    const log = new EventLog({ now: () => clock, retention: { short: 500, chat: 1000, audit: 5000 } });
+    log.append(mk({ id: 'chat-old', ts: 0 }));
+    log.append(ev({ id: 'gov-old', ts: 0, app: 'system', type: 'governance', circleId: 'c1', payload: { event: 'propose' } }));
+    log.append(ev({ id: 'ping-old', ts: 0, app: 'system', type: 'roster-updated', circleId: 'c1' }));
+    clock = 2000;   // past chat(1000) + short(500), inside audit(5000)
+    log.prune();
+    const ids = log.query().map((e) => e.id);
+    expect(ids).not.toContain('chat-old');
+    expect(ids).not.toContain('ping-old');
+    expect(ids).toContain('gov-old');       // the trail did not silently forget
+  });
+
+  it('past the AUDIT window an entry compacts — and the summary says how many it folded', () => {
+    let clock = 0;
+    const log = new EventLog({ now: () => clock, retention: { short: 500, chat: 1000, audit: 2000 } });
+    log.append(ev({ id: 'g1', ts: 0, app: 'system', type: 'governance', circleId: 'c1', actor: 'anna', payload: { event: 'propose' } }));
+    log.append(ev({ id: 'g2', ts: 10, app: 'system', type: 'governance', circleId: 'c1', actor: 'bram', payload: { event: 'vote' } }));
+    log.append(ev({ id: 'a1', ts: 20, app: 'system', type: 'agent-action', circleId: 'c1', actor: 'bot-x', payload: { op: 'addItems', via: 'grant:g9' } }));
+    clock = 3000;
+    log.prune();
+    const rows = log.query();
+    expect(rows.map((e) => e.id)).not.toContain('g1');
+    const summary = rows.find((e) => e.type === 'audit-summary' && e.circleId === 'c1');
+    expect(summary).toBeTruthy();
+    expect(summary.payload.foldedCount).toBe(3);
+    expect(summary.payload.counts).toEqual({ 'governance:propose': 1, 'governance:vote': 1, 'agent-action:addItems': 1 });
+    expect(summary.payload.actors.sort()).toEqual(['anna', 'bot-x', 'bram']);
+    expect(summary.payload.from).toBe(0);
+    expect(summary.payload.to).toBe(20);
+  });
+
+  it('later folds MERGE into the same summary; the summary itself never expires', () => {
+    let clock = 0;
+    const log = new EventLog({ now: () => clock, retention: { short: 100, chat: 100, audit: 1000 } });
+    log.append(ev({ id: 'g1', ts: 0, app: 'system', type: 'governance', circleId: 'c1', payload: { event: 'vote' } }));
+    clock = 1500; log.prune();
+    log.append(ev({ id: 'g2', ts: 1500, app: 'system', type: 'governance', circleId: 'c1', payload: { event: 'vote' } }));
+    clock = 3000; log.prune();
+    clock = 999999; log.prune();   // far future: everything else would be gone — the fold stays
+    const summaries = log.query().filter((e) => e.type === 'audit-summary');
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0].payload.foldedCount).toBe(2);
+    expect(summaries[0].payload.counts['governance:vote']).toBe(2);
+  });
+
+  it('an EXTERNAL append cannot rewrite the fold (first-write-wins holds for audit-summary)', () => {
+    let clock = 0;
+    const log = new EventLog({ now: () => clock, retention: { short: 100, chat: 100, audit: 100 } });
+    log.append(ev({ id: 'g1', ts: 0, app: 'system', type: 'governance', circleId: 'c1', payload: { event: 'vote' } }));
+    clock = 500; log.prune();
+    const before = log.query().find((e) => e.type === 'audit-summary');
+    expect(before.payload.foldedCount).toBe(1);
+    // a bot that knows the id tries to blank the history
+    log.append({ id: before.id, ts: 600, app: 'system', type: 'audit-summary', circleId: 'c1', payload: { foldedCount: 0, counts: {} } });
+    const after = log.query().find((e) => e.type === 'audit-summary');
+    expect(after.payload.foldedCount).toBe(1);
+  });
+
+  it('legacy retentionMs still shrinks the whole log (back-compat for hosts/tests that pass it)', () => {
+    let clock = 0;
+    const log = new EventLog({ now: () => clock, retentionMs: 1000 });
+    log.append(mk({ id: 'old', ts: 0 }));
+    clock = 2000;
+    log.append(mk({ id: 'new', ts: 2000 }));
+    expect(log.query().map((e) => e.id)).toEqual(['new']);
+  });
+
+  it('defaults: short < chat, audit window equals chat, and chat stays the decided 14 days', () => {
+    expect(RETENTION_DEFAULTS.chat).toBe(RETENTION_MS);
+    expect(RETENTION_DEFAULTS.short).toBeLessThan(RETENTION_DEFAULTS.chat);
+    expect(RETENTION_DEFAULTS.audit).toBe(RETENTION_MS);
+  });
+});
+
+/* ── One-log step E — the agent-trail entry shape ───────────────────────────────────────────────────── */
+
+describe('makeAgentTrailEntry', () => {
+  it('shapes a whitelisted, attributed, silent audit entry', () => {
+    const e = makeAgentTrailEntry({
+      actor: 'bot-x', op: 'addItems', target: { kind: 'list', ref: 'boodschappen' },
+      outcome: 'ok', via: 'grant:g9', circleId: 'c1',
+    });
+    expect(e.type).toBe('agent-action');
+    expect(e.actor).toBe('bot-x');
+    expect(e.circleId).toBe('c1');
+    expect(e.silent).toBe(true);
+    expect(e.payload).toEqual({ op: 'addItems', target: { kind: 'list', ref: 'boodschappen' }, outcome: 'ok', via: 'grant:g9' });
+  });
+
+  it('the whitelist holds — arguments/bodies passed in are NOT carried', () => {
+    const e = makeAgentTrailEntry({ actor: 'bot-x', op: 'chat.send', args: { text: 'geheim' }, body: 'geheim', via: 'owner' });
+    expect(JSON.stringify(e)).not.toContain('geheim');
+  });
+
+  it('unattributed or op-less rows are refused (null), and kind is constrained', () => {
+    expect(makeAgentTrailEntry({ op: 'x' })).toBeNull();
+    expect(makeAgentTrailEntry({ actor: 'a' })).toBeNull();
+    expect(makeAgentTrailEntry({ actor: 'a', op: 'x', kind: 'chat-message' }).type).toBe('agent-action');
+    expect(makeAgentTrailEntry({ actor: 'a', op: 'x', kind: 'settings-change' }).type).toBe('settings-change');
   });
 });

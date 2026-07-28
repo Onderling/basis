@@ -37,7 +37,7 @@ import {
   // Nearby model + label helpers (the action map + banner rule are SHARED with web — invariant 3).
   buildNearbyModel, NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, NEARBY_INVITE_LABELS,
   nearbyVisibilityKey, createNearbyScreen, POINT_SOURCE_LABELS,
-  createConnectionPoints, adoptExistingRelay, asyncStorageConnectionPointsIo,
+  createConnectionPoints, adoptExistingRelay, asyncStorageConnectionPointsIo, recordJoinedCirclePoints,
   // "My things" private notes-list.
   myThingsFromListFiles,
   // kring-scoped event stream + per-row action chips.
@@ -231,6 +231,9 @@ import CircleProfileScreen from './CircleProfileScreen.js';
 import CircleAdminPanelScreen from './CircleAdminPanelScreen.js';
 import CircleMyDataScreen from './CircleMyDataScreen.js';
 import { resolveMobileRelayUrl } from '../../core/agentBundle.js';
+// invite parity (J-NP3 + the invite-carries-endpoint decision) — the same policy/storage reads web's
+// showCircleInvite does, so a mobile-built invite carries the SAME disclosure + endpoint fields.
+import { loadCircleStoragePod } from '../../../../basis/src/v2/circleStoragePolicy.js';
 import CircleMijScreen from './CircleMijScreen.js';   // mij#personas — the "Mij → persona's" surface (replaces the single-persona About-me content, web parity with openAboutMePanel)
 import CircleGovernanceScreen from './CircleGovernanceScreen.js';   // Wave C §5 — governance surface (web≡mobile)
 import { bindCircleGovernance } from '../../../../basis/src/v2/governanceAppWiring.js';   // §8 — report filing
@@ -1301,13 +1304,39 @@ export default function CircleLauncherScreen({
     setJoinScanOpen(false);
     if (res && res.kind === 'invite' && res.payload) setJoinArgs({ invite: res.payload });
   }, []);
-  // OBJ-2 — show THIS circle's membership QR (admin-gated by the substrate).
+  // OBJ-2 — show THIS circle's membership QR (admin-gated by the substrate). Carries the same fields a
+  // web-built invite does (invariant 2): the freedom template (join-time consent), the pod disclosure +
+  // its url (J-NP3, rule 1), the admin's NKN address (B2) and the RELAY endpoint (the invite-carries-
+  // endpoint decision — a pasted invite has no deep-link context to learn the relay from). Every read is
+  // best-effort: a failure omits the field, never blocks the invite. (`offeringsMatching` stays a listed
+  // web-only exception — the board-8 admin draft lives in web localStorage.)
   const openCircleInvite = useCallback(async (circleId) => {
     let r;
-    try { r = await buildCircleInviteUri({ callSkill: bundle?.callSkill, circleId, adminPeerAddr: bundle?.agent?.householdSelfAddr ?? null }); }
-    catch { r = { error: 'failed' }; }
+    try {
+      let pol = {};
+      try { pol = (await policyStore.get(circleId)) ?? {}; } catch { pol = {}; }
+      let storage = null;
+      try { storage = await loadCircleStoragePod({ callSkill: bundle?.callSkill, circleId }); } catch { storage = null; }
+      const podBacked = storage?.pod === 'shared' || storage?.pod === 'hybrid';
+      // The relay THIS circle rides per the points mapping, else the device's live relay (web parity).
+      let relayUrl = null;
+      try {
+        const io = asyncStorageConnectionPointsIo(AsyncStorage);
+        const store = createConnectionPoints({ initial: await io.load(), save: () => {} });
+        relayUrl = store.pointsFor(circleId).find((p) => (p?.kind ?? 'relay') === 'relay')?.url ?? null;
+      } catch { relayUrl = null; }
+      if (!relayUrl) { try { relayUrl = await resolveMobileRelayUrl(); } catch { relayUrl = null; } }
+      r = await buildCircleInviteUri({
+        callSkill: bundle?.callSkill, circleId,
+        adminPeerAddr: bundle?.agent?.householdSelfAddr ?? null,
+        adminNknAddr:  bundle?.agent?.peer?.address ?? null,
+        capabilities: pol.capabilities, apps: pol.apps,
+        podBacked, podUrl: podBacked ? (storage?.groupPodUri ?? null) : null,
+        relayUrl,
+      });
+    } catch { r = { error: 'failed' }; }
     setInviteFor({ circleId, ...(r || {}) });
-  }, [bundle]);
+  }, [bundle, policyStore]);
 
   if (view === 'screens') {
     // α.3 — Screens primary tab.  Two sub-modes: 'picker' (CRUD list)
@@ -1846,6 +1875,19 @@ export default function CircleLauncherScreen({
               setJoinArgs(null);
               const gid = r?.groupId ?? r?.joinedGroupId ?? null;
               if (gid) feedHouseholdRoster({ agent: bundle?.agent, circleId: gid }).catch(() => {});
+              // Rule 1 (web parity) — record the joined circle's pod/relay connection point(s) from what
+              // the invite carried (the modal passes the decoded invite back). Best-effort by design:
+              // the list is a convenience, a failure never breaks the join.
+              if (gid && r?.invite) {
+                (async () => {
+                  try {
+                    const io = asyncStorageConnectionPointsIo(AsyncStorage);
+                    const store = createConnectionPoints({ initial: await io.load(), save: (v) => { io.save(v); } });
+                    recordJoinedCirclePoints({ store, invite: r.invite, circleId: gid });
+                    bundle?.registerCirclePresence?.();   // G13 — a new relay point changes the scoping
+                  } catch { /* best-effort */ }
+                })();
+              }
               load();
             }}
           />

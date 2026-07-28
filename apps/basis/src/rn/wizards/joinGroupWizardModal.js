@@ -60,7 +60,10 @@ export default function JoinGroupWizardModal({
     const { result, state: after } = await finalSubmit({ state: next, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink });
     setState({ ...after });
     if (result && typeof onDispatched === 'function') {
-      try { onDispatched({ ok: true, ...result }); } catch {}
+      // `invite` = the DECODED invite alongside the redeem result, so the host can apply rule 1
+      // (record the circle's pod/relay connection points from what the invite carried) — web's wizard
+      // host reads its own decoded closure; the RN host gets it here. Additive to the reply shape.
+      try { onDispatched({ ok: true, ...result, invite: state.invite }); } catch {}
     }
     if (result) onClose?.();
   }, [state, callSkill, onDispatched, onClose, sendPeerRedeem]);

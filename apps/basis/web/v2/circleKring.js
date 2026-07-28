@@ -78,6 +78,11 @@ export function renderCircleKring(container, {
   // (`circle.kring.bot_header`) rides in as the helper's fallback for a named-less bot,
   // never as an always-on default here. Null → the chat card renders without a head.
   botLabel = null,
+  // P1.7 — the viewer's conversation filter. `chatFilter` is the SHARED chip model
+  // (`chatFilterChips` + the active filter); `onChatFilter(nextFilter)` is the tap. Null → no chip row,
+  // exactly as before. The shell holds no filter logic: each chip already carries its `nextFilter`.
+  chatFilter = null,
+  onChatFilter = null,
   // per-kring bottom tabs (board Voorbeeld 1-3).
   // `tabs`     `[{id, label}]` produced by `buildKringTabs(policy, t)`
   // `activeTab` current tab id (defaults to first / 'gesprek')
@@ -278,6 +283,12 @@ export function renderCircleKring(container, {
   // S1 #1 — in the noticeboard tab the body owns its own composer, so the chat
   // composer + inline form below are suppressed.
   const inPrikbord = effectiveTab === 'prikbord' && !!noticeboard;
+  // P1.7 — the filter strip, above the stream and only in the conversation view. Rendering it only
+  // where it applies keeps it from reading as a global control over tabs it does not touch.
+  if (chatFilter && typeof onChatFilter === 'function' && effectiveTab === 'gesprek' && viewMode !== 'scherm') {
+    container.appendChild(buildChatFilterStrip(chatFilter, onChatFilter, tr));
+  }
+
   const body = document.createElement('div');
   body.className = 'circle-kring__list';
   body.dataset.activeTab = effectiveTab;
@@ -1135,4 +1146,52 @@ function collectMoreActions(more, tr, policy) {
     }
   }
   return out;
+}
+
+/**
+ * P1.7 — the conversation filter strip: one chip per kind the circle allows, then the people/agents
+ * chips. Pure projection of the shared model — a chip's tap just hands back its precomputed
+ * `nextFilter`, so web and mobile can never drift on what a tap means.
+ *
+ * The wording matters here: this narrows what YOU read. It is not a circle setting and changes nothing
+ * for anyone else, so the strip says so rather than looking like an admin control.
+ */
+function buildChatFilterStrip(model, onChatFilter, tr) {
+  const strip = document.createElement('div');
+  strip.className = 'circle-kring__filter';
+  if (model.active) strip.classList.add('circle-kring__filter--active');
+
+  const chip = (label, { selected, disabled, nextFilter, title }) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'circle-kring__filter-chip';
+    if (selected) b.classList.add('is-on');
+    b.textContent = label;
+    if (title) b.title = title;
+    if (disabled) {
+      b.disabled = true;
+      // The last remaining kind: say why rather than leaving a chip that silently does nothing.
+      b.title = tr('circle.chatFilter.last_kind');
+    } else {
+      b.addEventListener('click', () => onChatFilter(nextFilter));
+    }
+    return b;
+  };
+
+  for (const c of model.kindChips ?? []) {
+    strip.appendChild(chip(tr(`circle.chatFilter.kind.${c.kind}`, { defaultValue: c.kind }), c));
+  }
+  const sep = document.createElement('span');
+  sep.className = 'circle-kring__filter-sep';
+  sep.setAttribute('aria-hidden', 'true');
+  strip.appendChild(sep);
+  for (const c of model.authorChips ?? []) {
+    strip.appendChild(chip(tr(`circle.chatFilter.authors.${c.authors}`), c));
+  }
+
+  const note = document.createElement('span');
+  note.className = 'circle-kring__filter-note';
+  note.textContent = tr('circle.chatFilter.note');
+  strip.appendChild(note);
+  return strip;
 }

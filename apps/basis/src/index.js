@@ -265,6 +265,10 @@ export {
   invitePublishAllows, mayPublish, prepareBroadcastInvite, isInviteLive, receiveInvite, inviteActions,
   BROADCAST_INVITE_MAX_TTL_MS, INVITE_MESSAGE,
 } from './v2/nearbyInvites.js';
+export {
+  DEFAULT_CHAT_FILTER, CHAT_AUTHORS, normalizeChatFilter, applyChatFilter, chatFilterChips,
+  localStorageChatFilterIo, asyncStorageChatFilterIo,
+} from './v2/chatFilter.js';
 export { registerCircleAddresses, unregisterCircleAddresses }
                                                 from './v2/circleAddressRegistration.js';
 export {

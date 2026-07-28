@@ -42,6 +42,8 @@ import {
   myThingsFromListFiles,
   // kring-scoped event stream + per-row action chips.
   chatRows, actionsForStreamRow, resolveConversationKinds,
+  // P1.7 — the viewer's conversation filter (kinds × people/agents), shared model, device-local store.
+  applyChatFilter, chatFilterChips, normalizeChatFilter, asyncStorageChatFilterIo,
   deliveryPresentation,
   // Taken (tasks) tab — task-store item → stream-row projection (shared web≡mobile).
   buildTaskRows,
@@ -2222,15 +2224,48 @@ function CircleDetail({
   // The conversation shows what THIS circle chose — its admin setting, else its template's, else the
   // permissive default (`conversationKinds.js`, web≡mobile). A filter, never a data change: turning a kind
   // back on brings its history with it.
-  const rows = useMemo(() => chatRows({
-    events:    eventLog?.query ? eventLog.query({ excludeMuted: true }) : [],
-    circles,
-    circleId:  circle?.id ?? null,
-    kinds:     resolveConversationKinds({
-      circleSetting: circle?.conversationKinds ?? null,
-      templateKind:  circle?.kind ?? null,
+  const allowedKinds = useMemo(() => resolveConversationKinds({
+    circleSetting: circle?.conversationKinds ?? null,
+    templateKind:  circle?.kind ?? null,
+  }), [circle?.kind, circle?.conversationKinds]);
+  // P1.7 — the reader's own narrowing on top of the circle's setting (web parity). Device-local per
+  // circle; an actor we cannot resolve counts as a person, so nobody vanishes from a conversation.
+  const chatFilterIo = useMemo(() => asyncStorageChatFilterIo(AsyncStorage), []);
+  const [chatFilter, setChatFilter] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    const cid = circle?.id ?? null;
+    if (!cid) { setChatFilter(null); return undefined; }
+    chatFilterIo.load(cid).then((v) => { if (alive) setChatFilter(v); }).catch(() => {});
+    return () => { alive = false; };
+  }, [circle?.id, chatFilterIo]);
+  const viewerFilter = useMemo(
+    () => normalizeChatFilter(chatFilter, allowedKinds),
+    [chatFilter, allowedKinds],
+  );
+  const isAgentActor = useCallback((actor) => {
+    if (actor == null) return false;
+    const list = bundle?.peerGraph?.list ? bundle.peerGraph.list() : [];
+    return (list ?? []).some((p) => (p?.pubKey === actor || p?.url === actor)
+      && (p?.type === 'a2a' || p?.type === 'hybrid' || (Array.isArray(p?.skills) && p.skills.length > 0)));
+  }, [bundle]);
+  const rows = useMemo(() => applyChatFilter({
+    rows: chatRows({
+      events:    eventLog?.query ? eventLog.query({ excludeMuted: true }) : [],
+      circles,
+      circleId:  circle?.id ?? null,
+      kinds:     allowedKinds,
     }),
-  }), [eventLog, circles, circle?.id, circle?.kind, circle?.conversationKinds, streamTick]);
+    filter: viewerFilter,
+    allowedKinds,
+    isAgentActor,
+  }), [eventLog, circles, circle?.id, allowedKinds, viewerFilter, isAgentActor, streamTick]);
+  const onChatFilter = useCallback((next) => {
+    const cid = circle?.id ?? null;
+    if (!cid) return;
+    setChatFilter(next);
+    chatFilterIo.save(cid, next).catch(() => {});
+  }, [circle?.id, chatFilterIo]);
   // Conversation memory — a ref so the bot reads the LATEST rows without re-creating.
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
@@ -3458,6 +3493,17 @@ function CircleDetail({
           2px-ink border. The prikbord / scherm / leden tabs keep the plain body. The
           header + the bordered scroll are stacked siblings that read as one contiguous
           card (matching 2px-ink sides). */}
+      {/* P1.7 — the viewer's conversation filter strip (kinds × people/agents), web parity. Only in the
+          conversation view: elsewhere it would read as a control over tabs it does not touch. The chip
+          model is shared, so a tap means the same thing on both platforms. */}
+      {viewMode !== 'scherm' && activeTab === 'gesprek' ? (
+        <ChatFilterStrip
+          model={chatFilterChips({ allowedKinds, filter: viewerFilter })}
+          onPick={onChatFilter}
+          t={t}
+          styles={styles}
+        />
+      ) : null}
       {viewMode !== 'scherm' && activeTab === 'gesprek' && botLabel ? (
         <View style={styles.chatHead} testID="circle-detail-bot-head">
           <View style={styles.chatDot} />
@@ -3794,6 +3840,42 @@ function CircleDetail({
 // the web circleKring renderer.  Keeps the mobile parity tight.
 // δ.2 — `deliveryOpts` carries the per-message delivery-state hooks
 // for locally-sent bubbles (clock / warning + tap-to-retry).
+/**
+ * P1.7 — the conversation filter strip (mobile mirror of web's `buildChatFilterStrip`).
+ *
+ * Pure projection of the SHARED chip model: each chip carries its own `nextFilter`, so neither shell
+ * decides what a tap means. The note under the chips says this changes only what YOU see — it is a
+ * reading preference, not a circle setting, and must not read like an admin control.
+ */
+function ChatFilterStrip({ model, onPick, t, styles }) {
+  if (!model || typeof onPick !== 'function') return null;
+  const chip = (key, label, c) => (
+    <Pressable
+      key={key}
+      onPress={() => { if (!c.disabled) onPick(c.nextFilter); }}
+      disabled={c.disabled}
+      accessibilityRole="button"
+      accessibilityState={{ selected: c.selected, disabled: !!c.disabled }}
+      style={[styles.filterChip, c.selected && styles.filterChipOn, c.disabled && styles.filterChipOff]}
+      testID={`chat-filter-${key}`}
+    >
+      <Text style={[styles.filterChipText, c.selected && styles.filterChipTextOn]}>{label}</Text>
+    </Pressable>
+  );
+  return (
+    <View style={[styles.filterStrip, model.active && styles.filterStripActive]} testID="chat-filter-strip">
+      <View style={styles.filterRow}>
+        {(model.kindChips ?? []).map((c) =>
+          chip(c.kind, t(`circle.chatFilter.kind.${c.kind}`, { defaultValue: c.kind }), c))}
+        <View style={styles.filterSep} />
+        {(model.authorChips ?? []).map((c) =>
+          chip(c.authors, t(`circle.chatFilter.authors.${c.authors}`), c))}
+      </View>
+      <Text style={styles.filterNote}>{t('circle.chatFilter.note')}</Text>
+    </View>
+  );
+}
+
 function renderBubblesWithDayDividers(rows, t, deliveryOpts = null, styles) {
   const chronological = [...rows].reverse();
   const nodes = [];
@@ -4694,6 +4776,18 @@ const makeStyles = (theme) => StyleSheet.create({
   // .chatbox / web's circle-kring__chat-card). The header strip + the bordered scroll
   // are stacked siblings sharing a 2px-ink frame so they read as one card.
   chatHead:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: theme.color.card, borderTopWidth: 2, borderLeftWidth: 2, borderRightWidth: 2, borderColor: theme.color.ink, borderTopLeftRadius: theme.radius.md, borderTopRightRadius: theme.radius.md, borderBottomWidth: 1, borderBottomColor: theme.color.line },
+  // P1.7 — the conversation filter strip. Quiet by default; the strip warms when a filter is active so
+  // a narrowed conversation never reads as a missing one (web parity).
+  filterStrip:      { paddingHorizontal: 4, paddingTop: 6, paddingBottom: 2, gap: 4 },
+  filterStripActive:{ backgroundColor: theme.color.surface2 ?? theme.color.card, borderRadius: theme.radius.sm },
+  filterRow:        { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
+  filterChip:       { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999, borderWidth: 1, borderColor: theme.color.line },
+  filterChipOn:     { backgroundColor: theme.color.card, borderColor: theme.color.ink },
+  filterChipOff:    { opacity: 0.55 },
+  filterChipText:   { fontSize: 12, color: theme.color.inkSoft },
+  filterChipTextOn: { color: theme.color.ink, fontWeight: '600' },
+  filterSep:        { width: 1, height: 14, backgroundColor: theme.color.line, marginHorizontal: 2 },
+  filterNote:       { fontSize: 11, color: theme.color.inkSoft, paddingHorizontal: 2 },
   chatDot:   { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.color.green },
   chatName:  { fontSize: 12.5, fontWeight: '700', color: theme.color.ink },
   chatScroll:{ flex: 1, backgroundColor: theme.color.card, borderLeftWidth: 2, borderRightWidth: 2, borderBottomWidth: 2, borderColor: theme.color.ink, borderBottomLeftRadius: theme.radius.md, borderBottomRightRadius: theme.radius.md },

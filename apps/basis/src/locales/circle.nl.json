@@ -2947,6 +2947,52 @@
       "doc": "P1 §5 — empty state for the skill list."
     }
   },
+  "chatFilter": {
+    "note": {
+      "text": "Dit verandert alleen wat jij hier ziet.",
+      "doc": "P1.7 — the filter strip is a reading preference, not a circle setting."
+    },
+    "last_kind": {
+      "text": "Dit is de laatste — uitzetten laat niets over om te lezen.",
+      "doc": "P1.7 — why the final selected kind-chip is disabled."
+    },
+    "kind": {
+      "chat-message": {
+        "text": "Berichten",
+        "doc": "P1.7 — kind chip: plain chat."
+      },
+      "task": {
+        "text": "Taken",
+        "doc": "P1.7 — kind chip."
+      },
+      "vraag": {
+        "text": "Vragen",
+        "doc": "P1.7 — kind chip."
+      },
+      "aanbod": {
+        "text": "Aanbod",
+        "doc": "P1.7 — kind chip."
+      },
+      "leen": {
+        "text": "Lenen",
+        "doc": "P1.7 — kind chip."
+      }
+    },
+    "authors": {
+      "all": {
+        "text": "Iedereen",
+        "doc": "P1.7 — author chip: people + agents."
+      },
+      "people": {
+        "text": "Mensen",
+        "doc": "P1.7 — author chip: hide agent chatter (Frits' case)."
+      },
+      "agents": {
+        "text": "Agents",
+        "doc": "P1.7 — author chip: only what the agents said."
+      }
+    }
+  },
   "rules": {
     "title": {
       "text": "Huisregels",

@@ -123,6 +123,11 @@ import {
 import { createFallbackOffer } from '../../src/v2/addressFallback.js';
 import { setAddressFallbackReportHook } from '@onderling-app/stoop';
 import { resolveConversationKinds } from '../../src/v2/conversationKinds.js';
+// P1.7 — the VIEWER's own narrowing of the conversation (kinds × people/agents), device-local per
+// circle. The circle's conversationKinds stays the ceiling; this only narrows within it.
+import {
+  applyChatFilter, chatFilterChips, normalizeChatFilter, localStorageChatFilterIo,
+} from '../../src/v2/chatFilter.js';
 // S5 — key management: reuse the existing encrypted-backup + restore wizards
 // (the slash/page renderers) inside My-data, mounted in a lightweight overlay.
 import { renderEncryptedBackupWizard } from '../../src/web/wizards/encryptedBackupWizard.js';
@@ -830,6 +835,28 @@ const policyStore = createCirclePolicyStore({ ...localStoragePolicyIo(), version
 // α.1c — per-kring recipe book store (multi-recipe per kring, one active).
 // localStorage now; pod io can swap in later without touching callers.
 const recipeStore = createKringRecipeStore({ io: localStorageRecipeIo(), versions: recipeVersions });
+
+// P1.7 — the viewer's per-circle chat filter (device-local; nothing is fanned — a filter that told the
+// circle what you skip would be a new leak).
+const chatFilterIo = localStorageChatFilterIo();
+
+// Which actors are AGENTS, for the filter's people/agents axis. Read off the Contacten roster the app
+// already keeps (bots are flagged there), refreshed opportunistically; an actor we cannot resolve counts
+// as a PERSON, so an unknown never disappears from someone's conversation.
+let _agentActors = new Set();
+function refreshAgentActors() {
+  loadAllContacts()
+    .then((rows) => {
+      _agentActors = new Set(
+        (rows ?? []).filter((r) => r?.isBot)
+          .flatMap((r) => [r.contactId, r.peerAddr].filter(Boolean)),
+      );
+    })
+    .catch(() => { /* keep the previous set — a roster hiccup must not reshape a conversation */ });
+}
+function isAgentActorInCircle(actor) {
+  return actor != null && _agentActors.has(actor);
+}
 // D1 (§5A) — per-circle action-frequency counter (the quickActions row).
 // Hydrated from localStorage at boot; persists its snapshot on every bump.
 const ACTION_FREQ_KEY = 'cc.actionFrequency';
@@ -4982,17 +5009,29 @@ function showKring(id, circle, policy) {
       circleSetting: circle?.conversationKinds ?? null,
       templateKind:  circle?.kind ?? null,
     });
+    // The reader's own filter on top (Frits: "everything should be filterable, even chat itself").
+    // An agent's rows are identified through the Contacten roster the host already holds — this module
+    // owns no roster, and an unresolvable actor counts as a person (never hide people).
+    const viewerFilter = normalizeChatFilter(chatFilterIo.load(id), kinds);
     const rows = withDelivery(
-      chatRows({
-        events:    eventLog.query({ excludeMuted: true }),
-        circles:   circlesCache,
-        circleId:  id,
-        kinds,
+      applyChatFilter({
+        rows: chatRows({
+          events:    eventLog.query({ excludeMuted: true }),
+          circles:   circlesCache,
+          circleId:  id,
+          kinds,
+        }),
+        filter: viewerFilter,
+        allowedKinds: kinds,
+        isAgentActor: isAgentActorInCircle,
       }),
       deliveryByMessageId,
     );
     renderCircleKring(rootEl, {
       circle, rows, t,
+      // P1.7 — the chip model is shared; the shell only renders it and persists the tap.
+      chatFilter: { ...chatFilterChips({ allowedKinds: kinds, filter: viewerFilter }), filter: viewerFilter },
+      onChatFilter: (nextFilter) => { chatFilterIo.save(id, nextFilter); rerender(); },
       // §8 — report another member's message to the admins (a governance `message` report).
       onReportMessage: (msgId, row) => {
         const reason = (globalThis.prompt?.(t('circle.governance.report_reason_prompt')) ?? '') || '';
@@ -6794,6 +6833,7 @@ async function boot() {
   try {
     circlesCache = await loadCircles(sources);
     registerCirclePresence();   // G13 — the connect-time call may have run before circles were known
+    refreshAgentActors();       // P1.7 — populate the people/agents axis (best-effort, non-blocking)
   } catch (err) {
     console.warn('[circleApp] loadCircles failed', err);
     circlesCache = [];

@@ -92,9 +92,12 @@ export function isDeliveryState(v) {
  */
 export function advanceDelivery(current, next) {
   // A terminal state is where a message STOPPED, so it is not compared on the ladder: it replaces whatever
-  // came before (a send that fails after "pending" is failed), and nothing on the ladder replaces it —
-  // a stale ack must not resurrect a message the user was told did not go.
-  if (DELIVERY_TERMINAL.includes(current)) return current;
+  // came before, and a stale ack must not resurrect a message the user was told did not go.
+  //
+  // ONE exception, and it comes from the shipped flow rather than from theory: `pending → failed → (retry)
+  // pending → sent`. A retry is an ACT, not an arrival, so `pending` is allowed out of a terminal state and
+  // nothing else is.
+  if (DELIVERY_TERMINAL.includes(current)) return next === DELIVERY.PENDING ? next : current;
   if (DELIVERY_TERMINAL.includes(next)) return next;
 
   const a = DELIVERY_ORDER.indexOf(current);

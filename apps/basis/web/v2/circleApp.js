@@ -117,7 +117,7 @@ import { renderCircleProfile } from './circleProfile.js';
 import { renderCircleAdminPanel } from './circleAdminPanel.js';
 import { renderCircleMyData } from './circleMyData.js';
 import {
-  createDeliverySettingsStore, localStorageDeliveryIo, withDelivery, recordDelivery,
+  createDeliverySettingsStore, localStorageDeliveryIo, withDelivery,
 } from '../../src/v2/deliverySettings.js';
 import { resolveConversationKinds } from '../../src/v2/conversationKinds.js';
 // S5 — key management: reuse the existing encrypted-backup + restore wizards
@@ -1132,7 +1132,9 @@ const relayPrefStore       = createRelayPrefStore(localStorageRelayIo());
 // The two delivery settings, and the per-message state map they govern the display of.
 const deliverySettingsStore = createDeliverySettingsStore(localStorageDeliveryIo());
 let   deliverySettingsCache = { sendReceipts: true, allowFallback: false };
-let   deliveryByMessageId   = new Map();
+// Per-message state lives in the SHARED map (δ.2, both shells) — see deliverySettings.js for why there is
+// no second store.
+const deliveryByMessageId  = { get: (id) => deliveryStateMap.get(id) };
 let   CIRCLE_RELAY_URL      = resolveRelayUrl(localStorageRelayIo().load(), CIRCLE_RELAY_ENV);
 let   _peerAgent           = null;   // captured at boot so a relay-setting change can reconnect live
 let   _peerRouter          = null;

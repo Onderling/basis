@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, NEARBY_INVITE_LABELS, nearbyVisibilityKey,
-  POINT_SOURCE_LABELS,
+  POINT_SOURCE_LABELS, DELIVERY_LABELS, resolveConversationKinds,
 } from '@onderling-app/basis';
 import { initLocalisation, setLang, t }              from '../src/core/localisation.js';
 
@@ -62,6 +62,13 @@ describe('NEARBY_ACTION_LABELS — one definition, resolvable in both languages'
         ...Object.values(NEARBY_ASK_LABELS),
         ...Object.values(NEARBY_INVITE_LABELS),
         ...Object.values(POINT_SOURCE_LABELS),
+        ...Object.values(DELIVERY_LABELS),
+        ...['delivery_section', 'delivery_receipts_on', 'delivery_receipts_off',
+            'delivery_receipts_toggle_on', 'delivery_receipts_toggle_off',
+            'delivery_fallback_on', 'delivery_fallback_off',
+            'delivery_fallback_toggle_on', 'delivery_fallback_toggle_off',
+            'delivery_fallback_hint', 'delivery_fallback_cost', 'delivery_fallback_enable']
+          .map((k) => `circle.nearbyScreen.${k}`),
         ...['asks_title', 'asks_empty', 'ask_resonant', 'ask_disclosure', 'ask_compose',
             'ask_placeholder', 'ask_send', 'ask_sent', 'ask_expired', 'answer_sent',
             // step G — cards + room chat
@@ -119,6 +126,29 @@ describe('POINT_SOURCE_LABELS — provenance, described once', () => {
     // Both renderers read this map, so neither can describe the same point differently.
     expect(Object.keys(POINT_SOURCE_LABELS).sort()).toEqual(['join', 'manual', 'suggested']);
     expect(Object.isFrozen(POINT_SOURCE_LABELS)).toBe(true);
+  });
+});
+
+describe('the delivery ladder is ONE vocabulary, shared', () => {
+  it('every label lives in the namespace that already existed', () => {
+    // The chat bubble has had `circle.chat.delivery.*` since δ.2. A second namespace would mean the two
+    // shells could word the same fact differently — and nothing would catch it.
+    for (const key of Object.values(DELIVERY_LABELS)) {
+      expect(key).toMatch(/^circle\.chat\.delivery\./);
+    }
+  });
+});
+
+describe('conversation kinds reach mobile identically', () => {
+  it('a buurt shows the noticeboard, not open chat — the same answer as web', () => {
+    const kinds = resolveConversationKinds({ templateKind: 'buurt' });
+    expect(kinds).not.toContain('chat-message');
+    expect(kinds).toEqual(expect.arrayContaining(['vraag', 'aanbod']));
+  });
+
+  it("and an admin's choice wins on mobile too", () => {
+    expect(resolveConversationKinds({ circleSetting: ['chat-message'], templateKind: 'buurt' }))
+      .toEqual(['chat-message']);
   });
 });
 

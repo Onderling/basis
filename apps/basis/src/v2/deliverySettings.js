@@ -19,7 +19,7 @@
  * receipts off is precisely the disclosure `deliveryState.js` refuses to make — it would let anyone spot
  * the setting by looking at a conversation.
  */
-import { DELIVERY, DELIVERY_LABELS, isDeliveryState, advanceDelivery } from './deliveryState.js';
+import { DELIVERY_LABELS, isDeliveryState } from './deliveryState.js';
 
 /** Both settings, with their defaults. Only an explicit boolean changes one. */
 export function deliverySettings(stored = {}) {
@@ -108,12 +108,16 @@ export function withDelivery(rows, deliveryById, isMine = (r) => r?.mine === tru
 }
 
 /**
- * Fold a send outcome into a delivery map, never demoting (see `advanceDelivery`).
- * Returns a NEW map so a caller can diff it.
+ * ⚠️ **There is no `recordDelivery` here, deliberately.**
+ *
+ * Storing per-message delivery state already exists: `createDeliveryStateMap` in
+ * `@onderling/kring-host/deliveryState`, shared by both shells since δ.2, with subscriptions and pruning.
+ * A second store would be a third implementation of one idea — the exact failure
+ * `docs/conventions/shared-vocabularies.md` was written about, found by following its own advice.
+ *
+ * That map now carries the full ladder and the forward-only rule. Use it:
+ *
+ *     import { createDeliveryStateMap } from '@onderling/kring-host/deliveryState';
+ *     map.set(msgId, deliveryAfterSend(outcome));   // monotonic, retry-aware
+ *     map.get(msgId);                               // → a state for `deliveryLabelFor`
  */
-export function recordDelivery(deliveryById, messageId, nextState) {
-  const next = new Map(deliveryById instanceof Map ? deliveryById : Object.entries(deliveryById ?? {}));
-  if (!messageId || !isDeliveryState(nextState)) return next;
-  next.set(messageId, advanceDelivery(next.get(messageId) ?? DELIVERY.SENT, nextState));
-  return next;
-}

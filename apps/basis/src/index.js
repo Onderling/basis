@@ -278,7 +278,7 @@ export {
 } from './v2/deliveryState.js';
 export {
   deliverySettings, createDeliverySettingsStore, localStorageDeliveryIo, asyncStorageDeliveryIo,
-  deliveryLabelFor, withDelivery, recordDelivery,
+  deliveryLabelFor, withDelivery,
 } from './v2/deliverySettings.js';
 export {
   defaultConversationKinds, availableConversationKinds, TEMPLATE_CONVERSATION_KINDS,

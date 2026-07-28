@@ -12,6 +12,16 @@
  *   - `'sent'`     — fan-out resolved with no errors; bubble shows nothing (happy-path stays clean)
  *   - `'failed'`   — fan-out rejected or returned `errors[]`; bubble shows a warning that taps to retry
  *
+ * **Extended 2026-07-28 (G8/G9/G10)** with the far end of the same journey — what happened on the PEER's
+ * side, which δ.2 had no way to know:
+ *   - `'maybe-received'`  — we asked for a transport ack, got none, and sent it fire-and-forget anyway
+ *   - `'reached-device'`  — their transport acknowledged (before their app saw it)
+ *   - `'stored'`          — their app accepted and stored it
+ *
+ * One map, not two. `apps/basis/src/v2/deliveryState.js` owns the ladder and its ordering; this owns the
+ * per-message storage and the subscription. Splitting them across two maps was the near-miss that produced
+ * `docs/conventions/shared-vocabularies.md`.
+ *
  * The EventLog stays append-only.  This map is a separate piece of
  * UI state read at render time and re-fired when state flips.
  *
@@ -23,7 +33,7 @@
  */
 
 /**
- * @typedef {'pending' | 'sent' | 'failed' | null} DeliveryState
+ * @typedef {'pending'|'sent'|'maybe-received'|'reached-device'|'stored'|'failed'|'undeliverable'|null} DeliveryState
  */
 
 /**
@@ -60,6 +70,31 @@
  *
  * @returns {DeliveryStateMap}
  */
+/** The full ladder, weakest → strongest. Terminals sit outside it (see `advance`). */
+const LADDER = ['pending', 'sent', 'maybe-received', 'reached-device', 'stored'];
+const TERMINAL = new Set(['failed', 'undeliverable']);
+const KNOWN_STATES = new Set([...LADDER, ...TERMINAL]);
+
+/**
+ * Forward-only, with one deliberate exception.
+ *
+ * From a TERMINAL state (`failed` / `undeliverable`) the only move allowed is back to `pending` — a RETRY,
+ * which is an act by the user or the app, not a message arriving. Everything else is ignored, so a late
+ * transport-ack cannot quietly un-fail a message the user was already told did not send.
+ *
+ * That exception is not hypothetical: the existing flow is `pending → failed → (retry) pending → sent`, and
+ * a test has pinned it since δ.2. Making terminals fully absorbing broke it — which is the second time
+ * today that reading what already exists changed the design rather than confirming it.
+ */
+function advance(current, next) {
+  if (current == null) return next;
+  if (TERMINAL.has(current)) return next === 'pending' ? next : current;
+  if (TERMINAL.has(next)) return next;
+  const a = LADDER.indexOf(current);
+  const b = LADDER.indexOf(next);
+  return b > a ? next : current;
+}
+
 export function createDeliveryStateMap() {
   /** @type {Map<string, Exclude<DeliveryState, null>>} */
   const map = new Map();
@@ -85,9 +120,15 @@ export function createDeliveryStateMap() {
         notify(msgId, null);
         return;
       }
-      if (state !== 'pending' && state !== 'sent' && state !== 'failed') return;
-      map.set(msgId, state);
-      notify(msgId, state);
+      if (!KNOWN_STATES.has(state)) return;
+      // Monotonic: acks and receipts race, and a late transport-ack must not demote a message the app
+      // receipt already advanced. A TERMINAL state (failed/undeliverable) replaces whatever came before and
+      // is never itself replaced — the user was told it did not go, and a stale ack must not rewrite that.
+      const current = map.get(msgId);
+      const next = advance(current, state);
+      if (next === current) return;
+      map.set(msgId, next);
+      notify(msgId, next);
     },
     clear(msgId) {
       if (typeof msgId !== 'string' || msgId === '') return false;

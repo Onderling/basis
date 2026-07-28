@@ -14,6 +14,11 @@ import { useTheme, useThemePref } from './themeContext.js';
 import { surfacePrefStore } from '../../core/surfacePrefStore.js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createRelayPrefStore, asyncStorageRelayIo } from '../../../../basis/src/v2/relayPref.js';
+// The two delivery settings — one store, because they are two knobs on the same question (how much does
+// the network learn in exchange for the message arriving). web≡mobile via deliverySettings.js.
+import {
+  createDeliverySettingsStore, asyncStorageDeliveryIo,
+} from '../../../../basis/src/v2/deliverySettings.js';
 import UserLlmSettings from './UserLlmSettings.js';
 import EncryptedBackupWizardModal from '../../../../basis/src/rn/wizards/encryptedBackupWizardModal.js';
 import RestoreFromMnemonicWizardModal from '../../../../basis/src/rn/wizards/restoreFromMnemonicWizardModal.js';
@@ -81,6 +86,15 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
   // The connection-point LIST (Nearby step I) — the relay field above sets one url; this shows every point
   // the device knows, which circles ride each, and what removing one would cost.
   const openPoints = useCallback(() => { onOpenConnectionPoints?.(); }, [onOpenConnectionPoints]);
+
+  const deliveryStore = React.useMemo(
+    () => createDeliverySettingsStore(asyncStorageDeliveryIo(AsyncStorage)), [],
+  );
+  const [delivery, setDelivery] = useState({ sendReceipts: true, allowFallback: false });
+  useEffect(() => { deliveryStore.get().then(setDelivery).catch(() => {}); }, [deliveryStore]);
+  const toggleDelivery = useCallback(async (patch) => {
+    try { setDelivery(await deliveryStore.set(patch)); } catch { /* keep the old view */ }
+  }, [deliveryStore]);
 
   useEffect(() => { getNativePushState().then(setPush).catch(() => {}); }, []);
   const toggleNativePush = useCallback(async () => {
@@ -182,6 +196,46 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
             what removing one would cost (Nearby step I). */}
         <Pressable style={styles.relaySave} onPress={openPoints} testID="open-connection-points">
           <Text style={styles.relaySaveText}>{t('circle.nearbyScreen.points_open')}</Text>
+        </Pressable>
+
+        {/* Delivery (2026-07-28). Both lines say what HAPPENS, not which switch is where — and nothing
+            tells you what others see about your receipt setting, because nothing in the model reveals it.
+            A "they cannot tell" reassurance here would be the first place that leaked. */}
+        <Text style={styles.sectionTitle}>{t('circle.nearbyScreen.delivery_section')}</Text>
+        <Text style={styles.relayHint} testID="delivery-receipts-state">
+          {t(delivery.sendReceipts
+            ? 'circle.nearbyScreen.delivery_receipts_on'
+            : 'circle.nearbyScreen.delivery_receipts_off')}
+        </Text>
+        <Pressable
+          style={styles.relaySave}
+          onPress={() => toggleDelivery({ sendReceipts: !delivery.sendReceipts })}
+          testID="delivery-receipts-toggle"
+        >
+          <Text style={styles.relaySaveText}>
+            {t(delivery.sendReceipts
+              ? 'circle.nearbyScreen.delivery_receipts_toggle_on'
+              : 'circle.nearbyScreen.delivery_receipts_toggle_off')}
+          </Text>
+        </Pressable>
+
+        <Text style={styles.relayHint} testID="delivery-fallback-state">
+          {t(delivery.allowFallback
+            ? 'circle.nearbyScreen.delivery_fallback_on'
+            : 'circle.nearbyScreen.delivery_fallback_off')}
+        </Text>
+        {/* The cost rides WITH the option to enable it — never the fix alone. */}
+        <Text style={styles.relayHint}>{t('circle.nearbyScreen.delivery_fallback_cost')}</Text>
+        <Pressable
+          style={styles.relaySave}
+          onPress={() => toggleDelivery({ allowFallback: !delivery.allowFallback })}
+          testID="delivery-fallback-toggle"
+        >
+          <Text style={styles.relaySaveText}>
+            {t(delivery.allowFallback
+              ? 'circle.nearbyScreen.delivery_fallback_toggle_on'
+              : 'circle.nearbyScreen.delivery_fallback_toggle_off')}
+          </Text>
         </Pressable>
 
         {/* cluster J — pod sign-in entry (the v2 UI had none). When signed out: pod provider + Connect. */}

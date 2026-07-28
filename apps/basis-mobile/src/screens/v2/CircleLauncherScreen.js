@@ -41,7 +41,7 @@ import {
   // "My things" private notes-list.
   myThingsFromListFiles,
   // kring-scoped event stream + per-row action chips.
-  chatRows, actionsForStreamRow,
+  chatRows, actionsForStreamRow, resolveConversationKinds,
   // Taken (tasks) tab — task-store item → stream-row projection (shared web≡mobile).
   buildTaskRows,
   // per-kring bottom tabs from policy.features (v2 §1).
@@ -2162,11 +2162,18 @@ function CircleDetail({
   const [streamTick, setStreamTick] = useState(0);
   // C15 — a CHAT projection: the log's silent system lane (the `roster-updated` pull-me and
   // friends) never surfaces here; the cross-circle Stream tab is the firehose. Web parity.
+  // The conversation shows what THIS circle chose — its admin setting, else its template's, else the
+  // permissive default (`conversationKinds.js`, web≡mobile). A filter, never a data change: turning a kind
+  // back on brings its history with it.
   const rows = useMemo(() => chatRows({
     events:    eventLog?.query ? eventLog.query({ excludeMuted: true }) : [],
     circles,
     circleId:  circle?.id ?? null,
-  }), [eventLog, circles, circle?.id, streamTick]);
+    kinds:     resolveConversationKinds({
+      circleSetting: circle?.conversationKinds ?? null,
+      templateKind:  circle?.kind ?? null,
+    }),
+  }), [eventLog, circles, circle?.id, circle?.kind, circle?.conversationKinds, streamTick]);
   // Conversation memory — a ref so the bot reads the LATEST rows without re-creating.
   const rowsRef = useRef(rows);
   rowsRef.current = rows;

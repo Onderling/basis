@@ -145,7 +145,14 @@ describe('terminal states', () => {
     expect(advanceDelivery(DELIVERY.PENDING, DELIVERY.UNDELIVERABLE)).toBe(DELIVERY.UNDELIVERABLE);
   });
 
-  it('and nothing resurrects it — a stale ack must not un-fail a message', () => {
+  it('a RETRY is allowed out of a terminal state — it is an act, not an arrival', () => {
+    // The shipped flow is `pending → failed → (retry) pending → sent`, pinned by a kring-host test since
+    // δ.2. Making terminals fully absorbing broke it.
+    expect(advanceDelivery(DELIVERY.FAILED, DELIVERY.PENDING)).toBe(DELIVERY.PENDING);
+    expect(advanceDelivery(DELIVERY.UNDELIVERABLE, DELIVERY.PENDING)).toBe(DELIVERY.PENDING);
+  });
+
+  it('and nothing else resurrects it — a stale ack must not un-fail a message', () => {
     // The user was told it did not go. A late confirmation arriving afterwards is not a reason to quietly
     // change that story.
     expect(advanceDelivery(DELIVERY.FAILED, DELIVERY.REACHED)).toBe(DELIVERY.FAILED);

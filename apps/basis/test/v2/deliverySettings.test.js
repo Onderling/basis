@@ -6,10 +6,11 @@
  * disclosure `deliveryState.js` refuses to make. Null means render nothing.
  */
 import { describe, it, expect } from 'vitest';
+import * as mod from '../../src/v2/deliverySettings.js';
 import {
   deliverySettings, createDeliverySettingsStore,
   localStorageDeliveryIo, asyncStorageDeliveryIo,
-  deliveryLabelFor, withDelivery, recordDelivery,
+  deliveryLabelFor, withDelivery,
 } from '../../src/v2/deliverySettings.js';
 import { DELIVERY } from '../../src/v2/deliveryState.js';
 
@@ -118,28 +119,12 @@ describe('joining delivery onto rows', () => {
   });
 });
 
-describe('recording an outcome', () => {
-  it('advances and never demotes', () => {
-    let map = recordDelivery(new Map(), 'm1', DELIVERY.REACHED);
-    expect(map.get('m1')).toBe(DELIVERY.REACHED);
-
-    map = recordDelivery(map, 'm1', DELIVERY.STORED);
-    expect(map.get('m1')).toBe(DELIVERY.STORED);
-
-    // A late transport-ack arriving after the app receipt must not undo it.
-    map = recordDelivery(map, 'm1', DELIVERY.REACHED);
-    expect(map.get('m1')).toBe(DELIVERY.STORED);
-  });
-
-  it('returns a NEW map, so a caller can diff', () => {
-    const before = new Map();
-    const after = recordDelivery(before, 'm1', DELIVERY.SENT);
-    expect(after).not.toBe(before);
-    expect(before.size).toBe(0);
-  });
-
-  it('ignores an unusable id or state', () => {
-    expect(recordDelivery(new Map(), '', DELIVERY.SENT).size).toBe(0);
-    expect(recordDelivery(new Map(), 'm1', 'read').size).toBe(0);
+describe('there is no second delivery store here', () => {
+  it('storage lives in the SHARED map, not in this module', () => {
+    // `createDeliveryStateMap` (@onderling/kring-host) has done this since δ.2, for both shells, with
+    // subscriptions and pruning. A `recordDelivery` here would be a third implementation of one idea.
+    // Whole-word-ish: `deliverySettings` contains "set", which is not a store.
+    const looksLikeAStore = /^(record|set|track|remember)Delivery|DeliveryStateMap$/;
+    expect(Object.keys(mod).filter((k) => looksLikeAStore.test(k))).toEqual([]);
   });
 });

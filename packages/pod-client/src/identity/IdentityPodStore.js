@@ -212,7 +212,7 @@ export class IdentityPodStore {
     this.#rootPubKey = identity.pubKey;
 
     // Normalize into the identity-container namespace. New containers live under '/onderling/'
-    // (naming migration 2026-07-29); a caller passing an explicit '/canopy/' root — an EXISTING
+    // (naming migration 2026-07-28); a caller passing an explicit '/canopy/' root — an EXISTING
     // container from before the rename — is honoured as-is, so pre-rename pods keep syncing without a
     // data move. (A future migration tool can copy canopy/→onderling/; until then both spellings work.)
     let root = podRoot;

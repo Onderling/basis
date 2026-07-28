@@ -56,7 +56,7 @@ const NOOP_ENSURE_SHARES  = async () => ({ minted: 0, renewed: 0, errors: [] });
 const NOOP_LIST_SHARES    = async () => [];
 
 const STATE_FILE_RELPATH = '.onderling/notes-sync-state.json';
-// Naming migration 2026-07-29 — state written before the rename is READ from the old dir once (losing
+// Naming migration 2026-07-28 — state written before the rename is READ from the old dir once (losing
 // it would make every note look never-synced → a full re-walk / conflict noise); saves go new-dir only.
 const STATE_FILE_RELPATH_LEGACY = '.canopy/notes-sync-state.json';
 const DEFAULT_DEBOUNCE_MS = 500;

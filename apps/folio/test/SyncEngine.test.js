@@ -351,7 +351,7 @@ describe('SyncEngine — state persistence', () => {
     expect(r.downloads).toBe(0);
     expect(r.conflicts).toBe(0);
   });
-  // Naming migration 2026-07-29 — the real risk of moving the state dir: state written under the OLD
+  // Naming migration 2026-07-28 — the real risk of moving the state dir: state written under the OLD
   // path must still be READ, or every note looks never-synced and the next run re-uploads the world.
   it('reads pre-rename state from the legacy .canopy/ path (no spurious re-sync)', async () => {
     await fs.writeFile(join(localRoot, 'a.md'), 'A');

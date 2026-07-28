@@ -17,7 +17,7 @@
 import { TombstoneStore } from '../TombstoneStore.js';
 
 const DEFAULT_PREFIX = 'onderling:tombstones:';
-// Naming migration 2026-07-29 — tombstones persisted under the OLD prefix still count (a tombstone that
+// Naming migration 2026-07-28 — tombstones persisted under the OLD prefix still count (a tombstone that
 // silently stops counting = a deleted item resurrecting after the app update). Reads consult both; new
 // writes/removes use the new prefix only, so the old namespace ages out with its entries.
 const LEGACY_PREFIX  = 'canopy:tombstones:';

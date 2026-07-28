@@ -3,7 +3,7 @@
 # current public URL to ~/.onderling-relay-url. Under the systemd user service
 # (Restart=always + linger) this survives crashes / logout / reboot.
 #
-# Naming migration 2026-07-29: the URL is also written to the legacy ~/.canopy-relay-url for one
+# Naming migration 2026-07-28: the URL is also written to the legacy ~/.canopy-relay-url for one
 # window, so anything already reading that path (an old checkout, a shell alias) keeps working.
 #
 # NOTE: a cloudflared QUICK tunnel gets a fresh random URL on each (re)start, so

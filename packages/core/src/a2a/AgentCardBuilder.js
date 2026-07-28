@@ -82,7 +82,7 @@ export class AgentCardBuilder {
       authentication: {
         schemes: ['Bearer'],
       },
-      // Naming migration 2026-07-29 — the extension block is written under BOTH keys for one window:
+      // Naming migration 2026-07-28 — the extension block is written under BOTH keys for one window:
       // `x-onderling` is the name going forward; `x-canopy` keeps peers on older app versions (and the
       // public feedback repo) reading this card until they update. Readers here prefer x-onderling.
       'x-onderling': extensionBlock,

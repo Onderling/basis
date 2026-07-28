@@ -73,11 +73,11 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
 - **Shared vocabularies** (delivery states, entry kinds, roles, label maps) — the index of what already
   exists, and the rule that a new one needs a home + a guard — [`shared-vocabularies.md`](docs/conventions/shared-vocabularies.md).
 - **Record a decision** when a choice closes off alternatives / would be re-litigated / shapes architecture (→ `docs/decisions.md`) or org (→ private) — [`decision-log.md`](docs/conventions/decision-log.md).
-- **No new "canopy" identifiers** (Frits, 2026-07-29). Product/platform naming in code, comments, labels
+- **No new "canopy" identifiers** (Frits, 2026-07-28). Product/platform naming in code, comments, labels
   and schemes is **onderling** (or neutral). `canopy` survives only in FROZEN persisted/wire names that
   need a decided migration to change (pod `canopy/` layout, `https://canopy.org/ns`, `x-canopy` card
   fields, `canopy.mappings:` storage keys, `com.canopy.hub.BIND`, parse-only legacy `canopy-pair://`) —
-  the inventory + migration question lives in `plans/DECISIONS-FOR-REVIEW.md` 2026-07-29.
+  the inventory + migration question lives in `plans/DECISIONS-FOR-REVIEW.md` 2026-07-28.
 
 ## How to work
 - **Go through the SURFACE, never the transport.** App/shell code must not construct or drive
@@ -85,7 +85,7 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
   builder (`buildMeshTransports` → `createMeshAgent`) and the `Peer` façade; discoverability, advertising
   and routing are properties the surface exposes, not knobs an app reaches past it to set. Reaching for a
   transport is the signal that the surface is missing an affordance — add it there.
-- **The enforceability test** (Frits, 2026-07-29): *could someone running a different app version get
+- **The enforceability test** (Frits, 2026-07-28): *could someone running a different app version get
   what they want anyway?* If yes, do NOT present it as enforcement. Everything client-side is a
   convention — say so, and put the real gate where it holds (the seal, the key, the roster, the relay).
   A UI that promises what a modified client can ignore is lying to the user, not protecting them.

@@ -459,6 +459,6 @@ function withOnderlingPreset(options) {
   return config;
 }
 
-// `withCanopyPreset` is the legacy alias (naming decision 2026-07-29: no new "canopy" identifiers);
+// `withCanopyPreset` is the legacy alias (naming decision 2026-07-28: no new "canopy" identifiers);
 // existing metro configs keep working, new ones use `withOnderlingPreset`.
 module.exports = { withOnderlingPreset, withCanopyPreset: withOnderlingPreset, NODE_BUILTINS };

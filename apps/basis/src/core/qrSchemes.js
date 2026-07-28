@@ -16,7 +16,7 @@ export const QR_URI_PREFIXES = Object.freeze([
   'onderling-pair://', // OBJ-2 no-pod device/agent pairing: encodes a household peer address
   'canopy-pair://',    // legacy spelling of the pairing scheme — still RECOGNISED (a printed/screenshotted
                        // QR keeps working); new QRs are minted as onderling-pair:// only (naming decision
-                       // 2026-07-29: no new "canopy" identifiers).
+                       // 2026-07-28: no new "canopy" identifiers).
   'basis://',    // future: chat-shell-level invites
 ]);
 

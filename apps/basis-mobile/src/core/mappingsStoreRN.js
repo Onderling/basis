@@ -14,7 +14,7 @@
  */
 
 const PREFIX = 'onderling.mappings:';   // AsyncStorage namespace; JSON stored under PREFIX + <uri>
-// Naming migration 2026-07-29 — mappings persisted under the OLD prefix still resolve (an installed
+// Naming migration 2026-07-28 — mappings persisted under the OLD prefix still resolve (an installed
 // extension must not vanish on update). Reads fall back; writes/deletes use the new prefix only.
 const LEGACY_PREFIX = 'canopy.mappings:';
 

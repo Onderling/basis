@@ -67,7 +67,7 @@ const ENC_INFO       = 'canopy-pod-export-v1';
 const SALT_LEN       = 16;
 const NONCE_LEN      = 24;
 
-// Both spellings of the identity container count (naming migration 2026-07-29: new pods use
+// Both spellings of the identity container count (naming migration 2026-07-28: new pods use
 // /onderling/, pre-rename pods keep /canopy/).
 const IDENTITY_CONTAINER_PATHS = ['/onderling/', '/canopy/'];
 

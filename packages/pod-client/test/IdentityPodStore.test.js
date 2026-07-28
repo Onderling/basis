@@ -449,7 +449,7 @@ describe('IdentityPodStore envelope layout', () => {
   });
 });
 
-/* ── Naming migration 2026-07-29 — the identity container ───────────────────────────────────────── */
+/* ── Naming migration 2026-07-28 — the identity container ───────────────────────────────────────── */
 
 describe('IdentityPodStore — container namespace', () => {
   it('a fresh pod root normalizes into /onderling/', () => {

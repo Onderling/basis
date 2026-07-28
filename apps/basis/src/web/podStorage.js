@@ -16,7 +16,7 @@
  *     `onderling/` so basis-managed pod state doesn't collide
  *     with other Solid apps (folio's existing
  *     `<pod>/<folder-mirror>` paths remain unaffected). Reads fall
- *     back to the pre-2026-07-29 `canopy/` namespace.
+ *     back to the pre-2026-07-28 `canopy/` namespace.
  *
  * v0.7. limitations:
  *   - One-way write only (calendar emits .ics feed to pod).
@@ -158,7 +158,7 @@ function parseStorageFromJsonLd(body, webid) {
 
 // The namespace for app-specific triples published to user pods:
 // <webid> <onderling:peerAddr> "<nkn-address-string>" — see publishPeerAddr/discoverPeerAddr below.
-// Naming migration 2026-07-29: new docs use the onderling namespace; discovery still accepts the two
+// Naming migration 2026-07-28: new docs use the onderling namespace; discovery still accepts the two
 // legacy spellings (canopy.dev prefix + IRI) so peers on older app versions stay discoverable.
 
 /**
@@ -219,7 +219,7 @@ export async function discoverPeerAddr(session, targetWebid) {
   if (!peerPodRoot) return null;
 
   // Step 2: fetch the peer's identity.ttl — the new path first, then the legacy canopy/ path (a peer
-  // who hasn't republished since the 2026-07-29 rename still lives there).
+  // who hasn't republished since the 2026-07-28 rename still lives there).
   for (const url of [
     `${peerPodRoot}onderling/identity/identity.ttl`,
     `${peerPodRoot}canopy/identity/identity.ttl`,
@@ -245,7 +245,7 @@ export async function discoverPeerAddr(session, targetWebid) {
 /**
  * Build a pod-namespaced URL for basis-managed app state.
  *
- * Naming migration 2026-07-29: NEW writes land under `onderling/`; `podUrlLegacy` spells the same
+ * Naming migration 2026-07-28: NEW writes land under `onderling/`; `podUrlLegacy` spells the same
  * resource under the old `canopy/` namespace — read paths try new-then-legacy so state written before
  * the rename keeps resolving. Old app versions keep writing canopy/ until updated, which the fallback
  * also covers.

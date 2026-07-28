@@ -12,7 +12,7 @@
  * So the honest framing, which the surfaces must repeat: *this decides what people SEE, not what they
  * may DO.*
  *
- * ── Who decides (Frits, 2026-07-29) ──────────────────────────────────────────────────────────────────
+ * ── Who decides (Frits, 2026-07-28) ──────────────────────────────────────────────────────────────────
  * Two tiers, composing rather than competing — the same shape as default-strict + circle-ceiling:
  *
  *   1. **The OWNER decides the agent's own policy.** Ownership is the owner KEY: the agent stores the

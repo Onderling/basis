@@ -189,6 +189,6 @@ function _rank(card, { depth, endorsers, tags }) {
       depth,
     },
   };
-  // Both spellings for one window (naming migration 2026-07-29) — readers prefer x-onderling.
+  // Both spellings for one window (naming migration 2026-07-28) — readers prefer x-onderling.
   return { ...card, 'x-onderling': ranked, 'x-canopy': ranked };
 }

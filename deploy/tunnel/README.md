@@ -24,7 +24,7 @@ node deploy/smoke/smoke.mjs "$RELAY_URL"
 
 Manage it: `systemctl --user {status,restart,stop} onderling-tunnel.service`.
 
-### Already running the pre-2026-07-29 unit?
+### Already running the pre-2026-07-28 unit?
 
 The old `canopy-tunnel.service` keeps working — nothing breaks by itself. To move over:
 

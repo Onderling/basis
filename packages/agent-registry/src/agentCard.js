@@ -94,7 +94,7 @@ export function projectAgentCard(entry, { owner, circleId = null } = {}) {
     authentication: Object.freeze({
       schemes: Object.freeze(['Bearer']),
     }),
-    // Naming migration 2026-07-29 — written under BOTH keys for one window (x-onderling going
+    // Naming migration 2026-07-28 — written under BOTH keys for one window (x-onderling going
     // forward; x-canopy keeps older readers + the public feedback repo working). Readers prefer new.
     'x-onderling': extensionBlock,
     'x-canopy':    extensionBlock,

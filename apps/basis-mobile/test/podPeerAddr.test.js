@@ -73,7 +73,7 @@ describe('Bundle G3 (#265) — buildLookupPeerAddrByWebid', () => {
         body: `@prefix pim: <http://www.w3.org/ns/pim/space#>.
 <#me> pim:storage <https://bob.example/>.`,
       })],
-      // Naming migration 2026-07-29: this peer publishes at the LEGACY path with the legacy
+      // Naming migration 2026-07-28: this peer publishes at the LEGACY path with the legacy
       // prefix — discovery must still find them (a peer on an older app version).
       ['https://bob.example/canopy/identity/identity.ttl', () => ({
         status: 404, contentType: 'text/turtle', body: '',
@@ -94,7 +94,7 @@ describe('Bundle G3 (#265) — buildLookupPeerAddrByWebid', () => {
         body: `@prefix pim: <http://www.w3.org/ns/pim/space#>.
 <#me> pim:storage <https://bob.example/>.`,
       })],
-      // Naming migration 2026-07-29: this peer publishes at the LEGACY path with the legacy
+      // Naming migration 2026-07-28: this peer publishes at the LEGACY path with the legacy
       // prefix — discovery must still find them (a peer on an older app version).
       ['https://bob.example/canopy/identity/identity.ttl', () => ({
         status: 200, contentType: 'text/turtle',

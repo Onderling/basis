@@ -10,7 +10,7 @@
  * encryption envelope before being written.
  */
 
-// Naming migration 2026-07-29: new lines carry the onderling context. Parsing is per-line JSON and
+// Naming migration 2026-07-28: new lines carry the onderling context. Parsing is per-line JSON and
 // never validates the context string, so pre-rename lines still parse unchanged.
 const NS_CONTEXT = 'https://onderling.org/ns';
 

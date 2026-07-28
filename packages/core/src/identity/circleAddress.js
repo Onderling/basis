@@ -14,7 +14,7 @@ import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { AgentIdentity } from './AgentIdentity.js';
 
-// ⚠ FROZEN FOREVER — this is HKDF domain-separation INPUT, not a name (naming decision 2026-07-29):
+// ⚠ FROZEN FOREVER — this is HKDF domain-separation INPUT, not a name (naming decision 2026-07-28):
 // it is hashed, never displayed, never on the wire. "Renaming" it would re-derive every per-circle
 // address and orphan all existing rosters/registrations. A future derivation scheme starts at
 // 'onderling-identity-v2:'; v1 stays spelled exactly like this.

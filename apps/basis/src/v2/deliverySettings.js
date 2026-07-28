@@ -108,6 +108,37 @@ export function withDelivery(rows, deliveryById, isMine = (r) => r?.mine === tru
 }
 
 /**
+ * How a state is PRESENTED — glyph, whether it is retryable, and whether it shows at all.
+ *
+ * Extracted 2026-07-28 from an if/else chain in `circleKring.js` that hardcoded three states and their
+ * locale keys. That chain was the *second* implementation of state→label (the first being `DELIVERY_LABELS`)
+ * and it had a concrete cost, not just a stylistic one: it knew nothing of the far-end states, so
+ * `reached-device` and `stored` would have rendered as silence in the one place they matter.
+ *
+ * `show: false` is the happy path staying clean — `sent` and `pending`-after-success add nothing to a
+ * timeline. `retryable` is the only state a tap can help.
+ */
+export const DELIVERY_PRESENTATION = Object.freeze({
+  pending:         { glyph: '⏱', show: true,  retryable: false },
+  sent:            { glyph: '',  show: false, retryable: false },
+  // Genuinely unknown — worth a mark, because "nothing" here would read as delivered.
+  'maybe-received': { glyph: '◌', show: true,  retryable: true },
+  'reached-device': { glyph: '✓', show: true,  retryable: false },
+  stored:          { glyph: '✓✓', show: true,  retryable: false },
+  failed:          { glyph: '⚠', show: true,  retryable: true },
+  // Permanent (e.g. a member has no published key). Shown, but no retry — retrying cannot help.
+  undeliverable:   { glyph: '⊘', show: true,  retryable: false },
+});
+
+/** How to draw one state, or null when it should not appear. Pairs with `deliveryLabelFor`. */
+export function deliveryPresentation(state, { mine = true } = {}) {
+  if (!mine || !isDeliveryState(state)) return null;
+  const p = DELIVERY_PRESENTATION[state];
+  if (!p?.show) return null;
+  return { state, glyph: p.glyph, retryable: p.retryable, labelKey: DELIVERY_LABELS[state] };
+}
+
+/**
  * ⚠️ **There is no `recordDelivery` here, deliberately.**
  *
  * Storing per-message delivery state already exists: `createDeliveryStateMap` in

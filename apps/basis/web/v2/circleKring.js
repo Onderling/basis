@@ -36,6 +36,7 @@
  */
 
 import { actionsForStreamRow } from '../../src/v2/streamActions.js';
+import { deliveryPresentation } from '../../src/v2/deliverySettings.js';
 import { revealedMemberLabel } from '../../src/v2/circleViewAs.js';
 import { renderMandateLegibility } from './mandatePicker.js';
 // media — the sealed media-card chip renders via the existing shared
@@ -939,43 +940,31 @@ function renderBubble(row, {
   // ('sent' / null) renders nothing so it doesn't clutter the timeline.
   // Bulletin restyle: the icon now sits in the bottom meta line (below),
   // keeping its existing classes/roles.
+  // Delivery state, driven by the SHARED presentation table (`deliverySettings.js`) rather than an
+  // if/else per state. The chain this replaced knew three states and would have rendered the far-end ones
+  // — `reached-device`, `stored` — as silence, in the one place they are worth showing.
   let deliveryEl = null;
   if (typeof deliveryStateFor === 'function' && isMine) {
-    const state = deliveryStateFor(row.id);
-    if (state === 'pending') {
-      const ic = document.createElement('span');
-      ic.className = 'circle-kring__bubble-delivery circle-kring__bubble-delivery--pending';
-      ic.dataset.deliveryState = 'pending';
-      ic.setAttribute('role', 'status');
-      ic.setAttribute('aria-label', tr('circle.chat.delivery.pending'));
-      ic.title = tr('circle.chat.delivery.pending');
-      ic.textContent = '⏱';
-      deliveryEl = ic;
-    } else if (state === 'failed') {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'circle-kring__bubble-delivery circle-kring__bubble-delivery--failed';
-      btn.dataset.deliveryState = 'failed';
-      btn.setAttribute('aria-label', tr('circle.chat.delivery.failed'));
-      btn.title = tr('circle.chat.delivery.failed');
-      btn.textContent = '⚠';
-      btn.addEventListener('click', () => {
-        if (typeof onRetryDelivery === 'function') onRetryDelivery(row.id);
-      });
-      deliveryEl = btn;
-    } else if (state === 'undeliverable') {
-      // permanent (e.g. a member has no published key) — show it, but NO retry
-      // (retrying can't help). A static glyph, not a button.
-      const ic = document.createElement('span');
-      ic.className = 'circle-kring__bubble-delivery circle-kring__bubble-delivery--undeliverable';
-      ic.dataset.deliveryState = 'undeliverable';
-      ic.setAttribute('role', 'status');
-      ic.setAttribute('aria-label', tr('circle.chat.delivery.undeliverable'));
-      ic.title = tr('circle.chat.delivery.undeliverable');
-      ic.textContent = '⊘';
-      deliveryEl = ic;
+    const p = deliveryPresentation(deliveryStateFor(row.id));
+    if (p) {
+      const label = tr(p.labelKey);
+      const el2 = document.createElement(p.retryable ? 'button' : 'span');
+      el2.className = `circle-kring__bubble-delivery circle-kring__bubble-delivery--${p.state}`;
+      el2.dataset.deliveryState = p.state;
+      el2.setAttribute('aria-label', label);
+      el2.title = label;
+      el2.textContent = p.glyph;
+      if (p.retryable) {
+        el2.type = 'button';
+        el2.addEventListener('click', () => {
+          if (typeof onRetryDelivery === 'function') onRetryDelivery(row.id);
+        });
+      } else {
+        el2.setAttribute('role', 'status');
+      }
+      deliveryEl = el2;
     }
-    // 'sent' (and null) intentionally render nothing — happy path.
+    // States marked `show: false` render nothing — the happy path stays clean.
   }
 
   // Bottom meta line (the site's `.msg .src` pattern): ONE small mono line with

@@ -6,7 +6,7 @@
  * B4 / integration runs.
  *
  * Covers:
- *   - init creates `/canopy/manifest.ttl` and signs it.
+ *   - init creates `/onderling/manifest.ttl` and signs it.
  *   - readResource / writeResource round-trip for each resource type
  *     (Device, Contact, AppPermission, RecoveryHint, CapabilityGrant{Issued,Held}).
  *   - tamper detection — flipping a byte in an `.enc` file fails verifyManifest.
@@ -165,7 +165,7 @@ describe('IdentityPodStore.init', () => {
     expect(result.verified).toBe(true);
     expect(result.manifest.contentHash).toMatch(/^sha256:[0-9a-f]{64}$/);
 
-    const manifestUri = 'https://alice.example/canopy/manifest.ttl';
+    const manifestUri = 'https://alice.example/onderling/manifest.ttl';
     expect(podClient.store.has(manifestUri)).toBe(true);
     const ttl = podClient.store.get(manifestUri).content;
     const parsed = parseManifest(ttl);
@@ -243,7 +243,7 @@ describe('IdentityPodStore.writeResource / readResource', () => {
   it('updates the manifest contentHash on each write', async () => {
     const { store, podClient } = makeStore();
     await store.init();
-    const manifestUri = 'https://alice.example/canopy/manifest.ttl';
+    const manifestUri = 'https://alice.example/onderling/manifest.ttl';
     const h0 = parseManifest(podClient.store.get(manifestUri).content).contentHash;
     await store.writeResource('devices/device-x.enc', sampleDevice(1));
     const h1 = parseManifest(podClient.store.get(manifestUri).content).contentHash;
@@ -267,7 +267,7 @@ describe('IdentityPodStore.verifyManifest', () => {
     const { store, podClient } = makeStore();
     await store.init();
     await store.writeResource('devices/device-x.enc', sampleDevice());
-    const uri = 'https://alice.example/canopy/devices/device-x.enc';
+    const uri = 'https://alice.example/onderling/devices/device-x.enc';
     const tampered = podClient.store.get(uri).content;
     // Flip the FIRST character of the ciphertext field (still valid base64
     // but produces a different envelope byte stream).
@@ -290,7 +290,7 @@ describe('IdentityPodStore.verifyManifest', () => {
   it('detects a tampered signature', async () => {
     const { store, podClient } = makeStore();
     await store.init();
-    const manifestUri = 'https://alice.example/canopy/manifest.ttl';
+    const manifestUri = 'https://alice.example/onderling/manifest.ttl';
     const ttl = podClient.store.get(manifestUri).content;
     // Corrupt the signature literal.
     const corrupted = ttl.replace(/dw:signature\s+"[^"]+"/, 'dw:signature         "AAAAAAAA"');
@@ -327,15 +327,15 @@ describe('IdentityPodStore contentHash determinism', () => {
     // Recompute hash directly via the manifest module → must match the
     // stored manifest's contentHash.
     const { computeContentHash } = await import('../src/identity/identitySerializers/manifest.js');
-    const recomputed = await computeContentHash(a.podClient, 'https://alice.example/canopy/');
-    const manifestUri = 'https://alice.example/canopy/manifest.ttl';
+    const recomputed = await computeContentHash(a.podClient, 'https://alice.example/onderling/');
+    const manifestUri = 'https://alice.example/onderling/manifest.ttl';
     const stored = parseManifest(a.podClient.store.get(manifestUri).content).contentHash;
     expect(recomputed).toBe(stored);
 
     // And: hash is independent of insertion order — copy the EXACT bytes
     // into b's store under different write order, then hash — must match.
-    const aRoot = 'https://alice.example/canopy/';
-    const bRoot = 'https://alice.example/canopy/';
+    const aRoot = 'https://alice.example/onderling/';
+    const bRoot = 'https://alice.example/onderling/';
     const keys = ['devices/device-1.enc', 'contacts/contact-1.enc'];
     // copy in reverse order
     for (const k of [...keys].reverse()) {
@@ -438,7 +438,7 @@ describe('IdentityPodStore envelope layout', () => {
     const { store, podClient } = makeStore();
     await store.init();
     await store.writeResource('devices/d1.enc', sampleDevice(1));
-    const uri = 'https://alice.example/canopy/devices/d1.enc';
+    const uri = 'https://alice.example/onderling/devices/d1.enc';
     const env1 = JSON.parse(podClient.store.get(uri).content);
     await store.writeResource('devices/d1.enc', sampleDevice(1));
     const env2 = JSON.parse(podClient.store.get(uri).content);
@@ -446,5 +446,24 @@ describe('IdentityPodStore envelope layout', () => {
     expect(env1.nonce).not.toBe(env2.nonce);
     expect(env1.alg).toBe('xsalsa20poly1305');
     expect(env1.v).toBe(1);
+  });
+});
+
+/* ── Naming migration 2026-07-29 — the identity container ───────────────────────────────────────── */
+
+describe('IdentityPodStore — container namespace', () => {
+  it('a fresh pod root normalizes into /onderling/', () => {
+    const { store } = makeStore({ podRoot: 'https://alice.example/' });
+    expect(store.root).toBe('https://alice.example/onderling/');
+  });
+
+  it('an EXISTING pre-rename /canopy/ root is honoured as-is (no data move required)', () => {
+    const { store } = makeStore({ podRoot: 'https://alice.example/canopy/' });
+    expect(store.root).toBe('https://alice.example/canopy/');   // NOT .../canopy/onderling/
+  });
+
+  it('an explicit /onderling/ root is not doubled either', () => {
+    const { store } = makeStore({ podRoot: 'https://alice.example/onderling/' });
+    expect(store.root).toBe('https://alice.example/onderling/');
   });
 });

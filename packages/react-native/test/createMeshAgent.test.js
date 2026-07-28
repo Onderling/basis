@@ -350,7 +350,7 @@ describe('createMeshAgent', () => {
     });
     expect(agent._identityWiring).toBeTruthy();
     expect(agent._identityWiring.bootstrap).toBeInstanceOf(Bootstrap);
-    expect(agent._identityWiring.podStore.root).toBe('https://alice.example/canopy/');
+    expect(agent._identityWiring.podStore.root).toBe('https://alice.example/onderling/');
     expect(agent._identityWiring.sync.isRunning).toBe(true);
     expect(syncEvents).toEqual(['ctor', 'start']);
 

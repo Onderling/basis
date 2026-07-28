@@ -13,7 +13,10 @@
  * real pseudo-pod when the mobile pod layer lands (3.3c).
  */
 
-const PREFIX = 'canopy.mappings:';   // AsyncStorage namespace; JSON stored under PREFIX + <uri>
+const PREFIX = 'onderling.mappings:';   // AsyncStorage namespace; JSON stored under PREFIX + <uri>
+// Naming migration 2026-07-29 — mappings persisted under the OLD prefix still resolve (an installed
+// extension must not vanish on update). Reads fall back; writes/deletes use the new prefix only.
+const LEGACY_PREFIX = 'canopy.mappings:';
 
 /** The fixed V0 device id for mobile mappings (app-scoped; no real pod yet). */
 export const MAPPINGS_DEVICE = 'mobile';
@@ -26,7 +29,7 @@ export function asyncStorageMappingsStore(storage) {
       return { etag: undefined };
     },
     async read(uri) {
-      const raw = await storage.getItem(keyFor(uri));
+      const raw = (await storage.getItem(keyFor(uri))) ?? (await storage.getItem(LEGACY_PREFIX + uri));
       if (raw == null) return null;
       try { return { bytes: JSON.parse(raw) }; }
       catch { return { bytes: raw }; }
@@ -35,10 +38,16 @@ export function asyncStorageMappingsStore(storage) {
       const prefix = containerUri.endsWith('/') ? containerUri : `${containerUri}/`;
       const full = PREFIX + prefix;
       const keys = (await storage.getAllKeys()) || [];
-      return keys.filter((k) => k && k.startsWith(full)).map((k) => k.slice(PREFIX.length)).sort();
+      const legacyFull = LEGACY_PREFIX + prefix;
+      const uris = keys
+        .filter((k) => k && (k.startsWith(full) || k.startsWith(legacyFull)))
+        .map((k) => (k.startsWith(PREFIX) ? k.slice(PREFIX.length) : k.slice(LEGACY_PREFIX.length)));
+      return [...new Set(uris)].sort();
     },
     async delete(uri) {
       await storage.removeItem(keyFor(uri));
+      // …and any legacy copy — else the dual-read resurrects what the user just removed.
+      try { await storage.removeItem(LEGACY_PREFIX + uri); } catch { /* best-effort */ }
     },
   };
 }

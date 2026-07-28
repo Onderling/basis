@@ -109,7 +109,7 @@ describe('attachIdentityToAgent (B4)', () => {
     });
     expect(wiring.bootstrap).toBeInstanceOf(Bootstrap);
     expect(wiring.podStore).toBeTruthy();
-    expect(wiring.podStore.root).toBe('https://alice.example/canopy/');
+    expect(wiring.podStore.root).toBe('https://alice.example/onderling/');
     expect(wiring.sync).toBeTruthy();
     expect(wiring.sync.isRunning).toBe(true);
     // The IdentitySync constructor saw vault + podStore + intervalMs.

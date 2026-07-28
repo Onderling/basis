@@ -1,6 +1,6 @@
 # DEPLOY-RUNBOOK — get the relay (+ CSS pod + companion) online
 
-Turnkey guide to putting the canopy backend on a **free** host the moment you
+Turnkey guide to putting the Onderling backend on a **free** host the moment you
 provision one. Three paths, all accurate against the configs already in `deploy/`:
 
 - **Path C — Local stack + tunnel** *(no account, no card — start here for testing)*:

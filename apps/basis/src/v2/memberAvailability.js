@@ -115,7 +115,7 @@ export function localStorageAvailabilityIo(storage = globalThis.localStorage) {
  * resource that peers read.
  *
  * DESIGN DECISION — where the shared copy lives: a PER-USER pod resource
- * (`canopy/cc-availability/availability.json`), NOT a per-circle item.
+ * (`onderling/cc-availability/availability.json`), NOT a per-circle item.
  * Rationale: the pref is cross-circle + per-user by definition (see the
  * module header), so a single per-user home is the one truth; publishing
  * it under each circle would duplicate it N times. This deliberately does

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-<title>@canopy — dot control demo</title>
+<title>@onderling — dot control demo</title>
 <script type="importmap">
 {
   "imports": {
@@ -12,9 +12,9 @@
     "ed2curve":                       "https://esm.sh/ed2curve@0.3.0?deps=tweetnacl@1.0.3",
     "@scure/bip39":                   "https://esm.sh/@scure/bip39@1.4.0",
     "@scure/bip39/wordlists/english": "https://esm.sh/@scure/bip39@1.4.0/wordlists/english",
-    "@canopy/core":                 "./src/index.js",
-    "@canopy/vault":                "../vault/index.js",
-    "@canopy/transports":           "../transports/src/index.js"
+    "@onderling/core":                 "./src/index.js",
+    "@onderling/vault":                "../vault/index.js",
+    "@onderling/transports":           "../transports/src/index.js"
   }
 }
 </script>
@@ -129,7 +129,7 @@ canvas#dot-canvas{display:block;width:100%;height:100%;touch-action:none}
 <body>
 
 <header>
-  <h1>@canopy</h1>
+  <h1>@onderling</h1>
   <span class="badge">dot control</span>
   <span id="hdr-status">not started</span>
 </header>
@@ -222,9 +222,9 @@ canvas#dot-canvas{display:block;width:100%;height:100%;touch-action:none}
 import {
   Agent, AgentIdentity,
   DataPart, Parts,
-} from '@canopy/core';
-import { VaultMemory }                       from '@canopy/vault';
-import { RelayTransport, RendezvousTransport } from '@canopy/transports';
+} from '@onderling/core';
+import { VaultMemory }                       from '@onderling/vault';
+import { RelayTransport, RendezvousTransport } from '@onderling/transports';
 import { ping as sdkPing } from './src/protocol/ping.js';
 
 // ── Peer colour palette ────────────────────────────────────────────────────────

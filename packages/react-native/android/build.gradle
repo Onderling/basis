@@ -1,5 +1,5 @@
 /**
- * @canopy/react-native — Android native module sources.
+ * @onderling/react-native — Android native module sources.
  *
  * Provides two ReactPackage modules:
  *   - MdnsModule (mDNS/DNS-SD + TCP transport)  — com.canopy.mdns.MdnsPackage

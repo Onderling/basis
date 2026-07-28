@@ -61,11 +61,15 @@ const MAGIC          = new Uint8Array([0x44, 0x57, 0x4c, 0x44, 0x50, 0x00, 0x76,
 const FORMAT_NAME    = 'solid-ldp-archive';
 const FORMAT_VERSION = 1;
 const ENC_ALG        = 'xsalsa20poly1305';
+// ⚠ FROZEN FOREVER — key-derivation info (hashed, invisible); renaming would make existing export
+// archives undecryptable. A future format versions to onderling-pod-export-v2.
 const ENC_INFO       = 'canopy-pod-export-v1';
 const SALT_LEN       = 16;
 const NONCE_LEN      = 24;
 
-const IDENTITY_CONTAINER_PATH = '/canopy/';
+// Both spellings of the identity container count (naming migration 2026-07-29: new pods use
+// /onderling/, pre-rename pods keep /canopy/).
+const IDENTITY_CONTAINER_PATHS = ['/onderling/', '/canopy/'];
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -393,7 +397,7 @@ export class PodExporter {
     if (typeof uri !== 'string') return false;
     if (!uri.startsWith(this.#podRoot)) return false;
     const rel = '/' + uri.slice(this.#podRoot.length);
-    return rel === IDENTITY_CONTAINER_PATH || rel.startsWith(IDENTITY_CONTAINER_PATH);
+    return IDENTITY_CONTAINER_PATHS.some((p) => rel === p || rel.startsWith(p));
   }
 
   #relativePath(uri) {

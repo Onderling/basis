@@ -23,7 +23,7 @@ services:
       HOST: "0.0.0.0"
       # Enable the media edge locally by uncommenting + filling these:
       # R2_ENDPOINT: "https://<account-id>.r2.cloudflarestorage.com"
-      # R2_BUCKET: "canopy-media"
+      # R2_BUCKET: "onderling-media"
       # R2_ACCESS_KEY_ID: ""
       # R2_SECRET_ACCESS_KEY: ""
       # BLOB_GATE_UPLOADERS: ""

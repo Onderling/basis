@@ -10,7 +10,9 @@
  * encryption envelope before being written.
  */
 
-const NS_CONTEXT = 'https://canopy.org/ns';
+// Naming migration 2026-07-29: new lines carry the onderling context. Parsing is per-line JSON and
+// never validates the context string, so pre-rename lines still parse unchanged.
+const NS_CONTEXT = 'https://onderling.org/ns';
 
 /**
  * Build a single auth-event line.  Caller is responsible for signing

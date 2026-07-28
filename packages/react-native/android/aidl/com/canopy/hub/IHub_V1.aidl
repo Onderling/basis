@@ -64,7 +64,7 @@ interface IHub_V1 {
     /**
      * Publish a notify-envelope through the Hub's transport.
      *
-     * @param envelopeJson  the full envelope (matches @canopy/notify-envelope's
+     * @param envelopeJson  the full envelope (matches @onderling/notify-envelope's
      *                       wire shape: {v, kind, ref, etag?, fromActor?, payload?, ...}).
      * @param recipientsCsv comma-separated recipient addresses (CSV avoids
      *                       String[] marshalling quirks across some Android versions).

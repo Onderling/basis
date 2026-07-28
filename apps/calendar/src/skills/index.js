@@ -206,7 +206,7 @@ export function registerCalendarSkills(agent, store, opts = {}) {
     } else if (st.errorCount > 0 && st.errorCount === st.attempts) {
       lines.push('');
       lines.push('All writes have failed.  Likely causes:');
-      lines.push('  - Pod ACL: the canopy/ path may not be writable for this WebID');
+      lines.push('  - Pod ACL: the onderling/ path may not be writable for this WebID');
       lines.push('  - CORS: the pod may not allow cross-origin authenticated PUTs');
       lines.push('  - 404: parent container missing (v0.7.P2.1 tries to auto-create)');
     }

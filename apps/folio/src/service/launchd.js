@@ -1,12 +1,12 @@
 /**
  * launchd.js — macOS LaunchAgents service unit.
  *
- * Plist lives at `~/Library/LaunchAgents/ag.canopy.folio.plist`.
+ * Plist lives at `~/Library/LaunchAgents/org.onderling.folio.plist`.
  * Logs at      `~/Library/Logs/folio/folio.log`.
  *
  * The plist is loaded via:
- *   launchctl load   ~/Library/LaunchAgents/ag.canopy.folio.plist
- *   launchctl unload ~/Library/LaunchAgents/ag.canopy.folio.plist
+ *   launchctl load   ~/Library/LaunchAgents/org.onderling.folio.plist
+ *   launchctl unload ~/Library/LaunchAgents/org.onderling.folio.plist
  *
  * `KeepAlive = true` + `RunAtLoad = true` make the service auto-start on
  * login and respawn on crash.  This is per-user only — LaunchAgents (NOT

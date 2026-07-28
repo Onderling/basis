@@ -71,7 +71,7 @@ import { verifyEndorsement } from './endorsement.js';
 export const CURATOR_ROLES = new Set(['curator', 'community']);
 
 function roleOf(card) {
-  const r = card?.['x-canopy']?.role ?? card?.role ?? null;
+  const r = card?.['x-onderling']?.role ?? card?.['x-canopy']?.role ?? card?.role ?? null;
   return typeof r === 'string' ? r : null;
 }
 function isCuratorCard(card) {

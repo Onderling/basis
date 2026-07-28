@@ -20,7 +20,18 @@ import { hasConflictMarkers } from '../applyConflict.js';
 import { requireConfig }   from './_config.js';
 import { buildPodClient }  from './_podFactory.js';
 
-const STATE_FILE_RELPATH = '.canopy/notes-sync-state.json';
+const STATE_FILE_RELPATH        = '.onderling/notes-sync-state.json';
+const STATE_FILE_RELPATH_LEGACY = '.canopy/notes-sync-state.json';   // read-fallback (pre-rename state)
+
+/** Read the sync-state file, trying the new path then the legacy .canopy/ path (pre-rename state). */
+async function readStateText(fsImpl, root) {
+  for (const rel of [STATE_FILE_RELPATH, STATE_FILE_RELPATH_LEGACY]) {
+    try { return await fsImpl.readFile(join(root, rel), 'utf8'); }
+    catch (err) { if (err.code !== 'ENOENT') throw err; }
+  }
+  return null;
+}
+
 
 export async function statusCmd(_args) {
   const cfg       = await requireConfig();
@@ -31,10 +42,12 @@ export async function statusCmd(_args) {
   let knownState = {};
   let lastSyncAt = null;
   try {
-    const text = await fs.readFile(join(cfg.localRoot, STATE_FILE_RELPATH), 'utf8');
-    const parsed = JSON.parse(text);
-    knownState = parsed.files ?? {};
-    lastSyncAt = parsed.writtenAt ?? null;
+    const text = await readStateText(fs, cfg.localRoot);
+    if (text != null) {
+      const parsed = JSON.parse(text);
+      knownState = parsed.files ?? {};
+      lastSyncAt = parsed.writtenAt ?? null;
+    }
   } catch (err) {
     if (err.code !== 'ENOENT') throw err;
   }

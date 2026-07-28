@@ -12,9 +12,9 @@
     "ed2curve":                       "https://esm.sh/ed2curve@0.3.0?deps=tweetnacl@1.0.3",
     "@scure/bip39":                   "https://esm.sh/@scure/bip39@1.4.0",
     "@scure/bip39/wordlists/english": "https://esm.sh/@scure/bip39@1.4.0/wordlists/english",
-    "@canopy/core":                 "./src/index.js",
-    "@canopy/vault":                "../vault/index.js",
-    "@canopy/transports":           "../transports/src/index.js"
+    "@onderling/core":                 "./src/index.js",
+    "@onderling/vault":                "../vault/index.js",
+    "@onderling/transports":           "../transports/src/index.js"
   }
 }
 </script>
@@ -171,9 +171,9 @@ import {
   RoutingStrategy, PeerGraph,
   DataPart, Parts,
   registerTunnelReceiveSealed,
-} from '@canopy/core';
-import { VaultMemory }    from '@canopy/vault';
-import { RelayTransport } from '@canopy/transports';
+} from '@onderling/core';
+import { VaultMemory }    from '@onderling/vault';
+import { RelayTransport } from '@onderling/transports';
 
 // ── State ──────────────────────────────────────────────────────────────────────
 let agent       = null;

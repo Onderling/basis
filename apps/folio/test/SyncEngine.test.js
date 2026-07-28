@@ -327,7 +327,7 @@ describe('SyncEngine.deleteLocal — tombstone', () => {
 });
 
 describe('SyncEngine — state persistence', () => {
-  it('persists known state to .canopy/notes-sync-state.json and resumes', async () => {
+  it('persists known state to .onderling/notes-sync-state.json and resumes', async () => {
     await fs.writeFile(join(localRoot, 'a.md'), 'A');
     pod._seed(`${POD_ROOT}b.md`, 'B');
 
@@ -336,7 +336,7 @@ describe('SyncEngine — state persistence', () => {
     await e1.stop();
 
     const stateRaw = await fs.readFile(
-      join(localRoot, '.canopy', 'notes-sync-state.json'),
+      join(localRoot, '.onderling', 'notes-sync-state.json'),
       'utf8',
     );
     const state = JSON.parse(stateRaw);
@@ -350,6 +350,30 @@ describe('SyncEngine — state persistence', () => {
     expect(r.uploads).toBe(0);
     expect(r.downloads).toBe(0);
     expect(r.conflicts).toBe(0);
+  });
+  // Naming migration 2026-07-29 — the real risk of moving the state dir: state written under the OLD
+  // path must still be READ, or every note looks never-synced and the next run re-uploads the world.
+  it('reads pre-rename state from the legacy .canopy/ path (no spurious re-sync)', async () => {
+    await fs.writeFile(join(localRoot, 'a.md'), 'A');
+    pod._seed(`${POD_ROOT}b.md`, 'B');
+
+    const e1 = newEngine();
+    await e1.runOnce();
+    await e1.stop();
+
+    // Move the state file back to where a pre-rename install wrote it.
+    const newDir = join(localRoot, '.onderling');
+    const oldDir = join(localRoot, '.canopy');
+    await fs.mkdir(oldDir, { recursive: true });
+    await fs.rename(join(newDir, 'notes-sync-state.json'), join(oldDir, 'notes-sync-state.json'));
+
+    const e2 = newEngine();
+    const r = await e2.runOnce();
+    expect(r.uploads).toBe(0);      // the old state was honoured…
+    expect(r.downloads).toBe(0);
+    // …and the next save lands on the new path.
+    const moved = await fs.readFile(join(newDir, 'notes-sync-state.json'), 'utf8');
+    expect(JSON.parse(moved).files['a.md']).toBeDefined();
   });
 });
 
@@ -793,6 +817,7 @@ describe('SyncEngine — watcher sha-stability (Folio v2.6)', () => {
     expect(syncedCount.count).toBe(1);
 
     e._disarmForTest();
+    await e.stop();   // drains any in-flight runOnce — else its #saveState races afterEach's rm (ENOTEMPTY)
   });
 
   it('does NOT fire runOnce for a file deleted before the vigil settles', async () => {
@@ -820,6 +845,7 @@ describe('SyncEngine — watcher sha-stability (Folio v2.6)', () => {
     expect(syncedCount.count).toBe(0);
 
     e._disarmForTest();
+    await e.stop();   // drains any in-flight runOnce — else its #saveState races afterEach's rm (ENOTEMPTY)
   });
 
   it('caps total wait at maxStableWaitMs for an ever-changing file + emits warning', async () => {
@@ -862,6 +888,7 @@ describe('SyncEngine — watcher sha-stability (Folio v2.6)', () => {
     expect(ran).toBe(true);
 
     e._disarmForTest();
+    await e.stop();   // drains any in-flight runOnce — else its #saveState races afterEach's rm (ENOTEMPTY)
   });
 
   it('handles two files saved at once with independent stability vigils', async () => {
@@ -897,6 +924,7 @@ describe('SyncEngine — watcher sha-stability (Folio v2.6)', () => {
     expect(ran).toBe(true);
 
     e._disarmForTest();
+    await e.stop();   // drains any in-flight runOnce — else its #saveState races afterEach's rm (ENOTEMPTY)
   });
 
   it('restarts the wait when sha changes between checks (no premature fire)', async () => {
@@ -937,6 +965,7 @@ describe('SyncEngine — watcher sha-stability (Folio v2.6)', () => {
     expect(syncedCount.count).toBe(1);
 
     e._disarmForTest();
+    await e.stop();   // drains any in-flight runOnce — else its #saveState races afterEach's rm (ENOTEMPTY)
   });
 
   it('stop() cancels pending stability vigils — no spurious runOnce', async () => {
@@ -954,6 +983,7 @@ describe('SyncEngine — watcher sha-stability (Folio v2.6)', () => {
     // Tear down before the vigil could possibly settle.
     await new Promise((r) => setTimeout(r, 10));
     e._disarmForTest();
+    await e.stop();   // drains any in-flight runOnce — else its #saveState races afterEach's rm (ENOTEMPTY)
 
     // Wait past where 'stable' would have landed had we not torn down.
     await new Promise((r) => setTimeout(r, 200));
@@ -1051,6 +1081,7 @@ describe('SyncEngine — copy-rename grace window (Folio v2.10)', () => {
     expect(pod.store.has(`${POD_ROOT}A (Copy).md`)).toBe(false);
 
     e._disarmForTest();
+    await e.stop();   // drains any in-flight runOnce — else its #saveState races afterEach's rm (ENOTEMPTY)
   });
 
   it('copy alone (no rename) syncs after graceMs elapses', async () => {
@@ -1076,6 +1107,7 @@ describe('SyncEngine — copy-rename grace window (Folio v2.10)', () => {
     expect(pod.store.has(`${POD_ROOT}standalone.md`)).toBe(true);
 
     e._disarmForTest();
+    await e.stop();   // drains any in-flight runOnce — else its #saveState races afterEach's rm (ENOTEMPTY)
   });
 
   it('rapid edits within grace: only the LAST content is what eventually syncs', async () => {
@@ -1120,6 +1152,7 @@ describe('SyncEngine — copy-rename grace window (Folio v2.10)', () => {
     expect(content).toBe('v2-final');
 
     e._disarmForTest();
+    await e.stop();   // drains any in-flight runOnce — else its #saveState races afterEach's rm (ENOTEMPTY)
   });
 
   it('stop() cancels pending grace timers — no spurious runOnce after teardown', async () => {
@@ -1141,6 +1174,7 @@ describe('SyncEngine — copy-rename grace window (Folio v2.10)', () => {
     expect(armed).toBe(true);
 
     e._disarmForTest();
+    await e.stop();   // drains any in-flight runOnce — else its #saveState races afterEach's rm (ENOTEMPTY)
 
     // Wait past where grace would have fired had we not torn down.
     await new Promise((r) => setTimeout(r, 250));
@@ -1178,6 +1212,7 @@ describe('SyncEngine — copy-rename grace window (Folio v2.10)', () => {
     expect(graceDecisions).toEqual([]);
 
     e._disarmForTest();
+    await e.stop();   // drains any in-flight runOnce — else its #saveState races afterEach's rm (ENOTEMPTY)
   });
 
   it('runOnce() called explicitly bypasses grace entirely', async () => {

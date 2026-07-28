@@ -95,7 +95,8 @@ export function createCatalogSource({
   const resolve  = typeof resolveCard === 'function' ? resolveCard : () => null;
   const cacheOk  = cache && typeof cache.read === 'function' && typeof cache.write === 'function';
 
-  const idOf = (card) => card?.['x-canopy']?.id ?? card?.agentId ?? card?.['x-canopy']?.pubKey ?? card?.pubKey ?? null;
+  const idOf = (card) => card?.['x-onderling']?.id ?? card?.['x-canopy']?.id ?? card?.agentId
+    ?? card?.['x-onderling']?.pubKey ?? card?.['x-canopy']?.pubKey ?? card?.pubKey ?? null;
 
   /**
    * Build the per-endorser lookup the walk consumes. With `resolveEndorsements`
@@ -133,8 +134,8 @@ export function createCatalogSource({
     }
     // Authoritative deterministic order (id is the observable, stable tiebreak).
     projected.sort((a, b) => {
-      const ea = a.entry['x-canopy'].endorsement;
-      const eb = b.entry['x-canopy'].endorsement;
+      const ea = a.entry['x-onderling'].endorsement;
+      const eb = b.entry['x-onderling'].endorsement;
       if (ea.depth !== eb.depth) return ea.depth - eb.depth;          // proximity
       if (eb.count !== ea.count) return eb.count - ea.count;          // breadth
       return String(a.id).localeCompare(String(b.id));               // stable
@@ -178,17 +179,16 @@ export function createCatalogSource({
  * reachable endorsers (G1-compatible); `depth` = shortest trust-path proximity.
  */
 function _rank(card, { depth, endorsers, tags }) {
-  const xc = card?.['x-canopy'] ?? {};
-  return {
-    ...card,
-    'x-canopy': {
-      ...xc,
-      endorsement: {
-        count:     endorsers.length,
-        endorsers: [...endorsers],
-        tags:      [...tags],
-        depth,
-      },
+  const xc = card?.['x-onderling'] ?? card?.['x-canopy'] ?? {};
+  const ranked = {
+    ...xc,
+    endorsement: {
+      count:     endorsers.length,
+      endorsers: [...endorsers],
+      tags:      [...tags],
+      depth,
     },
   };
+  // Both spellings for one window (naming migration 2026-07-29) — readers prefer x-onderling.
+  return { ...card, 'x-onderling': ranked, 'x-canopy': ranked };
 }

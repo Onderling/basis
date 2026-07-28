@@ -9,7 +9,7 @@
  * Removes:
  *   <configDir>/config.json                    (config)
  *   <configDir>/vault.json                     (BIP-39 phrase + OIDC tokens)
- *   <localRoot>/.canopy/                     (sync state + marker)
+ *   <localRoot>/.onderling/                  (sync state + marker; legacy .canopy/ removed too)
  *   <localRoot>/.folio/                        (B3 share tokens)
  *
  * Does NOT remove anything else under `<localRoot>` — every .md / .txt /
@@ -26,7 +26,8 @@ import { configDir, configPath, loadConfig } from './_config.js';
 import { confirm, closePrompt }              from './_prompt.js';
 
 const VAULT_FILE       = 'vault.json';
-const FOLDER_META_DIR  = '.canopy';
+const FOLDER_META_DIR        = '.onderling';
+const FOLDER_META_DIR_LEGACY = '.canopy';   // pre-rename installs — reset clears both
 const FOLDER_SHARE_DIR = '.folio';
 
 export async function resetCmd(args = []) {
@@ -46,7 +47,8 @@ export async function resetCmd(args = []) {
   ];
   if (cfg?.localRoot) {
     targets.push(
-      { path: join(cfg.localRoot, FOLDER_META_DIR),  kind: 'dir', label: 'folder metadata (.canopy/)' },
+      { path: join(cfg.localRoot, FOLDER_META_DIR),  kind: 'dir', label: 'folder metadata (.onderling/)' },
+      { path: join(cfg.localRoot, FOLDER_META_DIR_LEGACY), kind: 'dir', label: 'folder metadata (legacy .canopy/)' },
       { path: join(cfg.localRoot, FOLDER_SHARE_DIR), kind: 'dir', label: 'share tokens (.folio/)' },
     );
   }

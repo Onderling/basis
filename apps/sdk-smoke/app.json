@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "android": {
-      "package": "ag.canopy.sdksmoke",
+      "package": "org.onderling.sdksmoke",
       "permissions": [
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_ADMIN",
@@ -41,7 +41,7 @@
       ]
     ],
     "ios": {
-      "bundleIdentifier": "ag.canopy.sdksmoke",
+      "bundleIdentifier": "org.onderling.sdksmoke",
       "infoPlist": {
         "UIBackgroundModes": [
           "remote-notification"

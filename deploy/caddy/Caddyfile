@@ -28,7 +28,7 @@
 # `reverse_proxy` transparently upgrades WebSocket connections, so both the
 # wss:// messaging socket and the https://$RELAY_DOMAIN/blob-gate media edge flow
 # to the same plain-HTTP relay. The relay answers HTTP 200 on `/`
-# ("@canopy/relay — WebSocket endpoint only"), which doubles as Caddy's upstream
+# ("@onderling/relay — WebSocket endpoint only"), which doubles as Caddy's upstream
 # health signal.
 #
 # The companion node's online /manage interface (6d surface ②) is served on the

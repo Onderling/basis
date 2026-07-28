@@ -211,14 +211,17 @@ export class IdentityPodStore {
     this.#identity   = identity;
     this.#rootPubKey = identity.pubKey;
 
-    // Normalize: ensure podRoot ends with '/canopy/'.
+    // Normalize into the identity-container namespace. New containers live under '/onderling/'
+    // (naming migration 2026-07-29); a caller passing an explicit '/canopy/' root — an EXISTING
+    // container from before the rename — is honoured as-is, so pre-rename pods keep syncing without a
+    // data move. (A future migration tool can copy canopy/→onderling/; until then both spellings work.)
     let root = podRoot;
     if (!root.endsWith('/')) root += '/';
-    if (!root.endsWith('/canopy/')) root += 'canopy/';
+    if (!root.endsWith('/onderling/') && !root.endsWith('/canopy/')) root += 'onderling/';
     this.#podRoot = root;
   }
 
-  /** Identity container root URI (always ending in `/canopy/`). */
+  /** Identity container root URI (ending in `/onderling/` — or `/canopy/` for a pre-rename container). */
   get root() { return this.#podRoot; }
 
   // ── init ────────────────────────────────────────────────────────────────

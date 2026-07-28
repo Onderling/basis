@@ -477,7 +477,7 @@ export async function createRealHouseholdAgent(opts = {}) {
 
   // v0.7. — caller (main.js) wires the pod writer on sign-in via
   // this setter; calendar's .ics feed then write-throughs to
-  // <pod>/canopy/calendar/feed.ics.
+  // <pod>/onderling/calendar/feed.ics.
   const setCalendarPodWriter = (writer) => calendarStore.setPodWriter(writer);
   // v0.7. — surface pod-write success / failure as notification
   // events so /logs + matching threads pick them up.
@@ -2775,7 +2775,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     },
     // v0.7. — caller wires the pod-writer on sign-in / clears on
     // sign-out so calendar's .ics feed writes-through to the user's
-    // pod under <pod>/canopy/calendar/feed.ics.
+    // pod under <pod>/onderling/calendar/feed.ics.
     setCalendarPodWriter,
     // N5 — caller wires the folio Drive's real-pod source on sign-in
     // (a PodClient + container) / clears on sign-out.  Lights up the

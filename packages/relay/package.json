@@ -9,6 +9,7 @@
     ".": "./index.js"
   },
   "bin": {
+    "onderling-relay": "./bin/relay.js",
     "canopy-relay": "./bin/relay.js"
   },
   "scripts": {

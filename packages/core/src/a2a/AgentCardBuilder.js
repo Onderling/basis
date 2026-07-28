@@ -59,6 +59,13 @@ export class AgentCardBuilder {
       if (level > 0) trustTiers[level] = vis;
     }
 
+    const extensionBlock = {
+      version:    CARD_VERSION,
+      pubKey:     agent.pubKey,
+      relayUrl:   config.relayUrl   ?? null,
+      groups:     config.groups     ?? [],
+      trustTiers,
+    };
     const card = {
       name:        config.name        ?? agent.label ?? 'Agent',
       description: config.description ?? '',
@@ -75,13 +82,11 @@ export class AgentCardBuilder {
       authentication: {
         schemes: ['Bearer'],
       },
-      'x-canopy': {
-        version:    CARD_VERSION,
-        pubKey:     agent.pubKey,
-        relayUrl:   config.relayUrl   ?? null,
-        groups:     config.groups     ?? [],
-        trustTiers,
-      },
+      // Naming migration 2026-07-29 — the extension block is written under BOTH keys for one window:
+      // `x-onderling` is the name going forward; `x-canopy` keeps peers on older app versions (and the
+      // public feedback repo) reading this card until they update. Readers here prefer x-onderling.
+      'x-onderling': extensionBlock,
+      'x-canopy':    extensionBlock,
     };
 
     // Remove null url to keep card clean.

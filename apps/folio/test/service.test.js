@@ -153,7 +153,7 @@ describe('launchd.buildUnit', () => {
     expect(plist).toContain('<plist version="1.0">');
     // Required keys.
     expect(plist).toContain('<key>Label</key>');
-    expect(plist).toContain('<string>ag.canopy.folio</string>');
+    expect(plist).toContain('<string>org.onderling.folio</string>');
     expect(plist).toContain('<key>ProgramArguments</key>');
     expect(plist).toContain('<string>/usr/local/bin/node</string>');
     expect(plist).toContain('<string>/Users/alice/canopy/apps/folio/src/cli.js</string>');
@@ -247,7 +247,7 @@ describe('launchd install + uninstall', () => {
     // Plist on disk matches the expected path.
     expect(result.unitPath).toBe(launchd.unitPath());
     const content = await fs.readFile(result.unitPath, 'utf8');
-    expect(content).toContain('ag.canopy.folio');
+    expect(content).toContain('org.onderling.folio');
     expect(content).toContain('/usr/local/bin/node');
     expect(content).toContain('/abs/cli.js');
     // Exec saw a `launchctl load <path>` call.
@@ -332,7 +332,7 @@ describe('service status', () => {
   it('reports running when launchctl list shows an active PID', async () => {
     const exec = makeExecStub({
       responses: {
-        'launchctl list': { stdout: '{\n\t"PID" = 12345;\n\t"Label" = "ag.canopy.folio";\n}', stderr: '' },
+        'launchctl list': { stdout: '{\n\t"PID" = 12345;\n\t"Label" = "org.onderling.folio";\n}', stderr: '' },
       },
     });
     await launchd.install({

@@ -25,19 +25,19 @@ describe('podRootFromWebid', () => {
 });
 
 describe('podUrl', () => {
-  it('namespaces under canopy/<app>/<resource>', () => {
+  it('namespaces under onderling/<app>/<resource>', () => {
     expect(podUrl('https://anne.example/', 'calendar', 'feed.ics'))
-      .toBe('https://anne.example/canopy/calendar/feed.ics');
+      .toBe('https://anne.example/onderling/calendar/feed.ics');
   });
 
   it('strips leading slashes from resource', () => {
     expect(podUrl('https://anne.example/', 'calendar', '/feed.ics'))
-      .toBe('https://anne.example/canopy/calendar/feed.ics');
+      .toBe('https://anne.example/onderling/calendar/feed.ics');
   });
 
   it('handles podRoot without trailing slash', () => {
     expect(podUrl('https://anne.example', 'household', 'profile.json'))
-      .toBe('https://anne.example/canopy/household/profile.json');
+      .toBe('https://anne.example/onderling/household/profile.json');
   });
 });
 
@@ -61,9 +61,9 @@ describe('createPodWriter', () => {
     const w = createPodWriter(session);
     const r = await w.write('calendar', 'feed.ics', 'BEGIN:VCALENDAR\n', 'text/calendar');
     expect(r.ok).toBe(true);
-    expect(r.url).toBe('https://anne.example/canopy/calendar/feed.ics');
+    expect(r.url).toBe('https://anne.example/onderling/calendar/feed.ics');
     expect(session.fetch).toHaveBeenCalledWith(
-      'https://anne.example/canopy/calendar/feed.ics',
+      'https://anne.example/onderling/calendar/feed.ics',
       expect.objectContaining({
         method:  'PUT',
         headers: { 'Content-Type': 'text/calendar' },
@@ -77,7 +77,7 @@ describe('createPodWriter', () => {
     const w = createPodWriter(session);
     const r = await w.read('calendar', 'feed.ics');
     expect(r.ok).toBe(true);
-    expect(r.body).toBe('mock-body-of:https://anne.example/canopy/calendar/feed.ics');
+    expect(r.body).toBe('mock-body-of:https://anne.example/onderling/calendar/feed.ics');
   });
 
   it('read returns ok=false on 404', async () => {
@@ -106,7 +106,7 @@ describe('createPodWriter', () => {
   it('urlFor returns the same namespaced URL the writer would PUT to', () => {
     const w = createPodWriter(makeMockSession());
     expect(w.urlFor('calendar', 'feed.ics'))
-      .toBe('https://anne.example/canopy/calendar/feed.ics');
+      .toBe('https://anne.example/onderling/calendar/feed.ics');
   });
 
   it('rejects sessions missing fetch or webid', () => {
@@ -130,7 +130,7 @@ describe('CalendarStore × podWriter integration', () => {
     const calls = session.fetch.mock.calls;
     const feedPut = calls.find(
       ([url, opts]) =>
-        url === 'https://anne.example/canopy/calendar/feed.ics'
+        url === 'https://anne.example/onderling/calendar/feed.ics'
         && opts?.method === 'PUT',
     );
     expect(feedPut).toBeTruthy();
@@ -161,6 +161,6 @@ describe('CalendarStore × podWriter integration', () => {
       fetch: vi.fn(),
     }));
     expect(store.getPodFeedUrl())
-      .toBe('https://anne.example/canopy/calendar/feed.ics');
+      .toBe('https://anne.example/onderling/calendar/feed.ics');
   });
 });

@@ -7,7 +7,7 @@
     "userInterfaceStyle": "automatic",
     "scheme": "stoop",
     "android": {
-      "package": "ag.canopy.stoopmobile",
+      "package": "org.onderling.stoop",
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.CAMERA",
@@ -20,7 +20,7 @@
       ]
     },
     "ios": {
-      "bundleIdentifier": "ag.canopy.stoopmobile",
+      "bundleIdentifier": "org.onderling.stoop",
       "supportsTablet": false
     },
     "plugins": [
@@ -36,7 +36,7 @@
         "expo-image-picker",
         {
           "photosPermission": "Stoop wil toegang tot je foto's om er een aan een post toe te voegen.",
-          "cameraPermission":  "Stoop wil de camera gebruiken om een foto bij een post te plaatsen."
+          "cameraPermission": "Stoop wil de camera gebruiken om een foto bij een post te plaatsen."
         }
       ],
       [

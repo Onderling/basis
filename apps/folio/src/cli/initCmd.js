@@ -11,7 +11,7 @@
  *               loud warning; require the user to type it back to confirm.
  *   - Persist the phrase to a `VaultNodeFs` at `<configDir>/vault.json`.
  *   - Persist config via `saveConfig`.
- *   - Write a marker file at `<localRoot>/.canopy/.folio-managed`.
+ *   - Write a marker file at `<localRoot>/.onderling/.folio-managed`.
  *
  * Non-interactive mode: when stdin is fed by a pipe (e.g. tests), defaults
  * are accepted on empty answers.
@@ -113,7 +113,7 @@ async function _init(args) {
   await saveConfig(cfg);
 
   // 7. Marker file.
-  const markerDir = join(localRoot, '.canopy');
+  const markerDir = join(localRoot, '.onderling');
   await fs.mkdir(markerDir, { recursive: true });
   await fs.writeFile(
     join(markerDir, '.folio-managed'),

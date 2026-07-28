@@ -14,7 +14,7 @@
  * Swap it for the community source behind the same contract; nothing in
  * installCores changes.
  *
- * An installable entry is an A2A Agent Card (+ `x-canopy`) per
+ * An installable entry is an A2A Agent Card (+ `x-onderling`) per
  * SPEC-agents-registry — the same shape `projectAgentCard` emits — so a
  * catalog card and a registry-projection card are interchangeable.
  */
@@ -31,7 +31,7 @@ export const STUB_CATALOG_CARDS = Object.freeze([
       Object.freeze({ id: 'summarise.document' }),
     ]),
     authentication: Object.freeze({ schemes: Object.freeze(['Bearer']) }),
-    'x-canopy': Object.freeze({
+    'x-onderling': Object.freeze({
       id:     'catalog:summariser',
       pubKey: 'pub-stub-summariser',
       role:   'service',
@@ -46,7 +46,7 @@ export const STUB_CATALOG_CARDS = Object.freeze([
       Object.freeze({ id: 'translate.text' }),
     ]),
     authentication: Object.freeze({ schemes: Object.freeze(['Bearer']) }),
-    'x-canopy': Object.freeze({
+    'x-onderling': Object.freeze({
       id:     'catalog:translator',
       pubKey: 'pub-stub-translator',
       role:   'service',
@@ -56,13 +56,14 @@ export const STUB_CATALOG_CARDS = Object.freeze([
 
 /**
  * createStubCatalog — a `{ list, get }` catalog source over a fixed card
- * list. Keyed by `x-canopy.id` (falling back to agentId/pubKey).
+ * list. Keyed by `x-onderling.id` (legacy `x-canopy.id`, then agentId/pubKey).
  *
  * @param {Array<object>} [cards]  installable cards (defaults to the stub set)
  * @returns {{ list: () => Promise<object[]>, get: (id: string) => Promise<object|null> }}
  */
 export function createStubCatalog(cards = STUB_CATALOG_CARDS) {
-  const idOf = (c) => c?.['x-canopy']?.id ?? c?.agentId ?? c?.['x-canopy']?.pubKey ?? c?.pubKey ?? null;
+  const idOf = (c) => c?.['x-onderling']?.id ?? c?.['x-canopy']?.id ?? c?.agentId
+    ?? c?.['x-onderling']?.pubKey ?? c?.['x-canopy']?.pubKey ?? c?.pubKey ?? null;
   const byId = new Map();
   for (const c of cards) {
     const id = idOf(c);

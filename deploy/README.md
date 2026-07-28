@@ -1,6 +1,6 @@
-# deploy/ — one-push PaaS deploy for the canopy backend services
+# deploy/ — one-push PaaS deploy for the Onderling backend services
 
-This directory makes the canopy backend **one-push-deployable to a PaaS**
+This directory makes the Onderling backend **one-push-deployable to a PaaS**
 (Railway is the default; Fly.io / Render are portable equivalents). It contains,
 per service, a portable **Dockerfile**, a **`railway.json`**, and an
 **`.env.example`**, plus a local **`docker-compose.yml`** that runs the whole
@@ -38,7 +38,7 @@ image therefore:
 4. `better-sqlite3` is native → the image installs `python3 make g++` to build it.
 
 The **CSS pod is different**: Community Solid Server is an independent npm package
-(no canopy deps), so `css-pod/Dockerfile` builds standalone from `deploy/css-pod`
+(no Onderling deps), so `css-pod/Dockerfile` builds standalone from `deploy/css-pod`
 (a small, fast image) rather than the monorepo.
 
 ## Deploy order (do this top-to-bottom)
@@ -109,7 +109,7 @@ The Dockerfiles are plain — nothing is Railway-specific. To retarget:
 
 **Fly.io** (`fly.toml`, per service — `fly launch --dockerfile deploy/relay/Dockerfile`):
 ```toml
-app = "canopy-relay"
+app = "onderling-relay"
 [build]
   dockerfile = "deploy/relay/Dockerfile"
 [http_service]
@@ -126,12 +126,12 @@ the CSS pod.
 ```yaml
 services:
   - type: web
-    name: canopy-relay
+    name: onderling-relay
     runtime: docker
     dockerfilePath: deploy/relay/Dockerfile
     dockerContext: .
   - type: web
-    name: canopy-pod
+    name: onderling-pod
     runtime: docker
     dockerfilePath: deploy/css-pod/Dockerfile
     dockerContext: deploy/css-pod

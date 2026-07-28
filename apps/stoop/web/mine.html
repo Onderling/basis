@@ -10,7 +10,7 @@
   mine.html — Slice E.1 (PLAN-gui-chat-uplift.md).
   V0.2-adopt (2026-05-21) — refactored to consume the NavModel V0.2
   substrate: `view.dataSource` (Q7) + `appliesTo.type: '*'` (Q8) +
-  shared `@canopy/web-adapter` helpers (`fetchSectionItems`,
+  shared `@onderling/web-adapter` helpers (`fetchSectionItems`,
   `itemMatchesAppliesTo`).
 
   First stoop web page consuming `renderWeb(stoopManifest)`.  The page
@@ -46,7 +46,7 @@
   while still proving the NavModel path when served by `stoop-web.js`.
 
   ──── V0.2 substrate gaps observed (logged for follow-on slices) ────
-    1. `itemMatchesAppliesTo` (in `@canopy/web-adapter`) does NOT
+    1. `itemMatchesAppliesTo` (in `@onderling/web-adapter`) does NOT
        understand `appliesTo.type === '*'` — its strict
        `types.includes(item.type)` check rejects every real item when
        the gate is a literal '*'.  This page special-cases the
@@ -104,7 +104,7 @@
 
   <script type="module">
     import { callSkill, getActor, mountLive, mountGroupSwitcher, initLocalisation, applyLocalisation, t } from '/app.js';
-    // V0.2 (2026-05-21) — shared @canopy/web-adapter helpers.  Overlaid
+    // V0.2 (2026-05-21) — shared @onderling/web-adapter helpers.  Overlaid
     // at `/lib/web-adapter/*.js` by `bin/stoop-web.js`'s extraStaticFiles
     // (same mechanism tasks-v0 uses).  Source-of-truth lives in
     // `packages/web-adapter/src/`.

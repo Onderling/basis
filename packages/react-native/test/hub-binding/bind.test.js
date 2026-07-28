@@ -114,10 +114,10 @@ describe('bind — happy path', () => {
     expect(binding.version).toBe(1);
   });
 
-  it('intentAction defaults to com.canopy.hub.BIND', async () => {
+  it('intentAction defaults to org.onderling.hub.BIND', async () => {
     const native = nativeMock();
     await bind({ nativeModule: native, manifest: MANIFEST });
-    expect(native.calls[0].args.intentAction).toBe('com.canopy.hub.BIND');
+    expect(native.calls[0].args.intentAction).toBe('org.onderling.hub.BIND');
   });
 });
 

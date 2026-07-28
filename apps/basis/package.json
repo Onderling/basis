@@ -2,7 +2,7 @@
   "name": "@onderling-app/basis",
   "version": "0.1.0-dev",
   "private": true,
-  "description": "basis — command-first unified chat shell consuming canopy app manifests.  Static web app; mesh agent runs browser-side via relay + NKN + WebRTC.",
+  "description": "basis — command-first unified chat shell consuming onderling app manifests.  Static web app; mesh agent runs browser-side via relay + NKN + WebRTC.",
   "type": "module",
   "main": "src/index.js",
   "exports": {

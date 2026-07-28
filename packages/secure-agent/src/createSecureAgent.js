@@ -1888,7 +1888,7 @@ async function isInboundAgentBlockedLocal({
  * Normalise the webAuthnUnlock opt to a config object usable by
  * the passkey helpers, or null if the opt wasn't set.
  *
- *   true         → infer rpId from window.location.hostname; userName='canopy-user'
+ *   true         → infer rpId from window.location.hostname; userName='onderling-user'
  *   { rpId, … }  → use as-is, fill in defaults
  */
 function resolvePasskeyConfig(opt) {
@@ -1908,8 +1908,10 @@ function resolvePasskeyConfig(opt) {
   return {
     rpId,
     rpName:   base.rpName   ?? rpId,
-    userName: base.userName ?? 'canopy-user',
-    userId:   base.userId   ?? 'canopy-user',
+    userName: base.userName ?? 'onderling-user',
+    userId:   base.userId   ?? 'onderling-user',
+    // ⚠ the DEFAULT prfSalt is FROZEN (key-derivation input — renaming it orphans existing WebAuthn
+    // vault keys); the visible userName/userId defaults are cosmetic and renamed (new credentials only).
     prfSalt:  base.prfSalt  ?? 'canopy/secure-agent/v1',
     ...(base.credentialId ? { credentialId: base.credentialId } : {}),
   };

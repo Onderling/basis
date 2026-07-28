@@ -120,7 +120,7 @@ async function makeRig({ withDeviceMeta = false } = {}) {
 
 function deviceUriFor(bootstrap, identity) {
   const fp = bootstrap.fingerprint(identity.pubKeyBytes);
-  return `${POD_ROOT}canopy/devices/device-${fp}.enc`;
+  return `${POD_ROOT}onderling/devices/device-${fp}.enc`;
 }
 
 // ── tests ──────────────────────────────────────────────────────────────────
@@ -174,7 +174,7 @@ describe('migrateVaultToPod — empty-ish vault', () => {
     expect(report.alreadyMigrated).toBe(false);
     expect(report.dryRun).toBe(false);
     expect(report.migrated).toHaveLength(1);
-    expect(report.migrated[0]).toMatch(/^__canopy:self-device → devices\/device-[0-9a-f]{16}\.enc$/);
+    expect(report.migrated[0]).toMatch(/^__onderling:self-device → devices\/device-[0-9a-f]{16}\.enc$/);
 
     // agent-privkey is in EXACT_SKIP_KEYS, should be reported as skipped.
     const skippedKeys = report.skipped.map((s) => s.key);
@@ -231,7 +231,7 @@ describe('migrateVaultToPod — populated vault', () => {
     // Pod has a manifest + the device record.
     const deviceUri = deviceUriFor(Bootstrap.fromMnemonic(mnemonic), identity);
     expect(podClient.store.has(deviceUri)).toBe(true);
-    expect(podClient.store.has(`${POD_ROOT}canopy/manifest.ttl`)).toBe(true);
+    expect(podClient.store.has(`${POD_ROOT}onderling/manifest.ttl`)).toBe(true);
   });
 
   it('the migrated device record reads back through IdentityPodStore', async () => {

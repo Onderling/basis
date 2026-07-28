@@ -14,7 +14,10 @@
 import { exec } from 'node:child_process';
 
 /** Stable service identifier used across all platforms. */
-export const SERVICE_ID = 'ag.canopy.folio';
+// Naming migration 2026-07-29 (pre-launch): the service re-installs under the new label. A machine
+// that installed before the rename may still have ~/Library/LaunchAgents/ag.canopy.folio.plist —
+// `launchctl unload` + delete it once; `service install` writes the new one.
+export const SERVICE_ID = 'org.onderling.folio';
 
 export function execAsync(cmd, opts = {}) {
   return new Promise((resolve, reject) => {

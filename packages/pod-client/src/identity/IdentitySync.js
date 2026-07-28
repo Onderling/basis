@@ -388,7 +388,7 @@ export class IdentitySync extends Emitter {
   // ── URI helpers ──────────────────────────────────────────────────────────
 
   #joinPodUri(relativePath) {
-    const root = this.#podStore.root; // already ends in '/canopy/'
+    const root = this.#podStore.root; // ends in '/onderling/' (or '/canopy/' for a pre-rename container)
     let rel = relativePath;
     while (rel.startsWith('/')) rel = rel.slice(1);
     return root + rel;

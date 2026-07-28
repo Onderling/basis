@@ -38,6 +38,8 @@ import {
 } from './Mnemonic.js';
 
 const SEED_LEN     = 32;
+// ⚠ FROZEN FOREVER — HKDF domain-separation input (hashed, invisible). Renaming re-derives every
+// identity/agent seed and orphans existing state; a future scheme starts at 'onderling-identity-v2:'.
 const HKDF_INFO_NS = 'canopy-identity-v1:';
 const HKDF_LEN     = 32;
 const SALT_LEN     = 16;

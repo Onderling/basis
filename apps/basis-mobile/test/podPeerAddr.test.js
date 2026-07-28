@@ -73,6 +73,8 @@ describe('Bundle G3 (#265) — buildLookupPeerAddrByWebid', () => {
         body: `@prefix pim: <http://www.w3.org/ns/pim/space#>.
 <#me> pim:storage <https://bob.example/>.`,
       })],
+      // Naming migration 2026-07-29: this peer publishes at the LEGACY path with the legacy
+      // prefix — discovery must still find them (a peer on an older app version).
       ['https://bob.example/canopy/identity/identity.ttl', () => ({
         status: 404, contentType: 'text/turtle', body: '',
       })],
@@ -92,6 +94,8 @@ describe('Bundle G3 (#265) — buildLookupPeerAddrByWebid', () => {
         body: `@prefix pim: <http://www.w3.org/ns/pim/space#>.
 <#me> pim:storage <https://bob.example/>.`,
       })],
+      // Naming migration 2026-07-29: this peer publishes at the LEGACY path with the legacy
+      // prefix — discovery must still find them (a peer on an older app version).
       ['https://bob.example/canopy/identity/identity.ttl', () => ({
         status: 200, contentType: 'text/turtle',
         body: `@prefix canopy: <https://canopy.dev/ns#>.
@@ -136,12 +140,12 @@ describe('Bundle G3 (#265) — buildPublishPeerAddrToPod', () => {
     // its prefix).
     const routes = new Map([
       // PUT on the identity.ttl file → 201 Created.
-      ['https://alice.example/canopy/identity/identity.ttl', (url) => {
+      ['https://alice.example/onderling/identity/identity.ttl', (url) => {
         writes.push(url);
         return { status: 201, contentType: 'text/turtle', body: '' };
       }],
       // HEAD on the container (ensureContainer probe) → 200 (exists).
-      ['https://alice.example/canopy/identity/', () => ({
+      ['https://alice.example/onderling/identity/', () => ({
         status: 200, contentType: 'text/turtle', body: '',
       })],
       // WebID doc → exposes pim:storage.
@@ -177,7 +181,7 @@ describe('Bundle G3 (#265) — buildPublishPeerAddrToPod', () => {
     const result = await publish();
     expect(result.ok).toBe(true);
     expect(result.status).toBe(201);
-    expect(result.url).toBe('https://alice.example/canopy/identity/identity.ttl');
+    expect(result.url).toBe('https://alice.example/onderling/identity/identity.ttl');
     // The PUT body carries the NKN triple.
     const ttlWrite = seenBodies.find(w => w.url.endsWith('identity.ttl'));
     expect(ttlWrite?.body).toContain('canopy:peerAddr');

@@ -86,7 +86,7 @@ function coerceCard(card) {
  * top-level `agentId`, else the pubKey.
  */
 function cardId(card) {
-  const xc = card?.['x-canopy'] ?? {};
+  const xc = card?.['x-onderling'] ?? card?.['x-canopy'] ?? {};
   return xc.id ?? card?.agentId ?? xc.pubKey ?? card?.pubKey ?? null;
 }
 
@@ -97,7 +97,7 @@ function cardId(card) {
  * (`p.*`) are kept as-is (they cover their prefix at grant time).
  */
 function declaredSkills(card) {
-  const xc = card?.['x-canopy'] ?? {};
+  const xc = card?.['x-onderling'] ?? card?.['x-canopy'] ?? {};
   const out = new Set();
   for (const s of Array.isArray(card?.skills) ? card.skills : []) {
     const id = typeof s === 'string' ? s : s?.id;
@@ -119,7 +119,7 @@ function isDeclared(declared, skill) {
 
 /** Card → the default-deny registry entry (capabilities/grants EMPTY). */
 function cardToEntry(card, { name } = {}) {
-  const xc = card?.['x-canopy'] ?? {};
+  const xc = card?.['x-onderling'] ?? card?.['x-canopy'] ?? {};
   const pubKey = xc.pubKey ?? card?.pubKey ?? null;
   const agentId = cardId(card);
   if (typeof pubKey !== 'string' || pubKey.length === 0) return null;

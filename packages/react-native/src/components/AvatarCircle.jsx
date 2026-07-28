@@ -6,7 +6,7 @@
  *
  * Renders the photo when `uri` is provided, otherwise a circle with
  * the user's initials over a deterministic background colour
- * (avatar palette from `@canopy/identity-resolver/display`).
+ * (avatar palette from `@onderling/identity-resolver/display`).
  *
  * Tokens come from `useTheme()` so each app supplies its own palette
  * via `<ThemeProvider value={tokens}>`.
@@ -14,7 +14,7 @@
 
 import React from 'react';
 import { View, Text, Image } from 'react-native';
-import { initials as _initialsFn, paletteFor } from '@canopy/identity-resolver/display';
+import { initials as _initialsFn, paletteFor } from '@onderling/identity-resolver/display';
 import { useTheme } from '../theme/index.js';
 
 export function AvatarCircle({ uri, name = '', size = 48, style }) {

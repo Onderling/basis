@@ -49,6 +49,23 @@ export function projectAgentCard(entry, { owner } = {}) {
     ...capabilities.filter(c => typeof c === 'string' && c.length > 0),
   ])].sort();
 
+  const extensionBlock = Object.freeze({
+    id:       entry.agentId,
+    pubKey:   entry.pubKey ?? null,
+    owner:    owner ?? entry.webid ?? null,
+    role:     entry.role ?? null,
+    deviceId: entry.deviceId ?? null,
+    grants:   Object.freeze(grants.map(g => Object.freeze({
+      tokenId:    g?.tokenId    ?? null,
+      skill:      g?.skill      ?? null,
+      capability: g?.capability ?? null,
+      expiresAt:  g?.expiresAt  ?? null,
+    }))),
+    status:   entry.revokedAt ? 'revoked' : 'active',
+    lastSeen: entry.signedAt ?? null,
+    created:  entry.signedAt ?? null,
+  });
+
   return Object.freeze({
     name:    entry.name ?? entry.agentId,
     url:     entry.agentUri ?? null,
@@ -62,21 +79,9 @@ export function projectAgentCard(entry, { owner } = {}) {
     authentication: Object.freeze({
       schemes: Object.freeze(['Bearer']),
     }),
-    'x-canopy': Object.freeze({
-      id:       entry.agentId,
-      pubKey:   entry.pubKey ?? null,
-      owner:    owner ?? entry.webid ?? null,
-      role:     entry.role ?? null,
-      deviceId: entry.deviceId ?? null,
-      grants:   Object.freeze(grants.map(g => Object.freeze({
-        tokenId:    g?.tokenId    ?? null,
-        skill:      g?.skill      ?? null,
-        capability: g?.capability ?? null,
-        expiresAt:  g?.expiresAt  ?? null,
-      }))),
-      status:   entry.revokedAt ? 'revoked' : 'active',
-      lastSeen: entry.signedAt ?? null,
-      created:  entry.signedAt ?? null,
-    }),
+    // Naming migration 2026-07-29 — written under BOTH keys for one window (x-onderling going
+    // forward; x-canopy keeps older readers + the public feedback repo working). Readers prefer new.
+    'x-onderling': extensionBlock,
+    'x-canopy':    extensionBlock,
   });
 }

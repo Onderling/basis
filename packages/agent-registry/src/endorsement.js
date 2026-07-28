@@ -92,7 +92,7 @@ export function cardHash(card) {
  * The endorsement's `subject` binds to this.
  */
 function cardPubKey(card) {
-  const xc = card?.['x-canopy'] ?? {};
+  const xc = card?.['x-onderling'] ?? card?.['x-canopy'] ?? {};   // legacy spelling still read
   const pk = xc.pubKey ?? card?.pubKey ?? null;
   return (typeof pk === 'string' && pk.length > 0) ? pk : null;
 }

@@ -81,12 +81,12 @@ export function localStorageSharedWithMeIo(storage = globalThis.localStorage) {
  *
  * We reuse the SAME shareable-substrate pattern the availability pref
  * uses (`podAvailabilityIo`/`tieredAvailabilityIo`), NOT a divergent
- * home: a per-user pod resource under the `canopy/<app>/` namespace,
+ * home: a per-user pod resource under the `onderling/<app>/` namespace,
  * written through a `createPodWriter`-shaped writer. The list holds only
  * sealed ciphertext + structural metadata, so it is leak-safe on the pod.
  *
  * DESIGN — where the shared copy lives: a PER-USER pod resource
- * (`canopy/cc-shared-with-me/received.json`), NOT a per-circle item. The
+ * (`onderling/cc-shared-with-me/received.json`), NOT a per-circle item. The
  * "shared with me" inbox is cross-circle + per-user by definition (it
  * collects copies pushed to THIS user out of any circle), so a single
  * per-user home is the one truth — mirroring the availability pref's home.

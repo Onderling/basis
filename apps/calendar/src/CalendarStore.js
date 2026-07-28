@@ -97,7 +97,7 @@ export class CalendarStore {
   /**
    * v0.7. — wire/unwire the pod-write target at runtime. The shell
    * chat calls this on sign-in / sign-out so calendar's .ics feed
-   * writes-through to `<pod>/canopy/calendar/feed.ics`.
+   * writes-through to `<pod>/onderling/calendar/feed.ics`.
    *
    * @param {object|null} writer  result of podStorage.createPodWriter,
    *                                or null to disable write-through.

@@ -94,9 +94,9 @@ describe('PathMap.shouldSync / shouldSkipDir', () => {
     expect(m.shouldSync('.hidden/notes.md')).toBe(false);
     expect(m.shouldSync('recipes/.draft.md')).toBe(false);
   });
-  it('skips .canopy/ metadata dir', () => {
-    expect(m.shouldSync('.canopy/notes-sync-state.json')).toBe(false);
-    expect(m.shouldSkipDir('.canopy')).toBe(true);
+  it('skips .onderling/ metadata dir', () => {
+    expect(m.shouldSync('.onderling/notes-sync-state.json')).toBe(false);
+    expect(m.shouldSkipDir('.onderling')).toBe(true);
   });
   it('skips OS noise', () => {
     expect(m.shouldSync('.DS_Store')).toBe(false);

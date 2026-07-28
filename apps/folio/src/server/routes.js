@@ -106,7 +106,18 @@ import {
   recommendFix as recommendFixFromSteps,
 } from '../diagnostics.js';
 
-const STATE_FILE_RELPATH = '.canopy/notes-sync-state.json';
+const STATE_FILE_RELPATH        = '.onderling/notes-sync-state.json';
+const STATE_FILE_RELPATH_LEGACY = '.canopy/notes-sync-state.json';   // read-fallback (pre-rename state)
+
+/** Read the sync-state file, trying the new path then the legacy .canopy/ path (pre-rename state). */
+async function readStateText(fsImpl, root) {
+  for (const rel of [STATE_FILE_RELPATH, STATE_FILE_RELPATH_LEGACY]) {
+    try { return await fsImpl.readFile(join(root, rel), 'utf8'); }
+    catch (err) { if (err.code !== 'ENOENT') throw err; }
+  }
+  return null;
+}
+
 
 /**
  * Build the REST router.
@@ -151,10 +162,12 @@ export function createRouter({ engine, podClient, vault, identity, hub, errorBuf
       let lastSyncAt = stats.lastSyncAt ?? null;
       let knownState = {};
       try {
-        const text = await fs.readFile(join(localRoot, STATE_FILE_RELPATH), 'utf8');
-        const parsed = JSON.parse(text);
-        knownState = parsed.files ?? {};
-        lastSyncAt = lastSyncAt ?? parsed.writtenAt ?? null;
+        const text = await readStateText(fs, localRoot);
+        if (text != null) {
+          const parsed = JSON.parse(text);
+          knownState = parsed.files ?? {};
+          lastSyncAt = lastSyncAt ?? parsed.writtenAt ?? null;
+        }
       } catch (err) {
         if (err.code !== 'ENOENT') throw err;
       }
@@ -625,8 +638,8 @@ export function createRouter({ engine, podClient, vault, identity, hub, errorBuf
     try { await fs.access(absPath); hasLocal = true; } catch { /* ENOENT */ }
     let hasKnown = false;
     try {
-      const text = await fs.readFile(join(localRoot, STATE_FILE_RELPATH), 'utf8');
-      const parsed = JSON.parse(text);
+      const text = await readStateText(fs, localRoot);
+      const parsed = text != null ? JSON.parse(text) : null;
       hasKnown = !!parsed?.files?.[relPath];
     } catch { /* no state yet */ }
     if (!hasLocal && !hasKnown) {
@@ -837,7 +850,7 @@ function sendError(res, status, code, message) {
 
 /**
  * Walk a tree, collecting absolute paths of files containing conflict markers.
- * Skips dotfiles (which also skips the .canopy/ metadata dir).
+ * Skips dotfiles (which also skips the .onderling/ metadata dir).
  */
 async function walkConflicts(root, dir, out) {
   let entries;

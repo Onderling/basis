@@ -56,6 +56,8 @@ import { hkdf }   from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 
 export const PFS_VERSION  = 1;
+// ⚠ FROZEN FOREVER — key-derivation salt (hashed, invisible; naming decision 2026-07-29). Renaming
+// would break decryption of everything sealed under it; a future scheme versions to onderling/…/v2.
 export const PFS_SALT     = new TextEncoder().encode('canopy/secure-agent/pfs/v1');
 export const DEFAULT_MAX_SKIP = 64;
 

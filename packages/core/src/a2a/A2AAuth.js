@@ -4,7 +4,7 @@
  * Trust tier assignment for inbound callers:
  *   0 — no Authorization header
  *   1 — valid Bearer JWT (not expired)
- *   2 — JWT + x-canopy-groups claim verified by GroupManager
+ *   2 — JWT + x-onderling-groups claim (legacy x-canopy-groups accepted) verified by GroupManager
  *   3 — JWT + capability-token claim verified by TokenRegistry
  *
  * Note: JWT signature is NOT verified here (trust TLS + token issuer).
@@ -59,14 +59,15 @@ export class A2AAuth {
     let tier = 1;
 
     // Tier 2: JWT carries group memberships verified by GroupManager.
-    if (tier === 1 && this.#groupManager && claims['x-canopy-groups']) {
-      const groups = claims['x-canopy-groups'];
+    const groupsClaim = claims['x-onderling-groups'] ?? claims['x-canopy-groups'];   // legacy spelling read
+    if (tier === 1 && this.#groupManager && groupsClaim) {
+      const groups = groupsClaim;
       if (Array.isArray(groups) && groups.length > 0) {
         // Any verified group membership → tier 2.
         for (const groupId of groups) {
           try {
             // Re-use the proof stored in the claim if provided, else just check claim presence.
-            const proof = claims[`x-canopy-proof:${groupId}`];
+            const proof = claims[`x-onderling-proof:${groupId}`] ?? claims[`x-canopy-proof:${groupId}`];
             if (proof) {
               const valid = await this.#groupManager.verifyProof(JSON.parse(proof));
               if (valid) { tier = 2; break; }
@@ -79,10 +80,11 @@ export class A2AAuth {
     }
 
     // Tier 3: JWT carries a capability token claim verified by TokenRegistry.
-    if (tier <= 2 && this.#tokenRegistry && claims['x-canopy-token']) {
+    const tokenClaim = claims['x-onderling-token'] ?? claims['x-canopy-token'];   // legacy spelling read
+    if (tier <= 2 && this.#tokenRegistry && tokenClaim) {
       try {
         const { CapabilityToken } = await import('../permissions/CapabilityToken.js');
-        const ct = JSON.parse(claims['x-canopy-token']);
+        const ct = JSON.parse(tokenClaim);
         if (CapabilityToken.verify(ct, null)) {
           tier = 3;
         }

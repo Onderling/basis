@@ -149,7 +149,7 @@ describe('folio init', () => {
     expect(vaultRaw.entries['bootstrap-mnemonic']).toBe(TEST_PHRASE);
     expect(typeof vaultRaw.entries['bootstrap-seed-b64']).toBe('string');
 
-    const markerRaw = await fs.readFile(join(localRoot, '.canopy', '.folio-managed'), 'utf8');
+    const markerRaw = await fs.readFile(join(localRoot, '.onderling', '.folio-managed'), 'utf8');
     expect(JSON.parse(markerRaw).webId).toBe('https://alice.example/profile/card#me');
   });
 
@@ -300,7 +300,7 @@ describe('folio reset', () => {
     // Pre-conditions: metadata + vault + config all present.
     await fs.access(join(cfgDir, 'config.json'));
     await fs.access(join(cfgDir, 'vault.json'));
-    await fs.access(join(localRoot, '.canopy', '.folio-managed'));
+    await fs.access(join(localRoot, '.onderling', '.folio-managed'));
     await fs.access(join(localRoot, '.folio', 'shares.json'));
 
     const r = await runCli({ args: ['reset', '--yes'], env: baseEnv() });
@@ -310,7 +310,7 @@ describe('folio reset', () => {
     // Settings gone.
     await expect(fs.access(join(cfgDir, 'config.json'))).rejects.toThrow();
     await expect(fs.access(join(cfgDir, 'vault.json'))).rejects.toThrow();
-    await expect(fs.access(join(localRoot, '.canopy'))).rejects.toThrow();
+    await expect(fs.access(join(localRoot, '.onderling'))).rejects.toThrow();
     await expect(fs.access(join(localRoot, '.folio'))).rejects.toThrow();
 
     // User content untouched.

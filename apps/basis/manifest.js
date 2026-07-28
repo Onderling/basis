@@ -439,7 +439,7 @@ export const basisManifest = {
     /**
      * `/lookup-peer <webid>` — v0.7.P3d.  Resolves a peer's NKN
      * address by fetching their WebID profile + reading the
-     * canopy:peerAddr triple from their pod's identity.ttl file.
+     * onderling:peerAddr triple from their pod's identity.ttl file.
      * Used to bridge webid → NKN cross-peer (so users don't have
      * to paste raw NKN addresses).
      */

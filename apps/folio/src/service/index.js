@@ -17,7 +17,7 @@
  * during tests) to call `launchctl` / `systemctl --user` / `schtasks`.  No new
  * top-level dependencies.
  *
- * Folio service identifier (stable): `ag.canopy.folio`.
+ * Folio service identifier (stable): `org.onderling.folio`.
  */
 import { platform } from 'node:os';
 

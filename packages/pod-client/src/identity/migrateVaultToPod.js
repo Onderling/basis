@@ -64,7 +64,7 @@ export const MIGRATED_FLAG_KEY = 'identity-migration:migrated-at';
  * is NOT a regular vault entry (the seed at `agent-privkey` is local-only
  * material and stays in the vault).
  */
-export const SELF_DEVICE_PSEUDO_KEY = '__canopy:self-device';
+export const SELF_DEVICE_PSEUDO_KEY = '__onderling:self-device';   // in-memory dispatch token, never persisted
 
 /**
  * Vault-key namespace prefixes that are explicitly NOT migrated.  Callers

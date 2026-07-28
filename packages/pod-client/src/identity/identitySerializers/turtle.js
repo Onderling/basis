@@ -12,7 +12,9 @@
  * manifest.
  */
 
-const NS_DW  = 'https://canopy.org/ns#';
+// Naming migration 2026-07-29: new docs declare the onderling namespace. The parser matches the `dw:`
+// PREFIX LABEL, never this URL, so pre-rename docs (declared with canopy.org) still parse unchanged.
+const NS_DW  = 'https://onderling.org/ns#';
 const NS_XSD = 'http://www.w3.org/2001/XMLSchema#';
 
 /**

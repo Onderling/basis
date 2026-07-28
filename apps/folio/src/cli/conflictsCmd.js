@@ -83,7 +83,7 @@ async function walk(root, dir, out) {
     throw err;
   }
   for (const e of entries) {
-    if (e.name.startsWith('.')) continue;          // skip dotfiles + .canopy
+    if (e.name.startsWith('.')) continue;          // skip dotfiles + .onderling
     const full = join(dir, e.name);
     if (e.isDirectory()) {
       await walk(root, full, out);

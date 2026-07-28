@@ -17,7 +17,7 @@
 
 import React from 'react';
 import { View, Text, Pressable, ScrollView } from 'react-native';
-import { localiseField } from '@canopy/identity-resolver/display';
+import { localiseField } from '@onderling/identity-resolver/display';
 import { useTheme } from '../theme/index.js';
 
 /**

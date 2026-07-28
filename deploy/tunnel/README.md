@@ -8,28 +8,41 @@ runbook Path C) so it survives crashes, logout, and reboot. Pairs with
 
 ```bash
 # cloudflared must already be at ~/.local/bin/cloudflared (see DEPLOY-RUNBOOK Path C)
-install -m755 deploy/tunnel/canopy-tunnel.sh      ~/.local/bin/canopy-tunnel.sh
-install -Dm644 deploy/tunnel/canopy-tunnel.service ~/.config/systemd/user/canopy-tunnel.service
+install -m755 deploy/tunnel/onderling-tunnel.sh      ~/.local/bin/onderling-tunnel.sh
+install -Dm644 deploy/tunnel/onderling-tunnel.service ~/.config/systemd/user/onderling-tunnel.service
 systemctl --user daemon-reload
-systemctl --user enable --now canopy-tunnel.service
+systemctl --user enable --now onderling-tunnel.service
 loginctl enable-linger "$USER"    # run without login + start on boot
 ```
 
-The current public URL is written to **`~/.canopy-relay-url`**:
+The current public URL is written to **`~/.onderling-relay-url`**:
 
 ```bash
-RELAY_URL="$(cat ~/.canopy-relay-url | sed s/https:/wss:/)"
+RELAY_URL="$(cat ~/.onderling-relay-url | sed s/https:/wss:/)"
 node deploy/smoke/smoke.mjs "$RELAY_URL"
 ```
 
-Manage it: `systemctl --user {status,restart,stop} canopy-tunnel.service`.
+Manage it: `systemctl --user {status,restart,stop} onderling-tunnel.service`.
+
+### Already running the pre-2026-07-29 unit?
+
+The old `canopy-tunnel.service` keeps working — nothing breaks by itself. To move over:
+
+```bash
+systemctl --user disable --now canopy-tunnel.service
+rm -f ~/.config/systemd/user/canopy-tunnel.service ~/.local/bin/canopy-tunnel.sh
+# then run the Install block above
+```
+
+The script writes the URL to **both** `~/.onderling-relay-url` and the legacy `~/.canopy-relay-url`
+for one migration window, so anything still reading the old path keeps working.
 
 ## What this does and does NOT give you
 
 - ✅ Survives the process crashing, you logging out, and (with linger) a reboot —
   as long as the **machine is on** and Docker is up (`restart: unless-stopped`).
 - ⚠️ The URL is a cloudflared **quick tunnel**, so it **rotates on every (re)start** —
-  read `~/.canopy-relay-url` for the current one. It is stable only while the
+  read `~/.onderling-relay-url` for the current one. It is stable only while the
   service stays up.
 
 ## Getting a truly STABLE URL (no card)
@@ -40,7 +53,7 @@ Two no-card ways to a URL that never rotates:
    `something.ngrok-free.app`. No domain of your own needed. Swap this service's
    `ExecStart` for `ngrok http --domain=<your>.ngrok-free.app 8787`.
 2. **Cloudflare NAMED tunnel** — needs a **domain** you add to a (free) Cloudflare
-   account: `cloudflared tunnel create canopy` + a DNS route → a stable
+   account: `cloudflared tunnel create onderling` + a DNS route → a stable
    `relay.<yourdomain>`. This also unblocks tunnelling the **pod** (CSS bakes its
    base URL into WebIDs, so it needs a stable URL — see the runbook's pod gotcha).
 

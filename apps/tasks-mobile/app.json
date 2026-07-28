@@ -7,7 +7,7 @@
     "userInterfaceStyle": "automatic",
     "scheme": "tasks",
     "android": {
-      "package": "ag.canopy.tasksmobile",
+      "package": "org.onderling.tasks",
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.CAMERA",
@@ -22,7 +22,7 @@
       ]
     },
     "ios": {
-      "bundleIdentifier": "ag.canopy.tasksmobile",
+      "bundleIdentifier": "org.onderling.tasks",
       "supportsTablet": false
     },
     "plugins": [
@@ -38,7 +38,7 @@
         "expo-image-picker",
         {
           "photosPermission": "Tasks wil toegang tot je foto's om er een aan een deliverable te koppelen.",
-          "cameraPermission":  "Tasks wil de camera gebruiken om een deliverable-foto te maken."
+          "cameraPermission": "Tasks wil de camera gebruiken om een deliverable-foto te maken."
         }
       ],
       [

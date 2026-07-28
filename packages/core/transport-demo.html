@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>@canopy/core — transport demo</title>
+<title>@onderling/core — transport demo</title>
 <script type="importmap">
 {
   "imports": {
@@ -12,9 +12,9 @@
     "ed2curve":                       "https://esm.sh/ed2curve@0.3.0?deps=tweetnacl@1.0.3",
     "@scure/bip39":                   "https://esm.sh/@scure/bip39@1.4.0",
     "@scure/bip39/wordlists/english": "https://esm.sh/@scure/bip39@1.4.0/wordlists/english",
-    "@canopy/core":                 "./src/index.js",
-    "@canopy/vault":                "../vault/index.js",
-    "@canopy/transports":           "../transports/src/index.js"
+    "@onderling/core":                 "./src/index.js",
+    "@onderling/vault":                "../vault/index.js",
+    "@onderling/transports":           "../transports/src/index.js"
   }
 }
 </script>
@@ -151,7 +151,7 @@ button.danger{ background: #3d1a1a; border: 1px solid var(--red); color: var(--r
 <body>
 
 <header>
-  <h1>@canopy/core</h1>
+  <h1>@onderling/core</h1>
   <span class="badge">transport demo</span>
   <span id="status">setting up…</span>
 </header>
@@ -385,9 +385,9 @@ import {
   Agent, AgentIdentity, InternalBus, InternalTransport,
   TextPart, DataPart, Parts,
   FallbackTable, RoutingStrategy, PeerGraph, PeerDiscovery,
-} from '@canopy/core';
-import { VaultMemory }    from '@canopy/vault';
-import { RelayTransport } from '@canopy/transports';
+} from '@onderling/core';
+import { VaultMemory }    from '@onderling/vault';
+import { RelayTransport } from '@onderling/transports';
 
 // ── State ──────────────────────────────────────────────────────────────────────
 

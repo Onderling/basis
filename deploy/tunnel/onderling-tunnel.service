@@ -1,10 +1,10 @@
 [Unit]
-Description=Canopy relay cloudflared tunnel (durable public wss:// for the local relay)
+Description=Onderling relay cloudflared tunnel (durable public wss:// for the local relay)
 After=network-online.target
 Wants=network-online.target
 
 [Service]
-ExecStart=%h/.local/bin/canopy-tunnel.sh
+ExecStart=%h/.local/bin/onderling-tunnel.sh
 Restart=always
 RestartSec=5
 

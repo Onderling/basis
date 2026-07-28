@@ -44,7 +44,7 @@ export function buildUnit({ nodePath, cliPath, workingDir, logPath: lp }) {
   const log = lp ?? logPath();
   return `[Unit]
 Description=Folio — markdown notes <-> Solid pod sync agent
-Documentation=https://github.com/canopy/folio
+Documentation=https://github.com/Onderling
 After=network-online.target
 Wants=network-online.target
 

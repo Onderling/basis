@@ -7,13 +7,13 @@
     "userInterfaceStyle": "dark",
     "scheme": "folio",
     "android": {
-      "package": "ag.canopy.foliomobile",
+      "package": "org.onderling.folio",
       "permissions": [
         "android.permission.INTERNET"
       ]
     },
     "ios": {
-      "bundleIdentifier": "ag.canopy.foliomobile",
+      "bundleIdentifier": "org.onderling.folio",
       "supportsTablet": false
     },
     "plugins": [

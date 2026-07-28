@@ -12,10 +12,11 @@
  * under the user's pod root.
  *
  * Path convention:
- *   - `<pod-root>/canopy/<app>/<resource>` — namespaced under
- *     `canopy/` so basis-managed pod state doesn't collide
+ *   - `<pod-root>/onderling/<app>/<resource>` — namespaced under
+ *     `onderling/` so basis-managed pod state doesn't collide
  *     with other Solid apps (folio's existing
- *     `<pod>/<folder-mirror>` paths remain unaffected).
+ *     `<pod>/<folder-mirror>` paths remain unaffected). Reads fall
+ *     back to the pre-2026-07-29 `canopy/` namespace.
  *
  * v0.7. limitations:
  *   - One-way write only (calendar emits .ics feed to pod).
@@ -155,16 +156,19 @@ function parseStorageFromJsonLd(body, webid) {
 
 /* ───────────────── v0.7.P3d — WebID ↔ NKN mapping ───────────────── */
 
-// Canopy's namespace for app-specific triples published to user pods.
-// Convention: <webid> <canopy:peerAddr> "<nkn-address-string>".
-const CANOPY_NKN_ADDR = 'https://canopy.dev/ns#peerAddr';
+// The namespace for app-specific triples published to user pods:
+// <webid> <onderling:peerAddr> "<nkn-address-string>" — see publishPeerAddr/discoverPeerAddr below.
+// Naming migration 2026-07-29: new docs use the onderling namespace; discovery still accepts the two
+// legacy spellings (canopy.dev prefix + IRI) so peers on older app versions stay discoverable.
 
 /**
  * v0.7.P3d — publish the user's peer address as a triple in their
  * pod profile, so other users can discover it from their WebID.
  *
- * Writes a small Turtle doc at <pod>/canopy/identity.ttl containing:
- *   <#me> canopy:peerAddr "app.<addr-hex>" .
+ * Writes a small Turtle doc at <pod>/onderling/identity/identity.ttl containing:
+ *   <#me> onderling:peerAddr "app.<addr-hex>" .
+ * A legacy `canopy:peerAddr` triple is written ALONGSIDE for one migration window, so a peer still on
+ * an older app version can keep discovering this address.
  *
  * Lives separately from the WebID doc (which the user can't always
  * write to directly).  Discovery: peer fetches THIS doc by URL
@@ -179,19 +183,23 @@ export async function publishPeerAddr(podWriter, peerAddr) {
   if (typeof peerAddr !== 'string' || peerAddr === '') {
     throw new TypeError('publishPeerAddr: peerAddr required');
   }
-  const turtle = `@prefix canopy: <https://canopy.dev/ns#>.
-<#me> canopy:peerAddr "${peerAddr.replace(/"/g, '\\"')}" .
+  const safe = peerAddr.replace(/"/g, '\\"');
+  const turtle = `@prefix onderling: <https://onderling.org/ns#>.
+@prefix canopy: <https://canopy.dev/ns#>.
+<#me> onderling:peerAddr "${safe}" .
+<#me> canopy:peerAddr "${safe}" .
 `;
   return podWriter.write('identity', 'identity.ttl', turtle, 'text/turtle');
 }
 
 /**
  * v0.7.P3d — discover a peer's peer address by fetching their WebID
- * + following the pod root + reading the canopy/identity.ttl file.
+ * + following the pod root + reading their identity.ttl.
  *
  * Two-step:
  *   1. Get the peer's WebID doc → find pim:storage (their pod root)
- *   2. Fetch <pod>/canopy/identity.ttl → extract canopy:peerAddr
+ *   2. Fetch <pod>/onderling/identity/identity.ttl (falling back to the legacy canopy/ path for a peer
+ *      who hasn't republished since the rename) → extract the peerAddr triple (either spelling)
  *
  * Falls back to null when any step fails (network, no triple, ACL).
  *
@@ -210,28 +218,37 @@ export async function discoverPeerAddr(session, targetWebid) {
   }).catch(() => null);
   if (!peerPodRoot) return null;
 
-  // Step 2: fetch <peer-pod>/canopy/identity.ttl
-  const url = `${peerPodRoot}canopy/identity/identity.ttl`;
-  try {
-    const res = await session.fetch(url, {
-      headers: { Accept: 'text/turtle' },
-    });
-    if (!res.ok) return null;
-    const body = await res.text();
-    // Match: canopy:peerAddr "<addr>".  Accept either bare prefix
-    // form or full IRI.
-    const full = body.match(/<https:\/\/canopy\.dev\/ns#peerAddr>\s*"([^"]+)"/);
-    if (full) return full[1];
-    const pref = body.match(/\bcanopy:peerAddr\s*"([^"]+)"/);
-    if (pref) return pref[1];
-  } catch {
-    /* fall through */
+  // Step 2: fetch the peer's identity.ttl — the new path first, then the legacy canopy/ path (a peer
+  // who hasn't republished since the 2026-07-29 rename still lives there).
+  for (const url of [
+    `${peerPodRoot}onderling/identity/identity.ttl`,
+    `${peerPodRoot}canopy/identity/identity.ttl`,
+  ]) {
+    try {
+      const res = await session.fetch(url, {
+        headers: { Accept: 'text/turtle' },
+      });
+      if (!res.ok) continue;
+      const body = await res.text();
+      // Accept the new AND legacy spellings, each as bare prefix or full IRI.
+      const full = body.match(/<https:\/\/(?:onderling\.org|canopy\.dev)\/ns#peerAddr>\s*"([^"]+)"/);
+      if (full) return full[1];
+      const pref = body.match(/\b(?:onderling|canopy):peerAddr\s*"([^"]+)"/);
+      if (pref) return pref[1];
+    } catch {
+      /* try the next path */
+    }
   }
   return null;
 }
 
 /**
- * Build a pod-namespaced URL for canopy app state.
+ * Build a pod-namespaced URL for basis-managed app state.
+ *
+ * Naming migration 2026-07-29: NEW writes land under `onderling/`; `podUrlLegacy` spells the same
+ * resource under the old `canopy/` namespace — read paths try new-then-legacy so state written before
+ * the rename keeps resolving. Old app versions keep writing canopy/ until updated, which the fallback
+ * also covers.
  *
  * @param {string} podRoot   from podRootFromWebid()
  * @param {string} app       'calendar' | 'household' | …
@@ -244,7 +261,12 @@ export function podUrl(podRoot, app, resource) {
   }
   const base = podRoot.endsWith('/') ? podRoot : podRoot + '/';
   const r = String(resource ?? '').replace(/^\/+/, '');
-  return `${base}canopy/${app}/${r}`;
+  return `${base}onderling/${app}/${r}`;
+}
+
+/** The legacy `canopy/` spelling of the same resource — read-fallback only, never written. */
+export function podUrlLegacy(podRoot, app, resource) {
+  return podUrl(podRoot, app, resource).replace('/onderling/', '/canopy/');
 }
 
 /**
@@ -332,15 +354,21 @@ export function createPodWriter(session, opts = {}) {
       };
     },
     async read(app, resource) {
-      const url = podUrl(podRoot, app, resource);
-      try {
-        const res = await session.fetch(url);
-        if (!res.ok) return { ok: false, url, body: null, status: res.status };
-        const body = await res.text();
-        return { ok: true, url, body, status: res.status };
-      } catch (err) {
-        return { ok: false, url, body: null, status: 0, error: err?.message };
+      // New namespace first; fall back to the legacy canopy/ path so pre-rename state keeps resolving.
+      let last = null;
+      for (const url of [podUrl(podRoot, app, resource), podUrlLegacy(podRoot, app, resource)]) {
+        try {
+          const res = await session.fetch(url);
+          if (res.ok) {
+            const body = await res.text();
+            return { ok: true, url, body, status: res.status };
+          }
+          last = { ok: false, url, body: null, status: res.status };
+        } catch (err) {
+          last = { ok: false, url, body: null, status: 0, error: err?.message };
+        }
       }
+      return last ?? { ok: false, url: podUrl(podRoot, app, resource), body: null, status: 0 };
     },
   };
 }

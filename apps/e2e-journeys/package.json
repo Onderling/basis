@@ -5,7 +5,7 @@
   "type": "module",
   "description": "End-to-end user-journey harness — runs the flagship journeys against a live (deployed) or local relay, in one process, with real SDK + app code.",
   "bin": {
-    "canopy-e2e": "./run.mjs"
+    "onderling-e2e": "./run.mjs"
   },
   "scripts": {
     "e2e": "node run.mjs",

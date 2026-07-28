@@ -650,3 +650,15 @@ Cost, accepted: a peer whose only transport is NKN is reachable as a contact, no
 Consequences: `NknTransport.supportsAliases` stays `false` as a design fact, not a pending item; per-circle
 addressing (G13) is a relay concern only.
 
+## Relay diversity is an unlinkability strategy; registration must not defeat it (2026-07-28, Frits)
+
+The G12/G13 promise conceded that *the relay you chose* can correlate your circles. Frits' sharpening:
+that concession is **per relay** — someone whose circles ride different relays is unlinkable to every one
+of them, because no single relay sees two of their addresses.
+
+The design rule that follows: **a per-circle address is registered ONLY on relays that circle rides.**
+Registering all addresses on every socket would hand each relay a linkage it could never observe on its
+own — quietly converting a per-relay concession into a global one. The connection-points store
+(`circlesFor(url)`) is the scoping source; a circle with no recorded point rides the deployment default
+and registers there alone.
+

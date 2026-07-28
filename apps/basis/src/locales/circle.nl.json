@@ -2232,6 +2232,66 @@
     }
   },
   "nearbyScreen": {
+    "points_title": {
+      "text": "Verbindingspunten",
+      "doc": "Heading of the connection-point list (Nearby step I). \"Relay\" is an implementation detail; this says what it does for you."
+    },
+    "points_intro": {
+      "text": "Deze houden je kringen bereikbaar als er niemand op je netwerk zit.",
+      "doc": "One line on what a connection point IS, in terms of what it does."
+    },
+    "points_empty": {
+      "text": "Je hebt nog geen verbindingspunten. Meedoen met een kring voegt er een toe.",
+      "doc": "Empty state — also says how one arrives, since you never configure one by hand."
+    },
+    "point_from_join": {
+      "text": "Toegevoegd toen je meedeed",
+      "doc": "Provenance: a circle brought this."
+    },
+    "point_from_manual": {
+      "text": "Door jou toegevoegd",
+      "doc": "Provenance: typed in."
+    },
+    "point_suggested": {
+      "text": "Voorgesteld door een kring — nog niet in gebruik",
+      "doc": "A suggestion is listed but not used. The circle suggests, the device decides."
+    },
+    "point_adopt": {
+      "text": "Deze gebruiken",
+      "doc": "Adopt a suggested point."
+    },
+    "point_carries": {
+      "text": "Draagt: {{circles}}",
+      "doc": "Which circles ride this point — the both-ways mapping."
+    },
+    "point_carries_none": {
+      "text": "Nog geen kring gebruikt dit.",
+      "doc": "A point nothing rides."
+    },
+    "point_remove": {
+      "text": "Verwijderen",
+      "doc": "Remove a connection point."
+    },
+    "remove_cuts_off": {
+      "text": "Dit verwijderen sluit af: {{circles}}",
+      "doc": "THE honest warning — circles left with no other point. Never merged with the milder case."
+    },
+    "remove_still_ok": {
+      "text": "Blijft op een andere manier bereikbaar: {{circles}}",
+      "doc": "The milder case — kept separate so the severe one keeps its weight."
+    },
+    "remove_nothing": {
+      "text": "Hier hangt niets van af.",
+      "doc": "Removing costs nothing."
+    },
+    "remove_confirm": {
+      "text": "Toch verwijderen",
+      "doc": "Confirm removal after seeing the impact."
+    },
+    "remove_cancel": {
+      "text": "Houden",
+      "doc": "Cancel removal."
+    },
     "invites_title": {
       "text": "Kringen die hier open staan",
       "doc": "Heading of the broadcast-invite list (Nearby step H)."

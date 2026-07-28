@@ -13,6 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, NEARBY_INVITE_LABELS, nearbyVisibilityKey,
+  POINT_SOURCE_LABELS,
 } from '@onderling-app/basis';
 import { initLocalisation, setLang, t }              from '../src/core/localisation.js';
 
@@ -60,6 +61,7 @@ describe('NEARBY_ACTION_LABELS — one definition, resolvable in both languages'
         ...Object.values(NEARBY_ACTION_LABELS),
         ...Object.values(NEARBY_ASK_LABELS),
         ...Object.values(NEARBY_INVITE_LABELS),
+        ...Object.values(POINT_SOURCE_LABELS),
         ...['asks_title', 'asks_empty', 'ask_resonant', 'ask_disclosure', 'ask_compose',
             'ask_placeholder', 'ask_send', 'ask_sent', 'ask_expired', 'answer_sent',
             // step G — cards + room chat
@@ -68,7 +70,11 @@ describe('NEARBY_ACTION_LABELS — one definition, resolvable in both languages'
             'chat_title', 'chat_empty', 'chat_ephemeral', 'chat_placeholder', 'chat_send',
             // step H — broadcast circle invites
             'invites_title', 'invites_empty', 'join_is_a_join', 'invite_expired',
-            'publish_invite', 'publish_warning', 'publish_short', 'invite_published']
+            'publish_invite', 'publish_warning', 'publish_short', 'invite_published',
+            // step I — connection points
+            'points_title', 'points_intro', 'points_empty', 'point_adopt', 'point_carries',
+            'point_carries_none', 'point_remove', 'remove_cuts_off', 'remove_still_ok',
+            'remove_nothing', 'remove_confirm', 'remove_cancel']
           .map((k) => `circle.nearbyScreen.${k}`),
         ...['visible', 'hidden', 'still_visible', 'unavailable']
           .flatMap((k) => [`circle.nearbyScreen.${k}_title`, `circle.nearbyScreen.${k}_body`]),
@@ -104,6 +110,15 @@ describe('NEARBY_INVITE_LABELS — one action, and it is a join', () => {
     // room you were in. Both renderers skip unlisted ids, so this map is where that is enforced.
     expect(Object.keys(NEARBY_INVITE_LABELS)).toEqual(['join-published-circle']);
     expect(Object.isFrozen(NEARBY_INVITE_LABELS)).toBe(true);
+  });
+});
+
+describe('POINT_SOURCE_LABELS — provenance, described once', () => {
+  it('covers every source the store can produce', () => {
+    // "A circle brought this" and "I typed this in" read differently, and a suggestion is a third thing.
+    // Both renderers read this map, so neither can describe the same point differently.
+    expect(Object.keys(POINT_SOURCE_LABELS).sort()).toEqual(['join', 'manual', 'suggested']);
+    expect(Object.isFrozen(POINT_SOURCE_LABELS)).toBe(true);
   });
 });
 

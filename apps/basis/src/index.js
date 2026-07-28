@@ -265,6 +265,8 @@ export {
   invitePublishAllows, mayPublish, prepareBroadcastInvite, isInviteLive, receiveInvite, inviteActions,
   BROADCAST_INVITE_MAX_TTL_MS, INVITE_MESSAGE,
 } from './v2/nearbyInvites.js';
+export { createConnectionPoints, POINT_SOURCE, POINT_SOURCE_LABELS }
+                                                from './v2/connectionPoints.js';
 export { makeSharedCirclePeerScope } from './v2/sharedCirclePeerScope.js';
 // agent-add admin approval: proposal-like flow for
 // joining an LLM agent to a circle whose `agents` axis is admin-approval.

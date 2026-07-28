@@ -36,7 +36,7 @@ import {
   makeAfterClaimHook,
   // Nearby model + label helpers (the action map + banner rule are SHARED with web — invariant 3).
   buildNearbyModel, NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, NEARBY_INVITE_LABELS,
-  nearbyVisibilityKey, createNearbyScreen,
+  nearbyVisibilityKey, createNearbyScreen, POINT_SOURCE_LABELS,
   // "My things" private notes-list.
   myThingsFromListFiles,
   // kring-scoped event stream + per-row action chips.
@@ -3970,6 +3970,82 @@ function subscribeToNetworkChange(fn) {
     _netSource = netinfo ? combineSources([subscribeAppState, netinfo]) : subscribeAppState;
   }
   return _netSource(fn);
+}
+
+// Connection points (Nearby step I). A projector over `createConnectionPoints` — the shared store makes
+// every decision; this draws it.
+//
+// The one thing it must get right is the removal warning: "cut off" and "still reachable another way" are
+// two separate statements, never one merged list of affected circles. Merging them is how someone clicks
+// through the warning that mattered.
+function ConnectionPointsScreen({ points = [], onBack, onAdopt, onRemove, onConfirmRemove, onCancelRemove, removing }) {
+  const theme = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+  return (
+    <View style={styles.page} testID="circle-points">
+      <View style={styles.bar}>
+        <Pressable onPress={onBack} accessibilityRole="button" testID="circle-points-back">
+          <Text style={styles.back}>{t('circle.back')}</Text>
+        </Pressable>
+      </View>
+      <Text style={styles.title}>{t('circle.nearbyScreen.points_title')}</Text>
+      <Text style={styles.muted}>{t('circle.nearbyScreen.points_intro')}</Text>
+      {points.length === 0 ? (
+        <Text style={styles.muted}>{t('circle.nearbyScreen.points_empty')}</Text>
+      ) : (
+        <ScrollView contentContainerStyle={styles.list}>
+          {points.map((point) => (
+            <View key={point.url} style={styles.row} testID={`point-${point.url}`}>
+              <Text style={styles.rowName}>{point.url}</Text>
+              <Text style={styles.rowMeta}>
+                {t(POINT_SOURCE_LABELS[point.source] ?? POINT_SOURCE_LABELS.manual)}
+              </Text>
+              <Text style={styles.rowMeta}>
+                {point.circles.length
+                  ? t('circle.nearbyScreen.point_carries', { circles: point.circles.join(', ') })
+                  : t('circle.nearbyScreen.point_carries_none')}
+              </Text>
+              <View style={styles.nearbyActions}>
+                {!point.adopted ? (
+                  <Pressable onPress={() => onAdopt?.(point.url)} accessibilityRole="button" testID={`point-adopt-${point.url}`} style={styles.nearbyAction}>
+                    <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.point_adopt')}</Text>
+                  </Pressable>
+                ) : null}
+                <Pressable onPress={() => onRemove?.(point.url)} accessibilityRole="button" testID={`point-remove-${point.url}`} style={styles.nearbyAction}>
+                  <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.point_remove')}</Text>
+                </Pressable>
+              </View>
+              {removing?.url === point.url ? (
+                <View style={styles.nearbyBannerAlert} accessibilityRole="alert" testID={`point-impact-${point.url}`}>
+                  {removing.losesReachability?.length ? (
+                    <Text style={styles.rowName} testID="point-impact-cutoff">
+                      {t('circle.nearbyScreen.remove_cuts_off', { circles: removing.losesReachability.join(', ') })}
+                    </Text>
+                  ) : null}
+                  {removing.stillReachable?.length ? (
+                    <Text style={styles.rowMeta}>
+                      {t('circle.nearbyScreen.remove_still_ok', { circles: removing.stillReachable.join(', ') })}
+                    </Text>
+                  ) : null}
+                  {!removing.losesReachability?.length && !removing.stillReachable?.length ? (
+                    <Text style={styles.rowMeta}>{t('circle.nearbyScreen.remove_nothing')}</Text>
+                  ) : null}
+                  <View style={styles.nearbyActions}>
+                    <Pressable onPress={() => onConfirmRemove?.(point.url)} accessibilityRole="button" testID="point-confirm" style={styles.nearbyAction}>
+                      <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.remove_confirm')}</Text>
+                    </Pressable>
+                    <Pressable onPress={onCancelRemove} accessibilityRole="button" testID="point-cancel" style={styles.nearbyAction}>
+                      <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.remove_cancel')}</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ) : null}
+            </View>
+          ))}
+        </ScrollView>
+      )}
+    </View>
+  );
 }
 
 // Host for the Nearby screen: owns the controller's lifecycle so the screen component stays a projector.

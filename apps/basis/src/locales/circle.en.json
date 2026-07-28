@@ -2232,6 +2232,66 @@
     }
   },
   "nearbyScreen": {
+    "points_title": {
+      "text": "Connection points",
+      "doc": "Heading of the connection-point list (Nearby step I). \"Relay\" is an implementation detail; this says what it does for you."
+    },
+    "points_intro": {
+      "text": "These keep your circles reachable when nobody is on your network.",
+      "doc": "One line on what a connection point IS, in terms of what it does."
+    },
+    "points_empty": {
+      "text": "You have no connection points yet. Joining a circle adds one.",
+      "doc": "Empty state — also says how one arrives, since you never configure one by hand."
+    },
+    "point_from_join": {
+      "text": "Added when you joined",
+      "doc": "Provenance: a circle brought this."
+    },
+    "point_from_manual": {
+      "text": "Added by you",
+      "doc": "Provenance: typed in."
+    },
+    "point_suggested": {
+      "text": "Suggested by a circle — not in use",
+      "doc": "A suggestion is listed but not used. The circle suggests, the device decides."
+    },
+    "point_adopt": {
+      "text": "Use this one",
+      "doc": "Adopt a suggested point."
+    },
+    "point_carries": {
+      "text": "Carries: {{circles}}",
+      "doc": "Which circles ride this point — the both-ways mapping."
+    },
+    "point_carries_none": {
+      "text": "No circle uses this yet.",
+      "doc": "A point nothing rides."
+    },
+    "point_remove": {
+      "text": "Remove",
+      "doc": "Remove a connection point."
+    },
+    "remove_cuts_off": {
+      "text": "Removing this cuts off: {{circles}}",
+      "doc": "THE honest warning — circles left with no other point. Never merged with the milder case."
+    },
+    "remove_still_ok": {
+      "text": "Still reachable another way: {{circles}}",
+      "doc": "The milder case — kept separate so the severe one keeps its weight."
+    },
+    "remove_nothing": {
+      "text": "Nothing depends on this one.",
+      "doc": "Removing costs nothing."
+    },
+    "remove_confirm": {
+      "text": "Remove it",
+      "doc": "Confirm removal after seeing the impact."
+    },
+    "remove_cancel": {
+      "text": "Keep it",
+      "doc": "Cancel removal."
+    },
     "invites_title": {
       "text": "Circles open here",
       "doc": "Heading of the broadcast-invite list (Nearby step H)."

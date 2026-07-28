@@ -71,8 +71,9 @@ export class NknTransport extends Transport {
   // sets of websocket connections to NKN nodes, N sub-client fan-outs — which on a phone is a real battery
   // and memory cost, not a detail.
   //
-  // That is a decision to take deliberately, not to make by accident, so this transport leaves
-  // `supportsAliases` false and `addAddress()` reports `{ok:false, reason:'aliases-unsupported'}`. A caller
+  // DECIDED 2026-07-28 (docs/decisions.md): this is the design, not a pending measurement. NKN reaches a
+  // PERSON; circles ride relays or pods — so `supportsAliases` stays false as a design fact, and per-circle
+  // addressing is a relay concern. `addAddress()` reports `{ok:false, reason:'aliases-unsupported'}`. A caller
   // wiring per-circle addressing can therefore SEE that this path is not ready, rather than sending to an
   // address nobody answers — which is exactly the silent hole that gated step C.
   //

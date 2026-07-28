@@ -637,3 +637,16 @@ becomes load-bearing at the transport, so hold-forward, the push-token registry 
 multiply per (member × circle). Migration is dual-addressing with a webid fallback, dropped last — the
 fallback is not only a safety net: members who joined before the address-proof work have no per-circle
 address at all.
+
+## NKN is the contact-to-contact transport; circles ride relays or pods (2026-07-28)
+
+An NKN client *is* an address — per-circle addressing over NKN would mean one client per circle, with each
+client's websocket set and fan-out, running on a phone. Rather than measure that cost, the decision is that
+it is the wrong shape: **NKN reaches a person; a circle is reached through a relay or through its pod.**
+The pod case is the built exception for relay-less circles: NKN carries the join handshake to the admin,
+and the pod is the circle's connection point thereafter.
+
+Cost, accepted: a peer whose only transport is NKN is reachable as a contact, not per-circle.
+Consequences: `NknTransport.supportsAliases` stays `false` as a design fact, not a pending item; per-circle
+addressing (G13) is a relay concern only.
+

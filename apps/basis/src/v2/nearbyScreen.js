@@ -31,6 +31,9 @@ import {
 import {
   roomAllows, createCard, createChatMessage, createRoomChat, CARD_MESSAGE, CHAT_MESSAGE,
 } from './nearbyRoom.js';
+import {
+  prepareBroadcastInvite, isInviteLive, inviteActions, INVITE_MESSAGE,
+} from './nearbyInvites.js';
 
 /**
  * Row action id → locale key.
@@ -52,6 +55,11 @@ export const NEARBY_ACTION_LABELS = Object.freeze({
 export const NEARBY_ASK_LABELS = Object.freeze({
   'answer-ask':  'circle.nearbyScreen.action_answer',
   'dismiss-ask': 'circle.nearbyScreen.action_dismiss',
+});
+
+/** Broadcast-invite action → locale key. Shared, so neither shell can offer what the other does not. */
+export const NEARBY_INVITE_LABELS = Object.freeze({
+  'join-published-circle': 'circle.nearbyScreen.action_join_published',
 });
 
 /**
@@ -83,6 +91,8 @@ export function nearbyVisibilityKey(visibility) {
  * @param {object} [deps.allows]         per-device room allows `{card, chat}` — BOTH default off (step G)
  * @param {(onCard: (card: object) => void) => (() => void)} [deps.subscribeToCards]
  * @param {(onMessage: (m: object) => void) => (() => void)} [deps.subscribeToChat]
+ * @param {(onInvite: (i: object) => void) => (() => void)} [deps.subscribeToInvites]
+ * @param {object} [deps.invitePublish]  per-circle publish allows `{[circleId]: true}` — off by default
  * @param {() => string|null} [deps.myRoomAddress]  the ephemeral address I present here
  * @param {() => Promise<Record<string,object>>} [deps.getDrivers]  MY drivers — read on-device, never sent
  * @param {Function} [deps.judge]        optional injected LLM judge for semantic matching
@@ -106,6 +116,8 @@ export function createNearbyScreen({
   allows: allowsInput = null,
   subscribeToCards = null,
   subscribeToChat = null,
+  subscribeToInvites = null,
+  invitePublish = null,
   myRoomAddress = () => null,
   getDrivers = null,
   judge,
@@ -158,6 +170,13 @@ export function createNearbyScreen({
   let unsubscribeCards = null;
   let unsubscribeChat = null;
   chat.subscribe(() => emit());
+
+  // ── Broadcast circle invites (step H) ──────────────────────────────────────
+  // Keyed by circleId rather than by publisher: two people in the room advertising the same circle is one
+  // circle you can join, not two offers to weigh up.
+  const roomInvites = new Map();
+  let unsubscribeInvites = null;
+  let publishAllows = invitePublish ?? {};
 
   async function ingestAsk(ask) {
     if (!ask?.id || !isAskLive(ask, now)) return;
@@ -244,10 +263,17 @@ export function createNearbyScreen({
     // rather than two lists the user has to reconcile.
     const withCards = rows.map((row) => (cards.has(row.id) ? { ...row, card: cards.get(row.id) } : row));
 
+    // Live only. A broadcast invite expires in minutes by design, so a stale one is gone rather than greyed
+    // out — offering a dead code is worse than offering nothing.
+    const inviteRows = [...roomInvites.values()]
+      .filter((inv) => isInviteLive(inv, now))
+      .map((inv) => ({ invite: inv, ...inviteActions(inv, { now }) }));
+
     return {
       ...built,
       rows: withCards,
       asks: askRows,
+      invites: inviteRows,
       allows,
       // Only present when I have joined the conversation. An empty array would read as "nobody has said
       // anything", which is a different fact from "I am not in this chat".
@@ -275,6 +301,15 @@ export function createNearbyScreen({
           }) ?? null;
         } catch (err) { unsubscribeCards = null; try { onError?.(err, 'subscribeToCards'); } catch { /* */ } }
       }
+      // Invites are RECEIVED regardless of what I publish — the same asymmetry as cards. Seeing that a
+      // circle exists is not publishing one of mine.
+      if (typeof subscribeToInvites === 'function' && !unsubscribeInvites) {
+        try {
+          unsubscribeInvites = subscribeToInvites((invite) => {
+            if (invite?.circleId && isInviteLive(invite, now)) { roomInvites.set(invite.circleId, invite); emit(); }
+          }) ?? null;
+        } catch (err) { unsubscribeInvites = null; try { onError?.(err, 'subscribeToInvites'); } catch { /* */ } }
+      }
       // Chat is different on purpose: the allow governs PARTICIPATING, both directions. Reading a room
       // conversation you have not joined is listening to people who believe they are talking among
       // participants.
@@ -298,13 +333,17 @@ export function createNearbyScreen({
       // Asks are dropped with the room, for the same reason the peer list is: a closed screen holding what
       // strangers needed is a quiet record of where someone has been.
       asks.clear();
-      for (const [unsub, name] of [[unsubscribeCards, 'cards'], [unsubscribeChat, 'chat']]) {
+      for (const [unsub, name] of [
+        [unsubscribeCards, 'cards'], [unsubscribeChat, 'chat'], [unsubscribeInvites, 'invites'],
+      ]) {
         if (!unsub) continue;
         try { unsub(); } catch (err) { try { onError?.(err, `unsubscribe:${name}`); } catch { /* */ } }
       }
       unsubscribeCards = null;
       unsubscribeChat = null;
+      unsubscribeInvites = null;
       cards.clear();
+      roomInvites.clear();
       chat.clear();     // leaving the room forgets the conversation — there is no history to come back to
       session.close();
       emit();
@@ -385,6 +424,42 @@ export function createNearbyScreen({
       }
       emit();
       return allows;
+    },
+
+    /**
+     * Publish a circle invite into the room.
+     *
+     * The invite itself must already have been built by the substrate (`buildCircleInviteUri`), which is
+     * admin-gated — this does not mint one, it only carries one. What it adds is the per-circle allow and
+     * the room's much tighter expiry ceiling.
+     */
+    async publishInvite({ uri, circleId, circleName, expiresAt } = {}) {
+      const built = prepareBroadcastInvite({
+        uri, circleId, circleName, expiresAt,
+        allows: publishAllows, from: safeCall(myRoomAddress, null), now,
+      });
+      if (!built.ok) return built;
+      if (!askChannel?.broadcastKind) return { ok: false, reason: 'no-channel', invite: built.invite };
+      try {
+        const result = await askChannel.broadcastKind(INVITE_MESSAGE, { invite: built.invite });
+        return { ok: true, invite: built.invite, ...result };
+      } catch (err) {
+        try { onError?.(err, 'publishInvite'); } catch { /* */ }
+        return { ok: false, reason: err?.message ?? 'broadcast-failed' };
+      }
+    },
+
+    /** The per-circle publish allows, as they stand. */
+    invitePublishAllows: () => ({ ...publishAllows }),
+
+    /** Allow or stop publishing ONE circle. There is no all-circles form, deliberately. */
+    setInvitePublish(circleId, value) {
+      if (!circleId) return { ...publishAllows };
+      publishAllows = value === true
+        ? { ...publishAllows, [circleId]: true }
+        : Object.fromEntries(Object.entries(publishAllows).filter(([k]) => k !== circleId));
+      emit();
+      return { ...publishAllows };
     },
 
     /** Publish my card to the room. Refused unless the card allow is on. */

@@ -35,7 +35,8 @@ import {
   // claim-router hook (mirror claimed tasks to my own circle).
   makeAfterClaimHook,
   // Nearby model + label helpers (the action map + banner rule are SHARED with web — invariant 3).
-  buildNearbyModel, NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, nearbyVisibilityKey, createNearbyScreen,
+  buildNearbyModel, NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, NEARBY_INVITE_LABELS,
+  nearbyVisibilityKey, createNearbyScreen,
   // "My things" private notes-list.
   myThingsFromListFiles,
   // kring-scoped event stream + per-row action chips.
@@ -1551,6 +1552,7 @@ export default function CircleLauncherScreen({
         onBack={() => setView('list')}
         onAction={handleNearbyAction}
         onOpenThread={openNearbyThread}
+        onJoinInvite={(uri) => setJoinArgs({ invite: uri })}
       />
     );
   }
@@ -3976,7 +3978,7 @@ function subscribeToNetworkChange(fn) {
 // it is deliberately tied to the React lifecycle rather than to a button, because the failure mode is a
 // user who *thinks* they left. Navigating away, backgrounding, or a crash mid-render all unmount, and all
 // must stop the announcement.
-function NearbyScreenHost({ bundle, onBack, onAction, onOpenThread }) {
+function NearbyScreenHost({ bundle, onBack, onAction, onOpenThread, onJoinInvite }) {
   const [model, setModel] = useState(null);
   // View state, not model state: whether THIS device currently has a text box open says nothing about
   // the room. `answering` holds the ask id being replied to.
@@ -4034,6 +4036,13 @@ function NearbyScreenHost({ bundle, onBack, onAction, onOpenThread }) {
 
   const say = useCallback((text) => { screen.say(text); }, [screen]);
 
+  // Joining a broadcast invite runs the SAME join as a scanned QR — the host hands the uri to the existing
+  // wizard rather than to anything new, which is the point of step H.
+  const inviteAction = useCallback((action, invite) => {
+    if (action !== 'join-published-circle' || !invite?.uri) return;
+    onJoinInvite?.(invite.uri);
+  }, [onJoinInvite]);
+
   return (
     <NearbyScreen
       model={model}
@@ -4043,6 +4052,7 @@ function NearbyScreenHost({ bundle, onBack, onAction, onOpenThread }) {
       onToggleAllow={toggleAllow}
       onSubmitCard={submitCard}
       onSay={say}
+      onInviteAction={inviteAction}
       onCompose={() => { setNotice(null); setComposing(true); }}
       composing={composing}
       answering={!!answering}
@@ -4067,7 +4077,7 @@ function NearbyScreenHost({ bundle, onBack, onAction, onOpenThread }) {
 // so web and mobile cannot drift on what a row offers or on when the "still visible" warning fires.
 function NearbyScreen({
   model, onBack, onAction, onAskAction, onCompose, composing, notice, onSubmitAsk,
-  answering, onSubmitAnswer, onCancel, onToggleAllow, onSubmitCard, onSay,
+  answering, onSubmitAnswer, onCancel, onToggleAllow, onSubmitCard, onSay, onInviteAction,
 }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -4083,6 +4093,7 @@ function NearbyScreen({
   const [cardLabel, setCardLabel] = useState('');
   const [cardLine, setCardLine]   = useState('');
   const [chatDraft, setChatDraft] = useState('');
+  const invites    = Array.isArray(model?.invites) ? model.invites : [];
   // Cleared whenever the composer opens or closes, so a previous question is never re-sent by accident.
   useEffect(() => { setDraft(''); }, [composing, answering]);
   return (
@@ -4220,6 +4231,34 @@ function NearbyScreen({
           </View>
         ))}
       </View>
+      {/* Circles being advertised here (step H). Its own block, not on peer rows: what matters is which
+          CIRCLE is open, not who is holding the door. */}
+      <View style={styles.nearbyAsks} testID="nearby-invites">
+        <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.invites_title')}</Text>
+        {invites.length === 0 ? (
+          <Text style={styles.muted}>{t('circle.nearbyScreen.invites_empty')}</Text>
+        ) : invites.map((entry) => (
+          <View key={entry.invite?.circleId} style={styles.nearbyAsk} testID={`nearby-invite-${entry.invite?.circleId}`}>
+            <Text style={styles.rowName}>{entry.invite?.circleName || entry.invite?.circleId}</Text>
+            {/* On every invite: the carrier changed, the gate did not. */}
+            <Text style={styles.rowMeta}>{t('circle.nearbyScreen.join_is_a_join')}</Text>
+            <View style={styles.nearbyActions}>
+              {(entry.actions ?? []).filter((a) => NEARBY_INVITE_LABELS[a]).map((action) => (
+                <Pressable
+                  key={action}
+                  onPress={() => onInviteAction?.(action, entry.invite)}
+                  accessibilityRole="button"
+                  testID={`nearby-invite-action-${action}-${entry.invite?.circleId}`}
+                  style={styles.nearbyAction}
+                >
+                  <Text style={styles.nearbyActionText}>{t(NEARBY_INVITE_LABELS[action])}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ))}
+      </View>
+
       {/* Cards + chat, each behind its own per-device allow (step G). */}
       <View style={styles.nearbyAsks} testID="nearby-allows">
         {['card', 'chat'].map((key) => (

@@ -249,7 +249,7 @@ export {
 export { createProximitySession, nearbyActions } from './v2/circleProximity.js';
 export { makeNearbySessionAdapter }             from './v2/nearbyDiscoverability.js';
 export { createNetworkChangeWatcher }           from './v2/networkChangeWatcher.js';
-export { createNearbyScreen, NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, nearbyVisibilityKey }
+export { createNearbyScreen, NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, NEARBY_INVITE_LABELS, nearbyVisibilityKey }
                                                 from './v2/nearbyScreen.js';
 export {
   createAsk, isAskLive, evaluateIncomingAsk, askActions, answerAsk, nearbyThreadDescriptor,
@@ -261,6 +261,10 @@ export {
   roomAllows, createCard, receiveCard, createChatMessage, receiveChatMessage, createRoomChat,
   CARD_MESSAGE, CHAT_MESSAGE, CARD_MAX_LABEL, CARD_MAX_LINE, CARD_MAX_TAGS, CHAT_MAX_TEXT,
 } from './v2/nearbyRoom.js';
+export {
+  invitePublishAllows, mayPublish, prepareBroadcastInvite, isInviteLive, receiveInvite, inviteActions,
+  BROADCAST_INVITE_MAX_TTL_MS, INVITE_MESSAGE,
+} from './v2/nearbyInvites.js';
 export { makeSharedCirclePeerScope } from './v2/sharedCirclePeerScope.js';
 // agent-add admin approval: proposal-like flow for
 // joining an LLM agent to a circle whose `agents` axis is admin-approval.

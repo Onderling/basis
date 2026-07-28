@@ -2232,6 +2232,42 @@
     }
   },
   "nearbyScreen": {
+    "invites_title": {
+      "text": "Circles open here",
+      "doc": "Heading of the broadcast-invite list (Nearby step H)."
+    },
+    "invites_empty": {
+      "text": "No circle is being advertised here.",
+      "doc": "Empty state for the invite list."
+    },
+    "action_join_published": {
+      "text": "Join",
+      "doc": "The one action on a broadcast invite. A real join, running the full gate."
+    },
+    "join_is_a_join": {
+      "text": "This is a real join — the circle still checks you in.",
+      "doc": "Note on every broadcast invite: nothing about the carrier weakens the gate."
+    },
+    "invite_expired": {
+      "text": "This invitation has expired.",
+      "doc": "A broadcast invite expires in minutes by design."
+    },
+    "publish_invite": {
+      "text": "Advertise this circle here",
+      "doc": "Per-circle publish toggle. Per circle, never global."
+    },
+    "publish_warning": {
+      "text": "Everyone in this room will see that this circle exists.",
+      "doc": "The consequence — this is the one action that discloses a GROUP, not just you."
+    },
+    "publish_short": {
+      "text": "It stops being advertised within 15 minutes.",
+      "doc": "The expiry ceiling, stated up front — the mitigation for having no max-uses."
+    },
+    "invite_published": {
+      "text": "Advertised to {{sent}} of {{peers}} nearby",
+      "doc": "Result after publishing — the real reach."
+    },
     "allow_card": {
       "text": "Show my card here",
       "doc": "Per-device allow (step G). Publishing MY card; looking at others needs no permission."

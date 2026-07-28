@@ -380,3 +380,63 @@ describe('cards and chat, each behind its allow (step G)', () => {
   });
 });
 
+describe('circles advertised in the room (step H)', () => {
+  const entry = (over = {}) => ({
+    invite: { uri: 'stoop-invite://abc', circleId: 'c1', circleName: 'Buurt' },
+    actions: ['join-published-circle'], note: 'join-is-a-join', ...over,
+  });
+
+  it('lists an advertised circle by name, with one action', () => {
+    const el = render(model({ invites: [entry()] }));
+    expect(el.querySelector('.circle-nearby__invite-name').textContent).toBe('Buurt');
+    const actions = [...el.querySelectorAll('.circle-nearby__invite-action')].map((b) => b.dataset.action);
+    expect(actions).toEqual(['join-published-circle']);
+  });
+
+  it('EVERY invite says the join is real — the carrier changed, the gate did not', () => {
+    const el = render(model({ invites: [entry(), entry({ invite: { circleId: 'c2', circleName: 'B' } })] }));
+    const notes = [...el.querySelectorAll('.circle-nearby__invite-note')];
+    expect(notes).toHaveLength(2);
+    expect(notes[0].textContent).toBe('circle.nearbyScreen.join_is_a_join');
+  });
+
+  it('falls back to the id when a circle advertises no name', () => {
+    const el = render(model({ invites: [entry({ invite: { circleId: 'c9', circleName: '' } })] }));
+    expect(el.querySelector('.circle-nearby__invite-name').textContent).toBe('c9');
+  });
+
+  it('clicking join reports the invite, so the host can run the SAME wizard as a QR', () => {
+    const onInviteAction = vi.fn();
+    const el = render(model({ invites: [entry()] }), { onInviteAction });
+    el.querySelector('.circle-nearby__invite-action').click();
+    expect(onInviteAction).toHaveBeenCalledWith(
+      'join-published-circle', expect.objectContaining({ uri: 'stoop-invite://abc' }),
+    );
+  });
+
+  it('an expired invite (no actions) renders no action bar', () => {
+    const el = render(model({ invites: [entry({ actions: [] })] }));
+    expect(el.querySelector('.circle-nearby__invite-actions')).toBeNull();
+  });
+
+  it('an unknown invite action is skipped rather than shown raw', () => {
+    const el = render(model({ invites: [entry({ actions: ['save-for-later', 'join-published-circle'] })] }));
+    const actions = [...el.querySelectorAll('.circle-nearby__invite-action')].map((b) => b.dataset.action);
+    expect(actions).toEqual(['join-published-circle']);
+  });
+
+  it('an empty room says so', () => {
+    const el = render(model({ invites: [] }));
+    expect(el.querySelector('.circle-nearby__invites-empty').textContent)
+      .toBe('circle.nearbyScreen.invites_empty');
+  });
+
+  it('no untranslated strings in the invite block', () => {
+    const el = render(model({ invites: [entry()] }));
+    for (const n of el.querySelectorAll('.circle-nearby__invites-title, .circle-nearby__invite-note, .circle-nearby__invite-action')) {
+      const txt = n.textContent.trim();
+      if (txt) expect(txt.startsWith('circle.'), `untranslated: "${txt}"`).toBe(true);
+    }
+  });
+});
+

@@ -624,3 +624,102 @@ describe('cards and room chat (step G)', () => {
   });
 });
 
+describe('broadcast circle invites (step H)', () => {
+  const T0 = 1_700_000_000_000;
+  const URI = 'stoop-invite://abc';
+
+  function withInvites({ invitePublish } = {}) {
+    let pushInvite = null;
+    const broadcastKind = vi.fn(async () => ({ sent: 4, failed: 0, peers: 4 }));
+    const screen = createNearbyScreen({
+      control: createDiscoverabilityControl({ transports: () => ({ ble: mk(Discovering) }) }),
+      subscribeToInvites: (fn) => { pushInvite = fn; return () => { pushInvite = null; }; },
+      askChannel: { broadcastKind },
+      invitePublish, myRoomAddress: () => 'me', now: () => T0, t: (k) => k,
+    });
+    return { screen, broadcastKind, invite: (i) => pushInvite?.(i) };
+  }
+
+  const inbound = (over = {}) => ({
+    uri: URI, circleId: 'c1', circleName: 'Buurt', expiresAt: T0 + 60_000, from: 'them', ...over,
+  });
+
+  it('publishing is refused for a circle that was not allowed', async () => {
+    const { screen, broadcastKind } = withInvites();
+    screen.open();
+    expect(await screen.publishInvite({ uri: URI, circleId: 'c1' }))
+      .toMatchObject({ ok: false, reason: 'publish-not-allowed' });
+    expect(broadcastKind).not.toHaveBeenCalled();
+  });
+
+  it('publishing an allowed circle reports the real reach', async () => {
+    const { screen, broadcastKind } = withInvites({ invitePublish: { c1: true } });
+    screen.open();
+    const r = await screen.publishInvite({ uri: URI, circleId: 'c1', circleName: 'Buurt' });
+    expect(r).toMatchObject({ ok: true, sent: 4, peers: 4 });
+    expect(broadcastKind).toHaveBeenCalledWith('nearby.invite', { invite: expect.objectContaining({ circleId: 'c1' }) });
+  });
+
+  it('the allow is PER CIRCLE — allowing one does not allow another', async () => {
+    const { screen } = withInvites({ invitePublish: { c1: true } });
+    screen.open();
+    expect(await screen.publishInvite({ uri: URI, circleId: 'c2' }))
+      .toMatchObject({ ok: false, reason: 'publish-not-allowed' });
+  });
+
+  it('setInvitePublish toggles exactly one circle', () => {
+    const { screen } = withInvites();
+    screen.open();
+    expect(screen.setInvitePublish('c1', true)).toEqual({ c1: true });
+    expect(screen.setInvitePublish('c2', true)).toEqual({ c1: true, c2: true });
+    expect(screen.setInvitePublish('c1', false)).toEqual({ c2: true });
+    expect(screen.setInvitePublish('c1', 'yes')).toEqual({ c2: true });   // truthy is not consent
+  });
+
+  it('a received invite appears with exactly one action: join', () => {
+    const { screen, invite } = withInvites();
+    screen.open();
+    invite(inbound());
+    const [row] = screen.model().invites;
+    expect(row.invite.circleName).toBe('Buurt');
+    expect(row.actions).toEqual(['join-published-circle']);
+    expect(row.note).toBe('join-is-a-join');
+  });
+
+  it('two people advertising the SAME circle is one joinable circle, not two offers', () => {
+    const { screen, invite } = withInvites();
+    screen.open();
+    invite(inbound({ from: 'peer-a' }));
+    invite(inbound({ from: 'peer-b' }));
+    expect(screen.model().invites).toHaveLength(1);
+  });
+
+  it('an expired invite never enters the room', () => {
+    const { screen, invite } = withInvites();
+    screen.open();
+    invite(inbound({ expiresAt: T0 - 1 }));
+    expect(screen.model().invites).toEqual([]);
+  });
+
+  it('I see invites regardless of what I publish — the same asymmetry as cards', () => {
+    const { screen, invite } = withInvites();      // publishing nothing
+    screen.open();
+    invite(inbound());
+    expect(screen.model().invites).toHaveLength(1);
+  });
+
+  it('leaving the room drops the invites', () => {
+    const { screen, invite } = withInvites();
+    screen.open();
+    invite(inbound());
+    screen.close();
+    expect(screen.model().invites).toEqual([]);
+  });
+
+  it('no invite source ⇒ an empty list, not a crash', () => {
+    const { screen } = build();
+    screen.open();
+    expect(screen.model().invites).toEqual([]);
+  });
+});
+

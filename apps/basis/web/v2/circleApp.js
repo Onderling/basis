@@ -3104,6 +3104,13 @@ function showNearby() {
       draw(nearbyScreen.model());
     },
     onSay: (text) => { nearbyScreen.say(text); },
+    onInviteAction: (action, invite) => {
+      // A broadcast invite joins through the SAME path as a scanned QR — that is the point of step H: the
+      // carrier changed, the object and the gate did not.
+      if (action !== 'join-published-circle' || !invite?.uri) return;
+      closeNearby();
+      showJoinCircle(invite.uri);
+    },
   });
 
   // Answering is what reveals me, so it needs its own handler rather than riding the row actions.

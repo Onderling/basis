@@ -2232,6 +2232,42 @@
     }
   },
   "nearbyScreen": {
+    "invites_title": {
+      "text": "Kringen die hier open staan",
+      "doc": "Heading of the broadcast-invite list (Nearby step H)."
+    },
+    "invites_empty": {
+      "text": "Er wordt hier geen kring aangeboden.",
+      "doc": "Empty state for the invite list."
+    },
+    "action_join_published": {
+      "text": "Meedoen",
+      "doc": "The one action on a broadcast invite. A real join, running the full gate."
+    },
+    "join_is_a_join": {
+      "text": "Dit is echt meedoen — de kring controleert je nog steeds.",
+      "doc": "Note on every broadcast invite: nothing about the carrier weakens the gate."
+    },
+    "invite_expired": {
+      "text": "Deze uitnodiging is verlopen.",
+      "doc": "A broadcast invite expires in minutes by design."
+    },
+    "publish_invite": {
+      "text": "Deze kring hier aanbieden",
+      "doc": "Per-circle publish toggle. Per circle, never global."
+    },
+    "publish_warning": {
+      "text": "Iedereen hier ziet dan dat deze kring bestaat.",
+      "doc": "The consequence — this is the one action that discloses a GROUP, not just you."
+    },
+    "publish_short": {
+      "text": "Na uiterlijk 15 minuten wordt het niet meer aangeboden.",
+      "doc": "The expiry ceiling, stated up front — the mitigation for having no max-uses."
+    },
+    "invite_published": {
+      "text": "Aangeboden aan {{sent}} van {{peers}} in de buurt",
+      "doc": "Result after publishing — the real reach."
+    },
     "allow_card": {
       "text": "Mijn kaartje hier tonen",
       "doc": "Per-device allow (step G). Publishing MY card; looking at others needs no permission."

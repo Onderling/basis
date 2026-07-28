@@ -11,7 +11,9 @@
  * locales (invariant 8) — a renamed locale key breaks here rather than on a device.
  */
 import { describe, it, expect } from 'vitest';
-import { NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, nearbyVisibilityKey } from '@onderling-app/basis';
+import {
+  NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, NEARBY_INVITE_LABELS, nearbyVisibilityKey,
+} from '@onderling-app/basis';
 import { initLocalisation, setLang, t }              from '../src/core/localisation.js';
 
 describe('nearbyVisibilityKey — the shared banner rule', () => {
@@ -57,12 +59,16 @@ describe('NEARBY_ACTION_LABELS — one definition, resolvable in both languages'
       const keys = [
         ...Object.values(NEARBY_ACTION_LABELS),
         ...Object.values(NEARBY_ASK_LABELS),
+        ...Object.values(NEARBY_INVITE_LABELS),
         ...['asks_title', 'asks_empty', 'ask_resonant', 'ask_disclosure', 'ask_compose',
             'ask_placeholder', 'ask_send', 'ask_sent', 'ask_expired', 'answer_sent',
             // step G — cards + room chat
             'allow_card', 'allow_card_off', 'allow_chat', 'allow_chat_off',
             'card_title', 'card_label', 'card_line', 'card_visible_to', 'card_save', 'card_shown',
-            'chat_title', 'chat_empty', 'chat_ephemeral', 'chat_placeholder', 'chat_send']
+            'chat_title', 'chat_empty', 'chat_ephemeral', 'chat_placeholder', 'chat_send',
+            // step H — broadcast circle invites
+            'invites_title', 'invites_empty', 'join_is_a_join', 'invite_expired',
+            'publish_invite', 'publish_warning', 'publish_short', 'invite_published']
           .map((k) => `circle.nearbyScreen.${k}`),
         ...['visible', 'hidden', 'still_visible', 'unavailable']
           .flatMap((k) => [`circle.nearbyScreen.${k}_title`, `circle.nearbyScreen.${k}_body`]),
@@ -89,6 +95,15 @@ describe('NEARBY_ASK_LABELS — the ask actions, shared', () => {
 
   it('is frozen', () => {
     expect(Object.isFrozen(NEARBY_ASK_LABELS)).toBe(true);
+  });
+});
+
+describe('NEARBY_INVITE_LABELS — one action, and it is a join', () => {
+  it('there is exactly one, and no save-for-later', () => {
+    // A broadcast invite expires in minutes; keeping one would be keeping a dead code and a record of a
+    // room you were in. Both renderers skip unlisted ids, so this map is where that is enforced.
+    expect(Object.keys(NEARBY_INVITE_LABELS)).toEqual(['join-published-circle']);
+    expect(Object.isFrozen(NEARBY_INVITE_LABELS)).toBe(true);
   });
 });
 

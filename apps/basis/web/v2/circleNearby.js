@@ -23,7 +23,9 @@
  *     web and mobile cannot drift on what proximity entitles a stranger to.
  */
 
-import { NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, nearbyVisibilityKey } from '../../src/v2/nearbyScreen.js';
+import {
+  NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, NEARBY_INVITE_LABELS, nearbyVisibilityKey,
+} from '../../src/v2/nearbyScreen.js';
 import { ASK_MAX_TEXT } from '../../src/v2/nearbyAsks.js';
 import { CARD_MAX_LABEL, CARD_MAX_LINE, CHAT_MAX_TEXT } from '../../src/v2/nearbyRoom.js';
 
@@ -40,6 +42,7 @@ export function renderCircleNearby(container, {
   onToggleAllow = null,
   onSubmitCard = null,
   onSay = null,
+  onInviteAction = null,
 } = {}) {
   const tr = typeof t === 'function' ? t : (k) => k;
   container.innerHTML = '';
@@ -60,7 +63,7 @@ export function renderCircleNearby(container, {
   const safeModel = model && typeof model === 'object' ? model : { rows: [], counts: { total: 0, sharingAny: 0 }, ownProfile: {}, headerLabel: '' };
   const {
     rows = [], ownProfile = {}, headerLabel = '', visibility = null, asks = [],
-    allows = { card: false, chat: false }, chat = null,
+    allows = { card: false, chat: false }, chat = null, invites = [],
   } = safeModel;
 
   // ── Visibility banner ──────────────────────────────────────────────────────
@@ -287,6 +290,61 @@ export function renderCircleNearby(container, {
     }
   }
   container.appendChild(asksBlock);
+
+  // ── Circles being advertised here (step H) ─────────────────────────────────
+  // Rendered as its own block rather than on peer rows: what matters is which CIRCLE is open, not who is
+  // holding the door — and two people advertising the same circle is one thing you can join.
+  const invitesBlock = document.createElement('div');
+  invitesBlock.className = 'circle-nearby__invites';
+
+  const invitesTitle = document.createElement('div');
+  invitesTitle.className = 'circle-nearby__invites-title';
+  invitesTitle.textContent = tr('circle.nearbyScreen.invites_title');
+  invitesBlock.appendChild(invitesTitle);
+
+  if (!invites.length) {
+    const none = document.createElement('div');
+    none.className = 'circle-nearby__invites-empty';
+    none.textContent = tr('circle.nearbyScreen.invites_empty');
+    invitesBlock.appendChild(none);
+  } else {
+    for (const entry of invites) {
+      const el = document.createElement('div');
+      el.className = 'circle-nearby__invite';
+      el.dataset.circleId = entry.invite?.circleId || '';
+
+      const name = document.createElement('div');
+      name.className = 'circle-nearby__invite-name';
+      name.textContent = entry.invite?.circleName || entry.invite?.circleId || '';
+      el.appendChild(name);
+
+      // On every invite: the carrier changed, the gate did not.
+      const note = document.createElement('div');
+      note.className = 'circle-nearby__invite-note';
+      note.textContent = tr('circle.nearbyScreen.join_is_a_join');
+      el.appendChild(note);
+
+      const bar = document.createElement('div');
+      bar.className = 'circle-nearby__invite-actions';
+      for (const action of Array.isArray(entry.actions) ? entry.actions : []) {
+        const labelKey = NEARBY_INVITE_LABELS[action];
+        if (!labelKey) continue;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `circle-nearby__invite-action circle-nearby__invite-action--${action}`;
+        btn.dataset.action = action;
+        btn.textContent = tr(labelKey);
+        btn.addEventListener('click', () => {
+          if (typeof onInviteAction === 'function') onInviteAction(action, entry.invite);
+        });
+        bar.appendChild(btn);
+      }
+      if (bar.childElementCount) el.appendChild(bar);
+
+      invitesBlock.appendChild(el);
+    }
+  }
+  container.appendChild(invitesBlock);
 
   // ── Card + chat, each behind its own allow (step G) ────────────────────────
   const allowsBlock = document.createElement('div');

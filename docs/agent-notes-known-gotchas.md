@@ -299,3 +299,15 @@ grepping before commit; nothing else would have.
 The web side does not have this gap — `apps/basis/web/**` is testable under happy-dom (`*.dom.test.js`), so
 a web renderer CAN be covered. Prefer putting a shared rule in a module both consume, and cover it there.
 
+## Scripted file edits: `open(path, 'w')` TRUNCATES before your write can fail
+
+Real incident (2026-07-28): a Python heredoc doing search-replace had a syntax slip that made
+`write()` throw — but `open(path, 'w')` had already truncated the file, leaving `circleInvite.js` EMPTY.
+Recovered from git in one command, but only because the file was committed.
+
+**Rules for scripted edits:**
+1. Do every replace (with `assert old in s`) FIRST, write LAST — never interleave.
+2. On any assert failure, nothing has been written; on a write failure after asserts, re-run — but check
+   `grep -c "" <file>` (0 lines = truncated) before assuming the file survived.
+3. Never scripted-edit an uncommitted file this way; stage or commit first so recovery is `git checkout`.
+

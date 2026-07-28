@@ -2232,6 +2232,38 @@
     }
   },
   "nearbyScreen": {
+    "delivery_sent": {
+      "text": "Sent",
+      "doc": "Rung 1 — handed to our own transport. The weakest claim; it does NOT mean anyone received it."
+    },
+    "delivery_reached_device": {
+      "text": "Reached their device",
+      "doc": "Rung 2 — the peer TRANSPORT acknowledged (the AK envelope). Sent before their app sees it, so it does not mean stored."
+    },
+    "delivery_stored": {
+      "text": "Their app has it",
+      "doc": "Rung 3 — the receiving APP accepted and stored it. The strongest claim we make; deliberately NOT a read receipt."
+    },
+    "delivery_receipts_off": {
+      "text": "Delivery updates are off",
+      "doc": "Shown on MY OWN setting. Must never be inferable about someone ELSE — off has to look like offline."
+    },
+    "delivery_not_delivered": {
+      "text": "Not delivered yet",
+      "doc": "Covers offline AND receipts-disabled, deliberately: the two must be indistinguishable from outside."
+    },
+    "delivery_fallback_hint": {
+      "text": "Some messages are not getting through. Allowing your main address as a fallback usually fixes it.",
+      "doc": "The in-app hint driven by the fallback instrumentation. Without this the setting is a trap: the symptom is silence."
+    },
+    "delivery_fallback_cost": {
+      "text": "It also lets the server you connect through see that your circles belong to the same person.",
+      "doc": "The cost, stated next to the offer. Never offer the fix without it."
+    },
+    "delivery_fallback_enable": {
+      "text": "Allow fallback",
+      "doc": "Turns the per-user fallback setting on."
+    },
     "point_active": {
       "text": "In use now",
       "doc": "The ONE point the transport is actually connected to. The substrate connects to one relay at a time."

@@ -2232,6 +2232,38 @@
     }
   },
   "nearbyScreen": {
+    "delivery_sent": {
+      "text": "Verstuurd",
+      "doc": "Rung 1 — handed to our own transport. The weakest claim; it does NOT mean anyone received it."
+    },
+    "delivery_reached_device": {
+      "text": "Aangekomen op hun apparaat",
+      "doc": "Rung 2 — the peer TRANSPORT acknowledged (the AK envelope). Sent before their app sees it, so it does not mean stored."
+    },
+    "delivery_stored": {
+      "text": "Hun app heeft het",
+      "doc": "Rung 3 — the receiving APP accepted and stored it. The strongest claim we make; deliberately NOT a read receipt."
+    },
+    "delivery_receipts_off": {
+      "text": "Bezorgmeldingen staan uit",
+      "doc": "Shown on MY OWN setting. Must never be inferable about someone ELSE — off has to look like offline."
+    },
+    "delivery_not_delivered": {
+      "text": "Nog niet bezorgd",
+      "doc": "Covers offline AND receipts-disabled, deliberately: the two must be indistinguishable from outside."
+    },
+    "delivery_fallback_hint": {
+      "text": "Sommige berichten komen niet aan. Je hoofdadres als terugval toestaan lost dat meestal op.",
+      "doc": "The in-app hint driven by the fallback instrumentation. Without this the setting is a trap: the symptom is silence."
+    },
+    "delivery_fallback_cost": {
+      "text": "Daardoor kan de server waarmee je verbindt wel zien dat je kringen bij dezelfde persoon horen.",
+      "doc": "The cost, stated next to the offer. Never offer the fix without it."
+    },
+    "delivery_fallback_enable": {
+      "text": "Terugval toestaan",
+      "doc": "Turns the per-user fallback setting on."
+    },
     "point_active": {
       "text": "Nu in gebruik",
       "doc": "The ONE point the transport is actually connected to. The substrate connects to one relay at a time."

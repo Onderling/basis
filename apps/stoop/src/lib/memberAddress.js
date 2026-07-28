@@ -28,6 +28,9 @@ export const ADDRESS_VIA = Object.freeze({
   CIRCLE: 'circle-address',
   PUBKEY: 'pubkey',
   WEBID: 'webid',
+  // No address at all — the per-user fallback setting is off and we have no circle address. Distinct from
+  // `null`, which means "we never had anything to route to"; this means "we refused on purpose".
+  NONE: 'blocked-by-setting',
 });
 
 /**
@@ -38,10 +41,14 @@ export const ADDRESS_VIA = Object.freeze({
  * @param {(info: {circleId, webid, via}) => void} [opts.onFallback]  called when NOT using the circle address
  * @param {boolean} [opts.preferCircleAddress=false]  G13 step C. OFF until every transport registers
  *   aliases (step B covers RelayTransport only today) — see the note above.
+ * @param {boolean} [opts.allowFallback=true]  the PER-USER setting (Frits, 2026-07-28), default OFF in the
+ *   product but default TRUE here so existing callers are unchanged. When false and no circle address is
+ *   known, we return NO address rather than routing over the member's global key.
  * @returns {Promise<{addr: string|null, via: string|null, webid: string|null}>}
  */
 export async function resolveMemberAddress(member, {
   circleId = null, resolveByWebid = null, onFallback = null, preferCircleAddress = false,
+  allowFallback = true,
 } = {}) {
   const m = member && typeof member === 'object' ? member : null;
   const webid = typeof member === 'string' ? member : (m?.webid ?? m?.webId ?? null);
@@ -50,6 +57,18 @@ export async function resolveMemberAddress(member, {
   //    (`verifyCircleLink`), so anything present here is already trustworthy.
   const circleAddress = typeof m?.circleAddress === 'string' && m.circleAddress ? m.circleAddress : null;
   if (preferCircleAddress && circleAddress) return { addr: circleAddress, via: ADDRESS_VIA.CIRCLE, webid };
+
+  // The per-user setting, and the whole point of it: with fallback OFF we would rather be UNDELIVERABLE
+  // than route over the member's one global key, because that key is what lets a relay link their circles
+  // together. It is only reachable when we were actually trying for a circle address — with step C off,
+  // there is no circle address to prefer and this would just break sending.
+  //
+  // The report still fires. It is the ONLY signal that this setting is costing someone messages, and it is
+  // what drives the offer to turn it on — without which "off" is silence with no explanation.
+  if (preferCircleAddress && !allowFallback) {
+    report(onFallback, { circleId, webid, via: ADDRESS_VIA.NONE, blocked: true });
+    return { addr: null, via: ADDRESS_VIA.NONE, webid };
+  }
 
   // 2. The global signing key. Correct today, and the reason G13 exists.
   let addr = typeof m?.pubKey === 'string' && m.pubKey ? m.pubKey : null;

@@ -130,3 +130,38 @@ describe('the reporter dedupes, so the signal stays readable', () => {
     expect(lines[0]).toMatch(/Step D/);
   });
 });
+
+describe('the per-user fallback setting (2026-07-28)', () => {
+  const member = { webid: 'w', pubKey: 'PUBKEY' };
+
+  it('with fallback OFF and no circle address, we are UNDELIVERABLE on purpose', async () => {
+    // Better unreachable than routed over the one global key that lets a relay link your circles.
+    const onFallback = vi.fn();
+    const r = await resolveMemberAddress(member, {
+      circleId: 'c1', preferCircleAddress: true, allowFallback: false, onFallback,
+    });
+    expect(r.addr).toBeNull();
+    expect(r.via).toBe(ADDRESS_VIA.NONE);
+    // The report still fires — it is the ONLY signal the setting is costing someone messages.
+    expect(onFallback).toHaveBeenCalledWith(expect.objectContaining({ blocked: true, circleId: 'c1' }));
+  });
+
+  it('with fallback ON it behaves exactly as before', async () => {
+    const r = await resolveMemberAddress(member, { preferCircleAddress: true, allowFallback: true });
+    expect(r.addr).toBe('PUBKEY');
+    expect(r.via).toBe(ADDRESS_VIA.PUBKEY);
+  });
+
+  it('the setting is irrelevant when a circle address exists', async () => {
+    const r = await resolveMemberAddress({ ...member, circleAddress: 'CIRCLE' }, {
+      preferCircleAddress: true, allowFallback: false,
+    });
+    expect(r.addr).toBe('CIRCLE');
+  });
+
+  it('and irrelevant while step C is off — otherwise it would just break sending', async () => {
+    const r = await resolveMemberAddress(member, { preferCircleAddress: false, allowFallback: false });
+    expect(r.addr).toBe('PUBKEY');
+  });
+});
+

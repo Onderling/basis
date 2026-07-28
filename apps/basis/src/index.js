@@ -267,6 +267,10 @@ export {
 } from './v2/nearbyInvites.js';
 export { createConnectionPoints, POINT_SOURCE, POINT_SOURCE_LABELS }
                                                 from './v2/connectionPoints.js';
+export {
+  createFallbackPrefStore, localStorageFallbackIo, asyncStorageFallbackIo,
+  createFallbackOffer, OFFER_AFTER_PEERS, OFFER_COOLDOWN_MS,
+} from './v2/addressFallback.js';
 export { makeSharedCirclePeerScope } from './v2/sharedCirclePeerScope.js';
 // agent-add admin approval: proposal-like flow for
 // joining an LLM agent to a circle whose `agents` axis is admin-approval.

@@ -129,4 +129,19 @@ describe('mobile circlePods — G11 no-pod rotation wiring', () => {
     // Content sealed under that log-only version opens through the fold (the pod reader alone cannot).
     expect(strat.open(sealWithGroupKey('na de rotatie', groupKey))).toBe('na de rotatie');
   });
+
+  it('recording a key-event drops the cached seal strategy (the stale-seal guard)', async () => {
+    initCirclePods(mockAsyncStorage());
+    const prod = await ensureCirclePod('g11-stale', { storagePosture: 'p2' });
+    const a = await getCircleSealStrategy('g11-stale', { storagePosture: 'p2' });
+    expect(a).toBeTruthy();
+    // A rotation lands (any route) → the next seal must RE-RESOLVE, not keep sealing the old version:
+    // the departed member still holds that old key, so a cache-lifetime seal would leak post-removal
+    // content to them. Backward secrecy must not depend on a cache.
+    const idKey = await prod.sealingIdentity.ensure();
+    const { event } = rotateKeyEvent({ groupId: 'g11-stale', fromVersion: 1, recipients: [idKey.publicKey] });
+    expect(recordCircleKeyEvent('g11-stale', event)).toBe(true);
+    const b = await getCircleSealStrategy('g11-stale', { storagePosture: 'p2' });
+    expect(b).not.toBe(a);
+  });
 });

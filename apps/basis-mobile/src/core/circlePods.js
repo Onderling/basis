@@ -71,7 +71,16 @@ export function setCircleContactsSource(fn) { _contactsSource = typeof fn === 'f
 // a sealed circle stays readable with NO pod, and a removed member — never sent the rotation event —
 // cannot open post-removal content. Same shared store module + handler as web (invariants #1/#2).
 const circleKeyEventStore = createKeyEventStore();
-export function recordCircleKeyEvent(groupId, event) { return circleKeyEventStore.record(groupId, event); }
+export function recordCircleKeyEvent(groupId, event) {
+  const recorded = circleKeyEventStore.record(groupId, event);
+  // A key-event means the circle's key state MOVED (typically a rotation). Drop the cached seal strategy so
+  // the next seal re-resolves against the new state — a stale cached strategy would keep sealing NEW content
+  // under the OLD version, which the departed member still holds. Backward secrecy must not depend on a
+  // cache's lifetime. (Rotation does not depend on the REMOVED client deleting anything — they never receive
+  // the new key; this guards the REMAINING members' seal side.)
+  if (recorded) circleSealStrategies.delete(groupId);
+  return recorded;
+}
 
 // The EMIT side's transport wiring — the peer sender + skill dispatch live in the agent bundle, which this
 // module doesn't own; the bundle injects them at boot (mirror of web's lazy `_peerAgent`/`rawCallSkill`
@@ -87,7 +96,8 @@ export function setCircleKeyEventWiring(wiring) { _keyEventWiring = wiring ?? nu
 function makeCircleKeyEventLog(circleId) {
   return makeKeyEventLogSink({
     groupId: circleId,
-    recordLocal: (event) => circleKeyEventStore.record(circleId, event),
+    // Through recordCircleKeyEvent so the EMIT side also drops the cached seal strategy (see there).
+    recordLocal: (event) => recordCircleKeyEvent(circleId, event),
     sendPeer: (addr, payload, opts) => (typeof _keyEventWiring?.sendPeer === 'function'
       ? _keyEventWiring.sendPeer(addr, payload, opts)
       : Promise.resolve()),

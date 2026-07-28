@@ -1359,6 +1359,15 @@ const circleSealStrategies = new Map();   // S4 — circleId → resolved {seal,
 // sealed circle stays readable with NO pod, and a removed member — never sent the rotation event — cannot open
 // post-removal content. Shared with mobile by construction (the same store module + handler).
 const circleKeyEventStore = createKeyEventStore();
+// The ONE way a key-event enters the store (emit side via the sink's recordLocal, receive side via the
+// peer router). Recording also drops the circle's cached seal strategy: a key-event means the key state
+// MOVED (typically a rotation), and a stale cached strategy would keep sealing NEW content under the OLD
+// version — which a removed member still holds. Backward secrecy must not depend on a cache's lifetime.
+function recordCircleKeyEvent(circleId, event) {
+  const recorded = circleKeyEventStore.record(circleId, event);
+  if (recorded) circleSealStrategies.delete(circleId);
+  return recorded;
+}
 // S4 — routes stoop membership events (redeem/leave) to the joined circle's producer, so
 // a new member's sealing key is wrapped into that circle's group key (multi-member sealing).
 // V0: routes to a LIVE producer (circle opened on this device); seeding from prior redemptions
@@ -1489,7 +1498,7 @@ async function ensureCirclePod(circleId, policy) {
       // RECEIVE/READ side (now wired): record this device's OWN emitted key-events into the local per-circle
       // log so its key chain advances (it can seal + open the new version with no pod). Inbound events from
       // other members land in the SAME store via the `group-key-event` peer handler; a content read folds both.
-      recordLocal: (event) => circleKeyEventStore.record(circleId, event),
+      recordLocal: (event) => recordCircleKeyEvent(circleId, event),
       sendPeer: (addr, payload, opts) => (typeof _peerAgent?.sendPeerMessage === 'function'
         ? _peerAgent.sendPeerMessage(addr, payload, opts)
         : Promise.resolve()),
@@ -6662,7 +6671,7 @@ async function boot() {
           // (establish/grant/rotation) lands in this device's local per-circle key-event log. A removed member
           // is never a recipient of the rotation fan → never records the new version → cannot open post-removal
           // content (backward secrecy, no pod). Folding into the key chain happens on a content read.
-          'group-key-event':         makeHandleGroupKeyEvent({ recordKeyEvent: (gid, event) => circleKeyEventStore.record(gid, event) }),
+          'group-key-event':         makeHandleGroupKeyEvent({ recordKeyEvent: (gid, event) => recordCircleKeyEvent(gid, event) }),
           // personas#2 — post-join persona-property push: admin records the member's disclosure onto
           // the roster + acks; the member resolves the pending push on the ack.
           'persona-props-update':    makeHandlePersonaPropsUpdate({ callSkill: rawCallSkill, sendPeer: (addr, payload) => agent.sendPeerMessage(addr, payload), announceRosterUpdate }),

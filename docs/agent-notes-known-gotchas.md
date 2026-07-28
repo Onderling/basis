@@ -311,3 +311,26 @@ Recovered from git in one command, but only because the file was committed.
    `grep -c "" <file>` (0 lines = truncated) before assuming the file survived.
 3. Never scripted-edit an uncommitted file this way; stage or commit first so recovery is `git checkout`.
 
+
+## Metro's ESM→CJS interop makes a MISSING named export `undefined`, not a load error
+
+Real incident (2026-07-28): the RN launcher imported `adoptExistingRelay` + `asyncStorageConnectionPointsIo`
+(and `CircleRulesScreen` imported `decisionsForMerges`) from `@onderling-app/basis`, but the index never
+exported them. Node ESM would refuse to link; **Metro/Babel interop silently binds `undefined`**, so the app
+boots fine and the crash happens only when the affected screen/path is opened on a device — invisible to the
+whole test suite because `src/screens/**` has no JSX loader.
+
+**Rules:**
+1. When a screen imports from `'@onderling-app/basis'`, check the name is actually exported by
+   `apps/basis/src/index.js` — being exported from its own module is not enough.
+2. The guard `apps/basis-mobile/test/basisIndexExports.test.js` pins every v2-screen import against the
+   entry's export list (static parse, no JSX needed). If you add a screen import, that test is the fast
+   check; if you add a new import SOURCE (another package entry), extend the guard the same way.
+
+## Invite fields must be added in TWO places: the builder AND the encoder whitelist
+
+Real incident (2026-07-28): `buildCircleInviteUri` put `podBacked`/`podUrl` on the invite object, but
+`encodeMembershipCodeUrl` (createGroupState.js) builds the wire payload from an explicit field WHITELIST —
+so the fields never rode a real `stoop-invite://` URI. Tests that pass the invite as an OBJECT bypass the
+encoder (decodeInvite has an object fast-path) and stay green while the real QR/paste flow drops the field.
+When adding an invite field: add it to BOTH, and pin it with a round-trip test through the ENCODED URI.

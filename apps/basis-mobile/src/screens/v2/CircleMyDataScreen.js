@@ -19,6 +19,11 @@ import { createRelayPrefStore, asyncStorageRelayIo } from '../../../../basis/src
 import {
   createDeliverySettingsStore, asyncStorageDeliveryIo,
 } from '../../../../basis/src/v2/deliverySettings.js';
+// P1 §4 tail — how long this device keeps conversations. ONE control (the chat window); plumbing
+// follows it and the audit trail uses it as a DETAIL window, compacting past it. web≡mobile.
+import {
+  RETENTION_CHOICES_DAYS, normalizeRetentionDays, retentionFromDays, asyncStorageRetentionIo,
+} from '../../../../basis/src/v2/retentionPref.js';
 import UserLlmSettings from './UserLlmSettings.js';
 import EncryptedBackupWizardModal from '../../../../basis/src/rn/wizards/encryptedBackupWizardModal.js';
 import RestoreFromMnemonicWizardModal from '../../../../basis/src/rn/wizards/restoreFromMnemonicWizardModal.js';
@@ -27,7 +32,7 @@ import { enableNativePush, disableNativePush, getNativePushState } from '../../v
 const CHAT_AI_KEY = { on: 'chat_ai_on', 'circle-off': 'chat_ai_circle_off', 'no-llm': 'chat_ai_no_llm', 'no-provider': 'chat_ai_no_provider' };
 
 export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi, userLlm, onSaveUserLlm, validateUserLlm, onReconnectPeer,
-  onOpenConnectionPoints }) {
+  onOpenConnectionPoints, eventLog = null }) {
   // Reactive theme — reading it at render time is what lets the display-theme
   // toggle below recolour THIS screen live (module-level StyleSheets can't).
   const theme = useTheme();
@@ -95,6 +100,18 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
   const toggleDelivery = useCallback(async (patch) => {
     try { setDelivery(await deliveryStore.set(patch)); } catch { /* keep the old view */ }
   }, [deliveryStore]);
+
+  // P1 §4 tail — the retention choice, applied LIVE (setRetention prunes at once) so a shortened
+  // window shows immediately rather than after a restart.
+  const retentionIo = React.useMemo(() => asyncStorageRetentionIo(AsyncStorage), []);
+  const [retentionDays, setRetentionDays] = useState(null);
+  useEffect(() => { retentionIo.load().then(setRetentionDays).catch(() => {}); }, [retentionIo]);
+  const pickRetention = useCallback((days) => {
+    const d = normalizeRetentionDays(days);
+    setRetentionDays(d);
+    retentionIo.save(d).catch(() => {});
+    try { eventLog?.setRetention?.(retentionFromDays(d)); } catch { /* a prune failure must not block the setting */ }
+  }, [retentionIo, eventLog]);
 
   useEffect(() => { getNativePushState().then(setPush).catch(() => {}); }, []);
   const toggleNativePush = useCallback(async () => {
@@ -276,6 +293,30 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
         </Pressable>
       </Section>
 
+      {/* P1 §4 tail — ONE retention control (the chat window), web parity. The note says what happens to
+          decisions/reports: they COMPACT into a counted summary, so "removed" alone would be untrue. */}
+      {retentionDays != null ? (
+        <Section title={t('circle.mydata.retention')}>
+          <View style={styles.retentionRow}>
+            {RETENTION_CHOICES_DAYS.map((days) => (
+              <Pressable
+                key={days}
+                onPress={() => pickRetention(days)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: days === retentionDays }}
+                style={[styles.retentionChoice, days === retentionDays && styles.retentionChoiceOn]}
+                testID={`retention-${days}`}
+              >
+                <Text style={[styles.retentionChoiceText, days === retentionDays && styles.retentionChoiceTextOn]}>
+                  {t('circle.mydata.retention_days', { days })}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text style={styles.privacyBody}>{t('circle.mydata.retention_note')}</Text>
+        </Section>
+      ) : null}
+
       <Section title={t('circle.mydata.notifications')}>
         <Text style={styles.privacyBody}>
           {!push.supported ? t('circle.mydata.notif_unsupported')
@@ -406,6 +447,12 @@ const makeStyles = (theme) => StyleSheet.create({
   privacy: { gap: 2 },
   privacyTitle: { fontSize: 13, fontWeight: '600', color: theme.color.ink },
   privacyBody: { fontSize: 13, color: theme.color.inkSoft, lineHeight: 18 },
+  // P1 §4 tail — the retention choice row (web parity).
+  retentionRow:         { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
+  retentionChoice:      { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: theme.color.line },
+  retentionChoiceOn:    { backgroundColor: theme.color.card, borderColor: theme.color.ink },
+  retentionChoiceText:  { fontSize: 12.5, color: theme.color.inkSoft },
+  retentionChoiceTextOn:{ color: theme.color.ink, fontWeight: '600' },
   relayEdit: { marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
   relayInput: { flex: 1, fontSize: 14, paddingVertical: 9, paddingHorizontal: 12, borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.md, color: theme.color.ink, backgroundColor: theme.color.white },
   relaySave: { paddingVertical: 9, paddingHorizontal: 14, borderRadius: theme.radius.md, backgroundColor: theme.color.terracotta },

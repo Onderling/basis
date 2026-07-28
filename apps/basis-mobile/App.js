@@ -33,6 +33,8 @@ import { createDeliveryStateMap } from '@onderling/kring-host/deliveryState';
 import {
   makeReceiptSender, asyncStorageDeliveryIo, createDeliverySettingsStore,
   createFallbackOffer, setAddressFallbackReportHook,
+  // P1 §4 tail — the retention choice applied to the shared EventLog at boot.
+  asyncStorageRetentionIo, retentionFromDays,
 } from '@onderling-app/basis';
 import FirstRunWelcomeScreen from './src/screens/FirstRunWelcomeScreen.js';
 import MnemonicEntryScreen from './src/screens/MnemonicEntryScreen.js';
@@ -112,6 +114,11 @@ export default function App() {
   const eventLogRef = useRef(null);
   if (!eventLogRef.current) {
     eventLogRef.current = new EventLog({ initial: [], muted: [] });
+    // P1 §4 tail — apply the stored retention choice once it reads (async storage). Until then the log
+    // runs on the decided defaults, which is the same thing the user chose if they never changed it.
+    asyncStorageRetentionIo(AsyncStorage).load()
+      .then((days) => eventLogRef.current?.setRetention?.(retentionFromDays(days)))
+      .catch(() => { /* defaults stand */ });
   }
   // ε.1 — single normalization gate for kring-chat inserts.  The
   // inbox owns msgId dedup + envelope validation + ingest mirror +

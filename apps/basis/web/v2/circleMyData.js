@@ -12,6 +12,7 @@
 
 import { renderUserLlmSettings } from './userLlmSettings.js';
 import { renderThemeToggle } from './themeToggle.js';
+import { RETENTION_CHOICES_DAYS } from '../../src/v2/retentionPref.js';
 
 export function renderCircleMyData(container, {
   dataLocation = {},
@@ -29,6 +30,10 @@ export function renderCircleMyData(container, {
   // The two delivery settings (2026-07-28). One object, because they are two knobs on one question.
   delivery,               // { sendReceipts, allowFallback } — absent ⇒ the section is omitted
   onSetDelivery,          // (patch) => void
+  // P1 §4 tail — how long this device keeps conversations. `retentionDays` = the current choice;
+  // `onSetRetention(days)` = the pick. Absent ⇒ the section is omitted (unchanged surface).
+  retentionDays = null,
+  onSetRetention = null,
   surfacePref,            // S6.C — current 'inline' | 'screen' | 'chat'
   chatAi,                 // S6.D — { enriched, reason } for the active circle (shown under "chat")
   onSetSurfacePref,       // (value) => void
@@ -228,6 +233,34 @@ export function renderCircleMyData(container, {
       : 'circle.nearbyScreen.delivery_fallback_toggle_off');
     fallbackBtn.addEventListener('click', () => onSetDelivery({ allowFallback: !delivery.allowFallback }));
     sec.appendChild(fallbackBtn);
+
+    container.appendChild(sec);
+  }
+
+  // ── how long this device keeps conversations (P1 §4 tail) ──────────────────
+  // ONE control, for the chat window only — the one number a person has an opinion about. The line
+  // under it says what happens to the rest, because "older messages are removed" would be a lie about
+  // the audit trail, which compacts into a summary instead of disappearing.
+  if (typeof onSetRetention === 'function' && retentionDays != null) {
+    const sec = section(tr('circle.mydata.retention'));
+
+    const row = document.createElement('div');
+    row.className = 'cc-mydata__retention';
+    for (const days of RETENTION_CHOICES_DAYS) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'cc-mydata__action cc-mydata__retention-choice';
+      if (days === retentionDays) b.classList.add('is-on');
+      b.textContent = tr('circle.mydata.retention_days', { days });
+      b.addEventListener('click', () => onSetRetention(days));
+      row.appendChild(b);
+    }
+    sec.appendChild(row);
+
+    const note = document.createElement('p');
+    note.className = 'cc-mydata__retention-note';
+    note.textContent = tr('circle.mydata.retention_note');
+    sec.appendChild(note);
 
     container.appendChild(sec);
   }

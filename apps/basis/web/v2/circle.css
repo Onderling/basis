@@ -526,6 +526,11 @@
 /* P1.7 — the viewer's conversation filter strip (kinds × people/agents). Sits above the stream, only
    in the conversation view. Quiet by default; the whole strip warms when a filter is active, so a
    narrowed conversation never looks like a missing one. */
+/* P1 §4 tail — the retention choice row in My data. */
+.cc-mydata__retention { display: flex; flex-wrap: wrap; gap: 6px; }
+.cc-mydata__retention-choice.is-on { background: var(--cc-accent-soft, rgba(0,0,0,0.07)); border-color: transparent; font-weight: 600; }
+.cc-mydata__retention-note { font-size: 12px; color: var(--cc-ink-soft, #6b6b6b); margin: 6px 0 0; }
+
 .circle-kring__filter { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 10px; }
 .circle-kring__filter--active { background: var(--cc-surface-2, rgba(0,0,0,0.035)); border-radius: 8px; }
 .circle-kring__filter-chip { font: inherit; font-size: 12px; line-height: 1; padding: 5px 9px; border-radius: 999px;

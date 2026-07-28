@@ -4055,6 +4055,18 @@
     "chat_ai_no_provider": {
       "text": "No AI model is configured.",
       "doc": "S6.D — no provider endpoint."
+    },
+    "retention": {
+      "text": "How long messages are kept",
+      "doc": "P1 §4 — heading of the retention control in My data."
+    },
+    "retention_days": {
+      "text": "{{days}} days",
+      "doc": "P1 §4 — a retention choice button."
+    },
+    "retention_note": {
+      "text": "Older messages are removed from this device. Decisions and reports are not deleted — they collapse into a summary that says how many they cover.",
+      "doc": "P1 §4 — what actually happens; the audit trail compacts rather than disappearing, so \"removed\" alone would be untrue."
     }
   },
   "admin": {

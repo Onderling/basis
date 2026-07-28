@@ -4055,6 +4055,18 @@
     "chat_ai_no_provider": {
       "text": "Er is geen AI-model ingesteld.",
       "doc": "S6.D — no provider endpoint."
+    },
+    "retention": {
+      "text": "Hoe lang berichten bewaard blijven",
+      "doc": "P1 §4 — heading of the retention control in My data."
+    },
+    "retention_days": {
+      "text": "{{days}} dagen",
+      "doc": "P1 §4 — a retention choice button."
+    },
+    "retention_note": {
+      "text": "Oudere berichten verdwijnen van dit apparaat. Besluiten en meldingen worden niet gewist — die vouwen samen tot een samenvatting die zegt om hoeveel het gaat.",
+      "doc": "P1 §4 — what actually happens; the audit trail compacts rather than disappearing, so \"removed\" alone would be untrue."
     }
   },
   "admin": {

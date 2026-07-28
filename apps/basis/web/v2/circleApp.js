@@ -62,6 +62,9 @@ import { createTokenGate } from '../../src/v2/tokenGate.js';
 import { circleGateRules } from '../../src/v2/circleGate.js';
 import { interpretToCommand } from '../../src/v2/interpretCommand.js';
 import { createRelayPrefStore, localStorageRelayIo, resolveRelayUrl } from '../../src/v2/relayPref.js';
+import {
+  RETENTION_CHOICES_DAYS, normalizeRetentionDays, retentionFromDays, localStorageRetentionIo,
+} from '../../src/v2/retentionPref.js';
 import { registerCircleAddresses, unregisterCircleAddresses } from '../../src/v2/circleAddressRegistration.js';
 import {
   createConnectionPoints, adoptExistingRelay, localStorageConnectionPointsIo, recordJoinedCirclePoints,
@@ -968,7 +971,11 @@ const agentRequestStore = createAgentRequestStore({
 });
 // Cross-circle Stream reads this firehose; the agent's
 // publishEvent appends to it during boot.
-const eventLog = new EventLog({ initial: [], muted: [] });
+// P1 §4 tail — the ONE retention control (Frits): the person sets how long conversations are kept;
+// plumbing follows it (never longer) and the audit trail uses it as its DETAIL window, compacting past
+// it rather than dropping. Device-local — never fanned.
+const retentionIo = localStorageRetentionIo();
+const eventLog = new EventLog({ initial: [], muted: [], retention: retentionFromDays(retentionIo.load()) });
 // Profile-update propagation (roster-as-truth, diff-gated, silent pull-me).
 //   • the memo — what this device last shared with each (persona, circle); the diff-gate's
 //     left-hand side, so open-and-save-unchanged sends nothing at all.
@@ -3776,7 +3783,16 @@ async function showMyData() {
     onSetDelivery: async (patch) => {
       try { deliverySettingsCache = await deliverySettingsStore.set(patch); } catch { /* keep the old view */ }
       rerender();
-    }, surfacePref: circleSurfacePref.get(), onSetSurfacePref, appLang: currentLang(), onSetAppLang, themePref: getThemePref(), onSetTheme, chatAi, userLlm: userLlmCfg, onSaveUserLlm, validateUserLlm: validateUserLlmConfig,
+    },
+    // P1 §4 tail — the retention choice takes effect NOW (setRetention prunes immediately), so a
+    // shortened window is visible in the conversation the user is looking at, not after a reload.
+    retentionDays: normalizeRetentionDays(retentionIo.load()),
+    onSetRetention: (days) => {
+      retentionIo.save(days);
+      try { eventLog.setRetention(retentionFromDays(days)); } catch { /* a prune failure must not block the setting */ }
+      rerender();
+    },
+    surfacePref: circleSurfacePref.get(), onSetSurfacePref, appLang: currentLang(), onSetAppLang, themePref: getThemePref(), onSetTheme, chatAi, userLlm: userLlmCfg, onSaveUserLlm, validateUserLlm: validateUserLlmConfig,
     // in-app relay setting (no rebuild): the field shows the saved setting; env is the placeholder fallback.
     // Objective D / Surface 4: onOpenRelayPanel routes editing into the docked side-panel (openPagePanel).
     relayUrl: resolveRelayUrl(localStorageRelayIo().load(), ''), relayEnvUrl: CIRCLE_RELAY_ENV, onSaveRelay: applyRelayUrl, onOpenRelayPanel: openRelayPanel });

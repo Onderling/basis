@@ -324,6 +324,26 @@ export class EventLog {
   }
 
   /**
+   * Change the retention windows at runtime (the user's setting, applied without a reload) and prune
+   * immediately, so shortening the window takes effect on the conversation the user is looking at
+   * rather than at some later append. Returns the number of entries dropped by that prune.
+   *
+   * @param {{short?: number, chat?: number, audit?: number}} patch
+   * @returns {number}
+   */
+  setRetention(patch = {}) {
+    for (const k of ['short', 'chat', 'audit']) {
+      if (typeof patch?.[k] === 'number' && patch[k] >= 0) this.#retention[k] = patch[k];
+    }
+    const dropped = this.prune();
+    // Persist the shrunk log, but do NOT notify subscribers: they are documented as receiving the
+    // APPENDED entry, and a prune has none. Inventing a null-event would make every subscriber add a
+    // guard for a case that is really the caller's own re-render.
+    if (dropped) this.#persist(this.#events.slice()).catch(() => {});
+    return dropped;
+  }
+
+  /**
    * Prune by the entry's retention CLASS (one-log step D). Three fates:
    *
    *   • `short` / `chat` entries older than their window are DROPPED (as before — one window each).

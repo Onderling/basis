@@ -19,11 +19,7 @@
     "test:web:headed": "playwright test --headed"
   },
   "dependencies": {
-    "@onderling-app/calendar": "file:../calendar",
     "@onderling-app/basis": "file:../basis",
-    "@onderling-app/folio": "file:../folio",
-    "@onderling-app/stoop": "file:../stoop",
-    "@onderling-app/tasks": "file:../tasks-v0",
     "@onderling/app-manifest": "file:../../packages/app-manifest",
     "@onderling/blob-gateway": "file:../../packages/blob-gateway",
     "@onderling/core": "file:../../packages/core",

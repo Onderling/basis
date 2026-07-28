@@ -624,3 +624,28 @@ checkbox.
 See `Project Files/basis/security-roadmap-2026-05-23.md` for
 the full per-slice rationale and `packages/secure-agent/README.md`
 for the per-opt API.
+
+## The APP layer rule (added 2026-07-28)
+
+Invariant 5 states the layering for `packages/`. It never stated it for `apps/`, which left a real question
+unanswered: may a mobile shell import an app directly?
+
+**No. A shell imports its COMPOSER, and nothing else from `apps/`.**
+
+```
+shells (basis-mobile · stoop-mobile · folio-mobile)
+  → their composer (basis / stoop / folio)
+    → apps (stoop · tasks · folio · calendar · agents)
+      → packages/ → core
+```
+
+A shell reaching past its composer into an app is a bypass, and it is exactly what lets logic drift into a
+shell (invariant 1) — the composer is where an op is resolved, so a shell that can reach an app directly can
+resolve one itself.
+
+**Checked 2026-07-28:** every shell already obeys this in source. `basis-mobile`'s 26 `@onderling-app/*`
+imports all go through `basis`; stoop-mobile → stoop; folio-mobile → folio. Only the *declared* dependencies
+had drifted (four apps listed in `basis-mobile/package.json` that nothing imported); those were removed.
+
+Guarded by `apps/basis-mobile/test/shellLayering.test.js`.
+

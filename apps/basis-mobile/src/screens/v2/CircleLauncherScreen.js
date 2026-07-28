@@ -1688,6 +1688,7 @@ export default function CircleLauncherScreen({
         circle={selected}
         deliveryStateMap={deliveryStateMap}
         registerKringBotSink={registerKringBotSink}
+        onAcceptFallback={onAcceptFallback}
         items={items}
         callSkill={callSkill}
         rawCallSkill={bundle?.callSkill}
@@ -2094,7 +2095,9 @@ function CircleDetail({
   circle, items, callSkill, rawCallSkill, catalog: rawCatalog, policy, myListTasks = [],
   deliveryStateMap = null,
   registerKringBotSink = null,
-  eventLog, circles = [],
+  onAcceptFallback = null,
+  eventLog,
+  onAcceptFallback = null, circles = [],
   recipeStore = null, onStoopEvent, sendPersonaUpdate, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null, coreIdentity = null,
   onCircleControl = null, circleTransport = null,
   // Task #13 — onboarding first-run flags (shared store) + the create-flow handoff.
@@ -2400,9 +2403,12 @@ function CircleDetail({
   // fanned: the offer is about MY setting, and broadcasting it would tell the circle I have it off.
   useEffect(() => {
     if (typeof registerKringBotSink !== 'function') return undefined;
-    registerKringBotSink(({ messageKey, costKey } = {}) => {
+    registerKringBotSink(({ messageKey, costKey, actionKey } = {}) => {
       const text = [messageKey && t(messageKey), costKey && t(costKey)].filter(Boolean).join(' ');
-      if (text) appendKringMessage({ actor: 'bot', text, scope: 'self' });
+      if (!text) return;
+      // The one-tap accept rides the EXISTING bubble-button pipeline (`onBubbleButton` routes by id).
+      const buttons = actionKey ? [{ id: 'delivery:allow-fallback', label: t(actionKey) }] : undefined;
+      appendKringMessage({ actor: 'bot', text, buttons, scope: 'self' });
     });
     return () => registerKringBotSink(null);
   }, [registerKringBotSink, appendKringMessage]);
@@ -2849,6 +2855,8 @@ function CircleDetail({
   // S6.A inline manifest button (has opId) → dispatch its op against the item;
   // otherwise (B clarification candidate) → bind the id + re-run.
   const onBubbleButton = useCallback((button) => {
+    // One-tap fallback accept (the offer bubble's button) — App owns the store + offer.
+    if (button?.id === 'delivery:allow-fallback') { onAcceptFallback?.(); return; }
     // Task #13 — an onboarding option (onboarding:*) or help affordance (help:topic:* / help:consent:*)
     // routes to the shared onboarding/help handlers before anything else.
     if (typeof button?.id === 'string' && task13ButtonRef.current?.(button.id)) return;
@@ -2872,7 +2880,7 @@ function CircleDetail({
       return;
     }
     if (button?.id) clarify.pick(button.id, { id: circle?.id });
-  }, [clarify, circle?.id, catalog, runCircleCommandResolved, switchKringFeedbackLang]);
+  }, [clarify, circle?.id, catalog, runCircleCommandResolved, switchKringFeedbackLang, onAcceptFallback]);
 
   // B (two-level LLM policy) — the member's PERSONAL default, consulted when the circle policy is
   // 'user'. Persisted via AsyncStorage; seeded from the configured route until a settings UI lands

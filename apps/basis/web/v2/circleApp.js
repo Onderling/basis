@@ -1149,13 +1149,28 @@ const deliveryByMessageId  = { get: (id) => deliveryStateMap.get(id) };
 // at most once per cooldown while the problem persists — informative, not nagging.
 const fallbackOffer = createFallbackOffer({
   onOffer: () => {
+    // One-tap accept: the button flips the setting IN the bubble. The cooldown still arms on showing
+    // (`decline()`), so an ignored offer stays quiet for a week; a tapped one clears the evidence instead.
     _kringRender?.botBubble(
       `${t('circle.nearbyScreen.delivery_fallback_hint')} ${t('circle.nearbyScreen.delivery_fallback_cost')}`,
+      { buttons: [{ id: 'delivery:allow-fallback', action: 'delivery:allow-fallback', label: t('circle.nearbyScreen.delivery_fallback_enable') }] },
     );
     fallbackOffer.decline();
   },
 });
 setAddressFallbackReportHook((info) => fallbackOffer.report(info));
+
+/**
+ * The one-tap accept. Flips the SAME store the My-data toggle reads (one setting, two doors), clears the
+ * offer's evidence, and confirms in the user's own words for the ON state — the same line the settings
+ * screen would show, so the bubble and the toggle can never describe the result differently.
+ */
+async function acceptFallbackOffer() {
+  try { deliverySettingsCache = await deliverySettingsStore.set({ allowFallback: true }); }
+  catch { /* the confirm below only fires on success */ return; }
+  fallbackOffer.accept();
+  _kringRender?.botBubble(t('circle.nearbyScreen.delivery_fallback_on'));
+}
 let   CIRCLE_RELAY_URL      = resolveRelayUrl(localStorageRelayIo().load(), CIRCLE_RELAY_ENV);
 let   _peerAgent           = null;   // captured at boot so a relay-setting change can reconnect live
 let   _peerRouter          = null;
@@ -4984,6 +4999,8 @@ function showKring(id, circle, policy) {
         // Task #13 Phase 2 — a help affordance (topic chip / consent choice) routes to the help Q&A.
         const help = parseHelpAction(b?.action);
         if (help) { handleHelpAction(id, help); return; }
+        // One-tap fallback accept (the offer bubble's button).
+        if (b?.action === 'delivery:allow-fallback') { acceptFallbackOffer(); return; }
         circleEmbedButtonTap?.(b);
       },
       // tap a "See also" embed chip → open the screen where the item lives (S6.B panel).

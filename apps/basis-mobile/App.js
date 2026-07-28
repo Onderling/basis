@@ -147,6 +147,15 @@ export default function App() {
     });
     setAddressFallbackReportHook((info) => fallbackOfferRef.current.report(info));
   }
+  // One-tap accept: same store the My-data toggle reads, offer evidence cleared, confirmation spoken
+  // through the current mouth. Threaded to CircleDetail's button router (App owns store + offer).
+  const acceptFallbackOffer = useCallback(async () => {
+    try { await deliverySettingsStoreRef.current.set({ allowFallback: true }); }
+    catch { return; }   // confirm only on success
+    fallbackOfferRef.current?.accept();
+    kringBotSinkRef.current?.({ messageKey: 'circle.nearbyScreen.delivery_fallback_on' });
+  }, []);
+
   const registerKringBotSink = useCallback((fn) => {
     kringBotSinkRef.current = typeof fn === 'function' ? fn : null;
     // A buffered offer speaks as soon as a mouth exists — and only then arms the cooldown, so an offer
@@ -519,6 +528,7 @@ export default function App() {
           bundle={bundle}
           deliveryStateMap={deliveryStateMapRef.current}
           registerKringBotSink={registerKringBotSink}
+          onAcceptFallback={acceptFallbackOffer}
           sessionRef={sessionRef}
           podAuth={podAuth}
           eventLog={eventLogRef.current}

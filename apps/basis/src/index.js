@@ -276,6 +276,14 @@ export {
   advanceDelivery, deliveryAfterSend, receiptPolicy, shouldSendReceipt,
   receiveReceipt, RECEIPT_MESSAGE,
 } from './v2/deliveryState.js';
+export {
+  deliverySettings, createDeliverySettingsStore, localStorageDeliveryIo, asyncStorageDeliveryIo,
+  deliveryLabelFor, withDelivery, recordDelivery,
+} from './v2/deliverySettings.js';
+export {
+  defaultConversationKinds, availableConversationKinds, TEMPLATE_CONVERSATION_KINDS,
+  resolveConversationKinds, setConversationKind,
+} from './v2/conversationKinds.js';
 export { makeSharedCirclePeerScope } from './v2/sharedCirclePeerScope.js';
 // agent-add admin approval: proposal-like flow for
 // joining an LLM agent to a circle whose `agents` axis is admin-approval.

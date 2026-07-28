@@ -1,0 +1,106 @@
+/**
+ * What a circle's conversation shows.
+ *
+ * The decision: admin decides, default permissive, seeded from the circle template. What these pin is the
+ * precedence chain and — the part most likely to rot — that the defaults stay DERIVED from the kind
+ * registry rather than copied out of it.
+ */
+import { describe, it, expect } from 'vitest';
+import { ENTRY_KINDS, LANE } from '@onderling/item-store';
+import { KRING_KINDS } from '../../src/v2/kringTemplates.js';
+import {
+  defaultConversationKinds, availableConversationKinds, TEMPLATE_CONVERSATION_KINDS,
+  resolveConversationKinds, setConversationKind,
+} from '../../src/v2/conversationKinds.js';
+
+describe('the defaults are derived, not copied', () => {
+  it('the permissive default is exactly the human lane', () => {
+    // Copying the list would mean a human kind added to the registry later is silently missing from every
+    // conversation — the drift the one-registry work exists to prevent.
+    const human = Object.entries(ENTRY_KINDS).filter(([, s]) => s.lane === LANE.HUMAN).map(([k]) => k);
+    expect(defaultConversationKinds().sort()).toEqual(human.sort());
+  });
+
+  it('technical kinds are off by default, and offerings are on', () => {
+    const def = defaultConversationKinds();
+    expect(def).toContain('aanbod');            // Frits said "maybe"; the per-circle setting resolves it
+    expect(def).not.toContain('roster-updated');
+    expect(def).not.toContain('agent-action');
+  });
+
+  it('the admin can choose from EVERY registered kind, not just the human ones', () => {
+    // "technical stuff should be off ofcourse (but an admin should be able to decide otherwise)".
+    const available = availableConversationKinds();
+    expect(available).toHaveLength(Object.keys(ENTRY_KINDS).length);
+    expect(available.find((a) => a.kind === 'governance')).toMatchObject({ defaultOn: false });
+    expect(available.find((a) => a.kind === 'chat-message')).toMatchObject({ defaultOn: true });
+  });
+});
+
+describe('the template axis', () => {
+  it('names only REAL circle kinds', () => {
+    // Guards against the failure that happened while writing this: inventing a template kind that the
+    // wizard has never heard of, which would silently never apply.
+    expect(Object.keys(TEMPLATE_CONVERSATION_KINDS).filter((k) => !KRING_KINDS.includes(k))).toEqual([]);
+  });
+
+  it('a buurt shows the noticeboard, NOT open chat — matching its own template', () => {
+    // `features.chat: false` for a buurt. A conversation full of chat messages would contradict the
+    // template that created the circle.
+    const kinds = resolveConversationKinds({ templateKind: 'buurt' });
+    expect(kinds).not.toContain('chat-message');
+    expect(kinds).toEqual(expect.arrayContaining(['vraag', 'aanbod']));
+  });
+
+  it('a household shows everything', () => {
+    expect(resolveConversationKinds({ templateKind: 'household' })).toContain('chat-message');
+  });
+
+  it('an unknown kind falls to the permissive default rather than showing nothing', () => {
+    expect(resolveConversationKinds({ templateKind: 'nope' })).toEqual(defaultConversationKinds());
+    expect(resolveConversationKinds()).toEqual(defaultConversationKinds());
+  });
+});
+
+describe('precedence: circle → template → default', () => {
+  it("the admin's choice beats the template", () => {
+    const kinds = resolveConversationKinds({ circleSetting: ['chat-message'], templateKind: 'buurt' });
+    expect(kinds).toEqual(['chat-message']);
+  });
+
+  it('an EMPTY admin choice is respected — a circle may show nothing', () => {
+    // `[]` is a decision; only `null`/absent means "not chosen".
+    expect(resolveConversationKinds({ circleSetting: [], templateKind: 'household' })).toEqual([]);
+  });
+
+  it('unregistered kinds are dropped from a stored setting', () => {
+    expect(resolveConversationKinds({ circleSetting: ['chat-message', 'not-a-kind', 'chat-message'] }))
+      .toEqual(['chat-message']);
+  });
+});
+
+describe('toggling one kind', () => {
+  it('adds and removes', () => {
+    const start = resolveConversationKinds({ templateKind: 'buurt' });
+    const withChat = setConversationKind(start, 'chat-message', true);
+    expect(withChat).toContain('chat-message');
+    expect(setConversationKind(withChat, 'chat-message', false)).not.toContain('chat-message');
+  });
+
+  it('an admin may turn a TECHNICAL kind on', () => {
+    expect(setConversationKind(['chat-message'], 'governance', true)).toContain('governance');
+  });
+
+  it('an unknown kind is ignored — a typo is not a new feature', () => {
+    expect(setConversationKind(['chat-message'], 'invented', true)).toEqual(['chat-message']);
+  });
+
+  it('takes the RESOLVED list, so the first change starts from what was shown', () => {
+    // Otherwise turning one kind off silently adopts the whole default set as an explicit choice, freezing
+    // the circle against future registry changes.
+    const resolved = resolveConversationKinds({ templateKind: 'household' });
+    const after = setConversationKind(resolved, 'leen', false);
+    expect(after).toContain('chat-message');
+    expect(after).not.toContain('leen');
+  });
+});

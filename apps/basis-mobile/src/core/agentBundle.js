@@ -52,6 +52,8 @@ import { PeerGraph } from '@onderling/core';
 import { AsyncStorageAdapter } from '@onderling/react-native/storage/AsyncStorageAdapter';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { resolveRelayUrl, asyncStorageRelayIo } from '../../../basis/src/v2/relayPref.js';
+import { registerCircleAddresses } from '../../../basis/src/v2/circleAddressRegistration.js';
+import { createConnectionPoints, asyncStorageConnectionPointsIo } from '../../../basis/src/v2/connectionPoints.js';
 // SILENT out-of-circle delivery — the per-user "shared with me" store (TIERED: AsyncStorage canonical + pod
 // mirror) and THIS device's network-derived sealing OPENER. Both are shared-src logic (web≡mobile): the store
 // factory mirrors web's tiered wiring in circleApp.js; the opener bridge injects the pod-client sealing adapter
@@ -373,6 +375,37 @@ export async function bootAgentBundle(opts = {}) {
     }
   })();
 
+  // G13 — register this device's per-circle addresses on the connected relay, SCOPED to the
+  // relay-diversity rule (docs/decisions.md): a circle's address goes only to relays that circle rides.
+  // Fire-and-forget BY DESIGN (mirrors web's registerCirclePresence): registering is harmless before the
+  // `preferCircleAddress` flip, the port replays aliases on reconnect of the same socket, `reconnectPeer`'s
+  // NEW socket re-runs this, and the relay holds+drains messages per registration — boot never waits on it.
+  // Circle ids come from the launcher after its load (the connect-time call may run before circles are
+  // known); idempotent, so calling twice is free. The points store is read here as a read-only view — the
+  // owning, saving instance stays in the connection-points screen.
+  let _circleIdsForRegistration = [];
+  const registerCirclePresence = async (circleIds = _circleIdsForRegistration) => {
+    _circleIdsForRegistration = circleIds;
+    try {
+      const relayUrl = await resolveMobileRelayUrl();
+      if (!relayUrl || !agent?.relay?.supportsAliases) return;
+      const io = asyncStorageConnectionPointsIo(AsyncStorage);
+      const points = createConnectionPoints({ initial: await io.load(), save: () => {} });
+      const circlesForPoint = (url) => points.circlesFor(url);
+      circlesForPoint.pointsFor = (cid) => points.pointsFor(cid);   // the reverse view the scoper duck-types
+      await registerCircleAddresses({
+        transport: agent.relay,   // the facade quacks like the port's alias half — never the transport itself
+        relayUrl,
+        circleIds,
+        circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
+        circlesForPoint,
+        // The relay this device connects to IS the deployment default — unmapped circles land here alone.
+        defaultRelayUrl: relayUrl,
+        onError: (err, cid) => console.warn(`[cc/boot] circle-address register failed (${cid}):`, err?.message ?? err),
+      });
+    } catch (err) { console.warn('[cc/boot] circle-address registration failed:', err?.message ?? err); }
+  };
+
   let transport = { kind: 'none' };
   if (typeof agent.connectPeerTransport === 'function') {
     transport = { kind: 'nkn', connecting: true };
@@ -429,6 +462,7 @@ export async function bootAgentBundle(opts = {}) {
           rtcLib,
         });
         console.log('[cc/boot] peer transport connected, address:', agent.peer?.address);
+        registerCirclePresence();   // G13 — fire-and-forget; never awaited (self-catching)
         // fire the catch-up trigger
         // 1.5s after connect so HI handshake settles first.  Mirrors
         // web/main.js:1338.  Read the slot at fire time — null/undefined
@@ -540,6 +574,7 @@ export async function bootAgentBundle(opts = {}) {
         rendezvous: true,
         rtcLib: _connRtcLib ?? undefined,
       });
+      registerCirclePresence();   // G13 — a NEW socket starts with no aliases; re-register (fire-and-forget)
       return { ok: true, effective: relayUrl };
     } catch (err) { return { ok: false, error: err?.message ?? String(err), effective: relayUrl }; }
   };
@@ -554,6 +589,7 @@ export async function bootAgentBundle(opts = {}) {
     callSkill,
     agent,
     reconnectPeer,
+    registerCirclePresence,   // G13 — the launcher feeds fresh circle ids after each circles load
     transport,
     pendingPeerRedeems,
     sendPeerRedeem,

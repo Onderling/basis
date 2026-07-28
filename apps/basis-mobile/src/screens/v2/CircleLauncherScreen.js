@@ -949,6 +949,8 @@ export default function CircleLauncherScreen({
         : {};
       const _l = await loadCircles(sources);
       setCircles(_l);
+      // G13 — feed the bundle's per-circle relay registration fresh ids (fire-and-forget, self-catching).
+      bundle?.registerCirclePresence?.(_l.map((c) => c?.id).filter(Boolean));
       return _l.length;
     } catch {
       setCircles([]);

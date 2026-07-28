@@ -136,7 +136,7 @@ export function fetchScreenItems(section, { callSkill, context } = {}) {
 /**
  * Extract the ROW LIST from a skill reply (fetchSectionItems returns
  * replies verbatim; "adapters extract items per their app's convention").
- * Canopy-chat's convention, in order:
+ * The chat shell's convention, in order:
  *   1. a bare array;
  *   2. `items` / `payload.items` (the chat-shell list contract);
  *   3. the reply's SOLE array-valued property (e.g. listAgents →

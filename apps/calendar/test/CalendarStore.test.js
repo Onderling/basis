@@ -203,7 +203,7 @@ describe('iCal feed (v0.7.11)', () => {
     const { ics, uri } = await store.getIcsFeed();
     expect(uri).toMatch(/calendar\/feed\.ics$/);
     expect(ics).toMatch(/^BEGIN:VCALENDAR/);
-    expect(ics).toMatch(/X-WR-CALNAME:Canopy Calendar/);
+    expect(ics).toMatch(/X-WR-CALNAME:Onderling Calendar/);
     const vevents = (ics.match(/BEGIN:VEVENT/g) ?? []).length;
     expect(vevents).toBe(2);
     expect(ics).toMatch(/SUMMARY:Team standup/);

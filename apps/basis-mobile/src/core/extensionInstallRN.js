@@ -4,8 +4,8 @@
  * Drives the consent sheet using the SHARED, tested orchestration
  * (`buildConsentModel` runs the sandbox gate + builds the plain card;
  * `installMapping` re-checks + writes to the store). A module-level +
- * `globalThis.canopyInstallExtension` trigger lets a deep link / dev tool
- * request an install — the RN analogue of web's `window.canopyInstallExtension`.
+ * `globalThis.onderlingInstallExtension` trigger lets a deep link / dev tool
+ * request an install — the RN analogue of web's `window.onderlingInstallExtension`.
  *
  * NB (V0): the installed mapping is persisted to AsyncStorage and surfaces as a
  * slash-command on the NEXT boot (the boot wiring in agentBundle loads it). A
@@ -37,7 +37,10 @@ export function useExtensionInstall({ store, deviceId, catalog, onInstalled }) {
   // Register the global/dev trigger while this hook is mounted.
   useEffect(() => {
     _trigger = requestInstall;
-    if (typeof globalThis !== 'undefined') globalThis.canopyInstallExtension = requestInstall;
+    if (typeof globalThis !== 'undefined') {
+      globalThis.onderlingInstallExtension = requestInstall;
+      globalThis.canopyInstallExtension = requestInstall;   // legacy alias (tools/e2e)
+    }
     return () => { if (_trigger === requestInstall) _trigger = null; };
   }, [requestInstall]);
 

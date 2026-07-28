@@ -13,7 +13,10 @@
 export const QR_URI_PREFIXES = Object.freeze([
   'stoop-contact://',
   'stoop-invite://',
-  'canopy-pair://',    // OBJ-2 no-pod device/agent pairing: encodes a household peer address
+  'onderling-pair://', // OBJ-2 no-pod device/agent pairing: encodes a household peer address
+  'canopy-pair://',    // legacy spelling of the pairing scheme — still RECOGNISED (a printed/screenshotted
+                       // QR keeps working); new QRs are minted as onderling-pair:// only (naming decision
+                       // 2026-07-29: no new "canopy" identifiers).
   'basis://',    // future: chat-shell-level invites
 ]);
 
@@ -27,10 +30,12 @@ export function isQrUri(v) {
 }
 
 // ── OBJ-2 device/agent pairing payload ──────────────────────────────────────
-// A pairing QR carries one household peer address: `canopy-pair://<addr>?name=<label>`.
+// A pairing QR carries one household peer address: `onderling-pair://<addr>?name=<label>`.
 // Scanning it on the other device → addHouseholdPeer(addr), so the two per-circle household
 // agents share their items over the relay/peer transport — no typing a long address.
-export const QR_PAIR_SCHEME = 'canopy-pair://';
+export const QR_PAIR_SCHEME = 'onderling-pair://';
+/** The legacy pairing prefix — parse-only (never minted). */
+export const QR_PAIR_SCHEME_LEGACY = 'canopy-pair://';
 
 /** Build a pairing URI for a household peer address (optional human label). */
 export function makePairUri(addr, name) {
@@ -44,11 +49,13 @@ export function makePairUri(addr, name) {
 export function parsePairUri(uri) {
   if (typeof uri !== 'string') return null;
   const s = uri.trim();
-  if (!s.startsWith(QR_PAIR_SCHEME)) {
+  const prefix = s.startsWith(QR_PAIR_SCHEME) ? QR_PAIR_SCHEME
+    : s.startsWith(QR_PAIR_SCHEME_LEGACY) ? QR_PAIR_SCHEME_LEGACY : null;
+  if (!prefix) {
     // Accept a bare address too (pasted directly), as long as it isn't some OTHER QR scheme.
     return s && !isQrUri(s) ? { addr: s, name: null } : null;
   }
-  const rest = s.slice(QR_PAIR_SCHEME.length);
+  const rest = s.slice(prefix.length);
   const qi = rest.indexOf('?');
   const addrPart = qi === -1 ? rest : rest.slice(0, qi);
   let name = null;

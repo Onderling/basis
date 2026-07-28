@@ -95,7 +95,7 @@ export function renderPairedDevices(container, opts = {}) {
     err.className = 'cc-paired__err';
     err.hidden = true;
     const submit = async () => {
-      // Accept a bare address OR a pasted `canopy-pair://…` URI (the QR's payload).
+      // Accept a bare address OR a pasted `onderling-pair://…` URI (the QR's payload).
       const addr = parsePairUri(addInput.value.trim())?.addr;
       if (!addr) return;
       err.hidden = true;

@@ -73,6 +73,11 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
 - **Shared vocabularies** (delivery states, entry kinds, roles, label maps) — the index of what already
   exists, and the rule that a new one needs a home + a guard — [`shared-vocabularies.md`](docs/conventions/shared-vocabularies.md).
 - **Record a decision** when a choice closes off alternatives / would be re-litigated / shapes architecture (→ `docs/decisions.md`) or org (→ private) — [`decision-log.md`](docs/conventions/decision-log.md).
+- **No new "canopy" identifiers** (Frits, 2026-07-29). Product/platform naming in code, comments, labels
+  and schemes is **onderling** (or neutral). `canopy` survives only in FROZEN persisted/wire names that
+  need a decided migration to change (pod `canopy/` layout, `https://canopy.org/ns`, `x-canopy` card
+  fields, `canopy.mappings:` storage keys, `com.canopy.hub.BIND`, parse-only legacy `canopy-pair://`) —
+  the inventory + migration question lives in `plans/DECISIONS-FOR-REVIEW.md` 2026-07-29.
 
 ## How to work
 - **Go through the SURFACE, never the transport.** App/shell code must not construct or drive

@@ -523,7 +523,7 @@ export const basisManifest = {
       ],
       surfaces: {
         slash: { command: '/set-relay', body: 'flags' },
-        chat:  { reply: 'text', hint: 'set the canopy relay URL (or --clear to drop it)' },
+        chat:  { reply: 'text', hint: 'set the relay URL (or --clear to drop it)' },
         // Objective D / Surface 4 — first LIVE consumer of openPagePanel's
         // simple-form path (web `pagePanel.js`).  The docked side-panel auto-builds
         // a form from these params (url · clear) and dispatches via callSkill.

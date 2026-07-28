@@ -95,7 +95,7 @@ export class CalendarStore {
   }
 
   /**
-   * v0.7. — wire/unwire the pod-write target at runtime. canopy
+   * v0.7. — wire/unwire the pod-write target at runtime. The shell
    * chat calls this on sign-in / sign-out so calendar's .ics feed
    * writes-through to `<pod>/canopy/calendar/feed.ics`.
    *
@@ -150,8 +150,8 @@ export class CalendarStore {
     const events = await this.#readAll();
     const ics = buildIcsForEvents({
       events,
-      calendarName: 'Canopy Calendar',
-      prodId:       '-//canopy-app/calendar//EN',
+      calendarName: 'Onderling Calendar',
+      prodId:       '-//onderling-app/calendar//EN',
     });
     return { ics, uri: ICS_FEED_URI };
   }

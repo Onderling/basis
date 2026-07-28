@@ -34,7 +34,7 @@ const telegramShim = fileURLToPath(new URL('./src/web/shims/telegramBridge.js', 
 // stray copies in other apps' node_modules (e.g. apps/folio/node_modules/@onderling/
 // core); without this, Vite can resolve @onderling/core — and thus its tweetnacl/
 // ed2curve crypto deps — to the WRONG copy, yielding 500s + a blank screen.
-const canopyCore  = fileURLToPath(new URL('../../packages/core',            import.meta.url));
+const onderlingCore = fileURLToPath(new URL('../../packages/core',          import.meta.url));
 // Resolve the npm `events` polyfill once, by absolute path.  Transitive
 // importers (packages/webid-discovery, etc.) lose the bare-specifier
 // resolution chain when they're served as source under pnpm hoisting;
@@ -115,7 +115,7 @@ export default defineConfig({
       // @onderling/core), which caused folio-path raw serving + 500s + a blank
       // screen. (NB: do NOT add tweetnacl/ed2curve to resolve.dedupe — that forces
       // resolution from the basis root, which has no tweetnacl, breaking it.)
-      '@onderling/core': canopyCore,
+      '@onderling/core': onderlingCore,
       // `ws` is Node-only; the relay's WsServerTransport statically
       // imports `WebSocketServer` from it.  Shim carries the named
       // export so Rollup is happy; classes throw at construction if

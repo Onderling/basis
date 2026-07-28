@@ -51,7 +51,7 @@ export function __resetEventIdSeq() { _eventIdSeq = 0; }
 
 /**
  * Default formatter: produces a `{message}` reply payload from an
- * event.  Apps following the canopy reply convention populate
+ * event.  Apps following the platform reply convention populate
  * `event.payload.message`; otherwise we fall back to a sane
  * concatenation that still tells the user something happened.
  *

@@ -22,12 +22,12 @@
 //     subpaths.
 
 const path = require('path');
-const { withCanopyPreset } = require('@onderling/react-native/metro-preset');
+const { withOnderlingPreset } = require('@onderling/react-native/metro-preset');
 
 const projectRoot = __dirname;
 const repoRoot    = path.resolve(__dirname, '../..');
 
-const _cfg = withCanopyPreset({
+const _cfg = withOnderlingPreset({
   projectRoot,
   repoRoot,
 

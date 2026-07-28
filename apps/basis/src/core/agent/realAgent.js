@@ -996,7 +996,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     identityVault: tasksIdentityVault,
     primaryCircleConfig: opts.tasksCircleConfig ?? {
       circleId:  'cc-default',
-      name:    'Canopy-chat tasks',
+      name:    'Onderling tasks',
       kind:    'household',
       members: [
         // chatAgent's pubKey is what tasks-v0 sees as `from`; bind

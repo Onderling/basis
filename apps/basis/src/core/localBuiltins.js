@@ -1404,7 +1404,7 @@ const RELAY_VAULT_KEY    = 'cc-relay-url';
 const TRANSPORT_VAULT_KEY = 'cc-transport-mode';
 
 /**
- * `/set-relay <ws://...>` — persist + connect to a canopy relay.
+ * `/set-relay <ws://...>` — persist + connect to a relay.
  * `/set-relay --clear`    — disconnect + clear the persisted URL.
  *
  * The agent's secure-agent has sa.relay.connect({relayUrl}) /

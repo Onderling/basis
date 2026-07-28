@@ -2,7 +2,7 @@
  * guidedSetup — a template-driven conversational "settings chatbot" (Theme B).
  *
  * A circle's config is set up by walking the user through a few questions in
- * chat, driven by a TEMPLATE that Canopy HQ can update remotely (open-source) —
+ * chat, driven by a TEMPLATE that Onderling can update remotely (open-source) —
  * so onboarding copy/flow improves without an app release. The bot collects
  * answers, builds a circle-policy patch, and can HAND OFF to the GUI settings
  * form mid-flow ("let me just show you the toggles").

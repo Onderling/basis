@@ -79,8 +79,8 @@ Apps consuming the substrate are responsible for their `metro.config.js`.
 Recommend using the shared preset:
 
 ```js
-const { withCanopyPreset } = require('@onderling/react-native/metro-preset');
-module.exports = withCanopyPreset({
+const { withOnderlingPreset } = require('@onderling/react-native/metro-preset');
+module.exports = withOnderlingPreset({
   // app-specific overrides
 });
 ```

@@ -12,7 +12,7 @@
 import { cellFor } from './geo.js';
 
 const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org/search';
-const USER_AGENT     = 'Stoop/0.2 (https://github.com/canopy)';
+const USER_AGENT     = 'Stoop/0.2 (https://github.com/Onderling)';
 
 let _httpFactory = null;
 let _lastCallAt  = 0;

@@ -423,7 +423,7 @@ export default function ChatScreen({
   }, [bootState, podAuth, media]);
 
   // Extension install (feedback-extension) — the consent sheet + its controller. Uses the shared
-  // buildConsentModel/installMapping (sandbox gate + store write). Trigger via globalThis.canopyInstallExtension
+  // buildConsentModel/installMapping (sandbox gate + store write). Trigger via globalThis.onderlingInstallExtension
   // (set by the hook). V0: the mapping persists to AsyncStorage and surfaces as a slash-command on the next boot.
   const extStore = useMemo(() => asyncStorageMappingsStore(AsyncStorage), []);
   const extCatalog = bootState.kind === 'ready' ? bootState.bundle.catalog : { opsById: new Map() };

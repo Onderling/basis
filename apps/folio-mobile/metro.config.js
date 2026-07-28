@@ -16,12 +16,12 @@
 //   packages/react-native/docs/    (folded into the substrate)
 
 const path = require('path');
-const { withCanopyPreset } = require('@onderling/react-native/metro-preset');
+const { withOnderlingPreset } = require('@onderling/react-native/metro-preset');
 
 const projectRoot = __dirname;
 const repoRoot    = path.resolve(__dirname, '../..');
 
-module.exports = withCanopyPreset({
+module.exports = withOnderlingPreset({
   projectRoot,
   repoRoot,
 

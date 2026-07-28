@@ -10,10 +10,10 @@
 // Usage in an app's metro.config.js:
 //
 //   const path = require('path');
-//   const { withCanopyPreset } =
+//   const { withOnderlingPreset } =
 //     require('@onderling/react-native/metro-preset');
 //
-//   module.exports = withCanopyPreset({
+//   module.exports = withOnderlingPreset({
 //     projectRoot: __dirname,
 //     repoRoot:    path.resolve(__dirname, '../..'),
 //     // optional app-specific extras:
@@ -168,7 +168,7 @@ const NODE_BUILTINS = new Set([
  *   resolution for the listed module names.  Use sparingly.
  * @returns {object}                                         Metro config object.
  */
-function withCanopyPreset(options) {
+function withOnderlingPreset(options) {
   const {
     projectRoot,
     repoRoot,
@@ -182,10 +182,10 @@ function withCanopyPreset(options) {
   } = options;
 
   if (!projectRoot) {
-    throw new Error('[withCanopyPreset] projectRoot is required');
+    throw new Error('[withOnderlingPreset] projectRoot is required');
   }
   if (!repoRoot) {
-    throw new Error('[withCanopyPreset] repoRoot is required');
+    throw new Error('[withOnderlingPreset] repoRoot is required');
   }
 
   const APP_MODULES = path.resolve(projectRoot, 'node_modules');
@@ -459,4 +459,6 @@ function withCanopyPreset(options) {
   return config;
 }
 
-module.exports = { withCanopyPreset, NODE_BUILTINS };
+// `withCanopyPreset` is the legacy alias (naming decision 2026-07-29: no new "canopy" identifiers);
+// existing metro configs keep working, new ones use `withOnderlingPreset`.
+module.exports = { withOnderlingPreset, withCanopyPreset: withOnderlingPreset, NODE_BUILTINS };

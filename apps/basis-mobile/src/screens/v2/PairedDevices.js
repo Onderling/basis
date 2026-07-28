@@ -26,7 +26,7 @@ export default function PairedDevices({ selfAddr = '', peers: initialPeers = [],
   const [scanOpen, setScanOpen] = useState(false);
   const [paired, setPaired] = useState(false);
 
-  // Pair by address (typed, pasted-URI, or scanned). Tolerant of a `canopy-pair://…` payload.
+  // Pair by address (typed, pasted-URI, or scanned). Tolerant of a pasted `onderling-pair://…` payload.
   const pair = async (raw) => {
     const addr = parsePairUri(String(raw ?? '').trim())?.addr;
     if (!addr) return;

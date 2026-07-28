@@ -887,7 +887,7 @@ const overrideStore = createMemberOverrideStore(localStorageOverrideIo());
 // β.5 — pin store (single keyless map at `cc.circlePinned`).
 const pinStore = createCirclePinStore(localStoragePinIo());
 // Per-user pod writer — built lazily from the restored Solid session
-// (`window.canopyPodSession`, set once sign-in completes below) and
+// (`window.onderlingPodSession`, set once sign-in completes below) and
 // memoised. While unsigned the thunk returns null, so every store wired
 // through it stays local-only (unchanged behaviour). SHARED by the
 // availability pref AND the "shared with me" list (both mirror a per-user
@@ -895,7 +895,7 @@ const pinStore = createCirclePinStore(localStoragePinIo());
 let _perUserPodWriter = null;
 const perUserPodWriter = () => {
   if (_perUserPodWriter) return _perUserPodWriter;
-  const s = (typeof window !== 'undefined' && window.canopyPodSession) || null;
+  const s = (typeof window !== 'undefined' && (window.onderlingPodSession ?? window.canopyPodSession)) || null;
   if (!s || typeof s.fetch !== 'function' || typeof s.webid !== 'string') return null;
   try { _perUserPodWriter = createPodWriter(s); } catch { return null; }
   return _perUserPodWriter;
@@ -1720,7 +1720,8 @@ function buildCircleBot(agent) {
     });
   }
   if (typeof window !== 'undefined') {
-    window.canopyInstallExtension = installExtensionFromLink;   // manual / programmatic install
+    window.onderlingInstallExtension = installExtensionFromLink;   // manual / programmatic install
+    window.canopyInstallExtension = installExtensionFromLink;       // legacy alias (tools/e2e)
     try {
       const enc = new URLSearchParams(window.location.search).get('install');
       if (enc) installExtensionFromLink(enc);                   // ?install=<base64 mapping JSON>
@@ -1791,7 +1792,8 @@ function buildCircleBot(agent) {
   if (typeof window !== 'undefined') {
     window.canopyContactChannel = circleContactChannel;
     window.canopyPeers = circlePeerGraph;   // debug / e2e seam (roster + journey-A tests seed/inspect peers)
-    window.canopyAddBot = addBotFromInput;  // manual / programmatic add
+    window.onderlingAddBot = addBotFromInput;  // manual / programmatic add
+    window.canopyAddBot = addBotFromInput;     // legacy alias (tools/e2e)
     try {
       const params = new URLSearchParams(_bootSearch);
       const addbot = params.get('addbot');
@@ -6370,7 +6372,8 @@ async function boot() {
     circleAuthedFetch = (podSession && typeof podSession.fetch === 'function') ? podSession.fetch : null;
     circleOwnerWebId  = podSession?.webid ?? null;
     if (typeof window !== 'undefined') {
-      window.canopyPodSession = podSession ?? null;               // debug / e2e seam
+      window.onderlingPodSession = podSession ?? null;            // debug / e2e seam
+      window.canopyPodSession = podSession ?? null;               // legacy alias (tools/e2e)
       window.canopyPodSignIn = (issuer) => podAuth.startSignIn({ issuer, redirectUrl: window.location.href });
     }
   } catch { /* not signed in → pseudo-pod */ }

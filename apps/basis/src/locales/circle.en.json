@@ -2232,6 +2232,22 @@
     }
   },
   "nearbyScreen": {
+    "point_active": {
+      "text": "In use now",
+      "doc": "The ONE point the transport is actually connected to. The substrate connects to one relay at a time."
+    },
+    "point_standby": {
+      "text": "Standby",
+      "doc": "A known, adopted point that is not currently carrying anything — a real fallback, not decoration."
+    },
+    "remove_was_active": {
+      "text": "This is the one in use. Removing it disconnects until you pick another.",
+      "doc": "Removing the LIVE point is its own event, even when no circle is cut off."
+    },
+    "points_open": {
+      "text": "Connection points",
+      "doc": "Menu entry that opens the connection-point screen."
+    },
     "points_title": {
       "text": "Connection points",
       "doc": "Heading of the connection-point list (Nearby step I). \"Relay\" is an implementation detail; this says what it does for you."

@@ -62,6 +62,10 @@ import { createTokenGate } from '../../src/v2/tokenGate.js';
 import { circleGateRules } from '../../src/v2/circleGate.js';
 import { interpretToCommand } from '../../src/v2/interpretCommand.js';
 import { createRelayPrefStore, localStorageRelayIo, resolveRelayUrl } from '../../src/v2/relayPref.js';
+import {
+  createConnectionPoints, adoptExistingRelay, localStorageConnectionPointsIo,
+} from '../../src/v2/connectionPoints.js';
+import { renderConnectionPoints } from './circleConnectionPoints.js';
 import { createCircleDispatch, addressesBot } from '../../src/v2/circleDispatch.js';
 // Conversation memory — recent kring turns woven into the bot's interpret context.
 import { recentKringTurns } from '../../src/v2/kringMemory.js';
@@ -1736,7 +1740,21 @@ function buildCircleBot(agent) {
       const joinParam  = params.get('join');
       if (relayParam || joinParam) {
         (async () => {
-          if (relayParam) { try { await applyRelayUrl(relayParam); } catch { /* relay best-effort */ } }
+          if (relayParam) {
+            try { await applyRelayUrl(relayParam); } catch { /* relay best-effort */ }
+            // Rule 1 — joining populates the connection-point list. This is the real-world path: one
+            // scan configures the endpoint AND joins, so the point arrives with the circle rather than
+            // being something anyone had to configure.
+            //
+            // NOTE the honest limit: the endpoint rides the DEEP LINK (`?relay=`), not the invite object
+            // itself, so a bare `stoop-invite://` pasted by hand brings no point. Recorded in
+            // plans/PLAN-nearby.md — making the invite carry it is a change to the invite payload.
+            try {
+              const points = getConnectionPoints();
+              points.addManually(relayParam);
+              points.setActive(relayParam);
+            } catch { /* the list is a convenience; never block a join on it */ }
+          }
           if (joinParam) {
             let inv = joinParam; try { inv = decodeURIComponent(joinParam); } catch { /* keep raw */ }
             for (let i = 0; i < 40 && !_peerAgent; i++) await new Promise((r) => setTimeout(r, 500));
@@ -3058,6 +3076,39 @@ async function refreshLauncherProposals() {
 // means the day a browser transport appears, navigating away already stops it.
 let nearbyScreen = null;
 
+// ── Connection points (Nearby step I) ───────────────────────────────────────
+// Hydrated once and kept: the list is device state, not screen state, so `addFromJoin` from a redeem can
+// land whether or not the screen is open.
+let connectionPointsStore = null;
+
+function getConnectionPoints() {
+  if (connectionPointsStore) return connectionPointsStore;
+  const io = localStorageConnectionPointsIo();
+  connectionPointsStore = createConnectionPoints({ initial: io.load(), save: (v) => io.save(v) });
+  // Non-destructive: the old single-url key still drives what boot connects to, so this seeds the list
+  // from it rather than replacing it — and marks it live, because it IS this device's connection.
+  try { adoptExistingRelay({ relayUrl: CIRCLE_RELAY_URL, points: connectionPointsStore }); }
+  catch { /* best-effort */ }
+  return connectionPointsStore;
+}
+
+function showConnectionPoints() {
+  hideCircleTabBar(tabBarEl);
+  const store = getConnectionPoints();
+  let removing = null;
+
+  const draw = () => renderConnectionPoints(rootEl, {
+    points: store.list(), t, removing,
+    onBack: showLauncher,
+    onAdopt: (url) => { store.adopt(url); draw(); },
+    // Ask before removing: the impact report is the point of this screen.
+    onRemove: (url) => { removing = { url, ...store.impactOfRemoving(url) }; draw(); },
+    onCancelRemove: () => { removing = null; draw(); },
+    onConfirmRemove: (url) => { store.remove(url); removing = null; draw(); },
+  });
+  draw();
+}
+
 function showNearby() {
   hideCircleTabBar(tabBarEl);
   closeNearby();
@@ -3461,6 +3512,8 @@ async function showMij() {
     },
     onAvailability: showAvailability,
     onMyData: showMyData,
+    // Nearby step I — the connection-point LIST, beside the single-relay field in My data.
+    onConnectionPoints: showConnectionPoints,
     // SILENT out-of-circle delivery — the personal, cross-circle "shared with me" inbox.
     onSharedWithMe: showSharedWithMe,
   });

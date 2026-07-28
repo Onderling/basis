@@ -6,7 +6,10 @@
  * a circle with a second point is inconvenienced; a circle left with none is cut off.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { createConnectionPoints, POINT_SOURCE } from '../../src/v2/connectionPoints.js';
+import {
+  createConnectionPoints, POINT_SOURCE, adoptExistingRelay,
+  localStorageConnectionPointsIo, asyncStorageConnectionPointsIo,
+} from '../../src/v2/connectionPoints.js';
 
 const A = 'wss://a.example';
 const B = 'wss://b.example';
@@ -187,3 +190,106 @@ describe('persistence and watching', () => {
     expect(good).toHaveBeenCalled();
   });
 });
+
+describe('one is live, the rest are standby', () => {
+  it('the substrate connects to ONE relay, so exactly one point is active', () => {
+    // A list showing five points as though all were carrying traffic would be a lie.
+    const cp = build();
+    cp.addFromJoin(A, 'c1');
+    cp.addFromJoin(B, 'c2');
+    expect(cp.list().filter((p) => p.active)).toHaveLength(0);
+
+    cp.setActive(A);
+    expect(cp.list().find((p) => p.url === A).active).toBe(true);
+    expect(cp.list().find((p) => p.url === B).active).toBe(false);
+    expect(cp.activeUrl()).toBe(A);
+  });
+
+  it('the store DESCRIBES the connection, it does not make one', () => {
+    // Setting a point we do not have would let the list claim something the transport disagrees with.
+    const cp = build();
+    expect(cp.setActive('wss://never.added')).toBeNull();
+  });
+
+  it('a STANDBY point still counts as "still reachable" — switching is a reconnect, not a re-join', () => {
+    const cp = build();
+    cp.addFromJoin(A, 'c1');
+    cp.addFromJoin(B, 'c1');
+    cp.setActive(A);
+    expect(cp.impactOfRemoving(A)).toMatchObject({ losesReachability: [], stillReachable: ['c1'] });
+  });
+
+  it('but removing the LIVE point is flagged as its own event', () => {
+    // Even when nothing is cut off, the connection drops until another is chosen.
+    const cp = build();
+    cp.addFromJoin(A, 'c1');
+    cp.addFromJoin(B, 'c1');
+    cp.setActive(A);
+    expect(cp.impactOfRemoving(A).wasActive).toBe(true);
+    expect(cp.impactOfRemoving(B).wasActive).toBe(false);
+  });
+
+  it('removing the live point clears active rather than leaving a dangling one', () => {
+    const cp = build();
+    cp.addFromJoin(A, 'c1');
+    cp.setActive(A);
+    cp.remove(A);
+    expect(cp.activeUrl()).toBeNull();
+  });
+});
+
+describe('migrating the old single-relay setting', () => {
+  it('folds the existing url in as a point, and marks it live', () => {
+    const cp = build();
+    expect(adoptExistingRelay({ relayUrl: A, points: cp })).toEqual({ migrated: true });
+    expect(cp.list()[0]).toMatchObject({ url: A, source: POINT_SOURCE.MANUAL });
+    expect(cp.activeUrl()).toBe(A);
+  });
+
+  it('is idempotent — running it again changes nothing', () => {
+    const cp = build();
+    adoptExistingRelay({ relayUrl: A, points: cp });
+    expect(adoptExistingRelay({ relayUrl: A, points: cp })).toEqual({ migrated: false });
+    expect(cp.list()).toHaveLength(1);
+  });
+
+  it('marks an ALREADY-KNOWN url live without re-adding it', () => {
+    const cp = build();
+    cp.addFromJoin(A, 'c1');
+    expect(adoptExistingRelay({ relayUrl: A, points: cp })).toEqual({ migrated: false });
+    expect(cp.list()[0]).toMatchObject({ source: POINT_SOURCE.JOIN, active: true, circles: ['c1'] });
+  });
+
+  it('no relay configured ⇒ nothing to migrate', () => {
+    const cp = build();
+    expect(adoptExistingRelay({ relayUrl: null, points: cp })).toEqual({ migrated: false });
+    expect(cp.list()).toEqual([]);
+  });
+});
+
+describe('the persistence adapters', () => {
+  it('localStorage IO round-trips', () => {
+    const mem = new Map();
+    const io = localStorageConnectionPointsIo({
+      getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v),
+    });
+    io.save({ [A]: { url: A, source: 'join', circles: ['c1'], adopted: true } });
+    expect(io.load()[A]).toMatchObject({ url: A, circles: ['c1'] });
+  });
+
+  it('a corrupt or absent store loads as empty rather than throwing', () => {
+    const io = localStorageConnectionPointsIo({ getItem: () => 'not json', setItem: () => {} });
+    expect(io.load()).toEqual({});
+    expect(localStorageConnectionPointsIo(null).load()).toEqual({});
+  });
+
+  it('AsyncStorage IO round-trips', async () => {
+    const mem = new Map();
+    const io = asyncStorageConnectionPointsIo({
+      getItem: async (k) => mem.get(k) ?? null, setItem: async (k, v) => { mem.set(k, v); },
+    });
+    await io.save({ [B]: { url: B, source: 'manual', circles: [], adopted: true } });
+    expect((await io.load())[B]).toMatchObject({ url: B });
+  });
+});
+

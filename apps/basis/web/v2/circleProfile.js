@@ -34,6 +34,8 @@ export function renderCircleProfile(container, {
   onClearLocation,
   onAvailability,
   onMyData,
+  // Nearby step I — the connection-point list. Absent ⇒ the link is simply omitted, like the others.
+  onConnectionPoints,
   // SILENT out-of-circle delivery — open the personal, cross-circle "shared with me"
   // inbox (sealed copies peers pushed to this device). A Mij sub-screen link, peer of
   // availability/my-data. Absent ⇒ the link is simply omitted (older callers / tests).
@@ -136,6 +138,12 @@ export function renderCircleProfile(container, {
   if (typeof onMyData === 'function') {
     const myData = button(tr('circle.profile.mydata'), 'cc-profile__mydata', onMyData);
     container.appendChild(myData);
+  }
+  if (typeof onConnectionPoints === 'function') {
+    const points = button(
+      tr('circle.nearbyScreen.points_open'), 'cc-profile__connection-points', onConnectionPoints,
+    );
+    container.appendChild(points);
   }
   if (typeof onSharedWithMe === 'function') {
     const shared = button(tr('circle.profile.sharedWithMe'), 'cc-profile__shared-with-me', onSharedWithMe);

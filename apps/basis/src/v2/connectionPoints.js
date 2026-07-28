@@ -21,6 +21,15 @@
  *      not the same event.
  *   4. **The circle SUGGESTS, the device DECIDES.** A circle can propose an endpoint; it cannot install one.
  *      Same shape as the disclosure ceiling/floor — the suggestion is recorded, the adoption is a choice.
+ *
+ * ── One is live; the rest are standby ────────────────────────────────────────────────────────────────────
+ * Found while wiring this up: the substrate connects to **one relay at a time** (`sa.relay.connect({relayUrl})`).
+ * A list that showed five points as though all were carrying traffic would be a lie, so the store tracks
+ * which one is ACTIVE and the renderers say so. The others are real — adopted, known, and a genuine
+ * fallback if the active one goes — they are just not carrying anything right now.
+ *
+ * This is why `impactOfRemoving` still counts a standby point as "still reachable": switching to it is a
+ * reconnect, not a re-join. But removing the ACTIVE one is a different event, and the report says that too.
  */
 
 /** How a point came to be here. Kept because "I added this" and "a circle brought this" read differently. */
@@ -44,7 +53,8 @@ export const POINT_SOURCE_LABELS = Object.freeze({
  * @param {(state: object) => any} [deps.save]
  * @param {() => number} [deps.now]
  */
-export function createConnectionPoints({ initial = {}, save = null, now = () => Date.now() } = {}) {
+export function createConnectionPoints({ initial = {}, save = null, now = () => Date.now(), activeUrl = null } = {}) {
+  let active = typeof activeUrl === 'string' ? activeUrl : null;
   /** url → { url, source, addedAt, circles: Set<string>, adopted: boolean } */
   const points = new Map();
 
@@ -91,12 +101,29 @@ export function createConnectionPoints({ initial = {}, save = null, now = () => 
       .sort((a, b) => b.addedAt - a.addedAt)
       .map((p) => ({
         url: p.url, source: p.source, addedAt: p.addedAt, adopted: p.adopted, circles: [...p.circles],
+        // Exactly one point is connected at a time. The others are standby, not decoration.
+        active: p.url === active,
       }));
   }
 
   return {
     list,
     snapshot,
+
+    /** Which point is currently connected, if any. */
+    activeUrl: () => active,
+
+    /**
+     * Record which point the transport is actually connected to.
+     *
+     * The store does not connect anything — it describes. The host owns the connection and tells the store,
+     * so the list can never claim a point is live when the transport disagrees.
+     */
+    setActive(url) {
+      active = url && points.has(url) ? url : null;
+      commit();
+      return active;
+    },
 
     /** Rule 2, one direction: which points does this circle have? */
     pointsFor(circleId) {
@@ -174,7 +201,12 @@ export function createConnectionPoints({ initial = {}, save = null, now = () => 
         );
         (others.length ? stillReachable : losesReachability).push(circleId);
       }
-      return { known: true, circles, losesReachability, stillReachable };
+      return {
+        known: true, circles, losesReachability, stillReachable,
+        // Removing the live point drops the connection until another is chosen — a different event from
+        // removing a standby, even when no circle ends up cut off.
+        wasActive: url === active,
+      };
     },
 
     /**
@@ -185,6 +217,7 @@ export function createConnectionPoints({ initial = {}, save = null, now = () => 
       const impact = this.impactOfRemoving(url);
       if (!impact.known) return { ok: false, reason: 'unknown-point', ...impact };
       points.delete(url);
+      if (active === url) active = null;
       commit();
       return { ok: true, ...impact };
     },
@@ -202,3 +235,54 @@ export function createConnectionPoints({ initial = {}, save = null, now = () => 
 function isUrl(url) {
   return typeof url === 'string' && /^wss?:\/\/\S+$/.test(url.trim());
 }
+
+// ── Persistence + migration ─────────────────────────────────────────────────
+
+const POINTS_STORAGE_KEY = 'cc.connectionPoints';
+
+/** localStorage-backed IO (web). Mirrors `relayPref.js` so both settings persist the same way. */
+export function localStorageConnectionPointsIo(storage = globalThis.localStorage) {
+  return {
+    load: () => { try { return JSON.parse(storage?.getItem(POINTS_STORAGE_KEY) ?? '{}'); } catch { return {}; } },
+    save: (v) => { try { storage?.setItem(POINTS_STORAGE_KEY, JSON.stringify(v ?? {})); } catch { /* ignore */ } },
+  };
+}
+
+/** AsyncStorage-backed IO (mobile). */
+export function asyncStorageConnectionPointsIo(AsyncStorage) {
+  return {
+    load: async () => {
+      try { return JSON.parse((await AsyncStorage?.getItem(POINTS_STORAGE_KEY)) ?? '{}'); }
+      catch { return {}; }
+    },
+    save: async (v) => {
+      try { await AsyncStorage?.setItem(POINTS_STORAGE_KEY, JSON.stringify(v ?? {})); }
+      catch { /* ignore */ }
+    },
+  };
+}
+
+/**
+ * Fold the OLD single-relay setting into the list.
+ *
+ * Non-destructive on purpose. The old key (`relayPref`) is what boot still reads to decide what to connect
+ * to, so this seeds the list from it rather than replacing it — a migration that broke connectivity to
+ * introduce a settings screen would be a bad trade. The old value simply appears as a point you added, and
+ * as the active one, because it is what the device is actually connected to.
+ *
+ * Idempotent: once the url is in the list, running again changes nothing.
+ *
+ * @param {object} a
+ * @param {string|null} a.relayUrl   whatever `resolveRelayUrl` produced
+ * @param {object} a.points          a `createConnectionPoints` store
+ * @returns {{migrated: boolean}}
+ */
+export function adoptExistingRelay({ relayUrl, points } = {}) {
+  if (!relayUrl || !points?.list) return { migrated: false };
+  const known = points.list().some((p) => p.url === relayUrl);
+  if (!known) points.addManually(relayUrl);
+  // Either way, mark it live — this IS the connection the device has.
+  points.setActive?.(relayUrl);
+  return { migrated: !known };
+}
+

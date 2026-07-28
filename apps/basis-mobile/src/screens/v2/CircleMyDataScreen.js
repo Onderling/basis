@@ -21,7 +21,8 @@ import { enableNativePush, disableNativePush, getNativePushState } from '../../v
 
 const CHAT_AI_KEY = { on: 'chat_ai_on', 'circle-off': 'chat_ai_circle_off', 'no-llm': 'chat_ai_no_llm', 'no-provider': 'chat_ai_no_provider' };
 
-export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi, userLlm, onSaveUserLlm, validateUserLlm, onReconnectPeer }) {
+export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi, userLlm, onSaveUserLlm, validateUserLlm, onReconnectPeer,
+  onOpenConnectionPoints }) {
   // Reactive theme — reading it at render time is what lets the display-theme
   // toggle below recolour THIS screen live (module-level StyleSheets can't).
   const theme = useTheme();
@@ -76,6 +77,10 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
       }
     } catch (e) { setRelayNote(t('circle.mydata.relay_error', { msg: e?.message ?? '' })); }
   }, [relayStore, relayInput, onReconnectPeer]);
+
+  // The connection-point LIST (Nearby step I) — the relay field above sets one url; this shows every point
+  // the device knows, which circles ride each, and what removing one would cost.
+  const openPoints = useCallback(() => { onOpenConnectionPoints?.(); }, [onOpenConnectionPoints]);
 
   useEffect(() => { getNativePushState().then(setPush).catch(() => {}); }, []);
   const toggleNativePush = useCallback(async () => {
@@ -173,6 +178,11 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
         </View>
         {relayNote ? <Text style={styles.relayNote}>{relayNote}</Text> : null}
         <Text style={styles.relayHint}>{t('circle.mydata.relay_hint')}</Text>
+        {/* The LIST behind the single field above — which points this device knows, what rides each, and
+            what removing one would cost (Nearby step I). */}
+        <Pressable style={styles.relaySave} onPress={openPoints} testID="open-connection-points">
+          <Text style={styles.relaySaveText}>{t('circle.nearbyScreen.points_open')}</Text>
+        </Pressable>
 
         {/* cluster J — pod sign-in entry (the v2 UI had none). When signed out: pod provider + Connect. */}
         {podAuth && !podSignedIn && (

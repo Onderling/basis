@@ -64,6 +64,13 @@ export function renderConnectionPoints(container, {
     url.textContent = point.url;
     el.appendChild(url);
 
+    // Which one is actually carrying traffic. The substrate connects to one relay at a time, so a list
+    // that showed them all as equal would be claiming something untrue.
+    const live = document.createElement('div');
+    live.className = point.active ? 'circle-points__live is-active' : 'circle-points__live is-standby';
+    live.textContent = tr(point.active ? 'circle.nearbyScreen.point_active' : 'circle.nearbyScreen.point_standby');
+    el.appendChild(live);
+
     const src = document.createElement('div');
     src.className = 'circle-points__source';
     src.textContent = tr(POINT_SOURCE_LABELS[point.source] ?? POINT_SOURCE_LABELS.manual);
@@ -120,7 +127,15 @@ export function renderConnectionPoints(container, {
         ok.textContent = tr('circle.nearbyScreen.remove_still_ok', { circles: stillOk.join(', ') });
         warn.appendChild(ok);
       }
-      if (!cutOff.length && !stillOk.length) {
+      // Removing the live point drops the connection until another is chosen — its own event, even when
+      // nothing is cut off.
+      if (removing.wasActive) {
+        const wasActive = document.createElement('div');
+        wasActive.className = 'circle-points__impact-active';
+        wasActive.textContent = tr('circle.nearbyScreen.remove_was_active');
+        warn.appendChild(wasActive);
+      }
+      if (!cutOff.length && !stillOk.length && !removing.wasActive) {
         const none = document.createElement('div');
         none.className = 'circle-points__impact-none';
         none.textContent = tr('circle.nearbyScreen.remove_nothing');

@@ -149,3 +149,36 @@ describe('invariant 8', () => {
     }
   });
 });
+
+describe('one is live, the rest are standby', () => {
+  it('marks the point actually in use, and the others as standby', () => {
+    // The substrate connects to one relay at a time; a list showing them all as equal would claim
+    // something untrue.
+    const el = render({
+      points: [point({ active: true }), point({ url: 'wss://b.example', active: false })],
+    });
+    const labels = [...el.querySelectorAll('.circle-points__live')].map((n) => n.textContent);
+    expect(labels).toEqual(['circle.nearbyScreen.point_active', 'circle.nearbyScreen.point_standby']);
+  });
+
+  it('removing the LIVE point warns about the disconnect, even with nothing cut off', () => {
+    const el = render({
+      points: [point({ active: true })],
+      removing: { url: 'wss://a.example', losesReachability: [], stillReachable: ['Straat'], wasActive: true },
+    });
+    expect(el.querySelector('.circle-points__impact-active').textContent)
+      .toBe('circle.nearbyScreen.remove_was_active');
+    // …and it does NOT also claim nothing depends on it.
+    expect(el.querySelector('.circle-points__impact-none')).toBeNull();
+  });
+
+  it('removing a STANDBY point does not warn about disconnecting', () => {
+    const el = render({
+      points: [point()],
+      removing: { url: 'wss://a.example', losesReachability: [], stillReachable: [], wasActive: false },
+    });
+    expect(el.querySelector('.circle-points__impact-active')).toBeNull();
+    expect(el.querySelector('.circle-points__impact-none')).toBeTruthy();
+  });
+});
+

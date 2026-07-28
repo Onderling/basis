@@ -37,6 +37,7 @@ import {
   // Nearby model + label helpers (the action map + banner rule are SHARED with web — invariant 3).
   buildNearbyModel, NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, NEARBY_INVITE_LABELS,
   nearbyVisibilityKey, createNearbyScreen, POINT_SOURCE_LABELS,
+  createConnectionPoints, adoptExistingRelay, asyncStorageConnectionPointsIo,
   // "My things" private notes-list.
   myThingsFromListFiles,
   // kring-scoped event stream + per-row action chips.
@@ -228,6 +229,7 @@ import CircleShareScreen from './CircleShareScreen.js';   // objective L — cro
 import CircleProfileScreen from './CircleProfileScreen.js';
 import CircleAdminPanelScreen from './CircleAdminPanelScreen.js';
 import CircleMyDataScreen from './CircleMyDataScreen.js';
+import { resolveMobileRelayUrl } from '../../core/agentBundle.js';
 import CircleMijScreen from './CircleMijScreen.js';   // mij#personas — the "Mij → persona's" surface (replaces the single-persona About-me content, web parity with openAboutMePanel)
 import CircleGovernanceScreen from './CircleGovernanceScreen.js';   // Wave C §5 — governance surface (web≡mobile)
 import { bindCircleGovernance } from '../../../../basis/src/v2/governanceAppWiring.js';   // §8 — report filing
@@ -1372,7 +1374,7 @@ export default function CircleLauncherScreen({
   if (view === 'mydata') {
     return (
       <WithTabBar active="mij" onSelect={onTab}>
-        <CircleMyDataScreen callSkill={bundle?.callSkill} podAuth={podAuth} onBack={() => setView('profile')} chatAi={chatAi} userLlm={userLlmCfg} onSaveUserLlm={onSaveUserLlm} validateUserLlm={validateUserLlmConfig} onReconnectPeer={bundle?.reconnectPeer} />
+        <CircleMyDataScreen callSkill={bundle?.callSkill} podAuth={podAuth} onBack={() => setView('profile')} chatAi={chatAi} userLlm={userLlmCfg} onSaveUserLlm={onSaveUserLlm} validateUserLlm={validateUserLlmConfig} onReconnectPeer={bundle?.reconnectPeer} onOpenConnectionPoints={() => setView('points')} />
       </WithTabBar>
     );
   }
@@ -1540,6 +1542,10 @@ export default function CircleLauncherScreen({
   if (view === 'hop') {
     // Hopping lives under the Mij tab (personal settings).
     return <CircleHopScreen callSkill={callSkill} onBack={() => setView('availability')} />;
+  }
+  if (view === 'points') {
+    // Connection points (Nearby step I). The store is hydrated + migrated by the host component below.
+    return <ConnectionPointsHost onBack={() => setView('mydata')} />;
   }
   if (view === 'nearby') {
     // Nearby screen. Driven by `createNearbyScreen` (shared with web), fed from the SURFACE — the
@@ -3972,6 +3978,43 @@ function subscribeToNetworkChange(fn) {
   return _netSource(fn);
 }
 
+// Owns the connection-point store: hydrate from storage, fold in the OLD single-relay setting, and hold
+// the remove-confirmation state. The store itself decides everything; this is lifecycle only.
+function ConnectionPointsHost({ onBack }) {
+  const [points, setPoints] = useState([]);
+  const [removing, setRemoving] = useState(null);
+  const storeRef = useRef(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const io = asyncStorageConnectionPointsIo(AsyncStorage);
+      const initial = await io.load();
+      const store = createConnectionPoints({ initial, save: (v) => { io.save(v); } });
+      // Non-destructive: the old key still drives what boot connects to, so this seeds the list from it
+      // rather than replacing it — and marks it live, because it IS the connection this device has.
+      try { adoptExistingRelay({ relayUrl: await resolveMobileRelayUrl(), points: store }); } catch { /* best-effort */ }
+      if (!alive) return;
+      storeRef.current = store;
+      store.subscribe(setPoints);
+      setPoints(store.list());
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  return (
+    <ConnectionPointsScreen
+      points={points}
+      onBack={onBack}
+      onAdopt={(url) => storeRef.current?.adopt(url)}
+      onRemove={(url) => setRemoving({ url, ...storeRef.current?.impactOfRemoving(url) })}
+      onCancelRemove={() => setRemoving(null)}
+      onConfirmRemove={(url) => { storeRef.current?.remove(url); setRemoving(null); }}
+      removing={removing}
+    />
+  );
+}
+
 // Connection points (Nearby step I). A projector over `createConnectionPoints` — the shared store makes
 // every decision; this draws it.
 //
@@ -3997,6 +4040,10 @@ function ConnectionPointsScreen({ points = [], onBack, onAdopt, onRemove, onConf
           {points.map((point) => (
             <View key={point.url} style={styles.row} testID={`point-${point.url}`}>
               <Text style={styles.rowName}>{point.url}</Text>
+              {/* Which one is actually carrying traffic — the substrate connects to one relay at a time. */}
+              <Text style={styles.rowMeta} testID={`point-live-${point.url}`}>
+                {t(point.active ? 'circle.nearbyScreen.point_active' : 'circle.nearbyScreen.point_standby')}
+              </Text>
               <Text style={styles.rowMeta}>
                 {t(POINT_SOURCE_LABELS[point.source] ?? POINT_SOURCE_LABELS.manual)}
               </Text>
@@ -4027,7 +4074,10 @@ function ConnectionPointsScreen({ points = [], onBack, onAdopt, onRemove, onConf
                       {t('circle.nearbyScreen.remove_still_ok', { circles: removing.stillReachable.join(', ') })}
                     </Text>
                   ) : null}
-                  {!removing.losesReachability?.length && !removing.stillReachable?.length ? (
+                  {removing.wasActive ? (
+                    <Text style={styles.rowName}>{t('circle.nearbyScreen.remove_was_active')}</Text>
+                  ) : null}
+                  {!removing.losesReachability?.length && !removing.stillReachable?.length && !removing.wasActive ? (
                     <Text style={styles.rowMeta}>{t('circle.nearbyScreen.remove_nothing')}</Text>
                   ) : null}
                   <View style={styles.nearbyActions}>

@@ -90,6 +90,8 @@ export function buildAgentSkills({ registry, tokens, versionStoreFor, catalog, p
     'getProfileDisclosure',
     'getPersonaView',
     'getPersonaRelease',
+    'setAgentSkillExposure',
+    'getAgentSkillExposure',
     'revokeAgent',
     'grantAgent',
     'grantRole',

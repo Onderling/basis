@@ -16,11 +16,12 @@ import {
   RESOURCE_VERSION,
 } from './resource.js';
 import { withCAS } from './concurrency.js';
+import { normalizeExposure } from './skillExposure.js';
 
 /**
  * Build the live agent-registry handle over an injected pseudo-pod: etag-CAS reads/writes of the
  * registry resource with retry, plus optional per-write snapshots via a `versionStore`. Returns
- * `{register, lookup, revoke, purge, updateCapabilities, applyGrant, revokeGrant, list, reload,
+ * `{register, lookup, revoke, purge, updateCapabilities, updateExposure, applyGrant, revokeGrant, list, reload,
  * resourceUri}`. The resource URI resolves from the `resourceUri` override, else `deviceId`
  * (pseudo-pod path), else `anchorPodUri`; throws INVALID_ARGUMENT without a usable `pseudoPod`.
  *
@@ -224,6 +225,34 @@ export function createAgentRegistry({
   }
 
   /**
+   * Replace an agent's per-skill EXPOSURE policy (which of its skills are advertised, per circle).
+   *
+   * The authority check does NOT live here — it belongs to the caller, which knows who signed the
+   * change (`setSkillExposure` / `setCircleSkillExposure` in skillExposure.js return the new policy or
+   * refuse). This is the persistence half only: same etag-CAS retry as every other entry mutation.
+   *
+   * @param {string} identifier   agentId or pubKey
+   * @param {object} exposure     the new policy (normalised on write)
+   */
+  async function updateExposure(identifier, exposure) {
+    return withCAS({
+      readCurrent: _readCurrent,
+      writeNext:   _writeNext,
+      maxRetries:  maxRetries ?? 3,
+      onPersistentConflict,
+      mutate(body) {
+        return {
+          v:         RESOURCE_VERSION,
+          agents:    body.agents.map(a =>
+            _agentMatches(a, identifier) ? { ...a, exposure: normalizeExposure(exposure) } : a,
+          ),
+          updatedAt: now(),
+        };
+      },
+    });
+  }
+
+  /**
    * HARD delete — removes the agent entry entirely (contrast `revoke`,
    * which only sets `revokedAt`). Idempotent: purging an absent id is a
    * no-op. Etag-CAS retry on conflict.
@@ -338,6 +367,7 @@ export function createAgentRegistry({
     revoke,
     purge,
     updateCapabilities,
+    updateExposure,
     applyGrant,
     revokeGrant,
     list,

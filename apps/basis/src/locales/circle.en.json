@@ -2897,6 +2897,56 @@
       "doc": "Shown when the agents axis is `no`."
     }
   },
+  "agentSkills": {
+    "title": {
+      "text": "What this agent shows",
+      "doc": "P1 §5 — heading of the per-skill exposure list on an agent."
+    },
+    "intro": {
+      "text": "This decides what other people SEE in their lists — not what the agent may do. What it may do is set by the permissions you gave it.",
+      "doc": "P1 §5 — the honest framing (the enforceability test): exposure is a discovery filter, the grant is the enforcement."
+    },
+    "shown": {
+      "text": "Shown",
+      "doc": "P1 §5 — state label: this skill is advertised."
+    },
+    "hidden": {
+      "text": "Hidden",
+      "doc": "P1 §5 — state label: this skill is not advertised."
+    },
+    "hide_action": {
+      "text": "Hide",
+      "doc": "P1 §5 — button: stop advertising this skill."
+    },
+    "show_action": {
+      "text": "Show",
+      "doc": "P1 §5 — button: advertise this skill again."
+    },
+    "in_circle": {
+      "text": "In {{circle}}",
+      "doc": "P1 §5 — scope label when viewing/editing one circle."
+    },
+    "everywhere": {
+      "text": "Everywhere",
+      "doc": "P1 §5 — scope label for the agent-wide policy."
+    },
+    "owner_only": {
+      "text": "Only the owner of this agent can change this everywhere. In this circle, its admins can hide a skill.",
+      "doc": "P1 §5 — explains the two tiers where the user meets them."
+    },
+    "cannot_widen": {
+      "text": "The owner hides this skill everywhere, so it cannot be shown here.",
+      "doc": "P1 §5 — the cannot-widen refusal, said plainly instead of a dead toggle."
+    },
+    "not_owner": {
+      "text": "You are not the owner of this agent.",
+      "doc": "P1 §5 — the not-owner refusal."
+    },
+    "empty": {
+      "text": "This agent has no skills yet.",
+      "doc": "P1 §5 — empty state for the skill list."
+    }
+  },
   "rules": {
     "title": {
       "text": "House rules",

@@ -2897,6 +2897,56 @@
       "doc": "Blocked state."
     }
   },
+  "agentSkills": {
+    "title": {
+      "text": "Wat deze agent laat zien",
+      "doc": "P1 §5 — heading of the per-skill exposure list on an agent."
+    },
+    "intro": {
+      "text": "Dit bepaalt wat anderen ZIEN in hun lijsten — niet wat de agent mag doen. Wat hij mag doen, staat in de rechten die je hebt gegeven.",
+      "doc": "P1 §5 — the honest framing (the enforceability test): exposure is a discovery filter, the grant is the enforcement."
+    },
+    "shown": {
+      "text": "Zichtbaar",
+      "doc": "P1 §5 — state label: this skill is advertised."
+    },
+    "hidden": {
+      "text": "Verborgen",
+      "doc": "P1 §5 — state label: this skill is not advertised."
+    },
+    "hide_action": {
+      "text": "Verbergen",
+      "doc": "P1 §5 — button: stop advertising this skill."
+    },
+    "show_action": {
+      "text": "Tonen",
+      "doc": "P1 §5 — button: advertise this skill again."
+    },
+    "in_circle": {
+      "text": "In {{circle}}",
+      "doc": "P1 §5 — scope label when viewing/editing one circle."
+    },
+    "everywhere": {
+      "text": "Overal",
+      "doc": "P1 §5 — scope label for the agent-wide policy."
+    },
+    "owner_only": {
+      "text": "Alleen de eigenaar van deze agent kan dit overal wijzigen. In deze kring kunnen de beheerders een vaardigheid verbergen.",
+      "doc": "P1 §5 — explains the two tiers where the user meets them."
+    },
+    "cannot_widen": {
+      "text": "De eigenaar verbergt deze vaardigheid overal, dus hier kan hij niet getoond worden.",
+      "doc": "P1 §5 — the cannot-widen refusal, said plainly instead of a dead toggle."
+    },
+    "not_owner": {
+      "text": "Je bent niet de eigenaar van deze agent.",
+      "doc": "P1 §5 — the not-owner refusal."
+    },
+    "empty": {
+      "text": "Deze agent heeft nog geen vaardigheden.",
+      "doc": "P1 §5 — empty state for the skill list."
+    }
+  },
   "rules": {
     "title": {
       "text": "Huisregels",

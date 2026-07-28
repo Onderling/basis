@@ -41,6 +41,10 @@
  * relied on.
  */
 
+import {
+  setSkillExposure, setCircleSkillExposure, isSkillExposed, normalizeExposure,
+} from '@onderling/agent-registry';
+
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const DEFAULT_EXPIRES_IN_DAYS = 30;   // BotAgentRegistry precedent.
 
@@ -172,6 +176,78 @@ export async function viewAgent(store, args = {}) {
   const { registry } = asStore(store);
   const entry = await resolveEntry(registry, args?.agentId);
   return { agent: entry ? toDetail(entry) : null };
+}
+
+/**
+ * setAgentSkillExposure — hide or show ONE of an agent's skills, agent-wide or inside one circle.
+ *
+ * **This decides what people SEE, not what they may DO.** Exposure is a discovery filter: it removes
+ * the skill from the cards and catalogs others read, and stops nothing. Someone on a modified client
+ * who knows the skill id can still dispatch it — the grant/token check refuses that, not this. Callers
+ * that surface this op must say so; promising protection here would be a lie (the enforceability test).
+ *
+ * Two authorities, both enforced here:
+ *   • **agent-wide** (no `circleId`) requires `bySigner` to match the entry's `ownerFingerprint` —
+ *     ownership IS the owner key, which is also what makes this answerable for an agent in no circle;
+ *   • **per-circle** requires `isAdmin` in that circle, and can only NARROW — an admin asking to expose
+ *     what the owner hid is refused `cannot-widen` rather than silently ignored.
+ *
+ * @param {object} store  `{ registry }`
+ * @param {{ agentId?: string, skillId?: string, exposed?: boolean|string,
+ *           circleId?: string, bySigner?: string, isAdmin?: boolean }} args
+ * @returns {Promise<{ ok: boolean, reason?: string, agentId?: string, skillId?: string,
+ *   exposed?: boolean, circleId?: string|null, exposure?: object }>}
+ */
+export async function setAgentSkillExposure(store, args = {}) {
+  const { registry } = asStore(store);
+  const entry  = await resolveEntry(registry, args?.agentId);
+  if (!entry) return { ok: false, reason: 'agent-not-found' };
+  const skillId  = typeof args?.skillId === 'string' ? args.skillId.trim() : '';
+  const circleId = typeof args?.circleId === 'string' && args.circleId.trim() ? args.circleId.trim() : null;
+  const exposed  = args?.exposed === true || args?.exposed === 'true';
+
+  const r = circleId == null
+    ? setSkillExposure({
+        exposure: entry.exposure, skillId, exposed,
+        ownerFingerprint: entry.ownerFingerprint, bySigner: args?.bySigner,
+      })
+    : setCircleSkillExposure({
+        exposure: entry.exposure, skillId, exposed, circleId, isAdmin: args?.isAdmin === true,
+      });
+  if (!r.ok) return r;
+
+  if (typeof registry.updateExposure !== 'function') return { ok: false, reason: 'registry-cannot-persist' };
+  await registry.updateExposure(entry.agentId ?? entry.pubKey, r.exposure);
+  return { ok: true, agentId: entry.agentId, skillId, exposed, circleId, exposure: r.exposure };
+}
+
+/**
+ * getAgentSkillExposure — the agent's skills with, per skill, whether it is currently advertised.
+ * The read model behind the owner's toggle list. `circleId` answers "as seen in that circle".
+ *
+ * @param {object} store
+ * @param {{ agentId?: string, circleId?: string }} args
+ * @returns {Promise<{ ok: boolean, reason?: string, agentId?: string, circleId?: string|null,
+ *   skills?: Array<{ id: string, exposed: boolean }>, exposure?: object }>}
+ */
+export async function getAgentSkillExposure(store, args = {}) {
+  const { registry } = asStore(store);
+  const entry = await resolveEntry(registry, args?.agentId);
+  if (!entry) return { ok: false, reason: 'agent-not-found', skills: [] };
+  const circleId = typeof args?.circleId === 'string' && args.circleId.trim() ? args.circleId.trim() : null;
+  // The same union the card projects FROM, so the toggle list and the card can never disagree about
+  // which skills exist — only about which are shown.
+  const ids = [...new Set([
+    ...(Array.isArray(entry.grants) ? entry.grants.map((g) => g?.skill) : []),
+    ...(Array.isArray(entry.capabilities) ? entry.capabilities : []),
+  ].filter((x) => typeof x === 'string' && x.length > 0))].sort();
+  return {
+    ok: true,
+    agentId: entry.agentId,
+    circleId,
+    exposure: normalizeExposure(entry.exposure),
+    skills: ids.map((id) => ({ id, exposed: isSkillExposed({ exposure: entry.exposure, skillId: id, circleId }) })),
+  };
 }
 
 /**
@@ -612,6 +688,8 @@ export const AGENT_CORES = Object.freeze({
   getProfileDisclosure,
   getPersonaView,
   getPersonaRelease,
+  setAgentSkillExposure,
+  getAgentSkillExposure,
   revokeAgent,
   grantAgent,
   grantRole,

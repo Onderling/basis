@@ -94,6 +94,53 @@ export const agentsManifest = {
       },
     },
 
+    /* ── per-skill EXPOSURE (P1 §5) ─────────────────────────────────────
+     * What this agent ADVERTISES, per circle. A discovery filter, NOT access control — the surfaces
+     * must say "what people see, not what they may do", because a modified client that knows a skill
+     * id can still dispatch it; the grant/token check is what refuses. Authority: agent-wide changes
+     * are signed by the owner key (`bySigner` vs the entry's ownerFingerprint — which is also what
+     * makes this answerable for an agent in no circle); a circle admin may only NARROW inside their
+     * own circle.
+     */
+    {
+      id:        'setAgentSkillExposure',
+      verb:      'update',
+      appliesTo: { type: 'agent' },
+      params: [
+        { name: 'agentId',  kind: 'string',  required: true, schema: { minLength: 1 } },
+        { name: 'skillId',  kind: 'string',  required: true, schema: { minLength: 1 } },
+        { name: 'exposed',  kind: 'boolean', required: true },
+        // Scope the change to ONE circle (an admin narrowing); omitted ⇒ agent-wide (owner only).
+        { name: 'circleId', kind: 'string' },
+      ],
+      surfaces: {
+        slash: { command: '/agent-skill' },
+        chat: {
+          reply: 'text',
+          hint:  'Show or hide one of an agent\'s skills — agent-wide (owner) or inside one circle '
+               + '(admin, hide only). This changes what OTHERS SEE in catalogs and cards; it does not '
+               + 'restrict what the agent may do — a grant does that.',
+        },
+      },
+    },
+    {
+      id:        'getAgentSkillExposure',
+      verb:      'list',
+      appliesTo: { type: 'agent' },
+      params: [
+        { name: 'agentId',  kind: 'string', required: true, schema: { minLength: 1 } },
+        // Answer "as seen in this circle" (applies that circle's narrowing on top of the agent's own).
+        { name: 'circleId', kind: 'string' },
+      ],
+      surfaces: {
+        chat: {
+          reply: 'list',
+          hint:  'List an agent\'s skills with whether each is currently advertised (optionally as seen '
+               + 'in one circle). Read-only.',
+        },
+      },
+    },
+
     /* ── identity step 4 — create a PROFILE ─────────────────────────────
      * A profile is a labelled identity whose key derives from the owner root
      * (recoverable from the phrase). The DERIVATION is the injected `profiles`

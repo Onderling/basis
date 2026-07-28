@@ -73,14 +73,9 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
 - **Shared vocabularies** (delivery states, entry kinds, roles, label maps) — the index of what already
   exists, and the rule that a new one needs a home + a guard — [`shared-vocabularies.md`](docs/conventions/shared-vocabularies.md).
 - **Record a decision** when a choice closes off alternatives / would be re-litigated / shapes architecture (→ `docs/decisions.md`) or org (→ private) — [`decision-log.md`](docs/conventions/decision-log.md).
-- **No "canopy" identifiers, anywhere** (Frits, 2026-07-28). Product/platform naming in code, comments,
-  labels, schemes, storage keys, namespaces and derivation inputs is **onderling** (or neutral).
-- **⏳ BACKWARDS COMPATIBILITY IS NOT REQUIRED — until 2026-07-31** (Frits, 2026-07-28). Nothing is
-  live: no external users, no data worth migrating. So a rename/reshape lands as a **clean break** —
-  no dual-write windows, no legacy read-fallbacks, no deprecated aliases. They are dead weight that
-  reads as caution and hides which path is real. **After 2026-07-31 this expires: ASK Frits whether it
-  still holds before breaking a persisted/wire format.** (Consequence, accepted: existing local dev
-  state — sealed pods, derived addresses, passkey vault keys — re-derives and may need re-creating.)
+- **Naming is `onderling`; compatibility is a DATED licence** — no "canopy" identifiers; backwards
+  compat **not required until 2026-07-31**, then it lapses and you ASK before breaking a persisted/wire
+  format — [`naming-and-compatibility.md`](docs/conventions/naming-and-compatibility.md).
 
 ## How to work
 - **Go through the SURFACE, never the transport.** App/shell code must not construct or drive
@@ -88,11 +83,8 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
   builder (`buildMeshTransports` → `createMeshAgent`) and the `Peer` façade; discoverability, advertising
   and routing are properties the surface exposes, not knobs an app reaches past it to set. Reaching for a
   transport is the signal that the surface is missing an affordance — add it there.
-- **The enforceability test** (Frits, 2026-07-28): *could someone running a different app version get
-  what they want anyway?* If yes, do NOT present it as enforcement. Everything client-side is a
-  convention — say so, and put the real gate where it holds (the seal, the key, the roster, the relay).
-  A UI that promises what a modified client can ignore is lying to the user, not protecting them.
-  Example: hiding a skill is a discovery FILTER; the grant check at dispatch is the enforcement.
+- **The enforceability test:** *could someone on a different app version get it anyway?* If yes, call it
+  a convention/filter and put the real gate where it binds — [`enforceability.md`](docs/conventions/enforceability.md).
 - **An idea is only dropped when Frits drops it.** Silence is not rejection. If you raise an option, a
   caveat, or a finding and it goes unanswered, it stays OPEN — carry it into the design/plan doc as an open
   item rather than quietly dropping it because the conversation moved on. When a thread has accumulated more

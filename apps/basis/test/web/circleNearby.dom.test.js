@@ -262,3 +262,121 @@ describe('the ask composer', () => {
   });
 });
 
+describe('cards and chat, each behind its allow (step G)', () => {
+  const withAllows = (allows, over = {}) => model({ allows, ...over });
+
+  it('both allows render as toggles, off by default', () => {
+    const el = render(model());
+    const boxes = [...el.querySelectorAll('.circle-nearby__allow input')];
+    expect(boxes.map((b) => b.dataset.allow)).toEqual(['card', 'chat']);
+    expect(boxes.every((b) => b.checked)).toBe(false);
+  });
+
+  it('an OFF allow says what OTHERS see, not what the setting is', () => {
+    // "Show my card here: off" tells you the switch position. "Nobody here sees a card from you" tells you
+    // the consequence, which is the thing you actually wanted to know.
+    const el = render(model());
+    expect(el.querySelector('.circle-nearby__allow-off--card').textContent)
+      .toBe('circle.nearbyScreen.allow_card_off');
+    expect(el.querySelector('.circle-nearby__allow-off--chat').textContent)
+      .toBe('circle.nearbyScreen.allow_chat_off');
+  });
+
+  it('toggling reports the key and the new value', () => {
+    const onToggleAllow = vi.fn();
+    const el = render(model(), { onToggleAllow });
+    const box = el.querySelector('.circle-nearby__allow--chat input');
+    box.checked = true;
+    box.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(onToggleAllow).toHaveBeenCalledWith('chat', true);
+  });
+
+  it('the card composer appears only once the card allow is on', () => {
+    expect(render(model()).querySelector('.circle-nearby__card-form')).toBeNull();
+    expect(render(withAllows({ card: true, chat: false })).querySelector('.circle-nearby__card-form')).toBeTruthy();
+  });
+
+  it('the composer states WHO can see it, right next to the fields', () => {
+    // "Everyone in this room" is not obvious from a text box.
+    const el = render(withAllows({ card: true, chat: false }));
+    expect(el.querySelector('.circle-nearby__card-visible').textContent)
+      .toBe('circle.nearbyScreen.card_visible_to');
+  });
+
+  it('submitting a card needs a face; an empty one does nothing', () => {
+    const onSubmitCard = vi.fn();
+    const el = render(withAllows({ card: true, chat: false }), { onSubmitCard });
+    const form = el.querySelector('.circle-nearby__card-form');
+
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    expect(onSubmitCard).not.toHaveBeenCalled();
+
+    el.querySelector('.circle-nearby__card-label').value = ' Sam ';
+    el.querySelector('.circle-nearby__card-line-input').value = 'net verhuisd';
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    expect(onSubmitCard).toHaveBeenCalledWith({ label: 'Sam', line: 'net verhuisd' });
+  });
+
+  it("another person's card renders on THEIR row, even with my own allow off", () => {
+    // Looking is not disclosure.
+    const el = render(model({
+      rows: [row({ card: { label: 'Ada', line: 'hoi', tags: ['fiets'] } })],
+    }));
+    expect(el.querySelector('.circle-nearby__card-line').textContent).toBe('hoi');
+    expect(el.querySelector('.circle-nearby__card-tags').textContent).toBe('fiets');
+    expect(el.querySelector('.circle-nearby__card-form')).toBeNull();   // mine is still not shown
+  });
+
+  it('NOT JOINED (chat: null) renders no chat at all — not an empty one', () => {
+    // An empty conversation and "I am not in this conversation" are different facts.
+    const el = render(model({ chat: null }));
+    expect(el.querySelector('.circle-nearby__chat')).toBeNull();
+  });
+
+  it('joined but silent renders the empty state', () => {
+    const el = render(model({ allows: { card: false, chat: true }, chat: [] }));
+    expect(el.querySelector('.circle-nearby__chat-empty').textContent)
+      .toBe('circle.nearbyScreen.chat_empty');
+  });
+
+  it('says out loud that nothing is kept', () => {
+    // A chat window normally implies history; this one has none, so it has to say so.
+    const el = render(model({ allows: { card: false, chat: true }, chat: [] }));
+    expect(el.querySelector('.circle-nearby__chat-ephemeral').textContent)
+      .toBe('circle.nearbyScreen.chat_ephemeral');
+  });
+
+  it('renders messages and sends new ones, clearing the input', () => {
+    const onSay = vi.fn();
+    const el = render(model({
+      allows: { card: false, chat: true },
+      chat: [{ id: 'm1', text: 'hoi' }, { id: 'm2', text: 'dag' }],
+    }), { onSay });
+
+    expect([...el.querySelectorAll('.circle-nearby__chat-line')].map((n) => n.textContent))
+      .toEqual(['hoi', 'dag']);
+
+    const input = el.querySelector('.circle-nearby__chat-input');
+    input.value = '  hallo  ';
+    el.querySelector('.circle-nearby__chat-form')
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    expect(onSay).toHaveBeenCalledWith('hallo');
+    expect(input.value).toBe('');
+  });
+
+  it('no untranslated strings with cards and chat on screen', () => {
+    const el = render(model({
+      allows: { card: true, chat: true },
+      chat: [],
+      rows: [row({ card: { label: 'Ada', line: 'hoi', tags: [] } })],
+    }));
+    const sel = '.circle-nearby__allow span, .circle-nearby__allow-off, .circle-nearby__card-title,'
+      + ' .circle-nearby__card-visible, .circle-nearby__card-save, .circle-nearby__chat-title,'
+      + ' .circle-nearby__chat-ephemeral, .circle-nearby__chat-empty, .circle-nearby__chat-send';
+    for (const n of el.querySelectorAll(sel)) {
+      const txt = n.textContent.trim();
+      if (txt) expect(txt.startsWith('circle.'), `untranslated: "${txt}"`).toBe(true);
+    }
+  });
+});
+

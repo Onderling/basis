@@ -2232,6 +2232,66 @@
     }
   },
   "nearbyScreen": {
+    "allow_card": {
+      "text": "Show my card here",
+      "doc": "Per-device allow (step G). Publishing MY card; looking at others needs no permission."
+    },
+    "allow_card_off": {
+      "text": "Nobody here sees a card from you.",
+      "doc": "State when the card allow is off — says what others see, not what the setting is."
+    },
+    "allow_chat": {
+      "text": "Join the room chat",
+      "doc": "Per-device allow. Governs PARTICIPATING both ways — reading a chat you have not joined is listening in."
+    },
+    "allow_chat_off": {
+      "text": "You are not in this conversation.",
+      "doc": "State when the chat allow is off. Distinct from \"nobody has said anything\"."
+    },
+    "card_title": {
+      "text": "Your card",
+      "doc": "Heading of the card composer."
+    },
+    "card_label": {
+      "text": "The name you show here",
+      "doc": "Card label field. A chosen face, not an identity."
+    },
+    "card_line": {
+      "text": "One line about why you are here",
+      "doc": "Card line field — optional."
+    },
+    "card_visible_to": {
+      "text": "Everyone in this room can see this.",
+      "doc": "Shown with the card composer. \"Everyone in this room\" is not obvious from a text field."
+    },
+    "card_save": {
+      "text": "Show it",
+      "doc": "Card composer submit."
+    },
+    "card_shown": {
+      "text": "Shown to {{sent}} of {{peers}} nearby",
+      "doc": "Result after publishing a card — the real reach, not \"saved\"."
+    },
+    "chat_title": {
+      "text": "Room chat",
+      "doc": "Heading of the room chat."
+    },
+    "chat_empty": {
+      "text": "Nobody has said anything yet.",
+      "doc": "Chat empty state — only shown once you have JOINED."
+    },
+    "chat_ephemeral": {
+      "text": "Nothing here is kept. Leaving forgets it.",
+      "doc": "Says the ephemerality out loud, since a chat window normally implies history."
+    },
+    "chat_placeholder": {
+      "text": "Say something",
+      "doc": "Chat input placeholder."
+    },
+    "chat_send": {
+      "text": "Send",
+      "doc": "Chat submit."
+    },
     "asks_title": {
       "text": "Asked here",
       "doc": "Heading above the list of open asks in the room (Nearby step F)."

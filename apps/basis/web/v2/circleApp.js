@@ -3096,6 +3096,14 @@ function showNearby() {
       draw(nearbyScreen.model());
     },
     onAskAction: handleNearbyAskAction,
+    onToggleAllow: (key, value) => { nearbyScreen.setAllow(key, value); notice = null; draw(nearbyScreen.model()); },
+    onSubmitCard: async (fields) => {
+      const r = await nearbyScreen.showCard(fields);
+      // The real reach, like an ask — "shown to 3 of 5" rather than "saved".
+      notice = r.ok ? { key: 'card_shown', vars: { sent: r.sent, peers: r.peers } } : { key: 'ask_expired' };
+      draw(nearbyScreen.model());
+    },
+    onSay: (text) => { nearbyScreen.say(text); },
   });
 
   // Answering is what reveals me, so it needs its own handler rather than riding the row actions.

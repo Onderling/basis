@@ -2232,6 +2232,66 @@
     }
   },
   "nearbyScreen": {
+    "allow_card": {
+      "text": "Mijn kaartje hier tonen",
+      "doc": "Per-device allow (step G). Publishing MY card; looking at others needs no permission."
+    },
+    "allow_card_off": {
+      "text": "Niemand hier ziet een kaartje van jou.",
+      "doc": "State when the card allow is off — says what others see, not what the setting is."
+    },
+    "allow_chat": {
+      "text": "Meedoen met het gesprek hier",
+      "doc": "Per-device allow. Governs PARTICIPATING both ways — reading a chat you have not joined is listening in."
+    },
+    "allow_chat_off": {
+      "text": "Je doet niet mee aan dit gesprek.",
+      "doc": "State when the chat allow is off. Distinct from \"nobody has said anything\"."
+    },
+    "card_title": {
+      "text": "Jouw kaartje",
+      "doc": "Heading of the card composer."
+    },
+    "card_label": {
+      "text": "De naam die je hier laat zien",
+      "doc": "Card label field. A chosen face, not an identity."
+    },
+    "card_line": {
+      "text": "Eén regel over waarom je hier bent",
+      "doc": "Card line field — optional."
+    },
+    "card_visible_to": {
+      "text": "Iedereen hier kan dit zien.",
+      "doc": "Shown with the card composer. \"Everyone in this room\" is not obvious from a text field."
+    },
+    "card_save": {
+      "text": "Laten zien",
+      "doc": "Card composer submit."
+    },
+    "card_shown": {
+      "text": "Getoond aan {{sent}} van {{peers}} in de buurt",
+      "doc": "Result after publishing a card — the real reach, not \"saved\"."
+    },
+    "chat_title": {
+      "text": "Gesprek hier",
+      "doc": "Heading of the room chat."
+    },
+    "chat_empty": {
+      "text": "Nog niemand heeft iets gezegd.",
+      "doc": "Chat empty state — only shown once you have JOINED."
+    },
+    "chat_ephemeral": {
+      "text": "Hier wordt niets bewaard. Weggaan wist het.",
+      "doc": "Says the ephemerality out loud, since a chat window normally implies history."
+    },
+    "chat_placeholder": {
+      "text": "Zeg iets",
+      "doc": "Chat input placeholder."
+    },
+    "chat_send": {
+      "text": "Sturen",
+      "doc": "Chat submit."
+    },
     "asks_title": {
       "text": "Hier gevraagd",
       "doc": "Heading above the list of open asks in the room (Nearby step F)."

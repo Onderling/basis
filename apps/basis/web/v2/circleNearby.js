@@ -25,6 +25,7 @@
 
 import { NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, nearbyVisibilityKey } from '../../src/v2/nearbyScreen.js';
 import { ASK_MAX_TEXT } from '../../src/v2/nearbyAsks.js';
+import { CARD_MAX_LABEL, CARD_MAX_LINE, CHAT_MAX_TEXT } from '../../src/v2/nearbyRoom.js';
 
 export function renderCircleNearby(container, {
   model = null,
@@ -36,6 +37,9 @@ export function renderCircleNearby(container, {
   composing = false,
   onSubmitAsk = null,
   notice = null,
+  onToggleAllow = null,
+  onSubmitCard = null,
+  onSay = null,
 } = {}) {
   const tr = typeof t === 'function' ? t : (k) => k;
   container.innerHTML = '';
@@ -54,7 +58,10 @@ export function renderCircleNearby(container, {
   container.appendChild(head);
 
   const safeModel = model && typeof model === 'object' ? model : { rows: [], counts: { total: 0, sharingAny: 0 }, ownProfile: {}, headerLabel: '' };
-  const { rows = [], ownProfile = {}, headerLabel = '', visibility = null, asks = [] } = safeModel;
+  const {
+    rows = [], ownProfile = {}, headerLabel = '', visibility = null, asks = [],
+    allows = { card: false, chat: false }, chat = null,
+  } = safeModel;
 
   // ── Visibility banner ──────────────────────────────────────────────────────
   // Ordered by what a person most needs to know, not by what we asked for:
@@ -108,6 +115,23 @@ export function renderCircleNearby(container, {
         skills.className = 'circle-nearby__skills';
         skills.textContent = row.sharedSkills.join(', ');
         el.appendChild(skills);
+      }
+
+      if (row.card) {
+        // Attached to the person, not listed separately — a face and a card are one thing on screen.
+        const card = document.createElement('div');
+        card.className = 'circle-nearby__card';
+        const cardLine = document.createElement('div');
+        cardLine.className = 'circle-nearby__card-line';
+        cardLine.textContent = row.card.line || '';
+        if (row.card.line) card.appendChild(cardLine);
+        if (row.card.tags?.length) {
+          const tags = document.createElement('div');
+          tags.className = 'circle-nearby__card-tags';
+          tags.textContent = row.card.tags.join(', ');
+          card.appendChild(tags);
+        }
+        if (card.childElementCount) el.appendChild(card);
       }
 
       if (row.proximity) {
@@ -263,6 +287,136 @@ export function renderCircleNearby(container, {
     }
   }
   container.appendChild(asksBlock);
+
+  // ── Card + chat, each behind its own allow (step G) ────────────────────────
+  const allowsBlock = document.createElement('div');
+  allowsBlock.className = 'circle-nearby__allows';
+
+  for (const [key, live] of [['card', allows.card], ['chat', allows.chat]]) {
+    const label = document.createElement('label');
+    label.className = `circle-nearby__allow circle-nearby__allow--${key}`;
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.checked = !!live;
+    box.dataset.allow = key;
+    box.addEventListener('change', () => {
+      if (typeof onToggleAllow === 'function') onToggleAllow(key, box.checked);
+    });
+    label.appendChild(box);
+    const text = document.createElement('span');
+    text.textContent = tr(`circle.nearbyScreen.allow_${key}`);
+    label.appendChild(text);
+    allowsBlock.appendChild(label);
+
+    // Says what OTHERS see, not what the setting is — a setting name does not tell you its consequence.
+    if (!live) {
+      const off = document.createElement('div');
+      off.className = `circle-nearby__allow-off circle-nearby__allow-off--${key}`;
+      off.textContent = tr(`circle.nearbyScreen.allow_${key}_off`);
+      allowsBlock.appendChild(off);
+    }
+  }
+  container.appendChild(allowsBlock);
+
+  if (allows.card) {
+    const form = document.createElement('form');
+    form.className = 'circle-nearby__card-form';
+
+    const title = document.createElement('div');
+    title.className = 'circle-nearby__card-title';
+    title.textContent = tr('circle.nearbyScreen.card_title');
+    form.appendChild(title);
+
+    const label = document.createElement('input');
+    label.type = 'text';
+    label.className = 'circle-nearby__card-label';
+    label.maxLength = CARD_MAX_LABEL;
+    label.placeholder = tr('circle.nearbyScreen.card_label');
+    form.appendChild(label);
+
+    const line = document.createElement('input');
+    line.type = 'text';
+    line.className = 'circle-nearby__card-line-input';
+    line.maxLength = CARD_MAX_LINE;
+    line.placeholder = tr('circle.nearbyScreen.card_line');
+    form.appendChild(line);
+
+    // The consequence, next to the fields. "Everyone in this room" is not obvious from a text box.
+    const who = document.createElement('div');
+    who.className = 'circle-nearby__card-visible';
+    who.textContent = tr('circle.nearbyScreen.card_visible_to');
+    form.appendChild(who);
+
+    const save = document.createElement('button');
+    save.type = 'submit';
+    save.className = 'circle-nearby__card-save';
+    save.textContent = tr('circle.nearbyScreen.card_save');
+    form.appendChild(save);
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = label.value.trim();
+      if (!name) return;
+      if (typeof onSubmitCard === 'function') onSubmitCard({ label: name, line: line.value.trim() });
+    });
+    container.appendChild(form);
+  }
+
+  // `chat === null` means "I have not joined" — deliberately distinct from an empty conversation.
+  if (Array.isArray(chat)) {
+    const block = document.createElement('div');
+    block.className = 'circle-nearby__chat';
+
+    const title = document.createElement('div');
+    title.className = 'circle-nearby__chat-title';
+    title.textContent = tr('circle.nearbyScreen.chat_title');
+    block.appendChild(title);
+
+    // Said out loud, because a chat window normally implies history and this one has none.
+    const eph = document.createElement('div');
+    eph.className = 'circle-nearby__chat-ephemeral';
+    eph.textContent = tr('circle.nearbyScreen.chat_ephemeral');
+    block.appendChild(eph);
+
+    if (!chat.length) {
+      const empty = document.createElement('div');
+      empty.className = 'circle-nearby__chat-empty';
+      empty.textContent = tr('circle.nearbyScreen.chat_empty');
+      block.appendChild(empty);
+    } else {
+      for (const m of chat) {
+        const line = document.createElement('div');
+        line.className = 'circle-nearby__chat-line';
+        line.dataset.messageId = m.id || '';
+        line.textContent = m.text;
+        block.appendChild(line);
+      }
+    }
+
+    const form = document.createElement('form');
+    form.className = 'circle-nearby__chat-form';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'circle-nearby__chat-input';
+    input.maxLength = CHAT_MAX_TEXT;
+    input.placeholder = tr('circle.nearbyScreen.chat_placeholder');
+    form.appendChild(input);
+    const send = document.createElement('button');
+    send.type = 'submit';
+    send.className = 'circle-nearby__chat-send';
+    send.textContent = tr('circle.nearbyScreen.chat_send');
+    form.appendChild(send);
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+      if (typeof onSay === 'function') onSay(text);
+      input.value = '';
+    });
+    block.appendChild(form);
+
+    container.appendChild(block);
+  }
 
   const footer = document.createElement('div');
   footer.className = 'circle-nearby__own';

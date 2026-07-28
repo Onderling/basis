@@ -4024,12 +4024,25 @@ function NearbyScreenHost({ bundle, onBack, onAction, onOpenThread }) {
     if (action === 'answer-ask')  { setNotice(null); setAnswering(ask?.id ?? null); }
   }, [screen]);
 
+  const toggleAllow = useCallback((key, value) => { screen.setAllow(key, value); setNotice(null); }, [screen]);
+
+  const submitCard = useCallback(async (fields) => {
+    const r = await screen.showCard(fields);
+    // Names the real reach, like an ask — "shown to 3 of 5" rather than "saved".
+    setNotice(r.ok ? { key: 'card_shown', vars: { sent: r.sent, peers: r.peers } } : { key: 'ask_expired' });
+  }, [screen]);
+
+  const say = useCallback((text) => { screen.say(text); }, [screen]);
+
   return (
     <NearbyScreen
       model={model}
       onBack={onBack}
       onAction={onAction}
       onAskAction={askAction}
+      onToggleAllow={toggleAllow}
+      onSubmitCard={submitCard}
+      onSay={say}
       onCompose={() => { setNotice(null); setComposing(true); }}
       composing={composing}
       answering={!!answering}
@@ -4052,7 +4065,10 @@ function NearbyScreenHost({ bundle, onBack, onAction, onOpenThread }) {
 
 // `NEARBY_ACTION_LABELS` + `nearbyVisibilityKey` are imported from the basis app above — one definition,
 // so web and mobile cannot drift on what a row offers or on when the "still visible" warning fires.
-function NearbyScreen({ model, onBack, onAction, onAskAction, onCompose, composing, notice, onSubmitAsk, answering, onSubmitAnswer, onCancel }) {
+function NearbyScreen({
+  model, onBack, onAction, onAskAction, onCompose, composing, notice, onSubmitAsk,
+  answering, onSubmitAnswer, onCancel, onToggleAllow, onSubmitCard, onSay,
+}) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const rows       = Array.isArray(model?.rows) ? model.rows : [];
@@ -4061,6 +4077,12 @@ function NearbyScreen({ model, onBack, onAction, onAskAction, onCompose, composi
   const visKey     = nearbyVisibilityKey(model?.visibility);
   const asks       = Array.isArray(model?.asks) ? model.asks : [];
   const [draft, setDraft] = useState('');
+  const allows     = model?.allows ?? { card: false, chat: false };
+  // `null` means "I have not joined" — deliberately distinct from an empty conversation.
+  const chat       = Array.isArray(model?.chat) ? model.chat : null;
+  const [cardLabel, setCardLabel] = useState('');
+  const [cardLine, setCardLine]   = useState('');
+  const [chatDraft, setChatDraft] = useState('');
   // Cleared whenever the composer opens or closes, so a previous question is never re-sent by accident.
   useEffect(() => { setDraft(''); }, [composing, answering]);
   return (
@@ -4097,6 +4119,9 @@ function NearbyScreen({ model, onBack, onAction, onAskAction, onCompose, composi
                 <Text style={styles.rowMeta}>{row.sharedSkills.join(', ')}</Text>
               ) : null}
               {row.proximity ? <Text style={styles.rowMeta}>{row.proximity}</Text> : null}
+              {/* Attached to the person, not a separate list — a face and a card are one thing. */}
+              {row.card?.line ? <Text style={styles.rowMeta}>{row.card.line}</Text> : null}
+              {row.card?.tags?.length ? <Text style={styles.rowMeta}>{row.card.tags.join(', ')}</Text> : null}
               {/* Rule (b): a stranger you can see is still a stranger — say it, rather than letting the
                   absence of an "open" button be the only hint. */}
               {row.note === 'nearby-not-member' ? (
@@ -4195,6 +4220,103 @@ function NearbyScreen({ model, onBack, onAction, onAskAction, onCompose, composi
           </View>
         ))}
       </View>
+      {/* Cards + chat, each behind its own per-device allow (step G). */}
+      <View style={styles.nearbyAsks} testID="nearby-allows">
+        {['card', 'chat'].map((key) => (
+          <View key={key}>
+            <Pressable
+              onPress={() => onToggleAllow?.(key, !allows[key])}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: !!allows[key] }}
+              testID={`nearby-allow-${key}`}
+              style={styles.nearbyAction}
+            >
+              <Text style={styles.nearbyActionText}>
+                {`${allows[key] ? '☑' : '☐'} ${t(`circle.nearbyScreen.allow_${key}`)}`}
+              </Text>
+            </Pressable>
+            {/* Says what OTHERS see, not what the switch position is. */}
+            {!allows[key] ? (
+              <Text style={styles.muted} testID={`nearby-allow-off-${key}`}>
+                {t(`circle.nearbyScreen.allow_${key}_off`)}
+              </Text>
+            ) : null}
+          </View>
+        ))}
+      </View>
+
+      {allows.card ? (
+        <View style={styles.nearbyAsks} testID="nearby-card-form">
+          <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.card_title')}</Text>
+          <TextInput
+            style={styles.nearbyInput}
+            value={cardLabel}
+            onChangeText={setCardLabel}
+            maxLength={40}
+            placeholder={t('circle.nearbyScreen.card_label')}
+            testID="nearby-card-label"
+          />
+          <TextInput
+            style={styles.nearbyInput}
+            value={cardLine}
+            onChangeText={setCardLine}
+            maxLength={140}
+            placeholder={t('circle.nearbyScreen.card_line')}
+            testID="nearby-card-line"
+          />
+          {/* The consequence, next to the fields. */}
+          <Text style={styles.muted}>{t('circle.nearbyScreen.card_visible_to')}</Text>
+          <Pressable
+            onPress={() => {
+              const label = cardLabel.trim();
+              if (!label) return;
+              onSubmitCard?.({ label, line: cardLine.trim() });
+            }}
+            accessibilityRole="button"
+            testID="nearby-card-save"
+            style={styles.nearbyAction}
+          >
+            <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.card_save')}</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {chat ? (
+        <View style={styles.nearbyAsks} testID="nearby-chat">
+          <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.chat_title')}</Text>
+          {/* A chat window normally implies history; this one has none, so it says so. */}
+          <Text style={styles.muted}>{t('circle.nearbyScreen.chat_ephemeral')}</Text>
+          {chat.length === 0 ? (
+            <Text style={styles.muted}>{t('circle.nearbyScreen.chat_empty')}</Text>
+          ) : chat.map((m) => (
+            <Text key={m.id} style={styles.rowMeta} testID={`nearby-chat-${m.id}`}>{m.text}</Text>
+          ))}
+          <View style={styles.nearbyComposer}>
+            <TextInput
+              style={styles.nearbyInput}
+              value={chatDraft}
+              onChangeText={setChatDraft}
+              maxLength={500}
+              placeholder={t('circle.nearbyScreen.chat_placeholder')}
+              testID="nearby-chat-input"
+            />
+            <Pressable
+              onPress={() => {
+                const text = chatDraft.trim();
+                if (!text) return;
+                onSay?.(text);
+                setChatDraft('');
+              }}
+              accessibilityRole="button"
+              testID="nearby-chat-send"
+              style={styles.nearbyAction}
+            >
+              <Text style={styles.nearbyActionText}>{t('circle.nearbyScreen.chat_send')}</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+
       <View style={styles.ownProfile}>
         <Text style={styles.ownProfileTitle}>{t('circle.nearbyScreen.own_profile')}</Text>
         <Text style={styles.muted}>

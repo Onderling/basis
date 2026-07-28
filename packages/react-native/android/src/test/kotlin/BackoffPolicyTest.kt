@@ -1,4 +1,4 @@
-package com.canopy.mdns
+package org.onderling.mdns
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.assertEquals

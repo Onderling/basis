@@ -73,9 +73,9 @@ async function seedHealthyConfig() {
     intervalMs: 60_000,
   };
   await fs.writeFile(join(cfgDir, 'config.json'), JSON.stringify(cfg, null, 2), 'utf8');
-  await fs.mkdir(join(localRoot, '.canopy'), { recursive: true });
+  await fs.mkdir(join(localRoot, '.onderling'), { recursive: true });
   await fs.writeFile(
-    join(localRoot, '.canopy', '.folio-managed'),
+    join(localRoot, '.onderling', '.folio-managed'),
     JSON.stringify({ podRoot: cfg.podRoot, webId: cfg.webId }),
     'utf8',
   );

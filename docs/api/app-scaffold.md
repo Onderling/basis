@@ -20,7 +20,7 @@ Stable error code for a `requires` that fails validation.
 capability → the SDK import specifier the scaffolded app should use.
 Every specifier resolves to the single `@onderling/sdk` package (sub-path
 exports), so the npm dependency is always just `@onderling/sdk`; this map is
-what the generated code IMPORTS and what `package.json.canopy.sdkImports`
+what the generated code IMPORTS and what `package.json.onderling.sdkImports`
 records per requested capability.
 
   - core       → @onderling/sdk/core

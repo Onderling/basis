@@ -8,7 +8,7 @@
  *            →  nknAddr (optional — current transport address)
  *
  * Published by the WebID owner to their pod (e.g. as a JSON file at
- * `<pod>/canopy/identity/claim.json`).  A peer that resolves a WebID
+ * `<pod>/onderling/identity/claim.json`).  A peer that resolves a WebID
  * fetches the claim, verifies the signature against the embedded
  * pubKey, and only THEN treats `nknAddr` as authoritative.
  *

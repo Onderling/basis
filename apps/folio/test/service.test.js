@@ -143,7 +143,7 @@ describe('launchd.buildUnit', () => {
   it('produces a valid plist with absolute paths + RunAtLoad + KeepAlive', () => {
     const plist = launchd.buildUnit({
       nodePath:   '/usr/local/bin/node',
-      cliPath:    '/Users/alice/canopy/apps/folio/src/cli.js',
+      cliPath:    '/Users/alice/onderling/apps/folio/src/cli.js',
       workingDir: '/Users/alice/notes',
       logPath:    '/Users/alice/Library/Logs/folio/folio.log',
     });
@@ -156,7 +156,7 @@ describe('launchd.buildUnit', () => {
     expect(plist).toContain('<string>org.onderling.folio</string>');
     expect(plist).toContain('<key>ProgramArguments</key>');
     expect(plist).toContain('<string>/usr/local/bin/node</string>');
-    expect(plist).toContain('<string>/Users/alice/canopy/apps/folio/src/cli.js</string>');
+    expect(plist).toContain('<string>/Users/alice/onderling/apps/folio/src/cli.js</string>');
     expect(plist).toContain('<string>serve</string>');
     expect(plist).toContain('<string>--watch</string>');
     expect(plist).toContain('<key>RunAtLoad</key>');
@@ -189,7 +189,7 @@ describe('systemd.buildUnit', () => {
   it('produces an INI-shaped unit with the right sections and keys', () => {
     const unit = systemd.buildUnit({
       nodePath:   '/usr/bin/node',
-      cliPath:    '/home/alice/canopy/apps/folio/src/cli.js',
+      cliPath:    '/home/alice/onderling/apps/folio/src/cli.js',
       workingDir: '/home/alice/notes',
       logPath:    '/home/alice/.cache/folio/folio.log',
     });
@@ -199,7 +199,7 @@ describe('systemd.buildUnit', () => {
     expect(unit).toContain('[Service]');
     expect(unit).toContain('Type=simple');
     expect(unit).toContain(
-      'ExecStart=/usr/bin/node /home/alice/canopy/apps/folio/src/cli.js serve --watch',
+      'ExecStart=/usr/bin/node /home/alice/onderling/apps/folio/src/cli.js serve --watch',
     );
     expect(unit).toContain('WorkingDirectory=/home/alice/notes');
     expect(unit).toContain('Restart=on-failure');
@@ -216,7 +216,7 @@ describe('windows.buildUnit', () => {
   it('produces a schtasks command with ONLOGON + LIMITED + force overwrite', () => {
     const cmd = windows.buildUnit({
       nodePath:   'C:\\Program Files\\nodejs\\node.exe',
-      cliPath:    'C:\\Users\\alice\\canopy\\apps\\folio\\src\\cli.js',
+      cliPath:    'C:\\Users\\alice\\onderling\\apps\\folio\\src\\cli.js',
       workingDir: 'C:\\Users\\alice\\notes',
     });
     expect(cmd).toMatch(/^schtasks /);

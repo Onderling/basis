@@ -1,4 +1,4 @@
-package com.canopy.ble
+package org.onderling.ble
 
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.NativeModule

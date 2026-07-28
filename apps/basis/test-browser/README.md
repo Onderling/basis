@@ -10,7 +10,7 @@
 From the repo root:
 
 ```bash
-cd /home/frits/expotest/canopy-mono
+cd /home/frits/expotest/onderling-mono
 pnpm add -Dw @playwright/test playwright
 pnpm exec playwright install chromium
 ```

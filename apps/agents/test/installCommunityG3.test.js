@@ -33,7 +33,7 @@ function agentCard(pubKey, { id, skills = ['summarise.thread', 'summarise.docume
     url: `https://example.invalid/agents/${id}`, version: '1.0',
     skills: skills.map((s) => ({ id: s })),
     authentication: { schemes: ['Bearer'] },
-    'x-canopy': { id, pubKey, role: 'service' },
+    'x-onderling': { id, pubKey, role: 'service' },
   };
 }
 function buildRegistry() {

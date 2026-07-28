@@ -33,7 +33,7 @@
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="stoop"/>
-        <data android:scheme="ag.canopy.stoopmobile"/>
+        <data android:scheme="org.onderling.stoopmobile"/>
         <data android:scheme="exp+stoop-mobile"/>
       </intent-filter>
     </activity>

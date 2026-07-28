@@ -31,7 +31,7 @@ function agentCard(pubKey, { id, role = 'service', skills = ['summarise.thread']
     url: `https://example.invalid/agents/${id}`, version: '1.0',
     skills: skills.map((s) => ({ id: s })),
     authentication: { schemes: ['Bearer'] },
-    'x-canopy': { id, pubKey, role },
+    'x-onderling': { id, pubKey, role },
   };
 }
 
@@ -41,7 +41,7 @@ function curatorCard(pubKey, { id } = {}) {
     name: id, description: `curator ${id}`,
     url: `https://example.invalid/curators/${id}`, version: '1.0',
     skills: [],
-    'x-canopy': { id, pubKey, role: 'curator' },
+    'x-onderling': { id, pubKey, role: 'curator' },
   };
 }
 
@@ -68,7 +68,7 @@ function graph() {
   };
 }
 
-const idsOf = (list) => list.map((c) => c['x-canopy'].id);
+const idsOf = (list) => list.map((c) => c['x-onderling'].id);
 
 /* ── TRANSITIVE REACH ───────────────────────────────────────────────────── */
 describe('G2 — transitive reach (the walk)', () => {
@@ -94,7 +94,7 @@ describe('G2 — transitive reach (the walk)', () => {
     const list = await cat.list();
 
     expect(idsOf(list)).toEqual(['catalog:X']);            // X reachable; Y excluded; curator B not listed
-    expect(list[0]['x-canopy'].endorsement.depth).toBe(2); // two endorsement hops from the root
+    expect(list[0]['x-onderling'].endorsement.depth).toBe(2); // two endorsement hops from the root
     expect(await cat.get('catalog:Y')).toBeNull();
   });
 });
@@ -149,8 +149,8 @@ describe('G2 — trust-path-proximity ranking', () => {
     const cat  = createCatalogSource({ resolveEndorsements: g.resolveEndorsements, roots: [root.pubKey], resolveCard: g.resolveCard, maxDepth: 4 });
     const list = await cat.list();
     expect(idsOf(list)).toEqual(['catalog:near', 'catalog:far']);   // proximity: near (1) before far (3)
-    expect(list[0]['x-canopy'].endorsement.depth).toBe(1);
-    expect(list[1]['x-canopy'].endorsement.depth).toBe(3);
+    expect(list[0]['x-onderling'].endorsement.depth).toBe(1);
+    expect(list[1]['x-onderling'].endorsement.depth).toBe(3);
   });
 
   it('same depth → MORE distinct reachable endorsers ranks higher (breadth tiebreak)', async () => {
@@ -172,8 +172,8 @@ describe('G2 — trust-path-proximity ranking', () => {
     const cat  = createCatalogSource({ resolveEndorsements: g.resolveEndorsements, roots: [root1.pubKey, root2.pubKey], resolveCard: g.resolveCard, maxDepth: 4 });
     const list = await cat.list();
     expect(idsOf(list)).toEqual(['catalog:popular', 'catalog:lonely']);   // same depth 1; popular has 2 endorsers
-    expect(list[0]['x-canopy'].endorsement.count).toBe(2);
-    expect(list[1]['x-canopy'].endorsement.count).toBe(1);
+    expect(list[0]['x-onderling'].endorsement.count).toBe(2);
+    expect(list[1]['x-onderling'].endorsement.count).toBe(1);
   });
 });
 
@@ -199,7 +199,7 @@ describe('G2 — cycle safety', () => {
     const cat  = createCatalogSource({ resolveEndorsements: g.resolveEndorsements, roots: [root.pubKey], resolveCard: g.resolveCard, maxDepth: 6 });
     const list = await cat.list();               // must return (the test completing IS the assertion)
     expect(idsOf(list)).toEqual(['catalog:leaf']);
-    expect(list[0]['x-canopy'].endorsement.depth).toBe(3);   // root→a(1)→b(2)→leaf(3)
+    expect(list[0]['x-onderling'].endorsement.depth).toBe(3);   // root→a(1)→b(2)→leaf(3)
   });
 });
 
@@ -276,7 +276,7 @@ describe('G2 — offline read-through cache', () => {
 
     online = false;
     expect(idsOf(await cat.list())).toEqual(['catalog:x']);   // offline: served from cache
-    expect((await cat.get('catalog:x'))['x-canopy'].id).toBe('catalog:x');
+    expect((await cat.get('catalog:x'))['x-onderling'].id).toBe('catalog:x');
   });
 
   it('with no cache, an unreachable source throws (no silent empty catalog)', async () => {

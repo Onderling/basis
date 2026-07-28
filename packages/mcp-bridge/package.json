@@ -2,7 +2,7 @@
   "private": true,
   "name":        "@onderling/mcp-bridge",
   "version":     "0.1.0",
-  "description": "B #63 tail — bidirectional bridge between the Model Context Protocol (MCP) and canopy's gated {opId,args} dispatch. Export direction: manifestToMcpTools projects an app manifest's ops into an MCP tools/list. Inbound direction: handleMcpToolCall maps an MCP tools/call to {opId,args} and dispatches it THROUGH the capability gate (the same callSkill path #63's dispatchRemoteOp uses) — an ungranted/revoked/unknown call surfaces as an MCP isError with the skill NOT executed. Transport is INJECTED (mock loopback in tests); the real stdio/HTTP+SSE server + token handshake are DEFERRED, mirroring the NetworkTransport convention.",
+  "description": "B #63 tail — bidirectional bridge between the Model Context Protocol (MCP) and Onderling's gated {opId,args} dispatch. Export direction: manifestToMcpTools projects an app manifest's ops into an MCP tools/list. Inbound direction: handleMcpToolCall maps an MCP tools/call to {opId,args} and dispatches it THROUGH the capability gate (the same callSkill path #63's dispatchRemoteOp uses) — an ungranted/revoked/unknown call surfaces as an MCP isError with the skill NOT executed. Transport is INJECTED (mock loopback in tests); the real stdio/HTTP+SSE server + token handshake are DEFERRED, mirroring the NetworkTransport convention.",
   "type":        "module",
   "main":        "src/index.js",
   "exports": {

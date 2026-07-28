@@ -171,7 +171,7 @@ discovery path is follow-on work.
 
 ---
 
-## 2026-07-14 — Agent property vocabulary: open JSON-LD (schema.org / FOAF / vCard / OIDC claims + W3C WoT), thin canopy policy namespace
+## 2026-07-14 — Agent property vocabulary: open JSON-LD (schema.org / FOAF / vCard / OIDC claims + W3C WoT), thin onderling policy namespace
 
 **Status:** adopted direction (design agreed; the properties system is not yet built). See
 [`conventions/property-vocabulary.md`](./conventions/property-vocabulary.md) for the how-to rule.
@@ -190,17 +190,17 @@ term may extend it:
   people/contact), OIDC standard-claim *names* (`birthdate`, `address`, …).
 - **Device/robot:** W3C **Web of Things Thing Description** (a thing's queryable properties/actions/events —
   "battery left", status).
-- **Canopy's own thin namespace** (`cdi:` — canopy disclosure) carries only the *policy* layer no standard
+- **Onderling's own thin namespace** (`cdi:` — onderling disclosure) carries only the *policy* layer no standard
   specifies: the disclosure **ladder** (coarsening rungs), **persona**, **disclosure level**.
 
 Anything **not pre-declared** is reachable only through a consent-gated query path (deferred; the highest-risk
 surface).
 
-**Alternatives / why:** over a **bespoke canopy vocabulary** — kills interop (another app/bot/agent can't
+**Alternatives / why:** over a **bespoke onderling vocabulary** — kills interop (another app/bot/agent can't
 understand our terms). Over **W3C Verifiable Credentials + DIDs as the base** — heavy, and verification /
 attestation is deliberately out of scope (properties are self-asserted; VC selective-disclosure is a clean
 *later* add-on at the predicate rung if a real verification need appears). Standard self-describing terms for the
-*what*; a thin canopy namespace for the *policy*.
+*what*; a thin onderling namespace for the *policy*.
 
 **Consequences:** properties attach as a facet to the A2A agent card, filtered by the caller's trust tier but at
 a **rung** (coarsened value) rather than binary show/hide; persona / disclosure-level / ladder live under `cdi:`;

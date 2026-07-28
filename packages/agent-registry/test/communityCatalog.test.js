@@ -35,11 +35,11 @@ function agentCard(pubKey, { id, role = 'service', skills = ['summarise.thread']
     url: `https://example.invalid/agents/${id}`, version: '1.0',
     skills: skills.map((s) => ({ id: s })),
     authentication: { schemes: ['Bearer'] },
-    'x-canopy': { id, pubKey, role },
+    'x-onderling': { id, pubKey, role },
   };
 }
 function curatorCard(pubKey, { id } = {}) {
-  return { name: id, url: `https://example.invalid/curators/${id}`, version: '1.0', skills: [], 'x-canopy': { id, pubKey, role: 'curator' } };
+  return { name: id, url: `https://example.invalid/curators/${id}`, version: '1.0', skills: [], 'x-onderling': { id, pubKey, role: 'curator' } };
 }
 
 /** An in-memory pseudo-pod (etag-CAS honoured by createEndorsementResource). */
@@ -70,7 +70,7 @@ function cardBook() {
   };
 }
 
-const idsOf = (list) => list.map((c) => c['x-canopy'].id);
+const idsOf = (list) => list.map((c) => c['x-onderling'].id);
 
 /* ── 1. ADMIN-GATED WRITE ──────────────────────────────────────────────── */
 describe('G3 — the community catalog write is gated to circle admins', () => {

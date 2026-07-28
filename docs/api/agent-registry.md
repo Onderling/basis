@@ -53,7 +53,7 @@ projectAgentCard(entry, { owner } = {})
 ```
 
 Project a registry agent entry to a frozen A2A Agent Card: the standard card fields plus the
-`x-canopy` extension block (ownership, grants, lifecycle status). Skill ids are the sorted,
+`x-onderling` extension block (ownership, grants, lifecycle status). Skill ids are the sorted,
 de-duplicated union of grant skills and coarse capabilities. Throws INVALID_ARGUMENT when
 `entry` / `entry.agentId` is missing.
 

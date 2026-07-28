@@ -69,10 +69,10 @@ describe('AgentCardBuilder', () => {
     expect(card.authentication.schemes).toContain('Bearer');
   });
 
-  it('includes x-canopy extension with pubKey', () => {
+  it('includes x-onderling extension with pubKey', () => {
     const builder = new AgentCardBuilder({ agent });
     const card = builder.build(0);
-    expect(card['x-canopy'].pubKey).toBe(agent.pubKey);
+    expect(card['x-onderling'].pubKey).toBe(agent.pubKey);
   });
 
   it('tier 0 — includes only public skills', () => {
@@ -235,7 +235,7 @@ describe('A2ATransport server', () => {
     const card = await resp.json();
     expect(card.name).toBeDefined();
     expect(card.skills).toBeInstanceOf(Array);
-    expect(card['x-canopy'].pubKey).toBe(agent.pubKey);
+    expect(card['x-onderling'].pubKey).toBe(agent.pubKey);
   });
 
   it('POST /tasks/send runs skill and returns completed result', async () => {

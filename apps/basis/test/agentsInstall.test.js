@@ -22,7 +22,7 @@ import { createRealHouseholdAgent } from '../src/core/agent/realAgent.js';
 const OVERRIDE_CARD = {
   name: 'Sideloaded', url: 'https://third-party.invalid/agent', version: '1.0',
   skills: [{ id: 'sideload.run' }],
-  'x-canopy': { id: 'override:sideloaded', pubKey: 'pub-override-sideloaded', role: 'service' },
+  'x-onderling': { id: 'override:sideloaded', pubKey: 'pub-override-sideloaded', role: 'service' },
 };
 
 describe('agents P3 — install through the real composition', () => {

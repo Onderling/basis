@@ -5,7 +5,7 @@ import { signingKey, presignGetUrl } from '../src/adapters/sigv4.js';
 const CFG = {
   endpoint: 'https://s3.us-east-1.amazonaws.com',
   region: 'us-east-1',
-  bucket: 'canopy-blobs',
+  bucket: 'onderling-blobs',
   accessKeyId: 'AKIAIOSFODNN7EXAMPLE',
   secretAccessKey: 'wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY',
 };
@@ -44,7 +44,7 @@ describe('createS3Bucket — put', () => {
     expect(fetch.calls).toHaveLength(1);
     const { url, init } = fetch.calls[0];
     expect(init.method).toBe('PUT');
-    expect(url).toBe('https://s3.us-east-1.amazonaws.com/canopy-blobs/objkey123');
+    expect(url).toBe('https://s3.us-east-1.amazonaws.com/onderling-blobs/objkey123');
     expect(init.body).toBe('SEALED-CIPHERTEXT');
 
     // SigV4 auth header shape.
@@ -72,7 +72,7 @@ describe('createS3Bucket — presign', () => {
     const url = await bucket.presign('objkey123', { ttl: 120 });
 
     const u = new URL(url);
-    expect(u.origin + u.pathname).toBe('https://s3.us-east-1.amazonaws.com/canopy-blobs/objkey123');
+    expect(u.origin + u.pathname).toBe('https://s3.us-east-1.amazonaws.com/onderling-blobs/objkey123');
     expect(u.searchParams.get('X-Amz-Algorithm')).toBe('AWS4-HMAC-SHA256');
     expect(u.searchParams.get('X-Amz-Expires')).toBe('120');
     expect(u.searchParams.get('X-Amz-Date')).toBe('20260706T120000Z');
@@ -100,7 +100,7 @@ describe('createS3Bucket — presign', () => {
     const getUrl = await bucket.presign('objkey123', { ttl: 120 });
 
     const p = new URL(putUrl);
-    expect(p.origin + p.pathname).toBe('https://s3.us-east-1.amazonaws.com/canopy-blobs/objkey123');
+    expect(p.origin + p.pathname).toBe('https://s3.us-east-1.amazonaws.com/onderling-blobs/objkey123');
     expect(p.searchParams.get('X-Amz-Expires')).toBe('120');
     // The HTTP method is part of the SigV4 canonical request → PUT ≠ GET signature.
     expect(p.searchParams.get('X-Amz-Signature'))
@@ -114,7 +114,7 @@ describe('createS3Bucket — presign', () => {
       fetch: stubFetch(), now: () => new Date('2026-07-06T12:00:00Z'),
     });
     const url = await bucket.presign('k', { ttl: 30 });
-    expect(url.startsWith('https://acct.r2.cloudflarestorage.com/canopy-blobs/k?')).toBe(true);
+    expect(url.startsWith('https://acct.r2.cloudflarestorage.com/onderling-blobs/k?')).toBe(true);
     expect(new URL(url).searchParams.get('X-Amz-Credential')).toContain('/auto/s3/aws4_request');
   });
 });
@@ -126,7 +126,7 @@ describe('createS3Bucket — delete', () => {
     await bucket.delete('objkey123');
     const { url, init } = fetch.calls[0];
     expect(init.method).toBe('DELETE');
-    expect(url).toBe('https://s3.us-east-1.amazonaws.com/canopy-blobs/objkey123');
+    expect(url).toBe('https://s3.us-east-1.amazonaws.com/onderling-blobs/objkey123');
     expect(init.headers.authorization).toMatch(/^AWS4-HMAC-SHA256 /);
   });
 

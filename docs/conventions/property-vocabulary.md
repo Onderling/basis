@@ -22,8 +22,8 @@ humans and bots/drones can understand it. The *why* (and the alternatives weighe
    - **Device/robot:** **W3C Web of Things (WoT) Thing Description** — the standard for a thing's queryable
      properties/actions/events ("battery left", location, status).
 4. **Every *declared* property carries a `cdi:ladder`** — the coarsening rungs from most→least revealing, so the
-   property can be disclosed at graduated precision (see the policy layer below). `cdi:` (canopy-disclosure) is
-   canopy's own thin namespace; it is the only non-standard part, and it carries *policy*, not vocabulary.
+   property can be disclosed at graduated precision (see the policy layer below). `cdi:` (onderling-disclosure) is
+   Onderling's own thin namespace; it is the only non-standard part, and it carries *policy*, not vocabulary.
 5. **Anything not declared** is reached only through a consent-gated query path (a separate, deferred mechanism)
    — never auto-answered.
 
@@ -32,7 +32,7 @@ humans and bots/drones can understand it. The *why* (and the alternatives weighe
 ```json
 {
   "@context": ["https://schema.org/", "https://www.w3.org/2019/wot/td/v1",
-               {"cdi": "https://canopy.dev/ns/disclosure#"}],
+               {"cdi": "https://onderling.org/ns/disclosure#"}],
   "location": { "@type": "GeoCoordinates", "value": {"lat": 52.7, "long": 5.1},
                 "cdi:ladder": ["coords", "district", "municipality", "region", "in-area", "none"] },
   "lendable": [ { "@type": "Offer", "itemOffered": {"@type": "Product", "name": "drill"},

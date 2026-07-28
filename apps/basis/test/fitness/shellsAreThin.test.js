@@ -49,7 +49,7 @@ describe('FITNESS: shells define no waist dispatch/resolution logic', () => {
       for (const file of jsFiles(shell.root)) {
         const src = readFileSync(file, 'utf8');
         for (const sym of GUARDED) {
-          if (defRe(sym).test(src)) offenders.push(`${file.split('/canopy-mono/')[1] ?? file} defines ${sym}`);
+          if (defRe(sym).test(src)) offenders.push(`${file.split('/onderling-mono/')[1] ?? file} defines ${sym}`);
         }
       }
       expect(offenders, `shell re-declares shared logic (move it to src/ + import):\n${offenders.join('\n')}`).toEqual([]);

@@ -1,4 +1,4 @@
-package com.canopy.mdns
+package org.onderling.mdns
 
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.NativeModule

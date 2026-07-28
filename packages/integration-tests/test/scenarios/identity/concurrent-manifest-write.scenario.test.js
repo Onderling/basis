@@ -41,7 +41,7 @@ import { VaultMemory } from '@onderling/vault';
 import { MockPod } from '../../../src/_harness/index.js';
 
 const POD_ROOT     = 'https://alice.example/';
-const MANIFEST_URI = 'https://alice.example/canopy/manifest.ttl';
+const MANIFEST_URI = 'https://alice.example/onderling/manifest.ttl';
 
 describe('identity/concurrent-manifest-write', () => {
   it('two simultaneous writers: LWW retry recovers; final manifest is consistent', async () => {
@@ -116,8 +116,8 @@ describe('identity/concurrent-manifest-write', () => {
     ]);
 
     // Both resolved — neither surfaced the CONFLICT to the caller.
-    expect(laptopRes.uri).toBe('https://alice.example/canopy/devices/laptop.enc');
-    expect(phoneRes.uri).toBe('https://alice.example/canopy/devices/phone.enc');
+    expect(laptopRes.uri).toBe('https://alice.example/onderling/devices/laptop.enc');
+    expect(phoneRes.uri).toBe('https://alice.example/onderling/devices/phone.enc');
 
     // ── Verify the conflict was actually consumed ───────────────────────
     // After the run, the conflict-injection set must be empty (a fresh
@@ -167,7 +167,7 @@ describe('identity/concurrent-manifest-write', () => {
     const now = new Date();
     const yyyy = now.getUTCFullYear();
     const mm   = String(now.getUTCMonth() + 1).padStart(2, '0');
-    const authUri = `https://alice.example/canopy/auth-log/${yyyy}-${mm}.enc`;
+    const authUri = `https://alice.example/onderling/auth-log/${yyyy}-${mm}.enc`;
     sharedPod.injectConflict(authUri);
 
     // appendAuthEvent's retry loop swallows the conflict and re-tries.

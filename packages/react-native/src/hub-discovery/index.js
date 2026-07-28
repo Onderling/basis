@@ -23,7 +23,7 @@ import { watch as runWatch }    from './watch.js';
 /**
  * @param {object} opts
  * @param {object}   opts.nativeModule         — required
- * @param {string}   [opts.intentAction]       — overrides the default 'com.canopy.hub.BIND'
+ * @param {string}   [opts.intentAction]       — overrides the default 'org.onderling.hub.BIND'
  * @param {() => string} [opts.now]
  */
 export function createHubDiscovery({

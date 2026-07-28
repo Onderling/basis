@@ -112,8 +112,8 @@ describe('pointerPredicates', () => {
   it('returns the predicate IRIs for each pointer', () => {
     const preds = pointerPredicates();
     expect(preds.storage).toBe('http://www.w3.org/ns/solid/terms#storage');
-    expect(preds.storageMappingUri).toMatch(/^https:\/\/canopy\.org\/ns#/);
-    expect(preds.agentRegistryUri).toMatch(/^https:\/\/canopy\.org\/ns#/);
-    expect(preds.auditLogUri).toMatch(/^https:\/\/canopy\.org\/ns#/);
+    expect(preds.storageMappingUri).toMatch(/^https:\/\/onderling\.org\/ns#/);
+    expect(preds.agentRegistryUri).toMatch(/^https:\/\/onderling\.org\/ns#/);
+    expect(preds.auditLogUri).toMatch(/^https:\/\/onderling\.org\/ns#/);
   });
 });

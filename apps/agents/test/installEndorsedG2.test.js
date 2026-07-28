@@ -33,11 +33,11 @@ function agentCard(pubKey, { id, skills = ['summarise.thread', 'summarise.docume
     url: `https://example.invalid/agents/${id}`, version: '1.0',
     skills: skills.map((s) => ({ id: s })),
     authentication: { schemes: ['Bearer'] },
-    'x-canopy': { id, pubKey, role: 'service' },
+    'x-onderling': { id, pubKey, role: 'service' },
   };
 }
 function curatorCard(pubKey, { id } = {}) {
-  return { name: id, url: `https://example.invalid/curators/${id}`, version: '1.0', skills: [], 'x-canopy': { id, pubKey, role: 'curator' } };
+  return { name: id, url: `https://example.invalid/curators/${id}`, version: '1.0', skills: [], 'x-onderling': { id, pubKey, role: 'curator' } };
 }
 
 function buildRegistry() {

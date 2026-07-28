@@ -8,7 +8,7 @@
  * recognised by `discoverPointers`.
  */
 
-export const NAMESPACE = 'https://canopy.org/ns#';
+export const NAMESPACE = 'https://onderling.org/ns#';
 
 export const WEBID_PREDICATES = Object.freeze({
   /** Pointer to the user's storage-mapping pod resource (§II.3). */

@@ -2,8 +2,8 @@
  * @onderling/react-native — Android native module sources.
  *
  * Provides two ReactPackage modules:
- *   - MdnsModule (mDNS/DNS-SD + TCP transport)  — com.canopy.mdns.MdnsPackage
- *   - BlePeripheralModule (BLE GATT server)      — com.canopy.ble.BlePeripheralPackage
+ *   - MdnsModule (mDNS/DNS-SD + TCP transport)  — org.onderling.mdns.MdnsPackage
+ *   - BlePeripheralModule (BLE GATT server)      — org.onderling.ble.BlePeripheralPackage
  *
  * Built as an Android library and consumed via React Native autolinking.
  * Apps don't need to hand-edit settings.gradle or MainApplication.kt —
@@ -24,7 +24,7 @@ apply plugin: "com.android.library"
 apply plugin: "kotlin-android"
 
 android {
-    namespace       "com.canopy.reactnative"
+    namespace       "org.onderling.reactnative"
     compileSdkVersion   safeProp("compileSdkVersion", 34)
     buildToolsVersion   safeProp("buildToolsVersion",  "34.0.0")
 

@@ -59,12 +59,12 @@ const CATALOG_CARD = Object.freeze({
   url:  'https://example.invalid/agents/summariser', version: '1.0',
   skills: [{ id: 'summarise.thread' }, { id: 'summarise.document' }],
   authentication: { schemes: ['Bearer'] },
-  'x-canopy': { id: 'catalog:summariser', pubKey: 'pub-cat-summariser', role: 'service' },
+  'x-onderling': { id: 'catalog:summariser', pubKey: 'pub-cat-summariser', role: 'service' },
 });
 const OVERRIDE_CARD = Object.freeze({
   name: 'Sideloaded', url: 'https://third-party.invalid/agent', version: '1.0',
   skills: [{ id: 'sideload.run' }],
-  'x-canopy': { id: 'override:sideloaded', pubKey: 'pub-override-sideloaded', role: 'service' },
+  'x-onderling': { id: 'override:sideloaded', pubKey: 'pub-override-sideloaded', role: 'service' },
 });
 const makeCatalog = () => createStubCatalog([CATALOG_CARD]);
 

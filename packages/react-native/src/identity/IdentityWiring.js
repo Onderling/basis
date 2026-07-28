@@ -47,7 +47,7 @@ import { IdentityPodStore } from '@onderling/pod-client';
  * @param {string} [opts.pod.mnemonic]                     BIP-39 phrase to recover the bootstrap secret
  * @param {object} [opts.pod.bootstrap]                    pre-built Bootstrap (alternative to mnemonic; for tests / advanced callers)
  * @param {object} opts.pod.podClient                      caller-supplied PodClient (from `@onderling/pod-client`)
- * @param {string} opts.pod.podRoot                        pod root URI; identity container will be at `<podRoot>/canopy/`
+ * @param {string} opts.pod.podRoot                        pod root URI; identity container will be at `<podRoot>/onderling/`
  * @param {number} [opts.pod.intervalMs=300_000]           IdentitySync polling interval (5 min default per Q-B.4)
  * @param {Function} [opts.pod._identitySyncCtor]          (test-only) inject IdentitySync constructor; default: lazy `import('@onderling/pod-client').IdentitySync`
  * @returns {Promise<{ bootstrap: object, podStore: object, sync: object, dispose: () => void }>}

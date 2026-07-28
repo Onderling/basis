@@ -36,9 +36,9 @@ import { isMnemonicValid, mnemonicWordCount } from '../core/wizards/restoreFromM
 
 // One place both shells load, so the dump is retrievable on either without extra wiring. (A user-facing
 // "Report a problem" screen that shows + sends this is the next logging slice.)
-if (typeof globalThis !== 'undefined' && !globalThis.canopyDumpLogs) {
-  globalThis.canopyLogs = dumpLogs;
-  globalThis.canopyDumpLogs = () => formatLogs();
+if (typeof globalThis !== 'undefined' && !globalThis.onderlingDumpLogs) {
+  globalThis.onderlingLogs = dumpLogs;
+  globalThis.onderlingDumpLogs = () => formatLogs();
 }
 
 // "Report a problem" copy — the PII-safe framing + trigger labels, localised in-place. The feedback surface

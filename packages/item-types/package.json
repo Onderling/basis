@@ -1,7 +1,7 @@
 {
   "name": "@onderling/item-types",
   "version": "0.1.0",
-  "description": "Cross-app item-type taxonomy + JSON Schema validation. Ships the canonical types (task, note, chat-message, offer, request, claim, contact, calendar-event, announcement, reveal-request, neighbourhood-job) plus the standard `embeds: [{type, ref}, ...]` field. Project-namespaced under `https://canopy.org/ns#`; no schema.org dependency. Vocabulary refresh 2026-05-12 — legacy names (supply-offer / demand-offer / lend-request) persist as aliases.",
+  "description": "Cross-app item-type taxonomy + JSON Schema validation. Ships the canonical types (task, note, chat-message, offer, request, claim, contact, calendar-event, announcement, reveal-request, neighbourhood-job) plus the standard `embeds: [{type, ref}, ...]` field. Project-namespaced under `https://onderling.org/ns#`; no schema.org dependency. Vocabulary refresh 2026-05-12 — legacy names (supply-offer / demand-offer / lend-request) persist as aliases.",
   "type": "module",
   "license": "Apache-2.0",
   "homepage": "https://github.com/Onderling/basis/tree/master/packages/item-types#readme",

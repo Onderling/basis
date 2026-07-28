@@ -57,14 +57,14 @@
  * @typedef {import('./StorageBackend.js').BackendEvent} BackendEvent
  */
 
-const DEFAULT_DB_NAME    = 'canopy-pseudo-pod';
+const DEFAULT_DB_NAME    = 'onderling-pseudo-pod';
 const DEFAULT_STORE_NAME = 'records';
 
 /**
  * Create a browser IndexedDB-backed `StorageBackend`.
  *
  * @param {object} [opts]
- * @param {string} [opts.dbName='canopy-pseudo-pod']  IndexedDB database name.
+ * @param {string} [opts.dbName='onderling-pseudo-pod']  IndexedDB database name.
  * @param {string} [opts.storeName='records']         object-store name.
  * @param {IDBFactory} [opts.indexedDB]               injectable factory
  *   (defaults to `globalThis.indexedDB`; injectable for tests +

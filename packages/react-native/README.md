@@ -4,7 +4,7 @@
 > **Convention:** Platform-glue substrates aggregate here; standalone
 > behaviors with a clear non-RN core live in their own packages.
 
-React Native platform layer + adapters for the canopy agent SDK.
+React Native platform layer + adapters for the onderling agent SDK.
 
 ## Submodules
 

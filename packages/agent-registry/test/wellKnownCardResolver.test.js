@@ -13,7 +13,7 @@ function okJson(card) { return { ok: true, json: async () => card }; }
 
 describe('G2 — createWellKnownCardResolver (injected fetch)', () => {
   it('fetches <url>/.well-known/agent from the endorsement url hint', async () => {
-    const card = { name: 'A', 'x-canopy': { id: 'catalog:a', pubKey: 'pk-a' } };
+    const card = { name: 'A', 'x-onderling': { id: 'catalog:a', pubKey: 'pk-a' } };
     const calls = [];
     const fetchImpl = async (u) => { calls.push(u); return okJson(card); };
     const resolve = createWellKnownCardResolver({ fetch: fetchImpl });
@@ -24,7 +24,7 @@ describe('G2 — createWellKnownCardResolver (injected fetch)', () => {
   });
 
   it('falls back to baseFor(subject) when the endorsement carries no url', async () => {
-    const card = { 'x-canopy': { pubKey: 'pk-b' } };
+    const card = { 'x-onderling': { pubKey: 'pk-b' } };
     const resolve = createWellKnownCardResolver({
       fetch: async () => okJson(card),
       baseFor: (subject) => `https://reg.invalid/${subject}`,

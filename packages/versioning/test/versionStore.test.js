@@ -346,7 +346,7 @@ describe('multi-writer (writerId) — concurrent devices on a shared backend', (
 // cap, newest-first ordering, undoable restore, read-content, empty-first-skip)
 // are already covered above and are backend-agnostic; the block below adds the
 // one Folio-specific rule — reject ANY relPath with a dotted segment
-// (`.folio/`, `.canopy/`, `.git/`, …), absolute paths, and `.`/`..` — carried
+// (`.folio/`, `.onderling/`, `.git/`, …), absolute paths, and `.`/`..` — carried
 // via `retention.shouldVersion` (the substrate's own `versionable` only rejects
 // the versions-root prefix).
 //
@@ -383,7 +383,7 @@ describe('Folio shouldVersion — dotted-segment reject (isVersionable rule)', (
     const { store } = makeFolioStore();
     expect(store.isVersionable('')).toBe(false);
     expect(store.isVersionable('.folio/versions/a.md')).toBe(false);
-    expect(store.isVersionable('.canopy/state.json')).toBe(false);
+    expect(store.isVersionable('.onderling/state.json')).toBe(false);
     expect(store.isVersionable('/abs/path')).toBe(false);
     expect(store.isVersionable('a/../b')).toBe(false);
     expect(store.isVersionable('a/.hidden/c.md')).toBe(false);

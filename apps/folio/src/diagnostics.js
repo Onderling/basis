@@ -259,29 +259,20 @@ export async function runDiagnostics(reporter, deps = {}) {
 
   // ── 6. Marker file ────────────────────────────────────────────────────
   const markerPath = join(cfg.localRoot, '.onderling', '.folio-managed');
-  const markerPathLegacy = join(cfg.localRoot, '.canopy', '.folio-managed');   // pre-rename installs
   try {
     await fs.access(markerPath);
     pass('marker', `marker file present at ${markerPath}`);
-  } catch {
-    try {
-      await fs.access(markerPathLegacy);
-      pass('marker', `marker file present at ${markerPathLegacy} (legacy dir — re-run init to move it)`);
-    } catch (err) {
-      warn('marker', `marker file present at ${markerPath}`,
-        'no `.folio-managed` marker — folder may not be a Folio root', err);
-    }
+  } catch (err) {
+    warn('marker', `marker file present at ${markerPath}`,
+      'no `.folio-managed` marker — folder may not be a Folio root', err);
   }
 
   // ── 7. Sync state ─────────────────────────────────────────────────────
   const statePath = join(cfg.localRoot, '.onderling', 'notes-sync-state.json');
-  const statePathLegacy = join(cfg.localRoot, '.canopy', 'notes-sync-state.json');
   let stateWrittenAt = null;
   let stateFileCount = 0;
   try {
-    let text;
-    try { text = await fs.readFile(statePath, 'utf8'); }
-    catch { text = await fs.readFile(statePathLegacy, 'utf8'); }   // pre-rename state
+    const text = await fs.readFile(statePath, 'utf8');
     const parsed = JSON.parse(text);
     stateFileCount = Object.keys(parsed?.files ?? {}).length;
     stateWrittenAt = parsed?.writtenAt ?? null;

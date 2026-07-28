@@ -546,7 +546,7 @@ Run a one-shot Vault → pod migration.
 - `opts.vault` `object` — Vault-shaped { get, set, list }.
 - `opts.identity` `object` — AgentIdentity instance (the device's own identity; its public key becomes the pod's first device record).
 - `opts.podClient` `object` — `@onderling/pod-client` PodClient.
-- `opts.podRoot` `string` — Pod root URI (or already-rooted `<base>/canopy/`).
+- `opts.podRoot` `string` — Pod root URI (or already-rooted `<base>/onderling/`).
 - `opts.mnemonic` `string` — BIP-39 phrase the user wrote down at first-run; used to derive the bootstrap secret.
 - `[opts.deviceMeta]` `object` — Optional extras for the Device record: { label, platformHint, capabilities, pairedAt }. Sensible defaults are used when fields are missing.
 - `[opts.dryRun=false]` `boolean` — Skip pod writes; report only. Flag is NOT set in dry-run.
@@ -1784,7 +1784,7 @@ new FileTombstones({ path: filePath } = {})
 
 Node-side `TombstoneStore` backed by a single JSON file, persistent across `PodClient` restarts.
 Writes are atomic (written to `<path>.tmp`, then renamed onto `<path>`). Defaults to
-`os.tmpdir() + '/canopy-tombstones.json'`; pass an explicit `{ path }` for production use.
+`os.tmpdir() + '/onderling-tombstones.json'`; pass an explicit `{ path }` for production use.
 
 **Methods:** `add()` · `has()` · `remove()` · `list()` · `close()`
 

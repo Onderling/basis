@@ -1,6 +1,6 @@
 # @onderling/sdk
 
-The layered developer facade over the canopy platform — the kernel
+The layered developer facade over the onderling platform — the kernel
 (`@onderling/core`) plus the default adapters (`@onderling/vault`,
 `@onderling/transports`, `@onderling/pod-client`), packaged as **one import**.
 The fast path is "import one thing, connect your app functions to skills,

@@ -6,7 +6,7 @@
 //
 // Standardisation Phase 51.7.
 
-package com.canopy.hub;
+package org.onderling.hub;
 
 oneway interface IIncomingCallback {
     /**

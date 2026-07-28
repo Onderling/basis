@@ -1,4 +1,4 @@
-package com.canopy.ble
+package org.onderling.ble
 
 import android.bluetooth.*
 import android.bluetooth.le.*

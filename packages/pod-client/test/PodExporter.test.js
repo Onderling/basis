@@ -6,7 +6,7 @@
  *   - round-trip encrypted (with Bootstrap)
  *   - wrong bootstrap → import throws
  *   - tampered archive → import throws
- *   - dataOnly: true skips /canopy/ identity container
+ *   - dataOnly: true skips /onderling/ identity container
  *   - deterministic output (same pod → same archive bytes)
  *   - empty pod exports cleanly
  */
@@ -110,8 +110,8 @@ function fixturePod() {
       [POD_ROOT + 'notes/hello.txt']: { content: 'hello world',         contentType: 'text/plain' },
       [POD_ROOT + 'notes/bye.txt']:   { content: 'goodbye',             contentType: 'text/plain' },
       [POD_ROOT + 'data/blob.bin']:   { content: new Uint8Array([1, 2, 3, 4, 0xff]), contentType: 'application/octet-stream' },
-      [POD_ROOT + 'canopy/identity.json']: { content: '{"v":1}', contentType: 'application/json' },
-      [POD_ROOT + 'canopy/devices/dev1.enc']: { content: new Uint8Array([0xab, 0xcd]), contentType: 'application/octet-stream' },
+      [POD_ROOT + 'onderling/identity.json']: { content: '{"v":1}', contentType: 'application/json' },
+      [POD_ROOT + 'onderling/devices/dev1.enc']: { content: new Uint8Array([0xab, 0xcd]), contentType: 'application/octet-stream' },
     },
   });
 }
@@ -165,7 +165,7 @@ describe('PodExporter (unencrypted)', () => {
     expect(dst._store.size).toBe(0);
   });
 
-  it('dataOnly: true skips entries under /canopy/', async () => {
+  it('dataOnly: true skips entries under /onderling/', async () => {
     const src = fixturePod();
     const exporter = new PodExporter({ podClient: src, podRoot: POD_ROOT });
     const archive = await exporter.export({ encrypt: false, dataOnly: true, exportedAt: FIXED_DATE });
@@ -179,8 +179,8 @@ describe('PodExporter (unencrypted)', () => {
     expect(result.header.dataOnly).toBe(true);
 
     // Identity entries must NOT be present in the dst pod.
-    expect(dst._store.has(POD_ROOT + 'canopy/identity.json')).toBe(false);
-    expect(dst._store.has(POD_ROOT + 'canopy/devices/dev1.enc')).toBe(false);
+    expect(dst._store.has(POD_ROOT + 'onderling/identity.json')).toBe(false);
+    expect(dst._store.has(POD_ROOT + 'onderling/devices/dev1.enc')).toBe(false);
     // Non-identity entries must be present.
     expect(dst._store.has(POD_ROOT + 'profile/card')).toBe(true);
     expect(dst._store.has(POD_ROOT + 'notes/hello.txt')).toBe(true);

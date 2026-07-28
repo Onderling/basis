@@ -14,9 +14,9 @@ export class KeychainVault extends Vault {
 
   /**
    * @param {object} [opts]
-   * @param {string} [opts.service='canopy']  — keychain service namespace
+   * @param {string} [opts.service='onderling']  — keychain service namespace
    */
-  constructor({ service = 'canopy' } = {}) {
+  constructor({ service = 'onderling' } = {}) {
     super();
     this.#service = service;
   }

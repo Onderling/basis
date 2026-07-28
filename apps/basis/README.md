@@ -7,7 +7,7 @@
 > here, not new app silos. See the root README's *Direction* note.
 
 > **Layer: app.** Command-first unified chat shell that consumes
-> other canopy apps' manifests.  Static web deployable; mesh agent
+> other Onderling apps' manifests.  Static web deployable; mesh agent
 > runs browser-side.
 
 > **⚠️ Surface coverage — keep it updated.** `npm run coverage` prints (and
@@ -28,7 +28,7 @@
 ## What this app does
 
 A single chat UI users open in a browser. Slash commands dispatch
-to whichever canopy app owns the op (household, tasks-v0, stoop,
+to whichever Onderling app owns the op (household, tasks-v0, stoop,
 folio's pod-doable subset). User can spawn multiple threads, each
 with its own event-filter + permission config.
 

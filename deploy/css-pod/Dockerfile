@@ -1,10 +1,10 @@
 # Community Solid Server (CSS) — deployable Solid pod image.
 #
 #   Build context = deploy/css-pod (self-contained; NOT the monorepo):
-#     docker build -f deploy/css-pod/Dockerfile -t canopy-pod deploy/css-pod
+#     docker build -f deploy/css-pod/Dockerfile -t onderling-pod deploy/css-pod
 #
 # CSS is an independent npm package (@solid/community-server@^7) — it does NOT
-# depend on the canopy workspace, so this image is small and standalone. The repo
+# depend on the onderling workspace, so this image is small and standalone. The repo
 # harnesses (packages/pod-client/scripts/css-*.mjs) boot exactly this via
 # `npx @solid/community-server@^7 -c <config>`; here we pin it into the image.
 FROM node:20-bookworm-slim

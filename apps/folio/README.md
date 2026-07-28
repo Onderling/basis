@@ -234,7 +234,7 @@ again to push the merge back to the pod.
 
 ## State
 
-Per-folder sync state lives at `<localRoot>/.canopy/notes-sync-state.json`
+Per-folder sync state lives at `<localRoot>/.onderling/notes-sync-state.json`
 and is the source of truth for "what was the last common version of each
 file."  Delete the state file to force a full re-scan on next sync.
 
@@ -317,7 +317,7 @@ What gets written, by platform:
 
 | OS      | Unit file                                          | Backend           |
 |---------|----------------------------------------------------|-------------------|
-| macOS   | `~/Library/LaunchAgents/ag.canopy.folio.plist`   | launchd (LaunchAgent) |
+| macOS   | `~/Library/LaunchAgents/org.onderling.folio.plist`   | launchd (LaunchAgent) |
 | Linux   | `~/.config/systemd/user/folio.service`             | systemd `--user`  |
 | Windows | Scheduled Task `Folio` (sentinel in `%LOCALAPPDATA%/folio/`) | Task Scheduler `/SC ONLOGON /RL LIMITED` |
 

@@ -152,7 +152,7 @@ describe('companion-node M2 — sealed inbox: hold → wake → drain → delive
 
 describe('companion-node M2 — durable persistence (beyond the relay-queue TTL)', () => {
   it('a file-backed inbox survives a fresh store instance (node restart)', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'canopy-inbox-'));
+    const dir = mkdtempSync(join(tmpdir(), 'onderling-inbox-'));
     cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
     const file = join(dir, 'sealed-inbox.json');
     const bobSeal = generateKeypair();

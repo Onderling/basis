@@ -24,18 +24,15 @@ node deploy/smoke/smoke.mjs "$RELAY_URL"
 
 Manage it: `systemctl --user {status,restart,stop} onderling-tunnel.service`.
 
-### Already running the pre-2026-07-28 unit?
+### Already running the old `onderling-tunnel.service`?
 
-The old `canopy-tunnel.service` keeps working — nothing breaks by itself. To move over:
+Retire it once — the new unit replaces it:
 
 ```bash
-systemctl --user disable --now canopy-tunnel.service
-rm -f ~/.config/systemd/user/canopy-tunnel.service ~/.local/bin/canopy-tunnel.sh
+systemctl --user disable --now onderling-tunnel.service
+rm -f ~/.config/systemd/user/onderling-tunnel.service ~/.local/bin/onderling-tunnel.sh ~/.onderling-relay-url
 # then run the Install block above
 ```
-
-The script writes the URL to **both** `~/.onderling-relay-url` and the legacy `~/.canopy-relay-url`
-for one migration window, so anything still reading the old path keeps working.
 
 ## What this does and does NOT give you
 

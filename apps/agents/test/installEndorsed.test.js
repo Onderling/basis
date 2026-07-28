@@ -39,7 +39,7 @@ function makeCard(pubKey, { id = 'catalog:summariser', name = 'Summariser', skil
     url: 'https://example.invalid/agents/summariser', version: '1.0',
     skills: skills.map((s) => ({ id: s })),
     authentication: { schemes: ['Bearer'] },
-    'x-canopy': { id, pubKey, role: 'service' },
+    'x-onderling': { id, pubKey, role: 'service' },
   };
 }
 
@@ -65,7 +65,7 @@ function buildEndorsements() {
 
 /** A card resolver keyed by subject pubKey (the G1 resolveCard collaborator). */
 function makeResolver(entries = []) {
-  const byKey = new Map(entries.map((c) => [c['x-canopy'].pubKey, c]));
+  const byKey = new Map(entries.map((c) => [c['x-onderling'].pubKey, c]));
   return { byKey, resolve: (subject) => byKey.get(subject) ?? null };
 }
 

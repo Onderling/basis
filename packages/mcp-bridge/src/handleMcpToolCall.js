@@ -1,7 +1,7 @@
 /**
  * handleMcpToolCall.js — INBOUND direction (MCP tools/call → gated dispatch).
  *
- * An inbound MCP `tools/call` (`{ name, arguments }`) is mapped to canopy's
+ * An inbound MCP `tools/call` (`{ name, arguments }`) is mapped to Onderling's
  * `{ opId: name, args }` and dispatched THROUGH the capability gate. It uses
  * the SAME gated path #63's remote-handler tier uses:
  *

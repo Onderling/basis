@@ -56,7 +56,7 @@
  */
 import { Transport } from '@onderling/core';
 
-const CHANNEL_LABEL  = 'canopy';
+const CHANNEL_LABEL  = 'onderling';
 const OPEN_TIMEOUT   = 30_000;   // ms
 const ICE_SERVERS    = [{ urls: 'stun:stun.l.google.com:19302' }];
 

@@ -2,15 +2,14 @@
   "private": true,
   "name": "@onderling/relay",
   "version": "0.1.0",
-  "description": "Relay + rendezvous server for the canopy agent SDK",
+  "description": "Relay + rendezvous server for the onderling agent SDK",
   "type": "module",
   "main": "index.js",
   "exports": {
     ".": "./index.js"
   },
   "bin": {
-    "onderling-relay": "./bin/relay.js",
-    "canopy-relay": "./bin/relay.js"
+    "onderling-relay": "./bin/relay.js"
   },
   "scripts": {
     "start": "node bin/relay.js",

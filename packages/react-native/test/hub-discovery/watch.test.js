@@ -40,11 +40,11 @@ describe('watch — event delivery', () => {
     const events = [];
     watch({ nativeModule: native, cache, callback: (e) => events.push(e) });
 
-    native.emit({ op: 'added',   packageName: 'com.canopy.hub' });
-    native.emit({ op: 'removed', packageName: 'com.canopy.hub' });
+    native.emit({ op: 'added',   packageName: 'org.onderling.hub' });
+    native.emit({ op: 'removed', packageName: 'org.onderling.hub' });
 
     expect(events.map(e => e.op)).toEqual(['added', 'removed']);
-    expect(events[0].packageName).toBe('com.canopy.hub');
+    expect(events[0].packageName).toBe('org.onderling.hub');
     expect(typeof events[0].at).toBe('string');
   });
 
@@ -54,7 +54,7 @@ describe('watch — event delivery', () => {
     cache.setCached({ hubInstalled: true, hubVersion: 1 });
     watch({ nativeModule: native, cache, callback: () => {} });
 
-    native.emit({ op: 'removed', packageName: 'com.canopy.hub' });
+    native.emit({ op: 'removed', packageName: 'org.onderling.hub' });
     expect(cache.getCached()).toBe(null);
   });
 

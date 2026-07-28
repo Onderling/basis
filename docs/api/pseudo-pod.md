@@ -29,7 +29,7 @@ Create a browser IndexedDB-backed `StorageBackend`.
 **Parameters**
 
 - `[opts]` `object`
-- `[opts.dbName='canopy-pseudo-pod']` `string` — IndexedDB database name.
+- `[opts.dbName='onderling-pseudo-pod']` `string` — IndexedDB database name.
 - `[opts.storeName='records']` `string` — object-store name.
 - `[opts.indexedDB]` `IDBFactory` — injectable factory (defaults to `globalThis.indexedDB`; injectable for tests + non-standard hosts).
 - `[opts.etagPrefix='idb']` `string` — prefix for generated etags.

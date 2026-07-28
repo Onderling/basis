@@ -32,10 +32,10 @@ describe('pairing QR payload', () => {
     expect(makePairUri('')).toBe('');
   });
 
-  // Naming decision 2026-07-28 — no new "canopy" identifiers: new QRs mint onderling-pair://, and the
+  // Naming decision 2026-07-28 — no new "onderling" identifiers: new QRs mint onderling-pair://, and the
   // legacy spelling stays PARSE-ONLY so a printed/screenshotted pairing QR keeps working.
-  it('mints onderling-pair:// and still parses the legacy canopy-pair:// spelling', () => {
+  it('mints onderling-pair:// and still parses the legacy onderling-pair:// spelling', () => {
     expect(makePairUri('abc')).toMatch(/^onderling-pair:\/\//);
-    expect(parsePairUri('canopy-pair://abc?name=Phone')).toEqual({ addr: 'abc', name: 'Phone' });
+    expect(parsePairUri('onderling-pair://abc?name=Phone')).toEqual({ addr: 'abc', name: 'Phone' });
   });
 });

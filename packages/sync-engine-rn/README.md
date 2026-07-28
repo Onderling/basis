@@ -6,7 +6,7 @@
 > (locked 2026-05-08, see
 > [`Project Files/conventions/architectural-layering.md`](../../docs/conventions/architectural-layering.md#mobile-substrates-live-in-their-own-packages-locked-2026-05-08)).
 
-React Native bootstrap helpers for the canopy agent SDK on mobile.
+React Native bootstrap helpers for the onderling agent SDK on mobile.
 Cross-platform sync logic stays in `@onderling/sync-engine`; this
 package is the RN-only wiring:
 

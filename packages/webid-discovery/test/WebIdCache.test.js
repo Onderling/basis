@@ -21,9 +21,9 @@ const WEBID = 'https://alice.example/profile/card#me';
 
 function turtleProfile({ storageMapping, agentRegistry, auditLog } = {}) {
   const lines = [`<${WEBID}> <http://xmlns.com/foaf/0.1/> "name" .`];
-  if (storageMapping) lines.push(`<${WEBID}> <https://canopy.org/ns#storage-mapping-uri> <${storageMapping}> .`);
-  if (agentRegistry)  lines.push(`<${WEBID}> <https://canopy.org/ns#agent-registry-uri>  <${agentRegistry}> .`);
-  if (auditLog)       lines.push(`<${WEBID}> <https://canopy.org/ns#audit-log-uri>       <${auditLog}> .`);
+  if (storageMapping) lines.push(`<${WEBID}> <https://onderling.org/ns#storage-mapping-uri> <${storageMapping}> .`);
+  if (agentRegistry)  lines.push(`<${WEBID}> <https://onderling.org/ns#agent-registry-uri>  <${agentRegistry}> .`);
+  if (auditLog)       lines.push(`<${WEBID}> <https://onderling.org/ns#audit-log-uri>       <${auditLog}> .`);
   return lines.join('\n');
 }
 

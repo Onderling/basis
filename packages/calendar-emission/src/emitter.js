@@ -72,14 +72,14 @@ export function buildIcsFor({ circleId, circleName, member, tasks, now = Date.no
  * @param {object} args
  * @param {Array<object>} args.events
  * @param {string}        [args.calendarName='Calendar']
- * @param {string}        [args.prodId='-//canopy-app/calendar//EN']
+ * @param {string}        [args.prodId='-//onderling-app/calendar//EN']
  * @param {number}        [args.now=Date.now()]
  * @returns {string}
  */
 export function buildIcsForEvents({
   events,
   calendarName = 'Calendar',
-  prodId       = '-//canopy-app/calendar//EN',
+  prodId       = '-//onderling-app/calendar//EN',
   now          = Date.now(),
 } = {}) {
   if (!Array.isArray(events)) {

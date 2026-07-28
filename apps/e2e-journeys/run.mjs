@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * canopy e2e journey harness — runs the flagship user journeys against a relay,
+ * onderling e2e journey harness — runs the flagship user journeys against a relay,
  * in one process, with the REAL SDK + app code (not stubs).
  *
  *   node run.mjs                       # self-contained: starts a local relay, runs all
@@ -56,7 +56,7 @@ if (!relayUrl) {
   console.log(`(no relay URL given → started a local relay at ${relayUrl})`);
 }
 
-console.log(`\n╔══ canopy e2e journeys → ${relayUrl}`);
+console.log(`\n╔══ onderling e2e journeys → ${relayUrl}`);
 console.log(`╚══ ${selected.length} ${selected.length === 1 ? 'journey' : 'journeys'}\n`);
 
 const summary = [];

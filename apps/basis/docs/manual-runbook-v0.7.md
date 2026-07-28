@@ -233,7 +233,7 @@ broken).
 **Steps**
 
 1. Tab A: `/backup --passphrase=hunter2-correct-horse-battery-staple`
-2. Browser downloads a blob (canopy-backup-YYYY-MM-DD.json)
+2. Browser downloads a blob (onderling-backup-YYYY-MM-DD.json)
 3. Open another tab; load `npx vitest run --reporter=verbose
    --testPathPattern=phase19` (round-trip via decryptBackup)
 

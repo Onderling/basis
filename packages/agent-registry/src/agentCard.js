@@ -7,7 +7,7 @@
  * entry — it does NOT reuse core's `AgentCardBuilder`, which builds
  * from a live in-process `Agent`, not a registry record.
  *
- * Card shape = the A2A standard fields + an `x-canopy` extension
+ * Card shape = the A2A standard fields + an `x-onderling` extension
  * block (ownership · grants · lifecycle). Skill descriptions are
  * strongly advised but optional per A2A — the registry doesn't carry
  * them yet, so the card is valid without.
@@ -19,7 +19,7 @@ const CARD_VERSION = '1.0';
 
 /**
  * Project a registry agent entry to a frozen A2A Agent Card: the standard card fields plus the
- * `x-canopy` extension block (ownership, grants, lifecycle status). Skill ids are the sorted,
+ * `x-onderling` extension block (ownership, grants, lifecycle status). Skill ids are the sorted,
  * de-duplicated union of grant skills and coarse capabilities. Throws INVALID_ARGUMENT when
  * `entry` / `entry.agentId` is missing.
  *
@@ -94,9 +94,6 @@ export function projectAgentCard(entry, { owner, circleId = null } = {}) {
     authentication: Object.freeze({
       schemes: Object.freeze(['Bearer']),
     }),
-    // Naming migration 2026-07-28 — written under BOTH keys for one window (x-onderling going
-    // forward; x-canopy keeps older readers + the public feedback repo working). Readers prefer new.
     'x-onderling': extensionBlock,
-    'x-canopy':    extensionBlock,
   });
 }

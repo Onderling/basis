@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>@canopy SDK — full demo</title>
+<title>@onderling SDK — full demo</title>
 <script type="importmap">
 {
   "imports": {
@@ -171,7 +171,7 @@ button.danger{background:#3d1a1a;border:1px solid var(--red);color:var(--red)}
 <body>
 
 <header class="top">
-  <h1>@canopy SDK</h1>
+  <h1>@onderling SDK</h1>
   <span class="badge">full demo</span>
   <span class="badge green">Groups A–L</span>
   <span id="hdr-status">not started</span>
@@ -625,7 +625,7 @@ async function startAgents() {
 
   // AgentCardBuilder
   cardBuilder = new AgentCardBuilder({ agent: agentA,
-    config: { url: location.origin, description: `${label} — canopy SDK demo` } });
+    config: { url: location.origin, description: `${label} — Onderling SDK demo` } });
 
   // PeerGraph events
   peerGraph.on('added',       p => logEv(`<span class="ok">+peer</span> ${sk(p.pubKey ?? p.url)}`));

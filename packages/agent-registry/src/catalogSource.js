@@ -35,7 +35,7 @@
  * survives offline. Same `{ list, get }` shape; entries are the ranked cards.
  *
  * The returned entries are plain Agent Cards (the SAME shape createStubCatalog
- * returned) with additive `x-canopy.endorsement` ranking metadata — so 's
+ * returned) with additive `x-onderling.endorsement` ranking metadata — so 's
  * installCores (`cardId`/`declaredSkills`/`cardToEntry`) consumes them
  * unchanged and the install still runs through the capability-security grant
  * path. cardHash is re-verified inside the walk on every `get`, so a card
@@ -95,8 +95,7 @@ export function createCatalogSource({
   const resolve  = typeof resolveCard === 'function' ? resolveCard : () => null;
   const cacheOk  = cache && typeof cache.read === 'function' && typeof cache.write === 'function';
 
-  const idOf = (card) => card?.['x-onderling']?.id ?? card?.['x-canopy']?.id ?? card?.agentId
-    ?? card?.['x-onderling']?.pubKey ?? card?.['x-canopy']?.pubKey ?? card?.pubKey ?? null;
+  const idOf = (card) => card?.['x-onderling']?.id ?? card?.agentId ?? card?.['x-onderling']?.pubKey ?? card?.pubKey ?? null;
 
   /**
    * Build the per-endorser lookup the walk consumes. With `resolveEndorsements`
@@ -174,12 +173,12 @@ export function createCatalogSource({
 }
 
 /**
- * Attach additive endorsement/ranking metadata under `x-canopy.endorsement`
- * without disturbing any A2A/x-canopy field reads. `count` = distinct
+ * Attach additive endorsement/ranking metadata under `x-onderling.endorsement`
+ * without disturbing any A2A/x-onderling field reads. `count` = distinct
  * reachable endorsers (G1-compatible); `depth` = shortest trust-path proximity.
  */
 function _rank(card, { depth, endorsers, tags }) {
-  const xc = card?.['x-onderling'] ?? card?.['x-canopy'] ?? {};
+  const xc = card?.['x-onderling'] ?? {};
   const ranked = {
     ...xc,
     endorsement: {
@@ -189,6 +188,5 @@ function _rank(card, { depth, endorsers, tags }) {
       depth,
     },
   };
-  // Both spellings for one window (naming migration 2026-07-28) — readers prefer x-onderling.
-  return { ...card, 'x-onderling': ranked, 'x-canopy': ranked };
+  return { ...card, 'x-onderling': ranked };
 }

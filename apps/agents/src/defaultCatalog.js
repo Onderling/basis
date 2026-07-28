@@ -56,14 +56,13 @@ export const STUB_CATALOG_CARDS = Object.freeze([
 
 /**
  * createStubCatalog — a `{ list, get }` catalog source over a fixed card
- * list. Keyed by `x-onderling.id` (legacy `x-canopy.id`, then agentId/pubKey).
+ * list. Keyed by `x-onderling.id` (legacy `x-onderling.id`, then agentId/pubKey).
  *
  * @param {Array<object>} [cards]  installable cards (defaults to the stub set)
  * @returns {{ list: () => Promise<object[]>, get: (id: string) => Promise<object|null> }}
  */
 export function createStubCatalog(cards = STUB_CATALOG_CARDS) {
-  const idOf = (c) => c?.['x-onderling']?.id ?? c?.['x-canopy']?.id ?? c?.agentId
-    ?? c?.['x-onderling']?.pubKey ?? c?.['x-canopy']?.pubKey ?? c?.pubKey ?? null;
+  const idOf = (c) => c?.['x-onderling']?.id ?? c?.agentId ?? c?.['x-onderling']?.pubKey ?? c?.pubKey ?? null;
   const byId = new Map();
   for (const c of cards) {
     const id = idOf(c);

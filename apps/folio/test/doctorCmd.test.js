@@ -112,9 +112,9 @@ async function seedHealthyConfig() {
   };
   await fs.writeFile(join(cfgDir, 'config.json'), JSON.stringify(cfg, null, 2), 'utf8');
   // marker
-  await fs.mkdir(join(localRoot, '.canopy'), { recursive: true });
+  await fs.mkdir(join(localRoot, '.onderling'), { recursive: true });
   await fs.writeFile(
-    join(localRoot, '.canopy', '.folio-managed'),
+    join(localRoot, '.onderling', '.folio-managed'),
     JSON.stringify({ podRoot: cfg.podRoot, webId: cfg.webId, createdAt: new Date().toISOString() }),
     'utf8',
   );

@@ -21,7 +21,7 @@
 import { TextPart, DataPart } from '@onderling/core';
 
 /**
- * Map an inbound MCP tool-call `arguments` object into canopy `Part[]`.
+ * Map an inbound MCP tool-call `arguments` object into Onderling `Part[]`.
  *
  * MCP passes a JSON object of named arguments; the gated skill reads them via
  * `Parts.data(ctx.parts)`. A plain object → one `DataPart`; a bare string →

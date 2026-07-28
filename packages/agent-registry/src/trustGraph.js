@@ -25,7 +25,7 @@
  *      published no endorsements simply contributes no further edges — harmless.
  *   2. CANDIDACY is by card ROLE — a subject is offered for INSTALL (a catalog
  *      candidate) unless its card declares a curator role
- *      (`x-canopy.role ∈ {curator, community}`). A curator identity card is a
+ *      (`x-onderling.role ∈ {curator, community}`). A curator identity card is a
  *      trust node you walk THROUGH, not an agent you install. Every other role
  *      (the fixtures' default `service`, plus `agent`, …) is an installable
  *      candidate. This keeps ALL of G1's `role:'service'` cards as candidates
@@ -71,7 +71,7 @@ import { verifyEndorsement } from './endorsement.js';
 export const CURATOR_ROLES = new Set(['curator', 'community']);
 
 function roleOf(card) {
-  const r = card?.['x-onderling']?.role ?? card?.['x-canopy']?.role ?? card?.role ?? null;
+  const r = card?.['x-onderling']?.role ?? card?.role ?? null;
   return typeof r === 'string' ? r : null;
 }
 function isCuratorCard(card) {

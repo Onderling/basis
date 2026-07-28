@@ -457,9 +457,9 @@ describe('IdentityPodStore — container namespace', () => {
     expect(store.root).toBe('https://alice.example/onderling/');
   });
 
-  it('an EXISTING pre-rename /canopy/ root is honoured as-is (no data move required)', () => {
-    const { store } = makeStore({ podRoot: 'https://alice.example/canopy/' });
-    expect(store.root).toBe('https://alice.example/canopy/');   // NOT .../canopy/onderling/
+  it('an EXISTING pre-rename /onderling/ root is honoured as-is (no data move required)', () => {
+    const { store } = makeStore({ podRoot: 'https://alice.example/onderling/' });
+    expect(store.root).toBe('https://alice.example/onderling/');   // NOT .../onderling/onderling/
   });
 
   it('an explicit /onderling/ root is not doubled either', () => {

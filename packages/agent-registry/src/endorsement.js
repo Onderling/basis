@@ -14,7 +14,7 @@
  *
  * ── Why it lives in @onderling/agent-registry (invariant #5) ──────────────────
  * The endorsement is bound to an Agent Card (`SPEC-agents-registry` — the
- * `{name,url,skills[],x-canopy.pubKey}` unit this package already projects via
+ * `{name,url,skills[],x-onderling.pubKey}` unit this package already projects via
  * `projectAgentCard`). Agent Cards + the catalog read-view are a SUBSTRATE
  * concern, not kernel: putting card-governance into `@onderling/core` would make
  * the kernel know about catalog curation. So the primitive lives here in the
@@ -88,11 +88,11 @@ export function cardHash(card) {
 }
 
 /**
- * The pubKey an Agent Card declares (`x-canopy.pubKey`, else top-level).
+ * The pubKey an Agent Card declares (`x-onderling.pubKey`, else top-level).
  * The endorsement's `subject` binds to this.
  */
 function cardPubKey(card) {
-  const xc = card?.['x-onderling'] ?? card?.['x-canopy'] ?? {};   // legacy spelling still read
+  const xc = card?.['x-onderling'] ?? {};
   const pk = xc.pubKey ?? card?.pubKey ?? null;
   return (typeof pk === 'string' && pk.length > 0) ? pk : null;
 }
@@ -126,7 +126,7 @@ export function issueEndorsement(endorserIdentity, opts = {}) {
   }
   const subject = opts.subject ?? cardPubKey(card);
   if (typeof subject !== 'string' || subject.length === 0) {
-    throw Object.assign(new Error('issueEndorsement: subject (or a card with x-canopy.pubKey) required'), { code: 'INVALID_ARGUMENT' });
+    throw Object.assign(new Error('issueEndorsement: subject (or a card with x-onderling.pubKey) required'), { code: 'INVALID_ARGUMENT' });
   }
   const ts = typeof now === 'function' ? now() : Date.now();
   const unsigned = {

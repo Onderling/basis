@@ -28,7 +28,7 @@ contains (at least):
 | `dec:storage-mapping-uri` | `<pod>/private/storage-mapping` | Storage-mapping config resource |
 | `dec:agent-registry-uri` | `<pod>/private/agent-registry` | Agent-registry config resource |
 
-`dec:` is `https://w3id.org/canopy/vocab#`.
+`dec:` is `https://w3id.org/onderling/vocab#`.
 
 These are written by `pod-onboarding.provisionDefault()` →
 `patchWebidProfile({pointers, predicates})`. The exact predicate
@@ -82,7 +82,7 @@ that apps know to look up) and valued by **destination URI**.
 
 ```json
 {
-  "@context":    { "dec": "https://w3id.org/canopy/vocab#" },
+  "@context":    { "dec": "https://w3id.org/onderling/vocab#" },
   "version":     1,
   "activeMap": {
     "items":           "<pod>/sharing/items/",

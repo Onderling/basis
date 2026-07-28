@@ -4,7 +4,7 @@
  * Fetches /.well-known/agent.json, validates required fields, builds an
  * A2A peer record, and upserts it into the agent's PeerGraph (if available).
  *
- * If the card contains x-onderling.pubKey (legacy: x-canopy) + nknAddr/relayUrl, a native
+ * If the card contains x-onderling.pubKey + nknAddr/relayUrl, a native
  * hello upgrade is attempted transparently.
  */
 
@@ -37,7 +37,7 @@ export async function discoverA2A(agent, url, opts = {}) {
 
   _validateCard(card, url);
 
-  const xd = card['x-onderling'] ?? card['x-canopy'] ?? {};   // legacy spelling still read
+  const xd = card['x-onderling'] ?? {};
 
   const peerRecord = {
     type:        'a2a',

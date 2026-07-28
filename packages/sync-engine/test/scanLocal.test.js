@@ -58,11 +58,11 @@ describe('scanLocal', () => {
     expect(rels).toEqual(['recipes/desserts/cake.md', 'top.md']);
   });
 
-  it('skips dotfiles and .canopy/', async () => {
+  it('skips dotfiles and .onderling/', async () => {
     await fs.writeFile(join(root, '.hidden'), 'x');
     await fs.writeFile(join(root, 'visible.md'), 'y');
-    await fs.mkdir(join(root, '.canopy'), { recursive: true });
-    await fs.writeFile(join(root, '.canopy', 'state.json'), '{}');
+    await fs.mkdir(join(root, '.onderling'), { recursive: true });
+    await fs.writeFile(join(root, '.onderling', 'state.json'), '{}');
     const out = await scanLocal(root, { pathMap: pm() });
     const rels = out.map((f) => f.relPath);
     expect(rels).toEqual(['visible.md']);

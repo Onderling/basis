@@ -1,5 +1,5 @@
 /**
- * manifestToMcpTools.js — EXPORT direction (canopy skills → MCP tools).
+ * manifestToMcpTools.js — EXPORT direction (Onderling skills → MCP tools).
  *
  * A PURE projector (no I/O): it turns an app `manifest.js` into an MCP
  * `tools/list` result. Each declared op becomes one MCP tool:

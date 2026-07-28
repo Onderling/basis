@@ -1,10 +1,10 @@
-# canopy — documentation
+# onderling — documentation
 
-Public documentation for the canopy monorepo (working name **Onderling**). If you're new here, read in
+Public documentation for the onderling monorepo (working name **Onderling**). If you're new here, read in
 this order.
 
 ## Start here
-1. **[Project overview](../README.md)** — what canopy is, the apps, the architecture model, and how to run
+1. **[Project overview](../README.md)** — what onderling is, the apps, the architecture model, and how to run
    things. This is the front page; everything below is detail.
 2. **[QUICKSTART](../QUICKSTART.md)** — a minimal hands-on agent in a few lines of code.
 3. **[Repository layout](./repository-layout.md)** — the apps, the packages (SDK → substrates), and how the

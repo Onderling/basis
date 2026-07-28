@@ -73,11 +73,14 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
 - **Shared vocabularies** (delivery states, entry kinds, roles, label maps) — the index of what already
   exists, and the rule that a new one needs a home + a guard — [`shared-vocabularies.md`](docs/conventions/shared-vocabularies.md).
 - **Record a decision** when a choice closes off alternatives / would be re-litigated / shapes architecture (→ `docs/decisions.md`) or org (→ private) — [`decision-log.md`](docs/conventions/decision-log.md).
-- **No new "canopy" identifiers** (Frits, 2026-07-28). Product/platform naming in code, comments, labels
-  and schemes is **onderling** (or neutral). `canopy` survives only in FROZEN persisted/wire names that
-  need a decided migration to change (pod `canopy/` layout, `https://canopy.org/ns`, `x-canopy` card
-  fields, `canopy.mappings:` storage keys, `com.canopy.hub.BIND`, parse-only legacy `canopy-pair://`) —
-  the inventory + migration question lives in `plans/DECISIONS-FOR-REVIEW.md` 2026-07-28.
+- **No "canopy" identifiers, anywhere** (Frits, 2026-07-28). Product/platform naming in code, comments,
+  labels, schemes, storage keys, namespaces and derivation inputs is **onderling** (or neutral).
+- **⏳ BACKWARDS COMPATIBILITY IS NOT REQUIRED — until 2026-07-31** (Frits, 2026-07-28). Nothing is
+  live: no external users, no data worth migrating. So a rename/reshape lands as a **clean break** —
+  no dual-write windows, no legacy read-fallbacks, no deprecated aliases. They are dead weight that
+  reads as caution and hides which path is real. **After 2026-07-31 this expires: ASK Frits whether it
+  still holds before breaking a persisted/wire format.** (Consequence, accepted: existing local dev
+  state — sealed pods, derived addresses, passkey vault keys — re-derives and may need re-creating.)
 
 ## How to work
 - **Go through the SURFACE, never the transport.** App/shell code must not construct or drive

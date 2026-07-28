@@ -1,6 +1,6 @@
 # Architecture
 
-The deep version of how canopy fits together. If you only need the summary, the one-sentence model +
+The deep version of how onderling fits together. If you only need the summary, the one-sentence model +
 invariants in [`CLAUDE.md`](../CLAUDE.md) and the [project overview](../README.md) are enough. Read this when
 you need to *understand the whole system* — why it's shaped this way, and how a request actually flows.
 

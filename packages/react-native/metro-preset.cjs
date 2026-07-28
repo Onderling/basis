@@ -208,17 +208,17 @@ function withOnderlingPreset(options) {
   // resolve the bare `@onderling/<x>` import under
   // `unstable_enablePackageExports: false`) AND a `watchFolders` entry
   // (Metro rejects files outside projectRoot/watchFolders even when
-  // resolved).  Node-only canopy packages (e.g. `@onderling/relay`) stay
+  // resolved).  Node-only onderling packages (e.g. `@onderling/relay`) stay
   // shimmed: their explicit `SHIM_PATHS.nodeBuiltins` entries appear
   // LATER in the `extraNodeModules` object literal below and therefore
   // override the directory alias produced here.
-  const CANOPY_PACKAGES_DIR = path.resolve(repoRoot, 'packages');
-  const canopyWorkspaceAliases = {};
-  const canopyWorkspaceDirs = [];
-  const canopyPkgMeta = {}; // name -> { dir, exports } for subpath resolution
-  for (const entry of fs.readdirSync(CANOPY_PACKAGES_DIR, { withFileTypes: true })) {
+  const ONDERLING_PACKAGES_DIR = path.resolve(repoRoot, 'packages');
+  const onderlingWorkspaceAliases = {};
+  const onderlingWorkspaceDirs = [];
+  const onderlingPkgMeta = {}; // name -> { dir, exports } for subpath resolution
+  for (const entry of fs.readdirSync(ONDERLING_PACKAGES_DIR, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
-    const pkgDir = path.resolve(CANOPY_PACKAGES_DIR, entry.name);
+    const pkgDir = path.resolve(ONDERLING_PACKAGES_DIR, entry.name);
     let pkgJson;
     try {
       pkgJson = require(path.join(pkgDir, 'package.json'));
@@ -227,9 +227,9 @@ function withOnderlingPreset(options) {
     }
     const name = pkgJson.name;
     if (typeof name !== 'string' || !name.startsWith('@onderling/')) continue;
-    canopyWorkspaceAliases[name] = pkgDir;
-    canopyWorkspaceDirs.push(pkgDir);
-    canopyPkgMeta[name] = { dir: pkgDir, exports: pkgJson.exports };
+    onderlingWorkspaceAliases[name] = pkgDir;
+    onderlingWorkspaceDirs.push(pkgDir);
+    onderlingPkgMeta[name] = { dir: pkgDir, exports: pkgJson.exports };
   }
 
   // ── Start from Expo's default config. ─────────────────────────────
@@ -239,7 +239,7 @@ function withOnderlingPreset(options) {
   // ── Watch folders (preset's monorepo defaults + app's extras). ────
   config.watchFolders = [
     ...(config.watchFolders ?? []),
-    ...canopyWorkspaceDirs,
+    ...onderlingWorkspaceDirs,
     ...watchFolders,
   ];
 
@@ -288,7 +288,7 @@ function withOnderlingPreset(options) {
   //
   //    Everything else in every package's node_modules resolves and
   //    crawls normally (plain JS libs are harmless to index).  Built
-  //    from `canopyWorkspaceDirs` so it stays drift-proof alongside
+  //    from `onderlingWorkspaceDirs` so it stays drift-proof alongside
   //    the auto-discovery.  Substrate Expo/RN deps are peerDeps the
   //    host app provides; the app (a full Expo app) carries the whole
   //    SDK set, so forcing its copy is correct (a missing one would be
@@ -296,7 +296,7 @@ function withOnderlingPreset(options) {
   const ECOSYSTEM_ALT =
     '@react-native[^/\\\\]*|@expo|expo(?:-[^/\\\\]+)?|' +
     'react-native(?:-[^/\\\\]+)?|react-dom|react|chokidar|readdirp';
-  const blockedSubtreeRegExps = canopyWorkspaceDirs.map((d) => {
+  const blockedSubtreeRegExps = onderlingWorkspaceDirs.map((d) => {
     const esc = path.resolve(d, 'node_modules').replace(/[/\\]/g, '[/\\\\]');
     return new RegExp(`^${esc}[/\\\\](?:${ECOSYSTEM_ALT})[/\\\\]`);
   });
@@ -327,7 +327,7 @@ function withOnderlingPreset(options) {
       // `packages/*` above (drift-proof; Node-only ones like
       // `@onderling/relay` are re-shimmed by the explicit entries below,
       // which win as later keys in this object literal).
-      ...canopyWorkspaceAliases,
+      ...onderlingWorkspaceAliases,
 
       // ws is Node-only; RN has globalThis.WebSocket built in.
       'ws': SHIM_PATHS.ws,
@@ -426,7 +426,7 @@ function withOnderlingPreset(options) {
         const slash = rest.indexOf('/');
         if (slash !== -1) {
           const pkg = '@onderling/' + rest.slice(0, slash);
-          const meta = canopyPkgMeta[pkg];
+          const meta = onderlingPkgMeta[pkg];
           if (meta) {
             const resolved = resolveExportsSubpath(
               meta.exports, meta.dir, rest.slice(slash + 1), platform,
@@ -459,6 +459,4 @@ function withOnderlingPreset(options) {
   return config;
 }
 
-// `withCanopyPreset` is the legacy alias (naming decision 2026-07-28: no new "canopy" identifiers);
-// existing metro configs keep working, new ones use `withOnderlingPreset`.
-module.exports = { withOnderlingPreset, withCanopyPreset: withOnderlingPreset, NODE_BUILTINS };
+module.exports = { withOnderlingPreset, NODE_BUILTINS };

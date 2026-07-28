@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# start-relay.sh — start the @canopy/relay broker on this machine.
+# start-relay.sh — start the @onderling/relay broker on this machine.
 #
 # Convenience wrapper around `node packages/relay/bin/relay.js`.
 # Prints the LAN-reachable WebSocket URL on startup; copy it into

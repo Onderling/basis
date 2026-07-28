@@ -10,7 +10,7 @@
  *      and NOTHING is scaffolded. This is why was gated on.
  *   2. GENERATES a runnable app skeleton as a `{ <path>: <content> }` map:
  *        - `package.json` — name `@onderling-app/<appId>`, `type: module`, a test
- *          script, `@onderling/sdk` as the dependency, and a `canopy` block that
+ *          script, `@onderling/sdk` as the dependency, and a `onderling` block that
  *          records the requires + the per-capability SDK sub-path import
  *          specifiers (: core→/core, transports→/transports, vault→/vault,
  *          pod→/pod, high→the barrel `@onderling/sdk`).
@@ -45,7 +45,7 @@ export const APP_SCAFFOLD_CODES = Object.freeze({
  * capability → the SDK import specifier the scaffolded app should use.
  * Every specifier resolves to the single `@onderling/sdk` package (sub-path
  * exports), so the npm dependency is always just `@onderling/sdk`; this map is
- * what the generated code IMPORTS and what `package.json.canopy.sdkImports`
+ * what the generated code IMPORTS and what `package.json.onderling.sdkImports`
  * records per requested capability.
  *
  *   - core       → @onderling/sdk/core
@@ -158,13 +158,13 @@ function genPackageJson({ appId, caps }) {
       // Every requested capability resolves to the single @onderling/sdk package
       // via its sub-path exports, so the dependency is @onderling/sdk regardless
       // of which slices are requested. The per-capability import specifiers
-      // live under `canopy.sdkImports`.
+      // live under `onderling.sdkImports`.
       '@onderling/sdk': '^0.1.0',
     },
     devDependencies: {
       vitest: '^3.0.0',
     },
-    canopy: {
+    onderling: {
       scaffold:   '@onderling/app-scaffold@0.1.0',
       requires:   caps,
       sdkImports,

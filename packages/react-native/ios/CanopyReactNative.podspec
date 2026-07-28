@@ -3,14 +3,14 @@ require 'json'
 package = JSON.parse(File.read(File.join(__dir__, '..', 'package.json')))
 
 Pod::Spec.new do |s|
-  s.name         = "CanopyReactNative"
+  s.name         = "OnderlingReactNative"
   s.version      = package["version"]
-  s.summary      = package["description"] || "canopy react-native native bindings"
+  s.summary      = package["description"] || "onderling react-native native bindings"
   s.license      = "MIT"
-  s.author       = { "canopy" => "hello@canopy.local" }
-  s.homepage     = "https://github.com/Phrytes/canopy-mono"
+  s.author       = { "onderling" => "hello@onderling.local" }
+  s.homepage     = "https://github.com/Phrytes/onderling-mono"
   s.platform     = :ios, "13.0"
-  s.source       = { :git => "https://github.com/Phrytes/canopy-mono.git" }
+  s.source       = { :git => "https://github.com/Phrytes/onderling-mono.git" }
   s.source_files = "*.{h,m,mm,swift}"
 
   # Native iOS transports (BLE, Bonjour) are not yet implemented.

@@ -38,7 +38,7 @@ const sampleHints = () => ([
   },
   {
     method:     'cloud-backup-dropbox',
-    identifier: 'canopy-backup',
+    identifier: 'onderling-backup',
     setupAt:    '2026-04-28T10:35:00Z',
   },
 ]);
@@ -84,9 +84,9 @@ describe('CloudBackup — constructor', () => {
     expect(cb.ref).toBe('foo.enc');
   });
 
-  it('defaults to canopy-cloud-backup.enc', () => {
+  it('defaults to onderling-cloud-backup.enc', () => {
     const cb = new CloudBackup({ adapter: new MemoryAdapter() });
-    expect(cb.ref).toBe('canopy-cloud-backup.enc');
+    expect(cb.ref).toBe('onderling-cloud-backup.enc');
   });
 });
 
@@ -157,7 +157,7 @@ describe('CloudBackup — error paths', () => {
 
     // Mutate the stored envelope: flip a byte inside the base64-encoded
     // ciphertext string.
-    const stored = await adapter.get('canopy-cloud-backup.enc');
+    const stored = await adapter.get('onderling-cloud-backup.enc');
     const env    = JSON.parse(new TextDecoder().decode(stored));
     // Flip a character near the end of the ct string (still base64-valid).
     const ctChars = env.ct.split('');
@@ -165,7 +165,7 @@ describe('CloudBackup — error paths', () => {
     ctChars[i] = ctChars[i] === 'A' ? 'B' : 'A';
     env.ct = ctChars.join('');
     await adapter.put(
-      'canopy-cloud-backup.enc',
+      'onderling-cloud-backup.enc',
       new TextEncoder().encode(JSON.stringify(env)),
     );
 
@@ -182,7 +182,7 @@ describe('CloudBackup — error paths', () => {
   it('malformed envelope JSON throws CLOUD_BACKUP_MALFORMED', async () => {
     const adapter = new MemoryAdapter();
     await adapter.put(
-      'canopy-cloud-backup.enc',
+      'onderling-cloud-backup.enc',
       new TextEncoder().encode('not json at all'),
     );
     const cb = new CloudBackup({ adapter, argonOpts: FAST_ARGON });
@@ -193,7 +193,7 @@ describe('CloudBackup — error paths', () => {
   it('envelope with missing fields throws CLOUD_BACKUP_MALFORMED', async () => {
     const adapter = new MemoryAdapter();
     await adapter.put(
-      'canopy-cloud-backup.enc',
+      'onderling-cloud-backup.enc',
       new TextEncoder().encode(JSON.stringify({ v: 1, alg: 'argon2id+xsalsa20poly1305' })),
     );
     const cb = new CloudBackup({ adapter, argonOpts: FAST_ARGON });

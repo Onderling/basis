@@ -52,7 +52,7 @@ describe('circle link proof', () => {
   });
 
   it('the challenge is deterministic and binds join + address', () => {
-    expect(circleLinkMessage('werk-7', 'ADDR')).toBe('canopy-circle-link-v1|werk-7|ADDR');
+    expect(circleLinkMessage('werk-7', 'ADDR')).toBe('onderling-circle-link-v1|werk-7|ADDR');
     expect(circleLinkMessage('werk-7', 'ADDR')).not.toBe(circleLinkMessage('anders-9', 'ADDR'));
   });
 });

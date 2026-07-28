@@ -123,7 +123,7 @@ sub-second.
 
 The mesh-demo's existing dev build is installed on the user's phone.
 Folio-mobile uses a **different** application ID
-(`ag.canopy.foliomobile`), so it needs its own dev build.  Per
+(`org.onderling.foliomobile`), so it needs its own dev build.  Per
 CLAUDE.md, you should NOT run `npx expo run:android` for this app
 without explicit user approval — that prebuilds and installs a fresh
 APK.

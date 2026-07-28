@@ -1,6 +1,6 @@
 /**
  * @onderling/sync-engine-rn — React Native bootstrap helpers for the
- * canopy sync-engine + pod-client.
+ * onderling sync-engine + pod-client.
  *
  * **Layer: SDK foundation (RN sibling).** Cross-platform sync logic
  * lives in `@onderling/sync-engine`; this package is RN-only wiring

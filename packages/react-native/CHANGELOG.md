@@ -27,7 +27,7 @@ major for breaking changes.
     that throw `VERSION_UNSUPPORTED` on V1 bindings.
   - `negotiateVersion({clientVersions, hubVersions})` exposed as a
     pure helper.
-  - AIDL interface files committed at `android/aidl/com/canopy/hub/`:
+  - AIDL interface files committed at `android/aidl/com/onderling/hub/`:
     `IHub_V1.aidl`, `IHub_V2.aidl` (direction-only), `IIncomingCallback.aidl`.
   - Native module + build integration documented in
     `android/HUB-BINDING-BUILD.md`.
@@ -76,8 +76,8 @@ major for breaking changes.
 - **`metro-preset.cjs`** — exported reusable Metro preset.  Apps
   consume via:
   ```js
-  const { withCanopyPreset } = require('@onderling/react-native/metro-preset');
-  module.exports = withCanopyPreset({ projectRoot: __dirname, repoRoot: '...' });
+  const { withOnderlingPreset } = require('@onderling/react-native/metro-preset');
+  module.exports = withOnderlingPreset({ projectRoot: __dirname, repoRoot: '...' });
   ```
   Encapsulates: NODE_BUILTINS shim list, `node:` prefix stripping,
   `util` / `path` / `ws` shim routing, monorepo subpath handling,
@@ -109,7 +109,7 @@ major for breaking changes.
   `Project Files/Substrates/L0-react-native.md` § "V0 deliverable"
   for the migration plan.
 - New apps starting on RN should consume the preset directly:
-  - `apps/<my-app>/metro.config.js` → `withCanopyPreset(...)`
+  - `apps/<my-app>/metro.config.js` → `withOnderlingPreset(...)`
   - `apps/<my-app>/index.js` → `import '@onderling/react-native/platform/polyfills';` first.
 - BRING-UP-NOTES.md is the canonical reference for new mobile
   bring-ups; append new traps here, don't duplicate in app docs.

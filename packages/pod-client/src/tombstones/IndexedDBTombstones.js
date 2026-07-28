@@ -9,7 +9,7 @@
  */
 import { TombstoneStore } from '../TombstoneStore.js';
 
-const DEFAULT_DB_NAME    = 'canopy-pod-client';
+const DEFAULT_DB_NAME    = 'onderling-pod-client';
 const DEFAULT_STORE_NAME = 'tombstones';
 
 /**
@@ -23,7 +23,7 @@ export class IndexedDBTombstones extends TombstoneStore {
 
   /**
    * @param {object} [opts]
-   * @param {string} [opts.dbName='canopy-pod-client']
+   * @param {string} [opts.dbName='onderling-pod-client']
    * @param {string} [opts.storeName='tombstones']
    */
   constructor({ dbName = DEFAULT_DB_NAME, storeName = DEFAULT_STORE_NAME } = {}) {

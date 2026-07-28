@@ -144,7 +144,7 @@ const proof = await sa.groups.issueProof('pk-alice', 'circle-1', { role: 'member
 
 // One-shot vault → pod migration (Track B)
 const report = await sa.migrateVaultToPod({
-  podClient, podRoot: 'https://alice.example/canopy/', mnemonic: '...',
+  podClient, podRoot: 'https://alice.example/onderling/', mnemonic: '...',
 });
 report.migrated;        // keys migrated
 report.skipped;         // keys NOT migrated (with reason)
@@ -175,7 +175,7 @@ sa.audit.filter(/^mute\./);                 // → all mute events
 sa.audit.verify();                          // → { ok: true }
 
 // Pod-side mirroring
-await podWriter.put('canopy/audit/log.json', sa.audit.serialize());
+await podWriter.put('onderling/audit/log.json', sa.audit.serialize());
 ```
 
 ### S5 — caps + roles + trust
@@ -253,7 +253,7 @@ const v = sa.claim.verify(receivedClaim);
 if (!v.ok) throw new Error(`claim invalid: ${v.reason}`);
 
 // Pod-side storage
-await podWriter.put('canopy/identity/claim.json', sa.claim.serialize(claim));
+await podWriter.put('onderling/identity/claim.json', sa.claim.serialize(claim));
 ```
 
 ## What's wired today (S0 → S8 — every roadmap slice)

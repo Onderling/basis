@@ -37,10 +37,7 @@ export function useExtensionInstall({ store, deviceId, catalog, onInstalled }) {
   // Register the global/dev trigger while this hook is mounted.
   useEffect(() => {
     _trigger = requestInstall;
-    if (typeof globalThis !== 'undefined') {
-      globalThis.onderlingInstallExtension = requestInstall;
-      globalThis.canopyInstallExtension = requestInstall;   // legacy alias (tools/e2e)
-    }
+    if (typeof globalThis !== 'undefined') globalThis.onderlingInstallExtension = requestInstall;
     return () => { if (_trigger === requestInstall) _trigger = null; };
   }, [requestInstall]);
 

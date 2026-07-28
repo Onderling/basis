@@ -30,7 +30,7 @@ for the full plan, the 10 scenarios (S1–S10), and the bring-up runbook.
 ```
 apps/sdk-smoke/
 ├── App.js                       # one screen, one section per scenario
-├── app.json                     # Expo config (ag.canopy.sdksmoke)
+├── app.json                     # Expo config (org.onderling.sdksmoke)
 ├── babel.config.js
 ├── metro.config.js              # mirrors mesh-demo's pinned RN/Expo wiring
 ├── index.js                     # registerRootComponent
@@ -112,8 +112,8 @@ during the hands-on session.
    Press `a` in the Metro CLI (or scan the QR) to attach the device.
 
 > **Do NOT run `npx expo run:android`.**  Phone-A's existing mesh-demo dev
-> build (CLAUDE.md gotcha) is at `com.canopy.meshdemo`, distinct from
-> sdk-smoke's `ag.canopy.sdksmoke`.  `expo run:android` will install the
+> build (CLAUDE.md gotcha) is at `org.onderling.meshdemo`, distinct from
+> sdk-smoke's `org.onderling.sdksmoke`.  `expo run:android` will install the
 > wrong target onto the wrong build slot.  Stick to `expo start` + sideloaded
 > dev client.
 

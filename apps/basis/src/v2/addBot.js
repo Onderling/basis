@@ -12,7 +12,7 @@
  *   - an **https URL** → REUSES core `discoverA2A(coreAgent, url, {peerGraph})`,
  *     which fetches the bot's `/.well-known/agent.json` agent card, upserts an
  *     `a2a` peer (skills become SkillCards → commands), and — if the card
- *     carries `x-canopy.pubKey`+`peerAddr` — transparently upgrades to a native
+ *     carries `x-onderling.pubKey`+`peerAddr` — transparently upgrades to a native
  *     peer so the conversational channel reaches it over sa.peer (mdns/relay/nkn);
  *   - a **raw peer address** (NKN/pubKey, optionally `addr|Name`) → a manual
  *     `hybrid` upsert, for a peer-only bot with no HTTP card.

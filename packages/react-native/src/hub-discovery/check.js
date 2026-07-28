@@ -2,7 +2,7 @@
  * `check()` — detect whether the Hub-Android is installed.
  *
  * Calls the Android `PackageManager.queryIntentServices` query for
- * the Hub's well-known intent action (`com.canopy.hub.BIND`). The
+ * the Hub's well-known intent action (`org.onderling.hub.BIND`). The
  * native module bridge owns the actual Java/Kotlin call; this module
  * normalises the result + caches it.
  *
@@ -16,7 +16,7 @@
  * @property {string}  [checkedAt]       — ISO timestamp of this check
  */
 
-const DEFAULT_INTENT_ACTION = 'com.canopy.hub.BIND';
+const DEFAULT_INTENT_ACTION = 'org.onderling.hub.BIND';
 
 /**
  * @param {object} args

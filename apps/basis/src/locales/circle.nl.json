@@ -3526,7 +3526,7 @@
     },
     "scanUnknown": {
       "text": "Die code is geen koppelcode voor een apparaat.",
-      "doc": "OBJ-2 — shown when a scanned/pasted code is not a canopy-pair payload."
+      "doc": "OBJ-2 — shown when a scanned/pasted code is not a onderling-pair payload."
     },
     "paired": {
       "text": "Gekoppeld ✓",

@@ -10,12 +10,12 @@
 // `Project Files/SDK/react-native-v2-coding-plan-2026-05-11.md` §51.7.
 //
 // Permission: every call requires the caller hold
-// `com.canopy.hub.PERMISSION_BIND`. The Hub additionally checks the
+// `org.onderling.hub.PERMISSION_BIND`. The Hub additionally checks the
 // caller's package signature against its trusted-signers list.
 
-package com.canopy.hub;
+package org.onderling.hub;
 
-import com.canopy.hub.IIncomingCallback;
+import org.onderling.hub.IIncomingCallback;
 
 interface IHub_V1 {
     /**

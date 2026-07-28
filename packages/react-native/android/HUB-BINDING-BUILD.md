@@ -11,7 +11,7 @@ requires building these as part of the consuming app's Android project.
 ## Files
 
 ```
-android/aidl/com/canopy/hub/
+android/aidl/com/onderling/hub/
 ├── IHub_V1.aidl          — Phase 51.7 interface
 ├── IHub_V2.aidl          — Phase 51.11 (direction-only) additive surface
 └── IIncomingCallback.aidl — bundle-side callback for inbound envelopes
@@ -38,7 +38,7 @@ RN ↔ Android-AIDL integration ships):
 ```
 
 The plugin copies the `.aidl` files into the host project's
-`android/app/src/main/aidl/com/canopy/hub/` directory at prebuild
+`android/app/src/main/aidl/com/onderling/hub/` directory at prebuild
 time. Gradle's `aidl` tool generates the Java stubs as part of the
 normal Android build cycle.
 
@@ -61,7 +61,7 @@ The Hub declares a custom Android signature-level permission:
 ```xml
 <!-- in the Hub APK's AndroidManifest.xml -->
 <permission
-    android:name="com.canopy.hub.PERMISSION_BIND"
+    android:name="org.onderling.hub.PERMISSION_BIND"
     android:label="Bind to the Decentralised Web Agent Hub"
     android:protectionLevel="signature" />
 ```
@@ -75,7 +75,7 @@ trusted at install time.
 
 ```xml
 <!-- in the bundle (Tasks / Stoop / Folio) AndroidManifest.xml -->
-<uses-permission android:name="com.canopy.hub.PERMISSION_BIND" />
+<uses-permission android:name="org.onderling.hub.PERMISSION_BIND" />
 ```
 
 ---
@@ -85,7 +85,7 @@ trusted at install time.
 Two native Android modules paired with the JS-side wrappers:
 
 ```
-android/src/main/java/com/canopy/react/
+android/src/main/java/com/onderling/react/
 ├── HubDiscoveryModule.kt   — Phase 51.6 PackageManager wrapper
 └── HubBindingModule.kt     — Phase 51.8 binding + 51.9 callback bridge
 ```
@@ -137,7 +137,7 @@ const { hubInstalled } = await hd.check();
 if (hubInstalled) {
   const binding = await bind({
     nativeModule: NativeModules.HubBinding,
-    intentAction: 'com.canopy.hub.BIND',
+    intentAction: 'org.onderling.hub.BIND',
     hubVersion:   1,
   });
   // …

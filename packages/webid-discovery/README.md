@@ -129,11 +129,11 @@ on their own.
 
 ## Predicate namespace
 
-Predicates live under `https://canopy.org/ns#`. Short form is
+Predicates live under `https://onderling.org/ns#`. Short form is
 `dec:` (matched by `discoverPointers`'s Turtle parser without
 requiring a `@prefix` declaration). Both forms are recognised:
 
-- `<https://canopy.org/ns#storage-mapping-uri>` (full IRI)
+- `<https://onderling.org/ns#storage-mapping-uri>` (full IRI)
 - `dec:storage-mapping-uri` (short)
 
 JSON-LD profiles can use either the full-IRI key, the short-name

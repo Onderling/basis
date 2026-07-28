@@ -4,7 +4,7 @@
  * Persistent across `PodClient` restarts.  Writes are atomic: data is
  * written to `<path>.tmp` then renamed onto `<path>`.
  *
- * Default path: `os.tmpdir() + '/canopy-tombstones.json'`.  Pass an
+ * Default path: `os.tmpdir() + '/onderling-tombstones.json'`.  Pass an
  * explicit `{ path }` for production deployments — `os.tmpdir()` may be
  * cleaned by the OS.
  */
@@ -14,12 +14,12 @@ import path from 'node:path';
 
 import { TombstoneStore } from '../TombstoneStore.js';
 
-const DEFAULT_FILENAME = 'canopy-tombstones.json';
+const DEFAULT_FILENAME = 'onderling-tombstones.json';
 
 /**
  * Node-side `TombstoneStore` backed by a single JSON file, persistent across `PodClient` restarts.
  * Writes are atomic (written to `<path>.tmp`, then renamed onto `<path>`). Defaults to
- * `os.tmpdir() + '/canopy-tombstones.json'`; pass an explicit `{ path }` for production use.
+ * `os.tmpdir() + '/onderling-tombstones.json'`; pass an explicit `{ path }` for production use.
  */
 export class FileTombstones extends TombstoneStore {
   #path;
@@ -29,7 +29,7 @@ export class FileTombstones extends TombstoneStore {
   /**
    * @param {object} [opts]
    * @param {string} [opts.path]  — absolute path; defaults to
-   *   `os.tmpdir() + '/canopy-tombstones.json'`.
+   *   `os.tmpdir() + '/onderling-tombstones.json'`.
    */
   constructor({ path: filePath } = {}) {
     super();

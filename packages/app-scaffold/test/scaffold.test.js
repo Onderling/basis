@@ -62,14 +62,14 @@ describe('scaffoldApp — happy path', () => {
 
   it('package.json carries the right SDK sub-path deps for the requires', () => {
     const pkg = JSON.parse(files['package.json']);
-    expect(pkg.canopy.requires).toEqual(['core', 'high', 'pod']);
-    expect(pkg.canopy.sdkImports).toEqual({
+    expect(pkg.onderling.requires).toEqual(['core', 'high', 'pod']);
+    expect(pkg.onderling.sdkImports).toEqual({
       core: '@onderling/sdk/core',
       high: '@onderling/sdk',
       pod:  '@onderling/sdk/pod',
     });
     // high maps to the barrel; pod maps to the /pod sub-path.
-    expect(pkg.canopy.sdkImports.pod).toBe(CAPABILITY_SDK_IMPORT.pod);
+    expect(pkg.onderling.sdkImports.pod).toBe(CAPABILITY_SDK_IMPORT.pod);
   });
 
   it('src/index.js imports createAgent from @onderling/sdk/high + wireSkill', () => {
@@ -126,7 +126,7 @@ describe('scaffoldApp — requires validation (SP-9 gate)', () => {
       appId: 'demo',
     });
     const pkg = JSON.parse(files['package.json']);
-    expect(pkg.canopy.sdkImports).toEqual({
+    expect(pkg.onderling.sdkImports).toEqual({
       core:       '@onderling/sdk/core',
       transports: '@onderling/sdk/transports',
       vault:      '@onderling/sdk/vault',

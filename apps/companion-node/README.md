@@ -58,7 +58,7 @@ Env vars for `src/boot.js`:
 | `COMPANION_RELAY_URL` | *(unset ⇒ boot local relay)* | connect to a shared relay as a client (decision #5) |
 | `PORT` | `0` (OS-assigned) | local-relay port (ignored when `COMPANION_RELAY_URL` is set) |
 | `HOST` | `127.0.0.1` | local-relay bind host |
-| `COMPANION_NODE_CONFIG_DIR` | `~/.config/canopy-companion` | where the host keypair is persisted |
+| `COMPANION_NODE_CONFIG_DIR` | `~/.config/onderling-companion` | where the host keypair is persisted |
 
 No user-facing surface ⇒ no localisation section.
 

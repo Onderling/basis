@@ -93,7 +93,7 @@ describe('MdnsTransport', () => {
     await transport.connect();
     expect(h.native.start).toHaveBeenCalledTimes(1);
     const [type, host, pubKey] = h.native.start.mock.calls[0];
-    expect(type).toBe('_canopy');
+    expect(type).toBe('_onderling');
     expect(host).toBe(`dw-${identity.pubKey.slice(0, 8)}`);
     expect(pubKey).toBe(identity.pubKey);
     await transport.connect();

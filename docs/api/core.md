@@ -216,7 +216,7 @@ A2AAuth — JWT validation for inbound A2A requests and outbound token managemen
 Trust tier assignment for inbound callers:
   0 — no Authorization header
   1 — valid Bearer JWT (not expired)
-  2 — JWT + x-canopy-groups claim verified by GroupManager
+  2 — JWT + x-onderling-groups claim verified by GroupManager
   3 — JWT + capability-token claim verified by TokenRegistry
 
 Note: JWT signature is NOT verified here (trust TLS + token issuer).

@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { tasksManifest }        from '../../../apps/tasks-v0/manifest.js';
 import { manifestToMcpTools }   from '../src/index.js';
 
-describe('manifestToMcpTools — canopy manifest → MCP tools/list', () => {
+describe('manifestToMcpTools — onderling manifest → MCP tools/list', () => {
   const { tools } = manifestToMcpTools(tasksManifest);
 
   it('produces one MCP tool per manifest op, in order', () => {

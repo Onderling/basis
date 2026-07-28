@@ -40,7 +40,7 @@ const vaultCacheKeyFor   = (resourcePath) => VAULT_CACHE_PREFIX + resourcePath;
 import { MockPod } from '../../../src/_harness/index.js';
 
 const POD_ROOT     = 'https://alice.example/';
-const POD_CANOPY = 'https://alice.example/canopy/';
+const POD_ONDERLING = 'https://alice.example/onderling/';
 const SYNC_INTERVAL_MS = 60_000;
 
 /**

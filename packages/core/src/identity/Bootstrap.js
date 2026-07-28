@@ -38,9 +38,8 @@ import {
 } from './Mnemonic.js';
 
 const SEED_LEN     = 32;
-// ⚠ FROZEN FOREVER — HKDF domain-separation input (hashed, invisible). Renaming re-derives every
-// identity/agent seed and orphans existing state; a future scheme starts at 'onderling-identity-v2:'.
-const HKDF_INFO_NS = 'canopy-identity-v1:';
+// HKDF domain-separation input (hashed, invisible). Clean break pre-launch — see circleAddress.js.
+const HKDF_INFO_NS = 'onderling-identity-v1:';
 const HKDF_LEN     = 32;
 const SALT_LEN     = 16;
 
@@ -50,7 +49,7 @@ const SALT_LEN     = 16;
  * salt (stored in the envelope), an agent seed must be reproducible from the phrase
  * ALONE — so the salt is a constant. Changing it would re-key every derived profile.
  */
-const _AGENT_SEED_SALT = new TextEncoder().encode('canopy-agent-seed-v1');
+const _AGENT_SEED_SALT = new TextEncoder().encode('onderling-agent-seed-v1');
 
 /**
  * Root identity secret + key derivation.
@@ -154,7 +153,7 @@ export class Bootstrap {
    *   K_resource = HKDF-SHA256(
    *     ikm    = bootstrap_secret,
    *     salt   = <random per-resource salt, stored in envelope>,
-   *     info   = "canopy-identity-v1:" + relative-resource-path,
+   *     info   = "onderling-identity-v1:" + relative-resource-path,
    *     length = 32 bytes
    *   )
    *
@@ -184,7 +183,7 @@ export class Bootstrap {
    * `AgentIdentity.fromSeed(seed, vault)`.
    *
    *   seed = HKDF-SHA256(ikm=root_secret, salt=_AGENT_SEED_SALT (fixed),
-   *                      info="canopy-identity-v1:agent-seed:" + label, len=32)
+   *                      info="onderling-identity-v1:agent-seed:" + label, len=32)
    *
    * The salt is FIXED (not per-resource-random like `deriveResourceKey`) precisely
    * so the same phrase + label re-derive the SAME seed on any device — the property

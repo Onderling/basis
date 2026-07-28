@@ -24,8 +24,8 @@ describe('parseWebIdPointers — JSON-LD', () => {
   it('extracts pointers using full-IRI keys', () => {
     const body = JSON.stringify({
       '@id': WEBID,
-      'https://canopy.org/ns#storage-mapping-uri': 'https://alice.pod/private/storage-mapping',
-      'https://canopy.org/ns#agent-registry-uri':  'https://alice.pod/private/agent-registry',
+      'https://onderling.org/ns#storage-mapping-uri': 'https://alice.pod/private/storage-mapping',
+      'https://onderling.org/ns#agent-registry-uri':  'https://alice.pod/private/agent-registry',
     });
     expect(parseWebIdPointers(body, WEBID)).toEqual({
       storageMappingUri: 'https://alice.pod/private/storage-mapping',
@@ -46,7 +46,7 @@ describe('parseWebIdPointers — JSON-LD', () => {
   it('extracts URIs from @id-wrapped JSON-LD objects', () => {
     const body = JSON.stringify({
       '@id': WEBID,
-      'https://canopy.org/ns#agent-registry-uri': [{ '@id': 'https://alice.pod/private/agent-registry' }],
+      'https://onderling.org/ns#agent-registry-uri': [{ '@id': 'https://alice.pod/private/agent-registry' }],
     });
     expect(parseWebIdPointers(body, WEBID)).toEqual({
       agentRegistryUri: 'https://alice.pod/private/agent-registry',
@@ -74,8 +74,8 @@ describe('parseWebIdPointers — JSON-LD', () => {
 describe('parseWebIdPointers — Turtle', () => {
   it('extracts pointers using full-IRI predicates', () => {
     const body = `
-      <${WEBID}> <https://canopy.org/ns#storage-mapping-uri> <https://alice.pod/private/storage-mapping> .
-      <${WEBID}> <https://canopy.org/ns#agent-registry-uri>  <https://alice.pod/private/agent-registry> .
+      <${WEBID}> <https://onderling.org/ns#storage-mapping-uri> <https://alice.pod/private/storage-mapping> .
+      <${WEBID}> <https://onderling.org/ns#agent-registry-uri>  <https://alice.pod/private/agent-registry> .
     `;
     expect(parseWebIdPointers(body, WEBID)).toEqual({
       storageMappingUri: 'https://alice.pod/private/storage-mapping',
@@ -85,7 +85,7 @@ describe('parseWebIdPointers — Turtle', () => {
 
   it('extracts pointers using dec: prefix predicates', () => {
     const body = `
-      @prefix dec: <https://canopy.org/ns#> .
+      @prefix dec: <https://onderling.org/ns#> .
       <${WEBID}> dec:storage-mapping-uri <https://alice.pod/private/storage-mapping> .
       <${WEBID}> dec:audit-log-uri       <https://alice.pod/private/audit-log> .
     `;
@@ -116,7 +116,7 @@ describe('parseWebIdPointers — Turtle', () => {
 
 describe('discoverPointers — fetch integration', () => {
   it('fetches the WebID profile and returns parsed pointers + raw body', async () => {
-    const body = `<${WEBID}> <https://canopy.org/ns#storage-mapping-uri> <https://alice.pod/private/storage-mapping> .`;
+    const body = `<${WEBID}> <https://onderling.org/ns#storage-mapping-uri> <https://alice.pod/private/storage-mapping> .`;
     const fakeFetch = async (url) => {
       expect(String(url)).toBe(WEBID);
       return new Response(body, { status: 200, headers: { 'content-type': 'text/turtle' } });

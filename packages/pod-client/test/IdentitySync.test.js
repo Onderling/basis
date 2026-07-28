@@ -236,7 +236,7 @@ describe('IdentitySync — idempotent pulls', () => {
 
     // Manually evict from pod.  Use list-driven pull so we discover the
     // disappearance.  After deletion, the listing won't include it.
-    const uri = 'https://alice.example/canopy/devices/device-x.enc';
+    const uri = 'https://alice.example/onderling/devices/device-x.enc';
     podClient.store.delete(uri);
 
     // The cache entry stays until someone re-pulls and notices.  Since

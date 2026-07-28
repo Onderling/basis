@@ -56,9 +56,6 @@ const NOOP_ENSURE_SHARES  = async () => ({ minted: 0, renewed: 0, errors: [] });
 const NOOP_LIST_SHARES    = async () => [];
 
 const STATE_FILE_RELPATH = '.onderling/notes-sync-state.json';
-// Naming migration 2026-07-28 — state written before the rename is READ from the old dir once (losing
-// it would make every note look never-synced → a full re-walk / conflict noise); saves go new-dir only.
-const STATE_FILE_RELPATH_LEGACY = '.canopy/notes-sync-state.json';
 const DEFAULT_DEBOUNCE_MS = 500;
 const DEFAULT_POLL_MS     = 60_000;
 
@@ -84,7 +81,7 @@ const DEFAULT_GRACE_MS = 3_000;
 /**
  * Folio's versionable predicate (ported verbatim from the retired
  * `versions.js`): reject empty, absolute, or any path with a dotted
- * segment (`.folio/`, `.canopy/`, `.git/`, …), plus `.`/`..`.  Injected
+ * segment (`.folio/`, `.onderling/`, `.git/`, …), plus `.`/`..`.  Injected
  * into the version store as `retention.shouldVersion` — the substrate's
  * own `versionable` only rejects the versions-root prefix, so this is the
  * HARD INVARIANT that keeps dotfiles + the versions dir out of history.
@@ -106,7 +103,6 @@ export class SyncEngine extends Emitter {
   #pollIntervalMs;
   #debounceMs;
   #stateFilePath;
-  #stateFilePathLegacy;
   #identity = null;
   #knownState = {};
   #stateLoaded = false;
@@ -315,7 +311,6 @@ export class SyncEngine extends Emitter {
     this.#ensureSharesHook  = typeof ensureSharesHook  === 'function' ? ensureSharesHook  : NOOP_ENSURE_SHARES;
     this.#listSharesHook    = typeof listSharesHook    === 'function' ? listSharesHook    : NOOP_LIST_SHARES;
     this.#stateFilePath  = joinPosix(this.#localRoot, STATE_FILE_RELPATH);
-    this.#stateFilePathLegacy = joinPosix(this.#localRoot, STATE_FILE_RELPATH_LEGACY);
     this.#versionsOpts   = versions ?? {};
 
     // one version store per engine instance, over @onderling/versioning.
@@ -1483,21 +1478,15 @@ export class SyncEngine extends Emitter {
 
   async #loadState() {
     if (this.#stateLoaded) return;
-    this.#knownState = {};
-    // New path first; the legacy .canopy/ path is read once for pre-rename state (the next save
-    // lands on the new path and the old file simply goes stale).
-    for (const path of [this.#stateFilePath, this.#stateFilePathLegacy]) {
-      try {
-        const raw = await this.#fs.readFileText(path, 'utf8');
-        const parsed = JSON.parse(raw);
-        this.#knownState = parsed?.files ?? {};
-        break;
-      } catch (err) {
-        if (err.code !== 'ENOENT') {
-          this.emit('error', { phase: 'load-state', err });
-          break;
-        }
+    try {
+      const raw = await this.#fs.readFileText(this.#stateFilePath, 'utf8');
+      const parsed = JSON.parse(raw);
+      this.#knownState = parsed?.files ?? {};
+    } catch (err) {
+      if (err.code !== 'ENOENT') {
+        this.emit('error', { phase: 'load-state', err });
       }
+      this.#knownState = {};
     }
     this.#stateLoaded = true;
   }

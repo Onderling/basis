@@ -2,7 +2,7 @@
  * notesList — pure helpers for listing files in the engine's localRoot.
  *
  * Walks `<localRoot>` (recursively) using the engine's `fs` adapter,
- * skipping dotted entries (`.folio/`, `.canopy/`).  Returns a flat
+ * skipping dotted entries (`.folio/`, `.onderling/`).  Returns a flat
  * array of `{ relPath, name, mtime, size }` sorted by mtime DESC.
  *
  * Living under `lib/` (not `screens/`) so unit tests can exercise it
@@ -24,7 +24,7 @@
  * @param {string} args.localRoot       Absolute root (file:// URI on RN)
  * @param {(rel: string) => boolean} [args.filter]
  *   Optional filter — return true to include.  Default: skip
- *   `.`-prefixed top-level dirs (`.folio`, `.canopy`) and any path
+ *   `.`-prefixed top-level dirs (`.folio`, `.onderling`) and any path
  *   segment starting with `.`.
  * @returns {Promise<ListedFile[]>}
  */

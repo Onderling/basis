@@ -8,9 +8,9 @@
 // + the JS-side wrapper; the Hub-Android side picks up the
 // implementation when V2 timing is committed.
 
-package com.canopy.hub;
+package org.onderling.hub;
 
-import com.canopy.hub.IHub_V1;
+import org.onderling.hub.IHub_V1;
 
 interface IHub_V2 {
     /**

@@ -14,13 +14,12 @@ import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { AgentIdentity } from './AgentIdentity.js';
 
-// ⚠ FROZEN FOREVER — this is HKDF domain-separation INPUT, not a name (naming decision 2026-07-28):
-// it is hashed, never displayed, never on the wire. "Renaming" it would re-derive every per-circle
-// address and orphan all existing rosters/registrations. A future derivation scheme starts at
-// 'onderling-identity-v2:'; v1 stays spelled exactly like this.
-const HKDF_INFO_NS = 'canopy-identity-v1:';
+// HKDF domain-separation input (hashed, never displayed, never on the wire). Renaming it re-derives
+// every per-circle address — a clean break, taken pre-launch (CLAUDE.md, 2026-07-28) rather than
+// carrying the old spelling forever.
+const HKDF_INFO_NS = 'onderling-identity-v1:';
 // FIXED domain-separation salt — permanent, never change (would re-key every per-circle address).
-const _CIRCLE_ADDR_SALT = new TextEncoder().encode('canopy-circle-addr-v1');
+const _CIRCLE_ADDR_SALT = new TextEncoder().encode('onderling-circle-addr-v1');
 
 /**
  * Derive a distinct 32-byte per-circle Ed25519 seed from a profile seed.

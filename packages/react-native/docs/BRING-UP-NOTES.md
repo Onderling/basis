@@ -18,7 +18,7 @@ future bring-ups should be appended here, not duplicated in app docs.
 ## ⚠ READ THIS FIRST — use the metro-preset, do not hand-roll
 
 > If your `apps/<your-app>/metro.config.js` does **not** start with
-> `withCanopyPreset`, you are going to rediscover most of the traps
+> `withOnderlingPreset`, you are going to rediscover most of the traps
 > below the hard way.
 
 **Symptom that triggers this:** any of the trap errors below — most
@@ -37,9 +37,9 @@ The minimum boilerplate is:
 
 ```js
 const path = require('path');
-const { withCanopyPreset } = require('@onderling/react-native/metro-preset');
+const { withOnderlingPreset } = require('@onderling/react-native/metro-preset');
 
-module.exports = withCanopyPreset({
+module.exports = withOnderlingPreset({
   projectRoot: __dirname,
   repoRoot:    path.resolve(__dirname, '../..'),
 
@@ -195,7 +195,7 @@ Metro's default name-prefix resolution).  Each resolver is a
 function; return `null` to fall through to the next.
 
 ```js
-module.exports = withCanopyPreset({
+module.exports = withOnderlingPreset({
   // ...
   extraSubpathResolvers: [
     (moduleName, repoRoot) => {
@@ -764,7 +764,7 @@ with desktop) and the error is just noise, not blocking.
 
 ```
 [expo-notifications] Default FirebaseApp is not initialized in
-  ag.canopy.sdksmoke. Make sure to call FirebaseApp.initializeApp(Context)
+  org.onderling.sdksmoke. Make sure to call FirebaseApp.initializeApp(Context)
   first.
 ```
 
@@ -776,7 +776,7 @@ Android push.  The native Firebase Android SDK refuses to mint a token
 without a `google-services.json` baked into the APK at build time.
 Custom dev builds (anything that isn't Expo Go) require this file —
 Expo Go has a shared one provided by Expo, but our app has its own
-package id (`ag.canopy.sdksmoke`) so we must provide our own.
+package id (`org.onderling.sdksmoke`) so we must provide our own.
 
 **Fix:**
 
@@ -785,13 +785,13 @@ This is real Firebase setup, ~10 minutes:
 1. **Create a Firebase project** at <https://console.firebase.google.com/>
    (free tier is fine; "sdk-smoke-dev" or similar).
 2. **Add an Android app** to the project. Package name MUST match
-   `app.json` `expo.android.package` exactly (`ag.canopy.sdksmoke`).
+   `app.json` `expo.android.package` exactly (`org.onderling.sdksmoke`).
 3. **Download `google-services.json`** when prompted; place at
    `apps/<app>/google-services.json`.
 4. **Wire it into `app.json`** under the `android` block:
    ```json
    "android": {
-     "package": "ag.canopy.sdksmoke",
+     "package": "org.onderling.sdksmoke",
      "googleServicesFile": "./google-services.json",
      ...
    }

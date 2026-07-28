@@ -35,4 +35,4 @@ export const BASE_PROPERTIES = Object.freeze({
 export const BASE_REQUIRED = Object.freeze(['type', 'id', 'createdAt', 'createdBy']);
 
 /** Project namespace for type IRIs. */
-export const NAMESPACE = 'https://canopy.org/ns#';
+export const NAMESPACE = 'https://onderling.org/ns#';

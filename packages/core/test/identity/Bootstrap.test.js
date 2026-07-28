@@ -159,7 +159,7 @@ describe('Bootstrap#deriveResourceKey (HKDF-SHA256)', () => {
     expect(arrEq(k1, k2)).toBe(false);
   });
 
-  it('matches the spec: HKDF-SHA256(ikm=secret, salt, info="canopy-identity-v1:" + path, len=32)', () => {
+  it('matches the spec: HKDF-SHA256(ikm=secret, salt, info="onderling-identity-v1:" + path, len=32)', () => {
     const seed = new Uint8Array(32).fill(0xab);
     const b    = Bootstrap.fromSeed(seed);
     const path = '/devices/device-deadbeefcafef00d.enc';
@@ -168,7 +168,7 @@ describe('Bootstrap#deriveResourceKey (HKDF-SHA256)', () => {
       'sha256',
       seed,
       s,
-      new TextEncoder().encode('canopy-identity-v1:' + path),
+      new TextEncoder().encode('onderling-identity-v1:' + path),
       32,
     ));
     expect(arrEq(b.deriveResourceKey(path, s), expected)).toBe(true);

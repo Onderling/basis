@@ -12,18 +12,18 @@ module.exports = {
       android: {
         sourceDir: './android',
         packageImportPath: [
-          'import com.canopy.mdns.MdnsPackage;',
-          'import com.canopy.ble.BlePeripheralPackage;',
+          'import org.onderling.mdns.MdnsPackage;',
+          'import org.onderling.ble.BlePeripheralPackage;',
         ].join('\n'),
         packageInstance: [
-          'new com.canopy.mdns.MdnsPackage()',
-          'new com.canopy.ble.BlePeripheralPackage()',
+          'new org.onderling.mdns.MdnsPackage()',
+          'new org.onderling.ble.BlePeripheralPackage()',
         ].join(',\n          '),
       },
       ios: {
         // Swift stubs under ios/; no native code yet.  Present so pod install
         // picks up an empty framework rather than failing outright.
-        podspecPath: './ios/CanopyReactNative.podspec',
+        podspecPath: './ios/OnderlingReactNative.podspec',
       },
     },
   },

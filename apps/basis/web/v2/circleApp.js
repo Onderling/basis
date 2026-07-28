@@ -21,7 +21,7 @@
 import '../../src/web/shims/bufferPolyfill.js';
 
 // Dev: mirror the privacy-first structured log (@onderling/logger) to the browser console. Prod fills the
-// buffer only; `canopyDumpLogs()` (set by the feedback surface) reads it for a bug report. PII-safe.
+// buffer only; `onderlingDumpLogs()` (set by the feedback surface) reads it for a bug report. PII-safe.
 import { configureLog, consoleSink } from '@onderling/logger';
 if (import.meta.env?.DEV) configureLog({ sink: consoleSink });
 
@@ -891,11 +891,11 @@ const pinStore = createCirclePinStore(localStoragePinIo());
 // memoised. While unsigned the thunk returns null, so every store wired
 // through it stays local-only (unchanged behaviour). SHARED by the
 // availability pref AND the "shared with me" list (both mirror a per-user
-// pod resource under `canopy/<app>/`).
+// pod resource under `onderling/<app>/`).
 let _perUserPodWriter = null;
 const perUserPodWriter = () => {
   if (_perUserPodWriter) return _perUserPodWriter;
-  const s = (typeof window !== 'undefined' && (window.onderlingPodSession ?? window.canopyPodSession)) || null;
+  const s = (typeof window !== 'undefined' && window.onderlingPodSession) || null;
   if (!s || typeof s.fetch !== 'function' || typeof s.webid !== 'string') return null;
   try { _perUserPodWriter = createPodWriter(s); } catch { return null; }
   return _perUserPodWriter;
@@ -903,7 +903,7 @@ const perUserPodWriter = () => {
 // SILENT out-of-circle delivery — per-user "shared with me" store. TIERED
 // (Frits' call): localStorage (`cc.sharedWithMe`) is canonical; when a
 // signed-in pod writer is present the sealed copies are mirrored to
-// `canopy/cc-shared-with-me/received.json` so they SURVIVE + SYNC across the
+// `onderling/cc-shared-with-me/received.json` so they SURVIVE + SYNC across the
 // user's devices. Received copies land here via the peer router
 // `shared-copy` handler (below); openable only with this user's own
 // network-derived sealing key. Unsigned → local-only, unchanged.
@@ -1269,7 +1269,7 @@ const FEEDBACK_ACTIVATION_URL = import.meta.env?.VITE_FEEDBACK_ACTIVATION_URL ??
 // central pod under the participant's pseudonym (no participant pod login). When set, the feedback
 // surface signs contributions (verify) and routes consent writes here instead of the in-memory pod.
 const FEEDBACK_COLLECTOR_URL = import.meta.env?.VITE_FEEDBACK_COLLECTOR_URL ?? null;
-// Bot languages the project lead OFFERS (canopy-side project setting until a PM config UI exists; the
+// Bot languages the project lead OFFERS (onderling-side project setting until a PM config UI exists; the
 // feedback config schema is read-only + only nl/en are fully translated today). The greeting invites a
 // participant to switch into any offered language they read, in THAT language — so a non-primary speaker
 // can find it. First entry is the default/primary.
@@ -1721,7 +1721,6 @@ function buildCircleBot(agent) {
   }
   if (typeof window !== 'undefined') {
     window.onderlingInstallExtension = installExtensionFromLink;   // manual / programmatic install
-    window.canopyInstallExtension = installExtensionFromLink;       // legacy alias (tools/e2e)
     try {
       const enc = new URLSearchParams(window.location.search).get('install');
       if (enc) installExtensionFromLink(enc);                   // ?install=<base64 mapping JSON>
@@ -1736,7 +1735,7 @@ function buildCircleBot(agent) {
   // catalog (contact ops are contact-thread-scoped, not app-scoped), so it never
   // pollutes the circle bot's command pool. The contact-thread VIEW that renders a
   // bot's commands in its own DM thread is; this wiring makes the bridge live
-  // + drivable now (`window.canopyContactSkills` for the view + e2e).
+  // + drivable now (`window.onderlingContactSkills` for the view + e2e).
   const sendContactTask = async (peerUrl, skillId, args) => {
     const task = sendA2ATask(agent, peerUrl, skillId, args);
     const { parts } = await task.done();
@@ -1762,16 +1761,16 @@ function buildCircleBot(agent) {
   try { agent.sa?.attachPeerGraph?.(circlePeerGraph); } catch { /* seam optional */ }
   circleCoreAgent = agent.sa?.agent ?? null;   // the core chat agent — discoverA2A's hello/native-upgrade target
   if (typeof window !== 'undefined') {
-    window.canopyCirclePods = circlePods;   // S4 debug / e2e seam
+    window.onderlingCirclePods = circlePods;   // S4 debug / e2e seam
     // e2e: drive a producer for any posture (verifies browser-safe sealing crypto end-to-end).
-    window.canopyMakeCirclePod = (circleId, storagePosture = 'p2', roster = []) =>
+    window.onderlingMakeCirclePod = (circleId, storagePosture = 'p2', roster = []) =>
       createCirclePodProducer({ circleId, storagePosture, vault: circleVault, roster,
         generateKeypair: podGenerateKeypair, makePodClient: makeCirclePodClient });
-    window.canopySealingKit = { generateKeypair: podGenerateKeypair, createSealedPodClient, scopeStoopCallSkill };
+    window.onderlingSealingKit = { generateKeypair: podGenerateKeypair, createSealedPodClient, scopeStoopCallSkill };
   }
   circleContactSkills = createContactSkillRegistry({ peerGraph: circlePeerGraph, sendTask: sendContactTask });
   circleContactSkills.start().catch(() => { /* discovery is best-effort — never blocks the kring */ });
-  if (typeof window !== 'undefined') window.canopyContactSkills = circleContactSkills;
+  if (typeof window !== 'undefined') window.onderlingContactSkills = circleContactSkills;
 
   // the conversational channel (the client end of the bot peer link). The
   // channel sends over agent.sendPeerMessage, which routes through core
@@ -1790,10 +1789,9 @@ function buildCircleBot(agent) {
     localActor: LOCAL_ACTOR,
   });
   if (typeof window !== 'undefined') {
-    window.canopyContactChannel = circleContactChannel;
-    window.canopyPeers = circlePeerGraph;   // debug / e2e seam (roster + journey-A tests seed/inspect peers)
+    window.onderlingContactChannel = circleContactChannel;
+    window.onderlingPeers = circlePeerGraph;   // debug / e2e seam (roster + journey-A tests seed/inspect peers)
     window.onderlingAddBot = addBotFromInput;  // manual / programmatic add
-    window.canopyAddBot = addBotFromInput;     // legacy alias (tools/e2e)
     try {
       const params = new URLSearchParams(_bootSearch);
       const addbot = params.get('addbot');
@@ -2083,7 +2081,7 @@ function buildCircleBot(agent) {
     // source. (Feedback's fp:* buttons render in the fp-bot thread, handled there by onButtonTap →
     // surface.tapButton — no longer in the kring composer since F2 retired the in-kring mount.)
     if (action) {
-      // Feedback language switch (fp-lang:<code>) — a canopy-side action (not a bot control): rebuild the
+      // Feedback language switch (fp-lang:<code>) — a onderling-side action (not a bot control): rebuild the
       // surface in the chosen language. Must be handled before the fp:* surface routing below.
       if (action.startsWith('fp-lang:')) { switchFeedbackLang(_kringRender?.circleId, action.slice('fp-lang:'.length)); return; }
       // Feedback bot buttons (fp:consent:*, fp:review, fp:mine, …) render in the kring for an invite-created
@@ -5342,7 +5340,7 @@ function showKring(id, circle, policy) {
             rerender();
             return;
           }
-          // Language switch as a typed command: /taal en · /lang nl · /language en (canopy-side, not a bot control).
+          // Language switch as a typed command: /taal en · /lang nl · /language en (onderling-side, not a bot control).
           const _langCmd = line.match(/^\/(?:taal|lang|language)\s+([a-z]{2})\s*$/i);
           if (_langCmd && LANG_INFO[_langCmd[1].toLowerCase()]) { await switchFeedbackLang(id, _langCmd[1].toLowerCase()); return; }
           // a feedback circle routes ALL free text to its co-hosted feedback bot (the user's
@@ -6373,8 +6371,7 @@ async function boot() {
     circleOwnerWebId  = podSession?.webid ?? null;
     if (typeof window !== 'undefined') {
       window.onderlingPodSession = podSession ?? null;            // debug / e2e seam
-      window.canopyPodSession = podSession ?? null;               // legacy alias (tools/e2e)
-      window.canopyPodSignIn = (issuer) => podAuth.startSignIn({ issuer, redirectUrl: window.location.href });
+      window.onderlingPodSignIn = (issuer) => podAuth.startSignIn({ issuer, redirectUrl: window.location.href });
     }
   } catch { /* not signed in → pseudo-pod */ }
 

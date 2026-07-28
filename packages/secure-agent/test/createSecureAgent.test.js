@@ -1551,7 +1551,7 @@ describe('createSecureAgent — S7 groups + a2aTls + rateLimit + migrate', () =>
     try {
       report = await sa.migrateVaultToPod({
         podClient,
-        podRoot:  'https://alice.example/canopy/',
+        podRoot:  'https://alice.example/onderling/',
         mnemonic,
         dryRun:   true,
       });

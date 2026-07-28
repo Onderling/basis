@@ -1,6 +1,6 @@
-# Building agents compatible with Canopy
+# Building agents compatible with Onderling
 
-How to build something — a bot, a drone, an app, another agent — that talks to a Canopy agent. The key idea up
+How to build something — a bot, a drone, an app, another agent — that talks to a Onderling agent. The key idea up
 front: **"a bot" and "a human app" are not two integrations.** Both target the same waist (`{opId, args}` →
 `callSkill`) and the same discovery surface (the A2A agent card); a human comes in through a GUI projector, a
 bot queries the card and calls ops directly. Target the waist, and both work.
@@ -19,8 +19,8 @@ bot queries the card and calls ops directly. Target the waist, and both work.
 
 ## 1. Discover — the A2A agent card
 
-A Canopy agent advertises itself as a standards-shaped **A2A agent card** (`name`, `description`, `skills`,
-`capabilities`, `authentication`, and an `x-canopy` block with `pubKey` / `groups` / `trustTiers`). Two things
+A Onderling agent advertises itself as a standards-shaped **A2A agent card** (`name`, `description`, `skills`,
+`capabilities`, `authentication`, and an `x-onderling` block with `pubKey` / `groups` / `trustTiers`). Two things
 to read:
 
 - **`skills`** — the ops you can call, each already **filtered by your trust tier** (`public` /
@@ -49,13 +49,13 @@ scope. Your tier decides which skills you see and which property rungs you get. 
 ## 4. Vocabulary
 
 Properties use **open JSON-LD**: standard terms as the common baseline (schema.org / FOAF / vCard / OIDC for
-people, W3C Web of Things for devices), extensible with any namespaced term, plus a thin canopy `cdi:` namespace
+people, W3C Web of Things for devices), extensible with any namespaced term, plus a thin onderling `cdi:` namespace
 for the disclosure policy. Full rule: [`conventions/property-vocabulary.md`](./conventions/property-vocabulary.md);
 rationale: [`decisions.md`](./decisions.md) (2026-07-14).
 
 ## 5. Be a *provider* — satisfy the port
 
-To reimplement a piece of Canopy (a transport, a data source, an actor resolver) rather than call one:
+To reimplement a piece of Onderling (a transport, a data source, an actor resolver) rather than call one:
 **"compatible" means exactly "satisfies the port"** — implement the documented interface `@onderling/core` exports
 and pass its conformance harness. See [`conventions/ports.md`](./conventions/ports.md). For building a whole app
 that plugs into the waist, the fat facade is `@onderling/sdk` (one import, connect app functions to skills, done);

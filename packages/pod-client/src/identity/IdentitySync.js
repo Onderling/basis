@@ -388,13 +388,13 @@ export class IdentitySync extends Emitter {
   // ── URI helpers ──────────────────────────────────────────────────────────
 
   #joinPodUri(relativePath) {
-    const root = this.#podStore.root; // ends in '/onderling/' (or '/canopy/' for a pre-rename container)
+    const root = this.#podStore.root; // ends in '/onderling/'
     let rel = relativePath;
     while (rel.startsWith('/')) rel = rel.slice(1);
     return root + rel;
   }
 
-  /** Strip the pod root (`<base>/canopy/`) from an absolute URI. */
+  /** Strip the pod root (`<base>/onderling/`) from an absolute URI. */
   #relativeFromUri(uri) {
     const root = this.#podStore.root;
     if (!uri.startsWith(root)) return null;

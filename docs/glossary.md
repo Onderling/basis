@@ -1,6 +1,6 @@
 # Glossary
 
-The vocabulary that recurs across canopy. Plain definitions; see the [project overview](../README.md) for how
+The vocabulary that recurs across onderling. Plain definitions; see the [project overview](../README.md) for how
 they fit together.
 
 ## The model
@@ -56,8 +56,8 @@ they fit together.
 ## Data & storage
 
 - **Item / item-type** — the cross-app data taxonomy (`task`, `note`, `chat-message`, `offer`, `request`,
-  `claim`, `contact`, `calendar-event`, …), project-namespaced under `https://canopy.org/ns#`.
-- **Pod (Solid pod)** — the user's personal, standards-based data store. In canopy it's the **portability
+  `claim`, `contact`, `calendar-event`, …), project-namespaced under `https://onderling.org/ns#`.
+- **Pod (Solid pod)** — the user's personal, standards-based data store. In onderling it's the **portability
   layer, not a runtime dependency**: every app runs fully local; the pod is opt-in.
 - **WebID** — a stable identity URI for a user, hosted at their pod; the network keypair can rotate while the
   WebID stays fixed.
@@ -118,5 +118,5 @@ they fit together.
 
 ## Names
 
-- **canopy / Onderling** — *canopy* is the engineering name (the platform ships as `@onderling/*`, apps as `@onderling-app/*`);
+- **onderling / Onderling** — *onderling* is the engineering name (the platform ships as `@onderling/*`, apps as `@onderling-app/*`);
   ***Onderling*** is the working name in public/product material.

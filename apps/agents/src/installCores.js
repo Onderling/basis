@@ -82,22 +82,22 @@ function coerceCard(card) {
 }
 
 /**
- * The stable catalog / registry id for a card: `x-canopy.id`, else a
+ * The stable catalog / registry id for a card: `x-onderling.id`, else a
  * top-level `agentId`, else the pubKey.
  */
 function cardId(card) {
-  const xc = card?.['x-onderling'] ?? card?.['x-canopy'] ?? {};
+  const xc = card?.['x-onderling'] ?? {};
   return xc.id ?? card?.agentId ?? xc.pubKey ?? card?.pubKey ?? null;
 }
 
 /**
  * The set of skills a card DECLARES it can perform — the ceiling on what
  * a grant may authorise. Union of the A2A `skills[].id`, any pre-existing
- * `x-canopy.grants[].skill`, and coarse `capabilities[]`. Patterns
+ * `x-onderling.grants[].skill`, and coarse `capabilities[]`. Patterns
  * (`p.*`) are kept as-is (they cover their prefix at grant time).
  */
 function declaredSkills(card) {
-  const xc = card?.['x-onderling'] ?? card?.['x-canopy'] ?? {};
+  const xc = card?.['x-onderling'] ?? {};
   const out = new Set();
   for (const s of Array.isArray(card?.skills) ? card.skills : []) {
     const id = typeof s === 'string' ? s : s?.id;
@@ -119,7 +119,7 @@ function isDeclared(declared, skill) {
 
 /** Card → the default-deny registry entry (capabilities/grants EMPTY). */
 function cardToEntry(card, { name } = {}) {
-  const xc = card?.['x-onderling'] ?? card?.['x-canopy'] ?? {};
+  const xc = card?.['x-onderling'] ?? {};
   const pubKey = xc.pubKey ?? card?.pubKey ?? null;
   const agentId = cardId(card);
   if (typeof pubKey !== 'string' || pubKey.length === 0) return null;

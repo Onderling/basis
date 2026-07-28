@@ -8,7 +8,7 @@
  *   defaultInputModes, defaultOutputModes,
  *   skills: [ SkillCard[] ],
  *   authentication: { schemes: ['Bearer'] },
- *   'x-canopy': { version, pubKey, relayUrl, groups, trustTiers }
+ *   'x-onderling': { version, pubKey, relayUrl, groups, trustTiers }
  * }
  *
  * Skills are filtered by the requestTier (caller's trust level):
@@ -82,11 +82,7 @@ export class AgentCardBuilder {
       authentication: {
         schemes: ['Bearer'],
       },
-      // Naming migration 2026-07-28 — the extension block is written under BOTH keys for one window:
-      // `x-onderling` is the name going forward; `x-canopy` keeps peers on older app versions (and the
-      // public feedback repo) reading this card until they update. Readers here prefer x-onderling.
       'x-onderling': extensionBlock,
-      'x-canopy':    extensionBlock,
     };
 
     // Remove null url to keep card clean.

@@ -1,4 +1,4 @@
-package com.canopy.mdns
+package org.onderling.mdns
 
 /**
  * Exponential backoff for NsdManager resolve retries.

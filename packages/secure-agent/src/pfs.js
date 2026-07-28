@@ -56,9 +56,9 @@ import { hkdf }   from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 
 export const PFS_VERSION  = 1;
-// ⚠ FROZEN FOREVER — key-derivation salt (hashed, invisible; naming decision 2026-07-28). Renaming
-// would break decryption of everything sealed under it; a future scheme versions to onderling/…/v2.
-export const PFS_SALT     = new TextEncoder().encode('canopy/secure-agent/pfs/v1');
+// Key-derivation salt (hashed, invisible). Clean break pre-launch: anything sealed under the old
+// salt no longer opens — accepted, there is nothing live (CLAUDE.md 2026-07-28).
+export const PFS_SALT     = new TextEncoder().encode('onderling/secure-agent/pfs/v1');
 export const DEFAULT_MAX_SKIP = 64;
 
 /**
@@ -253,7 +253,7 @@ export class PFSChain {
 // ── Private helpers ──────────────────────────────────────────────────
 
 function _chainSeed(shared, fromPub, toPub) {
-  const info = new TextEncoder().encode(`canopy-pfs|${fromPub}|${toPub}`);
+  const info = new TextEncoder().encode(`onderling-pfs|${fromPub}|${toPub}`);
   return hkdf(sha256, shared, PFS_SALT, info, 32);
 }
 

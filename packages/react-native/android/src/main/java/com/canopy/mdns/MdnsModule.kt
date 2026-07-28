@@ -1,4 +1,4 @@
-package com.canopy.mdns
+package org.onderling.mdns
 
 import android.content.Context
 import android.net.nsd.NsdManager

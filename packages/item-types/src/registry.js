@@ -32,7 +32,7 @@ import addFormats from 'ajv-formats';
  * @typedef {object} TypeEntry
  * @property {object} schema
  * @property {string} [iri]    — optional canonical IRI for the type
- *                               (project ns: `https://canopy.org/ns#<TypeName>`).
+ *                               (project ns: `https://onderling.org/ns#<TypeName>`).
  *                               When set, available via `metadata(typeName).iri`.
  */
 

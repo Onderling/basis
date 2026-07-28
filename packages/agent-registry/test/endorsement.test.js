@@ -29,14 +29,14 @@ import {
 
 /* ── Fixtures ──────────────────────────────────────────────────────────── */
 
-/** An Agent Card whose x-canopy.pubKey = the given endorsed-agent pubKey. */
+/** An Agent Card whose x-onderling.pubKey = the given endorsed-agent pubKey. */
 function makeCard(pubKey, { id = 'catalog:summariser', skills = ['summarise.thread', 'summarise.document'] } = {}) {
   return {
     name: 'Summariser', description: 'Summarises threads.',
     url: 'https://example.invalid/agents/summariser', version: '1.0',
     skills: skills.map((s) => ({ id: s })),
     authentication: { schemes: ['Bearer'] },
-    'x-canopy': { id, pubKey, role: 'service' },
+    'x-onderling': { id, pubKey, role: 'service' },
   };
 }
 
@@ -192,14 +192,14 @@ describe('G1 — createCatalogSource (single root → only verified cards)', () 
 
     const cat  = createCatalogSource({ endorsementResource: res, roots: [root.pubKey], resolveCard });
     const list = await cat.list();
-    const ids  = list.map((c) => c['x-canopy'].id).sort();
+    const ids  = list.map((c) => c['x-onderling'].id).sort();
     expect(ids).toEqual(['catalog:A', 'catalog:B']);
     // The non-root endorsement did not inflate B's count.
-    const bEntry = list.find((c) => c['x-canopy'].id === 'catalog:B');
-    expect(bEntry['x-canopy'].endorsement.count).toBe(1);
-    expect(bEntry['x-canopy'].endorsement.endorsers).toEqual([root.pubKey]);
+    const bEntry = list.find((c) => c['x-onderling'].id === 'catalog:B');
+    expect(bEntry['x-onderling'].endorsement.count).toBe(1);
+    expect(bEntry['x-onderling'].endorsement.endorsers).toEqual([root.pubKey]);
     // get() resolves the same verified card.
-    expect((await cat.get('catalog:A'))['x-canopy'].id).toBe('catalog:A');
+    expect((await cat.get('catalog:A'))['x-onderling'].id).toBe('catalog:A');
   });
 
   it('excludes a FLAGGED subject, an INVALID endorsement, and a cardHash-mismatch', async () => {
@@ -224,7 +224,7 @@ describe('G1 — createCatalogSource (single root → only verified cards)', () 
     await res.append(issueEndorsement(root, { subject: flg.pubKey, card: cardFlg, claim: 'flag' }));
 
     const cat = createCatalogSource({ endorsementResource: res, roots: [root.pubKey], resolveCard });
-    const ids = (await cat.list()).map((c) => c['x-canopy'].id);
+    const ids = (await cat.list()).map((c) => c['x-onderling'].id);
     expect(ids).toEqual(['catalog:good']);
     expect(await cat.get('catalog:bad')).toBeNull();
     expect(await cat.get('catalog:flagged')).toBeNull();

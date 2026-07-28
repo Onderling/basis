@@ -141,7 +141,7 @@ describe('provisionDefault — happy path', () => {
     const patchCall = prov.calls.find(c => c.name === 'patchWebidProfile');
     expect(patchCall.args.webidUri).toBe(ANNE_WEBID);
     expect(patchCall.args.pointers.storageMappingUri).toBe('https://anne.pod/private/storage-mapping');
-    expect(patchCall.args.predicates.storageMappingUri).toMatch(/canopy\.org/);
+    expect(patchCall.args.predicates.storageMappingUri).toMatch(/onderling\.org/);
   });
 
   it('accepts a pre-built identity (no mnemonic)', async () => {

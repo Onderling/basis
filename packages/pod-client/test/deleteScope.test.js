@@ -227,7 +227,7 @@ describe('FileTombstones — persistence round-trip', () => {
   let tmpPath;
 
   beforeEach(async () => {
-    tmpPath = path.join(os.tmpdir(), `canopy-tombstones-test-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
+    tmpPath = path.join(os.tmpdir(), `onderling-tombstones-test-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
   });
 
   afterEach(async () => {

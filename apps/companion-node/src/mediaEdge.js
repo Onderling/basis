@@ -11,7 +11,7 @@
  *
  *     { verifyToken, bucket, uploaders?, ttl?, route? }
  *
- *   • verifyToken — the canopy `createCapabilityVerifier` (blob-gateway adapter):
+ *   • verifyToken — the onderling `createCapabilityVerifier` (blob-gateway adapter):
  *                   media Phase-1 posture — `requiredSkill: 'media.read'`,
  *                   `requireSelfIssued: true` (issuer === subject, so the ACL
  *                   actor is proof-of-possession of the signing key), REAL Ed25519

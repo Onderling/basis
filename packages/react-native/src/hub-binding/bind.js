@@ -23,8 +23,6 @@
 import { IHubBinding }       from './IHubBinding.js';
 import { negotiateVersion }  from './versionNegotiation.js';
 
-// Naming migration 2026-07-28 — new default; a hub APK built before the rename still binds by passing
-// `intentAction: 'com.canopy.hub.BIND'` explicitly (the option exists for exactly this).
 const DEFAULT_INTENT_ACTION = 'org.onderling.hub.BIND';
 const DEFAULT_CLIENT_VERSIONS = [1];
 

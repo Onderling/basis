@@ -352,7 +352,7 @@ describe('JM-10 — holiday mode silences right things', () => {
   /*
    * Roadmap quote:
    *   Anne flips holiday mode on (settings or /holiday-mode).
-   *   Canopy-chat-mobile suppresses push notifications + marks
+   *   Onderling-mobile suppresses push notifications + marks
    *   Anne's tasks-v0 skill availability as off.  Frits's view
    *   shows Anne grayed-out in the contact list.
    *

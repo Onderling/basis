@@ -87,7 +87,7 @@ post-Doze can be tens of seconds (Android's normal behaviour).
 - **App standby buckets** — if Stoop-mobile lands in the
   `restricted` bucket, push + background-fetch get serialised
   hard. Look at `adb shell am get-standby-bucket
-  com.canopy.stoop` to verify.
+  org.onderling.stoop` to verify.
 - **Battery saver** (system) — clamps background work
   aggressively. Numbers from a battery-saver-enabled device
   shouldn't be compared to a normal-mode device.

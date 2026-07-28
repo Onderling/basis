@@ -17,7 +17,7 @@
  * `houseRules` doesn't get a tab — it lives in the kring header's
  * overflow `⋯` menu as "Huisregels" (per).
  *
- * Boards in `Canopy interface · v2 — kring als bouwsteen · print.pdf`:
+ * Boards in `Onderling interface · v2 — kring als bouwsteen · print.pdf`:
  *   - Voorbeeld 1 · BUURT     → GESPREK / PRIKBORD / LEDEN
  *   - Voorbeeld 2 · HUISHOUDEN → GESPREK / TAKEN / LIJSTEN
  *   - Voorbeeld 3 · PRIVÉ     → GESPREK / NOTITIES / TAKEN

@@ -10,18 +10,18 @@
  *
  * Create three throw-away accounts at https://solidcommunity.net/register
  * (or any compatible Solid IdP):
- *   - canopy-test-alice
- *   - canopy-test-bob
- *   - canopy-test-carol
+ *   - onderling-test-alice
+ *   - onderling-test-bob
+ *   - onderling-test-carol
  *
  * Then drop a gitignored `.env.test.local` at the repo root:
  *
- *   CANOPY_TEST_POD_ALICE_WEBID=https://canopy-test-alice.solidcommunity.net/profile/card#me
- *   CANOPY_TEST_POD_ALICE_PASSWORD=...
- *   CANOPY_TEST_POD_BOB_WEBID=https://canopy-test-bob.solidcommunity.net/profile/card#me
- *   CANOPY_TEST_POD_BOB_PASSWORD=...
- *   CANOPY_TEST_POD_CAROL_WEBID=https://canopy-test-carol.solidcommunity.net/profile/card#me
- *   CANOPY_TEST_POD_CAROL_PASSWORD=...
+ *   ONDERLING_TEST_POD_ALICE_WEBID=https://onderling-test-alice.solidcommunity.net/profile/card#me
+ *   ONDERLING_TEST_POD_ALICE_PASSWORD=...
+ *   ONDERLING_TEST_POD_BOB_WEBID=https://onderling-test-bob.solidcommunity.net/profile/card#me
+ *   ONDERLING_TEST_POD_BOB_PASSWORD=...
+ *   ONDERLING_TEST_POD_CAROL_WEBID=https://onderling-test-carol.solidcommunity.net/profile/card#me
+ *   ONDERLING_TEST_POD_CAROL_PASSWORD=...
  *
  * Pre-flight one-liner so vitest sees the vars:
  *
@@ -56,12 +56,12 @@
  */
 import { describe, it, expect } from 'vitest';
 
-const A_WEBID = process.env.CANOPY_TEST_POD_ALICE_WEBID;
-const A_PASS  = process.env.CANOPY_TEST_POD_ALICE_PASSWORD;
-const B_WEBID = process.env.CANOPY_TEST_POD_BOB_WEBID;
-const B_PASS  = process.env.CANOPY_TEST_POD_BOB_PASSWORD;
-const C_WEBID = process.env.CANOPY_TEST_POD_CAROL_WEBID;
-const C_PASS  = process.env.CANOPY_TEST_POD_CAROL_PASSWORD;
+const A_WEBID = process.env.ONDERLING_TEST_POD_ALICE_WEBID;
+const A_PASS  = process.env.ONDERLING_TEST_POD_ALICE_PASSWORD;
+const B_WEBID = process.env.ONDERLING_TEST_POD_BOB_WEBID;
+const B_PASS  = process.env.ONDERLING_TEST_POD_BOB_PASSWORD;
+const C_WEBID = process.env.ONDERLING_TEST_POD_CAROL_WEBID;
+const C_PASS  = process.env.ONDERLING_TEST_POD_CAROL_PASSWORD;
 
 const HAS_ALICE = !!(A_WEBID && A_PASS);
 const HAS_BOB   = !!(B_WEBID && B_PASS);
@@ -75,7 +75,7 @@ const HAS_ABC   = HAS_AB && HAS_CAROL;
 if (!HAS_ALICE && !HAS_BOB && !HAS_CAROL) {
   // eslint-disable-next-line no-console
   console.warn(
-    '[journeys-pod] SKIPPED — no CANOPY_TEST_POD_* env vars set.\n' +
+    '[journeys-pod] SKIPPED — no ONDERLING_TEST_POD_* env vars set.\n' +
     '[journeys-pod] See test file header for setup instructions.',
   );
 }
@@ -145,7 +145,7 @@ describe.skipIf(!HAS_AB)('CC-CL.2 — calendar invite by WebID resolves through 
   it.todo('TODO when wired: Bob publishes claim; Alice /addappt --attendees-webid=Bob resolves + delivers', async () => {
     // When enabled:
     //   1. Bob signs + publishes a WebID claim to his pod
-    //      (sa.claim.sign + serialize → POST to <pod>/canopy/identity/claim.json)
+    //      (sa.claim.sign + serialize → POST to <pod>/onderling/identity/claim.json)
     //   2. Alice's /lookup-peer --webid=B_WEBID  → returns Bob's NKN addr
     //   3. Alice's /addappt --attendees-webid=B_WEBID  → calendar
     //      invite envelope reaches Bob's agent

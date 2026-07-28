@@ -43,12 +43,12 @@ const CARD = Object.freeze({
   url:  'https://example.invalid/agents/summariser', version: '1.0',
   skills: [{ id: 'summarise.thread' }, { id: 'summarise.document' }],
   authentication: { schemes: ['Bearer'] },
-  'x-canopy': { id: 'catalog:summariser', pubKey: 'pub-cat-summariser', role: 'service' },
+  'x-onderling': { id: 'catalog:summariser', pubKey: 'pub-cat-summariser', role: 'service' },
 });
 const OVERRIDE_CARD = Object.freeze({
   name: 'Sideloaded', url: 'https://third-party.invalid/agent', version: '1.0',
   skills: [{ id: 'sideload.run' }],
-  'x-canopy': { id: 'override:sideloaded', pubKey: 'pub-override-sideloaded', role: 'service' },
+  'x-onderling': { id: 'override:sideloaded', pubKey: 'pub-override-sideloaded', role: 'service' },
 });
 
 /** In-memory pseudo-pod → a real createAgentRegistry over it. */
@@ -267,7 +267,7 @@ describe('agents — P3 capability-security: an installed agent can ONLY do what
     }
     const trust = new TrustRegistry(new VaultMemory());
     await trust.setTier(issuerId.pubKey, 'trusted');            // token issuer is trusted
-    await trust.setTier(CARD['x-canopy'].pubKey, 'authenticated'); // the installed agent (caller)
+    await trust.setTier(CARD['x-onderling'].pubKey, 'authenticated'); // the installed agent (caller)
     const policy = new PolicyEngine({
       trustRegistry: trust,
       skillRegistry: skills,
@@ -275,7 +275,7 @@ describe('agents — P3 capability-security: an installed agent can ONLY do what
       isRevoked:     (id) => tokenRegistry.isRevoked(id),
     });
 
-    return { issuer, tokens, tokenRegistry, issuedById, policy, callerPubKey: CARD['x-canopy'].pubKey };
+    return { issuer, tokens, tokenRegistry, issuedById, policy, callerPubKey: CARD['x-onderling'].pubKey };
   }
 
   it('grants ONLY the granted skill; the same token is DENIED for an ungranted skill', async () => {

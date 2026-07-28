@@ -81,7 +81,7 @@ describe('protocol — multi-recipient + relay restart (durable SQLite queue)', 
   let store;
 
   beforeEach(async () => {
-    tmpDir  = await mkdtemp(join(tmpdir(), 'canopy-mrq-'));
+    tmpDir  = await mkdtemp(join(tmpdir(), 'onderling-mrq-'));
     dbPath  = join(tmpDir, 'queue.sqlite');
   });
 

@@ -2,10 +2,10 @@
  * MqttTransport — MQTT broker transport.
  *
  * Each agent subscribes to its own inbox topic:
- *   canopy/<address>/in
+ *   onderling/<address>/in
  *
  * Outbound messages are published to the recipient's inbox:
- *   canopy/<to>/in
+ *   onderling/<to>/in
  *
  * The address is a 24-char lowercase hex string derived from the first 12
  * bytes of the agent's Ed25519 pubKey. Short enough to be human-readable,
@@ -22,11 +22,11 @@
  */
 import { Transport } from '@onderling/core';
 
-const PREFIX = 'canopy';
+const PREFIX = 'onderling';
 
 /**
- * MQTT-broker `Transport`: the agent subscribes to its own inbox topic `canopy/<address>/in` and
- * publishes outbound envelopes to `canopy/<to>/in`. The address is 24 lowercase hex chars derived
+ * MQTT-broker `Transport`: the agent subscribes to its own inbox topic `onderling/<address>/in` and
+ * publishes outbound envelopes to `onderling/<to>/in`. The address is 24 lowercase hex chars derived
  * from the first 12 bytes of the identity's Ed25519 pubKey. Requires the `mqtt` package (peer
  * dependency), dynamic-imported on `connect()`.
  */
@@ -58,7 +58,7 @@ export class MqttTransport extends Transport {
 
     await new Promise((resolve, reject) => {
       this.#client = mqtt.connect(this.#opts.brokerUrl, {
-        clientId: `canopy_${this.address}`,
+        clientId: `onderling_${this.address}`,
         clean:    true,
         ...this.#opts.mqttOpts,
       });

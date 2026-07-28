@@ -15,11 +15,11 @@
  *
  * Recognised predicate forms (Turtle):
  *   <webid> dec:storage-mapping-uri <uri> .
- *   <webid> <https://canopy.org/ns#storage-mapping-uri> <uri> .
+ *   <webid> <https://onderling.org/ns#storage-mapping-uri> <uri> .
  *
  * Recognised predicate forms (JSON-LD):
  *   "storage-mapping-uri": "<uri>"
- *   "https://canopy.org/ns#storage-mapping-uri": [{"@id": "<uri>"}]
+ *   "https://onderling.org/ns#storage-mapping-uri": [{"@id": "<uri>"}]
  *
  * Any unrecognised predicates are silently ignored.
  */
@@ -144,7 +144,7 @@ function matchTurtlePredicate(body, fullIri, localName, _webidUri) {
   // Form 2: `dec:<localName> <object> .` — we don't verify the prefix
   // declaration; that's the same shortcut the SolidVault Turtle path takes.
   const localEsc = localName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const reShort  = new RegExp(`(?:dec|canopy):${localEsc}\\s*<([^>]+)>`, 'i');
+  const reShort  = new RegExp(`(?:dec|onderling):${localEsc}\\s*<([^>]+)>`, 'i');
   const m2 = body.match(reShort);
   if (m2) return m2[1];
 

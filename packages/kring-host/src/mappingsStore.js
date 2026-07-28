@@ -12,7 +12,7 @@
  * the web pod layer (3.3c) lands is a one-line change at the call site.
  */
 
-const PREFIX = 'canopy.mappings:';   // localStorage namespace; we store JSON under PREFIX + <uri>
+const PREFIX = 'onderling.mappings:';   // localStorage namespace; we store JSON under PREFIX + <uri>
 
 /** The fixed V0 device id for web mappings (app-scoped; no real pod yet). */
 export const WEB_MAPPINGS_DEVICE = 'web';

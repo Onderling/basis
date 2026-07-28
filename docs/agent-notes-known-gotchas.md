@@ -224,7 +224,7 @@ link: `apps/basis/node_modules/@onderling/attribute-charter -> ../../../../packa
 
 ## mDNS: the native module gained a split — an old app binary silently cannot do ghost mode
 
-`MdnsModule` (Android, `packages/react-native/android/src/main/java/com/canopy/mdns/MdnsModule.kt`) used to
+`MdnsModule` (Android, `packages/react-native/android/src/main/java/com/onderling/mdns/MdnsModule.kt`) used to
 expose one `start()` that registered the service AND began browsing. It now also exposes `startAdvertising` /
 `stopAdvertising` / `startDiscovery` / `stopDiscovery`, and `MdnsTransport` feature-detects them via
 `MdnsTransport.supportsSplit()`.

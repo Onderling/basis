@@ -81,7 +81,7 @@ describe('the split is used when the native module has it', () => {
 
     expect(r.effective).toBe('browse+publish');
     expect(h.native.startDiscovery).toHaveBeenCalled();
-    expect(h.native.startAdvertising).toHaveBeenCalledWith('_canopy', 'dw-test', identity.pubKey);
+    expect(h.native.startAdvertising).toHaveBeenCalledWith('_onderling', 'dw-test', identity.pubKey);
     expect(t.isAdvertising).toBe(true);
   });
 

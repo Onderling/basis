@@ -35,7 +35,7 @@ describe('createHubDiscovery', () => {
     const seen = [];
     hd.watch((event) => seen.push(event.op));
     native.setNextResponse({ hubInstalled: false });
-    native.emit({ op: 'removed', packageName: 'com.canopy.hub' });
+    native.emit({ op: 'removed', packageName: 'org.onderling.hub' });
     const r2 = await hd.check();
     expect(r2.hubInstalled).toBe(false);
     expect(seen).toEqual(['removed']);

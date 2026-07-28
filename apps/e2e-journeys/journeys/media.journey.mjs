@@ -22,9 +22,9 @@ import { checker } from './_util.mjs';
 export const name = 'J-media (blob edge → real S3, grant/read/deny)';
 
 const MINIO  = process.env.MINIO_URL    || 'http://127.0.0.1:9000';
-const BUCKET = process.env.MINIO_BUCKET || 'canopy-media';
-const KEY    = process.env.MINIO_KEY    || 'canopyadmin';
-const SECRET = process.env.MINIO_SECRET || 'canopysecret123';
+const BUCKET = process.env.MINIO_BUCKET || 'onderling-media';
+const KEY    = process.env.MINIO_KEY    || 'onderlingadmin';
+const SECRET = process.env.MINIO_SECRET || 'onderlingsecret123';
 
 async function s3Reachable() {
   try { return (await fetch(`${MINIO}/minio/health/live`, { signal: AbortSignal.timeout(2500) })).ok; } catch { return false; }

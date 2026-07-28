@@ -41,14 +41,14 @@ describe('check — happy path (Hub installed)', () => {
     const native = nativeMock({
       hubInstalled:      true,
       hubVersion:        1,
-      packageName:       'com.canopy.hub',
-      serviceName:       'com.canopy.hub.HubService',
+      packageName:       'org.onderling.hub',
+      serviceName:       'org.onderling.hub.HubService',
       supportedVersions: [1, 2],
     });
     const result = await check({ nativeModule: native, cache });
     expect(result.hubInstalled).toBe(true);
     expect(result.hubVersion).toBe(1);
-    expect(result.packageName).toBe('com.canopy.hub');
+    expect(result.packageName).toBe('org.onderling.hub');
     expect(result.supportedVersions).toEqual([1, 2]);
     expect(typeof result.checkedAt).toBe('string');
     expect(Object.isFrozen(result)).toBe(true);

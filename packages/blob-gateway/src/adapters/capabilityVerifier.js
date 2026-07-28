@@ -1,9 +1,9 @@
-// capabilityVerifier.js — the canopy capability-token verifier satisfying the
+// capabilityVerifier.js — the Onderling capability-token verifier satisfying the
 // same v0 `verifyToken` contract the gatekeeper injects:
 //
 //   verifyToken(token) => Promise<{ webId } | null>
 //
-// PLAN-media-infra-deployment (DECIDED): canopy capability tokens are the
+// PLAN-media-infra-deployment (DECIDED): Onderling capability tokens are the
 // PRIMARY media-gate auth; Solid-OIDC (solidVerifier.js) stays as an additional
 // verifier — compose the two with `anyVerifier` below.
 //

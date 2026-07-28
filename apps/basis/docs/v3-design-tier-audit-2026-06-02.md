@@ -1,10 +1,10 @@
 # v3 interface-ontwerp — tier audit (board-by-board vs real repo state)
 
-**Source doc:** `Canopy interface — interface-ontwerp · print.pdf` (repo root) — the
+**Source doc:** `Onderling interface — interface-ontwerp · print.pdf` (repo root) — the
 standalone v3 design conversation, 11 sections / 34 sketches. This is the doc the
 todo's **N4** asked to import and tier-label.
 
-**Canon status.** v3 is **canon *alongside* the v2 PDF** (`Canopy interface · v2 —
+**Canon status.** v3 is **canon *alongside* the v2 PDF** (`Onderling interface · v2 —
 kring als bouwsteen · print.pdf`), not a replacement. v2 ("kring als bouwsteen")
 remains the GESPREK-is-the-kring-view canon; v3 only *extends* it — same single
 codebase, same kring substrate underneath. Where v3 and the shipped app diverge,

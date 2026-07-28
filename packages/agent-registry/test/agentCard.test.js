@@ -37,9 +37,9 @@ describe('projectAgentCard — full entry', () => {
     expect(Object.isFrozen(card)).toBe(true);
   });
 
-  it('maps the x-canopy extension (owner defaults to webid; subject not exposed)', () => {
+  it('maps the x-onderling extension (owner defaults to webid; subject not exposed)', () => {
     const card = projectAgentCard(FULL_ENTRY);
-    expect(card['x-canopy']).toEqual({
+    expect(card['x-onderling']).toEqual({
       id:       'proxy-anne',
       pubKey:   'pub-anne-proxy',
       owner:    'https://anne.pod/profile#me',
@@ -57,7 +57,7 @@ describe('projectAgentCard — full entry', () => {
 
   it('an explicit owner option wins over entry.webid', () => {
     const card = projectAgentCard(FULL_ENTRY, { owner: 'did:key:root' });
-    expect(card['x-canopy'].owner).toBe('did:key:root');
+    expect(card['x-onderling'].owner).toBe('did:key:root');
   });
 });
 
@@ -94,7 +94,7 @@ describe('projectAgentCard — skills', () => {
 describe('projectAgentCard — lifecycle + minimal entries', () => {
   it('a revoked entry projects status: revoked', () => {
     const card = projectAgentCard({ ...FULL_ENTRY, revokedAt: '2026-07-08T09:00:00Z' });
-    expect(card['x-canopy'].status).toBe('revoked');
+    expect(card['x-onderling'].status).toBe('revoked');
   });
 
   it('a minimal entry projects gracefully (skills: [], name falls back to agentId)', () => {
@@ -105,7 +105,7 @@ describe('projectAgentCard — lifecycle + minimal entries', () => {
     });
     expect(card.name).toBe('bare-agent');
     expect(card.skills).toEqual([]);
-    expect(card['x-canopy']).toMatchObject({
+    expect(card['x-onderling']).toMatchObject({
       id:     'bare-agent',
       owner:  null,
       grants: [],

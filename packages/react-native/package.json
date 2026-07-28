@@ -2,7 +2,7 @@
   "private": true,
   "name": "@onderling/react-native",
   "version": "0.2.0",
-  "description": "React Native platform layer + adapters for the canopy agent SDK",
+  "description": "React Native platform layer + adapters for the onderling agent SDK",
   "type": "module",
   "main": "index.js",
   "exports": {

@@ -22,8 +22,8 @@ const ENC_SUFFIX = '.enc';
  * relative path used in step 2 of the contentHash algorithm.
  *
  * Example:
- *   identityRoot = 'https://alice.example/canopy/'
- *   uri          = 'https://alice.example/canopy/grants/issued/grant-x.enc'
+ *   identityRoot = 'https://alice.example/onderling/'
+ *   uri          = 'https://alice.example/onderling/grants/issued/grant-x.enc'
  *   →              'grants/issued/grant-x.enc'
  *
  * Rejects URIs that don't start with the identity root.
@@ -92,7 +92,7 @@ function toBytes(content) {
  * 6. SHA-256 the concatenation; lowercase hex; prefix `sha256:`.
  *
  * @param   {object} podClient   `@onderling/pod-client` PodClient.
- * @param   {string} identityRoot  e.g. `'https://alice.example/canopy/'`.
+ * @param   {string} identityRoot  e.g. `'https://alice.example/onderling/'`.
  * @returns {Promise<string>}      `'sha256:<64 lowercase hex>'`.
  */
 export async function computeContentHash(podClient, identityRoot) {

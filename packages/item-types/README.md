@@ -25,7 +25,7 @@ This substrate ships the common vocabulary plus a validator so the apps
 agree on:
 
 - the **type name** (`task`, not `Task` or `tasks-v1/task`);
-- the **canonical IRI** (`https://canopy.org/ns#Task`);
+- the **canonical IRI** (`https://onderling.org/ns#Task`);
 - the **required fields** every item carries (`type`, `id`,
   `createdAt`, `createdBy`);
 - the **embed shape** (`embeds: [{type, ref, …}]`) so cross-app links
@@ -50,7 +50,7 @@ const result = validate({
 if (!result.ok) console.error(result.errors);
 
 list();              // → ['announcement', 'calendar-event', …, 'task']
-metadata('task');    // → { name: 'task', iri: 'https://canopy.org/ns#Task' }
+metadata('task');    // → { name: 'task', iri: 'https://onderling.org/ns#Task' }
 ```
 
 The default registry is pre-loaded with all canonical types — no setup
@@ -89,7 +89,7 @@ reg.registerType('my-app/widget', WIDGET_SCHEMA);
 | `media`             | `source`               | Pointer-only media item (images first; `mime` distinguishes). `source` is an embeds-shaped `{type, ref, enc?}` storage pointer — blob-gateway's manifest line slots in directly. Optional writer-asserted `mime`/`width`/`height` + `caption`. |
 
 Every type ships under the **`dec:`** namespace
-(`https://canopy.org/ns#<TypeName>`). The substrate intentionally does
+(`https://onderling.org/ns#<TypeName>`). The substrate intentionally does
 **not** alias to `schema.org` or other external vocabularies — see the
 "vocabulary stance" note below.
 

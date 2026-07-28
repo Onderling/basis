@@ -1910,9 +1910,9 @@ function resolvePasskeyConfig(opt) {
     rpName:   base.rpName   ?? rpId,
     userName: base.userName ?? 'onderling-user',
     userId:   base.userId   ?? 'onderling-user',
-    // ⚠ the DEFAULT prfSalt is FROZEN (key-derivation input — renaming it orphans existing WebAuthn
-    // vault keys); the visible userName/userId defaults are cosmetic and renamed (new credentials only).
-    prfSalt:  base.prfSalt  ?? 'canopy/secure-agent/v1',
+    // Key-derivation input for the WebAuthn/passkey-backed vault. Renamed pre-launch: an existing
+    // passkey now derives a different key, so a dev vault must be re-registered (accepted).
+    prfSalt:  base.prfSalt  ?? 'onderling/secure-agent/v1',
     ...(base.credentialId ? { credentialId: base.credentialId } : {}),
   };
 }

@@ -92,7 +92,7 @@ export function resolveConfigDir(explicit) {
   if (explicit) return explicit;
   if (process.env.COMPANION_NODE_CONFIG_DIR) return process.env.COMPANION_NODE_CONFIG_DIR;
   const xdg = process.env.XDG_CONFIG_HOME;
-  return join(xdg && xdg.length > 0 ? xdg : join(homedir(), '.config'), 'canopy-companion');
+  return join(xdg && xdg.length > 0 ? xdg : join(homedir(), '.config'), 'onderling-companion');
 }
 
 /**

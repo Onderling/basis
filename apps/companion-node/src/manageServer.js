@@ -40,7 +40,7 @@ const PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <div id="app">…</div>
 <script>
 const $=(h)=>{const d=document.createElement('div');d.innerHTML=h;return d.firstElementChild};
-const TKEY='canopy-manage-token';
+const TKEY='onderling-manage-token';
 const tok=()=>localStorage.getItem(TKEY);
 async function api(op,data){const r=await fetch('/manage/api/'+op,{method:'POST',headers:{'authorization':'Bearer '+tok(),'content-type':'application/json'},body:JSON.stringify({data:data||{}})});return {status:r.status,body:await r.json()}}
 function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}

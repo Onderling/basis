@@ -174,7 +174,7 @@ const REDIRECT = 'http://localhost:8888/auth/callback';
 
 describe('createSolidAuthNode — interactive redirect round-trip (#167)', () => {
   it('start → authorize URL carries state + S256 PKCE challenge + redirect_uri', async () => {
-    const auth = createSolidAuthNode({ vault: new MemVault(), clientName: 'Canopy' });
+    const auth = createSolidAuthNode({ vault: new MemVault(), clientName: 'Onderling' });
     const { redirectUrl } = await auth.start({ issuer: 'inrupt', redirectUrl: REDIRECT });
 
     const u = new URL(redirectUrl);
@@ -189,7 +189,7 @@ describe('createSolidAuthNode — interactive redirect round-trip (#167)', () =>
 
   it('full hop: start → IdP redirect back → handleCallback → authenticated + usable fetch', async () => {
     const vault = new MemVault();
-    const auth  = createSolidAuthNode({ vault, clientName: 'Canopy' });
+    const auth  = createSolidAuthNode({ vault, clientName: 'Onderling' });
 
     // 1. start → authorize URL.
     const { redirectUrl: authorizeUrl } = await auth.start({ issuer: 'inrupt', redirectUrl: REDIRECT });
@@ -217,7 +217,7 @@ describe('createSolidAuthNode — interactive redirect round-trip (#167)', () =>
   });
 
   it('STATE integrity: a tampered state in the callback is rejected (no session)', async () => {
-    const auth = createSolidAuthNode({ vault: new MemVault(), clientName: 'Canopy' });
+    const auth = createSolidAuthNode({ vault: new MemVault(), clientName: 'Onderling' });
     const { redirectUrl: authorizeUrl } = await auth.start({ issuer: 'inrupt', redirectUrl: REDIRECT });
 
     // Attacker/forged callback: valid-looking code, WRONG state.
@@ -228,7 +228,7 @@ describe('createSolidAuthNode — interactive redirect round-trip (#167)', () =>
   });
 
   it('STATE integrity: a callback with no authorization code is rejected', async () => {
-    const auth = createSolidAuthNode({ vault: new MemVault(), clientName: 'Canopy' });
+    const auth = createSolidAuthNode({ vault: new MemVault(), clientName: 'Onderling' });
     const { redirectUrl: authorizeUrl } = await auth.start({ issuer: 'inrupt', redirectUrl: REDIRECT });
     const state = new URL(authorizeUrl).searchParams.get('state');
     const noCode = `${REDIRECT}?state=${encodeURIComponent(state)}`;   // state ok, code absent
@@ -238,13 +238,13 @@ describe('createSolidAuthNode — interactive redirect round-trip (#167)', () =>
 
   it('PKCE binding: a code minted for session A cannot be redeemed by a fresh session B', async () => {
     // Session A runs the full dance and captures a real authorize URL (state + challenge).
-    const authA = createSolidAuthNode({ vault: new MemVault(), clientName: 'Canopy' });
+    const authA = createSolidAuthNode({ vault: new MemVault(), clientName: 'Onderling' });
     const { redirectUrl: authorizeUrlA } = await authA.start({ issuer: 'inrupt', redirectUrl: REDIRECT });
     const callbackForA = idpRedirectBack(authorizeUrlA, REDIRECT);
 
     // Session B starts its OWN dance (fresh session, fresh code_verifier/state),
     // then someone replays A's callback (A's code+state) into B.
-    const authB = createSolidAuthNode({ vault: new MemVault(), clientName: 'Canopy' });
+    const authB = createSolidAuthNode({ vault: new MemVault(), clientName: 'Onderling' });
     await authB.start({ issuer: 'inrupt', redirectUrl: REDIRECT });
     await expect(authB.handleCallback(callbackForA)).rejects.toMatchObject({ code: 'OIDC_CALLBACK_FAILED' });
     expect(authB.isAuthenticated()).toBe(false);
@@ -256,7 +256,7 @@ describe('createSolidAuthNode — interactive redirect round-trip (#167)', () =>
   });
 
   it('handleCallback before start is refused (no login in progress)', async () => {
-    const auth = createSolidAuthNode({ vault: new MemVault(), clientName: 'Canopy' });
+    const auth = createSolidAuthNode({ vault: new MemVault(), clientName: 'Onderling' });
     await expect(auth.handleCallback(`${REDIRECT}?code=x&state=y`))
       .rejects.toMatchObject({ code: 'NO_LOGIN_IN_PROGRESS' });
   });
@@ -264,7 +264,7 @@ describe('createSolidAuthNode — interactive redirect round-trip (#167)', () =>
   it('persisted-vault round-trip: a fresh process resumes silently from the stored refresh token', async () => {
     // ── Process 1: interactive sign-in populates the vault. ──
     const vault = new MemVault();
-    const auth1 = createSolidAuthNode({ vault, clientName: 'Canopy' });
+    const auth1 = createSolidAuthNode({ vault, clientName: 'Onderling' });
     const { redirectUrl: authorizeUrl } = await auth1.start({ issuer: 'inrupt', redirectUrl: REDIRECT });
     await auth1.handleCallback(idpRedirectBack(authorizeUrl, REDIRECT));
     expect(auth1.isAuthenticated()).toBe(true);
@@ -272,7 +272,7 @@ describe('createSolidAuthNode — interactive redirect round-trip (#167)', () =>
 
     // ── Process 2: brand-new auth object + fresh session, SAME vault. ──
     // No start()/handleCallback() — just restoreFromVault, as a cold boot would.
-    const auth2 = createSolidAuthNode({ vault, clientName: 'Canopy' });
+    const auth2 = createSolidAuthNode({ vault, clientName: 'Onderling' });
     expect(auth2.isAuthenticated()).toBe(false);          // nothing in memory yet
     const restored = await auth2.restoreFromVault();
     expect(restored).toBe(true);

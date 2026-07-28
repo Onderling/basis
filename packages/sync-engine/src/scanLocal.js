@@ -7,7 +7,7 @@
  *
  * `relPath` is POSIX-style (forward slashes) so it can be compared against
  * pod URIs without platform normalization.  Hidden files / directories
- * and `.canopy/` are skipped via `pathMap.shouldSync` /
+ * and `.onderling/` are skipped via `pathMap.shouldSync` /
  * `pathMap.shouldSkipDir`.
  *
  * sha256 is computed over the raw bytes.  Streaming for very large files

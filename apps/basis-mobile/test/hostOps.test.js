@@ -211,13 +211,13 @@ describe('Bundle G3 (#265) — /lookup-peer + /publish-peer with sessionRef wire
 <#me> pim:storage <https://bob.example/>.`,
               };
             }
-            // Peer's identity.ttl → canopy:peerAddr.
-            if (String(url).startsWith('https://bob.example/canopy/identity/identity.ttl')) {
+            // Peer's identity.ttl → onderling:peerAddr.
+            if (String(url).startsWith('https://bob.example/onderling/identity/identity.ttl')) {
               return {
                 ok: true, status: 200,
                 headers: { get: (k) => k.toLowerCase() === 'content-type' ? 'text/turtle' : null },
-                text: async () => `@prefix canopy: <https://canopy.dev/ns#>.
-<#me> canopy:peerAddr "app.bobbob".`,
+                text: async () => `@prefix onderling: <https://onderling.org/ns#>.
+<#me> onderling:peerAddr "app.bobbob".`,
               };
             }
             return { ok: false, status: 404, headers: { get: () => null }, text: async () => '' };

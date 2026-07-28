@@ -129,7 +129,7 @@ export const EXACT_SKIP_KEYS = Object.freeze(new Set([
  *                                              first device record).
  * @param {object}        opts.podClient      `@onderling/pod-client` PodClient.
  * @param {string}        opts.podRoot        Pod root URI (or already-rooted
- *                                              `<base>/canopy/`).
+ *                                              `<base>/onderling/`).
  * @param {string}        opts.mnemonic       BIP-39 phrase the user wrote
  *                                              down at first-run; used to
  *                                              derive the bootstrap secret.

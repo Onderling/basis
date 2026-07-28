@@ -50,7 +50,7 @@ import { encode as b64encode,
 const ENVELOPE_VERSION = 1;
 const PAYLOAD_VERSION  = 1;
 const ALG              = 'argon2id+xsalsa20poly1305';
-const DEFAULT_REF      = 'canopy-cloud-backup.enc';
+const DEFAULT_REF      = 'onderling-cloud-backup.enc';
 const SALT_LEN         = 16;
 const NONCE_LEN        = 24;     // nacl.secretbox.nonceLength
 const KEY_LEN          = 32;     // nacl.secretbox.keyLength
@@ -103,7 +103,7 @@ export class CloudBackup {
    * @param {object} opts
    * @param {import('./CloudAdapter.js').CloudAdapter} opts.adapter
    *   Concrete adapter instance to read/write through.
-   * @param {string} [opts.ref='canopy-cloud-backup.enc']
+   * @param {string} [opts.ref='onderling-cloud-backup.enc']
    *   Stable identifier for the backup blob inside the adapter.
    * @param {{ m: number, t: number, p: number }} [opts.argonOpts]
    *   **Test-only override** for Argon2id cost.  Production callers MUST

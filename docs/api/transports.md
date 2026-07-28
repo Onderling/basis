@@ -18,8 +18,8 @@ class MqttTransport extends Transport
 new MqttTransport(opts)
 ```
 
-MQTT-broker `Transport`: the agent subscribes to its own inbox topic `canopy/<address>/in` and
-publishes outbound envelopes to `canopy/<to>/in`. The address is 24 lowercase hex chars derived
+MQTT-broker `Transport`: the agent subscribes to its own inbox topic `onderling/<address>/in` and
+publishes outbound envelopes to `onderling/<to>/in`. The address is 24 lowercase hex chars derived
 from the first 12 bytes of the identity's Ed25519 pubKey. Requires the `mqtt` package (peer
 dependency), dynamic-imported on `connect()`.
 

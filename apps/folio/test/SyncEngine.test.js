@@ -353,7 +353,7 @@ describe('SyncEngine — state persistence', () => {
   });
   // Naming migration 2026-07-28 — the real risk of moving the state dir: state written under the OLD
   // path must still be READ, or every note looks never-synced and the next run re-uploads the world.
-  it('reads pre-rename state from the legacy .canopy/ path (no spurious re-sync)', async () => {
+  it('reads pre-rename state from the legacy .onderling/ path (no spurious re-sync)', async () => {
     await fs.writeFile(join(localRoot, 'a.md'), 'A');
     pod._seed(`${POD_ROOT}b.md`, 'B');
 
@@ -363,7 +363,7 @@ describe('SyncEngine — state persistence', () => {
 
     // Move the state file back to where a pre-rename install wrote it.
     const newDir = join(localRoot, '.onderling');
-    const oldDir = join(localRoot, '.canopy');
+    const oldDir = join(localRoot, '.onderling');
     await fs.mkdir(oldDir, { recursive: true });
     await fs.rename(join(newDir, 'notes-sync-state.json'), join(oldDir, 'notes-sync-state.json'));
 

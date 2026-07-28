@@ -190,7 +190,7 @@ The hard work is:
   web-basis conventions, not mobile concerns directly. They
   belong in the `src/core/` lift under #221.5.
 - Pod sign-in flows — folio-mobile and stoop-mobile both have OIDC
-  flows that differ from basis-web's. Canopy-chat-mobile
+  flows that differ from basis-web's. Onderling-mobile
   reuses one of those (open question).
 
 ---

@@ -1,6 +1,6 @@
 /**
  * @onderling/mcp-bridge — bidirectional bridge between the Model Context Protocol
- * (MCP) and canopy's gated `{opId, args}` dispatch (the #63 MCP-integration tail).
+ * (MCP) and Onderling's gated `{opId, args}` dispatch (the #63 MCP-integration tail).
  *
  * Two directions, one contract (the manifest):
  *   • EXPORT  — `manifestToMcpTools(manifest)` projects an app's ops into an

@@ -106,16 +106,11 @@ import {
   recommendFix as recommendFixFromSteps,
 } from '../diagnostics.js';
 
-const STATE_FILE_RELPATH        = '.onderling/notes-sync-state.json';
-const STATE_FILE_RELPATH_LEGACY = '.canopy/notes-sync-state.json';   // read-fallback (pre-rename state)
-
-/** Read the sync-state file, trying the new path then the legacy .canopy/ path (pre-rename state). */
+const STATE_FILE_RELPATH = '.onderling/notes-sync-state.json';
+/** Read the sync-state file (null when absent). */
 async function readStateText(fsImpl, root) {
-  for (const rel of [STATE_FILE_RELPATH, STATE_FILE_RELPATH_LEGACY]) {
-    try { return await fsImpl.readFile(join(root, rel), 'utf8'); }
-    catch (err) { if (err.code !== 'ENOENT') throw err; }
-  }
-  return null;
+  try { return await fsImpl.readFile(join(root, STATE_FILE_RELPATH), 'utf8'); }
+  catch (err) { if (err.code !== 'ENOENT') throw err; return null; }
 }
 
 

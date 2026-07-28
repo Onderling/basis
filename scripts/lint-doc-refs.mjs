@@ -5,7 +5,7 @@
 // HARD FAILS (exit 1):
 //   1. Any file tracked under an ignored private tree (plans/ or _archive/).
 //   2. Any TRACKED markdown whose link target points into a private/ignored area
-//      (plans/, _archive/, ../canopy projectfiles, REMAINING-WORK.md, PROGRESS.md) —
+//      (plans/, _archive/, ../onderling projectfiles, REMAINING-WORK.md, PROGRESS.md) —
 //      such links break on a fresh public clone.
 //   3. Any TRACKED markdown with a BROKEN relative link (target file doesn't exist) —
 //      e.g. a link left dangling after a doc move/purge.
@@ -24,7 +24,7 @@ const tracked = sh('git ls-files').split('\n').filter(Boolean);
 const PRIVATE_TREE = /^(plans|_archive)\//;
 const PRIVATE_PREFIX = /^(PLAN|DESIGN|CODING|VOORSTEL|PROPOSAL|NOTE|WIP|BRIEF)-.*\.md$|^(REMAINING-WORK|PROGRESS)\.md$/;
 // link targets that won't resolve for a fresh clone (ignored or outside the repo):
-const BAD_TARGET = /(^|\/)(plans|_archive)\/|canopy projectfiles|(^|\/)(REMAINING-WORK|PROGRESS)\.md/;
+const BAD_TARGET = /(^|\/)(plans|_archive)\/|onderling projectfiles|(^|\/)(REMAINING-WORK|PROGRESS)\.md/;
 const MD_LINK = /\]\(([^)]+)\)/g;
 // intentional placeholder/example links that legitimately don't resolve to a repo file:
 const ALLOW_BROKEN = new Set(['bestand.html', 'xxx.html', './pod-layout-conventions.md']);

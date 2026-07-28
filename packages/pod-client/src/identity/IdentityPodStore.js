@@ -4,7 +4,7 @@
  * Implements the on-pod side of `Design-v3/identity-pod-schema.md`:
  *   • encrypts each identity resource per the schema's encryption-protocol
  *     (XSalsa20-Poly1305 envelope, per-resource HKDF-SHA256 key).
- *   • walks the `/canopy/` container and computes the deterministic
+ *   • walks the `/onderling/` container and computes the deterministic
  *     `dw:contentHash` per the schema's 6-step algorithm.
  *   • signs the plaintext `manifest.ttl` with an `AgentIdentity`.
  *   • appends to `auth-log/YYYY-MM.enc` in JSON-LD Lines format.
@@ -178,7 +178,7 @@ export class IdentityPodStore {
   /** @type {object} */    #podClient;
   /** @type {Bootstrap} */ #bootstrap;
   /** @type {AgentIdentity} */ #identity;
-  /** @type {string} */    #podRoot;        // e.g. 'https://alice.example/canopy/'
+  /** @type {string} */    #podRoot;        // e.g. 'https://alice.example/onderling/'
   /** @type {string} */    #rootPubKey;     // base64url Ed25519 pubkey of #identity.
 
   /**
@@ -188,8 +188,8 @@ export class IdentityPodStore {
    * @param {AgentIdentity} opts.identity    root device identity (manifest signer).
    * @param {string}        opts.podRoot     pod-relative or absolute URI; the
    *                                          identity container will be at
-   *                                          `<podRoot>/canopy/`.  If `podRoot`
-   *                                          already ends in `/canopy/`, it
+   *                                          `<podRoot>/onderling/`.  If `podRoot`
+   *                                          already ends in `/onderling/`, it
    *                                          is used as-is.
    */
   constructor({ podClient, bootstrap, identity, podRoot } = {}) {
@@ -211,17 +211,14 @@ export class IdentityPodStore {
     this.#identity   = identity;
     this.#rootPubKey = identity.pubKey;
 
-    // Normalize into the identity-container namespace. New containers live under '/onderling/'
-    // (naming migration 2026-07-28); a caller passing an explicit '/canopy/' root — an EXISTING
-    // container from before the rename — is honoured as-is, so pre-rename pods keep syncing without a
-    // data move. (A future migration tool can copy canopy/→onderling/; until then both spellings work.)
+    // Normalize: ensure podRoot ends with '/onderling/'.
     let root = podRoot;
     if (!root.endsWith('/')) root += '/';
-    if (!root.endsWith('/onderling/') && !root.endsWith('/canopy/')) root += 'onderling/';
+    if (!root.endsWith('/onderling/')) root += 'onderling/';
     this.#podRoot = root;
   }
 
-  /** Identity container root URI (ending in `/onderling/` — or `/canopy/` for a pre-rename container). */
+  /** Identity container root URI (always ending in `/onderling/`). */
   get root() { return this.#podRoot; }
 
   // ── init ────────────────────────────────────────────────────────────────

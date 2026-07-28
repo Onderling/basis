@@ -4,7 +4,7 @@
 // central pod under the participant's PSEUDONYM (their agent public key). The participant never logs
 // in to the central pod; the companion is the authenticated server-side writer.
 //
-// Boundary: this is the CANOPY half of feedback's central-pod route. It is deliberately BLIND to the
+// Boundary: this is the ONDERLING half of feedback's central-pod route. It is deliberately BLIND to the
 // contribution's meaning — an opaque JSON blob with a `{sig, pubKey}` that rides along in the body.
 // Signature validity is enforced by the feedback AGGREGATION at read time (it re-checks every stored
 // signature and drops forged/unsigned/sybil records — see feedback css-central-pod.js), so a dishonest

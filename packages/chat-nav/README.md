@@ -79,7 +79,7 @@ from the side-panel page).
 
 ## Why a substrate, not an app-internal helper
 
-Every canopy app's settings / logs / file-dir page needs this
+Every Onderling app's settings / logs / file-dir page needs this
 behaviour.  Lifting it to a substrate means:
 
 - One code path for the protocol (no per-app drift)

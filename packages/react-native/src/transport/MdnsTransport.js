@@ -40,7 +40,7 @@ import { b64Encode, b64Decode }              from '../utils/base64.js';
 const MdnsNative = NativeModules.MdnsModule ?? null;
 const mdnsEmitter = MdnsNative ? new NativeEventEmitter(MdnsNative) : null;
 
-const SERVICE_TYPE = '_canopy';
+const SERVICE_TYPE = '_onderling';
 
 export class MdnsTransport extends Transport {
   #hostname;

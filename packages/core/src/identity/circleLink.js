@@ -19,7 +19,7 @@ import { encode as b64encode } from '../crypto/b64.js';
 
 /** The canonical challenge a linkable joiner signs. Deterministic; binds join + address. */
 export function circleLinkMessage(groupId, address) {
-  return `canopy-circle-link-v1|${String(groupId)}|${String(address)}`;
+  return `onderling-circle-link-v1|${String(groupId)}|${String(address)}`;
 }
 
 /**

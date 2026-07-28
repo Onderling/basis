@@ -5,7 +5,7 @@ level methods (`fetchResource`, `publishEnvelope`, …); the wrapper
 handles bind / version-negotiation / register / unbind.
 
 > Standardisation Phase **51.7 – 51.9**. AIDL interface files live
-> under `android/aidl/com/canopy/hub/`; build wiring is documented
+> under `android/aidl/com/onderling/hub/`; build wiring is documented
 > in `HUB-BINDING-BUILD.md`.
 
 ---

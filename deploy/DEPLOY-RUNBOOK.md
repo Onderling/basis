@@ -178,8 +178,8 @@ sudo usermod -aG docker "$USER"   # then log out/in so `docker` runs without sud
 ### B5. Get the code + set env
 
 ```bash
-git clone <this-repo-url> canopy-mono
-cd canopy-mono/deploy
+git clone <this-repo-url> onderling-mono
+cd onderling-mono/deploy
 
 cp caddy/.env.example .env
 # Edit .env: RELAY_DOMAIN, POD_DOMAIN, ACME_EMAIL (and optional R2_* / push).
@@ -211,7 +211,7 @@ To switch to ACP, override `CSS_CONFIG` on the `pod` service (add it to the
 ### B7. Bring the stack up with TLS
 
 ```bash
-# from canopy-mono/deploy, with .env filled and DNS + firewall done:
+# from onderling-mono/deploy, with .env filled and DNS + firewall done:
 docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d --build
 ```
 
@@ -300,7 +300,7 @@ swap to Path B when you later want a genuinely always-on companion node.
 ### C1. Bring the stack up locally (no TLS overlay — the tunnel provides TLS)
 
 ```bash
-# from canopy-mono/deploy, with .env filled (RELAY_* / POD_* / optional R2_*/push):
+# from onderling-mono/deploy, with .env filled (RELAY_* / POD_* / optional R2_*/push):
 docker compose up -d          # relay :8787, CSS pod :3000, companion (internal)
 ```
 

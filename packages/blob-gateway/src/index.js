@@ -33,7 +33,7 @@ export {
 // Solid-verifier adapters use `node:crypto`):
 //   • bucket      → '@onderling/blob-gateway/adapters/s3'                  createS3Bucket
 //   • verifyToken → '@onderling/blob-gateway/adapters/capability-verifier' createCapabilityVerifier / anyVerifier
-//                   (PRIMARY media-gate auth: canopy capability tokens)
+//                   (PRIMARY media-gate auth: Onderling capability tokens)
 //   • verifyToken → '@onderling/blob-gateway/adapters/solid-verifier'      createSolidVerifier / createJwksVerifier
 //                   (additional verifier: Solid-OIDC — compose via anyVerifier)
 //   • acl         → '@onderling/blob-gateway/adapters/pod-acl'             createPodAcl

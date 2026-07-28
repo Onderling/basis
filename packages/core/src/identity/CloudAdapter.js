@@ -27,7 +27,7 @@ export class CloudAdapter {
   /**
    * Upload a blob with a deterministic identifier.
    *
-   * @param   {string}     ref   caller-chosen stable id, e.g. `'canopy-bootstrap.enc'`
+   * @param   {string}     ref   caller-chosen stable id, e.g. `'onderling-bootstrap.enc'`
    * @param   {Uint8Array} bytes blob payload
    * @param   {object}     [opts]
    * @returns {Promise<{ ref: string, version?: string }>}

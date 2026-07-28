@@ -70,7 +70,7 @@ describe('podSharedWithMeIo', () => {
     const list = [copy('a', 2), copy('b', 1)];
     await io.save(list);
     expect(await io.load()).toEqual(list);
-    // Per-user resource under the shared-with-me app segment (→ canopy/cc-shared-with-me/received.json).
+    // Per-user resource under the shared-with-me app segment (→ onderling/cc-shared-with-me/received.json).
     expect(writer.store.has('cc-shared-with-me::received.json')).toBe(true);
   });
 

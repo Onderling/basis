@@ -1574,7 +1574,7 @@ function noteCircleBotTurn(r, query) {
   const reply = r && r.via === 'llm-reply' && typeof r.reply === 'string' ? r.reply.trim() : '';
   circleAwaitingBotReply = reply && /\?/.test(reply) ? { question: reply, query: String(query || '') } : null;
 }
-let _kringRender = null;         // { circleId, botBubble(text), fanOut(msgId,text,ts) } — set by showKring
+let _kringRender = null;         // { circleId, botBubble(text, opts?) — opts.buttons/scope/embeds ride payload, fanOut(msgId,text,ts) } — set by showKring
 let _clarifyScope = null;        // scope of the last clarify ask(), so a candidate button taps pick() on it
 let _lastKringListing = null;    // { appOrigin, items } from the most-recent list reply, for bulk "/done all"
 const _fileShareInbox = new Map();   // fileId → {name,mime,dataB64,size} of a received peer file, for [Download]

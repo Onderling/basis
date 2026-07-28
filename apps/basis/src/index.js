@@ -271,6 +271,9 @@ export {
   createFallbackPrefStore, localStorageFallbackIo, asyncStorageFallbackIo,
   createFallbackOffer, OFFER_AFTER_PEERS, OFFER_COOLDOWN_MS,
 } from './v2/addressFallback.js';
+// Re-exported THROUGH the composer: a shell imports basis and nothing else from apps/
+// (`shellLayering.test.js`), so basis-mobile reaches stoop's fallback-report hook via here.
+export { setAddressFallbackReportHook } from '@onderling-app/stoop';
 export {
   DELIVERY, DELIVERY_ORDER, DELIVERY_LABELS, deliveryStates, isDeliveryState,
   advanceDelivery, deliveryAfterSend, receiptPolicy, shouldSendReceipt,

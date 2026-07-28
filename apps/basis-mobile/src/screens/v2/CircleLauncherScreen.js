@@ -348,6 +348,9 @@ export default function CircleLauncherScreen({
   bundle,
   // Delivery honesty — the shared per-message map (App.js owns it; ChatScreen's router feeds it).
   deliveryStateMap = null,
+  // The fallback offer's MOUTH (App.js owns the offer): the open kring chat registers its bot bubble
+  // while mounted, so an app-level offer can speak in the conversation the person is looking at.
+  registerKringBotSink = null,
   // cluster J — the OidcSessionRN ref (App.js:187), needed to activate the feedback verify pods.
   sessionRef = null,
   // cluster J — podAuth (lifted from the hidden ChatScreen) so the "Me" screen can drive pod sign-in.
@@ -1684,6 +1687,7 @@ export default function CircleLauncherScreen({
       <CircleDetail
         circle={selected}
         deliveryStateMap={deliveryStateMap}
+        registerKringBotSink={registerKringBotSink}
         items={items}
         callSkill={callSkill}
         rawCallSkill={bundle?.callSkill}
@@ -2089,6 +2093,7 @@ function LauncherTile({ circle: c, preview, pending, isPinned = false, isMuted =
 function CircleDetail({
   circle, items, callSkill, rawCallSkill, catalog: rawCatalog, policy, myListTasks = [],
   deliveryStateMap = null,
+  registerKringBotSink = null,
   eventLog, circles = [],
   recipeStore = null, onStoopEvent, sendPersonaUpdate, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null, coreIdentity = null,
   onCircleControl = null, circleTransport = null,
@@ -2389,6 +2394,18 @@ function CircleDetail({
     setStreamTick((n) => n + 1);
     return { msgId, ts };
   }, [eventLog, circle?.id]);
+
+  // The fallback offer speaks HERE while this kring is open (web parity: the chat makes the offer, at the
+  // moment the person is confused about why nobody replied). `scope: 'self'` — a local bubble, never
+  // fanned: the offer is about MY setting, and broadcasting it would tell the circle I have it off.
+  useEffect(() => {
+    if (typeof registerKringBotSink !== 'function') return undefined;
+    registerKringBotSink(({ messageKey, costKey } = {}) => {
+      const text = [messageKey && t(messageKey), costKey && t(costKey)].filter(Boolean).join(' ');
+      if (text) appendKringMessage({ actor: 'bot', text, scope: 'self' });
+    });
+    return () => registerKringBotSink(null);
+  }, [registerKringBotSink, appendKringMessage]);
 
   // Build the co-hosted feedback surface + mount for a circle in a given language, over the given (cached) pods.
   // Factored out so a language switch can REBUILD reusing the same pods (local Stage-1 survives). Rich emit sink:

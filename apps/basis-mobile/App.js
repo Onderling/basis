@@ -30,7 +30,10 @@ import CircleLauncherScreen from './src/screens/v2/CircleLauncherScreen.js';
 // peer-router (inbound receipts) and CircleLauncherScreen's bubbles (rendering) share an instance.
 // Two maps would mean receipts advancing a state no bubble reads.
 import { createDeliveryStateMap } from '@onderling/kring-host/deliveryState';
-import { makeReceiptSender, asyncStorageDeliveryIo, createDeliverySettingsStore } from '@onderling-app/basis';
+import {
+  makeReceiptSender, asyncStorageDeliveryIo, createDeliverySettingsStore,
+  createFallbackOffer, setAddressFallbackReportHook,
+} from '@onderling-app/basis';
 import FirstRunWelcomeScreen from './src/screens/FirstRunWelcomeScreen.js';
 import MnemonicEntryScreen from './src/screens/MnemonicEntryScreen.js';
 import MnemonicCreateScreen from './src/screens/MnemonicCreateScreen.js';
@@ -127,6 +130,34 @@ export default function App() {
   if (!deliverySettingsStoreRef.current) {
     deliverySettingsStoreRef.current = createDeliverySettingsStore(asyncStorageDeliveryIo(AsyncStorage));
   }
+  // The fallback OFFER (2026-07-28), mobile half. The offer logic is app-level (its evidence and cooldown
+  // must survive circle switches); the MOUTH is whichever kring chat is open, registered below. When the
+  // offer fires with no kring open it is BUFFERED, not dropped — the moment a chat mounts, it speaks and
+  // arms the cooldown. Same dormancy as web: nothing fires until `preferCircleAddress` is enabled.
+  const kringBotSinkRef = useRef(null);
+  const pendingFallbackOfferRef = useRef(null);
+  const fallbackOfferRef = useRef(null);
+  if (!fallbackOfferRef.current) {
+    fallbackOfferRef.current = createFallbackOffer({
+      onOffer: (payload) => {
+        const sink = kringBotSinkRef.current;
+        if (sink) { sink(payload); fallbackOfferRef.current.decline(); }
+        else pendingFallbackOfferRef.current = payload;
+      },
+    });
+    setAddressFallbackReportHook((info) => fallbackOfferRef.current.report(info));
+  }
+  const registerKringBotSink = useCallback((fn) => {
+    kringBotSinkRef.current = typeof fn === 'function' ? fn : null;
+    // A buffered offer speaks as soon as a mouth exists — and only then arms the cooldown, so an offer
+    // that never got shown does not silently burn its one chance.
+    if (kringBotSinkRef.current && pendingFallbackOfferRef.current) {
+      kringBotSinkRef.current(pendingFallbackOfferRef.current);
+      pendingFallbackOfferRef.current = null;
+      fallbackOfferRef.current.decline();
+    }
+  }, []);
+
   const kringChatInboxRef = useRef(null);
   if (!kringChatInboxRef.current) {
     kringChatInboxRef.current = createChatMessageInbox({
@@ -487,6 +518,7 @@ export default function App() {
         <CircleLauncherScreen
           bundle={bundle}
           deliveryStateMap={deliveryStateMapRef.current}
+          registerKringBotSink={registerKringBotSink}
           sessionRef={sessionRef}
           podAuth={podAuth}
           eventLog={eventLogRef.current}

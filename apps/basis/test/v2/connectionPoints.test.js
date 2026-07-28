@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import {
-  createConnectionPoints, POINT_SOURCE, adoptExistingRelay,
+  createConnectionPoints, POINT_SOURCE, POINT_KIND, adoptExistingRelay,
   localStorageConnectionPointsIo, asyncStorageConnectionPointsIo,
 } from '../../src/v2/connectionPoints.js';
 
@@ -290,6 +290,52 @@ describe('the persistence adapters', () => {
     });
     await io.save({ [B]: { url: B, source: 'manual', circles: [], adopted: true } });
     expect((await io.load())[B]).toMatchObject({ url: B });
+  });
+});
+
+describe('the pod as a connection point (NKN+pod circle, J-NP1/J-NP6)', () => {
+  const POD = 'https://pod.example/circles/c1';
+
+  it('a pod-backed circle lists its POD, so "what breaks if I remove this" has an answer', () => {
+    const cp = build();
+    expect(cp.addPodPoint(POD, 'c1')).toEqual({ ok: true });
+    const [p] = cp.list();
+    expect(p).toMatchObject({ kind: POINT_KIND.POD, url: POD, circles: ['c1'], adopted: true });
+  });
+
+  it('a pod point takes https and a relay point does not — each kind validates its own shape', () => {
+    const cp = build();
+    expect(cp.addPodPoint('wss://not-a-pod.example', 'c1')).toMatchObject({ ok: false });
+    expect(cp.addFromJoin(POD, 'c1')).toMatchObject({ ok: false });          // https is not a relay
+    expect(cp.addPodPoint(POD, 'c1')).toEqual({ ok: true });
+  });
+
+  it('a pod is NEVER "active" — that is a socket fact, and a pod has no socket', () => {
+    // Claiming a pod was standby would be the same lie in the other direction: it is used whenever the
+    // circle syncs. The flag is relay-only; renderers skip the line for pods.
+    const cp = build();
+    cp.addPodPoint(POD, 'c1');
+    expect(cp.setActive(POD)).toBeNull();
+    expect(cp.list()[0].active).toBe(false);
+
+    cp.addFromJoin(A, 'c2');
+    expect(cp.setActive(A)).toBe(A);
+  });
+
+  it('J-NP6: removing the pod of a pod-only circle names it CUT OFF', () => {
+    // A pod-backed circle has no relay to fall back to; the impact calculation must not assume every
+    // circle has an alternative.
+    const cp = build();
+    cp.addPodPoint(POD, 'pod-only-circle');
+    expect(cp.impactOfRemoving(POD)).toMatchObject({ losesReachability: ['pod-only-circle'] });
+  });
+
+  it('a pod point survives a save/restore round-trip with its kind', () => {
+    const save = vi.fn();
+    const cp = build({ save });
+    cp.addPodPoint(POD, 'c1');
+    const restored = build({ initial: save.mock.calls.at(-1)[0] });
+    expect(restored.list()[0]).toMatchObject({ kind: POINT_KIND.POD, url: POD });
   });
 });
 

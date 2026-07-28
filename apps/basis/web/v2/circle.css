@@ -1186,6 +1186,16 @@
 .cc-wizard-body { margin-bottom: 14px; }
 .cc-wizard-body h3 { margin: 0 0 6px; font-size: 16px; font-family: var(--font-serif); color: var(--ink); }
 .cc-wizard-blurb { margin: 0 0 10px; font-size: 13px; color: var(--ink-soft); line-height: 1.5; }
+
+/* NKN+pod circle (J-NP3) — the pod-host disclosure at create AND join. Visually a warning-weight
+   line, not body copy: it is the one fact on the step the person cannot infer from the fields. */
+.cc-wizard-pod-disclosure {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--warn, #b8860b);
+  background: var(--surface-soft, rgba(184, 134, 11, 0.06));
+  font-size: 13px;
+}
 .cc-wizard-advice { font-size: 12.5px; color: var(--ink-soft); line-height: 1.5; margin: 6px 0; }
 .cc-wizard-warn { font-size: 12.5px; color: var(--danger); margin: 6px 0; }
 .cc-wizard-link { color: var(--accent); text-decoration: underline; cursor: pointer; }

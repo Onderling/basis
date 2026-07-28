@@ -98,6 +98,12 @@ export default function JoinGroupWizardModal({
                 title={t('circle.join.wizard.rules.title', { circle: state.invite?.groupId ?? '' })}
                 intro={t('circle.join.wizard.rules.intro')}
               >
+                {/* NKN+pod circle (J-NP3) — the pod-host disclosure BEFORE redeeming, mirroring web:
+                    the creator accepting it on the joiner's behalf is the pattern the disclosure model
+                    exists to prevent. Absent on older / non-pod invites. */}
+                {state.invite?.podBacked === true ? (
+                  <Text style={styles.loading}>{t('circle.nearbyScreen.point_pod_host_sees')}</Text>
+                ) : null}
                 {/* 5.5b — structured v2 doc when the invite carries it, with the
                     question/answer shape the create-wizard authored.  Older
                     invites (rulesText only) and the loading / error states fall

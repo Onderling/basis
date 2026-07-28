@@ -47,7 +47,7 @@ import { initialState, decodeInvite, finalSubmit, existingSelvesFrom, setLinkCho
  *           capabilities?:object|null, apps?:string[]|null, offeringsMatching?:boolean|null }} a
  * @returns {Promise<{uri:string, expiresAt?:number} | {error:string}>}
  */
-export async function buildCircleInviteUri({ callSkill, circleId, adminPeerAddr = null, adminNknAddr = null, capabilities = null, apps = null, offeringsMatching = null } = {}) {
+export async function buildCircleInviteUri({ callSkill, circleId, adminPeerAddr = null, adminNknAddr = null, capabilities = null, apps = null, offeringsMatching = null, podBacked = null } = {}) {
   if (typeof callSkill !== 'function' || !circleId) return { error: 'missing-args' };
   let res;
   try { res = await callSkill('stoop', 'getCurrentMembershipCode', { groupId: circleId }); }
@@ -77,6 +77,11 @@ export async function buildCircleInviteUri({ callSkill, circleId, adminPeerAddr 
     ...(Array.isArray(apps) && apps.length ? { apps } : {}),
     // Fold-in phase C — only ever embedded as an explicit true; false/null stays absent.
     ...(offeringsMatching === true ? { offeringsMatching: true } : {}),
+    // NKN+pod circle (2026-07-28) — the circle's shared store is its meeting place, and the pod host can
+    // see the membership. Embedded so the JOINER is told BEFORE redeeming (J-NP3): the creator accepting
+    // that disclosure on the joiner's behalf is exactly the pattern the disclosure model exists to prevent.
+    // Same additive rule as offeringsMatching: explicit true or absent, so older invites are unchanged.
+    ...(podBacked === true ? { podBacked: true } : {}),
   };
   return { uri: encodeMembershipCodeUrl(invite), expiresAt };
 }

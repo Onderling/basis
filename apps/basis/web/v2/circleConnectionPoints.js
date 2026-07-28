@@ -64,12 +64,24 @@ export function renderConnectionPoints(container, {
     url.textContent = point.url;
     el.appendChild(url);
 
-    // Which one is actually carrying traffic. The substrate connects to one relay at a time, so a list
-    // that showed them all as equal would be claiming something untrue.
+    // Which one is actually carrying traffic. The substrate connects to one RELAY at a time, so a list
+    // that showed them all as equal would be claiming something untrue. A POD has no socket — it is used
+    // whenever the circle syncs — so active/standby would be the same lie in the other direction; it gets
+    // its own line, plus the host-sees disclosure so the fact from create/join stays visible here too.
     const live = document.createElement('div');
-    live.className = point.active ? 'circle-points__live is-active' : 'circle-points__live is-standby';
-    live.textContent = tr(point.active ? 'circle.nearbyScreen.point_active' : 'circle.nearbyScreen.point_standby');
-    el.appendChild(live);
+    if (point.kind === 'pod') {
+      live.className = 'circle-points__live is-pod';
+      live.textContent = tr('circle.nearbyScreen.point_kind_pod');
+      el.appendChild(live);
+      const sees = document.createElement('div');
+      sees.className = 'circle-points__pod-sees';
+      sees.textContent = tr('circle.nearbyScreen.point_pod_host_sees');
+      el.appendChild(sees);
+    } else {
+      live.className = point.active ? 'circle-points__live is-active' : 'circle-points__live is-standby';
+      live.textContent = tr(point.active ? 'circle.nearbyScreen.point_active' : 'circle.nearbyScreen.point_standby');
+      el.appendChild(live);
+    }
 
     const src = document.createElement('div');
     src.className = 'circle-points__source';

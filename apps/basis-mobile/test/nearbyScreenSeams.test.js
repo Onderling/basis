@@ -81,7 +81,9 @@ describe('NEARBY_ACTION_LABELS — one definition, resolvable in both languages'
             // step I — connection points
             'points_title', 'points_intro', 'points_empty', 'point_adopt', 'point_carries',
             'point_carries_none', 'point_remove', 'remove_cuts_off', 'remove_still_ok',
-            'remove_nothing', 'remove_confirm', 'remove_cancel']
+            'remove_nothing', 'remove_confirm', 'remove_cancel',
+            // NKN+pod circle
+            'point_kind_pod', 'point_pod_host_sees', 'join_no_admin']
           .map((k) => `circle.nearbyScreen.${k}`),
         ...['visible', 'hidden', 'still_visible', 'unavailable']
           .flatMap((k) => [`circle.nearbyScreen.${k}_title`, `circle.nearbyScreen.${k}_body`]),

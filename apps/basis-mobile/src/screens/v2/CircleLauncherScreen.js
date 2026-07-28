@@ -4047,10 +4047,20 @@ function ConnectionPointsScreen({ points = [], onBack, onAdopt, onRemove, onConf
           {points.map((point) => (
             <View key={point.url} style={styles.row} testID={`point-${point.url}`}>
               <Text style={styles.rowName}>{point.url}</Text>
-              {/* Which one is actually carrying traffic — the substrate connects to one relay at a time. */}
-              <Text style={styles.rowMeta} testID={`point-live-${point.url}`}>
-                {t(point.active ? 'circle.nearbyScreen.point_active' : 'circle.nearbyScreen.point_standby')}
-              </Text>
+              {/* One RELAY is live at a time (a socket); a POD has no socket — it is used whenever the
+                  circle syncs — so it gets its own line + the host-sees disclosure instead. */}
+              {point.kind === 'pod' ? (
+                <>
+                  <Text style={styles.rowMeta} testID={`point-live-${point.url}`}>
+                    {t('circle.nearbyScreen.point_kind_pod')}
+                  </Text>
+                  <Text style={styles.rowMeta}>{t('circle.nearbyScreen.point_pod_host_sees')}</Text>
+                </>
+              ) : (
+                <Text style={styles.rowMeta} testID={`point-live-${point.url}`}>
+                  {t(point.active ? 'circle.nearbyScreen.point_active' : 'circle.nearbyScreen.point_standby')}
+                </Text>
+              )}
               <Text style={styles.rowMeta}>
                 {t(POINT_SOURCE_LABELS[point.source] ?? POINT_SOURCE_LABELS.manual)}
               </Text>

@@ -154,6 +154,16 @@ function renderRulesStep(container, doc, state, onNext, onCancel, rerender) {
   blurb.textContent = t('circle.join.wizard.rules.intro');
   wrap.appendChild(blurb);
 
+  // NKN+pod circle (J-NP3) — the pod-host disclosure, BEFORE redeeming. The invite carries `podBacked`
+  // precisely so this can be said to the JOINER: Anna saw it at create, and her accepting it on Bo's
+  // behalf is the pattern the disclosure model exists to prevent. Absent on older / non-pod invites.
+  if (state.invite?.podBacked === true) {
+    const podSees = doc.createElement('p');
+    podSees.className = 'cc-wizard-pod-disclosure';
+    podSees.textContent = t('circle.nearbyScreen.point_pod_host_sees');
+    wrap.appendChild(podSees);
+  }
+
   // 5.5b — when the invite carries a v2 structured rules doc, render
   // each non-blank field as its own section (question + answer).  This
   // matches the create-wizard's authoring shape, so a joiner sees the

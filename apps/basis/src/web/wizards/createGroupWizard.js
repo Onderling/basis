@@ -332,6 +332,13 @@ function renderTechStep(container, doc, state, onNext, onBack, onCancel, rerende
       state.groupPodUri, (v) => { state.groupPodUri = v; },
       { placeholder: 'https://group-pod.example/canopy/buurt/',
         hint: 'Required for centralised + hybrid storage.', monospace: true });
+    // NKN+pod circle (J-NP3) — the CREATE half of the disclosure shown at both ends: choosing a shared
+    // pod means its host can see the membership. Said here, next to the choice that causes it, so the
+    // creator decides with the fact in view rather than discovering it in a settings screen later.
+    const podSees = doc.createElement('p');
+    podSees.className = 'cc-wizard-pod-disclosure';
+    podSees.textContent = t('circle.nearbyScreen.point_pod_host_sees');
+    wrap.appendChild(podSees);
   }
 
   appendRadioField(wrap, doc, 'Key rotation mode', state.keyRotationMode, KEY_ROTATION_MODES,

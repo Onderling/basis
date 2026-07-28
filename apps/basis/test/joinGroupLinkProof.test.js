@@ -81,3 +81,42 @@ describe('#4 link proof — joiner emits a proof the admin verifies', () => {
     expect(redeemArgs.circleAddressProof).toBeUndefined();
   });
 });
+
+describe('J-NP2 — the admin-offline case is a typed NOTICE, not a generic failure', () => {
+  const unreachableState = () => ({
+    invite: { kind: 'membershipCode', code: 'CODE123', groupId: 'g1', adminPeerAddr: 'admin-addr' },
+    handle: 'jan',
+    existingSelves: [],
+    linkChoice: 'fresh',
+  });
+  // Local redeem says the code needs the admin (invalid HERE), so the peer bridge is the path taken.
+  // NB the membershipCode path calls `redeemMembershipCode` — `redeemInviteWithGate` is path B, and a mock
+  // keyed on the wrong op makes the join silently succeed locally (found writing this test).
+  const callSkill = vi.fn(async (app, op) => (op === 'redeemMembershipCode'
+    ? { error: 'invalid-or-expired-code' }
+    : { ok: true }));
+
+  it('a peer redeem that reaches NOBODY maps to the join_no_admin key, and the invite survives', async () => {
+    // Reported generically, this is indistinguishable from a broken invite — people conclude the app does
+    // not work, and the retry that would have succeeded never happens.
+    const state = unreachableState();
+    await finalSubmit({ state, callSkill, sendPeerRedeem: async () => null });
+    expect(state.submitErrorKey).toBe('circle.nearbyScreen.join_no_admin');
+    expect(state.invite.code).toBe('CODE123');          // the invitation stays valid — retry is the fix
+  });
+
+  it('a transport THROW on the way to the admin is the same notice', async () => {
+    const state = unreachableState();
+    await finalSubmit({ state, callSkill, sendPeerRedeem: async () => { throw new Error('nkn timeout'); } });
+    expect(state.submitErrorKey).toBe('circle.nearbyScreen.join_no_admin');
+  });
+
+  it('a real REJECTION from a live admin is NOT dressed up as offline', async () => {
+    // "Offline, try later" on a genuine refusal would send people retrying forever.
+    const state = unreachableState();
+    await finalSubmit({ state, callSkill, sendPeerRedeem: async () => ({ error: 'code-revoked' }) });
+    expect(state.submitErrorKey).toBeNull();
+    expect(state.submitError).toBe('code-revoked');
+  });
+});
+

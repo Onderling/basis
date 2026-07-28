@@ -667,12 +667,26 @@ export async function finalSubmit({ state, callSkill, sendPeerRedeem, circleAddr
       state.handleRejected = true;
       state.submitErrorKey = 'circle.errors.invalid_handle.handle-taken';
       state.step = 3;
+    } else if (err?.reason === 'admin-unreachable') {
+      // J-NP2 — a notice, not a failure verdict: no admin was online, the invitation stays valid, try
+      // again later. The state keeps the decoded invite, so retrying is the same wizard, same step.
+      state.submitErrorKey = 'circle.nearbyScreen.join_no_admin';
     } else {
       state.submitError = err?.message ?? String(err);
     }
     state.submitting = false;
     return { state };
   }
+}
+
+/**
+ * Typed admin-unreachable error (J-NP2). The invite is NOT consumed by this failure — the state keeps it,
+ * so "try again later" is literally a retry of the same wizard.
+ */
+function adminUnreachableError() {
+  const e = new Error('admin-unreachable');
+  e.reason = 'admin-unreachable';
+  return e;
 }
 
 /** Throw a typed handle-taken error the finalSubmit catch maps to the localised prompt. */
@@ -735,19 +749,30 @@ async function runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddre
     if (redeem?.error === 'handle-taken') throw handleTakenError();
     // Cross-instance fallback.
     if (redeem?.error === 'invalid-or-expired-code' && inv.adminPeerAddr && typeof sendPeerRedeem === 'function') {
-      const peerReply = await sendPeerRedeem({
-        adminPeerAddr:    inv.adminPeerAddr,
-        groupId:     inv.groupId,
-        code:        inv.code,
-        shareCard:   !!state.shareAddress,
-        peerDisplay: state.handle,
-        ...personaArg,
-        ...circleAddressArg,
-      });
+      // J-NP2 — the admin-offline case gets its own TYPE. The peer redeem reaching nobody (a transport
+      // throw, a timeout, an empty reply) is not a broken invite: the code may be perfectly valid and the
+      // admin's phone simply off. Reported generically, this failure is indistinguishable from a bad
+      // invite, people conclude the app does not work, and the retry that would have succeeded never
+      // happens. Same pattern as handle-taken: typed here, mapped to a localisable key in the catch.
+      let peerReply;
+      try {
+        peerReply = await sendPeerRedeem({
+          adminPeerAddr:    inv.adminPeerAddr,
+          groupId:     inv.groupId,
+          code:        inv.code,
+          shareCard:   !!state.shareAddress,
+          peerDisplay: state.handle,
+          ...personaArg,
+          ...circleAddressArg,
+        });
+      } catch {
+        throw adminUnreachableError();     // could not even reach them — the clearest offline signal
+      }
       if (peerReply?.error === 'handle-taken') throw handleTakenError();
-      if (!peerReply || peerReply.error) {
-        throw new Error(peerReply?.error
-          ?? "Admin's substrate did not confirm the code. They may be offline — try again, or ask for a fresh code.");
+      if (!peerReply) throw adminUnreachableError();   // reached out, heard nothing
+      if (peerReply.error) {
+        // A real REJECTION from a live admin device stays verbatim — that is not "offline".
+        throw new Error(peerReply.error);
       }
       await callSkill('stoop', 'recordRemoteRedemption', {
         groupId:     inv.groupId,

@@ -2244,6 +2244,18 @@
     }
   },
   "nearbyScreen": {
+    "point_kind_pod": {
+      "text": "This circle's pod",
+      "doc": "Connection-point kind line for a pod-backed circle. Replaces the active/standby line: a pod has no socket, it is used whenever the circle syncs."
+    },
+    "point_pod_host_sees": {
+      "text": "The pod host can see who is in this circle.",
+      "doc": "The pod-host disclosure (NKN+pod circle). Shown at CREATE and at JOIN — Frits: visible both times, never a footnote."
+    },
+    "join_no_admin": {
+      "text": "No admin is online right now — try again later. The invitation stays valid.",
+      "doc": "The no-admin-online notice at join (J-NP2). Without it this failure is indistinguishable from a broken invite, and nobody retries."
+    },
     "delivery_section": {
       "text": "Delivery",
       "doc": "My-data section for the two delivery settings."

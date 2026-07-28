@@ -35,6 +35,21 @@
 /** How a point came to be here. Kept because "I added this" and "a circle brought this" read differently. */
 export const POINT_SOURCE = Object.freeze({ JOIN: 'join', MANUAL: 'manual', SUGGESTED: 'suggested' });
 
+/**
+ * What KIND of connection point (2026-07-28, the NKN+pod circle).
+ *
+ * A `relay` is a websocket endpoint the transport connects to. A `pod` is a circle's shared store — the
+ * approved exception to "NKN stays contact-to-contact": everyone reaches the admin over NKN for the join,
+ * and from then on the POD is how the circle stays reachable. It belongs in this list because the list
+ * answers "if I remove this, what breaks?", and for a pod-backed circle the pod IS the answer — a circle
+ * with no relay would otherwise have nothing to point at (journey J-NP1/J-NP6).
+ *
+ * The two kinds differ in one visible way: exactly one RELAY is live at a time (a socket), while a pod is
+ * simply used whenever the circle syncs — so the renderers show active/standby for relays only. Claiming a
+ * pod was "standby" would be the same lie in the other direction.
+ */
+export const POINT_KIND = Object.freeze({ RELAY: 'relay', POD: 'pod' });
+
 /** Provenance → locale key. Shared, so web and mobile cannot describe the same point differently. */
 export const POINT_SOURCE_LABELS = Object.freeze({
   join:      'circle.nearbyScreen.point_from_join',
@@ -59,9 +74,11 @@ export function createConnectionPoints({ initial = {}, save = null, now = () => 
   const points = new Map();
 
   for (const [url, rec] of Object.entries(initial ?? {})) {
-    if (!isUrl(url)) continue;
+    const kind = rec?.kind === POINT_KIND.POD ? POINT_KIND.POD : POINT_KIND.RELAY;
+    if (!isUrl(url, kind)) continue;
     points.set(url, {
       url,
+      kind,
       source: rec?.source ?? POINT_SOURCE.MANUAL,
       addedAt: typeof rec?.addedAt === 'number' ? rec.addedAt : now(),
       circles: new Set(Array.isArray(rec?.circles) ? rec.circles.filter(Boolean) : []),
@@ -72,7 +89,7 @@ export function createConnectionPoints({ initial = {}, save = null, now = () => 
 
   const watchers = new Set();
   const snapshot = () => Object.fromEntries([...points.values()].map((p) => [p.url, {
-    url: p.url, source: p.source, addedAt: p.addedAt, circles: [...p.circles], adopted: p.adopted,
+    url: p.url, kind: p.kind, source: p.source, addedAt: p.addedAt, circles: [...p.circles], adopted: p.adopted,
   }]));
 
   function commit() {
@@ -82,7 +99,7 @@ export function createConnectionPoints({ initial = {}, save = null, now = () => 
     return state;
   }
 
-  function upsert(url, { source, circleId = null, adopted = true }) {
+  function upsert(url, { source, circleId = null, adopted = true, kind = POINT_KIND.RELAY }) {
     const existing = points.get(url);
     if (existing) {
       if (circleId) existing.circles.add(circleId);
@@ -90,7 +107,7 @@ export function createConnectionPoints({ initial = {}, save = null, now = () => 
       if (adopted) existing.adopted = true;
       return existing;
     }
-    const rec = { url, source, addedAt: now(), circles: new Set(circleId ? [circleId] : []), adopted };
+    const rec = { url, kind, source, addedAt: now(), circles: new Set(circleId ? [circleId] : []), adopted };
     points.set(url, rec);
     return rec;
   }
@@ -100,9 +117,11 @@ export function createConnectionPoints({ initial = {}, save = null, now = () => 
     return [...points.values()]
       .sort((a, b) => b.addedAt - a.addedAt)
       .map((p) => ({
-        url: p.url, source: p.source, addedAt: p.addedAt, adopted: p.adopted, circles: [...p.circles],
-        // Exactly one point is connected at a time. The others are standby, not decoration.
-        active: p.url === active,
+        url: p.url, kind: p.kind, source: p.source, addedAt: p.addedAt, adopted: p.adopted,
+        circles: [...p.circles],
+        // Exactly one RELAY is connected at a time; a pod has no socket to be "active" on, so the flag is
+        // relay-only and renderers skip the active/standby line for pods.
+        active: p.kind === POINT_KIND.RELAY && p.url === active,
       }));
   }
 
@@ -120,7 +139,9 @@ export function createConnectionPoints({ initial = {}, save = null, now = () => 
      * so the list can never claim a point is live when the transport disagrees.
      */
     setActive(url) {
-      active = url && points.has(url) ? url : null;
+      // Relay-only: "active" is a socket fact, and a pod has no socket. Setting a pod active would make
+      // the list claim a connection the transport does not have.
+      active = url && points.get(url)?.kind === POINT_KIND.RELAY ? url : null;
       commit();
       return active;
     },
@@ -139,11 +160,19 @@ export function createConnectionPoints({ initial = {}, save = null, now = () => 
      * Rule 1 — redeeming an invite adds the circle's endpoint automatically.
      * Adopted on arrival: you chose to join, and joining is the consent.
      */
-    addFromJoin(url, circleId) {
-      if (!isUrl(url) || !circleId) return { ok: false, reason: 'invalid' };
-      upsert(url, { source: POINT_SOURCE.JOIN, circleId, adopted: true });
+    addFromJoin(url, circleId, { kind = POINT_KIND.RELAY } = {}) {
+      if (!isUrl(url, kind) || !circleId) return { ok: false, reason: 'invalid' };
+      upsert(url, { source: POINT_SOURCE.JOIN, circleId, adopted: true, kind });
       commit();
       return { ok: true };
+    },
+
+    /**
+     * A pod-backed circle's store, as its connection point (the NKN+pod circle, approved 2026-07-28).
+     * Sugar over `addFromJoin` so the call site reads as what it is.
+     */
+    addPodPoint(podUrl, circleId) {
+      return this.addFromJoin(podUrl, circleId, { kind: POINT_KIND.POD });
     },
 
     /** A point the user typed in themselves. */
@@ -231,9 +260,15 @@ export function createConnectionPoints({ initial = {}, save = null, now = () => 
   };
 }
 
-/** A connection point is a websocket endpoint. Anything else is a typo, not a point. */
-function isUrl(url) {
-  return typeof url === 'string' && /^wss?:\/\/\S+$/.test(url.trim());
+/**
+ * A RELAY point is a websocket endpoint; a POD point is an https resource (the pod root).
+ * Anything else is a typo, not a point.
+ */
+function isUrl(url, kind = POINT_KIND.RELAY) {
+  if (typeof url !== 'string') return false;
+  return kind === POINT_KIND.POD
+    ? /^https:\/\/\S+$/.test(url.trim())
+    : /^wss?:\/\/\S+$/.test(url.trim());
 }
 
 // ── Persistence + migration ─────────────────────────────────────────────────

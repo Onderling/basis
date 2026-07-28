@@ -36,7 +36,7 @@ import { initLocalisation, t, setLang, detectDeviceLang, currentLang,
 // the producer just consumes the injected makePodClient/generateKeypair.
 import { PodClient, generateKeypair as podGenerateKeypair, createSealedPodClient, SolidOidcAuth,
   createSealedPodDataSource, podGroupPrefix,
-  recipientStrategy as podRecipientStrategy, makeOpener as podMakeOpener,
+  recipientStrategy as podRecipientStrategy,
   // Connectivity Phase 3 — LIVE shared-pod key custody: adapt a circle's pod-client to the blind
   // StorageBackend port + lay/read SEALED chat rows over it (the seal is the circle's live group-key
   // {seal,open}, applied ABOVE the blind store — no new crypto).
@@ -245,7 +245,7 @@ import { makePeerRouter } from '../../src/core/handlers/peerRouter.js';
 // No-pod group-key rotation, RECEIVE side: record a fanned key-event into the local per-circle log +
 // fold the recorded events into the key chain on a content read (the counterpart to the key-event log sink).
 import { makeHandleGroupKeyEvent } from '../../src/core/handlers/groupKeyEvent.js';
-import { createKeyEventStore, openViaKeyEvents } from '../../src/v2/keyEventStore.js';
+import { createKeyEventStore, wrapStrategyWithKeyEventFold } from '../../src/v2/keyEventStore.js';
 // OBJ-2 membership — the peer-redeem handshake (joiner ⇄ admin) is shared core; v2 just wires the
 // same three factories the classic shells use (groupRedeem.js) into its peer router + join glue.
 import { makeHandleGroupRedeemRequest, makeHandleGroupRedeemResponse, makeSendGroupRedeemRequest } from '../../src/core/handlers/groupRedeem.js';
@@ -1384,32 +1384,14 @@ async function getCircleSealStrategy(circleId, policy) {
       // using this device's per-circle sealing opener. The events are read lazily at open time (later fans land
       // after this strategy is cached). Additive — a circle with no key-events behaves exactly as before.
       if (strat && idKey?.privateKey) {
-        strat = wrapStrategyWithKeyEventFold(strat, circleId, idKey.privateKey);
+        strat = wrapStrategyWithKeyEventFold(strat, {
+          listEvents: () => circleKeyEventStore.list(circleId), groupId: circleId, privateKey: idKey.privateKey,
+        });
       }
     }
   } catch { strat = null; }
   circleSealStrategies.set(circleId, strat);
   return strat;
-}
-
-/**
- * Compose a sealed-content strategy's `open` with the no-pod folded key chain: try the given (pod) `open` first;
- * on any miss, fold the recorded key-events for this circle and open across them with this device's per-circle
- * sealing opener. `seal` and every other field pass through untouched. The key-events are resolved at CALL time,
- * so events that arrive after the strategy is cached are still seen.
- */
-function wrapStrategyWithKeyEventFold(strat, circleId, privateKey) {
-  const opener = podMakeOpener(privateKey);
-  return {
-    ...strat,
-    open: (text) => {
-      try { return strat.open(text); }
-      catch (podErr) {
-        try { return openViaKeyEvents(text, { events: circleKeyEventStore.list(circleId), groupId: circleId, opener }); }
-        catch { throw podErr; }   // neither reader opens it — surface the original (pod) denial
-      }
-    },
-  };
 }
 
 // media — one DEV bucket per app session (in-memory: uploads don't survive a reload

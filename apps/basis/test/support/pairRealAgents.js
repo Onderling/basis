@@ -44,6 +44,9 @@ import { VaultMemory } from '@onderling/vault';
 import { makeKeyEventLogSink } from '@onderling/kring-host/keyEventLogSink';
 
 import { createRealHouseholdAgent } from '../../src/web/realAgent.js';
+// G13 step C — the harness must do what the app does at boot, or every send routes to a per-circle
+// address nobody bound. See `registerCirclePresence` in circleApp.js / agentBundle.js.
+import { registerCircleAddresses } from '../../src/v2/circleAddressRegistration.js';
 import { createCirclePodProducer, createCircleControlAgentRouter } from '../../src/v2/circlePodProducer.js';
 import { openerForIdentity } from '../../src/v2/sharedCopyOpener.js';
 import { createKeyEventStore, openViaKeyEvents } from '../../src/v2/keyEventStore.js';
@@ -307,7 +310,35 @@ export async function pairCircle(admin, joiner, {
 } = {}) {
   const { created } = await createCircle(admin, { groupId, name, purpose });
   const { invite, joined } = await joinExistingCircle(admin, joiner, { groupId, handle });
+  // Both sides now bind their per-circle address, exactly as the shells do after a join.
+  await bindCircleAddresses([admin, joiner], groupId);
   return { created, invite, joined, groupId };
+}
+
+/**
+ * Bind each node's per-circle address on its bus/relay transport — the harness half of G13 step C.
+ *
+ * Production does this at boot and after every join (`registerCirclePresence`); without it a flipped
+ * `preferCircleAddress` resolves to an address no transport is listening on, and every cross-peer test
+ * fails for a reason that has nothing to do with what it is testing. Doing it HERE (rather than relaxing
+ * the assertions) keeps the harness a faithful model of the app: if a send works in these tests, the same
+ * registration made it work.
+ *
+ * Idempotent and best-effort: a node with no alias-capable transport is skipped, which is the same
+ * degradation the shells have.
+ */
+export async function bindCircleAddresses(nodes, ...circleIds) {
+  const ids = circleIds.flat().filter(Boolean);
+  for (const n of nodes.filter(Boolean)) {
+    const transport = n._busTransport ?? n.agent?.relay ?? null;
+    if (!transport?.supportsAliases) continue;
+    await registerCircleAddresses({
+      transport,
+      relayUrl: 'internal://bus',          // single-transport world: everything rides the one socket
+      circleIds: ids,
+      circleAddressFor: (cid) => n.agent?.circleAddressFor?.(cid) ?? null,
+    });
+  }
 }
 
 /**

@@ -911,10 +911,19 @@ export function buildSkills({
   groupId: explicitGroupId,
   dataLocationConfig,
   // G13 step C — route circle traffic to each member's PER-CIRCLE address instead of their one global
-  // signing key. OFF by default and threaded from the host, because turning it on is a DEPLOYMENT-level
-  // choice, not a per-message one: every participant must be on a build whose transport can bind aliases
-  // (`Transport.supportsAliases` — relay + internal yes, NKN deliberately not), or messages route to an
-  // address nobody answers. There are no existing users to migrate, so this can flip once NKN is decided.
+  // signing key. Still OFF, and the reason is now EVIDENCE rather than caution.
+  //
+  // Flipping this default (attempted 2026-07-29) breaks cross-peer delivery in every real-agent test —
+  // in-process, over a real relay, and over real NKN alike. The addresses themselves are fine: the
+  // roster's `circleAddress` for a member equals that member's own derivation, and binding it on the
+  // transport succeeds (`registerCircleAddresses` reports `registered`). What does NOT work is the SEND:
+  // resolving a recipient to their per-circle address produces a destination the send path does not
+  // reach, so messages are held for everyone and nothing arrives.
+  //
+  // So the precondition is not "NKN is decided" (it is) — it is that the send path can ROUTE to a
+  // per-circle address on each transport. That is a slice of work, not a one-line default change, and it
+  // belongs to the S4 walk where J-G13.2 ("a member still reaches her") is the actual check.
+  // → `plans/SESSION-S4-infrastructure.md` · `REMAINING-WORK.md` P0.
   preferCircleAddress = false,
   // The per-USER half of the same ladder (2026-07-28): may a send fall back to the member's global key
   // when no per-circle address is known? OFF is the private default; the host threads the live setting as

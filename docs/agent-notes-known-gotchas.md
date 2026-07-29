@@ -358,3 +358,33 @@ Consequences for anything multi-step on a dev-client build:
   mid-journey in. Walk first, fix afterwards.
 - When the logic under test lives in shared `src/` — which, per invariant 1, is most of it — driving it
   headlessly is both faster and a permanent regression test. Save the device for what only a device shows.
+
+## Drive the dev-client by DEEP LINK, not by tapping its launcher
+
+Tapping "Reload" (or a development-server row) in the expo-dev-client launcher is unreliable when you are
+also reading the screen with `uiautomator dump` — the dump's accessibility event re-opens the developer
+menu, so each dump undoes the tap you just made, and the app never loads any JS. It looks exactly like a
+broken or stale build: no red box, no bundling error, zero `ReactNativeJS` lines.
+
+Skip the UI entirely:
+
+```bash
+adb reverse tcp:8081 tcp:8081        # so the phone's localhost is your machine
+adb shell am start -a android.intent.action.VIEW \
+  -d "org.onderling.basis://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081"
+```
+
+Watch `adb logcat | grep ReactNativeJS` for `Running "main"` — that is the app actually starting, and it
+is the only reliable signal. Expect ~10s on a warm Metro; a cold `--clear` start is much longer, because
+the dev bundle is ~44 MB.
+
+**Before blaming the build**, check Metro can serve at all. The entry point is virtual on SDK 50+, so the
+legacy `/index.bundle` path 404s with a confusing "Unable to resolve module ./index from
+`<monorepo-root>/.`" — which reads like a broken Metro config and is not:
+
+```bash
+curl -s -o /dev/null -w '%{http_code} %{size_download}\n' \
+  'http://localhost:8081/.expo/.virtual-metro-entry.bundle?platform=android&dev=true'
+```
+
+200 plus tens of MB means Metro is healthy and the problem is on the device side.

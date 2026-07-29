@@ -2238,10 +2238,14 @@ function CircleDetail({
   // The conversation shows what THIS circle chose — its admin setting, else its template's, else the
   // permissive default (`conversationKinds.js`, web≡mobile). A filter, never a data change: turning a kind
   // back on brings its history with it.
+  // Decision 3 (2026-07-29) — read both fields from the POLICY, which is where a create now writes them.
+  // They were only ever read off the circle record, where nothing put them, so every circle resolved to
+  // the permissive default no matter which template made it (S3/J-CW3). The circle record is still
+  // consulted as a fallback, for a circle whose kind arrived by some other route.
   const allowedKinds = useMemo(() => resolveConversationKinds({
-    circleSetting: circle?.conversationKinds ?? null,
-    templateKind:  circle?.kind ?? null,
-  }), [circle?.kind, circle?.conversationKinds]);
+    circleSetting: selectedPolicy?.conversationKinds ?? circle?.conversationKinds ?? null,
+    templateKind:  selectedPolicy?.kind ?? circle?.kind ?? null,
+  }), [selectedPolicy?.kind, selectedPolicy?.conversationKinds, circle?.kind, circle?.conversationKinds]);
   // P1.7 — the reader's own narrowing on top of the circle's setting (web parity). Device-local per
   // circle; an actor we cannot resolve counts as a person, so nobody vanishes from a conversation.
   const chatFilterIo = useMemo(() => asyncStorageChatFilterIo(AsyncStorage), []);

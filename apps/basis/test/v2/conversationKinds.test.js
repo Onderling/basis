@@ -10,7 +10,7 @@ import { ENTRY_KINDS, LANE } from '@onderling/item-store';
 import { KRING_KINDS, applyTemplate, markAxisTouched } from '../../src/v2/kringTemplates.js';
 import {
   defaultConversationKinds, availableConversationKinds, TEMPLATE_CONVERSATION_KINDS,
-  resolveConversationKinds, setConversationKind,
+  resolveConversationKinds, setConversationKind, withDerivedChatFeature, chatIsInConversation,
 } from '../../src/v2/conversationKinds.js';
 
 describe('the defaults are derived, not copied', () => {
@@ -131,3 +131,36 @@ describe('the wizard axis (J-CW1/J-CW2)', () => {
   });
 });
 
+
+describe('features.chat is a VIEW of the kinds list (decision 3, 2026-07-29)', () => {
+  it('a buurt reports no chat, whatever the stored flag says', () => {
+    const p = withDerivedChatFeature({ kind: 'buurt', features: { chat: true, tasks: true } });
+    expect(p.features.chat).toBe(false);
+    expect(p.features.tasks).toBe(true);        // only the one derived key is touched
+  });
+
+  it('an explicit list beats the template', () => {
+    const p = withDerivedChatFeature({ kind: 'buurt', conversationKinds: ['chat-message', 'vraag'], features: {} });
+    expect(p.features.chat).toBe(true);
+  });
+
+  it('THE MIGRATION CASE — a circle with neither field keeps its stored flag', () => {
+    // Every circle created before this decision has no `kind` and no list, and the permissive default
+    // contains chat. Deriving unconditionally would have turned chat back ON for every buurt whose admin
+    // had turned it off — silently, and against an explicit choice. Where there is nothing to derive
+    // from, the stored flag is the only record of what someone decided.
+    const p = withDerivedChatFeature({ features: { chat: false } });
+    expect(p.features.chat).toBe(false);
+  });
+
+  it('…and a circle with neither field and chat ON also keeps it', () => {
+    expect(withDerivedChatFeature({ features: { chat: true } }).features.chat).toBe(true);
+  });
+
+  it('chatIsInConversation agrees with what the conversation will render', () => {
+    for (const kind of ['buurt', 'household', 'vriendenkring', 'team']) {
+      const kinds = resolveConversationKinds({ templateKind: kind });
+      expect(chatIsInConversation({ templateKind: kind })).toBe(kinds.includes('chat-message'));
+    }
+  });
+});

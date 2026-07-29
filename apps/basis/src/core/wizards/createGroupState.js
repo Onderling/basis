@@ -189,6 +189,11 @@ export function policyPatchFromState(state) {
   for (const ax of ['revealPolicy', 'pod', 'llmTool', 'agents', 'consensusRequired']) {
     if (s[ax] !== undefined) patch[ax] = s[ax];
   }
+  // Decision 3 — the two fields the reader has always asked for and nobody ever wrote. Without them a
+  // circle cannot remember which template made it, so its conversation has no relation to the kind its
+  // creator chose (S3/J-CW2, J-CW3).
+  if (typeof s.kind === 'string' && s.kind) patch.kind = s.kind;
+  if (s.conversationKinds !== undefined) patch.conversationKinds = s.conversationKinds;
   return patch;
 }
 

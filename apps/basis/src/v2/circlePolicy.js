@@ -94,6 +94,10 @@ export const CIRCLE_POLICY_ENUMS = {
 // will override these at pin-time to lock to their narrower surface.
 // (S1 #1, 2026-06-15: noticeboard flipped on now that its prikbord surface exists.)
 export const DEFAULT_CIRCLE_POLICY = {
+  // Decision 3 (2026-07-29) — a circle remembers which template made it, and which kinds its
+  // conversation shows. `null` on both means "never chosen": no template, and the living default list.
+  kind:              null,
+  conversationKinds: null,
   features: {
     chat:            true,
     noticeboard:     true,
@@ -288,6 +292,19 @@ export function normalizeCirclePolicy(stored = {}) {
     revealPolicy:       pickEnum('revealPolicy'),
     pod:                pickEnum('pod'),
     catchUpChooserMode: pickEnum('catchUpChooserMode'),
+    // Decision 3 (2026-07-29) — the circle's KIND and its conversation KINDS are part of the policy, so
+    // they survive a create. Until then neither was persisted anywhere: `finalSubmit` never sent `kind`
+    // and this patch never carried `conversationKinds`, so every circle fell through to the permissive
+    // default and a buurt created with chat off still showed a chat surface (S3/J-CW2, J-CW3).
+    //
+    // `kind` is free-form here rather than an enum: a circle created by a newer app version may name a
+    // kind this one has never heard of, and the resolver already treats an unknown kind as "no template".
+    kind:               typeof p.kind === 'string' && p.kind ? p.kind : null,
+    // `null` means "the living default, whatever the registry says by then" — deliberately not a frozen
+    // copy of today's list. An array is an explicit choice.
+    conversationKinds:  Array.isArray(p.conversationKinds)
+      ? p.conversationKinds.filter((k) => typeof k === 'string' && k)
+      : null,
     admins:             Array.isArray(p.admins) ? p.admins.filter((x) => typeof x === 'string') : [],
     decisionDeadline:   pickEnum('decisionDeadline'),
     consensusRequired:

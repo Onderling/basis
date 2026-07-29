@@ -5064,9 +5064,12 @@ function showKring(id, circle, policy) {
     // (the `roster-updated` pull-me and friends). The cross-circle Stream tab is the firehose.
     // The conversation shows what this circle chose — its admin setting, else its template's, else the
     // permissive default (`conversationKinds.js`). A filter, never a data change.
+    // Decision 3 (2026-07-29) — from the POLICY, which is where a create writes them (web ≡ mobile).
+    // The circle record is the fallback; nothing ever wrote these there, which is why every circle used
+    // the permissive default regardless of its template.
     const kinds = resolveConversationKinds({
-      circleSetting: circle?.conversationKinds ?? null,
-      templateKind:  circle?.kind ?? null,
+      circleSetting: policy?.conversationKinds ?? circle?.conversationKinds ?? null,
+      templateKind:  policy?.kind ?? circle?.kind ?? null,
     });
     // The reader's own filter on top (Frits: "everything should be filterable, even chat itself").
     // An agent's rows are identified through the Contacten roster the host already holds — this module

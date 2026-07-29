@@ -68,10 +68,10 @@ const VOCABULARIES = {
       const carriesKind = Object.prototype.hasOwnProperty.call(patch, 'kind');
       return carriesKind ? new Set(KRING_KINDS) : new Set();
     },
-    knownGaps: Object.fromEntries(KRING_KINDS.map((k) => [k,
-      'S3/J-CW2+CW3, 2026-07-29: `finalSubmit` never sends the circle\'s `kind` and '
-      + '`policyPatchFromState` never carries `conversationKinds`, so every circle falls through to the '
-      + 'default conversation regardless of the template picked. See REMAINING-WORK.md P1 #4.'])),
+    // CLOSED 2026-07-29 (decision 3): `policyPatchFromState` now carries `kind`, so a circle remembers
+    // the template that made it. This list is empty on purpose rather than deleted — the entry is what
+    // keeps the vocabulary checked.
+    knownGaps: {},
   },
 };
 
@@ -124,10 +124,12 @@ describe('FITNESS: the delivery gap, stated as its own fact', () => {
   });
 });
 
-describe('FITNESS: the circle-kind gap, stated as its own fact', () => {
-  it('the wizard offers kinds that no circle can carry — every one of them is a known gap', () => {
+describe('FITNESS: a circle can carry the kind it was created as', () => {
+  it('every kind the wizard offers survives a create', () => {
+    // Was the S3/J-CW2+CW3 gap: the wizard offered four kinds and none was ever stored, so a circle's
+    // conversation had no relation to the template its creator picked. Closed by decision 3.
     const spec = VOCABULARIES['circle kinds'];
-    expect(spec.produced().size, 'a circle can now carry its kind — delete the knownGaps entries').toBe(0);
-    expect(Object.keys(spec.knownGaps).sort()).toEqual([...KRING_KINDS].sort());
+    expect([...spec.produced()].sort()).toEqual([...KRING_KINDS].sort());
+    expect(Object.keys(spec.knownGaps), 'a kind regressed to unstorable').toEqual([]);
   });
 });

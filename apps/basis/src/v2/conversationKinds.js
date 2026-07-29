@@ -109,3 +109,54 @@ function sanitize(kinds) {
   }
   return out;
 }
+
+/** The kind a chat line is. Named once so the derivation below cannot drift from the registry. */
+export const CHAT_KIND = 'chat-message';
+
+/**
+ * Does this circle's conversation include chat? — **the single source for that fact** (decision 3,
+ * 2026-07-29).
+ *
+ * `features.chat` and `conversationKinds` were two vocabularies for one thing: the wizard wrote the
+ * first, the conversation read the second, and nothing reconciled them. That is how a buurt created with
+ * chat OFF ended up showing a chat surface (S3/J-CW3) — each half was correct about its own field.
+ *
+ * The kinds list wins, because it is the richer of the two: it already carries the resolver, the
+ * templates, the viewer filter and the per-circle ceiling. `features.chat` becomes a view of it rather
+ * than a second place to look.
+ *
+ * Takes the same inputs as `resolveConversationKinds` so a caller cannot accidentally consult a
+ * different list than the conversation renders.
+ *
+ * @param {{circleSetting?: string[]|null, templateKind?: string|null}} a
+ * @returns {boolean}
+ */
+export function chatIsInConversation({ circleSetting = null, templateKind = null } = {}) {
+  return resolveConversationKinds({ circleSetting, templateKind }).includes(CHAT_KIND);
+}
+
+/**
+ * Project a circle policy so `features.chat` reports what the conversation will actually show.
+ *
+ * Applied at the READ side rather than by rewriting stored policies: an existing circle's stored
+ * `features.chat` may disagree with its kinds list, and the honest resolution is to believe the list
+ * rather than to silently edit what the admin saved. A migration would also have to guess for every
+ * circle written before the two were reconciled.
+ *
+ * @param {object} policy   a normalised circle policy
+ * @returns {object} the same policy with `features.chat` derived
+ */
+export function withDerivedChatFeature(policy) {
+  const p = policy && typeof policy === 'object' ? policy : {};
+  const list = Array.isArray(p.conversationKinds) ? p.conversationKinds : null;
+  const kind = typeof p.kind === 'string' && p.kind ? p.kind : null;
+  // Nothing to derive FROM ⇒ leave the stored flag alone.
+  //
+  // This is not a detail. Every circle created before decision 3 has neither field, and the permissive
+  // default list contains `chat-message` — so deriving unconditionally would have quietly turned chat
+  // back ON for every buurt whose admin had turned it off. "The list wins" is only honest when there is
+  // a list; where there is none, the stored flag IS the only record of what someone chose.
+  if (!list && !kind) return p;
+  const chat = chatIsInConversation({ circleSetting: list, templateKind: kind });
+  return { ...p, features: { ...(p.features && typeof p.features === 'object' ? p.features : {}), chat } };
+}

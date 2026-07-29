@@ -2929,7 +2929,7 @@ export async function createRealHouseholdAgent(opts = {}) {
      * only `nknLib` is the original NKN path; both → the unified router picks the best route per peer.
      * Caller (web main.js / circleApp / RN bundle) injects its runtime's nkn-sdk when available.
      */
-    async connectPeerTransport({ nknLib, onPeerMessage, relayUrl, rendezvous = false, rtcLib = null }) {
+    async connectPeerTransport({ nknLib, onPeerMessage, relayUrl, rendezvous = false, rtcLib = null, awaitRelayReady = false }) {
       if (!nknLib && !relayUrl) {
         throw new Error('connectPeerTransport: provide nknLib and/or relayUrl (nothing to connect)');
       }
@@ -2974,7 +2974,10 @@ export async function createRealHouseholdAgent(opts = {}) {
       // never blocks NKN — but if relay is the ONLY transport, its failure means no cross-peer wire.
       if (relayUrl) {
         try {
-          await sa.relay.connect({ relayUrl, onPeerMessage: routedOnPeerMessage });
+          // `awaitRelayReady` — for callers who send on the next line (a join dialling the endpoint its
+          // invite names). Boot leaves it off: blocking start-up behind a relay is what the transport's
+          // non-blocking connect exists to avoid.
+          await sa.relay.connect({ relayUrl, onPeerMessage: routedOnPeerMessage, awaitReady: awaitRelayReady });
           sa.setTransportMode(nknLib ? 'both' : 'relay');
           if (typeof console !== 'undefined') console.info(`[realAgent] relay connected — routing across {${nknLib ? 'nkn, relay' : 'relay'}}`);
         } catch (err) {

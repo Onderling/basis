@@ -593,6 +593,10 @@ export async function bootAgentBundle(opts = {}) {
         nknLib: _connNknLib ?? undefined,
         onPeerMessage: (addr, payload) => peerWiringRef.onPeerMessage?.(addr, payload),
         relayUrl,
+        // An explicit URL means a caller is about to send over it (the join dial). Wait for the socket:
+        // routing consults the real `canReach`, so a send issued before it opens quietly picks another
+        // transport and waits out its timeout instead.
+        awaitRelayReady: typeof override === 'string' && !!override,
         rendezvous: true,
         rtcLib: _connRtcLib ?? undefined,
       });

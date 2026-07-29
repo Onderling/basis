@@ -52,6 +52,7 @@ import {
   InternalBus,
   InternalTransport,
   RoutingStrategy,
+  TRANSPORT_PRIORITY,
 } from '@onderling/core';
 import {
   NknTransport,
@@ -746,6 +747,10 @@ export async function createSecureAgent(opts = {}) {
   // `transportMode` ('nkn' | 'relay' | 'both', default 'nkn').
   let relayTransport = null;
   const relayState = { status: 'idle', address: null, error: null, url: null };
+  // How long `connectRelay` waits for the socket to actually open before reporting back. Bounded so a
+  // relay that never comes up cannot hang a caller; the transport keeps reconnecting on its own either
+  // way. Overridable mainly so tests do not sit here.
+  const relayReadyTimeoutMs = Number.isFinite(opts.relayReadyTimeoutMs) ? opts.relayReadyTimeoutMs : 8_000;
   let transportMode = opts.transportMode ?? 'nkn';
   // T5.2a — extra transports added via addSecureTransport (mdns/ble injected by the RN app,
   // rendezvous by enableSecureRendezvous). Tracked for shutdown.
@@ -953,6 +958,21 @@ export async function createSecureAgent(opts = {}) {
    * @param {object} callOpts
    * @param {string} callOpts.relayUrl  ws:// or wss:// URL
    */
+  /**
+   * Resolve once the transport's socket is genuinely open, or after `ms` — whichever comes first.
+   * Never rejects: a relay that is slow (or down) leaves the caller to carry on with whatever other
+   * transport it has, which is exactly the pre-existing behaviour.
+   */
+  async function waitForSocket(tx, ms) {
+    if (!tx || tx.connected) return tx?.connected === true;
+    const deadline = Date.now() + Math.max(0, ms);
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 25));
+      if (tx.connected) return true;
+    }
+    return tx.connected === true;
+  }
+
   async function connectRelay(callOpts = {}) {
     const relayUrl = callOpts.relayUrl ?? opts.relayUrl;
     if (callOpts.onPeerMessage) onPeerMessageFn = callOpts.onPeerMessage;
@@ -972,6 +992,22 @@ export async function createSecureAgent(opts = {}) {
       const tx = new RelayTransport({ identity, relayUrl });
       makeReceiveHandler(tx);
       await tx.connect();
+      // `connect()` only REQUESTS the socket — it deliberately does not await it, so that
+      // `agent.start()` never blocks on a relay that may be unreachable. That is right for boot and
+      // wrong for everyone else, because it left two facts disagreeing: `status` said 'connected' the
+      // instant connect() returned, while `canReach()` (which reads the actual socket) still said no.
+      //
+      // Routing believes `canReach`, so it correctly skipped the relay — and callers believed `status`,
+      // so they thought they were on it. On hardware that combination cost 15 seconds per join: the
+      // dial reported success, the redeem was routed over NKN because the relay was not open YET, it
+      // burned the full HI timeout, and only then failed over to the relay that had come up in the
+      // meantime and answered instantly (S4, 2026-07-29).
+      //
+      // So: a caller that is about to SEND can ask to wait for the socket. Opt-in, because the
+      // non-blocking default is right for boot — `agent.start()` must not stall behind a relay that may
+      // be unreachable — and wrong only for callers who need the relay usable on the next line.
+      // Bounded either way; the transport reconnects on its own regardless.
+      if (callOpts.awaitReady === true) await waitForSocket(tx, relayReadyTimeoutMs);
       relayTransport     = tx;
       relayState.status  = 'connected';
       relayState.address = tx.address;
@@ -1219,11 +1255,21 @@ export async function createSecureAgent(opts = {}) {
         }
       } catch { /* fall through to the static fallback */ }
     }
-    // Static fallback when the router can't decide (no addr / nothing
-    // reachable): prefer NKN then relay, reporting whatever name applies so
-    // the failover loop can still degrade it.
-    if (peerTransport)  return { name: 'nkn',   transport: peerTransport,  address: await addressFor(addr, 'nkn') };
-    if (relayTransport) return { name: 'relay', transport: relayTransport, address: await addressFor(addr, 'relay') };
+    // Static fallback when the router can't decide — which is the FIRST-CONTACT case: a peer we have
+    // never spoken to has no PeerGraph entry and no latency history, so the strategy has nothing to go on.
+    // It therefore runs far more often than "can't decide" suggests, and it must agree with the canonical
+    // order rather than invent its own.
+    //
+    // It used to hardcode "prefer NKN then relay", which is backwards: `TRANSPORT_PRIORITY` ranks relay
+    // ABOVE nkn. On hardware that cost 15 seconds per first contact — a join's redeem went out over NKN,
+    // waited for the full HI timeout, and only then failed over to the relay that was up the whole time
+    // and answered immediately (S4, 2026-07-29). Slow enough that people conclude the join is broken.
+    for (const name of TRANSPORT_PRIORITY) {
+      const t = name === 'relay' ? relayTransport
+        : name === 'nkn' ? peerTransport
+        : extraTransports.get(name);
+      if (t) return { name, transport: t, address: await addressFor(addr, name) };
+    }
     return null;
   }
 

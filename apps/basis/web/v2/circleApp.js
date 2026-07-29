@@ -758,7 +758,7 @@ const LOCAL_ACTOR = 'me';
 // not a prerequisite. Bring up whichever is available — NKN (CDN) and/or the relay (VITE_CIRCLE_RELAY_URL).
 // A configured relay alone is enough for the LAN no-pod two-device path; with NKN too the router picks
 // the best route. Doesn't throw if neither is available — the kring view still works locally.
-async function tryConnectPeerTransport(agent, peerMessageRouter) {
+async function tryConnectPeerTransport(agent, peerMessageRouter, { awaitRelayReady = false } = {}) {
   const nknLib =
        (typeof window !== 'undefined' && window.nkn)
     ?? (typeof globalThis !== 'undefined' && globalThis.nkn)
@@ -780,6 +780,9 @@ async function tryConnectPeerTransport(agent, peerMessageRouter) {
       onPeerMessage: peerMessageRouter,
       relayUrl:      CIRCLE_RELAY_URL,
       rendezvous:    true,
+      // Only a caller about to send over this relay waits for the socket (the join dial). Boot does not:
+      // blocking start-up behind a relay is what the transport's non-blocking connect exists to avoid.
+      awaitRelayReady,
     });
     const routes = [nknLib && 'nkn', CIRCLE_RELAY_URL && 'relay'].filter(Boolean).join(' + ');
     console.info(`[circleApp] peer transport connected (${routes}, routed) + rendezvous`);
@@ -846,7 +849,7 @@ async function dialRelayUrl(url) {
   if (CIRCLE_RELAY_URL === url) return { ok: true, effective: url };
   CIRCLE_RELAY_URL = url;                       // the live resolved value tryConnect… reads
   try {
-    await tryConnectPeerTransport(_peerAgent, _peerRouter);
+    await tryConnectPeerTransport(_peerAgent, _peerRouter, { awaitRelayReady: true });
     return { ok: true, effective: CIRCLE_RELAY_URL };
   } catch (err) {
     return { ok: false, error: err?.message ?? String(err), effective: CIRCLE_RELAY_URL };

@@ -633,6 +633,13 @@ export async function createSecureAgent(opts = {}) {
   const pendingHold = new Map();
   let   holdSeq     = 0;
 
+  // G12 — identity pubKey → the alias addresses bound to it (`registerPeerAddress`). The hold queue is
+  // keyed by the address you SENT to, but presence arrives on the address the peer SPEAKS from: a peer
+  // reconnecting announces itself as its canonical pubKey, so messages held for their per-circle address
+  // would never be flushed without this reverse view. Same address-vs-identity confusion the binding
+  // itself exists to fix, one layer up.
+  const peerAliases = new Map();
+
   /** Does this send opt in to the hold-forward delivery guarantee? */
   function wantsHold(sendOpts) {
     return sendOpts?.hold === true || sendOpts?.guarantee === 'hold-forward';
@@ -674,6 +681,34 @@ export async function createSecureAgent(opts = {}) {
    * application refusal (e.g. muted) drops the held message (a resend can't fix
    * it). Best-effort, fire-and-forget from the receive path.
    */
+  /**
+   * Flush every queue belonging to the peer that just became reachable — the address presence arrived
+   * on, PLUS every alias bound to the same identity. Presence is an identity fact; the hold queue is
+   * per-address, so without the fan-out a per-circle send stays held forever behind a peer who is
+   * demonstrably back.
+   */
+  /** Every address that reaches the SAME peer as `addr` — itself plus its bound aliases. */
+  function addressesOfIdentity(addr) {
+    const out = new Set([addr]);
+    try {
+      const pubKey = agent.security?.getPeerKey?.(addr) ?? null;
+      for (const alias of (pubKey ? peerAliases.get(pubKey) ?? [] : [])) out.add(alias);
+    } catch { /* the direct address is still correct */ }
+    return out;
+  }
+
+  /** Are we holding anything for this PEER (under any of their addresses)? */
+  function hasHoldForIdentity(addr) {
+    for (const a2 of addressesOfIdentity(addr)) if (pendingHold.has(a2)) return true;
+    return false;
+  }
+
+  async function flushPresence(addr) {
+    let flushed = 0;
+    for (const t of addressesOfIdentity(addr)) flushed += (await flushPending(t)).flushed;
+    return { flushed };
+  }
+
   async function flushPending(addr) {
     const q = pendingHold.get(addr);
     if (!q || q.size === 0) return { flushed: 0 };
@@ -850,8 +885,10 @@ export async function createSecureAgent(opts = {}) {
       // (their reconnect HI, or any message) proves they are reachable now, so
       // flush anything we were holding for them. Fire-and-forget: re-hold on a
       // still-failing send is handled inside flushPending.
-      if (pendingHold.has(env._from)) {
-        flushPending(env._from).catch(() => { /* re-hold handled internally */ });
+      // The gate asks about the PEER, not one address of them: with per-circle addressing the hold sits
+      // under the address we sent to, while presence arrives on the address they speak from.
+      if (hasHoldForIdentity(env._from)) {
+        flushPresence(env._from).catch(() => { /* re-hold handled internally */ });
       }
     });
   }
@@ -1516,6 +1553,56 @@ export async function createSecureAgent(opts = {}) {
       stableId: identity.stableId,
       vault,
     },
+    /**
+     * G12/G13 — bind an ALIAS address to a peer's identity key.
+     *
+     * `SecurityLayer` keys a peer's public key by **the address you send to**, and the HI handshake only
+     * ever populates that under the peer's canonical pubKey. So a send to any OTHER address of the same
+     * person — a per-circle address, a mesh-native address — throws `No pubKey registered`, the
+     * handshake-retry loop gives up, and the message is held forever. That failure lives ABOVE the
+     * transport, which is why it looks identical on relay, NKN and in-process alike.
+     *
+     * This is the binding half of G12 ("three key spaces, no membership record"): an alias is not a new
+     * identity, it is another address for one, and the sealing key is per identity. Callers hold the two
+     * facts together already — a circle roster row carries `{pubKey, circleAddress}` side by side — so
+     * the app registers the mapping when it learns the roster.
+     *
+     * Idempotent. Re-registering after a rotation simply overwrites.
+     *
+     * @param {string} address  the alias to make sendable (e.g. a per-circle address)
+     * @param {string} pubKey   the peer's canonical identity pubKey (b64url)
+     * @returns {boolean} whether the mapping was recorded
+     */
+    registerPeerAddress(address, pubKey) {
+      if (typeof address !== 'string' || !address) return false;
+      if (typeof pubKey !== 'string' || !pubKey) return false;
+      if (typeof agent.security?.registerPeer !== 'function') return false;
+      agent.security.registerPeer(address, pubKey);
+      if (address !== pubKey) {
+        let set = peerAliases.get(pubKey);
+        if (!set) { set = new Set(); peerAliases.set(pubKey, set); }
+        set.add(address);
+      }
+      return true;
+    },
+
+    /**
+     * Drop an alias binding — a member who left or was removed. Their canonical pubKey mapping is
+     * untouched (they may still be a contact); only the circle-scoped address stops being sealable.
+     */
+    forgetPeerAddress(address) {
+      if (typeof address !== 'string' || !address) return false;
+      if (typeof agent.security?.unregisterPeer !== 'function') return false;
+      // Resolve the identity BEFORE dropping the mapping, or the reverse index leaks the alias.
+      const pubKey = agent.security.getPeerKey?.(address) ?? null;
+      agent.security.unregisterPeer(address);
+      if (pubKey) {
+        const set = peerAliases.get(pubKey);
+        if (set) { set.delete(address); if (set.size === 0) peerAliases.delete(pubKey); }
+      }
+      return true;
+    },
+
     peer: {
       connect: connectPeer,
       sendTo:  sendToPeer,
@@ -1572,7 +1659,7 @@ export async function createSecureAgent(opts = {}) {
     // re-sends everything held for `addr` and resolves with `{ flushed }`.
     // `heldFor(addr)` reports how many messages are currently parked for a peer
     // (0 when none) for diagnostics + tests.
-    presenceSignal: (addr) => flushPending(addr),
+    presenceSignal: (addr) => flushPresence(addr),
     heldFor: (addr) => pendingHold.get(addr)?.size ?? 0,
 
     /** v0.7.cc — diagnostic snapshot of the last 10 envelopes,

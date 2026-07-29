@@ -3029,6 +3029,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     // Step 5B/C — the per-circle ADDRESS this device presents in a circle (unlinkable-by-default),
     // derived from the default profile seed. The substrate the roster-recording wire consumes.
     circleAddressFor: (circleId) => deriveCircleAddress(defaultProfileSeed, circleId),
+    // G12 — bind a member's PER-CIRCLE address to their identity key, so this device can seal to it.
+    // Without this, routing to a per-circle address (G13 step C) throws `No pubKey registered` above the
+    // transport and every message holds. The shells call it with the circle roster, which already carries
+    // `{pubKey, circleAddress}` per member. → `src/v2/circleAddressKeys.js` for the reasoning.
+    registerPeerAddress: (address, pubKey) => sa.registerPeerAddress?.(address, pubKey) ?? false,
+    forgetPeerAddress:   (address) => sa.forgetPeerAddress?.(address) ?? false,
     // Decision B (SENSITIVE) — sign the cross-circle link challenge with the SOURCE circle's
     // key (seed-derived, no vault) so a "continue as an existing self" claim is PROVABLE. The
     // join wizard passes this on the redeem seam; the admin verifies it before recording.

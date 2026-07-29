@@ -12,6 +12,8 @@
  * @param {{ agent: object, circleId: string }} a
  * @returns {Promise<number>} how many peers were (re-)added (deduped by the agent).
  */
+
+import { bindCircleAddressKeys } from './circleAddressKeys.js';
 export async function feedHouseholdRoster({ agent, circleId } = {}) {
   if (!agent || typeof agent.addHouseholdPeer !== 'function' || !circleId) return 0;
   let r;
@@ -30,5 +32,38 @@ export async function feedHouseholdRoster({ agent, circleId } = {}) {
   // without this re-push, an item added before the OTHER device opened the circle never arrives. Safe
   // (the receiver de-dupes by etag). Fires on every circle-open, both directions → both sides converge.
   try { await agent.resyncHouseholdCircle?.(circleId); } catch { /* best-effort */ }
+  // G12 — bind each member's per-circle address to their identity key while we are here. This is the
+  // moment both shells already learn a circle's membership, and it is the only moment the two facts are
+  // in hand together; without the binding, routing to a per-circle address (G13 step C) throws
+  // `No pubKey registered` above the transport and every message holds. Best-effort by design: a
+  // roster read that fails must not break pairing, which is what this function is actually for.
+  try { await bindCircleAddressKeysFor({ agent, circleId }); } catch { /* best-effort */ }
   return added;
+}
+
+/**
+ * Bind every member of `circleId` to their per-circle address (G12).
+ *
+ * Reads `listGroupMembers` rather than `listGroupRoster`: the roster projection carries only
+ * `{addr, role}`, while the member rows carry `{pubKey, circleAddress}` — the pair captured together at
+ * join, where the joiner PROVED the address. Split out so a caller that only wants the binding (a roster
+ * refresh, a post-removal re-bind) does not also re-run household pairing.
+ *
+ * @param {object} a
+ * @param {object} a.agent      the host agent (needs `callSkill` + `registerPeerAddress`)
+ * @param {string} a.circleId
+ * @returns {Promise<{bound: number, skipped: number}>}
+ */
+export async function bindCircleAddressKeysFor({ agent, circleId } = {}) {
+  if (!agent || typeof agent.callSkill !== 'function' || !circleId) return { bound: 0, skipped: 0 };
+  if (typeof agent.registerPeerAddress !== 'function') return { bound: 0, skipped: 0 };
+  let res;
+  try { res = await agent.callSkill('stoop', 'listGroupMembers', { groupId: circleId }); }
+  catch { return { bound: 0, skipped: 0 }; }
+  return bindCircleAddressKeys({
+    members: Array.isArray(res?.members) ? res.members : [],
+    registerPeerAddress: (address, pubKey) => agent.registerPeerAddress(address, pubKey),
+    // Skip my own row — I never seal to myself, and binding it would be a harmless no-op at best.
+    selfPubKey: agent.identity?.pubKey ?? agent.peer?.address ?? null,
+  });
 }

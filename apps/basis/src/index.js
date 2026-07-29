@@ -273,6 +273,7 @@ export {
   RETENTION_CHOICES_DAYS, DEFAULT_RETENTION_DAYS, normalizeRetentionDays, retentionFromDays, daysToMs,
   localStorageRetentionIo, asyncStorageRetentionIo,
 } from './v2/retentionPref.js';
+export { bindCircleAddressKeys, forgetCircleAddressKeys } from './v2/circleAddressKeys.js';
 export { registerCircleAddresses, unregisterCircleAddresses }
                                                 from './v2/circleAddressRegistration.js';
 export {

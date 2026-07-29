@@ -911,20 +911,22 @@ export function buildSkills({
   groupId: explicitGroupId,
   dataLocationConfig,
   // G13 step C — route circle traffic to each member's PER-CIRCLE address instead of their one global
-  // signing key. Still OFF, and the reason is now EVIDENCE rather than caution.
+  // signing key. **ON since 2026-07-29.**
   //
-  // Flipping this default (attempted 2026-07-29) breaks cross-peer delivery in every real-agent test —
-  // in-process, over a real relay, and over real NKN alike. The addresses themselves are fine: the
-  // roster's `circleAddress` for a member equals that member's own derivation, and binding it on the
-  // transport succeeds (`registerCircleAddresses` reports `registered`). What does NOT work is the SEND:
-  // resolving a recipient to their per-circle address produces a destination the send path does not
-  // reach, so messages are held for everyone and nothing arrives.
+  // The precondition was never "NKN is decided" — it was G12, the membership binding: `SecurityLayer`
+  // keys a peer's pubKey by the ADDRESS you send to, and the HI handshake only populates that under the
+  // peer's canonical pubKey. So a send to a per-circle address threw `No pubKey registered` above the
+  // transport and held forever, identically on relay, NKN and in-process. That is now closed: the shells
+  // bind each member's `circleAddress → pubKey` from the roster (the two facts the roster has carried
+  // side by side since join, where the address was PROVEN). → `basis/src/v2/circleAddressKeys.js`.
   //
-  // So the precondition is not "NKN is decided" (it is) — it is that the send path can ROUTE to a
-  // per-circle address on each transport. That is a slice of work, not a one-line default change, and it
-  // belongs to the S4 walk where J-G13.2 ("a member still reaches her") is the actual check.
-  // → `plans/SESSION-S4-infrastructure.md` · `REMAINING-WORK.md` P0.
-  preferCircleAddress = false,
+  // What this buys, exactly (docs/decisions.md 2026-07-27): unlinkable to other members, to anyone
+  // watching the wire, and to every relay you did NOT use. The relay you chose still correlates your
+  // circles — one device has one push token — but reads nothing. The relay's-view journeys (J-R1, J-R5)
+  // keep that concession observable rather than denied.
+  //
+  // Still threaded from the host: a deployment that must talk to pre-flip peers passes `false`.
+  preferCircleAddress = true,
   // The per-USER half of the same ladder (2026-07-28): may a send fall back to the member's global key
   // when no per-circle address is known? OFF is the private default; the host threads the live setting as
   // a value or a function, because unlike `preferCircleAddress` (a deployment fact) this one changes at

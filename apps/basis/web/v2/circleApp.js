@@ -66,6 +66,7 @@ import {
   RETENTION_CHOICES_DAYS, normalizeRetentionDays, retentionFromDays, localStorageRetentionIo,
 } from '../../src/v2/retentionPref.js';
 import { registerCircleAddresses, unregisterCircleAddresses } from '../../src/v2/circleAddressRegistration.js';
+import { forgetCircleAddressKeys } from '../../src/v2/circleAddressKeys.js';
 import {
   createConnectionPoints, adoptExistingRelay, localStorageConnectionPointsIo, recordJoinedCirclePoints,
 } from '../../src/v2/connectionPoints.js';
@@ -6135,9 +6136,29 @@ async function showAdmin(id) {
       notice = null; busy = true; rerender();
       let removed = false;
       try {
+        // G12 — capture the departing member's per-circle address BEFORE the removal, while they are
+        // still on the roster. The rendered row cannot supply it (`normalizeCircleMembers` strips the
+        // raw fields), so read it from the raw member rows.
+        let goneAddress = null;
+        try {
+          const raw = await rawCallSkill('stoop', 'listGroupMembers', { groupId: id });
+          goneAddress = (raw?.members ?? []).find((row) => row?.webid === m.webid)?.circleAddress ?? null;
+        } catch { /* best-effort — the unbind below simply does nothing */ }
+
         const r = await rawCallSkill('stoop', 'removeMember', { groupId: id, memberWebid: m.webid, memberStableId: m.stableId });
         if (r?.error) notice = t('circle.admin.refused');
-        else removed = true;
+        else {
+          removed = true;
+          // …then stop being able to seal to it. Their CANONICAL pubKey mapping is deliberately left
+          // alone: they may still be a contact, and forgetting that would break an unrelated
+          // conversation. (Hygiene, not the protection — backward secrecy is the G11 key rotation.)
+          try {
+            forgetCircleAddressKeys({
+              addresses: [goneAddress],
+              forgetPeerAddress: (addr) => _peerAgent?.forgetPeerAddress?.(addr),
+            });
+          } catch { /* best-effort */ }
+        }
       } catch { notice = t('circle.admin.refused'); }
       // objective L — auto-revoke: on a SUCCESSFUL removal, rotate this circle's outbound canonical shares away
       // from the departing member (reuses revokeAllForMember → revokeItemShare). BEST-EFFORT — a revoke failure

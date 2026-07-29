@@ -47,6 +47,7 @@ import { createRealHouseholdAgent } from '../../src/web/realAgent.js';
 // G13 step C — the harness must do what the app does at boot, or every send routes to a per-circle
 // address nobody bound. See `registerCirclePresence` in circleApp.js / agentBundle.js.
 import { registerCircleAddresses } from '../../src/v2/circleAddressRegistration.js';
+import { bindCircleAddressKeysFor } from '../../src/v2/householdRosterPairing.js';
 import { createCirclePodProducer, createCircleControlAgentRouter } from '../../src/v2/circlePodProducer.js';
 import { openerForIdentity } from '../../src/v2/sharedCopyOpener.js';
 import { createKeyEventStore, openViaKeyEvents } from '../../src/v2/keyEventStore.js';
@@ -310,8 +311,14 @@ export async function pairCircle(admin, joiner, {
 } = {}) {
   const { created } = await createCircle(admin, { groupId, name, purpose });
   const { invite, joined } = await joinExistingCircle(admin, joiner, { groupId, handle });
-  // Both sides now bind their per-circle address, exactly as the shells do after a join.
+  // Both sides now do exactly what the shells do after a join:
+  //   1. bind their per-circle address on the transport (the boot-call half), and
+  //   2. bind every OTHER member's `circleAddress → pubKey` in the security layer (the G12 half —
+  //      without it a send to a per-circle address throws `No pubKey registered` above the transport).
+  // (2) calls the SAME shared function production calls via `feedHouseholdRoster`, so this harness
+  // exercises the real path rather than a test-only shortcut.
   await bindCircleAddresses([admin, joiner], groupId);
+  await Promise.all([admin, joiner].map((n) => bindCircleAddressKeysFor({ agent: n.agent, circleId: groupId })));
   return { created, invite, joined, groupId };
 }
 

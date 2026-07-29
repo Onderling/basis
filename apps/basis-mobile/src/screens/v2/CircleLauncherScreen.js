@@ -2152,7 +2152,7 @@ function CircleDetail({
   registerKringBotSink = null,
   onAcceptFallback = null,
   eventLog,
-  onAcceptFallback = null, circles = [],
+  circles = [],
   recipeStore = null, onStoopEvent, sendPersonaUpdate, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null, coreIdentity = null,
   onCircleControl = null, circleTransport = null,
   // Task #13 — onboarding first-run flags (shared store) + the create-flow handoff.

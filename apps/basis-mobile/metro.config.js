@@ -258,6 +258,14 @@ _cfg.resolver.resolveRequest = (context, moduleName, platform) => {
   if (moduleName === 'react-native-webrtc') {
     return { filePath: path.resolve(__dirname, 'src/shims/reactNativeWebrtc.js'), type: 'sourceFile' };
   }
+  // expo-notifications / expo-device: named as prerequisites by src/v2/nativePush.js and never added
+  // to package.json, so Metro cannot resolve them. nativePush already degrades ({supported:false}),
+  // but Metro resolves require() statically — an absent module is a BUILD failure before any
+  // try/catch runs. Stub both so the app bundles and reports honestly. (Add the deps + rebuild the
+  // dev client to enable real push, then drop this entry.)
+  if (moduleName === 'expo-notifications' || moduleName === 'expo-device') {
+    return { filePath: path.resolve(__dirname, 'src/shims/expoNotificationsAbsent.js'), type: 'sourceFile' };
+  }
   return _presetResolve
     ? _presetResolve(context, moduleName, platform)
     : context.resolveRequest(context, moduleName, platform);

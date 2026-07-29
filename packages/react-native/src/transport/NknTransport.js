@@ -289,14 +289,18 @@ export class NknTransport extends Transport {
 
     // Dynamic import for Node / RN-with-bundler.  Try nkn-multiclient
     // first (lighter wrapper); fall back to nkn-sdk.
-    /* eslint-disable no-await-in-loop */
-    for (const pkg of ['nkn-multiclient', 'nkn-sdk']) {
-      try {
-        const mod = await import(pkg);
-        return mod.default ?? mod;
-      } catch { /* try next */ }
-    }
-    /* eslint-enable no-await-in-loop */
+    // Metro (unlike Node) requires a dynamic import's specifier to be a STRING LITERAL — it resolves the
+    // dependency graph statically, so `import(pkg)` is an "Invalid call" and the whole bundle fails to
+    // build. Spelling both out keeps the same behaviour (try the lighter wrapper, fall back to the SDK)
+    // while staying analyzable. Found 2026-07-29 by running the app: it bundles on Node and not on RN.
+    try {
+      const mod = await import('nkn-multiclient');
+      return mod.default ?? mod;
+    } catch { /* fall through to nkn-sdk */ }
+    try {
+      const mod = await import('nkn-sdk');
+      return mod.default ?? mod;
+    } catch { /* neither available — the throw below is the honest answer */ }
     throw new Error(
       'NknTransport: no NKN library available.  Install `nkn-multiclient` ' +
       'or `nkn-sdk`, or pass opts.nknLib (e.g. window.nkn from CDN).',

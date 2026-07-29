@@ -1286,7 +1286,15 @@ export async function createSecureAgent(opts = {}) {
         // WHY we are holding matters to the caller. "No route this circle may use" is a different fact
         // from "this peer is offline": the first is a standing property of the connection that will not
         // fix itself, and the product owes the user an explanation rather than silent holding.
-        const scopedOut = !!opts?.scope && !(await hasLiveRoute(addr));
+        //
+        // The scope is to blame only when an UNSCOPED route would have worked — i.e. the peer is
+        // reachable in general and the circle's own narrowing is what stopped this send. This test read
+        // `!hasLiveRoute(addr)` until 2026-07-29, which is the exact opposite, and swapped both labels:
+        // an ordinary offline peer was reported as `no-eligible-route` (surfacing as `blocked`, which
+        // offers the address-fallback trade — a trade that cannot help someone who is simply offline),
+        // while a genuinely scoped-out send was held silently as `unreachable`, so the one offer that
+        // WOULD have fixed it never appeared. Found by J-CS4/CS6/CS7.
+        const scopedOut = !!opts?.scope && (await hasLiveRoute(addr));
         return enqueueHold(addr, payload, opts, scopedOut ? 'no-eligible-route' : 'unreachable');
       }
       try {

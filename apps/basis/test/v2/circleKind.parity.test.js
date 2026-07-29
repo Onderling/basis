@@ -17,6 +17,7 @@ import nlWebRaw from '../../locales/nl.json' with { type: 'json' };
 import enMobRaw from '../../../basis-mobile/locales/en.json' with { type: 'json' };
 import nlMobRaw from '../../../basis-mobile/locales/nl.json' with { type: 'json' };
 import { sharedCircleLocale } from '../../src/locales/index.js';
+import { KRING_KINDS } from '../../src/v2/kringTemplates.js';
 // `circle.*` is now the SHARED source both shells merge — so web ≡ mobile for circle by construction.
 const enWeb = { ...enWebRaw, circle: sharedCircleLocale.en };
 const nlWeb = { ...nlWebRaw, circle: sharedCircleLocale.nl };
@@ -34,22 +35,26 @@ function flatKeys(obj, prefix = '') {
   return out;
 }
 
-const KIND_KEYS = [
-  'circle.kind.buurt',
-  'circle.kind.household',
-  'circle.kind.other',
-  'circle.kind.vriendenkring',
-];
+/**
+ * `circle.kind.*` serves TWO readers: the launcher's section headers and the create wizard's kind
+ * picker. They are not the same set — the launcher needs a catch-all (`other`) that is not a kind you
+ * can pick, and the wizard needs every kind in `KRING_KINDS`. Derive the union rather than hardcoding
+ * it: this list was pinned at four while `KRING_KINDS` grew to include `team`, so the picker rendered
+ * the raw key `circle.kind.team` on screen in both languages (found walking S3, 2026-07-29) and this
+ * test still passed. A hardcoded list of a vocabulary that lives elsewhere only ever goes stale.
+ */
+const KIND_KEYS = [...new Set([...KRING_KINDS, 'other'])]
+  .map((k) => `circle.kind.${k}`).sort();
 
 describe('β.3 — circle.kind.* locale parity', () => {
-  it('web en + nl both expose the four launcher section-header keys', () => {
+  it('web en + nl both expose every kind key (launcher headers + wizard picker)', () => {
     const e = flatKeys(enWeb).filter((k) => k.startsWith('circle.kind.')).sort();
     const n = flatKeys(nlWeb).filter((k) => k.startsWith('circle.kind.')).sort();
     expect(e).toEqual(KIND_KEYS);
     expect(n).toEqual(KIND_KEYS);
   });
 
-  it('mobile en + nl both expose the four launcher section-header keys', () => {
+  it('mobile en + nl both expose every kind key (launcher headers + wizard picker)', () => {
     const e = flatKeys(enMob).filter((k) => k.startsWith('circle.kind.')).sort();
     const n = flatKeys(nlMob).filter((k) => k.startsWith('circle.kind.')).sort();
     expect(e).toEqual(KIND_KEYS);

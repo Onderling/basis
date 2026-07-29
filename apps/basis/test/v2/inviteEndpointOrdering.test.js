@@ -15,6 +15,8 @@
 import { describe, it, expect } from 'vitest';
 import { endpointToDialForInvite } from '../../src/v2/connectionPoints.js';
 import { joinCircleFromInvite } from '../../src/v2/circleInvite.js';
+import { initialState, decodeInvite, finalSubmit } from '../../src/core/wizards/joinGroupState.js';
+import { sharedCircleLocale } from '../../src/locales/index.js';
 
 const RELAY = 'ws://relay.example:8787';
 
@@ -173,5 +175,37 @@ describe('a failed join says WHY, not just that it failed', () => {
     const r = await joinCircleFromInvite({ inviteUri: INV, callSkill: ok, handle: 'bo' });
     expect(r).toMatchObject({ ok: true, circleId: 'buurttest' });
     expect(r.reason).toBeUndefined();
+  });
+});
+
+describe('the typed failure reaches the SCREEN, not just the caller', () => {
+  // Walked as J-NP2 (2026-07-30) one layer above where the machine-readable half was fixed the same day.
+  // `submitErrorKey` had zero consumers: both wizards rendered only `state.submitError`, which the
+  // admin-unreachable branch deliberately does not set. So the joiner saw a blank re-render —
+  // indistinguishable from the button not working — for the one failure that is explicitly a NOTICE
+  // rather than a verdict ("the invitation stays valid, try again later").
+  it('finalSubmit leaves a locale key for the admin-offline case, and no raw string', async () => {
+    const state = initialState();
+    decodeInvite({ kind: 'membershipCode', groupId: 'g', code: 'c', adminPeerAddr: 'admin' }, state);
+    state.handle = 'bo';
+    const callSkill = async (app, op) => (op === 'setMyHandle' ? { ok: true } : { error: 'invalid-or-expired-code' });
+    const { state: out } = await finalSubmit({
+      state, callSkill, sendPeerRedeem: async () => { throw new Error('offline'); },
+    });
+
+    expect(out.submitErrorKey).toBe('circle.nearbyScreen.join_no_admin');
+    // The renderers used to read ONLY this, which is why nothing appeared.
+    expect(out.submitError).toBeNull();
+    // Whichever a shell reads, it must now find something to say.
+    expect(out.submitErrorKey ?? out.submitError).toBeTruthy();
+  });
+
+  it('the key resolves to a notice in both languages — not an error verdict', () => {
+    for (const lang of ['en', 'nl']) {
+      const text = sharedCircleLocale[lang].nearbyScreen.join_no_admin.text;
+      expect(text, `${lang} says nothing`).toBeTruthy();
+      // The property the journey cares about: it says the invitation survives.
+      expect(text.toLowerCase()).toMatch(lang === 'en' ? /still valid|try again/ : /blijft geldig|later/);
+    }
   });
 });

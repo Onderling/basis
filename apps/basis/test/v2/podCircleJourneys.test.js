@@ -1,78 +1,346 @@
 /**
  * S4 §2 — the pod-backed circle journeys (J-NP1 … J-NP6), walked headlessly against REAL components.
- * SCRATCH VERSION — iterating.
+ *
+ * How this was walked (2026-07-30): a real Community Solid Server was running on
+ * `http://localhost:3000` and a real pod was provisioned on it (`http://localhost:3000/anna/`, real
+ * WebID, real client credentials, root container 401s to an unauthenticated PUT — it is a genuine,
+ * access-controlled pod). Two REAL basis agents (`bootRealAgentNode`) were paired over a real
+ * `InternalTransport` on a shared bus, and the circle was created + joined through the production op
+ * path (`createGroupState.finalSubmit` → `stoop.createGroupV2`, then `buildCircleInviteUri` →
+ * `joinCircleFromInvite` → `joinGroupState.finalSubmit` → the real group-redeem peer bridge).
+ *
+ * The assertions below are network-free so they run in CI, but every one of them was first observed on
+ * that live setup. Where a journey FAILS, the test asserts the CURRENT behaviour and the comment says
+ * what is wrong — this file walks, it does not fix.
+ *
+ * Not pinned here because they are not walkable at all (see plans/DRAFT-S4-pod-results.md):
+ *   - J-NP4 (last admin leaves → caretaker can still grant pod access): `governanceCaretaker.js` has
+ *     NO production call site. `stoop.leaveGroup` does not appoint anyone.
+ *   - J-NP5 (no internet ⇒ reads local + says it is not syncing): there is no "not syncing" surface for
+ *     a pod-backed circle anywhere in the locale bundle or the renderers.
  */
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import 'fake-indexeddb/auto';
 
 import {
-  bootRealAgentNode, connectAgentsOverBus, createCircle, teardown, until, bindCircleAddresses,
+  bootRealAgentNode, connectAgentsOverBus, teardown, goOffline, goOnline,
 } from '../support/pairRealAgents.js';
-import { buildCircleInviteUri, joinCircleFromInvite } from '../../src/v2/circleInvite.js';
-import { loadCircleStoragePod, pushCircleStoragePolicy } from '../../src/v2/circleStoragePolicy.js';
-import { createConnectionPoints, recordJoinedCirclePoints } from '../../src/v2/connectionPoints.js';
-import { decodeInvite, initialState } from '../../src/core/wizards/joinGroupState.js';
-
-const CSS_URL = process.env.CSS_URL || 'http://localhost:3000/';
-
-let cssUp = false;
-beforeAll(async () => {
-  try { cssUp = (await fetch(CSS_URL, { method: 'HEAD' })).ok; } catch { cssUp = false; }
-  // eslint-disable-next-line no-console
-  console.log('[walk] CSS at', CSS_URL, 'reachable:', cssUp);
-});
-
 import {
   initialState as createGroupInitialState,
   finalSubmit as createGroupFinalSubmit,
 } from '../../src/core/wizards/createGroupState.js';
+import { initialState, decodeInvite, finalSubmit } from '../../src/core/wizards/joinGroupState.js';
+import { buildCircleInviteUri, joinCircleFromInvite } from '../../src/v2/circleInvite.js';
+import { loadCircleStoragePod, pushCircleStoragePolicy } from '../../src/v2/circleStoragePolicy.js';
+import { createConnectionPoints, recordJoinedCirclePoints } from '../../src/v2/connectionPoints.js';
+import { registerCircleAddresses } from '../../src/v2/circleAddressRegistration.js';
 
+/** The pod that was actually running for this walk. Plain http — a local CSS has no TLS. */
+const LIVE_POD = 'http://localhost:3000/anna/circles/podkring';
+/** The same pod, hypothetically behind TLS — the only shape the code accepts. */
+const TLS_POD = 'https://pod.example.org/anna/circles/podkring';
+
+/** Create a pod-backed circle through the real create-wizard op path. */
 async function createPodCircle(admin, { groupId, groupPodUri }) {
-  const cs = (app, op, args) => admin.agent.callSkill(app, op, args);
+  const callSkill = (app, op, args) => admin.agent.callSkill(app, op, args);
   const state = createGroupInitialState();
-  state.groupId = groupId; state.name = groupId; state.purpose = 'pod walk';
-  state.storagePolicy = 'centralised';
+  state.groupId = groupId;
+  state.name = groupId;
+  state.purpose = 'pod-backed circle walk';
+  state.storagePolicy = 'centralised';   // = the `shared` pod axis = podBacked
   state.groupPodUri = groupPodUri;
-  const { result, state: out } = await createGroupFinalSubmit({ state, callSkill: cs });
-  if (!result) throw new Error(`create failed: ${out?.submitError}`);
+  const { result, state: out } = await createGroupFinalSubmit({ state, callSkill });
+  if (!result) throw new Error(`createGroupV2 failed: ${out?.submitError ?? 'unknown'}`);
   return result;
 }
 
-describe('probe', () => {
-  it('storage policy via CREATE, then invite', async () => {
+/** Build the invite exactly as both shells do: read the storage policy, derive podBacked from it. */
+async function inviteAsShellsBuildIt(admin, circleId) {
+  const callSkill = (app, op, args) => admin.agent.callSkill(app, op, args);
+  const storage = await loadCircleStoragePod({ callSkill, circleId });
+  const podBacked = storage?.pod === 'shared' || storage?.pod === 'hybrid';
+  const built = await buildCircleInviteUri({
+    callSkill, circleId, adminPeerAddr: admin.pubKey,
+    podBacked, podUrl: podBacked ? (storage?.groupPodUri ?? null) : null,
+  });
+  if (built?.error) throw new Error(`buildCircleInviteUri failed: ${built.error}`);
+  // …and what the JOINER actually gets: the decoded wire payload, not the object the admin held.
+  const decoded = initialState();
+  decodeInvite(built.uri, decoded);
+  return { storage, built, invite: decoded.invite };
+}
+
+// ── J-NP1 — the ordinary join: the pod must land in the joiner's connection points ──────────────────
+
+describe('J-NP1 — the pod as this circle’s connection point', () => {
+  it('the whole chain works — but ONLY for an https pod url', async () => {
     const anna = await bootRealAgentNode('anna');
-    const cs = (app, op, args) => anna.agent.callSkill(app, op, args);
-    const podUri = `${CSS_URL}anna/circles/podkring`;
-    const created = await createPodCircle(anna, { groupId: 'podkring', groupPodUri: podUri });
-    console.log('[walk] created keys =', Object.keys(created ?? {}).join(','));
-    const read = await loadCircleStoragePod({ callSkill: cs, circleId: 'podkring' });
-    console.log('[walk] read =', JSON.stringify(read));
-    const podBacked = read?.pod === 'shared' || read?.pod === 'hybrid';
-    const inv = await buildCircleInviteUri({
-      callSkill: cs, circleId: 'podkring', adminPeerAddr: anna.pubKey,
-      podBacked, podUrl: podBacked ? (read?.groupPodUri ?? null) : null,
-    });
-    const st = initialState();
-    decodeInvite(inv.uri, st);
-    console.log('[walk] decoded =', JSON.stringify(st.invite));
+    const bo = await bootRealAgentNode('bo');
+    try {
+      await connectAgentsOverBus(anna, bo);
+      await createPodCircle(anna, { groupId: 'tlskring', groupPodUri: TLS_POD });
 
-    // and the same again with an https pod url
-    const podUriHttps = 'https://pod.example.org/anna/circles/podkring2';
-    await createPodCircle(anna, { groupId: 'podkring2', groupPodUri: podUriHttps });
-    const read2 = await loadCircleStoragePod({ callSkill: cs, circleId: 'podkring2' });
-    const inv2 = await buildCircleInviteUri({
-      callSkill: cs, circleId: 'podkring2', adminPeerAddr: anna.pubKey,
-      podBacked: true, podUrl: read2?.groupPodUri ?? null,
-    });
-    const st2 = initialState();
-    decodeInvite(inv2.uri, st2);
-    console.log('[walk] decoded2 =', JSON.stringify(st2.invite));
+      const { storage, invite } = await inviteAsShellsBuildIt(anna, 'tlskring');
+      expect(storage).toEqual({ pod: 'shared', groupPodUri: TLS_POD });
+      // The disclosure AND the place both survive the wire (both were silently dropped by the URI
+      // encoder until 2026-07-28 — the object-path tests passed while the real pasted invite did not).
+      expect(invite.podBacked).toBe(true);
+      expect(invite.podUrl).toBe(TLS_POD);
 
-    const cp = createConnectionPoints({});
-    console.log('[walk] record http =', JSON.stringify(recordJoinedCirclePoints({ store: cp, invite: st.invite, circleId: 'podkring' })));
-    console.log('[walk] record https =', JSON.stringify(recordJoinedCirclePoints({ store: cp, invite: st2.invite, circleId: 'podkring2' })));
-    console.log('[walk] points =', JSON.stringify(cp.list()));
-    await teardown(anna);
-    expect(true).toBe(true);
-  }, 60000);
+      // A REAL join over the real peer bridge.
+      const joined = await joinCircleFromInvite({
+        inviteUri: invite,
+        callSkill: (app, op, args) => bo.agent.callSkill(app, op, args),
+        sendPeerRedeem: bo.sendPeerRedeem,
+        handle: 'bobbie',
+      });
+      expect(joined).toMatchObject({ ok: true, circleId: 'tlskring' });
+
+      // Rule 1, on Bo's device: the joined circle's points come from what the invite carried.
+      const points = createConnectionPoints({});
+      expect(recordJoinedCirclePoints({ store: points, invite, circleId: 'tlskring' }).recorded)
+        .toEqual(['pod']);
+      // …and the list shows the POD — not a relay url, not nothing. This is J-NP1's actual claim.
+      expect(points.list()).toEqual([expect.objectContaining({
+        url: TLS_POD, kind: 'pod', source: 'join', circles: ['tlskring'],
+        adopted: true,
+        // A pod has no socket, so it is never "active" — the renderers show a pod line instead of
+        // active/standby. Claiming a pod was standby would be the same lie in the other direction.
+        active: false,
+      })]);
+    } finally {
+      await teardown(anna, bo);
+    }
+  }, 60_000);
+
+  it('DEFECT — against the real (http) local pod the point silently never lands', async () => {
+    const anna = await bootRealAgentNode('anna-http');
+    try {
+      await createPodCircle(anna, { groupId: 'podkring', groupPodUri: LIVE_POD });
+      const { storage, invite } = await inviteAsShellsBuildIt(anna, 'podkring');
+
+      // stoop stored the http pod url happily — `_validateStoragePolicy` only requires a non-empty
+      // string, so the circle IS pod-backed and the app believes it.
+      expect(storage).toEqual({ pod: 'shared', groupPodUri: LIVE_POD });
+
+      // WRONG, pinned as-is: `buildCircleInviteUri` gates `podUrl` on /^https:\/\// and drops it, while
+      // keeping `podBacked: true`. The joiner is told a pod host can see them and is NOT told which pod.
+      expect(invite.podBacked).toBe(true);
+      expect(invite.podUrl).toBeUndefined();
+
+      // …so rule 1 records NOTHING, and it does so silently (`recordJoinedCirclePoints` is best-effort
+      // by design). The pod is invisible in the list, which is exactly the failure J-NP1 exists to
+      // catch: "if I remove this, what breaks?" is unanswerable for the circles with no relay to
+      // point at. Note the asymmetry — a RELAY point accepts plaintext ws://, a pod does not.
+      const points = createConnectionPoints({});
+      expect(recordJoinedCirclePoints({ store: points, invite, circleId: 'podkring' }).recorded)
+        .toEqual([]);
+      expect(points.list()).toEqual([]);
+    } finally {
+      await teardown(anna);
+    }
+  }, 60_000);
+});
+
+// ── J-NP2 — the admin is asleep: a NOTICE, not a failure verdict ────────────────────────────────────
+
+describe('J-NP2 — no admin online is a notice, and the invite survives it', () => {
+  it('a redeem that reaches nobody is typed admin-unreachable, and the SAME invite works later', async () => {
+    const anna = await bootRealAgentNode('anna');
+    // A short redeem budget: this journey is about the shape of the failure, not about waiting for it.
+    const bo = await bootRealAgentNode('bo', { redeemTimeoutMs: 1500 });
+    try {
+      await connectAgentsOverBus(anna, bo);
+      await createPodCircle(anna, { groupId: 'nachtkring', groupPodUri: TLS_POD });
+      const { invite } = await inviteAsShellsBuildIt(anna, 'nachtkring');
+      const boCallSkill = (app, op, args) => bo.agent.callSkill(app, op, args);
+
+      // 3am: Anna's phone is off.
+      await goOffline(anna);
+      const asleep = await joinCircleFromInvite({
+        inviteUri: invite, callSkill: boCallSkill, sendPeerRedeem: bo.sendPeerRedeem, handle: 'bobbie',
+      });
+      // The distinction that matters: not "join-failed", not "invalid-or-expired-code".
+      expect(asleep).toMatchObject({
+        reason: 'admin-unreachable',
+        errorKey: 'circle.nearbyScreen.join_no_admin',
+      });
+
+      // …and the invitation stays valid: the same code, redeemed once Anna is back.
+      await goOnline(anna, { announceTo: bo });
+      const awake = await joinCircleFromInvite({
+        inviteUri: invite, callSkill: boCallSkill, sendPeerRedeem: bo.sendPeerRedeem, handle: 'bobbie',
+      });
+      expect(awake).toMatchObject({ ok: true, circleId: 'nachtkring' });
+    } finally {
+      await teardown(anna, bo);
+    }
+  }, 60_000);
+
+  it('DEFECT — the notice exists in the state and NO shell renders it', async () => {
+    const anna = await bootRealAgentNode('anna');
+    try {
+      await createPodCircle(anna, { groupId: 'stillekring', groupPodUri: TLS_POD });
+      const { invite } = await inviteAsShellsBuildIt(anna, 'stillekring');
+
+      // Drive `joinGroupState.finalSubmit` exactly as both wizards do, with a peer redeem that reaches
+      // nobody (the throw an offline admin produces).
+      const state = initialState();
+      decodeInvite(invite, state);
+      state.handle = 'bobbie';
+      const { result, state: after } = await finalSubmit({
+        state,
+        callSkill: async (app, op) => (op === 'setMyHandle'
+          ? { ok: true }
+          : (op === 'redeemMembershipCode' ? { error: 'invalid-or-expired-code' } : {})),
+        sendPeerRedeem: async () => { throw new Error('offline'); },
+      });
+      expect(result).toBeUndefined();
+      expect(after.submitErrorReason).toBe('admin-unreachable');
+      expect(after.submitErrorKey).toBe('circle.nearbyScreen.join_no_admin');
+
+      // WRONG, pinned as-is. `submitError` is the ONLY field either join wizard renders
+      // (`joinGroupWizard.js` "if (state.submitError)"; `joinGroupWizardModal.js`
+      // "<ErrorBanner message={state.submitError} />", which returns null on a falsy message), and the
+      // admin-unreachable branch deliberately does not set it. `submitErrorKey` and `handleRejected`
+      // have ZERO consumers anywhere in either shell. So on screen this journey is a wizard that
+      // re-renders with nothing on it — the failure J-NP2 was written to catch, one layer above where
+      // the typed reason was added. The same silence swallows the handle-taken prompt.
+      expect(after.submitError).toBeNull();
+    } finally {
+      await teardown(anna);
+    }
+  }, 60_000);
+});
+
+// ── J-NP3 — the disclosure, before the decision ─────────────────────────────────────────────────────
+
+describe('J-NP3 — the pod-host disclosure reaches the JOINER before they redeem', () => {
+  it('podBacked is on the decoded invite before any skill call happens', async () => {
+    const anna = await bootRealAgentNode('anna');
+    try {
+      await createPodCircle(anna, { groupId: 'openkring', groupPodUri: TLS_POD });
+      const { invite } = await inviteAsShellsBuildIt(anna, 'openkring');
+
+      // The sequence property, stated where it is actually decided: decoding is what the join wizard
+      // does on mount, and the wizard's step 1 (Rules) renders the disclosure off `state.invite
+      // .podBacked` — three steps before `finalSubmit` runs. So a joiner who reads it and stops has
+      // committed nothing. A true statement shown after the decision would not be a disclosure.
+      const state = initialState();
+      decodeInvite(invite, state);
+      expect(state.invite.podBacked).toBe(true);
+      expect(state.step).toBe(1);          // …and the joiner is on Rules, where the line renders
+
+      // The commitment is the redeem, and it happens only inside `finalSubmit` — which the wizards
+      // reach from step 3. Nothing was asked of the substrate to LEARN the disclosure.
+      const calls = [];
+      await joinCircleFromInvite({
+        inviteUri: invite,
+        callSkill: async (app, op) => { calls.push(op); return op === 'setMyHandle' ? { ok: true } : {}; },
+        handle: 'bobbie',
+      });
+      expect(calls).toContain('redeemMembershipCode');
+    } finally {
+      await teardown(anna);
+    }
+  }, 60_000);
+
+  it('the connection-point row keeps the same fact visible — the store hands the renderer kind:pod', () => {
+    // Both renderers (`web/v2/circleConnectionPoints.js`, `CircleLauncherScreen`) key the
+    // point_pod_host_sees line off `point.kind === 'pod'`, so this is the input that decides it.
+    const points = createConnectionPoints({});
+    points.addPodPoint(TLS_POD, 'openkring');
+    expect(points.list()[0].kind).toBe('pod');
+  });
+});
+
+// ── J-NP6 — removing the pod point cuts a pod-only circle off ───────────────────────────────────────
+
+describe('J-NP6 — a pod-only circle reads as CUT OFF, not merely inconvenienced', () => {
+  it('the impact report names this circle, and does not claim a socket was dropped', () => {
+    const points = createConnectionPoints({ activeUrl: 'wss://relay.example:8787' });
+    points.addFromJoin('wss://relay.example:8787', 'relaykring');
+    points.addPodPoint(TLS_POD, 'podonly');
+
+    const impact = points.impactOfRemoving(TLS_POD);
+    expect(impact.losesReachability).toEqual(['podonly']);   // no relay to fall back to
+    expect(impact.stillReachable).toEqual([]);
+    // A pod is never the ACTIVE point (no socket), so the "you are dropping your live connection"
+    // line must not fire here — that would be a second, untrue alarm on top of a true one.
+    expect(impact.wasActive).toBe(false);
+
+    // The other circle is untouched by the removal — the report is per-circle, not per-device.
+    expect(points.impactOfRemoving('wss://relay.example:8787')).toMatchObject({
+      losesReachability: ['relaykring'], wasActive: true,
+    });
+  });
+
+  it('DEFECT — walked against the real http pod there is nothing to remove at all', () => {
+    // The J-NP1 defect makes J-NP6 unreachable on the live pod: no point was ever recorded, so the
+    // impact report cannot warn about a circle it has never heard of. It answers `known:false` —
+    // indistinguishable, from the outside, from a circle that is fine.
+    const points = createConnectionPoints({});
+    recordJoinedCirclePoints({ store: points, invite: { podBacked: true }, circleId: 'podkring' });
+    expect(points.impactOfRemoving(LIVE_POD)).toMatchObject({ known: false, losesReachability: [] });
+  });
+});
+
+// ── Two things found while walking ──────────────────────────────────────────────────────────────────
+
+describe('found while walking the pod journeys', () => {
+  it('DEFECT — the circle-settings pod axis reports ok:true in basis and changes nothing', async () => {
+    const anna = await bootRealAgentNode('anna');
+    try {
+      const callSkill = (app, op, args) => anna.agent.callSkill(app, op, args);
+      const state = createGroupInitialState();
+      state.groupId = 'plainkring'; state.name = 'plainkring'; state.purpose = 'no pod at create';
+      await createGroupFinalSubmit({ state, callSkill });
+
+      // The settings-screen path: make an existing circle pod-backed.
+      const pushed = await pushCircleStoragePolicy({
+        callSkill, circleId: 'plainkring', pod: 'shared', groupPodUri: TLS_POD,
+      });
+      expect(pushed).toMatchObject({ ok: true, storage: { policy: 'centralised', groupPodUri: TLS_POD } });
+
+      // WRONG, pinned as-is. `stoop.setCircleStoragePolicy` writes through
+      // `bundle?.podRouting?.setCirclePolicy?.()`, and basis never wires a `podRouting` (it is a
+      // tasks-v0 / tasks-mobile concept). The optional chaining swallows the missing writer, the skill
+      // returns success, and `getCircleStoragePolicy` falls back to the group-rules item — which was
+      // written at CREATE and never updated. So the only way a basis circle becomes pod-backed is to
+      // be created that way; the settings toggle is a no-op that reports success.
+      expect(await loadCircleStoragePod({ callSkill, circleId: 'plainkring' }))
+        .toEqual({ pod: 'none', groupPodUri: null });
+    } finally {
+      await teardown(anna);
+    }
+  }, 60_000);
+
+  it('DEFECT — a pod point counts as "mapped to another relay" and suppresses address registration', async () => {
+    // `circleMappedAnywhere` does not filter by kind, so recording a circle's POD makes the scoping
+    // rule believe the circle rides some OTHER relay, and it is skipped even on the default relay.
+    // Nothing takes over: a pod is not a transport, and no code registers per-circle addresses on one.
+    // So J-NP1 succeeding is what stops a pod-only circle's per-circle address from being registered
+    // anywhere — the pass and the regression come from the same line.
+    const points = createConnectionPoints({});
+    points.addPodPoint(TLS_POD, 'podonly');
+
+    const added = [];
+    const transport = {
+      supportsAliases: true,
+      addAddress: async (a) => { added.push(a); return { ok: true }; },
+    };
+    const circlesForPoint = (url) => points.circlesFor(url);
+    circlesForPoint.pointsFor = (cid) => points.pointsFor(cid);   // the reverse view both shells pass
+
+    const out = await registerCircleAddresses({
+      transport,
+      relayUrl: 'wss://default.example:8787',
+      defaultRelayUrl: 'wss://default.example:8787',
+      circleIds: ['podonly'],
+      circleAddressFor: () => 'addr-podonly',
+      circlesForPoint,
+    });
+    expect(out.skippedOffRelay).toEqual(['podonly']);
+    expect(added).toEqual([]);
+  });
 });

@@ -222,7 +222,10 @@ export default function JoinGroupWizardModal({
                     ]}
                   />
                 ) : null}
-                <ErrorBanner message={state.submitError} />
+                {/* A typed failure carries a locale KEY; an untyped one a raw substrate string. Rendering
+                    only the second meant the two failures that bothered to type themselves — the admin
+                    being offline, and a handle already taken — showed nothing at all (J-NP2, 2026-07-30). */}
+                <ErrorBanner message={state.submitErrorKey ? t(state.submitErrorKey) : state.submitError} />
                 <Submitting visible={state.submitting} label={t('circle.join.wizard.submitting')} />
               </Body>
             )}

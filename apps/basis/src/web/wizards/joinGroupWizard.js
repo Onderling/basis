@@ -497,10 +497,16 @@ function renderHandleStep(container, doc, state, onSubmit, onBack, onCancel, rer
     wrap.appendChild(offeringsHint);
   }
 
-  if (state.submitError) {
+  // A typed failure carries a locale KEY (`submitErrorKey`); an untyped one carries a raw substrate
+  // string (`submitError`). Only the second was ever rendered, so the two failures that bothered to type
+  // themselves — the admin being offline, and a handle already taken — showed the joiner NOTHING: a blank
+  // re-render, indistinguishable from the button not working. Found walking J-NP2 (2026-07-30), one layer
+  // above where the machine-readable half was fixed the same day.
+  const failure = state.submitErrorKey ? t(state.submitErrorKey) : state.submitError;
+  if (failure) {
     const err = doc.createElement('div');
     err.className = 'cc-wizard-error';
-    err.textContent = state.submitError;
+    err.textContent = failure;
     wrap.appendChild(err);
   }
 

@@ -193,16 +193,48 @@ export function makeReceiptSender({ getSettings, sendTo, logger = console } = {}
  * Validation first (`receiveReceipt`: rebuilt, `from` off the wire), then advance to `stored` — the map's
  * own monotonic rule handles ordering.
  *
+ * ── Why the id must already be known (S6 · J-A5, 2026-07-29) ─────────────────────────────────────────
+ * `receiveReceipt` takes the sender off the wire, which stops a payload naming someone else. That is only
+ * half the job: the sender was then **discarded**, and the receipt applied whatever it named. So anyone
+ * able to send this device a peer message could mark any message id `stored` — and an id that did not
+ * exist was created, which is attacker-controlled growth in a map that nothing bounds.
+ *
+ * The gate is the map's own key set. Every message this device SENDS is marked `pending` before the
+ * fan-out starts, so the keys are exactly "messages I sent". A receipt for anything else — a message
+ * somebody else sent, or one that never existed — is now refused rather than believed. That is the whole
+ * of what a receipt is for: advancing my own send.
+ *
+ * What this does NOT close, stated plainly: a genuine recipient of my message can still send its receipt
+ * early, so `stored` can be claimed before it is true by someone who really is in the circle. Closing
+ * that needs the per-message recipient set, which this module does not hold — hence `isRecipient`, an
+ * optional host-injected predicate. Absent, the check degrades to the id gate above rather than to
+ * nothing, and never to refusing honest receipts.
+ *
  * ⚠️ **Group semantics, stated rather than hidden:** the δ.2 map is per-MESSAGE, so in a circle of five,
  * `stored` means *at least one member's app stored it*. That is honest for a pairwise chat and an
  * approximation for a group; per-recipient states are a refinement recorded in DECISIONS-FOR-REVIEW, not
  * quietly implied by the label.
  *
+ * @param {object} payload           the inbound wire payload
+ * @param {string|null} fromAddress  the sender, off the wire — never from the payload
+ * @param {{get:Function, set:Function}} deliveryMap
+ * @param {{ isRecipient?: (from: string|null, msgId: string) => boolean }} [opts]
  * @returns {boolean} whether a valid receipt was applied
  */
-export function applyReceipt(payload, fromAddress, deliveryMap) {
+export function applyReceipt(payload, fromAddress, deliveryMap, { isRecipient = null } = {}) {
   const receipt = receiveReceipt(payload, fromAddress);
   if (!receipt || typeof deliveryMap?.set !== 'function') return false;
+  // A receipt may only advance a message THIS device sent. `get` returns null/undefined for an id the
+  // map never had; both mean the same thing here.
+  if (typeof deliveryMap.get !== 'function') return false;
+  const known = deliveryMap.get(receipt.messageId);
+  if (known === null || known === undefined) return false;
+  // …and, where the host can tell us, only from someone the message actually went to.
+  if (typeof isRecipient === 'function') {
+    let ok = false;
+    try { ok = isRecipient(receipt.from, receipt.messageId) === true; } catch { ok = false; }
+    if (!ok) return false;
+  }
   deliveryMap.set(receipt.messageId, DELIVERY.STORED);
   return true;
 }

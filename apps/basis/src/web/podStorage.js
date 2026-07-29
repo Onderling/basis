@@ -173,8 +173,12 @@ function parseStorageFromJsonLd(body, webid) {
  * @param {string} peerAddr
  * @returns {Promise<{ ok: boolean, url: string, status: number }>}
  */
-export async function publishPeerAddr(podWriter, peerAddr) {
+export async function publishPeerAddr(podWriter, peerAddr, { allowed = true } = {}) {
   if (!podWriter?.write) throw new TypeError('publishPeerAddr: podWriter required');
+  // "Never share my global address": refuse rather than write. The pod copy is the longest-lived and
+  // most public one — it sits at a stable URL for anyone who knows the WebID — so the lock has to hold
+  // HERE, not only at the call site. Reported, never thrown: refusing is the setting working.
+  if (allowed === false) return { ok: false, url: null, status: 0, refused: 'address-sharing-off' };
   if (typeof peerAddr !== 'string' || peerAddr === '') {
     throw new TypeError('publishPeerAddr: peerAddr required');
   }

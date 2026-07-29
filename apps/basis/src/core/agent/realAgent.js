@@ -27,6 +27,7 @@ import {
   Agent, AgentIdentity, Bootstrap, InternalBus, InternalTransport, DataPart, TokenRegistry,
   PolicyEngine, TrustRegistry, deriveCircleAddress, signCircleLinkFromSeed,
 } from '@onderling/core';
+import { shareableAddress } from '../../v2/addressSharing.js';
 import { VaultMemory, VaultLocalStorage } from '@onderling/vault';
 import { wireSkill } from '@onderling/sdk';
 import { createSecureMeshAgent } from '@onderling/secure-agent';
@@ -1687,7 +1688,10 @@ export async function createRealHouseholdAgent(opts = {}) {
         // address into the card so the scanner can DM straight back
         // (no pod lookup needed).  The stoop substrate has no NKN
         // identity of its own; only the chat-layer secure-agent does.
-        const myPeerAddr = sa?.peer?.address ?? null;
+        // …gated by the user's publication lock: a contact card is the single most travelled copy of
+        // this address, so "never share my global address" has to hold here first. Off ⇒ the card simply
+        // carries no peerAddr and the scanner reaches them by the other rungs.
+        const myPeerAddr = shareableAddress(sa?.peer?.address ?? null, opts.shareNknAddress);
         if (myPeerAddr) realArgs = { ...realArgs, peerAddr: myPeerAddr };
         if (typeof console !== 'undefined') {
           console.log('[realAgent] getContactShareQr inject peerAddr=' + (myPeerAddr ? myPeerAddr.slice(0,16)+'…' : 'NONE'));

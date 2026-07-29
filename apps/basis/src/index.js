@@ -274,6 +274,10 @@ export {
   localStorageRetentionIo, asyncStorageRetentionIo,
 } from './v2/retentionPref.js';
 export { bindCircleAddressKeys, forgetCircleAddressKeys } from './v2/circleAddressKeys.js';
+export {
+  DEFAULT_SHARE_NKN_ADDRESS, normalizeShareNknAddress, shareableAddress,
+  localStorageAddressSharingIo, asyncStorageAddressSharingIo,
+} from './v2/addressSharing.js';
 export { registerCircleAddresses, unregisterCircleAddresses }
                                                 from './v2/circleAddressRegistration.js';
 export {

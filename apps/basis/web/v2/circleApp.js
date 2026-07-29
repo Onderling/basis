@@ -67,6 +67,9 @@ import {
 } from '../../src/v2/retentionPref.js';
 import { registerCircleAddresses, unregisterCircleAddresses } from '../../src/v2/circleAddressRegistration.js';
 import { forgetCircleAddressKeys } from '../../src/v2/circleAddressKeys.js';
+// "Never share my global address" (Frits, 2026-07-29) — a per-user PUBLICATION lock, distinct from the
+// routing fallback: a global address seen in two contexts collapses two personas into one person.
+import { shareableAddress, localStorageAddressSharingIo } from '../../src/v2/addressSharing.js';
 import {
   createConnectionPoints, adoptExistingRelay, localStorageConnectionPointsIo, recordJoinedCirclePoints,
 } from '../../src/v2/connectionPoints.js';
@@ -843,6 +846,12 @@ const recipeStore = createKringRecipeStore({ io: localStorageRecipeIo(), version
 // P1.7 — the viewer's per-circle chat filter (device-local; nothing is fanned — a filter that told the
 // circle what you skip would be a new leak).
 const chatFilterIo = localStorageChatFilterIo();
+const addressSharingIo = localStorageAddressSharingIo();
+/** This device's global address, or null when the user refuses to publish it. Read per call. */
+const myShareableNknAddr = () => shareableAddress(
+  circleHouseholdAgent?.peer?.address ?? null,
+  () => addressSharingIo.load(),
+);
 
 // Which actors are AGENTS, for the filter's people/agents axis. Read off the Contacten roster the app
 // already keeps (bots are flagged there), refreshed opportunistically; an actor we cannot resolve counts
@@ -3902,7 +3911,9 @@ async function showCircleInvite(circleId) {
   const adminPeerAddr = circleHouseholdAgent?.householdSelfAddr ?? null;
   // B2 — the admin's NKN native address (distinct from the pubKey), so a pure-NKN
   // joiner can route the redeem handshake. Best-effort: null when NKN isn't up.
-  const adminNknAddr = circleHouseholdAgent?.peer?.address ?? null;
+  // …gated: with sharing off the invite simply carries no NKN address, and a joiner falls back to the
+  // relay endpoint. An invite is one of the places the address would otherwise travel furthest.
+  const adminNknAddr = myShareableNknAddr();
   // embed the circle's freedom template in the invite so the joiner can review its
   // opt-outable capabilities at join (see circleConsent.js). Best-effort: a missing policy just omits it.
   let invitePolicy = {};

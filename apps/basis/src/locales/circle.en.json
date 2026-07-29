@@ -4091,6 +4091,18 @@
     "address_sharing_toggle_off": {
       "text": "Share my address again",
       "doc": "J-CS8 — button when the lock is on."
+    },
+    "notif_privacy": {
+      "text": "To wake your phone, the relay you are connected to keeps one wake-token for this device. That lets it see that your circles belong to one device — so that relay can tell they are yours.",
+      "doc": "J-CS10 — the trade, stated where it is made. One device gets one push token from the OS, registered under each of its per-circle addresses; grouping by token groups the circles."
+    },
+    "notif_privacy_not": {
+      "text": "It still cannot read anything: no messages, no circle names, no member list.",
+      "doc": "J-CS10 — what is NOT learned. A bare \"affects your privacy\" invites imagining something worse than the truth."
+    },
+    "notif_privacy_escape": {
+      "text": "If that matters to you: run your own relay, or spread your circles across different relays — a relay only ever sees the circles that ride it.",
+      "doc": "J-CS10 — name the escape rather than leaving a dead end (the companion node; relay diversity)."
     }
   },
   "admin": {

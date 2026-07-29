@@ -349,6 +349,18 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
           {!push.supported ? t('circle.mydata.notif_unsupported')
             : push.granted ? t('circle.mydata.notif_on') : t('circle.mydata.notif_off')}
         </Text>
+        {/* J-CS10 — the trade is made by turning this ON, so it is stated HERE, above the button, in
+            both states: someone reviewing their settings should be able to see what having it on means.
+            Three lines on purpose — the cost, what is still not learned (a bare "affects your privacy"
+            invites imagining worse than the truth), and the escape. Deliberately not framed as a
+            warning: most people should turn notifications on. → docs/decisions.md 2026-07-29 */}
+        {push.supported ? (
+          <>
+            <Text style={styles.privacyBody} testID="mydata-notif-privacy">{t('circle.mydata.notif_privacy')}</Text>
+            <Text style={styles.privacyBody}>{t('circle.mydata.notif_privacy_not')}</Text>
+            <Text style={styles.privacyBody}>{t('circle.mydata.notif_privacy_escape')}</Text>
+          </>
+        ) : null}
         {push.supported ? (
           <Pressable style={styles.action} onPress={toggleNativePush} testID="mydata-notif-toggle">
             <Text style={styles.actionLabel}>{push.granted ? t('circle.mydata.notif_disable') : t('circle.mydata.notif_enable')}</Text>

@@ -4091,6 +4091,18 @@
     "address_sharing_toggle_off": {
       "text": "Mijn adres weer delen",
       "doc": "J-CS8 — button when the lock is on."
+    },
+    "notif_privacy": {
+      "text": "Om je telefoon te wekken bewaart de relay waarmee je verbonden bent één wek-token voor dit apparaat. Daardoor kan die relay zien dat jouw kringen bij één apparaat horen — dus dat ze van jou zijn.",
+      "doc": "J-CS10 — the trade, stated where it is made."
+    },
+    "notif_privacy_not": {
+      "text": "Lezen kan hij nog steeds niet: geen berichten, geen kringnamen, geen ledenlijst.",
+      "doc": "J-CS10 — what is NOT learned."
+    },
+    "notif_privacy_escape": {
+      "text": "Vind je dat bezwaarlijk: draai je eigen relay, of verdeel je kringen over verschillende relays — een relay ziet alleen de kringen die erop draaien.",
+      "doc": "J-CS10 — name the escape rather than leaving a dead end."
     }
   },
   "admin": {

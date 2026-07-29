@@ -183,6 +183,17 @@ export function renderCircleMyData(container, {
       : n.subscribed ? tr('circle.mydata.notif_on') : tr('circle.mydata.notif_off');
     notif.appendChild(sub);
     if (n.supported) {
+      // J-CS10 — the trade is made by turning this ON, so it is stated HERE, above the button, in both
+      // states: someone reviewing their settings should see what having it on means. Three lines on
+      // purpose — the cost, what is still NOT learned (a bare "affects your privacy" invites imagining
+      // worse than the truth), and the escape. Not framed as a warning: most people should turn
+      // notifications on, they should just know what they are agreeing to. → docs/decisions.md 2026-07-29
+      for (const key of ['notif_privacy', 'notif_privacy_not', 'notif_privacy_escape']) {
+        const line = document.createElement('p');
+        line.className = `cc-mydata__notif-privacy cc-mydata__${key.replace(/_/g, '-')}`;
+        line.textContent = tr(`circle.mydata.${key}`);
+        notif.appendChild(line);
+      }
       const toggle = document.createElement('button');
       toggle.type = 'button';
       toggle.className = 'cc-mydata__action cc-mydata__notif-toggle';

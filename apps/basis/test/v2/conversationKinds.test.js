@@ -144,16 +144,11 @@ describe('features.chat is a VIEW of the kinds list (decision 3, 2026-07-29)', (
     expect(p.features.chat).toBe(true);
   });
 
-  it('THE MIGRATION CASE — a circle with neither field keeps its stored flag', () => {
-    // Every circle created before this decision has no `kind` and no list, and the permissive default
-    // contains chat. Deriving unconditionally would have turned chat back ON for every buurt whose admin
-    // had turned it off — silently, and against an explicit choice. Where there is nothing to derive
-    // from, the stored flag is the only record of what someone decided.
-    const p = withDerivedChatFeature({ features: { chat: false } });
-    expect(p.features.chat).toBe(false);
-  });
-
-  it('…and a circle with neither field and chat ON also keeps it', () => {
+  it('a circle with neither field resolves to the permissive default, stored flag or not', () => {
+    // No backwards-compatibility requirement (Frits, 2026-07-29), so there is no pre-decision circle
+    // whose stored flag must be honoured — the list is simply the answer, and an absent list means the
+    // default one. Both directions, so the flag is demonstrably not consulted.
+    expect(withDerivedChatFeature({ features: { chat: false } }).features.chat).toBe(true);
     expect(withDerivedChatFeature({ features: { chat: true } }).features.chat).toBe(true);
   });
 

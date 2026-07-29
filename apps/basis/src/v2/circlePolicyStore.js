@@ -29,10 +29,9 @@ export function createCirclePolicyStore({ load, save, versions } = {}) {
     async get(circleId) {
       let raw = null;
       try { raw = load ? await load(circleId) : null; } catch { raw = null; }
-      // Decision 3 (2026-07-29) — `features.chat` is a VIEW of `conversationKinds`, not a second place
-      // to store the same fact. Derived on read rather than migrated on write: an existing circle's
-      // stored flag may disagree with its list, and believing the list is honest where silently editing
-      // what an admin saved is not. `update` still merges the raw patch, so nothing is lost.
+      // Decision 3 (2026-07-29) — `features.chat` is a VIEW of `conversationKinds`, not a second place to
+      // store the same fact. Derived on read rather than rewritten on save, so there is one place that
+      // decides it; `update` still merges the raw patch, so nothing is lost.
       return withDerivedChatFeature(normalizeCirclePolicy(raw));
     },
     async update(circleId, patch) {

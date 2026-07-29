@@ -100,12 +100,13 @@ describe('persistence — wizard policy reaches the circle store (E8 link)', () 
   }
 
   it('a created buurt persists policy.features.chat === false', async () => {
-    const state = setKind(initialState(), 'buurt');     // template → chat:false
+    const state = setKind(initialState(), 'buurt');     // template → no chat in the conversation
     const store = createCirclePolicyStore(localStoragePolicyIo(memStorage()));
-    // Mirror the wizard's persist patch.
-    await store.update('buurt-westend', {
-      features: state.features, revealPolicy: state.revealPolicy, pod: state.pod,
-    });
+    // Send the patch the wizard actually sends. This used to hand-copy three fields, which is how it
+    // drifted: when `policyPatchFromState` gained `kind` and `conversationKinds` (decision 3) the copy
+    // silently kept testing the old shape, and `features.chat` — now derived from the kinds list — had
+    // nothing to derive from.
+    await store.update('buurt-westend', policyPatchFromState(state));
     const policy = await store.get('buurt-westend');
     expect(isFeatureEnabled(policy, 'chat')).toBe(false);
     expect(isFeatureEnabled(policy, 'noticeboard')).toBe(true);

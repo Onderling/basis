@@ -150,13 +150,10 @@ export function withDerivedChatFeature(policy) {
   const p = policy && typeof policy === 'object' ? policy : {};
   const list = Array.isArray(p.conversationKinds) ? p.conversationKinds : null;
   const kind = typeof p.kind === 'string' && p.kind ? p.kind : null;
-  // Nothing to derive FROM ⇒ leave the stored flag alone.
-  //
-  // This is not a detail. Every circle created before decision 3 has neither field, and the permissive
-  // default list contains `chat-message` — so deriving unconditionally would have quietly turned chat
-  // back ON for every buurt whose admin had turned it off. "The list wins" is only honest when there is
-  // a list; where there is none, the stored flag IS the only record of what someone chose.
-  if (!list && !kind) return p;
+  // Derived unconditionally: with no backwards-compatibility requirement (Frits, 2026-07-29) there is no
+  // pre-decision circle whose stored flag has to be honoured, so the list is simply the answer. A circle
+  // with neither field resolves to the permissive default, which includes chat — coherent, since that is
+  // exactly what its conversation shows.
   const chat = chatIsInConversation({ circleSetting: list, templateKind: kind });
   return { ...p, features: { ...(p.features && typeof p.features === 'object' ? p.features : {}), chat } };
 }

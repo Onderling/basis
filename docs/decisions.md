@@ -755,3 +755,38 @@ sealed data. Accepted, because pre-launch is exactly when that is cheap.
 **The no-backwards-compatibility licence is dated: it expires 2026-07-31**, after which breaking a
 persisted or wire format needs an explicit decision again. A standing "compat doesn't matter" would
 quietly outlive the condition that made it true.
+
+## The push-token concession: its escape is the companion, and the UI owes the user the trade (2026-07-29)
+
+Per-circle addressing registers several addresses on one socket, so a relay has no addressing reason to
+think they are one person. Push notifications reintroduce exactly that: a device gets **one** push token
+from the OS, and waking it for any of those addresses means registering the same token under each
+(`PushTokenRegistry` is keyed by address; the relay writes one row per address the socket owns). Group by
+token and the circles fall out as one device — one person.
+
+You cannot fragment a push token, so this is not an implementation gap to close later:
+
+> **G13 cannot deliver unlinkability against a relay you are connected to, while push notifications are
+> enabled on that device.**
+
+**The escape is the companion node, not a cleverer protocol.** The concession is *"the relay you chose can
+correlate your circles"* — so the answer is that the relay is **yours**: a user-hostable node
+(`plans/NOTE-companion-node.md`) makes the one party who can correlate the same party who already knows
+everything. That is a hosting decision, not a cryptographic one, and it is why self-hosting sits in the
+promise as the real answer rather than as a footnote. Relay diversity (2026-07-28) is the weaker version
+available to someone who does not self-host: split circles across relays and no single one sees two.
+
+**What the UI owes the user.** Because the trade is *made by turning notifications on*, it has to be
+visible where that choice is made — on mobile, where push actually exists:
+
+- enabling notifications is the moment the relay gains the ability to link that device's circles, and the
+  surface must say so, in the same breath as the benefit, the way the address-fallback offer states its
+  cost;
+- it must not be buried in a privacy page the user reaches later, and it must not be framed as a warning
+  that discourages a normal choice — most people should probably turn notifications on;
+- it must say what is NOT learned (no content, no circle names, no roster), because a bare "this affects
+  your privacy" invites people to imagine something worse than the truth;
+- and it should name the escape rather than leaving a dead end: a relay you host yourself, or circles
+  spread across relays.
+
+A privacy property the user cannot see themselves trading away is not a property they can act on.

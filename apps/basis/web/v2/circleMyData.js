@@ -34,6 +34,10 @@ export function renderCircleMyData(container, {
   // `onSetRetention(days)` = the pick. Absent ⇒ the section is omitted (unchanged surface).
   retentionDays = null,
   onSetRetention = null,
+  // "Never share my global address" — the strictest privacy position in the product. `shareNknAddress`
+  // is the current value; absent ⇒ the section is omitted (unchanged surface).
+  shareNknAddress = null,
+  onSetShareAddress = null,
   surfacePref,            // S6.C — current 'inline' | 'screen' | 'chat'
   chatAi,                 // S6.D — { enriched, reason } for the active circle (shown under "chat")
   onSetSurfacePref,       // (value) => void
@@ -233,6 +237,36 @@ export function renderCircleMyData(container, {
       : 'circle.nearbyScreen.delivery_fallback_toggle_off');
     fallbackBtn.addEventListener('click', () => onSetDelivery({ allowFallback: !delivery.allowFallback }));
     sec.appendChild(fallbackBtn);
+
+    container.appendChild(sec);
+  }
+
+  // ── my global address (2026-07-29) ─────────────────────────────────────────
+  // Placed with delivery rather than alone: it is the same family of question — how much does the
+  // network learn in exchange for reaching you. The cost rides WITH the option, as it does there.
+  if (typeof onSetShareAddress === 'function' && shareNknAddress != null) {
+    const sec = section(tr('circle.mydata.address_sharing'));
+
+    const line = document.createElement('p');
+    line.className = 'cc-mydata__address-sharing';
+    line.textContent = tr(shareNknAddress
+      ? 'circle.mydata.address_sharing_on'
+      : 'circle.mydata.address_sharing_off');
+    sec.appendChild(line);
+
+    const cost = document.createElement('p');
+    cost.className = 'cc-mydata__address-sharing-cost';
+    cost.textContent = tr('circle.mydata.address_sharing_cost');
+    sec.appendChild(cost);
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cc-mydata__action cc-mydata__address-sharing-toggle';
+    btn.textContent = tr(shareNknAddress
+      ? 'circle.mydata.address_sharing_toggle_on'
+      : 'circle.mydata.address_sharing_toggle_off');
+    btn.addEventListener('click', () => onSetShareAddress(!shareNknAddress));
+    sec.appendChild(btn);
 
     container.appendChild(sec);
   }

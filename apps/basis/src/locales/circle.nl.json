@@ -4067,6 +4067,30 @@
     "retention_note": {
       "text": "Oudere berichten verdwijnen van dit apparaat. Besluiten en meldingen worden niet gewist — die vouwen samen tot een samenvatting die zegt om hoeveel het gaat.",
       "doc": "P1 §4 — what actually happens; the audit trail compacts rather than disappearing, so \"removed\" alone would be untrue."
+    },
+    "address_sharing": {
+      "text": "Jouw adres op het netwerk",
+      "doc": "J-CS8 — heading of the global-address publication lock."
+    },
+    "address_sharing_on": {
+      "text": "Je adres mag gedeeld worden, zodat mensen je direct kunnen bereiken.",
+      "doc": "J-CS8 — state line, sharing allowed."
+    },
+    "address_sharing_off": {
+      "text": "Je adres wordt nooit gedeeld. Niemand kan je via het netwerk bereiken.",
+      "doc": "J-CS8 — state line, lock on; says the consequence in the same breath."
+    },
+    "address_sharing_cost": {
+      "text": "Eén adres voor alles is precies wat je kringen aan één persoon koppelt. Delen maakt je bereikbaar; niet delen betekent geen directe berichten, geen uitnodigingen via scannen, en geen kring die op het netwerk draait.",
+      "doc": "J-CS9 — the cost, stated with the option rather than after it."
+    },
+    "address_sharing_toggle_on": {
+      "text": "Mijn adres niet meer delen",
+      "doc": "J-CS8 — button when sharing is on."
+    },
+    "address_sharing_toggle_off": {
+      "text": "Mijn adres weer delen",
+      "doc": "J-CS8 — button when the lock is on."
     }
   },
   "admin": {

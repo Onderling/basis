@@ -44,6 +44,8 @@ import {
   chatRows, actionsForStreamRow, resolveConversationKinds,
   // P1.7 — the viewer's conversation filter (kinds × people/agents), shared model, device-local store.
   applyChatFilter, chatFilterChips, normalizeChatFilter, asyncStorageChatFilterIo,
+  // "Never share my global address" — the publication lock (web parity).
+  shareableAddress, asyncStorageAddressSharingIo,
   deliveryPresentation,
   // Taken (tasks) tab — task-store item → stream-row projection (shared web≡mobile).
   buildTaskRows,
@@ -1312,6 +1314,11 @@ export default function CircleLauncherScreen({
   // endpoint decision — a pasted invite has no deep-link context to learn the relay from). Every read is
   // best-effort: a failure omits the field, never blocks the invite. (`offeringsMatching` stays a listed
   // web-only exception — the board-8 admin draft lives in web localStorage.)
+  // The publication lock, read at invite-build time so a flip takes effect without a remount.
+  const addressSharingIo = useMemo(() => asyncStorageAddressSharingIo(AsyncStorage), []);
+  const [shareNknAddress, setShareNknAddress] = useState(true);
+  useEffect(() => { addressSharingIo.load().then(setShareNknAddress).catch(() => {}); }, [addressSharingIo]);
+
   const openCircleInvite = useCallback(async (circleId) => {
     let r;
     try {
@@ -1331,14 +1338,16 @@ export default function CircleLauncherScreen({
       r = await buildCircleInviteUri({
         callSkill: bundle?.callSkill, circleId,
         adminPeerAddr: bundle?.agent?.householdSelfAddr ?? null,
-        adminNknAddr:  bundle?.agent?.peer?.address ?? null,
+        // Gated by the publication lock (J-CS8): with sharing off the invite carries no NKN address.
+        // A lock that held only on web would invite trust on the wrong device.
+        adminNknAddr:  shareableAddress(bundle?.agent?.peer?.address ?? null, shareNknAddress),
         capabilities: pol.capabilities, apps: pol.apps,
         podBacked, podUrl: podBacked ? (storage?.groupPodUri ?? null) : null,
         relayUrl,
       });
     } catch { r = { error: 'failed' }; }
     setInviteFor({ circleId, ...(r || {}) });
-  }, [bundle, policyStore]);
+  }, [bundle, policyStore, shareNknAddress]);
 
   if (view === 'screens') {
     // α.3 — Screens primary tab.  Two sub-modes: 'picker' (CRUD list)

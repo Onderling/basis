@@ -658,19 +658,19 @@ export async function createSecureAgent(opts = {}) {
    * a structured `{ held:true, ... }` result (never throws) so the send path
    * can surface "held" to the app instead of an error.
    */
-  function enqueueHold(addr, payload, sendOpts) {
+  function enqueueHold(addr, payload, sendOpts, reason = 'unreachable') {
     const msgId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;
     let q = pendingHold.get(addr);
     if (!q) { q = new Map(); pendingHold.set(addr, q); }
     const key = holdKeyFor(payload);
     if (q.has(key)) {
-      return { held: true, delivered: false, deduped: true, msgId, pending: q.size };
+      return { held: true, delivered: false, deduped: true, msgId, pending: q.size, reason };
     }
     q.set(key, { payload, opts: sendOpts, ts: Date.now() });
     if (typeof console !== 'undefined') {
       console.info(`[secure-agent] peer ${String(addr).slice(0, 16)}… unreachable — holding message (${q.size} queued)`);
     }
-    return { held: true, delivered: false, deduped: false, msgId, pending: q.size };
+    return { held: true, delivered: false, deduped: false, msgId, pending: q.size, reason };
   }
 
   /**
@@ -1282,7 +1282,13 @@ export async function createSecureAgent(opts = {}) {
     //      error after failover → hold rather than propagate. An application
     //      refusal (muted / not permitted) still throws — a resend can't fix it.
     if (wantsHold(opts)) {
-      if (!(await hasLiveRoute(addr, opts?.scope ?? null))) return enqueueHold(addr, payload, opts);
+      if (!(await hasLiveRoute(addr, opts?.scope ?? null))) {
+        // WHY we are holding matters to the caller. "No route this circle may use" is a different fact
+        // from "this peer is offline": the first is a standing property of the connection that will not
+        // fix itself, and the product owes the user an explanation rather than silent holding.
+        const scopedOut = !!opts?.scope && !(await hasLiveRoute(addr));
+        return enqueueHold(addr, payload, opts, scopedOut ? 'no-eligible-route' : 'unreachable');
+      }
       try {
         const result = await _sendWithHandshakeRetry(addr, payload, opts);
         const msgId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;

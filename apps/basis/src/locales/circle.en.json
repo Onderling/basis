@@ -4067,6 +4067,30 @@
     "retention_note": {
       "text": "Older messages are removed from this device. Decisions and reports are not deleted — they collapse into a summary that says how many they cover.",
       "doc": "P1 §4 — what actually happens; the audit trail compacts rather than disappearing, so \"removed\" alone would be untrue."
+    },
+    "address_sharing": {
+      "text": "Your address on the mesh",
+      "doc": "J-CS8 — heading of the global-address publication lock."
+    },
+    "address_sharing_on": {
+      "text": "Your address can be shared, so people can reach you directly.",
+      "doc": "J-CS8 — state line, sharing allowed."
+    },
+    "address_sharing_off": {
+      "text": "Your address is never shared. Nobody can reach you over the mesh.",
+      "doc": "J-CS8 — state line, lock on; says the consequence in the same breath."
+    },
+    "address_sharing_cost": {
+      "text": "One address across everything is what links your circles to one person. Sharing it makes you reachable; not sharing it means no direct messages, no invitations by scan, and no circle that runs on the mesh.",
+      "doc": "J-CS9 — the cost, stated with the option rather than after it."
+    },
+    "address_sharing_toggle_on": {
+      "text": "Stop sharing my address",
+      "doc": "J-CS8 — button when sharing is on."
+    },
+    "address_sharing_toggle_off": {
+      "text": "Share my address again",
+      "doc": "J-CS8 — button when the lock is on."
     }
   },
   "admin": {

@@ -3796,6 +3796,8 @@ async function showMyData() {
     },
     // P1 §4 tail — the retention choice takes effect NOW (setRetention prunes immediately), so a
     // shortened window is visible in the conversation the user is looking at, not after a reload.
+    shareNknAddress: addressSharingIo.load(),
+    onSetShareAddress: (allowed) => { addressSharingIo.save(allowed); rerender(); },
     retentionDays: normalizeRetentionDays(retentionIo.load()),
     onSetRetention: (days) => {
       retentionIo.save(days);

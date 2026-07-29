@@ -573,6 +573,13 @@ async function _fanOutViaReliableSend({
       // that explicitly reports neither is the only genuine transient failure.
       if (r && r.held === false && r.delivered === false) errors.push({ webid, reason: 'not-delivered' });
       else sent += 1;
+      // Held because this circle has NO route it may use (its points cannot carry per-circle addressing
+      // and the user has not accepted the fallback) — a standing fact, not a peer being briefly offline.
+      // Report it as BLOCKED so it reaches the same offer the other blocked case does: holding silently
+      // is indistinguishable from the app being broken, which is the failure we keep designing against.
+      if (r?.held && r.reason === 'no-eligible-route') {
+        _reportAddressFallback({ circleId, webid, via: 'blocked-by-transport', blocked: true });
+      }
     } catch (err) {
       errors.push({ webid, reason: String(err?.message ?? err) });
     }

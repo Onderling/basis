@@ -24,6 +24,9 @@ import {
 import {
   RETENTION_CHOICES_DAYS, normalizeRetentionDays, retentionFromDays, asyncStorageRetentionIo,
 } from '../../../../basis/src/v2/retentionPref.js';
+// "Never share my global address" (J-CS8) — the strictest privacy position in the product: one address
+// across everything is what links a person's circles together.
+import { asyncStorageAddressSharingIo } from '../../../../basis/src/v2/addressSharing.js';
 import UserLlmSettings from './UserLlmSettings.js';
 import EncryptedBackupWizardModal from '../../../../basis/src/rn/wizards/encryptedBackupWizardModal.js';
 import RestoreFromMnemonicWizardModal from '../../../../basis/src/rn/wizards/restoreFromMnemonicWizardModal.js';
@@ -103,6 +106,15 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
 
   // P1 §4 tail — the retention choice, applied LIVE (setRetention prunes at once) so a shortened
   // window shows immediately rather than after a restart.
+  const addressSharingIo = React.useMemo(() => asyncStorageAddressSharingIo(AsyncStorage), []);
+  const [shareNknAddress, setShareNknAddress] = useState(null);
+  useEffect(() => { addressSharingIo.load().then(setShareNknAddress).catch(() => {}); }, [addressSharingIo]);
+  const toggleShareAddress = useCallback(async () => {
+    const next = !(shareNknAddress !== false);
+    setShareNknAddress(next);
+    addressSharingIo.save(next).catch(() => {});
+  }, [addressSharingIo, shareNknAddress]);
+
   const retentionIo = React.useMemo(() => asyncStorageRetentionIo(AsyncStorage), []);
   const [retentionDays, setRetentionDays] = useState(null);
   useEffect(() => { retentionIo.load().then(setRetentionDays).catch(() => {}); }, [retentionIo]);
@@ -292,6 +304,21 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
           <Text style={styles.actionMutedLabel}>{t('circle.mydata.restore')}</Text>
         </Pressable>
       </Section>
+
+      {/* J-CS8 — the global-address publication lock, with its cost stated alongside (web parity). */}
+      {shareNknAddress != null ? (
+        <Section title={t('circle.mydata.address_sharing')}>
+          <Text style={styles.privacyBody}>
+            {t(shareNknAddress ? 'circle.mydata.address_sharing_on' : 'circle.mydata.address_sharing_off')}
+          </Text>
+          <Text style={styles.privacyBody}>{t('circle.mydata.address_sharing_cost')}</Text>
+          <Pressable onPress={toggleShareAddress} accessibilityRole="button" style={styles.action} testID="address-sharing-toggle">
+            <Text style={styles.actionLabel}>
+              {t(shareNknAddress ? 'circle.mydata.address_sharing_toggle_on' : 'circle.mydata.address_sharing_toggle_off')}
+            </Text>
+          </Pressable>
+        </Section>
+      ) : null}
 
       {/* P1 §4 tail — ONE retention control (the chat window), web parity. The note says what happens to
           decisions/reports: they COMPACT into a counted summary, so "removed" alone would be untrue. */}

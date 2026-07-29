@@ -22,7 +22,7 @@ export { OFFERING_AXES };
 // pre-fills the policy axes (features / revealPolicy / pod / llmTool /
 // agents / consensusRequired) with the matching template's defaults
 // for any axis the user hasn't already overridden.
-import { applyTemplate, KRING_KINDS, SIZE_BANDS, recommendChat } from '../../v2/kringTemplates.js';
+import { applyTemplate, markAxisTouched, KRING_KINDS, SIZE_BANDS, recommendChat } from '../../v2/kringTemplates.js';
 import { ROLE_TEMPLATE_IDS, applyRoleTemplates } from '../../v2/roleTemplates.js';
 export { KRING_KINDS, SIZE_BANDS, ROLE_TEMPLATE_IDS };
 
@@ -131,11 +131,13 @@ export function setSize(state, size) {
  */
 export function setChatEnabled(state, on) {
   const s = state && typeof state === 'object' ? state : {};
-  return {
+  // `chatUserSet` is kept for the advice logic that already reads it; `markAxisTouched` is what a kind
+  // switch consults (decision 4). Both say the same thing about the same axis.
+  return markAxisTouched({
     ...s,
     features:    { ...(s.features && typeof s.features === 'object' ? s.features : {}), chat: !!on },
     chatUserSet: true,
-  };
+  }, 'features.chat');
 }
 
 /**

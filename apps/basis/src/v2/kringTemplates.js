@@ -156,25 +156,62 @@ export function defaultsForKind(kind) {
 export function applyTemplate(state, kind) {
   const s = state && typeof state === 'object' ? state : {};
   const t = defaultsForKind(kind);
+  // PROVENANCE (decision 4, 2026-07-29). The rule used to be "keep anything already set", which cannot
+  // tell *the user chose this* from *the previous template chose this*. Since the first template fills
+  // every axis, a kind switch could never move anything: picking buurt and then switching to
+  // vriendenkring changed the label and nothing else — ten axes kept buurt's values, and the wizard's own
+  // promise (a template is a starting point, not a track) was true only for the first pick.
+  //
+  // So the question is now "did the USER set this", answered by `touched`. Everything they never touched
+  // re-fills from the new template; everything they did survives, exactly as before.
+  const touched = s.touchedAxes instanceof Set ? s.touchedAxes
+    : new Set(Array.isArray(s.touchedAxes) ? s.touchedAxes : []);
+  // `chatUserSet` predates this and means the same thing for one axis — honour it so an in-flight state
+  // (or an older caller) does not lose a deliberate chat choice.
+  if (s.chatUserSet === true) touched.add('features.chat');
+  const kept = (axis, current, fallback) => (touched.has(axis) && current !== undefined ? current : fallback);
+  const userFeatures = {};
+  for (const [k, v] of Object.entries(s.features && typeof s.features === 'object' ? s.features : {})) {
+    if (touched.has(`features.${k}`)) userFeatures[k] = v;
+  }
   return {
     ...s,
     kind,
-    // Template features first, state features overlay → user wins per key.
-    features:          { ...t.features, ...(s.features && typeof s.features === 'object' ? s.features : {}) },
-    revealPolicy:      s.revealPolicy      !== undefined ? s.revealPolicy      : t.revealPolicy,
-    pod:               s.pod               !== undefined ? s.pod               : t.pod,
-    llmTool:           s.llmTool           !== undefined ? s.llmTool           : t.llmTool,
-    agents:            s.agents            !== undefined ? s.agents            : t.agents,
-    consensusRequired: s.consensusRequired !== undefined ? s.consensusRequired : t.consensusRequired,
+    // Template features first, then ONLY the ones the user actually toggled.
+    features:          { ...t.features, ...userFeatures },
+    revealPolicy:      kept('revealPolicy', s.revealPolicy, t.revealPolicy),
+    pod:               kept('pod', s.pod, t.pod),
+    llmTool:           kept('llmTool', s.llmTool, t.llmTool),
+    agents:            kept('agents', s.agents, t.agents),
+    consensusRequired: kept('consensusRequired', s.consensusRequired, t.consensusRequired),
     // Conversation kinds (2026-07-28) — what this circle's conversation will SHOW. One more item on the
     // menukaart, same rule as the rest: the template pre-fills, the user's explicit choice survives a
     // kind switch. The default lives in `conversationKinds.js` (TEMPLATE_CONVERSATION_KINDS), keyed by
     // kind, so this only resolves it when the user has not chosen. `null` means "the permissive default,
     // whatever the registry says by then" — deliberately not a frozen copy of today's list.
-    conversationKinds: s.conversationKinds !== undefined
-      ? s.conversationKinds
-      : (TEMPLATE_CONVERSATION_KINDS[kind] ?? null),
+    conversationKinds: kept('conversationKinds', s.conversationKinds, TEMPLATE_CONVERSATION_KINDS[kind] ?? null),
+    // Carried through so the next switch can still tell the two apart.
+    touchedAxes: [...touched],
   };
+}
+
+/**
+ * Mark an axis as the USER's choice, so a later kind switch leaves it alone.
+ *
+ * Axis names are the state's own keys (`revealPolicy`, `llmTool`, …) with features addressed as
+ * `features.<name>`. A setter that forgets to call this is not a crash — it just means a template switch
+ * may overwrite that choice, which is why the wizard's setters call it rather than the shells.
+ *
+ * @param {object} state
+ * @param {string} axis
+ * @returns {object}
+ */
+export function markAxisTouched(state, axis) {
+  const s = state && typeof state === 'object' ? state : {};
+  if (typeof axis !== 'string' || !axis) return s;
+  const next = new Set(Array.isArray(s.touchedAxes) ? s.touchedAxes : []);
+  next.add(axis);
+  return { ...s, touchedAxes: [...next] };
 }
 
 /* ─── N1 — size-driven chat advice ─────────────────────────────── */

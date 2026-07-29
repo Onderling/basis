@@ -7,7 +7,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { ENTRY_KINDS, LANE } from '@onderling/item-store';
-import { KRING_KINDS, applyTemplate } from '../../src/v2/kringTemplates.js';
+import { KRING_KINDS, applyTemplate, markAxisTouched } from '../../src/v2/kringTemplates.js';
 import {
   defaultConversationKinds, availableConversationKinds, TEMPLATE_CONVERSATION_KINDS,
   resolveConversationKinds, setConversationKind,
@@ -114,17 +114,20 @@ describe('the wizard axis (J-CW1/J-CW2)', () => {
   it('J-CW1: an explicit choice SURVIVES a kind switch', () => {
     // The menukaart rule: presets pre-fill, the user wins per key. A template switch overwriting a
     // deliberate choice is the failure that makes people distrust every default in the wizard.
+    // Since decision 4 (2026-07-29) "the user chose it" is recorded rather than inferred from the value
+    // being set — setting the field alone no longer claims a person did it.
     let st = applyTemplate({}, 'buurt');
-    st = applyTemplate({ ...st, conversationKinds: ['chat-message'] }, 'vriendenkring');
+    st = applyTemplate(markAxisTouched({ ...st, conversationKinds: ['chat-message'] }, 'conversationKinds'), 'vriendenkring');
     expect(st.conversationKinds).toEqual(['chat-message']);
   });
 
-  it('an untouched axis DOES follow the new kind', () => {
-    let st = applyTemplate({}, 'household');       // null (permissive)
+  it('an untouched axis DOES follow the new kind — which it now genuinely does', () => {
+    // This test's NAME and its body used to disagree: it asserted that household's `null` survived a
+    // switch to buurt, i.e. that the axis did NOT follow. That was the old no-op semantics, and the
+    // mismatch between the two was the smell. Under provenance the name is true.
+    let st = applyTemplate({}, 'household');       // null (the living default)
     st = applyTemplate(st, 'buurt');
-    // household filled it with null; null is a VALUE here (the living default), so it survives — matching
-    // the documented switch-kind semantics: the second template is a no-op for axes the first filled.
-    expect(st.conversationKinds).toBeNull();
+    expect(st.conversationKinds).toEqual(['vraag', 'aanbod', 'task', 'leen']);
   });
 });
 

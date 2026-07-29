@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  KRING_TEMPLATES, KRING_KINDS, defaultsForKind, applyTemplate, unknownKeysFor,
+  KRING_TEMPLATES, KRING_KINDS, defaultsForKind, applyTemplate, markAxisTouched, unknownKeysFor,
 } from '../../src/v2/kringTemplates.js';
 import { CIRCLE_FEATURES, CIRCLE_POLICY_ENUMS } from '../../src/v2/circlePolicy.js';
 
@@ -77,53 +77,61 @@ describe('applyTemplate — empty state', () => {
   });
 });
 
-describe('applyTemplate — user overrides win', () => {
-  it('keeps a user-toggled feature (chat:false) when picking household', () => {
-    const next = applyTemplate({ features: { chat: false } }, 'household');
-    // chat is user-set false → preserved
+describe('applyTemplate — the USER\'s choices win, and only theirs (decision 4, 2026-07-29)', () => {
+  // The rule used to be "keep anything already set", which cannot tell *the user chose this* from *the
+  // previous template chose this*. Since the first template fills every axis, a kind switch could never
+  // move anything — the wizard's promise that a template is a starting point was true only for the first
+  // pick. Provenance (`touchedAxes`) is now what decides. Setting a field without marking it touched is
+  // no longer a claim that a person chose it.
+
+  it('keeps a feature the user actually toggled', () => {
+    const next = applyTemplate(markAxisTouched({ features: { chat: false } }, 'features.chat'), 'household');
     expect(next.features.chat).toBe(false);
-    // other features fill from the template
+    // …and the rest still fills from the template
     expect(next.features.noticeboard).toBe(true);
     expect(next.features.tasks).toBe(true);
   });
 
-  it('keeps user revealPolicy when picking household', () => {
-    const next = applyTemplate({ revealPolicy: 'pairwise' }, 'household');
-    // household's template default is 'open' but the user picked 'pairwise'.
+  it('keeps a user-set revealPolicy / pod / llmTool / agents / consensusRequired', () => {
+    let s = { revealPolicy: 'pairwise', pod: 'none', llmTool: 'cloud', agents: 'no', consensusRequired: true };
+    for (const axis of ['revealPolicy', 'pod', 'llmTool', 'agents', 'consensusRequired']) s = markAxisTouched(s, axis);
+    const next = applyTemplate(s, 'household');
     expect(next.revealPolicy).toBe('pairwise');
-  });
-
-  it('keeps user pod / llmTool / agents / consensusRequired', () => {
-    const next = applyTemplate(
-      { pod: 'none', llmTool: 'cloud', agents: 'no', consensusRequired: true },
-      'household',
-    );
     expect(next.pod).toBe('none');
     expect(next.llmTool).toBe('cloud');
     expect(next.agents).toBe('no');
     expect(next.consensusRequired).toBe(true);
-    // features still come from the household template
-    expect(next.features.houseRules).toBe(true);
+    expect(next.features.houseRules).toBe(true);       // untouched features still come from the template
   });
 
-  it('switching kinds is a no-op for axes the first kind filled', () => {
-    // Pick household first, then switch to buurt.
+  it('THE CHANGE — switching kinds now re-fills the axes only a template had set', () => {
     const afterHousehold = applyTemplate({}, 'household');
     const afterBuurt     = applyTemplate(afterHousehold, 'buurt');
-    // kind reflects the latest pick
+    const freshBuurt     = applyTemplate({}, 'buurt');
+
     expect(afterBuurt.kind).toBe('buurt');
-    // axes from the first template are preserved (design call: never
-    // overwrite a value the user already has — even by virtue of an
-    // earlier template).
-    expect(afterBuurt.revealPolicy).toBe(afterHousehold.revealPolicy);
-    expect(afterBuurt.pod).toBe(afterHousehold.pod);
-    expect(afterBuurt.llmTool).toBe(afterHousehold.llmTool);
-    expect(afterBuurt.agents).toBe(afterHousehold.agents);
-    expect(afterBuurt.consensusRequired).toBe(afterHousehold.consensusRequired);
-    // features map likewise stays — household had all 8 on, switching
-    // to buurt (whose template has lists/calendar/notes off) keeps
-    // them on because the user/state already had them on.
-    expect(afterBuurt.features).toEqual(afterHousehold.features);
+    // Nobody touched anything, so switching gives you the buurt you asked for — not a household wearing
+    // a buurt label, which is what the old rule produced.
+    for (const axis of ['revealPolicy', 'pod', 'llmTool', 'agents', 'consensusRequired']) {
+      expect(afterBuurt[axis], `${axis} did not follow the new kind`).toEqual(freshBuurt[axis]);
+    }
+    expect(afterBuurt.features).toEqual(freshBuurt.features);
+  });
+
+  it('…while a choice made along the way still survives the switch', () => {
+    const buurt   = applyTemplate({}, 'buurt');
+    const chosen  = markAxisTouched({ ...buurt, features: { ...buurt.features, chat: true } }, 'features.chat');
+    const swapped = applyTemplate(chosen, 'vriendenkring');
+    expect(swapped.features.chat).toBe(true);
+    // and everything she never touched now matches a fresh vriendenkring
+    const fresh = applyTemplate({}, 'vriendenkring');
+    expect(swapped.revealPolicy).toBe(fresh.revealPolicy);
+    expect(swapped.features.tasks).toBe(fresh.features.tasks);
+  });
+
+  it('`chatUserSet` is honoured as provenance for its one axis, so older state does not lose a choice', () => {
+    const next = applyTemplate({ features: { chat: false }, chatUserSet: true }, 'household');
+    expect(next.features.chat).toBe(false);
   });
 });
 

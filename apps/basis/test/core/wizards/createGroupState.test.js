@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  initialState, setKind, KRING_KINDS,
+  initialState, setKind, setChatEnabled, KRING_KINDS,
 } from '../../../src/core/wizards/createGroupState.js';
 import { KRING_TEMPLATES } from '../../../src/v2/kringTemplates.js';
 
@@ -68,49 +68,39 @@ describe('setKind — fills policy axes from the template', () => {
   });
 });
 
-describe('setKind — preserves explicit user choices', () => {
+describe('setKind — the USER\'s choices survive; a previous template\'s do not (decision 4, 2026-07-29)', () => {
+  // See kringTemplates.js: the merge now keys on provenance rather than on "is it already set", so a
+  // kind switch gives you the kind you asked for instead of the first one wearing a new label.
+
   it('a feature the user toggled before picking is not clobbered', () => {
-    const s0 = { ...initialState(), features: { chat: false } };
+    const s0 = setChatEnabled({ ...initialState(), features: {} }, false);   // an explicit choice
     const s1 = setKind(s0, 'household');
-    // user-toggled chat:false survives
     expect(s1.features.chat).toBe(false);
-    // other features still fill from the template
     expect(s1.features.noticeboard).toBe(true);
     expect(s1.features.tasks).toBe(true);
   });
 
-  it('a user-set revealPolicy / pod / llmTool / agents survives a kind pick', () => {
-    const s0 = {
-      ...initialState(),
-      revealPolicy: 'pairwise',
-      pod:          'none',
-      llmTool:      'cloud',
-      agents:       'no',
-      consensusRequired: true,
-    };
-    const s1 = setKind(s0, 'household');
-    // template defaults differ; user values win on every axis.
-    expect(s1.revealPolicy).toBe('pairwise');
-    expect(s1.pod).toBe('none');
-    expect(s1.llmTool).toBe('cloud');
-    expect(s1.agents).toBe('no');
-    expect(s1.consensusRequired).toBe(true);
-  });
-
-  it('switching kinds is a no-op for axes the previous pick already filled', () => {
-    // Design call (kringTemplates.js header): never overwrite a value
-    // already on the state, even one supplied by a previous template.
+  it('THE CHANGE — switching kinds re-fills every axis the user never touched', () => {
     const s1 = setKind(initialState(), 'household');
     const s2 = setKind(s1, 'buurt');
+    const fresh = setKind(initialState(), 'buurt');
     expect(s2.kind).toBe('buurt');
-    // axes from household preserved
-    expect(s2.revealPolicy).toBe(s1.revealPolicy);
-    expect(s2.pod).toBe(s1.pod);
-    expect(s2.llmTool).toBe(s1.llmTool);
-    expect(s2.agents).toBe(s1.agents);
-    expect(s2.consensusRequired).toBe(s1.consensusRequired);
-    // features map likewise preserved
-    expect(s2.features).toEqual(s1.features);
+    for (const axis of ['revealPolicy', 'pod', 'llmTool', 'agents', 'consensusRequired']) {
+      expect(s2[axis], `${axis} kept the household value`).toEqual(fresh[axis]);
+    }
+    expect(s2.features).toEqual(fresh.features);
+  });
+
+  it('…and a choice made along the way still survives it', () => {
+    const buurt = setKind(initialState(), 'buurt');
+    const chose = setChatEnabled(buurt, true);
+    const swapped = setKind(chose, 'vriendenkring');
+    expect(swapped.features.chat).toBe(true);
+    // everything else now matches a fresh vriendenkring — the J-CW1 walk, as a test
+    const fresh = setKind(initialState(), 'vriendenkring');
+    expect(swapped.revealPolicy).toBe(fresh.revealPolicy);
+    expect(swapped.features.tasks).toBe(fresh.features.tasks);
+    expect(swapped.features.houseRules).toBe(fresh.features.houseRules);
   });
 });
 

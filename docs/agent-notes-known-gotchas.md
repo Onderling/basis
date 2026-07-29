@@ -334,3 +334,27 @@ Real incident (2026-07-28): `buildCircleInviteUri` put `podBacked`/`podUrl` on t
 so the fields never rode a real `stoop-invite://` URI. Tests that pass the invite as an OBJECT bypass the
 encoder (decodeInvite has an object fast-path) and stay green while the real QR/paste flow drops the field.
 When adding an invite field: add it to BOTH, and pin it with a round-trip test through the ENCODED URI.
+
+## `uiautomator dump` tears down the React Native dev-client (device walks)
+
+Driving the app over adb with `uiautomator dump` to read the screen **intermittently destroys and recreates
+the RN context**: the dump launcher raises an accessibility event, and the log shows
+`AppContext was destroyed` → `AppContext was initialized` a moment later. Any open modal is gone, and the
+app lands back on its default tab.
+
+It presents as "the app randomly dismissed my wizard halfway through", which sends you hunting for a
+backdrop-tap or a stray BACK/ESC keyevent. (Both of *those* also dismiss a modal, so it is easy to convince
+yourself you found it.) What pins it: an idle control run with no dumps and no edits — 90 seconds, zero
+reloads — versus a reload arriving within a second of each dump. Look for
+`Calling main entry com.android.commands.uiautomator.Launcher` immediately before the teardown.
+
+Consequences for anything multi-step on a dev-client build:
+
+- Read the screen **once**, then drive the whole sequence from that one dump's coordinates. Dumping between
+  every tap is what makes it flaky.
+- Don't use `input keyevent 4` (BACK) or `111` (ESC) to dismiss a keyboard inside a modal — both close the
+  modal itself.
+- **Editing any source file mid-walk also reloads the app** (Metro fast refresh), losing the state you were
+  mid-journey in. Walk first, fix afterwards.
+- When the logic under test lives in shared `src/` — which, per invariant 1, is most of it — driving it
+  headlessly is both faster and a permanent regression test. Save the device for what only a device shows.

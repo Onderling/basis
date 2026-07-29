@@ -382,6 +382,10 @@
       "text": "Friends",
       "doc": "β.3 — launcher section header for kind='vriendenkring' circles."
     },
+    "team": {
+      "text": "Team",
+      "doc": "The circle kind for work-style groups (KRING_KINDS includes `team`; the label was missing, so the wizard showed the raw key `circle.kind.team`). Found on device 2026-07-29, S3/J-CW2."
+    },
     "other": {
       "text": "Other",
       "doc": "β.3 — launcher section header for circles whose kind isn't household/buurt/vriendenkring."

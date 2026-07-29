@@ -16,6 +16,18 @@ import { POINT_SOURCE_LABELS }    from '../../src/v2/connectionPoints.js';
 import {
   NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, NEARBY_INVITE_LABELS,
 } from '../../src/v2/nearbyScreen.js';
+import { KRING_KINDS }           from '../../src/v2/kringTemplates.js';
+
+/**
+ * Vocabularies whose label keys are built by INTERPOLATION (`circle.kind.${k}`) rather than declared in
+ * a map. Nothing had been checking these, and it showed: `KRING_KINDS` gained `team` while the locale did
+ * not, so the create wizard offered a fourth circle kind labelled `circle.kind.team` — the raw key, on
+ * screen, in both languages. Found by walking S3 on a device (2026-07-29), which is far too late for a
+ * missing string. An id list plus a key pattern is a label map with the checking filed off.
+ */
+const DERIVED = {
+  'KRING_KINDS → circle.kind.*': { ids: KRING_KINDS, key: (id) => `circle.kind.${id}` },
+};
 
 const MAPS = {
   DELIVERY_LABELS,
@@ -42,6 +54,13 @@ for (const lang of ['en', 'nl']) {
     const bundle = JSON.parse(readFileSync(
       new URL(`../../src/locales/circle.${lang}.json`, import.meta.url), 'utf8',
     ));
+
+    for (const [name, { ids, key }] of Object.entries(DERIVED)) {
+      it(`${name} — every id has a label`, () => {
+        const missing = ids.filter((id) => !lookup(bundle, key(id))).map((id) => key(id));
+        expect(missing, `${name}: these ${lang} keys would render as raw keys on screen`).toEqual([]);
+      });
+    }
 
     for (const [name, map] of Object.entries(MAPS)) {
       it(`${name} — every key exists and is non-empty`, () => {

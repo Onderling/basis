@@ -382,6 +382,10 @@
       "text": "Vriendenkring",
       "doc": "β.3 — launcher section header for kind='vriendenkring' circles."
     },
+    "team": {
+      "text": "Team",
+      "doc": "The circle kind for work-style groups (see the en doc)."
+    },
     "other": {
       "text": "Overig",
       "doc": "β.3 — launcher section header for circles whose kind isn't household/buurt/vriendenkring."

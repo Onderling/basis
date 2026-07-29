@@ -612,6 +612,8 @@ export function initialState() {
     // localisable key the shell renders via t() (invariant #8), null = no i18n key.
     handleRejected:   false,
     submitErrorKey:   null,
+    /** Machine-readable failure reason — see the catch in `finalSubmit` for why both exist. */
+    submitErrorReason: null,
     // Wave B — reveal-state default (C7 · §1.6). `revealPreset` = the chosen
     // in-circle disclosure level (handle|profile|full), starting at the personal
     // default; `personalRevealDefault` = your usual level (loaded, overridable);
@@ -671,16 +673,31 @@ export async function finalSubmit({
     // Handle-uniqueness rejection (Decision C): surface it as a localisable prompt to
     // pick another handle, and keep the joiner on the handle step. Any other error is
     // reported verbatim (raw substrate string) as before.
+    //
+    // `submitErrorReason` is the MACHINE-readable half, and it is why this block changed (2026-07-30).
+    // The typed reason exists right here — the throw sites mint `admin-unreachable` and `handle-taken`
+    // deliberately — and it used to be spent entirely on choosing a locale key. A programmatic caller
+    // (`joinCircleFromInvite`) reads `submitError`, which these branches never set, so every typed failure
+    // reached it as a bare `join-failed`. That made "this invite expired" indistinguishable from "the admin
+    // is offline" — a distinction that matters to the person joining, and one that made the invite-expiry
+    // bug found the same week harder to diagnose than it needed to be.
     if (err?.reason === 'handle-taken' || /handle-taken/.test(String(err?.message ?? ''))) {
       state.handleRejected = true;
       state.submitErrorKey = 'circle.errors.invalid_handle.handle-taken';
+      state.submitErrorReason = 'handle-taken';
       state.step = 3;
     } else if (err?.reason === 'admin-unreachable') {
       // J-NP2 — a notice, not a failure verdict: no admin was online, the invitation stays valid, try
       // again later. The state keeps the decoded invite, so retrying is the same wizard, same step.
       state.submitErrorKey = 'circle.nearbyScreen.join_no_admin';
+      state.submitErrorReason = 'admin-unreachable';
     } else {
       state.submitError = err?.message ?? String(err);
+      // An expired or rotated-away code arrives as the substrate's own string. Naming it here means a
+      // caller can act on it — "ask for a fresh invite" is a different instruction from "try again later".
+      state.submitErrorReason = /invalid-or-expired-code/.test(String(err?.message ?? ''))
+        ? 'invalid-or-expired-code'
+        : 'join-failed';
     }
     state.submitting = false;
     return { state };

@@ -121,3 +121,57 @@ describe('the join dials before it redeems', () => {
     expect(trace.filter((t) => t.startsWith('dial:'))).toEqual([]);
   });
 });
+
+describe('a failed join says WHY, not just that it failed', () => {
+  // Until 2026-07-30 every typed failure reached a programmatic caller as a bare `join-failed`. The typed
+  // reason existed at the throw site and was spent entirely on choosing a locale key, while
+  // `joinCircleFromInvite` read a field those branches never set. So "this invite has expired — ask for a
+  // fresh one" and "the admin is offline — try again later" were the same string, and they call for
+  // opposite actions from the person joining.
+  const INV = { kind: 'membershipCode', groupId: 'buurttest', code: 'abc-123', relayUrl: RELAY, adminPeerAddr: 'admin-key' };
+
+  it('an EXPIRED code is reported as expired', async () => {
+    const callSkill = async (app, op) => {
+      if (op === 'setMyHandle') return { ok: true };
+      if (op === 'redeemMembershipCode') return { error: 'invalid-or-expired-code' };
+      return {};
+    };
+    // No peer fallback available, so the local refusal is the answer.
+    const r = await joinCircleFromInvite({ inviteUri: INV, callSkill, handle: 'bo' });
+    expect(r.reason).toBe('invalid-or-expired-code');
+    expect(r.error).toMatch(/invalid-or-expired-code/);
+  });
+
+  it('an OFFLINE admin is reported as unreachable, and is not confused with an expired invite', async () => {
+    const callSkill = async (app, op) => {
+      if (op === 'setMyHandle') return { ok: true };
+      // The local instance does not hold the code, so the chain falls back to the admin…
+      if (op === 'redeemMembershipCode') return { error: 'invalid-or-expired-code' };
+      return {};
+    };
+    // …and the admin cannot be reached.
+    const sendPeerRedeem = async () => { throw new Error('peer did not respond with HI'); };
+    const r = await joinCircleFromInvite({ inviteUri: INV, callSkill, sendPeerRedeem, handle: 'bo' });
+
+    expect(r.reason, 'an offline admin still reads as a bad invite').toBe('admin-unreachable');
+    // …and it carries the locale key that says the invitation is still valid, so the UI can say "later".
+    expect(r.errorKey).toBe('circle.nearbyScreen.join_no_admin');
+  });
+
+  it('the two are distinguishable, which is the whole point', async () => {
+    const expired = async (app, op) => (op === 'setMyHandle' ? { ok: true } : { error: 'invalid-or-expired-code' });
+    const a = await joinCircleFromInvite({ inviteUri: INV, callSkill: expired, handle: 'bo' });
+    const b = await joinCircleFromInvite({
+      inviteUri: INV, callSkill: expired, handle: 'bo',
+      sendPeerRedeem: async () => { throw new Error('offline'); },
+    });
+    expect(a.reason).not.toBe(b.reason);
+  });
+
+  it('a success carries no reason at all — this is not a new field on the happy path', async () => {
+    const ok = async (app, op) => (op === 'redeemMembershipCode' ? { ok: true, groupId: 'buurttest' } : { ok: true });
+    const r = await joinCircleFromInvite({ inviteUri: INV, callSkill: ok, handle: 'bo' });
+    expect(r).toMatchObject({ ok: true, circleId: 'buurttest' });
+    expect(r.reason).toBeUndefined();
+  });
+});

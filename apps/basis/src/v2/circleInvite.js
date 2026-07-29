@@ -137,6 +137,15 @@ export async function joinCircleFromInvite({
   const { result, state: out } = await finalSubmit({
     state, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink, dialEndpoint, activeEndpointUrl,
   });
-  if (!result) return { error: out?.submitError || 'join-failed' };
+  if (!result) {
+    // Carry the typed reason and the locale key, not just a flattened string. A caller needs to tell
+    // "this invite has expired — ask for a fresh one" from "the admin is offline — try again later";
+    // until 2026-07-30 both arrived here as a bare `join-failed`.
+    return {
+      error:    out?.submitError || out?.submitErrorReason || 'join-failed',
+      reason:   out?.submitErrorReason ?? 'join-failed',
+      ...(out?.submitErrorKey ? { errorKey: out.submitErrorKey } : {}),
+    };
+  }
   return { ok: true, circleId: result.groupId, message: result.message, handle: result.handle };
 }

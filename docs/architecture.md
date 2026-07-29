@@ -466,6 +466,29 @@ closest to most indirect:
 - **companion** — a user-hostable node that consent-grants "route through me"; the last-resort carry when no
   closer rung reaches the peer.
 
+**Per-peer is not enough for a circle.** The picker answers *"how do I reach this person?"*, which is the
+wrong question for circle traffic: a circle is reached the way **that circle** is reached. Left per-person,
+circle content rides whatever transport wins for that peer — including one the circle does not live on,
+where its per-circle address means nothing and the message is undeliverable.
+
+So circle traffic carries a **scope**: the circle's own **connection points**. The constraint travels as
+points (urls), never as a circle id downward or a transport name upward — the app owns points, the transport
+layer owns transports, and neither learns the other's vocabulary. A circle with no recorded point rides the
+deployment default; *"unconfigured"* means the default, never nowhere.
+
+The scope **narrows** the candidate set; reachability still decides. (Replacing selection rather than
+narrowing it makes an offline peer look routable and silently disables hold-forward.)
+
+**What the scope refuses, and why it is a user's choice.** Per-circle addressing only works where a
+transport can bind aliases — a relay can; NKN cannot, because an NKN client *is* an address, so per-circle
+addresses would mean one client per circle. Routing a circle over a transport that cannot carry them does
+not fail loudly: it silently strips **member-level unlinkability**, since everyone in two of your circles
+would route to the same address. That is not a decision the router should take, so it is bound to the
+existing **per-user address fallback** (default off, offered with its cost): with the fallback off a circle
+whose points cannot carry per-circle addressing is honestly undeliverable; with it on, the user has
+accepted the trade and an NKN circle works. Same vocabulary as every other fallback in the product — no new
+concept, and the cost is stated where it is incurred.
+
 `RoutingStrategy.routeLadder(peer)` exposes the full `direct → mesh → hop → companion` ladder. **Built vs.
 forward:** direct + mesh resolve from real transports (NKN end-to-end, relay, `InternalTransport`); the **hop**
 rung resolves only when a peer-as-relay bridge resolver is wired, else it reports itself unavailable; the

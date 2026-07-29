@@ -565,7 +565,10 @@ async function _fanOutViaReliableSend({
   const errors = unresolved.map((webid) => ({ webid, reason: 'recipient-pubkey-unknown' }));
   await Promise.all([...targets].map(async ([addr, webid]) => {
     try {
-      const r = await reliableSend(addr, envelope, { guarantee: 'hold-forward' });
+      // Circle-scoped: this traffic belongs to `circleId`, and the host constrains it to that circle's
+      // connection points. stoop names the CIRCLE and nothing else — which transports exist, and which of
+      // them the circle rides, are not its business. → plans/NOTE-circle-scoped-routing.md
+      const r = await reliableSend(addr, envelope, { guarantee: 'hold-forward', circleId });
       // held (offline → queued for hold-forward) AND delivered both count as sent; a send
       // that explicitly reports neither is the only genuine transient failure.
       if (r && r.held === false && r.delivered === false) errors.push({ webid, reason: 'not-delivered' });

@@ -732,8 +732,8 @@ export async function createSecureAgent(opts = {}) {
 
   /** Is there a live route to `addr` right now? (route() returns null when no
    *  connected transport reports it can reach the peer.) */
-  async function hasLiveRoute(addr) {
-    try { return !!(await route(addr)); }
+  async function hasLiveRoute(addr, scope = null) {
+    try { return !!(await route(addr, scope)); }
     catch { return false; }
   }
 
@@ -1147,7 +1147,56 @@ export async function createSecureAgent(opts = {}) {
    * @param {string} addr  — the peer's canonical / wire address
    * @returns {Promise<{ name: string, transport: object, address: string }|null>}
    */
-  async function route(addr) {
+  /**
+   * SCOPED routing — the constraint a circle's traffic carries with it.
+   *
+   * Routing is otherwise per-PERSON: `selectTransport(peerId)` picks the best transport for a peer from
+   * one global priority list, with no idea which circle the traffic belongs to. That is the defect this
+   * closes — circle content would ride whatever won for that peer, including transports the circle does
+   * not live on, where its per-circle address means nothing.
+   *
+   * The scope arrives as **connection points** (urls), never as a circle id or a transport name: the app
+   * owns points, this layer owns transports, and neither has to learn the other's vocabulary.
+   *
+   *   • `points` — the circle's own points. Empty ⇒ the deployment default (an unconfigured circle must
+   *     mean "the default", never "nowhere"). A transport with no url cannot contradict a point, so it
+   *     stays eligible.
+   *   • `requireAliasCapable` — the user's address-fallback setting, inverted. With the fallback OFF we
+   *     will not route a circle over a transport that cannot carry per-circle addressing, because doing
+   *     so silently strips member-level unlinkability. With it ON the user has accepted that trade
+   *     knowingly (this is what makes an NKN circle work — see NOTE-circle-scoped-routing.md).
+   *
+   * No eligible transport returns null, which the caller turns into a hold. That is honest — and it must
+   * be made VISIBLE by the caller rather than left as silent holding.
+   */
+  function eligibleUnderScope(transport, scope) {
+    if (!transport) return false;
+    if (scope?.requireAliasCapable && transport.supportsAliases !== true) return false;
+    const points = Array.isArray(scope?.points) ? scope.points.filter(Boolean) : [];
+    if (points.length === 0) return true;
+    const url = typeof transport.url === 'string' && transport.url ? transport.url : null;
+    return url ? points.includes(url) : true;
+  }
+
+  async function route(addr, scope = null) {
+    if (scope) {
+      // The scope NARROWS the candidate set; it does not replace route selection. Reachability still
+      // decides — otherwise an offline peer looks routable (their transport is not ours), the send goes
+      // nowhere, and the hold-forward rung never engages. Priority: the relay the circle rides, then
+      // anything else registered, then NKN last (reachable here only when the user accepted the fallback).
+      const reachable = (t) => (typeof t.canReach !== 'function' ? true : t.canReach(addr) === true);
+      const candidates = [relayTransport, ...extraTransports.values(), peerTransport].filter(Boolean);
+      const pick = candidates.find((t) => eligibleUnderScope(t, scope) && reachable(t));
+      if (!pick) return null;
+      const name = pick === relayTransport ? 'relay'
+        : pick === peerTransport ? 'nkn'
+        : ([...extraTransports.entries()].find(([, t]) => t === pick)?.[0] ?? 'relay');
+      return { name, transport: pick, address: await addressFor(addr, name) };
+    }
+    return routeUnscoped(addr);
+  }
+
+  async function routeUnscoped(addr) {
     // Explicit pin — respect a user-chosen single transport (no alternative
     // to fail over to; the failover loop degrades to a single attempt).
     if (transportMode === 'nkn') {
@@ -1233,7 +1282,7 @@ export async function createSecureAgent(opts = {}) {
     //      error after failover → hold rather than propagate. An application
     //      refusal (muted / not permitted) still throws — a resend can't fix it.
     if (wantsHold(opts)) {
-      if (!(await hasLiveRoute(addr))) return enqueueHold(addr, payload, opts);
+      if (!(await hasLiveRoute(addr, opts?.scope ?? null))) return enqueueHold(addr, payload, opts);
       try {
         const result = await _sendWithHandshakeRetry(addr, payload, opts);
         const msgId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;
@@ -1317,7 +1366,7 @@ export async function createSecureAgent(opts = {}) {
     let   lastErr = null;
 
     for (let attempt = 0; attempt < budget; attempt++) {
-      const sel = await route(addr);
+      const sel = await route(addr, opts?.scope ?? null);
       if (!sel) {
         throw new Error(
           `Peer transport not connected (mode=${transportMode}).  ` +

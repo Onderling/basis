@@ -1115,8 +1115,25 @@ export async function createRealHouseholdAgent(opts = {}) {
     // `chat.send` transport (stoop's own in-process agent) never had. The stoop skill builds a
     // conforming `kring-chat-message` envelope and calls this per recipient; a briefly-offline
     // member has the message HELD and flushed on reconnect, exactly like a task/noticeboard fan.
-    reliableSend: (to, envelope, sendOpts = {}) =>
-      sa.peer.sendTo(to, envelope, { guarantee: 'hold-forward', ...sendOpts }),
+    reliableSend: (to, envelope, sendOpts = {}) => {
+      // Circle-scoped routing (2026-07-29): map the circle to its CONNECTION POINTS and hand those down.
+      // The app owns points; the transport layer owns transports; neither learns the other's vocabulary.
+      // `requireAliasCapable` is the user's address-fallback setting inverted — with the fallback OFF we
+      // would rather be undeliverable than route a circle over a transport that cannot carry per-circle
+      // addressing, because that silently strips member-level unlinkability. With it ON, an NKN circle
+      // works on terms the user accepted. → plans/NOTE-circle-scoped-routing.md
+      const { circleId, ...rest } = sendOpts;
+      if (circleId == null) return sa.peer.sendTo(to, envelope, { guarantee: 'hold-forward', ...rest });
+      const points = opts.circlePointsFor?.(circleId) ?? [];
+      const fallbackOn = typeof opts.allowAddressFallback === 'function'
+        ? opts.allowAddressFallback() !== false
+        : opts.allowAddressFallback !== false;
+      return sa.peer.sendTo(to, envelope, {
+        guarantee: 'hold-forward',
+        ...rest,
+        scope: { points, requireAliasCapable: !fallbackOn },
+      });
+    },
     // Connectivity Phase 3 — LIVE shared-pod key-custody seams (host-injected by circleApp over each
     // circle's per-circle StorageBackend + its live group-key {seal,open}). All keyed by circleId so the
     // ONE stoop agent resolves each circle's member-side custody per call (invariant #6):

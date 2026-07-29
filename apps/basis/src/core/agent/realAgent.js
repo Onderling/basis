@@ -310,6 +310,16 @@ export async function createRealHouseholdAgent(opts = {}) {
     // Pass-through for extra factory opts (tests + future ops):
     // identityResolver, capabilityIssuer, policyEngine, groupManager,
     // a2aTls, rateLimit, usePerfectFwdSec, webidClaim, helloGate, …
+    //
+    // ⚠ `rateLimit` is deliberately NOT enabled by default, and the reason is worth keeping (2026-07-30).
+    // It DROPS over-quota envelopes, and catch-up replay is a legitimate burst: `catchUpProvider` fetches
+    // up to 1000 items, while the limiter's per-peer bucket is burst 30 / refill 5-per-second. Turning it
+    // on at the default tuning would silently discard most of a catch-up — message loss on reconnect,
+    // which is worse than the flood it defends against.
+    //
+    // Flooding IS defended, at the layer that can afford to be strict: the nearby room's per-author ask
+    // budget (`createAskBudget`, nearbyRoom.js), which protects the expensive half — matching, which can
+    // call a language model. Enabling this one properly needs a catch-up exemption first.
     ...(opts.secureAgentOpts ?? {}),
   });
   const chatAgent = sa.agent;

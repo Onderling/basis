@@ -143,8 +143,8 @@ describe('J-A14 — two room paths TRUNCATE instead of refusing', () => {
   });
 });
 
-describe('J-A11 — the room ask store is unbounded (ATTACK SUCCEEDS)', () => {
-  it('keeps and renders every ask a stranger sends', async () => {
+describe('J-A11 — a room bounds its asks, and one peer cannot order work on your device (FIXED 2026-07-30)', () => {
+  it('a flood is capped per author, so 400 asks from three attackers do not all land', async () => {
     let push = null;
     const channel = createAskChannel({ listPeers: () => [], sendTo: async () => {} });
     const screen = createNearbyScreen({
@@ -164,14 +164,16 @@ describe('J-A11 — the room ask store is unbounded (ATTACK SUCCEEDS)', () => {
     }
     await new Promise((r) => setTimeout(r, 20));
 
-    // WRONG: nothing bounds the ask map (nearbyScreen.js) — expired asks are filtered on RENDER but never
-    // evicted, and every ask received is also rendered. Ingest is quadratic too (emit() rebuilds the whole
-    // model per ask), and with drivers wired each ask drives the on-device matcher (an LLM judge included).
-    // RIGHT: a cap on how many asks a room may hold, eviction on expiry, and a per-peer ceiling before the
-    // matcher runs — one scripted peer should not be able to fill a room or order work on your device.
-    expect(screen.model().asks.length).toBe(N);
+    // Each of the three attackers gets a per-author allowance; nothing like 400 survives. The cap that
+    // matters most is not the map size but the work: with drivers wired, every ask used to drive the
+    // on-device matcher, which can call a language model — so a scripted peer could spend someone else's
+    // compute by talking. The budget is checked BEFORE that runs.
+    const kept = screen.model().asks.length;
+    expect(kept).toBeGreaterThan(0);                 // an honest ask still arrives
+    expect(kept).toBeLessThan(40);                   // …but a flood does not
+    expect(screen.model().asksIgnored).toBeGreaterThan(300);   // and the room says so rather than hiding it
 
-    // The one thing that IS bounded: leaving the room forgets them.
+    // Still true, and still worth asserting: leaving the room forgets them.
     screen.close();
     expect(screen.model().asks.length).toBe(0);
   });

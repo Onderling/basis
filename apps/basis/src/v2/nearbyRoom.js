@@ -35,6 +35,25 @@ export const CHAT_MAX_TEXT  = 500;
 /** Room chat is ephemeral. This is a render cap, not a store — nothing is persisted anywhere. */
 export const CHAT_MAX_KEPT  = 100;
 
+/**
+ * How many asks a room keeps, and how many one stranger may cost you.
+ *
+ * Walked 2026-07-29 (S6/J-A11) and it was worse than unbounded memory: **every** incoming ask was matched
+ * against the reader's drivers, and matching can call a language model. 200 asks from one peer drove 400
+ * judge calls — a remote party spending someone else's compute, or money, by talking.
+ *
+ * Two separate limits, because they answer different questions:
+ *
+ *   • `ASKS_MAX_KEPT` — what a room is worth remembering. A room is a transient place; the oldest asks
+ *     stop mattering, and an unbounded map in a screen that never unmounts is a leak either way.
+ *   • `ASKS_PER_AUTHOR_BURST` / `_REFILL_PER_SEC` — what one person may cost. A token bucket per author,
+ *     checked BEFORE the judge runs, so the expensive half is what gets protected. Tuned for a real room:
+ *     a person asking a handful of things in a minute is normal; a hundred is not a person.
+ */
+export const ASKS_MAX_KEPT            = 200;
+export const ASKS_PER_AUTHOR_BURST    = 8;
+export const ASKS_PER_AUTHOR_REFILL   = 0.2;   // one more every five seconds
+
 export const CARD_MESSAGE = 'nearby-card';
 export const CHAT_MESSAGE = 'nearby-chat';
 
@@ -190,4 +209,41 @@ function hash(s) {
   let h = 0;
   for (let i = 0; i < s.length; i += 1) { h = ((h << 5) - h + s.charCodeAt(i)) | 0; }
   return h;
+}
+
+
+/**
+ * A per-author token bucket for ask ingest — the cheap gate in front of the expensive one.
+ *
+ * Deliberately local to the room rather than reusing the transport-level limiter in
+ * `@onderling/secure-agent`: that one counts ENVELOPES on a socket, and a nearby room's asks arrive over
+ * mDNS/BLE where there is no socket to count. Both are wanted; neither replaces the other.
+ *
+ * Unknown/absent author ⇒ one shared bucket. That is deliberately strict: an ask with no attributable
+ * sender is exactly what a flooder would send, so they all draw on the same allowance rather than each
+ * getting a fresh one.
+ */
+export function createAskBudget({
+  burst = ASKS_PER_AUTHOR_BURST,
+  refillPerSec = ASKS_PER_AUTHOR_REFILL,
+  now = () => Date.now(),
+} = {}) {
+  /** author → { tokens, at } */
+  const buckets = new Map();
+  const ANON = '\u0000anonymous';
+  return {
+    /** @returns {boolean} true when this ask may be processed. */
+    take(author) {
+      const key = (typeof author === 'string' && author) ? author : ANON;
+      const t = now();
+      const b = buckets.get(key) ?? { tokens: burst, at: t };
+      const refilled = Math.min(burst, b.tokens + ((t - b.at) / 1000) * refillPerSec);
+      if (refilled < 1) { buckets.set(key, { tokens: refilled, at: t }); return false; }
+      buckets.set(key, { tokens: refilled - 1, at: t });
+      return true;
+    },
+    /** Leaving the room forgets everyone's allowance, like the rest of the room state. */
+    clear() { buckets.clear(); },
+    size: () => buckets.size,
+  };
 }

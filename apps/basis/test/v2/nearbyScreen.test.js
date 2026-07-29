@@ -723,3 +723,73 @@ describe('broadcast circle invites (step H)', () => {
   });
 });
 
+
+/* ── S6/J-A11 — one stranger cannot spend this device's compute ─────────────── */
+
+describe('an ask flood is bounded, and the expensive half is what gets protected', () => {
+  const T0 = 1_700_000_000_000;
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  function floodRig({ judgeCalls }) {
+    let pushAsk = null;
+    const control = createDiscoverabilityControl({ transports: () => ({ ble: mk(Discovering) }) });
+    const screen = createNearbyScreen({
+      control,
+      subscribeToAsks: (fn) => { pushAsk = fn; return () => {}; },
+      getDrivers: async () => [{ kind: 'help', text: 'ladders', tags: ['ladder'] }],
+      judge: async () => { judgeCalls.n += 1; return { resonant: false }; },
+      now: () => T0, t: (k) => k,
+    });
+    return { screen, ask: (a) => pushAsk?.(a) };
+  }
+
+  const askFrom = (from, i) => Object.freeze({
+    id: `ask-${from}-${i}`, text: `flood ${i}`, tags: ['ladder'],
+    from, createdAt: T0, expiresAt: T0 + 60_000,
+  });
+
+  it('200 asks from ONE peer no longer drive 200 matches', async () => {
+    // Walked as an attack: every ask was matched against the reader's drivers, and matching can call a
+    // language model — so a remote party could spend someone else's compute (or money) by talking. The
+    // budget is checked BEFORE the judge, which is the whole point of where it sits.
+    const judgeCalls = { n: 0 };
+    const { screen, ask } = floodRig({ judgeCalls });
+    screen.open();
+    for (let i = 0; i < 200; i++) ask(askFrom('mallory', i));
+    await flush();
+
+    const m = screen.model();
+    expect(judgeCalls.n, 'the judge ran once per ask — the amplification is back').toBeLessThanOrEqual(10);
+    expect(m.asks.length).toBeLessThanOrEqual(10);
+    // …and the room is honest about it rather than presenting a filtered view as the room.
+    expect(m.asksIgnored).toBeGreaterThan(150);
+  });
+
+  it('an honest neighbour is unaffected by someone else flooding', async () => {
+    // A shared bucket would have let one flooder silence everybody, which is a denial of service dressed
+    // up as a defence.
+    const judgeCalls = { n: 0 };
+    const { screen, ask } = floodRig({ judgeCalls });
+    screen.open();
+    for (let i = 0; i < 200; i++) ask(askFrom('mallory', i));
+    await flush();
+    ask(askFrom('honest-neighbour', 1));
+    await flush();
+
+    expect(screen.model().asks.some((r) => r.ask.from === 'honest-neighbour')).toBe(true);
+  });
+
+  it('a re-delivery of an ask we already hold does not spend a token', async () => {
+    // Otherwise a flaky link looks like a flood, and the person on the other end of it gets throttled for
+    // having bad reception.
+    const judgeCalls = { n: 0 };
+    const { screen, ask } = floodRig({ judgeCalls });
+    screen.open();
+    const same = askFrom('neighbour', 1);
+    for (let i = 0; i < 50; i++) ask(same);
+    await flush();
+
+    expect(screen.model().asks).toHaveLength(1);
+    expect(screen.model().asksIgnored).toBe(0);
+  });
+});

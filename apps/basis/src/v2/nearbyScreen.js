@@ -30,6 +30,7 @@ import {
 } from './nearbyAsks.js';
 import {
   roomAllows, createCard, createChatMessage, createRoomChat, CARD_MESSAGE, CHAT_MESSAGE,
+  createAskBudget, ASKS_MAX_KEPT,
 } from './nearbyRoom.js';
 import {
   prepareBroadcastInvite, isInviteLive, inviteActions, INVITE_MESSAGE,
@@ -159,6 +160,15 @@ export function createNearbyScreen({
   /** askId → { ask, resonant, reason } */
   const asks = new Map();
   let unsubscribeAsks = null;
+  // S6/J-A11 — a stranger's asks cost this device work, and matching can call a language model. The budget
+  // is checked BEFORE the judge, so what is protected is the expensive half. See nearbyRoom.js for why it
+  // is a room-local bucket rather than the transport limiter.
+  const askBudget = createAskBudget();
+  // Counted, not hidden: a room that quietly ignored half its asks would look like a room where nobody
+  // asked anything. The model reports this so a surface CAN say so.
+  let asksIgnored = 0;
+  /** Ask ids being matched right now — see ingestAsk for why this is not merely an optimisation. */
+  const asksInFlight = new Set();
 
   // ── Cards + room chat (step G) ─────────────────────────────────────────────
   // Both behind their own per-device allow, both defaulting OFF. The allows are held here rather than read
@@ -180,18 +190,68 @@ export function createNearbyScreen({
 
   async function ingestAsk(ask) {
     if (!ask?.id || !isAskLive(ask, now)) return;
+    // A re-delivery of something we already hold — or are still evaluating — is free, and must not spend a
+    // token: otherwise a flaky link looks like a flood and the person with bad reception gets throttled
+    // for it. `inFlight` is load-bearing rather than tidy: matching is async, so without it 50 redeliveries
+    // of one ask all arrive before the first `asks.set` and each pay.
+    if (!asks.has(ask.id) && !asksInFlight.has(ask.id)) {
+      if (!askBudget.take(ask.from)) {
+        asksIgnored += 1;
+        emitCoalesced();
+        return;
+      }
+    } else if (asksInFlight.has(ask.id)) {
+      return;   // already being matched; the result will land once
+    }
+    asksInFlight.add(ask.id);
     let evaluated = { resonant: false, reason: null };
     if (typeof getDrivers === 'function') {
       try { evaluated = await evaluateIncomingAsk({ ask, getDrivers, judge, now }); }
       catch (err) { try { onError?.(err, 'evaluateAsk'); } catch { /* diagnostics only */ } }
     }
+    asksInFlight.delete(ask.id);
     asks.set(ask.id, { ask, resonant: !!evaluated.resonant, reason: evaluated.reason ?? null });
-    emit();
+    pruneAsks();
+    emitCoalesced();
+  }
+
+  /**
+   * Keep the room's asks bounded: drop what has expired, then the oldest, until we are under the cap.
+   *
+   * Expiry first on purpose — an expired ask is worthless, so evicting it costs nothing, and only if that
+   * is not enough do we start dropping live ones.
+   */
+  function pruneAsks() {
+    for (const [id, entry] of asks) if (!isAskLive(entry.ask, now)) asks.delete(id);
+    if (asks.size <= ASKS_MAX_KEPT) return;
+    // `createdAt` is the field an ask actually carries (`at` was a guess, and it would have made every
+    // entry sort equal — i.e. arbitrary eviction rather than oldest-first).
+    const age = (e) => e?.ask?.createdAt ?? e?.ask?.at ?? 0;
+    const byAge = [...asks.entries()].sort((a, b) => age(a[1]) - age(b[1]));
+    for (const [id] of byAge.slice(0, asks.size - ASKS_MAX_KEPT)) asks.delete(id);
   }
 
   function emit() {
     const snapshot = model();
     for (const w of watchers) { try { w(snapshot); } catch { /* one bad watcher */ } }
+  }
+
+  /**
+   * Emit at most once per microtask — used by ask ingest only.
+   *
+   * `model()` rebuilds the whole snapshot, so emitting once per ask made ingest quadratic: 2 000 asks took
+   * 3.7s where 250 took 0.1s (S6/J-A11). A burst now produces one render, which is also what a screen
+   * wants — nobody needs 2 000 intermediate states.
+   *
+   * Deliberately NOT applied to the other emitters. Peers arriving, cards and chat emit rarely, and
+   * callers there legitimately observe the effect of their own call synchronously; making every emit async
+   * would change behaviour far beyond the path that had the problem.
+   */
+  let emitScheduled = false;
+  function emitCoalesced() {
+    if (emitScheduled) return;
+    emitScheduled = true;
+    queueMicrotask(() => { emitScheduled = false; emit(); });
   }
 
   /**
@@ -273,6 +333,9 @@ export function createNearbyScreen({
       ...built,
       rows: withCards,
       asks: askRows,
+      // How many asks this device declined to process, because one sender was flooding. Reported so a
+      // surface can be honest about a partial view rather than presenting a filtered room as the room.
+      asksIgnored,
       invites: inviteRows,
       allows,
       // Only present when I have joined the conversation. An empty array would read as "nobody has said

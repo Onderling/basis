@@ -790,3 +790,71 @@ visible where that choice is made — on mobile, where push actually exists:
   spread across relays.
 
 A privacy property the user cannot see themselves trading away is not a property they can act on.
+
+---
+
+## 2026-07-29 — four calls the evaluation walks forced
+
+The S2/S3/S4 walks each ended at a question that code could not answer, because either answer was
+defensible. All four were put to Frits together and settled in one sitting; each closed off alternatives,
+which is why they are here rather than in a commit message.
+
+### 1 · The delivery ladder admits doubt, and never claims arrival
+
+**Only `maybe-received` gets wired. A positive transport ack is never reported to the UI.**
+
+The ladder declares seven states; the send path produced five, and the two missing ones were exactly the
+two that carry uncertainty. So the app said *"sent"* both for "their phone took it" and for "we never
+heard anything back" — the over-claim the vocabulary exists to prevent (S2/J-D2).
+
+Wiring the acks naively would have broken a second promise. A device acknowledges a message whatever its
+owner's receipt setting says, so a peer with receipts **off** would settle at `reached-device` while an
+offline peer stayed at `sent`. No string would announce the setting; the *shape of the ladder* would
+(S2/J-D5). The two journeys pull against each other and cannot both be satisfied by adding rungs.
+
+The call keeps the privacy property and fixes the honesty one: report the **downgrade** (we asked, heard
+nothing, sent anyway) and never the confirmation. `reached-device` stays in the vocabulary as a state
+nothing produces — listed as a dated gap in the producer guard, so it cannot be mistaken for an oversight.
+
+What it costs: a sender never learns from the ladder that a message actually arrived. `stored` still
+exists, and still arrives — but only from a peer who chose to send receipts. That is the honest position:
+the only positive evidence we have is evidence somebody chose to give us.
+
+### 2 · Reachability-on-this-circle is answered ABOVE the send path
+
+An NKN-only member of a relay circle dropped out silently: a relay reports it can reach anyone, so the
+send was attempted there, failed, and landed in a generic offline hold (S4/J-CS7).
+
+**The fan-out answers it, not routing.** The fan-out already holds the roster, so it marks a recipient
+unreachable-on-this-circle and never calls `sendTo` for them. Routing stays circle-blind and keeps its one
+job — pick the best transport for a person — which is what the circle-scope design was written to protect.
+
+The cost is accepted knowingly: two places now decide reachability, and they must not drift. The
+alternative (passing a member→transport map down with the scope) would have put roster knowledge inside
+routing, which is the coupling the scope exists to avoid.
+
+### 3 · The conversation-kinds list is the truth; `features.chat` derives from it
+
+`features.chat` and `conversationKinds` were two vocabularies for one fact — the wizard wrote the first,
+the conversation read the second, and neither reached storage (S3/J-CW2, J-CW3).
+
+**`conversationKinds` is authoritative.** Whether a circle has chat is whether `chat-message` is in its
+list; `features.chat` becomes a derived view, not a second source. One list, one place, and the
+duplicate-vocabulary trap that `shared-vocabularies.md` exists to prevent is closed rather than
+documented.
+
+This changes what "turn chat off" means in the wizard: it removes a kind from the conversation rather than
+flipping a feature. That is the more accurate description of what actually happens to the conversation.
+
+### 4 · A template switch re-fills what the user never touched
+
+Picking `buurt` and then switching to `vriendenkring` moved nothing but the label — ten axes kept the
+first template's values, because the merge rule could not tell "the user chose this" from "the first
+template chose this" (S3/J-CW1).
+
+**Track provenance.** Remember which axes the user actually touched; a kind switch re-fills the rest from
+the new template. This makes the wizard's own promise true — a template is a starting point, not a track —
+and it makes picking the wrong kind first recoverable.
+
+A switch now visibly moves things, which is the point, and should be said out loud in the UI rather than
+happening quietly.

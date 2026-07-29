@@ -71,7 +71,10 @@
  * @returns {DeliveryStateMap}
  */
 /** The full ladder, weakest → strongest. Terminals sit outside it (see `advance`). */
-const LADDER = ['pending', 'sent', 'maybe-received', 'reached-device', 'stored'];
+// Decision 1 (2026-07-29): `sent` and `reached-device` are retired. `sent` read as success while meaning
+// only "the fan-out accepted it"; `reached-device` is the transport ack, which is deliberately never
+// shown because a phone acks whatever its owner's receipt setting says. See deliveryState.js in basis.
+const LADDER = ['pending', 'maybe-received', 'stored'];
 const TERMINAL = new Set(['failed', 'undeliverable']);
 const KNOWN_STATES = new Set([...LADDER, ...TERMINAL]);
 
@@ -137,11 +140,18 @@ export function createDeliveryStateMap() {
       notify(msgId, null);
       return true;
     },
-    pruneSent() {
+    /**
+     * Drop the entries that never got confirmed, so a long-lived map does not accumulate them.
+     *
+     * Was `pruneSent`, which pruned the retired `sent` state. Renamed with its meaning: the resting state
+     * for an unconfirmed message is now `maybe-received`. (It has no production caller either way — worth
+     * knowing before relying on it.)
+     */
+    pruneUnconfirmed() {
       // Collect IDs first so we don't mutate the Map while iterating.
       const toClear = [];
       for (const [id, st] of map.entries()) {
-        if (st === 'sent') toClear.push(id);
+        if (st === 'maybe-received') toClear.push(id);
       }
       for (const id of toClear) {
         map.delete(id);

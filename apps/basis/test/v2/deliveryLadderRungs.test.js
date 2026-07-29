@@ -1,80 +1,57 @@
 /**
- * S2 · J-D1…J-D4 — which rungs of the delivery ladder the product can actually reach.
+ * S2 · J-D1…J-D4 — the delivery ladder, after decision 1 (2026-07-29).
  *
- * The ladder declares seven states and labels all seven. The send path produces five of them:
+ * The walk found seven states declared and five produced, and the two missing ones were exactly the two
+ * that carried uncertainty — so the app said "sent" both for "their phone took it" and for "we never
+ * heard anything back". That was J-D2, the journey the whole item exists for.
  *
- *   pending      — set before the fan-out starts
- *   sent         — `classifyFanOut` with no errors
- *   failed       — an error, or a transient per-member failure
- *   undeliverable— every per-member failure is permanent
- *   stored       — an inbound app-level receipt
+ * The fix was subtraction rather than wiring, and the reason is J-D5. A phone acknowledges a message
+ * whatever its owner's receipt setting says, so reporting the ack would have made a receipts-off peer
+ * identifiable by where their ladder stops. The two journeys could not both be satisfied by adding rungs.
  *
- * The two it never produces are exactly the two that carry uncertainty:
- *
- *   maybe-received — "we asked for an ack, heard nothing, sent it anyway"
- *   reached-device — "the peer's transport confirmed"
- *
- * **This is the S2/J-D2 finding (walked 2026-07-29).** The sheet calls J-D2 "the one this whole item
- * exists for": with the receiver's acks failing, a message must read *maybe received*, not *sent* —
- * "if it reads 'sent', the over-claim is back." It reads `sent`, because `classifyFanOut` has no notion
- * of an ack at all. `deliveryAfterSend` — the function that computes those two rungs — is called from
- * nowhere but tests, and `sendMessage`'s `onDelivery` report, which is where the ack/downgrade
- * distinction is actually made, is wired in tests only.
- *
- * So the honesty the ladder was built to provide is, at the far end, not yet delivered: today the app
- * says "sent" for both "the phone took it" and "we never heard anything back". That is the over-claim
- * the vocabulary exists to prevent.
- *
- * These tests pin the gap rather than assert the intent — they should FAIL when the rungs get wired,
- * which is the moment to delete them and walk J-D2 for real.
+ * So: `sent` and `reached-device` are gone. What is left is what the product can honestly say — it left
+ * here and may have arrived, or somebody CHOSE to tell us it arrived.
  */
 import { describe, it, expect } from 'vitest';
-import { DELIVERY, DELIVERY_ORDER, DELIVERY_LABELS, deliveryAfterSend } from '../../src/v2/deliveryState.js';
+import { DELIVERY, DELIVERY_ORDER, DELIVERY_LABELS, DELIVERY_TERMINAL, deliveryAfterSend } from '../../src/v2/deliveryState.js';
 import { classifyFanOut } from '@onderling/kring-host/kringBroadcast';
 
-/** Every state the real send path can put on a message today. */
-const PRODUCED = new Set([
-  DELIVERY.PENDING,                       // marked before the call
-  classifyFanOut({ errors: [] }),         // sent
-  classifyFanOut({ error: 'chat-unavailable' }),                        // failed
-  classifyFanOut({ errors: [{ reason: 'not-a-member' }] }),             // failed or undeliverable
-  DELIVERY.STORED,                        // an inbound receipt
-]);
-
-describe('what the fan-out can actually report', () => {
-  it('a clean fan-out is `sent` — never `reached-device`, because no ack is consulted', () => {
-    expect(classifyFanOut({ errors: [] })).toBe(DELIVERY.SENT);
+describe('J-D2 — the over-claim is gone', () => {
+  it('a clean fan-out is `maybe-received`, not a word that reads like success', () => {
+    expect(classifyFanOut({ errors: [] })).toBe(DELIVERY.MAYBE);
   });
 
-  it('an error is `failed`; all-permanent errors are `undeliverable`', () => {
-    expect(classifyFanOut({ error: 'chat-unavailable' })).toBe(DELIVERY.FAILED);
-    expect(classifyFanOut({ errors: [{ reason: 'whatever-transient' }] })).toBe(DELIVERY.FAILED);
+  it('there is no state that claims arrival without someone having said so', () => {
+    // `stored` is the only positive rung, and it can only come from a receipt the recipient chose to send.
+    expect(DELIVERY_ORDER).toEqual([DELIVERY.PENDING, DELIVERY.MAYBE, DELIVERY.STORED]);
   });
 
-  it('THE FINDING — `maybe-received` is unreachable, so J-D2 cannot pass', () => {
-    // Nothing the fan-out can return produces it…
-    const everyShape = [
-      { errors: [] }, { error: 'x' }, { errors: [{ reason: 'a' }] }, {}, null, undefined,
-    ].map((r) => classifyFanOut(r));
-    expect(everyShape).not.toContain(DELIVERY.MAYBE);
-    // …and the function that WOULD produce it is called from nowhere but tests.
+  it('an attempt that left the device is `maybe-received` whatever the transport said', () => {
+    // The ack is not evidence we may show (J-D5), so it does not change the answer. The old signature
+    // took {acked, downgraded}; both are now irrelevant by decision.
+    expect(deliveryAfterSend()).toBe(DELIVERY.MAYBE);
+    expect(deliveryAfterSend({ acked: true })).toBe(DELIVERY.MAYBE);
     expect(deliveryAfterSend({ acked: false, downgraded: true })).toBe(DELIVERY.MAYBE);
   });
 
-  it('`reached-device` is unreachable too — the middle of the ladder is missing, not just the top', () => {
-    expect(PRODUCED.has(DELIVERY.REACHED)).toBe(false);
-    expect(deliveryAfterSend({ acked: true })).toBe(DELIVERY.REACHED);   // the code exists, unused
+  it('failure is still distinct from doubt — a failed send does not read as "maybe"', () => {
+    expect(classifyFanOut({ error: 'chat-unavailable' })).toBe(DELIVERY.FAILED);
+    expect(classifyFanOut({ errors: [{ reason: 'recipient-pubkey-unknown' }] })).toBe(DELIVERY.UNDELIVERABLE);
+    for (const st of DELIVERY_TERMINAL) expect(DELIVERY_ORDER).not.toContain(st);
+  });
+});
+
+describe('the retired states leave nothing behind', () => {
+  it('no label survives for a state that no longer exists', () => {
+    expect(DELIVERY_LABELS['sent']).toBeUndefined();
+    expect(DELIVERY_LABELS['reached-device']).toBeUndefined();
+    // …and every state that DOES exist still has one, so nothing renders as a raw key.
+    for (const st of [...DELIVERY_ORDER, ...DELIVERY_TERMINAL]) expect(DELIVERY_LABELS[st]).toBeTruthy();
   });
 
-  it('the two unreachable rungs are exactly the ones that express uncertainty', () => {
-    const unreachable = [...DELIVERY_ORDER].filter((s) => !PRODUCED.has(s));
-    expect(unreachable.sort()).toEqual([DELIVERY.MAYBE, DELIVERY.REACHED].sort());
-  });
-
-  it('…and both are fully labelled, which is why the gap is invisible from the UI side', () => {
-    // A state with no label would have been noticed. These have labels in both locales and a place in
-    // the order — everything except a producer.
-    expect(DELIVERY_LABELS[DELIVERY.MAYBE]).toBeTruthy();
-    expect(DELIVERY_LABELS[DELIVERY.REACHED]).toBeTruthy();
+  it('the label for the resting state says both halves out loud', () => {
+    // "Sent · maybe received" — it left, and we do not know. A label that said only "sent" is what the
+    // over-claim looked like from the outside.
+    expect(DELIVERY_LABELS[DELIVERY.MAYBE]).toBe('circle.chat.delivery.maybe_received');
   });
 });

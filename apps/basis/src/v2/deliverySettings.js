@@ -121,15 +121,25 @@ export function withDelivery(rows, deliveryById, isMine = (r) => r?.mine === tru
  * timeline. `retryable` is the only state a tap can help.
  */
 export const DELIVERY_PRESENTATION = Object.freeze({
-  pending:         { glyph: '⏱', show: true,  retryable: false },
-  sent:            { glyph: '',  show: false, retryable: false },
-  // Genuinely unknown — worth a mark, because "nothing" here would read as delivered.
-  'maybe-received': { glyph: '◌', show: true,  retryable: true },
-  'reached-device': { glyph: '✓', show: true,  retryable: false },
-  stored:          { glyph: '✓✓', show: true,  retryable: false },
-  failed:          { glyph: '⚠', show: true,  retryable: true },
+  // ── The three ordinary states, as ONE mark that changes weight and colour ────────────────────────────
+  // Decision 1's visual (Frits asked for "colours or symbols, your call"). The rule the design encodes:
+  //
+  //   **colour means somebody told us; shape alone never claims more than "it left here".**
+  //
+  // So the same mark carries all three: hollow while it is still here, filled once it has gone, and
+  // accented only when a receipt the recipient CHOSE to send came back. Deliberately one glyph rather
+  // than three, so the difference a reader has to notice is small and consistent — and so the accent is
+  // the only thing that ever asserts arrival.
+  pending:          { glyph: '○', tone: 'muted',  show: true,  retryable: false },
+  // Filled, still neutral. This is where a message rests whenever the other side has not chosen to
+  // confirm — identical whether they are offline or have receipts off, which is J-D5 (see deliveryState).
+  'maybe-received': { glyph: '●', tone: 'neutral', show: true,  retryable: true },
+  // The one positive rung, and the only one with colour.
+  stored:           { glyph: '●', tone: 'accent',  show: true,  retryable: false },
+  // ── Failure keeps its own shapes, so it can never be mistaken for a quiet state ─────────────────────
+  failed:           { glyph: '⚠', tone: 'warn',   show: true,  retryable: true },
   // Permanent (e.g. a member has no published key). Shown, but no retry — retrying cannot help.
-  undeliverable:   { glyph: '⊘', show: true,  retryable: false },
+  undeliverable:    { glyph: '⊘', tone: 'warn',   show: true,  retryable: false },
 });
 
 /** How to draw one state, or null when it should not appear. Pairs with `deliveryLabelFor`. */
@@ -137,7 +147,9 @@ export function deliveryPresentation(state, { mine = true } = {}) {
   if (!mine || !isDeliveryState(state)) return null;
   const p = DELIVERY_PRESENTATION[state];
   if (!p?.show) return null;
-  return { state, glyph: p.glyph, retryable: p.retryable, labelKey: DELIVERY_LABELS[state] };
+  // `tone` is a NAME, not a colour value: the shells map it to their own palette, so web and mobile cannot
+  // drift on which states are coloured even if their hues differ.
+  return { state, glyph: p.glyph, tone: p.tone, retryable: p.retryable, labelKey: DELIVERY_LABELS[state] };
 }
 
 /**

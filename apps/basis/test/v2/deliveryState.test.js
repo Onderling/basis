@@ -7,6 +7,12 @@
  *   • **no state means "they turned receipts off"** — a state that said so would broadcast the setting to
  *     everyone who messages you, which is the opposite of what a privacy setting is for.
  */
+// Vocabulary note (decision 1, 2026-07-29): `sent` and `reached-device` are retired — `sent` read as
+// success while meaning only "the fan-out accepted it" (S2/J-D2), and `reached-device` is the transport
+// ack, never shown because a phone acks whatever its owner's receipt setting says (S2/J-D5). The resting
+// state for an unconfirmed message is `maybe-received`; `stored` is the only positive rung, and it can
+// only come from a receipt the recipient CHOSE to send.
+
 import { describe, it, expect } from 'vitest';
 import * as mod from '../../src/v2/deliveryState.js';
 import {
@@ -16,10 +22,11 @@ import {
 } from '../../src/v2/deliveryState.js';
 
 describe('the ladder', () => {
-  it('is ONE ladder with the states that already existed, not a second vocabulary', () => {
-    // The chat bubble already had pending/sent/failed/undeliverable. They compose with the new far-end
-    // states rather than competing: `sent` is the hinge, and everything shares `circle.chat.delivery.*`.
-    expect(DELIVERY_ORDER).toEqual(['pending', 'sent', 'maybe-received', 'reached-device', 'stored']);
+  it('is ONE ladder, and every rung is something the product can actually say', () => {
+    // Three rungs after decision 1: it has not left yet, it left and we do not know, someone told us it
+    // arrived. `sent` and `reached-device` were removed rather than wired — see the note above.
+    expect(DELIVERY_ORDER).toEqual(['pending', 'maybe-received', 'stored']);
+    // Still no read-receipt vocabulary: `stored` is about a device, never about a person having looked.
     expect(DELIVERY_ORDER.some((s) => /read|seen|viewed/i.test(s))).toBe(false);
   });
 
@@ -54,21 +61,21 @@ describe('the ladder', () => {
 
 describe('the ladder only goes up', () => {
   it('advances forward', () => {
-    expect(advanceDelivery(DELIVERY.SENT, DELIVERY.REACHED)).toBe(DELIVERY.REACHED);
-    expect(advanceDelivery(DELIVERY.REACHED, DELIVERY.STORED)).toBe(DELIVERY.STORED);
+    expect(advanceDelivery(DELIVERY.MAYBE, DELIVERY.MAYBE)).toBe(DELIVERY.MAYBE);
+    expect(advanceDelivery(DELIVERY.MAYBE, DELIVERY.STORED)).toBe(DELIVERY.STORED);
   });
 
   it('NEVER demotes — a late transport-ack must not undo an app receipt', () => {
     // Out-of-order arrival is normal, not exceptional: the receipt travels the same unreliable network.
-    expect(advanceDelivery(DELIVERY.STORED, DELIVERY.REACHED)).toBe(DELIVERY.STORED);
-    expect(advanceDelivery(DELIVERY.REACHED, DELIVERY.MAYBE)).toBe(DELIVERY.REACHED);
-    expect(advanceDelivery(DELIVERY.MAYBE, DELIVERY.SENT)).toBe(DELIVERY.MAYBE);
+    expect(advanceDelivery(DELIVERY.STORED, DELIVERY.MAYBE)).toBe(DELIVERY.STORED);
+    expect(advanceDelivery(DELIVERY.MAYBE, DELIVERY.MAYBE)).toBe(DELIVERY.MAYBE);
+    expect(advanceDelivery(DELIVERY.MAYBE, DELIVERY.MAYBE)).toBe(DELIVERY.MAYBE);
   });
 
   it('is idempotent, and survives junk on either side', () => {
-    expect(advanceDelivery(DELIVERY.REACHED, DELIVERY.REACHED)).toBe(DELIVERY.REACHED);
-    expect(advanceDelivery(DELIVERY.REACHED, 'nonsense')).toBe(DELIVERY.REACHED);
-    expect(advanceDelivery('nonsense', DELIVERY.SENT)).toBe(DELIVERY.SENT);
+    expect(advanceDelivery(DELIVERY.MAYBE, DELIVERY.MAYBE)).toBe(DELIVERY.MAYBE);
+    expect(advanceDelivery(DELIVERY.MAYBE, 'nonsense')).toBe(DELIVERY.MAYBE);
+    expect(advanceDelivery('nonsense', DELIVERY.MAYBE)).toBe(DELIVERY.MAYBE);
     expect(advanceDelivery(undefined, undefined)).toBe(DELIVERY.PENDING);
   });
 
@@ -79,8 +86,8 @@ describe('the ladder only goes up', () => {
 });
 
 describe('what a send produces', () => {
-  it('an acknowledged send reached the device', () => {
-    expect(deliveryAfterSend({ acked: true })).toBe(DELIVERY.REACHED);
+  it('an acknowledged send is STILL only `maybe-received` — the ack is not evidence we show', () => {
+    expect(deliveryAfterSend({ acked: true })).toBe(DELIVERY.MAYBE);
   });
 
   it('THE DOWNGRADE CASE: asked, heard nothing, sent anyway ⇒ MAYBE received', () => {
@@ -89,9 +96,9 @@ describe('what a send produces', () => {
     expect(deliveryAfterSend({ acked: false, downgraded: true })).toBe(DELIVERY.MAYBE);
   });
 
-  it('an ordinary unconfirmed send is just sent', () => {
-    expect(deliveryAfterSend({})).toBe(DELIVERY.SENT);
-    expect(deliveryAfterSend({ acked: false, downgraded: false })).toBe(DELIVERY.SENT);
+  it('an ordinary unconfirmed send is `maybe-received`', () => {
+    expect(deliveryAfterSend({})).toBe(DELIVERY.MAYBE);
+    expect(deliveryAfterSend({ acked: false, downgraded: false })).toBe(DELIVERY.MAYBE);
   });
 });
 
@@ -141,7 +148,7 @@ describe('an inbound receipt is untrusted', () => {
 
 describe('terminal states', () => {
   it('a failure REPLACES whatever the ladder had reached', () => {
-    expect(advanceDelivery(DELIVERY.SENT, DELIVERY.FAILED)).toBe(DELIVERY.FAILED);
+    expect(advanceDelivery(DELIVERY.MAYBE, DELIVERY.FAILED)).toBe(DELIVERY.FAILED);
     expect(advanceDelivery(DELIVERY.PENDING, DELIVERY.UNDELIVERABLE)).toBe(DELIVERY.UNDELIVERABLE);
   });
 
@@ -155,7 +162,7 @@ describe('terminal states', () => {
   it('and nothing else resurrects it — a stale ack must not un-fail a message', () => {
     // The user was told it did not go. A late confirmation arriving afterwards is not a reason to quietly
     // change that story.
-    expect(advanceDelivery(DELIVERY.FAILED, DELIVERY.REACHED)).toBe(DELIVERY.FAILED);
+    expect(advanceDelivery(DELIVERY.FAILED, DELIVERY.MAYBE)).toBe(DELIVERY.FAILED);
     expect(advanceDelivery(DELIVERY.UNDELIVERABLE, DELIVERY.STORED)).toBe(DELIVERY.UNDELIVERABLE);
   });
 

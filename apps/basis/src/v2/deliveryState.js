@@ -52,9 +52,19 @@ export const DELIVERY = Object.freeze({
   FAILED: 'failed',
   UNDELIVERABLE: 'undeliverable',
   // The hinge, and the far end.
-  SENT: 'sent',
+  //
+  // Decision 1 (2026-07-29) retired two states that used to sit here:
+  //
+  //   `sent`           — it read as success and meant only "the fan-out accepted it". Every message that
+  //                      left the device stopped here, so the app said the same thing for "their phone
+  //                      took it" and "we never heard anything back". That was the over-claim (S2/J-D2).
+  //   `reached-device` — the transport ack. Deliberately never reported: a phone acks whatever its owner's
+  //                      receipt setting says, so surfacing it would let anyone identify a peer who turned
+  //                      receipts off, by watching where the ladder stops (S2/J-D5).
+  //
+  // What remains is what we can honestly say: it left here and may have arrived (`maybe-received`), or
+  // someone CHOSE to tell us it arrived (`stored`).
   MAYBE: 'maybe-received',
-  REACHED: 'reached-device',
   STORED: 'stored',
 });
 
@@ -63,7 +73,7 @@ export const DELIVERY_TERMINAL = Object.freeze([DELIVERY.FAILED, DELIVERY.UNDELI
 
 /** Ordered weakest → strongest. The order IS the semantics; see rule 1. */
 export const DELIVERY_ORDER = Object.freeze([
-  DELIVERY.PENDING, DELIVERY.SENT, DELIVERY.MAYBE, DELIVERY.REACHED, DELIVERY.STORED,
+  DELIVERY.PENDING, DELIVERY.MAYBE, DELIVERY.STORED,
 ]);
 
 /** Every state → its locale key. Shared, so web and mobile cannot word the same fact differently. */
@@ -71,9 +81,7 @@ export const DELIVERY_LABELS = Object.freeze({
   [DELIVERY.PENDING]:       'circle.chat.delivery.pending',
   [DELIVERY.FAILED]:        'circle.chat.delivery.failed',
   [DELIVERY.UNDELIVERABLE]: 'circle.chat.delivery.undeliverable',
-  [DELIVERY.SENT]:          'circle.chat.delivery.sent',
   [DELIVERY.MAYBE]:         'circle.chat.delivery.maybe_received',
-  [DELIVERY.REACHED]:       'circle.chat.delivery.reached_device',
   [DELIVERY.STORED]:        'circle.chat.delivery.stored',
 });
 
@@ -114,11 +122,17 @@ export function advanceDelivery(current, next) {
  * @param {boolean} outcome.acked        the transport ack came back
  * @param {boolean} [outcome.downgraded] we asked for an ack, timed out, and sent fire-and-forget anyway
  */
-export function deliveryAfterSend({ acked = false, downgraded = false } = {}) {
-  if (acked) return DELIVERY.REACHED;
-  // The distinction Frits drew: a plain send that has not been confirmed YET is `sent`; one where we asked
-  // and heard nothing is `maybe-received`, because it may well have arrived.
-  return downgraded ? DELIVERY.MAYBE : DELIVERY.SENT;
+export function deliveryAfterSend() {
+  // Always the same answer, and that is the decision rather than a simplification.
+  //
+  // The transport ack is not evidence we may show: a device acknowledges a message whatever its owner's
+  // receipt setting says, so reporting it would make a receipts-off peer identifiable by where their
+  // ladder stops (S2/J-D5). And a send with no confirmation is not a success, which is what the retired
+  // `sent` state implied (S2/J-D2). So an attempt that left this device is `maybe-received` — it may well
+  // have arrived, and we do not know.
+  //
+  // Positive evidence exists, but only one kind: a receipt the recipient CHOSE to send (`stored`).
+  return DELIVERY.MAYBE;
 }
 
 /**

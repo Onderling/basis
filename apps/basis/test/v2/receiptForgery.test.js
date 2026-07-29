@@ -56,21 +56,21 @@ describe('J-A5 — the attack, now closed', () => {
   });
 
   it('an honest receipt for a message I DID send still applies — the gate is not a wall', () => {
-    const map = mapOf([['m-1', DELIVERY.SENT]]);
+    const map = mapOf([['m-1', DELIVERY.MAYBE]]);
     expect(applyReceipt({ subtype: RECEIPT_MESSAGE, messageId: 'm-1' }, 'bo', map)).toBe(true);
     expect(map.get('m-1')).toBe(DELIVERY.STORED);
   });
 
   it('the optional recipient check refuses a sender the host says was not a recipient', () => {
-    const map = mapOf([['m-1', DELIVERY.SENT]]);
+    const map = mapOf([['m-1', DELIVERY.MAYBE]]);
     const isRecipient = (from) => from === 'bo';
     expect(applyReceipt({ subtype: RECEIPT_MESSAGE, messageId: 'm-1' }, 'mallory', map, { isRecipient })).toBe(false);
-    expect(map.get('m-1')).toBe(DELIVERY.SENT);          // untouched
+    expect(map.get('m-1')).toBe(DELIVERY.MAYBE);          // untouched
     expect(applyReceipt({ subtype: RECEIPT_MESSAGE, messageId: 'm-1' }, 'bo', map, { isRecipient })).toBe(true);
   });
 
   it('a throwing recipient predicate refuses rather than letting the receipt through', () => {
-    const map = mapOf([['m-1', DELIVERY.SENT]]);
+    const map = mapOf([['m-1', DELIVERY.MAYBE]]);
     const isRecipient = () => { throw new Error('roster unavailable'); };
     expect(applyReceipt({ subtype: RECEIPT_MESSAGE, messageId: 'm-1' }, 'bo', map, { isRecipient })).toBe(false);
   });
@@ -80,7 +80,7 @@ describe('what is still OPEN — a real recipient can claim `stored` early', () 
   it('without the host predicate, any sender is accepted for a message I did send', () => {
     // This is the residue, kept visible on purpose. Bo is genuinely in the circle; so is Mallory, and
     // she received the fan-out too — so she can send its receipt before Bo's device does.
-    const map = mapOf([['m-1', DELIVERY.SENT]]);
+    const map = mapOf([['m-1', DELIVERY.MAYBE]]);
     expect(applyReceipt({ subtype: RECEIPT_MESSAGE, messageId: 'm-1' }, 'mallory', map)).toBe(true);
     // Closing this needs the per-message recipient set, which `deliverySettings` does not hold. The seam
     // is there (`isRecipient`); wiring it is a shell job, and it is on REMAINING-WORK.

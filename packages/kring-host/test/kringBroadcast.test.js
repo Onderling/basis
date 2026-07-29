@@ -1,3 +1,10 @@
+// Vocabulary note (decision 1, 2026-07-29): `sent` and `reached-device` are retired. `sent` read as
+// success while meaning only "the fan-out accepted it", so the app said the same thing for "their phone
+// took it" and "we never heard anything back" (S2/J-D2). `reached-device` is the transport ack, never
+// shown, because a phone acks whatever its owner's receipt setting says — surfacing it would identify a
+// peer who turned receipts off by where their ladder stops (S2/J-D5). The resting state for an
+// unconfirmed message is `maybe-received`.
+
 import { describe, it, expect, vi } from 'vitest';
 import { kringChatMessageEvent, broadcastKringFanOut, classifyFanOut, mediaForKringWire } from '../src/kringBroadcast.js';
 
@@ -93,7 +100,7 @@ describe('mediaForKringWire — the wire-boundary whitelist (media P1 fan-out)',
 describe('broadcastKringFanOut', () => {
   const base = { circleId: 'c1', msgId: 'm1', text: 'hi', ts: 9 };
 
-  it('pending → sent on a clean result, and calls the RAW app-targeted skill', async () => {
+  it('pending → maybe-received on a clean result, and calls the RAW app-targeted skill', async () => {
     const map = mapOf();
     const calls = [];
     const rawCallSkill = vi.fn(async (app, op, args) => { calls.push([app, op, args]); return {}; });
@@ -102,7 +109,7 @@ describe('broadcastKringFanOut', () => {
     // Legacy wire pin: WITHOUT media the args are byte-identical to the pre-media shape
     // (no `media` key at all — legacy receivers see exactly what they always saw).
     expect(calls[0]).toEqual(['stoop', 'broadcastKringMessage', { groupId: 'c1', text: 'hi', msgId: 'm1', ts: 9 }]);
-    expect(map.get('m1')).toBe('sent');
+    expect(map.get('m1')).toBe('maybe-received');
     expect(onChange).toHaveBeenCalledTimes(2);   // pending + sent
   });
 
@@ -123,7 +130,7 @@ describe('broadcastKringFanOut', () => {
     });
     expect(JSON.stringify(args)).not.toContain('localPath');
     expect(args.media).not.toHaveProperty('stored');
-    expect(map.get('m1')).toBe('sent');
+    expect(map.get('m1')).toBe('maybe-received');
   });
 
   it('a non-media-card `media` arg is dropped, not sent (legacy args shape)', async () => {
@@ -166,8 +173,8 @@ describe('broadcastKringFanOut', () => {
 
 describe('classifyFanOut', () => {
   it('no errors → sent', () => {
-    expect(classifyFanOut({})).toBe('sent');
-    expect(classifyFanOut({ sent: 3, errors: [] })).toBe('sent');
+    expect(classifyFanOut({})).toBe('maybe-received');
+    expect(classifyFanOut({ sent: 3, errors: [] })).toBe('maybe-received');
   });
   it('whole-op {error} → failed (transient)', () => {
     expect(classifyFanOut({ error: 'chat-unavailable' })).toBe('failed');

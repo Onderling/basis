@@ -5,6 +5,12 @@
  * with receipts off would let anyone spot that setting by looking at a conversation — which is exactly the
  * disclosure `deliveryState.js` refuses to make. Null means render nothing.
  */
+// Vocabulary note (decision 1, 2026-07-29): `sent` and `reached-device` are retired — `sent` read as
+// success while meaning only "the fan-out accepted it" (S2/J-D2), and `reached-device` is the transport
+// ack, never shown because a phone acks whatever its owner's receipt setting says (S2/J-D5). The resting
+// state for an unconfirmed message is `maybe-received`; `stored` is the only positive rung, and it can
+// only come from a receipt the recipient CHOSE to send.
+
 import { describe, it, expect } from 'vitest';
 import * as mod from '../../src/v2/deliverySettings.js';
 import {
@@ -72,7 +78,7 @@ describe('the two settings pull in opposite directions', () => {
 describe('what a row shows', () => {
   it('labels my own message with its state', () => {
     // One namespace for the wording — the states share a home with the ones that already existed.
-    expect(deliveryLabelFor(DELIVERY.REACHED)).toBe('circle.chat.delivery.reached_device');
+    expect(deliveryLabelFor(DELIVERY.MAYBE)).toBe('circle.chat.delivery.maybe_received');
     expect(deliveryLabelFor(DELIVERY.MAYBE)).toBe('circle.chat.delivery.maybe_received');
   });
 
@@ -112,8 +118,8 @@ describe('joining delivery onto rows', () => {
   });
 
   it('accepts a Map as well as an object', () => {
-    const out = withDelivery(rows, new Map([['m1', DELIVERY.REACHED]]));
-    expect(out[0].delivery).toBe('reached-device');
+    const out = withDelivery(rows, new Map([['m1', DELIVERY.MAYBE]]));
+    expect(out[0].delivery).toBe('maybe-received');
   });
 
   it('survives junk input', () => {
@@ -187,7 +193,7 @@ describe('the receipt sender (inbox onStored → wire)', () => {
 describe('applying an inbound receipt', () => {
   it('advances the SHARED map to stored', () => {
     const map = createDeliveryStateMap();
-    map.set('m1', 'reached-device');
+    map.set('m1', 'maybe-received');
     expect(applyReceipt({ subtype: RECEIPT_MESSAGE, messageId: 'm1' }, 'peer-a', map)).toBe(true);
     expect(map.get('m1')).toBe('stored');
   });

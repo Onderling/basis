@@ -858,3 +858,20 @@ and it makes picking the wrong kind first recoverable.
 
 A switch now visibly moves things, which is the point, and should be said out loud in the UI rather than
 happening quietly.
+
+### 3a · `SETTING_KINDS` gains `multi`, and why that does not break the freeze
+
+Building decision 3's surface needed a control the manifest could not express: a set of options where any
+number may be on. `SETTING_KINDS` is described in `validate.js` as a **frozen allow-list**, so extending it
+deserves stating.
+
+The freeze is mechanical rather than a policy. Its stated reason is that "the wizard/form renderer picks a
+control per kind" — i.e. the list is closed so that nothing can be *declared* without something able to
+*render* it. Renderers for `multi` landed in both shells in the same commit, so the property the freeze
+protects is intact.
+
+One thing `multi` does differently, and it is the interesting half: it names its option source
+(`optionsFrom`) instead of listing options (`of`). The conversation-kinds axis is driven by the entry-kind
+registry, and a list frozen into a manifest drifts the moment that registry gains a member. The validator
+**refuses** both a `multi` with no source and a `multi` that supplies `of` — making the drift
+unrepresentable rather than merely discouraged.

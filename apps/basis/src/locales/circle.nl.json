@@ -454,12 +454,8 @@
     },
     "delivery": {
       "maybe_received": {
-        "text": "Misschien aangekomen",
-        "doc": "We asked for confirmation, got none, and sent it anyway (fire-and-forget). It may have arrived and the confirmation may have been lost — genuinely unknown, and \"Sent\" would over-claim. (Frits, 2026-07-28.)"
-      },
-      "reached_device": {
-        "text": "Aangekomen op hun apparaat",
-        "doc": "The peer TRANSPORT acknowledged. Sent before their app sees it, so it does NOT mean stored."
+        "text": "Verzonden · misschien ontvangen",
+        "doc": "Het is van dit apparaat vertrokken. Of het is aangekomen weten we niet, tenzij de ander dat zelf laat weten."
       },
       "stored": {
         "text": "Hun app heeft het",
@@ -468,10 +464,6 @@
       "pending": {
         "text": "Bezig met versturen…",
         "doc": "δ.2 — bubble icon caption while the kring fan-out (broadcastKringMessage) is in flight."
-      },
-      "sent": {
-        "text": "Verstuurd",
-        "doc": "δ.2 — bubble icon caption after a successful kring fan-out.  Currently never surfaced (the happy path renders nothing) but reserved for future use."
       },
       "failed": {
         "text": "Versturen mislukt (tik om opnieuw te proberen)",

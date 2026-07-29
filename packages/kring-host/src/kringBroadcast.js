@@ -122,7 +122,10 @@ export const PERMANENT_FANOUT_REASONS = new Set(['recipient-pubkey-unknown']);
 export function classifyFanOut(r) {
   if (r?.error) return 'failed';                 // chat-unavailable / members-unavailable → transient
   const errors = Array.isArray(r?.errors) ? r.errors : [];
-  if (errors.length === 0) return 'sent';
+  // A clean fan-out means the send left this device — not that it arrived. Decision 1 (2026-07-29): that
+  // is `maybe-received`, because we asked for nothing we are willing to show and heard nothing back. The
+  // retired `sent` said the same thing in a word that reads like success.
+  if (errors.length === 0) return 'maybe-received';
   if (errors.some((e) => !PERMANENT_FANOUT_REASONS.has(e?.reason))) return 'failed';
   return 'undeliverable';                         // all permanent
 }
@@ -139,7 +142,7 @@ export function broadcastKringFanOut({ rawCallSkill, circleId, msgId, text, ts, 
     }))
     .then((r) => {
       const state = classifyFanOut(r);
-      if (state !== 'sent') console.info('[kring-chat] fan-out', state, '—', r?.error ?? r?.errors);
+      if (state !== 'maybe-received') console.info('[kring-chat] fan-out', state, '—', r?.error ?? r?.errors);
       mark(state);
     })
     .catch((err) => { console.warn('[kring-chat] fan-out failed:', err?.message ?? err); mark('failed'); });

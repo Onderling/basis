@@ -11,18 +11,14 @@
  * SAME send twice, once against a Bo who turned receipts off and once against a Bo who is simply
  * offline, and compare the two observations whole.
  *
- * **Result of the walk (2026-07-29): J-D5 holds — but for a reason worth knowing.** It holds because the
- * ladder's middle rungs are not wired. `classifyFanOut` (kringBroadcast.js) produces only
- * `failed | sent | undeliverable`; `pending` is set before the send and `stored` arrives with a receipt.
- * `reached-device` and `maybe-received` are never produced by the product at all — see
- * `deliveryLadderRungs.test.js` next door, which is the S2/J-D2 finding.
+ * **Result, after decision 1 (2026-07-29): J-D5 holds BY CONSTRUCTION.** It used to hold by accident —
+ * the ack rungs were simply unwired, and wiring them would have made a receipts-off peer identifiable by
+ * where their ladder stopped. The decision removed that possibility instead of relying on it: the
+ * transport ack is never reported, so there is no rung that could differ between "receipts off" and
+ * "offline". Both rest at `maybe-received`.
  *
- * So today both Bos look like `sent`, and Anna cannot tell them apart. The moment someone wires the
- * transport ack — which is what `reached-device` is FOR — a receipts-off Bo will settle at
- * `reached-device` while an offline Bo stays at `sent`, and the setting becomes readable from the shape
- * of the ladder. That is not hypothetical: the ack exists, it simply is not reported yet.
- *
- * Both cases are therefore pinned below: what holds now, and what will break when the rungs land.
+ * The distinguishing signal is therefore not merely absent, it is unrepresentable — which is the only
+ * form of this promise worth having.
  */
 import { describe, it, expect } from 'vitest';
 import {
@@ -36,14 +32,11 @@ import { classifyFanOut } from '@onderling/kring-host/kringBroadcast';
  * arrived back from Bo. Returns EVERYTHING the sender learns — the point is that this whole object must
  * match between the two scenarios, not merely its `state` field.
  */
-function observeSend({ bobPolicy, bobOnline, ackRungsWired = false }) {
+function observeSend({ bobPolicy, bobOnline }) {
   const messageId = 'm-1';
-  // What the product does TODAY: the fan-out reports success or failure, with no notion of an ack, so a
-  // send that left the device reads `sent` whether or not the peer's phone is on.
-  let state = ackRungsWired
-    // …and what it would do once the ack is reported, which is what `deliveryAfterSend` is written for.
-    ? deliveryAfterSend({ acked: bobOnline === true })
-    : classifyFanOut({ errors: [] });          // 'sent'
+  // A send that left the device: `maybe-received`, whether or not Bo's phone is on. There is no branch
+  // here any more, and that absence IS the property — the ack cannot enter the observation.
+  let state = classifyFanOut({ errors: [] });
 
   // Rung 4: the app-level receipt. Bo's device only emits one when it stored the message AND his policy
   // allows it — so an offline Bo and a receipts-off Bo both send nothing.
@@ -66,34 +59,18 @@ function observeSend({ bobPolicy, bobOnline, ackRungsWired = false }) {
 }
 
 describe('J-D5 — receipts OFF is indistinguishable from OFFLINE', () => {
-  it('as the product stands, they ARE indistinguishable — both read `sent`', () => {
+  it('they are identical, field for field', () => {
     const receiptsOff = observeSend({ bobPolicy: { sendReceipts: false }, bobOnline: true });
     const offline     = observeSend({ bobPolicy: { sendReceipts: true },  bobOnline: false });
     expect(receiptsOff).toEqual(offline);
-    expect(receiptsOff.state).toBe(DELIVERY.SENT);
+    expect(receiptsOff.state).toBe(DELIVERY.MAYBE);
   });
 
-  it('…but the moment the ack rungs are wired, the setting becomes readable from the ladder', () => {
-    const receiptsOff = observeSend({ bobPolicy: { sendReceipts: false }, bobOnline: true, ackRungsWired: true });
-    const offline     = observeSend({ bobPolicy: { sendReceipts: true },  bobOnline: false, ackRungsWired: true });
-
-    // Walked 2026-07-29. The journey asks for these to be identical; once the acks are reported they are
-    // not, and the reason is
-    // structural rather than an oversight: the transport ack is not disableable ("it is how the wire
-    // works", deliveryState.js), so Bo's phone acknowledges the message whatever his receipt setting
-    // says. Receipts-off therefore settles at `reached-device`; a genuinely offline phone never acks at
-    // all and stays at `sent`.
-    //
-    // No string announces anything — the label checks below all pass. The leak is the SHAPE: a message
-    // that reaches the device and then never advances means "this person turned receipts off", because
-    // for everyone else `reached-device` is a state you pass through on the way to `stored`.
-    //
-    // Recorded rather than patched: closing it is a product decision (collapse `reached-device` into
-    // `sent` for everyone? hold the rung back until a receipt would have been due?), and every option
-    // costs honest information that the ladder exists to give. See REMAINING-WORK.md → "? Needs Frits".
-    expect(receiptsOff.state).toBe(DELIVERY.REACHED);
-    expect(offline.state).toBe(DELIVERY.SENT);
-    expect(receiptsOff).not.toEqual(offline);      // ← the finding, pinned so a fix flips this test
+  it('…and no ack can enter the observation, so nothing could make them differ', () => {
+    // The old failure mode was a FUTURE one: wire the ack and the setting becomes readable. That future
+    // is closed — `deliveryAfterSend` returns the same rung whatever the transport reported.
+    expect(deliveryAfterSend({ acked: true })).toBe(deliveryAfterSend({ acked: false }));
+    expect(Object.values(DELIVERY)).not.toContain('reached-device');
   });
 
   it('what DOES hold: neither observation carries a receipt, so nothing states the choice outright', () => {

@@ -24,7 +24,7 @@
  * silently doing neither is what this test exists to stop.
  */
 import { describe, it, expect } from 'vitest';
-import { DELIVERY, DELIVERY_ORDER, DELIVERY_TERMINAL, deliveryAfterSend } from '../../src/v2/deliveryState.js';
+import { DELIVERY, DELIVERY_ORDER, DELIVERY_TERMINAL } from '../../src/v2/deliveryState.js';
 import { classifyFanOut } from '@onderling/kring-host/kringBroadcast';
 import { KRING_KINDS } from '../../src/v2/kringTemplates.js';
 import { policyPatchFromState, finalSubmit } from '../../src/core/wizards/createGroupState.js';
@@ -39,7 +39,7 @@ const VOCABULARIES = {
     declared: [...DELIVERY_ORDER, ...DELIVERY_TERMINAL],
     produced: () => new Set([
       DELIVERY.PENDING,                                       // kringBroadcast marks it before the fan-out
-      classifyFanOut({ errors: [] }),                         // sent
+      classifyFanOut({ errors: [] }),                         // maybe-received
       classifyFanOut({ error: 'chat-unavailable' }),          // failed
       classifyFanOut({ errors: [{ reason: 'some-transient-thing' }] }),      // failed
       // …and the permanent case. The reason string matters: only `recipient-pubkey-unknown` is permanent
@@ -48,14 +48,11 @@ const VOCABULARIES = {
       classifyFanOut({ errors: [{ reason: 'recipient-pubkey-unknown' }] }),  // undeliverable
       DELIVERY.STORED,                                        // an inbound, now-authenticated receipt
     ]),
-    knownGaps: {
-      [DELIVERY.MAYBE]:
-        'S2/J-D2, 2026-07-29: `deliveryAfterSend` is called only from tests and `sendMessage`\'s '
-        + '`onDelivery` report is wired only in tests, so an unconfirmed send reads `sent`. Entangled '
-        + 'with J-D5 — see REMAINING-WORK.md "? Needs Frits".',
-      [DELIVERY.REACHED]:
-        'S2/J-D2, same cause: no transport ack is reported to the UI layer.',
-    },
+    // CLOSED 2026-07-29 (decision 1) — not by wiring the two missing rungs, but by RETIRING them.
+    // `sent` read as success while meaning only "the fan-out accepted it"; `reached-device` is the
+    // transport ack, which is deliberately never shown because a phone acks whatever its owner's receipt
+    // setting says. What remains is what the product can honestly say.
+    knownGaps: {},
   },
 
   'circle kinds': {
@@ -112,17 +109,22 @@ describe('FITNESS: every declared state has a producer', () => {
   }
 });
 
-describe('FITNESS: the delivery gap, stated as its own fact', () => {
-  it('`maybe-received` and `reached-device` are the two that carry uncertainty', () => {
-    // Worth its own assertion because WHICH states are missing is the point. Losing the two uncertain
-    // rungs is not a cosmetic gap: it is the difference between admitting doubt and claiming success.
-    expect(deliveryAfterSend({ acked: false, downgraded: true })).toBe(DELIVERY.MAYBE);
-    expect(deliveryAfterSend({ acked: true })).toBe(DELIVERY.REACHED);
-    const produced = VOCABULARIES['delivery states'].produced();
-    expect(produced.has(DELIVERY.MAYBE)).toBe(false);
-    expect(produced.has(DELIVERY.REACHED)).toBe(false);
+describe('FITNESS: the delivery ladder says only what it can produce', () => {
+  it('every rung is reachable — the honesty gap is closed by subtraction, not by wiring', () => {
+    // Was the S2/J-D2 finding: seven states declared, five produced, and the two missing ones were
+    // exactly the two that carried uncertainty. Decision 1 removed them instead of reporting them, so
+    // there is nothing left in the vocabulary that the product cannot say.
+    const spec = VOCABULARIES['delivery states'];
+    const produced = spec.produced();
+    expect(spec.declared.filter((st) => !produced.has(st))).toEqual([]);
+  });
+
+  it('`sent` and `reached-device` are gone from the vocabulary entirely', () => {
+    expect(Object.values(DELIVERY)).not.toContain('sent');
+    expect(Object.values(DELIVERY)).not.toContain('reached-device');
   });
 });
+
 
 describe('FITNESS: a circle can carry the kind it was created as', () => {
   it('every kind the wizard offers survives a create', () => {

@@ -29,6 +29,26 @@ function makeMsg(text) {
   };
 }
 
+/**
+ * Let the post-timer async chain finish.
+ *
+ * `NudgeTimer.onFire` returns `void | Promise<void>`: the timer callback KICKS OFF the
+ * scheduler → agent.dispatch → bridge.sendReply chain but does not await it. `advanceTimersByTimeAsync`
+ * flushes microtasks once, which is usually enough and — under load, with the whole suite running —
+ * sometimes is not. That produced a genuine intermittent failure, not a cross-file leak.
+ *
+ * So POSITIVE assertions wait for the observable instead of assuming it landed on a particular tick.
+ * Bounded, and it still fails if the thing never happens. NEGATIVE assertions ("nothing fired yet") must
+ * NOT use this — there is nothing to wait for, and waiting would only weaken them.
+ */
+async function settled(predicate, turns = 50) {
+  for (let i = 0; i < turns; i++) {
+    if (predicate()) return true;
+    await vi.advanceTimersByTimeAsync(0);
+  }
+  return predicate();
+}
+
 describe('Phase 4 e2e — Scheduler + HouseholdAgent', () => {
   /** @type {InMemoryStore} */ let store;
   /** @type {MockBridge} */    let bridge;
@@ -75,6 +95,7 @@ describe('Phase 4 e2e — Scheduler + HouseholdAgent', () => {
     expect(bridge.size()).toBe(0);
     // Mature: nudge fires → scheduler dispatches → bridge.sendReply called.
     await vi.advanceTimersByTimeAsync(30 * 60 * 1000 + 100);
+    await settled(() => bridge.size() >= 1);
     expect(bridge.size()).toBe(1);
     const sent = bridge.pop();
     expect(sent.text).toMatch(/bread/i);
@@ -96,6 +117,7 @@ describe('Phase 4 e2e — Scheduler + HouseholdAgent', () => {
     // The most recent `schedule` resets the timer; nudge matures 1 h
     // after the LAST add.
     await vi.advanceTimersByTimeAsync(60 * 60 * 1000 + 100);
+    await settled(() => bridge.size() >= 1);
     expect(bridge.size()).toBe(1);
     const sent = bridge.pop();
     // The single nudge's text references at least one of the pending items.
@@ -194,6 +216,7 @@ describe('Phase 4 e2e — Scheduler suppression hook (5.7c)', () => {
     quiet = false;
     await bridge.emit(makeMsg('add shopping milk'));
     await vi.advanceTimersByTimeAsync(60 * 60 * 1000 + 100);
+    await settled(() => bridge.size() >= 1);
     expect(bridge.size()).toBe(1);
     await scheduler.stop();
   });

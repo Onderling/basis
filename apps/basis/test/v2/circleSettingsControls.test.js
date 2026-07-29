@@ -13,9 +13,20 @@ import { basisManifest } from '../../src/index.js';
 const CONTROLS = settingsControlsFromManifest(basisManifest);
 
 describe('§9 settings controls — declared on the manifest (invariant #4)', () => {
-  it('the settings op carries the three controls', () => {
+  it('the settings op carries its controls, declared in the manifest', () => {
     const ids = CONTROLS.map((c) => c.id);
-    expect(ids).toEqual(['transport-mode', 'relay-endpoint', 'private-dm']);
+    expect(ids).toEqual(['transport-mode', 'relay-endpoint', 'conversation-kinds', 'private-dm']);
+  });
+
+  it('the conversation-kinds control resolves its options from the registry, not from the manifest', () => {
+    // Decision 3 (2026-07-29). Declared with `optionsFrom` rather than a frozen `of` list: the entry-kind
+    // registry is the source, so adding a kind there cannot leave this control showing a stale set.
+    const ck = CONTROLS.find((c) => c.id === 'conversation-kinds');
+    expect(ck).toMatchObject({
+      kind: 'multi', scope: 'circle', policyField: 'conversationKinds',
+      optionsFrom: 'conversationKinds', adminOnly: true,
+    });
+    expect(ck.of, 'a frozen option list would drift from the registry').toBeUndefined();
   });
   it('the private-DM control is a circle-policy toggle gated by the relayRoute predicate', () => {
     const dm = CONTROLS.find((c) => c.id === 'private-dm');

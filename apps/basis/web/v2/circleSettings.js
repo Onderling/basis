@@ -19,6 +19,7 @@
  * `title` opt).
  */
 import { CIRCLE_FEATURES, CIRCLE_POLICY_ENUMS } from '../../src/v2/circlePolicy.js';
+import { conversationKindsRows } from '../../src/v2/conversationKinds.js';
 import { renderThemeToggle } from './themeToggle.js';
 // Phase 4 §9 — the settings-surface CONTROLS + the `enabledWhen` fold (route × capability).
 import { resolveControlEnablement } from '../../src/v2/circleSettingsControls.js';
@@ -498,6 +499,39 @@ function renderConnectionControls(container, { controls, policy, transport, tr, 
         span.textContent = ctl.optLabelPrefix ? tr(`${ctl.optLabelPrefix}.${opt}`) : opt;
         orow.append(radio, span);
         row.appendChild(orow);
+      }
+    } else if (ctl.kind === 'multi') {
+      // Decision 3's admin control. The rows come from the shared model, so web and mobile cannot offer
+      // different kinds or compute a different next list; the shell adds markup and persists what it was
+      // handed (invariants #1/#2).
+      const lab = document.createElement('div');
+      lab.className = 'circle-settings__control-label';
+      lab.textContent = tr(ctl.labelKey);
+      row.appendChild(lab);
+      for (const r of conversationKindsRows({
+        circleSetting: policy?.conversationKinds ?? null,
+        templateKind:  policy?.kind ?? null,
+      })) {
+        const orow = document.createElement('label');
+        orow.className = 'circle-settings__control-opt';
+        const box = document.createElement('input');
+        box.type = 'checkbox';
+        box.dataset.kind = r.kind;
+        box.checked = r.on;
+        box.disabled = !state.enabled;
+        box.addEventListener('change', () => emit({ [ctl.policyField]: r.next }));
+        const span = document.createElement('span');
+        span.textContent = tr(r.labelKey);
+        orow.append(box, span);
+        row.appendChild(orow);
+      }
+      if (ctl.hintKey) {
+        const hint = document.createElement('div');
+        hint.className = 'circle-settings__control-hint';
+        // Says that turning a kind off hides rather than deletes — the property J-CW4 checks, and the one
+        // people will not assume unless told.
+        hint.textContent = tr(ctl.hintKey);
+        row.appendChild(hint);
       }
     } else if (ctl.kind === 'text') {
       const lab = document.createElement('label');

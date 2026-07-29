@@ -60,6 +60,9 @@ export function buildSettingsForm(manifest, { scope, values = {} } = {}) {
     label:     s.label,
     control:   s.kind,                                             // widget hint for the shell
     choices:   s.kind === 'choice' ? (Array.isArray(s.of) ? s.of : []) : undefined,
+    // `multi` carries the NAME of its option source; the shell resolves it against the registry at render
+    // time, so adding a kind to that registry cannot leave this control behind.
+    optionsFrom: s.kind === 'multi' ? s.optionsFrom : undefined,
     value:     values[s.key] !== undefined ? values[s.key] : s.default,
     required:  isSettingRequired(s, values),
     adminOnly: !!s.adminOnly,

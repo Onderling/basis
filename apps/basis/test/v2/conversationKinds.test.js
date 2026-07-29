@@ -11,6 +11,7 @@ import { KRING_KINDS, applyTemplate, markAxisTouched } from '../../src/v2/kringT
 import {
   defaultConversationKinds, availableConversationKinds, TEMPLATE_CONVERSATION_KINDS,
   resolveConversationKinds, setConversationKind, withDerivedChatFeature, chatIsInConversation,
+  conversationKindsRows,
 } from '../../src/v2/conversationKinds.js';
 
 describe('the defaults are derived, not copied', () => {
@@ -157,5 +158,50 @@ describe('features.chat is a VIEW of the kinds list (decision 3, 2026-07-29)', (
       const kinds = resolveConversationKinds({ templateKind: kind });
       expect(chatIsInConversation({ templateKind: kind })).toBe(kinds.includes('chat-message'));
     }
+  });
+});
+
+describe('conversationKindsRows — the admin control’s model (decision 3’s missing surface)', () => {
+  it('offers every HUMAN kind, on or off, so an admin sees what a conversation could contain', () => {
+    const rows = conversationKindsRows({ templateKind: 'buurt' });
+    expect(rows.map((r) => r.kind).sort()).toEqual(['aanbod', 'chat-message', 'leen', 'task', 'vraag'].sort());
+    expect(rows.find((r) => r.kind === 'chat-message').on).toBe(false);   // a buurt starts without chat
+    expect(rows.find((r) => r.kind === 'vraag').on).toBe(true);
+  });
+
+  it('offers NO governance kind — the projection enforces the lane, so a checkbox would do nothing', () => {
+    // Worse than useless: it would invite an admin to try putting decisions in the conversation, which
+    // J-L1 exists to prevent. `availableConversationKinds()` returns those kinds; this control filters.
+    const kinds = conversationKindsRows({ templateKind: 'household' }).map((r) => r.kind);
+    expect(kinds).not.toContain('governance');
+    for (const k of kinds) expect(ENTRY_KINDS[k].lane).toBe(LANE.HUMAN);
+  });
+
+  it('each row carries the WHOLE next list, so a shell persists what it displayed', () => {
+    const rows = conversationKindsRows({ templateKind: 'buurt' });
+    const chat = rows.find((r) => r.kind === 'chat-message');
+    expect(chat.next).toContain('chat-message');                 // tapping an off row turns it on
+    const vraag = rows.find((r) => r.kind === 'vraag');
+    expect(vraag.next).not.toContain('vraag');                   // tapping an on row turns it off
+    // …and the rest of the list is untouched either way.
+    expect(vraag.next).toContain('aanbod');
+  });
+
+  it('an admin MAY empty the conversation — unlike a reader, who cannot empty their own filter', () => {
+    // The admin decides what the circle IS; the reader decides what they look at. `chatFilterChips`
+    // refuses to produce an empty filter; this deliberately does not.
+    let list = resolveConversationKinds({ templateKind: 'buurt' });
+    for (const k of [...list]) {
+      const row = conversationKindsRows({ circleSetting: list }).find((r) => r.kind === k);
+      list = row.next;
+    }
+    expect(list).toEqual([]);
+    expect(resolveConversationKinds({ circleSetting: [] })).toEqual([]);
+  });
+
+  it('the rows agree with what the conversation will actually render', () => {
+    const rows = conversationKindsRows({ templateKind: 'vriendenkring' });
+    const shown = resolveConversationKinds({ templateKind: 'vriendenkring' });
+    for (const r of rows) expect(r.on).toBe(shown.includes(r.kind));
   });
 });

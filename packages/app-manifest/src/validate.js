@@ -55,7 +55,11 @@ const VERB_SET   = new Set(VERBS);
  * `member`=circle-member picker.  Distinct from PARAM_KINDS (settings are user-facing config,
  * not op arguments).
  */
-export const SETTING_KINDS = Object.freeze(['toggle', 'choice', 'text', 'number', 'member']);
+// `multi` — a set of options where any number may be on, and the option list is supplied at RENDER time
+// rather than declared here (decision 3, 2026-07-29: the conversation-kinds axis is registry-driven, so a
+// list frozen into the manifest would drift from the registry the moment a kind is added). That is why
+// `multi` deliberately does NOT require `of` the way `choice` does — see the check below.
+export const SETTING_KINDS = Object.freeze(['toggle', 'choice', 'multi', 'text', 'number', 'member']);
 const SETTING_KIND_SET = new Set(SETTING_KINDS);
 /** a setting's resolution scope: `circle` = admin template, `user` = member pref. */
 export const SETTING_SCOPES = Object.freeze(['circle', 'user']);
@@ -762,6 +766,23 @@ function validateSetting(s, path, errors, keySet) {
       errors.push({ path: `${path}/of`, message: "setting.kind='choice' requires a non-empty 'of' array" });
     } else if (s.of.some((v) => typeof v !== 'string')) {
       errors.push({ path: `${path}/of`, message: 'setting.of must contain only strings' });
+    }
+  }
+  if (s.kind === 'multi') {
+    // A `multi` names WHERE its options come from instead of listing them. Requiring that name is what
+    // stops a registry-driven control being declared with no way to populate it — the "declared but
+    // nothing produces it" failure this repo has now hit three times.
+    if (typeof s.optionsFrom !== 'string' || s.optionsFrom === '') {
+      errors.push({
+        path:    `${path}/optionsFrom`,
+        message: "setting.kind='multi' requires 'optionsFrom' — the name of the option source the shell resolves",
+      });
+    }
+    if (s.of !== undefined) {
+      errors.push({
+        path:    `${path}/of`,
+        message: "setting.kind='multi' takes 'optionsFrom', not 'of' — a frozen list would drift from its registry",
+      });
     }
   }
   if (s.scope !== undefined && !SETTING_SCOPE_SET.has(s.scope)) {

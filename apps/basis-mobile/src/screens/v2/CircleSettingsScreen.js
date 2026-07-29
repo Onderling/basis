@@ -38,6 +38,7 @@ import { loadRecipeForReview, applyReviewedRecipe } from '../../core/recipeConse
 // §4 storage-policy bridge — the circle `pod` axis drives stoop's authoritative
 // four-tier circle storage policy (shared with web; pure mapping + call).
 import { pushCircleStoragePolicy } from '../../../../basis/src/v2/circleStoragePolicy.js';
+import { conversationKindsRows } from '../../../../basis/src/v2/conversationKinds.js';
 // D / consumer-switch (MOBILE parity) — the screen header is sourced from
 // the manifest PAGE projection: the `settings` op declares `surfaces.page` with
 // a `labelKey`, renderMobile projects it into NavModel.pages[], and the label
@@ -487,6 +488,31 @@ export default function CircleSettingsScreen({
                         );
                       })}
                     </View>
+                    {ctl.hintKey ? <Text style={styles.hintText}>{t(ctl.hintKey)}</Text> : null}
+                  </View>
+                );
+              }
+              if (ctl.kind === 'multi') {
+                // Decision 3's admin control — same shared row model as web, so neither shell can offer a
+                // different set of kinds or compute a different next list (invariants #1/#2).
+                return (
+                  <View key={ctl.id} style={styles.controlRow} testID={`control-${ctl.id}`}>
+                    <Text style={styles.rowLabel}>{t(ctl.labelKey)}</Text>
+                    <View style={styles.chipRow}>
+                      {conversationKindsRows({
+                        circleSetting: working?.conversationKinds ?? null,
+                        templateKind:  working?.kind ?? null,
+                      }).map((r) => (
+                        <Pressable key={r.kind} disabled={!cs.enabled}
+                          onPress={() => patch({ [ctl.policyField]: r.next })}
+                          style={[styles.chip, r.on && styles.chipOn, !cs.enabled && styles.chipDisabled]}
+                          testID={`control-${ctl.id}-${r.kind}${r.on ? '-on' : '-off'}`}>
+                          <Text style={styles.chipText}>{t(r.labelKey)}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                    {/* Says that turning a kind off hides rather than deletes — J-CW4's property, and not
+                        something anyone assumes unless told. */}
                     {ctl.hintKey ? <Text style={styles.hintText}>{t(ctl.hintKey)}</Text> : null}
                   </View>
                 );

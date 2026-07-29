@@ -1877,6 +1877,14 @@
     "sharePosture": {
       "text": "Sharing out of the circle",
       "doc": "Objective L — settings axis: how an item is exposed to an outsider when shared out of the circle (CIRCLE_POLICY_ENUMS.sharePosture: closed/copy/trusted/registered/canonical)."
+    },
+    "conversationKinds": {
+      "text": "What the conversation contains",
+      "doc": "Admin control for the circle’s conversation kinds (decision 3, 2026-07-29)."
+    },
+    "conversationKinds_hint": {
+      "text": "Which kinds of entry appear in this circle’s conversation. Turning one off hides it here and keeps its history — turn it back on and the entries return.",
+      "doc": "States that turning a kind off is a filter, not a deletion."
     }
   },
   "override": {
@@ -4802,6 +4810,28 @@
     "menu": {
       "text": "Add",
       "doc": "P2/J4 — aria/title for the composer + attach-menu trigger."
+    }
+  },
+  "conversationKinds": {
+    "chat-message": {
+      "text": "Chat",
+      "doc": "Label for the chat-message conversation kind in the admin control."
+    },
+    "vraag": {
+      "text": "Questions",
+      "doc": "Label for the vraag conversation kind in the admin control."
+    },
+    "aanbod": {
+      "text": "Offers",
+      "doc": "Label for the aanbod conversation kind in the admin control."
+    },
+    "task": {
+      "text": "Tasks",
+      "doc": "Label for the task conversation kind in the admin control."
+    },
+    "leen": {
+      "text": "Borrowing",
+      "doc": "Label for the leen conversation kind in the admin control."
     }
   }
 }

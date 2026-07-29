@@ -157,3 +157,44 @@ export function withDerivedChatFeature(policy) {
   const chat = chatIsInConversation({ circleSetting: list, templateKind: kind });
   return { ...p, features: { ...(p.features && typeof p.features === 'object' ? p.features : {}), chat } };
 }
+
+/**
+ * The admin control for a circle's conversation kinds — the row model both shells render.
+ *
+ * `setConversationKind` existed with no call site for a day (S3/J-CW5: "passes for the wrong reason —
+ * nobody has the control, admin included"). This is that call site, expressed the way `chatFilterChips`
+ * expresses the reader's own filter: a pure model, so the shells add only markup.
+ *
+ * Every registered kind appears, on or off, so an admin can see what a conversation COULD contain rather
+ * than only what it currently does. The rows carry the whole next list rather than a delta, so a shell
+ * persists what it was given and cannot compute a different set than the one it displayed.
+ *
+ * An admin MAY switch everything off — a circle is allowed to show nothing, and `resolveConversationKinds`
+ * already respects an empty explicit choice. That is deliberately unlike the reader's filter, which
+ * refuses to construct an empty conversation for itself: the admin is deciding what the circle IS, the
+ * reader is deciding what they look at.
+ *
+ * @param {object} a
+ * @param {string[]|null} [a.circleSetting]  the circle's stored list, if it has chosen one
+ * @param {string|null} [a.templateKind]     the circle's kind, for the template default
+ * @returns {Array<{kind: string, labelKey: string, on: boolean, lane: string, next: string[]}>}
+ */
+export function conversationKindsRows({ circleSetting = null, templateKind = null } = {}) {
+  const current = resolveConversationKinds({ circleSetting, templateKind });
+  // HUMAN lane only. `availableConversationKinds()` returns every registered kind, governance ones
+  // included, and `chatRows` projects the human lane regardless of this list — so a governance checkbox
+  // here would appear to do something and do nothing. Worse, it would invite an admin to try putting
+  // decisions in the conversation, which J-L1 exists to prevent. The lane is enforced by the projection;
+  // this control should not pretend otherwise.
+  return availableConversationKinds().filter(({ lane }) => lane === LANE.HUMAN).map(({ kind, lane }) => {
+    const on = current.includes(kind);
+    return {
+      kind,
+      lane,
+      labelKey: `circle.conversationKinds.${kind}`,
+      on,
+      // What to persist if this row is tapped: the list with this kind flipped.
+      next: setConversationKind(current, kind, !on),
+    };
+  });
+}

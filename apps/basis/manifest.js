@@ -609,6 +609,17 @@ export const basisManifest = {
           labelKey: 'circle.settings.relayEndpoint', hintKey: 'circle.settings.relayEndpoint_hint',
           enabledWhen: 'always',
         },
+        // What this circle's conversation contains — circle-policy field, admin-only, options resolved
+        // from the entry-kind registry at render time (`optionsFrom`). Added 2026-07-29 as decision 3's
+        // missing surface: the axis was persisted and read, and `setConversationKind` had no call site,
+        // so nobody — admin included — could change it (S3/J-CW5).
+        {
+          id: 'conversation-kinds', kind: 'multi', scope: 'circle', policyField: 'conversationKinds',
+          optionsFrom: 'conversationKinds', adminOnly: true,
+          labelKey: 'circle.settings.conversationKinds',
+          hintKey: 'circle.settings.conversationKinds_hint',
+          enabledWhen: 'always',
+        },
         // Member↔member private chat — circle-policy field; enabled only when a relay/rendezvous
         // route can carry the peer pairwise key (§7). Greys out under pod-only (no relay).
         {

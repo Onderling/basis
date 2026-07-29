@@ -830,6 +830,29 @@ async function applyRelayUrl(url) {
   return { ok: true, effective: CIRCLE_RELAY_URL };
 }
 
+/**
+ * J-CP1 — dial the endpoint an invite names, LIVE and without persisting.
+ *
+ * Distinct from `applyRelayUrl` above on purpose: that one is the user changing their relay, so it writes
+ * the setting. Joining a circle must not silently rewrite a preference the user set — but the redeem does
+ * have to reach an admin who may only be on the circle's relay, and until 2026-07-29 nothing connected
+ * there until after the join had already succeeded (which it never did). So: connect now, record the
+ * point as usual, and leave the stored default alone.
+ *
+ * Mirrors mobile's `reconnectPeer({ relayUrl })` — same semantics, same non-persistence (invariant #2).
+ */
+async function dialRelayUrl(url) {
+  if (typeof url !== 'string' || !url || !_peerAgent) return { ok: false, error: 'no-transport' };
+  if (CIRCLE_RELAY_URL === url) return { ok: true, effective: url };
+  CIRCLE_RELAY_URL = url;                       // the live resolved value tryConnect… reads
+  try {
+    await tryConnectPeerTransport(_peerAgent, _peerRouter);
+    return { ok: true, effective: CIRCLE_RELAY_URL };
+  } catch (err) {
+    return { ok: false, error: err?.message ?? String(err), effective: CIRCLE_RELAY_URL };
+  }
+}
+
 // γ.2 — versions adapters per kring store.  Wired here at construction
 // so capture happens ABOVE the (localStorage / pod) tier — γ.3 will
 // read these slots for 3-way merge after a remote sync.  Each store
@@ -3884,6 +3907,9 @@ async function showJoinCircle(inviteArg) {
     circles: circlesCache,
     circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
     signCircleLink: (cid, gid, addr) => agent.signCircleLink?.(cid, gid, addr) ?? null,
+    // J-CP1 — be on the circle's endpoint BEFORE the redeem (web ≡ mobile).
+    dialEndpoint: (url) => dialRelayUrl(url),
+    activeEndpointUrl: () => CIRCLE_RELAY_URL || null,
     onDispatched: async (reply) => {
       const gid = reply?.groupId ?? reply?.joinedGroupId ?? null;
       if (gid) { try { await feedHouseholdRosterForCircle?.(gid); } catch { /* best-effort */ } }

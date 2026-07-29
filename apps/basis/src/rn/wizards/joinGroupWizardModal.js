@@ -28,6 +28,8 @@ import {
 export default function JoinGroupWizardModal({
   visible, args, callSkill, onClose, onDispatched, t, sendPeerRedeem,
   circles, circleAddressFor, signCircleLink,
+  // J-CP1 — the host's seam for connecting to the endpoint the invite names, before the redeem.
+  dialEndpoint, activeEndpointUrl,
 }) {
   const [state, setState] = useState(() => {
     const s = initialState();
@@ -57,7 +59,9 @@ export default function JoinGroupWizardModal({
   const onJoin = useCallback(async () => {
     let next = { ...state, submitting: true, submitError: null };
     setState(next);
-    const { result, state: after } = await finalSubmit({ state: next, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink });
+    const { result, state: after } = await finalSubmit({
+      state: next, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink, dialEndpoint, activeEndpointUrl,
+    });
     setState({ ...after });
     if (result && typeof onDispatched === 'function') {
       // `invite` = the DECODED invite alongside the redeem result, so the host can apply rule 1

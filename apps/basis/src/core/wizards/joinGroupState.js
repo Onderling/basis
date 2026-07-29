@@ -19,6 +19,7 @@ import { normalizeDriverKind, REVEAL_PRESETS, isRevealPreset } from '@onderling/
 export { REVEAL_PRESETS };
 
 import { buildJoinConsentModel, optOutsFromDeclined } from '../../v2/circleConsent.js';
+import { endpointToDialForInvite } from '../../v2/connectionPoints.js';
 import { personaPresetKeys } from '../../v2/memberCards.js';
 
 /* ─── Locale strings ────────────────────────────────────────── */
@@ -645,12 +646,19 @@ export function initialState() {
  * presenter; it lets the SENSITIVE "continue as an existing self" choice present a
  * chosen existing key instead of the fresh (this-circle) default. Absent → fresh.
  */
-export async function finalSubmit({ state, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink }) {
+export async function finalSubmit({
+  state, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink,
+  dialEndpoint = null, activeEndpointUrl = null,
+}) {
   state.submitting    = true;
   state.submitError   = null;
   state.submitErrorKey = null;
   state.handleRejected = false;
   try {
+    // J-CP1 (S4, 2026-07-29) — be ON the circle's endpoint before asking its admin for anything.
+    // Best-effort: a join that would have worked over a shared transport must not start failing
+    // because a relay was unreachable, so a dial failure is logged and the chain continues.
+    await dialInviteEndpoint({ invite: state.invite, dialEndpoint, activeEndpointUrl });
     const result = await runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink);
     // carry the joiner's declined caps out with the success envelope so the host records
     // them into the member's prefs (`override.capabilityOptOuts`), feeding the gate's admin ∩ user set.
@@ -676,6 +684,37 @@ export async function finalSubmit({ state, callSkill, sendPeerRedeem, circleAddr
     }
     state.submitting = false;
     return { state };
+  }
+}
+
+/**
+ * Connect to the endpoint the invite names, before the redeem that needs it.
+ *
+ * The ordering bug this fixes (J-CP1, walked on hardware 2026-07-29): the only consumer of an invite's
+ * `relayUrl` ran from the join callback, which needs a circle id — which only exists once the join has
+ * already succeeded. So a joiner adopted the circle's relay strictly AFTER the redeem that had to travel
+ * over it. With a relay-only admin and a joiner on defaults, the redeem went out over NKN, waited 15s for
+ * an HI that could never arrive, and the join died holding an invite that named the relay it needed.
+ *
+ * Best-effort on purpose. The decision is `endpointToDialForInvite`; connecting belongs to the host, so it
+ * arrives as a seam. A missing seam is not an error — the programmatic path (`joinCircleFromInvite`) is
+ * used by callers that manage their own transport.
+ */
+async function dialInviteEndpoint({ invite, dialEndpoint, activeEndpointUrl }) {
+  if (typeof dialEndpoint !== 'function') return { dialled: null };
+  const active = typeof activeEndpointUrl === 'function' ? activeEndpointUrl() : activeEndpointUrl;
+  const url = endpointToDialForInvite({ invite, activeUrl: active ?? null });
+  if (!url) return { dialled: null };
+  try {
+    await dialEndpoint(url);
+    return { dialled: url };
+  } catch (err) {
+    // Not fatal: the admin may still be reachable another way, and a hard failure here would turn a
+    // working join into a broken one.
+    if (typeof console !== 'undefined') {
+      console.warn(`[join] could not connect to the invite's endpoint ${url}:`, err?.message ?? err);
+    }
+    return { dialled: null, error: err?.message ?? String(err) };
   }
 }
 

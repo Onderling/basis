@@ -298,6 +298,10 @@ export async function bootAgentBundle(opts = {}) {
   // Captured at connect so `reconnectPeer` (in-app relay setting change) can re-invoke connectPeerTransport
   // with the fresh relay URL + the same nkn/rtc libs — a LIVE reconnect, no app reload. Mirrors web.
   let _connNknLib = null; let _connRtcLib = null;
+  // The relay this device is actually on. The connection-points store describes points; this is the
+  // socket fact behind `setActive`, and the join path reads it to decide whether an invite's endpoint
+  // still needs dialling (J-CP1).
+  let _activeRelayUrl = null;
   if (typeof opts.buildPeerWiring === 'function') {
     try {
       const w = opts.buildPeerWiring({ agent, callSkill: agent.callSkill });
@@ -452,11 +456,12 @@ export async function bootAgentBundle(opts = {}) {
         // Stable wrapper reads the mutable slot at delivery time, so a
         // router attached after connect still receives messages.
         _connNknLib = nknLib; _connRtcLib = rtcLib;   // capture for reconnectPeer (live relay reconnect)
+        _activeRelayUrl = await resolveMobileRelayUrl();
         await agent.connectPeerTransport({
           nknLib,
           onPeerMessage: (addr, payload) => peerWiringRef.onPeerMessage?.(addr, payload),
           // T3a — relay alongside NKN (routed); the in-app setting wins over the env (no rebuild). unset → NKN-only.
-          relayUrl: await resolveMobileRelayUrl(),
+          relayUrl: _activeRelayUrl,
           // T5.2d — direct WebRTC upgrade over the nkn/relay signalling path.
           rendezvous: true,
           rtcLib,
@@ -574,9 +579,15 @@ export async function bootAgentBundle(opts = {}) {
 
   // In-app relay setting live-reconnect: re-invoke connectPeerTransport with the FRESH relay URL + the
   // params captured at boot. Returns { ok, effective } — the URL now in use. Mirrors web's applyRelayUrl.
-  const reconnectPeer = async () => {
+  /**
+   * Live relay reconnect. With no argument it re-reads the in-app setting (the "I changed my relay"
+   * case). With an explicit `relayUrl` it dials THAT endpoint — which is how a join reaches a circle
+   * whose admin lives on a relay this device is not on yet (J-CP1). One reconnect path either way:
+   * a second way to open a socket is a second way to get the alias replay wrong.
+   */
+  const reconnectPeer = async ({ relayUrl: override = null } = {}) => {
     if (typeof agent?.connectPeerTransport !== 'function') return { ok: false, error: 'no transport' };
-    const relayUrl = await resolveMobileRelayUrl();
+    const relayUrl = (typeof override === 'string' && override) ? override : await resolveMobileRelayUrl();
     try {
       await agent.connectPeerTransport({
         nknLib: _connNknLib ?? undefined,
@@ -585,6 +596,7 @@ export async function bootAgentBundle(opts = {}) {
         rendezvous: true,
         rtcLib: _connRtcLib ?? undefined,
       });
+      _activeRelayUrl = relayUrl;
       registerCirclePresence();   // G13 — a NEW socket starts with no aliases; re-register (fire-and-forget)
       return { ok: true, effective: relayUrl };
     } catch (err) { return { ok: false, error: err?.message ?? String(err), effective: relayUrl }; }
@@ -600,6 +612,8 @@ export async function bootAgentBundle(opts = {}) {
     callSkill,
     agent,
     reconnectPeer,
+    /** The relay this device is on right now (null = none). Read live; do not cache across renders. */
+    activeRelayUrl: () => _activeRelayUrl,
     registerCirclePresence,   // G13 — the launcher feeds fresh circle ids after each circles load
     transport,
     pendingPeerRedeems,

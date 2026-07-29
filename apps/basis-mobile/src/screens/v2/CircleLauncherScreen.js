@@ -1881,6 +1881,11 @@ export default function CircleLauncherScreen({
             circles={circles}
             circleAddressFor={(cid) => bundle?.agent?.circleAddressFor?.(cid) ?? null}
             signCircleLink={(cid, gid, addr) => bundle?.agent?.signCircleLink?.(cid, gid, addr) ?? null}
+            // J-CP1 — be on the circle's endpoint BEFORE the redeem. The invite names it; without this
+            // the redeem goes out over whatever transport this device happens to have, and a relay-only
+            // admin never hears it.
+            dialEndpoint={(url) => bundle?.reconnectPeer?.({ relayUrl: url })}
+            activeEndpointUrl={() => bundle?.activeRelayUrl?.() ?? null}
             onClose={() => setJoinArgs(null)}
             onDispatched={(r) => {
               setJoinArgs(null);

@@ -69,7 +69,9 @@ import { t } from '../../localisation.js';
  */
 export function renderJoinGroupWizard(opts) {
   const { container, doc, args, callSkill, onClose, onDispatched, sendPeerRedeem, sources,
-    circles, circleAddressFor, signCircleLink } = opts;
+    circles, circleAddressFor, signCircleLink,
+    // J-CP1 — the host's seam for connecting to the endpoint the invite names, before the redeem.
+    dialEndpoint, activeEndpointUrl } = opts;
 
   // Wizard state — kept in-scope, re-renders rebuild the DOM from it.
   const state = initialState();
@@ -114,7 +116,9 @@ export function renderJoinGroupWizard(opts) {
     if (state.step === 2) renderPrivacyStep(container, doc, state, () => { state.step = 3; rerender(); }, () => { state.step = 1; rerender(); }, onClose, rerender);
     if (state.step === 3) renderHandleStep(container, doc, state, async () => {
       rerender(); // show submitting state
-      const { result } = await finalSubmit({ state, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink });
+      const { result } = await finalSubmit({
+        state, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink, dialEndpoint, activeEndpointUrl,
+      });
       if (result) {
         if (typeof onDispatched === 'function') {
           try { onDispatched(result); } catch { /* swallow */ }

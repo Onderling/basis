@@ -118,6 +118,7 @@ export async function buildCircleInviteUri({ callSkill, circleId, adminPeerAddr 
 export async function joinCircleFromInvite({
   inviteUri, callSkill, sendPeerRedeem, handle, shareAddress = true,
   linkChoice = 'fresh', circles = null, circleAddressFor = null, signCircleLink = null,
+  dialEndpoint = null, activeEndpointUrl = null,
 } = {}) {
   const h = String(handle ?? '').trim();
   if (!h) return { error: 'handle-required' };
@@ -133,7 +134,9 @@ export async function joinCircleFromInvite({
   // circleAddressFor + signCircleLink seams; a missing seam ⇒ no proof ⇒ the admin drops the link.
   state.existingSelves = existingSelvesFrom(Array.isArray(circles) ? circles : [], state.invite.groupId);
   setLinkChoice(state, linkChoice);
-  const { result, state: out } = await finalSubmit({ state, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink });
+  const { result, state: out } = await finalSubmit({
+    state, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink, dialEndpoint, activeEndpointUrl,
+  });
   if (!result) return { error: out?.submitError || 'join-failed' };
   return { ok: true, circleId: result.groupId, message: result.message, handle: result.handle };
 }

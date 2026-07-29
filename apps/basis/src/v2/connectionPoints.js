@@ -295,6 +295,37 @@ export function recordJoinedCirclePoints({ store, invite, circleId } = {}) {
   return { recorded };
 }
 
+/**
+ * Rule 1, applied EARLIER — the endpoint a joiner must be on **before** the redeem, or `null`.
+ *
+ * `recordJoinedCirclePoints` above runs from the join callback, which needs a circle id, which only
+ * exists once the join has succeeded. That ordering has a hole in it, and S4 walked straight into it
+ * (J-CP1, 2026-07-29): the redeem has to reach an admin who is only reachable on the circle's relay, but
+ * the joiner does not adopt that relay until after the redeem lands. On real hardware the phone fell back
+ * to NKN, waited 15s for an HI that could never come, and the join died — with the relay it needed sitting
+ * decoded in the invite the whole time.
+ *
+ * It stays invisible whenever the two happen to share a transport (both on NKN, or one LAN with mDNS),
+ * which is why it survived this long. The realistic case — an admin on a relay, a newcomer on defaults —
+ * is the one that breaks.
+ *
+ * This decides; it never connects. The host owns the socket (see `setActive`), so the join path takes a
+ * `dialEndpoint` seam and the shells supply it.
+ *
+ * @param {object} a
+ * @param {object|null} a.invite      the DECODED invite (`relayUrl` is the field read).
+ * @param {string|null} [a.activeUrl] the relay this device is already on, if any.
+ * @returns {string|null} the url to dial, or null when there is nothing to do.
+ */
+export function endpointToDialForInvite({ invite, activeUrl = null } = {}) {
+  const url = typeof invite?.relayUrl === 'string' ? invite.relayUrl.trim() : '';
+  if (!url || !isUrl(url, POINT_KIND.RELAY)) return null;
+  // Already there ⇒ nothing to do. A device is on at most one relay (`setActive` is relay-only), so this
+  // is a straight comparison rather than a membership test.
+  if (typeof activeUrl === 'string' && activeUrl.trim() === url) return null;
+  return url;
+}
+
 // ── Persistence + migration ─────────────────────────────────────────────────
 
 const POINTS_STORAGE_KEY = 'cc.connectionPoints';

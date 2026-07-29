@@ -56,6 +56,10 @@ export async function resolveMemberAddress(member, {
   // 1. The per-circle address — the whole point. Recorded on the roster ONLY when its proof verified
   //    (`verifyCircleLink`), so anything present here is already trustworthy.
   const circleAddress = typeof m?.circleAddress === 'string' && m.circleAddress ? m.circleAddress : null;
+  // The ladder stays TRANSPORT-AGNOSTIC on purpose: this expresses an INTENT ("reach them as a member of
+  // this circle"), not a routing decision. Whether the live connection can actually carry a per-circle
+  // address is a capability of the connection, answered below the waist — the send path maps the address
+  // back to the member's canonical one when it cannot. See `createSecureAgent` `addressFor`.
   if (preferCircleAddress && circleAddress) return { addr: circleAddress, via: ADDRESS_VIA.CIRCLE, webid };
 
   // The per-user setting, and the whole point of it: with fallback OFF we would rather be UNDELIVERABLE

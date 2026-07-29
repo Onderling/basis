@@ -11,7 +11,18 @@ import { bootRealAgentNode, connectAgentsOverNkn, pairCircle, until, teardown } 
 // `_sendOverRoute`), so the handshake completes once the peer is reachable; the redeem round-trip
 // and the chat ingest below simply poll patiently (tens of seconds) rather than racing it. Wall
 // clock of a minute or two is expected — NKN is slow.
-describe('GATE — kring chat via the REAL receiver over REAL NKN', () => {
+// ⏸ PENDING A DECISION (2026-07-29), not broken. With per-circle addressing ON (G13 step C), circle
+// traffic addresses each member by their per-circle address — and NKN cannot bind aliases, because an
+// NKN client IS an address (docs/decisions.md 2026-07-28: NKN is contact-to-contact; circles ride relays
+// or pods). So this gate asserts a configuration that decision retired.
+//
+// It is skipped rather than deleted because the decision is being REOPENED: an NKN circle is workable if
+// members address each other by their global NKN address and prove circle membership inside the envelope
+// (which the group-key sealing already does). What that costs is MEMBER-level unlinkability — everyone
+// in two of your circles routes to the same address — which is exactly the trade the per-user address
+// fallback already expresses. If we allow NKN circles on those terms, un-skip this.
+// → `REMAINING-WORK.md` P0.
+describe.skip('GATE — kring chat via the REAL receiver over REAL NKN', () => {
   it('broadcastKringMessage A -> B ingests over NKN', async () => {
     // Larger redeem budget to absorb the mesh cold-start on each leg of the round-trip.
     const A = await bootRealAgentNode('A', { redeemTimeoutMs: 45_000 });

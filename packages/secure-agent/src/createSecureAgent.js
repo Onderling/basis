@@ -1173,8 +1173,8 @@ export async function createSecureAgent(opts = {}) {
     // Static fallback when the router can't decide (no addr / nothing
     // reachable): prefer NKN then relay, reporting whatever name applies so
     // the failover loop can still degrade it.
-    if (peerTransport)  return { name: 'nkn',   transport: peerTransport,  address: addr };
-    if (relayTransport) return { name: 'relay', transport: relayTransport, address: addr };
+    if (peerTransport)  return { name: 'nkn',   transport: peerTransport,  address: await addressFor(addr, 'nkn') };
+    if (relayTransport) return { name: 'relay', transport: relayTransport, address: await addressFor(addr, 'relay') };
     return null;
   }
 

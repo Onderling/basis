@@ -328,11 +328,51 @@ async function collectCircleHandles({ store, members, groupId } = {}) {
 }
 
 /**
+ * How long an already-redeemed MEMBERSHIP stays "active" past its code's expiry.
+ *
+ * Generous on purpose: this answers *is this person still one of us*, and letting someone's standing
+ * lapse over a clock difference would evict a real member. Nobody gets IN through this.
+ */
+const MEMBERSHIP_GRACE_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * How much clock difference a REDEEM tolerates past a code's expiry.
+ *
+ * A different question from the one above, and it took an attack to see that they had been sharing a
+ * constant. Redeeming asks *may this code still admit a stranger*, so 24 hours was not a grace — it was
+ * the code's real lifetime, plus a day. Walked 2026-07-29 (S6/J-A6): an invite clamped to 15 minutes and
+ * shouted into a café was still redeemable 16 minutes later, and at two hours with its own `expiresAt`
+ * already past. The comment that justified it spoke about members "mid-handoff" being evicted — which
+ * this path cannot do, because it is how people join, not how they stay.
+ *
+ * Two minutes is what clock skew actually needs.
+ */
+const CODE_SKEW_MS = 2 * 60 * 1000;
+
+/**
+ * The ONE gate for "may this code be redeemed right now".
+ *
+ * Both redeem paths (the local skill and the peer/admin-side handler) used to carry their own copy of this
+ * predicate. They agreed, which is the only reason the bug was one bug rather than two — and it is exactly
+ * the drift `docs/conventions/shared-vocabularies.md` warns about. One function now, so a change to the
+ * rule cannot land in one path and miss the other.
+ *
+ * A code with no `expiresAt` is refused rather than treated as eternal: an unstamped code is a malformed
+ * one, and the safe reading of malformed is no.
+ */
+function codeRedeemableNow(codeItem, now = Date.now()) {
+  const expiresAt = codeItem?.source?.expiresAt;
+  if (typeof expiresAt !== 'number' || !Number.isFinite(expiresAt)) return false;
+  // Superseded by a rotation ⇒ done, whatever its own expiry said.
+  if (typeof codeItem?.source?.supersededAt === 'number') return false;
+  return now <= expiresAt + CODE_SKEW_MS;
+}
+
+/**
  * Latest `kind: 'membership-code'` item for the group whose
  * `expiresAt` is still in the future.  Returns null when no active
- * code exists (e.g. all expired).  Does NOT apply the 24h grace
- * window — callers that accept stale codes (redemption) check
- * `expiresAt + GRACE_MS` themselves.
+ * code exists (e.g. all expired).  Redemption applies its own small
+ * clock-skew allowance — see `codeRedeemableNow`.
  */
 async function _findLatestActiveCode(store, groupId) {
   const all = await store.listOpen({ type: 'membership-code' });
@@ -2294,10 +2334,15 @@ export function buildSkills({
 
     /**
      * rotateMyGroupCode({groupId})
-     *   — Phase 25.4.  Admin-only.  Mints a fresh membership code,
-     *   marking the previous one stale.  Old codes remain redeemable
-     *   for 24h (grace window) so members mid-handoff don't get
-     *   evicted by a clock-skew.
+     *   — Phase 25.4.  Admin-only.  Mints a fresh membership code and
+     *   SUPERSEDES every previous one for the circle.
+     *
+     *   It used to say it marked the previous one stale, and it did not: it only added a newer row, and
+     *   the redeem gate accepted any row inside its own expiry plus a day. So rotating a code did not
+     *   remove anybody — the old code kept admitting strangers for up to 24 hours (walked 2026-07-29,
+     *   S6/J-A8). Rotation is an act of REMOVAL, and it now behaves like one; an already-redeemed
+     *   membership keeps its own generous grace (`MEMBERSHIP_GRACE_MS`), so nobody already inside is
+     *   evicted by this.
      */
     defineSkill('rotateMyGroupCode', async ({ parts, from }) => {
       const a = dataArgs(parts);
@@ -2335,6 +2380,14 @@ export function buildSkills({
         .reduce((m, i) => Math.max(m, i.source?.issuedAt ?? 0), 0);
       const issuedAt  = Math.max(Date.now(), maxPrev + 1);
       const expiresAt = issuedAt + inviteExpiresInHours * 60 * 60 * 1000;
+      // Supersede the codes this one replaces, BEFORE minting the new one — if the mint fails we would
+      // rather have closed the old door than leave two open.
+      for (const prev of allCodes.filter((i) => i?.source?.groupId === a.groupId
+        && typeof i.source?.supersededAt !== 'number')) {
+        try {
+          await store.update(prev.id, { source: { ...prev.source, supersededAt: issuedAt } }, { actor: from });
+        } catch { /* best-effort per row: one un-superseded code must not abort the rotation */ }
+      }
       const [codeItem] = await store.addItems(
         [{
           type:       'membership-code',
@@ -2405,12 +2458,7 @@ export function buildSkills({
       const all = await store.listOpen({ type: 'membership-code' });
       const forGroup = all.filter(i => i?.source?.groupId === a.groupId);
       const now = Date.now();
-      const GRACE_MS = 24 * 60 * 60 * 1000;
-      const valid = forGroup.find(i =>
-        i.source.code === a.code &&
-        // Active OR within grace window past expiry.
-        (now <= (i.source.expiresAt ?? 0) + GRACE_MS),
-      );
+      const valid = forGroup.find(i => i.source.code === a.code && codeRedeemableNow(i, now));
       if (!valid) return { error: 'invalid-or-expired-code' };
 
       // ── Signing pubKey capture (kring fan-out fix) ────────────────────────
@@ -2526,11 +2574,7 @@ export function buildSkills({
       const all = await store.listOpen({ type: 'membership-code' });
       const forGroup = all.filter(i => i?.source?.groupId === a.groupId);
       const now = Date.now();
-      const GRACE_MS = 24 * 60 * 60 * 1000;
-      const valid = forGroup.find(i =>
-        i.source.code === a.code &&
-        (now <= (i.source.expiresAt ?? 0) + GRACE_MS),
-      );
+      const valid = forGroup.find(i => i.source.code === a.code && codeRedeemableNow(i, now));
       if (!valid) return { error: 'invalid-or-expired-code' };
 
       // Wave B (SENSITIVE) — the peer path's copy of the cross-circle link proof check
@@ -2898,10 +2942,10 @@ export function buildSkills({
       if (mine.length === 0) return { redeemed: false };
       mine.sort((p, q) => (q.source.redeemedAt ?? 0) - (p.source.redeemedAt ?? 0));
       const latest = mine[0];
-      const GRACE_MS = 24 * 60 * 60 * 1000;
       const now = Date.now();
       const validUntil = latest.source.expiresAt ?? 0;
-      const isActive = now <= validUntil + GRACE_MS;
+      // Standing, not admission — the generous grace belongs here and only here.
+      const isActive = now <= validUntil + MEMBERSHIP_GRACE_MS;
       return {
         redeemed:  true,
         isActive,

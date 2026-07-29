@@ -181,18 +181,33 @@ describe('Stoop V2 Phase 25.4 — redeemMembershipCode', () => {
     expect(r).toEqual({ error: 'invalid-or-expired-code' });
   });
 
-  it('previous code remains valid during 24h grace window', async () => {
+  it('ROTATION REMOVES: the previous code stops working immediately', async () => {
+    // This test used to assert the opposite — "previous code remains valid during 24h grace window" —
+    // and that was the vulnerability, not the feature (walked 2026-07-29, S6/J-A8). Rotation claimed in
+    // its own docstring to mark the old code stale and did not: it only added a newer row, while the
+    // redeem gate accepted any row inside its expiry plus a day. So rotating did not remove anybody, and
+    // an admin who rotated after a code leaked had done nothing for 24 hours.
+    //
+    // Rotation is an act of removal. An already-redeemed MEMBERSHIP keeps its own generous grace
+    // (`MEMBERSHIP_GRACE_MS`), so nobody already inside is evicted by this — the two questions no longer
+    // share a constant.
     const bundle = await buildBundle();
     const r1 = await callSkill(bundle.agent, 'createGroupV2', {
       groupId: GROUP, name: 'X', rules: RULES,
     });
     await callSkill(bundle.agent, 'rotateMyGroupCode', { groupId: GROUP });
-    // The original code still has a non-expired expiresAt (it was just
-    // rotationDays in the future), so it remains valid in this test.
-    // We're verifying the redemption finds it at all (not hard-coded
-    // to "current code only").
     const redeem = await callSkill(bundle.agent, 'redeemMembershipCode',
       { groupId: GROUP, code: r1.code }, BOB);
+    expect(redeem).toEqual({ error: 'invalid-or-expired-code' });
+  });
+
+  it('…and the FRESH code from that rotation does work', async () => {
+    // The other half, so "rotation removes" cannot be satisfied by breaking rotation altogether.
+    const bundle = await buildBundle();
+    await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
+    const rotated = await callSkill(bundle.agent, 'rotateMyGroupCode', { groupId: GROUP });
+    const redeem = await callSkill(bundle.agent, 'redeemMembershipCode',
+      { groupId: GROUP, code: rotated.code }, BOB);
     expect(redeem.redemptionId).toBeTruthy();
   });
 });
@@ -218,5 +233,60 @@ describe('Stoop V2 Phase 25.7 — getMyMembershipStatus', () => {
     const r = await callSkill(bundle.agent, 'getMyMembershipStatus', { groupId: GROUP }, BOB);
     expect(r.redeemed).toBe(true);
     expect(r.isActive).toBe(true);
+  });
+});
+
+/* ── S6/J-A6 — an invite's expiry is enforced where it is redeemed ──────────── */
+
+describe("a code's expiry is enforced at the redeem, not merely displayed", () => {
+  // Walked 2026-07-29. The redeem gate accepted any code row inside `expiresAt + 24h`, so the enforced
+  // life of an invite was its own TTL plus a day: one clamped to 15 minutes and read aloud in a café was
+  // still redeemable 16 minutes later, and at two hours with its own expiry already past. The 24h came
+  // from a constant shared with a different question — whether an already-redeemed MEMBERSHIP is still
+  // active — where being generous is kind rather than dangerous.
+  it('a code past its expiry is refused', async () => {
+    const bundle = await buildBundle();
+    await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
+    // Mint one that expires almost immediately (1 h is the floor the op accepts), then age it by hand.
+    const rotated = await callSkill(bundle.agent, 'rotateMyGroupCode', { groupId: GROUP, inviteExpiresInHours: 1 });
+    const codes = (await bundle.itemStore.listOpen({ type: 'membership-code' }))
+      .filter((i) => i.source?.groupId === GROUP && i.source?.code === rotated.code);
+    expect(codes).toHaveLength(1);
+    await bundle.itemStore.update(codes[0].id,
+      { source: { ...codes[0].source, expiresAt: Date.now() - 10 * 60 * 1000 } }, { actor: ADMIN });
+
+    const redeem = await callSkill(bundle.agent, 'redeemMembershipCode',
+      { groupId: GROUP, code: rotated.code }, BOB);
+    expect(redeem).toEqual({ error: 'invalid-or-expired-code' });
+  });
+
+  it('a small clock difference is still tolerated — the allowance is skew, not a second lifetime', async () => {
+    const bundle = await buildBundle();
+    await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
+    const rotated = await callSkill(bundle.agent, 'rotateMyGroupCode', { groupId: GROUP, inviteExpiresInHours: 1 });
+    const codes = (await bundle.itemStore.listOpen({ type: 'membership-code' }))
+      .filter((i) => i.source?.groupId === GROUP && i.source?.code === rotated.code);
+    // Expired 30 seconds ago: within the skew allowance, so an honest joiner whose clock is a little off
+    // is not turned away at the door.
+    await bundle.itemStore.update(codes[0].id,
+      { source: { ...codes[0].source, expiresAt: Date.now() - 30 * 1000 } }, { actor: ADMIN });
+
+    const redeem = await callSkill(bundle.agent, 'redeemMembershipCode',
+      { groupId: GROUP, code: rotated.code }, BOB);
+    expect(redeem.redemptionId).toBeTruthy();
+  });
+
+  it('a code with no expiry at all is refused rather than treated as eternal', async () => {
+    const bundle = await buildBundle();
+    await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
+    const rotated = await callSkill(bundle.agent, 'rotateMyGroupCode', { groupId: GROUP });
+    const codes = (await bundle.itemStore.listOpen({ type: 'membership-code' }))
+      .filter((i) => i.source?.groupId === GROUP && i.source?.code === rotated.code);
+    const { expiresAt, ...noExpiry } = codes[0].source;
+    await bundle.itemStore.update(codes[0].id, { source: noExpiry }, { actor: ADMIN });
+
+    const redeem = await callSkill(bundle.agent, 'redeemMembershipCode',
+      { groupId: GROUP, code: rotated.code }, BOB);
+    expect(redeem).toEqual({ error: 'invalid-or-expired-code' });
   });
 });

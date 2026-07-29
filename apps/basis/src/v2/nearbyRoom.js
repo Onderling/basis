@@ -113,7 +113,13 @@ export function receiveCard(payload, fromAddress, now = () => Date.now()) {
 
   const label = typeof raw.label === 'string' ? raw.label.trim() : '';
   if (!label || label.length > CARD_MAX_LABEL) return null;
-  const line = typeof raw.line === 'string' ? raw.line.trim().slice(0, CARD_MAX_LINE) : '';
+  // REFUSE rather than truncate (2026-07-30, S6/J-A14). `label` already refused; `line` used to be cut to
+  // 140 characters, so a 5 000-character line arrived as a card that LOOKED like a normal card and was
+  // not what its author sent. Truncation mutates content and tells nobody — the reader believes they have
+  // the whole of it. A refused card is visibly absent; a shortened one is invisibly wrong.
+  const rawLine = typeof raw.line === 'string' ? raw.line.trim() : '';
+  if (rawLine.length > CARD_MAX_LINE) return null;
+  const line = rawLine;
 
   return Object.freeze({
     label,

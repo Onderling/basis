@@ -16,7 +16,7 @@ import { decodeInvite } from '../../src/core/wizards/joinGroupState.js';
 import { createNearbyScreen } from '../../src/v2/nearbyScreen.js';
 import { createAskChannel, ASK_MESSAGE } from '../../src/v2/nearbyAskChannel.js';
 import { receiveCard, CARD_MESSAGE, CARD_MAX_LINE } from '../../src/v2/nearbyRoom.js';
-import { receiveInvite, prepareBroadcastInvite, INVITE_MAX_NAME, BROADCAST_INVITE_MAX_TTL_MS } from '../../src/v2/nearbyInvites.js';
+import { receiveInvite, prepareBroadcastInvite, INVITE_MESSAGE, INVITE_MAX_NAME, BROADCAST_INVITE_MAX_TTL_MS } from '../../src/v2/nearbyInvites.js';
 
 const MIN = 60_000;
 const codeOf = (uri) => { const st = {}; decodeInvite(uri, st); return st.invite.code; };
@@ -121,25 +121,37 @@ describe('J-A8 — rotating the membership code kills the old one (FIXED 2026-07
   }, 60_000);
 });
 
-describe('J-A14 — two room paths TRUNCATE instead of refusing', () => {
-  it('a 5000-character card line is stored as 140 characters, silently', () => {
-    const card = receiveCard({ subtype: CARD_MESSAGE, card: { label: 'Jan', line: 'x'.repeat(5000) } }, 'attacker');
-    // WRONG: the receiver keeps a half-object it believes is complete — the one line of prose a person writes
-    // about why they are here can be cut mid-word with nothing saying anything was removed. Note the SAME
-    // object refuses an over-long `label` (below), so it is half strict and half lenient with no rule stated.
-    // RIGHT: refuse the card, as the over-long label already is.
-    expect(card.line.length).toBe(CARD_MAX_LINE);
-    expect(receiveCard({ subtype: CARD_MESSAGE, card: { label: 'x'.repeat(41) } }, 'attacker')).toBeNull();
+describe('J-A14 — the room refuses over-long content instead of shortening it (FIXED 2026-07-30)', () => {
+  it('a 5000-character card line is REFUSED, not stored as 140 characters', () => {
+    // Truncation mutates content and tells nobody: the reader sees a card that looks ordinary and is not
+    // what its author sent. And the "not hostile just for being wordy" defence does not apply here —
+    // `createCard` already refuses `line-too-long`, so a wordy neighbour is stopped at their own keyboard
+    // with something they can act on. Anything arriving over-length did not come from an honest client.
+    const card = receiveCard({
+      subtype: CARD_MESSAGE,
+      card: { label: 'Sam', line: 'x'.repeat(5000) },
+    }, 'them');
+    expect(card).toBeNull();
   });
 
-  it("a 5000-character circle name on a broadcast invite is stored as 60 characters, silently", () => {
-    const invite = receiveInvite({
-      subtype: 'nearby-invite',
-      invite: { uri: 'stoop-invite://abc', circleId: 'c', circleName: 'x'.repeat(5000), expiresAt: Date.now() + MIN },
-    }, 'attacker');
-    // WRONG, same shape as the card: the invite's `uri` and `circleId` are REFUSED when over-long, but the
-    // name a room reads is trimmed. RIGHT: refuse it — a truncated circle name is a different circle's name.
-    expect(invite.circleName.length).toBe(INVITE_MAX_NAME);
+  it('a 5000-character circle name on a broadcast invite is REFUSED, not stored as 60', () => {
+    // A circle presented under a name nobody chose is worse than a circle that does not appear: the
+    // person deciding whether to join reads the shortened name as the real one.
+    const seen = receiveInvite({
+      subtype: INVITE_MESSAGE,
+      invite: {
+        uri: 'stoop-invite://abc', circleId: 'buurt',
+        circleName: 'n'.repeat(5000), expiresAt: Date.now() + 5 * MIN,
+      },
+    }, 'them');
+    expect(seen).toBeNull();
+  });
+
+  it('…and content that fits is untouched, so the rule is a ceiling and not a new obstacle', () => {
+    const card = receiveCard({
+      subtype: CARD_MESSAGE, card: { label: 'Sam', line: 'a short line' },
+    }, 'them');
+    expect(card.line).toBe('a short line');
   });
 });
 

@@ -91,6 +91,8 @@ export {
 // adapter implements (extend it, override `_put`). See docs/conventions/ports.md
 // and test/conformance/transportConformance.js.
 export { Transport }                      from './transport/Transport.js';
+export { MAX_ENVELOPE_BYTES, EnvelopeTooLargeError, envelopeExceedsLimit, envelopeByteLength }
+  from './transport/envelopeSize.js';
 export {
   DISCOVERABILITY, DISCOVERABILITY_ORDER, isDiscoverability,
   normalizeDiscoverability, publishes, browses, maxExposure,

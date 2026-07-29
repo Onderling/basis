@@ -75,9 +75,19 @@ describe('an inbound card is untrusted', () => {
     expect(c.verified).toBeUndefined();
   });
 
-  it('clamps rather than rejecting a long line — a card is not hostile just for being wordy', () => {
-    const c = receiveCard(inbound({ label: 'Sam', line: 'x'.repeat(CARD_MAX_LINE + 50) }), 'them', now);
-    expect(c.line).toHaveLength(CARD_MAX_LINE);
+  it('REFUSES a long line rather than clamping it — a shortened card is invisibly wrong', () => {
+    // This test used to assert the opposite, on the reasoning that "a card is not hostile just for being
+    // wordy". That reasoning does not survive looking at the send side: `createCard` REFUSES
+    // `line-too-long`, so a wordy neighbour is stopped at their own keyboard, with a message they can act
+    // on by shortening it. Nothing an honest client emits can arrive over-length.
+    //
+    // What clamping did instead was accept a 5 000-character line as a 140-character card that LOOKED
+    // like an ordinary card and was not what its author sent (S6/J-A14). A refused card is visibly
+    // absent; a truncated one is invisibly wrong, and the reader has no way to know.
+    expect(receiveCard(inbound({ label: 'Sam', line: 'x'.repeat(CARD_MAX_LINE + 1) }), 'them', now)).toBeNull();
+    // …and one that fits is untouched, so the rule is a ceiling and not a new obstacle.
+    const ok = receiveCard(inbound({ label: 'Sam', line: 'x'.repeat(CARD_MAX_LINE) }), 'them', now);
+    expect(ok.line).toHaveLength(CARD_MAX_LINE);
   });
 
   it('rejects a card with no usable face, or the wrong message kind', () => {

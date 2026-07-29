@@ -116,6 +116,9 @@ export function receiveInvite(payload, fromAddress, now = () => Date.now()) {
     ? raw.circleId : null;
   if (!circleId) return null;
 
+  // Over-long name ⇒ refuse the whole invite, before anything else is computed.
+  if (typeof raw.circleName === 'string' && raw.circleName.trim().length > INVITE_MAX_NAME) return null;
+
   const at = now();
   const claimed = typeof raw.expiresAt === 'number' && Number.isFinite(raw.expiresAt) ? raw.expiresAt : 0;
   const expiresAt = Math.min(claimed, at + BROADCAST_INVITE_MAX_TTL_MS);
@@ -124,7 +127,10 @@ export function receiveInvite(payload, fromAddress, now = () => Date.now()) {
   return Object.freeze({
     uri,
     circleId,
-    circleName: typeof raw.circleName === 'string' ? raw.circleName.trim().slice(0, INVITE_MAX_NAME) : '',
+    // Refused, not shortened — same rule as a room card (S6/J-A14). A circle whose name arrived cut to 60
+    // characters is a circle presented under a name nobody chose, and the person deciding whether to join
+    // reads it as the real one.
+    circleName: typeof raw.circleName === 'string' ? raw.circleName.trim() : '',
     expiresAt,
     // The wire wins — a broadcast must not be able to attribute a circle to someone who did not publish it.
     from: fromAddress ?? null,

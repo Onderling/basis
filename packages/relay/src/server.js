@@ -88,6 +88,7 @@ import { readFile, stat }                    from 'node:fs/promises';
 import { extname, join, resolve }            from 'node:path';
 import { networkInterfaces }                 from 'node:os';
 import { WebSocketServer }                   from 'ws';
+import { MAX_ENVELOPE_BYTES } from '@onderling/core';
 import { MultiRecipientQueue }               from './MultiRecipientQueue.js';
 import { ForwardQueue }                       from './ForwardQueue.js';
 import { GroupAuthVerifier }                 from './GroupAuthVerifier.js';
@@ -322,7 +323,11 @@ export async function startRelay(opts = {}) {
   const blobGateMount = blobGate ? mountBlobGate(httpServer, blobGate) : null;
 
   // ── WebSocket relay ────────────────────────────────────────────────────────
-  const wss = new WebSocketServer({ server: httpServer });
+  // `maxPayload` is the backstop: it protects the relay's own memory from a payload too big to buffer,
+  // which the app-level check above cannot do because it runs after `ws` has already assembled the frame.
+  // Given headroom over the app limit so the app check is what normally speaks — `ws` closing the socket
+  // (1009) is the outcome we are trying to avoid, not the one we want.
+  const wss = new WebSocketServer({ server: httpServer, maxPayload: MAX_ENVELOPE_BYTES * 4 });
 
   /** address → WebSocket */
   const clients = new Map();
@@ -431,6 +436,22 @@ export async function startRelay(opts = {}) {
     const msgBucket = rateLimitCfg ? createTokenBucket(rateLimitCfg) : null;
 
     socket.on('message', (raw) => {
+      // Size first, before parsing — a refusal must not require us to build the object we are refusing.
+      //
+      // The relay also sets `maxPayload` on the server (see startRelay), but that is the LAST line rather
+      // than the first: when `ws` enforces it, it closes the connection with code 1009 and the sender
+      // cannot tell a refusal from the peer going offline. Checking here lets us answer. Walked
+      // 2026-07-29 (S6/J-A14): before either check, a 64 MB envelope was forwarded intact.
+      const size = typeof raw?.length === 'number' ? raw.length : byteLengthOf(raw);
+      if (size > MAX_ENVELOPE_BYTES) {
+        try {
+          socket.send(JSON.stringify({
+            type: 'error', reason: 'envelope-too-large',
+            message: `envelope is ${size} bytes, over the ${MAX_ENVELOPE_BYTES}-byte limit`,
+          }));
+        } catch { /* the socket may already be gone; the drop is the point */ }
+        return;
+      }
       let msg;
       try { msg = JSON.parse(raw); } catch { return; }
 
@@ -842,4 +863,13 @@ export function getLanIp() {
     }
   }
   return null;
+}
+
+
+/** Byte length of whatever the socket handed us (Buffer, ArrayBuffer, or string). */
+function byteLengthOf(raw) {
+  if (raw == null) return 0;
+  if (typeof raw === 'string') return Buffer.byteLength(raw);
+  if (typeof raw.byteLength === 'number') return raw.byteLength;
+  return 0;
 }

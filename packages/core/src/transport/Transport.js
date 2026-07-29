@@ -65,6 +65,7 @@
  * An adapter's inbound path MUST call `this._receive(rawEnvelope)` for each
  * envelope it pulls off the wire so the base can run steps 1–3.
  */
+import { MAX_ENVELOPE_BYTES, EnvelopeTooLargeError, envelopeExceedsLimit } from './envelopeSize.js';
 import { Emitter }               from '../Emitter.js';
 import { mkEnvelope, P, REPLY_CODES } from '../Envelope.js';
 import {
@@ -499,6 +500,15 @@ export class Transport extends Emitter {
    * @param {object} rawEnvelope — as received from the network
    */
   _receive(rawEnvelope) {
+    // Inbound is the check an attacker cannot skip. A relay-side limit protects the relay and everyone
+    // routed through it, but mDNS and NKN never touch a relay — so without this, the bound exists only on
+    // the path that happens to have a server on it.
+    const tooBig = envelopeExceedsLimit(rawEnvelope, this.maxEnvelopeBytes);
+    if (tooBig) {
+      // Reported, not silently dropped: a receiver must be able to tell "too big" from "never arrived".
+      this.emit('security-error', new EnvelopeTooLargeError(tooBig.bytes, tooBig.limit), rawEnvelope);
+      return;
+    }
     let envelope;
     try {
       envelope = this.#securityLayer
@@ -548,6 +558,12 @@ export class Transport extends Emitter {
     }
   }
 
+  /**
+   * The per-envelope wire ceiling for this transport. Overridable by an adapter whose medium genuinely
+   * differs; the default is the shared one so every path agrees unless someone says otherwise.
+   */
+  get maxEnvelopeBytes() { return MAX_ENVELOPE_BYTES; }
+
   // ── Internals ───────────────────────────────────────────────────────────────
 
   /** Apply SecurityLayer (if set) and call _put. */
@@ -555,6 +571,10 @@ export class Transport extends Emitter {
     const outgoing = this.#securityLayer
       ? this.#securityLayer.encrypt(envelope)
       : envelope;
+    // Refuse before the wire, so the SENDER gets a clear error rather than a mysterious disconnect. The
+    // check is after encryption on purpose: what matters is the size of what actually goes out.
+    const tooBig = envelopeExceedsLimit(outgoing, this.maxEnvelopeBytes);
+    if (tooBig) throw new EnvelopeTooLargeError(tooBig.bytes, tooBig.limit);
     await this._put(to, outgoing);
   }
 

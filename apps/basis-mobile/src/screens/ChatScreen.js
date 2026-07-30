@@ -21,7 +21,7 @@
  */
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
-  AppState, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet,
+  AppState, Image, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 
@@ -110,6 +110,9 @@ import { makeHandleFileShare } from '../../../basis/src/core/handlers/fileShare.
 // SILENT out-of-circle delivery — inbound `shared-copy` handler: lands a relayed sealed COPY into the per-user
 // "shared with me" store (the launcher lists + opens it). Shared core (web≡mobile), same as circleApp.js.
 import { makeHandleSharedCopy } from '../../../basis/src/core/handlers/sharedCopyReceive.js';
+// Circle roster → household no-pod sync peers (+ per-circle address binding). The ONE shared
+// implementation, called by web (circleApp) and the mobile launcher too.
+import { feedHouseholdRoster } from '../../../basis/src/v2/householdRosterPairing.js';
 import { computeEmbedButtons } from '../../../basis/src/core/embedButtons.js';
 import { makeCalendarOutboundHook }
                                from '../../../basis/src/core/handlers/calendarOutbound.js';
@@ -141,6 +144,8 @@ import MultiFieldFormBubble from '../rn/MultiFieldFormBubble.js';
 // @onderling/react-native/qr/view wraps react-native-qrcode-svg.
 import { QrCodeView }     from '@onderling/react-native/qr/view';
 import QrScannerModal     from '../rn/QrScannerModal.js';
+import { classifyQrPayload } from '@onderling/react-native/qr';
+import { getBasisClassifiers } from '../core/qrClassifiers.js';
 // Extension install (feedback-extension mobile parity) — consent sheet + controller.
 import ExtensionConsentSheet from './v2/ExtensionConsentSheet.js';
 import { useExtensionInstall } from '../core/extensionInstallRN.js';
@@ -193,6 +198,10 @@ function makeFallbackInbox(eventLog, callSkill) {
 export default function ChatScreen({
   bundle = null,
   bootError = null,
+  // A circle was joined in THIS shell (the invite-link path) → the launcher's list is stale and must
+  // reload. Declared here deliberately: the sibling bug fixed the same day was App.js passing
+  // `onAcceptFallback` to a screen that never destructured it, which threw on render.
+  onCirclesChanged = null,
   eventLog = null,
   // ε.1 — shared inbox singleton (msgId dedup + ingest mirror + eventLog append).
   // The receiver path here routes through it; rehydrator + future catch-up paths
@@ -385,6 +394,56 @@ export default function ChatScreen({
   // remounts.  Mirrors web's `pendingPeerRedeems` module-level Map.
   const pendingPeerRedeemsRef = useRef(new Map());
   useEffect(() => { threadStateRef.current = threadState; }, [threadState]);
+
+  // An invite someone SENDS you, rather than one you scan.
+  //
+  // Found walking S4 (2026-07-30): four schemes are declared in `app.json`, the registry in
+  // `qrSchemes.js` exists to hold that config honest, and `decodeInvite` parses the URL — but nothing in
+  // this app ever *received* one. There was no `Linking` call anywhere in `basis-mobile`, so tapping an
+  // invite link opened the app on whatever screen it was last on and dropped the invite on the floor. The
+  // scanned and pasted paths worked, which is why it went unnoticed: the failure only appears on the route
+  // most people would actually use, which is to send a friend a link.
+  //
+  // Deliberately a pass-through: the URL goes to the SAME classifier the scanner uses and then to the same
+  // `onQrScanResult`, so a link and a scan of the same payload cannot diverge. A cold start arrives via
+  // `getInitialURL`, a warm one via the 'url' event — both are needed, and only having the second is the
+  // usual version of this bug.
+  //
+  // A cold start has to WAIT for the agent. The link arrives at mount, which is well before the bundle is
+  // ready, and the join wizard's first act is to fetch the circle's rules over `callSkill` — so delivering
+  // immediately produced "Could not load rules: callSkill is not a function". The scanner path can never hit
+  // this (you cannot scan before the app is up), which is why the ordering was never exercised. So a URL
+  // that arrives early is PARKED and delivered on the render where boot reports ready.
+  // Declared HERE and not further down: the effect below lists it as a dependency, and a dep array is
+  // evaluated during render — a `const` declared later would be a TDZ ReferenceError on first paint.
+  const bootReady = bootState.kind === 'ready';
+  const pendingLinkRef = useRef(null);
+  // Readiness has to be readable from inside the link subscription, and the subscription is mounted ONCE
+  // (`[]`) so it can never drop a link that arrives mid-render. That means it closes over the values from
+  // mount — when boot is by definition not ready yet — so reading the render-scoped `bootReady` from in
+  // there is permanently `false`. A ref is the live value; the flag above is only for the effect's dep.
+  const bootReadyRef = useRef(false);
+  bootReadyRef.current = bootReady;
+  useEffect(() => {
+    let cancelled = false;
+    const receive = (url) => {
+      if (cancelled || !url) return;
+      pendingLinkRef.current = String(url).trim();
+      drainPendingLink();
+    };
+    Linking.getInitialURL().then(receive).catch(() => { /* no launch URL is the normal case */ });
+    const sub = Linking.addEventListener('url', ({ url }) => receive(url));
+    return () => { cancelled = true; sub?.remove?.(); };
+    // `onQrScanResult`/`drainPendingLink` are stable function declarations in this component body;
+    // re-subscribing on every render would drop links that arrive mid-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Second half of the same mechanism: whenever boot becomes ready, hand over anything parked.
+  useEffect(() => {
+    if (bootReady) drainPendingLink();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bootReady]);
 
   const activeThread     = getActiveThread(threadState);
   const activeMessages   = activeThread?.messages ?? [];
@@ -585,7 +644,13 @@ export default function ChatScreen({
       'calendar-rsvp':         makeHandleCalendarRsvp({ callSkill, publishEvent }),
       'calendar-cancel':       makeHandleCalendarCancel({ callSkill, publishEvent }),
       'buurt-post':            makeHandleBuurtPost({ callSkill, publishEvent }),
-      'group-redeem-request':  makeHandleGroupRedeemRequest({ callSkill, sendPeer, publishEvent }),
+      'group-redeem-request':  makeHandleGroupRedeemRequest({
+        callSkill, sendPeer, publishEvent,
+        // …and return OUR per-circle address for the circle being joined, proven the same way the joiner
+        // proves theirs, so per-circle addressing works in both directions from the join on (web parity).
+        circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,
+        signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
+      }),
       // joiner-side response. Pairs with
       // `pendingPeerRedeemsRef` populated by the joinGroup wizard's
       // sendPeerRedeem call.  Mirror of web's handleGroupRedeemResponse
@@ -736,16 +801,16 @@ export default function ChatScreen({
             roster = Array.isArray(r?.members) ? r.members : [];
           } catch { /* empty */ }
           const knownPeers = roster.map((m) => m?.addr).filter(Boolean);
-          // OBJ-2 S1c-shell (mobile parity) — feed the household no-pod sync roster
-          // with this circle's MEMBERS (people, from the stoop group roster — never
-          // bots: a bot must not receive household items). addHouseholdPeer dedupes,
-          // so re-running catch-up is safe. Mirrors circleApp.js's web wiring.
-          if (typeof agent?.addHouseholdPeer === 'function') {
-            const self = agent?.peer?.address ?? null;
-            for (const addr of knownPeers) {
-              if (addr !== self) agent.addHouseholdPeer(addr);
-            }
-          }
+          // Feed the household no-pod sync roster with this circle's members, through the SHARED helper
+          // both other call sites already use (web's `feedHouseholdRosterForCircle`, the mobile
+          // launcher's circles-load). This was an inline copy, and it had drifted twice over: it called
+          // `addHouseholdPeer(addr)` with ONE argument where the signature is
+          // `addHouseholdPeer(circleId, addr)` — so peers read from THIS circle's roster were paired into
+          // whatever circle happened to be active — and it skipped the resync + per-circle key binding
+          // the shared helper also does. Logic that already exists in shared code is called, not
+          // re-written (invariant 1).
+          // Fire-and-forget, like the launcher's call: pairing must not delay the catch-up it precedes.
+          feedHouseholdRoster({ agent, circleId }).catch(() => { /* best-effort */ });
           return catchUpReceiver.requestCatchUp({
             circleId,
             sinceTs:    Number.isFinite(sinceTs) ? sinceTs : 0,
@@ -1841,6 +1906,23 @@ export default function ChatScreen({
             // OBJ-2 — the BUNDLE's shared sender (same pending-map the response handler resolves against,
             // and the same one the v2 launcher uses), so classic + v2 joins both correlate.
             sendPeerRedeem={bootState.kind === 'ready' ? bootState.bundle.sendPeerRedeem : undefined}
+            // Post-join reachability (G13). Only consumed by JoinGroupWizardModal; other wizards ignore it.
+            //
+            // This host is where a TAPPED INVITE LINK lands, and it passed neither of the two things a join
+            // has to do to make the new member reachable — register this device's per-circle address for the
+            // circle, and bind the other members' addresses to their keys. Both used to hang off the
+            // launcher screen, so joining from here left the member on the roster at an address their own
+            // device had never registered: unreachable until the app was relaunched (found 2026-07-30).
+            onJoined={bootState.kind === 'ready'
+              ? async (a) => {
+                try { await bootState.bundle.onCircleJoined(a); } finally {
+                  // …and tell the launcher its list is stale. Separate from reachability on purpose: a
+                  // circle you cannot see is a different failure from one nobody can reach you in, and
+                  // fixing only the second still leaves you unable to open what you just joined.
+                  onCirclesChanged?.();
+                }
+              }
+              : undefined}
             // /create-group success-screen embeds the admin's NKN
             // address into the invite URL so the joiner can peer-
             // redeem when their substrate has no local copy of the
@@ -1964,6 +2046,20 @@ export default function ChatScreen({
       ) : null}
     </KeyboardAvoidingView>
   );
+
+  /**
+   * Deliver a parked deep link, but only once the agent can serve the wizard behind it.
+   *
+   * Holding rather than dropping matters: the invite link is how most people arrive, and it is a cold start
+   * by definition — the app was not running when they tapped it.
+   */
+  function drainPendingLink() {
+    if (!bootReadyRef.current) return;
+    const url = pendingLinkRef.current;
+    if (!url) return;
+    pendingLinkRef.current = null;
+    onQrScanResult(classifyQrPayload(url, getBasisClassifiers()));
+  }
 
   async function onQrScanResult(res) {
     setQrScannerOpen(false);

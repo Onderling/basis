@@ -97,6 +97,20 @@ const DEFAULT_WARN_AFTER_MS    = 20_000;
 const DEFAULT_CONNECT_TIMEOUT  = 90_000;
 const DEFAULT_SEND_RETRIES     = 2;     // total attempts = retries + 1
 const DEFAULT_SEND_RETRY_DELAY = 500;   // ms between retries
+// A send must not be able to outlive the handshake window that is waiting on it.
+//
+// `nkn-sdk`'s `client.send()` waits for the client to become ready and never times out on its own, and
+// `_put` used to guard only on `#client` EXISTING — which it does from construction, ~90 s before it can
+// actually be connected. So every HI issued while the mesh was still coming up hung forever. That was bad
+// on its own, but the real damage was upstream: `secure-agent`'s `announceHi()` awaits this call, so
+// `_sendOverRoute` never returned, its own 5 s/15 s HI wait never ran, and the routing layer never failed
+// over — the relay was connected and working the whole time and could not be reached, because the
+// transport that was down never said no. (Found on hardware 2026-07-30: 812 "sending outbound HI" against
+// 11 "sent OK", and no failures at all.)
+//
+// 8 s, not the relay's 5 s: NKN is legitimately slower. But well inside secure-agent's 15 s mesh wait, so
+// a failure surfaces while there is still time to re-announce or fail over.
+const DEFAULT_SEND_TIMEOUT     = 8_000;
 
 export class NknTransport extends Transport {
   #client    = null;
@@ -121,6 +135,8 @@ export class NknTransport extends Transport {
    * @param {number}  [opts.connectTimeout=90000]
    * @param {number}  [opts.sendRetries=2]
    * @param {number}  [opts.sendRetryDelayMs=500]
+   * @param {number}  [opts.sendTimeoutMs=8000] — hard bound per wire send; a mesh that never answers
+   *   must fail rather than hang, or the routing layer above cannot fail over to a transport that works.
    */
   constructor(opts = {}) {
     if (!opts?.identity) throw new Error('NknTransport requires identity');
@@ -132,6 +148,7 @@ export class NknTransport extends Transport {
       connectTimeout:   DEFAULT_CONNECT_TIMEOUT,
       sendRetries:      DEFAULT_SEND_RETRIES,
       sendRetryDelayMs: DEFAULT_SEND_RETRY_DELAY,
+      sendTimeoutMs:    DEFAULT_SEND_TIMEOUT,
       ...opts,
     };
   }
@@ -214,6 +231,11 @@ export class NknTransport extends Transport {
    */
   async _put(to, envelope) {
     if (!this.#client) throw new Error('NknTransport: not connected');
+    // `#client` exists from construction; `#connected` only after the 'connect' event, which can be ~90 s
+    // later. Passing the truthiness test and calling into a client that is still connecting is what hung
+    // 801 sends — say no NOW so the routing layer can try a transport that is actually up. (`canReach()`
+    // already reports this correctly; a transport must still refuse rather than trust every caller to ask.)
+    if (!this.#connected) throw new Error('NknTransport: not connected yet (mesh still coming up)');
 
     // Auto-HI BEFORE the first OW to a peer.  HI envelopes themselves
     // skip this guard (they ARE the introduction).
@@ -228,7 +250,7 @@ export class NknTransport extends Transport {
     let lastErr;
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
-        await this.#client.send(to, payload, { noReply: true });
+        await this.#withSendTimeout(this.#client.send(to, payload, { noReply: true }), to);
         return;
       } catch (err) {
         lastErr = err;
@@ -259,6 +281,33 @@ export class NknTransport extends Transport {
   }
 
   // ── Private ───────────────────────────────────────────────────────────────
+
+  /**
+   * Bound a wire send so a wedged mesh fails instead of hanging.
+   *
+   * Deliberately does NOT cancel the underlying send — nkn-sdk gives us no handle to do so, and a send that
+   * lands late is harmless. What matters is that OUR promise settles, so the caller's timeout and failover
+   * logic can run at all.
+   */
+  async #withSendTimeout(promise, to) {
+    const ms = Math.max(0, this.#opts.sendTimeoutMs | 0);
+    if (!ms) return promise;
+    let timer;
+    try {
+      return await Promise.race([
+        promise,
+        new Promise((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error(`NknTransport: send to ${to} timed out after ${ms}ms`)),
+            ms,
+          );
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
 
   /**
    * Derive a 64-hex-char NKN seed from the agent's Ed25519 pubKey

@@ -56,7 +56,12 @@ async function main() {
   const me = await bootRealAgentNode('walk-peer', { redeemTimeoutMs: 45_000 });
   await me.agent.connectPeerTransport({
     relayUrl,
-    onPeerMessage: (addr, payload) => me._routerRef.fn?.(addr, payload),
+    // ONE argument: the router is `onPeerMessage(env)` and destructures `{from, payload}` off it. This site
+        // used to spread it as `(addr, payload)`, so the router received an address STRING where it expected an
+        // envelope, found no `payload.subtype`, and dropped every inbound message — which made `log` report
+        // "(nothing received)" and looked exactly like the phone failing to deliver (2026-07-30). Every other
+        // call site in `pairRealAgents.js` already passed `(env)`; only the walk harness diverged.
+        onPeerMessage: (env) => me._routerRef.fn?.(env),
   });
   console.log(`[walk-peer] connected to ${relayUrl}`);
   console.log(`[walk-peer] my pubKey: ${me.pubKey}`);
@@ -93,6 +98,7 @@ async function main() {
       const r = await quickCreateCircle({ callSkill: call, name: label });
       if (!r?.groupId) return console.log('create failed:', JSON.stringify(r));
       console.log(`created ${r.groupId}`);
+      await registerMyCircleAddresses();
       await commands.invite(r.groupId);
     },
 
@@ -114,7 +120,10 @@ async function main() {
         inviteUri: uri, callSkill: call, sendPeerRedeem: me.sendPeerRedeem, handle: 'walkpeer',
       });
       console.log(r?.ok ? `joined ${r.circleId}` : `join failed: ${JSON.stringify(r)}`);
-      if (r?.ok) await bindCircleAddressKeysFor({ agent: me.agent, circleId: r.circleId });
+      if (r?.ok) {
+        await bindCircleAddressKeysFor({ agent: me.agent, circleId: r.circleId });
+        await registerMyCircleAddresses();
+      }
     },
 
     async post(circleId, ...rest) {
@@ -154,7 +163,12 @@ async function main() {
     async online() {
       await me.agent.connectPeerTransport({
         relayUrl,
-        onPeerMessage: (addr, payload) => me._routerRef.fn?.(addr, payload),
+        // ONE argument: the router is `onPeerMessage(env)` and destructures `{from, payload}` off it. This site
+        // used to spread it as `(addr, payload)`, so the router received an address STRING where it expected an
+        // envelope, found no `payload.subtype`, and dropped every inbound message — which made `log` report
+        // "(nothing received)" and looked exactly like the phone failing to deliver (2026-07-30). Every other
+        // call site in `pairRealAgents.js` already passed `(env)`; only the walk harness diverged.
+        onPeerMessage: (env) => me._routerRef.fn?.(env),
       });
       console.log('online — anything held for me should flush now');
     },
@@ -165,6 +179,35 @@ async function main() {
       for (const e of rows) console.log(`  [${e.type}] ${e.payload?.text ?? JSON.stringify(e.payload ?? {}).slice(0, 80)}`);
     },
   };
+
+  /**
+   * Register THIS peer's per-circle addresses on the relay — what a real shell does and this harness did not.
+   *
+   * Found finishing the round-trip (2026-07-30). A roster row carries a member's per-circle address, so peers
+   * send to it. The shells register their aliases with the relay (`registerCircleAddresses`, wired at boot,
+   * circles-load and join); walk-peer never did, so it was reachable only under its pubKey. Consequence: the
+   * phone sent a chat message to walk-peer's roster address, the relay had never heard of that address, and
+   * the message was undeliverable — while walk-peer's OWN sends worked fine, because the phone *had*
+   * registered. So the harness could send but not be sent to, which read exactly like the phone failing to
+   * deliver. Two harness bugs stacked (the other was the router signature) before the product was even in
+   * question.
+   *
+   * Unscoped on purpose: a walk peer rides one relay and the scoping rule (a circle registers only on relays
+   * it uses) is the shells' concern, tested there. Here the point is simply to be reachable.
+   */
+  async function registerMyCircleAddresses() {
+    try {
+      const relay = me.agent?.relay;
+      if (!relay?.supportsAliases) return;
+      const { circles } = await listCircles();
+      for (const c of circles) {
+        const addr = me.agent?.circleAddressFor?.(c.id);
+        if (addr) await relay.addAddress(addr);
+      }
+    } catch (err) {
+      console.log('[walk-peer] circle-address registration failed:', err?.message ?? err);
+    }
+  }
 
   async function listCircles() {
     try {

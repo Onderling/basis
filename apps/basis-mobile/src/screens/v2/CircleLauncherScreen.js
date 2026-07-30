@@ -358,6 +358,18 @@ export default function CircleLauncherScreen({
   // The fallback offer's MOUTH (App.js owns the offer): the open kring chat registers its bot bubble
   // while mounted, so an app-level offer can speak in the conversation the person is looking at.
   registerKringBotSink = null,
+  // …and its ACCEPT (App.js `acceptFallbackOffer`: sets the setting, clears the offer, speaks the confirm).
+  //
+  // This line was missing, and it broke EVERY circle-open (found 2026-07-30). App.js passed the prop, the
+  // detail component declared it, and the render at ~1733 forwarded a bare `onAcceptFallback` that existed
+  // in no scope — so opening any circle threw `Property 'onAcceptFallback' doesn't exist`, React aborted the
+  // render, and the launcher stayed on the list. It read as a dead tap: no navigation and nothing in the log,
+  // because the press handler ran fine and the RENDER it caused is what failed. The redbox was there the
+  // whole time, minimised.
+  onAcceptFallback = null,
+  // Bumped by App.js when a circle is joined/created from another surface. The launcher loads its list on
+  // mount and after its OWN wizards; both screens stay mounted, so nothing else told it.
+  circlesRevision = 0,
   // cluster J — the OidcSessionRN ref (App.js:187), needed to activate the feedback verify pods.
   sessionRef = null,
   // cluster J — podAuth (lifted from the hidden ChatScreen) so the "Me" screen can drive pod sign-in.
@@ -1041,7 +1053,9 @@ export default function CircleLauncherScreen({
     };
     tick();
     return () => { cancelled = true; };
-  }, [load, callSkill]);
+    // `circlesRevision` re-runs this when a circle arrives from elsewhere — the retry-while-empty loop is
+    // exactly the right shape for it, since a just-joined circle may take a beat to reach the store.
+  }, [load, callSkill, circlesRevision]);
 
   // refresh per-circle pending proposal counts whenever the
   // circle list changes.  countPending is async per circle; we tolerate
@@ -1736,6 +1750,7 @@ export default function CircleLauncherScreen({
         rawCallSkill={bundle?.callSkill}
         catalog={bundle?.catalog}
         policy={selectedPolicy}
+        peerGraph={bundle?.peerGraph ?? null}
         myListTasks={myListTasks}
         eventLog={eventLog}
         circles={circles}
@@ -1889,6 +1904,11 @@ export default function CircleLauncherScreen({
             // admin never hears it.
             dialEndpoint={(url) => bundle?.reconnectPeer?.({ relayUrl: url })}
             activeEndpointUrl={() => bundle?.activeRelayUrl?.() ?? null}
+            // Post-join reachability (G13) — the same seam the chat-shell host passes, so a join is
+            // equally complete from either surface. This screen already bound the roster keys in
+            // `onDispatched`; what it never did was RE-REGISTER this device's per-circle address, so the
+            // circle just joined was missing from the relay until the next circles load.
+            onJoined={bundle?.onCircleJoined}
             onClose={() => setJoinArgs(null)}
             onDispatched={(r) => {
               setJoinArgs(null);
@@ -2159,6 +2179,13 @@ function CircleDetail({
   deliveryStateMap = null,
   registerKringBotSink = null,
   onAcceptFallback = null,
+  // `isAgentActor` needs the peer graph to tell an agent actor from a person. It used to read
+  // `bundle?.peerGraph`, and `bundle` is the LAUNCHER's prop — not one of ours. Optional chaining does not
+  // save an UNDECLARED name, so that was a third render crash stacked behind `onAcceptFallback` and
+  // `selectedPolicy` (found 2026-07-30 by the scope fitness guard, after the first two were fixed by hand).
+  // Passed narrowly rather than handing this component the whole bundle: it needs one lookup, and the file's
+  // style is to thread the specific store.
+  peerGraph = null,
   eventLog,
   circles = [],
   recipeStore = null, onStoopEvent, sendPersonaUpdate, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null, coreIdentity = null,
@@ -2245,10 +2272,15 @@ function CircleDetail({
   // They were only ever read off the circle record, where nothing put them, so every circle resolved to
   // the permissive default no matter which template made it (S3/J-CW3). The circle record is still
   // consulted as a fallback, for a circle whose kind arrived by some other route.
+  // `policy` — CircleDetail's own prop name for it. This block was written against `selectedPolicy`, which
+  // is the LAUNCHER's state variable (it is what gets passed down as `policy`), so inside this component the
+  // name resolved to nothing and opening a circle threw `Property 'selectedPolicy' doesn't exist`. It never
+  // showed up because the render already died one prop earlier on `onAcceptFallback`; two crashes stacked in
+  // the same render, both from a name that reads perfectly plausibly in the file it sits in.
   const allowedKinds = useMemo(() => resolveConversationKinds({
-    circleSetting: selectedPolicy?.conversationKinds ?? circle?.conversationKinds ?? null,
-    templateKind:  selectedPolicy?.kind ?? circle?.kind ?? null,
-  }), [selectedPolicy?.kind, selectedPolicy?.conversationKinds, circle?.kind, circle?.conversationKinds]);
+    circleSetting: policy?.conversationKinds ?? circle?.conversationKinds ?? null,
+    templateKind:  policy?.kind ?? circle?.kind ?? null,
+  }), [policy?.kind, policy?.conversationKinds, circle?.kind, circle?.conversationKinds]);
   // P1.7 — the reader's own narrowing on top of the circle's setting (web parity). Device-local per
   // circle; an actor we cannot resolve counts as a person, so nobody vanishes from a conversation.
   const chatFilterIo = useMemo(() => asyncStorageChatFilterIo(AsyncStorage), []);
@@ -2266,10 +2298,10 @@ function CircleDetail({
   );
   const isAgentActor = useCallback((actor) => {
     if (actor == null) return false;
-    const list = bundle?.peerGraph?.list ? bundle.peerGraph.list() : [];
+    const list = peerGraph?.list ? peerGraph.list() : [];
     return (list ?? []).some((p) => (p?.pubKey === actor || p?.url === actor)
       && (p?.type === 'a2a' || p?.type === 'hybrid' || (Array.isArray(p?.skills) && p.skills.length > 0)));
-  }, [bundle]);
+  }, [peerGraph]);
   const rows = useMemo(() => applyChatFilter({
     rows: chatRows({
       events:    eventLog?.query ? eventLog.query({ excludeMuted: true }) : [],

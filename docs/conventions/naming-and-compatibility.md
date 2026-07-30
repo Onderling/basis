@@ -14,7 +14,13 @@ feedback repo's `file:` deps cross to it) and `apps/tasks-mobile` (a deferred de
 
 ## Compatibility: a dated licence, not a standing one
 
-> **⏳ Backwards compatibility is NOT required — until 2026-07-31** (Frits, 2026-07-28).
+> **⏳ Backwards compatibility is NOT required — until 2026-08-31**
+> (Frits, 2026-07-28; **extended from 07-31 to 08-31 on 2026-07-30**).
+
+*Why it was extended:* the round-trip work on 2026-07-30 turned up a wire change worth making — the
+reciprocal HI now carries a `reply: true` marker — and the original month ran out the next day, mid-flight.
+Renewing deliberately is the point of a dated licence; letting it lapse by accident while work is in the air
+is not.
 
 Nothing is live: no external users, no data worth migrating. So a rename or reshape lands as a **clean
 break** — no dual-write windows, no legacy read-fallbacks, no deprecated aliases. Those cost real
@@ -27,7 +33,7 @@ re-creating. Pre-launch is exactly when that is cheap, which is the whole reason
 
 ### The expiry is the point
 
-**After 2026-07-31 this licence lapses — ASK before breaking a persisted or wire format.** A standing
+**After 2026-08-31 this licence lapses — ASK before breaking a persisted or wire format.** A standing
 "compatibility doesn't matter" would quietly outlive the condition that made it true, which is how a
 reasonable decision becomes an unreasonable habit. If the date has passed and nobody has renewed it,
 treat compatibility as required again and raise the question.

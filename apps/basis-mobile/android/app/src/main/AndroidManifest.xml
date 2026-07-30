@@ -28,6 +28,13 @@
         <data android:scheme="basis"/>
         <data android:scheme="org.onderling.basis"/>
         <data android:scheme="exp+basis-mobile"/>
+        <!-- The three product schemes from app.json. They were declared there and NOT here, because
+             `scheme` only reaches this file through `expo prebuild` and nobody had re-run it: the OS
+             therefore refused every onderling-invite:// link. `schemeRegistry.test.js` now holds this
+             file to `OS_REGISTERED_SCHEMES`, so the two cannot drift again. -->
+        <data android:scheme="onderling-invite"/>
+        <data android:scheme="onderling-contact"/>
+        <data android:scheme="onderling-pair"/>
       </intent-filter>
     </activity>
   </application>

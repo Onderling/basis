@@ -388,3 +388,77 @@ curl -s -o /dev/null -w '%{http_code} %{size_download}\n' \
 ```
 
 200 plus tens of MB means Metro is healthy and the problem is on the device side.
+
+## `expo.scheme` in app.json does NOT reach the device — `prebuild` writes AndroidManifest, and nobody re-ran it
+
+**Symptom.** `adb shell am start -a android.intent.action.VIEW -d "onderling-invite://<payload>" org.onderling.basis`
+answers `Error: Activity not started, unable to resolve Intent`, even though `app.json` clearly lists the
+scheme. `adb shell dumpsys package org.onderling.basis | grep Scheme:` shows only the old set.
+
+**Cause.** `expo.scheme` is a build *input*. It is copied into
+`android/app/src/main/AndroidManifest.xml` by `expo prebuild`, and this repo keeps `android/` checked in — so
+editing app.json changes nothing until a prebuild (or a hand-edit of the manifest) plus a **native rebuild**.
+A JS reload cannot fix it; the intent filter lives in the APK.
+
+**Check, in order** — each answers a different layer, and they were disagreeing:
+```bash
+grep -A3 '"scheme"' apps/basis-mobile/app.json                                    # the intent
+grep android:scheme apps/basis-mobile/android/app/src/main/AndroidManifest.xml    # what will be built
+adb shell dumpsys package org.onderling.basis | grep -i 'Scheme:'                 # what IS installed
+```
+
+**Fix.** Add `<data android:scheme="…"/>` to the VIEW `intent-filter` (exactly what prebuild emits — safer
+than running prebuild, which regenerates all of `android/` and can clobber hand-edits noted elsewhere in this
+file), then `cd apps/basis-mobile/android && ./gradlew assembleDebug` and reinstall.
+
+**Guard.** `apps/basis-mobile/test/schemesRegistered.test.js` now checks the native manifest against
+`OS_REGISTERED_SCHEMES`, not just app.json. It passed for days while links were dead on device, because it
+only knew about the layer above the break.
+
+**The nastier half.** A registered scheme with no listener is *worse* than an unregistered one: the OS opens
+the app, so the link looks like it worked. `basis-mobile` had no `Linking` reference anywhere — schemes,
+registry, parser and guard all existed and nothing ever received a URL. Same test file now asserts both
+`getInitialURL` (cold start) and `addEventListener('url', …)` (warm) exist.
+
+## `adb shell input text` with a long string RELOADS the JS context (device walks)
+
+Typing a ~250-char invite payload into a TextInput reliably blanked the screen and re-booted the whole JS
+context — same pid, fresh `[cc/boot]` — which reads exactly like a crash and sent an hour into the wrong
+place. Short strings (`abcdefg`) are fine; the reload tracks length, not any particular character (`r`, and
+the `://` in a URL, were both ruled out by bisecting).
+
+Consequence for walks: **do not drive long text through `input text`.** Use a deep link
+(`adb shell am start -a android.intent.action.VIEW -d '<uri>' <pkg>`) — see the entry above for making the
+scheme resolvable first. Keep `input text` for short values (a circle name, a handle).
+
+Also: `adb shell input keyevent 67` (DEL) on an already-empty field falls through to **back navigation** and
+closes the sheet you are working in, so a "clear the field" loop silently walks you out of the flow. Re-open
+the sheet for a clean field instead of clearing it.
+
+## A "dead button" in a screen is usually a RENDER error, not a dead handler
+
+Three `ReferenceError`s in one render made opening any circle impossible on 2026-07-30, and the symptom was
+indistinguishable from a Pressable that does nothing: the press handler ran, its skills fired
+(`listGroupRoster`, `listOpen` in logcat), and then the render those state updates caused threw. Nothing
+appeared, and nothing in the log looked wrong.
+
+**Diagnose it in this order** — do not start by suspecting the touch target:
+1. `adb exec-out screencap -p` right after the tap. A dev-build **redbox may be minimised**, so the crash is
+   on screen but not obvious — the earlier screenshots looked like an unresponsive list.
+2. `adb logcat -d | grep -iE "doesn't exist|Render Error|ReferenceError"`. This is the fast answer.
+3. Only then instrument the handler (`onPressIn={() => console.log(...)}`) to prove the press arrives.
+
+They come in threes because the first crash hides the rest: fix one, re-run, get the next. The guard
+`apps/basis-mobile/test/screensNoUndefinedIdentifiers.test.js` now finds them all at once with real scope
+analysis over `src/screens/**` (`@babel/parser` + `@babel/traverse`, already in the tree) — that directory is
+excluded from vitest, and this repo has no ESLint, so `no-undef` had no home until now. Run it before blaming
+a tap.
+
+The two shapes it catches, both of which read as perfectly plausible code in the file they sit in:
+- a prop `App.js` passes that the screen never destructured (`onAcceptFallback`), and
+- a value belonging to a SIBLING component in the same file (`selectedPolicy` where the local prop is
+  `policy`; `bundle` where only the parent has it). **Optional chaining does not save an undeclared name** —
+  `bundle?.peerGraph` still throws when `bundle` is unbound.
+
+Companion guard: `test/screenPropsDestructured.test.js` compares what `App.js` passes against what each screen
+destructures. It found a dead `getPodWriter` prop within seconds of being written.

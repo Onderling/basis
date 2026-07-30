@@ -111,6 +111,40 @@ families compose.*
 6. **Result** — flows back to the invoking surface. Verify the *result*, not just that dispatch fired: a gate
    can route correctly while the op silently fails.
 
+### The event log — what runs is written down
+
+Underneath the flow above there is one **append-only event log per device**, and it is a *substrate*, not a
+feature of any surface: any part of the app can append to it, and the chat, the cross-circle stream and the
+activity views are projections over it rather than stores of their own (see *One log, many projections* in
+Part 3 for the projection side).
+
+Three properties are worth knowing before you write to it or read from it:
+
+- **Append-only, and auditable entries are immutable.** An entry is de-duplicated on the caller's id; for the
+  kinds marked auditable, a repeat id is first-write-wins — a delegated agent cannot rewrite a row it already
+  wrote. Ordering is a storage-assigned sequence, never a caller-supplied one.
+- **Kind-classified.** Behaviour is carried by the entry's **kind**, in one shared table
+  (`ENTRY_KINDS` in `@onderling/item-store`), which answers four separate questions: does it show in a
+  conversation or is it system plumbing (`lane`), may it wake an offline device (`wakes`), how long is it
+  kept (`retain`), and is it immutable once written (`audit`). An unregistered kind gets the conservative
+  reading — system lane, never wakes, shortest retention — so a new kind cannot accidentally reach a phone.
+  The table lives in a substrate package precisely so two apps cannot each derive the wake rule differently
+  (→ [`shared-vocabularies.md`](conventions/shared-vocabularies.md)).
+- **Retention is per class, not one number.** "Retention of what?" is the right question: plumbing
+  (roster pings, delivery state) is kept days, the conversation longer, and the **audit** class does not
+  expire by dropping — entries past the detail window **compact** into a summary that says how many it folded
+  and of what. A trail that forgets silently looks complete, which is worse than one that is honestly short.
+
+The log is deliberately a record of *pointers*, not a second copy of the data: the agent-trail entry shape is
+a whitelist (`{op, target, outcome, via}`) with no arguments, message bodies or file contents. The trail says
+*that* an agent wrote to something and under whose authority; the thing itself says what.
+
+Because the log is complete and local, the redaction question lives at the **export** boundary — a support
+bundle or bug report is where identities are stripped or pseudonymised, not at the point of writing. The
+device-local structured logger (`@onderling/logger`) takes the opposite approach for the layers below the
+app, where there is no circle scope to key on: it is PII-safe *by construction*, accepting only event codes
+and scalar fields and rejecting identifier-shaped values whatever field they arrive under.
+
 ### Retrieval (RAG) — grounding the circle bot
 
 Each circle has an assistant (the "circle bot"). Before it answers via the LLM, it retrieves the circle's own

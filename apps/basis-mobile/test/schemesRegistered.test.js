@@ -44,4 +44,47 @@ describe('FITNESS: the app claims every scheme it hands out', () => {
     // Named explicitly because it is the scheme of the first thing a new person ever receives.
     expect(declared).toContain('onderling-invite');
   });
+
+  // This guard originally stopped at app.json, which turned out to be one layer ABOVE where the failure
+  // was (2026-07-30). `expo.scheme` is only a build INPUT: it reaches Android through `expo prebuild`,
+  // which regenerates AndroidManifest.xml. Nobody had re-run it, so app.json listed four schemes, the
+  // manifest listed one, `dumpsys package` agreed with the manifest, and the OS refused every
+  // onderling-invite:// link — with the guard passing the whole time.
+  it('the ANDROID MANIFEST declares them too — app.json alone proves nothing on device', () => {
+    const manifest = readFileSync(
+      path.join(here, '..', 'android', 'app', 'src', 'main', 'AndroidManifest.xml'), 'utf-8',
+    );
+    const missing = OS_REGISTERED_SCHEMES.filter((sc) => !manifest.includes(`android:scheme="${sc}"`));
+    expect(
+      missing,
+      'declared in app.json but absent from the native manifest — `expo prebuild` has not been re-run, so '
+      + 'the OS does not know the app claims these. Links are dead on device even though this config looks '
+      + 'right in JS.',
+    ).toEqual([]);
+  });
+});
+
+describe('FITNESS: something actually RECEIVES an incoming link', () => {
+  // The other half, and the one that cost the most: every layer of this — app.json, the registry, the
+  // native manifest, `decodeInvite` — can be correct while the app still drops invites, because nothing
+  // subscribes to the URL. `basis-mobile` had no `Linking` reference anywhere at all. A registered scheme
+  // with no listener is *worse* than an unregistered one: the OS opens the app, so it looks like the link
+  // worked.
+  it('the mobile shell subscribes to incoming URLs, cold start AND warm', () => {
+    const chat = readFileSync(path.join(here, '..', 'src', 'screens', 'ChatScreen.js'), 'utf-8');
+    expect(chat, 'no Linking import — incoming links cannot arrive').toMatch(/\bLinking\b/);
+    // A cold start arrives only via getInitialURL; a warm one only via the event. Having just the second
+    // is the usual shape of this bug — the link works if the app is already open and not otherwise.
+    expect(chat, 'no cold-start path: a link that launches the app is dropped').toContain('getInitialURL');
+    expect(chat, 'no warm path: a link tapped while the app runs is dropped').toMatch(
+      /addEventListener\(\s*'url'/,
+    );
+  });
+
+  it('…and it routes them through the same classifier the scanner uses', () => {
+    // Scanned and linked payloads must not be able to diverge — same classifier, same handler.
+    const chat = readFileSync(path.join(here, '..', 'src', 'screens', 'ChatScreen.js'), 'utf-8');
+    expect(chat).toContain('getBasisClassifiers');
+    expect(chat).toContain('onQrScanResult(classifyQrPayload');
+  });
 });

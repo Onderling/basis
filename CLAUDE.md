@@ -73,8 +73,16 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
 - **Shared vocabularies** (delivery states, entry kinds, roles, label maps) — the index of what already
   exists, and the rule that a new one needs a home + a guard — [`shared-vocabularies.md`](docs/conventions/shared-vocabularies.md).
 - **Record a decision** when a choice closes off alternatives / would be re-litigated / shapes architecture (→ `docs/decisions.md`) or org (→ private) — [`decision-log.md`](docs/conventions/decision-log.md).
+- **Log your OWN judgement calls as you make them — dated rule, review on 2026-08-13.** Any choice made
+  without Frits goes into `plans/DECISIONS-FOR-REVIEW.md` **in the same turn as the change**, colour-coded
+  (🟢 mechanical · 🟡 shapes something · 🔴 awkward to undo) and stating **how to undo it**. Not a batch at
+  the end of a session: the file silently drifted three days in July 2026 and had to be reconstructed after
+  the fact, which can only ever be partial — what you forgot is by definition absent. This is the same habit
+  as `agent-notes-known-gotchas.md` (write it the turn you hit it), and distinct from `docs/decisions.md`,
+  which is only for decisions Frits has *answered*. **On 2026-08-13 this rule is re-decided** — keep, narrow,
+  or drop. It exists because it was forgotten once, not forever.
 - **Naming is `onderling`; compatibility is a DATED licence** — no "canopy" identifiers; backwards
-  compat **not required until 2026-07-31**, then it lapses and you ASK before breaking a persisted/wire
+  compat **not required until 2026-08-31** (extended 2026-07-30), then it lapses and you ASK before breaking a persisted/wire
   format — [`naming-and-compatibility.md`](docs/conventions/naming-and-compatibility.md).
 
 ## How to work
@@ -104,6 +112,13 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
   it needs its own interaction model** (Frits, 2026-07-28): stoop and tasks do not, so they reduce to close
   to a manifest; **folio does** — basis is a poor file manager — so it keeps a surface of its own.
 - **Ship web first, then mobile** as separate steps/commits; don't bundle both platforms in one commit.
+- **A device harness already exists — use it before hand-driving anything.** `apps/basis-mobile/e2e/` is a
+  **Detox** suite (real emulator or attached phone, driven by `testID`s): `coldBoot`, `allWizards`,
+  `circleScreens`, `restartSurvival`. `npm run detox:build` once per source change, then `npm run detox:test`
+  (or `detox:test:attached` for the physical phone). Hand-driving with `adb input tap` + `screencap` is a last
+  resort, not the default — pixel coordinates and `input text` have their own traps
+  (→ `docs/agent-notes-known-gotchas.md`), and a whole afternoon went into them on 2026-07-30 while this
+  suite sat unused. If a journey is not expressible here, that is a gap in the harness worth closing.
 - **Verify the RESULT, not just the dispatch** — check the skill's return value, not only that a command
   fired (the device-run lesson; a gate can route while the op silently fails).
 - **Keep the design-doc status overview current.** When you finish, supersede, or archive a plan/design doc,

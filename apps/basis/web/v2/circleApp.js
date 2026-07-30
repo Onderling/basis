@@ -1271,7 +1271,24 @@ async function acceptFallbackOffer() {
   fallbackOffer.accept();
   _kringRender?.botBubble(t('circle.nearbyScreen.delivery_fallback_on'));
 }
-let   CIRCLE_RELAY_URL      = resolveRelayUrl(localStorageRelayIo().load(), CIRCLE_RELAY_ENV);
+// Boot relay: the setting if there is one, else a connection point we already hold (web ≡ mobile,
+// 2026-07-30). Without this a device is only on a circle's relay WHILE joining it — the join dials the
+// endpoint the invite names and deliberately does not persist it — so after a reload it is on no relay,
+// registers its per-circle addresses nowhere, and cannot be reached in that circle. The point was recorded
+// the whole time. `bootRelayUrl` holds the ordering; an explicit choice always wins.
+//
+// Read through a THROWAWAY store rather than `getConnectionPoints()`: that accessor seeds itself from
+// `CIRCLE_RELAY_URL` (via `adoptExistingRelay`), so calling it here — inside that variable's own
+// initialiser — is a temporal-dead-zone crash at module load. The shared store is built later, from the
+// same persisted state, and this decision only needs to read.
+let   CIRCLE_RELAY_URL      = bootRelayUrl({
+  stored: resolveRelayUrl(localStorageRelayIo().load(), CIRCLE_RELAY_ENV),
+  list:   (() => {
+    try {
+      return createConnectionPoints({ initial: localStorageConnectionPointsIo().load(), save: () => {} }).list();
+    } catch { return []; }
+  })(),
+});
 let   _peerAgent           = null;   // captured at boot so a relay-setting change can reconnect live
 let   _peerRouter          = null;
 // Phase 4 §9 — device transport-mode preference (nkn|relay|both), persisted so the settings

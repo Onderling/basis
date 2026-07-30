@@ -8,7 +8,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   createConnectionPoints, POINT_SOURCE, POINT_KIND, adoptExistingRelay,
-  localStorageConnectionPointsIo, asyncStorageConnectionPointsIo, recordJoinedCirclePoints,
+  localStorageConnectionPointsIo, asyncStorageConnectionPointsIo, recordJoinedCirclePoints, bootRelayUrl
 } from '../../src/v2/connectionPoints.js';
 
 const A = 'wss://a.example';
@@ -371,5 +371,48 @@ describe('recordJoinedCirclePoints', () => {
     expect(recordJoinedCirclePoints({ store: cp, invite: { relayUrl: 'http://not-a-socket', podBacked: true, podUrl: 'ftp://x' }, circleId: 'c4' }).recorded).toEqual([]);
     expect(recordJoinedCirclePoints({ invite: { relayUrl: A }, circleId: 'c4' }).recorded).toEqual([]);
     expect(recordJoinedCirclePoints({ store: cp, circleId: 'c4' }).recorded).toEqual([]);
+  });
+});
+
+describe('bootRelayUrl — a device reconnects to a circle it already joined (2026-07-30)', () => {
+  // The hole this closes: a device was only on a circle's relay WHILE joining it. The join dials the
+  // endpoint the invite names and deliberately does not persist it, so after a restart the device was on
+  // no relay, registered its per-circle addresses nowhere, and could not be reached in that circle. The
+  // point was recorded the whole time. Found running the first message round-trip on hardware.
+  const P = (url, over = {}) => ({ url, kind: POINT_KIND.RELAY, adopted: true, active: false, ...over });
+
+  it('an explicit stored preference always wins', () => {
+    // Someone who chose a relay keeps it. A joined circle must never quietly move them.
+    expect(bootRelayUrl({ stored: 'ws://mine:8787', list: [P('ws://joined:8788')] })).toBe('ws://mine:8787');
+  });
+
+  it('else the point that was live last time', () => {
+    expect(bootRelayUrl({ list: [P('ws://newer:1'), P('ws://was-active:2', { active: true })] }))
+      .toBe('ws://was-active:2');
+  });
+
+  it('else the newest adopted relay — in practice the circle joined most recently', () => {
+    expect(bootRelayUrl({ list: [P('ws://newest:1'), P('ws://older:2')] })).toBe('ws://newest:1');
+  });
+
+  it('never a pod — it has no socket to connect to', () => {
+    expect(bootRelayUrl({ list: [P('https://pod.example/anna/', { kind: POINT_KIND.POD }), P('ws://relay:1')] }))
+      .toBe('ws://relay:1');
+    expect(bootRelayUrl({ list: [P('https://pod.example/anna/', { kind: POINT_KIND.POD })] })).toBeNull();
+  });
+
+  it('never a merely SUGGESTED point — rule 4 says the device adopts, and a boot is not adopting', () => {
+    expect(bootRelayUrl({ list: [P('ws://suggested:1', { adopted: false })] })).toBeNull();
+    // …but once adopted it is fair game.
+    expect(bootRelayUrl({ list: [P('ws://suggested:1', { adopted: true })] })).toBe('ws://suggested:1');
+  });
+
+  it('junk in the list cannot become a boot target', () => {
+    expect(bootRelayUrl({ list: [P('not-a-url'), P('https://a-pod/'), P('ws://good:1')] })).toBe('ws://good:1');
+  });
+
+  it('nothing stored and nothing recorded ⇒ null, which is the previous behaviour', () => {
+    expect(bootRelayUrl({})).toBeNull();
+    expect(bootRelayUrl({ stored: '   ', list: [] })).toBeNull();
   });
 });

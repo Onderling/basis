@@ -53,7 +53,7 @@ import { AsyncStorageAdapter } from '@onderling/react-native/storage/AsyncStorag
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { resolveRelayUrl, asyncStorageRelayIo } from '../../../basis/src/v2/relayPref.js';
 import { registerCircleAddresses } from '../../../basis/src/v2/circleAddressRegistration.js';
-import { createConnectionPoints, asyncStorageConnectionPointsIo } from '../../../basis/src/v2/connectionPoints.js';
+import { createConnectionPoints, bootRelayUrl, asyncStorageConnectionPointsIo } from '../../../basis/src/v2/connectionPoints.js';
 // SILENT out-of-circle delivery — the per-user "shared with me" store (TIERED: AsyncStorage canonical + pod
 // mirror) and THIS device's network-derived sealing OPENER. Both are shared-src logic (web≡mobile): the store
 // factory mirrors web's tiered wiring in circleApp.js; the opener bridge injects the pod-client sealing adapter
@@ -67,6 +67,27 @@ import { openerForIdentity } from '../../../basis/src/v2/sharedCopyOpener.js';
 export async function resolveMobileRelayUrl() {
   try { return resolveRelayUrl(await asyncStorageRelayIo(AsyncStorage).load(), process.env.EXPO_PUBLIC_CIRCLE_RELAY_URL); }
   catch { return process.env.EXPO_PUBLIC_CIRCLE_RELAY_URL || null; }
+}
+
+/**
+ * The relay to connect with at BOOT — the setting if there is one, else a connection point we already
+ * hold (2026-07-30).
+ *
+ * Without this a device was only on a circle's relay *while joining it*: the join dials the endpoint the
+ * invite names and does not persist it, so after a restart the device was on no relay, registered its
+ * per-circle addresses nowhere, and could not be reached in that circle at all. The point was recorded the
+ * whole time; nothing reconnected to it. `bootRelayUrl` holds the ordering (an explicit choice always
+ * wins) — see its header for why a suggested point and a pod are both excluded.
+ */
+export async function resolveBootRelayUrl() {
+  const stored = await resolveMobileRelayUrl();
+  try {
+    const io = asyncStorageConnectionPointsIo(AsyncStorage);
+    const points = createConnectionPoints({ initial: await io.load(), save: () => {} });
+    return bootRelayUrl({ stored, list: points.list() });
+  } catch {
+    return stored;      // no points store ⇒ exactly the previous behaviour
+  }
 }
 import { discoverA2A } from '@onderling/core';
 
@@ -464,7 +485,7 @@ export async function bootAgentBundle(opts = {}) {
         // Stable wrapper reads the mutable slot at delivery time, so a
         // router attached after connect still receives messages.
         _connNknLib = nknLib; _connRtcLib = rtcLib;   // capture for reconnectPeer (live relay reconnect)
-        _activeRelayUrl = await resolveMobileRelayUrl();
+        _activeRelayUrl = await resolveBootRelayUrl();
         await agent.connectPeerTransport({
           nknLib,
           onPeerMessage: (addr, payload) => peerWiringRef.onPeerMessage?.(addr, payload),

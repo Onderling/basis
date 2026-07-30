@@ -320,6 +320,42 @@ export function recordJoinedCirclePoints({ store, invite, circleId } = {}) {
 }
 
 /**
+ * Which relay to connect to at BOOT — the point that closes the reachability hole.
+ *
+ * A device was only on a circle's relay *while joining it*: the join dials the endpoint the invite names
+ * (`endpointToDialForInvite`) and deliberately does not persist it, so joining cannot silently rewrite a
+ * relay someone chose. The consequence, observed running the first message round-trip on hardware
+ * (2026-07-30): after a restart the device was on no relay, its per-circle addresses were registered
+ * nowhere, and every message addressed to it timed out. The connection point was recorded the whole time
+ * — nothing reconnected to it.
+ *
+ * So the boot path now says what the routing scope already says for circles: **unconfigured means the
+ * default, never nowhere.** The order is the only interesting part:
+ *
+ *   1. an explicit stored preference — a person who chose a relay keeps it, always;
+ *   2. else the ACTIVE point, if one was live when we last shut down;
+ *   3. else the newest adopted RELAY point — in practice the relay of the circle joined most recently,
+ *      which is the one a returning user is most likely to want to be reachable in.
+ *
+ * Never a pod (it has no socket) and never a merely SUGGESTED point — rule 4 says a circle may propose an
+ * endpoint and only the device adopts one. Inferring adoption from a boot would take that decision away.
+ *
+ * @param {object} a
+ * @param {string|null} [a.stored]  the persisted relay preference, if any
+ * @param {Array<object>} [a.list]  `store.list()` — newest first, carrying `kind`/`adopted`/`active`
+ * @returns {string|null}
+ */
+export function bootRelayUrl({ stored = null, list = [] } = {}) {
+  const explicit = typeof stored === 'string' ? stored.trim() : '';
+  if (explicit) return explicit;
+  const points = Array.isArray(list) ? list : [];
+  const usable = points.filter((p) => p?.kind !== POINT_KIND.POD && p?.adopted !== false && isUrl(p?.url, POINT_KIND.RELAY));
+  const active = usable.find((p) => p?.active === true);
+  if (active) return active.url;
+  return usable[0]?.url ?? null;      // `list()` is newest first
+}
+
+/**
  * Rule 1, applied EARLIER — the endpoint a joiner must be on **before** the redeem, or `null`.
  *
  * `recordJoinedCirclePoints` above runs from the join callback, which needs a circle id, which only

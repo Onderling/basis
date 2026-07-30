@@ -272,7 +272,7 @@ import { loadCircleStoragePod } from '../../src/v2/circleStoragePolicy.js';
 // addresses from a decoded invite BEFORE the redeem, so the secure router resolves
 // the relay/nkn wire address (`addressesOf`) instead of degrading to the bare pubKey.
 import { decodeInvite as decodeInviteForPopulate, populateAdminAddressesFromInvite } from '../../src/core/wizards/joinGroupState.js';
-import { feedHouseholdRoster } from '../../src/v2/householdRosterPairing.js';
+import { feedHouseholdRoster, makeCircleReachable } from '../../src/v2/householdRosterPairing.js';
 import { makeKringChatPeerHandler } from '../../src/v2/kringChatReceiver.js';
 import { rehydrateKringChatsFromStoop } from '../../src/v2/kringChatRehydrate.js';
 import { createChatMessageInbox } from '../../src/v2/chatMessageInbox.js';
@@ -803,7 +803,15 @@ async function tryConnectPeerTransport(agent, peerMessageRouter, { awaitRelayRea
 //
 // Called on connect (circlesCache may still be empty then — the post-load call covers it) and again once
 // circles are known / change. Idempotent, so calling twice is free.
-function registerCirclePresence(agent = _peerAgent) {
+/**
+ * @param {object} [agent]
+ * @param {string[]} [extraCircleIds] — circles to register ALONGSIDE `circlesCache`.
+ *   A circle joined a moment ago is not in the cache yet (the cache refreshes on the next circles load), and
+ *   registering only the cache is what left a new member unreachable until a reload — the roster carried
+ *   their per-circle address while the relay had never been told it (found on hardware 2026-07-30, mobile
+ *   first; web had the same hole).
+ */
+function registerCirclePresence(agent = _peerAgent, extraCircleIds = []) {
   if (!CIRCLE_RELAY_URL || !agent?.relay?.supportsAliases) return;
   const points = getConnectionPoints();
   const circlesForPoint = (url) => points.circlesFor(url);
@@ -811,7 +819,10 @@ function registerCirclePresence(agent = _peerAgent) {
   registerCircleAddresses({
     transport: agent.relay,   // the facade quacks like the port's alias half — never the transport itself
     relayUrl: CIRCLE_RELAY_URL,
-    circleIds: circlesCache.map((c) => c?.id).filter(Boolean),
+    circleIds: [...new Set([
+      ...circlesCache.map((c) => c?.id).filter(Boolean),
+      ...(Array.isArray(extraCircleIds) ? extraCircleIds.filter(Boolean) : []),
+    ])],
     circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
     circlesForPoint,
     // The relay this device connects to IS the deployment default — unmapped circles land here alone.
@@ -3930,6 +3941,17 @@ async function showJoinCircle(inviteArg) {
     // J-CP1 — be on the circle's endpoint BEFORE the redeem (web ≡ mobile).
     dialEndpoint: (url) => dialRelayUrl(url),
     activeEndpointUrl: () => CIRCLE_RELAY_URL || null,
+    // Post-join reachability (G13, web ≡ mobile). Joining puts you on the roster; it does not make you
+    // reachable. Two things must follow, and neither used to: register THIS device's per-circle address for
+    // the circle, and bind the other members' addresses to their keys from the roster. `onDispatched` below
+    // did the second and never the first, so the circle just joined was missing from the relay until the
+    // next circles load.
+    onJoined: ({ circleId }) => makeCircleReachable({
+      agent: _peerAgent,
+      circleId,
+      // The new circle is not in `circlesCache` yet, so pass it explicitly rather than waiting for a refresh.
+      registerCirclePresence: () => registerCirclePresence(_peerAgent, [circleId]),
+    }),
     onDispatched: async (reply) => {
       const gid = reply?.groupId ?? reply?.joinedGroupId ?? null;
       if (gid) { try { await feedHouseholdRosterForCircle?.(gid); } catch { /* best-effort */ } }
@@ -6819,7 +6841,15 @@ async function boot() {
           }),
           // OBJ-2 membership — the no-pod join handshake (shared core, same as the classic shells):
           // admin verifies an incoming redeem + replies; joiner resolves the pending request on response.
-          'group-redeem-request':    makeHandleGroupRedeemRequest({ callSkill: rawCallSkill, sendPeer: (addr, payload) => agent.sendPeerMessage(addr, payload), publishEvent: publishEventToLog }),
+          'group-redeem-request':    makeHandleGroupRedeemRequest({
+            callSkill: rawCallSkill,
+            sendPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
+            publishEvent: publishEventToLog,
+            // …and return OUR per-circle address for the circle being joined, proven the same way the
+            // joiner proves theirs, so per-circle addressing works in both directions from the join on.
+            circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,
+            signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
+          }),
           'group-redeem-response':   makeHandleGroupRedeemResponse({ pendingMap: circlePendingRedeems }),
           // No-pod group-key rotation — RECEIVE side: a key-event fanned by the circle's key-event log sink
           // (establish/grant/rotation) lands in this device's local per-circle key-event log. A removed member

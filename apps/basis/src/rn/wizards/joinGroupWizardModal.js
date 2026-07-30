@@ -33,6 +33,10 @@ export default function JoinGroupWizardModal({
   theme,
   // J-CP1 — the host's seam for connecting to the endpoint the invite names, before the redeem.
   dialEndpoint, activeEndpointUrl,
+  // The host's post-join seam: register this device's per-circle address for the circle just joined and
+  // bind the other members' addresses to their keys. Without it a new member sits on the roster at an
+  // address their own device never registered, and is unreachable until the app is relaunched.
+  onJoined,
 }) {
   // Shadows the module-level fallback, so every `styles.x` below follows the host's theme with no other
   // edits. Recomputed only when the theme changes.
@@ -67,6 +71,7 @@ export default function JoinGroupWizardModal({
     setState(next);
     const { result, state: after } = await finalSubmit({
       state: next, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink, dialEndpoint, activeEndpointUrl,
+      onJoined,
     });
     setState({ ...after });
     if (result && typeof onDispatched === 'function') {
@@ -76,7 +81,7 @@ export default function JoinGroupWizardModal({
       try { onDispatched({ ok: true, ...result, invite: state.invite }); } catch {}
     }
     if (result) onClose?.();
-  }, [state, callSkill, onDispatched, onClose, sendPeerRedeem]);
+  }, [state, callSkill, onDispatched, onClose, sendPeerRedeem, onJoined]);
 
   if (state.inviteParseError) {
     return (

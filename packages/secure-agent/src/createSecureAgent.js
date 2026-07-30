@@ -608,6 +608,16 @@ export async function createSecureAgent(opts = {}) {
   let peerTransport = null;
   const peerState = { status: 'idle', address: null, error: null };
   const helloedPeers = new Set();
+  // Reciprocal HIs are tracked SEPARATELY from `helloedPeers`, and the difference matters.
+  //
+  // `helloedPeers` answers the SEND path's question: "have I announced myself to this peer, so may I
+  // encrypt to them?". The receive path was reusing it to answer a different one: "have I already replied
+  // to this peer?". One Set for two questions meant that once we had ever sent this peer an HI ourselves,
+  // we would never answer THEIR handshake again — so a peer who lost our key (a restart, a reinstall, a new
+  // per-circle address) could HI us forever and we would sit silent while they timed out into "they may be
+  // offline". Found finishing the message round-trip on hardware, 2026-07-30: a walk-peer that had been up
+  // for eight hours refused to answer the phone, and the phone reported the peer as offline.
+  const reciprocatedPeers = new Set();
 
   // ─── Delivery guarantee — local sender-hold + presence-flush ───────
   // (Connectivity Phase 2, the "deliver" ladder — the offline ladder's
@@ -631,8 +641,47 @@ export async function createSecureAgent(opts = {}) {
   // Later (kept for a following phase, NOT built here): the QueueStore that
   // unifies this local-pending queue with the relay + companion + pod hold
   // queues behind one port.
+  //
+  // ── The BOUNDS (2026-07-30) ────────────────────────────────────────────────
+  // Until now this queue had no TTL, no size cap and no eviction. Entries drain only on a presence
+  // signal from that identity — which, by definition, never arrives for a peer that no longer exists.
+  // Found on hardware: five dead peers of abandoned test circles, three queued messages each, every one
+  // of them paid for again on every later send to that address. It is in-memory, so a restart clears it;
+  // that is not a bound, it is a coincidence.
+  //
+  // Three bounds, each answering a different way the queue grows:
+  //   • TTL          — a message nobody could take for a day is not going to be taken by this queue;
+  //                    catch-up (roster-driven, `sinceTs`) is the path that still repairs it.
+  //   • size caps    — per peer and across peers, dropping the OLDEST first: the newest message is the
+  //                    one the user is most likely still waiting on.
+  //   • failure count — stop paying for a peer that keeps failing. This is the expensive one: relay/NKN
+  //                    `canReach` is address-agnostic, so an address that no longer answers passes the
+  //                    route check and then costs a full handshake-retry budget (~8 s) per send.
+  //
+  // Nothing here is a timer: the sweep runs on enqueue/flush, keeping the "purely event-driven" property
+  // above intact. Every drop is REPORTED (`onHoldDropped` + a warn) — a message the user was told was
+  // sent must never vanish quietly.
   const pendingHold = new Map();
   let   holdSeq     = 0;
+  /** How long a held message may wait for its peer. `0`/negative disables the TTL. */
+  const holdTtlMs = Number.isFinite(opts.holdTtlMs) ? opts.holdTtlMs : 24 * 60 * 60 * 1000;
+  /** Most messages held for ONE peer; the oldest is dropped past this. */
+  const holdMaxPerPeer = Number.isFinite(opts.holdMaxPerPeer) ? opts.holdMaxPerPeer : 50;
+  /** Most PEERS we hold anything for; the least-recently-queued peer's queue goes first. */
+  const holdMaxPeers = Number.isFinite(opts.holdMaxPeers) ? opts.holdMaxPeers : 64;
+  /** Consecutive failed delivery attempts to one address before we stop attempting (0 = never stop). */
+  const holdMaxDeliveryFailures = Number.isFinite(opts.holdMaxDeliveryFailures)
+    ? opts.holdMaxDeliveryFailures : 3;
+  /**
+   * Told about every held message we give up on: `{addr, msgId, reason, ageMs}`.
+   *
+   * `reason` is one of `expired` · `queue-full` · `peer-evicted` · `peer-unreachable`. The HOST turns this into
+   * something a person sees (the δ.2 delivery-state map keys on the same `msgId`); the agent's own duty
+   * is to never drop one silently.
+   */
+  const onHoldDropped = typeof opts.onHoldDropped === 'function' ? opts.onHoldDropped : null;
+  /** address → consecutive failed delivery attempts. Cleared by a success or a presence signal. */
+  const deliveryFailures = new Map();
 
   // G12 — identity pubKey → the alias addresses bound to it (`registerPeerAddress`). The hold queue is
   // keyed by the address you SENT to, but presence arrives on the address the peer SPEAKS from: a peer
@@ -654,13 +703,47 @@ export async function createSecureAgent(opts = {}) {
   }
 
   /**
+   * Report a held message we are giving up on. Never silent: the caller was told "held", and a queue
+   * that quietly forgets is indistinguishable from one that delivered.
+   */
+  function dropHeld(addr, entry, reason) {
+    const msgId = entry?.payload?.msgId ?? entry?.payload?.id ?? entry?.payload?._id ?? null;
+    if (typeof console !== 'undefined') {
+      console.warn(`[secure-agent] dropping held message for ${String(addr).slice(0, 16)}… (${reason}`
+        + `${msgId ? `, msgId ${msgId}` : ''})`);
+    }
+    try { onHoldDropped?.({ addr, msgId, reason, ageMs: entry?.ts ? Date.now() - entry.ts : null }); }
+    catch { /* a report hook must never break a send */ }
+  }
+
+  /** Drop everything that outlived the TTL, across every peer. Cheap at these sizes; no timer. */
+  function sweepExpiredHolds(now = Date.now()) {
+    if (!(holdTtlMs > 0)) return 0;
+    let dropped = 0;
+    for (const [addr, q] of pendingHold) {
+      for (const [key, entry] of q) {
+        if (now - (entry.ts ?? now) < holdTtlMs) continue;
+        q.delete(key);
+        dropHeld(addr, entry, 'expired');
+        dropped += 1;
+      }
+      if (q.size === 0) pendingHold.delete(addr);
+    }
+    return dropped;
+  }
+
+  /**
    * Park a message for an unreachable peer. Collapses a repeat msgId so a
    * caller that retries while the peer is offline holds it only once. Returns
    * a structured `{ held:true, ... }` result (never throws) so the send path
    * can surface "held" to the app instead of an error.
+   *
+   * Bounded (see the note on `pendingHold`): expired entries are swept first, then the per-peer and
+   * across-peers caps are enforced by dropping the OLDEST — reported, never silently.
    */
   function enqueueHold(addr, payload, sendOpts, reason = 'unreachable') {
     const msgId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;
+    sweepExpiredHolds();
     let q = pendingHold.get(addr);
     if (!q) { q = new Map(); pendingHold.set(addr, q); }
     const key = holdKeyFor(payload);
@@ -668,10 +751,49 @@ export async function createSecureAgent(opts = {}) {
       return { held: true, delivered: false, deduped: true, msgId, pending: q.size, reason };
     }
     q.set(key, { payload, opts: sendOpts, ts: Date.now() });
+    // Per-peer cap — a Map iterates in insertion order, so the first key IS the oldest.
+    while (holdMaxPerPeer > 0 && q.size > holdMaxPerPeer) {
+      const [oldestKey, oldest] = q.entries().next().value;
+      q.delete(oldestKey);
+      dropHeld(addr, oldest, 'queue-full');
+    }
+    // Across-peers cap — evict whole queues, least-recently-queued first (same insertion order, and
+    // re-inserting on each enqueue below keeps `addr` at the young end).
+    pendingHold.delete(addr);
+    pendingHold.set(addr, q);
+    while (holdMaxPeers > 0 && pendingHold.size > holdMaxPeers) {
+      const [oldestAddr, oldestQueue] = pendingHold.entries().next().value;
+      pendingHold.delete(oldestAddr);
+      for (const entry of oldestQueue.values()) dropHeld(oldestAddr, entry, 'peer-evicted');
+    }
     if (typeof console !== 'undefined') {
       console.info(`[secure-agent] peer ${String(addr).slice(0, 16)}… unreachable — holding message (${q.size} queued)`);
     }
     return { held: true, delivered: false, deduped: false, msgId, pending: q.size, reason };
+  }
+
+  /**
+   * Record a failed delivery attempt to an address, and say whether we should stop attempting.
+   *
+   * "Stop attempting" is the point: an address that no longer answers still passes `canReach` on the
+   * address-agnostic transports (relay, NKN), so every send to it buys the full handshake-retry budget
+   * before failing. After `holdMaxDeliveryFailures` in a row we take the peer at its word until they
+   * prove otherwise — any presence signal or successful send clears the count (`clearDeliveryFailures`).
+   */
+  function recordDeliveryFailure(addr) {
+    const n = (deliveryFailures.get(addr) ?? 0) + 1;
+    deliveryFailures.set(addr, n);
+    return holdMaxDeliveryFailures > 0 && n >= holdMaxDeliveryFailures;
+  }
+
+  /** This address answered (or announced itself) — it is not a dead address after all. */
+  function clearDeliveryFailures(addr) {
+    deliveryFailures.delete(addr);
+  }
+
+  /** Have we given up on attempting delivery to this address until it shows a sign of life? */
+  function isProbeSuppressed(addr) {
+    return holdMaxDeliveryFailures > 0 && (deliveryFailures.get(addr) ?? 0) >= holdMaxDeliveryFailures;
   }
 
   /**
@@ -706,23 +828,34 @@ export async function createSecureAgent(opts = {}) {
 
   async function flushPresence(addr) {
     let flushed = 0;
-    for (const t of addressesOfIdentity(addr)) flushed += (await flushPending(t)).flushed;
+    // Presence is PROOF of life, so it also clears the give-up counter for every address of this peer —
+    // otherwise a peer who went away for an hour and came back would stay written off.
+    for (const t of addressesOfIdentity(addr)) {
+      clearDeliveryFailures(t);
+      flushed += (await flushPending(t)).flushed;
+    }
     return { flushed };
   }
 
   async function flushPending(addr) {
+    sweepExpiredHolds();
     const q = pendingHold.get(addr);
     if (!q || q.size === 0) return { flushed: 0 };
     const entries = [...q.values()];
     pendingHold.delete(addr);
     let flushed = 0;
-    for (const { payload, opts } of entries) {
+    for (const entry of entries) {
+      const { payload, opts } = entry;
       try {
         await _sendWithFailover(addr, payload, { ...opts, hold: false, guarantee: 'best-effort' });
+        clearDeliveryFailures(addr);
         flushed++;
       } catch (err) {
         if (isApplicationError(err)) continue;   // unfixable by resend → drop
-        enqueueHold(addr, payload, opts);         // still unreachable → re-hold
+        // Still unreachable → re-hold, unless this address has now failed often enough that re-holding
+        // is just paying for it again later. Giving up is REPORTED, like every other drop.
+        if (recordDeliveryFailure(addr)) dropHeld(addr, entry, 'peer-unreachable');
+        else enqueueHold(addr, payload, opts);
       }
     }
     if (flushed && typeof console !== 'undefined') {
@@ -854,20 +987,41 @@ export async function createSecureAgent(opts = {}) {
         // creates an infinite HI ping-pong between two peers who both
         // keep replying.  The real cross-device delivery asymmetry is
         // handled at the transport layer via MultiClient.)
-        if (!helloedPeers.has(env._from)) {
+        // An explicit HI always deserves an answer — that is the whole point of a handshake, and the peer
+        // may be asking precisely because they no longer hold our key. The ping-pong the old guard was
+        // protecting against is avoided by MARKING the answer (`reply: true`) instead of by refusing to
+        // answer twice: a reply never provokes a reply, so the exchange terminates in one round.
+        const inboundIsHi    = env?._p === 'HI';
+        // A reply is an HI that names the HI it answers (`_re`) — the envelope's own reply-to atom, not a
+        // flag we invented. A reply never provokes a reply, so an exchange terminates in one round.
+        const inboundIsReply = inboundIsHi && !!env?._re;
+        const owePeerAnHi    = inboundIsHi ? !inboundIsReply : !reciprocatedPeers.has(env._from);
+        if (owePeerAnHi) {
           if (typeof console !== 'undefined') {
             console.log('[secure-agent] sending reciprocal HI to ' + String(env._from).slice(0, 16) + '…');
           }
           try {
-            await tx.sendHello(env._from, { pubKey: identity.pubKey });
-            helloedPeers.add(env._from);
+            // Answer AS the address they dialled (G13). Without `from`, the reply carries our canonical
+            // address, the peer files our key under that, and it keeps waiting for a key under the alias it
+            // sent to — so a handshake to a per-circle address never completes. `Transport.sendHello`
+            // validates the claim against our own addresses and falls back to the primary.
+            await tx.sendHello(
+              env._from,
+              { pubKey: identity.pubKey },
+              // `from` — answer AS the address they dialled (G13), or a handshake to a per-circle address
+              // can never complete. `re` — name the envelope we are answering, which is what makes this a
+              // REPLY and therefore unanswerable; no new wire field is needed for that.
+              { from: env._to, re: env._id ?? null },
+            );
+            // NOT `helloedPeers` — answering someone is not the same as having announced ourselves to them,
+            // and conflating the two also let the send path believe it had already introduced itself.
+            reciprocatedPeers.add(env._from);
             if (typeof console !== 'undefined') {
               console.log('[secure-agent] reciprocal HI sent OK to ' + String(env._from).slice(0, 16) + '…');
             }
           } catch (err) {
             console.warn('[secure-agent] reciprocal HI failed (will retry on next envelope)', err?.message ?? err);
-            // Don't add to helloedPeers — next inbound envelope from
-            // this peer triggers another HI attempt.
+            // Don't record it — the next inbound envelope from this peer triggers another attempt.
           }
         }
       } catch (err) {
@@ -894,6 +1048,10 @@ export async function createSecureAgent(opts = {}) {
       // under the address we sent to, while presence arrives on the address they speak from.
       if (hasHoldForIdentity(env._from)) {
         flushPresence(env._from).catch(() => { /* re-hold handled internally */ });
+      } else {
+        // No holds to flush, but this peer is demonstrably alive — reinstate any address of theirs we
+        // had given up attempting delivery to, or the next send would be refused on stale evidence.
+        for (const t of addressesOfIdentity(env._from)) clearDeliveryFailures(t);
       }
     });
   }
@@ -1328,6 +1486,16 @@ export async function createSecureAgent(opts = {}) {
     //      error after failover → hold rather than propagate. An application
     //      refusal (muted / not permitted) still throws — a resend can't fix it.
     if (wantsHold(opts)) {
+      // 0. GIVEN UP — this address has failed delivery `holdMaxDeliveryFailures` times in a row with
+      //    nothing since to suggest it is alive. Neither probe nor queue it: answer honestly and
+      //    immediately. `{held:false, delivered:false}` is the shape the fan-out already reads as a
+      //    per-recipient `not-delivered`, which the chat surfaces as a retryable failure — so the user
+      //    is told, rather than the message joining a queue for a peer that no longer exists. A presence
+      //    signal (or an inbound envelope) clears the count and the peer is tried again at once.
+      if (isProbeSuppressed(addr)) {
+        const msgId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;
+        return { held: false, delivered: false, msgId, reason: 'peer-unreachable' };
+      }
       if (!(await hasLiveRoute(addr, opts?.scope ?? null))) {
         // WHY we are holding matters to the caller. "No route this circle may use" is a different fact
         // from "this peer is offline": the first is a standing property of the connection that will not
@@ -1346,9 +1514,20 @@ export async function createSecureAgent(opts = {}) {
       try {
         const result = await _sendWithHandshakeRetry(addr, payload, opts);
         const msgId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;
+        clearDeliveryFailures(addr);          // it answered — not a dead address
         return { held: false, delivered: true, msgId, result };
       } catch (err) {
         if (isApplicationError(err)) throw err;
+        // A transport-class failure AFTER the route said yes — the only evidence we get that an address
+        // is dead rather than briefly offline, so it is what the give-up counter counts.
+        if (recordDeliveryFailure(addr)) {
+          const msgId = payload?.msgId ?? payload?.id ?? payload?._id ?? null;
+          if (typeof console !== 'undefined') {
+            console.warn(`[secure-agent] giving up on ${String(addr).slice(0, 16)}… after `
+              + `${holdMaxDeliveryFailures} failed deliveries — not holding (a presence signal reinstates it)`);
+          }
+          return { held: false, delivered: false, msgId, reason: 'peer-unreachable' };
+        }
         return enqueueHold(addr, payload, opts);
       }
     }
@@ -1603,6 +1782,7 @@ export async function createSecureAgent(opts = {}) {
       peerTransportConnected: !!peerTransport,
       peerAddress:    peerState.address,
       helloedPeerCount: helloedPeers.size,
+      reciprocatedPeers: [...reciprocatedPeers],
       helloedPeers:   [...helloedPeers],
       // S1 — mute state
       muteCount:       muteSet.size,
@@ -1770,6 +1950,16 @@ export async function createSecureAgent(opts = {}) {
     // (0 when none) for diagnostics + tests.
     presenceSignal: (addr) => flushPresence(addr),
     heldFor: (addr) => pendingHold.get(addr)?.size ?? 0,
+    /**
+     * What the (bounded) hold queue currently holds, and the bounds it is held to. Diagnostics + tests:
+     * an unbounded queue was invisible until a device got slow, and this is what makes it visible.
+     */
+    holdStats: () => ({
+      peers: pendingHold.size,
+      messages: [...pendingHold.values()].reduce((n, q) => n + q.size, 0),
+      givenUpOn: [...deliveryFailures.keys()].filter(isProbeSuppressed).length,
+      limits: { ttlMs: holdTtlMs, maxPerPeer: holdMaxPerPeer, maxPeers: holdMaxPeers, maxDeliveryFailures: holdMaxDeliveryFailures },
+    }),
 
     /** v0.7.cc — diagnostic snapshot of the last 10 envelopes,
      * inbound + outbound, for /debug-dump bug reports. */

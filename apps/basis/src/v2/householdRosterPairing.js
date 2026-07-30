@@ -67,3 +67,54 @@ export async function bindCircleAddressKeysFor({ agent, circleId } = {}) {
     selfPubKey: agent.identity?.pubKey ?? agent.peer?.address ?? null,
   });
 }
+
+/**
+ * Make a circle REACHABLE — the two steps that must follow a join, in one place.
+ *
+ * Joining puts you on the roster. It does not make anyone able to message you, and until 2026-07-30 nothing
+ * closed that gap from the join itself:
+ *
+ *   1. **Register this device's per-circle address** for the circle, or peers dial an address the relay has
+ *      never heard of. The roster carries it, so they *will* dial it.
+ *   2. **Bind the other members' circle addresses to their keys** from the roster, or sealing to them throws
+ *      `No pubKey registered` above the transport and every message holds.
+ *
+ * Both already existed — and both were reached only from `CircleLauncherScreen` (its circles-load effect and
+ * its circle-open effect). So they ran when you browsed to the circle list and not when you joined, which
+ * meant a join performed from anywhere else left a member unreachable until the app was relaunched. That is
+ * dispatch logic living in a shell (invariant 1); it belongs here, where both shells and the programmatic
+ * path can reach it.
+ *
+ * Best-effort per step, and independent: registering an address is useful even if the roster read fails, and
+ * vice versa. Returns what happened so a caller can log it rather than guess.
+ *
+ * @param {object} a
+ * @param {object} a.agent                       host agent (`callSkill` + `registerPeerAddress`)
+ * @param {string} a.circleId
+ * @param {(circleIds?: string[]) => any} [a.registerCirclePresence]
+ *   the host's presence seam (mobile: `bundle.registerCirclePresence`). Called with no arguments so the host
+ *   decides the full current circle list — this function knows about one circle, not all of them.
+ * @returns {Promise<{registered: boolean, bound: number, skipped: number}>}
+ */
+export async function makeCircleReachable({ agent, circleId, registerCirclePresence } = {}) {
+  let registered = false;
+  if (typeof registerCirclePresence === 'function') {
+    try { await registerCirclePresence(); registered = true; }
+    catch (err) {
+      // Best-effort, but NOT silent (review, 2026-07-30). A join that succeeds while registration fails
+      // leaves the member on the roster at an address their own device never announced — reachable by
+      // nobody until the next circles load, with nothing anywhere saying so. Failing the join would be
+      // worse (the membership is real), so the join stands and the failure is stated instead.
+      if (typeof console !== 'undefined') {
+        console.warn(
+          `[circle] joined ${circleId} but could not register this device's address — others may not `
+          + `reach you until the app is reopened: ${err?.message ?? err}`,
+        );
+      }
+    }
+  }
+  let bound = { bound: 0, skipped: 0 };
+  try { bound = await bindCircleAddressKeysFor({ agent, circleId }); }
+  catch { /* a roster read that fails must not undo the registration above */ }
+  return { registered, bound: bound.bound ?? 0, skipped: bound.skipped ?? 0 };
+}

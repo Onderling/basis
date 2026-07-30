@@ -163,6 +163,16 @@ export default function App() {
     kringBotSinkRef.current?.({ messageKey: 'circle.nearbyScreen.delivery_fallback_on' });
   }, []);
 
+  // "The circle list is stale" — a counter, owned here because BOTH screens stay mounted.
+  //
+  // The launcher loads its circles on mount and after its OWN create/join wizards. A join that happens
+  // anywhere else — a tapped invite link opens the wizard in the chat shell — never told it, and since App
+  // renders both screens simultaneously (one hidden behind a View) switching tabs does not remount it
+  // either. So you joined a circle and it was simply not in "Your circles" until the app was relaunched
+  // (found 2026-07-30, right after the first message round-trip landed). Bumping this is the notification.
+  const [circlesRevision, setCirclesRevision] = useState(0);
+  const onCirclesChanged = useCallback(() => setCirclesRevision((n) => n + 1), []);
+
   const registerKringBotSink = useCallback((fn) => {
     kringBotSinkRef.current = typeof fn === 'function' ? fn : null;
     // A buffered offer speaks as soon as a mouth exists — and only then arms the cooldown, so an offer
@@ -247,11 +257,19 @@ export default function App() {
   // 5.4c (2026-05-30) — single OidcSessionRN, lifted from ChatScreen so
   // BOTH the chat shell AND the circle launcher see the same restored
   // session.  ChatScreen still drives sign-in / sign-out through the
-  // `useBasisAuth` hook (and now reads this ref via props); the
-  // launcher reads it through a `getPodWriter` thunk that returns a
-  // ready `podWriter` once the session restores.  Until then the
-  // thunk returns null and circle policy IO stays local-only — see
-  // tieredPolicyIo + makeCirclePolicyStoreRN.
+  // `useBasisAuth` hook (and now reads this ref via props); the launcher
+  // builds its own `getPodWriter` thunk from THIS ref
+  // (`sessionToPodWriterRN(sessionRef.current)`), so it is live on every
+  // call.  Until a session restores the thunk returns null and circle
+  // policy IO stays local-only — see tieredPolicyIo + makeCirclePolicyStoreRN.
+  //
+  // `getCirclePodWriter` below is a DIFFERENT reader of the same idea
+  // (`circlePodWriterRef.current`) and belongs to the bundle
+  // (`getSharedWithMePodWriter`). It used to be handed to the launcher too, as
+  // a `getPodWriter` prop the launcher never destructured or read — dead, and
+  // the comment here claimed otherwise. Removed 2026-07-30, found by the
+  // prop-destructuring fitness guard while fixing the `onAcceptFallback`
+  // render crash of the same shape.
   const sessionRef = useRef(null);
   if (!sessionRef.current) {
     sessionRef.current = new OidcSessionRN({ store: SecureStore, appId: 'basis' });
@@ -370,6 +388,22 @@ export default function App() {
         const alreadySeeded = await AsyncStorage.getItem(SEED_FLAG).catch(() => null) === '1';
         let eventSeq = 0;
         const b = await bootAgentBundle({
+          // A message the hold queue GIVES UP ON must stop claiming "maybe received" (review, 2026-07-30).
+          // `createSecureAgent` reports every drop; without a consumer the bubble kept the optimistic
+          // state for a message that is gone — the one place the UI could say something untrue. App owns
+          // the delivery map and hands the SAME instance to both shells, so writing here is web≡mobile by
+          // construction. `failed` is an existing terminal state the bubble already renders with a retry.
+          secureAgentOpts: {
+            onHoldDropped: ({ msgId, reason, addr, ageMs }) => {
+              if (!msgId) return;
+              try { deliveryStateMapRef.current?.set(msgId, 'failed'); }
+              catch { /* the warn in createSecureAgent already recorded the drop */ }
+              console.warn(
+                `[delivery] gave up on ${String(msgId)} → ${String(addr).slice(0, 16)}… `
+                + `(${reason}${Number.isFinite(ageMs) ? `, held ${Math.round(ageMs / 1000)}s` : ''})`,
+              );
+            },
+          },
           // Persist the agent identity (chat + host vaults + stoop
           // cache) to AsyncStorage so the NKN address — derived from the
           // identity keypair — stays stable across reboots (otherwise a
@@ -518,6 +552,8 @@ export default function App() {
             ChatScreen is mounted + peer-wired but never visible. */}
         <View style={styles.hiddenChat} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           <ChatScreen
+            // A join completed in THIS shell (the invite-link path) must reach the launcher's list.
+            onCirclesChanged={onCirclesChanged}
             bundle={bundle}
             bootError={bootError}
             eventLog={eventLogRef.current}
@@ -539,10 +575,11 @@ export default function App() {
           deliveryStateMap={deliveryStateMapRef.current}
           registerKringBotSink={registerKringBotSink}
           onAcceptFallback={acceptFallbackOffer}
+          // Bumped when a circle is joined/created from another surface → the launcher reloads its list.
+          circlesRevision={circlesRevision}
           sessionRef={sessionRef}
           podAuth={podAuth}
           eventLog={eventLogRef.current}
-          getPodWriter={getCirclePodWriter}
           kringRecipePendingStore={kringRecipePendingStoreRef.current}
           kringRulesPendingStore={kringRulesPendingStoreRef.current}
           kringPolicyPendingStore={kringPolicyPendingStoreRef.current}

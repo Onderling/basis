@@ -115,13 +115,14 @@ export async function buildCircleInviteUri({ callSkill, circleId, adminPeerAddr 
  * @param {{ inviteUri:(string|object), callSkill:Function, sendPeerRedeem?:Function, handle:string,
  *           shareAddress?:boolean, linkChoice?:string, circles?:Array<{id:string,name?:string}>,
  *           circleAddressFor?:(circleId:string)=>(string|null),
- *           signCircleLink?:(sourceCircleId:string, groupId:string, address:string)=>(any) }} a
+ *           signCircleLink?:(sourceCircleId:string, groupId:string, address:string)=>(any),
+ *           onJoined?:(a:{circleId:string})=>(any) }} a
  * @returns {Promise<{ ok:true, circleId:string, message?:string, handle?:string } | { error:string }>}
  */
 export async function joinCircleFromInvite({
   inviteUri, callSkill, sendPeerRedeem, handle, shareAddress = true,
   linkChoice = 'fresh', circles = null, circleAddressFor = null, signCircleLink = null,
-  dialEndpoint = null, activeEndpointUrl = null,
+  dialEndpoint = null, activeEndpointUrl = null, onJoined = null,
 } = {}) {
   const h = String(handle ?? '').trim();
   if (!h) return { error: 'handle-required' };
@@ -139,6 +140,9 @@ export async function joinCircleFromInvite({
   setLinkChoice(state, linkChoice);
   const { result, state: out } = await finalSubmit({
     state, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink, dialEndpoint, activeEndpointUrl,
+    // Forwarded, not handled here: `finalSubmit` is the choke point the WIZARD also goes
+    // through, so the post-join reachability step must fire there or the UI path skips it.
+    onJoined,
   });
   if (!result) {
     // Carry the typed reason and the locale key, not just a flattened string. A caller needs to tell

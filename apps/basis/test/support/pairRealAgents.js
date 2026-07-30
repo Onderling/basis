@@ -153,7 +153,13 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   const handlers = {
     'kring-chat-message': kringChatHandler,
     // ADMIN side: verify the joiner's code + reply, then propagate mesh intros.
-    'group-redeem-request': makeHandleGroupRedeemRequest({ callSkill, sendPeer, propagateMeshIntros, logger: QUIET }),
+    'group-redeem-request': makeHandleGroupRedeemRequest({
+      callSkill, sendPeer, propagateMeshIntros, logger: QUIET,
+      // The ADMIN half of per-circle addressing (web ≡ mobile ≡ harness): the reply carries OUR proven
+      // per-circle address, so the joiner records it instead of knowing us only by our global key.
+      circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,
+      signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
+    }),
     // JOINER side: resolve the pending redeem promise.
     'group-redeem-response': makeHandleGroupRedeemResponse({ pendingMap, logger: QUIET }),
     // Both sides: record a mesh-introduced peer into the local roster.

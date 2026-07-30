@@ -76,9 +76,20 @@ import { createTaskStore, requestableSkillHandler } from '@onderling/item-store'
  * agent's vault is selected by createSecureAgent's picker via the
  * identityVaultPrefix opt.
  */
-function makeBrowserVault(prefix) {
+function makeBrowserVault(prefix, { durabilityMatters = false } = {}) {
   if (typeof globalThis.localStorage !== 'undefined') {
     try { return new VaultLocalStorage({ prefix }); } catch { /* defensive */ }
+  }
+  // A memory vault is a fine default for something reconstructible. It is NOT fine for an identity root,
+  // and the difference was silent until 2026-07-30: React Native has no `localStorage`, so the owner root
+  // landed here, was regenerated on every launch, and took every per-circle address with it — plus the
+  // 24-word recovery phrase, which derives from the same root and therefore recovered nothing. Say so.
+  if (durabilityMatters && typeof console !== 'undefined') {
+    console.warn(
+      `[realAgent] no durable storage for "${prefix}" — falling back to MEMORY. Anything derived from it `
+      + '(per-circle addresses, the recovery phrase) is regenerated on the next launch. A host that has '
+      + 'durable storage must pass its own vault.',
+    );
   }
   return new VaultMemory();
 }
@@ -251,7 +262,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // sub-agents still generate independent random seeds until step 2 migrates
   // them onto the root). The default profile (= the chat identity below, which
   // the feedback no-login pseudonym uses) derives from it.
-  const ownerRootVault = opts.ownerRootVault ?? makeBrowserVault('cc-owner-root:');
+  const ownerRootVault = opts.ownerRootVault ?? makeBrowserVault('cc-owner-root:', { durabilityMatters: true });
   const ownerRoot      = await ensureOwnerRoot(ownerRootVault);
 
   // Host agent — in-process app skills (household, tasks-v0, stoop,

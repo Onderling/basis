@@ -53,6 +53,7 @@ import { AsyncStorageAdapter } from '@onderling/react-native/storage/AsyncStorag
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { resolveRelayUrl, asyncStorageRelayIo } from '../../../basis/src/v2/relayPref.js';
 import { registerCircleAddresses } from '../../../basis/src/v2/circleAddressRegistration.js';
+import { makeCircleReachable } from '../../../basis/src/v2/householdRosterPairing.js';
 import { createConnectionPoints, bootRelayUrl, asyncStorageConnectionPointsIo } from '../../../basis/src/v2/connectionPoints.js';
 // SILENT out-of-circle delivery — the per-user "shared with me" store (TIERED: AsyncStorage canonical + pod
 // mirror) and THIS device's network-derived sealing OPENER. Both are shared-src logic (web≡mobile): the store
@@ -204,6 +205,22 @@ export async function bootAgentBundle(opts = {}) {
     ?? (opts.asyncStorage
       ? new VaultAsyncStorage({ prefix: 'cc-host-id:', asyncStorage: opts.asyncStorage })
       : undefined);
+  // The OWNER ROOT — and it was missing (2026-07-30). Two vaults were synthesised here and this third one
+  // was not, so `realAgent` fell back to its `makeBrowserVault('cc-owner-root:')`, which on React Native
+  // finds no `localStorage` and quietly returns a **VaultMemory**. A new owner root was therefore minted on
+  // every launch, and two things followed:
+  //
+  //   • every per-circle address is derived from that root, so they ALL changed on every app start. A
+  //     member's address on the roster stopped matching the address their device registers, and nobody
+  //     could reach them in a circle after a restart. Found running the first message round-trip on
+  //     hardware — the peer sent to the recorded address and it answered from nowhere.
+  //   • the 24-word recovery phrase shown during onboarding derives from the same root, so it was
+  //     regenerated each launch. The screen says "without these words you can't get back to your things";
+  //     they would not have got anyone back to anything.
+  const ownerRootVault = opts.ownerRootVault
+    ?? (opts.asyncStorage
+      ? new VaultAsyncStorage({ prefix: 'cc-owner-root:', asyncStorage: opts.asyncStorage })
+      : undefined);
 
   // when asyncStorage is provided, also seed the stoop
   // per-agent cache adapter so stoop's web-style boot survives app
@@ -241,6 +258,7 @@ export async function bootAgentBundle(opts = {}) {
     agent = await createRealHouseholdAgent({
       chatVault,
       hostVault,
+      ownerRootVault,
       stoopPersistDb,
       tasksPersistDb,
       householdPersistDb,
@@ -409,8 +427,30 @@ export async function bootAgentBundle(opts = {}) {
   // known); idempotent, so calling twice is free. The points store is read here as a read-only view — the
   // owning, saving instance stays in the connection-points screen.
   let _circleIdsForRegistration = [];
-  const registerCirclePresence = async (circleIds = _circleIdsForRegistration) => {
-    _circleIdsForRegistration = circleIds;
+  //
+  // Called with NO argument, this now asks the substrate which circles this device is in rather than
+  // reusing whatever list the launcher screen last pushed in. That default was the bug (2026-07-30): the
+  // only caller feeding fresh ids was `CircleLauncherScreen`'s circles-load effect, so a circle joined
+  // from anywhere else -- a tapped invite link opens the join wizard over whatever screen you were on --
+  // was absent from the cached list, its per-circle address was never registered, and the new member was
+  // unreachable until the app was relaunched and the launcher happened to load. Asking the substrate makes
+  // a bare `registerCirclePresence()` correct from any caller, which is what the post-join seam needs.
+  const liveCircleIds = async () => {
+    try {
+      const res = await agent.callSkill?.('stoop', 'listMyBuurts', {});
+      const ids = (Array.isArray(res?.buurts) ? res.buurts : [])
+        .map((b) => (typeof b === 'string' ? b : b?.id))
+        .filter(Boolean);
+      // Union with the cached list: a circle the substrate has not caught up on yet must not be
+      // DE-registered by a refresh, and registration is idempotent.
+      return [...new Set([...ids, ..._circleIdsForRegistration])];
+    } catch {
+      return _circleIdsForRegistration;
+    }
+  };
+  const registerCirclePresence = async (circleIds = null) => {
+    const ids = Array.isArray(circleIds) ? circleIds : await liveCircleIds();
+    _circleIdsForRegistration = ids;
     try {
       // The relay this device is ACTUALLY on, not the one it was configured with (2026-07-30).
       //
@@ -429,7 +469,7 @@ export async function bootAgentBundle(opts = {}) {
       await registerCircleAddresses({
         transport: agent.relay,   // the facade quacks like the port's alias half — never the transport itself
         relayUrl,
-        circleIds,
+        circleIds: ids,
         circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
         circlesForPoint,
         // The relay this device connects to IS the deployment default — unmapped circles land here alone.
@@ -647,7 +687,18 @@ export async function bootAgentBundle(opts = {}) {
     reconnectPeer,
     /** The relay this device is on right now (null = none). Read live; do not cache across renders. */
     activeRelayUrl: () => _activeRelayUrl,
-    registerCirclePresence,   // G13 — the launcher feeds fresh circle ids after each circles load
+    registerCirclePresence,   // G13 — callable with no args from anywhere; asks the substrate for the list
+    /**
+     * Post-join: make a circle reachable (G13). Register this device's per-circle address AND bind the
+     * other members' circle addresses to their keys from the roster.
+     *
+     * Wired into the join wizard's `onJoined` seam. Both halves used to run only from
+     * `CircleLauncherScreen`, so joining from anywhere else left the member on the roster at an address
+     * their own device had never registered — unreachable until the app was relaunched.
+     */
+    onCircleJoined: ({ circleId } = {}) => makeCircleReachable({
+      agent, circleId, registerCirclePresence,
+    }),
     transport,
     pendingPeerRedeems,
     sendPeerRedeem,

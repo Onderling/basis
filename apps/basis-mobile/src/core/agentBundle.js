@@ -391,7 +391,15 @@ export async function bootAgentBundle(opts = {}) {
   const registerCirclePresence = async (circleIds = _circleIdsForRegistration) => {
     _circleIdsForRegistration = circleIds;
     try {
-      const relayUrl = await resolveMobileRelayUrl();
+      // The relay this device is ACTUALLY on, not the one it was configured with (2026-07-30).
+      //
+      // These disagree in the case that matters most: joining a circle dials the endpoint the invite
+      // names WITHOUT persisting it — deliberately, so joining does not silently rewrite a relay someone
+      // chose. But registration read the stored preference, so a joiner ended up connected to the
+      // circle's relay while registering its per-circle addresses against a different url — or none at
+      // all. The relay then knew the device only by its pubKey, and every message addressed to its
+      // per-circle address timed out. Found by walking the first message round-trip on hardware.
+      const relayUrl = agent?.relay?.url ?? _activeRelayUrl ?? await resolveMobileRelayUrl();
       if (!relayUrl || !agent?.relay?.supportsAliases) return;
       const io = asyncStorageConnectionPointsIo(AsyncStorage);
       const points = createConnectionPoints({ initial: await io.load(), save: () => {} });

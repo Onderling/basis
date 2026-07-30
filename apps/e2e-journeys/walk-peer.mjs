@@ -120,7 +120,13 @@ async function main() {
     async post(circleId, ...rest) {
       const text = rest.join(' ');
       if (!circleId || !text) return console.log('usage: post <circleId> <text>');
-      const r = await call('stoop', 'broadcastKringMessage', { groupId: circleId, text });
+      // `msgId` is required by the skill — the shells mint one per message and key delivery state on it
+      // (`broadcastKringFanOut`). This tool did not, so `post` failed with `msgId-required` the first time
+      // anyone tried to send from it (2026-07-30). Mirror what a shell does rather than inventing a shape.
+      const msgId = `walk-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+      const r = await call('stoop', 'broadcastKringMessage', {
+        groupId: circleId, text, msgId, ts: Date.now(),
+      });
       console.log('sent:', JSON.stringify(r));
       // `sent` counts recipients the send path accepted — HELD counts as sent. If the phone does not
       // show it, that is the interesting part: check the relay log before assuming a UI bug.

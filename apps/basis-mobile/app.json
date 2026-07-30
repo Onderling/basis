@@ -5,7 +5,12 @@
     "version": "0.0.1",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "scheme": "basis",
+    "scheme": [
+      "basis",
+      "stoop-invite",
+      "stoop-contact",
+      "onderling-pair"
+    ],
     "android": {
       "package": "org.onderling.basis",
       "permissions": [

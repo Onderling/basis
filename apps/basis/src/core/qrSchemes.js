@@ -61,3 +61,21 @@ export function parsePairUri(uri) {
   addr = addr.trim();
   return addr ? { addr, name } : null;
 }
+
+/**
+ * The schemes an OS must hand to this app, derived from the registry above.
+ *
+ * A QR payload only has to be *recognised* once it is already inside the app — the scanner reads it and
+ * `isQrUri` classifies it. A link someone taps in a chat is different: the operating system has to know
+ * the app claims that scheme, or nothing happens at all.
+ *
+ * The two drifted (found walking S4, 2026-07-30). `basis://` was registered in the Android manifest;
+ * `stoop-invite://` — the scheme every circle invite this product builds actually uses — was not. So
+ * sharing an invite the most natural way, by sending someone the link, produced a dead string. It worked
+ * scanned or pasted, which is exactly why nobody noticed.
+ *
+ * Exported so a fitness test can hold the app config to this list rather than someone remembering.
+ */
+export const OS_REGISTERED_SCHEMES = Object.freeze(
+  QR_URI_PREFIXES.map((p) => p.replace('://', '')),
+);

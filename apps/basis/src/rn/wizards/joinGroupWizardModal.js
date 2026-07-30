@@ -9,7 +9,7 @@
  *
  * Shares src/core/wizards/joinGroupState.js with web.
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Modal, View, ScrollView, StyleSheet, Pressable, Text } from 'react-native';
 
 import {
@@ -28,9 +28,14 @@ import {
 export default function JoinGroupWizardModal({
   visible, args, callSkill, onClose, onDispatched, t, sendPeerRedeem,
   circles, circleAddressFor, signCircleLink,
+  // Injected by the shell — see `sheetStyles`. Absent ⇒ the previous light sheet.
+  theme,
   // J-CP1 — the host's seam for connecting to the endpoint the invite names, before the redeem.
   dialEndpoint, activeEndpointUrl,
 }) {
+  // Shadows the module-level fallback, so every `styles.x` below follows the host's theme with no other
+  // edits. Recomputed only when the theme changes.
+  const styles = useMemo(() => sheetStyles(theme), [theme]);
   const [state, setState] = useState(() => {
     const s = initialState();
     decodeInvite(args?.invite ?? args?.id ?? args, s);
@@ -172,11 +177,19 @@ export default function JoinGroupWizardModal({
                   placeholder={t('circle.join.wizard.handle.placeholder')}
                   monospace
                 />
-                <Text style={styles.subLabel}>{t('circle.join.wizard.handle.suggestions')}</Text>
-                <Chips
-                  items={suggestions}
-                  onPress={(v) => setState((s) => ({ ...s, handle: v }))}
-                />
+                {/* Only when there is something to suggest. The shell has no display name to work from
+                    yet (see `suggestions` above), so this row used to render a heading over an empty chip
+                    and two bare suffixes — `-29`, `.2026` — that were not valid handles and changed on
+                    every render (S3, 2026-07-30). A heading with nothing under it is its own small lie. */}
+                {suggestions.length ? (
+                  <>
+                    <Text style={styles.subLabel}>{t('circle.join.wizard.handle.suggestions')}</Text>
+                    <Chips
+                      items={suggestions}
+                      onPress={(v) => setState((s) => ({ ...s, handle: v }))}
+                    />
+                  </>
+                ) : null}
                 {/* Property layer — join-with-persona. Pick a persona whose
                     per-circle disclosure applies here, or join minimally (the
                     protective default: share no background). Nothing is shared
@@ -255,15 +268,31 @@ export default function JoinGroupWizardModal({
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16,
-    maxHeight: '88%', minHeight: '60%',
-  },
-  scroll: { flexGrow: 1 },
-  rulesBlock: { padding: 10, backgroundColor: '#f7f7f7', borderRadius: 8 },
-  rulesText: { fontSize: 13, color: '#222', lineHeight: 18 },
-  loading: { fontSize: 13, color: '#666', fontStyle: 'italic' },
-  subLabel: { fontSize: 12, color: '#555', fontWeight: '600', marginTop: 8 },
-});
+/**
+ * The sheet's colours, from the host's theme.
+ *
+ * These were hardcoded light (`#fff` on a dark app), so the join flow — the first surface a new person
+ * ever sees — arrived as a white sheet in a dark room (found walking S3, 2026-07-30). The theme lives in
+ * the shell, and this module is in the SHARED rn tree, so it is injected rather than imported: reaching
+ * up into `basis-mobile` from here would invert the dependency the layering rule exists to protect.
+ *
+ * Absent theme ⇒ the previous light values, so a host that does not pass one is unchanged.
+ */
+function sheetStyles(theme) {
+  const c = theme?.color ?? {};
+  return StyleSheet.create({
+    backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+    sheet: {
+      backgroundColor: c.card ?? '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16,
+      maxHeight: '88%', minHeight: '60%',
+    },
+    scroll: { flexGrow: 1 },
+    rulesBlock: { padding: 10, backgroundColor: c.consentBg ?? c.card ?? '#f7f7f7', borderRadius: 8 },
+    rulesText: { fontSize: 13, color: c.ink ?? '#222', lineHeight: 18 },
+    loading: { fontSize: 13, color: c.inkSoft ?? '#666', fontStyle: 'italic' },
+    subLabel: { fontSize: 12, color: c.inkSoft ?? '#555', fontWeight: '600', marginTop: 8 },
+  });
+}
+
+/** The unthemed fallback, so module-level references keep working. */
+const styles = sheetStyles(null);

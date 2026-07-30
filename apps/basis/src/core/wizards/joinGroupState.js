@@ -69,12 +69,24 @@ export function handleSuggestions(priorOrName, existingDisplayName) {
     ? [...new Set(priorHandles.map((h) => String(h ?? '').trim().toLowerCase()).filter(isValidHandle))]
     : [];
   if (prior.length) return prior.slice(0, 8);        // your own prior handles — no leak
-  const base = String(displayName ?? 'me').toLowerCase().replace(/[^a-z0-9]/g, '-');
-  return [
-    base,
-    `${base}-${Math.floor(Math.random() * 90 + 10)}`,
-    `${base}.${new Date().getFullYear()}`,
-  ];
+  // Derived candidates, and three things this got wrong (seen on a device, S3 2026-07-30 — the chips read
+  // as an empty pill, `-29` and `.2026`):
+  //
+  //   1. `displayName ?? 'me'` only catches null/undefined, so an EMPTY STRING passed straight through and
+  //      `base` became ''. Every candidate was then a bare suffix.
+  //   2. `Math.random()` made the suggestions change on every render, so a chip a person was reaching for
+  //      moved under their finger.
+  //   3. Nothing checked the output against `isValidHandle`, three lines above in this same file — '' and
+  //      '-29' are not handles, and the field would have refused them if anyone had tried.
+  //
+  // Deterministic, and validated with the rule the field itself uses.
+  const base = String(displayName ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  // No name to work from ⇒ suggest NOTHING. The old fallback was `'me'`, which is not even a valid handle
+  // (the rule three lines up wants 3+ characters), and inventing an English word as someone's name in a
+  // Dutch-first product is the wrong instinct regardless. An empty list is honest: we do not know.
+  if (!base) return [];
+  const year = new Date().getFullYear();
+  return [base, `${base}-${year}`, `${base}2`].filter(isValidHandle);
 }
 
 /**

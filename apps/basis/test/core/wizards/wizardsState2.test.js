@@ -185,12 +185,15 @@ describe('joinGroupState', () => {
     expect(JG.privacyNoticeFor('xx')).toBe(JG.PRIVACY_NOTICE.en);
   });
 
-  it('handleSuggestions slugifies the base name + adds 2 variants', () => {
+  it('handleSuggestions slugifies the base name + adds 2 variants, all of them VALID', () => {
+    // This test used to pin the old output exactly — and the old output was wrong in a way the test
+    // recorded without noticing: `'anne-k-'` ends in a dash, and `isValidHandle` (asserted three lines
+    // below) rejects that. The other two carried a random two-digit suffix, so they changed on every
+    // render. Seen on a device as an empty pill, `-29` and `.2026` (S3, 2026-07-30).
     const suggestions = JG.handleSuggestions('Anne K.');
-    expect(suggestions).toHaveLength(3);
-    expect(suggestions[0]).toBe('anne-k-');
-    expect(suggestions[1]).toMatch(/^anne-k--\d{2}$/);
-    expect(suggestions[2]).toMatch(/^anne-k-\.\d{4}$/);
+    expect(suggestions).toEqual(['anne-k', 'anne-k-2026', 'anne-k2']);
+    // The property that matters more than the exact strings:
+    for (const s of suggestions) expect(JG.isValidHandle(s), s).toBe(true);
   });
 
   it('isValidHandle accepts lower+digits+ _ -; rejects mixed case', () => {

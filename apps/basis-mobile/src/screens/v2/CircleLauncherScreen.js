@@ -1878,6 +1878,9 @@ export default function CircleLauncherScreen({
             callSkill={bundle?.callSkill}
             sendPeerRedeem={bundle?.sendPeerRedeem}
             t={t}
+            // The join sheet is the first surface a new person meets; it was hardcoded light and arrived
+            // as a white sheet in a dark app (S3, 2026-07-30). The theme lives here, in the shell.
+            theme={theme}
             circles={circles}
             circleAddressFor={(cid) => bundle?.agent?.circleAddressFor?.(cid) ?? null}
             signCircleLink={(cid, gid, addr) => bundle?.agent?.signCircleLink?.(cid, gid, addr) ?? null}

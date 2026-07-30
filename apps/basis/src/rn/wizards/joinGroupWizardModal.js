@@ -23,6 +23,7 @@ import { RULES_FIELDS } from '../../v2/circleRules.js';
 
 import {
   Steps, Body, Field, Checkbox, Chips, RadioGroup, Actions, ErrorBanner, Submitting,
+  WizardTheme, wizardPalette,
 } from './_kit.js';
 
 export default function JoinGroupWizardModal({
@@ -79,6 +80,8 @@ export default function JoinGroupWizardModal({
 
   if (state.inviteParseError) {
     return (
+      // Same provider on the error path — a bad invite should not be the one screen that stays light.
+      <WizardTheme theme={theme}>
       <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
         <Pressable style={styles.backdrop} onPress={onClose}>
           <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}
@@ -90,12 +93,15 @@ export default function JoinGroupWizardModal({
           </Pressable>
         </Pressable>
       </Modal>
+      </WizardTheme>
     );
   }
 
   const suggestions = handleSuggestions(/* TODO: pull from agent.profile if available */ '');
 
   return (
+    // The kit's primitives read their palette from here, so the sheet and its contents cannot disagree.
+    <WizardTheme theme={theme}>
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable
@@ -265,6 +271,7 @@ export default function JoinGroupWizardModal({
         </Pressable>
       </Pressable>
     </Modal>
+    </WizardTheme>
   );
 }
 
@@ -279,7 +286,10 @@ export default function JoinGroupWizardModal({
  * Absent theme ⇒ the previous light values, so a host that does not pass one is unchanged.
  */
 function sheetStyles(theme) {
-  const c = theme?.color ?? {};
+  // The same palette the kit uses — theming the container from one source and its contents from another is
+  // how the sheet ended up dark with dark text on it (2026-07-30).
+  const p = wizardPalette(theme);
+  const c = { card: p.card, ink: p.ink, inkSoft: p.inkSoft, consentBg: p.quote };
   return StyleSheet.create({
     backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
     sheet: {

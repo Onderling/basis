@@ -21,12 +21,15 @@
  * strings.  Helpers don't reach into `t()` themselves.
  */
 import React from 'react';
+
+import { LIGHT, wizardPalette } from './_palette.js';
 import {
   View, Text, TextInput, TouchableOpacity, ActivityIndicator,
   StyleSheet,
 } from 'react-native';
 
 export function Steps({ labels, current }) {
+  const styles = makeStyles(useWizardPalette());
   return (
     <View style={styles.stepsRow} testID="wizard-steps">
       {labels.map((label, i) => {
@@ -60,6 +63,7 @@ export function Steps({ labels, current }) {
 }
 
 export function Body({ title, intro, children }) {
+  const styles = makeStyles(useWizardPalette());
   return (
     <View style={styles.body}>
       {title ? <Text style={styles.bodyTitle}>{title}</Text> : null}
@@ -70,6 +74,7 @@ export function Body({ title, intro, children }) {
 }
 
 export function Field({ label, value, onChangeText, placeholder, monospace }) {
+  const styles = makeStyles(useWizardPalette());
   return (
     <View style={styles.fieldRow}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -85,6 +90,7 @@ export function Field({ label, value, onChangeText, placeholder, monospace }) {
 }
 
 export function Textarea({ label, value, onChangeText, placeholder, rows = 4 }) {
+  const styles = makeStyles(useWizardPalette());
   return (
     <View style={styles.fieldRow}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -101,6 +107,7 @@ export function Textarea({ label, value, onChangeText, placeholder, rows = 4 }) 
 }
 
 export function RadioGroup({ label, value, options, onChange, consequenceLabel }) {
+  const styles = makeStyles(useWizardPalette());
   // N2 — when an option carries a `consequence` string (callers attach it
   // via `attachConsequences`), show an ⓘ that toggles the note inline.
   const [openInfo, setOpenInfo] = React.useState(null);
@@ -149,6 +156,7 @@ export function RadioGroup({ label, value, options, onChange, consequenceLabel }
 }
 
 export function Checkbox({ label, checked, onToggle, testID }) {
+  const styles = makeStyles(useWizardPalette());
   return (
     <TouchableOpacity
       onPress={() => onToggle?.(!checked)}
@@ -166,6 +174,7 @@ export function Checkbox({ label, checked, onToggle, testID }) {
 }
 
 export function Chips({ items, onPress }) {
+  const styles = makeStyles(useWizardPalette());
   return (
     <View style={styles.chipsRow}>
       {items.map((it, i) => (
@@ -183,6 +192,7 @@ export function Chips({ items, onPress }) {
 }
 
 export function ContextCard({ label, quoteText, placeholder }) {
+  const styles = makeStyles(useWizardPalette());
   return (
     <View style={styles.contextCard}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -196,6 +206,7 @@ export function ContextCard({ label, quoteText, placeholder }) {
 }
 
 export function Actions({ buttons }) {
+  const styles = makeStyles(useWizardPalette());
   return (
     <View style={styles.actionsRow}>
       {buttons.map((b, i) => {
@@ -230,6 +241,7 @@ export function Actions({ buttons }) {
 }
 
 export function ErrorBanner({ message }) {
+  const styles = makeStyles(useWizardPalette());
   if (!message) return null;
   return (
     <View style={styles.errorBanner} testID="wizard-error">
@@ -239,6 +251,7 @@ export function ErrorBanner({ message }) {
 }
 
 export function Submitting({ visible, label }) {
+  const styles = makeStyles(useWizardPalette());
   if (!visible) return null;
   return (
     <View style={styles.submittingRow} testID="wizard-submitting">
@@ -249,6 +262,7 @@ export function Submitting({ visible, label }) {
 }
 
 export function ReviewList({ items }) {
+  const styles = makeStyles(useWizardPalette());
   return (
     <View style={styles.reviewList}>
       {items.map((it, i) => (
@@ -268,6 +282,7 @@ export function ReviewList({ items }) {
 }
 
 export function Warn({ children }) {
+  const styles = makeStyles(useWizardPalette());
   return (
     <View style={styles.warnBox}>
       <Text style={styles.warnText}>{children}</Text>
@@ -275,113 +290,147 @@ export function Warn({ children }) {
   );
 }
 
-const styles = StyleSheet.create({
+/**
+ * The wizard kit's palette — set by the shell, defaulted to what it always was.
+ *
+ * Every colour below used to be a literal, which was invisible until the join sheet started following the
+ * app's dark theme (2026-07-30): the SHEET went dark and its contents stayed dark grey on dark, so
+ * "Pick a name", the step labels and the field labels were all but unreadable. Theming the container and
+ * not its contents is worse than theming neither.
+ *
+ * A context rather than a prop on every component: these are ~10 small primitives used dozens of times,
+ * and threading a theme through each call site would be a lot of edits for a value that is constant for
+ * the whole sheet. The shell wraps the wizard in `WizardTheme` and the kit reads it — the dependency still
+ * points from the shell into the shared tree, never the other way.
+ */
+const WizardThemeContext = React.createContext(LIGHT);
+
+
+/** Wrap a wizard so the kit's primitives follow the host's theme. */
+export function WizardTheme({ theme, children }) {
+  const value = React.useMemo(() => wizardPalette(theme), [theme]);
+  return <WizardThemeContext.Provider value={value}>{children}</WizardThemeContext.Provider>;
+}
+
+/** The palette in force. Used by the kit's own components; exported for a wizard's local styles. */
+export function useWizardPalette() {
+  return React.useContext(WizardThemeContext);
+}
+
+/** The kit's stylesheet, built from the palette in force. See `WizardTheme`. */
+function makeStyles(p) {
+  return StyleSheet.create({
   stepsRow: {
     flexDirection: 'row', justifyContent: 'space-between',
     paddingHorizontal: 12, paddingVertical: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eee',
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: p.hair,
   },
   stepCell: { alignItems: 'center', flex: 1 },
   stepBubble: {
     width: 28, height: 28, borderRadius: 14,
-    backgroundColor: '#e8e8e8',
+    backgroundColor: p.rail,
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 4,
   },
-  stepBubbleActive: { backgroundColor: '#1e88e5' },
-  stepBubbleDone:   { backgroundColor: '#43a047' },
-  stepBubbleText:   { fontSize: 12, fontWeight: '700', color: '#666' },
-  stepBubbleTextActive: { color: '#fff' },
-  stepLabel:        { fontSize: 11, color: '#666' },
-  stepLabelActive:  { color: '#222', fontWeight: '600' },
+  stepBubbleActive: { backgroundColor: p.accent },
+  stepBubbleDone:   { backgroundColor: p.done },
+  stepBubbleText:   { fontSize: 12, fontWeight: '700', color: p.inkSoft },
+  stepBubbleTextActive: { color: p.onAccent },
+  stepLabel:        { fontSize: 11, color: p.inkSoft },
+  stepLabelActive:  { color: p.ink, fontWeight: '600' },
 
   body:       { padding: 16, gap: 12 },
-  bodyTitle:  { fontSize: 18, fontWeight: '700', color: '#222' },
-  bodyIntro:  { fontSize: 13, color: '#666', lineHeight: 18 },
+  bodyTitle:  { fontSize: 18, fontWeight: '700', color: p.ink },
+  bodyIntro:  { fontSize: 13, color: p.inkSoft, lineHeight: 18 },
 
   fieldRow:    { gap: 6, marginTop: 4 },
-  fieldLabel:  { fontSize: 12, color: '#555', fontWeight: '600' },
+  fieldLabel:  { fontSize: 12, color: p.inkMuted, fontWeight: '600' },
   fieldInput: {
-    borderWidth: 1, borderColor: '#ccc', borderRadius: 8,
+    borderWidth: 1, borderColor: p.hair, borderRadius: 8,
     paddingHorizontal: 10, paddingVertical: 8, fontSize: 14,
-    backgroundColor: '#fff',
+    backgroundColor: p.card,
   },
   fieldInputMono: { fontFamily: 'monospace' },
 
   radioRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, gap: 8, flex: 1 },
   // N2 — option row holds the radio + the ⓘ button; the note sits below.
   radioOptionRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  radioInfoIcon:  { fontSize: 15, color: '#b5651d', paddingHorizontal: 4 },
+  radioInfoIcon:  { fontSize: 15, color: p.info, paddingHorizontal: 4 },
   radioConsequence: {
-    fontSize: 12, lineHeight: 17, color: '#666',
+    fontSize: 12, lineHeight: 17, color: p.inkSoft,
     marginLeft: 28, marginBottom: 6, paddingLeft: 8,
-    borderLeftWidth: 2, borderLeftColor: '#ddd',
+    borderLeftWidth: 2, borderLeftColor: p.hair,
   },
   radioCircle: {
     width: 18, height: 18, borderRadius: 9,
-    borderWidth: 2, borderColor: '#bbb',
+    borderWidth: 2, borderColor: p.inkSoft,
     alignItems: 'center', justifyContent: 'center',
   },
-  radioCircleChecked: { borderColor: '#1e88e5' },
+  radioCircleChecked: { borderColor: p.accent },
   radioInner: {
-    width: 10, height: 10, borderRadius: 5, backgroundColor: '#1e88e5',
+    width: 10, height: 10, borderRadius: 5, backgroundColor: p.accent,
   },
-  radioLabel: { fontSize: 13, color: '#222', flex: 1 },
+  radioLabel: { fontSize: 13, color: p.ink, flex: 1 },
 
   checkRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 8, gap: 10 },
   checkBox: {
     width: 18, height: 18, borderRadius: 4, borderWidth: 2,
-    borderColor: '#bbb', alignItems: 'center', justifyContent: 'center',
+    borderColor: p.inkSoft, alignItems: 'center', justifyContent: 'center',
     marginTop: 2,
   },
-  checkBoxChecked: { backgroundColor: '#1e88e5', borderColor: '#1e88e5' },
-  checkMark: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  checkLabel: { flex: 1, fontSize: 13, color: '#222', lineHeight: 18 },
+  checkBoxChecked: { backgroundColor: p.accent, borderColor: p.accent },
+  checkMark: { color: p.card, fontSize: 12, fontWeight: '700' },
+  checkLabel: { flex: 1, fontSize: 13, color: p.ink, lineHeight: 18 },
 
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
   chip: {
     paddingHorizontal: 10, paddingVertical: 4,
-    backgroundColor: '#e3f2fd', borderRadius: 14,
+    backgroundColor: p.accentSoft, borderRadius: 14,
   },
-  chipText: { color: '#1565c0', fontSize: 12, fontWeight: '600' },
+  chipText: { color: p.accentStrong, fontSize: 12, fontWeight: '600' },
 
-  contextCard: { padding: 10, backgroundColor: '#f7f7f7', borderRadius: 8, gap: 4 },
-  contextQuote: { borderLeftWidth: 3, borderLeftColor: '#1e88e5', paddingLeft: 10 },
-  contextQuoteText: { fontSize: 13, fontStyle: 'italic', color: '#444' },
+  contextCard: { padding: 10, backgroundColor: p.quote, borderRadius: 8, gap: 4 },
+  contextQuote: { borderLeftWidth: 3, borderLeftColor: p.accent, paddingLeft: 10 },
+  contextQuoteText: { fontSize: 13, fontStyle: 'italic', color: p.ink },
 
   actionsRow: {
     flexDirection: 'row', justifyContent: 'flex-end',
     padding: 12, gap: 8, borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#eee',
+    borderTopColor: p.hair,
   },
   actionBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18 },
-  actionBtnPrimary:   { backgroundColor: '#1e88e5' },
-  actionBtnSecondary: { backgroundColor: '#f0f0f0' },
-  actionBtnDisabled:  { backgroundColor: '#ddd' },
+  actionBtnPrimary:   { backgroundColor: p.accent },
+  actionBtnSecondary: { backgroundColor: p.railSoft },
+  actionBtnDisabled:  { backgroundColor: p.hair },
   actionBtnText:      { fontSize: 14, fontWeight: '600' },
-  actionBtnTextPrimary:   { color: '#fff' },
-  actionBtnTextSecondary: { color: '#333' },
-  actionBtnTextDisabled:  { color: '#888' },
+  actionBtnTextPrimary:   { color: p.card },
+  actionBtnTextSecondary: { color: p.inkStrong },
+  actionBtnTextDisabled:  { color: p.inkFaint },
 
   errorBanner: {
-    backgroundColor: '#fde8e8', padding: 10, borderRadius: 8,
-    borderWidth: 1, borderColor: '#f5b5b5', marginTop: 8,
+    backgroundColor: p.dangerSurface, padding: 10, borderRadius: 8,
+    borderWidth: 1, borderColor: p.dangerEdge, marginTop: 8,
   },
-  errorBannerText: { fontSize: 13, color: '#b00' },
+  errorBannerText: { fontSize: 13, color: p.danger },
 
   submittingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
-  submittingLabel: { fontSize: 13, color: '#666' },
+  submittingLabel: { fontSize: 13, color: p.inkSoft },
 
   reviewList:  { gap: 6, marginTop: 4 },
   reviewRow:   { gap: 2 },
-  reviewLabel: { fontSize: 11, color: '#666', fontWeight: '600' },
-  reviewValue: { fontSize: 14, color: '#222' },
+  reviewLabel: { fontSize: 11, color: p.inkSoft, fontWeight: '600' },
+  reviewValue: { fontSize: 14, color: p.ink },
   reviewValueMono: { fontFamily: 'monospace', fontSize: 12 },
   reviewValuePre:  { fontFamily: 'monospace', fontSize: 13 },
 
   warnBox: {
-    backgroundColor: '#fff8e1', padding: 10, borderRadius: 8,
-    borderWidth: 1, borderColor: '#ffd54f', marginTop: 8,
+    backgroundColor: p.warnSurface, padding: 10, borderRadius: 8,
+    borderWidth: 1, borderColor: p.warnEdge, marginTop: 8,
   },
-  warnText: { fontSize: 12, color: '#5d4037' },
-});
+  warnText: { fontSize: 12, color: p.infoInk },
+  });
+}
+
+// Re-exported: the modal builds its own sheet styles from the SAME palette, so the container and its
+// contents cannot disagree — which is exactly how the dark-sheet-with-dark-text bug happened.
+export { wizardPalette };

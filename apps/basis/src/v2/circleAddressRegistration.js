@@ -17,6 +17,8 @@
  * populate. A circle with no recorded point rides the deployment default and registers there alone.
  */
 
+import { POINT_KIND } from './connectionPoints.js';
+
 /**
  * Register this device's per-circle addresses on ONE relay socket, scoped to the circles that ride it.
  *
@@ -102,7 +104,7 @@ export async function unregisterCircleAddresses({ transport, circleIds = [], cir
   return { removed };
 }
 
-/** Is this circle mapped to any OTHER relay? (A helper the scoping rule reads; never throws.) */
+/** Is this circle mapped to any OTHER RELAY? (A helper the scoping rule reads; never throws.) */
 function circleMappedAnywhere(circlesForPoint, circleId, exceptUrl) {
   // The points store answers per-url; without a reverse index we ask the store's OWN reverse view when it
   // has one. `circlesForPoint.pointsFor` is duck-typed: hosts pass `(url) => store.circlesFor(url)` plus,
@@ -110,7 +112,18 @@ function circleMappedAnywhere(circlesForPoint, circleId, exceptUrl) {
   const pointsFor = circlesForPoint?.pointsFor;
   if (typeof pointsFor !== 'function') return false;   // no reverse view ⇒ treat as unmapped (register on default)
   try {
-    return (pointsFor(circleId) ?? []).some((p) => (p?.url ?? p) !== exceptUrl);
+    return (pointsFor(circleId) ?? [])
+      // RELAY points only (2026-07-30). The question this answers is "does this circle live on a
+      // different relay", and a pod is not a relay — it carries no socket and no address registration.
+      // Counting one made a pod-backed circle look mapped elsewhere, so its per-circle address registered
+      // NOWHERE: it was skipped here as off-relay, and the pod cannot take a registration either. Found
+      // walking S4's pod set, where J-NP1 succeeding is precisely what triggered it — recording the pod
+      // point is what made the circle look mapped away.
+      //
+      // A bare-string entry has no kind and is treated as a relay, which is the pre-existing behaviour
+      // for hosts that pass a simpler reverse view.
+      .filter((p) => (typeof p === 'string' ? true : p?.kind !== POINT_KIND.POD))
+      .some((p) => (p?.url ?? p) !== exceptUrl);
   } catch { return false; }
 }
 

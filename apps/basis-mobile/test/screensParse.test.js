@@ -21,7 +21,18 @@ import path from 'node:path';
 import { transform } from 'esbuild';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const screensRoot = path.join(here, '..', 'src', 'screens');
+/**
+ * Every JSX tree with no test coverage — not just this app's screens.
+ *
+ * `apps/basis/src/rn/**` is the shared React-Native half (the wizards both shells' mobile builds mount).
+ * It has the same property that made this guard necessary: JSX, so a plain `node --check` cannot read it,
+ * and no test imports it. Adding the pod-host disclosure to the create wizard on 2026-07-30 is what
+ * surfaced the gap — I referenced a style key that did not exist and had to check the parse by hand.
+ */
+const ROOTS = [
+  path.join(here, '..', 'src', 'screens'),
+  path.join(here, '..', '..', 'basis', 'src', 'rn'),
+];
 
 function jsFilesUnder(dir) {
   const out = [];
@@ -34,14 +45,18 @@ function jsFilesUnder(dir) {
 }
 
 describe('every mobile screen parses as an ES module', () => {
-  const files = jsFilesUnder(screensRoot);
+  const files = ROOTS.flatMap((root) => jsFilesUnder(root));
 
   it('found screens to check (the guard is not vacuously green)', () => {
     expect(files.length).toBeGreaterThan(5);
   });
 
+  it('covers the SHARED rn tree too, not only this app', () => {
+    expect(files.some((f) => f.includes(path.join('basis', 'src', 'rn')))).toBe(true);
+  });
+
   for (const file of files) {
-    const rel = path.relative(screensRoot, file);
+    const rel = path.relative(path.join(here, '..', '..'), file);
     it(`${rel} parses`, async () => {
       const source = readFileSync(file, 'utf-8');
       // `format: 'esm'` is the point: sloppy-mode CommonJS would accept a duplicate parameter.

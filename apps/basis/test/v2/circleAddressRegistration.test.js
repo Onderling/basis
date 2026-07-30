@@ -130,3 +130,65 @@ describe('the mechanics', () => {
     expect(r.addresses).not.toContain('addr-x');
   });
 });
+
+describe('a pod point is not a relay (2026-07-30, S4 pod walk)', () => {
+  // Found where J-NP1 SUCCEEDING caused the failure: recording the circle's pod as a connection point
+  // made `circleMappedAnywhere` treat the circle as living on some other relay, so its per-circle address
+  // registered nowhere at all — skipped here as off-relay, and a pod cannot take a registration either.
+  const DEFAULT_RELAY = 'ws://default:8787';
+
+  function pointsView(pointsByCircle) {
+    const fn = () => [];                                   // circlesFor(url) — unused by this path
+    fn.pointsFor = (cid) => pointsByCircle[cid] ?? [];
+    return fn;
+  }
+
+  it('a circle whose only point is a POD still registers on the default relay', async () => {
+    const registered = [];
+    const r = await registerCircleAddresses({
+      transport: { supportsAliases: true, addAddress: async (a) => { registered.push(a); return { ok: true }; } },
+      relayUrl: DEFAULT_RELAY,
+      defaultRelayUrl: DEFAULT_RELAY,
+      circleIds: ['podkring'],
+      circleAddressFor: () => 'podkring@address',
+      circlesForPoint: pointsView({
+        podkring: [{ url: 'https://pod.example/anna/', kind: 'pod' }],
+      }),
+    });
+    expect(r.skippedOffRelay).toEqual([]);
+    expect(registered).toEqual(['podkring@address']);
+  });
+
+  it('…while a circle mapped to a different RELAY is still kept off this one', async () => {
+    // The rule this helper exists for must survive the fix — that is the leak it prevents.
+    const registered = [];
+    const r = await registerCircleAddresses({
+      transport: { supportsAliases: true, addAddress: async (a) => { registered.push(a); return { ok: true }; } },
+      relayUrl: DEFAULT_RELAY,
+      defaultRelayUrl: DEFAULT_RELAY,
+      circleIds: ['elsewhere'],
+      circleAddressFor: () => 'elsewhere@address',
+      circlesForPoint: pointsView({
+        elsewhere: [{ url: 'ws://other-relay:8787', kind: 'relay' }],
+      }),
+    });
+    expect(r.skippedOffRelay).toEqual(['elsewhere']);
+    expect(registered).toEqual([]);
+  });
+
+  it('a circle with BOTH a pod and another relay is still kept off — the relay is what counts', async () => {
+    const registered = [];
+    const r = await registerCircleAddresses({
+      transport: { supportsAliases: true, addAddress: async (a) => { registered.push(a); return { ok: true }; } },
+      relayUrl: DEFAULT_RELAY,
+      defaultRelayUrl: DEFAULT_RELAY,
+      circleIds: ['both'],
+      circleAddressFor: () => 'both@address',
+      circlesForPoint: pointsView({
+        both: [{ url: 'https://pod.example/x/', kind: 'pod' }, { url: 'ws://other:8787', kind: 'relay' }],
+      }),
+    });
+    expect(r.skippedOffRelay).toEqual(['both']);
+    expect(registered).toEqual([]);
+  });
+});

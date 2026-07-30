@@ -297,7 +297,7 @@ describe('J-NP6 — a pod-only circle reads as CUT OFF, not merely inconvenience
 // ── Two things found while walking ──────────────────────────────────────────────────────────────────
 
 describe('found while walking the pod journeys', () => {
-  it('DEFECT — the circle-settings pod axis reports ok:true in basis and changes nothing', async () => {
+  it('FIXED — the circle-settings pod axis refuses honestly when nothing can write it', async () => {
     const anna = await bootRealAgentNode('anna');
     try {
       const callSkill = (app, op, args) => anna.agent.callSkill(app, op, args);
@@ -305,18 +305,19 @@ describe('found while walking the pod journeys', () => {
       state.groupId = 'plainkring'; state.name = 'plainkring'; state.purpose = 'no pod at create';
       await createGroupFinalSubmit({ state, callSkill });
 
-      // The settings-screen path: make an existing circle pod-backed.
       const pushed = await pushCircleStoragePolicy({
         callSkill, circleId: 'plainkring', pod: 'shared', groupPodUri: TLS_POD,
       });
-      expect(pushed).toMatchObject({ ok: true, storage: { policy: 'centralised', groupPodUri: TLS_POD } });
 
-      // WRONG, pinned as-is. `stoop.setCircleStoragePolicy` writes through
-      // `bundle?.podRouting?.setCirclePolicy?.()`, and basis never wires a `podRouting` (it is a
-      // tasks-v0 / tasks-mobile concept). The optional chaining swallows the missing writer, the skill
-      // returns success, and `getCircleStoragePolicy` falls back to the group-rules item — which was
-      // written at CREATE and never updated. So the only way a basis circle becomes pod-backed is to
-      // be created that way; the settings toggle is a no-op that reports success.
+      // Was: `ok: true` with the requested policy echoed back, while `podRouting` — a tasks-* concept
+      // basis never wires — meant nothing was written at all. The optional chain swallowed the missing
+      // writer and the caller had no way to tell. `?.()` is right for a genuinely optional collaborator
+      // and wrong when its absence means the operation did not happen.
+      expect(pushed.ok).toBe(false);
+      expect(pushed.error).toBe('storage-policy-writer-unavailable');
+
+      // The circle is unchanged either way — but now the caller was TOLD, so a surface can say
+      // "this cannot be changed here" instead of showing a toggle that lies.
       expect(await loadCircleStoragePod({ callSkill, circleId: 'plainkring' }))
         .toEqual({ pod: 'none', groupPodUri: null });
     } finally {
@@ -324,12 +325,12 @@ describe('found while walking the pod journeys', () => {
     }
   }, 60_000);
 
-  it('DEFECT — a pod point counts as "mapped to another relay" and suppresses address registration', async () => {
-    // `circleMappedAnywhere` does not filter by kind, so recording a circle's POD makes the scoping
-    // rule believe the circle rides some OTHER relay, and it is skipped even on the default relay.
-    // Nothing takes over: a pod is not a transport, and no code registers per-circle addresses on one.
-    // So J-NP1 succeeding is what stops a pod-only circle's per-circle address from being registered
-    // anywhere — the pass and the regression come from the same line.
+  it('FIXED — a pod point is not a relay, so a pod-only circle still registers on the default', async () => {
+    // `circleMappedAnywhere` did not filter by kind, so recording a circle's POD made the scoping rule
+    // believe the circle rode some OTHER relay, and it was skipped even on the default. Nothing took
+    // over — a pod is not a transport and no code registers per-circle addresses on one — so J-NP1
+    // SUCCEEDING is what stopped a pod-only circle's address from being registered anywhere. The pass
+    // and the regression came from the same line.
     const points = createConnectionPoints({});
     points.addPodPoint(TLS_POD, 'podonly');
 
@@ -349,7 +350,7 @@ describe('found while walking the pod journeys', () => {
       circleAddressFor: () => 'addr-podonly',
       circlesForPoint,
     });
-    expect(out.skippedOffRelay).toEqual(['podonly']);
-    expect(added).toEqual([]);
+    expect(out.skippedOffRelay).toEqual([]);
+    expect(added).toEqual(['addr-podonly']);
   });
 });

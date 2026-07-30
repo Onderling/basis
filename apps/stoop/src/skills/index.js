@@ -2320,8 +2320,23 @@ export function buildSkills({
       if (current && current.policy && current.policy !== 'no-pod' && next.policy === 'no-pod') {
         return { error: 'storage-policy-downgrade-not-supported' };
       }
+      // The writer has to EXIST before we claim to have written (2026-07-30).
+      //
+      // This was `await bundle?.podRouting?.setCirclePolicy?.(…)` and then an unconditional success. When
+      // `podRouting` is absent — which it always is in basis, where it is a tasks-* concept the app never
+      // wires — the optional chain evaluated to `undefined`, nothing was stored, and the caller was told
+      // `ok: true` with the policy it had asked for echoed back. Walking S4's pod set found it: the only
+      // way a basis circle becomes pod-backed is to be CREATED that way, and nobody could tell, because
+      // the op that was supposed to change it reported success every time.
+      //
+      // `?.()` is the right tool for a genuinely optional collaborator. It is the wrong one when its
+      // absence means the operation did not happen.
+      const writeCirclePolicy = bundle?.podRouting?.setCirclePolicy;
+      if (typeof writeCirclePolicy !== 'function') {
+        return { error: 'storage-policy-writer-unavailable' };
+      }
       try {
-        await bundle?.podRouting?.setCirclePolicy?.(a.groupId, next);
+        await writeCirclePolicy.call(bundle.podRouting, a.groupId, next);
       } catch (e) {
         return { error: `storage-policy-write-failed:${e?.message ?? 'unknown'}` };
       }

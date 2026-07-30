@@ -327,13 +327,23 @@ export default function CreateGroupWizardModal({
                   consequenceLabel={t('common.consequences')}
                 />
                 {(state.storagePolicy === 'centralised' || state.storagePolicy === 'hybrid') && (
-                  <Field
-                    label="Group pod URI"
-                    value={state.groupPodUri}
-                    onChangeText={(v) => setState((s) => ({ ...s, groupPodUri: v }))}
-                    placeholder="https://group.example/pod/"
-                    monospace
-                  />
+                  <>
+                    <Field
+                      label="Group pod URI"
+                      value={state.groupPodUri}
+                      onChangeText={(v) => setState((s) => ({ ...s, groupPodUri: v }))}
+                      placeholder="https://group.example/pod/"
+                      monospace
+                    />
+                    {/* J-NP3, the CREATE half — web had this and mobile did not (found 2026-07-30).
+                        Choosing a shared pod means its host can see the membership, and the fact belongs
+                        next to the choice that causes it: a creator deciding here should not meet it
+                        later in a settings screen, and they are deciding on behalf of everyone who
+                        joins. The join side already says it; parity matters most for a disclosure. */}
+                    <Text style={styles.podDisclosure} testID="create-pod-host-disclosure">
+                      {t('circle.nearbyScreen.point_pod_host_sees')}
+                    </Text>
+                  </>
                 )}
               </Body>
             )}
@@ -411,4 +421,8 @@ const styles = StyleSheet.create({
   roleHeading: { fontSize: 13, fontWeight: '700', color: '#444', marginTop: 14, marginBottom: 2 },
   roleHint:    { fontSize: 12, lineHeight: 17, color: '#777', marginBottom: 6 },
   roleDesc:    { fontSize: 12, lineHeight: 17, color: '#666', marginLeft: 28, marginBottom: 8 },
+  // J-NP3 — the pod-host disclosure sits under the pod field. Same weight as the other hints: a
+  // disclosure that shouts reads as a warning against a normal choice, and one that whispers is not a
+  // disclosure. It matches `roleHint` deliberately.
+  podDisclosure: { fontSize: 12, lineHeight: 17, color: '#777', marginTop: 6, marginBottom: 6 },
 });

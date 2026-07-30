@@ -261,13 +261,37 @@ export function createConnectionPoints({ initial = {}, save = null, now = () => 
 }
 
 /**
- * A RELAY point is a websocket endpoint; a POD point is an https resource (the pod root).
+ * Is this a usable POD url? — **the one rule**, exported because three places had their own (2026-07-30).
+ *
+ * They disagreed, and the disagreement was not academic. Walking S4's pod set against a real Community
+ * Solid Server found: `circleRealPod.podRootFromWebid` accepts `http://` (with a unit test naming
+ * `http://localhost:3000/...`), while the invite builder and this store both demanded `https://`. So a
+ * circle could be created on a local pod, stored happily, and then have its pod url silently dropped from
+ * its own invite — while the invite went on claiming `podBacked: true`. The joiner was told a pod host
+ * could see them and never told which pod.
+ *
+ * The rule now: **https anywhere, or http on loopback.** That is not a loosening for its own sake — it is
+ * the same line browsers draw for secure contexts, and it matches what this product already does one
+ * layer down, where a relay point accepts plaintext `ws://`. A pod you are running on your own machine is
+ * not a downgrade; a pod reached in cleartext across a network is.
+ */
+export function isPodUrl(url) {
+  if (typeof url !== 'string') return false;
+  const u = url.trim();
+  if (/^https:\/\/\S+$/.test(u)) return true;
+  // Loopback only — never a LAN address. `http://192.168.x.x` crosses a wire someone else can read, and
+  // the fact that it is "local" to you is not a property the pod's contents care about.
+  return /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/\S*)?$/.test(u);
+}
+
+/**
+ * A RELAY point is a websocket endpoint; a POD point is a pod root — see `isPodUrl`.
  * Anything else is a typo, not a point.
  */
 function isUrl(url, kind = POINT_KIND.RELAY) {
   if (typeof url !== 'string') return false;
   return kind === POINT_KIND.POD
-    ? /^https:\/\/\S+$/.test(url.trim())
+    ? isPodUrl(url)
     : /^wss?:\/\/\S+$/.test(url.trim());
 }
 

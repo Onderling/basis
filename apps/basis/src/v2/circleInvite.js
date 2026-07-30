@@ -17,6 +17,7 @@
  */
 
 import { encodeMembershipCodeUrl } from '../core/wizards/createGroupState.js';
+import { isPodUrl } from './connectionPoints.js';
 import { initialState, decodeInvite, finalSubmit, existingSelvesFrom, setLinkChoice } from '../core/wizards/joinGroupState.js';
 
 /**
@@ -81,12 +82,14 @@ export async function buildCircleInviteUri({ callSkill, circleId, adminPeerAddr 
     // see the membership. Embedded so the JOINER is told BEFORE redeeming (J-NP3): the creator accepting
     // that disclosure on the joiner's behalf is exactly the pattern the disclosure model exists to prevent.
     // Same additive rule as offeringsMatching: explicit true or absent, so older invites are unchanged.
-    ...(podBacked === true ? { podBacked: true } : {}),
-    // …and WHERE (Frits' invite-carries-endpoint decision, applied to the pod case): without a common
-    // connection point the joiner cannot reach the circle at all, and the pod IS that point here. Only
-    // ever alongside `podBacked` — a pod URL on a non-pod invite would be noise claiming to be a place.
-    ...(podBacked === true && typeof podUrl === 'string' && /^https:\/\/\S+$/.test(podUrl)
-      ? { podUrl } : {}),
+    // …and WHERE. The two travel TOGETHER or not at all (2026-07-30). They used to be independent, and the
+    // combination that produced was the worst one: the URL failed a stricter gate than the one that stored
+    // it, got dropped, and `podBacked: true` stayed — so the joiner was told a pod host could see them and
+    // never told which pod. A disclosure you cannot act on is worse than none, because it reads as
+    // informed consent. Found walking J-NP1 against a real Community Solid Server (S4, 2026-07-30).
+    //
+    // `isPodUrl` is now the ONE rule (connectionPoints.js); three places had their own and disagreed.
+    ...(podBacked === true && isPodUrl(podUrl) ? { podBacked: true, podUrl } : {}),
     // …and the RELAY endpoint (the same invite-carries-endpoint decision, the relay case): a pasted
     // invite has no deep-link context, so without this the joiner reaches the circle only if their
     // device happens to ride the same default relay. Rule 1 (join populates the connection-point list)

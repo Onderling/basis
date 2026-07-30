@@ -113,33 +113,42 @@ describe('J-NP1 — the pod as this circle’s connection point', () => {
     }
   }, 60_000);
 
-  it('DEFECT — against the real (http) local pod the point silently never lands', async () => {
+  it('FIXED — against the real (http) local pod, the point lands and the invite names it', async () => {
     const anna = await bootRealAgentNode('anna-http');
     try {
       await createPodCircle(anna, { groupId: 'podkring', groupPodUri: LIVE_POD });
       const { storage, invite } = await inviteAsShellsBuildIt(anna, 'podkring');
 
-      // stoop stored the http pod url happily — `_validateStoragePolicy` only requires a non-empty
-      // string, so the circle IS pod-backed and the app believes it.
       expect(storage).toEqual({ pod: 'shared', groupPodUri: LIVE_POD });
 
-      // WRONG, pinned as-is: `buildCircleInviteUri` gates `podUrl` on /^https:\/\// and drops it, while
-      // keeping `podBacked: true`. The joiner is told a pod host can see them and is NOT told which pod.
+      // Was the defect: `buildCircleInviteUri` gated `podUrl` on /^https:\/\// and dropped it while
+      // KEEPING `podBacked: true` — so the joiner was told a pod host could see them and never told
+      // which pod. A disclosure you cannot act on reads as informed consent and is not.
+      //
+      // One rule now (`isPodUrl`): https anywhere, or http on loopback — the line browsers draw for
+      // secure contexts, and the one this product already draws a layer down, where a relay point
+      // accepts plaintext ws://. And the two fields travel together: no podUrl, no podBacked claim.
       expect(invite.podBacked).toBe(true);
-      expect(invite.podUrl).toBeUndefined();
+      expect(invite.podUrl).toBe(LIVE_POD);
 
-      // …so rule 1 records NOTHING, and it does so silently (`recordJoinedCirclePoints` is best-effort
-      // by design). The pod is invisible in the list, which is exactly the failure J-NP1 exists to
-      // catch: "if I remove this, what breaks?" is unanswerable for the circles with no relay to
-      // point at. Note the asymmetry — a RELAY point accepts plaintext ws://, a pod does not.
+      // …so rule 1 records the pod, and "if I remove this, what breaks?" is answerable for a circle
+      // with no relay to point at — which is what J-NP1 exists to check.
       const points = createConnectionPoints({});
       expect(recordJoinedCirclePoints({ store: points, invite, circleId: 'podkring' }).recorded)
-        .toEqual([]);
-      expect(points.list()).toEqual([]);
+        .toEqual(['pod']);
+      expect(points.list().map((p) => p.url)).toEqual([LIVE_POD]);
     } finally {
       await teardown(anna);
     }
   }, 60_000);
+
+  it('a pod reached in cleartext ACROSS a network is still refused — loopback is the exception', () => {
+    // The rule is not "http is fine now". A LAN address crosses a wire someone else can read, and being
+    // local to you is not a property the pod's contents care about.
+    const invite = { podBacked: true, podUrl: 'http://192.168.2.20:3000/anna/' };
+    const points = createConnectionPoints({});
+    expect(recordJoinedCirclePoints({ store: points, invite, circleId: 'x' }).recorded).toEqual([]);
+  });
 });
 
 // ── J-NP2 — the admin is asleep: a NOTICE, not a failure verdict ────────────────────────────────────

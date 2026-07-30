@@ -12,6 +12,8 @@
  * back to the pseudo-pod (offline / not-signed-in), so this is purely additive.
  */
 
+import { isPodUrl } from './connectionPoints.js';
+
 /** Derive a pod ROOT from a WebID (`https://me.pod/profile/card#me` → `https://me.pod/`).
  *  Heuristic FALLBACK only — prefer the host passing a `podRoot` resolved via the canonical
  *  `discoverPodRoot(session)` (src/web/podStorage.js — reads the WebID's `pim:storage`). */
@@ -20,7 +22,10 @@ export function podRootFromWebid(webid) {
   const i = webid.indexOf('/profile/');
   let base = i >= 0 ? webid.slice(0, i + 1) : webid.replace(/[#?].*$/, '').replace(/\/[^/]*$/, '/');
   if (!base.endsWith('/')) base += '/';
-  return /^https?:\/\//.test(base) ? base : null;
+  // The same rule as everywhere else (2026-07-30). This function used to accept any `http://` host, the
+  // invite builder demanded `https://`, and the connection-point store agreed with the invite — so a
+  // circle could be created on a pod that one component considered valid and another silently refused.
+  return isPodUrl(base) ? base : null;
 }
 
 /**

@@ -385,8 +385,48 @@ export class Transport extends Emitter {
    * Fire-and-forget; SecurityLayer on the receiving end auto-registers the sender.
    * Use agent.hello() to do a bidirectional introduction.
    */
-  async sendHello(to, payload) {
-    await this._send(to, mkEnvelope(P.HI, this.#address, to, payload));
+  async sendHello(to, payload, opts = {}) {
+    // `opts.from` — answer AS the address you were addressed to (G13).
+    //
+    // Per-circle addresses live in `#aliases`, and this used to stamp `this.#address` unconditionally. So a
+    // peer who dialled one of our circle addresses got a reply from our CANONICAL address, filed our key
+    // under that, and went on waiting for a key under the alias it had dialled — then timed out and reported
+    // us offline while we were actively answering it. A handshake to a per-circle address could therefore
+    // never complete, which is why no message ever crossed between two devices (found 2026-07-30).
+    //
+    // Passing the alias keeps the circle address as the identity on the wire end to end, so the peer never
+    // learns our canonical address — the unlinkability G13 exists for. The alternative (letting the peer
+    // credit a canonical-address reply to the alias it dialled) would have worked too and would have handed
+    // them exactly the circle-address → identity link the design withholds.
+    //
+    // Unknown addresses fall back to the primary rather than throwing: `_to` on an inbound envelope is
+    // attacker-influenced, and a bad value must not let someone make us claim an address that is not ours.
+    const claimed = typeof opts.from === 'string' ? opts.from : null;
+    const from = claimed && (claimed === this.#address || this.#aliases.has(claimed))
+      ? claimed
+      : this.#address;
+    if (claimed && from !== claimed && typeof console !== 'undefined') {
+      // Loud on purpose (Frits, review 2026-07-30). The fallback is SAFE against hostile input — but a
+      // genuine wiring mistake, passing an address this transport never bound, would otherwise look like
+      // success, and "looks right, does nothing" is the failure class behind most of this month's bugs.
+      // Hostile input can at worst make log noise; a real bug now leaves a trace.
+      console.warn(
+        `[transport] sendHello: asked to answer as "${String(claimed).slice(0, 16)}…" `
+        + 'which this transport does not hold — falling back to the primary address',
+      );
+    }
+    // `opts.re` — the `_id` of the HI this one ANSWERS.
+    //
+    // An earlier version of the reciprocal-HI fix invented a `reply: true` field in the payload to mark an
+    // answer, so that answering could not provoke another answer. That was a new wire field for something
+    // the envelope already expresses: `_re` ("reply-to envelope `_id`") is an atom on EVERY envelope, and
+    // saying which HI you are answering is both zero new fields and strictly more informative than a
+    // boolean. (Frits, 2026-07-30: "check the transport atoms first" — he was right.)
+    //
+    // Safe against the reply-correlation machinery: `_receive` resolves a pending promise only when
+    // `REPLY_CODES.has(_p) && _re`, and HI is not a reply code — so an HI carrying `_re` cannot resolve
+    // someone's outstanding request.
+    await this._send(to, mkEnvelope(P.HI, from, to, payload, { re: opts.re ?? null }));
   }
 
   // ── Notification envelopes (Phase 50.7) ────────────────────────────────────

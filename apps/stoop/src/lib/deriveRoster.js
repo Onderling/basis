@@ -72,7 +72,7 @@ export function deriveRoster({
   for (const it of redemptions ?? []) {
     const src = (it && it.source) ?? {};
     const {
-      redeemedBy, confirmedBy, channel, role,
+      redeemedBy, confirmedBy, confirmedByCircleAddress, channel, role,
       signingPublicKey, sealingPublicKey, circleAddress, personaProperties,
     } = src;
     if (redeemedBy) {
@@ -85,7 +85,21 @@ export function deriveRoster({
       });
     }
     // The admin's address as recorded on the joiner side (peer-bridge only).
-    if (confirmedBy && channel === 'peer') upsert(confirmedBy, 'admin', {});
+    if (confirmedBy && channel === 'peer') {
+      upsert(confirmedBy, 'admin', {
+        // The admin's PER-CIRCLE address, returned on the redeem response and proof-verified before it
+        // was written (`recordRemoteRedemption`). This row is the joiner's ONLY view of the admin, so
+        // without it every send to them falls through to the global signing key — refused outright when
+        // the per-user address fallback is off. Absent on a pre-2026-07-30 trail: the row is unchanged.
+        circleAddress: confirmedByCircleAddress,
+        // …and the admin's SIGNING key, which is `confirmedBy` itself: a basis circle binds
+        // webid === the member's chat signing address (the same identity the redeem response was
+        // authenticated under, and the same fact the address ladder's webid rung already relies on).
+        // Named here because the pair {pubKey, circleAddress} is what `bindCircleAddressKeys` needs to
+        // make the per-circle address sealable — a row with only the address is silently skipped.
+        pubKey: confirmedBy,
+      });
+    }
   }
 
   // Founder(s) — the circle creator + any admin-role member; never redeem.

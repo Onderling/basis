@@ -89,3 +89,69 @@ describe('peer redeem — admin forwards the joiner circleAddress', () => {
     expect('circleAddress' in callSkill.mock.calls[0][2]).toBe(false);
   });
 });
+
+/**
+ * …and the other direction (2026-07-30). Per-circle addressing used to be one-directional: the admin
+ * learned the joiner's address and the joiner learned nothing, so joiner→admin sends fell through to the
+ * admin's global signing key — refused outright when the per-user address fallback is off. The reply is
+ * where that closes.
+ */
+describe('peer redeem — the admin returns ITS OWN circleAddress on the response', () => {
+  const okSkill = () => vi.fn(async () => ({ ok: true, codeId: 'c1', validUntil: 9 }));
+
+  it('carries the admin address + proof for the circle being joined', async () => {
+    const sent = [];
+    const handle = makeHandleGroupRedeemRequest({
+      callSkill: okSkill(),
+      sendPeer: async (addr, payload) => { sent.push({ addr, payload }); },
+      circleAddressFor: (gid) => `admin-addr-for-${gid}`,
+      signCircleAddress: (gid, addr) => `sig(${gid},${addr})`,
+      logger: { warn() {}, error() {} },
+    });
+    await handle('joiner@nkn', { requestId: 'r1', groupId: 'buurt-42', code: 'ABC' });
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0].payload.subtype).toBe('group-redeem-response');
+    expect(sent[0].payload.circleAddress).toBe('admin-addr-for-buurt-42');
+    expect(sent[0].payload.circleAddressProof).toBe('sig(buurt-42,admin-addr-for-buurt-42)');
+  });
+
+  it('sends NOTHING it cannot prove (same deny-by-default as the request direction)', async () => {
+    const sent = [];
+    const handle = makeHandleGroupRedeemRequest({
+      callSkill: okSkill(),
+      sendPeer: async (addr, payload) => { sent.push({ addr, payload }); },
+      circleAddressFor: (gid) => `admin-addr-for-${gid}`,   // derivable…
+      // …but no signer → unprovable → omitted.
+      logger: { warn() {}, error() {} },
+    });
+    await handle('joiner@nkn', { requestId: 'r1', groupId: 'buurt-42', code: 'ABC' });
+    expect('circleAddress' in sent[0].payload).toBe(false);
+  });
+
+  it('never rides a REJECTION — a refused join learns nothing about the admin', async () => {
+    const sent = [];
+    const handle = makeHandleGroupRedeemRequest({
+      callSkill: vi.fn(async () => ({ error: 'invalid-or-expired-code' })),
+      sendPeer: async (addr, payload) => { sent.push({ addr, payload }); },
+      circleAddressFor: (gid) => `admin-addr-for-${gid}`,
+      signCircleAddress: (gid, addr) => `sig(${gid},${addr})`,
+      logger: { warn() {}, error() {} },
+    });
+    await handle('stranger@nkn', { requestId: 'r1', groupId: 'buurt-42', code: 'WRONG' });
+    expect(sent[0].payload.error).toBe('invalid-or-expired-code');
+    expect('circleAddress' in sent[0].payload).toBe(false);
+  });
+
+  it('omits it entirely when no presenter is wired (back-compat)', async () => {
+    const sent = [];
+    const handle = makeHandleGroupRedeemRequest({
+      callSkill: okSkill(),
+      sendPeer: async (addr, payload) => { sent.push({ addr, payload }); },
+      logger: { warn() {}, error() {} },
+    });
+    await handle('joiner@nkn', { requestId: 'r1', groupId: 'buurt-42', code: 'ABC' });
+    expect('circleAddress' in sent[0].payload).toBe(false);
+    expect(sent[0].payload.ok).toBe(true);
+  });
+});

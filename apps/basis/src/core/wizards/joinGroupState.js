@@ -662,7 +662,7 @@ export function initialState() {
  */
 export async function finalSubmit({
   state, callSkill, sendPeerRedeem, circleAddressFor, signCircleLink,
-  dialEndpoint = null, activeEndpointUrl = null,
+  dialEndpoint = null, activeEndpointUrl = null, onJoined = null,
 }) {
   state.submitting    = true;
   state.submitError   = null;
@@ -680,6 +680,25 @@ export async function finalSubmit({
       result.capabilityOptOuts = [...state.capabilityOptOuts];
     }
     state.submitting = false;
+    // A joined circle is not yet a REACHABLE one (found on hardware 2026-07-30).
+    //
+    // Before anyone can message a new member, their device must register its per-circle address for the
+    // circle and bind the other members' circle addresses to their keys from the roster. Both existed;
+    // neither was reached from the join. They hung off `CircleLauncherScreen`'s load and circle-open
+    // effects, so a join that happened anywhere else -- a tapped invite link opens this wizard over
+    // whatever screen you were on -- left the member on the roster at an address their own device had
+    // never registered. Confirmed by experiment: the roster had the address, the relay did not, and a
+    // restart fixed it. A new member was unreachable until they relaunched the app, which is exactly
+    // when someone is most likely to message them.
+    //
+    // The seam lives HERE rather than only in `joinCircleFromInvite` because the wizard calls
+    // `finalSubmit` directly -- this is the one choke point the UI and the programmatic path share.
+    // Best-effort and after the fact: the join has already succeeded, and failing it here would turn a
+    // completed join into a reported failure.
+    if (result && result.groupId && typeof onJoined === 'function') {
+      try { await onJoined({ circleId: result.groupId }); }
+      catch { /* reachability is repaired on the next circles load either way */ }
+    }
     return { result, state };
   } catch (err) {
     // Handle-uniqueness rejection (Decision C): surface it as a localisable prompt to
@@ -848,6 +867,13 @@ async function runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddre
         codeId:      peerReply.codeId ?? null,
         expiresAt:   peerReply.validUntil ?? null,
         confirmedBy: inv.adminPeerAddr,
+        // The ADMIN's own per-circle address for this circle, riding back on the redeem response
+        // (2026-07-30). Forwarded raw WITH its proof: the substrate verifies it (`verifyCircleLink`) and
+        // records it only if the proof holds, exactly as the admin does with ours on the way in. Without
+        // this the joiner knows the admin only as `confirmedBy` — a global signing key — and a send to
+        // them is refused whenever the per-user address-fallback setting is off.
+        ...(peerReply.circleAddress ? { confirmedByCircleAddress: peerReply.circleAddress } : {}),
+        ...(peerReply.circleAddressProof ? { confirmedByCircleAddressProof: peerReply.circleAddressProof } : {}),
         ...(state.handle ? { peerDisplay: state.handle } : {}),
         ...(inv.rules && typeof inv.rules === 'object' ? { rules: inv.rules } : {}),
       });

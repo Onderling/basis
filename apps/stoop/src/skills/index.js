@@ -764,22 +764,43 @@ async function listGroupMembersCore(scope, a, ctx) {
       return show ? { ...m, reveals: [viewerWebid] } : m;
     });
   };
-  // B1 fix (C2) — proof-derived membership: the roster is a PROJECTION of the
-  // durable, signed `membership-redemption` trail (the same source EvictionRoster
-  // reduces), NOT `MemberMap.list() ∩ trail`. The MemberMap is a lossy in-memory
-  // cache that reads EMPTY at runtime even after a JOIN succeeded on the trail; the
-  // old intersection therefore went empty and took the roster + fan-out + mandate
-  // WIE down with it. `deriveRoster` starts FROM the trail and left-joins the
-  // MemberMap for display only — so the roster never goes empty when the trail has
-  // members. (See plans/DESIGN-connectivity-phase1-membership.md, Part A.)
-  let redemptions = [];
-  try { redemptions = await store.listOpen({ type: 'membership-redemption' }); } catch { redemptions = []; }
-  const forGroup = redemptions.filter((i) => i?.source?.groupId === _groupId);
-
+  const scoped = await projectCircleRoster({ store, groupId: _groupId, memberMapList: list });
   // Legacy back-compat (unchanged): a group with NO redemption trail (a seeded
   // single-buurt roster from before code-minting) has no durable source to
   // project from — fall back to the full MemberMap so those setups are unchanged.
-  if (forGroup.length === 0) return { groupId: _groupId, members: withViewerReveals(list) };
+  if (!scoped) return { groupId: _groupId, members: withViewerReveals(list) };
+  return { groupId: _groupId, members: withViewerReveals(scoped) };
+}
+
+/**
+ * The per-circle membership PROJECTION — one source, read by BOTH the roster skill
+ * (`listGroupMembers`) and the circle FAN-OUT (`broadcastToCircle`).
+ *
+ * B1 fix (C2) — proof-derived membership: a circle's members are a PROJECTION of the
+ * durable, signed `membership-redemption` trail (the same source EvictionRoster
+ * reduces), NOT `MemberMap.list()`. The MemberMap is a lossy, GLOBAL display cache:
+ * it holds every member of every circle this device ever admitted (with no circle
+ * key on the row), and it holds nothing for a circle whose members this device
+ * learned from the trail alone — which is exactly a JOINER's view of the admin
+ * (`recordRemoteRedemption` records only the joiner's own row; the admin is known
+ * only through `confirmedBy`). `deriveRoster` starts FROM the trail and left-joins
+ * the MemberMap for display only. (plans/DESIGN-connectivity-phase1-membership.md,
+ * Part A.)
+ *
+ * @param {object} a
+ * @param {{listOpen: Function}} a.store
+ * @param {string} a.groupId
+ * @param {Array<object>} [a.memberMapList]  `MemberMap.list()` — display left-join + legacy admins.
+ * @returns {Promise<Array<object>|null>} the circle's members, or `null` when the
+ *   circle has NO redemption trail (the caller keeps its pre-trail behaviour).
+ */
+async function projectCircleRoster({ store, groupId, memberMapList = [] } = {}) {
+  if (!store || typeof store.listOpen !== 'function' || !groupId) return null;
+  const list = Array.isArray(memberMapList) ? memberMapList : [];
+  let redemptions = [];
+  try { redemptions = await store.listOpen({ type: 'membership-redemption' }); } catch { redemptions = []; }
+  const forGroup = (redemptions ?? []).filter((i) => i?.source?.groupId === groupId);
+  if (forGroup.length === 0) return null;
 
   // Founder(s) — the creator never redeems their own code. Derive them from two
   // sources so the roster survives a cold MemberMap:
@@ -791,8 +812,8 @@ async function listGroupMembersCore(scope, a, ctx) {
   const founderWebids = new Set();
   try {
     const rules = await store.listOpen({ type: 'group-rules' });
-    for (const it of rules) {
-      if (it?.source?.groupId !== _groupId) continue;
+    for (const it of rules ?? []) {
+      if (it?.source?.groupId !== groupId) continue;
       if (it?.source?.mirrored === true) continue;
       if (typeof it?.addedBy === 'string' && it.addedBy) founderWebids.add(it.addedBy);
     }
@@ -801,12 +822,11 @@ async function listGroupMembersCore(scope, a, ctx) {
     if (m?.webid && isCircleAdmin(m.role)) founderWebids.add(m.webid);
   }
 
-  const scoped = deriveRoster({
+  return deriveRoster({
     redemptions: forGroup,
     founderWebids: [...founderWebids],
     memberMapForDisplay: list,
   });
-  return { groupId: _groupId, members: withViewerReveals(scoped) };
 }
 
 async function respondToItemCore(scope, a, ctx) {
@@ -1095,6 +1115,23 @@ export function buildSkills({
     if (!reliableSend && !chat?.send) return { error: 'chat-unavailable', sent: 0, attempted: 0, errors: [] };
     if (!members)                     return { error: 'members-unavailable', sent: 0, attempted: 0, errors: [] };
 
+    // ── Who the recipients ARE (2026-07-30) ────────────────────────────────
+    // THIS CIRCLE's roster — the same trail-derived projection `listGroupMembers` returns — not the
+    // device's global `MemberMap`. The MemberMap carries no circle on a row, so fanning over it sent
+    // every circle's message to every member of every OTHER circle this device ever admitted (dead
+    // test peers included: their rows persist), while a member this device knows ONLY from the trail
+    // was never sent to at all. That second half is a JOINER's normal state: `recordRemoteRedemption`
+    // writes only the joiner's own row, so the admin exists solely as `confirmedBy` on the trail —
+    // which is why joiner→admin chat silently never left the device while admin→joiner worked, and why
+    // catch-up (roster-driven) reached the peer the chat fan-out could not.
+    // No trail (legacy seeded single-buurt) → `null` → the MemberMap, exactly as before.
+    let memberMapList = [];
+    try { memberMapList = (await members.list()) ?? []; } catch { memberMapList = []; }
+    const roster = await projectCircleRoster({ store, groupId: circleId, memberMapList });
+    const fanMembers = roster
+      ? { list: async () => roster, resolveByWebid: (w) => members.resolveByWebid(w) }
+      : members;
+
     // ── Connectivity Phase 2/3 (G1/G2) — the data-move branch ──────────────
     // The circle's data-policy (`policy.pod`) decides HOW a message moves; we
     // consult it here, ABOVE the transport choice (reliableSend vs chat.send).
@@ -1136,9 +1173,12 @@ export function buildSkills({
             fromActor: envelope.fromActor ?? null, fromWebid: envelope.fromWebid ?? null,
             media: envelope.media,
           });
+          // NOTE (unchanged here, worth a look on its own): this ref fan passes no `circleId` /
+          // `preferCircleAddress`, so unlike the full fan below it still routes to members' GLOBAL
+          // keys rather than their per-circle addresses.
           const refFan = reliableSend
-            ? await _fanOutViaReliableSend({ members, reliableSend, selfWebid: from, envelope: refEnvelope })
-            : await _fanOutToMembers({ members, chat, selfWebid: from, subtype: kind, threadId: circleId, body: '', extras: { ...extras, ref } });
+            ? await _fanOutViaReliableSend({ members: fanMembers, reliableSend, selfWebid: from, envelope: refEnvelope })
+            : await _fanOutToMembers({ members: fanMembers, chat, selfWebid: from, subtype: kind, threadId: circleId, body: '', extras: { ...extras, ref } });
           if (metric) metrics?.record?.(metric);
           return { sent: refFan.sent, attempted: refFan.attempted, errors: refFan.errors, podSignal: true, ref };
         }
@@ -1155,10 +1195,10 @@ export function buildSkills({
     const wire = envelope ?? { subtype: kind, ...extras };
     const { sent, attempted, errors } = reliableSend
       ? await _fanOutViaReliableSend({
-        members, reliableSend, selfWebid: from, envelope: wire, only, circleId, preferCircleAddress,
+        members: fanMembers, reliableSend, selfWebid: from, envelope: wire, only, circleId, preferCircleAddress,
         allowFallback: allowAddressFallback,
       })
-      : await _fanOutToMembers({ members, chat, selfWebid: from, subtype: kind, threadId: circleId, body, extras, only });
+      : await _fanOutToMembers({ members: fanMembers, chat, selfWebid: from, subtype: kind, threadId: circleId, body, extras, only });
     if (metric) metrics?.record?.(metric);
     return { sent, attempted, errors };
   }
@@ -2715,6 +2755,18 @@ export function buildSkills({
         return { error: 'groupId required' };
       if (typeof a.code !== 'string' || !a.code)
         return { error: 'code required' };
+      // The ADMIN's per-circle address, as it rode back on the redeem response (2026-07-30). Same
+      // deny-by-default check the admin applies to OURS in `verifyMembershipCodeForPeer`, and for the
+      // same reason: an address is only ever recorded when its presenter PROVED control of the key
+      // behind it, so a co-member who has merely seen the admin's address elsewhere cannot plant it.
+      // Unproven ⇒ dropped, and the joiner keeps reaching the admin the old way.
+      const verifiedAdminCircleAddress = (a.confirmedByCircleAddress
+        && verifyCircleLink({
+          groupId: a.groupId,
+          address: a.confirmedByCircleAddress,
+          proof:   a.confirmedByCircleAddressProof,
+        }))
+        ? a.confirmedByCircleAddress : null;
       const [item] = await store.addItems([{
         type:       'membership-redemption',
         text:       `${from} (peer-confirmed) for ${a.groupId}`,
@@ -2727,6 +2779,10 @@ export function buildSkills({
           expiresAt:   a.expiresAt ?? null,
           confirmedBy: a.confirmedBy ?? null,
           channel:     'peer',
+          // …and the per-circle ADDRESS that admin answers on in this circle (proof-verified above).
+          // `deriveRoster` projects it onto the admin's roster row, which is what lets a send to them
+          // resolve on the circle-address rung instead of falling through to their global key.
+          ...(verifiedAdminCircleAddress ? { confirmedByCircleAddress: verifiedAdminCircleAddress } : {}),
           // Handle presented in THIS circle (Wave B) — recorded joiner-side so
           // `listMyHandles` can surface it as a prior handle later.
           ...(typeof a.peerDisplay === 'string' && a.peerDisplay ? { peerDisplay: a.peerDisplay } : {}),

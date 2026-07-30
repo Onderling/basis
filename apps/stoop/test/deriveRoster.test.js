@@ -58,6 +58,20 @@ describe('deriveRoster', () => {
     expect(roster.find((m) => m.webid === 'B')?.role).toBe('member');
   });
 
+  it('joiner side: the admin row carries their per-circle address + signing key', () => {
+    // Recorded (proof-verified) by `recordRemoteRedemption` when the redeem RESPONSE carried it. Without
+    // both halves a send to the admin falls through to their global key — refused when the per-user
+    // address fallback is off — and the address cannot be bound to an identity key for sealing.
+    const roster = deriveRoster({
+      redemptions: [redemption({
+        redeemedBy: 'B', confirmedBy: 'A', channel: 'peer', confirmedByCircleAddress: 'addrA-in-g1',
+      })],
+    });
+    const a = roster.find((m) => m.webid === 'A');
+    expect(a.circleAddress).toBe('addrA-in-g1');
+    expect(a.pubKey).toBe('A');
+  });
+
   it('ignores confirmedBy when the channel is not peer', () => {
     const roster = deriveRoster({
       redemptions: [redemption({ redeemedBy: 'B', confirmedBy: 'A', channel: 'intro' })],

@@ -9,7 +9,8 @@
  *     joiner's membership code via `stoop.verifyMembershipCodeForPeer`
  *     + replies with `group-redeem-response`.  On success, fires
  *     `propagateMeshIntros` so newly-consenting members see each
- *     other's addresses.
+ *     other's addresses.  The reply also carries the ADMIN's OWN
+ *     per-circle address + proof — see `ownProvenCircleAddress`.
  *
  *   - `makeHandleGroupRedeemResponse` (JOINER side) — looks up the
  *     pending request by `requestId` in a caller-owned `pendingMap`
@@ -22,11 +23,14 @@
  * @param {(addr: string, payload: object) => Promise<*>}                  args.sendPeer
  * @param {(args: {groupId: string, newPeerAddr: string, newPeerDisplay?: string, newPeerShared?: boolean}) => Promise<*>} [args.propagateMeshIntros]
  * @param {(event: object) => void}                                        [args.publishEvent]
+ * @param {(groupId: string) => (string|null)}                             [args.circleAddressFor]  the admin's own per-circle address presenter
+ * @param {(groupId: string, address: string) => (string|null)}            [args.signCircleAddress] …and its proof-of-possession signer
  * @param {{info?, warn?, error?}}                                         [args.logger]
  * @returns {(fromAddr: string, payload: object) => Promise<void>}
  */
 export function makeHandleGroupRedeemRequest({
-  callSkill, sendPeer, propagateMeshIntros, publishEvent, logger = console,
+  callSkill, sendPeer, propagateMeshIntros, publishEvent,
+  circleAddressFor, signCircleAddress, logger = console,
 } = {}) {
   if (typeof callSkill !== 'function') throw new Error('makeHandleGroupRedeemRequest: callSkill required');
   if (typeof sendPeer  !== 'function') throw new Error('makeHandleGroupRedeemRequest: sendPeer required');
@@ -57,6 +61,22 @@ export function makeHandleGroupRedeemRequest({
         reply = { error: result.error };
       } else {
         reply = { ok: true, codeId: result.codeId, validUntil: result.validUntil };
+        // Per-circle addressing RIDES BACK (2026-07-30). Until now it was one-directional: the joiner
+        // presented + proved its per-circle address and the admin recorded it, so the admin could reach
+        // the joiner while the joiner held no per-circle address for the ADMIN and fell through to their
+        // global signing key — which, with the per-user address-fallback setting off (the default), is
+        // refused outright (`resolveMemberAddress` → `blocked-by-setting`). Measured on hardware:
+        // admin→joiner chat worked, joiner→admin did not.
+        //
+        // The redeem RESPONSE is the moment to fix it: both sides are talking, on a channel the joiner
+        // already trusts, and one field closes the loop. It is PROVEN, not asserted — the joiner runs the
+        // same `verifyCircleLink` check the admin runs on the way in, so a co-member who has merely SEEN
+        // the admin's address in another circle cannot inject it here.
+        //
+        // (The general refresh path — addresses on the roster-updated broadcast — is deliberately NOT
+        // built here: it is the same mechanism as "re-announce", and the two belong together.)
+        const own = ownProvenCircleAddress(groupId, { circleAddressFor, signCircleAddress });
+        if (own) Object.assign(reply, own);
       }
     } catch (err) {
       reply = { error: err?.message ?? String(err) };
@@ -89,6 +109,32 @@ export function makeHandleGroupRedeemRequest({
       logger.error?.('[peer] group-redeem-response send failed', err);
     }
   };
+}
+
+/**
+ * THIS device's own per-circle address for `groupId`, together with its proof of possession — or `null`
+ * when either seam is missing or the address cannot be signed for.
+ *
+ * Deny-by-default, and shared by BOTH directions of the redeem so they cannot drift: the JOINER presents
+ * it on a fresh join (the request), the ADMIN returns it (the response). Both are the same claim —
+ * "this is the address I answer on in this circle, and here is a signature by the key behind it" — and
+ * both are verified by the receiver with `verifyCircleLink`. Proving possession of your OWN per-circle
+ * address leaks nothing: the address is derived per-circle from a secret profile seed, so it is
+ * uncorrelatable with any other circle's.
+ *
+ * @param {string} groupId
+ * @param {{circleAddressFor?: Function, signCircleAddress?: Function}} seams
+ * @returns {{circleAddress: string, circleAddressProof: string}|null}
+ */
+export function ownProvenCircleAddress(groupId, { circleAddressFor, signCircleAddress } = {}) {
+  if (typeof circleAddressFor !== 'function' || typeof signCircleAddress !== 'function') return null;
+  try {
+    const circleAddress = circleAddressFor(groupId);
+    const circleAddressProof = circleAddress ? signCircleAddress(groupId, circleAddress) : null;
+    return (circleAddress && circleAddressProof) ? { circleAddress, circleAddressProof } : null;
+  } catch {
+    return null;   // no address available → present none, exactly as before
+  }
 }
 
 /**
@@ -151,12 +197,9 @@ export function makeSendGroupRedeemRequest({
     let circleAddress = (typeof presentedCircleAddress === 'string' && presentedCircleAddress)
       ? presentedCircleAddress : null;
     let proof = (typeof circleAddressProof === 'string' && circleAddressProof) ? circleAddressProof : null;
-    if (!circleAddress && typeof circleAddressFor === 'function' && typeof signCircleAddress === 'function') {
-      try {
-        const fresh = circleAddressFor(groupId);
-        const sig = fresh ? signCircleAddress(groupId, fresh) : null;
-        if (fresh && sig) { circleAddress = fresh; proof = sig; }
-      } catch { /* no fresh address available → send none, exactly as before */ }
+    if (!circleAddress) {
+      const own = ownProvenCircleAddress(groupId, { circleAddressFor, signCircleAddress });
+      if (own) { circleAddress = own.circleAddress; proof = own.circleAddressProof; }
     }
     const linkArg = (circleAddress && proof) ? { circleAddress, circleAddressProof: proof } : {};
     const requestId = `gr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;

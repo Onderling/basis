@@ -34,7 +34,7 @@ const CORE = [
       const [A, B] = peers;
       const res = await H.pair(A, B, { name: 'Peer Circle' });
       console.log('[pairing]', JSON.stringify(res));
-      expect(res.inviteUri, 'peer A produced a stoop-invite URI').toBeTruthy();
+      expect(res.inviteUri, 'peer A produced a onderling-invite URI').toBeTruthy();
       // Phase-0-provable: the redeem handshake completed (wizard closed / joiner got the tile).
       // The hard both-rosters-show-2 assertion is the Phase-1 acceptance (see journeys.spec.js).
       expect(res.joined || res.joinerHasTile, 'B joined (wizard closed / tile present)').toBeTruthy();

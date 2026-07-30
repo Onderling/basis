@@ -11,8 +11,8 @@
  */
 
 export const QR_URI_PREFIXES = Object.freeze([
-  'stoop-contact://',
-  'stoop-invite://',
+  'onderling-contact://',
+  'onderling-invite://',
   'onderling-pair://', // OBJ-2 no-pod device/agent pairing: encodes a household peer address
   'basis://',    // future: chat-shell-level invites
 ]);
@@ -70,7 +70,7 @@ export function parsePairUri(uri) {
  * the app claims that scheme, or nothing happens at all.
  *
  * The two drifted (found walking S4, 2026-07-30). `basis://` was registered in the Android manifest;
- * `stoop-invite://` — the scheme every circle invite this product builds actually uses — was not. So
+ * `onderling-invite://` — the scheme every circle invite this product builds actually uses — was not. So
  * sharing an invite the most natural way, by sending someone the link, produced a dead string. It worked
  * scanned or pasted, which is exactly why nobody noticed.
  *

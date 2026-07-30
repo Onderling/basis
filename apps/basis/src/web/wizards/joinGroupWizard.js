@@ -25,7 +25,7 @@
  *   stoop.redeemInvite       → step 3's actual GroupManager redeem
  *
  * Args expected: `{ invite: <string|object> }`.  String form is the
- * `stoop-invite://<base64url-encoded-invite-object>` URL surfaced by
+ * `onderling-invite://<base64url-encoded-invite-object>` URL surfaced by
  * the QR rendering in /invite (A9, 7). Object form: the
  * already-decoded invite per stoop's GroupManager.issueInvite shape.
  */

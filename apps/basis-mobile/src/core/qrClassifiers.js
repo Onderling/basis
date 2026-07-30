@@ -3,10 +3,10 @@
  *
  * Two payload shapes the mobile scanner accepts today (2026-05-27):
  *
- *   - kind 'contact' — `stoop-contact://<base64url-encoded-card>`
+ *   - kind 'contact' — `onderling-contact://<base64url-encoded-card>`
  *     (output of /share-my-contact); routes via stoop's
  *     `addContactFromQr` skill.
- *   - kind 'invite'  — `stoop-invite://<base64url-encoded-invite>` OR
+ *   - kind 'invite'  — `onderling-invite://<base64url-encoded-invite>` OR
  *     a URL with `?invite=<encoded-json>` (output of /create-group);
  *     routes via the joinGroup wizard, which already accepts the URL
  *     verbatim (decodeInvite is in core/wizards/joinGroupState.js).
@@ -16,8 +16,8 @@
  * testable with vitest.
  */
 
-const STOOP_CONTACT_SCHEME = 'stoop-contact://';
-const STOOP_INVITE_SCHEME  = 'stoop-invite://';
+const STOOP_CONTACT_SCHEME = 'onderling-contact://';
+const STOOP_INVITE_SCHEME  = 'onderling-invite://';
 const PAIR_SCHEME          = 'onderling-pair://';
 
 /**

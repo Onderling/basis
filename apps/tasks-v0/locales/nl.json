@@ -123,7 +123,7 @@
     "heading":         { "text": "Aansluiten via uitnodiging", "doc": "H2 on /onboard.html." },
     "intro":           { "text": "Plak de uitnodiging die je van een kring-admin kreeg. Het is een eenmalig token dat bewijst dat je bent vouched-for en de toegewezen rol meebrengt.", "doc": "Lead paragraph on /onboard.html." },
     "invite_label":    { "text": "Uitnodiging-payload", "doc": "Label of the invite textarea." },
-    "invite_hint":     { "text": "Plak de ruwe JSON of een stoop-invite:// link — allebei werken.", "doc": "Hint under the invite textarea." },
+    "invite_hint":     { "text": "Plak de ruwe JSON of een onderling-invite:// link — allebei werken.", "doc": "Hint under the invite textarea." },
     "display_label":   { "text": "Jouw weergavenaam (optioneel)", "doc": "Label of the optional display-name input." },
     "webid_label":     { "text": "Jouw WebID (optioneel)", "doc": "Label of the optional WebID input." },
     "webid_hint":      { "text": "Laat leeg om een opaak, pubKey-gebaseerd id te krijgen.", "doc": "Hint under the WebID input." },

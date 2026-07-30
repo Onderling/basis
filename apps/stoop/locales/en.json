@@ -135,7 +135,7 @@
     "pick_from_library":            { "text": "Pick from library", "doc": "Library-CTA next to the camera-CTA on the post-form." },
     "scan_qr":                      { "text": "Scan QR", "doc": "Primary CTA on the welcome / onboard screen — opens the camera to a barcode scanner." },
     "scan_recognised_invite":       { "text": "Invite link recognised.", "doc": "Inline status when an invite QR is decoded." },
-    "scan_recognised_contact":      { "text": "Contact link recognised.", "doc": "Inline status when a stoop-contact:// QR is decoded." },
+    "scan_recognised_contact":      { "text": "Contact link recognised.", "doc": "Inline status when a onderling-contact:// QR is decoded." },
     "scan_recognised_recovery":     { "text": "Recovery phrase recognised.", "doc": "Inline status when a 12/24-word recovery phrase QR is decoded." },
     "scan_unrecognised":            { "text": "Unknown QR code.", "doc": "Inline status when a scanned QR doesn't match any known Stoop payload." }
   },
@@ -302,7 +302,7 @@
   "contact": {
     "unknown":              { "text": "Contact not found.", "doc": "Empty state on ContactScreen when the route was opened without a resolved contact." },
     "open_chat":            { "text": "Open chat", "doc": "Primary CTA on ContactScreen — navigates to a 1:1 thread." },
-    "show_qr":              { "text": "Show my QR", "doc": "CTA — reveals the user's stoop-contact:// share QR." },
+    "show_qr":              { "text": "Show my QR", "doc": "CTA — reveals the user's onderling-contact:// share QR." },
     "hide_qr":              { "text": "Hide QR", "doc": "Hide the user's share QR (toggle)." },
     "qr_caption":           { "text": "Show this to your contact so you can mark each other as known.", "doc": "Caption under the share QR." },
     "mute":                 { "text": "Mute", "doc": "Mute action on ContactScreen — silences notifications." },
@@ -536,9 +536,9 @@
 
     "add_heading":             { "text": "Add a new contact", "doc": "H2 above the add-contact section." },
     "qr_heading":              { "text": "Via QR / link", "doc": "H3 for the QR / paste-link sub-flow." },
-    "qr_intro_html":           { "text": "Show someone your QR (they scan it in their Stoop), or paste their <code>stoop-contact://</code> link here.", "doc": "Hint under the QR heading. Contains <code>." },
+    "qr_intro_html":           { "text": "Show someone your QR (they scan it in their Stoop), or paste their <code>onderling-contact://</code> link here.", "doc": "Hint under the QR heading. Contains <code>." },
     "show_my_qr":              { "text": "Show my QR", "doc": "Button that calls getContactShareQr." },
-    "qr_paste_label_html":     { "text": "Paste <code>stoop-contact://</code> link", "doc": "Label of the paste-link input. Contains <code>." },
+    "qr_paste_label_html":     { "text": "Paste <code>onderling-contact://</code> link", "doc": "Label of the paste-link input. Contains <code>." },
     "add_button":              { "text": "Add", "doc": "Submit button — reused on multiple add-contact forms." },
     "added":                   { "text": "Added.", "doc": "Inline confirmation after a successful add." },
     "added_named":             { "text": "Added: {name}.", "doc": "Inline confirmation after a successful QR-add." },

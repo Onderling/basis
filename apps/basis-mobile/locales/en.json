@@ -135,7 +135,7 @@
       "doc": "QrScannerModal title"
     },
     "scan_subheading": {
-      "text": "Point the camera at a stoop-contact:// or stoop-invite:// QR. You can also paste it.",
+      "text": "Point the camera at a onderling-contact:// or onderling-invite:// QR. You can also paste it.",
       "doc": "QrScannerModal under-camera hint"
     },
     "scan_perm_rationale": {
@@ -151,7 +151,7 @@
       "doc": "Toggle for paste fallback on QR scanner"
     },
     "scan_paste_placeholder": {
-      "text": "Paste a stoop-contact:// or stoop-invite:// URL",
+      "text": "Paste a onderling-contact:// or onderling-invite:// URL",
       "doc": "Placeholder in paste input"
     },
     "scan_paste_submit": {
@@ -159,12 +159,12 @@
       "doc": "Submit button on paste input"
     },
     "scan_unknown": {
-      "text": "Unrecognised QR. Expected stoop-contact:// or stoop-invite://.",
+      "text": "Unrecognised QR. Expected onderling-contact:// or onderling-invite://.",
       "doc": "Hint when classifier returns kind:unknown"
     },
     "scan_contact_added": {
       "text": "✓ Contact added.",
-      "doc": "Bot bubble after stoop-contact:// scan + addContactFromQr succeeds"
+      "doc": "Bot bubble after onderling-contact:// scan + addContactFromQr succeeds"
     },
     "scan_invite_open": {
       "text": "Opening join-buurt wizard with scanned invite…",

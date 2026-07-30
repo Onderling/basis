@@ -26,11 +26,11 @@ describe('routeForKind', () => {
 
   it('contact → Shell/Contacts with pendingContact', () => {
     const nav = makeNav();
-    const r = routeForKind(nav, { kind: 'contact', payload: 'stoop-contact://x' });
+    const r = routeForKind(nav, { kind: 'contact', payload: 'onderling-contact://x' });
     expect(r).toBe(ROUTES.Shell);
     expect(nav.navigate).toHaveBeenCalledWith(ROUTES.Shell, expect.objectContaining({
       screen: ROUTES.Contacts,
-      params: expect.objectContaining({ pendingContact: 'stoop-contact://x' }),
+      params: expect.objectContaining({ pendingContact: 'onderling-contact://x' }),
     }));
   });
 

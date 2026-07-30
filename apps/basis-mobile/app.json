@@ -7,8 +7,8 @@
     "userInterfaceStyle": "automatic",
     "scheme": [
       "basis",
-      "stoop-invite",
-      "stoop-contact",
+      "onderling-invite",
+      "onderling-contact",
       "onderling-pair"
     ],
     "android": {

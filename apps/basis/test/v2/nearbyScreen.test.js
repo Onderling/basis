@@ -626,7 +626,7 @@ describe('cards and room chat (step G)', () => {
 
 describe('broadcast circle invites (step H)', () => {
   const T0 = 1_700_000_000_000;
-  const URI = 'stoop-invite://abc';
+  const URI = 'onderling-invite://abc';
 
   function withInvites({ invitePublish } = {}) {
     let pushInvite = null;

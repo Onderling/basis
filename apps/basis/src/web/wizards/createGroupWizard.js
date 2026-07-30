@@ -419,7 +419,7 @@ function renderReviewStep(container, doc, state, onBack, onCancel, rerender, onS
 function renderSuccessStep(container, doc, state, onClose) {
   const wrap = makeBody(doc, '✓ Buurt created', `${state.successResult.groupId} is live.`);
 
-  // Encode {kind, groupId, code, expiresAt, adminPeerAddr?} as a stoop-invite://
+  // Encode {kind, groupId, code, expiresAt, adminPeerAddr?} as a onderling-invite://
   // URL so the invitee can paste a single string into /join-group.  The
   // wizard's decoder reads `kind` to pick the right substrate path; if
   // `adminPeerAddr` is set, the joiner falls back to a peer-redeem when its
@@ -547,10 +547,10 @@ function encodeMembershipCodeUrl(result) {
     ...(result.rules ? { rules: result.rules } : {}),
   };
   const json = JSON.stringify(payload);
-  if (typeof globalThis.btoa !== 'function') return `stoop-invite://${json}`;
+  if (typeof globalThis.btoa !== 'function') return `onderling-invite://${json}`;
   const b64 = globalThis.btoa(json)
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  return `stoop-invite://${b64}`;
+  return `onderling-invite://${b64}`;
 }
 
 /* ─── helpers ──────────────────────────────────────────────── */

@@ -64,7 +64,7 @@
                     placeholder='{"groupId":"oss-tools","token":"…","role":"member","expiresAt":1740000000000}'
                     style="font-family: ui-monospace, Menlo, monospace; font-size: 0.92rem;"></textarea>
           <small class="hint" data-i18n="onboard.invite_hint">
-            Paste either the raw JSON or a stoop-invite:// link — both are accepted.
+            Paste either the raw JSON or a onderling-invite:// link — both are accepted.
           </small>
         </label>
 
@@ -134,9 +134,9 @@
     function parseInvitePayload(raw) {
       const text = raw.trim();
       if (text.length === 0) return null;
-      // Tolerate stoop-invite:// / tasks-invite:// URL-encoded payloads:
+      // Tolerate onderling-invite:// / tasks-invite:// URL-encoded payloads:
       // strip a scheme prefix + URI-decode the remainder.
-      const stripped = text.startsWith('stoop-invite://') || text.startsWith('tasks-invite://')
+      const stripped = text.startsWith('onderling-invite://') || text.startsWith('tasks-invite://')
         ? text.replace(/^[a-z-]+:\/\//, '')
         : text;
       const decoded = (() => {

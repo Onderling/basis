@@ -12,7 +12,7 @@
 import { classifyQrPayload as _classifyQrPayload } from '@onderling/react-native/qr';
 
 const STOOP_INVITE_PATH    = 'onboard.html';
-const STOOP_CONTACT_SCHEME = 'stoop-contact://';
+const STOOP_CONTACT_SCHEME = 'onderling-contact://';
 const BIP39_WORD_COUNTS    = new Set([12, 15, 18, 21, 24]);
 
 const STOOP_CLASSIFIERS = [

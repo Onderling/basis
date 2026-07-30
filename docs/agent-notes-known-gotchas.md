@@ -331,7 +331,7 @@ whole test suite because `src/screens/**` has no JSX loader.
 
 Real incident (2026-07-28): `buildCircleInviteUri` put `podBacked`/`podUrl` on the invite object, but
 `encodeMembershipCodeUrl` (createGroupState.js) builds the wire payload from an explicit field WHITELIST —
-so the fields never rode a real `stoop-invite://` URI. Tests that pass the invite as an OBJECT bypass the
+so the fields never rode a real `onderling-invite://` URI. Tests that pass the invite as an OBJECT bypass the
 encoder (decodeInvite has an object fast-path) and stay green while the real QR/paste flow drops the field.
 When adding an invite field: add it to BOTH, and pin it with a round-trip test through the ENCODED URI.
 

@@ -52,7 +52,7 @@ export function mayPublish(allows, circleId) {
  * came from.
  *
  * @param {object} a
- * @param {string} a.uri            the `stoop-invite://…` URI from `buildCircleInviteUri`
+ * @param {string} a.uri            the `onderling-invite://…` URI from `buildCircleInviteUri`
  * @param {string} a.circleId
  * @param {string} [a.circleName]   what to call it in the room
  * @param {number} [a.expiresAt]    the invite's own expiry, if it has one

@@ -161,7 +161,7 @@ describe('Stoop V2 Phase 24 — QR contact-share', () => {
 
     await callSkill(srcBundle.agent, 'setMyHandle', { handle: 'oosterpoort-bird-23' });
     const r = await callSkill(srcBundle.agent, 'getContactShareQr', { trustOffer: 'vertrouwd' });
-    expect(r.payload).toMatch(/^stoop-contact:\/\//);
+    expect(r.payload).toMatch(/^onderling-contact:\/\//);
 
     const add = await callSkill(dst.bundle.agent, 'addContactFromQr', { payload: r.payload }, 'https://id.example/dst');
     expect(add.contact.webid).toBe(ANNE);

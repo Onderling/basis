@@ -2,8 +2,8 @@
  * addBotToGraph — the ONE input decoder behind both shells' contact-add box (C13: one handshake,
  * two rungs, and the URI names the rung).
  *
- * The load-bearing pair: a `stoop-contact://` card takes the FAST rung (asymmetric add via stoop's
- * `addContactFromQr` — the card's decoding stays there, the one decoder), while a `stoop-invite://`
+ * The load-bearing pair: a `onderling-contact://` card takes the FAST rung (asymmetric add via stoop's
+ * `addContactFromQr` — the card's decoding stays there, the one decoder), while a `onderling-invite://`
  * pasted in the same box is REFUSED with a typed error — silently upserting a "contact" out of a
  * circle invite would skip the verified rung's consent gate.
  */
@@ -13,7 +13,7 @@ import { addBotToGraph, CONTACT_CARD_PREFIX, CIRCLE_INVITE_PREFIX } from '../../
 const graph = () => ({ upsert: vi.fn(async (rec) => rec) });
 
 describe('addBotToGraph — the C13 fast rung', () => {
-  it('routes a stoop-contact:// card to the injected addContact and returns the contact', async () => {
+  it('routes a onderling-contact:// card to the injected addContact and returns the contact', async () => {
     const addContact = vi.fn(async () => ({ contact: { webid: 'did:bram', displayName: 'Bram', peerAddr: 'addr:bram' } }));
     const payload = `${CONTACT_CARD_PREFIX}abc123`;
     const rec = await addBotToGraph({ input: payload, peerGraph: graph(), addContact });
@@ -35,7 +35,7 @@ describe('addBotToGraph — the C13 fast rung', () => {
       .rejects.toMatchObject({ code: 'malformed-card' });
   });
 
-  it('a stoop-invite:// is the VERIFIED rung — refused with code circle-invite, nothing added', async () => {
+  it('a onderling-invite:// is the VERIFIED rung — refused with code circle-invite, nothing added', async () => {
     const g = graph();
     const addContact = vi.fn();
     await expect(addBotToGraph({ input: `${CIRCLE_INVITE_PREFIX}xyz`, peerGraph: g, addContact }))

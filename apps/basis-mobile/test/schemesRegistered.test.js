@@ -7,7 +7,7 @@
  * tapping it does nothing at all.
  *
  * The two drifted, and the drift was invisible for exactly that reason (found walking S4, 2026-07-30):
- * `basis://` was registered, `stoop-invite://` — the scheme every circle invite actually uses — was not.
+ * `basis://` was registered, `onderling-invite://` — the scheme every circle invite actually uses — was not.
  * Sharing an invite the most natural way, by sending someone the link, produced a dead string, while
  * scanning and pasting both worked fine.
  *
@@ -40,8 +40,8 @@ describe('FITNESS: the app claims every scheme it hands out', () => {
     for (const s of OS_REGISTERED_SCHEMES) expect(s).not.toContain(':');
   });
 
-  it('`stoop-invite` in particular — the one that was missing', () => {
+  it('`onderling-invite` in particular — the one that was missing', () => {
     // Named explicitly because it is the scheme of the first thing a new person ever receives.
-    expect(declared).toContain('stoop-invite');
+    expect(declared).toContain('onderling-invite');
   });
 });

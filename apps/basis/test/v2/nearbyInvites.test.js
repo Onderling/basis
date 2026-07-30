@@ -17,7 +17,7 @@ import {
 
 const T0 = 1_700_000_000_000;
 const at = (ms) => () => T0 + ms;
-const URI = 'stoop-invite://abc123';
+const URI = 'onderling-invite://abc123';
 
 describe('per-circle, admin-only, off by default', () => {
   it('nothing is publishable until a specific circle is listed', () => {

@@ -66,7 +66,7 @@ node bin/stoop-ui.js \
 
 1. Admin generates an invite URL via `/onboard.html` (issue mode)
    or via the QR helper (`getInviteQrPayload` →
-   `stoop-invite://...`).
+   `onderling-invite://...`).
 2. New member opens the URL on their device.  The page asks them
    to:
    - Pick a per-group **handle** (`@oosterpoort-bird-23`).

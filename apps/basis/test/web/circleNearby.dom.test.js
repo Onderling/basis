@@ -382,7 +382,7 @@ describe('cards and chat, each behind its allow (step G)', () => {
 
 describe('circles advertised in the room (step H)', () => {
   const entry = (over = {}) => ({
-    invite: { uri: 'stoop-invite://abc', circleId: 'c1', circleName: 'Buurt' },
+    invite: { uri: 'onderling-invite://abc', circleId: 'c1', circleName: 'Buurt' },
     actions: ['join-published-circle'], note: 'join-is-a-join', ...over,
   });
 
@@ -410,7 +410,7 @@ describe('circles advertised in the room (step H)', () => {
     const el = render(model({ invites: [entry()] }), { onInviteAction });
     el.querySelector('.circle-nearby__invite-action').click();
     expect(onInviteAction).toHaveBeenCalledWith(
-      'join-published-circle', expect.objectContaining({ uri: 'stoop-invite://abc' }),
+      'join-published-circle', expect.objectContaining({ uri: 'onderling-invite://abc' }),
     );
   });
 

@@ -293,7 +293,7 @@ export async function readRoster(page) {
 // ── pairing (invite → wizard join) ─────────────────────────────────────────────
 
 /**
- * On the circle creator: open ⋯ → invite and read the `stoop-invite://` URI. Returns
+ * On the circle creator: open ⋯ → invite and read the `onderling-invite://` URI. Returns
  * the URI string (or null if the invite surface / code is missing). Dismisses the modal.
  */
 export async function getInvite(page, tag = 'invite') {

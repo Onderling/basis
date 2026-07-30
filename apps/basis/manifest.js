@@ -258,8 +258,8 @@ export const basisManifest = {
      * `/scan-qr` — open the camera + scan a QR code (2026-05-27).
      * Pure UI host-op: the chat-shell catches this in localBuiltins,
      * triggers `openQrScanner()`, and the scanner modal classifies the
-     * scanned text against the registered URI schemes (stoop-contact://,
-     * stoop-invite://, …).  Web shell renders nothing today — the
+     * scanned text against the registered URI schemes (onderling-contact://,
+     * onderling-invite://, …).  Web shell renders nothing today — the
      * platform-specific implementation lives in
      * apps/basis-mobile (and a future browser implementation
      * via getUserMedia + jsQR if desired).

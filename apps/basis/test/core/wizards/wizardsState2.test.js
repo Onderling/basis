@@ -220,7 +220,7 @@ describe('joinGroupState', () => {
 
   it('decodeInvite: JSON-literal URL parses', () => {
     const state = JG.initialState();
-    JG.decodeInvite('stoop-invite://{"groupId":"b2","code":"c"}', state);
+    JG.decodeInvite('onderling-invite://{"groupId":"b2","code":"c"}', state);
     expect(state.invite).toEqual({ groupId: 'b2', code: 'c' });
   });
 
@@ -228,7 +228,7 @@ describe('joinGroupState', () => {
     const state = JG.initialState();
     const json = JSON.stringify({ groupId: 'b3', code: 'x' });
     const b64 = Buffer.from(json).toString('base64').replace(/=/g, '');
-    JG.decodeInvite(`stoop-invite://${b64}`, state);
+    JG.decodeInvite(`onderling-invite://${b64}`, state);
     expect(state.invite.groupId).toBe('b3');
   });
 

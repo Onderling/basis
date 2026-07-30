@@ -4,10 +4,10 @@
  * The Contacten roster reads the app-owned PeerGraph; this is how a bot GETS
  * there. Three inputs, each landing a record the unified roster picks up:
  *
- *   - a **`stoop-contact://` contact card** → the C13 FAST rung: routed to stoop's
+ *   - a **`onderling-contact://` contact card** → the C13 FAST rung: routed to stoop's
  *     `addContactFromQr` (asymmetric add, no consent gate — the card's decoding stays in stoop, the
  *     ONE decoder). The card carries the person's `peerAddr`, so their DM thread is deliver-ready
- *     immediately; a `stoop-invite://` in the same box is refused with `code:'circle-invite'` (that is
+ *     immediately; a `onderling-invite://` in the same box is refused with `code:'circle-invite'` (that is
  *     the VERIFIED rung — the circle-join flow with its consent gate);
  *   - an **https URL** → REUSES core `discoverA2A(coreAgent, url, {peerGraph})`,
  *     which fetches the bot's `/.well-known/agent.json` agent card, upserts an
@@ -23,23 +23,23 @@
  */
 
 /** The two stoop URI schemes this decoder tells apart — the URI names the rung (C13). */
-export const CONTACT_CARD_PREFIX  = 'stoop-contact://';
-export const CIRCLE_INVITE_PREFIX = 'stoop-invite://';
+export const CONTACT_CARD_PREFIX  = 'onderling-contact://';
+export const CIRCLE_INVITE_PREFIX = 'onderling-invite://';
 
 /**
  * @param {object} deps
  * @param {string}  deps.input       an https URL, a peer address (`addr` | `addr|Name`), or a
- *   `stoop-contact://` contact card (the C13 FAST rung — asymmetric add, DM-ready immediately).
+ *   `onderling-contact://` contact card (the C13 FAST rung — asymmetric add, DM-ready immediately).
  * @param {{ upsert: (rec: object) => Promise<object> }} deps.peerGraph  the app PeerGraph.
  * @param {object}  [deps.coreAgent] the core chat agent (for `discover`); required for URL input.
  * @param {(agent: object, url: string, opts: object) => Promise<object>} [deps.discover]
  *   core `discoverA2A`; required for URL input.
  * @param {(payload: string) => Promise<object>} [deps.addContact]
  *   the shell's stoop dispatch for a contact card — `(payload) => callSkill('stoop',
- *   'addContactFromQr', { payload })`. Required for `stoop-contact://` input. The card's decoding and
+ *   'addContactFromQr', { payload })`. Required for `onderling-contact://` input. The card's decoding and
  *   the ContactBook write stay in stoop (the ONE decoder); this routes by prefix only.
  * @returns {Promise<object>} the upserted peer record, or the added contact row for a contact card.
- * @throws an Error with `code: 'circle-invite'` when the input is a `stoop-invite://` — that is the
+ * @throws an Error with `code: 'circle-invite'` when the input is a `onderling-invite://` — that is the
  *   VERIFIED rung (circle-join with its consent gate); the caller sends the user to the join flow
  *   rather than silently adding a "contact" out of a circle invite.
  */

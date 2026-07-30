@@ -136,8 +136,8 @@ import ThreadDrawer        from '../rn/ThreadDrawer.js';
 import MultiFieldFormBubble from '../rn/MultiFieldFormBubble.js';
 
 // Phase 1 QR (2026-05-27) — render real QR images for record-field
-// values matching one of the registered URI schemes (stoop-contact://,
-// stoop-invite://, basis://).  Substrate at
+// values matching one of the registered URI schemes (onderling-contact://,
+// onderling-invite://, basis://).  Substrate at
 // @onderling/react-native/qr/view wraps react-native-qrcode-svg.
 import { QrCodeView }     from '@onderling/react-native/qr/view';
 import QrScannerModal     from '../rn/QrScannerModal.js';
@@ -1991,7 +1991,7 @@ export default function ChatScreen({
       // opId MUST match the WIZARD_REGISTRY key ('joinGroupWizard',
       // not 'joinGroup') — wizardModalFor() looks it up by exact key,
       // and a mismatch silently renders nothing (the bug: /scan-qr of
-      // a stoop-invite:// did nothing because 'joinGroup' wasn't a
+      // a onderling-invite:// did nothing because 'joinGroup' wasn't a
       // registered wizard).
       setPendingWizard({ opId: 'joinGroupWizard', args: { invite: payload } });
       return;
@@ -2127,7 +2127,7 @@ function MessageBubble({ msg, onButtonTap, onFollowUpTap, onQuickReplyTap, onFor
   // through to empty text bubble for skills returning `reply:'record'`
   // (e.g. /share-my-contact, /pod-status, /folio-status).  Renders
   // title + each `{name, value}` field.  For QR-payload values
-  // (stoop-contact://, stoop-invite://) the value is rendered as a
+  // (onderling-contact://, onderling-invite://) the value is rendered as a
   // real scannable QR via @onderling/react-native/qr/view + the raw URL
   // as selectable text underneath (Phase 1 of mobile QR slice).
   if (r.kind === 'record') {

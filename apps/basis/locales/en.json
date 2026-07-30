@@ -222,18 +222,18 @@
     },
     "scanned_contact": {
       "text": "✓ Added contact: {{name}}",
-      "doc": "Bot bubble after scanning a stoop-contact:// QR and addContactFromQr succeeds."
+      "doc": "Bot bubble after scanning a onderling-contact:// QR and addContactFromQr succeeds."
     },
     "scanned_invite": {
       "text": "Opening join-buurt wizard with scanned invite…",
-      "doc": "Bot bubble after scanning a stoop-invite://; the wizard takes over."
+      "doc": "Bot bubble after scanning a onderling-invite://; the wizard takes over."
     },
     "scan_failed": {
       "text": "Scan failed: {{error}}",
       "doc": "Substrate returned error or classifier saw an unknown payload."
     },
     "scan_unknown": {
-      "text": "Unrecognised QR code. Expected a stoop-contact:// or stoop-invite:// URL.",
+      "text": "Unrecognised QR code. Expected a onderling-contact:// or onderling-invite:// URL.",
       "doc": "classifyQrPayload returned kind:'unknown'."
     }
   },

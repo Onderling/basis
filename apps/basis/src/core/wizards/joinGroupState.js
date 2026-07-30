@@ -122,9 +122,9 @@ export function isValidHandle(handle) {
  * the result into `state.invite` / `state.inviteParseError`.
  *
  * Supports three URL forms (slash-arg parsers sometimes mangle "://"):
- *   - `stoop-invite://<base64url>`  (canonical)
- *   - `stoop-invite:<base64url>`
- *   - `stoop-invite/<base64url>`
+ *   - `onderling-invite://<base64url>`  (canonical)
+ *   - `onderling-invite:<base64url>`
+ *   - `onderling-invite/<base64url>`
  *
  * And accepts a JSON-encoded invite directly (starts with `{`).
  *
@@ -139,14 +139,14 @@ export function decodeInvite(invite, state) {
     state.invite = invite;
     return;
   }
-  const PREFIX = 'stoop-invite://';
+  const PREFIX = 'onderling-invite://';
   let str = String(invite).trim();
   if (str.startsWith(PREFIX)) {
     str = str.slice(PREFIX.length);
-  } else if (str.startsWith('stoop-invite:')) {
-    str = str.replace(/^stoop-invite:[/]*/i, '');
-  } else if (str.startsWith('stoop-invite/')) {
-    str = str.replace(/^stoop-invite[/]+/i, '');
+  } else if (str.startsWith('onderling-invite:')) {
+    str = str.replace(/^onderling-invite:[/]*/i, '');
+  } else if (str.startsWith('onderling-invite/')) {
+    str = str.replace(/^onderling-invite[/]+/i, '');
   }
   try {
     if (str.startsWith('{')) {

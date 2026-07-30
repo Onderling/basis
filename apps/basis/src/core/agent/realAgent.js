@@ -1577,11 +1577,11 @@ export async function createRealHouseholdAgent(opts = {}) {
         };
       }
       if (realOpId === 'redeemInvite' && typeof realArgs.invite === 'string') {
-        // User pastes either a QR URL (`stoop-invite://<base64url>`) or
+        // User pastes either a QR URL (`onderling-invite://<base64url>`) or
         // raw JSON.  Decode the URL form back to the invite object that
         // the real skill expects.  Pass JSON through unchanged.
         let inv = realArgs.invite.trim();
-        const PREFIX = 'stoop-invite://';
+        const PREFIX = 'onderling-invite://';
         if (inv.startsWith(PREFIX)) {
           try {
             const b64 = inv.slice(PREFIX.length);
@@ -2183,7 +2183,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         ? globalThis.btoa(json)
             .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
         : json;
-      const qrUri = `stoop-invite://${b64url}`;
+      const qrUri = `onderling-invite://${b64url}`;
       const expires = inv?.expiresAt
         ? new Date(inv.expiresAt).toISOString()
         : '(no expiry)';
@@ -2651,7 +2651,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         _sync: simulateSync(),
       };
     }
-    // getContactShareQr: real returns {payload: 'stoop-contact://...'}
+    // getContactShareQr: real returns {payload: 'onderling-contact://...'}
     // → record reply with the URL spelt out (user can paste into any
     // QR generator).  Canvas-rendered QR image is a follow-up.
     if (opId === 'getContactShareQr' && data.payload) {

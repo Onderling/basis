@@ -54,16 +54,16 @@ describe('classifyQrPayload — invite', () => {
 });
 
 describe('classifyQrPayload — contact', () => {
-  it('recognises stoop-contact:// URIs', () => {
-    const r = classifyQrPayload('stoop-contact://anne?webid=https%3A%2F%2Fid.example%2Fanne');
+  it('recognises onderling-contact:// URIs', () => {
+    const r = classifyQrPayload('onderling-contact://anne?webid=https%3A%2F%2Fid.example%2Fanne');
     expect(r.kind).toBe('contact');
-    expect(r.payload).toBe('stoop-contact://anne?webid=https%3A%2F%2Fid.example%2Fanne');
+    expect(r.payload).toBe('onderling-contact://anne?webid=https%3A%2F%2Fid.example%2Fanne');
   });
 
   it('handles surrounding whitespace', () => {
-    const r = classifyQrPayload('   stoop-contact://x   ');
+    const r = classifyQrPayload('   onderling-contact://x   ');
     expect(r.kind).toBe('contact');
-    expect(r.payload).toBe('stoop-contact://x');
+    expect(r.payload).toBe('onderling-contact://x');
   });
 
   it('rejects other custom schemes', () => {
@@ -125,7 +125,7 @@ describe('classifyQrPayload — fallthrough', () => {
 
 describe('_internal — exports for test introspection', () => {
   it('exposes the constants', () => {
-    expect(_internal.STOOP_CONTACT_SCHEME).toBe('stoop-contact://');
+    expect(_internal.STOOP_CONTACT_SCHEME).toBe('onderling-contact://');
     expect(_internal.BIP39_WORD_COUNTS.has(12)).toBe(true);
     expect(_internal.BIP39_WORD_COUNTS.has(24)).toBe(true);
     expect(_internal.BIP39_WORD_COUNTS.has(13)).toBe(false);

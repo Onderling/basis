@@ -222,18 +222,18 @@
     },
     "scanned_contact": {
       "text": "✓ Contact toegevoegd: {{name}}",
-      "doc": "After scanning a stoop-contact://."
+      "doc": "After scanning a onderling-contact://."
     },
     "scanned_invite": {
       "text": "Bezig met openen van de join-buurt-wizard…",
-      "doc": "After scanning a stoop-invite://; wizard opens."
+      "doc": "After scanning a onderling-invite://; wizard opens."
     },
     "scan_failed": {
       "text": "Scan mislukt: {{error}}",
       "doc": "Substrate error or unknown payload."
     },
     "scan_unknown": {
-      "text": "QR-code niet herkend. Verwacht: stoop-contact:// of stoop-invite:// URL.",
+      "text": "QR-code niet herkend. Verwacht: onderling-contact:// of onderling-invite:// URL.",
       "doc": "classifyQrPayload returned kind:'unknown'."
     }
   },

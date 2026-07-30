@@ -44,7 +44,7 @@ describe('app-level circle join between two real agents over a shared InternalBu
     // The circle + invite were produced.
     expect(created.groupId).toBe(groupId);
     expect(created.code, 'createGroupV2 minted a membership code').toBeTruthy();
-    expect(invite.uri, 'admin produced a stoop-invite URI').toMatch(/^stoop-invite:\/\//);
+    expect(invite.uri, 'admin produced a onderling-invite URI').toMatch(/^onderling-invite:\/\//);
 
     // THE THING THE BROWSER COULD NOT CONFIRM: the full app join completed.
     expect(joined.error, `join must not error — got: ${JSON.stringify(joined.error)}`).toBeUndefined();

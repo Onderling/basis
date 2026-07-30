@@ -50,12 +50,12 @@ describe('Bundle F P2 — createGroup state machine', () => {
 });
 
 describe('Bundle F P2 — joinGroup state machine', () => {
-  it('decodeInvite handles base64url stoop-invite URLs', () => {
+  it('decodeInvite handles base64url onderling-invite URLs', () => {
     const s = joinGroupState.initialState();
     const payload = { kind: 'membershipCode', code: 'C42', groupId: 'g1' };
     const b64 = Buffer.from(JSON.stringify(payload)).toString('base64')
       .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-    joinGroupState.decodeInvite(`stoop-invite://${b64}`, s);
+    joinGroupState.decodeInvite(`onderling-invite://${b64}`, s);
     expect(s.inviteParseError).toBeFalsy();
     expect(s.invite).toEqual(payload);
   });

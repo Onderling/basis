@@ -27,7 +27,7 @@ describe('pairing QR payload', () => {
   });
 
   it('rejects another QR scheme and empties', () => {
-    expect(parsePairUri('stoop-contact://xyz')).toBeNull();
+    expect(parsePairUri('onderling-contact://xyz')).toBeNull();
     expect(parsePairUri('')).toBeNull();
     expect(makePairUri('')).toBe('');
   });

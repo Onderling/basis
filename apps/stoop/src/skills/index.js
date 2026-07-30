@@ -185,7 +185,7 @@ function dataArgs(parts) {
 
 /**
  * Encode an object as a base64url-encoded compact JSON string —
- * the canonical body of `stoop-invite://` and `stoop-contact://`
+ * the canonical body of `onderling-invite://` and `onderling-contact://`
  * QR/URL payloads.
  */
 function _encodeQrPayload(obj) {
@@ -4414,13 +4414,13 @@ export function buildSkills({
      * getInviteQrPayload({invite})
      *   — produce the canonical string an invite QR encodes.  Apps
      *   pass this to any QR-rendering library; Stoop ships no
-     *   renderer.  Wire shape: a `stoop-invite://` URL whose path
+     *   renderer.  Wire shape: a `onderling-invite://` URL whose path
      *   is a compact-JSON base64url-encoded invite token.
      */
     defineSkill('getInviteQrPayload', async ({ parts }) => {
       const a = dataArgs(parts);
       if (!a.invite || typeof a.invite !== 'object') return { error: 'invite required' };
-      return { payload: `stoop-invite://${_encodeQrPayload(a.invite)}` };
+      return { payload: `onderling-invite://${_encodeQrPayload(a.invite)}` };
     }, {
       description: 'Canonical encoding of an invite for QR/URL display.',
       visibility:  'authenticated',
@@ -4428,7 +4428,7 @@ export function buildSkills({
 
     /**
      * getContactShareQr({trustOffer? = 'bekend'})  — Phase 24.5.
-     *   Produce a `stoop-contact://` payload containing the calling
+     *   Produce a `onderling-contact://` payload containing the calling
      *   actor's webid + pubKey + handle + optional avatar/displayName
      *   + the offered trust level.  Recipient scans and decides
      *   themselves whether to accept; trustOffer is a *suggestion*,
@@ -4457,7 +4457,7 @@ export function buildSkills({
         // substrate doesn't have its own NKN identity.
         ...(typeof a.peerAddr === 'string' && a.peerAddr ? { peerAddr: a.peerAddr } : {}),
       };
-      return { payload: `stoop-contact://${_encodeQrPayload(card)}` };
+      return { payload: `onderling-contact://${_encodeQrPayload(card)}` };
     }, {
       description: 'Canonical QR/URL payload for sharing this actor as a contact.',
       visibility:  'authenticated',
@@ -4465,7 +4465,7 @@ export function buildSkills({
 
     /**
      * addContactFromQr({payload})  — Phase 24.5.
-     *   Parse a `stoop-contact://` payload and add the contact
+     *   Parse a `onderling-contact://` payload and add the contact
      *   to the local ContactBook.  Honours the `trustOffer` from
      *   the QR (defaults to 'bekend' if missing).  Asymmetric —
      *   adding a contact here does *not* notify them; that's
@@ -4473,11 +4473,11 @@ export function buildSkills({
      */
     defineSkill('addContactFromQr', async ({ parts }) => {
       const a = dataArgs(parts);
-      if (typeof a.payload !== 'string' || !a.payload.startsWith('stoop-contact://')) {
+      if (typeof a.payload !== 'string' || !a.payload.startsWith('onderling-contact://')) {
         return { error: 'invalid-payload' };
       }
       if (!bundle?.contacts) return { error: 'no-contacts' };
-      const card = _decodeQrPayload(a.payload.slice('stoop-contact://'.length));
+      const card = _decodeQrPayload(a.payload.slice('onderling-contact://'.length));
       if (!card?.webid) return { error: 'malformed-card' };
       if (typeof console !== 'undefined') {
         console.log('[stoop/addContactFromQr] card.peerAddr=' + (card.peerAddr ? (card.peerAddr.slice(0,16)+'…') : 'NONE') + ' for webid=' + String(card.webid).slice(0, 32));
@@ -4499,7 +4499,7 @@ export function buildSkills({
       metrics?.record?.('contact-added-from-qr');
       return { contact: m };
     }, {
-      description: 'Add a contact from a stoop-contact:// QR/URL payload.',
+      description: 'Add a contact from a onderling-contact:// QR/URL payload.',
       visibility:  'authenticated',
     }),
 

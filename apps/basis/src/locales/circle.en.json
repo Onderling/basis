@@ -106,7 +106,7 @@
     },
     "paste": {
       "text": "Paste the invite link from the other device:",
-      "doc": "OBJ-2 — prompt for the stoop-invite:// URL when joining on web (no camera)."
+      "doc": "OBJ-2 — prompt for the onderling-invite:// URL when joining on web (no camera)."
     },
     "consent": {
       "title": {
@@ -3525,7 +3525,7 @@
       "doc": "P5 — button on the contacts roster to add a bot by URL/address."
     },
     "add_prompt": {
-      "text": "Bot address — an https URL (agent card), a peer address, or a stoop-contact:// contact card",
+      "text": "Bot address — an https URL (agent card), a peer address, or a onderling-contact:// contact card",
       "doc": "P5 — prompt when adding a bot or a contact card (C13 fast rung)."
     },
     "add_failed": {
@@ -3534,7 +3534,7 @@
     },
     "invite_not_contact": {
       "text": "That is a circle invite, not a contact card — use “Join a circle” for it.",
-      "doc": "C13 — a stoop-invite:// pasted in the contact-add box: the VERIFIED rung belongs to the join flow."
+      "doc": "C13 — a onderling-invite:// pasted in the contact-add box: the VERIFIED rung belongs to the join flow."
     },
     "added": {
       "text": "Added {{name}}.",

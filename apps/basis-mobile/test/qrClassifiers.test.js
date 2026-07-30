@@ -5,16 +5,16 @@ import { getBasisClassifiers } from '../src/core/qrClassifiers.js';
 const CL = getBasisClassifiers();
 
 describe('basis-mobile QR classifiers', () => {
-  it('classifies a stoop-contact:// URL as kind:contact', () => {
-    const r = classifyQrPayload('stoop-contact://eyJ3ZWJpZCI6Imh0dHBzOi8vYS5leGFtcGxlIn0', CL);
+  it('classifies a onderling-contact:// URL as kind:contact', () => {
+    const r = classifyQrPayload('onderling-contact://eyJ3ZWJpZCI6Imh0dHBzOi8vYS5leGFtcGxlIn0', CL);
     expect(r.kind).toBe('contact');
-    expect(r.payload).toMatch(/^stoop-contact:\/\//);
+    expect(r.payload).toMatch(/^onderling-contact:\/\//);
   });
 
-  it('classifies a stoop-invite:// URL as kind:invite', () => {
-    const r = classifyQrPayload('stoop-invite://eyJncm91cElkIjoidGVzdCJ9', CL);
+  it('classifies a onderling-invite:// URL as kind:invite', () => {
+    const r = classifyQrPayload('onderling-invite://eyJncm91cElkIjoidGVzdCJ9', CL);
     expect(r.kind).toBe('invite');
-    expect(r.payload).toMatch(/^stoop-invite:\/\//);
+    expect(r.payload).toMatch(/^onderling-invite:\/\//);
   });
 
   it('classifies a ?invite= query URL as kind:invite', () => {

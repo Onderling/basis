@@ -72,7 +72,7 @@ export default function CreateGroupWizardModal({
       // 2026-05-27 (Bundle I).  Surface the invite URL + a scannable QR
       // so the admin can share the buurt right away — the web wizard's
       // success-screen path, ported to mobile.  Build the same
-      // stoop-invite:// URL the web emits + send it back as a
+      // onderling-invite:// URL the web emits + send it back as a
       // `record`-shape reply; ChatScreen's record-bubble auto-renders
       // a QR for QR-prefixed field values.
       const adminPeerAddr = (typeof getMyPeerAddr === 'function') ? (getMyPeerAddr() ?? null) : null;

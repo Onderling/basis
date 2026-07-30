@@ -7,7 +7,7 @@
  *
  *   - buildCircleInviteUri  — an admin reads the circle's current membership code
  *     (`stoop.getCurrentMembershipCode`), stamps its peer address, and encodes a
- *     `stoop-invite://…` URI (the QR payload) via the classic `encodeMembershipCodeUrl`.
+ *     `onderling-invite://…` URI (the QR payload) via the classic `encodeMembershipCodeUrl`.
  *   - joinCircleFromInvite  — a joiner decodes a scanned/pasted invite and runs the
  *     classic `finalSubmit` chain (local redeem → peer-bridge fallback). No pod.
  *
@@ -21,7 +21,7 @@ import { isPodUrl } from './connectionPoints.js';
 import { initialState, decodeInvite, finalSubmit, existingSelvesFrom, setLinkChoice } from '../core/wizards/joinGroupState.js';
 
 /**
- * Build a `stoop-invite://` URI for an EXISTING circle so the admin can show it as a QR.
+ * Build a `onderling-invite://` URI for an EXISTING circle so the admin can show it as a QR.
  * Admin-gated by the substrate (getCurrentMembershipCode returns {error:'admin-only'} otherwise).
  *
  * the invite optionally EMBEDS the circle's freedom template (`capabilities` +

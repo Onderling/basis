@@ -123,7 +123,7 @@
     "heading":         { "text": "Join a circle via invite", "doc": "H2 on /onboard.html." },
     "intro":           { "text": "Paste the invite payload you got from a circle admin. The invite is a single-use token that proves you were vouched for and carries the role the admin assigned.", "doc": "Lead paragraph on /onboard.html." },
     "invite_label":    { "text": "Invite payload", "doc": "Label of the invite textarea." },
-    "invite_hint":     { "text": "Paste either the raw JSON or a stoop-invite:// link — both are accepted.", "doc": "Hint under the invite textarea." },
+    "invite_hint":     { "text": "Paste either the raw JSON or a onderling-invite:// link — both are accepted.", "doc": "Hint under the invite textarea." },
     "display_label":   { "text": "Your display name (optional)", "doc": "Label of the optional display-name input." },
     "webid_label":     { "text": "Your WebID (optional)", "doc": "Label of the optional WebID input." },
     "webid_hint":      { "text": "Leave blank to derive an opaque pubKey-based identifier.", "doc": "Hint under the WebID input." },

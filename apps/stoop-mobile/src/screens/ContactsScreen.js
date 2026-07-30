@@ -39,7 +39,7 @@ export function ContactsScreen() {
     if (!pendingContact || pendingHandled) return;
     setPendingHandled(true);
     // Skill expects `payload`, not `uri` — it validates
-    // `payload.startsWith('stoop-contact://')` and decodes the rest.
+    // `payload.startsWith('onderling-contact://')` and decodes the rest.
     addFromQr.call({ payload: pendingContact })
       .then((r) => {
         if (r?.error) throw new Error(r.error);

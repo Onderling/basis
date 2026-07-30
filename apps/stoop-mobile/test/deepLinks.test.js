@@ -43,7 +43,7 @@ describe('parseDeepLink', () => {
   });
 
   it('parses stoop://contact?uri=<...>', () => {
-    const uri = 'stoop-contact://bob?webid=https%3A%2F%2Fid.example';
+    const uri = 'onderling-contact://bob?webid=https%3A%2F%2Fid.example';
     const url = `stoop://contact?uri=${encodeURIComponent(uri)}`;
     const r = parseDeepLink(url);
     expect(r.kind).toBe('contact');
@@ -105,10 +105,10 @@ describe('actionToNavigation', () => {
   });
 
   it('maps contact → Shell/Contacts with pendingContact', () => {
-    const t = actionToNavigation({ kind: 'contact', params: { uri: 'stoop-contact://x' } });
+    const t = actionToNavigation({ kind: 'contact', params: { uri: 'onderling-contact://x' } });
     expect(t.name).toBe(ROUTES.Shell);
     expect(t.params.screen).toBe(ROUTES.Contacts);
-    expect(t.params.params.pendingContact).toBe('stoop-contact://x');
+    expect(t.params.params.pendingContact).toBe('onderling-contact://x');
   });
 
   it('maps chat → ChatThread with thread + peer ids', () => {

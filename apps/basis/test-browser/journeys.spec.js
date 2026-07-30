@@ -52,7 +52,7 @@ test('pairing — two peers pair over the app transport into one circle', async 
   try {
     const res = await H.pair(A, B, { name: 'Peer Circle' });
     console.log('pairing:', JSON.stringify(res));
-    expect(res.inviteUri, 'peer A produced a stoop-invite URI').toBeTruthy();
+    expect(res.inviteUri, 'peer A produced a onderling-invite URI').toBeTruthy();
 
     // The redeem handshake completing (wizard closed) is the Phase-0-provable part.
     expect(res.joined || res.joinerHasTile, 'B joined the circle (wizard closed / tile present)').toBeTruthy();

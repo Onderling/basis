@@ -62,12 +62,12 @@ describe('Stoop V1 Phase 17 — getMnemonicOnce', () => {
 // ── getInviteQrPayload ───────────────────────────────────────────────────
 
 describe('Stoop V1 Phase 17 — getInviteQrPayload', () => {
-  it('round-trips an invite as base64url under stoop-invite://', async () => {
+  it('round-trips an invite as base64url under onderling-invite://', async () => {
     const bundle = await buildAgent();
     const invite = { groupId: 'oosterpoort', adminPubKey: 'abc', nonce: 'xyz' };
     const r = await callSkill(bundle.agent, 'getInviteQrPayload', { invite });
-    expect(r.payload).toMatch(/^stoop-invite:\/\//);
-    const b64 = r.payload.replace(/^stoop-invite:\/\//, '');
+    expect(r.payload).toMatch(/^onderling-invite:\/\//);
+    const b64 = r.payload.replace(/^onderling-invite:\/\//, '');
     // Decode + parse → matches the original invite.
     const std = b64.replaceAll('-', '+').replaceAll('_', '/');
     const pad = std + '='.repeat((4 - std.length % 4) % 4);

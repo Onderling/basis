@@ -1870,7 +1870,7 @@ function buildCircleBot(agent) {
       // feedback bot as a member (no Solid login). — trigger on `projectId` alone so a reload (the
       // OIDC handler strips `code`) still re-attaches the feedback circle (code is pulled from localStorage).
       if (params.get('projectId')) openFeedbackInviteFromBoot(_bootSearch);
-      // ?relay=<wss> applies the relay transport; ?join=<stoop-invite:// | full deep-link> auto-runs the
+      // ?relay=<wss> applies the relay transport; ?join=<onderling-invite:// | full deep-link> auto-runs the
       // circle-join flow — one QR scan on a phone configures the relay AND joins. Relay first so the join
       // can reach the admin; wait for the peer agent to come up before sending the redeem.
       const relayParam = params.get('relay');
@@ -1884,7 +1884,7 @@ function buildCircleBot(agent) {
             // being something anyone had to configure.
             //
             // NOTE the honest limit: the endpoint rides the DEEP LINK (`?relay=`), not the invite object
-            // itself, so a bare `stoop-invite://` pasted by hand brings no point. Recorded in
+            // itself, so a bare `onderling-invite://` pasted by hand brings no point. Recorded in
             // plans/PLAN-nearby.md — making the invite carry it is a change to the invite payload.
             try {
               const points = getConnectionPoints();
@@ -2725,7 +2725,7 @@ async function addBotFromInput(input) {
   try {
     const rec = await addBotToGraph({
       input, peerGraph: circlePeerGraph, coreAgent: circleCoreAgent, discover: discoverA2A,
-      // C13 fast rung — a stoop-contact:// card routes to stoop's addContactFromQr (the one decoder);
+      // C13 fast rung — a onderling-contact:// card routes to stoop's addContactFromQr (the one decoder);
       // the unified roster merges the ContactBook, so the person appears DM-ready right away.
       addContact: (payload) => rawCallSkill('stoop', 'addContactFromQr', { payload }),
     });
@@ -3874,7 +3874,7 @@ function mountMyDataWizard(renderWizard, extra = {}) {
   } catch (err) { close(); globalThis.alert?.(err?.message ?? String(err)); }
 }
 
-// OBJ-2 — Join a circle (no pod). Paste an invite (the QR's stoop-invite:// payload) and mount the SHARED
+// OBJ-2 — Join a circle (no pod). Paste an invite (the QR's onderling-invite:// payload) and mount the SHARED
 // join wizard through the same overlay adapter; the joiner-side peer-redeem sender carries the no-pod
 // handshake. On success we feed the new roster (so items sync) and refresh the launcher. Pure reuse.
 async function showJoinCircle(inviteArg) {
@@ -3937,7 +3937,7 @@ async function showJoinCircle(inviteArg) {
 }
 
 // OBJ-2 — Invite to THIS circle: read the current membership code (admin-gated) + encode it as a
-// stoop-invite:// QR for another device to scan/paste. Shown in the same modal overlay.
+// onderling-invite:// QR for another device to scan/paste. Shown in the same modal overlay.
 async function showCircleInvite(circleId) {
   const adminPeerAddr = circleHouseholdAgent?.householdSelfAddr ?? null;
   // B2 — the admin's NKN native address (distinct from the pubKey), so a pure-NKN

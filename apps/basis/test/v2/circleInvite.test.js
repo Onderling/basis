@@ -1,25 +1,25 @@
 /**
  * v2 circle invite/join glue — reuses the classic membership core. Verifies the issue side
- * (build a stoop-invite:// URI from the current code) round-trips into the join side (decode +
+ * (build a onderling-invite:// URI from the current code) round-trips into the join side (decode +
  * run the shared finalSubmit chain), with callSkill mocked at the stoop-skill boundary.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { buildCircleInviteUri, joinCircleFromInvite } from '../../src/v2/circleInvite.js';
 
 describe('buildCircleInviteUri', () => {
-  it('reads the current code and encodes a stoop-invite:// URI with the admin address', async () => {
+  it('reads the current code and encodes a onderling-invite:// URI with the admin address', async () => {
     const callSkill = vi.fn(async (app, op) =>
       (op === 'getCurrentMembershipCode' ? { code: 'OPEN-SESAME', expiresAt: 123 } : {}));
     const r = await buildCircleInviteUri({ callSkill, circleId: 'circle-1', adminPeerAddr: 'addr-admin' });
     expect(callSkill).toHaveBeenCalledWith('stoop', 'getCurrentMembershipCode', { groupId: 'circle-1' });
-    expect(r.uri).toMatch(/^stoop-invite:\/\//);
+    expect(r.uri).toMatch(/^onderling-invite:\/\//);
   });
 
   it('B2 — carries BOTH addresses (pubKey adminPeerAddr + NKN adminNknAddr) when known; omits nkn otherwise', async () => {
     const callSkill = vi.fn(async (app, op) =>
       (op === 'getCurrentMembershipCode' ? { code: 'C', expiresAt: 1 } : {}));
     const decode = (uri) => JSON.parse(Buffer.from(
-      uri.replace(/^stoop-invite:\/\//, '').replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString());
+      uri.replace(/^onderling-invite:\/\//, '').replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString());
     const both = await buildCircleInviteUri({ callSkill, circleId: 'c', adminPeerAddr: 'PUBKEY', adminNknAddr: 'nkn-addr' });
     const d = decode(both.uri);
     expect(d.adminPeerAddr).toBe('PUBKEY');
@@ -41,8 +41,8 @@ describe('buildCircleInviteUri', () => {
       (op === 'getCurrentMembershipCode' ? { code: 'C', expiresAt: 1 } : {}));
     const capabilities = { 'tasks complete task': { freedom: 'optional' } };
     const r = await buildCircleInviteUri({ callSkill, circleId: 'c', capabilities, apps: ['tasks'] });
-    // decode the payload back out of the stoop-invite:// URI
-    const b64 = r.uri.replace(/^stoop-invite:\/\//, '');
+    // decode the payload back out of the onderling-invite:// URI
+    const b64 = r.uri.replace(/^onderling-invite:\/\//, '');
     const decoded = JSON.parse(Buffer.from(b64.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString());
     expect(decoded.capabilities).toEqual(capabilities);
     expect(decoded.apps).toEqual(['tasks']);
@@ -52,7 +52,7 @@ describe('buildCircleInviteUri', () => {
     const callSkill = vi.fn(async (app, op) =>
       (op === 'getCurrentMembershipCode' ? { code: 'C', expiresAt: 1 } : {}));
     const decode = (uri) => JSON.parse(Buffer.from(
-      uri.replace(/^stoop-invite:\/\//, '').replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString());
+      uri.replace(/^onderling-invite:\/\//, '').replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString());
     // encodeMembershipCodeUrl WHITELISTS fields; until 2026-07-28 it dropped podBacked/podUrl, so a
     // real pasted/scanned invite never carried the J-NP3 disclosure the object-path tests proved.
     const r = await buildCircleInviteUri({
@@ -67,7 +67,7 @@ describe('buildCircleInviteUri', () => {
     const callSkill = vi.fn(async (app, op) =>
       (op === 'getCurrentMembershipCode' ? { code: 'C', expiresAt: 1 } : {}));
     const decode = (uri) => JSON.parse(Buffer.from(
-      uri.replace(/^stoop-invite:\/\//, '').replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString());
+      uri.replace(/^onderling-invite:\/\//, '').replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString());
     // a pasted invite has no deep-link context — the relay endpoint must ride the invite itself (rule 1).
     const withRelay = await buildCircleInviteUri({ callSkill, circleId: 'c', relayUrl: ' wss://relay.example ' });
     expect(decode(withRelay.uri).relayUrl).toBe('wss://relay.example');   // trimmed
@@ -81,7 +81,7 @@ describe('buildCircleInviteUri', () => {
     const callSkill = vi.fn(async (app, op) =>
       (op === 'getCurrentMembershipCode' ? { code: 'C', expiresAt: 1 } : {}));
     const r = await buildCircleInviteUri({ callSkill, circleId: 'c', capabilities: {}, apps: [] });
-    const b64 = r.uri.replace(/^stoop-invite:\/\//, '');
+    const b64 = r.uri.replace(/^onderling-invite:\/\//, '');
     const decoded = JSON.parse(Buffer.from(b64.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString());
     expect('capabilities' in decoded).toBe(false);
     expect('apps' in decoded).toBe(false);
@@ -91,7 +91,7 @@ describe('buildCircleInviteUri', () => {
     const callSkill = vi.fn(async (app, op) =>
       (op === 'getCurrentMembershipCode' ? { code: 'C', expiresAt: 1 } : {}));
     const decode = (uri) => JSON.parse(Buffer.from(
-      uri.replace(/^stoop-invite:\/\//, '').replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString());
+      uri.replace(/^onderling-invite:\/\//, '').replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString());
     const on = await buildCircleInviteUri({ callSkill, circleId: 'c', offeringsMatching: true });
     expect(decode(on.uri).offeringsMatching).toBe(true);
     const off = await buildCircleInviteUri({ callSkill, circleId: 'c', offeringsMatching: false });
@@ -108,7 +108,7 @@ describe('buildCircleInviteUri', () => {
     });
     const r = await buildCircleInviteUri({ callSkill, circleId: 'c', adminPeerAddr: 'a' });
     expect(callSkill).toHaveBeenCalledWith('stoop', 'rotateMyGroupCode', { groupId: 'c' });
-    expect(r.uri).toMatch(/^stoop-invite:\/\//);
+    expect(r.uri).toMatch(/^onderling-invite:\/\//);
   });
 });
 
@@ -132,7 +132,7 @@ describe('joinCircleFromInvite', () => {
 
   it('requires a handle and rejects a bad invite', async () => {
     const callSkill = vi.fn();
-    expect(await joinCircleFromInvite({ inviteUri: 'stoop-invite://x', callSkill, handle: '' })).toEqual({ error: 'handle-required' });
+    expect(await joinCircleFromInvite({ inviteUri: 'onderling-invite://x', callSkill, handle: '' })).toEqual({ error: 'handle-required' });
     const bad = await joinCircleFromInvite({ inviteUri: 'not-an-invite', callSkill, handle: 'me' });
     expect(bad.error).toBeTruthy();
     expect(callSkill).not.toHaveBeenCalled();

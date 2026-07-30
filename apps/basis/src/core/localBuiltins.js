@@ -140,8 +140,8 @@ export function createLocalBuiltins({
 }
 
 /**
- * `/scan-qr` — open the camera so the user can scan a stoop-contact://
- * or stoop-invite:// URL.  Mobile-only today; web returns a hint.
+ * `/scan-qr` — open the camera so the user can scan a onderling-contact://
+ * or onderling-invite:// URL.  Mobile-only today; web returns a hint.
  */
 async function runScanQrBuiltin({ openQrScanner, t }) {
   if (typeof openQrScanner !== 'function') {

@@ -135,7 +135,7 @@
       "doc": "QrScannerModal titel"
     },
     "scan_subheading": {
-      "text": "Richt de camera op een stoop-contact:// of stoop-invite:// QR. Je kunt ook plakken.",
+      "text": "Richt de camera op een onderling-contact:// of onderling-invite:// QR. Je kunt ook plakken.",
       "doc": "QrScannerModal hint onder camera"
     },
     "scan_perm_rationale": {
@@ -151,7 +151,7 @@
       "doc": "Toggle naar plak-fallback"
     },
     "scan_paste_placeholder": {
-      "text": "Plak een stoop-contact:// of stoop-invite:// URL",
+      "text": "Plak een onderling-contact:// of onderling-invite:// URL",
       "doc": "Placeholder in plak-input"
     },
     "scan_paste_submit": {
@@ -159,12 +159,12 @@
       "doc": "Submit-knop op plak-input"
     },
     "scan_unknown": {
-      "text": "QR-code niet herkend. Verwacht: stoop-contact:// of stoop-invite://.",
+      "text": "QR-code niet herkend. Verwacht: onderling-contact:// of onderling-invite://.",
       "doc": "Hint bij kind:unknown"
     },
     "scan_contact_added": {
       "text": "✓ Contact toegevoegd.",
-      "doc": "Bot-bericht na stoop-contact:// scan + addContactFromQr"
+      "doc": "Bot-bericht na onderling-contact:// scan + addContactFromQr"
     },
     "scan_invite_open": {
       "text": "Bezig met openen van de join-buurt-wizard…",

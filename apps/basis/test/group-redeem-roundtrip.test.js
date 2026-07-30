@@ -3,7 +3,7 @@
  * round-trip.
  *
  * Mirrors the cross-DEVICE join the mobile app does when a joiner
- * scans an admin's `stoop-invite://` QR but the joiner's local
+ * scans an admin's `onderling-invite://` QR but the joiner's local
  * substrate has no copy of the code (separate instances).  The join
  * wizard's `finalSubmit` falls back to `sendPeerRedeem`, which:
  *

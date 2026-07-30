@@ -297,7 +297,7 @@ export function buildRulesObjectFromState(state) {
 
 /**
  * Encode the substrate's `{groupId, code, expiresAt, adminPeerAddr?, rules?}`
- * result into a `stoop-invite://<base64url-of-JSON>` URL the joiner
+ * result into a `onderling-invite://<base64url-of-JSON>` URL the joiner
  * can paste into `/join-group`.  Lifted from web/createGroupWizard.js
  * 2026-05-27 so the mobile success-screen can reuse it.
  *
@@ -335,10 +335,10 @@ export function encodeMembershipCodeUrl(result) {
     ...(typeof result.relayUrl === 'string' ? { relayUrl: result.relayUrl } : {}),
   };
   const json = JSON.stringify(payload);
-  if (typeof globalThis.btoa !== 'function') return `stoop-invite://${json}`;
+  if (typeof globalThis.btoa !== 'function') return `onderling-invite://${json}`;
   const b64 = globalThis.btoa(json)
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  return `stoop-invite://${b64}`;
+  return `onderling-invite://${b64}`;
 }
 
 /**

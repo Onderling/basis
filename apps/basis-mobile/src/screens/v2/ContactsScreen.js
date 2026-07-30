@@ -73,7 +73,7 @@ export default function ContactsScreen({ bundle, onOpen, feedbackStore = null })
       else {
         await addBotToGraph({
           input, peerGraph, coreAgent: bundle?.coreAgent, discover: bundle?.discoverA2A,
-          // C13 fast rung — a stoop-contact:// card routes to stoop's addContactFromQr (the one
+          // C13 fast rung — a onderling-contact:// card routes to stoop's addContactFromQr (the one
           // decoder); the unified roster merges the ContactBook, so the person appears DM-ready.
           addContact: callSkill ? (payload) => callSkill('stoop', 'addContactFromQr', { payload }) : undefined,
         });

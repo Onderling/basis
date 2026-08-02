@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { bootKring } from './helpers.js';
 
 /**
  * Phase 4 Wave A3 — settings-surface controls (§9) + composer slash dispatch (G17), web e2e.
@@ -17,20 +18,9 @@ test.setTimeout(70_000);
 const LONG = 30_000;
 
 async function openKringComposer(page, name) {
-  page.on('dialog', (d) => d.accept(name));
-  await page.goto('/');
-  await page.waitForTimeout(2500);
-  await page.locator('[data-tab="kringen"]').click();
-  await page.waitForTimeout(1500);
-  if (await page.locator('.circle-tile').count() === 0) {
-    await page.locator('.circle-launcher__new').click();
-    await page.waitForTimeout(5000);
-  }
-  await page.locator('.circle-tile').first().click();
-  await page.waitForTimeout(2500);
-  await page.locator('.circle-kring__view-toggle-btn', { hasText: 'Chat' }).click();
-  await page.waitForTimeout(1200);
-  await expect(page.locator('.circle-kring__composer-input')).toBeVisible();
+  // Delegates to the ONE shared boot (test-browser/helpers.js). Six specs each carried a copy of
+  // this, and all six broke the same way when the product changed twice underneath them.
+  await bootKring(page, name);
 }
 
 test('/settings (G17 built-in) opens the settings panel with the Connection controls; private-DM greys out under pod-only', async ({ page }) => {

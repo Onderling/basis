@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { bootKring } from './helpers.js';
 
 // Composer parity — the v2 kring composer now has the classic shell's slash-command auto-suggest
 // dropdown + bash-style input history (shared src/v2/commandSuggest.js, web↔mobile). These verify
@@ -6,20 +7,9 @@ import { test, expect } from '@playwright/test';
 test.setTimeout(70000);
 
 async function openKringComposer(page) {
-  page.on('dialog', (d) => d.accept('P5 Circle'));
-  await page.goto('/');
-  await page.waitForTimeout(2500);
-  await page.locator('[data-tab="kringen"]').click();
-  await page.waitForTimeout(1500);
-  if (await page.locator('.circle-tile').count() === 0) {
-    await page.locator('.circle-launcher__new').click();
-    await page.waitForTimeout(5000);
-  }
-  await page.locator('.circle-tile').first().click();
-  await page.waitForTimeout(2500);
-  await page.locator('.circle-kring__view-toggle-btn', { hasText: 'Chat' }).click();
-  await page.waitForTimeout(1200);
-  await expect(page.locator('.circle-kring__composer-input')).toBeVisible();
+  // Delegates to the ONE shared boot (test-browser/helpers.js). Six specs each carried a copy of
+  // this, and all six broke the same way when the product changed twice underneath them.
+  await bootKring(page, 'P5 Circle');
 }
 
 test('slash-suggest dropdown opens on "/", filters by prefix, and closes after a space', async ({ page }) => {

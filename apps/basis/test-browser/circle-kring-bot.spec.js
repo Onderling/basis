@@ -10,7 +10,9 @@ test.setTimeout(70000);
 async function openKringComposer(page) {
   // Delegates to the ONE shared boot (test-browser/helpers.js). Six specs each carried a copy of
   // this, and all six broke the same way when the product changed twice underneath them.
-  await bootKring(page, 'P5 Circle');
+  // `{ tasks: true }` — `@assistant add X` is gated on the per-circle tasks feature, which a
+  // wizard-created circle starts with OFF.
+  await bootKring(page, 'P5 Circle', { tasks: true });
 }
 
 async function send(page, text) {

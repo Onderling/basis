@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { bootKring } from './helpers.js';
+import { bootKring, enableTasksFeature } from './helpers.js';
 
 // S6.A e2e — manifest-driven inline buttons on a bot reply. The deterministic
 // gate ("@assistant add X" → addTask) dispatches a real task op; the reply must
@@ -20,7 +20,9 @@ async function send(page, text) {
 }
 
 test('adding a task renders an inline Claim button on the bot reply, and it dispatches', async ({ page }) => {
-  await openKringComposer(page);
+  // Tasks are OFF for a new circle — the very next test asserts that as the intended default. This test
+  // used to inherit tasks-on from whatever circle it happened to land in.
+  await bootKring(page, 'S6A Circle', { tasks: true });
 
   await send(page, '@assistant add s6abuy');
 
@@ -44,20 +46,6 @@ test('adding a task renders an inline Claim button on the bot reply, and it disp
   expect(blob).not.toContain('couldn');
 });
 
-async function enableTasksFeature(page) {
-  await page.locator('.circle-kring__more').click();
-  await page.locator('.circle-kring__more-item[data-action="settings"]').click();
-  await page.waitForTimeout(800);
-  const box = page.locator('input[data-feature="tasks"]');
-  await expect(box).toBeVisible({ timeout: 5000 });
-  if (!(await box.isChecked())) await box.check();
-  await page.locator('.circle-settings__save').click();   // persist (toggle alone only edits local state)
-  await page.waitForTimeout(800);
-  const back = page.locator('.circle-settings__back');
-  if (await back.count()) { await back.click(); await page.waitForTimeout(800); }
-  const chat = page.locator('.circle-kring__view-toggle-btn', { hasText: 'Chat' });
-  if (await chat.count()) { await chat.click(); await page.waitForTimeout(800); }
-}
 
 test('S6.C gate + S6.B — the tasks screen is gated per-circle; enabling tasks reveals the panel', async ({ page }) => {
   await openKringComposer(page);
@@ -75,10 +63,16 @@ test('S6.C gate + S6.B — the tasks screen is gated per-circle; enabling tasks 
   await expect(screenBtn.first()).toBeVisible({ timeout: 8000 });
   await expect(screenBtn.first()).toHaveAttribute('data-screen', 'tasks');
 
-  // S6.B — tapping it opens the tasks panel (the Schermen tasks block in an overlay).
+  // Tapping it opens the tasks panel in an overlay.
+  //
+  // The tasks screen renders through `listScreen.js` now, not as a `circle-screen__block--tasks`. Both
+  // renderers still exist — blocks are what a composed Schermen page uses — so the old selector was not
+  // stale everywhere, just for THIS screen, which is the kind of drift a selector cannot tell you about.
+  // What matters to the person is unchanged and is what we assert: the panel opens, and their task is in
+  // it.
   await screenBtn.first().click();
   await expect(page.locator('.cc-screen-panel')).toBeVisible({ timeout: 5000 });
-  await expect(page.locator('.cc-screen-panel .circle-screen__block--tasks')).toBeVisible();
+  await expect(page.locator('.cc-screen-panel .list-screen')).toBeVisible();
   await expect(page.locator('.cc-screen-panel')).toContainText('s6bpanel');
 });
 

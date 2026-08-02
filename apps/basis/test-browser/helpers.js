@@ -60,7 +60,30 @@ export async function createCircleViaWizard(page, name) {
 
 /** Boot the v2 app and open a kring chat composer for OUR circle, creating it if needed.
  *  Lifted from the per-spec `openKringComposer` so every spec shares ONE boot. */
-export async function bootKring(page, circleName = 'Test Circle') {
+/**
+ * Turn the per-circle TASKS feature on, through the settings surface a person would use.
+ *
+ * A circle created through the wizard has tasks OFF — that is the intended default, asserted by its own
+ * test. So anything exercising `@assistant add X` has to enable it first, or the bot correctly answers
+ * "That isn't turned on for this circle" and no task is ever created. Three specs assumed tasks-on because
+ * they used to inherit whatever circle they happened to land in.
+ */
+export async function enableTasksFeature(page) {
+  await page.locator('.circle-kring__more').click();
+  await page.locator('.circle-kring__more-item[data-action="settings"]').click();
+  await page.waitForTimeout(800);
+  const box = page.locator('input[data-feature="tasks"]');
+  await expect(box).toBeVisible({ timeout: 5000 });
+  if (!(await box.isChecked())) await box.check();
+  await page.locator('.circle-settings__save').click();   // the toggle alone only edits local state
+  await page.waitForTimeout(800);
+  const back = page.locator('.circle-settings__back');
+  if (await back.count()) { await back.click(); await page.waitForTimeout(800); }
+  const chat = page.locator('.circle-kring__view-toggle-btn', { hasText: 'Chat' });
+  if (await chat.count()) { await chat.click(); await page.waitForTimeout(800); }
+}
+
+export async function bootKring(page, circleName = 'Test Circle', { tasks = false } = {}) {
   const id = circleSlug(circleName);
   await page.goto('/');
   await page.waitForTimeout(2500);
@@ -83,6 +106,7 @@ export async function bootKring(page, circleName = 'Test Circle') {
   await page.locator('.circle-kring__view-toggle-btn', { hasText: 'Chat' }).click();
   await page.waitForTimeout(1200);
   await expect(page.locator('.circle-kring__composer-input')).toBeVisible();
+  if (tasks) await enableTasksFeature(page);
 }
 
 /** Send a kring composer line (explicit send button — no Enter/Escape dropdown dance). */

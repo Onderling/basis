@@ -6,6 +6,20 @@ before you start bisecting a build or native crash.
 
 ---
 
+## `adb shell input keyevent 111` is ESCAPE — it cancels the modal, not the keyboard
+
+Walking the join wizard on a device (2026-08-02), I sent `keyevent 111` after `input text` intending to
+dismiss the soft keyboard. It dismissed the **wizard**, silently, back to the previous tab — three steps of
+input gone with no error and no log line. The keyboard is `keyevent 4` (BACK) — which on an empty field has
+its own trap already recorded below — or simply leave it open: it does not block a `tap` on a button that
+is still on screen.
+
+**Related, from the same walk:** an `onderling-invite://…` URI can be delivered straight to a running app
+with `adb shell am start -a android.intent.action.VIEW -d "<uri>"`. That is by far the most reliable way to
+walk the join flow — no QR, no typing, and it exercises the real deep-link receiver rather than a shortcut.
+`am start` reports *"Activity not started, intent has been delivered to currently running top-most
+instance"*, which is success, not a warning to chase.
+
 ## Monorepo module resolution (npm workspaces + symlinks)
 
 **Umbrella pattern.** Workspace packages are symlinked into `node_modules`. Anything that breaks

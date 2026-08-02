@@ -93,6 +93,15 @@ import { getPrivacyNotice } from '../lib/privacyNotice.js';
 import { categoryFor, TAXONOMY } from '../lib/offeringsMatch.js';
 import { findNearDuplicate } from '../lib/dupCheck.js';
 import { deriveRoster } from '../lib/deriveRoster.js';
+// B4 — who has LEFT or been REMOVED from ONE circle. The rule lives in one place so the roster
+// projection, the fan-out roster and the legacy MemberMap fallback cannot disagree about who is in.
+import { readCircleExits, isExited, collectCircleExits, CIRCLE_EXIT_TYPES } from '../lib/circleExits.js';
+// B5 — how many people ONE invite may admit: circle ceiling → per-invite choice → system cap,
+// enforced at redemption on the side that issues the membership.
+import {
+  circleInviteCeiling, clampInviteMaxRedemptions, inviteMaxRedemptionsOf, redeemersOfCode,
+  INVITE_LIMIT_REACHED, INVITE_REDEMPTION_SYSTEM_CAP,
+} from '../lib/inviteCeiling.js';
 import { encryptBackup, decryptBackup } from '../lib/encryptedBackup.js';
 import { startPodSignIn, completePodSignIn, signOutOfPod, podSignInStatus } from '../lib/podSignIn.js';
 import { loadSettings, updateSettings as updateSettingsLib } from '../lib/Settings.js';
@@ -363,6 +372,38 @@ const CODE_SKEW_MS = 2 * 60 * 1000;
  * A code with no `expiresAt` is refused rather than treated as eternal: an unstamped code is a malformed
  * one, and the safe reading of malformed is no.
  */
+/**
+ * B5 — the ONE ceiling check, shared by both redeem paths (the local skill and the admin-side peer
+ * validator), for exactly the reason `codeRedeemableNow` above is shared: two copies of a rule are
+ * two chances for a fix to land in one of them.
+ *
+ * Three answers, and the middle one is the interesting one:
+ *   • `{ allow: true }`               — room left (or the ceiling is not reached yet).
+ *   • `{ allow: true, already }`      — this identity has ALREADY redeemed this invite. An
+ *     idempotent success: re-scanning a QR is a thing people do, and punishing it with a refusal
+ *     teaches nothing while breaking a legitimate retry. `already` is their existing redemption
+ *     item, so the caller can answer with the original id instead of writing a second audit row —
+ *     the duplicate row found by J-A9, which nothing counting rows could tell from a second person.
+ *   • `{ allow: false }`              — a NEW identity beyond what this invite permits. Refused here,
+ *     on the device that would otherwise write the membership.
+ *
+ * @returns {Promise<{allow: boolean, already?: object, used: number, max: number}>}
+ */
+async function inviteRedemptionVerdict({ store, groupId, codeItem, requesterWebid }) {
+  const rulesItem = await _findLatestGroupRules(store, groupId);
+  const ceiling = circleInviteCeiling(rulesItem?.source?.rules);
+  const max = inviteMaxRedemptionsOf(codeItem, ceiling);
+  let redemptions = [];
+  try { redemptions = await store.listOpen({ type: 'membership-redemption' }); } catch { redemptions = []; }
+  const redeemers = redeemersOfCode({
+    redemptions, groupId, codeId: codeItem?.id ?? null, code: codeItem?.source?.code ?? null,
+  });
+  const already = requesterWebid ? redeemers.get(requesterWebid) ?? null : null;
+  if (already) return { allow: true, already, used: redeemers.size, max };
+  if (redeemers.size >= max) return { allow: false, used: redeemers.size, max };
+  return { allow: true, used: redeemers.size, max };
+}
+
 function codeRedeemableNow(codeItem, now = Date.now()) {
   const expiresAt = codeItem?.source?.expiresAt;
   if (typeof expiresAt !== 'number' || !Number.isFinite(expiresAt)) return false;
@@ -491,22 +532,23 @@ async function grantPodAccess(controlAgent, { webId, sealingPublicKey, role = 'm
   try { await controlAgent.addMember({ webId, publicKey: sealingPublicKey, role, groupId }); }
   catch { metrics?.record?.('control-agent-grant-failed'); }
 }
-async function revokePodAccess(controlAgent, { webId, force = false, policy = 'graceful', groupId, members, metrics }) {
+async function revokePodAccess(controlAgent, { webId, force = false, policy = 'graceful', groupId, metrics }) {
   if (!webId) return null;
   let result = null;
   if (controlAgent) {
     // Rotate the content key (forward secrecy) + re-seal history per policy (graceful keeps the
     // departed's prior access; ban strips it). See packages/pod-client controlAgent.removeMember.
+    // Routed per circle by the control-agent ROUTER (`groupId`), so this half was already local.
     try { result = await controlAgent.removeMember({ webId, force, policy, groupId }); }
     catch { metrics?.record?.('control-agent-revoke-failed'); }
   }
-  // COUPLING (the security fix): the app-level "mesh membership" is the MemberMap (there is no
-  // GroupManager proof in this flow). Drop the departed so fan-out/routing stops targeting them —
-  // otherwise removal only rotates the content key and peers keep sending to a removed member.
-  if (members && typeof members.removeMember === 'function') {
-    try { await members.removeMember(webId); }
-    catch { metrics?.record?.('member-map-remove-failed'); }
-  }
+  // B4 (2026-08-02) — what used to be here was `members.removeMember(webId)`, and it was the bug.
+  // The MemberMap is ONE global display cache with no circle on a row, so dropping the departed
+  // stopped fan-out in the circle they were removed from AND erased them everywhere else: removing
+  // someone from one circle severed the relationship in every circle you shared with them. Fan-out
+  // no longer reads that cache for membership anyway — it reads the per-circle trail projection
+  // (`projectCircleRoster`), which now honours `group-removal`/`group-leave` for THAT circle
+  // (`../lib/circleExits.js`). So the coupling is kept and the collateral is gone.
   return result;
 }
 
@@ -768,10 +810,15 @@ async function listGroupMembersCore(scope, a, ctx) {
     });
   };
   const scoped = await projectCircleRoster({ store, groupId: _groupId, memberMapList: list });
-  // Legacy back-compat (unchanged): a group with NO redemption trail (a seeded
-  // single-buurt roster from before code-minting) has no durable source to
-  // project from — fall back to the full MemberMap so those setups are unchanged.
-  if (!scoped) return { groupId: _groupId, members: withViewerReveals(list) };
+  // Legacy back-compat: a group with NO redemption trail (a seeded single-buurt roster from before
+  // code-minting) has no durable source to project from — fall back to the full MemberMap so those
+  // setups are unchanged. B4: the fallback is still EXIT-FILTERED, or removal would silently do
+  // nothing on exactly the circles whose roster has no other representation.
+  if (!scoped) {
+    const exits = await readCircleExits({ store, groupId: _groupId });
+    const kept = exits.size === 0 ? list : list.filter((m) => !isExited(exits, m?.webid ?? '', 0));
+    return { groupId: _groupId, members: withViewerReveals(kept) };
+  }
   return { groupId: _groupId, members: withViewerReveals(scoped) };
 }
 
@@ -829,6 +876,9 @@ async function projectCircleRoster({ store, groupId, memberMapList = [] } = {}) 
     redemptions: forGroup,
     founderWebids: [...founderWebids],
     memberMapForDisplay: list,
+    // B4 — a removal/leave recorded for THIS circle drops the member from THIS circle only. The
+    // trail is already circle-scoped, so nothing here can reach a circle you also share with them.
+    exits: await readCircleExits({ store, groupId }),
   });
 }
 
@@ -1131,9 +1181,17 @@ export function buildSkills({
     let memberMapList = [];
     try { memberMapList = (await members.list()) ?? []; } catch { memberMapList = []; }
     const roster = await projectCircleRoster({ store, groupId: circleId, memberMapList });
+    // B4 — the no-trail fallback fans over the global MemberMap, so it must drop this circle's
+    // exits itself; otherwise a removed member keeps receiving the circle's traffic.
+    const fanExits = roster ? null : await readCircleExits({ store, groupId: circleId });
     const fanMembers = roster
       ? { list: async () => roster, resolveByWebid: (w) => members.resolveByWebid(w) }
-      : members;
+      : (fanExits && fanExits.size > 0
+        ? {
+          list: async () => ((await members.list()) ?? []).filter((m) => !isExited(fanExits, m?.webid ?? '', 0)),
+          resolveByWebid: (w) => members.resolveByWebid(w),
+        }
+        : members);
 
     // ── Connectivity Phase 2/3 (G1/G2) — the data-move branch ──────────────
     // The circle's data-policy (`policy.pod`) decides HOW a message moves; we
@@ -2224,6 +2282,12 @@ export function buildSkills({
       const inviteExpiresInHours = (typeof a.inviteExpiresInHours === 'number'
           && a.inviteExpiresInHours >= 1 && a.inviteExpiresInHours <= 8760)
         ? a.inviteExpiresInHours : 1;
+      // B5 — the circle's CEILING on how many people one of its invites may admit. Stored in the
+      // rules blob (so it travels with the circle and shows up in the invite/consent surfaces) and
+      // clamped to the system cap here, which is the only place a circle's number meets it.
+      const inviteMaxRedemptions = clampInviteMaxRedemptions(
+        a.inviteMaxRedemptions, INVITE_REDEMPTION_SYSTEM_CAP,
+      );
 
       // A3 (2026-05-14) — storage policy (§II.2 of the standardisation
       // plan). Default `'no-pod'` keeps V1 UX parity. Centralised /
@@ -2234,7 +2298,7 @@ export function buildSkills({
       const storage = _buildStoragePolicy(a.storagePolicy, a.groupPodUri);
 
       const rulesWithRotation = {
-        ...a.rules, keyRotationMode, rotationDays, inviteExpiresInHours,
+        ...a.rules, keyRotationMode, rotationDays, inviteExpiresInHours, inviteMaxRedemptions,
         storage, version: 1,
       };
 
@@ -2260,6 +2324,9 @@ export function buildSkills({
           source:     {
             groupId: a.groupId, code, issuedAt, expiresAt,
             issuedBy: from, rotationDays, keyRotationMode, inviteExpiresInHours,
+            // B5 — what THIS invite permits, within the circle's ceiling. The first code of a new
+            // circle takes the ceiling itself: the strictness decision was made once, in the wizard.
+            maxRedemptions: clampInviteMaxRedemptions(a.inviteMaxRedemptions, inviteMaxRedemptions),
           },
           visibility: 'household',
         }],
@@ -2428,6 +2495,10 @@ export function buildSkills({
             ? rules.inviteExpiresInHours
             : legacyHours);
 
+      // B5 — this invite's own limit, chosen within the circle's ceiling (never above it).
+      const inviteCeiling = circleInviteCeiling(rules);
+      const maxRedemptions = clampInviteMaxRedemptions(a.maxRedemptions, inviteCeiling);
+
       const code = _freshMembershipCode();
       // Guarantee the rotated code has a strictly later issuedAt than
       // every existing code for this group (defends `_findLatestActiveCode`
@@ -2453,13 +2524,17 @@ export function buildSkills({
           source:     {
             groupId: a.groupId, code, issuedAt, expiresAt,
             issuedBy: from, rotationDays, keyRotationMode, inviteExpiresInHours,
+            maxRedemptions,
           },
           visibility: 'household',
         }],
         { actor: from },
       );
       metrics?.record?.('group-code-rotated');
-      return { codeId: codeItem.id, code, expiresAt, _sync: simulateSync() };
+      return {
+        codeId: codeItem.id, code, expiresAt, maxRedemptions,
+        inviteMaxRedemptions: inviteCeiling, _sync: simulateSync(),
+      };
     }, {
       description: 'Admin-only: mint a fresh membership code (rotates the group secret).',
       visibility:  'authenticated',
@@ -2486,11 +2561,19 @@ export function buildSkills({
 
       const latest = await _findLatestActiveCode(store, a.groupId);
       if (!latest) return { error: 'no-code' };
+      // B5 — an invite that says nothing about how many people it can still admit is how "one code,
+      // 300 members" stays invisible. The admin surfaces read these two straight off the answer.
+      const verdict = await inviteRedemptionVerdict({
+        store, groupId: a.groupId, codeItem: latest, requesterWebid: null,
+      });
       return {
         code:       latest.source.code,
         issuedAt:   latest.source.issuedAt,
         expiresAt:  latest.source.expiresAt,
         keyRotationMode: mode,
+        maxRedemptions:     verdict.max,
+        redemptionsUsed:    verdict.used,
+        inviteMaxRedemptions: circleInviteCeiling(rulesItem?.source?.rules),
       };
     }, {
       description: 'Read the current membership code (admin always; member if mode=peer-distributable).',
@@ -2518,6 +2601,24 @@ export function buildSkills({
       const now = Date.now();
       const valid = forGroup.find(i => i.source.code === a.code && codeRedeemableNow(i, now));
       if (!valid) return { error: 'invalid-or-expired-code' };
+
+      // B5 — the ceiling, checked on the store that HOLDS the code (this path is the same-device
+      // redeem, so the issuer and the redeemer are the same store). A repeat by the same identity is
+      // an idempotent success returning the original redemption; a new identity beyond the invite's
+      // limit is refused here rather than admitted and counted afterwards.
+      const limit = await inviteRedemptionVerdict({
+        store, groupId: a.groupId, codeItem: valid, requesterWebid: from,
+      });
+      if (!limit.allow) return { error: INVITE_LIMIT_REACHED, used: limit.used, max: limit.max };
+      if (limit.already) {
+        return {
+          redemptionId: limit.already.id,
+          groupId:      a.groupId,
+          validUntil:   valid.source.expiresAt,
+          alreadyRedeemed: true,
+          _sync:        simulateSync(),
+        };
+      }
 
       // ── Signing pubKey capture (kring fan-out fix) ────────────────────────
       // Bind the joiner's SIGNING pubKey to the AUTHENTICATED sender of the
@@ -2639,6 +2740,19 @@ export function buildSkills({
       const valid = forGroup.find(i => i.source.code === a.code && codeRedeemableNow(i, now));
       if (!valid) return { error: 'invalid-or-expired-code' };
 
+      // B5 — THE gate. This runs on the ADMIN's device, which is the device that writes the
+      // membership; a joiner on any build, patched or not, cannot get past it, because getting in is
+      // this function returning a row. A repeat by the same identity answers with the ORIGINAL
+      // redemption id and writes nothing new (idempotent — re-scanning a QR must not punish anyone,
+      // and a duplicate audit row is indistinguishable from a second person to anything counting).
+      const limit = await inviteRedemptionVerdict({
+        store, groupId: a.groupId, codeItem: valid, requesterWebid: a.requesterWebid,
+      });
+      if (!limit.allow) {
+        metrics?.record?.('group-code-redeem-refused-limit');
+        return { error: INVITE_LIMIT_REACHED, used: limit.used, max: limit.max };
+      }
+
       // Wave B (SENSITIVE) — the peer path's copy of the cross-circle link proof check
       // (mirrors redeemMembershipCode): a presented per-circle address is recorded ONLY when
       // the joiner proved control of the key behind it. Deny-by-default; unproven ⇒ dropped.
@@ -2664,6 +2778,30 @@ export function buildSkills({
       // address, so the joiner's signing pubKey IS `requesterWebid`.
       // Declared OUTSIDE the handle-claim section below, which it outlives (roster upsert reads it).
       const peerSigningPubKey = a.requesterWebid;
+
+      // B5 — the same identity, again: no second membership row. Their pod access + display row are
+      // still refreshed below (both idempotent, and a reinstalled joiner may have a new sealing key),
+      // so the repeat is a no-op in the ledger and a refresh everywhere it is safe to be one.
+      if (limit.already) {
+        if (members && a.requesterWebid) {
+          try {
+            await members.addMember({
+              webid: a.requesterWebid,
+              pubKey: a.requesterWebid,
+              ...(verifiedCircleAddress ? { circleAddress: verifiedCircleAddress } : {}),
+            });
+          } catch { /* best-effort, exactly as on the first redeem */ }
+        }
+        await grantPodAccess(controlAgent, { webId: a.requesterWebid, sealingPublicKey: a.sealingPublicKey, groupId: a.groupId, metrics });
+        return {
+          redemptionId: limit.already.id,
+          codeId:       valid.id,
+          groupId:      a.groupId,
+          validUntil:   valid.source.expiresAt,
+          alreadyRedeemed: true,
+          _sync:        simulateSync(),
+        };
+      }
 
       // SERIALISED per (circle, handle) — the uniqueness check and the redemption write are separated by
       // awaits, so two joiners redeeming the same invite and both claiming `@jan` each read a roster with
@@ -3178,17 +3316,35 @@ export function buildSkills({
      */
     defineSkill('listMyBuurts', async ({ from }) => {
       const ids = new Set();
+      /** groupId → my latest join there, so an exit can be compared against it (B4). */
+      const myJoinedAt = new Map();
       const redemptions = await store.listOpen({ type: 'membership-redemption' });
       for (const it of redemptions) {
         if (it?.source?.redeemedBy !== from) continue;
         const gid = it?.source?.groupId;
-        if (typeof gid === 'string' && gid) ids.add(gid);
+        if (typeof gid !== 'string' || !gid) continue;
+        ids.add(gid);
+        const at = typeof it.source.redeemedAt === 'number' ? it.source.redeemedAt : 0;
+        if (at > (myJoinedAt.get(gid) ?? 0)) myJoinedAt.set(gid, at);
       }
       const rules = await store.listOpen({ type: 'group-rules' });
       for (const it of rules) {
         if (it?.addedBy !== from) continue;
         const gid = it?.source?.groupId;
         if (typeof gid === 'string' && gid) ids.add(gid);
+      }
+      // B4 — a circle I have LEFT (or been removed from, where that item reached this device) is not
+      // one of "my circles". This is not cosmetic: this list drives `primeCircleSecurity` and the
+      // relay's per-circle address registration, so without the filter the next boot would re-record
+      // the authorize snapshot for a circle I left and re-register its address on the relay —
+      // silently undoing both halves of the leave, one restart later.
+      const exitItems = [];
+      for (const type of CIRCLE_EXIT_TYPES) {
+        try { exitItems.push(...(await store.listOpen({ type })) ?? []); } catch { /* absent ⇒ none */ }
+      }
+      for (const gid of [...ids]) {
+        const exits = collectCircleExits({ items: exitItems, groupId: gid });
+        if (isExited(exits, from, myJoinedAt.get(gid) ?? 0)) ids.delete(gid);
       }
       return { buurts: [...ids], _sync: simulateSync() };
     }, {
@@ -3253,16 +3409,26 @@ export function buildSkills({
       if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
       const all = await store.listOpen({ type: 'membership-redemption' });
       const forGroup = all.filter(i => i?.source?.groupId === a.groupId);
+      // B4 — the same per-circle exit rule the roster projection uses. Without it, household-sync
+      // pairing keeps re-adding a removed member as a peer for this circle on every circle-open.
+      const exits = await readCircleExits({ store, groupId: a.groupId });
+      const joinedAt = new Map();
+      for (const it of forGroup) {
+        const w = it?.source?.redeemedBy;
+        const at = typeof it?.source?.redeemedAt === 'number' ? it.source.redeemedAt : 0;
+        if (w && at > (joinedAt.get(w) ?? 0)) joinedAt.set(w, at);
+      }
       const seen = new Map();   // addr → role
       for (const it of forGroup) {
         const src = it.source ?? {};
         // `redeemedBy` is a joiner (the actor who presented the code).
-        if (src.redeemedBy && src.redeemedBy !== from) {
+        if (src.redeemedBy && src.redeemedBy !== from && !isExited(exits, src.redeemedBy, joinedAt.get(src.redeemedBy) ?? 0)) {
           if (!seen.has(src.redeemedBy)) seen.set(src.redeemedBy, 'member');
         }
         // `confirmedBy` is the admin's address as recorded on the
         // joiner side (peer-bridge channel only).
-        if (src.confirmedBy && src.confirmedBy !== from && src.channel === 'peer') {
+        if (src.confirmedBy && src.confirmedBy !== from && src.channel === 'peer'
+          && !isExited(exits, src.confirmedBy, 0)) {
           seen.set(src.confirmedBy, 'admin');
         }
       }
@@ -3718,7 +3884,7 @@ export function buildSkills({
       // Sealed household pod: revoke the leaver's ACL + rotate the group key (forward secrecy) + drop
       // them from the MemberMap so fan-out stops. A self-leave is 'graceful' — the leaver keeps access
       // to content they already had on their device.
-      await revokePodAccess(controlAgent, { webId: from, policy: 'graceful', groupId: a.groupId, members, metrics });
+      await revokePodAccess(controlAgent, { webId: from, policy: 'graceful', groupId: a.groupId, metrics });
 
       let deleted = 0;
       if (a.deletePosts) {
@@ -4587,14 +4753,17 @@ export function buildSkills({
       }
       const policy = a.policy === 'ban' ? 'ban' : 'graceful';
 
+      // B4 — the RESOLVED webid, not only what the caller happened to pass. An admin who removes by
+      // stableId used to write a row naming nobody the roster projection could match, so the removal
+      // was unprojectable and therefore inert. `memberStableId` is still recorded for the audit.
       const [item] = await store.addItems([{
         type:       'group-removal',
-        text:       `${a.memberWebid ?? a.memberStableId} removed from ${_groupId} (${policy})`,
+        text:       `${memberWebid ?? a.memberStableId} removed from ${_groupId} (${policy})`,
         visibility: 'household',
         source: {
           groupId:        _groupId,
           memberStableId: a.memberStableId ?? null,
-          memberWebid:    a.memberWebid    ?? null,
+          memberWebid:    memberWebid      ?? null,
           removedBy:      from,
           removedAt:      Date.now(),
           policy,
@@ -4607,7 +4776,7 @@ export function buildSkills({
       // ≥1-admin guard for a non-self target; the op's own admin-gate above is the authority.
       let revoked = false;
       if (memberWebid) {
-        await revokePodAccess(controlAgent, { webId: memberWebid, force: true, policy, groupId: _groupId, members, metrics });
+        await revokePodAccess(controlAgent, { webId: memberWebid, force: true, policy, groupId: _groupId, metrics });
         revoked = true;
       }
       return { removalId: item.id, revoked, policy };

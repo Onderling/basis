@@ -1,3 +1,5 @@
+import { isExited } from './circleExits.js';
+
 /**
  * deriveRoster — project a circle's membership FROM the durable, signed
  * redemption trail (the source of truth), left-joining the MemberMap for
@@ -33,16 +35,24 @@
  * is NEVER consulted for member EXISTENCE. Membership no longer depends on the
  * cache landing.
  *
+ * B4 (2026-08-02) — EXITS are part of the projection, per circle. A `group-removal` or
+ * `group-leave` for THIS circle drops the member from THIS circle's roster and nothing else: the
+ * trail is already circle-scoped, so removing someone here cannot touch a circle you share with them
+ * elsewhere. An exit only counts while it is LATER than the member's most recent join, so a re-join
+ * re-admits them rather than removal being permanent and unappealable. → `circleExits.js`.
+ *
  * @param {object} o
  * @param {Array<object>} [o.redemptions]         `membership-redemption` items for ONE group.
  * @param {Array<string>} [o.founderWebids]       webids to force role `admin` (creator + admins).
  * @param {Array<object>} [o.memberMapForDisplay] `MemberMap.list()` — display fields only.
+ * @param {Map<string, number>} [o.exits]         webid → latest exit ts (`collectCircleExits`).
  * @returns {Array<object>} one record per member, built from the trail + display left-join.
  */
 export function deriveRoster({
   redemptions = [],
   founderWebids = [],
   memberMapForDisplay = [],
+  exits = null,
 } = {}) {
   const displayByWebid = new Map();
   for (const m of memberMapForDisplay ?? []) {
@@ -53,6 +63,9 @@ export function deriveRoster({
 
   /** webid → derived record, built FROM the trail. */
   const roster = new Map();
+
+  /** webid → their most recent `redeemedAt`, so an exit can be compared against their latest join. */
+  const joinedAt = new Map();
 
   const upsert = (webid, role, trailFields = {}) => {
     if (typeof webid !== 'string' || !webid) return;
@@ -77,6 +90,8 @@ export function deriveRoster({
       personaProperties,
     } = src;
     if (redeemedBy) {
+      const at = typeof src.redeemedAt === 'number' ? src.redeemedAt : 0;
+      if (at > (joinedAt.get(redeemedBy) ?? 0)) joinedAt.set(redeemedBy, at);
       upsert(redeemedBy, role ?? 'member', {
         pubKey:            signingPublicKey,
         sealingPublicKey,
@@ -111,6 +126,15 @@ export function deriveRoster({
 
   // Founder(s) — the circle creator + any admin-role member; never redeem.
   for (const w of founderWebids ?? []) upsert(w, 'admin', {});
+
+  // B4 — drop whoever has exited THIS circle since their latest join. Applied AFTER the founder pass
+  // so leaving a circle you created works too: a founder's `joinedAt` is 0 (they never redeem), so
+  // any exit of theirs is by definition later.
+  if (exits instanceof Map && exits.size > 0) {
+    for (const webid of [...roster.keys()]) {
+      if (isExited(exits, webid, joinedAt.get(webid) ?? 0)) roster.delete(webid);
+    }
+  }
 
   // LEFT-JOIN the MemberMap for display fields; the trail wins on existence + keys.
   // Spread disp first, then the derived record: rec only carries keys it actually

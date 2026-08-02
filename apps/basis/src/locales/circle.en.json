@@ -309,6 +309,26 @@
     "no_code": {
       "text": "No invite code is available for this circle.",
       "doc": "OBJ-2 — shown when the circle has no current membership code."
+    },
+    "ceiling_label": {
+      "text": "How many people one invite may admit",
+      "doc": "B5 — the circle-level ceiling in the create wizard. An individual invite chooses within it, never above."
+    },
+    "ceiling_hint": {
+      "text": "The most anyone may join on a single invite code. A code that leaves the room can admit no more than this. You can set a lower number on an individual invite later.",
+      "doc": "B5 — hint under the create-wizard ceiling field; says what the number protects against."
+    },
+    "ceiling_review": {
+      "text": "People per invite",
+      "doc": "B5 — review-step label for the circle invite ceiling."
+    },
+    "uses_left": {
+      "text": "{{used}} of {{max}} places on this invite used",
+      "doc": "B5 — how much of the current invite is spent; shown beside the invite QR."
+    },
+    "limit_reached": {
+      "text": "This invite has admitted everyone it may. Ask whoever runs the circle for a new one.",
+      "doc": "B5 — the joiner-facing message when the ISSUER refuses an over-ceiling redemption. No count: the joiner is not told the circle’s limit, only that this invite is spent."
     }
   },
   "members": {
@@ -4175,6 +4195,10 @@
     "unmute": {
       "text": "Unmute",
       "doc": "S3 — unmute a peer."
+    },
+    "removed": {
+      "text": "{{name}} is no longer in this circle. They keep any other circle you share.",
+      "doc": "B4 — confirmation after removing a member; states the per-circle scope, which is the thing that used to be untrue."
     }
   },
   "userLlm": {

@@ -13,9 +13,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, StyleSheet } from 'react-native';
 import { t } from '../../core/localisation.js';
+import { removeCircleMember } from '../../../../basis/src/v2/circleMembershipHygiene.js';
 import { useTheme } from './themeContext.js';
 
-export default function CircleAdminPanelScreen({ callSkill, groupId, onBack }) {
+export default function CircleAdminPanelScreen({ callSkill, agent = null, groupId, onBack }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [members, setMembers] = useState([]);
@@ -35,12 +36,25 @@ export default function CircleAdminPanelScreen({ callSkill, groupId, onBack }) {
 
   useEffect(() => { load(); }, [load]);
 
+  // B4 — the SAME shared op web uses (`removeCircleMember`): remove from THIS circle only, unbind
+  // that member's per-circle address, then re-record the authorize snapshot from a fresh roster read.
+  // Mobile previously called the raw skill and did neither of the last two, so a member removed on a
+  // phone could still speak into the circle — the drift invariant 2 exists to catch.
   const remove = useCallback(async (m) => {
     setNotice(null);
-    try { const r = await callSkill('stoop', 'removeMember', { groupId, memberWebid: m.webid, memberStableId: m.stableId }); if (r?.error) setNotice(t('circle.admin.refused')); }
-    catch { setNotice(t('circle.admin.refused')); }
+    try {
+      const r = await removeCircleMember({
+        agent, callSkill,
+        circleId: groupId,
+        memberWebid: m.webid,
+        memberStableId: m.stableId,
+      });
+      setNotice(r?.ok
+        ? t('circle.admin.removed', { name: m.displayName || m.handle || m.webid })
+        : t('circle.admin.refused'));
+    } catch { setNotice(t('circle.admin.refused')); }
     load();
-  }, [callSkill, groupId, load]);
+  }, [agent, callSkill, groupId, load]);
   const postAnnounce = useCallback(async () => {
     const text = announce.trim(); if (!text) return;
     setAnnounce(''); setNotice(null);

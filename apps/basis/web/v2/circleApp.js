@@ -66,7 +66,10 @@ import {
   RETENTION_CHOICES_DAYS, normalizeRetentionDays, retentionFromDays, localStorageRetentionIo,
 } from '../../src/v2/retentionPref.js';
 import { registerCircleAddresses, unregisterCircleAddresses } from '../../src/v2/circleAddressRegistration.js';
-import { forgetCircleAddressKeys } from '../../src/v2/circleAddressKeys.js';
+// B4 — removing one member from ONE circle, and leaving one, live in shared code: both end by
+// re-recording the boundary-authentication snapshot from a fresh roster read, which is the step that
+// makes a removal a security change rather than a list edit. web ≡ mobile by construction.
+import { removeCircleMember, leaveCircleLocally } from '../../src/v2/circleMembershipHygiene.js';
 // "Never share my global address" (Frits, 2026-07-29) — a per-user PUBLICATION lock, distinct from the
 // routing fallback: a global address seen in two contexts collapses two personas into one person.
 import { shareableAddress, localStorageAddressSharingIo } from '../../src/v2/addressSharing.js';
@@ -3257,27 +3260,26 @@ async function onLeaveCircle(id, circle) {
     ? globalThis.confirm(t('circle.tile.menu.leave_confirm', { name }))
     : true;
   if (!ok) return;
-  const dispatch = resolveCallSkill ?? rawCallSkill;
-  if (typeof dispatch === 'function') {
-    try {
-      // The stoop substrate exposes `leaveGroup`; the slash router
-      // resolves /leave-group to this op.  Calling the resolved op
-      // directly here keeps β.5 standalone (no chat-shell dependency).
-      await dispatch('leaveGroup', { groupId: id });
-    } catch (err) {
-      console.warn('[circleApp] leaveGroup failed:', err?.message ?? err);
-    }
+  // B4 — leaving PRUNES this circle on this device: the substrate leave, then unbind every member's
+  // per-circle address and drop the circle's authorize snapshot. Until 2026-08-02 leaving pruned
+  // nothing, so a circle you had left still held a live list of who may speak to you.
+  // J-R4 — the relay a left circle rode stops receiving its registration, and learns nothing else.
+  // Passed in as the shell's own step: it needs a transport handle, the one thing that genuinely
+  // differs per shell.
+  try {
+    await leaveCircleLocally({
+      agent: _peerAgent, callSkill: rawCallSkill,
+      circleId: id,
+      unregister: () => unregisterCircleAddresses({
+        transport: _peerAgent?.relay, circleIds: [id],
+        circleAddressFor: (cid) => _peerAgent?.circleAddressFor?.(cid) ?? null,
+      }),
+    });
+  } catch (err) {
+    console.warn('[circleApp] leaveGroup failed:', err?.message ?? err);
   }
   try { circlesCache = await loadCircles(sources); }
   catch { /* keep cache */ }
-  // J-R4 — the relay a left circle rode stops receiving its registration, and learns nothing else.
-  // Best-effort: on a dead socket the facade no-ops, and the next boot simply won't re-register it.
-  try {
-    await unregisterCircleAddresses({
-      transport: _peerAgent?.relay, circleIds: [id],
-      circleAddressFor: (cid) => _peerAgent?.circleAddressFor?.(cid) ?? null,
-    });
-  } catch { /* best-effort */ }
   // Drop the pin if the circle is gone — the map otherwise keeps a
   // dangling key that the partition would happily filter out anyway,
   // but cleanup keeps storage tidy.
@@ -4120,6 +4122,14 @@ async function showCircleInvite(circleId) {
   const hint = document.createElement('p');
   hint.textContent = t('circle.invite.hint');
   card.appendChild(hint);
+  // B5 — how many places this invite still has. The admin holding a code is the one person who can
+  // act on the number, and until now nothing anywhere said it (web ≡ mobile: same line, same key).
+  if (typeof r.maxRedemptions === 'number' && typeof r.redemptionsUsed === 'number') {
+    const used = document.createElement('p');
+    used.textContent = t('circle.invite.uses_left', { used: r.redemptionsUsed, max: r.maxRedemptions });
+    used.style.cssText = 'font-size:12px;opacity:.8';
+    card.appendChild(used);
+  }
   const code = document.createElement('code');
   code.textContent = deepLink;
   code.style.cssText = 'display:block;word-break:break-all;font-size:11px;margin-top:6px;opacity:.7';
@@ -6287,28 +6297,18 @@ async function showAdmin(id) {
       notice = null; busy = true; rerender();
       let removed = false;
       try {
-        // G12 — capture the departing member's per-circle address BEFORE the removal, while they are
-        // still on the roster. The rendered row cannot supply it (`normalizeCircleMembers` strips the
-        // raw fields), so read it from the raw member rows.
-        let goneAddress = null;
-        try {
-          const raw = await rawCallSkill('stoop', 'listGroupMembers', { groupId: id });
-          goneAddress = (raw?.members ?? []).find((row) => row?.webid === m.webid)?.circleAddress ?? null;
-        } catch { /* best-effort — the unbind below simply does nothing */ }
-
-        const r = await rawCallSkill('stoop', 'removeMember', { groupId: id, memberWebid: m.webid, memberStableId: m.stableId });
-        if (r?.error) notice = t('circle.admin.refused');
+        // B4 — ONE shared op. It reads the roster while the member is still on it (for their
+        // per-circle address), removes them from THIS circle only, unbinds that address, and then
+        // re-reads the roster to re-record the authorize snapshot — the step without which a removed
+        // member's key stays in the allowed set and they can still speak here.
+        const r = await removeCircleMember({
+          agent: _peerAgent, callSkill: rawCallSkill,
+          circleId: id, memberWebid: m.webid, memberStableId: m.stableId,
+        });
+        if (!r.ok) notice = t('circle.admin.refused');
         else {
           removed = true;
-          // …then stop being able to seal to it. Their CANONICAL pubKey mapping is deliberately left
-          // alone: they may still be a contact, and forgetting that would break an unrelated
-          // conversation. (Hygiene, not the protection — backward secrecy is the G11 key rotation.)
-          try {
-            forgetCircleAddressKeys({
-              addresses: [goneAddress],
-              forgetPeerAddress: (addr) => _peerAgent?.forgetPeerAddress?.(addr),
-            });
-          } catch { /* best-effort */ }
+          notice = t('circle.admin.removed', { name: m.displayName || m.handle || m.webid });
         }
       } catch { notice = t('circle.admin.refused'); }
       // objective L — auto-revoke: on a SUCCESSFUL removal, rotate this circle's outbound canonical shares away

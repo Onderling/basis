@@ -717,6 +717,14 @@ export async function finalSubmit({
       state.submitErrorKey = 'circle.errors.invalid_handle.handle-taken';
       state.submitErrorReason = 'handle-taken';
       state.step = 3;
+    } else if (/invite-redemption-limit-reached/.test(String(err?.message ?? ''))) {
+      // B5 — the ISSUER refused: this invite has admitted everyone it may. A different failure from
+      // an expired code (a fresh one from the same admin fixes it) and from an offline admin (waiting
+      // fixes it), so it gets its own typed reason and its own sentence rather than a raw substrate
+      // string. The joiner is told the invite is spent, never the circle's limit.
+      state.submitError = err?.message ?? String(err);
+      state.submitErrorKey = 'circle.invite.limit_reached';
+      state.submitErrorReason = 'invite-redemption-limit-reached';
     } else if (err?.reason === 'admin-unreachable') {
       // J-NP2 — a notice, not a failure verdict: no admin was online, the invitation stays valid, try
       // again later. The state keeps the decoded invite, so retrying is the same wizard, same step.

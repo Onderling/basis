@@ -55,6 +55,10 @@ export async function buildCircleInviteUri({ callSkill, circleId, adminPeerAddr 
   catch (err) { res = { error: err?.message || 'code-fetch-failed' }; }
   let code = res?.code;
   let expiresAt = res?.expiresAt;
+  // B5 — how much of this invite is already spent. An invite surface that cannot say "3 of 6 places
+  // used" is exactly how "one code, 300 members" stays invisible to the person holding the code.
+  let maxRedemptions  = typeof res?.maxRedemptions === 'number' ? res.maxRedemptions : null;
+  let redemptionsUsed = typeof res?.redemptionsUsed === 'number' ? res.redemptionsUsed : null;
   if (!code) {
     // A non-'no-code' error (e.g. admin-only) is terminal — don't try to mint. Otherwise there's simply
     // no ACTIVE code (expired, or the circle predates code-minting) → mint a fresh one (admin-gated;
@@ -65,6 +69,9 @@ export async function buildCircleInviteUri({ callSkill, circleId, adminPeerAddr 
     catch (err) { rot = { error: err?.message || 'rotate-failed' }; }
     if (!rot?.code) return { error: rot?.error || 'no-code' };
     code = rot.code; expiresAt = rot.expiresAt;
+    // A freshly minted code has admitted nobody yet, and carries its own limit.
+    maxRedemptions  = typeof rot.maxRedemptions === 'number' ? rot.maxRedemptions : null;
+    redemptionsUsed = 0;
   }
   const invite = {
     groupId: circleId, code, expiresAt,
@@ -97,7 +104,14 @@ export async function buildCircleInviteUri({ callSkill, circleId, adminPeerAddr 
     ...(typeof relayUrl === 'string' && /^wss?:\/\/\S+$/.test(relayUrl.trim())
       ? { relayUrl: relayUrl.trim() } : {}),
   };
-  return { uri: encodeMembershipCodeUrl(invite), expiresAt };
+  return {
+    uri: encodeMembershipCodeUrl(invite), expiresAt,
+    // Deliberately NOT embedded in the invite object above: how many places a code has left is the
+    // ISSUER's business, and putting it on the wire would tell a scanner how full the circle is
+    // without telling them anything they need. It rides the RETURN value, for the admin's own screen.
+    ...(maxRedemptions  != null ? { maxRedemptions }  : {}),
+    ...(redemptionsUsed != null ? { redemptionsUsed } : {}),
+  };
 }
 
 /**

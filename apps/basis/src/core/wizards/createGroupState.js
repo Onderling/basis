@@ -23,6 +23,7 @@ export { OFFERING_AXES };
 // agents / consensusRequired) with the matching template's defaults
 // for any axis the user hasn't already overridden.
 import { applyTemplate, markAxisTouched, KRING_KINDS, SIZE_BANDS, recommendChat } from '../../v2/kringTemplates.js';
+import { INVITE_CEILING_FALLBACK } from '@onderling-app/stoop/lib/inviteCeiling';
 import { ROLE_TEMPLATE_IDS, applyRoleTemplates } from '../../v2/roleTemplates.js';
 export { KRING_KINDS, SIZE_BANDS, ROLE_TEMPLATE_IDS };
 
@@ -236,6 +237,11 @@ export function initialState() {
     keyRotationMode:       'admin-only',
     rotationDays:          30,
     inviteExpiresInHours:  1,
+    // B5 — the circle-level CEILING on how many people one of its invites may admit. `setKind`
+    // pre-fills it from the kind (`inviteCeilingForKind`); this is what a circle created WITHOUT
+    // picking a kind gets, and it is deliberately the same number the substrate falls back to for a
+    // circle whose rules say nothing. One meaning of "nobody chose", not two.
+    inviteMaxRedemptions:  INVITE_CEILING_FALLBACK,
     storagePolicy:         'no-pod',
     groupPodUri:           '',
     // Submission
@@ -375,6 +381,7 @@ export async function finalSubmit({ state, callSkill }) {
       keyRotationMode:      state.keyRotationMode,
       rotationDays:         state.rotationDays,
       inviteExpiresInHours: state.inviteExpiresInHours,
+      inviteMaxRedemptions: state.inviteMaxRedemptions,
       storagePolicy:        state.storagePolicy,
       ...(state.groupPodUri ? { groupPodUri: state.groupPodUri } : {}),
     });

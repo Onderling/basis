@@ -18,7 +18,7 @@
  * NOT quietly reached over their global key. With the fallback on, this test passes even when the
  * announcement never happens, which is exactly how this class of bug survives.
  *
- * The re-announce case is here too, because it is the same operation (Q1, "re-prove in place") and
+ * The re-announce case is here too, because it is the same operation (the "re-prove in place" answer, 2026-07-31) and
  * because the risk in it is invisible: an announcement that updates addressing but not the
  * boundary-authentication snapshot leaves a member reachable and then REFUSED — failing after
  * appearing to work. Delivery after a re-announce is the only assertion that covers both halves,

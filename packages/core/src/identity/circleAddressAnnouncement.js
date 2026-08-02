@@ -18,7 +18,7 @@
 // `circleAddressProof` is exactly what a join already carries: a signature by the key BEHIND the
 // address over `circleLinkMessage(circleId, address)` — `signCircleLink` / `signCircleLinkFromSeed`,
 // verified with the deny-by-default `verifyCircleLink`. Re-proving in place is deliberately no new
-// power (Q1, 2026-07-31): re-joining the circle would achieve the same thing at the cost of history
+// power (the "re-prove in place" answer, 2026-07-31): re-joining the circle would achieve the same thing at the cost of history
 // and standing, for identical security. One operation therefore covers re-announcing, and is the
 // precondition for signed key handover later.
 //

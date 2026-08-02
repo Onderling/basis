@@ -34,6 +34,7 @@
 // and some things are NOT on the card at all (invariants ship regardless of kind).
 import { CIRCLE_FEATURES, CIRCLE_POLICY_ENUMS } from './circlePolicy.js';
 import { TEMPLATE_CONVERSATION_KINDS } from './conversationKinds.js';
+import { INVITE_CEILING_FALLBACK } from '@onderling-app/stoop/lib/inviteCeiling';
 
 /**
  * @typedef {{
@@ -119,6 +120,34 @@ export const KRING_TEMPLATES = Object.freeze({
   },
 });
 
+/**
+ * B5 — how many people ONE of this circle's invites may admit, per kind: the circle-level CEILING the
+ * create wizard pre-fills, which an individual invite then chooses WITHIN and never above.
+ *
+ * It sits BESIDE `KRING_TEMPLATES` rather than inside it, for the same reason `TEMPLATE_CONVERSATION_KINDS`
+ * does: a template is a projection of `circlePolicy.js`'s axes, and `unknownKeysFor` (a fitness guard)
+ * enforces exactly that. This is a membership setting, not a policy axis.
+ *
+ * The numbers follow how each kind actually onboards: a household is a handful of people who already
+ * live together; a buurt takes a street in waves off one code read out at a door. The `_default` value
+ * is the same one the substrate uses for a circle whose rules say nothing
+ * (`@onderling-app/stoop/lib/inviteCeiling` → `INVITE_CEILING_FALLBACK`), so "nobody chose" means one
+ * number everywhere rather than two that drift.
+ */
+export const TEMPLATE_INVITE_MAX_REDEMPTIONS = Object.freeze({
+  household:     6,
+  buurt:         50,
+  vriendenkring: 15,
+  team:          25,
+  _default:      INVITE_CEILING_FALLBACK,
+});
+
+/** The ceiling a kind pre-fills. Always a number — an unknown kind falls back like everything else. */
+export function inviteCeilingForKind(kind) {
+  const v = TEMPLATE_INVITE_MAX_REDEMPTIONS[kind];
+  return typeof v === 'number' ? v : TEMPLATE_INVITE_MAX_REDEMPTIONS._default;
+}
+
 /** Known kinds (excluding the `_default` fallback). */
 export const KRING_KINDS = Object.freeze(
   Object.keys(KRING_TEMPLATES).filter((k) => k !== '_default'),
@@ -190,6 +219,9 @@ export function applyTemplate(state, kind) {
     // kind, so this only resolves it when the user has not chosen. `null` means "the permissive default,
     // whatever the registry says by then" — deliberately not a frozen copy of today's list.
     conversationKinds: kept('conversationKinds', s.conversationKinds, TEMPLATE_CONVERSATION_KINDS[kind] ?? null),
+    // B5 — the invite ceiling, on the same menukaart rule as every axis above: the template
+    // pre-fills, an explicit choice by the admin survives a kind switch.
+    inviteMaxRedemptions: kept('inviteMaxRedemptions', s.inviteMaxRedemptions, inviteCeilingForKind(kind)),
     // Carried through so the next switch can still tell the two apart.
     touchedAxes: [...touched],
   };

@@ -309,6 +309,26 @@
     "no_code": {
       "text": "Er is geen uitnodigingscode voor deze kring.",
       "doc": "OBJ-2 — shown when the circle has no current membership code."
+    },
+    "ceiling_label": {
+      "text": "Hoeveel mensen één uitnodiging mag toelaten",
+      "doc": "B5 — the circle-level ceiling in the create wizard. An individual invite chooses within it, never above."
+    },
+    "ceiling_hint": {
+      "text": "Het maximum aantal mensen dat met één uitnodigingscode kan meedoen. Raakt de code buiten de kring, dan kan er niet meer dan dit aantal bij. Je kunt een losse uitnodiging later lager zetten.",
+      "doc": "B5 — hint under the create-wizard ceiling field; says what the number protects against."
+    },
+    "ceiling_review": {
+      "text": "Mensen per uitnodiging",
+      "doc": "B5 — review-step label for the circle invite ceiling."
+    },
+    "uses_left": {
+      "text": "{{used}} van {{max}} plekken op deze uitnodiging gebruikt",
+      "doc": "B5 — how much of the current invite is spent; shown beside the invite QR."
+    },
+    "limit_reached": {
+      "text": "Deze uitnodiging heeft iedereen toegelaten die mocht. Vraag de beheerder van de kring om een nieuwe.",
+      "doc": "B5 — the joiner-facing message when the ISSUER refuses an over-ceiling redemption. No count: the joiner is not told the circle’s limit, only that this invite is spent."
     }
   },
   "members": {
@@ -4175,6 +4195,10 @@
     "unmute": {
       "text": "Dempen opheffen",
       "doc": "S3 — unmute a peer."
+    },
+    "removed": {
+      "text": "{{name}} zit niet meer in deze kring. Andere kringen die jullie delen blijven ongewijzigd.",
+      "doc": "B4 — confirmation after removing a member; states the per-circle scope, which is the thing that used to be untrue."
     }
   },
   "userLlm": {

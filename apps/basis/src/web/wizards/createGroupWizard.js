@@ -32,6 +32,11 @@ import {
   ROLE_TEMPLATE_IDS, toggleRole,
 } from '../../core/wizards/createGroupState.js';
 import { ROLE_TEMPLATES } from '../../v2/roleTemplates.js';
+// B5 — the ceiling field. `markAxisTouched` so an explicit choice survives a kind switch (the same
+// rule every other axis follows); the system cap comes from the module that ENFORCES it, so the
+// wizard cannot offer a number the substrate would silently clamp.
+import { markAxisTouched } from '../../v2/kringTemplates.js';
+import { INVITE_REDEMPTION_SYSTEM_CAP } from '@onderling-app/stoop/lib/inviteCeiling';
 import { RULES_QUESTIONS } from '../../v2/circleRules.js';
 import { createCirclePolicyStore, localStoragePolicyIo } from '../../v2/circlePolicyStore.js';
 import { consequenceKeyFor } from '../../v2/optionConsequences.js';
@@ -221,6 +226,18 @@ function renderGovernanceStep(container, doc, state, onNext, onBack, onCancel, r
     { type: 'number',
       hint: 'How long the membership-code stays redeemable. Short = safer for ad-hoc shares (1 h default). Long = good for slower onboarding (e.g. 168 = 1 week). Admin can /rotate-code later to mint a fresh one.' });
 
+  // B5 — the invite CEILING, next to the invite expiry because they answer the same worry from two
+  // sides: how long a leaked code lives, and how many people it can let in while it does.
+  appendField(wrap, doc, t('circle.invite.ceiling_label'), 'inviteMaxRedemptions',
+    String(state.inviteMaxRedemptions),
+    (v) => {
+      const n = parseInt(v, 10);
+      state.inviteMaxRedemptions = Number.isFinite(n)
+        ? Math.max(1, Math.min(INVITE_REDEMPTION_SYSTEM_CAP, n)) : 1;
+      markAxisTouched(state, 'inviteMaxRedemptions');
+    },
+    { type: 'number', hint: t('circle.invite.ceiling_hint') });
+
   // N3 — extra role templates (admin opt-in).
   appendRoleChecklist(wrap, doc, state, rerender);
 
@@ -374,6 +391,7 @@ function renderReviewStep(container, doc, state, onBack, onCancel, rerender, onS
   appendReview(dl, doc, 'Access policy',   labelOf(ACCESS_POLICIES, state.accessPolicy));
   appendReview(dl, doc, 'Leave policy',    labelOf(LEAVE_POLICIES, state.leavePolicy));
   appendReview(dl, doc, 'Invite expiry',   `${state.inviteExpiresInHours} h`);
+  appendReview(dl, doc, t('circle.invite.ceiling_review'), String(state.inviteMaxRedemptions));
   // 5.5a — render each non-empty rules-doc field on its own row.
   for (const q of RULES_QUESTIONS) {
     if (q.key === 'purpose') continue;   // shown above via state.purpose

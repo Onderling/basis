@@ -10,6 +10,7 @@
     "./browser": "./src/browser.js",
     "./lib/geo": "./src/lib/geo.js",
     "./lib/membershipRecord": "./src/lib/membershipRecord.js",
+    "./lib/inviteCeiling": "./src/lib/inviteCeiling.js",
     "./lib/podPathMap": "./src/lib/podPathMap.js",
     "./lib/existingPodProvisioner": "./src/lib/existingPodProvisioner.js",
     "./lib/derivePodRoot": "./src/lib/derivePodRoot.js",

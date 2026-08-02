@@ -73,7 +73,7 @@ export function Body({ title, intro, children }) {
   );
 }
 
-export function Field({ label, value, onChangeText, placeholder, monospace }) {
+export function Field({ label, value, onChangeText, placeholder, monospace, hint }) {
   const styles = makeStyles(useWizardPalette());
   return (
     <View style={styles.fieldRow}>
@@ -85,6 +85,9 @@ export function Field({ label, value, onChangeText, placeholder, monospace }) {
         placeholder={placeholder}
         autoCorrect
       />
+      {/* web's `appendField` has carried a `hint` since C1; mobile's had no slot for one, so any
+          field whose NUMBER needs a sentence lost the sentence on mobile (invariant 2). */}
+      {hint ? <Text style={styles.fieldHint}>{hint}</Text> : null}
     </View>
   );
 }
@@ -345,6 +348,7 @@ function makeStyles(p) {
 
   fieldRow:    { gap: 6, marginTop: 4 },
   fieldLabel:  { fontSize: 12, color: p.inkMuted, fontWeight: '600' },
+  fieldHint:   { fontSize: 11, color: p.inkSoft, lineHeight: 15, marginTop: 2 },
   fieldInput: {
     borderWidth: 1, borderColor: p.hair, borderRadius: 8,
     paddingHorizontal: 10, paddingVertical: 8, fontSize: 14,

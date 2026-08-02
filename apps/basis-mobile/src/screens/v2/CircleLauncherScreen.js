@@ -95,6 +95,11 @@ import { buildManifestsByOrigin } from '../../core/composeManifests.js';
 // D / Surface 2 — the detail ACTION BAR roster, projected from manifest.actions
 // via the shared selector (web≡mobile; NOT a hand-written ⋯-menu list).
 import { circleActionsMobile } from '../../../../basis/src/v2/actionProjection.js';
+// B4 — leaving a circle prunes it on THIS device (address bindings + the authorize snapshot), and
+// de-registers its per-circle address on the transport. Both shared with web; the transport handle
+// is the only per-shell part, passed in as `unregister`.
+import { leaveCircleLocally } from '../../../../basis/src/v2/circleMembershipHygiene.js';
+import { unregisterCircleAddresses } from '../../../../basis/src/v2/circleAddressRegistration.js';
 import { basisManifest } from '../../../../basis/src/index.js';
 // S6.B/C — open-screen surface + per-circle gate (shared with web).
 import { isAppSurfaceEnabled } from '../../../../basis/src/v2/appFeature.js';
@@ -1239,9 +1244,19 @@ export default function CircleLauncherScreen({
           text: t('circle.tile.menu.leave'),
           style: 'destructive',
           onPress: async () => {
+            // B4 — the SAME shared leave web uses: the substrate leave, then unbind every member's
+            // per-circle address and drop this circle's authorize snapshot. Mobile also had no
+            // address de-registration at all, which web has had since J-R4.
             if (typeof bundle?.callSkill === 'function') {
               try {
-                await bundle.callSkill('stoop', 'leaveGroup', { groupId: cid });
+                await leaveCircleLocally({
+                  agent: bundle.agent, callSkill: bundle.callSkill,
+                  circleId: cid,
+                  unregister: () => unregisterCircleAddresses({
+                    transport: bundle.agent?.relay, circleIds: [cid],
+                    circleAddressFor: (id) => bundle.agent?.circleAddressFor?.(id) ?? null,
+                  }),
+                });
               } catch (err) {
                 console.warn('[circleLauncher] leaveGroup failed:', err?.message ?? err);
               }
@@ -1511,6 +1526,7 @@ export default function CircleLauncherScreen({
     return (
       <CircleAdminPanelScreen
         callSkill={bundle?.callSkill}
+        agent={bundle?.agent}
         groupId={selected.id}
         onBack={() => setView('detail')}
       />
@@ -1980,6 +1996,12 @@ export default function CircleLauncherScreen({
                 <>
                   <QrCodeView value={inviteFor.uri} size={200} />
                   <Text style={styles.inviteHint}>{t('circle.invite.hint')}</Text>
+                  {/* B5 — web ≡ mobile: the same "n of m places used" line, from the same key. */}
+                  {typeof inviteFor.maxRedemptions === 'number' && typeof inviteFor.redemptionsUsed === 'number' ? (
+                    <Text style={styles.inviteHint}>
+                      {t('circle.invite.uses_left', { used: inviteFor.redemptionsUsed, max: inviteFor.maxRedemptions })}
+                    </Text>
+                  ) : null}
                 </>
               ) : (
                 <Text style={styles.inviteHint}>{inviteFor?.error === 'admin-only' ? t('circle.invite.admin_only') : t('circle.invite.no_code')}</Text>

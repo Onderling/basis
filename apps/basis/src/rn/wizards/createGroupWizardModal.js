@@ -29,6 +29,9 @@ import {
 import { RULES_QUESTIONS } from '../../v2/circleRules.js';
 import { attachConsequences } from '../../v2/optionConsequences.js';
 import { ROLE_TEMPLATES } from '../../v2/roleTemplates.js';
+// B5 — web ≡ mobile: the same two imports the web wizard uses for the same field.
+import { markAxisTouched } from '../../v2/kringTemplates.js';
+import { INVITE_REDEMPTION_SYSTEM_CAP } from '@onderling-app/stoop/lib/inviteCeiling';
 
 import {
   Steps, Body, Field, Textarea, RadioGroup, Checkbox,
@@ -319,6 +322,19 @@ export default function CreateGroupWizardModal({
                   onChangeText={(v) => setState((s) => ({ ...s, inviteExpiresInHours: Number(v) || 1 }))}
                   placeholder="1"
                 />
+                {/* B5 — the invite CEILING (web ≡ mobile). Same clamp, same locale keys, same
+                    `touchedAxes` bookkeeping, so a kind switch respects an explicit choice here
+                    exactly as it does on web. */}
+                <Field
+                  label={t('circle.invite.ceiling_label')}
+                  value={String(state.inviteMaxRedemptions)}
+                  onChangeText={(v) => setState((s) => markAxisTouched({
+                    ...s,
+                    inviteMaxRedemptions: Math.max(1, Math.min(INVITE_REDEMPTION_SYSTEM_CAP, Number(v) || 1)),
+                  }, 'inviteMaxRedemptions'))}
+                  placeholder="1"
+                  hint={t('circle.invite.ceiling_hint')}
+                />
                 <RadioGroup
                   label="Storage policy"
                   value={state.storagePolicy}
@@ -378,6 +394,7 @@ export default function CreateGroupWizardModal({
                     { label: 'Key rotation',value: labelOf(KEY_ROTATION_MODES, state.keyRotationMode) },
                     { label: 'Rotation interval (days)', value: String(state.rotationDays) },
                     { label: 'Invite expiry (hours)',    value: String(state.inviteExpiresInHours) },
+                    { label: t('circle.invite.ceiling_review'), value: String(state.inviteMaxRedemptions) },
                     { label: 'Storage',     value: labelOf(STORAGE_POLICIES, state.storagePolicy) },
                     ...(state.groupPodUri  ? [{ label: 'Group pod', value: state.groupPodUri, monospace: true }] : []),
                   ]} />

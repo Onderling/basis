@@ -52,7 +52,11 @@ expect them.
 ├── private/             — owner-only ACP; no public access
 │   ├── identity-vault       — encrypted vault blob (mnemonic-locked)
 │   ├── storage-mapping      — storage-mapping config (this doc)
-│   ├── agent-registry       — agent-registry resource
+│   ├── agent-registry       — DEVICE index (see the naming note below)
+│   ├── accounts/            — one per portable ACCOUNT (see "Accounts" below)
+│   │   └── <accountId>/
+│   │       ├── registry         — profiles, properties, key references
+│   │       └── log/             — this account's event log
 │   ├── state/               — per-user app state (NOT shareable; see standard)
 │   └── drafts/              — unsynced drafts
 ├── sharing/             — default-deny ACP; per-resource overrides
@@ -73,6 +77,52 @@ expect them.
   when a resource is shared (Phase 52.16 `client.sharing.*`).
 - `/sharing/public/` — world-readable, owner-write. Apps writing
   here are explicitly publishing.
+
+## Accounts — the portable unit
+
+**An account is a registry plus a log.** The registry says who you are; the log says what happened.
+Everything a person sees — circles, screens, settings, rosters, history — is a projection over those two,
+never a third stored copy. That split is not cosmetic: a materialised copy of derivable state is what
+produced the stale-membership class of bug, so the rule is *derived views over durable records*.
+
+```
+<pod>/private/accounts/<accountId>/
+    registry     — profiles, the own/inherit property graph, key REFERENCES
+    log/         — the event log for this account
+```
+
+### Why circle data is NOT under an account
+
+Circle data lives at `group/<circleId>/…` — keyed by **what it is**, not by who referenced it first. Two
+consequences, both deliberate:
+
+- **Sharing needs no index layer.** An account holds what is its own; anything shared already sits
+  somewhere shared. Accounts do not need to be bags of pointers into a blob store.
+- **Deleting an account cannot orphan a circle's history**, because that history was never inside it.
+
+For genuinely shared non-circle data (two accounts, one set of contacts), the mechanism is the profile
+property graph's **own vs inherit**: a property either holds a value or points at another profile's. One
+mechanism, no second one.
+
+### Key material is referenced, never inlined
+
+The registry stores `{"ref": "<scheme>:<id>"}`, not key bytes. Today the resolver reads them from the
+sealed registry itself; an external key manager later is a new scheme (`hsm:`, `remote:`) and a different
+resolver. **Inlining the bytes would make that swap a migration of every stored registry** — the
+indirection costs one field now and saves a rewrite later.
+
+### The file is a serialised pseudo-pod
+
+There is no separate backup format. A no-pod user's resources already live at
+`pseudo-pod://<deviceId>/private/…` and `pod-routing` picks the location, so the exported file is the same
+payload with a different carrier. **One serialiser, one restore path, one thing to test** — two formats
+would be free to drift, and drifting formats have already cost us twice (delivery TTLs, membership views).
+
+### ⚠ Naming: `agent-registry` and `accounts/` are different things
+
+`agent-registry` (Phase 52.10) is a **flat index of device installations** for WebID↔pubKey lookup, and it
+keeps that meaning. An **account** is a portable identity-plus-history. Two things, two names, on purpose —
+one word for both is how the delivery-state and membership-view confusions started.
 
 ## Storage-mapping config
 

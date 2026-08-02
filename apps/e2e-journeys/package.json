@@ -9,7 +9,8 @@
   },
   "scripts": {
     "e2e": "node run.mjs",
-    "e2e:live": "node run.mjs"
+    "e2e:live": "node run.mjs",
+    "three-party": "node three-party-circle.mjs"
   },
   "dependencies": {
     "@onderling/core": "workspace:*",

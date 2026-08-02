@@ -134,6 +134,15 @@ export async function announceOwnCircleAddress({ agent, circleId, logger = conso
     sent = Number(res?.sent) || 0;
     // "Nobody was left out" — including the circle-of-one case, where there was nobody to tell.
     // A hold-forwarded send counts as reached: it is queued, not lost.
+    //
+    // ⚠ 2026-08-02 — READ THIS BEFORE TRUSTING `reached`. It is a SEND-side signal. The fan reports what
+    // it handed to the transport; it cannot see the recipient REFUSING the envelope, and since per-circle
+    // signing became enforced there is a refusal that hits exactly this path: an announcement sent before
+    // our alias is bound goes out signed by the canonical key and is refused as
+    // `a-members-canonical-key-where-they-sign-per-circle`. The fan still says "sent, no errors".
+    //
+    // So `reached` means "nothing failed locally", NOT "the circle knows me" — and it must never again be
+    // used to decide that we are done announcing. See the trigger below.
     reached = !res?.error && (Array.isArray(res?.errors) ? res.errors.length === 0 : true);
   } catch (err) {
     logger?.warn?.('[circle-address] announce fan-out failed', err?.message ?? err);
@@ -180,6 +189,14 @@ export async function announceOwnCircleAddress({ agent, circleId, logger = conso
  * @param {(msg: string, err?: any) => void} [a.onWarn]
  * @returns {Promise<{announced: boolean, sent?: number, reason?: string}>}
  */
+/**
+ * Circles we have already announced ourselves in during THIS process.
+ *
+ * Deliberately in memory and deliberately not persisted: its whole job is to be forgotten on restart, so
+ * every boot re-announces once and a refusal can never become permanent.
+ */
+const announcedThisBoot = new Set();
+
 export async function announceOwnCircleAddressIfChanged({
   agent, circleId, members = null, onWarn = null,
 } = {}) {
@@ -200,10 +217,26 @@ export async function announceOwnCircleAddressIfChanged({
   const myRow = rows.find((m) => m?.webid === mine.memberWebid) ?? null;
   // Both halves have to be there: an address with no proof cannot be relayed on, so a row in that
   // state is not yet "known" for the purpose this exists to serve.
-  if (myRow?.circleAddress === mine.circleAddress
-    && typeof myRow?.circleAddressProof === 'string' && myRow.circleAddressProof) {
+  const rowIsCurrent = myRow?.circleAddress === mine.circleAddress
+    && typeof myRow?.circleAddressProof === 'string' && !!myRow.circleAddressProof;
+
+  // ⚠ Our own row is NOT evidence that anyone else heard us.
+  //
+  // It used to be treated as exactly that: `announceOwnCircleAddress` recorded our row locally whenever
+  // the fan reported no errors, and this check then read that row back and stayed silent forever. The
+  // three-party run (2026-08-02) measured the consequence — a joiner's announcement was refused by every
+  // recipient, the joiner recorded success anyway, and never announced again. The circle only worked
+  // because the ADMIN teaches both sides separately; the joiner's own announcement contributed nothing.
+  //
+  // So: announce ONCE PER BOOT per circle regardless of the row, and let the row suppress only the
+  // repeats within a boot. Announcing is idempotent (deny-by-default verification, patched in place) and
+  // costs one small fan; a silent-forever failure costs a member nobody can address. Anything stronger
+  // needs a RECEIPT for the announcement, which does not exist — and inventing an optimistic stand-in
+  // for one is the bug this replaces.
+  if (rowIsCurrent && announcedThisBoot.has(`${circleId}\u0000${mine.memberWebid}`)) {
     return { announced: false, reason: 'unchanged' };
   }
+  announcedThisBoot.add(`${circleId}\u0000${mine.memberWebid}`);
   return announceOwnCircleAddress({ agent, circleId, logger });
 }
 

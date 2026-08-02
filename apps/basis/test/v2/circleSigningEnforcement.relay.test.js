@@ -38,7 +38,7 @@ import {
   bindCircleAddresses, readRoster, until, teardown,
 } from '../support/pairRealAgents.js';
 import { bindCircleAddressKeysFor } from '../../src/v2/householdRosterPairing.js';
-import { primeCircleSecurity } from '../../src/v2/circleSecurityPriming.js';
+import { primeCircleSecurity, announceCircleAddresses } from '../../src/v2/circleSecurityPriming.js';
 
 const CIRCLE_A = 'buurt-signing-enforced';
 const CIRCLE_B = 'koor-signing-enforced';
@@ -52,7 +52,17 @@ async function settleMember(node, circleId) {
 }
 
 /** The BOOT step — what a shell runs, and what heals a row that proves no address. */
-const boot = (node) => primeCircleSecurity({ agent: node.agent, onWarn: () => {} });
+// BOTH steps, in the shells' order — priming installs identities and rosters, and only AFTER the alias
+// is bound does the device announce. Modelling boot as the primer alone made this file pass while the
+// real shells failed: the announcement went out signed by the canonical key and every recipient refused
+// it (measured 2026-08-02, three-party run). A boot helper that does less than boot is a test that
+// agrees with itself.
+const boot = async (node) => {
+  const primed = await primeCircleSecurity({ agent: node.agent, onWarn: () => {} });
+  const spoke = await announceCircleAddresses({ agent: node.agent, onWarn: () => {} });
+  // one object, so callers keep reading `addressesAnnounced` as they did when the primer announced
+  return { ...primed, addressesAnnounced: spoke.announced };
+};
 
 const rowFor = (roster, webid) => roster.find((m) => m?.webid === webid) ?? null;
 

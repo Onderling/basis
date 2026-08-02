@@ -757,7 +757,7 @@ import { renderCircleLauncher } from './circleLauncher.js';
 import { renderCircleTabBar, hideCircleTabBar } from './circleTabBar.js';
 import { renderCircleSettings } from './circleSettings.js';
 import { renderCircleOverride } from './circleOverride.js';
-import { primeCircleSecurity } from '../../src/v2/circleSecurityPriming.js';
+import { primeCircleSecurity, announceCircleAddresses } from '../../src/v2/circleSecurityPriming.js';
 
 // actor label stamped on local chat-message events. Real WebID/
 // peer-display wiring lands with peer broadcast.
@@ -849,7 +849,12 @@ function registerCirclePresence(agent = _peerAgent, extraCircleIds = []) {
     // The relay this device connects to IS the deployment default — unmapped circles land here alone.
     defaultRelayUrl: CIRCLE_RELAY_URL,
     onError: (err, cid) => console.warn(`[circleApp] circle-address register failed (${cid}):`, err?.message ?? err),
-  }).catch((err) => console.warn('[circleApp] circle-address registration failed:', err?.message ?? err));
+  })
+    // ONLY NOW announce. Before the aliases are bound the announcement is signed by the canonical key and
+    // every recipient refuses it, while the fan reports success (measured 2026-08-02). Web previously
+    // fired the primer and this call unawaited, so it RACED; mobile lost deterministically.
+    .then(() => announceCircleAddresses({ agent, circleIds }))
+    .catch((err) => console.warn('[circleApp] circle-address registration failed:', err?.message ?? err));
 }
 
 // In-app relay setting (Settings → Mij): persist the URL, update the resolved value, and RECONNECT the

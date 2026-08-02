@@ -60,8 +60,39 @@ CSS_URL=http://localhost:3001/ node run.mjs      # now j-companion runs instead 
   Oracle VM — see [`../../deploy/DEPLOY-RUNBOOK.md`](../../deploy/DEPLOY-RUNBOOK.md)).
   This is what proved the stack live over the tunnel.
 
+## Three participants, three processes — `three-party-circle.mjs`
+
+```bash
+node three-party-circle.mjs                  # against ws://127.0.0.1:8787
+node three-party-circle.mjs ws://host:8787   # another relay
+VERBOSE=1 node three-party-circle.mjs        # forward each participant's own output
+```
+
+Three `walk-peer.mjs` children — **separate OS processes, separate identities, separate stores** — join
+one circle on a real relay with the global-address fallback **off**, and every one of the six directions
+(admin→joiner, joiner→admin, joiner↔joiner) is checked by polling the RECIPIENT's message log. It also
+watches each participant's own log for envelopes that were REFUSED rather than lost, since that trace
+exists on exactly one side and it is never the sender's. Exit `0` = every direction delivered · `1` = one
+did not · `2` = the run could not be set up. FINDINGS are printed and do not fail the run.
+
+The in-process analogue (`apps/basis/test/v2/circleAddressAnnounce.relay.test.js`) proves the same
+protocol with three agents in ONE process; what only separate processes can show is state that is
+accidentally shared and orderings that hold only because one agent's microtask ran first.
+
+## Driving a participant by hand — `walk-peer.mjs`
+
+```bash
+node walk-peer.mjs ws://192.168.1.20:8787 --handle=bram
+node walk-peer.mjs ws://… --address-fallback=off --machine   # one JSON result line per command
+```
+
+The handle is **unique per circle**, so a second peer needs its own (`--handle` / `WALK_PEER_HANDLE`);
+reusing one is refused `handle-taken`. `--machine` makes it scriptable and `--address-fallback=off`
+refuses the global-key fallback. `help` lists the commands.
+
 ## Relation to the other test layers
 
+- `three-party-circle.mjs` — the only **multi-process** layer: three OS processes over one real relay.
 - `deploy/smoke/smoke.mjs` — a portable, `ws`-only **wire-protocol** smoke test of a
   *deployed* relay (no workspace checkout). Coarser; checks reachability + brokering.
 - **This harness** — the full **SDK/app-level** journeys (real `Agent`, sealing,

@@ -61,7 +61,7 @@ import { createConnectionPoints, bootRelayUrl, asyncStorageConnectionPointsIo } 
 // into the ENCAPSULATED identity secret (only the closure escapes).
 import { makeSharedWithMeStoreRN } from './circleStoresRN.js';
 import { openerForIdentity } from '../../../basis/src/v2/sharedCopyOpener.js';
-import { primeCircleSecurity } from '../../../basis/src/v2/circleSecurityPriming.js';
+import { primeCircleSecurity, announceCircleAddresses } from '../../../basis/src/v2/circleSecurityPriming.js';
 
 // The relay URL to connect with: the in-app setting (Settings → Mij) wins over the build-time env var,
 // so the no-server cross-device relay is configurable without a rebuild. Async (AsyncStorage) — boot +
@@ -484,6 +484,11 @@ export async function bootAgentBundle(opts = {}) {
         defaultRelayUrl: relayUrl,
         onError: (err, cid) => console.warn(`[cc/boot] circle-address register failed (${cid}):`, err?.message ?? err),
       });
+      // NOW announce — the aliases are bound, so the announcement is signed per-circle. Sending it any
+      // earlier means the canonical key signs it and every recipient refuses it while the fan reports
+      // success (measured 2026-08-02, three-party run).
+      try { await announceCircleAddresses({ agent, circleIds: ids }); }
+      catch (err) { console.warn('[cc/boot] circle-address announce failed:', err?.message ?? err); }
     } catch (err) { console.warn('[cc/boot] circle-address registration failed:', err?.message ?? err); }
   };
 

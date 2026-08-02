@@ -81,7 +81,19 @@ export async function bootPeer(browser, label, opts = {}) {
   const { lang = 'nl', transportMode, relayUrl, pod = 'no-pod', storageState } = opts;
 
   // Resolve the effective relay URL for this client's mode.
-  const wantsRelay = transportMode === 'relay' || transportMode === 'both';
+  // ARMING THE FIXTURE IS THE SWITCH (2026-08-02).
+  //
+  // This used to seed a relay only when a caller passed `transportMode: 'relay' | 'both'` — and the
+  // journeys call `bootPeers(browser, 2)` with no options at all. So `--project=relay` with
+  // PEER_TEST_RELAY set still booted every peer NKN-ONLY, which is not a configuration the two-peer
+  // journeys can pass: two ephemeral headless contexts do not find each other over NKN, so the redeem
+  // never lands and the pairing fails with `[group-redeem] send failed`.
+  //
+  // The config already describes the intended contract — "`relay` needs PEER_TEST_RELAY armed … the
+  // harness seeds it per-client" — so arming the fixture now IS the switch. An explicit `transportMode`
+  // still wins, and with no relay armed nothing changes.
+  const effTransport = transportMode || (FIXTURE_RELAY ? 'relay' : '');
+  const wantsRelay = effTransport === 'relay' || effTransport === 'both';
   const effRelay = relayUrl || (wantsRelay ? FIXTURE_RELAY : '');
 
   const context = await browser.newContext(storageState ? { storageState } : {});
@@ -93,7 +105,7 @@ export async function bootPeer(browser, label, opts = {}) {
     } catch { /* storage may be unavailable pre-nav; the ?relay= param still applies */ }
   }, {
     langKey: LS_KEYS.lang, lang,
-    transportKey: LS_KEYS.transport, transport: transportMode || '',
+    transportKey: LS_KEYS.transport, transport: effTransport,
     relayKey: LS_KEYS.relayUrl, relayUrl: effRelay,
   });
 
@@ -109,7 +121,7 @@ export async function bootPeer(browser, label, opts = {}) {
   const dest = effRelay ? `/?relay=${encodeURIComponent(effRelay)}` : '/';
   await page.goto(dest);
   await page.waitForTimeout(4000);
-  return { context, page, label, mode: { transportMode: transportMode || 'nkn', relayUrl: effRelay, pod } };
+  return { context, page, label, mode: { transportMode: effTransport || 'nkn', relayUrl: effRelay, pod } };
 }
 
 /**

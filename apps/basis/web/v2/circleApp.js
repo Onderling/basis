@@ -75,6 +75,9 @@ import { removeCircleMember, leaveCircleLocally } from '../../src/v2/circleMembe
 import { shareableAddress, localStorageAddressSharingIo } from '../../src/v2/addressSharing.js';
 import {
   createConnectionPoints, adoptExistingRelay, localStorageConnectionPointsIo, recordJoinedCirclePoints,
+  // Used at module scope to pick the boot relay; it was never imported, so loading the web shell threw
+  // `bootRelayUrl is not defined` before anything rendered — a BLANK PAGE, not a degraded one.
+  bootRelayUrl,
 } from '../../src/v2/connectionPoints.js';
 import { renderConnectionPoints } from './circleConnectionPoints.js';
 import { createCircleDispatch, addressesBot } from '../../src/v2/circleDispatch.js';

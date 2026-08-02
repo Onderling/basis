@@ -6,6 +6,22 @@ before you start bisecting a build or native crash.
 
 ---
 
+## A Vite alias pointing at `./node_modules/<pkg>` cannot resolve under a hoisted install
+
+`apps/basis/vite.config.js` aliased the `events` polyfill to a path built with
+`new URL('./node_modules/events/events.js', import.meta.url)`. That only exists when the dependency is
+materialised **app-locally**. This repo installs hoisted — `apps/basis/node_modules/` holds nothing but
+the workspace symlinks — so the file was absent and **Vite failed to start at all**: no dev server, no
+Playwright run, no web shell. The error surfaces as an esbuild-optimizer `ENOENT` deep in a Vite stack,
+which reads like a corrupt install rather than a config bug.
+
+Use `createRequire(import.meta.url).resolve(...)` instead — it finds the package wherever the installer
+put it, and keeps the single-module-instance property such aliases exist for.
+
+**And resolve the FILE, not the bare specifier:** `require.resolve('events')` returns Node's **builtin**
+`'events'`, not the npm polyfill, so the alias would silently point at a different module than intended.
+`require.resolve('events/events.js')` gives the real path.
+
 ## `adb shell input keyevent 111` is ESCAPE — it cancels the modal, not the keyboard
 
 Walking the join wizard on a device (2026-08-02), I sent `keyevent 111` after `input text` intending to

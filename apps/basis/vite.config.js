@@ -10,6 +10,7 @@
 
 import { defineConfig } from 'vite';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
 const empty       = fileURLToPath(new URL('./src/web/shims/empty.js',       import.meta.url));
 const oidcSession = fileURLToPath(new URL('./src/web/shims/oidcSession.js', import.meta.url));
@@ -40,9 +41,16 @@ const onderlingCore = fileURLToPath(new URL('../../packages/core',          impo
 // resolution chain when they're served as source under pnpm hoisting;
 // pinning to one absolute file keeps every `node:events` import on the
 // same module instance.
-const eventsShim  = fileURLToPath(new URL(
-  './node_modules/events/events.js', import.meta.url,
-));
+//
+// 2026-08-02 — RESOLVED, not hardcoded. This used to point at `./node_modules/events/events.js` relative
+// to this file, which only exists when the dependency is materialised app-locally. Under the hoisted
+// layout this repo actually installs, `apps/basis/node_modules/` holds nothing but the workspace links,
+// so the path did not exist and Vite failed to START at all — no dev server, no browser suite, no web
+// shell. `createRequire().resolve` finds it wherever the installer put it and keeps the single-instance
+// property the comment above is about.
+// `events/events.js`, not `events` — the bare specifier resolves to Node's BUILTIN, which is not what
+// the browser bundle needs and would silently give a different module than the alias promises.
+const eventsShim  = createRequire(import.meta.url).resolve('events/events.js');
 
 export default defineConfig({
   root: 'web',

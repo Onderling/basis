@@ -25,6 +25,8 @@
  * marked with the phase that makes them green — Phase 0 lands the net, not the fixes.
  */
 
+import { createCircleViaWizard } from './helpers.js';
+
 /** Where every journey drops its screenshots. */
 export const SHOTS = '/home/frits/.claude/jobs/c6a31a12/tmp/verify-shots';
 
@@ -177,11 +179,15 @@ export async function tileNames(page) {
   return out;
 }
 
-/** Create a circle from the launcher (name comes via the "+ new circle" prompt). */
+/**
+ * Create a circle from the launcher, through the WIZARD.
+ *
+ * This used to accept a `window.prompt` — creation has been a five-step wizard for weeks, so the handler
+ * waited for a dialog that is never raised and no circle was ever made. Delegates to the one
+ * implementation in `helpers.js` so this harness and the single-page specs cannot drift apart again.
+ */
 export async function createCircle(page, name) {
-  page.once('dialog', (d) => d.accept(name));
-  await page.locator('.circle-launcher__new').click();
-  await page.waitForTimeout(5000);
+  await createCircleViaWizard(page, name);
 }
 
 /** Open the launcher tile matching `re` (falls back to the first tile). */

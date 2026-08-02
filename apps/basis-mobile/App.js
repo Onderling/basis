@@ -30,6 +30,7 @@ import CircleLauncherScreen from './src/screens/v2/CircleLauncherScreen.js';
 // peer-router (inbound receipts) and CircleLauncherScreen's bubbles (rendering) share an instance.
 // Two maps would mean receipts advancing a state no bubble reads.
 import { createDeliveryStateMap } from '@onderling/kring-host/deliveryState';
+import { makeGiveUpConsumers } from '../basis/src/v2/deliveryGiveUp.js';
 import {
   makeReceiptSender, asyncStorageDeliveryIo, createDeliverySettingsStore,
   createFallbackOffer, setAddressFallbackReportHook,
@@ -405,25 +406,10 @@ export default function App() {
           // state for a message that is gone — the one place the UI could say something untrue. App owns
           // the delivery map and hands the SAME instance to both shells, so writing here is web≡mobile by
           // construction. `failed` is an existing terminal state the bubble already renders with a retry.
-          secureAgentOpts: {
-            onHoldDropped: ({ msgId, reason, addr, ageMs }) => {
-              if (!msgId) return;
-              try { deliveryStateMapRef.current?.set(msgId, 'failed'); }
-              catch { /* the warn in createSecureAgent already recorded the drop */ }
-              console.warn(
-                `[delivery] gave up on ${String(msgId)} → ${String(addr).slice(0, 16)}… `
-                + `(${reason}${Number.isFinite(ageMs) ? `, held ${Math.round(ageMs / 1000)}s` : ''})`,
-              );
-            },
-            // The far-end twin: the message DID leave here, waited at the relay, and the relay's TTL or a
-            // cap ended it. Same honest outcome for the bubble — `failed`, which renders with a retry —
-            // but a different fact, so it is a different hook (see createSecureAgent).
-            onUndelivered: ({ msgId, reason }) => {
-              if (!msgId) return;
-              try { deliveryStateMapRef.current?.set(msgId, 'failed'); }
-              catch { /* nothing to do; the relay already told us and the warn below records it */ }
-              console.warn(`[delivery] relay gave up on ${String(msgId)} (${reason})`);
-            },
+          // The two give-up reports, from the ONE shared rule (web's circleApp.js calls the same).
+          // This was an inline copy here and absent on web, which is how web ended up unable to say that
+          // a message had been given up on.
+          secureAgentOpts: makeGiveUpConsumers({ deliveryMap: deliveryStateMapRef.current }),
           },
           // Persist the agent identity (chat + host vaults + stoop
           // cache) to AsyncStorage so the NKN address — derived from the

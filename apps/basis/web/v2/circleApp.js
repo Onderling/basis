@@ -758,6 +758,7 @@ import { renderCircleTabBar, hideCircleTabBar } from './circleTabBar.js';
 import { renderCircleSettings } from './circleSettings.js';
 import { renderCircleOverride } from './circleOverride.js';
 import { primeCircleSecurity, announceCircleAddresses } from '../../src/v2/circleSecurityPriming.js';
+import { makeGiveUpConsumers } from '../../src/v2/deliveryGiveUp.js';
 
 // actor label stamped on local chat-message events. Real WebID/
 // peer-display wiring lands with peer broadcast.
@@ -6619,6 +6620,10 @@ async function boot() {
     };
     const agent = await createRealHouseholdAgent({
       publishEvent: publishEventToLog,
+      // A message the system has GIVEN UP ON must stop looking fine. Web consumed neither report until
+      // 2026-08-02, so a dropped or expired message kept its optimistic state forever — on the shell we
+      // are shipping first. Same shared rule mobile uses; the shell injects only its map and logger.
+      secureAgentOpts: makeGiveUpConsumers({ deliveryMap: deliveryStateMap }),
       // recovery — resolve a circle's pod version store for the
       // listDataVersions/restoreDataVersion skills (see circleVersioning.js).
       versionStoreFor: getCircleVersionStore,

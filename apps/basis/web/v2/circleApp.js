@@ -1055,6 +1055,54 @@ const agentRequestStore = createAgentRequestStore({
 // it rather than dropping. Device-local — never fanned.
 const retentionIo = localStorageRetentionIo();
 const eventLog = new EventLog({ initial: [], muted: [], retention: retentionFromDays(retentionIo.load()) });
+
+/**
+ * The display-theme preference — read and written by BOTH "My data" and Settings.
+ *
+ * Module scope because it had two callers in different functions: declared inside `showMyData`, referenced
+ * inside `showSettings`, where it resolved to nothing. `themePref: getThemePref()` is evaluated while
+ * building the settings model, so the ReferenceError took the whole SETTINGS SCREEN down on web — not just
+ * the theme control. The pre-paint hook in index.html reads the same key at boot; 'system' = follow the OS.
+ */
+function getThemePref() {
+  try { return localStorage.getItem('basis.theme') || 'system'; } catch { return 'system'; }
+}
+
+/**
+ * Persist + stamp the theme. Deliberately does NOT redraw: every screen that offers this control has its
+ * own `rerender` closure, so the redraw belongs at the call site. Hoisting the whole handler (including
+ * `rerender()`) is how the first attempt at this fix broke — it captured whichever `rerender` happened to
+ * be lexically nearest, which is exactly the confusion these hoists exist to remove.
+ */
+function setThemePref(v) {
+  if (v !== 'system' && v !== 'light' && v !== 'dark') return false;
+  try {
+    if (v === 'system') localStorage.removeItem('basis.theme');
+    else localStorage.setItem('basis.theme', v);
+  } catch { /* best-effort */ }
+  if (v === 'system') delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = v;
+  return true;
+}
+
+/**
+ * Append an application event to the one log.
+ *
+ * Module scope because it has always had TWO callers in different scopes: the agent boot passes it as
+ * `publishEvent`, and the bulk-dispatch path at the top of the file calls it directly. It used to be
+ * declared inside the boot, so that second call site referenced an identifier that resolved to nothing —
+ * wrapped in `try { … } catch { /* swallow *\/ }`, which turned a ReferenceError into a feature that
+ * silently did nothing: bulk-dispatch events were never logged, and nothing said so.
+ */
+let _eventSeq = 0;
+function publishEventToLog(e) {
+  if (!e || typeof e !== 'object') return;
+  eventLog.append({
+    ...e,
+    id: e.id ?? `cc-${Date.now()}-${(_eventSeq += 1).toString(36)}`,
+    ts: e.ts ?? Date.now(),
+  });
+}
 // Profile-update propagation (roster-as-truth, diff-gated, silent pull-me).
 //   • the memo — what this device last shared with each (persona, circle); the diff-gate's
 //     left-hand side, so open-and-save-unchanged sends nothing at all.
@@ -1479,6 +1527,11 @@ let circleDispatchReady = null;  // buildCircleBot's dispatchReady({opId,args}) 
 let circleApplyUserLlm = null;   // (cfg) => {ok,mode}|{ok:false,error} — rebuild the live LLM/embed providers from the member's settings
 let circleEmbedButtonTap = null; // S6.A — dispatch an inline embed button {opId,itemId} from a bot reply
 let circleSyncFolioNoteEmbedder = null; // 52.25 — re-wire folio /zoek's embedder from the active circle's embed policy
+// The circle-policy embedder resolver, published out of the scope that owns `policyFor` / `userDefault` /
+// `embedProviders`. The agent-boot block below needs it and cannot see any of those three: it was calling
+// them directly, so every folio-embedder sync threw a ReferenceError instead of setting an embedder. Same
+// publish-a-module-level-handle pattern as the line above.
+let circleResolveRagEmbedder = null;
 // S6.C — per-user surface preference (inline / screen / minimal); hydrated at boot.
 const circleSurfacePref = createSurfacePrefStore(localStorageSurfacePrefIo());
 let circleContactSkills = null;  // live contact/bot exposed-skill registry (subscribed to agent.peers)
@@ -2023,10 +2076,12 @@ function buildCircleBot(agent) {
   // resolved `EmbeddingClient` OBJECT (the PodSearch-backed retriever normalises
   // it — `{model}` → `{id}`), or `null` when off/unconfigured → the hybrid index
   // degrades to LEXICAL-only with NO embed call (invariant #7 + llmTool gate).
+  // eslint-disable-next-line no-func-assign -- published to module scope; see the declaration
   const resolveCircleRagEmbedder = async () => {
     try { return resolveCircleEmbedder({ circlePolicy: await policyFor(), userDefault, providers: embedProviders }) || null; }
     catch { return null; }
   };
+  circleResolveRagEmbedder = resolveCircleRagEmbedder;   // reachable from the agent boot (see declaration)
   const policyIo = localStoragePolicyIo();
   async function policyFor() {
     const cid = getActiveCircle();
@@ -3851,19 +3906,6 @@ async function showMyData() {
   };
   // Display theme: persist + stamp data-theme live (the pre-paint hook in
   // index.html reads the same key at boot; 'system' = follow the OS).
-  const getThemePref = () => {
-    try { return localStorage.getItem('basis.theme') || 'system'; } catch { return 'system'; }
-  };
-  const onSetTheme = (v) => {
-    if (v !== 'system' && v !== 'light' && v !== 'dark') return;
-    try {
-      if (v === 'system') localStorage.removeItem('basis.theme');
-      else localStorage.setItem('basis.theme', v);
-    } catch { /* best-effort */ }
-    if (v === 'system') delete document.documentElement.dataset.theme;
-    else document.documentElement.dataset.theme = v;
-    rerender();
-  };
   // S6.D — is the conversational "chat" projection AI-enriched in THIS circle?
   // (user-loaded LLM + circle policy.llmTool + a configured provider).
   let chatAi = { enriched: false, reason: 'no-provider' };
@@ -3938,7 +3980,7 @@ async function showMyData() {
       try { eventLog.setRetention(retentionFromDays(days)); } catch { /* a prune failure must not block the setting */ }
       rerender();
     },
-    surfacePref: circleSurfacePref.get(), onSetSurfacePref, appLang: currentLang(), onSetAppLang, themePref: getThemePref(), onSetTheme, chatAi, userLlm: userLlmCfg, onSaveUserLlm, validateUserLlm: validateUserLlmConfig,
+    surfacePref: circleSurfacePref.get(), onSetSurfacePref, appLang: currentLang(), onSetAppLang, themePref: getThemePref(), onSetTheme: (v) => { if (setThemePref(v)) rerender(); }, chatAi, userLlm: userLlmCfg, onSaveUserLlm, validateUserLlm: validateUserLlmConfig,
     // in-app relay setting (no rebuild): the field shows the saved setting; env is the placeholder fallback.
     // Objective D / Surface 4: onOpenRelayPanel routes editing into the docked side-panel (openPagePanel).
     relayUrl: resolveRelayUrl(localStorageRelayIo().load(), ''), relayEnvUrl: CIRCLE_RELAY_ENV, onSaveRelay: applyRelayUrl, onOpenRelayPanel: openRelayPanel });
@@ -4016,8 +4058,12 @@ async function showJoinCircle(inviteArg) {
     // the picker; the per-circle address presenter + its signing-proof seam let a chosen link
     // be PROVEN (Decision B). All from the agent; absent ⇒ the picker just doesn't show.
     circles: circlesCache,
-    circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
-    signCircleLink: (cid, gid, addr) => agent.signCircleLink?.(cid, gid, addr) ?? null,
+    // `circleHouseholdAgent`, not a bare `agent` — there is no such binding in this scope. The optional
+    // chain does not save it: `agent.circleAddressFor?.()` still evaluates `agent` first, so this THREW a
+    // ReferenceError whenever someone joined a circle on web. Web's join is the on-ramp, and nothing runs
+    // the web shell, so it went unseen.
+    circleAddressFor: (cid) => circleHouseholdAgent?.circleAddressFor?.(cid) ?? null,
+    signCircleLink: (cid, gid, addr) => circleHouseholdAgent?.signCircleLink?.(cid, gid, addr) ?? null,
     // J-CP1 — be on the circle's endpoint BEFORE the redeem (web ≡ mobile).
     dialEndpoint: (url) => dialRelayUrl(url),
     activeEndpointUrl: () => CIRCLE_RELAY_URL || null,
@@ -6426,7 +6472,7 @@ async function showSettings(id) {
     // Display theme — the SAME per-device preference "Mijn gegevens" shows, surfaced here too because this
     // is where people look for it. `onSetTheme` persists + stamps live and rerenders the app (defined above).
     themePref: getThemePref(),
-    onSetTheme,
+    onSetTheme: (v) => { if (setThemePref(v)) rerender(); },
     // the projected PAGE surface drives the header label (labelKey via t).
     settingsPage,
     // Phase 4 §9 — the manifest-declared Connection & transport controls + the device transport
@@ -6628,15 +6674,6 @@ async function boot() {
   } catch { /* not signed in → pseudo-pod */ }
 
   try {
-    let eventSeq = 0;
-    const publishEventToLog = (e) => {
-      if (!e || typeof e !== 'object') return;
-      eventLog.append({
-        ...e,
-        id: e.id ?? `cc-${Date.now()}-${(eventSeq += 1).toString(36)}`,
-        ts: e.ts ?? Date.now(),
-      });
-    };
     const agent = await createRealHouseholdAgent({
       publishEvent: publishEventToLog,
       // A message the system has GIVEN UP ON must stop looking fine. Web consumed neither report until
@@ -6678,9 +6715,9 @@ async function boot() {
     circleSyncFolioNoteEmbedder = async () => {
       if (typeof agent?.setFolioNoteEmbedder !== 'function') return;
       let embedder = null;
-      try {
-        embedder = resolveCircleEmbedder({ circlePolicy: await policyFor(), userDefault, providers: embedProviders });
-      } catch { embedder = null; }
+      // Through the published resolver — `policyFor`, `userDefault` and `embedProviders` are all in a
+      // scope this block cannot see, so calling them here threw rather than resolving an embedder.
+      try { embedder = (await circleResolveRagEmbedder?.()) ?? null; } catch { embedder = null; }
       agent.setFolioNoteEmbedder(embedder || null);
     };
     circleSyncFolioNoteEmbedder();

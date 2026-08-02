@@ -60,26 +60,22 @@ const KNOWN_GLOBALS = new Set([
   'scrollTo', 'open', 'close', 'print', 'process', 'require', 'module', 'exports', 'import',
   // service-worker scope (web/sw.js) — legitimate, not a missing import
   'self', 'clients', 'caches', 'skipWaiting', 'registration',
+  // `Buffer` is a NODE global used as a documented fallback behind `typeof btoa === 'function'`. Static
+  // analysis cannot see that guard; the reference only ever evaluates where the global exists.
+  'Buffer',
 ]);
 
 /**
- * Known-undefined references, recorded 2026-08-02 so this guard can GATE while the backlog is triaged.
+ * Known-undefined references. **Empty as of 2026-08-02 — all eight were fixed rather than tolerated.**
  *
- * Each is a real latent `ReferenceError` on the shell we are shipping — the path that touches it throws
- * when it runs. They are listed rather than silently allowed because the list is the work:
+ * They were: `publishEventToLog` (bulk-dispatch events silently never logged, the ReferenceError swallowed
+ * by a `catch`), `agent` in the JOIN flow (threw on every web join — the on-ramp), `getThemePref` +
+ * `onSetTheme` (took the whole SETTINGS screen down), `policyFor` + `userDefault` + `embedProviders` (every
+ * folio-embedder sync threw instead of resolving one), and `lang` in the persona screen.
  *
- *   circleApp.js  publishEventToLog:2193 · agent:4019 · getThemePref:6428 · onSetTheme:6429 ·
- *                 policyFor / userDefault / embedProviders:6682   (three in one call)
- *   circleApp.js  Buffer:4577 — a NODE global in a browser bundle. Harmless today only because the
- *                 `typeof btoa === 'function'` branch above it always wins in a browser.
- *   circleMij.js  lang:181
- *
- * Do not grow this. Removing an entry is the fix; adding one needs a reason.
+ * Keep this empty. An entry here is a live ReferenceError on the shell we ship.
  */
-const KNOWN_UNDEFINED = new Map([
-  ['web/v2/circleApp.js', ['Buffer', 'agent', 'embedProviders', 'getThemePref', 'onSetTheme', 'policyFor', 'publishEventToLog', 'userDefault']],
-  ['web/v2/circleMij.js', ['lang']],
-]);
+const KNOWN_UNDEFINED = new Map();
 
 const files = webFiles(WEB_DIR);
 

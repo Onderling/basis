@@ -66,14 +66,17 @@ export function renderMij(container, {
     return container;
   }
 
-  container.appendChild(renderGeneral(tr, model, { onSetProperty, onAddOffering, onSetPicture, resolvePicture, currentPicture }));
+  container.appendChild(renderGeneral(tr, model, { onSetProperty, onAddOffering, onSetPicture, resolvePicture, currentPicture, lang }));
   container.appendChild(renderPersonas(tr, model, { onCreatePersona }));
   container.appendChild(renderCircles(tr, model, { onToggleDisclosure, onShareToCircle }));
   return container;
 }
 
 // ── 1 · MIJN ALGEMENE PERSONA — de waarheidslaag ────────────────────────────
-function renderGeneral(tr, model, { onSetProperty, onAddOffering, onSetPicture, resolvePicture, currentPicture }) {
+// `lang` is threaded in rather than closed over: this is a module-level function, not nested inside
+// `renderMij`, so the `lang` it used to read resolved to NOTHING and the coarse-category chip threw a
+// ReferenceError — taking the persona screen down for anyone whose offering carries a category.
+function renderGeneral(tr, model, { onSetProperty, onAddOffering, onSetPicture, resolvePicture, currentPicture, lang = 'nl' }) {
   const sec = section(tr, 'circle.mij.general_eyebrow', 'circle.mij.general_tagline');
   const panel = el('div', 'cc-mij__panel');
 

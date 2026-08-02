@@ -536,8 +536,8 @@
         "doc": "Header on the 5.9b-followup BIP39 restore screen."
       },
       "lede": {
-        "text": "Type the 24 words you wrote down when you first set up the app. They'll bring back your identity and circles.",
-        "doc": "Helper text under the title."
+        "text": "Type the 24 words you wrote down when you first set up the app. They bring back your identity — the same you, reachable at the same addresses. They do NOT bring back your circles: ask an admin to invite you again, and you will keep the name you had.",
+        "doc": "2026-08-02 — it used to promise \"your identity and circles\". A hardware wipe-and-restore proved the circles do not come back: membership lives in local storage a reinstall clears. Saying so, and saying what to do instead, is worth more than the promise. The fix is the portability arc; this is not a placeholder for it."
       },
       "placeholder": {
         "text": "linen field garden …",

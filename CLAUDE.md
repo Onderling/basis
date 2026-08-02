@@ -59,10 +59,14 @@ file only helps if it's written to.
    moving private data onto an untrusted host. → [`pod-independence.md`](docs/conventions/pod-independence.md).
 8. **Every user-facing string goes through `t()`** with a locale entry — hardcoded English is a defect.
    → [`localisation.md`](docs/conventions/localisation.md).
-9. **Names are legible without the plans.** A code file — identifiers, titles, comments, UI labels — must read on its own; a
-   name that only makes sense to someone who has read a plan/design doc (a project codename, a `report-flow`-style journey tag)
-   is a defect. The `lint-codenames` guard (`scripts/lint-codenames.mjs`) enforces the codename half; keep new names
-   self-explanatory. The same discipline applies in the plan docs — spell journeys/flows out, don't invent opaque tags.
+9. **Names are legible without the plans — and that includes REFERENCES.** A comment saying `B8`, `C4a`,
+   `L13` or `J-CS8` is unresolvable for anyone without the private plan docs, and those are gitignored, so
+   for a public reader it is unresolvable by construction. Name the thing (*"the address-fallback setting"*),
+   not its row in a list. Journey tags are guarded (`lint-codenames`, baselined — do not grow it);
+   checklist ids are a review rule, because `B1`/`C3`/`L4` collide with real identifiers and a guard that
+   cannot tell them apart trains people to ignore it. Same for identifiers, titles and UI labels: a name
+   that only makes sense to someone who has read a plan doc is a defect. Spell journeys out in the plans
+   too, rather than inventing opaque tags to refer back to.
 
 ## Further conventions
 Project-wide rules beyond the invariants — concise here, full detail in [`docs/conventions/`](docs/conventions/):

@@ -174,6 +174,15 @@ export const CODENAME_PATTERNS = [
   { id: 'issue-ref', re: /#\d{3,}(?:\.\d+[a-z]?)*\b/g, codeOnly: true },
   { id: 'slice-n',   re: /\bslice[ ]+(?:\d|[A-Z]\.)/gi },
   { id: 'V-tag',     re: /\bV\d+\.\d+\b/g },
+  // Journey tags (2026-08-02, Frits: "the code must be readable standalone").
+  // `J-CS8`, `J-R4`, `J-NP3` mean nothing without the private JOURNEYS.md — and that file is gitignored,
+  // so for a public reader they are unresolvable by construction. Name what the journey CHECKS.
+  //
+  // Deliberately NOT matching checklist ids (`B8`, `C4a`, `L13`): tried, and it flagged 899 sites because
+  // `B1`/`C3`/`L4` collide with legitimate identifiers everywhere. A guard that cannot tell a plan
+  // reference from a variable is worse than the written rule, because its noise trains people to ignore
+  // it. Those stay a review rule in CLAUDE.md.
+  { id: 'journey-id',   re: /\bJ-[A-Z]{1,3}\d{1,2}(?:\.\d+)?\b/g },
 ];
 
 // EXTRA patterns enforced ONLY on the PUBLIC API surface (context 'api':

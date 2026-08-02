@@ -2405,12 +2405,12 @@
       "doc": "Turn receipts on."
     },
     "delivery_fallback_on": {
-      "text": "Je hoofdadres mag als terugval gebruikt worden",
-      "doc": "Fallback ON."
+      "text": "Kring-adressen als we ze kennen, anders je hoofdadres",
+      "doc": "Identical to the off-state on purpose — see that key."
     },
     "delivery_fallback_off": {
-      "text": "Alleen je adressen per kring worden gebruikt",
-      "doc": "Fallback OFF — the default. Phrased as what happens, not as \"a setting is off\"."
+      "text": "Kring-adressen als we ze kennen, anders je hoofdadres",
+      "doc": "Says what HAPPENS, not what a setting is. Until the stored setting reaches the send path the two states are identical, so both keys carry the same sentence rather than one of them lying."
     },
     "delivery_fallback_toggle_on": {
       "text": "Terugval niet meer toestaan",
@@ -2731,6 +2731,10 @@
     "own_profile_empty": {
       "text": "Je hebt nog geen aanbod gepubliceerd.",
       "doc": "Empty-skills footer."
+    },
+    "delivery_fallback_note": {
+      "text": "Iemand bereiken van wie je het kring-adres nog niet hebt, gebruikt je hoofdadres. Een relay die jullie allebei gebruiken kan dan zien dat die kringen bij één persoon horen. Dit per kring kunnen kiezen komt nog; nu gebeurt het altijd.",
+      "doc": "The consequence, stated where it is incurred. Replaces the toggle: a control that changes nothing is a stronger false claim than a sentence, so the button is gone until the setting is wired."
     }
   },
   "viewAsSplit": {

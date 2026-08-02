@@ -15,7 +15,7 @@
 //   node scripts/lint-codenames.mjs --list    # group hits by pattern id
 //   node scripts/lint-codenames.mjs --json     # machine-readable hit list
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import {
   tracked, isScopedCode, isScopedDoc, isPublicApiDoc, isWave1PkgJson,
   commentMask, docProseMask, pkgDescriptionMask, findCodenames,
@@ -39,7 +39,7 @@ function scopeOf(f) {
   return null;
 }
 
-const violations = [];
+let violations = [];
 const files = tracked();
 for (const f of files) {
   const scope = scopeOf(f);
@@ -69,8 +69,38 @@ if (MODE === 'list') {
   process.exit(0);
 }
 
+// ── Baseline (2026-08-02) ────────────────────────────────────────────────────────────────────────────
+// This guard has been RED for a long time, which means it has been gating nothing — and a guard that
+// gates nothing is one people learn to scroll past. Adding the journey-tag pattern took it from 28 to
+// ~191, which would have made that worse rather than better.
+//
+// So: known sites are recorded and the guard fails only on GROWTH. Same shape as the dependency-boundary
+// baseline next door, and the same reasoning as the ledger guard — land the check, then triage the debt
+// down, rather than leaving a correct check permanently ignored.
+//
+//   node scripts/lint-codenames.mjs --update   rewrite the baseline from what is on disk now
+const BASELINE = new URL('codenames-baseline.json', import.meta.url).pathname;
+const siteKey = (v) => `${v.file}:${v.id}:${v.match}`;
+
+if (process.argv.includes('--update')) {
+  writeFileSync(BASELINE, `${JSON.stringify({ sites: violations.map(siteKey).sort() }, null, 2)}\n`);
+  console.log(`lint-codenames — baseline rewritten: ${violations.length} known site(s).`);
+  console.log('  Triage these DOWN. Every codename you replace with its meaning is one less thing a');
+  console.log('  reader has to hold a private plan doc to understand. Do not grow this number.');
+  process.exit(0);
+}
+
+let known = new Set();
+try { known = new Set(JSON.parse(readFileSync(BASELINE, 'utf8')).sites ?? []); } catch { /* none yet */ }
+const fresh = violations.filter((v) => !known.has(siteKey(v)));
+const carried = violations.length - fresh.length;
+if (carried) {
+  console.warn(`⚠ lint-codenames: ${carried} known codename site(s) carried in the baseline — debt, not news.`);
+}
+violations = fresh;
+
 if (violations.length) {
-  console.error(`\n✖ lint-codenames: ${violations.length} internal codename(s) in scoped comments/docs:`);
+  console.error(`\n✖ lint-codenames: ${violations.length} NEW internal codename(s) in scoped comments/docs:`);
   const byFile = {};
   for (const v of violations) (byFile[v.file] ??= []).push(v);
   for (const f of Object.keys(byFile).sort()) {

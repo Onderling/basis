@@ -255,17 +255,12 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
         </Text>
         {/* The cost rides WITH the option to enable it — never the fix alone. */}
         <Text style={styles.relayHint}>{t('circle.nearbyScreen.delivery_fallback_cost')}</Text>
-        <Pressable
-          style={styles.relaySave}
-          onPress={() => toggleDelivery({ allowFallback: !delivery.allowFallback })}
-          testID="delivery-fallback-toggle"
-        >
-          <Text style={styles.relaySaveText}>
-            {t(delivery.allowFallback
-              ? 'circle.nearbyScreen.delivery_fallback_toggle_on'
-              : 'circle.nearbyScreen.delivery_fallback_toggle_off')}
-          </Text>
-        </Pressable>
+        {/* The toggle is GONE until the stored setting reaches the send path (2026-08-02) — it wrote a
+            preference nothing read, so both states behaved identically. A control that changes nothing is a
+            stronger false claim than the sentence above it. web ≡ mobile: circleMyData.js does the same. */}
+        <Text style={styles.relayHint} testID="delivery-fallback-note">
+          {t('circle.nearbyScreen.delivery_fallback_note')}
+        </Text>
 
         {/* cluster J — pod sign-in entry (the v2 UI had none). When signed out: pod provider + Connect. */}
         {podAuth && !podSignedIn && (

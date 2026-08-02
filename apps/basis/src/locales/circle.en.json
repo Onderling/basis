@@ -2405,12 +2405,12 @@
       "doc": "Turn receipts on."
     },
     "delivery_fallback_on": {
-      "text": "Your main address may be used as a fallback",
-      "doc": "Fallback ON."
+      "text": "Per-circle addresses when we know them, your main address when we don't",
+      "doc": "Identical to the off-state on purpose — see that key."
     },
     "delivery_fallback_off": {
-      "text": "Only your per-circle addresses are used",
-      "doc": "Fallback OFF — the default. Phrased as what happens, not as \"a setting is off\"."
+      "text": "Per-circle addresses when we know them, your main address when we don't",
+      "doc": "Says what HAPPENS, not what a setting is. Until the stored setting reaches the send path the two states are identical, so both keys carry the same sentence rather than one of them lying."
     },
     "delivery_fallback_toggle_on": {
       "text": "Stop allowing fallback",
@@ -2731,6 +2731,10 @@
     "own_profile_empty": {
       "text": "You haven't published any offerings yet.",
       "doc": "Footer when no skills are published."
+    },
+    "delivery_fallback_note": {
+      "text": "Reaching someone whose per-circle address you don't have yet uses your main address, so a relay you both use can tell those circles belong to one person. Choosing this per circle is coming; for now it always happens.",
+      "doc": "The consequence, stated where it is incurred. Replaces the toggle: a control that changes nothing is a stronger false claim than a sentence, so the button is gone until the setting is wired."
     }
   },
   "viewAsSplit": {

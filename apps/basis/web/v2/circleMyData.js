@@ -240,14 +240,16 @@ export function renderCircleMyData(container, {
     fallbackCost.textContent = tr('circle.nearbyScreen.delivery_fallback_cost');
     sec.appendChild(fallbackCost);
 
-    const fallbackBtn = document.createElement('button');
-    fallbackBtn.type = 'button';
-    fallbackBtn.className = 'cc-mydata__action cc-mydata__delivery-fallback-toggle';
-    fallbackBtn.textContent = tr(delivery.allowFallback
-      ? 'circle.nearbyScreen.delivery_fallback_toggle_on'
-      : 'circle.nearbyScreen.delivery_fallback_toggle_off');
-    fallbackBtn.addEventListener('click', () => onSetDelivery({ allowFallback: !delivery.allowFallback }));
-    sec.appendChild(fallbackBtn);
+    // The toggle is GONE until the stored setting reaches the send path (2026-08-02).
+    //
+    // It wrote a preference nothing read: the send path defaults the fallback ON and never consults it, so
+    // both states behaved identically while the screen described them as different. A control that changes
+    // nothing is a stronger false claim than a sentence — someone presses it and believes they acted. The
+    // preference is still stored, so wiring it later restores the control without a migration.
+    const fallbackNote = document.createElement('p');
+    fallbackNote.className = 'cc-mydata__hint';
+    fallbackNote.textContent = tr('circle.nearbyScreen.delivery_fallback_note');
+    sec.appendChild(fallbackNote);
 
     container.appendChild(sec);
   }

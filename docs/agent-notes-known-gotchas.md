@@ -462,3 +462,28 @@ The two shapes it catches, both of which read as perfectly plausible code in the
 
 Companion guard: `test/screenPropsDestructured.test.js` compares what `App.js` passes against what each screen
 destructures. It found a dead `getPodWriter` prop within seconds of being written.
+
+## Relay registration is CHALLENGE-FIRST since 2026-07-31 — pipelined frames and stale relays break
+
+Registering with a relay used to be one frame (`{type:'register', address}` → `registered`). It is now
+two round trips: the relay answers with a `challenge` carrying a nonce, the client signs it with the key
+behind the address, and only the `register-proof` frame produces a `registered`. Three traps come with
+that, and all three look like something else:
+
+1. **A frame sent immediately after `register` can arrive too early.** Anything that requires a
+   completed registration — `register-push-token` is the one in the tree — now needs the `registered`
+   ack first, because the registration is one round trip further away than it used to be. The symptom is
+   `register-push-token requires register first` on a client that plainly did register. Real clients wait
+   on the transport's connect promise and are unaffected; hand-written WebSocket fixtures are not.
+2. **A relay process left running from before the change refuses every client** — correctly, because a
+   compliant client refuses a relay that does not demand proof. A long-lived dev relay on `:8787` is the
+   likely one. Restart it before concluding the client is broken; the error names the url and the reason.
+3. **A test that registers `'alice'` cannot work any more.** An address IS a public key
+   (`deriveCircleAddress` → `AgentIdentity.pubKeyFromSeed`), so registration is verified against the
+   address itself. Use `packages/relay/test/helpers/provenClient.js` (`addr('alice')` mints a real key
+   and the client answers challenges automatically) rather than inventing another fixture.
+
+Registering a per-circle ALIAS additionally needs its own signer — a different circle is a different key
+— via `addAddress(address, { sign: circleAddressSigner(profileSeed, circleId) })`. Without one the bind
+is refused locally with a named reason rather than silently never completing.
+Background: `plans/DESIGN-boundary-authentication.md` §7.

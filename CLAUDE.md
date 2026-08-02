@@ -35,7 +35,9 @@ file only helps if it's written to.
    pairs" violated; see `apps/basis/docs/web-mobile-consolidation-plan.md`.)
 2. **web ≡ mobile.** Neither platform is the "primitive" one. A shared string/op/behaviour must exist in
    BOTH — ideally **by construction** (one shared source both merge), not copied. New shared work lands in
-   `src/`; each shell injects only its adapter.
+   `src/`; each shell injects only its adapter. An **empty grep on the other shell is a FINDING, not a
+   clearance** — wire the equivalent, or say in the same turn that there isn't one. (5× in July 2026: the
+   rule never failed, *noticing* the violation did.)
 3. **No duplication.** A string/op/function is defined ONCE. Editing the same thing in two files (e.g. a
    locale key in the web *and* mobile bundle) is the signal to consolidate — then add a guard so it can't
    recur. (`circle.*` locale is now one shared source `apps/basis/src/locales/`; do the same for the rest.)
@@ -107,6 +109,11 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
   coverage, so nothing else will catch a typo there (→ `docs/agent-notes-known-gotchas.md`).
 - **Prefer a fitness function to a manual check.** When you fix drift, add the test/lint that makes the same
   drift FAIL CI next time. This is the roadmap's step 0 — see `REMAINING-WORK.md` "★ Architectural spine".
+  **A seam is not done until something passes through it:** write the test that CROSSES it — a real socket, a
+  real boot — not unit tests either side. Two green tests flanking a dead seam is what inert wiring looks like.
+- **When two layers hold the same fact, pin the AGREEMENT, not either value.** The relay held messages 5 min
+  and the app 24 h — one system, two answers, neither chosen. A test reading both forces whoever changes one
+  to change both, or to decide on purpose that they differ.
 - **New functionality = add a manifest + projectors**, not a new app silo. Most apps dissolve into basis —
   their `manifest.js` stays the source of truth and the app *name* becomes a nav label. **The test is whether
   it needs its own interaction model** (Frits, 2026-07-28): stoop and tasks do not, so they reduce to close

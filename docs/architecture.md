@@ -430,7 +430,9 @@ access, sealing, the confidential LLM transport) stays client-side or in an **at
 moving private data onto an untrusted host. Correspondingly:
 
 - **Local-only mode is the floor; the pod is portability.** Every app works fully without an authenticated
-  pod. Shared-state apps without a pod replicate P2P via kernel `MergeContracts` + relay group-publish.
+  pod. Shared-state apps without a pod replicate P2P via kernel `MergeContracts` + per-member relay
+  forwards. (The relay's `group-publish` fan-out was removed 2026-07-31: the frame named a circle in
+  cleartext on the wire. The sender holds the roster and addresses each member.)
 - **Pod is truth, local cache is reality.** When a pod is configured it's authoritative but slow; the UI reads
   the local cache and syncs on a cadence with optimistic, queued writes, so a pod outage never breaks the app.
 
@@ -522,6 +524,15 @@ existing **per-user address fallback** (default off, offered with its cost): wit
 whose points cannot carry per-circle addressing is honestly undeliverable; with it on, the user has
 accepted the trade and an NKN circle works. Same vocabulary as every other fallback in the product — no new
 concept, and the cost is stated where it is incurred.
+
+**A different address is not enough on its own: a circle also signs with its own key.** A member holds a
+**per-circle identity** derived from the profile seed (`circleIdentity`), and it is that key — not the
+profile's global one — that signs a circle envelope and that content is sealed to. Without this the routing
+address differs per circle while the keys in the header do not, so anything carrying the traffic can line the
+circles up by key alone and the per-circle address buys nothing. Selection is by address: the transport
+stamps one of its own bound addresses on the envelope and the security layer picks the identity that answers
+there, so nothing below the app learns that a circle exists. Contact and pairing traffic still uses the
+profile identity — there is no circle to speak as.
 
 `RoutingStrategy.routeLadder(peer)` exposes the full `direct → mesh → hop → companion` ladder. **Built vs.
 forward:** direct + mesh resolve from real transports (NKN end-to-end, relay, `InternalTransport`); the **hop**

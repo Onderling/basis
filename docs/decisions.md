@@ -875,3 +875,229 @@ One thing `multi` does differently, and it is the interesting half: it names its
 registry, and a list frozen into a manifest drifts the moment that registry gains a member. The validator
 **refuses** both a `multi` with no source and a `multi` that supplies `of` — making the drift
 unrepresentable rather than merely discouraged.
+
+---
+
+## 2026-07-30 — Two token kinds, and only two: role tokens for authority, mandate tokens for acting on behalf
+
+**Status:** settled (design); first implementation target chosen, not yet built. Sits on the settled
+2026-07-18 substrate — roles are capability bundles that materialize signed cap-tokens on grant
+(`RoleBundle` / `RoleGrantManager`), with `PolicyEngine` as the single enforcement point.
+
+**Context:** with a capability-token substrate in place, the open question was *which* operations carry a
+token. Left unanswered, every new operation re-argues it, and the answer drifts per surface. The decision
+was taken on 2026-07-30 and until now lived only in a private design document (the ops · flows · nav
+design), which two later documents already leaned on — precisely the drift
+[`conventions/decision-log.md`](./conventions/decision-log.md) exists to prevent.
+
+**Decision:** exactly two kinds of token, each with a reason to exist.
+
+- **Role tokens** gate the few operations that assert **authority beyond membership** — evict a member,
+  rotate a key, change policy, change the rules. Standing, held for as long as the role is held.
+- **Mandate tokens** gate anything an agent does **on someone's behalf**. Task-scoped and inherently
+  expiring — the task ends, the mandate ends. (Code term *mandate*, UI term *entrust* / NL *toevertrouwen*
+  — 2026-07-18.)
+- **Ordinary posting needs neither.** Membership plus the seal already establish entitlement: to post into
+  a circle you must be able to seal to it, and the roster already says who that is. A token there would
+  restate what the seal proves.
+
+Enforcement runs **on the device that owns the state** — the admin's device for authority verbs, the
+producer's device for content — never in the caller's UI, per
+[`conventions/enforceability.md`](./conventions/enforceability.md).
+
+**Alternatives / why:** over *"every operation carries a token, with membership issuing a baseline token at
+join"* — uniform, and every action would carry the same auditable shape. Rejected on two counts. It makes
+ordinary conversation **ceremonial**: sending a message would mint, present and check a credential to
+re-derive a fact the seal already carries. And a token that is **always present stops carrying
+information** — if everything is token-gated, the token no longer marks the operations that deserve a
+second look, and the audit trail it was supposed to produce says only that people were members.
+
+**Consequences:** the "may admit new members" grant is the same shape as evict/rotate/policy/rules — a
+capability in a bundle, not a mechanism of its own. The **first implementation target is one
+mandate-gated operation**, not a role-gated one: the journey that needs it exercises an *expired* grant
+being refused, and expiry is inherent to a mandate while a role token is standing — so the mandate path
+exercises issue, present, check **and** expire, where the role path would exercise only the first three.
+
+---
+
+## The push-token concession is ACCEPTED and stated in the product, not engineered around (2026-07-31, Frits)
+
+The 2026-07-29 entry above established the concession — one device, one OS push token, so a relay you are
+connected to can group N per-circle addresses as one person once notifications are on. The remaining call
+was what to *do* about it, and it was blocking a verification session.
+
+**Decision: accept it, bound it, and say it plainly.** Per-circle addressing still hides your circles from
+**each other** and from every relay you do **not** use, so the concession is bounded to the relay you chose
+— that is the honest sentence, and it is the one the product should carry. Notifications stay **on by
+default**, and the settings surface where they are enabled says that the relay you use can tell your
+circles apart.
+
+**Rejected, with reasons:**
+
+- *Notifications off by default.* Most people never change a default, so most people would silently get no
+  notifications — a failure of its own, and a worse one than the linkage it avoids.
+- *Per-circle push tokens.* Expensive to build, and the OS may defeat it anyway; a mitigation that may not
+  hold is worse than a stated limit, because it invites a claim we cannot support.
+
+**The honest limit is pinned as a test rather than as prose** (`perCircleAddressingConcession`), so it
+cannot drift away from what the code actually does. That is the same pattern as the other privacy claims:
+the claim is the journey, the guard is the test.
+
+---
+
+## A wake notification carries NOTHING but the fact of a wake (2026-07-31, Frits)
+
+The offline-delivery ladder ends in an OS push, and the question was what that push may say. The candidate
+payloads were `hint:'message-pending'` and a bare `{wake:true}`.
+
+**Decision: bare.** A wake tells the device to come and look; it does not say what it would find. The
+`hint` field looks harmless because it carries no content, but it tells the push provider — Google or
+Apple, outside anything we control — that a *message* is waiting, and doing that on every delivery leaks a
+communication-pattern trace about a person to a third party who is not part of the conversation. The
+functional gain is nil: the app has to open the connection and look either way.
+
+**Consequences:** the wake is a doorbell, not an envelope. Anything that wants richer local notification
+copy must derive it **after** waking, from what the device already holds — never from the push payload.
+Timing remains the residual channel, and is addressed separately by throttling and digests rather than by
+the payload.
+
+---
+
+## Pods are SELF-HOSTED (Community Solid Server), not a hosted provider (2026-07-31, Frits — ratified)
+
+Long-standing in practice, never written down: development, the hardware walks and the pod-backed circle
+journeys all ran against a self-hosted CSS pod with WAC. The alternative was a hosted provider (Inrupt,
+ACP).
+
+**Decision: ratify what practice already chose.** Self-hosting keeps the pod on infrastructure the
+deployment controls, which is what invariant 7 asks for — sensitive data does not move onto an untrusted
+host. It also keeps the access-control model as WAC, which the storage layout and the grants work already
+assume.
+
+**Recorded rather than decided:** this entry exists because the choice was made by doing, and an unwritten
+choice is one that gets silently re-opened. Revisit only if hosting a pod becomes the thing standing
+between a real neighbourhood and using this.
+
+---
+
+## An envelope carries the FULL signing key, not a key id (2026-08-02, Frits)
+
+Boundary-authentication decision 1 made every envelope carry the key its signature must verify against
+(`_signedBy`), so that `_from` can be a routing hint that nothing trusts. The remaining choice was what
+that field holds.
+
+**Decision: the full public key.** Measured cost is 58 bytes — a minimal encrypted message goes from 404
+to 462.
+
+**Why not a key id.** A key id is smaller, but it needs somewhere to resolve ids into keys, and **a
+resolver is an observer**: whoever answers "which key is this?" learns who is asking about whom. That is
+precisely the linkage per-circle addressing exists to prevent, so the saving would be paid for in the
+currency this project is trying not to spend. A key id also cannot serve genuine first contact — an
+unresolvable id is an unverifiable envelope, where a carried key needs nothing but itself.
+
+**Consequences:** verification is self-contained. Nothing has to be looked up, fetched, or cached to check
+that a message is genuinely from the key it claims — which is what lets the authorize step be a separate,
+injectable decision rather than a lookup entangled with verification.
+
+**Revisit when:** high-frequency small envelopes appear (presence beats, telemetry), where 58 bytes stops
+being noise. The choice is isolated in two functions in `senderKey.js` and the lookup path is already
+threaded, so changing it is small.
+
+---
+
+## A circle address and a circle signing key are ONE derivation (2026-08-02, Frits)
+
+`deriveCircleAddress(profileSeed, circleId)` returns a public key, and in a circle that key is both **where
+you are reached** and **what verifies your signatures**. `circleAddress.js` has asserted this since it was
+written; this entry ratifies it rather than leaving it as an assumption the design leans on.
+
+**Decision: one derivation.** Routing and verification are the same fact. Knowing where to reach someone in
+a circle means already holding the key that verifies them — no directory to consult, no key distribution
+step, nothing to fetch before you can check a signature.
+
+**Why not two.** The benefit of separating them is rotating one without disturbing the other, and two
+earlier decisions already cover that ground. *Re-prove in place* made re-announce, adding a device and key
+rotation a single operation, so rotation does not need the separation. And *per-device keys under one
+identity* resolves a member to a SET of addresses, having explicitly rejected the shape where devices share
+one address (delivery becomes ambiguous, revocation all-or-nothing) — which is the shape two derivations
+pulls back toward.
+
+### The consequence: `_signedBy` is redundant on circle traffic, on purpose
+
+Because the address is the key, the `_signedBy` field that boundary-authentication decision 1 puts on every
+envelope **repeats `_from`** for circle traffic. Two names for one value, 58 bytes apiece.
+
+**This is kept deliberately, and it is worth understanding why**, because "remove the redundant field" is an
+obvious-looking cleanup that would quietly reintroduce a defect:
+
+- **Deriving the verification key FROM the address ties the two namespaces together.** That equivalence
+  holds for per-circle addressing and is **already false elsewhere** — a canonical identity on a mesh
+  transport has an address that is not its key. Code that reads the key out of `_from` would be correct on
+  one path and wrong on another, which is the worst shape a security check can have.
+- **The whole point of decision 1 is that `_from` is a routing hint nothing trusts.** Reading the
+  verification key out of the field we just finished refusing to trust would undo the inversion while
+  looking like a simplification.
+- **The redundancy is where the check lives.** Two independent statements of the same fact can disagree,
+  and a disagreement is exactly what we want to catch — a single field can only be believed.
+
+So: the bytes buy the property that verification never depends on what the routing layer claims. If this
+ever needs to change, the field is resolved in one place (`senderKey.js`), not read inline anywhere.
+
+**What would reopen this:** answering L2 the other way later. If addresses and signing keys ever become two
+derivations, `_signedBy` stops being redundant and starts carrying information `_from` does not have — the
+field is already correct for that world, which is the other reason it was not collapsed.
+
+---
+
+## Membership authorization lives in the APP, and its absence is loud (2026-08-02, Frits)
+
+Boundary-authentication decision 1 verifies an envelope against the key it carries and then **authorizes**
+that key against a roster. Authorization needs to know who is in a circle, and invariant 5 says concrete
+membership knowledge does not belong in `packages/core`.
+
+**Decision: the kernel holds a port, the app holds the implementation** — which is what was built, so this
+ratifies it. A fitness test asserts that no membership word appears as an identifier anywhere in
+`packages/core`.
+
+**The question that was actually open** was whether the implementation should move down into a substrate
+package, so that anything built on the published SDK inherits it rather than reimplementing it. **Not yet:**
+the substrate has no membership concept either, so pushing it down recreates the same invariant-5 problem
+one floor lower. Revisit when SDK publishing lands and there is a third-party consumer to protect.
+
+**Because we chose that, the absence had to stop being silent.** An agent with no authorizer installed
+verifies that a message is genuinely signed by the key it carries — and then accepts it from anyone. That is
+reasonable for a test rig or a single-peer tool and serious for an app with circles, and nothing
+distinguished the two. `SecurityLayer` now **warns once, naming the fix**, and keeps a count
+(`senderAuthorizationsByAbsence`): a counter survives a lost console, a warning survives an unread counter.
+
+**One constraint that survives either answer, and explains a limitation elsewhere:** the port is
+**synchronous**, because the receive path is. An authorizer cannot do I/O; it answers from state already in
+memory. That is why the roster has to be assembled ahead of time — and why assembling it as a side effect of
+opening a screen is a real gap rather than a detail.
+
+---
+
+## A member is present on ANY of a circle's connection points, not all (2026-08-02, Frits)
+
+A circle may have several connection points (relays). The sender-side half was decided on 2026-07-31: a
+sender uses **the fewest points that achieve delivery** — try where the recipient is known reachable, fall
+back sequentially, stay sticky, back off from what keeps failing. Not "race them all", because *trying* a
+point reveals you to it.
+
+**Decision: a member must be present on at least ONE point, and may be on several by choice.**
+
+**Why not "all".** Requiring every member on every point makes delivery deterministic, and pays for it in
+exactly the currency the sender-side answer was protecting: every relay would then see every member of the
+circle, so adding a point would tax every member's privacy and every member's device (N open connections,
+on phones). It also defeats a reason to have several operators at all.
+
+**What it commits us to.** Delivery is best-effort across points. "I could not reach them" becomes a real
+outcome the interface has to be able to state — the same honesty requirement as the delivery-state ladder,
+not a new one.
+
+**Resilience is a member's choice, not a circle-wide tax.** Someone who wants to survive their relay going
+down joins a second point. They do not impose that cost on everyone else.
+
+**Consequence for invites:** an invite carries the connection point(s) **the sharer is on**, and it is fine
+that this is not exhaustive — a joiner learns more as they meet more members. Under "all" an incomplete
+invite would have been a defect; under "any" it is the honest thing to send.

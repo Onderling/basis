@@ -4849,5 +4849,11 @@
       "text": "Borrowing",
       "doc": "Label for the leen conversation kind in the admin control."
     }
+  },
+  "errors": {
+    "invalid_handle": {
+      "handle-taken": "That name is already taken in this circle. Pick another.",
+      "handle-taken_hint": "If you restored this device, the circle may still hold your previous name — pick a new one, or ask an admin to remove the old entry."
+    }
   }
 }

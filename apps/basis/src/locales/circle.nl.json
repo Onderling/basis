@@ -4849,5 +4849,11 @@
       "text": "Lenen",
       "doc": "Label for the leen conversation kind in the admin control."
     }
+  },
+  "errors": {
+    "invalid_handle": {
+      "handle-taken": "Die naam is al bezet in deze kring. Kies een andere.",
+      "handle-taken_hint": "Als je dit apparaat hersteld hebt, houdt de kring je vorige naam misschien nog vast — kies een nieuwe, of vraag een beheerder de oude te verwijderen."
+    }
   }
 }

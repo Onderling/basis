@@ -50,6 +50,30 @@ export function circleSigningKeyOf(member) {
 }
 
 /**
+ * Does this roster row carry a per-circle address the member PROVED?
+ *
+ * ▸ **This is what decides whether a member is held to per-circle signing** (B6). A row that carries
+ *   an address *and* the signature over it (`circleAddressProof`, verified by `verifyCircleLink`
+ *   before it was ever written — at redeem, or on an announcement) is a member who has demonstrated
+ *   they can sign per-circle. From then on their canonical key buys them nothing and leaks their
+ *   identity across circles, so `circleSenderAuthorization` stops accepting it.
+ *
+ * The PROOF, not merely the address, is the test — for one reason that matters: it is the same
+ * condition `announceOwnCircleAddressIfChanged` uses to decide whether to re-announce, and the same
+ * one `announcementsFromRoster` uses to decide whether a row can be relayed on. So the set of
+ * members still allowed to speak canonically is exactly the set the announce path is already trying
+ * to heal — one condition, three call sites, no third state to reason about.
+ *
+ * @param {object} member  a roster row
+ * @returns {boolean}
+ */
+export function hasProvenCircleAddress(member) {
+  if (typeof member?.circleAddressProof !== 'string' || !member.circleAddressProof) return false;
+  const signing = circleSigningKeyOf(member);
+  return typeof signing === 'string' && !!signing;
+}
+
+/**
  * Bind every member's per-circle address to their identity key, from a circle roster.
  *
  * Idempotent — re-running after a roster refresh picks up new members and key rotations, and rebinding an

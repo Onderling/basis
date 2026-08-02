@@ -557,6 +557,24 @@ async function securityStatus(_args, { agent, t }) {
       lines.push(`  - ${p.length > 64 ? p.slice(0, 60) + '…' : p}`);
     }
   }
+  // ── The circle boundary (Decision 1 + B6) ──────────────────────────────────────────────────
+  // Three numbers that cannot be read anywhere else, and each names a way this check is weaker or
+  // stronger than it looks. `canonicalOnly` is the one to watch: it is the set of members still
+  // allowed to speak by their canonical identity key because they have never proved a per-circle
+  // one — a transition, and a transition nobody can measure is a permanent state with a nicer name.
+  const circle = (typeof agent.circleSenderAuthorization === 'function')
+    ? agent.circleSenderAuthorization()
+    : null;
+  if (circle) {
+    lines.push('');
+    lines.push('Circle boundary (who may speak):');
+    lines.push(`  Roster authorizer:      ${circle.installed ? 'installed' : 'NOT INSTALLED — any valid signature is accepted'}`);
+    lines.push(`  Circles recorded:       ${circle.circles}`);
+    lines.push(`  Refused (stranger):     ${circle.refusedStrangers}`);
+    lines.push(`  Refused (canonical):    ${circle.refusedCanonicalSigners ?? 0}  — members who signed as their global identity`);
+    lines.push(`  Canonical-only members: ${circle.canonicalOnlyMembers ?? 0}  — no proven per-circle address yet; linkable across circles`);
+    lines.push(`  Accepted unchecked:     ${circle.unknownRosterAllowances}  — envelopes to a circle whose roster was never read`);
+  }
   lines.push('');
   lines.push('Every OW envelope to a HI\'d peer is:');
   lines.push('  ✓ Ed25519-signed (sender authenticated)');

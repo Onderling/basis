@@ -31,7 +31,7 @@ import {
 import {
   useCircleSigningIdentity, installCircleSigningIdentities,
 } from '../../v2/circleSigningIdentity.js';
-import { createCircleSenderAuthorization } from '../../v2/circleSenderAuthorization.js';
+import { createCircleSenderAuthorization, SENDER_REASON } from '../../v2/circleSenderAuthorization.js';
 import { shareableAddress } from '../../v2/addressSharing.js';
 import { VaultMemory, VaultLocalStorage } from '@onderling/vault';
 import { wireSkill } from '@onderling/sdk';
@@ -372,9 +372,21 @@ export async function createRealHouseholdAgent(opts = {}) {
       `[realAgent] no roster recorded for own circle address ${String(ownAddress).slice(0, 12)}… — `
       + 'traffic to it is ACCEPTED unchecked until this circle\'s membership has been read once.',
     ),
-    onRefused: ({ circleId, senderKey }) => console.warn(
-      `[realAgent] refused a validly-signed envelope in ${circleId ?? 'a circle'}: the key `
-      + `${String(senderKey).slice(0, 12)}… is not on its roster.`,
+    onRefused: ({ circleId, senderKey, reason }) => console.warn(
+      reason === SENDER_REASON.CANONICAL_REFUSED
+        ? `[realAgent] refused a validly-signed envelope in ${circleId ?? 'a circle'}: the key `
+          + `${String(senderKey).slice(0, 12)}… is a MEMBER's canonical identity, and that member has `
+          + 'proved a per-circle address — inside a circle only the per-circle key may speak.'
+        : `[realAgent] refused a validly-signed envelope in ${circleId ?? 'a circle'}: the key `
+          + `${String(senderKey).slice(0, 12)}… is not on its roster.`,
+    ),
+    // The transition, said out loud (B6). These members are still accepted on their canonical key
+    // because refusing them would make them undeliverable rather than pseudonymous — a shrinking
+    // set, not an open door, and the only way to know which it is in practice is to print it.
+    onCanonicalOnlyMembers: ({ circleId, count, of }) => console.warn(
+      `[realAgent] ${count} of ${of} member(s) of ${circleId ?? 'a circle'} have no PROVEN per-circle `
+      + 'address, so their canonical identity key is still accepted there — linkable across circles. '
+      + 'They leave this set on their own, the first time their device announces an address.',
     ),
   });
   sa.setSenderAuthorizer?.(circleSenders.authorizeSender);
@@ -3190,6 +3202,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       circles:                 circleSenders.circleAddressCount,
       unknownRosterAllowances: circleSenders.unknownRosterAllowances,
       refusedStrangers:        circleSenders.refusedStrangers,
+      // B6 — the two halves of "is per-circle signing enforced here, and how far is it done?"
+      refusedCanonicalSigners: circleSenders.refusedCanonicalSigners,
+      canonicalOnlyMembers:    circleSenders.canonicalOnlyMembers,
     }),
     // Decision B (SENSITIVE) — sign the cross-circle link challenge with the SOURCE circle's
     // key (seed-derived, no vault) so a "continue as an existing self" claim is PROVABLE. The

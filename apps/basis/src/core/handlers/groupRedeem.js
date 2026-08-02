@@ -22,6 +22,10 @@
  * @param {(appOrigin: string, opId: string, args: object) => Promise<*>} args.callSkill
  * @param {(addr: string, payload: object) => Promise<*>}                  args.sendPeer
  * @param {(args: {groupId: string, newPeerAddr: string, newPeerDisplay?: string, newPeerShared?: boolean}) => Promise<*>} [args.propagateMeshIntros]
+ * @param {(args: {circleId: string, newMemberWebid: string}) => Promise<*>} [args.propagateCircleAddresses]
+ *   B2 — hand the circle the newcomer's PROVEN per-circle address, and the newcomer the circle's.
+ *   The admin is the only party that can reach both sides at this moment; see
+ *   `v2/circleAddressAnnounce.js` for why carrying these is not vouching for them.
  * @param {(event: object) => void}                                        [args.publishEvent]
  * @param {(groupId: string) => (string|null)}                             [args.circleAddressFor]  the admin's own per-circle address presenter
  * @param {(groupId: string, address: string) => (string|null)}            [args.signCircleAddress] …and its proof-of-possession signer
@@ -29,7 +33,7 @@
  * @returns {(fromAddr: string, payload: object) => Promise<void>}
  */
 export function makeHandleGroupRedeemRequest({
-  callSkill, sendPeer, propagateMeshIntros, publishEvent,
+  callSkill, sendPeer, propagateMeshIntros, propagateCircleAddresses, publishEvent,
   circleAddressFor, signCircleAddress, logger = console,
 } = {}) {
   if (typeof callSkill !== 'function') throw new Error('makeHandleGroupRedeemRequest: callSkill required');
@@ -97,6 +101,14 @@ export function makeHandleGroupRedeemRequest({
             : `⚠ rejected join attempt for ${groupId}: ${reply.error}`,
         },
       });
+      if (reply.ok && typeof propagateCircleAddresses === 'function') {
+        // B2 — the join is the moment per-circle addressing becomes knowable for a member nobody
+        // else can address yet. Fire-and-forget for the same reason the intros are: the joiner's
+        // membership is already real, and a failed propagation must not turn into a failed join.
+        // It only means someone keeps being reached the old way until the next announce.
+        propagateCircleAddresses({ circleId: groupId, newMemberWebid: fromAddr })
+          .catch((err) => logger.warn?.('[circle-address] post-join propagation failed', err));
+      }
       if (reply.ok && typeof propagateMeshIntros === 'function') {
         propagateMeshIntros({
           groupId,

@@ -25,8 +25,13 @@
 
 import {
   Agent, AgentIdentity, Bootstrap, InternalBus, InternalTransport, DataPart, TokenRegistry,
-  PolicyEngine, TrustRegistry, deriveCircleAddress, signCircleLinkFromSeed,
+  PolicyEngine, TrustRegistry, deriveCircleAddress, circleAddressSigner, signCircleLinkFromSeed,
+  circleIdentity,
 } from '@onderling/core';
+import {
+  useCircleSigningIdentity, installCircleSigningIdentities,
+} from '../../v2/circleSigningIdentity.js';
+import { createCircleSenderAuthorization } from '../../v2/circleSenderAuthorization.js';
 import { shareableAddress } from '../../v2/addressSharing.js';
 import { VaultMemory, VaultLocalStorage } from '@onderling/vault';
 import { wireSkill } from '@onderling/sdk';
@@ -127,6 +132,7 @@ async function ensureOwnerRoot(vault) {
   return bootstrap;
 }
 
+import { restoreOwnerRoot } from './ownerRootRestore.js';
 import {
   CalendarStore, registerCalendarSkills,
 } from '@onderling-app/calendar';
@@ -304,6 +310,20 @@ export async function createRealHouseholdAgent(opts = {}) {
   if (!(await chatVault.has('agent-privkey'))) {
     await AgentIdentity.fromSeed(defaultProfileSeed, chatVault);
   }
+
+  // Decision 4 — the per-circle SIGNING identity, one per circle, memoised.
+  //
+  // Deterministic from the profile seed, so the vault is deliberately EPHEMERAL: nothing here is
+  // worth persisting, and a per-circle key written to storage is one more copy of the thing we are
+  // trying not to spread. Re-derived on every boot; the same on every device the profile is on.
+  const circleIdentities = new Map();   // circleId → Promise<AgentIdentity>
+  const circleIdentityFor = (circleId) => {
+    if (!circleIdentities.has(circleId)) {
+      circleIdentities.set(circleId, circleIdentity(defaultProfileSeed, circleId, new VaultMemory()));
+    }
+    return circleIdentities.get(circleId);
+  };
+  const circleAddressFor = (circleId) => deriveCircleAddress(defaultProfileSeed, circleId);
   const sa = await createSecureMeshAgent({
     bus,
     vault:               chatVault,
@@ -335,6 +355,29 @@ export async function createRealHouseholdAgent(opts = {}) {
   });
   const chatAgent = sa.agent;
   const chatId    = chatAgent.identity;
+
+  /* ─── Decision 1 step 3 — the roster authorize, installed here for BOTH shells ────────────────
+   * The kernel verifies an inbound envelope against the key it carries and then asks this whether
+   * that key may speak at the address the envelope was sent to. Installed at agent construction
+   * rather than by a shell, so `web ≡ mobile` holds by construction: a shell cannot forget it,
+   * because a shell never touches it. The snapshot it answers from is fed by
+   * `bindCircleAddressKeysFor`, which is the one place the app already learns a circle's roster.
+   *
+   * Both diagnostics below are deliberately loud. "Nobody vouched for this key" and "I have never
+   * seen this circle's roster" are the two ways this check can be weaker than it looks, and neither
+   * announces itself any other way.
+   */
+  const circleSenders = createCircleSenderAuthorization({
+    onUnknownRoster: ({ ownAddress }) => console.warn(
+      `[realAgent] no roster recorded for own circle address ${String(ownAddress).slice(0, 12)}… — `
+      + 'traffic to it is ACCEPTED unchecked until this circle\'s membership has been read once.',
+    ),
+    onRefused: ({ circleId, senderKey }) => console.warn(
+      `[realAgent] refused a validly-signed envelope in ${circleId ?? 'a circle'}: the key `
+      + `${String(senderKey).slice(0, 12)}… is not on its roster.`,
+    ),
+  });
+  sa.setSenderAuthorizer?.(circleSenders.authorizeSender);
 
   /* ─── OBJ-2 (S1a/S1c) — household no-pod peer item-sync ─────────────────────
    * Wire the in-process household store into the substrate mirror over the REAL
@@ -921,11 +964,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     try { root = Bootstrap.fromMnemonic(mnemonic); }
     catch { return [DataPart({ ok: false, error: 'invalid-phrase' })]; }
     try {
-      // Persist the owner root + re-derive the default profile into the chat vault.
-      // The live chatAgent keeps its current identity until an app RELOAD re-boots
-      // realAgent, which then restores this seed + owner root.
-      await ownerRootVault.set('owner-phrase', root.toMnemonic());
-      await AgentIdentity.fromSeed(root.deriveAgentSeed('default'), chatVault);
+      // ONE implementation, shared with the first-run door (`ownerRootRestore.js`) — which used to have
+      // its own, and restored nothing. The live chatAgent keeps its current identity until an app RELOAD
+      // re-boots realAgent, which then finds this seed + owner root.
+      const r = await restoreOwnerRoot({ mnemonic: root.toMnemonic(), ownerRootVault, chatVault });
+      if (!r.ok) return [DataPart({ ok: false, error: r.detail ?? r.code })];
       return [DataPart({ ok: true, reloadRequired: true })];
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'restore-failed' })]; }
   }, { visibility: 'trusted' });   // 2.4b — overwrites the owner root: owner-only
@@ -1137,7 +1180,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // `chat.send` transport (stoop's own in-process agent) never had. The stoop skill builds a
     // conforming `kring-chat-message` envelope and calls this per recipient; a briefly-offline
     // member has the message HELD and flushed on reconnect, exactly like a task/noticeboard fan.
-    reliableSend: (to, envelope, sendOpts = {}) => {
+    reliableSend: async (to, envelope, sendOpts = {}) => {
       // Circle-scoped routing (2026-07-29): map the circle to its CONNECTION POINTS and hand those down.
       // The app owns points; the transport layer owns transports; neither learns the other's vocabulary.
       // `requireAliasCapable` is the user's address-fallback setting inverted — with the fallback OFF we
@@ -1150,10 +1193,19 @@ export async function createRealHouseholdAgent(opts = {}) {
       const fallbackOn = typeof opts.allowAddressFallback === 'function'
         ? opts.allowAddressFallback() !== false
         : opts.allowAddressFallback !== false;
+      // Decision 4 — sign this circle's traffic as this circle's identity, not as the person.
+      // `sendAs` is an ADDRESS of ours; the key behind it never leaves the SecurityLayer, and the
+      // transport layer below never learns that a circle was involved. Installing here as well as at
+      // boot is deliberate: the send path must not depend on a boot step having happened first.
+      const sendAs = await useCircleSigningIdentity({
+        circleId, circleAddressFor, circleIdentityFor,
+        registerSelfIdentity: (address, id) => sa.registerSelfIdentity(address, id),
+      });
       return sa.peer.sendTo(to, envelope, {
         guarantee: 'hold-forward',
         ...rest,
         scope: { points, requireAliasCapable: !fallbackOn },
+        ...(sendAs ? { sendAs } : {}),
       });
     },
     // Connectivity Phase 3 — LIVE shared-pod key-custody seams (host-injected by circleApp over each
@@ -1166,6 +1218,14 @@ export async function createRealHouseholdAgent(opts = {}) {
     circleDataMove: opts.stoopCircleDataMove,
     podWrite:       opts.stoopPodWrite,
     podReadSince:   opts.stoopPodReadSince,
+    // The per-user address-fallback setting reaches the FAN too, not only `reliableSend` below.
+    // The two enforce different halves of the same choice: the fan decides WHICH address a member
+    // is reached at, `reliableSend` decides which transports may carry it. Until now only the
+    // second was wired, so "fallback off" narrowed the transport while the fan still chose the
+    // member's one global key — the setting was half-applied, in the half that leaks. Absent →
+    // undefined → the skills' own `true` default, i.e. no behaviour change for a host that
+    // passes nothing.
+    allowAddressFallback: opts.allowAddressFallback,
     label:      'StoopAgent(cc)',
   });
   await chatAgent.hello(stoopAgent.address);
@@ -3073,13 +3133,64 @@ export async function createRealHouseholdAgent(opts = {}) {
     hostPolicyEngine: hostAgent.policyEngine ?? null,
     // Step 5B/C — the per-circle ADDRESS this device presents in a circle (unlinkable-by-default),
     // derived from the default profile seed. The substrate the roster-recording wire consumes.
-    circleAddressFor: (circleId) => deriveCircleAddress(defaultProfileSeed, circleId),
+    circleAddressFor,
+    // The address IS a public key, so registering it on a relay means answering a challenge with the
+    // matching private key. This is that signer — it stays beside circleAddressFor because the two are
+    // one fact: an address you cannot prove is an address you cannot register.
+    circleAddressSignerFor: (circleId) => circleAddressSigner(defaultProfileSeed, circleId),
+    // Decision 4 — the per-circle SIGNING identity behind that address, and the one call a shell
+    // makes to switch it on. `installCircleIdentities(ids)` must run for every circle this device is
+    // in: without it this device cannot OPEN what was sent to its per-circle address, and a shell
+    // that forgets it looks exactly like a shell whose relay is down. Both shells call it beside
+    // their existing per-circle address registration.
+    circleIdentityFor,
+    registerSelfIdentity: (address, identity) => sa.registerSelfIdentity?.(address, identity) ?? false,
+    forgetSelfIdentity:   (address) => sa.forgetSelfIdentity?.(address) ?? false,
+    installCircleIdentities: (circleIds) => installCircleSigningIdentities({
+      circleIds,
+      circleAddressFor,
+      circleIdentityFor,
+      registerSelfIdentity: (address, id) => sa.registerSelfIdentity(address, id),
+      onFailed: (cid) => console.warn(`[realAgent] no per-circle signing identity for ${cid} — this `
+        + 'device signs that circle as its global identity, and messages sealed to its per-circle '
+        + 'address cannot be opened.'),
+    }),
     // G12 — bind a member's PER-CIRCLE address to their identity key, so this device can seal to it.
     // Without this, routing to a per-circle address (G13 step C) throws `No pubKey registered` above the
     // transport and every message holds. The shells call it with the circle roster, which already carries
     // `{pubKey, circleAddress}` per member. → `src/v2/circleAddressKeys.js` for the reasoning.
-    registerPeerAddress: (address, pubKey) => sa.registerPeerAddress?.(address, pubKey) ?? false,
+    registerPeerAddress: (address, pubKey, addrOpts) =>
+      sa.registerPeerAddress?.(address, pubKey, addrOpts) ?? false,
     forgetPeerAddress:   (address) => sa.forgetPeerAddress?.(address) ?? false,
+    // Decision 1 step 3 — feed the roster authorize. Called from `bindCircleAddressKeysFor`, i.e.
+    // from the same read of the same rows that binds each member's address to their key: the two
+    // facts are one fact, and reading them twice is how the two drift. Returns how many distinct
+    // keys may now speak in the circle, so a caller can tell "recorded" from "the read came back
+    // empty and I recorded nothing".
+    async recordCircleSenders({ circleId, members } = {}) {
+      const ownAddress = circleAddressFor(circleId);
+      if (!ownAddress) return 0;
+      let selfCircleKey = null;
+      try { selfCircleKey = (await circleIdentityFor(circleId))?.pubKey ?? null; } catch { /* derive-only */ }
+      return circleSenders.recordCircleRoster({
+        circleId,
+        ownAddress,
+        members,
+        // Our own two keys: what we sign this circle's traffic with, and our canonical identity —
+        // the second because our OTHER devices share this profile seed and may still be speaking
+        // canonically, and refusing ourselves is never the right answer.
+        selfKeys: [selfCircleKey, chatId.pubKey].filter(Boolean),
+      });
+    },
+    /** Drop a circle's authorize snapshot — the circle was left. */
+    forgetCircleSenders: (circleId) => circleSenders.forgetCircleSenders(circleId),
+    /** Diagnostics for `/security-status`: how strong this device's membership check actually is. */
+    circleSenderAuthorization: () => ({
+      installed:               !!sa.senderAuthorizerInstalled,
+      circles:                 circleSenders.circleAddressCount,
+      unknownRosterAllowances: circleSenders.unknownRosterAllowances,
+      refusedStrangers:        circleSenders.refusedStrangers,
+    }),
     // Decision B (SENSITIVE) — sign the cross-circle link challenge with the SOURCE circle's
     // key (seed-derived, no vault) so a "continue as an existing self" claim is PROVABLE. The
     // join wizard passes this on the redeem seam; the admin verifies it before recording.

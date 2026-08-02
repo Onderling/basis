@@ -14,6 +14,10 @@ import { TextPart, Parts } from '../src/Parts.js';
 // rather than depending on @onderling/relay (separate package).
 
 import { WebSocketServer } from 'ws';
+// The fixture has to CHALLENGE: a client refuses a server that registers it without
+// demanding proof of address possession (DESIGN-boundary-authentication §7).
+import { newAddressChallenge, verifyAddressPossession } from '../src/identity/addressPossession.js';
+
 
 function startServer() {
   const wss     = new WebSocketServer({ port: 0 });
@@ -21,12 +25,24 @@ function startServer() {
 
   wss.on('connection', ws => {
     let addr = null;
+    const open = new Map();               // nonce → address, single use
     ws.on('message', raw => {
       let msg;
       try { msg = JSON.parse(raw); } catch { return; }
       if (msg.type === 'register') {
+        const nonce = newAddressChallenge();
+        open.set(nonce, msg.address);
+        ws.send(JSON.stringify({ type: 'challenge', address: msg.address, nonce }));
+        return;
+      }
+      if (msg.type === 'register-proof') {
+        if (open.get(msg.nonce) !== msg.address || !verifyAddressPossession(msg)) {
+          ws.send(JSON.stringify({ type: 'error', message: 'PROOF_INVALID' }));
+          return;
+        }
+        open.delete(msg.nonce);
         addr = msg.address; clients.set(addr, ws);
-        ws.send(JSON.stringify({ type: 'registered' }));
+        ws.send(JSON.stringify({ type: 'registered', address: addr }));
         return;
       }
       if (msg.type === 'send') {

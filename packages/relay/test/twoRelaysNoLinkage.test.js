@@ -17,8 +17,19 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import WebSocket from 'ws';
 import { startRelay } from '../src/server.js';
 import { RelayTransport } from '@onderling/transports';
-import { AgentIdentity, deriveCircleAddress, deriveCircleSeed } from '@onderling/core';
+import {
+  AgentIdentity, deriveCircleAddress, deriveCircleSeed, circleAddressSigner,
+} from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
+import { randomBytes } from 'node:crypto';
+// The co-tenant observer has to register a real address of its own now — and Anna's circle
+// addresses are keys she proves, not labels (Decision 3, 2026-07-31).
+import { addr, proveAddress } from './helpers/provenClient.js';
+
+/** Anna's profile seed → her real per-circle addresses, and the signer for each. */
+const ANNA_SEED = new Uint8Array(randomBytes(32));
+const circleAddr = (circleId) => deriveCircleAddress(ANNA_SEED, circleId);
+const alias = (circleId) => [circleAddr(circleId), { sign: circleAddressSigner(ANNA_SEED, circleId) }];
 
 const settle = (ms = 150) => new Promise((r) => setTimeout(r, ms));
 
@@ -42,6 +53,11 @@ async function observer(url, ownAddress) {
     try {
       const msg = JSON.parse(raw);
       ws.frames.push(msg);
+      // The relay challenges before it registers anyone, including the watcher.
+      if (msg?.type === 'challenge') {
+        const proof = proveAddress(msg.address, msg.nonce);
+        if (proof) ws.send(JSON.stringify({ type: 'register-proof', address: msg.address, nonce: msg.nonce, proof }));
+      }
       if (msg?.type === 'peer-list') for (const p of msg.peers ?? []) ws.seen.add(p);
     } catch { /* not for us */ }
   });
@@ -73,18 +89,18 @@ describe('J-R2 — a relay learns nothing about a circle it does not host', () =
   });
 
   it('R1 sees only the X-address; R2 only the Y-address', async () => {
-    const xAddress = 'anna@circle-x';
-    const yAddress = 'anna@circle-y';
+    const xAddress = circleAddr('anna@circle-x');
+    const yAddress = circleAddr('anna@circle-y');
     // Someone connected to each relay, watching what it announces.
-    const eyeOnR1 = await observer(`ws://127.0.0.1:${r1.port}`, 'co-tenant-on-r1');
-    const eyeOnR2 = await observer(`ws://127.0.0.1:${r2.port}`, 'co-tenant-on-r2');
+    const eyeOnR1 = await observer(`ws://127.0.0.1:${r1.port}`, addr('co-tenant-on-r1'));
+    const eyeOnR2 = await observer(`ws://127.0.0.1:${r2.port}`, addr('co-tenant-on-r2'));
     sockets.push(eyeOnR1, eyeOnR2);
 
     // Circle X rides R1. Anna registers the address for THAT circle, and nothing else.
     const onR1 = new RelayTransport({ relayUrl: `ws://127.0.0.1:${r1.port}`, identity: anna });
     sockets.push(onR1);
     await onR1.connect();
-    await onR1.addAddress(xAddress);
+    await onR1.addAddress(...alias('anna@circle-x'));
     await settle();
 
     // Later, circle Y on R2 — a device is on one relay at a time, which is the realistic shape.
@@ -92,7 +108,7 @@ describe('J-R2 — a relay learns nothing about a circle it does not host', () =
     const onR2 = new RelayTransport({ relayUrl: `ws://127.0.0.1:${r2.port}`, identity: anna });
     sockets.push(onR2);
     await onR2.connect();
-    await onR2.addAddress(yAddress);
+    await onR2.addAddress(...alias('anna@circle-y'));
     await settle();
 
     const seenByR1 = eyeOnR1.seen;
@@ -149,15 +165,15 @@ describe('J-R4 — a relay you left learns nothing more', () => {
   });
 
   it('moving a circle to another relay leaves no forwarding address behind', async () => {
-    const xAddress = 'anna@circle-x';
-    const eyeOnR1 = await observer(`ws://127.0.0.1:${r1.port}`, 'co-tenant-on-r1');
+    const xAddress = circleAddr('anna@circle-x');
+    const eyeOnR1 = await observer(`ws://127.0.0.1:${r1.port}`, addr('co-tenant-on-r1'));
     sockets.push(eyeOnR1);
 
     // Circle X is on R1 for a while.
     const onR1 = new RelayTransport({ relayUrl: `ws://127.0.0.1:${r1.port}`, identity: anna });
     sockets.push(onR1);
     await onR1.connect();
-    await onR1.addAddress(xAddress);
+    await onR1.addAddress(...alias('anna@circle-x'));
     await settle();
     expect(eyeOnR1.seen.has(xAddress), 'R1 never saw the address it was hosting').toBe(true);
 
@@ -166,7 +182,7 @@ describe('J-R4 — a relay you left learns nothing more', () => {
     const onR2 = new RelayTransport({ relayUrl: `ws://127.0.0.1:${r2.port}`, identity: anna });
     sockets.push(onR2);
     await onR2.connect();
-    await onR2.addAddress(xAddress);
+    await onR2.addAddress(...alias('anna@circle-x'));
     await settle();
 
     // R1 keeps what it already saw — that is unavoidable, and the journey does not ask otherwise. What it
@@ -178,18 +194,18 @@ describe('J-R4 — a relay you left learns nothing more', () => {
   });
 
   it('…and R1 stops routing to her: a message sent there is not silently delivered elsewhere', async () => {
-    const xAddress = 'anna@circle-x';
+    const xAddress = circleAddr('anna@circle-x');
     const onR1 = new RelayTransport({ relayUrl: `ws://127.0.0.1:${r1.port}`, identity: anna });
     sockets.push(onR1);
     await onR1.connect();
-    await onR1.addAddress(xAddress);
+    await onR1.addAddress(...alias('anna@circle-x'));
     await settle();
     await onR1.disconnect();
     await settle();
 
     // A sender still pointed at R1 gets no delivery — the message queues or fails there. The failure this
     // guards against is the opposite: R1 quietly knowing where to forward, which is the leak.
-    const stranger = await observer(`ws://127.0.0.1:${r1.port}`, 'someone-else');
+    const stranger = await observer(`ws://127.0.0.1:${r1.port}`, addr('someone-else'));
     sockets.push(stranger);
     expect(stranger.seen.has(xAddress), 'R1 still advertises a peer that left').toBe(false);
   });

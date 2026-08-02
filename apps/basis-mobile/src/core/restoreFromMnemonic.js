@@ -21,11 +21,15 @@
  * The helper is pure (DI'd AsyncStorage) so vitest covers the full
  * decision tree against a Map-backed mock — no RN runtime needed.
  */
-import { AgentIdentity, validateMnemonic } from '@onderling/core';
+import { validateMnemonic } from '@onderling/core';
 import { VaultAsyncStorage } from '@onderling/react-native/identity/VaultAsyncStorage';
+import { restoreOwnerRoot } from '../../../basis/src/core/agent/ownerRootRestore.js';
 
 const REQUIRED_WORDS = 24;
 const CHAT_VAULT_PREFIX = 'cc-chat-id:';
+// Must match `realAgent`'s owner-root vault prefix — a restore that writes the phrase anywhere else is a
+// restore that silently does nothing.
+const OWNER_ROOT_VAULT_PREFIX = 'cc-owner-root:';
 
 /**
  * Restore the chat-side identity from a user-typed mnemonic.
@@ -47,15 +51,18 @@ export async function restoreFromMnemonic({ mnemonic, asyncStorage }) {
     return { ok: false, code: 'invalid' };
   }
 
-  try {
-    const vault = new VaultAsyncStorage({
-      prefix: CHAT_VAULT_PREFIX,
-      asyncStorage,
-    });
-    await AgentIdentity.fromMnemonic(normalized, vault);
-  } catch (err) {
-    return { ok: false, code: 'storage', detail: err?.message ?? String(err) };
-  }
+  // 2026-08-02 — this used to write ONLY the chat vault, from the mnemonic's raw entropy, and never
+  // touched the owner root. The next boot then found an empty owner-root vault, minted a fresh RANDOM
+  // root, and re-keyed every per-circle address — so the phrase restored nothing that mattered, and the
+  // 24 words the app would show next were neither the typed ones nor the new root's. Since a reinstaller
+  // has no identity yet, the working in-app wizard was unreachable and this was the ONLY door they had.
+  // Now it runs the same `restoreOwnerRoot` the wizard's skill runs.
+  const r = await restoreOwnerRoot({
+    mnemonic: normalized,
+    ownerRootVault: new VaultAsyncStorage({ prefix: OWNER_ROOT_VAULT_PREFIX, asyncStorage }),
+    chatVault:      new VaultAsyncStorage({ prefix: CHAT_VAULT_PREFIX,       asyncStorage }),
+  });
+  if (!r.ok) return { ok: false, code: r.code === 'invalid' ? 'invalid' : 'storage', detail: r.detail };
   return { ok: true };
 }
 

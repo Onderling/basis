@@ -29,6 +29,9 @@ export class A2ATLSLayer {
   /** Stub matching SecurityLayer.registerPeer (no-op for A2A). */
   registerPeer() {}
 
+  /** Stub matching SecurityLayer.learnPeerKey — nothing to learn, no key map here. */
+  learnPeerKey() { return 'unchanged'; }
+
   // ── HTTP-level auth helpers (called by A2ATransport directly) ────────────────
 
   /**

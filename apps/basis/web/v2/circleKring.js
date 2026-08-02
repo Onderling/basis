@@ -564,6 +564,22 @@ export function renderCircleKring(container, {
     container.appendChild(bar);
   }
 
+  // The newest bubble must be the one you can SEE.
+  //
+  // Bubbles render oldest-first into `.circle-kring__list`, which is its own `overflow-y: auto` box, and
+  // this renderer rebuilds that box from scratch on every repaint — so it came back scrolled to the TOP
+  // and the message just sent sat below the fold. It reads exactly like a message that was dropped, which
+  // is the same complaint the mobile Conversation produced from the same cause (web ≡ mobile).
+  //
+  // Belt and braces: assigned now for a container already in the document, and again on the next frame
+  // for the first paint, when heights are not final yet. Guarded — a layout-less DOM (jsdom, the tests
+  // here) has no `scrollHeight` worth reading and must not throw.
+  if (isChatStream) {
+    const toBottom = () => { try { body.scrollTop = body.scrollHeight; } catch { /* layout-less DOM */ } };
+    toBottom();
+    globalThis.requestAnimationFrame?.(toBottom);
+  }
+
   return container;
 }
 

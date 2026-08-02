@@ -89,8 +89,13 @@ export async function handleHello(agent, envelope) {
   //   • don't emit 'peer'
   //   • don't send ack
   //   • undo the SecurityLayer auto-register that happened during
-  //     decryptAndVerify, so we don't carry a key for someone we
-  //     actively refuse to hello.
+  //     decryptAndVerify — but ONLY if this envelope is what registered them.
+  //     Until 2026-08-02 this unregistered unconditionally, on the premise that a
+  //     handshake was the only way we could hold their key. The 2026-07-30 roster
+  //     fix made that false: a mute could delete a binding proved at join, breaking
+  //     verification of that member's past messages and making an unmute require a
+  //     fresh handshake. A mute says "I do not want to hear from you"; it does not
+  //     say "destroy what you learned about them elsewhere".
   // From the sender's perspective, the hello simply times out.
   const gate = agent.helloGate;
   if (typeof gate === 'function') {
@@ -101,7 +106,13 @@ export async function handleHello(agent, envelope) {
       accepted = false;                    // fail-closed on thrown errors
     }
     if (!accepted) {
-      agent.security?.unregisterPeer?.(envelope._from);
+      // Falls back to the blunt behaviour only on a SecurityLayer too old to answer — there is no
+      // such build in this tree, but the optional-call chain would silently do nothing otherwise.
+      if (typeof agent.security?.unregisterPeerIfEstablishedBy === 'function') {
+        agent.security.unregisterPeerIfEstablishedBy(envelope._from, envelope._id);
+      } else {
+        agent.security?.unregisterPeer?.(envelope._from);
+      }
       return;
     }
   }

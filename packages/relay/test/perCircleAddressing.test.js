@@ -12,8 +12,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { startRelay } from '../src/server.js';
 import { RelayTransport } from '@onderling/transports';
-import { AgentIdentity } from '@onderling/core';
+import { AgentIdentity, deriveCircleAddress, circleAddressSigner } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
+import { randomBytes } from 'node:crypto';
 
 const settle = (ms = 120) => new Promise((r) => setTimeout(r, ms));
 async function waitFor(pred, ms = 2_000) {
@@ -23,6 +24,16 @@ async function waitFor(pred, ms = 2_000) {
     await new Promise((r) => setTimeout(r, 15));
   }
 }
+
+/**
+ * Anna's profile seed and, from it, her REAL per-circle addresses. Since 2026-07-31 an alias is not a
+ * label but a key the relay makes you prove (Decision 3), so an alias comes as a pair: the address
+ * `deriveCircleAddress` produces, and the signer for the key behind it. `circleAddressSigner` is
+ * vault-free, which is what keeps registering N circles as cheap as registering one.
+ */
+const ANNA_SEED = new Uint8Array(randomBytes(32));
+const circleAddr = (circleId) => deriveCircleAddress(ANNA_SEED, circleId);
+const circleAlias = (circleId) => [circleAddr(circleId), { sign: circleAddressSigner(ANNA_SEED, circleId) }];
 
 describe('a device is reachable at its per-circle addresses', () => {
   let relay; let url; let anna; let bram; let annaId; let bramId;
@@ -50,10 +61,10 @@ describe('a device is reachable at its per-circle addresses', () => {
   });
 
   it('registers an alias and receives at it', async () => {
-    await anna.addAddress('anna@oosterpoort');
+    await anna.addAddress(...circleAlias('anna@oosterpoort'));
     await settle();
 
-    await bram._put('anna@oosterpoort', { subtype: 'kring-chat-message', text: 'hoi' });
+    await bram._put(circleAddr('anna@oosterpoort'), { subtype: 'kring-chat-message', text: 'hoi' });
     await waitFor(() => inbox.length >= 1);
     expect(JSON.stringify(inbox[0])).toContain('hoi');
   });
@@ -61,27 +72,27 @@ describe('a device is reachable at its per-circle addresses', () => {
   it('the PRIMARY address keeps working — nothing breaks while senders migrate', async () => {
     // Step C has not happened yet, so most senders still address the global key. Adding an alias must not
     // take that away, or the migration would be a flag day rather than a staged one.
-    await anna.addAddress('anna@oosterpoort');
+    await anna.addAddress(...circleAlias('anna@oosterpoort'));
     await settle();
 
     await bram._put(annaId.pubKey, { subtype: 'kring-chat-message', text: 'old-path' });
     await waitFor(() => inbox.length >= 1);
-    expect(anna.addresses).toEqual([annaId.pubKey, 'anna@oosterpoort']);
+    expect(anna.addresses).toEqual([annaId.pubKey, circleAddr('anna@oosterpoort')]);
   });
 
   it('several circles, several addresses, one connection', async () => {
-    for (const a of ['anna@x', 'anna@y', 'anna@z']) await anna.addAddress(a);
+    for (const c of ['anna@x', 'anna@y', 'anna@z']) await anna.addAddress(...circleAlias(c));
     await settle();
 
-    for (const a of ['anna@x', 'anna@y', 'anna@z']) {
-      await bram._put(a, { subtype: 'kring-chat-message', to: a });
+    for (const c of ['anna@x', 'anna@y', 'anna@z']) {
+      await bram._put(circleAddr(c), { subtype: 'kring-chat-message', to: circleAddr(c) });
     }
     await waitFor(() => inbox.length >= 3);
     expect(anna.addresses).toHaveLength(4);            // primary + three circles
   });
 
   it('aliases SURVIVE a reconnect — the failure a unit test cannot see', async () => {
-    await anna.addAddress('anna@oosterpoort');
+    await anna.addAddress(...circleAlias('anna@oosterpoort'));
     await settle();
 
     // Drop the socket the way a flaky network would, then let it come back.
@@ -90,14 +101,14 @@ describe('a device is reachable at its per-circle addresses', () => {
     await anna.connect();
     await settle(250);
 
-    await bram._put('anna@oosterpoort', { subtype: 'kring-chat-message', text: 'after-reconnect' });
+    await bram._put(circleAddr('anna@oosterpoort'), { subtype: 'kring-chat-message', text: 'after-reconnect' });
     await waitFor(() => inbox.length >= 1);
   });
 
   it('adding the same alias twice is idempotent', async () => {
-    await anna.addAddress('anna@x');
-    await anna.addAddress('anna@x');
-    expect(anna.addresses).toEqual([annaId.pubKey, 'anna@x']);
+    await anna.addAddress(...circleAlias('anna@x'));
+    await anna.addAddress(...circleAlias('anna@x'));
+    expect(anna.addresses).toEqual([annaId.pubKey, circleAddr('anna@x')]);
   });
 
   it('the primary is never added as an alias', async () => {
@@ -111,13 +122,13 @@ describe('a device is reachable at its per-circle addresses', () => {
   });
 
   it('removing an alias takes it out of the replay set', async () => {
-    await anna.addAddress('anna@stays');
-    await anna.addAddress('anna@leaving');
-    anna.removeAddress('anna@leaving');
+    await anna.addAddress(...circleAlias('anna@stays'));
+    await anna.addAddress(...circleAlias('anna@leaving'));
+    anna.removeAddress(circleAddr('anna@leaving'));
 
     // `addresses` IS the replay set — `#aliases` is exactly what `onopen` re-registers — so this is the
     // claim, not a proxy for it.
-    expect(anna.addresses).toEqual([annaId.pubKey, 'anna@stays']);
+    expect(anna.addresses).toEqual([annaId.pubKey, circleAddr('anna@stays')]);
 
     // NOT asserted here: that the RELAY forgets it after a reconnect. A removed alias only disappears
     // relay-side on reconnect (a socket cannot un-register one address today), and every way of observing

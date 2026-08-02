@@ -23,10 +23,26 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { startRelay } from '../src/server.js';
 import { PushTokenRegistry } from '../src/push/PushTokenRegistry.js';
 import { RelayTransport } from '@onderling/transports';
-import { AgentIdentity } from '@onderling/core';
+import { AgentIdentity, deriveCircleAddress, circleAddressSigner } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
+import { randomBytes } from 'node:crypto';
 
 const settle = (ms = 150) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * A per-circle address is a KEY, and since 2026-07-31 the relay makes a device prove it holds it
+ * (Decision 3) — so an alias here is the real derived address plus its vault-free signer, exactly as
+ * a device would present it. Nothing about the concession this file measures changes: what the relay
+ * correlates is the shared push token, which proof of possession does not touch.
+ */
+const seedFor = new Map();
+const seedOf = (who) => {
+  if (!seedFor.has(who)) seedFor.set(who, new Uint8Array(randomBytes(32)));
+  return seedFor.get(who);
+};
+const circleAddr = (who, circleId) => deriveCircleAddress(seedOf(who), circleId);
+const alias = (who, circleId) =>
+  [circleAddr(who, circleId), { sign: circleAddressSigner(seedOf(who), circleId) }];
 
 describe('J-R1 — one socket, several addresses, one token (the concession, exactly)', () => {
   let relay; let url; let registry; let anna; let annaId;
@@ -47,11 +63,11 @@ describe('J-R1 — one socket, several addresses, one token (the concession, exa
 
   it('the relay CAN correlate a device’s circle addresses through the shared push token', async () => {
     await anna.registerPushToken?.({ token: 'ExponentPushToken[anna-device]', platform: 'android' });
-    await anna.addAddress('anna@oosterpoort');
-    await anna.addAddress('anna@voetbalclub');
+    await anna.addAddress(...alias('anna', 'anna@oosterpoort'));
+    await anna.addAddress(...alias('anna', 'anna@voetbalclub'));
     await settle();
 
-    const rows = ['anna@oosterpoort', 'anna@voetbalclub'].map((a) => registry.get(a));
+    const rows = ['anna@oosterpoort', 'anna@voetbalclub'].map((c) => registry.get(circleAddr('anna', c)));
     // Both addresses are known to the relay…
     expect(rows.every(Boolean), 'the relay did not learn both per-circle addresses').toBe(true);
     // …and they carry the SAME token. This is the concession, stated as a fact rather than a caveat:
@@ -65,19 +81,19 @@ describe('J-R1 — one socket, several addresses, one token (the concession, exa
     // the OS hands over a token whenever it feels like it. If only one order wired the token through,
     // the other order would leave addresses unwoken, which is the G15 failure (a circle whose offline
     // members silently stop being notified) rather than a privacy one.
-    await anna.addAddress('anna@eerst');
+    await anna.addAddress(...alias('anna', 'anna@eerst'));
     await settle();
     await anna.registerPushToken?.({ token: 'ExponentPushToken[anna-device]', platform: 'android' });
     await settle();
-    await anna.addAddress('anna@daarna');
+    await anna.addAddress(...alias('anna', 'anna@daarna'));
     await settle();
 
-    expect(registry.get('anna@eerst')?.token, 'an address registered BEFORE the token was left unwoken').toBe('ExponentPushToken[anna-device]');
-    expect(registry.get('anna@daarna')?.token, 'an address registered AFTER the token was left unwoken').toBe('ExponentPushToken[anna-device]');
+    expect(registry.get(circleAddr('anna', 'anna@eerst'))?.token, 'an address registered BEFORE the token was left unwoken').toBe('ExponentPushToken[anna-device]');
+    expect(registry.get(circleAddr('anna', 'anna@daarna'))?.token, 'an address registered AFTER the token was left unwoken').toBe('ExponentPushToken[anna-device]');
   });
 
   it('what G13 still delivers: the addresses do not carry the identity that links them', async () => {
-    await anna.addAddress('anna@oosterpoort');
+    await anna.addAddress(...alias('anna', 'anna@oosterpoort'));
     await settle();
     // The correlation above comes from the TOKEN, not from the address space. A relay with no push
     // configured — and every relay Anna never used — learns nothing linking these two names. That is
@@ -87,10 +103,10 @@ describe('J-R1 — one socket, several addresses, one token (the concession, exa
       const bramId = await AgentIdentity.generate(new VaultMemory());
       const bram = new RelayTransport({ relayUrl: `ws://127.0.0.1:${plain.port}`, identity: bramId });
       await bram.connect();
-      await bram.addAddress('bram@oosterpoort');
+      await bram.addAddress(...alias('bram', 'bram@oosterpoort'));
       await settle();
       // Nothing about Anna's device reached this relay at all.
-      expect(registry.get('bram@oosterpoort')).toBeNull();
+      expect(registry.get(circleAddr('bram', 'bram@oosterpoort'))).toBeNull();
       await bram.disconnect();
     } finally { await plain.stop(); }
   });
@@ -111,10 +127,10 @@ describe('J-R5 — the token maps to the socket, never to a circle', () => {
     const dev = new RelayTransport({ relayUrl: url, identity: id });
     await dev.connect();
     await dev.registerPushToken?.({ token: 'ExponentPushToken[dev]', platform: 'android' });
-    await dev.addAddress('someone@buurt');
+    await dev.addAddress(...alias('dev', 'someone@buurt'));
     await settle();
 
-    const row = registry.get('someone@buurt');
+    const row = registry.get(circleAddr('dev', 'someone@buurt'));
     expect(row).toBeTruthy();
     // The shape IS the guarantee: a relay that stored a circle id here would know which circles a device
     // belongs to, which is strictly more than the token already leaks.
@@ -133,12 +149,12 @@ describe('J-R5 — the token maps to the socket, never to a circle', () => {
     await Promise.all([a.connect(), b.connect()]);
     await a.registerPushToken?.({ token: 'ExponentPushToken[device-a]', platform: 'android' });
     await b.registerPushToken?.({ token: 'ExponentPushToken[device-b]', platform: 'ios' });
-    await a.addAddress('x@circle');
-    await b.addAddress('y@circle');
+    await a.addAddress(...alias('a', 'x@circle'));
+    await b.addAddress(...alias('b', 'y@circle'));
     await settle();
 
     // Same circle, two members: nothing joins them. The concession is per-device and stays there.
-    expect(registry.get('x@circle')?.token).not.toBe(registry.get('y@circle')?.token);
+    expect(registry.get(circleAddr('a', 'x@circle'))?.token).not.toBe(registry.get(circleAddr('b', 'y@circle'))?.token);
     await a.disconnect(); await b.disconnect();
   });
 });

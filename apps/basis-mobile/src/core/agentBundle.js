@@ -61,6 +61,7 @@ import { createConnectionPoints, bootRelayUrl, asyncStorageConnectionPointsIo } 
 // into the ENCAPSULATED identity secret (only the closure escapes).
 import { makeSharedWithMeStoreRN } from './circleStoresRN.js';
 import { openerForIdentity } from '../../../basis/src/v2/sharedCopyOpener.js';
+import { primeCircleSecurity } from '../../../basis/src/v2/circleSecurityPriming.js';
 
 // The relay URL to connect with: the in-app setting (Settings → Mij) wins over the build-time env var,
 // so the no-server cross-device relay is configurable without a rebuild. Async (AsyncStorage) — boot +
@@ -448,9 +449,15 @@ export async function bootAgentBundle(opts = {}) {
       return _circleIdsForRegistration;
     }
   };
-  const registerCirclePresence = async (circleIds = null) => {
+  const registerCirclePresence = async (circleIds = null) => {   // primes security, then relay scoping
     const ids = Array.isArray(circleIds) ? circleIds : await liveCircleIds();
     _circleIdsForRegistration = ids;
+    // Decisions 4 + 1 — the per-circle SIGNING identity AND the roster snapshot that authorizes senders,
+    // for EVERY circle the substrate knows, before (and independently of) the relay scoping below.
+    // One shared primer, called identically by web (`circleApp.js`); until 2026-08-02 the roster half was
+    // fed only by screens, so a circle you had not OPENED accepted its traffic unchecked.
+    try { await primeCircleSecurity({ agent, circleIds: ids }); }
+    catch (err) { console.warn('[cc/boot] circle security priming failed:', err?.message ?? err); }
     try {
       // The relay this device is ACTUALLY on, not the one it was configured with (2026-07-30).
       //
@@ -471,6 +478,7 @@ export async function bootAgentBundle(opts = {}) {
         relayUrl,
         circleIds: ids,
         circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
+        circleAddressSignerFor: (cid) => agent.circleAddressSignerFor?.(cid) ?? null,
         circlesForPoint,
         // The relay this device connects to IS the deployment default — unmapped circles land here alone.
         defaultRelayUrl: relayUrl,

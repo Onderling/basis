@@ -26,6 +26,55 @@ export const INVITE_MESSAGE = 'nearby-invite';
 export const INVITE_MAX_NAME = 60;
 export const INVITE_MAX_URI  = 2048;
 
+import { decodeInvite } from '../core/wizards/joinGroupState.js';
+import { encodeInviteUri } from '../core/wizards/createGroupState.js';
+
+/**
+ * Fields an invite may carry on a QR code or a link, but NOT into a room.
+ *
+ * Frits, 2026-07-27, when the invite-carries-endpoint decision was costed: *"carrying it means step H's
+ * broadcast also broadcasts which relay a circle uses — nothing for a street party, a linkable group fact
+ * for a support group."* The endpoint shipped on 28 July; this half did not, so until 2026-07-31 a
+ * broadcast invite handed the circle's relay to everyone in radio range.
+ *
+ * A joiner does not lose anything: they learn these at redeem, by which point they are a member rather
+ * than a stranger with a radio. The disclosure is deferred, not removed.
+ *
+ * `podUrl` joined the list on 2026-07-31 (Frits) for the same reason one step further in: the relay says
+ * where a circle's MESSAGES pass, the pod says where its DATA lives. Broadcasting either hands a room a
+ * durable, linkable fact about a group whose existence is the only thing the broadcast is meant to share.
+ * `podBacked` itself stays — "this circle keeps data in a pod" is a property of the circle a joiner needs
+ * in order to decide, and it points at nobody.
+ *
+ * `adminNknAddr` is deliberately NOT here: it is gated upstream by the publication lock (J-CS8), so with
+ * sharing off the invite never carries it in the first place. Two gates on one field would mean neither
+ * is the answer to "where is this enforced".
+ */
+export const NOT_FOR_A_ROOM = Object.freeze(['relayUrl', 'podUrl']);
+
+/**
+ * Rebuild an invite URI without the fields no room should hear.
+ *
+ * **Fail-closed:** an invite we cannot parse is an invite we cannot strip, so it is refused rather than
+ * broadcast intact. The alternative — pass the unreadable string through — would make an encoding change
+ * upstream silently re-open the leak this function exists to close.
+ *
+ * @returns {{ok: true, uri: string, stripped: string[]}|{ok: false, reason: string}}
+ */
+export function stripForBroadcast(uri) {
+  const scratch = {};
+  try { decodeInvite(uri, scratch); } catch { return { ok: false, reason: 'invite-unreadable' }; }
+  const invite = scratch.invite;
+  if (!invite || typeof invite !== 'object' || scratch.inviteParseError) {
+    return { ok: false, reason: 'invite-unreadable' };
+  }
+  const stripped = NOT_FOR_A_ROOM.filter((f) => invite[f] !== undefined);
+  if (!stripped.length) return { ok: true, uri, stripped };
+  const clean = { ...invite };
+  for (const f of stripped) delete clean[f];
+  return { ok: true, uri: encodeInviteUri(clean), stripped };
+}
+
 /**
  * Per-circle publish allows. Off unless a circle id is explicitly listed — there is deliberately no
  * "publish all my circles", because the decision is per circle and a global switch would answer it wrongly
@@ -66,6 +115,11 @@ export function prepareBroadcastInvite({
   if (typeof uri !== 'string' || !uri.trim()) return { ok: false, reason: 'no-invite' };
   if (uri.length > INVITE_MAX_URI) return { ok: false, reason: 'invite-too-long' };
 
+  // Strip BEFORE the clamp: what goes in the room is the stripped URI, and an unreadable invite never
+  // reaches the room at all.
+  const safe = stripForBroadcast(uri);
+  if (!safe.ok) return { ok: false, reason: safe.reason };
+
   const at = now();
   const ceiling = at + BROADCAST_INVITE_MAX_TTL_MS;
   // The tighter of the two always wins: a short-lived invite is not extended by broadcasting it, and a
@@ -78,7 +132,7 @@ export function prepareBroadcastInvite({
   return {
     ok: true,
     invite: Object.freeze({
-      uri: uri.trim(),
+      uri: safe.uri.trim(),
       circleId,
       circleName: String(circleName ?? '').trim().slice(0, INVITE_MAX_NAME),
       expiresAt: expires,

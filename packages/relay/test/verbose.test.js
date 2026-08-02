@@ -58,7 +58,7 @@ describe('verbose — env-var gating', () => {
     expect(hopLine).toMatch(/bytes=\d+/);
   });
 
-  it('flags an unsealed plaintext message as a potential leak', () => {
+  it('flags an unsealed payload as a potential leak', () => {
     setVerboseEnabled(true);
 
     logHop({
@@ -66,27 +66,32 @@ describe('verbose — env-var gating', () => {
       from: 'alice-pubkey-aaaaaaaa',
       to:   'bob-pubkey-bbbbbbbbbb',
       envelope: {
-        _p: 'mesh',
-        body: 'Hello Bob, this is Alice — meeting at 3pm.',
+        _p: 'OW', _from: 'alice-pubkey-aaaaaaaa', _to: 'bob-pubkey-bbbbbbbbbb',
+        payload: { text: 'Hello Bob, this is Alice — meeting at 3pm.' },
       },
     });
 
     const lines = logSpy.mock.calls.map(c => c[0]);
     const leak  = lines.find(l => l.includes('potential plaintext leak'));
     expect(leak).toBeTruthy();
-    // Excerpt should include part of the plaintext.
-    expect(leak).toMatch(/Hello Bob/);
-    // Should also include the addressing info so the user can correlate.
+    // It says WHICH contract broke, rather than gesturing at "looks like English".
+    expect(leak).toMatch(/marker=unsealed-payload/);
+    // Addressing info so an operator can correlate…
     expect(leak).toMatch(/from=alice-pubkey/);
     expect(leak).toMatch(/to=bob-pubkey/);
+    // …and the excerpt is `shortId`-length, so the alarm cannot itself become the leak.
+    const excerpt = JSON.parse(leak.slice(leak.indexOf('excerpt=') + 'excerpt='.length));
+    expect(excerpt.length).toBeLessThanOrEqual(shortId('x'.repeat(200)).length);
+    expect(leak).not.toContain('meeting at 3pm');
   });
 
-  it('does NOT flag a base64-noise body (sealed-forward stand-in)', () => {
+  it('does NOT flag a genuinely sealed envelope — the shape SecurityLayer produces', () => {
     setVerboseEnabled(true);
 
-    // Random-looking ciphertext: long, alphanumeric, no spaces.  This is the
-    // shape of a sealed envelope's body field after JSON-encoding.
-    const noise =
+    // `SecurityLayer.encrypt` replaces `payload` with `{ _box: <base64 nonce‖ciphertext> }` and
+    // leaves the routing header in cleartext. That is the whole sealed contract, so this must be
+    // silent no matter what the base64 happens to spell.
+    const box =
       'eyJjaXBoZXJ0ZXh0IjoiTjlSeDhWN0pMcEttd0F1OERvVHlSNkZMbWFTcUxpbW' +
       'JjV3JhYzVRRG10b2VuMTNoeFhsRkVnNXJZcXVOSlJqVzg4NEN5UE52VkdSakZS' +
       'NXp4S0M3a3IzcWlncTl3M0F0Q3hBcEY9PSIsIm5vbmNlIjoieHJZc1ZQRVNVbm' +
@@ -96,23 +101,40 @@ describe('verbose — env-var gating', () => {
     logHop({
       kind: 'send',
       from: 'alice', to: 'bob',
-      envelope: { _p: 'mesh', body: noise },
+      envelope: {
+        _v: 1, _p: 'OW', _id: 'abc', _re: null, _from: 'alice', _to: 'bob',
+        _topic: null, _ts: 1, _sig: 'sig', payload: { _box: box },
+      },
     });
 
     const lines = logSpy.mock.calls.map(c => c[0]);
-    const leak  = lines.find(l => l.includes('potential plaintext leak'));
-    expect(leak).toBeFalsy();
+    expect(lines.find(l => l.includes('potential plaintext leak'))).toBeFalsy();
   });
 
-  it('finds plaintext nested inside an envelope object', () => {
-    expect(findPlaintextLeak({
-      a: 1,
-      b: { c: ['noise', 'this is a secret love letter to bob'] },
-    })).toMatch(/this is a secret/);
+  it('flags readable structure smuggled beside the routing header', () => {
+    const leak = findPlaintextLeak({
+      _p: 'OW', _from: 'alice', _to: 'bob',
+      payload: { _box: 'AAAA' },
+      note: 'this is a secret love letter to bob',
+    });
+    expect(leak.marker).toBe('readable-outside-payload');
+    expect(leak.excerpt).toContain('note');
   });
 
-  it('returns null for shapes that contain no readable runs', () => {
-    expect(findPlaintextLeak({ a: 1, b: 'short', c: ['x', 'y'] })).toBeNull();
+  it('flags a bare application object handed straight to the wire', () => {
+    // No envelope around it at all — the `_put(bare payload)` case. Readable by the relay, so it
+    // is a leak, and the canary should say so rather than judge the prose.
+    const leak = findPlaintextLeak({ subtype: 'kring-chat-message', text: 'hoi allemaal' });
+    expect(leak.marker).toBe('readable-outside-payload');
+  });
+
+  it('leaves plaintext-by-design and header-only bodies alone', () => {
+    // HI is the agent-card hello: signed plaintext on purpose, not a leak.
+    expect(findPlaintextLeak({ _p: 'HI', _from: 'alice', payload: { card: 'x' } })).toBeNull();
+    // A bare sealed box — a `multi-deliver` payload the caller sealed itself.
+    expect(findPlaintextLeak({ _box: 'AAAA' })).toBeNull();
+    // Nothing but routing header.
+    expect(findPlaintextLeak({ _p: 'OW', _from: 'alice', _to: 'bob' })).toBeNull();
     expect(findPlaintextLeak(null)).toBeNull();
     expect(findPlaintextLeak(123)).toBeNull();
   });

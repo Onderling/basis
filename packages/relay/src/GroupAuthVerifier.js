@@ -15,7 +15,7 @@
  *         requiredRole?:  'member',
  *
  *         // Phase 2 (Stoop V1 — 2026-05-05) additions; all optional.
- *         quotas?:        { msgsPerDay?: number, maxConnections?: number },
+ *         quotas?:        { msgsPerDay?: number },
  *         revokedMembers?: ['<memberPubKey>', ...],
  *       },
  *       ...
@@ -46,10 +46,12 @@
  *     whose proofs are rejected even when otherwise valid.  Static
  *     config; dynamic admin-signed revocation messages are deferred
  *     to V2 (Stoop Relay Kit).
- *   - `quotas: { msgsPerDay?, maxConnections? }` per accepted-group
- *     entry.  The verifier exposes the configured quota on `verify`'s
- *     return value; the *enforcement* (per-group counters) lives in
- *     the relay server, not here.  See `server.js` for the integration.
+ *   - `quotas: { msgsPerDay? }` per accepted-group entry.  The verifier
+ *     exposes the configured quota on `verify`'s return value; the
+ *     *enforcement* (per-group counters) lives in the relay server, not
+ *     here.  See `server.js` for the integration.  (`maxConnections` was
+ *     removed 2026-07-31 — a connection cap is now per-connection and
+ *     circle-blind: `maxAddressesPerConnection` in `server.js`.)
  */
 import { verifyGroupProof, KeyRotation, STANDARD_RANKS } from '@onderling/core';
 

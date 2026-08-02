@@ -59,6 +59,10 @@ import {
   makeHandleGroupRedeemResponse,
 } from '../../src/core/handlers/groupRedeem.js';
 import { makePropagateMeshIntros, makeHandleBuurtPeerIntro } from '../../src/core/handlers/meshIntros.js';
+// B2 — the exact per-circle address announcing wiring both shells use.
+import {
+  makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin,
+} from '../../src/v2/circleAddressAnnounce.js';
 import { EventLog } from '../../src/eventLog.js';
 import { createChatMessageInbox } from '../../src/v2/chatMessageInbox.js';
 import { makeKringChatPeerHandler } from '../../src/v2/kringChatReceiver.js';
@@ -101,7 +105,7 @@ export async function until(pred, { timeout = 4000, step = 10 } = {}) {
  *   pendingMap: Map<string, object>,
  * }>}
  */
-export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 8000 } = {}) {
+export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 8000, agentOpts = {} } = {}) {
   const routerRef = { fn: null };
   const received = [];
   // A sealed circle's log carries key-events + sealed content over the real transport. Key-events are recorded
@@ -130,6 +134,12 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     // A fresh, code-minting REAL circle must show only real members — keep demo
     // scaffolding off so rosters carry exactly the creator + real joiners.
     seedDemoData: false,
+    // Per-test agent options, threaded straight into the production factory. The one this exists
+    // for today is `allowAddressFallback: false` — the per-user "rather undeliverable than routed
+    // over my one global key" setting. A test that claims to prove per-circle addressing works
+    // must be able to turn the escape hatch OFF; with it on, every such test also passes when the
+    // addressing is broken, which is the failure mode this whole area keeps producing.
+    ...agentOpts,
   });
 
   const pubKey = agent.identity.chat.pubKey;
@@ -159,11 +169,18 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
       // per-circle address, so the joiner records it instead of knowing us only by our global key.
       circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,
       signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
+      // B2 (web ≡ mobile ≡ harness): after admitting a member, hand the circle their proven
+      // per-circle address and hand them the circle's — the step neither joiner can do for itself.
+      propagateCircleAddresses: ({ circleId, newMemberWebid }) =>
+        propagateCircleAddressesAfterJoin({ agent, circleId, newMemberWebid, logger: QUIET }),
     }),
     // JOINER side: resolve the pending redeem promise.
     'group-redeem-response': makeHandleGroupRedeemResponse({ pendingMap, logger: QUIET }),
     // Both sides: record a mesh-introduced peer into the local roster.
     'buurt-peer-intro': makeHandleBuurtPeerIntro({ callSkill, logger: QUIET }),
+    // B2 receive half — record an announced per-circle address, then refresh the binding + the
+    // authorize snapshot from one roster read.
+    'circle-address-announce': makeCircleAddressAnnouncePeerHandler({ agent, logger: QUIET }),
     // Sealed circle — the PRODUCTION receive handler records a fanned key-event into the PRODUCTION per-circle
     // key-event log (the no-pod key-chain carrier), de-duped by version. This is the real app's receive path,
     // dispatched by the real `makePeerRouter` — not a harness stand-in. Folding happens on read (`readSealed`).
@@ -263,6 +280,19 @@ export async function connectAgentsOverNkn(a, b) {
 }
 
 /**
+ * Connect N booted node agents over a REAL relay — the N-agent generalisation of
+ * `connectAgentsOverRelay`, through each node's own production `connectPeerTransport` path.
+ */
+export async function connectNodesOverRelay(nodes, { relayUrl }) {
+  for (const n of nodes.filter(Boolean)) {
+    await n.agent.connectPeerTransport({
+      relayUrl,
+      onPeerMessage: (env) => n._routerRef.fn?.(env),
+    });
+  }
+}
+
+/**
  * Connect N booted node agents onto ONE shared presence-aware bus (the three-agent generalisation of
  * `connectAgentsOverBus`). Each node's chat transport is registered under its chat pubKey, so any node can
  * `sendPeerMessage(peer.pubKey, …)` to any other; each node's `_busTransport` is stashed for goOffline/goOnline.
@@ -343,6 +373,9 @@ export async function pairCircle(admin, joiner, {
 export async function bindCircleAddresses(nodes, ...circleIds) {
   const ids = circleIds.flat().filter(Boolean);
   for (const n of nodes.filter(Boolean)) {
+    // Decision 4 — the per-circle SIGNING identity, exactly as both shells install it, and BEFORE
+    // the transport check: it is needed to open inbound circle traffic even where no alias is bound.
+    await n.agent?.installCircleIdentities?.(ids);
     const transport = n._busTransport ?? n.agent?.relay ?? null;
     if (!transport?.supportsAliases) continue;
     await registerCircleAddresses({
@@ -350,6 +383,7 @@ export async function bindCircleAddresses(nodes, ...circleIds) {
       relayUrl: 'internal://bus',          // single-transport world: everything rides the one socket
       circleIds: ids,
       circleAddressFor: (cid) => n.agent?.circleAddressFor?.(cid) ?? null,
+      circleAddressSignerFor: (cid) => n.agent?.circleAddressSignerFor?.(cid) ?? null,
     });
   }
 }

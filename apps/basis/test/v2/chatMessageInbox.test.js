@@ -46,6 +46,10 @@ describe('createChatMessageInbox · ε.1 single normalization gate', () => {
       circleId: 'g1',
       text:     'Hoi buurt!',
       kind:     'chat-message',
+      // Arrival IS the evidence of reach: this envelope came over the circle fan-out, so the bubble may
+      // say "whole kring". Without it both shells' badge fell through to "only you" on every received
+      // message — the visibility chip claiming the opposite of the truth.
+      scope:    'kring',
       senderDisplay: 'webid:anne',
     });
   });
@@ -179,6 +183,78 @@ describe('createChatMessageInbox · ε.1 single normalization gate', () => {
     expect(resolveActor).toHaveBeenCalledTimes(1);
     expect(eventLog.events[0].actor).toBe('Anne');
     expect(eventLog.events[0].payload.senderDisplay).toBe('Anne');
+  });
+
+  /* ── self-authorship: my own messages, read back out of storage ── */
+
+  describe('a message I wrote comes back as MINE', () => {
+    const isSelfAuthored = (env) => env.fromActor === 'webid:me';
+
+    it('stamps the local actor on a REHYDRATED own message (was: attributed to a stranger)', async () => {
+      const eventLog = fakeEventLog();
+      const inbox = createChatMessageInbox({ eventLog, isSelfAuthored, logger: silentLogger });
+      await inbox.ingestChatMessage(
+        envelope({ msgId: 'mine1', text: 'zie ik je zaterdag?', fromActor: 'webid:me' }),
+        { source: 'rehydrator' },
+      );
+      expect(eventLog.events[0].actor).toBe('me');
+    });
+
+    it('renders IDENTICALLY to the live optimistic append — no sender name above my own bubble', async () => {
+      const eventLog = fakeEventLog();
+      const inbox = createChatMessageInbox({ eventLog, isSelfAuthored, logger: silentLogger });
+      await inbox.ingestChatMessage(
+        envelope({ msgId: 'mine2', fromActor: 'webid:me' }),
+        { source: 'rehydrator' },
+      );
+      // `senderDisplay` ABSENT, exactly as `kringChatMessageEvent` omits it on the send path.
+      expect(eventLog.events[0].payload).not.toHaveProperty('senderDisplay');
+      expect(eventLog.events[0].payload.scope).toBe('kring');
+    });
+
+    it('covers the other restore paths too — pod replay and catch-up', async () => {
+      const eventLog = fakeEventLog();
+      const inbox = createChatMessageInbox({ eventLog, isSelfAuthored, logger: silentLogger });
+      await inbox.ingestChatMessage(envelope({ msgId: 'mP1', fromActor: 'webid:me' }), { source: 'pod' });
+      await inbox.ingestChatMessage(envelope({ msgId: 'mC1', fromActor: 'webid:me' }), { source: 'catchUp' });
+      expect(eventLog.events.map((e) => e.actor)).toEqual(['me', 'me']);
+    });
+
+    it('leaves someone else\'s restored message attributed to them', async () => {
+      const eventLog = fakeEventLog();
+      const inbox = createChatMessageInbox({ eventLog, isSelfAuthored, logger: silentLogger });
+      await inbox.ingestChatMessage(envelope({ msgId: 'mHers', fromActor: 'webid:anne' }), { source: 'rehydrator' });
+      expect(eventLog.events[0].actor).toBe('webid:anne');
+      expect(eventLog.events[0].payload.senderDisplay).toBe('webid:anne');
+    });
+
+    it('REFUSES to honour a live envelope claiming to be from me (that would render a peer\'s words as mine)', async () => {
+      const eventLog = fakeEventLog();
+      const inbox = createChatMessageInbox({ eventLog, isSelfAuthored, logger: silentLogger });
+      await inbox.ingestChatMessage(
+        envelope({ msgId: 'mSpoof', text: 'I agree with everything', fromActor: 'webid:me' }),
+        { source: 'receiver', fromPeerAddr: 'nkn-mallory' },
+      );
+      expect(eventLog.events[0].actor).toBe('webid:me');   // attributed, never claimed as mine
+      expect(eventLog.events[0].payload.senderDisplay).toBe('webid:me');
+    });
+
+    it('a throwing check degrades to the old attribution rather than to a wrong one', async () => {
+      const eventLog = fakeEventLog();
+      const inbox = createChatMessageInbox({
+        eventLog, logger: silentLogger,
+        isSelfAuthored: () => { throw new Error('identity unavailable'); },
+      });
+      await inbox.ingestChatMessage(envelope({ msgId: 'mBoom', fromActor: 'webid:me' }), { source: 'rehydrator' });
+      expect(eventLog.events[0].actor).toBe('webid:me');
+    });
+
+    it('honours a custom localActor stamp', async () => {
+      const eventLog = fakeEventLog();
+      const inbox = createChatMessageInbox({ eventLog, isSelfAuthored, localActor: 'ik', logger: silentLogger });
+      await inbox.ingestChatMessage(envelope({ msgId: 'mIk', fromActor: 'webid:me' }), { source: 'rehydrator' });
+      expect(eventLog.events[0].actor).toBe('ik');
+    });
   });
 
   it('runs the per-call resolveActor when provided (overrides constructor default)', async () => {

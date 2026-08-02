@@ -13,7 +13,7 @@
  *
  * The `membership-redemption` itemStore items carry, per member:
  *   { groupId, redeemedBy (webid), signingPublicKey, sealingPublicKey,
- *     circleAddress, personaProperties, confirmedBy?, channel?, redeemedAt }
+ *     circleAddress, circleAddressProof, personaProperties, confirmedBy?, channel?, redeemedAt }
  * — durable + signed + synced like any content (no pod required). Everything the
  * roster needs is already there:
  *   - `redeemedBy`  → a member (the joiner who presented the code, or a
@@ -72,14 +72,20 @@ export function deriveRoster({
   for (const it of redemptions ?? []) {
     const src = (it && it.source) ?? {};
     const {
-      redeemedBy, confirmedBy, confirmedByCircleAddress, channel, role,
-      signingPublicKey, sealingPublicKey, circleAddress, personaProperties,
+      redeemedBy, confirmedBy, confirmedByCircleAddress, confirmedByCircleAddressProof,
+      channel, role, signingPublicKey, sealingPublicKey, circleAddress, circleAddressProof,
+      personaProperties,
     } = src;
     if (redeemedBy) {
       upsert(redeemedBy, role ?? 'member', {
         pubKey:            signingPublicKey,
         sealingPublicKey,
         circleAddress,
+        // The proof that came with the address. Carried onto the row so a member can RELAY this
+        // member's announcement to someone who was not present when it was proven — the receiver
+        // re-verifies it themselves, so relaying grants the relayer no authority
+        // (`circleAddressAnnouncement.js`). Absent on a pre-2026-08-02 trail: the row is unchanged.
+        circleAddressProof,
         personaProperties: (personaProperties && typeof personaProperties === 'object'
           && Object.keys(personaProperties).length) ? personaProperties : undefined,
       });
@@ -91,7 +97,8 @@ export function deriveRoster({
         // was written (`recordRemoteRedemption`). This row is the joiner's ONLY view of the admin, so
         // without it every send to them falls through to the global signing key — refused outright when
         // the per-user address fallback is off. Absent on a pre-2026-07-30 trail: the row is unchanged.
-        circleAddress: confirmedByCircleAddress,
+        circleAddress:      confirmedByCircleAddress,
+        circleAddressProof: confirmedByCircleAddressProof,
         // …and the admin's SIGNING key, which is `confirmedBy` itself: a basis circle binds
         // webid === the member's chat signing address (the same identity the redeem response was
         // authenticated under, and the same fact the address ladder's webid rung already relies on).

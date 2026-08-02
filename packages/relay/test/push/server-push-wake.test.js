@@ -3,10 +3,10 @@
  * `pushSender.send(...)` when a `send` lands for an offline peer.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { WebSocket }        from 'ws';
 import { startRelay }       from '../../src/server.js';
 import { PushSender }       from '../../src/push/PushSender.js';
 import { PushTokenRegistry } from '../../src/push/PushTokenRegistry.js';
+import { openClient, send, addr } from '../helpers/provenClient.js';
 
 class FakePushSender extends PushSender {
   constructor() { super(); this.calls = []; this.next = { ok: true }; }
@@ -16,19 +16,8 @@ class FakePushSender extends PushSender {
   }
 }
 
-function openClient(url) {
-  return new Promise((resolve, reject) => {
-    const ws = new WebSocket(url);
-    ws.messages = [];
-    ws.on('message', (raw) => {
-      try { ws.messages.push(JSON.parse(raw)); } catch {}
-    });
-    ws.once('open',  () => resolve(ws));
-    ws.once('error', reject);
-  });
-}
-
-function send(ws, obj) { ws.send(JSON.stringify(obj)); }
+// Registration is challenge-first (Decision 3), so the client + the addresses come from the shared
+// helper: `addr('alice')` is a real public key it can prove possession of.
 
 async function waitFor(predicate, timeoutMs = 1_000) {
   const start = Date.now();
@@ -69,17 +58,17 @@ describe('relay — push wake (E2c)', () => {
 
   it('register-push-token after register stores the token', async () => {
     const ws = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(ws, { type: 'register', address: 'alice' });
+    send(ws, { type: 'register', address: addr('alice') });
     await waitFor(() => ws.messages.some((m) => m.type === 'registered'));
     send(ws, { type: 'register-push-token', token: 'tok-1', platform: 'ios' });
     await waitFor(() => ws.messages.some((m) => m.type === 'push-token-registered'));
-    expect(registry.get('alice')).toMatchObject({ token: 'tok-1', platform: 'ios' });
+    expect(registry.get(addr('alice'))).toMatchObject({ token: 'tok-1', platform: 'ios' });
     ws.close();
   });
 
   it('rejects empty token', async () => {
     const ws = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(ws, { type: 'register', address: 'alice' });
+    send(ws, { type: 'register', address: addr('alice') });
     await waitFor(() => ws.messages.some((m) => m.type === 'registered'));
     send(ws, { type: 'register-push-token', token: '', platform: 'ios' });
     await waitFor(() => ws.messages.some((m) => m.type === 'error' && /token required/.test(m.message)));
@@ -88,20 +77,20 @@ describe('relay — push wake (E2c)', () => {
 
   it('unregister-push-token removes the entry', async () => {
     const ws = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(ws, { type: 'register', address: 'alice' });
+    send(ws, { type: 'register', address: addr('alice') });
     await waitFor(() => ws.messages.some((m) => m.type === 'registered'));
     send(ws, { type: 'register-push-token', token: 'tok-1' });
     await waitFor(() => ws.messages.some((m) => m.type === 'push-token-registered'));
     send(ws, { type: 'unregister-push-token' });
     await waitFor(() => ws.messages.some((m) => m.type === 'push-token-unregistered'));
-    expect(registry.get('alice')).toBeNull();
+    expect(registry.get(addr('alice'))).toBeNull();
     ws.close();
   });
 
   it('fires push when send lands for an offline peer with a token', async () => {
     // Alice connects + registers a push token, then disconnects.
     const alice = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(alice, { type: 'register', address: 'alice' });
+    send(alice, { type: 'register', address: addr('alice') });
     await waitFor(() => alice.messages.some((m) => m.type === 'registered'));
     send(alice, { type: 'register-push-token', token: 'tok-alice', platform: 'ios' });
     await waitFor(() => alice.messages.some((m) => m.type === 'push-token-registered'));
@@ -110,9 +99,9 @@ describe('relay — push wake (E2c)', () => {
 
     // Bob sends to offline alice.
     const bob = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(bob, { type: 'register', address: 'bob' });
+    send(bob, { type: 'register', address: addr('bob') });
     await waitFor(() => bob.messages.some((m) => m.type === 'registered'));
-    send(bob, { type: 'send', to: 'alice', envelope: { _p: 'OW', payload: 'x' } });
+    send(bob, { type: 'send', to: addr('alice'), envelope: { _p: 'OW', payload: 'x' } });
 
     await waitFor(() => pushSender.calls.length >= 1, 500);
     expect(pushSender.calls[0].token).toBe('tok-alice');
@@ -124,9 +113,9 @@ describe('relay — push wake (E2c)', () => {
   it('no-wake flag: hold-forwards WITHOUT a push, while a normal message DOES wake', async () => {
     const url = `ws://127.0.0.1:${relay.port}`;
     // Two offline peers, each with a push token registered.
-    for (const [addr, tok] of [['nw-alice', 'tok-nw'], ['w-dave', 'tok-w']]) {
+    for (const [who, tok] of [['nw-alice', 'tok-nw'], ['w-dave', 'tok-w']]) {
       const c = await openClient(url);
-      send(c, { type: 'register', address: addr });
+      send(c, { type: 'register', address: addr(who) });
       await waitFor(() => c.messages.some((m) => m.type === 'registered'));
       send(c, { type: 'register-push-token', token: tok, platform: 'ios' });
       await waitFor(() => c.messages.some((m) => m.type === 'push-token-registered'));
@@ -135,13 +124,13 @@ describe('relay — push wake (E2c)', () => {
     }
 
     const bob = await openClient(url);
-    send(bob, { type: 'register', address: 'bob' });
+    send(bob, { type: 'register', address: addr('bob') });
     await waitFor(() => bob.messages.some((m) => m.type === 'registered'));
 
     // A routine governance vote (envelope stamped `noWake`) → hold-forwarded, NO push.
-    send(bob, { type: 'send', to: 'nw-alice', envelope: { _p: 'OW', noWake: true, subtype: 'kring-governance-broadcast' } });
+    send(bob, { type: 'send', to: addr('nw-alice'), envelope: { _p: 'OW', noWake: true, subtype: 'kring-governance-broadcast' } });
     // A normal message to a different offline peer → DOES push.
-    send(bob, { type: 'send', to: 'w-dave', envelope: { _p: 'OW' } });
+    send(bob, { type: 'send', to: addr('w-dave'), envelope: { _p: 'OW' } });
 
     await waitFor(() => pushSender.calls.length >= 1, 500);
     // Give any spurious (no-wake) push a tick to (not) fire.
@@ -152,7 +141,7 @@ describe('relay — push wake (E2c)', () => {
     // The no-wake message was still BUFFERED — alice receives it on reconnect
     // (hold-forward is preserved; only the wake was suppressed).
     const alice = await openClient(url);
-    send(alice, { type: 'register', address: 'nw-alice' });
+    send(alice, { type: 'register', address: addr('nw-alice') });
     await waitFor(() => alice.messages.some((m) => m.type === 'message'));
     const got = alice.messages.find((m) => m.type === 'message');
     expect(got.envelope).toMatchObject({ noWake: true });
@@ -162,15 +151,15 @@ describe('relay — push wake (E2c)', () => {
 
   it('does NOT fire push when target is online', async () => {
     const alice = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(alice, { type: 'register', address: 'alice' });
+    send(alice, { type: 'register', address: addr('alice') });
     await waitFor(() => alice.messages.some((m) => m.type === 'registered'));
     send(alice, { type: 'register-push-token', token: 'tok-alice' });
     await waitFor(() => alice.messages.some((m) => m.type === 'push-token-registered'));
 
     const bob = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(bob, { type: 'register', address: 'bob' });
+    send(bob, { type: 'register', address: addr('bob') });
     await waitFor(() => bob.messages.some((m) => m.type === 'registered'));
-    send(bob, { type: 'send', to: 'alice', envelope: { _p: 'OW' } });
+    send(bob, { type: 'send', to: addr('alice'), envelope: { _p: 'OW' } });
 
     await waitFor(() => alice.messages.some((m) => m.type === 'message'));
     // Give any spurious push a tick to fire.
@@ -182,9 +171,9 @@ describe('relay — push wake (E2c)', () => {
 
   it('does NOT fire push when offline target has no registered token', async () => {
     const bob = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(bob, { type: 'register', address: 'bob' });
+    send(bob, { type: 'register', address: addr('bob') });
     await waitFor(() => bob.messages.some((m) => m.type === 'registered'));
-    send(bob, { type: 'send', to: 'never-registered', envelope: { _p: 'OW' } });
+    send(bob, { type: 'send', to: addr('never-registered'), envelope: { _p: 'OW' } });
 
     await new Promise((r) => setTimeout(r, 30));
     expect(pushSender.calls).toHaveLength(0);
@@ -193,7 +182,7 @@ describe('relay — push wake (E2c)', () => {
 
   it('throttles repeated sends to the same offline peer', async () => {
     const alice = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(alice, { type: 'register', address: 'alice' });
+    send(alice, { type: 'register', address: addr('alice') });
     await waitFor(() => alice.messages.some((m) => m.type === 'registered'));
     send(alice, { type: 'register-push-token', token: 'tok-alice' });
     await waitFor(() => alice.messages.some((m) => m.type === 'push-token-registered'));
@@ -201,13 +190,13 @@ describe('relay — push wake (E2c)', () => {
     await waitFor(() => alice.readyState === alice.CLOSED);
 
     const bob = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(bob, { type: 'register', address: 'bob' });
+    send(bob, { type: 'register', address: addr('bob') });
     await waitFor(() => bob.messages.some((m) => m.type === 'registered'));
 
     // Three rapid sends within the 50ms throttle window.
-    send(bob, { type: 'send', to: 'alice', envelope: { _p: 'OW', n: 1 } });
-    send(bob, { type: 'send', to: 'alice', envelope: { _p: 'OW', n: 2 } });
-    send(bob, { type: 'send', to: 'alice', envelope: { _p: 'OW', n: 3 } });
+    send(bob, { type: 'send', to: addr('alice'), envelope: { _p: 'OW', n: 1 } });
+    send(bob, { type: 'send', to: addr('alice'), envelope: { _p: 'OW', n: 2 } });
+    send(bob, { type: 'send', to: addr('alice'), envelope: { _p: 'OW', n: 3 } });
 
     await waitFor(() => pushSender.calls.length >= 1, 500);
     await new Promise((r) => setTimeout(r, 30));
@@ -215,7 +204,7 @@ describe('relay — push wake (E2c)', () => {
 
     // After the throttle window, the next send should fire again.
     await new Promise((r) => setTimeout(r, 80));
-    send(bob, { type: 'send', to: 'alice', envelope: { _p: 'OW', n: 4 } });
+    send(bob, { type: 'send', to: addr('alice'), envelope: { _p: 'OW', n: 4 } });
     await waitFor(() => pushSender.calls.length >= 2, 500);
     expect(pushSender.calls).toHaveLength(2);
 
@@ -226,7 +215,7 @@ describe('relay — push wake (E2c)', () => {
     pushSender.next = { ok: false, error: 'expo-error: DeviceNotRegistered' };
 
     const alice = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(alice, { type: 'register', address: 'alice' });
+    send(alice, { type: 'register', address: addr('alice') });
     await waitFor(() => alice.messages.some((m) => m.type === 'registered'));
     send(alice, { type: 'register-push-token', token: 'tok-alice' });
     await waitFor(() => alice.messages.some((m) => m.type === 'push-token-registered'));
@@ -234,9 +223,9 @@ describe('relay — push wake (E2c)', () => {
     await waitFor(() => alice.readyState === alice.CLOSED);
 
     const bob = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(bob, { type: 'register', address: 'bob' });
+    send(bob, { type: 'register', address: addr('bob') });
     await waitFor(() => bob.messages.some((m) => m.type === 'registered'));
-    send(bob, { type: 'send', to: 'alice', envelope: { _p: 'OW' } });
+    send(bob, { type: 'send', to: addr('alice'), envelope: { _p: 'OW' } });
 
     // Push fired but failed; relay should still be responsive.
     await waitFor(() => pushSender.calls.length >= 1, 500);
@@ -250,7 +239,7 @@ describe('relay — push wake (E2c)', () => {
     const plain = await startRelay({ port: 0 });
     try {
       const ws = await openClient(`ws://127.0.0.1:${plain.port}`);
-      send(ws, { type: 'register', address: 'alice' });
+      send(ws, { type: 'register', address: addr('alice') });
       await waitFor(() => ws.messages.some((m) => m.type === 'registered'));
       send(ws, { type: 'register-push-token', token: 'tok-1' });
       await waitFor(() => ws.messages.some((m) => m.type === 'error' && /push not configured/.test(m.message)));

@@ -9,6 +9,9 @@
  * HubDelegateTransport from '@onderling/core' — those stay in core.
  */
 export { NknTransport }        from './NknTransport.js';
+// The nkn half of sender binding (the shared rule lives in core). Exported because the react-native NKN
+// adapter uses the SAME normalisation and port — web ≡ mobile by construction, not by copy.
+export { nknSenderVerdict, nknAuthenticatedSender, stripSubClientPrefix } from './nknSenderBinding.js';
 export { MqttTransport }       from './MqttTransport.js';
 export { RelayTransport }      from './RelayTransport.js';
 export { RendezvousTransport } from './RendezvousTransport.js';

@@ -62,4 +62,27 @@ describe('isNoticeboardPost — hides system items', () => {
   it('keeps a real post that happens to be type:post', () => {
     expect(isNoticeboardPost({ type: 'post', text: 'Anne needs help moving', source: { targets: [{ kind: 'group', groupId: 'miep' }] } })).toBe(true);
   });
+
+  // A circle CHAT line is mirrored into the same itemStore so the conversation survives a
+  // reload (stoop `broadcastKringMessage` / `ingestKringMessage`). It is not a noticeboard
+  // post — but it was rendered as one, with a "Withdraw" action when it was yours.
+  describe('kring chat lines are not noticeboard posts', () => {
+    const chatItem = (over = {}) => ({
+      type: 'kring-chat-message',
+      text: 'zie ik je zaterdag?',
+      source: { circleId: 'miep', msgId: 'kring-miep-1735-1', ts: 1735_000_000_000, fromActor: 'webid:anne' },
+      ...over,
+    });
+    it('drops a chat item by type', () => {
+      expect(isNoticeboardPost(chatItem())).toBe(false);
+    });
+    it('drops it on the LIVE path too, where adaptStoopReply has flattened it to type:post', () => {
+      expect(isNoticeboardPost(chatItem({ type: 'post' }))).toBe(false);
+    });
+    it('a chat line carries no circle hint, so it leaked onto EVERY circle unfiltered', () => {
+      // Documents why the filter has to be the type/source gate rather than the circle
+      // scope: keepForCircle is lenient, and source.circleId is not a hint it reads.
+      expect(keepForCircle(chatItem({ type: 'post' }), 'some-other-circle')).toBe(true);
+    });
+  });
 });

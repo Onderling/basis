@@ -38,6 +38,18 @@ export { Bootstrap }          from './identity/Bootstrap.js';
 // identity step 3 — per-circle addresses (unlinkability layer)
 export { deriveCircleSeed, deriveCircleAddress, circleIdentity } from './identity/circleAddress.js';
 export { circleLinkMessage, signCircleLink, signCircleLinkFromSeed, verifyCircleLink } from './identity/circleLink.js';
+export {
+  CIRCLE_ADDRESS_ANNOUNCE_KIND, circleAddressAnnouncement, ownCircleAddressAnnouncement,
+  ownCircleAddressAnnouncementFromSeed, verifyCircleAddressAnnouncement,
+  verifyCircleAddressAnnouncements,
+} from './identity/circleAddressAnnouncement.js';
+// Proof of possession of an address, for whatever routes to it (DESIGN-boundary-authentication §7).
+// NOT circleLink: the verifier supplies a fresh nonce — see the header of addressPossession.js.
+export {
+  ADDRESS_NONCE_BYTES, ADDRESS_CHALLENGE_TTL_MS, newAddressChallenge,
+  addressPossessionMessage, signAddressPossession, signAddressPossessionFromSeed,
+  circleAddressSigner, verifyAddressPossession,
+} from './identity/addressPossession.js';
 export { hashHex } from './hashHex.js';
 // NOTE: IdentityPodStore, IdentitySync and migrateVaultToPod were extracted OUT
 // of core into `@onderling/pod-client` — they store/migrate/sync identity ON a pod
@@ -55,6 +67,13 @@ export {
 
 // ── Security ─────────────────────────────────────────────────────────────────
 export { SecurityLayer, SecurityError, SEC } from './security/SecurityLayer.js';
+// Decision 1 — the two seams the inverted receive path is built on. `senderKey` decides what an
+// envelope CARRIES (L1: full key vs key id); `senderAuthorization` declares the roster-authorize
+// port the kernel calls and never implements (L3: kernel vs substrate).
+export { SENDER_KEY_FIELD, senderCredential, resolveSenderKey, carriedSenderCredential, isEd25519PubKey }
+  from './security/senderKey.js';
+export { SENDER_AUTHORIZATION, allowSender, refuseSender, askSenderAuthorizer }
+  from './security/senderAuthorization.js';
 export {
   signReachabilityClaim,
   verifyReachabilityClaim,
@@ -98,6 +117,10 @@ export {
   normalizeDiscoverability, publishes, browses, maxExposure,
   createDiscoverabilityControl,
 } from './transport/discoverability.js';
+// Sender binding — the one shared rule ("may this envelope claim this sender?") plus the
+// `authenticatedSender` port every boundary implements. Pure kernel logic; the transport-specific
+// halves live with their adapters (nkn in `@onderling/transports`, the socket set in `@onderling/relay`).
+export { senderVerdict, createSenderBinding } from './transport/senderBinding.js';
 export { createNearbyPeerSource }         from './transport/nearbyPeers.js';
 export { InternalBus, InternalTransport } from './transport/InternalTransport.js';
 export { HubDelegateTransport }           from './transport/HubDelegateTransport.js';

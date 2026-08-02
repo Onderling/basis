@@ -5,7 +5,9 @@
  *
  * Protocol (matches RelayTransport client):
  *   Client → Server: { type: 'register', address: '<pubKey>' }
- *   Server → Client: { type: 'registered' }
+ *   Server → Client: { type: 'challenge', address, nonce }
+ *   Client → Server: { type: 'register-proof', address, nonce, proof }
+ *   Server → Client: { type: 'registered', address }
  *   Client → Server: { type: 'send', to: '<address>', envelope: {...} }
  *   Server → Client: { type: 'message', envelope: {...} }
  *   Server → Client: { type: 'error', message: '<reason>' }
@@ -16,11 +18,30 @@
  *   _to === offline peer         → buffer in queue (up to offlineQueueTtl ms)
  *
  * WebRTC signaling envelopes are forwarded as-is (no special handling needed).
+ *
+ * Proof of possession on register (2026-07-31, DESIGN-boundary-authentication §7 — Decision 3):
+ * registration here is CHALLENGE-FIRST too, and for the same reason. This broker speaks the same
+ * wire protocol as `server.js`, so leaving it unproven would have left a second relay that a
+ * compliant client must refuse to talk to — and the check costs it nothing it lacks: verifying a
+ * proof needs no identity of the verifier's own, only the address, because the address IS the
+ * public key. It has no `acceptedGroups` and no group proof (that is operator policy `server.js`
+ * carries and this one does not), so the ONLY thing register asks here is "do you hold this key".
+ *
+ * Sender binding (2026-07-31): a `send` frame whose `envelope._from` is an address this socket has not
+ * registered is refused with `SENDER_NOT_REGISTERED` and not forwarded — the same rule
+ * (`senderVerdict`, from `@onderling/core`) that `server.js` and the NKN transports ask, with this
+ * broker's own answer to "who is this connection authenticated to speak as?". It was documented as
+ * hygiene rather than a defence, because a socket could simply register the victim's address first.
+ * **That premise is gone as of the proof above**: an address on this socket's registered set is one
+ * it proved, so the binding now says something about a key rather than about a claim.
  */
 import { WebSocketServer } from 'ws';
 
 // Transport is a peer dependency resolved from @onderling/core.
-import { Transport } from '@onderling/core';
+import {
+  Transport, senderVerdict,
+  newAddressChallenge, verifyAddressPossession, ADDRESS_CHALLENGE_TTL_MS,
+} from '@onderling/core';
 
 import { ForwardQueue } from './ForwardQueue.js';
 
@@ -94,15 +115,51 @@ export class WsServerTransport extends Transport {
 
   #onConnection(ws) {
     let peerAddress = null;
+    // Every address this socket has registered. `peerAddress` stays the socket's PRIMARY identity (the
+    // most recent registration, used for the peer-connected/disconnected events); this set is what sender
+    // binding is asked about, because one socket may legitimately own several addresses — a device
+    // presents a different address per circle, the same shape `server.js` already carries.
+    const registeredAddresses = new Set();
+    /** nonce → { address, expiresAt } — challenges issued on THIS socket and not yet answered. */
+    const openChallenges = new Map();
 
     ws.on('message', raw => {
       let msg;
       try { msg = JSON.parse(raw); } catch { return; }
 
+      // Register, step 1: ask. Nothing is registered here — `#clients.set` is unreachable from
+      // this branch, which is what makes "no unproven address is ever routed to" structural.
       if (msg.type === 'register') {
-        peerAddress = msg.address;
+        if (!msg.address) return;
+        for (const [n, c] of openChallenges) if (c.expiresAt <= Date.now()) openChallenges.delete(n);
+        const nonce = newAddressChallenge();
+        openChallenges.set(nonce, { address: msg.address, expiresAt: Date.now() + ADDRESS_CHALLENGE_TTL_MS });
+        ws.send(JSON.stringify({ type: 'challenge', address: msg.address, nonce }));
+        return;
+      }
+
+      // Register, step 2: prove. Verified against the address itself.
+      if (msg.type === 'register-proof') {
+        const { address, nonce, proof } = msg;
+        const challenge = typeof nonce === 'string' ? openChallenges.get(nonce) : null;
+        if (!challenge || challenge.address !== address) {
+          ws.send(JSON.stringify({ type: 'error', message: 'NO_CHALLENGE', address }));
+          return;
+        }
+        openChallenges.delete(nonce);                         // single use, spent before verifying
+        if (Date.now() > challenge.expiresAt) {
+          ws.send(JSON.stringify({ type: 'error', message: 'CHALLENGE_EXPIRED', address }));
+          return;
+        }
+        if (!verifyAddressPossession({ address, nonce, proof })) {
+          ws.send(JSON.stringify({ type: 'error', message: 'PROOF_INVALID', address }));
+          return;
+        }
+
+        peerAddress = address;
+        registeredAddresses.add(peerAddress);
         this.#clients.set(peerAddress, ws);
-        ws.send(JSON.stringify({ type: 'registered' }));
+        ws.send(JSON.stringify({ type: 'registered', address: peerAddress }));
         this.#forward.drain(peerAddress, ws, { evictFirst: true });
         this.emit('peer-connected', peerAddress);
         // Notify all other connected clients that a new peer joined
@@ -116,6 +173,21 @@ export class WsServerTransport extends Transport {
       if (msg.type === 'send' && msg.envelope) {
         const to = msg.to ?? msg.envelope?._to;
         if (!to) return;
+
+        // Sender binding — one shared rule, this broker's port: the addresses this socket registered. An
+        // EMPTY set is a real answer ("registered as nobody"), so a claim from a socket that never
+        // registered is refused rather than passing through the unchecked path. A frame with no `_from`
+        // is forwarded (`no-claimed-sender`) — bare payload objects are legitimate wire traffic here, and
+        // an envelope without a sender is useless to an impersonator. Refuse the FRAME, keep the socket:
+        // one socket owns many addresses, so a mis-timed frame must not take the others down.
+        // See the header for why this is hygiene rather than a defence on this particular broker.
+        const verdict = senderVerdict(null, msg.envelope, () => [...registeredAddresses]);
+        if (!verdict.ok) {
+          if (ws.readyState === 1) {
+            ws.send(JSON.stringify({ type: 'error', message: 'SENDER_NOT_REGISTERED' }));
+          }
+          return;
+        }
 
         if (to === this.address) {
           // Message addressed to the relay itself — dispatch to RelayAgent.

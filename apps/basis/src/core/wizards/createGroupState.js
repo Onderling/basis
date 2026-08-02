@@ -334,6 +334,19 @@ export function encodeMembershipCodeUrl(result) {
     // the circle lives; rule 1 records it on their device at join.
     ...(typeof result.relayUrl === 'string' ? { relayUrl: result.relayUrl } : {}),
   };
+  return encodeInviteUri(payload);
+}
+
+/**
+ * The wire form of an invite payload: `onderling-invite://<base64url-of-JSON>`.
+ *
+ * Split out of `encodeMembershipCodeUrl` so a caller that has to REBUILD an invite — the broadcast clamp
+ * strips the relay endpoint before putting one in a room — can re-encode without going back through the
+ * field whitelist above. That distinction is load-bearing: the whitelist silently dropped `podBacked`/
+ * `podUrl` until 2026-07-28, and round-tripping an already-built invite through it would re-create
+ * exactly that class of silent loss for every field it does not yet know about.
+ */
+export function encodeInviteUri(payload) {
   const json = JSON.stringify(payload);
   if (typeof globalThis.btoa !== 'function') return `onderling-invite://${json}`;
   const b64 = globalThis.btoa(json)

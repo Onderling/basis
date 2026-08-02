@@ -53,6 +53,7 @@ import { dlog } from './src/core/devLog.js';
 import { EventLog } from '../basis/src/eventLog.js';
 import { rehydrateKringChatsFromStoop } from '../basis/src/v2/kringChatRehydrate.js';
 import { createChatMessageInbox } from '../basis/src/v2/chatMessageInbox.js';
+import { createSelfAuthorCheck } from '../basis/src/v2/chatSelfAuthor.js';
 import { OidcSessionRN } from '@onderling/oidc-session-rn';
 import { buildCirclePodWriter } from './src/core/circleStoresRN.js';
 // γ-next.recipe — per-kring pending-recipe cache (AsyncStorage-backed).
@@ -208,6 +209,17 @@ export default function App() {
           ? bundleRef.current.sendPeer(to, payload)
           : Promise.reject(new Error('no peer send yet'))),
       }),
+      // "Did I write this?" — so a message of mine read back out of storage (the boot rehydrate two
+      // blocks down, catch-up, pod replay) comes back as MINE ('me', what the bubbles compare against)
+      // instead of as a stranger's. Web parity, same shared check; per-circle by construction, and never
+      // consulted on the live receive path (chatSelfAuthor.js). Reads `bundleRef` lazily like `ingest`.
+      isSelfAuthored: createSelfAuthorCheck({
+        whoAmI: () => (typeof bundleRef.current?.callSkill === 'function'
+          ? bundleRef.current.callSkill('stoop', 'whoAmI', {})
+          : Promise.resolve(null)),
+        circleAddressFor: (cid) => bundleRef.current?.agent?.circleAddressFor?.(cid) ?? null,
+      }),
+      localActor: 'me',
     });
   }
   // γ-next.recipe — shared kring-recipe-broadcast pending store.
@@ -403,6 +415,15 @@ export default function App() {
                 + `(${reason}${Number.isFinite(ageMs) ? `, held ${Math.round(ageMs / 1000)}s` : ''})`,
               );
             },
+            // The far-end twin: the message DID leave here, waited at the relay, and the relay's TTL or a
+            // cap ended it. Same honest outcome for the bubble — `failed`, which renders with a retry —
+            // but a different fact, so it is a different hook (see createSecureAgent).
+            onUndelivered: ({ msgId, reason }) => {
+              if (!msgId) return;
+              try { deliveryStateMapRef.current?.set(msgId, 'failed'); }
+              catch { /* nothing to do; the relay already told us and the warn below records it */ }
+              console.warn(`[delivery] relay gave up on ${String(msgId)} (${reason})`);
+            },
           },
           // Persist the agent identity (chat + host vaults + stoop
           // cache) to AsyncStorage so the NKN address — derived from the
@@ -473,7 +494,24 @@ export default function App() {
         try {
           const show = await shouldShowCreateMnemonic(AsyncStorage);
           if (!show) { setMnemonicState('dismissed'); return; }
-          const phrase = await b.agent?.sa?.agent?.identity?.getMnemonic?.();
+          // The OWNER ROOT's phrase — the one secret everything derives from — via the same skill the
+          // in-app "show my recovery phrase" screen uses.
+          //
+          // 2026-08-02: this used to read `b.agent.sa.agent.identity.getMnemonic()`, which is the CHAT
+          // identity. Its seed is `root.deriveAgentSeed('default')` — a CHILD of the root — so
+          // `getMnemonic()` re-encoded the child and the app showed 24 words that were NOT the recovery
+          // phrase. Writing them down and typing them back installed them as a brand-new root: a
+          // different person, at addresses nobody had ever seen.
+          // Same defensive read as CircleMyDataScreen, the consumer that already had this right — whose
+          // own comment records that it too once read the wrong seed ("was stoop getMnemonicOnce").
+          let phrase = null;
+          try {
+            const res = await b.callSkill?.('household', 'revealOwnerPhrase', {});
+            if (res && !res.error) {
+              const w = res.mnemonic ?? res.phrase ?? res.words ?? '';
+              phrase = Array.isArray(w) ? w.join(' ') : String(w || '');
+            }
+          } catch { phrase = null; }
           if (typeof phrase === 'string' && phrase.trim()) {
             if (!cancelled) {
               setMnemonic(phrase);

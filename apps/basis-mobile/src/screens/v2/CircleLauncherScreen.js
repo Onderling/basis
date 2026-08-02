@@ -15,6 +15,9 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, BackHandler, Modal, Alert, findNodeHandle } from 'react-native';
 import { useTheme } from './themeContext.js';
+// The status bar overlaps a full-screen View on Android/iOS. Every screen in this file draws its own
+// header bar at the very top of `styles.page`, so the inset belongs to that style — see `makeStyles`.
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 // Network-change sources for the Nearby re-announce. AppState is always available; netinfo is an OPTIONAL
 // peer, so it is loaded defensively — a shell without it keeps foreground-return detection and simply loses
@@ -42,6 +45,9 @@ import {
   myThingsFromListFiles,
   // kring-scoped event stream + per-row action chips.
   chatRows, actionsForStreamRow, resolveConversationKinds,
+  // recognising an inbound CHAT entry for THIS circle — the same kind + the same circle-id read the
+  // conversation projection itself uses, so the refresh cannot key off something the filter ignores.
+  CHAT_KIND, eventCircleId,
   // P1.7 — the viewer's conversation filter (kinds × people/agents), shared model, device-local store.
   applyChatFilter, chatFilterChips, normalizeChatFilter, asyncStorageChatFilterIo,
   // "Never share my global address" — the publication lock (web parity).
@@ -387,7 +393,8 @@ export default function CircleLauncherScreen({
   kringPolicyPendingStore = null,
 }) {
   const theme = useTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const insets = useSafeAreaInsets();   // clear the status bar so the header bar is fully tappable
+  const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
   const [circles, setCircles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
@@ -1839,10 +1846,23 @@ export default function CircleLauncherScreen({
         {/* no "← chat" button (no chat shell to navigate to). */}
         <Text style={styles.title}>{t('circle.title')}</Text>
 
-        {loading ? (
+        {/* A RELOAD MUST NOT REMOVE WHAT IS ALREADY ON SCREEN — this is the two-taps-to-open bug.
+            `load()` sets `loading` for the whole round-trip, and this branch used to swap the entire list
+            for the loading line. React Native ends an in-flight press when the row it started on
+            unmounts, so any tap that straddled a reload was simply dropped and the user tapped again.
+            And reloads are common exactly where the miss was seen: joining from an invite link bumps
+            `circlesRevision`, and the boot retry re-runs `load()` up to five times.
+            So the placeholder is for an EMPTY list only — a refresh now repaints in place. */}
+        {loading && circles.length === 0 ? (
           <Text style={styles.muted}>{t('circle.loading')}</Text>
         ) : (
-          <ScrollView contentContainerStyle={styles.list}>
+          <ScrollView
+            contentContainerStyle={styles.list}
+            // …and the sibling class of first-tap loss: with this unset a ScrollView spends the first tap
+            // dismissing the keyboard instead of hitting the row under it. Same value the other circle
+            // list already uses (`CircleListScreen.js`).
+            keyboardShouldPersistTaps="handled"
+          >
             {bundle?.mdns ? (
               <View style={styles.nearbyRow} testID="circle-nearby">
                 <Text style={styles.nearbyText}>
@@ -2195,7 +2215,8 @@ function CircleDetail({
   onBack, onSettings, onMine, onViewAs, onAdvisor, onSkills, onFiles, onRules, onRecipes, onAdmin, onLists, onShare, onInvite, onGovernance, onReportMember, onReportPost, onReportMessage,
 }) {
   const theme = useTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const insets = useSafeAreaInsets();   // clear the status bar so the header bar is fully tappable
+  const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
   // Part D — scope the bot/suggest catalog to the circle's apps: drops basis's infra ops (/me etc.)
   // that the circle bot can't run (they threw `circle.bot.failed`) and keeps them out of the suggest list.
   const catalog = useMemo(
@@ -2335,12 +2356,20 @@ function CircleDetail({
     const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n;
   }), []);
   const lastKringListingRef = useRef(null); // { appOrigin, items } from the last list reply, for bulk "/done all"
+  const streamScrollRef = useRef(null);     // the Conversation viewport — kept at the newest bubble (see the ScrollView)
   // Prefer the SHARED map from App.js — inbound receipts land there. The local fallback keeps older
   // callers/tests working, but a private map here means receipts advance a state no bubble reads.
   if (deliveryStateMapRef.current == null) {
     deliveryStateMapRef.current = deliveryStateMap ?? createDeliveryStateMap();
   }
   const [deliveryTick, setDeliveryTick] = useState(0);
+  // …and REDRAW when something else writes to that map. The send path bumps the tick itself (it owns the
+  // `onChange` hook), so an inbound RECEIPT was the one writer with nothing to announce it: the receipt
+  // arrived, the map advanced to `stored`, and the bubble kept saying "maybe received" until an unrelated
+  // render happened to repaint it. The map has had `subscribe` since δ.2; nobody had used it.
+  // Unconditional here (web narrows to `stored`): a tick is a cheap React state bump rather than a DOM
+  // rebuild, and App.js writes `failed` into this same map from outside this screen with no other hook.
+  useEffect(() => deliveryStateMapRef.current?.subscribe?.(() => setDeliveryTick((n) => n + 1)), []);
   const deliveryStateFor = useCallback((msgId) => {
     // eslint-disable-next-line no-unused-expressions
     deliveryTick; // read tick so memoised consumers re-evaluate on bumps
@@ -2387,6 +2416,12 @@ function CircleDetail({
       if (e?.type === ROSTER_UPDATED_KIND && e?.circleId === circle.id) {
         setMembersReloadTick((n) => n + 1);
       }
+      // …and the conversation itself. `rows` is a memo re-pulled off a hand-bumped `streamTick`, and the
+      // SEND path was the only thing bumping it — so a message that ARRIVED while this pane was open
+      // could not appear until something unrelated re-rendered it. Web has no equivalent gap: it
+      // re-renders on every event. `eventCircleId` reads the same circle the projection filters on, so a
+      // first-class `circleId` and the older payload dig both match.
+      if (e?.type === CHAT_KIND && eventCircleId(e) === circle.id) setStreamTick((n) => n + 1);
     });
   }, [eventLog, circle?.id]);
   useEffect(() => {
@@ -3567,6 +3602,17 @@ function CircleDetail({
         contentContainerStyle={viewMode !== 'scherm' && activeTab === 'gesprek' ? [styles.list, styles.chatListPad] : styles.list}
         style={viewMode !== 'scherm' && activeTab === 'gesprek' ? styles.chatScroll : undefined}
         testID="circle-detail-stream"
+        ref={streamScrollRef}
+        // "My own message never appears in the Conversation" — it DID appear, at the bottom, below the
+        // fold. Bubbles render oldest-first, this pane never scrolled, and nothing here moved the
+        // viewport, so a send into a conversation that already filled the screen looked like a message
+        // that had been dropped (it reached the peers the whole time). The sibling chat surface
+        // (`ChatScreen`) has had this since it was written; this one never got it.
+        // Gated on the chat tab: the prikbord / leden / taken bodies are lists you read from the top.
+        onContentSizeChange={() => {
+          if (viewMode === 'scherm' || activeTab !== 'gesprek') return;
+          streamScrollRef.current?.scrollToEnd?.({ animated: true });
+        }}
       >
         {viewMode === 'scherm' ? (
           // α.1e — render the materialized recipe blocks.  CircleScreenView
@@ -4238,7 +4284,8 @@ function ConnectionPointsHost({ onBack }) {
 // through the warning that mattered.
 function ConnectionPointsScreen({ points = [], onBack, onAdopt, onRemove, onConfirmRemove, onCancelRemove, removing }) {
   const theme = useTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const insets = useSafeAreaInsets();   // clear the status bar so the header bar is fully tappable
+  const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
   return (
     <View style={styles.page} testID="circle-points">
       <View style={styles.bar}>
@@ -4431,7 +4478,8 @@ function NearbyScreen({
   answering, onSubmitAnswer, onCancel, onToggleAllow, onSubmitCard, onSay, onInviteAction,
 }) {
   const theme = useTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const insets = useSafeAreaInsets();   // clear the status bar so the header bar is fully tappable
+  const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
   const rows       = Array.isArray(model?.rows) ? model.rows : [];
   const own        = model?.ownProfile ?? {};
   const headerText = model?.headerLabel ?? '';
@@ -4724,7 +4772,8 @@ function NearbyScreen({
 // when callSkill('listFiles') returns mine-and-circle-less items.
 function MyThingsScreen({ files = [], onBack }) {
   const theme = useTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const insets = useSafeAreaInsets();   // clear the status bar so the header bar is fully tappable
+  const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
   return (
     <View style={styles.page} testID="circle-mythings">
       <View style={styles.bar}>
@@ -4748,14 +4797,25 @@ function MyThingsScreen({ files = [], onBack }) {
   );
 }
 
-const makeStyles = (theme) => StyleSheet.create({
+/**
+ * `insets` — the safe-area insets of the screen this stylesheet is for (`useSafeAreaInsets()`).
+ *
+ * Every screen in this file is a full-bleed `styles.page` whose FIRST child is a header bar with the
+ * `← circles` back button and (on the detail screen) the Chat/Scherm toggle. With a flat 12px top pad
+ * those controls render level with the system clock: their upper halves are behind the status bar and
+ * simply do not receive touches — `← circles` could not be hit at all. So the inset belongs to `page`,
+ * the one style all of them share, rather than to each header.
+ *
+ * Defaults to zero so a caller with no header (the launcher TILE) keeps the exact previous padding.
+ */
+const makeStyles = (theme, insets = null) => StyleSheet.create({
   // S6.B — chat-triggered screen panel.
   panelBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   panelCard:  { backgroundColor: theme.color.paper, borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '85%', minHeight: '50%', padding: 16 },
   panelHead:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   panelTitle: { fontFamily: theme.font.serif, fontSize: 18, fontWeight: '600', color: theme.color.ink },
   panelClose: { fontSize: 16, color: theme.color.inkSoft, paddingHorizontal: 6 },
-  page:       { flex: 1, paddingHorizontal: 16, paddingTop: 12, backgroundColor: theme.color.paper },
+  page:       { flex: 1, paddingHorizontal: 16, paddingTop: (insets?.top ?? 0) + 12, backgroundColor: theme.color.paper },
   bar:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 22 },
   back:       { fontSize: 13, color: theme.color.inkSoft },
   barActions: { flexDirection: 'row', gap: 14, marginLeft: 'auto' },

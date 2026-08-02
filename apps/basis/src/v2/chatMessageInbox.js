@@ -58,6 +58,12 @@ const DEFAULT_DEDUP_CAP = 256;
  *                                                 the full chat envelope by reading the shared pod
  *                                                 (StorageBackend.get + unseal). Absent → ref
  *                                                 envelopes are skipped (never crash the loop).
+ * @param {(envelope) => Promise<boolean>|boolean} [args.isSelfAuthored]
+ *                                                 "did I write this?" — see `chatSelfAuthor.js`.
+ *                                                 Applied on the RESTORE paths only (below).
+ * @param {string} [args.localActor]               the actor stamp a self-authored message gets
+ *                                                 back (default `'me'`, what both shells' bubbles
+ *                                                 compare against).
  * @param {number} [args.dedupCap]                 LRU cap (default 256)
  * @param {{warn?, info?, debug?}} [args.logger]
  * @returns {{ ingestChatMessage: Function, _seen: object }}  `_seen` exposed for tests.
@@ -67,6 +73,8 @@ export function createChatMessageInbox({
   ingest        = null,
   resolveActor  = null,
   resolveRef    = null,
+  isSelfAuthored = null,
+  localActor    = 'me',
   dedupCap      = DEFAULT_DEDUP_CAP,
   logger        = console,
   // Delivery honesty (2026-07-28): called AFTER a genuine insert with `{ msgId, fromPeerAddr, source }`.
@@ -168,9 +176,27 @@ export function createChatMessageInbox({
       }
     }
 
-    const actor = (typeof resolveActorFn === 'function'
+    // Is this a message *I* wrote, coming back out of storage? Then it must land with the SAME
+    // actor stamp the optimistic append gave it, or a relaunch turns your own history into
+    // strangers' — left-aligned, sender-labelled, reportable. `chatSelfAuthor.js` explains the
+    // per-circle test; the rule about WHICH paths may ask it lives here:
+    //
+    //   • restore paths ('rehydrator' / 'pod' / 'catchUp') read messages BACK, which is the only
+    //     way one of your own can legitimately reappear — they may ask.
+    //   • the live 'receiver' path may NOT. The author rides the envelope, so a peer can put your
+    //     identifier in it; honouring that live would render THEIR sentence as YOURS, which is a
+    //     worse lie than the one this fixes. Nothing is lost: your own fan-out never loops back,
+    //     so a live message claiming to be from you is an echo (already deduped) or a forgery.
+    //
+    // A check that fails (missing seam, unreachable identity, a synchronous throw) answers "not
+    // mine": the message still lands, attributed exactly as it was before this existed.
+    const selfAuthored = source !== 'receiver'
+      && typeof isSelfAuthored === 'function'
+      && await Promise.resolve().then(() => isSelfAuthored(envelope)).catch(() => false);
+
+    const actor = selfAuthored ? localActor : ((typeof resolveActorFn === 'function'
       ? resolveActorFn(envelope, fromPeerAddr)
-      : envelope.fromActor) ?? fromPeerAddr ?? null;
+      : envelope.fromActor) ?? fromPeerAddr ?? null);
 
     // media — optional media-card embed riding the envelope (forward
     // additive; the sender's wire whitelist already stripped local-only
@@ -192,7 +218,22 @@ export function createChatMessageInbox({
       circleId: envelope.circleId,
       actor,
       text:     envelope.text,
-      senderDisplay: actor,
+      // `senderDisplay` is the name printed ABOVE a bubble, and my own messages never print one
+      // (the shells suppress it for `isMine`). Omitting the key — rather than passing `'me'` —
+      // makes the restored event byte-identical to the optimistic one the live send appended, so
+      // restored history renders exactly like live history instead of merely looking like it.
+      ...(selfAuthored ? {} : { senderDisplay: actor }),
+      // A message that ARRIVED here arrived over the circle fan-out, so its reach IS the whole kring.
+      // Both shells render the scope badge as `scope === 'kring' ? "whole kring" : "only you"`
+      // (`circleKring.js` / the mobile bubble), so leaving it unset made every received message — every
+      // fanned message anyone ever sees — claim it was private to the reader. Untrue, and the most
+      // visible kind of untrue.
+      //
+      // Derived from ARRIVAL, not read off the wire, and that is the point: `scope` is a local-only
+      // presentation field that never rides the envelope (`chatEnvelope.js`), a `scope:'self'` message is
+      // never fanned out at all, and a wire field would be the sender asserting its own reach — which the
+      // enforceability test says is worth nothing. Arrival is the evidence; the badge states exactly it.
+      scope: 'kring',
       ...(media ? { media } : {}),
     }));
     logger.info?.('[kring-chat] received', envelope.msgId, 'circle=' + envelope.circleId, 'source=' + source);

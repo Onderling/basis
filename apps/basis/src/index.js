@@ -135,6 +135,14 @@ export {
   rosterUpdatedPayload, appendRosterUpdatedEntry, isValidRosterUpdatedEnvelope,
   makeRosterUpdateAnnouncer, makeRosterUpdatedPeerHandler,
 } from './v2/rosterUpdated.js';
+// B2 — per-circle ADDRESS announcing: the proven "here is where I answer in this circle" record,
+// the admin's post-join propagation (the only party that can reach both a newcomer and the circle),
+// and the receive half that records it AND refreshes who may speak, from one roster read.
+export {
+  CIRCLE_ADDRESS_ANNOUNCE_KIND, selfWebidOf, announcementsFromRoster, ownAnnouncementFor,
+  announceOwnCircleAddress, announceOwnCircleAddressIfChanged, propagateCircleAddressesAfterJoin,
+  isValidCircleAddressAnnounceEnvelope, makeCircleAddressAnnouncePeerHandler,
+} from './v2/circleAddressAnnounce.js';
 // per-kring bottom tabs derived from policy.features (v2 §1).
 export { buildKringTabs, DEFAULT_KRING_TAB, featureActionLabelKey, featureTabId, featureForTabId } from './v2/kringTabs.js';
 // δ.2 — per-message delivery state (pending / sent / failed) for the
@@ -273,7 +281,12 @@ export {
   RETENTION_CHOICES_DAYS, DEFAULT_RETENTION_DAYS, normalizeRetentionDays, retentionFromDays, daysToMs,
   localStorageRetentionIo, asyncStorageRetentionIo,
 } from './v2/retentionPref.js';
-export { bindCircleAddressKeys, forgetCircleAddressKeys } from './v2/circleAddressKeys.js';
+export { bindCircleAddressKeys, forgetCircleAddressKeys, circleSigningKeyOf }
+                                                from './v2/circleAddressKeys.js';
+export { useCircleSigningIdentity, installCircleSigningIdentities }
+                                                from './v2/circleSigningIdentity.js';
+export { createCircleSenderAuthorization, SENDER_REASON }
+                                                from './v2/circleSenderAuthorization.js';
 export {
   DEFAULT_SHARE_NKN_ADDRESS, normalizeShareNknAddress, shareableAddress,
   localStorageAddressSharingIo, asyncStorageAddressSharingIo,
@@ -302,12 +315,15 @@ export {
 } from './v2/deliveryState.js';
 export {
   deliverySettings, createDeliverySettingsStore, localStorageDeliveryIo, asyncStorageDeliveryIo,
-  deliveryLabelFor, withDelivery, makeReceiptSender, applyReceipt,
+  deliveryLabelFor, withDelivery, makeReceiptSender, applyReceipt, makeReceiptReceiver,
   DELIVERY_PRESENTATION, deliveryPresentation,
 } from './v2/deliverySettings.js';
 export {
   defaultConversationKinds, availableConversationKinds, TEMPLATE_CONVERSATION_KINDS,
   resolveConversationKinds, setConversationKind,
+  // The kind a chat line IS — named once so a surface that has to recognise one (e.g. a shell deciding
+  // whether an inbound entry should refresh its conversation) cannot hardcode a second copy of the string.
+  CHAT_KIND,
 } from './v2/conversationKinds.js';
 export { makeSharedCirclePeerScope } from './v2/sharedCirclePeerScope.js';
 // agent-add admin approval: proposal-like flow for

@@ -7,6 +7,9 @@ import WebSocket from 'ws';
 import { WsServerTransport } from '../src/WsServerTransport.js';
 import { AgentIdentity } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
+// Registration is challenge-first here too since 2026-07-31 (Decision 3), so a client address is a
+// real public key and the fixture below answers the broker's challenge with a real signature.
+import { addr as A, proveAddress, useIdentity } from './helpers/provenClient.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -33,6 +36,14 @@ function openClient(port, address) {
 
     ws.on('message', raw => {
       const msg = JSON.parse(raw);
+      // Step 2 of registration: prove we hold the key behind the address we asked for.
+      if (msg.type === 'challenge') {
+        const proof = proveAddress(msg.address, msg.nonce);
+        if (proof) {
+          ws.send(JSON.stringify({ type: 'register-proof', address: msg.address, nonce: msg.nonce, proof }));
+        }
+        return;
+      }
       if (pending.length) {
         const { resolve: res, timer } = pending.shift();
         clearTimeout(timer);
@@ -90,32 +101,33 @@ describe('WsServerTransport', () => {
   });
 
   it('accepts client connections and confirms registration', async () => {
-    const { ws } = await openClient(relay.transport.port, 'client-1');
+    const { ws } = await openClient(relay.transport.port, A('client-1'));
     expect(ws.readyState).toBe(WebSocket.OPEN);
     ws.close();
   });
 
   it('getConnectedPeers lists registered clients', async () => {
-    const { ws } = await openClient(relay.transport.port, 'peer-a');
-    expect(relay.transport.getConnectedPeers()).toContain('peer-a');
+    const { ws } = await openClient(relay.transport.port, A('peer-a'));
+    expect(relay.transport.getConnectedPeers()).toContain(A('peer-a'));
     ws.close();
   });
 
   it('removes peer from connected list on disconnect', async () => {
-    const { ws } = await openClient(relay.transport.port, 'peer-b');
+    const { ws } = await openClient(relay.transport.port, A('peer-b'));
     await new Promise(resolve => {
       relay.transport.once('peer-disconnected', resolve);
       ws.close();
     });
-    expect(relay.transport.getConnectedPeers()).not.toContain('peer-b');
+    expect(relay.transport.getConnectedPeers()).not.toContain(A('peer-b'));
   });
 
   it('forwards envelope from sender to recipient', async () => {
     const id = await AgentIdentity.generate(new VaultMemory());
-    const { ws: wsSender } = await openClient(relay.transport.port, 'sender');
+    const { ws: wsSender } = await openClient(relay.transport.port, A('sender'));
+    useIdentity(id);
     const { next }         = await openClient(relay.transport.port, id.pubKey);
 
-    const envelope = { _v: 1, _p: 'OW', _id: 'e1', _from: 'sender',
+    const envelope = { _v: 1, _p: 'OW', _id: 'e1', _from: A('sender'),
                        _to: id.pubKey, _ts: Date.now(), _sig: null, payload: 'hello' };
     wsSender.send(JSON.stringify({ type: 'send', to: id.pubKey, envelope }));
 
@@ -140,12 +152,16 @@ describe('WsServerTransport', () => {
   });
 
   it('queues envelope for offline peer and delivers on reconnect', async () => {
-    const offlineAddr = 'offline-peer';
-    const envelope = { _v: 1, _p: 'OW', _id: 'q1', _from: 'x',
+    const offlineAddr = A('offline-peer');
+    // `_from` is the sender's OWN registered address, as a real client's is: the base `Transport` stamps
+    // it from `this.address`. Since 2026-07-31 the broker binds sender→registration, so a fixture that
+    // claimed some third address ('x') would now be refused — correctly, and for the reason this test is
+    // not about.
+    const envelope = { _v: 1, _p: 'OW', _id: 'q1', _from: A('sender-q'),
                        _to: offlineAddr, _ts: Date.now(), _sig: null, payload: 'queued' };
 
     // Send while peer is offline.
-    const { ws: wsSender } = await openClient(relay.transport.port, 'sender-q');
+    const { ws: wsSender } = await openClient(relay.transport.port, A('sender-q'));
     wsSender.send(JSON.stringify({ type: 'send', to: offlineAddr, envelope }));
     await new Promise(r => setTimeout(r, 50));
 
@@ -163,24 +179,26 @@ describe('WsServerTransport', () => {
     await relay.transport.stop();
     relay = await makeTransport({ offlineQueueTtl: 1 });
 
-    const envelope = { _v: 1, _p: 'OW', _id: 'exp1', _from: 'x',
-                       _to: 'late-peer', _ts: Date.now(), _sig: null, payload: 'expired' };
+    // Same as above: claim the address this socket registers, so the timeout below proves TTL expiry
+    // rather than a sender-binding refusal.
+    const envelope = { _v: 1, _p: 'OW', _id: 'exp1', _from: A('sender-exp'),
+                       _to: A('late-peer'), _ts: Date.now(), _sig: null, payload: 'expired' };
 
-    const { ws: wsSender } = await openClient(relay.transport.port, 'sender-exp');
-    wsSender.send(JSON.stringify({ type: 'send', to: 'late-peer', envelope }));
+    const { ws: wsSender } = await openClient(relay.transport.port, A('sender-exp'));
+    wsSender.send(JSON.stringify({ type: 'send', to: A('late-peer'), envelope }));
     await new Promise(r => setTimeout(r, 50));
 
-    const { next } = await openClient(relay.transport.port, 'late-peer');
+    const { next } = await openClient(relay.transport.port, A('late-peer'));
     await expect(next(200)).rejects.toThrow('Timeout');
 
     wsSender.close();
   });
 
   it('emits peer-connected when client registers', async () => {
-    const addr = await new Promise(resolve => {
+    const connected = await new Promise(resolve => {
       relay.transport.once('peer-connected', resolve);
-      openClient(relay.transport.port, 'new-peer').catch(() => {});
+      openClient(relay.transport.port, A('new-peer')).catch(() => {});
     });
-    expect(addr).toBe('new-peer');
+    expect(connected).toBe(A('new-peer'));
   });
 });

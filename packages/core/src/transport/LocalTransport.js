@@ -10,8 +10,15 @@
  *
  * Unlike RelayTransport there is no auto-reconnect — if the connection drops
  * the transport emits 'disconnect' and must be manually reconnected.
+ *
+ * Registration is challenge-first, exactly as on `RelayTransport` (2026-07-31,
+ * DESIGN-boundary-authentication §7): the server sends a nonce, we sign it with the key behind our
+ * address, and a `registered` we never answered a challenge for is refused rather than accepted.
+ * This transport speaks the same protocol as the relay brokers, so it inherits the same rule — a
+ * localhost server is still a server that decides where our inbound traffic goes.
  */
 import { Transport } from './Transport.js';
+import { signAddressPossession } from '../identity/addressPossession.js';
 
 /**
  * WebSocket transport to a localhost relay-style server, addressed by port, Unix
@@ -87,7 +94,10 @@ export class LocalTransport extends Transport {
     const ws = new WS(this.#url);
     this.#ws = ws;
 
+    let proved = false;   // did we answer a challenge on THIS socket?
+
     ws.onopen = () => {
+      proved = false;
       ws.send(JSON.stringify({ type: 'register', address: this.address }));
     };
 
@@ -95,7 +105,27 @@ export class LocalTransport extends Transport {
       let msg;
       try { msg = JSON.parse(event.data); } catch { return; }
 
+      if (msg.type === 'challenge' && msg.address === this.address && msg.nonce) {
+        proved = true;
+        ws.send(JSON.stringify({
+          type:    'register-proof',
+          address: this.address,
+          nonce:   msg.nonce,
+          proof:   signAddressPossession(this.identity, this.address, msg.nonce),
+        }));
+        return;
+      }
+
       if (msg.type === 'registered') {
+        if (!proved) {
+          // No fallback: a server that registers an address without demanding proof is one where
+          // anyone may claim ours. Report it and stay unregistered.
+          this.emit('error', new Error(
+            'LocalTransport server: registered without demanding proof of address possession — refusing.',
+          ));
+          try { ws.close(); } catch { /* already gone */ }
+          return;
+        }
         this.emit('connect', { address: this.address });
         const res = this.#connectResolve;
         this.#connectResolve = null;

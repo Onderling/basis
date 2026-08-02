@@ -12,9 +12,11 @@
  *   - Soft warn at 20 s if still connecting
  *   - Hard timeout at 90 s → seedless retry (different node pool)
  */
-import { Transport, b64encode, b64decode } from '@onderling/core';
+import { Transport, b64encode, b64decode, createSenderBinding } from '@onderling/core';
 import { log } from '@onderling/logger';
 import nacl from 'tweetnacl';
+
+import { nknAuthenticatedSender } from './nknSenderBinding.js';
 
 /**
  * Derive a peer's NKN address from its base64url chat pubKey. NKN uses the agent's
@@ -45,6 +47,8 @@ export class NknTransport extends Transport {
   #client    = null;
   #nknLib    = null;
   #opts;
+  /** The shared sender-binding rule, asked with nkn's `authenticatedSender` port. */
+  #checkSender;
 
   /**
    * @param {object} opts
@@ -62,6 +66,16 @@ export class NknTransport extends Transport {
       connectTimeout: 90_000,
       ...opts,
     };
+    this.#checkSender = createSenderBinding({
+      transportName:       'NknTransport',
+      authenticatedSender: nknAuthenticatedSender,
+      // Loud absence: if nkn ever stops handing us `src` (or the injected lib does not), the receive path
+      // is delivering unchecked envelopes and must say so rather than read as protected.
+      onUnauthenticated:   (message) => {
+        log.warn('transport', 'transport.inbound.sender-unchecked');
+        this.emit('warn', message);
+      },
+    });
   }
 
   // ── G13 aliases — DELIBERATELY UNSUPPORTED (2026-07-27) ─────────────────────
@@ -236,6 +250,30 @@ export class NknTransport extends Transport {
       this.#client.on('message', (msg) => {
         let envelope;
         try { envelope = JSON.parse(msg.payload.toString()); } catch { return; }
+
+        // ── Sender binding — second line, NOT the wall (2026-07-31) ──────────────────────────────
+        //
+        // This handler used to discard `msg.src` — the one sender fact nkn actually authenticates — and
+        // deliver whatever sender the envelope's `_from` claimed. `_from` is free text, so any peer that
+        // could reach us could speak as anyone we had already keyed. The rule + the reasoning live in
+        // `nknSenderBinding.js` (nkn's half) and `@onderling/core` `senderBinding.js` (the shared half).
+        //
+        // Limits, stated so nobody reads this as the boundary: it covers ONE transport (the same envelope
+        // arriving over the relay is checked there, separately, and only against the relay's own view);
+        // it trusts nkn's authentication; and it binds a sender to a CONNECTION, never to a key. The real
+        // fix — the signing key IS the identity, authorised against the circle roster — is the circle
+        // layer's sealing + roster work, a separate build.
+        //
+        // This adapter can receive over MultiClient *or* single Client (it falls back automatically on a
+        // MultiClient connect timeout, see #tryConnect), so the `__N__.` sub-client prefix genuinely
+        // reaches this comparison — the normalisation in the port is load-bearing, not defensive dressing.
+        const verdict = this.#checkSender(msg, envelope);
+        if (!verdict.ok) {
+          // PII-SAFE: the verdict REASON only — never `src`, `_from`, or payload contents.
+          log.warn('transport', 'transport.inbound.sender-rejected', { reason: verdict.reason });
+          this.emit('warn', `NknTransport: dropped inbound envelope (${verdict.reason})`);
+          return;
+        }
         this._receive(envelope);
       });
 

@@ -49,23 +49,38 @@ export async function feedHouseholdRoster({ agent, circleId } = {}) {
  * join, where the joiner PROVED the address. Split out so a caller that only wants the binding (a roster
  * refresh, a post-removal re-bind) does not also re-run household pairing.
  *
+ * The rows themselves come back with the counts, so a caller that needs to ASK something of the
+ * roster it just caused to be read (does my own row still name the address I derive? — the address
+ * announcing trigger) does not read it a second time. Two reads is how two views of one fact drift.
+ *
  * @param {object} a
  * @param {object} a.agent      the host agent (needs `callSkill` + `registerPeerAddress`)
  * @param {string} a.circleId
- * @returns {Promise<{bound: number, skipped: number}>}
+ * @returns {Promise<{bound: number, skipped: number, members: Array<object>}>}
  */
 export async function bindCircleAddressKeysFor({ agent, circleId } = {}) {
-  if (!agent || typeof agent.callSkill !== 'function' || !circleId) return { bound: 0, skipped: 0 };
-  if (typeof agent.registerPeerAddress !== 'function') return { bound: 0, skipped: 0 };
+  if (!agent || typeof agent.callSkill !== 'function' || !circleId) return { bound: 0, skipped: 0, members: [] };
+  if (typeof agent.registerPeerAddress !== 'function') return { bound: 0, skipped: 0, members: [] };
   let res;
   try { res = await agent.callSkill('stoop', 'listGroupMembers', { groupId: circleId }); }
-  catch { return { bound: 0, skipped: 0 }; }
-  return bindCircleAddressKeys({
-    members: Array.isArray(res?.members) ? res.members : [],
-    registerPeerAddress: (address, pubKey) => agent.registerPeerAddress(address, pubKey),
-    // Skip my own row — I never seal to myself, and binding it would be a harmless no-op at best.
-    selfPubKey: agent.identity?.pubKey ?? agent.peer?.address ?? null,
-  });
+  catch { return { bound: 0, skipped: 0, members: [] }; }
+  const members = Array.isArray(res?.members) ? res.members : [];
+  // Decision 1 step 3 — the SAME rows also say who may speak in this circle. Recorded here rather
+  // than from a second read, because the sealing binding and the authorize snapshot are two uses of
+  // one fact, and a second read is how they come to disagree. Best-effort and never fatal: a device
+  // that cannot record the snapshot falls back to accepting the circle's traffic unchecked (and says
+  // so, loudly, from `realAgent`), which is the honest degradation — refusing on the strength of not
+  // knowing would drop every message in the circle.
+  try { await agent.recordCircleSenders?.({ circleId, members }); } catch { /* best-effort */ }
+  return {
+    ...bindCircleAddressKeys({
+      members,
+      registerPeerAddress: (address, pubKey, addrOpts) => agent.registerPeerAddress(address, pubKey, addrOpts),
+      // Skip my own row — I never seal to myself, and binding it would be a harmless no-op at best.
+      selfPubKey: agent.identity?.pubKey ?? agent.peer?.address ?? null,
+    }),
+    members,
+  };
 }
 
 /**

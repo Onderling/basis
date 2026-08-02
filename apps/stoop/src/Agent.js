@@ -210,6 +210,15 @@ export async function createNeighborhoodAgent({
    * behaviour, unchanged.
    */
   podReadSince,
+  /**
+   * The per-USER address-fallback setting (2026-07-28), threaded down to the circle FAN so the
+   * setting reaches the place that picks an address. `false` = "rather undeliverable than routed
+   * over my one global key", which is what makes per-circle addressing worth anything.
+   *
+   * A value or a function `() => boolean`: the user can flip it mid-session, and a boolean captured
+   * at boot would ignore every change after. Absent → `true`, i.e. exactly today's behaviour.
+   */
+  allowAddressFallback,
   label = 'NeighborhoodAgent',
 }) {
   if (!offeringMatchOpts?.group || !offeringMatchOpts?.localActor) {
@@ -587,6 +596,9 @@ export async function createNeighborhoodAgent({
       chat,           // Phase 14 — used by sendChatMessage / respondToItem
       metrics,        // Phase 18 — record() called from key handlers
       bundle,         // Phase 20 — sign-in skills mutate bundle.oidcSession + cache
+      // The per-user address-fallback setting, when the host supplies one (absent → the skills'
+      // own `true` default, unchanged).
+      ...(allowAddressFallback === undefined ? {} : { allowAddressFallback }),
     })) agent.skills.register(def);
 
     await agent.start();

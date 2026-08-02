@@ -125,7 +125,7 @@ import { renderCircleProfile } from './circleProfile.js';
 import { renderCircleAdminPanel } from './circleAdminPanel.js';
 import { renderCircleMyData } from './circleMyData.js';
 import {
-  createDeliverySettingsStore, localStorageDeliveryIo, withDelivery, makeReceiptSender, applyReceipt,
+  createDeliverySettingsStore, localStorageDeliveryIo, withDelivery, makeReceiptSender, makeReceiptReceiver,
 } from '../../src/v2/deliverySettings.js';
 import { createFallbackOffer } from '../../src/v2/addressFallback.js';
 import { setAddressFallbackReportHook } from '@onderling-app/stoop';
@@ -248,6 +248,10 @@ import {
 // profile-update propagation — the silent roster "pull-me" signal (announce on a real roster
 // write; receive → re-read the changed rows). No values on the wire, no chat bubble, no wake.
 import { makeRosterUpdatedPeerHandler, makeRosterUpdateAnnouncer } from '../../src/v2/rosterUpdated.js';
+// B2 — per-circle ADDRESS announcing: the receive half, and the admin's post-join propagation.
+import {
+  makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin,
+} from '../../src/v2/circleAddressAnnounce.js';
 import { isFeatureEnabled, defaultViewModeFromPolicy } from '../../src/v2/circlePolicy.js';
 import { buildKringTabs, DEFAULT_KRING_TAB, featureTabId, featureForTabId } from '../../src/v2/kringTabs.js';
 import { buildTaskRows } from '../../src/v2/taskRows.js';
@@ -276,6 +280,7 @@ import { feedHouseholdRoster, makeCircleReachable } from '../../src/v2/household
 import { makeKringChatPeerHandler } from '../../src/v2/kringChatReceiver.js';
 import { rehydrateKringChatsFromStoop } from '../../src/v2/kringChatRehydrate.js';
 import { createChatMessageInbox } from '../../src/v2/chatMessageInbox.js';
+import { createSelfAuthorCheck } from '../../src/v2/chatSelfAuthor.js';
 // ε.4 — negotiated catch-up protocol substrate.
 import { makeCatchUpProviderHandler } from '../../src/v2/catchUpProvider.js';
 import { makeCatchUpReceiver }        from '../../src/v2/catchUpReceiver.js';
@@ -749,6 +754,7 @@ import { renderCircleLauncher } from './circleLauncher.js';
 import { renderCircleTabBar, hideCircleTabBar } from './circleTabBar.js';
 import { renderCircleSettings } from './circleSettings.js';
 import { renderCircleOverride } from './circleOverride.js';
+import { primeCircleSecurity } from '../../src/v2/circleSecurityPriming.js';
 
 // actor label stamped on local chat-message events. Real WebID/
 // peer-display wiring lands with peer broadcast.
@@ -812,6 +818,17 @@ async function tryConnectPeerTransport(agent, peerMessageRouter, { awaitRelayRea
  *   first; web had the same hole).
  */
 function registerCirclePresence(agent = _peerAgent, extraCircleIds = []) {
+  const circleIds = [...new Set([
+    ...circlesCache.map((c) => c?.id).filter(Boolean),
+    ...(Array.isArray(extraCircleIds) ? extraCircleIds.filter(Boolean) : []),
+  ])];
+  // Decisions 4 + 1 — the per-circle SIGNING identity AND the roster snapshot that authorizes senders,
+  // for EVERY circle, before (and independently of) the relay scoping below. One shared primer, called
+  // identically by mobile (`agentBundle.js`). Note it asks the SUBSTRATE rather than trusting the ids
+  // computed above: those come from `circlesCache`, which is a rendering convenience and is empty on a
+  // cold boot — exactly when priming matters most. Fire-and-forget for the same reason the rest is.
+  primeCircleSecurity({ agent, circleIds })
+    .catch((err) => console.warn('[circleApp] circle security priming failed:', err?.message ?? err));
   if (!CIRCLE_RELAY_URL || !agent?.relay?.supportsAliases) return;
   const points = getConnectionPoints();
   const circlesForPoint = (url) => points.circlesFor(url);
@@ -819,11 +836,12 @@ function registerCirclePresence(agent = _peerAgent, extraCircleIds = []) {
   registerCircleAddresses({
     transport: agent.relay,   // the facade quacks like the port's alias half — never the transport itself
     relayUrl: CIRCLE_RELAY_URL,
-    circleIds: [...new Set([
-      ...circlesCache.map((c) => c?.id).filter(Boolean),
-      ...(Array.isArray(extraCircleIds) ? extraCircleIds.filter(Boolean) : []),
-    ])],
+    circleIds,
     circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
+    // An address IS a key, so registering it means answering the relay's challenge with the key
+    // behind it (Decision 3). Web was not passing this — mobile was — so every per-circle alias was
+    // refused here and only here: the invariant-2 half of a change that landed on one shell.
+    circleAddressSignerFor: (cid) => agent.circleAddressSignerFor?.(cid) ?? null,
     circlesForPoint,
     // The relay this device connects to IS the deployment default — unmapped circles land here alone.
     defaultRelayUrl: CIRCLE_RELAY_URL,
@@ -1045,6 +1063,32 @@ const pullRosterForCircle = async ({ circleId }) => {
 // msgId 'pending' → 'sent' | 'failed' as broadcastKringMessage
 // resolves; the kring renderer reads it at render time.
 const deliveryStateMap = createDeliveryStateMap();
+// …and REDRAW when a RECEIPT advances a message. `broadcastFanOut` announces its own transitions
+// (`onChange: rerender`), so the receipt was the one writer with nothing to announce it: it arrived, the
+// map advanced to `stored`, and the bubble kept saying "maybe received" until an unrelated render
+// repainted it. The map has had `subscribe` since δ.2; nobody had used it.
+//
+// Narrowed to `stored` — the only state a receipt produces — because web's `rerender` REBUILDS the kring
+// DOM, composer included, and an input element rebuilt mid-sentence loses what was typed into it. A
+// repaint here is not free the way a React tick is, which is why mobile's equivalent can be unconditional
+// (it also has an out-of-screen writer for `failed`; web has none).
+deliveryStateMap.subscribe((_msgId, state) => {
+  if (state !== 'stored') return;
+  try { _kringRender?.rerender?.(); } catch { /* no open kring */ }
+});
+// Delivery honesty (receiver half) — who is ALLOWED to tell us a message arrived. The shared receiver
+// resolves the message's circle off the log and only lets someone that circle's ROSTER knows advance it;
+// `applyReceipt`'s `isRecipient` seam had existed unpassed in both shells, so any peer able to reach this
+// device could advance one of its bubbles to `stored`. The rule is shared; the shell injects its adapters.
+const applyIncomingReceipt = makeReceiptReceiver({
+  deliveryMap: deliveryStateMap,
+  eventLog,
+  listCircleMembers: async (circleId) => {
+    if (typeof rawCallSkill !== 'function') return [];
+    const r = await rawCallSkill('stoop', 'listGroupMembers', { groupId: circleId });
+    return Array.isArray(r?.members) ? r.members : [];
+  },
+});
 
 // ε.5 — "Catching up…" indicator state + notification banner.
 // Status is the latest snapshot fed by the negotiated catch-up
@@ -3114,6 +3158,18 @@ async function refreshLauncherMutes() {
   launcherMutedMap = next;
 }
 
+/**
+ * A stable fingerprint of the pin + mute state the launcher last drew.
+ *
+ * Exists so `showLauncher` can tell "the background refresh found something new" from "the background
+ * refresh confirmed what is already on screen" — because the second one must NOT rebuild the tiles under
+ * the user's finger. Keys sorted, so map insertion order cannot fake a change.
+ */
+function launcherPinMuteSignature() {
+  const keys = (m) => Object.keys(m ?? {}).filter((k) => m[k]).sort().join(',');
+  return `${keys(launcherPinnedMap)}|${keys(launcherMutedMap)}`;
+}
+
 // β.5 — paint the launcher tiles (previews + pin/mute/proposal state). PURE render, no async
 // re-scheduling — so it's safe to call from the pins/mutes refresh `.then` WITHOUT re-entering
 // showLauncher (which would re-schedule that refresh and loop forever; that infinite re-render
@@ -3156,8 +3212,19 @@ function showLauncher() {
   refreshLauncherProposals().catch(() => { /* ignore */ });
   // β.5 — pull fresh pin + mute state, then RE-PAINT (not re-enter showLauncher — see paintLauncher)
   // so a just-toggled state shows immediately, without looping.
+  //
+  // …but ONLY when it would change something. `paintLauncher` wipes the tile DOM (`innerHTML = ''`), and a
+  // browser `click` needs mousedown and mouseup on the SAME element — so a tap that straddled this second
+  // paint was silently lost, and the user clicked again. That is web's half of the two-taps-to-open bug
+  // (mobile's is the reload blanking the list; same shape, different mechanism). Nothing is lost by
+  // skipping: the state we just read is the state the first paint already drew.
+  const before = launcherPinMuteSignature();
   Promise.all([refreshLauncherPins(), refreshLauncherMutes()])
-    .then(() => { if (getActiveCircle() == null) paintLauncher(); })
+    .then(() => {
+      if (getActiveCircle() != null) return;
+      if (launcherPinMuteSignature() === before) return;   // nothing changed → do not rebuild under a press
+      paintLauncher();
+    })
     .catch(() => { /* tolerate */ });
 }
 
@@ -6682,6 +6749,14 @@ async function boot() {
         // no body) into the full chat message by reading + unsealing the circle's shared pod. Absent a
         // pod / group key → the inbox skips the ref (deferred), never crashes the receive loop.
         resolveRef: circleResolveRef,
+        // "Did I write this?" — so a message of mine read back out of storage (boot rehydrate,
+        // catch-up, pod replay) comes back as MINE (`LOCAL_ACTOR`) instead of as a stranger's.
+        // Per-circle by construction; never consulted on the live receive path (chatSelfAuthor.js).
+        isSelfAuthored: createSelfAuthorCheck({
+          whoAmI: () => agent.callSkill('stoop', 'whoAmI', {}),
+          circleAddressFor: (cid) => agent.circleAddressFor?.(cid) ?? null,
+        }),
+        localActor: LOCAL_ACTOR,
         logger: console,
       });
       const kringChatHandler = makeKringChatPeerHandler({ inbox: kringChatInbox });
@@ -6792,8 +6867,10 @@ async function boot() {
         handlers: {
           'kring-chat-message':      kringChatHandler,
           // Delivery honesty — the peer's app stored our message; advance the shared δ.2 map to `stored`.
-          // `applyReceipt` validates (rebuilt, `from` off the wire) and the map's monotonic rule orders it.
-          'delivery-receipt':        (from, payload) => applyReceipt(payload, from, deliveryStateMap),
+          // The shared receiver validates (rebuilt, `from` off the wire), checks the sender against the
+          // circle's roster, and the map's monotonic rule orders it. Fire-and-forget: the roster read is a
+          // skill call and the router does not await handlers, so it delays the bubble, not the receive loop.
+          'delivery-receipt':        (from, payload) => { applyIncomingReceipt(payload, from); },
           'kring-recipe-broadcast':  kringRecipeHandler,
           'kring-rules-broadcast':   kringRulesHandler,
           'kring-policy-broadcast':  kringPolicyHandler,
@@ -6849,8 +6926,17 @@ async function boot() {
             // joiner proves theirs, so per-circle addressing works in both directions from the join on.
             circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,
             signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
+            // B2 — and hand the circle the newcomer's proven per-circle address (and the newcomer
+            // the circle's). Nothing else can: a fresh joiner cannot address the other members yet,
+            // and they cannot address the joiner. Mobile wires the identical seam.
+            propagateCircleAddresses: ({ circleId, newMemberWebid }) =>
+              propagateCircleAddressesAfterJoin({ agent, circleId, newMemberWebid }),
           }),
           'group-redeem-response':   makeHandleGroupRedeemResponse({ pendingMap: circlePendingRedeems }),
+          // B2 — a member (or the admin, relaying) says where they answer in this circle. Each
+          // announcement carries its own proof, so the carrier is not trusted; recording refreshes
+          // the sealing binding AND the authorize snapshot together.
+          'circle-address-announce': makeCircleAddressAnnouncePeerHandler({ agent }),
           // No-pod group-key rotation — RECEIVE side: a key-event fanned by the circle's key-event log sink
           // (establish/grant/rotation) lands in this device's local per-circle key-event log. A removed member
           // is never a recipient of the rotation fan → never records the new version → cannot open post-removal

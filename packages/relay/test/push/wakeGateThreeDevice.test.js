@@ -19,8 +19,9 @@
  * everything up to `pushSender.send`.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { WebSocket } from 'ws';
 import { startRelay } from '../../src/server.js';
+// Challenge-first registration (Decision 3): these three members' addresses are real keys.
+import { openClient, send, addr } from '../helpers/provenClient.js';
 import { PushSender } from '../../src/push/PushSender.js';
 import { PushTokenRegistry } from '../../src/push/PushTokenRegistry.js';
 
@@ -29,14 +30,6 @@ class FakePushSender extends PushSender {
   async send(token, payload, opts) { this.calls.push({ token, payload, opts }); return this.next; }
 }
 
-const openClient = (url) => new Promise((resolve, reject) => {
-  const ws = new WebSocket(url);
-  ws.messages = [];
-  ws.on('message', (raw) => { try { ws.messages.push(JSON.parse(raw)); } catch { /* not ours */ } });
-  ws.once('open', () => resolve(ws));
-  ws.once('error', reject);
-});
-const send = (ws, obj) => ws.send(JSON.stringify(obj));
 
 async function waitFor(predicate, timeoutMs = 1_000) {
   const start = Date.now();
@@ -70,9 +63,9 @@ const govEnvelope = (event, { noWake }) => ({
   ...(noWake ? { noWake: true } : {}),
 });
 
-const ANNA = 'anna-addr';
-const BRAM = 'bram-addr';
-const CATO = 'cato-addr';
+const ANNA = addr('anna-addr');
+const BRAM = addr('bram-addr');
+const CATO = addr('cato-addr');
 
 describe('4.3 — a decision wakes; the votes that follow do not', () => {
   let relay; let pushSender; let registry; let url;
@@ -142,6 +135,10 @@ describe('4.3 — a decision wakes; the votes that follow do not', () => {
     const bram = await openClient(url);
     send(anna, { type: 'register', address: ANNA });
     send(bram, { type: 'register', address: BRAM });
+    // Registration is challenge-first (Decision 3), so it completes a round-trip later than the
+    // `register` frame — and `register-push-token` still requires a completed registration. Wait for
+    // the ack before handing the token over, which is what a real client does anyway.
+    await waitFor(() => bram.messages.some((m) => m.type === 'registered'));
     // Bram has a token too; being ONLINE must be what prevents the push, not the absence of a token.
     send(bram, { type: 'register-push-token', token: 'ExponentPushToken[bram]', platform: 'android' });
     await waitFor(() => registry.get(BRAM));

@@ -82,7 +82,12 @@
  * retry.  TODO(#224B): hook into AppState.addEventListener('change')
  * + auto-reconnect on foreground.  Stub left in `_onAppStateChange()`.
  */
-import { Transport } from '@onderling/core';
+import { Transport, createSenderBinding } from '@onderling/core';
+// Sender binding: the shared RULE is kernel logic (`@onderling/core` → `transport/senderBinding.js`);
+// nkn's half — the `__N__.` sub-client normalisation and the encrypted-only `src` guarantee — lives with
+// the nkn adapters in `@onderling/transports`. Both NKN adapters ask the same question of the same code,
+// so web ≡ mobile by construction rather than by copy (invariants 2 + 3).
+import { nknAuthenticatedSender, nknSenderVerdict } from '@onderling/transports';
 
 // Canonical NKN server-side error strings.  When `_put` fails with any
 // of these, the receiver hasn't seen our HI yet — re-issue HI then
@@ -112,6 +117,17 @@ const DEFAULT_SEND_RETRY_DELAY = 500;   // ms between retries
 // a failure surfaces while there is still time to re-announce or fail over.
 const DEFAULT_SEND_TIMEOUT     = 8_000;
 
+// ── Sender binding ───────────────────────────────────────────────────────────
+//
+// The rule and nkn's normalisation used to live here as local helpers. They now live once — the shared
+// verdict in `@onderling/core` (`transport/senderBinding.js`), nkn's `authenticatedSender` port in
+// `@onderling/transports` (`nknSenderBinding.js`) — and both NKN adapters import them. All of the
+// reasoning (why `src` and `_from` are comparable, why an unencrypted frame is refused rather than
+// checked, why we drop instead of annotate) is in those two files.
+//
+// Re-exported here because this module is where callers and tests already reach for it.
+export { nknSenderVerdict };
+
 export class NknTransport extends Transport {
   #client    = null;
   #nknLib    = null;
@@ -123,6 +139,8 @@ export class NknTransport extends Transport {
   // sendHelloOnce serialises concurrent HI requests for the same peer
   // so two parallel _put()s don't both fire HI.
   #inFlightHello = new Map();   // addr → Promise<void>
+  /** The shared sender-binding rule, asked with nkn's `authenticatedSender` port. */
+  #checkSender;
 
   /**
    * @param {object} opts
@@ -151,6 +169,13 @@ export class NknTransport extends Transport {
       sendTimeoutMs:    DEFAULT_SEND_TIMEOUT,
       ...opts,
     };
+    this.#checkSender = createSenderBinding({
+      transportName:       'NknTransport',
+      authenticatedSender: nknAuthenticatedSender,
+      // Loud absence: a transport that cannot authenticate its senders must SAY so once, or an unchecked
+      // receive path reads exactly like a checked one.
+      onUnauthenticated:   (message) => this.emit('warn', message),
+    });
   }
 
   /** True after the underlying NKN client has emitted 'connect'. */
@@ -414,6 +439,32 @@ export class NknTransport extends Transport {
             : msg.payload?.toString?.() ?? '';
           envelope = JSON.parse(raw);
         } catch { return; }
+
+        // ── Sender binding — second line, NOT the wall (2026-07-31) ──────────
+        //
+        // The frame nkn hands us carries `msg.src`, and until now this handler threw it away and
+        // delivered whatever sender the envelope's own `_from` field claimed. `_from` is free text: no
+        // transport authenticates it, and a signature only proves someone holds A key, never that the key
+        // belongs at the address the envelope names. So a peer who could reach us at all could speak as
+        // anyone we had already keyed.
+        //
+        // This does not fix that. The fix is inverting identity resolution so the SIGNING KEY is the
+        // identity and is authorised against the circle roster — a separate, larger build. Two limits are
+        // worth stating plainly rather than discovering later:
+        //   • it covers the transports that authenticate. The web/Node NKN adapter and the relay's two
+        //     forward paths now ask the SAME rule, but a hostile relay sits outside the relay's own check
+        //     (it is the thing checking), and any transport whose port returns null is unchecked — which
+        //     is why the port announces that case instead of passing quietly.
+        //   • it trusts nkn's own authentication, so it is only as good as that.
+        // It exists to make the cheap remote impersonation expensive, not to be the boundary.
+        const verdict = this.#checkSender(msg, envelope);
+        if (!verdict.ok) {
+          this.emit('warn',
+            `NknTransport: dropped inbound envelope (${verdict.reason}) — `
+            + `claimed "${String(verdict.claimed ?? '?').slice(0, 16)}…", `
+            + `transport says "${String(verdict.authenticated ?? '?').slice(0, 16)}…"`);
+          return;
+        }
         this._receive(envelope);
       });
 

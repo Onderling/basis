@@ -53,6 +53,7 @@ export class ForwardQueue {
   #queueCap;
   #queueCapTotal;
   #evictOnWrite;
+  #onGiveUp;
   #onWake;
 
   /**
@@ -71,6 +72,7 @@ export class ForwardQueue {
     queueCapTotal = null,
     evictOnWrite  = false,
     onWake        = null,
+    onGiveUp      = null,
   } = {}) {
     this.#ttlMs         = ttlMs;
     this.#topicAware    = topicAware;
@@ -78,6 +80,19 @@ export class ForwardQueue {
     this.#queueCapTotal = queueCapTotal;
     this.#evictOnWrite  = evictOnWrite;
     this.#onWake        = onWake;
+    this.#onGiveUp      = onGiveUp;
+  }
+
+  /**
+   * Announce that a buffered envelope will never be delivered.
+   *
+   * Every path that removes an undelivered entry goes through here, so "the queue gave up" has exactly
+   * one definition. Fired for the TTL sweep and for both cap evictions — NOT for `drain`, which is the
+   * one removal that means success.
+   */
+  #giveUp(to, entry, reason) {
+    try { this.#onGiveUp?.({ to, envelope: entry?.envelope ?? null, reason, at: entry?.at ?? null }); }
+    catch { /* a reporting failure must never break the queue it reports on */ }
   }
 
   /** The wire frame both prior forwards emitted to deliver an envelope. */
@@ -87,8 +102,10 @@ export class ForwardQueue {
 
   /**
    * Deliver `envelope` to `socket` when it is live, otherwise buffer it for
-   * `to`. Returns `'delivered'` or `'queued'` (server.js relies on this to
-   * summarise a group-publish fan-out).
+   * `to`. Returns `'delivered'` or `'queued'` — the outcome, for callers that
+   * report on it. (`server.js` no longer reads it: the fan-out that summarised
+   * a broadcast was removed 2026-07-31. `WsServerTransport` and this module's
+   * own tests still do.)
    *
    * @param {string} to
    * @param {object} envelope
@@ -127,12 +144,12 @@ export class ForwardQueue {
       for (const m of buf) if (m.topic === bucketKey) bucketCount += 1;
       if (bucketCount > this.#queueCap) {
         const idx = buf.findIndex(m => m.topic === bucketKey);
-        if (idx >= 0) buf.splice(idx, 1);
+        if (idx >= 0) this.#giveUp(to, buf.splice(idx, 1)[0], 'bucket-full');
       }
     }
     // Global per-address safety valve.
     if (this.#queueCapTotal != null) {
-      while (buf.length > this.#queueCapTotal) buf.shift();
+      while (buf.length > this.#queueCapTotal) this.#giveUp(to, buf.shift(), 'address-full');
     }
   }
 
@@ -162,7 +179,11 @@ export class ForwardQueue {
   /** Sweep every address's buffer, dropping expired entries (timer path). */
   evictExpired() {
     for (const [addr, buf] of this.#buffers) {
-      const fresh = buf.filter(m => !this.#isExpired(m));
+      const fresh = [];
+      for (const m of buf) {
+        if (this.#isExpired(m)) this.#giveUp(addr, m, 'expired');
+        else fresh.push(m);
+      }
       if (fresh.length === 0) this.#buffers.delete(addr);
       else this.#buffers.set(addr, fresh);
     }
@@ -178,7 +199,11 @@ export class ForwardQueue {
   #dropExpired(to) {
     const buf = this.#buffers.get(to);
     if (!buf) return;
-    const fresh = buf.filter(m => !this.#isExpired(m));
+    const fresh = [];
+    for (const m of buf) {
+      if (this.#isExpired(m)) this.#giveUp(to, m, 'expired');
+      else fresh.push(m);
+    }
     if (fresh.length === 0) this.#buffers.delete(to);
     else this.#buffers.set(to, fresh);
   }

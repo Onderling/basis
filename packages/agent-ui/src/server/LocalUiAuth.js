@@ -53,6 +53,7 @@ export class LocalUiAuth {
   encrypt(envelope)             { return envelope; }
   decryptAndVerify(rawEnvelope) { return rawEnvelope; }
   registerPeer()                { /* no-op */ }
+  learnPeerKey()                { return 'unchanged'; }
 
   // ── HTTP-level auth ────────────────────────────────────────────────────
   /**

@@ -607,7 +607,12 @@ export async function createSecureAgent(opts = {}) {
   // ─── Peer state (NKN cross-peer; stays idle until connect()) ───
   let peerTransport = null;
   const peerState = { status: 'idle', address: null, error: null };
+  // Keyed by `${peerAddress}|${theAddressWeSpokeFrom}` (`helloKey`) — Decision 4. An HI announces ONE
+  // of our identities: having introduced our canonical self to a peer says nothing about whether they
+  // hold the per-circle key we are about to sign with, and treating it as if it did leaves them unable
+  // to verify a single circle envelope. One entry per (peer, identity-we-speak-as) is the honest key.
   const helloedPeers = new Set();
+  const helloKey = (addr, sendAs = null) => `${addr}|${sendAs ?? ''}`;
   // Reciprocal HIs are tracked SEPARATELY from `helloedPeers`, and the difference matters.
   //
   // `helloedPeers` answers the SEND path's question: "have I announced myself to this peer, so may I
@@ -680,6 +685,15 @@ export async function createSecureAgent(opts = {}) {
    * is to never drop one silently.
    */
   const onHoldDropped = typeof opts.onHoldDropped === 'function' ? opts.onHoldDropped : null;
+  /**
+   * The RELAY gave up on a message we had already handed it — the far-end twin of `onHoldDropped`.
+   *
+   * Two different give-ups, deliberately reported by two different hooks: `onHoldDropped` means it never
+   * left this device, `onUndelivered` means it left, waited at the relay, and the relay's TTL or a cap
+   * ended it. Both mean "this did not arrive"; only the first means "we never sent it". Collapsing them
+   * would lose the distinction the retry path needs.
+   */
+  const onUndelivered = typeof opts.onUndelivered === 'function' ? opts.onUndelivered : null;
   /** address → consecutive failed delivery attempts. Cleared by a success or a presence signal. */
   const deliveryFailures = new Map();
 
@@ -689,6 +703,16 @@ export async function createSecureAgent(opts = {}) {
   // would never be flushed without this reverse view. Same address-vs-identity confusion the binding
   // itself exists to fix, one layer up.
   const peerAliases = new Map();
+
+  // The same fact from the other side: alias address → the peer's CANONICAL identity pubKey.
+  //
+  // Kept explicitly since Decision 4 (2026-07-31). It used to be readable from the SecurityLayer —
+  // `getPeerKey(circleAddress)` returned the person's canonical key — but a per-circle address is now
+  // bound to that circle's SIGNING key, which is deliberately unrelated to the person. Asking the
+  // crypto layer "who is this" would therefore return a different answer per circle, which is exactly
+  // the unlinkability we want on the wire and exactly the wrong answer for "flush what I held for
+  // them". So the identity link lives here, on the device, where it is nobody else's to see.
+  const peerIdentityOf = new Map();
 
   /** Does this send opt in to the hold-forward delivery guarantee? */
   function wantsHold(sendOpts) {
@@ -814,7 +838,7 @@ export async function createSecureAgent(opts = {}) {
   function addressesOfIdentity(addr) {
     const out = new Set([addr]);
     try {
-      const pubKey = agent.security?.getPeerKey?.(addr) ?? null;
+      const pubKey = peerIdentityOf.get(addr) ?? agent.security?.getPeerKey?.(addr) ?? null;
       for (const alias of (pubKey ? peerAliases.get(pubKey) ?? [] : [])) out.add(alias);
     } catch { /* the direct address is still correct */ }
     return out;
@@ -951,9 +975,17 @@ export async function createSecureAgent(opts = {}) {
       // pubKey would miss even though the HI arrived.  Register the peer under
       // the canonical pubKey too: harmless idempotent self-mapping on relay,
       // the missing link on the mesh transport.
+      //
+      // Through `learnPeerKey`, not `registerPeer`: this key comes off the wire
+      // (`payload.pubKey`), so it may ESTABLISH a binding but never replace
+      // one.  The case that matters is a peer who has ROTATED — after
+      // `migratePeerKey` the map holds `oldPubKey → newPubKey`, and an HI
+      // asserting the retired key would reset it to `old → old`, putting a key
+      // its owner deliberately retired back in service.  `registerPeer` stays
+      // the overwriting setter for what WE establish out of band (roster rows).
       if (env?._p === 'HI' && env?.payload?.pubKey
-            && typeof agent.security?.registerPeer === 'function') {
-        agent.security.registerPeer(env.payload.pubKey, env.payload.pubKey);
+            && typeof agent.security?.learnPeerKey === 'function') {
+        agent.security.learnPeerKey(env.payload.pubKey, env.payload.pubKey);
       }
       // S1 — drop envelopes from muted peers BEFORE any further
       // bookkeeping (no reciprocal HI, no onPeerMessage fire).
@@ -1005,9 +1037,16 @@ export async function createSecureAgent(opts = {}) {
             // address, the peer files our key under that, and it keeps waiting for a key under the alias it
             // sent to — so a handshake to a per-circle address never completes. `Transport.sendHello`
             // validates the claim against our own addresses and falls back to the primary.
+            // Decision 4 — answer with the key that BELONGS to the address they dialled. They
+            // dialled a per-circle address; replying with our canonical pubKey would hand them (and
+            // the relay, in cleartext, via `_to`) the link between that address and the identity the
+            // rest of our circles use — the exact linkage per-circle addressing exists to withhold.
+            // Absent ⇒ the canonical key, which is right for contact/pairing traffic.
+            const answerKey = (typeof agent.security?.selfIdentityFor === 'function'
+              ? agent.security.selfIdentityFor(env._to)?.pubKey : null) ?? identity.pubKey;
             await tx.sendHello(
               env._from,
-              { pubKey: identity.pubKey },
+              { pubKey: answerKey },
               // `from` — answer AS the address they dialled (G13), or a handshake to a per-circle address
               // can never complete. `re` — name the envelope we are answering, which is what makes this a
               // REPLY and therefore unanswerable; no new wire field is needed for that.
@@ -1147,7 +1186,11 @@ export async function createSecureAgent(opts = {}) {
     relayState.status = 'connecting';
     relayState.url    = relayUrl;
     try {
-      const tx = new RelayTransport({ identity, relayUrl });
+      const tx = new RelayTransport({
+        identity,
+        relayUrl,
+        onUndelivered: onUndelivered ? (info) => onUndelivered(info) : null,
+      });
       makeReceiveHandler(tx);
       await tx.connect();
       // `connect()` only REQUESTS the socket — it deliberately does not await it, so that
@@ -1651,7 +1694,22 @@ export async function createSecureAgent(opts = {}) {
   async function _sendOverRoute(addr, payload, sel, opts = {}) {
     const tx      = sel.transport;
     const wireAddr = sel.address ?? addr;   // per-transport address (Phase-1 map); === addr today
-    if (!helloedPeers.has(addr)) {
+    // Decision 4 — WHICH of our identities this traffic belongs to. The caller passes an ADDRESS of
+    // ours (a per-circle one); the SecurityLayer holds the key behind it, so nothing about a circle
+    // travels down here and no private key travels back up. Unknown/absent ⇒ the canonical identity,
+    // which is the whole of today's behaviour for contact and pairing traffic.
+    const sendAs = typeof opts?.sendAs === 'string' && opts.sendAs ? opts.sendAs : null;
+    const sendingIdentity = (sendAs && typeof agent.security?.selfIdentityFor === 'function')
+      ? agent.security.selfIdentityFor(sendAs) : null;
+    if (sendAs && !sendingIdentity && typeof console !== 'undefined') {
+      // Named here, where the address is known, rather than surfacing three layers away as "my
+      // messages in this circle never arrive": without the identity we would sign as the canonical
+      // self while claiming the per-circle address, and the recipient would reject every envelope.
+      console.warn(`[secure-agent] no identity registered for own address ${String(sendAs).slice(0, 16)}…`
+        + ' — falling back to the canonical identity; per-circle signing is OFF for this send.');
+    }
+    const speakAs = sendingIdentity ? sendAs : null;
+    if (!helloedPeers.has(helloKey(addr, speakAs))) {
       // The peer's key is known once its reciprocal HI has registered it at our
       // SecurityLayer.  Treated as "known" when there is no SecurityLayer to
       // consult, so a plaintext transport never blocks on a handshake it can't
@@ -1662,7 +1720,14 @@ export async function createSecureAgent(opts = {}) {
       // One path for the initial HI and every propagation re-announce.
       const announceHi = async () => {
         try {
-          await tx.sendHello(wireAddr, { pubKey: identity.pubKey });
+          // The HI announces the key we are about to SIGN with, from the address we will sign as —
+          // the two halves of one claim. Announcing the canonical key from a per-circle address
+          // would make the peer file the wrong key under it and reject everything that follows.
+          await tx.sendHello(
+            wireAddr,
+            { pubKey: (sendingIdentity ?? identity).pubKey },
+            speakAs ? { from: speakAs } : {},
+          );
           if (typeof console !== 'undefined') {
             console.log('[secure-agent] outbound HI sent OK to ' + String(addr).slice(0, 16) + '…');
           }
@@ -1724,7 +1789,7 @@ export async function createSecureAgent(opts = {}) {
       }
       // Only mark as helloed after the bidirectional handshake fully
       // completed (or wasn't needed because we already had their key).
-      helloedPeers.add(addr);
+      helloedPeers.add(helloKey(addr, speakAs));
       // Phase-2 · Piece-2b (population) — now that HI resolved a live route to
       // this peer, record its transport-appropriate wire address into the
       // app-owned PeerGraph attached on the shared router, so LATER sends
@@ -1747,7 +1812,7 @@ export async function createSecureAgent(opts = {}) {
       subtype: payload?.subtype ?? payload?.type ?? null,
       size:    JSON.stringify(payload ?? {}).length,
     });
-    return tx.sendOneWay(wireAddr, payload);
+    return tx.sendOneWay(wireAddr, payload, speakAs ? { from: speakAs } : {});
   }
 
   /**
@@ -1858,22 +1923,92 @@ export async function createSecureAgent(opts = {}) {
      *
      * Idempotent. Re-registering after a rotation simply overwrites.
      *
+     * ── Two keys, not one (Decision 4, 2026-07-31) ──────────────────────────────────────────────
+     * `signingKey` is the key that actually signs and is sealed to AT that address; `pubKey` is who
+     * the person is. Before per-circle signing they were the same key and one argument was enough.
+     * They are now deliberately different for a circle address, and each is used for exactly one
+     * thing: the crypto binding gets the signing key, the alias/presence index gets the identity.
+     * Collapsing them either breaks verification (sign with one, check the other) or re-links the
+     * circles locally under a key that the roster says is the same person everywhere.
+     *
      * @param {string} address  the alias to make sendable (e.g. a per-circle address)
      * @param {string} pubKey   the peer's canonical identity pubKey (b64url)
+     * @param {{signingKey?: string}} [opts]  the key that signs AT this address; default `pubKey`
      * @returns {boolean} whether the mapping was recorded
      */
-    registerPeerAddress(address, pubKey) {
+    registerPeerAddress(address, pubKey, opts = {}) {
       if (typeof address !== 'string' || !address) return false;
       if (typeof pubKey !== 'string' || !pubKey) return false;
       if (typeof agent.security?.registerPeer !== 'function') return false;
-      agent.security.registerPeer(address, pubKey);
+      const signingKey = (typeof opts?.signingKey === 'string' && opts.signingKey)
+        ? opts.signingKey : pubKey;
+      agent.security.registerPeer(address, signingKey);
       if (address !== pubKey) {
         let set = peerAliases.get(pubKey);
         if (!set) { set = new Set(); peerAliases.set(pubKey, set); }
         set.add(address);
+        peerIdentityOf.set(address, pubKey);
       }
       return true;
     },
+
+    /**
+     * Decision 4 — install an identity of OUR OWN that this device speaks as from `address`: the
+     * per-circle signing identity (`circleIdentity(profileSeed, circleId, vault)`).
+     *
+     * The mirror of `registerPeerAddress`: that one says "this address belongs to that peer's key",
+     * this one says "this address of mine is backed by this key of mine". Once installed, a send
+     * carrying `{ sendAs: address }` is signed and sealed with it, and inbound traffic sealed to it
+     * opens — so BOTH directions of a circle work only if this ran, which is why it is done for
+     * every circle this device is in rather than lazily on the first send.
+     *
+     * The key never leaves the SecurityLayer; callers hold the address and nothing else.
+     *
+     * @param {string} address   one of this device's own addresses (a per-circle address)
+     * @param {object} identity  the AgentIdentity behind it
+     * @returns {boolean}
+     */
+    registerSelfIdentity(address, identity) {
+      if (typeof agent.security?.addSelfIdentity !== 'function') return false;
+      return agent.security.addSelfIdentity(address, identity);
+    },
+
+    /** Stop speaking as the identity at `address` — the circle was left. Idempotent. */
+    forgetSelfIdentity(address) {
+      if (typeof agent.security?.removeSelfIdentity !== 'function') return false;
+      return agent.security.removeSelfIdentity(address);
+    },
+
+    /** Diagnostic: the addresses this device holds an identity of its own for. */
+    get selfIdentityAddresses() { return agent.security?.selfAddresses ?? []; },
+
+    /**
+     * Decision 1 step 3 — install the ROSTER AUTHORIZE step.
+     *
+     * The kernel verifies an inbound envelope against the key the envelope carries, which is
+     * self-consistent and establishes nothing about who the sender is. This is the step that turns
+     * a proven key into a person: the caller supplies a function that answers, synchronously,
+     * whether that key is on the roster of the circle the envelope was addressed to. Without one,
+     * the kernel has no membership knowledge and every validly-signed envelope passes the step —
+     * which is honest, counted (`agent.security.senderAuthorizationsByAbsence`), and not a
+     * membership check.
+     *
+     * This substrate deliberately does not implement one: it holds no rosters, and inventing a
+     * notion of membership here would put circle vocabulary below the app (design §2, invariant 5).
+     * It passes the port through and nothing more — which is also the shape that survives L3 being
+     * answered "a substrate", because then the implementation moves INTO a substrate and this line
+     * still just installs it.
+     *
+     * @param {((context: object) => {allow: boolean, reason: string})|null} authorizer
+     * @returns {boolean} whether an authorizer is now installed
+     */
+    setSenderAuthorizer(authorizer) {
+      if (typeof agent.security?.setSenderAuthorizer !== 'function') return false;
+      return agent.security.setSenderAuthorizer(authorizer);
+    },
+
+    /** Diagnostic: is anything checking circle membership on the receive path? */
+    get senderAuthorizerInstalled() { return !!agent.security?.hasSenderAuthorizer; },
 
     /**
      * Drop an alias binding — a member who left or was removed. Their canonical pubKey mapping is
@@ -1883,7 +2018,10 @@ export async function createSecureAgent(opts = {}) {
       if (typeof address !== 'string' || !address) return false;
       if (typeof agent.security?.unregisterPeer !== 'function') return false;
       // Resolve the identity BEFORE dropping the mapping, or the reverse index leaks the alias.
-      const pubKey = agent.security.getPeerKey?.(address) ?? null;
+      // `peerIdentityOf` first: since Decision 4 the crypto layer answers with the address's own
+      // signing key, which is not the person (see `peerIdentityOf`).
+      const pubKey = peerIdentityOf.get(address) ?? agent.security.getPeerKey?.(address) ?? null;
+      peerIdentityOf.delete(address);
       agent.security.unregisterPeer(address);
       if (pubKey) {
         const set = peerAliases.get(pubKey);
@@ -1916,8 +2054,11 @@ export async function createSecureAgent(opts = {}) {
       // port KEEPS a failed bind for replay, so an early add is deferred, not lost.
       get supportsAliases() { return relayTransport?.supportsAliases ?? false; },
       get addresses()       { return relayTransport?.addresses ?? []; },
-      addAddress: (a) => (relayTransport
-        ? relayTransport.addAddress(a)
+      // opts carries { sign } — the proof-of-possession signer for a per-circle alias. Dropping the
+      // second argument here made alias registration inert: the alias is a DIFFERENT key from the
+      // transport's own identity, so without the caller's signer the relay's challenge cannot be answered.
+      addAddress: (a, opts) => (relayTransport
+        ? relayTransport.addAddress(a, opts)
         : Promise.resolve({ ok: false, reason: 'not-connected' })),
       removeAddress: (a) => { try { relayTransport?.removeAddress(a); } catch { /* best-effort */ } },
     },

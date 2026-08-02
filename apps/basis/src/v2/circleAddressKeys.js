@@ -20,7 +20,34 @@
  * It does not make a per-circle address *discoverable*, and it grants no authority: it only lets this
  * device seal to an address it was already entitled to reach. An address with no matching pubKey on the
  * roster is skipped rather than guessed.
+ *
+ * ── Which key (Decision 4, 2026-07-31) ───────────────────────────────────────────────────────────────
+ * Two facts now hang off one roster row, and they are no longer the same key. The member's CANONICAL
+ * pubKey still says who they are — that is what groups their addresses together locally, for presence
+ * and for the hold queue. But what signs and is sealed to AT a per-circle address is that circle's own
+ * signing key, because that is what the sender speaks as. Binding the canonical key there would reject
+ * every envelope they send in the circle, with a BAD_SIG that looks like corruption rather than a
+ * mis-binding. `circleSigningKeyOf` is where the two are told apart.
  */
+
+/**
+ * The key that signs at a member's per-circle address.
+ *
+ * ▸ **This is the L2 seam** (`plans/DESIGN-boundary-authentication.md` §13.2 — Frits' call). Today the
+ *   per-circle signing key and the per-circle address are ONE derivation (`circleIdentity` in
+ *   `packages/core/src/identity/circleAddress.js`: "its pubKey IS the per-circle address"), so the
+ *   address is the key and no roster field is needed. If the answer becomes TWO derivations, the join
+ *   path records the signing key beside the address and this reads it — which is why an explicit
+ *   `circleSigningKey` on the row already wins here. Nothing else in the app has to change.
+ *
+ * @param {object} member  a roster row
+ * @returns {string|null}
+ */
+export function circleSigningKeyOf(member) {
+  const explicit = typeof member?.circleSigningKey === 'string' ? member.circleSigningKey : null;
+  if (explicit) return explicit;
+  return typeof member?.circleAddress === 'string' ? member.circleAddress : null;
+}
 
 /**
  * Bind every member's per-circle address to their identity key, from a circle roster.
@@ -51,7 +78,9 @@ export function bindCircleAddressKeys({ members, registerPeerAddress, selfPubKey
     if (!pubKey || !address) { skipped += 1; continue; }
     if (selfPubKey && pubKey === selfPubKey) { skipped += 1; continue; }
     try {
-      registerPeerAddress(address, pubKey);
+      // Two keys, one row: `pubKey` is the person (presence, holds, mute), `signingKey` is what
+      // actually signs at this address (Decision 4). See `circleSigningKeyOf`.
+      registerPeerAddress(address, pubKey, { signingKey: circleSigningKeyOf(m) });
       bound += 1;
     } catch { skipped += 1; }
   }

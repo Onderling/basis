@@ -40,7 +40,8 @@
  *       Drop cached per-peer state. Default: no-op.
  *
  * PROVIDED by this base (do NOT re-implement — call, don't override):
- *   • `sendOneWay(to, payload)`      — OW, fire-and-forget.
+ *   • `sendOneWay(to, payload, opts?)` — OW, fire-and-forget. `opts.from` sends as one of our
+ *     extra addresses (per-circle); every primitive below takes the same option.
  *   • `publishOneWay(to, topic, payload)` — OW with a wire-level topic hint.
  *   • `sendAck(to, payload, timeout?) → Promise<AK envelope>` — deliver + await AK.
  *   • `request(to, payload, timeout?) → Promise<RS envelope>` — RQ + await RS.
@@ -86,8 +87,11 @@ const REQ_TIMEOUT = 30_000;  // ms
 export class Transport extends Emitter {
   #address;
 
-  /** G13 — extra addresses this transport answers to (per-circle / per-contact). */
-  #aliases = new Set();
+  /**
+   * G13 — extra addresses this transport answers to (per-circle / per-contact), each with what the
+   * caller gave us to prove it is theirs: address → `{ sign }` (see `addAddress`).
+   */
+  #aliases = new Map();
 
   /** Nearby step A — what this transport is actually doing about discovery. */
   #discoverability = DISCOVERABILITY.OFF;
@@ -132,7 +136,7 @@ export class Transport extends Emitter {
   get supportsAliases() { return false; }
 
   /** Every address this transport answers to — the primary first, then aliases in insertion order. */
-  get addresses() { return [this.#address, ...this.#aliases]; }
+  get addresses() { return [this.#address, ...this.#aliases.keys()]; }
 
   /**
    * Also answer at `address`.
@@ -141,16 +145,29 @@ export class Transport extends Emitter {
    * configuration fact a caller needs to branch on (per-circle addressing can only be enabled once every
    * transport a recipient listens on can bind one) — not an error.
    *
+   * `opts.sign` is how a caller proves the alias is theirs (2026-07-31,
+   * `plans/DESIGN-boundary-authentication.md` §7). A per-circle address is a DIFFERENT key from the
+   * primary, so holding the primary proves nothing about it: the only party that can answer a
+   * challenge for an alias is whoever holds that alias's key, and only the caller knows which circle
+   * an address belongs to. It lives on `addAddress` rather than on the constructor for exactly that
+   * reason — the caller has the circleId in hand at this call site and nowhere else.
+   *
+   * The signer is handed a MESSAGE built by the adapter, never bytes chosen by the far end: an
+   * adapter must construct what is signed from its own protocol, so registration cannot be used as
+   * a signing oracle. It is kept for the lifetime of the alias because a reconnect re-binds and
+   * therefore has to re-prove.
+   *
    * @param {string} address
+   * @param {{ sign?: (message: string) => (string|Uint8Array|Promise<string|Uint8Array>) }} [opts]
    * @returns {Promise<{ok: boolean, reason?: string}>}
    */
-  async addAddress(address) {
+  async addAddress(address, opts = {}) {
     if (typeof address !== 'string' || !address) return { ok: false, reason: 'invalid-address' };
     if (address === this.#address) return { ok: true };            // the primary is already ours
     if (!this.supportsAliases) return { ok: false, reason: 'aliases-unsupported' };
     if (this.#aliases.has(address)) return { ok: true };            // idempotent
-    this.#aliases.add(address);
-    try { await this._bindAddress(address); } catch (err) {
+    this.#aliases.set(address, { sign: opts?.sign ?? null });
+    try { await this._bindAddress(address, this.#aliases.get(address)); } catch (err) {
       // Keep it in the set: a bind can fail because we are offline, and the replay on reconnect is
       // precisely what should fix that. Report so a caller is not told it worked.
       return { ok: false, reason: err?.message ?? 'bind-failed' };
@@ -166,13 +183,13 @@ export class Transport extends Emitter {
 
   /** Re-bind every alias — adapters call this after a (re)connect. */
   async _rebindAddresses() {
-    for (const alias of this.#aliases) {
-      try { await this._bindAddress(alias); } catch { /* a failed replay is retried on the next connect */ }
+    for (const [alias, opts] of this.#aliases) {
+      try { await this._bindAddress(alias, opts); } catch { /* a failed replay is retried on the next connect */ }
     }
   }
 
-  /** @protected adapters override: start listening at `address`. */
-  async _bindAddress(_address) {}
+  /** @protected adapters override: start listening at `address`. `opts.sign` proves it is ours. */
+  async _bindAddress(_address, _opts) {}
 
   /** @protected adapters override: stop listening at `address`. */
   _unbindAddress(_address) {}
@@ -337,10 +354,45 @@ export class Transport extends Emitter {
   // ── Four primitives ─────────────────────────────────────────────────────────
 
   /**
-   * OW — fire-and-forget. No reply expected.
+   * WHICH of our addresses to speak from (G13 / Decision 4).
+   *
+   * A caller may ask to send AS one of our extra addresses — the per-circle address that circle's
+   * traffic belongs to — so that neither the header nor the signature over it names the person
+   * globally. The claim is validated against the addresses this transport actually holds: `_to` on
+   * an inbound envelope is attacker-influenced and is one of the things callers pass here, so a bad
+   * value must never let someone make us claim an address that is not ours. Unknown ⇒ the primary.
+   *
+   * `warn` is on for a DELIBERATE claim (a caller that meant to send as a circle) and off where the
+   * claim is opportunistic (answering at whatever address an inbound envelope was addressed to,
+   * which on a mesh transport is routinely a pubkey rather than one of our bound addresses).
+   *
+   * @param {string|null|undefined} claimed
+   * @param {{warn?: boolean}} [opts]
+   * @returns {string} one of our own addresses
    */
-  async sendOneWay(to, payload) {
-    await this._send(to, mkEnvelope(P.OW, this.#address, to, payload));
+  #ownAddress(claimed, { warn = true } = {}) {
+    const asked = typeof claimed === 'string' && claimed ? claimed : null;
+    if (!asked) return this.#address;
+    if (asked === this.#address || this.#aliases.has(asked)) return asked;
+    if (warn && typeof console !== 'undefined') {
+      // Loud on purpose (Frits, review 2026-07-30). The fallback is SAFE against hostile input — but
+      // a genuine wiring mistake, passing an address this transport never bound, would otherwise
+      // look like success, and "looks right, does nothing" is the failure class behind most of this
+      // month's bugs. Hostile input can at worst make log noise; a real bug now leaves a trace.
+      console.warn(
+        `[transport] asked to send as "${String(asked).slice(0, 16)}…" `
+        + 'which this transport does not hold — falling back to the primary address',
+      );
+    }
+    return this.#address;
+  }
+
+  /**
+   * OW — fire-and-forget. No reply expected.
+   * `opts.from` — send AS one of our extra addresses (see `#ownAddress`).
+   */
+  async sendOneWay(to, payload, opts = {}) {
+    await this._send(to, mkEnvelope(P.OW, this.#ownAddress(opts?.from), to, payload));
   }
 
   /**
@@ -351,16 +403,16 @@ export class Transport extends Emitter {
    * (e.g. relay's topic-aware offline queue).  Equivalent to
    * `sendOneWay(to, payload)` for transports that don't use the hint.
    */
-  async publishOneWay(to, topic, payload) {
-    await this._send(to, mkEnvelope(P.OW, this.#address, to, payload, { topic }));
+  async publishOneWay(to, topic, payload, opts = {}) {
+    await this._send(to, mkEnvelope(P.OW, this.#ownAddress(opts?.from), to, payload, { topic }));
   }
 
   /**
    * AS — deliver and wait for AK (delivery confirmation).
    * Resolves with the AK envelope on success, rejects on timeout.
    */
-  async sendAck(to, payload, timeout = ACK_TIMEOUT) {
-    const env = mkEnvelope(P.AS, this.#address, to, payload);
+  async sendAck(to, payload, timeout = ACK_TIMEOUT, opts = {}) {
+    const env = mkEnvelope(P.AS, this.#ownAddress(opts?.from), to, payload);
     return this._awaitReply(env._id, timeout, () => this._send(to, env));
   }
 
@@ -368,16 +420,16 @@ export class Transport extends Emitter {
    * RQ — send request and wait for RS (response with result).
    * Resolves with the RS envelope on success, rejects on timeout.
    */
-  async request(to, payload, timeout = REQ_TIMEOUT) {
-    const env = mkEnvelope(P.RQ, this.#address, to, payload);
+  async request(to, payload, timeout = REQ_TIMEOUT, opts = {}) {
+    const env = mkEnvelope(P.RQ, this.#ownAddress(opts?.from), to, payload);
     return this._awaitReply(env._id, timeout, () => this._send(to, env));
   }
 
   /**
    * RS — send a reply to a previous RQ.
    */
-  async respond(to, replyToId, payload) {
-    await this._send(to, mkEnvelope(P.RS, this.#address, to, payload, { re: replyToId }));
+  async respond(to, replyToId, payload, opts = {}) {
+    await this._send(to, mkEnvelope(P.RS, this.#ownAddress(opts?.from), to, payload, { re: replyToId }));
   }
 
   /**
@@ -401,20 +453,8 @@ export class Transport extends Emitter {
     //
     // Unknown addresses fall back to the primary rather than throwing: `_to` on an inbound envelope is
     // attacker-influenced, and a bad value must not let someone make us claim an address that is not ours.
-    const claimed = typeof opts.from === 'string' ? opts.from : null;
-    const from = claimed && (claimed === this.#address || this.#aliases.has(claimed))
-      ? claimed
-      : this.#address;
-    if (claimed && from !== claimed && typeof console !== 'undefined') {
-      // Loud on purpose (Frits, review 2026-07-30). The fallback is SAFE against hostile input — but a
-      // genuine wiring mistake, passing an address this transport never bound, would otherwise look like
-      // success, and "looks right, does nothing" is the failure class behind most of this month's bugs.
-      // Hostile input can at worst make log noise; a real bug now leaves a trace.
-      console.warn(
-        `[transport] sendHello: asked to answer as "${String(claimed).slice(0, 16)}…" `
-        + 'which this transport does not hold — falling back to the primary address',
-      );
-    }
+    // The validation itself is `#ownAddress`, shared with every other primitive so there is one rule.
+    const from = this.#ownAddress(opts.from);
     // `opts.re` — the `_id` of the HI this one ANSWERS.
     //
     // An earlier version of the reciprocal-HI fix invented a `reply: true` field in the payload to mark an
@@ -566,7 +606,15 @@ export class Transport extends Emitter {
     // Transport-level delivery acknowledgment for AS envelopes.
     // Sent before the application layer sees the envelope.
     if (envelope._p === P.AS) {
-      const ack = mkEnvelope(P.AK, this.#address, envelope._from, {}, { re: envelope._id });
+      // Answer AS the address that was dialled (G13 / Decision 4), exactly as the reciprocal HI
+      // does: an ack stamped with our canonical address would hand the sender — and anything on the
+      // path — the link between our per-circle address and our global one, which is the whole point
+      // of having a per-circle address. `warn: false` because `_to` is the key the sender sealed to
+      // and is routinely not one of our bound addresses (a mesh transport's primary is not a pubkey);
+      // that is the ordinary case, not a wiring mistake.
+      const ack = mkEnvelope(
+        P.AK, this.#ownAddress(envelope._to, { warn: false }), envelope._from, {}, { re: envelope._id },
+      );
       this._send(envelope._from, ack).catch(err => this.emit('error', err));
       // fall through — also dispatch AS to the application
     }

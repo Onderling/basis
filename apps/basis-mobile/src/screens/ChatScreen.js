@@ -57,7 +57,7 @@ import {
   ensureDmThread, updatePeerDisplay,
 } from '../core/threadState.js';
 import { makePeerRouter }      from '../../../basis/src/core/handlers/peerRouter.js';
-import { applyReceipt }        from '../../../basis/src/v2/deliverySettings.js';
+import { makeReceiptReceiver } from '../../../basis/src/v2/deliverySettings.js';
 import { pushContactReply }    from '../core/contactReplyInbox.js';
 import { makeKringChatPeerHandler } from '../../../basis/src/v2/kringChatReceiver.js';
 import { createChatMessageInbox } from '../../../basis/src/v2/chatMessageInbox.js';
@@ -70,6 +70,10 @@ import { makeHandleChatMessage }
                                from '../../../basis/src/core/handlers/chatMessage.js';
 import { makeHandleBuurtPeerIntro }
                                from '../../../basis/src/core/handlers/meshIntros.js';
+// B2 — per-circle ADDRESS announcing (web parity): the receive half + the admin's post-join
+// propagation. Same shared source both shells call; each only passes its own `agent`.
+import { makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin }
+                               from '../../../basis/src/v2/circleAddressAnnounce.js';
 // G11 — no-pod group-key rotation, RECEIVE side: record an inbound key-event into the local per-circle
 // log (circlePods' store); a content read folds it into the key chain. Same shared handler as web.
 import { makeHandleGroupKeyEvent }
@@ -546,6 +550,20 @@ export default function ChatScreen({
       try { eventLogRef.current?.append?.(evt); } catch { /* defensive */ }
     };
 
+    // Delivery honesty (receiver half) — who is ALLOWED to tell us a message arrived. Built here rather
+    // than at the handler so the roster cache lives as long as the peer wiring does. The shell injects
+    // only its two adapters (the log it already owns, the roster skill); the rule is shared with web.
+    const applyIncomingReceipt = deliveryStateMap
+      ? makeReceiptReceiver({
+        deliveryMap: deliveryStateMap,
+        eventLog:    eventLogRef.current,
+        listCircleMembers: async (circleId) => {
+          const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+          return Array.isArray(r?.members) ? r.members : [];
+        },
+      })
+      : null;
+
     // profile-update propagation — on a REAL roster write (admin recording a member's disclosure
     // change) drop the SILENT `roster-updated` entry on the shared eventLog + fan the refs out.
     // No values on the wire, no chat bubble, no wake. Parity with web's `announceRosterUpdate`.
@@ -613,6 +631,10 @@ export default function ChatScreen({
       // Substrate-only handlers — no UI bubble; just persist local
       // state + publish a notification for /logs.
       'buurt-peer-intro':      makeHandleBuurtPeerIntro({ callSkill }),
+      // B2 — inbound per-circle ADDRESS announcements (web parity). Every announcement carries its
+      // own proof, so the sender is not trusted; recording refreshes the sealing binding AND the
+      // authorize snapshot together, or the member would be reachable and then refused.
+      'circle-address-announce': makeCircleAddressAnnouncePeerHandler({ agent }),
       // G11 — a group-key rotation fanned by another member lands in the local key-event log (web parity).
       'group-key-event':       makeHandleGroupKeyEvent({ recordKeyEvent: recordCircleKeyEvent }),
       // Legacy peer-poll path kept as fallback for callers / tests
@@ -650,6 +672,10 @@ export default function ChatScreen({
         // proves theirs, so per-circle addressing works in both directions from the join on (web parity).
         circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,
         signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
+        // B2 — hand the circle the newcomer's proven per-circle address, and the newcomer the
+        // circle's (web parity: the identical shared function, only the agent differs).
+        propagateCircleAddresses: ({ circleId, newMemberWebid }) =>
+          propagateCircleAddressesAfterJoin({ agent, circleId, newMemberWebid }),
       }),
       // joiner-side response. Pairs with
       // `pendingPeerRedeemsRef` populated by the joinGroup wizard's
@@ -721,11 +747,12 @@ export default function ChatScreen({
       'kring-chat-message':    makeKringChatPeerHandler({
         inbox: kringChatInbox ?? makeFallbackInbox(eventLogRef.current, callSkill),
       }),
-      // Delivery honesty — the peer's app stored our message. `applyReceipt` validates (rebuilt, `from`
-      // off the wire) and the shared map's monotonic rule orders it; absent map ⇒ handler still safe.
-      'delivery-receipt': (from, payload) => {
-        if (deliveryStateMap) applyReceipt(payload, from, deliveryStateMap);
-      },
+      // Delivery honesty — the peer's app stored our message. The shared receiver validates (rebuilt,
+      // `from` off the wire), resolves the message's circle off the log, and only lets someone the
+      // circle's ROSTER knows advance it; the map's monotonic rule then orders it. Absent map ⇒ the
+      // handler is a no-op, as before. Fire-and-forget: reading the roster is a skill call and the peer
+      // router does not await its handlers, so a slow read delays the bubble, never the receive loop.
+      'delivery-receipt': (from, payload) => { applyIncomingReceipt?.(payload, from); },
       // γ-next.recipe — kring scherm recipe broadcast.  Caches the
       // inbound recipe per-kring; the editor pulls on next open and
       // passes via γ.3's `incomingRecipe` opt.  No bubble UI.
@@ -1906,6 +1933,17 @@ export default function ChatScreen({
             // OBJ-2 — the BUNDLE's shared sender (same pending-map the response handler resolves against,
             // and the same one the v2 launcher uses), so classic + v2 joins both correlate.
             sendPeerRedeem={bootState.kind === 'ready' ? bootState.bundle.sendPeerRedeem : undefined}
+            // J-CP1 — be on the circle's endpoint BEFORE the redeem (same seams the v2 launcher passes).
+            // This host is where a TAPPED INVITE LINK lands, and it is precisely the host that has NOT been
+            // told which relay the invite names: without these two the redeem goes out over whatever
+            // transport this device happens to have, waits out a handshake timeout, and the join fails or
+            // crawls. Only consumed by JoinGroupWizardModal; other wizards ignore them.
+            dialEndpoint={(url) => bootState.kind === 'ready'
+              ? bootState.bundle.reconnectPeer?.({ relayUrl: url })
+              : undefined}
+            activeEndpointUrl={() => bootState.kind === 'ready'
+              ? (bootState.bundle.activeRelayUrl?.() ?? null)
+              : null}
             // Post-join reachability (G13). Only consumed by JoinGroupWizardModal; other wizards ignore it.
             //
             // This host is where a TAPPED INVITE LINK lands, and it passed neither of the two things a join

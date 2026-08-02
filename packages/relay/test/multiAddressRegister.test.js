@@ -9,16 +9,19 @@
  *
  * What must hold, and each is a way this could go wrong:
  *   • every address routes to the same live socket, and a message to ANY of them arrives;
- *   • the connection-quota counts DEVICES, not addresses — otherwise being in five circles exhausts a cap
- *     meant to count phones;
+ *   • a cap on connections must not be a cap on CIRCLES — being in five circles must not exhaust a cap
+ *     meant to bound one device (the per-group quota that used to make this mistake was removed
+ *     2026-07-31; the surviving `maxAddressesPerConnection` sits far above real use);
  *   • closing takes ALL of them down — a leftover entry routes to a dead socket, silently;
  *   • hold-forward drains PER REGISTRATION, so there is no race about which address registers first;
  *   • a push token covers every address the socket owns, including ones registered later (decision 2a) —
  *     a missed address is a circle whose offline members silently stop being woken (the G15 failure).
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { WebSocket } from 'ws';
 import { startRelay } from '../src/server.js';
+// Addresses are PUBLIC KEYS and registration is challenge-first since 2026-07-31 (Decision 3), so
+// the per-circle addresses below are real keys the shared client can prove.
+import { openClient, send, addr } from './helpers/provenClient.js';
 import { PushSender } from '../src/push/PushSender.js';
 import { PushTokenRegistry } from '../src/push/PushTokenRegistry.js';
 
@@ -27,14 +30,6 @@ class FakePushSender extends PushSender {
   async send(token, payload, opts) { this.calls.push({ token, payload, opts }); return { ok: true }; }
 }
 
-const openClient = (url) => new Promise((resolve, reject) => {
-  const ws = new WebSocket(url);
-  ws.messages = [];
-  ws.on('message', (raw) => { try { ws.messages.push(JSON.parse(raw)); } catch { /* not ours */ } });
-  ws.once('open', () => resolve(ws));
-  ws.once('error', reject);
-});
-const send = (ws, o) => ws.send(JSON.stringify(o));
 const settle = () => new Promise((r) => setTimeout(r, 80));
 async function waitFor(pred, ms = 1_500) {
   const t0 = Date.now();
@@ -44,9 +39,9 @@ async function waitFor(pred, ms = 1_500) {
   }
 }
 /** Anna's per-circle addresses — one identity per circle, as the design intends. */
-const ANNA_X = 'anna@circle-x';
-const ANNA_Y = 'anna@circle-y';
-const BRAM = 'bram-addr';
+const ANNA_X = addr('anna@circle-x');
+const ANNA_Y = addr('anna@circle-y');
+const BRAM = addr('bram-addr');
 
 describe('one socket, several addresses', () => {
   let relay; let url; let pushSender; let registry;
@@ -122,9 +117,10 @@ describe('one socket, several addresses', () => {
   });
 
   it('a second address on the same socket is not a second connection', async () => {
-    // The quota counts DEVICES. Registering five circle addresses must not exhaust a cap meant for phones.
+    // Registering five circle addresses must not trip any cap: the per-connection ceiling
+    // (`maxAddressesPerConnection`, default 64) is set far above the number of circles anyone is in.
     const anna = await openClient(url);
-    for (const a of ['a@1', 'a@2', 'a@3', 'a@4', 'a@5']) send(anna, { type: 'register', address: a });
+    for (const a of ['a@1', 'a@2', 'a@3', 'a@4', 'a@5'].map(addr)) send(anna, { type: 'register', address: a });
     await waitFor(() => anna.messages.filter((m) => m.type === 'registered').length === 5);
     expect(anna.messages.some((m) => m.type === 'error')).toBe(false);
     anna.close();

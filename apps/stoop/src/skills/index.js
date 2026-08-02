@@ -57,7 +57,10 @@
  * (nothing for `wireSkill` to derive from).
  */
 
-import { defineSkill, validateMnemonic, mnemonicToSeed, AgentIdentity, roleRank, ROLES, verifyCircleLink } from '@onderling/core';
+import {
+  defineSkill, validateMnemonic, mnemonicToSeed, AgentIdentity, roleRank, ROLES, verifyCircleLink,
+  CIRCLE_ADDRESS_ANNOUNCE_KIND, verifyCircleAddressAnnouncement, verifyCircleAddressAnnouncements,
+} from '@onderling/core';
 import { wireSkill } from '@onderling/sdk';
 import { stoopManifest } from '../../manifest.js';
 import nacl from 'tweetnacl';
@@ -2560,6 +2563,10 @@ export function buildSkills({
           // (`verifiedCircleAddress`): a "continue as an existing self" linkage is provable,
           // never a bare claim a co-member could forge. Unproven ⇒ omitted (join still succeeds).
           ...(verifiedCircleAddress ? { circleAddress: verifiedCircleAddress } : {}),
+          // …and the PROOF itself (2026-08-02). Kept, not discarded, because it is what lets this
+          // device later RELAY the fact to a member who was not here — the receiver re-verifies it,
+          // so carrying it grants the carrier nothing (`circleAddressAnnouncement.js`).
+          ...(verifiedCircleAddress ? { circleAddressProof: a.circleAddressProof } : {}),
           // Property layer — the coarse background values the joiner CHOSE to disclose in THIS circle when
           // joining AS a persona (getPersonaRelease). Self-asserted like circleAddress; opt-in (absent = shared
           // nothing). A map {key: coarseValue}.
@@ -2697,6 +2704,9 @@ export function buildSkills({
             // Per-circle ADDRESS the joiner presents in THIS circle (identity step 5B/C) —
             // forwarded by the peer bridge, recorded ONLY when its cross-circle link proof verified.
             ...(verifiedCircleAddress ? { circleAddress: verifiedCircleAddress } : {}),
+            // …and its PROOF (2026-08-02), so the ADMIN can relay this member's address on to the
+            // other members — who verify it themselves rather than taking the admin's word.
+            ...(verifiedCircleAddress ? { circleAddressProof: a.circleAddressProof } : {}),
             // Property layer — the joiner's disclosed persona properties (forwarded by the peer bridge).
             ...(a.personaProperties && Object.keys(a.personaProperties).length ? { personaProperties: a.personaProperties } : {}),
           },
@@ -2783,6 +2793,8 @@ export function buildSkills({
           // `deriveRoster` projects it onto the admin's roster row, which is what lets a send to them
           // resolve on the circle-address rung instead of falling through to their global key.
           ...(verifiedAdminCircleAddress ? { confirmedByCircleAddress: verifiedAdminCircleAddress } : {}),
+          // …and its proof, for the same relay reason as the joiner's own (2026-08-02).
+          ...(verifiedAdminCircleAddress ? { confirmedByCircleAddressProof: a.confirmedByCircleAddressProof } : {}),
           // Handle presented in THIS circle (Wave B) — recorded joiner-side so
           // `listMyHandles` can surface it as a prior handle later.
           ...(typeof a.peerDisplay === 'string' && a.peerDisplay ? { peerDisplay: a.peerDisplay } : {}),
@@ -2952,6 +2964,126 @@ export function buildSkills({
       return { ok: true, introId: item.id, _sync: simulateSync() };
     }, {
       description: 'Joiner-side mirror: record a mesh introduction for another buurt member.',
+      visibility:  'authenticated',
+    }),
+
+    /**
+     * recordCircleAddressAnnouncement({groupId, memberWebid?, circleAddress, circleAddressProof})
+     *   — the RECEIVE half of per-circle address announcing (B2, 2026-08-02).
+     *
+     *   A join teaches exactly two devices about each other: the joiner proves its per-circle
+     *   address to the admin, and the admin's proven address rides back on the redeem response.
+     *   Two JOINERS were never taught each other's, so in a circle of three, admin↔joiner delivery
+     *   worked and joiner↔joiner silently did not — with the per-user global-address fallback off
+     *   (the default) a send to them is refused rather than downgraded. This skill is where the
+     *   missing fact lands.
+     *
+     *   PROOF, not claim. The announcement is verified with the same deny-by-default
+     *   `verifyCircleLink` the join uses, via `verifyCircleAddressAnnouncement`. An unproven or
+     *   forged address writes NOTHING and answers `{ok:false, reason:'unproven-address'}` — an
+     *   honest refusal, never a silent no-op.
+     *
+     *   WHOSE row may this write? Same rule as `recordMemberPersonaProperties`: a REMOTE caller may
+     *   only ever write their OWN row (`memberWebid` ignored, `from` wins) and may only UPDATE a row
+     *   that already exists — a stranger cannot announce themselves into a circle. The LOCAL path
+     *   (the peer bridge, which substitutes the authenticated envelope sender, and the admin
+     *   relaying a member's announcement on) may name a member and may create their row: that is
+     *   the same carrier position `recordPeerIntro` already occupies.
+     *
+     *   It PATCHES the durable trail rather than appending a second row, because
+     *   `deriveRoster` merges trail rows first-non-null-wins: a second row carrying a NEW address
+     *   would lose to the stale one it was meant to replace. Both shapes are patched — the member's
+     *   own `circleAddress` and, when they are the admin we joined through, `confirmedByCircleAddress`.
+     *
+     *   Returns: { ok:true, groupId, memberWebid, circleAddress, patched, created, unchanged }
+     *          | { ok:false, reason }.
+     */
+    defineSkill('recordCircleAddressAnnouncement', async ({ parts, from }) => {
+      const a = dataArgs(parts);
+      if (typeof a.groupId !== 'string' || !a.groupId) return { ok: false, reason: 'groupId-required' };
+
+      const isLocalCall = !!localActor && from === localActor;
+      const requested = (typeof a.memberWebid === 'string' && a.memberWebid) ? a.memberWebid : null;
+      const webid = (isLocalCall && requested) ? requested : from;
+      if (!webid) return { ok: false, reason: 'member-unresolved' };
+      if (requested && requested !== webid) return { ok: false, reason: 'may-only-write-own-row' };
+
+      const proven = verifyCircleAddressAnnouncement({
+        circleId:           a.groupId,
+        memberWebid:        webid,
+        circleAddress:      a.circleAddress,
+        circleAddressProof: a.circleAddressProof,
+      }, a.groupId);
+      if (!proven) return { ok: false, reason: 'unproven-address' };
+
+      let all = [];
+      try { all = await store.listOpen({ type: 'membership-redemption' }); } catch { all = []; }
+      const forGroup = (all ?? []).filter((i) => i?.source?.groupId === a.groupId);
+
+      let patched = 0;
+      let unchanged = 0;
+      for (const it of forGroup) {
+        const src = it.source ?? {};
+        let next = null;
+        if (src.redeemedBy === webid) {
+          if (src.circleAddress === proven.circleAddress
+            && src.circleAddressProof === proven.circleAddressProof) { unchanged += 1; continue; }
+          next = {
+            circleAddress:      proven.circleAddress,
+            circleAddressProof: proven.circleAddressProof,
+            // A row learned from an intro carries no key at all; without one
+            // `bindCircleAddressKeys` skips the address it was just given. webid IS the member's
+            // signing address in a basis circle (the same fact the ladder's webid rung relies on).
+            ...(src.signingPublicKey ? {} : { signingPublicKey: webid }),
+          };
+        } else if (src.confirmedBy === webid && src.channel === 'peer') {
+          if (src.confirmedByCircleAddress === proven.circleAddress
+            && src.confirmedByCircleAddressProof === proven.circleAddressProof) { unchanged += 1; continue; }
+          next = {
+            confirmedByCircleAddress:      proven.circleAddress,
+            confirmedByCircleAddressProof: proven.circleAddressProof,
+          };
+        }
+        if (!next) continue;
+        try {
+          await store.update(it.id, { source: { ...src, ...next } }, { actor: from });
+          patched += 1;
+        } catch { /* one unwritable row must not cost the others their update */ }
+      }
+
+      let created = 0;
+      if (patched === 0 && unchanged === 0) {
+        // Nobody by this webid on the trail yet. Only the LOCAL carrier may introduce them — see the
+        // "whose row" note above; a remote self-announce from a non-member is refused outright.
+        if (!isLocalCall) return { ok: false, reason: 'not-a-member' };
+        const [item] = await store.addItems([{
+          type:       'membership-redemption',
+          text:       `${webid} announced a per-circle address for ${a.groupId}`,
+          source:     {
+            groupId:            a.groupId,
+            redeemedBy:         webid,
+            signingPublicKey:   webid,
+            circleAddress:      proven.circleAddress,
+            circleAddressProof: proven.circleAddressProof,
+            channel:            'announce',
+            announcedAt:        Date.now(),
+          },
+          visibility: 'household',
+        }], { actor: from });
+        created = item ? 1 : 0;
+      }
+
+      return {
+        ok: true,
+        groupId:       a.groupId,
+        memberWebid:   webid,
+        circleAddress: proven.circleAddress,
+        patched, created,
+        unchanged: patched === 0 && created === 0,
+        _sync: simulateSync(),
+      };
+    }, {
+      description: 'Record a member\'s PROVEN per-circle address for a circle (the receive half of address announcing).',
       visibility:  'authenticated',
     }),
 
@@ -4112,6 +4244,49 @@ export function buildSkills({
       });
     }, {
       description: 'Fan a roster "pull-me" signal (member ref + changed property NAMES, never values) out to every other member via chat.send subtype:roster-updated; receivers re-read the changed roster rows.',
+      visibility:  'authenticated',
+    }),
+
+    /**
+     * broadcastCircleAddresses({groupId, announcements, to?, msgId?, ts?})
+     *   — the SEND half of per-circle address announcing (B2, 2026-08-02). Sibling of
+     *   `broadcastRosterUpdated`: same circle-scoped fan-out plumbing, subtype
+     *   `circle-address-announce`.
+     *
+     *   It carries a LIST because one mechanism serves all three moments:
+     *     • a member RE-ANNOUNCING their own address  → one announcement, unnarrowed fan;
+     *     • the admin telling the circle about a NEW member → one announcement, unnarrowed fan;
+     *     • the admin telling that new member about EVERYONE → many announcements, `to:[joiner]`.
+     *   The third is what actually closes the joiner↔joiner gap: a fresh joiner cannot yet address
+     *   the other members, so the fact has to travel from someone who can reach both — and it can,
+     *   without trusting them, because every announcement carries its own proof.
+     *
+     *   Verified BEFORE it is fanned, not only on arrival: nothing unprovable should occupy the
+     *   wire, and a caller who assembled the list wrongly finds out here rather than in silence.
+     *
+     *   Never wakes a device (silent lane): learning where to send is housekeeping, not news.
+     */
+    defineSkill('broadcastCircleAddresses', async ({ parts, from }) => {
+      const a = dataArgs(parts);
+      const _groupId = a.groupId ?? groupId;
+      if (!_groupId) return { error: 'groupId-required' };
+      const announcements = verifyCircleAddressAnnouncements(a.announcements, _groupId);
+      if (!announcements.length) return { error: 'no-proven-announcements' };
+      const ts = typeof a.ts === 'number' && Number.isFinite(a.ts) ? a.ts : Date.now();
+      const msgId = (typeof a.msgId === 'string' && a.msgId)
+        ? a.msgId
+        : `ca-${ts.toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+      // `to` NARROWS the fan to named members (the admin's "here is everyone, for you alone" send).
+      const only = Array.isArray(a.to) ? a.to.filter((x) => typeof x === 'string' && x) : null;
+      return broadcastToCircle({
+        circleId: _groupId, kind: CIRCLE_ADDRESS_ANNOUNCE_KIND, from,
+        extras: { circleId: _groupId, msgId, ts, announcements },
+        metric: 'circle-address-announce-fanout',
+        noWake: true,
+        only,
+      });
+    }, {
+      description: 'Fan proven per-circle ADDRESS announcements to a circle (subtype:circle-address-announce); receivers verify each proof themselves and record it. Pass `to` to narrow the fan. Never wakes a device.',
       visibility:  'authenticated',
     }),
 

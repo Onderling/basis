@@ -233,6 +233,84 @@ export function makeReceiptSender({ getSettings, sendTo, logger = console } = {}
  * @param {{ isRecipient?: (from: string|null, msgId: string) => boolean }} [opts]
  * @returns {boolean} whether a valid receipt was applied
  */
+/**
+ * The receipt RECEIVER — the counterpart of `makeReceiptSender`, and the host wiring `applyReceipt`'s
+ * `isRecipient` seam has been waiting for.
+ *
+ * The seam existed and neither shell passed it, which meant the fail-closed predicate was never exercised
+ * and anyone who could send this device a peer message could advance one of its own bubbles to `stored` —
+ * i.e. make your app claim their device received something it did not. The check has to live somewhere
+ * that knows two things `deliverySettings.js` deliberately does not:
+ *
+ *   1. **which circle a message went to** — read back off the append-only log, where the optimistic local
+ *      append stamped `payload.circleId` at send time. The message id alone says nothing.
+ *   2. **who that circle's members are** — the roster, which is the same trail-derived projection the
+ *      fan-out itself iterates (`listGroupMembers` → `projectCircleRoster`), so the set that may confirm
+ *      a message cannot drift from the set the message was sent to.
+ *
+ * A member is matched on ANY address the roster knows for them (per-circle address, signing key, webid):
+ * the receipt comes back over whichever route their device happens to be using, and accepting only the
+ * one the fan-out picked would refuse honest receipts from the same person.
+ *
+ * ── The one case that must NOT fail closed ───────────────────────────────────────────────────────────
+ * When the roster cannot be determined at all — no circle on the entry, the skill call fails, an empty
+ * result — this passes NO predicate rather than a predicate that says no. `applyReceipt` then still
+ * enforces its id gate ("a receipt may only advance a message THIS device sent"), which is exactly the
+ * behaviour before this existed. The alternative is worse than the hole it closes: a check that refuses
+ * every receipt whenever a local read hiccups turns "your message may have arrived" into a permanent
+ * verdict, and the user cannot tell the two apart. Refusing a spoof is worth doing; silently refusing the
+ * truth is the failure this whole delivery vocabulary exists to avoid.
+ *
+ * @param {object} deps
+ * @param {{get:Function, set:Function}} deps.deliveryMap        the shared δ.2 map
+ * @param {{query:Function}} deps.eventLog                       to resolve msgId → circleId
+ * @param {(circleId: string) => Promise<Array<object>>} deps.listCircleMembers  roster rows for a circle
+ * @returns {(payload: object, fromAddress: string|null) => Promise<boolean>} whether a receipt was applied
+ */
+export function makeReceiptReceiver({ deliveryMap, eventLog, listCircleMembers } = {}) {
+  /** circleId → Set of every address the roster knows for its members. */
+  const byCircle = new Map();
+
+  const circleIdOfMessage = (msgId) => {
+    try {
+      const evt = eventLog?.query?.()?.find((e) => e?.id === msgId);
+      const cid = evt?.payload?.circleId;
+      return typeof cid === 'string' && cid ? cid : null;
+    } catch { return null; }
+  };
+
+  async function addressesFor(circleId, { refresh = false } = {}) {
+    if (!refresh && byCircle.has(circleId)) return byCircle.get(circleId);
+    let rows = [];
+    try { rows = (await listCircleMembers?.(circleId)) ?? []; } catch { rows = []; }
+    // No roster ⇒ no opinion (see above), NOT "nobody".
+    if (!Array.isArray(rows) || rows.length === 0) return null;
+    const addrs = new Set();
+    for (const m of rows) {
+      for (const v of [m?.circleAddress, m?.pubKey, m?.signingPublicKey, m?.addr, m?.stableId, m?.webid]) {
+        if (typeof v === 'string' && v) addrs.add(v);
+      }
+    }
+    if (addrs.size === 0) return null;
+    byCircle.set(circleId, addrs);
+    return addrs;
+  }
+
+  return async function onReceipt(payload, fromAddress) {
+    const msgId = typeof payload?.messageId === 'string' ? payload.messageId : null;
+    const circleId = msgId ? circleIdOfMessage(msgId) : null;
+    let allowed = circleId ? await addressesFor(circleId) : null;
+    // Someone who joined since this circle's roster was last read is a recipient we have not heard of
+    // yet, not an impostor — re-read once before refusing them.
+    if (allowed && typeof fromAddress === 'string' && !allowed.has(fromAddress)) {
+      allowed = await addressesFor(circleId, { refresh: true });
+    }
+    return applyReceipt(payload, fromAddress, deliveryMap, allowed
+      ? { isRecipient: (from) => typeof from === 'string' && allowed.has(from) }
+      : {});
+  };
+}
+
 export function applyReceipt(payload, fromAddress, deliveryMap, { isRecipient = null } = {}) {
   const receipt = receiveReceipt(payload, fromAddress);
   if (!receipt || typeof deliveryMap?.set !== 'function') return false;

@@ -177,6 +177,39 @@ describe('rehydrateKringChatsFromStoop · SP-13.2.2 boot rehydrator', () => {
     expect(r.skipped).toBe(2);
   });
 
+  /* ── the relaunch journey: my own history must come back as MINE ── */
+
+  it('re-attributes MY stored messages to me on a relaunch, and leaves the others alone', async () => {
+    // End-to-end over the real pieces the boot path wires: stoop's stored items → the strict
+    // envelope projection → the real inbox → the real per-circle self-check. Before the fix every
+    // one of these events came back with `actor: 'webid:me'`, so a relaunch rendered your own side
+    // of the conversation left-aligned, sender-labelled and reportable.
+    const { createChatMessageInbox } = await import('../../src/v2/chatMessageInbox.js');
+    const { createSelfAuthorCheck } = await import('../../src/v2/chatSelfAuthor.js');
+    const eventLog = fakeEventLog();
+    const inbox = createChatMessageInbox({
+      eventLog,
+      isSelfAuthored: createSelfAuthorCheck({
+        whoAmI: async () => ({ webid: 'webid:me', pubKey: 'pk-me' }),
+        circleAddressFor: (cid) => (cid === 'g1' ? 'addr-in-g1' : null),
+      }),
+      logger: silentLogger,
+    });
+    const callSkill = vi.fn(async () => ({ items: [
+      item({ msgId: 'm1', text: 'hoi allemaal', fromActor: 'webid:anne' }),
+      item({ msgId: 'm2', text: 'zie ik je zaterdag?', fromActor: 'webid:me' }),     // stoop's local mirror
+      item({ msgId: 'm3', text: 'en zondag ook', fromActor: 'addr-in-g1' }),         // per-circle address
+    ] }));
+    const r = await rehydrateKringChatsFromStoop({ callSkill, inbox, logger: silentLogger });
+
+    expect(r.rehydrated).toBe(3);
+    expect(eventLog.events.map((e) => e.actor)).toEqual(['webid:anne', 'me', 'me']);
+    // …and my own bubbles carry no sender name, exactly like the live optimistic append.
+    expect(eventLog.events[1].payload).not.toHaveProperty('senderDisplay');
+    expect(eventLog.events[2].payload).not.toHaveProperty('senderDisplay');
+    expect(eventLog.events[0].payload.senderDisplay).toBe('webid:anne');
+  });
+
   it('shares dedup state with the receiver through the inbox LRU', async () => {
     // Real inbox; both rehydrator + receiver use it → second arrival is deduped.
     const { createChatMessageInbox } = await import('../../src/v2/chatMessageInbox.js');

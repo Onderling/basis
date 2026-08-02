@@ -33,6 +33,11 @@ import { tmpdir }          from 'node:os';
 import { join, dirname }   from 'node:path';
 import { fileURLToPath }   from 'node:url';
 import { startRelay }            from '@onderling/relay';
+import nacl                     from 'tweetnacl';
+// Registration is challenge-first since 2026-07-31 (DESIGN-boundary-authentication §7): an address
+// is a public key the relay makes you prove. The five targets below are therefore real keys, and the
+// client answers the challenge — everything else about this scenario is unchanged.
+import { AgentIdentity, addressPossessionMessage, b64encode } from '@onderling/core';
 
 // The relay package does not currently re-export its queue stores at the
 // top level (its `exports` map only exposes `.`).  Resolve their files via
@@ -50,12 +55,37 @@ const { WebSocket }           = await import(`${RELAY_NM}/node_modules/ws/wrappe
 
 // ── ws client helpers (mirroring relay/test/server.test.js) ───────────────────
 
+/** label → keypair; the address IS the public key, so the labels below name real keys. */
+const keys = new Map();
+function keyFor(label) {
+  if (!keys.has(label)) {
+    const seed = new Uint8Array(32);
+    seed.set(new TextEncoder().encode(label).slice(0, 31));
+    seed[31] = keys.size + 1;
+    keys.set(label, { seed, address: AgentIdentity.pubKeyFromSeed(seed) });
+  }
+  return keys.get(label);
+}
+const addr = (label) => keyFor(label).address;
+function proofFor(address, nonce) {
+  const rec = [...keys.values()].find((k) => k.address === address);
+  if (!rec) return null;
+  const kp = nacl.sign.keyPair.fromSeed(rec.seed);
+  return b64encode(nacl.sign.detached(
+    new TextEncoder().encode(addressPossessionMessage(address, nonce)), kp.secretKey,
+  ));
+}
+
 function openClient(url) {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(url);
     ws.messages = [];
     ws.on('message', (raw) => {
-      try { ws.messages.push(JSON.parse(raw)); } catch {}
+      let msg; try { msg = JSON.parse(raw); } catch { return; }
+      ws.messages.push(msg);
+      if (msg.type !== 'challenge') return;
+      const proof = proofFor(msg.address, msg.nonce);
+      if (proof) ws.send(JSON.stringify({ type: 'register-proof', address: msg.address, nonce: msg.nonce, proof }));
     });
     ws.once('open',  () => resolve(ws));
     ws.once('error', reject);
@@ -94,7 +124,7 @@ describe('protocol — multi-recipient + relay restart (durable SQLite queue)', 
   });
 
   it('persists in-flight requests to SQLite; resumes open requests after a relay restart', async () => {
-    const TARGETS = ['p1', 'p2', 'p3', 'p4', 'p5'];
+    const TARGETS = ['p1', 'p2', 'p3', 'p4', 'p5'].map(addr);
 
     // ── Boot relay #1 with a SQLite-backed multi-recipient queue ──────────
     store = new SqliteQueueStore({ path: dbPath });
@@ -107,7 +137,7 @@ describe('protocol — multi-recipient + relay restart (durable SQLite queue)', 
 
     // ── Wire alice + the 5 targets ────────────────────────────────────────
     const alice = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(alice, { type: 'register', address: 'alice' });
+    send(alice, { type: 'register', address: addr('alice') });
     await waitFor(() => alice.messages.some(m => m.type === 'registered'));
 
     const targets = [];
@@ -184,14 +214,14 @@ describe('protocol — multi-recipient + relay restart (durable SQLite queue)', 
     expect(reqAfter.responses).toHaveLength(2);
     // The two early responders are still in there, byte-identical.
     const fromKeys = reqAfter.responses.map(r => r.fromPubKey).sort();
-    expect(fromKeys).toEqual(['p1', 'p2']);
-    expect(reqAfter.responses[0].response).toEqual({ from: 'p1', ok: true });
+    expect(fromKeys).toEqual([addr('p1'), addr('p2')].sort());
+    expect(reqAfter.responses[0].response).toEqual({ from: addr('p1'), ok: true });
 
     // ── Confirm partial-set semantics by closing the request via the
     // queue's normal deadline path: simulate a response from p3 to ensure
     // the durable store still accepts new responses after restart, then
     // close.  This proves "queue resumes" end-to-end at the store layer.
-    const updated = await mrQueue.addResponse(requestId, 'p3', { from: 'p3', ok: true });
+    const updated = await mrQueue.addResponse(requestId, addr('p3'), { from: addr('p3'), ok: true });
     expect(updated?.responses).toHaveLength(3);
 
     // Close the request — mirroring the deadline-elapsed path inside

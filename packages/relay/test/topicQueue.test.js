@@ -17,21 +17,9 @@
  * pinned independently of the SDK plumbing.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { WebSocket } from 'ws';
 import { startRelay } from '../src/server.js';
-
-function openClient(url) {
-  return new Promise((resolve, reject) => {
-    const ws = new WebSocket(url);
-    ws.messages = [];
-    ws.on('message', (raw) => {
-      try { ws.messages.push(JSON.parse(raw)); } catch {}
-    });
-    ws.once('open',  () => resolve(ws));
-    ws.once('error', reject);
-  });
-}
-function send(ws, obj) { ws.send(JSON.stringify(obj)); }
+// Registration is challenge-first (Decision 3): `addr('alice')` is a real key the client can prove.
+import { openClient, send, addr } from './helpers/provenClient.js';
 async function waitFor(predicate, timeoutMs = 1_000) {
   const start = Date.now();
   while (!predicate()) {
@@ -59,12 +47,12 @@ describe('startRelay — topic-aware offline queue (Phase 7 step 4)', () => {
   it('forwards an online publish frame including the topic hint (no queueing)', async () => {
     const alice = await openClient(`ws://127.0.0.1:${relay.port}`);
     const bob   = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(alice, { type: 'register', address: 'alice' });
-    send(bob,   { type: 'register', address: 'bob'   });
+    send(alice, { type: 'register', address: addr('alice') });
+    send(bob,   { type: 'register', address: addr('bob')   });
     await waitFor(() => alice.messages.some(m => m.type === 'registered')
                      && bob.messages.some(m => m.type === 'registered'));
 
-    send(alice, publishFrame('bob', 'block-42/requests', 1));
+    send(alice, publishFrame(addr('bob'), 'block-42/requests', 1));
 
     await waitFor(() => bob.messages.some(m => m.type === 'message'));
     const delivered = bob.messages.find(m => m.type === 'message');
@@ -76,17 +64,17 @@ describe('startRelay — topic-aware offline queue (Phase 7 step 4)', () => {
 
   it('per-bucket FIFO eviction: noisy topic does not evict a quiet topic', async () => {
     const alice = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(alice, { type: 'register', address: 'alice' });
+    send(alice, { type: 'register', address: addr('alice') });
     await waitFor(() => alice.messages.some(m => m.type === 'registered'));
 
     // bob is offline. Send 5 publishes on topic A (over the cap of 3) plus
     // 1 publish on topic B. Topic B's single message must survive.
-    for (let n = 1; n <= 5; n++) send(alice, publishFrame('bob', 'A', n));
-    send(alice, publishFrame('bob', 'B', 99));
+    for (let n = 1; n <= 5; n++) send(alice, publishFrame(addr('bob'), 'A', n));
+    send(alice, publishFrame(addr('bob'), 'B', 99));
     await new Promise(r => setTimeout(r, 30));
 
     const bob = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(bob, { type: 'register', address: 'bob' });
+    send(bob, { type: 'register', address: addr('bob') });
 
     await waitFor(() =>
       bob.messages.filter(m => m.type === 'message').length >= 4,
@@ -109,15 +97,15 @@ describe('startRelay — topic-aware offline queue (Phase 7 step 4)', () => {
 
   it('legacy (no topic) sends share a single null-topic bucket capped at queueCap', async () => {
     const alice = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(alice, { type: 'register', address: 'alice' });
+    send(alice, { type: 'register', address: addr('alice') });
     await waitFor(() => alice.messages.some(m => m.type === 'registered'));
 
     // 5 untopiced sends. Default cap of 3: oldest 2 evicted.
-    for (let n = 1; n <= 5; n++) send(alice, legacyFrame('bob', n));
+    for (let n = 1; n <= 5; n++) send(alice, legacyFrame(addr('bob'), n));
     await new Promise(r => setTimeout(r, 30));
 
     const bob = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(bob, { type: 'register', address: 'bob' });
+    send(bob, { type: 'register', address: addr('bob') });
     await waitFor(() =>
       bob.messages.filter(m => m.type === 'message').length === 3,
     );
@@ -131,16 +119,16 @@ describe('startRelay — topic-aware offline queue (Phase 7 step 4)', () => {
 
   it('topic-bucketed and untopiced messages share an address but cap independently', async () => {
     const alice = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(alice, { type: 'register', address: 'alice' });
+    send(alice, { type: 'register', address: addr('alice') });
     await waitFor(() => alice.messages.some(m => m.type === 'registered'));
 
     // 5 of A (cap 3 → keep 3,4,5), 4 untopiced (cap 3 → keep 2,3,4).
-    for (let n = 1; n <= 5; n++) send(alice, publishFrame('bob', 'A', n));
-    for (let n = 1; n <= 4; n++) send(alice, legacyFrame('bob', n));
+    for (let n = 1; n <= 5; n++) send(alice, publishFrame(addr('bob'), 'A', n));
+    for (let n = 1; n <= 4; n++) send(alice, legacyFrame(addr('bob'), n));
     await new Promise(r => setTimeout(r, 30));
 
     const bob = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(bob, { type: 'register', address: 'bob' });
+    send(bob, { type: 'register', address: addr('bob') });
     await waitFor(() =>
       bob.messages.filter(m => m.type === 'message').length === 6,
     );
@@ -162,19 +150,19 @@ describe('startRelay — topic-aware offline queue (Phase 7 step 4)', () => {
     relay = await startRelay({ port: 0, queueCap: 3, queueCapTotal: 4 });
 
     const alice = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(alice, { type: 'register', address: 'alice' });
+    send(alice, { type: 'register', address: addr('alice') });
     await waitFor(() => alice.messages.some(m => m.type === 'registered'));
 
     // Five distinct topics, one message each → total 5; ceiling 4 → oldest one trimmed.
-    send(alice, publishFrame('bob', 'A', 1));
-    send(alice, publishFrame('bob', 'B', 2));
-    send(alice, publishFrame('bob', 'C', 3));
-    send(alice, publishFrame('bob', 'D', 4));
-    send(alice, publishFrame('bob', 'E', 5));
+    send(alice, publishFrame(addr('bob'), 'A', 1));
+    send(alice, publishFrame(addr('bob'), 'B', 2));
+    send(alice, publishFrame(addr('bob'), 'C', 3));
+    send(alice, publishFrame(addr('bob'), 'D', 4));
+    send(alice, publishFrame(addr('bob'), 'E', 5));
     await new Promise(r => setTimeout(r, 30));
 
     const bob = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(bob, { type: 'register', address: 'bob' });
+    send(bob, { type: 'register', address: addr('bob') });
     await waitFor(() =>
       bob.messages.filter(m => m.type === 'message').length === 4,
     );
@@ -187,17 +175,17 @@ describe('startRelay — topic-aware offline queue (Phase 7 step 4)', () => {
 
   it('drain order: chronological across buckets', async () => {
     const alice = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(alice, { type: 'register', address: 'alice' });
+    send(alice, { type: 'register', address: addr('alice') });
     await waitFor(() => alice.messages.some(m => m.type === 'registered'));
 
-    send(alice, publishFrame('bob', 'A', 1));
-    send(alice, publishFrame('bob', 'B', 2));
-    send(alice, publishFrame('bob', 'A', 3));
-    send(alice, publishFrame('bob', 'B', 4));
+    send(alice, publishFrame(addr('bob'), 'A', 1));
+    send(alice, publishFrame(addr('bob'), 'B', 2));
+    send(alice, publishFrame(addr('bob'), 'A', 3));
+    send(alice, publishFrame(addr('bob'), 'B', 4));
     await new Promise(r => setTimeout(r, 30));
 
     const bob = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(bob, { type: 'register', address: 'bob' });
+    send(bob, { type: 'register', address: addr('bob') });
     await waitFor(() =>
       bob.messages.filter(m => m.type === 'message').length === 4,
     );

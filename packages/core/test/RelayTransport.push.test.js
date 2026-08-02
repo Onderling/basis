@@ -6,6 +6,9 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { WebSocketServer } from 'ws';
+// The fixture has to CHALLENGE — see RelayTransport.test.js.
+import { newAddressChallenge, verifyAddressPossession } from '../src/identity/addressPossession.js';
+
 import { AgentIdentity }   from '../src/identity/AgentIdentity.js';
 import { VaultMemory }     from '@onderling/vault';
 import { RelayTransport }  from '@onderling/transports';
@@ -17,14 +20,26 @@ function startPushFixture({ rejectRegister = false, dropAcks = false } = {}) {
 
   wss.on('connection', (ws) => {
     let address = null;
+    const open = new Map();               // nonce → address, single use
     ws.on('message', (raw) => {
       let msg;
       try { msg = JSON.parse(raw); } catch { return; }
       events.push(msg);
 
       if (msg.type === 'register') {
+        const nonce = newAddressChallenge();
+        open.set(nonce, msg.address);
+        ws.send(JSON.stringify({ type: 'challenge', address: msg.address, nonce }));
+        return;
+      }
+      if (msg.type === 'register-proof') {
+        if (open.get(msg.nonce) !== msg.address || !verifyAddressPossession(msg)) {
+          ws.send(JSON.stringify({ type: 'error', message: 'PROOF_INVALID' }));
+          return;
+        }
+        open.delete(msg.nonce);
         address = msg.address;
-        ws.send(JSON.stringify({ type: 'registered' }));
+        ws.send(JSON.stringify({ type: 'registered', address }));
         return;
       }
       if (msg.type === 'register-push-token') {

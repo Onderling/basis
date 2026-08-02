@@ -98,13 +98,16 @@ describe('§7.9 — replay attack (dedup + replay window)', () => {
     const mallorySec = new SecurityLayer({ identity: mallory });
     mallorySec.registerPeer(bobId.pubKey, bobId.pubKey);
 
-    // Mallory captures the SHAPE and re-emits under Alice's _from but signs
-    // with her own key. Bob has Alice's key registered for that _from → sig
-    // verify fails.
+    // Mallory captures the SHAPE and re-emits under Alice's _from but signs with her own key.
+    // Since Decision 1 the signature verifies — against MALLORY's key, which the envelope now
+    // carries — and the envelope is refused one step later instead, because that key is not the one
+    // Bob holds for the address it claims. Same outcome, more accurate diagnosis: this was never a
+    // forged signature, it was a genuine signature from the wrong person.
     const env = mkEnvelope(P.OW, aliceId.pubKey, bobId.pubKey, { x: 1 });
     const enc = mallorySec.encrypt(env);   // signed by Mallory, _from = Alice
     let code = null;
     try { bobSec.decryptAndVerify(enc); } catch (e) { code = e.code; }
-    expect([SEC.BAD_SIG, SEC.DECRYPT_FAILED]).toContain(code);
+    expect([SEC.SENDER_NOT_BOUND, SEC.BAD_SIG, SEC.DECRYPT_FAILED]).toContain(code);
+    expect(code).toBe(SEC.SENDER_NOT_BOUND);
   });
 });

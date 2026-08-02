@@ -626,7 +626,13 @@ describe('cards and room chat (step G)', () => {
 
 describe('broadcast circle invites (step H)', () => {
   const T0 = 1_700_000_000_000;
-  const URI = 'onderling-invite://abc';
+  // A REAL invite URI. `prepareBroadcastInvite` now DECODES what it is handed so it can strip the circle's
+  // relay endpoint before a room hears it (2026-07-31), and fails closed on anything it cannot read — so a
+  // placeholder string is no longer a valid fixture. No `relayUrl` here, so the strip is a byte-for-byte
+  // no-op and the identity assertions below still hold.
+  const URI = `onderling-invite://${globalThis.btoa(JSON.stringify({
+    kind: 'membershipCode', groupId: 'c1', code: 'CODE-1',
+  })).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
 
   function withInvites({ invitePublish } = {}) {
     let pushInvite = null;

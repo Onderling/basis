@@ -5,6 +5,11 @@
 import { describe, it, expect, beforeEach, afterEach, beforeAll } from 'vitest';
 import { WebSocket } from 'ws';
 import { startRelay } from '../src/server.js';
+// Registration is challenge-first (DESIGN-boundary-authentication §7): an address is a public key
+// and must be PROVED, so the client and the addresses come from the shared helper rather than being
+// string literals. `addr('alice')` is a real key this suite holds; `useIdentity` teaches the helper
+// about the identities the group-proof suites below connect as.
+import { openClient, send, addr, useIdentity } from './helpers/provenClient.js';
 import { AgentIdentity, GroupManager } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 
@@ -19,22 +24,6 @@ async function loadSelfsigned() {
     return null;
   }
 }
-
-// ── Helper client ────────────────────────────────────────────────────────────
-
-function openClient(url, opts = {}) {
-  return new Promise((resolve, reject) => {
-    const ws = new WebSocket(url, opts);
-    ws.messages = [];
-    ws.on('message', (raw) => {
-      try { ws.messages.push(JSON.parse(raw)); } catch {}
-    });
-    ws.once('open',  () => resolve(ws));
-    ws.once('error', reject);
-  });
-}
-
-function send(ws, obj) { ws.send(JSON.stringify(obj)); }
 
 async function waitFor(predicate, timeoutMs = 1_000) {
   const start = Date.now();
@@ -66,7 +55,7 @@ describe('startRelay — ws://', () => {
 
   it('replies to register with a `registered` ack', async () => {
     const ws = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(ws, { type: 'register', address: 'alice' });
+    send(ws, { type: 'register', address: addr('alice') });
 
     await waitFor(() => ws.messages.some(m => m.type === 'registered'));
     ws.close();
@@ -76,12 +65,12 @@ describe('startRelay — ws://', () => {
     const alice = await openClient(`ws://127.0.0.1:${relay.port}`);
     const bob   = await openClient(`ws://127.0.0.1:${relay.port}`);
 
-    send(alice, { type: 'register', address: 'alice' });
-    send(bob,   { type: 'register', address: 'bob'   });
+    send(alice, { type: 'register', address: addr('alice') });
+    send(bob,   { type: 'register', address: addr('bob')   });
     await waitFor(() => alice.messages.some(m => m.type === 'registered')
                      && bob.messages.some(m => m.type === 'registered'));
 
-    send(alice, { type: 'send', to: 'bob', envelope: { _p: 'OW', payload: { hi: true } } });
+    send(alice, { type: 'send', to: addr('bob'), envelope: { _p: 'OW', payload: { hi: true } } });
 
     await waitFor(() => bob.messages.some(m => m.type === 'message'));
     const delivered = bob.messages.find(m => m.type === 'message');
@@ -92,18 +81,18 @@ describe('startRelay — ws://', () => {
 
   it('buffers messages to an offline peer and drains on register', async () => {
     const alice = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(alice, { type: 'register', address: 'alice' });
+    send(alice, { type: 'register', address: addr('alice') });
     await waitFor(() => alice.messages.some(m => m.type === 'registered'));
 
     // Send to bob while he's offline.
-    send(alice, { type: 'send', to: 'bob', envelope: { _p: 'OW', payload: { n: 1 } } });
-    send(alice, { type: 'send', to: 'bob', envelope: { _p: 'OW', payload: { n: 2 } } });
+    send(alice, { type: 'send', to: addr('bob'), envelope: { _p: 'OW', payload: { n: 1 } } });
+    send(alice, { type: 'send', to: addr('bob'), envelope: { _p: 'OW', payload: { n: 2 } } });
     // Small delay to let the relay buffer them.
     await new Promise(r => setTimeout(r, 30));
 
     // Bob comes online — should receive the two buffered messages.
     const bob = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(bob, { type: 'register', address: 'bob' });
+    send(bob, { type: 'register', address: addr('bob') });
 
     await waitFor(() =>
       bob.messages.filter(m => m.type === 'message').length === 2,
@@ -116,15 +105,15 @@ describe('startRelay — ws://', () => {
 
   it('broadcasts peer-list on connect and disconnect', async () => {
     const alice = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(alice, { type: 'register', address: 'alice' });
+    send(alice, { type: 'register', address: addr('alice') });
     await waitFor(() => alice.messages.some(m => m.type === 'registered'));
 
     const bob = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(bob, { type: 'register', address: 'bob' });
+    send(bob, { type: 'register', address: addr('bob') });
 
     // Alice should receive a peer-list broadcast that includes bob.
     await waitFor(() => alice.messages.some(
-      m => m.type === 'peer-list' && m.peers?.includes('bob'),
+      m => m.type === 'peer-list' && m.peers?.includes(addr('bob')),
     ));
 
     bob.close();
@@ -132,7 +121,7 @@ describe('startRelay — ws://', () => {
     await waitFor(() => {
       const peerLists = alice.messages.filter(m => m.type === 'peer-list');
       const last     = peerLists[peerLists.length - 1];
-      return last && !last.peers?.includes('bob');
+      return last && !last.peers?.includes(addr('bob'));
     });
 
     alice.close();
@@ -140,12 +129,12 @@ describe('startRelay — ws://', () => {
 
   it('responds to a peer-list request with the current client list', async () => {
     const alice = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(alice, { type: 'register', address: 'alice' });
+    send(alice, { type: 'register', address: addr('alice') });
     await waitFor(() => alice.messages.some(m => m.type === 'registered'));
 
     send(alice, { type: 'peer-list' });
     await waitFor(() => alice.messages.some(
-      m => m.type === 'peer-list' && m.peers?.includes('alice'),
+      m => m.type === 'peer-list' && m.peers?.includes(addr('alice')),
     ));
 
     alice.close();
@@ -184,9 +173,9 @@ describe('startRelay — multi-recipient (E2b)', () => {
     const b = await openClient(`ws://127.0.0.1:${relay.port}`);
     const c = await openClient(`ws://127.0.0.1:${relay.port}`);
 
-    send(a, { type: 'register', address: 'alice' });
-    send(b, { type: 'register', address: 'bob'   });
-    send(c, { type: 'register', address: 'carol' });
+    send(a, { type: 'register', address: addr('alice') });
+    send(b, { type: 'register', address: addr('bob')   });
+    send(c, { type: 'register', address: addr('carol') });
     await waitFor(() =>
       a.messages.some(m => m.type === 'registered') &&
       b.messages.some(m => m.type === 'registered') &&
@@ -196,7 +185,7 @@ describe('startRelay — multi-recipient (E2b)', () => {
     // A fires the multi-request.
     send(a, {
       type:    'multi-request',
-      targets: ['bob', 'carol'],
+      targets: [addr('bob'), addr('carol')],
       payload: { task: 'ping' },
       timeoutMs: 1_000,
     });
@@ -207,7 +196,7 @@ describe('startRelay — multi-recipient (E2b)', () => {
 
     const bDeliver = b.messages.find(m => m.type === 'multi-deliver');
     const cDeliver = c.messages.find(m => m.type === 'multi-deliver');
-    expect(bDeliver.from).toBe('alice');
+    expect(bDeliver.from).toBe(addr('alice'));
     expect(bDeliver.id).toBe(cDeliver.id);
     expect(bDeliver.payload).toEqual({ task: 'ping' });
 
@@ -220,7 +209,7 @@ describe('startRelay — multi-recipient (E2b)', () => {
     expect(reply.partial).toBe(false);
     expect(reply.responses).toHaveLength(2);
     const fromKeys = reply.responses.map(r => r.fromPubKey).sort();
-    expect(fromKeys).toEqual(['bob', 'carol']);
+    expect(fromKeys).toEqual([addr('bob'), addr('carol')].sort());
 
     a.close(); b.close(); c.close();
   });
@@ -230,9 +219,9 @@ describe('startRelay — multi-recipient (E2b)', () => {
     const b = await openClient(`ws://127.0.0.1:${relay.port}`);
     const c = await openClient(`ws://127.0.0.1:${relay.port}`);
 
-    send(a, { type: 'register', address: 'alice' });
-    send(b, { type: 'register', address: 'bob'   });
-    send(c, { type: 'register', address: 'carol' });
+    send(a, { type: 'register', address: addr('alice') });
+    send(b, { type: 'register', address: addr('bob')   });
+    send(c, { type: 'register', address: addr('carol') });
     await waitFor(() =>
       a.messages.some(m => m.type === 'registered') &&
       b.messages.some(m => m.type === 'registered') &&
@@ -241,7 +230,7 @@ describe('startRelay — multi-recipient (E2b)', () => {
 
     send(a, {
       type:    'multi-request',
-      targets: ['bob', 'carol'],
+      targets: [addr('bob'), addr('carol')],
       payload: { task: 'ping' },
       timeoutMs: 80,
     });
@@ -255,14 +244,14 @@ describe('startRelay — multi-recipient (E2b)', () => {
     const reply = a.messages.find(m => m.type === 'multi-response');
     expect(reply.partial).toBe(true);
     expect(reply.responses).toHaveLength(1);
-    expect(reply.responses[0].fromPubKey).toBe('bob');
+    expect(reply.responses[0].fromPubKey).toBe(addr('bob'));
 
     a.close(); b.close(); c.close();
   });
 
   it('rejects multi-request with non-array targets', async () => {
     const a = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(a, { type: 'register', address: 'alice' });
+    send(a, { type: 'register', address: addr('alice') });
     await waitFor(() => a.messages.some(m => m.type === 'registered'));
 
     send(a, { type: 'multi-request', targets: 'nope', payload: {} });
@@ -314,12 +303,12 @@ describe('startRelay — wss://', async () => {
 
     const alice = await openClient(`wss://localhost:${relay.port}`, wsOpts);
     const bob   = await openClient(`wss://localhost:${relay.port}`, wsOpts);
-    send(alice, { type: 'register', address: 'alice' });
-    send(bob,   { type: 'register', address: 'bob'   });
+    send(alice, { type: 'register', address: addr('alice') });
+    send(bob,   { type: 'register', address: addr('bob')   });
     await waitFor(() => alice.messages.some(m => m.type === 'registered')
                      && bob.messages.some(m => m.type === 'registered'));
 
-    send(alice, { type: 'send', to: 'bob', envelope: { _p: 'OW', payload: { secure: true } } });
+    send(alice, { type: 'send', to: addr('bob'), envelope: { _p: 'OW', payload: { secure: true } } });
     await waitFor(() => bob.messages.some(m => m.type === 'message'));
     expect(bob.messages.find(m => m.type === 'message').envelope.payload).toEqual({ secure: true });
 
@@ -339,6 +328,7 @@ describe('startRelay — group auth (Q-E.2)', () => {
   beforeAll(async () => {
     admin    = await AgentIdentity.generate(new VaultMemory());
     member   = await AgentIdentity.generate(new VaultMemory());
+    useIdentity(member);          // this suite connects AS member, so it must be able to prove member
     gm       = new GroupManager({ identity: admin, vault: new VaultMemory() });
     validProof = await gm.issueProof(member.pubKey, 'my-block');
 
@@ -396,7 +386,7 @@ describe('startRelay — group auth (Q-E.2)', () => {
     const openRelay = await startRelay({ port: 0 }); // no acceptedGroups
     try {
       const ws = await openClient(`ws://127.0.0.1:${openRelay.port}`);
-      send(ws, { type: 'register', address: 'any-address' });
+      send(ws, { type: 'register', address: addr('any-address') });
       await waitFor(() => ws.messages.some(m => m.type === 'registered'));
       expect(ws.messages.some(m => m.type === 'error')).toBe(false);
       try { ws.close(); } catch {}
@@ -414,6 +404,7 @@ describe('startRelay — Phase 2: per-group revocation', () => {
   beforeAll(async () => {
     admin  = await AgentIdentity.generate(new VaultMemory());
     member = await AgentIdentity.generate(new VaultMemory());
+    useIdentity(member);          // revoked or not, the client still has to prove its own address
     gm     = new GroupManager({ identity: admin, vault: new VaultMemory() });
     proof  = await gm.issueProof(member.pubKey, 'my-block');
   });
@@ -437,46 +428,53 @@ describe('startRelay — Phase 2: per-group revocation', () => {
   });
 });
 
-describe('startRelay — Phase 2: per-group connection quota', () => {
-  let admin, m1, m2, m3, gm, p1, p2, p3, relay;
-
-  beforeAll(async () => {
-    admin = await AgentIdentity.generate(new VaultMemory());
-    m1    = await AgentIdentity.generate(new VaultMemory());
-    m2    = await AgentIdentity.generate(new VaultMemory());
-    m3    = await AgentIdentity.generate(new VaultMemory());
-    gm    = new GroupManager({ identity: admin, vault: new VaultMemory() });
-    p1    = await gm.issueProof(m1.pubKey, 'my-block');
-    p2    = await gm.issueProof(m2.pubKey, 'my-block');
-    p3    = await gm.issueProof(m3.pubKey, 'my-block');
-  });
-
+// The per-GROUP connection quota (`quotas.maxConnections` → OVER_QUOTA_CONNECTIONS) was removed on
+// 2026-07-31: it made the relay count members of a circle, which is knowledge the relay must not hold
+// (`plans/DESIGN-boundary-authentication.md` §2), and it was inert in every deployment we run. Its test
+// went with it. What follows guards the replacement, which is circle-blind.
+describe('startRelay — per-connection address cap', () => {
+  let relay;
   afterEach(async () => { if (relay) await relay.stop(); });
 
-  it('accepts up to maxConnections; rejects further with OVER_QUOTA_CONNECTIONS', async () => {
-    relay = await startRelay({
-      port: 0,
-      acceptedGroups: [{
-        groupId:     'my-block',
-        adminPubKey: admin.pubKey,
-        quotas:      { maxConnections: 2 },
-      }],
-    });
+  it('refuses the over-cap register with TOO_MANY_ADDRESSES and keeps the socket usable', async () => {
+    relay = await startRelay({ port: 0, maxAddressesPerConnection: 2 });
+    const url = `ws://127.0.0.1:${relay.port}`;
 
-    const ws1 = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(ws1, { type: 'register', address: m1.pubKey, groupProof: p1 });
-    await waitFor(() => ws1.messages.some(m => m.type === 'registered'));
+    const anna = await openClient(url);
+    send(anna, { type: 'register', address: addr('anna@x') });
+    send(anna, { type: 'register', address: addr('anna@y') });
+    await waitFor(() => anna.messages.filter(m => m.type === 'registered').length === 2);
 
-    const ws2 = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(ws2, { type: 'register', address: m2.pubKey, groupProof: p2 });
-    await waitFor(() => ws2.messages.some(m => m.type === 'registered'));
+    send(anna, { type: 'register', address: addr('anna@z') });
+    await waitFor(() => anna.messages.some(m => m.type === 'error'));
+    expect(anna.messages.find(m => m.type === 'error').message).toBe('TOO_MANY_ADDRESSES');
 
-    const ws3 = await openClient(`ws://127.0.0.1:${relay.port}`);
-    send(ws3, { type: 'register', address: m3.pubKey, groupProof: p3 });
-    await waitFor(() => ws3.messages.some(m => m.type === 'error'));
-    expect(ws3.messages.find(m => m.type === 'error').message).toBe('OVER_QUOTA_CONNECTIONS');
+    // The socket survives, and the addresses it already owns still route — refusing the frame must not
+    // take the other circles on this device down with it.
+    const bram = await openClient(url);
+    send(bram, { type: 'register', address: addr('bram') });
+    await waitFor(() => bram.messages.some(m => m.type === 'registered'));
+    send(bram, { type: 'send', to: addr('anna@x'), envelope: { subtype: 'still-here' } });
+    await waitFor(() => anna.messages.some(m => m.type === 'message'));
+    expect(anna.messages.find(m => m.type === 'message').envelope.subtype).toBe('still-here');
 
-    try { ws1.close(); ws2.close(); ws3.close(); } catch {}
+    // ...and the refused address was NOT half-registered.
+    send(bram, { type: 'peer-list' });
+    await waitFor(() => bram.messages.some(m => m.type === 'peer-list' && m.peers.includes(addr('bram'))));
+    const peers = bram.messages.filter(m => m.type === 'peer-list').at(-1).peers;
+    expect(peers).not.toContain(addr('anna@z'));
+
+    try { anna.close(); bram.close(); } catch {}
+  });
+
+  it('re-registering an address the socket already owns is free', async () => {
+    relay = await startRelay({ port: 0, maxAddressesPerConnection: 1 });
+    const ws = await openClient(`ws://127.0.0.1:${relay.port}`);
+    send(ws, { type: 'register', address: addr('anna@x') });
+    send(ws, { type: 'register', address: addr('anna@x') });
+    await waitFor(() => ws.messages.filter(m => m.type === 'registered').length === 2);
+    expect(ws.messages.some(m => m.type === 'error')).toBe(false);
+    try { ws.close(); } catch {}
   });
 });
 
@@ -487,6 +485,7 @@ describe('startRelay — Phase 2: per-group msgsPerDay quota', () => {
     admin = await AgentIdentity.generate(new VaultMemory());
     m1    = await AgentIdentity.generate(new VaultMemory());
     m2    = await AgentIdentity.generate(new VaultMemory());
+    useIdentity(m1); useIdentity(m2);
     gm    = new GroupManager({ identity: admin, vault: new VaultMemory() });
     p1    = await gm.issueProof(m1.pubKey, 'my-block');
     p2    = await gm.issueProof(m2.pubKey, 'my-block');
@@ -532,6 +531,7 @@ describe('startRelay — Phase 2: rotation chain at register', () => {
     admin   = await AgentIdentity.generate(new VaultMemory());
     oldId   = await AgentIdentity.generate(new VaultMemory());
     newId   = await AgentIdentity.generate(new VaultMemory());
+    useIdentity(newId);           // the rotation test connects with the NEW key and must prove it
     otherId = await AgentIdentity.generate(new VaultMemory());
     gm      = new GroupManager({ identity: admin, vault: new VaultMemory() });
     oldProof = await gm.issueProof(oldId.pubKey, 'my-block');

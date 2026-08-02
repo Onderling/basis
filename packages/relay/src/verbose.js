@@ -11,17 +11,25 @@
  *   - message type (e.g. `send`, `multi-deliver`)
  *
  * Additionally, for the S9 (sealed-forward) smoke check, the verbose
- * logger inspects the envelope body and emits a `[verbose] potential
- * plaintext leak: ...` line whenever the body contains a run of
- * `MIN_LEAK_LEN` or more readable UTF-8 characters in a row.  Sealed
- * messages are random ciphertext-looking blobs; plaintext fragments
- * standing out is the easiest "are we leaking?" canary.
+ * logger inspects the forwarded body and emits a `[verbose] potential
+ * plaintext leak: ...` line when the body is **not the shape a sealed
+ * envelope has** — see `findPlaintextLeak` for the signal and why it is a
+ * contract rather than a guess.
+ *
+ * Rewritten 2026-07-31.  The previous canary guessed: any run of ≥40 readable
+ * characters with an English-looking vowel ratio was called plaintext.  A
+ * base64 Ed25519 address is 43 readable characters, so it fired on ordinary
+ * sealed traffic depending on the key material — and the line it emitted
+ * carried an 80-character excerpt, printing the address in full and defeating
+ * the `shortId` truncation every other log line uses.  Tuning the ratio only
+ * moves that line: an address is not distinguishable from prose by entropy.
+ * So the mechanism changed rather than its threshold, and the excerpt now goes
+ * through `shortId` like everything else.
  *
  * No new deps.  Plain `console.log`.  When the env var is unset, all of
  * these helpers are no-ops.
  */
-
-const MIN_LEAK_LEN = 20;
+import { P } from '@onderling/core';
 
 // Cached at module-load.  Tests that need to flip the flag mid-process
 // can set it directly via setVerboseEnabled() (private; not exported
@@ -66,82 +74,106 @@ export function logHop({ kind, from, to, envelope, payload }) {
   if (body) {
     const leak = findPlaintextLeak(body);
     if (leak) {
+      // The excerpt goes through `shortId` — the SAME truncation every other relay log line uses.
+      // A canary that prints 80 characters of what it found is a canary that writes an address, a
+      // name or a sentence into an operator's stdout; the marker says what is wrong and the excerpt
+      // is only there to make the shape recognisable.
       console.log(
         `[verbose] potential plaintext leak: ` +
-        `from=${shortId(from)} to=${shortId(to)} kind=${kind} ` +
-        `excerpt=${JSON.stringify(leak.slice(0, 80))}`
+        `from=${shortId(from)} to=${shortId(to)} kind=${kind} marker=${leak.marker} ` +
+        `excerpt=${JSON.stringify(shortId(leak.excerpt))}`
       );
     }
   }
 }
 
 /**
- * Walk an arbitrary JSON-shaped body, return the first readable-character
- * run of length >= MIN_LEAK_LEN, or null.  "Readable" = ASCII printable
- * minus a few near-random punctuation classes.  Crude on purpose; sealed
- * payloads are random bytes Base64-encoded, which **does** produce long
- * runs of readable chars (alphanumerics) — so we additionally require
- * the run to contain at least one **space** OR be >= 40 chars with
- * a vowel ratio above 18% (typical English text).  This filters out
- * Base64-noise while still catching "Hello, World!" style leaks.
+ * The envelope fields the relay is MEANT to read in cleartext — the routing header.
+ * `SecurityLayer.encrypt` replaces only `payload`; these stay plaintext at the top level by
+ * design, which is why the broker can log `_p` and route on `_to`.
  *
- * Returns the matching substring (truncated by caller) or null.
+ * The privacy harness keeps the authoritative copy of this list
+ * (`test/security/whatTheRelayMayLearn.js` → `ENVELOPE_HEADER_FIELDS`, plus `payload`), because
+ * there it IS the claim: a circle id added to this header would be visible to every relay on
+ * every path. `whatTheRelayLearns.test.js` asserts the two agree, so they cannot drift apart.
+ */
+export const ROUTING_HEADER_FIELDS = Object.freeze([
+  '_v', '_p', '_id', '_re', '_from', '_to', '_topic', '_ts', '_sig', '_rotationProof',
+  // Decision 1 (2026-07-31) — the key that signed the envelope. The relay neither reads nor checks
+  // it (verification is end-to-end); it is listed so the sealing check does not mistake a routing
+  // header field for readable content.
+  '_signedBy',
+]);
+
+/** The one key a sealed payload carries: `SecurityLayer.encrypt` sets `payload = { _box }`. */
+const SEALED_PAYLOAD_KEY = '_box';
+
+/**
+ * Is this body content the relay can READ that it should not be able to?
  *
- * Exposed for testing.
+ * The signal is a known marker, not entropy. Sealing has a shape, and it is a contract rather
+ * than a statistical property: `SecurityLayer.encrypt` replaces `envelope.payload` with
+ * `{ _box: <base64> }` and leaves the routing header in cleartext (`SecurityLayer.js`). So an
+ * envelope crossing this relay is sealed **iff** its payload is exactly that, and everything
+ * else it carries is a routing-header field. Anything else in the payload position, or any
+ * readable field beside the header, is by definition not sealed — which is the whole and honest
+ * statement of what this alarm is for.
+ *
+ * The one deliberate exemption is `P.HI`: the hello/agent-card exchange is *signed plaintext by
+ * design*, not a leak. Firing on it would be the same cry-wolf failure in a new costume.
+ *
+ * Why not "does it look like prose": because a base64 Ed25519 address does, to any threshold you
+ * pick. The old canary flagged one of this suite's real per-circle addresses and stayed quiet on
+ * the next, which is a coin flip an operator learns to ignore.
+ *
+ * @param   {*} body  an envelope, or (for `multi-deliver`) a bare payload
+ * @returns {{marker: string, excerpt: string} | null}
+ *   `marker` names WHICH contract was broken; `excerpt` is a short structural sample the caller
+ *   MUST truncate (`logHop` runs it through `shortId`). Null when the body is sealed, or is
+ *   plaintext by design, or carries nothing readable at all.
  */
 export function findPlaintextLeak(body) {
-  const flat = collectStrings(body);
-  for (const s of flat) {
-    const hit = scanReadableRun(s);
-    if (hit) return hit;
+  if (body == null || typeof body !== 'object') return null;
+
+  // Signed plaintext by design — the agent-card hello carries no user content.
+  if (body._p === P.HI) return null;
+
+  // A bare sealed box (a `multi-deliver` payload the caller sealed itself).
+  if (isSealedBox(body)) return null;
+
+  // 1. The case this alarm exists for: something readable where `{_box}` belongs.
+  if ('payload' in body && !isSealedBox(body.payload)) {
+    return { marker: 'unsealed-payload', excerpt: sample(body.payload) };
   }
+
+  // 2. Readable structure BESIDE the routing header — content smuggled into a field of its own,
+  //    or a bare application object handed straight to `_put` with no envelope around it.
+  const extra = Object.keys(body).filter(
+    (k) => k !== 'payload' && !ROUTING_HEADER_FIELDS.includes(k),
+  );
+  if (extra.length > 0) {
+    return { marker: 'readable-outside-payload', excerpt: sample(pick(body, extra)) };
+  }
+
   return null;
 }
 
-function collectStrings(node, out = [], depth = 0) {
-  if (depth > 6 || node == null) return out;
-  if (typeof node === 'string') { out.push(node); return out; }
-  if (typeof node !== 'object') return out;
-  if (Array.isArray(node)) {
-    for (const v of node) collectStrings(v, out, depth + 1);
-    return out;
-  }
-  for (const v of Object.values(node)) collectStrings(v, out, depth + 1);
+/** The sealed shape, exactly: an object whose only key is `_box`, holding a string. */
+function isSealedBox(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const keys = Object.keys(value);
+  return keys.length === 1 && keys[0] === SEALED_PAYLOAD_KEY && typeof value._box === 'string';
+}
+
+function pick(obj, keys) {
+  const out = {};
+  for (const k of keys) out[k] = obj[k];
   return out;
 }
 
-const PRINTABLE_RE = /[\x20-\x7e]/;
-const VOWEL_RE     = /[aeiouAEIOU]/g;
-
-function scanReadableRun(s) {
-  if (typeof s !== 'string' || s.length < MIN_LEAK_LEN) return null;
-  let runStart = -1;
-  for (let i = 0; i <= s.length; i++) {
-    const ch = s[i];
-    const printable = ch !== undefined && PRINTABLE_RE.test(ch);
-    if (printable) {
-      if (runStart < 0) runStart = i;
-    } else {
-      if (runStart >= 0) {
-        const run = s.slice(runStart, i);
-        if (run.length >= MIN_LEAK_LEN && looksLikePlaintext(run)) return run;
-        runStart = -1;
-      }
-    }
-  }
-  return null;
-}
-
-function looksLikePlaintext(run) {
-  // Heuristic 1: contains a space → almost certainly natural text.
-  if (run.includes(' ')) return true;
-  // Heuristic 2: long-ish + decent vowel ratio → English-ish.
-  if (run.length >= 40) {
-    const vowels = (run.match(VOWEL_RE) ?? []).length;
-    const ratio  = vowels / run.length;
-    if (ratio >= 0.18 && ratio <= 0.55) return true;
-  }
-  return false;
+/** A structural sample of what was readable. Truncation is the CALLER's job — see `logHop`. */
+function sample(value) {
+  try { return JSON.stringify(value) ?? String(value); } catch { return '<uninspectable>'; }
 }
 
 function bodySize(body) {

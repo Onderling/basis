@@ -42,6 +42,7 @@ export async function registerCircleAddresses({
   relayUrl,
   circleIds = [],
   circleAddressFor,
+  circleAddressSignerFor = null,
   circlesForPoint = null,
   defaultRelayUrl = null,
   onError = null,
@@ -76,8 +77,17 @@ export async function registerCircleAddresses({
     try { address = await circleAddressFor(circleId); } catch { address = null; }
     if (!address) { out.noAddress.push(circleId); continue; }
 
+    // No signer ⇒ the relay's challenge cannot be answered and the registration is refused there. Say
+    // so HERE, where the circle id is known: the symptom otherwise is "messages to this circle time out",
+    // several layers away from the cause.
+    const sign = circleAddressSignerFor?.(circleId) ?? null;
+    if (!sign) {
+      console.warn(`[circle-address] no signer for ${circleId} — per-circle addressing is OFF for it; `
+        + 'messages addressed to this circle will not arrive. Pass circleAddressSignerFor.');
+    }
+
     try {
-      const r = await transport.addAddress(address);
+      const r = await transport.addAddress(address, { sign });
       (r?.ok ? out.registered : out.failed).push(circleId);
       if (!r?.ok) report(onError, new Error(r?.reason ?? 'bind-failed'), circleId);
     } catch (err) {

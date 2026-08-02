@@ -8,19 +8,20 @@
  * over InternalTransport take a moment, hence the generous timeouts.
  */
 import { test, expect } from '@playwright/test';
+// Circle creation is a five-step WIZARD now, not a `window.prompt` — the dialog handlers these
+// tests used accepted a prompt that is never raised, so no circle was ever created.
+import { createCircleViaWizard, circleSlug } from './helpers.js';
 
 const LONG = 30_000;
 
 test('launcher renders + "+ new circle" creates a circle that then appears', async ({ page }) => {
-  // "+ new circle" prompts for a name via window.prompt.
-  page.on('dialog', (d) => d.accept('Test Circle'));
 
   await page.goto('/');
   // '/' lands on the Stroom (screens) tab; the launcher lives under the Kringen tab.
   await page.locator('[data-tab="kringen"]').click();
   await expect(page.locator('.circle-launcher__title')).toBeVisible({ timeout: LONG });
 
-  await page.locator('.circle-launcher__new').click();
+  await createCircleViaWizard(page, 'Test Circle');
 
   // createGroupV2 → reload via listMyBuurts → a tile appears. The tile name
   // is the groupId slug today (name enrichment is a later polish).
@@ -30,13 +31,12 @@ test('launcher renders + "+ new circle" creates a circle that then appears', asy
 });
 
 test('opening a circle shows its detail and back returns to the launcher', async ({ page }) => {
-  page.on('dialog', (d) => d.accept('Detail Circle'));
 
   await page.goto('/');
   // '/' lands on the Stroom (screens) tab; the launcher lives under the Kringen tab.
   await page.locator('[data-tab="kringen"]').click();
   await expect(page.locator('.circle-launcher__title')).toBeVisible({ timeout: LONG });
-  await page.locator('.circle-launcher__new').click();
+  await createCircleViaWizard(page, 'Detail Circle');
 
   const tile = page.locator('.circle-tile').first();
   await expect(tile).toBeVisible({ timeout: LONG });
@@ -54,14 +54,13 @@ test('opening a circle shows its detail and back returns to the launcher', async
 // added in Phase-4 Wave A2. A single-account circle has exactly the creator as a
 // member, so its own row is the "jij"-badged self row → tapping it is the self-view path.
 test('LEDEN tab renders member rows and a tap opens the member card / self-view', async ({ page }) => {
-  page.on('dialog', (d) => d.accept('Leden Circle'));
   const pageErrors = [];
   page.on('pageerror', (e) => pageErrors.push(e.message));
 
   await page.goto('/');
   await page.locator('[data-tab="kringen"]').click();
   await expect(page.locator('.circle-launcher__title')).toBeVisible({ timeout: LONG });
-  await page.locator('.circle-launcher__new').click();
+  await createCircleViaWizard(page, 'Leden Circle');
 
   const tile = page.locator('.circle-tile').first();
   await expect(tile).toBeVisible({ timeout: LONG });

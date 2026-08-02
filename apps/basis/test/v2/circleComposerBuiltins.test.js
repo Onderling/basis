@@ -3,6 +3,7 @@
 // routed to the bot/LLM. Everything else returns null so the shell continues to the bot.
 import { describe, it, expect } from 'vitest';
 import { parseCircleBuiltin, CIRCLE_BUILTIN_COMMANDS } from '../../src/v2/circleComposerBuiltins.js';
+import manifest from '../../manifest.js';
 
 describe('G17 — composer built-in classifier', () => {
   it('/set-relay <url> fires the set-relay op with the url', () => {
@@ -45,6 +46,20 @@ describe('G17 — composer built-in classifier', () => {
   });
 
   it('the built-in command set matches the manifest slash surfaces it dispatches', () => {
-    expect([...CIRCLE_BUILTIN_COMMANDS]).toEqual(['settings', 'set-relay', 'transport-mode', 'transports']);
+    // 2026-08-02 — this asserted a hardcoded literal while its NAME promised a manifest check, so adding
+    // `/security-status` (a declared slash surface since v0.7) failed it for the wrong reason: the list
+    // was stale, not the change. It now reads the manifest, which is what invariant 4 says is the source
+    // of truth for surfaces — and it will now fail if a builtin is classified that the manifest does not
+    // declare, which is the property worth having.
+    const declared = new Set(
+      (manifest.operations ?? [])
+        .map((op) => op?.surfaces?.slash?.command)
+        .filter((c) => typeof c === 'string')
+        .map((c) => c.replace(/^\//, '')),
+    );
+    for (const command of CIRCLE_BUILTIN_COMMANDS) {
+      expect(declared.has(command), `/${command} is classified as a built-in but not declared in the manifest`)
+        .toBe(true);
+    }
   });
 });

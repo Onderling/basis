@@ -759,6 +759,8 @@ import { renderCircleSettings } from './circleSettings.js';
 import { renderCircleOverride } from './circleOverride.js';
 import { primeCircleSecurity, announceCircleAddresses } from '../../src/v2/circleSecurityPriming.js';
 import { makeGiveUpConsumers } from '../../src/v2/deliveryGiveUp.js';
+// The SHARED security-status report — the same function mobile reaches through the builtins table.
+import { securityStatus } from '../../src/core/localBuiltins.js';
 
 // actor label stamped on local chat-message events. Real WebID/
 // peer-display wiring lands with peer broadcast.
@@ -5440,6 +5442,20 @@ function showKring(id, circle, policy) {
             kringNote(r?.ok
               ? t('circle.settings.transport_set', { mode: r.mode })
               : t('circle.settings.transport_bad', { mode: mode ?? '—' }));
+            return;
+          }
+          if (builtin.opId === 'security-status') {
+            // The handler has always existed in the shared builtins; web hand-rolls a subset of the table
+            // and so had no route to it. It reports what the boundary is ENFORCING — refused senders,
+            // and the members still accepted on their canonical key — which is the one number that says
+            // whether per-circle signing is actually taking hold. Invisible on the shell we ship first
+            // until 2026-08-02.
+            try {
+              const r = await securityStatus({}, { agent: circleHouseholdAgent, t });
+              kringNote(r?.message ?? String(r ?? ''));
+            } catch (err) {
+              kringNote(String(err?.message ?? err));
+            }
             return;
           }
           if (builtin.opId === 'transports') {

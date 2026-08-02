@@ -4131,6 +4131,10 @@
     "notif_privacy_escape": {
       "text": "If that matters to you: run your own relay, or spread your circles across different relays — a relay only ever sees the circles that ride it.",
       "doc": "J-CS10 — name the escape rather than leaving a dead end (the companion node; relay diversity)."
+    },
+    "pod_local_consequence": {
+      "text": "Everything here lives on this device only. If you lose it or reinstall, your recovery phrase brings back who you are — not your circles or your conversations. Connect a pod, or export a backup file, to be able to pick this up somewhere else.",
+      "doc": "Said where the state is shown, not only when someone tries to leave with it (2026-08-02). A wipe-and-restore walk proved the phrase brings back the identity and no circles; someone who learns that at the moment they switch devices learns it too late to act on."
     }
   },
   "admin": {

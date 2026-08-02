@@ -17,7 +17,15 @@
  * Names match the `surfaces.slash.command` (sans leading `/`) on the basis manifest ops.
  * @type {ReadonlyArray<string>}
  */
-export const CIRCLE_BUILTIN_COMMANDS = Object.freeze(['settings', 'set-relay', 'transport-mode', 'transports']);
+export const CIRCLE_BUILTIN_COMMANDS = Object.freeze([
+  'settings', 'set-relay', 'transport-mode', 'transports',
+  // 2026-08-02 — `/security-status` joins the classifier so the WEB composer can reach it. The handler has
+  // always existed (`localBuiltins.js`), and mobile mounts the whole builtins table; web hand-rolls a
+  // subset and so had no route to it. It reports what the boundary is actually enforcing — how many
+  // members are still accepted on their canonical key, how many senders were refused — and web is the
+  // shell we are shipping first, so those numbers were invisible exactly where they matter.
+  'security-status',
+]);
 
 /** Parse `--lang=nl` / `--lang nl` / `lang nl` out of a `/settings` body. */
 function parseSettingsArgs(body) {
@@ -54,6 +62,8 @@ export function parseCircleBuiltin(line) {
       return { command, opId: 'transport-mode', args: body ? { mode: body.split(/\s+/)[0].toLowerCase() } : {} };
     case 'transports':
       return { command, opId: 'transports', args: {} };
+    case 'security-status':
+      return { command, opId: 'security-status', args: {} };
     default:
       return null;
   }

@@ -200,6 +200,12 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
 
       <Section title={t('circle.mydata.storage')}>
         <KV k={t('circle.mydata.pod')} v={podSignedIn ? t('circle.mydata.pod_signed_in', { webid: podWebid }) : t('circle.mydata.pod_local')} />
+        {/* What "local only" costs, said where the state is shown — web ≡ mobile (circleMyData.js). */}
+        {!podSignedIn && (
+          <Text style={styles.relayHint} testID="pod-local-consequence">
+            {t('circle.mydata.pod_local_consequence')}
+          </Text>
+        )}
         {dataLocation.podRoot ? <KV k={t('circle.mydata.pod_root')} v={dataLocation.podRoot} /> : null}
         {relay ? <KV k={t('circle.mydata.relay')} v={relay} /> : null}
 

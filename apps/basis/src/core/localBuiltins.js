@@ -521,7 +521,7 @@ async function rotateIdentity(_args, { agent, t }) {
 /**
  * `/security-status` — v0.7.P3d.  Diagnostic for the crypto layer.
  */
-async function securityStatus(_args, { agent, t }) {
+export async function securityStatus(_args, { agent, t }) {
   if (!agent || typeof agent.securityStatus !== 'function') {
     return { message: t('security.unavailable') };
   }

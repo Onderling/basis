@@ -304,6 +304,7 @@ export async function openMore(page, action) {
  */
 export async function enableFeature(page, feature = 'tasks') {
   if (!(await openMore(page, 'settings'))) return false;
+  await resolveIncomingPolicy(page);
   const box = page.locator(`input[data-feature="${feature}"]`);
   let ok = false;
   if (await box.count()) {
@@ -314,6 +315,41 @@ export async function enableFeature(page, feature = 'tasks') {
   const save = page.locator('.circle-settings__save');
   if (await save.count()) { await save.first().click(); await page.waitForTimeout(1800); }
   return ok;
+}
+
+/**
+ * Adopt an INCOMING circle policy, if the settings editor is showing one.
+ *
+ * When the admin changes circle policy it fans out to members as a PENDING document, and the settings
+ * editor raises a conflict sheet on mount: *this is what the circle now says, do you apply it?* Adopting
+ * it is how a member ends up with the admin's change — it is a consent step, not an error.
+ *
+ * The harness used to click straight at the save button and time out, because the sheet was over it. The
+ * failure read as "settings are broken" when the app was asking a perfectly reasonable question and
+ * getting no answer. Two peers, one policy, and the test never said yes.
+ *
+ * Best-effort by design: no sheet ⇒ nothing to adopt ⇒ carry on. A test that cares which document won
+ * must assert that itself.
+ */
+export async function resolveIncomingPolicy(page, choice = 'theirs') {
+  const sheet = page.locator('.circle-settings__conflict-overlay');
+  if (!(await sheet.count().catch(() => 0))) return false;
+  // Apply starts DISABLED and only enables once every conflicting block and meta field has a decision
+  // (`refreshApplyState`) — the sheet will not let you adopt a document you have not actually read.
+  // So pick a side on each conflict first; 'theirs' is the admin's incoming change, which is the whole
+  // point of a member opening this sheet.
+  const picks = page.locator(`.circle-recipe-conflict__choice[data-choice="${choice}"]`);
+  const n = await picks.count().catch(() => 0);
+  for (let i = 0; i < n; i++) {
+    await picks.nth(i).click({ timeout: 4000 }).catch(() => {});
+    await page.waitForTimeout(120);
+  }
+  const apply = page.locator('.circle-recipe-conflict__apply');
+  if (await apply.count().catch(() => 0)) {
+    await apply.first().click({ timeout: 6000 }).catch(() => {});
+    await page.waitForTimeout(1500);
+  }
+  return !(await sheet.count().catch(() => 0));
 }
 
 /** Back-compat alias matching the two-peer drive's name. */

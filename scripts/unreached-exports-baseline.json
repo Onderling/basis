@@ -214,5 +214,22 @@
     "packages/versioning/src/index.js:DEFAULT_VERSIONS_ROOT",
     "packages/versioning/src/versionStore.js:DEFAULT_VERSIONS_PER_SERIES",
     "packages/versioning/src/versionStore.js:DEFAULT_VERSIONS_ROOT"
-  ]
+  ],
+  "reasons": {
+    "secure-agent": "MIXED (2026-08-03). identityResolver ORPHANED \u2014 its naming half is unmet and two live defects need it (mute-that-does-not-mute, /block's false alias promise). webAuthnUnlock ORPHANED \u2014 the cleartext-vault threat is live. usePerfectFwdSec ORPHANED-partial, PARKED by Frits. webidClaim SUPERSEDED in-circle by per-circle addressing. trustRegistry/capabilityIssuer/policyEngine SUPERSEDED by host-agent-direct wiring (realAgent.js:678). rateLimit off is a DELIBERATE decision, do not sweep.",
+    "mcp-bridge": "ORPHANED \u2014 verified against 4 supersession candidates, all fail. The 'any LLM/bot' boundary, paired with A2A as the 'Onderling agent' one. Its consumer (the feedback bot) left with the feedback split; that work continues in the feedback repo. ~50 lines of bin/ from reachable. \u26a0 First external-egress op \u2014 the egress gate ships in the SAME slice. See packages/mcp-bridge/README.md.",
+    "data-connectors": "ORPHANED \u2014 Frits 2026-08-03: 'definitely needed'. Nothing supersedes it (core.DataSource is storage over our OWN items; mcp-bridge points inward both ways). Wiring is ~10 lines: a noun-dispatching wrapper on householdApp.js:152's `generic` map. Note apps/import-bridge-v0 has its own connector abstraction that predates this \u2014 the real overlap.",
+    "llm-client": "PARTLY SUPERSEDED \u2014 endpoints/metering were built for a per-customer billing model never built, and circleLlmRoutes.js duplicates resolveEndpoint with its own presets. Chat + embeddings core is live. \u26a0 routeSafety.js:31-34 still claims attestation is unverifiable while a working verifier sits next door.",
+    "blob-gateway": "ADOPTED 2026-08-03 (15ef23a9) \u2014 isBlobRef/BLOB_TYPE/bucketKeyFromRef now have production consumers. Remaining entries are package internals. \u26a0 Do NOT narrow agent-registry/mediaProperty.js to isBlobRef: it is scheme-agnostic on purpose (blob:// OR https:// OR urn:dec:item: OR stoop-att://).",
+    "notifier": "SPLIT \u2014 PodScheduleStore ORPHANED (the only durable-scheduling impl in the repo; tasks-v0 took the in-memory default, so pending jobs die on restart). recogniseEnvelopeShape SUPERSEDED by notify-envelope's pickMode. envelopeBridge: Frits leans reclaim \u2014 preserve one sentence (notifier.scheduleOnce + notifyEnvelope.publish compose) in the companion-node note.",
+    "circles": "ORPHANED DESTINATION \u2014 do NOT delete. DESIGN-ops-flows-nav \u00a78c names @onderling/circles as the extraction target for stoop/skills/index.js (6,045 lines, the de-facto membership engine). circlesStore.js itself is a superseded 122-line sketch in the right building; leave its fate to the \u00a78c read-through. The dead read sites were removed 2026-08-03 (e628368d).",
+    "pod-search": "createBackfill has zero references anywhere \u2014 even its own demo routes around it. Candidate SUPERSEDED/delete; not yet archaeologised. Every consumer imports the same pair {PodSearch, hash}.",
+    "kring-host": "BARREL HYGIENE ONLY \u2014 apps import by deep subpath, never the barrel. memberToViewAs is a correctly-placed projector; localStorageBackend is injected. Zero deletable lines.",
+    "confidential-llm": "ORPHANED, KEEP \u2014 objectives/F names it the top build item, blocked on TEE hardware, with four named waiting consumers.",
+    "recipe-loader": "BARREL HYGIENE \u2014 validateRecipe already runs at load time; basis defines its own RECIPE_APPLY_CODES deliberately.",
+    "versioning": "BARREL HYGIENE \u2014 all consumers pass explicit config. \u26a0 pseudo-pod inlines the literal 'versions/' by hand instead; either import DEFAULT_VERSIONS_ROOT or drop it from the barrel.",
+    "agent-ui": "ORPHANED (test-only) \u2014 the production half (mountLocalUi) is live in three bin/ entrypoints. Demote to a test fixture or delete.",
+    "chat-agent": "SUPERSEDED \u2014 SessionManager overlaps core.StateManager.openSession; ChatAgent.js contains zero occurrences of Session.",
+    "identity-resolver": "ORPHANED \u2014 its consumer is named in the FUTURE tense inside the package it was built for (agent-registry/communityCatalog.js:100 'G3-seam'). Production uses the real MemberMap."
+  }
 }

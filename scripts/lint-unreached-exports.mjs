@@ -182,6 +182,25 @@ Fix, in order of preference:
   process.exit(1);
 }
 
+// ── Report the carried debt WITH ITS VERDICT ────────────────────────────────────────────────────────
+// A baseline records THAT something is unreached. It cannot record WHICH of the two it is — orphaned (the
+// job still stands, wire it) or superseded (something else took the job, delete it). That distinction is
+// the whole decision, it costs a subsystem's worth of archaeology to recover, and on 2026-08-03 it was
+// recovered for nine of them. Without somewhere to put it, that work evaporates and the next person redoes
+// it. So: `reasons` in the baseline, keyed by package, printed here.
+//
+// Packages with no verdict yet are named as such — an honest "not yet triaged" beats a silent omission.
 const carried = violations.length;
-if (carried) console.warn(`⚠ lint:unreached: ${carried} known unreached export(s) carried — debt, not news. Triage them DOWN.`);
+if (carried) {
+  let reasons = {};
+  try { reasons = JSON.parse(readFileSync(BASELINE, 'utf8')).reasons ?? {}; } catch { /* none yet */ }
+  const byPkg = new Map();
+  for (const v of violations) byPkg.set(v.package, (byPkg.get(v.package) ?? 0) + 1);
+  console.warn(`⚠ lint:unreached: ${carried} known unreached export(s) carried — debt, not news.\n`);
+  for (const [pkg, n] of [...byPkg].sort((a, b) => b[1] - a[1])) {
+    const why = reasons[pkg];
+    console.warn(`   ${String(n).padStart(3)}  ${pkg.padEnd(18)} ${why ?? '— NOT YET TRIAGED (orphaned or superseded? recover the intent before deciding)'}`);
+  }
+  console.warn('\n   orphaned → wire it · superseded → delete it. "Unreached" alone decides nothing.\n');
+}
 console.log('✓ lint:unreached: no newly-unreached exports.');

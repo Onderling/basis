@@ -1,4 +1,4 @@
-// C7 — Reveals resolves THROUGH disclosure.js: showDisplayName ≡ the display-name
+// Reveals resolves THROUGH disclosure.js: showDisplayName ≡ the display-name
 // attribute's `enabled` bit for that (group/peer) context. Round-trips the delegation.
 import { describe, it, expect } from 'vitest';
 import { isDisclosed } from '@onderling/agent-registry';

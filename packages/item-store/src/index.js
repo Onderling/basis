@@ -9,7 +9,7 @@
 
 export { ItemStore } from './ItemStore.js';
 export { computeStatus } from './lifecycleStatus.js';
-export { CircleItemStore } from './CircleItemStore.js';   // cluster L · L1 — per-circle, type-indexed generic store
+export { CircleItemStore } from './CircleItemStore.js';   // per-circle, type-indexed generic store
 export {                                                  // PLAN-capabilities-tasks-roles (Option A) — task lifecycle
   claim, reassign, markComplete, submit, approve, reject, revoke,  // VERBS as functions-over-CircleItemStore
   assigneesOf, maxAssigneesOf, isAssigneesFull, isAssignee,        // co-ownership model helpers (J2): assignees[] + the `assignee` mirror
@@ -22,8 +22,8 @@ export {                                                  // REQUESTABLE BRIDGE 
   requestableSkillHandler, offeringsToSkillDefinitions, REQUEST_TASK_KIND, REQUEST_SOURCE_KIND,
 } from './requestableBridge.js';
 export { createGenericAtomHandlers } from './genericAtomHandlers.js';  // B · Layer 1 §1b — generic CRUD-by-atom over any noun
-export { memoryDataSource } from './memoryDataSource.js'; // cluster L · L1 — Map-backed DataSource (no-pod / tests)
-export { createCircleStores } from './circleStores.js';  // cluster L · L1 — per-circle store registry (web≡mobile)
+export { memoryDataSource } from './memoryDataSource.js'; // Map-backed DataSource (no-pod / tests)
+export { createCircleStores } from './circleStores.js';  // per-circle store registry (web≡mobile)
 export {                                                 // containment (ref + back-ref) over a store
   contain, uncontain, listChildren, childIdsOf, parentsOf, deleteContainer, listLoose,
 } from './containment.js';
@@ -31,8 +31,8 @@ export {                                                 // composable ops engin
   addChildTo, resolveContainerAdd, buildAcceptsPolicy, resolveAddInContainer,
 } from './containerOps.js';
 export { projectContainer } from './projectContainer.js';   // recursive child-render projector
-export { wireStoreMirror } from './mirrorSync.js';          // cluster L3 — attach a peer mirror to a store (no-pod sync publish)
-export { wireCircleStoreInbound } from './circleStoreInbound.js';  // cluster L3 — ingest peer envelopes into a store (inbound)
+export { wireStoreMirror } from './mirrorSync.js';          // attach a peer mirror to a store (no-pod sync publish)
+export { wireCircleStoreInbound } from './circleStoreInbound.js';  // ingest peer envelopes into a store (inbound)
 export { causalWinner, causalRank } from './causalMerge.js';       // Objective L — origin-ts + writer-id causal LWW for inbound merge
 export { recoverCircleFromCaches, writeRecoveredInto } from './podRecovery.js';  // Objective S — pod-recovery: causal merge of device caches
 export { shareIntoAudience, resolveSharedRef, listShared } from './shareIntoAudience.js';  // cross-circle share

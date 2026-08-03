@@ -1,5 +1,5 @@
 /**
- * basis v2 — circle admin panel (web DOM renderer, S3 — group ops #8).
+ * basis v2 — circle admin panel (web DOM renderer, group ops #8).
  *
  * The per-circle admin surface off the `⋯` menu: the member roster (with role +
  * a remove action) and a post-announcement box. Pure render — the host

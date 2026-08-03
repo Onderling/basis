@@ -9,7 +9,7 @@
  * etag hasn't changed since the last sync.  v1 re-fetches everything for
  * simplicity; this is the documented hot spot for Phase B perf work.
  *
- * Folio.C1 — adapter-aware: takes an optional `hash` adapter (default
+ * Adapter-aware: takes an optional `hash` adapter (default
  * Node).  No fs adapter needed — pod-side reads go through `podClient`,
  * which is already pluggable.
  */

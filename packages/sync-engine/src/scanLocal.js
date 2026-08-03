@@ -15,7 +15,7 @@
  * the 100 MB convention threshold + pathMap.shouldSync filter — a Phase B
  * concern).
  *
- * Folio.C1 — adapter-aware
+ * Adapter-aware
  * ------------------------
  * The Node-only `node:fs/promises` + `node:crypto` calls are gone; the
  * helper now takes an `fs` adapter (default Node) and `hash` adapter

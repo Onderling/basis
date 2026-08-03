@@ -19,28 +19,28 @@
  *
  * # What lands in S1 + S2 + S3 (also this file)
  *
- *   - muteListVaultKey   (S1 — A.1)   persistent mute set + send-side block
- *   - helloGate          (S1 — A+.1)  PSK / predicate gate + mute base gate
- *   - webidClaim         (S2 — A.2)   sa.claim.sign/verify/serialize/parse
- *   - passphrase         (S3 — A.3)   forwards to vault picker → VaultIndexedDB
- *   - webAuthnUnlock     (S3 — A+.5)  sa.passkey.{register,unlock} via PRF
- *   - identityResolver   (S4 — A.4)   sa.resolver.* + alias-fanout mute
- *   - trustRegistry      (S5 — A+.3)  sa.trust (vault-backed)
- *   - capabilityIssuer   (S5 — A.5)   sa.caps.issue/verify
- *   - policyEngine       (S5 — A.5b)  sa.policy (composes trust + skills)
+ *   - muteListVaultKey   (A.1)   persistent mute set + send-side block
+ *   - helloGate          (A+.1)  PSK / predicate gate + mute base gate
+ *   - webidClaim         (A.2)   sa.claim.sign/verify/serialize/parse
+ *   - passphrase         (A.3)   forwards to vault picker → VaultIndexedDB
+ *   - webAuthnUnlock     (A+.5)  sa.passkey.{register,unlock} via PRF
+ *   - identityResolver   (A.4)   sa.resolver.* + alias-fanout mute
+ *   - trustRegistry      (A+.3)  sa.trust (vault-backed)
+ *   - capabilityIssuer   (A.5)   sa.caps.issue/verify
+ *   - policyEngine       (A.5b)  sa.policy (composes trust + skills)
  *   - Roles re-exported as sa.ROLES + module export
- *   - auditLog           (S6 — A.6)   sa.audit signed hash-chain + autoLog
- *   - groupManager       (S7 — A.7)   sa.groups (auto-threaded into policy)
- *   - a2aTls             (S7 — A+.4)  sa.a2aTls (A2ATransport helper)
- *   - rateLimit          (S7 — A+.8)  drops over-quota envelopes
+ *   - auditLog           (A.6)   sa.audit signed hash-chain + autoLog
+ *   - groupManager       (A.7)   sa.groups (auto-threaded into policy)
+ *   - a2aTls             (A+.4)  sa.a2aTls (A2ATransport helper)
+ *   - rateLimit          (A+.8)  drops over-quota envelopes
  *   - sa.migrateVaultToPod helper bound to our identity + vault
- *   - usePerfectFwdSec   (S8 — A.8)   sa.pfs partial Double-Ratchet
+ *   - usePerfectFwdSec   (A.8)   sa.pfs partial Double-Ratchet
  *                                      (symmetric ratchet; no DH ratchet —
  *                                      see pfs.js header for scope)
  *
  * # Future work
  *
- *   - S8b — full Double-Ratchet (DH ratchet + per-message ephemerals)
+ *   - full Double-Ratchet (DH ratchet + per-message ephemerals)
  *           — requires transport-level integration; not in current scope
  *
  * All roadmap slices S0–S8 are now wired.  STUB_OPTS is empty.
@@ -96,24 +96,24 @@ import { loadAuditLog }       from './auditLog.js';
  * @property {object}  [vault]                  Pre-built Vault (e.g. VaultMemory for tests)
  * @property {string}  [identityVaultPrefix]    Default 'sa-id:'
  * @property {object}  [bus]                    Pre-built InternalBus — share when this agent needs to talk to others in-process (e.g. basis's host+chat topology).  Default: factory builds its own siloed bus.
- * @property {string}  [passphrase]             S3 — wraps vault with AES-GCM via PBKDF2 (browser/IndexedDB)
- * @property {boolean|object} [webAuthnUnlock]  S3 — true | { rpId, prfSalt, userName, ... }
+ * @property {string}  [passphrase]             wraps vault with AES-GCM via PBKDF2 (browser/IndexedDB)
+ * @property {boolean|object} [webAuthnUnlock]  true | { rpId, prfSalt, userName, ... }
  *
  * @property {object}  [nknLib]                 window.nkn from CDN, or RN nkn-sdk; absent → no peer transport
  *
- * @property {string}  [muteListVaultKey]       S1 — persistent mute slot (omit = in-memory)
- * @property {Function|string|object} [helloGate] S1 — fn(envelope)=>bool, PSK string, or { token }
- * @property {object}  [webidClaim]             S2 — { webid } binds default WebID for claim.sign()
- * @property {object}  [identityResolver]       S4 — MemberMap-shape (or { memberMap }) for alias-aware mute + sa.resolver.*
+ * @property {string}  [muteListVaultKey]       persistent mute slot (omit = in-memory)
+ * @property {Function|string|object} [helloGate] fn(envelope)=>bool, PSK string, or { token }
+ * @property {object}  [webidClaim]             { webid } binds default WebID for claim.sign()
+ * @property {object}  [identityResolver]       MemberMap-shape (or { memberMap }) for alias-aware mute + sa.resolver.*
  * @property {object}  [circleEnforcement]      5.7c — host-injected `{groupsIndex, getOverride, getCirclePolicy, memberMap, getCircleIdForEnv?}` accessors.  Inbound envelopes from a peer in any circle the local user has set `override.chatOff` on, OR from a peer whose MemberMap relation is `'agent'` in a circle where agents are blocked, are dropped after the existing mute-gate.  Fails OPEN on accessor throw so a broken store never silently drops inbound.
- * @property {boolean|object} [capabilityIssuer] S5 — true | { defaultExpiresIn }  exposes sa.caps
- * @property {boolean|object} [trustRegistry]    S5 — true | { vault }  exposes sa.trust
- * @property {boolean|object} [policyEngine]     S5 — true | { groupManager, isRevoked, actorResolver }  exposes sa.policy (requires trustRegistry)
- * @property {boolean|object} [auditLog]        S6 — true | { vaultKey, vault?, autoLog? }  exposes sa.audit
- * @property {boolean|object} [groupManager]    S7 — true | { vault } exposes sa.groups (auto-threaded into policy)
- * @property {boolean|object} [a2aTls]          S7 — true | { a2aAuth } exposes sa.a2aTls
- * @property {boolean|object} [rateLimit]       S7 — true | { perPeer, global } drops over-quota envelopes
- * @property {boolean|object} [usePerfectFwdSec] S8 — true | { vaultKeyPrefix, maxSkip } exposes sa.pfs
+ * @property {boolean|object} [capabilityIssuer] true | { defaultExpiresIn }  exposes sa.caps
+ * @property {boolean|object} [trustRegistry]    true | { vault }  exposes sa.trust
+ * @property {boolean|object} [policyEngine]     true | { groupManager, isRevoked, actorResolver }  exposes sa.policy (requires trustRegistry)
+ * @property {boolean|object} [auditLog]        true | { vaultKey, vault?, autoLog? }  exposes sa.audit
+ * @property {boolean|object} [groupManager]    true | { vault } exposes sa.groups (auto-threaded into policy)
+ * @property {boolean|object} [a2aTls]          true | { a2aAuth } exposes sa.a2aTls
+ * @property {boolean|object} [rateLimit]       true | { perPeer, global } drops over-quota envelopes
+ * @property {boolean|object} [usePerfectFwdSec] true | { vaultKeyPrefix, maxSkip } exposes sa.pfs
  *
  * @property {Function} [onPeerMessage]         ({from, payload, ts}) => void
  * @property {object}   [podWriter]             For S2 / S6 pod-side writes
@@ -212,7 +212,7 @@ function isApplicationError(err) {
  * }>}
  */
 export async function createSecureAgent(opts = {}) {
-  // S0 — warn about stubbed opts so callers know what's wired now
+  // warn about stubbed opts so callers know what's wired now
   // vs what they're asking for that will activate in a future slice.
   if (opts.warnOnInsecure !== false && typeof console !== 'undefined') {
     for (const key of STUB_OPTS) {
@@ -238,7 +238,7 @@ export async function createSecureAgent(opts = {}) {
   };
 
   // ─── Identity (persists across page loads when vault supports it) ───
-  // S3 — when opts.passphrase is set, the picker promotes us from
+  // when opts.passphrase is set, the picker promotes us from
   // VaultLocalStorage (plaintext) to VaultIndexedDB (AES-GCM via
   // PBKDF2(passphrase, dbName)).  See vault.js for the picker.
   const vault = opts.vault ?? makeBrowserVault({
@@ -278,7 +278,7 @@ export async function createSecureAgent(opts = {}) {
   const agent = new Agent({ identity, transport, routing });
   await agent.start();
 
-  // ─── S1 — persistent mute set (A.1) ───────────────────────────────
+  // ─── persistent mute set (A.1) ───────────────────────────────
   // Match key today = NKN peer address.  S4 (identity-resolver) will
   // additionally match on stableId + webid when those mappings exist.
   const muteSet = await loadMuteSet({
@@ -286,7 +286,7 @@ export async function createSecureAgent(opts = {}) {
     vaultKey: opts.muteListVaultKey ?? null,
   });
 
-  // ─── S1 — helloGate (A+.1) ────────────────────────────────────────
+  // ─── helloGate (A+.1) ────────────────────────────────────────
   // Two layers, composed via anyOf-style AND (we want ALL to pass):
   //   1. mute-block gate (always installed): reject HI from muted peer addr
   //   2. user-supplied gate (optional): tokenGate(string) | groupGate | custom fn
@@ -299,7 +299,7 @@ export async function createSecureAgent(opts = {}) {
     : muteBlockGate;
   agent.setHelloGate(composedGate);
 
-  // ─── S2 — signed WebID claim (A.2) ────────────────────────────────
+  // ─── signed WebID claim (A.2) ────────────────────────────────
   // Bind the WebID once (factory-time) if the caller passed one; then
   // signClaim() can default to it.  No bound webid → caller must pass
   // it to each signClaim call.
@@ -307,7 +307,7 @@ export async function createSecureAgent(opts = {}) {
     ? (opts.webidClaim.webid ?? null)
     : null;
 
-  // ─── S3 — passphrase + WebAuthn (A.3 + A+.5) ──────────────────────
+  // ─── passphrase + WebAuthn (A.3 + A+.5) ──────────────────────
   // The passphrase has already been forwarded to the vault picker
   // above.  Here we record whether the vault was actually wrapped,
   // for securityStatus reporting.
@@ -322,7 +322,7 @@ export async function createSecureAgent(opts = {}) {
   //   { rpId, rpName, prfSalt, ... }→ explicit config
   const passkeyConfig = resolvePasskeyConfig(opts.webAuthnUnlock);
 
-  // ─── S4 — identity-resolver (A.4) ─────────────────────────────────
+  // ─── identity-resolver (A.4) ─────────────────────────────────
   // Compose SecurityLayer (addr→pubKey) with the caller-supplied
   // MemberMap-like (pubKey/webid/stableId→member).  Either source may
   // be absent; the resolver degrades gracefully (returns null).
@@ -454,7 +454,7 @@ export async function createSecureAgent(opts = {}) {
     return false;
   }
 
-  // ─── S5 — TrustRegistry + CapabilityTokens + PolicyEngine ─────────
+  // ─── TrustRegistry + CapabilityTokens + PolicyEngine ─────────
   // (A.5 caps + A+.2 Roles + A+.3 Trust)
   //
   // TrustRegistry: persistent per-peer trust/tier/group/token-grant
@@ -476,7 +476,7 @@ export async function createSecureAgent(opts = {}) {
     : {};
   const capsWired = !!opts.capabilityIssuer;
 
-  // ─── S7 — GroupManager (A.7) ──────────────────────────────────────
+  // ─── GroupManager (A.7) ──────────────────────────────────────
   // Closed-group membership proofs.  Vault-backed; reuses identity
   // vault by default.  Threaded into PolicyEngine when both are wired
   // (so policy checks can consult group membership).
@@ -518,7 +518,7 @@ export async function createSecureAgent(opts = {}) {
     agent.policyEngine = policyEngine;
   }
 
-  // ─── S7 — A2ATLSLayer (A+.4) ──────────────────────────────────────
+  // ─── A2ATLSLayer (A+.4) ──────────────────────────────────────
   // For agents that compose A2ATransport (HTTPS + Bearer JWT).  The
   // layer itself just wraps A2AAuth (which the caller supplies if any).
   let a2aTls = null;
@@ -527,7 +527,7 @@ export async function createSecureAgent(opts = {}) {
     a2aTls = new A2ATLSLayer({ a2aAuth: aOpts.a2aAuth ?? null });
   }
 
-  // ─── S7 — rate-limit (A+.8) ───────────────────────────────────────
+  // ─── rate-limit (A+.8) ───────────────────────────────────────
   // Per-peer + global token-bucket; drops over-quota envelopes BEFORE
   // they reach onPeerMessage.  Default tuning is chat-pace; apps with
   // bursty traffic should pass explicit limits or false.
@@ -540,7 +540,7 @@ export async function createSecureAgent(opts = {}) {
     });
   }
 
-  // ─── S8 — Perfect Forward Secrecy (A.8, partial Double-Ratchet) ──
+  // ─── Perfect Forward Secrecy (A.8, partial Double-Ratchet) ──
   // Per-peer symmetric KDF chain.  Each message gets a fresh one-time
   // key derived via HKDF-SHA256; old keys are deleted after use.
   //
@@ -581,7 +581,7 @@ export async function createSecureAgent(opts = {}) {
     return c;
   }
 
-  // ─── S6 — signed activity / audit log (A.6) ───────────────────────
+  // ─── signed activity / audit log (A.6) ───────────────────────
   //
   // auditLog opt forms:
   //   true             → in-memory log, autoLog ON
@@ -946,7 +946,7 @@ export async function createSecureAgent(opts = {}) {
     // + nacl.box encrypted with a per-peer shared secret.  HI stays
     // plaintext-but-signed so peers can bootstrap.
     tx.useSecurityLayer(agent.security);
-    // v0.7.S0 — bilateral HI auto-handshake on receive.  When we
+    // bilateral HI auto-handshake on receive.  When we
     // receive an envelope from a peer we haven't HI'd, send HI to
     // them so THEIR SecurityLayer registers our pubKey too.
     // Without this:
@@ -987,9 +987,9 @@ export async function createSecureAgent(opts = {}) {
             && typeof agent.security?.learnPeerKey === 'function') {
         agent.security.learnPeerKey(env.payload.pubKey, env.payload.pubKey);
       }
-      // S1 — drop envelopes from muted peers BEFORE any further
+      // drop envelopes from muted peers BEFORE any further
       // bookkeeping (no reciprocal HI, no onPeerMessage fire).
-      // S4 — fanout the check across resolver-known aliases.
+      // fanout the check across resolver-known aliases.
       if (await isPeerMuted(env?._from)) return;
       // 5.7c — circle override enforcement runs AFTER mute (so muted
       // peers never reach the override layer) and BEFORE rate-limit /
@@ -999,7 +999,7 @@ export async function createSecureAgent(opts = {}) {
       // the envelope is silently dropped.  Fails open if accessors
       // throw — never silently swallow inbound on a broken store.
       if (await isInboundCircleBlocked(env)) return;
-      // S7 — rate-limit drop.  Over-quota peers are silently
+      // rate-limit drop.  Over-quota peers are silently
       // ignored at the receive boundary (no reciprocal HI either —
       // we don't want them to make us spam them in return).
       if (rateLimiter && !rateLimiter.check(env?._from)) return;
@@ -1633,7 +1633,7 @@ export async function createSecureAgent(opts = {}) {
    * @param {object} [opts]  — `firstSendTimeoutMs`, `failoverBudget`
    */
   async function _sendWithFailover(addr, payload, opts = {}) {
-    // S1 + S4 — refuse to send to a muted peer (alias-aware) up front.
+    // refuse to send to a muted peer (alias-aware) up front.
     // This is an APPLICATION decision, never a transport failure: no
     // re-route, no degrade.  Throws so the caller knows the intent didn't
     // reach the wire.
@@ -1849,35 +1849,35 @@ export async function createSecureAgent(opts = {}) {
       helloedPeerCount: helloedPeers.size,
       reciprocatedPeers: [...reciprocatedPeers],
       helloedPeers:   [...helloedPeers],
-      // S1 — mute state
+      // mute state
       muteCount:       muteSet.size,
       mutedPeers:      muteSet.list(),
       muteIsPersistent: !!opts.muteListVaultKey,
       helloGateWired:  !!userHelloGate,
-      // S2 — claim state
+      // claim state
       claimWebidBound: boundWebid,
-      // S3 — vault encryption + passkey
+      // vault encryption + passkey
       vaultEncrypted,
       passkeyConfigured: !!passkeyConfig,
       passkeyAvailable:  webauthnAvailable(),
-      // S4 — resolver state
+      // resolver state
       resolverWired:    !!resolverMemberMap,
       // 5.7c — circle override enforcement
       circleEnforcementWired: !!circleEnf,
-      // S5 — caps + trust + policy
+      // caps + trust + policy
       trustWired:       !!trustRegistry,
       capsWired,
       policyWired:      !!policyEngine,
-      // S6 — audit log
+      // audit log
       auditWired:       !!auditLog,
       auditAutoLog,
       auditSize:        auditLog?.size ?? 0,
-      // S7 — groups + a2aTls + rate-limit
+      // groups + a2aTls + rate-limit
       groupsWired:      !!groupManager,
       a2aTlsWired:      !!a2aTls,
       rateLimitWired:   !!rateLimiter,
       rateLimitState:   rateLimiter?.snapshot() ?? null,
-      // S8 — PFS (partial)
+      // PFS (partial)
       pfsWired:         pfsEnabled,
       pfsChainCount:    pfsChains.size,
       pfsPartial:       true,            // honest: no DH ratchet
@@ -2106,7 +2106,7 @@ export async function createSecureAgent(opts = {}) {
      * inbound + outbound, for /debug-dump bug reports. */
     recentTraffic: () => recentTraffic.slice(),
 
-    // S1 — mute / block list (S6 — instrumented for autoLog)
+    // mute / block list (instrumented for autoLog)
     mute: {
       async add(addr) {
         const r = await muteSet.add(addr);
@@ -2124,13 +2124,13 @@ export async function createSecureAgent(opts = {}) {
       get size() { return muteSet.size; },
     },
 
-    // S4 — identity-resolver (peer alias resolution + mute fanout)
+    // identity-resolver (peer alias resolution + mute fanout)
     resolver: peerResolver,
 
-    // S5 — TrustRegistry (vault-backed per-peer trust)
+    // TrustRegistry (vault-backed per-peer trust)
     trust: trustRegistry,                  // null when not opted in
 
-    // S5 — CapabilityToken issuance + verification (S6 — autoLog issue)
+    // CapabilityToken issuance + verification (autoLog issue)
     caps: capsWired ? {
       async issue(issueOpts = {}) {
         const token = await CapabilityToken.issue(identity, {
@@ -2157,23 +2157,23 @@ export async function createSecureAgent(opts = {}) {
       },
     } : null,
 
-    // S5 — PolicyEngine
+    // PolicyEngine
     policy: policyEngine,                  // null when not opted in
 
-    // S5 — Roles constants (no per-instance state)
+    // Roles constants (no per-instance state)
     ROLES,
 
-    // S6 — signed activity / audit log
+    // signed activity / audit log
     audit: auditLog,                       // null when not opted in
     auditAutoLog,                          // diagnostic: were auto-fires wired?
 
-    // S7 — closed groups
+    // closed groups
     groups: groupManager,                  // null when not opted in
 
-    // S7 — A2A TLS layer (for A2ATransport composition)
+    // A2A TLS layer (for A2ATransport composition)
     a2aTls,                                // null when not opted in
 
-    // S7 — rate limiter (the running instance, for inspection)
+    // rate limiter (the running instance, for inspection)
     rateLimit: rateLimiter,                // null when not opted in
 
     // 5.7c — circle override enforcement.  When `circleEnforcement`
@@ -2185,7 +2185,7 @@ export async function createSecureAgent(opts = {}) {
       isInboundBlocked(env) { return isInboundCircleBlocked(env); },
     },
 
-    // S8 — Perfect Forward Secrecy chains (partial Double-Ratchet)
+    // Perfect Forward Secrecy chains (partial Double-Ratchet)
     pfs: pfsEnabled ? {
       enabled: true,
       get partial() { return true; },     // honest about scope
@@ -2201,7 +2201,7 @@ export async function createSecureAgent(opts = {}) {
       knownPeers() { return [...pfsChains.keys()]; },
     } : null,
 
-    // S7 — pod-mirror identity migration (bound to our identity + vault)
+    // pod-mirror identity migration (bound to our identity + vault)
     async migrateVaultToPod(args = {}) {
       if (!args.podClient || !args.podRoot || !args.mnemonic) {
         throw new Error(
@@ -2226,7 +2226,7 @@ export async function createSecureAgent(opts = {}) {
       return report;
     },
 
-    // S3 — WebAuthn / passkey unlock helpers
+    // WebAuthn / passkey unlock helpers
     passkey: {
       get available() { return webauthnAvailable(); },
       get config()    { return passkeyConfig; },
@@ -2249,7 +2249,7 @@ export async function createSecureAgent(opts = {}) {
       ERRORS: PASSKEY_ERRORS,
     },
 
-    // S2 — signed WebID claim (S6 — autoLog claim.sign)
+    // signed WebID claim (autoLog claim.sign)
     claim: {
       sign(args = {}) {
         const webid = args.webid ?? boundWebid;
@@ -2269,7 +2269,7 @@ export async function createSecureAgent(opts = {}) {
       get boundWebid() { return boundWebid; },
     },
 
-    // S0 — pendingOpts is the bridge between 'caller asked for X' and
+    // pendingOpts is the bridge between 'caller asked for X' and
     // 'X not wired yet'.  Future slices delete each entry from
     // STUB_OPTS as they activate.
     pendingOpts: pickStubOpts(opts),

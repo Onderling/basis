@@ -33,7 +33,7 @@ export {
 // Pod storage adapter + portable archive export/import (extracted from
 // @onderling/core — the concrete Solid pod DataSource and its backup pair).
 export { SolidPodSource } from './SolidPodSource.js';
-// L1b — sealed, pod-backed `core.DataSource` (SolidPodSource + createSealedPodClient → read/write/delete/list),
+// sealed, pod-backed `core.DataSource` (SolidPodSource + createSealedPodClient → read/write/delete/list),
 // so a per-circle CircleItemStore can persist to a real pod with content sealed at rest under the group key.
 export { createSealedPodDataSource, podGroupPrefix } from './sealedPodDataSource.js';
 export { PodExporter }    from './PodExporter.js';
@@ -51,7 +51,7 @@ export { PodClient }      from './PodClient.js';
 export { createPodTokenVerifier, scopeForRequest } from './Auth/PodTokenVerifier.js';
 export { PodTokenRegistry } from './Auth/PodTokenRegistry.js';
 
-// A7 — Conflict detection + resolution.
+// Conflict detection + resolution.
 export { ConflictResolver } from './ConflictResolver.js';
 
 // Phase 52.16 (2026-05-14) — ACP/WAC sharing primitives. The main
@@ -94,7 +94,7 @@ export {
 // (CEK offline) / TaskGrantManager (mandate) + the seal audience — no new crypto.
 export {
   createGrantsOverPeer, chooseGrantMode, GRANT_MODE, serializeGrants, hydrateGrants,
-  assertScopedScheme, SCOPED_SEAL_SCHEMES,   // D2 — a grant may never extend a group-key audience
+  assertScopedScheme, SCOPED_SEAL_SCHEMES,   // a grant may never extend a group-key audience
 } from './grants/index.js';
 
 // Identity-on-pod (extracted from @onderling/core — Track B / identity-pod-schema).
@@ -105,7 +105,7 @@ export { IdentityPodStore } from './identity/IdentityPodStore.js';
 export { IdentitySync, vaultCacheKeyFor, resourcePathFromCacheKey } from './identity/IdentitySync.js';
 export { migrateVaultToPod } from './identity/migrateVaultToPod.js';
 
-// A6 — Delete-scope primitive (TombstoneStore + per-platform adapters).
+// Delete-scope primitive (TombstoneStore + per-platform adapters).
 export { TombstoneStore }         from './TombstoneStore.js';
 export { MemoryTombstones }       from './tombstones/MemoryTombstones.js';
 export { IndexedDBTombstones }    from './tombstones/IndexedDBTombstones.js';

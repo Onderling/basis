@@ -66,7 +66,7 @@ import {
   RETENTION_CHOICES_DAYS, normalizeRetentionDays, retentionFromDays, localStorageRetentionIo,
 } from '../../src/v2/retentionPref.js';
 import { registerCircleAddresses, unregisterCircleAddresses } from '../../src/v2/circleAddressRegistration.js';
-// B4 — removing one member from ONE circle, and leaving one, live in shared code: both end by
+// removing one member from ONE circle, and leaving one, live in shared code: both end by
 // re-recording the boundary-authentication snapshot from a fresh roster read, which is the step that
 // makes a removal a security change rather than a list edit. web ≡ mobile by construction.
 import { removeCircleMember, leaveCircleLocally } from '../../src/v2/circleMembershipHygiene.js';
@@ -141,19 +141,19 @@ import { resolveConversationKinds } from '../../src/v2/conversationKinds.js';
 import {
   applyChatFilter, chatFilterChips, normalizeChatFilter, localStorageChatFilterIo,
 } from '../../src/v2/chatFilter.js';
-// S5 — key management: reuse the existing encrypted-backup + restore wizards
+// key management: reuse the existing encrypted-backup + restore wizards
 // (the slash/page renderers) inside My-data, mounted in a lightweight overlay.
 import { renderEncryptedBackupWizard } from '../../src/web/wizards/encryptedBackupWizard.js';
 import { renderRestoreFromMnemonicWizard } from '../../src/web/wizards/restoreFromMnemonicWizard.js';
 // OBJ-2 membership — reuse the classic join wizard renderer in v2 via the same overlay adapter.
 import { renderJoinGroupWizard } from '../../src/web/wizards/joinGroupWizard.js';
-// S5 — web-push subscription orchestration (client half; server delivery is a
+// web-push subscription orchestration (client half; server delivery is a
 // Node-hosted stoop with VAPID keys). The SW receiver lives at web/sw.js.
 import { enableWebPush, disableWebPush, getWebPushState } from '../../src/web/webPushClient.js';
 // Objective D / Surface 4 — generic docked side-panel renderer for manifest ops
 // that declare `surfaces.page` (first LIVE consumer: the my-data relay-URL editor).
 import { openPagePanel } from '../../src/web/pagePanel.js';
-// S5 — client-side image-attachment encoder (Canvas resize + thumbnail → the
+// client-side image-attachment encoder (Canvas resize + thumbnail → the
 // inbound shape stoop.postRequest expects).
 import { encodeImageFile } from '../../src/v2/attachmentEncoder.js';
 // media — the LIVE sealed-media composition for the active circle: the circle's own
@@ -254,7 +254,7 @@ import {
 // profile-update propagation — the silent roster "pull-me" signal (announce on a real roster
 // write; receive → re-read the changed rows). No values on the wire, no chat bubble, no wake.
 import { makeRosterUpdatedPeerHandler, makeRosterUpdateAnnouncer } from '../../src/v2/rosterUpdated.js';
-// B2 — per-circle ADDRESS announcing: the receive half, and the admin's post-join propagation.
+// per-circle ADDRESS announcing: the receive half, and the admin's post-join propagation.
 import {
   makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin,
 } from '../../src/v2/circleAddressAnnounce.js';
@@ -392,7 +392,7 @@ function getContactDmStore() {
   return _contactDmStorePromise;
 }
 
-// L1b — a SEALED, POD-BACKED lists service per circle (opt-in). When a pod session is present AND the circle
+// a SEALED, POD-BACKED lists service per circle (opt-in). When a pod session is present AND the circle
 // resolves a sealing strategy (a sealed p2/p3 posture with an available group key), the circle's lists persist
 // to the user's REAL pod with content sealed at rest under the group key — the keys BE the canonical
 // `resourceUriFor` pod URIs (rootPrefix = `<podRoot>/group/`). Absent a session/strategy this returns null and
@@ -877,7 +877,7 @@ async function applyRelayUrl(url) {
 }
 
 /**
- * J-CP1 — dial the endpoint an invite names, LIVE and without persisting.
+ * dial the endpoint an invite names, LIVE and without persisting.
  *
  * Distinct from `applyRelayUrl` above on purpose: that one is the user changing their relay, so it writes
  * the setting. Joining a circle must not silently rewrite a preference the user set — but the redeem does
@@ -1552,16 +1552,16 @@ let circleSendPersonaUpdate = null;           // makeSendPersonaPropsUpdate(...)
 // (people, from the stoop group roster — never bots). Assigned in the boot fn
 // (which owns `agent`); module-level so `showDetail` (open-circle) can call it.
 let feedHouseholdRosterForCircle = null;
-// S4 — a dedicated vault for per-circle sealing identities + controller keys + the
+// a dedicated vault for per-circle sealing identities + controller keys + the
 // persisted group-key resource (durability). IndexedDB-backed so a sealed circle's keys
 // survive reloads; falls back to in-memory where IndexedDB is unavailable.
 const circleVault = (() => {
   try { return new VaultIndexedDB({ dbName: 'cc-circle-pod' }); }
   catch { return new VaultMemory(); }
 })();
-const circlePods = new Map();    // S4 — circleId → per-circle pod producer (sealing identity + control agent)
+const circlePods = new Map();    // circleId → per-circle pod producer (sealing identity + control agent)
 let circleRealPodRouting = null; // S4 circle OIDC — set when signed in; routes sealed circles to the real pod
-const circleSealStrategies = new Map();   // S4 — circleId → resolved {seal,open} content strategy (or null for p0/p1)
+const circleSealStrategies = new Map();   // circleId → resolved {seal,open} content strategy (or null for p0/p1)
 // No-pod group-key rotation — the LOCAL per-circle key-event log this device holds: its OWN emitted key-events
 // (recorded by the key-event log sink's `recordLocal` below) + every event fanned to it by another member (the
 // `group-key-event` receive handler in the peer router). A content read folds these into the key chain, so a
@@ -1577,14 +1577,14 @@ function recordCircleKeyEvent(circleId, event) {
   if (recorded) circleSealStrategies.delete(circleId);
   return recorded;
 }
-// S4 — routes stoop membership events (redeem/leave) to the joined circle's producer, so
+// routes stoop membership events (redeem/leave) to the joined circle's producer, so
 // a new member's sealing key is wrapped into that circle's group key (multi-member sealing).
 // V0: routes to a LIVE producer (circle opened on this device); seeding from prior redemptions
 // is a follow-up. Passed to the single stoop agent as its `controlAgent`.
 const circleControlAgentRouter = createCircleControlAgentRouter((id) => circlePods.get(id) ?? null);
 
 /**
- * S4 — resolve (and cache) a circle's CONTENT seal/open strategy. For a sealed (p2/p3)
+ * resolve (and cache) a circle's CONTENT seal/open strategy. For a sealed (p2/p3)
  * circle this is the producer's control-agent strategy unwrapped with the local device's
  * own per-circle sealing identity (a recipient of the group key). p0/p1 → null (plaintext).
  */
@@ -1662,7 +1662,7 @@ async function resolveCircleMediaComposition(circleId, policy) {
   });
 }
 
-/** S4 — a pseudo-pod client for one circle (real per-circle sealed storage, no OIDC/CSS). Objective L:
+/** a pseudo-pod client for one circle (real per-circle sealed storage, no OIDC/CSS). Objective L:
  * the backend is browser-persistent (IndexedDB, scoped per circle) so the circle's items survive a
  * reload; falls back to in-memory under SSR / tests (no `indexedDB`) — see `pickWebBackend`. */
 function makeCirclePodClient(circleId) {
@@ -1678,7 +1678,7 @@ function makeCirclePodClient(circleId) {
 }
 
 /**
- * S4 — ensure a per-circle pod producer exists (idempotent, keyed by circle id). For a
+ * ensure a per-circle pod producer exists (idempotent, keyed by circle id). For a
  * sealed posture (p2/p3) this stands up a real per-circle control agent over the circle's
  * own in-memory pod; p0/p1 get just a sealing identity. Best-effort: never blocks circle
  * load (a missing vault / pod machinery just skips, leaving the plain shared path).
@@ -2237,7 +2237,7 @@ function buildCircleBot(agent) {
     if (hopCard) _kringRender?.botBubble(`${hopCard.title}\n${hopCard.body}`);
   }
 
-  // E2 — run a bulk route ("/done all") over the most-recent listing's items; item-changed events fan out
+  // run a bulk route ("/done all") over the most-recent listing's items; item-changed events fan out
   // cross-thread via the event log. Ported from classic handleBulkRoute.
   async function handleBulkRoute(route) {
     const itemIds = (_lastKringListing?.items ?? []).map((it) => it.id).filter(Boolean);
@@ -3326,10 +3326,10 @@ async function onLeaveCircle(id, circle) {
     ? globalThis.confirm(t('circle.tile.menu.leave_confirm', { name }))
     : true;
   if (!ok) return;
-  // B4 — leaving PRUNES this circle on this device: the substrate leave, then unbind every member's
+  // leaving PRUNES this circle on this device: the substrate leave, then unbind every member's
   // per-circle address and drop the circle's authorize snapshot. Until 2026-08-02 leaving pruned
   // nothing, so a circle you had left still held a live list of who may speak to you.
-  // J-R4 — the relay a left circle rode stops receiving its registration, and learns nothing else.
+  // the relay a left circle rode stops receiving its registration, and learns nothing else.
   // Passed in as the shell's own step: it needs a transport handle, the one thing that genuinely
   // differs per shell.
   try {
@@ -3766,7 +3766,7 @@ function showStream() {
 
 // "Mij" tab — personal availability (holiday quiet hours) plus
 // the device-global Hopping stance.
-// S2 — the Mij tab is now your PROFILE (handle + display name + location),
+// the Mij tab is now your PROFILE (handle + display name + location),
 // backed by stoop's profile ops. Availability/quiet-hours moves to a
 // sub-screen reached from here.
 // Offering→property fold-in phase C (2026-07-17): the personal-offering editor
@@ -3866,22 +3866,22 @@ async function showSharedWithMe() {
   });
 }
 
-// S5 — "My data": where your data lives (pod/relay) + privacy + usage + key
+// "My data": where your data lives (pod/relay) + privacy + usage + key
 // management (back up · reveal recovery phrase · restore). A sub-screen of Mij.
 async function showMyData() {
   try { deliverySettingsCache = await deliverySettingsStore.get(); } catch { /* keep the defaults */ }
   hideCircleTabBar(tabBarEl);
   let dataLocation = {}; let podStatus = {}; let privacy = []; let metrics = {};
-  // S4 — the actual pod sign-in state (reuses podAuth), + a sign-in button when local-only.
+  // the actual pod sign-in state (reuses podAuth), + a sign-in button when local-only.
   const onSignIn = () => Promise.resolve(
     podAuth.startSignIn({ issuer: podAuth.DEFAULT_ISSUER_ID, redirectUrl: window.location.href }),
   ).catch((e) => globalThis.alert?.(e?.message ?? 'sign-in failed'));
-  // S5 — launch the existing backup/restore wizards in a modal overlay; reveal
+  // launch the existing backup/restore wizards in a modal overlay; reveal
   // the recovery phrase via the stoop `getMnemonicOnce` skill (shown once).
   const onBackup = () => mountMyDataWizard(renderEncryptedBackupWizard);
   const onRestore = () => mountMyDataWizard(renderRestoreFromMnemonicWizard);
   const onViewMnemonic = () => showMnemonicReveal();
-  // S5 — web-push toggle. State is read from the live PushManager so the screen
+  // web-push toggle. State is read from the live PushManager so the screen
   // reflects reality; toggling subscribes/unsubscribes + tells stoop.
   let notifications = { supported: false, permission: 'default', subscribed: false };
   const onToggleNotifications = async () => {
@@ -4005,7 +4005,7 @@ async function showMyData() {
   rerender();
 }
 
-// S5 — mount one of the existing wizard renderers (encrypted-backup / restore)
+// mount one of the existing wizard renderers (encrypted-backup / restore)
 // inside a dismissable modal overlay. The wizard owns its own DOM; we supply the
 // container + the shared `rawCallSkill` (the wizards call `callSkill('stoop', …)`).
 function mountMyDataWizard(renderWizard, extra = {}) {
@@ -4064,7 +4064,7 @@ async function showJoinCircle(inviteArg) {
     // the web shell, so it went unseen.
     circleAddressFor: (cid) => circleHouseholdAgent?.circleAddressFor?.(cid) ?? null,
     signCircleLink: (cid, gid, addr) => circleHouseholdAgent?.signCircleLink?.(cid, gid, addr) ?? null,
-    // J-CP1 — be on the circle's endpoint BEFORE the redeem (web ≡ mobile).
+    // be on the circle's endpoint BEFORE the redeem (web ≡ mobile).
     dialEndpoint: (url) => dialRelayUrl(url),
     activeEndpointUrl: () => CIRCLE_RELAY_URL || null,
     // Post-join reachability (G13, web ≡ mobile). Joining puts you on the roster; it does not make you
@@ -4105,7 +4105,7 @@ async function showJoinCircle(inviteArg) {
 // onderling-invite:// QR for another device to scan/paste. Shown in the same modal overlay.
 async function showCircleInvite(circleId) {
   const adminPeerAddr = circleHouseholdAgent?.householdSelfAddr ?? null;
-  // B2 — the admin's NKN native address (distinct from the pubKey), so a pure-NKN
+  // the admin's NKN native address (distinct from the pubKey), so a pure-NKN
   // joiner can route the redeem handshake. Best-effort: null when NKN isn't up.
   // …gated: with sharing off the invite simply carries no NKN address, and a joiner falls back to the
   // relay endpoint. An invite is one of the places the address would otherwise travel furthest.
@@ -4179,7 +4179,7 @@ async function showCircleInvite(circleId) {
   const hint = document.createElement('p');
   hint.textContent = t('circle.invite.hint');
   card.appendChild(hint);
-  // B5 — how many places this invite still has. The admin holding a code is the one person who can
+  // how many places this invite still has. The admin holding a code is the one person who can
   // act on the number, and until now nothing anywhere said it (web ≡ mobile: same line, same key).
   if (typeof r.maxRedemptions === 'number' && typeof r.redemptionsUsed === 'number') {
     const used = document.createElement('p');
@@ -4193,7 +4193,7 @@ async function showCircleInvite(circleId) {
   card.appendChild(code);
 }
 
-// S5 — reveal the OWNER-ROOT recovery phrase (host `revealOwnerPhrase`, step 1b) —
+// reveal the OWNER-ROOT recovery phrase (host `revealOwnerPhrase`, step 1b) —
 // the one phrase that re-derives every profile incl. the feedback pseudonym. Shown in
 // the same modal overlay with a destructive warning. (Was the stoop `getMnemonicOnce`,
 // which revealed the unrelated stoop sub-agent seed — not the recovery phrase.)
@@ -4264,7 +4264,7 @@ function openListsPanel(circleId) {
   const typeLabel = (type) => t(`circle.container.type.${type}`, undefined, type);
 
   async function draw() {
-    // L1b — sealed pod-backed lists for this circle when a pod session + sealing strategy exist
+    // sealed pod-backed lists for this circle when a pod session + sealing strategy exist
     // (else the memoised IDB/memory default). policyStore holds the circle's storagePosture.
     let listsPolicy = null;
     try { listsPolicy = (await policyStore.get(circleId)) ?? {}; } catch { /* default posture */ }
@@ -4615,7 +4615,7 @@ function openGuidedSetupPanel({ onDone } = {}) {
   draw();
 }
 
-// S5 — full-size image viewer for a prikbord attachment, in a dismissable overlay.
+// full-size image viewer for a prikbord attachment, in a dismissable overlay.
 /** Uint8Array → standard base64 for a `data:` URL (web `btoa`, node `Buffer` fallback). */
 function bytesToStdB64(bytes) {
   let bin = '';
@@ -4641,7 +4641,7 @@ function showImageModal(src, { pending = false } = {}) {
   document.body.appendChild(overlay);
 }
 
-// S2 — availability/quiet-hours/hopping (the former Mij body), now a sub-screen of Mij.
+// availability/quiet-hours/hopping (the former Mij body), now a sub-screen of Mij.
 async function showAvailability() {
   let working = await availabilityStore.get();
   const rerender = () => renderCircleAvailability(rootEl, {
@@ -4905,7 +4905,7 @@ function showKring(id, circle, policy) {
     // to everyone for V0; admin-gating + multi-admin consensus are
     // follow-up slices.
     recipes:  () => showRecipeEditor(id),
-    // S3 — group admin (member roster + remove + announcements). The ops are
+    // group admin (member roster + remove + announcements). The ops are
     // admin-gated server-side; shown to everyone for V0 (a non-admin's action is
     // refused with a notice). Role-gating the menu entry is a follow-up.
     admin:    () => showAdmin(id),
@@ -4928,7 +4928,7 @@ function showKring(id, circle, policy) {
   // stoop's `listOpen`/`postRequest`, but SCOPED to THIS circle: `stoopCall` injects
   // the circle id as the stoop scope key on writes and filters list reads to the
   // circle (S4 per-circle restructure — one shared agent, per-circle scope key).
-  // S4 — scope stoop ops to this circle AND, for a sealed (p2/p3) circle, transparently
+  // scope stoop ops to this circle AND, for a sealed (p2/p3) circle, transparently
   // seal post bodies at rest / open them on read via the per-circle content strategy.
   // Sealed media (2026-07-11): thread THIS circle's media gateway into the wrapper so a
   // prikbord image attachment seals + rides the SAME `{type:'media'}` blob pointer as
@@ -5000,7 +5000,7 @@ function showKring(id, circle, policy) {
   // G16 — the LEDEN tab's trail-roster (canonical Member via normalizeCircleMembers).
   // null = not loaded yet → the tab shows its loading state; [] = loaded empty.
   let kringRoster = null;
-  let noticeboardPendingAttachment = null;   // S5 — { encoded, thumbnail, name } before posting
+  let noticeboardPendingAttachment = null;   // { encoded, thumbnail, name } before posting
   let myWebid = null;   // fetched once, best-effort (whoAmI is a stoop skill, not chat-manifested)
   let myCircleRole = null;   // my role in THIS circle ('admin' | …), for mandate owner-visibility
   // 1:1-bot chat gate — THIS circle's raw roster rows (each carrying `relation`/`webid`),
@@ -5060,7 +5060,7 @@ function showKring(id, circle, policy) {
         addedBy:      it.addedBy,
         addedByLabel: shortWebid(it.addedBy),
         mine:         !!(myWebid && it.addedBy === myWebid),
-        // S5 — carry inline-image metadata (thumbnail travels; full bytes on demand).
+        // carry inline-image metadata (thumbnail travels; full bytes on demand).
         attachments:  Array.isArray(it.attachments) ? it.attachments
                       : (Array.isArray(it.source?.attachments) ? it.source.attachments : []),
         // embeds[] — the canonical cross-object references (a post → a task /
@@ -5137,7 +5137,7 @@ function showKring(id, circle, policy) {
     if (changed) rerender();
   }
 
-  // S5 — encode a picked image into the inbound-attachment shape + hold it pending.
+  // encode a picked image into the inbound-attachment shape + hold it pending.
   async function noticeboardAttach(file) {
     try {
       const encoded = await encodeImageFile(file);
@@ -5233,7 +5233,7 @@ function showKring(id, circle, policy) {
   }
 
   const rerender = () => {
-    // C15 — the per-circle surface is a CHAT projection: it excludes the log's silent system lane
+    // the per-circle surface is a CHAT projection: it excludes the log's silent system lane
     // (the `roster-updated` pull-me and friends). The cross-circle Stream tab is the firehose.
     // The conversation shows what this circle chose — its admin setting, else its template's, else the
     // permissive default (`conversationKinds.js`). A filter, never a data change.
@@ -5362,7 +5362,7 @@ function showKring(id, circle, policy) {
         onPost:   noticeboardPost,
         onAction: noticeboardAction,
         onIntent: (it) => { noticeboardIntent = it; rerender(); },
-        // S5 — inline image attachments. The attach affordance is gated on the SAME
+        // inline image attachments. The attach affordance is gated on the SAME
         // resolved media composition (`kringMedia` = getCircleMediaComposition(id, policy))
         // the kring composer's own attach uses (see `onAttachMedia` above): a p0/p1 circle
         // has no seal strategy → no media gateway → `kringMedia` stays null → NO 📎 button.
@@ -5422,10 +5422,10 @@ function showKring(id, circle, policy) {
       },
       onTab: (tabId) => {
         activeTab = tabId;
-        // D1 — count the tab use so the quickActions row reflects reality.
+        // count the tab use so the quickActions row reflects reality.
         const f = featureForTabId(tabId);
         if (f) actionFrequency.bump(id, f);
-        if (tabId === 'prikbord') loadNoticeboard();   // S1 — lazy-load the buurt posts
+        if (tabId === 'prikbord') loadNoticeboard();   // lazy-load the buurt posts
         if (tabId === 'taken') loadTasks();            // Taken — lazy-load the circle's tasks
         if (tabId === 'leden')  loadRoster();          // G16 — lazy-load the member roster
         rerender();
@@ -5591,7 +5591,7 @@ function showKring(id, circle, policy) {
           return;
         }
         // Phase 5 — the circle bot routes the turn (gate → interpret → dispatch), with plain messages
-        // fanning out; replies render into the kring stream via _kringRender. (F2: the in-kring feedback
+        // fanning out; replies render into the kring stream via _kringRender. (the in-kring feedback
         // mount was retired — feedback lives in the fp-bot contact thread, not the kring composer.)
         // Optimistic local append + best-effort peer fan-out. The msgId is shared so receiver-side dedup
         // suppresses any echo. δ.2 tracks delivery state (pending → sent | failed) for the bubble icon.
@@ -5733,7 +5733,7 @@ function showKring(id, circle, policy) {
       const blocks = await materializeRecipe({
         recipe:   active,
         circleId: id,
-        // D1 — policy + actionFrequency feed the quickActions block. The block
+        // policy + actionFrequency feed the quickActions block. The block
         // materializers call `callSkill(appOrigin, opId, args)` (3-arg), so this
         // MUST be the raw 3-arg dispatch — the 2-arg `resolveCallSkill` resolver
         // would mis-read the appOrigin as the opId (#16: this also un-breaks the
@@ -5879,8 +5879,8 @@ function broadcastActiveRecipe({ circleId, book }) {
 function showFolio(id) {
   let filter = 'all';
   let shareFilter = null;          // null | 'shared-by-me' | 'shared-with-me'
-  let currentPath = '';            // N5 — folder being viewed ('' = root)
-  let sourceMode = 'index';        // N5 — 'index' (in-app) | 'pod' (real pod)
+  let currentPath = '';            // folder being viewed ('' = root)
+  let sourceMode = 'index';        // 'index' (in-app) | 'pod' (real pod)
   let needsPod = false;            // pod selected but no pod connected yet
   let lastListResult = null;       // raw `listFiles` result for re-projection
   let files = buildCircleFiles({ files: [], circleId: id });
@@ -5957,7 +5957,7 @@ function showFolio(id) {
       project();
       rerender();
     },
-    // N5 — switch the file SOURCE: in-app index ↔ the user's real pod.
+    // switch the file SOURCE: in-app index ↔ the user's real pod.
     onSourceMode: (mode) => {
       if (mode === sourceMode || (mode !== 'index' && mode !== 'pod')) return;
       sourceMode = mode;
@@ -5969,7 +5969,7 @@ function showFolio(id) {
       rerender();
       load();
     },
-    // N5 — descend into / climb out of folders derived from file paths.
+    // descend into / climb out of folders derived from file paths.
     onNavigate: (path) => { currentPath = path; rerender(); },
     onBack: () => showDetail(id),
   });
@@ -6238,7 +6238,7 @@ async function showGovernance(id) {
         } catch { /* */ }
         await rerender();
       },
-      // L3 — "review & remove" an equivocator: open a removeMember decision (its class applies).
+      // "review & remove" an equivocator: open a removeMember decision (its class applies).
       onReviewDisputed: async (ref) => {
         try { await gov.propose({ circleId: id, action: 'removeMember', subject: ref, actor: { ref: myWebid } }); } catch { /* */ }
         await rerender();
@@ -6312,7 +6312,7 @@ async function showOverride(id) {
   rerender();
 }
 
-// S3 — group admin panel (member roster + remove + announcements). Reached from
+// group admin panel (member roster + remove + announcements). Reached from
 // the kring `⋯` menu. Ops are admin-gated server-side; a refusal surfaces a notice.
 async function showAdmin(id) {
   hideCircleTabBar(tabBarEl);
@@ -6368,7 +6368,7 @@ async function showAdmin(id) {
       notice = null; busy = true; rerender();
       let removed = false;
       try {
-        // B4 — ONE shared op. It reads the roster while the member is still on it (for their
+        // ONE shared op. It reads the roster while the member is still on it (for their
         // per-circle address), removes them from THIS circle only, unbinds that address, and then
         // re-reads the roster to re-record the authorize snapshot — the step without which a removed
         // member's key stays in the allowed set and they can still speak here.
@@ -6640,7 +6640,7 @@ async function boot() {
   await initLocalisation({ lng: (_storedAppLang === 'nl' || _storedAppLang === 'en') ? _storedAppLang : detectDeviceLang() });
   renderCircleLauncher(rootEl, { loading: true, t });
 
-  // S5 — register the web-push service worker (root-scoped /sw.js). Best-effort:
+  // register the web-push service worker (root-scoped /sw.js). Best-effort:
   // it makes `serviceWorker.ready` resolve so the My-data push toggle can read
   // live subscription state; actual subscription happens on user opt-in.
   // DEV: skip on localhost — a cached SW serves a stale bundle across code changes
@@ -6693,7 +6693,7 @@ async function boot() {
       // OBJ-2 S1e (web) — persist the household store in IndexedDB so items survive
       // a reload (mobile already threads its AsyncStorage descriptor). Parity with stoop.
       householdPersistDb: { dbName: 'cc-household-state', storeName: 'items' },
-      stoopControlAgent: circleControlAgentRouter,   // S4 — multi-member sealing on redeem/leave
+      stoopControlAgent: circleControlAgentRouter,   // multi-member sealing on redeem/leave
       // Connectivity Phase 3 — LIVE shared-pod key-custody seams (member-side; keyed by circleId). A
       // shared/hybrid circle WITH a pod + group key now really seals→writes the pod + fans a ref
       // (pod-signal), and catch-up range-queries→opens it; a no-pod circle keeps fan-out-full unchanged.
@@ -6701,7 +6701,7 @@ async function boot() {
       stoopPodWrite:       circlePodWrite,
       stoopPodReadSince:   circlePodReadSince,
       getActiveCircleId: getActiveCircle,            // per-circle store scoping — the active circle scopes chat ops
-      // L3 — household routes through the uniform wired path (dissolved cores over the per-circle
+      // household routes through the uniform wired path (dissolved cores over the per-circle
       // CircleItemStore) by default; the legacy registry is retired. No flag: it's unconditional now.
     });
     circleHouseholdAgent = agent;   // OBJ-2 — expose to showSettings (sibling fn) for the paired-devices panel
@@ -6739,7 +6739,7 @@ async function boot() {
       pendingMap:      circlePendingPersonaProps,
       circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,
     });
-    // S4 — when signed in, route stoop's items to the user's REAL pod (parity with
+    // when signed in, route stoop's items to the user's REAL pod (parity with
     // folio/calendar; reuses stoop's already-built pod-routing write-through). Best-effort.
     if (podSession?.isLoggedIn && circleRealPodRouting?.podRoot && typeof agent.attachStoopPod === 'function') {
       agent.attachStoopPod({ podRoot: circleRealPodRouting.podRoot, webid: podSession.webid, fetch: podSession.fetch })
@@ -6992,14 +6992,14 @@ async function boot() {
             // joiner proves theirs, so per-circle addressing works in both directions from the join on.
             circleAddressFor: (gid) => agent.circleAddressFor?.(gid) ?? null,
             signCircleAddress: (gid, addr) => agent.signCircleLink?.(gid, gid, addr) ?? null,
-            // B2 — and hand the circle the newcomer's proven per-circle address (and the newcomer
+            // and hand the circle the newcomer's proven per-circle address (and the newcomer
             // the circle's). Nothing else can: a fresh joiner cannot address the other members yet,
             // and they cannot address the joiner. Mobile wires the identical seam.
             propagateCircleAddresses: ({ circleId, newMemberWebid }) =>
               propagateCircleAddressesAfterJoin({ agent, circleId, newMemberWebid }),
           }),
           'group-redeem-response':   makeHandleGroupRedeemResponse({ pendingMap: circlePendingRedeems }),
-          // B2 — a member (or the admin, relaying) says where they answer in this circle. Each
+          // a member (or the admin, relaying) says where they answer in this circle. Each
           // announcement carries its own proof, so the carrier is not trusted; recording refreshes
           // the sealing binding AND the authorize snapshot together.
           'circle-address-announce': makeCircleAddressAnnouncePeerHandler({ agent }),

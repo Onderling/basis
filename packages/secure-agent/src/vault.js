@@ -36,7 +36,7 @@ export function makeBrowserVault(arg = 'sa-id:') {
   const prefix     = opts.prefix     ?? 'sa-id:';
   const passphrase = opts.passphrase ?? null;
 
-  // S3 — passphrase-wrapped vault.  IndexedDB is the only browser
+  // passphrase-wrapped vault.  IndexedDB is the only browser
   // backend the @onderling/vault family supports encryption for.
   if (passphrase) {
     if (typeof globalThis.indexedDB !== 'undefined') {
@@ -59,7 +59,7 @@ export function makeBrowserVault(arg = 'sa-id:') {
     }
   }
 
-  // S0 — default browser path: plaintext localStorage.
+  // default browser path: plaintext localStorage.
   if (typeof globalThis.localStorage !== 'undefined') {
     try {
       return new VaultLocalStorage({ prefix });

@@ -298,7 +298,7 @@ describe('createMeshAgent', () => {
     await agent.stop();
   });
 
-  // ── Track B / B4: identity-as-pod-content wiring (opt-in via `pod`) ──────
+  // ── Track B / identity-as-pod-content wiring (opt-in via `pod`) ──────
   // Q-B.2 side-by-side: absence of `pod` preserves today's behavior; presence
   // attaches IdentitySync + materializes the pod manifest before agent.start.
 

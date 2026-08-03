@@ -1,4 +1,4 @@
-// C7 — reveal PRESETS over disclosure's `enabled` axis, and the delegation of the old
+// reveal PRESETS over disclosure's `enabled` axis, and the delegation of the old
 // `revealLadder` level names onto the presets. The per-attribute booleans stay the truth.
 import { describe, it, expect } from 'vitest';
 import {

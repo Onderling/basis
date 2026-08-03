@@ -13,5 +13,5 @@
 export { createNotifyEnvelope } from './src/NotifyEnvelope.js';
 export { pickMode }             from './src/picker.js';
 export { createPendingQueue, QUEUE_PREFIX } from './src/pendingQueue.js';
-// OBJ-2 S2 — the generic item-store substrate mirror (tasks + household share it).
+// the generic item-store substrate mirror (tasks + household share it).
 export { wireItemMirror, defaultInferAction, stripIdentity } from './src/substrateMirror.js';

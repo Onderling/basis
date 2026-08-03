@@ -26,7 +26,7 @@ export function renderCircleNoticeboard(container, {
   onPost,
   onAction,
   onIntent,
-  attachment = null,        // S5 — the pending image attachment ({thumbnail, name}) or null
+  attachment = null,        // the pending image attachment ({thumbnail, name}) or null
   onAttach,                 // (file) => void — host encodes + sets the pending attachment (the FILE entry's media pipeline)
   // (J4) — the ATTACHMENT projector's menu. `attachMenu` is
   // `renderAttachments(basisManifest).attachMenu` (host-computed); the composer's
@@ -86,7 +86,7 @@ export function renderCircleNoticeboard(container, {
   row.appendChild(post);
   composer.appendChild(row);
 
-  // S5 — pending-attachment preview (thumbnail + remove).
+  // pending-attachment preview (thumbnail + remove).
   if (attachment && attachment.thumbnail) {
     const preview = document.createElement('div');
     preview.className = 'cc-prikbord__attach-preview';
@@ -125,7 +125,7 @@ export function renderCircleNoticeboard(container, {
   composer.addEventListener('submit', (e) => {
     e.preventDefault();
     const text = input.value.trim();
-    if (!text && !attachment) return;   // S5 — an image-only post is valid
+    if (!text && !attachment) return;   // an image-only post is valid
     input.value = '';
     const dueAt = due?.value ? Date.parse(due.value) : undefined;
     if (typeof onPost === 'function') onPost({ intent, text, ...(Number.isFinite(dueAt) ? { dueAt } : {}) });
@@ -193,7 +193,7 @@ export function renderCircleNoticeboard(container, {
       li.appendChild(wrap);
     }
 
-    // S5 — inline image attachments: render the thumbnail; tap opens the full image.
+    // inline image attachments: render the thumbnail; tap opens the full image.
     const atts = Array.isArray(p.attachments) ? p.attachments : [];
     if (atts.length) {
       const gallery = document.createElement('div');

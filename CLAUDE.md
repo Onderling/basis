@@ -62,9 +62,10 @@ file only helps if it's written to.
 9. **Names are legible without the plans — and that includes REFERENCES.** A comment saying `B8`, `C4a`,
    `L13` or `J-CS8` is unresolvable for anyone without the private plan docs, and those are gitignored, so
    for a public reader it is unresolvable by construction. Name the thing (*"the address-fallback setting"*),
-   not its row in a list. Journey tags are guarded (`lint-codenames`, baselined — do not grow it);
-   checklist ids are a review rule, because `B1`/`C3`/`L4` collide with real identifiers and a guard that
-   cannot tell them apart trains people to ignore it. Same for identifiers, titles and UI labels: a name
+   not its row in a list. Journey tags **and checklist ids are both guarded** now (`lint-codenames`,
+   baselined — do not grow it). Checklist ids were long recorded as unguardable because `B1`/`C3`/`L4`
+   collide with real identifiers — true of a BARE token, but the **label form** `B4 — ` is punctuation,
+   not a name, and does not collide (2026-08-03). Same for identifiers, titles and UI labels: a name
    that only makes sense to someone who has read a plan doc is a defect. Spell journeys out in the plans
    too, rather than inventing opaque tags to refer back to.
 

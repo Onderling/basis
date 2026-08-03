@@ -1,7 +1,7 @@
 /**
  * MultiRecipientQueue tests — covers MemoryQueueStore + SqliteQueueStore.
  *
- * Track E §E2b — see `coding-plans/track-E-mobile-push-relay.md`.
+ * Queueing for a recipient who is not connected, so a push wake-up has something to deliver.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync }                          from 'node:fs';

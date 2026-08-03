@@ -45,7 +45,7 @@ export class PolicyEngine {
    * @param {import('./TrustRegistry.js').TrustRegistry}         opts.trustRegistry
    * @param {import('../skills/SkillRegistry.js').SkillRegistry} opts.skillRegistry
    * @param {string} [opts.agentPubKey]  — this agent's Ed25519 pubKey (base64url)
-   * @param {import('./GroupManager.js').GroupManager} [opts.groupManager]  — D3: enables `requiredRole` checks
+   * @param {import('./GroupManager.js').GroupManager} [opts.groupManager]  — enables `requiredRole` checks
    * @param {(tokenId: string) => boolean | Promise<boolean>} [opts.isRevoked]
    *   Optional issuer-side revocation check. When supplied,
    *   `checkInbound` calls it after the token's signature/expiry/
@@ -163,7 +163,7 @@ export class PolicyEngine {
       );
     }
 
-    // D3: role-aware group check.  A skill may declare
+    // role-aware group check.  A skill may declare
     //   requiredRole: { group: <groupId>, role: <roleId> }
     // to require the caller hold a group proof at or above the given role.
     if (skill.requiredRole) {

@@ -1,7 +1,7 @@
 /**
  * createSolidAuthNode — interactive redirect ROUND-TRIP harness.
  *
- * D §4 S4 — "the one hop not verified end-to-end". The focused surface
+ * "The one hop not verified end-to-end". The focused surface
  * tests in `createSolidAuthNode.test.js` prove each method in isolation
  * with a permissive fake. Here we harness the FULL browser-redirect
  * round-trip against a PKCE/state-FAITHFUL fake Inrupt `Session`, so the

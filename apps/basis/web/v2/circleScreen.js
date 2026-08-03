@@ -37,7 +37,7 @@ import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '.
  *        non-empty array, append a subtle pip element to signal a
  *        background materialize is in flight (cache-first render).
  *        Ignored on the loading / empty branches.
- * @param {(actionKey: string) => void} [args.onAction] D1 — invoked when a
+ * @param {(actionKey: string) => void} [args.onAction] invoked when a
  *        quickActions pill is tapped (host routes the feature to a tab /
  *        action).  Omitted → pills render disabled.
  * @returns {HTMLElement}

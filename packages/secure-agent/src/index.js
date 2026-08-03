@@ -15,10 +15,10 @@ export { createSecureAgent } from './createSecureAgent.js';
 export { createSecureMeshAgent } from './createSecureMeshAgent.js';   // T5.3 — the unified secure-mesh factory
 export { makeBrowserVault, restoreOrGenerate } from './vault.js';
 
-// S1 — mute / block
+// mute / block
 export { loadMuteSet, MuteSet } from './mute.js';
 
-// S2 — signed WebID claim
+// signed WebID claim
 export {
   signClaim,
   verifyClaim,
@@ -28,7 +28,7 @@ export {
   DEFAULT_TTL_MS as DEFAULT_CLAIM_TTL_MS,
 } from './claim.js';
 
-// S3 — WebAuthn / passkey helpers
+// WebAuthn / passkey helpers
 export {
   registerPasskey,
   unlockWithPasskey,
@@ -36,18 +36,18 @@ export {
   PASSKEY_ERRORS,
 } from './passkey.js';
 
-// S4 — peer identity resolver
+// peer identity resolver
 export { createPeerResolver, PeerResolver } from './resolver.js';
 
-// S6 — signed activity / audit log
+// signed activity / audit log
 export { loadAuditLog, AuditLog, AUDIT_VERSION } from './auditLog.js';
 
-// S7 — rate limiter
+// rate limiter
 export {
   createRateLimiter, RateLimiter, RATE_LIMIT_DEFAULTS,
 } from './rateLimit.js';
 
-// S8 — Perfect Forward Secrecy (partial Double-Ratchet)
+// Perfect Forward Secrecy (partial Double-Ratchet)
 export {
   loadPFSChain, PFSChain,
   PFS_VERSION, DEFAULT_MAX_SKIP,
@@ -64,7 +64,7 @@ export {
   NOT_REMOTE,
 } from './remoteHandlers.js';
 
-// S5 + S7 — re-export the substrate primitives the factory wires
+// re-export the substrate primitives the factory wires
 export {
   TrustRegistry,
   TIER_LEVEL,

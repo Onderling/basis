@@ -78,7 +78,7 @@ describe('secure-agent slice-2 — registered tiers + PeerGraph address resoluti
     expect(sender.peerGraph).toBe(graph);
     expect(sender.agent.routing.peerGraph).toBe(graph);
 
-    // B2 — addressesOf resolves the transport-appropriate wire address.
+    // addressesOf resolves the transport-appropriate wire address.
     const addrs = await graph.addressesOf(targetId);
     expect(addrs).toEqual({ relay: relayAddr, nkn: nknAddr });
 

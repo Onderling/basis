@@ -1,5 +1,5 @@
 /**
- * S6/J-A14 — a size limit on the peer wire.
+ * A size limit on the peer wire.
  *
  * Before this, the only bound was the `ws` library default: a **64 MB envelope was forwarded intact**
  * through a real relay, and at 120 MB the library killed the SENDER's socket with code 1009 and no typed

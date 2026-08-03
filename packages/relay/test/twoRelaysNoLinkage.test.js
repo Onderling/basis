@@ -1,5 +1,5 @@
 /**
- * S4 · J-R2 — **the property Frits named**: no shared relay, no linkage.
+ * **The property Frits named**: no shared relay, no linkage.
  *
  *   Circle X rides relay R1; circle Y rides R2. → R1 sees ONLY Anna's X-address; R2 only her Y-address.
  *   Neither can link them, and the addresses share no derivable relation.

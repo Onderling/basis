@@ -57,7 +57,7 @@ export function renderRecipientPicker(container, {
     return container;
   }
 
-  // D7 — the out-of-circle LINK warning. Picking here grants by published network key, which is a
+  // the out-of-circle LINK warning. Picking here grants by published network key, which is a
   // deliberate 1:1 link both sides can see; say so BEFORE the pick. Informed consent, never a block —
   // the rule (warn iff the pick grants by network key) lives in the shared selector, not here.
   const linkWarning = outOfCircleLinkWarning(recipients);

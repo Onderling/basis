@@ -316,7 +316,7 @@ export async function startRelay(opts = {}) {
     acceptedGroups,
     roleRanks,
     maxAddressesPerConnection = DEFAULT_MAX_ADDRESSES_PER_CONNECTION,
-    // E2c: push wake-up.  When `pushSender` is null/undefined, the relay
+    // push wake-up.  When `pushSender` is null/undefined, the relay
     // ignores `register-push-token` envelopes and never attempts wake — fully
     // backward compatible with existing tests and deployments.
     pushSender                = null,
@@ -345,7 +345,7 @@ export async function startRelay(opts = {}) {
   const mrQueue = multiRecipientQueue
     ?? new MultiRecipientQueue(multiRecipientQueueOpts ?? {});
 
-  // E2c: token registry exists whenever `pushSender` is configured; otherwise
+  // token registry exists whenever `pushSender` is configured; otherwise
   // we still allow callers to inject one for advanced setups.
   // G15 (2026-07-27): if the caller wired a durable store on the registry, rehydrate it BEFORE serving —
   // otherwise the relay comes back up having forgotten every sleeping device it is supposed to wake, and

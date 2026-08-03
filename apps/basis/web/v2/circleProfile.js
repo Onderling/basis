@@ -1,5 +1,5 @@
 /**
- * basis v2 — profile editor (web DOM renderer, S2 — identity + matching).
+ * basis v2 — profile editor (web DOM renderer, identity + matching).
  *
  * The "Mij" surface: your handle + display name (#5) and your coarse location
  * (#7). Pure render — the host (`circleApp.js` showMij) loads `getMyProfile`

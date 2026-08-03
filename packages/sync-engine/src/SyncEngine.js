@@ -117,7 +117,7 @@ export class SyncEngine extends Emitter {
   /** @type {ReturnType<typeof createVersionStore>} */
   #versionStore;
 
-  // Folio.C1 — adapter handles (default to Node singletons).
+  // adapter handles (default to Node singletons).
   #fs;
   #hash;
   #watcherFactory;
@@ -204,17 +204,17 @@ export class SyncEngine extends Emitter {
    *        pod.  Set `graceMs: 0` to disable the grace phase and revert to
    *        v2.6 behaviour (fire as soon as sha is stable).
    * @param {import('./adapters/index.js').FsAdapter}      [opts.fs]
-   *        Folio.C1 — filesystem adapter.  Defaults to a Node-backed
+   *        filesystem adapter.  Defaults to a Node-backed
    *        adapter wrapping `node:fs/promises`.  RN callers (see
    *        `apps/folio/src/rn/serviceFactory.js`) pass an `expo-file-system`
    *        wrapper.  Threaded into `scanLocal`, `applyConflict`,
    *        `versions`, and `autoShare` for every read/write.
    * @param {import('./adapters/index.js').HashAdapter}    [opts.hash]
-   *        Folio.C1 — hash adapter.  Defaults to a Node-backed
+   *        hash adapter.  Defaults to a Node-backed
    *        `createHash('sha256')` wrapper.  RN callers pass an
    *        `expo-crypto` wrapper.
    * @param {import('./adapters/index.js').WatcherAdapter} [opts.watcherFactory]
-   *        Folio.C1 — watcher adapter.  Defaults to a chokidar wrapper.
+   *        watcher adapter.  Defaults to a chokidar wrapper.
    *        RN callers pass an interval-poll watcher.  This is a SEPARATE
    *        knob from the legacy `watcher` parameter (above) which
    *        configures stability / grace timings.
@@ -553,7 +553,7 @@ export class SyncEngine extends Emitter {
           await podClient.write(podUri, content, { contentType: ct });
           this.#knownState[f.relPath] = { sha256: f.sha256, syncedAt: Date.now() };
           uploads++;
-          // Folio.B4: snapshot the just-uploaded content.  Skip dotted paths
+          // snapshot the just-uploaded content.  Skip dotted paths
           // (which would feed back into .folio/versions/ itself).
           await this.#captureVersionSafe(f.relPath, content);
         } catch (err) {
@@ -577,7 +577,7 @@ export class SyncEngine extends Emitter {
           }
           this.#knownState[f.relPath] = { sha256: f.sha256, syncedAt: Date.now() };
           downloads++;
-          // Folio.B4: snapshot the just-downloaded content.
+          // snapshot the just-downloaded content.
           await this.#captureVersionSafe(f.relPath, r.content);
         } catch (err) {
           if (err?.code === 'NOT_FOUND') {
@@ -598,7 +598,7 @@ export class SyncEngine extends Emitter {
           remoteTimestamp: f.remoteMtimeMs,
           fs:              this.#fs,
         });
-        // Folio.B4: snapshot the conflicted-state content too — it's the
+        // snapshot the conflicted-state content too — it's the
         // intermediate state the user sees, and rolling back a botched
         // resolve to the marker form is genuinely useful.
         try {
@@ -931,7 +931,7 @@ export class SyncEngine extends Emitter {
 
   /**
    * Local-only delete (tombstone via PodClient).  Subsequent runOnce calls
-   * skip this URI.  Folio.B4 — also drops the version history under
+   * skip this URI.  also drops the version history under
    * `.folio/versions/<relPath>/` (so `folio rm` is a true forget).
    *
    * @param {string} relPath  POSIX-style relative path
@@ -1005,7 +1005,7 @@ export class SyncEngine extends Emitter {
     return { relPath, podUri };
   }
 
-  // ── Folio.B4 — time-machine versioning ────────────────────────────────────
+  // ── time-machine versioning ────────────────────────────────────
 
   /**
    * List all versions of `relPath`, newest-first.

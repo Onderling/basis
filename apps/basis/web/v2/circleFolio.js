@@ -8,7 +8,7 @@
  * a row opens that file (onOpen).  Mirrors the stream renderer so it
  * stays unit-testable under happy-dom.
  *
- * N5 — when the host wires `onNavigate`, the flat row list is projected
+ * when the host wires `onNavigate`, the flat row list is projected
  * through Folio's source-agnostic `folioLevel` (folio/browser) into a
  * Drive-style level: a breadcrumb trail, the immediate subfolders (with
  * counts), and the files directly in the current folder.  Folder rows
@@ -80,11 +80,11 @@ export function renderCircleFolioBrowser(container, {
   // pill is active (the normal filter strip handles the list).
   shareFilter = null,
   onShareFilter,
-  // N5 — when wired, the list becomes a folder tree: `currentPath` is the
+  // when wired, the list becomes a folder tree: `currentPath` is the
   // folder being viewed ('' = root) and `onNavigate(path)` descends/climbs.
   currentPath = '',
   onNavigate,
-  // N5 — file SOURCE toggle: 'index' (in-app) | 'pod' (the user's real pod).
+  // file SOURCE toggle: 'index' (in-app) | 'pod' (the user's real pod).
   // `needsPod` = pod source picked but no pod connected yet.
   sourceMode = 'index',
   onSourceMode,
@@ -116,7 +116,7 @@ export function renderCircleFolioBrowser(container, {
   head.textContent = tr('circle.folio.title');
   container.appendChild(head);
 
-  // N5 — source toggle (In-app / My pod).  Only appears when the host wires
+  // source toggle (In-app / My pod).  Only appears when the host wires
   // `onSourceMode`.  Picking "My pod" reads the user's real signed-in pod.
   if (typeof onSourceMode === 'function') {
     const srcRow = document.createElement('div');
@@ -183,7 +183,7 @@ export function renderCircleFolioBrowser(container, {
     return container;
   }
 
-  // N5 — pod source picked but no pod connected: prompt sign-in instead of
+  // pod source picked but no pod connected: prompt sign-in instead of
   // an empty list (the data is on the pod, not a defect).
   if (podMode && needsPod) {
     const hint = document.createElement('div');
@@ -193,7 +193,7 @@ export function renderCircleFolioBrowser(container, {
     return container;
   }
 
-  // ── N5: Drive-style folder navigation ──────────────────────────────
+  // ── Drive-style folder navigation ──────────────────────────────
   if (navigable) {
     const level = folioLevel(files, currentPath);
 

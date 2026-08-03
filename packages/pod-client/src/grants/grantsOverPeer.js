@@ -7,7 +7,7 @@
  * ship, adds NO new crypto (design: `plans/NOTE-grants-over-peer.md`, decisions D1–D7):
  *
  *   - **mandate (a skill scope, task-bound)** → `TaskGrantManager.attachGrant` ("authority travels with
- *     the task"; revoked on task complete/cancel). D5: attenuated from the granter's own authority.
+ *     the task"; revoked on task complete/cancel). attenuated from the granter's own authority.
  *   - **resource share, DEFAULT = broker (D1)** → a scoped `res.read:<id>` `PodCapabilityToken` the
  *     granter's device/companion honours; the KEY NEVER LEAVES, revoke is instant.
  *   - **resource share, OFFLINE opt-in (`policy.offline`)** → `resourceKeyGrant.issueGrant` (a per-resource
@@ -80,7 +80,7 @@ export function assertScopedScheme(scheme) {
 }
 
 /**
- * D1 — pick the scheme for a RESOURCE grant from policy. Default = broker (least-authority: key stays home,
+ * pick the scheme for a RESOURCE grant from policy. Default = broker (least-authority: key stays home,
  * revoke instant). `policy.offline === true` opts into the per-resource CEK (offline-capable) path.
  * @param {{offline?: boolean}} [policy]
  * @returns {'broker'|'cek'}
@@ -148,14 +148,14 @@ export function hydrateGrants(records) {
  * @param {(peerPubKey: string) => boolean} [deps.isMember]  circle membership — a member always `mayDecrypt`.
  * @param {Map<string, object>} [deps.grants]  the local grant registry (grantId → record). Injectable for tests.
  * @param {() => number} [deps.now]            clock (expiry checks); injectable for tests.
- * @param {(event: object) => any} [deps.onGrantEvent]  D3 — the governance/permission-log emitter, called ONLY
+ * @param {(event: object) => any} [deps.onGrantEvent]  the governance/permission-log emitter, called ONLY
  *   for a grant against a CIRCLE resource (one issued with `{circleId}`); an out-of-circle share of the
  *   granter's OWN content stays private to the local registry. Injected from the composition root so this
  *   module stays transport-free (invariant 5); BEST-EFFORT — an emitter failure never fails the grant/revoke.
  *   The payload follows the existing `permission-log` convention (`{logKind, event, …}`).
- * @param {(resourceId: string) => (string|null|Promise<string|null>)} [deps.readSealed]  D4 — read a resource's
+ * @param {(resourceId: string) => (string|null|Promise<string|null>)} [deps.readSealed]  read a resource's
  *   CURRENT sealed body, for revoke→rotate. With `writeSealed`, a CEK revoke re-seals under a fresh key.
- * @param {(resourceId: string, sealed: string) => any} [deps.writeSealed]  D4 — persist the re-sealed body.
+ * @param {(resourceId: string, sealed: string) => any} [deps.writeSealed]  persist the re-sealed body.
  * @param {(records: Array<object>) => any} [deps.persist]  DURABILITY — called after EVERY mutation with the
  *   full record set, so the registry survives a reload. Without it the registry is in-process only: after a
  *   restart `mayDecrypt` would deny a peer who still holds a valid, unexpired token, and `liveGrants` would
@@ -195,7 +195,7 @@ export function createGrantsOverPeer({
   }
 
   /**
-   * D3 — emit the governance/permission-log event for a CIRCLE-resource grant. A grant carrying no
+   * emit the governance/permission-log event for a CIRCLE-resource grant. A grant carrying no
    * `circleId` is an out-of-circle share of the granter's own content: it stays in the local registry and
    * emits NOTHING (their call, nobody else's business). Best-effort by design — the grant has already
    * landed, so a logging hiccup must never fail it or be reported as failure.
@@ -231,7 +231,7 @@ export function createGrantsOverPeer({
   }
 
   /**
-   * Issue a grant to a `Peer`. D5: a grant can never exceed the granter's own reach — the underlying
+   * Issue a grant to a `Peer`. a grant can never exceed the granter's own reach — the underlying
    * primitives enforce attenuation (TaskGrant `verifyChain`; a resource grant is issued FROM the granter's
    * own custody). Records the grant locally (D3 own-content path).
    *
@@ -241,7 +241,7 @@ export function createGrantsOverPeer({
    * @param {'resource'|'skill'} [opts.kind='resource']
    * @param {{offline?: boolean}} [opts.policy]  D1 scheme selector for a resource grant.
    * @param {string} [opts.task]    task id — REQUIRED for a `skill` (mandate) grant.
-   * @param {string} [opts.circleId]  D3 — set when the scope is a CIRCLE resource: the grant is then also
+   * @param {string} [opts.circleId]  set when the scope is a CIRCLE resource: the grant is then also
    *   emitted to the governance/permission log (co-admins see it). Omit for an out-of-circle share of the
    *   granter's own content, which stays private to the local registry.
    * @param {number} [opts.expiresIn]
@@ -289,11 +289,11 @@ export function createGrantsOverPeer({
   }
 
   /**
-   * Revoke a grant by id, or every grant of a task. D4: broker-backed → the token is marked revoked so a
+   * Revoke a grant by id, or every grant of a task. broker-backed → the token is marked revoked so a
    * future open/releaseKey denies (instant, nothing to rotate); CEK-backed → same registry revoke here, plus
    * the resource re-seal/rotate is the step-3 addition (a released CEK can't be un-seen). Drops the local row.
    *
-   * D4 — a CEK-backed revoke also ROTATES when `readSealed`/`writeSealed` are wired: the resource is
+   * a CEK-backed revoke also ROTATES when `readSealed`/`writeSealed` are wired: the resource is
    * re-sealed under a fresh CEK, because a grantee who already fetched the old key cannot be made to
    * un-see it (the same honesty as the circle's ban→rotate). Still-live grantees pick the new key up on
    * their next `releaseKey`; the revoked one is denied. Without those seams the revoke is registry-only —
@@ -390,7 +390,7 @@ export function createGrantsOverPeer({
    *
    * @param {Array<string|object>} baseKeys  raw sealing pubkeys (or peer descriptors — `sealingPublicKey` is read).
    * @param {string} resourceId
-   * @param {{scheme?: string, policy?: object}} opts  D2 — required, as for `effectiveAudience`.
+   * @param {{scheme?: string, policy?: object}} opts  required, as for `effectiveAudience`.
    * @returns {string[]} deduped sealing public keys.
    */
   function effectiveSealingKeys(baseKeys, resourceId, { scheme, policy } = {}) {

@@ -68,8 +68,8 @@ export {
 // ── Security ─────────────────────────────────────────────────────────────────
 export { SecurityLayer, SecurityError, SEC } from './security/SecurityLayer.js';
 // Decision 1 — the two seams the inverted receive path is built on. `senderKey` decides what an
-// envelope CARRIES (L1: full key vs key id); `senderAuthorization` declares the roster-authorize
-// port the kernel calls and never implements (L3: kernel vs substrate).
+// envelope CARRIES (full key vs key id); `senderAuthorization` declares the roster-authorize
+// port the kernel calls and never implements (kernel vs substrate).
 export { SENDER_KEY_FIELD, senderCredential, resolveSenderKey, carriedSenderCredential, isEd25519PubKey }
   from './security/senderKey.js';
 export { SENDER_AUTHORIZATION, allowSender, refuseSender, askSenderAuthorizer }

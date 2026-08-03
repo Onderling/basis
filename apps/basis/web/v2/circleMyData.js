@@ -1,12 +1,12 @@
 /**
- * basis v2 — "My data" screen (web DOM renderer, S5 — privacy + diagnostics).
+ * basis v2 — "My data" screen (web DOM renderer, privacy + diagnostics).
  *
  * A read-only surface that retires stoop's privacy + metrics + data-location
  * pages: WHERE your data lives (pod root / relay, `getDataLocation` +
  * `podSignInStatus`), the privacy disclosure (`getPrivacyNotice`), and a usage
  * snapshot (`getMetrics`). Pure render — the host (`circleApp.js` showMyData)
  * loads the stoop ops and passes the results. The key-management actions
- * (S5 — back up · view recovery phrase · restore) are rendered when the host
+ * (back up · view recovery phrase · restore) are rendered when the host
  * injects the matching callbacks; each launches an existing wizard/skill.
  */
 
@@ -192,7 +192,7 @@ export function renderCircleMyData(container, {
       : n.subscribed ? tr('circle.mydata.notif_on') : tr('circle.mydata.notif_off');
     notif.appendChild(sub);
     if (n.supported) {
-      // J-CS10 — the trade is made by turning this ON, so it is stated HERE, above the button, in both
+      // the trade is made by turning this ON, so it is stated HERE, above the button, in both
       // states: someone reviewing their settings should see what having it on means. Three lines on
       // purpose — the cost, what is still NOT learned (a bare "affects your privacy" invites imagining
       // worse than the truth), and the escape. Not framed as a warning: most people should turn

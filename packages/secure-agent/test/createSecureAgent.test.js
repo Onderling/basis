@@ -158,7 +158,7 @@ describe('createSecureAgent — S0 foundation', () => {
   });
 });
 
-/* ─── S1 — mute / block + helloGate ──────────────────── */
+/* ─── mute / block + helloGate ──────────────────── */
 
 describe('createSecureAgent — S1 mute + helloGate', () => {
   it('mute set persists across two factory invocations (same vault key)', async () => {
@@ -298,7 +298,7 @@ describe('createSecureAgent — S1 mute + helloGate', () => {
   });
 });
 
-/* ─── S2 — signed WebID claim ────────────────────────── */
+/* ─── signed WebID claim ────────────────────────── */
 
 describe('createSecureAgent — S2 signed WebID claim', () => {
   it('signClaim → verifyClaim round-trips', async () => {
@@ -420,7 +420,7 @@ describe('createSecureAgent — S2 signed WebID claim', () => {
   });
 });
 
-/* ─── S3 — passphrase vault + WebAuthn ───────────────── */
+/* ─── passphrase vault + WebAuthn ───────────────── */
 
 describe('createSecureAgent — S3 passphrase vault', () => {
   it('passphrase opt without IndexedDB warns + falls through (no crash)', async () => {
@@ -653,7 +653,7 @@ describe('createSecureAgent — S3 WebAuthn / passkey', () => {
   });
 });
 
-/* ─── S4 — identity-resolver ─────────────────────────── */
+/* ─── identity-resolver ─────────────────────────── */
 
 describe('createSecureAgent — S4 identity-resolver', () => {
   // Build a minimal MemberMap-shape that returns canned members.
@@ -1055,7 +1055,7 @@ describe('createSecureAgent — 5.7c circle override enforcement', () => {
   });
 });
 
-/* ─── S5 — caps + roles + trust ─────────────────────── */
+/* ─── caps + roles + trust ─────────────────────── */
 
 describe('createSecureAgent — S5 trust + caps + policy', () => {
   it('omit trustRegistry/capabilityIssuer/policyEngine → all null', async () => {
@@ -1183,7 +1183,7 @@ describe('createSecureAgent — S5 trust + caps + policy', () => {
   });
 });
 
-/* ─── S6 — signed audit log ──────────────────────────── */
+/* ─── signed audit log ──────────────────────────── */
 
 describe('AuditLog — standalone', () => {
   async function makeLog({ vault = null, vaultKey = null } = {}) {
@@ -1395,7 +1395,7 @@ describe('createSecureAgent — S6 audit integration', () => {
   });
 });
 
-/* ─── S7 — groups + a2aTls + rate-limit + migrate ────── */
+/* ─── groups + a2aTls + rate-limit + migrate ────── */
 
 describe('RateLimiter — standalone', () => {
   it('per-peer bucket: burst, then deny, then refill', () => {
@@ -1584,7 +1584,7 @@ describe('createSecureAgent — S7 groups + a2aTls + rateLimit + migrate', () =>
   });
 });
 
-/* ─── S8 — Perfect Forward Secrecy ──────────────────── */
+/* ─── Perfect Forward Secrecy ──────────────────── */
 
 describe('PFSChain — standalone', () => {
   async function makePair() {

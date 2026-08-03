@@ -1,5 +1,5 @@
 /**
- * A7 — Conflict detection + resolution tests.
+ * Conflict detection + resolution tests.
  *
  * @see Design-v3/pod-client-api.md §Conflict detection
  * @see coding-plans/track-A-pod-substrate.md §A7

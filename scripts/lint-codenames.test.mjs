@@ -129,16 +129,47 @@ describe('PUBLIC API surface: the fuller pattern set (base + extras)', () => {
   });
 });
 
-describe('FORWARD PROTECTION: the real tree is clean today', () => {
-  it('no internal codename in any scoped source comment, doc, api-ref, or wave-1 description', () => {
+describe('FORWARD PROTECTION: nothing leaks in beyond the recorded debt', () => {
+  // This asserted an ABSOLUTELY clean tree until 2026-08-03, when the `plan-label` pattern started
+  // catching checklist ids (`B4 — `, `M1-S3: `) that had been unguardable before. That pattern found
+  // ~500 pre-existing sites, so an absolute assertion would have meant either deleting the guard or
+  // rewriting every one of them in a single change.
+  //
+  // So it now mirrors the LINT SCRIPT's ceiling semantics instead: known sites are carried in
+  // `codenames-baseline.json` as debt, and anything NOT in that file fails. The guard's real job is
+  // unchanged — a codename you add today still fails here — and the debt can only be paid down,
+  // because `--update` is the only way to rewrite the baseline and it is reviewed like any other diff.
+  const siteKey = (f, h) => `${f}:${h.id}:${h.match}`;
+  const known = new Set(
+    JSON.parse(readFileSync(new URL('codenames-baseline.json', import.meta.url), 'utf8')).sites ?? [],
+  );
+
+  it('no NEW internal codename in any scoped source comment, doc, api-ref, or wave-1 description', () => {
     const hits = [];
     for (const f of tracked()) {
       const scope = scopeOf(f);
       if (!scope) continue;
       let src;
       try { src = readFileSync(f, 'utf8'); } catch { continue; }
-      for (const h of findCodenames(scope.mask(src), scope.context)) hits.push(`${f} [${h.id}: ${h.match}]`);
+      for (const h of findCodenames(scope.mask(src), scope.context)) {
+        if (!known.has(siteKey(f, h))) hits.push(`${f} [${h.id}: ${h.match}]`);
+      }
     }
     expect(hits, `codenames leaked back into a scoped surface:\n${hits.join('\n')}`).toEqual([]);
+  });
+
+  it('the baseline is DEBT, not a licence — every entry still exists in the tree', () => {
+    // A baseline that outlives the code it describes silently grants permission for names nobody
+    // has written yet. Entries that no longer match anything are stale and must be pruned.
+    const live = new Set();
+    for (const f of tracked()) {
+      const scope = scopeOf(f);
+      if (!scope) continue;
+      let src;
+      try { src = readFileSync(f, 'utf8'); } catch { continue; }
+      for (const h of findCodenames(scope.mask(src), scope.context)) live.add(siteKey(f, h));
+    }
+    const stale = [...known].filter((k) => !live.has(k));
+    expect(stale, `baseline entries that no longer exist — run --update:\n${stale.join('\n')}`).toEqual([]);
   });
 });

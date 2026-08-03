@@ -1,5 +1,5 @@
 /**
- * S4 · J-R1 + J-R5 — the relay's own view of per-circle addressing, from the adversary's seat.
+ * The relay's own view of per-circle addressing, from the adversary's seat.
  *
  * Per-circle addressing (G13) promises unlinkability against **other members**, against **anyone watching
  * the wire**, and against **every relay you did not use**. It does NOT promise unlinkability against a

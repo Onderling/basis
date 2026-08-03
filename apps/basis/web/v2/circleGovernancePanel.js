@@ -42,7 +42,7 @@ export function renderGovernancePanel(container, { view = { open: [], closed: []
 
   container.appendChild(el('h2', 'circle-governance__title', tr('circle.governance.title')));
 
-  // L3 — equivocation alert: authors caught telling different peers different things. The
+  // equivocation alert: authors caught telling different peers different things. The
   // fork-proof is self-verifying; the circle reviews + removes via the normal removeMember class.
   const disputed = view?.disputed ?? [];
   for (const d of disputed) {

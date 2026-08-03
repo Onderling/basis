@@ -1,5 +1,5 @@
 /**
- * J-B10 / J-B13 — you may register an address only if you hold its key.
+ * J-B10 / you may register an address only if you hold its key.
  *
  * THE BREACH THIS CLOSES, measured on hardware 2026-07-30 and reproduced below: a fresh socket sent
  * `{type:'register', address}` naming another member's per-circle address, the relay believed it,

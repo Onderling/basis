@@ -178,11 +178,29 @@ export const CODENAME_PATTERNS = [
   // `J-CS8`, `J-R4`, `J-NP3` mean nothing without the private JOURNEYS.md — and that file is gitignored,
   // so for a public reader they are unresolvable by construction. Name what the journey CHECKS.
   //
-  // Deliberately NOT matching checklist ids (`B8`, `C4a`, `L13`): tried, and it flagged 899 sites because
-  // `B1`/`C3`/`L4` collide with legitimate identifiers everywhere. A guard that cannot tell a plan
-  // reference from a variable is worse than the written rule, because its noise trains people to ignore
-  // it. Those stay a review rule in CLAUDE.md.
   { id: 'journey-id',   re: /\bJ-[A-Z]{1,3}\d{1,2}(?:\.\d+)?\b/g },
+
+  // Checklist ids in LABEL position — `B4 — `, `M1-S3: `, `L1b — ` (2026-08-03).
+  //
+  // This was previously recorded here as impossible: matching checklist ids flagged 899 sites, because
+  // `B1`/`C3`/`L4` collide with legitimate identifiers everywhere, and a guard that cannot tell a plan
+  // reference from a variable is worse than the written rule — its noise trains people to ignore it.
+  //
+  // That reasoning holds for a BARE token and only for a bare token. The label FORM does not collide,
+  // because what identifies it is not the token but the punctuation after it: an id followed by an
+  // em-dash or a colon and a space is a comment introducing a section, never an expression. `B4 — ` is
+  // a label; `B4` in `const B4 = …` or `roster.B4` is not, and this pattern does not see it.
+  //
+  // Requiring the separator is the whole trick, so do not relax it to a bare `\b<id>\b`: that is the
+  // 899-site version, and it is the reason this guard did not exist for a year.
+  //
+  // KNOWN false positives, both carried in the baseline rather than special-cased — the shapes are too
+  // rare to be worth complicating the regex, and each is obvious on sight:
+  //   • `R2/S3 — ` in blob-gateway/sigv4.js — Cloudflare R2 and Amazon S3, the storage products.
+  //   • `circle Y on R2 — ` in relay/test/twoRelaysNoLinkage — the second RELAY in that test.
+  // If a third appears in the same family (a product or a local label that happens to look like an id),
+  // prefer adding it to the baseline over loosening the pattern.
+  { id: 'plan-label',   re: /\b(?:[A-FLNRS]\d{1,2}[a-z]?|M\d+-S\d{1,2})\s*(?:—|–|--|:)\s+/g },
 ];
 
 // EXTRA patterns enforced ONLY on the PUBLIC API surface (context 'api':

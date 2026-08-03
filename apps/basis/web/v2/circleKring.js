@@ -310,7 +310,7 @@ export function renderCircleKring(container, {
       onPost:   noticeboard.onPost,
       onAction: noticeboard.onAction,
       onIntent: noticeboard.onIntent,
-      // S5 — inline image attachments.
+      // inline image attachments.
       attachment:       noticeboard.attachment ?? null,
       onAttach:         noticeboard.onAttach,
       onClearAttach:    noticeboard.onClearAttach,

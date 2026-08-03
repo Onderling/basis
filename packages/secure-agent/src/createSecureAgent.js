@@ -1032,26 +1032,23 @@ export async function createSecureAgent(opts = {}) {
           if (typeof console !== 'undefined') {
             console.log('[secure-agent] sending reciprocal HI to ' + String(env._from).slice(0, 16) + '…');
           }
+          // Answer AS the address they dialled (G13). Without `from`, the reply carries our canonical
+          // address, the peer files our key under that, and it keeps waiting for a key under the alias it
+          // sent to — so a handshake to a per-circle address never completes. `Transport.sendHello`
+          // validates the claim against our own addresses and falls back to the primary.
+          // Decision 4 — answer with the key that BELONGS to the address they dialled. They
+          // dialled a per-circle address; replying with our canonical pubKey would hand them (and
+          // the relay, in cleartext, via `_to`) the link between that address and the identity the
+          // rest of our circles use — the exact linkage per-circle addressing exists to withhold.
+          // Absent ⇒ the canonical key, which is right for contact/pairing traffic.
+          const answerKey = (typeof agent.security?.selfIdentityFor === 'function'
+            ? agent.security.selfIdentityFor(env._to)?.pubKey : null) ?? identity.pubKey;
+          // `from` — answer AS the address they dialled (G13), or a handshake to a per-circle address
+          // can never complete. `re` — name the envelope we are answering, which is what makes this a
+          // REPLY and therefore unanswerable; no new wire field is needed for that.
+          const helloArgs = [env._from, { pubKey: answerKey }, { from: env._to, re: env._id ?? null }];
           try {
-            // Answer AS the address they dialled (G13). Without `from`, the reply carries our canonical
-            // address, the peer files our key under that, and it keeps waiting for a key under the alias it
-            // sent to — so a handshake to a per-circle address never completes. `Transport.sendHello`
-            // validates the claim against our own addresses and falls back to the primary.
-            // Decision 4 — answer with the key that BELONGS to the address they dialled. They
-            // dialled a per-circle address; replying with our canonical pubKey would hand them (and
-            // the relay, in cleartext, via `_to`) the link between that address and the identity the
-            // rest of our circles use — the exact linkage per-circle addressing exists to withhold.
-            // Absent ⇒ the canonical key, which is right for contact/pairing traffic.
-            const answerKey = (typeof agent.security?.selfIdentityFor === 'function'
-              ? agent.security.selfIdentityFor(env._to)?.pubKey : null) ?? identity.pubKey;
-            await tx.sendHello(
-              env._from,
-              { pubKey: answerKey },
-              // `from` — answer AS the address they dialled (G13), or a handshake to a per-circle address
-              // can never complete. `re` — name the envelope we are answering, which is what makes this a
-              // REPLY and therefore unanswerable; no new wire field is needed for that.
-              { from: env._to, re: env._id ?? null },
-            );
+            await tx.sendHello(...helloArgs);
             // NOT `helloedPeers` — answering someone is not the same as having announced ourselves to them,
             // and conflating the two also let the send path believe it had already introduced itself.
             reciprocatedPeers.add(env._from);
@@ -1059,8 +1056,46 @@ export async function createSecureAgent(opts = {}) {
               console.log('[secure-agent] reciprocal HI sent OK to ' + String(env._from).slice(0, 16) + '…');
             }
           } catch (err) {
-            console.warn('[secure-agent] reciprocal HI failed (will retry on next envelope)', err?.message ?? err);
-            // Don't record it — the next inbound envelope from this peer triggers another attempt.
+            // ── The answer must not die with the transport it arrived on ────────────────────────────
+            //
+            // The reciprocal HI goes back over the transport that RECEIVED the envelope. That is normally
+            // exactly right, and it is silently wrong when that transport can receive but not SEND — a
+            // rendezvous route whose DataChannel never opened still delivers inbound traffic (its
+            // signalling rides another transport) and then cannot answer.
+            //
+            // Giving up here used to be survivable because of "retry on next envelope". It is not, when
+            // the peer is waiting for precisely this answer: no further envelope is coming, so the retry
+            // never fires and both sides wait forever.
+            //
+            // Measured 2026-08-03 — this is what breaks a JOIN. The admin receives the redeem, sends its
+            // HI and waits for the joiner's reciprocal HI; the joiner tries to answer over a dead
+            // rendezvous channel and gives up; the admin times out ("did not respond with HI within
+            // 5000ms"); the redeem RESPONSE is therefore never sent; and the joiner tells the person
+            // **"no admin online"** about an admin that is online, listening, and holding their request.
+            // One dead transport on the answering side, and the on-ramp closes.
+            //
+            // So: demote the route that could not answer, then answer over whatever the router picks
+            // instead. If that also fails, the original behaviour stands — log and wait.
+            try { routing.onTransportFailure?.(env._from, tx?.name ?? null); } catch { /* defensive */ }
+            let recovered = false;
+            try {
+              const sel = await route(env._from);
+              if (sel?.transport && sel.transport !== tx) {
+                await sel.transport.sendHello(...helloArgs);
+                reciprocatedPeers.add(env._from);
+                recovered = true;
+                if (typeof console !== 'undefined') {
+                  console.log(
+                    `[secure-agent] reciprocal HI re-routed to ${String(env._from).slice(0, 16)}… `
+                    + `after ${tx?.name ?? 'the receiving transport'} could not answer`,
+                  );
+                }
+              }
+            } catch { /* fall through to the original warning */ }
+            if (!recovered) {
+              console.warn('[secure-agent] reciprocal HI failed (will retry on next envelope)', err?.message ?? err);
+              // Don't record it — the next inbound envelope from this peer triggers another attempt.
+            }
           }
         }
       } catch (err) {

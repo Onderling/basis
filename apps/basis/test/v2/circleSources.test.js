@@ -24,12 +24,15 @@ describe('circleSources', () => {
     expect(g[0].name).toBe('selwerd');
   });
 
-  it('omits fetchCircles without a circlesStore, uses it when present', async () => {
-    expect(circleSourcesFromAgent({ callSkill }).fetchCircles).toBeUndefined();
-    const circlesStore = { list: async () => [{ id: 'z', name: 'Z' }] };
-    const s = circleSourcesFromAgent({ callSkill, circlesStore });
-    expect(await s.fetchCircles()).toEqual([{ id: 'z', name: 'Z' }]);
-  });
+  // REMOVED 2026-08-03 — this test proved the BRANCH while nothing proved the WIRING.
+  //
+  // It asserted `fetchCircles` appears when a `circlesStore` is passed and is omitted otherwise, using a
+  // hand-made `{ list }` fake. Both halves passed. Meanwhile the real callers read `agent.circlesStore`,
+  // which nothing has ever assigned — on any branch, in 4,422 commits — so in production the branch was
+  // permanently `undefined` and the source silently never existed.
+  //
+  // That is the shape worth remembering: a green test over an injected fake says the code works IF something
+  // calls it. It says nothing about whether anything does. The fake was the only caller it ever had.
 
   it('feeds loadCircles end-to-end (circles + buurts merged + normalised)', async () => {
     const list = await loadCircles(circleSourcesFromAgent({ callSkill }));

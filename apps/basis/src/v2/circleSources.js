@@ -41,9 +41,15 @@ export function circleSourcesFromAgent({ callSkill, circlesStore, helpCircleName
         return raw;
       });
     },
-    fetchCircles: circlesStore
-      ? async () => (await circlesStore.list()) ?? []
-      : undefined,
+    // NO `fetchCircles` here. It used to read an optional `@onderling/circles` store off the agent — and
+    // nothing has EVER assigned `agent.circlesStore`, on any branch, in 4,422 commits. So the branch was
+    // permanently `undefined`: the source silently never existed, with no error and no warning. Its test
+    // passed a hand-made `{list}` fake, which proved the BRANCH worked while nothing proved the WIRING did
+    // (removed 2026-08-03).
+    //
+    // Not re-wired on purpose. Standing up `createCirclesStore` here would create a SECOND circle registry
+    // beside stoop's `getMyCircles`/`listMyBuurts`, which is the confusion the planned stoop→circles
+    // extraction exists to remove — see `DESIGN-ops-flows-nav` §8c. The list of circles has one home.
   };
 }
 

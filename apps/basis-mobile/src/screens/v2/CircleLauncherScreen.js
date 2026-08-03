@@ -976,7 +976,7 @@ export default function CircleLauncherScreen({
     setLoading(true);
     try {
       const sources = callSkill
-        ? circleSourcesFromAgent({ callSkill, circlesStore: bundle?.agent?.circlesStore, helpCircleName: () => helpCircleSpec(t).name })
+        ? circleSourcesFromAgent({ callSkill, helpCircleName: () => helpCircleSpec(t).name })
         : {};
       const _l = await loadCircles(sources);
       setCircles(_l);

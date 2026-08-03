@@ -46,3 +46,23 @@ lower ceremony, and the whole history reads top-to-bottom.)
 - A decision that turns into work → add the work to the relevant roadmap; the decision entry records *why*.
 
 *(This convention is itself an entry in `docs/decisions.md`, 2026-07-02.)*
+
+## Your OWN judgement calls — the private review file
+
+`docs/decisions.md` records decisions the *maintainer* has answered. A choice an agent makes **without**
+him is a different thing and has a different home: `plans/DECISIONS-FOR-REVIEW.md` (private/local).
+
+**The rule — dated, and re-decided on 2026-08-13.** Any such choice goes into that file **in the same turn
+as the change**, colour-coded 🟢 mechanical · 🟡 shapes something · 🔴 awkward to undo, and stating **how to
+undo it**.
+
+**Why same-turn and not a batch at the end.** The file silently drifted three days in July 2026 and had to
+be reconstructed afterwards, which can only ever be partial: what you forgot is by definition absent. It is
+the same habit as `agent-notes-known-gotchas.md` — write it the turn you hit it.
+
+**What a good entry contains**, beyond the decision itself: the *risk you are taking*, stated plainly, and
+the reversal. An entry that only says what was done is a changelog line; the value is in what a reviewer
+would otherwise have to reconstruct — what else was possible, and what breaks if this was wrong.
+
+**On 2026-08-13 this rule is re-decided** — keep, narrow, or drop. It exists because it was forgotten once,
+not forever.

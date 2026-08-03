@@ -82,12 +82,8 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
 - **Record a decision** when a choice closes off alternatives / would be re-litigated / shapes architecture (→ `docs/decisions.md`) or org (→ private) — [`decision-log.md`](docs/conventions/decision-log.md).
 - **Log your OWN judgement calls as you make them — dated rule, review on 2026-08-13.** Any choice made
   without Frits goes into `plans/DECISIONS-FOR-REVIEW.md` **in the same turn as the change**, colour-coded
-  (🟢 mechanical · 🟡 shapes something · 🔴 awkward to undo) and stating **how to undo it**. Not a batch at
-  the end of a session: the file silently drifted three days in July 2026 and had to be reconstructed after
-  the fact, which can only ever be partial — what you forgot is by definition absent. This is the same habit
-  as `agent-notes-known-gotchas.md` (write it the turn you hit it), and distinct from `docs/decisions.md`,
-  which is only for decisions Frits has *answered*. **On 2026-08-13 this rule is re-decided** — keep, narrow,
-  or drop. It exists because it was forgotten once, not forever.
+  (🟢 · 🟡 · 🔴), stating **the risk you are taking** and **how to undo it**. Not a batch at the end — the
+  file drifted three days in July 2026 and could only be partly reconstructed. → [`decision-log.md`](docs/conventions/decision-log.md).
 - **Naming is `onderling`; compatibility is a DATED licence** — no "canopy" identifiers; backwards
   compat **not required until 2026-08-31** (extended 2026-07-30), then it lapses and you ASK before breaking a persisted/wire
   format — [`naming-and-compatibility.md`](docs/conventions/naming-and-compatibility.md).
@@ -104,11 +100,9 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
   caveat, or a finding and it goes unanswered, it stays OPEN — carry it into the design/plan doc as an open
   item rather than quietly dropping it because the conversation moved on. When a thread has accumulated more
   open points than a reply can hold, **ask** which to keep rather than deciding for him.
-- **Check whether it already exists — the locale file is the fastest index.** Before adding a set of states,
-  a label map, or any small closed vocabulary, grep `apps/basis/src/locales/circle.en.json` for the word a
-  user would see: if the product can already say it, the concept already exists in code. Then check
-  [`shared-vocabularies.md`](docs/conventions/shared-vocabularies.md). Duplicate vocabularies do not break
-  anything — they just make two parts of the app describe one fact differently — so nothing catches them.
+- **Check whether it already exists — the locale file is the fastest index.** Grep
+  `circle.en.json` for the word a *user* would see before adding any small closed vocabulary. Duplicates
+  break nothing, so nothing catches them. → [`shared-vocabularies.md`](docs/conventions/shared-vocabularies.md).
 - **Grep every identifier you introduce against the file you put it in**, especially state setters and
   navigation helpers: they read plausibly and are named differently per screen. `src/screens/**` has no test
   coverage, so nothing else will catch a typo there (→ `docs/agent-notes-known-gotchas.md`).
@@ -125,12 +119,9 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
   to a manifest; **folio does** — basis is a poor file manager — so it keeps a surface of its own.
 - **Ship web first, then mobile** as separate steps/commits; don't bundle both platforms in one commit.
 - **A device harness already exists — use it before hand-driving anything.** `apps/basis-mobile/e2e/` is a
-  **Detox** suite (real emulator or attached phone, driven by `testID`s): `coldBoot`, `allWizards`,
-  `circleScreens`, `restartSurvival`. `npm run detox:build` once per source change, then `npm run detox:test`
-  (or `detox:test:attached` for the physical phone). Hand-driving with `adb input tap` + `screencap` is a last
-  resort, not the default — pixel coordinates and `input text` have their own traps
-  (→ `docs/agent-notes-known-gotchas.md`), and a whole afternoon went into them on 2026-07-30 while this
-  suite sat unused. If a journey is not expressible here, that is a gap in the harness worth closing.
+  **Detox** suite (real emulator or attached phone). Hand-driving with `adb input tap` is a last resort; a
+  whole afternoon went into its traps on 2026-07-30 while this suite sat unused.
+  → [`e2e/README.md`](apps/basis-mobile/e2e/README.md).
 - **Verify the RESULT, not just the dispatch** — check the skill's return value, not only that a command
   fired (the device-run lesson; a gate can route while the op silently fails).
 - **Keep the design-doc status overview current.** When you finish, supersede, or archive a plan/design doc,

@@ -70,3 +70,17 @@ pattern so the Detox selectors stay greppable.
 - `../docs/manifest-pipeline.md` — pipeline that lands on screen
 - `Project Files/basis/post-2026-05-24-priority.md` —
   Bundle D test-pyramid + coverage matrix
+
+## Use this before hand-driving anything
+
+`npm run detox:build` once per source change, then `npm run detox:test` — or `detox:test:attached` for a
+physical phone. The suites are `coldBoot`, `allWizards`, `circleScreens`, `restartSurvival`, driven by
+`testID`s against a real emulator or attached device.
+
+**Hand-driving with `adb input tap` + `screencap` is a last resort, not the default.** Pixel coordinates and
+`input text` have their own traps (→ `docs/agent-notes-known-gotchas.md`; `adb shell input keyevent 111` is
+ESCAPE, which silently cancels a wizard mid-flow). A whole afternoon went into those on 2026-07-30 while
+this suite sat unused.
+
+**If a journey is not expressible here, that is a gap in the harness worth closing** — extend the suite
+rather than reaching for `adb`, so the next person inherits a harness instead of a transcript.

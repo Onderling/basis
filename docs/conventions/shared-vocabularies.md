@@ -56,3 +56,15 @@ are two halves of one journey, and forcing a choice between them loses informati
   for the rest of this page.
 - `scripts/lint-codenames.mjs` — names must read without the plans (invariant 9).
 - `apps/basis-mobile/test/shellLayering.test.js` — a shell imports its composer and nothing else.
+
+## Before you add one: the locale file is the fastest index
+
+Before adding a set of states, a label map, or any small closed vocabulary, grep
+`apps/basis/src/locales/circle.en.json` for the word a **user** would see. If the product can already say
+it, the concept already exists in code — find it rather than inventing a second name for it.
+
+Then check this file's index above.
+
+**Why this needs a written rule at all:** a duplicate vocabulary breaks nothing. It compiles, it ships, and
+it passes every test — it just makes two parts of the app describe one fact differently. Nothing fails, so
+nothing catches it, which is why the check has to be a habit rather than a guard.

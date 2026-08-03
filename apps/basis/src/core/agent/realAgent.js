@@ -476,7 +476,14 @@ export async function createRealHouseholdAgent(opts = {}) {
         prefix:         `/household/circles/${id}/items/`,
       });
       householdSyncWired.add(id);
-    } catch { /* sync is best-effort; the op still runs locally */ }
+      if (typeof console !== 'undefined') console.info(`[household-sync] ${id}: store<->mirror wired`);
+    } catch (err) {
+      // Best-effort by design — the op must still run locally — but silence here means "items never
+      // sync" and looked identical to "items sync fine" (2026-08-03). Say which one it was.
+      if (typeof console !== 'undefined') {
+        console.warn(`[household-sync] ${id}: store<->mirror NOT wired — items will not fan out`, err?.message ?? err);
+      }
+    }
   }
   // Legacy bucket's mirror (back-compat default for un-scoped peer ops + the seed/demo path).
   const householdMirror = await ensureHouseholdMirror('household');

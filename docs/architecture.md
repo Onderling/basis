@@ -6,19 +6,19 @@ you need to *understand the whole system* — why it's shaped this way, and how 
 
 **The model in one sentence.** Every interface — AI, GUI, slash command, deterministic gate — compiles to the
 same `{opId, args}` and hands it to `callSkill`; an app's `manifest.js` is the single contract, and pure
-projectors turn that one declaration into every surface. Interfaces are pass-throughs (*pass-through*); the
-manifest is the contract; the functionality the op names resolves *wherever it lives*.
+projectors turn that one declaration into every surface. Interfaces are pass-throughs; the manifest is the
+contract; the functionality the op names resolves *wherever it lives*.
 
 **How this document is organised.** Five parts, front to back — the model, then how it runs, then the domain
-it models, then the system it runs on, then where it's going:
+it models, then the system it runs on, then where it's going. Each part assumes the one before it:
 
 | Part | Sections | What you get |
 |---|---|---|
 | **1 · The model** | The one idea · The manifest is the contract | the thin waist, and the single declaration every surface reads |
-| **2 · How it runs** | How a request flows · Retrieval (RAG) · The help bot · Chat and screens compose | a request end to end, how answers are grounded, the standing bot, and how surfaces trigger each other |
-| **3 · The domain** | Circles/types/capabilities · Tasks/roles/grants · Offerings/disclosure · Sharing | the one `(circle, type, verb)` algebra, the task + delegation substrate, the offering model, and how sealed sharing rides on it |
-| **4 · The system** | The layers · Placement by trust+latency · Agents interacting · Reachability | kernel/adapters/substrates, where compute is placed, and the inter-agent axis |
-| **5 · Direction** | Direction · Where to go next | what's being enforced next, and pointers onward |
+| **2 · How it runs** | How a request flows · The event log · Retrieval (RAG) · The help bot · Chat and screens compose | a request end to end, the record it is written into and read back from, how answers are grounded, the standing bot, and how surfaces trigger each other |
+| **3 · The domain** | Circles/types/capabilities · The data plane · Tasks/roles/grants · Offerings/disclosure · Sharing | the one `(circle, type, verb)` algebra, the stores and typed items it lands on, the task + delegation substrate, the offering model, and how sealed sharing rides on it |
+| **4 · The system** | The layers · Placement by trust+latency · Agents interacting · Reachability · Consistency & governance | kernel/adapters/substrates, where compute is placed, the inter-agent axis, and how a circle's state stays consistent |
+| **5 · Direction** | Where this is going · Where to go next | what's being enforced next, and pointers onward |
 
 ---
 
@@ -42,8 +42,8 @@ intermediate is the **thin waist**.
 Two consequences follow from the waist, and they are the whole architecture:
 
 1. **Interfaces are peer compilers, not privileged front-ends.** AI and GUI both *compile to* `{opId, args}`;
-   neither owns the logic. They are pass-throughs — *pass-through*. Adding a surface never means adding a
-   `switch` over apps; it means projecting the manifest onto that surface.
+   neither owns the logic. They are pass-throughs. Adding a surface never means adding a `switch` over apps;
+   it means projecting the manifest onto that surface.
 2. **Where an op resolves is a separate axis from how it was invoked.** `callSkill` runs the op; the
    functionality it names can live *anywhere* — a local handler, an external agent, a model, the user's Solid
    pod, an MCP service, a scheduled job. The interface doesn't know or care.
@@ -90,12 +90,14 @@ is what makes a reader ask "why is `renderAttachments` a peer of the chat shell?
 (`npm run coverage` → `apps/basis/docs/surface-coverage.md`) records which surfaces each op is wired for,
 so the map can't drift from the manifests.
 
+That is the whole of the model. The rest of this document is what happens when it runs.
+
 ---
 
 ## 2 · How it runs
 
-*The waist in motion: a request end to end, how the circle bot's answers are grounded, and how the two surface
-families compose.*
+*The waist in motion: a request end to end, the record everything is written into and read back from, how the
+circle bot's answers are grounded, and how the two surface families compose.*
 
 ### How a request flows, end to end
 
@@ -105,20 +107,21 @@ families compose.*
 3. **Dispatch** — `resolveDispatch` maps `{opId, args}` to a handler via the merged manifest; `runDispatch`
    invokes it.
 4. **`callSkill`** — the single entry point that runs the op. This is also the **security boundary**: an op
-   only runs if it's in the caller's effective capability set (see *Circles, types, and capabilities* below).
+   only runs if it's in the caller's effective capability set (see *Circles, types, and capabilities* in
+   Part 3).
 5. **Functionality resolves** — wherever it lives: a local skill handler, a peer agent over a transport, an
    LLM, a read/write against the Solid pod, an MCP tool, or a scheduled job.
 6. **Result** — flows back to the invoking surface. Verify the *result*, not just that dispatch fired: a gate
    can route correctly while the op silently fails.
 
-### The event log — what runs is written down
+### The event log — one record, many projections
 
-Underneath the flow above there is one **append-only event log per device**, and it is a *substrate*, not a
-feature of any surface: any part of the app can append to it, and the chat, the cross-circle stream and the
-activity views are projections over it rather than stores of their own (see *One log, many projections* in
-Part 3 for the projection side).
+Underneath that flow there is one **append-only event log per device** — not one per circle, and not one per
+surface. It is a *substrate*, not a feature of any surface: any part of the app can append to it, and the
+chat, the cross-circle stream and the activity views are projections over it rather than stores of their own.
+Every entry carries a **kind**, an **actor**, and (usually) a `circleId`; the log is the canonical record.
 
-Three properties are worth knowing before you write to it or read from it:
+Three properties are worth knowing before you write to it:
 
 - **Append-only, and auditable entries are immutable.** An entry is de-duplicated on the caller's id; for the
   kinds marked auditable, a repeat id is first-write-wins — a delegated agent cannot rewrite a row it already
@@ -126,7 +129,10 @@ Three properties are worth knowing before you write to it or read from it:
 - **Kind-classified.** Behaviour is carried by the entry's **kind**, in one shared table
   (`ENTRY_KINDS` in `@onderling/item-store`), which answers four separate questions: does it show in a
   conversation or is it system plumbing (`lane`), may it wake an offline device (`wakes`), how long is it
-  kept (`retain`), and is it immutable once written (`audit`). An unregistered kind gets the conservative
+  kept (`retain`), and is it immutable once written (`audit`). The kind is also what the attention gate keys
+  off: the silent system kinds — membership, key events, delivery state, a roster ping — never wake an
+  offline device, and only human-facing kinds may. Deriving that from the kind, rather than stamping a flag
+  at each write site, is what keeps the rule from drifting. An unregistered kind gets the conservative
   reading — system lane, never wakes, shortest retention — so a new kind cannot accidentally reach a phone.
   The table lives in a substrate package precisely so two apps cannot each derive the wake rule differently
   (→ [`shared-vocabularies.md`](conventions/shared-vocabularies.md)).
@@ -145,11 +151,26 @@ device-local structured logger (`@onderling/logger`) takes the opposite approach
 app, where there is no circle scope to key on: it is PII-safe *by construction*, accepting only event codes
 and scalar fields and rejecting identifier-shaped values whatever field they arrive under.
 
+**Reading it back is a projection, never a second store.** A projection selects on two axes, and it is worth
+naming them because the function names alone do not:
+
+- **scope** — one circle, or all of them;
+- **content** — which entry *kinds* (`chat-message`, `task`, `governance`, `report`, …), and therefore which
+  lane: the human-facing kinds, or also the silent system ones.
+
+So the per-circle chat is `scope = this circle, content = the conversation kinds`, and the cross-circle
+stream is `scope = all, content = everything`. A combine-and-filter surface is just a control that sets those
+two arguments — not a new query path.
+
+*(Being completed: the projector functions and the kind registry are converging on exactly this shape — see
+the private roadmap. The principle above is the design of record.)*
+
 ### Retrieval (RAG) — grounding the circle bot
 
-Each circle has an assistant (the "circle bot"). Before it answers via the LLM, it retrieves the circle's own
-relevant items and weaves them into the prompt, so answers are grounded in the circle's real data (chores,
-tasks, notes, messages) rather than the model's guesses.
+Projections are one way a circle's own material is read back. Grounding a model in it is another. Each circle
+has an assistant (the "circle bot"); before it answers via the LLM, it retrieves the circle's own relevant
+items and weaves them into the prompt, so answers are grounded in the circle's real data (chores, tasks,
+notes, messages) rather than the model's guesses.
 
 **Flow.** The pre-LLM gate (`tokenGate.js`) routes each message: a deterministic command (`/done milk`) fires
 directly with no model; anything else takes the `via:'llm'` path, where the gate calls `retrieve(text, ctx)`,
@@ -181,10 +202,11 @@ survives an app restart on a signed-in pod, and exercises the ACP grant path aga
 
 ### The standing help bot and onboarding
 
-A first run drops the user into a help circle ("Uitleg") whose only other member is the **Onderling bot** — a
-real peer member of the circle, not a modal overlay. Onboarding is therefore *just the bot's chat*: a guided
-conversation whose copy is resolved in the active language at the moment it starts (not frozen at import), and
-whose "make my own circle" branch hands off to the create-circle wizard.
+The circle bot answers inside a circle the user already has. A first run has none, so it is met by a different
+standing bot: the user is dropped into a help circle ("Uitleg") whose only other member is the **Onderling
+bot** — a real peer member of the circle, not a modal overlay. Onboarding is therefore *just the bot's chat*:
+a guided conversation whose copy is resolved in the active language at the moment it starts (not frozen at
+import), and whose "make my own circle" branch hands off to the create-circle wizard.
 
 Two rules make the bot honest and unobtrusive:
 
@@ -200,12 +222,13 @@ Two rules make the bot honest and unobtrusive:
 
 ### Chat and screens compose (and trigger each other)
 
-There are two surface *families* over the waist, not one: **conversational** (chat/gate/slash) and **screen**
-(the web/mobile GUI). They don't merely render the same op in parallel — they **compose and trigger each other**.
-Today, in the web shell: an op that declares `surfaces.ui.screen` gets an **"Open" button** that opens a
-full-screen panel (`openCircleScreenPanel`); conversely a **row action inside a screen posts `{opId, args}` back
-through the same waist** (`dispatchReady`). So a chat command can open a screen, and a screen action can drive a
-chat flow. Three treatments — **inline menu · full-screen panel · chat** — are chosen per user.
+Both bots live on the conversational side of the waist — which is only one of the two surface *families* over
+it, and the two are not independent. There is **conversational** (chat/gate/slash) and **screen** (the
+web/mobile GUI), and they don't merely render the same op in parallel — they **compose and trigger each
+other**. Today, in the web shell: an op that declares `surfaces.ui.screen` gets an **"Open" button** that opens
+a full-screen panel (`openCircleScreenPanel`); conversely a **row action inside a screen posts `{opId, args}`
+back through the same waist** (`dispatchReady`). So a chat command can open a screen, and a screen action can
+drive a chat flow. Three treatments — **inline menu · full-screen panel · chat** — are chosen per user.
 
 *Current state:* the flat **list** surface (contacts/prikbord) is manifest-projected on both platforms — the
 hardcoded `LIST_SCREENS` map is **retired**; `openCircleScreenPanel` reads its config from the projected
@@ -213,7 +236,7 @@ hardcoded `LIST_SCREENS` map is **retired**; `openCircleScreenPanel` reads its c
 **detail action-bar** project from one nav-chrome `NavModel` kind — `manifest.tabs[]` → `NavModel.tabs[]` and
 `manifest.actions[]` → `NavModel.actions[]`, a small shared `NavItem`/`NavTarget` vocabulary (`tabProjection.js`
 · `actionProjection.js`) that both shells render from. Every consumer reads the *same* roster: web's tab bar
-(`web/v2/circleTabBar.js`), web's circle detail *and* the **live web kring ⋯ menu** (`circleDetail.js` ·
+(`web/v2/circleTabBar.js`), web's circle detail *and* the **live web kring (circle) ⋯ menu** (`circleDetail.js` ·
 `circleKring.js`), and the mobile tab bar + **live mobile kring ⋯ menu** (`CircleTabBar.js` ·
 `CircleLauncherScreen.js` via `circleTabsMobile`/`circleActionsMobile`) — the duplicated `TABS`/action literals
 are gone, and each shell only *filters* the identical roster by an action's `platforms` + `requires` gate.
@@ -228,32 +251,8 @@ separate surface KIND, parked). The compose/trigger loop (open-screen button ↔
 
 ## 3 · The domain
 
-*What the system actually models: one algebra of circles, types, and capabilities — and how every kind of
-sharing is a move over a single sealed resource.*
-
-### One log, many projections
-
-The same instinct applies to what a circle *records*. There is **one append-only event log per device** — not
-one per circle and not one per surface. Every entry carries a **kind**, an **actor**, and (usually) a
-`circleId`; the log is the canonical record, and **chat, the cross-circle stream, and the activity views are
-all projections of it**, not separate stores.
-
-A projection selects on two axes, and it is worth naming them because the function names alone do not:
-
-- **scope** — one circle, or all of them;
-- **content** — which entry *kinds* (`chat-message`, `task`, `governance`, `report`, …), and therefore which
-  lane: the human-facing kinds, or also the silent system ones.
-
-So the per-circle chat is `scope = this circle, content = the conversation kinds`, and the cross-circle
-stream is `scope = all, content = everything`. A combine-and-filter surface is just a control that sets those
-two arguments — not a new query path.
-
-The entry **kind** is also what the attention gate keys off: silent system kinds (membership, key events,
-delivery state, a roster ping) never wake an offline device; only human-facing kinds may. Deriving that from
-the kind — rather than stamping a flag at each write site — is what keeps the rule from drifting.
-
-*(Being completed: the projector functions and the kind registry are converging on exactly this shape — see
-the private roadmap. The principle above is the design of record.)*
+*What the system actually models: one algebra of circles, types, and capabilities; the stores and typed items
+that algebra lands on; and how every kind of sharing is a move over a single sealed resource.*
 
 ### Circles, types, and capabilities — one algebra
 
@@ -262,17 +261,71 @@ drifting apart:
 
 - A **circle** is one scope worn several ways at once: the **audience** of an item (who may see it), the
   **storage key** (data is keyed by `circle + type`), the **capability-policy scope** (permissions are
-  per-circle), and the **pod routing key** — all one `circleId`. (A circle is itself an item-type.)
+  per-circle), and the **pod routing key** — all one `circleId`. (A circle is itself an item type.)
 - A **capability** is a **`(verb × noun)`** pair — the **verb** is a canonical **atom** (`add` · `list` ·
-  `update` · `remove` · `complete` · `claim` · `share` · …) and the **noun** is an **item-type** (`task` ·
-  `note` · `offer` · `contact` · …). So "who may do what" is a set of `(atom × item-type)` pairs, authorized
+  `update` · `remove` · `complete` · `claim` · `share` · …) and the **noun** is an **item type** (`task` ·
+  `note` · `offer` · `contact` · …). So "who may do what" is a set of `(atom × item type)` pairs, authorized
   **per circle at `callSkill`** (default-deny).
 - A manifest **declares** its `nouns` (its capability surface); its ops just fill in the implementing `opId`.
   The same item-type registry that validates stored data supplies the nouns.
 
-The upshot: the **type axis** (item-types), the **verb axis** (atoms), and the **scope axis** (circles) compose
+The upshot: the **type axis** (item types), the **verb axis** (atoms), and the **scope axis** (circles) compose
 — **storage, permissions, and surfaces are all projections of one `(circle, type, verb)` space.** That is why a
 new noun added to a manifest becomes storable, gate-able, and renderable at once.
+
+### The data plane — circles, stores, items, verbs
+
+The algebra says which axes exist. The data plane is where they land in the running code. Parts 1 and 2
+describe how a *request* travels; this is what it travels **to**: one sentence, then the parts.
+
+> **A circle owns one store; a store holds typed items; a type gets the standard verbs for free and adds
+> its own where it needs them; and whatever the store holds is what syncs to the circle's other members.**
+
+**Circle → store.** The scope axis is also the storage axis: a circle's items live in one
+`CircleItemStore` (`packages/item-store`), rooted per circle. "Which circle" is not a filter applied to a
+shared pile — it is which store you are holding. Two stores for one circle is a defect, not a design.
+
+**Store → items.** Items are typed, and the types are declared, not implied — `packages/item-types`
+carries a schema per canonical type:
+
+> `task` · `note` · `chat-message` · `chat-thread` · `offer` · `request` · `claim` · `contact` ·
+> `calendar-event` · `announcement` · `media` · `view` · `circle` · `shared-ref` · `neighbourhood-job` ·
+> `reveal-request`
+
+**A message and a task are siblings.** Both are typed items in a circle's store; `chatEnvelope.js` sits
+beside `taskLifecycle.js` in the same package. Neither is privileged, and neither belongs to an "app".
+
+**Items → verbs.** Every type gets the canonical atoms for free — `add · list · get · update · remove`
+(`createGenericAtomHandlers`: *declare a noun → get CRUD*). A type that needs more declares bespoke ops,
+and `resolveAtom` lets those win over the generic ones. So `task` adds `claim` · `submit` · `approve` ·
+`reassign` over its DAG (`dag.js`, `taskLifecycle.js`), while `note` needs nothing beyond the atoms. This
+is what makes "one algebra" affordable: **unify the store and the transport, never the operations.**
+
+**State is derived, not stored.** A task's status comes from `effectiveStatus(task, …)` over its
+dependencies — the row is the materialised head, the transitions are the history. Same shape as the event
+log in Part 2: durable records, derived views.
+
+**Store → the wire.** A store is bridged to the circle's peer mirror by `wireStoreMirror`
+(publish-on-write) and `wireCircleStoreInbound` (ingest, `causalMerge` by origin-timestamp + writer-id,
+`sync:false` on inbound to stop echo). **This is the only fan-out path there should be.** A type that
+reaches a peer some other way is a second implementation of sync, and will drift from this one.
+
+#### Where the runtime does NOT match this yet
+
+Written down on 2026-08-03 because all four are live, and because prose that flatters the code is worse than
+no prose:
+
+| | state |
+|---|---|
+| Chat messages live in **both** an `EventLog` and as a `chat-message` item type | duplication to resolve — decide which is the record |
+| `addTask` exists on the `tasks` app-origin **and** in `HOUSEHOLD_WIRED_OPS` over the circle store | two routes to one op; the household copy is `{text, completedAt}` and cannot carry the lifecycle |
+| Tasks are correctly per-circle, and their store is **not** on the fan-out path | a task written on one device reaches no peer |
+| `household` names circle-level machinery throughout (`addHouseholdPeer`, `getHouseholdScope`) | a legacy app name doing load-bearing work; rename to `circle` |
+
+**The rule these violations share:** each is a place where the code can no longer tell "did not happen"
+from "happened fine". That is the failure mode this architecture is most exposed to — everything here is
+composed of best-effort seams — so **a seam is not done until something crosses it**, and the guard for
+this section is a per-type sync matrix: one item of every canonical type, two real peers, asserted arrival.
 
 ### Tasks, roles, and task-scoped grants
 
@@ -302,7 +355,7 @@ Authority over tasks rides on two capability-token primitives, both enforced by 
   it calls `RoleGrantManager.materializeBundle`, which signs each template into a real `CapabilityToken` scoped to
   the member and group. The display role and the enforced authority are the same object.
 - **Task-scoped grants (the mandate / *entrust* primitive).** `TaskGrantManager.attachGrant` issues **one**
-  cap-token equal-or-narrower than the granter's, stamped `constraints.task = taskId`, **off by default**;
+  capability token equal-or-narrower than the granter's, stamped `constraints.task = taskId`, **off by default**;
   `revokeTaskGrants(taskId)` revokes it on task complete/cancel. In the UI this is **entrust** (NL
   *toevertrouwen*): a task owner delegates "act as me" or "use this offering" for just this task, chosen from an
   extensible grant-kind taxonomy and routed through the confirm gate. The kring **Taken** tab surfaces both the
@@ -311,10 +364,11 @@ Authority over tasks rides on two capability-token primitives, both enforced by 
 
 ### Offerings and the three disclosure axes
 
-Alongside the *invocable* skills an agent advertises (the A2A sense — see `decisions.md`, 2026-07-17), a person's
-own "I can do X" is an **offering** (NL *aanbod*) — a disclosure-controlled profile property, held on the roster
-as `MemberMap.offerings` and normalised against a fixed taxonomy in `@onderling/agent-registry`. It is *data*,
-not a callable, and it becomes reachable to others only through the disclosure policy.
+Not everything a person can do arrives as a task someone already wrote down. Alongside the *invocable* skills an
+agent advertises (the A2A sense — see `decisions.md`, 2026-07-17), a person's own "I can do X" is an
+**offering** (NL *aanbod*) — a disclosure-controlled profile property, held on the roster as `MemberMap.offerings`
+and normalised against a fixed taxonomy in `@onderling/agent-registry`. It is *data*, not a callable, and it
+becomes reachable to others only through the disclosure policy.
 
 That policy is **three independent axes** per property, not one show/hide flag:
 
@@ -332,6 +386,9 @@ task** the owner can accept, adapt, or refuse. So "ask a neighbour to do X" conv
 above, with the owner's consent step intact.
 
 ### Sharing — in place, across circles, and beyond them
+
+Tasks, offerings, and every other item type share one further problem: how an item crosses from one circle to
+another without being copied, and how that crossing is taken back.
 
 Sealed circles (postures p2/p3) encrypt content under a per-circle **group key**, kept in a *versioned*
 **group-key resource** on the pod — each version wrapped to the then-current members' keys. Membership **is**
@@ -371,64 +428,10 @@ written in plaintext (invariant #7).
 
 ---
 
-### The data plane — circles, stores, items, verbs (2026-08-03)
-
-The waist above describes how a *request* travels. This is what it travels **to**: one sentence, then the
-parts.
-
-> **A circle owns one store; a store holds typed items; a type gets the standard verbs for free and adds
-> its own where it needs them; and whatever the store holds is what syncs to the circle's other members.**
-
-**Circle → store.** A circle is the unit of scope *and* the unit of storage. Its items live in one
-`CircleItemStore` (`packages/item-store`), rooted per circle. "Which circle" is not a filter applied to a
-shared pile — it is which store you are holding. Two stores for one circle is a defect, not a design.
-
-**Store → items.** Items are typed, and the types are declared, not implied — `packages/item-types`
-carries a schema per canonical type:
-
-> `task` · `note` · `chat-message` · `chat-thread` · `offer` · `request` · `claim` · `contact` ·
-> `calendar-event` · `announcement` · `media` · `view` · `circle` · `shared-ref` · `neighbourhood-job` ·
-> `reveal-request`
-
-**A message and a task are siblings.** Both are typed items in a circle's store; `chatEnvelope.js` sits
-beside `taskLifecycle.js` in the same package. Neither is privileged, and neither belongs to an "app".
-
-**Items → verbs.** Every type gets the canonical atoms for free — `add · list · get · update · remove`
-(`createGenericAtomHandlers`: *declare a noun → get CRUD*). A type that needs more declares bespoke ops,
-and `resolveAtom` lets those win over the generic ones. So `task` adds `claim` · `submit` · `approve` ·
-`reassign` over its DAG (`dag.js`, `taskLifecycle.js`), while `note` needs nothing beyond the atoms. This
-is what makes "one algebra" affordable: **unify the store and the transport, never the operations.**
-
-**State is derived, not stored.** A task's status comes from `effectiveStatus(task, …)` over its
-dependencies — the row is the materialised head, the transitions are the history. Same shape as the log
-model above: durable records, derived views.
-
-**Store → the wire.** A store is bridged to the circle's peer mirror by `wireStoreMirror`
-(publish-on-write) and `wireCircleStoreInbound` (ingest, `causalMerge` by origin-timestamp + writer-id,
-`sync:false` on inbound to stop echo). **This is the only fan-out path there should be.** A type that
-reaches a peer some other way is a second implementation of sync, and will drift from this one.
-
-#### Where the runtime does NOT match this yet
-
-Written down because all four are live, and because prose that flatters the code is worse than no prose:
-
-| | state |
-|---|---|
-| Chat messages live in **both** an `EventLog` and as a `chat-message` item type | duplication to resolve — decide which is the record |
-| `addTask` exists on the `tasks` app-origin **and** in `HOUSEHOLD_WIRED_OPS` over the circle store | two routes to one op; the household copy is `{text, completedAt}` and cannot carry the lifecycle |
-| Tasks are correctly per-circle, and their store is **not** on the fan-out path | a task written on one device reaches no peer |
-| `household` names circle-level machinery throughout (`addHouseholdPeer`, `getHouseholdScope`) | a legacy app name doing load-bearing work; rename to `circle` |
-
-**The rule these violations share:** each is a place where the code can no longer tell "did not happen"
-from "happened fine". That is the failure mode this architecture is most exposed to — everything here is
-composed of best-effort seams — so **a seam is not done until something crosses it**, and the guard for
-this section is a per-type sync matrix: one item of every canonical type, two real peers, asserted arrival.
-
-
 ## 4 · The system
 
-*What it all runs on: the layer stack, the rule for where compute is placed, and the inter-agent axis with the
-paths that carry it.*
+*What it all runs on: the layer stack, the rule for where compute is placed, the inter-agent axis with the
+paths that carry it, and how a circle's state stays consistent without a server.*
 
 ### The layers — kernel, adapters, substrates, apps
 
@@ -447,8 +450,8 @@ packages/core                the KERNEL — a lean set of PORTS + kernel logic
 - **The kernel (`packages/core`) is lean.** It holds the `Agent`, envelope/parts, the skill registry, the
   inbound-permission gate (`PolicyEngine`), the inter-agent invoke (`invokeAgentSkill`), `InternalTransport`, and
   the **ports** — `Transport` · `DataSource` · `ActorResolver`, plus the narrower `StorageBackend` (a **blind
-  ciphertext store**: opaque `put`/`get`/`list`, no plaintext read — see *Sharing* below for why the seal, not
-  the store's access control, is the gate).
+  ciphertext store**: opaque `put`/`get`/`list`, no plaintext read — see *Sharing* in Part 3 for why the seal,
+  not the store's access control, is the gate).
   The ports are the **named compatibility contract**: *implement the port + pass its conformance harness =
   compatible with the kernel* ([`conventions/ports.md`](./conventions/ports.md)). The concrete **adapters** live
   OUTSIDE the kernel — network transports in **`@onderling/transports`**, Solid-pod storage + on-pod identity in
@@ -492,14 +495,14 @@ moving private data onto an untrusted host. Correspondingly:
 
 ### Agents interacting (the inter-agent axis)
 
-The flow above is **intra-agent**: one interface → the waist → dispatch → functionality. Equally fundamental is
-the **inter-agent** axis — agents as **peers exchanging over a transport**, carried by an **envelope**. One wire
-carries three things: it **syncs circle stores** (with no pod, a write fans out to circle members as envelopes),
-it carries **direct exchanges** (offer→claim, request→respond), and it enables **remote skill-acquisition** — an
-agent authenticates into *another* agent's gated skill surface over a transport, with identity, permission, and
-validation travelling **in the envelope**. This is what lets functionality resolve on an external agent
-(consequence #2 above), and it's the substrate the developer-integration on-ramps (a connected bot, a remote
-handler) build on.
+The request flow in Part 2 is **intra-agent**: one interface → the waist → dispatch → functionality. Equally
+fundamental is the **inter-agent** axis — agents as **peers exchanging over a transport**, carried by an
+**envelope**. One wire carries three things: it **syncs circle stores** (with no pod, a write fans out to circle
+members as envelopes), it carries **direct exchanges** (offer→claim, request→respond), and it enables **remote
+skill-acquisition** — an agent authenticates into *another* agent's gated skill surface over a transport, with
+identity, permission, and validation travelling **in the envelope**. This is what lets functionality resolve on
+an external agent (consequence #2 in Part 1), and it's the substrate the developer-integration on-ramps (a
+connected bot, a remote handler) build on.
 
 **One send waist (`deliver`).** Every message a circle emits — a chat line, a broadcast, a 1:1 DM — funnels
 through one primitive rather than the parallel send paths that used to exist. There is **one canonical chat
@@ -605,6 +608,9 @@ Transport details: [project overview → Reachability](../README.md#reachability
 
 ### Consistency & governance
 
+Reachability gets a message to a peer. What happens when several peers write at once, or when one of them lies,
+is the last system-level concern.
+
 A circle's state lives in **one signed log stream** (the `EventLog`) — chat, membership, key rotations, and
 governance events all ride it; no central server arbitrates. Four layers keep it consistent under partitions
 and bad actors, weakest concern to strongest:
@@ -616,9 +622,9 @@ and bad actors, weakest concern to strongest:
 - **L3 · equivocation** — a member signing two contradictory events (telling different peers different things —
   double-voting, key-splitting) is caught by a **per-author hash-chain**: each governance-spine event carries a
   `parentHash`, so two events sharing a parent are a self-verifying **fork-proof**. Any replica holding both
-  halves mints it; the fold marks the author **disputed**, which resolves via L4. *Scope: the hash-chain covers
-  only the governance/membership/key event types — chat stays on the mergeable L1 path (forking chat isn't an
-  attack).*
+  halves mints it; the fold marks the author **disputed**, which resolves via the governance layer below.
+  *Scope: the hash-chain covers only the governance/membership/key event types — chat stays on the mergeable
+  concurrent-edit path (forking chat isn't an attack).*
 - **L4 · governance** — each governed action maps to a **decision-class** in the circle policy
   (`governance: { removeMember, rotateKey, changeRule, changePolicy } → any-admin | admin-quorum | member-vote`).
   A `member-vote` tallies `governance` events over the **full proof-derived membership** (not the reachable
@@ -636,7 +642,9 @@ locally — the same discipline the hash-chain enforces. Full record: [decisions
 
 *Where this is going, and where to read next.*
 
-### Direction (where this is going)
+### Where this is going
+
+Two directions are settled and already shaping the work described above:
 
 - **Apps consolidate into the Basis shell.** The manifest-per-app split is an *engineering*
   boundary, not a product one: each `manifest.js` stays the source of truth every projector reads,

@@ -678,7 +678,6 @@
     "packages/pod-client/test/IdentityPodStore.test.js:plan-bucket:Track B",
     "packages/pod-client/test/IdentitySync.test.js:plan-bucket:Track B",
     "packages/pod-client/test/PodExporter.test.js:plan-bucket:Track C",
-    "packages/pod-client/test/grantsDurable.test.js:P-phase:P0.3",
     "packages/pod-client/test/migrateVaultToPod.test.js:plan-bucket:Track B",
     "packages/pseudo-pod/src/IndexedDbBackend.js:plan-bucket:Objective L",
     "packages/react-native/src/createMeshAgent.js:plan-bucket:Track B",

@@ -238,7 +238,11 @@ export function createChatMessageInbox({
     }));
     logger.info?.('[kring-chat] received', envelope.msgId, 'circle=' + envelope.circleId, 'source=' + source);
     if (typeof onStored === 'function') {
-      try { onStored({ msgId: envelope.msgId, fromPeerAddr, source }); }
+      // `circleId` rides along so a shell can decide whether this insert affects what is ON SCREEN.
+      // Without it the only honest options are "repaint on every stored message" or "never" — and web
+      // took the second, so a received message sat in the log with nothing telling the open kring to
+      // show it (2026-08-03).
+      try { onStored({ msgId: envelope.msgId, circleId: envelope.circleId, fromPeerAddr, source }); }
       catch (err) { logger.warn?.('[kring-chat] onStored hook threw', err?.message ?? err); }
     }
     return { result: 'inserted' };

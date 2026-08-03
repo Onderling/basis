@@ -6805,12 +6805,34 @@ async function boot() {
         // Delivery honesty — a LIVE insert ("their app stored it", from our side of the mirror) answers
         // the sender with a receipt. Policy is entirely in `makeReceiptSender`: only source 'receiver',
         // setting read per message, fail-closed on a broken settings read.
-        onStored: makeReceiptSender({
+        onStored: ((sendReceipt) => (info) => {
+          try { sendReceipt(info); } catch { /* a failed receipt must not stop the repaint below */ }
+          // …and REPAINT, because a message that arrived while the kring is open has to APPEAR.
+          //
+          // Storing it was never the problem: the envelope arrives, the inbox appends it to the event
+          // log, and the log is what the kring renders from — but nothing told the open view to render
+          // again, so the message existed and was invisible until some unrelated redraw happened by.
+          //
+          // This is the same shape as the receipt bug fixed just above ("the one writer with nothing to
+          // announce it"), and it is the more serious version: a receipt going stale leaves a bubble
+          // saying "maybe received", while this leaves the OTHER PERSON'S MESSAGE off the screen
+          // entirely. Measured on 2026-08-03: two paired peers, delivery confirmed in the log
+          // (`[kring-chat] received … source=receiver`), and B's chat read empty.
+          //
+          // Narrowed exactly like the receipt subscription, and for the same reason: web's `rerender`
+          // REBUILDS the kring DOM including the composer, and an input rebuilt mid-sentence loses what
+          // was typed into it. So repaint only for a LIVE inbound insert (`source === 'receiver'`, not a
+          // rehydrate or catch-up backfill, both of which are followed by their own render) and only
+          // when the message belongs to the circle actually on screen.
+          if (info?.source !== 'receiver') return;
+          if (!info?.circleId || info.circleId !== _kringRender?.circleId) return;
+          try { _kringRender?.rerender?.(); } catch { /* no open kring */ }
+        })(makeReceiptSender({
           getSettings: () => deliverySettingsStore.get(),
           sendTo: (to, payload) => (typeof _peerAgent?.sendPeerMessage === 'function'
             ? _peerAgent.sendPeerMessage(to, payload)
             : Promise.reject(new Error('no peer agent'))),
-        }),
+        })),
         // Connectivity Phase 3 (receiver side) — resolve a pod-signal REF envelope (a pod-row pointer,
         // no body) into the full chat message by reading + unsealing the circle's shared pod. Absent a
         // pod / group key → the inbox skips the ref (deferred), never crashes the receive loop.

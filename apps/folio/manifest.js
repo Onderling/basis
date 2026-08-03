@@ -19,12 +19,18 @@
  *
  * Folio is structurally different from the item-store apps (tasks-v0,
  * stoop, household): it doesn't have an ItemStore + circle-scoped items.
- * Its "items" are markdown files mirrored to a Solid pod via
- * `@onderling/sync-engine`.  Its "skills" are HTTP route handlers
- * (`apps/folio/src/server/routes.js`) + CLI commands
- * (`apps/folio/src/cli/*.js`) + RN actions
- * (`apps/folio-mobile/src/screens/*.js`) — NOT the
- * `defineSkill` / agent-invoke shape the substrate apps use.
+ * Its "items" are markdown files mirrored to a Solid pod via `@onderling/sync-engine`.
+ *
+ * ⚠ CORRECTED 2026-08-03. This used to say folio's skills are "HTTP route handlers + CLI commands + RN
+ * actions — NOT the `defineSkill` / agent-invoke shape the substrate apps use". That stopped being true on
+ * 2026-07-10, when folio became a connectable agent: `apps/folio/src/wireSkills.js` derives
+ * `defineSkill`-shaped handlers from THIS manifest via `buildFolioSkills`, guarded by
+ * `apps/folio/test/localWireFitness.test.js`. The HTTP/CLI/RN surfaces still exist — they are now
+ * projections alongside the wire route, not instead of it.
+ *
+ * The stale sentence is worth naming: it is why an audit read folio's `listFiles` as a declaration with no
+ * backing skill. The op has four live consumers. A comment that outlives its code does not just mislead a
+ * reader — it makes working code look dead.
  *
  * What this manifest IS:
  *   Source-of-truth declaration of folio's destructive ops with
@@ -50,10 +56,12 @@
  *   - Wired into the HTTP routes — routes still own their own logic.
  *   - Wired into folio-mobile screens — they still own their own
  *     ConfirmModal usage.
- *   strict — `validateManifest(folioManifest, {strict: true})`
- *     would flag `listFiles` + `verifyPodState` because they don't have
- *     `defineSkill` entries; folio's "skills" are HTTP routes.  Default
- *     non-strict validation passes.
+ *   strict — historical note: this said strict validation "would flag `listFiles` + `verifyPodState`
+ *     because they don't have `defineSkill` entries". They do, since 2026-07-10 (`buildFolioSkills`).
+ *     What strict mode still flags is the `listFiles` VIEW at the end of this file, whose
+ *     `dataSource.skillId` is declared while the view itself is deliberately not projected — see
+ *     `plans/NOTE-manifest-browser-surface-type.md` ("better honestly-bespoke than misleadingly
+ *     half-projected").
  *
  * Future slices (F.2+) can wire the HTTP /status page + folio-mobile
  * screens to read this manifest's projected NavModel for severity

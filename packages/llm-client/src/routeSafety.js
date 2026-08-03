@@ -29,8 +29,17 @@ export function isLoopbackBase(base) {
 /**
  * Attestation is "configured" when the caller asserts it (the client verifies the TEE quote — Option B)
  * or the deploy opts in via PRIVATEMODE_ATTESTATION. NB this is a CONFIG FLAG, not quote verification —
- * the real client-side quote check is the unbuilt Option B enclave gateway. Until then this is the
- * deliberate, auditable bypass for a deployment that has verified its enclave out-of-band.
+ * it records that someone ASSERTED an attested route, and nothing here checks a quote.
+ *
+ * ⚠ CORRECTED 2026-08-03. This used to say "the real client-side quote check is the unbuilt Option B
+ * enclave gateway". **A real verifier exists** — `verifyAttestation` in
+ * `packages/confidential-llm/src/attestation.js:65`. What is missing is not the check; it is that nothing
+ * calls it on this path. So today a deployment trusts an env flag while a working verifier sits one
+ * package away, unreferenced.
+ *
+ * Until it is wired, this remains the deliberate, auditable bypass for a deployment that has verified its
+ * enclave out-of-band — but "unbuilt" was the wrong word, and it is the word that kept anyone from
+ * looking.
  */
 export function attestationConfigured({ attestation } = {}) {
   return Boolean(attestation || env('PRIVATEMODE_ATTESTATION'));

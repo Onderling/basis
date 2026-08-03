@@ -16,8 +16,16 @@ substrate is the functionality.
 
 > The model is right. **Make the architecture self-enforcing** so it stays right.
 
-**Deeper architecture** — the waist, the end-to-end dispatch flow, the layers, and where this is going:
-[`docs/architecture.md`](docs/architecture.md). The sentence above + the invariants below are the working summary.
+## READ THIS FIRST — [`docs/architecture.md`](docs/architecture.md)
+The waist, the dispatch flow, the layers, and **the data plane**: how circles, stores, item types and their
+verbs actually relate (§3, "The data plane"). One sentence of it, because it decides most questions:
+
+> **A circle owns one store; a store holds typed items; a type gets the standard verbs for free and adds
+> its own where it needs them; and whatever the store holds is what syncs to the circle's other members.**
+
+That file also lists **where the runtime does not match the model yet** — read those before concluding
+something is unbuilt. The recurring failure here is not a wrong decision; it is a route that quietly
+stopped following a right one, and the code kept working locally the whole time.
 
 ## Before you debug a build/native failure
 Check **`docs/agent-notes-known-gotchas.md`** first — known monorepo-resolution (EAS/Metro

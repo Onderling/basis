@@ -371,6 +371,60 @@ written in plaintext (invariant #7).
 
 ---
 
+### The data plane — circles, stores, items, verbs (2026-08-03)
+
+The waist above describes how a *request* travels. This is what it travels **to**: one sentence, then the
+parts.
+
+> **A circle owns one store; a store holds typed items; a type gets the standard verbs for free and adds
+> its own where it needs them; and whatever the store holds is what syncs to the circle's other members.**
+
+**Circle → store.** A circle is the unit of scope *and* the unit of storage. Its items live in one
+`CircleItemStore` (`packages/item-store`), rooted per circle. "Which circle" is not a filter applied to a
+shared pile — it is which store you are holding. Two stores for one circle is a defect, not a design.
+
+**Store → items.** Items are typed, and the types are declared, not implied — `packages/item-types`
+carries a schema per canonical type:
+
+> `task` · `note` · `chat-message` · `chat-thread` · `offer` · `request` · `claim` · `contact` ·
+> `calendar-event` · `announcement` · `media` · `view` · `circle` · `shared-ref` · `neighbourhood-job` ·
+> `reveal-request`
+
+**A message and a task are siblings.** Both are typed items in a circle's store; `chatEnvelope.js` sits
+beside `taskLifecycle.js` in the same package. Neither is privileged, and neither belongs to an "app".
+
+**Items → verbs.** Every type gets the canonical atoms for free — `add · list · get · update · remove`
+(`createGenericAtomHandlers`: *declare a noun → get CRUD*). A type that needs more declares bespoke ops,
+and `resolveAtom` lets those win over the generic ones. So `task` adds `claim` · `submit` · `approve` ·
+`reassign` over its DAG (`dag.js`, `taskLifecycle.js`), while `note` needs nothing beyond the atoms. This
+is what makes "one algebra" affordable: **unify the store and the transport, never the operations.**
+
+**State is derived, not stored.** A task's status comes from `effectiveStatus(task, …)` over its
+dependencies — the row is the materialised head, the transitions are the history. Same shape as the log
+model above: durable records, derived views.
+
+**Store → the wire.** A store is bridged to the circle's peer mirror by `wireStoreMirror`
+(publish-on-write) and `wireCircleStoreInbound` (ingest, `causalMerge` by origin-timestamp + writer-id,
+`sync:false` on inbound to stop echo). **This is the only fan-out path there should be.** A type that
+reaches a peer some other way is a second implementation of sync, and will drift from this one.
+
+#### Where the runtime does NOT match this yet
+
+Written down because all four are live, and because prose that flatters the code is worse than no prose:
+
+| | state |
+|---|---|
+| Chat messages live in **both** an `EventLog` and as a `chat-message` item type | duplication to resolve — decide which is the record |
+| `addTask` exists on the `tasks` app-origin **and** in `HOUSEHOLD_WIRED_OPS` over the circle store | two routes to one op; the household copy is `{text, completedAt}` and cannot carry the lifecycle |
+| Tasks are correctly per-circle, and their store is **not** on the fan-out path | a task written on one device reaches no peer |
+| `household` names circle-level machinery throughout (`addHouseholdPeer`, `getHouseholdScope`) | a legacy app name doing load-bearing work; rename to `circle` |
+
+**The rule these violations share:** each is a place where the code can no longer tell "did not happen"
+from "happened fine". That is the failure mode this architecture is most exposed to — everything here is
+composed of best-effort seams — so **a seam is not done until something crosses it**, and the guard for
+this section is a per-type sync matrix: one item of every canonical type, two real peers, asserted arrival.
+
+
 ## 4 · The system
 
 *What it all runs on: the layer stack, the rule for where compute is placed, and the inter-agent axis with the

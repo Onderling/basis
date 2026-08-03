@@ -1,12 +1,343 @@
 {
   "$schema": "dep-boundary-baseline/v0",
   "description": "CEILING of known cross-package raw-src reach-ins (CLAUDE.md invariant #5). lint:deps FAILS on any violation NOT listed here; removing entries is always allowed. Regenerate with: node scripts/lint-dep-boundaries.mjs --update",
-  "generatedAt": "2026-07-09",
-  "total": 0,
+  "generatedAt": "2026-08-03",
+  "total": 55,
   "byCategory": {
-    "runtime": 0,
+    "runtime": 4,
     "script": 0,
-    "test": 0
+    "test": 51
   },
-  "violations": []
+  "violations": [
+    {
+      "file": "apps/agents/test/install.test.js",
+      "specifier": "../../../packages/agent-registry/src/AgentRegistry.js",
+      "reachesInto": "@onderling/agent-registry",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/install.test.js",
+      "specifier": "../../../packages/core/src/Agent.js",
+      "reachesInto": "@onderling/core",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/install.test.js",
+      "specifier": "../../../packages/core/src/identity/AgentIdentity.js",
+      "reachesInto": "@onderling/core",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/install.test.js",
+      "specifier": "../../../packages/core/src/permissions/PolicyEngine.js",
+      "reachesInto": "@onderling/core",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/install.test.js",
+      "specifier": "../../../packages/core/src/permissions/TokenRegistry.js",
+      "reachesInto": "@onderling/core",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/install.test.js",
+      "specifier": "../../../packages/core/src/permissions/TrustRegistry.js",
+      "reachesInto": "@onderling/core",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/install.test.js",
+      "specifier": "../../../packages/core/src/skills/SkillRegistry.js",
+      "reachesInto": "@onderling/core",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/install.test.js",
+      "specifier": "../../../packages/core/src/transport/InternalTransport.js",
+      "reachesInto": "@onderling/core",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/install.test.js",
+      "specifier": "../../../packages/vault/src/VaultMemory.js",
+      "reachesInto": "@onderling/vault",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/installCommunityG3.test.js",
+      "specifier": "../../../packages/agent-registry/src/AgentRegistry.js",
+      "reachesInto": "@onderling/agent-registry",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/installCommunityG3.test.js",
+      "specifier": "../../../packages/agent-registry/src/catalogSource.js",
+      "reachesInto": "@onderling/agent-registry",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/installCommunityG3.test.js",
+      "specifier": "../../../packages/agent-registry/src/communityCatalog.js",
+      "reachesInto": "@onderling/agent-registry",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/installCommunityG3.test.js",
+      "specifier": "../../../packages/agent-registry/src/endorsement.js",
+      "reachesInto": "@onderling/agent-registry",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/installCommunityG3.test.js",
+      "specifier": "../../../packages/agent-registry/src/subscriptions.js",
+      "reachesInto": "@onderling/agent-registry",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/installCommunityG3.test.js",
+      "specifier": "../../../packages/circles/src/audience.js",
+      "reachesInto": "@onderling/circles",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/installCommunityG3.test.js",
+      "specifier": "../../../packages/core/src/identity/AgentIdentity.js",
+      "reachesInto": "@onderling/core",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/installCommunityG3.test.js",
+      "specifier": "../../../packages/vault/src/VaultMemory.js",
+      "reachesInto": "@onderling/vault",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/installEndorsed.test.js",
+      "specifier": "../../../packages/agent-registry/src/AgentRegistry.js",
+      "reachesInto": "@onderling/agent-registry",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/installEndorsed.test.js",
+      "specifier": "../../../packages/agent-registry/src/catalogSource.js",
+      "reachesInto": "@onderling/agent-registry",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/installEndorsed.test.js",
+      "specifier": "../../../packages/agent-registry/src/endorsement.js",
+      "reachesInto": "@onderling/agent-registry",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/installEndorsed.test.js",
+      "specifier": "../../../packages/agent-registry/src/endorsementResource.js",
+      "reachesInto": "@onderling/agent-registry",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/installEndorsed.test.js",
+      "specifier": "../../../packages/core/src/identity/AgentIdentity.js",
+      "reachesInto": "@onderling/core",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/installEndorsed.test.js",
+      "specifier": "../../../packages/vault/src/VaultMemory.js",
+      "reachesInto": "@onderling/vault",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/installEndorsedG2.test.js",
+      "specifier": "../../../packages/agent-registry/src/AgentRegistry.js",
+      "reachesInto": "@onderling/agent-registry",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/installEndorsedG2.test.js",
+      "specifier": "../../../packages/agent-registry/src/catalogSource.js",
+      "reachesInto": "@onderling/agent-registry",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/installEndorsedG2.test.js",
+      "specifier": "../../../packages/agent-registry/src/endorsement.js",
+      "reachesInto": "@onderling/agent-registry",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/installEndorsedG2.test.js",
+      "specifier": "../../../packages/core/src/identity/AgentIdentity.js",
+      "reachesInto": "@onderling/core",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/installEndorsedG2.test.js",
+      "specifier": "../../../packages/vault/src/VaultMemory.js",
+      "reachesInto": "@onderling/vault",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/localWireFitness.test.js",
+      "specifier": "../../../packages/agent-registry/src/AgentRegistry.js",
+      "reachesInto": "@onderling/agent-registry",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/localWireFitness.test.js",
+      "specifier": "../../../packages/app-manifest/src/renderWeb.js",
+      "reachesInto": "@onderling/app-manifest",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/localWireFitness.test.js",
+      "specifier": "../../../packages/app-manifest/src/validate.js",
+      "reachesInto": "@onderling/app-manifest",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/localWireFitness.test.js",
+      "specifier": "../../../packages/sdk/src/index.js",
+      "reachesInto": "@onderling/sdk",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/localWireFitness.test.js",
+      "specifier": "../../../packages/sdk/src/testing/localWireFitness.js",
+      "reachesInto": "@onderling/sdk",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/localWireFitness.test.js",
+      "specifier": "../../../packages/versioning/src/versionStore.js",
+      "reachesInto": "@onderling/versioning",
+      "category": "test"
+    },
+    {
+      "file": "apps/agents/test/localWireFitness.test.js",
+      "specifier": "../../../packages/web-adapter/src/fetchSectionItems.js",
+      "reachesInto": "@onderling/web-adapter",
+      "category": "test"
+    },
+    {
+      "file": "apps/basis-mobile/test/circleStoopMediaMobile.test.js",
+      "specifier": "../../../packages/blob-gateway/src/index.js",
+      "reachesInto": "@onderling/blob-gateway",
+      "category": "test"
+    },
+    {
+      "file": "apps/basis-mobile/test/mediaCardModel.test.js",
+      "specifier": "../../../packages/blob-gateway/src/bytes.js",
+      "reachesInto": "@onderling/blob-gateway",
+      "category": "test"
+    },
+    {
+      "file": "apps/basis-mobile/test/mediaEmbedMobile.test.js",
+      "specifier": "../../../packages/blob-gateway/src/index.js",
+      "reachesInto": "@onderling/blob-gateway",
+      "category": "test"
+    },
+    {
+      "file": "apps/basis/test/v2/circleAddressAnnounce.relay.test.js",
+      "specifier": "../../../../packages/relay/src/server.js",
+      "reachesInto": "@onderling/relay",
+      "category": "test"
+    },
+    {
+      "file": "apps/basis/test/v2/circleSenderAuthorization.relay.test.js",
+      "specifier": "../../../../packages/relay/src/server.js",
+      "reachesInto": "@onderling/relay",
+      "category": "test"
+    },
+    {
+      "file": "apps/basis/test/v2/circleSenderAuthorization.relay.test.js",
+      "specifier": "../../../../packages/transports/src/RelayTransport.js",
+      "reachesInto": "@onderling/transports",
+      "category": "test"
+    },
+    {
+      "file": "apps/basis/test/v2/circleSigningEnforcement.relay.test.js",
+      "specifier": "../../../../packages/relay/src/server.js",
+      "reachesInto": "@onderling/relay",
+      "category": "test"
+    },
+    {
+      "file": "apps/basis/test/v2/relayRouteExchange.test.js",
+      "specifier": "../../../../packages/relay/src/server.js",
+      "reachesInto": "@onderling/relay",
+      "category": "test"
+    },
+    {
+      "file": "apps/e2e-journeys/journeys/media.journey.mjs",
+      "specifier": "../../../packages/blob-gateway/src/adapters/capabilityVerifier.js",
+      "reachesInto": "@onderling/blob-gateway",
+      "category": "runtime"
+    },
+    {
+      "file": "apps/e2e-journeys/journeys/media.journey.mjs",
+      "specifier": "../../../packages/blob-gateway/src/adapters/s3Bucket.js",
+      "reachesInto": "@onderling/blob-gateway",
+      "category": "runtime"
+    },
+    {
+      "file": "apps/folio/src/wireSkills.js",
+      "specifier": "../../../packages/sdk/src/buildSkillsFromManifest.js",
+      "reachesInto": "@onderling/sdk",
+      "category": "runtime"
+    },
+    {
+      "file": "apps/folio/src/wireSkillsNode.js",
+      "specifier": "../../../packages/sdk/src/buildSkillsFromManifest.js",
+      "reachesInto": "@onderling/sdk",
+      "category": "runtime"
+    },
+    {
+      "file": "apps/folio/test/localWireFitness.test.js",
+      "specifier": "../../../packages/sdk/src/testing/localWireFitness.js",
+      "reachesInto": "@onderling/sdk",
+      "category": "test"
+    },
+    {
+      "file": "apps/folio/test/localWireFitnessNode.test.js",
+      "specifier": "../../../packages/sdk/src/testing/localWireFitness.js",
+      "reachesInto": "@onderling/sdk",
+      "category": "test"
+    },
+    {
+      "file": "packages/agent-registry/test/communityCatalog.test.js",
+      "specifier": "../../vault/src/VaultMemory.js",
+      "reachesInto": "@onderling/vault",
+      "category": "test"
+    },
+    {
+      "file": "packages/agent-registry/test/endorsement.test.js",
+      "specifier": "../../vault/src/VaultMemory.js",
+      "reachesInto": "@onderling/vault",
+      "category": "test"
+    },
+    {
+      "file": "packages/agent-registry/test/loadProfile.test.js",
+      "specifier": "../../vault/src/VaultMemory.js",
+      "reachesInto": "@onderling/vault",
+      "category": "test"
+    },
+    {
+      "file": "packages/agent-registry/test/registryVersioning.test.js",
+      "specifier": "../../versioning/src/versionStore.js",
+      "reachesInto": "@onderling/versioning",
+      "category": "test"
+    },
+    {
+      "file": "packages/agent-registry/test/trustGraph.test.js",
+      "specifier": "../../vault/src/VaultMemory.js",
+      "reachesInto": "@onderling/vault",
+      "category": "test"
+    },
+    {
+      "file": "packages/pseudo-pod/test/PseudoPod.versioning.test.js",
+      "specifier": "../../versioning/src/versionStore.js",
+      "reachesInto": "@onderling/versioning",
+      "category": "test"
+    }
+  ]
 }

@@ -72,6 +72,7 @@
  */
 
 import nacl from 'tweetnacl';
+import { isBlobRef, bucketKeyFromRef, BLOB_TYPE } from '@onderling/blob-gateway';
 
 // Tiny standard-base64 helpers (NOT base64url — attachments are
 // runtime payloads, not URL components).  Browser uses btoa/atob;
@@ -184,9 +185,14 @@ export function validateInboundAttachment(att) {
   if (att.type !== 'media') return 'attachment-not-media';
   const src = att.source;
   if (!src || typeof src !== 'object') return 'attachment-source-missing';
-  if (src.type !== 'blob' || typeof src.ref !== 'string' || !src.ref.startsWith('blob://')) {
+  // The blob-ref grammar lives in ONE place (`@onderling/blob-gateway`), not in a literal here. This used
+  // to be a hand-rolled `startsWith('blob://')`, which also admitted a bare `blob://` with NO bucket key —
+  // a ref the reader can never open, stored happily by the writer and failing opaquely at read time.
+  // `bucketKeyFromRef` is the strict form: it throws on exactly that.
+  if (src.type !== BLOB_TYPE || typeof src.ref !== 'string' || !isBlobRef(src.ref)) {
     return 'attachment-not-sealed-blob';
   }
+  try { bucketKeyFromRef(src.ref); } catch { return 'attachment-not-sealed-blob'; }
   if (!src.enc || src.enc.sealed !== true) return 'attachment-not-sealed';
   if (!ALLOWED_MIMES.has(att.mime)) return `attachment-mime-not-allowed:${att.mime}`;
   return null;

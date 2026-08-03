@@ -34,7 +34,7 @@
  * the handler, the message pointer, and the chip — stay byte-identical.
  */
 
-import { createBlobGatekeeper, openBlob } from '@onderling/blob-gateway';
+import { createBlobGatekeeper, openBlob, BLOB_SCHEME } from '@onderling/blob-gateway';
 import { CapabilityToken } from '@onderling/core';
 import { circleMemberActors } from './circleMemberActors.js';
 
@@ -138,7 +138,9 @@ export function createRemoteMediaBucket({ gateUrl, token, memberActors, fetch: f
       if (put && put.ok === false) throw new Error(`media edge: PUT failed (${put.status ?? 'error'})`);
       // 3. grant the roster. A denial here MUST surface (no silent drop).
       await edgePostJson(doFetch, `${base}/grant`, token, {
-        key: `blob://${key}`, actors,
+        // The FULL ref for /grant — stored verbatim and presented back by the reader. Note the edge's
+        // asymmetry: /upload-url takes the BARE key (see blobGateMount's header).
+        key: BLOB_SCHEME + key, actors,
       });
     },
   };
@@ -252,7 +254,7 @@ export async function createCircleMediaGateway({
   // the uploader (and nobody else). uploadBlob's key IS the ref authority.
   const uploadingBucket = {
     ...bucket,
-    put: async (key, bytes) => { await bucket.put(key, bytes); granted.add(`blob://${key}`); },
+    put: async (key, bytes) => { await bucket.put(key, bytes); granted.add(BLOB_SCHEME + key); },
   };
   const gate = createBlobGatekeeper({ verifyToken, acl, bucket, ttl });
 

@@ -92,10 +92,8 @@ export {
 // grants-over-Peer — ONE grant surface (out-of-circle share + task mandate) over the single `Peer`
 // (connectivity Phase 4 §4). A thin façade composing PodCapabilityToken (broker default) / resourceKeyGrant
 // (CEK offline) / TaskGrantManager (mandate) + the seal audience — no new crypto.
-export {
-  createGrantsOverPeer, chooseGrantMode, GRANT_MODE, serializeGrants, hydrateGrants,
-  assertScopedScheme, SCOPED_SEAL_SCHEMES,   // a grant may never extend a group-key audience
-} from './grants/index.js';
+// The D2 rule survived its façade — see sealing/scopedSchemes.js and the note there.
+export { assertScopedScheme, SCOPED_SEAL_SCHEMES } from './sealing/scopedSchemes.js';
 
 // Identity-on-pod (extracted from @onderling/core — Track B / identity-pod-schema).
 // On-pod identity store, vault→pod migration, and the pod↔vault identity

@@ -17,9 +17,22 @@
  *     → 403 { error: 'forbidden' }        on ANY denial
  *
  *   POST <route>/upload-url               Authorization: Bearer <token>
- *     body { key: 'blob://<key>' }
+ *     body { key: '<bucketKey>' }         ⚠ the BARE bucket key — NOT a `blob://` ref
  *     → 200 { url }                       presigned PUT URL to the ciphertext
  *     → 403 { error: 'forbidden' }        on ANY denial
+ *
+ * ⚠ `key` MEANS TWO DIFFERENT THINGS on the two routes above, and this doc used to get it wrong.
+ *   • `/grant` takes the FULL ref (`blob://<key>`) — it is stored verbatim and the reader presents the
+ *     same string back, so the ACL store never parses it.
+ *   • `/upload-url` takes the BARE bucket key — it goes to `bucket.presignPut(key)`, which must be the
+ *     object name, because the GET side derives that name with `bucketKeyFromRef` (which STRIPS the
+ *     scheme).
+ *   This header previously documented `/upload-url` as taking `blob://<key>`. A second client written to
+ *   that line would have PUT its ciphertext under the literal object name `blob://<key>`, received a 200,
+ *   and produced a blob that every later read fails to find — a silent, permanent loss with a success
+ *   response. Corrected 2026-08-03. Today only `circleMediaGateway` speaks this wire and it sends the bare
+ *   key, so nothing is broken; the doc was the only thing wrong, and it was wrong in the dangerous
+ *   direction.
  *
  * CREDENTIAL-LESS CLIENT UPLOAD (presigned PUT — PLAN-media-infra-deployment):
  * a client that holds an uploader token never sees R2/S3 credentials. The flow is

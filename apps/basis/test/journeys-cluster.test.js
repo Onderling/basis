@@ -11,8 +11,11 @@
  * assertion intent verbatim as comments, so each flips to a real assertion the
  * moment the phase that unblocks it lands. Each pending block names the phase.
  *
- *   GREEN now : J1 (task lifecycle — the store-convergence keystone).
- *   TODO      : J2 J3 J4 J5 J6 J7 J8 J9 J10 (features not built yet).
+ *   GREEN now : J1–J10. (Header corrected 2026-08-03 — it still read "TODO: J2…J10 (features not built
+ *               yet)" while every one of those describes in THIS FILE is labelled GREEN and passing. The
+ *               features landed; the header did not. A stale TODO in a test file is worse than one in a
+ *               plan: it tells a reader the coverage does not exist, so nobody looks for the gap that
+ *               actually remains.)
  *
  * SCOPE: test-only. Imports the built substrate from `@onderling/item-store`;
  * edits no source. Lives in apps/basis (which already depends on item-store),

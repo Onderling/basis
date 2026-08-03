@@ -118,7 +118,15 @@ for (const f of consumerFiles) {
 }
 
 let allow = {};
-try { allow = JSON.parse(readFileSync(ALLOWLIST, 'utf8')).symbols ?? {}; } catch { /* none yet */ }
+let allowPackages = {};
+try {
+  const a = JSON.parse(readFileSync(ALLOWLIST, 'utf8'));
+  allow = a.symbols ?? {};
+  // Whole-package entries: a PUBLISHED package's barrel IS its third-party surface, so "nothing in this
+  // repo calls it" is the expected state, not a finding. One reason per package beats 400 copies of the
+  // same reason — and keeps the list readable enough that someone would notice a package added by stealth.
+  allowPackages = a.packages ?? {};
+} catch { /* none yet */ }
 
 const violations = [];
 for (const file of sources) {
@@ -126,7 +134,7 @@ for (const file of sources) {
   try { src = readFileSync(path.join(ROOT, file), 'utf8'); } catch { continue; }
   const owner = pkgOf(file);
   for (const name of exportsIn(src)) {
-    if (allow[name]) continue;                       // declared public API, with a reason
+    if (allow[name] || allowPackages[owner]) continue;   // declared public API, with a reason
     const surface = surfaceByPkg.get(owner);
     if (!surface || !surface.has(name)) continue;    // internal helper — its own tests may be its only caller
     const re = new RegExp(`\\b${name.replace(/[$]/g, '\\$')}\\b`);

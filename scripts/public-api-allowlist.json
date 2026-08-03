@@ -1,1 +1,26 @@
-{ "symbols": {} }
+{
+  "$schema": "public-api-allowlist/v0",
+  "description": "Exports that legitimately have no consumer INSIDE this repo, because they are the surface third parties call. Every entry carries a reason someone can disagree with — 'it's public API' is exactly the excuse that would let inert seams back in, so it has to be argued, not asserted.",
+
+  "packages": {
+    "sdk":               "The dev-facing facade over the platform (CLAUDE.md invariant 5). Its whole job is to be called from outside this repo.",
+    "core":              "The kernel — ports + kernel logic. Exports ports that adapters implement and apps compose; a port with no in-repo caller is the normal case, not a dead seam.",
+    "transports":        "Concrete transport adapters behind the mesh builder. Published surface; apps reach them through the builder, never directly (the SURFACE rule).",
+    "vault":             "Key/secret storage adapter. Published surface consumed via the SDK facade.",
+    "pod-client":        "Solid-pod read/write/seal. Published surface; also consumed in-repo, so only its unreached half lands here.",
+    "redaction":         "Redaction primitives — published so a third-party app can redact before export.",
+    "pseudo-pod":        "The file-shaped pod stand-in. Published so an app can run pod-shaped without a pod.",
+    "item-types":        "The canonical item-type schemas. Published BECAUSE third parties declare types against them.",
+    "item-store":        "The per-circle store + sync seams. Published surface; the guard still governs its non-barrel internals.",
+    "app-manifest":      "The manifest schema + projectors. Published — an app declaring a manifest is the primary third-party act.",
+    "app-scaffold":      "Scaffolds a new app from a manifest. By definition only ever called from outside.",
+    "attribute-charter": "The requested-attributes charter vocabulary. Published so a consumer can state what it asks for.",
+    "logger":            "Logging port. Published adapter surface.",
+    "oidc-session":      "OIDC session handling for pod sign-in. Published adapter surface.",
+    "agent-registry":    "Profiles, disclosure, endorsements. Published surface; several exports are the A2A card contract other agents read."
+  },
+
+  "symbols": {},
+
+  "note": "PLAN-sdk-publishing.md decides which packages are publishable: at/below the substrate layer AND part of the public API. This file records that decision where the guard can read it. If a package is added here, it is claiming to be publishable — check that plan first. Packages NOT listed here (secure-agent, mcp-bridge, llm-client, data-connectors, blob-gateway, pod-search, kring-host, recipe-loader, notifier, confidential-llm, versioning, agent-ui, chat-agent, circles, identity-resolver) are internal, and an unreached export in them is a real finding."
+}

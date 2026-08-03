@@ -175,11 +175,45 @@ export function log(step, verdict, note) {
  * drive — the in-kring nav is NOT `[data-tab="kringen"]`).
  */
 export async function gotoKringen(page) {
+  await dismissAnyModal(page);
   const back = page.locator('.circle-kring__back');
   if (await back.count()) { await back.first().click(); await page.waitForTimeout(1500); }
   const tab = page.locator('[data-tab="kringen"]');
   if (await tab.count()) { await tab.first().click(); await page.waitForTimeout(1600); }
   else { await page.waitForTimeout(600); }
+}
+
+/**
+ * Close any modal overlay still standing, so the NEXT step fails for its own reason.
+ *
+ * A modal that outlives its step swallows every click underneath it, and the error you get names the
+ * overlay rather than whatever actually went wrong. That cost this suite most of a day: a join that never
+ * completed left its wizard open, and the failure surfaced as "`cc-mydata-modal` intercepts pointer events"
+ * at the NEXT navigation — 7 minutes later, in a different function, with the real outcome already
+ * computed and discarded. It reads exactly like a broken launcher, and is not.
+ *
+ * This is the second time in one week: the same shape closed an invite panel left over the launcher.
+ * So it lives in the shared navigation helper rather than at either call site — a leftover overlay is a
+ * property of the PAGE, and the fix belongs where every journey passes.
+ *
+ * Deliberately quiet and best-effort: it is hygiene before the real step, never an assertion. If a test
+ * cares that a modal closed, it must assert that itself — `joinFromInvite` does exactly that, and this
+ * runs after it, so the assertion still happens against the real state.
+ */
+export async function dismissAnyModal(page) {
+  const overlay = page.locator('.cc-mydata-modal');
+  if (!(await overlay.count().catch(() => 0))) return false;
+  // These modals have NO close button — they close on a BACKDROP click:
+  //   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); })
+  // so the click must land on the overlay itself. A bare .click() targets the element's CENTRE, which is
+  // the card sitting on top of it — i.e. it clicks the wizard and dismisses nothing. Hence the corner.
+  await overlay.first().click({ position: { x: 4, y: 4 }, timeout: 4000 }).catch(() => {});
+  await page.waitForTimeout(400);
+  if (await overlay.count().catch(() => 0)) {
+    await page.keyboard.press('Escape').catch(() => {});
+    await page.waitForTimeout(400);
+  }
+  return !(await overlay.count().catch(() => 0));
 }
 
 /** All launcher tile names (normalised whitespace). */

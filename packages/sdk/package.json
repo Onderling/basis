@@ -1,7 +1,7 @@
 {
   "name": "@onderling/sdk",
   "version": "0.1.0",
-  "description": "Batteries-included, LAYERED developer facade for @onderling. ONE import for the whole SDK. LOW layer: named re-exports of the kernel (@onderling/core) plus the default adapters (VaultMemory + Vault family from @onderling/vault, the transports from @onderling/transports, the pod pieces from @onderling/pod-client) — a dev wires adapters explicitly for maximal clarity + compatibility. HIGH layer: thin opinionated helpers built ON the low layer — createAgent({...}) (run-as-agent, Tier 3, injects the defaults) + connectSkill(agent, name, appFn) (Tier 1: map any plain app function to a skill). Purely additive; the kernel stays de-fatted (defaults live HERE, not in core).",
+  "description": "Batteries-included, LAYERED developer facade for @onderling. ONE import for the whole SDK. LOW layer: named re-exports of the kernel (@onderling/core) plus the default adapters (VaultMemory + Vault family from @onderling/vault, the transports from @onderling/transports, the pod pieces from @onderling/pod-client) \u2014 a dev wires adapters explicitly for maximal clarity + compatibility. HIGH layer: thin opinionated helpers built ON the low layer \u2014 createAgent({...}) (run-as-agent, Tier 3, injects the defaults) + connectSkill(agent, name, appFn) (Tier 1: map any plain app function to a skill). Purely additive; the kernel stays de-fatted (defaults live HERE, not in core).",
   "type": "module",
   "license": "Apache-2.0",
   "homepage": "https://github.com/Onderling/basis/tree/master/packages/sdk#readme",
@@ -25,7 +25,8 @@
     "./pod": "./src/pod.js",
     "./high": "./src/high.js",
     "./requires": "./src/requires.js",
-    "./testing": "./src/testing/localWireFitness.js"
+    "./testing": "./src/testing/localWireFitness.js",
+    "./skills": "./src/buildSkillsFromManifest.js"
   },
   "scripts": {
     "test": "vitest run",

@@ -14,16 +14,22 @@
  * via `agent.register(id, handler)` (folio's handlers carry no explicit
  * visibility today, so callers may drop it).
  *
- * RESOLUTION / BROWSER-BOUNDARY: `wireSkill` is imported by RELATIVE PATH
- * from `@onderling/sdk`'s source rather than the bare `@onderling/sdk` barrel.
- * Two reasons: (1) `browser.js` (which imports this module) is composed
- * into basis's BROWSER bundle and must stay node-free — the barrel
- * re-exports `@onderling/transports` etc. which carry node deps; `wireSkill.js`
- * + its only import `connectSkill.js` are a zero-dependency, node-free
- * 2-file closure.  (2) folio's isolated `node_modules` has no
- * `@onderling/sdk`.  Same rationale as `apps/agents/test/*`'s relative import.
+ * RESOLUTION / BROWSER-BOUNDARY: imported via the `@onderling/sdk/skills`
+ * SUBPATH, never the bare barrel. `browser.js` (which imports this module) is
+ * composed into basis's BROWSER bundle and must stay node-free — the barrel
+ * re-exports `@onderling/transports` etc., which carry node deps. The subpath
+ * resolves to `buildSkillsFromManifest.js` → `wireSkill.js` → `connectSkill.js`,
+ * a zero-dependency node-free 3-file closure.
+ *
+ * ⚠ HISTORY, because this line has now been wrong in BOTH directions: it began as
+ * a relative reach into the sdk's src (node-free, but bypassing the package
+ * surface — flagged by the dep-boundary guard); on 2026-08-03 a sweep "fixed" it
+ * to the bare barrel — satisfying the guard and silently pulling node transports
+ * into the browser bundle, against this very header. The subpath is the form that
+ * satisfies both constraints. If you change this import, you are choosing between
+ * them: read both reasons first.
  */
-import { buildSkillsFromManifest } from '@onderling/sdk';
+import { buildSkillsFromManifest } from '@onderling/sdk/skills';
 
 import { folioManifest } from '../manifest.js';
 import { FOLIO_CORES } from './agentCores.js';

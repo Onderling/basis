@@ -31,7 +31,7 @@
  * import `connectSkill.js` are a zero-dependency, node-free 2-file closure, and
  * folio's isolated `node_modules` has no `@onderling/sdk`.
  */
-import { buildSkillsFromManifest } from '@onderling/sdk';
+import { buildSkillsFromManifest } from '@onderling/sdk/skills';
 
 import { folioManifest } from '../manifest.js';
 import { FOLIO_NODE_CORES } from './nodeAgentCores.js';

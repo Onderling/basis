@@ -58,10 +58,22 @@ export function createPeerResolver({ security, memberMap } = {}) {
 export class PeerResolver {
   #security;
   #memberMap;
+  /** @type {((addr:string)=>string|null)|null} host-supplied alias→canonical identity (Decision 4). */
+  #identityForAddr;
 
-  constructor({ security, memberMap }) {
+  constructor({ security, memberMap, identityForAddr = null }) {
     this.#security  = security  ?? null;
     this.#memberMap = memberMap ?? null;
+    // ── Decision 4 correction (2026-08-03) ──────────────────────────────────────────────────────────
+    // `alias address → the person's CANONICAL identity key`. MUST be supplied by a host that has one,
+    // because since Decision 4 the SecurityLayer can no longer answer it: a per-circle address is bound
+    // to that CIRCLE's signing key, deliberately unrelated to the person. So `getPeerKey(circleAddress)`
+    // returns a different answer per circle — correct for the wire, and exactly wrong for "who is this".
+    //
+    // Without this, wiring the resolver would fold a per-circle signing key into a person's alias set and
+    // re-create the linkage Decision 4 exists to remove. `createSecureAgent` keeps the map for this
+    // (`peerIdentityOf`, and its comment says why it lives on the device: "it is nobody else's to see").
+    this.#identityForAddr = typeof identityForAddr === 'function' ? identityForAddr : null;
   }
 
   get hasMemberMap() { return !!this.#memberMap; }
@@ -72,6 +84,13 @@ export class PeerResolver {
    * Returns null if no SecurityLayer or no HI received from this peer yet.
    */
   pubKeyForAddr(addr) {
+    // The host's device-local identity link FIRST — see the constructor. Only it can answer "who is this"
+    // correctly for a per-circle address; the SecurityLayer answers "which key signs here", a different
+    // question with a different answer per circle.
+    if (this.#identityForAddr) {
+      const canonical = this.#identityForAddr(addr);
+      if (canonical) return canonical;
+    }
     if (!this.#security || typeof this.#security.getPeerKey !== 'function') return null;
     return this.#security.getPeerKey(addr);
   }

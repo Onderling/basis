@@ -118,10 +118,24 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
   consumer** — the production path a person's action travels to it. A test that exercises the mechanism is
   not a consumer. *Why this is an invariant and not advice:* on 2026-08-03 an audit found the dominant
   remaining shape in every seam was **built-but-unadopted** — `createGrantsOverPeer`, `peerFacade`,
-  `sealedMessageLog`, `loadProfile`, `makeAgentTrailEntry` all exported with **zero consumers**, plus a
+  `loadProfile` and `makeAgentTrailEntry` exported with **zero consumers**, plus a
   circle store that was mirrored with nothing writing to it and a BLE transport the app never constructs.
   Every one passed its tests. None of them ran. **Nothing fails when a seam is left inert** — so say what
   reaches it, or delete it.
+- **Nothing runs PARALLEL to the main components.** Everything is one of: an **event-log entry**, a
+  **projection** (a derived read-only view over the log or over sources), a **manifest op** reached through
+  the waist (`{opId, args}` → `callSkill`), an **item type + its verbs**, or a **transport/adapter behind
+  the surface**. There is no sixth kind. If a new thing does not fit one of those, that is the design
+  question — do not add it beside them and hope.
+  *Why:* a composer that routes actions but does NOT sit behind an op is **unreachable by construction** —
+  every interface compiles to `callSkill`, so nothing can get to it, and whatever inline code IS reachable
+  wins by default. That is not an accident of adoption; it is the architecture rejecting a foreign shape.
+  `grantsOverPeer` (2026-07-26) is the worked example: a real security gate that guards a path nobody walks.
+- **Do not call anything a "facade".** The word hid four different things here — a projection
+  (`peerFacade`, which is `peerRows` in all but name), a waist-composer, a package re-export for DX, and a
+  rename bridge. Say which one you mean. Naming a projection a facade also hides WHERE it belongs: a
+  projection is built where its sources are and passed DOWN, which is why `peerFacade` could not be adopted
+  at the call sites that only hold one row.
 - **Prefer a fitness function to a manual check.** When you fix drift, add the test/lint that makes the same
   drift FAIL CI next time. This is the roadmap's step 0 — see `REMAINING-WORK.md` "★ Architectural spine".
   **A seam is not done until something passes through it:** write the test that CROSSES it — a real socket, a

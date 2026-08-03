@@ -38,6 +38,14 @@ import {
 } from '@onderling/core';
 
 import { MdnsTransport }          from './transport/MdnsTransport.js';
+// ⚠ STATIC — and this is why `apps/basis-mobile` does NOT use this builder (verified 2026-08-03).
+// `BleTransport` pulls `react-native-ble-plx`, which basis-mobile does not declare, so importing this
+// module at all would put an undeclared native dep in that app's Metro graph. The app therefore hand-rolls
+// mDNS at `src/core/agentBundle.js:373` — duplicating the hostname derivation, the availability guard, the
+// 6000 ms time-box and the discoverability wiring, and bypassing the SURFACE rule (CLAUDE.md).
+// **Adopting the builder there requires making this import lazy inside the `enableBle` branch first.**
+// That is the prerequisite nobody had written down; no comment stated the reason, it had to be inferred
+// from the missing dependency.
 import { BleTransport }           from './transport/BleTransport.js';
 import { requestMeshPermissions } from './permissions.js';
 

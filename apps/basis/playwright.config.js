@@ -51,6 +51,10 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   /* Single worker keeps two-tab orchestration deterministic. */
   workers: 1,
+  /* Bound an `expect(...)` poll too. Same reasoning as `actionTimeout`: the default 5s is fine, but
+   * several specs pass an explicit longer one, and without a floor here a bare `toBeVisible()` on a
+   * never-appearing element is another silent budget-eater. */
+  expect: { timeout: 10_000 },
   reporter: process.env.CI ? 'list' : 'html',
   /* Relay fixture: only spawns a relay when PEER_TEST_RELAY is set (default/nkn runs are untouched,
    * and nothing leaks). Teardown stops whatever globalSetup started. */
@@ -58,7 +62,20 @@ export default defineConfig({
   globalTeardown: './test-browser/relayTeardown.js',
   use: {
     baseURL: BASE_URL,
-    trace: 'on-first-retry',
+    /* Bound a SINGLE action, so a missing element fails in seconds NAMING ITSELF, instead of eating the
+     * whole test budget and reporting only "timeout exceeded".
+     *
+     * Playwright's default here is 0 — unbounded — and this config never set it, so every hang consumed
+     * the test's entire allowance: 30s in a default spec, 70s in the kring specs, and a full SEVEN
+     * MINUTES in the journeys/matrix/twopeer trio that set `setTimeout(420_000)`. Three of those in one
+     * run is 21 minutes spent learning nothing, which is most of why this suite was too slow to run and
+     * too vague to act on when it did fail.
+     *
+     * 20s is deliberately generous — this app boots a real agent and a transport before it can render —
+     * but it is finite, and finite is the whole point. */
+    actionTimeout: 20_000,
+    navigationTimeout: 45_000,
+    trace: 'retain-on-failure',
     /* Headless by default — flip to false locally with
      * `pnpm exec playwright test --headed` to watch the flows. */
     headless: true,

@@ -993,6 +993,19 @@ export async function startRelay(opts = {}) {
         mrQueue.addResponse(id, registeredAddress, response).catch(() => {});
         return;
       }
+
+      // ── nothing matched ───────────────────────────────────────────────────
+      // Say so. Until 2026-08-03 this if-chain simply ENDED: an unrecognised frame was accepted, matched
+      // nothing, and vanished — no error to the sender, no line in the log, no counter. A client on a
+      // newer build talking to an older relay would look like a network fault; a typo in a frame type
+      // would look like nothing at all.
+      //
+      // Deliberately a LOG, not an error frame back to the sender: replying would tell an unauthenticated
+      // peer which frame types this relay knows, which is free reconnaissance. The operator needs to know;
+      // the sender does not get to enumerate.
+      logLine(`[relay] unknown-frame  ${shortId(registeredAddress ?? 'unregistered')}  type=${
+        typeof msg?.type === 'string' ? msg.type.slice(0, 40) : typeof msg?.type
+      }`);
     });
 
     socket.on('close', () => {

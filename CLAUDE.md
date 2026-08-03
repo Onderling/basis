@@ -114,6 +114,14 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
 - **Grep every identifier you introduce against the file you put it in**, especially state setters and
   navigation helpers: they read plausibly and are named differently per screen. `src/screens/**` has no test
   coverage, so nothing else will catch a typo there (→ `docs/agent-notes-known-gotchas.md`).
+- **DONE = declared · implemented · tested · REACHED.** A thing is not done until you can **name its
+  consumer** — the production path a person's action travels to it. A test that exercises the mechanism is
+  not a consumer. *Why this is an invariant and not advice:* on 2026-08-03 an audit found the dominant
+  remaining shape in every seam was **built-but-unadopted** — `createGrantsOverPeer`, `peerFacade`,
+  `sealedMessageLog`, `loadProfile`, `makeAgentTrailEntry` all exported with **zero consumers**, plus a
+  circle store that was mirrored with nothing writing to it and a BLE transport the app never constructs.
+  Every one passed its tests. None of them ran. **Nothing fails when a seam is left inert** — so say what
+  reaches it, or delete it.
 - **Prefer a fitness function to a manual check.** When you fix drift, add the test/lint that makes the same
   drift FAIL CI next time. This is the roadmap's step 0 — see `REMAINING-WORK.md` "★ Architectural spine".
   **A seam is not done until something passes through it:** write the test that CROSSES it — a real socket, a

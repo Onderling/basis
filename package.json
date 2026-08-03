@@ -30,7 +30,9 @@
     "release": "pnpm -r publish --access public",
     "readme-fitness": "node scripts/readme-fitness.mjs",
     "api-appendix": "node scripts/api-appendix.mjs",
-    "api-fitness": "node scripts/api-fitness.mjs"
+    "api-fitness": "node scripts/api-fitness.mjs",
+    "lint:unreached": "node scripts/lint-unreached-exports.mjs",
+    "lint:unreached:update": "node scripts/lint-unreached-exports.mjs --update"
   },
   "devDependencies": {
     "@babel/parser": "^7.29.3",

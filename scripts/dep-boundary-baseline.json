@@ -2,9 +2,9 @@
   "$schema": "dep-boundary-baseline/v0",
   "description": "CEILING of known cross-package raw-src reach-ins (CLAUDE.md invariant #5). lint:deps FAILS on any violation NOT listed here; removing entries is always allowed. Regenerate with: node scripts/lint-dep-boundaries.mjs --update",
   "generatedAt": "2026-08-03",
-  "total": 55,
+  "total": 51,
   "byCategory": {
-    "runtime": 4,
+    "runtime": 0,
     "script": 0,
     "test": 51
   },
@@ -266,30 +266,6 @@
       "specifier": "../../../../packages/relay/src/server.js",
       "reachesInto": "@onderling/relay",
       "category": "test"
-    },
-    {
-      "file": "apps/e2e-journeys/journeys/media.journey.mjs",
-      "specifier": "../../../packages/blob-gateway/src/adapters/capabilityVerifier.js",
-      "reachesInto": "@onderling/blob-gateway",
-      "category": "runtime"
-    },
-    {
-      "file": "apps/e2e-journeys/journeys/media.journey.mjs",
-      "specifier": "../../../packages/blob-gateway/src/adapters/s3Bucket.js",
-      "reachesInto": "@onderling/blob-gateway",
-      "category": "runtime"
-    },
-    {
-      "file": "apps/folio/src/wireSkills.js",
-      "specifier": "../../../packages/sdk/src/buildSkillsFromManifest.js",
-      "reachesInto": "@onderling/sdk",
-      "category": "runtime"
-    },
-    {
-      "file": "apps/folio/src/wireSkillsNode.js",
-      "specifier": "../../../packages/sdk/src/buildSkillsFromManifest.js",
-      "reachesInto": "@onderling/sdk",
-      "category": "runtime"
     },
     {
       "file": "apps/folio/test/localWireFitness.test.js",

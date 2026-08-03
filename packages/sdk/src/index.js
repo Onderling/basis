@@ -65,3 +65,10 @@ export * from './high.js';
 
 // ──: requires vocabulary + validator (the seam) ───────────────
 export { CAPABILITIES, REQUIRES_CODES, validateRequires } from './requires.js';
+
+// ── manifest → skills: the shared wiring every app uses ────────────────────────────────────────────
+// `buildSkillsFromManifest` documents itself as `import … from '@onderling/sdk'` and was never actually
+// exported here, so both callers reached into `packages/sdk/src/…` directly — an invariant-5 violation
+// the dependency guard reported and nobody could act on while it was red. Exported now, so the
+// documented import is the working one.
+export { buildSkillsFromManifest } from './buildSkillsFromManifest.js';

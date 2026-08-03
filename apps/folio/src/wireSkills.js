@@ -23,7 +23,7 @@
  * 2-file closure.  (2) folio's isolated `node_modules` has no
  * `@onderling/sdk`.  Same rationale as `apps/agents/test/*`'s relative import.
  */
-import { buildSkillsFromManifest } from '../../../packages/sdk/src/buildSkillsFromManifest.js';
+import { buildSkillsFromManifest } from '@onderling/sdk';
 
 import { folioManifest } from '../manifest.js';
 import { FOLIO_CORES } from './agentCores.js';

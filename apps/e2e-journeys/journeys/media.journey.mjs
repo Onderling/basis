@@ -13,8 +13,8 @@
 import { AgentIdentity, CapabilityToken } from '@onderling/core';
 import { VaultMemory }                    from '@onderling/vault';
 import { startRelay, MemoryBlobAclStore } from '@onderling/relay';
-import { createS3Bucket }                 from '../../../packages/blob-gateway/src/adapters/s3Bucket.js';
-import { createCapabilityVerifier }       from '../../../packages/blob-gateway/src/adapters/capabilityVerifier.js';
+import { createS3Bucket }                 from '@onderling/blob-gateway/adapters/s3';
+import { createCapabilityVerifier }       from '@onderling/blob-gateway/adapters/capability-verifier';
 import { circleMemberActors }             from '../../basis/src/v2/circleMemberActors.js';
 import { generateGroupKey, sealWithGroupKey, openWithGroupKey } from '@onderling/pod-client/sealing';
 import { checker } from './_util.mjs';

@@ -129,7 +129,14 @@ describe('real repo is within its baseline (check passes today)', () => {
     const baseline = loadBaseline();
     const current = scanViolations(REPO_ROOT);
     expect(current.length).toBe(baseline.total);
-    const counts = current.reduce((a, v) => ((a[v.category] = (a[v.category] ?? 0) + 1), a), {});
+    // Seed every category, exactly as `buildBaselineFile` does. Counting from `{}` makes an EMPTY
+    // category vanish instead of reading zero, so a baseline written when one category happened to be
+    // empty could never match a scan again — the tallies disagreed about representation, not about the
+    // tree. Zero is a count; absent is not.
+    const counts = current.reduce(
+      (a, v) => ((a[v.category] = (a[v.category] ?? 0) + 1), a),
+      { runtime: 0, script: 0, test: 0 },
+    );
     expect(counts).toEqual(baseline.byCategory);
   });
 });

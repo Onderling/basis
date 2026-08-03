@@ -2997,6 +2997,19 @@ export async function createRealHouseholdAgent(opts = {}) {
       circleId:      householdCircleId,
       selfAddr:      chatId.pubKey,
     },
+    // Wire a circle's store↔mirror sync (publish AND inbound) WITHOUT waiting for a wired op.
+    //
+    // It was only ever wired lazily, on the first `addTask`/`listTasks`/… for that circle. For the
+    // PUBLISH half that is fine — you cannot publish a write you have not made. For the INBOUND half it
+    // is a race the receiver always loses: a peer's item arrives before this device has opened the tab
+    // that would wire the listener, so it lands nowhere and nothing re-sends it.
+    //
+    // Measured 2026-08-03: A adds a task, B has the circle open, B's Taken tab reads empty — because B
+    // wires its inbound only when the tab opens, which is AFTER A published. The pairing was fine
+    // (`[household-sync] paired 1 peer(s)`); there was simply nobody listening yet.
+    //
+    // Idempotent (guarded by `householdSyncWired`), so circle-open can call it every time.
+    ensureCircleSync: (circleId) => ensureHouseholdCircleSync(circleId),
 
     // Transport-NEUTRAL reachability — true when ANY peer transport can carry a
     // message (NKN `.peer` OR the WebSocket `.relay`; sendPeerMessage already

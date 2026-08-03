@@ -16,6 +16,11 @@
 import { bindCircleAddressKeys } from './circleAddressKeys.js';
 export async function feedHouseholdRoster({ agent, circleId } = {}) {
   if (!agent || typeof agent.addHouseholdPeer !== 'function' || !circleId) return 0;
+  // BEFORE pairing: make sure this circle can RECEIVE. The store↔mirror sync used to be wired lazily,
+  // on the first wired household op for the circle — which for the inbound half is a race the receiver
+  // always loses. Pairing tells the other device it may publish to us; if our listener is not up yet,
+  // what it publishes lands nowhere and nothing re-sends it. So listen first, then say you are ready.
+  try { await agent.ensureCircleSync?.(circleId); } catch { /* best-effort, like everything else here */ }
   let r;
   try { r = await agent.callSkill('stoop', 'listGroupRoster', { groupId: circleId }); }
   catch { return 0; }   // not a group / no roster → household sync stays local
@@ -38,6 +43,13 @@ export async function feedHouseholdRoster({ agent, circleId } = {}) {
   // `No pubKey registered` above the transport and every message holds. Best-effort by design: a
   // roster read that fails must not break pairing, which is what this function is actually for.
   try { await bindCircleAddressKeysFor({ agent, circleId }); } catch { /* best-effort */ }
+  // Say how many peers this circle actually paired. Every step above is best-effort and swallows its own
+  // errors — correct, because a roster read that fails must not break pairing — but the result was that a
+  // circle which paired NOBODY looked exactly like one that paired everybody. Items then simply never
+  // fan out, with nothing anywhere saying why (2026-08-03, chasing exactly that).
+  if (typeof console !== 'undefined') {
+    console.info(`[household-sync] ${circleId}: paired ${added} peer(s) for item fan-out`);
+  }
   return added;
 }
 

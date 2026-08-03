@@ -201,6 +201,15 @@ export const CODENAME_PATTERNS = [
   // If a third appears in the same family (a product or a local label that happens to look like an id),
   // prefer adding it to the baseline over loosening the pattern.
   { id: 'plan-label',   re: /\b(?:[A-FLNRS]\d{1,2}[a-z]?|M\d+-S\d{1,2})\s*(?:—|–|--|:)\s+/g },
+
+  // The same thing spelled out (2026-08-03, found by grepping for what `plan-label` MISSED — the first
+  // sweep reported the web shell clean, and these were sitting in the files it had just rewritten).
+  // `OBJ-2`, `Objective D`, `Track C` are planning buckets wherever they appear, and unlike the bare
+  // checklist ids they do not collide with anything, so they need no separator to be unambiguous.
+  // NB `Phase <n>` is deliberately NOT here: it is enforced on the public API surface only
+  // (PUBLIC_SURFACE_PATTERNS), because it is common in internal working notes — that call predates this
+  // pattern and is left standing rather than quietly reversed.
+  { id: 'plan-bucket',  re: /\b(?:OBJ-\d+|Objective\s+[A-Z]\b|Track\s+[A-Z]\b)/g },
 ];
 
 // EXTRA patterns enforced ONLY on the PUBLIC API surface (context 'api':

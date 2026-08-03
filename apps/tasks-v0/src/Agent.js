@@ -202,6 +202,12 @@ export async function createTasksAgent({
     },
     roles,
     itemStore,
+    // The UNDERLYING CircleItemStore, alongside the task-store wrapper above. Exposed so a host can
+    // attach a peer mirror to it (`wireStoreMirror`) — the wrapper has no `setSyncHook`, so without
+    // this a circle's tasks can be written and read but never SYNCED, which is exactly what happened
+    // (2026-08-03: the circle's mirror was wired and paired, and the tasks lived in a store it could
+    // not see).
+    circleStore,
     dataSource,
     members,
     // task-scoped grants — the granting authority skills reach via the
@@ -241,6 +247,7 @@ export async function createTasksAgent({
   return {
     agent,
     itemStore,
+    circleStore,   // see above — the mirror attaches here, not to the task-store wrapper
     members,
     notifier,
     offeringMatch,

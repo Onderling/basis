@@ -4,6 +4,11 @@
   "private": true,
   "description": "@onderling/* packages + mesh-demo example app",
   "type": "module",
+  "packageManager": "pnpm@10.33.4",
+  "engines": {
+    "node": ">=20.19.0 <21",
+    "pnpm": ">=10.33.4"
+  },
   "scripts": {
     "test": "npm run test --prefix packages/core && npm run test --prefix packages/react-native && npm run test --prefix packages/relay && npm run test --prefix packages/pod-client && npm run test --prefix packages/integration-tests",
     "test:core": "npm run test --prefix packages/core",
@@ -35,7 +40,8 @@
     "lint:unreached:update": "node scripts/lint-unreached-exports.mjs --update",
     "guards": "node scripts/guards.mjs",
     "check:versions": "npx --yes syncpack@13 list-mismatches",
-    "fix:versions": "npx --yes syncpack@13 fix-mismatches"
+    "fix:versions": "npx --yes syncpack@13 fix-mismatches",
+    "tree:fix": "bash scripts/reconstruct-tree.sh"
   },
   "devDependencies": {
     "@babel/parser": "^7.29.3",
@@ -45,6 +51,10 @@
     "playwright": "^1.60.0"
   },
   "pnpm": {
+    "//": "Collapse conflicts a clean install can't otherwise place. CRYPTO libs (@noble/*, @scure/*) are",
+    "//2": "deliberately UNIFIED to one version each — one audited crypto version, not two — and .syncpackrc",
+    "//3": "enforces they never drift. The rest are transitional and dissolve with the file:->workspace:",
+    "//4": "migration (batch 2), which lets pnpm's isolated store hold per-package versions natively.",
     "overrides": {
       "@noble/hashes": "^2.2.0",
       "@scure/bip39": "^2.0.1",

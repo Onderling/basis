@@ -4,12 +4,22 @@
   "//2": "declared under mixed protocols (workspace:/file:/version) — that unification is the workspace-",
   "//3": "protocol migration (wave 2 batch 2), tracked there, so ignore them here. What THIS surfaces is",
   "//4": "the EXTERNAL version conflicts that break a clean install (e.g. @noble/hashes v1 vs v2).",
+  "//5": "CRYPTO must never diverge across the monorepo: one audited version of each hashing/mnemonic/",
+  "//6": "signing lib, so there is never a question of which version signed/hashed a value. This group",
+  "//7": "makes any drift a check:versions FAILURE. Non-crypto libs MAY differ per package (pnpm's",
+  "//8": "isolated store supports that natively once the workspace-protocol migration lands).",
   "versionGroups": [
     {
       "label": "Internal workspace packages — protocol unification handled by the workspace-protocol migration, not here",
       "packages": ["**"],
       "dependencies": ["@onderling/**", "@onderling-app/**", "onderling-feedback"],
       "isIgnored": true
+    },
+    {
+      "label": "Crypto libraries MUST be a single version monorepo-wide (never two audited versions)",
+      "packages": ["**"],
+      "dependencies": ["@noble/**", "@scure/**", "tweetnacl"],
+      "policy": "sameRange"
     }
   ]
 }

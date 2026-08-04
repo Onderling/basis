@@ -40,6 +40,24 @@ but fail on device/CI. Don't re-bisect a trap that's already written down.
 workspace dep that needs its `node_modules` link materialized) — record it there in the same turn. A read-first
 file only helps if it's written to.
 
+## NEVER `rm -rf node_modules` here — this tree does not survive a clean reinstall
+The install is a hand-accreted, FLAT (`.npmrc` `node-linker=hoisted`), per-app layout built with an old
+package manager, over DUAL lockfiles (`package-lock.json` AND `pnpm-lock.yaml`, both tracked) and mixed
+protocols (`workspace:`, `link:../../../feedback`, `file:`). There is NO `packageManager` pin. A clean
+reinstall on the current node/pnpm exposes latent version conflicts the original lenient install tolerated
+(`@noble/hashes` v1-vs-v2, `@scure/bip39` v1-vs-v2, `ws@7`-vs-`8` via `isomorphic-ws`, async-storage) and
+does NOT come back — this has cost multiple sessions.
+- A STALE workspace copy (an app's `node_modules/@onderling/<pkg>` doesn't reflect a source edit) -> replace
+  ONLY that one with a symlink to the source: `rm -rf apps/<app>/node_modules/@onderling/<pkg> &&
+  ln -s ../../../../packages/<pkg> apps/<app>/node_modules/@onderling/<pkg>`. Never reinstall the whole tree
+  to pick up one edit.
+- Diagnose dep conflicts with `npm run check:versions` (syncpack; internal `@onderling/*` protocol noise is
+  filtered in `.syncpackrc.json`, leaving the real external conflicts).
+- The proper fix (one package manager + one lockfile, pin `packageManager`/node, resolve the version splits)
+  is the workspace-protocol migration — a scheduled task, not a mid-work reinstall.
+- `.nvmrc` pins node (`20.19.5`); Expo/RN native versions live in
+  `packages/react-native/docs/VERSION-MATRIX.md` — do not bump without reading it.
+
 ## Invariants — a violation is a bug, not a style nit
 1. **Logic lives once, in shared code.** Web/mobile shells are **thin adapters/projectors**: platform UI +
    the transport/bundle adapter, *nothing else* — concretely, a shell does **composition and paint** and

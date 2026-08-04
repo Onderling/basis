@@ -33,7 +33,9 @@
     "api-fitness": "node scripts/api-fitness.mjs",
     "lint:unreached": "node scripts/lint-unreached-exports.mjs",
     "lint:unreached:update": "node scripts/lint-unreached-exports.mjs --update",
-    "guards": "node scripts/guards.mjs"
+    "guards": "node scripts/guards.mjs",
+    "check:versions": "npx --yes syncpack@13 list-mismatches",
+    "fix:versions": "npx --yes syncpack@13 fix-mismatches"
   },
   "devDependencies": {
     "@babel/parser": "^7.29.3",

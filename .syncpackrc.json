@@ -1,0 +1,15 @@
+{
+  "$schema": "https://unpkg.com/syncpack@13/dist/schema.json",
+  "//": "Version-consistency guard. Run: npm run check:versions. The INTERNAL @onderling/* packages are",
+  "//2": "declared under mixed protocols (workspace:/file:/version) — that unification is the workspace-",
+  "//3": "protocol migration (wave 2 batch 2), tracked there, so ignore them here. What THIS surfaces is",
+  "//4": "the EXTERNAL version conflicts that break a clean install (e.g. @noble/hashes v1 vs v2).",
+  "versionGroups": [
+    {
+      "label": "Internal workspace packages — protocol unification handled by the workspace-protocol migration, not here",
+      "packages": ["**"],
+      "dependencies": ["@onderling/**", "@onderling-app/**", "onderling-feedback"],
+      "isIgnored": true
+    }
+  ]
+}

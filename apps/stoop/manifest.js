@@ -1253,6 +1253,32 @@ export const stoopManifest = {
       searchFields:  ['label'],
     },
   ],
+
+  /**
+   * Declared FLOWS (Surfaces home, batch 6) — a wizard is a flow through the waist, and the manifest
+   * is where surfaces are declared (invariant #4). This is the FIRST one; the shape is
+   * `{ id, kind, opId, steps: [{id, next}], needs, produces }`.
+   *
+   * A flow here is a DECLARATION of an existing state machine, not a second implementation: the join
+   * wizard still runs `joinGroupState.js`'s numeric steps, whose exported `JOIN_FLOW_STEPS` names
+   * them. The flow-integrity guard (G-S3, `scripts/flowIntegrity.test.js`) holds the two together —
+   * declared ids ≡ exported ids, the `next` chain acyclic and fully reachable, `opId` declared in
+   * this manifest's operations — so the declaration cannot drift from the machine it describes.
+   */
+  flows: [
+    {
+      id:    'joinGroup',
+      kind:  'wizard',
+      opId:  'joinGroupWizard',
+      steps: [
+        { id: 'invite',   next: 'consent'  },   // paste/scan + decode the invite
+        { id: 'consent',  next: 'identity' },   // the rules gate: rules + privacy + capability consent
+        { id: 'identity', next: null       },   // handle / persona / reveal / key choice → finalSubmit
+      ],
+      needs:    ['invite'],                     // the op's required param — what the flow consumes
+      produces: ['membership-redemption'],      // the item the successful flow writes (both sides)
+    },
+  ],
 };
 
 export default stoopManifest;

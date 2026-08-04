@@ -4835,5 +4835,43 @@
       "handle-taken": "Die naam is al bezet in deze kring. Kies een andere.",
       "handle-taken_hint": "Als je dit apparaat hersteld hebt, houdt de kring je vorige naam misschien nog vast — kies een nieuwe, of vraag een beheerder de oude te verwijderen."
     }
+  },
+  "firstRun": {
+    "title": {
+      "text": "Welkom bij basis",
+      "doc": "Eerste-start welkom: titel."
+    },
+    "lede": {
+      "text": "Een buurtchat die op je telefoon draait.  Je gegevens blijven lokaal; jij bepaalt wie wat ziet.",
+      "doc": "Eerste-start intro."
+    },
+    "bullet_circles": {
+      "text": "Kringen die jij beheert — uitnodigen met code of QR.",
+      "doc": "Bullet 1."
+    },
+    "bullet_items": {
+      "text": "Taken, berichten en notities per kring.",
+      "doc": "Bullet 2."
+    },
+    "bullet_pod": {
+      "text": "Synchronisatie via een pod zodra je inlogt.",
+      "doc": "Bullet 3."
+    },
+    "start": {
+      "text": "Start",
+      "doc": "Primaire knop."
+    },
+    "restore": {
+      "text": "Ik heb een herstelzin",
+      "doc": "Secundaire knop → herstelzin invoeren."
+    },
+    "notice_title": {
+      "text": "Herstellen kan na het starten",
+      "doc": "Fallback-melding titel."
+    },
+    "notice_body": {
+      "text": "Tik op Start om te beginnen; open daarna de chat (← chat) en gebruik /restore-from-mnemonic om je herstelzin in te laden.  Herstellen bij het opstarten komt in een latere update.",
+      "doc": "Fallback-melding tekst."
+    }
   }
 }

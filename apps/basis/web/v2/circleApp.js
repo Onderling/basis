@@ -105,7 +105,7 @@ import { effectiveCapabilities, checkCapability } from '../../src/v2/capabilityG
 import { buildCapabilityMatrix, renderAttachments } from '@onderling/app-manifest';
 // D / consumer-switch — select the projected PAGE surface (renderWeb) for
 // the settings op so the live settings header is manifest-driven (invariant #4).
-import { pageForOp } from '../../src/v2/pageProjection.js';
+import { pageForOp, flowForOp } from '../../src/v2/pageProjection.js';
 // the interactive list-screen surface (search + category checkboxes + capability-gated rows).
 import { renderListBlock } from './listScreen.js';
 // record-shaped detail screens (read-only key→value, e.g. agent-detail).
@@ -4049,6 +4049,14 @@ async function showJoinCircle(inviteArg) {
     decodedInvite = decoded.invite ?? null;
     if (decoded.invite) await populateAdminAddressesFromInvite({ peerGraph: circlePeerGraph, invite: decoded.invite });
   } catch { /* population must never block the join */ }
+  // The join wizard mounts FROM its declared flow (batch 6): `flows: [{ id: 'joinGroup', … }]` on the
+  // stoop manifest is the admission that this wizard exists, and G-S3 pins that declaration to the
+  // state machine (`JOIN_FLOW_STEPS`). An undeclared flow refuses to mount — the reachability rule
+  // made live, not a warning someone can scroll past.
+  if (!flowForOp(circleBaseSources, 'joinGroupWizard')) {
+    console.error('[circle] join wizard has no declared flow (manifest.flows) — refusing to mount');
+    return;
+  }
   mountMyDataWizard(renderJoinGroupWizard, {
     args: { invite },
     sendPeerRedeem: circleSendPeerRedeem,

@@ -22,6 +22,10 @@ import React, { useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 
 import { theme } from './v2/theme.js';
+// Invariant 8 (batch 6): the FIRST screen a new user sees speaks their language — every string via
+// t(), en+nl (`circle.firstRun.*`). The no-pod line reuses `circle.mydata.pod_local_consequence`:
+// the same fact My-data states, worded once (the C4b copy), so welcome and settings cannot drift.
+import { t } from '../core/localisation.js';
 
 export default function FirstRunWelcomeScreen({ onStart, onRestore } = {}) {
   // 5.9b-followup (2026-05-30): boot-time restore now has a real entry
@@ -38,17 +42,17 @@ export default function FirstRunWelcomeScreen({ onStart, onRestore } = {}) {
 
   return (
     <ScrollView contentContainerStyle={styles.root} testID="first-run-welcome">
-      <Text style={styles.title}>Welcome to basis</Text>
-      <Text style={styles.lede}>
-        A neighbourhood chat that runs on your phone.  Your data stays
-        local; you choose who sees what.
-      </Text>
+      <Text style={styles.title}>{t('circle.firstRun.title')}</Text>
+      <Text style={styles.lede}>{t('circle.firstRun.lede')}</Text>
 
       <View style={styles.bullets}>
-        <Bullet>Circles you control — invite by code or QR.</Bullet>
-        <Bullet>Tasks, posts, and notes scoped to each circle.</Bullet>
-        <Bullet>Pod-backed sync when you sign in to a Solid pod.</Bullet>
+        <Bullet>{t('circle.firstRun.bullet_circles')}</Bullet>
+        <Bullet>{t('circle.firstRun.bullet_items')}</Bullet>
+        <Bullet>{t('circle.firstRun.bullet_pod')}</Bullet>
       </View>
+
+      {/* The no-pod truth, stated up front in the SAME words My-data uses (one key, two doors). */}
+      <Text style={styles.lede}>{t('circle.mydata.pod_local_consequence')}</Text>
 
       <Pressable
         style={[styles.cta, styles.ctaPrimary]}
@@ -56,7 +60,7 @@ export default function FirstRunWelcomeScreen({ onStart, onRestore } = {}) {
         testID="first-run-start"
         accessibilityRole="button"
       >
-        <Text style={styles.ctaPrimaryText}>Start</Text>
+        <Text style={styles.ctaPrimaryText}>{t('circle.firstRun.start')}</Text>
       </Pressable>
 
       <Pressable
@@ -65,18 +69,13 @@ export default function FirstRunWelcomeScreen({ onStart, onRestore } = {}) {
         testID="first-run-restore"
         accessibilityRole="button"
       >
-        <Text style={styles.ctaSecondaryText}>I have a recovery phrase</Text>
+        <Text style={styles.ctaSecondaryText}>{t('circle.firstRun.restore')}</Text>
       </Pressable>
 
       {showRestoreNotice && (
         <View style={styles.notice} testID="first-run-restore-notice">
-          <Text style={styles.noticeTitle}>Restore comes after sign-in</Text>
-          <Text style={styles.noticeBody}>
-            Tap Start to get going; once you're in, open the chat
-            (← chat) and run /restore-from-mnemonic to swap in your
-            recovery phrase.  A boot-time restore lands in a future
-            update.
-          </Text>
+          <Text style={styles.noticeTitle}>{t('circle.firstRun.notice_title')}</Text>
+          <Text style={styles.noticeBody}>{t('circle.firstRun.notice_body')}</Text>
         </View>
       )}
     </ScrollView>

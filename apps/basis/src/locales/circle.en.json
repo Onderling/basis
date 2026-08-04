@@ -4835,5 +4835,43 @@
       "handle-taken": "That name is already taken in this circle. Pick another.",
       "handle-taken_hint": "If you restored this device, the circle may still hold your previous name — pick a new one, or ask an admin to remove the old entry."
     }
+  },
+  "firstRun": {
+    "title": {
+      "text": "Welcome to basis",
+      "doc": "First-run welcome (5.9b→batch 6): screen title."
+    },
+    "lede": {
+      "text": "A neighbourhood chat that runs on your phone.  Your data stays local; you choose who sees what.",
+      "doc": "First-run lede."
+    },
+    "bullet_circles": {
+      "text": "Circles you control — invite by code or QR.",
+      "doc": "First-run bullet 1."
+    },
+    "bullet_items": {
+      "text": "Tasks, posts, and notes scoped to each circle.",
+      "doc": "First-run bullet 2."
+    },
+    "bullet_pod": {
+      "text": "Pod-backed sync when you sign in to a Solid pod.",
+      "doc": "First-run bullet 3."
+    },
+    "start": {
+      "text": "Start",
+      "doc": "Primary CTA."
+    },
+    "restore": {
+      "text": "I have a recovery phrase",
+      "doc": "Secondary CTA → mnemonic entry."
+    },
+    "notice_title": {
+      "text": "Restore comes after sign-in",
+      "doc": "Fallback notice title (only when the host wires no onRestore)."
+    },
+    "notice_body": {
+      "text": "Tap Start to get going; once you're in, open the chat (← chat) and run /restore-from-mnemonic to swap in your recovery phrase.  A boot-time restore lands in a future update.",
+      "doc": "Fallback notice body."
+    }
   }
 }

@@ -126,3 +126,27 @@ export function pageLabel(page, t, fallback) {
   if (page && typeof page.title === 'string' && page.title) return page.title;
   return fallback;
 }
+
+/**
+ * The declared FLOW behind an op (batch 6) — `manifest.flows[]`, the wizard tier of the surface
+ * contract. Both shells gate a wizard mount on this: a wizard whose flow is not declared is a
+ * surface the manifest does not admit to having (the twin-reachability rule, applied to flows —
+ * G-S3 holds the declaration itself against the state module it describes).
+ *
+ * Accepts one manifest or a merged-source list (`[{manifest}, …]`), because the shells hold the
+ * latter and the guard holds the former.
+ *
+ * @param {object|Array<object|{manifest: object}>} manifestOrSources
+ * @param {string} opId
+ * @returns {object|null} the flow declaration, or null when no manifest declares one for this op.
+ */
+export function flowForOp(manifestOrSources, opId) {
+  const list = Array.isArray(manifestOrSources)
+    ? manifestOrSources.map((s) => s?.manifest ?? s)
+    : [manifestOrSources];
+  for (const m of list) {
+    const flow = (Array.isArray(m?.flows) ? m.flows : []).find((f) => f?.opId === opId);
+    if (flow) return flow;
+  }
+  return null;
+}

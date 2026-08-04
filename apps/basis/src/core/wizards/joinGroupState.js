@@ -589,9 +589,26 @@ export async function applyOfferingsDisclosureAtJoin({ state, callSkill, context
 
 /* ─── Initial state + final-submit chain ───────────────────── */
 
+/**
+ * The join flow's DECLARED steps (batch 6) — the first flow to live on a manifest (`stoop`'s
+ * `flows: [{ id: 'joinGroup', … }]`), and this export is what keeps that declaration honest: the
+ * flow-integrity guard (G-S3, `scripts/flowIntegrity.test.js`) asserts declared ids ≡ these ids and
+ * that the `next` chain is acyclic and fully reachable. The wizard's own machine still runs on the
+ * numeric `state.step` 1..3 below — this is a DECLARATION of that existing flow, not a rewrite —
+ * and the index of each entry is its numeric step minus one.
+ */
+export const JOIN_FLOW_STEPS = Object.freeze([
+  // step 1 — paste/scan the invite; decode + validate it (`decodeInvite`).
+  Object.freeze({ id: 'invite',   next: 'consent' }),
+  // step 2 — the rules gate: circle rules + privacy notice + the join-time capability consent.
+  Object.freeze({ id: 'consent',  next: 'identity' }),
+  // step 3 — who joins: handle, persona, reveal preset, the key/link choice; then `finalSubmit`.
+  Object.freeze({ id: 'identity', next: null }),
+]);
+
 export function initialState() {
   return {
-    step:             1,            // 1..3
+    step:             1,            // 1..3 — JOIN_FLOW_STEPS[step - 1] is the declared name
     invite:           null,         // decoded invite object
     inviteParseError: null,
     rulesText:        null,

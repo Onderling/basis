@@ -24,6 +24,8 @@ const BASELINE = path.join(ROOT, 'scripts', 'disclosure-exit-baseline.json');
 const ALLOWED = [
   /^apps\/basis\/src\/v2\/circleViewAs\.js$/,          // the ladder (revealedMemberLabel)
   /^apps\/basis\/src\/v2\/memberCards\.js$/,           // the card projections implementing it
+  /^packages\/kring-host\/src\/circleMembers\.js$/,     // the release projection feeding the ladder (realName ← personaProperties)
+  /^packages\/core\/src\/discovery\/peerFacade\.js$/,  // builds Peer.revealState FROM the release — disclosure machinery, not a bypass
   /^packages\/agent-registry\/src\//,                  // the registry owns the attribute
   /^apps\/stoop\/src\/lib\/deriveRoster\.js$/,         // writes the roster row
   /(^|\/)(test|tests|e2e|test-browser)\//, /\.(test|spec)\.[cm]?js$/,   // tests may construct fixtures

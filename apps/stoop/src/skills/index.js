@@ -71,7 +71,8 @@ import { validateCanonical } from '@onderling/item-types';
 import { changedReleaseKeys } from '@onderling/agent-registry';
 import { treeOf, createCrossPodRefResolver, chatEnvelopeFromStoreItem, toWireEnvelope, toWireRefEnvelope } from '@onderling/item-store';
 // The circle fan-out CORE lives in the circles substrate now; stoop injects its deps + helpers.
-import { createCircleFanOut } from '@onderling/circles';
+// The per-circle ADDRESS announce/record logic lives there too (same DI lift).
+import { createCircleFanOut, recordCircleAddress, fanCircleAddresses } from '@onderling/circles';
 import { validateStoopItem, intentToCanonicalDraft } from '../lib/canonicalAdapter.js';
 
 import { validateHandle, findHandleCollision, withHandleClaim } from '../lib/handle.js';
@@ -3018,106 +3019,13 @@ export function buildSkills({
      *          | { ok:false, reason }.
      */
     defineSkill('recordCircleAddressAnnouncement', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      if (typeof a.groupId !== 'string' || !a.groupId) return { ok: false, reason: 'groupId-required' };
-
-      const isLocalCall = !!localActor && from === localActor;
-      const requested = (typeof a.memberWebid === 'string' && a.memberWebid) ? a.memberWebid : null;
-      const webid = (isLocalCall && requested) ? requested : from;
-      if (!webid) return { ok: false, reason: 'member-unresolved' };
-      if (requested && requested !== webid) return { ok: false, reason: 'may-only-write-own-row' };
-
-      const proven = verifyCircleAddressAnnouncement({
-        circleId:           a.groupId,
-        memberWebid:        webid,
-        circleAddress:      a.circleAddress,
-        circleAddressProof: a.circleAddressProof,
-        personaProperties:  a.personaProperties,
-      }, a.groupId);
-      if (!proven) return { ok: false, reason: 'unproven-address' };
-      // The member's RELEASE rides the (proof-verified) address, carried under the same roster-level
-      // trust as the webid attribution. Written only onto the member's OWN row below, never merged
-      // blindly: a plain object or nothing. This is what makes a released name reach a co-member.
-      const releasedProps = (proven.personaProperties && typeof proven.personaProperties === 'object'
-        && !Array.isArray(proven.personaProperties)) ? proven.personaProperties : null;
-
-      let all = [];
-      try { all = await store.listOpen({ type: 'membership-redemption' }); } catch { all = []; }
-      const forGroup = (all ?? []).filter((i) => i?.source?.groupId === a.groupId);
-
-      let patched = 0;
-      let unchanged = 0;
-      for (const it of forGroup) {
-        const src = it.source ?? {};
-        let next = null;
-        if (src.redeemedBy === webid) {
-          // Unchanged only when NEITHER the address NOR the release moved — an announcement that
-          // carries a NEW release for an already-known address must still patch the row, or a
-          // released name would never land on a device that already had the address.
-          const releaseChanged = !!releasedProps
-            && JSON.stringify(src.personaProperties ?? null) !== JSON.stringify(releasedProps);
-          if (src.circleAddress === proven.circleAddress
-            && src.circleAddressProof === proven.circleAddressProof
-            && !releaseChanged) { unchanged += 1; continue; }
-          next = {
-            circleAddress:      proven.circleAddress,
-            circleAddressProof: proven.circleAddressProof,
-            // A row learned from an intro carries no key at all; without one
-            // `bindCircleAddressKeys` skips the address it was just given. webid IS the member's
-            // signing address in a basis circle (the same fact the ladder's webid rung relies on).
-            ...(src.signingPublicKey ? {} : { signingPublicKey: webid }),
-            // …and the member's release, when the announcement carried one — completing the roster
-            // projection so a released name reaches this device. Absent → the row's release is left
-            // exactly as it was (an announcement without a release never ERASES one).
-            ...(releasedProps ? { personaProperties: releasedProps } : {}),
-          };
-        } else if (src.confirmedBy === webid && src.channel === 'peer') {
-          if (src.confirmedByCircleAddress === proven.circleAddress
-            && src.confirmedByCircleAddressProof === proven.circleAddressProof) { unchanged += 1; continue; }
-          next = {
-            confirmedByCircleAddress:      proven.circleAddress,
-            confirmedByCircleAddressProof: proven.circleAddressProof,
-          };
-        }
-        if (!next) continue;
-        try {
-          await store.update(it.id, { source: { ...src, ...next } }, { actor: from });
-          patched += 1;
-        } catch { /* one unwritable row must not cost the others their update */ }
-      }
-
-      let created = 0;
-      if (patched === 0 && unchanged === 0) {
-        // Nobody by this webid on the trail yet. Only the LOCAL carrier may introduce them — see the
-        // "whose row" note above; a remote self-announce from a non-member is refused outright.
-        if (!isLocalCall) return { ok: false, reason: 'not-a-member' };
-        const [item] = await store.addItems([{
-          type:       'membership-redemption',
-          text:       `${webid} announced a per-circle address for ${a.groupId}`,
-          source:     {
-            groupId:            a.groupId,
-            redeemedBy:         webid,
-            signingPublicKey:   webid,
-            circleAddress:      proven.circleAddress,
-            circleAddressProof: proven.circleAddressProof,
-            channel:            'announce',
-            announcedAt:        Date.now(),
-            ...(releasedProps ? { personaProperties: releasedProps } : {}),
-          },
-          visibility: 'household',
-        }], { actor: from });
-        created = item ? 1 : 0;
-      }
-
-      return {
-        ok: true,
-        groupId:       a.groupId,
-        memberWebid:   webid,
-        circleAddress: proven.circleAddress,
-        patched, created,
-        unchanged: patched === 0 && created === 0,
-        _sync: simulateSync(),
-      };
+      // Thin wrapper: the receive-half logic lives in `@onderling/circles`
+      // (`recordCircleAddress`). Stoop injects the store, the proof verifier,
+      // and its `_sync` producer, and passes the parsed args + carrier context.
+      return recordCircleAddress(
+        { store, verifyCircleAddressAnnouncement, simulateSync },
+        { a: dataArgs(parts), from, localActor },
+      );
     }, {
       description: 'Record a member\'s PROVEN per-circle address for a circle (the receive half of address announcing).',
       visibility:  'authenticated',
@@ -4343,24 +4251,18 @@ export function buildSkills({
      *   Never wakes a device (silent lane): learning where to send is housekeeping, not news.
      */
     defineSkill('broadcastCircleAddresses', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      const _groupId = a.groupId ?? groupId;
-      if (!_groupId) return { error: 'groupId-required' };
-      const announcements = verifyCircleAddressAnnouncements(a.announcements, _groupId);
-      if (!announcements.length) return { error: 'no-proven-announcements' };
-      const ts = typeof a.ts === 'number' && Number.isFinite(a.ts) ? a.ts : Date.now();
-      const msgId = (typeof a.msgId === 'string' && a.msgId)
-        ? a.msgId
-        : `ca-${ts.toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-      // `to` NARROWS the fan to named members (the admin's "here is everyone, for you alone" send).
-      const only = Array.isArray(a.to) ? a.to.filter((x) => typeof x === 'string' && x) : null;
-      return broadcastToCircle({
-        circleId: _groupId, kind: CIRCLE_ADDRESS_ANNOUNCE_KIND, from,
-        extras: { circleId: _groupId, msgId, ts, announcements },
-        metric: 'circle-address-announce-fanout',
-        noWake: true,
-        only,
-      });
+      // Thin wrapper: the send-half logic lives in `@onderling/circles`
+      // (`fanCircleAddresses`). Stoop injects the list verifier, the announce
+      // kind, and the fan-out core, and passes the parsed args + active-circle
+      // default.
+      return fanCircleAddresses(
+        {
+          verifyCircleAddressAnnouncements,
+          broadcastToCircle,
+          announceKind: CIRCLE_ADDRESS_ANNOUNCE_KIND,
+        },
+        { a: dataArgs(parts), groupId, from },
+      );
     }, {
       description: 'Fan proven per-circle ADDRESS announcements to a circle (subtype:circle-address-announce); receivers verify each proof themselves and record it. Pass `to` to narrow the fan. Never wakes a device.',
       visibility:  'authenticated',

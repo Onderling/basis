@@ -25,3 +25,8 @@ export {
 // The ONE circle-broadcast fan the `broadcastKring*` family rides. Lifted out
 // of stoop as a pure DI core — the caller injects its deps + helpers.
 export { createCircleFanOut } from './circleFanOut.js';
+
+// Per-circle ADDRESS announcing — receive half (`recordCircleAddress`) and send
+// half (`fanCircleAddresses`). Pure DI lift out of stoop; the caller injects the
+// store, the core verify helpers, the announce kind, and the fan.
+export { recordCircleAddress, fanCircleAddresses } from './circleAddress.js';

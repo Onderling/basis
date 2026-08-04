@@ -30,3 +30,8 @@ export { createCircleFanOut } from './circleFanOut.js';
 // half (`fanCircleAddresses`). Pure DI lift out of stoop; the caller injects the
 // store, the core verify helpers, the announce kind, and the fan.
 export { recordCircleAddress, fanCircleAddresses } from './circleAddress.js';
+
+// Roster read / persona-property write / roster-updated fan. Pure DI lift out of
+// stoop; the caller injects the store, the shared exit + foreign-caller helpers,
+// the release-key diff, the fan-out core, and its `_sync` producer.
+export { listCircleRoster, recordMemberPersonaProperties, fanRosterUpdated } from './circleRoster.js';

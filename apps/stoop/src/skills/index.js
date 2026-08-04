@@ -71,8 +71,12 @@ import { validateCanonical } from '@onderling/item-types';
 import { changedReleaseKeys } from '@onderling/agent-registry';
 import { treeOf, createCrossPodRefResolver, chatEnvelopeFromStoreItem, toWireEnvelope, toWireRefEnvelope } from '@onderling/item-store';
 // The circle fan-out CORE lives in the circles substrate now; stoop injects its deps + helpers.
-// The per-circle ADDRESS announce/record logic lives there too (same DI lift).
-import { createCircleFanOut, recordCircleAddress, fanCircleAddresses } from '@onderling/circles';
+// The per-circle ADDRESS announce/record logic lives there too (same DI lift), as does the
+// roster read / persona-property write / roster-updated fan.
+import {
+  createCircleFanOut, recordCircleAddress, fanCircleAddresses,
+  listCircleRoster, recordMemberPersonaProperties, fanRosterUpdated,
+} from '@onderling/circles';
 import { validateStoopItem, intentToCanonicalDraft } from '../lib/canonicalAdapter.js';
 
 import { validateHandle, findHandleCollision, withHandleClaim } from '../lib/handle.js';
@@ -3211,50 +3215,14 @@ export function buildSkills({
      *   Returns: { members: [{addr, role: 'admin'|'member'}, ...] }
      */
     defineSkill('listGroupRoster', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
-      const all = await store.listOpen({ type: 'membership-redemption' });
-      const forGroup = all.filter(i => i?.source?.groupId === a.groupId);
-      // The circle's routing addresses are functional data for MEMBERS. A FOREIGN caller (one acting
-      // as a webid other than this device's own) gets them only if they are themselves in this
-      // circle's trail — otherwise a handshaked stranger could map a circle they have no part in.
-      // Local calls (acting as our own webid) are unchanged. Same gate `listGroupMembers` applies,
-      // one circle at a time — where the data is, not in the caller's shell.
-      if (rosterCallerIsForeign(from, localActor)) {
-        const isMember = forGroup.some((i) => {
-          const s = i?.source ?? {};
-          return s.redeemedBy === from || s.confirmedBy === from;
-        });
-        if (!isMember) return { groupId: a.groupId, members: [], reason: 'not-a-member' };
-      }
-      // B4 — the same per-circle exit rule the roster projection uses. Without it, household-sync
-      // pairing keeps re-adding a removed member as a peer for this circle on every circle-open.
-      const exits = await readCircleExits({ store, groupId: a.groupId });
-      const joinedAt = new Map();
-      for (const it of forGroup) {
-        const w = it?.source?.redeemedBy;
-        const at = typeof it?.source?.redeemedAt === 'number' ? it.source.redeemedAt : 0;
-        if (w && at > (joinedAt.get(w) ?? 0)) joinedAt.set(w, at);
-      }
-      const seen = new Map();   // addr → role
-      for (const it of forGroup) {
-        const src = it.source ?? {};
-        // `redeemedBy` is a joiner (the actor who presented the code).
-        if (src.redeemedBy && src.redeemedBy !== from && !isExited(exits, src.redeemedBy, joinedAt.get(src.redeemedBy) ?? 0)) {
-          if (!seen.has(src.redeemedBy)) seen.set(src.redeemedBy, 'member');
-        }
-        // `confirmedBy` is the admin's address as recorded on the
-        // joiner side (peer-bridge channel only).
-        if (src.confirmedBy && src.confirmedBy !== from && src.channel === 'peer'
-          && !isExited(exits, src.confirmedBy, 0)) {
-          seen.set(src.confirmedBy, 'admin');
-        }
-      }
-      return {
-        groupId: a.groupId,
-        members: [...seen.entries()].map(([addr, role]) => ({ addr, role })),
-        _sync:   simulateSync(),
-      };
+      // Thin wrapper: the roster-read logic (including the foreign-caller gate) lives
+      // in `@onderling/circles` (`listCircleRoster`). Stoop injects the store, the
+      // shared exit + foreign-caller helpers, and its `_sync` producer, and passes the
+      // parsed args + carrier context.
+      return listCircleRoster(
+        { store, readCircleExits, isExited, rosterCallerIsForeign, simulateSync },
+        { a: dataArgs(parts), from, localActor },
+      );
     }, {
       description: 'List addresses for the calling actor\'s buurt peers (fan-out roster).',
       visibility:  'authenticated',
@@ -3284,91 +3252,14 @@ export function buildSkills({
      *   Returns: { ok:true, groupId, memberWebid, keys, changedKeys, unchanged? } | { ok:false, reason }.
      */
     defineSkill('recordMemberPersonaProperties', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      if (typeof a.groupId !== 'string' || !a.groupId) return { ok: false, reason: 'groupId-required' };
-      // WHOSE row may this call write?
-      //
-      // The doc above states the invariant — "a member can only speak for their own row, never overwrite
-      // another's" — but it was enforced only by CONVENTION at one call site: the admin's peer handler
-      // substitutes the authenticated `fromAddr`. This skill is `visibility:'authenticated'`, so it is also
-      // reachable DIRECTLY over the wire, where `from` is the remote caller and `memberWebid` is whatever
-      // they typed. A member could therefore overwrite ANOTHER member's disclosed persona on the admin's
-      // roster — a forgery, not just a lost update.
-      //
-      // So: a REMOTE caller may only ever write their own row (`memberWebid` is ignored, `from` wins). The
-      // LOCAL path keeps honouring `memberWebid`, because that is exactly where the trusted substitution
-      // happens: the admin's `handlePersonaPropsUpdate` passes the authenticated peer address, and the
-      // admin adjusting their own row passes their own. Deny-by-default: when we cannot tell, use `from`.
-      const isLocalCall = !!localActor && from === localActor;
-      const requested = (typeof a.memberWebid === 'string' && a.memberWebid) ? a.memberWebid : null;
-      const webid = (isLocalCall && requested) ? requested : from;
-      if (!webid) return { ok: false, reason: 'member-unresolved' };
-      if (requested && requested !== webid) {
-        return { ok: false, reason: 'may-only-write-own-row' };   // honest refusal, never a silent no-op
-      }
-      const props = (a.personaProperties && typeof a.personaProperties === 'object' && !Array.isArray(a.personaProperties))
-        ? a.personaProperties : null;
-      if (props === null) return { ok: false, reason: 'personaProperties-required' };
-      if (!members) return { ok: false, reason: 'roster-unavailable' };
-
-      // An empty disclosure ({}) is "I now share nothing here" — normalise to the SAME `null`
-      // absent-state a never-disclosed member carries, so the roster never holds an empty object
-      // downstream code has to special-case (back-compat with the join-time capture).
-      const stored = Object.keys(props).length ? props : null;
-
-      // 1. Live row — merge onto the EXISTING member (read-modify-write, like setMySkills). A
-      //    non-member gets no phantom row: only someone the admin already recorded can be updated.
-      const me = await members.resolveByWebid(webid);
-      if (!me) return { ok: false, reason: 'not-a-member' };
-
-      // The DURABLE backing of this row (the redemption item `listGroupMembers` recovers from) —
-      // read up-front because it is BOTH the diff's left-hand side and the patch target below.
-      // The live MemberMap row is a lossy cache (it can read empty after a rebuild), so the
-      // durable value wins when the two disagree: never call a real change "unchanged".
-      let durableItem = null;
-      try {
-        const all = await store.listOpen({ type: 'membership-redemption' });
-        durableItem = all.find((i) => i?.source?.redeemedBy === webid && i?.source?.groupId === a.groupId) ?? null;
-      } catch { durableItem = null; }
-      const previous = me.personaProperties ?? durableItem?.source?.personaProperties ?? null;
-
-      // DIFF-GATE — an unchanged save is a true no-op: no write, no durable patch, no changed
-      // keys for the caller to announce. (A `circleAddress` refresh alone is bookkeeping, not a
-      // disclosure change, so it rides along on a real change only.)
-      const changedKeys = changedReleaseKeys(previous, stored);
-      if (changedKeys.length === 0) {
-        return {
-          ok: true, unchanged: true, groupId: a.groupId, memberWebid: webid,
-          keys: Object.keys(props), changedKeys: [], _sync: simulateSync(),
-        };
-      }
-
-      await members.addMember({
-        ...me,
-        personaProperties: stored,
-        ...(typeof a.circleAddress === 'string' && a.circleAddress ? { circleAddress: a.circleAddress } : {}),
-      });
-
-      // 2. Durable backing — patch the member's redemption item source so `listGroupMembers`
-      //    recovers the fresh value after a rebuild (the admin's OWN row has no redemption item —
-      //    the patch simply finds nothing and the live row stands, matching createGroupV2).
-      try {
-        const item = durableItem;
-        if (item) {
-          await store.update(item.id, {
-            source: {
-              ...item.source,
-              personaProperties: stored,
-              ...(typeof a.circleAddress === 'string' && a.circleAddress ? { circleAddress: a.circleAddress } : {}),
-            },
-          }, { actor: from });
-        }
-      } catch { /* durable patch is best-effort — the live row already reflects the change */ }
-
-      return {
-        ok: true, groupId: a.groupId, memberWebid: webid,
-        keys: Object.keys(props), changedKeys, _sync: simulateSync(),
-      };
+      // Thin wrapper: the persona-property write logic (whose-row gate + diff-gate +
+      // durable patch) lives in `@onderling/circles` (`recordMemberPersonaProperties`).
+      // Stoop injects the store, the MemberMap, the release-key diff, and its `_sync`
+      // producer, and passes the parsed args + carrier context.
+      return recordMemberPersonaProperties(
+        { store, members, changedReleaseKeys, simulateSync },
+        { a: dataArgs(parts), from, localActor },
+      );
     }, {
       description: 'Record an already-joined member\'s disclosed persona properties onto the roster (post-join "share to this circle").',
       visibility:  'authenticated',
@@ -4211,21 +4102,13 @@ export function buildSkills({
      *   `errors[]` array but never throw.
      */
     defineSkill('broadcastRosterUpdated', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      const _groupId = a.groupId ?? groupId;
-      if (!_groupId)                                          return { error: 'groupId-required' };
-      if (typeof a.memberRef !== 'string' || !a.memberRef)    return { error: 'memberRef-required' };
-      if (typeof a.msgId !== 'string' || !a.msgId)            return { error: 'msgId-required' };
-
-      const ts = typeof a.ts === 'number' && Number.isFinite(a.ts) ? a.ts : Date.now();
-      // Key NAMES only — a value that somehow reached this arg is dropped here, at the boundary.
-      const keys = Array.isArray(a.keys) ? a.keys.filter((k) => typeof k === 'string' && k) : [];
-
-      return broadcastToCircle({
-        circleId: _groupId, kind: 'roster-updated', from,
-        extras: { circleId: _groupId, msgId: a.msgId, ts, memberRef: a.memberRef, keys },
-        metric: 'roster-updated-fanout',
-      });
+      // Thin wrapper: the roster-updated fan logic lives in `@onderling/circles`
+      // (`fanRosterUpdated`). Stoop injects the fan-out core and passes the parsed
+      // args + active-circle default.
+      return fanRosterUpdated(
+        { broadcastToCircle },
+        { a: dataArgs(parts), groupId, from },
+      );
     }, {
       description: 'Fan a roster "pull-me" signal (member ref + changed property NAMES, never values) out to every other member via chat.send subtype:roster-updated; receivers re-read the changed roster rows.',
       visibility:  'authenticated',

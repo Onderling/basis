@@ -15,7 +15,6 @@ export { mockProvider } from './providers/mock.js';
 
 // Configurable endpoint block — pick an endpoint (baseUrl + model + auth/headers)
 // by name / customer, composed with the existing provider constructors.
-export { resolveEndpoint } from './endpoints.js';
 
 // Per-customer usage metering — injectable sink + in-memory aggregator + the
 // token-extraction / estimate helpers.

@@ -1,7 +1,11 @@
 /**
  * ⏸ PARKED for commercialisation (decided): built for a per-customer billing model that never shipped;
  * the portfolio's licensing ideas will want usage metering, so it waits rather than dies. NB the sibling
- * endpoint half IS superseded (a live duplicate exists in basis's circleLlmRoutes).
+ * endpoint half WAS superseded (basis's circleLlmRoutes is the live route resolver) and its file is now
+ * DELETED per "no duplicates": the one idea unique to it — customer→endpoint selection for per-customer
+ * deployments — is part of THIS parked billing model and is re-derivable from git (`endpoints.js`) or
+ * re-designed fresh when commercialisation lands. Nothing the live path needed was lost: circle routes
+ * select by CIRCLE policy, not by customer, and never consumed it.
  * Per-customer usage metering for @onderling/llm-client.
  *
  * A plain, injectable seam — NO global state, NO persistence, NO DB.  A

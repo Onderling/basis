@@ -27,7 +27,8 @@
   "dependencies": {
     "@onderling/core": "workspace:^",
     "@onderling/logger": "workspace:^",
-    "ws": "^8.20.0"
+    "ws": "^8.20.0",
+    "tweetnacl": "^1.0.3"
   },
   "optionalDependencies": {
     "node-datachannel": "^0.32.2",

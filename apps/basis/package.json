@@ -2,7 +2,7 @@
   "name": "@onderling-app/basis",
   "version": "0.1.0-dev",
   "private": true,
-  "description": "basis \u2014 command-first unified chat shell consuming onderling app manifests.  Static web app; mesh agent runs browser-side via relay + NKN + WebRTC.",
+  "description": "basis — command-first unified chat shell consuming onderling app manifests.  Static web app; mesh agent runs browser-side via relay + NKN + WebRTC.",
   "type": "module",
   "main": "src/index.js",
   "exports": {
@@ -96,6 +96,8 @@
     "fake-indexeddb": "^6.0.0",
     "happy-dom": "^15.0.0",
     "vite": "^5.4.0",
-    "vitest": "^3.0.0"
+    "vitest": "^3.0.0",
+    "tweetnacl": "^1.0.3",
+    "nkn-sdk": "^1.3.6"
   }
 }

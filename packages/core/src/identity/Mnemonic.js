@@ -11,7 +11,7 @@ import {
   entropyToMnemonic,
   validateMnemonic  as bip39Validate,
 } from '@scure/bip39';
-import { wordlist } from '@scure/bip39/wordlists/english';
+import { wordlist } from '@scure/bip39/wordlists/english.js';
 
 const BITS = 256; // 256 bits of entropy → 24 words → 32-byte seed
 

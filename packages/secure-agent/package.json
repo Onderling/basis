@@ -1,25 +1,26 @@
 {
   "private": true,
-  "name":        "@onderling/secure-agent",
-  "version":     "0.1.0",
+  "name": "@onderling/secure-agent",
+  "version": "0.1.0",
   "description": "Safety-by-default agent factory.  Wires persistent identity + Agent (auto-SecurityLayer) + NknTransport (with useSecurityLayer + auto-HI) into a single createSecureAgent({...}) call.  Reserved opts for future safety items (mute, helloGates, signed-WebID, passphrase-vault, WebAuthn, identity-resolver, capability tokens, audit log, group encryption, Double-Ratchet PFS) so apps inherit each defence behind a checkbox — without re-wiring per app.  See Project Files/basis/security-roadmap-2026-05-23.md.",
-  "type":        "module",
-  "main":        "src/index.js",
+  "type": "module",
+  "main": "src/index.js",
   "exports": {
     ".": "./src/index.js"
   },
   "scripts": {
-    "test":       "vitest run",
+    "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@onderling/core":       "workspace:*",
+    "@onderling/core": "workspace:*",
     "@onderling/pod-client": "workspace:*",
     "@onderling/transports": "workspace:*",
-    "@onderling/vault":      "workspace:*",
-    "@noble/hashes":      "^1.5.0"
+    "@onderling/vault": "workspace:*",
+    "@noble/hashes": "^1.5.0"
   },
   "devDependencies": {
-    "vitest": "^3.0.0"
+    "vitest": "^3.0.0",
+    "tweetnacl": "^1.0.3"
   }
 }

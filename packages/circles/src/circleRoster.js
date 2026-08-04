@@ -264,3 +264,95 @@ export async function fanRosterUpdated(
     metric: 'roster-updated-fanout',
   });
 }
+
+/**
+ * `listCircleMembers(deps, args)` — the full roster READ: return each member's row
+ * for a circle, with the per-member release the only thing that decides which fields
+ * ride. This is the read the members view uses; its sibling `listCircleRoster` returns
+ * only routing addresses.
+ *
+ * TWO GATES, both enforced where the data is (this replying device), never in the
+ * caller's shell:
+ *   1. FOREIGN-CALLER — a caller whose acting webid is not this device's own
+ *      (`rosterCallerIsForeign`) is a real peer. A foreign non-member is refused
+ *      (`{members:[], reason:'not-a-member'}`); a foreign member gets the per-peer
+ *      ALLOWLIST projection via `gateRosterReplyForPeer`, NEVER this device's private
+ *      roster cache. A LOCAL call (acting as our own webid) is our own view and passes
+ *      unchanged. The pre-trail fallback has no trail to prove membership against, so a
+ *      foreign caller there is refused deny-by-default.
+ *   2. RELEASE — which member fields a LOCAL viewer sees follows each member's own
+ *      per-circle release (`personaProperties`, carried on the projected row) plus the
+ *      viewer's OWN "show me names" preference (`reveals.decide`), which may only ever
+ *      NARROW what a release shows. The peer allowlist (gate 1) is the release rule for
+ *      a foreign member.
+ *
+ * Pure DI lift out of stoop's `listGroupMembersCore` — behaviour and wire strings are
+ * byte-identical. The per-circle membership PROJECTION (`projectCircleRoster`), the
+ * shared exit helpers (`readCircleExits`/`isExited`), and the foreign-caller + allowlist
+ * gate helpers (`rosterCallerIsForeign`/`gateRosterReplyForPeer`) are INJECTED — the same
+ * helpers stay in stoop for skills that do not move (and the gate has stoop + basis test
+ * consumers by path), so injecting keeps the package's dependency surface minimal and
+ * avoids a bidirectional stoop↔package coupling, exactly as `listCircleRoster` does.
+ *
+ * @param {object} deps
+ * @param {object} deps.store                   the circle's ItemStore.
+ * @param {object} deps.members                 the MemberMap.
+ * @param {?object} deps.reveals                the VIEWER's local "show me names" store (release NARROWING only).
+ * @param {Function} deps.projectCircleRoster    the per-circle membership projection (shared — injected).
+ * @param {Function} deps.readCircleExits        the circle's exit-set reader (shared — injected).
+ * @param {Function} deps.isExited               the exit predicate (shared — injected).
+ * @param {Function} deps.rosterCallerIsForeign  the local/foreign caller discriminator (shared — injected).
+ * @param {Function} deps.gateRosterReplyForPeer the peer allowlist gate (shared — injected).
+ * @param {object} args
+ * @param {object} args.a           the parsed skill data (`{groupId?}`).
+ * @param {?string} args.from       the authenticated caller (acting webid).
+ * @param {?string} args.localActor this device's own webid (the local/foreign discriminator).
+ * @param {?string} args.groupId    the bundle's active-circle default.
+ * @returns {Promise<object>} `{ groupId, members:[...] }` | `{ members:[] }` | `{ groupId, members:[], reason }`.
+ */
+export async function listCircleMembers(
+  { store, members, reveals, projectCircleRoster, readCircleExits, isExited, rosterCallerIsForeign, gateRosterReplyForPeer },
+  { a, from, localActor, groupId },
+) {
+  const _groupId = a.groupId ?? groupId;
+  if (!members) return { members: [] };
+  const list = await members.list();
+
+  // The viewer's OWN "show me names" preference, surfaced under its honest name. This store is the
+  // VIEWER's local choice (the same one that gates item-author display names via
+  // `resolveMember`/`hydrateItem`) — it says nothing about what the MEMBER disclosed. For a while it
+  // was projected as `reveals: [viewerWebid]`, which downstream gates read as "this member revealed
+  // to me" — the inverse consent direction. The discloser-side fact rides `personaProperties` (the
+  // member's per-circle release); this marker may only ever NARROW what a release shows.
+  const viewerWebid = from ?? null;
+  const withViewerReveals = (rows) => {
+    if (!reveals || !viewerWebid || !Array.isArray(rows)) return rows;
+    return rows.map((m) => {
+      const wid = m?.webid ?? m?.id ?? null;
+      if (!wid || wid === viewerWebid) return m;
+      const show = !!reveals.decide({ peerWebid: wid, groupId: _groupId })?.showDisplayName;
+      return show ? { ...m, viewerNameOptIn: true } : m;
+    });
+  };
+  const scoped = await projectCircleRoster({ store, groupId: _groupId, memberMapList: list });
+  const caller = from ?? null;
+  const foreign = rosterCallerIsForeign(caller, localActor);
+  // A foreign caller must PROVE membership of this circle from its durable trail — the fallback path
+  // has no trail to prove it against, so a foreign caller there is refused (deny-by-default). A local
+  // call keeps the fallback's pre-trail behaviour unchanged.
+  if (!scoped) {
+    if (foreign) return { groupId: _groupId, members: [], reason: 'not-a-member' };
+    // Legacy back-compat: a group with NO redemption trail (a seeded single-buurt roster from before
+    // code-minting) falls back to the full MemberMap so those setups are unchanged. Still
+    // EXIT-FILTERED, or removal would silently do nothing on circles with no other representation.
+    const exits = await readCircleExits({ store, groupId: _groupId });
+    const kept = exits.size === 0 ? list : list.filter((m) => !isExited(exits, m?.webid ?? '', 0));
+    return { groupId: _groupId, members: withViewerReveals(kept) };
+  }
+  if (foreign) {
+    const gated = gateRosterReplyForPeer(scoped, caller);
+    if (!gated.ok) return { groupId: _groupId, members: [], reason: 'not-a-member' };
+    return { groupId: _groupId, members: gated.members };
+  }
+  return { groupId: _groupId, members: withViewerReveals(scoped) };
+}

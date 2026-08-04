@@ -75,7 +75,7 @@ import { treeOf, createCrossPodRefResolver, chatEnvelopeFromStoreItem, toWireEnv
 // roster read / persona-property write / roster-updated fan.
 import {
   createCircleFanOut, recordCircleAddress, fanCircleAddresses,
-  listCircleRoster, recordMemberPersonaProperties, fanRosterUpdated,
+  listCircleRoster, recordMemberPersonaProperties, fanRosterUpdated, listCircleMembers,
 } from '@onderling/circles';
 import { validateStoopItem, intentToCanonicalDraft } from '../lib/canonicalAdapter.js';
 
@@ -792,48 +792,19 @@ async function getGroupRulesCore(scope, a, ctx) {
 }
 
 async function listGroupMembersCore(scope, a, ctx) {
+  // Thin wrapper: the full roster-read logic — the foreign-caller ALLOWLIST gate AND the
+  // local-viewer release read — lives in `@onderling/circles` (`listCircleMembers`). Stoop
+  // injects the store, the MemberMap, the viewer's reveal store, the per-circle membership
+  // projection, the shared exit helpers, and the foreign-caller + allowlist gate helpers,
+  // and passes the parsed args + carrier context.
   const { store, members, reveals, groupId, localActor } = scope;
-  const _groupId = a.groupId ?? groupId;
-  if (!members) return { members: [] };
-  const list = await members.list();
-
-  // The viewer's OWN "show me names" preference, surfaced under its honest name. This store is the
-  // VIEWER's local choice (the same one that gates item-author display names via
-  // `resolveMember`/`hydrateItem`) — it says nothing about what the MEMBER disclosed. For a while it
-  // was projected as `reveals: [viewerWebid]`, which downstream gates read as "this member revealed
-  // to me" — the inverse consent direction. The discloser-side fact rides `personaProperties` (the
-  // member's per-circle release); this marker may only ever NARROW what a release shows.
-  const viewerWebid = ctx?.from ?? null;
-  const withViewerReveals = (rows) => {
-    if (!reveals || !viewerWebid || !Array.isArray(rows)) return rows;
-    return rows.map((m) => {
-      const wid = m?.webid ?? m?.id ?? null;
-      if (!wid || wid === viewerWebid) return m;
-      const show = !!reveals.decide({ peerWebid: wid, groupId: _groupId })?.showDisplayName;
-      return show ? { ...m, viewerNameOptIn: true } : m;
-    });
-  };
-  const scoped = await projectCircleRoster({ store, groupId: _groupId, memberMapList: list });
-  const caller = ctx?.from ?? null;
-  const foreign = rosterCallerIsForeign(caller, localActor);
-  // A foreign caller must PROVE membership of this circle from its durable trail — the fallback path
-  // has no trail to prove it against, so a foreign caller there is refused (deny-by-default). A local
-  // call keeps the fallback's pre-trail behaviour unchanged.
-  if (!scoped) {
-    if (foreign) return { groupId: _groupId, members: [], reason: 'not-a-member' };
-    // Legacy back-compat: a group with NO redemption trail (a seeded single-buurt roster from before
-    // code-minting) falls back to the full MemberMap so those setups are unchanged. B4: still
-    // EXIT-FILTERED, or removal would silently do nothing on circles with no other representation.
-    const exits = await readCircleExits({ store, groupId: _groupId });
-    const kept = exits.size === 0 ? list : list.filter((m) => !isExited(exits, m?.webid ?? '', 0));
-    return { groupId: _groupId, members: withViewerReveals(kept) };
-  }
-  if (foreign) {
-    const gated = gateRosterReplyForPeer(scoped, caller);
-    if (!gated.ok) return { groupId: _groupId, members: [], reason: 'not-a-member' };
-    return { groupId: _groupId, members: gated.members };
-  }
-  return { groupId: _groupId, members: withViewerReveals(scoped) };
+  return listCircleMembers(
+    {
+      store, members, reveals, projectCircleRoster, readCircleExits, isExited,
+      rosterCallerIsForeign, gateRosterReplyForPeer,
+    },
+    { a, from: ctx?.from ?? null, localActor, groupId },
+  );
 }
 
 /**

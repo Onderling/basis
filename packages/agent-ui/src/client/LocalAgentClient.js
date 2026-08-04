@@ -1,4 +1,6 @@
 /**
+ * ⚠ DELETION CANDIDATE / demote-to-fixture (decided: mark, don't delete). Only test importers remain; the
+ * production half of the pair (`mountLocalUi`) lives on in the bin/ entrypoints.
  * LocalAgentClient — speaks A2A's wire shape to a `mountLocalUi`-served
  * agent (or to any A2A endpoint, really — the client doesn't care).
  *

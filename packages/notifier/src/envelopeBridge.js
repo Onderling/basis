@@ -1,4 +1,8 @@
 /**
+ * ⚠ DELETION CANDIDATE (decided: mark, don't delete). Its premise was retracted days after it was built,
+ * production routed around it (`substrateMirror` publishes directly), and it is stale against the current
+ * channel contract (`sendReply`). The one reusable fact: `notifier.scheduleOnce` + `notifyEnvelope.publish`
+ * COMPOSE — the scheduled-digests idea in the companion note builds on that sentence, not on this file.
  * createEnvelopeBridge — pair the scheduler with notify-envelope.
  *
  * Phase 52.9.1: apps that want time-shifted envelope delivery

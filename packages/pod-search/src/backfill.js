@@ -1,4 +1,7 @@
 /**
+ * ⏸ PARKED, NOT a deletion candidate (decided): this becomes the REBUILD-THE-INDEX gate of the Pod home.
+ * An embedding index is a rebuildable projection; the moment embeddings adopt on an existing pod, a
+ * from-scratch reindex is exactly what is needed — and this is it. Unreached today by design.
  * Backfill orchestrator (Phase 52.24, PLAN-podsearch-v2-embeddings §backfill).
  *
  * A one-time, **resumable**, **idle-friendly** walk that pours an existing

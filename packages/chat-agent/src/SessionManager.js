@@ -1,4 +1,7 @@
 /**
+ * ⚠ DELETION CANDIDATE (decided: mark, don't delete — we may still learn from it). Superseded by
+ * `core.StateManager.openSession`; `ChatAgent.js` contains zero references to Session. Successor named,
+ * kept for reference. See the homes plan's decisions.
  * SessionManager — per-chat session state with TTL eviction.
  *
  * Internal to ChatAgent.  Pure in-memory; restart-survival is V1+

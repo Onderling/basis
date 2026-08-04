@@ -1,4 +1,6 @@
 /**
+ * ⚠ DELETION CANDIDATE (decided: mark, don't delete). Superseded by `@onderling/notify-envelope`'s
+ * `pickMode`, which took this job and is widely consumed. Kept for reference.
  * recogniseEnvelopeShape — pure detector.
  *
  * Phase 52.9.1: distinguish notify-envelope wire shapes

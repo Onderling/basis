@@ -1,4 +1,7 @@
 /**
+ * ⏸ PARKED for commercialisation (decided): built for a per-customer billing model that never shipped;
+ * the portfolio's licensing ideas will want usage metering, so it waits rather than dies. NB the sibling
+ * endpoint half IS superseded (a live duplicate exists in basis's circleLlmRoutes).
  * Per-customer usage metering for @onderling/llm-client.
  *
  * A plain, injectable seam — NO global state, NO persistence, NO DB.  A

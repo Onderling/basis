@@ -14,12 +14,16 @@ import { renderCircleKring } from '../web/v2/circleKring.js';
 
 const t = (k) => k;
 
+// `realName` is RELEASE-sourced (`released` states the member's own per-circle disclosure);
+// a name someone holds locally but never released rides only `ownDisplayName` and shows nobody.
 const MEMBERS = [
-  { id: 'webid:ella',  webid: 'webid:ella',  handle: 'ella', realName: 'Ella Prins', reveals: [] },
-  { id: 'webid:bram',  webid: 'webid:bram',  handle: null,   realName: 'Bram de Wit', reveals: ['webid:me'] },
-  { id: 'webid:me',    webid: 'webid:me',    handle: 'ik',   realName: 'Me Myself',  reveals: [] },
-  { id: 'webid:noor',  webid: 'webid:noor',  handle: null,   realName: 'Noor Visser', reveals: [],
-    circleAddress: 'relay:noor.c1' },
+  { id: 'webid:ella',  webid: 'webid:ella',  handle: 'ella', realName: null, released: false,
+    ownDisplayName: 'Ella Prins' },
+  { id: 'webid:bram',  webid: 'webid:bram',  handle: null,   realName: 'Bram de Wit', released: true },
+  { id: 'webid:me',    webid: 'webid:me',    handle: 'ik',   realName: null, released: false,
+    ownDisplayName: 'Me Myself' },
+  { id: 'webid:noor',  webid: 'webid:noor',  handle: null,   realName: null, released: false,
+    ownDisplayName: 'Noor Visser', circleAddress: 'relay:noor.c1' },
 ];
 
 const chatEvent = (actor, text, extraPayload = {}) => ({
@@ -40,12 +44,12 @@ describe('chatRows — the sender stamp', () => {
     expect(row.senderSelf).toBe(false);
   });
 
-  it('a member who revealed to THIS viewer shows their real name (no handle to prefer)', () => {
+  it('a member who RELEASED their name to this circle shows it (no handle to prefer)', () => {
     const [row] = rowsFor([chatEvent('webid:bram', 'dag')]);
     expect(row.senderLabel).toBe('Bram de Wit');
   });
 
-  it('an unrevealed member without a handle falls back to the id — never the real name', () => {
+  it('an unreleased member without a handle falls back to the id — never a cached name', () => {
     const [row] = rowsFor([chatEvent('webid:noor', 'hee')]);
     expect(row.senderLabel).toBe('webid:noor');
     expect(row.senderLabel).not.toContain('Noor');
@@ -78,12 +82,13 @@ describe('chatRows — the sender stamp', () => {
     expect('senderSelf' in row).toBe(false);
   });
 
-  it('open policy reveals real names to members (the ladder, not a special case)', () => {
+  it('open policy widens who sees a RELEASE — it never conjures a name nobody disclosed', () => {
     const rows = stampSenderLabels(
-      [{ actor: 'webid:noor' }],
+      [{ actor: 'webid:noor' }, { actor: 'webid:bram' }],
       { members: MEMBERS, viewerId: 'webid:me', policy: 'open' },
     );
-    expect(rows[0].senderLabel).toBe('Noor Visser');
+    expect(rows[0].senderLabel).toBe('webid:noor');   // released nothing → the honest id, even open
+    expect(rows[1].senderLabel).toBe('Bram de Wit');  // released → open shows it
   });
 });
 

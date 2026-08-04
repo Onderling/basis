@@ -173,9 +173,9 @@ describe('peerFacade — per-circle keying, no global id (Decision A)', () => {
 });
 
 describe('peerFacade — revealState (C7 reveal-state collapse, Wave B)', () => {
-  // The trail carries no per-viewer `reveals[]` today (the op doesn't surface it),
-  // so real-name disclosure is driven by the circle's revealPolicy: 'open' discloses
-  // it to members, 'pairwise' withholds it until a member reveals to ≥1 peer.
+  // Real-name disclosure is driven by the member's own RELEASE (personaProperties) plus the
+  // circle's revealPolicy: 'open' widens a release to every member; 'pairwise' shows it only
+  // because the member released it here. A viewer preference never stands in for either.
   const readEnabled = (peer, ctx, key) => peer?.revealState?.perContext?.[ctx]?.[key]?.enabled === true;
 
   it('is a disclosure.js-shaped policy keyed by the circleId, handle floor always enabled', () => {
@@ -196,12 +196,14 @@ describe('peerFacade — revealState (C7 reveal-state collapse, Wave B)', () => 
     expect(readEnabled(anna, 'circleX', 'realName')).toBe(true);
   });
 
-  it("'pairwise' policy discloses realName once the member has revealed it to ≥1 peer", () => {
-    const withReveal = { ...trailX[1], reveals: ['https://anna.example/me'] };
-    const [bram] = peerFacade({ trailRoster: [withReveal], circleId: 'circleX', revealPolicy: 'pairwise' });
+  it("'pairwise' policy discloses realName once the member RELEASED it to this circle", () => {
+    // Revealing is the discloser's act: the release (personaProperties) carries the name and IS
+    // the disclosure fact — a viewer-side preference can never stand in for it.
+    const withRelease = { ...trailX[1], personaProperties: { realName: 'Bram de Wit' } };
+    const [bram] = peerFacade({ trailRoster: [withRelease], circleId: 'circleX', revealPolicy: 'pairwise' });
     expect(readEnabled(bram, 'circleX', 'realName')).toBe(true);
-    // …and stays withheld with an empty reveal list.
-    const [bram0] = peerFacade({ trailRoster: [{ ...trailX[1], reveals: [] }], circleId: 'circleX' });
+    // …and stays withheld when nothing was released.
+    const [bram0] = peerFacade({ trailRoster: [{ ...trailX[1] }], circleId: 'circleX' });
     expect(readEnabled(bram0, 'circleX', 'realName')).toBe(false);
   });
 

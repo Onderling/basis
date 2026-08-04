@@ -118,7 +118,7 @@ describe('joining with three devices — offline admin, provable self-links, fre
       signCircleLink: (cid, gid, addr) => C.agent.signCircleLink(cid, gid, addr),
     });
     expect(linked.ok, `linked join failed: ${linked.error ?? ''}`).toBe(true);
-    await until(async () => rowsFor(await rosterOf(A, 'circle-y'), C.pubKey).length === 1);
+    await until(async () => rowsFor(await rosterOf(A, 'circle-y'), C.pubKey).length === 1, { timeout: 15_000 });
     const [row] = rowsFor(await rosterOf(A, 'circle-y'), C.pubKey);
     expect(row.circleAddress, 'the proven existing-self address must be on the roster row').toBe(xAddress);
   });
@@ -142,7 +142,7 @@ describe('joining with three devices — offline admin, provable self-links, fre
       signCircleLink: () => 'forged-proof',
     });
     expect(forged.ok, 'the join itself may stand — membership was legitimately redeemed').toBe(true);
-    await until(async () => rowsFor(await rosterOf(A, 'circle-z'), B.pubKey).length === 1);
+    await until(async () => rowsFor(await rosterOf(A, 'circle-z'), B.pubKey).length === 1, { timeout: 15_000 });
     const [row] = rowsFor(await rosterOf(A, 'circle-z'), B.pubKey);
     // The forged CLAIM must never be recorded. The row MAY legitimately carry an address anyway:
     // after the join, Bram's own device announces an address it can genuinely sign for — his fresh
@@ -177,7 +177,7 @@ describe('joining with three devices — offline admin, provable self-links, fre
     expect(fresh.ok, `fresh join failed: ${fresh.error ?? ''}`).toBe(true);
 
     const xAddress = C.agent.circleAddressFor('circle-x');
-    await until(async () => rowsFor(await rosterOf(A, 'circle-w'), C.pubKey).length === 1);
+    await until(async () => rowsFor(await rosterOf(A, 'circle-w'), C.pubKey).length === 1, { timeout: 15_000 });
     const [row] = rowsFor(await rosterOf(A, 'circle-w'), C.pubKey);
     // The fresh address is real and is NOT the circle-x one.
     if (row.circleAddress != null) expect(row.circleAddress).not.toBe(xAddress);

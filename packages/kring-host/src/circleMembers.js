@@ -79,7 +79,13 @@ export function memberFrom(entry) {
     handle,
     displayName,
     role: m.role ?? 'member',
-    reveals: Array.isArray(m.reveals) ? m.reveals : [],
+    // The member's per-circle RELEASE — what they chose to disclose to this circle (captured at
+    // join or by a later persona share). This is the fact the reveal ladder gates on: a name is
+    // visible because its OWNER released it here, never because a viewer opted in to seeing it.
+    // Was dropped by this projection for a while, which made the release invisible to every
+    // downstream consumer and left the ladder leaning on a viewer-side marker instead.
+    personaProperties: (m.personaProperties && typeof m.personaProperties === 'object')
+      ? m.personaProperties : null,
   };
   if (m.circleAddress != null) out.circleAddress = m.circleAddress;
   return out;
@@ -110,17 +116,30 @@ export function memberToChatItem(member) {
 
 /**
  * `memberToViewAs` — project a canonical Member onto the View-as directory
- * shape `circleViewAs` consumes: `{ id, handle, realName, reveals }`.
+ * shape `circleViewAs` consumes: `{ id, handle, realName, released, ownDisplayName }`.
+ *
+ * `realName` comes from the member's RELEASE (`personaProperties.realName`) — the name their
+ * disclosure choice put into this circle — never from the local display cache: revealing is the
+ * discloser's act, and a name nobody released is a name the directory does not have. `released`
+ * states that fact explicitly so the ladder never has to infer it from string presence.
+ * `ownDisplayName` carries the local display-cache name for exactly ONE consumer: the viewer's
+ * OWN row (you always see yourself; your device holds your name whether or not you released it).
  *
  * @param {Member} member
  */
 export function memberToViewAs(member) {
   const m = member ?? {};
+  const releasedName = (m.personaProperties && typeof m.personaProperties.realName === 'string'
+    && m.personaProperties.realName) ? m.personaProperties.realName : null;
   return {
     id: m.webid ?? null,
     handle: m.handle ?? null,
-    realName: m.displayName ?? null,
-    reveals: Array.isArray(m.reveals) ? m.reveals : [],
+    realName: releasedName,
+    released: releasedName != null,
+    ownDisplayName: m.displayName ?? null,
+    // Carried for the sender-label index (an actor that never resolved past its transport address
+    // still matches its roster row); display never reads it.
+    ...(m.circleAddress != null ? { circleAddress: m.circleAddress } : {}),
   };
 }
 

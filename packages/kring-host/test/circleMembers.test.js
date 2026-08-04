@@ -13,9 +13,12 @@ describe('normalizeCircleMembers', () => {
         { webid: 'did:bob', handle: '@bob', displayName: null },
       ],
     });
+    // `realName` is RELEASE-sourced now: a raw `displayName` (the local display cache) surfaces
+    // only as `ownDisplayName`, usable for the viewer's own row alone — revealing is the
+    // discloser's act, and these rows released nothing.
     expect(out).toEqual([
-      { id: 'did:anne', handle: '@anne', realName: 'Anne de Vries', reveals: [] },
-      { id: 'did:bob', handle: '@bob', realName: null, reveals: [] },
+      { id: 'did:anne', handle: '@anne', realName: null, released: false, ownDisplayName: 'Anne de Vries' },
+      { id: 'did:bob', handle: '@bob', realName: null, released: false, ownDisplayName: null },
     ]);
   });
 
@@ -26,13 +29,16 @@ describe('normalizeCircleMembers', () => {
         { id: 'did:carol', webid: 'did:carol', label: '@carol', handle: '@carol' }, // label == handle → no real name
       ],
     });
-    expect(out[0]).toEqual({ id: 'did:anne', handle: '@anne', realName: 'Anne de Vries', reveals: [] });
-    expect(out[1]).toEqual({ id: 'did:carol', handle: '@carol', realName: null, reveals: [] });
+    expect(out[0]).toEqual({ id: 'did:anne', handle: '@anne', realName: null, released: false, ownDisplayName: 'Anne de Vries' });
+    expect(out[1]).toEqual({ id: 'did:carol', handle: '@carol', realName: null, released: false, ownDisplayName: null });
   });
 
-  it('carries through a pairwise reveals array when present', () => {
-    const out = normalizeCircleMembers({ members: [{ webid: 'did:anne', reveals: ['did:bob'] }] });
-    expect(out[0].reveals).toEqual(['did:bob']);
+  it('surfaces a RELEASED name — the member\'s own per-circle disclosure — as realName', () => {
+    const out = normalizeCircleMembers({
+      members: [{ webid: 'did:anne', personaProperties: { realName: 'Anne de Vries' } }],
+    });
+    expect(out[0].realName).toBe('Anne de Vries');
+    expect(out[0].released).toBe(true);
   });
 
   it('tolerates an empty / nullish / malformed result', () => {
@@ -59,7 +65,8 @@ describe('canonical Member projections', () => {
     const fromItem = memberFrom({ id: 'did:anne', type: 'member', webid: 'did:anne', label: 'Anne de Vries', handle: '@anne', role: 'admin' });
     expect(fromRaw).toEqual(fromItem);
     expect(fromRaw).toEqual({
-      webid: 'did:anne', handle: '@anne', displayName: 'Anne de Vries', role: 'admin', reveals: [],
+      webid: 'did:anne', handle: '@anne', displayName: 'Anne de Vries', role: 'admin',
+      personaProperties: null,
     });
   });
 

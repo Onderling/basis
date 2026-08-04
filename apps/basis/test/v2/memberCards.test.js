@@ -9,10 +9,11 @@ import {
   personaPresetKeys, revealPresetLabelKey, REVEAL_PRESETS,
 } from '../../src/v2/memberCards.js';
 
-// A small roster (same shape `normalizeCircleMembers` emits): id + handle + realName + reveals.
-const me    = { id: 'me',    handle: 'Owl',   realName: 'Frits', reveals: ['bob'] };   // I revealed to bob
-const bob   = { id: 'bob',   handle: 'Fox',   realName: 'Bob',   reveals: ['me'] };    // bob revealed to me
-const carol = { id: 'carol', handle: 'Heron', realName: 'Carol', reveals: [] };        // carol revealed to no one
+// A small roster (same shape `normalizeCircleMembers` emits): `realName` is RELEASE-sourced and
+// `released` states the fact — revealing is the discloser's act, never a viewer preference.
+const me    = { id: 'me',    handle: 'Owl',   realName: 'Frits', released: true };
+const bob   = { id: 'bob',   handle: 'Fox',   realName: 'Bob',   released: true };
+const carol = { id: 'carol', handle: 'Heron', realName: null,    released: false, ownDisplayName: 'Carol' };
 
 describe('personaAttributes', () => {
   it('projects the roster pair the reveal ladder covers: handle (public) + realName (pairwise)', () => {
@@ -65,13 +66,19 @@ describe('selfViewSplit — how a chosen viewer sees me', () => {
     expect(split.hides.map((a) => a.key)).toEqual(['realName']);
   });
 
-  it('pairwise: a member I revealed to sees my real name; one I did not sees only the handle', () => {
+  it('pairwise: my RELEASE decides — every member sees what I released; nobody sees what I did not', () => {
+    // The release is circle-scoped: I released my name here, so any member viewer sees it.
+    // (Per-viewer targeting — release to Bob but not Carol — is a future narrowing of the same
+    // shape; today the circle is the audience unit.)
     const toBob = selfViewSplit({ me, viewer: { kind: 'member', id: 'bob' }, policy: 'pairwise' });
     expect(toBob.sees.map((a) => a.key).sort()).toEqual(['handle', 'realName']);
-
     const toCarol = selfViewSplit({ me, viewer: { kind: 'member', id: 'carol' }, policy: 'pairwise' });
-    expect(toCarol.sees.map((a) => a.key)).toEqual(['handle']);
-    expect(toCarol.hides.map((a) => a.key)).toEqual(['realName']);
+    expect(toCarol.sees.map((a) => a.key).sort()).toEqual(['handle', 'realName']);
+
+    // …and someone who released NOTHING shows nobody anything, whoever asks.
+    const carolToBob = selfViewSplit({ me: carol, viewer: { kind: 'member', id: 'bob' }, policy: 'pairwise' });
+    expect(carolToBob.sees.map((a) => a.key)).toEqual(['handle']);
+    expect(carolToBob.hides.map((a) => a.key)).toEqual(['realName']);
   });
 
   it('open policy: any member viewer sees my real name', () => {
@@ -118,10 +125,10 @@ describe('reveal-state + amount presets (C7)', () => {
 
   it('memberPersonaView reads the façade-populated Peer.revealState — same output as the reveals[]-derived path', () => {
     const circleId = 'circle-x';
-    // The Peer-façade populates Peer.revealState from the same reveal data (reveals[] + policy).
-    // bob revealed to someone (reveals:['me']) under pairwise → realName disclosed for the circle.
+    // The Peer-façade populates Peer.revealState from the member's RELEASE (personaProperties):
+    // bob released his name to this circle → realName disclosed for the circle.
     const [peerBob] = peerFacade({
-      trailRoster: [{ webid: 'bob', handle: 'Fox', reveals: ['me'] }],
+      trailRoster: [{ webid: 'bob', handle: 'Fox', personaProperties: { realName: 'Bob' } }],
       circleId,
       revealPolicy: 'pairwise',
     });

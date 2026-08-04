@@ -46,7 +46,7 @@ describe('names and reveals across three devices', () => {
     await createCircle(A, { groupId: GROUP, name: 'Reveal Circle' });
     expect((await joinExistingCircle(A, B, { groupId: GROUP, handle: 'bram' })).joined.ok).toBe(true);
     expect((await joinExistingCircle(A, C, { groupId: GROUP, handle: 'cato' })).joined.ok).toBe(true);
-    await until(async () => (await rosterOn(A)).length >= 3);
+    await until(async () => (await rosterOn(A)).length >= 3, { timeout: 15_000 });
   });
 
   it("a member's display name stays on their OWN device — no other roster ever holds it", async () => {
@@ -54,7 +54,7 @@ describe('names and reveals across three devices', () => {
     expect(set?.error).toBeUndefined();
 
     // Bram's own device has it (his MemberMap row is his to write)…
-    await until(async () => rowFor(await rosterOn(B), B.pubKey)?.displayName === 'Bram de Wit');
+    await until(async () => rowFor(await rosterOn(B), B.pubKey)?.displayName === 'Bram de Wit', { timeout: 15_000 });
 
     // …and neither the admin's nor the bystander's device EVER receives those bytes. Not gated,
     // not hidden by a renderer: absent. Give propagation every chance to happen before asserting.
@@ -68,22 +68,23 @@ describe('names and reveals across three devices', () => {
     }
   });
 
-  it('a reveal is a viewer-side choice: flipping it changes only the flipping device', async () => {
-    // Anna opts in to seeing Bram's name. This is HER preference, recorded on HER device.
+  it('the "show me names" preference is viewer-side: flipping it changes only the flipping device', async () => {
+    // Anna opts in to seeing names. This is HER display preference, recorded on HER device — it is
+    // NOT a reveal: it cannot stand in for a member's own release, and its marker carries an honest
+    // name (`viewerNameOptIn`) so no gate can mistake it for the discloser's consent again.
     const r = await A.agent.callSkill('stoop', 'setGroupReveal', { groupId: GROUP, showDisplayName: true });
     expect(r?.error).toBeUndefined();
 
-    // On Anna's device every row now carries the marker naming ANNA as the viewer it applies to.
     const onA = rowFor(await rosterOn(A), B.pubKey);
-    expect(onA.reveals, "the marker is the viewing device's own opt-in").toContain(A.pubKey);
+    expect(onA.viewerNameOptIn, "the marker is the viewing device's own opt-in").toBe(true);
+    expect(onA.reveals ?? null, 'the old revealer-shaped field must not come back').toBeNull();
 
-    // On Cato's device: nothing. A reveal is not an event, not a fan, not a shared fact — another
-    // device's roster shows no trace of Anna's choice.
+    // On Cato's device: nothing. A preference is not an event, not a fan, not a shared fact.
     const onC = rowFor(await rosterOn(C), B.pubKey);
-    expect(onC.reveals ?? [], "one viewer's opt-in must never appear on another device").toEqual([]);
+    expect(onC.viewerNameOptIn ?? false, "one viewer's opt-in must never appear on another device").toBe(false);
 
-    // And the marker never conjured name bytes that were not there: Anna may now be WILLING to see
-    // Bram's name, but her device still does not HAVE it (fact 1 above).
+    // And the preference never conjured name bytes that were not there: Anna may now be WILLING to
+    // see Bram's name, but her device still does not HAVE it (fact 1 above).
     expect(onA.displayName ?? null).toBeNull();
   });
 

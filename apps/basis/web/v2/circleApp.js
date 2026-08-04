@@ -6290,7 +6290,7 @@ async function showSelfView(id) {
   try { const r = await rawCallSkill('stoop', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
   let roster = [];
   try { roster = normalizeCircleMembers(await rawCallSkill('stoop', 'listGroupMembers', { groupId: id })); } catch { /* */ }
-  const me = roster.find((m) => m.id === myWebid) ?? { id: myWebid || null, handle: null, realName: null, reveals: [] };
+  const me = roster.find((m) => m.id === myWebid) ?? { id: myWebid || null, handle: null, realName: null, released: false };
   const others = roster.filter((m) => m.id && m.id !== myWebid);
   let viewer = { kind: 'stranger' };
   const _comp = await getCircleMediaComposition(id, policy).catch(() => null);

@@ -131,14 +131,14 @@ export function peerFacade({ trailRoster = [], memberMap = [], peerGraph = [], c
     const props = _pickObject(row.personaProperties) ?? _pickObject(disp.personaProperties);
     if (props) peer.props = props;
 
-    // revealState — the C7 reveal-state collapse (Wave B). The member's per-circle
-    // disclosure as a `disclosure.js` policy (context = circleId), read downstream via
-    // `isDisclosed(peer.revealState, circleId, key)`. `handle` is the always-shown floor;
-    // `realName` is disclosed for the circle iff the policy is 'open' OR the member has
-    // revealed it to ≥1 peer. Built as a plain policy object (core cannot import the
-    // agent-registry `disclosure.js` — it sits a layer up — but the policy is a plain
-    // serialisable object, so the shape IS the contract; see disclosure.js `getDisclosure`).
-    peer.revealState = _revealState({ circleId, reveals: row.reveals, revealPolicy });
+    // revealState — the member's per-circle disclosure as a `disclosure.js` policy
+    // (context = circleId), read downstream via `isDisclosed(peer.revealState, circleId, key)`.
+    // `handle` is the always-shown floor; `realName` is disclosed for the circle iff the policy
+    // is 'open' OR the member RELEASED it here (their own per-circle persona release — revealing
+    // is the discloser's act, never a viewer preference). Built as a plain policy object (core
+    // cannot import the agent-registry `disclosure.js` — it sits a layer up — but the policy is
+    // a plain serialisable object, so the shape IS the contract).
+    peer.revealState = _revealState({ circleId, released: props?.realName != null, revealPolicy });
 
     out.push(peer);
   }
@@ -167,13 +167,13 @@ function _flattenTransports(live, disp) {
  * (`{ perContext: { [ctx]: { key: {enabled,rung,matchable,requestable} } } }`),
  * default-withhold on every axis but `enabled`. `handle` is the pseudonym FLOOR
  * (always enabled); `realName` is enabled iff the circle policy is 'open' OR the
- * member has revealed it to at least one peer (`reveals[]`). Only the disclosed
- * (`enabled`) axis carries a value here; `matchable`/`requestable` stay withheld.
+ * member RELEASED it to this circle (their release carries the value itself).
+ * Only the disclosed (`enabled`) axis carries a value here; `matchable`/`requestable`
+ * stay withheld.
  */
-function _revealState({ circleId, reveals, revealPolicy }) {
+function _revealState({ circleId, released, revealPolicy }) {
   const ctx = (typeof circleId === 'string' && circleId) ? circleId : 'circle';
-  const revealedToSomeone = Array.isArray(reveals) && reveals.length > 0;
-  const realNameShared = revealPolicy === 'open' || revealedToSomeone;
+  const realNameShared = revealPolicy === 'open' || released === true;
   const entry = (enabled) => ({ enabled: enabled === true, rung: null, matchable: false, requestable: false });
   return { perContext: { [ctx]: { handle: entry(true), realName: entry(realNameShared) } } };
 }

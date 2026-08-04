@@ -789,16 +789,12 @@ async function listGroupMembersCore(scope, a, ctx) {
   if (!members) return { members: [] };
   const list = await members.list();
 
-  // Wave B — surface the pairwise reveal list so the member-persona card's
-  // per-circle real-name collapse resolves. `reveals[]` on a row means "the
-  // webids this member's real name is shown to"; the card checks
-  // `m.reveals.includes(viewerWebid)`. The reveal state that actually lives on
-  // THIS device is the viewer's OWN `Reveals` store (the same store that already
-  // gates item-author display names via `resolveMember`/`hydrateItem`), so the
-  // projection is viewer-scoped: mark a member `reveals:[viewerWebid]` iff this
-  // viewer has opted to see that member's name (`reveals.decide` — peer override
-  // wins, then group default; default withhold). No new network exposure — the
-  // name is already locally known; this only gates whether the card shows it.
+  // The viewer's OWN "show me names" preference, surfaced under its honest name. This store is the
+  // VIEWER's local choice (the same one that gates item-author display names via
+  // `resolveMember`/`hydrateItem`) — it says nothing about what the MEMBER disclosed. For a while it
+  // was projected as `reveals: [viewerWebid]`, which downstream gates read as "this member revealed
+  // to me" — the inverse consent direction. The discloser-side fact rides `personaProperties` (the
+  // member's per-circle release); this marker may only ever NARROW what a release shows.
   const viewerWebid = ctx?.from ?? null;
   const withViewerReveals = (rows) => {
     if (!reveals || !viewerWebid || !Array.isArray(rows)) return rows;
@@ -806,7 +802,7 @@ async function listGroupMembersCore(scope, a, ctx) {
       const wid = m?.webid ?? m?.id ?? null;
       if (!wid || wid === viewerWebid) return m;
       const show = !!reveals.decide({ peerWebid: wid, groupId: _groupId })?.showDisplayName;
-      return show ? { ...m, reveals: [viewerWebid] } : m;
+      return show ? { ...m, viewerNameOptIn: true } : m;
     });
   };
   const scoped = await projectCircleRoster({ store, groupId: _groupId, memberMapList: list });

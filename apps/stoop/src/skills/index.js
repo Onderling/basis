@@ -73,6 +73,7 @@ import { treeOf, createCrossPodRefResolver, chatEnvelopeFromStoreItem, toWireEnv
 import { validateStoopItem, intentToCanonicalDraft } from '../lib/canonicalAdapter.js';
 
 import { validateHandle, findHandleCollision, withHandleClaim } from '../lib/handle.js';
+import { rosterCallerIsRemote, gateRosterReplyForPeer } from '../lib/rosterAccessGate.js';
 import { resolveMemberAddress, makeFallbackReporter } from '../lib/memberAddress.js';
 import { kindWakes } from '@onderling/item-store';
 
@@ -806,14 +807,23 @@ async function listGroupMembersCore(scope, a, ctx) {
     });
   };
   const scoped = await projectCircleRoster({ store, groupId: _groupId, memberMapList: list });
-  // Legacy back-compat: a group with NO redemption trail (a seeded single-buurt roster from before
-  // code-minting) has no durable source to project from — fall back to the full MemberMap so those
-  // setups are unchanged. B4: the fallback is still EXIT-FILTERED, or removal would silently do
-  // nothing on exactly the circles whose roster has no other representation.
+  const remote = rosterCallerIsRemote(ctx);
+  // A peer must PROVE membership of this circle from its durable trail — the fallback path has no
+  // trail to prove it against, so a remote caller there is refused (deny-by-default). A local call
+  // keeps the fallback's pre-trail behaviour unchanged.
   if (!scoped) {
+    if (remote) return { groupId: _groupId, members: [], reason: 'not-a-member' };
+    // Legacy back-compat: a group with NO redemption trail (a seeded single-buurt roster from before
+    // code-minting) falls back to the full MemberMap so those setups are unchanged. B4: still
+    // EXIT-FILTERED, or removal would silently do nothing on circles with no other representation.
     const exits = await readCircleExits({ store, groupId: _groupId });
     const kept = exits.size === 0 ? list : list.filter((m) => !isExited(exits, m?.webid ?? '', 0));
     return { groupId: _groupId, members: withViewerReveals(kept) };
+  }
+  if (remote) {
+    const gated = gateRosterReplyForPeer(scoped, ctx?.envelope?._from ?? null);
+    if (!gated.ok) return { groupId: _groupId, members: [], reason: 'not-a-member' };
+    return { groupId: _groupId, members: gated.members };
   }
   return { groupId: _groupId, members: withViewerReveals(scoped) };
 }
@@ -3416,11 +3426,24 @@ export function buildSkills({
      *
      *   Returns: { members: [{addr, role: 'admin'|'member'}, ...] }
      */
-    defineSkill('listGroupRoster', async ({ parts, from }) => {
+    defineSkill('listGroupRoster', async ({ parts, from, envelope }) => {
       const a = dataArgs(parts);
       if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
       const all = await store.listOpen({ type: 'membership-redemption' });
       const forGroup = all.filter(i => i?.source?.groupId === a.groupId);
+      // The circle's routing addresses are functional data for MEMBERS. A remote caller (one with a
+      // transport-verified `_from`) gets them only if they are themselves in this circle's trail —
+      // otherwise a handshaked stranger could map a circle they have no part in. Local calls (own
+      // device, empty envelope) are unchanged. Same gate `listGroupMembers` applies, one circle at a
+      // time — where the data is, not in the caller's shell.
+      const remoteCaller = envelope && envelope._from ? envelope._from : null;
+      if (remoteCaller) {
+        const isMember = forGroup.some((i) => {
+          const s = i?.source ?? {};
+          return s.redeemedBy === remoteCaller || s.confirmedBy === remoteCaller;
+        });
+        if (!isMember) return { groupId: a.groupId, members: [], reason: 'not-a-member' };
+      }
       // B4 — the same per-circle exit rule the roster projection uses. Without it, household-sync
       // pairing keeps re-adding a removed member as a peer for this circle on every circle-open.
       const exits = await readCircleExits({ store, groupId: a.groupId });
@@ -4114,7 +4137,7 @@ export function buildSkills({
      *   `groupId` defaults to the bundle's current group.
      */
     wire('listGroupMembers', {
-      description: 'List the members of a group (handles, displayName per Reveals, role; sealingPublicKey + circleAddress when known).',
+      description: 'List the members of a group. To a member peer: identity + keys + address + role + handle + their own release only (allowlist); a non-member peer is refused; the local shell gets the full view. circleAddress when known).',
       visibility:  'authenticated',
     }),
 

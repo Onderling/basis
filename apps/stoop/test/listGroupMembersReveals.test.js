@@ -1,9 +1,9 @@
-// Wave B — the member-persona per-circle collapse. `listGroupMembers` surfaces a viewer-scoped
-// pairwise reveal list (`reveals[]`) so the member-persona card's real-name collapse resolves:
-// a member is marked `reveals:[viewerWebid]` iff THIS viewer has opted (via their own Reveals
-// store, the same store that gates item-author display names) to see that member's real name.
-// Default-withhold; no new network exposure. The collapse itself is proven basis-side in
-// apps/basis/test/v2/memberCards.test.js (`m.reveals.includes(viewerWebid)` → realName shown).
+// The VIEWER's own "show me names" preference, surfaced under its honest name `viewerNameOptIn`.
+// `listGroupMembers` marks a member `viewerNameOptIn: true` iff THIS viewer opted (via their own
+// Reveals store — a personal display toggle) to see names. This is NOT a reveal: revealing is the
+// DISCLOSER's act (the member's own release), and the ladder gates on THAT. The preference may only
+// ever NARROW what a release shows; it can never stand in for the member's consent. These calls are
+// LOCAL (the admin's own device), so the reply carries the full view including this marker.
 import { describe, it, expect } from 'vitest';
 import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
@@ -34,14 +34,14 @@ async function seedTwoMembers(bundle) {
 }
 
 describe('listGroupMembers — viewer-scoped pairwise reveal projection (Wave B)', () => {
-  it('default-withhold: with no reveals set, every member row surfaces reveals: []', async () => {
+  it('default: with nothing opted in, no member row carries the viewer-opt-in marker', async () => {
     const bundle = await buildBundle();
     await seedTwoMembers(bundle);
     const out = await callSkill(bundle.agent, 'listGroupMembers', { groupId: GROUP }, ADMIN);
-    for (const m of out.members) expect(m.reveals ?? []).toEqual([]);
+    for (const m of out.members) expect(m.viewerNameOptIn ?? false).toBe(false);
   });
 
-  it('surfaces reveals:[viewerWebid] for exactly the members THIS viewer opted to see', async () => {
+  it('marks viewerNameOptIn for exactly the members THIS viewer opted to see', async () => {
     const bundle = await buildBundle();
     await seedTwoMembers(bundle);
     // The admin (viewer) opts to see Bob's name but not Cara's (a local viewer choice).
@@ -50,11 +50,11 @@ describe('listGroupMembers — viewer-scoped pairwise reveal projection (Wave B)
     const out = await callSkill(bundle.agent, 'listGroupMembers', { groupId: GROUP }, ADMIN);
     const bob  = out.members.find((m) => m.webid === BOB);
     const cara = out.members.find((m) => m.webid === CARA);
-    expect(bob.reveals).toEqual([ADMIN]);   // opted in → the card will show the real name
-    expect(cara.reveals ?? []).toEqual([]); // not opted in → stays withheld
+    expect(bob.viewerNameOptIn).toBe(true);        // opted in to seeing this member's name
+    expect(cara.viewerNameOptIn ?? false).toBe(false); // not opted in
   });
 
-  it('group-wide reveal opts the viewer into every OTHER member (the group-default branch)', async () => {
+  it('group-wide opt-in marks every OTHER member (the group-default branch)', async () => {
     const bundle = await buildBundle();
     await seedTwoMembers(bundle);
     await callSkill(bundle.agent, 'setGroupReveal', { groupId: GROUP, showDisplayName: true }, ADMIN);
@@ -62,8 +62,8 @@ describe('listGroupMembers — viewer-scoped pairwise reveal projection (Wave B)
     const out = await callSkill(bundle.agent, 'listGroupMembers', { groupId: GROUP }, ADMIN);
     const others = out.members.filter((m) => m.webid !== ADMIN);
     expect(others.length).toBeGreaterThan(0);
-    for (const m of others) expect(m.reveals).toEqual([ADMIN]);   // every other member now visible
+    for (const m of others) expect(m.viewerNameOptIn).toBe(true);   // every other member opted-into
     // The viewer's OWN row is never self-marked.
-    expect(out.members.find((m) => m.webid === ADMIN)?.reveals ?? []).toEqual([]);
+    expect(out.members.find((m) => m.webid === ADMIN)?.viewerNameOptIn ?? false).toBe(false);
   });
 });

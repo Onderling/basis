@@ -27,6 +27,7 @@ import {
   until, teardown, goOffline, goOnline,
 } from '../support/pairRealAgents.js';
 import { joinCircleFromInvite, buildCircleInviteUri } from '../../src/v2/circleInvite.js';
+import { gateRosterReplyForPeer } from '../../../stoop/src/lib/rosterAccessGate.js';
 
 const rosterOf = async (node, groupId) => {
   const r = await node.agent.callSkill('stoop', 'listGroupMembers', { groupId });
@@ -187,5 +188,29 @@ describe('joining with three devices — offline admin, provable self-links, fre
     // the data level, not at the courtesy-of-the-renderer level.
     const roster = await rosterOf(A, 'circle-w');
     expect(JSON.stringify(roster)).not.toContain(xAddress);
+  });
+
+  it('the roster access gate, over the REAL trail: a member peer gets an allowlist, a stranger nothing', async () => {
+    // The admin's real circle-x roster (Anna + Bram + Cato, all really joined above). The wire gate
+    // decides what a REMOTE caller receives from it — this asserts the decision the replying device
+    // applies, over the genuine projected roster rather than a fixture.
+    const roster = await rosterOf(A, 'circle-x');
+    expect(roster.length, 'the real circle should have members to gate').toBeGreaterThanOrEqual(2);
+
+    // A MEMBER peer (Bram, really in the circle) is admitted — and gets functional fields, never the
+    // admin's local display cache of anyone.
+    const forMember = gateRosterReplyForPeer(roster, B.pubKey);
+    expect(forMember.ok, 'a real member must be admitted').toBe(true);
+    expect(forMember.members.length).toBe(roster.length);
+    for (const m of forMember.members) {
+      expect(m).not.toHaveProperty('displayName');   // the local cache never crosses
+      expect(m).not.toHaveProperty('relation');
+    }
+
+    // A STRANGER (never joined this or any circle here) is refused outright.
+    const strangerId = 'webid:total-stranger-not-in-any-circle';
+    const forStranger = gateRosterReplyForPeer(roster, strangerId);
+    expect(forStranger.ok, 'a non-member must be refused').toBe(false);
+    expect(forStranger.members).toEqual([]);
   });
 });

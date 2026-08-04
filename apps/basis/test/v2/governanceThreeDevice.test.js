@@ -13,6 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import { DECISION_STATUS } from '../../src/v2/governanceDecision.js';
 import { threeDevices, openProposal } from './helpers/threeDeviceGovernance.js';
+import { normalizeCirclePolicy } from '../../src/v2/circlePolicy.js';
 
 // The harness (three devices, hold-forward partitions, both fan channels, a mutable clock) lives in
 // `helpers/threeDeviceGovernance.js` — shared with the 3.3/3.5/3.6 suite so both drive ONE substrate.
@@ -120,5 +121,62 @@ describe('3.2 — a non-admin tipping vote does not enact; the admin does, exact
     const annaAfter = await h.rowOn('admin0', proposalId);
     expect(annaAfter.closed).toBe(true);
     expect(annaAfter.awaitingEnactment).toBe(false);
+  });
+});
+
+// ── 3.2b — the enactment trigger is a CIRCLE SETTING ──────────────────────────────────────────────
+// `governanceEnactment: 'settle'` (default) makes an approved decision WAIT for an explicit admin
+// action; `'auto'` makes an admin DEVICE enact the moment it sees one. Either way the decision is
+// signed-and-quorate and only an admin may act — the axis chooses the trigger, never who may act.
+describe('3.2b — governanceEnactment: settle (default) vs auto', () => {
+  const withEnactment = (mode) =>
+    normalizeCirclePolicy({ governance: { removeMember: 'member-vote' }, governanceEnactment: mode });
+
+  it("DEFAULT 'settle': an approved decision waits — no device enacts on the tipping vote alone", async () => {
+    const h = threeDevices({ policy: withEnactment('settle') });
+    const proposalId = await openProposal(h);
+    await h.devices.admin0.gov.vote({ circleId: 'c1', proposalId, voter: 'm0', choice: 'yes' });
+    await h.devices.m1.gov.vote({ circleId: 'c1', proposalId, voter: 'm1', choice: 'yes' });   // approves
+
+    // Everyone can SEE it (including the admin) — but merely viewing does not enact under 'settle'.
+    for (const ref of ['admin0', 'm0', 'm1']) await h.devices[ref].gov.view('c1');
+    expect(h.removalsEverywhere()).toEqual([]);                    // nothing enacted yet
+    const anna = await h.rowOn('admin0', proposalId);
+    expect(anna.approved).toBe(true);
+    expect(anna.awaitingEnactment).toBe(true);                     // …and the chip says so
+
+    // The explicit admin action is what enacts — exactly once, on the admin.
+    await h.devices.admin0.gov.settle('c1');
+    expect(h.removalsEverywhere().map((r) => r.by)).toEqual(['admin0']);
+  });
+
+  it("'auto': the ADMIN device enacts the moment it VIEWS an approved decision — no explicit tap", async () => {
+    const h = threeDevices({ policy: withEnactment('auto') });
+    const proposalId = await openProposal(h);
+    await h.devices.admin0.gov.vote({ circleId: 'c1', proposalId, voter: 'm0', choice: 'yes' });
+    await h.devices.m1.gov.vote({ circleId: 'c1', proposalId, voter: 'm1', choice: 'yes' });   // approves
+
+    // A MEMBER viewing does NOT enact even under 'auto' — the mode changes the trigger, not who may act.
+    await h.devices.m1.gov.view('c1');
+    await h.devices.m0.gov.view('c1');
+    expect(h.removalsEverywhere(), 'no member device enacts under auto either').toEqual([]);
+
+    // The admin merely VIEWING (panel open / re-render) enacts — no settle() call.
+    await h.devices.admin0.gov.view('c1');
+    expect(h.removalsEverywhere().map((r) => r.by)).toEqual(['admin0']);
+    const anna = await h.rowOn('admin0', proposalId);
+    expect(anna.closed).toBe(true);
+    expect(anna.awaitingEnactment).toBe(false);
+  });
+
+  it("'auto' fires EXACTLY ONCE — a second admin view does not re-enact", async () => {
+    const h = threeDevices({ policy: withEnactment('auto') });
+    const proposalId = await openProposal(h);
+    await h.devices.admin0.gov.vote({ circleId: 'c1', proposalId, voter: 'm0', choice: 'yes' });
+    await h.devices.m1.gov.vote({ circleId: 'c1', proposalId, voter: 'm1', choice: 'yes' });
+
+    await h.devices.admin0.gov.view('c1');
+    await h.devices.admin0.gov.view('c1');                          // panel re-opens
+    expect(h.removalsEverywhere().map((r) => r.by)).toEqual(['admin0']);   // still just one
   });
 });

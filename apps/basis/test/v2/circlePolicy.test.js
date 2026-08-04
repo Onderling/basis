@@ -3,7 +3,7 @@ import {
   DEFAULT_CIRCLE_POLICY, CIRCLE_FEATURES,
   normalizeCirclePolicy, mergeCirclePolicy,
   isFeatureEnabled, enabledFeatures,
-  defaultViewModeFromPolicy,
+  defaultViewModeFromPolicy, autoEnacts,
   DEFAULT_MEMBER_OVERRIDE, normalizeMemberOverride, mergeMemberOverride,
   shouldPushNotify,
 } from '../../src/v2/circlePolicy.js';
@@ -348,5 +348,21 @@ describe('B · Slice 4 — member capabilityOptOuts', () => {
   it('merge replaces the opt-out list wholesale (UI sends the full set)', () => {
     const merged = mergeMemberOverride({ capabilityOptOuts: ['a x y'] }, { capabilityOptOuts: ['b x y'] });
     expect(merged.capabilityOptOuts).toEqual(['b x y']);
+  });
+});
+
+describe('circlePolicy · governanceEnactment (the enactment-trigger setting)', () => {
+  it("normalizes to 'settle' by default and accepts 'auto'; junk falls back to the default", () => {
+    expect(normalizeCirclePolicy().governanceEnactment).toBe('settle');
+    expect(normalizeCirclePolicy({ governanceEnactment: 'auto' }).governanceEnactment).toBe('auto');
+    expect(normalizeCirclePolicy({ governanceEnactment: 'nonsense' }).governanceEnactment).toBe('settle');
+  });
+
+  it('autoEnacts reads the enum as a boolean, default-safe', () => {
+    expect(autoEnacts({ governanceEnactment: 'auto' })).toBe(true);
+    expect(autoEnacts({ governanceEnactment: 'settle' })).toBe(false);
+    expect(autoEnacts({})).toBe(false);          // default is settle
+    expect(autoEnacts(null)).toBe(false);
+    expect(autoEnacts({ governanceEnactment: 'bogus' })).toBe(false);
   });
 });

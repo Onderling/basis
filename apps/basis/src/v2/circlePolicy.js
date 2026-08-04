@@ -79,6 +79,12 @@ export const CIRCLE_POLICY_ENUMS = {
   // than accidental. Values are globally unique across the opt locale namespace (`circle.settings.opt.*`),
   // which is shared by every axis — `none` was already taken.
   decisionDeadline:     ['1d', '3d', '7d', '14d', '30d', 'open-ended'],
+  // When a governed decision reaches approval, WHO turns that into the real-world action, and when.
+  // 'settle' (default): an admin enacts EXPLICITLY — every device shows "approved, waiting for an
+  // admin to enact" until one does. Nuchter, no surprise removals. 'auto': an admin DEVICE enacts
+  // the moment it sees an approved proposal (on the same admin-only path), no explicit tap. The
+  // decision is signed-and-quorate either way; this axis only chooses the trigger, never who may act.
+  governanceEnactment:  ['settle', 'auto'],
   agents:               ['yes', 'admin-approval', 'no'],
   revealPolicy:         ['pairwise', 'open'],
   pod:                  ['none', 'shared', 'personal', 'hybrid'],
@@ -140,6 +146,9 @@ export const DEFAULT_CIRCLE_POLICY = {
   // radio/consequence renderer, so an admin can actually CHANGE it — a bare number would have needed a new
   // control type and would have stayed admin-invisible. `open-ended` keeps a decision open forever.
   decisionDeadline: '7d',
+  // Default 'settle': the nuchter option — an approved removal waits for a human admin to enact it,
+  // and every device says so. A circle opts into 'auto' if it wants admin devices to enact on sight.
+  governanceEnactment: 'settle',
   revealPolicy:     'pairwise',
   pod:              'none',
   // ε.6 — see CIRCLE_POLICY_ENUMS.catchUpChooserMode docstring above.
@@ -264,6 +273,20 @@ export function decisionDeadlineDays(policy) {
 }
 
 /**
+ * Does this circle enact an approved decision AUTOMATICALLY on an admin device (`'auto'`), or wait
+ * for an explicit admin action (`'settle'`, the default)? The one place the enum becomes a boolean,
+ * so a shell/host never hard-codes the comparison. An unknown/absent value reads as the default.
+ *
+ * @param {object} policy  a circle policy (normalized or raw)
+ * @returns {boolean} true iff this circle auto-enacts on an admin device
+ */
+export function autoEnacts(policy) {
+  const v = policy?.governanceEnactment;
+  return (CIRCLE_POLICY_ENUMS.governanceEnactment.includes(v) ? v : DEFAULT_CIRCLE_POLICY.governanceEnactment)
+    === 'auto';
+}
+
+/**
  * The policy axes the settings surface offers as radio groups, in display order.
  *
  * SHARED because it was duplicated and had already drifted: the web list carried `storagePosture` and
@@ -275,6 +298,7 @@ export function decisionDeadlineDays(policy) {
  */
 export const SETTINGS_ENUM_AXES = Object.freeze([
   'view', 'llmTool', 'storagePosture', 'sharePosture', 'agents', 'revealPolicy', 'pod', 'decisionDeadline',
+  'governanceEnactment',
 ]);
 
 export function normalizeCirclePolicy(stored = {}) {
@@ -317,6 +341,7 @@ export function normalizeCirclePolicy(stored = {}) {
       : null,
     admins:             Array.isArray(p.admins) ? p.admins.filter((x) => typeof x === 'string') : [],
     decisionDeadline:   pickEnum('decisionDeadline'),
+    governanceEnactment: pickEnum('governanceEnactment'),
     consensusRequired:
       typeof p.consensusRequired === 'boolean' ? p.consensusRequired : DEFAULT_CIRCLE_POLICY.consensusRequired,
     // §5 (L4) — decision-class per governed action; each falls back to DEFAULT_GOVERNANCE,

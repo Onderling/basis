@@ -13,6 +13,7 @@
  * with no special case.
  */
 import { makeGovernanceOrchestrator } from './governanceOrchestrator.js';
+import { autoEnacts } from './circlePolicy.js';
 import { foldGovernance } from './governanceLog.js';
 import { buildGovernanceView } from './governanceView.js';
 import { foldDisputes } from './governanceChain.js';
@@ -63,7 +64,16 @@ export function makeCircleGovernance({
 
   /** The current governance view-model for a circle (the shells render this). */
   async function view(circleId, { labelForSubject } = {}) {
-    const ctx = await getContext(circleId);
+    let ctx = await getContext(circleId);
+    // 'auto' enactment (circle setting): an admin device enacts an approved decision the moment it
+    // SEES one, with no explicit tap. `view` is called on every governance ingest and re-render, so
+    // settling here is the trigger — gated to admins by `settle`/`tally`'s own `canEnact` (a member
+    // device's settle is a no-op), and to circles that chose 'auto'. The default 'settle' skips this
+    // entirely: an approved decision waits, and the shell shows "waiting for an admin to enact".
+    // Re-read the context afterward so the view reflects any proposal this settle just closed.
+    if (autoEnacts(ctx.policy) && canEnact(ctx)) {
+      try { await settle(circleId); ctx = await getContext(circleId); } catch { /* view must still render */ }
+    }
     const me = (ctx.members || []).find((m) => m && m.ref === localActorRef) || null;
     const fold = foldGovernance(ctx.events, { policy: ctx.policy, members: ctx.members, now: now(), disputed: ctx.disputed });
     const base = buildGovernanceView({ fold, viewer: me, labelForSubject });

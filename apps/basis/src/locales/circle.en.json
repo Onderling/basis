@@ -1846,6 +1846,14 @@
       "canonical": {
         "text": "Live share, revocable",
         "doc": "sharePosture option (canonical) — the item stays in place; the recipient gets a revocable key grant to open it, no copy."
+      },
+      "settle": {
+        "text": "An admin enacts it",
+        "doc": "settle (default): an approved decision waits until an admin explicitly enacts it; every device shows \"waiting for an admin\". No surprise removals."
+      },
+      "auto": {
+        "text": "Automatically, on an admin device",
+        "doc": "auto: an admin device carries out an approved decision the moment it sees one, with no explicit step. Still admin-only and still signed + quorate."
       }
     },
     "conflict": {
@@ -1869,6 +1877,10 @@
     "conversationKinds_hint": {
       "text": "Which kinds of entry appear in this circle’s conversation. Turning one off hides it here and keeps its history — turn it back on and the entries return.",
       "doc": "States that turning a kind off is a filter, not a deletion."
+    },
+    "governanceEnactment": {
+      "text": "When is an approved decision carried out?",
+      "doc": "Governance-enactment axis: who turns an approved vote into the real action, and when."
     }
   },
   "override": {

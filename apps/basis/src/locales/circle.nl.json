@@ -1846,6 +1846,14 @@
       "canonical": {
         "text": "Live delen, intrekbaar",
         "doc": "sharePosture option (canonical) — the item stays in place; the recipient gets a revocable key grant to open it, no copy."
+      },
+      "settle": {
+        "text": "Een beheerder voert het uit",
+        "doc": "settle (standaard): een aangenomen besluit wacht tot een beheerder het uitvoert; elk apparaat toont \"wacht op een beheerder\". Geen verrassingen."
+      },
+      "auto": {
+        "text": "Automatisch, op een beheerdersapparaat",
+        "doc": "auto: een beheerdersapparaat voert een aangenomen besluit meteen uit, zonder aparte stap. Nog steeds alleen beheerder, en nog steeds ondertekend + met quorum."
       }
     },
     "conflict": {
@@ -1869,6 +1877,10 @@
     "conversationKinds_hint": {
       "text": "Welke soorten berichten in het gesprek van deze kring verschijnen. Iets uitzetten verbergt het hier en bewaart de geschiedenis — zet je het weer aan, dan staan de berichten er weer.",
       "doc": "States that turning a kind off is a filter, not a deletion."
+    },
+    "governanceEnactment": {
+      "text": "Wanneer wordt een aangenomen besluit uitgevoerd?",
+      "doc": "Uitvoerings-as: wie zet een aangenomen stemming om in de echte actie, en wanneer."
     }
   },
   "override": {

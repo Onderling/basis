@@ -19,7 +19,7 @@
  *
  * Routing decision shape:
  *
- *   route({ type, claimedBy }) → { pod, withRef }
+ *   route({ type, assignee }) → { pod, withRef }
  *
  *   pod      = 'household' | 'member'
  *   withRef  = if true and pod === 'member', the orchestrator also
@@ -40,10 +40,10 @@
 /**
  * @param {object} args
  * @param {import('../types.js').ItemType} args.type
- * @param {string|null} args.claimedBy         webid of the assignee, or null
+ * @param {string} [args.assignee]            webid of the owner, or absent
  * @returns {RoutingDecision}
  */
-export function route({ type, claimedBy }) {
+export function route({ type, assignee }) {
   switch (type) {
     case 'shopping':
       // Household-shared by definition (someone-buys-it-for-everyone).
@@ -54,13 +54,13 @@ export function route({ type, claimedBy }) {
     case 'errand':
       // Default to household pod; if explicitly assigned to one
       // member, store on their pod with a ref for the household to see.
-      return claimedBy
+      return assignee
         ? { pod: 'member', withRef: true }
         : { pod: 'household', withRef: false };
     case 'schedule':
       // Schedule items: same as errand — personal if assigned, shared
       // otherwise.
-      return claimedBy
+      return assignee
         ? { pod: 'member', withRef: true }
         : { pod: 'household', withRef: false };
     default:
@@ -74,10 +74,10 @@ export function route({ type, claimedBy }) {
  * a row requires a doc note in `programming-plan.md`.
  */
 export const ROUTING_TABLE = Object.freeze([
-  { type: 'shopping', claimedBy: 'any',     pod: 'household', withRef: false },
-  { type: 'repair',   claimedBy: 'any',     pod: 'household', withRef: false },
-  { type: 'errand',   claimedBy: 'unset',   pod: 'household', withRef: false },
-  { type: 'errand',   claimedBy: 'set',     pod: 'member',    withRef: true  },
-  { type: 'schedule', claimedBy: 'unset',   pod: 'household', withRef: false },
-  { type: 'schedule', claimedBy: 'set',     pod: 'member',    withRef: true  },
+  { type: 'shopping', assignee: 'any',     pod: 'household', withRef: false },
+  { type: 'repair',   assignee: 'any',     pod: 'household', withRef: false },
+  { type: 'errand',   assignee: 'unset',   pod: 'household', withRef: false },
+  { type: 'errand',   assignee: 'set',     pod: 'member',    withRef: true  },
+  { type: 'schedule', assignee: 'unset',   pod: 'household', withRef: false },
+  { type: 'schedule', assignee: 'set',     pod: 'member',    withRef: true  },
 ]);

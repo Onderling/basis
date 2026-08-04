@@ -45,7 +45,7 @@ export async function nudgeCompletion(args, ctx) {
     const fetched = await Promise.all(itemIds.map((id) => ctx.store.getById(id)));
     items = fetched.filter(
       /** @returns {it is import('../types.js').Item} */
-      (it) => it !== null && it.completedAt === null,
+      (it) => it !== null && it.completedAt == null,   // open = completedAt absent (or null)
     );
   } else {
     items = await ctx.store.listOpen({});

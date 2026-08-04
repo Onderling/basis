@@ -29,8 +29,9 @@ describe('InMemoryStore', () => {
       expect(item.type).toBe('shopping');
       expect(item.text).toBe('bread');
       expect(item.addedBy).toBe('webid:alice');
-      expect(item.completedAt).toBeNull();
-      expect(item.claimedBy).toBeNull();
+      // Rich task shape: open = `completedAt` absent, unclaimed = `assignee` absent.
+      expect(item.completedAt).toBeUndefined();
+      expect(item.assignee).toBeUndefined();
       expect(item.source).toEqual(SAMPLE_SOURCE);
     });
 

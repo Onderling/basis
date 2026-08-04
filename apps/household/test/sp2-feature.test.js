@@ -58,7 +58,7 @@ describe('SP-2: addTask', () => {
       buildCtx(store, { senderWebid: 'web:alice' }),
     );
     const [task] = await store.listOpen({ type: 'task' });
-    expect(task.claimedBy).toBe('web:charlie'); // legacyShape maps assignee → claimedBy
+    expect(task.assignee).toBe('web:charlie'); // rich task shape: owner is `assignee`
   });
 });
 
@@ -93,7 +93,7 @@ describe('SP-2: claim', () => {
       expect.objectContaining({ kind: 'item.claimed', chatId: 'chat-1' }),
     ]);
     const [task] = await store.listOpen({ type: 'task' });
-    expect(task.claimedBy).toBe('web:bob');
+    expect(task.assignee).toBe('web:bob');
   });
 
   it('reports "already claimed" on second claim', async () => {
@@ -133,7 +133,7 @@ describe('SP-2: reassign', () => {
       expect.objectContaining({ kind: 'item.reassigned' }),
     ]);
     const [task] = await store.listOpen({ type: 'task' });
-    expect(task.claimedBy).toBe('web:charlie');
+    expect(task.assignee).toBe('web:charlie');
   });
 
   it('rejects a missing assignee', async () => {

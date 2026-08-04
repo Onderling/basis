@@ -52,7 +52,7 @@ export async function composeDigest(args, ctx) {
   if (typeof ctx.store.listAll === 'function') {
     const all = await ctx.store.listAll();
     doneInWindow = all.filter(
-      (it) => it.completedAt !== null && it.completedAt >= sinceCompleted,
+      (it) => it.completedAt != null && it.completedAt >= sinceCompleted,
     );
   }
 

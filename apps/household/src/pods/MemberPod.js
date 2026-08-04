@@ -2,7 +2,7 @@
  * MemberPod — pod operations against a *single household member's* pod.
  *
  * Per Q-H2.6 + the routing table in `routingTable.js`, items that are
- * explicitly assigned to one member (errand / schedule with claimedBy
+ * explicitly assigned to one member (errand / schedule with an `assignee`
  * set) live on **that member's** pod, with an `ItemRef` written to the
  * shared household pod so cross-member listings still work.  This
  * class is the wrapper the orchestrator uses for "the assignee's pod"
@@ -198,7 +198,7 @@ export class MemberPod {
   }
 
   /**
-   * List the member's *open* items (completedAt === null), optionally
+   * List the member's *open* items (`completedAt` absent), optionally
    * filtered by type.  Walks errands.json + schedule.json (or just one
    * if `filter.type` is set) and merges.  Sorted by `addedAt` ASC; ties
    * broken by id (ULID) for determinism.

@@ -62,14 +62,14 @@ export class HybridPodStore {
    * @returns {Promise<import('../types.js').Item>}
    */
   async addItem({ type, text, addedBy, source, dueAt }) {
+    // A fresh item is unclaimed + open, expressed the rich way: `assignee`
+    // and `completedAt` are simply ABSENT (not explicit nulls).
     const item = {
       id:           ulid(),
       type,
       text,
       addedBy,
       addedAt:      Date.now(),
-      claimedBy:    null,
-      completedAt:  null,
       source,
       ...(dueAt !== undefined ? { dueAt } : {}),
     };

@@ -19,9 +19,11 @@
  *   - remove(id)            → itemStore.removeItems([{id}], {actor})
  *   - getById(id)           → itemStore.getById(id)
  *
- * Result shape: L1b uses `assignee` + absent fields where H2 used
- * `claimedBy` + explicit-null.  `legacyShape()` below normalises so
- * existing tests that check `item.completedAt === null` still pass.
+ * Result shape: the substrate's rich task item is returned DIRECTLY — the
+ * household `Item` shape IS the shared task shape (`assignee` for the owner,
+ * `completedAt` absent while open). `publicItem()` below only takes a
+ * defensive shallow copy and drops the substrate-internal `_etag`; it does
+ * NOT rename or re-null any field, so there is one task shape, not two.
  *
  * The `ulid` export is preserved for any caller that imports it
  * directly (one test does); re-exported from L1b's ULID helper.
@@ -129,7 +131,7 @@ export class InMemoryStore {
     });
     this.#insertionOrder.set(item.id, ++this.#seq);
     this.#emitWrite(item);                 // OBJ-2 S1d — fan out to peers
-    return legacyShape(item, addedBy);
+    return publicItem(item);
   }
 
   /**
@@ -149,7 +151,7 @@ export class InMemoryStore {
     return items
       .slice()
       .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
-      .map((it) => legacyShape(it));
+      .map((it) => publicItem(it));
   }
 
   /**
@@ -162,7 +164,7 @@ export class InMemoryStore {
       { actor: SYSTEM_ACTOR },
     );
     this.#emitWrite(item);                 // OBJ-2 S1d
-    return legacyShape(item);
+    return publicItem(item);
   }
 
   /**
@@ -178,10 +180,9 @@ export class InMemoryStore {
   }
 
   /**
-   * claim a task (assignee:= actor). Returns the updated item
-   * via `legacyShape`, or — if the item is already claimed by someone
-   * else — the L1b ItemStore's `{error: 'already-claimed', current}`
-   * shape passed through (with `current` legacy-shaped).
+   * claim a task (assignee:= actor). Returns the updated item, or — if
+   * the item is already claimed by someone else — the L1b ItemStore's
+   * `{error: 'already-claimed', current}` shape passed through.
    *
    * @param {string} itemId
    * @param {string} [actor]
@@ -190,10 +191,10 @@ export class InMemoryStore {
   async claim(itemId, actor) {
     const result = await this.#store.claim(itemId, { actor: actor ?? SYSTEM_ACTOR });
     if (result && result.error === 'already-claimed') {
-      return { error: 'already-claimed', current: legacyShape(result.current) };
+      return { error: 'already-claimed', current: publicItem(result.current) };
     }
     this.#emitWrite(result);              // OBJ-2 S1d — fan out the claim
-    return legacyShape(result);
+    return publicItem(result);
   }
 
   /**
@@ -210,7 +211,7 @@ export class InMemoryStore {
       { actor: actor ?? SYSTEM_ACTOR },
     );
     this.#emitWrite(item);                // OBJ-2 S1d — fan out the reassign
-    return legacyShape(item);
+    return publicItem(item);
   }
 
   /**
@@ -219,39 +220,23 @@ export class InMemoryStore {
    */
   async getById(itemId) {
     const item = await this.#store.getById(itemId);
-    return item ? legacyShape(item) : null;
+    return item ? publicItem(item) : null;
   }
 }
 
 /**
- * Normalise L1b's Item shape into H2's legacy shape:
- *   - completedAt: undefined (absent) → null
- *   - assignee → claimedBy (renamed); undefined → null
- *   - addedBy: respect the constructor-supplied value when L1b returned the
- *     SYSTEM_ACTOR (legacy tests pass any string as addedBy).
- *   - _etag: stripped (substrate-internal)
+ * Return the substrate's rich task item as the household `Item`, taking a
+ * defensive shallow copy (callers mutate results in tests) and dropping the
+ * substrate-internal `_etag`. It renames nothing and re-nulls nothing: the
+ * owner stays `assignee`, and `completedAt` stays absent while open — this is
+ * the ONE task shape the app speaks, not a translation to a second one.
  *
  * @param {object} item
- * @param {string} [addedByOverride]   re-attribute SYSTEM_ACTOR-shaped writes
  * @returns {object}
  */
-function legacyShape(item, addedByOverride) {
-  const {
-    _etag, addedByDisplayName, completedByDisplayName, claimedAt,
-    completedBy, assignee, completedAt,
-    addedBy,
-    dependencies, requiredSkills, visibility,
-    ...rest
-  } = item;
-  // Drop H4-extension fields that H2 doesn't use.
-  void dependencies; void requiredSkills; void visibility;
-  void completedBy; void completedByDisplayName; void claimedAt;
-  void addedByDisplayName; void _etag;
-
-  return {
-    ...rest,
-    addedBy:    addedByOverride && addedBy === SYSTEM_ACTOR ? addedByOverride : addedBy,
-    completedAt: completedAt ?? null,
-    claimedBy:   assignee ?? null,
-  };
+function publicItem(item) {
+  if (!item) return item;
+  const { _etag, ...rest } = item;
+  void _etag;
+  return rest;
 }

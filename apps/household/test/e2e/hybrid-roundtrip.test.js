@@ -145,11 +145,11 @@ describe('Phase 2 e2e — HouseholdAgent over HybridPodStore', () => {
   });
 
   it('items added via the store land on the right pod (routing table holds end-to-end)', async () => {
-    // Skills don't set claimedBy, so all routes land on household.
+    // Skills don't set an assignee, so all routes land on household.
     await bridge.emit(makeMsg('add errand fix the bike'));
     const open = await store.listOpen();
     expect(open).toHaveLength(1);
-    expect(open[0].claimedBy).toBeNull();
+    expect(open[0].assignee).toBeUndefined();
     // Check that the household pod actually has a `/household/errands/open/...` entry.
     const householdEntries = await householdPodClient.list('https://pod.example/household/errands/open/');
     expect(householdEntries.entries).toHaveLength(1);
@@ -157,15 +157,14 @@ describe('Phase 2 e2e — HouseholdAgent over HybridPodStore', () => {
 
   it('a directly-orchestrator-added member-pod item shows up in cross-pod listings', async () => {
     // Bypass the agent — exercise the orchestrator directly so we can
-    // hit the member-pod path (skills don't yet plumb claimedBy).
+    // hit the member-pod path (skills don't yet plumb an assignee).
     const item = {
       id:          'TEST123ITEM',
       type:        'errand',
       text:        'pick up dry cleaning',
       addedBy:     ALICE,
       addedAt:     1_000_000,
-      claimedBy:   ALICE,
-      completedAt: null,
+      assignee:    ALICE,
       source:      { tg: { chatId: 'chat-1', messageId: 'msg-x' } },
     };
     await orchestrator.addItem(item);

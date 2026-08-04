@@ -57,22 +57,22 @@ export class HybridPodOrchestrator {
    * @returns {Promise<{ pod: 'household'|'member', uri: string }>}
    */
   async addItem(item) {
-    const { pod, withRef } = route({ type: item.type, claimedBy: item.claimedBy });
+    const { pod, withRef } = route({ type: item.type, assignee: item.assignee });
 
     if (pod === 'household') {
       const { uri } = await this.#household.addItem(item);
       return { pod: 'household', uri };
     }
 
-    // pod === 'member' — needs a claimedBy webid + a resolvable MemberPod.
-    if (!item.claimedBy) {
+    // pod === 'member' — needs an assignee webid + a resolvable MemberPod.
+    if (!item.assignee) {
       // Defensive: the routing decision said 'member' but the item is
-      // unclaimed — shouldn't happen given route() requires claimedBy
+      // unclaimed — shouldn't happen given route() requires an assignee
       // for that branch.  Fall back to household.
       const { uri } = await this.#household.addItem(item);
       return { pod: 'household', uri };
     }
-    const memberPod = await this.#memberPodFor(item.claimedBy);
+    const memberPod = await this.#memberPodFor(item.assignee);
     if (!memberPod) {
       // Member doesn't have a per-member pod set up yet.  Fall back to
       // the household pod.  Document the trade-off: the item ends up
@@ -89,7 +89,7 @@ export class HybridPodOrchestrator {
       const ref = {
         id:            item.id,
         type:          item.type,
-        ownerWebid:    item.claimedBy,
+        ownerWebid:    item.assignee,
         ownerPodRoot:  uri.slice(0, uri.length - relPath.length), // derive from uri minus relPath
         relPath,
         addedAt:       item.addedAt,

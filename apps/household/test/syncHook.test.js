@@ -22,12 +22,12 @@ describe('InMemoryStore sync hook (OBJ-2 S1d)', () => {
     const raw = publishItem.mock.calls[0][0];
     expect(raw.id).toBe(item.id);
     expect(raw.text).toBe('Milk');
-    // The converged CircleItemStore keeps etags at the DataSource/CAS layer (no inline
-    // `_etag` body field the class ItemStore used to stamp), so raw-ness is proven by
-    // the fields legacyShape ADDS: it always normalises completedAt→null and renames
-    // assignee→claimedBy. Their absence on the fanned-out payload proves it's the raw item.
-    expect('claimedBy' in raw).toBe(false);   // legacyShape adds claimedBy — its absence ⇒ raw
-    expect(raw.completedAt).toBeUndefined();  // legacyShape normalises completedAt→null
+    // The fan-out carries the RAW substrate item, which is the rich task shape:
+    // the owner is `assignee` (never a `claimedBy` alias) and `completedAt` is
+    // absent while open. Their shape here matches what the store's own methods
+    // return — there is one task shape, so nothing is translated on the way out.
+    expect('claimedBy' in raw).toBe(false);   // no legacy `claimedBy` alias — the field is `assignee`
+    expect(raw.completedAt).toBeUndefined();  // open ⇒ completedAt absent
   });
 
   it('markComplete fans out', async () => {

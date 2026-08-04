@@ -200,7 +200,7 @@ describe('skills/composeDigest', () => {
 function makeStoreWithListAll(items) {
   return {
     async listOpen() {
-      return items.filter((it) => it.completedAt === null).map((i) => ({ ...i }));
+      return items.filter((it) => it.completedAt == null).map((i) => ({ ...i }));
     },
     async listAll() {
       return items.map((i) => ({ ...i }));
@@ -208,6 +208,8 @@ function makeStoreWithListAll(items) {
   };
 }
 
+// Rich task shape: an open item simply omits `completedAt` (and has no
+// `assignee` until claimed); a done item carries a numeric `completedAt`.
 function makeOpenItem(type, text) {
   return {
     id: `open-${text}`,
@@ -215,8 +217,6 @@ function makeOpenItem(type, text) {
     text,
     addedBy: 'x',
     addedAt: NOW_MS - 60 * 60 * 1000,
-    claimedBy: null,
-    completedAt: null,
     source: SAMPLE_SOURCE,
   };
 }
@@ -228,7 +228,6 @@ function makeCompletedItem(type, text, completedAt) {
     text,
     addedBy: 'x',
     addedAt: completedAt - 60 * 60 * 1000,
-    claimedBy: null,
     completedAt,
     source: SAMPLE_SOURCE,
   };

@@ -53,14 +53,15 @@ const POD_ROOT = 'https://pod.example.com/anne/';
 const WEBID    = 'https://id.inrupt.com/anne';
 
 function mkItem(overrides = {}) {
+  // Rich task shape: `assignee` for the owner; open items simply omit
+  // `completedAt` (a done item passes it explicitly via overrides).
   return {
     id:          'ulid-1',
     type:        'errand',
     text:        'pick up the dry cleaning',
     addedBy:     WEBID,
     addedAt:     1_700_000_000_000,
-    claimedBy:   WEBID,
-    completedAt: null,
+    assignee:    WEBID,
     source:      { tg: { chatId: 'c1', messageId: 'm1' } },
     ...overrides,
   };
@@ -181,7 +182,7 @@ describe('MemberPod', () => {
   });
 
   it('listOpen excludes completed items', async () => {
-    const open  = mkItem({ id: 'open',  completedAt: null });
+    const open  = mkItem({ id: 'open' });
     const done  = mkItem({ id: 'done',  completedAt: 1_700_000_001_000 });
     await member.addItem(open);
     await member.addItem(done);

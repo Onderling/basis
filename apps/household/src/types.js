@@ -13,8 +13,15 @@
  */
 
 /**
- * Raw "thing the household cares about", living on a pod.  Same shape
+ * A "thing the household cares about", living on a pod.  Same shape
  * regardless of which pod (household / member) holds it.
+ *
+ * This IS the shared/rich task shape (`@onderling/item-types` `task`):
+ * the owner is `assignee` (singular mirror of the `assignees[]` co-owner
+ * set on the substrate), and `completedAt` is ABSENT while the item is
+ * open — not an explicit `null`.  Household stores its own non-canonical
+ * types (shopping/errand/repair/schedule/contact) in this same shape, so
+ * there is one task shape across the app, not a lightweight variant.
  *
  * @typedef {object} Item
  * @property {string}      id                ULID
@@ -22,8 +29,8 @@
  * @property {string}      text              freeform user-supplied text
  * @property {string}      addedBy           webid
  * @property {number}      addedAt           ms epoch
- * @property {string|null} claimedBy         webid or null
- * @property {number|null} completedAt       ms epoch or null
+ * @property {string}     [assignee]         webid of the owner; absent = unclaimed
+ * @property {number}     [completedAt]      ms epoch; absent while open
  * @property {Source}      source            origin marker (e.g. tg chat+message)
  * @property {number}     [dueAt]            optional ms epoch
  */

@@ -18,7 +18,7 @@
  *   the persisted Item.
  *
  * @property {(filter: ListFilter) => Promise<Array<import('../types.js').Item>>} listOpen
- *   Items not yet completed (`completedAt === null`).  Filterable by
+ *   Items not yet completed (`completedAt` absent).  Filterable by
  *   type and `since` (added-after-this-ms-epoch).
  *
  * @property {(itemId: string) => Promise<import('../types.js').Item>} markComplete

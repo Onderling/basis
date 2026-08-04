@@ -97,7 +97,7 @@ describe('B/L1 create-path atom: addTask === createHouseholdItem (task noun)', (
     const [task] = await store.listOpen({ type: 'task' });
     expect(task.type).toBe('task');
     expect(task.text).toBe('mow the lawn');
-    expect(task.claimedBy).toBe('web:charlie'); // legacyShape maps assignee → claimedBy
+    expect(task.assignee).toBe('web:charlie'); // rich task shape: owner is `assignee`
   });
 
   it('rejects empty text with the task wording (no state change)', async () => {

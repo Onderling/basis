@@ -109,14 +109,14 @@ function makePod() {
 }
 
 function makeItem(overrides = {}) {
+  // Rich task shape: a fresh household item is shared (no `assignee`) and
+  // open (`completedAt` absent), so neither field is set explicitly.
   return {
     id:          '01HXY000000000000000000001',
     type:        'shopping',
     text:        'milk',
     addedBy:     'https://id.example/alice',
     addedAt:     1_700_000_000_000,
-    claimedBy:   null,
-    completedAt: null,
     source:      { tg: { chatId: 'c1', messageId: 'm1' } },
     ...overrides,
   };
@@ -275,7 +275,7 @@ describe('HouseholdPod.getById', () => {
 
     const open = await hh.getById('OPEN');
     expect(open?.id).toBe('OPEN');
-    expect(open?.completedAt).toBeNull();
+    expect(open?.completedAt).toBeUndefined();
 
     const done = await hh.getById('DONE');
     expect(done?.id).toBe('DONE');

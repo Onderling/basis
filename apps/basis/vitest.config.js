@@ -32,5 +32,49 @@ export default defineConfig({
     // `test-browser/**` cleanly.
     include: ['test/**/*.{test,spec}.?(c|m)[jt]s?(x)'],
     exclude: ['test-browser/**', 'node_modules/**'],
+    // ── B9: a regression must be distinguishable from noise ────────────────────────────────────────
+    // One test failed per full run, a DIFFERENT one each time, every one passing in isolation — so a
+    // red run carried no information, which is worse for the guards' credibility than being slow.
+    // The relay package hit the same wall at 283 tests and went fully serial; this suite is ~4,900,
+    // so the blunt fix costs real wall-clock. Instead: the files that boot REAL agents, relays or
+    // sockets — the load-sensitive minority — run in one sequential group; the other ~450 files keep
+    // full parallelism. Same cure as the relay's, scoped to where the disease is.
+    sequence: { groupOrder: 0 },
+    poolOptions: { forks: { singleFork: false } },
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'boot-serial',
+          include: [
+            'test/app*.test.js',
+            'test/**/*.relay.*.?(c|m)js',
+            'test/**/*RealReceive*.test.js',
+            'test/**/*ThreeDevice*.test.js',
+            'test/v2/circleAddressAnnounce.relay.test.js',
+            'test/v2/kringChatReliableSend.integration.test.js',
+            'test/reachabilityOracleAdoption.test.js',
+          ],
+          fileParallelism: false,
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'parallel',
+          include: ['test/**/*.{test,spec}.?(c|m)[jt]s?(x)'],
+          exclude: [
+            'test-browser/**', 'node_modules/**',
+            'test/app*.test.js',
+            'test/**/*.relay.*.?(c|m)js',
+            'test/**/*RealReceive*.test.js',
+            'test/**/*ThreeDevice*.test.js',
+            'test/v2/circleAddressAnnounce.relay.test.js',
+            'test/v2/kringChatReliableSend.integration.test.js',
+            'test/reachabilityOracleAdoption.test.js',
+          ],
+        },
+      },
+    ],
   },
 });

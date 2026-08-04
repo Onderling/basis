@@ -32,6 +32,7 @@
  */
 
 import { releaseUnchanged, changedReleaseKeys } from '../../v2/rosterUpdated.js';
+import { announcementsFromRoster } from '../../v2/circleAddressAnnounce.js';
 
 /**
  * The member-side "what did I last share with this circle?" memo — the diff-gate's left-hand side.
@@ -208,6 +209,22 @@ export function makeHandlePersonaPropsUpdate({
         await announceRosterUpdate?.({ circleId: groupId, memberRef: fromAddr, keys: changedKeys });
       } catch (err) {
         logger.warn?.('[peer] roster-updated announce failed', err?.message ?? err);
+      }
+      // …and re-fan the circle addresses, which now carry the member's RELEASE. The roster-updated
+      // fan above is refs-only (values never ride it), and each member's local pull re-reads their
+      // OWN store — so without this, the released value the admin just recorded would never leave the
+      // admin. The address fan is the crossing that already shares the roster; carrying the release
+      // on it is what completes the projection. Best-effort: a failed re-fan must not fail the update.
+      try {
+        const roster = await callSkill('stoop', 'listGroupMembers', { groupId });
+        const announcements = announcementsFromRoster({
+          members: Array.isArray(roster?.members) ? roster.members : [], circleId: groupId,
+        });
+        if (announcements.length) {
+          await callSkill('stoop', 'broadcastCircleAddresses', { groupId, announcements });
+        }
+      } catch (err) {
+        logger.warn?.('[peer] release re-announce failed', err?.message ?? err);
       }
     }
     try {

@@ -3174,8 +3174,14 @@ export function buildSkills({
         memberWebid:        webid,
         circleAddress:      a.circleAddress,
         circleAddressProof: a.circleAddressProof,
+        personaProperties:  a.personaProperties,
       }, a.groupId);
       if (!proven) return { ok: false, reason: 'unproven-address' };
+      // The member's RELEASE rides the (proof-verified) address, carried under the same roster-level
+      // trust as the webid attribution. Written only onto the member's OWN row below, never merged
+      // blindly: a plain object or nothing. This is what makes a released name reach a co-member.
+      const releasedProps = (proven.personaProperties && typeof proven.personaProperties === 'object'
+        && !Array.isArray(proven.personaProperties)) ? proven.personaProperties : null;
 
       let all = [];
       try { all = await store.listOpen({ type: 'membership-redemption' }); } catch { all = []; }
@@ -3187,8 +3193,14 @@ export function buildSkills({
         const src = it.source ?? {};
         let next = null;
         if (src.redeemedBy === webid) {
+          // Unchanged only when NEITHER the address NOR the release moved — an announcement that
+          // carries a NEW release for an already-known address must still patch the row, or a
+          // released name would never land on a device that already had the address.
+          const releaseChanged = !!releasedProps
+            && JSON.stringify(src.personaProperties ?? null) !== JSON.stringify(releasedProps);
           if (src.circleAddress === proven.circleAddress
-            && src.circleAddressProof === proven.circleAddressProof) { unchanged += 1; continue; }
+            && src.circleAddressProof === proven.circleAddressProof
+            && !releaseChanged) { unchanged += 1; continue; }
           next = {
             circleAddress:      proven.circleAddress,
             circleAddressProof: proven.circleAddressProof,
@@ -3196,6 +3208,10 @@ export function buildSkills({
             // `bindCircleAddressKeys` skips the address it was just given. webid IS the member's
             // signing address in a basis circle (the same fact the ladder's webid rung relies on).
             ...(src.signingPublicKey ? {} : { signingPublicKey: webid }),
+            // …and the member's release, when the announcement carried one — completing the roster
+            // projection so a released name reaches this device. Absent → the row's release is left
+            // exactly as it was (an announcement without a release never ERASES one).
+            ...(releasedProps ? { personaProperties: releasedProps } : {}),
           };
         } else if (src.confirmedBy === webid && src.channel === 'peer') {
           if (src.confirmedByCircleAddress === proven.circleAddress
@@ -3228,6 +3244,7 @@ export function buildSkills({
             circleAddressProof: proven.circleAddressProof,
             channel:            'announce',
             announcedAt:        Date.now(),
+            ...(releasedProps ? { personaProperties: releasedProps } : {}),
           },
           visibility: 'household',
         }], { actor: from });

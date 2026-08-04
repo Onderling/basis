@@ -54,25 +54,41 @@ export const CIRCLE_ADDRESS_ANNOUNCE_KIND = 'circle-address-announce';
 
 /**
  * Shape one announcement — a WHITELIST, like `rosterUpdatedPayload`: anything a caller passes that
- * is not one of these four fields is dropped here, at the boundary, rather than travelling.
+ * is not one of these fields is dropped here, at the boundary, rather than travelling.
+ *
+ * `personaProperties` (optional) is the member's per-circle RELEASE — what they chose to disclose to
+ * THIS circle. It rides the announcement so a released name reaches co-members, completing the roster
+ * projection that already shares the address. It is NOT proof-bound (unlike the address): it is a
+ * roster-level claim, carried under exactly the same residual trust the `memberWebid` attribution
+ * already carries (see the header). The SOURCE gate is structural: a carrier fans it from a member's
+ * own roster row, which holds only what that member released — a member who released nothing has an
+ * empty release, so nothing travels. A future hardening could sign the release; recorded as such.
  *
  * @param {object} a
  * @param {string} a.circleId
  * @param {string} a.memberWebid          whose address this is (the member's canonical signing key)
  * @param {string} a.circleAddress        the address they answer on IN THIS CIRCLE
  * @param {string} a.circleAddressProof   `signCircleLink(circleIdentity, circleId, circleAddress)`
- * @returns {{circleId: string, memberWebid: string, circleAddress: string, circleAddressProof: string}}
+ * @param {object} [a.personaProperties]  the member's per-circle release (optional; a plain object)
+ * @returns {{circleId, memberWebid, circleAddress, circleAddressProof, personaProperties?}}
  */
 export function circleAddressAnnouncement({
-  circleId, memberWebid, circleAddress, circleAddressProof,
+  circleId, memberWebid, circleAddress, circleAddressProof, personaProperties,
 } = {}) {
   const s = (v) => (typeof v === 'string' ? v : '');
-  return {
+  const out = {
     circleId:           s(circleId),
     memberWebid:        s(memberWebid),
     circleAddress:      s(circleAddress),
     circleAddressProof: s(circleAddressProof),
   };
+  // Only a non-empty plain object rides — never an array, never junk, and absent when empty so the
+  // wire shape is byte-identical to a release-less announcement (conservation).
+  if (personaProperties && typeof personaProperties === 'object' && !Array.isArray(personaProperties)
+    && Object.keys(personaProperties).length > 0) {
+    out.personaProperties = personaProperties;
+  }
+  return out;
 }
 
 /**

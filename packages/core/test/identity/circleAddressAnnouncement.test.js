@@ -95,14 +95,33 @@ describe('per-circle address announcement', () => {
     }
   });
 
-  it('the payload is a WHITELIST — a caller\'s extra fields never reach the wire', () => {
+  it('the payload is a WHITELIST — a caller\'s UNKNOWN extra fields never reach the wire', () => {
     const shaped = circleAddressAnnouncement({
       circleId: CIRCLE, memberWebid: 'w', circleAddress: 'a', circleAddressProof: 'p',
-      displayName: 'Bram', personaProperties: { age: '30s' },
+      displayName: 'Bram',   // ← unknown field, dropped
     });
     expect(Object.keys(shaped).sort()).toEqual(
       ['circleAddress', 'circleAddressProof', 'circleId', 'memberWebid'],
     );
+  });
+
+  it('personaProperties (the RELEASE) is a KNOWN optional field — a non-empty object rides, junk is dropped', () => {
+    // The release completes the roster projection (a released name reaches co-members). It is carried
+    // only as a non-empty plain object; an empty object, an array, or a non-object drops away so the
+    // wire shape stays byte-identical to a release-less announcement.
+    const withRelease = circleAddressAnnouncement({
+      circleId: CIRCLE, memberWebid: 'w', circleAddress: 'a', circleAddressProof: 'p',
+      personaProperties: { realName: 'Bram de Wit' },
+    });
+    expect(withRelease.personaProperties).toEqual({ realName: 'Bram de Wit' });
+
+    for (const junk of [{}, [], 'x', 42, null]) {
+      const shaped = circleAddressAnnouncement({
+        circleId: CIRCLE, memberWebid: 'w', circleAddress: 'a', circleAddressProof: 'p',
+        personaProperties: junk,
+      });
+      expect(shaped).not.toHaveProperty('personaProperties');
+    }
   });
 
   it('a batch keeps what checks out and drops what does not — one bad row costs the others nothing', () => {

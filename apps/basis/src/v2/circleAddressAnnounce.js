@@ -87,6 +87,10 @@ export function announcementsFromRoster({ members, circleId, exceptWebid = null 
       memberWebid,
       circleAddress:      m.circleAddress,
       circleAddressProof: m.circleAddressProof,
+      // The member's per-circle RELEASE rides along, completing the roster projection: the row this
+      // reads from holds only what the member disclosed to THIS circle, so a member who released
+      // nothing carries nothing. `circleAddressAnnouncement` drops an empty/junk value at the boundary.
+      personaProperties:  m.personaProperties,
     }));
   }
   return out;
@@ -379,6 +383,9 @@ export function makeCircleAddressAnnouncePeerHandler({ agent, logger = console }
           memberWebid:        one.memberWebid,
           circleAddress:      one.circleAddress,
           circleAddressProof: one.circleAddressProof,
+          // The member's release rides along, completing the roster projection (a released name
+          // reaches this device). Absent on a release-less announcement — carried only when present.
+          ...(one.personaProperties ? { personaProperties: one.personaProperties } : {}),
         });
         if (r?.ok) recorded += 1;
       } catch (err) {

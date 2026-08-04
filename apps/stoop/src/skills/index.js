@@ -70,6 +70,8 @@ import { validateCanonical } from '@onderling/item-types';
 // unchanged "share to this circle" never touches the row, never acks a change, never announces one.
 import { changedReleaseKeys } from '@onderling/agent-registry';
 import { treeOf, createCrossPodRefResolver, chatEnvelopeFromStoreItem, toWireEnvelope, toWireRefEnvelope } from '@onderling/item-store';
+// The circle fan-out CORE lives in the circles substrate now; stoop injects its deps + helpers.
+import { createCircleFanOut } from '@onderling/circles';
 import { validateStoopItem, intentToCanonicalDraft } from '../lib/canonicalAdapter.js';
 
 import { validateHandle, findHandleCollision, withHandleClaim } from '../lib/handle.js';
@@ -1108,168 +1110,24 @@ export function buildSkills({
     return defineSkill(id, wireSkill(coreFn, op(id), { storeFor }), opts);
   };
 
-  /**
-   * Connectivity Phase 2 (C4) — the ONE circle-broadcast fan the four
-   * `broadcastKring*` skills share. They differ only by their wire subtype
-   * (`kind`) + payload; the roster-fan, transport choice, delivery-state
-   * accounting, and `{sent, attempted, errors}` return contract live here
-   * once so they can't drift across the four (invariant 3 — logic lives once).
-   *
-   * Default path fans the payload out to every OTHER trail-roster member over
-   * the bus-local `chat.send` (subtype `kind`, threadId `circleId`, body +
-   * extras). A caller that supplies a pre-projected `envelope` (the chat kind,
-   * via `toWireEnvelope`) rides the host-injected RELIABLE sender
-   * (`bundle.reliableSend`) instead when the host wired one — inheriting the
-   * offline hold-forward guarantee — and falls back to `chat.send` (body +
-   * extras) when no host wired one. Same delivery-state contract either way.
-   *
-   * @param {object} a
-   * @param {string} a.circleId          the circle/group id (chat.send threadId)
-   * @param {string} a.kind              the wire subtype (chat.send subtype)
-   * @param {string|null} a.from         sender webid, omitted from the fan-out
-   * @param {string} [a.body]            chat.send body (default '')
-   * @param {object} [a.extras]          chat.send extras payload (default {})
-   * @param {string|null} [a.metric]     UsageMetrics label to record on fan-out
-   * @param {object|null} [a.envelope]   reliable-send wire envelope (chat kind)
-   * @returns {Promise<{sent:number, attempted:number, errors:Array}|{error:string,sent:0,attempted:0,errors:Array}>}
-   */
-  /**
-   * Connectivity Phase 2 (G1/G2) — resolve the circle's data-MOVE branch:
-   * `'fan-out-full' | 'pod-signal' | 'pod-only'`. The host owns the ONE
-   * data-policy resolver (basis `circleDataMove` over the circle's stored
-   * `policy.pod`) and injects the decision as `bundle.circleDataMove(circleId)`
-   * — so the send path branches on the policy WITHOUT an app→app import. The
-   * resolver may be sync or async. Absent / unknown / throwing → 'fan-out-full'
-   * (the honest default: with no pod posture known, the envelope must carry the
-   * data — today's only real path).
-   */
-  async function resolveCircleDataMove(circleId) {
-    const resolver = bundle?.circleDataMove;
-    if (typeof resolver !== 'function') return 'fan-out-full';
-    try {
-      const r = resolver(circleId);
-      const move = (r && typeof r.then === 'function') ? await r : r;
-      return (move === 'pod-signal' || move === 'pod-only') ? move : 'fan-out-full';
-    } catch { return 'fan-out-full'; }
-  }
-
-  async function broadcastToCircle({ circleId, kind, from, body = '', extras = {}, metric = null, envelope = null, noWake = false, only = null }) {
-    // Relay wake-gate (§ residual server-side wake work): a broadcast marked
-    // `noWake` is hold-forwarded to offline members but must NOT fire an OS push
-    // wake — routine governance events (individual votes/resolves) and reports
-    // are noise; only a decision OPENING wakes a device. We stamp the wire flag
-    // the relay honours (`envelope.noWake`, see @onderling/relay wakePayload
-    // `envelopeSuppressesWake`) onto BOTH transport shapes: the synthesised wire
-    // envelope (reliable-send path) AND `extras` (the chat.send fallback rebuilds
-    // its payload from subtype+extras). Chat/policy/rules/recipe never set it, so
-    // they wake as before — fully backward compatible.
-    if (noWake) extras = { ...extras, noWake: true };
-    // Prefer the RELIABLE sender for EVERY broadcast, not just chat (which passes an
-    // `envelope`). It resolves webid→pubKey + hold-forwards; the bus-local `chat.send`
-    // fallback cannot resolve the mesh address, so a control-plane broadcast (policy / rules /
-    // recipe / governance / report — no `envelope`) failed "No pubKey registered" over the
-    // mesh. When there is no `envelope`, we synthesise a wire one from `subtype + extras` so
-    // the receiver routes + ingests it identically. `chat.send` stays the fallback when no
-    // reliable sender is wired.
-    const reliableSend = (typeof bundle?.reliableSend === 'function') ? bundle.reliableSend : null;
-    if (!reliableSend && !chat?.send) return { error: 'chat-unavailable', sent: 0, attempted: 0, errors: [] };
-    if (!members)                     return { error: 'members-unavailable', sent: 0, attempted: 0, errors: [] };
-
-    // ── Who the recipients ARE (2026-07-30) ────────────────────────────────
-    // THIS CIRCLE's roster — the same trail-derived projection `listGroupMembers` returns — not the
-    // device's global `MemberMap`. The MemberMap carries no circle on a row, so fanning over it sent
-    // every circle's message to every member of every OTHER circle this device ever admitted (dead
-    // test peers included: their rows persist), while a member this device knows ONLY from the trail
-    // was never sent to at all. That second half is a JOINER's normal state: `recordRemoteRedemption`
-    // writes only the joiner's own row, so the admin exists solely as `confirmedBy` on the trail —
-    // which is why joiner→admin chat silently never left the device while admin→joiner worked, and why
-    // catch-up (roster-driven) reached the peer the chat fan-out could not.
-    // No trail (legacy seeded single-buurt) → `null` → the MemberMap, exactly as before.
-    let memberMapList = [];
-    try { memberMapList = (await members.list()) ?? []; } catch { memberMapList = []; }
-    const roster = await projectCircleRoster({ store, groupId: circleId, memberMapList });
-    // B4 — the no-trail fallback fans over the global MemberMap, so it must drop this circle's
-    // exits itself; otherwise a removed member keeps receiving the circle's traffic.
-    const fanExits = roster ? null : await readCircleExits({ store, groupId: circleId });
-    const fanMembers = roster
-      ? { list: async () => roster, resolveByWebid: (w) => members.resolveByWebid(w) }
-      : (fanExits && fanExits.size > 0
-        ? {
-          list: async () => ((await members.list()) ?? []).filter((m) => !isExited(fanExits, m?.webid ?? '', 0)),
-          resolveByWebid: (w) => members.resolveByWebid(w),
-        }
-        : members);
-
-    // ── Connectivity Phase 2/3 (G1/G2) — the data-move branch ──────────────
-    // The circle's data-policy (`policy.pod`) decides HOW a message moves; we
-    // consult it here, ABOVE the transport choice (reliableSend vs chat.send).
-    const dataMove = await resolveCircleDataMove(circleId);
-    if ((dataMove === 'pod-signal' || dataMove === 'pod-only') && envelope) {
-      // Phase 3: a REAL shared pod is written HERE, then peers are either
-      // signalled with a REF envelope (`pod-signal`: `toWireRefEnvelope`, the
-      // body replaced by the pod-row `ref`) or left to read the pod themselves
-      // (`pod-only`, no fan). The pod write is the host-injected `bundle.podWrite`
-      // seam — it SEALS the canonical Envelope with the circle's EXISTING
-      // sealing path (the seal resolver) and stores it under the range-queryable
-      // row key (see @onderling/pod-client `writeSealedMessage`), returning that
-      // row's opaque `ref`. Only the CHAT path carries a wire `envelope`, so the
-      // pod log is scoped to chat history; control-plane broadcasts (recipe /
-      // rules / policy) have no envelope and fan-out-full unchanged.
-      //
-      // No `podWrite` wired, or the write fails / yields no ref → DEGRADE to
-      // fan-out-full, EXPLICITLY + loudly (never silently), so the message
-      // still reaches every member.
-      const podWrite = typeof bundle?.podWrite === 'function' ? bundle.podWrite : null;
-      if (podWrite) {
-        let ref = null;
-        try {
-          const res = await podWrite(circleId, envelope);
-          ref = (res && typeof res === 'object') ? (res.ref ?? null) : (typeof res === 'string' ? res : null);
-        } catch (err) {
-          console.warn(`[broadcastToCircle] podWrite for circle ${circleId} failed → degrading to fan-out-full:`, err?.message ?? err);
-        }
-        if (ref) {
-          if (dataMove === 'pod-only') {
-            // No fan: every member reads the pod itself (getMessagesSince / catch-up).
-            if (metric) metrics?.record?.(metric);
-            return { sent: 0, attempted: 0, errors: [], podOnly: true, ref };
-          }
-          // pod-signal: fan the REF envelope (the pod-row pointer) in place of
-          // the full-body envelope, over the SAME transport the full fan uses.
-          const refEnvelope = toWireRefEnvelope({
-            circleId, msgId: envelope.msgId, ts: envelope.ts, ref,
-            fromActor: envelope.fromActor ?? null, fromWebid: envelope.fromWebid ?? null,
-            media: envelope.media,
-          });
-          // NOTE (unchanged here, worth a look on its own): this ref fan passes no `circleId` /
-          // `preferCircleAddress`, so unlike the full fan below it still routes to members' GLOBAL
-          // keys rather than their per-circle addresses.
-          const refFan = reliableSend
-            ? await _fanOutViaReliableSend({ members: fanMembers, reliableSend, selfWebid: from, envelope: refEnvelope })
-            : await _fanOutToMembers({ members: fanMembers, chat, selfWebid: from, subtype: kind, threadId: circleId, body: '', extras: { ...extras, ref } });
-          if (metric) metrics?.record?.(metric);
-          return { sent: refFan.sent, attempted: refFan.attempted, errors: refFan.errors, podSignal: true, ref };
-        }
-      } else {
-        console.info(`[broadcastToCircle] data-policy for circle ${circleId} selected ${dataMove}; no podWrite wired → degrading to fan-out-full`);
-      }
-      // fall through — fan-out-full is the honest degrade target when the pod
-      // write is absent or failed.
-    }
-
-    // The wire object the reliable path sends: chat passes a real `envelope`; a control-plane
-    // broadcast has none, so synthesise `{ subtype: kind, ...extras }` — the same shape the
-    // chat.send fallback would produce as the receiver's payload (routed by `subtype`).
-    const wire = envelope ?? { subtype: kind, ...extras };
-    const { sent, attempted, errors } = reliableSend
-      ? await _fanOutViaReliableSend({
-        members: fanMembers, reliableSend, selfWebid: from, envelope: wire, only, circleId, preferCircleAddress,
-        allowFallback: allowAddressFallback,
-      })
-      : await _fanOutToMembers({ members: fanMembers, chat, selfWebid: from, subtype: kind, threadId: circleId, body, extras, only });
-    if (metric) metrics?.record?.(metric);
-    return { sent, attempted, errors };
-  }
+  // The circle fan-out CORE — the ONE fan the whole `broadcastKring*` family
+  // rides (roster-fan, transport choice, the pod data-move branch, delivery-state
+  // accounting, the `{sent, attempted, errors}` contract) — now lives in
+  // `@onderling/circles`. Stoop wires it ONCE here with its deps + the helpers it
+  // shares with the roster skills (`projectCircleRoster`/`readCircleExits`/`isExited`,
+  // injected because they are NOT owned by the fan) and its two private fan helpers
+  // (`_fanOutViaReliableSend`/`_fanOutToMembers`, which close over the member-address
+  // resolver, so they stay in stoop and are injected). `toWireRefEnvelope` is injected
+  // rather than imported into the package so the package needs no item-store dep.
+  // Every `broadcastKring*` skill keeps calling `broadcastToCircle(...)` unchanged.
+  const broadcastToCircle = createCircleFanOut({
+    chat, members, store, metrics, bundle,
+    preferCircleAddress, allowAddressFallback,
+    projectCircleRoster, readCircleExits, isExited,
+    fanOutViaReliableSend: _fanOutViaReliableSend,
+    fanOutToMembers: _fanOutToMembers,
+    toWireRefEnvelope,
+  });
 
   return [
     /**

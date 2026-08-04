@@ -37,6 +37,7 @@
     "@onderling/app-manifest": "file:../../packages/app-manifest",
     "@onderling/chat-agent": "file:../../packages/chat-agent",
     "@onderling/chat-p2p": "file:../../packages/chat-p2p",
+    "@onderling/circles": "file:../../packages/circles",
     "@onderling/core": "file:../../packages/core",
     "@onderling/transports": "file:../../packages/transports",
     "@onderling/vault": "file:../../packages/vault",

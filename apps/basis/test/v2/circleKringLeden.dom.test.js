@@ -17,9 +17,12 @@ function mount() {
 
 const circle = { id: 'buurt', name: 'Buurt' };
 const tabs = [{ id: 'gesprek', label: 'Gesprek' }, { id: 'leden', label: 'Leden' }];
+// Neither member RELEASED a name to this circle (`realName` is release-sourced, so it is null);
+// each holds their own name only locally (`ownDisplayName`), which reaches nobody but the
+// member's own row — the viewer still sees THEIR OWN name via that self-row fallback.
 const members = [
-  { id: 'me',  handle: 'Owl', realName: 'Frits', reveals: [] },
-  { id: 'bob', handle: 'Fox', realName: 'Bob',   reveals: [] },
+  { id: 'me',  handle: 'Owl', realName: null, released: false, ownDisplayName: 'Frits' },
+  { id: 'bob', handle: 'Fox', realName: null, released: false, ownDisplayName: 'Bob' },
 ];
 
 describe('renderCircleKring · LEDEN tab', () => {

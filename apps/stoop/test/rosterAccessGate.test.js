@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  PEER_ROSTER_FIELDS, rosterCallerIsRemote, callerIsCircleMember,
+  PEER_ROSTER_FIELDS, rosterCallerIsForeign, callerIsCircleMember,
   projectRosterRowForPeer, gateRosterReplyForPeer,
 } from '../src/lib/rosterAccessGate.js';
 
@@ -27,12 +27,13 @@ const row = (over = {}) => ({
   ...over,
 });
 
-describe('rosterCallerIsRemote', () => {
-  it('a call with a transport-verified _from is remote; an empty envelope is local', () => {
-    expect(rosterCallerIsRemote({ envelope: { _from: 'webid:peer' } })).toBe(true);
-    expect(rosterCallerIsRemote({ envelope: {} })).toBe(false);
-    expect(rosterCallerIsRemote({})).toBe(false);
-    expect(rosterCallerIsRemote(null)).toBe(false);
+describe('rosterCallerIsForeign', () => {
+  it('a caller whose webid differs from our own is foreign; our own webid is local', () => {
+    expect(rosterCallerIsForeign('webid:peer', 'webid:me')).toBe(true);
+    expect(rosterCallerIsForeign('webid:me', 'webid:me')).toBe(false);
+    // fail-open: with no localActor to compare against, we never classify anyone as foreign
+    expect(rosterCallerIsForeign('webid:peer', null)).toBe(false);
+    expect(rosterCallerIsForeign(null, 'webid:me')).toBe(false);
   });
 });
 

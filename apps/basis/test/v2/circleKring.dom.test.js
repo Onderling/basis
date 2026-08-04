@@ -18,21 +18,24 @@ const circle = { id: 'g1', name: 'Selwerd', memberCount: 87 };
 const yest = Date.now() - 24 * 60 * 60 * 1000;
 const now  = Date.now();
 
+// `senderLabel` is what `chatRows` stamps through the reveal ladder; the renderer paints it and
+// ignores any payload `senderDisplay` (which could be a wire-claimed name). Rows here carry the
+// stamp directly, as a stamped row would.
 const rows = [
   // newest-first (matches buildKringStream output)
   {
     id: 'r3', ts: now,        app: 'household', type: 'chat-message',
-    actor: 'Pieter', circleId: 'g1',
+    actor: 'Pieter', circleId: 'g1', senderLabel: 'Pieter',
     event: { id: 'r3', type: 'chat-message', payload: { text: 'Bedankt!', senderDisplay: 'Pieter' } },
   },
   {
     id: 'r2', ts: now - 60_000, app: 'stoop', type: 'buurt-post',
-    actor: 'Pieter', circleId: 'g1',
+    actor: 'Pieter', circleId: 'g1', senderLabel: 'Pieter',
     event: { id: 'r2', type: 'buurt-post', payload: { kind: 'aanbod', text: 'Boekje te geef.', authorName: 'Pieter' } },
   },
   {
     id: 'r1', ts: yest, app: 'stoop', type: 'buurt-post',
-    actor: 'Anne', circleId: 'g1',
+    actor: 'Anne', circleId: 'g1', senderLabel: 'Anne',
     event: { id: 'r1', type: 'buurt-post', payload: { kind: 'vraag', text: 'Heeft iemand een ladder t/m vrijdag?', authorName: 'Anne' } },
   },
 ];

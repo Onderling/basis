@@ -5,9 +5,11 @@ import { renderCircleViewAs } from '../../web/v2/circleViewAs.js';
 const t = (k) => k;
 function mount() { const el = document.createElement('div'); document.body.appendChild(el); return el; }
 
+// `realName` is RELEASE-sourced (the member's own per-circle disclosure); `released` states the
+// fact — revealing is the discloser's act, never a viewer preference.
 const members = [
-  { id: 'me',  handle: 'Owl', realName: 'Frits', reveals: ['bob'] },
-  { id: 'bob', handle: 'Fox', realName: 'Bob',   reveals: ['me'] },
+  { id: 'me',  handle: 'Owl', realName: 'Frits', released: true },
+  { id: 'bob', handle: 'Fox', realName: 'Bob',   released: true },
 ];
 
 describe('renderCircleViewAs', () => {
@@ -28,7 +30,7 @@ describe('renderCircleViewAs', () => {
     expect([...el.querySelectorAll('.circle-viewas__row')].every((r) => r.dataset.revealed === 'false')).toBe(true);
   });
 
-  it('as member "me" under pairwise, bob is revealed, rendered with real name', () => {
+  it('as member "me" under pairwise, bob RELEASED his name here → rendered with real name', () => {
     const el = mount();
     renderCircleViewAs(el, { members, policy: 'pairwise', viewer: { id: 'me', kind: 'member' }, t });
     const bobRow = el.querySelector('.circle-viewas__row[data-member-id=bob]');

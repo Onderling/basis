@@ -73,7 +73,7 @@ import { treeOf, createCrossPodRefResolver, chatEnvelopeFromStoreItem, toWireEnv
 import { validateStoopItem, intentToCanonicalDraft } from '../lib/canonicalAdapter.js';
 
 import { validateHandle, findHandleCollision, withHandleClaim } from '../lib/handle.js';
-import { rosterCallerIsRemote, gateRosterReplyForPeer } from '../lib/rosterAccessGate.js';
+import { rosterCallerIsForeign, gateRosterReplyForPeer } from '../lib/rosterAccessGate.js';
 import { resolveMemberAddress, makeFallbackReporter } from '../lib/memberAddress.js';
 import { kindWakes } from '@onderling/item-store';
 
@@ -785,7 +785,7 @@ async function getGroupRulesCore(scope, a, ctx) {
 }
 
 async function listGroupMembersCore(scope, a, ctx) {
-  const { store, members, reveals, groupId } = scope;
+  const { store, members, reveals, groupId, localActor } = scope;
   const _groupId = a.groupId ?? groupId;
   if (!members) return { members: [] };
   const list = await members.list();
@@ -807,12 +807,13 @@ async function listGroupMembersCore(scope, a, ctx) {
     });
   };
   const scoped = await projectCircleRoster({ store, groupId: _groupId, memberMapList: list });
-  const remote = rosterCallerIsRemote(ctx);
-  // A peer must PROVE membership of this circle from its durable trail — the fallback path has no
-  // trail to prove it against, so a remote caller there is refused (deny-by-default). A local call
-  // keeps the fallback's pre-trail behaviour unchanged.
+  const caller = ctx?.from ?? null;
+  const foreign = rosterCallerIsForeign(caller, localActor);
+  // A foreign caller must PROVE membership of this circle from its durable trail — the fallback path
+  // has no trail to prove it against, so a foreign caller there is refused (deny-by-default). A local
+  // call keeps the fallback's pre-trail behaviour unchanged.
   if (!scoped) {
-    if (remote) return { groupId: _groupId, members: [], reason: 'not-a-member' };
+    if (foreign) return { groupId: _groupId, members: [], reason: 'not-a-member' };
     // Legacy back-compat: a group with NO redemption trail (a seeded single-buurt roster from before
     // code-minting) falls back to the full MemberMap so those setups are unchanged. B4: still
     // EXIT-FILTERED, or removal would silently do nothing on circles with no other representation.
@@ -820,8 +821,8 @@ async function listGroupMembersCore(scope, a, ctx) {
     const kept = exits.size === 0 ? list : list.filter((m) => !isExited(exits, m?.webid ?? '', 0));
     return { groupId: _groupId, members: withViewerReveals(kept) };
   }
-  if (remote) {
-    const gated = gateRosterReplyForPeer(scoped, ctx?.envelope?._from ?? null);
+  if (foreign) {
+    const gated = gateRosterReplyForPeer(scoped, caller);
     if (!gated.ok) return { groupId: _groupId, members: [], reason: 'not-a-member' };
     return { groupId: _groupId, members: gated.members };
   }
@@ -3426,21 +3427,20 @@ export function buildSkills({
      *
      *   Returns: { members: [{addr, role: 'admin'|'member'}, ...] }
      */
-    defineSkill('listGroupRoster', async ({ parts, from, envelope }) => {
+    defineSkill('listGroupRoster', async ({ parts, from }) => {
       const a = dataArgs(parts);
       if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
       const all = await store.listOpen({ type: 'membership-redemption' });
       const forGroup = all.filter(i => i?.source?.groupId === a.groupId);
-      // The circle's routing addresses are functional data for MEMBERS. A remote caller (one with a
-      // transport-verified `_from`) gets them only if they are themselves in this circle's trail —
-      // otherwise a handshaked stranger could map a circle they have no part in. Local calls (own
-      // device, empty envelope) are unchanged. Same gate `listGroupMembers` applies, one circle at a
-      // time — where the data is, not in the caller's shell.
-      const remoteCaller = envelope && envelope._from ? envelope._from : null;
-      if (remoteCaller) {
+      // The circle's routing addresses are functional data for MEMBERS. A FOREIGN caller (one acting
+      // as a webid other than this device's own) gets them only if they are themselves in this
+      // circle's trail — otherwise a handshaked stranger could map a circle they have no part in.
+      // Local calls (acting as our own webid) are unchanged. Same gate `listGroupMembers` applies,
+      // one circle at a time — where the data is, not in the caller's shell.
+      if (rosterCallerIsForeign(from, localActor)) {
         const isMember = forGroup.some((i) => {
           const s = i?.source ?? {};
-          return s.redeemedBy === remoteCaller || s.confirmedBy === remoteCaller;
+          return s.redeemedBy === from || s.confirmedBy === from;
         });
         if (!isMember) return { groupId: a.groupId, members: [], reason: 'not-a-member' };
       }

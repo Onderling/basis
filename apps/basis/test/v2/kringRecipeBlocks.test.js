@@ -74,7 +74,9 @@ describe('kringRecipeBlocks · α.1b — materializeBlock (pure types)', () => {
     expect(r.status).toBe('ok');
     expect(r.content.items).toHaveLength(1);
     expect(r.content.items[0].event.payload.text).toContain('boormachine');
-    expect(r.content.items[0].actor).toBe('me');   // shortWebid of the addedBy
+    // `actor` keeps the FULL webid now — the shortening was display-only and display moved into the
+    // reveal-gated `senderLabel` stamp; the full id is what lets the roster stamp match.
+    expect(r.content.items[0].actor).toBe('https://alice.example/me');
   });
 });
 

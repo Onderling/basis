@@ -136,33 +136,37 @@ describe('per-circle signing is enforced per member (real relay, fallback OFF)',
     expect(typeof asBramSeesThem.circleAddressProof, 'proven, not claimed').toBe('string');
   });
 
-  /* ── The transitional set, measured and then shrunk ──────────────────────────────────────── */
+  /* ── The joiner's own row: NO transition — proven at redeem ───────────────────────────────────
+   *
+   * This scenario USED to demonstrate a transitional "canonical-only" window: `recordRemoteRedemption`
+   * wrote neither a signing key nor an address onto the joiner's OWN row, so that row was left-joined
+   * a stray display-cache `pubKey` — NOT the joiner's circle-chat identity — and counted as a member
+   * allowed by a canonical key alone until a later boot healed it. The joiner's-row-complete-at-redeem
+   * change closed that window: the mirror now writes the joiner's own real `signingPublicKey` (their
+   * chat identity) the moment they redeem. So the own row is recognised as SELF from the join, never
+   * as a stray canonical key — the canonical-only set is zero without waiting for a boot. (The old
+   * tests predicted exactly this and said "rewrite the demo, do not relax it".)
+   */
 
-  it('THE TRANSITION: a joiner who has not booted yet has ONE canonical-only member — themselves', async () => {
-    // Measured, not assumed. `recordRemoteRedemption` (the joiner-side mirror of their own join)
-    // writes neither a signing key nor an address onto the joiner's OWN row, so on their own device
-    // that row proves nothing and is left-joined a `pubKey` from the display MemberMap — a key that
-    // is not their circle-chat identity at all. It is the whole transitional set in this scenario.
-    //
-    // If this assertion ever fails with 0, the joiner-side row shape has been fixed upstream and
-    // this scenario no longer has a transition to demonstrate: rewrite the demo, do not relax it.
+  it("THE JOINER'S OWN ROW carries their real signing key AT REDEEM — no canonical-only window", async () => {
     const own = rowFor(await readRoster(bram, CIRCLE_A), bram.pubKey);
     expect(own, 'bram is on his own roster').toBeTruthy();
-    expect(own.circleAddressProof, 'with nothing proved about his address').toBeFalsy();
+    // The batch that closed the window: the joiner's own row records THEIR chat identity at redeem
+    // (projected onto `pubKey`), not a stray display-cache key. That is why it is recognised as self,
+    // not as a canonical member.
+    expect(own.pubKey, "his own row records HIS signing key, written at redeem").toBe(bram.pubKey);
+    // …so nothing on his device authorizes by a canonical key alone — enforcement is total from the join.
     expect(bram.agent.circleSenderAuthorization().canonicalOnlyMembers,
-      'exactly one member is still allowed by a canonical key alone').toBe(1);
+      'no member allowed by a canonical key alone — the transition is already over at redeem').toBe(0);
   });
 
-  it('THE TRANSITION SHRINKS: booting the joiner announces, and the set drops to zero', async () => {
-    // The self-healing property, end to end and with no coordination: one device boots, announces
-    // the address it derives, records it on its own row — and its own canonical-only allowance is
-    // gone on the next roster read. Nothing was switched on and no other device did anything.
-    const before = bram.agent.circleSenderAuthorization().canonicalOnlyMembers;
-    expect(before).toBeGreaterThanOrEqual(1);
+  it('BOOTING is idempotent for the joiner — the announce heals the ADDRESS, the count stays zero', async () => {
+    // The self-healing announce still runs (this join presented no per-circle address, so the boot is
+    // where the address+proof land on the own row). But the canonical-only set was already zero at
+    // redeem and stays zero — a boot has nothing to fix about who may sign.
+    expect(bram.agent.circleSenderAuthorization().canonicalOnlyMembers).toBe(0);
 
-    const primed = await boot(bram);
-    expect(primed.addressesAnnounced, 'bram had an address to announce').toBeGreaterThanOrEqual(1);
-
+    await boot(bram);
     const own = await until(async () => {
       const row = rowFor(await readRoster(bram, CIRCLE_A), bram.pubKey);
       return row?.circleAddressProof ? row : null;
@@ -171,7 +175,7 @@ describe('per-circle signing is enforced per member (real relay, fallback OFF)',
 
     await bindCircleAddressKeysFor({ agent: bram.agent, circleId: CIRCLE_A });
     expect(bram.agent.circleSenderAuthorization().canonicalOnlyMembers,
-      'the transition is over on this device').toBe(0);
+      'still zero — the row was self from the join; the boot only proved the address').toBe(0);
   }, 60000);
 
   it('THE FOUNDER: their own row SELF-HEALS the same way, through B2\'s re-announce', async () => {

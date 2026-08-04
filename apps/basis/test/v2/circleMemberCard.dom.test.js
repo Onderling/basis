@@ -16,12 +16,15 @@ function mount() {
   return el;
 }
 
-const me    = { id: 'me',    handle: 'Owl', realName: 'Frits', reveals: [] };
-const bob   = { id: 'bob',   handle: 'Fox', realName: 'Bob',   reveals: ['me'] };
-const carol = { id: 'carol', handle: 'Heron', realName: 'Carol', reveals: [] };
+// `realName` is RELEASE-sourced (the member's own per-circle disclosure); `released` states the
+// fact. Carol holds a name locally (`ownDisplayName`) but released nothing — revealing is the
+// discloser's act, so nobody but Carol may see it.
+const me    = { id: 'me',    handle: 'Owl',   realName: 'Frits', released: true };
+const bob   = { id: 'bob',   handle: 'Fox',   realName: 'Bob',   released: true };
+const carol = { id: 'carol', handle: 'Heron', realName: null,    released: false, ownDisplayName: 'Carol' };
 
 describe('renderMemberPersonaCard', () => {
-  it('splits the member into visible / hidden columns (carol hides her real name from me)', () => {
+  it('splits the member into visible / hidden columns (carol released no name → hidden)', () => {
     const el = mount();
     const split = memberPersonaView({ member: carol, viewerWebid: 'me', policy: 'pairwise' });
     renderMemberPersonaCard(el, { member: carol, split, t });
@@ -37,7 +40,7 @@ describe('renderMemberPersonaCard', () => {
     expect(el.querySelector('.circle-membercard__title').textContent).toBe('@Heron');
   });
 
-  it('shows the real name for a member who revealed to me', () => {
+  it('shows the real name for a member who RELEASED their name to this circle', () => {
     const el = mount();
     const split = memberPersonaView({ member: bob, viewerWebid: 'me', policy: 'pairwise' });
     renderMemberPersonaCard(el, { member: bob, split, t });

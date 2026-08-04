@@ -97,36 +97,47 @@ describe('3.4 — concurrent conflicting decisions stay independent', () => {
 });
 
 // ── §5.1 / §5.2 — reveal is per-circle and DIRECTIONAL ───────────────────────────────────────────────
-describe('5.1 / 5.2 — a reveal is per-circle and points one way', () => {
-  const bram = { id: 'bram', handle: 'fox', realName: 'Bram', reveals: ['anna'] };   // revealed to Anna only
-  const cato = { id: 'cato', handle: 'heron', realName: 'Cato', reveals: [] };
+// Revealing is the DISCLOSER's act (decision 19). A member who released their name to this circle is
+// name-visible to circle members; one who released nothing shows only their handle. Per-VIEWER
+// targeting ("release to Anna but not Cato") is the recorded future extension — no revealer-side
+// per-viewer fact exists today, so the circle is the audience unit. The old fixtures encoded the
+// INVERTED model (a viewer-side `reveals[]` deciding), and passed for the wrong reason.
+describe('5.1 / 5.2 — a name is visible because its owner released it', () => {
+  const bram = { id: 'bram', handle: 'fox', realName: 'Bram', released: true };    // released his name here
+  const cato = { id: 'cato', handle: 'heron', realName: null, released: false, ownDisplayName: 'Cato' };
 
-  it('Anna sees Bram\'s name; Cato does not, and cannot infer it from the roster', () => {
+  it('a member who RELEASED shows their name to circle members; one who did not is withheld', () => {
     expect(memberPersonaView({ member: bram, viewerWebid: 'anna' }).sees.map((a) => a.key)).toContain('realName');
-    const asCato = memberPersonaView({ member: bram, viewerWebid: 'cato' });
-    expect(asCato.sees.map((a) => a.key)).not.toContain('realName');
-    // The withheld value must not ride along in the payload the shell renders.
-    expect(JSON.stringify(asCato.sees)).not.toContain('Bram');
+    expect(memberPersonaView({ member: bram, viewerWebid: 'cato' }).sees.map((a) => a.key)).toContain('realName');
+    const catoAsAnna = memberPersonaView({ member: cato, viewerWebid: 'anna' });
+    expect(catoAsAnna.sees.map((a) => a.key)).not.toContain('realName');
+    expect(JSON.stringify(catoAsAnna.sees)).not.toContain('Cato');
   });
 
-  it('a reveal is DIRECTIONAL — Bram revealing to Anna does not reveal Anna to Bram', () => {
-    const anna = { id: 'anna', handle: 'owl', realName: 'Anna', reveals: [] };       // Anna revealed to nobody
-    expect(memberPersonaView({ member: anna, viewerWebid: 'bram' }).sees.map((a) => a.key)).not.toContain('realName');
+  it('DEFERRED (decision 19): per-viewer targeting is a future extension, not today', () => {
+    // Today a release is circle-scoped — no way to release to Anna but not Cato. This asserts the
+    // CURRENT truth so the day directional release lands, THIS is the test that changes, on purpose.
+    expect(memberPersonaView({ member: bram, viewerWebid: 'anna' }).sees.map((a) => a.key))
+      .toEqual(memberPersonaView({ member: bram, viewerWebid: 'cato' }).sees.map((a) => a.key));
   });
 
-  it('the per-circle POLICY decides too: the same roster reads differently in an `open` circle', () => {
-    const members = [bram, cato];
-    const rowFor = (policy) => viewAsDirectory({ members, viewer: { kind: 'member', id: 'cato' }, policy })
+  it('the per-circle POLICY still flows through', () => {
+    const rowFor = (policy) => viewAsDirectory({ members: [bram, cato], viewer: { kind: 'member', id: 'cato' }, policy })
       .find((r) => r.id === 'bram');
-    // The gate is `revealed` + `displayName` — the row deliberately still CARRIES realName (it is local
-    // data), so a shell must render `displayName`. See the pinned leak below.
-    expect(rowFor('pairwise').revealed).toBe(false);
-    expect(rowFor('pairwise').displayName).toBe('fox');
+    expect(rowFor('pairwise').revealed).toBe(true);        // Bram released → visible pairwise
+    expect(rowFor('pairwise').displayName).toBe('Bram');
     expect(rowFor('open').revealed).toBe(true);
     expect(rowFor('open').displayName).toBe('Bram');
   });
 
-  it('a stranger/agent viewer never clears the pairwise gate', () => {
+  it('an `open` circle WIDENS a release but never conjures a name nobody disclosed', () => {
+    const rowFor = (policy) => viewAsDirectory({ members: [cato], viewer: { kind: 'member', id: 'bram' }, policy })
+      .find((r) => r.id === 'cato');
+    expect(rowFor('open').revealed).toBe(false);           // Cato released nothing → handle even in open
+    expect(rowFor('open').displayName).toBe('heron');
+  });
+
+  it('a stranger/agent viewer never clears the member gate', () => {
     for (const kind of ['stranger', 'agent']) {
       const [row] = viewAsDirectory({ members: [bram], viewer: { kind }, policy: 'pairwise' });
       expect(row.revealed).toBe(false);
@@ -210,17 +221,17 @@ describe('6.1 / 6.3 — a person\'s own two devices', () => {
 // straight, so an unrevealed member's real name could appear in the main list. `revealedMemberLabel` now
 // computes the label ONCE for both shells.
 describe('5.2b — the members list respects the reveal gate', () => {
-  const unrevealed = { id: 'bram', handle: 'fox', realName: 'Bram de Vries', reveals: [] };
-  const revealed   = { id: 'cato', handle: 'heron', realName: 'Cato Jansen', reveals: ['me'] };
+  const unrevealed = { id: 'bram', handle: 'fox', realName: null, released: false, ownDisplayName: 'Bram de Vries' };
+  const revealed   = { id: 'cato', handle: 'heron', realName: 'Cato Jansen', released: true };
 
-  it('an UNREVEALED member shows their handle — never their name, in either line', () => {
+  it('an UNRELEASED member shows their handle — never their name, in either line', () => {
     const l = revealedMemberLabel(unrevealed, { viewerId: 'me', policy: 'pairwise' });
     expect(l.primary).toBe('@fox');
     expect(l.secondary).toBeNull();
     expect(JSON.stringify(l)).not.toContain('Vries');
   });
 
-  it('a member who revealed TO ME shows the name as the secondary line', () => {
+  it('a member who RELEASED their name shows it as the secondary line', () => {
     const l = revealedMemberLabel(revealed, { viewerId: 'me', policy: 'pairwise' });
     expect(l.primary).toBe('@heron');
     expect(l.secondary).toBe('Cato Jansen');
@@ -232,8 +243,10 @@ describe('5.2b — the members list respects the reveal gate', () => {
     expect(l.primary).not.toContain('Vries');
   });
 
-  it('an `open` circle shows names, and my OWN row always shows mine', () => {
-    expect(revealedMemberLabel(unrevealed, { viewerId: 'me', policy: 'open' }).secondary).toBe('Bram de Vries');
+  it('an `open` circle shows RELEASED names, and my OWN row always shows mine', () => {
+    // Unreleased Bram: even open shows only his handle — open widens a release, it never conjures one.
+    expect(revealedMemberLabel(unrevealed, { viewerId: 'me', policy: 'open' }).secondary).toBeNull();
+    // …but my OWN row falls back to my local cache — I always see myself.
     expect(revealedMemberLabel({ ...unrevealed, id: 'me' }, { viewerId: 'me' }).secondary).toBe('Bram de Vries');
   });
 

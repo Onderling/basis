@@ -167,9 +167,11 @@ describe('J-UI-4 — the governance panel shows the decision and gates admin con
 
 // ── J-UI-5 — A member card shows only what the viewer may see ─────────────────────────────────────────
 describe('J-UI-5 — the member-persona card respects the disclosure split', () => {
-  it('a revealed real name lands in "sees"; an unrevealed one in "hides"', () => {
-    const revealed = { id: 'bram', handle: 'fox', realName: 'Bram', reveals: ['me'] };
-    const hidden   = { id: 'cato', handle: 'heron', realName: 'Cato', reveals: [] };
+  it('a RELEASED real name lands in "sees"; an unreleased one in "hides"', () => {
+    // `realName` is release-sourced; Cato holds her name only locally (`ownDisplayName`), so it
+    // rides outside the released row data and can never reach another member's card.
+    const revealed = { id: 'bram', handle: 'fox', realName: 'Bram', released: true };
+    const hidden   = { id: 'cato', handle: 'heron', realName: null, released: false, ownDisplayName: 'Cato' };
 
     const a = mount();
     renderMemberPersonaCard(a, { member: revealed, split: memberPersonaView({ member: revealed, viewerWebid: 'me' }), t });
@@ -182,7 +184,7 @@ describe('J-UI-5 — the member-persona card respects the disclosure split', () 
   });
 
   const PIC = { type: 'blob', ref: 'blob://x', enc: { sealed: true, mime: 'image/jpeg' } };
-  const withPic = { id: 'bram', handle: 'fox', realName: 'Bram', reveals: ['me'], profilePicture: PIC };
+  const withPic = { id: 'bram', handle: 'fox', realName: 'Bram', released: true, profilePicture: PIC };
 
   it('renders as an IMAGE (never a stringified ref) once the viewer is entitled', () => {
     // `open` policy entitles every member, so this exercises the RENDER path itself.
@@ -197,16 +199,21 @@ describe('J-UI-5 — the member-persona card respects the disclosure split', () 
     expect(row.textContent).not.toContain('blob://');     // the sealed ref must never be shown as text
   });
 
-  // ✅ FIXED 2026-07-26 (Frits's call). A pairwise reveal is ONE act — "I show this person who I am" —
+  // ✅ FIXED 2026-07-26 (Frits's call). A release is ONE act — "I show this circle who I am" —
   // not a per-attribute list, so it covers the picture the member put on their row too (a picture is only
   // ever there because they shared it). Layer (a), the member's own disclosure, still decides whether the
   // attribute exists at all, so nothing the member did not share is widened.
-  it('a viewer the member revealed to now sees the picture under the DEFAULT pairwise policy', () => {
+  it('a member sees the picture of a member who RELEASED, under the DEFAULT pairwise policy', () => {
     const split = memberPersonaView({ member: withPic, viewerWebid: 'me', policy: 'pairwise' });
     expect(split.sees.map((a) => a.key)).toContain('profilePicture');
-    // …and it still must never leak to a viewer with NO reveal at all.
-    const stranger = memberPersonaView({ member: { ...withPic, reveals: [] }, viewerWebid: 'nobody', policy: 'pairwise' });
-    expect(stranger.sees.map((a) => a.key)).not.toContain('profilePicture');
+    // …and an UNRELEASED member's picture reaches no viewer at all. (Per-viewer targeting —
+    // releasing to one member but not another — is a deferred future extension; today the
+    // circle is the audience unit.)
+    const unreleased = memberPersonaView({
+      member: { ...withPic, realName: null, released: false, ownDisplayName: 'Bram' },
+      viewerWebid: 'nobody', policy: 'pairwise',
+    });
+    expect(unreleased.sees.map((a) => a.key)).not.toContain('profilePicture');
   });
 });
 

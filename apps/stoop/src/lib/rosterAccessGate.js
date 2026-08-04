@@ -5,14 +5,21 @@
  * a gate in the calling shell would sit on the asker's side of the trust boundary, and a peer holds
  * their own shell and can ask it anything. Two rules, both enforced where the data is:
  *
- *   1. A REMOTE caller (one the transport verified — it carries a `_from`) gets the roster only if
- *      they are themselves a member of THIS circle. A handshaked stranger is refused. A LOCAL call
- *      (this device's own shell, no `_from`) is our own view and passes unchanged.
+ *   1. A call from a FOREIGN caller — one whose acting webid is not this device's own — gets the
+ *      roster only if they are themselves a member of THIS circle. A handshaked stranger is refused.
+ *      A LOCAL call (this device's own shell, acting as our own webid) is our own view and passes
+ *      unchanged.
  *   2. Even a member peer gets only what a member legitimately needs about another member — an
  *      ALLOWLIST of functional + released fields, never this device's private view of them.
  *
  * The allowlist is deliberate over a denylist: a denylist only strips the fields someone thought
  * of, and the leak arrives under the one they didn't (the same lesson the log redactor learned).
+ *
+ * NOTE on the local/foreign signal: the acting webid (`ctx.from`) equals the device's own
+ * `localActor` for a local shell call, and differs for a real peer. This is the SAME signal every
+ * other own-row-only stoop skill uses (`recordCircleAddressAnnouncement` etc.). It is NOT the
+ * transport `_from`: the local shell reaches stoop as chatAgent→stoopAgent, which stamps a `_from`
+ * of its own — so `_from` presence cannot tell local from foreign, but the acting webid can.
  */
 
 /**
@@ -27,9 +34,14 @@ export const PEER_ROSTER_FIELDS = Object.freeze([
   'role', 'handle', 'personaProperties',
 ]);
 
-/** True when the call came from a transport-verified peer (vs this device's own shell). */
-export function rosterCallerIsRemote(ctx) {
-  return !!(ctx?.envelope && ctx.envelope._from);
+/**
+ * True when the call came from a FOREIGN caller (a real peer), not this device's own shell.
+ * Local ⇔ the acting webid is our own. Fail-open: with no `localActor` to compare against we cannot
+ * positively identify a foreigner, so we do not gate — the gate strengthens where it can be sure,
+ * and never refuses a call it cannot classify.
+ */
+export function rosterCallerIsForeign(caller, localActor) {
+  return !!localActor && !!caller && caller !== localActor;
 }
 
 /** Is the verified remote caller a member of this circle's projected roster? */

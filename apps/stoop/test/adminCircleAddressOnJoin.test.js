@@ -159,3 +159,34 @@ describe('the property: joiner → admin resolves WITHOUT the global-key fallbac
     expect(row.circleAddress).toBe(ADMIN_CIRCLE_ADDRESS);
   });
 });
+
+describe("joiner side — the joiner's OWN row is complete AT REDEEM (wave 1 batch 5)", () => {
+  // The joiner's real per-circle identity, exactly as the wizard presents it to the admin.
+  const MY_SEED = new Uint8Array(32).fill(9);
+  const MY_CIRCLE_ADDRESS = deriveCircleAddress(MY_SEED, CIRCLE);
+  const MY_PROOF = signCircleLinkFromSeed(MY_SEED, CIRCLE, CIRCLE, MY_CIRCLE_ADDRESS);
+
+  const myRow = async (bundle) => {
+    const roster = await callSkill(bundle.agent, 'listGroupMembers', { groupId: CIRCLE });
+    return (roster.members ?? []).find((m) => m.webid === ME) ?? null;
+  };
+
+  it('records signingPublicKey + a PROVEN own circleAddress onto the local row — no announce needed', async () => {
+    // The canonical-only lag this ends: the ADMIN's copy of this row was complete at redeem while the
+    // joiner's own mirror carried neither key nor address until a later announce healed it.
+    const bundle = await buildJoinerBundle();
+    await recordJoin(bundle, { circleAddress: MY_CIRCLE_ADDRESS, circleAddressProof: MY_PROOF });
+    const row = await myRow(bundle);
+    expect(row).toBeTruthy();
+    expect(row.pubKey).toBe(ME);                        // webid === the chat signing key (basis binds them)
+    expect(row.circleAddress).toBe(MY_CIRCLE_ADDRESS);  // the pair the key binding needs, complete at redeem
+  });
+
+  it('an UNPROVEN own address is dropped — one rule, every enforcement point, own device included', async () => {
+    const bundle = await buildJoinerBundle();
+    await recordJoin(bundle, { circleAddress: MY_CIRCLE_ADDRESS /* no proof */ });
+    const row = await myRow(bundle);
+    expect(row).toBeTruthy();
+    expect(row.circleAddress ?? null).toBeNull();   // deriveRoster projects an absent address as null
+  });
+});

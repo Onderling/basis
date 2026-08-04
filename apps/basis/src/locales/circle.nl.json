@@ -78,10 +78,6 @@
       "text": "Kringen",
       "doc": "Bottom-nav tab → the circle list (board 1)."
     },
-    "stroom": {
-      "text": "Stroom",
-      "doc": "Bottom-nav tab → the cross-circle stream (board 5)."
-    },
     "mij": {
       "text": "Mij",
       "doc": "Bottom-nav tab → personal availability/quiet-hours/hopping (board 6C)."
@@ -432,30 +428,6 @@
     "doc": "Heading for the claim-router mirror section on CircleDetail (P6.5 #342)."
   },
   "stream": {
-    "title": {
-      "text": "Stroom",
-      "doc": "Heading of the cross-circle Stream tab (board 5B)."
-    },
-    "open": {
-      "contacts": {
-        "text": "Contacten",
-        "doc": "B/S3 list-screen open label."
-      },
-      "prikbord": {
-        "text": "Prikbord",
-        "doc": "B/S3 list-screen open label."
-      },
-      "text": "Stroom",
-      "doc": "Launcher entry that opens the cross-circle Stream."
-    },
-    "empty": {
-      "text": "Nog niks uit je kringen.",
-      "doc": "Empty state for the Stream."
-    },
-    "untagged": {
-      "text": "—",
-      "doc": "Tag shown on a Stream row that isn't tied to a circle."
-    },
     "compose_placeholder_default": {
       "text": "Reageer in de tijdlijn",
       "doc": "Pinned compose placeholder (P6.M3)."
@@ -1786,10 +1758,6 @@
       "screen": {
         "text": "Scherm",
         "doc": "B/Q1 — view-axis option: land on the screen/overview pane."
-      },
-      "cross-stream": {
-        "text": "Gesprek + Stroom",
-        "doc": "B/Q1 — view-axis option: chat, and the kring's content also flows into Stroom."
       },
       "user": {
         "text": "Eigen keuze van het lid",

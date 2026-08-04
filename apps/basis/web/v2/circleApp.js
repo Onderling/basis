@@ -249,7 +249,7 @@ import { makeKeyEventLogSink, recipientAddrsFromRoster } from '@onderling/kring-
 // "only you" vs "whole kring" — message scope (a data property; the badge renders it).
 import { scopeForReply } from '../../src/v2/messageScope.js';
 import {
-  allCircleRows, circleRows, chatRows,
+  circleRows, chatRows,
 } from '../../src/v2/circleStream.js';
 // profile-update propagation — the silent roster "pull-me" signal (announce on a real roster
 // write; receive → re-read the changed rows). No values on the wire, no chat bubble, no wake.
@@ -689,7 +689,6 @@ import {
 } from '../../src/v2/folioSharedFilters.js';
 import { createNearbyScreen } from '../../src/v2/nearbyScreen.js';
 import { subscribeToNetworkChange } from '../../src/web/networkChangeSource.js';
-import { renderCircleStream } from './circleStream.js';
 import { renderCircleNearby } from './circleNearby.js';
 import { renderCircleMyThings } from './circleMyThings.js';
 import { renderCircleAdvisor } from './circleAdvisor.js';
@@ -3762,15 +3761,9 @@ async function _showActiveScreen() {
   screenBlocksCache.set(screen.id, blocks).catch(() => { /* ignore */ });
 }
 
-function showStream() {
-  const rows = allCircleRows({
-    events: eventLog.query({ excludeMuted: true }),
-    circles: circlesCache,
-  });
-  // Top-level tab screen — no back link (the Kringen tab is the way back).
-  renderCircleStream(rootEl, { rows, t, onOpenCircle: showDetail });
-  showTabBar('screens');   // α.3 — stroom retired in favour of screens
-}
+// (Batch 5) `showStream` is GONE — the cross-circle Stream VIEW retired (α.3 already removed its tab;
+// the function sat unreachable since). The LOG is untouched: `allCircleRows`/`projectEntries` remain the
+// projectors every surface uses — the Stream was only ever a view over them.
 
 // "Mij" tab — personal availability (holiday quiet hours) plus
 // the device-global Hopping stance.

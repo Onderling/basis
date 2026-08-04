@@ -220,7 +220,6 @@ import {
 } from '../../core/screenPanelDrilldown.js';
 import CircleRecordScreen from './CircleRecordScreen.js';
 import CircleAvailabilityScreen from './CircleAvailabilityScreen.js';
-import CircleStreamScreen from './CircleStreamScreen.js';
 import CircleViewAsScreen from './CircleViewAsScreen.js';
 import CircleMemberCardScreen from './CircleMemberCardScreen.js';   // §2 — member-persona card + self-view
 import CircleAdvisorScreen from './CircleAdvisorScreen.js';
@@ -1315,7 +1314,7 @@ export default function CircleLauncherScreen({
       if (selected && view === 'admin') { setView('detail'); return true; }
       if (selected && view === 'governance') { setView('detail'); return true; }
       // Top-level tab screens → back to launcher list.
-      if (view === 'availability' || view === 'stream' || view === 'profile'
+      if (view === 'availability' || view === 'profile'
           || view === 'nearby' || view === 'mythings') {
         setView('list'); return true;
       }
@@ -1510,17 +1509,9 @@ export default function CircleLauncherScreen({
       </WithTabBar>
     );
   }
-  if (view === 'stream') {
-    return (
-      <WithTabBar active="stroom" onSelect={onTab}>
-        <CircleStreamScreen
-          eventLog={eventLog}
-          circles={circles}
-          onOpenCircle={(id) => openCircle(circles.find((c) => c.id === id) || { id })}
-        />
-      </WithTabBar>
-    );
-  }
+  // (Batch 5) the `stream` view is GONE — the cross-circle Stream VIEW retired (its tab left the bar
+  // long ago; nothing could `setView('stream')` since). The LOG is untouched; every remaining surface
+  // projects it via `circleRows`/`chatRows`. Web's `showStream` retired in the same batch (web≡mobile).
   // S3 — group admin panel (member roster + remove + announcements + moderation).
   if (selected && view === 'admin') {
     return (

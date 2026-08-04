@@ -2915,6 +2915,15 @@ export function buildSkills({
           proof:   a.confirmedByCircleAddressProof,
         }))
         ? a.confirmedByCircleAddress : null;
+      // The joiner's OWN per-circle address (wave 1 batch 5) — the row this skill writes is the row the
+      // joiner's own roster projects for THEMSELVES, and until now it carried neither their address nor
+      // their signing key: complete only on the ADMIN's side, locally not until a later announce healed
+      // it (the canonical-only lag). Same deny-by-default proof check as every other address on this
+      // path — it is the joiner's own device, but an unproven address must not enter a roster row here
+      // any more than anywhere else (one rule, many enforcement points).
+      const verifiedOwnCircleAddress = (a.circleAddress
+        && verifyCircleLink({ groupId: a.groupId, address: a.circleAddress, proof: a.circleAddressProof }))
+        ? a.circleAddress : null;
       const [item] = await store.addItems([{
         type:       'membership-redemption',
         text:       `${from} (peer-confirmed) for ${a.groupId}`,
@@ -2927,6 +2936,13 @@ export function buildSkills({
           expiresAt:   a.expiresAt ?? null,
           confirmedBy: a.confirmedBy ?? null,
           channel:     'peer',
+          // The joiner's own signing key — webid == the secure-mesh signing address in this
+          // architecture (the same identity the admin-side row records as `signingPublicKey`).
+          signingPublicKey: from,
+          // …and their own per-circle address + proof (verified above), so the local roster row is
+          // COMPLETE AT REDEEM, exactly as the admin's copy of it is.
+          ...(verifiedOwnCircleAddress ? { circleAddress: verifiedOwnCircleAddress } : {}),
+          ...(verifiedOwnCircleAddress ? { circleAddressProof: a.circleAddressProof } : {}),
           // …and the per-circle ADDRESS that admin answers on in this circle (proof-verified above).
           // `deriveRoster` projects it onto the admin's roster row, which is what lets a send to them
           // resolve on the circle-address rung instead of falling through to their global key.

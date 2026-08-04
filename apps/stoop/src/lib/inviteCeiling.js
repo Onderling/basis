@@ -46,13 +46,15 @@ export const INVITE_REDEMPTION_SYSTEM_CAP = 100;
  * The ceiling for a circle whose rules do not state one — every circle created before 2026-08-02,
  * and any rules blob that lost the field.
  *
- * **This is the transitional value, and it is deliberately not 1.** Strict-by-default is right for a
- * NEW circle (the wizard asks, and the templates answer), but applying it retroactively would make
- * every existing invite a single-use code the moment this shipped — the second member of an existing
- * dev circle would be refused by a rule nobody had ever been shown. 5 is small enough to bound a
- * leak and large enough that no existing circle breaks. → `plans/DECISIONS-FOR-REVIEW.md` 2026-08-02.
+ * **Unbounded within the system cap** (wave 1 batch 5; was the transitional 5): a circle that never
+ * chose a ceiling gets no per-circle narrowing — "infinite" in the product sense, while the system
+ * cap above still binds absolutely (it was its own decision and STAYS; lifting it is a separate
+ * call that is Frits', flagged in IMPL-wave-1). The transitional 5 solved the opposite problem —
+ * not stranding pre-ceiling circles on single-use codes — and had started refusing the sixth member
+ * of ordinary circles that never saw the wizard. A circle that WANTS a bound sets one; the wizard
+ * asks, and the templates answer. → `plans/DECISIONS-FOR-REVIEW.md` 2026-08-02 + IMPL-wave-1 batch 5.
  */
-export const INVITE_CEILING_FALLBACK = 5;
+export const INVITE_CEILING_FALLBACK = INVITE_REDEMPTION_SYSTEM_CAP;
 
 /** Clamp any number into `[1, INVITE_REDEMPTION_SYSTEM_CAP]`, or null when it is not a usable number. */
 function clampToSystem(n) {

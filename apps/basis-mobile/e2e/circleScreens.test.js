@@ -53,14 +53,7 @@ describe('circle availability screen (M3)', () => {
       .withTimeout(10_000);
   });
 
-  it('opens the cross-circle Stream; the Kringen tab returns', async () => {
-    await element(by.id('circle-tab-stroom')).tap();
-    await waitFor(element(by.id('circle-stream')))
-      .toBeVisible()
-      .withTimeout(10_000);
-    await element(by.id('circle-tab-kringen')).tap();
-    await waitFor(element(by.id('circle-launcher')))
-      .toBeVisible()
-      .withTimeout(10_000);
-  });
+  // (Batch 5) the cross-circle Stream spec is GONE with the view it tapped: `circle-tab-stroom` left
+  // the tab bar long ago, so this spec could only fail — a must-fail spec in the suite teaches people
+  // to ignore red. The LOG the Stream projected is untouched; its surfaces are the circle tabs above.
 });

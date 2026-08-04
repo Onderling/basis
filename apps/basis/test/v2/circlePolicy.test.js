@@ -106,7 +106,14 @@ describe('circlePolicy · defaultViewModeFromPolicy (§4)', () => {
   it("maps each view axis value to its landing mode", () => {
     expect(defaultViewModeFromPolicy({ view: 'chat' })).toBe('chat');
     expect(defaultViewModeFromPolicy({ view: 'screen' })).toBe('scherm');
+    // retired value (batch 5) — an OLD stored blob still lands on chat, never on the 'screen' default
     expect(defaultViewModeFromPolicy({ view: 'cross-stream' })).toBe('chat');
+  });
+
+  it("MIGRATION (batch 5): a stored 'cross-stream' view normalizes to 'chat', not to the default", () => {
+    expect(normalizeCirclePolicy({ view: 'cross-stream' }).view).toBe('chat');
+    // …and the retired value is gone from the settable enum (no radio renders it any more).
+    expect(defaultViewModeFromPolicy({ view: 'garbage' })).toBe('scherm');
   });
 
   it("falls back to the policy default ('screen' → scherm) for missing/invalid input", () => {

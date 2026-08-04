@@ -30,7 +30,9 @@ export const DEFAULT_GOVERNANCE = {
 };
 
 export const CIRCLE_POLICY_ENUMS = {
-  view:                 ['chat', 'screen', 'cross-stream'],
+  // 'cross-stream' RETIRED (wave 1 batch 5, with the Stream view): stored values migrate to 'chat'
+  // in `normalizeCirclePolicy` — the same landing surface the axis always mapped it to.
+  view:                 ['chat', 'screen'],
   // llmTool — the circle's LLM posture, AUTHORITATIVE within the circle: 'off' forbids any LLM here
   // (privacy hard-stop, even if a member wants one); 'local'/'cloud' mandate that route for everyone;
   // 'user' = "user decides" → defer to each member's personal default LLM (see resolveCircleLlm).
@@ -191,16 +193,17 @@ export function enabledFeatures(policy) {
   return CIRCLE_FEATURES.filter((k) => isFeatureEnabled(policy, k));
 }
 
-// §4 — map the admin's `view` axis ('chat' | 'screen' | 'cross-stream')
+// §4 — map the admin's `view` axis ('chat' | 'screen')
 // to the kring's default Schakelaar mode ('chat' | 'scherm').  This is the
 // *front door* the admin chose: which surface a member lands on when they
 // open the kring before they've ever toggled the pill themselves.
 //
 //   'screen'       → 'scherm'  (admin recipe'd page is the landing surface)
 //   'chat'         → 'chat'    (v2 §4 default: chat IS the home view)
-//   'cross-stream' → 'chat'    (the kring's content also flows into Stroom;
-//                               inside the kring itself the conversation is
-//                               still the natural home view)
+//
+// ('cross-stream' retired with the Stream view, batch 5 — normalizeCirclePolicy migrates a stored
+// value to 'chat', the mode this table always mapped it to. The mapping row is kept so an
+// un-normalized read of an old policy blob still lands on chat, not undefined.)
 //
 // The per-user pill (cc.circleViewMode) overrides this once the member has
 // flipped it — see readViewMode() (web) / the viewMode useEffect (mobile).
@@ -216,9 +219,11 @@ const VIEW_AXIS_TO_MODE = { screen: 'scherm', chat: 'chat', 'cross-stream': 'cha
  * @returns {'chat'|'scherm'}
  */
 export function defaultViewModeFromPolicy(policy) {
-  const axis = policy && typeof policy === 'object' && CIRCLE_POLICY_ENUMS.view.includes(policy.view)
-    ? policy.view
-    : DEFAULT_CIRCLE_POLICY.view;
+  // A RETIRED-but-mapped value ('cross-stream', batch 5) still lands where it always did — this reads
+  // the mapping table, not the enum, so an old stored blob reaches 'chat' rather than the default.
+  const known = policy && typeof policy === 'object'
+    && Object.prototype.hasOwnProperty.call(VIEW_AXIS_TO_MODE, policy.view);
+  const axis = known ? policy.view : DEFAULT_CIRCLE_POLICY.view;
   return VIEW_AXIS_TO_MODE[axis] ?? 'chat';
 }
 
@@ -280,9 +285,14 @@ export function normalizeCirclePolicy(stored = {}) {
   }
   const pickEnum = (key) =>
     CIRCLE_POLICY_ENUMS[key].includes(p[key]) ? p[key] : DEFAULT_CIRCLE_POLICY[key];
+  // Migration (batch 5): 'cross-stream' left the view enum with the Stream view; a stored value maps
+  // to 'chat' — what the axis always resolved it to — rather than falling to the 'screen' default.
+  // (A local, not `p.view = …` — normalize must never mutate the caller's stored blob.)
+  const viewValue = p.view === 'cross-stream' ? 'chat'
+    : (CIRCLE_POLICY_ENUMS.view.includes(p.view) ? p.view : DEFAULT_CIRCLE_POLICY.view);
   return {
     features,
-    view:               pickEnum('view'),
+    view:               viewValue,
     llmTool:            pickEnum('llmTool'),
     storagePosture:     pickEnum('storagePosture'),
     sharePosture:       pickEnum('sharePosture'),

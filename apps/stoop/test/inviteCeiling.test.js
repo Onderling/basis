@@ -56,9 +56,13 @@ const trailRows = async (bundle) =>
     .filter((i) => i?.source?.groupId === G);
 
 describe('B5 — the three levels: circle ceiling, per-invite choice, system cap', () => {
-  it('a circle whose rules say nothing gets the transitional fallback, not "unlimited"', () => {
+  it('a circle whose rules say nothing gets NO per-circle narrowing — the system cap alone binds', () => {
     expect(circleInviteCeiling(undefined)).toBe(INVITE_CEILING_FALLBACK);
     expect(circleInviteCeiling({})).toBe(INVITE_CEILING_FALLBACK);
+    // Wave 1 batch 5: the fallback IS the system cap ("infinite" in the product sense — the
+    // transitional 5 had started refusing the sixth member of circles that never saw the wizard).
+    // The cap itself STAYS a hard bound; lifting it is a separate, flagged decision (Frits').
+    expect(INVITE_CEILING_FALLBACK).toBe(INVITE_REDEMPTION_SYSTEM_CAP);
   });
 
   it('an invite may be STRICTER than its circle, never looser', () => {

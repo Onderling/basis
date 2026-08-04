@@ -882,6 +882,10 @@ async function runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddre
         // them is refused whenever the per-user address-fallback setting is off.
         ...(peerReply.circleAddress ? { confirmedByCircleAddress: peerReply.circleAddress } : {}),
         ...(peerReply.circleAddressProof ? { confirmedByCircleAddressProof: peerReply.circleAddressProof } : {}),
+        // The joiner's OWN per-circle address + proof (batch 5) — the same pair just presented to the
+        // admin, so the LOCAL mirror row is complete at redeem too (the substrate re-verifies the
+        // proof; an unproven address is dropped there, never recorded).
+        ...circleAddressArg,
         ...(state.handle ? { peerDisplay: state.handle } : {}),
         ...(inv.rules && typeof inv.rules === 'object' ? { rules: inv.rules } : {}),
       });

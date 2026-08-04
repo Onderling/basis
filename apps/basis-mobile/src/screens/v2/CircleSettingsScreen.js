@@ -57,8 +57,8 @@ const SETTINGS_CONTROLS = settingsControlsFromManifest(basisManifest);
 // → the bundled DEFAULT_SETTINGS_TEMPLATE fallback (web's SETTINGS_TEMPLATE_URL).
 const SETTINGS_TEMPLATE_URL = process.env.EXPO_PUBLIC_SETTINGS_TEMPLATE_URL || undefined;
 
-// 5.9a — `view` is the per-circle default-pane axis ('chat' / 'screen' /
-// 'cross-stream'); making it editable here lets an admin pick which surface
+// 5.9a — `view` is the per-circle default-pane axis ('chat' / 'screen' —
+// 'cross-stream' retired with the Stream view, batch 5); an admin picks which surface
 // a member lands on when they open the circle.  Listed first so it stays
 // the most prominent setting.
 // Was a LOCAL copy that had drifted from web's — it omitted `storagePosture` and `sharePosture`, so a

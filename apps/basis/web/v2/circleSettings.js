@@ -37,8 +37,8 @@ import { renderRecipeConsentCard } from './recipeConsentCard.js';
 import { pageLabel } from '../../src/v2/pageProjection.js';
 import { SETTINGS_ENUM_AXES } from '../../src/v2/circlePolicy.js';
 
-// 5.9a — `view` is the per-circle default-pane axis ('chat' / 'screen' /
-// 'cross-stream'); making it editable here lets an admin pick which surface
+// 5.9a — `view` is the per-circle default-pane axis ('chat' / 'screen' —
+// 'cross-stream' retired with the Stream view, batch 5); an admin picks which surface
 // a member lands on when they open the circle.  Listed first so it stays
 // the most prominent setting.
 // Exported so the locale-coverage fitness guard (test/v2/circleLocaleCoverage.test.js)

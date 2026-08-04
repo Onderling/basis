@@ -23,24 +23,18 @@ export default defineConfig({
     },
   },
   test: {
-    // Per-file env via @vitest/environment directive at the top of
-    // each test file that needs DOM (see test/domAdapter.test.js).
+    // Per-file env via @vitest/environment directive at the top of each test file that needs DOM.
     environment: 'node',
-    // Vitest's default include picks up `**/*.spec.{js,...}` which
-    // collides with Playwright (test-browser/*.spec.js).  Restrict
-    // to the canonical `test/**` location so Playwright owns
-    // `test-browser/**` cleanly.
-    include: ['test/**/*.{test,spec}.?(c|m)[jt]s?(x)'],
-    exclude: ['test-browser/**', 'node_modules/**'],
-    // ── B9: a regression must be distinguishable from noise ────────────────────────────────────────
+    // ── The flakiness fix: a regression must be distinguishable from noise ────────────────────────────────────────
     // One test failed per full run, a DIFFERENT one each time, every one passing in isolation — so a
-    // red run carried no information, which is worse for the guards' credibility than being slow.
-    // The relay package hit the same wall at 283 tests and went fully serial; this suite is ~4,900,
-    // so the blunt fix costs real wall-clock. Instead: the files that boot REAL agents, relays or
-    // sockets — the load-sensitive minority — run in one sequential group; the other ~450 files keep
-    // full parallelism. Same cure as the relay's, scoped to where the disease is.
-    sequence: { groupOrder: 0 },
-    poolOptions: { forks: { singleFork: false } },
+    // red run carried no information. The relay package went fully serial at 283 tests; this suite is
+    // ~4,900, so the cure is scoped: the files that boot REAL agents/relays/sockets run in one SERIAL
+    // project; everything else keeps full parallelism.
+    //
+    // NB the root deliberately declares NO `include`: with `extends: true` vitest CONCATENATES array
+    // fields, so a root include would leak into both projects and every file would run twice — which is
+    // exactly what happened on this config's first run (9,848 tests ≈ 2× the suite). Each project owns
+    // its globs COMPLETELY. The Playwright exclusion (`test-browser/**`) therefore lives in both.
     projects: [
       {
         extends: true,
@@ -48,13 +42,14 @@ export default defineConfig({
           name: 'boot-serial',
           include: [
             'test/app*.test.js',
-            'test/**/*.relay.*.?(c|m)js',
+            'test/**/*.relay.*(repro.)test.js',
             'test/**/*RealReceive*.test.js',
             'test/**/*ThreeDevice*.test.js',
             'test/v2/circleAddressAnnounce.relay.test.js',
             'test/v2/kringChatReliableSend.integration.test.js',
             'test/reachabilityOracleAdoption.test.js',
           ],
+          exclude: ['test-browser/**', 'node_modules/**'],
           fileParallelism: false,
         },
       },
@@ -66,7 +61,7 @@ export default defineConfig({
           exclude: [
             'test-browser/**', 'node_modules/**',
             'test/app*.test.js',
-            'test/**/*.relay.*.?(c|m)js',
+            'test/**/*.relay.*(repro.)test.js',
             'test/**/*RealReceive*.test.js',
             'test/**/*ThreeDevice*.test.js',
             'test/v2/circleAddressAnnounce.relay.test.js',

@@ -25,13 +25,13 @@ importers:
         version: file:../../packages/chat-agent
       '@onderling/chat-p2p':
         specifier: file:../../packages/chat-p2p
-        version: file:../../packages/chat-p2p(@onderling/core@file:../../packages/core)(@onderling/identity-resolver@file:../../packages/identity-resolver)(@onderling/item-store@file:../../packages/item-store)
+        version: file:../../packages/chat-p2p(@onderling/core@file:../../packages/core)(@onderling/identity-resolver@file:../../packages/identity-resolver(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)))(@onderling/item-store@file:../../packages/item-store)
       '@onderling/core':
         specifier: file:../../packages/core
         version: file:../../packages/core
       '@onderling/identity-resolver':
         specifier: file:../../packages/identity-resolver
-        version: file:../../packages/identity-resolver
+        version: file:../../packages/identity-resolver(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))
       '@onderling/item-store':
         specifier: file:../../packages/item-store
         version: file:../../packages/item-store
@@ -50,9 +50,15 @@ importers:
       '@onderling/notify-envelope':
         specifier: file:../../packages/notify-envelope
         version: file:../../packages/notify-envelope(@onderling/core@file:../../packages/core)(@onderling/pod-routing@file:../../packages/pod-routing(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)))(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))
+      '@onderling/offering-match':
+        specifier: file:../../packages/offering-match
+        version: file:../../packages/offering-match
       '@onderling/oidc-session':
         specifier: file:../../packages/oidc-session
         version: file:../../packages/oidc-session
+      '@onderling/pod-client':
+        specifier: file:../../packages/pod-client
+        version: file:../../packages/pod-client(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))
       '@onderling/pod-routing':
         specifier: file:../../packages/pod-routing
         version: file:../../packages/pod-routing(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))
@@ -61,10 +67,16 @@ importers:
         version: file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)
       '@onderling/relay':
         specifier: file:../../packages/relay
-        version: file:../../packages/relay(@onderling/core@file:../../packages/core)
-      '@onderling/offering-match':
-        specifier: file:../../packages/offering-match
-        version: file:../../packages/offering-match
+        version: file:../../packages/relay(@onderling/core@file:../../packages/core)(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))(@onderling/vault@file:../../packages/vault)
+      '@onderling/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+      '@onderling/substrate-stack':
+        specifier: file:../../packages/substrate-stack
+        version: file:../../packages/substrate-stack(@onderling/core@file:../../packages/core)
+      '@onderling/vault':
+        specifier: file:../../packages/vault
+        version: file:../../packages/vault
       '@onderling/web-adapter':
         specifier: file:../../packages/web-adapter
         version: file:../../packages/web-adapter
@@ -84,96 +96,6 @@ packages:
   '@bergos/jsonparse@1.4.2':
     resolution: {integrity: sha512-qUt0QNJjvg4s1zk+AuLM6s/zcsQ8MvGn7+1f0vPuxvpCYa08YtTryuDInngbEyW5fNGGYe2znKt61RMGd5HnXg==}
     engines: {'0': node >= 0.2.0}
-
-  '@onderling/agent-registry@file:../../packages/agent-registry':
-    resolution: {directory: ../../packages/agent-registry, type: directory}
-    peerDependencies:
-      '@onderling/core': '*'
-      '@onderling/pseudo-pod': '*'
-
-  '@onderling/agent-ui@file:../../packages/agent-ui':
-    resolution: {directory: ../../packages/agent-ui, type: directory}
-
-  '@onderling/app-manifest@file:../../packages/app-manifest':
-    resolution: {directory: ../../packages/app-manifest, type: directory}
-
-  '@onderling/chat-agent@file:../../packages/chat-agent':
-    resolution: {directory: ../../packages/chat-agent, type: directory}
-    peerDependencies:
-      telegraf: ^4.16.0
-    peerDependenciesMeta:
-      telegraf:
-        optional: true
-
-  '@onderling/chat-p2p@file:../../packages/chat-p2p':
-    resolution: {directory: ../../packages/chat-p2p, type: directory}
-    peerDependencies:
-      '@onderling/core': ^0.1.0
-      '@onderling/identity-resolver': ^0.1.0
-      '@onderling/item-store': workspace:*
-    peerDependenciesMeta:
-      '@onderling/identity-resolver':
-        optional: true
-      '@onderling/item-store':
-        optional: true
-
-  '@onderling/core@file:../../packages/core':
-    resolution: {directory: ../../packages/core, type: directory}
-
-  '@onderling/identity-resolver@file:../../packages/identity-resolver':
-    resolution: {directory: ../../packages/identity-resolver, type: directory}
-
-  '@onderling/item-store@file:../../packages/item-store':
-    resolution: {directory: ../../packages/item-store, type: directory}
-
-  '@onderling/item-types@file:../../packages/item-types':
-    resolution: {directory: ../../packages/item-types, type: directory}
-
-  '@onderling/local-store@file:../../packages/local-store':
-    resolution: {directory: ../../packages/local-store, type: directory}
-    peerDependencies:
-      '@onderling/core': ^0.1.0
-
-  '@onderling/manifest-host@file:../../packages/manifest-host':
-    resolution: {directory: ../../packages/manifest-host, type: directory}
-
-  '@onderling/notifier@file:../../packages/notifier':
-    resolution: {directory: ../../packages/notifier, type: directory}
-
-  '@onderling/notify-envelope@file:../../packages/notify-envelope':
-    resolution: {directory: ../../packages/notify-envelope, type: directory}
-    peerDependencies:
-      '@onderling/core': '*'
-      '@onderling/pod-routing': '*'
-      '@onderling/pseudo-pod': '*'
-
-  '@onderling/oidc-session@file:../../packages/oidc-session':
-    resolution: {directory: ../../packages/oidc-session, type: directory}
-
-  '@onderling/pod-routing@file:../../packages/pod-routing':
-    resolution: {directory: ../../packages/pod-routing, type: directory}
-    peerDependencies:
-      '@onderling/pseudo-pod': '*'
-
-  '@onderling/pseudo-pod@file:../../packages/pseudo-pod':
-    resolution: {directory: ../../packages/pseudo-pod, type: directory}
-    peerDependencies:
-      '@onderling/core': '*'
-
-  '@onderling/relay@file:../../packages/relay':
-    resolution: {directory: ../../packages/relay, type: directory}
-    hasBin: true
-    peerDependencies:
-      '@onderling/core': ^0.1.0
-
-  '@onderling/offering-match@file:../../packages/offering-match':
-    resolution: {directory: ../../packages/offering-match, type: directory}
-
-  '@onderling/vault@file:../../packages/vault':
-    resolution: {directory: ../../packages/vault, type: directory}
-
-  '@onderling/web-adapter@file:../../packages/web-adapter':
-    resolution: {directory: ../../packages/web-adapter, type: directory}
 
   '@esbuild/aix-ppc64@0.21.5':
     resolution: {integrity: sha512-1SDgH6ZSPTlggy1yI6+Dbkiz8xzpHJEVAlF/AM1tHPLsf5STom9rwtjE4hKAF20FfXXNTFqEYXyJNWh1GiZedQ==}
@@ -339,6 +261,114 @@ packages:
   '@noble/hashes@2.2.0':
     resolution: {integrity: sha512-IYqDGiTXab6FniAgnSdZwgWbomxpy9FtYvLKs7wCUs2a8RkITG+DFGO1DM9cr+E3/RgADRpFjrKVaJ1z6sjtEg==}
     engines: {node: '>= 20.19.0'}
+
+  '@onderling/agent-registry@file:../../packages/agent-registry':
+    resolution: {directory: ../../packages/agent-registry, type: directory}
+    peerDependencies:
+      '@onderling/core': '*'
+      '@onderling/pseudo-pod': '*'
+
+  '@onderling/agent-ui@file:../../packages/agent-ui':
+    resolution: {directory: ../../packages/agent-ui, type: directory}
+
+  '@onderling/app-manifest@file:../../packages/app-manifest':
+    resolution: {directory: ../../packages/app-manifest, type: directory}
+
+  '@onderling/blob-gateway@file:../../packages/blob-gateway':
+    resolution: {directory: ../../packages/blob-gateway, type: directory}
+
+  '@onderling/chat-agent@file:../../packages/chat-agent':
+    resolution: {directory: ../../packages/chat-agent, type: directory}
+    peerDependencies:
+      telegraf: ^4.16.0
+    peerDependenciesMeta:
+      telegraf:
+        optional: true
+
+  '@onderling/chat-p2p@file:../../packages/chat-p2p':
+    resolution: {directory: ../../packages/chat-p2p, type: directory}
+    peerDependencies:
+      '@onderling/core': ^0.1.0
+      '@onderling/identity-resolver': ^0.1.0
+      '@onderling/item-store': workspace:*
+    peerDependenciesMeta:
+      '@onderling/identity-resolver':
+        optional: true
+      '@onderling/item-store':
+        optional: true
+
+  '@onderling/core@file:../../packages/core':
+    resolution: {directory: ../../packages/core, type: directory}
+
+  '@onderling/identity-resolver@file:../../packages/identity-resolver':
+    resolution: {directory: ../../packages/identity-resolver, type: directory}
+
+  '@onderling/item-store@file:../../packages/item-store':
+    resolution: {directory: ../../packages/item-store, type: directory}
+
+  '@onderling/item-types@file:../../packages/item-types':
+    resolution: {directory: ../../packages/item-types, type: directory}
+
+  '@onderling/local-store@file:../../packages/local-store':
+    resolution: {directory: ../../packages/local-store, type: directory}
+    peerDependencies:
+      '@onderling/core': ^0.1.0
+
+  '@onderling/manifest-host@file:../../packages/manifest-host':
+    resolution: {directory: ../../packages/manifest-host, type: directory}
+
+  '@onderling/notifier@file:../../packages/notifier':
+    resolution: {directory: ../../packages/notifier, type: directory}
+
+  '@onderling/notify-envelope@file:../../packages/notify-envelope':
+    resolution: {directory: ../../packages/notify-envelope, type: directory}
+    peerDependencies:
+      '@onderling/core': '*'
+      '@onderling/pod-routing': '*'
+      '@onderling/pseudo-pod': '*'
+
+  '@onderling/offering-match@file:../../packages/offering-match':
+    resolution: {directory: ../../packages/offering-match, type: directory}
+
+  '@onderling/oidc-session@file:../../packages/oidc-session':
+    resolution: {directory: ../../packages/oidc-session, type: directory}
+
+  '@onderling/pod-client@file:../../packages/pod-client':
+    resolution: {directory: ../../packages/pod-client, type: directory}
+    peerDependencies:
+      '@onderling/pseudo-pod': workspace:^
+    peerDependenciesMeta:
+      '@onderling/pseudo-pod':
+        optional: true
+
+  '@onderling/pod-routing@file:../../packages/pod-routing':
+    resolution: {directory: ../../packages/pod-routing, type: directory}
+    peerDependencies:
+      '@onderling/pseudo-pod': '*'
+
+  '@onderling/pseudo-pod@file:../../packages/pseudo-pod':
+    resolution: {directory: ../../packages/pseudo-pod, type: directory}
+    peerDependencies:
+      '@onderling/core': workspace:^
+
+  '@onderling/relay@file:../../packages/relay':
+    resolution: {directory: ../../packages/relay, type: directory}
+    hasBin: true
+    peerDependencies:
+      '@onderling/core': ^0.1.0
+      '@onderling/vault': ^0.1.0
+
+  '@onderling/substrate-stack@file:../../packages/substrate-stack':
+    resolution: {directory: ../../packages/substrate-stack, type: directory}
+
+  '@onderling/vault@file:../../packages/vault':
+    resolution: {directory: ../../packages/vault, type: directory}
+
+  '@onderling/versioning@file:../../packages/versioning':
+    resolution: {directory: ../../packages/versioning, type: directory}
+
+  '@onderling/web-adapter@file:../../packages/web-adapter':
+    resolution: {directory: ../../packages/web-adapter, type: directory}
 
   '@rdfjs/data-model@1.3.4':
     resolution: {integrity: sha512-iKzNcKvJotgbFDdti7GTQDCYmL7GsGldkYStiP0K8EYtN7deJu5t7U11rKTz+nR7RtesUggT+lriZ7BakFv8QQ==}
@@ -997,105 +1027,6 @@ snapshots:
     dependencies:
       buffer: 6.0.3
 
-  '@onderling/agent-registry@file:../../packages/agent-registry(@onderling/core@file:../../packages/core)(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))':
-    dependencies:
-      '@onderling/core': file:../../packages/core
-      '@onderling/pseudo-pod': file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)
-
-  '@onderling/agent-ui@file:../../packages/agent-ui':
-    dependencies:
-      '@onderling/core': file:../../packages/core
-
-  '@onderling/app-manifest@file:../../packages/app-manifest':
-    dependencies:
-      '@onderling/item-types': file:../../packages/item-types
-
-  '@onderling/chat-agent@file:../../packages/chat-agent':
-    dependencies:
-      '@onderling/core': file:../../packages/core
-
-  '@onderling/chat-p2p@file:../../packages/chat-p2p(@onderling/core@file:../../packages/core)(@onderling/identity-resolver@file:../../packages/identity-resolver)(@onderling/item-store@file:../../packages/item-store)':
-    dependencies:
-      '@onderling/core': file:../../packages/core
-      tweetnacl: 1.0.3
-    optionalDependencies:
-      '@onderling/identity-resolver': file:../../packages/identity-resolver
-      '@onderling/item-store': file:../../packages/item-store
-
-  '@onderling/core@file:../../packages/core':
-    dependencies:
-      '@onderling/oidc-session': file:../../packages/oidc-session
-      '@onderling/vault': file:../../packages/vault
-      '@inrupt/solid-client': 3.0.0
-      '@inrupt/solid-client-authn-node': 4.0.0
-      '@noble/hashes': 2.2.0
-      '@scure/bip39': 1.6.0
-      ed2curve: 0.3.0
-      tweetnacl: 1.0.3
-      tweetnacl-util: 0.15.1
-    optionalDependencies:
-      node-datachannel: 0.32.3
-
-  '@onderling/identity-resolver@file:../../packages/identity-resolver':
-    dependencies:
-      '@onderling/core': file:../../packages/core
-
-  '@onderling/item-store@file:../../packages/item-store':
-    dependencies:
-      '@onderling/core': file:../../packages/core
-
-  '@onderling/item-types@file:../../packages/item-types':
-    dependencies:
-      ajv: 8.20.0
-      ajv-formats: 3.0.1(ajv@8.20.0)
-
-  '@onderling/local-store@file:../../packages/local-store(@onderling/core@file:../../packages/core)':
-    dependencies:
-      '@onderling/core': file:../../packages/core
-
-  '@onderling/manifest-host@file:../../packages/manifest-host':
-    dependencies:
-      '@onderling/app-manifest': file:../../packages/app-manifest
-
-  '@onderling/notifier@file:../../packages/notifier':
-    dependencies:
-      '@onderling/core': file:../../packages/core
-
-  '@onderling/notify-envelope@file:../../packages/notify-envelope(@onderling/core@file:../../packages/core)(@onderling/pod-routing@file:../../packages/pod-routing(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)))(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))':
-    dependencies:
-      '@onderling/core': file:../../packages/core
-      '@onderling/pod-routing': file:../../packages/pod-routing(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))
-      '@onderling/pseudo-pod': file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)
-
-  '@onderling/oidc-session@file:../../packages/oidc-session':
-    dependencies:
-      '@inrupt/solid-client-authn-node': 4.0.0
-
-  '@onderling/pod-routing@file:../../packages/pod-routing(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))':
-    dependencies:
-      '@onderling/pseudo-pod': file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)
-
-  '@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)':
-    dependencies:
-      '@onderling/core': file:../../packages/core
-
-  '@onderling/relay@file:../../packages/relay(@onderling/core@file:../../packages/core)':
-    dependencies:
-      '@onderling/core': file:../../packages/core
-      better-sqlite3: 11.10.0
-      ws: 8.20.1
-    transitivePeerDependencies:
-      - bufferutil
-      - utf-8-validate
-
-  '@onderling/offering-match@file:../../packages/offering-match':
-    dependencies:
-      '@onderling/core': file:../../packages/core
-
-  '@onderling/vault@file:../../packages/vault': {}
-
-  '@onderling/web-adapter@file:../../packages/web-adapter': {}
-
   '@esbuild/aix-ppc64@0.21.5':
     optional: true
 
@@ -1198,6 +1129,143 @@ snapshots:
   '@noble/hashes@1.8.0': {}
 
   '@noble/hashes@2.2.0': {}
+
+  '@onderling/agent-registry@file:../../packages/agent-registry(@onderling/core@file:../../packages/core)(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))':
+    dependencies:
+      '@noble/hashes': 2.2.0
+      '@onderling/core': file:../../packages/core
+      '@onderling/pseudo-pod': file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)
+
+  '@onderling/agent-ui@file:../../packages/agent-ui':
+    dependencies:
+      '@onderling/core': file:../../packages/core
+      '@onderling/vault': file:../../packages/vault
+
+  '@onderling/app-manifest@file:../../packages/app-manifest':
+    dependencies:
+      '@onderling/item-types': link:../../packages/item-types
+
+  '@onderling/blob-gateway@file:../../packages/blob-gateway(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))':
+    dependencies:
+      '@onderling/core': file:../../packages/core
+      '@onderling/oidc-session': file:../../packages/oidc-session
+      '@onderling/pod-client': file:../../packages/pod-client(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))
+    transitivePeerDependencies:
+      - '@onderling/pseudo-pod'
+
+  '@onderling/chat-agent@file:../../packages/chat-agent':
+    dependencies:
+      '@onderling/core': file:../../packages/core
+
+  '@onderling/chat-p2p@file:../../packages/chat-p2p(@onderling/core@file:../../packages/core)(@onderling/identity-resolver@file:../../packages/identity-resolver(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)))(@onderling/item-store@file:../../packages/item-store)':
+    dependencies:
+      '@onderling/core': file:../../packages/core
+      tweetnacl: 1.0.3
+    optionalDependencies:
+      '@onderling/identity-resolver': file:../../packages/identity-resolver(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))
+      '@onderling/item-store': file:../../packages/item-store
+
+  '@onderling/core@file:../../packages/core':
+    dependencies:
+      '@inrupt/solid-client': 3.0.0
+      '@inrupt/solid-client-authn-node': 4.0.0
+      '@noble/hashes': 2.2.0
+      '@scure/bip39': 1.6.0
+      ed2curve: 0.3.0
+      tweetnacl: 1.0.3
+      tweetnacl-util: 0.15.1
+    optionalDependencies:
+      node-datachannel: 0.32.3
+
+  '@onderling/identity-resolver@file:../../packages/identity-resolver(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))':
+    dependencies:
+      '@onderling/agent-registry': file:../../packages/agent-registry(@onderling/core@file:../../packages/core)(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))
+      '@onderling/core': file:../../packages/core
+    transitivePeerDependencies:
+      - '@onderling/pseudo-pod'
+
+  '@onderling/item-store@file:../../packages/item-store':
+    dependencies:
+      '@onderling/core': link:../../packages/core
+
+  '@onderling/item-types@file:../../packages/item-types':
+    dependencies:
+      ajv: 8.20.0
+      ajv-formats: 3.0.1(ajv@8.20.0)
+
+  '@onderling/local-store@file:../../packages/local-store(@onderling/core@file:../../packages/core)':
+    dependencies:
+      '@onderling/core': file:../../packages/core
+
+  '@onderling/manifest-host@file:../../packages/manifest-host':
+    dependencies:
+      '@onderling/app-manifest': file:../../packages/app-manifest
+
+  '@onderling/notifier@file:../../packages/notifier':
+    dependencies:
+      '@onderling/core': file:../../packages/core
+
+  '@onderling/notify-envelope@file:../../packages/notify-envelope(@onderling/core@file:../../packages/core)(@onderling/pod-routing@file:../../packages/pod-routing(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)))(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))':
+    dependencies:
+      '@onderling/core': file:../../packages/core
+      '@onderling/pod-routing': file:../../packages/pod-routing(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))
+      '@onderling/pseudo-pod': file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)
+
+  '@onderling/offering-match@file:../../packages/offering-match':
+    dependencies:
+      '@onderling/core': file:../../packages/core
+      '@onderling/vault': file:../../packages/vault
+
+  '@onderling/oidc-session@file:../../packages/oidc-session':
+    dependencies:
+      '@inrupt/solid-client-authn-node': 4.0.0
+
+  '@onderling/pod-client@file:../../packages/pod-client(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))':
+    dependencies:
+      '@inrupt/solid-client': 3.0.0
+      '@onderling/core': link:../../packages/core
+      '@onderling/logger': link:../../packages/logger
+      '@onderling/oidc-session': link:../../packages/oidc-session
+      '@onderling/vault': link:../../packages/vault
+      ed2curve: 0.3.0
+      tweetnacl: 1.0.3
+    optionalDependencies:
+      '@onderling/pseudo-pod': file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)
+
+  '@onderling/pod-routing@file:../../packages/pod-routing(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))':
+    dependencies:
+      '@onderling/pseudo-pod': file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)
+
+  '@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)':
+    dependencies:
+      '@onderling/core': file:../../packages/core
+
+  '@onderling/relay@file:../../packages/relay(@onderling/core@file:../../packages/core)(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))(@onderling/vault@file:../../packages/vault)':
+    dependencies:
+      '@onderling/blob-gateway': file:../../packages/blob-gateway(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))
+      '@onderling/core': file:../../packages/core
+      '@onderling/vault': file:../../packages/vault
+      better-sqlite3: 11.10.0
+      ws: 8.20.1
+    transitivePeerDependencies:
+      - '@onderling/pseudo-pod'
+      - bufferutil
+      - utf-8-validate
+
+  '@onderling/substrate-stack@file:../../packages/substrate-stack(@onderling/core@file:../../packages/core)':
+    dependencies:
+      '@onderling/notify-envelope': file:../../packages/notify-envelope(@onderling/core@file:../../packages/core)(@onderling/pod-routing@file:../../packages/pod-routing(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)))(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))
+      '@onderling/pod-routing': file:../../packages/pod-routing(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))
+      '@onderling/pseudo-pod': file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)
+      '@onderling/versioning': file:../../packages/versioning
+    transitivePeerDependencies:
+      - '@onderling/core'
+
+  '@onderling/vault@file:../../packages/vault': {}
+
+  '@onderling/versioning@file:../../packages/versioning': {}
+
+  '@onderling/web-adapter@file:../../packages/web-adapter': {}
 
   '@rdfjs/data-model@1.3.4':
     dependencies:

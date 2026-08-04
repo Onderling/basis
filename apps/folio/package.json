@@ -1,7 +1,7 @@
 {
   "name": "@onderling-app/folio",
   "version": "0.1.0",
-  "description": "Folio — your markdown notes, mirrored into your Solid pod",
+  "description": "Folio \u2014 your markdown notes, mirrored into your Solid pod",
   "type": "module",
   "main": "src/index.js",
   "exports": {
@@ -37,7 +37,8 @@
     "chokidar": "^3.6.0",
     "express": "^4.21.0",
     "systray2": "^2.1.4",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "@onderling/sdk": "workspace:*"
   },
   "devDependencies": {
     "vitest": "^2.1.0"

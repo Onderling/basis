@@ -2,7 +2,7 @@
   "name": "@onderling-app/stoop",
   "version": "0.2.0",
   "private": true,
-  "description": "Stoop — buurt-skill-app. V2 of the H5 / neighborhood-v0 closed-group skill-matchmaking app, renamed 2026-05-06.",
+  "description": "Stoop \u2014 buurt-skill-app. V2 of the H5 / neighborhood-v0 closed-group skill-matchmaking app, renamed 2026-05-06.",
   "type": "module",
   "main": "src/index.js",
   "exports": {
@@ -49,7 +49,7 @@
     "@onderling/notify-envelope": "file:../../packages/notify-envelope",
     "@onderling/oidc-session": "file:../../packages/oidc-session",
     "@onderling/pod-client": "file:../../packages/pod-client",
-    "@onderling/pod-onboarding": "file:../../packages/pod-onboarding",
+    "@onderling/pod-onboarding": "workspace:*",
     "@onderling/pod-routing": "file:../../packages/pod-routing",
     "@onderling/pseudo-pod": "file:../../packages/pseudo-pod",
     "@onderling/relay": "file:../../packages/relay",

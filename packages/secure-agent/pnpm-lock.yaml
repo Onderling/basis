@@ -8,18 +8,21 @@ importers:
 
   .:
     dependencies:
+      '@noble/hashes':
+        specifier: ^1.5.0
+        version: 1.8.0
       '@onderling/core':
         specifier: workspace:*
         version: link:../core
+      '@onderling/pod-client':
+        specifier: workspace:*
+        version: link:../pod-client
       '@onderling/transports':
         specifier: workspace:*
         version: link:../transports
       '@onderling/vault':
         specifier: workspace:*
         version: link:../vault
-      '@noble/hashes':
-        specifier: ^1.5.0
-        version: 1.8.0
     devDependencies:
       vitest:
         specifier: ^3.0.0

@@ -8,6 +8,12 @@ importers:
 
   .:
     dependencies:
+      '@inrupt/solid-client-authn-node':
+        specifier: ^4.0.0
+        version: 4.0.0
+      '@onderling/agent-registry':
+        specifier: file:../../packages/agent-registry
+        version: file:../../packages/agent-registry(@onderling/core@file:../../packages/core)(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))
       '@onderling/app-manifest':
         specifier: file:../../packages/app-manifest
         version: file:../../packages/app-manifest
@@ -20,18 +26,24 @@ importers:
       '@onderling/pod-client':
         specifier: file:../../packages/pod-client
         version: file:../../packages/pod-client(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))
+      '@onderling/pod-search':
+        specifier: file:../../packages/pod-search
+        version: file:../../packages/pod-search
       '@onderling/pseudo-pod':
         specifier: file:../../packages/pseudo-pod
         version: file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)
+      '@onderling/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
       '@onderling/sync-engine':
         specifier: file:../../packages/sync-engine
         version: file:../../packages/sync-engine(expo-crypto@55.0.15(expo@55.0.25))(expo-file-system@55.0.21(expo@55.0.25)(react-native@0.85.3(@babel/core@7.29.0)(react@19.2.6)))
       '@onderling/sync-engine-rn':
         specifier: file:../../packages/sync-engine-rn
         version: file:../../packages/sync-engine-rn(@onderling/core@file:../../packages/core)(@onderling/pod-client@file:../../packages/pod-client(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)))(@onderling/sync-engine@file:../../packages/sync-engine(expo-crypto@55.0.15(expo@55.0.25))(expo-file-system@55.0.21(expo@55.0.25)(react-native@0.85.3(@babel/core@7.29.0)(react@19.2.6))))(react@19.2.6)
-      '@inrupt/solid-client-authn-node':
-        specifier: ^4.0.0
-        version: 4.0.0
+      '@onderling/vault':
+        specifier: file:../../packages/vault
+        version: file:../../packages/vault
       chokidar:
         specifier: ^3.6.0
         version: 3.6.0
@@ -491,60 +503,6 @@ packages:
     resolution: {integrity: sha512-qUt0QNJjvg4s1zk+AuLM6s/zcsQ8MvGn7+1f0vPuxvpCYa08YtTryuDInngbEyW5fNGGYe2znKt61RMGd5HnXg==}
     engines: {'0': node >= 0.2.0}
 
-  '@onderling/app-manifest@file:../../packages/app-manifest':
-    resolution: {directory: ../../packages/app-manifest, type: directory}
-
-  '@onderling/core@file:../../packages/core':
-    resolution: {directory: ../../packages/core, type: directory}
-
-  '@onderling/item-types@file:../../packages/item-types':
-    resolution: {directory: ../../packages/item-types, type: directory}
-
-  '@onderling/oidc-session@file:../../packages/oidc-session':
-    resolution: {directory: ../../packages/oidc-session, type: directory}
-
-  '@onderling/pod-client@file:../../packages/pod-client':
-    resolution: {directory: ../../packages/pod-client, type: directory}
-    peerDependencies:
-      '@onderling/pseudo-pod': '*'
-    peerDependenciesMeta:
-      '@onderling/pseudo-pod':
-        optional: true
-
-  '@onderling/pseudo-pod@file:../../packages/pseudo-pod':
-    resolution: {directory: ../../packages/pseudo-pod, type: directory}
-    peerDependencies:
-      '@onderling/core': '*'
-
-  '@onderling/sync-engine-rn@file:../../packages/sync-engine-rn':
-    resolution: {directory: ../../packages/sync-engine-rn, type: directory}
-    peerDependencies:
-      '@onderling/core': ^0.1.0
-      '@onderling/pod-client': ^0.1.0
-      '@onderling/sync-engine': workspace:*
-      react: '>=18'
-    peerDependenciesMeta:
-      '@onderling/pod-client':
-        optional: true
-      '@onderling/sync-engine':
-        optional: true
-      react:
-        optional: true
-
-  '@onderling/sync-engine@file:../../packages/sync-engine':
-    resolution: {directory: ../../packages/sync-engine, type: directory}
-    peerDependencies:
-      expo-crypto: '*'
-      expo-file-system: '*'
-    peerDependenciesMeta:
-      expo-crypto:
-        optional: true
-      expo-file-system:
-        optional: true
-
-  '@onderling/vault@file:../../packages/vault':
-    resolution: {directory: ../../packages/vault, type: directory}
-
   '@esbuild/aix-ppc64@0.21.5':
     resolution: {integrity: sha512-1SDgH6ZSPTlggy1yI6+Dbkiz8xzpHJEVAlF/AM1tHPLsf5STom9rwtjE4hKAF20FfXXNTFqEYXyJNWh1GiZedQ==}
     engines: {node: '>=12'}
@@ -892,6 +850,69 @@ packages:
     resolution: {integrity: sha512-IYqDGiTXab6FniAgnSdZwgWbomxpy9FtYvLKs7wCUs2a8RkITG+DFGO1DM9cr+E3/RgADRpFjrKVaJ1z6sjtEg==}
     engines: {node: '>= 20.19.0'}
 
+  '@onderling/agent-registry@file:../../packages/agent-registry':
+    resolution: {directory: ../../packages/agent-registry, type: directory}
+    peerDependencies:
+      '@onderling/core': '*'
+      '@onderling/pseudo-pod': '*'
+
+  '@onderling/app-manifest@file:../../packages/app-manifest':
+    resolution: {directory: ../../packages/app-manifest, type: directory}
+
+  '@onderling/core@file:../../packages/core':
+    resolution: {directory: ../../packages/core, type: directory}
+
+  '@onderling/oidc-session@file:../../packages/oidc-session':
+    resolution: {directory: ../../packages/oidc-session, type: directory}
+
+  '@onderling/pod-client@file:../../packages/pod-client':
+    resolution: {directory: ../../packages/pod-client, type: directory}
+    peerDependencies:
+      '@onderling/pseudo-pod': workspace:^
+    peerDependenciesMeta:
+      '@onderling/pseudo-pod':
+        optional: true
+
+  '@onderling/pod-search@file:../../packages/pod-search':
+    resolution: {directory: ../../packages/pod-search, type: directory}
+
+  '@onderling/pseudo-pod@file:../../packages/pseudo-pod':
+    resolution: {directory: ../../packages/pseudo-pod, type: directory}
+    peerDependencies:
+      '@onderling/core': workspace:^
+
+  '@onderling/sync-engine-rn@file:../../packages/sync-engine-rn':
+    resolution: {directory: ../../packages/sync-engine-rn, type: directory}
+    peerDependencies:
+      '@onderling/core': ^0.1.0
+      '@onderling/pod-client': ^0.1.0
+      '@onderling/sync-engine': workspace:*
+      react: '>=18'
+    peerDependenciesMeta:
+      '@onderling/pod-client':
+        optional: true
+      '@onderling/sync-engine':
+        optional: true
+      react:
+        optional: true
+
+  '@onderling/sync-engine@file:../../packages/sync-engine':
+    resolution: {directory: ../../packages/sync-engine, type: directory}
+    peerDependencies:
+      expo-crypto: '*'
+      expo-file-system: '*'
+    peerDependenciesMeta:
+      expo-crypto:
+        optional: true
+      expo-file-system:
+        optional: true
+
+  '@onderling/vault@file:../../packages/vault':
+    resolution: {directory: ../../packages/vault, type: directory}
+
+  '@onderling/versioning@file:../../packages/versioning':
+    resolution: {directory: ../../packages/versioning, type: directory}
+
   '@rdfjs/data-model@1.3.4':
     resolution: {integrity: sha512-iKzNcKvJotgbFDdti7GTQDCYmL7GsGldkYStiP0K8EYtN7deJu5t7U11rKTz+nR7RtesUggT+lriZ7BakFv8QQ==}
     hasBin: true
@@ -1230,17 +1251,6 @@ packages:
   agent-base@7.1.4:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
     engines: {node: '>= 14'}
-
-  ajv-formats@3.0.1:
-    resolution: {integrity: sha512-8iUql50EUR+uUcdRQ3HDqa6EVyo3docL8g5WJ3FNcWmu62IbkGUue/pEyLBW8VGKKucTPgqeks4fIU1DA4yowQ==}
-    peerDependencies:
-      ajv: ^8.0.0
-    peerDependenciesMeta:
-      ajv:
-        optional: true
-
-  ajv@8.20.0:
-    resolution: {integrity: sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA==}
 
   anser@1.4.10:
     resolution: {integrity: sha512-hCv9AqTQ8ycjpSd3upOJd7vFwW1JaoYQ7tpham03GJ1ca8/65rqn0RpaWpItOAd6ylW9wAw6luXYPJIyPFVOww==}
@@ -1803,12 +1813,6 @@ packages:
     resolution: {integrity: sha512-IuL+Elrou2ZvCFHs18/CIzy2Nzvo25nZ1/D2eIZlz7c+QUayAcYoiM2BthCjs+EBHVpjYjcuLDAiCWgeIX3X1Q==}
     engines: {node: '>= 0.10.0'}
 
-  fast-deep-equal@3.1.3:
-    resolution: {integrity: sha512-f3qQ9oQy9j2AhBe/H9VC91wLmKBCCU/gDOnKNAYG5hswO7BLKj09Hc5HYNz9cGI++xlpDCIgDaitVs03ATR84Q==}
-
-  fast-uri@3.1.2:
-    resolution: {integrity: sha512-rVjf7ArG3LTk+FS6Yw81V1DLuZl1bRbNrev6Tmd/9RaroeeRRJhAt7jg/6YFxbvAQXUCavSoZhPPj6oOx+5KjQ==}
-
   fb-dotslash@0.5.8:
     resolution: {integrity: sha512-XHYLKk9J4BupDxi9bSEhkfss0m+Vr9ChTrjhf9l2iw3jB5C7BnY4GVPoMcqbrTutsKJso6yj2nAB6BI/F2oZaA==}
     engines: {node: '>=20'}
@@ -2082,9 +2086,6 @@ packages:
     resolution: {integrity: sha512-/sM3dO2FOzXjKQhJuo0Q173wf2KOo8t4I8vHy6lF9poUp7bKT0/NHE8fPX23PwfhnykfqnC2xRxOnVw5XuGIaA==}
     engines: {node: '>=6'}
     hasBin: true
-
-  json-schema-traverse@1.0.0:
-    resolution: {integrity: sha512-NM8/P9n3XjXhIZn1lLhkFaACTOURQXjWhV4BA/RnOv8xvgqtqpAX9IO4mRQxSx1Rlo4tqzeqb0sOlruaOy3dug==}
 
   json5@2.2.3:
     resolution: {integrity: sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg==}
@@ -2718,10 +2719,6 @@ packages:
 
   require-directory@2.1.1:
     resolution: {integrity: sha512-fGxEI7+wsG9xrvdjsrlmL22OMTTiHRwAMroiEeMgq8gzoLC/PQr7RsRDSTLUg/bZAZtF+TVIkHc6/4RIKrui+Q==}
-    engines: {node: '>=0.10.0'}
-
-  require-from-string@2.0.2:
-    resolution: {integrity: sha512-Xf0nWe6RseziFMu+Ap9biiUbmplq6S9/p+7w7YXP/JBHhrUDDUhwa+vANyubuqfZWTveU//DYVGsDG7RKL/vEw==}
     engines: {node: '>=0.10.0'}
 
   resolve-from@5.0.0:
@@ -3756,61 +3753,6 @@ snapshots:
     dependencies:
       buffer: 6.0.3
 
-  '@onderling/app-manifest@file:../../packages/app-manifest':
-    dependencies:
-      '@onderling/item-types': file:../../packages/item-types
-
-  '@onderling/core@file:../../packages/core':
-    dependencies:
-      '@onderling/oidc-session': file:../../packages/oidc-session
-      '@onderling/vault': file:../../packages/vault
-      '@inrupt/solid-client': 3.0.0
-      '@inrupt/solid-client-authn-node': 4.0.0
-      '@noble/hashes': 2.2.0
-      '@scure/bip39': 1.6.0
-      ed2curve: 0.3.0
-      tweetnacl: 1.0.3
-      tweetnacl-util: 0.15.1
-    optionalDependencies:
-      node-datachannel: 0.32.3
-
-  '@onderling/item-types@file:../../packages/item-types':
-    dependencies:
-      ajv: 8.20.0
-      ajv-formats: 3.0.1(ajv@8.20.0)
-
-  '@onderling/oidc-session@file:../../packages/oidc-session':
-    dependencies:
-      '@inrupt/solid-client-authn-node': 4.0.0
-
-  '@onderling/pod-client@file:../../packages/pod-client(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))':
-    dependencies:
-      '@onderling/core': file:../../packages/core
-    optionalDependencies:
-      '@onderling/pseudo-pod': file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)
-
-  '@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)':
-    dependencies:
-      '@onderling/core': file:../../packages/core
-
-  '@onderling/sync-engine-rn@file:../../packages/sync-engine-rn(@onderling/core@file:../../packages/core)(@onderling/pod-client@file:../../packages/pod-client(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)))(@onderling/sync-engine@file:../../packages/sync-engine(expo-crypto@55.0.15(expo@55.0.25))(expo-file-system@55.0.21(expo@55.0.25)(react-native@0.85.3(@babel/core@7.29.0)(react@19.2.6))))(react@19.2.6)':
-    dependencies:
-      '@onderling/core': file:../../packages/core
-    optionalDependencies:
-      '@onderling/pod-client': file:../../packages/pod-client(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))
-      '@onderling/sync-engine': file:../../packages/sync-engine(expo-crypto@55.0.15(expo@55.0.25))(expo-file-system@55.0.21(expo@55.0.25)(react-native@0.85.3(@babel/core@7.29.0)(react@19.2.6)))
-      react: 19.2.6
-
-  '@onderling/sync-engine@file:../../packages/sync-engine(expo-crypto@55.0.15(expo@55.0.25))(expo-file-system@55.0.21(expo@55.0.25)(react-native@0.85.3(@babel/core@7.29.0)(react@19.2.6)))':
-    dependencies:
-      '@onderling/core': file:../../packages/core
-      chokidar: 3.6.0
-    optionalDependencies:
-      expo-crypto: 55.0.15(expo@55.0.25)
-      expo-file-system: 55.0.21(expo@55.0.25)(react-native@0.85.3(@babel/core@7.29.0)(react@19.2.6))
-
-  '@onderling/vault@file:../../packages/vault': {}
-
   '@esbuild/aix-ppc64@0.21.5':
     optional: true
 
@@ -4274,6 +4216,72 @@ snapshots:
 
   '@noble/hashes@2.2.0': {}
 
+  '@onderling/agent-registry@file:../../packages/agent-registry(@onderling/core@file:../../packages/core)(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))':
+    dependencies:
+      '@noble/hashes': 2.2.0
+      '@onderling/core': file:../../packages/core
+      '@onderling/pseudo-pod': file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)
+
+  '@onderling/app-manifest@file:../../packages/app-manifest':
+    dependencies:
+      '@onderling/item-types': link:../../packages/item-types
+
+  '@onderling/core@file:../../packages/core':
+    dependencies:
+      '@inrupt/solid-client': 3.0.0
+      '@inrupt/solid-client-authn-node': 4.0.0
+      '@noble/hashes': 2.2.0
+      '@scure/bip39': 1.6.0
+      ed2curve: 0.3.0
+      tweetnacl: 1.0.3
+      tweetnacl-util: 0.15.1
+    optionalDependencies:
+      node-datachannel: 0.32.3
+
+  '@onderling/oidc-session@file:../../packages/oidc-session':
+    dependencies:
+      '@inrupt/solid-client-authn-node': 4.0.0
+
+  '@onderling/pod-client@file:../../packages/pod-client(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))':
+    dependencies:
+      '@inrupt/solid-client': 3.0.0
+      '@onderling/core': link:../../packages/core
+      '@onderling/logger': link:../../packages/logger
+      '@onderling/oidc-session': link:../../packages/oidc-session
+      '@onderling/vault': link:../../packages/vault
+      ed2curve: 0.3.0
+      tweetnacl: 1.0.3
+    optionalDependencies:
+      '@onderling/pseudo-pod': file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)
+
+  '@onderling/pod-search@file:../../packages/pod-search': {}
+
+  '@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)':
+    dependencies:
+      '@onderling/core': file:../../packages/core
+
+  '@onderling/sync-engine-rn@file:../../packages/sync-engine-rn(@onderling/core@file:../../packages/core)(@onderling/pod-client@file:../../packages/pod-client(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)))(@onderling/sync-engine@file:../../packages/sync-engine(expo-crypto@55.0.15(expo@55.0.25))(expo-file-system@55.0.21(expo@55.0.25)(react-native@0.85.3(@babel/core@7.29.0)(react@19.2.6))))(react@19.2.6)':
+    dependencies:
+      '@onderling/core': file:../../packages/core
+    optionalDependencies:
+      '@onderling/pod-client': file:../../packages/pod-client(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))
+      '@onderling/sync-engine': file:../../packages/sync-engine(expo-crypto@55.0.15(expo@55.0.25))(expo-file-system@55.0.21(expo@55.0.25)(react-native@0.85.3(@babel/core@7.29.0)(react@19.2.6)))
+      react: 19.2.6
+
+  '@onderling/sync-engine@file:../../packages/sync-engine(expo-crypto@55.0.15(expo@55.0.25))(expo-file-system@55.0.21(expo@55.0.25)(react-native@0.85.3(@babel/core@7.29.0)(react@19.2.6)))':
+    dependencies:
+      '@onderling/core': file:../../packages/core
+      '@onderling/pseudo-pod': file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)
+      '@onderling/versioning': file:../../packages/versioning
+      chokidar: 3.6.0
+    optionalDependencies:
+      expo-crypto: 55.0.15(expo@55.0.25)
+      expo-file-system: 55.0.21(expo@55.0.25)(react-native@0.85.3(@babel/core@7.29.0)(react@19.2.6))
+
+  '@onderling/vault@file:../../packages/vault': {}
+
+  '@onderling/versioning@file:../../packages/versioning': {}
+
   '@rdfjs/data-model@1.3.4':
     dependencies:
       '@rdfjs/types': 2.0.1
@@ -4633,17 +4641,6 @@ snapshots:
   acorn@8.16.0: {}
 
   agent-base@7.1.4: {}
-
-  ajv-formats@3.0.1(ajv@8.20.0):
-    optionalDependencies:
-      ajv: 8.20.0
-
-  ajv@8.20.0:
-    dependencies:
-      fast-deep-equal: 3.1.3
-      fast-uri: 3.1.2
-      json-schema-traverse: 1.0.0
-      require-from-string: 2.0.2
 
   anser@1.4.10: {}
 
@@ -5302,10 +5299,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  fast-deep-equal@3.1.3: {}
-
-  fast-uri@3.1.2: {}
-
   fb-dotslash@0.5.8: {}
 
   fb-watchman@2.0.2:
@@ -5573,8 +5566,6 @@ snapshots:
   jsc-safe-url@0.2.4: {}
 
   jsesc@3.1.0: {}
-
-  json-schema-traverse@1.0.0: {}
 
   json5@2.2.3: {}
 
@@ -6433,8 +6424,6 @@ snapshots:
   relative-to-absolute-iri@1.0.8: {}
 
   require-directory@2.1.1: {}
-
-  require-from-string@2.0.2: {}
 
   resolve-from@5.0.0: {}
 

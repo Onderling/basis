@@ -2,7 +2,7 @@
   "name": "@onderling-app/companion-node",
   "version": "0.1.0",
   "private": true,
-  "description": "companion-node — a user-hostable Node process that remotely hosts Folio's relocatable (runtime:'browser') pod-file agent, reachable by the user's own devices over the mesh. Slice R1 (LAN/trusted, no gate).",
+  "description": "companion-node \u2014 a user-hostable Node process that remotely hosts Folio's relocatable (runtime:'browser') pod-file agent, reachable by the user's own devices over the mesh. Slice R1 (LAN/trusted, no gate).",
   "type": "module",
   "main": "src/index.js",
   "exports": {
@@ -23,7 +23,8 @@
     "@onderling/relay": "file:../../packages/relay",
     "@onderling/transports": "file:../../packages/transports",
     "@onderling/vault": "file:../../packages/vault",
-    "@onderling-app/folio": "file:../folio"
+    "@onderling-app/folio": "file:../folio",
+    "@onderling/blob-gateway": "workspace:*"
   },
   "devDependencies": {
     "vitest": "^2.1.0"

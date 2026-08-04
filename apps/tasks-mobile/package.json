@@ -2,7 +2,7 @@
   "name": "@onderling-app/tasks-mobile",
   "version": "0.0.1",
   "private": true,
-  "description": "Tasks V1 mobile — React Native client for the per-circle tasks app. Phase 41 of the Tasks coding plan; mirrors stoop-mobile's Expo 52 + RN 0.76.9 setup.",
+  "description": "Tasks V1 mobile \u2014 React Native client for the per-circle tasks app. Phase 41 of the Tasks coding plan; mirrors stoop-mobile's Expo 52 + RN 0.76.9 setup.",
   "main": "index.js",
   "scripts": {
     "android": "expo run:android",
@@ -69,7 +69,8 @@
     "react-native-svg": "15.8.0",
     "tweetnacl": "^1.0.3",
     "tweetnacl-util": "^0.15.1",
-    "util": "^0.12.5"
+    "util": "^0.12.5",
+    "@onderling/agent-registry": "workspace:*"
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",

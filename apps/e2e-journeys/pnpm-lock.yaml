@@ -1,0 +1,40 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@onderling-app/companion-node':
+        specifier: workspace:*
+        version: link:../companion-node
+      '@onderling-app/stoop':
+        specifier: workspace:*
+        version: link:../stoop
+      '@onderling/blob-gateway':
+        specifier: workspace:*
+        version: link:../../packages/blob-gateway
+      '@onderling/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@onderling/identity-resolver':
+        specifier: workspace:*
+        version: link:../../packages/identity-resolver
+      '@onderling/pod-client':
+        specifier: workspace:*
+        version: link:../../packages/pod-client
+      '@onderling/relay':
+        specifier: workspace:*
+        version: link:../../packages/relay
+      '@onderling/secure-agent':
+        specifier: workspace:*
+        version: link:../../packages/secure-agent
+      '@onderling/transports':
+        specifier: workspace:*
+        version: link:../../packages/transports
+      '@onderling/vault':
+        specifier: workspace:*
+        version: link:../../packages/vault

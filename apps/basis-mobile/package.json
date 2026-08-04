@@ -2,7 +2,7 @@
   "name": "@onderling-app/basis-mobile",
   "version": "0.0.1",
   "private": true,
-  "description": "basis for Android — composition shell that unifies tasks-v0 + stoop + folio + household + calendar over a shared InternalBus, rendered with RN. Per Project Files/basis/mobile-roadmap-2026-05-24.md (#222).",
+  "description": "basis for Android \u2014 composition shell that unifies tasks-v0 + stoop + folio + household + calendar over a shared InternalBus, rendered with RN. Per Project Files/basis/mobile-roadmap-2026-05-24.md (#222).",
   "main": "index.js",
   "scripts": {
     "android": "expo run:android",
@@ -72,7 +72,11 @@
     "react-native-svg": "15.8.0",
     "react-native-web": "~0.19.13",
     "tweetnacl": "^1.0.3",
-    "util": "^0.12.5"
+    "util": "^0.12.5",
+    "@onderling/agent-registry": "workspace:*",
+    "@onderling/item-store": "workspace:*",
+    "@onderling/pod-client": "workspace:*",
+    "@onderling/pseudo-pod": "workspace:*"
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",

@@ -8,6 +8,15 @@ importers:
 
   .:
     dependencies:
+      '@inrupt/solid-client':
+        specifier: ^3.0.0
+        version: 3.0.0
+      '@inrupt/solid-client-authn-browser':
+        specifier: ^2.4.0
+        version: 2.5.0
+      '@onderling-app/agents':
+        specifier: workspace:*
+        version: link:../agents
       '@onderling-app/calendar':
         specifier: workspace:*
         version: link:../calendar
@@ -20,49 +29,97 @@ importers:
       '@onderling-app/tasks':
         specifier: workspace:*
         version: link:../tasks-v0
+      '@onderling/agent-registry':
+        specifier: workspace:*
+        version: link:../../packages/agent-registry
       '@onderling/app-manifest':
         specifier: workspace:*
         version: link:../../packages/app-manifest
+      '@onderling/attribute-charter':
+        specifier: workspace:*
+        version: link:../../packages/attribute-charter
+      '@onderling/blob-gateway':
+        specifier: workspace:*
+        version: link:../../packages/blob-gateway
       '@onderling/chat-nav':
         specifier: workspace:*
         version: link:../../packages/chat-nav
       '@onderling/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@onderling/item-store':
+        specifier: workspace:*
+        version: link:../../packages/item-store
+      '@onderling/item-types':
+        specifier: workspace:*
+        version: link:../../packages/item-types
+      '@onderling/kring-host':
+        specifier: workspace:*
+        version: link:../../packages/kring-host
       '@onderling/llm-client':
         specifier: workspace:*
         version: link:../../packages/llm-client
+      '@onderling/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
       '@onderling/manifest-host':
         specifier: workspace:*
         version: link:../../packages/manifest-host
+      '@onderling/oidc-session':
+        specifier: workspace:*
+        version: link:../../packages/oidc-session
       '@onderling/pod-client':
         specifier: workspace:*
         version: link:../../packages/pod-client
+      '@onderling/pod-onboarding':
+        specifier: workspace:*
+        version: link:../../packages/pod-onboarding
       '@onderling/pod-routing':
         specifier: workspace:*
         version: link:../../packages/pod-routing
+      '@onderling/pod-search':
+        specifier: workspace:*
+        version: link:../../packages/pod-search
+      '@onderling/recipe-loader':
+        specifier: workspace:*
+        version: link:../../packages/recipe-loader
+      '@onderling/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
       '@onderling/secure-agent':
         specifier: workspace:*
         version: link:../../packages/secure-agent
+      '@onderling/sync-engine':
+        specifier: workspace:*
+        version: link:../../packages/sync-engine
       '@onderling/vault':
         specifier: workspace:*
         version: link:../../packages/vault
-      '@inrupt/solid-client':
-        specifier: ^3.0.0
-        version: 3.0.0
-      '@inrupt/solid-client-authn-browser':
-        specifier: ^2.4.0
-        version: 2.5.0
+      '@onderling/web-adapter':
+        specifier: workspace:*
+        version: link:../../packages/web-adapter
       chrono-node:
         specifier: ^2.7.0
         version: 2.9.1
       i18next:
         specifier: ^23.15.0
         version: 23.16.8
+      onderling-feedback:
+        specifier: link:../../../feedback
+        version: link:../../../feedback
       qrcode:
         specifier: ^1.5.4
         version: 1.5.4
     devDependencies:
+      '@onderling/pseudo-pod':
+        specifier: workspace:*
+        version: link:../../packages/pseudo-pod
+      '@onderling/relay':
+        specifier: workspace:*
+        version: link:../../packages/relay
+      '@onderling/versioning':
+        specifier: workspace:*
+        version: link:../../packages/versioning
       events:
         specifier: ^3.3.0
         version: 3.3.0

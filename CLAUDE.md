@@ -16,6 +16,11 @@ substrate is the functionality.
 
 > The model is right. **Make the architecture self-enforcing** so it stays right.
 
+**The five HOMES** (the design's organising frame, being made real — see `docs/architecture.md` as it
+lands): **Agent · Circle · Pod · Surfaces · Connectivity**, plus the type **dictionary** they all speak.
+Homes are the **places**, the five kinds are the **grammar**, and the dictionary's types are the **nouns**
+(that word keeps its manifest meaning exclusively). Nothing lives outside a home.
+
 ## READ THIS FIRST — [`docs/architecture.md`](docs/architecture.md)
 The waist, the dispatch flow, the layers, and **the data plane**: how circles, stores, item types and their
 verbs actually relate (§3, "The data plane"). One sentence of it, because it decides most questions:
@@ -37,7 +42,8 @@ file only helps if it's written to.
 
 ## Invariants — a violation is a bug, not a style nit
 1. **Logic lives once, in shared code.** Web/mobile shells are **thin adapters/projectors**: platform UI +
-   the transport/bundle adapter, *nothing else*. A shell must NOT carry dispatch / resolution / routing
+   the transport/bundle adapter, *nothing else* — concretely, a shell does **composition and paint** and
+   may contain **no gate, no projection, no verb**. A shell must NOT carry dispatch / resolution / routing
    logic — that lives in shared `src/` (the basis app) or a substrate package. Writing logic in a shell that
    already exists in shared code → STOP and call the shared one. (This is exactly what the four "duplicated
    pairs" violated; see `apps/basis/docs/web-mobile-consolidation-plan.md`.)
@@ -137,7 +143,8 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
   projection is built where its sources are and passed DOWN, which is why `peerFacade` could not be adopted
   at the call sites that only hold one row.
 - **Prefer a fitness function to a manual check.** When you fix drift, add the test/lint that makes the same
-  drift FAIL CI next time. This is the roadmap's step 0 — see `REMAINING-WORK.md` "★ Architectural spine".
+  drift FAIL CI next time — and register it in the **`npm run guards` aggregate: a guard outside it does
+  not exist.** This is the roadmap's step 0 — see `REMAINING-WORK.md` "★ Architectural spine".
   **A seam is not done until something passes through it:** write the test that CROSSES it — a real socket, a
   real boot — not unit tests either side. Two green tests flanking a dead seam is what inert wiring looks like.
 - **When two layers hold the same fact, pin the AGREEMENT, not either value.** The relay held messages 5 min

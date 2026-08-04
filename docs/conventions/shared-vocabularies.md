@@ -68,3 +68,11 @@ Then check this file's index above.
 **Why this needs a written rule at all:** a duplicate vocabulary breaks nothing. It compiles, it ships, and
 it passes every test — it just makes two parts of the app describe one fact differently. Nothing fails, so
 nothing catches it, which is why the check has to be a habit rather than a guard.
+
+
+## The dictionary (added with the homes design)
+
+The item types + their verbs are **the dictionary**: deliberately owned by NO single component, spoken by
+all of them. A task is the same thing in a store, at rest, on the wire and on a screen; a manifest declares
+WHICH nouns an app speaks and never defines them. Every vocabulary in this file's index is either part of
+the dictionary or a home-local closed set — a new one still needs a home + a guard.

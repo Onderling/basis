@@ -67,3 +67,11 @@ rationale, phases, cross-links — lives in `plans/PLAN-roadmap-and-docs-restruc
 
 When work spans two products, put it in the one whose *home* it belongs to and **cross-link**, rather than
 duplicating (duplication is the drift `CLAUDE.md` invariant #3 forbids).
+
+
+## Where design truth is heading (added with the homes design)
+
+The plan corpus consolidates into **five home chapters** (Agent · Circle · Pod · Surfaces · Connectivity),
+each ending with its gates, its guards, and its open items — a decision lands ON its home's chapter, and
+the home's GUARD is its completion signal. The master todo shrinks to an index. Until that lands, the
+private working design is the plans-side source; this file's public/private split is unchanged.

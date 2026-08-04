@@ -649,3 +649,16 @@ had drifted (four apps listed in `basis-mobile/package.json` that nothing import
 
 Guarded by `apps/basis-mobile/test/shellLayering.test.js`.
 
+
+
+## The homes and the packages (added with the homes design)
+
+The system's design-level units are the five **homes** — Agent · Circle · Pod · Surfaces · Connectivity —
+plus the shared type dictionary. A home is a contract (state it owns · gates it exposes · a guard that
+makes bypass fail); **packages are where a home's code sleeps**, and the layering in this file is the
+BUILD dimension, orthogonal to homes. Two consequences for packages:
+
+- **End state: a package's public API = its home's gates.** Barrels stop exporting internals; the
+  unreached-exports guard is the enforcement, and its per-package `reasons` record the verdicts.
+- Home-shaped package renames (e.g. the membership engine consolidating into `@onderling/circles`) ride
+  the compatibility licence — dated in `naming-and-compatibility.md` — not ad-hoc breaks.

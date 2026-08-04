@@ -644,6 +644,11 @@ locally — the same discipline the hash-chain enforces. Full record: [decisions
 
 ### Where this is going
 
+> **A reorganisation of this document is designed but not yet real.** The working design (private plans,
+> "PLAN-homes") organises the system as five homes — Agent · Circle · Pod · Surfaces · Connectivity — plus
+> a shared type dictionary. This file changes **only as that becomes reality**, chapter by chapter; it is
+> not a wishful-thinking document. This pointer is temporary and is removed when the update lands.
+
 Two directions are settled and already shaping the work described above:
 
 - **Apps consolidate into the Basis shell.** The manifest-per-app split is an *engineering*

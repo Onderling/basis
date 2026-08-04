@@ -27,10 +27,23 @@ if (process.env.TLS_CERT && process.env.TLS_KEY) {
   tlsKey  = readFileSync(process.env.TLS_KEY);
 }
 
+// Bound mode (batch 7) — same knob as the PaaS entrypoint: `ACCEPTED_GROUPS` inline JSON or
+// `ACCEPTED_GROUPS_FILE`; unset ⇒ open mode, unchanged. Unparseable ⇒ refuse boot, loudly.
+let acceptedGroups;
+{
+  const raw = process.env.ACCEPTED_GROUPS
+    ?? (process.env.ACCEPTED_GROUPS_FILE ? readFileSync(process.env.ACCEPTED_GROUPS_FILE, 'utf8') : null);
+  if (raw != null) {
+    acceptedGroups = JSON.parse(raw);
+    if (!Array.isArray(acceptedGroups)) throw new Error('ACCEPTED_GROUPS must be a JSON array');
+  }
+}
+
 const { tls } = await startRelay({
   port, host,
   tlsCert, tlsKey,
   serveStaticDir: staticDir,
+  acceptedGroups,
   log: true,
 });
 

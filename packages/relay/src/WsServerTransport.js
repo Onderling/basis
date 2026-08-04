@@ -199,15 +199,24 @@ export class WsServerTransport extends Transport {
       }
     });
 
-    ws.on('close', () => {
-      if (peerAddress) {
-        this.#clients.delete(peerAddress);
-        this.emit('peer-disconnected', peerAddress);
+    // Close cleans EVERY address→socket mapping this socket registered (batch 7), not only the
+    // primary: one socket may own several addresses (a device presents one per circle), and deleting
+    // only `peerAddress` left the earlier ones pointing at a dead socket — routed-to but unreachable
+    // until the process restarted. Guarded per entry (`=== ws`): an address a NEWER socket has since
+    // re-registered belongs to that socket now, and this close must not evict the newcomer.
+    // `peer-disconnected` still fires once, for the primary — the event's meaning is unchanged.
+    const dropRegisteredAddresses = () => {
+      for (const addr of registeredAddresses) {
+        if (this.#clients.get(addr) === ws) this.#clients.delete(addr);
       }
+    };
+    ws.on('close', () => {
+      dropRegisteredAddresses();
+      if (peerAddress) this.emit('peer-disconnected', peerAddress);
     });
 
     ws.on('error', () => {
-      if (peerAddress) this.#clients.delete(peerAddress);
+      dropRegisteredAddresses();
     });
   }
 

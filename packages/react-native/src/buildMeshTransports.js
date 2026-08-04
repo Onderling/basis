@@ -39,14 +39,12 @@ import {
 
 import { MdnsTransport }          from './transport/MdnsTransport.js';
 // ⚠ STATIC — and this is why `apps/basis-mobile` does NOT use this builder (verified 2026-08-03).
-// `BleTransport` pulls `react-native-ble-plx`, which basis-mobile does not declare, so importing this
-// module at all would put an undeclared native dep in that app's Metro graph. The app therefore hand-rolls
-// mDNS at `src/core/agentBundle.js:373` — duplicating the hostname derivation, the availability guard, the
-// 6000 ms time-box and the discoverability wiring, and bypassing the SURFACE rule (CLAUDE.md).
-// **Adopting the builder there requires making this import lazy inside the `enableBle` branch first.**
-// That is the prerequisite nobody had written down; no comment stated the reason, it had to be inferred
-// from the missing dependency.
-import { BleTransport }           from './transport/BleTransport.js';
+// `BleTransport` pulls `react-native-ble-plx`, which basis-mobile does not declare — a STATIC import
+// here would put an undeclared native dep in that app's Metro graph, which is exactly why basis-mobile
+// hand-rolled its own mDNS block instead of adopting this builder. So the import is LAZY, inside the
+// `enableBle` branch (batch 7): an app that never enables BLE never loads the module, and the builder
+// becomes adoptable by every shell. (Metro statically bundles dynamic imports it can resolve, so a
+// BLE-less app must ALSO stub the module path in its metro.config — basis-mobile does.)
 import { requestMeshPermissions } from './permissions.js';
 
 export async function buildMeshTransports({
@@ -92,6 +90,8 @@ export async function buildMeshTransports({
   let ble = null;
   if (enableBle && perms?.ble) {
     try {
+      // Lazy (batch 7) — see the note at the top imports: a BLE-less app must never load this module.
+      const { BleTransport } = await import('./transport/BleTransport.js');
       // BLE gets its OWN state, and it defaults TIGHTER (Nearby step J).
       //
       // mDNS is confined to a LAN, so "publish" there means visible to people who already joined this

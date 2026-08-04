@@ -121,6 +121,28 @@ describe('WsServerTransport', () => {
     expect(relay.transport.getConnectedPeers()).not.toContain(A('peer-b'));
   });
 
+  it('disconnect removes EVERY address the socket registered, not only the primary (batch 7)', async () => {
+    // One socket, two addresses (a device presents one per circle). Before the fix, close deleted only
+    // the PRIMARY (most recent) mapping — the earlier address kept pointing at the dead socket and was
+    // routed-to-but-unreachable until restart.
+    const { ws } = await openClient(relay.transport.port, A('peer-multi-1'));
+    // Register a second address on the SAME socket; the helper answers its challenge automatically.
+    ws.send(JSON.stringify({ type: 'register', address: A('peer-multi-2') }));
+    await new Promise((resolve) => {
+      const t = setInterval(() => {
+        if (relay.transport.getConnectedPeers().includes(A('peer-multi-2'))) { clearInterval(t); resolve(); }
+      }, 10);
+    });
+    expect(relay.transport.getConnectedPeers()).toContain(A('peer-multi-1'));
+
+    await new Promise((resolve) => {
+      relay.transport.once('peer-disconnected', resolve);
+      ws.close();
+    });
+    expect(relay.transport.getConnectedPeers()).not.toContain(A('peer-multi-1'));   // the leak
+    expect(relay.transport.getConnectedPeers()).not.toContain(A('peer-multi-2'));
+  });
+
   it('forwards envelope from sender to recipient', async () => {
     const id = await AgentIdentity.generate(new VaultMemory());
     const { ws: wsSender } = await openClient(relay.transport.port, A('sender'));

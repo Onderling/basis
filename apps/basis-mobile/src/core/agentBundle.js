@@ -117,7 +117,7 @@ async function loadCreateRealHouseholdAgent() {
 // native module guard inside MdnsTransport.isAvailable() short-circuits
 // to false when MdnsModule isn't compiled in (e.g. iOS, Expo Go) — so
 // failure is silent and the "Nearby" UI row simply doesn't render.
-async function loadMdnsTransport() {
+async function loadMdnsTransport() {   // (batch 7) unused — kept one release for the stoop-mobile mirror; builder owns construction now
   try {
     const mod = await import('../../../../packages/react-native/src/transport/MdnsTransport.js');
     return mod.MdnsTransport;
@@ -385,25 +385,27 @@ export async function bootAgentBundle(opts = {}) {
 
   (async () => {
     try {
-      const MdnsTransport = await loadMdnsTransport();
-      if (!MdnsTransport || !MdnsTransport.isAvailable?.()) return;
+      // Batch 7 — the shared BUILDER, mDNS-only, replaces the hand-rolled block that duplicated its
+      // hostname derivation, availability guard, 6000 ms time-box and discoverability wiring (the
+      // SURFACE rule). Adoptable now that the builder's BleTransport import is lazy (+ the metro
+      // bleAbsent shim). `permissions: { ble: false }` — mDNS needs no prompt, and the hand-rolled
+      // block never showed one; letting the builder ask for BLE/location here would be a regression.
+      // The bundle's own discoverability/nearbyPeers surfaces (built pre-transport, lazy thunks over
+      // `mdns` above) stay THE surfaces — they pick this instance up on assignment.
+      const { buildMeshTransports } = await import('../../../../packages/react-native/src/buildMeshTransports.js');
       // The full chat AgentIdentity (with pubKey/sign/encrypt) lives
       // inside sa.agent.identity — same one the peer address is derived
       // from, so peers see one consistent identifier.
       const chatIdentity = agent?.sa?.agent?.identity;
       if (!chatIdentity?.pubKey) return;
-      const inst = new MdnsTransport({
+      const built = await buildMeshTransports({
         identity: chatIdentity,
-        hostname: `cc-${chatIdentity.pubKey.slice(0, 8)}`,
+        enable: { ble: false, relay: false },
+        hostnamePrefix: 'cc',
+        permissions: { ble: false },
       });
-      // Time-box the native start (Wi-Fi off otherwise hangs forever).
-      await Promise.race([
-        inst.connect(),
-        new Promise((_, reject) => setTimeout(
-          () => reject(new Error('mdns pre-connect timeout')),
-          6000,
-        )),
-      ]);
+      if (!built?.mdns) return;   // no radio / Wi-Fi off / native module absent — Nearby row hides
+      const inst = built.mdns;
       mdns = inst;
       // T5.2d — inject the built mDNS into the unified secure-mesh router so
       // peers found on the local network are actually ROUTABLE (mdns > relay >

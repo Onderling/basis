@@ -38,6 +38,7 @@
 // monorepo installs per-package (shared-workspace-lockfile=false), so there is no
 // root node_modules linking @onderling/relay. The package's OWN @onderling/* deps still
 // resolve from packages/relay/node_modules — only this outer hop must be relative.
+import { readFileSync } from 'node:fs';
 import { startRelay, getLanIp, ExpoPushSender } from '../../packages/relay/index.js';
 
 const port = parseInt(process.env.PORT ?? '8787', 10);
@@ -89,11 +90,29 @@ if ((process.env.PUSH_PROVIDER ?? '').toLowerCase() === 'expo') {
   });
 }
 
+// ── bound mode (batch 7) — the relay refuses clients outside the configured circles ──────────────
+// `ACCEPTED_GROUPS` = inline JSON, or `ACCEPTED_GROUPS_FILE` = path to a JSON file; either way an
+// array of `{ groupId, adminPubKey, requiredRole?, quotas?, revokedMembers? }` (GroupAuthVerifier's
+// shape). Unset/empty ⇒ open mode, exactly as before — existing deployments change nothing. A value
+// that does not parse REFUSES BOOT: a relay silently open when its operator asked for bound is the
+// worst of both.
+let acceptedGroups;
+{
+  const inline = process.env.ACCEPTED_GROUPS ?? null;
+  const file   = process.env.ACCEPTED_GROUPS_FILE ?? null;
+  const raw    = inline ?? (file ? readFileSync(file, 'utf8') : null);
+  if (raw != null) {
+    acceptedGroups = JSON.parse(raw);   // throws → boot fails loudly, by design
+    if (!Array.isArray(acceptedGroups)) throw new Error('ACCEPTED_GROUPS must be a JSON array');
+  }
+}
+
 const { port: boundPort, tls } = await startRelay({
   port,
   host,
   blobGate,
   pushSender,
+  acceptedGroups,
   log: true,
 });
 

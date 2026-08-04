@@ -255,6 +255,12 @@ _cfg.resolver.resolveRequest = (context, moduleName, platform) => {
   // APK; the loader's try/catch can't suppress the native error on Hermes (redbox). Stub it so
   // loadRendezvousRtcLib() returns null and the app runs over relay/nkn. (Install the native
   // dep + rebuild to enable direct WebRTC.)
+  // react-native-ble-plx: the shared mesh builder's BleTransport import is LAZY (never executes —
+  // basis is mDNS-only), but Metro resolves it statically; an absent package is a build failure
+  // before any runtime check. Stub → the builder bundles, BLE stays honestly off (batch 7).
+  if (moduleName === 'react-native-ble-plx') {
+    return { filePath: path.resolve(__dirname, 'src/shims/bleAbsent.js'), type: 'sourceFile' };
+  }
   if (moduleName === 'react-native-webrtc') {
     return { filePath: path.resolve(__dirname, 'src/shims/reactNativeWebrtc.js'), type: 'sourceFile' };
   }

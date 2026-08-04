@@ -32,7 +32,7 @@
 import { GroupManager, AgentIdentity } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { MemberMap, MemberMapCache, buildOnboardingSkills } from '@onderling/identity-resolver';
-import { Notifier, InMemoryScheduleStore, NoopChannel, PushChannel, PushPolicy } from '@onderling/notifier';
+import { Notifier, InMemoryScheduleStore, PodScheduleStore, NoopChannel, PushChannel, PushPolicy } from '@onderling/notifier';
 import { wireChat } from '@onderling/chat-p2p';
 import { createPseudoPod, createMemoryBackend } from '@onderling/pseudo-pod';
 import { registerAgentBundle } from '@onderling/agent-registry';
@@ -273,6 +273,11 @@ export async function createCircleAgent({
   roles: rolesOverride,
   offeringMatch,
   notifier,
+  // Durable schedule (batch 7, Task #14's tail) — when BOTH are supplied and no `notifier` override
+  // is, the fallback notifier persists its jobs to the pod instead of the in-memory store that
+  // forgets them on restart. Absent ⇒ in-memory, exactly as before.
+  podClient,
+  scheduleStoreUri,
   pushSender,
   bus,
   circleBundlesProvider,
@@ -537,7 +542,31 @@ export async function createCircleAgent({
     // Phase 6 — notifier + issuer-notification jobs.
     if (!bundle.notifier) {
       notifierChannels = { silent: new NoopChannel() };
-      const scheduleStore = new InMemoryScheduleStore();
+      // Durable when a pod is threaded in (batch 7): `PodScheduleStore` persists every job except its
+      // `builder` closure; the resolver below RECONSTRUCTS the one job shape this app schedules — the
+      // due-deadline nudge (`wireIssuerNotifications`, cancelKey `due:<itemId>`) — by re-reading the
+      // item at fire time. An item that vanished meanwhile gets an honest placeholder, not a crash;
+      // an unrecognised cancelKey falls through to the store's own "builder not restored" stub.
+      const scheduleStore = (podClient && scheduleStoreUri)
+        ? new PodScheduleStore({
+          podClient,
+          uri: scheduleStoreUri,
+          builderResolver: (persisted) => {
+            const m = /^due:(.+)$/.exec(persisted?.cancelKey ?? '');
+            if (!m) return undefined;
+            const itemId = m[1];
+            return async () => {
+              let item = null;
+              try { item = await bundle.itemStore.get(itemId); } catch { /* fall through */ }
+              return item
+                ? { text: `Deadline missed: "${item.text}"`,
+                  meta: { eventType: 'missed-deadline', itemId, dueAt: item.dueAt } }
+                : { text: 'Deadline missed: (task no longer exists)',
+                  meta: { eventType: 'missed-deadline', itemId } };
+            };
+          },
+        })
+        : new InMemoryScheduleStore();
       notifierBundle = new Notifier({
         channels: notifierChannels,
         store:    scheduleStore,

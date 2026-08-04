@@ -480,8 +480,18 @@ export async function createRealHouseholdAgent(opts = {}) {
     try {
       const mirror = await ensureHouseholdMirror(id);
       wireStoreMirror(store, mirror);
+      // Inbound ingest for the tasks store. Without this the tasks store was publish-only: a task created
+      // on another device fanned out correctly but was ingested only into the household store (a DIFFERENT
+      // CircleItemStore instance the tasks surface never reads), so it never appeared here — the store was
+      // mirrored out with nothing writing the inbound back. Same transport + prefix the household store's
+      // own inbound uses; the ingest is id-preserving, causal, and sync:false (no echo).
+      wireCircleStoreInbound({
+        notifyEnvelope: householdSubstrate.notifyEnvelope,
+        store,
+        prefix:         `/household/circles/${id}/items/`,
+      });
       tasksSyncWired.add(id);
-      if (typeof console !== 'undefined') console.info(`[tasks-sync] ${id}: tasks store<->mirror wired`);
+      if (typeof console !== 'undefined') console.info(`[tasks-sync] ${id}: tasks store<->mirror wired (in+out)`);
     } catch (err) {
       if (typeof console !== 'undefined') {
         console.warn(`[tasks-sync] ${id}: tasks store<->mirror NOT wired — tasks will not fan out`, err?.message ?? err);

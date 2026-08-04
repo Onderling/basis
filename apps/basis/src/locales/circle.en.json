@@ -575,6 +575,10 @@
         "text": "Unknown source",
         "doc": "ε.6 — fallback name when resolveContact returns null AND the offerFrom addr is empty."
       }
+    },
+    "unknown_sender": {
+      "text": "Unknown member",
+      "doc": "Wave 1 batch 4 — neutral sender label for a chat/noticeboard row whose actor is not on the roster (departed, or never resolved). A blank reads as 'mine'; a raw id reads as noise. Also covers unknown senders generally."
     }
   },
   "tabs": {

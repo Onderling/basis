@@ -30,7 +30,7 @@
  */
 
 import { BLOCK_TYPES } from './kringRecipe.js';
-import { circleRows } from './circleStream.js';
+import { circleRows, stampSenderLabels } from './circleStream.js';
 import { normalizeRulesDoc, isRulesEmpty } from './circleRules.js';
 import { enabledFeatures } from './circlePolicy.js';
 import { enrichEmbedsWithTitles } from './embedResolve.js';
@@ -61,7 +61,10 @@ export const BLOCK_REGISTRY = Object.freeze({
  * @param {object} args
  * @param {{id: string, type: string, config: object}} args.block
  * @param {string} args.circleId          which kring the recipe belongs to
- * @param {object} args.hostOps           { callSkill, eventLog, circles }
+ * @param {object} args.hostOps           { callSkill, eventLog, circles, members?, viewerId?, revealPolicy? }
+ *   — the optional roster trio lets sender-bearing blocks (noticeboard) stamp `senderLabel`
+ *   through the reveal ladder (`revealPolicy`, NOT `policy` — that name already carries the full
+ *   policy object for quickActions); absent → rows pass through unstamped (conservation).
  * @returns {Promise<object>}
  */
 export async function materializeBlock({ block, circleId, hostOps = {} } = {}) {
@@ -172,7 +175,7 @@ function materializePhoto(block) {
   };
 }
 
-async function materializeNoticeboard(block, circleId, { callSkill, eventLog, circles } = {}) {
+async function materializeNoticeboard(block, circleId, { callSkill, eventLog, circles, members, viewerId, revealPolicy } = {}) {
   const limit = clampInt(block.config?.limit, 1, 50, 5);
   let rows = [];
   // #16 — prefer the REAL open posts (stoop `listOpen`) so the scherm noticeboard
@@ -188,7 +191,9 @@ async function materializeNoticeboard(block, circleId, { callSkill, eventLog, ci
       const items = (Array.isArray(res?.items) ? res.items : []).filter(isNoticeboardPost);
       rows = items.slice(0, limit).map((it) => ({
         id: it.id,
-        actor: shortWebid(it.addedBy),
+        // The FULL webid, not `shortWebid(...)` (batch 4): the shortening was display-only, display
+        // now goes through `senderLabel`, and the full id is what lets the roster stamp match.
+        actor: it.addedBy ?? null,
         event: { payload: { text: it.text ?? it.label ?? '' } },
       }));
       listOpenSucceeded = true;
@@ -203,6 +208,12 @@ async function materializeNoticeboard(block, circleId, { callSkill, eventLog, ci
     // circleRows returns newest-first; cap to `limit`.
     rows = stream.slice(0, limit);
   }
+  // Sender labels through the reveal ladder (batch 4) — same stamp `chatRows` applies, so the
+  // noticeboard renderers paint `senderLabel`/`senderLabelKey` and never a raw id or wire name.
+  // Without a roster in hostOps the rows pass through unstamped (conservation).
+  if (Array.isArray(members)) {
+    rows = stampSenderLabels(rows, { members, viewerId: viewerId ?? null, policy: revealPolicy ?? 'pairwise' });
+  }
   return {
     blockId: block.id, type: 'noticeboard',
     status: rows.length > 0 ? 'ok' : 'empty',
@@ -210,11 +221,6 @@ async function materializeNoticeboard(block, circleId, { callSkill, eventLog, ci
     // α.5c — surface the compact flag so the renderer can tighten rows.
     config: { compact: block.config?.compact === true },
   };
-}
-
-/** Short, readable form of a webid for a noticeboard sender. */
-function shortWebid(w) {
-  return typeof w === 'string' && w ? (w.split(/[/#]/).filter(Boolean).pop() || w).slice(0, 18) : '';
 }
 
 async function materializeAgenda(block, { callSkill } = {}) {

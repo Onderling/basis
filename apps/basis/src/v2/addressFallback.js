@@ -31,40 +31,13 @@ export const OFFER_AFTER_PEERS = 2;
 /** And a declined offer stays declined for this long. */
 export const OFFER_COOLDOWN_MS = 7 * 24 * 60 * 60_000;
 
-/**
- * The per-user setting. Mirrors `relayPref.js` — a tiny store over injectable IO, so web and mobile share it.
- *
- * @param {object} io  `{ load, save }`
+/*
+ * (Batch 4) The per-user SETTING itself lives in `deliverySettings.js` (`allowFallback` — one store,
+ * both shells' toggles, and the live read the agent now holds). A duplicate store half lived here for
+ * a while — the same setting under a second key (`cc.allowAddressFallback`) that no product path ever
+ * read. Two stores of one fact is how two views of it come to disagree; the duplicate retired, the
+ * OFFER below stayed — it is this file's actual job.
  */
-export function createFallbackPrefStore({ load, save } = {}) {
-  return {
-    /** Default OFF: the private behaviour is what you get without choosing. */
-    async get() {
-      try { return (await load?.()) === true; } catch { return false; }
-    },
-    async set(allowed) {
-      const value = allowed === true;
-      try { await save?.(value); } catch { /* a failed save must not pretend the setting changed */ }
-      return value;
-    },
-  };
-}
-
-/** localStorage IO (web). */
-export function localStorageFallbackIo(storage = globalThis.localStorage, key = 'cc.allowAddressFallback') {
-  return {
-    load: () => { try { return storage?.getItem(key) === 'true'; } catch { return false; } },
-    save: (v) => { try { storage?.setItem(key, v ? 'true' : 'false'); } catch { /* ignore */ } },
-  };
-}
-
-/** AsyncStorage IO (mobile). */
-export function asyncStorageFallbackIo(AsyncStorage, key = 'cc.allowAddressFallback') {
-  return {
-    load: async () => { try { return (await AsyncStorage?.getItem(key)) === 'true'; } catch { return false; } },
-    save: async (v) => { try { await AsyncStorage?.setItem(key, v ? 'true' : 'false'); } catch { /* ignore */ } },
-  };
-}
 
 /**
  * Watch the undeliverable reports and decide when to offer.

@@ -8,38 +8,12 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import {
-  createFallbackPrefStore, localStorageFallbackIo, asyncStorageFallbackIo,
   createFallbackOffer, OFFER_AFTER_PEERS, OFFER_COOLDOWN_MS,
 } from '../../src/v2/addressFallback.js';
+// (Batch 4) The SETTING's tests moved with the setting: it lives in `deliverySettings.js` as
+// `allowFallback` — the duplicate store half that lived here (a second key nothing read) retired.
 
 const T0 = 1_700_000_000_000;
-
-describe('the setting', () => {
-  it('is OFF unless explicitly turned on — the private behaviour is the default', async () => {
-    expect(await createFallbackPrefStore({ load: () => null }).get()).toBe(false);
-    expect(await createFallbackPrefStore({ load: () => 'true' }).get()).toBe(false);   // not a truthy string
-    expect(await createFallbackPrefStore({ load: () => true }).get()).toBe(true);
-  });
-
-  it('a broken store reads as off rather than throwing', async () => {
-    const store = createFallbackPrefStore({ load: () => { throw new Error('no disk'); } });
-    expect(await store.get()).toBe(false);
-  });
-
-  it('round-trips through both platform adapters', async () => {
-    const mem = new Map();
-    const web = localStorageFallbackIo({ getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) });
-    web.save(true);
-    expect(web.load()).toBe(true);
-
-    const mem2 = new Map();
-    const rn = asyncStorageFallbackIo({
-      getItem: async (k) => mem2.get(k) ?? null, setItem: async (k, v) => { mem2.set(k, v); },
-    });
-    await rn.save(true);
-    expect(await rn.load()).toBe(true);
-  });
-});
 
 describe('the offer — rule 1: not on the first failure', () => {
   it('says nothing about one unreachable person', () => {

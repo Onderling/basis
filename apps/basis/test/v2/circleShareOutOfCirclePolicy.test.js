@@ -66,7 +66,11 @@ function buildEnforcement({ sharing, keyStore, controllerKey, roster }) {
     // A REAL group-key opener for the source's at-rest content: it passes plaintext through but THROWS on a
     // foreign envelope — so a granted NON-recipient of a sealed copy is dropped (no ciphertext leak), exactly
     // like a p2 source circle. (An identity opener would pass ciphertext through — not the realistic seam.)
-    strategy: { open: groupKeyStrategy({ groupKey: generateGroupKey() }).open },
+    // The SCHEME tag says 'pairwise' (a scoped circle): these tests pin the out-of-circle POLICY semantics
+    // (notify default / toCircleId / includeHistory), which since batch 4 require a scoped scheme — the D2
+    // gate refuses out-of-circle grants on group-key-sealed content outright (circleSharePublishedKey.test
+    // pins THAT). The opener's throw-on-foreign behaviour is scheme-independent and stays.
+    strategy: { scheme: 'pairwise', open: groupKeyStrategy({ groupKey: generateGroupKey() }).open },
     podRoot: POD,
     controlAgent: { keyStore, members: () => roster.map((publicKey) => ({ publicKey })) },
     idKey: { publicKey: controllerKey.publicKey, privateKey: controllerKey.privateKey },

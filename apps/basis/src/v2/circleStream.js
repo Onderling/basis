@@ -13,6 +13,7 @@
 
 import { taskRowProvenance } from './streamActions.js';
 import { isSilentEntry } from '../eventLog.js';
+import { revealedMemberLabel } from './circleViewAs.js';
 
 /**
  * Circle id for a logged event.  C15: entries MAY now carry a first-class
@@ -167,7 +168,55 @@ export function circleRows(opts = {}) {
  * here. When it is, this wrapper is the only place that changes.
  */
 export function chatRows(opts = {}) {
-  return projectEntries({ ...opts, lane: 'human' });
+  const { members = null, viewerId = null, policy = 'pairwise', ...rest } = opts;
+  const rows = projectEntries({ ...rest, lane: 'human' });
+  // Conservation: a caller that passes no roster gets exactly the pre-existing rows.
+  if (!Array.isArray(members)) return rows;
+  return stampSenderLabels(rows, { members, viewerId, policy });
+}
+
+/**
+ * Stamp each row with the sender label a shell may actually RENDER — the projection half of the
+ * disclosure exit (G-A1). Until this, every surface carried its own `pickSender` reading names OFF THE
+ * PAYLOAD (`senderDisplay` / `authorName` / `displayName`) — i.e. whatever the sender claimed on the
+ * wire, which fails the enforceability test twice over: an unrevealed member's real name could ride in,
+ * and a forged one could too. The roster is the authority; resolve locally, through the reveal ladder.
+ *
+ *   - `senderSelf`      — the row is the viewer's own (shells suppress the label on own bubbles).
+ *   - `senderLabel`     — the reveal-gated label (`revealedMemberLabel(...).primary`), or null.
+ *   - `senderLabelKey`  — locale key when there is no label to show: an actor not on the roster
+ *     (departed, or never resolved) gets `circle.chat.unknown_sender`, because a BLANK reads as "mine"
+ *     and a raw id reads as noise. `t()` lives in the shells (invariant 8); this module stays pure.
+ *
+ * Matching: `row.actor` is the resolved webid where resolution succeeded, or the raw transport address
+ * where it did not — so the index also carries `circleAddress`. That is a local lookup of a locally-held
+ * roster row, NOT trusting the wire (the address was proven at join, G12).
+ *
+ * @param {object[]} rows      StreamRow[] (any projector's output)
+ * @param {{members: object[], viewerId?: ?string, policy?: 'open'|'pairwise'}} a
+ * @returns {object[]} the same rows, sender-stamped
+ */
+export function stampSenderLabels(rows, { members = [], viewerId = null, policy = 'pairwise' } = {}) {
+  const byKey = new Map();
+  for (const m of members) {
+    if (!m || typeof m !== 'object') continue;
+    for (const k of [m.id, m.webid, m.circleAddress]) if (k != null) byKey.set(k, m);
+  }
+  return (rows || []).map((row) => {
+    const actor = row?.actor ?? null;
+    const self = viewerId != null && actor === viewerId;
+    if (self) return { ...row, senderSelf: true, senderLabel: null, senderLabelKey: null };
+    const member = actor != null ? byKey.get(actor) : null;
+    if (!member) {
+      return { ...row, senderSelf: false, senderLabel: null, senderLabelKey: 'circle.chat.unknown_sender' };
+    }
+    return {
+      ...row,
+      senderSelf: false,
+      senderLabel: revealedMemberLabel(member, { viewerId, policy }).primary,
+      senderLabelKey: null,
+    };
+  });
 }
 
 /**

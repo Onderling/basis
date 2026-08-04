@@ -72,10 +72,12 @@ const canonicalPolicyOf = () => ({ sharePosture: 'canonical' });
 
 // Build the enforcement through the ONE SHARED builder both shells call — real createCanonicalShare over a
 // fake ACP surface + memKeyStore, the origin roster's sealing keys resolved from the control agent's members.
-function buildEnforcement({ sharing, keyStore, controllerKey, roster }) {
+function buildEnforcement({ sharing, keyStore, controllerKey, roster, scheme = 'pairwise' }) {
   return buildCircleShareEnforcement({
     sharing,
-    strategy: { open: (text) => text },   // content is plaintext in this memory seam test
+    // Content is plaintext in this memory seam test; the SCHEME tag is what the D2 gate (batch 4) reads
+    // on the out-of-circle path — a scoped scheme passes, group-key/absent throws (tested below).
+    strategy: { scheme, open: (text) => text },
     podRoot: POD,
     controlAgent: { keyStore, members: () => roster.map((publicKey) => ({ publicKey })) },
     idKey: { publicKey: controllerKey.publicKey, privateKey: controllerKey.privateKey },
@@ -133,6 +135,60 @@ describe('circleShare — shareItemToPublishedKey (grant an OUT-OF-CIRCLE recipi
 
     const forStranger = await listSharedResolved({ resolveService, enforcementFor, circleId: 'B', recipient: 'did:eve' });
     expect(forStranger).toHaveLength(0);
+  });
+
+  it('G-P1 — the seal gate BITES: an out-of-circle grant on GROUP-KEY-sealed content is REFUSED (D2)', async () => {
+    const svc = makeCircleLists();
+    const resolveService = async () => svc;
+    const controllerKey = generateKeypair();
+    const dave = fakeNetworkIdentity();
+    const sharing = fakeSharing();
+    const keyStore = memKeyStore();
+    // The circle's content is sealed under the GROUP key — one grant would hand Dave every piece of it.
+    const enforcement = buildEnforcement({ sharing, keyStore, controllerKey, roster: [], scheme: 'group-key' });
+    const enforcementFor = async () => enforcement;
+
+    const src = await svc.createList('A', 'the whole circle history', 'alice');
+    const r = await shareItemToPublishedKey({
+      resolveService, enforcementFor, policyOf: canonicalPolicyOf,
+      itemId: src.id, fromCircleId: 'A', toCircleId: 'B', by: 'alice',
+      recipient: 'did:dave', recipientNetworkKey: dave.publicKey,
+    });
+    // REFUSED — stated, not silent, and named after the rule that refused it.
+    expect(r.ok).toBe(false);
+    expect(r.error).toBe('share-grant-failed');
+    expect(String(r.cause?.message)).toMatch(/GROUP-KEY audience/);
+    // …and no key grant landed: Dave cannot unwrap anything.
+    const daveSealing = sealingKeyPairFromNetworkKey(dave.secretKey);
+    const kr = keyStore.current();
+    expect(kr == null || unwrapGroupKey(kr, daveSealing.privateKey) == null).toBe(true);
+  });
+
+  it('G-P1 — deny-by-default: a strategy that does not NAME its scheme is refused too', async () => {
+    const svc = makeCircleLists();
+    const resolveService = async () => svc;
+    const controllerKey = generateKeypair();
+    const dave = fakeNetworkIdentity();
+    const sharing = fakeSharing();
+    const keyStore = memKeyStore();
+    const enforcement = buildEnforcement({
+      sharing, keyStore, controllerKey, roster: [], scheme: undefined,
+    });
+    // buildEnforcement defaults scheme to 'pairwise' — pass an explicit schemeless strategy instead.
+    const bare = buildCircleShareEnforcement({
+      sharing, strategy: { open: (t) => t }, podRoot: POD,
+      controlAgent: { keyStore, members: () => [] },
+      idKey: { publicKey: controllerKey.publicKey, privateKey: controllerKey.privateKey },
+    });
+    const src = await svc.createList('A', 'body', 'alice');
+    const r = await shareItemToPublishedKey({
+      resolveService, enforcementFor: async () => bare, policyOf: canonicalPolicyOf,
+      itemId: src.id, fromCircleId: 'A', toCircleId: 'B', by: 'alice',
+      recipient: 'did:dave', recipientNetworkKey: dave.publicKey,
+    });
+    expect(r.ok).toBe(false);
+    expect(String(r.cause?.message)).toMatch(/no seal scheme resolved/);
+    void enforcement;
   });
 
   it('REVOKE (forward secrecy) reuses revokeItemShare: key rotated away + ACP revoked → read resolves to null', async () => {

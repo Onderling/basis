@@ -32,22 +32,35 @@ const ALLOWED = [
 const files = execSync('git ls-files', { encoding: 'utf8' }).split('\n')
   .filter((f) => /^(apps|packages)\/.*\.[cm]?js$/.test(f) && !f.includes('/node_modules/'));
 
-const hits = [];
+// Sites are keyed by FILE + NORMALIZED LINE TEXT, not line number: a line-number key false-alarmed
+// twice on 2026-08-04 alone — any edit ABOVE a baselined site shifts it and the guard cries wolf on
+// unchanged code, which is how guards get ignored. Duplicate identical lines in one file collapse to
+// one key (`#n` suffix disambiguates), so a NEW copy of a baselined read still fails.
+const hits = [];       // display form: file:line
+const keys = [];       // baseline form: file • normalized text (#n for duplicates)
+const seenPerFile = new Map();
 for (const f of files) {
   if (ALLOWED.some((re) => re.test(f))) continue;
   let src; try { src = readFileSync(path.join(ROOT, f), 'utf8'); } catch { continue; }
   src.split('\n').forEach((line, i) => {
-    if (/\.realName\b/.test(line) && !/^\s*(\/\/|\*)/.test(line)) hits.push(`${f}:${i + 1}`);
+    if (/\.realName\b/.test(line) && !/^\s*(\/\/|\*)/.test(line)) {
+      const norm = line.trim().replace(/\s+/g, ' ');
+      const base = `${f} • ${norm}`;
+      const n = (seenPerFile.get(base) ?? 0) + 1;
+      seenPerFile.set(base, n);
+      hits.push(`${f}:${i + 1}`);
+      keys.push(n === 1 ? base : `${base} #${n}`);
+    }
   });
 }
 
 if (process.argv.includes('--update')) {
-  writeFileSync(BASELINE, JSON.stringify({ sites: hits.sort() }, null, 2) + '\n');
+  writeFileSync(BASELINE, JSON.stringify({ sites: [...keys].sort() }, null, 2) + '\n');
   console.log(`✓ baseline updated: ${hits.length} known site(s)`); process.exit(0);
 }
 let known = new Set();
 try { known = new Set(JSON.parse(readFileSync(BASELINE, 'utf8')).sites ?? []); } catch { /* none */ }
-const fresh = hits.filter((h) => !known.has(h));
+const fresh = hits.filter((_, idx) => !known.has(keys[idx]));
 if (fresh.length) {
   console.error(`✗ lint:disclosure-exit — ${fresh.length} NEW raw identity-attribute read(s):`);
   for (const h of fresh) console.error('   - ' + h);

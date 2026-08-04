@@ -32,18 +32,21 @@ describe('sealedMessageLog — sealed round-trip (p2 group-key via resolveCircle
     const { seal, open } = resolveCircleStorage({ posture: 'p2', groupKey });
     const backend = new MemoryStorageBackend();
 
-    const ref1 = await writeSealedMessage(backend, seal, envOf({ msgId: 'm1', ts: 1000, text: 'hi' }));
+    // The marker contains characters OUTSIDE the base64url alphabet ('!', space) — `'hi'` was two
+    // base64 characters, and ~2% of runs found it INSIDE the random ciphertext (a flake, found when
+    // batch 4's scheme tag landed and this file re-ran often). Impossible-by-alphabet beats unlikely.
+    const ref1 = await writeSealedMessage(backend, seal, envOf({ msgId: 'm1', ts: 1000, text: 'geheim bericht!' }));
     await writeSealedMessage(backend, seal, envOf({ msgId: 'm2', ts: 3000, text: 'there' }));
     await writeSealedMessage(backend, seal, envOf({ msgId: 'm3', ts: 2000, text: 'middle' }));
 
     // The store holds SEALED bytes — never plaintext.
     const raw = await backend.get(ref1);
     expect(isSealed(raw)).toBe(true);
-    expect(raw.includes('hi')).toBe(false);
+    expect(raw.includes('geheim bericht!')).toBe(false);
 
     // Single-ref read opens back to the canonical message.
     const one = await readSealedMessage(backend, open, ref1);
-    expect(one).toMatchObject({ subtype: 'kring-chat-message', circleId: CIRCLE, msgId: 'm1', ts: 1000, text: 'hi', fromActor: 'alice' });
+    expect(one).toMatchObject({ subtype: 'kring-chat-message', circleId: CIRCLE, msgId: 'm1', ts: 1000, text: 'geheim bericht!', fromActor: 'alice' });
 
     // Range read: since 1500 → m3(2000), m2(3000), oldest→newest, m1 excluded.
     const { items, truncated } = await readSealedMessagesSince(backend, open, { circleId: CIRCLE, sinceTs: 1500 });

@@ -575,6 +575,10 @@
         "text": "Onbekende bron",
         "doc": "ε.6 — fallback name."
       }
+    },
+    "unknown_sender": {
+      "text": "Onbekend lid",
+      "doc": "Wave 1 batch 4 — neutrale afzender voor een bericht waarvan de afzender niet (meer) op de ledenlijst staat. Leeg leest als 'van mij'; een ruwe id leest als ruis."
     }
   },
   "tabs": {

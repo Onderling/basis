@@ -38,6 +38,11 @@ export function resolveCircleStorage({ posture, resource, groupKey, recipients, 
   // here: p2 → group-key, p3 → pairwise (recipient-wrap), p0/p1 → no client-side seal. The strategy
   // CONSTRUCTION (and its fail-safe key-material checks) stays local, unchanged.
   const scheme = chooseSealScheme({ posture });
+  // The returned strategy is TAGGED with its scheme (batch 4) — `resolveSealStrategy` always did this;
+  // here the tag was dropped, so a consumer holding a circle's strategy could not say what the content
+  // is sealed under. The D2 grant gate (`assertScopedScheme` in circleShareEnforcement) reads exactly
+  // this field; deny-by-default means an untagged strategy would deny every out-of-circle grant.
+  const tag = (strategy) => (strategy ? { scheme, ...strategy } : null);
   switch (scheme) {
     case SEAL_SCHEMES.GROUP_KEY:
       // Preferred: the retained RESOURCE + the reader's private key → the cross-version reader. Fail-safe —
@@ -45,13 +50,13 @@ export function resolveCircleStorage({ posture, resource, groupKey, recipients, 
       // open would only ever throw. A revoked member keeps a non-empty (historic-only) readable set, so they
       // get a read-only strategy: opens pre-revocation content, cannot seal or open post-revocation content.
       if (resource && privateKey) {
-        return readableGroupKeys(resource, privateKey).length ? groupKeyStrategy({ resource, privateKey }) : null;
+        return readableGroupKeys(resource, privateKey).length ? tag(groupKeyStrategy({ resource, privateKey })) : null;
       }
-      return groupKey ? groupKeyStrategy({ groupKey }) : null;
+      return groupKey ? tag(groupKeyStrategy({ groupKey })) : null;
     case SEAL_SCHEMES.PAIRWISE: {
       const hasRecipients = Array.isArray(recipients) ? recipients.length > 0 : !!recipients;
       // a processor (private key, no recipients) can still OPEN; a writer (recipients) can SEAL.
-      return (hasRecipients || privateKey) ? recipientStrategy({ recipients, privateKey }) : null;
+      return (hasRecipients || privateKey) ? tag(recipientStrategy({ recipients, privateKey })) : null;
     }
     default:
       return null;

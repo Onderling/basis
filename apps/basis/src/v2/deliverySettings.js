@@ -50,6 +50,17 @@ export function asyncStorageDeliveryIo(AsyncStorage, key = 'cc.delivery') {
 }
 
 /**
+ * Change hook (batch 4) — same module-global shape as `setAddressFallbackReportHook`. The agent reads
+ * `allowFallback` LIVE through a host-held cache; on mobile the My-data screen owns its OWN store
+ * instance over the same AsyncStorage key, so without a notify the host's cache goes stale until
+ * reboot and a flipped toggle would not reach the send path. Every store's `set()` fires it.
+ */
+let _onDeliverySettingsChanged = null;
+export function setDeliverySettingsChangedHook(fn) {
+  _onDeliverySettingsChanged = typeof fn === 'function' ? fn : null;
+}
+
+/**
  * A tiny store over that IO, mirroring `relayPref.js` so both shells wire it the same way.
  */
 export function createDeliverySettingsStore({ load, save } = {}) {
@@ -66,6 +77,7 @@ export function createDeliverySettingsStore({ load, save } = {}) {
       const base = await this.get();
       current = deliverySettings({ ...base, ...patch });
       try { await save?.({ ...current }); } catch { /* a failed save must not pretend it changed */ }
+      try { _onDeliverySettingsChanged?.(current); } catch { /* a listener must not break the set */ }
       return current;
     },
   };

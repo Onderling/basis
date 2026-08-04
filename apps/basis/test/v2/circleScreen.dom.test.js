@@ -23,12 +23,15 @@ const okPhoto = {
   blockId: 'b3', type: 'photo', status: 'ok',
   content: { src: '/feest.jpg', caption: 'Vorig jaar' },
 };
+// Batch 4 — the renderer paints the STAMPED `senderLabel` (materializeNoticeboard resolves it from
+// the roster through the reveal ladder); a payload-claimed name (`senderDisplay`/`authorName`) is
+// exactly the leak the stamp replaced and must never paint.
 const okNoticeboard = {
   blockId: 'b4', type: 'noticeboard', status: 'ok',
   content: { items: [
-    { id: 'r1', actor: 'Anne',
-      event: { payload: { text: 'Heeft iemand een ladder?', senderDisplay: 'Anne' } } },
-    { id: 'r2', actor: 'Pieter',
+    { id: 'r1', actor: 'webid:anne', senderSelf: false, senderLabel: 'Anne', senderLabelKey: null,
+      event: { payload: { text: 'Heeft iemand een ladder?', senderDisplay: 'Gejat Naampje' } } },
+    { id: 'r2', actor: 'webid:pieter', senderSelf: false, senderLabel: 'Pieter', senderLabelKey: null,
       event: { payload: { text: 'Boekje te geef.', authorName: 'Pieter' } } },
   ] },
 };
@@ -119,6 +122,24 @@ describe('renderCircleScreen · α.1c.1 — block shapes', () => {
     expect(rows[0].querySelector('.circle-screen__noticeboard-text').textContent)
       .toBe('Heeft iemand een ladder?');
     expect(rows[1].querySelector('.circle-screen__noticeboard-sender').textContent).toBe('Pieter');
+    // …and the payload-claimed name never paints (batch 4: the stamp is the only sender source).
+    expect(el.textContent).not.toContain('Gejat Naampje');
+  });
+
+  it('noticeboard: an UNSTAMPED row paints no sender — never a wire-claimed name (batch 4)', () => {
+    const el = mount();
+    renderCircleScreen(el, {
+      blocks: [{
+        blockId: 'b4u', type: 'noticeboard', status: 'ok',
+        content: { items: [
+          { id: 'r1', actor: 'webid:anne',
+            event: { payload: { text: 'Ladder?', senderDisplay: 'Wire Naam' } } },
+        ] },
+      }],
+      t,
+    });
+    expect(el.querySelector('.circle-screen__noticeboard-sender')).toBeNull();
+    expect(el.textContent).not.toContain('Wire Naam');
   });
 
   it('agenda: titled list with label per row', () => {

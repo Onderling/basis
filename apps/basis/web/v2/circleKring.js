@@ -764,7 +764,12 @@ function renderBubble(row, {
   if (isMine) el.classList.add('circle-kring__bubble--mine');
 
   // Sender label (top, small mono) — others'/bot bubbles only; my own name is noise.
-  const senderText = pickSender(row);
+  // Stamped by `chatRows` through the reveal ladder (batch 4) — the renderer only paints. An
+  // unstamped row (roster still loading) shows no label; a stamped-unknown row shows the neutral
+  // key. Never a payload-claimed name — that was the leak the old `pickSender` chain carried.
+  const senderText = row?.senderSelf
+    ? null
+    : (row?.senderLabel ?? (row?.senderLabelKey ? tr(row.senderLabelKey) : null));
   if (senderText && !isMine) {
     const sender = document.createElement('div');
     sender.className = 'circle-kring__bubble-sender';
@@ -1131,15 +1136,6 @@ function pickKindLabel(row) {
   // Don't show a kind pill for plain chat messages — they're the default.
   if (!k || k === 'message' || k === 'chat-message') return null;
   return k.toUpperCase();
-}
-
-function pickSender(row) {
-  const p = row?.event?.payload && typeof row.event.payload === 'object' ? row.event.payload : {};
-  for (const k of ['senderDisplay', 'authorName', 'displayName', 'actor']) {
-    if (typeof p[k] === 'string' && p[k]) return p[k];
-  }
-  if (typeof row?.actor === 'string' && row.actor) return row.actor;
-  return null;
 }
 
 // D / Surface 2 — the ⋯ overflow roster is PROJECTED from `manifest.actions`

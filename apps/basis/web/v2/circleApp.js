@@ -1356,6 +1356,10 @@ const relayPrefStore       = createRelayPrefStore(localStorageRelayIo());
 // The two delivery settings, and the per-message state map they govern the display of.
 const deliverySettingsStore = createDeliverySettingsStore(localStorageDeliveryIo());
 let   deliverySettingsCache = { sendReceipts: true, allowFallback: false };
+// Prime the cache from the store at boot (batch 4). The agent reads the fallback setting LIVE through
+// this cache (`allowAddressFallback` below); until now the cache refreshed only when My-data opened or
+// a toggle flipped, so a stored `allowFallback: true` did not reach the send path after a reload.
+deliverySettingsStore.get().then((s) => { deliverySettingsCache = s; }).catch(() => { /* keep defaults */ });
 // Per-message state lives in the SHARED map (δ.2, both shells) — see deliverySettings.js for why there is
 // no second store.
 const deliveryByMessageId  = { get: (id) => deliveryStateMap.get(id) };
@@ -5112,7 +5116,12 @@ function showKring(id, circle, policy) {
     try {
       kringRoster = normalizeCircleMembers(await rawCallSkill('stoop', 'listGroupMembers', { groupId: id }));
     } catch { kringRoster = []; }
-    if (getActiveCircle() === id) rerender();
+    if (getActiveCircle() === id) {
+      rerender();
+      // Sender labels (batch 4) — the scherm's noticeboard block stamps from this roster at
+      // materialize time, so blocks built BEFORE the roster landed must be rebuilt once it has.
+      loadScherm().catch(() => {});
+    }
   }
 
   // Add a task from the Taken tab. Routes through the SAME dispatch waist every op uses
@@ -5259,6 +5268,13 @@ function showKring(id, circle, policy) {
           circles:   circlesCache,
           circleId:  id,
           kinds,
+          // Sender labels through the reveal ladder (batch 4): the roster is the authority; the
+          // projector stamps `senderLabel`/`senderLabelKey`, the renderer only paints. `kringRoster`
+          // is null until `loadRoster()` (kicked at open) resolves — rows stay unstamped and the
+          // bubbles show no label for that window, never a wire-claimed name.
+          members:  kringRoster,
+          viewerId: myWebid || null,
+          policy:   policy?.revealPolicy ?? 'pairwise',
         }),
         filter: viewerFilter,
         allowedKinds: kinds,
@@ -5716,6 +5732,9 @@ function showKring(id, circle, policy) {
   // Taken tab — load the circle's tasks in the background so the tab is populated the
   // moment it's opened (a task created via /addtask or the bot also lands here). Fail-soft.
   loadTasks().catch(() => {});
+  // Sender labels (batch 4) — the chat tab needs the roster the moment it paints, not first when
+  // the LEDEN tab is opened. Same lazy loader; it rerenders on completion. Fail-soft.
+  loadRoster().catch(() => {});
   // Task #13 — first time the help circle opens, run the guided onboarding conversation as the
   // Onderling-bot's chat (idempotent via the persisted onboardingDone flag + a per-session guard).
   maybeStartOnboarding(id).catch((err) => console.warn('[circleApp] onboarding start failed', err?.message ?? err));
@@ -5744,7 +5763,14 @@ function showKring(id, circle, policy) {
         // tasks/agenda scherm blocks, which had the same latent bug). `stoopCall`
         // keeps the 3-arg contract and scopes the noticeboard block to THIS circle
         // (non-stoop ops pass through unchanged).
-        hostOps:  { callSkill: stoopCall, eventLog, circles: circlesCache, policy, actionFrequency, fetchImpl: circleAuthedFetch || undefined },
+        hostOps:  {
+          callSkill: stoopCall, eventLog, circles: circlesCache, policy, actionFrequency,
+          fetchImpl: circleAuthedFetch || undefined,
+          // Sender labels through the reveal ladder (batch 4) — the noticeboard block stamps
+          // `senderLabel` from the roster; `revealPolicy` (not `policy`, taken above) gates names.
+          members: kringRoster, viewerId: myWebid || null,
+          revealPolicy: policy?.revealPolicy ?? 'pairwise',
+        },
       });
       screenBlocks = blocks;
       if (getActiveCircle() === id) rerender();
@@ -6690,6 +6716,11 @@ async function boot() {
         ...makeGiveUpConsumers({ deliveryMap: deliveryStateMap }),
         ...makeCircleMembraneOpts({ overrideStore, groupsIndex: circleGroupsIndex }),
       },
+      // The per-user address-fallback setting, read LIVE (batch 4) — a function, so a toggle flip
+      // reaches the very next send without an agent reboot. The seam inside (`reliableSend`'s
+      // `requireAliasCapable` + the fan's address choice) was wired end-to-end; no shell passed the
+      // setting in, so "fallback off" was unenforceable and every install behaved as default-on.
+      allowAddressFallback: () => deliverySettingsCache.allowFallback === true,
       // recovery — resolve a circle's pod version store for the
       // listDataVersions/restoreDataVersion skills (see circleVersioning.js).
       versionStoreFor: getCircleVersionStore,

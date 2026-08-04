@@ -265,6 +265,10 @@ export async function bootAgentBundle(opts = {}) {
       householdPersistDb,
       stoopControlAgent: opts.stoopControlAgent,   // S4 — multi-member sealing router (redeem/leave)
       secureAgentOpts:  opts.secureAgentOpts,
+      // The per-user address-fallback setting, read LIVE (batch 4) — forwarded as-is (function or
+      // bool); realAgent threads it into both halves of the choice (the fan's address pick and
+      // reliableSend's `requireAliasCapable`). Absent → the pre-existing default (on), unchanged.
+      allowAddressFallback: opts.allowAddressFallback,
       publishEvent:     opts.publishEvent,
       // recovery — resolve a circle's pod version store for the
       // listDataVersions/restoreDataVersion skills (RN twin of web's

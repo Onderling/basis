@@ -180,7 +180,10 @@ function renderNoticeboard(block, styles) {
     <View>
       <Text style={styles.blockTitle}>{t('circle.recipe.block.noticeboard')}</Text>
       {items.map((row) => {
-        const sender = pickSender(row);
+        // Stamped by `materializeNoticeboard` through the reveal ladder (batch 4) — paint only.
+        const sender = row?.senderSelf
+          ? null
+          : (row?.senderLabel ?? (row?.senderLabelKey ? t(row.senderLabelKey) : null));
         const text   = pickRowText(row);
         return (
           <View key={row.id ?? Math.random().toString(36)} style={rowStyle}>
@@ -295,15 +298,6 @@ function renderRules(block, styles) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────── */
-
-function pickSender(row) {
-  const p = row?.event?.payload && typeof row.event.payload === 'object' ? row.event.payload : {};
-  for (const k of ['senderDisplay', 'authorName', 'displayName', 'actor']) {
-    if (typeof p[k] === 'string' && p[k]) return p[k];
-  }
-  if (typeof row?.actor === 'string' && row.actor) return row.actor;
-  return null;
-}
 
 function pickRowText(row) {
   const p = row?.event?.payload && typeof row.event.payload === 'object' ? row.event.payload : {};

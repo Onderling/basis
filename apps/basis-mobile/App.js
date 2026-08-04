@@ -33,6 +33,7 @@ import { createDeliveryStateMap } from '@onderling/kring-host/deliveryState';
 import { makeGiveUpConsumers } from '../basis/src/v2/deliveryGiveUp.js';
 import {
   makeReceiptSender, asyncStorageDeliveryIo, createDeliverySettingsStore,
+  setDeliverySettingsChangedHook,
   createFallbackOffer, setAddressFallbackReportHook,
   // P1 §4 tail — the retention choice applied to the shared EventLog at boot.
   asyncStorageRetentionIo, retentionFromDays,
@@ -141,8 +142,17 @@ export default function App() {
   const circleGroupsIndexRef = useRef(makeCircleGroupsIndex());
   if (!deliveryStateMapRef.current) deliveryStateMapRef.current = createDeliveryStateMap();
   const deliverySettingsStoreRef = useRef(null);
+  // The agent reads `allowFallback` LIVE through this cache (batch 4): a sync read, because the send
+  // path cannot await AsyncStorage per message. Primed from the store at mount; kept fresh by the
+  // shared change hook — the My-data screen owns its OWN store instance over the same key, so
+  // without the hook a flipped toggle would not reach the send path until reboot.
+  const deliverySettingsCacheRef = useRef({ sendReceipts: true, allowFallback: false });
   if (!deliverySettingsStoreRef.current) {
     deliverySettingsStoreRef.current = createDeliverySettingsStore(asyncStorageDeliveryIo(AsyncStorage));
+    setDeliverySettingsChangedHook((s) => { deliverySettingsCacheRef.current = s; });
+    deliverySettingsStoreRef.current.get()
+      .then((s) => { deliverySettingsCacheRef.current = s; })
+      .catch(() => { /* keep defaults */ });
   }
   // The fallback OFFER (2026-07-28), mobile half. The offer logic is app-level (its evidence and cooldown
   // must survive circle switches); the MOUTH is whichever kring chat is open, registered below. When the
@@ -424,7 +434,9 @@ export default function App() {
               groupsIndex: circleGroupsIndexRef.current,
             }),
           },
-          },
+          // The per-user address-fallback setting, read LIVE (batch 4, web≡mobile) — a sync read off
+          // the hook-fed cache, because the send path cannot await AsyncStorage per message.
+          allowAddressFallback: () => deliverySettingsCacheRef.current.allowFallback === true,
           // Persist the agent identity (chat + host vaults + stoop
           // cache) to AsyncStorage so the NKN address — derived from the
           // identity keypair — stays stable across reboots (otherwise a

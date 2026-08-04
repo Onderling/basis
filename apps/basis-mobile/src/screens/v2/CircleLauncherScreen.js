@@ -2345,17 +2345,31 @@ function CircleDetail({
     return (list ?? []).some((p) => (p?.pubKey === actor || p?.url === actor)
       && (p?.type === 'a2a' || p?.type === 'hybrid' || (Array.isArray(p?.skills) && p.skills.length > 0)));
   }, [peerGraph]);
+  // Declared HERE (not with the entrust/LEDEN blocks below) because the rows memo reads them: the
+  // viewer signals gate the owner-only entrust action AND the reveal-gated sender labels, and the
+  // roster is what the labels resolve against. The circle roster via listGroupMembers (web≡mobile);
+  // null = not loaded yet, [] = loaded empty. Loads at circle OPEN (batch 4): the chat tab needs it
+  // for sender labels the moment it paints, not first when LEDEN is opened.
+  const [mandateViewer, setMandateViewer] = useState({ viewerWebid: null, isAdmin: false });
+  const [tabMembers, setTabMembers] = useState(null);
   const rows = useMemo(() => applyChatFilter({
     rows: chatRows({
       events:    eventLog?.query ? eventLog.query({ excludeMuted: true }) : [],
       circles,
       circleId:  circle?.id ?? null,
       kinds:     allowedKinds,
+      // Sender labels through the reveal ladder (batch 4, web≡mobile): the projector stamps
+      // `senderLabel`/`senderLabelKey`, the view only paints. `tabMembers` is null until the
+      // circle-open roster load resolves — rows stay unstamped for that window, never a wire name.
+      members:   tabMembers,
+      viewerId:  mandateViewer.viewerWebid ?? null,
+      policy:    policy?.revealPolicy ?? 'pairwise',
     }),
     filter: viewerFilter,
     allowedKinds,
     isAgentActor,
-  }), [eventLog, circles, circle?.id, allowedKinds, viewerFilter, isAgentActor, streamTick]);
+  }), [eventLog, circles, circle?.id, allowedKinds, viewerFilter, isAgentActor, streamTick,
+    tabMembers, mandateViewer, policy]);
   const onChatFilter = useCallback((next) => {
     const cid = circle?.id ?? null;
     if (!cid) return;
@@ -2426,9 +2440,7 @@ function CircleDetail({
   // doesn't persist across opens.
   useEffect(() => { setActiveTab(DEFAULT_KRING_TAB); }, [circle?.id]);
 
-  // LEDEN (members) tab — real roster via listGroupMembers (web≡mobile; mirrors web's directory load).
-  // null = not loaded yet, [] = loaded empty. Loads lazily when the tab is opened (per circle).
-  const [tabMembers, setTabMembers] = useState(null);
+  // (roster state `tabMembers` is declared above the rows memo — it feeds the sender labels.)
   // Profile-update propagation — the PULL: a silent `roster-updated` entry for THIS circle means a
   // member's row moved; bump this tick to re-read the roster (no bubble, no toast — just a refresh).
   const [membersReloadTick, setMembersReloadTick] = useState(0);
@@ -2447,7 +2459,7 @@ function CircleDetail({
     });
   }, [eventLog, circle?.id]);
   useEffect(() => {
-    if (activeTab !== 'leden' || !circle?.id || typeof rawCallSkill !== 'function') return undefined;
+    if (!circle?.id || typeof rawCallSkill !== 'function') return undefined;
     let alive = true;
     setTabMembers(null);
     (async () => {
@@ -2456,7 +2468,7 @@ function CircleDetail({
       if (alive) setTabMembers(mem);
     })();
     return () => { alive = false; };
-  }, [activeTab, circle?.id, rawCallSkill, membersReloadTick]);
+  }, [circle?.id, rawCallSkill, membersReloadTick]);
 
   // Taken (tasks) tab — the circle's tasks from the composed tasks agent, projected to
   // stream rows via the SHARED buildTaskRows (web≡mobile), so the tab's lifecycle chips +
@@ -2503,7 +2515,14 @@ function CircleDetail({
           // un-breaks the tasks/agenda scherm blocks that shared the latent bug).
           // `stoopCall` = the raw 3-arg `rawCallSkill` scoped to this circle (the
           // earlier `bundle?.callSkill` was undefined here — `bundle` isn't a prop).
-          hostOps:  { callSkill: stoopCall, eventLog, circles, policy, actionFrequency, fetchImpl: getCirclePodFetch() || undefined },
+          hostOps:  {
+            callSkill: stoopCall, eventLog, circles, policy, actionFrequency,
+            fetchImpl: getCirclePodFetch() || undefined,
+            // Sender labels through the reveal ladder (batch 4, web≡mobile) — the noticeboard
+            // block stamps `senderLabel`; `revealPolicy` (not `policy`, taken above) gates names.
+            members: tabMembers, viewerId: mandateViewer.viewerWebid ?? null,
+            revealPolicy: policy?.revealPolicy ?? 'pairwise',
+          },
         });
         if (alive) setScreenBlocks(blocks);
       } catch (err) {
@@ -2512,7 +2531,8 @@ function CircleDetail({
       }
     })();
     return () => { alive = false; };
-  }, [recipeStore, circle?.id, callSkill, eventLog, circles, policy, screenReloadTick]);
+  }, [recipeStore, circle?.id, callSkill, eventLog, circles, policy, screenReloadTick,
+    tabMembers, mandateViewer]);
 
   // Chat ↔ Scherm pill state (v2 §4 "De Schakelaar").
   // Per-circle preference persists in AsyncStorage at cc.circleViewMode.
@@ -2656,7 +2676,6 @@ function CircleDetail({
   // the owner-only "entrust" row action via the SHARED actionsForStreamRow (web≡mobile);
   // fail-closed until resolved (a locally-authored row still offers it via isOwn).
   const [mandatePicker, setMandatePicker] = useState(null);
-  const [mandateViewer, setMandateViewer] = useState({ viewerWebid: null, isAdmin: false });
   // 1:1-bot chat gate (web≡mobile) — the assistant-header strip shows ONLY when this circle is
   // you + exactly one participant, and that participant is a bot. Computed from THIS circle's raw
   // roster (relation/webid rows) + my webid via the SHARED oneToOneBotLabel; null (roster not yet
@@ -4038,7 +4057,12 @@ function renderBubble(row, t, deliveryOpts = null, styles) {
     );
   }
   const text = payload.text || payload.title || payload.body || String(row.id ?? '');
-  const sender = payload.senderDisplay || payload.authorName || row.actor || null;
+  // Stamped by `chatRows` through the reveal ladder (batch 4, web≡mobile) — paint only. An
+  // unstamped row (roster still loading) shows no label; a stamped-unknown row shows the neutral
+  // key. Never a payload-claimed name — that was the leak the old fallback chain carried.
+  const sender = row?.senderSelf
+    ? null
+    : (row?.senderLabel ?? (row?.senderLabelKey ? t(row.senderLabelKey) : null));
   const kindRaw = payload.kind;
   const kind = (typeof kindRaw === 'string' && kindRaw && kindRaw !== 'message' && kindRaw !== 'chat-message')
     ? kindRaw.toUpperCase() : null;

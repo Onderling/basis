@@ -132,8 +132,10 @@ describe('there is no second delivery store here', () => {
   it('storage lives in the SHARED map, not in this module', () => {
     // `createDeliveryStateMap` (@onderling/kring-host) has done this since δ.2, for both shells, with
     // subscriptions and pruning. A `recordDelivery` here would be a third implementation of one idea.
-    // Whole-word-ish: `deliverySettings` contains "set", which is not a store.
-    const looksLikeAStore = /^(record|set|track|remember)Delivery|DeliveryStateMap$/;
+    // Whole-word-ish: `deliverySettings` contains "set", which is not a store. And per-message STATE
+    // is what this pins — `setDeliverySettingsChangedHook` (batch 4, a settings-changed notify with no
+    // message state) is not that, so the pattern names the state shapes rather than the prefix `set`.
+    const looksLikeAStore = /^(record|track|remember)Delivery|^setDeliveryState|DeliveryStateMap$/;
     expect(Object.keys(mod).filter((k) => looksLikeAStore.test(k))).toEqual([]);
   });
 });

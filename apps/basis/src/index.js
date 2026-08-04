@@ -302,7 +302,6 @@ export {
   recordJoinedCirclePoints,
 } from './v2/connectionPoints.js';
 export {
-  createFallbackPrefStore, localStorageFallbackIo, asyncStorageFallbackIo,
   createFallbackOffer, OFFER_AFTER_PEERS, OFFER_COOLDOWN_MS,
 } from './v2/addressFallback.js';
 // Re-exported THROUGH the composer: a shell imports basis and nothing else from apps/
@@ -315,6 +314,7 @@ export {
 } from './v2/deliveryState.js';
 export {
   deliverySettings, createDeliverySettingsStore, localStorageDeliveryIo, asyncStorageDeliveryIo,
+  setDeliverySettingsChangedHook,
   deliveryLabelFor, withDelivery, makeReceiptSender, applyReceipt, makeReceiptReceiver,
   DELIVERY_PRESENTATION, deliveryPresentation,
 } from './v2/deliverySettings.js';

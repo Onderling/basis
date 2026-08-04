@@ -15,7 +15,7 @@
  * fallback both platforms share.
  */
 import { makeCircleShareEnforcement } from '@onderling/item-store';
-import { createCanonicalShare } from '@onderling/pod-client';
+import { createCanonicalShare, assertScopedScheme } from '@onderling/pod-client';
 import { makeResourceUriResolver, sharedRefResourceUri } from '@onderling/pod-onboarding/resourceUri';
 
 /**
@@ -162,6 +162,13 @@ export function buildCircleShareEnforcement({ sharing, strategy, podRoot, contro
   // revoke. The origin roster is seeded as `currentRecipients` (default; a caller may override per-call).
   if (canonicalShare && typeof canonicalShare.shareToPublishedKey === 'function') {
     enforcement.onShareToPublishedKey = async ({ recipient, recipientNetworkKey, currentRecipients: roster, verify, ref, includeHistory = false } = {}) => {
+      // D2, BOUND (batch 4) — an out-of-circle grant may only extend a SCOPED audience. The rule sat in
+      // `assertScopedScheme` with nothing on this path calling it, so a group-key-sealed circle could
+      // have its whole history handed to one outside grantee by a single grant. The strategy names the
+      // scheme the content is actually sealed under; deny-by-default (absent/unknown throws too).
+      // In-circle re-wraps (`onShareCanonical` / roster grants) are NOT audience extension and stay as
+      // they are — this gate is exactly the out-of-circle door.
+      assertScopedScheme(strategy?.scheme);
       // A GRANT — so the base is the widened one (roster ∪ current key-holders); an explicit per-call
       // `currentRecipients` still overrides. Roster-only here would drop earlier out-of-circle grantees.
       const cur = Array.isArray(roster) ? roster.filter(Boolean) : await grantRecipients();

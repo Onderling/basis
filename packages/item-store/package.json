@@ -22,13 +22,14 @@
     ".": "./src/index.js"
   },
   "scripts": {
-    "test":       "vitest run",
+    "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
     "@onderling/core": "workspace:^"
   },
   "devDependencies": {
-    "vitest": "^2.1.0"
+    "vitest": "^2.1.0",
+    "@onderling/item-types": "workspace:^"
   }
 }

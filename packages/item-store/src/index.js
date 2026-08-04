@@ -18,6 +18,11 @@ export {                                                  // PLAN-capabilities-t
   addTasks, listOpen, listClosed, getById, update, removeItems,   // CRUD/query surface as functions-over-CircleItemStore
 } from './taskCrud.js';
 export { createTaskStore } from './createTaskStore.js';   // PLAN-capabilities-tasks-roles step 2 — ItemStore-compatible task surface (Emitter + audit + sync) over CircleItemStore
+export {                                                  // task transitions as an append-only event log — the record; the store row is its head
+  TASK_LOG_KIND, TASK_EVENT, taskEntryId, taskWakeHint, taskEventName, applyTaskEntry,
+  createTaskEvent, claimTaskEvent, reassignTaskEvent, completeTaskEvent,
+  submitTaskEvent, approveTaskEvent, rejectTaskEvent, revokeTaskEvent, updateTaskEvent, removeTaskEvent,
+} from './taskLog.js';
 export {                                                  // REQUESTABLE BRIDGE (P4b · J6) — a requestable offering, invoked, becomes a TASK (not an action)
   requestableSkillHandler, offeringsToSkillDefinitions, REQUEST_TASK_KIND, REQUEST_SOURCE_KIND,
 } from './requestableBridge.js';

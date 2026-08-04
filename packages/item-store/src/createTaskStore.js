@@ -52,6 +52,12 @@ import { addTasks, listOpen, listClosed, getById, update, removeItems } from './
 import { claim, reassign, markComplete, submit, approve, reject, revoke } from './taskLifecycle.js';
 import { requireActor, gate } from './taskCtx.js';
 import { ItemNotFoundError, InvalidLifecycleError } from './errors.js';
+import {
+  TASK_LOG_KIND, applyTaskEntry, taskEntryId, taskEventName,
+  createTaskEvent, claimTaskEvent, reassignTaskEvent, completeTaskEvent,
+  submitTaskEvent, approveTaskEvent, rejectTaskEvent, revokeTaskEvent,
+  updateTaskEvent, removeTaskEvent,
+} from './taskLog.js';
 
 /** Validate an ApprovalMode string — parity with `ItemStore`'s `_isApprovalMode`. */
 function isApprovalMode(m) {
@@ -103,6 +109,34 @@ export function createTaskStore(circleStore, { rolePolicy, enforceDependencies }
   const emitter = new Emitter();
   /** @type {Array<object>} in-memory append-only audit log (parity with ItemStore's `<root>/audit/`). */
   const audit = [];
+
+  /** @type {Array<object>} the task-log: every transition as a typed entry. This is the RECORD the
+   *  cutover makes canonical — the store row is the materialised head of replaying these. */
+  const logEntries = [];
+  /** @type {Set<(entry: object) => void>} outbound-fan subscribers — the peer transport wires here. */
+  const logSubs = new Set();
+  /** @type {Set<string>} stable ids already folded — dedup so an idempotent re-delivery never double-applies. */
+  const seenEntryIds = new Set();
+
+  /** Append a transition to the task-log + notify the outbound fan. */
+  function recordLog(entry) {
+    if (!entry) return;
+    logEntries.push(entry);
+    seenEntryIds.add(taskEntryId(entry));
+    for (const fn of logSubs) { try { fn(entry); } catch { /* fan is best-effort */ } }
+  }
+
+  /** A `sync:false` write proxy over the circle store — an INGEST replay must never echo the item
+   *  back to the mesh (the same discipline `applySync` uses with `{origin:true, sync:false}`). */
+  function ingestProxy(store) {
+    return {
+      get:        (id) => store.get(id),
+      list:       () => store.list(),
+      put:        (item, opts = {}) => store.put(item, { ...opts, sync: false }),
+      putIfMatch: (item, opts = {}) => store.putIfMatch(item, { ...opts, sync: false }),
+      delete:     (id, opts = {}) => store.delete(id, { ...opts, sync: false }),
+    };
+  }
 
   /** Record an audit entry (best-effort parity with `ItemStore#appendAudit`). */
   function appendAudit({ itemId, action, ctx = {}, actor, actorDisplayName, details, synced }) {
@@ -160,6 +194,7 @@ export function createTaskStore(circleStore, { rolePolicy, enforceDependencies }
           ctx,
           details: ctx.reason ? { reason: ctx.reason } : undefined,
         });
+        recordLog(createTaskEvent({ taskId: item.id, by: ctx.actor ?? item.createdBy, at: item.addedAt ?? Date.now(), item }));
       }
       return created;
     },
@@ -169,24 +204,32 @@ export function createTaskStore(circleStore, { rolePolicy, enforceDependencies }
     update: async (id, patch, ctx = {}) => {
       const res = await update(circleStore, id, patch, mkCtx(ctx));
       appendAudit({ itemId: id, action: 'update', ctx, details: { fields: Object.keys(patch ?? {}) } });
+      recordLog(updateTaskEvent({ taskId: id, by: ctx.actor, at: Date.now(), patch }));
       return res;
     },
     removeItems: async (refs, ctx = {}) => {
       const removed = await removeItems(circleStore, refs, mkCtx(ctx));
-      for (const id of removed) appendAudit({ itemId: id, action: 'remove', ctx });
+      for (const id of removed) {
+        appendAudit({ itemId: id, action: 'remove', ctx });
+        recordLog(removeTaskEvent({ taskId: id, by: ctx.actor, at: Date.now() }));
+      }
       return removed;
     },
 
     // ── Lifecycle verbs (taskLifecycle) ──────────────────────────────────────
     claim: async (id, ctx = {}) => {
       const res = await claim(circleStore, id, mkCtx(ctx));
-      if (!res?.error) appendAudit({ itemId: id, action: 'claim', ctx });
+      if (!res?.error) {
+        appendAudit({ itemId: id, action: 'claim', ctx });
+        recordLog(claimTaskEvent({ taskId: id, by: ctx.actor, at: Date.now() }));
+      }
       return res;
     },
     reassign: async (id, newAssignee, ctx = {}) => {
       const res = await reassign(circleStore, id, newAssignee, mkCtx(ctx));
       if (!res?.error) {
         appendAudit({ itemId: id, action: 'reassign', ctx, details: { from: res.claimBase ?? null, to: newAssignee } });
+        recordLog(reassignTaskEvent({ taskId: id, by: ctx.actor, at: Date.now(), to: newAssignee }));
       }
       return res;
     },
@@ -199,12 +242,14 @@ export function createTaskStore(circleStore, { rolePolicy, enforceDependencies }
           ctx,
           details: ctx.reason ? { reason: ctx.reason } : undefined,
         });
+        recordLog(completeTaskEvent({ taskId: item.id, by: ctx.actor, at: Date.now(), reason: ctx.reason }));
       }
       return completed;
     },
     submit: async (id, args, ctx = {}) => {
       const res = await submit(circleStore, id, args, mkCtx(ctx));
       appendAudit({ itemId: id, action: 'submit', ctx, details: args?.note ? { note: args.note } : undefined });
+      recordLog(submitTaskEvent({ taskId: id, by: ctx.actor, at: Date.now(), args }));
       return res;
     },
     approve: async (id, args, ctx = {}) => {
@@ -215,12 +260,14 @@ export function createTaskStore(circleStore, { rolePolicy, enforceDependencies }
           ...(ctx.reason ? { reason: ctx.reason } : {}),
         };
         appendAudit({ itemId: id, action: ctx.actionOverride ?? 'approve', ctx, details });
+        recordLog(approveTaskEvent({ taskId: id, by: ctx.actor, at: Date.now(), args }));
       }
       return res;
     },
     reject: async (id, args, ctx = {}) => {
       const res = await reject(circleStore, id, args, mkCtx(ctx));
       appendAudit({ itemId: id, action: 'reject', ctx, details: { note: args?.note } });
+      recordLog(rejectTaskEvent({ taskId: id, by: ctx.actor, at: Date.now(), args }));
       return res;
     },
     revoke: async (id, args, ctx = {}) => {
@@ -229,6 +276,7 @@ export function createTaskStore(circleStore, { rolePolicy, enforceDependencies }
         if (name === 'item-revoked') previousAssignee = payload?.previousAssignee ?? null;
       }));
       appendAudit({ itemId: id, action: 'revoke', ctx, details: { reason: args?.reason, previousAssignee } });
+      recordLog(revokeTaskEvent({ taskId: id, by: ctx.actor, at: Date.now(), args }));
       return res;
     },
 
@@ -300,6 +348,49 @@ export function createTaskStore(circleStore, { rolePolicy, enforceDependencies }
       appendAudit({ itemId: local.id, action: 'sync-remove', actor: ctx.remoteActor ?? 'substrate', synced: true });
       emitter.emit('item-removed', { id: local.id, item: local });
       return local;
+    },
+
+    // ── The task-log (the record cutover) ────────────────────────────────────
+    // Every verb above ALSO appends a typed entry to `logEntries`; the store row is the
+    // materialised head of replaying those. `onLogEntry` is where the peer transport
+    // subscribes to fan a transition; `applyLogEntry` is the inbound counterpart — and
+    // unlike `applySync`, it REPLAYS the entry through the real verbs, so a `create` for a
+    // task this device never saw produces it by construction (the fan-out fix).
+
+    /** Subscribe to outbound transitions (the fan). Returns an unsubscribe handle. */
+    onLogEntry: (fn) => {
+      if (typeof fn !== 'function') return () => {};
+      logSubs.add(fn);
+      return () => logSubs.delete(fn);
+    },
+
+    /** Read the task-log — most-recently-appended last. A defensive copy. */
+    taskLog: () => logEntries.slice(),
+
+    /**
+     * Ingest one inbound task-log entry by REPLAYING it through the verbs against a
+     * `sync:false` proxy (no echo). Idempotent: a re-delivery of an already-folded entry
+     * is skipped. Best-effort: an entry whose target isn't here yet (out-of-order arrival)
+     * is left un-folded and un-seen, so a later re-delivery — once its `create` has landed —
+     * still applies. Emits the parity event so `Circle.js` listeners fire, exactly as
+     * `applySync` does.
+     */
+    applyLogEntry: async (entry) => {
+      if (!entry || entry.kind !== TASK_LOG_KIND || typeof entry.taskId !== 'string') return null;
+      const id = taskEntryId(entry);
+      if (seenEntryIds.has(id)) return null;   // idempotent re-delivery
+      let res;
+      try {
+        res = await applyTaskEntry(ingestProxy(circleStore), entry);
+      } catch {
+        return null;   // out-of-order / not-yet-applicable: leave un-seen for a later retry
+      }
+      logEntries.push(entry);
+      seenEntryIds.add(id);
+      const payload = Array.isArray(res) ? res[0] : res;
+      emitter.emit(taskEventName(entry.event), payload ?? { id: entry.taskId });
+      for (const fn of logSubs) { try { fn(entry); } catch { /* re-fan is best-effort */ } }
+      return payload ?? null;
     },
   };
 }

@@ -72,5 +72,7 @@ ensure_link packages/transports/node_modules/tweetnacl      ../../core/node_modu
 ensure_link packages/secure-agent/node_modules/tweetnacl    ../../core/node_modules/tweetnacl
 ensure_link apps/basis/node_modules/tweetnacl               ../../../packages/core/node_modules/tweetnacl
 ensure_link apps/basis/node_modules/nkn-sdk                 ../../../packages/transports/node_modules/nkn-sdk
+# internal workspace dep used only by a test, declared but not always hoisted into the leaf:
+ensure_link packages/item-store/node_modules/@onderling/item-types  ../../../item-types
 
 echo "tree reconstructed — run a suite (e.g. 'cd apps/stoop && npx vitest run') to confirm."

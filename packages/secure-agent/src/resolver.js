@@ -51,8 +51,8 @@
  *                                     resolveByWebid / resolveByStableId
  * @returns {PeerResolver}
  */
-export function createPeerResolver({ security, memberMap } = {}) {
-  return new PeerResolver({ security, memberMap });
+export function createPeerResolver({ security, memberMap, identityForAddr } = {}) {
+  return new PeerResolver({ security, memberMap, identityForAddr });
 }
 
 export class PeerResolver {

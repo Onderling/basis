@@ -73,6 +73,8 @@ import { makeKringRulesPendingStoreRN } from './src/core/kringRulesPendingStorag
 // CircleLauncherScreen's settings editor reads on open + clears after
 // the γ.4 resolver applies / discards.
 import { makeKringPolicyPendingStoreRN } from './src/core/kringPolicyPendingStorageRN.js';
+import { makeCircleMembraneOpts, makeCircleGroupsIndex } from '../basis/src/v2/circleMembrane.js';
+import { makeMemberOverrideStoreRN } from './src/core/circleStoresRN.js';
 
 export default function App() {
   const [localeReady, setLocaleReady] = useState(false);
@@ -134,6 +136,9 @@ export default function App() {
   // read `inbox` via props from boot, no second pass needed.
   const bundleRef = useRef(null);
   const deliveryStateMapRef = useRef(null);
+  // The mute membrane's circle↔person index — one per agent lifetime; the roster feed fills it
+  // (householdRosterPairing reads `agent._circleGroupsIndex`), the receive path consumes it.
+  const circleGroupsIndexRef = useRef(makeCircleGroupsIndex());
   if (!deliveryStateMapRef.current) deliveryStateMapRef.current = createDeliveryStateMap();
   const deliverySettingsStoreRef = useRef(null);
   if (!deliverySettingsStoreRef.current) {
@@ -409,7 +414,16 @@ export default function App() {
           // The two give-up reports, from the ONE shared rule (web's circleApp.js calls the same).
           // This was an inline copy here and absent on web, which is how web ended up unable to say that
           // a message had been given up on.
-          secureAgentOpts: makeGiveUpConsumers({ deliveryMap: deliveryStateMapRef.current }),
+          // ADMISSION + delivery, one opts object — EXTEND, never replace (web ≡ mobile; the same
+          // membrane fragment both shells spread; the toggles wrote overrides for months while nothing
+          // on the receive path read them).
+          secureAgentOpts: {
+            ...makeGiveUpConsumers({ deliveryMap: deliveryStateMapRef.current }),
+            ...makeCircleMembraneOpts({
+              overrideStore: makeMemberOverrideStoreRN(AsyncStorage),
+              groupsIndex: circleGroupsIndexRef.current,
+            }),
+          },
           },
           // Persist the agent identity (chat + host vaults + stoop
           // cache) to AsyncStorage so the NKN address — derived from the
@@ -453,6 +467,8 @@ export default function App() {
         // closure built above.  Must happen BEFORE the rehydrator
         // fires (next block) so the first ingest call sees callSkill.
         bundleRef.current = b;
+        // web ≡ mobile: same attach as circleApp.js — the roster feed fills the membrane's index.
+        if (b?.agent) b.agent._circleGroupsIndex = circleGroupsIndexRef.current;
         setBundle(b);
         maybeAttachStoopPod();   // S4 — bundle up → attach stoop's item store if already signed in
         // Mark the first-boot seed as done so the next launch skips it.

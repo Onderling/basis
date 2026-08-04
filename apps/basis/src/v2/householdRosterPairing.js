@@ -27,10 +27,17 @@ export async function feedHouseholdRoster({ agent, circleId } = {}) {
   // relay-only deployments expose the address as relay.address; NKN as peer.address; fall back to the
   // household self-address (the pubKey peers route to). Never pair with ourselves.
   const self = agent.peer?.address ?? agent.relay?.address ?? agent.householdSelfAddr ?? null;
+  // The mute membrane's index rides the SAME roster read (one read, two consumers). The rows' `addr`
+  // field is `redeemedBy`/`confirmedBy` — documented in deriveRoster as the WEBID (the person's stable
+  // id; in basis it equals the canonical pubKey). It is NOT a per-circle address — those live in a
+  // separate field and must never enter an alias index. The index is host-attached
+  // (`agent._circleGroupsIndex`) so every existing call site feeds it without a signature change.
+  const gidx = agent._circleGroupsIndex ?? null;
   let added = 0;
   for (const m of (Array.isArray(r?.members) ? r.members : [])) {
     // Per-circle (OBJ-2 Phase 6): pair the member into THIS circle's mirror, not a global roster.
     if (m?.addr && m.addr !== self) { try { agent.addHouseholdPeer(circleId, m.addr); added += 1; } catch { /* */ } }
+    if (m?.addr && gidx) { try { gidx.add(circleId, m.addr); } catch { /* the index must never break pairing */ } }
   }
   // OBJ-2 convergence — re-push our current items to all (now-paired) peers. The live publish-on-write
   // only reaches peers subscribed at write-time, and per-peer catch-up fires only on a FRESH pair; so

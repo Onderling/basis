@@ -764,6 +764,7 @@ import { primeCircleSecurity, announceCircleAddresses } from '../../src/v2/circl
 import { makeGiveUpConsumers } from '../../src/v2/deliveryGiveUp.js';
 // The SHARED security-status report — the same function mobile reaches through the builtins table.
 import { securityStatus } from '../../src/core/localBuiltins.js';
+import { makeCircleMembraneOpts, makeCircleGroupsIndex } from '../../src/v2/circleMembrane.js';
 
 // actor label stamped on local chat-message events. Real WebID/
 // peer-display wiring lands with peer broadcast.
@@ -993,6 +994,9 @@ const screenBlocksCache = createScreenBlocksCacheLocal();
 // active screen drives the new Schermen tab.
 const userScreenStore = createUserScreenStore({ io: localStorageScreenIo() });
 const overrideStore = createMemberOverrideStore(localStorageOverrideIo());
+// The mute membrane's circle↔person index — fed by every roster read (householdRosterPairing), consumed
+// by the receive path (circleEnforcement). One per agent; attached to the agent post-boot below.
+const circleGroupsIndex = makeCircleGroupsIndex();
 // β.5 — pin store (single keyless map at `cc.circlePinned`).
 const pinStore = createCirclePinStore(localStoragePinIo());
 // Per-user pod writer — built lazily from the restored Solid session
@@ -6679,7 +6683,13 @@ async function boot() {
       // A message the system has GIVEN UP ON must stop looking fine. Web consumed neither report until
       // 2026-08-02, so a dropped or expired message kept its optimistic state forever — on the shell we
       // are shipping first. Same shared rule mobile uses; the shell injects only its map and logger.
-      secureAgentOpts: makeGiveUpConsumers({ deliveryMap: deliveryStateMap }),
+      // ADMISSION + delivery, one opts object. The membrane fragment is what makes mute/block BITE —
+      // the toggles wrote overrides for months while nothing on the receive path read them. EXTEND this
+      // object, never replace it: the give-up consumers ride the same bag.
+      secureAgentOpts: {
+        ...makeGiveUpConsumers({ deliveryMap: deliveryStateMap }),
+        ...makeCircleMembraneOpts({ overrideStore, groupsIndex: circleGroupsIndex }),
+      },
       // recovery — resolve a circle's pod version store for the
       // listDataVersions/restoreDataVersion skills (see circleVersioning.js).
       versionStoreFor: getCircleVersionStore,
@@ -6704,6 +6714,7 @@ async function boot() {
       // household routes through the uniform wired path (dissolved cores over the per-circle
       // CircleItemStore) by default; the legacy registry is retired. No flag: it's unconditional now.
     });
+    agent._circleGroupsIndex = circleGroupsIndex;   // the roster feed fills it (householdRosterPairing)
     circleHouseholdAgent = agent;   // OBJ-2 — expose to showSettings (sibling fn) for the paired-devices panel
     // 52.25 — wire folio `/zoek`'s SEMANTIC embedder from the ACTIVE circle's
     // embed policy (embedTool ?? llmTool), reusing the SAME resolution the

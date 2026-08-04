@@ -334,6 +334,18 @@ export async function createSecureAgent(opts = {}) {
   const peerResolver = createPeerResolver({
     security:  agent.security,
     memberMap: resolverMemberMap,
+    // Decision-4 correction, actually THREADED (the first version of this hook existed only on the
+    // PeerResolver constructor while this factory dropped it — unreached by construction, the exact
+    // disease it was built against). First hop: the device-local alias→canonical link this factory
+    // already keeps (`peerIdentityOf`, declared below — evaluated at CALL time, so the ordering is
+    // safe); second: a host-supplied hook, if any.
+    identityForAddr: (addr) => {
+      try {
+        return peerIdentityOf.get?.(addr)
+          ?? (typeof opts.identityResolver?.identityForAddr === 'function'
+            ? opts.identityResolver.identityForAddr(addr) : null);
+      } catch { return null; }
+    },
   });
 
   // ─── 5.7c — circle override enforcement (chat-off + agent-block) ──

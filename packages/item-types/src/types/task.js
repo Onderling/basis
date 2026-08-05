@@ -33,5 +33,17 @@ export const TASK_SCHEMA = {
     circleId:       { type: 'string' },
     dod:          { type: 'string' },
     approver:     { type: 'string' },
+    // ── G-DICT catch-up: fields the lifecycle verbs read/write that the canonical schema had drifted BEHIND
+    // (the homes plan Part III dictionary catch-up). Left UNCONSTRAINED (accept any) on purpose: the schema's
+    // job here is to DECLARE these fields exist (so a schema-validating consumer no longer rejects a real item
+    // that carries them, and "declare a noun → get CRUD" is complete), NOT to police their shape. The runtime
+    // writes several of them inconsistently across call sites — timestamps as epoch numbers OR ISO strings OR
+    // null, `requiredSkills` as an array OR a comma-string — so a strict type would either re-introduce the
+    // rejection bug or hit Ajv strict-mode's no-multi-data-type-union rule. `requiredSkills` is the field the
+    // hybrid-dispatch product idea depends on; `deliverable` is the Definition-of-Done artefact. Tighten a
+    // field to a single canonical type once the runtime normalises to one (a separate normalisation debt).
+    requiredSkills: {}, deliverable: {},
+    claimedAt: {}, completedAt: {}, submittedAt: {}, dueAt: {}, addedAt: {},
+    addedBy: {}, addedByDisplayName: {}, parentTaskId: {}, note: {}, notes: {}, reviewLog: {},
   },
 };

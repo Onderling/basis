@@ -1,14 +1,12 @@
 /**
  * G-DICT — the dictionary stays a superset of the runtime (the homes plan, Part III).
  *
- * The task type's schema drifted BEHIND the code: the lifecycle verbs read/write fields the canonical
+ * The task type's schema had drifted BEHIND the code: the lifecycle verbs read/write fields the canonical
  * schema never learned (`requiredSkills` among them — the field the hybrid-dispatch product idea depends
  * on). A dictionary that under-describes its own type makes every schema-validating consumer reject real
- * items, and makes "declare a noun → get CRUD" quietly partial.
- *
- * Baselined GREEN over the known gap: `KNOWN_MISSING` holds the fields the wave-2 catch-up will add to
- * the schema. Shrink it as they land; a NEW runtime field that skips the schema fails immediately.
- * When it reaches empty, delete the constant and this header's excuse with it.
+ * items, and makes "declare a noun → get CRUD" quietly partial. The wave-2 catch-up CLOSED that gap: every
+ * field the runtime writes is now declared on the schema (2026-08-05), so the former `KNOWN_MISSING`
+ * baseline is gone. A NEW runtime field that skips the schema fails immediately.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -37,16 +35,6 @@ function runtimeTaskFields() {
   return [...fields].filter((f) => !NOT_FIELDS.has(f)).sort();
 }
 
-/** The wave-2 catch-up list — the KNOWN gap, baselined green. Shrink, never grow. */
-const KNOWN_MISSING = [
-  // the nine the verification passes catalogued…
-  'claimedAt', 'completedAt', 'dueAt', 'note', 'notes', 'parentTaskId',
-  'requiredSkills', 'reviewLog', 'submittedAt',
-  // …and four more this guard's own first measurement found that no pass had (the derived list beating
-  // the remembered one, on its first run):
-  'addedAt', 'addedBy', 'addedByDisplayName', 'deliverable',
-];
-
 describe('G-DICT — the task schema is a superset of the runtime', () => {
   const schema = CANONICAL_TYPES.task;
   const declared = new Set(Object.keys(schema?.properties ?? {}));
@@ -54,17 +42,14 @@ describe('G-DICT — the task schema is a superset of the runtime', () => {
   it('the schema exists and declares its core', () => {
     expect(declared.size).toBeGreaterThan(5);
     expect(declared.has('text')).toBe(true);
+    // the catch-up landed the field the hybrid-dispatch product idea depends on
+    expect(declared.has('requiredSkills')).toBe(true);
   });
 
-  it('every runtime field is declared OR in the known wave-2 gap — a NEW undeclared field fails', () => {
+  it('every runtime field is declared on the schema — a NEW undeclared field fails immediately', () => {
     const runtime = runtimeTaskFields();
-    const missing = runtime.filter((f) => !declared.has(f) && !KNOWN_MISSING.includes(f));
-    expect(missing, `runtime task fields the schema never learned (add to the schema, not to KNOWN_MISSING): ${missing.join(', ')}`)
+    const missing = runtime.filter((f) => !declared.has(f));
+    expect(missing, `runtime task fields the schema never learned — add them to TASK_SCHEMA.properties: ${missing.join(', ')}`)
       .toEqual([]);
-  });
-
-  it('KNOWN_MISSING only shrinks — a field added to the schema must leave the list', () => {
-    const stale = KNOWN_MISSING.filter((f) => declared.has(f));
-    expect(stale, `these are IN the schema now — remove from KNOWN_MISSING: ${stale.join(', ')}`).toEqual([]);
   });
 });

@@ -16,6 +16,8 @@
     "test:relay": "npm run test --prefix packages/relay",
     "test:pod-client": "npm run test --prefix packages/pod-client",
     "test:scenarios": "npm run test --prefix packages/integration-tests",
+    "test:integration": "node scripts/run-integration.mjs",
+    "test:integration:provision": "node scripts/run-integration.mjs --provision",
     "demo": "node examples/mesh-demo/index.js",
     "demo:verify": "node examples/mesh-demo/index.js",
     "relay:start": "npm run start --prefix packages/relay",

@@ -104,21 +104,34 @@ export function circleMembershipsFromProperties(getProfile, profileId, opts = {}
 }
 
 /**
- * Upsert one circle's membership record as an OWN property. Returns a NEW frozen properties map
- * (merged onto the current own value, so other circles' records are preserved). Throws on an invalid
- * record — this is restore data; a malformed entry that silently vanished would reproduce the exact
- * "nothing came back" failure.
+ * Upsert one circle's membership record as an OWN property. Returns a NEW frozen properties map (other
+ * circles' records preserved). This is a FACET MERGE, not a replace: the given `patch` is merged onto any
+ * existing record for `circleId`, so a PARTIAL patch — e.g. adding the wrapped-key `{key}` pointer at
+ * circle-open, AFTER the `{handle,address}` write-on-join — keeps the facets it does not mention. The
+ * MERGED result must still be a valid record (handle + address); a key-only patch for a circle with no
+ * prior record throws (there is nothing to attach the key to — callers treat that best-effort). Throwing on
+ * an invalid result is deliberate: this is restore data, and an entry that silently vanished would reproduce
+ * the exact "nothing came back" failure.
  * @param {object} properties  the profile's current properties map
  * @param {string} circleId
- * @param {object} record      { handle, address, proof?, relays?, key? }
+ * @param {object} patch       any subset of { handle, address, proof, relays, key } to merge in
  */
-export function setCircleMembership(properties, circleId, record) {
+export function setCircleMembership(properties, circleId, patch) {
   if (typeof circleId !== 'string' || !circleId) throw new TypeError('setCircleMembership: circleId required');
-  const rec = normaliseCircleMembership(record);
-  if (!rec) throw new TypeError('setCircleMembership: invalid membership record (handle + address required)');
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw new TypeError('setCircleMembership: record required');
   const cur = properties?.[CIRCLE_MEMBERSHIPS_KEY];
   const curMap = (cur?.mode === 'own' && cur.value && typeof cur.value === 'object' && !Array.isArray(cur.value))
     ? cur.value
     : {};
+  // Merge the supplied facets onto any existing record (skip undefined/null so a partial patch preserves
+  // the rest). Then normalise the RESULT — which enforces handle + address on what actually lands.
+  const merged = { ...(curMap[circleId] ?? {}) };
+  if (patch.handle != null) merged.handle = patch.handle;
+  if (patch.address != null) merged.address = patch.address;
+  if (patch.proof != null) merged.proof = patch.proof;
+  if (Array.isArray(patch.relays)) merged.relays = patch.relays;
+  if (patch.key != null) merged.key = patch.key;
+  const rec = normaliseCircleMembership(merged);
+  if (!rec) throw new TypeError('setCircleMembership: invalid membership record (handle + address required)');
   return setOwn(properties, CIRCLE_MEMBERSHIPS_KEY, { ...curMap, [circleId]: rec });
 }

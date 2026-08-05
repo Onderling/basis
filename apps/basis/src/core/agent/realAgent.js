@@ -490,6 +490,14 @@ export async function createRealHouseholdAgent(opts = {}) {
     if (_cacheMedium && typeof _cacheMedium.catchUp === 'function') {
       try { await _cacheMedium.catchUp(); } catch { /* best-effort — reads still fall through per-key */ }
     }
+    // Restore-robustness: a pod-backed medium tags itself with WHERE its group-key resource lives
+    // (`keyRef` = pod-URI pointer + posture). Record that pointer into this device's membership registry, so
+    // a wiped device re-attaches by an explicit reference (survives a routing/scheme change), not only by
+    // re-deriving the URI. Best-effort merge onto the existing record; a no-record circle is a no-op.
+    if (_cacheMedium?.keyRef) {
+      try { await upsertCircleKeyRef(id, _cacheMedium.keyRef); }
+      catch { /* the pointer is optional restore-data — never block circle-open */ }
+    }
     try {
       // getStore builds+caches this circle's store (over the cache medium if pod-backed) — do it either way.
       const circleStore = householdService.stores.getStore(id);
@@ -682,6 +690,10 @@ export async function createRealHouseholdAgent(opts = {}) {
   // is scoped) so the restore-and-open boot loop can enumerate this device's circles. Default → none, so a
   // degraded/bare registry simply re-opens nothing rather than throwing at boot.
   let readSelfCircleMemberships = async () => ({});
+  // Patch the wrapped-key POINTER into an EXISTING circle-membership record. Set inside the block; a
+  // no-op until then. Returns false when there is no record to attach to (the key facet needs a prior
+  // {handle,address} join write) — so it is safe to call at every circle-open, best-effort.
+  let upsertCircleKeyRef = async () => false;
   {
     const agentsRegistry =
       (await registerAgentBundle({
@@ -696,6 +708,18 @@ export async function createRealHouseholdAgent(opts = {}) {
     // boot loop reads it to re-open the circles this device belongs to. Own map of the default profile —
     // that is where write-on-join records {handle,address} (id:'default').
     readSelfCircleMemberships = async () => circleMembershipsOf((await agentsRegistry.lookup('default')) ?? {});
+
+    // Patch the wrapped-key POINTER into the default profile's membership record for a circle — a
+    // FACET MERGE (the pure setter keeps handle/address). No-op if there is no record yet (nothing to
+    // attach to) or the ref is absent. Only touches the OWN record; never carries a secret — `keyRef` is a
+    // pod-URI pointer + posture, and every key still re-derives from the recovery phrase.
+    upsertCircleKeyRef = async (circleId, keyRef) => {
+      if (!circleId || !keyRef?.ref) return false;
+      const cur = await agentsRegistry.lookup('default');
+      if (!cur || !circleMembershipsOf(cur)[circleId]) return false;
+      await agentsRegistry.register({ ...cur, properties: registrySetCircleMembership(cur.properties ?? {}, circleId, { key: keyRef }) });
+      return true;
+    };
 
     /* control ops — LIVE token binding (2026-07-09). hostAgent (the skills' home)
      * is the ISSUER: `issueCapabilityToken` signs with its identity and needs no other

@@ -6707,11 +6707,20 @@ async function boot() {
         try {
           const policy = await _circlePolicy(circleId);
           if (circleStoreMode(policy.pod) !== 'cache') return null;   // no-pod → shared local backing
-          return createCircleCacheMedium({
+          const medium = createCircleCacheMedium({
             localBackend: pickWebBackend(`cc-circle-cache-${circleId}`),
             deviceId:     `circle-cache-${circleId}`,
             resolvePod:   () => resolveCirclePodCustody(circleId),
           });
+          // Restore-robustness: tag the medium with WHERE this circle's wrapped group-key resource
+          // lives, so a wiped device re-attaches by an EXPLICIT pointer (survives a routing/scheme change or
+          // relocated pod), not only by re-deriving the URI. realAgent upserts it into the circle-membership
+          // registry. Best-effort + deterministic — a failure just omits the optional pointer.
+          try {
+            const custody = await resolveCirclePodCustody(circleId);
+            if (custody?.circleRootUri) medium.keyRef = { ref: `${custody.circleRootUri}/.keys/group.json`, posture: policy.storagePosture };
+          } catch { /* the pointer is optional — never break the medium */ }
+          return medium;
         } catch { return null; }   // any failure → local-only (honest degrade)
       },
       getActiveCircleId: getActiveCircle,            // per-circle store scoping — the active circle scopes chat ops

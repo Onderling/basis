@@ -60,6 +60,20 @@ describe('the circle-membership record vocabulary', () => {
     expect(circleMembershipsFromProperties(() => ({ properties: props }), 'me').werkgroep.address).toBe('nkn:a2');
   });
 
+  it('a key-only patch MERGES the wrapped-key pointer onto an existing record (handle/address kept)', () => {
+    // write-on-join records {handle,address}; the key-resource pointer is learned LATER, at circle-open.
+    let props = setCircleMembership({}, 'oosterpoort', { handle: 'anne', address: 'nkn:a1' });
+    props = setCircleMembership(props, 'oosterpoort', { key: { ref: 'https://pod/oosterpoort/.keys/group.json', posture: 'p2' } });
+    const rec = circleMembershipsFromProperties(() => ({ properties: props }), 'me').oosterpoort;
+    expect(rec.handle).toBe('anne');       // preserved through the key-only patch
+    expect(rec.address).toBe('nkn:a1');    // preserved
+    expect(rec.key).toEqual({ ref: 'https://pod/oosterpoort/.keys/group.json', posture: 'p2' });
+  });
+
+  it('a key-only patch for a circle with NO prior record throws — nothing to attach the key to', () => {
+    expect(() => setCircleMembership({}, 'never-joined', { key: { ref: 'https://p/x/.keys/group.json', posture: 'p2' } })).toThrow();
+  });
+
   it('a persona inherits its memberships from the default profile unless it declares its own', () => {
     let dflt = {};
     dflt = setCircleMembership(dflt, 'oosterpoort', { handle: 'anne', address: 'nkn:a1' });

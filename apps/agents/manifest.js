@@ -224,6 +224,21 @@ export const agentsManifest = {
       ],
       surfaces: { chat: { reply: 'record', hint: 'Read a profile\'s personal drivers.' } },
     },
+    /* Registry restore-data — record a per-circle membership ({handle, address, …}) on a profile so a
+     * restored device knows its circles + the handle it used. The join wizard writes through this on a
+     * successful join; the wrapped-key ref is written later (group-key event) and is optional. */
+    {
+      id:        'setProfileCircleMembership',
+      verb:      'update',
+      appliesTo: { type: 'agent' },
+      params: [
+        { name: 'id',       kind: 'string', required: true, schema: { minLength: 1 } },
+        { name: 'circleId', kind: 'string', required: true, schema: { minLength: 1 } },
+        { name: 'handle',   kind: 'string' },
+        { name: 'address',  kind: 'string' },
+      ],
+      surfaces: { chat: { reply: 'record', hint: 'Record a per-circle membership on a profile (restore-data).' } },
+    },
 
     /* Personas — persist what a persona SHARES per context (circle/project). The general per-persona version
      * of the feedback charter consent; the "About me" surface + join wizard write through these. */

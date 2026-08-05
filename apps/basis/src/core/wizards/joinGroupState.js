@@ -716,6 +716,23 @@ export async function finalSubmit({
       try { await onJoined({ circleId: result.groupId }); }
       catch { /* reachability is repaired on the next circles load either way */ }
     }
+    // Record this circle membership into the profile registry (restore-data) so a restored device knows its
+    // circles + the handle it used there. The one choke point both the UI and programmatic paths share, and
+    // where `state.handle` + `result.groupId` + `circleAddressFor` are all in scope (the `onJoined` seam
+    // carries neither the handle nor, on the web render wizard, itself). Only when handle + a resolved address
+    // are present — an address-less record is invalid (the registry setter requires both). Best-effort AFTER
+    // success: a failure just means the restored-device circle list won't include this one; the join already
+    // succeeded. The wrapped-key ref is written later (group-key event) and is optional in the record.
+    if (result && result.groupId && state.handle && typeof circleAddressFor === 'function') {
+      try {
+        const address = circleAddressFor(result.groupId);
+        if (address) {
+          await callSkill('agents', 'setProfileCircleMembership', {
+            id: 'default', circleId: result.groupId, handle: state.handle, address,
+          });
+        }
+      } catch { /* best-effort restore-data — never fails a completed join */ }
+    }
     return { result, state };
   } catch (err) {
     // Handle-uniqueness rejection (Decision C): surface it as a localisable prompt to

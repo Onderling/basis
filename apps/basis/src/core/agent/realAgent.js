@@ -66,6 +66,7 @@ import {
   releasedValues as releaseFromPolicy,
   createDriver,
   driversFromProperties,
+  setCircleMembership as registrySetCircleMembership,
   isRequestable,
   effectiveProperties,
 } from '@onderling/agent-registry';
@@ -825,6 +826,19 @@ export async function createRealHouseholdAgent(opts = {}) {
         return { ok: true };
       },
       getDrivers: async ({ profileId }) => driversFromProperties((await agentsRegistry.lookup(profileId))?.properties ?? {}),
+      // Circle membership (registry restore-data) — carry a per-circle { handle, address, … } record on the
+      // profile so a restored device knows its circles + the handle it used. Merge via the pure setter (keeps
+      // the other circles' records), then re-register the FULL entry (preserves key/role/grants/disclosure).
+      setCircleMembership: async ({ profileId, circleId, handle, address, proof, relays, key }) => {
+        const cur = await agentsRegistry.lookup(profileId);
+        if (!cur) throw new Error(`setCircleMembership: no such profile ${profileId}`);
+        const record = { handle, address };
+        if (proof != null) record.proof = proof;
+        if (Array.isArray(relays)) record.relays = relays;
+        if (key != null) record.key = key;
+        await agentsRegistry.register({ ...cur, properties: registrySetCircleMembership(cur.properties ?? {}, circleId, record) });
+        return { ok: true };
+      },
       // Personas — the PERSISTED per-context disclosure policy ("what this persona shares in circle X").
       // Merge via the pure disclosure setter, then re-register the FULL entry (preserves properties/key/grants).
       setDisclosure: async ({ profileId, contextId, key, enabled, rung, matchable, requestable }) => {

@@ -156,6 +156,35 @@ describe('finalSubmit — the skills default rides the join release', () => {
     const { callSkill, calls } = makeCallSkill();
     const { result } = await finalSubmit({ state: s, callSkill });
     expect(result?.ok).toBe(true);
+    // No `circleAddressFor` here → the restore-data membership write is skipped (address-less record is
+    // invalid), so this stays no-agents-traffic. The write itself is proven below.
     expect(calls.every((c) => c.app !== 'agents')).toBe(true);
+  });
+});
+
+describe('finalSubmit — write-on-join records the circle membership (registry restore-data)', () => {
+  it('on a successful join, writes { handle, address } to the default profile via setProfileCircleMembership', async () => {
+    const s = stateFor(plainInvite);
+    s.handle = 'anne';                                       // the handle the joiner chose
+    const { callSkill, calls } = makeCallSkill();
+    const circleAddressFor = (circleId) => `nkn:addr-${circleId}`;
+    const { result } = await finalSubmit({ state: s, callSkill, circleAddressFor });
+    expect(result?.ok).toBe(true);
+    // The writer is now REACHED in production — a completed join records the per-circle membership so a
+    // restored device knows its circles + the handle it used (the built-but-unadopted gap, closed).
+    const write = calls.find((c) => c.app === 'agents' && c.op === 'setProfileCircleMembership');
+    expect(write, 'the membership write fired on join').toBeTruthy();
+    expect(write.args).toEqual({
+      id: 'default', circleId: result.groupId, handle: 'anne', address: `nkn:addr-${result.groupId}`,
+    });
+  });
+
+  it('skips the write when no circleAddressFor is available (an address-less record is invalid)', async () => {
+    const s = stateFor(plainInvite);
+    s.handle = 'anne';
+    const { callSkill, calls } = makeCallSkill();
+    const { result } = await finalSubmit({ state: s, callSkill });   // no circleAddressFor
+    expect(result?.ok).toBe(true);
+    expect(calls.some((c) => c.op === 'setProfileCircleMembership')).toBe(false);
   });
 });

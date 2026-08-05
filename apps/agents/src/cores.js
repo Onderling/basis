@@ -588,6 +588,30 @@ export async function setProfileDriver(store, args = {}) {
   }
 }
 
+/**
+ * setProfileCircleMembership — record a per-circle MEMBERSHIP on a profile (registry restore-data): the
+ * `{ handle, address, proof?, relays?, key? }` record a restored device needs so it knows its circles + the
+ * handle it used there. Merge + validation live in the `profiles` collaborator (the pure setter preserves the
+ * other circles' records). Degrades (ok:false) if unwired / missing id or circleId. Best-effort by the caller.
+ */
+export async function setProfileCircleMembership(store, args = {}) {
+  const s = asStore(store);
+  const id = typeof args?.id === 'string' ? args.id.trim() : '';
+  const circleId = typeof args?.circleId === 'string' ? args.circleId.trim() : '';
+  if (typeof s.profiles?.setCircleMembership !== 'function' || !id || !circleId) {
+    return { ok: false, reason: !id ? 'id-required' : (!circleId ? 'circleId-required' : 'profiles-unavailable') };
+  }
+  try {
+    await s.profiles.setCircleMembership({
+      profileId: id, circleId,
+      handle: args?.handle, address: args?.address, proof: args?.proof, relays: args?.relays, key: args?.key,
+    });
+    return { ok: true, id, circleId };
+  } catch (err) {
+    return { ok: false, reason: 'invalid-membership', detail: err?.message ?? String(err) };
+  }
+}
+
 /** getProfileDrivers — just the DRIVER-typed properties of a profile (for the About-me editor + the matcher). */
 export async function getProfileDrivers(store, args = {}) {
   const s = asStore(store);
@@ -684,6 +708,7 @@ export const AGENT_CORES = Object.freeze({
   getProfileProperties,
   setProfileDriver,
   getProfileDrivers,
+  setProfileCircleMembership,
   setProfileDisclosure,
   getProfileDisclosure,
   getPersonaView,

@@ -86,6 +86,7 @@ export function buildAgentSkills({ registry, tokens, versionStoreFor, catalog, p
     'getProfileProperties',
     'setProfileDriver',
     'getProfileDrivers',
+    'setProfileCircleMembership',
     'setProfileDisclosure',
     'getProfileDisclosure',
     'getPersonaView',

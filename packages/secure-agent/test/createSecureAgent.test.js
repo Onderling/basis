@@ -19,7 +19,6 @@ import {
   webauthnAvailable,
   PASSKEY_ERRORS,
 } from '../src/passkey.js';
-import { createPeerResolver, PeerResolver } from '../src/resolver.js';
 import {
   TrustRegistry, CapabilityToken, PolicyEngine, ROLES, roleRank,
 } from '@onderling/core';
@@ -673,7 +672,7 @@ describe('createSecureAgent — S4 identity-resolver', () => {
     const sa = await createSecureAgent({
       vault: new VaultMemory(), identityResolver: mm,
     });
-    expect(sa.resolver).toBeInstanceOf(PeerResolver);
+    expect(typeof sa.resolver.aliasesFor).toBe('function');   // the device-local resolver projection
     expect(sa.resolver.hasMemberMap).toBe(true);
     expect(sa.securityStatus().resolverWired).toBe(true);
     await sa.shutdown();
@@ -792,27 +791,26 @@ describe('createSecureAgent — S4 identity-resolver', () => {
     await sa.shutdown();
   });
 
-  it('createPeerResolver standalone: graceful nulls when sources missing', async () => {
-    const r = createPeerResolver({});
-    expect(r.hasMemberMap).toBe(false);
-    expect(r.hasSecurity).toBe(false);
-    expect(r.pubKeyForAddr('whatever')).toBeNull();
-    expect(await r.resolveByAddr('whatever')).toBeNull();
-    expect(await r.resolveByWebid('w')).toBeNull();
-    expect(await r.aliasesFor('addr')).toEqual(['addr']);
+  it('resolver: graceful nulls when the MemberMap is absent (no identityResolver)', async () => {
+    const sa = await createSecureAgent({ vault: new VaultMemory() });
+    expect(sa.resolver.hasMemberMap).toBe(false);
+    expect(await sa.resolver.resolveByAddr('whatever')).toBeNull();
+    expect(await sa.resolver.resolveByWebid('w')).toBeNull();
+    // No member info known → aliasesFor collapses to just the address itself (nothing to fan across).
+    expect(await sa.resolver.aliasesFor('app.unknown.1')).toEqual(['app.unknown.1']);
+    await sa.shutdown();
   });
 
-  it('resolver falls back to addr-as-pubKey when SecurityLayer has no record', async () => {
-    const mm = {
-      async resolveByPubKey(pk) {
-        return pk === 'app.directpubkey'
-          ? { webid: 'https://d.example/#me', pubKey: 'app.directpubkey' }
-          : null;
-      },
-    };
-    const r = createPeerResolver({ memberMap: mm });
-    const m = await r.resolveByAddr('app.directpubkey');
+  it('resolver falls back to addr-as-pubKey when the SecurityLayer has no HI record (NKN-style)', async () => {
+    // A transport where the address IS the pubKey: no HI was received, so getPeerKey has no record, but
+    // the MemberMap resolves the address treated directly as a pubKey.
+    const mm = makeFakeMemberMap([
+      { webid: 'https://d.example/#me', pubKey: 'app.directpubkey', stableId: 'sid-d' },
+    ]);
+    const sa = await createSecureAgent({ vault: new VaultMemory(), identityResolver: mm });
+    const m = await sa.resolver.resolveByAddr('app.directpubkey');   // never registerPeer'd
     expect(m.webid).toBe('https://d.example/#me');
+    await sa.shutdown();
   });
 });
 

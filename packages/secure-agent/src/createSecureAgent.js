@@ -88,7 +88,6 @@ import {
   webauthnAvailable,
   PASSKEY_ERRORS,
 } from './passkey.js';
-import { createPeerResolver } from './resolver.js';
 import { loadAuditLog }       from './auditLog.js';
 
 /**
@@ -345,22 +344,70 @@ export async function createSecureAgent(opts = {}) {
   //   memberMap-shape       → treat as MemberMap directly
   //   { memberMap }         → object form for future expansion
   const resolverMemberMap = pickResolverMemberMap(opts.identityResolver);
-  const peerResolver = createPeerResolver({
-    security:  agent.security,
-    memberMap: resolverMemberMap,
-    // Decision-4 correction, actually THREADED (the first version of this hook existed only on the
-    // PeerResolver constructor while this factory dropped it — unreached by construction, the exact
-    // disease it was built against). First hop: the device-local alias→canonical link this factory
-    // already keeps (`peerIdentityOf`, declared below — evaluated at CALL time, so the ordering is
-    // safe); second: a host-supplied hook, if any.
-    identityForAddr: (addr) => {
-      try {
-        return peerIdentityOf.get?.(addr)
-          ?? (typeof opts.identityResolver?.identityForAddr === 'function'
-            ? opts.identityResolver.identityForAddr(addr) : null);
-      } catch { return null; }
-    },
-  });
+
+  // ── Peer identity resolution (a device-local projection) ────────────────────────────────────────────
+  // Maps a volatile identifier (a per-circle address / a rotating pubKey) to the stable person, and fans a
+  // mute across ALL of a peer's known aliases. It lives HERE — inlined over this factory's own sources —
+  // and deliberately NOT on the MemberMap/identity layer, for a disclosure reason, not just convenience:
+  // `aliasesFor` is the one place that LINKS a person's per-circle addresses back to one person, and
+  // per-circle unlinkability makes that linkage device-local ("nobody else's to see"), while a MemberMap
+  // can be pod-backed/shared. Its three inputs all compose here: the SecurityLayer (addr→pubKey), the
+  // device-local `peerIdentityOf` alias→canonical map, and the caller's MemberMap. The mute LIST is
+  // portable (opaque strings, your list); the RESOLUTION of an address to a person is not.
+  //
+  // addr → pubKey. The device-local identity link FIRST — since Decision 4 the SecurityLayer can no longer
+  // answer "who is this" for a per-circle address (its `getPeerKey` returns that CIRCLE's signing key, a
+  // different answer per circle); only `peerIdentityOf` (kept below — read at CALL time, so referencing it
+  // here is safe) knows the canonical person. Then a host-supplied hook, then the SecurityLayer.
+  const pubKeyForAddr = (addr) => {
+    try {
+      const canonical = peerIdentityOf.get?.(addr)
+        ?? (typeof opts.identityResolver?.identityForAddr === 'function'
+          ? opts.identityResolver.identityForAddr(addr) : null);
+      if (canonical) return canonical;
+    } catch { /* fall through to the SecurityLayer */ }
+    if (!agent.security || typeof agent.security.getPeerKey !== 'function') return null;
+    return agent.security.getPeerKey(addr);
+  };
+  const resolveMemberByAddr = async (addr) => {
+    if (!addr) return null;
+    const pubKey = pubKeyForAddr(addr);
+    if (pubKey && resolverMemberMap?.resolveByPubKey) {
+      const m = await resolverMemberMap.resolveByPubKey(pubKey);
+      if (m) return m;
+    }
+    // Fallback: treat addr AS a pubKey (pubKey-addressed transports, e.g. NKN — the address IS the key).
+    if (resolverMemberMap?.resolveByPubKey) {
+      const m = await resolverMemberMap.resolveByPubKey(addr);
+      if (m) return m;
+    }
+    return null;
+  };
+  // The SET of identifiers we believe equate to this peer — the mute-fanout input. addr + pubKey + the
+  // resolved member's {pubKey, webid, stableId}, deduped.
+  const aliasesForAddr = async (addr) => {
+    const set = new Set();
+    if (addr) set.add(addr);
+    const pubKey = pubKeyForAddr(addr);
+    if (pubKey) set.add(pubKey);
+    const m = await resolveMemberByAddr(addr);
+    if (m?.pubKey)   set.add(m.pubKey);
+    if (m?.webid)    set.add(m.webid);
+    if (m?.stableId) set.add(m.stableId);
+    return [...set];
+  };
+  // The `sa.resolver` surface (the security journeys assert `aliasesFor` here). A plain projection object,
+  // not a class — its logic is these closures over the factory's sources.
+  const peerResolver = {
+    get hasMemberMap() { return !!resolverMemberMap; },
+    get hasSecurity()  { return !!agent.security; },
+    pubKeyForAddr,
+    resolveByAddr:     resolveMemberByAddr,
+    resolveByPubKey:   async (pubKey)   => (pubKey && resolverMemberMap?.resolveByPubKey   ? resolverMemberMap.resolveByPubKey(pubKey)     : null),
+    resolveByWebid:    async (webid)    => (webid && resolverMemberMap?.resolveByWebid     ? resolverMemberMap.resolveByWebid(webid)       : null),
+    resolveByStableId: async (stableId) => (stableId && resolverMemberMap?.resolveByStableId ? resolverMemberMap.resolveByStableId(stableId) : null),
+    aliasesFor:        aliasesForAddr,
+  };
 
   // ─── 5.7c — circle override enforcement (chat-off + agent-block) ──
   // Host-injected accessors let the substrate (basis v2) consult

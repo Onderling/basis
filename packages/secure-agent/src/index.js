@@ -37,7 +37,6 @@ export {
 } from './passkey.js';
 
 // peer identity resolver
-export { createPeerResolver, PeerResolver } from './resolver.js';
 
 // signed activity / audit log
 export { loadAuditLog, AuditLog, AUDIT_VERSION } from './auditLog.js';

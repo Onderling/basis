@@ -63,6 +63,40 @@ export function groupGate(groupIds, groupManager) {
 }
 
 /**
+ * First-contact RATE bound — caps how fast NEW (not-yet-known) senders can register via hello, so a flood of
+ * stranger HIs on a local transport cannot grow the peer graph unboundedly. This bounds a RESOURCE, it is not
+ * an authorization gate (who-may-send binds at the receive-path roster-authorize + seal). Composed AND-wise
+ * into the always-on stack beside mute-block.
+ *
+ * A KNOWN peer re-helloing ALWAYS passes — the bound only limits NEW registrations. `isKnown(from)` must read
+ * the PEER GRAPH (not the key store): the SecurityLayer auto-registers the HI key BEFORE the gate runs, so a
+ * key-store check would see every first contact as already-known and the bound would never engage. A sliding
+ * window (`windowMs`) of accepted new-sender hellos is kept; once `maxPerWindow` is reached, further NEW
+ * senders are dropped until the window drains. Defaults are generous (normal pairing is 1–2): a flood is 100s.
+ *
+ * @param {object} a
+ * @param {(from:string)=>(boolean|Promise<boolean>)} a.isKnown  true ⇒ already-known peer ⇒ always accept.
+ * @param {number} [a.maxPerWindow=32]  max NEW-sender hellos accepted per window.
+ * @param {number} [a.windowMs=60000]   the sliding window.
+ * @param {()=>number} [a.now=Date.now]
+ */
+export function firstContactRateGate({ isKnown, maxPerWindow = 32, windowMs = 60_000, now = () => Date.now() } = {}) {
+  if (typeof isKnown !== 'function') {
+    throw new Error('firstContactRateGate requires an isKnown(from) => boolean|Promise<boolean> predicate');
+  }
+  const stamps = [];   // timestamps of accepted NEW-sender hellos still inside the window
+  return async function firstContactRateGateFn(envelope) {
+    const from = envelope?._from;
+    try { if (from && (await isKnown(from))) return true; } catch { /* unresolvable ⇒ treat as new */ }
+    const t = now();
+    while (stamps.length && stamps[0] <= t - windowMs) stamps.shift();
+    if (stamps.length >= maxPerWindow) return false;    // a flood of new-sender hellos — bound it
+    stamps.push(t);
+    return true;
+  };
+}
+
+/**
  * Composition helper — passes if any of the inner gates passes.
  * Short-circuits on the first accept.
  *

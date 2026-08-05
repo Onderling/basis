@@ -96,6 +96,7 @@ export {
   tokenGate,
   groupGate,
   anyOf,
+  firstContactRateGate,
 }                                            from './security/helloGates.js';
 
 // ── Transport ────────────────────────────────────────────────────────────────

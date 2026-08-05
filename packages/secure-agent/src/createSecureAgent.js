@@ -53,6 +53,7 @@ import {
   InternalTransport,
   RoutingStrategy,
   TRANSPORT_PRIORITY,
+  firstContactRateGate,
 } from '@onderling/core';
 import {
   NknTransport,
@@ -287,16 +288,29 @@ export async function createSecureAgent(opts = {}) {
   });
 
   // ─── helloGate (A+.1) ────────────────────────────────────────
-  // Two layers, composed via anyOf-style AND (we want ALL to pass):
-  //   1. mute-block gate (always installed): reject HI from muted peer addr
-  //   2. user-supplied gate (optional): tokenGate(string) | groupGate | custom fn
-  // Composition: AND (both must return true to accept).  Helper:
-  // helloGates.anyOf is OR, so we manually AND here.
+  // Layers, composed AND-wise (ALL must pass to accept the HI):
+  //   1. mute-block gate (always): reject a muted peer's HI (the only pre-registration drop point for it).
+  //   2. first-contact rate bound (always): cap how fast NEW (not-yet-known) senders register, so a flood of
+  //      stranger hellos on a local transport can't grow the peer graph unboundedly. A KNOWN peer (already in
+  //      the graph) is unaffected. This bounds a RESOURCE — it is NOT the authz boundary (who-may-send binds
+  //      at the receive-path roster-authorize + seal). "known" reads the PEER GRAPH, not the key store,
+  //      because the SecurityLayer auto-registers the HI key before this gate runs. Tunable via
+  //      `opts.helloRateLimit = { maxPerWindow, windowMs }`; a no-PeerGraph agent has nothing to grow, so the
+  //      bound is a no-op there (every sender reads as "known").
+  //   3. user-supplied gate (optional): tokenGate(string) | groupGate | custom fn.
   const userHelloGate = resolveHelloGate(opts.helloGate);
   const muteBlockGate = async (env) => !muteSet.has(env?._from);
-  const composedGate  = userHelloGate
-    ? async (env) => (await muteBlockGate(env)) && (await userHelloGate(env))
-    : muteBlockGate;
+  const rl = (opts.helloRateLimit && typeof opts.helloRateLimit === 'object') ? opts.helloRateLimit : {};
+  const boundGate = firstContactRateGate({
+    isKnown: async (from) => !agent.peers || !!(await agent.peers.get(from)),
+    maxPerWindow: rl.maxPerWindow,
+    windowMs:     rl.windowMs,
+  });
+  const gates = [muteBlockGate, boundGate, ...(userHelloGate ? [userHelloGate] : [])];
+  const composedGate = async (env) => {
+    for (const g of gates) { if (!(await g(env))) return false; }
+    return true;
+  };
   agent.setHelloGate(composedGate);
 
   // ─── signed WebID claim (A.2) ────────────────────────────────

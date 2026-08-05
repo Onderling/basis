@@ -30,6 +30,11 @@ import { createCirclePodSharing } from '../../../basis/src/v2/circlePodSharing.j
 import { buildCircleShareEnforcement } from '../../../basis/src/v2/circleShareEnforcement.js';
 import { recipientSealingKeyResolver } from '../../../basis/src/v2/shareRecipients.js';
 import { shareItemAcrossCircles, shareItemToPublishedKey as sharedShareItemToPublishedKey, listSharedResolved, revokeItemShare } from '../../../basis/src/v2/circleShare.js';
+// Cache-mode mirroring (RN parity): the SHARED custody-resolution + cache medium, fed by mobile's own
+// ensureCirclePod / getCircleSealStrategy / policy resolver / AsyncStorage backend.
+import { createCirclePodCustody } from '../../../basis/src/v2/circlePodCustody.js';
+import { createCircleCacheMedium } from '../../../basis/src/v2/circleCacheMedium.js';
+import { circleStoreMode } from '../../../basis/src/v2/circleDataPolicy.js';
 import { buildHouseholdDataSource } from '../../../household/src/index.js';
 // objective L follow-up — the mobile per-circle policy store (AsyncStorage-backed, `cc.circlePolicy.<id>`
 // keys). Mirror of web circleApp.js's module-level `policyStore`: the composition-root's `policyOf` reads the
@@ -450,4 +455,39 @@ export async function unshareItemFromCircle({
     policyOf: r.policyOf,
     itemId, fromCircleId, toCircleId, recipient, recipients, remainingRecipients,
   });
+}
+
+// ── Cache-mode mirroring — the store MEDIUM for a pod-backed circle (RN parity with web's circleApp) ──────
+// The circle-pod custody, reusing the SHARED resolver over mobile's own ensureCirclePod + seal-strategy +
+// policy resolver. Lazy so all three are defined by call time.
+let _circlePodCustodyRN = null;
+function circlePodCustodyRN() {
+  if (!_circlePodCustodyRN) {
+    _circlePodCustodyRN = createCirclePodCustody({
+      ensureCirclePod,
+      policyFor:       _defaultPolicyOf,
+      sealStrategyFor: getCircleSealStrategy,
+    });
+  }
+  return _circlePodCustodyRN;
+}
+
+/**
+ * Provision a pod-backed circle's store MEDIUM (a cache-mode PseudoPod that seals→write-throughs to the
+ * circle's pod). realAgent calls this once per circle at circle-open, BEFORE the store is built. A no-pod
+ * circle → null → the shared local backing, unchanged. RN parity with web's circleApp `provisionCircleMedium`.
+ */
+export async function provisionCircleMedium(circleId) {
+  try {
+    const policy = await _defaultPolicyOf(circleId);
+    if (circleStoreMode(policy?.pod) !== 'cache') return null;   // no-pod → shared local backing
+    const localBackend = asyncStorageRef
+      ? createAsBackend({ AsyncStorage: asyncStorageRef, scope: `cc-circle-cache-${circleId}` })
+      : createMemoryBackend();
+    return createCircleCacheMedium({
+      localBackend,
+      deviceId:   `circle-cache-${circleId}`,
+      resolvePod: () => circlePodCustodyRN().resolveCirclePodCustody(circleId),
+    });
+  } catch { return null; }   // any failure → local-only (honest degrade)
 }

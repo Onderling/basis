@@ -264,6 +264,10 @@ export async function bootAgentBundle(opts = {}) {
       tasksPersistDb,
       householdPersistDb,
       stoopControlAgent: opts.stoopControlAgent,   // S4 — multi-member sealing router (redeem/leave)
+      // Cache-mode mirroring (RN parity with web circleApp): provision a pod-backed circle's store MEDIUM
+      // (a cache-mode PseudoPod sealing→write-throughing to the pod). App.js passes circlePods'
+      // `provisionCircleMedium`; absent → no cache media → shared local backing, unchanged.
+      provisionCircleMedium: opts.provisionCircleMedium,
       secureAgentOpts:  opts.secureAgentOpts,
       // The per-user address-fallback setting, read LIVE (batch 4) — forwarded as-is (function or
       // bool); realAgent threads it into both halves of the choice (the fan's address pick and

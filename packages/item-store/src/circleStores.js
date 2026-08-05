@@ -17,6 +17,11 @@
  * @param {(circleId:string, store:import('./CircleItemStore.js').CircleItemStore)=>void} [args.onStore]  called ONCE
  *        when a circle's store is first created — the seam to attach a per-circle peer mirror (L3 · no-pod-sync-off-
  *        household: `onStore: (id, s) => wireStoreMirror(s, mirrorFor(id))`). Lazy stores mean there's no other moment.
+ * @param {(circleId:string)=>(import('@onderling/core').DataSource|null|undefined)} [args.dataSourceFor]  per-circle
+ *        MEDIUM by posture (cache-mode mirroring): a pod-backed circle may run over its OWN DataSource — a cache-mode
+ *        PseudoPod that write-throughs to the pod ("pod is truth, local cache is reality") — instead of the shared local
+ *        backing. Return a DataSource to override for that circle; return null/undefined (or omit the fn) → the shared
+ *        `dataSource`, today's behaviour, fully back-compat.
  * @returns {{ getStore:(circleId:string)=>import('./CircleItemStore.js').CircleItemStore, has:(circleId:string)=>boolean, rootFor:(circleId:string)=>string }}
  */
 import { CircleItemStore } from './CircleItemStore.js';
@@ -29,7 +34,7 @@ import { CircleItemStore } from './CircleItemStore.js';
  * @returns {{getStore: (circleId: string) => object, has: (circleId: string) => boolean,
  *   rootFor: (circleId: string) => string}}
  */
-export function createCircleStores({ dataSource, registry, rootPrefix = 'mem://circles/', onStore } = {}) {
+export function createCircleStores({ dataSource, registry, rootPrefix = 'mem://circles/', onStore, dataSourceFor } = {}) {
   if (!dataSource || typeof dataSource.read !== 'function') {
     throw new Error('createCircleStores: a shared core.DataSource (read/write/delete/list) is required');
   }
@@ -44,7 +49,12 @@ export function createCircleStores({ dataSource, registry, rootPrefix = 'mem://c
       }
       let store = stores.get(circleId);
       if (!store) {
-        store = new CircleItemStore({ dataSource, rootContainer: rootFor(circleId), registry });
+        // Per-circle MEDIUM by posture (cache-mode mirroring): a pod-backed circle may run over its OWN
+        // DataSource (a cache-mode PseudoPod write-throughing to the pod); absent/null → the shared local
+        // backing (today's behaviour). The store row stays THE materialised head either way (G-C1) — only
+        // its medium differs, which is the "pod is truth, local cache is reality" posture for a pod circle.
+        const backing = (typeof dataSourceFor === 'function' && dataSourceFor(circleId)) || dataSource;
+        store = new CircleItemStore({ dataSource: backing, rootContainer: rootFor(circleId), registry });
         stores.set(circleId, store);
         if (typeof onStore === 'function') { try { onStore(circleId, store); } catch { /* best-effort wiring */ } }
       }

@@ -50,6 +50,26 @@ describe('createCircleStores (L1 integration)', () => {
     expect(() => createCircleStores({})).toThrow(/dataSource/i);
     expect(() => f.getStore('')).toThrow(/circleId/);
   });
+
+  it('dataSourceFor routes a pod-backed circle to its OWN medium; others use the shared backing', async () => {
+    const shared = memoryDataSource();
+    const podMedium = memoryDataSource();                 // stands in for a cache-mode PseudoPod medium
+    const f = createCircleStores({
+      dataSource: shared,
+      registry,
+      dataSourceFor: (circleId) => (circleId === 'pod-circle' ? podMedium : null),   // null → shared (back-compat)
+    });
+
+    await f.getStore('pod-circle').put({ type: 'task', text: 'on the pod' });
+    await f.getStore('local-circle').put({ type: 'task', text: 'local only' });
+
+    // The pod-backed circle's item landed in ITS medium, not the shared one …
+    expect((await podMedium.list('mem://circles/pod-circle/')).length).toBeGreaterThan(0);
+    expect(await shared.list('mem://circles/pod-circle/')).toEqual([]);
+    // … and the ordinary circle's item landed in the shared backing (unchanged behaviour).
+    expect((await shared.list('mem://circles/local-circle/')).length).toBeGreaterThan(0);
+    expect(await podMedium.list('mem://circles/local-circle/')).toEqual([]);
+  });
 });
 
 describe('memoryDataSource', () => {

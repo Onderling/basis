@@ -674,6 +674,9 @@ export async function createSecureAgent(opts = {}) {
       identity,
       vault:    aOpts.vault    ?? vault,
       vaultKey: aOpts.vaultKey ?? null,
+      // Retention at the load checkpoint: fold anything past the AUDIT window (from the shared kind table)
+      // into a summary. Opt-out via `{ auditLog: { autoCompact: false } }`.
+      autoCompact: aOpts.autoCompact !== false,
     });
   }
 

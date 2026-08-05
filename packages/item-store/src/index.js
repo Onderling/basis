@@ -120,7 +120,7 @@ export {
 // than in an app because stoop and basis each need it and stoop cannot import basis (invariant 5); before
 // this the wake rule existed twice and was held together by a fitness test.
 export {
-  ENTRY_KINDS, LANE, RETAIN, UNKNOWN_KIND,
-  entryKind, isSystemKind, isAuditKind, retentionOf,
+  ENTRY_KINDS, LANE, RETAIN, UNKNOWN_KIND, RETENTION_WINDOW,
+  entryKind, isSystemKind, isAuditKind, retentionOf, retentionWindowFor,
   conversationKinds, kindWakes, governanceWakes,
 } from './entryKinds.js';

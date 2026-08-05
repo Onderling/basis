@@ -38,6 +38,7 @@
  */
 
 import { AgentIdentity, canonicalize, b64encode, b64decode, genId } from '@onderling/core';
+import { RETAIN, retentionWindowFor } from '@onderling/item-store';
 import { sha256 } from '@noble/hashes/sha2.js';
 
 export const AUDIT_VERSION = 1;
@@ -57,9 +58,13 @@ export const AUDIT_SUMMARY_EVENT = 'audit.summary';
  * @param {AgentIdentity} args.identity
  * @param {object}        [args.vault]      VaultMemory | VaultLocalStorage | VaultIndexedDB
  * @param {string|null}   [args.vaultKey]   persistence slot; null → in-memory
+ * @param {boolean}       [args.autoCompact] compact to the AUDIT retention window right after loading — the
+ *                                           natural checkpoint for retention (boot). Off by default so the
+ *                                           primitive's other users are unaffected; `createSecureAgent` (the
+ *                                           sa.audit owner) turns it on.
  * @returns {Promise<AuditLog>}
  */
-export async function loadAuditLog({ identity, vault, vaultKey = null } = {}) {
+export async function loadAuditLog({ identity, vault, vaultKey = null, autoCompact = false } = {}) {
   if (!identity || typeof identity.sign !== 'function') {
     throw new Error('loadAuditLog: identity with .sign() required');
   }
@@ -77,7 +82,11 @@ export async function loadAuditLog({ identity, vault, vaultKey = null } = {}) {
       // Corrupt slot → start fresh; next persist overwrites.
     }
   }
-  return new AuditLog({ identity, vault, vaultKey, entries });
+  const log = new AuditLog({ identity, vault, vaultKey, entries });
+  // Retention at the load checkpoint: fold anything past the AUDIT detail window into a summary. A no-op for a
+  // log under the window, and safe on a mixed-signer/peer-shared log (compact refuses it), so it never throws.
+  if (autoCompact) { try { await log.compactToWindow(); } catch { /* best-effort retention — never block load */ } }
+  return log;
 }
 
 export class AuditLog {
@@ -290,6 +299,24 @@ export class AuditLog {
     this.#entries = rechained;
     await this.#persist();
     return { compacted: true, foldedCount: folded.length };
+  }
+
+  /**
+   * Compact to the AUDIT retention window — the DERIVATION (`G-A4`). The window is NOT sa.audit's to choose:
+   * it comes from the one shared kind/retention table (`entryKinds.RETENTION_WINDOW[RETAIN.AUDIT]`), the same
+   * table the agent trail reads, so the two audit records cannot drift to different windows. `sa.audit`'s whole
+   * log is AUDIT-class by nature (security events), so it reads the AUDIT bucket directly. A no-op under the
+   * window (nothing to fold). Returns the compaction result plus the `window` it resolved (so a caller — and
+   * the guard — can see the window was derived, not hardcoded).
+   *
+   * @param {object} [args]
+   * @param {number} [args.now]  clock override (tests)
+   * @returns {Promise<{compacted:boolean, foldedCount:number, window:number, reason?:string}>}
+   */
+  async compactToWindow({ now } = {}) {
+    const window = retentionWindowFor(RETAIN.AUDIT);
+    const res = await this.compact({ keepRecent: window, now });
+    return { ...res, window };
   }
 
   // ── internal ──────────────────────────────────────────────────────

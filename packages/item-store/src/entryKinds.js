@@ -95,6 +95,24 @@ export function isAuditKind(kind) { return entryKind(kind).audit === true; }
 export function retentionOf(kind) { return entryKind(kind).retain; }
 
 /**
+ * The DETAIL WINDOW per retention class — how many most-recent entries stay verbatim before the class's
+ * policy applies to the rest (the AUDIT class COMPACTS beyond it; SHORT/CHAT drop the oldest). Durations are
+ * a per-user setting (see the RETAIN doc); these are the shared DEFAULTS. This is the ONE table both audit
+ * records — `sa.audit` (secure-agent) and the agent trail — read for their window, so neither hardcodes its
+ * own number: the `G-A4` "pin-the-agreement" guard holds them to it.
+ */
+export const RETENTION_WINDOW = Object.freeze({
+  [RETAIN.SHORT]: 200,
+  [RETAIN.CHAT]:  2000,
+  [RETAIN.AUDIT]: 1000,
+});
+
+/** The detail-window for a RETAIN class (falls back to SHORT for an unknown class). */
+export function retentionWindowFor(retainClass) {
+  return RETENTION_WINDOW[retainClass] ?? RETENTION_WINDOW[RETAIN.SHORT];
+}
+
+/**
  * May an entry of this kind wake an offline device?
  *
  * `payload` is consulted ONLY for kinds whose table entry is not the whole story — today just `governance`,

@@ -92,6 +92,10 @@ local tree has the symlinks/`node_modules` and the build server doesn't.
   versioning/agents work hand-materialized `@onderling/versioning` into `apps/basis`, `apps/basis-mobile`,
   and `packages/substrate-stack`; `@onderling/substrate-stack` into `apps/{stoop,tasks-v0,household}`; and
   `@onderling-app/agents` + `@onderling/agent-registry` into `apps/basis` — all pending the next real install.
+  *Concrete (2026-08-06):* the `sa.audit` retention derivation added `@onderling/item-store` to
+  `packages/secure-agent` (it now reads the shared `entryKinds` retention window); hand-materialized
+  `packages/secure-agent/node_modules/@onderling/item-store → ../../../item-store` (mirroring `core`/`vault`),
+  pending the next real install. Tell: `Failed to load url @onderling/item-store` from a secure-agent test.
   *Concrete (2026-07-13):* the logging model added `@onderling/logger`; links hand-materialized into
   `apps/basis`, `apps/basis-mobile`, and the repo-root `node_modules`, plus a `metro.config.js`
   `extraNodeModules` alias (Metro has package-exports disabled, so `@onderling/*` MUST be aliased there).

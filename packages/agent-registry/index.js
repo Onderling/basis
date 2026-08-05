@@ -29,6 +29,16 @@ export {
   setSkillExposure, setCircleSkillExposure,
 } from './src/skillExposure.js';
 export { loadProfile } from './src/loadProfile.js';
+// circle-membership RESTORE data (NOTE-identity-profiles-and-portability "What the registry must
+// gain") — per-circle { handle, address, proof, relays, key:{ref,posture} }
+// records carried in the profile property graph so a NEW DEVICE re-derives circle state (and can OPEN
+// pre-wipe content via the wrapped-key ref) after a phrase restore. Personal restore data, NOT a
+// disclosed attribute — no disclosure ladder.
+export {
+  CIRCLE_MEMBERSHIPS_KEY, isKeyRef, isCircleMembershipRecord, normaliseCircleMembership,
+  circleMembershipsOf, circleMembershipOf, circleKeyRefOf, circleMembershipsFromProperties,
+  setCircleMembership,
+} from './src/circleMembership.js';
 // identity step 5A — encrypted-file/DB export of the profile set
 export { exportProfileRegistry, importProfileRegistry, restoreProfilesInto } from './src/exportRegistry.js';
 export { registerAgentBundle } from './src/registerAgentBundle.js';

@@ -12,7 +12,7 @@
  * store inbound too; the one-store-per-circle collapse (same day) then removed the
  * second store entirely — tasks-v0 now uses the injected household store, so the
  * tasks surface and the household store ARE the same store, synced by the single
- * `ensureHouseholdCircleSync` mirror. This test crosses a real task over the wire
+ * `ensureCircleSync` mirror. This test crosses a real task over the wire
  * and reads it back through B's tasks surface: it can only pass if that ONE store
  * both received the fanned envelope and backs the tasks read — so it fails CI if
  * either the one-store collapse (G-C1) or the inbound wiring (G-C3) regresses.

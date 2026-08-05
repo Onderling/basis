@@ -28,7 +28,8 @@
  * install would be picked up on the next boot in preference to the restored one.
  */
 
-import { Bootstrap, AgentIdentity } from '@onderling/core';
+import { Bootstrap } from '@onderling/core';
+import { loadProfile } from '@onderling/agent-registry';
 
 /** The vault key the owner root phrase lives under. One name, so the two doors cannot disagree. */
 export const OWNER_PHRASE_KEY = 'owner-phrase';
@@ -61,8 +62,11 @@ export async function restoreOwnerRoot({ mnemonic, ownerRootVault, chatVault } =
     //    the phrase, where the reverse order would leave a chat key with no root to justify it.
     await ownerRootVault.set(OWNER_PHRASE_KEY, root.toMnemonic());
     // 2. The default profile, derived — never from the mnemonic's raw entropy. That was the other half of
-    //    the bug: the chat key is a CHILD of the root (`deriveAgentSeed`), not the root re-encoded.
-    const identity = await AgentIdentity.fromSeed(root.deriveAgentSeed(DEFAULT_PROFILE), chatVault);
+    //    the bug: the chat key is a CHILD of the root (`deriveAgentSeed`), not the root re-encoded. Load it
+    //    through the shared profile-loader so the "derive a profile's identity into a vault" logic lives in
+    //    ONE place (it also derives the per-circle addresses) — a fresh restore vault, so its unconditional
+    //    seed-write is exactly right here.
+    const { identity } = await loadProfile({ ownerRoot: root, profileId: DEFAULT_PROFILE, vault: chatVault });
     return { ok: true, pubKey: identity?.pubKey ?? null };
   } catch (err) {
     return { ok: false, code: 'storage', detail: err?.message ?? String(err) };

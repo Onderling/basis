@@ -1,14 +1,14 @@
 /**
  * FITNESS — pairing a household sync peer always names the CIRCLE.
  *
- * `agent.addHouseholdPeer(circleId, addr)` has been per-circle since a77371cd. A stale one-argument call
+ * `agent.addCirclePeer(circleId, addr)` has been per-circle since a77371cd. A stale one-argument call
  * survived in `basis-mobile/src/screens/ChatScreen.js` until 2026-07-30: it read a roster for circle X and
  * paired every member into whatever circle was active (or a legacy bucket). It read perfectly plausibly,
  * `src/screens/**` has no unit coverage, and nothing failed — which is the failure mode this repo keeps
  * having to undo.
  *
  * Two guards, because the bug had two halves:
- *   1. no shell may call `addHouseholdPeer` with a single argument — the arity IS the circle scoping;
+ *   1. no shell may call `addCirclePeer` with a single argument — the arity IS the circle scoping;
  *   2. feeding a whole ROSTER goes through the shared `feedHouseholdRoster`, never an inline loop. That
  *      helper also resyncs and binds each member's per-circle address to their key; the inline copy did
  *      neither, so the circles it touched were mis-scoped AND unsealable.
@@ -43,13 +43,13 @@ function jsFiles(root) {
 }
 
 /**
- * Every `addHouseholdPeer(...)` call in `src`, with the number of TOP-LEVEL arguments it passes.
+ * Every `addCirclePeer(...)` call in `src`, with the number of TOP-LEVEL arguments it passes.
  * Counted by walking the parentheses rather than by regex, so a nested call or a template literal in an
  * argument does not read as a second argument.
  */
 function addHouseholdPeerCalls(src) {
   const calls = [];
-  const needle = 'addHouseholdPeer(';
+  const needle = 'addCirclePeer(';
   for (let i = src.indexOf(needle); i !== -1; i = src.indexOf(needle, i + 1)) {
     let depth = 0;
     let args = 0;
@@ -81,18 +81,18 @@ function inCommentLine(src, index) {
 
 describe('FITNESS: household sync peers are paired per circle', () => {
   for (const shell of SHELLS) {
-    it(`${shell.name} never calls addHouseholdPeer without a circle`, () => {
+    it(`${shell.name} never calls addCirclePeer without a circle`, () => {
       const offenders = [];
       for (const file of jsFiles(shell.root)) {
         const src = readFileSync(file, 'utf8');
-        if (!src.includes('addHouseholdPeer(')) continue;
+        if (!src.includes('addCirclePeer(')) continue;
         for (const call of addHouseholdPeerCalls(src)) {
           if (call.args === 1 && !inCommentLine(src, call.index)) {
             offenders.push(`${file}:${lineOf(src, call.index)}`);
           }
         }
       }
-      expect(offenders, 'addHouseholdPeer(circleId, addr) — a one-argument call mis-scopes the peer')
+      expect(offenders, 'addCirclePeer(circleId, addr) — a one-argument call mis-scopes the peer')
         .toEqual([]);
     });
 
@@ -101,7 +101,7 @@ describe('FITNESS: household sync peers are paired per circle', () => {
       for (const file of jsFiles(shell.root)) {
         const src = readFileSync(file, 'utf8');
         // A shell that pairs peers in a LOOP is feeding a roster; that is the shared helper's job.
-        if (!/for\s*\(([^)]*)\)\s*\{?[^}]{0,200}addHouseholdPeer\(/s.test(src)) continue;
+        if (!/for\s*\(([^)]*)\)\s*\{?[^}]{0,200}addCirclePeer\(/s.test(src)) continue;
         offenders.push(file);
       }
       expect(offenders, 'call feedHouseholdRoster({agent, circleId}) instead of looping the roster here')
@@ -116,6 +116,6 @@ describe('the shared helper is the one that gets it right', () => {
     const calls = addHouseholdPeerCalls(src).filter((c) => c.args > 0);
     expect(calls.length).toBeGreaterThan(0);
     for (const call of calls) expect(call.args).toBe(2);
-    expect(src).toContain('addHouseholdPeer(circleId,');
+    expect(src).toContain('addCirclePeer(circleId,');
   });
 });

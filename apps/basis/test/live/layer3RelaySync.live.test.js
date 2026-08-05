@@ -89,8 +89,8 @@ describe.runIf(LIVE_RELAY)(`LIVE Layer-3 — household no-pod sync over relay @ 
     B = await buildRelayAgent('B (phone)');
 
     // Each adds the OTHER to its household roster (member pubKeys) → publishItem fans out to them.
-    A.addHouseholdPeer(B.relay.address);
-    B.addHouseholdPeer(A.relay.address);
+    A.addCirclePeer(B.relay.address);
+    B.addCirclePeer(A.relay.address);
     expect(A.relay.address).toBeTruthy();
     expect(B.relay.address).toBeTruthy();
     expect(A.relay.address).not.toBe(B.relay.address);   // genuinely two identities

@@ -32,7 +32,7 @@ export function getBasisClassifiers() {
 }
 
 // OBJ-2 device/agent pairing: `onderling-pair://<addr>?name=<label>` (output of the paired-devices QR).
-// The owning screen passes the payload to parsePairUri → addHouseholdPeer.
+// The owning screen passes the payload to parsePairUri → addCirclePeer.
 function _classifyPair(text) {
   return typeof text === 'string' && text.startsWith(PAIR_SCHEME) ? text : null;
 }

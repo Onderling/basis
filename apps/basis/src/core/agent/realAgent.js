@@ -203,7 +203,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // rooted at mem://household/circles/<id>/ so its list is its OWN. The legacy bucket ('household' /
   // no active circle) keeps the bare root, so the pre-partition pile stays reachable as a default.
   const householdStores = new Map();   // circleId → HouseholdStore
-  function getHouseholdScope(circleId) {
+  function getCircleScope(circleId) {
     const id = (typeof circleId === 'string' && circleId) ? circleId : 'household';
     let store = householdStores.get(id);
     if (!store) {
@@ -216,7 +216,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   // The active circle (shell-supplied) scopes a household call when the chat args don't carry one
   // (read verbs like listOpen aren't auto-scoped by the dispatch). circleId in args still wins.
   const getActiveHouseholdCircleId = typeof opts.getActiveCircleId === 'function' ? opts.getActiveCircleId : () => null;
-  function resolveHouseholdCircleId(args) {
+  function resolveCircleId(args) {
     return (args?.circleId ?? args?.circleId ?? args?.groupId ?? getActiveHouseholdCircleId()) || 'household';
   }
   // cluster L · L3 — household is now the UNIFORM wired path by DEFAULT (the legacy agent is retired).
@@ -406,7 +406,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * transport-agnostic; we hand it the secure-mesh envelope adapter (publish →
    * sa.peer.sendTo; receive → handleInbound, registered in the inbound router by
    * connectPeerTransport below). Peers are app-owned (the chat agent keeps no
-   * core PeerGraph) — the shell feeds the roster via `addHouseholdPeer` as the
+   * core PeerGraph) — the shell feeds the roster via `addCirclePeer` as the
    * circle's members become known (publish early-returns while the roster is
    * empty, so this is inert until peers are added). Publish-on-write hooks in the
    * skills (S1d) + persistence (S1e) follow; the mirror is exposed on `ctx` now
@@ -425,7 +425,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     sendPeerMessage: (to, payload) => sa.peer.sendTo(to, payload, { guarantee: 'hold-forward' }),
     selfAddress:     chatId.pubKey,
   });
-  const householdSubstrate = buildHouseholdSubstrateStack({
+  const circleSubstrate = buildHouseholdSubstrateStack({
     transport: householdEnvelopeAdapter,
     deviceId:  chatId.pubKey,
   });
@@ -442,11 +442,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     const id = (typeof circleId === 'string' && circleId) ? circleId : 'household';
     let mirror = circleMirrors.get(id);
     if (!mirror) {
-      const store = getHouseholdScope(id);
+      const store = getCircleScope(id);
       mirror = await wireHouseholdSubstrateMirror({
         itemStore:      store.substrate,
-        notifyEnvelope: householdSubstrate.notifyEnvelope,
-        pseudoPod:      householdSubstrate.pseudoPod,
+        notifyEnvelope: circleSubstrate.notifyEnvelope,
+        pseudoPod:      circleSubstrate.pseudoPod,
         circleId:       id,
         selfPubKey:     chatId.pubKey,
       });
@@ -504,7 +504,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         const mirror = await ensureCircleMirror(id);
         wireStoreMirror(circleStore, mirror);
         wireCircleStoreInbound({
-          notifyEnvelope: householdSubstrate.notifyEnvelope,
+          notifyEnvelope: circleSubstrate.notifyEnvelope,
           store:          circleStore,
           prefix:         `/household/circles/${id}/items/`,
         });
@@ -646,7 +646,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       params: (op.params ?? []).map((p) => (p.name === 'type' ? { ...p, required: false } : p)),
     });
     const storeFor = (ctx) =>
-      householdService.stores.getStore(resolveHouseholdCircleId(ctx.parts?.[0]?.data ?? {}));
+      householdService.stores.getStore(resolveCircleId(ctx.parts?.[0]?.data ?? {}));
     // Thread the acting member (`by`) from the invoke context into the pure core's ctx.
     const withBy   = (coreFn) => (store, a, ctx) => coreFn(store, a, { ...ctx, by: ctx.from ?? chatId?.pubKey });
     // Box the bare-array list cores so invoke returns a DataPart, not an array-mistaken-for-Parts.
@@ -667,7 +667,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * The `apps/agents` manifest (listAgents /agents + viewAgent detail) reads the canonical
    * `@onderling/agent-registry` pod resource.  The registry is anchored on THE USER'S OWN
    * pseudo-pod: the shared substrate stack already built above for household
-   * (`householdSubstrate.pseudoPod`), whose URI authority is the CHAT identity's pubKey —
+   * (`circleSubstrate.pseudoPod`), whose URI authority is the CHAT identity's pubKey —
    * i.e. this user's device pod, not a per-circle pod.  Mirrors the sibling bring-up
    * pattern (stoop-mobile bootstrapBundle / tasks-v0 Circle.js): `registerAgentBundle`
    * registers THIS device (the chat agent) in the resource — so the roster is non-empty
@@ -680,12 +680,12 @@ export async function createRealHouseholdAgent(opts = {}) {
   {
     const agentsRegistry =
       (await registerAgentBundle({
-        pseudoPod:   householdSubstrate.pseudoPod,
+        pseudoPod:   circleSubstrate.pseudoPod,
         podDeviceId: chatId.pubKey,
         agent:       chatAgent,
         opts: { capabilities: ['basis'], name: opts.agentsSelfName ?? 'basis (this device)' },
       }))
-      ?? createAgentRegistry({ pseudoPod: householdSubstrate.pseudoPod, deviceId: chatId.pubKey });
+      ?? createAgentRegistry({ pseudoPod: circleSubstrate.pseudoPod, deviceId: chatId.pubKey });
 
     /* control ops — LIVE token binding (2026-07-09). hostAgent (the skills' home)
      * is the ISSUER: `issueCapabilityToken` signs with its identity and needs no other
@@ -768,7 +768,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // Subscribed-community roots (live thunk) unioned with any pinned
       // commonsRoots; per-endorser records come from the subscriptions (their
       // community catalogs) plus the same shared endorsement resource pool.
-      const endorsements = createEndorsementResource({ pseudoPod: householdSubstrate.pseudoPod, deviceId: chatId.pubKey });
+      const endorsements = createEndorsementResource({ pseudoPod: circleSubstrate.pseudoPod, deviceId: chatId.pubKey });
       agentsCatalog = createCatalogSource({
         roots: async () => [...new Set([...commonsRoots, ...(await communitySubs.roots())])],
         resolveEndorsements: async (pk) => {
@@ -785,7 +785,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // resolveEndorsements(pubKey); wired here as the pool the walk groups by
       // endorser so G1's single resource keeps working.)
       const endorsements = createEndorsementResource({
-        pseudoPod: householdSubstrate.pseudoPod,
+        pseudoPod: circleSubstrate.pseudoPod,
         deviceId:  chatId.pubKey,
       });
       agentsCatalog = createCatalogSource({
@@ -1579,7 +1579,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // exactly like the bespoke household path below (chatId.pubKey actor · resolved circle).
       if (g?.app === 'household' && householdService) {
         return householdService.callCapability(g.atom, g.noun, args ?? {}, {
-          circleId: resolveHouseholdCircleId(args),
+          circleId: resolveCircleId(args),
           by:       chatId?.pubKey,
         });
       }
@@ -1588,7 +1588,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       return { ok: false, error: 'generic-capability-unavailable' };
     }
     if (appOrigin === 'household') {
-      const circleId = resolveHouseholdCircleId(args);
+      const circleId = resolveCircleId(args);
       // The DISSOLVED cores route through the uniform invoke to the wireSkill-wrapped pure cores on the
       // dedicated household agent (S1 InternalTransport fast-path + the callSkill security gate). circleId
       // is injected into the DataPart args so the wired `storeFor` resolves the per-circle CircleItemStore.
@@ -3022,8 +3022,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // OBJ-2 Phase 6 — peer ops are PER-CIRCLE. `(circleId, pubKey)`; a legacy 1-arg `(pubKey)` call
     // scopes to the active circle (the paired-devices screen pairs the open circle). Each circle's
     // mirror has its own roster — pairing circle A never fans A's items to a B-only device.
-    addHouseholdPeer:    async (circleId, pubKey) => {
-      if (pubKey === undefined) { pubKey = circleId; circleId = resolveHouseholdCircleId({}); }
+    addCirclePeer:    async (circleId, pubKey) => {
+      if (pubKey === undefined) { pubKey = circleId; circleId = resolveCircleId({}); }
       const id = (typeof circleId === 'string' && circleId) ? circleId : 'household';
       const mirror = await ensureCircleMirror(id);
       const fresh = isNewCirclePeer(id, pubKey);
@@ -3032,7 +3032,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       return mirror.listPeers?.() ?? [];
     },
     removeHouseholdPeer: async (circleId, pubKey) => {
-      if (pubKey === undefined) { pubKey = circleId; circleId = resolveHouseholdCircleId({}); }
+      if (pubKey === undefined) { pubKey = circleId; circleId = resolveCircleId({}); }
       const id = (typeof circleId === 'string' && circleId) ? circleId : 'household';
       const mirror = await ensureCircleMirror(id);
       mirror.removePeer(pubKey); await persistCirclePeers(id);
@@ -3041,7 +3041,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // OBJ-2 mutual pairing — add the peer AND ask it to add us back (a __pairReq carrying our address +
     // the circle), so a single scan makes the no-pod sync bidirectional. No echo → no loop.
     pairWithPeer:        async (circleId, pubKey) => {
-      if (pubKey === undefined) { pubKey = circleId; circleId = resolveHouseholdCircleId({}); }
+      if (pubKey === undefined) { pubKey = circleId; circleId = resolveCircleId({}); }
       const id = (typeof circleId === 'string' && circleId) ? circleId : 'household';
       const mirror = await ensureCircleMirror(id);
       const fresh = isNewCirclePeer(id, pubKey);

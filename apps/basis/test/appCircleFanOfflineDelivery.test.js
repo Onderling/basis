@@ -12,7 +12,7 @@
  * reconnect — without the caller ever passing an opt.
  *
  * The test drives the op, NOT `sa.peer.sendTo` directly:
- *   A.agent.addHouseholdPeer(circle, B)  — B is a sync peer of A's circle store.
+ *   A.agent.addCirclePeer(circle, B)  — B is a sync peer of A's circle store.
  *   A.agent.callSkill('household','addTask',…)  — the REAL app write → mirror fan.
  *
  * An InternalBus disconnect stands in for B dropping off the mesh; B's reconnect HI
@@ -54,7 +54,7 @@ describe('offline delivery for a REAL circle-content fan (household.addTask over
     await connectAgentsOverBus(A, B);
 
     // B is a sync peer of A's default circle store, so A's item writes fan to B.
-    await A.agent.addHouseholdPeer('household', B.pubKey);
+    await A.agent.addCirclePeer('household', B.pubKey);
 
     // Warm the handshake while both are online (so the later hold path is a real
     // offline-hold, not a first-contact HI failure) and prove online item fan-out

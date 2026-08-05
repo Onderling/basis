@@ -28,7 +28,7 @@ export function isQrUri(v) {
 
 // ── OBJ-2 device/agent pairing payload ──────────────────────────────────────
 // A pairing QR carries one household peer address: `onderling-pair://<addr>?name=<label>`.
-// Scanning it on the other device → addHouseholdPeer(addr), so the two per-circle household
+// Scanning it on the other device → addCirclePeer(addr), so the two per-circle household
 // agents share their items over the relay/peer transport — no typing a long address.
 export const QR_PAIR_SCHEME = 'onderling-pair://';
 

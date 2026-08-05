@@ -1596,7 +1596,7 @@ export default function CircleLauncherScreen({
         // OBJ-2 — paired devices (no-pod sync). The agent exposes the household roster surface.
         householdSelfAddr={bundle?.agent?.householdSelfAddr ?? null}
         householdPeers={bundle?.agent?.listHouseholdPeers?.(selected.id) ?? []}
-        onAddHouseholdPeer={(addr) => (bundle?.agent?.pairWithPeer ?? bundle?.agent?.addHouseholdPeer)?.(selected.id, addr)}
+        onAddHouseholdPeer={(addr) => (bundle?.agent?.pairWithPeer ?? bundle?.agent?.addCirclePeer)?.(selected.id, addr)}
         onRemoveHouseholdPeer={(addr) => bundle?.agent?.removeHouseholdPeer?.(selected.id, addr)}
         // Phase 4 §9 — the device transport state the enabledWhen fold reads + the built-in dispatcher
         // for device-scoped controls (transport-mode · relay endpoint). web parity with circleApp.js.

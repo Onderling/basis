@@ -9,8 +9,8 @@ function mkAgent({ members = [], selfAddr = 'me', skill } = {}) {
   return {
     added,
     peer: { address: selfAddr },
-    // Peer ops are per-circle since a77371cd: addHouseholdPeer(circleId, pubKey). Capture the peer, not the circle.
-    addHouseholdPeer: (_circleId, addr) => { added.push(addr); },
+    // Peer ops are per-circle since a77371cd: addCirclePeer(circleId, pubKey). Capture the peer, not the circle.
+    addCirclePeer: (_circleId, addr) => { added.push(addr); },
     callSkill: skill ?? vi.fn(async (app, op) => (op === 'listGroupRoster' ? { members } : {})),
   };
 }
@@ -23,10 +23,10 @@ describe('feedHouseholdRoster', () => {
     expect(agent.added).toEqual(['laptop', 'phone2']);
   });
 
-  it('no-ops without an agent / addHouseholdPeer / circleId', async () => {
+  it('no-ops without an agent / addCirclePeer / circleId', async () => {
     expect(await feedHouseholdRoster({})).toBe(0);
-    expect(await feedHouseholdRoster({ agent: { addHouseholdPeer: () => {} } })).toBe(0); // no circleId
-    expect(await feedHouseholdRoster({ agent: { callSkill: () => {} }, circleId: 'c' })).toBe(0); // no addHouseholdPeer
+    expect(await feedHouseholdRoster({ agent: { addCirclePeer: () => {} } })).toBe(0); // no circleId
+    expect(await feedHouseholdRoster({ agent: { callSkill: () => {} }, circleId: 'c' })).toBe(0); // no addCirclePeer
   });
 
   it('stays local when the roster lookup throws (not a group / no roster)', async () => {

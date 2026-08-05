@@ -1544,7 +1544,7 @@ let circlePeerGraph = null;      // app-owned PeerGraph (contacts roster registr
 let circleCoreAgent = null;      // the core chat agent (agent.sa.agent), for discoverA2A
 let circleHouseholdAgent = null; // OBJ-2 — the real household agent (createRealHouseholdAgent); module-level
                                  // so showSettings (a sibling fn, NOT nested in buildCircleBot) can read its
-                                 // no-pod sync hooks (householdSelfAddr / addHouseholdPeer). Was referenced
+                                 // no-pod sync hooks (householdSelfAddr / addCirclePeer). Was referenced
                                  // as a free `agent` → ReferenceError that broke web Circle Settings entirely.
 let circleContactChannel = null; // contact-thread peer channel (conversational link over sa.peer)
 // OBJ-2 membership — peer-redeem correlation (joiner side) + the sender, set when the agent boots.
@@ -6493,8 +6493,8 @@ async function showSettings(id) {
     householdPeers:        circleHouseholdAgent?.listHouseholdPeers?.(id) ?? [],   // THIS circle's roster
     onAddHouseholdPeer:    typeof circleHouseholdAgent?.pairWithPeer === 'function'
       ? (addr) => circleHouseholdAgent.pairWithPeer(id, addr)        // mutual + per-circle: pair into THIS circle
-      : (typeof circleHouseholdAgent?.addHouseholdPeer === 'function'
-        ? (addr) => circleHouseholdAgent.addHouseholdPeer(id, addr) : undefined),
+      : (typeof circleHouseholdAgent?.addCirclePeer === 'function'
+        ? (addr) => circleHouseholdAgent.addCirclePeer(id, addr) : undefined),
     onRemoveHouseholdPeer: typeof circleHouseholdAgent?.removeHouseholdPeer === 'function'
       ? (addr) => circleHouseholdAgent.removeHouseholdPeer(id, addr) : undefined,
     onIncomingApplied:   () => clearPending(),
@@ -7102,7 +7102,7 @@ async function boot() {
       });
       // OBJ-2 S1c-shell — feed the household no-pod sync roster from a circle's
       // MEMBERS (the stoop group roster = people with reachable peer addrs), NOT
-      // the bot contacts: a bot must never receive household items. `addHouseholdPeer`
+      // the bot contacts: a bot must never receive household items. `addCirclePeer`
       // dedupes, so repeated calls (re-open, reconnect) are safe; the mirror only
       // fans out once peers are present. Reuses the exact member source the
       // catch-up path uses (`listGroupRoster` → `members[].addr`).

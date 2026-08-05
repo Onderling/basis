@@ -290,16 +290,16 @@ describe('createRealHouseholdAgent — T5.2d secure-mesh seams', () => {
 describe('createRealHouseholdAgent — OBJ-2 household no-pod sync (S1a/S1c)', () => {
   it('exposes the sync roster hooks + seam', async () => {
     const a = await createRealHouseholdAgent();
-    expect(typeof a.addHouseholdPeer).toBe('function');
+    expect(typeof a.addCirclePeer).toBe('function');
     expect(typeof a.removeHouseholdPeer).toBe('function');
     expect(typeof a.householdSync?.handleInbound).toBe('function');
     expect(typeof a.householdSync?.mirror?.publishItem).toBe('function');
     expect(a.householdSync.circleId).toBe('household');
   });
 
-  it('addHouseholdPeer / removeHouseholdPeer feed the mirror roster + return it', async () => {
+  it('addCirclePeer / removeHouseholdPeer feed the mirror roster + return it', async () => {
     const a = await createRealHouseholdAgent();
-    const after = await a.addHouseholdPeer('peerB');
+    const after = await a.addCirclePeer('peerB');
     expect(after).toContain('peerB');
     expect(a.listHouseholdPeers()).toContain('peerB');
     await a.removeHouseholdPeer('peerB');
@@ -316,7 +316,7 @@ describe('createRealHouseholdAgent — OBJ-2 household no-pod sync (S1a/S1c)', (
   it('manually-paired peers PERSIST across a reload (same vault → re-fed on boot)', async () => {
     const chatVault = new VaultMemory();
     const a = await createRealHouseholdAgent({ chatVault });
-    await a.addHouseholdPeer('peerPersisted');
+    await a.addCirclePeer('peerPersisted');
     expect(a.listHouseholdPeers()).toContain('peerPersisted');
     // "reload": a fresh agent on the SAME vault re-feeds the saved pairing on boot.
     const a2 = await createRealHouseholdAgent({ chatVault });
@@ -352,7 +352,7 @@ describe('createRealHouseholdAgent — OBJ-2 household no-pod sync (S1a/S1c)', (
 
   it('S1d — a local addItem via the skills fans out to the roster (publish-on-write)', async () => {
     const a = await createRealHouseholdAgent();
-    a.addHouseholdPeer('peerB');
+    a.addCirclePeer('peerB');
     const spy = vi.spyOn(a.householdSync.mirror, 'publishItem');
     await a.callSkill('household', 'addItem', { type: 'shopping', text: 'Buy milk' });
     expect(spy).toHaveBeenCalled();

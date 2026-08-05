@@ -3,7 +3,7 @@
  *
  * A circle's members are recorded as stoop `membership-redemption` items; `listGroupRoster` flattens
  * them to `[{addr, role}]`. To make a circle's items sync peer-to-peer with no pod, each device adds
- * every OTHER member's transport address as a household-sync peer (`agent.addHouseholdPeer`). When both
+ * every OTHER member's transport address as a household-sync peer (`agent.addCirclePeer`). When both
  * devices do this on circle-open (and after a join), they become mutual sync peers — so subsequent
  * writes fan out across the circle.
  *
@@ -15,7 +15,7 @@
 
 import { bindCircleAddressKeys } from './circleAddressKeys.js';
 export async function feedHouseholdRoster({ agent, circleId } = {}) {
-  if (!agent || typeof agent.addHouseholdPeer !== 'function' || !circleId) return 0;
+  if (!agent || typeof agent.addCirclePeer !== 'function' || !circleId) return 0;
   // BEFORE pairing: make sure this circle can RECEIVE. The store↔mirror sync used to be wired lazily,
   // on the first wired household op for the circle — which for the inbound half is a race the receiver
   // always loses. Pairing tells the other device it may publish to us; if our listener is not up yet,
@@ -36,7 +36,7 @@ export async function feedHouseholdRoster({ agent, circleId } = {}) {
   let added = 0;
   for (const m of (Array.isArray(r?.members) ? r.members : [])) {
     // Per-circle (OBJ-2 Phase 6): pair the member into THIS circle's mirror, not a global roster.
-    if (m?.addr && m.addr !== self) { try { agent.addHouseholdPeer(circleId, m.addr); added += 1; } catch { /* */ } }
+    if (m?.addr && m.addr !== self) { try { agent.addCirclePeer(circleId, m.addr); added += 1; } catch { /* */ } }
     if (m?.addr && gidx) { try { gidx.add(circleId, m.addr); } catch { /* the index must never break pairing */ } }
   }
   // OBJ-2 convergence — re-push our current items to all (now-paired) peers. The live publish-on-write

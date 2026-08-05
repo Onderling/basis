@@ -82,7 +82,7 @@ describe('a task created on one device reaches another device\'s TASKS store (th
     wireInboundLikeShell(B);
 
     // B is a sync peer of A's tasks circle mirror, so A's task writes fan to B.
-    await A.agent.addHouseholdPeer(CIRCLE_ID, B.pubKey);
+    await A.agent.addCirclePeer(CIRCLE_ID, B.pubKey);
 
     // Warm the handshake while both are online (so delivery is deterministic, not a
     // first-contact HI failure).

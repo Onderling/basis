@@ -93,7 +93,7 @@ export async function primeCircleSecurity({ agent, circleIds = null, onWarn = nu
   // 2. Then the rosters — who may speak.
   //
   //    `bindCircleAddressKeysFor`, NOT `feedHouseholdRoster`. The two differ in a way that matters here:
-  //    `feedHouseholdRoster` returns early unless `agent.addHouseholdPeer` exists, so the authorize
+  //    `feedHouseholdRoster` returns early unless `agent.addCirclePeer` exists, so the authorize
   //    snapshot — which lives inside it — was a PASSENGER on household sync and silently did not happen
   //    for any agent without it. Security state must not be gated behind an unrelated capability.
   //    `bindCircleAddressKeysFor` needs exactly what the job needs: `callSkill` + `registerPeerAddress`.

@@ -831,8 +831,8 @@ export default function ChatScreen({
           // Feed the household no-pod sync roster with this circle's members, through the SHARED helper
           // both other call sites already use (web's `feedHouseholdRosterForCircle`, the mobile
           // launcher's circles-load). This was an inline copy, and it had drifted twice over: it called
-          // `addHouseholdPeer(addr)` with ONE argument where the signature is
-          // `addHouseholdPeer(circleId, addr)` — so peers read from THIS circle's roster were paired into
+          // `addCirclePeer(addr)` with ONE argument where the signature is
+          // `addCirclePeer(circleId, addr)` — so peers read from THIS circle's roster were paired into
           // whatever circle happened to be active — and it skipped the resync + per-circle key binding
           // the shared helper also does. Logic that already exists in shared code is called, not
           // re-written (invariant 1).

@@ -61,7 +61,7 @@ describe('the primer stands on its own', () => {
   });
 
   it('does not route the security snapshot through household sync', () => {
-    // `feedHouseholdRoster` returns early unless `addHouseholdPeer` exists, so the authorize snapshot
+    // `feedHouseholdRoster` returns early unless `addCirclePeer` exists, so the authorize snapshot
     // inside it silently did not happen for any agent without household pairing. Security state must not
     // be gated behind an unrelated capability.
     expect(bare).toMatch(/bindCircleAddressKeysFor/);

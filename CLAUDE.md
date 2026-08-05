@@ -182,6 +182,13 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
 - **Keep the design-doc status overview current.** When you finish, supersede, or archive a plan/design doc,
   update its row (status + date) in `plans/DOC-STATUS.md` — the living lifecycle map of the plan corpus
   (status · 🗄 archive-ready · the reconciliation record). Stops parallel/stale plans creeping back.
+- **Stay anchored — the plan DERIVES, it does not invent.** The *why* is [`docs/principles.md`], the *what/how*
+  is `plans/PLAN-homes.md`. Every other plan/design doc is a **derivation** from those and a **child of an
+  existing arc**, never a new authority. Resolve a fork by deriving from them and checking the invariants
+  above — never by starting a fresh direction in a new doc. If a new thing does not map to a principle **and**
+  a HOMES home, that is drift — stop and reconcile before continuing. Keep the two trackers live as you work:
+  `plans/DOC-STATUS.md` (doc lifecycle) + `plans/DECISIONS-FOR-REVIEW.md` (every autonomous call), and
+  sanity-check that mapping at each session's close (the wave-2 log in `DOC-STATUS.md` is the worked example).
 
 ## Where the truth is
 - **Doc layout (task #66 model — `plans/PLAN-file-org-inventory.md`):** function is encoded in name/location and

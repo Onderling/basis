@@ -1,18 +1,21 @@
 /**
  * basis — node-level, in-process TWO-DEVICE regression for a task crossing to
- * another device's TASKS store (not just its household store).
+ * another device's tasks surface. Guards `G-C3` (per-type sync arrival) and now
+ * also `G-C1` (one store per circle) — see below.
  *
- * A task created on device A must appear in device B's tasks store — the store
- * the tasks surface actually reads (`mem://tasks/circles/<id>/`). The gap this
- * guards: the tasks CircleItemStore used to be wired OUTBOUND ONLY (publish-on-
- * write via `wireStoreMirror`) and never wired INBOUND. So a task created on A
- * fanned out correctly, but on B the fanned envelope was ingested only into B's
- * HOUSEHOLD store (a DIFFERENT CircleItemStore instance the tasks surface never
- * reads) — the task never reached B's tasks store, so it never appeared. The fix
- * adds `wireCircleStoreInbound(...)` to `ensureTasksCircleMirror` so the tasks
- * store is mirrored BOTH ways. In short: the store was mirrored out with nothing
- * writing the inbound back. This test crosses a real task over the wire and reads
- * it back through B's tasks surface, so that gap fails CI if it reopens.
+ * A task created on device A must appear when device B reads its tasks. HISTORY:
+ * there used to be TWO CircleItemStore instances for one circle — the tasks store
+ * (`mem://tasks/circles/<id>/`, tasks-v0's own) and the household store
+ * (`mem://circles/<id>/`, basis'). The tasks store was wired OUTBOUND ONLY, so a
+ * fanned task was ingested only into B's household store (which the tasks surface
+ * never read) and never appeared. The 2026-08-05 interim fix wired the tasks
+ * store inbound too; the one-store-per-circle collapse (same day) then removed the
+ * second store entirely — tasks-v0 now uses the injected household store, so the
+ * tasks surface and the household store ARE the same store, synced by the single
+ * `ensureHouseholdCircleSync` mirror. This test crosses a real task over the wire
+ * and reads it back through B's tasks surface: it can only pass if that ONE store
+ * both received the fanned envelope and backs the tasks read — so it fails CI if
+ * either the one-store collapse (G-C1) or the inbound wiring (G-C3) regresses.
  *
  * The task is created through the REAL app path:
  *   A.agent.callSkill('tasks','addTask',{ text, circleId })   — the tasks

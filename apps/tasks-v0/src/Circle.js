@@ -288,8 +288,19 @@ export async function createCircleAgent({
   // call — the CLI owns the wireSkills invocation.
   agent: sharedAgent,
   registerSkills,
+  // One-store-per-circle — a factory the host supplies to hand each circle
+  // its ALREADY-OWNED store (basis: the household CircleItemStore). When it
+  // resolves a store, tasks live in that one store and sync over the host's
+  // one mirror; tasks-v0's own substrate mirror is skipped (the host owns the
+  // single fan-out path). Absent / returns null ⇒ standalone self-wired store.
+  circleStoreFor,
 } = {}) {
   const circle = _normaliseConfig(circleConfig ?? { ...IMPLICIT_HOUSEHOLD_CONFIG });
+
+  // Resolve the host-owned per-circle store, if any (one-store-per-circle).
+  const injectedCircleStore = (typeof circleStoreFor === 'function')
+    ? (circleStoreFor(circle.circleId) ?? null)
+    : null;
 
   // boot-time re-register the circle's custom roles into the
   // process-global `core.Roles` registry, so a fresh CLI launch
@@ -357,10 +368,13 @@ export async function createCircleAgent({
     circleMutator,
     agent:        sharedAgent,
     registerSkills,
+    // One-store-per-circle — pass the host's store through when supplied.
+    circleStore:  injectedCircleStore,
     // Multi-circle runtime — when a shared agent is supplied (the CLI's
     // multi-circle path), each circle bundle MUST use its own item-store
     // root so writes don't leak across circles on the same localStore.
     // Single-circle path preserves the legacy `mem://tasks/` root.
+    // (Ignored when an external store is injected — it already owns its URI.)
     itemStoreRoot: sharedAgent
       ? `mem://tasks/circles/${circle.circleId}/`
       : undefined,
@@ -760,8 +774,12 @@ export async function createCircleAgent({
   // and applies inbound task envelopes to the local itemStore. Only
   // wired when the full substrate stack came up (notifyEnvelope is
   // required). Selfless tests that don't need fan-out can still run.
+  // One-store-per-circle — when the host injected its own circle store, the
+  // host owns the SINGLE fan-out path (its store<->mirror wiring already
+  // carries our task items). Wiring our own substrate mirror here would be a
+  // second sync path over the same items → double-publish/ingest. Skip it.
   let tasksMirror = null;
-  if (bundle.notifyEnvelope) {
+  if (bundle.notifyEnvelope && !injectedCircleStore) {
     try {
       tasksMirror = await wireTasksSubstrateMirror({
         itemStore:       bundle.itemStore,

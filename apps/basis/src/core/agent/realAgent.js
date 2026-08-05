@@ -458,46 +458,13 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
     return mirror;
   }
-  // L3 no-pod-sync — bridge a circle's CircleItemStore (the live wired data) to its peer mirror,
-  // BIDIRECTIONALLY, ONCE per circle (guard with the Set; inbound `subscribe` accumulates):
+  // Bridge a circle's ONE CircleItemStore (the live wired data — tasks + all its other items, since
+  // one-store-per-circle collapsed them, G-C1) to its peer mirror, BIDIRECTIONALLY, ONCE per circle
+  // (guard with the Set; inbound `subscribe` accumulates):
   //   PUBLISH — local writes fan out to the circle's other devices (`wireStoreMirror` → publish-on-write).
   //   INBOUND — peer envelopes ingest back into THIS circle store (`wireCircleStoreInbound`, id-preserving,
-  //             no echo). Same kind/prefix the household mirror publishes. Best-effort (op still runs locally).
-  // Tasks ride the SAME peer mirror as the circle's other items — one fan-out path, not a second one.
-  // `wireStoreMirror` needs a store with `setSyncHook`: that is the bundle's underlying CircleItemStore,
-  // not the `createTaskStore` wrapper around it (which is why the bundle now exposes both).
-  const tasksSyncWired = new Set();
-  async function ensureTasksCircleMirror(circleId, bundle) {
-    const id = (typeof circleId === 'string' && circleId) ? circleId : null;
-    if (!id || tasksSyncWired.has(id)) return;
-    const store = bundle?.circleStore ?? bundle?._circleState?.circleStore ?? null;
-    if (!store || typeof store.setSyncHook !== 'function') {
-      if (typeof console !== 'undefined') {
-        console.warn(`[tasks-sync] ${id}: no mirrorable store on the tasks bundle — tasks will not fan out`);
-      }
-      return;
-    }
-    try {
-      const mirror = await ensureHouseholdMirror(id);
-      wireStoreMirror(store, mirror);
-      // Inbound ingest for the tasks store. Without this the tasks store was publish-only: a task created
-      // on another device fanned out correctly but was ingested only into the household store (a DIFFERENT
-      // CircleItemStore instance the tasks surface never reads), so it never appeared here — the store was
-      // mirrored out with nothing writing the inbound back. Same transport + prefix the household store's
-      // own inbound uses; the ingest is id-preserving, causal, and sync:false (no echo).
-      wireCircleStoreInbound({
-        notifyEnvelope: householdSubstrate.notifyEnvelope,
-        store,
-        prefix:         `/household/circles/${id}/items/`,
-      });
-      tasksSyncWired.add(id);
-      if (typeof console !== 'undefined') console.info(`[tasks-sync] ${id}: tasks store<->mirror wired (in+out)`);
-    } catch (err) {
-      if (typeof console !== 'undefined') {
-        console.warn(`[tasks-sync] ${id}: tasks store<->mirror NOT wired — tasks will not fan out`, err?.message ?? err);
-      }
-    }
-  }
+  //             no echo). Best-effort (the op still runs locally). This is the SINGLE fan-out path for the
+  //   circle: tasks ride it too now (tasks-v0's own substrate mirror is skipped when the store is injected).
   async function ensureHouseholdCircleSync(circleId) {
     const id = (typeof circleId === 'string' && circleId) ? circleId : 'household';
     if (householdSyncWired.has(id)) return;
@@ -1142,8 +1109,19 @@ export async function createRealHouseholdAgent(opts = {}) {
     // `cc.firstBootSeeded.v1` workaround in App.js).
     persistDb: opts.tasksPersistDb,
     label: 'TasksCircle(cc)',
+    // One-store-per-circle (G-C1) — hand every tasks circle its household
+    // CircleItemStore instead of tasks-v0 constructing a second one. Tasks then
+    // live in the ONE per-circle store and sync over the ONE household mirror
+    // (ensureHouseholdCircleSync); tasks-v0 skips its own substrate mirror.
+    circleStoreFor: (id) => householdService.stores.getStore(id),
   });
   await chatAgent.hello(tasksCircle.address);
+
+  // The primary tasks circle's single store needs its store<->mirror sync wired
+  // so unscoped task ops (which don't carry a circleId, so the per-op wiring at
+  // dispatch is skipped) still fan out. Idempotent with the dispatch-time wire.
+  const tasksPrimaryCircleId = opts.tasksCircleConfig?.circleId ?? 'cc-default';
+  await ensureHouseholdCircleSync(tasksPrimaryCircleId);
 
   // Pre-seed the demo circle with 4 starter tasks — the demo + journey
   // fixtures expect /mytasks to show these out of the box.  DEMO-ONLY: a real
@@ -1732,12 +1710,12 @@ export async function createRealHouseholdAgent(opts = {}) {
       // calls leave circleId unset → resolver falls back to the primary
       // circle (legacy single-circle behaviour).  ensureCircle is idempotent.
       if (typeof realArgs.circleId === 'string' && realArgs.circleId) {
-        const spawned = await tasksCircle.ensureCircle(realArgs.circleId);
-        // A circle's tasks live in the tasks bundle's own CircleItemStore, which is correctly SCOPED per
-        // circle but was never MIRRORED — so tasks could be written and read on a device and no peer ever
-        // heard about them, while the circle's mirror sat wired and paired with nothing to send.
-        // Attach the same mirror the circle's other items already use. Idempotent per circle.
-        await ensureTasksCircleMirror(realArgs.circleId, spawned);
+        await tasksCircle.ensureCircle(realArgs.circleId);
+        // One-store-per-circle (G-C1): this circle's tasks live in the SAME
+        // CircleItemStore as its other items (injected via circleStoreFor), so
+        // the household store<->mirror sync is the single fan-out path. Wire it
+        // for this circle (idempotent per circle) — no separate tasks mirror.
+        await ensureHouseholdCircleSync(realArgs.circleId);
       }
       const parts = [DataPart(realArgs)];
       const result = await chatAgent.invoke(tasksCircle.address, realOpId, parts);

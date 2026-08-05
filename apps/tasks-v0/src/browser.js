@@ -156,6 +156,10 @@ export async function createBrowserMultiCircleTasksAgent({
   primaryCircleConfig,
   persistDb,
   label = 'TasksMeshAgent(cc)',
+  // One-store-per-circle — the host's per-circle store factory, threaded to
+  // every circle (primary + lazily-spawned). Absent ⇒ each circle self-wires
+  // its own store, exactly as before.
+  circleStoreFor,
 }) {
   if (!bus) throw new TypeError('createBrowserMultiCircleTasksAgent: bus required');
   if (!identityVault) throw new TypeError('createBrowserMultiCircleTasksAgent: identityVault required');
@@ -192,6 +196,7 @@ export async function createBrowserMultiCircleTasksAgent({
     agent:                meshAgent,
     registerSkills:       false,   // wireSkills owns registration below
     wireOnboardingSkills: false,
+    circleStoreFor,
   });
   const primaryCircleState = primaryBundle._circleState;
   const circlesMap = new Map([[primaryCircleState.circleId, primaryCircleState]]);
@@ -217,6 +222,7 @@ export async function createBrowserMultiCircleTasksAgent({
       agent:                meshAgent,
       registerSkills:       false,
       wireOnboardingSkills: false,
+      circleStoreFor,
     });
     const cs = spawned._circleState;
     circlesMap.set(circleId, cs);

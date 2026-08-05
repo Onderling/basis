@@ -91,6 +91,12 @@ export async function createTasksAgent({
   // legacy `'mem://tasks/'` is preserved as the default for the
   // single-circle path.
   itemStoreRoot,
+  // One-store-per-circle — an EXTERNAL per-circle CircleItemStore to use
+  // instead of constructing our own. When the host already owns a circle
+  // store (basis' household store), injecting it here means tasks and the
+  // circle's other items live in ONE store, syncing over ONE mirror. Absent
+  // ⇒ tasks-v0 constructs its own store (single-circle / standalone path).
+  circleStore: injectedCircleStore,
 }) {
   if (!roles || typeof roles !== 'object') {
     throw new TypeError('createTasksAgent: roles map required');
@@ -116,7 +122,8 @@ export async function createTasksAgent({
   // separately (warn-only) rather than rejecting on write.
   // enforce hard subtask dependencies: parent can't close while any of
   // its `dependencies[]` is still open (threaded into the task-store ctx).
-  const circleStore = new CircleItemStore({
+  // The injected host store (one-store-per-circle) wins; else construct our own.
+  const circleStore = injectedCircleStore ?? new CircleItemStore({
     dataSource,
     rootContainer:        itemStoreRoot ?? 'mem://tasks/',
   });

@@ -84,6 +84,18 @@ export async function sendHello(agent, peerAddress, timeout = 15_000) {
 export async function handleHello(agent, envelope) {
   const { pubKey, label, ack, capabilities } = envelope.payload ?? {};
 
+  // ── What this gate IS (and is NOT) — the enforcement split, stated ──────────────────────────
+  // This is NOT the authorization boundary. WHO may send you messages is enforced where it BINDS no
+  // matter what client the other side runs: the roster-authorize port + the seal, on the receive path,
+  // on EVERY transport (see security/senderAuthorization.js + the enforceability convention). This
+  // hello gate is a FIRST-CONTACT filter on the handshake, and its always-on job is the MUTE-BLOCK drop:
+  // a muted/blocked peer's HELLO is dropped HERE, before it registers/acks/emits — the only point that
+  // can, because the receive-path gates act on decrypted MESSAGES, not the plaintext HI. It is INACTIVE
+  // on transports that do not run the handshake (NKN's addresses are self-authenticating; the relay binds
+  // `_from` itself) — that is a transport fact, not a dead gate. (What this gate does NOT yet do: BOUND
+  // the RATE of first-contact registrations from unknown senders — a resource/DoS concern distinct from
+  // authorization; tracked as a hardening.)
+  //
   // Hello gate (Group W): if the agent has installed a gate and it
   // returns false (or throws — fail closed), drop this HI silently:
   //   • don't emit 'peer'

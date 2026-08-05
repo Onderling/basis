@@ -484,10 +484,18 @@ export async function provisionCircleMedium(circleId) {
     const localBackend = asyncStorageRef
       ? createAsBackend({ AsyncStorage: asyncStorageRef, scope: `cc-circle-cache-${circleId}` })
       : createMemoryBackend();
-    return createCircleCacheMedium({
+    const medium = createCircleCacheMedium({
       localBackend,
       deviceId:   `circle-cache-${circleId}`,
       resolvePod: () => circlePodCustodyRN().resolveCirclePodCustody(circleId),
     });
+    // Restore-robustness, RN parity with web: tag the medium with WHERE this circle's wrapped
+    // group-key resource lives, so a wiped device re-attaches by an explicit pointer (survives a
+    // routing/scheme change), not only by re-deriving the URI. realAgent upserts it into the registry.
+    try {
+      const custody = await circlePodCustodyRN().resolveCirclePodCustody(circleId);
+      if (custody?.circleRootUri) medium.keyRef = { ref: `${custody.circleRootUri}/.keys/group.json`, posture: policy?.storagePosture };
+    } catch { /* the pointer is optional — never break the medium */ }
+    return medium;
   } catch { return null; }   // any failure → local-only (honest degrade)
 }

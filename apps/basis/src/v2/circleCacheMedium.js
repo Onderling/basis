@@ -27,7 +27,8 @@ const applyOpen = (strategy, bytes) => (strategy?.open ? strategy.open(bytes) : 
  * @param {() => Promise<{ backend:{put:Function,get:Function}, sealed:boolean, strategy:({seal:Function,open:Function}|null) }|null>} a.resolvePod
  *        the circle's live pod custody (slice-1 `resolveCirclePodCustody`), or null when unreachable / no key.
  * @param {object} [a.versioning]  optional displaced-bytes version store (pass-through to the PseudoPod).
- * @returns {import('@onderling/pseudo-pod').PseudoPod}  a DataSource-shaped ({read,write,delete,list}) medium.
+ * @returns {{read:Function, write:Function, delete:Function, list:Function, catchUp:Function, pseudoPod:object}}
+ *          a core.DataSource-shaped medium (an adapter over the cache-mode PseudoPod) + `catchUp` + the pod.
  */
 export function createCircleCacheMedium({ localBackend, deviceId, resolvePod, versioning } = {}) {
   if (!localBackend || typeof localBackend.get !== 'function') {
@@ -36,7 +37,7 @@ export function createCircleCacheMedium({ localBackend, deviceId, resolvePod, ve
   if (typeof resolvePod !== 'function') {
     throw new TypeError('createCircleCacheMedium: resolvePod() => {backend,strategy}|null is required');
   }
-  return createPseudoPod({
+  const pod = createPseudoPod({
     backend: localBackend,
     mode:    'cache',
     deviceId,
@@ -59,4 +60,34 @@ export function createCircleCacheMedium({ localBackend, deviceId, resolvePod, ve
       return { bytes: applyOpen(c.strategy, raw) };
     },
   });
+
+  // The store expects a core.DataSource (`read` → the stored VALUE, `write(uri,value,{ifMatch})`), but a
+  // PseudoPod's `read` returns a RICHER record `{uri, bytes, etag, _v}` and its `write` takes a bare etag. So
+  // the medium is a thin ADAPTER over the PseudoPod — unwrap `read` to `.bytes`, map `write`'s options — not
+  // the raw PseudoPod. (This is the DataSource-vs-PseudoPod shape difference; the methods match, the return
+  // shapes don't.) `write` still returns the PseudoPod result so callers can see `{queued}` (honest degrade).
+  const medium = {
+    read:   async (uri) => { const rec = await pod.read(uri); return rec == null ? null : rec.bytes; },
+    write:  async (uri, value, opts) => pod.write(uri, value, opts?.ifMatch),
+    delete: async (uri) => (typeof pod.delete === 'function' ? pod.delete(uri) : undefined),
+    list:   async (containerUri) => pod.list(containerUri),
+    // Catch-up ENUMERATION. PseudoPod read-through is per-KEY and its `list` is local-only — so a fresh device
+    // can OPEN a pod item it knows the id of, but never DISCOVERS items whose keys it has not seen. `catchUp`
+    // closes that: list the circle's pod resources, then read each THROUGH (fetch + open + cache-local), so
+    // the store's next `list()` (which reads the local backend fresh) finds them. Best-effort + idempotent (a
+    // locally-present item is a cheap no-op read); a null pod / no key → nothing pulled (honest degrade).
+    catchUp: async ({ prefix = '' } = {}) => {
+      const c = await resolvePod();
+      if (!c?.backend || (c.sealed && !c.strategy)) return { pulled: 0 };
+      let pulled = 0;
+      try {
+        const uris = await c.backend.list(prefix);   // the per-circle pod backend is already circle-scoped
+        for (const uri of (uris || [])) { if (await pod.read(uri)) pulled += 1; }
+      } catch { /* best-effort — a partial catch-up still helps */ }
+      return { pulled };
+    },
+    /** The underlying PseudoPod — for drain / introspection (the write-through queue lives on it). */
+    get pseudoPod() { return pod; },
+  };
+  return medium;
 }

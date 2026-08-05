@@ -46,9 +46,9 @@ describe('createCircleCacheMedium — sealed write-through / read-through', () =
     await a.write(URI, 'device-A-note');
 
     // Device B: a fresh LOCAL cache, same pod → local miss → read-through → OPENED plaintext.
+    // (The medium is a core.DataSource adapter: `read` returns the VALUE, not the PseudoPod's {bytes} record.)
     const b = createCircleCacheMedium({ localBackend: createMemoryBackend(), deviceId: 'B', resolvePod });
-    const rec = await b.read(URI);
-    expect(rec?.bytes).toBe('device-A-note');
+    expect(await b.read(URI)).toBe('device-A-note');
   });
 
   it('honest degrade: no pod (offline) → the write PARKS in the queue, nothing hits the pod', async () => {
@@ -58,7 +58,7 @@ describe('createCircleCacheMedium — sealed write-through / read-through', () =
     expect(res.queued).toBe(true);                         // parked for a later drain
     expect(pod.raw.size).toBe(0);                          // never written
     // reading it back locally still works (local-immediate write)
-    expect((await medium.read(URI))?.bytes).toBe('later');
+    expect(await medium.read(URI)).toBe('later');
   });
 
   it('a SEALED circle with NO group key REFUSES the pod write (parks, never plaintext)', async () => {
@@ -84,5 +84,34 @@ describe('createCircleCacheMedium — as a circle store medium (via createCircle
     const podKeys = await pod.backend.list('mem://circles/pod-circle/');
     expect(podKeys.length).toBeGreaterThan(0);
     for (const k of podKeys) expect(await pod.backend.get(k)).toMatch(/^SEALED\(/);
+  });
+});
+
+describe('createCircleCacheMedium — catch-up enumeration (a fresh device DISCOVERS pod items)', () => {
+  it('a fresh device sees nothing until catchUp, then lists everything the pod holds', async () => {
+    const pod = mockPod();
+    const resolvePod = async () => ({ backend: pod.backend, sealed: true, strategy: pod.strategy });
+
+    // Device A writes two items to the pod-backed circle.
+    const mediumA = createCircleCacheMedium({ localBackend: createMemoryBackend(), deviceId: 'A', resolvePod });
+    const a = createCircleStores({ dataSource: memoryDataSource(), registry, dataSourceFor: () => mediumA });
+    await a.getStore('c1').put({ type: 'task', text: 'one' });
+    await a.getStore('c1').put({ type: 'task', text: 'two' });
+
+    // Device B: a FRESH local cache, same pod. It has no local keys → list() finds nothing (the gap).
+    const mediumB = createCircleCacheMedium({ localBackend: createMemoryBackend(), deviceId: 'B', resolvePod });
+    const b = createCircleStores({ dataSource: memoryDataSource(), registry, dataSourceFor: () => mediumB });
+    expect(await b.getStore('c1').list()).toHaveLength(0);        // read-through per-key can't help — B has no ids
+
+    // Catch-up enumerates the pod + reads each through → the store's next list() discovers them.
+    const { pulled } = await mediumB.catchUp();
+    expect(pulled).toBe(2);
+    const items = await b.getStore('c1').list();
+    expect(items.map((i) => i.text).sort()).toEqual(['one', 'two']);
+  });
+
+  it('catchUp is a no-op honest-degrade when the pod is unreachable', async () => {
+    const medium = createCircleCacheMedium({ localBackend: createMemoryBackend(), deviceId: 'B', resolvePod: async () => null });
+    expect(await medium.catchUp()).toEqual({ pulled: 0 });
   });
 });

@@ -482,6 +482,12 @@ export async function createRealHouseholdAgent(opts = {}) {
       try { const m = await opts.provisionCircleMedium(id); if (m) circleMedia.set(id, m); }
       catch (err) { if (typeof console !== 'undefined') console.warn(`[cache-medium] ${id}: provision failed — local only`, err?.message ?? err); }
     }
+    // Catch up on pod items this device has never seen — a fresh device DISCOVERS the circle's pod contents
+    // (read-through alone only opens items whose ids it already knows). Best-effort, once per circle at open.
+    const _cacheMedium = circleMedia.get(id);
+    if (_cacheMedium && typeof _cacheMedium.catchUp === 'function') {
+      try { await _cacheMedium.catchUp(); } catch { /* best-effort — reads still fall through per-key */ }
+    }
     try {
       const mirror      = await ensureHouseholdMirror(id);
       const circleStore = householdService.stores.getStore(id);

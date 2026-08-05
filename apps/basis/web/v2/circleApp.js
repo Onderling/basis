@@ -28,7 +28,6 @@ if (import.meta.env?.DEV) configureLog({ sink: consoleSink });
 import { initLocalisation, t, setLang, detectDeviceLang, currentLang,
   parseInput, mergeManifests, resolveDispatch, runDispatch, scopeReadyDispatch,
   scopeStoopCallSkill, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, seedCircleRoster,
-  resolveCircleDataPolicy, circleHasPod,
   isNoticeboardPost,
   basisManifest, AppRegistry, filterCatalog } from '../../src/index.js';
 // S4 pod foundation — per-circle sealed storage producer. The pod-client + in-memory
@@ -37,10 +36,6 @@ import { initLocalisation, t, setLang, detectDeviceLang, currentLang,
 import { PodClient, generateKeypair as podGenerateKeypair, createSealedPodClient, SolidOidcAuth,
   createSealedPodDataSource, podGroupPrefix,
   recipientStrategy as podRecipientStrategy,
-  // Connectivity Phase 3 — LIVE shared-pod key custody: adapt a circle's pod-client to the blind
-  // StorageBackend port + lay/read SEALED chat rows over it (the seal is the circle's live group-key
-  // {seal,open}, applied ABOVE the blind store — no new crypto).
-  podStorageBackend, writeSealedMessage, readSealedMessage, readSealedMessagesSince,
   sealingPublicKeyFromNetworkKey as podSealingPublicKeyFromNetworkKey } from '@onderling/pod-client';
 import { createPseudoPod } from '@onderling/pseudo-pod';
 import { circleVersioningFor, getCircleVersionStore } from '../../src/web/circleVersioning.js';
@@ -80,6 +75,7 @@ import {
   bootRelayUrl,
 } from '../../src/v2/connectionPoints.js';
 import { renderConnectionPoints } from './circleConnectionPoints.js';
+import { createCirclePodCustody } from '../../src/v2/circlePodCustody.js';
 import { createCircleDispatch, addressesBot } from '../../src/v2/circleDispatch.js';
 // Conversation memory — recent kring turns woven into the bot's interpret context.
 import { recentKringTurns } from '../../src/v2/kringMemory.js';
@@ -1745,60 +1741,19 @@ async function ensureCirclePod(circleId, policy) {
 }
 
 /* ─── Connectivity Phase 3 — LIVE shared-pod key custody (MEMBER-SIDE) ─────────────────────────────
- * A circle member ALREADY HOLDS the circle group key: this device's per-circle X25519 sealing identity
- * (vault-backed) unwraps the group key from the control agent's key resource (+ the no-pod key-event
- * fold). So sealing/reading pod rows with that key is device-local MEMBER custody — NOT the folio
- * broker/proxy model (the non-member case, out of scope). `getCircleSealStrategy` returns the SAME live
- * {seal,open} the sealed-lists + share paths already use; `ensureCirclePod().podClient` is the per-circle
- * store. This resolves both, per circle, so the ONE stoop agent seals→writes / range-queries→opens each
- * circle's shared pod at call time (invariant #6). Reuses existing primitives only — no new crypto.
+ * The custody-resolution + seal-or-refuse write/read/ref logic moved to the SHARED, platform-neutral
+ * `src/v2/circlePodCustody.js` (a shell must carry no such logic — invariants 1+2 — and the store path
+ * needs to reach it for cache-mode mirroring). This shell supplies the web-woven `ensureCirclePod` +
+ * the policy / seal-strategy resolvers; the module resolves {backend, sealed, strategy} per circle and
+ * the ONE agent seals→writes / range-queries→opens each circle's shared pod at call time (invariant #6).
  */
-async function resolveCirclePodCustody(circleId) {
-  if (!circleId) return null;
-  const policy = await _circlePolicy(circleId);
-  if (!circleHasPod(policy.pod)) return null;              // no-pod circle → the seam is inert (fan-out-full stays)
-  const prod = await ensureCirclePod(circleId, policy);
-  if (!prod?.podClient) return null;
-  // A SEALED posture (p2/p3) requires the live group key; a plaintext posture (p0/p1) seals nothing.
-  const sealed = policy.storagePosture === 'p2' || policy.storagePosture === 'p3';
-  const strategy = await getCircleSealStrategy(circleId, policy);   // live group-key {seal,open}; null for p0/p1 or no key
-  return { backend: podStorageBackend(prod.podClient), sealed, strategy };
-}
-
-/** Send-path data-move branch for a circle (policy.pod → 'fan-out-full' | 'pod-signal' | 'pod-only'). */
-async function circleSendDataMove(circleId) {
-  const policy = await _circlePolicy(circleId);
-  return resolveCircleDataPolicy(policy.pod).dataMove;
-}
-
-/**
- * Seal + write one chat row to the circle's shared pod; return its opaque `ref` (the pod-signal fan
- * carries it in place of the body). SEAL-OR-REFUSE: a sealed circle whose group key is not resolvable
- * (never a member / not yet provisioned) THROWS rather than write plaintext — stoop then degrades to
- * fan-out-full, loudly (never a silent unsealed pod write; invariant #7). A p0/p1 circle writes unsealed
- * by design (seal === null).
- */
-async function circlePodWrite(circleId, envelope) {
-  const c = await resolveCirclePodCustody(circleId);
-  if (!c) throw new Error(`circlePodWrite: no shared pod for circle ${circleId}`);                       // → fan-out-full degrade
-  if (c.sealed && !c.strategy) throw new Error(`circlePodWrite: sealed circle ${circleId} has no group key — refusing to write plaintext`);
-  const ref = await writeSealedMessage(c.backend, c.strategy?.seal ?? null, envelope);
-  return { ref };
-}
-
-/** Range-query + open the circle's shared-pod rows since a ts (the getMessagesSince catch-up merge). */
-async function circlePodReadSince(circleId, q) {
-  const c = await resolveCirclePodCustody(circleId);
-  if (!c || (c.sealed && !c.strategy)) return { items: [] };   // no pod / can't open → fall back to the local mirror
-  return readSealedMessagesSince(c.backend, c.strategy?.open ?? null, { circleId, ...q });
-}
-
-/** Resolve one pod-signal REF envelope → the full chat envelope (read the pod row + unseal). */
-async function circleResolveRef(refEnvelope) {
-  const c = await resolveCirclePodCustody(refEnvelope?.circleId);
-  if (!c || (c.sealed && !c.strategy)) return null;   // no pod / can't open → inbox skips the ref (deferred)
-  return readSealedMessage(c.backend, c.strategy?.open ?? null, refEnvelope.ref);
-}
+const {
+  resolveCirclePodCustody, circleSendDataMove, circlePodWrite, circlePodReadSince, circleResolveRef,
+} = createCirclePodCustody({
+  ensureCirclePod,
+  policyFor:        _circlePolicy,
+  sealStrategyFor:  getCircleSealStrategy,
+});
 // per-contact DM thread state: contactId → { name, peerAddr, messages:[{origin,text,buttons?,pending?}] }.
 const contactThreads = new Map();
 let _activeContactThread = null; // { contactId, rerender } — set while a DM thread is on screen

@@ -664,6 +664,8 @@ Two directions are settled and already shaping the work described above:
 
 ### Where to go next
 
+- [`principles.md`](./principles.md) — the *why* behind all of the above: the load-bearing values + the rule
+  for deriving a design fork from them. Read it first when a decision needs a value, not a mechanism.
 - [`CLAUDE.md`](../CLAUDE.md) — the working conventions + the invariants, for agents editing code here.
 - [`conventions/`](./conventions/) — the detailed project-wide rules.
 - [`glossary.md`](./glossary.md) — every term used above, defined.

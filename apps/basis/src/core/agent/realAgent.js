@@ -227,7 +227,14 @@ export async function createRealHouseholdAgent(opts = {}) {
   const { wireStoreMirror, wireCircleStoreInbound } = await import('@onderling/item-store');
   let householdAgent = null;           // B1 — dedicated in-process agent hosting the wireSkill-wrapped pure cores
   const householdSyncWired = new Set();   // circleIds whose store↔mirror sync (publish + inbound) is wired (once each)
-  const householdService = householdApp.createHouseholdService({ dataSource: householdDataSource });
+  // Cache-mode mirroring: a pod-backed circle's store runs over a per-circle cache-mode MEDIUM (write-through
+  // to the pod). The platform provisions it (`opts.provisionCircleMedium`, web-woven) at circle-open, keyed
+  // here; `dataSourceFor` hands it to the store at build time. Absent injection → the shared local backing.
+  const circleMedia = new Map();          // circleId → cache-mode PseudoPod medium (DataSource-shaped)
+  const householdService = householdApp.createHouseholdService({
+    dataSource: householdDataSource,
+    dataSourceFor: (id) => circleMedia.get(id) ?? null,
+  });
   // The wired household ops (dissolved cores on `householdAgent`). Everything else on the 'household'
   // app-origin (calendar_* passthrough, addMember, getChoreSnapshot, resolveContact, help, registerName)
   // routes to `hostAgent`; `household_briefSummary` is derived from the wired store (see callSkill).
@@ -468,6 +475,13 @@ export async function createRealHouseholdAgent(opts = {}) {
   async function ensureHouseholdCircleSync(circleId) {
     const id = (typeof circleId === 'string' && circleId) ? circleId : 'household';
     if (householdSyncWired.has(id)) return;
+    // Provision the pod-cache MEDIUM FIRST — BEFORE the getStore below builds+caches this circle's store, so a
+    // pod-backed circle's store runs over the cache-mode medium (write-through to the pod). Idempotent; a
+    // no-pod circle (or a failure) → null → the shared local backing (honest degrade), never a broken op.
+    if (!circleMedia.has(id) && typeof opts.provisionCircleMedium === 'function') {
+      try { const m = await opts.provisionCircleMedium(id); if (m) circleMedia.set(id, m); }
+      catch (err) { if (typeof console !== 'undefined') console.warn(`[cache-medium] ${id}: provision failed — local only`, err?.message ?? err); }
+    }
     try {
       const mirror      = await ensureHouseholdMirror(id);
       const circleStore = householdService.stores.getStore(id);

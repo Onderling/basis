@@ -28,6 +28,7 @@ if (import.meta.env?.DEV) configureLog({ sink: consoleSink });
 import { initLocalisation, t, setLang, detectDeviceLang, currentLang,
   parseInput, mergeManifests, resolveDispatch, runDispatch, scopeReadyDispatch,
   scopeStoopCallSkill, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, seedCircleRoster,
+  circleStoreMode,
   isNoticeboardPost,
   basisManifest, AppRegistry, filterCatalog } from '../../src/index.js';
 // S4 pod foundation — per-circle sealed storage producer. The pod-client + in-memory
@@ -76,6 +77,7 @@ import {
 } from '../../src/v2/connectionPoints.js';
 import { renderConnectionPoints } from './circleConnectionPoints.js';
 import { createCirclePodCustody } from '../../src/v2/circlePodCustody.js';
+import { createCircleCacheMedium } from '../../src/v2/circleCacheMedium.js';
 import { createCircleDispatch, addressesBot } from '../../src/v2/circleDispatch.js';
 // Conversation memory — recent kring turns woven into the bot's interpret context.
 import { recentKringTurns } from '../../src/v2/kringMemory.js';
@@ -6697,6 +6699,21 @@ async function boot() {
       stoopCircleDataMove: circleSendDataMove,
       stoopPodWrite:       circlePodWrite,
       stoopPodReadSince:   circlePodReadSince,
+      // Cache-mode mirroring: provision a pod-backed circle's store MEDIUM (a cache-mode PseudoPod that
+      // seals→write-throughs to the circle's pod, "pod is truth, local cache is reality"). realAgent calls
+      // this once per circle at circle-open, BEFORE the store is built. A no-pod circle → null → the shared
+      // local backing, unchanged. Reuses the circle-pod custody (resolveCirclePodCustody) for the sealed pod backend.
+      provisionCircleMedium: async (circleId) => {
+        try {
+          const policy = await _circlePolicy(circleId);
+          if (circleStoreMode(policy.pod) !== 'cache') return null;   // no-pod → shared local backing
+          return createCircleCacheMedium({
+            localBackend: pickWebBackend(`cc-circle-cache-${circleId}`),
+            deviceId:     `circle-cache-${circleId}`,
+            resolvePod:   () => resolveCirclePodCustody(circleId),
+          });
+        } catch { return null; }   // any failure → local-only (honest degrade)
+      },
       getActiveCircleId: getActiveCircle,            // per-circle store scoping — the active circle scopes chat ops
       // household routes through the uniform wired path (dissolved cores over the per-circle
       // CircleItemStore) by default; the legacy registry is retired. No flag: it's unconditional now.

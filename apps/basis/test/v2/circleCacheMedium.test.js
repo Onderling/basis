@@ -1,4 +1,4 @@
-// circleCacheMedium — a pod-backed circle's cache-mode store MEDIUM (cache-mode mirroring, slice 2b-core).
+// circleCacheMedium — a pod-backed circle's cache-mode store MEDIUM (cache-mode mirroring).
 // Proves the two thin things the module adds around the (already-tested) PseudoPod cache primitive: the
 // per-resource SEAL (seal on write-through, open on read-through) and the honest degrade (no pod / no key →
 // parked, never a plaintext pod write). The medium-level round-trip (write on A → sealed on the pod → open on

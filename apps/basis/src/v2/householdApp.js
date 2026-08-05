@@ -118,8 +118,10 @@ const OPS = { addItem, listOpen, markComplete, removeItem, addTask, listTasks, c
  * No-pod default = in-memory; a real boot injects a persistent/sealed DataSource. Retires the legacy agent
  * once this is the live path.
  */
-export function createHouseholdService({ dataSource, registry, manifest = householdManifest } = {}) {
-  const stores = createCircleStores({ dataSource: dataSource || memoryDataSource(), registry: registry || householdRegistry() });
+export function createHouseholdService({ dataSource, registry, manifest = householdManifest, dataSourceFor } = {}) {
+  // `dataSourceFor(circleId)` (cache-mode mirroring): a pod-backed circle may run over its OWN medium (a
+  // cache-mode PseudoPod write-throughing to the pod) instead of the shared local backing. Absent → shared.
+  const stores = createCircleStores({ dataSource: dataSource || memoryDataSource(), registry: registry || householdRegistry(), dataSourceFor });
   const service = {
     async callSkill(op, args = {}, ctx = {}) {
       const circleId = ctx.circleId ?? args.circleId;

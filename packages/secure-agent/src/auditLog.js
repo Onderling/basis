@@ -43,6 +43,13 @@ import { sha256 } from '@noble/hashes/sha2.js';
 export const AUDIT_VERSION = 1;
 
 /**
+ * The event of a compaction SUMMARY entry — what an old run of entries folds INTO (the AUDIT retention
+ * class "compacts rather than dropping", `entryKinds.js` / `architecture.md` §2). Its `data` carries the
+ * SHAPE of what was folded: `{ from, to, foldedCount, counts, actors, foldedThroughHash }`.
+ */
+export const AUDIT_SUMMARY_EVENT = 'audit.summary';
+
+/**
  * Build an AuditLog bound to an identity (for signing) + optional
  * persistence (vault slot).
  *
@@ -194,6 +201,95 @@ export class AuditLog {
   async clear() {
     this.#entries = [];
     await this.#persist();
+  }
+
+  /**
+   * Compact the OLD tail of the chain into ONE signed `audit.summary`, re-chaining the recent survivors so
+   * `verify()` still passes — the "re-chain the tail" fold (Frits 2026-08-06). The AUDIT retention class
+   * COMPACTS rather than dropping (`architecture.md` §2 / `entryKinds.js`): the folded entries' individual
+   * signatures are gone by design, but the summary preserves the SHAPE — how many folded, over what time
+   * range, by which actors, per-event counts — plus the folded run's terminal hash as evidence. The survivors'
+   * CONTENT is untouched; only their `prev` link (and therefore their signature) is recomputed, so the log
+   * stays ONE continuous verifiable strand.
+   *
+   * INTERNAL compaction — the log's own compactor, NEVER an append (a delegated agent cannot trigger it, and
+   * it does not go through the append/first-write-wins path). Refuses on a MIXED-SIGNER chain: a survivor this
+   * device did not sign cannot be re-signed, so a peer-shared/foreign entry is left untouched rather than
+   * corrupted. A prior summary at the head folds in too, its `foldedCount` carried forward so the total stays
+   * truthful under repeated compaction.
+   *
+   * @param {object} args
+   * @param {number} args.keepRecent  how many most-recent entries to keep VERBATIM (the detail window). The
+   *                                  WINDOW itself derives from the kind table upstream (`G-A4`); this method
+   *                                  is the mechanism, given a resolved count.
+   * @param {number} [args.now]       clock override (tests)
+   * @returns {Promise<{compacted:boolean, foldedCount:number, reason?:string}>}
+   */
+  async compact({ keepRecent, now } = {}) {
+    const n = this.#entries.length;
+    if (!Number.isInteger(keepRecent) || keepRecent < 0) {
+      return { compacted: false, foldedCount: 0, reason: 'bad-keepRecent' };
+    }
+    // Fold [0..cut-1], keep [cut..n-1]. Folding fewer than 2 entries would only GROW the log (summary +
+    // survivors), so there must be at least two to fold.
+    const cut = n - keepRecent;
+    if (cut < 2) return { compacted: false, foldedCount: 0, reason: 'nothing-to-fold' };
+
+    const folded    = this.#entries.slice(0, cut);
+    const survivors = this.#entries.slice(cut);
+
+    // We RE-SIGN the survivors, so every survivor must be signed by THIS device. A foreign-signed survivor
+    // (e.g. loaded from a peer's log) cannot be re-chained — refuse rather than corrupt it.
+    const me = this.#identity.pubKey;
+    if (survivors.some((e) => e?.actor !== me)) {
+      return { compacted: false, foldedCount: 0, reason: 'mixed-signer' };
+    }
+
+    // The SHAPE of what folded (the audit-summary contract).
+    const counts = {};
+    const actors = new Set();
+    let priorFolded = 0;
+    for (const e of folded) {
+      counts[e.event] = (counts[e.event] ?? 0) + 1;
+      if (typeof e.actor === 'string') actors.add(e.actor);
+      // A previous summary already stood for some entries — carry its count so foldedCount stays truthful.
+      if (e.event === AUDIT_SUMMARY_EVENT && Number.isInteger(e.data?.foldedCount)) {
+        priorFolded += e.data.foldedCount - 1;   // -1: the summary entry itself is already counted above
+      }
+    }
+
+    const summaryBody = {
+      v:     AUDIT_VERSION,
+      id:    genId(),
+      ts:    typeof now === 'number' ? now : Date.now(),
+      actor: me,
+      event: AUDIT_SUMMARY_EVENT,
+      prev:  null,                                   // the summary is the NEW head
+      data: {
+        from:              folded[0].ts,
+        to:                folded.at(-1).ts,
+        foldedCount:       folded.length + priorFolded,        // real entries this summary now stands for
+        counts,
+        actors:            [...actors],
+        foldedThroughHash: this.#hashEntry(folded.at(-1)),     // evidence: terminal hash of the folded run
+      },
+    };
+    const summary = { ...summaryBody, sig: b64encode(this.#identity.sign(canonicalize(summaryBody))) };
+
+    // Re-chain the survivors onto the summary: recompute each `prev` + re-sign (content unchanged).
+    const rechained = [summary];
+    let prevHash = this.#hashEntry(summary);
+    for (const e of survivors) {
+      const { sig: _oldSig, ...body } = e;
+      body.prev = prevHash;
+      const resigned = { ...body, sig: b64encode(this.#identity.sign(canonicalize(body))) };
+      rechained.push(resigned);
+      prevHash = this.#hashEntry(resigned);
+    }
+
+    this.#entries = rechained;
+    await this.#persist();
+    return { compacted: true, foldedCount: folded.length };
   }
 
   // ── internal ──────────────────────────────────────────────────────

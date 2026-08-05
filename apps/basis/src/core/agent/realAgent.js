@@ -67,6 +67,7 @@ import {
   createDriver,
   driversFromProperties,
   setCircleMembership as registrySetCircleMembership,
+  circleMembershipsOf,
   isRequestable,
   effectiveProperties,
 } from '@onderling/agent-registry';
@@ -677,6 +678,10 @@ export async function createRealHouseholdAgent(opts = {}) {
    * The wireSkill-derived handlers live on `hostAgent` (same home as the other in-process
    * host skills); the 'agents' branch of callSkill routes through `chatAgent.invoke`. */
   let agentsTokenRegistry = null;   // issuer-side revocation list (exposed on the handle; null = degraded)
+  // The READ side of the circle-membership registry, exposed OUT of the block below (where agentsRegistry
+  // is scoped) so the restore-and-open boot loop can enumerate this device's circles. Default → none, so a
+  // degraded/bare registry simply re-opens nothing rather than throwing at boot.
+  let readSelfCircleMemberships = async () => ({});
   {
     const agentsRegistry =
       (await registerAgentBundle({
@@ -686,6 +691,11 @@ export async function createRealHouseholdAgent(opts = {}) {
         opts: { capabilities: ['basis'], name: opts.agentsSelfName ?? 'basis (this device)' },
       }))
       ?? createAgentRegistry({ pseudoPod: circleSubstrate.pseudoPod, deviceId: chatId.pubKey });
+
+    // Expose the default profile's circle-membership map outward (see the outer `let`): the restore-and-open
+    // boot loop reads it to re-open the circles this device belongs to. Own map of the default profile —
+    // that is where write-on-join records {handle,address} (id:'default').
+    readSelfCircleMemberships = async () => circleMembershipsOf((await agentsRegistry.lookup('default')) ?? {});
 
     /* control ops — LIVE token binding (2026-07-09). hostAgent (the skills' home)
      * is the ISSUER: `issueCapabilityToken` signs with its identity and needs no other
@@ -1167,6 +1177,55 @@ export async function createRealHouseholdAgent(opts = {}) {
   // dispatch is skipped) still fan out. Idempotent with the dispatch-time wire.
   const tasksPrimaryCircleId = opts.tasksCircleConfig?.circleId ?? 'cc-default';
   await ensureCircleSync(tasksPrimaryCircleId);
+
+  // Registry restore-and-open — the READ side of the circle-membership registry, the consumer that
+  // was missing (the writer records {handle,address} per circle on the default profile at join, but
+  // NOTHING read it back, so circles only opened on a user action). Every boot — crucially the
+  // post-restore reload, where the recovery phrase re-derived IDENTITY but left the circle side inert
+  // ("the phrase brought back who I am, but every circle was gone") — enumerate the circles this device
+  // belongs to and re-open each: ensureCircleSync wires the store + provisions the pod cache medium
+  // (which re-derives the seal strategy and catches the pod up, so a wiped device DECRYPTS pre-wipe
+  // content it can re-fetch from the pod), and the per-circle SIGNING identity is re-installed so this
+  // device can open what was sent to its per-circle address. Nothing here carries a secret: the registry
+  // holds only pointers (handle/address), and every key re-derives from the recovery phrase. Best-effort
+  // per circle and idempotent — a circle whose pod is unreachable degrades locally, never blocking boot
+  // or the other circles. (The already-eager 'household' and tasks-primary circles are skipped.)
+  async function reopenMemberCircles() {
+    const reopened = [];
+    let memberCircleIds = [];
+    try {
+      memberCircleIds = Object.keys(await readSelfCircleMemberships())
+        .filter((id) => id && id !== tasksPrimaryCircleId && id !== 'household');
+    } catch (err) {
+      if (typeof console !== 'undefined') console.warn('[restore-open] membership enumeration failed — no circles auto-reopened', err?.message ?? err);
+      return { reopened };
+    }
+    for (const id of memberCircleIds) {
+      try { await ensureCircleSync(id); reopened.push(id); }
+      catch (err) {
+        if (typeof console !== 'undefined') console.warn(`[restore-open] ${id}: re-open failed — circle stays dark until re-navigated`, err?.message ?? err);
+      }
+    }
+    if (memberCircleIds.length) {
+      // Re-install the per-circle signing identities in one derive-only call (memoised) — the same wire
+      // the shells drive via the exposed installCircleIdentities, run here for the restored set. Done for
+      // the whole enumerated set (derive-only, cheap) even if a circle's store re-open degraded.
+      try {
+        installCircleSigningIdentities({
+          circleIds: memberCircleIds,
+          circleAddressFor,
+          circleIdentityFor,
+          registerSelfIdentity: (address, identity) => sa.registerSelfIdentity(address, identity),
+          onFailed: (cid) => console.warn(`[restore-open] no per-circle signing identity for ${cid} — messages `
+            + 'sealed to its per-circle address cannot be opened until it derives.'),
+        });
+      } catch (err) {
+        if (typeof console !== 'undefined') console.warn('[restore-open] signing-identity install failed', err?.message ?? err);
+      }
+    }
+    return { reopened };
+  }
+  await reopenMemberCircles();
 
   // Pre-seed the demo circle with 4 starter tasks — the demo + journey
   // fixtures expect /mytasks to show these out of the box.  DEMO-ONLY: a real
@@ -3080,6 +3139,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     //
     // Idempotent (guarded by `circleSyncWired`), so circle-open can call it every time.
     ensureCircleSync,
+
+    // Registry restore-and-open: re-open every circle this device belongs to, straight from the
+    // circle-membership registry (the READ side of write-on-join). Run once at boot; also exposed so a
+    // shell can re-run it after a late registry import/restore without a full reload. Returns
+    // `{ reopened: [circleId] }`. Idempotent + best-effort per circle.
+    reopenMemberCircles,
 
     // Transport-NEUTRAL reachability — true when ANY peer transport can carry a
     // message (NKN `.peer` OR the WebSocket `.relay`; sendPeerMessage already

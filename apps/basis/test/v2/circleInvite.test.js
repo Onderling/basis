@@ -175,7 +175,11 @@ describe('joinCircleFromInvite', () => {
       inviteUri: uri, callSkill: joinSkill, handle: 'frits',
       linkChoice: 'a-circle-im-not-in', circles: [{ id: 'brood' }], circleAddressFor, signCircleLink: () => 'P',
     });
-    expect(circleAddressFor).not.toHaveBeenCalled();
+    // Deny-by-default is about NOT presenting the SOURCE circle's key: the chosen source is never resolved
+    // to an address (so it can't be signed/presented), and nothing reaches the redeem. `circleAddressFor`
+    // IS legitimately called with the JOINING circle's id to record local restore-data (the membership
+    // registry) — a different, local-only use — so we assert on the source id, not "never called at all".
+    expect(circleAddressFor).not.toHaveBeenCalledWith('a-circle-im-not-in');
     expect('circleAddress' in redeemArgs()).toBe(false);
   });
 

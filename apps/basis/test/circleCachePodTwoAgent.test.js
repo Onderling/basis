@@ -1,4 +1,4 @@
-// Cache-mode mirroring — the TWO-AGENT end-to-end proof (slice 6). Two REAL household agents share ONLY a
+// Cache-mode mirroring — the TWO-AGENT end-to-end proof (the pod feed). Two REAL household agents share ONLY a
 // pod (the pod-only topology: members connect via the pod, no peer mesh) — so the ONLY way B can see A's
 // item is through the pod, which is exactly what this must prove. A writes a household item via the real
 // callSkill path → it seals + write-throughs to the shared pod; B opens the circle → catch-up enumerates the

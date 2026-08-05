@@ -489,16 +489,27 @@ export async function createRealHouseholdAgent(opts = {}) {
       try { await _cacheMedium.catchUp(); } catch { /* best-effort — reads still fall through per-key */ }
     }
     try {
-      const mirror      = await ensureHouseholdMirror(id);
+      // getStore builds+caches this circle's store (over the cache medium if pod-backed) — do it either way.
       const circleStore = householdService.stores.getStore(id);
-      wireStoreMirror(circleStore, mirror);
-      wireCircleStoreInbound({
-        notifyEnvelope: householdSubstrate.notifyEnvelope,
-        store:          circleStore,
-        prefix:         `/household/circles/${id}/items/`,
-      });
-      householdSyncWired.add(id);
-      if (typeof console !== 'undefined') console.info(`[household-sync] ${id}: store<->mirror wired`);
+      // Compose the peer seam BY POSTURE — avoid the double-carry. A POD-BACKED circle (a cache medium was
+      // provisioned) carries content THROUGH THE POD (write-through on send + catch-up on open), so it must
+      // NOT also full-body peer-fan the same items. A no-pod circle has the peer mirror as its ONLY carry, so
+      // it wires as before. (A reactive pod-signal REF-fan for the store — immediate delivery without waiting
+      // for the next catch-up — is a later refinement; today a pod-backed circle converges on open.)
+      if (_cacheMedium) {
+        householdSyncWired.add(id);
+        if (typeof console !== 'undefined') console.info(`[household-sync] ${id}: pod-carried (peer mirror skipped — no double-carry)`);
+      } else {
+        const mirror = await ensureHouseholdMirror(id);
+        wireStoreMirror(circleStore, mirror);
+        wireCircleStoreInbound({
+          notifyEnvelope: householdSubstrate.notifyEnvelope,
+          store:          circleStore,
+          prefix:         `/household/circles/${id}/items/`,
+        });
+        householdSyncWired.add(id);
+        if (typeof console !== 'undefined') console.info(`[household-sync] ${id}: store<->mirror wired`);
+      }
     } catch (err) {
       // Best-effort by design — the op must still run locally — but silence here means "items never
       // sync" and looked identical to "items sync fine" (2026-08-03). Say which one it was.

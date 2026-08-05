@@ -138,6 +138,22 @@ export function buildCircleShareEnforcement({ sharing, strategy, podRoot, contro
     return holders.filter((k) => !drop.has(k));
   };
 
+  // The REMOVE-list companion to `revokeRecipients`: the exact sealing keys being evicted. Given to the
+  // substrate, it prunes them from the LIVE key resource so a CONCURRENT grant survives (revoke-wins without
+  // collaterally dropping it). Same resolution + same FAIL-SAFE: null when any revokee's key can't be
+  // resolved, so the substrate falls back to the conservative roster-minus keep-list.
+  const revokedKeysFor = async (revokeeWebids = []) => {
+    const who = Array.isArray(revokeeWebids) ? revokeeWebids.filter(Boolean) : [];
+    if (who.length === 0) return null;
+    const drop = [];
+    for (const webid of who) {
+      const key = await sealingKeyForWebid(webid);
+      if (!key) return null;                             // unresolvable → conservative keep-list path
+      drop.push(key);
+    }
+    return drop;
+  };
+
   // Enforcement `seal` is OMITTED on purpose: the cross-circle recipient re-seal (copy postures) is layered
   // ABOVE this binder in `shareItemAcrossCircles`. On read, `open: strategy.open` unseals a group-key source;
   // `composeReaderOpen` (in circleShare) adds the reader's own opener. `currentRecipients` re-wraps the group
@@ -148,6 +164,7 @@ export function buildCircleShareEnforcement({ sharing, strategy, podRoot, contro
     currentRecipients,   // roster-only — the conservative fallback (must never include a revocable recipient)
     grantRecipients,     // roster ∪ current key-holders — so an earlier out-of-circle grantee isn't dropped
     revokeRecipients,    // current holders MINUS the named revokee(s) — evict exactly one, not the bystanders
+    revokedKeysFor,      // the exact revoked keys — lets the substrate preserve a concurrent grant (revoke-wins)
   });
 
   // Phase 2 (objective L follow-up) — grant an OUT-OF-CIRCLE recipient (NOT in the origin roster) revocable

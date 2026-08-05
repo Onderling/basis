@@ -241,7 +241,7 @@ export function makeShareGrantHook({ sharing, resourceUriFor, mode = 'read', sea
  *        roster and collaterally evicting unrelated out-of-circle grantees. Absent → `currentRecipients`.
  * @returns {{ onShare: Function, revoke: Function }}
  */
-export function makeCanonicalShareHook({ canonicalShare, currentRecipients, grantRecipients, revokeRecipients } = {}) {
+export function makeCanonicalShareHook({ canonicalShare, currentRecipients, grantRecipients, revokeRecipients, revokedKeysFor } = {}) {
   if (!canonicalShare || typeof canonicalShare.share !== 'function' || typeof canonicalShare.revoke !== 'function') {
     throw new Error('makeCanonicalShareHook: a canonicalShare with { share, revoke } is required');
   }
@@ -286,11 +286,16 @@ export function makeCanonicalShareHook({ canonicalShare, currentRecipients, gran
     async revoke({ ref, recipient, recipients, remainingRecipients } = {}) {
       const who = recipientsOf(recipient, recipients);
       if (who.length === 0) throw new Error('makeCanonicalShareHook: at least one recipient is required to revoke');
-      const remaining = Array.isArray(remainingRecipients)
-        ? remainingRecipients.filter(Boolean)
-        : (await revokeBaseKeys(who));
+      const explicitRemaining = Array.isArray(remainingRecipients);
+      const remaining = explicitRemaining ? remainingRecipients.filter(Boolean) : (await revokeBaseKeys(who));
+      // The REMOVE-list — the exact sealing keys being evicted — used ONLY when the app did not override with
+      // an explicit keep-list. Given it, the substrate prunes them from the LIVE resource so a concurrent
+      // grant survives (revoke-wins without collateral). An explicit `remainingRecipients` from the app still
+      // WINS (a deliberate override); and `revokedKeysFor` → null (any revokee's key unresolvable) falls back
+      // to the keep-list too — the conservative, still-safe path (unchanged).
+      const revokedKeys = (!explicitRemaining && typeof revokedKeysFor === 'function') ? await revokedKeysFor(who) : null;
       for (const agent of who) {
-        await canonicalShare.revoke({ recipient: agent, remainingRecipients: remaining, ref });
+        await canonicalShare.revoke({ recipient: agent, revokedKeys: revokedKeys ?? undefined, remainingRecipients: remaining, ref });
       }
     },
   };
@@ -329,7 +334,7 @@ export function makeCanonicalShareHook({ canonicalShare, currentRecipients, gran
  * @param {string} [opts.mode='read']  the access mode granted + required. Must match on both sides.
  * @returns {{ onShare: Function, policy: { checkGrant: Function, open?: Function }, onShareCanonical?: Function, revokeCanonical?: Function }}
  */
-export function makeCircleShareEnforcement({ sharing, resourceUriFor, recipient, open, seal, canonicalShare, currentRecipients, grantRecipients, revokeRecipients, mode = 'read' } = {}) {
+export function makeCircleShareEnforcement({ sharing, resourceUriFor, recipient, open, seal, canonicalShare, currentRecipients, grantRecipients, revokeRecipients, revokedKeysFor, mode = 'read' } = {}) {
   if (!sharing || typeof sharing.grant !== 'function' || typeof sharing.list !== 'function') {
     throw new Error('makeCircleShareEnforcement: a { grant, list } sharing surface (client.sharing) is required');
   }
@@ -338,7 +343,7 @@ export function makeCircleShareEnforcement({ sharing, resourceUriFor, recipient,
     policy:  makeSharedRefPolicy({ sharing, open, recipient, resourceUriFor, mode }),
   };
   if (canonicalShare) {
-    const canon = makeCanonicalShareHook({ canonicalShare, currentRecipients, grantRecipients, revokeRecipients });
+    const canon = makeCanonicalShareHook({ canonicalShare, currentRecipients, grantRecipients, revokeRecipients, revokedKeysFor });
     out.onShareCanonical = canon.onShare;
     out.revokeCanonical  = canon.revoke;
   }

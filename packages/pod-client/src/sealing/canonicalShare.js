@@ -141,9 +141,13 @@ export function createCanonicalShare({ sharing, keyStore, controllerKey, resourc
         ? grantMember(base, {
             newRecipient: recipientKey,
             granterPrivateKey: controllerKey.privateKey,
-            // Union the caller's view with whatever the resource ALREADY holds, so a concurrent grantee that
-            // landed between our read and our write is carried forward rather than overwritten.
-            currentRecipients: withController([...new Set([...(base.recipients ?? []), ...currentRecipients])]),
+            // Union from the AUTHORITATIVE stored resource (`base.recipients`) ONLY — never the caller's
+            // `currentRecipients` snapshot. The stored set is the current truth: a concurrent grantee that
+            // landed is carried forward by re-reading it here (the serializer + CAS guarantee we read the
+            // latest), while a subject a concurrent REVOKE just rotated out is NOT re-introduced by a stale
+            // caller snapshot — this is what makes revoke win over a racing grant. `currentRecipients` seeds
+            // only the FIRST resource (the bootstrap branch below), where there is no base to be authoritative.
+            currentRecipients: withController(base.recipients ?? []),
             includeHistory,
           })
         : buildGroupKeyResource({
@@ -248,19 +252,56 @@ export function createCanonicalShare({ sharing, keyStore, controllerKey, resourc
      * @param {object} [p.ref]
      * @returns {Promise<{keyResource:object, resourceUri:string}>}
      */
-    async revoke({ recipient, remainingRecipients = [], ref } = {}) {
+    async revoke({ recipient, revokedKeys, remainingRecipients = [], ref } = {}) {
       if (!recipient) throw new Error('canonicalShare.revoke: recipient WebID required');
       const uri = uriFor(ref);
+      // The REMOVE-list — the sealing keys to prune. Given it, we rotate to the LIVE resource MINUS these,
+      // so a concurrent grant that landed after this revoke's read SURVIVES (it stays in the live set) while
+      // the revoked recipient is pruned. Without it we fall back to the caller's static keep-list (which
+      // still locks the revoked recipient out, but cannot preserve a concurrent grant it never saw).
+      const revoked = new Set(
+        (Array.isArray(revokedKeys) ? revokedKeys : (revokedKeys ? [revokedKeys] : [])).filter(Boolean),
+      );
+      const rotateRecipients = (cur) => (revoked.size > 0
+        ? withController((cur?.recipients ?? []).filter((k) => !revoked.has(k)))
+        : withController(remainingRecipients));
 
       // 1. ROTATE — a fresh group key + new version, sealed ONLY to the remaining recipients (+controller).
       //    The revoked recipient is absent from the new resource ⇒ unwrapGroupKey throws for them, so content
       //    under the new key is unreadable to them (forward secrecy). Remaining recipients get the new key.
-      const cur = await keyStore.read();
-      const next = rotateGroupKeyResource({
-        previous: cur,
-        recipients: withController(remainingRecipients),
+      //
+      //    REVOKE-WINS (story 1.5, grant∥revoke). The rotate runs in the SAME serialized-CAS critical section
+      //    as grants, so a grant and a revoke on this key store are ORDERED in-process, never interleaved, and
+      //    a real compare-and-swap (`writeIfUnchanged`) closes the cross-device window. The new version is
+      //    sealed to the caller's remaining set (which excludes the revoked recipient), so the revoked
+      //    recipient is absent from it whatever a concurrent grant did — a grant cannot keep them in, and the
+      //    grant core (above) cannot re-add them afterwards (it unions from the authoritative base, not a stale
+      //    snapshot). ⚠ TRADEOFF (safety over liveness): a grant that landed AFTER this revoke's read is not
+      //    carried into the rotation — that grantee must re-grant. The guarantee kept is that the REVOKED
+      //    recipient is out; a concurrent grant losing to a revoke is a liveness cost, not a safety hole.
+      const next = await _serialize(async () => {
+        for (let attempt = 0; attempt < MAX_GRANT_ATTEMPTS; attempt += 1) {
+          const cur = await keyStore.read();
+          const candidate = rotateGroupKeyResource({
+            previous: cur,
+            recipients: rotateRecipients(cur),
+          });
+          if (typeof keyStore.writeIfUnchanged === 'function') {
+            const wrote = await keyStore.writeIfUnchanged(candidate, cur);
+            if (wrote !== false) return candidate;
+            continue;                                                   // a concurrent write won — re-rotate
+          }
+          await keyStore.write(candidate);
+          return candidate;
+        }
+        const cur = await keyStore.read();
+        const latest = rotateGroupKeyResource({
+          previous: cur,
+          recipients: rotateRecipients(cur),
+        });
+        await keyStore.write(latest);
+        return latest;
       });
-      await keyStore.write(next);
 
       // 2. ACP REVOKE. Throws SHARING_REVOKE_NOOP on a null SDK return (a revoke that changed nothing) — we
       //    let it propagate so a no-op revoke surfaces instead of silently "succeeding".

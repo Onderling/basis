@@ -517,3 +517,17 @@ Registering a per-circle ALIAS additionally needs its own signer — a different
 — via `addAddress(address, { sign: circleAddressSigner(profileSeed, circleId) })`. Without one the bind
 is refused locally with a named reason rather than silently never completing.
 Background: `plans/DESIGN-boundary-authentication.md` §7.
+
+## basis-mobile vitest: the `@onderling-app/basis` node_modules COPY is incomplete (2026-08-05)
+
+`apps/basis-mobile/node_modules/@onderling-app/basis` is a real-directory COPY (not a symlink), and it is
+missing transitive deps under vitest — so importing anything that reaches `@onderling-app/basis/src/index.js`
+fails one dep at a time: first `@onderling-app/stoop`, then `@onderling-app/folio` (missing app symlinks
+under `@onderling-app/`), then `@onderling/pod-routing` (a missing package dep of the copy). This is the
+"tree does not survive" fragility (see CLAUDE.md "NEVER rm -rf node_modules"), NOT a code problem — a mobile
+change can be correct-by-parity and parse-clean while its vitest still cannot load.
+- **Partial fix applied:** `ln -s ../../../stoop` and `ln -s ../../../folio` under
+  `apps/basis-mobile/node_modules/@onderling-app/`. `@onderling/pod-routing` (and likely more) still missing.
+- **Do not** `rm -rf` / reinstall to fix this — it will expose latent version conflicts and not come back.
+  Either symlink each missing dep from the source, or run the equivalent test on the `apps/basis` (web) side
+  where the same shared modules ARE resolvable (mobile parity code reuses `apps/basis/src/v2/*` verbatim).

@@ -1,11 +1,11 @@
 {
   "sites": [
-    "apps/household/src/storage/InMemoryStore.js:83",
+    "apps/household/src/storage/InMemoryStore.js:85",
     "apps/presence-v0/src/HomeAgent.js:49",
     "apps/stoop/src/Agent.js:324",
     "apps/stoop/src/Service.js:75",
     "apps/tasks-mobile/src/lib/buildCircleState.js:155",
     "apps/tasks-v0/bin/tasks-ui.js:176",
-    "apps/tasks-v0/src/Agent.js:119"
+    "apps/tasks-v0/src/Agent.js:126"
   ]
 }

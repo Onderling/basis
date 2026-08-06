@@ -172,6 +172,10 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
 - **Prefer a fitness function to a manual check.** When you fix drift, add the test/lint that makes the same
   drift FAIL CI next time — and register it in the **`npm run guards` aggregate: a guard outside it does
   not exist.** This is the roadmap's step 0 — see `REMAINING-WORK.md` "★ Architectural spine".
+  **After adding/removing/renaming a guard, run `npm run guard-index` and commit `docs/guards.md`** (the
+  generated designed-vs-built map; its `--check` fitness test fails if it is stale, same contract as the
+  surface-coverage snapshot). `npm run guard-status` prints live green/red — read a guard's OWN exit there,
+  never `cmd | tail; echo $?` (that returns the pipe's exit, not the guard's — it has masked reds).
   **A seam is not done until something passes through it:** write the test that CROSSES it — a real socket, a
   real boot — not unit tests either side. Two green tests flanking a dead seam is what inert wiring looks like.
 - **When two layers hold the same fact, pin the AGREEMENT, not either value.** The relay held messages 5 min

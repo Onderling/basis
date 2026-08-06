@@ -81,22 +81,37 @@ function testFiles() {
   return out;
 }
 
-/** Named design guards: `G-*` ids that appear in a `describe(...)` string. Claim = that string. */
+/**
+ * Named design guards, from two sources: an EXPLICIT `@guard [G-XX] <claim>` docstring tag (the primary,
+ * unambiguous declaration — a test IS this guard), and, as a weak fallback, a `G-*` id inside a `describe(...)`
+ * string. `@guard` wins over the fallback and lets a guard with NO `G-*` id (e.g. the audit-retention
+ * agreement) still appear. To add a fitness guard to the map, tag its test:  ` * @guard <id?> — <claim>`.
+ */
 function namedGuards() {
-  const byId = new Map();
-  const idRe = /\bG-[A-Z][A-Za-z0-9-]*\b/g;
-  for (const file of testFiles()) {
+  const byKey = new Map();
+  const files = testFiles();
+  const add = (id, claim, file) => {
+    const key = id && id !== '—' ? id : claim;
+    if (claim && !byKey.has(key)) byKey.set(key, { id: id ?? '—', claim, file });
+  };
+  // Pass 1 — explicit @guard tags (preferred).
+  for (const file of files) {
+    let src; try { src = readFileSync(file, 'utf8'); } catch { continue; }
+    const rel = path.relative(ROOT, file);
+    for (const gm of src.matchAll(/@guard\s+(?:(G-[A-Za-z0-9-]+)\s*[—:-]?\s*)?([^\n*]+)/g)) {
+      add(gm[1] ?? null, cleanClaim(gm[2].trim(), gm[1] ?? ''), rel);
+    }
+  }
+  // Pass 2 — fallback: a G-* id in a describe() string, only if that id wasn't tagged.
+  for (const file of files) {
     let src; try { src = readFileSync(file, 'utf8'); } catch { continue; }
     const rel = path.relative(ROOT, file);
     for (const dm of src.matchAll(/describe\(\s*(['"`])([\s\S]*?)\1/g)) {
       const text = dm[2].replace(/\s+/g, ' ').trim();
-      for (const im of text.matchAll(idRe)) {
-        const id = im[0];
-        if (!byId.has(id)) byId.set(id, { id, claim: cleanClaim(text, id), file: rel });
-      }
+      for (const im of text.matchAll(/\bG-[A-Z][A-Za-z0-9-]*\b/g)) add(im[0], cleanClaim(text, im[0]), rel);
     }
   }
-  return [...byId.values()].sort((a, b) => a.id.localeCompare(b.id));
+  return [...byKey.values()].sort((a, b) => String(a.id).localeCompare(String(b.id)));
 }
 
 /** Trim a describe string to the CLAIM: drop the id + a leading separator, cap length. */
@@ -125,7 +140,8 @@ function render(scripts, named) {
   L.push('');
   L.push(`## Named design guards (\`G-*\`, in fitness tests) · ${named.length}`);
   L.push('');
-  L.push('*Best-effort — discovered from `describe(...)` blocks. A guard with no `G-*` id will not appear here.*');
+  L.push('*From an explicit `@guard [<id>] — <claim>` tag in a fitness test (preferred), or a `G-*` id in a');
+  L.push('`describe(...)` block (fallback). Tag a fitness test with `@guard` to add it here — an id is optional.*');
   L.push('');
   L.push('| Id | Claim | Where |');
   L.push('|---|---|---|');

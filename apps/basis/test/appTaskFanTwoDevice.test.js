@@ -3,6 +3,9 @@
  * another device's tasks surface. Guards `G-C3` (per-type sync arrival) and now
  * also `G-C1` (one store per circle) — see below.
  *
+ * @guard G-C1 — a circle owns ONE store: the local write and its publisher are the same object
+ * @guard G-C3 — a task fanned from one device arrives on another device's per-type tasks store
+ *
  * A task created on device A must appear when device B reads its tasks. HISTORY:
  * there used to be TWO CircleItemStore instances for one circle — the tasks store
  * (`mem://tasks/circles/<id>/`, tasks-v0's own) and the household store

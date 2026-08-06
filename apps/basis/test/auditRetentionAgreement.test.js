@@ -1,6 +1,8 @@
 /**
  * The audit-retention agreement guard (full) — the two audit records agree on retention, from ONE table.
  *
+ * @guard sa.audit and the agent trail read their AUDIT retention window from ONE shared table
+ *
  * sa.audit (secure-agent's signed security log) and the agent trail (basis's eventLog) must read their AUDIT
  * retention window from the SAME shared table — `@onderling/item-store` `RETENTION_DEFAULTS` — so they cannot
  * drift to different windows (architecture.md §2 / PLAN-homes:188-196). basis is the ONLY place both records

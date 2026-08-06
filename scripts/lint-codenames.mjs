@@ -49,6 +49,8 @@ for (const f of files) {
   for (const hit of findCodenames(scope.mask(src), scope.context)) {
     const line = lineOf(src, hit.index);
     const lineText = src.split('\n')[line - 1] ?? '';
+    // (`@guard …` lines are exempted inside the mask — codenames-scope.exemptGuardLines — so both this
+    // binary and the self-test honour a guard naming itself from one place.)
     violations.push({ file: f, line, id: hit.id, match: hit.match, text: lineText.trim().slice(0, 120) });
   }
 }

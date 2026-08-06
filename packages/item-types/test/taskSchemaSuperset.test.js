@@ -1,6 +1,8 @@
 /**
  * G-DICT — the dictionary stays a superset of the runtime (the homes plan, Part III).
  *
+ * @guard G-DICT — every field the runtime writes on a type is declared on its canonical schema
+ *
  * The task type's schema had drifted BEHIND the code: the lifecycle verbs read/write fields the canonical
  * schema never learned (`requiredSkills` among them — the field the hybrid-dispatch product idea depends
  * on). A dictionary that under-describes its own type makes every schema-validating consumer reject real

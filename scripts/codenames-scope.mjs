@@ -81,6 +81,15 @@ export function tracked() {
  */
 export const BLANK = '\x00'; // sentinel for non-comment/non-prose chars (lets the fixer isolate comment spans)
 
+/**
+ * Blank any line carrying a `@guard …` tag — a guard DECLARING its own id for the guard-index map is a
+ * sanctioned self-naming, not a plan-coordinate reference. Length-preserving so line/column indices stay
+ * aligned. Applied by both masks, so the binary and its self-test honour it from one place.
+ */
+function exemptGuardLines(masked) {
+  return masked.split('\n').map((l) => (/@guard\b/.test(l) ? ' '.repeat(l.length) : l)).join('\n');
+}
+
 export function commentMask(src) {
   const out = new Array(src.length).fill(BLANK);
   let i = 0;
@@ -121,7 +130,7 @@ export function commentMask(src) {
         break;
     }
   }
-  return out.join('');
+  return exemptGuardLines(out.join(''));
 }
 
 /**
@@ -131,7 +140,7 @@ export function commentMask(src) {
 export function docProseMask(src) {
   let s = src.replace(/```[\s\S]*?```/g, (m) => m.replace(/[^\n]/g, BLANK));
   s = s.replace(/`[^`\n]*`/g, (m) => BLANK.repeat(m.length));
-  return s;
+  return exemptGuardLines(s);
 }
 
 /**

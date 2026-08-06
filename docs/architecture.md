@@ -312,15 +312,17 @@ reaches a peer some other way is a second implementation of sync, and will drift
 
 #### Where the runtime does NOT match this yet
 
-Written down on 2026-08-03 because all four are live, and because prose that flatters the code is worse than
-no prose:
+Written down on 2026-08-03 because all four were live, and because prose that flatters the code is worse than
+no prose. **Reconciled 2026-08 (wave 2): two of the four are since resolved — verified against the code, not
+claimed.** The durable fix for this section is to make each row a guard (fail-until-built) rather than prose
+that drifts; until then it is maintained by hand.
 
 | | state |
 |---|---|
-| Chat messages live in **both** an `EventLog` and as a `chat-message` item type | duplication to resolve — decide which is the record |
-| `addTask` exists on the `tasks` app-origin **and** in `HOUSEHOLD_WIRED_OPS` over the circle store | two routes to one op; the household copy is `{text, completedAt}` and cannot carry the lifecycle |
-| Tasks are correctly per-circle, and their store is **not** on the fan-out path | a task written on one device reaches no peer |
-| `household` names circle-level machinery throughout (`addHouseholdPeer`, `getHouseholdScope`) | a legacy app name doing load-bearing work; rename to `circle` |
+| Chat messages live in **both** an `EventLog` and as a `chat-message` item type | OPEN — duplication to resolve; decide which is the record (the one-log convergence, `PLAN-one-log-convergence.md`) |
+| `addTask` exists on the `tasks` app-origin **and** in `HOUSEHOLD_WIRED_OPS` over the circle store | PARTLY resolved — the lightweight `{text, completedAt}` model was folded onto the rich shape (2026-08, `555bdbd5`); the two-routes tail may remain |
+| Tasks are correctly per-circle, and their store is **not** on the fan-out path | ✅ RESOLVED (wave 2) — the one-store collapse put the tasks store on the `ensureCircleSync` fan-out; a task now crosses A→B, proven + guarded by `appTaskFanTwoDevice` (one store per circle + per-type sync arrival) |
+| `household` names circle-level machinery throughout (`addHouseholdPeer`, `getHouseholdScope`) | ✅ RESOLVED (wave 2) — the circle-infra was renamed (`addCirclePeer`, `getCircleScope`, `ensureCircleSync`, …); the remaining `household` is a legitimate template/app name, not circle machinery |
 
 **The rule these violations share:** each is a place where the code can no longer tell "did not happen"
 from "happened fine". That is the failure mode this architecture is most exposed to — everything here is

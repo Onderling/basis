@@ -64,6 +64,10 @@ import {
 // Shared ctx plumbing (actor/gate/emit/ref-resolution) lives ONCE in taskCtx.js
 // and is reused by both this module and taskCrud.js — no duplicated gate logic.
 import { requireActor, gate, emit, resolveById } from './taskCtx.js';
+// Structural subtask edge — the item-store CONTAINMENT model (the same tree treeOf renders and
+// shareContainerTree walks), reused rather than tasks-v0's immutable `parentTaskId` field.
+import { addChildTo } from './containerOps.js';
+import { parentsOf } from './containment.js';
 
 // ── co-ownership model (assignees[] + the `assignee` mirror) ─────────────────
 //
@@ -428,6 +432,63 @@ export async function revoke(store, id, args, ctx = {}) {
 // from '.../taskLifecycle.js'` alongside the verbs. (The DAG-aware status —
 // ready/waiting/blocked, "waiting until subtasks/deps complete" — is
 // `computeDagStatus` in `dag.js`; this is the substrate lifecycle status.)
+/**
+ * spawnSubtask — create a child task CONTAINED by `parentId`, on the item-store CONTAINMENT model
+ * (`contain`/`containedBy` — the SAME tree `treeOf` renders and `shareContainerTree` walks), NOT tasks-v0's
+ * immutable `parentTaskId` field. It ALSO wires the child into the parent's `dependencies[]`, so
+ * `computeDagStatus` holds the parent `waiting` until the subtask completes: containment is the structural
+ * TREE, `dependencies[]` is the DAG completion GATE — two edges, both kept (architecture §3.4).
+ *
+ * STRUCTURAL only — there is deliberately NO authority gate yet: the capability gate
+ * (`gate(ctx.rolePolicy, <spawn>, actor, parent)` — item-relative parent-assignee/master + role, per
+ * architecture's "task authority rides the one PolicyEngine" + the enforceability principle) is a separate
+ * later step, landing BEFORE any consumer adopts this (per the taskLifecycle note below: establish the
+ * canonical function + prove parity first). Actor is required; a completed parent is refused; the spawner is
+ * the subtask's `master` by default (parity with tasks-v0).
+ *
+ * @returns {Promise<{ task: object, depth: number }>}  the stored child + its containment depth (root=0)
+ */
+export async function spawnSubtask(store, parentId, args = {}, ctx = {}) {
+  const actor = requireActor(ctx);
+  if (typeof args.text !== 'string' || !args.text.trim()) throw new MissingArgumentError({ argument: 'text' });
+  const parent = await store.get(parentId);
+  if (!parent) throw new ItemNotFoundError(parentId);
+  if (parent.completedAt) {
+    throw new InvalidLifecycleError({ itemId: parentId, currentState: 'completed', attemptedAction: 'spawnSubtask' });
+  }
+  // Create the child + establish containment (contains embed on the parent + containedBy on the child), via
+  // the shared primitive — no re-implementation, no parentTaskId.
+  const child = await addChildTo(store, parentId, {
+    type:   args.type ?? 'task',
+    text:   args.text,
+    master: args.master ?? actor,           // the spawner owns the subtask by default (tasks-v0 parity)
+    ...(args.notes            !== undefined ? { notes:            args.notes }            : {}),
+    ...(args.requiredSkills   !== undefined ? { requiredSkills:   args.requiredSkills }   : {}),
+    ...(args.dueAt            !== undefined ? { dueAt:            args.dueAt }            : {}),
+    ...(args.visibility       !== undefined ? { visibility:       args.visibility }       : {}),
+    ...(args.definitionOfDone !== undefined ? { definitionOfDone: args.definitionOfDone } : {}),
+    ...(args.approval         !== undefined ? { approval:         args.approval }         : {}),
+  });
+  // DAG completion gate: the parent is `waiting` until the subtask completes. `addChildTo` re-put the parent
+  // (the contains edge), so re-read before appending the dep.
+  const fresh = await store.get(parentId);
+  const deps = Array.isArray(fresh?.dependencies) ? fresh.dependencies : [];
+  if (!deps.includes(child.id)) await store.put({ ...fresh, dependencies: [...deps, child.id] });
+  const depth = await depthOfContained(store, child.id);
+  emit(ctx, 'subtask-spawned', { task: child, depth });
+  return { task: child, depth };
+}
+
+/** Containment depth of `id`: 0 at a root (no container), else 1 + the deepest containing path. Cycle-guarded. */
+async function depthOfContained(store, id, seen = new Set()) {
+  if (seen.has(id)) return 0;
+  seen.add(id);
+  const parents = await parentsOf(store, id);
+  let max = 0;
+  for (const p of parents) max = Math.max(max, 1 + await depthOfContained(store, p, seen));
+  return max;
+}
+
 export { computeStatus };
 
 // ── Module-private helpers (parity with ItemStore's) ─────────────────────────

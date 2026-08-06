@@ -61,6 +61,37 @@ describe('spawnSubtask — structural containment + DAG gate (no parentTaskId)',
     expect(await parentsOf(store, c2.id)).toEqual([c1.id]);
   });
 
+  it('depth-approval — a subtask past ctx.approvalDepth is HELD (queued), not created', async () => {
+    const store = newStore();
+    const parent = await store.put({ type: 'task', text: 'p', createdBy: ANNE });
+
+    // approvalDepth 0 ⇒ a depth-1 child exceeds it ⇒ queued signal, nothing created/contained.
+    const held = await spawnSubtask(store, parent.id, { text: 'too deep' }, { actor: ANNE, approvalDepth: 0 });
+    expect(held).toMatchObject({ queued: true, depth: 1, threshold: 0 });
+    expect(held.task).toBeUndefined();
+    expect(childIdsOf(await store.get(parent.id))).toEqual([]);
+
+    // approvalDepth 1 ⇒ the same depth-1 child is within ⇒ created.
+    const ok = await spawnSubtask(store, parent.id, { text: 'ok' }, { actor: ANNE, approvalDepth: 1 });
+    expect(ok.queued).toBe(false);
+    expect(ok.task.text).toBe('ok');
+    expect(childIdsOf(await store.get(parent.id))).toContain(ok.task.id);
+  });
+
+  it('default approval depth (3) holds only past depth 3', async () => {
+    const store = newStore();
+    let node = await store.put({ type: 'task', text: 'root', createdBy: ANNE });
+    // depths 1,2,3 all create (<= 3); the 4th is held.
+    for (const d of [1, 2, 3]) {
+      const r = await spawnSubtask(store, node.id, { text: `d${d}` }, { actor: ANNE });
+      expect(r.queued, `depth ${d} should create`).toBe(false);
+      expect(r.depth).toBe(d);
+      node = r.task;
+    }
+    const held = await spawnSubtask(store, node.id, { text: 'd4' }, { actor: ANNE });
+    expect(held).toMatchObject({ queued: true, depth: 4, threshold: 3 });
+  });
+
   // @guard the subtask-spawn gate bites — only an authorized actor can spawn under a parent
   it('the capability gate BITES — canSpawnSubtask=false throws; =true lets the authorized actor through', async () => {
     const store = newStore();

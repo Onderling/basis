@@ -446,8 +446,15 @@ export async function revoke(store, id, args, ctx = {}) {
  * canonical function + prove parity first). Actor is required; a completed parent is refused; the spawner is
  * the subtask's `master` by default (parity with tasks-v0).
  *
- * @returns {Promise<{ task: object, depth: number }>}  the stored child + its containment depth (root=0)
+ * DEPTH-APPROVAL: a subtask deeper than the circle's spawn-approval depth (`ctx.approvalDepth`, default
+ * `DEFAULT_SUBTASK_APPROVAL_DEPTH`) is HELD — NOT created — and returns `{ queued: true, depth, threshold }`.
+ * The depth LIMIT is enforced here; the approval-request item + admin approve/decline is the consumer's
+ * workflow (fed by this signal), so no bespoke request type leaks into the item-store.
+ *
+ * @returns {Promise<{ queued: false, task: object, depth: number } | { queued: true, depth: number, threshold: number }>}
  */
+export const DEFAULT_SUBTASK_APPROVAL_DEPTH = 3;
+
 export async function spawnSubtask(store, parentId, args = {}, ctx = {}) {
   const actor = requireActor(ctx);
   if (typeof args.text !== 'string' || !args.text.trim()) throw new MissingArgumentError({ argument: 'text' });
@@ -462,8 +469,21 @@ export async function spawnSubtask(store, parentId, args = {}, ctx = {}) {
   // + role (coordinator/admin) — the tasks-v0 spawn perms expressed as a capability, not an inline
   // `circle.roles[from]` check. A missing policy/predicate = allow (the gate's documented default).
   gate(ctx.rolePolicy, 'canSpawnSubtask', actor, parent);
-  // Create the child + establish containment (contains embed on the parent + containedBy on the child), via
-  // the shared primitive — no re-implementation, no parentTaskId.
+
+  // Depth-approval — enforce the circle's spawn-approval depth HERE (canonical). A subtask deeper than the
+  // threshold is HELD, not created directly: return a `{ queued: true }` signal instead. The depth LIMIT is
+  // canonical; FILING the approval request + the admin approve/decline is the consumer's workflow (it owns
+  // the bespoke request item), fed by this signal — so a bespoke type never leaks into the item-store.
+  // Threshold is injected (`ctx.approvalDepth`, a per-circle setting); default `DEFAULT_SUBTASK_APPROVAL_DEPTH`.
+  const depth = 1 + await depthOfContained(store, parentId);          // the child would be one deeper than the parent
+  const threshold = Number.isFinite(ctx.approvalDepth) ? ctx.approvalDepth : DEFAULT_SUBTASK_APPROVAL_DEPTH;
+  if (depth > threshold) {
+    emit(ctx, 'subtask-spawn-held', { parentId, depth, threshold, by: actor });
+    return { queued: true, depth, threshold };
+  }
+
+  // Within the depth — create the child + establish containment (contains embed on the parent + containedBy
+  // on the child), via the shared primitive — no re-implementation, no parentTaskId.
   const child = await addChildTo(store, parentId, {
     type:   args.type ?? 'task',
     text:   args.text,
@@ -480,9 +500,8 @@ export async function spawnSubtask(store, parentId, args = {}, ctx = {}) {
   const fresh = await store.get(parentId);
   const deps = Array.isArray(fresh?.dependencies) ? fresh.dependencies : [];
   if (!deps.includes(child.id)) await store.put({ ...fresh, dependencies: [...deps, child.id] });
-  const depth = await depthOfContained(store, child.id);
   emit(ctx, 'subtask-spawned', { task: child, depth });
-  return { task: child, depth };
+  return { queued: false, task: child, depth };
 }
 
 /** Containment depth of `id`: 0 at a root (no container), else 1 + the deepest containing path. Cycle-guarded. */

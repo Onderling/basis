@@ -43,6 +43,7 @@
     "guards": "node scripts/guards.mjs",
     "guard-index": "node scripts/guard-index.mjs",
     "guard-status": "node scripts/guard-index.mjs --status",
+    "health": "node scripts/health.mjs",
     "check:versions": "npx --yes syncpack@13 list-mismatches",
     "fix:versions": "npx --yes syncpack@13 fix-mismatches",
     "tree:fix": "bash scripts/reconstruct-tree.sh"

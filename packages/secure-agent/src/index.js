@@ -63,23 +63,7 @@ export {
   NOT_REMOTE,
 } from './remoteHandlers.js';
 
-// re-export the substrate primitives the factory wires
-export {
-  TrustRegistry,
-  TIER_LEVEL,
-  CapabilityToken,
-  PolicyEngine,
-  ROLES,
-  roleRank,
-  isKnownRole,
-  registerCustomRole,
-  unregisterCustomRole,
-  canPromote,
-  listKnownRoles,
-  offeringMatches,
-  skillAttenuates,
-  GroupManager,
-  A2ATLSLayer,
-  A2AAuth,
-} from '@onderling/core';
-export { migrateVaultToPod } from '@onderling/pod-client';
+// NOTE: this barrel is secure-agent's OWN gate surface only. It used to also PASS THROUGH core primitives
+// (TrustRegistry, CapabilityToken, PolicyEngine, ROLES, GroupManager, A2A*, …) and pod-client's
+// migrateVaultToPod — a convenience with ZERO consumers (2026-08-06). Import those from their real homes
+// (`@onderling/core`, `@onderling/pod-client`); a substrate should not re-export another's surface.

@@ -257,6 +257,20 @@ export function buildStandardRolePolicy(roles, opts = {}) {
       if (isCoordinatorOrAbove(r)) return true;
       return item?.master === actor;
     },
+
+    /**
+     * Spawn a sub-task UNDER a parent (the canonical `spawnSubtask` verb's gate). The parent's assignee OR
+     * master (`master ?? addedBy`) OR a coordinator/admin may spawn — the item-relative + role authority the
+     * sub-task flow needs, expressed as a capability (this replaces the inline `circle.roles[from]` check
+     * `apps/tasks-v0/src/skills/subtasks.js` hand-rolled). `item` here is the PARENT.
+     */
+    canSpawnSubtask: (actor, item) => {
+      const r = get(actor);
+      if (r === undefined || r === 'observer') return false;
+      if (isCoordinatorOrAbove(r)) return true;                       // admin / coordinator
+      if (isAssignee(item, actor)) return true;                       // the parent's assignee (co-owner)
+      return (item?.master ?? item?.addedBy) === actor;               // the parent's master
+    },
   };
 }
 

@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest';
 
 import { CircleItemStore } from '../src/CircleItemStore.js';
 import { memoryDataSource } from '../src/memoryDataSource.js';
-import { spawnSubtask } from '../src/taskLifecycle.js';
+import { spawnSubtask, isAssignee } from '../src/taskLifecycle.js';
 import { childIdsOf, parentsOf } from '../src/containment.js';
 import { computeDagStatus } from '../src/dag.js';
 import { treeOf } from '../src/embeds.js';
@@ -17,6 +17,7 @@ import { treeOf } from '../src/embeds.js';
 const ROOT = 'mem://circles/c/';
 const newStore = () => new CircleItemStore({ dataSource: memoryDataSource(), rootContainer: ROOT });
 const ANNE = 'webid:anne';
+const BOB  = 'webid:bob';
 
 describe('spawnSubtask — structural containment + DAG gate (no parentTaskId)', () => {
   it('creates a child CONTAINED by the parent (contains + containedBy), master=spawner, depth 1', async () => {
@@ -58,6 +59,27 @@ describe('spawnSubtask — structural containment + DAG gate (no parentTaskId)',
     const { task: c2, depth } = await spawnSubtask(store, c1.id, { text: 'c2' }, { actor: ANNE });
     expect(depth).toBe(2);                                  // p(0) → c1(1) → c2(2)
     expect(await parentsOf(store, c2.id)).toEqual([c1.id]);
+  });
+
+  // @guard the subtask-spawn gate bites — only an authorized actor can spawn under a parent
+  it('the capability gate BITES — canSpawnSubtask=false throws; =true lets the authorized actor through', async () => {
+    const store = newStore();
+    const parent = await store.put({ type: 'task', text: 'p', createdBy: ANNE, assignees: [ANNE] });
+
+    // A rolePolicy that DENIES → a PermissionDeniedError, and NO child is created.
+    const deny = { canSpawnSubtask: () => false };
+    await expect(spawnSubtask(store, parent.id, { text: 'nope' }, { actor: BOB, rolePolicy: deny }))
+      .rejects.toThrow(/permission|denied/i);
+    expect(childIdsOf(await store.get(parent.id))).toEqual([]);
+
+    // The real item-relative rule (assignee/master + role): the parent's assignee is allowed, a stranger is not.
+    const policy = {
+      canSpawnSubtask: (actor, p) => isAssignee(p, actor) || (p?.master ?? p?.addedBy) === actor,
+    };
+    await expect(spawnSubtask(store, parent.id, { text: 'nope' }, { actor: BOB, rolePolicy: policy }))
+      .rejects.toThrow(/permission|denied/i);
+    const { task } = await spawnSubtask(store, parent.id, { text: 'ok' }, { actor: ANNE, rolePolicy: policy });
+    expect(task.text).toBe('ok');
   });
 
   it('refuses a completed parent and requires an actor', async () => {

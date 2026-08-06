@@ -456,6 +456,12 @@ export async function spawnSubtask(store, parentId, args = {}, ctx = {}) {
   if (parent.completedAt) {
     throw new InvalidLifecycleError({ itemId: parentId, currentState: 'completed', attemptedAction: 'spawnSubtask' });
   }
+  // Authority — the capability gate AT the canonical verb (the enforceability principle: put the gate where
+  // it binds). The
+  // circle's rolePolicy decides `canSpawnSubtask(actor, parent)` — item-relative (parent's assignee/master)
+  // + role (coordinator/admin) — the tasks-v0 spawn perms expressed as a capability, not an inline
+  // `circle.roles[from]` check. A missing policy/predicate = allow (the gate's documented default).
+  gate(ctx.rolePolicy, 'canSpawnSubtask', actor, parent);
   // Create the child + establish containment (contains embed on the parent + containedBy on the child), via
   // the shared primitive — no re-implementation, no parentTaskId.
   const child = await addChildTo(store, parentId, {

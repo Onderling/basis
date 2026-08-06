@@ -21,27 +21,26 @@
  */
 
 import { matchesFilter } from './filter.js';
-import { ENTRY_KINDS, isSystemKind, isAuditKind, kindWakes, retentionOf } from '@onderling/item-store';
-
-/** 14 days in ms — OQ-7.B retention default (the `chat` class). */
-export const RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
+import {
+  ENTRY_KINDS, isSystemKind, isAuditKind, kindWakes, retentionOf, RETENTION_DEFAULTS,
+} from '@onderling/item-store';
 
 /**
  * Per-CLASS retention defaults (one-log step D). "Retention of what?" is the right question — one number
- * for chat, roster pings and an audit trail is wrong for all three. The classes come from the kind
- * registry (`retentionOf`); the durations are a per-user setting with these defaults:
+ * for chat, roster pings and an audit trail is wrong for all three. The classes come from the kind registry
+ * (`retentionOf`); the DURATIONS live in the ONE shared table in `@onderling/item-store` (`RETENTION_DEFAULTS`,
+ * a per-user setting with these defaults) — moved there so `sa.audit` (secure-agent) reads the SAME numbers as
+ * this trail does, since secure-agent cannot import the basis app. Re-exported for the existing basis
+ * consumers; `RETENTION_MS` is the `chat`-class window (the historical name).
  *
  *   • `short` — pure plumbing (roster pings, delivery state): 7 days.
- *   • `chat`  — the conversation: 14 days (today's number, unchanged).
- *   • `audit` — governance, reports, key events, the agent trail: the number is the DETAIL window;
- *     entries past it COMPACT into an `audit-summary` instead of dropping, so the shape of what
- *     happened survives — and says how many it folded. A trail that quietly forgets looks complete.
+ *   • `chat`  — the conversation: 14 days.
+ *   • `audit` — governance, reports, key events, the agent trail: the number is the DETAIL window; entries
+ *     past it COMPACT into an `audit-summary` instead of dropping, so the shape of what happened survives —
+ *     and says how many it folded. A trail that quietly forgets looks complete.
  */
-export const RETENTION_DEFAULTS = Object.freeze({
-  short: 7  * 24 * 60 * 60 * 1000,
-  chat:  RETENTION_MS,
-  audit: RETENTION_MS,
-});
+export { RETENTION_DEFAULTS };
+export const RETENTION_MS = RETENTION_DEFAULTS.chat;
 
 /**
  * @typedef {object} LoggedEvent

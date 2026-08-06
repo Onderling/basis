@@ -229,7 +229,7 @@ export class AuditLog {
    *
    * @param {object} args
    * @param {number} args.keepRecent  how many most-recent entries to keep VERBATIM (the detail window). The
-   *                                  WINDOW itself derives from the kind table upstream (`G-A4`); this method
+   *                                  WINDOW itself derives from the kind table upstream (the audit-retention agreement); this method
    *                                  is the mechanism, given a resolved count.
    * @param {number} [args.now]       clock override (tests)
    * @returns {Promise<{compacted:boolean, foldedCount:number, reason?:string}>}
@@ -302,21 +302,27 @@ export class AuditLog {
   }
 
   /**
-   * Compact to the AUDIT retention window — the DERIVATION (`G-A4`). The window is NOT sa.audit's to choose:
-   * it comes from the one shared kind/retention table (`entryKinds.RETENTION_WINDOW[RETAIN.AUDIT]`), the same
-   * table the agent trail reads, so the two audit records cannot drift to different windows. `sa.audit`'s whole
-   * log is AUDIT-class by nature (security events), so it reads the AUDIT bucket directly. A no-op under the
-   * window (nothing to fold). Returns the compaction result plus the `window` it resolved (so a caller — and
-   * the guard — can see the window was derived, not hardcoded).
+   * Compact to the AUDIT retention window — the DERIVATION (the audit-retention agreement). The window is NOT sa.audit's to choose:
+   * it is the DURATION from the one shared kind/retention table (`RETENTION_DEFAULTS[RETAIN.AUDIT]`), the SAME
+   * table + units the agent trail's compactor reads, so the two audit records cannot drift. `sa.audit`'s whole
+   * log is AUDIT-class by nature (security events), so it reads the AUDIT bucket directly. Folding is BY AGE:
+   * entries older than `now − window` are past the detail window and fold; the chain is append-ordered by
+   * `ts`, so that is a contiguous prefix, which the re-chain `compact()` primitive handles as a `keepRecent`
+   * count. A no-op under the window. Returns the resolved `windowMs` (so a caller — and the guard — can see it
+   * was derived, not hardcoded) alongside the compaction result.
    *
    * @param {object} [args]
    * @param {number} [args.now]  clock override (tests)
-   * @returns {Promise<{compacted:boolean, foldedCount:number, window:number, reason?:string}>}
+   * @returns {Promise<{compacted:boolean, foldedCount:number, windowMs:number, keepRecent:number, reason?:string}>}
    */
   async compactToWindow({ now } = {}) {
-    const window = retentionWindowFor(RETAIN.AUDIT);
-    const res = await this.compact({ keepRecent: window, now });
-    return { ...res, window };
+    const windowMs = retentionWindowFor(RETAIN.AUDIT);          // the shared table's AUDIT window, in ms
+    const at = typeof now === 'number' ? now : Date.now();
+    const cutoff = at - windowMs;
+    // Detail window = the suffix with ts >= cutoff (entries are append-ordered by ts).
+    const keepRecent = this.#entries.reduce((n, e) => n + (typeof e.ts === 'number' && e.ts >= cutoff ? 1 : 0), 0);
+    const res = await this.compact({ keepRecent, now: at });
+    return { ...res, windowMs, keepRecent };
   }
 
   // ── internal ──────────────────────────────────────────────────────

@@ -9,9 +9,12 @@ import { describe, it, expect } from 'vitest';
 import { AgentIdentity } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 
+import { RETAIN, retentionWindowFor } from '@onderling/item-store';
+
 import { loadAuditLog, AUDIT_SUMMARY_EVENT } from '../src/auditLog.js';
 
 const freshLog = async () => loadAuditLog({ identity: await AgentIdentity.generate(new VaultMemory()) });
+const DAY = 24 * 60 * 60 * 1000;
 
 describe('AuditLog.compact — re-chain the tail', () => {
   it('folds the old tail into one summary + re-chains survivors, and verify() still passes', async () => {
@@ -57,6 +60,21 @@ describe('AuditLog.compact — re-chain the tail', () => {
     // S2 stands for R1..R13 = 13 real entries (S1's 8 + the 5 real ones folded now), never the summary slots.
     expect(log.entries()[0].data.foldedCount).toBe(13);
     expect(log.size).toBe(4);                                       // S2 + R14..R16
+  });
+
+  it('compactToWindow folds by AGE using the shared AUDIT window, keeping entries inside it', async () => {
+    const log = await freshLog();
+    for (let i = 0; i < 5; i++) await log.append({ event: 'key.rotate', now: 1000 + i });      // ancient (~epoch)
+    for (let i = 0; i < 3; i++) await log.append({ event: 'mute.add',  now: 100 * DAY + i });   // recent
+
+    const res = await log.compactToWindow({ now: 100 * DAY + 10 });   // 100 days >> the 14-day AUDIT window
+    expect(res.windowMs).toBe(retentionWindowFor(RETAIN.AUDIT));      // window derived from the shared table
+    expect(res.compacted).toBe(true);
+    expect(res.keepRecent).toBe(3);                                   // the 3 recent are inside the window
+    expect(log.verify()).toEqual({ ok: true });
+    expect(log.size).toBe(4);                                         // summary + 3 recent
+    expect(log.entries()[0].event).toBe(AUDIT_SUMMARY_EVENT);
+    expect(log.entries()[0].data.foldedCount).toBe(5);               // the 5 ancient folded
   });
 
   it('refuses to re-chain a foreign-signed survivor (mixed-signer) rather than corrupt it', async () => {

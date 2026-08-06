@@ -95,21 +95,22 @@ export function isAuditKind(kind) { return entryKind(kind).audit === true; }
 export function retentionOf(kind) { return entryKind(kind).retain; }
 
 /**
- * The DETAIL WINDOW per retention class — how many most-recent entries stay verbatim before the class's
- * policy applies to the rest (the AUDIT class COMPACTS beyond it; SHORT/CHAT drop the oldest). Durations are
- * a per-user setting (see the RETAIN doc); these are the shared DEFAULTS. This is the ONE table both audit
- * records — `sa.audit` (secure-agent) and the agent trail — read for their window, so neither hardcodes its
- * own number: the `G-A4` "pin-the-agreement" guard holds them to it.
+ * The retention window PER class, as a DURATION in ms — the ONE table both audit records read: `sa.audit`
+ * (the signed security log, in secure-agent) and the agent trail (in basis's `eventLog`). It lives HERE, in
+ * the substrate, precisely so both can import it — secure-agent cannot import the basis app, so a copy in
+ * `eventLog.js` (where it used to live) could never be the shared source. Durations are a per-user setting;
+ * these are the shared DEFAULTS. Past its window an AUDIT entry COMPACTS into an `audit-summary` (never
+ * drops); short/chat past theirs are dropped. The audit-retention agreement guard holds both records to reading THIS table.
  */
-export const RETENTION_WINDOW = Object.freeze({
-  [RETAIN.SHORT]: 200,
-  [RETAIN.CHAT]:  2000,
-  [RETAIN.AUDIT]: 1000,
+export const RETENTION_DEFAULTS = Object.freeze({
+  [RETAIN.SHORT]:  7 * 24 * 60 * 60 * 1000,   // pure plumbing — roster pings, delivery state
+  [RETAIN.CHAT]:  14 * 24 * 60 * 60 * 1000,   // the conversation
+  [RETAIN.AUDIT]: 14 * 24 * 60 * 60 * 1000,   // governance, reports, key events, the agent trail — DETAIL window
 });
 
-/** The detail-window for a RETAIN class (falls back to SHORT for an unknown class). */
+/** The retention window (ms) for a RETAIN class (falls back to CHAT for an unknown class). */
 export function retentionWindowFor(retainClass) {
-  return RETENTION_WINDOW[retainClass] ?? RETENTION_WINDOW[RETAIN.SHORT];
+  return RETENTION_DEFAULTS[retainClass] ?? RETENTION_DEFAULTS[RETAIN.CHAT];
 }
 
 /**

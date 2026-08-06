@@ -1,5 +1,5 @@
 /**
- * G-A4 — the audit-retention AGREEMENT guard.
+ * The audit-retention agreement guard (sa.audit half).
  *
  * The two audit records — `sa.audit` (the security layer's signed log) and the agent trail (agent actions) —
  * stay separate but must declare their retention window from the ONE shared kind/retention table
@@ -11,14 +11,17 @@
 import { describe, it, expect } from 'vitest';
 import { AgentIdentity } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
-import { RETAIN, RETENTION_WINDOW, retentionWindowFor, isAuditKind } from '@onderling/item-store';
+import { RETAIN, RETENTION_DEFAULTS, retentionWindowFor, isAuditKind } from '@onderling/item-store';
 
 import { loadAuditLog } from '../src/auditLog.js';
 
-describe('G-A4 — the two audit records derive their retention window from the one kind table', () => {
-  it('the shared table declares an AUDIT window', () => {
-    expect(RETENTION_WINDOW[RETAIN.AUDIT]).toBeGreaterThan(0);
-    expect(retentionWindowFor(RETAIN.AUDIT)).toBe(RETENTION_WINDOW[RETAIN.AUDIT]);
+// This is the sa.audit HALF of the audit-retention agreement (this package cannot import the basis app). The FULL both-records
+// agreement — that the agent trail's compactor reads the SAME table — lives in
+// apps/basis/test/auditRetentionAgreement.test.js, where both records are importable.
+describe('audit-retention agreement (sa.audit half) — sa.audit derives its retention window from the one kind table', () => {
+  it('the shared table declares an AUDIT window (a duration)', () => {
+    expect(RETENTION_DEFAULTS[RETAIN.AUDIT]).toBeGreaterThan(0);
+    expect(retentionWindowFor(RETAIN.AUDIT)).toBe(RETENTION_DEFAULTS[RETAIN.AUDIT]);
   });
 
   it('sa.audit resolves its compaction window FROM the table, not a hardcoded number', async () => {
@@ -26,14 +29,14 @@ describe('G-A4 — the two audit records derive their retention window from the 
     const res = await log.compactToWindow();
     // The window it used is exactly the shared table's AUDIT window — if sa.audit hardcoded its own, this
     // equality breaks the moment the table changes.
-    expect(res.window).toBe(retentionWindowFor(RETAIN.AUDIT));
+    expect(res.windowMs).toBe(retentionWindowFor(RETAIN.AUDIT));
   });
 
   it('the agent-trail kinds are AUDIT-class, so they read the SAME window bucket', () => {
     // Trail records land as 'agent-action' / 'settings-change' in the event log; both are audit-class, so
     // their retention resolves through the same RETAIN.AUDIT bucket sa.audit uses — the agreement holds by
     // construction once the trail's compaction is wired. Extend this with the trail's LIVE window assertion
-    // when that lands (the second half of G-A4).
+    // when that lands (the second half of the agreement guard).
     expect(isAuditKind('agent-action')).toBe(true);
     expect(isAuditKind('settings-change')).toBe(true);
   });

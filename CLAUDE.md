@@ -135,15 +135,19 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
 - **Check whether it already exists — the locale file is the fastest index.** Grep
   `circle.en.json` for the word a *user* would see before adding any small closed vocabulary. Duplicates
   break nothing, so nothing catches them. → [`shared-vocabularies.md`](docs/conventions/shared-vocabularies.md).
-- **SEARCH before you BUILD a cross-cutting concern.** Before adding retention, logging, an emitter, a
-  per-class table, or any shared vocabulary, grep the WHOLE repo for the *concept* — not the exact name you
-  have in mind — or send an Explore agent "does X already exist?" These almost always already live in a
-  substrate, and a second copy is the drift the structural guards do NOT catch. *Worked example (2026-08-06):*
-  a count-based retention table was added to `entryKinds` while a duration-based one already lived in
-  `eventLog.js` with a full compactor — one broad `grep -r "retention|compact|prune"` would have found it.
-  **A plan/architecture note saying a thing is "being completed" is NOT evidence it is unbuilt — verify against
-  the real code** (that claim was stale; the machinery was done). Duplicating logic → STOP and consolidate,
-  then leave a guard so it can't recur.
+- **SEARCH before you BUILD — and before you CONCLUDE.** Before adding a cross-cutting concern (retention,
+  logging, an emitter, a per-class table, any shared vocabulary) grep the WHOLE repo for the *concept* — not
+  the exact name you have in mind — or send an Explore agent "does X already exist?". These almost always
+  already live in a substrate, and a second copy is the drift the structural guards do NOT catch. **The same
+  discipline binds a CONCLUSION**: before you claim something is missing, unbuilt, broken, or a "parallel
+  structure", grep for the thing you're about to say doesn't exist — a wrong assessment sends real work in the
+  wrong direction. *Worked examples (2026-08-06):* a count-based retention table was added to `entryKinds`
+  while a duration-based one already lived in `eventLog.js` with a full compactor (one broad
+  `grep -r "retention|compact|prune"` would have found it); and the test twin was called a "parallel
+  structure" from reading ONE test, before grepping the harness's other connection modes — which turned out to
+  cross the real transport seam over relay + NKN. **A plan/architecture note saying a thing is "being
+  completed" is NOT evidence it is unbuilt — verify against the real code.** Duplicating logic → STOP and
+  consolidate, then leave a guard so it can't recur.
 - **Grep every identifier you introduce against the file you put it in**, especially state setters and
   navigation helpers: they read plausibly and are named differently per screen. `src/screens/**` has no test
   coverage, so nothing else will catch a typo there (→ `docs/agent-notes-known-gotchas.md`).

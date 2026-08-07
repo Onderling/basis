@@ -4,20 +4,27 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@noble/hashes': ^2.2.0
+  '@scure/bip39': ^2.0.1
+  ws: ^8.20.0
+  '@react-native-async-storage/async-storage': ^1.24.0
+  bunyan: 2.0.5
+
 importers:
 
   .:
     dependencies:
       '@noble/hashes':
-        specifier: ^1.4.0
-        version: 1.8.0
+        specifier: ^2.2.0
+        version: 2.2.0
 
 packages:
 
-  '@noble/hashes@1.8.0':
-    resolution: {integrity: sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A==}
-    engines: {node: ^14.21.3 || >=16}
+  '@noble/hashes@2.2.0':
+    resolution: {integrity: sha512-IYqDGiTXab6FniAgnSdZwgWbomxpy9FtYvLKs7wCUs2a8RkITG+DFGO1DM9cr+E3/RgADRpFjrKVaJ1z6sjtEg==}
+    engines: {node: '>= 20.19.0'}
 
 snapshots:
 
-  '@noble/hashes@1.8.0': {}
+  '@noble/hashes@2.2.0': {}

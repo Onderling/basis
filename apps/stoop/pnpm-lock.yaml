@@ -4,6 +4,13 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@noble/hashes': ^2.2.0
+  '@scure/bip39': ^2.0.1
+  ws: ^8.20.0
+  '@react-native-async-storage/async-storage': ^1.24.0
+  bunyan: 2.0.5
+
 importers:
 
   .:
@@ -278,10 +285,6 @@ packages:
   '@nkn/ncp@1.1.2':
     resolution: {integrity: sha512-HNQtIdAx/fQERvRQxIMZ2YrDqH9iDI/VhBSBfI0fp1owqawOP3996M7f/td4hjEgjh3Q72A9N/QYdu07AFLEEw==}
 
-  '@noble/hashes@1.8.0':
-    resolution: {integrity: sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A==}
-    engines: {node: ^14.21.3 || >=16}
-
   '@noble/hashes@2.2.0':
     resolution: {integrity: sha512-IYqDGiTXab6FniAgnSdZwgWbomxpy9FtYvLKs7wCUs2a8RkITG+DFGO1DM9cr+E3/RgADRpFjrKVaJ1z6sjtEg==}
     engines: {node: '>= 20.19.0'}
@@ -546,11 +549,11 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@scure/base@1.2.6':
-    resolution: {integrity: sha512-g/nm5FgUa//MCj1gV09zTJTaM6KBAHqLN907YVQqf7zC49+DcO4B1so4ZX07Ef10Twr6nuqYEH9GEggFXA4Fmg==}
+  '@scure/base@2.2.0':
+    resolution: {integrity: sha512-b8XEupJibegiXV+tDUseI8oLQc8ei3d/4Jkb2RpbHh3MfE054ov3uIz2dhFkB3FI8iwYkEh0gGCApkrYggkPNg==}
 
-  '@scure/bip39@1.6.0':
-    resolution: {integrity: sha512-+lF0BbLiJNwVlev4eKelw1WWLaiKXw7sSl8T6FvBlWkdX+94aGJ4o8XjUdlyhTCjd8c+B3KT3JfS8P0bLRNU6A==}
+  '@scure/bip39@2.2.0':
+    resolution: {integrity: sha512-T/Bj/YvYMNkIPq6EENO6/rcs2e7qTNuyoUXf0KBFDmp0ZDu0H2X4Lq6yC3i0c8PcWkov5EbW+yQZZbdMmk154A==}
 
   '@types/estree@1.0.9':
     resolution: {integrity: sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg==}
@@ -917,7 +920,7 @@ packages:
   isomorphic-ws@4.0.1:
     resolution: {integrity: sha512-BhBvN2MBpWTaSHdWRb/bwdZJ1WaehQ2L1KngkCkfLUGF0mAWAT1sQUQacEmQ0jXkFw/czDXPNQSL5u2/Krsz1w==}
     peerDependencies:
-      ws: '*'
+      ws: ^8.20.0
 
   jose@4.15.9:
     resolution: {integrity: sha512-1vUQX+IdDMVPj4k8kOxgUqlcK518yluMuGZwqlr44FS1ppZB/5GWh4rZG89erpOBOJjU/OBsnCVFfapsRz6nEA==}
@@ -1309,18 +1312,6 @@ packages:
   wrappy@1.0.2:
     resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
 
-  ws@7.5.11:
-    resolution: {integrity: sha512-zS54Oen9bITtp7kp2XM3AydrCIq1D+HwJOuH+c+e4LfpL/lotP5osijd+UoMnxwAam1GN8R4KtLAyIrIcBNpiA==}
-    engines: {node: '>=8.3.0'}
-    peerDependencies:
-      bufferutil: ^4.0.1
-      utf-8-validate: ^5.0.2
-    peerDependenciesMeta:
-      bufferutil:
-        optional: true
-      utf-8-validate:
-        optional: true
-
   ws@8.21.0:
     resolution: {integrity: sha512-Vsp28b7DRcimFQvrqu2Wek3z1iYxDCWqHYB8Qsnk/S4RfaCQzPGPyBNuVjJV3cd6UiKtUtp6sNM77gWvzcCH+g==}
     engines: {node: '>=10.0.0'}
@@ -1457,8 +1448,6 @@ snapshots:
       setimmediate: 1.0.5
     optional: true
 
-  '@noble/hashes@1.8.0': {}
-
   '@noble/hashes@2.2.0': {}
 
   '@onderling/agent-registry@file:../../packages/agent-registry(@onderling/core@file:../../packages/core)(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))':
@@ -1501,7 +1490,7 @@ snapshots:
       '@inrupt/solid-client': 3.0.0
       '@inrupt/solid-client-authn-node': 4.0.0
       '@noble/hashes': 2.2.0
-      '@scure/bip39': 1.6.0
+      '@scure/bip39': 2.2.0
       ed2curve: 0.3.0
       tweetnacl: 1.0.3
       tweetnacl-util: 0.15.1
@@ -1705,12 +1694,12 @@ snapshots:
   '@rollup/rollup-win32-x64-msvc@4.62.0':
     optional: true
 
-  '@scure/base@1.2.6': {}
+  '@scure/base@2.2.0': {}
 
-  '@scure/bip39@1.6.0':
+  '@scure/bip39@2.2.0':
     dependencies:
-      '@noble/hashes': 1.8.0
-      '@scure/base': 1.2.6
+      '@noble/hashes': 2.2.0
+      '@scure/base': 2.2.0
 
   '@types/estree@1.0.9': {}
 
@@ -2145,9 +2134,9 @@ snapshots:
   ip-address@10.2.0:
     optional: true
 
-  isomorphic-ws@4.0.1(ws@7.5.11):
+  isomorphic-ws@4.0.1(ws@8.21.0):
     dependencies:
-      ws: 7.5.11
+      ws: 8.21.0
     optional: true
 
   jose@4.15.9: {}
@@ -2293,14 +2282,14 @@ snapshots:
       ed2curve: 0.3.0
       google-protobuf: 3.21.4
       heap: 0.2.7
-      isomorphic-ws: 4.0.1(ws@7.5.11)
+      isomorphic-ws: 4.0.1(ws@8.21.0)
       libsodium-wrappers: 0.7.16
       memory-cache: 0.2.0
       pako: 1.0.11
       scrypt-js: 3.0.1
       tweetnacl: 1.0.3
       webworkify: 1.5.0
-      ws: 7.5.11
+      ws: 8.21.0
     transitivePeerDependencies:
       - bufferutil
       - debug
@@ -2656,9 +2645,6 @@ snapshots:
     optional: true
 
   wrappy@1.0.2: {}
-
-  ws@7.5.11:
-    optional: true
 
   ws@8.21.0: {}
 

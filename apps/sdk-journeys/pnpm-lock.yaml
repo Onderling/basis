@@ -1,0 +1,41 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+overrides:
+  '@noble/hashes': ^2.2.0
+  '@scure/bip39': ^2.0.1
+  ws: ^8.20.0
+  '@react-native-async-storage/async-storage': ^1.24.0
+  bunyan: 2.0.5
+
+importers:
+
+  .:
+    dependencies:
+      '@onderling/app-manifest':
+        specifier: workspace:*
+        version: link:../../packages/app-manifest
+      '@onderling/app-scaffold':
+        specifier: workspace:*
+        version: link:../../packages/app-scaffold
+      '@onderling/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@onderling/item-store':
+        specifier: workspace:*
+        version: link:../../packages/item-store
+      '@onderling/item-types':
+        specifier: workspace:*
+        version: link:../../packages/item-types
+      '@onderling/pseudo-pod':
+        specifier: workspace:*
+        version: link:../../packages/pseudo-pod
+      '@onderling/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+      '@onderling/vault':
+        specifier: workspace:*
+        version: link:../../packages/vault

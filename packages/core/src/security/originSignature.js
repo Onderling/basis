@@ -5,7 +5,7 @@
  * The origin signs a deterministic canonical form of the *invocation
  * intent*, not the envelope wrapper:
  *
- *   body = { v: 1, target, skill, parts, ts }
+ *   body = { v: 'onderling/origin.v1', target, skill, parts, ts }
  *   sig  = b64url( Ed25519.sign(canonicalize(body), origin.privateKey) )
  *
  * Three fields travel with the RQ payload to the target:
@@ -24,10 +24,11 @@ import { canonicalize }         from '../Envelope.js';
 import { encode as b64encode }  from '../crypto/b64.js';
 
 /**
- * Version (`v` field) of the signed origin-signature body. `signOrigin` writes it;
- * `verifyOrigin` rejects any other version.
+ * Version (`v` field) of the signed origin-signature body — a self-describing, namespaced STRING so an
+ * independent implementation knows the exact shape without our source (docs/conventions/signed-bodies.md).
+ * `signOrigin` writes it; `verifyOrigin` rejects any other version.
  */
-export const ORIGIN_SIG_VERSION      = 1;
+export const ORIGIN_SIG_VERSION      = 'onderling/origin.v1';
 /** Default clock-skew window for verifyOrigin's timestamp check: ±10 minutes. */
 export const DEFAULT_ORIGIN_WINDOW_MS = 10 * 60_000;  // ±10 min, matches SecurityLayer
 

@@ -45,5 +45,11 @@ export const TASK_SCHEMA = {
     requiredSkills: {}, deliverable: {},
     claimedAt: {}, completedAt: {}, submittedAt: {}, dueAt: {}, addedAt: {},
     addedBy: {}, addedByDisplayName: {}, parentTaskId: {}, note: {}, notes: {}, reviewLog: {},
+    // The claim-confirmation lifecycle fields (the decentralized-subtree fix): a claim's confirmation
+    // state + lease/expiry, its monotonic per-author sequence, the CONFIRMED assignee + time, and the
+    // master (root of the tree) / provisional (unconfirmed claim) markers. Same declare-don't-police
+    // rationale as the block above — the merge writes several of these as number-OR-null across call sites.
+    claimConfirmation: {}, claimLease: {}, claimSeq: {}, confirmedAssignee: {}, confirmedAt: {},
+    master: {}, provisional: {},
   },
 };

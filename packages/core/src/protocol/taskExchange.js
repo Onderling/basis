@@ -34,7 +34,7 @@
 import { Task }             from './Task.js';
 import { Parts }            from '../Parts.js';
 import { genId }            from '../Envelope.js';
-import { verifyOrigin }     from '../security/originSignature.js';
+import { verifyOrigin, ORIGIN_SIG_VERSION } from '../security/originSignature.js';
 import { openTunnelOW }     from '../security/tunnelSeal.js';
 import { InternalTransport } from '../transport/InternalTransport.js';
 
@@ -519,7 +519,7 @@ export async function runGatedSkill(agent, {
 
   // ── Origin signature verification (Group Z) ──────────────────────────────
   // Default: no verified origin. If the caller carries _origin + _originSig +
-  // _originTs, verify against canonicalize({ v:1, target: agent.pubKey, skill,
+  // _originTs, verify against canonicalize({ v: ORIGIN_SIG_VERSION, target: agent.pubKey, skill,
   // parts, ts }). On success → trust the claim. On failure → fall back to the
   // relay's pubkey and emit a security-warning. Missing sig entirely is the
   // backward-compat case (pre-Z callers) — attribute to `from` silently.
@@ -530,7 +530,7 @@ export async function runGatedSkill(agent, {
       {
         origin,
         sig:  originSig,
-        body: { v: 1, target: agent.pubKey, skill: skillId, parts, ts: originTs },
+        body: { v: ORIGIN_SIG_VERSION, target: agent.pubKey, skill: skillId, parts, ts: originTs },
       },
       { expectedPubKey: agent.pubKey },
     );

@@ -31,7 +31,7 @@
 import { Parts, DataPart }    from '../Parts.js';
 import { openSealed }          from '../security/sealedForward.js';
 import { sealTunnelOW }        from '../security/tunnelSeal.js';
-import { verifyOrigin }        from '../security/originSignature.js';
+import { verifyOrigin, ORIGIN_SIG_VERSION } from '../security/originSignature.js';
 
 const isAsyncGen = (x) => x && typeof x[Symbol.asyncIterator] === 'function';
 
@@ -78,7 +78,7 @@ export function registerTunnelReceiveSealed(agent, opts = {}) {
         origin: inner.origin,
         sig:    inner.originSig,
         body: {
-          v:      1,
+          v:      ORIGIN_SIG_VERSION,
           target: agent.pubKey,
           skill:  inner.skill,
           parts:  inner.parts,

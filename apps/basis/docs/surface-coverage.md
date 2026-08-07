@@ -52,6 +52,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `registerName` | register | ✅ | ✅ | ✅ | · | ✅ | · | register, registreer, naam |
 | **tasks** | `addTask` | add | ✅ | ✅ | ✅ | · | ✅ | · | add, todo, new task, voeg, zet, maak taak, nieuwe taak |
 |  | `claimTask` | claim | ✅ | ✅ | ✅ | · | ✅ | ✅ | claim, pak, neem, i'll take, i'll do, ik pak, ik doe, ik neem |
+|  | `confirmClaim` | confirm | ✅ | ✅ | ✅ | · | ✅ | ✅ | confirm, bevestig, keur, keur goed, ken toe |
 |  | `completeTask` | complete | ✅ | ✅ | ✅ | · | ✅ | ✅ | klaar met, done with, done, complete, completed, finished, klaar, voltooid, gedaan |
 |  | `getTaskSnapshot` | list | ✅ | · | · | · | · | · |  |
 |  | `removeTask` | remove | ✅ | · | · | · | · | · |  |
@@ -68,6 +69,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `resolveClaim` | reassign | ✅ | · | · | · | · | · |  |
 |  | `listAwaitingApproval` | list | ✅ | · | · | · | · | · |  |
 |  | `listMyMasteredTasks` | list | ✅ | · | · | · | · | · |  |
+|  | `listMyPendingClaims` | list | ✅ | · | · | · | · | · |  |
 |  | `listMyInbox` | list | ✅ | · | · | · | · | · |  |
 |  | `clearInboxItem` | remove | ✅ | · | · | · | ✅ | ✅ |  |
 |  | `approveSubtaskRequest` | approve | ✅ | ✅ | · | · | ✅ | ✅ |  |
@@ -181,10 +183,10 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `listDataVersions` | list | ✅ | · | · | · | · | · |  |
 |  | `restoreDataVersion` | update | ✅ | · | · | · | ✅ | ✅ |  |
 |---|---|---|---|---|---|---|---|---|---|
-| **totals** | 176 ops | | 173 | 127 | 33 | 3 | 84 | 47 | |
+| **totals** | 178 ops | | 175 | 128 | 34 | 3 | 85 | 48 | |
 
 ## Gaps for the gate/LLM + inline-menu work
 
-- **missing gate** (143/176): basis:help, basis:newthread, basis:help-with, basis:threads, basis:startDm, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:compare, basis:signin, basis:reset-thread, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, basis:apps, basis:sendto, household:reassign, tasks:getTaskSnapshot, tasks:removeTask, tasks:attachTaskGrant …
-- **missing inline** (129/176): basis:help, basis:newthread, basis:help-with, basis:threads, basis:startDm, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:compare, basis:signin, basis:reset-thread, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, basis:apps, basis:sendto, household:addItem, household:listOpen, household:help, household:addTask …
-- **missing chat** (3/176): folio:deleteFromPod, folio:deleteLocally, folio:forceRepush
+- **missing gate** (144/178): basis:help, basis:newthread, basis:help-with, basis:threads, basis:startDm, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:compare, basis:signin, basis:reset-thread, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, basis:apps, basis:sendto, household:reassign, tasks:getTaskSnapshot, tasks:removeTask, tasks:attachTaskGrant …
+- **missing inline** (130/178): basis:help, basis:newthread, basis:help-with, basis:threads, basis:startDm, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:compare, basis:signin, basis:reset-thread, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, basis:apps, basis:sendto, household:addItem, household:listOpen, household:help, household:addTask …
+- **missing chat** (3/178): folio:deleteFromPod, folio:deleteLocally, folio:forceRepush

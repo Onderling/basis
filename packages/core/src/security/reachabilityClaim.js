@@ -11,7 +11,7 @@
  *
  * Signed body shape:
  *   {
- *     v: 1,                        // protocol version
+ *     v: 'onderling/reachability.v1', // protocol version (self-describing string)
  *     i: '<issuer-pubkey-b64url>', // Ed25519 pubkey of signer
  *     p: ['<pk1>','<pk2>',...],    // sorted lexicographically
  *     t: 300000,                   // ttlMs (relative, receiver-anchored)
@@ -27,10 +27,11 @@ import { canonicalize }          from '../Envelope.js';
 import { encode as b64encode }   from '../crypto/b64.js';
 
 /**
- * Version (`v` field) of the signed reachability-claim body. Signing writes it;
- * `verifyReachabilityClaim` rejects any other version.
+ * Version (`v` field) of the signed reachability-claim body — a self-describing, namespaced STRING so an
+ * independent implementation knows the exact shape without our source (docs/conventions/signed-bodies.md).
+ * Signing writes it; `verifyReachabilityClaim` rejects any other version.
  */
-export const CLAIM_VERSION = 1;
+export const CLAIM_VERSION = 'onderling/reachability.v1';
 
 /** Sane consumer-side defaults. Callers can pass their own limits. */
 export const DEFAULT_VERIFY_LIMITS = Object.freeze({

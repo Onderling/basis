@@ -247,7 +247,7 @@ describe('verifyOrigin — structure rejects', () => {
     const res = verifyOrigin({
       origin: alice.pubKey,
       sig,
-      body: { v: 1, target: carol.pubKey, skill: 's', parts: 'not-an-array', ts: originTs },
+      body: { v: ORIGIN_SIG_VERSION, target: carol.pubKey, skill: 's', parts: 'not-an-array', ts: originTs },
     }, { expectedPubKey: carol.pubKey });
     expect(res.ok).toBe(false);
     expect(res.reason).toMatch(/parts must be an array/);
@@ -280,7 +280,7 @@ describe('constants', () => {
   it('DEFAULT_ORIGIN_WINDOW_MS is 10 min', () => {
     expect(DEFAULT_ORIGIN_WINDOW_MS).toBe(10 * 60_000);
   });
-  it('ORIGIN_SIG_VERSION is 1', () => {
-    expect(ORIGIN_SIG_VERSION).toBe(1);
+  it('ORIGIN_SIG_VERSION is the namespaced version string', () => {
+    expect(ORIGIN_SIG_VERSION).toBe('onderling/origin.v1');
   });
 });

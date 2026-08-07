@@ -24,6 +24,9 @@ author code — several are load-bearing invariants, not style preferences.
   it, not parallel agents.
 - **[ports.md](./ports.md)** — the `Transport` / `DataSource` / `ActorResolver` ports the kernel defines:
   the compatibility contract a third-party adapter implements, plus the conformance harness that checks it.
+- **[signed-bodies.md](./signed-bodies.md)** — how a signed, peer-verified body carries its version (a
+  self-describing namespaced string, inside the signature) so the format is legible to an independent
+  implementation and can evolve without a flag day.
 - **[storage-layout.md](./storage-layout.md)** — how app data is laid out in a pod.
 - **[doc-structure.md](./doc-structure.md)** — what belongs in `CLAUDE.md` vs the docs tree, and when to
   compress/enlarge `CLAUDE.md` (the rule governing this split).

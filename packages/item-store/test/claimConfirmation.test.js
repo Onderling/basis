@@ -1,16 +1,15 @@
 /**
- * Claim confirmation + the immutable-once-set claim merge — the subtask decentralized-tree fix
- * (PLAN-subtask-claim-and-confirmation, slices 1–3).
+ * Claim confirmation + the immutable-once-set claim merge — the subtask decentralized-tree fix.
  *
  * The guarantee: a subtask tree survives decentralization because only the CONFIRMED claimant writes a
  * node's subtree (single writer per node → no array clobber). This proves the three moving parts:
- *   • slice 1 — `claim` auto-confirms by default / stays PENDING in explicit mode; `confirmClaim` (authority)
- *     turns a pending claim into a real one;
- *   • slice 2 — the immutable-once-set CLAIM merge: two concurrent claims resolve FIRST-COME across devices
+ *   • claim/confirm — `claim` auto-confirms by default / stays PENDING in explicit mode; `confirmClaim`
+ *     (authority) turns a pending claim into a real one;
+ *   • the immutable-once-set CLAIM merge — two concurrent claims resolve FIRST-COME across devices
  *     (not causally-latest), a confirmed claim beats a pending one, an authoritative transition (reassign/
  *     revoke) supersedes a stale claim, and a claimless content edit never drops the claim;
- *   • slice 3 — `spawnSubtask` only unlocks for the CONFIRMED claimant (or master/admin) — a pending claim
- *     cannot accrue committed subtasks.
+ *   • confirmed-only subtree — `spawnSubtask` only unlocks for the CONFIRMED claimant (or master/admin);
+ *     a pending claim cannot accrue committed subtasks.
  */
 import { describe, it, expect } from 'vitest';
 import { MemorySource } from '@onderling/core';

@@ -17,7 +17,7 @@
  */
 import { Parts, DataPart }  from '../Parts.js';
 import { openSealed }       from '../security/sealedForward.js';
-import { verifyOrigin }     from '../security/originSignature.js';
+import { verifyOrigin, ORIGIN_SIG_VERSION } from '../security/originSignature.js';
 
 /**
  * Register the `relay-receive-sealed` skill on `agent`.
@@ -64,7 +64,7 @@ export function registerRelayReceiveSealed(agent, opts = {}) {
         origin: inner.origin,
         sig:    inner.originSig,
         body: {
-          v:      1,
+          v:      ORIGIN_SIG_VERSION,
           target: agent.pubKey,
           skill:  inner.skill,
           parts:  inner.parts,

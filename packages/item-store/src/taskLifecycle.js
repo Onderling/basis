@@ -67,7 +67,7 @@ import { requireActor, gate, emit, resolveById } from './taskCtx.js';
 // Structural subtask edge — the item-store CONTAINMENT model (the same tree treeOf renders and
 // shareContainerTree walks), reused rather than tasks-v0's immutable `parentTaskId` field.
 import { addChildTo } from './containerOps.js';
-import { parentsOf } from './containment.js';
+import { parentsOf, contain } from './containment.js';
 
 // ── co-ownership model (assignees[] + the `assignee` mirror) ─────────────────
 //
@@ -112,6 +112,86 @@ export function isAssigneesFull(item) {
 /** True iff `actor` is one of the task's co-owners (membership, not equality). */
 export function isAssignee(item, actor) {
   return assigneesOf(item).includes(actor);
+}
+
+// ── claim confirmation (the subtask decentralized-tree fix) ──────────────────
+//
+// A claim is a REQUEST until it is CONFIRMED. Confirmation is what makes the claimant the SINGLE writer of the
+// task's subtree — the property that lets the tree survive decentralization without a CRDT (see
+// PLAN-subtask-claim-and-confirmation). Two modes, chosen by the task master at creation:
+//   • 'auto' (default) — the first valid claim confirms itself (the master pre-delegates);
+//   • 'explicit'       — the claim stays PENDING until an authority (master/admin/coordinator) confirms it.
+// The confirmed claimant is `confirmedAssignee`; `confirmedAt`/`confirmedBy` attribute the confirmation.
+
+/** The confirmation mode of a task — `'explicit'` iff set so, else `'auto'` (the least-friction default). */
+export function confirmationModeOf(item) {
+  return item?.claimConfirmation === 'explicit' ? 'explicit' : 'auto';
+}
+
+/** The confirmed claimant's id, or null when the claim is still pending / the task is unclaimed. */
+export function confirmedClaimOf(item) {
+  return item?.confirmedAssignee ?? null;
+}
+
+/** True iff `actor` holds the CONFIRMED claim (not merely a pending one). */
+export function isConfirmedClaimant(item, actor) {
+  return item?.confirmedAssignee != null && item.confirmedAssignee === actor;
+}
+
+/**
+ * The claim state of a task, for projections/UX: `'unclaimed' | 'pending' | 'confirmed'`. A `pending` claim
+ * has a claimant but no confirmation yet (explicit mode, awaiting the authority) — the "not yet yours" state.
+ */
+export function claimState(item) {
+  if (item?.confirmedAssignee != null) return 'confirmed';
+  if (assigneesOf(item).length > 0) return 'pending';
+  return 'unclaimed';
+}
+
+/**
+ * The canonical string a confirmer SIGNS to make a `claim-confirmed` authoritative — the facts that identify
+ * exactly which claim, on which task, at which sequence. Stable + delimiter-separated so two devices produce
+ * the same bytes. (The signing/verifying keys live in the identity layer, NOT here — this substrate only
+ * canonicalises + carries `confirmedSig`; sign/verify are injected. Enforcement rides eviction-as-signed-
+ * statement, task #2.)
+ * @param {{taskId?:string, confirmedAssignee?:string, confirmedAt?:number, claimSeq?:number}} facts
+ */
+export function claimConfirmationStatement({ taskId, confirmedAssignee, confirmedAt, claimSeq } = {}) {
+  return ['claim-confirmed', taskId ?? '', confirmedAssignee ?? '', confirmedAt ?? '', claimSeq ?? ''].join(' ');
+}
+
+/**
+ * Verify a task's `confirmedSig` against its confirmation facts, using an injected `verify(message, sig)` (the
+ * identity layer's Ed25519 verify bound to the confirmer's pubkey). Returns false when there is no signature /
+ * no confirmed claimant, or the signature does not check out. A no-op-safe read — no crypto in the substrate.
+ * @param {object} item
+ * @param {(message:string, sig:string)=>boolean} verify
+ */
+export function verifyClaimConfirmation(item, verify) {
+  const sig = item?.confirmedSig;
+  if (!sig || item?.confirmedAssignee == null || typeof verify !== 'function') return false;
+  const msg = claimConfirmationStatement({
+    taskId: item.id, confirmedAssignee: item.confirmedAssignee, confirmedAt: item.confirmedAt, claimSeq: item.claimSeq,
+  });
+  try { return verify(msg, sig) === true; } catch { return false; }
+}
+
+/**
+ * True iff the task's claim has LAPSED under its lease (§2.8): the issuer set a `claimLease` (duration in ms)
+ * at creation and `claimedAt + claimLease` is in the past. A lapsed claim returns the node to claimable — an
+ * unfinished claim no longer freezes its subtree. DETERMINISTIC: computed identically on every device from the
+ * item's own fields + a `now` the caller supplies (principle 10 — nothing decided locally). No lease (the
+ * default) ⇒ never expires (manual release only). A completed task never expires.
+ * @param {object} item
+ * @param {number} [now] epoch ms (caller-supplied so the fn stays pure/testable)
+ */
+export function isClaimExpired(item, now = 0) {
+  const lease = typeof item?.claimLease === 'number' ? item.claimLease : null;
+  if (!lease || lease <= 0) return false;
+  if (item?.completedAt) return false;
+  const since = typeof item?.claimedAt === 'number' ? item.claimedAt : null;
+  if (since == null) return false;
+  return (since + lease) < now;
 }
 
 // ── lifecycle-specific helpers ───────────────────────────────────────────────
@@ -165,17 +245,44 @@ export async function claim(store, id, ctx = {}) {
   if (current.completedAt) {
     throw new InvalidLifecycleError({ itemId: id, currentState: 'completed', attemptedAction: 'claim' });
   }
+  const at = Date.now();
   const roster = assigneesOf(current);
-  // Already a co-owner, OR the set is full (default maxAssignees:1 ⇒ full after
-  // the first claim = today's EXCLUSIVE first-come) → ItemStore's already-claimed.
-  if (roster.includes(actor) || roster.length >= maxAssigneesOf(current)) {
+  // A claim that has LAPSED under its lease (§2.8) returns the node to claimable — a new claim SUPERSEDES it.
+  const expired = isClaimExpired(current, at);
+  // Already a co-owner, OR the set is full (default maxAssignees:1 ⇒ full after the first claim = today's
+  // EXCLUSIVE first-come) → ItemStore's already-claimed — UNLESS the current claim has expired.
+  if (!expired && (roster.includes(actor) || roster.length >= maxAssigneesOf(current))) {
     return { error: 'already-claimed', current };
   }
   gate(ctx.rolePolicy, 'canClaim', actor, current);
 
-  const at = Date.now();
-  const assignees = [...roster, actor];        // CAS-ADD (append, not overwrite)
-  const updated = { ...current, assignees, assignee: assignees[0], claimedAt: at };
+  // A fresh claim over an EXPIRED one drops the lapsed roster + its (now void) confirmation; otherwise CAS-ADD.
+  const assignees = expired ? [actor] : [...roster, actor];
+  const updated = {
+    ...current, assignees, assignee: assignees[0], claimedAt: at,
+    claimSeq: (current.claimSeq ?? 0) + 1,     // advance the claim's monotonic sequence (immutable-once-set)
+  };
+  delete updated.claimReleasedAt;              // a fresh claim clears a prior release marker (re-claim)
+  if (expired) {                               // the lapsed claim's confirmation no longer holds
+    delete updated.confirmedAssignee;
+    delete updated.confirmedAt;
+    delete updated.confirmedBy;
+  }
+  // Auto-confirm (default): unless the task requires EXPLICIT confirmation, the claim confirms itself — the
+  // master pre-delegated (§2.3). A confirmed claim is what unlocks the subtree. In explicit mode the claim
+  // stays PENDING (no `confirmedAssignee`) until an authority calls `confirmClaim`. An EXPIRED claim's old
+  // confirmation is void, so the superseding claim re-confirms per the mode.
+  const autoConfirm = confirmationModeOf(current) !== 'explicit' && (expired || current.confirmedAssignee == null);
+  if (autoConfirm) {
+    updated.confirmedAssignee = actor;
+    updated.confirmedAt = at;
+    updated.confirmedBy = current.master ?? current.addedBy ?? actor;   // the pre-delegating authority
+    if (typeof ctx.sign === 'function') {
+      updated.confirmedSig = ctx.sign(claimConfirmationStatement({
+        taskId: id, confirmedAssignee: actor, confirmedAt: at, claimSeq: updated.claimSeq,
+      }));
+    }
+  }
   const res = await store.putIfMatch(updated, { by: actor, expectedEtag: ctx.expectedEtag });
   // CAS conflict → someone else claimed between our read and our write. Re-map
   // to ItemStore's contract; `res.current` is the re-read winner.
@@ -183,7 +290,92 @@ export async function claim(store, id, ctx = {}) {
     return { error: 'already-claimed', current: res.current ?? current };
   }
   emit(ctx, 'item-claimed', res);
+  if (autoConfirm) emit(ctx, 'claim-confirmed', res);
   return res;
+}
+
+/**
+ * Confirm a claim — AUTHORITATIVE (CAS). The authority (task master, or admin/coordinator via `rolePolicy`)
+ * turns a PENDING claim into a real one: the confirmed claimant becomes the SINGLE writer of the subtree, so
+ * `spawnSubtask` unlocks (see `canSpawnSubtask`). Confirms `ctx.assignee` when given, else the current sole
+ * claimant; collapses the co-owner set to the confirmed claimant (confirmation RESOLVES a contested claim to
+ * one). Emits `claim-confirmed`. Idempotent-safe: re-confirming the same claimant just re-stamps.
+ *
+ * @param {import('./CircleItemStore.js').CircleItemStore} store
+ * @param {string} id
+ * @param {object} ctx  `actor` required; `assignee` (the claim to confirm), `rolePolicy`, `expectedEtag`,
+ *   `emit` optional.
+ * @returns {Promise<object | {error:'conflict', current: object|null} | {error:'no-claim', current: object}>}
+ */
+export async function confirmClaim(store, id, ctx = {}) {
+  const actor = requireActor(ctx);
+  const current = await store.get(id);
+  if (!current) throw new ItemNotFoundError(id);
+  if (current.completedAt) {
+    throw new InvalidLifecycleError({ itemId: id, currentState: 'completed', attemptedAction: 'confirmClaim' });
+  }
+  // The claim to confirm: an explicit target, else the current sole claimant.
+  const target = ctx.assignee ?? assigneesOf(current)[0] ?? null;
+  if (!target) return { error: 'no-claim', current };     // nothing pending to confirm
+  gate(ctx.rolePolicy, 'canConfirmClaim', actor, current);
+
+  const at = Date.now();
+  const updated = {
+    ...current,
+    // Confirmation RESOLVES a contested claim to the one confirmed claimant (the master may confirm a claimant
+    // who lost the local CAS but is the chosen one), so collapse the co-owner set to them.
+    assignees: [target],
+    assignee: target,
+    claimedAt: current.claimedAt ?? at,
+    confirmedAssignee: target,
+    confirmedAt: at,
+    confirmedBy: actor,
+    claimSeq: (current.claimSeq ?? 0) + 1,     // an authoritative transition — supersedes a pending claim
+  };
+  delete updated.claimReleasedAt;
+  // Optional cryptographic attestation: if the caller injects a signer (the confirmer's identity key), sign
+  // the canonical confirmation statement so a peer CAN verify it (enforcement rides task #2's ingest rail).
+  if (typeof ctx.sign === 'function') {
+    updated.confirmedSig = ctx.sign(claimConfirmationStatement({
+      taskId: id, confirmedAssignee: target, confirmedAt: at, claimSeq: updated.claimSeq,
+    }));
+  } else {
+    delete updated.confirmedSig;               // a re-confirmation without a signer clears any stale signature
+  }
+  const res = await store.putIfMatch(updated, { by: actor, expectedEtag: ctx.expectedEtag });
+  if (res && res.error === 'conflict') return res;
+  // Confirmation is the moment PROVISIONAL becomes real: commit the confirmed claimant's optimistic subtree
+  // and discard any losing claimant's (§2.5).
+  await commitProvisionalSubtree(store, id, target, actor, ctx);
+  emit(ctx, 'claim-confirmed', res);
+  return res;
+}
+
+/**
+ * On confirmation, the confirmed claimant's PROVISIONAL children (spawned optimistically while the claim was
+ * pending) become REAL — the `provisional` flag cleared, the parent embed + the `dependencies` completion gate
+ * established. Any OTHER claimant's provisional children under the task are DISCARDED (the loser's optimistic
+ * subtree, §2.5). A no-op when the store can't enumerate or there are none.
+ */
+async function commitProvisionalSubtree(store, parentId, confirmedAssignee, by, ctx = {}) {
+  if (typeof store.list !== 'function') return;
+  const all = await store.list();
+  const kids = (all ?? []).filter((it) =>
+    it?.provisional === true && Array.isArray(it.containedBy) && it.containedBy.includes(parentId));
+  for (const kid of kids) {
+    const authoredByWinner = kid.createdBy === confirmedAssignee || kid.master === confirmedAssignee;
+    if (authoredByWinner) {
+      await store.put({ ...kid, provisional: false }, { by });     // commit: no longer provisional
+      await contain(store, parentId, kid.id);                       // establish the parent embed
+      const parent = await store.get(parentId);
+      const deps = Array.isArray(parent?.dependencies) ? parent.dependencies : [];
+      if (!deps.includes(kid.id)) await store.put({ ...parent, dependencies: [...deps, kid.id] }, { by });
+      emit(ctx, 'subtask-committed', { task: { ...kid, provisional: false }, parentId });
+    } else {
+      await store.delete(kid.id);                                   // discard a losing claimant's optimistic child
+      emit(ctx, 'subtask-discarded', { taskId: kid.id, parentId });
+    }
+  }
 }
 
 /**
@@ -210,17 +402,29 @@ export async function reassign(store, id, newAssignee, ctx = {}) {
   const at = Date.now();
   // `claimBase` records the SUPERSEDED sole owner (the mirror = assignees[0]) for
   // the substrate's causal-vs-concurrent disambiguation — preserved verbatim.
-  const updated = { ...current, claimBase: current.assignee ?? null };
+  // Reassign/release is an AUTHORITATIVE transition (coordinator+); advance the claim sequence so it
+  // supersedes any stale claim on a peer (the merge keeps the higher-sequence side).
+  const updated = { ...current, claimBase: current.assignee ?? null, claimSeq: (current.claimSeq ?? 0) + 1 };
   if (newAssignee) {
-    // Reassign to a new SOLE owner: collapse the co-owner set to just them.
+    // Reassign to a new SOLE owner: collapse the co-owner set to just them, and re-confirm them (a
+    // coordinator reassignment is inherently authoritative → the new assignee is the confirmed claimant).
     updated.assignees = [newAssignee];
     updated.assignee = newAssignee;            // mirror = assignees[0]
     updated.claimedAt = at;
+    updated.confirmedAssignee = newAssignee;
+    updated.confirmedAt = at;
+    updated.confirmedBy = actor;
+    delete updated.claimReleasedAt;
   } else {
-    // Release: clear the whole set + the mirror.
+    // Release: clear the whole set + the mirror + the confirmation; stamp the release marker so the merge
+    // knows this is a deliberate un-claim (not a stale claimless edit).
     delete updated.assignees;
     delete updated.assignee;
     delete updated.claimedAt;
+    delete updated.confirmedAssignee;
+    delete updated.confirmedAt;
+    delete updated.confirmedBy;
+    updated.claimReleasedAt = at;
   }
   const res = await store.putIfMatch(updated, { by: actor, expectedEtag: ctx.expectedEtag });
   if (res && res.error === 'conflict') return res;
@@ -408,20 +612,32 @@ export async function revoke(store, id, args, ctx = {}) {
   const roster = assigneesOf(current);
   const target = args?.assignee ?? args?.target ?? null;
   const reviewLog = appendReview(current.reviewLog, { at, by: actor, decision: 'revoke', note: args.reason });
-  const updated = { ...current, reviewLog };
+  // Revoke is an AUTHORITATIVE transition — advance the claim sequence so it supersedes a stale claim on a peer.
+  const updated = { ...current, reviewLog, claimSeq: (current.claimSeq ?? 0) + 1 };
   let previousAssignee;
   if (target && roster.includes(target) && roster.length > 1) {
-    // Yank ONE co-owner; the rest keep the task.
+    // Yank ONE co-owner; the rest keep the task. If the yanked one was the confirmed claimant, the
+    // confirmation is now stale — clear it (the remaining co-owners hold a plain claim until re-confirmed).
     const remaining = roster.filter((w) => w !== target);
     updated.assignees = remaining;
     updated.assignee = remaining[0];           // mirror = new assignees[0]
+    if (current.confirmedAssignee === target) {
+      delete updated.confirmedAssignee;
+      delete updated.confirmedAt;
+      delete updated.confirmedBy;
+    }
     previousAssignee = target;
   } else {
-    // Clear the whole set + the mirror (single-owner parity).
+    // Clear the whole set + the mirror + confirmation (single-owner parity); stamp the release marker so the
+    // merge treats this as a deliberate un-claim rather than a stale claimless edit.
     previousAssignee = current.assignee;
     delete updated.assignees;
     delete updated.assignee;
     delete updated.claimedAt;
+    delete updated.confirmedAssignee;
+    delete updated.confirmedAt;
+    delete updated.confirmedBy;
+    updated.claimReleasedAt = at;
   }
   const res = await store.put(updated, { by: actor });
   emit(ctx, 'item-revoked', { item: res, previousAssignee, reason: args.reason });
@@ -439,12 +655,14 @@ export async function revoke(store, id, args, ctx = {}) {
  * `computeDagStatus` holds the parent `waiting` until the subtask completes: containment is the structural
  * TREE, `dependencies[]` is the DAG completion GATE — two edges, both kept (architecture §3.4).
  *
- * STRUCTURAL only — there is deliberately NO authority gate yet: the capability gate
- * (`gate(ctx.rolePolicy, <spawn>, actor, parent)` — item-relative parent-assignee/master + role, per
- * architecture's "task authority rides the one PolicyEngine" + the enforceability principle) is a separate
- * later step, landing BEFORE any consumer adopts this (per the taskLifecycle note below: establish the
- * canonical function + prove parity first). Actor is required; a completed parent is refused; the spawner is
- * the subtask's `master` by default (parity with tasks-v0).
+ * AUTHORITY — the capability gate is WIRED at this verb: `gate(ctx.rolePolicy, 'canSpawnSubtask', actor,
+ * parent)` — item-relative parent-assignee/master + role, per architecture's "task authority rides the one
+ * PolicyEngine" + the enforceability principle. Note it binds on the WRITE side only: inbound peer sync
+ * (`circleStoreInbound.js`) is a raw causal `put` with no authority check, so a divergent client that calls
+ * `put` directly is NOT rejected by peers — the verb gate is convention-strength until an ingest-side
+ * authority check is added (deliberately deferred: a circle is trusted people, per the enforceability
+ * principle). Actor is required; a completed parent is refused; the spawner is the subtask's `master` by
+ * default (parity with tasks-v0).
  *
  * DEPTH-APPROVAL: a subtask deeper than the circle's spawn-approval depth (`ctx.approvalDepth`, default
  * `DEFAULT_SUBTASK_APPROVAL_DEPTH`) is HELD — NOT created — and returns `{ queued: true, depth, threshold }`.
@@ -463,19 +681,50 @@ export async function spawnSubtask(store, parentId, args = {}, ctx = {}) {
   if (parent.completedAt) {
     throw new InvalidLifecycleError({ itemId: parentId, currentState: 'completed', attemptedAction: 'spawnSubtask' });
   }
-  // Authority — the capability gate AT the canonical verb (the enforceability principle: put the gate where
-  // it binds). The
-  // circle's rolePolicy decides `canSpawnSubtask(actor, parent)` — item-relative (parent's assignee/master)
-  // + role (coordinator/admin) — the tasks-v0 spawn perms expressed as a capability, not an inline
-  // `circle.roles[from]` check. A missing policy/predicate = allow (the gate's documented default).
-  gate(ctx.rolePolicy, 'canSpawnSubtask', actor, parent);
+  // Authority TIER — the capability gate AT the canonical verb (the enforceability principle: put the gate
+  // where it binds). A CONFIRMED claimant / master / admin spawns a COMMITTED subtask (`canSpawnSubtask`). A
+  // PENDING (unconfirmed) claimant may still spawn OPTIMISTICALLY while partitioned — a PROVISIONAL subtask
+  // that does NOT gate the parent and is committed on confirmation / discarded if the claim loses (offline
+  // autonomy, §2.5). Anyone else is denied. (A missing policy/predicate = allow — the gate's documented default.)
+  let provisional = false;
+  try {
+    gate(ctx.rolePolicy, 'canSpawnSubtask', actor, parent);
+  } catch (denied) {
+    if (isAssignee(parent, actor) && !isConfirmedClaimant(parent, actor)) {
+      provisional = true;
+    } else {
+      throw denied;
+    }
+  }
+
+  const depth = 1 + await depthOfContained(store, parentId);          // the child would be one deeper than the parent
+
+  if (provisional) {
+    // Child-side edge ONLY (`containedBy`) — a pending claimant must NOT write the parent (that is exactly the
+    // clobber the confirmed-claim gate prevents). No `dependencies` gate; marked `provisional` until the claim
+    // is confirmed. `confirmClaim` commits these (or discards a loser's) — the moment provisional becomes real.
+    const child = await store.put({
+      type:   args.type ?? 'task',
+      text:   args.text,
+      master: args.master ?? actor,
+      containedBy: [parentId],
+      provisional: true,
+      ...(args.notes            !== undefined ? { notes:            args.notes }            : {}),
+      ...(args.requiredSkills   !== undefined ? { requiredSkills:   args.requiredSkills }   : {}),
+      ...(args.dueAt            !== undefined ? { dueAt:            args.dueAt }            : {}),
+      ...(args.visibility       !== undefined ? { visibility:       args.visibility }       : {}),
+      ...(args.definitionOfDone !== undefined ? { definitionOfDone: args.definitionOfDone } : {}),
+      ...(args.approval         !== undefined ? { approval:         args.approval }         : {}),
+    }, { by: actor });
+    emit(ctx, 'subtask-spawned-provisional', { task: child, parentId, depth });
+    return { queued: false, provisional: true, task: child, depth };
+  }
 
   // Depth-approval — enforce the circle's spawn-approval depth HERE (canonical). A subtask deeper than the
   // threshold is HELD, not created directly: return a `{ queued: true }` signal instead. The depth LIMIT is
   // canonical; FILING the approval request + the admin approve/decline is the consumer's workflow (it owns
   // the bespoke request item), fed by this signal — so a bespoke type never leaks into the item-store.
   // Threshold is injected (`ctx.approvalDepth`, a per-circle setting); default `DEFAULT_SUBTASK_APPROVAL_DEPTH`.
-  const depth = 1 + await depthOfContained(store, parentId);          // the child would be one deeper than the parent
   const threshold = Number.isFinite(ctx.approvalDepth) ? ctx.approvalDepth : DEFAULT_SUBTASK_APPROVAL_DEPTH;
   if (depth > threshold) {
     emit(ctx, 'subtask-spawn-held', { parentId, depth, threshold, by: actor });
@@ -528,16 +777,11 @@ function appendReview(prev, entry) {
 /*
  * ── TODO seams — LATER steps (deliberately NOT done here) ─────────────────
  *
- * 1. parentTaskId → containment migration.
- *    `dependencies[]` is kept as the DAG completion gate ONLY (above). The
- *    structural parent/child ("is a subtask of") currently ridden on tasks-v0's
- *    immutable `parentTaskId` must move onto containment (`contain` /
- *    `containedBy`, see `containment.js` / `containerOps.js`; `treeOf` already
- *    renders deps + containment as one tree). CAVEAT (from the -SPIKE VERDICT):
- *    `parentTaskId` is load-bearing for authz (spawn perms, master inheritance,
- *    depth-approval) — migrate carefully, not a field swap. These verbs read no
- *    `parentTaskId`; wire the containment-aware spawn/authz here when that step
- *    lands.
+ * 1. parentTaskId → containment migration — DONE. The structural parent/child edge is now CONTAINMENT
+ *    (`containedBy` on the child; `contain` / `containerOps.js`); `dependencies[]` stays the DAG completion
+ *    gate. `spawnSubtask` carries the confirmed-claim authz + depth-approval; the tasks-v0 spawn writers and
+ *    tree readers were ported off `parentTaskId` (it is retired — no writer sets it, no reader reads it as a
+ *    tree edge). See the subtask claim-confirmation arc.
  *
  * 2. Consumer migration (tasks-v0 → these functions).
  *    `apps/tasks-v0` (+ stoop/household/presence-v0/tasks-mobile) still call

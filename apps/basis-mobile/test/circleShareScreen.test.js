@@ -12,7 +12,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   loadShareableItems, loadSharedRows, shareRowFrom, shareOut, stopSharing, pickableCircles,
-  outOfCircleLinkWarning, pickableRecipients,
+  outOfCircleLinkWarning, pickableRecipients, shareToRecipient,
 } from '../src/core/circleShareScreen.js';
 
 // A fake lists service exposing only the store surface loadShareableItems reads.
@@ -127,6 +127,32 @@ describe('circle share screen model (objective L)', () => {
     const s = await stopSharing({ row, toCircleId: 'B', deps: { unshareItemFromCircle } });
     expect(unshareItemFromCircle).not.toHaveBeenCalled();
     expect(s).toEqual({ ok: false, statusKey: 'circle.share.not_revocable', params: undefined });
+  });
+});
+
+// #26 — the D2 seal-gate COPY fallback surfaces a distinct notice (web≡mobile): a group-key out-of-circle
+// share that came back as a re-sealed COPY (`via:'copy'`) maps to `to_person_done_copy` (outside-circle sharing
+// differs — not revocable), not the plain `to_person_done`. This is the mobile half of the seal-gate arc, now
+// testable since the mobile vitest env was repaired 2026-08-07.
+describe('shareToRecipient — the via:copy fallback notice (#26)', () => {
+  const base = { itemId: 'i1', fromCircleId: 'A', recipient: 'did:bob', recipientNetworkKey: 'KEY_BOB', name: 'Bob' };
+
+  it('a share that returned via:copy maps to to_person_done_copy', async () => {
+    const shareItemToPublishedKey = vi.fn(async () => ({ ok: true, via: 'copy', revocable: false }));
+    const s = await shareToRecipient({ ...base, deps: { shareItemToPublishedKey } });
+    expect(s).toEqual({ ok: true, statusKey: 'circle.share.to_person_done_copy', params: { item: 'i1', name: 'Bob' } });
+  });
+
+  it('a normal in-place grant (no via) maps to the plain to_person_done', async () => {
+    const shareItemToPublishedKey = vi.fn(async () => ({ ok: true }));
+    const s = await shareToRecipient({ ...base, deps: { shareItemToPublishedKey } });
+    expect(s.statusKey).toBe('circle.share.to_person_done');
+  });
+
+  it('a failure still maps to to_person_failed', async () => {
+    const shareItemToPublishedKey = vi.fn(async () => ({ ok: false, error: 'share-prohibited' }));
+    const s = await shareToRecipient({ ...base, deps: { shareItemToPublishedKey } });
+    expect(s).toMatchObject({ ok: false, statusKey: 'circle.share.to_person_failed', params: { error: 'share-prohibited' } });
   });
 });
 

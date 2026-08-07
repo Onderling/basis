@@ -22,7 +22,7 @@
  *   await store.listByType('task');                            // the type index
  */
 import { ulid } from './ulid.js';
-import { causalWinner } from './causalMerge.js';
+import { causalWinner, reconcileClaim, applyClaimOverlay, claimClusterEqual } from './causalMerge.js';
 
 const ITEMS_DIR = 'items';
 
@@ -125,11 +125,36 @@ export class CircleItemStore {
       }
     }
     if (origin) {
-      // Causal guard: keep the causally-newer side. Compare against the RAW payload (its real origin clock) so a
-      // payload without `updatedAt` correctly falls back to last-received-wins rather than tying on the fallback
-      // `ts`. A causally-older inbound is dropped: return the existing item unchanged, no write, no fan-out.
+      // Causal guard: keep the causally-newer side for CONTENT. Compare against the RAW payload (its real origin
+      // clock) so a payload without `updatedAt` correctly falls back to last-received-wins rather than tying on
+      // the fallback `ts`.
       const existing = await this.get(id);
-      if (existing && causalWinner(existing, item) === 'local') return existing;
+      if (existing) {
+        const keepLocalContent = causalWinner(existing, item) === 'local';
+        // The CLAIM cluster resolves on its OWN immutable-once-set rule (first-come wins), independent of the
+        // content LWW — otherwise the causally-LATER claimant would win, the opposite of first-come. See
+        // `reconcileClaim`. Non-task items carry no claim → overlay is null → pure content LWW as before.
+        const overlay = reconcileClaim(existing, item);
+        if (keepLocalContent) {
+          // Content stays local; but a CONTENDED claim may still have to change hands even though the content
+          // is older. Resolve just the claim cluster onto the local copy.
+          if (!overlay) return existing;                                   // no claim anywhere → drop stale inbound
+          const merged = applyClaimOverlay(existing, overlay);
+          if (claimClusterEqual(existing, merged)) return existing;        // local claim already won → no churn
+          await this.#source.write(this.#uri(id), JSON.stringify(merged));
+          if (sync !== false) this.#emitWrite(merged);
+          return merged;
+        }
+        // Content winner is the inbound item; overlay the WINNING claim (which may be the LOCAL one — first-come)
+        // onto it so a causally-newer content edit cannot drop an earlier claim.
+        if (overlay) {
+          const merged = applyClaimOverlay(stored, overlay);
+          await this.#source.write(this.#uri(id), JSON.stringify(merged));
+          if (sync !== false) this.#emitWrite(merged);
+          return merged;
+        }
+        // no claim on either side → fall through to write the plain content winner (`stored`)
+      }
     }
     await this.#source.write(this.#uri(id), JSON.stringify(stored));
     // `sync:false` suppresses the fan-out — used for INBOUND writes (a peer's item we just received) so a sync

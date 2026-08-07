@@ -25,7 +25,7 @@
  * since a refused envelope simply never surfaces.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { startRelay } from '../../../../packages/relay/src/server.js';
+import { startRelay } from '@onderling/relay';
 import {
   bootRealAgentNode, connectNodesOverRelay, createCircle, joinExistingCircle,
   bindCircleAddresses, readRoster, until, teardown,

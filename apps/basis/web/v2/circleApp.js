@@ -5513,9 +5513,13 @@ function showKring(id, circle, policy) {
           const [, itemId, toCircleId] = shareWithCmd;
           await openRecipientPicker({
             itemId, fromCircleId: id, toCircleId,
-            onResult: (r, recip) => kringNote(r?.ok
-              ? t('circle.share.to_person_done', { item: itemId, name: recip?.name ?? recip?.id ?? '' })
-              : t('circle.share.to_person_failed', { error: r?.error ?? 'unknown' })),
+            onResult: (r, recip) => kringNote(
+              !r?.ok
+                ? t('circle.share.to_person_failed', { error: r?.error ?? 'unknown' })
+                // via:'copy' — the D2 seal gate re-sealed a COPY (group-key content can't grant in place
+                // out-of-circle); tell the user outside-circle sharing differs (a copy, not revocable).
+                : t(r?.via === 'copy' ? 'circle.share.to_person_done_copy' : 'circle.share.to_person_done',
+                    { item: itemId, name: recip?.name ?? recip?.id ?? '' })),
           });
           return;
         }

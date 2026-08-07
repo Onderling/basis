@@ -49,8 +49,9 @@
 import { Emitter } from '@onderling/core';
 import { ulid } from './ulid.js';
 import { addTasks, listOpen, listClosed, getById, update, removeItems } from './taskCrud.js';
-import { claim, reassign, markComplete, submit, approve, reject, revoke } from './taskLifecycle.js';
+import { claim, confirmClaim, spawnSubtask, reassign, markComplete, submit, approve, reject, revoke } from './taskLifecycle.js';
 import { requireActor, gate } from './taskCtx.js';
+import { contain as containImpl } from './containment.js';
 import { ItemNotFoundError, InvalidLifecycleError } from './errors.js';
 import {
   TASK_LOG_KIND, applyTaskEntry, taskEntryId, taskEventName,
@@ -223,6 +224,33 @@ export function createTaskStore(circleStore, { rolePolicy, enforceDependencies }
         appendAudit({ itemId: id, action: 'claim', ctx });
         recordLog(claimTaskEvent({ taskId: id, by: ctx.actor, at: Date.now() }));
       }
+      return res;
+    },
+    // Confirm a claim (subtask decentralized-tree fix) — the authority (master/admin via rolePolicy) turns a
+    // pending claim into the real, subtree-unlocking one. `ctx.assignee` names the claim to confirm.
+    confirmClaim: async (id, ctx = {}) => {
+      const res = await confirmClaim(circleStore, id, mkCtx(ctx));
+      if (res && !res.error) {
+        appendAudit({ itemId: id, action: 'confirmClaim', ctx, details: { assignee: res.confirmedAssignee } });
+      }
+      return res;
+    },
+    // Spawn a subtask under `parentId` on the CONTAINMENT model, gated on a CONFIRMED claim (or master/admin).
+    // Returns `{queued:true,...}` past the approval depth (the caller files the request), else `{task, depth}`.
+    spawnSubtask: async (parentId, args = {}, ctx = {}) => {
+      const res = await spawnSubtask(circleStore, parentId, args, mkCtx(ctx));
+      if (res && !res.queued && res.task) {
+        appendAudit({ itemId: res.task.id, action: ctx.actionOverride ?? 'spawnSubtask', ctx, details: { parentId } });
+        recordLog(createTaskEvent({ taskId: res.task.id, by: ctx.actor ?? res.task.createdBy, at: Date.now(), item: res.task }));
+      }
+      return res;
+    },
+    // Establish a CONTAINMENT edge (parent embed + child `containedBy`) directly — for the already-authorised
+    // approve/force-spawn flows that create the child as the ORIGINAL requester (preserving `addedBy`) and then
+    // nest it, rather than going through the confirmed-claim `spawnSubtask` gate.
+    contain: async (parentId, childId, ctx = {}) => {
+      const res = await containImpl(circleStore, parentId, childId);
+      appendAudit({ itemId: childId, action: 'contain', ctx, details: { parentId } });
       return res;
     },
     reassign: async (id, newAssignee, ctx = {}) => {

@@ -499,3 +499,16 @@ export async function provisionCircleMedium(circleId) {
     return medium;
   } catch { return null; }   // any failure → local-only (honest degrade)
 }
+
+// ── Connectivity Phase 3 — LIVE shared-pod key-custody seams (member-side, keyed by circleId) ────────────
+// RN parity with web's circleApp, which threads `stoopCircleDataMove`/`stoopPodWrite`/`stoopPodReadSince`
+// into the agent + `resolveRef` into the chat inbox. Thin LAZY wrappers over the SAME shared custody the
+// cache medium already uses (`circlePodCustodyRN()` → `createCirclePodCustody`), so a shared/hybrid circle
+// WITH a pod + group key really seals→writes the pod + fans a ref (pod-signal), and catch-up range-
+// queries→opens it; a no-pod circle keeps fan-out-full / local-mirror reads unchanged. realAgent maps the
+// three into circleDataMove/podWrite/podReadSince; the inbox uses circleResolveRef to resolve a REF envelope.
+// Lazy (resolve at call time) because the custody's ensureCirclePod/policy/seal seams settle after boot.
+export const circleSendDataMove = (circleId)          => circlePodCustodyRN().circleSendDataMove(circleId);
+export const circlePodWrite     = (circleId, envelope) => circlePodCustodyRN().circlePodWrite(circleId, envelope);
+export const circlePodReadSince = (circleId, q)        => circlePodCustodyRN().circlePodReadSince(circleId, q);
+export const circleResolveRef   = (refEnvelope)        => circlePodCustodyRN().circleResolveRef(refEnvelope);

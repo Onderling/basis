@@ -76,6 +76,7 @@ import { treeOf, createCrossPodRefResolver, chatEnvelopeFromStoreItem, toWireEnv
 import {
   createCircleFanOut, recordCircleAddress, fanCircleAddresses,
   listCircleRoster, recordMemberPersonaProperties, fanRosterUpdated, listCircleMembers,
+  createGroupWithRules, createGroupV2, redeemInviteWithGate,
 } from '@onderling/circles';
 import { validateStoopItem, intentToCanonicalDraft } from '../lib/canonicalAdapter.js';
 
@@ -2075,20 +2076,9 @@ export function buildSkills({
      *   V2 callers use `createGroupV2` which adds rotating-code config.
      */
     defineSkill('createGroupWithRules', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
-      if (typeof a.name    !== 'string' || !a.name)    return { error: 'name required' };
-      if (typeof a.rules   !== 'object' || a.rules === null) return { error: 'rules object required' };
-      const [item] = await store.addItems(
-        [{
-          type:       'group-rules',
-          text:       a.name,
-          source:     { groupId: a.groupId, rules: a.rules, version: 1 },
-          visibility: 'household',
-        }],
-        { actor: from },
-      );
-      return { rulesId: item.id, groupId: a.groupId, _sync: simulateSync() };
+      // Thin wrapper: the write lives in `@onderling/circles` (`createGroupWithRules`, §8c slice-a). Stoop
+      // injects the store + its `_sync` producer and passes the parsed args + carrier.
+      return createGroupWithRules({ store, simulateSync }, { a: dataArgs(parts), from });
     }, {
       description: 'Persist a group\'s governance rules (V1 admin wizard output).',
       visibility:  'authenticated',
@@ -2108,112 +2098,18 @@ export function buildSkills({
      *   per-member proof that `redeemMembershipCode` mints.
      */
     defineSkill('createGroupV2', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
-      if (typeof a.name    !== 'string' || !a.name)    return { error: 'name required' };
-      if (typeof a.rules   !== 'object' || a.rules === null) return { error: 'rules object required' };
-      const keyRotationMode = (a.keyRotationMode === 'peer-distributable')
-        ? 'peer-distributable' : 'admin-only';
-      const rotationDays = (typeof a.rotationDays === 'number' && a.rotationDays >= 1 && a.rotationDays <= 365)
-        ? a.rotationDays : 30;
-      // Admin-controlled membership-code lifetime (hours). Decoupled
-      // from key rotation since 2026-05-24 — short codes default to
-      // 1 h so ad-hoc WhatsApp/SMS shares don't leak a live join
-      // secret for weeks. Range 1-8760 (1h-1y).
-      const inviteExpiresInHours = (typeof a.inviteExpiresInHours === 'number'
-          && a.inviteExpiresInHours >= 1 && a.inviteExpiresInHours <= 8760)
-        ? a.inviteExpiresInHours : 1;
-      // B5 — the circle's CEILING on how many people one of its invites may admit. Stored in the
-      // rules blob (so it travels with the circle and shows up in the invite/consent surfaces) and
-      // clamped to the system cap here, which is the only place a circle's number meets it.
-      const inviteMaxRedemptions = clampInviteMaxRedemptions(
-        a.inviteMaxRedemptions, INVITE_REDEMPTION_SYSTEM_CAP,
-      );
-
-      // A3 (2026-05-14) — storage policy (§II.2 of the standardisation
-      // plan). Default `'no-pod'` keeps V1 UX parity. Centralised /
-      // hybrid require a `groupPodUri` (otherwise the circle has nowhere
-      // to land its canonical state). Decentralised + no-pod ignore it.
-      const storageErr = _validateStoragePolicy(a.storagePolicy, a.groupPodUri);
-      if (storageErr) return { error: storageErr };
-      const storage = _buildStoragePolicy(a.storagePolicy, a.groupPodUri);
-
-      const rulesWithRotation = {
-        ...a.rules, keyRotationMode, rotationDays, inviteExpiresInHours, inviteMaxRedemptions,
-        storage, version: 1,
-      };
-
-      // Persist the group rules.
-      const [rulesItem] = await store.addItems(
-        [{
-          type:       'group-rules',
-          text:       a.name,
-          source:     { groupId: a.groupId, rules: rulesWithRotation, version: 1 },
-          visibility: 'household',
-        }],
-        { actor: from },
-      );
-
-      // Mint the initial membership code.
-      const code      = _freshMembershipCode();
-      const issuedAt  = Date.now();
-      const expiresAt = issuedAt + inviteExpiresInHours * 60 * 60 * 1000;
-      const [codeItem] = await store.addItems(
-        [{
-          type:       'membership-code',
-          text:       `Membership code for ${a.groupId}`,
-          source:     {
-            groupId: a.groupId, code, issuedAt, expiresAt,
-            issuedBy: from, rotationDays, keyRotationMode, inviteExpiresInHours,
-            // B5 — what THIS invite permits, within the circle's ceiling. The first code of a new
-            // circle takes the ceiling itself: the strictness decision was made once, in the wizard.
-            maxRedemptions: clampInviteMaxRedemptions(a.inviteMaxRedemptions, inviteMaxRedemptions),
-          },
-          visibility: 'household',
-        }],
-        { actor: from },
-      );
-
-      // Promote caller to admin in MemberMap (idempotent).  Also record the
-      // creator's own per-circle ADDRESS for this circle (identity step 5B/C)
-      // when supplied — the admin is a member too, so the roster carries the
-      // unlinkable address they present here just like a joiner's. No proof gate
-      // here (unlike the redeem path): this is the creator's OWN fresh per-circle
-      // address for a circle they own, not a cross-circle "existing self" CLAIM
-      // that a separate admin must verify — the creator IS the authority, so
-      // there is no counterparty to prove it to. Create-time linkability (if ever
-      // offered) would STORE a proof for members to verify on READ, not gate here.
-      if (members) {
-        const me = (await members.resolveByWebid(from)) ?? { webid: from };
-        await members.addMember({
-          ...me,
-          role: 'admin',
-          ...(a.circleAddress ? { circleAddress: a.circleAddress } : {}),
-          ...(a.personaProperties && Object.keys(a.personaProperties).length ? { personaProperties: a.personaProperties } : {}),
-        });
-      }
-
-      // A3 — push the storage policy into pod-routing so substrate-mirror
-      // and notify-envelope honour it on subsequent writes. Best-effort:
-      // when the bundle has no podRouting (legacy / test setups), the
-      // rules item carries the policy + a future bundle bring-up can
-      // hydrate from there.
-      try {
-        await bundle?.podRouting?.setCirclePolicy?.(a.groupId, storage);
-      } catch { /* best-effort; rules-item is the source of truth */ }
-
-      metrics?.record?.('group-create-v2');
-      return {
-        groupId: a.groupId,
-        rulesId: rulesItem.id,
-        codeId:  codeItem.id,
-        code,                      // returned ONCE so the caller can hand it out
-        expiresAt,
-        keyRotationMode,
-        rotationDays,
-        storage,
-        _sync:   simulateSync(),
-      };
+      // Thin wrapper: the create-v2 write lives in `@onderling/circles` (`createGroupV2`, §8c slice-a). Stoop
+      // injects the store/members/metrics + `_sync`, the stoop-local storage + code helpers, the
+      // invite-ceiling clamp + cap, and a best-effort pod-routing policy push (the closure carries the
+      // optional chain over an absent bundle — legacy/test setups where podRouting isn't wired).
+      return createGroupV2({
+        store, members, metrics, simulateSync,
+        clampInviteMaxRedemptions, INVITE_REDEMPTION_SYSTEM_CAP,
+        validateStoragePolicy: _validateStoragePolicy,
+        buildStoragePolicy:    _buildStoragePolicy,
+        freshMembershipCode:   _freshMembershipCode,
+        setCirclePolicy:       (gid, storage) => bundle?.podRouting?.setCirclePolicy?.(gid, storage),
+      }, { a: dataArgs(parts), from });
     }, {
       description: 'V2: create a group + initial membership code; caller becomes admin.',
       visibility:  'authenticated',
@@ -4669,19 +4565,8 @@ export function buildSkills({
      *   after this gate clears.
      */
     defineSkill('redeemInviteWithGate', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      if (!a.invite) return { error: 'invite required' };
-      if (a.privacyAccepted !== true) return { error: 'privacy-not-accepted' };
-      if (a.rulesAccepted   !== true) return { error: 'rules-not-accepted' };
-      const _groupId = a.invite?.groupId;
-      if (!_groupId) return { error: 'invite missing groupId' };
-      const [item] = await store.addItems([{
-        type:       'rules-accept',
-        text:       `Accepted rules of ${_groupId}`,
-        source:     { groupId: _groupId, acceptedBy: from, acceptedAt: Date.now(), gateVersion: 'phase-17' },
-        visibility: 'household',
-      }], { actor: from });
-      return { ok: true, groupId: _groupId, acceptanceId: item.id };
+      // Thin wrapper: the join rules-gate lives in `@onderling/circles` (`redeemInviteWithGate`, §8c slice-a).
+      return redeemInviteWithGate({ store }, { a: dataArgs(parts), from });
     }, {
       description: 'Phase 17 gated redeem — verify privacy + rules acceptance before downstream redeem.',
       visibility:  'authenticated',

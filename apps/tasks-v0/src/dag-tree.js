@@ -2,9 +2,10 @@
  * dag-tree — pure helpers for the sub-task hierarchy (Tasks V1
  * Phase 7).
  *
- * The substrate already stores `parentTaskId` on items (Phase 5);
- * this module gives the app + UI ergonomic ways to walk parent /
- * child chains:
+ * The subtask tree edge is the item-store CONTAINMENT model — `containedBy`
+ * on the CHILD (the one conflict-free edge; the parent's forward `embeds`
+ * are written only by the confirmed claimant, so they never clobber). This
+ * module gives the app + UI ergonomic ways to walk parent / child chains:
  *
  *   - `childrenOf(parentId, allTasks)`     — direct children
  *   - `treeOf(rootId, allTasks)`           — recursive tree {id, item, children}
@@ -16,9 +17,12 @@
  * Pure functions — no I/O. Apps pass the current open + closed item
  * lists (typically `await store.listOpen() + await store.listClosed()`).
  *
- * Cycle detection note: when a sub-task is spawned, the app updates
- * BOTH `parentTaskId` on the child AND adds `childId` to the parent's
- * `dependencies`. The existing `detectCycle` in `dag.js` walks
+ * The subtask edge is CONTAINMENT (`containedBy`) — every spawn path writes it. (The legacy `parentTaskId`
+ * tree field is retired; no writer sets it. `parentTaskId` survives only as an ARGUMENT name — "the parent
+ * task's id" — and as a field on a subtask-REQUEST blob naming which parent it targets, neither of which is a
+ * stored tree edge.)
+ *
+ * Cycle detection note: the existing `detectCycle` in `dag.js` walks
  * `dependencies` and will catch most parent-chain cycles. This module
  * adds a parallel parent-chain walk for safety + early rejection on
  * the spawn path.
@@ -34,6 +38,24 @@ function _byId(allTasks) {
 }
 
 /**
+ * The parent ids of a task — the CONTAINMENT edge (`containedBy`, may be multi-parent). The subtask TREE walk
+ * uses the first parent.
+ * @param {object} item
+ * @returns {string[]}
+ */
+function _parentIdsOf(item) {
+  if (Array.isArray(item?.containedBy) && item.containedBy.length) {
+    return item.containedBy.filter((p) => typeof p === 'string' && p);
+  }
+  return [];
+}
+
+/** True iff `item` is a direct child of `parentId` under either edge. */
+function _isChildOf(item, parentId) {
+  return _parentIdsOf(item).includes(parentId);
+}
+
+/**
  * Direct children of `parentId`.
  *
  * @param {string} parentId
@@ -42,7 +64,7 @@ function _byId(allTasks) {
  */
 export function childrenOf(parentId, allTasks) {
   if (typeof parentId !== 'string' || !parentId) return [];
-  return (allTasks ?? []).filter((t) => t?.parentTaskId === parentId);
+  return (allTasks ?? []).filter((t) => _isChildOf(t, parentId));
 }
 
 /**
@@ -70,7 +92,7 @@ function _build(item, ix, seen) {
   seen.add(item.id);
   const children = [];
   for (const child of ix.values()) {
-    if (child.parentTaskId === item.id) {
+    if (_isChildOf(child, item.id)) {
       children.push(_build(child, ix, seen));
     }
   }
@@ -79,7 +101,7 @@ function _build(item, ix, seen) {
 
 /**
  * Ancestor chain: `[root, ..., parent, self]`. If the task has no
- * `parentTaskId`, returns `[self]`. If a `parentTaskId` references
+ * containment parent, returns `[self]`. If a parent id references
  * a missing item, the chain stops there.
  *
  * @param {string} taskId
@@ -93,13 +115,16 @@ export function ancestorChain(taskId, allTasks) {
   const out = [self];
   let cursor = self;
   const seen = new Set([self.id]);
-  while (cursor.parentTaskId) {
-    if (seen.has(cursor.parentTaskId)) break;
-    const next = ix.get(cursor.parentTaskId);
+  // Walk the FIRST parent up the chain (the subtask tree is single-parent even though containment allows many).
+  let parentId = _parentIdsOf(cursor)[0];
+  while (parentId) {
+    if (seen.has(parentId)) break;
+    const next = ix.get(parentId);
     if (!next) break;
     out.unshift(next);
     seen.add(next.id);
     cursor = next;
+    parentId = _parentIdsOf(cursor)[0];
   }
   return out;
 }

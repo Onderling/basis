@@ -3356,6 +3356,10 @@
       "text": "Shared \"{{item}}\" with {{name}}.",
       "doc": "objective L Phase 2 — success note after granting an out-of-circle contact via shareItemToPublishedKey."
     },
+    "to_person_done_copy": {
+      "text": "Shared \"{{item}}\" with {{name}} — as a separate sealed copy. Sharing outside a circle is different: they keep their own copy, later circle edits don't reach it, and you can't take it back.",
+      "doc": "D2 seal-gate copy fallback (Frits 2026-08-06): shown when a group-key circle's out-of-circle share went as a re-sealed COPY (result via:'copy'), NOT an in-place revocable grant. Makes the copy semantics explicit."
+    },
     "to_person_failed": {
       "text": "Share with a person failed: {{error}}.",
       "doc": "objective L Phase 2 — failure note for the out-of-circle person share."

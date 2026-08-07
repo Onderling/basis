@@ -35,6 +35,21 @@ describe('dag.effectiveStatus', () => {
     expect(effectiveStatus(task, [task], [])).toBe('claimed');
   });
 
+  it('an EXPLICIT-confirm task with an unratified claim reads as "pending-confirmation"', () => {
+    const pending = { id: 't1', assignee: ANNE, claimConfirmation: 'explicit' };
+    expect(effectiveStatus(pending, [pending], [])).toBe('pending-confirmation');
+    // once confirmed it is a normal claim; an AUTO task is claimed the moment it has an assignee.
+    const confirmed = { id: 't2', assignee: ANNE, claimConfirmation: 'explicit', confirmedAssignee: ANNE };
+    expect(effectiveStatus(confirmed, [confirmed], [])).toBe('claimed');
+    const auto = { id: 't3', assignee: ANNE };  // default = auto
+    expect(effectiveStatus(auto, [auto], [])).toBe('claimed');
+  });
+
+  it('a PROVISIONAL subtask reads as "provisional"', () => {
+    const prov = { id: 't1', assignee: ANNE, provisional: true };
+    expect(effectiveStatus(prov, [prov], [])).toBe('provisional');
+  });
+
   it('returns "submitted" when last reviewLog entry is submit', () => {
     const task = {
       id: 't1', assignee: ANNE,

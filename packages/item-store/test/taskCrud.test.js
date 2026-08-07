@@ -49,13 +49,12 @@ describe('addTasks — materialise + defaults', () => {
     const deps = ['x'];
     const [t] = await addTasks(store, [{
       text: 'work', type: 'task', dependencies: deps, requiredSkills: ['plumbing'],
-      approval: 'creator', parentTaskId: 'p1', master: BOB, dueAt: 123,
+      approval: 'creator', master: BOB, dueAt: 123,
     }], { actor: ANNE });
     expect(t.dependencies).toEqual(['x']);
     expect(t.dependencies).not.toBe(deps);            // copied, not aliased
     expect(t.requiredSkills).toEqual(['plumbing']);
     expect(t.approval).toBe('creator');
-    expect(t.parentTaskId).toBe('p1');
     expect(t.master).toBe(BOB);                       // explicit master wins over the actor-default
     expect(t.dueAt).toBe(123);
   });

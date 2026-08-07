@@ -93,7 +93,7 @@ export {
 // (connectivity Phase 4 §4). A thin façade composing PodCapabilityToken (broker default) / resourceKeyGrant
 // (CEK offline) / TaskGrantManager (mandate) + the seal audience — no new crypto.
 // The D2 rule survived its façade — see sealing/scopedSchemes.js and the note there.
-export { assertScopedScheme, SCOPED_SEAL_SCHEMES } from './sealing/scopedSchemes.js';
+export { assertScopedScheme, needsCopyToLeaveAudience, SCOPED_SEAL_SCHEMES } from './sealing/scopedSchemes.js';
 
 // Identity-on-pod (extracted from @onderling/core — Track B / identity-pod-schema).
 // On-pod identity store, vault→pod migration, and the pod↔vault identity

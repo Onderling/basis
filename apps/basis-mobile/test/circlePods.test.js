@@ -8,6 +8,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   initCirclePods, getCircleSealStrategy, setCirclePodSession, getActiveRealPodRouting,
   ensureCirclePod, setCircleKeyEventWiring, recordCircleKeyEvent,
+  circleSendDataMove, circlePodWrite, circlePodReadSince, circleResolveRef,
 } from '../src/core/circlePods.js';
 import { rotateKeyEvent, sealWithGroupKey } from '@onderling/pod-client';
 
@@ -143,5 +144,25 @@ describe('mobile circlePods — G11 no-pod rotation wiring', () => {
     expect(recordCircleKeyEvent('g11-stale', event)).toBe(true);
     const b = await getCircleSealStrategy('g11-stale', { storagePosture: 'p2' });
     expect(b).not.toBe(a);
+  });
+});
+
+// #9 — the sealed-catch-up seams the agent bundle threads (RN parity with web circleApp:6699-6701 + :6863).
+// The 4 lazy wrappers delegate to the SAME shared circle-pod custody the cache medium uses; with no pod
+// session they must degrade cleanly (catch-up reads fall back, a write refuses — never a silent success).
+describe('mobile sealed-catch-up seams (#9) — the custody wrappers wired for the bundle', () => {
+  it('exports the four lazy wrappers as functions', () => {
+    for (const fn of [circleSendDataMove, circlePodWrite, circlePodReadSince, circleResolveRef]) {
+      expect(typeof fn).toBe('function');
+    }
+  });
+
+  it('degrade cleanly for a circle with no shared pod (delegates to the custody fallback)', async () => {
+    initCirclePods(mockAsyncStorage());
+    // No pod session → resolveCirclePodCustody is null → catch-up reads fall back to the local mirror.
+    expect(await circlePodReadSince('mob-nopod', { sinceTs: 0 })).toEqual({ items: [] });
+    expect(await circleResolveRef({ circleId: 'mob-nopod', ref: 'x' })).toBeNull();
+    // …and a WRITE refuses loudly rather than pretending it sealed to a pod that isn't there.
+    await expect(circlePodWrite('mob-nopod', { some: 'env' })).rejects.toThrow(/no shared pod/i);
   });
 });

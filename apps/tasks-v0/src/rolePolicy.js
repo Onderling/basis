@@ -267,9 +267,24 @@ export function buildStandardRolePolicy(roles, opts = {}) {
     canSpawnSubtask: (actor, item) => {
       const r = get(actor);
       if (r === undefined || r === 'observer') return false;
+      if (isCoordinatorOrAbove(r)) return true;                       // admin / coordinator always
+      if ((item?.master ?? item?.addedBy) === actor) return true;     // the parent's master
+      // Only the CONFIRMED claimant may decompose — a PENDING (unconfirmed) claim does NOT unlock the
+      // subtree, so a task "nobody really won" cannot accrue committed subtasks. This is the single-writer-
+      // per-node guarantee that lets the tree survive decentralization (the decentralized-tree fix).
+      return item?.confirmedAssignee === actor;
+    },
+
+    /**
+     * Confirm a claim (the `confirmClaim` verb's gate) — turns a pending claim into the real, subtree-
+     * unlocking one. The task MASTER (`master ?? addedBy`) or an admin/coordinator may confirm; a plain
+     * member (even the claimant) may not confirm their own claim in explicit mode.
+     */
+    canConfirmClaim: (actor, item) => {
+      const r = get(actor);
+      if (r === undefined || r === 'observer') return false;
       if (isCoordinatorOrAbove(r)) return true;                       // admin / coordinator
-      if (isAssignee(item, actor)) return true;                       // the parent's assignee (co-owner)
-      return (item?.master ?? item?.addedBy) === actor;               // the parent's master
+      return (item?.master ?? item?.addedBy) === actor;               // the task master
     },
   };
 }

@@ -14,7 +14,7 @@
  * Cast: Anna (admin) · Bram (releases his name to the circle) · Cato (must receive it).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { startRelay } from '../../../../packages/relay/src/server.js';
+import { startRelay } from '@onderling/relay';
 import {
   bootRealAgentNode, connectNodesOverRelay, createCircle, joinExistingCircle,
   bindCircleAddresses, readRoster, until, teardown,

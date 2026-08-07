@@ -137,28 +137,38 @@ describe('circleShare — shareItemToPublishedKey (grant an OUT-OF-CIRCLE recipi
     expect(forStranger).toHaveLength(0);
   });
 
-  it('G-P1 — the seal gate BITES: an out-of-circle grant on GROUP-KEY-sealed content is REFUSED (D2)', async () => {
+  it('G-P1 (Q2) — a GROUP-KEY out-of-circle person share FALLS BACK to a COPY, never an in-place group-key grant (D2, Frits 2026-08-06)', async () => {
     const svc = makeCircleLists();
     const resolveService = async () => svc;
     const controllerKey = generateKeypair();
     const dave = fakeNetworkIdentity();
     const sharing = fakeSharing();
     const keyStore = memKeyStore();
-    // The circle's content is sealed under the GROUP key — one grant would hand Dave every piece of it.
+    // The circle's content is sealed under the GROUP key — an in-place grant would hand Dave every piece of it,
+    // so the share re-seals a COPY to Dave instead (the SAME procedure as a circle→circle share). The copy
+    // machinery is host-blind (needs only the recipient's derived key), so it's stubbed here — the real crypto
+    // re-seal is proven in circleShareReseal.test.js; this asserts the ROUTING (copy, not group-key grant).
     const enforcement = buildEnforcement({ sharing, keyStore, controllerKey, roster: [], scheme: 'group-key' });
     const enforcementFor = async () => enforcement;
+    const sealCopy = (item, keys) => ({ ...item, _sealedTo: keys });
+    const sealingKeyFromNetworkKey = (nk) => `sealkey:${nk}`;
 
     const src = await svc.createList('A', 'the whole circle history', 'alice');
     const r = await shareItemToPublishedKey({
       resolveService, enforcementFor, policyOf: canonicalPolicyOf,
       itemId: src.id, fromCircleId: 'A', toCircleId: 'B', by: 'alice',
       recipient: 'did:dave', recipientNetworkKey: dave.publicKey,
+      sealCopy, sealingKeyFromNetworkKey,
     });
-    // REFUSED — stated, not silent, and named after the rule that refused it.
-    expect(r.ok).toBe(false);
-    expect(r.error).toBe('share-grant-failed');
-    expect(String(r.cause?.message)).toMatch(/GROUP-KEY audience/);
-    // …and no key grant landed: Dave cannot unwrap anything.
+    // NOT refused, NOT an in-place grant — a re-sealed COPY, tagged so the UI can show outside-sharing differs.
+    expect(r.ok).toBe(true);
+    expect(r.via).toBe('copy');
+    expect(r.revocable).toBe(false);
+    // A SEPARATE object (sharedCopyOf) was minted; the source item is untouched.
+    const aItems = await svc.stores.getStore('A').list();
+    expect(aItems.some((it) => it.sharedCopyOf === src.id)).toBe(true);
+    // The outsider never received the SOURCE group key (the leak the router closes): no group-key grant Dave
+    // can unwrap ever landed.
     const daveSealing = sealingKeyPairFromNetworkKey(dave.secretKey);
     const kr = keyStore.current();
     expect(kr == null || unwrapGroupKey(kr, daveSealing.privateKey) == null).toBe(true);

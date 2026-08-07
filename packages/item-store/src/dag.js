@@ -54,11 +54,19 @@ export function computeDagStatus(task, openItems, closedItems) {
 export function effectiveStatus(task, openItems, closedItems) {
   if (!task) return 'ready';
   if (task.completedAt) return 'complete';
+  // A PROVISIONAL subtask (spawned optimistically under a pending claim) reads distinctly — it is not yet
+  // committed and does not gate its parent (the subtask decentralized-tree fix, §2.5).
+  if (task.provisional === true) return 'provisional';
   const log  = Array.isArray(task.reviewLog) ? task.reviewLog : [];
   const last = log[log.length - 1]?.decision ?? null;
   if (last === 'submit') return 'submitted';
   if (last === 'reject') return 'rejected';
-  if (task.assignee) return 'claimed';
+  if (task.assignee) {
+    // An EXPLICIT-confirm task whose claim is not yet ratified reads as pending — the master's confirmation
+    // is what turns it into a real 'claimed'. Auto-confirm (the default) sets `confirmedAssignee` on claim, so
+    // it stays 'claimed' — no existing behaviour changes.
+    return (task.claimConfirmation === 'explicit' && !task.confirmedAssignee) ? 'pending-confirmation' : 'claimed';
+  }
   return computeDagStatus(task, openItems, closedItems);
 }
 

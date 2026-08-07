@@ -100,8 +100,10 @@ export function buildWorkspaceSkills({ bundleResolver } = {}) {
         return { tree };
       }
 
-      // No rootId → return one tree per top-level task (no parentTaskId).
-      const tops = all.filter((t) => !t.parentTaskId && t.type !== 'subtask-request');
+      // No rootId → return one tree per top-level task (not contained by any parent). A task is a CHILD when
+      // it carries the containment edge `containedBy`.
+      const isChild = (t) => Array.isArray(t.containedBy) && t.containedBy.length > 0;
+      const tops = all.filter((t) => !isChild(t) && t.type !== 'subtask-request');
       const trees = tops.map((t) => treeOf(t.id, all)).filter(Boolean);
       return { trees };
     }, {
@@ -124,6 +126,24 @@ export function buildWorkspaceSkills({ bundleResolver } = {}) {
       return { items: decorateWithLastSync(mastered), _sync: simulateSync() };
     }, {
       description: 'Open tasks where the caller is the master.',
+    }),
+
+    // The approvals inbox for pending CLAIMS: tasks I MASTER whose claim awaits my confirmation (explicit-
+    // confirm, not yet ratified). Rows carry `status: 'pending-confirmation'`, so the manifest's confirmClaim
+    // button surfaces on each by construction. Parity with `listAwaitingApproval` (the submitted-tasks review).
+    defineSkill('listMyPendingClaims', async ({ parts, from, envelope }) => {
+      const circle = bundleResolver(parts, { envelope, from });
+      if (!circle) return { error: 'circleId required' };
+      if (!from) return { items: [] };
+      const open = await circle.itemStore.listOpen();
+      const closed = await circle.itemStore.listClosed();
+      const pending = open
+        .filter((it) => (it.master ?? it.addedBy) === from
+          && effectiveStatus(it, open, closed) === 'pending-confirmation')
+        .map((it) => ({ ...it, status: effectiveStatus(it, open, closed), openDeps: unmetDeps(it, open, closed) }));
+      return { items: decorateWithLastSync(pending), viewer: from ?? null, _sync: simulateSync() };
+    }, {
+      description: 'List tasks I master whose claim is awaiting my confirmation.',
     }),
 
     /**

@@ -39,3 +39,7 @@ export { recordCircleAddress, fanCircleAddresses } from './circleAddress.js';
 export {
   listCircleRoster, recordMemberPersonaProperties, fanRosterUpdated, listCircleMembers,
 } from './circleRoster.js';
+
+// Circle-creation writers (§8c slice-a, ZERO-KEY) — pure DI lift out of stoop; the group key bootstraps
+// lazily on the first addMember, so creation moves without the key-custody plumbing.
+export { createGroupWithRules, createGroupV2, redeemInviteWithGate } from './circleCreate.js';

@@ -150,10 +150,14 @@ async function addTaskCore(circle, a, ctx) {
     ...(a.definitionOfDone !== undefined ? { definitionOfDone: a.definitionOfDone } : {}),
     ...(a.approval         !== undefined ? { approval:         a.approval         } : {}),
     ...(a.master           !== undefined ? { master:           a.master           } : {}),
-    ...(a.parentTaskId     !== undefined ? { parentTaskId:     a.parentTaskId     } : {}),
     // Co-ownership (J2) — declare the claim ceiling at creation. Default 1 ⇒
     // exclusive first-come; >1 or null ⇒ co-ownable.
     ...(a.maxAssignees     !== undefined ? { maxAssignees:     a.maxAssignees     } : {}),
+    // Claim confirmation MODE, declared at creation (the master's call): 'explicit' holds a claim pending
+    // until an authority confirms it; absent/'auto' ⇒ the first claim confirms itself (the subtask fix).
+    ...(a.claimConfirmation !== undefined ? { claimConfirmation: a.claimConfirmation } : {}),
+    // Claim lease (§2.8), ms — an unfinished claim auto-releases after claimedAt+claimLease. Absent ⇒ manual.
+    ...(a.claimLease !== undefined ? { claimLease: a.claimLease } : {}),
     // V2 task fields (auto-scheduling invoicing).
     ...(a.scheduledAt      !== undefined ? { scheduledAt:      a.scheduledAt     } : {}),
     ...(a.estimateMinutes  !== undefined ? { estimateMinutes:  a.estimateMinutes } : {}),

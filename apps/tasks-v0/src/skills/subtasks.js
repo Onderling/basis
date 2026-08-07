@@ -103,24 +103,15 @@ export function buildSubtaskSkills({ bundleResolver } = {}) {
         };
       }
 
-      // Compute depth via parentTaskId walk.
-      // Top-level task = depth 0; direct child = depth 1; etc.
-      const allOpen   = await itemStore.listOpen();
-      const allClosed = await itemStore.listClosed();
-      const allTasks  = [...allOpen, ...allClosed];
-      const newDepth  = depthOf(a.parentTaskId, allTasks) + 1;
-
       const lc = circle.liveCircle ?? {};
       const threshold = Number.isFinite(lc?.subtasksAdminApprovalDepth)
         ? lc.subtasksAdminApprovalDepth
         : DEFAULT_ADMIN_APPROVAL_DEPTH;
 
-      // Build the partial we'll either persist directly or store
-      // inside the request blob.
-      const partial = {
+      // The child fields (the spawn verb owns creation + containment + the parent's `dependencies` gate).
+      const childArgs = {
         type:           a.type ?? 'task',
         text:           a.text,
-        parentTaskId:   a.parentTaskId,
         master:         a.master ?? from,    // spawner is master by default
         ...(a.notes            !== undefined ? { notes:            a.notes }            : {}),
         ...(a.requiredSkills   !== undefined ? { requiredSkills:   a.requiredSkills }   : {}),
@@ -130,8 +121,24 @@ export function buildSubtaskSkills({ bundleResolver } = {}) {
         ...(a.approval         !== undefined ? { approval:         a.approval }         : {}),
       };
 
-      if (newDepth > threshold) {
-        // Queue an admin-approval request.
+      // Spawn through the CONTAINMENT verb — it establishes `containedBy` + the parent `dependencies` gate +
+      // the depth-approval hold, GATED on the actor holding a CONFIRMED claim on the parent (or master/admin,
+      // via the store's rolePolicy). A pending (unconfirmed) claim no longer unlocks the subtree.
+      let spawnRes;
+      try {
+        spawnRes = await itemStore.spawnSubtask(a.parentTaskId, childArgs, {
+          actor: from, actorDisplayName, approvalDepth: threshold,
+        });
+      } catch (e) {
+        if (e && (e.code === 'PERMISSION_DENIED' || e.name === 'PermissionDeniedError')) {
+          return { error: 'only the parent\'s confirmed claimant, master, or an admin/coordinator may spawn sub-tasks' };
+        }
+        throw e;
+      }
+
+      if (spawnRes.queued) {
+        // Past the approval depth — the verb HELD it; file the admin-approval request (its workflow item).
+        const partial = { ...childArgs, parentTaskId: a.parentTaskId };
         const [request] = await itemStore.addItems([{
           type:    REQUEST_TYPE,
           text:    `Sub-task request: "${a.text}" under "${parent.text}"`,
@@ -139,43 +146,22 @@ export function buildSubtaskSkills({ bundleResolver } = {}) {
             kind:           'subtask-request',
             parentTaskId:   a.parentTaskId,
             requestedBy:    from,
-            requestedDepth: newDepth,
+            requestedDepth: spawnRes.depth,
             partial,
           },
           master: from,
         }], { actor: from, actorDisplayName });
-        return {
-          queued:    true,
-          requestId: request.id,
-          newDepth,
-          threshold,
-        };
+        return { queued: true, requestId: request.id, newDepth: spawnRes.depth, threshold };
       }
 
-      // Cycle check: would the new edge close a parent-chain cycle?
-      // Pure-logic; cheap.
-      const cycle = wouldCreateParentCycle(a.parentTaskId, '__new__', allTasks);
-      if (cycle) {
-        return { error: 'parent-chain cycle detected', cycle };
-      }
-
-      // Create the sub-task.
-      const [sub] = await itemStore.addItems([partial], { actor: from, actorDisplayName });
-
-      // Wire the parent's `dependencies` to include the child id so
-      // `computeStatus` reports the parent as `waiting` until the
-      // sub-task completes.
-      const parentDeps = Array.isArray(parent.dependencies) ? parent.dependencies : [];
-      if (!parentDeps.includes(sub.id)) {
-        await itemStore.update(a.parentTaskId, {
-          dependencies: [...parentDeps, sub.id],
-        }, { actor: from, actorDisplayName });
-      }
-
+      // The child carries the CONTAINMENT edge (`containedBy`). A PENDING claimant gets a PROVISIONAL child
+      // (optimistic, "not yours yet", doesn't gate the parent — §2.5); a confirmed claimant/master a committed
+      // one. `parentTaskId` is deliberately never set.
       return {
-        queued: false,
-        task:   sub,
-        depth:  newDepth,
+        queued:      false,
+        provisional: spawnRes.provisional ?? false,
+        task:        spawnRes.task,
+        depth:       spawnRes.depth,
       };
     }, {
       description: 'Spawn a sub-task. Past the circle\'s admin-approval depth, files a request instead.',
@@ -211,10 +197,12 @@ export function buildSubtaskSkills({ bundleResolver } = {}) {
         return { error: 'parent task no longer exists; decline this request instead' };
       }
 
-      // Create the sub-task on behalf of the original requester.
-      const [sub] = await itemStore.addItems([partial], {
-        actor: req.source.requestedBy,
-      });
+      // Create the sub-task on behalf of the original requester (preserving `addedBy`), then establish the
+      // CONTAINMENT edge — this flow is already authorised (admin approved the depth request), so it nests
+      // directly rather than through the confirmed-claim spawn gate. `parentTaskId` is dropped.
+      const { parentTaskId: _pid, ...childPartial } = partial;
+      const [sub] = await itemStore.addItems([childPartial], { actor: req.source.requestedBy });
+      const { child: contained } = await itemStore.contain(parent.id, sub.id, { actor: from });
 
       // Wire the parent's dependencies + close the request.
       const parentDeps = Array.isArray(parent.dependencies) ? parent.dependencies : [];
@@ -225,7 +213,7 @@ export function buildSubtaskSkills({ bundleResolver } = {}) {
       }
       await itemStore.markComplete([{ id: req.id }], { actor: from, actorDisplayName });
 
-      return { ok: true, task: sub, requestId: req.id };
+      return { ok: true, task: contained, requestId: req.id };
     }, {
       description: 'Approve a queued sub-task request (admin/coordinator only).',
       visibility:  'authenticated',
@@ -371,11 +359,14 @@ export function buildSubtaskSkills({ bundleResolver } = {}) {
         return { error: 'parent task no longer exists; decline this proposal instead' };
       }
 
-      // Spawn the sub-task on behalf of the original proposer.
-      const [sub] = await itemStore.addItems(
-        [partial],
+      // Spawn the sub-task on behalf of the original proposer (preserving `addedBy`), then nest via containment
+      // (the assignee consented — already authorised). `parentTaskId` is dropped.
+      const { parentTaskId: _pid2, ...childPartial } = partial;
+      const [subCreated] = await itemStore.addItems(
+        [childPartial],
         { actor: prop.source.requestedBy, actorDisplayName },
       );
+      const { child: sub } = await itemStore.contain(parent.id, subCreated.id, { actor: from });
 
       // Wire parent.dependencies to include the new child id.
       const parentDeps = Array.isArray(parent.dependencies) ? parent.dependencies : [];
@@ -460,10 +451,9 @@ export function buildSubtaskSkills({ bundleResolver } = {}) {
       if (!parent) return { error: 'parent task not found', parentTaskId: a.parentTaskId };
       if (parent.completedAt) return { error: 'parent task is already complete' };
 
-      const partial = {
+      const childPartial = {
         type:           a.type ?? 'task',
         text:           a.text,
-        parentTaskId:   a.parentTaskId,
         master:         a.master ?? from,
         ...(a.notes            !== undefined ? { notes:            a.notes }            : {}),
         ...(a.requiredSkills   !== undefined ? { requiredSkills:   a.requiredSkills }   : {}),
@@ -473,12 +463,15 @@ export function buildSubtaskSkills({ bundleResolver } = {}) {
         ...(a.approval         !== undefined ? { approval:         a.approval }         : {}),
       };
 
-      const [sub] = await itemStore.addItems([partial], {
+      // Admin override — create the child (auditable `force-spawn`), then nest via containment. `parentTaskId`
+      // is dropped; the admin's authority carries the create, no confirmed-claim gate.
+      const [subCreated] = await itemStore.addItems([childPartial], {
         actor:            from,
         actorDisplayName,
         actionOverride:   'force-spawn',
         reason:           a.reason.trim(),
       });
+      const { child: sub } = await itemStore.contain(parent.id, subCreated.id, { actor: from });
 
       const parentDeps = Array.isArray(parent.dependencies) ? parent.dependencies : [];
       if (!parentDeps.includes(sub.id)) {
@@ -490,6 +483,31 @@ export function buildSubtaskSkills({ bundleResolver } = {}) {
       return { ok: true, task: sub, reason: a.reason.trim() };
     }, {
       description: 'Admin-only force-spawn override (bypasses post-submit gate + approval-depth; mandatory reason).',
+      visibility:  'authenticated',
+    }),
+
+    /**
+     * Confirm a pending claim — the authority (task master, or admin/coordinator via the rolePolicy) turns a
+     * PENDING claim into the real, subtree-unlocking one. Only needed for EXPLICIT-confirm tasks; a default
+     * (auto-confirm) task confirms on `claimTask` already. `assignee` names the claim to confirm (defaults to
+     * the current sole claimant).
+     */
+    defineSkill('confirmClaim', async ({ parts, from, envelope, actorDisplayName }) => {
+      const circle = bundleResolver(parts, { envelope, from });
+      if (!circle) return { error: 'circleId required' };
+      const a = argsFromParts(parts);
+      if (typeof a.id !== 'string' || !a.id) {
+        return { error: 'id required (the task whose claim to confirm)' };
+      }
+      const res = await circle.itemStore.confirmClaim(a.id, {
+        actor: from, assignee: a.assignee, actorDisplayName,
+      });
+      if (!res || res.error) return res ?? { error: 'confirm failed' };
+      // Publish the confirmed state to peers (parity with claimTask's mirror publish).
+      circle?.tasksMirror?.publishTask?.(res)?.catch?.(() => {});
+      return { ok: true, task: res };
+    }, {
+      description: 'Confirm a pending claim (task master / admin) so the claimant may decompose the subtree.',
       visibility:  'authenticated',
     }),
   ];

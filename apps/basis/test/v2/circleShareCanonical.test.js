@@ -172,6 +172,67 @@ describe('circleShare — canonical posture (objective L)', () => {
     });
     expect(rev).toEqual({ ok: false, error: 'not-canonical' });
   });
+
+  it('Q1 — a CANONICAL circle with GROUP-KEY content shares cross-circle as a COPY, never an in-place group-key grant (D2, Frits 2026-08-06)', async () => {
+    const svc = makeCircleLists();
+    const resolveService = async () => svc;
+    const controllerKey = generateKeypair();
+    const alice = generateKeypair();
+    const bob = generateKeypair();                 // the other circle's member
+    const sharing = fakeSharing();
+    const keyStore = memKeyStore();
+    const enforcement = buildCanonicalEnforcement({
+      sharing, keyStore, controllerKey, currentRecipients: () => [alice.publicKey],
+    });
+    // Content is GROUP-KEY sealed → the D2 router forces a copy (the flag `buildCircleShareEnforcement` sets in
+    // production from `strategy.scheme === group-key`; set directly here since this harness uses the substrate
+    // builder without the app wrapper).
+    enforcement.leaveAudienceNeedsCopy = true;
+    const enforcementFor = async () => enforcement;
+
+    const src = await svc.createList('A', 'the whole circle history', 'alice');
+    const r = await shareItemAcrossCircles({
+      resolveService, enforcementFor, policyOf: canonicalPolicyOf,
+      itemId: src.id, fromCircleId: 'A', toCircleId: 'B', by: 'alice',
+      recipients: ['did:bob'], recipientKeys: [bob.publicKey],
+      sealCopy: (item, keys) => ({ ...item, _sealedTo: keys }),   // host-blind stub; real crypto in circleShareReseal
+    });
+    expect(r.ok).toBe(true);
+
+    // A separate COPY was minted (sharedCopyOf) — NOT the in-place canonical grant the same posture does for
+    // scoped content. The target gets a shared-ref to the COPY, not to the source.
+    const aItems = await svc.stores.getStore('A').list();
+    expect(aItems.some((it) => it.sharedCopyOf === src.id)).toBe(true);
+
+    // The group key was NEVER re-wrapped to bob (the leak the router closes): no in-place grant landed.
+    const kr = keyStore.current();
+    const bobLocked = kr == null || (() => { try { return unwrapGroupKey(kr, bob.privateKey) == null; } catch { return true; } })();
+    expect(bobLocked).toBe(true);
+  });
+
+  it('Q1 fail-loud — a group-key canonical share with NO copy machinery REFUSES, never falls through to an in-place re-wrap', async () => {
+    const svc = makeCircleLists();
+    const resolveService = async () => svc;
+    const controllerKey = generateKeypair();
+    const bob = generateKeypair();
+    const sharing = fakeSharing();
+    const keyStore = memKeyStore();
+    const enforcement = buildCanonicalEnforcement({
+      sharing, keyStore, controllerKey, currentRecipients: () => [],
+    });
+    enforcement.leaveAudienceNeedsCopy = true;
+    const enforcementFor = async () => enforcement;
+
+    const src = await svc.createList('A', 'secret', 'alice');
+    const r = await shareItemAcrossCircles({          // NO sealCopy injected → copy branch can't run
+      resolveService, enforcementFor, policyOf: canonicalPolicyOf,
+      itemId: src.id, fromCircleId: 'A', toCircleId: 'B', by: 'alice',
+      recipients: ['did:bob'], recipientKeys: [bob.publicKey],
+    });
+    expect(r).toEqual({ ok: false, error: 'seal-scope-copy-unavailable' });
+    // No in-place re-wrap happened: bob holds nothing.
+    expect(keyStore.current()).toBeNull();
+  });
 });
 
 describe('circleShare — the four shipped postures are unchanged by the canonical wiring', () => {

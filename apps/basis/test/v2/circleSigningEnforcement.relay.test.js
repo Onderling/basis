@@ -32,7 +32,7 @@
  * proofs. Two devices' views of them are checked, because they differ.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { startRelay } from '../../../../packages/relay/src/server.js';
+import { startRelay } from '@onderling/relay';
 import {
   bootRealAgentNode, connectNodesOverRelay, createCircle, joinExistingCircle,
   bindCircleAddresses, readRoster, until, teardown,

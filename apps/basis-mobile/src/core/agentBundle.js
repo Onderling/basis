@@ -264,6 +264,13 @@ export async function bootAgentBundle(opts = {}) {
       tasksPersistDb,
       householdPersistDb,
       stoopControlAgent: opts.stoopControlAgent,   // S4 — multi-member sealing router (redeem/leave)
+      // Connectivity Phase 3 — LIVE shared-pod key-custody seams (member-side, keyed by circleId), RN
+      // parity with web circleApp. A shared/hybrid circle WITH a pod + group key seals→writes the pod +
+      // fans a ref (pod-signal), and catch-up range-queries→opens it; a no-pod circle keeps fan-out-full /
+      // local-mirror reads. App.js passes circlePods' lazy wrappers; absent → the pre-Phase-3 behaviour.
+      stoopCircleDataMove: opts.stoopCircleDataMove,
+      stoopPodWrite:       opts.stoopPodWrite,
+      stoopPodReadSince:   opts.stoopPodReadSince,
       // Cache-mode mirroring (RN parity with web circleApp): provision a pod-backed circle's store MEDIUM
       // (a cache-mode PseudoPod sealing→write-throughing to the pod). App.js passes circlePods'
       // `provisionCircleMedium`; absent → no cache media → shared local backing, unchanged.

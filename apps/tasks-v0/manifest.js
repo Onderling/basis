@@ -103,6 +103,11 @@ export const tasksManifest = {
         { name: 'notes',            kind: 'string' },
         { name: 'dueAt',            kind: 'number' },
         { name: 'definitionOfDone', kind: 'string' },
+        // Claim confirmation mode (the master's call at creation): 'explicit' holds a claim PENDING until the
+        // master confirms it; 'auto' (default) confirms the first claim immediately. See the confirmClaim op.
+        { name: 'claimConfirmation', kind: 'enum', of: ['auto', 'explicit'], required: false },
+        // Claim lease (§2.8), ms — an unfinished claim auto-releases after claimedAt+claimLease. Absent ⇒ manual.
+        { name: 'claimLease', kind: 'number', required: false },
       ],
       surfaces: {
         // Part G (2026-06-17) — slash/gate folded in from the former mockTasksManifest.
@@ -150,6 +155,31 @@ export const tasksManifest = {
           embed: { cardSnapshotSkill: 'getTaskSnapshot' },
         },
         ui: { control: 'button', label: 'Claim' },
+      },
+    },
+    {
+      // Confirm a PENDING claim (explicit-confirm tasks) so the claimant may decompose — the master/admin's
+      // ratification. Auto-confirm tasks never surface this (claimTask already confirms). Verb `confirm`
+      // (lifecycle atom). appliesTo the `claimed` state (a claim exists); the gate + the "am I the master?"
+      // visibility live in the rolePolicy the projector reads.
+      id:        'confirmClaim',
+      verb:      'confirm',
+      // Shows on a PENDING claim (explicit-confirm, not yet ratified) — the state `effectiveStatus` reports
+      // as `pending-confirmation`. An auto-confirmed / already-confirmed claim is `claimed` and needs no button.
+      appliesTo: { type: 'task', state: ['pending-confirmation'] },
+      params: [
+        { name: 'id', kind: 'string', required: true, ...ID_NONEMPTY, pickerSource: { listOp: 'listOpen' } },
+        { name: 'assignee', kind: 'string', required: false },   // which claim to confirm (defaults to the sole claimant)
+      ],
+      surfaces: {
+        slash: { command: '/confirm',
+          match: {
+            verbs: ['confirm', 'bevestig', 'keur', ['keur', 'goed'], ['ken', 'toe']],
+            body:  'match',
+            arg:   'id',
+          } },
+        chat: { hint: 'Confirm a pending claim so the claimant may decompose the task.' },
+        ui: { control: 'button', label: 'Confirm claim' },
       },
     },
     {
@@ -476,6 +506,17 @@ export const tasksManifest = {
       params:    [],
       surfaces: {
         chat: { hint: 'List open tasks where the caller is the master.' },
+      },
+    },
+    {
+      // The pending-claims approvals list — data source for the `pending-claims` view. Rows carry
+      // `status:'pending-confirmation'`, so the confirmClaim button surfaces on each (its appliesTo).
+      id:        'listMyPendingClaims',
+      verb:      'list',
+      appliesTo: { type: 'task' },
+      params:    [],
+      surfaces: {
+        chat: { hint: 'List tasks I master whose claim is awaiting my confirmation.' },
       },
     },
     /*
@@ -957,7 +998,8 @@ export const tasksManifest = {
      */
     {
       id:    'addSubtask', verb: 'add',
-      appliesTo: { type: 'task', state: ['open', 'claimed'] },
+      // Also on a PENDING claim: the claimant may decompose optimistically (a provisional subtree, §2.5).
+      appliesTo: { type: 'task', state: ['open', 'claimed', 'pending-confirmation'] },
       params: [
         { name: 'parentTaskId',     kind: 'string', required: true,
           pickerSource: { listOp: 'listMine' } },
@@ -1045,6 +1087,14 @@ export const tasksManifest = {
       title:      "I'm master of",
       type:       'task',
       dataSource: { skillId: 'listMyMasteredTasks' },
+    },
+    {
+      // The approvals inbox for pending CLAIMS (explicit-confirm tasks awaiting my confirmation). Each row's
+      // confirmClaim button comes from the op's appliesTo:['pending-confirmation'] — no per-row wiring here.
+      id:         'pending-claims',
+      title:      'Awaiting your confirmation',
+      type:       'task',
+      dataSource: { skillId: 'listMyPendingClaims' },
     },
     {
       id:         'claimable',

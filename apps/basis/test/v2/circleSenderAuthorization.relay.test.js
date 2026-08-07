@@ -19,7 +19,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { startRelay } from '../../../../packages/relay/src/server.js';
+import { startRelay } from '@onderling/relay';
 import { AgentIdentity, SecurityLayer, mkEnvelope, P } from '@onderling/core';
 // Relative, like `startRelay` above: `@onderling/transports` is not a dependency of this app (the
 // shells reach transports through the secure-agent facade, invariant 5). A test that needs to BE a

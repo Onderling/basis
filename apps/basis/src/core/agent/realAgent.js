@@ -895,7 +895,15 @@ export async function createRealHouseholdAgent(opts = {}) {
       releaseFor: async ({ profileId, contextId, keys = [], defaultProfileId = 'default' }) => {
         const [self, dflt] = await Promise.all([agentsRegistry.lookup(profileId), agentsRegistry.lookup(defaultProfileId)]);
         const byId = { [profileId]: self, [defaultProfileId]: dflt };
-        const request = { items: (Array.isArray(keys) ? keys : []).map((k) => ({ key: k })) };
+        // Absent/empty keys means "release everything I disclosed HERE" — the documented persona-release
+        // semantics (see getPersonaRelease's doc). Default to the keys this persona has a disclosure entry
+        // for in THIS context; `releasedValues` still re-checks `enabled` per key + fail-closed-coarsens, so
+        // this leaks nothing extra. Without it, the no-keys callers — the reveal-at-join carry
+        // (`joinGroupState.js`) and the "About me" roster push (`personaPropsUpdate.js`) — released {} and a
+        // user's picked reveal never reached the roster (#24).
+        const named = (Array.isArray(keys) ? keys : []).filter(Boolean);
+        const requested = named.length ? named : Object.keys(self?.disclosure?.perContext?.[contextId] ?? {});
+        const request = { items: requested.map((k) => ({ key: k })) };
         return releaseFromPolicy({ getProfile: (id) => byId[id] ?? null, profileId, defaultProfileId }, request, self?.disclosure ?? { perContext: {} }, contextId);
       },
     };

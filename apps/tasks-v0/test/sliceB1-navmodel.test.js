@@ -39,6 +39,7 @@ describe('Slice B.1: renderWeb(tasksManifest) NavModel', () => {
       'open',
       'mine',
       'mastered',     // .1 (2026-05-20) — middle section of mine.html
+      'pending-claims', // (2026-08-07) — claims awaiting my confirmation (claim-confirmation UX)
       'claimable',
       'review',       // .2 (2026-05-20) — review.html reviewer queue
       'dag',          // (2026-05-20)

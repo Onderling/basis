@@ -19,6 +19,12 @@ export default defineConfig({
       // (pod-client dynamic-imports it); vite mis-resolves the real RN package in
       // node. Alias the specifier to an in-memory stub so the boot completes.
       '@react-native-async-storage/async-storage': path.resolve(__dirname, 'test/stubs/asyncStorage.js'),
+      // `@onderling-app/basis` is a node_modules COPY here, a SEPARATE module tree from mobile's direct
+      // `../../../basis/src/*` relative imports of the SAME shared code → two instances of every shared module
+      // (breaks "same selector, no fork" identity + risks singleton divergence). Alias it to the real
+      // workspace `apps/basis` so both import styles dedupe to ONE tree — and its `@onderling/*` deps resolve
+      // from `apps/basis/node_modules` (complete) with vite transforming its src (JSON handled). (2026-08-07)
+      '@onderling-app/basis': path.resolve(__dirname, '../basis'),
     },
   },
   test: {

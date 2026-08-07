@@ -144,7 +144,9 @@ export async function shareToRecipient({
       itemId, fromCircleId, toCircleId: target, by, recipient, recipientNetworkKey, verify, includeHistory, policyOf,
     });
   } catch (e) { return status(false, 'circle.share.to_person_failed', { error: e?.message ?? 'error' }); }
-  if (r?.ok) return status(true, 'circle.share.to_person_done', { item: itemId, name: name ?? recipient });
+  // via:'copy' — the D2 seal gate re-sealed a COPY (group-key content can't grant in place out-of-circle);
+  // tell the user outside-circle sharing differs (a copy, not revocable). Web parity (circleApp.js).
+  if (r?.ok) return status(true, r?.via === 'copy' ? 'circle.share.to_person_done_copy' : 'circle.share.to_person_done', { item: itemId, name: name ?? recipient });
   return status(false, 'circle.share.to_person_failed', { error: r?.error ?? 'unknown' });
 }
 

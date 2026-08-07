@@ -233,7 +233,15 @@ async function shareOneResolved({
   // opens the CANONICAL resource in place — never a duplicated item (no `sharedCopyOf`). Absent a canonical
   // enforcement (memory path / no pod / not signed in), it degrades to the plain `shared-ref` write — the
   // pre-L in-memory behaviour, byte-for-byte (no grant).
-  if (isCanonicalPosture(posture)) {
+  // D2 ROUTER (Frits 2026-08-06): group-key content may NOT re-wrap its key to another circle IN PLACE — a
+  // cross-circle share of it leaves as a re-sealed COPY (the copy branch below), the SAME procedure as an
+  // out-of-circle person share. `leaveAudienceNeedsCopy` is set only on the pod path when the scheme is
+  // group-key / sealed-forward / absent; false for a scoped scheme, and undefined on the memory path (no
+  // enforcement → the plain-ref canonical branch below runs unchanged). A SAME-circle member-add is a
+  // different flow (grantMember/join) and never reaches here — only cross-circle shares do.
+  const mustCopy = !!enforcement?.leaveAudienceNeedsCopy;
+
+  if (isCanonicalPosture(posture) && !mustCopy) {
     return shareIntoAudience(stores, {
       itemId, fromCircleId, toCircleId, by, recipient, recipients, recipientKeys: keys, postureOf,
       onShare: enforcement?.onShareCanonical,   // grant IN PLACE; undefined on the memory path → plain ref write
@@ -249,7 +257,7 @@ async function shareOneResolved({
   // three postures differ ONLY in who may initiate (the slice-2 gate above: `closed` refuses, `registered`
   // admin-only, `copy`/`trusted` any member); the re-seal mechanism is now shared. The revocable in-place
   // *canonical* posture is handled ABOVE (its own branch — no copy); see isCanonicalPosture.
-  if (usesCopyReseal(posture) && enforcement?.onShare && typeof sealCopy === 'function' && keys.length) {
+  if ((usesCopyReseal(posture) || mustCopy) && enforcement?.onShare && typeof sealCopy === 'function' && keys.length) {
     const fromStore = stores.getStore(fromCircleId);
     const srcItem = await fromStore.get(itemId);
     if (!srcItem) return { ok: false, error: 'item-not-found' };
@@ -266,6 +274,14 @@ async function shareOneResolved({
       itemId: copy.id, fromCircleId, toCircleId, by, recipient, recipients, postureOf,
       onShare: enforcement.onShare,   // grant on the copy; no further re-seal (already sealed to the recipients)
     });
+  }
+
+  // FAIL LOUD — a canonical circle whose group-key content must leave as a COPY, but the copy machinery (pod
+  // onShare + a sealer + recipient keys) isn't ALL present: refuse rather than fall through to the in-place
+  // re-wrap below, which would be exactly the group-key leak this router exists to stop. Production always
+  // wires `sealCopy`, so this is the belt-and-braces path, not the common one.
+  if (isCanonicalPosture(posture) && mustCopy) {
+    return { ok: false, error: 'seal-scope-copy-unavailable' };
   }
 
   // Fallback (no pod/keys, or an enforcement without onShare) — in-place ref path: write the ref to the source
@@ -435,6 +451,25 @@ export async function shareItemToPublishedKey({
       stores, fromCircleId, toCircleId, itemId, by, recipient, recipientNetworkKey,
       enforcement, sealCopy, sealingKeyFromNetworkKey, postureOf, sendSharedCopy,
     });
+  }
+
+  // D2 ROUTER (Frits 2026-08-06) — group-key content can't be granted IN PLACE to an outsider (that would hand
+  // them the whole circle's key). It leaves as a re-sealed COPY — the SAME mechanism as `silent`, but STILL
+  // notified: mint the copy, then emit the out-of-circle notice. Tagged `via:'copy', revocable:false` so the
+  // UI can show that sharing OUTSIDE a circle differs from inside (no in-place revoke on a copy the recipient
+  // already holds). Previously this hard-errored `share-grant-failed` on a group-key circle.
+  if (enforcement?.leaveAudienceNeedsCopy) {
+    const copyResult = await shareSilentCopyToPublishedKey({
+      stores, fromCircleId, toCircleId, itemId, by, recipient, recipientNetworkKey,
+      enforcement, sealCopy, sealingKeyFromNetworkKey, postureOf, sendSharedCopy,
+    });
+    if (copyResult.ok) {
+      await emitOutOfCircleNotice({
+        target: policy.notifyOutOfCircle, itemId, fromCircleId, toCircleId, recipient, by, notify, post,
+      });
+      return { ...copyResult, via: 'copy', revocable: false };
+    }
+    return copyResult;
   }
 
   // NOTIFY (default) — the revocable canonical in-place grant, then a best-effort circle/admin notification.

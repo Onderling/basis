@@ -116,7 +116,10 @@ describe('claim — CAS single-winner (Option A)', () => {
     expect(res.assignee).toBe(ANNE);
     expect(typeof res.claimedAt).toBe('number');
     expect(emitted).toContain('a');                    // publish-on-write seam fired
-    expect(named).toEqual(['item-claimed']);           // ItemStore-parity named event
+    // A default (auto-confirm) task confirms the claim in the same step, so BOTH named events fire
+    // (the master pre-delegated). The claim is CONFIRMED, not merely pending.
+    expect(named).toEqual(['item-claimed', 'claim-confirmed']);
+    expect(res.confirmedAssignee).toBe(ANNE);
   });
 });
 

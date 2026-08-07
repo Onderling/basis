@@ -50,6 +50,21 @@ export function assertScopedScheme(scheme) {
 }
 
 /**
+ * The D2 ROUTER predicate (Frits 2026-08-06) — true iff content under this scheme must LEAVE its audience as a
+ * re-sealed COPY rather than an in-place grant. That is EXACTLY `group-key`: an in-place grant of group-key
+ * content hands the grantee the one key to the WHOLE audience's content, so a cross-circle or out-of-circle
+ * share of it becomes a copy instead. A SCOPED scheme (`PAIRWISE` | `PER_RESOURCE_CEK`) grants only its own
+ * per-recipient/per-resource audience → in-place is fine. Absent/unknown/sealed-forward is NEITHER copy nor
+ * in-place: it stays REFUSED by the throwing gate (`assertScopedScheme`), deny-by-default — a caller that can't
+ * name its scheme must not silently share. Narrow on purpose (group-key only), so nothing else changes.
+ * @param {string|null|undefined} scheme  a `SEAL_SCHEMES` value.
+ * @returns {boolean}
+ */
+export function needsCopyToLeaveAudience(scheme) {
+  return scheme === SEAL_SCHEMES.GROUP_KEY;
+}
+
+/**
  * pick the scheme for a RESOURCE grant from policy. Default = broker (least-authority: key stays home,
  * revoke instant). `policy.offline === true` opts into the per-resource CEK (offline-capable) path.
  * @param {{offline?: boolean}} [policy]

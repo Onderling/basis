@@ -121,6 +121,10 @@ import { resolveCircleLlm } from '../../../../basis/src/v2/llmPicker.js';
 // Phase 4 §9/§10 — the settings-surface transport state (relayPref) + the shared composer built-in classifier (G17).
 import { resolveRelayUrl, asyncStorageRelayIo } from '../../../../basis/src/v2/relayPref.js';
 import { parseCircleBuiltin } from '../../../../basis/src/v2/circleComposerBuiltins.js';
+// The SHARED security-status report — the SAME handler web reaches (circleApp.js). Mobile's circle composer
+// classified `/security-status` (it's in CIRCLE_BUILTIN_COMMANDS) but had no branch, so it fell through to the
+// bot/feedback path — a web≡mobile drift (#18). This restores parity.
+import { securityStatus } from '../../../../basis/src/core/localBuiltins.js';
 // Task #13 — the onboarding + standing help-bot flow, all logic shared with web (circleApp.js). The mobile
 // shell wires the SAME thin seams: provision the help circle, drive onboarding as the bot's chat, and run
 // the standing Q&A router with the honest (#37) route-conditional wording.
@@ -463,6 +467,17 @@ export default function CircleLauncherScreen({
     if (opId === 'transport-mode' && ['nkn', 'relay', 'both'].includes(String(args?.mode))) {
       try { await AsyncStorage.setItem('cc-transport-mode', args.mode); } catch { /* best-effort */ }
       try { bundle?.agent?.setTransportMode?.(args.mode); } catch { /* best-effort */ }
+    }
+    if (opId === 'security-status') {
+      // The SHARED security-status report (web≡mobile — circleApp.js): what the circle boundary is ENFORCING.
+      // `bundle.agent` is the household agent (web's `circleHouseholdAgent`); the message rides back to the
+      // composer as a bot bubble. Routed HERE because `bundle` is the launcher's prop, not CircleDetail's (#18).
+      try {
+        const r = await securityStatus({}, { agent: bundle?.agent, t });
+        return { ok: true, message: r?.message ?? String(r ?? '') };
+      } catch (err) {
+        return { ok: false, message: String(err?.message ?? err) };
+      }
     }
     loadCircleTransport();
     return null;
@@ -3392,6 +3407,15 @@ function CircleDetail({
         appendKringMessage({ actor: 'bot', text: t('circle.settings.transports_status', {
           mode: ts.mode ?? 'nkn', relay: ts.relayUrl || t('circle.settings.transports_none'),
         }) });
+        return;
+      }
+      if (builtin.opId === 'security-status') {
+        // web≡mobile parity (circleApp.js): the shared security-status report — what the circle boundary is
+        // ENFORCING (refused senders + members still on their canonical key). Without this branch it fell
+        // through to the bot path and never ran (#18). Routed via `onCircleControl` (the launcher owns the
+        // agent `bundle`; CircleDetail is threaded the specific callback, not the whole bundle).
+        const r = await onCircleControl?.('security-status', {});
+        appendKringMessage({ actor: 'bot', text: r?.message ?? '' });
         return;
       }
     }

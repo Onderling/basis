@@ -11,7 +11,7 @@
 // (asyncStorageRelayIo `.save`, commit 7de8b661) let the phone actually dial the relay. This
 // guards the transport+propagation mechanism the phone shares — no phone/adb needed.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { startRelay } from '../../../../packages/relay/src/server.js';
+import { startRelay } from '@onderling/relay';
 import {
   bootRealAgentNode, connectAgentsOverRelay, pairCircle, until, teardown,
 } from '../support/pairRealAgents.js';

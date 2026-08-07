@@ -524,6 +524,20 @@ Background: `plans/DESIGN-boundary-authentication.md` §7.
 
 ## basis-mobile vitest: the `@onderling-app/basis` node_modules COPY is incomplete (2026-08-05)
 
+> **✅ FIXED 2026-08-07 — the whole mobile suite now runs (703/704, 0 fail; was 100% unrunnable).** Two parts:
+> 1. **Durable (version-controlled):** in `apps/basis-mobile/vitest.config.js`, alias
+>    `'@onderling-app/basis' → path.resolve(__dirname, '../basis')`. This points vitest at the LIVE workspace
+>    `apps/basis` instead of the stale node_modules COPY, so (a) basis's transitive `@onderling/*` resolve from
+>    the complete `apps/basis/node_modules`, (b) vite transforms basis src (the `.json` import-attribute error
+>    goes away), and (c) mobile's `@onderling-app/basis` imports and its direct `../../../basis/src/*` relative
+>    imports DEDUPE to ONE module tree (fixes "same selector, no fork" identity failures + singleton drift).
+> 2. **Install state:** the 12 `@onderling/*` symlinks below are still needed for the handful of mobile tests
+>    that import those packages DIRECTLY — materialise them per the pattern below. They persist with the
+>    hand-accreted install (which you never wipe anyway).
+> A single `deps.inline` also works for (1b) but leaves the dual-tree (part 1c) broken — prefer the alias.
+> The original diagnosis is kept below for context.
+
+
 `apps/basis-mobile/node_modules/@onderling-app/basis` is a real-directory COPY (not a symlink), and it is
 missing transitive deps under vitest — so importing anything that reaches `@onderling-app/basis/src/index.js`
 fails one dep at a time: first `@onderling-app/stoop`, then `@onderling-app/folio` (missing app symlinks
@@ -535,3 +549,9 @@ change can be correct-by-parity and parse-clean while its vitest still cannot lo
 - **Do not** `rm -rf` / reinstall to fix this — it will expose latent version conflicts and not come back.
   Either symlink each missing dep from the source, or run the equivalent test on the `apps/basis` (web) side
   where the same shared modules ARE resolvable (mobile parity code reuses `apps/basis/src/v2/*` verbatim).
+- **The EXACT gap (enumerated 2026-08-07):** 12 `@onderling/*` are present+linked under
+  `apps/basis/node_modules` but MISSING under `apps/basis-mobile/node_modules/@onderling/`:
+  `pod-routing · pod-onboarding · pod-search · item-types · sync-engine · relay · sdk · logger · llm-client ·
+  chat-nav · recipe-loader · attribute-charter`. Materialising them (`ln -s ../../../../packages/<pkg>` each,
+  the sanctioned per-package pattern) MIGHT unblock mobile vitest — but may cascade or surface the version
+  splits above, so timebox + be ready to revert. The proper fix is the scheduled workspace-protocol migration.

@@ -76,3 +76,147 @@ export function causalWinner(local, incoming) {
   // idempotent redelivery) keep local — a no-op.
   return I.by > L.by ? 'incoming' : 'local';
 }
+
+// ── Immutable-once-set CLAIM reconciliation (the subtask decentralized-tree fix) ─────────────────────────
+//
+// The whole-item causal LWW above is too blunt for the ONE contended scalar in a subtask tree: the CLAIM.
+// Two devices that claim the SAME task while partitioned each write their own claimant; plain item-LWW keeps
+// the causally-NEWER write = the LATER claimant — the OPPOSITE of first-come. This resolves the claim cluster
+// on its OWN rule, so first-come actually wins and every peer converges identically, independent of the
+// content LWW. It is a per-FIELD rule for the claim cluster, NOT a general field merge or an OR-Set: the
+// single-writer-per-node property a CONFIRMED claim buys makes a tree CRDT unnecessary (only the claim itself
+// is ever contended). Rule (deterministic, order-independent):
+//   1. a CONFIRMED claim beats an unconfirmed one (an authority spoke);
+//   2. two confirmed claims → earliest `confirmedAt` wins (two authorities acted concurrently), tie by id;
+//   3. two pending claims   → earliest `claimedAt` wins (first-come queue), tie by claimant id;
+//   4. exactly one side carries a claim → it is preserved, so a concurrent claimLESS content edit on the
+//      other side cannot silently drop the claim.
+// SCOPE: a concurrent claim-vs-RELEASE is deliberately out of scope here — a release is issuer-driven and
+//   rare, and rides the normal content LWW (the lease/expiry path is a separate, later concern).
+
+// The claim cluster the verbs maintain. `claimSeq` is a single monotonic scalar (a Lamport counter on the
+// claim, NOT a per-writer vector): every authoritative claim transition (claim/confirm/reassign/revoke) reads
+// the current claim and writes `claimSeq+1`, so a transition that HAPPENED-AFTER the claim carries a higher
+// sequence and supersedes it — while two CONCURRENT writes from the same base tie on the sequence and fall to
+// the first-come rule. That is the precise meaning of "immutable-once-set": once set (seq≥1) only a
+// higher-sequence act that read it can change it; a same-sequence race resolves earliest-wins.
+const CLAIM_FIELDS = [
+  'assignees', 'assignee', 'claimedAt', 'confirmedAssignee', 'confirmedAt', 'confirmedBy', 'confirmedSig',
+  'claimSeq', 'claimReleasedAt',
+];
+
+/** The claim cluster of an item, or null when it carries no claim NOR any claim transition (non-task → null). */
+function claimStateOf(item) {
+  if (!item || typeof item !== 'object') return null;
+  const assignees = Array.isArray(item.assignees) ? item.assignees
+    : (item.assignee != null ? [item.assignee] : []);
+  const confirmedAssignee = item.confirmedAssignee ?? null;
+  const claimedAt = typeof item.claimedAt === 'number' ? item.claimedAt : null;
+  const claimSeq = typeof item.claimSeq === 'number' ? item.claimSeq : null;
+  const releasedAt = typeof item.claimReleasedAt === 'number' ? item.claimReleasedAt : null;
+  // A claim-state exists when there is a live claim OR an authoritative claim TRANSITION on record — a release
+  // still counts (it must be able to beat a stale claim on a peer that never saw the revoke).
+  if (assignees.length === 0 && confirmedAssignee == null && claimedAt == null
+      && claimSeq == null && releasedAt == null) {
+    return null;
+  }
+  return {
+    assignees,
+    assignee: item.assignee ?? assignees[0] ?? null,
+    claimedAt,
+    confirmedAssignee,
+    confirmedAt: typeof item.confirmedAt === 'number' ? item.confirmedAt : null,
+    confirmedBy: item.confirmedBy ?? null,
+    confirmedSig: item.confirmedSig ?? null,
+    claimSeq: claimSeq ?? 0,
+    releasedAt,
+    released: assignees.length === 0 && confirmedAssignee == null,   // no live claimant (open / revoked)
+  };
+}
+
+/** The identity used for the deterministic first-come tiebreak. */
+function claimantId(s) {
+  return String(s.confirmedAssignee ?? s.assignee ?? s.assignees[0] ?? '');
+}
+
+/** Which of two claim states wins. */
+function claimWinner(a, b) {
+  // (0) Higher authoritative SEQUENCE wins — a transition that read the set claim (confirm/reassign/revoke)
+  //     supersedes it. Concurrent writes from the SAME base tie here and fall through to first-come.
+  if (a.claimSeq !== b.claimSeq) return a.claimSeq > b.claimSeq ? a : b;
+  // (1) Tie on sequence (the concurrent case, e.g. the claim RACE). Safety-over-liveness: a RELEASE/revoke
+  //     beats a live claim (deny wins), and two releases resolve by the later marker.
+  if (a.released !== b.released) return a.released ? a : b;
+  if (a.released && b.released) return (a.releasedAt ?? 0) >= (b.releasedAt ?? 0) ? a : b;
+  // (2) two live claims at the same sequence → a confirmed claim beats a pending one
+  const aC = a.confirmedAssignee != null;
+  const bC = b.confirmedAssignee != null;
+  if (aC !== bC) return aC ? a : b;
+  // (3)/(4) same status → earliest relevant clock wins (first-come), tie broken deterministically by id
+  const [ak, bk] = aC ? [a.confirmedAt, b.confirmedAt] : [a.claimedAt, b.claimedAt];
+  const at = ak == null ? Infinity : ak;
+  const bt = bk == null ? Infinity : bk;
+  if (at !== bt) return at < bt ? a : b;
+  return claimantId(a) >= claimantId(b) ? a : b;
+}
+
+/**
+ * The winning claim cluster to OVERLAY onto the content winner, or null when neither side carries a claim
+ * (non-task items are unaffected). See the rule above.
+ * @param {object|null|undefined} local
+ * @param {object} incoming
+ * @returns {object|null}
+ */
+export function reconcileClaim(local, incoming) {
+  const a = claimStateOf(local);
+  const b = claimStateOf(incoming);
+  if (!a && !b) return null;
+  if (a && !b) return a;
+  if (b && !a) return b;
+  return claimWinner(a, b);
+}
+
+/** Replace the claim cluster of `base` with `bundle` (absent fields are deleted, so nothing stale lingers). */
+export function applyClaimOverlay(base, bundle) {
+  const out = { ...base };
+  for (const f of CLAIM_FIELDS) delete out[f];
+  if (bundle.claimSeq != null) out.claimSeq = bundle.claimSeq;
+  if (bundle.released) {
+    // A released/revoked transition: keep the sequence + the release marker, no live claimant.
+    if (bundle.releasedAt != null) out.claimReleasedAt = bundle.releasedAt;
+    return out;
+  }
+  if (bundle.assignees && bundle.assignees.length) {
+    out.assignees = bundle.assignees;
+    out.assignee = bundle.assignee ?? bundle.assignees[0];
+  } else if (bundle.assignee != null) {
+    out.assignees = [bundle.assignee];
+    out.assignee = bundle.assignee;
+  }
+  if (bundle.claimedAt != null) out.claimedAt = bundle.claimedAt;
+  if (bundle.confirmedAssignee != null) {
+    out.confirmedAssignee = bundle.confirmedAssignee;
+    if (bundle.confirmedAt != null) out.confirmedAt = bundle.confirmedAt;
+    if (bundle.confirmedBy != null) out.confirmedBy = bundle.confirmedBy;
+    if (bundle.confirmedSig != null) out.confirmedSig = bundle.confirmedSig;   // the attestation rides its claim
+  }
+  return out;
+}
+
+/** True iff two items carry the SAME claim cluster (used to keep an origin merge idempotent — no churn). */
+export function claimClusterEqual(a, b) {
+  const sa = claimStateOf(a);
+  const sb = claimStateOf(b);
+  if (!sa && !sb) return true;
+  if (!sa || !sb) return false;
+  return sa.assignee === sb.assignee
+    && sa.claimedAt === sb.claimedAt
+    && sa.confirmedAssignee === sb.confirmedAssignee
+    && sa.confirmedAt === sb.confirmedAt
+    && sa.confirmedBy === sb.confirmedBy
+    && sa.confirmedSig === sb.confirmedSig
+    && sa.claimSeq === sb.claimSeq
+    && sa.releasedAt === sb.releasedAt
+    && sa.assignees.length === sb.assignees.length
+    && sa.assignees.every((x, i) => x === sb.assignees[i]);
+}

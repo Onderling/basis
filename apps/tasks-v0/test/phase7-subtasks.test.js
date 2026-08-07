@@ -76,9 +76,9 @@ async function listInbox(cache, container = 'mem://user/inbox/') {
 describe('Phase 7 — dag-tree helpers (pure)', () => {
   const tasks = [
     { id: 'A', text: 'root' },
-    { id: 'B', text: 'child of A',     parentTaskId: 'A' },
-    { id: 'C', text: 'child of B',     parentTaskId: 'B' },
-    { id: 'D', text: 'sibling of C',   parentTaskId: 'B' },
+    { id: 'B', text: 'child of A',     containedBy: ['A'] },
+    { id: 'C', text: 'child of B',     containedBy: ['B'] },
+    { id: 'D', text: 'sibling of C',   containedBy: ['B'] },
     { id: 'E', text: 'orphan' },
   ];
 
@@ -96,7 +96,7 @@ describe('Phase 7 — dag-tree helpers (pure)', () => {
     expect(tree.children[0].children.map((c) => c.id).sort()).toEqual(['C', 'D']);
   });
 
-  it('ancestorChain walks parentTaskId upward to the root', () => {
+  it('ancestorChain walks the containment chain upward to the root', () => {
     expect(ancestorChain('C', tasks).map((t) => t.id)).toEqual(['A', 'B', 'C']);
     expect(ancestorChain('A', tasks).map((t) => t.id)).toEqual(['A']);
     expect(ancestorChain('E', tasks).map((t) => t.id)).toEqual(['E']);
@@ -139,9 +139,10 @@ describe('Phase 7 — addSubtask (live, with depth threshold)', () => {
     await circle?.close?.();
   });
 
-  it('basic spawn: assignee creates a sub-task; child carries parentTaskId; parent gains the dep edge', async () => {
+  it('basic spawn: the CONFIRMED claimant creates a sub-task; child carries the containment edge; parent gains the dep edge', async () => {
     await freshCircle();
     const { task: parent } = await callSkill(circle.agent, 'addTask', { text: 'Build shed' }, ANNE);
+    // claimTask on a default (auto-confirm) task confirms the claim, so the claimant may decompose.
     await callSkill(circle.agent, 'claimTask', { id: parent.id }, KID);
 
     const r = await callSkill(circle.agent, 'addSubtask', {
@@ -150,12 +151,62 @@ describe('Phase 7 — addSubtask (live, with depth threshold)', () => {
     }, KID);
     expect(r.queued).toBe(false);
     expect(r.task).toBeDefined();
-    expect(r.task.parentTaskId).toBe(parent.id);
+    expect(r.task.containedBy).toContain(parent.id);   // the containment edge (was parentTaskId)
     expect(r.task.master).toBe(KID);     // spawner is master of the child
     expect(r.depth).toBe(1);
 
     const updatedParent = await circle.itemStore.getById(parent.id);
     expect(updatedParent.dependencies).toContain(r.task.id);
+  });
+
+  it('EXPLICIT mode: a pending claimant spawns PROVISIONALLY; confirmation commits + unlocks committed spawns', async () => {
+    await freshCircle();
+    const { task: parent } = await callSkill(circle.agent, 'addTask',
+      { text: 'Paint fence', claimConfirmation: 'explicit' }, ANNE);
+    await callSkill(circle.agent, 'claimTask', { id: parent.id }, KID);   // pending (explicit)
+
+    // Pending claimant may spawn OPTIMISTICALLY — a provisional child ("not yours yet"), not a committed one.
+    const prov = await callSkill(circle.agent, 'addSubtask', { parentTaskId: parent.id, text: 'Buy paint' }, KID);
+    expect(prov.provisional).toBe(true);
+    expect(prov.task.provisional).toBe(true);
+    const parentBefore = await circle.itemStore.getById(parent.id);
+    expect(parentBefore.dependencies ?? []).not.toContain(prov.task.id);   // provisional ⇒ no gate
+
+    // The authority (Anne, admin) confirms Kid's claim → the provisional subtree becomes real.
+    const confirmed = await callSkill(circle.agent, 'confirmClaim', { id: parent.id }, ANNE);
+    expect(confirmed.ok).toBe(true);
+    expect(confirmed.task.confirmedAssignee).toBe(KID);
+    const committedKid = await circle.itemStore.getById(prov.task.id);
+    expect(committedKid.provisional).toBe(false);
+    const parentAfter = await circle.itemStore.getById(parent.id);
+    expect(parentAfter.dependencies).toContain(prov.task.id);              // now gates
+
+    // And a confirmed claimant now spawns COMMITTED subtasks directly.
+    const ok = await callSkill(circle.agent, 'addSubtask', { parentTaskId: parent.id, text: 'Sand it' }, KID);
+    expect(ok.provisional).toBeFalsy();
+    expect(ok.task.containedBy).toContain(parent.id);
+  });
+
+  it('the pending-claims approvals list surfaces a master\'s unconfirmed claims, and clears on confirmation', async () => {
+    await freshCircle();
+    const { task: parent } = await callSkill(circle.agent, 'addTask',
+      { text: 'Hang shelves', claimConfirmation: 'explicit' }, ANNE);   // Anne masters it
+    await callSkill(circle.agent, 'claimTask', { id: parent.id }, KID);  // pending
+
+    // Anne (the master) sees the pending claim in her approvals list, tagged pending-confirmation.
+    const before = await callSkill(circle.agent, 'listMyPendingClaims', {}, ANNE);
+    const row = (before.items ?? []).find((t) => t.id === parent.id);
+    expect(row, 'the pending claim is in Anne\'s approvals list').toBeTruthy();
+    expect(row.status).toBe('pending-confirmation');
+
+    // A non-master (Kid) sees nothing to confirm.
+    const kidList = await callSkill(circle.agent, 'listMyPendingClaims', {}, KID);
+    expect((kidList.items ?? []).some((t) => t.id === parent.id)).toBe(false);
+
+    // After Anne confirms, it leaves the list.
+    await callSkill(circle.agent, 'confirmClaim', { id: parent.id }, ANNE);
+    const after = await callSkill(circle.agent, 'listMyPendingClaims', {}, ANNE);
+    expect((after.items ?? []).some((t) => t.id === parent.id)).toBe(false);
   });
 
   it('master can spawn even when not the assignee', async () => {
@@ -272,7 +323,7 @@ describe('Phase 7 — approve / decline subtask requests', () => {
       { requestId }, ANNE);
     expect(r.ok).toBe(true);
     expect(r.task).toBeDefined();
-    expect(r.task.parentTaskId).toBe(child.id);
+    expect(r.task.containedBy).toContain(child.id);   // containment edge (was parentTaskId)
 
     // Request is closed.
     const reqAfter = await circle.itemStore.getById(requestId);

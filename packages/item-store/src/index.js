@@ -11,8 +11,10 @@ export { ItemStore } from './ItemStore.js';
 export { computeStatus } from './lifecycleStatus.js';
 export { CircleItemStore } from './CircleItemStore.js';   // per-circle, type-indexed generic store
 export {                                                  // PLAN-capabilities-tasks-roles (Option A) — task lifecycle
-  claim, reassign, markComplete, submit, approve, reject, revoke,  // VERBS as functions-over-CircleItemStore
+  claim, confirmClaim, reassign, markComplete, submit, approve, reject, revoke,  // VERBS as functions-over-CircleItemStore
   assigneesOf, maxAssigneesOf, isAssigneesFull, isAssignee,        // co-ownership model helpers (J2): assignees[] + the `assignee` mirror
+  confirmationModeOf, confirmedClaimOf, isConfirmedClaimant, claimState, isClaimExpired,  // claim-confirmation (subtask decentralized-tree fix) + lease/expiry (§2.8)
+  claimConfirmationStatement, verifyClaimConfirmation,   // §2.1 — the signable confirmation statement + its (DI) verify
 } from './taskLifecycle.js';
 export {                                                  // PLAN-capabilities-tasks-roles step 1 — task CRUD + queries
   addTasks, listOpen, listClosed, getById, update, removeItems,   // CRUD/query surface as functions-over-CircleItemStore
@@ -38,7 +40,7 @@ export {                                                 // composable ops engin
 export { projectContainer } from './projectContainer.js';   // recursive child-render projector
 export { wireStoreMirror } from './mirrorSync.js';          // attach a peer mirror to a store (no-pod sync publish)
 export { wireCircleStoreInbound } from './circleStoreInbound.js';  // ingest peer envelopes into a store (inbound)
-export { causalWinner, causalRank } from './causalMerge.js';       // Objective L — origin-ts + writer-id causal LWW for inbound merge
+export { causalWinner, causalRank, reconcileClaim, applyClaimOverlay, claimClusterEqual } from './causalMerge.js';  // Objective L causal LWW + the immutable-once-set CLAIM merge (subtask fix)
 export { recoverCircleFromCaches, writeRecoveredInto } from './podRecovery.js';  // Objective S — pod-recovery: causal merge of device caches
 export { shareIntoAudience, resolveSharedRef, listShared } from './shareIntoAudience.js';  // cross-circle share
 export { shareContainerTree, collectSubtree } from './shareContainerTree.js';  // journey J5 — SENDABLE LISTS: fan the single-item share over a container subtree

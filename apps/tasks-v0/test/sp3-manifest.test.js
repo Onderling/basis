@@ -80,6 +80,22 @@ describe('SP-3 V0: tasks-v0 manifest', () => {
     }
   });
 
+  it('confirmClaim op surfaces a button + slash (the claim-confirmation UX) and addTask offers the auto/explicit toggle', () => {
+    const confirm = tasksManifest.operations.find((o) => o.id === 'confirmClaim');
+    expect(confirm, 'confirmClaim op is declared').toBeTruthy();
+    expect(confirm.verb).toBe('confirm');                          // the lifecycle atom
+    expect(confirm.appliesTo).toEqual({ type: 'task', state: ['pending-confirmation'] });
+    expect(confirm.surfaces?.ui?.control).toBe('button');         // the card 'Confirm claim' button
+    expect(confirm.surfaces?.slash?.command).toBe('/confirm');    // the slash surface
+    expect(confirm.params.some((p) => p.name === 'id' && p.required)).toBe(true);
+
+    const addTask = tasksManifest.operations.find((o) => o.id === 'addTask');
+    const mode = addTask.params.find((p) => p.name === 'claimConfirmation');
+    expect(mode, 'addTask offers the confirmation-mode toggle at creation').toBeTruthy();
+    expect(mode.kind).toBe('enum');
+    expect(mode.of).toEqual(['auto', 'explicit']);
+  });
+
   it('renderChat produces well-formed toolCatalog covering every op', () => {
     const stub = Object.fromEntries(
       tasksManifest.operations.map((op) => [

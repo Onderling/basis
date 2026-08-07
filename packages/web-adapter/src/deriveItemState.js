@@ -44,6 +44,7 @@ export function deriveItemState(item) {
 
   if (item.completedAt) return 'complete';
   if (item.removedAt)   return 'removed';
+  if (item.provisional === true) return 'provisional';   // optimistic subtask (subtask decentralized-tree fix)
 
   // DoD lifecycle — reviewLog wins over assignee.
   // reviewLog: [{decision:'submit'|'reject'|'approve', by, at, note?}]
@@ -52,7 +53,10 @@ export function deriveItemState(item) {
   if (last === 'submit') return 'submitted';
   if (last === 'reject') return 'rejected';
 
-  if (item.assignee) return 'claimed';
+  if (item.assignee) {
+    // Explicit-confirm task, claim not yet ratified → pending; else claimed (auto-confirm sets confirmedAssignee).
+    return (item.claimConfirmation === 'explicit' && !item.confirmedAssignee) ? 'pending-confirmation' : 'claimed';
+  }
   return 'open';
 }
 
@@ -62,6 +66,8 @@ const _KNOWN = new Set([
   'waiting',
   'blocked',
   'claimed',
+  'pending-confirmation',
+  'provisional',
   'submitted',
   'rejected',
   'complete',

@@ -118,10 +118,15 @@ function materialise(partial, ctx) {
     ...(partial.source ? { source: partial.source } : {}),
     ...(partial.definitionOfDone ? { definitionOfDone: partial.definitionOfDone } : {}),
     ...(partial.approval ? { approval: partial.approval } : {}),
-    ...(partial.parentTaskId ? { parentTaskId: partial.parentTaskId } : {}),
     // Co-ownership (J2): the claim ceiling declared at creation. Absent ⇒ default
     // 1 (EXCLUSIVE first-come) via `maxAssigneesOf`; a number/`null` ⇒ co-ownable.
     ...(partial.maxAssignees !== undefined ? { maxAssignees: partial.maxAssignees } : {}),
+    // Claim confirmation MODE, declared at creation (the master's call): `'explicit'` holds a claim PENDING
+    // until an authority confirms it; absent/`'auto'` ⇒ the first claim confirms itself (the subtask fix).
+    ...(partial.claimConfirmation !== undefined ? { claimConfirmation: partial.claimConfirmation } : {}),
+    // Claim LEASE (§2.8), ms — an unfinished claim auto-releases after `claimedAt + claimLease` (deterministic;
+    // returns the node to claimable). Absent/0 ⇒ manual release only (the default). Set by the issuer.
+    ...(partial.claimLease !== undefined ? { claimLease: partial.claimLease } : {}),
     ...(partial.scheduledAt !== undefined ? { scheduledAt: partial.scheduledAt } : {}),
     ...(partial.estimateMinutes !== undefined ? { estimateMinutes: partial.estimateMinutes } : {}),
     ...(Array.isArray(partial.embeds) && partial.embeds.length > 0

@@ -44,6 +44,7 @@ export const ATOMS = Object.freeze([
   // ── LIFECYCLE (state transitions on an item) ────────────────────────────
   { verb: 'complete',  category: 'lifecycle', targets: 'item',       aliases: ['done'],          semantics: 'Mark an item done.' },
   { verb: 'claim',     category: 'lifecycle', targets: 'item',       aliases: ['grab'],          semantics: 'Self-assign an open item.' },
+  { verb: 'confirm',   category: 'lifecycle', targets: 'item',       aliases: [],                semantics: 'Confirm a pending claim so the claimant may act (the authority ratifies a claim request).' },
   { verb: 'reassign',  category: 'lifecycle', targets: 'item',       aliases: ['assign'],        semantics: 'Assign or transfer an item to a member.' },
   { verb: 'submit',    category: 'lifecycle', targets: 'item',       aliases: [],                semantics: 'Submit an item for review (workflow transition).' },
   { verb: 'approve',   category: 'lifecycle', targets: 'item',       aliases: [],                semantics: 'Approve a submitted item.' },
@@ -81,10 +82,10 @@ export const ATOM_VERBS = Object.freeze(ATOMS.map((a) => a.verb));
  * is a rogue verb and fails the guard.
  *
  * It is the AUTHORITATIVE SUPERSET: every atom any app manifest declares today
- * is a subset of this list (add/list/get/update/remove/complete/claim/reassign/
- * submit/approve/reject/revoke/archive/unarchive/share/move). Adding a new
- * canonical verb to the algebra = adding one `Atom` to `ATOMS` above (with its
- * category/aliases/semantics), which flows here automatically.
+ * is a subset of this list (add/list/get/update/remove/complete/claim/confirm/
+ * reassign/submit/approve/reject/revoke/archive/unarchive/share/move). Adding a
+ * new canonical verb to the algebra = adding one `Atom` to `ATOMS` above (with
+ * its category/aliases/semantics), which flows here automatically.
  *
  * Alias to `ATOM_VERBS` so there is ONE source (CLAUDE.md invariant #3) — this
  * name exists to make the CONVENTION greppable under the `CANONICAL_ATOMS`

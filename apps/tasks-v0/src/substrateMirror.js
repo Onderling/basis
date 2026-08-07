@@ -5,7 +5,7 @@
  * OBJ-2 S2: now a THIN wrapper over the shared generic `wireItemMirror`
  * (`@onderling/notify-envelope`), which household also uses. Tasks-specific bits:
  * the envelope `kind` ('task'), the per-circle URI namespace, the full task draft
- * (dependencies / requiredSkills / approval / parentTaskId / scheduling / …),
+ * (dependencies / requiredSkills / approval / containedBy / scheduling / …),
  * and an action inference that also reads the review-log (submit/approve/reject).
  *
  * Behaviour is unchanged from the prior hand-rolled copy: `addTask` fan-out plus
@@ -47,7 +47,9 @@ function taskDraft(payload, fromPubKey) {
     ...(payload.visibility ? { visibility: payload.visibility } : {}),
     ...(payload.definitionOfDone ? { definitionOfDone: payload.definitionOfDone } : {}),
     ...(payload.approval ? { approval: payload.approval } : {}),
-    ...(payload.parentTaskId ? { parentTaskId: payload.parentTaskId } : {}),
+    // The subtask tree edge: the CONTAINMENT back-ref on the child — so a synced subtask keeps its parent
+    // link on the peer.
+    ...(Array.isArray(payload.containedBy) && payload.containedBy.length ? { containedBy: payload.containedBy } : {}),
     ...(payload.scheduledAt     !== undefined ? { scheduledAt:     payload.scheduledAt }     : {}),
     ...(payload.estimateMinutes !== undefined ? { estimateMinutes: payload.estimateMinutes } : {}),
     ...(payload.embeds ? { embeds: payload.embeds } : {}),

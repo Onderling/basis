@@ -62,7 +62,7 @@ import { buildCirclePodWriter } from './src/core/circleStoresRN.js';
 // One store per app; shared between ChatScreen (receiver) and
 // CircleLauncherScreen (editor pull + send-side clear).
 import { makeKringRecipePendingStoreRN } from './src/core/kringRecipePendingStorageRN.js';
-import { initCirclePods, circleControlAgentRouter, setCirclePodSession, setCircleKeyEventWiring, provisionCircleMedium } from './src/core/circlePods.js';
+import { initCirclePods, circleControlAgentRouter, setCirclePodSession, setCircleKeyEventWiring, provisionCircleMedium, circleSendDataMove, circlePodWrite, circlePodReadSince, circleResolveRef } from './src/core/circlePods.js';
 import { discoverPodRoot } from '../basis/src/web/podStorage.js';
 // γ-next.rules — per-kring pending-rules cache (AsyncStorage-backed).
 // Mirrors the recipe wire: ChatScreen writes via the receiver,
@@ -225,6 +225,11 @@ export default function App() {
           ? bundleRef.current.sendPeer(to, payload)
           : Promise.reject(new Error('no peer send yet'))),
       }),
+      // Connectivity Phase 3 (receiver side) — resolve a pod-signal REF envelope (a pod-row pointer, no
+      // body) into the full chat message by reading + unsealing the circle's shared pod. Absent a pod /
+      // group key → the inbox skips the ref (deferred), never crashes the receive loop. Web parity
+      // (circleApp inbox `resolveRef: circleResolveRef`); the lazy wrapper settles custody at call time.
+      resolveRef: circleResolveRef,
       // "Did I write this?" — so a message of mine read back out of storage (the boot rehydrate two
       // blocks down, catch-up, pod replay) comes back as MINE ('me', what the bubbles compare against)
       // instead of as a stranger's. Web parity, same shared check; per-circle by construction, and never
@@ -450,6 +455,12 @@ export default function App() {
           stoopControlAgent: circleControlAgentRouter,
           // Cache-mode mirroring (RN parity): a pod-backed circle's store rides a cache-mode PseudoPod.
           provisionCircleMedium,
+          // Connectivity Phase 3 — LIVE shared-pod key-custody seams (member-side), RN parity with web
+          // circleApp. A shared/hybrid circle WITH a pod + group key seals→writes the pod + fans a ref
+          // (pod-signal); catch-up range-queries→opens it. A no-pod circle keeps fan-out-full unchanged.
+          stoopCircleDataMove: circleSendDataMove,
+          stoopPodWrite:       circlePodWrite,
+          stoopPodReadSince:   circlePodReadSince,
           // G11 — the no-pod key-event fan's transport (a REMOVE → rotation fans the new key to the
           // remaining members). The bundle injects its peer sender + skill dispatch at boot.
           setKeyEventWiring: setCircleKeyEventWiring,

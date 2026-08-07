@@ -15,7 +15,7 @@
  * fallback both platforms share.
  */
 import { makeCircleShareEnforcement } from '@onderling/item-store';
-import { createCanonicalShare, assertScopedScheme } from '@onderling/pod-client';
+import { createCanonicalShare, assertScopedScheme, needsCopyToLeaveAudience } from '@onderling/pod-client';
 import { makeResourceUriResolver, sharedRefResourceUri } from '@onderling/pod-onboarding/resourceUri';
 
 /**
@@ -195,5 +195,11 @@ export function buildCircleShareEnforcement({ sharing, strategy, podRoot, contro
     };
   }
 
+  // D2 ROUTER (Frits 2026-08-06) — group-key content must LEAVE its audience as a re-sealed COPY, never an
+  // in-place re-wrap (which hands the grantee the one key to the whole audience). Set ONLY for group-key: a
+  // scoped scheme stays an in-place grant, and an absent/unknown scheme stays REFUSED by the throwing gate
+  // (`assertScopedScheme`) — narrow on purpose so nothing but the group-key leak changes. The caller reads
+  // this boolean to ROUTE to the copy path instead of catching a throw.
+  enforcement.leaveAudienceNeedsCopy = needsCopyToLeaveAudience(strategy?.scheme);
   return enforcement;
 }

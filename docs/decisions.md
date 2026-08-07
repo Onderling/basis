@@ -1101,3 +1101,37 @@ down joins a second point. They do not impose that cost on everyone else.
 **Consequence for invites:** an invite carries the connection point(s) **the sharer is on**, and it is fine
 that this is not exhaustive — a joiner learns more as they meet more members. Under "all" an incomplete
 invite would have been a defect; under "any" it is the honest thing to send.
+
+---
+
+## 2026-08-06 — The seal-scope (D2) gate covers EVERY out-of-audience share; cross-circle sharing re-seals a COPY, never re-wraps the group key
+
+**Status:** decided (Frits 2026-08-06). The out-of-circle *person* door is already bound (`assertScopedScheme`
+at `apps/basis/src/v2/circleShareEnforcement.js:188`, guard `G-P1` passing); the circle→circle *canonical*
+door + the copy-path fallback are the open work.
+
+**Context:** group-key-sealed circle content is readable by anyone holding the circle key. Sharing OUT of the
+circle must never hand out that key — it must re-seal a COPY under a scoped scheme (`pairwise` /
+`per-resource-CEK`) for the specific recipient. The D2 gate (`assertScopedScheme`, `packages/pod-client/src/
+sealing/scopedSchemes.js`) enforces exactly this on the out-of-circle person share (`onShareToPublishedKey`).
+But the circle→circle canonical share (`onShareCanonical`) re-wraps the group key to *another circle's roster*
+WITHOUT the gate, on the reasoning "in-circle re-wraps are not audience extension" — which silently hands
+circle B the key to all of circle A's history and retained versions.
+
+**Decision (Frits):**
+1. **Cross-circle sharing follows the same procedure as sharing to one person: a re-sealed COPY, not a
+   group-key re-wrap.** The circle→circle canonical door must route through the copy/re-seal path (scoped
+   scheme) and be covered by the D2 gate. Handing another whole circle the combination is the same leak as
+   handing one person the combination. **Distinction to preserve:** a *same-circle* roster grant (adding a
+   member to their OWN circle) is NOT audience extension and stays a re-wrap; only a *cross-circle* share is
+   gated/copied.
+2. **A group-key circle's out-of-circle share FALLS BACK to the copy path, not a hard error.** Today it
+   throws `share-grant-failed`; instead it should transparently make the re-sealed copy. The UI should make
+   clear that sharing OUTSIDE a circle differs from sharing inside it.
+
+**Consequences:** the D2 gate becomes a *router*, not only a refusal — group-key content leaving its audience
+→ re-seal copy; already-scoped content → in-place grant. `G-P1` gains a twin for the canonical door.
+
+**Reverse it by:** this is the security posture; reverting reopens the cross-circle group-key leak. The
+mechanical revert is dropping the canonical-door gate + restoring the hard error, but do not without a
+replacement.

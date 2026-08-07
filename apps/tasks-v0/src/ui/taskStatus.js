@@ -27,7 +27,7 @@
  *                     short ids for the disabled-button tooltip.
  */
 
-/** @typedef {'ready'|'waiting'|'blocked'|'claimed'|'submitted'|'complete'|'rejected'|'unknown'} StatusKind */
+/** @typedef {'ready'|'waiting'|'blocked'|'claimed'|'pending-confirmation'|'provisional'|'submitted'|'complete'|'rejected'|'unknown'} StatusKind */
 
 /**
  * @param {object} item   listOpen item from Tasks ItemStore
@@ -106,7 +106,8 @@ export function shouldOfferForceComplete(item, actor, role) {
 function _normaliseKind(s) {
   if (typeof s !== 'string' || !s) return 'unknown';
   if (s === 'ready' || s === 'waiting' || s === 'blocked' ||
-      s === 'claimed' || s === 'submitted' || s === 'complete' ||
+      s === 'claimed' || s === 'pending-confirmation' || s === 'provisional' ||
+      s === 'submitted' || s === 'complete' ||
       s === 'rejected') return s;
   return 'unknown';
 }
@@ -116,6 +117,10 @@ const _LABELS = {
   waiting:   'waiting',
   blocked:   'blocked',
   claimed:   'claimed',
+  // A claim awaiting the master's confirmation (explicit-confirm) — "not yours yet".
+  'pending-confirmation': 'awaiting confirmation',
+  // An optimistic subtask spawned under a pending claim — committed on confirmation, discarded on loss.
+  provisional: 'provisional',
   submitted: 'submitted',
   complete:  'complete',
   rejected:  'rejected',
@@ -127,6 +132,8 @@ const _COLOR = {
   waiting:   'warning',
   blocked:   'danger',
   claimed:   'primary',
+  'pending-confirmation': 'warning',
+  provisional: 'textMuted',
   submitted: 'success',
   complete:  'textMuted',
   rejected:  'danger',

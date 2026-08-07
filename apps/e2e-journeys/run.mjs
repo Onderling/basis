@@ -31,8 +31,10 @@ import * as telegram     from './journeys/telegram.journey.mjs';
 import * as media        from './journeys/media.journey.mjs';
 import * as removal      from './journeys/removal.journey.mjs';
 import * as mute         from './journeys/mute.journey.mjs';
+import * as governance   from './journeys/governance.journey.mjs';
+import * as reachability  from './journeys/reachability.journey.mjs';
 
-const ALL = [twoParty, offline, circle, sealedInbox, buurt, companion, taskClaim, security, notifications, feedback, manage, bot, keyexchange, telegram, media, removal, mute];
+const ALL = [twoParty, offline, circle, sealedInbox, buurt, companion, taskClaim, security, notifications, feedback, manage, bot, keyexchange, telegram, media, removal, mute, governance, reachability];
 const KEY = (n) => n.split(' ')[0].toLowerCase().replace(/[^a-z-]/g, ''); // "two-party messaging" -> "two-party"
 
 const args = process.argv.slice(2);

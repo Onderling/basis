@@ -51,6 +51,9 @@ export {
   circleAddressSigner, verifyAddressPossession,
 } from './identity/addressPossession.js';
 export { hashHex } from './hashHex.js';
+// The reusable per-author hash-chain + fork-proof primitive. Governance and membership BIND it with
+// their own body-serialization rather than each reimplementing the chaining/fork detection.
+export { createAuthorChain, isChained, authorHead, makeForkProof } from './security/authorChain.js';
 // NOTE: IdentityPodStore, IdentitySync and migrateVaultToPod were extracted OUT
 // of core into `@onderling/pod-client` — they store/migrate/sync identity ON a pod
 // (SDK pod layer), not kernel identity. Import them from '@onderling/pod-client'.
@@ -87,6 +90,11 @@ export {
   ORIGIN_SIG_VERSION,
   DEFAULT_ORIGIN_WINDOW_MS,
 }                                            from './security/originSignature.js';
+export {
+  signEviction,
+  verifyEviction,
+  EVICTION_STMT_VERSION,
+}                                            from './security/evictionStatement.js';
 export {
   packSealed,
   openSealed,

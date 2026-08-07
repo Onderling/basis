@@ -43,7 +43,8 @@ function evictionBody({ circleId, evicted, by, seq }) {
 ## Current state
 
 Following this convention:
-- **eviction** — `packages/core/src/security/evictionStatement.js` — `"onderling/eviction.v1"`.
+- **eviction** — `packages/core/src/security/evictionStatement.js` — `"onderling/eviction.v2"` (a signed,
+  chained spine statement — content + `authorChain` fields; v1 was the standalone wall-clock form).
 - **origin signature** — `packages/core/src/security/originSignature.js` — `"onderling/origin.v1"`.
 - **reachability claim** — `packages/core/src/security/reachabilityClaim.js` — `"onderling/reachability.v1"`.
 

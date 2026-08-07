@@ -129,12 +129,17 @@ try {
 } catch { /* none yet */ }
 
 const violations = [];
+// Barrel symbols in a WHOLE-PACKAGE-exempted (published) package that nothing in-repo reaches. Expected for
+// genuine third-party API — but the whole-package exemption is COARSE, so an internal seam that landed on a
+// published barrel without being real API (the `peerFacade` class) would hide here silently. We keep these
+// GREEN (a published barrel IS a third-party surface) but SURFACE their count, so the mask stays honest.
+const exemptedUnreached = [];
 for (const file of sources) {
   let src;
   try { src = readFileSync(path.join(ROOT, file), 'utf8'); } catch { continue; }
   const owner = pkgOf(file);
   for (const name of exportsIn(src)) {
-    if (allow[name] || allowPackages[owner]) continue;   // declared public API, with a reason
+    if (allow[name]) continue;   // explicitly-named public API, with a per-symbol reason — fully exempt
     const surface = surfaceByPkg.get(owner);
     if (!surface || !surface.has(name)) continue;    // internal helper — its own tests may be its only caller
     const re = new RegExp(`\\b${name.replace(/[$]/g, '\\$')}\\b`);
@@ -143,7 +148,10 @@ for (const file of sources) {
       if (pkgOf(f) === owner && f.startsWith('packages/')) continue;   // own package does not count
       if (re.test(content)) { reached = true; break; }
     }
-    if (!reached) violations.push({ file, symbol: name, package: owner });
+    if (reached) continue;
+    // Unreached. A whole-package exemption keeps it green but is surfaced (not failed); anything else fails.
+    if (allowPackages[owner]) exemptedUnreached.push({ file, symbol: name, package: owner });
+    else violations.push({ file, symbol: name, package: owner });
   }
 }
 
@@ -202,5 +210,21 @@ if (carried) {
     console.warn(`   ${String(n).padStart(3)}  ${pkg.padEnd(18)} ${why ?? '— NOT YET TRIAGED (orphaned or superseded? recover the intent before deciding)'}`);
   }
   console.warn('\n   orphaned → wire it · superseded → delete it. "Unreached" alone decides nothing.\n');
+}
+
+// ── Visibility: the whole-package exemptions, made honest ────────────────────────────────────────────
+// A published package's barrel IS its third-party surface, so "no in-repo consumer" is expected there and we
+// do not fail on it. But that whole-package exemption is coarse — it would also hide an INTERNAL seam that
+// ended up on a published barrel without being genuine API (peerFacade is the worked example: an internal
+// per-circle member projection, on `core`'s barrel, unadopted). So we surface the per-package count. Green,
+// but honest: someone can look at "core: N" and ask whether all N are really third-party API. Triage by
+// moving an inert internal off the barrel (making it a plain internal the guard ignores) or wiring it.
+if (exemptedUnreached.length) {
+  const byPkg = new Map();
+  for (const v of exemptedUnreached) byPkg.set(v.package, (byPkg.get(v.package) ?? 0) + 1);
+  console.warn(`ℹ lint:unreached: ${exemptedUnreached.length} barrel symbol(s) in published (whole-package-exempted) packages have no in-repo consumer.`);
+  console.warn('   Expected for genuine third-party API — but VERIFY none is an inert internal (the peerFacade class). Per package:');
+  for (const [pkg, n] of [...byPkg].sort((a, b) => b[1] - a[1])) console.warn(`   ${String(n).padStart(3)}  ${pkg}`);
+  console.warn('');
 }
 console.log('✓ lint:unreached: no newly-unreached exports.');

@@ -2,6 +2,12 @@
  * `@onderling/circles` — audience model + saved-audience (circles)
  * substrate.  See README.md for the canonical alias note
  * (`circle.id ≡ task.circleId`).
+ *
+ * ⚠ This is a **pure-DI** package: it imports almost nothing (the store, fan-out, verify helpers are all
+ * INJECTED by consumers — see `circleCreate.js` "imports NOTHING"). So `package.json` declares almost no deps,
+ * and a `node import @onderling/item-store` from here FAILS — because item-store is not a dependency, by
+ * design, NOT because the workspace is broken. If a migration adds direct-import code here, declare its deps in
+ * `package.json` + run `scripts/relink-workspace.mjs`. See `docs/architecture.md` "How the monorepo resolves".
  */
 
 export {

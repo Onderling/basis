@@ -474,6 +474,22 @@ packages/core                the KERNEL — a lean set of PORTS + kernel logic
 
 See [`repository-layout.md`](./repository-layout.md) for the full apps + packages map.
 
+**How the monorepo resolves — the workspace + the two scopes.** All the code lives in one pnpm **workspace**:
+many packages in one repo, linked to each other on disk (not downloaded). Two npm scopes make the layer stack
+visible in every import — **`@onderling/*` are the substrate PACKAGES** (`packages/*` — item-store, core,
+circles, sdk, …), **`@onderling-app/*` are the APPS** (`apps/*` — basis, stoop, tasks, folio, …). "`@onderling-app`"
+is NOT a second repo; it is the app scope. An app importing `@onderling/item-store` resolves to a **symlink**
+pointing at the sibling `packages/item-store`, never a published copy. The tree is deliberately **FLAT**
+(`.npmrc` `node-linker=hoisted`, per-app lockfiles) because Metro/Vite + the relative cross-package imports
+need packages sitting at their real locations. Caveat worth knowing before you touch installs: a partial
+`pnpm install --filter …` can **shred those symlinks repo-wide** (replacing links with copies, pruning
+siblings you never named) — the deterministic fix is **`node scripts/relink-workspace.mjs`**, NOT a reinstall
+(full trap + tells in [`agent-notes-known-gotchas.md`](./agent-notes-known-gotchas.md)). A green test suite
+means the tree is healthy; a flood of "cannot resolve `@onderling/x`" in apps you did not change is the relink
+tell — not a "broken tree". Note many substrate packages are **pure DI** (they import almost nothing;
+consumers inject the store/fan-out — e.g. `@onderling/circles`), so "this package doesn't resolve `@onderling/y`"
+usually means y is simply not its dependency, not that resolution is broken.
+
 **A fourth region the diagram omits: the deployment / hosting layer.** Client apps host nothing. Server-side
 services — **pod-HOSTING**, relay/proxy, the private-LLM enclave, rollout — form a separate layer, placed by
 trust + latency (below), that sits *outside* the client apps. The `feedback` deployment occupies it today (it

@@ -20,14 +20,17 @@
  *     so it gets a much tighter ceiling than the invite itself carries.
  */
 
-/** A broadcast invite expires fast. A QR you hand someone can live for hours; a shout to a café cannot. */
-export const BROADCAST_INVITE_MAX_TTL_MS = 15 * 60_000;
-export const INVITE_MESSAGE = 'nearby-invite';
-export const INVITE_MAX_NAME = 60;
-export const INVITE_MAX_URI  = 2048;
-
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { decodeInvite } from '../core/wizards/joinGroupState.js';
 import { encodeInviteUri } from '../core/wizards/createGroupState.js';
+
+// Parameter register (#36) — broadcast-invite bounds. scope:device (per-install), kind:internal: the tight
+// ceiling + name/URI caps are SAFETY bounds (a broadcast reaches strangers) — never user-poke-able.
+/** A broadcast invite expires fast. A QR you hand someone can live for hours; a shout to a café cannot. */
+export const BROADCAST_INVITE_MAX_TTL_MS = param({ key: 'nearby.invite.maxTtlMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 15 * 60_000 });
+export const INVITE_MESSAGE = 'nearby-invite';
+export const INVITE_MAX_NAME = param({ key: 'nearby.invite.maxName', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60 });
+export const INVITE_MAX_URI  = param({ key: 'nearby.invite.maxUri',  scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 2048 });
 
 /**
  * Fields an invite may carry on a QR code or a link, but NOT into a room.

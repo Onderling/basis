@@ -43,6 +43,7 @@
  * generator if they need a deterministic id (`requestId` is plumbed
  * through as a string, not produced here, by the coordinator).
  */
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 /**
  * Subtype constants for the five negotiated catch-up envelopes.
@@ -70,7 +71,9 @@ export const CATCH_UP_MODES = Object.freeze(['all', 'last-50', 'last-7-days']);
  * typical kring messages are < 200 bytes), big enough that a kring
  * with a week of activity (~200 msgs) ships in 4 frames.
  */
-export const DEFAULT_CHUNK_SIZE = 50;
+// Parameter register (#36) — per-install (scope:device), kind:internal: a wire/protocol tuning bound (NKN
+// frame fit), not a user preference. `param()` returns 50 unchanged; still caller-overridable via chunkItems.
+export const DEFAULT_CHUNK_SIZE = param({ key: 'catchup.chunkSize', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 50 });
 
 /**
  * Generate a stable request id for one catch-up exchange.  Not a

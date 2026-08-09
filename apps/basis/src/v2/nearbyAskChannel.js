@@ -19,6 +19,7 @@
  * That last one matters most: without it, an ask could name another person's room address and any answer
  * would open a channel to them instead. Cheap to get right here, impossible to fix later.
  */
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { ASK_MAX_TEXT, ASK_MAX_TTL_MS, isAskLive } from './nearbyAsks.js';
 
 /** Message kind on the wire. Namespaced so a room message cannot be confused with app traffic. */
@@ -26,7 +27,9 @@ export const ASK_MESSAGE = 'nearby-ask';
 export const ANSWER_MESSAGE = 'nearby-answer';
 
 /** A room ask is a shout, not a mailing list — cap the tags so it cannot become a profile. */
-export const ASK_MAX_TAGS = 8;
+// Parameter register (#36) — a wire cap on tags per ask (scope:device, kind:internal — a safety bound, not a
+// user preference). `param()` returns 8 unchanged.
+export const ASK_MAX_TAGS = param({ key: 'nearby.ask.maxTags', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 8 });
 
 /**
  * @param {object} deps

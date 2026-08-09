@@ -27,13 +27,16 @@
  *     participants. That is a different thing from browsing a list of who is present, and the honest
  *     default is that you are either in the conversation or not in it.
  */
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
-export const CARD_MAX_LABEL = 40;
-export const CARD_MAX_LINE  = 140;
-export const CARD_MAX_TAGS  = 5;
-export const CHAT_MAX_TEXT  = 500;
+// Parameter register (#36) — card/chat format + render caps. All scope:device (per-install), kind:internal:
+// wire-format and buffer bounds a user must not be able to poke. `param()` returns each default unchanged.
+export const CARD_MAX_LABEL = param({ key: 'nearby.card.maxLabel', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 40 });
+export const CARD_MAX_LINE  = param({ key: 'nearby.card.maxLine',  scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 140 });
+export const CARD_MAX_TAGS  = param({ key: 'nearby.card.maxTags',  scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 5 });
+export const CHAT_MAX_TEXT  = param({ key: 'nearby.chat.maxText',  scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 500 });
 /** Room chat is ephemeral. This is a render cap, not a store — nothing is persisted anywhere. */
-export const CHAT_MAX_KEPT  = 100;
+export const CHAT_MAX_KEPT  = param({ key: 'nearby.chat.maxKept',  scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 100 });
 
 /**
  * How many asks a room keeps, and how many one stranger may cost you.
@@ -50,9 +53,9 @@ export const CHAT_MAX_KEPT  = 100;
  *     checked BEFORE the judge runs, so the expensive half is what gets protected. Tuned for a real room:
  *     a person asking a handful of things in a minute is normal; a hundred is not a person.
  */
-export const ASKS_MAX_KEPT            = 200;
-export const ASKS_PER_AUTHOR_BURST    = 8;
-export const ASKS_PER_AUTHOR_REFILL   = 0.2;   // one more every five seconds
+export const ASKS_MAX_KEPT            = param({ key: 'nearby.asks.maxKept',         scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 200 });
+export const ASKS_PER_AUTHOR_BURST    = param({ key: 'nearby.asks.perAuthorBurst',  scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 8 });
+export const ASKS_PER_AUTHOR_REFILL   = param({ key: 'nearby.asks.perAuthorRefill', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 0.2 });   // one more every five seconds
 
 export const CARD_MESSAGE = 'nearby-card';
 export const CHAT_MESSAGE = 'nearby-chat';

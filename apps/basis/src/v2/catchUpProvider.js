@@ -41,6 +41,7 @@
  * doesn't leak.
  */
 
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import {
   CATCH_UP_SUBTYPES,
   isValidRequest,
@@ -54,9 +55,12 @@ import {
   DEFAULT_CHUNK_SIZE,
 } from './catchUpProtocol.js';
 
-const DEFAULT_DECISION_TIMEOUT_MS = 60_000;
-const DEFAULT_MAX_FETCH           = 1000;
-const DEFAULT_ACCEPT_TIMEOUT_MS   = 15_000;
+// Parameter register (#36) — catch-up provider protocol timing/limits. Per-install (scope:device) and
+// kind:internal: safety bounds a user must not be able to poke (a settable fetch cap or timeout is how you
+// wedge a provider). All are already caller-overridable via the args below; `param()` returns them unchanged.
+const DEFAULT_DECISION_TIMEOUT_MS = param({ key: 'catchup.decisionTimeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });
+const DEFAULT_MAX_FETCH           = param({ key: 'catchup.maxFetch',          scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1000 });
+const DEFAULT_ACCEPT_TIMEOUT_MS   = param({ key: 'catchup.acceptTimeoutMs',   scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 15_000 });
 
 /**
  * Build the provider-side catch-up handler.

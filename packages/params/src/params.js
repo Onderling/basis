@@ -119,9 +119,20 @@ export function createParamRegistry() {
   const values = new Map();   // key -> synced override — ONLY EVER a kind:user param (decision E: internal has no slot)
 
   const api = {
-    /** Declare a param INTO the register (the DI seam — invariant 5). Last declaration wins; chainable. */
+    /**
+     * Declare a param INTO the register (the DI seam — invariant 5). ONE KEY IS ONE TUNABLE: re-declaring the
+     * same key with a DIFFERENT default throws (a mirror must AGREE; a genuinely different knob needs its own
+     * key). This is the runtime half of the reuse guarantee — the stale-param guard is the static half.
+     * Re-declaring with the SAME default is fine (idempotent); chainable.
+     */
     declare(spec) {
       validateSpec(spec, 'paramRegistry.declare');
+      const prior = specs.get(spec.key);
+      if (prior && !Object.is(prior.default, spec.default)) {
+        throw new Error(`paramRegistry.declare: "${spec.key}" re-declared with a CONFLICTING default `
+          + `(${JSON.stringify(prior.default)} vs ${JSON.stringify(spec.default)}) — one key is one tunable. `
+          + `Reuse the key with the SAME default (a mirror), or use a distinct key.`);
+      }
       specs.set(spec.key, Object.freeze({ ...spec }));
       return api;
     },

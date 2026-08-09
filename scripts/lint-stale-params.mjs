@@ -54,15 +54,39 @@ const files = tracked().filter(isSource);
 const contentByFile = new Map();
 for (const f of files) { try { contentByFile.set(f, readFileSync(path.join(ROOT, f), 'utf8')); } catch { /* skip */ } }
 
-/** Collect every declared param: { file, name, key }. */
+/** Collect every declared param: { file, name, key, default }. `default` is the last spec field by convention. */
 const params = [];
 for (const [f, src] of contentByFile) {
   for (const m of stripComments(src).matchAll(DECL_RE)) {
     const name = m[1];
     const key = field(m[2], 'key');
     if (!key) continue;   // a real param spec always carries a `key: '…'` string literal — no key ⇒ not a declaration
-    params.push({ file: f, name, key, decl: m[0] });
+    const def = m[2].match(/\bdefault\s*:\s*([\s\S]+?)\s*,?\s*$/)?.[1]?.replace(/\s+/g, ' ').trim() ?? null;
+    params.push({ file: f, name, key, default: def, decl: m[0] });
   }
+}
+
+// ── AGREEMENT (the reuse guarantee): one key is one tunable ──────────────────────────────────────────────
+// The param KEY is the canonical identity. The same key MAY appear in more than one file (a by-value mirror —
+// e.g. the attachment caps across three shells) but ONLY if the DEFAULTS agree. A key with two different
+// defaults is drift: two knobs wearing one name, or a mirror that fell out of sync. Hard error, never
+// baselined — the runtime half is `paramRegistry.declare()` throwing on a conflicting default.
+const byKey = new Map();   // key -> Map(normalisedDefault -> ["file:name", …])
+for (const p of params) {
+  const dm = byKey.get(p.key) ?? new Map();
+  const d = p.default ?? '(unparsed)';
+  dm.set(d, [...(dm.get(d) ?? []), `${p.file}:${p.name}`]);
+  byKey.set(p.key, dm);
+}
+const disagreements = [...byKey].filter(([, dm]) => dm.size > 1);
+if (disagreements.length) {
+  console.error(`\n✗ lint:stale-params — ${disagreements.length} param key(s) declared with DISAGREEING defaults (one key is one tunable):\n`);
+  for (const [key, dm] of disagreements) {
+    console.error(`   ${key}:`);
+    for (const [d, where] of dm) console.error(`      default ${d}  ← ${where.join(', ')}`);
+  }
+  console.error('\n   A key is the tunable\'s identity. Reuse a key only for the SAME value (a mirror), or use a distinct key.\n');
+  process.exit(1);
 }
 
 /** A param is READ if its const NAME or its key string appears anywhere OTHER than its own declaration. */

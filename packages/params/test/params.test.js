@@ -62,6 +62,22 @@ describe('the register — declared values + accessors (decision B)', () => {
   });
 });
 
+describe('ONE KEY IS ONE TUNABLE — the reuse guarantee (declare agreement)', () => {
+  it('re-declaring a key with the SAME default is idempotent (a mirror)', () => {
+    const reg = createParamRegistry()
+      .declare({ key: 'attachment.maxImageDim', scope: 'device', kind: 'internal', default: 1280 })
+      .declare({ key: 'attachment.maxImageDim', scope: 'device', kind: 'internal', default: 1280 });   // mirror — OK
+    expect(reg.valueOf('attachment.maxImageDim')).toBe(1280);
+  });
+
+  it('re-declaring a key with a CONFLICTING default throws (drift caught at composition)', () => {
+    const reg = createParamRegistry().declare({ key: 'attachment.maxImageDim', scope: 'device', kind: 'internal', default: 1280 });
+    expect(() => reg.declare({ key: 'attachment.maxImageDim', scope: 'device', kind: 'internal', default: 8 }))
+      .toThrow(/CONFLICTING default|one key is one tunable/i);
+    expect(reg.valueOf('attachment.maxImageDim')).toBe(1280);   // unchanged
+  });
+});
+
 describe('kind:internal is IMMUTABLE BY CONSTRUCTION (decision E)', () => {
   const reg = createParamRegistry()
     .declare({ key: 'nearby.ask.maxText', scope: PARAM_SCOPE.AGENT, kind: PARAM_KIND.INTERNAL, default: 280 });

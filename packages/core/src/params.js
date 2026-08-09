@@ -1,8 +1,17 @@
 /**
- * params — THE PARAMETER REGISTER (task #36): the SECOND half of the declaration layer, the third sibling of
- * the item-store substrate's declaration family — `entryKinds` → `resolutionPolicy` → **params**. It answers a
- * different question than either: not "how does this item behave" but "what is this tunable constant, who may
- * change it, and where does a change sync" (`PLAN-homes.md` §"declaration layer + the flywheel").
+ * params — THE PARAMETER REGISTER (task #36): the SECOND half of the declaration layer. It answers "what is
+ * this tunable constant, who may change it, and where does a change sync" (`PLAN-homes.md` §"declaration
+ * layer + the flywheel").
+ *
+ * ── Why it lives in `core`, below its declaration-layer relatives ────────────────────────────────────────
+ * `entryKinds` and `resolutionPolicy` (the other declaration-layer tables) live in `@onderling/item-store`
+ * because they are item-store-DOMAIN facts (how a logged item behaves / how two writes merge). `params` is
+ * NOT item-store-domain — a tunable constant lives in EVERY layer, including `core` itself and the substrate
+ * packages that sit below item-store. So `param()` is a universal primitive and belongs at the kernel base:
+ * homing it here lets any package that depends on `core` declare its params, which item-store could not.
+ * `@onderling/item-store` RE-EXPORTS the whole surface, so existing `@onderling/item-store` importers are
+ * unaffected. (Moved down 2026-08-09, Frits — was the item-store "third sibling" until packages below
+ * item-store needed to declare params too.)
  *
  * ── The two axes (decision B) ────────────────────────────────────────────────────────────────────────────
  * Every param declares two orthogonal facts, replacing the three overloaded `scope` vocabularies that meant
@@ -20,8 +29,8 @@
  * no import-order hazard. The census of every declared param is collected STATICALLY from source by the
  * stale-param guard (`scripts/lint-stale-params.mjs`), exactly as `lint-unreached-exports` reads exports —
  * not at runtime. The runtime register (below) is a plain INSTANCE, populated by DI at composition and
- * injected DOWN (invariant 5: the app declares its params INTO the substrate register; the substrate never
- * up-imports the app), mirroring how `resolutionRegistryFromManifests` seeds the resolution registry.
+ * injected DOWN (invariant 5: the app declares its params INTO the register; the substrate never up-imports
+ * the app), mirroring how `resolutionRegistryFromManifests` seeds the resolution registry.
  *
  * A `const` is evaluated once at import and can never track a value that syncs in LATER at runtime, so
  * `param()` returns the code DEFAULT — behaviour-preserving by construction (a migrated const returns exactly

@@ -47,12 +47,13 @@ export {
   RESOLUTION, DELIVERY, DEFAULT_RESOLUTION, deliveryForResolution,
   createResolutionRegistry, defaultResolutionRegistry, declareManifestPolicies, resolutionRegistryFromManifests,
 } from './resolutionPolicy.js';
-// The PARAMETER REGISTER (#36) — the second half of the declaration layer. `param()` declares a tunable at
-// its site (scope drives sync, kind is the security gate); the register is the DI home for settable values;
-// `setParam` is the one kind-enforcing set op. kind:internal is immutable by construction. See params.js.
+// The PARAMETER REGISTER (#36) — the second half of the declaration layer. RE-EXPORTED from `@onderling/core`,
+// where it was homed (2026-08-09) so packages below item-store can declare params too. Re-exported here so
+// existing `@onderling/item-store` importers are unaffected. `param()` declares a tunable at its site (scope
+// drives sync, kind is the security gate); the register is the DI home for values; `setParam` is the one set op.
 export {
   PARAM_SCOPE, PARAM_KIND, param, createParamRegistry, setParam,
-} from './params.js';
+} from '@onderling/core';
 export { recoverCircleFromCaches, writeRecoveredInto } from './podRecovery.js';  // Objective S — pod-recovery: causal merge of device caches
 export { shareIntoAudience, resolveSharedRef, listShared } from './shareIntoAudience.js';  // cross-circle share
 export { shareContainerTree, collectSubtree } from './shareContainerTree.js';  // journey J5 — SENDABLE LISTS: fan the single-item share over a container subtree

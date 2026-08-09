@@ -33,6 +33,8 @@ import {
 } from '../../v2/circleSigningIdentity.js';
 import { createCircleSenderAuthorization, SENDER_REASON } from '../../v2/circleSenderAuthorization.js';
 import { shareableAddress } from '../../v2/addressSharing.js';
+import { createParamsService, basisParamRegistry } from '../../v2/paramsService.js';   // #36 — settable params surface
+import { paramsManifest } from '../../v2/paramsManifest.js';   // #36 — the params op contract (gates the waist branch)
 import { VaultMemory, VaultLocalStorage } from '@onderling/vault';
 import { wireSkill } from '@onderling/sdk';
 import { createSecureMeshAgent } from '@onderling/secure-agent';
@@ -364,6 +366,17 @@ export async function createRealHouseholdAgent(opts = {}) {
   });
   const chatAgent = sa.agent;
   const chatId    = chatAgent.identity;
+
+  // Parameter register (#36) — the settable params surface, reached through the waist (the `params`
+  // app-origin branch in callSkill below). Device/agent params persist to this agent's local settings homes
+  // (`householdDataSource` keyed by the real per-install `deviceId`); circle scope is wired when a circle
+  // param lands (degrades safely until then). Hydrate the synced values at boot; boot-safe if none exist yet.
+  const paramsService = createParamsService({
+    register:   basisParamRegistry(),
+    dataSource: householdDataSource,
+    deviceId:   chatId?.deviceId ?? null,
+  });
+  try { await paramsService.hydrate(); } catch { /* settings absent → registered defaults stand */ }
 
   /* ─── Decision 1 step 3 — the roster authorize, installed here for BOTH shells ────────────────
    * The kernel verifies an inbound envelope against the key it carries and then asks this whether
@@ -1677,6 +1690,14 @@ export async function createRealHouseholdAgent(opts = {}) {
       // An app with no generic handler → a structured error, mirroring how callSkill
       // surfaces skill errors (never throw for this boundary case).
       return { ok: false, error: 'generic-capability-unavailable' };
+    }
+    if (appOrigin === 'params') {
+      // #36 — the register's read/write surface, routed to paramsService. The `paramsManifest` is the CONTRACT
+      // that gates it: only its declared ops (set-param / get-param / list-user-params) dispatch; `set-param`
+      // is the ONE kind-gated write (refuses kind:internal + unknown). circleId carried for circle-scoped
+      // params (persistence wired when a circle param lands).
+      if (!paramsManifest.operations.some((o) => o.id === opId)) return { ok: false, error: 'unknown-op', app: 'params', op: opId };
+      return paramsService.callSkill(opId, args ?? {}, { circleId: resolveCircleId(args) });
     }
     if (appOrigin === 'household') {
       const circleId = resolveCircleId(args);

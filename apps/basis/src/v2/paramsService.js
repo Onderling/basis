@@ -107,7 +107,7 @@ export function createParamsService({ register = basisParamRegistry(), dataSourc
     register,
     settingsModule,
     /**
-     * hydrate — the READ side (#36 L24): load persisted kind:user param VALUES from the homes into the
+     * hydrate — the READ side (#36): load persisted kind:user param VALUES from the homes into the
      * register, so `valueOf` (and `get-param`) return the synced value, not just the code default. Call at
      * boot (device/agent scope) and per-circle-open (circle scope). Only genuinely-set values (≠ the code
      * default) become overrides — an unset param stays at its default. kind:internal params are never here.

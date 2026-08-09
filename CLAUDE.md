@@ -106,6 +106,7 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
 - **App READMEs** follow one scheme (built-on · deviations · honest phase table) — [`app-readme-scheme.md`](docs/conventions/app-readme-scheme.md).
 - **Web/mobile differences** are idiom or listed exceptions, never capability/vocab/consent drift — [`web-mobile-exceptions.md`](docs/conventions/web-mobile-exceptions.md).
 - **Cross-app settings** split pod-side into portable `shared.json` + per-install `devices/<id>.json` — [`cross-app-settings.md`](docs/conventions/cross-app-settings.md).
+- **Tunable constants go through the parameter register** — declare with `param({key,scope,kind,default})` (from `@onderling/params`, re-exported by core/item-store), never a bare literal; `scope` drives sync, `kind` gates settability (`internal` = immutable), and the stale-param guard fails a param nobody reads. Not for unit multipliers / crypto-format / enums — [`parameters.md`](docs/conventions/parameters.md).
 - **Cross-pod references** use the `embeds: [{type, ref}]` field + a permission handshake, never inlined pod URLs — [`cross-pod-refs.md`](docs/conventions/cross-pod-refs.md).
 - **Pod storage layout** is canonical, owned by `@onderling/pod-onboarding` — [`storage-layout.md`](docs/conventions/storage-layout.md).
 - **This file's scope + size budget** — what belongs in `CLAUDE.md` vs `docs/`, and when to compress/enlarge it — [`doc-structure.md`](docs/conventions/doc-structure.md).

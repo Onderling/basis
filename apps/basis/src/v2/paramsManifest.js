@@ -28,26 +28,23 @@ export const paramsManifest = {
         // form projects that from `list-user-params`). `string` here is just the generic surface holder.
         { name: 'value', kind: 'string', required: true },
       ],
-      surfaces: {
-        chat: { hint: 'Change a user-tunable setting by its key (only kind:user params; internal ones are refused).' },
-      },
+      // SETTINGS-ONLY (Frits 2026-08-10): no chat/slash surface — driven by the settings GUI calling
+      // `callSkill('params', …)` directly. Surfacing set-param in chat would let an LLM change your settings
+      // from a sentence — a deliberate future opt-in ("conversational settings"), not a default.
+      surfaces: {},
     },
     {
       id:   'get-param',
       verb: 'get-param',
       params: [{ name: 'key', kind: 'string', required: true }],
-      surfaces: {
-        chat: { hint: 'Read the current (possibly synced) value of a registered param by key.' },
-      },
+      surfaces: {},
     },
     {
       id:   'list-user-params',
       verb: 'list-user-params',
+      // The settings form projects over this — the kind:user slice with scope/default/current value.
       params: [],
-      surfaces: {
-        // The settings form projects over this — the kind:user slice with scope/default/current value.
-        chat: { hint: 'List the user-tunable params (the settings-form seed).' },
-      },
+      surfaces: {},
     },
   ],
 };

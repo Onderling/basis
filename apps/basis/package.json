@@ -68,6 +68,7 @@
     "@onderling/item-types": "workspace:*",
     "@onderling/kring-host": "workspace:*",
     "@onderling/llm-client": "workspace:*",
+    "@onderling/local-store": "workspace:*",
     "@onderling/manifest-host": "workspace:*",
     "@onderling/pod-client": "workspace:*",
     "@onderling/pod-onboarding": "workspace:*",

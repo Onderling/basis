@@ -158,7 +158,7 @@ export function createParamRegistry() {
  * @param {Record<'device'|'agent'|'circle', (p:{key,value,scope,spec})=>void>} [opts.homes]  scope → home writer
  * @returns {{ok:boolean, key?:string, value?:*, scope?:string, home?:string, error?:string}}
  */
-export function setParam(register, { key, value } = {}, { homes } = {}) {
+export async function setParam(register, { key, value } = {}, { homes } = {}) {
   if (!register || typeof register.isSettable !== 'function') throw new Error('setParam: a param register is required');
   if (typeof key !== 'string' || !key) return { ok: false, error: 'param-key-required' };
   if (!register.has(key))          return { ok: false, error: 'param-unknown', key };
@@ -167,6 +167,8 @@ export function setParam(register, { key, value } = {}, { homes } = {}) {
   register.setValue(key, value);
   const scope = register.scopeOf(key);
   const home = homes && homes[scope];
-  if (typeof home === 'function') home({ key, value, scope, spec: register.specOf(key) });   // route to the existing home
+  // Await the home so `ok:true` means the value REACHED its sync home — a set that returned before the write
+  // landed would be a lie a caller (or a set→read crossing test) could observe.
+  if (typeof home === 'function') await home({ key, value, scope, spec: register.specOf(key) });
   return { ok: true, key, value, scope, home: PARAM_HOME_FOR[scope] };
 }

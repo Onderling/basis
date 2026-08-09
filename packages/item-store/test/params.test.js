@@ -83,24 +83,24 @@ describe('the set-param op — the one kind-enforcing chokepoint (decision D)', 
     .declare({ key: 'circle.match.minShared',  scope: PARAM_SCOPE.CIRCLE, kind: PARAM_KIND.USER,     default: 1 })
     .declare({ key: 'nearby.ask.maxText',      scope: PARAM_SCOPE.AGENT,  kind: PARAM_KIND.INTERNAL, default: 280 });
 
-  it('sets a kind:user param and reports the scope + home', () => {
+  it('sets a kind:user param and reports the scope + home', async () => {
     const reg = build();
-    const r = setParam(reg, { key: 'nearby.ask.defaultTtlMs', value: 600000 });
+    const r = await setParam(reg, { key: 'nearby.ask.defaultTtlMs', value: 600000 });
     expect(r).toMatchObject({ ok: true, scope: 'agent', home: PARAM_HOME_FOR.agent });
     expect(reg.valueOf('nearby.ask.defaultTtlMs')).toBe(600000);
   });
 
-  it('REFUSES a kind:internal param — the belt-and-suspenders gate (never writes)', () => {
+  it('REFUSES a kind:internal param — the belt-and-suspenders gate (never writes)', async () => {
     const reg = build();
-    expect(setParam(reg, { key: 'nearby.ask.maxText', value: 9999 })).toMatchObject({ ok: false, error: 'param-internal' });
+    expect(await setParam(reg, { key: 'nearby.ask.maxText', value: 9999 })).toMatchObject({ ok: false, error: 'param-internal' });
     expect(reg.valueOf('nearby.ask.maxText')).toBe(280);
   });
 
-  it('refuses an unknown key', () => {
-    expect(setParam(build(), { key: 'not.a.param', value: 1 })).toMatchObject({ ok: false, error: 'param-unknown' });
+  it('refuses an unknown key', async () => {
+    expect(await setParam(build(), { key: 'not.a.param', value: 1 })).toMatchObject({ ok: false, error: 'param-unknown' });
   });
 
-  it('routes the value to the EXISTING home for its scope (decision C — no new plumbing)', () => {
+  it('routes the value to the EXISTING home for its scope (decision C — no new plumbing)', async () => {
     const reg = build();
     const routed = [];
     const homes = {
@@ -108,10 +108,10 @@ describe('the set-param op — the one kind-enforcing chokepoint (decision D)', 
       agent:  (p) => routed.push(['agent', p.key, p.value]),
       circle: (p) => routed.push(['circle', p.key, p.value]),
     };
-    setParam(reg, { key: 'poll.intervalMs', value: 3000 }, { homes });
-    setParam(reg, { key: 'nearby.ask.defaultTtlMs', value: 600000 }, { homes });
-    setParam(reg, { key: 'circle.match.minShared', value: 2 }, { homes });
-    setParam(reg, { key: 'nearby.ask.maxText', value: 9999 }, { homes });   // internal — refused, MUST NOT route
+    await setParam(reg, { key: 'poll.intervalMs', value: 3000 }, { homes });
+    await setParam(reg, { key: 'nearby.ask.defaultTtlMs', value: 600000 }, { homes });
+    await setParam(reg, { key: 'circle.match.minShared', value: 2 }, { homes });
+    await setParam(reg, { key: 'nearby.ask.maxText', value: 9999 }, { homes });   // internal — refused, MUST NOT route
     expect(routed).toEqual([
       ['device', 'poll.intervalMs', 3000],
       ['agent', 'nearby.ask.defaultTtlMs', 600000],

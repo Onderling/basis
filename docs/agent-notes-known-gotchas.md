@@ -555,3 +555,19 @@ change can be correct-by-parity and parse-clean while its vitest still cannot lo
   chat-nav · recipe-loader · attribute-charter`. Materialising them (`ln -s ../../../../packages/<pkg>` each,
   the sanctioned per-package pattern) MIGHT unblock mobile vitest — but may cascade or surface the version
   splits above, so timebox + be ready to revert. The proper fix is the scheduled workspace-protocol migration.
+
+---
+
+## New workspace dep needs its `node_modules` link materialised by hand (2026-08-09)
+
+Adding a `@onderling/*` dep to an app's `package.json` does NOT create the `node_modules` symlink on its own
+here (no clean reinstall — see CLAUDE.md "NEVER rm -rf node_modules"). Symptom: `Cannot find package
+'@onderling/<pkg>'` from that app even though the dep line is present.
+
+- **Fix (sanctioned per-package pattern):** `ln -sfn ../../../../packages/<pkg>
+  apps/<app>/node_modules/@onderling/<pkg>`.
+- **Worked example:** wiring the parameter register's value routing (#36) added
+  `@onderling/local-store` to `apps/basis`; materialised with
+  `ln -sfn ../../../../packages/local-store apps/basis/node_modules/@onderling/local-store`. `local-store`
+  is dependency-free, so no transitive links were needed — verify with
+  `node -e "import('@onderling/<pkg>').then(m=>console.log(Object.keys(m)))"` from the app dir.

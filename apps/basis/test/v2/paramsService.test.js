@@ -110,3 +110,52 @@ describe('set-param routes to the real homes and the value round-trips', () => {
     expect(shared == null || !JSON.parse(shared)['nearby.ask.maxText']).toBe(true);
   });
 });
+
+// ── hydrate: the READ side round-trips the user stories (set → persist → reboot/other-device → read) ─────────
+describe('hydrate round-trips the params user stories', () => {
+  const regAllScopes = () => basisParamRegistry([
+    { key: 'catchup.pollIntervalMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: 5000 },
+    { key: 'nearby.match.minShared', scope: PARAM_SCOPE.CIRCLE, kind: PARAM_KIND.USER, default: 1 },
+  ]);
+  const circlePolicyStore = () => {
+    const m = new Map();
+    return createCirclePolicyStore({ load: (id) => m.get(id) ?? null, save: (id, v) => { m.set(id, v); } });
+  };
+
+  it('S6 — round-trip after "reboot": set → fresh register hydrates → the value survives', async () => {
+    const dataSource = memoryDataSource();
+    const a = createParamsService({ register: regAllScopes(), dataSource, deviceId: 'dev-1' });
+    await a.callSkill('set-param', { key: 'nearby.ask.defaultTtlMs', value: 10 * 60_000 });
+    const b = createParamsService({ register: regAllScopes(), dataSource, deviceId: 'dev-1' });   // fresh boot
+    expect((await b.callSkill('get-param', { key: 'nearby.ask.defaultTtlMs' })).value).toBe(30 * 60_000); // default pre-hydrate
+    await b.hydrate();
+    expect((await b.callSkill('get-param', { key: 'nearby.ask.defaultTtlMs' })).value).toBe(10 * 60_000); // synced post-hydrate
+  });
+
+  it('S1 — agent scope SYNCS across the user\'s devices (shared.json)', async () => {
+    const dataSource = memoryDataSource();
+    const a = createParamsService({ register: regAllScopes(), dataSource, deviceId: 'dev-A' });
+    await a.callSkill('set-param', { key: 'nearby.ask.defaultTtlMs', value: 10 * 60_000 });
+    const b = createParamsService({ register: regAllScopes(), dataSource, deviceId: 'dev-B' });   // 2nd device, same pod
+    await b.hydrate();
+    expect((await b.callSkill('get-param', { key: 'nearby.ask.defaultTtlMs' })).value).toBe(10 * 60_000);
+  });
+
+  it('S2 — device scope is LOCAL-ONLY (does not cross to another device)', async () => {
+    const dataSource = memoryDataSource();
+    const a = createParamsService({ register: regAllScopes(), dataSource, deviceId: 'dev-A' });
+    await a.callSkill('set-param', { key: 'catchup.pollIntervalMs', value: 3000 });
+    const b = createParamsService({ register: regAllScopes(), dataSource, deviceId: 'dev-B' });
+    await b.hydrate();
+    expect((await b.callSkill('get-param', { key: 'catchup.pollIntervalMs' })).value).toBe(5000);   // B keeps its default
+  });
+
+  it('S3 — circle scope: set on one member, read on another via the circle policy', async () => {
+    const circlePolicy = circlePolicyStore();
+    const a = createParamsService({ register: regAllScopes(), circlePolicy });
+    await a.callSkill('set-param', { key: 'nearby.match.minShared', value: 2 }, { circleId: 'c1' });
+    const b = createParamsService({ register: regAllScopes(), circlePolicy });
+    await b.hydrate({ circleId: 'c1' });
+    expect((await b.callSkill('get-param', { key: 'nearby.match.minShared' })).value).toBe(2);
+  });
+});

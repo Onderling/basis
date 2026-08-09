@@ -106,6 +106,33 @@ export function createParamsService({ register = basisParamRegistry(), dataSourc
   const service = {
     register,
     settingsModule,
+    /**
+     * hydrate — the READ side (#36 L24): load persisted kind:user param VALUES from the homes into the
+     * register, so `valueOf` (and `get-param`) return the synced value, not just the code default. Call at
+     * boot (device/agent scope) and per-circle-open (circle scope). Only genuinely-set values (≠ the code
+     * default) become overrides — an unset param stays at its default. kind:internal params are never here.
+     */
+    async hydrate({ circleId } = {}) {
+      const users = register.userParams();
+      if (settingsModule && dataSource) {
+        const loaded = await settingsModule.loadSettings({ dataSource, deviceId });
+        for (const p of users) {
+          if (p.scope !== PARAM_SCOPE.CIRCLE && loaded[p.key] !== undefined && loaded[p.key] !== p.default) {
+            register.setValue(p.key, loaded[p.key]);
+          }
+        }
+      }
+      if (circlePolicy && circleId) {
+        const policy = await circlePolicy.get(circleId);
+        const cs = (policy && policy.settings) || {};
+        for (const p of users) {
+          if (p.scope === PARAM_SCOPE.CIRCLE && cs[p.key] !== undefined && cs[p.key] !== p.default) {
+            register.setValue(p.key, cs[p.key]);
+          }
+        }
+      }
+      return register;
+    },
     async callSkill(op, args = {}, ctx = {}) {
       switch (op) {
         case 'set-param': return setParam(register, args, { homes: homes ?? defaultHomes(ctx) });

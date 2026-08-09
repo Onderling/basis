@@ -73,8 +73,12 @@ import {
   DISCOVERABILITY, isDiscoverability, normalizeDiscoverability, maxExposure,
 } from './discoverability.js';
 
-const ACK_TIMEOUT = 10_000;  // ms
-const REQ_TIMEOUT = 30_000;  // ms
+import { param, PARAM_SCOPE, PARAM_KIND } from '../params.js';
+
+// Parameter register (#36) — transport ack/request timeouts (scope:device, kind:internal — per-install
+// protocol timing). Caller-overridable via the `timeout` arg. `param()` returns each default unchanged.
+const ACK_TIMEOUT = param({ key: 'transport.ackTimeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 10_000 });  // ms
+const REQ_TIMEOUT = param({ key: 'transport.reqTimeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30_000 });  // ms
 
 /**
  * Abstract transport base class — the port a wire adapter implements. Subclasses

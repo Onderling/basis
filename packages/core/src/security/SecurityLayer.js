@@ -66,9 +66,13 @@ import { encode as b64encode, decode as b64decode }  from '../crypto/b64.js';
 import { SENDER_KEY_FIELD, senderCredential, resolveSenderKey, carriedSenderCredential }
   from './senderKey.js';
 import { askSenderAuthorizer }                       from './senderAuthorization.js';
+import { param, PARAM_SCOPE, PARAM_KIND }            from '../params.js';
 
-const REPLAY_WINDOW_MS = 10 * 60 * 1_000;  // ±10 minutes (tolerates LAN clock drift)
-const DEDUP_TTL_MS     = 10 * 60 * 1_000;  // match replay window
+// Parameter register (#36) — the anti-replay window + dedup TTL. scope:device, kind:INTERNAL is load-bearing
+// here: these are SECURITY bounds, and kind:internal makes them immutable by construction — a user can never
+// widen the replay window through a set-op. `param()` returns each default unchanged.
+const REPLAY_WINDOW_MS = param({ key: 'security.replayWindowMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 10 * 60 * 1_000 });  // ±10 minutes (tolerates LAN clock drift)
+const DEDUP_TTL_MS     = param({ key: 'security.dedupTtlMs',     scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 10 * 60 * 1_000 });  // match replay window
 
 // ── Error ──────────────────────────────────────────────────────────────────
 

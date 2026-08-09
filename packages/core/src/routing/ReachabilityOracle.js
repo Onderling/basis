@@ -30,6 +30,7 @@
  */
 
 import { Emitter }                 from '../Emitter.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '../params.js';
 import {
   signReachabilityClaim,
   verifyReachabilityClaim,
@@ -37,8 +38,9 @@ import {
   DEFAULT_VERIFY_LIMITS,
 }                                  from '../security/reachabilityClaim.js';
 
-export const DEFAULT_TTL_MS      = 5 * 60_000;     // Q-G.2 default
-export const DEFAULT_INTERVAL_MS = 60_000;         // Q-G.1 safety-net heartbeat
+// Parameter register (#36) — reachability oracle cadence (scope:device, kind:internal). Caller-overridable.
+export const DEFAULT_TTL_MS      = param({ key: 'reachabilityOracle.ttlMs',      scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 5 * 60_000 });     // default entry lifetime
+export const DEFAULT_INTERVAL_MS = param({ key: 'reachabilityOracle.intervalMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });         // safety-net heartbeat
 /** Pubsub topic on which signed reachability-oracle claims are broadcast and received. */
 export const ORACLE_TOPIC        = 'reachability:oracle';
 

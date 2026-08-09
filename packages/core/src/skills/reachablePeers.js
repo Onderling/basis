@@ -29,10 +29,13 @@
  */
 import { DataPart }                        from '../Parts.js';
 import { signReachabilityClaim }            from '../security/reachabilityClaim.js';
+import { param, PARAM_SCOPE, PARAM_KIND }   from '../params.js';
 
-export const DEFAULT_TTL_MS             = 5 * 60_000;
-export const DEFAULT_REFRESH_BEFORE_MS  = 60_000;
-export const DEFAULT_MAX_PEERS          = 256;
+// Parameter register (#36) — reachable-peers cache tuning (scope:device, kind:internal). Caller-overridable
+// via opts. `param()` returns each default unchanged.
+export const DEFAULT_TTL_MS             = param({ key: 'reachablePeers.ttlMs',          scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 5 * 60_000 });
+export const DEFAULT_REFRESH_BEFORE_MS  = param({ key: 'reachablePeers.refreshBeforeMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });
+export const DEFAULT_MAX_PEERS          = param({ key: 'reachablePeers.maxPeers',        scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 256 });
 
 /**
  * Register the `reachable-peers` skill on `agent`.

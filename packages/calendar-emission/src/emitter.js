@@ -27,7 +27,7 @@
  */
 
 import ICAL from 'ical.js';
-import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/params';
 
 // Parameter register (#36) — default event duration. A genuine user preference (agent-scoped, follows the
 // user); kind:user. Declared for the census; not yet wired to a settable home.

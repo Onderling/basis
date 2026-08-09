@@ -53,7 +53,7 @@
  */
 
 import { EventEmitter } from 'node:events';
-import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/params';
 
 /* ────────────────────────────────────────────────────────────────────────── */
 

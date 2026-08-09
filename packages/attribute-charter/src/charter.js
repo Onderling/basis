@@ -16,7 +16,7 @@
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { isVocabKey } from './vocabulary.js';
-import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/params';
 // Parameter register (#36) — CHARTER_MAX_ATTRIBUTES is a PRIVACY cap (agent-scoped): kind:internal is
 // load-bearing — a user must not be able to raise it to disclose more attributes than the charter allows.
 

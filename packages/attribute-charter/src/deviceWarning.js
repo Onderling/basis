@@ -13,7 +13,7 @@
  * package holds NO user-facing strings — invariant #8). Pure function.
  */
 import { bucketCount } from './vocabulary.js';
-import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/params';
 
 // The graduated warning modes (property-layer §10b). 'minimal' warns only on NEAR-CERTAIN uniqueness (a
 // stricter bar than 'normal'); 'off' never warns.

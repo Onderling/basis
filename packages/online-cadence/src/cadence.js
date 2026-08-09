@@ -14,7 +14,7 @@
  * without React Native and easy to repurpose across apps.
  */
 
-import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/params';
 
 // Parameter register (#36) — the poll cadence. The DEFAULT is a genuine per-DEVICE USER preference (poll
 // cadence is a battery/hardware call the cross-app-settings convention lists as device-scoped); the MINIMUM

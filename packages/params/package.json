@@ -1,0 +1,29 @@
+{
+  "name": "@onderling/params",
+  "version": "0.1.0",
+  "description": "The parameter register (#36) — the zero-dependency base leaf for declaring tunable constants: param() at the declaration site (scope drives sync, kind is the security gate), the DI register for settable values, and the one kind-enforcing set-param op. Homed at the true base so EVERY layer (core, substrates, apps) can declare params without depending on the kernel.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Onderling/basis.git",
+    "directory": "packages/params"
+  },
+  "files": [
+    "src"
+  ],
+  "devDependencies": {
+    "vitest": "^2.1.0"
+  }
+}

@@ -17,6 +17,6 @@
     "vitest": "^2.1.0"
   },
   "dependencies": {
-    "@onderling/core": "workspace:*"
+    "@onderling/params": "workspace:*"
   }
 }

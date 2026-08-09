@@ -18,7 +18,7 @@
  */
 
 const LEVELS = Object.freeze({ debug: 10, info: 20, warn: 30, error: 40 });
-import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/params';
 
 // Parameter register (#36) — ring-buffer capacity + field truncation (scope:device, kind:internal).
 const DEFAULT_MAX = param({ key: 'logger.ringMaxRecords', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 500 });   // ring-buffer capacity (records)

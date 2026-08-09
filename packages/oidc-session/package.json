@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "@inrupt/solid-client-authn-node": "4.0.0",
-    "@onderling/core": "workspace:*"
+    "@onderling/params": "workspace:*"
   },
   "devDependencies": {
     "@onderling/core": "workspace:^",

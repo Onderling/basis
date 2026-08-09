@@ -13,7 +13,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@onderling/core": "workspace:*",
+    "@onderling/params": "workspace:*",
     "ical.js": "^2.2.1"
   },
   "devDependencies": {

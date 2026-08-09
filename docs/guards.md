@@ -32,8 +32,8 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | Id | Claim | Where |
 |---|---|---|
 | — | sa.audit and the agent trail read their AUDIT retention window from ONE shared table | `apps/basis/test/auditRetentionAgreement.test.js` |
-| — | a param declares scope (sync) + kind (security); kind:internal is immutable by construction, and set-param gates on kind | `packages/core/test/params.test.js` |
 | — | subtask-spawn gate bites — only an authorized actor can spawn under a parent | `packages/item-store/test/spawnSubtask.test.js` |
+| — | a param declares scope (sync) + kind (security); kind:internal is immutable by construction, and set-param gates on kind | `packages/params/test/params.test.js` |
 | G-C1 | a circle owns ONE store: the local write and its publisher are the same object | `apps/basis/test/appTaskFanTwoDevice.test.js` |
 | G-C3 | a task fanned from one device arrives on another device's per-type tasks store | `apps/basis/test/appTaskFanTwoDevice.test.js` |
 | G-DICT | every field the runtime writes on a type is declared on its canonical schema | `packages/item-types/test/taskSchemaSuperset.test.js` |

@@ -22,12 +22,24 @@
  * `matchProfileDrivers`) is exactly step 3, so an ask is shaped as something it can already consume. What is
  * new here is the ask OBJECT, its expiry, and the rule that an answer is a deliberate act.
  */
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { evaluateItemForDrivers, matchReasonText } from '../core/handlers/driverMatchNotify.js';
 
+// ── Parameter register (#36), worked example ─────────────────────────────────────────────────────────────
+// These three were plain module constants; they are the first cluster migrated to `param()` (the declaration
+// layer, gradual — adopt at every change, do NOT sweep the whole landscape). `param()` returns the same code
+// default the const held, so behaviour is byte-identical — the migration is a pure re-declaration.
+//
+//   • the DEFAULT ask lifetime is a user preference that should follow the user → kind:user, scope:agent
+//     (routes to shared.json). Settable through the one `set-param` op.
+//   • the ttl CEILING and the text CAP are safety bounds — a user must not be able to raise their own limit
+//     by poking a threshold, so they are kind:internal: IMMUTABLE BY CONSTRUCTION (the register keeps no
+//     settable value behind them; `set-param` refuses them). This is the immutable-section proof.
+
 /** Asks are transient by construction. A need that outlives the room is a noticeboard post, not an ask. */
-export const ASK_DEFAULT_TTL_MS = 30 * 60_000;   // 30 minutes
-export const ASK_MAX_TTL_MS     = 4 * 60 * 60_000;
-export const ASK_MAX_TEXT       = 280;
+export const ASK_DEFAULT_TTL_MS = param({ key: 'nearby.ask.defaultTtlMs', scope: PARAM_SCOPE.AGENT,  kind: PARAM_KIND.USER,     default: 30 * 60_000 });   // 30 minutes
+export const ASK_MAX_TTL_MS     = param({ key: 'nearby.ask.maxTtlMs',     scope: PARAM_SCOPE.AGENT,  kind: PARAM_KIND.INTERNAL, default: 4 * 60 * 60_000 });
+export const ASK_MAX_TEXT       = param({ key: 'nearby.ask.maxText',      scope: PARAM_SCOPE.AGENT,  kind: PARAM_KIND.INTERNAL, default: 280 });
 
 /**
  * Build an ask for broadcast.

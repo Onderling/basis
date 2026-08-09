@@ -40,6 +40,8 @@
     "api-fitness": "node scripts/api-fitness.mjs",
     "lint:unreached": "node scripts/lint-unreached-exports.mjs",
     "lint:unreached:update": "node scripts/lint-unreached-exports.mjs --update",
+    "lint:stale-params": "node scripts/lint-stale-params.mjs",
+    "lint:stale-params:update": "node scripts/lint-stale-params.mjs --update",
     "guards": "node scripts/guards.mjs",
     "guard-index": "node scripts/guard-index.mjs",
     "guard-status": "node scripts/guard-index.mjs --status",

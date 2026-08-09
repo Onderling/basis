@@ -1,0 +1,6 @@
+{
+  "$schema": "stale-params-baseline/v0",
+  "description": "CEILING of registered params (`param({…})`) whose value nothing reads. A param here is DEBT: wire it (read its value) or delete it. Removing entries is always allowed; adding one needs a reason in review.",
+  "total": 0,
+  "params": []
+}

@@ -40,11 +40,12 @@ import {
 } from './reference-manifest.js';
 
 import { NoneStore } from './external-stores/NoneStore.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '../params.js';
 
 /* ─────────────────────────────────────────────────────────────────────────── */
 
-/** Default threshold: 1 MB (Q-A.1, locked 2026-04-28). */
-export const DEFAULT_CONVENTION_THRESHOLD = 1_000_000;
+// Parameter register (#36) — inline-vs-external storage threshold, 1 MB (scope:device, kind:internal).
+export const DEFAULT_CONVENTION_THRESHOLD = param({ key: 'podStorageConvention.thresholdBytes', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1_000_000 });
 
 /** MIME type written to the pod when the payload is the manifest itself. */
 const MANIFEST_CONTENT_TYPE = 'application/json';

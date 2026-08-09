@@ -9,8 +9,11 @@
  */
 import { Task } from '../protocol/Task.js';
 
-const TASK_TTL_MS   = 30 * 60 * 1_000;   // 30 min
-const STREAM_TTL_MS = 10 * 60 * 1_000;   // 10 min
+import { param, PARAM_SCOPE, PARAM_KIND } from '../params.js';
+
+// Parameter register (#36) — task/stream state lifetimes (scope:device, kind:internal).
+const TASK_TTL_MS   = param({ key: 'stateManager.taskTtlMs',   scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30 * 60 * 1_000 });   // 30 min
+const STREAM_TTL_MS = param({ key: 'stateManager.streamTtlMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 10 * 60 * 1_000 });   // 10 min
 
 /**
  * Runtime registries for in-flight tasks, streams, and sessions, shared by the

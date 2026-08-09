@@ -32,7 +32,10 @@
  */
 
 /** The default ceiling for one envelope on the peer wire, in bytes. */
-export const MAX_ENVELOPE_BYTES = 256 * 1024;
+import { param, PARAM_SCOPE, PARAM_KIND } from '../params.js';
+
+// Parameter register (#36) — max envelope size (scope:device, kind:internal — a defensive protocol cap).
+export const MAX_ENVELOPE_BYTES = param({ key: 'transport.maxEnvelopeBytes', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 256 * 1024 });
 
 /** Raised when an envelope is refused for size — typed so a caller can tell it from a disconnect. */
 export class EnvelopeTooLargeError extends Error {

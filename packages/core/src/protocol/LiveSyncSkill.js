@@ -53,7 +53,9 @@
  */
 
 const STATE_KEY_PREFIX = 'livesync:';
-const APPLIED_IDS_CAP  = 10_000;
+import { param, PARAM_SCOPE, PARAM_KIND } from '../params.js';
+// Parameter register (#36) — applied-ids dedup cap (scope:device, kind:internal).
+const APPLIED_IDS_CAP  = param({ key: 'liveSync.appliedIdsCap', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 10_000 });
 
 /**
  * One-way sync engine applying change events from a source adapter to a target

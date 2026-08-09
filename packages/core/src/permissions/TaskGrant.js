@@ -44,8 +44,11 @@
  * VERIFY time (PolicyEngine).
  */
 import { CapabilityToken } from './CapabilityToken.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '../params.js';
 
-const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000; // 24h — a task grant is temporary; a template/param TTL overrides.
+// Parameter register (#36) — default task-grant lifetime (scope:device, kind:internal). Per-grant/template
+// TTL still overrides, as before.
+const DEFAULT_TTL_MS = param({ key: 'taskGrant.ttlMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 24 * 60 * 60 * 1000 }); // 24h — temporary; a template/param TTL overrides.
 
 /**
  * Normalise + validate one grant template — the SAME GrantTemplate shape as

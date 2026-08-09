@@ -21,8 +21,11 @@
 import { DataPart, FilePart as _FilePart, Parts } from '../Parts.js';
 import { genId } from '../Envelope.js';
 
-const SIZE_THRESHOLD = 64 * 1024;   // 64 KB
-const CHUNK_SIZE     = 32 * 1024;   // 32 KB per BT chunk
+import { param, PARAM_SCOPE, PARAM_KIND } from '../params.js';
+
+// Parameter register (#36) — file-sharing size threshold + chunk size (scope:device, kind:internal).
+const SIZE_THRESHOLD = param({ key: 'fileSharing.sizeThresholdBytes', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 64 * 1024 });   // 64 KB
+const CHUNK_SIZE     = param({ key: 'fileSharing.chunkBytes',         scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 32 * 1024 });   // 32 KB per BT chunk
 
 // ── Public API ────────────────────────────────────────────────────────────────
 

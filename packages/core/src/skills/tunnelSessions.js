@@ -26,8 +26,11 @@
  */
 import { Emitter } from '../Emitter.js';
 
-export const DEFAULT_TTL_MS = 10 * 60_000;   // 10 minutes
-export const SWEEP_INTERVAL = 60_000;        // scan once a minute
+import { param, PARAM_SCOPE, PARAM_KIND } from '../params.js';
+
+// Parameter register (#36) — tunnel session lifetime + sweep cadence (scope:device, kind:internal).
+export const DEFAULT_TTL_MS = param({ key: 'tunnelSessions.ttlMs',          scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 10 * 60_000 });   // 10 minutes
+export const SWEEP_INTERVAL = param({ key: 'tunnelSessions.sweepIntervalMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });        // scan once a minute
 
 /**
  * In-memory table of open hop-tunnel sessions on the bridge side, keyed by tunnelId.

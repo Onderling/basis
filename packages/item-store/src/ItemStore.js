@@ -36,7 +36,7 @@
  *  - audit log — append-only (one file per entry; never edited).
  */
 
-import { Emitter } from '@onderling/core';
+import { Emitter, param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 import { computeStatus } from './lifecycleStatus.js';   // pure status fn, extracted out of this retired class
 
 import { ulid }                        from './ulid.js';
@@ -51,8 +51,9 @@ import {
 
 const NOOP_POLICY = Object.freeze({});
 
-const ID_PREFIX_LEN = 8;
-const MIN_PREFIX_LEN = 6;
+// Parameter register (#36) — id / id-prefix resolution bounds (scope:device, kind:internal).
+const ID_PREFIX_LEN = param({ key: 'itemStore.idPrefixLen', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 8 });
+const MIN_PREFIX_LEN = param({ key: 'itemStore.minPrefixLen', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 6 });
 
 const ITEMS_DIR = 'items';
 const AUDIT_DIR = 'audit';

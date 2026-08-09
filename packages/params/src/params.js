@@ -46,6 +46,27 @@
  * is not "an op that declines" — there is nothing to poke. `setParam` refuses it anyway as the explicit
  * belt-and-suspenders gate (principle 9). The line never to cross: never give a kind:internal param a
  * settable/synced value — the moment it has one, immutability becomes a hope.
+ *
+ * ── Future: a richer metadata schema (roadmap — NOT implemented; extend when a consumer lands) ───────────
+ * The spec is `{ key, scope, kind, default }` today. It is a plain object, so it can grow OPTIONAL fields
+ * without breaking any existing declaration — the register just carries them and projections read them. The
+ * point of growing it is to make the register SELF-DESCRIBING, so a settings surface can render copy and an
+ * agent/LLM can reason about a param WITHOUT reading this code. Intended additions, each added only when a
+ * real consumer needs it:
+ *   • `description` — a terse, factual, dev/LLM-facing English one-liner (what this param is / does). The
+ *       first field to add (it is also the settings-form's help text). Make it REQUIRED for `kind:user` and
+ *       guard its PRESENCE — its CORRECTNESS is unenforceable prose (it can drift; `default` cannot), so keep
+ *       it short and factual. NB it becomes disclosure surface once the register is queryable: nothing
+ *       sensitive in it. The LOCALISED, user-facing copy is a separate concern — it belongs in the locale
+ *       system keyed by the param key, not as a raw string here (one string cannot be both stable-English and
+ *       localised).
+ *   • `unit` — `'ms'` | `'days'` | `'bytes'` | `'count'` | … so a consumer need not guess the unit.
+ *   • `range` / `enum` — allowed `{min,max}` or value set; lets a form render a slider/select and lets the
+ *       set-param op validate a proposed value as a second gate.
+ *   • `tags` / `category` — grouping for the form + agent reasoning (e.g. `['battery']`, `['privacy']`).
+ *   • `effect` — direction/impact hint (e.g. "higher = more battery use") — the field that most helps an
+ *       agent reason about a CHANGE without the code.
+ * Start with `description` (+ `unit`); resist over-schematising until something reads the rest.
  */
 
 /** The sync scope — decides where a set value routes (decision B/C). */

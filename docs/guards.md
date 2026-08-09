@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 10
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 11
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -19,10 +19,11 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `duplicate-vocab` | — | a shared VOCABULARY is defined in exactly ONE place |
 | `integration-index` | — | the integration index stays in sync with reality |
 | `ledger` | — | Fitness function for the open-questions ledger in REMAINING-WORK.md |
+| `resolution-policy` | G-L23 | the DECLARATION LAYER is complete + has no SECOND ordering mechanism |
 | `scope-leaks` | — | no CROSS-SCOPE REFERENCE LEAKS in the RN shell screens |
 | `unreached-exports` | — | a substrate symbol that nothing reaches is a LIABILITY, not an asset |
 
-## Named design guards (`G-*`, in fitness tests) · 5
+## Named design guards (`G-*`, in fitness tests) · 6
 
 *From an explicit `@guard [<id>] — <claim>` tag in a fitness test (preferred), or a `G-*` id in a
 `describe(...)` block (fallback). Tag a fitness test with `@guard` to add it here — an id is optional.*
@@ -34,3 +35,4 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | G-C1 | a circle owns ONE store: the local write and its publisher are the same object | `apps/basis/test/appTaskFanTwoDevice.test.js` |
 | G-C3 | a task fanned from one device arrives on another device's per-type tasks store | `apps/basis/test/appTaskFanTwoDevice.test.js` |
 | G-DICT | every field the runtime writes on a type is declared on its canonical schema | `packages/item-types/test/taskSchemaSuperset.test.js` |
+| G-L23 | resolution policy is DECLARED per (item-type,field), receiver-enforced, behaviour-preserving | `packages/item-store/test/resolutionPolicy.test.js` |

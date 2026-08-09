@@ -23,6 +23,7 @@
  */
 import { ulid } from './ulid.js';
 import { causalWinner, reconcileClaim, applyClaimOverlay, claimClusterEqual } from './causalMerge.js';
+import { defaultResolutionRegistry, RESOLUTION } from './resolutionPolicy.js';
 
 const ITEMS_DIR = 'items';
 
@@ -46,6 +47,11 @@ export class CircleItemStore {
   // ingest) — see `#observeClock`. A read-modify-write therefore always ticks ABOVE the value it read, so a fresh
   // process re-derives a correct counter from the items it touches, with no cold-start scan blocking the write path.
   /** @type {number} */ #clock = 0;
+  // The DECLARATION LAYER (#34): the receiver-enforced `(item-type, field) → resolution policy` registry the
+  // inbound merge dispatches on. Injected DOWN at composition (the manifest declares into it); defaults to the
+  // safe code floor (`defaultResolutionRegistry` — task's claim cluster is `claim`, everything else content),
+  // so a store built without a manifest still dispatches identically to the pre-declaration behaviour.
+  /** @type {{ hasChannel:(t:string,r:string)=>boolean }} */ #resolution;
 
   /**
    * @param {object} args
@@ -54,8 +60,11 @@ export class CircleItemStore {
    * @param {{ validate?: (item:object)=>{ok:boolean,errors?:Array} }} [args.registry]  @onderling/item-types registry;
    *        when present, `put` rejects items that fail `validate`. Injected (no hard dep) — pass a fresh
    *        `createRegistry()` (with any third-party `registerType`d schemas) or the default canonical one.
+   * @param {{ hasChannel:(t:string,r:string)=>boolean }} [args.resolution]  the (item-type,field)→policy
+   *        registry (`@onderling/item-store` `resolutionPolicy`) the inbound merge enforces. Defaults to the
+   *        safe code floor; a composition root injects a manifest-declared one.
    */
-  constructor({ dataSource, rootContainer, registry } = {}) {
+  constructor({ dataSource, rootContainer, registry, resolution } = {}) {
     if (!dataSource || typeof dataSource.read !== 'function' || typeof dataSource.write !== 'function') {
       throw new Error('CircleItemStore: dataSource (core.DataSource: read/write/delete/list) required');
     }
@@ -65,6 +74,7 @@ export class CircleItemStore {
     this.#source   = dataSource;
     this.#root     = rootContainer.endsWith('/') ? rootContainer : `${rootContainer}/`;
     this.#validate = registry && typeof registry.validate === 'function' ? registry.validate : null;
+    this.#resolution = (resolution && typeof resolution.hasChannel === 'function') ? resolution : defaultResolutionRegistry();
   }
 
   #uri(id) { return `${this.#root}${ITEMS_DIR}/${id}.json`; }
@@ -153,10 +163,17 @@ export class CircleItemStore {
       const existing = await this.get(id);
       if (existing) {
         const keepLocalContent = causalWinner(existing, item) === 'local';
-        // The CLAIM cluster resolves on its OWN immutable-once-set rule (first-come wins), independent of the
-        // content LWW — otherwise the causally-LATER claimant would win, the opposite of first-come. See
-        // `reconcileClaim`. Non-task items carry no claim → overlay is null → pure content LWW as before.
-        const overlay = reconcileClaim(existing, item);
+        // RECEIVER-ENFORCED DISPATCH (declaration layer, #34). The claim cluster resolves on its OWN
+        // immutable-once-set rule (first-come wins), independent of the content LWW — otherwise the
+        // causally-LATER claimant would win, the opposite of first-come (see `reconcileClaim`). WHICH types
+        // get that path is decided HERE by the declared `(item-type → claim channel)` registry, NOT by
+        // sniffing the payload for claim fields: the receiver enforces the policy, so a sender cannot shape a
+        // non-claim item (e.g. a chat message carrying a stray `assignee`) to steal the first-wins merge. A
+        // type with no declared `claim` channel resolves by pure content-LWW. (task declares it → identical to
+        // the previous always-reconcile behaviour, since only task ever carried the cluster.)
+        const overlay = this.#resolution.hasChannel(stored.type, RESOLUTION.CLAIM)
+          ? reconcileClaim(existing, item)
+          : null;
         if (keepLocalContent) {
           // Content stays local; but a CONTENDED claim may still have to change hands even though the content
           // is older. Resolve just the claim cluster onto the local copy.

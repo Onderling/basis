@@ -127,6 +127,11 @@ export const tasksManifest = {
       id:        'claimTask',
       verb:      'claim',
       appliesTo: { type: 'task', state: ['open'] },                      // F-SP3-a
+      // DECLARATION LAYER (#34) — this op writes the task's `assignee` under the CLAIM policy (first-wins /
+      // immutable-once-set): concurrent claims resolve to the first grab, not the latest write. Declared per-op,
+      // enforced by the receiver against (item-type,field) — a sender cannot downgrade it. Delivery follows the
+      // policy (at-least-once). See @onderling/item-store `resolutionPolicy`.
+      resolves: [{ field: 'assignee', policy: 'claim' }],
       params: [
         {
           name: 'id', kind: 'string', required: true, ...ID_NONEMPTY,
@@ -776,6 +781,10 @@ export const tasksManifest = {
     {
       id:    'editTask', verb: 'edit',
       appliesTo: { type: 'task', state: ['open', 'claimed'] },
+      // DECLARATION LAYER (#34) — an edit to the task's `text` (body content) resolves under the CONTENT policy
+      // (LWW-register): the latest edit survives. Same `task` type as claimTask, different field, different
+      // policy — which is exactly why the registry is keyed by (item-type, field). Delivery: best-effort.
+      resolves: [{ field: 'text', policy: 'content' }],
       params: [
         { name: 'id',               kind: 'string',  required: true,
           pickerSource: { listOp: 'listMine' } },

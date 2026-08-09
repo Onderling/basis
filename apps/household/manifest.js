@@ -223,6 +223,9 @@ export const householdManifest = {
       id:        'claim',
       verb:      'claim',
       appliesTo: { type: 'task', state: ['open'] },     // array form is canonical (matches tasks-v0/calendar/stoop)
+      // DECLARATION LAYER (#34) — grabbing a household task writes `assignee` under the CLAIM policy
+      // (first-wins). Same declared (task, assignee)→claim the receiver enforces for every app's task.
+      resolves: [{ field: 'assignee', policy: 'claim' }],
       params: [
         { name: 'match', kind: 'string', required: true, ...STR_NONEMPTY },
       ],
@@ -248,6 +251,8 @@ export const householdManifest = {
       id:        'reassign',
       verb:      'reassign',
       appliesTo: { type: 'task' },
+      // DECLARATION LAYER (#34) — reassigning writes `assignee`, part of the CLAIM cluster (first-wins).
+      resolves: [{ field: 'assignee', policy: 'claim' }],
       params: [
         { name: 'match',    kind: 'string', required: true, ...STR_NONEMPTY },
         { name: 'assignee', kind: 'string', required: true, ...STR_NONEMPTY },

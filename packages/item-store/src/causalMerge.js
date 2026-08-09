@@ -89,7 +89,10 @@ export function causalWinner(local, incoming) {
 // sequence and supersedes it — while two CONCURRENT writes from the same base tie on the sequence and fall to
 // the first-come rule. That is the precise meaning of "immutable-once-set": once set (seq≥1) only a
 // higher-sequence act that read it can change it; a same-sequence race resolves earliest-wins.
-const CLAIM_FIELDS = [
+// The claim cluster the verbs maintain — the ONE list of what "the claim" is. Exported so the declaration
+// layer (`resolutionPolicy.js`) declares exactly these fields as the `claim`-policy channel, rather than
+// keeping a second copy of the cluster (invariant 3 — no duplication).
+export const CLAIM_FIELDS = [
   'assignees', 'assignee', 'claimedAt', 'confirmedAssignee', 'confirmedAt', 'confirmedBy', 'confirmedSig',
   'claimSeq', 'claimReleasedAt',
 ];

@@ -11,7 +11,7 @@
  * The list types are registered via `registerType` (third-party-style); `task` is canonical. Every op is a
  * pure function over the circle store — no agent, no own store. (REMAINING-WORK.md cluster L.)
  */
-import { createCircleStores, memoryDataSource, createGenericAtomHandlers } from '@onderling/item-store';
+import { createCircleStores, memoryDataSource, createGenericAtomHandlers, resolutionRegistryFromManifests } from '@onderling/item-store';
 import { createRegistry, registerCanonicalTypes } from '@onderling/item-types';
 import { dispatchCapability } from '@onderling/app-manifest';
 import { householdManifest } from '../../../household/manifest.js';
@@ -121,7 +121,11 @@ const OPS = { addItem, listOpen, markComplete, removeItem, addTask, listTasks, c
 export function createHouseholdService({ dataSource, registry, manifest = householdManifest, dataSourceFor } = {}) {
   // `dataSourceFor(circleId)` (cache-mode mirroring): a pod-backed circle may run over its OWN medium (a
   // cache-mode PseudoPod write-throughing to the pod) instead of the shared local backing. Absent → shared.
-  const stores = createCircleStores({ dataSource: dataSource || memoryDataSource(), registry: registry || householdRegistry(), dataSourceFor });
+  // DECLARATION LAYER (#34) — the manifest's declared per-op field policies are injected DOWN into the per-circle
+  // stores' resolution registry (invariant 5: app declares INTO the substrate). Layered over the safe default
+  // floor, so the inbound merge dispatch enforces (task,assignee)→claim / (task,text)→content by declaration.
+  const resolution = resolutionRegistryFromManifests(manifest);
+  const stores = createCircleStores({ dataSource: dataSource || memoryDataSource(), registry: registry || householdRegistry(), resolution, dataSourceFor });
   const service = {
     async callSkill(op, args = {}, ctx = {}) {
       const circleId = ctx.circleId ?? args.circleId;

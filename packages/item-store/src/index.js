@@ -40,7 +40,13 @@ export {                                                 // composable ops engin
 export { projectContainer } from './projectContainer.js';   // recursive child-render projector
 export { wireStoreMirror } from './mirrorSync.js';          // attach a peer mirror to a store (no-pod sync publish)
 export { wireCircleStoreInbound } from './circleStoreInbound.js';  // ingest peer envelopes into a store (inbound)
-export { causalWinner, causalRank, reconcileClaim, applyClaimOverlay, claimClusterEqual } from './causalMerge.js';  // Objective L causal LWW + the immutable-once-set CLAIM merge (subtask fix)
+export { causalWinner, causalRank, reconcileClaim, applyClaimOverlay, claimClusterEqual, CLAIM_FIELDS } from './causalMerge.js';  // Objective L causal LWW + the immutable-once-set CLAIM merge (subtask fix)
+// The DECLARATION LAYER (#34): the receiver-enforced resolution policy per item-type + field, plus its
+// implied delivery tier. Homed here in the substrate; apps declare into it via the manifest (see resolutionPolicy.js).
+export {
+  RESOLUTION, DELIVERY, DEFAULT_RESOLUTION, deliveryForResolution,
+  createResolutionRegistry, defaultResolutionRegistry, declareManifestPolicies, resolutionRegistryFromManifests,
+} from './resolutionPolicy.js';
 export { recoverCircleFromCaches, writeRecoveredInto } from './podRecovery.js';  // Objective S — pod-recovery: causal merge of device caches
 export { shareIntoAudience, resolveSharedRef, listShared } from './shareIntoAudience.js';  // cross-circle share
 export { shareContainerTree, collectSubtree } from './shareContainerTree.js';  // journey J5 — SENDABLE LISTS: fan the single-item share over a container subtree

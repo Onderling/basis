@@ -1,3 +1,4 @@
+import { foldRoster } from '@onderling/core';
 import { isExited } from './circleExits.js';
 
 /**
@@ -46,6 +47,10 @@ import { isExited } from './circleExits.js';
  * @param {Array<string>} [o.founderWebids]       webids to force role `admin` (creator + admins).
  * @param {Array<object>} [o.memberMapForDisplay] `MemberMap.list()` — display fields only.
  * @param {Map<string, number>} [o.exits]         webid → latest exit ts (`collectCircleExits`).
+ * @param {Array<object>} [o.spineStatements]     VERIFIED spine statement bodies (join/leave/evict/role) for
+ *   THIS circle. When present, they are folded DENY-WINS on top of the trail-derived head — the spine may only
+ *   STRENGTHEN it (drop a member, promote to admin), never re-admit or invent one (the safe cutover — see
+ *   below). When absent, the trail projection stands alone (the legacy path).
  * @returns {Array<object>} one record per member, built from the trail + display left-join.
  */
 export function deriveRoster({
@@ -53,6 +58,7 @@ export function deriveRoster({
   founderWebids = [],
   memberMapForDisplay = [],
   exits = null,
+  spineStatements = [],
 } = {}) {
   const displayByWebid = new Map();
   for (const m of memberMapForDisplay ?? []) {
@@ -133,6 +139,31 @@ export function deriveRoster({
   if (exits instanceof Map && exits.size > 0) {
     for (const webid of [...roster.keys()]) {
       if (isExited(exits, webid, joinedAt.get(webid) ?? 0)) roster.delete(webid);
+    }
+  }
+
+  // ── Cutover: the SIGNED spine folds ON TOP of the trail-derived head, DENY-WINS ───────────────────────
+  // No data migration (the record decision for membership): the trail-derived roster computed above is the
+  // materialised HEAD at cutover; the signed spine statements are the chained transitions folded on top —
+  // same statements → same roster on every device (no wall-clock, no arrival-order dependence). The fold is
+  // applied DENY-WINS with the trail head: the spine can only STRENGTHEN it (a valid leave/evict drops a
+  // member; a role promotion lifts one to admin), never re-admit or invent a member the trail lacks. That is
+  // the SAFE direction while each member's own circle-scoped SIGNER is being settled: a foreign or partial
+  // spine (e.g. one signed by a substrate runner whose key is not the member's webid) can then only be
+  // ignored, never corrupt who-is-in. When membership is emitted per-device in the webid==key namespace the
+  // trail and spine agree, and this becomes the plan's causal roster. A circle with no spine is untouched.
+  if (Array.isArray(spineStatements) && spineStatements.length > 0) {
+    const seedMembers = [...roster.keys()];
+    const seedAdmins  = [...roster.values()].filter((r) => r.role === 'admin').map((r) => r.webid);
+    const folded = foldRoster(spineStatements, {
+      founders: founderWebids ?? [],
+      seed: { members: seedMembers, admins: seedAdmins },
+    });
+    const inMembers = new Set(folded.members);
+    const inAdmins  = new Set(folded.admins);
+    for (const webid of [...roster.keys()]) {
+      if (!inMembers.has(webid)) roster.delete(webid);            // spine removed them (deny-wins)
+      else if (inAdmins.has(webid)) roster.get(webid).role = 'admin';   // promote-only (never downgrade here)
     }
   }
 

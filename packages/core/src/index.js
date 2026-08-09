@@ -53,7 +53,10 @@ export {
 export { hashHex } from './hashHex.js';
 // The reusable per-author hash-chain + fork-proof primitive. Governance and membership BIND it with
 // their own body-serialization rather than each reimplementing the chaining/fork detection.
-export { createAuthorChain, isChained, authorHead, makeForkProof } from './security/authorChain.js';
+export {
+  createAuthorChain, isChained, authorHead, makeForkProof,
+  parentsOf, frontier, reachability,
+} from './security/authorChain.js';
 // NOTE: IdentityPodStore, IdentitySync and migrateVaultToPod were extracted OUT
 // of core into `@onderling/pod-client` — they store/migrate/sync identity ON a pod
 // (SDK pod layer), not kernel identity. Import them from '@onderling/pod-client'.
@@ -90,9 +93,21 @@ export {
   ORIGIN_SIG_VERSION,
   DEFAULT_ORIGIN_WINDOW_MS,
 }                                            from './security/originSignature.js';
+// The generic per-author SPINE statement (governance · roles · membership · keys ride ONE filterable chain).
+// Any kind — including third-party ones — signs/verifies here; only the FOLD is kind-aware.
+export {
+  signSpine,
+  verifySpine,
+  SPINE_STMT_VERSION,
+}                                            from './security/spineStatement.js';
+// The WRITE side: append a signed spine statement to a circle's store, chained to its author's own frontier.
+export { createSpineAppender, SPINE_STATEMENT_ITEM } from './security/spineAppender.js';
+// The membership HEAD folded from the spine chain (deny-wins, deterministic; who is member / who is admin).
+export { foldRoster }                        from './security/rosterFold.js';
 export {
   signEviction,
   verifyEviction,
+  EVICTION_KIND,
   EVICTION_STMT_VERSION,
 }                                            from './security/evictionStatement.js';
 export {

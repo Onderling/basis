@@ -7,6 +7,8 @@
  * `confirmedBy`, display-field left-join, and key backfill from the trail.
  */
 import { describe, it, expect } from 'vitest';
+import { signSpine, AgentIdentity } from '@onderling/core';
+import { VaultMemory } from '@onderling/vault';
 import { deriveRoster } from '../src/lib/deriveRoster.js';
 
 const redemption = (over = {}) => ({
@@ -130,5 +132,40 @@ describe('deriveRoster', () => {
 
   it('returns [] for a fully empty input (caller falls back to the cache)', () => {
     expect(deriveRoster({})).toEqual([]);
+  });
+
+  // ── The membership SPINE folds DENY-WINS on top of the trail head (the safe cutover) ──────────────────
+  describe('spine fold (deny-wins over the trail head)', () => {
+    const stmt = (id, kind, subject) => signSpine(id, { kind, circleId: 'g1', subject }).body;
+
+    it('a valid evict on the spine DROPS a trail member; the rest of the trail stands', async () => {
+      // The webid==key namespace the fold needs: everyone is keyed by their signing pubKey.
+      const founder = await AgentIdentity.generate(new VaultMemory());
+      const bea = await AgentIdentity.generate(new VaultMemory());
+      const cor = await AgentIdentity.generate(new VaultMemory());
+      const roster = deriveRoster({
+        redemptions: [
+          redemption({ redeemedBy: bea.pubKey, signingPublicKey: bea.pubKey }),
+          redemption({ redeemedBy: cor.pubKey, signingPublicKey: cor.pubKey }),
+        ],
+        founderWebids: [founder.pubKey],
+        spineStatements: [stmt(founder, 'evict', bea.pubKey)],   // founder (admin) evicts bea
+      });
+      const ids = roster.map((m) => m.webid).sort();
+      expect(ids).toContain(founder.pubKey);
+      expect(ids).toContain(cor.pubKey);
+      expect(ids).not.toContain(bea.pubKey);
+    });
+
+    it('a FOREIGN/partial spine cannot invent or re-admit a member — deny-wins keeps the trail head', async () => {
+      // A join for a webid the trail does not carry (e.g. a spine signed in a key namespace that isn\'t the
+      // roster\'s) must NOT add anyone: the spine may only strengthen the trail head, never invent one.
+      const stranger = await AgentIdentity.generate(new VaultMemory());
+      const roster = deriveRoster({
+        redemptions: [redemption({ redeemedBy: 'B' })],
+        spineStatements: [stmt(stranger, 'join', 'GHOST')],
+      });
+      expect(roster.map((m) => m.webid)).toEqual(['B']);   // GHOST never enters
+    });
   });
 });

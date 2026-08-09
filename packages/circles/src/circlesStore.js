@@ -1,4 +1,10 @@
 /**
+ * ⚠ DELETION-CANDIDATE (2026-08-08, §8c fork 4 — derived from principle 7 "one store per circle").
+ *   Zero production consumers: `apps/basis/src/v2/circleSources.js` explicitly declined to wire it because
+ *   standing it up would be a SECOND circle registry (a principle-7 defect). SUCCESSOR: the canonical `circle`
+ *   item type read through `circleRoster` / `audience`. Kept (not deleted) per the "mark, don't delete" rule so
+ *   its shape can still be learned from; retire when nothing references it.
+ *
  * `createCirclesStore({ itemStore })` — CRUD over saved audiences.
  *
  * Backed by the canonical `circle` item type (registered in

@@ -60,6 +60,7 @@
 import {
   defineSkill, validateMnemonic, mnemonicToSeed, AgentIdentity, roleRank, ROLES, verifyCircleLink,
   CIRCLE_ADDRESS_ANNOUNCE_KIND, verifyCircleAddressAnnouncement, verifyCircleAddressAnnouncements,
+  createSpineAppender, verifySpine, SPINE_STATEMENT_ITEM,
 } from '@onderling/core';
 import { wireSkill } from '@onderling/sdk';
 import { stoopManifest } from '../../manifest.js';
@@ -77,6 +78,10 @@ import {
   createCircleFanOut, recordCircleAddress, fanCircleAddresses,
   listCircleRoster, recordMemberPersonaProperties, fanRosterUpdated, listCircleMembers,
   createGroupWithRules, createGroupV2, redeemInviteWithGate,
+  redeemMembershipCode as redeemMembershipCodeCore,
+  verifyMembershipCodeForPeer as verifyMembershipCodeForPeerCore,
+  leaveGroup as leaveGroupCore,
+  removeMember as removeMemberCore,
 } from '@onderling/circles';
 import { validateStoopItem, intentToCanonicalDraft } from '../lib/canonicalAdapter.js';
 
@@ -858,13 +863,30 @@ async function projectCircleRoster({ store, groupId, memberMapList = [] } = {}) 
     if (m?.webid && isCircleAdmin(m.role)) founderWebids.add(m.webid);
   }
 
+  // The membership SPINE — the per-author SIGNED statements (join/leave/evict) the roster folds
+  // deterministically (identical on every device, no wall-clock). Verified on read: only a genuine,
+  // untampered, chain-consistent statement for THIS circle folds. When present, `deriveRoster` folds these
+  // ON TOP of the trail-derived roster (the pre-spine head); when absent, the trail projection stands alone.
+  let spineStatements = [];
+  try {
+    const spineItems = await store.listOpen({ type: SPINE_STATEMENT_ITEM });
+    for (const it of spineItems ?? []) {
+      if (it?.source?.groupId !== groupId) continue;
+      const stmt = it?.source?.statement;
+      const v = stmt && verifySpine(stmt, { expectedCircleId: groupId });
+      if (v && v.ok) spineStatements.push(v.body);
+    }
+  } catch { spineStatements = []; }
+
   return deriveRoster({
     redemptions: forGroup,
     founderWebids: [...founderWebids],
     memberMapForDisplay: list,
-    // B4 — a removal/leave recorded for THIS circle drops the member from THIS circle only. The
+    // A removal/leave recorded for THIS circle drops the member from THIS circle only. The
     // trail is already circle-scoped, so nothing here can reach a circle you also share with them.
     exits: await readCircleExits({ store, groupId }),
+    // The signed spine deltas fold ON TOP of the trail head (the cutover model — no data migration).
+    spineStatements,
   });
 }
 
@@ -1105,6 +1127,17 @@ export function buildSkills({
     fanOutToMembers: _fanOutToMembers,
     toWireRefEnvelope,
   });
+
+  // Puts each membership transition (join/leave/evict) onto the circle's SIGNED spine, the per-author chained
+  // log the roster folds deterministically. The membership writers stay identity-free and call this injected
+  // emitter. `bundle.agent.identity` is THIS device's circle-scoped signer; a member's webid IS that signing
+  // key here, so for a self-transition (join on a same-device redeem, leave) the statement's author == `from`,
+  // which the fold requires. Absent (no identity on the bundle) → no emitter: the writer still records its
+  // typed item, just no spine statement — additive, never a regression.
+  const _spineSigner = bundle?.agent?.identity;
+  const emitSpine = (_spineSigner?.pubKey && typeof _spineSigner.sign === 'function')
+    ? createSpineAppender({ store, signer: _spineSigner })
+    : undefined;
 
   return [
     /**
@@ -2329,116 +2362,14 @@ export function buildSkills({
      *   "I have the code, please add me" half.
      */
     defineSkill('redeemMembershipCode', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
-      if (typeof a.code    !== 'string' || !a.code)    return { error: 'code required' };
-
-      const all = await store.listOpen({ type: 'membership-code' });
-      const forGroup = all.filter(i => i?.source?.groupId === a.groupId);
-      const now = Date.now();
-      const valid = forGroup.find(i => i.source.code === a.code && codeRedeemableNow(i, now));
-      if (!valid) return { error: 'invalid-or-expired-code' };
-
-      // B5 — the ceiling, checked on the store that HOLDS the code (this path is the same-device
-      // redeem, so the issuer and the redeemer are the same store). A repeat by the same identity is
-      // an idempotent success returning the original redemption; a new identity beyond the invite's
-      // limit is refused here rather than admitted and counted afterwards.
-      const limit = await inviteRedemptionVerdict({
-        store, groupId: a.groupId, codeItem: valid, requesterWebid: from,
-      });
-      if (!limit.allow) return { error: INVITE_LIMIT_REACHED, used: limit.used, max: limit.max };
-      if (limit.already) {
-        return {
-          redemptionId: limit.already.id,
-          groupId:      a.groupId,
-          validUntil:   valid.source.expiresAt,
-          alreadyRedeemed: true,
-          _sync:        simulateSync(),
-        };
-      }
-
-      // ── Signing pubKey capture (kring fan-out fix) ────────────────────────
-      // Bind the joiner's SIGNING pubKey to the AUTHENTICATED sender of the
-      // redeem — `from` is the skill-invocation actor (= `envelope._from`,
-      // stamped by the transport AFTER signature-verify), NOT a body field the
-      // joiner could spoof.  In this architecture a member's webid IS their
-      // secure-mesh signing address (basis binds `localActor` +
-      // `members[].webid` to `chatId.pubKey`; the peer-bridge sets
-      // `requesterWebid` from the authenticated NKN `fromAddr`), so the
-      // authenticated identity for the joiner is `from` itself.  We DO NOT read
-      // any body-supplied pubKey for the binding — a self-asserted key would let
-      // a joiner claim another member's routing address.  Recording it lets
-      // kring fan-out (`wireChat.send` → `MemberMap.resolveByWebid(webid).pubKey`)
-      // route to a code-redeemer instead of returning `recipient-pubkey-unknown`.
-      const signingPubKey = (typeof from === 'string' && from) ? from : null;
-      // Wave B (SENSITIVE — cross-circle linkability): a presented per-circle address must be
-      // PROVEN, not asserted. "Continue as an existing self" = present the address you already
-      // use in another circle; anyone who has SEEN that address (a co-member there) could assert
-      // it, so we require a signature by the key BEHIND the address over a challenge bound to
-      // THIS join (Decision B — the signing proof). Deny-by-default: an unproven or forged
-      // address is DROPPED — the join still succeeds, just WITHOUT the cross-circle linkage.
-      const verifiedCircleAddress = (a.circleAddress
-        && verifyCircleLink({ groupId: a.groupId, address: a.circleAddress, proof: a.circleAddressProof }))
-        ? a.circleAddress : null;
-      const [item] = await store.addItems([{
-        type:       'membership-redemption',
-        text:       `${from} redeemed membership code for ${a.groupId}`,
-        source:     {
-          groupId:   a.groupId,
-          code:      a.code,
-          codeId:    valid.id,
-          redeemedBy: from,
-          redeemedAt: now,
-          expiresAt:  valid.source.expiresAt,
-          // Sealing public key the joiner publishes so the household control-agent can wrap the
-          // group key to them (distinct from their transport identity).
-          ...(a.sealingPublicKey ? { sealingPublicKey: a.sealingPublicKey } : {}),
-          // Signing pubKey (the joiner's transport/chat-agent identity) — mirror
-          // of sealingPublicKey but for the OTHER key family: fan-out routing.
-          ...(signingPubKey ? { signingPublicKey: signingPubKey } : {}),
-          // Per-circle ADDRESS the joiner presents in THIS circle (identity step 5B/C —
-          // deriveCircleAddress). Recorded ONLY when the signing proof verified above
-          // (`verifiedCircleAddress`): a "continue as an existing self" linkage is provable,
-          // never a bare claim a co-member could forge. Unproven ⇒ omitted (join still succeeds).
-          ...(verifiedCircleAddress ? { circleAddress: verifiedCircleAddress } : {}),
-          // …and the PROOF itself (2026-08-02). Kept, not discarded, because it is what lets this
-          // device later RELAY the fact to a member who was not here — the receiver re-verifies it,
-          // so carrying it grants the carrier nothing (`circleAddressAnnouncement.js`).
-          ...(verifiedCircleAddress ? { circleAddressProof: a.circleAddressProof } : {}),
-          // Property layer — the coarse background values the joiner CHOSE to disclose in THIS circle when
-          // joining AS a persona (getPersonaRelease). Self-asserted like circleAddress; opt-in (absent = shared
-          // nothing). A map {key: coarseValue}.
-          ...(a.personaProperties && Object.keys(a.personaProperties).length ? { personaProperties: a.personaProperties } : {}),
-          // Handle the joiner presented in THIS circle (Wave B). Recorded on the
-          // JOINER's own redemption too so `listMyHandles` can surface it as a prior
-          // handle next time (your own info; self-asserted like circleAddress).
-          ...(typeof a.peerDisplay === 'string' && a.peerDisplay ? { peerDisplay: a.peerDisplay } : {}),
-        },
-        visibility: 'household',
-      }], { actor: from });
-      metrics?.record?.('group-code-redeemed');
-      // Populate the MemberMap with the joiner's signing pubKey so fan-out can
-      // resolve them.  Best-effort + additive — never throws (back-compat: an
-      // older/no-auth redeem with no `from`, or a bundle with no MemberMap,
-      // simply skips this and the redemption item is still written).
-      if (members && signingPubKey) {
-        try {
-          await members.addMember({
-            webid: from,
-            pubKey: signingPubKey,
-            ...(verifiedCircleAddress ? { circleAddress: verifiedCircleAddress } : {}),
-            ...(a.personaProperties && Object.keys(a.personaProperties).length ? { personaProperties: a.personaProperties } : {}),
-          });
-        }
-        catch { /* roster upsert is best-effort — never block the redeem */ }
-      }
-      await grantPodAccess(controlAgent, { webId: from, sealingPublicKey: a.sealingPublicKey, groupId: a.groupId, metrics });
-      return {
-        redemptionId: item.id,
-        groupId:      a.groupId,
-        validUntil:   valid.source.expiresAt,
-        _sync:        simulateSync(),
-      };
+      // Thin wrapper: the membership-state body lives in `@onderling/circles`
+      // (`redeemMembershipCode`, §8c slice-b). Stoop injects the store + helpers and binds the trailing
+      // group-key grant to `grantPodAccess(controlAgent, …)` (the key custodian stays here, not in circles).
+      return redeemMembershipCodeCore({
+        store, members, metrics, simulateSync, emitSpine,
+        grantKey: (opts) => grantPodAccess(controlAgent, opts),
+        codeRedeemableNow, inviteRedemptionVerdict, INVITE_LIMIT_REACHED, verifyCircleLink,
+      }, { a: dataArgs(parts), from });
     }, {
       description: 'Present a membership code obtained out-of-band; records redemption.',
       visibility:  'authenticated',
@@ -2463,156 +2394,15 @@ export function buildSkills({
      *   joiner can mirror a local redemption that references it.
      */
     defineSkill('verifyMembershipCodeForPeer', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      if (typeof a.groupId !== 'string' || !a.groupId)
-        return { error: 'groupId required' };
-      if (typeof a.code !== 'string' || !a.code)
-        return { error: 'code required' };
-      if (typeof a.requesterWebid !== 'string' || !a.requesterWebid)
-        return { error: 'requesterWebid required' };
-
-      const all = await store.listOpen({ type: 'membership-code' });
-      const forGroup = all.filter(i => i?.source?.groupId === a.groupId);
-      const now = Date.now();
-      const valid = forGroup.find(i => i.source.code === a.code && codeRedeemableNow(i, now));
-      if (!valid) return { error: 'invalid-or-expired-code' };
-
-      // B5 — THE gate. This runs on the ADMIN's device, which is the device that writes the
-      // membership; a joiner on any build, patched or not, cannot get past it, because getting in is
-      // this function returning a row. A repeat by the same identity answers with the ORIGINAL
-      // redemption id and writes nothing new (idempotent — re-scanning a QR must not punish anyone,
-      // and a duplicate audit row is indistinguishable from a second person to anything counting).
-      const limit = await inviteRedemptionVerdict({
-        store, groupId: a.groupId, codeItem: valid, requesterWebid: a.requesterWebid,
-      });
-      if (!limit.allow) {
-        metrics?.record?.('group-code-redeem-refused-limit');
-        return { error: INVITE_LIMIT_REACHED, used: limit.used, max: limit.max };
-      }
-
-      // Wave B (SENSITIVE) — the peer path's copy of the cross-circle link proof check
-      // (mirrors redeemMembershipCode): a presented per-circle address is recorded ONLY when
-      // the joiner proved control of the key behind it. Deny-by-default; unproven ⇒ dropped.
-      const verifiedCircleAddress = (a.circleAddress
-        && verifyCircleLink({ groupId: a.groupId, address: a.circleAddress, proof: a.circleAddressProof }))
-        ? a.circleAddress : null;
-
-      // Per-circle handle uniqueness (Phase 4 Wave B — pinned rule: no duplicate
-      // handles within a single circle), enforced HERE on the admin/host side —
-      // the authority that owns the circle roster. The joiner's chosen handle
-      // rides the redeem as `peerDisplay`; reject the join if another member of
-      // THIS circle already holds it (case-folded, so `Jan`/`jan` collide),
-      // rather than silently admitting a duplicate. The joiner re-presenting
-      // their OWN handle (a re-send) is not a collision — excluded by
-      // `requesterWebid`. Absent `peerDisplay` = no handle claimed → skip.
-      // Signing pubKey for the peer path — the joiner's authenticated identity
-      // is `requesterWebid`, which the admin-side basis handler
-      // (`makeHandleGroupRedeemRequest`) sets from the AUTHENTICATED NKN
-      // `fromAddr` of the group-redeem-request envelope, NOT from a
-      // joiner-supplied claim.  A malicious joiner controls the request body
-      // (code/shareCard/…) but not `fromAddr`, so they cannot bind another
-      // member's key.  In this architecture webid == the secure-mesh signing
-      // address, so the joiner's signing pubKey IS `requesterWebid`.
-      // Declared OUTSIDE the handle-claim section below, which it outlives (roster upsert reads it).
-      const peerSigningPubKey = a.requesterWebid;
-
-      // B5 — the same identity, again: no second membership row. Their pod access + display row are
-      // still refreshed below (both idempotent, and a reinstalled joiner may have a new sealing key),
-      // so the repeat is a no-op in the ledger and a refresh everywhere it is safe to be one.
-      if (limit.already) {
-        if (members && a.requesterWebid) {
-          try {
-            await members.addMember({
-              webid: a.requesterWebid,
-              pubKey: a.requesterWebid,
-              ...(verifiedCircleAddress ? { circleAddress: verifiedCircleAddress } : {}),
-            });
-          } catch { /* best-effort, exactly as on the first redeem */ }
-        }
-        await grantPodAccess(controlAgent, { webId: a.requesterWebid, sealingPublicKey: a.sealingPublicKey, groupId: a.groupId, metrics });
-        return {
-          redemptionId: limit.already.id,
-          codeId:       valid.id,
-          groupId:      a.groupId,
-          validUntil:   valid.source.expiresAt,
-          alreadyRedeemed: true,
-          _sync:        simulateSync(),
-        };
-      }
-
-      // SERIALISED per (circle, handle) — the uniqueness check and the redemption write are separated by
-      // awaits, so two joiners redeeming the same invite and both claiming `@jan` each read a roster with
-      // no `jan` and each wrote one (story 2.1: three concurrent claims produced three members named jan).
-      // The lock is per (circle, handle), so unrelated joins still run concurrently.
-      const claimed = await withHandleClaim(store, a.groupId, a.peerDisplay, async () => {
-        if (typeof a.peerDisplay === 'string' && a.peerDisplay) {
-          const takenHandles = await collectCircleHandles({ store, members, groupId: a.groupId });
-          if (findHandleCollision({ candidate: a.peerDisplay, claimantWebid: a.requesterWebid, taken: takenHandles })) {
-            return { error: 'handle-taken', reason: 'handle-taken' };
-          }
-        }
-
-        const [item] = await store.addItems([{
-          type:       'membership-redemption',
-          text:       `${a.requesterWebid} redeemed (via peer) membership code for ${a.groupId}`,
-          source:     {
-            groupId:        a.groupId,
-            code:           a.code,
-            codeId:         valid.id,
-            redeemedBy:     a.requesterWebid,
-            redeemedAt:     now,
-            expiresAt:      valid.source.expiresAt,
-            confirmedBy:    from,
-            channel:        'peer',
-            // Signing pubKey (fan-out routing) — see note above; mirrors sealingPublicKey.
-            ...(peerSigningPubKey ? { signingPublicKey: peerSigningPubKey } : {}),
-            // joiner's mesh-consent token.
-            // When true, admin propagates this peer's address to
-            // other members (+ propagates other consenting members'
-            // addresses to this joiner).  When false, the joiner
-            // stays star-routed via admin.
-            ...(a.shareCard ? { shareCard: true } : {}),
-            ...(typeof a.peerDisplay === 'string' && a.peerDisplay ? { peerDisplay: a.peerDisplay } : {}),
-            // The joiner's sealing public key (forwarded by the peer bridge) → the control-agent wraps
-            // the group key to them. Admin-side: this is where the sealed household pod grants access.
-            ...(a.sealingPublicKey ? { sealingPublicKey: a.sealingPublicKey } : {}),
-            // Per-circle ADDRESS the joiner presents in THIS circle (identity step 5B/C) —
-            // forwarded by the peer bridge, recorded ONLY when its cross-circle link proof verified.
-            ...(verifiedCircleAddress ? { circleAddress: verifiedCircleAddress } : {}),
-            // …and its PROOF (2026-08-02), so the ADMIN can relay this member's address on to the
-            // other members — who verify it themselves rather than taking the admin's word.
-            ...(verifiedCircleAddress ? { circleAddressProof: a.circleAddressProof } : {}),
-            // Property layer — the joiner's disclosed persona properties (forwarded by the peer bridge).
-            ...(a.personaProperties && Object.keys(a.personaProperties).length ? { personaProperties: a.personaProperties } : {}),
-          },
-          visibility: 'household',
-        }], { actor: from });
-        return { item };
-      });
-      if (claimed?.error) return claimed;
-      const item = claimed.item;
-      metrics?.record?.('group-code-redeemed-peer');
-      // Populate the admin's MemberMap so the admin (and, via mesh-intro
-      // propagation, other members) can fan out to the new joiner.  Best-effort.
-      if (members && peerSigningPubKey) {
-        try {
-          await members.addMember({
-            webid: a.requesterWebid,
-            pubKey: peerSigningPubKey,
-            ...(verifiedCircleAddress ? { circleAddress: verifiedCircleAddress } : {}),
-            ...(a.personaProperties && Object.keys(a.personaProperties).length ? { personaProperties: a.personaProperties } : {}),
-          });
-        }
-        catch { /* roster upsert is best-effort — never block the redeem */ }
-      }
-      await grantPodAccess(controlAgent, { webId: a.requesterWebid, sealingPublicKey: a.sealingPublicKey, groupId: a.groupId, metrics });
-      return {
-        redemptionId: item.id,
-        codeId:       valid.id,
-        groupId:      a.groupId,
-        validUntil:   valid.source.expiresAt,
-        _sync:        simulateSync(),
-      };
+      // Thin wrapper: the admin-side peer-redeem body lives in `@onderling/circles`
+      // (`verifyMembershipCodeForPeer`, §8c slice-b). Both grant sites (idempotent-repeat + main path) bind to
+      // `grantPodAccess(controlAgent, …)`; the handle-uniqueness helpers are injected so circles stays pure.
+      return verifyMembershipCodeForPeerCore({
+        store, members, metrics, simulateSync, emitSpine,
+        grantKey: (opts) => grantPodAccess(controlAgent, opts),
+        codeRedeemableNow, inviteRedemptionVerdict, INVITE_LIMIT_REACHED, verifyCircleLink,
+        withHandleClaim, collectCircleHandles, findHandleCollision,
+      }, { a: dataArgs(parts), from });
     }, {
       description: 'Admin-side peer validator: confirms a joiner-presented code + records redemption.',
       visibility:  'authenticated',
@@ -3444,37 +3234,12 @@ export function buildSkills({
     // `leaveGroup({})` → `{error:'groupId required'}` returned, but the op
     // declares groupId required so wireSkill would THROW instead. Kept hand-written.
     defineSkill('leaveGroup', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
-
-      const [marker] = await store.addItems(
-        [{
-          type:       'group-leave',
-          text:       `${from} left ${a.groupId}`,
-          source:     { groupId: a.groupId, leftBy: from, leftAt: Date.now() },
-          visibility: 'household',
-        }],
-        { actor: from },
-      );
-
-      // Sealed household pod: revoke the leaver's ACL + rotate the group key (forward secrecy) + drop
-      // them from the MemberMap so fan-out stops. A self-leave is 'graceful' — the leaver keeps access
-      // to content they already had on their device.
-      await revokePodAccess(controlAgent, { webId: from, policy: 'graceful', groupId: a.groupId, metrics });
-
-      let deleted = 0;
-      if (a.deletePosts) {
-        const myItems = (await store.listOpen({})).filter(i => i.addedBy === from && i.id !== marker.id);
-        for (const it of myItems) {
-          await store.removeItems([{ id: it.id }], { actor: from });
-          // Also cancel any lend reminders the user had pending.
-          if (notifier) {
-            try { await notifier.cancel(`due:${it.id}`); } catch {}
-          }
-          deleted += 1;
-        }
-      }
-      return { leaveMarkerId: marker.id, deletedItems: deleted, _sync: simulateSync() };
+      // Thin wrapper: the leave-state body lives in `@onderling/circles` (`leaveGroup`, §8c slice-b). The
+      // trailing revoke+rotate binds to `revokePodAccess(controlAgent, …)`; `metrics` rides inside that hook.
+      return leaveGroupCore({
+        store, simulateSync, notifier, emitSpine,
+        revokeKey: (opts) => revokePodAccess(controlAgent, { ...opts, metrics }),
+      }, { a: dataArgs(parts), from });
     }, {
       description: 'Record group-leave audit + optionally delete the actor\'s own items.',
       visibility:  'authenticated',
@@ -4296,52 +4061,13 @@ export function buildSkills({
      *   so the next group-rules push can include it.
      */
     defineSkill('removeMember', async ({ parts, from }) => {
-      const a = dataArgs(parts);
-      const _groupId = a.groupId ?? groupId;
-      if (!_groupId) return { error: 'groupId required' };
-      if (!a.memberStableId && !a.memberWebid) {
-        return { error: 'memberStableId or memberWebid required' };
-      }
-      if (members) {
-        const me = await members.resolveByWebid(from);
-        const isAdmin = isCircleAdmin(me?.role);
-        if (!isAdmin) return { error: 'admin-only' };
-      }
-      // Resolve the target's webid (webid === signing key). Prefer an explicit webid; fall back to a
-      // stableId resolver if the MemberMap offers one.
-      let memberWebid = a.memberWebid ?? null;
-      if (!memberWebid && a.memberStableId && members && typeof members.resolveByStableId === 'function') {
-        memberWebid = (await members.resolveByStableId(a.memberStableId))?.webid ?? null;
-      }
-      const policy = a.policy === 'ban' ? 'ban' : 'graceful';
-
-      // B4 — the RESOLVED webid, not only what the caller happened to pass. An admin who removes by
-      // stableId used to write a row naming nobody the roster projection could match, so the removal
-      // was unprojectable and therefore inert. `memberStableId` is still recorded for the audit.
-      const [item] = await store.addItems([{
-        type:       'group-removal',
-        text:       `${memberWebid ?? a.memberStableId} removed from ${_groupId} (${policy})`,
-        visibility: 'household',
-        source: {
-          groupId:        _groupId,
-          memberStableId: a.memberStableId ?? null,
-          memberWebid:    memberWebid      ?? null,
-          removedBy:      from,
-          removedAt:      Date.now(),
-          policy,
-          reason:         a.reason ?? null,
-        },
-      }], { actor: from });
-
-      // ACTUALLY revoke (not just record intent): rotate the group key + re-seal history per policy +
-      // drop the member from the MemberMap (fan-out stops). `force` — an admin removal overrides the
-      // ≥1-admin guard for a non-self target; the op's own admin-gate above is the authority.
-      let revoked = false;
-      if (memberWebid) {
-        await revokePodAccess(controlAgent, { webId: memberWebid, force: true, policy, groupId: _groupId, metrics });
-        revoked = true;
-      }
-      return { removalId: item.id, revoked, policy };
+      // Thin wrapper: the admin-only removal-state body lives in `@onderling/circles` (`removeMember`, §8c
+      // slice-b). The closure `groupId` default is injected as `defaultGroupId`; the forced revoke+rotate+reseal
+      // binds to `revokePodAccess(controlAgent, …)` (metrics ride inside the hook).
+      return removeMemberCore({
+        store, members, isCircleAdmin, emitSpine, defaultGroupId: groupId,
+        revokeKey: (opts) => revokePodAccess(controlAgent, { ...opts, metrics }),
+      }, { a: dataArgs(parts), from });
     }, {
       description: 'Admin-only: remove a member — record it + rotate the group key + drop them from the mesh (policy: graceful|ban).',
       visibility:  'authenticated',

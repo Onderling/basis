@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@onderling/core": "workspace:*",
+    "@onderling/circles": "workspace:*",
     "@onderling/transports": "workspace:*",
     "@onderling/vault": "workspace:*",
     "@onderling/pod-client": "workspace:*",

@@ -145,6 +145,39 @@ The log is deliberately a record of *pointers*, not a second copy of the data: t
 a whitelist (`{op, target, outcome, via}`) with no arguments, message bodies or file contents. The trail says
 *that* an agent wrote to something and under whose authority; the thing itself says what.
 
+#### Three append channels for devs — spine, content, claim (plus the audit chain)
+
+A dev's item lands on one of **three generalized channels**, chosen by how concurrent writes to it must
+resolve. Each is extensible — a new item type or a plugin opts into a channel rather than inventing a fourth
+mechanism (the survey that found three parallel "signed causal log" shapes is exactly the drift this names
+away):
+
+- **The spine chain** (`createAuthorChain` + the generic `signSpine`) — for events where **EQUIVOCATION is an
+  attack**: governance (proposals/votes), **roles** (admin promote/demote), **membership** (join/leave/evict),
+  **key rotations**. A per-author hash-chain with fork-proofs, filterable by `kind`: each entry points at its
+  author's previous spine head (`parentHash`), so two entries off the same parent with different content are a
+  self-verifying FORK-PROOF anyone recomputes. Append a **signed spine statement of your `kind`** — signed by
+  the **circle-scoped** key; any kind, *including one a third party adds*, signs/verifies the same way, and
+  **only the FOLD is kind-aware**, so the primitive never changes to admit a new kind. Over the one chain sit
+  materialised HEADS — the roster head (membership), a governance head, a roles head, the `Peer` projection.
+  Realises principle 6 ("membership is proof-derived + tamper-evident: a per-author hash-chain over
+  membership/key events") and principle 10 (who-is-in / who-is-admin folds identically everywhere, deny-wins).
+- **Content merge** (the per-circle item-store, `wireCircleStoreInbound` / `causalMerge` by origin-timestamp +
+  writer-id) — for content where **FORKING IS NORMAL**: chat, tasks, offerings, prikbord posts. Append a typed
+  item; concurrent edits merge.
+- **The single-writer claim fold** (`causalMerge`'s immutable-once-set path) — for a field that must have **ONE
+  first-come winner** across devices: a task's `assignee`, an offering's reservation, a lend's borrower. An
+  item type **declares** a field uses this fold — it is **pluggable, not task-specific**: any dev item can opt
+  a field into single-writer semantics (generalising the fold beyond tasks — offerings, lending — is planned).
+
+Plus, **not a dev channel: the audit chain** (`auditLog`, `@onderling/secure-agent`) — the security layer's
+own signed LINEAR record of key ceremonies/crypto (one author, per-entry signatures, `verify()` walks every
+sig + link). It may SHARE the chain primitive, never the log; its retention COMPACTS rather than drops.
+
+Rule of thumb: **concurrent writes must be equivocation-proof → spine · they merge → content · exactly one
+must win → claim fold** (and the security layer's own integrity record → audit). A new cross-cutting ordering
+need extends one of these — never a fifth mechanism.
+
 Because the log is complete and local, the redaction question lives at the **export** boundary — a support
 bundle or bug report is where identities are stripped or pseudonymised, not at the point of writing. The
 device-local structured logger (`@onderling/logger`) takes the opposite approach for the layers below the

@@ -6,7 +6,10 @@
  * mechanism serves any domain that supplies its own body-serialization — the whole point of the lift.
  */
 import { describe, it, expect } from 'vitest';
-import { createAuthorChain, isChained, authorHead, makeForkProof } from '../src/security/authorChain.js';
+import {
+  createAuthorChain, isChained, authorHead, makeForkProof,
+  parentsOf, frontier, reachability,
+} from '../src/security/authorChain.js';
 
 // A membership-flavoured serializer: identity is the eviction content, NOT the volatile `at`.
 const serialize = (e) => `${e.kind}|${e.circleId}|${e.evicted}|${e.seq}`;
@@ -67,5 +70,72 @@ describe('createAuthorChain — reusable across domains', () => {
     const a = chain.chainEvent(evt('did:bram', 1), { author: 'admin0', parentHash: 'g0' });
     const b = c2.chainEvent(evt('did:bram', 1), { author: 'admin0', parentHash: 'g0' });
     expect(a.hash).toBe(b.hash);
+  });
+});
+
+// ── The multi-parent deps-DAG (DESIGN-log-ordering-unification §2–4) ────────────────────────────────────
+describe('createAuthorChain — the multi-parent deps-DAG', () => {
+  // A tiny cross-author DAG:  e1 ← e2  (author w1);  e3 is a concurrent root (author w2);
+  // merge references e2 (its own parent) AND e3 (a cross-author dep) — a git-style merge that collapses the
+  // two live tips back to one.
+  const e1 = chain.chainEvent(evt('did:a', 1), { author: 'w1', parentHash: null });
+  const e2 = chain.chainEvent(evt('did:b', 2), { author: 'w1', parentHash: e1.hash });
+  const e3 = chain.chainEvent(evt('did:c', 3), { author: 'w2', parentHash: null });
+  const merge = chain.chainEvent(evt('did:d', 4), { author: 'w1', parentHash: e2.hash, deps: [e3.hash] });
+  const dag = [e1, e2, e3, merge];
+
+  it('a single-parent event (no/empty deps) is byte-identical to the pre-DAG chain — no deps field, same hash', () => {
+    const withNone  = chain.chainEvent(evt('did:x', 9), { author: 'w1', parentHash: 'p' });
+    const withEmpty = chain.chainEvent(evt('did:x', 9), { author: 'w1', parentHash: 'p', deps: [] });
+    expect('deps' in withNone).toBe(false);
+    expect('deps' in withEmpty).toBe(false);
+    expect(withNone.hash).toBe(withEmpty.hash);
+  });
+
+  it('a multi-parent event carries a canonical (sorted, deduped) deps set, and the frontier order is irrelevant', () => {
+    const a = chain.chainEvent(evt('did:d', 4), { author: 'w1', parentHash: e2.hash, deps: [e3.hash, e1.hash] });
+    const b = chain.chainEvent(evt('did:d', 4), { author: 'w1', parentHash: e2.hash, deps: [e1.hash, e3.hash, e1.hash] });
+    expect(a.deps).toEqual([e1.hash, e3.hash].sort());   // sorted + deduped
+    expect(a.hash).toBe(b.hash);                          // reordering / duplicating the frontier ≠ a new event
+  });
+
+  it('parentsOf unions the self-parent + the cross-author deps; frontier is the single live tip after a merge', () => {
+    expect(parentsOf(merge).sort()).toEqual([e2.hash, e3.hash].sort());
+    expect(parentsOf(e1)).toEqual([]);
+    expect(frontier(dag)).toEqual([merge.hash]);          // the merge collapsed both tips to one
+    expect(frontier([e1, e2, e3]).sort()).toEqual([e2.hash, e3.hash].sort());   // two live tips before the merge
+  });
+
+  it('reachability labels before / concurrent / later over the DAG (cross-author, exact)', () => {
+    expect(reachability(dag, e1.hash, e2.hash)).toBe('before');       // e1 is an ancestor of e2
+    expect(reachability(dag, e2.hash, e1.hash)).toBe('later');        // symmetric
+    expect(reachability(dag, e1.hash, e3.hash)).toBe('concurrent');   // different authors, no edge
+    expect(reachability(dag, e2.hash, e3.hash)).toBe('concurrent');
+    expect(reachability(dag, e3.hash, merge.hash)).toBe('before');    // reached via the cross-author dep edge
+    expect(reachability(dag, e1.hash, merge.hash)).toBe('before');    // reached transitively (e1←e2←merge)
+    expect(reachability(dag, merge.hash, e1.hash)).toBe('later');
+    expect(reachability(dag, merge.hash, merge.hash)).toBe('concurrent');   // an event is not before/after itself
+  });
+
+  it('FORK DETECTION STILL FIRES under multi-parent — same content off one self-parent with a DIFFERENT frontier is a fork', () => {
+    const base  = chain.chainEvent(evt('did:x', 1), { author: 'w1', parentHash: 'g0' });
+    // Two events: SAME author, SAME parentHash, SAME content — but a DIFFERENT deps frontier. Because deps is
+    // bound into the hash but excluded from the content serializer, this equivocation hashes differently.
+    const forkA = chain.chainEvent(evt('did:y', 2), { author: 'w1', parentHash: base.hash, deps: [e3.hash] });
+    const forkB = chain.chainEvent(evt('did:y', 2), { author: 'w1', parentHash: base.hash, deps: [e1.hash] });
+    expect(forkA.hash).not.toBe(forkB.hash);
+    const forks = chain.detectForks([base, forkA, forkB]);
+    expect(forks).toHaveLength(1);
+    expect(forks[0]).toMatchObject({ kind: 'fork-proof', author: 'w1', parentHash: base.hash });
+    expect(chain.verifyForkProof(forks[0])).toBe(true);
+    expect([...chain.foldDisputes({ events: [base, forkA, forkB] })]).toEqual(['w1']);
+  });
+
+  it('re-listing the SAME frontier is idempotent, not a fork (same author + parent + content + deps → one hash)', () => {
+    const base = chain.chainEvent(evt('did:x', 1), { author: 'w1', parentHash: 'g0' });
+    const a = chain.chainEvent(evt('did:y', 2), { author: 'w1', parentHash: base.hash, deps: [e1.hash, e3.hash] });
+    const b = chain.chainEvent(evt('did:y', 2), { author: 'w1', parentHash: base.hash, deps: [e3.hash, e1.hash] });
+    expect(a.hash).toBe(b.hash);
+    expect(chain.detectForks([base, a, b])).toHaveLength(0);
   });
 });

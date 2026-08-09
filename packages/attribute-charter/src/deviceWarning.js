@@ -13,10 +13,12 @@
  * package holds NO user-facing strings — invariant #8). Pure function.
  */
 import { bucketCount } from './vocabulary.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 
 // The graduated warning modes (property-layer §10b). 'minimal' warns only on NEAR-CERTAIN uniqueness (a
 // stricter bar than 'normal'); 'off' never warns.
-export const MINIMAL_FACTOR = 4;
+// Parameter register (#36) — k-anonymity minimal-factor (scope:agent, kind:internal — a privacy safety bound).
+export const MINIMAL_FACTOR = param({ key: 'charter.minimalFactor', scope: PARAM_SCOPE.AGENT, kind: PARAM_KIND.INTERNAL, default: 4 });
 
 /**
  * On-device disclosure warning: warns when the participant's enabled attribute combo is likely

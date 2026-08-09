@@ -36,8 +36,10 @@
 import { VectorIndex } from './VectorIndex.js';
 import { chunkText, resolveChunking } from './chunking.js';
 import { codedError } from './errors.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 
-const DEFAULT_LIMIT = 50;
+// Parameter register (#36) — default search result limit (scope:device, kind:internal; caller overrides per query).
+const DEFAULT_LIMIT = param({ key: 'podSearch.defaultLimit', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 50 });
 const RRF_K = 60; // reciprocal rank fusion constant (pre-decided)
 
 export class PodSearch {

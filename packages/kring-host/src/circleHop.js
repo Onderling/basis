@@ -20,8 +20,10 @@
  * skills + sends.
  */
 
-/** Hard ceiling — hopping is strictly second-degree. */
-export const MAX_HOPS = 1;
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';   // re-exported from @onderling/core
+
+/** Hard ceiling — hopping is strictly second-degree. (scope:device, kind:internal — a fixed bound.) */
+export const MAX_HOPS = param({ key: 'kringHost.maxHops', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1 });
 
 /** Normalize a `getHopMode` reply to `{ global }`. */
 export function normalizeHopMode(raw) {

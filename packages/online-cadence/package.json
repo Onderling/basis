@@ -6,10 +6,10 @@
   "type": "module",
   "main": "index.js",
   "exports": {
-    ".":         "./index.js",
+    ".": "./index.js",
     "./cadence": "./src/cadence.js",
     "./appStateBridge": "./src/appStateBridge.js",
-    "./bgTask":  "./src/bgTask.js"
+    "./bgTask": "./src/bgTask.js"
   },
   "scripts": {
     "test": "vitest run",
@@ -19,10 +19,15 @@
     "@onderling/sync-engine-rn": "^0.1.0"
   },
   "peerDependenciesMeta": {
-    "@onderling/sync-engine-rn": { "optional": true }
+    "@onderling/sync-engine-rn": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@onderling/sync-engine-rn": "file:../sync-engine-rn",
     "vitest": "^2.1.9"
+  },
+  "dependencies": {
+    "@onderling/core": "workspace:*"
   }
 }

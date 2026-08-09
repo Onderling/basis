@@ -18,8 +18,11 @@
  */
 
 const LEVELS = Object.freeze({ debug: 10, info: 20, warn: 30, error: 40 });
-const DEFAULT_MAX = 500;   // ring-buffer capacity (records)
-const FIELD_STR_MAX = 48;  // truncate string field values — codes are short; content gets clipped
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
+
+// Parameter register (#36) — ring-buffer capacity + field truncation (scope:device, kind:internal).
+const DEFAULT_MAX = param({ key: 'logger.ringMaxRecords', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 500 });   // ring-buffer capacity (records)
+const FIELD_STR_MAX = param({ key: 'logger.fieldStrMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 48 });  // truncate string field values — codes are short; content gets clipped
 export const REDACTED = '\u27e8redacted\u27e9';   // stands in for an identifier-shaped value (see looksLikeIdentifier)
 
 const state = {

@@ -20,8 +20,10 @@
  */
 
 import { buildIcsFor, buildCancellationIcs, diffRemoved } from './emitter.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 
-const DEFAULT_DEBOUNCE_MS = 60_000;
+// Parameter register (#36) — emission debounce window (scope:device, kind:internal).
+const DEFAULT_DEBOUNCE_MS = param({ key: 'calendarEmission.debounceMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });
 const RELEVANT_EVENTS = [
   'item-added', 'item-completed', 'item-removed',
   'item-submitted', 'item-rejected', 'item-revoked',

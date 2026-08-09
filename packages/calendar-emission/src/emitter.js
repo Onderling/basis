@@ -27,8 +27,11 @@
  */
 
 import ICAL from 'ical.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 
-const DEFAULT_DURATION_MIN = 30;
+// Parameter register (#36) — default event duration. A genuine user preference (agent-scoped, follows the
+// user); kind:user. Declared for the census; not yet wired to a settable home.
+const DEFAULT_DURATION_MIN = param({ key: 'calendarEmission.defaultDurationMin', scope: PARAM_SCOPE.AGENT, kind: PARAM_KIND.USER, default: 30 });
 
 /**
  * @param {object} args

@@ -16,10 +16,13 @@
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { isVocabKey } from './vocabulary.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
+// Parameter register (#36) — CHARTER_MAX_ATTRIBUTES is a PRIVACY cap (agent-scoped): kind:internal is
+// load-bearing — a user must not be able to raise it to disclose more attributes than the charter allows.
 
 // Proposed cap (adjustable per real cohort sizes — see the spec's open details).
 /** Maximum number of (coarse) attributes one charter may request — keeps the joint value space small. */
-export const CHARTER_MAX_ATTRIBUTES = 3;
+export const CHARTER_MAX_ATTRIBUTES = param({ key: 'charter.maxAttributes', scope: PARAM_SCOPE.AGENT, kind: PARAM_KIND.INTERNAL, default: 3 });
 
 /**
  * Build a canonical, validated charter.

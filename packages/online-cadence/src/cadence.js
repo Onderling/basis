@@ -14,8 +14,13 @@
  * without React Native and easy to repurpose across apps.
  */
 
-const DEFAULT_POLL_INTERVAL_MS = 5000;
-const MIN_POLL_INTERVAL_MS     = 1000;
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
+
+// Parameter register (#36) — the poll cadence. The DEFAULT is a genuine per-DEVICE USER preference (poll
+// cadence is a battery/hardware call the cross-app-settings convention lists as device-scoped); the MINIMUM
+// is a kind:internal floor a user must not be able to drop below.
+const DEFAULT_POLL_INTERVAL_MS = param({ key: 'onlineCadence.pollIntervalMs',    scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER,     default: 5000 });
+const MIN_POLL_INTERVAL_MS     = param({ key: 'onlineCadence.minPollIntervalMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1000 });
 
 /**
  * @param {object} args

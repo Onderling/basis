@@ -5,10 +5,18 @@
   "description": "FTS5 wrapper + faceted filter over pod content (Archive, Notes search, Task search).",
   "type": "module",
   "main": "src/index.js",
-  "exports": { ".": "./src/index.js" },
-  "scripts": { "test": "vitest run", "test:watch": "vitest" },
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
   "devDependencies": {
     "@onderling/pseudo-pod": "file:../pseudo-pod",
     "vitest": "^2.1.0"
+  },
+  "dependencies": {
+    "@onderling/core": "workspace:*"
   }
 }

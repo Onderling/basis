@@ -53,11 +53,12 @@
  */
 
 import { EventEmitter } from 'node:events';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 
 /* ────────────────────────────────────────────────────────────────────────── */
 
 /** Refresh when within this many ms of expiry. */
-const REFRESH_LEEWAY_MS = 60_000;
+const REFRESH_LEEWAY_MS = param({ key: 'oidcSession.refreshLeewayMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });
 
 /**
  * Minimal in-memory Vault-shaped store used as the default when no vault is

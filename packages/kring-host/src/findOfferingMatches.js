@@ -22,6 +22,7 @@
  */
 
 import { MATCH_SOURCES } from './circleOfferings.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';   // re-exported from @onderling/core
 
 const STOPWORDS = new Set([
   'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'do', 'for', 'from',
@@ -32,7 +33,8 @@ const STOPWORDS = new Set([
   'ik', 'jij', 'wij', 'mijn', 'jouw', 'iemand', 'wie', 'wat',
 ]);
 
-const MAX_RESULTS_DEFAULT = 5;
+// Parameter register (#36) — default offering-match result cap (scope:device, kind:internal).
+const MAX_RESULTS_DEFAULT = param({ key: 'kringHost.maxResults', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 5 });
 
 /**
  * Tokenize free text → lowercased non-stopword tokens.  Exposed for

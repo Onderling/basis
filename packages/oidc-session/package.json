@@ -26,7 +26,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@inrupt/solid-client-authn-node": "4.0.0"
+    "@inrupt/solid-client-authn-node": "4.0.0",
+    "@onderling/core": "workspace:*"
   },
   "devDependencies": {
     "@onderling/core": "workspace:^",

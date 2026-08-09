@@ -26,10 +26,14 @@
  *      breath. An offer that only says "this will fix it" is not a choice either.
  */
 
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
+// Parameter register (#36) — address-fallback offer thresholds (scope:device, kind:internal). These are
+// anti-nag SAFETY bounds a user must not be able to poke; caller-overridable via args. Defaults unchanged.
 /** Distinct peers who must be unreachable before we say anything. One is noise; two is a pattern. */
-export const OFFER_AFTER_PEERS = 2;
+export const OFFER_AFTER_PEERS = param({ key: 'addressFallback.offerAfterPeers', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 2 });
 /** And a declined offer stays declined for this long. */
-export const OFFER_COOLDOWN_MS = 7 * 24 * 60 * 60_000;
+export const OFFER_COOLDOWN_MS = param({ key: 'addressFallback.offerCooldownMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 7 * 24 * 60 * 60_000 });
 
 /*
  * (Batch 4) The per-user SETTING itself lives in `deliverySettings.js` (`allowFallback` — one store,

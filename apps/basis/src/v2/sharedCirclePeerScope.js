@@ -16,9 +16,12 @@
  * The failure mode of this function is "hop routing degrades", never "a graph leaks".
  */
 
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
 /** Cache lifetime for a roster read. Long enough to stop a chatty peer re-reading rosters on every claim,
  *  short enough that a removed member stops being disclosed about promptly. */
-const DEFAULT_TTL_MS = 30_000;
+// Parameter register (#36) — roster-read cache TTL (scope:device, kind:internal). Caller-overridable via arg.
+const DEFAULT_TTL_MS = param({ key: 'sharedPeerScope.ttlMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30_000 });
 
 /**
  * Build a `peerScope(callerPubKey, peers) → peers[]` bound to this device's circle memberships.

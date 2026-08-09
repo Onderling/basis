@@ -27,8 +27,10 @@
  */
 
 import { objectDiff } from '@onderling/sync-engine/objectDiff';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
-const DEFAULT_DEDUP_CAP = 256;
+// Parameter register (#36) — bounded dedup-map cap (scope:device, kind:internal). Caller-overridable via arg.
+const DEFAULT_DEDUP_CAP = param({ key: 'kringKind.dedupCap', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 256 });
 
 /* ─────────────────────────────────────────────────────────────────────── */
 /* Receiver substrate — one shape for policy / rules / recipe             */

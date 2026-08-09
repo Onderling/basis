@@ -20,7 +20,11 @@
  * lands).
  */
 
-const SHARED_SKILLS_DEFAULT_MAX = 3;
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
+// Parameter register (#36) — how many shared skills a nearby row shows (scope:device, kind:internal — a
+// render cap). Caller-overridable via arg. `param()` returns 3 unchanged.
+const SHARED_SKILLS_DEFAULT_MAX = param({ key: 'circleNearby.maxSharedSkillsPerRow', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3 });
 
 /**
  * Build the Nearby model from raw peers + the local user's skills.

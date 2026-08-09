@@ -19,10 +19,13 @@
 // Per-thread key. Mirrors the `fp.lang.${threadId}` / `fp.ownpod.${threadId}` convention (one key per thread).
 const keyFor = (threadId) => `fp.history.${threadId}`;
 
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
 // Bound on stored history. The feedback thread is a short guided flow (greeting → a few turns → review
 // cards), so 200 messages is generous headroom; beyond it we keep the MOST RECENT and drop the oldest.
 // Truncation is deliberate and documented (not silent): keep newest, drop oldest.
-export const HISTORY_CAP = 200;
+// Parameter register (#36) — scope:device, kind:internal (a storage bound). `param()` returns 200 unchanged.
+export const HISTORY_CAP = param({ key: 'feedback.historyCap', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 200 });
 
 // The ONLY fields persisted for a message. Everything else (functions, surface/mount refs, DOM nodes,
 // transient render flags) is dropped. Keep in sync with the render objects the shells build:

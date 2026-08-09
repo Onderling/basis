@@ -18,8 +18,10 @@
  *
  * Platform: neutral.
  */
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
-const DEFAULT_CACHE_TTL_MS = 60_000;
+// Parameter register (#36) — brief cache TTL (scope:device, kind:internal). Caller-overridable via opts.ttlMs.
+const DEFAULT_CACHE_TTL_MS = param({ key: 'brief.cacheTtlMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });
 
 /**
  * @typedef {object} BriefSection

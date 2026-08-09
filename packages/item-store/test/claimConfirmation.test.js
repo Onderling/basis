@@ -224,10 +224,10 @@ describe('slice 2 — the race resolves FIRST-COME across two real stores (origi
     await owner.put({
       type: 'task', id: 'p', text: 'parent', master: MASTER,
       assignees: [ANNE], assignee: ANNE, confirmedAssignee: ANNE, confirmedAt: 10, confirmedBy: MASTER,
-      claimedAt: 10, claimSeq: 1, dependencies: ['c1'], updatedAt: 10, updatedBy: ANNE,
-    }, { origin: true });   // preserve the origin clock (10) so the incoming edit at 20 is genuinely newer
+      claimedAt: 10, claimSeq: 1, dependencies: ['c1'], clock: 1, updatedBy: ANNE,
+    }, { origin: true });   // preserve the origin clock (1) so the incoming edit at clock 2 is genuinely newer
     // The editor's copy predates the claim and carries a NEWER text edit (no claim fields).
-    const claimlessNewerEdit = { type: 'task', id: 'p', text: 'renamed parent', master: MASTER, dependencies: ['c1'], updatedAt: 20, updatedBy: BRAM };
+    const claimlessNewerEdit = { type: 'task', id: 'p', text: 'renamed parent', master: MASTER, dependencies: ['c1'], clock: 2, updatedBy: BRAM };
     await owner.put(claimlessNewerEdit, { origin: true });
 
     const merged = await owner.get('p');

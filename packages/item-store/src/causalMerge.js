@@ -1,48 +1,37 @@
 /**
- * causalMerge — origin-timestamp + writer-id causal LWW for inbound item ingest (Objective L).
+ * causalMerge — Lamport-clock + writer-id causal LWW for inbound item ingest (Objective L; unified clock #33).
  *
- * THE PROBLEM (v0 was last-received-wins): `CircleItemStore.put` re-stamped `updatedAt` to the local ingest
- * time, so when a peer's item arrived it overwrote the local copy purely because it arrived LATER — even when
- * the local copy was causally NEWER. Arrival order clobbered causal order.
+ * THE PROBLEM (v0 was last-received-wins): `CircleItemStore.put` re-stamped the ordering field to the local
+ * ingest time, so when a peer's item arrived it overwrote the local copy purely because it arrived LATER — even
+ * when the local copy was causally NEWER. Arrival order clobbered causal order.
  *
- * THE FIX (this module): decide the winner by the item's ORIGIN clock, not by arrival. Each item already carries
- * `updatedAt` (the origin's write time — an ISO string or epoch number) and `updatedBy` (the writer id). Those
- * two fields ARE a coarse causal coordinate, so no new item field is required: the refinement is that inbound
- * ingest PRESERVES `updatedAt`/`updatedBy` from the payload instead of re-stamping them (see CircleItemStore.put
- * `origin:true`), and this comparator picks the causally-newer side.
+ * THE COORDINATE — a per-(device, circle) LAMPORT clock (`item.clock`), NOT the wall clock. Each item carries an
+ * integer `clock` stamped by its writer (tick-on-write: the writer's per-circle counter + 1) and `updatedBy` (the
+ * writer id). On inbound ingest the store advances its local counter to `max(local, incoming.clock)`
+ * (max-on-receive) — see `CircleItemStore.put`. Wall-clock skew no longer decides ordering, so two devices whose
+ * clocks drift still converge. `updatedAt` STAYS on the item as a DISPLAY field (when-edited) but is no longer
+ * read for ordering (design DESIGN-log-ordering-unification §4). This is Phase 1 (the content-LWW coordinate); the
+ * CLAIM cluster keeps its own `claimSeq` Lamport counter and the notify-envelope its own `_v` for now.
  *
- * DESIGN CHOICE — origin-timestamp + writer-id causal LWW, NOT a full per-writer version vector.
- *   • Guarantees: an inbound item that is causally OLDER (earlier origin `updatedAt`) can NOT overwrite a newer
- *     local edit; a causally-NEWER inbound wins; two truly concurrent edits (equal `updatedAt`) resolve by a
- *     DETERMINISTIC tiebreak on writer id — so every peer converges to the SAME survivor regardless of the order
- *     envelopes arrived. That is exactly what stops arrival-order clobbering.
+ * DESIGN CHOICE — Lamport scalar + writer-id causal LWW, NOT a full per-writer version vector.
+ *   • Guarantees: an inbound item that is causally OLDER (lower `clock`) can NOT overwrite a newer local edit; a
+ *     causally-NEWER inbound wins; two truly concurrent edits (equal `clock`) resolve by a DETERMINISTIC tiebreak
+ *     on writer id — so every peer converges to the SAME survivor regardless of the order envelopes arrived.
  *   • Limits: this is last-WRITER-wins at ITEM granularity, not a field-level merge — the losing side of a true
- *     concurrent edit is dropped whole (its distinct fields are not merged in). A full version vector (per-writer
- *     counters) would additionally DETECT concurrency vs causal descent and enable a 3-way field merge, but it is
- *     heavier (every writer must maintain + ship a counter map, and ingest must merge vectors). `sync-engine`'s
- *     `objectDiff` does a 3-way field merge but requires a per-item "last common state" (base) history, which the
- *     CircleItemStore substrate does not keep per item (`objectVersions` history is wired for the kring stores,
- *     not items). So reusing it here would mean inventing that base-state store — out of scope for the smallest
- *     correct fix. This LWW is the documented first step; upgrading to a vector is additive on top of it.
- *
- * BACKWARD COMPATIBILITY: a payload with no parseable `updatedAt` can not be causally ordered, so it falls back
- * to today's last-received-wins ('incoming' always applies). Items therefore ingest unchanged when a peer hasn't
- * been upgraded to send origin metadata — the change is additive, never a crash.
+ *     concurrent edit is dropped whole (its distinct fields are not merged in). The deps-DAG + version-vector
+ *     upgrade (detect concurrency vs causal descent, enable a 3-way field merge) is a later slice, additive on top.
  */
 
 /**
  * The causal coordinate of an item: `{ at, by }`.
- *   at — numeric origin clock parsed from `updatedAt` (epoch number as-is, ISO string via Date.parse);
- *        `NaN` when absent/unparseable (⇒ "no comparable clock").
+ *   at — the item's Lamport `clock` (an integer); `NaN` when absent (⇒ "no comparable clock").
  *   by — writer id (`updatedBy`) used only as the concurrency tiebreak; `''` when absent.
  * @param {object} item
  * @returns {{ at: number, by: string }}
  */
 export function causalRank(item) {
-  const raw = item == null ? undefined : item.updatedAt;
-  let at = NaN;
-  if (typeof raw === 'number') at = raw;
-  else if (typeof raw === 'string') at = Date.parse(raw);
+  const raw = item == null ? undefined : item.clock;
+  const at = typeof raw === 'number' ? raw : NaN;
   const by = (item && typeof item.updatedBy === 'string') ? item.updatedBy : '';
   return { at, by };
 }
@@ -50,15 +39,15 @@ export function causalRank(item) {
 /**
  * Decide which side to keep when an inbound item meets the local copy.
  *
- * @param {object|null|undefined} local     the currently-stored item (has a stamped `updatedAt`), or null/absent
- * @param {object} incoming                 the inbound PAYLOAD (its `updatedAt` is the origin clock, if present)
+ * @param {object|null|undefined} local     the currently-stored item (has a stamped `clock`), or null/absent
+ * @param {object} incoming                 the inbound PAYLOAD (its `clock` is the origin Lamport clock, if present)
  * @returns {'incoming'|'local'}
  *   - no local                          → 'incoming' (first arrival / create)
- *   - incoming has no comparable clock  → 'incoming' (backward-compat last-received-wins)
- *   - local has no comparable clock     → 'incoming' (local predates metadata; accept the clock-bearing update)
- *   - incoming.updatedAt >  local       → 'incoming' (causally newer wins)
- *   - incoming.updatedAt <  local       → 'local'    (causally OLDER inbound must NOT clobber)
- *   - equal updatedAt, higher writer id → 'incoming' (deterministic concurrency tiebreak)
+ *   - incoming has no comparable clock  → 'incoming' (last-received-wins fallback for a clockless item)
+ *   - local has no comparable clock     → 'incoming' (local predates the clock; accept the clock-bearing update)
+ *   - incoming.clock >  local           → 'incoming' (causally newer wins)
+ *   - incoming.clock <  local           → 'local'    (causally OLDER inbound must NOT clobber)
+ *   - equal clock, higher writer id     → 'incoming' (deterministic concurrency tiebreak)
  *   - otherwise (fully equal / lower)   → 'local'    (idempotent: no rewrite, no churn)
  */
 export function causalWinner(local, incoming) {
@@ -71,7 +60,7 @@ export function causalWinner(local, incoming) {
   if (!lHas) return 'incoming';   // local predates origin metadata → accept the update
   if (I.at > L.at) return 'incoming';
   if (I.at < L.at) return 'local';
-  // Concurrent (identical origin clock): deterministic tiebreak on writer id so every
+  // Concurrent (identical Lamport clock): deterministic tiebreak on writer id so every
   // peer converges to the same survivor irrespective of arrival order. Ties (same writer,
   // idempotent redelivery) keep local — a no-op.
   return I.by > L.by ? 'incoming' : 'local';

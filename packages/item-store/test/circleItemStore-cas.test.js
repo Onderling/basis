@@ -118,14 +118,14 @@ describe('CircleItemStore.putIfMatch — CAS authoritative write (Option A)', ()
     const mem = new MemorySource();
     const store = new CircleItemStore({ dataSource: mem, rootContainer: ROOT });
 
-    // Newer local edit lands first.
+    // Newer local edit lands first (higher Lamport clock).
     await store.put(
-      { type: 'task', id: 'c', text: 'newer', updatedAt: '2026-01-02T00:00:00Z', updatedBy: 'a' },
+      { type: 'task', id: 'c', text: 'newer', clock: 2, updatedBy: 'a' },
       { origin: true },
     );
-    // A causally-OLDER inbound must NOT overwrite it (causalWinner keeps local).
+    // A causally-OLDER inbound (lower clock) must NOT overwrite it (causalWinner keeps local).
     const res = await store.put(
-      { type: 'task', id: 'c', text: 'older', updatedAt: '2026-01-01T00:00:00Z', updatedBy: 'b' },
+      { type: 'task', id: 'c', text: 'older', clock: 1, updatedBy: 'b' },
       { origin: true },
     );
     expect(res.text).toBe('newer');

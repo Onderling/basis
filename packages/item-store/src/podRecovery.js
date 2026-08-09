@@ -16,20 +16,20 @@
  * from a SUBSET of devices still yields the best-known state for the items that subset holds.
  *
  * THE MERGE — REUSE `causalWinner`, DON'T REINVENT. Union items across caches by `id`; on collision keep the
- * causal winner via `causalWinner(local, incoming)` from `causalMerge.js` (origin-`updatedAt` + writer-id
+ * causal winner via `causalWinner(local, incoming)` from `causalMerge.js` (Lamport `clock` + writer-id
  * causal LWW). Consequences we get for free from that comparator:
  *   • a causally-OLDER copy never clobbers a newer one;
- *   • two truly-concurrent copies (equal `updatedAt`) resolve by the DETERMINISTIC writer-id tiebreak;
+ *   • two truly-concurrent copies (equal `clock`) resolve by the DETERMINISTIC writer-id tiebreak;
  *   • therefore the result is the SAME regardless of which caches are present or in what order they're read
  *     (fold of a total order over comparable clocks — order-independent).
- * Same caveat as `causalMerge`: a copy with no parseable `updatedAt` can't be causally ordered, so it falls
- * back to last-seen-wins for that id (order-dependent only among clockless copies) — items written by
- * `CircleItemStore` always carry `updatedAt`, so this is the pre-metadata edge, not the norm.
+ * Same caveat as `causalMerge`: a copy with no `clock` can't be causally ordered, so it falls back to
+ * last-seen-wins for that id (order-dependent only among clockless copies) — items written by
+ * `CircleItemStore` always carry a `clock`, so this is the edge, not the norm.
  *
  * PURITY + THE WRITE-BACK SEAM. `recoverCircleFromCaches` is PURE: it only reads caches and returns the merged
  * winners + stats; it performs NO pod I/O. Writing the recovered state to a FRESH pod is a separate, injected
  * seam — `writeRecoveredInto(targetStore, items)` — a thin loop of `targetStore.put(item, { origin: true })`
- * so the causal metadata (`updatedAt`/`updatedBy`) is PRESERVED on write-back and the store's own causal guard
+ * so the causal metadata (`clock`/`updatedBy`) is PRESERVED on write-back and the store's own causal guard
  * still applies. Kept out of the pure core so recovery composition and its target are independent.
  */
 import { causalWinner } from './causalMerge.js';

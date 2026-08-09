@@ -6,8 +6,10 @@
  *   `id` (string, URI-shaped after)
  *   - `createdAt` (ISO timestamp)
  *   - `createdBy` (agent URI)
- *   - `updatedAt` (ISO timestamp, optional)
+ *   - `updatedAt` (ISO timestamp, optional — DISPLAY only, when-edited; no longer read for ordering)
  *   - `updatedBy` (agent URI, optional)
+ *   - `clock` (integer Lamport stamp, optional — the content-LWW ordering coordinate; per-(device, circle),
+ *     tick-on-write / max-on-receive; see item-store `causalMerge` / `CircleItemStore`)
  *   - `embeds` (array of {type, ref}, optional — see embedsSchema.js)
  *
  * Type-specific schemas spread `BASE_PROPERTIES` into their own
@@ -29,6 +31,7 @@ export const BASE_PROPERTIES = Object.freeze({
   createdBy: { type: 'string', minLength: 1 },
   updatedAt: { type: 'string', format: 'date-time' },
   updatedBy: { type: 'string', minLength: 1 },
+  clock:     { type: 'integer', minimum: 0 },
   embeds:    EMBEDS_SCHEMA,
 });
 

@@ -38,6 +38,14 @@ export class CircleItemStore {
   /** @type {string} */                            #root;
   /** @type {((item:object)=>{ok:boolean,errors?:Array})|null} */ #validate;
   /** @type {{publishItem?:(item:object)=>any, publishItemRemoved?:(id:string)=>any}|null} */ #syncHook = null;
+  // The per-(device, circle) LAMPORT clock — the content-LWW ordering coordinate (#33 / DESIGN §4). This is its
+  // HOME: this store IS the circle's log for this device, and `createCircleStores` caches one instance per circle,
+  // so an in-memory counter here is exactly "per (device, circle)". It re-derives from the log rather than being
+  // persisted separately (principle 4 — rebuildable): the canonical Lamport rule is "counter ≥ every clock this
+  // device has SEEN", so the counter is advanced whenever an item is READ (`get`/`list`) or RECEIVED (origin
+  // ingest) — see `#observeClock`. A read-modify-write therefore always ticks ABOVE the value it read, so a fresh
+  // process re-derives a correct counter from the items it touches, with no cold-start scan blocking the write path.
+  /** @type {number} */ #clock = 0;
 
   /**
    * @param {object} args
@@ -83,21 +91,30 @@ export class CircleItemStore {
     try { const r = fn(id); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch { /* best-effort */ }
   }
 
+  // ── The per-(device, circle) Lamport clock (content-LWW coordinate; #33 / DESIGN §4) ──────────────────────
+  /** MAX-ON-OBSERVE — advance the local counter to `max(local, seen)` for any clock this device READS or RECEIVES. */
+  #observeClock(seen) {
+    if (typeof seen === 'number' && seen > this.#clock) this.#clock = seen;
+  }
+
+  /** TICK-ON-WRITE — the next Lamport stamp for a LOCAL write (counter + 1, strictly above everything seen). */
+  #nextClock() { this.#clock += 1; return this.#clock; }
+
   /**
    * Create or replace a typed item. Requires `item.type` (validated against the registry when one is
    * injected); assigns a ULID `id` when absent. Returns the stored item (with its `id`).
    *
    * `origin:true` — INBOUND CAUSAL INGEST (Objective L). Used by the sync inbound path for a peer's item so the
    * merge resolves by CAUSAL order, not arrival order:
-   *   1. Origin metadata is PRESERVED, not re-stamped: `updatedAt`/`updatedBy` keep the payload's values (the
-   *      origin's write clock + writer id) instead of being overwritten with the local ingest time — so the
-   *      causal relationship survives transport. (Payload lacking them falls back to the local `ts`.)
-   *   2. Before writing, the stored copy is compared via `causalWinner`: a causally-OLDER inbound item does NOT
-   *      overwrite a newer local edit (it returns the existing item, no write, no fan-out); a causally-newer
-   *      inbound wins; true concurrency resolves by a deterministic writer-id tiebreak. See `causalMerge.js`
-   *      for the guarantees/limits (item-level last-writer-wins, not a field merge). Payloads with no parseable
-   *      `updatedAt` fall back to last-received-wins, so pre-metadata peers still ingest (backward-compatible).
-   * Default `origin:false` keeps today's behaviour: `updatedAt` is always the local write time.
+   *   1. Origin metadata is PRESERVED, not re-stamped: the payload's `clock` (the origin's Lamport stamp),
+   *      `updatedAt` (display) and `updatedBy` (writer id) survive transport instead of being overwritten with
+   *      the local ingest time. The local Lamport counter advances to `max(local, incoming.clock)` (max-on-receive).
+   *   2. Before writing, the stored copy is compared via `causalWinner`: a causally-OLDER inbound item (lower
+   *      `clock`) does NOT overwrite a newer local edit (it returns the existing item, no write, no fan-out); a
+   *      causally-newer inbound wins; true concurrency (equal `clock`) resolves by a deterministic writer-id
+   *      tiebreak. See `causalMerge.js` for the guarantees/limits (item-level last-writer-wins, not a field merge).
+   * Default `origin:false` is a LOCAL write: it TICKS the counter, stamping a fresh `clock`, and `updatedAt` is the
+   * local write time (display only).
    */
   async put(item, { by, now, sync = true, origin = false } = {}) {
     if (!item || typeof item !== 'object') throw new Error('CircleItemStore.put: an item object is required');
@@ -114,9 +131,14 @@ export class CircleItemStore {
       id,
       createdAt: item.createdAt ?? ts,
       createdBy: item.createdBy ?? by ?? 'unknown',
-      updatedAt: origin ? (item.updatedAt ?? ts) : ts,
+      updatedAt: origin ? (item.updatedAt ?? ts) : ts,     // DISPLAY only (when-edited); no longer read for ordering
       updatedBy: origin ? (item.updatedBy ?? by ?? item.createdBy ?? 'unknown') : (by ?? item.createdBy ?? 'unknown'),
     };
+    // The content-LWW coordinate: a LOCAL write TICKS the per-circle Lamport counter (counter + 1); an ORIGIN
+    // (inbound) write PRESERVES the payload's `clock` (already spread above) and advances the counter to
+    // max(local, incoming) — MAX-ON-RECEIVE — so a later local write out-clocks everything seen. See causalMerge.
+    if (origin) this.#observeClock(item.clock);
+    else stored.clock = this.#nextClock();
     if (this.#validate) {
       const res = this.#validate(stored);
       if (res && res.ok === false) {
@@ -219,9 +241,13 @@ export class CircleItemStore {
       id,
       createdAt: item.createdAt ?? ts,
       createdBy: item.createdBy ?? by ?? 'unknown',
-      updatedAt: ts,
+      updatedAt: ts,                                        // DISPLAY only (when-edited)
       updatedBy: by ?? item.updatedBy ?? item.createdBy ?? 'unknown',
     };
+    // A CAS write is still a LOCAL circle-item write, so it TICKS the content-LWW Lamport clock — its stored item
+    // then carries a coordinate for the ordinary content merge when it later syncs to a peer. (Winner-take-all
+    // among CAS racers is the etag precondition below; the claim's OWN ordering is `claimSeq`, not this clock.)
+    stored.clock = this.#nextClock();
     if (this.#validate) {
       const res = this.#validate(stored);
       if (res && res.ok === false) {
@@ -253,7 +279,9 @@ export class CircleItemStore {
   async get(id) {
     const raw = await this.#source.read(this.#uri(id));
     if (raw === null || raw === undefined) return null;
-    return typeof raw === 'string' ? JSON.parse(raw) : raw;
+    const item = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (item && typeof item === 'object') this.#observeClock(item.clock);   // Lamport: seeing an item advances the clock
+    return item;
   }
 
   /** Delete one item by id (no-op if absent, mirroring DataSource.delete). */
@@ -269,7 +297,11 @@ export class CircleItemStore {
     for (const k of (keys || [])) {
       const raw = await this.#source.read(k);
       if (raw === null || raw === undefined) continue;
-      try { out.push(typeof raw === 'string' ? JSON.parse(raw) : raw); } catch { /* skip malformed */ }
+      try {
+        const item = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (item && typeof item === 'object') this.#observeClock(item.clock);   // Lamport: seeing an item advances the clock
+        out.push(item);
+      } catch { /* skip malformed */ }
     }
     return out;
   }

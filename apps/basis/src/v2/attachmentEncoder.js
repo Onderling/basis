@@ -19,10 +19,16 @@
  * avoid an app→app dependency).
  */
 
-export const MAX_PRIKBORD_BYTES_PER_ATT = 600_000;     // mirror Attachments.MAX_PRIKBORD_BYTES_PER_ATT
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
+// Parameter register (#36) — attachment size/dimension caps (scope:device, kind:internal — safety bounds).
+// `param()` returns each existing default. NOTE the by-value mirror below is a known duplication with
+// stoop's Attachments.MAX_PRIKBORD_BYTES_PER_ATT (app→app import is forbidden); unifying both on the shared
+// `attachment.maxPrikbordBytesPerAtt` key is a follow-up once the register is read at runtime (L24).
+export const MAX_PRIKBORD_BYTES_PER_ATT = param({ key: 'attachment.maxPrikbordBytesPerAtt', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 600_000 });     // mirror Attachments.MAX_PRIKBORD_BYTES_PER_ATT
 export const ALLOWED_MIMES = Object.freeze(new Set(['image/jpeg', 'image/png', 'image/webp']));
-const THUMB_DIM = 120;
-const DEFAULT_MAX_DIM = 1280;
+const THUMB_DIM = param({ key: 'attachment.thumbDim', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 120 });
+const DEFAULT_MAX_DIM = param({ key: 'attachment.maxImageDim', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1280 });
 
 /** Scale (w,h) to fit inside a `maxDim` box, preserving aspect ratio. Pure. */
 export function fitDimensions(w, h, maxDim) {

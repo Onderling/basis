@@ -24,8 +24,10 @@
  * helpers stay testable with a Map-backed snapshot.
  */
 import { eventCircleId } from './circleStream.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
-const MAX_SUBTITLE_LEN = 60;
+// Parameter register (#36) — tile subtitle render cap (scope:device, kind:internal). `param()` returns 60.
+const MAX_SUBTITLE_LEN = param({ key: 'circleTile.maxSubtitleLen', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60 });
 
 /**
  * Project an event list + seenAt snapshot into per-circle tile previews.

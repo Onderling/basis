@@ -13,11 +13,18 @@
  * telling a circle how long you keep its messages would be a disclosure nobody asked you to make.
  */
 
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
 /** The offered chat windows, in days. */
 export const RETENTION_CHOICES_DAYS = Object.freeze([7, 14, 30, 90]);
 
-/** The decided default (OQ-7.B, 2026-05-22) — unchanged by this setting existing. */
-export const DEFAULT_RETENTION_DAYS = 14;
+// Parameter register (#36) — a GENUINE user preference (the chat-retention window a person actually has an
+// opinion about) and explicitly device-scoped ("what THIS device keeps... not a circle policy"): scope:device,
+// kind:user. Declared here for discoverability + the stale-param census; its SETTABLE home stays the existing
+// retention setting (do NOT also route it through set-param — double-homing would be drift). Folding that
+// bespoke set into the one set-param op is part of the register's read/set adoption (REMAINING-WORK L24).
+/** The decided default — unchanged by this setting existing. */
+export const DEFAULT_RETENTION_DAYS = param({ key: 'retention.chatDays', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: 14 });
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

@@ -11,7 +11,7 @@
  * The list types are registered via `registerType` (third-party-style); `task` is canonical. Every op is a
  * pure function over the circle store — no agent, no own store. (REMAINING-WORK.md cluster L.)
  */
-import { createCircleStores, memoryDataSource, createGenericAtomHandlers, resolutionRegistryFromManifests } from '@onderling/item-store';
+import { createCircleStores, memoryDataSource, createGenericAtomHandlers, resolutionRegistryFromManifests, param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { createRegistry, registerCanonicalTypes } from '@onderling/item-types';
 import { dispatchCapability } from '@onderling/app-manifest';
 import { householdManifest } from '../../../household/manifest.js';
@@ -38,7 +38,8 @@ export function householdRegistry() {
   return reg;
 }
 
-const MATCH_MIN_PREFIX_LEN = 6;   // id-prefix resolution only kicks in for reasonably long inputs
+// Parameter register (#36) — id-prefix match heuristic (scope:device, kind:internal). `param()` returns 6.
+const MATCH_MIN_PREFIX_LEN = param({ key: 'household.matchMinPrefixLen', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 6 });   // id-prefix resolution only kicks in for reasonably long inputs
 
 /**
  * Resolve ALL open (completedAt null) items matching `match`, among `types`, using the legacy skill's

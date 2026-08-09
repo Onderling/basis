@@ -45,6 +45,7 @@
  */
 
 import { PodSearch, hash as defaultHash } from '@onderling/pod-search';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 /**
  * Default semantic cosine floor for circle RAG retrieval. pod-search stores
@@ -58,7 +59,7 @@ import { PodSearch, hash as defaultHash } from '@onderling/pod-search';
  * 0.1 is the shared, defensible convention). Overridable per call via
  * `makeCircleRetriever({ minScore })` (pass `0` to disable the floor).
  */
-export const DEFAULT_CIRCLE_RAG_MIN_SCORE = 0.1;
+export const DEFAULT_CIRCLE_RAG_MIN_SCORE = param({ key: 'circleRag.minScore', scope: PARAM_SCOPE.CIRCLE, kind: PARAM_KIND.INTERNAL, default: 0.1 });
 
 // Minimal bilingual stop-word set (EN + NL) so common glue words don't inflate
 // the overlap score. Kept tiny on purpose — it's a relevance nudge, not an NLP

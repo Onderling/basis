@@ -27,8 +27,12 @@ export const INTERESTS_MIGRATION_KEY = '_migrations.interests';
 /** The driver key the folded-in interests live under (one consolidated `interest` driver). */
 export const INTERESTS_DRIVER_KEY = 'interests';
 
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
+// Parameter register (#36) — cap on folded-in interest terms (scope:agent — a profile property; kind:internal
+// — a signal-shaping bound, not a user-facing preference). `param()` returns 8 unchanged.
 /** How many of the strongest learned terms to fold in — the signal, not the whole vocabulary. */
-export const INTERESTS_MAX_TERMS = 8;
+export const INTERESTS_MAX_TERMS = param({ key: 'interests.maxTerms', scope: PARAM_SCOPE.AGENT, kind: PARAM_KIND.INTERNAL, default: 8 });
 
 const unwrap = (v) => (v && typeof v === 'object' && 'mode' in v ? v.value : v);
 

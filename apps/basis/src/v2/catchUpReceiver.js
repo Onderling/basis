@@ -62,6 +62,7 @@
  *     { phase: 'timed-out',          circleId, reason: 'chunk' | 'offer' }
  */
 
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import {
   CATCH_UP_SUBTYPES,
   isValidOffer,
@@ -72,8 +73,12 @@ import {
   makeRequestId,
 } from './catchUpProtocol.js';
 
-const DEFAULT_OFFER_WINDOW_MS = 3000;
-const DEFAULT_CHUNK_TIMEOUT_MS = 10_000;
+// Parameter register (#36) — the catch-up cadence defaults. Per-device network/battery timing (scope:device),
+// and kind:internal: protocol tuning a user must NOT be able to poke (a settable chunk timeout is how you let
+// someone wedge their own catch-up). Both are already caller-overridable via the args below; these are the
+// defaults, so `param()` returns them unchanged — behaviour-identical.
+const DEFAULT_OFFER_WINDOW_MS  = param({ key: 'catchup.offerWindowMs',  scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3000 });
+const DEFAULT_CHUNK_TIMEOUT_MS = param({ key: 'catchup.chunkTimeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 10_000 });
 
 /**
  * @param {object} args

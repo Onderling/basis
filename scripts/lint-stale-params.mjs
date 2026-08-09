@@ -39,10 +39,11 @@ const isTest = (f) => /(^|\/)(test|tests|e2e|test-browser|__tests__)\//.test(f) 
 const isVendored = (f) => /(^|\/)vendor\//.test(f) || /\.min\.js$/.test(f) || f.includes('/node_modules/');
 const isSource = (f) => /\.[cm]?[jt]sx?$/.test(f) && !isTest(f) && !isVendored(f);
 
-// Every `export const NAME = param({ key:'…', scope:'…', kind:'…', … })` — the declaration form the register
-// helper forces. `param()` from the item-store substrate itself is the helper, not a param, so its own file
-// is skipped by matching only the `export const … = param({` shape (the definition is `export function param`).
-const DECL_RE = /export\s+const\s+([A-Za-z_$][\w$]*)\s*=\s*param\(\s*\{([\s\S]*?)\}\s*\)/g;
+// Every `const NAME = param({ key:'…', scope:'…', kind:'…', … })` — the declaration form the register helper
+// forces, exported OR module-private (a param is a param either way; an unread private one is just as dead).
+// `param()` from the item-store substrate itself is the helper, not a param — its definition is
+// `export function param`, which this `const … = param(` shape does not match.
+const DECL_RE = /(?:export\s+)?const\s+([A-Za-z_$][\w$]*)\s*=\s*param\(\s*\{([\s\S]*?)\}\s*\)/g;
 const field = (body, name) => body.match(new RegExp(`\\b${name}\\s*:\\s*(?:PARAM_[A-Z]+\\.[A-Z]+|['"]([^'"]+)['"])`))?.[1] ?? null;
 // Strip comments before the DECLARATION scan so a docstring EXAMPLE of the `param({…})` form (this guard's own
 // header, params.js's) is not miscounted as a real declaration. Reachability still scans full content (a name

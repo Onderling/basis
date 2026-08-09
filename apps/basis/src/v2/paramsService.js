@@ -76,21 +76,31 @@ export function settingsModuleForRegister(register, { appId = 'basis' } = {}) {
 export function createParamsService({ register = basisParamRegistry(), dataSource, deviceId, circlePolicy, settings, homes } = {}) {
   const settingsModule = settings ?? (dataSource ? settingsModuleForRegister(register) : null);
 
-  // The default homes: route each scope to its real store. A writer is a no-op when its store was not injected,
-  // so the seam degrades safely (the set still updates the in-memory register; only persistence is skipped).
+  // The default homes: route each scope to its real store. Built ONLY for the scopes the register actually
+  // declares a settable param for — a home writer exists iff a param that could reach it exists (so no
+  // standing device/circle writer sits as code reached only by tests; it materialises when a real param of
+  // that scope migrates). A writer is still a no-op if its store was not injected, so the seam degrades safely
+  // (the set updates the in-memory register; only persistence is skipped).
   function defaultHomes(ctx) {
     const circleId = ctx?.circleId;
-    return {
-      device: async ({ key, value }) => {
+    const scopes = new Set(register.userParams().map((p) => p.scope));
+    const h = {};
+    if (scopes.has(PARAM_SCOPE.DEVICE)) {
+      h.device = async ({ key, value }) => {
         if (settingsModule && dataSource) await settingsModule.updateSettings({ dataSource, deviceId, patch: { [key]: value }, scope: 'device' });
-      },
-      agent: async ({ key, value }) => {
+      };
+    }
+    if (scopes.has(PARAM_SCOPE.AGENT)) {
+      h.agent = async ({ key, value }) => {
         if (settingsModule && dataSource) await settingsModule.updateSettings({ dataSource, deviceId, patch: { [key]: value }, scope: 'shared' });
-      },
-      circle: async ({ key, value }) => {
+      };
+    }
+    if (scopes.has(PARAM_SCOPE.CIRCLE)) {
+      h.circle = async ({ key, value }) => {
         if (circlePolicy && circleId) await circlePolicy.update(circleId, { settings: { [key]: value } });
-      },
-    };
+      };
+    }
+    return h;
   }
 
   const service = {

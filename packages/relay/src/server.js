@@ -152,6 +152,7 @@ import {
   MAX_ENVELOPE_BYTES, senderVerdict,
   newAddressChallenge, verifyAddressPossession, ADDRESS_CHALLENGE_TTL_MS,
 } from '@onderling/core';
+import { param, PARAM_SCOPE, PARAM_KIND }    from '@onderling/core';
 import { MultiRecipientQueue }               from './MultiRecipientQueue.js';
 import { ForwardQueue }                       from './ForwardQueue.js';
 import { GroupAuthVerifier }                 from './GroupAuthVerifier.js';
@@ -173,15 +174,17 @@ const DEFAULT_PORT             = 8787;
 // `queueCapTotal` (200) messages regardless of TTL. What a longer TTL does grow is the NUMBER of addresses
 // holding a buffer at once — bounded in practice by the eviction sweep, and `queueTtlMs` remains an option
 // for a deployment that wants to trade retention for footprint.
-const DEFAULT_QUEUE_TTL        = 24 * 60 * 60_000;  // 24 h — same as the app's hold queue
-const DEFAULT_QUEUE_CAP        = 50;
+// Parameter register (#36) — offline queue TTL + per-bucket cap (scope:device, kind:internal).
+const DEFAULT_QUEUE_TTL        = param({ key: 'relay.queueTtlMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 24 * 60 * 60_000 });  // 24 h — same as the app's hold queue
+const DEFAULT_QUEUE_CAP        = param({ key: 'relay.queueCap', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 50 });
 // Topic-aware queueing (Phase 7 step 4) caps each (addr, topic) bucket at
 // `queueCap`; the per-address global cap is a safety valve so a publisher
 // flooding many distinct topics can't memory-DoS the relay. Default is
 // 4× queueCap, so up to 4 saturated topics fit before global FIFO eviction
 // kicks in.
-const DEFAULT_QUEUE_CAP_RATIO  = 4;
-const DEFAULT_PUSH_THROTTLE_MS = 30_000;     // do not push more than once / 30s / address
+// Parameter register (#36) — global-cap ratio + push throttle (scope:device, kind:internal).
+const DEFAULT_QUEUE_CAP_RATIO  = param({ key: 'relay.queueCapRatio', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 4 });
+const DEFAULT_PUSH_THROTTLE_MS = param({ key: 'relay.pushThrottleMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30_000 });     // do not push more than once / 30s / address
 
 // Default per-connection message rate limit (J-security flood defense).
 // A token-bucket over the data-plane frame (`send`) so a
@@ -193,8 +196,9 @@ const DEFAULT_PUSH_THROTTLE_MS = 30_000;     // do not push more than once / 30s
 // N costs N tokens rather than one) while capping a
 // flood: `burst` messages may go through instantly, then `perSec` sustained.
 // A 200-message instantaneous blast delivers ~`burst` then gets `OVER_RATE`.
-const DEFAULT_MSG_RATE_PER_SEC = 30;
-const DEFAULT_MSG_RATE_BURST   = 60;
+// Parameter register (#36) — per-connection message rate limit (scope:device, kind:internal).
+const DEFAULT_MSG_RATE_PER_SEC = param({ key: 'relay.msgRatePerSec', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30 });
+const DEFAULT_MSG_RATE_BURST   = param({ key: 'relay.msgRateBurst', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60 });
 
 // Per-connection ceiling on how many addresses ONE socket may register.
 //
@@ -210,7 +214,8 @@ const DEFAULT_MSG_RATE_BURST   = 60;
 // reverse proxy), not something the relay can settle without an identity it can verify — said here so
 // this does not read as protection it is not.
 // Set far above legitimate use: a device registers one address per circle it is in.
-const DEFAULT_MAX_ADDRESSES_PER_CONNECTION = 64;
+// Parameter register (#36) — per-connection address registration ceiling (scope:device, kind:internal).
+const DEFAULT_MAX_ADDRESSES_PER_CONNECTION = param({ key: 'relay.maxAddressesPerConnection', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 64 });
 
 /**
  * Minimal O(1) token bucket. `take()` returns true and consumes one token

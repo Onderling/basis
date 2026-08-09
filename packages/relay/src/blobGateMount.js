@@ -85,10 +85,12 @@
  * @returns {{ route: string, acl: object }}  The mount's route + the live ACL store.
  */
 import { createHttpGate } from '@onderling/blob-gateway/http';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 import { MemoryBlobAclStore } from './blobAclStore.js';
 
 const DENY = Object.freeze({ status: 403, body: Object.freeze({ error: 'forbidden' }) });
-const MAX_BODY_BYTES = 64 * 1024;   // grant bodies are tiny; cap defensively.
+// Parameter register (#36) — grant-body byte cap (scope:device, kind:internal).
+const MAX_BODY_BYTES = param({ key: 'relay.blobMaxBodyBytes', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 64 * 1024 });   // grant bodies are tiny; cap defensively.
 
 export function mountBlobGate(server, {
   verifyToken, bucket, acl, ttl, route = '/blob-gate', uploaders,

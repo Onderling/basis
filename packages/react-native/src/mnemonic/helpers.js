@@ -18,10 +18,13 @@
  * classifier; the two are deliberately consistent.
  */
 
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
+
 export const BIP39_WORD_COUNTS = Object.freeze(new Set([12, 15, 18, 21, 24]));
 
-const MIN_WORD_LEN = 3;
-const MAX_WORD_LEN = 8;
+// Parameter register (#36) — BIP-39-shaped word-length bounds (scope:device, kind:internal).
+const MIN_WORD_LEN = param({ key: 'rnMnemonic.minWordLen', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3 });
+const MAX_WORD_LEN = param({ key: 'rnMnemonic.maxWordLen', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 8 });
 
 /**
  * Lowercase the input, collapse whitespace runs to a single space,

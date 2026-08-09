@@ -15,8 +15,10 @@
 // Only the happy path returns a URL. A denial never carries a URL — no leak.
 
 import { bucketKeyFromRef } from './ref.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 
-const DEFAULT_TTL = 60; // seconds — short-lived by default.
+// Parameter register (#36) — presigned ciphertext-URL TTL, seconds (scope:device, kind:internal).
+const DEFAULT_TTL = param({ key: 'blobGateway.presignTtlSec', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60 }); // seconds — short-lived by default.
 
 export function createBlobGatekeeper({ verifyToken, acl, bucket, ttl = DEFAULT_TTL } = {}) {
   if (typeof verifyToken !== 'function') {

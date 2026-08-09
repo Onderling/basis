@@ -83,6 +83,7 @@
  * + auto-reconnect on foreground.  Stub left in `_onAppStateChange()`.
  */
 import { Transport, createSenderBinding } from '@onderling/core';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 // Sender binding: the shared RULE is kernel logic (`@onderling/core` → `transport/senderBinding.js`);
 // nkn's half — the `__N__.` sub-client normalisation and the encrypted-only `src` guarantee — lives with
 // the nkn adapters in `@onderling/transports`. Both NKN adapters ask the same question of the same code,
@@ -98,10 +99,11 @@ const HI_RACE_PATTERNS = [
   /did\s*not\s*respond\s*with\s*HI/i,
 ];
 
-const DEFAULT_WARN_AFTER_MS    = 20_000;
-const DEFAULT_CONNECT_TIMEOUT  = 90_000;
-const DEFAULT_SEND_RETRIES     = 2;     // total attempts = retries + 1
-const DEFAULT_SEND_RETRY_DELAY = 500;   // ms between retries
+// Parameter register (#36) — NKN transport warn/connect/retry timing (scope:device, kind:internal).
+const DEFAULT_WARN_AFTER_MS    = param({ key: 'rnNkn.warnAfterMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 20_000 });
+const DEFAULT_CONNECT_TIMEOUT  = param({ key: 'rnNkn.connectTimeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 90_000 });
+const DEFAULT_SEND_RETRIES     = param({ key: 'rnNkn.sendRetries', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 2 });     // total attempts = retries + 1
+const DEFAULT_SEND_RETRY_DELAY = param({ key: 'rnNkn.sendRetryDelayMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 500 });   // ms between retries
 // A send must not be able to outlive the handshake window that is waiting on it.
 //
 // `nkn-sdk`'s `client.send()` waits for the client to become ready and never times out on its own, and
@@ -115,7 +117,8 @@ const DEFAULT_SEND_RETRY_DELAY = 500;   // ms between retries
 //
 // 8 s, not the relay's 5 s: NKN is legitimately slower. But well inside secure-agent's 15 s mesh wait, so
 // a failure surfaces while there is still time to re-announce or fail over.
-const DEFAULT_SEND_TIMEOUT     = 8_000;
+// Parameter register (#36) — NKN send timeout (scope:device, kind:internal).
+const DEFAULT_SEND_TIMEOUT     = param({ key: 'rnNkn.sendTimeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 8_000 });
 
 // ── Sender binding ───────────────────────────────────────────────────────────
 //

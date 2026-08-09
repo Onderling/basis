@@ -25,9 +25,10 @@
  * preserved verbatim from Stoop's V1 Phase 7 — apps that already
  * register these names continue to work after the lift.
  */
-import { defineSkill } from '@onderling/core';
+import { defineSkill, param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 
-const DEFAULT_TTL_MS = 60 * 60 * 1000;        // 1 hour
+// Parameter register (#36) — onboarding-skill registration TTL (scope:device, kind:internal).
+const DEFAULT_TTL_MS = param({ key: 'onboardingSkills.ttlMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60 * 60 * 1000 });        // 1 hour
 
 /**
  * @typedef {(args: {webid, displayName, role}) => Promise<{

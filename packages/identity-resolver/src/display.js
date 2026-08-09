@@ -13,6 +13,8 @@
  * authoritative gate.
  */
 
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
+
 // ── Avatar palette ──────────────────────────────────────────────────────────
 
 export const PALETTE = Object.freeze([
@@ -46,8 +48,9 @@ export function paletteFor(name) {
 
 // ── Handle validation ───────────────────────────────────────────────────────
 
-const DEFAULT_MIN_LEN = 3;
-const DEFAULT_MAX_LEN = 32;
+// Parameter register (#36) — handle length bounds (scope:device, kind:internal).
+const DEFAULT_MIN_LEN = param({ key: 'handleValidation.minLen', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3 });
+const DEFAULT_MAX_LEN = param({ key: 'handleValidation.maxLen', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 32 });
 const DEFAULT_HANDLE_RE = /^[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?$/;
 
 export const HANDLE_LIMITS = Object.freeze({

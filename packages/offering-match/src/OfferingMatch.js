@@ -40,11 +40,12 @@
  *   via `addPeer({pubKey})` / `removePeer(pubKey)`.
  */
 
-import { publish, subscribe, unsubscribe } from '@onderling/core';
+import { publish, subscribe, unsubscribe, param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 
 import { ulid } from './ulid.js';
 
-const DEFAULT_TIMEOUT_MS = 30_000;
+// Parameter register (#36) — broadcast claim-collection timeout (scope:device, kind:internal).
+const DEFAULT_TIMEOUT_MS = param({ key: 'offeringMatch.timeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30_000 });
 
 export class OfferingMatch {
   /** @type {import('@onderling/core').Agent} */ #agent;

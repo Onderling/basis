@@ -23,10 +23,12 @@
 import { isSealed } from '@onderling/pod-client/sealing';
 import { bytesToB64u, b64uToBytes, randomKey } from './bytes.js';
 import { makeManifestLine } from './ref.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 
 /** Ceiling on the SEALED thumbnail envelope carried inline in a manifest line (ascii chars,
  *  which is bytes for the envelope). ~48KB — beyond that, fetch the blob instead. */
-export const MAX_SEALED_THUMB_CHARS = 48 * 1024;
+// Parameter register (#36) — inline sealed-thumbnail envelope ceiling (scope:device, kind:internal).
+export const MAX_SEALED_THUMB_CHARS = param({ key: 'blobGateway.sealedThumbMaxChars', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 48 * 1024 });
 
 export async function uploadBlob({ bytes, bucket, sealer, keyRef, key, media }) {
   if (!bytes) throw new Error('uploadBlob: bytes required');

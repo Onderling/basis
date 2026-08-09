@@ -16,11 +16,13 @@
  * Standardisation Phase 51.4.
  */
 
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 import { createAsBackend } from './AsBackend.js';
 import { createFsBackend } from './FsBackend.js';
 import { estimateBytes }   from './_utils.js';
 
-const DEFAULT_FS_THRESHOLD_BYTES = 4 * 1024;
+// Parameter register (#36) — size-routing backend threshold (scope:device, kind:internal).
+const DEFAULT_FS_THRESHOLD_BYTES = param({ key: 'rnBackend.fsThresholdBytes', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 4 * 1024 });
 
 /**
  * @param {object} opts

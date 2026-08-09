@@ -12,7 +12,10 @@
  * Standardisation Phase 52.10.3.
  */
 
-const DEFAULT_MAX_RETRIES = 3;
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
+
+// Parameter register (#36) — etag compare-and-swap retry cap (scope:device, kind:internal).
+const DEFAULT_MAX_RETRIES = param({ key: 'concurrency.maxRetries', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3 });
 const DEFAULT_BACKOFF_MS  = [10, 50, 200];
 
 /**

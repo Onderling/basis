@@ -53,6 +53,7 @@ import nacl  from 'tweetnacl';
 import { b64encode, b64decode } from '@onderling/core';
 import { Bootstrap }      from '@onderling/core';
 import { AgentIdentity }  from '@onderling/core';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 import {
   serializeManifest,
   parseManifest,
@@ -70,7 +71,8 @@ const ENVELOPE_ALG    = 'xsalsa20poly1305';
 const NONCE_LEN       = 24;
 const SALT_LEN        = 16;
 const MANIFEST_FILE   = 'manifest.ttl';
-const MAX_MANIFEST_RETRIES = 3;
+// Parameter register (#36) — manifest write retries (scope:device, kind:internal).
+const MAX_MANIFEST_RETRIES = param({ key: 'podClient.manifestRetries', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3 });
 
 // ── Envelope helpers ───────────────────────────────────────────────────────
 

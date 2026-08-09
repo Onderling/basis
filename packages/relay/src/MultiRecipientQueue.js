@@ -10,10 +10,12 @@
  *
  * See `coding-plans/track-E-mobile-push-relay.md` §E2b.
  */
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 import { MemoryQueueStore } from './queueStores/MemoryQueueStore.js';
 
-const POLL_INTERVAL_MS  = 50;
-const DEFAULT_TIMEOUT   = 10_000;
+// Parameter register (#36) — aggregation poll interval + default deadline (scope:device, kind:internal).
+const POLL_INTERVAL_MS  = param({ key: 'relay.pollIntervalMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 50 });
+const DEFAULT_TIMEOUT   = param({ key: 'relay.timeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 10_000 });
 
 export class MultiRecipientQueue {
   #store;

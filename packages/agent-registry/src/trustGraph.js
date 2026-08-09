@@ -66,6 +66,7 @@
  */
 
 import { verifyEndorsement } from './endorsement.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 
 /** Card roles that mark a TRUST NODE (walked through) rather than an installable agent. */
 export const CURATOR_ROLES = new Set(['curator', 'community']);
@@ -79,7 +80,8 @@ function isCuratorCard(card) {
 }
 
 /** Default maximum candidate depth for `walkTrustGraph`'s bounded BFS over the endorsement graph. */
-export const DEFAULT_MAX_DEPTH = 4;
+// Parameter register (#36) — trust-graph BFS depth bound (scope:device, kind:internal).
+export const DEFAULT_MAX_DEPTH = param({ key: 'trustGraph.maxDepth', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 4 });
 
 /**
  * walkTrustGraph — bounded BFS over the endorsement graph from `roots`.

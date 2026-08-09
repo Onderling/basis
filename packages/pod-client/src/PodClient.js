@@ -38,6 +38,7 @@
  *   - Node: `FileTombstones`
  */
 import { Emitter } from '@onderling/core';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 // SolidPodSource was extracted OUT of @onderling/core into this package (Phase 1/3
 // pod-storage extraction); import it from its local module here rather than
 // from the kernel, which no longer exports it. (Completes a dangling import
@@ -61,14 +62,16 @@ async function loadInrupt() {
   return _inrupt;
 }
 
-const DEFAULT_APPEND_RETRIES         = 3;
+// Parameter register (#36) — append retries + conflict-listener timeout (scope:device, kind:internal).
+const DEFAULT_APPEND_RETRIES         = param({ key: 'podClient.appendRetries', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3 });
 const DEFAULT_CONFLICT_POLICY        = 'reject';   // Q-A.4 LOCK 2026-04-28
-const DEFAULT_CONFLICT_LISTENER_TIMEOUT_MS = 30_000;
+const DEFAULT_CONFLICT_LISTENER_TIMEOUT_MS = param({ key: 'podClient.conflictListenerTimeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30_000 });
 // Soft cap for fetching `remoteContent` to attach to the 'conflict' event.
 // Above this size, or for non-text content types, `remoteContent` is left
 // undefined and the listener can decide what to do (re-fetch via client.read,
 // merge by URI, etc.).  This bound also protects against runaway memory use.
-const REMOTE_CONTENT_FETCH_LIMIT     = 1_000_000;
+// Parameter register (#36) — soft cap for remoteContent fetch (scope:device, kind:internal).
+const REMOTE_CONTENT_FETCH_LIMIT     = param({ key: 'podClient.remoteContentFetchLimit', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1_000_000 });
 const TEXT_CONTENT_TYPE_RE           = /^(text\/|application\/json\b|application\/.*\+json\b)/i;
 
 /**

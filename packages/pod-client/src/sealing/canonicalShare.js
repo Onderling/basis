@@ -48,6 +48,7 @@
 // CURRENT version only (grant carries history forward untouched) — never retroactive access to pre-grant
 // history. Expanding that (grant historic versions) is a deliberate POLICY choice, not the default.
 
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 import {
   grantMember, rotateGroupKeyResource, buildGroupKeyResource, unwrapGroupKey,
   openSealedAcrossVersions,
@@ -88,7 +89,8 @@ function _serializerFor(keyStore) {
 }
 
 /** Bounded optimistic-concurrency retries for a grant (story 1.5); a grant is a pure union, so retrying is safe. */
-const MAX_GRANT_ATTEMPTS = 4;
+// Parameter register (#36) — bounded optimistic-concurrency grant retries (scope:device, kind:internal).
+const MAX_GRANT_ATTEMPTS = param({ key: 'podClient.grantAttempts', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 4 });
 
 export function createCanonicalShare({ sharing, keyStore, controllerKey, resourceUri, resourceUriFor, mode = 'read' } = {}) {
   if (!sharing || typeof sharing.grant !== 'function' || typeof sharing.revoke !== 'function') {

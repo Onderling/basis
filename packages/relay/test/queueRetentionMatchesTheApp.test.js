@@ -20,8 +20,13 @@ const constantIn = (path, re, what) => {
   const src = readFileSync(new URL(path, import.meta.url), 'utf8');
   const m = src.match(re);
   if (!m) throw new Error(`${what} not found in ${path} — was it renamed? This guard is only as good as its anchor.`);
+  let expr = m[1].replace(/\/\/.*$/, '').trim();
+  // A constant migrated to the parameter register reads `param({ …, default: <expr> })`; the value under
+  // test is the `default`. Unwrap it so the agreement stays pinned to the number, not the wrapper.
+  const wrapped = expr.match(/^param\(\{[\s\S]*\bdefault:\s*([\s\S]+?)\}\s*\)\s*$/);
+  if (wrapped) expr = wrapped[1].replace(/,\s*$/, '').trim();
   // eslint-disable-next-line no-new-func -- arithmetic literals only, from our own source
-  return Function(`"use strict"; return (${m[1].replace(/\/\/.*$/, '').trim()});`)();
+  return Function(`"use strict"; return (${expr});`)();
 };
 
 const RELAY_TTL = [/DEFAULT_QUEUE_TTL\s*=\s*([^;\n]+)/, 'DEFAULT_QUEUE_TTL'];

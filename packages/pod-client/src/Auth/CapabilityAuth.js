@@ -32,6 +32,7 @@
  * hang (§R3 decision #3).
  */
 import { PodCapabilityToken, b64encode, b64decode } from '@onderling/core';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 
 import { Auth }                          from './Auth.js';
 import { AuthError, DeviceUnreachableError, PayloadTooLargeError } from '../Errors.js';
@@ -57,7 +58,8 @@ const SUPPORTED_MODES = new Set(['pod-direct', 'agent-proxy']);
  * `maxBodyBytes` option; raise it only with the 100 MiB ceiling (and the
  * base64 + envelope inflation) in mind.
  */
-export const DEFAULT_MAX_BODY_BYTES = 16 * 1024 * 1024;
+// Parameter register (#36) — max request body bytes to proxy (scope:device, kind:internal).
+export const DEFAULT_MAX_BODY_BYTES = param({ key: 'podClient.maxBodyBytes', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 16 * 1024 * 1024 });
 
 /** Header names that must NEVER leave the holder toward the device (§R3 #1). */
 const STRIPPED_HEADERS = new Set(['authorization', 'dpop']);

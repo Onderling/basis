@@ -34,12 +34,14 @@
 import { BleManager, State }             from 'react-native-ble-plx';
 import { NativeModules, NativeEventEmitter } from 'react-native';
 import { Transport, DISCOVERABILITY }    from '@onderling/core';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 import { b64Encode, b64Decode }          from '../utils/base64.js';
 
 export const SERVICE_UUID        = 'a8f0e4d2-0001-4b3f-8c9a-1e2d3f4a5b6c';
 export const CHARACTERISTIC_UUID = 'b1c3e5a7-0002-4f8e-9d0b-2c3e4a5f6b7d';
 
-const DEFAULT_MTU = 20;  // bytes; most devices negotiate higher (up to 512)
+// Parameter register (#36) — default BLE MTU (scope:device, kind:internal).
+const DEFAULT_MTU = param({ key: 'rnBle.mtu', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 20 });  // bytes; most devices negotiate higher (up to 512)
 
 // Native peripheral module — null if the Kotlin module is not present.
 const BlePeripheral = NativeModules.BlePeripheral ?? null;

@@ -53,6 +53,7 @@
  * denied across the network exactly as in-process.
  */
 import { Transport } from '@onderling/core';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 
 /** Wire-frame version + kind — lets a real multiplexed channel demux. */
 const FRAME_V    = 1;
@@ -88,7 +89,8 @@ export function decodeFrame(frame) {
   return { to: obj.to, from: obj.from, envelope: obj.envelope };
 }
 
-const DEFAULT_SERVE_TIMEOUT = 30_000;  // ms — fetch/HTTP server-side wait for the RS
+// Parameter register (#36) — server-side serve timeout (scope:device, kind:internal).
+const DEFAULT_SERVE_TIMEOUT = param({ key: 'transports.serveTimeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30_000 });  // ms — fetch/HTTP server-side wait for the RS
 
 /**
  * Channel-agnostic A2A `Transport` over an injected `send(frame)` function — WebSocket, TCP,

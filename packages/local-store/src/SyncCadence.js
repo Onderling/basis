@@ -29,8 +29,11 @@
  */
 
 import { Emitter } from '@onderling/core';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 
-const DEFAULT_INTERVAL_MS = 60_000;
+// Parameter register (#36) — foreground sync tick interval (scope:device, kind:internal).
+// FLAG: reads as a user-tunable sync interval — candidate for kind:user reclassification.
+const DEFAULT_INTERVAL_MS = param({ key: 'localStore.syncIntervalMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });
 
 export class SyncCadence extends Emitter {
   #intervalMs;

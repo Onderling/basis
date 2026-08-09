@@ -55,9 +55,11 @@
  *   await rdv._put(peerAddress, envelope); // send via DataChannel
  */
 import { Transport } from '@onderling/core';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 
 const CHANNEL_LABEL  = 'onderling';
-const OPEN_TIMEOUT   = 30_000;   // ms
+// Parameter register (#36) — WebRTC channel-open timeout (scope:device, kind:internal).
+const OPEN_TIMEOUT   = param({ key: 'transports.openTimeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30_000 });   // ms
 const ICE_SERVERS    = [{ urls: 'stun:stun.l.google.com:19302' }];
 
 /**

@@ -18,7 +18,10 @@
  * with a vanilla mock.
  */
 
-const DEFAULT_MAX_PER_DAY = 3;
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
+
+// Parameter register (#36) — per-recipient daily push cap (scope:device, kind:internal).
+const DEFAULT_MAX_PER_DAY = param({ key: 'notifier.maxPerDay', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3 });
 
 export class PushPolicy {
   #send;

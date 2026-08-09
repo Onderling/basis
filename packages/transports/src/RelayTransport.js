@@ -43,9 +43,11 @@
 import {
   Transport, addressPossessionMessage, signAddressPossession, b64encode,
 } from '@onderling/core';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 
-const MAX_BACKOFF_MS = 30_000;
-const PUSH_ACK_TIMEOUT_MS = 5_000;
+// Parameter register (#36) — reconnect backoff ceiling + push-ack timeout (scope:device, kind:internal).
+const MAX_BACKOFF_MS = param({ key: 'transports.maxBackoffMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30_000 });
+const PUSH_ACK_TIMEOUT_MS = param({ key: 'transports.pushAckTimeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 5_000 });
 
 /**
  * WebSocket relay-server `Transport`: registers this agent's address with the relay, which

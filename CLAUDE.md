@@ -116,9 +116,9 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
   without Frits goes into `plans/DECISIONS-FOR-REVIEW.md` **in the same turn as the change**, colour-coded
   (🟢 · 🟡 · 🔴), stating **the risk you are taking** and **how to undo it**. Not a batch at the end — the
   file drifted three days in July 2026 and could only be partly reconstructed. → [`decision-log.md`](docs/conventions/decision-log.md).
-- **Naming is `onderling`; compatibility is a DATED licence** — no "canopy" identifiers; backwards
-  compat **not required until 2026-08-31** (extended 2026-07-30), then it lapses and you ASK before breaking a persisted/wire
-  format — [`naming-and-compatibility.md`](docs/conventions/naming-and-compatibility.md).
+- **Naming is `onderling`; NO backwards compatibility needed** — no "canopy" identifiers; break persisted/wire
+  formats freely, no dual-write / fallback / alias cruft (Frits, 2026-08-08 — standing rule; pre-launch, no
+  external users, dev state re-derives) — [`naming-and-compatibility.md`](docs/conventions/naming-and-compatibility.md).
 
 ## How to work
 - **Go through the SURFACE, never the transport.** App/shell code must not construct or drive

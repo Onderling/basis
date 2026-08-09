@@ -12,15 +12,14 @@ The earlier split (onderling = product, canopy = platform/SDK) is dropped — se
 2026-07-28. Two places legitimately still say canopy: the local checkout folder `canopy-mono` (the
 feedback repo's `file:` deps cross to it) and `apps/tasks-mobile` (a deferred delete candidate).
 
-## Compatibility: a dated licence, not a standing one
+## Compatibility: not required (a standing rule)
 
-> **⏳ Backwards compatibility is NOT required — until 2026-08-31**
-> (Frits, 2026-07-28; **extended from 07-31 to 08-31 on 2026-07-30**).
+> **Backwards compatibility is NOT required — standing rule (Frits, 2026-08-08).**
+> Break persisted/wire formats freely; this is no longer a dated licence.
 
-*Why it was extended:* the round-trip work on 2026-07-30 turned up a wire change worth making — the
-reciprocal HI now carries a `reply: true` marker — and the original month ran out the next day, mid-flight.
-Renewing deliberately is the point of a dated licence; letting it lapse by accident while work is in the air
-is not.
+*History:* this was a dated licence (2026-07-28, extended to 2026-08-31); on 2026-08-08 Frits made it
+standing — "no backwards compatibility needed." The condition that makes it safe is unchanged: nothing is
+live.
 
 Nothing is live: no external users, no data worth migrating. So a rename or reshape lands as a **clean
 break** — no dual-write windows, no legacy read-fallbacks, no deprecated aliases. Those cost real
@@ -31,12 +30,12 @@ work out whether the fallback is load-bearing.
 vault keys and old export archives written under previous names do not open; dev circles may need
 re-creating. Pre-launch is exactly when that is cheap, which is the whole reason to do it now.
 
-### The expiry is the point
+### When to revisit (the one trigger)
 
-**After 2026-08-31 this licence lapses — ASK before breaking a persisted or wire format.** A standing
-"compatibility doesn't matter" would quietly outlive the condition that made it true, which is how a
-reasonable decision becomes an unreasonable habit. If the date has passed and nobody has renewed it,
-treat compatibility as required again and raise the question.
+The dated expiry was retired 2026-08-08; the rule is now standing. The thing that makes it safe is *no
+external users*. **Revisit only when that changes** — a published `@onderling/*` package gains real
+third-party consumers, or a real user's sealed data must survive an upgrade. Until then, a rename or
+reshape lands as a clean break.
 
 ### What a break still owes the reader
 

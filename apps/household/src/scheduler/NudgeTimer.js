@@ -19,7 +19,10 @@
  * the Node process alive past `stop()`.
  */
 
-const DEFAULT_DELAY_MS = 60 * 60 * 1000; // 1 hour — Q-H2.7
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
+// Parameter register (#36) — default delay before a completion nudge fires (scope:device, kind:internal).
+const DEFAULT_DELAY_MS = param({ key: 'household.nudgeDelayMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60 * 60 * 1000 }); // 1 hour — Q-H2.7
 
 /** @param {string} chatId @param {string} itemId */
 function makeKey(chatId, itemId) {

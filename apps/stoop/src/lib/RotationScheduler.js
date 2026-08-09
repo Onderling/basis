@@ -20,10 +20,12 @@
  */
 
 import { Emitter } from '@onderling/core';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-const DEFAULT_INTERVAL_MS  = 30 * ONE_DAY_MS;
-const DEFAULT_GRACE_MS     = 7 * ONE_DAY_MS;
+// Parameter register (#36) — identity-rotation cadence + grace window (scope:device, kind:internal).
+const DEFAULT_INTERVAL_MS  = param({ key: 'stoop.rotationIntervalMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30 * ONE_DAY_MS });
+const DEFAULT_GRACE_MS     = param({ key: 'stoop.rotationGraceMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 7 * ONE_DAY_MS });
 
 export class RotationScheduler extends Emitter {
   #agent;

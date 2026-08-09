@@ -11,8 +11,11 @@
  * opportunity once `@onderling/identity-resolver` lands).
  */
 
-const ID_PREFIX_LEN  = 8;
-const MIN_PREFIX_LEN = 6;
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
+// Parameter register (#36) — displayed id-prefix length + minimum prefix accepted for matching (scope:device, kind:internal).
+const ID_PREFIX_LEN  = param({ key: 'household.reassignIdPrefixLen', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 8 });
+const MIN_PREFIX_LEN = param({ key: 'household.reassignMinPrefixLen', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 6 });
 
 function resolveCandidates(items, match) {
   const m = match.trim();

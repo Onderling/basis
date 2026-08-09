@@ -17,8 +17,10 @@
  */
 
 import { defineSkill } from '@onderling/core';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
-const DEFAULT_TTL_MS = 60 * 60 * 1000;
+// Parameter register (#36) — invite default TTL (scope:device, kind:internal).
+const DEFAULT_TTL_MS = param({ key: 'tasksV0.ttlMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60 * 60 * 1000 });
 
 function dataArgs(parts) {
   if (!Array.isArray(parts)) return {};

@@ -27,7 +27,10 @@
  * Emits no stateUpdates — this skill does not mutate state.
  */
 
-const BUTTON_THRESHOLD = 10;
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
+// Parameter register (#36) — item count above which inline done-buttons are dropped (scope:device, kind:internal).
+const BUTTON_THRESHOLD = param({ key: 'household.nudgeButtonThreshold', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 10 });
 
 /** @type {Array<import('../types.js').ItemType>} */
 const TYPE_ORDER = ['shopping', 'errand', 'repair', 'schedule'];

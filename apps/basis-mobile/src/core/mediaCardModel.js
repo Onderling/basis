@@ -19,9 +19,11 @@
  * already carries the line it will need (`embed.snapshot.source`).
  */
 import { openThumbnail } from '@onderling/blob-gateway';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 /** Display box the thumb scales into (longest edge, RN dp). */
-const THUMB_MAX_EDGE = 220;
+// Parameter register (#36) — thumbnail max edge (scope:device, kind:internal render cap).
+const THUMB_MAX_EDGE = param({ key: 'basisMobile.thumbMaxEdge', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 220 });
 
 /** Uint8Array → standard base64 (chunked — a big spread/apply would
  *  blow the arg limit; Hermes ships atob/btoa). */

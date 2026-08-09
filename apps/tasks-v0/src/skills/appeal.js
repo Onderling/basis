@@ -31,8 +31,10 @@
 import { defineSkill } from '@onderling/core';
 
 import { argsFromParts } from '../bundleResolver.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
-const APPEAL_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+// Parameter register (#36) — post-revoke appeal window (scope:device, kind:internal).
+const APPEAL_WINDOW_MS = param({ key: 'tasksV0.appealWindowMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 7 * 24 * 60 * 60 * 1000 });
 
 /**
  * @param {object} args

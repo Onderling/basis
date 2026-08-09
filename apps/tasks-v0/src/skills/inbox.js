@@ -26,9 +26,11 @@ import { defineSkill } from '@onderling/core';
 import { argsFromParts } from '../bundleResolver.js';
 // DESIGN gap #2 (2026-05-27) — `_sync` reply envelope for staleness hints.
 import { simulateSync, decorateWithLastSync } from './_syncEnvelope.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 const DEFAULT_INBOX_CONTAINER = 'mem://user/inbox/';
-const BADGE_WINDOW_MS = 24 * 60 * 60 * 1000;
+// Parameter register (#36) — inbox badge count window (scope:device, kind:internal).
+const BADGE_WINDOW_MS = param({ key: 'tasksV0.badgeWindowMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 24 * 60 * 60 * 1000 });
 
 async function _listAll(dataSource, container) {
   const keys = await dataSource.list(container);

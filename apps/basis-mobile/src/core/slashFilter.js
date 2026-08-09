@@ -18,7 +18,10 @@
  */
 
 /** Default limit on returned matches (matches web auto-suggest). */
-export const DEFAULT_SUGGEST_LIMIT = 12;
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
+// Parameter register (#36) — slash-suggest result cap (scope:device, kind:internal).
+export const DEFAULT_SUGGEST_LIMIT = param({ key: 'basisMobile.slashSuggestLimit', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 12 });
 
 /**
  * @param {object}   args

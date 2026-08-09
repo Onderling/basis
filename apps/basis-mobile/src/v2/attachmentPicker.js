@@ -14,8 +14,12 @@
  * shaping logic is unit-testable with fakes — mirrors the web encoder's seam.
  */
 
-export const MAX_PRIKBORD_BYTES_PER_ATT = 600_000;   // mirror web encoder / stoop Attachments
-const DEFAULT_MAX_DIM = 1280;
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
+// Parameter register (#36) — attachment caps. Reuse the SHARED keys (same tunable as the web encoder + stoop
+// Attachments) so the by-value mirror is documented as one param. scope:device, kind:internal.
+export const MAX_PRIKBORD_BYTES_PER_ATT = param({ key: 'attachment.maxPrikbordBytesPerAtt', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 600_000 });   // mirror web encoder / stoop Attachments
+const DEFAULT_MAX_DIM = param({ key: 'attachment.maxImageDim', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1280 });
 const THUMB_DIM = 120;
 
 /** Shape a manipulator result + thumbnail into the inbound-attachment record. Pure. */

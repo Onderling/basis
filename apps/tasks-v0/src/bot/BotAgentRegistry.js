@@ -32,8 +32,10 @@
 
 import { Agent, AgentIdentity, InternalTransport, TrustRegistry, PolicyEngine, TokenRegistry, CapabilityToken } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
-const DEFAULT_TTL_DAYS = 30;
+// Parameter register (#36) — bot cap-token default TTL in days (scope:device, kind:internal).
+const DEFAULT_TTL_DAYS = param({ key: 'tasksV0.ttlDays', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30 });
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /**

@@ -14,8 +14,11 @@
  * (case-insensitive).  Only open items are considered.
  */
 
-const ID_PREFIX_LEN = 8;
-const MIN_PREFIX_LEN = 6;
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
+// Parameter register (#36) — displayed id-prefix length + minimum prefix accepted for matching (scope:device, kind:internal).
+const ID_PREFIX_LEN = param({ key: 'household.markCompleteIdPrefixLen', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 8 });
+const MIN_PREFIX_LEN = param({ key: 'household.markCompleteMinPrefixLen', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 6 });
 
 /**
  * @param {Array<import('../types.js').Item>} items

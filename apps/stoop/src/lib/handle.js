@@ -12,8 +12,11 @@
  * `@anne-23` get a friendly normalisation rather than a hard error.
  */
 
-const MIN_LEN = 3;
-const MAX_LEN = 32;
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
+// Parameter register (#36) — handle length bounds (scope:device, kind:internal).
+const MIN_LEN = param({ key: 'stoop.handleMinLen', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3 });
+const MAX_LEN = param({ key: 'stoop.handleMaxLen', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 32 });
 const HANDLE_RE = /^[a-z0-9_-]+$/;
 
 /**

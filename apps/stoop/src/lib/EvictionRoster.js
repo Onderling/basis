@@ -24,7 +24,10 @@
  * — consumers call `isEvicted(webid)` only.
  */
 
-const GRACE_MS = 24 * 60 * 60 * 1000;   // 24h, matches Phase 25.4
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
+// Parameter register (#36) — eviction grace window past membership expiry (scope:device, kind:internal).
+const GRACE_MS = param({ key: 'stoop.evictionGraceMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 24 * 60 * 60 * 1000 });   // 24h, matches Phase 25.4
 
 export class EvictionRoster {
   /** @type {Map<string, number>} webid → latest expiresAt */

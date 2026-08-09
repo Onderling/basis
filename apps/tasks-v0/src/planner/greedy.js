@@ -25,8 +25,12 @@
  * app-local.
  */
 
-const SLOT_STEP_MIN = 30;
-const DEFAULT_ESTIMATE_MIN = 60;
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
+// Parameter register (#36) — planner slot step + default estimate (scope:device, kind:internal).
+const SLOT_STEP_MIN = param({ key: 'tasksV0.slotStepMin', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30 });
+// FLAG: possibly user-facing preference (default duration estimate) — migrated as INTERNAL per rubric.
+const DEFAULT_ESTIMATE_MIN = param({ key: 'tasksV0.estimateMin', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60 });
 const MS_PER_MIN = 60_000;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 

@@ -21,10 +21,13 @@
  *      § "Pod schema → Bot's pod governance"
  */
 
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
 const TELEGRAM_OAUTH_SERVICE = 'telegram';
 const BOT_TOKEN_PATH         = '/bot/bot-token.enc';
 const CONFIG_PATH            = '/bot/config.json';
-const DEFAULT_AUDIT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+// Parameter register (#36) — default audit-log retention window (scope:device, kind:internal).
+const DEFAULT_AUDIT_WINDOW_MS = param({ key: 'household.auditWindowMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30 * 24 * 60 * 60 * 1000 }); // 30 days
 
 /**
  * Format a Date (or ms epoch) as "YYYY-MM" in UTC.  Audit log files

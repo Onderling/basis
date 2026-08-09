@@ -18,8 +18,11 @@
  * `Project Files/Substrates/substrate-candidates.md`.
  */
 
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
 const EARTH_R_KM = 6371;
-const DEFAULT_GRID_M = 500;
+// Parameter register (#36) — default coarse geo-grid size in metres (scope:device, kind:internal).
+const DEFAULT_GRID_M = param({ key: 'stoop.gridM', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 500 });
 
 /**
  * Compute the cell string for a (lat, lng) pair at a given grid.

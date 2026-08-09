@@ -23,8 +23,10 @@
  */
 
 import { defineSkill } from '@onderling/core';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
-const MAX_ITEMS = 5;
+// Parameter register (#36) — brief summary row cap (scope:device, kind:internal).
+const MAX_ITEMS = param({ key: 'tasksV0.maxItems', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 5 });
 
 /**
  * Build the `tasks_briefSummary` skill.  Same factory shape as

@@ -10,13 +10,15 @@
  */
 
 import { cellFor } from './geo.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org/search';
 const USER_AGENT     = 'Stoop/0.2 (https://github.com/Onderling)';
 
 let _httpFactory = null;
 let _lastCallAt  = 0;
-const RATE_LIMIT_MS = 1000;
+// Parameter register (#36) — Nominatim rate-limit interval (scope:device, kind:internal).
+const RATE_LIMIT_MS = param({ key: 'stoop.geocodeRateLimitMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1000 });
 
 /** Test seam: replace the fetch implementation. */
 export function _setHttpFactory(factory) {

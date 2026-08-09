@@ -32,6 +32,8 @@
  * success rather than a refusal (see `redeemersOfCode`).
  */
 
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
 /**
  * The system cap: the most redemptions ANY invite may permit, whatever a circle asks for.
  *
@@ -40,7 +42,8 @@
  * lowering it below an existing circle's ceiling silently tightens that circle at its next mint,
  * which is the safe direction.
  */
-export const INVITE_REDEMPTION_SYSTEM_CAP = 100;
+// Parameter register (#36) — system-wide invite redemption cap (scope:device, kind:internal).
+export const INVITE_REDEMPTION_SYSTEM_CAP = param({ key: 'stoop.inviteRedemptionSystemCap', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 100 });
 
 /**
  * The ceiling for a circle whose rules do not state one — every circle created before 2026-08-02,

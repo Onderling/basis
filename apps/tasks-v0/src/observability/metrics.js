@@ -23,8 +23,10 @@
  */
 
 import { UsageMetrics } from '@onderling/notifier';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
-const DEFAULT_LATENCY_RESERVOIR = 200;
+// Parameter register (#36) — per-name latency reservoir size (scope:device, kind:internal).
+const DEFAULT_LATENCY_RESERVOIR = param({ key: 'tasksV0.latencyReservoir', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 200 });
 
 const COUNTER_NAMES = Object.freeze({
   ADDED:            'task.added',

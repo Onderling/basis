@@ -19,9 +19,11 @@
  */
 
 import { createProfile } from './InterestProfile.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 const PROFILE_PATH = 'mem://stoop/interest-profile.json';
-const DEFAULT_DEBOUNCE_MS = 10_000;
+// Parameter register (#36) — interest-profile save debounce (scope:device, kind:internal).
+const DEFAULT_DEBOUNCE_MS = param({ key: 'stoop.interestProfileDebounceMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 10_000 });
 
 async function load({ dataSource } = {}) {
   if (!dataSource?.read) throw new TypeError('InterestProfileCache.load: dataSource required');

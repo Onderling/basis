@@ -39,10 +39,12 @@ import { defineSkill } from '@onderling/core';
 
 import { depthOf, wouldCreateParentCycle } from '../dag-tree.js';
 import { argsFromParts } from '../bundleResolver.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 const REQUEST_TYPE = 'subtask-request';
 const PROPOSAL_TYPE = 'subtask-proposal';
-const DEFAULT_ADMIN_APPROVAL_DEPTH = 3;
+// Parameter register (#36) — subtask depth requiring admin approval (scope:device, kind:internal).
+const DEFAULT_ADMIN_APPROVAL_DEPTH = param({ key: 'tasksV0.adminApprovalDepth', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3 });
 
 /**
  * Build the sub-task skills.

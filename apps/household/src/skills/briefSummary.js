@@ -19,7 +19,10 @@
  * ctx  : SkillContext (ctx.store.listOpen())
  */
 
-const MAX_ITEMS = 5;
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
+// Parameter register (#36) — cap on items surfaced in the brief section (scope:device, kind:internal).
+const MAX_ITEMS = param({ key: 'household.briefMaxItems', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 5 });
 
 /**
  * @type {import('../types.js').SkillHandler}

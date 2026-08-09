@@ -47,18 +47,19 @@
  * injected `FsAdapter` (default Node).
  */
 
-import { PodCapabilityToken }  from '@onderling/core';
+import { PodCapabilityToken, param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 
 import { fsNode }              from './adapters/fsNode.js';
 import { joinPosix, dirnamePosix } from './adapters/pathPosix.js';
 
 // ── Public constants ────────────────────────────────────────────────────────
 
+// Parameter register (#36) — share lifetime + renewal window (scope:device, kind:internal).
 /** 90 days, the default share lifetime. */
-export const SHARE_EXPIRY_MS = 90 * 24 * 60 * 60 * 1000;
+export const SHARE_EXPIRY_MS = param({ key: 'folio.shareExpiryMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 90 * 24 * 60 * 60 * 1000 });
 
 /** Renew a token if it expires within this window. */
-export const SHARE_RENEW_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+export const SHARE_RENEW_WINDOW_MS = param({ key: 'folio.shareRenewWindowMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 7 * 24 * 60 * 60 * 1000 });
 
 /** Where the persisted token store lives, relative to the local root. */
 export const SHARES_FILE_RELPATH = '.folio/shares.json';

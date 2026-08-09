@@ -43,9 +43,11 @@ import {
   createContextBuilder,
   installSlashCommandPreprocessor,
 } from '../scripts/lib/freetext-core.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
-const DEFAULT_SESSION_TTL_MS = 60_000;
-const DEFAULT_HISTORY_DEPTH  = 16;
+// Parameter register (#36) — chat-session TTL + retained history depth (scope:device, kind:internal).
+const DEFAULT_SESSION_TTL_MS = param({ key: 'household.sessionTtlMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 60_000 });
+const DEFAULT_HISTORY_DEPTH  = param({ key: 'household.historyDepth', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 16 });
 
 export class HouseholdAgentFreeform {
   /** @type {object} */                          #store;

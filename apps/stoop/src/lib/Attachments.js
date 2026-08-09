@@ -73,6 +73,7 @@
 
 import nacl from 'tweetnacl';
 import { isBlobRef, bucketKeyFromRef, BLOB_TYPE } from '@onderling/blob-gateway';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 // Tiny standard-base64 helpers (NOT base64url — attachments are
 // runtime payloads, not URL components).  Browser uses btoa/atob;
@@ -86,13 +87,17 @@ function _b64encode(bytes) {
 }
 // (_b64decode removed with the plaintext path — stoop no longer decodes attachment bytes.)
 
+// Parameter register (#36) — attachment count + byte caps (scope:device, kind:internal).
 /** Max prikbord attachments per item (web picker enforces too). */
-export const MAX_ATTACHMENTS_PER_POST = 4;
+export const MAX_ATTACHMENTS_PER_POST = param({ key: 'stoop.maxAttachmentsPerPost', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 4 });
 
 /** Max bytes per prikbord attachment AFTER client-side resize. */
-export const MAX_PRIKBORD_BYTES_PER_ATT = 600_000;     // ~600 KB
+export const MAX_PRIKBORD_BYTES_PER_ATT = param({ key: 'attachment.maxPrikbordBytesPerAtt', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 600_000 });     // ~600 KB
 
 /** Max bytes per chat-message attachment AFTER client-side resize. */
+// NOT migrated to param(): read only by a test (phase39) that pins its value, never by production code — the
+// stale-param guard rightly treats test-only usage as unread, so registering it would be a dead param.
+// Flagged as a production-dead export (an unenforced cap) for review/cleanup.
 export const MAX_CHAT_BYTES_PER_ATT = 250_000;         // ~250 KB
 
 /** Allowed mime types. */

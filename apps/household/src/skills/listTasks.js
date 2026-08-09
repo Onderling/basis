@@ -11,9 +11,12 @@
  * `done <id>`.
  */
 
-const ID_PREFIX_LEN = 8;
-const LABEL_MAX = 24;
-const BUTTON_THRESHOLD = 10;
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
+// Parameter register (#36) — id-prefix length, label cap, and button-drop threshold (scope:device, kind:internal).
+const ID_PREFIX_LEN = param({ key: 'household.listTasksIdPrefixLen', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 8 });
+const LABEL_MAX = param({ key: 'household.listTasksLabelMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 24 });
+const BUTTON_THRESHOLD = param({ key: 'household.listTasksButtonThreshold', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 10 });
 
 function shortLabel(text, fallback) {
   const t = String(text ?? '').trim();

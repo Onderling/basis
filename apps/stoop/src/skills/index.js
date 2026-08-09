@@ -71,6 +71,7 @@ import { validateCanonical } from '@onderling/item-types';
 // unchanged "share to this circle" never touches the row, never acks a change, never announces one.
 import { changedReleaseKeys } from '@onderling/agent-registry';
 import { treeOf, createCrossPodRefResolver, chatEnvelopeFromStoreItem, toWireEnvelope, toWireRefEnvelope } from '@onderling/item-store';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 // The circle fan-out CORE lives in the circles substrate now; stoop injects its deps + helpers.
 // The per-circle ADDRESS announce/record logic lives there too (same DI lift), as does the
 // roster read / persona-property write / roster-updated fan.
@@ -159,7 +160,8 @@ function isCircleAdmin(role) {
  * "this offer touches several other items" use cases. A4 / V2
  * functional design §4b.
  */
-const MAX_EMBEDS_PER_POST = 8;
+// Parameter register (#36) — cross-pod embed soft cap per post (scope:device, kind:internal).
+const MAX_EMBEDS_PER_POST = param({ key: 'stoop.maxEmbedsPerPost', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 8 });
 
 function validateEmbed(e) {
   if (!e || typeof e !== 'object') return 'embed-not-object';
@@ -196,9 +198,11 @@ function _buildStoragePolicy(storagePolicy, groupPodUri) {
   return { policy };
 }
 
-const DEFAULT_TIMEOUT_MS = 30_000;
+// Parameter register (#36) — default skill task timeout (scope:device, kind:internal).
+const DEFAULT_TIMEOUT_MS = param({ key: 'stoop.skillTimeoutMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30_000 });
+// Parameter register (#36) — lend return-reminder lead time (scope:device, kind:internal).
 /** Default lead time for lend return reminders: 24 hours before dueAt. */
-const DEFAULT_LEND_LEAD_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_LEND_LEAD_MS = param({ key: 'stoop.lendLeadMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 24 * 60 * 60 * 1000 });
 /** Default channel id used to schedule lend reminders. Apps wire the channel into the notifier. */
 const DEFAULT_LEND_CHANNEL = 'push';
 
@@ -359,7 +363,8 @@ async function collectCircleHandles({ store, members, groupId } = {}) {
  * Generous on purpose: this answers *is this person still one of us*, and letting someone's standing
  * lapse over a clock difference would evict a real member. Nobody gets IN through this.
  */
-const MEMBERSHIP_GRACE_MS = 24 * 60 * 60 * 1000;
+// Parameter register (#36) — membership-standing grace past expiry (scope:device, kind:internal).
+const MEMBERSHIP_GRACE_MS = param({ key: 'stoop.membershipGraceMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 24 * 60 * 60 * 1000 });
 
 /**
  * How much clock difference a REDEEM tolerates past a code's expiry.
@@ -373,7 +378,8 @@ const MEMBERSHIP_GRACE_MS = 24 * 60 * 60 * 1000;
  *
  * Two minutes is what clock skew actually needs.
  */
-const CODE_SKEW_MS = 2 * 60 * 1000;
+// Parameter register (#36) — redeem clock-skew tolerance past code expiry (scope:device, kind:internal).
+const CODE_SKEW_MS = param({ key: 'stoop.codeSkewMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 2 * 60 * 1000 });
 
 /**
  * The ONE gate for "may this code be redeemed right now".

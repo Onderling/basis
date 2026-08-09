@@ -10,8 +10,11 @@
  * Emits no stateUpdates.
  */
 
-const ID_PREFIX_LEN = 8;
-const LABEL_MAX = 24;          // Telegram inline buttons clip past ~30 chars on narrow screens
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
+// Parameter register (#36) — id-prefix length + inline-button label cap (scope:device, kind:internal).
+const ID_PREFIX_LEN = param({ key: 'household.listOpenIdPrefixLen', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 8 });
+const LABEL_MAX = param({ key: 'household.listOpenLabelMax', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 24 });          // Telegram inline buttons clip past ~30 chars on narrow screens
 
 function shortLabel(text, fallback) {
   const t = String(text ?? '').trim();
@@ -19,7 +22,8 @@ function shortLabel(text, fallback) {
   if (t.length <= LABEL_MAX) return t;
   return t.slice(0, LABEL_MAX - 1) + '…';
 }
-const BUTTON_THRESHOLD = 10;
+// Parameter register (#36) — item count above which inline buttons are dropped (scope:device, kind:internal).
+const BUTTON_THRESHOLD = param({ key: 'household.listOpenButtonThreshold', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 10 });
 const KNOWN_TYPES = new Set(['shopping', 'errand', 'repair', 'schedule']);
 
 /**

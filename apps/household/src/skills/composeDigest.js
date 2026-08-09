@@ -28,11 +28,14 @@
  * becomes mandatory.
  */
 
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
 const TYPE_ORDER = ['shopping', 'errand', 'repair', 'schedule'];
-const TYPE_LABEL_WIDTH = 10; // padded width for the type column
+// Parameter register (#36) — digest formatting width, stale-age cutoff, default window (scope:device, kind:internal).
+const TYPE_LABEL_WIDTH = param({ key: 'household.typeLabelWidth', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 10 }); // padded width for the type column
 const DAY_MS = 24 * 60 * 60 * 1000;
-const STALE_AGE_MS = 7 * DAY_MS;
-const DEFAULT_WINDOW_MS = DAY_MS;
+const STALE_AGE_MS = param({ key: 'household.staleAgeMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 7 * DAY_MS });
+const DEFAULT_WINDOW_MS = param({ key: 'household.digestWindowMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: DAY_MS });
 
 /**
  * @type {import('../types.js').SkillHandler}

@@ -46,9 +46,11 @@
  *        the heavy hammer for "admin removed".
  */
 import { PodCapabilityToken } from '@onderling/core';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
+// Parameter register (#36) — default admin-capability TTL (scope:device, kind:internal).
 /** Default TTL for an admin cap if the caller doesn't specify one. */
-const DEFAULT_EXPIRES_IN_MS = 30 * 24 * 60 * 60 * 1000; // 30 days.
+const DEFAULT_EXPIRES_IN_MS = param({ key: 'household.adminCapExpiresInMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30 * 24 * 60 * 60 * 1000 }); // 30 days.
 
 /** The single scope an admin cap grants: full pod-root authority. */
 const ADMIN_SCOPES = ['pod.*:/'];

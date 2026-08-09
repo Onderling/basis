@@ -27,6 +27,7 @@
 import { defineSkill } from '@onderling/core';
 
 import { argsFromParts } from '../bundleResolver.js';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 /**
  * Default skill opts for every `bot.*` defineSkill call.
@@ -65,7 +66,8 @@ function effectiveActor({ from, envelope }) {
   return from;
 }
 
-const MIN_PREFIX_LEN = 6;
+// Parameter register (#36) — minimum short-id prefix length for fuzzy resolve (scope:device, kind:internal).
+const MIN_PREFIX_LEN = param({ key: 'tasksV0.minPrefixLen', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 6 });
 
 /**
  * Resolve a short prefix to a full id. Returns null if no match,

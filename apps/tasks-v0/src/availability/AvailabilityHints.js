@@ -17,10 +17,13 @@
  *     leak the absence — drop them entirely).
  */
 
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+
 const VALID_STATES = Object.freeze(['open', 'tight', 'unavailable']);
 const VALID_HALVES = Object.freeze(['am', 'pm']);
 const VALID_DAYS   = Object.freeze(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']);
-const STALE_AFTER_WEEKS = 4;
+// Parameter register (#36) — availability hint staleness window in ISO weeks (scope:device, kind:internal).
+const STALE_AFTER_WEEKS = param({ key: 'tasksV0.staleAfterWeeks', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 4 });
 
 export class AvailabilityHints {
   /** @type {Map<string, Map<string, string>>} week → (cell → state) */

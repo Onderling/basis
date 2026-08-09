@@ -41,7 +41,7 @@ import { defineSkill } from '@onderling/core';
 import { wireSkill } from '@onderling/sdk';
 // Co-ownership (J2) — membership over the `assignees[]` set (falls back to the
 // legacy `assignee` mirror for single-owner items) + the not-full claimable test.
-import { assigneesOf, isAssigneesFull } from '@onderling/item-store';
+import { assigneesOf, isAssigneesFull, param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 import { computeStatus, effectiveStatus, unmetDeps, detectCycle } from '../dag.js';
 import { argsFromParts } from '../bundleResolver.js';
 // DESIGN gap #2 (2026-05-27) — `_sync` reply envelope for staleness hints.
@@ -62,7 +62,8 @@ import {
  * several other items" use cases. Tasks V2 substrate-adoption (the
  * A4 equivalent from Stoop V2 web). V2 functional design §4b.
  */
-const MAX_EMBEDS_PER_TASK = 8;
+// Parameter register (#36) — cross-pod embed soft cap per task (scope:device, kind:internal).
+const MAX_EMBEDS_PER_TASK = param({ key: 'tasksV0.maxEmbedsPerTask', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 8 });
 
 function _validateEmbed(e) {
   if (!e || typeof e !== 'object') return 'embed-not-object';

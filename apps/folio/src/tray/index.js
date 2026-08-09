@@ -53,6 +53,7 @@ import { exec }           from 'node:child_process';
 import { fileURLToPath }  from 'node:url';
 import { dirname, join }  from 'node:path';
 import { readFileSync }   from 'node:fs';
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 
 // ─── Public constants ──────────────────────────────────────────────────────
 
@@ -63,9 +64,10 @@ export const STATES = Object.freeze({
   error:    'sync-error',
 });
 
-const POLL_INTERVAL_MS    = 5_000;
-const BACKOFF_INTERVAL_MS = 30_000;
-const BACKOFF_THRESHOLD   = 5;
+// Parameter register (#36) — tray /status poll cadence + failure backoff (scope:device, kind:internal).
+const POLL_INTERVAL_MS    = param({ key: 'folio.trayPollIntervalMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 5_000 });
+const BACKOFF_INTERVAL_MS = param({ key: 'folio.backoffIntervalMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30_000 });
+const BACKOFF_THRESHOLD   = param({ key: 'folio.backoffThreshold', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 5 });
 
 const HERE      = dirname(fileURLToPath(import.meta.url));
 const ICONS_DIR = join(HERE, 'icons');

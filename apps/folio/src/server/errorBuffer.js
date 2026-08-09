@@ -20,7 +20,10 @@
  *   - `attachErrorBuffer(engine)` — convenience: build + subscribe in one call.
  */
 
-const DEFAULT_CAPACITY = 50;
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
+
+// Parameter register (#36) — ring-buffer capacity for recent sync errors (scope:device, kind:internal).
+const DEFAULT_CAPACITY = param({ key: 'folio.errorBufferCapacity', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 50 });
 
 // Errors with these phases are not "failure" surfaces — they belong to the
 // normal sync flow (conflict resolution surfaces via its own UI affordance).

@@ -3922,6 +3922,31 @@ export function buildSkills({
       visibility:  'authenticated',
     }),
 
+    // Type-general catch-up for the SPINE channel (task C): the spine resolution policy declares RELIABLE
+    // delivery, so a device offline during an eviction must be able to PULL the missed membership-spine
+    // statements on reconnect and re-fold its roster. Unlike chat, the spine carries NO wall-clock ts and is
+    // CAUSALLY chained — so there is no meaningful `sinceTs` cursor. We return ALL of the circle's spine items;
+    // that is safe and cheap because the receiver re-puts them id-preserving (dedup is free) and the roster fold
+    // is idempotent + strengthen-only: re-pulling a known statement is a no-op, and a pulled one can only DROP a
+    // member (verified against the circle), never invent one. Raw stored shape ({id,type,source}) — NOT a chat
+    // envelope — so the receiver can re-put it id-preserving and `deriveRoster` verifies + folds it on next read.
+    defineSkill('getSpineSince', async ({ parts }) => {
+      const a = dataArgs(parts);
+      const groupId = typeof a.groupId === 'string' ? a.groupId : '';
+      const rawMax  = Number.isFinite(a.max) ? a.max : 500;
+      const max     = Math.max(1, Math.min(rawMax, 2000));
+      if (!groupId) return { items: [], truncated: false };
+      const all = await store.listOpen({ type: SPINE_STATEMENT_ITEM });
+      const items = all
+        .filter((it) => it?.source?.groupId === groupId)
+        .map((it) => ({ id: it.id, type: SPINE_STATEMENT_ITEM, source: it.source }));
+      const truncated = items.length > max;
+      return { items: truncated ? items.slice(0, max) : items, truncated };
+    }, {
+      description: 'Read this circle\'s membership-spine statements from itemStore for type-general catch-up (task C). Returns raw stored items ({id,type,source}) for id-preserving re-put; no ts cursor (spine is causally chained + idempotent). Args: groupId (required), max (default 500, cap 2000).',
+      visibility:  'authenticated',
+    }),
+
     /**
      * ingestKringMessage({payload, fromPubKey, fromPeerAddr})
      *   — receive-side mirror for an inbound kring chat

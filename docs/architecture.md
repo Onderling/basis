@@ -343,6 +343,13 @@ log in Part 2: durable records, derived views.
 `sync:false` on inbound to stop echo). **This is the only fan-out path there should be.** A type that
 reaches a peer some other way is a second implementation of sync, and will drift from this one.
 
+**Two axes, declared.** How an item *reaches* peers and how concurrent writes *reconcile* are separate, declared
+choices — **delivery** and **resolution**. Delivery is the live fan-out above plus the companions for what it
+misses: a reconnecting device **catches up** (a request/response replay, or a pod range-query for a pod-backed
+circle), and a message to one named peer takes the **addressed** point-to-point path instead of the circle
+mirror. Resolution — how a receiver merges concurrent writes to the same item — is the consistency layer's
+concern (§4 · Consistency & governance).
+
 #### Where the runtime does NOT match this yet
 
 Written down on 2026-08-03 because all four were live, and because prose that flatters the code is worse than
@@ -667,7 +674,11 @@ governance events all ride it; no central server arbitrates. Four layers keep it
 and bad actors, weakest concern to strongest:
 
 - **L1 · concurrent edits** — benign divergence (two people editing offline) is a deterministic merge, not a
-  conflict; eventual connectivity converges. (The full content-merge policy lands later with folio versioning.)
+  conflict; eventual connectivity converges. The merge is a **declared resolution policy** per
+  `(item-type, field)`, receiver-enforced so a sender cannot pick a weaker one: **content** (last-writer-wins —
+  posts, notes, task text) · **claim** (first-wins / immutable-once-set — a task's assignee, a reservation) ·
+  **spine** (deny-wins — membership, roles, keys; enforced by the L3 hash-chain below). (Rich collaborative
+  content-merge — sequences, text — lands later with folio versioning.)
 - **L2 · forgery** — every event is signed by the author's **per-circle key** + proof-of-membership, so
   non-members can't inject and members can't forge each other's events.
 - **L3 · equivocation** — a member signing two contradictory events (telling different peers different things —

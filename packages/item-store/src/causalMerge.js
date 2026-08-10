@@ -105,6 +105,11 @@ export function causalWinner(local, incoming) {
 // Lamport clock WHEN this fold is generalised: it changes the tiebreak for tasks too, so it rides that same
 // reviewed change rather than a bespoke one here.
 //
+// AND that wiring is a SWEEP, not a point-fix (Frits 2026-08-10): audit EVERY procedure that decides CONVERGED
+// state or a concurrent-write winner by wall-clock — message/event ordering, any last-writer-wins tiebreak — and
+// move it onto the one Lamport coordinate. Expiry/TTL windows and pure display sorts stay wall-clock (correct);
+// the target is only ordering that two skewed devices must agree on. Tracked as its own task with a candidate list.
+//
 // The claim cluster the verbs maintain — the ONE list of what "the claim" is. Exported so the declaration
 // layer (`resolutionPolicy.js`) declares exactly these fields as the `claim`-policy channel, rather than
 // keeping a second copy of the cluster (invariant 3 — no duplication).

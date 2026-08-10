@@ -4,7 +4,7 @@ import { VaultMemory } from '@onderling/vault';
 import { makeCircleEntryRail } from '../../src/v2/circleEntryRail.js';
 import { foldGovernance } from '../../src/v2/governanceLog.js';
 
-// The rail core (slice 1 step 1): signed circle-scoped governance entries on the device log, verified read,
+// The rail core: signed circle-scoped governance entries on the device log, verified read,
 // projected into the flat events the REAL foldGovernance consumes. Kinds are declared in the fold's own
 // event vocabulary (propose/vote/resolve) so the projection needs no mapping table.
 

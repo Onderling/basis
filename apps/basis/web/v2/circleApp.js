@@ -167,6 +167,7 @@ import { buildSelfMediaComposition, makeResealMediaForCircle } from '../../src/v
 import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals } from '../../src/v2/governanceAppWiring.js';
 import { makeGovernanceCatchUp } from '../../src/v2/governanceCatchUp.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../src/v2/membershipRail.js';
+import { wireEventLogPersistence, backendSnapshotIo } from '../../src/v2/eventLogPersistence.js';
 import { buildSubjectLabeler } from '../../src/v2/governanceView.js';
 import { governanceEntryId, foldGovernance } from '../../src/v2/governanceLog.js';
 import { reportEntryId } from '../../src/v2/reportModel.js';
@@ -6651,6 +6652,16 @@ function broadcastPolicy({ circleId, policy }) {
 }
 
 async function boot() {
+  // THE DEVICE LOG IS DURABLE (the content re-root's first slice): hydrate the persisted snapshot before
+  // anything appends, then late-bind the debounced save. Without this every reload wiped the log and the
+  // legacy chat store quietly stayed the real record — the inverse of the decided hierarchy. Best-effort:
+  // a blocked IndexedDB degrades to the old in-memory behaviour, never a broken boot.
+  try {
+    const { hydrated } = await wireEventLogPersistence({
+      eventLog, io: backendSnapshotIo(pickWebBackend('cc-device-log')),
+    });
+    if (hydrated) console.info(`[device-log] hydrated ${hydrated} persisted entries`);
+  } catch (err) { console.warn('[device-log] persistence wiring failed — in-memory this session:', err?.message ?? err); }
   rootEl = document.getElementById('circle-root');
   tabBarEl = document.getElementById('circle-tabbar');
   // App language: a persisted user choice (the Mij toggle) wins over the device locale.

@@ -454,6 +454,42 @@ export class EventLog {
    * @param {(event: LoggedEvent) => void} fn
    * @returns {() => void}                 unsubscribe
    */
+  /**
+   * Bulk-load PERSISTED events at boot (the durability slice: the log is the record, so it must survive a
+   * reload). Deduped by id against anything already present; `seq` is restamped locally (it is per-instance
+   * and never travels); ONE prune afterwards. Deliberately does NOT notify subscribers and does NOT persist —
+   * call BEFORE `setPersist`, so hydration never echoes into storage or repaints mid-boot.
+   *
+   * @param {LoggedEvent[]} events  a snapshot as `persist` received it (most-recent first)
+   * @returns {number} how many entries were loaded
+   */
+  hydrate(events) {
+    if (!Array.isArray(events) || events.length === 0) return 0;
+    const have = new Set(this.#events.map((e) => e.id));
+    let loaded = 0;
+    // The snapshot is most-recent-first; walk oldest→newest so unshift rebuilds the original order
+    // with ascending fresh seqs.
+    for (let i = events.length - 1; i >= 0; i -= 1) {
+      const e = events[i];
+      if (!e || typeof e.id !== 'string' || e.id === '' || have.has(e.id)) continue;
+      const { seq: _ignored, ...rest } = e;
+      this.#events.unshift({ ...rest, seq: (this.#seq += 1) });
+      have.add(e.id);
+      loaded += 1;
+    }
+    if (loaded) this.prune();
+    return loaded;
+  }
+
+  /**
+   * Late-bind the persist sink (the shells construct the log synchronously at module scope, before any
+   * async storage is open — same late-bind pattern as `persistMuted`). Called with the full snapshot on
+   * every append and after every prune.
+   */
+  setPersist(fn) {
+    this.#persist = typeof fn === 'function' ? fn : async () => {};
+  }
+
   subscribe(fn) {
     if (typeof fn !== 'function') return () => {};
     this.#subscribers.add(fn);

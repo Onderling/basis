@@ -55,6 +55,7 @@ import { dlog } from './src/core/devLog.js';
 import { EventLog } from '../basis/src/eventLog.js';
 import { rehydrateKringChatsFromStoop } from '../basis/src/v2/kringChatRehydrate.js';
 import { createSettingsPodMedium } from '../basis/src/v2/settingsPodMedium.js';
+import { wireEventLogPersistence, asyncStorageSnapshotIo } from '../basis/src/v2/eventLogPersistence.js';
 import { createChatMessageInbox } from '../basis/src/v2/chatMessageInbox.js';
 import { createSelfAuthorCheck } from '../basis/src/v2/chatSelfAuthor.js';
 import { OidcSessionRN } from '@onderling/oidc-session-rn';
@@ -415,6 +416,14 @@ export default function App() {
         // tasks-v0 gains AsyncStorage persistence the flag becomes
         // redundant (the probe will return non-empty); leaving the
         // flag in place is harmless.
+        // THE DEVICE LOG IS DURABLE (the content re-root's first slice): hydrate + wire the debounced
+        // save before the bundle boots (whose entries would otherwise race an unhydrated log). Best-effort.
+        try {
+          const { hydrated } = await wireEventLogPersistence({
+            eventLog: eventLogRef.current, io: asyncStorageSnapshotIo(AsyncStorage),
+          });
+          if (hydrated) dlog(`[device-log] hydrated ${hydrated} persisted entries`);
+        } catch (err) { dlog(`[device-log] persistence wiring failed: ${err?.message ?? err}`); }
         const SEED_FLAG = 'cc.firstBootSeeded.v1';
         const alreadySeeded = await AsyncStorage.getItem(SEED_FLAG).catch(() => null) === '1';
         let eventSeq = 0;

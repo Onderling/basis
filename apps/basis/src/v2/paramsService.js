@@ -38,6 +38,10 @@ export const BASIS_USER_PARAMS = [
   // same key + default here, so the register's declare-agreement holds). The FIRST real consumer: the eventLog
   // retention reads it via `agent.getParamValue('retention.chatDays')` (see circleApp), not a bespoke store.
   { key: 'retention.chatDays',      scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: DEFAULT_RETENTION_DAYS },
+  // Registered 2026-08-10 (review finding 2): declared kind:user at their sites but governed by no register
+  // (inert settability). Defaults MUST match the declaration site — the duplicate-vocab guard enforces agreement.
+  { key: 'calendarEmission.defaultDurationMin', scope: PARAM_SCOPE.AGENT,  kind: PARAM_KIND.USER, default: 30 },
+  { key: 'onlineCadence.pollIntervalMs',        scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: 5000 },
 ];
 
 /**

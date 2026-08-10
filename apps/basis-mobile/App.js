@@ -54,6 +54,7 @@ import {
 import { dlog } from './src/core/devLog.js';
 import { EventLog } from '../basis/src/eventLog.js';
 import { rehydrateKringChatsFromStoop } from '../basis/src/v2/kringChatRehydrate.js';
+import { createSettingsPodMedium } from '../basis/src/v2/settingsPodMedium.js';
 import { createChatMessageInbox } from '../basis/src/v2/chatMessageInbox.js';
 import { createSelfAuthorCheck } from '../basis/src/v2/chatSelfAuthor.js';
 import { OidcSessionRN } from '@onderling/oidc-session-rn';
@@ -62,7 +63,7 @@ import { buildCirclePodWriter } from './src/core/circleStoresRN.js';
 // One store per app; shared between ChatScreen (receiver) and
 // CircleLauncherScreen (editor pull + send-side clear).
 import { makeKringRecipePendingStoreRN } from './src/core/kringRecipePendingStorageRN.js';
-import { initCirclePods, circleControlAgentRouter, setCirclePodSession, setCircleKeyEventWiring, provisionCircleMedium, circleSendDataMove, circlePodWrite, circlePodReadSince, circleResolveRef } from './src/core/circlePods.js';
+import { initCirclePods, circleControlAgentRouter, setCirclePodSession, setCircleKeyEventWiring, provisionCircleMedium, circleSendDataMove, circlePodWrite, circlePodReadSince, circleResolveRef, getCirclePodFetch, getActiveRealPodRouting } from './src/core/circlePods.js';
 import { discoverPodRoot } from '../basis/src/web/podStorage.js';
 // γ-next.rules — per-kring pending-rules cache (AsyncStorage-backed).
 // Mirrors the recipe wire: ChatScreen writes via the receiver,
@@ -452,6 +453,15 @@ export default function App() {
           stoopControlAgent: circleControlAgentRouter,
           // Cache-mode mirroring (RN parity): a pod-backed circle's store rides a cache-mode PseudoPod.
           provisionCircleMedium,
+          // Settings pod-sync (RN parity with web circleApp): seal the parameter register's agent/circle params
+          // to <pod>/basis/settings/… under the owner-derived key, so they open on the user's other devices.
+          // Same shared factory + attachInner path realAgent already runs; mobile only supplies the pod
+          // fetch + root, exactly like provisionCircleMedium above. Null fetch/root → factory returns null → local.
+          provisionSettingsMedium: async (strategy) => createSettingsPodMedium({
+            fetch:   getCirclePodFetch(),
+            podRoot: getActiveRealPodRouting()?.podRoot ?? null,
+            strategy,
+          }),
           // Connectivity Phase 3 — LIVE shared-pod key-custody seams (member-side), RN parity with web
           // circleApp. A shared/hybrid circle WITH a pod + group key seals→writes the pod + fans a ref
           // (pod-signal); catch-up range-queries→opens it. A no-pod circle keeps fan-out-full unchanged.

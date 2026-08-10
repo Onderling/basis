@@ -35,6 +35,7 @@ import { createCircleSenderAuthorization, SENDER_REASON } from '../../v2/circleS
 import { shareableAddress } from '../../v2/addressSharing.js';
 import { createParamsService, basisParamRegistry } from '../../v2/paramsService.js';   // #36 — settable params surface
 import { settingsSealStrategyForIdentity } from '../../v2/sharedCopyOpener.js';         // #36 pod-sync — seal-to-self for settings
+import { probeSettingsMedium, isProbeSafeToAttach } from '../../v2/settingsRestoreGate.js'; // #36 — probe-before-flush (no cross-key clobber)
 import { paramsManifest } from '../../v2/paramsManifest.js';   // #36 — the params op contract (gates the waist branch)
 import { VaultMemory, VaultLocalStorage } from '@onderling/vault';
 import { wireSkill } from '@onderling/sdk';
@@ -394,7 +395,25 @@ export async function createRealHouseholdAgent(opts = {}) {
       // escapes — only the `{seal, open}` closures. Null strategy (no identity) → no pod sync, stays local.
       const strategy = settingsSealStrategyForIdentity(chatId);
       const medium   = strategy ? await opts.provisionSettingsMedium(strategy) : null;
-      if (medium) await settingsDataSource.attachInner(medium);
+      if (medium) {
+        // RESTORATION GATE (finding 3): attachInner BULK-FLUSHES local settings to the pod, so a device whose
+        // key cannot OPEN the pod's owner-sealed blobs (a fresh install signed in WITHOUT the recovery phrase)
+        // would silently overwrite them. Probe read-only first; only attach+flush when we own the key
+        // (openable) or the pod is fresh (missing). Gate the write on being able to open — never a silent write.
+        const probe = await probeSettingsMedium(medium);
+        if (isProbeSafeToAttach(probe)) {
+          await settingsDataSource.attachInner(medium);
+        } else if (probe === 'undecryptable') {
+          // The pod's settings are sealed under a DIFFERENT key — HOLD: stay local, overwrite nothing. Surface
+          // the recover-or-overwrite choice to the shell (the per-param merge / coarse dialog rides this seam).
+          try { opts.onSettingsKeyMismatch?.(); } catch { /* a shell hook must not break boot */ }
+          if (typeof console !== 'undefined') console.warn('[settings-medium] pod settings are sealed under a different key — staying local; recover with your phrase to sync (nothing overwritten).');
+        } else {
+          // transport — could not reach the pod to verify. Stay local THIS session WITHOUT declaring a key
+          // mismatch (never accuse on a network hiccup); the next sign-in retries the probe.
+          if (typeof console !== 'undefined') console.warn('[settings-medium] could not verify pod settings (transport) — staying local this session.');
+        }
+      }
     } catch (err) { if (typeof console !== 'undefined') console.warn('[settings-medium] provision failed — local only', err?.message ?? err); }
   }
   const paramsService = createParamsService({

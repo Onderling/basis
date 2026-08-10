@@ -134,6 +134,7 @@ async function loadMdnsTransport() {   // (batch 7) unused — kept one release 
  * @param {object}  [opts.chatVault]           secure-agent chat-side vault (e.g. VaultMemory in tests, VaultAsyncStorage on RN)
  * @param {object}  [opts.hostVault]           host-side vault (defaults inside factory to makeBrowserVault)
  * @param {object}  [opts.asyncStorage]        when provided AND chatVault/hostVault are NOT, synthesises two VaultAsyncStorage instances (cc-chat-id: + cc-host-id: prefixes). RN runtime path; vitest can pass a mock AsyncStorage to exercise it.
+ * @param {function}[opts.provisionSettingsMedium] `(strategy) => medium|null` — the pod-backed self-sealed settings inner realAgent attaches to the parameter register on sign-in (RN parity with web circleApp)
  * @param {object}  [opts.secureAgentOpts]     forwarded to createRealHouseholdAgent → createSecureAgent
  * @param {function}[opts.publishEvent]        forwarded; defaults to no-op
  * @param {object}  [opts.nknLib]              optional runtime nkn-sdk module; if present, connectPeerTransport is wired
@@ -280,6 +281,9 @@ export async function bootAgentBundle(opts = {}) {
       // (a cache-mode PseudoPod sealing→write-throughing to the pod). App.js passes circlePods'
       // `provisionCircleMedium`; absent → no cache media → shared local backing, unchanged.
       provisionCircleMedium: opts.provisionCircleMedium,
+      // Settings pod-sync inner (RN parity): realAgent attaches this self-sealed pod medium to the parameter
+      // register's settings store on sign-in. App.js passes circlePods' fetch/root; absent → local-only.
+      provisionSettingsMedium: opts.provisionSettingsMedium,
       secureAgentOpts:  opts.secureAgentOpts,
       // The per-user address-fallback setting, read LIVE (batch 4) — forwarded as-is (function or
       // bool); realAgent threads it into both halves of the choice (the fan's address pick and

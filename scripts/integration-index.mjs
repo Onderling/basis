@@ -36,6 +36,7 @@ export const INTEGRATION_TESTS = [
   { file: 'apps/basis-mobile/test/circleSealE2E.css.test.js',         proves: 'Mobile circle seal end-to-end against a real pod (the RN-side parity of the basis producer path).' },
   { file: 'apps/companion-node/test/companionAgentProxy.css.test.js', proves: 'The companion proxies a device\'s pod fetches to a real pod (holds no secret); out-of-scope is denied; revoke kills the grant.' },
   { file: 'apps/stoop/test/realPodAttach.css.test.js',                proves: 'Attaching a real Solid pod to stoop and reading/writing through the attachment.' },
+  { file: 'apps/basis/test/v2/settingsPodMedium.css.test.js',          proves: 'The parameter register self-sealed settings on a real pod: an agent-scope value round-trips, ciphertext at rest (fp1), a second device (same owner-seed) opens it, a stranger is denied.' },
 ];
 
 /** The workspace a test runs in — the `apps/<x>` or `packages/<x>` prefix of its path. */

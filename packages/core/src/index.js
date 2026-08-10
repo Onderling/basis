@@ -311,7 +311,8 @@ export { Agent } from './Agent.js';
 // ── Parameter register (declaration layer, #36) ─────────────────────────────────
 // A universal primitive: `param()` declares a tunable at its site (scope drives sync, kind is the security
 // gate); the register is the DI home for settable values; `setParam` is the one kind-enforcing set op. Homed
-// in the kernel so every layer — core, substrates, apps — can declare params. See params.js.
+// in the zero-dep `@onderling/params` leaf (re-exported here + by item-store for DX) so every layer — core,
+// substrates, apps — can declare params. See ./params.js (the re-export shim).
 export {
   PARAM_SCOPE, PARAM_KIND, param, createParamRegistry, setParam,
 } from './params.js';

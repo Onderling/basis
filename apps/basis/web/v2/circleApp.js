@@ -165,6 +165,7 @@ import { encodeImageFile } from '../../src/v2/attachmentEncoder.js';
 import { createCircleMediaComposition, makeDevMediaBucket } from '../../src/v2/circleMediaGateway.js';
 import { buildSelfMediaComposition, makeResealMediaForCircle } from '../../src/v2/profileMediaReseal.js';
 import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals } from '../../src/v2/governanceAppWiring.js';
+import { makeGovernanceCatchUp } from '../../src/v2/governanceCatchUp.js';
 import { buildSubjectLabeler } from '../../src/v2/governanceView.js';
 import { governanceEntryId, foldGovernance } from '../../src/v2/governanceLog.js';
 import { reportEntryId } from '../../src/v2/reportModel.js';
@@ -1309,6 +1310,7 @@ const _bootSearch = (typeof window !== 'undefined' && window.location) ? window.
 let rawCallSkill = null;     // (appOrigin, opId, args) — for createGroupV2
 let circleIdentityForShell = null;   // the agent's per-circle signer resolver — governance signs circle-scoped
 let govShellRail = null;             // the governance rail for the RECEIVE side (verify-on-ingest)
+let govCatchUpShell = null;          // pull-all governance catch-up (the offline-device half of reliable)
 // The pod-session's AUTHED fetch (set on sign-in) — lets embed-ref resolution
 // read the user's OWN private-pod items; null when signed out → resolution falls
 // back to a public fetch (only public cross-pod refs resolve; protected → 🔒).
@@ -6842,6 +6844,13 @@ async function boot() {
           myRef: _who?.webid ?? _who?.webId ?? '', callSkill: rawCallSkill,
         });
       } catch { govShellRail = null; }
+      // The offline-device half of the reliable tier: on reconnect, pull every circle's governance
+      // statements from its reachable members; each passes the rail's full ingest gate.
+      govCatchUpShell = govShellRail ? makeGovernanceCatchUp({
+        rail: govShellRail,
+        sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
+        onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); },
+      }) : null;
       // Route the auto-resolving callSkill through the calendar-wrapped one too,
       // so button-driven calendar dispatches fan out as well as the bot path.
       // Pass a catalog GETTER so the resolver skips origins that don't declare the
@@ -7044,6 +7053,7 @@ async function boot() {
           'kring-policy-broadcast':  kringPolicyHandler,
           // Wave C tail A — ingest fanned governance/report events into the one log so a
           // vote/report raised on another device shows here; re-render an open panel.
+          ...(govCatchUpShell ? { [govCatchUpShell.subtypes.request]: govCatchUpShell.onRequest, [govCatchUpShell.subtypes.batch]: govCatchUpShell.onBatch } : {}),
           'kring-governance-broadcast': makeKringGovernancePeerHandler({ eventLog, rail: govShellRail, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); }, notify: govNotify }),
           'kring-report-broadcast':     makeKringReportPeerHandler({ eventLog, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); } }),
           // ε.4 — negotiated catch-up subtypes.
@@ -7178,6 +7188,8 @@ async function boot() {
       setTimeout(() => {
         requestCatchUpAll().catch((err) =>
           console.warn('[catch-up] kick-off failed', err?.message ?? err));
+        // Governance pull-all rides the same kick — any one complete peer suffices (idempotent ingest).
+        govCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         // Seed the household roster for the active circle (re-fed on open below).
         feedHouseholdRosterForCircle(getActiveCircle()).catch(() => {});
       }, 1500);

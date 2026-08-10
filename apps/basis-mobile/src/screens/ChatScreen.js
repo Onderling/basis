@@ -66,6 +66,7 @@ import { makeKringRulesPeerHandler }  from '../../../basis/src/v2/kringRulesRece
 import { makeKringPolicyPeerHandler } from '../../../basis/src/v2/kringPolicyReceiver.js';
 import { makeKringGovernancePeerHandler, makeKringReportPeerHandler } from '../../../basis/src/v2/kringLogReceiver.js';
 import { makeGovernanceRail } from '../../../basis/src/v2/governanceAppWiring.js';
+import { makeGovernanceCatchUp } from '../../../basis/src/v2/governanceCatchUp.js';
 import { governanceEntryId } from '../../../basis/src/v2/governanceLog.js';
 import { makeHandleChatMessage }
                                from '../../../basis/src/core/handlers/chatMessage.js';
@@ -785,22 +786,37 @@ export default function ChatScreen({
       // Wave C tail A — ingest fanned governance/report events into the one log so a
       // vote/report raised on another device replicates here (deduped by the stable id).
       // notify: an in-app nudge when a decision OPENS (governanceWakeHint gates to propose).
-      'kring-governance-broadcast': makeKringGovernancePeerHandler({
-        eventLog: eventLogRef.current,
-        // The receive-side governance RAIL: verify (signature + declared kind + roster key-ref binding)
-        // before a fanned statement lands. Same rules as the web shell's receiver.
-        rail: (bundle?.agent?.circleIdentityFor
+      // The receive-side governance RAIL (verify before a fanned statement lands) + the pull-all
+      // catch-up pair (the offline-device half of the reliable tier). Built once per router build;
+      // the reconnect kick fires once per app launch — after that the LIVE fan keeps the log current.
+      ...(() => {
+        const govRail = bundle?.agent?.circleIdentityFor
           ? makeGovernanceRail({ eventLog: eventLogRef.current, circleIdentityFor: bundle.agent.circleIdentityFor, myRef: '', callSkill: bundle.callSkill })
-          : null),
-        notify: (circleId, event) => {
-          try {
-            eventLogRef.current?.append({
-              id: `gov-notif-${governanceEntryId(event)}`, ts: Date.now(), app: 'basis', type: 'notification', circleId,
-              payload: { message: t('circle.governance.notify_vote_opened', { action: t(`circle.governance.action.${event.action}`) }) },
-            });
-          } catch { /* best-effort */ }
-        },
-      }),
+          : null;
+        const govCatchUp = govRail ? makeGovernanceCatchUp({
+          rail: govRail,
+          sendToPeer: (addr, payload) => bundle?.agent?.sendPeerMessage?.(addr, payload),
+        }) : null;
+        if (govCatchUp && !globalThis.__onderlingGovCatchUpKicked) {
+          globalThis.__onderlingGovCatchUpKicked = true;
+          setTimeout(() => { govCatchUp.requestAll({ callSkill: bundle.callSkill }).catch(() => {}); }, 2000);
+        }
+        return {
+          ...(govCatchUp ? { [govCatchUp.subtypes.request]: govCatchUp.onRequest, [govCatchUp.subtypes.batch]: govCatchUp.onBatch } : {}),
+          'kring-governance-broadcast': makeKringGovernancePeerHandler({
+            eventLog: eventLogRef.current,
+            rail: govRail,
+            notify: (circleId, event) => {
+              try {
+                eventLogRef.current?.append({
+                  id: `gov-notif-${governanceEntryId(event)}`, ts: Date.now(), app: 'basis', type: 'notification', circleId,
+                  payload: { message: t('circle.governance.notify_vote_opened', { action: t(`circle.governance.action.${event.action}`) }) },
+                });
+              } catch { /* best-effort */ }
+            },
+          }),
+        };
+      })(),
       'kring-report-broadcast':     makeKringReportPeerHandler({ eventLog: eventLogRef.current }),
     };
     const defaultHandler = makeHandleChatMessage({

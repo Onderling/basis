@@ -60,7 +60,6 @@ import { makePeerRouter }      from '../../../basis/src/core/handlers/peerRouter
 import { makeReceiptReceiver } from '../../../basis/src/v2/deliverySettings.js';
 import { pushContactReply }    from '../core/contactReplyInbox.js';
 import { makeKringChatPeerHandler } from '../../../basis/src/v2/kringChatReceiver.js';
-import { createChatMessageInbox } from '../../../basis/src/v2/chatMessageInbox.js';
 import { makeKringRecipePeerHandler } from '../../../basis/src/v2/kringRecipeReceiver.js';
 import { makeKringRulesPeerHandler }  from '../../../basis/src/v2/kringRulesReceiver.js';
 import { makeKringPolicyPeerHandler } from '../../../basis/src/v2/kringPolicyReceiver.js';
@@ -190,19 +189,11 @@ const FEEDBACK_PROJECT_ID = process.env.EXPO_PUBLIC_FEEDBACK_PROJECT_ID || 'basi
 // ε.1 — fallback inbox builder used only when App.js didn't pass one
 // (e.g. older standalone test mounts).  Production wiring goes through
 // the App-level singleton so dedup state is shared with the rehydrator.
-function makeFallbackInbox(eventLog, callSkill) {
-  return createChatMessageInbox({
-    eventLog,
-    ingest: async (payload, fromPeerAddr) => {
-      if (typeof callSkill !== 'function') return { ok: false };
-      try { return await callSkill('stoop', 'ingestKringMessage', { payload, fromPeerAddr }); }
-      catch (err) {
-        console.warn('[kring-chat] ingestKringMessage failed:', err?.message ?? err);
-        return { error: String(err?.message ?? err) };
-      }
-    },
-  });
-}
+// The kring-chat inbox is a SINGLETON owned by App.js (validation, msgId dedup, ingest mirror,
+// resolveRef, receipts, self-author check — one dedup domain for live receive, rehydrate AND catch-up).
+// There used to be a private fallback inbox built here when the prop was missing; it was a divergent
+// twin (no resolveRef, no receipts) that no mount and no test ever reached — deleted. A missing inbox
+// now means kring chat receive is OFF, loudly, instead of silently crippled.
 
 export default function ChatScreen({
   bundle = null,
@@ -744,14 +735,15 @@ export default function ChatScreen({
       // ε.1 — kring chat-message: routes through the shared inbox
       // (App.js owns the singleton).  The inbox handles envelope
       // validation, msgId dedup, ingest mirror into stoop's itemStore
-      // (mute/eviction filtered), and the eventLog append that drives
-      // the GESPREK tab bubbles.  Same dedup state as the boot
-      // rehydrator so a chat already in itemStore can't double-render.
-      // If no inbox was wired (older standalone tests) we fall back to
-      // a private one so existing wiring keeps working.
-      'kring-chat-message':    makeKringChatPeerHandler({
-        inbox: kringChatInbox ?? makeFallbackInbox(eventLogRef.current, callSkill),
-      }),
+      // (mute/eviction filtered), resolveRef for pod-signal envelopes,
+      // delivery receipts, and the eventLog append that drives the
+      // GESPREK tab bubbles.  ONE dedup domain shared with the boot
+      // rehydrator and catch-up, so nothing can double-render. Without
+      // the injected inbox the subtype is not routed — kring receive is
+      // OFF loudly, never silently served by a crippled private twin.
+      ...(kringChatInbox
+        ? { 'kring-chat-message': makeKringChatPeerHandler({ inbox: kringChatInbox }) }
+        : (console.warn('[kring-chat] no shared inbox injected — kring chat receive is OFF'), {})),
       // Delivery honesty — the peer's app stored our message. The shared receiver validates (rebuilt,
       // `from` off the wire), resolves the message's circle off the log, and only lets someone the
       // circle's ROSTER knows advance it; the map's monotonic rule then orders it. Absent map ⇒ the

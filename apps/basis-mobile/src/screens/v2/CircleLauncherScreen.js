@@ -2613,12 +2613,13 @@ function CircleDetail({
   // δ.2 — fan-out helper used by both the initial send and the
   // tap-to-retry handler for failed bubbles.  Re-fires with the
   // SAME msgId so receiver-side dedup suppresses duplicates.
-  const broadcastFanOut = useCallback(({ msgId, text, ts }) => {
+  const broadcastFanOut = useCallback(({ msgId, text, ts, media }) => {
     // Shared fan-out (Phase 2). RAW 3-arg callSkill (app-targeted at stoop) — the 2-arg resolving one
     // arg-shifts (op→'stoop') and never delivers. The helper marks δ.2 delivery state; onChange = the
-    // RN rerender tick.
+    // RN rerender tick. `media` rides through like on web — the helper's wire whitelist projects it —
+    // so a media-carrying message fans with its embed instead of arriving as bare text.
     broadcastKringFanOut({
-      rawCallSkill, circleId: circle?.id, msgId, text, ts,
+      rawCallSkill, circleId: circle?.id, msgId, text, ts, media,
       deliveryStateMap: deliveryStateMapRef.current,
       onChange: () => setDeliveryTick((n) => n + 1),
     });
@@ -3546,7 +3547,8 @@ function CircleDetail({
     const text = evt?.payload?.text;
     const ts   = evt?.ts ?? Date.now();
     if (typeof text !== 'string' || !text) return;
-    broadcastFanOut({ msgId, text, ts });
+    // Web parity: a retry re-fans the ORIGINAL message including its media embed, not a text-only copy.
+    broadcastFanOut({ msgId, text, ts, media: evt?.payload?.media });
   }, [eventLog, broadcastFanOut]);
 
   // Proof-of-Location: the passive placeholder row was removed 2026-06-25 (parked feature, /

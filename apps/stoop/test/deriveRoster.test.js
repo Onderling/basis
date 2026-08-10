@@ -157,15 +157,20 @@ describe('deriveRoster', () => {
       expect(ids).not.toContain(bea.pubKey);
     });
 
-    it('a FOREIGN/partial spine cannot invent or re-admit a member — deny-wins keeps the trail head', async () => {
-      // A join for a webid the trail does not carry (e.g. a spine signed in a key namespace that isn\'t the
-      // roster\'s) must NOT add anyone: the spine may only strengthen the trail head, never invent one.
-      const stranger = await AgentIdentity.generate(new VaultMemory());
+    it('the AUTHORITATIVE fold admits a folded-in member ahead of their trail row (the rider cutover)', async () => {
+      // The membership-rider cutover: the statements handed to deriveRoster are VERIFIED with their key-ref
+      // bindings resolved (the rail's read / the store path's resolver) — unverifiable/foreign statements
+      // are dropped BEFORE the fold (see circleScopedSpineSigner: a forged binding never reaches here), so
+      // the fold itself is authoritative: a verified join adds the member, with a minimal row until the
+      // trail backfills display fields. The old strengthen-only interim (foreign joins ignored at the fold)
+      // is retired with the signer settlement.
+      const joiner = await AgentIdentity.generate(new VaultMemory());
       const roster = deriveRoster({
         redemptions: [redemption({ redeemedBy: 'B' })],
-        spineStatements: [stmt(stranger, 'join', 'GHOST')],
+        spineStatements: [stmt(joiner, 'join', 'NEW-MEMBER')],
+        foldAuthoritative: true,
       });
-      expect(roster.map((m) => m.webid)).toEqual(['B']);   // GHOST never enters
+      expect(roster.map((m) => m.webid).sort()).toEqual(['B', 'NEW-MEMBER']);   // admitted, B kept
     });
   });
 });

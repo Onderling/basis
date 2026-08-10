@@ -1,8 +1,8 @@
 /**
- * circleEntryRail — THE RAIL (convergence slice 1): the one write path that turns a circle-scoped system
+ * circleEntryRail — THE RAIL: the one write path that turns a circle-scoped system
  * event into durable, signed truth on the device log, and the verified read that projects it back out.
  *
- *   append:  sign (circle-scoped key, D5) → chain (parent + deps — order is DERIVED at fold, never stamped)
+ *   append:  sign (circle-scoped key) → chain (parent + deps — order is DERIVED at fold, never stamped)
  *            → append to the device EventLog (stable id, first-write-wins on audit kinds) → hand to the fan.
  *   read:    verify every stored statement (signature + chain + circle) → check the CLAIMED actor is the
  *            statement's own authorRef (nobody votes as someone else) → verify the key↔ref BINDING
@@ -10,11 +10,12 @@
  *            equivocators (two statements, one author, same parent → disputed) → project the flat events
  *            the pure folds consume.
  *
- * WHY (principles): P2/P6 — governance was trust-based (unsigned events; any device could fabricate an
- * approval); a signed chained statement makes forgery fail verification and double-voting a self-verifying
- * fork-proof. P8 — one chokepoint every rider (governance now; membership, chat later) enters through.
- * P9 — the gate binds at verify-on-read/ingest, not at the sender. D6 — a kind the manifest didn't declare
- * is refused LOUDLY at append (a misconfigured add-on fails at its own write, not silently).
+ * WHY (principles): no central arbiter + tamper-evident trust — governance was trust-based (unsigned events;
+ * any device could fabricate an approval); a signed chained statement makes forgery fail verification and
+ * double-voting a self-verifying fork-proof. One central surface — one chokepoint every rider (governance
+ * now; membership, chat later) enters through. Enforceability — the gate binds at verify-on-read/ingest,
+ * not at the sender. Declared kinds — a kind the lane's declaration doesn't carry is refused LOUDLY at
+ * append (a misconfigured add-on fails at its own write, not silently).
  *
  * This module is transport- and storage-free by DI: it needs only `eventLog` ({query, appendSilentEntry})
  * and the per-circle signer resolver. The fan stays the caller's (best-effort, never blocks the write).
@@ -55,7 +56,7 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
    */
   async function append(circleId, { kind, subject, payload, actor } = {}) {
     if (!declaredKinds.includes(kind)) {
-      // D6: an undeclared kind is a bug at the DECLARING side — fail loudly at the write, never silently.
+      // An undeclared kind is a bug at the DECLARING side — fail loudly at the write, never silently.
       throw new Error(`circleEntryRail(${entryKind}): kind "${kind}" is not declared [${declaredKinds.join(', ')}]`);
     }
     let resolved = null;
@@ -144,7 +145,35 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     return { events, disputed: disputedRefs };
   }
 
-  return { append, ingest, readVerified, storedStatements };
+  /**
+   * READ (body-shaped) — for folds that consume raw statement BODIES (rosterFold-style) rather than the
+   * flat-event projection above. Same gates: verify, declared kind, actor==authorRef when claimed, the
+   * key↔ref binding — and the AUTHOR IS RESOLVED TO ITS REF, because those folds' authority rules
+   * (founders, self-authored leave, admin evict) live in ref space. Returns the disputed ref set alongside.
+   */
+  async function readVerifiedBodies(circleId) {
+    const bodies = [];
+    const seenByAuthorParent = new Map();
+    const disputed = new Set();
+    for (const stmt of storedStatements(circleId)) {
+      const v = safeVerify(stmt, circleId);
+      if (!v.ok) continue;
+      const b = v.body;
+      if (!declaredKinds.includes(b.kind)) continue;
+      const ref = b.payload?.authorRef;
+      if (typeof ref !== 'string' || !ref) continue;
+      if (!(await bindingOk(b.author, ref, circleId))) continue;
+      const forkKey = `${b.author}|${b.parentHash ?? ''}`;
+      const set = seenByAuthorParent.get(forkKey) ?? new Set();
+      set.add(b.hash);
+      seenByAuthorParent.set(forkKey, set);
+      if (set.size > 1) disputed.add(ref);
+      bodies.push({ ...b, author: ref });
+    }
+    return { bodies, disputed };
+  }
+
+  return { append, ingest, readVerified, readVerifiedBodies, storedStatements };
 }
 
 export default makeCircleEntryRail;

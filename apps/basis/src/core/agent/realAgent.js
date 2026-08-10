@@ -36,6 +36,7 @@ import { shareableAddress } from '../../v2/addressSharing.js';
 import { createParamsService, basisParamRegistry } from '../../v2/paramsService.js';   // #36 — settable params surface
 import { settingsSealStrategyForIdentity } from '../../v2/sharedCopyOpener.js';         // #36 pod-sync — seal-to-self for settings
 import { probeSettingsMedium, isProbeSafeToAttach } from '../../v2/settingsRestoreGate.js'; // #36 — probe-before-flush (no cross-key clobber)
+import { makeMembershipRail, makeMembershipEmitter } from '../../v2/membershipRail.js'; // the membership rider — statements ride the device log
 import { paramsManifest } from '../../v2/paramsManifest.js';   // #36 — the params op contract (gates the waist branch)
 import { VaultMemory, VaultLocalStorage } from '@onderling/vault';
 import { wireSkill } from '@onderling/sdk';
@@ -1378,6 +1379,29 @@ export async function createRealHouseholdAgent(opts = {}) {
    */
   const stoopIdentityVault = opts.stoopIdentityVault
     ?? makeBrowserVault('cc-stoop-id:');
+  // THE MEMBERSHIP RIDER: when the shell hands the DEVICE LOG (`opts.deviceLog`), membership statements
+  // ride its membership lane — signed with the per-circle key, fanned via broadcastKringMembership,
+  // verified on ingest, pull-all caught-up — and the roster folds the rail's VERIFIED bodies
+  // authoritatively. Absent → the store-based spine path stands (legacy compositions/tests).
+  let membershipRail = null;
+  let membershipEmit;
+  let membershipRead;
+  if (opts.deviceLog) {
+    membershipRail = makeMembershipRail({
+      eventLog: opts.deviceLog,
+      circleIdentityFor,
+      myRef: chatId.pubKey,
+      callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
+    });
+    membershipEmit = makeMembershipEmitter({
+      rail: membershipRail,
+      myRef: chatId.pubKey,
+      fan: (circleId, statement) => callSkill('stoop', 'broadcastKringMembership', {
+        groupId: circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now(),
+      }).catch(() => { /* fan is best-effort — catch-up reconciles */ }),
+    });
+    membershipRead = (circleId) => membershipRail.readVerifiedBodies(circleId);
+  }
   const stoopAgent = await createBrowserStoopAgent({
     bus,
     identityVault: stoopIdentityVault,
@@ -1386,6 +1410,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // carries the member's ref (webid == the chat pubKey in the basis binding) as the signed authorRef the
     // roster projection verifies. One global key across circles would re-link memberships; this doesn't.
     circleSignerFor: async (circleId) => ({ identity: await circleIdentityFor(circleId), ref: chatId.pubKey }),
+    membershipEmit,
+    membershipRead,
     // Bind chatAgent's pubKey as the local actor so real stoop
     // skills' `from` lookups resolve back to 'me' (admin role).
     localActor: chatId.pubKey,
@@ -3410,6 +3436,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     // that forgets it looks exactly like a shell whose relay is down. Both shells call it beside
     // their existing per-circle address registration.
     circleIdentityFor,
+    // The membership rider's rail (null without opts.deviceLog) — the shells register the fan receiver +
+    // the catch-up pair over THIS instance so both ends verify with the same declaration + binding rules.
+    membershipRail,
     registerSelfIdentity: (address, identity) => sa.registerSelfIdentity?.(address, identity) ?? false,
     forgetSelfIdentity:   (address) => sa.forgetSelfIdentity?.(address) ?? false,
     installCircleIdentities: (circleIds) => installCircleSigningIdentities({

@@ -284,6 +284,8 @@ export async function bootAgentBundle(opts = {}) {
       // Settings pod-sync inner (RN parity): realAgent attaches this self-sealed pod medium to the parameter
       // register's settings store on sign-in. App.js passes circlePods' fetch/root; absent → local-only.
       provisionSettingsMedium: opts.provisionSettingsMedium,
+      // The membership rider: the device log (the shells' EventLog) — membership statements ride its lane.
+      deviceLog: opts.deviceLog,
       secureAgentOpts:  opts.secureAgentOpts,
       // The per-user address-fallback setting, read LIVE (batch 4) — forwarded as-is (function or
       // bool); realAgent threads it into both halves of the choice (the fan's address pick and

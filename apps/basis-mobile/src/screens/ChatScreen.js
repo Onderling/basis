@@ -66,6 +66,7 @@ import { makeKringRulesPeerHandler }  from '../../../basis/src/v2/kringRulesRece
 import { makeKringPolicyPeerHandler } from '../../../basis/src/v2/kringPolicyReceiver.js';
 import { makeKringGovernancePeerHandler, makeKringReportPeerHandler } from '../../../basis/src/v2/kringLogReceiver.js';
 import { makeGovernanceRail } from '../../../basis/src/v2/governanceAppWiring.js';
+import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../../basis/src/v2/membershipRail.js';
 import { makeGovernanceCatchUp } from '../../../basis/src/v2/governanceCatchUp.js';
 import { governanceEntryId } from '../../../basis/src/v2/governanceLog.js';
 import { makeHandleChatMessage }
@@ -801,8 +802,20 @@ export default function ChatScreen({
           globalThis.__onderlingGovCatchUpKicked = true;
           setTimeout(() => { govCatchUp.requestAll({ callSkill: bundle.callSkill }).catch(() => {}); }, 2000);
         }
+        const memRail = bundle?.agent?.membershipRail ?? null;
+        const memCatchUp = memRail ? makeGovernanceCatchUp({
+          rail: memRail,
+          sendToPeer: (addr, payload) => bundle?.agent?.sendPeerMessage?.(addr, payload),
+          subtypes: MEMBERSHIP_CATCHUP_SUBTYPES,
+        }) : null;
+        if (memCatchUp && !globalThis.__onderlingMemCatchUpKicked) {
+          globalThis.__onderlingMemCatchUpKicked = true;
+          setTimeout(() => { memCatchUp.requestAll({ callSkill: bundle.callSkill }).catch(() => {}); }, 2500);
+        }
         return {
           ...(govCatchUp ? { [govCatchUp.subtypes.request]: govCatchUp.onRequest, [govCatchUp.subtypes.batch]: govCatchUp.onBatch } : {}),
+          ...(memRail ? { [MEMBERSHIP_BROADCAST]: makeMembershipPeerHandler({ rail: memRail }) } : {}),
+          ...(memCatchUp ? { [memCatchUp.subtypes.request]: memCatchUp.onRequest, [memCatchUp.subtypes.batch]: memCatchUp.onBatch } : {}),
           'kring-governance-broadcast': makeKringGovernancePeerHandler({
             eventLog: eventLogRef.current,
             rail: govRail,

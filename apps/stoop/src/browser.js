@@ -87,6 +87,9 @@ export async function createBrowserStoopAgent({
   // Circle-scoped spine signer resolver `(circleId) => {identity, ref}` — threaded to the skills' spine
   // emitter + roster projection (principle 5). Absent → the legacy global-identity signer.
   circleSignerFor,
+  // The membership rider: device-log emitter + verified reader (absent → the store-based spine path).
+  membershipEmit,
+  membershipRead,
 }) {
   if (!bus)           throw new TypeError('createBrowserStoopAgent: bus required');
   if (!identityVault) throw new TypeError('createBrowserStoopAgent: identityVault required');
@@ -119,6 +122,8 @@ export async function createBrowserStoopAgent({
     podReadSince,   // Phase 3 seam — real shared-pod reader (absent → getMessagesSince = local mirror)
     allowAddressFallback,  // per-user setting → the circle fan's address ladder (absent → allowed, unchanged)
     circleSignerFor,       // circle-scoped spine signing (absent → legacy global-identity signer, unchanged)
+    membershipEmit,        // the membership rider's device-log emitter (absent → store-based, unchanged)
+    membershipRead,        // the rider's verified reader for the roster fold
   });
 
   return {

@@ -147,7 +147,9 @@ export async function redeemMembershipCode({
   // acting device IS the joiner: the injected emitter signs `join` with the joiner's own identity (author =
   // subject = the joiner) and chains it to their frontier. Additive: the typed redemption item above is
   // unchanged. Optional — a caller that has not wired the spine simply skips it.
-  await emitSpine?.({ kind: 'join', circleId: a.groupId, subject: from, actor: from });
+  // The join's authorization rides the SIGNED payload: the redemption row it stands on. The fold admits a
+  // self-authored join only when that row exists (deny-favoring: a not-yet-arrived row defers, never forges).
+  await emitSpine?.({ kind: 'join', circleId: a.groupId, subject: from, actor: from, payload: { redemptionRef: item.id } });
   return {
     redemptionId: item.id,
     groupId:      a.groupId,
@@ -317,7 +319,7 @@ export async function verifyMembershipCodeForPeer({
   // ADMIN's device confirming a REMOTE joiner, who is not here to sign — so the ADMIN signs `join` with their
   // own identity (author = admin, subject = the joiner). Admin authorship is sound: the admin is the authority
   // that validated the code + enforced the ceiling, and a join needs no authority in the fold anyway. Additive.
-  await emitSpine?.({ kind: 'join', circleId: a.groupId, subject: a.requesterWebid, actor: from });
+  await emitSpine?.({ kind: 'join', circleId: a.groupId, subject: a.requesterWebid, actor: from, payload: { redemptionRef: item.id } });
   return {
     redemptionId: item.id,
     codeId:       valid.id,

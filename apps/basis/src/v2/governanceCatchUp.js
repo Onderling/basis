@@ -29,7 +29,11 @@ const MAX_BATCH = 500;
  *   known peer, and every statement is a SIGNED fact the receiver re-verifies; the residual exposure is the
  *   proposal/vote metadata itself, the same the live fan already carries). Wire a roster check to narrow.
  */
-export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, mayServe = null } = {}) {
+export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, mayServe = null, subtypes = null } = {}) {
+  // Lane-parametrized: the governance pair by default; a second lane (membership) passes its own pair —
+  // one mechanism, per-lane wire names.
+  const REQ = subtypes?.request ?? GOV_CATCHUP_REQUEST;
+  const BATCH = subtypes?.batch ?? GOV_CATCHUP_BATCH;
   if (!rail || typeof rail.storedStatements !== 'function' || typeof rail.ingest !== 'function') {
     throw new Error('governanceCatchUp: a governance rail (storedStatements + ingest) is required');
   }
@@ -37,20 +41,20 @@ export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, maySe
 
   /** SERVE — a reconnecting peer asks for a circle's governance statements; reply with all of them. */
   async function onRequest(fromPeerAddr, payload) {
-    if (!payload || payload.subtype !== GOV_CATCHUP_REQUEST) return;
+    if (!payload || payload.subtype !== REQ) return;
     const { circleId } = payload;
     if (typeof circleId !== 'string' || !circleId) return;
     try {
       if (mayServe && !(await mayServe(fromPeerAddr, circleId))) return;
       const statements = rail.storedStatements(circleId).slice(0, MAX_BATCH);
       if (statements.length === 0) return;   // nothing to serve — silence, not an empty batch
-      await sendToPeer(fromPeerAddr, { subtype: GOV_CATCHUP_BATCH, circleId, statements });
+      await sendToPeer(fromPeerAddr, { subtype: BATCH, circleId, statements });
     } catch { /* serving is best-effort — the requester retries on its next reconnect */ }
   }
 
   /** RECEIVE — every statement passes the rail's full ingest gate; unverifiable ones drop, the rest land. */
   async function onBatch(_fromPeerAddr, payload) {
-    if (!payload || payload.subtype !== GOV_CATCHUP_BATCH) return;
+    if (!payload || payload.subtype !== BATCH) return;
     const { circleId, statements } = payload;
     if (typeof circleId !== 'string' || !circleId || !Array.isArray(statements)) return;
     let landed = 0;
@@ -64,7 +68,7 @@ export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, maySe
   }
 
   /** Ask one peer for one circle's governance statements. */
-  const requestFrom = (peerAddr, circleId) => sendToPeer(peerAddr, { subtype: GOV_CATCHUP_REQUEST, circleId });
+  const requestFrom = (peerAddr, circleId) => sendToPeer(peerAddr, { subtype: REQ, circleId });
 
   /**
    * The reconnect kick: request every circle's governance statements from that circle's reachable members
@@ -90,7 +94,7 @@ export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, maySe
     return { requested };
   }
 
-  return { onRequest, onBatch, requestFrom, requestAll, subtypes: { request: GOV_CATCHUP_REQUEST, batch: GOV_CATCHUP_BATCH } };
+  return { onRequest, onBatch, requestFrom, requestAll, subtypes: { request: REQ, batch: BATCH } };
 }
 
 /** True when a folded proposal list still has open decisions — the caller may nudge (propose-only wakes). */

@@ -59,6 +59,11 @@ export function deriveRoster({
   memberMapForDisplay = [],
   exits = null,
   spineStatements = [],
+  // The membership-rider cutover switch: TRUE when the statements come from the RAIL's verified read
+  // (bindings resolved against real per-circle keys) — the fold is then AUTHORITATIVE and the wall-clock
+  // exit rule retires. FALSE (legacy store path / compositions where author==ref is the global-identity
+  // convention) keeps the pre-rider semantics: wall-clock exits + the strengthen-only spine overlay.
+  foldAuthoritative = false,
 } = {}) {
   const displayByWebid = new Map();
   for (const m of memberMapForDisplay ?? []) {
@@ -133,25 +138,26 @@ export function deriveRoster({
   // Founder(s) — the circle creator + any admin-role member; never redeem.
   for (const w of founderWebids ?? []) upsert(w, 'admin', {});
 
-  // B4 — drop whoever has exited THIS circle since their latest join. Applied AFTER the founder pass
-  // so leaving a circle you created works too: a founder's `joinedAt` is 0 (they never redeem), so
-  // any exit of theirs is by definition later.
-  if (exits instanceof Map && exits.size > 0) {
+  // B4 — the wall-clock exit drop. LEGACY PATH ONLY: with verified spine statements present the causal
+  // fold below is AUTHORITATIVE and the wall-clock comparison retires (two skewed devices must agree on
+  // who-is-in; `exitAt >= joinedAt` cannot give that — the deps-chain can). A circle with no statements
+  // (pre-rail, or a composition without the rail) keeps the old rule unchanged.
+  const authoritative = foldAuthoritative && Array.isArray(spineStatements) && spineStatements.length > 0;
+  if (!authoritative && exits instanceof Map && exits.size > 0) {
     for (const webid of [...roster.keys()]) {
       if (isExited(exits, webid, joinedAt.get(webid) ?? 0)) roster.delete(webid);
     }
   }
 
-  // ── Cutover: the SIGNED spine folds ON TOP of the trail-derived head, DENY-WINS ───────────────────────
-  // No data migration (the record decision for membership): the trail-derived roster computed above is the
-  // materialised HEAD at cutover; the signed spine statements are the chained transitions folded on top —
-  // same statements → same roster on every device (no wall-clock, no arrival-order dependence). The fold is
-  // applied DENY-WINS with the trail head: the spine can only STRENGTHEN it (a valid leave/evict drops a
-  // member; a role promotion lifts one to admin), never re-admit or invent a member the trail lacks. That is
-  // the SAFE direction while each member's own circle-scoped SIGNER is being settled: a foreign or partial
-  // spine (e.g. one signed by a substrate runner whose key is not the member's webid) can then only be
-  // ignored, never corrupt who-is-in. When membership is emitted per-device in the webid==key namespace the
-  // trail and spine agree, and this becomes the plan's causal roster. A circle with no spine is untouched.
+  // ── The CAUSAL FOLD is AUTHORITATIVE (the membership rider cutover) ──────────────────────────────────
+  // No data migration (the record decision for membership): the trail-derived roster above is the
+  // materialised HEAD; the signed statements are the chained transitions — `head + fold(deltas)` IS the
+  // membership. Same statements → same roster on every device (deps-chain order, no wall-clock, no
+  // arrival-order dependence). The statements handed here are VERIFIED with their key↔ref bindings RESOLVED
+  // (the rail's read, or the legacy store path's resolver) — the earlier strengthen-only interim existed
+  // because the signer wasn't settled; it is (circle-scoped signing + verified bindings), so the fold now
+  // ADMITS as well as removes: a causally-later re-join re-admits; a folded-in member the trail doesn't
+  // know yet gets a minimal row (their trail row backfills display fields when it arrives).
   if (Array.isArray(spineStatements) && spineStatements.length > 0) {
     const seedMembers = [...roster.keys()];
     const seedAdmins  = [...roster.values()].filter((r) => r.role === 'admin').map((r) => r.webid);
@@ -161,9 +167,20 @@ export function deriveRoster({
     });
     const inMembers = new Set(folded.members);
     const inAdmins  = new Set(folded.admins);
-    for (const webid of [...roster.keys()]) {
-      if (!inMembers.has(webid)) roster.delete(webid);            // spine removed them (deny-wins)
-      else if (inAdmins.has(webid)) roster.get(webid).role = 'admin';   // promote-only (never downgrade here)
+    if (authoritative) {
+      for (const webid of inMembers) {
+        if (!roster.has(webid)) upsert(webid, 'member', {});      // folded in ahead of their trail row
+      }
+      for (const webid of [...roster.keys()]) {
+        if (!inMembers.has(webid)) roster.delete(webid);          // folded out (deny-wins)
+        else roster.get(webid).role = inAdmins.has(webid) ? 'admin' : roster.get(webid).role;
+      }
+    } else {
+      // Legacy strengthen-only overlay: the spine may drop a member or promote to admin, never admit.
+      for (const webid of [...roster.keys()]) {
+        if (!inMembers.has(webid)) roster.delete(webid);
+        else if (inAdmins.has(webid)) roster.get(webid).role = 'admin';
+      }
     }
   }
 

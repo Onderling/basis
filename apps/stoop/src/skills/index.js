@@ -809,10 +809,12 @@ async function listGroupMembersCore(scope, a, ctx) {
   // injects the store, the MemberMap, the viewer's reveal store, the per-circle membership
   // projection, the shared exit helpers, and the foreign-caller + allowlist gate helpers,
   // and passes the parsed args + carrier context.
-  const { store, members, reveals, groupId, localActor, circleSignerFor } = scope;
+  const { store, members, reveals, groupId, localActor, circleSignerFor, membershipRead } = scope;
   // Thread the circle-scoped signer resolver into the projection so it can verify THIS device's own
   // circle-key↔ref binding when folding spine statements (see projectCircleRoster).
-  const project = circleSignerFor ? ((a2) => projectCircleRoster({ ...a2, circleSignerFor })) : projectCircleRoster;
+  const project = (circleSignerFor || membershipRead)
+    ? ((a2) => projectCircleRoster({ ...a2, circleSignerFor, membershipRead }))
+    : projectCircleRoster;
   return listCircleMembers(
     {
       store, members, reveals, projectCircleRoster: project, readCircleExits, isExited,
@@ -844,7 +846,7 @@ async function listGroupMembersCore(scope, a, ctx) {
  * @returns {Promise<Array<object>|null>} the circle's members, or `null` when the
  *   circle has NO redemption trail (the caller keeps its pre-trail behaviour).
  */
-export async function projectCircleRoster({ store, groupId, memberMapList = [], circleSignerFor } = {}) {
+export async function projectCircleRoster({ store, groupId, memberMapList = [], circleSignerFor, membershipRead } = {}) {
   if (!store || typeof store.listOpen !== 'function' || !groupId) return null;
   const list = Array.isArray(memberMapList) ? memberMapList : [];
   let redemptions = [];
@@ -906,6 +908,27 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
     return null;   // claimed binding unverifiable on this device → ignore (never trust, never corrupt)
   };
   let spineStatements = [];
+  if (typeof membershipRead === 'function') {
+    // THE RAIL (the membership rider): statements live on the DEVICE LOG's membership lane — the injected
+    // reader returns VERIFIED bodies with the key↔ref binding already resolved. Two fold-side gates apply
+    // HERE (where the trail rows are at hand), per the join-proof decision:
+    //   • a SELF-authored join must carry `payload.redemptionRef` naming an existing redemption row for the
+    //     same subject — deny-favoring: a row that hasn't arrived yet defers the join to the next read;
+    //   • a join authored by SOMEONE ELSE stands only on a FOUNDER's authority (dynamic non-founder-admin
+    //     authority is the deferred causal-authority slice).
+    try {
+      const { bodies } = await membershipRead(groupId);
+      spineStatements = (bodies ?? []).filter((b) => {
+        if (b.kind !== 'join') return true;
+        if (b.author === b.subject) {
+          const ref = b.payload?.redemptionRef;
+          return typeof ref === 'string' && !!ref
+            && forGroup.some((it) => it.id === ref && it?.source?.redeemedBy === b.subject);
+        }
+        return founderWebids.has(b.author);
+      });
+    } catch { spineStatements = []; }
+  } else {
   try {
     const spineItems = await store.listOpen({ type: SPINE_STATEMENT_ITEM });
     for (const it of spineItems ?? []) {
@@ -918,11 +941,15 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
       }
     }
   } catch { spineStatements = []; }
+  }
 
   return deriveRoster({
     redemptions: forGroup,
     founderWebids: [...founderWebids],
     memberMapForDisplay: list,
+    // Authoritative ONLY on the rail path: its statements carry verified per-circle-key bindings. The
+    // legacy store path keeps the pre-rider semantics until stoop dissolves.
+    foldAuthoritative: typeof membershipRead === 'function',
     // A removal/leave recorded for THIS circle drops the member from THIS circle only. The
     // trail is already circle-scoped, so nothing here can reach a circle you also share with them.
     exits: await readCircleExits({ store, groupId }),
@@ -1047,12 +1074,12 @@ export const STOOP_CORES = Object.freeze({
 export function buildStoopScope(deps = {}) {
   const {
     store, offeringMatch, notifier, reveals, members, controlAgent,
-    muted, localActor, groupId: explicitGroupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor,
+    muted, localActor, groupId: explicitGroupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
   } = deps;
   const groupId = explicitGroupId ?? offeringMatch?.group ?? null;
   return {
     store, offeringMatch, notifier, reveals, members, controlAgent,
-    muted, localActor, groupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor,
+    muted, localActor, groupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
   };
 }
 
@@ -1085,6 +1112,11 @@ export function buildSkills({
   // Circle-scoped spine signer resolver `(circleId) => {identity, ref}` (principle 5) — host-injected;
   // absent → the legacy global-identity signer below (author==ref by the basis binding).
   circleSignerFor,
+  // THE MEMBERSHIP RIDER (host-injected): `membershipEmit` replaces the store-based spine appender (the
+  // statement rides the DEVICE LOG's membership lane + the fan); `membershipRead(circleId)` returns the
+  // rail's VERIFIED bodies for the roster fold. Absent → the legacy store-based spine path, unchanged.
+  membershipEmit,
+  membershipRead,
   // G13 step C — route circle traffic to each member's PER-CIRCLE address instead of their one global
   // signing key. **ON since 2026-07-29.**
   //
@@ -1139,7 +1171,7 @@ export function buildSkills({
   // `wireSkill`, and re-attaches the same description/visibility.
   const scope = buildStoopScope({
     store, offeringMatch, notifier, reveals, members, controlAgent,
-    muted, localActor, groupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor,
+    muted, localActor, groupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
   });
   const storeFor = () => scope;
   const op = (id) => {
@@ -1166,7 +1198,9 @@ export function buildSkills({
   const broadcastToCircle = createCircleFanOut({
     chat, members, store, metrics, bundle,
     preferCircleAddress, allowAddressFallback,
-    projectCircleRoster: (circleSignerFor ? ((a2) => projectCircleRoster({ ...a2, circleSignerFor })) : projectCircleRoster),
+    projectCircleRoster: ((circleSignerFor || membershipRead)
+      ? ((a2) => projectCircleRoster({ ...a2, circleSignerFor, membershipRead }))
+      : projectCircleRoster),
     readCircleExits, isExited,
     fanOutViaReliableSend: _fanOutViaReliableSend,
     fanOutToMembers: _fanOutToMembers,
@@ -1183,11 +1217,15 @@ export function buildSkills({
   // claiming it was, was wrong). No signer at all → no emitter: the writer still records its typed item, just
   // no spine statement — additive, never a regression.
   const _spineSigner = bundle?.agent?.identity;
-  const emitSpine = (typeof circleSignerFor === 'function')
-    ? createSpineAppender({ store, signerFor: circleSignerFor })
-    : ((_spineSigner?.pubKey && typeof _spineSigner.sign === 'function')
-        ? createSpineAppender({ store, signer: _spineSigner })
-        : undefined);
+  const emitSpine = (typeof membershipEmit === 'function')
+    // THE MEMBERSHIP RIDER: statements ride the device log's membership lane (signed, fanned, verified on
+    // ingest, caught-up) — the store-based appender below is the legacy path for compositions without it.
+    ? membershipEmit
+    : (typeof circleSignerFor === 'function')
+      ? createSpineAppender({ store, signerFor: circleSignerFor })
+      : ((_spineSigner?.pubKey && typeof _spineSigner.sign === 'function')
+          ? createSpineAppender({ store, signer: _spineSigner })
+          : undefined);
 
   return [
     /**
@@ -3733,6 +3771,32 @@ export function buildSkills({
       });
     }, {
       description: 'Fan a governance event (propose/vote/resolve) to every other member via chat.send subtype:kring-governance-broadcast; receivers ingest it into their local EventLog. Only a propose wakes an offline device (governanceWakeHint).',
+      visibility:  'authenticated',
+    }),
+
+    /**
+     * broadcastKringMembership({groupId, event, msgId, ts?})
+     *   — the membership rider: fan a SIGNED membership statement (join/leave/evict/role) to every other
+     *   member; receivers verify it at their membership rail before it lands on their device log. Same
+     *   plumbing as broadcastKringGovernance; subtype kring-membership-broadcast. A membership transition
+     *   never wakes an offline device by itself (the roster converges via catch-up; principle: silent
+     *   system lane).
+     */
+    defineSkill('broadcastKringMembership', async ({ parts, from }) => {
+      const a = dataArgs(parts);
+      const _groupId = a.groupId ?? groupId;
+      if (!_groupId)                                                  return { error: 'groupId-required' };
+      if (!a.event || typeof a.event !== 'object')                    return { error: 'event-required' };
+      if (typeof a.msgId !== 'string' || !a.msgId)                    return { error: 'msgId-required' };
+      const ts = typeof a.ts === 'number' && Number.isFinite(a.ts) ? a.ts : Date.now();
+      return broadcastToCircle({
+        circleId: _groupId, kind: 'kring-membership-broadcast', from,
+        extras: { circleId: _groupId, msgId: a.msgId, ts, event: a.event },
+        metric: 'kring-membership-fanout',
+        noWake: true,
+      });
+    }, {
+      description: 'Fan a signed membership statement (join/leave/evict/role) to every other member via subtype:kring-membership-broadcast; receivers verify at their membership rail before it lands. Never wakes.',
       visibility:  'authenticated',
     }),
 

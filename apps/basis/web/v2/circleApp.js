@@ -166,6 +166,7 @@ import { createCircleMediaComposition, makeDevMediaBucket } from '../../src/v2/c
 import { buildSelfMediaComposition, makeResealMediaForCircle } from '../../src/v2/profileMediaReseal.js';
 import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals } from '../../src/v2/governanceAppWiring.js';
 import { makeGovernanceCatchUp } from '../../src/v2/governanceCatchUp.js';
+import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../src/v2/membershipRail.js';
 import { buildSubjectLabeler } from '../../src/v2/governanceView.js';
 import { governanceEntryId, foldGovernance } from '../../src/v2/governanceLog.js';
 import { reportEntryId } from '../../src/v2/reportModel.js';
@@ -1311,6 +1312,7 @@ let rawCallSkill = null;     // (appOrigin, opId, args) — for createGroupV2
 let circleIdentityForShell = null;   // the agent's per-circle signer resolver — governance signs circle-scoped
 let govShellRail = null;             // the governance rail for the RECEIVE side (verify-on-ingest)
 let govCatchUpShell = null;          // pull-all governance catch-up (the offline-device half of reliable)
+let memCatchUpShell = null;          // the membership lane's catch-up (same mechanism, its own subtypes)
 // The pod-session's AUTHED fetch (set on sign-in) — lets embed-ref resolution
 // read the user's OWN private-pod items; null when signed out → resolution falls
 // back to a public fetch (only public cross-pod refs resolve; protected → 🔒).
@@ -6692,6 +6694,9 @@ async function boot() {
   try {
     const agent = await createRealHouseholdAgent({
       publishEvent: publishEventToLog,
+      // The membership rider: hand the DEVICE LOG so membership statements ride its membership lane
+      // (signed, fanned, verified, caught-up) and the roster folds the rail's verified bodies.
+      deviceLog: eventLog,
       // A message the system has GIVEN UP ON must stop looking fine. Web consumed neither report until
       // 2026-08-02, so a dropped or expired message kept its optimistic state forever — on the shell we
       // are shipping first. Same shared rule mobile uses; the shell injects only its map and logger.
@@ -6850,6 +6855,12 @@ async function boot() {
         rail: govShellRail,
         sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
         onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); },
+      }) : null;
+      // The membership lane's catch-up: the same lane-parametrized mechanism over the agent's rail.
+      memCatchUpShell = agent.membershipRail ? makeGovernanceCatchUp({
+        rail: agent.membershipRail,
+        sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
+        subtypes: MEMBERSHIP_CATCHUP_SUBTYPES,
       }) : null;
       // Route the auto-resolving callSkill through the calendar-wrapped one too,
       // so button-driven calendar dispatches fan out as well as the bot path.
@@ -7054,6 +7065,9 @@ async function boot() {
           // Wave C tail A — ingest fanned governance/report events into the one log so a
           // vote/report raised on another device shows here; re-render an open panel.
           ...(govCatchUpShell ? { [govCatchUpShell.subtypes.request]: govCatchUpShell.onRequest, [govCatchUpShell.subtypes.batch]: govCatchUpShell.onBatch } : {}),
+          // The membership rider: the fan receiver (verify-on-ingest at the agent's rail) + its catch-up pair.
+          ...(agent.membershipRail ? { [MEMBERSHIP_BROADCAST]: makeMembershipPeerHandler({ rail: agent.membershipRail }) } : {}),
+          ...(memCatchUpShell ? { [memCatchUpShell.subtypes.request]: memCatchUpShell.onRequest, [memCatchUpShell.subtypes.batch]: memCatchUpShell.onBatch } : {}),
           'kring-governance-broadcast': makeKringGovernancePeerHandler({ eventLog, rail: govShellRail, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); }, notify: govNotify }),
           'kring-report-broadcast':     makeKringReportPeerHandler({ eventLog, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); } }),
           // ε.4 — negotiated catch-up subtypes.
@@ -7190,6 +7204,7 @@ async function boot() {
           console.warn('[catch-up] kick-off failed', err?.message ?? err));
         // Governance pull-all rides the same kick — any one complete peer suffices (idempotent ingest).
         govCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
+        memCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         // Seed the household roster for the active circle (re-fed on open below).
         feedHouseholdRosterForCircle(getActiveCircle()).catch(() => {});
       }, 1500);

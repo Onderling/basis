@@ -457,6 +457,8 @@ export default function App() {
           // to <pod>/basis/settings/… under the owner-derived key, so they open on the user's other devices.
           // Same shared factory + attachInner path realAgent already runs; mobile only supplies the pod
           // fetch + root, exactly like provisionCircleMedium above. Null fetch/root → factory returns null → local.
+          // The membership rider: hand the device log so membership statements ride its lane.
+          deviceLog: eventLogRef.current ?? undefined,
           provisionSettingsMedium: async (strategy) => createSettingsPodMedium({
             fetch:   getCirclePodFetch(),
             podRoot: getActiveRealPodRouting()?.podRoot ?? null,

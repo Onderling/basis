@@ -222,6 +222,9 @@ export async function createNeighborhoodAgent({
   // Circle-scoped spine signer resolver `(circleId) => {identity, ref}` — host-injected (basis derives it
   // from the profile seed via circleIdentityFor). Absent → skills fall back to the global-identity signer.
   circleSignerFor,
+  // The membership rider (host-injected): the device-log emitter + verified reader — see skills/index.js.
+  membershipEmit,
+  membershipRead,
   label = 'NeighborhoodAgent',
 }) {
   if (!offeringMatchOpts?.group || !offeringMatchOpts?.localActor) {
@@ -600,6 +603,8 @@ export async function createNeighborhoodAgent({
       metrics,        // Phase 18 — record() called from key handlers
       bundle,         // Phase 20 — sign-in skills mutate bundle.oidcSession + cache
       circleSignerFor, // circle-scoped spine signing (principle 5) — absent → legacy global-identity signer
+      membershipEmit,  // the membership rider's device-log emitter (absent → the store-based spine path)
+      membershipRead,  // the rider's verified statement reader for the roster fold
       // The per-user address-fallback setting, when the host supplies one (absent → the skills'
       // own `true` default, unchanged).
       ...(allowAddressFallback === undefined ? {} : { allowAddressFallback }),

@@ -367,6 +367,10 @@ export class EventLog {
     const fold = [];
     for (const e of this.#events) {
       if (e.type === 'audit-summary') { keep.push(e); continue; }   // a fold never expires
+      // MEMBERSHIP is EXEMPT from retention entirely: the roster is a fold of these statements, so one
+      // compacting away silently changes who-is-in on rebuild. The set is tiny (bounded by membership
+      // churn, not traffic) — keeping all of it is cheap; losing one is a security divergence.
+      if (e.type === 'membership') { keep.push(e); continue; }
       const cls = retentionOf(e.type);
       const cutoff = now - (this.#retention[cls] ?? this.#retention.chat);
       if (e.ts >= cutoff) { keep.push(e); continue; }

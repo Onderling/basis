@@ -117,9 +117,6 @@ export {
 export {
   ROLE_TEMPLATES, ROLE_TEMPLATE_IDS, roleTemplateById, applyRoleTemplates,
 } from './v2/roleTemplates.js';
-export { makeProposal, approveProposal, pendingApprovers } from './v2/circleConsensus.js';
-// persistence layer for multi-admin proposals.
-export { createProposalStore, localStorageProposalIo } from './v2/circleProposalStore.js';
 export {
   eventCircleId, buildCircleStream,
   // kring-scoped stream + chip filters.

@@ -21,7 +21,6 @@ import {
   // SILENT out-of-circle delivery — the per-user "shared with me" store (received sealed copies).
   createSharedWithMeStore, podSharedWithMeIo, tieredSharedWithMeIo,
   // multi-admin proposal persistence on RN.
-  createProposalStore,
   // α.1a — scherm recipe book store.
   createKringRecipeStore,
   // α.2 — per-user screens store.
@@ -185,9 +184,6 @@ export function asyncRawIo(storage) {
   };
 }
 
-export function makeProposalStoreRN(storage) {
-  return createProposalStore({ io: asyncRawIo(storage) });
-}
 
 /** β.5 — per-user "pin to top" store (single key: `cc.circlePinned`). */
 export function makeCirclePinStoreRN(storage) {

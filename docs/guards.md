@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 13
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 14
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -20,6 +20,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `integration-index` | — | the integration index stays in sync with reality |
 | `ledger` | — | Fitness function for the open-questions ledger in REMAINING-WORK.md |
 | `resolution-policy` | G-L23 | the DECLARATION LAYER is complete + has no SECOND ordering mechanism |
+| `retired-modules` | — | a RETIRED module must stay dead (the legacy-deletion-after-cutover discipline) |
 | `scope-leaks` | — | no CROSS-SCOPE REFERENCE LEAKS in the RN shell screens |
 | `stale-params` | — | a REGISTERED param that NOTHING reads is dead (the #36 fork of lint-unreached-exports) |
 | `ungoverned-user-params` | — | a `kind:user` param that NO register governs advertises settability it |

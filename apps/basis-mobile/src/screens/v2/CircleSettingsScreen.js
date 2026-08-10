@@ -20,7 +20,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, Pressable, ScrollView, Switch, TextInput, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
 import {
-  CIRCLE_FEATURES, CIRCLE_POLICY_ENUMS, SETTINGS_ENUM_AXES, mergeCirclePolicy, makeProposal, DEFAULT_CIRCLE_ORIGINS,
+  CIRCLE_FEATURES, CIRCLE_POLICY_ENUMS, SETTINGS_ENUM_AXES, mergeCirclePolicy, DEFAULT_CIRCLE_ORIGINS,
   detectPolicyConflicts, applyPolicyResolution,
 } from '@onderling-app/basis';
 // the shared manifest-driven settings form + per-skill freedom matrix (web≡mobile).
@@ -74,7 +74,7 @@ const ENUM_AXES = SETTINGS_ENUM_AXES;
 const SETTINGS_PAGE = pageForOpMobile(basisManifest, 'settings');
 
 export default function CircleSettingsScreen({
-  store, proposalStore, circleId, onBack,
+  store, onProposePolicy, circleId, onBack,
   // §4 storage-policy bridge — the host injects the agent's raw callSkill so a
   // pod-tier change drives stoop.setCircleStoragePolicy (web parity).
   callSkill,
@@ -267,19 +267,10 @@ export default function CircleSettingsScreen({
   const onSave = useCallback(async () => {
     if (!working) return;
     if (consensusActive) {
-      // record + persist the pending proposal. When unanimous
-      // (single-admin / proposer in `requiredApprovers`), commit
-      // immediately + drop the proposal; otherwise keep it pending.
-      const proposal = makeProposal({
-        circleId, patch: working, proposedBy: null, policy: working,
-      });
-      if (proposalStore) {
-        await proposalStore.save(proposal);
-        if (proposal.status === 'ready') {
-          await store.update(circleId, working);
-          await proposalStore.remove(proposal.id);
-        }
-      }
+      // Multi-admin consensus → a GOVERNANCE proposal (changePolicy) on the log, raised by the parent's
+      // governance handle: it fans to the other admins, they vote in the governance panel, and on
+      // approval the wired setPolicy enactor applies the patch. The side-store is retired.
+      await onProposePolicy?.(circleId, working);
     } else {
       await store.update(circleId, working);
       // §4 storage-policy bridge — when the pod tier changed, drive stoop's
@@ -299,7 +290,7 @@ export default function CircleSettingsScreen({
       }
     }
     onBack?.();
-  }, [working, consensusActive, store, proposalStore, circleId, onBack, callSkill]);
+  }, [working, consensusActive, store, onProposePolicy, circleId, onBack, callSkill]);
 
   // γ.4 — overlay rendered on top of the regular screen when a conflict
   // is detected.  Mirrors CircleRecipeEditorScreen's pattern (β.5).

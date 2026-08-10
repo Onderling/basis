@@ -33,8 +33,32 @@ function makeIngestHandler({ eventLog, subtype, kind, idFor, onChange, notify, w
 
 /** Peer handler for `kring-governance-broadcast` → ingest the vote/proposal event locally.
  *  `notify(circleId, event)` fires an IN-APP nudge for wake-worthy events (a decision opened),
- *  not every vote (governanceWakeHint). */
-export function makeKringGovernancePeerHandler({ eventLog, onChange, notify } = {}) {
+ *  not every vote (governanceWakeHint).
+ *
+ *  THE RAIL: with a `rail`, a fanned governance event is a SIGNED STATEMENT and must pass the
+ *  rail's ingest — signature + chain + declared kind + the key↔ref binding — before it lands (P9: the gate
+ *  binds at the receiver). A bare unsigned event is then REFUSED (no-backcompat: one path per type). Without
+ *  a rail (legacy composition) the unsigned path stands unchanged. */
+export function makeKringGovernancePeerHandler({ eventLog, onChange, notify, rail = null } = {}) {
+  if (rail) {
+    return async function onKringGovernanceRail(_fromPeerAddr, payload) {
+      if (!payload || payload.subtype !== 'kring-governance-broadcast') return;
+      const { circleId, event: statement } = payload;
+      if (typeof circleId !== 'string' || !circleId || !statement?.body || !statement?.sig) return;   // signed-only
+      const id = `${GOVERNANCE_KIND}:${statement.body.hash}`;
+      const isNew = eventLog.query({}).every((e) => e.id !== id);
+      try {
+        const res = await rail.ingest(circleId, statement);
+        if (!res?.ok) return;                     // refused: unverifiable — never lands, never notifies
+        try { onChange?.(circleId); } catch { /* re-render is best-effort */ }
+        if (isNew && typeof notify === 'function' && statement.body.kind === 'propose') {
+          // notify gets the flat event shape the legacy path passed (a decision OPENED nudge).
+          const { authorRef, ...flat } = statement.body.payload ?? {};
+          try { notify(circleId, { ...flat, event: statement.body.kind, proposalId: statement.body.subject }); } catch { /* best-effort */ }
+        }
+      } catch { /* ingest is best-effort — never throw on a peer message */ }
+    };
+  }
   return makeIngestHandler({ eventLog, subtype: 'kring-governance-broadcast', kind: GOVERNANCE_KIND, idFor: governanceEntryId, onChange, notify, wakeHint: governanceWakeHint });
 }
 

@@ -65,6 +65,7 @@ import { makeKringRecipePeerHandler } from '../../../basis/src/v2/kringRecipeRec
 import { makeKringRulesPeerHandler }  from '../../../basis/src/v2/kringRulesReceiver.js';
 import { makeKringPolicyPeerHandler } from '../../../basis/src/v2/kringPolicyReceiver.js';
 import { makeKringGovernancePeerHandler, makeKringReportPeerHandler } from '../../../basis/src/v2/kringLogReceiver.js';
+import { makeGovernanceRail } from '../../../basis/src/v2/governanceAppWiring.js';
 import { governanceEntryId } from '../../../basis/src/v2/governanceLog.js';
 import { makeHandleChatMessage }
                                from '../../../basis/src/core/handlers/chatMessage.js';
@@ -786,6 +787,11 @@ export default function ChatScreen({
       // notify: an in-app nudge when a decision OPENS (governanceWakeHint gates to propose).
       'kring-governance-broadcast': makeKringGovernancePeerHandler({
         eventLog: eventLogRef.current,
+        // The receive-side governance RAIL: verify (signature + declared kind + roster key-ref binding)
+        // before a fanned statement lands. Same rules as the web shell's receiver.
+        rail: (bundle?.agent?.circleIdentityFor
+          ? makeGovernanceRail({ eventLog: eventLogRef.current, circleIdentityFor: bundle.agent.circleIdentityFor, myRef: '', callSkill: bundle.callSkill })
+          : null),
         notify: (circleId, event) => {
           try {
             eventLogRef.current?.append({

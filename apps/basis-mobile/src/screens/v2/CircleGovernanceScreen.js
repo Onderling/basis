@@ -26,7 +26,7 @@ import { mergeCirclePolicy, GOVERNANCE_ACTIONS, GOVERNANCE_CLASSES, decisionClas
 const CLASS_KEY = { 'any-admin': 'any_admin', 'admin-quorum': 'admin_quorum', 'member-vote': 'member_vote' };
 const trOr = (key, fallback, params) => { const v = t(key, params); return v === key ? fallback : v; };
 
-export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy, updatePolicy, circleId, onBack }) {
+export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy, updatePolicy, circleId, onBack, circleIdentityFor = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [model, setModel] = useState({ view: { open: [], closed: [] }, isAdmin: false, policy: null });
@@ -37,13 +37,14 @@ export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy,
     try { const r = await callSkill('stoop', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
     const broadcast = (channel, circleId, event, opts) => {
       const op = channel === 'report' ? 'broadcastKringReport' : 'broadcastKringGovernance';
-      const msgId = channel === 'report' ? reportEntryId(event) : governanceEntryId(event);
+      const msgId = channel === 'report' ? reportEntryId(event) : (event?.body?.hash ? `gov:${event.body.hash}` : governanceEntryId(event));
       // `opts.to` narrows the fan to the circle's admins on the report channel (story 3.6) — web parity.
       const to = Array.isArray(opts?.to) ? opts.to : undefined;
       callSkill('stoop', op, { groupId: circleId, event, msgId, ts: Date.now(), ...(to ? { to } : {}) }).catch(() => {});
     };
     const gov = bindCircleGovernance({
       eventLog, callSkill, getPolicy, myRef: myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast,
+      circleIdentityFor,
     });
     ctxRef.current = { gov, myWebid };
     let ctx = { policy: {}, members: [] };

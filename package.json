@@ -43,6 +43,7 @@
     "lint:stale-params": "node scripts/lint-stale-params.mjs",
     "lint:stale-params:update": "node scripts/lint-stale-params.mjs --update",
     "lint:ungoverned-params": "node scripts/lint-ungoverned-user-params.mjs",
+    "lint:retired": "node scripts/lint-retired-modules.mjs",
     "plan-index": "node scripts/gen-plan-index.mjs",
     "plan-index:check": "node scripts/gen-plan-index.mjs --check",
     "guards": "node scripts/guards.mjs",

@@ -164,9 +164,9 @@ import { encodeImageFile } from '../../src/v2/attachmentEncoder.js';
 // Solid verifier) is recorded in circleMediaGateway.js.
 import { createCircleMediaComposition, makeDevMediaBucket } from '../../src/v2/circleMediaGateway.js';
 import { buildSelfMediaComposition, makeResealMediaForCircle } from '../../src/v2/profileMediaReseal.js';
-import { bindCircleGovernance } from '../../src/v2/governanceAppWiring.js';
+import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals } from '../../src/v2/governanceAppWiring.js';
 import { buildSubjectLabeler } from '../../src/v2/governanceView.js';
-import { governanceEntryId } from '../../src/v2/governanceLog.js';
+import { governanceEntryId, foldGovernance } from '../../src/v2/governanceLog.js';
 import { reportEntryId } from '../../src/v2/reportModel.js';
 import { makeKringGovernancePeerHandler, makeKringReportPeerHandler } from '../../src/v2/kringLogReceiver.js';
 import { renderGovernancePanel } from './circleGovernancePanel.js';
@@ -726,8 +726,6 @@ import { settingsControlsFromManifest } from '../../src/v2/circleSettingsControl
 // Phase 4 §10 / G17 — the shared composer built-in classifier (circle/transport slash commands
 // dispatch as built-ins, not to the bot/LLM).
 import { parseCircleBuiltin } from '../../src/v2/circleComposerBuiltins.js';
-import { makeProposal, pendingApprovers } from '../../src/v2/circleConsensus.js';
-import { createProposalStore, localStorageProposalIo } from '../../src/v2/circleProposalStore.js';
 // agent-add admin approval store.
 import { createAgentRequestStore } from '../../src/v2/agentRequest.js';
 import { buildTilePreviews, bumpSeenAt } from '../../src/v2/circleTilePreviews.js';
@@ -1036,7 +1034,6 @@ const availabilityStore = createAvailabilityStore(
   ),
 );
 // persisted pending proposals (multi-admin consensus).
-const proposalStore = createProposalStore({ io: localStorageProposalIo() });
 // persisted pending agent-add requests. Reuses
 // the same {load, save} adapter shape as the proposal store.
 const AGENT_REQ_STORE_KEY = 'cc.agentRequestQueue';
@@ -1310,6 +1307,8 @@ let resolveCallSkill = null; // (opId, args) => Promise<object|null>
 // code), which would wipe a feedback invite's `?projectId&code` before we read it. Snapshot first.
 const _bootSearch = (typeof window !== 'undefined' && window.location) ? window.location.search : '';
 let rawCallSkill = null;     // (appOrigin, opId, args) — for createGroupV2
+let circleIdentityForShell = null;   // the agent's per-circle signer resolver — governance signs circle-scoped
+let govShellRail = null;             // the governance rail for the RECEIVE side (verify-on-ingest)
 // The pod-session's AUTHED fetch (set on sign-in) — lets embed-ref resolution
 // read the user's OWN private-pod items; null when signed out → resolution falls
 // back to a public fetch (only public cross-pod refs resolve; protected → 🔒).
@@ -3336,7 +3335,13 @@ async function refreshLauncherProposals() {
   const next = {};
   for (const c of circlesCache) {
     let n = 0;
-    try { n += await proposalStore.countPending(c.id); } catch { /* ignore */ }
+    try {
+      if (govShellRail) {
+        const { events } = await govShellRail.readVerified(c.id);
+        const fold = foldGovernance(events, { policy: {}, members: [], now: Date.now() });
+        n += fold.proposals.filter((p) => !p.closed && p.action === 'changePolicy').length;
+      }
+    } catch { /* ignore */ }
     try { n += await agentRequestStore.countPending(c.id); } catch { /* ignore */ }
     if (n > 0) next[c.id] = n;
   }
@@ -6153,7 +6158,7 @@ function govNotify(circleId, event) {
 }
 function govBroadcast(channel, circleId, event, opts) {
   const op = channel === 'report' ? 'broadcastKringReport' : 'broadcastKringGovernance';
-  const msgId = channel === 'report' ? reportEntryId(event) : governanceEntryId(event);
+  const msgId = channel === 'report' ? reportEntryId(event) : (event?.body?.hash ? `gov:${event.body.hash}` : governanceEntryId(event));
   // `opts.to` narrows the fan — the report channel passes the circle's admins, so a report never lands on
   // the device of the person it is about (story 3.6). Undefined for governance: those fan to everyone.
   const to = Array.isArray(opts?.to) ? opts.to : undefined;
@@ -6177,6 +6182,7 @@ async function fileCircleReport(circleId, targetType, targetRef, targetLabel = n
   const gov = bindCircleGovernance({
     eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
     myRef: myWebid, genId: () => `rep-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
+    circleIdentityFor: circleIdentityForShell,
   });
   try { return await gov.reports.file({ circleId, targetType, targetRef, targetLabel, reason }); }
   catch { return { ok: false }; }
@@ -6192,6 +6198,11 @@ async function showGovernance(id) {
     eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
     myRef: myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
     removeReported: removeReportedItem,
+    circleIdentityFor: circleIdentityForShell,
+    setPolicy: (cid, patch) => policyStore.update(cid, patch).then((r) => {
+      try { broadcastPolicy({ circleId: cid, policy: patch }); } catch { /* fan is best-effort */ }
+      return r;
+    }),
   });
   rootEl.innerHTML = '';
   const back = document.createElement('button');
@@ -6421,6 +6432,20 @@ async function showAdmin(id) {
 
 async function showSettings(id) {
   let working = await policyStore.get(id);
+  // Settings consensus rides GOVERNANCE (the changePolicy action on the log) — the localStorage
+  // proposal side-store is retired. One handle serves the pending list, the propose, and (via the
+  // wired setPolicy enactor) the apply-on-approval; approvals cross devices because the events fan.
+  let myWebid = '';
+  try { const r = await rawCallSkill('stoop', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
+  const gov = bindCircleGovernance({
+    eventLog, callSkill: rawCallSkill, getPolicy: (cid) => policyStore.get(cid),
+    myRef: myWebid, genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`, broadcast: govBroadcast,
+    circleIdentityFor: circleIdentityForShell,
+    setPolicy: (cid, patch) => policyStore.update(cid, patch).then((r) => {
+      try { broadcastPolicy({ circleId: cid, policy: patch }); } catch { /* fan is best-effort */ }
+      return r;
+    }),
+  });
   // §4 storage-policy bridge — remember the pod tier at entry so Save only pushes
   // to stoop when the admin actually changed it; a failed push (admin-only / the
   // one-way downgrade guard / a centralised tier missing its groupPodUri) is
@@ -6429,14 +6454,18 @@ async function showSettings(id) {
   let storageNote;
   const consensusActive = () => !!working.consensusRequired && (working.admins?.length ?? 0) >= 2;
   // load pending proposals so the banner can surface the count of
-  // outstanding "waiting on N admins" approvals on settings entry.
-  let pending = await proposalStore.listForCircle(id);
-  const pendingCount = () => pending.filter((p) => p.status !== 'ready').length;
+  // outstanding "waiting on N admins" approvals on settings entry — folded off the LOG, so a
+  // proposal raised on another admin's device shows here too.
+  let pending = [];
+  let pendingMembers = [];
+  try { ({ proposals: pending, members: pendingMembers } = await openPolicyProposals(gov, id)); } catch { /* */ }
+  const pendingCount = () => pending.length;
   const pendingNote = () => {
     if (pendingCount() === 0) return consensusActive() ? t('circle.settings.pending') : undefined;
-    // Build a "waiting on Pieter, Sara" string from the first pending proposal.
-    const first = pending.find((p) => p.status !== 'ready');
-    const waiting = first ? pendingApprovers(first) : [];
+    // "waiting on Pieter, Sara" — the admins whose vote the first open proposal still lacks.
+    const first = pending[0];
+    const voted = new Set((first?.votes ?? []).map((v) => v.voter));
+    const waiting = pendingMembers.filter((m) => m.role === 'admin' && !voted.has(m.ref)).map((m) => m.ref);
     return waiting.length
       ? t('circle.settings.pending_waiting', { who: waiting.join(', ') })
       : t('circle.settings.pending');
@@ -6576,29 +6605,15 @@ async function showSettings(id) {
         showDetail(id);
         return;
       }
-      // record + persist the pending proposal. Cross-admin
-      // delivery (NKN fan-out + receive handler) is the V1 follow-up;
-      // single-device approval works on-device today via approveProposal +
-      // proposalStore.updateOne, and unanimous-approve commits via
-      // policyStore.update + proposalStore.remove.
-      const proposal = makeProposal({
-        circleId: id, patch: working, proposedBy: null, policy: working,
+      // Multi-admin consensus → a GOVERNANCE proposal (changePolicy) on the log: it fans to the other
+      // admins, they vote in the governance panel, and on approval the wired setPolicy enactor applies
+      // the patch + broadcasts the committed policy. Single admin / consensus off never reaches here
+      // (the branch above commits immediately) — so this always opens a real cross-device proposal.
+      await gov.propose({
+        circleId: id, action: 'changePolicy', subject: working,
+        actor: { ref: myWebid, role: 'admin' },
       });
-      await proposalStore.save(proposal);
-      if (proposal.status === 'ready') {
-        // Single admin / self-only consensus → commit immediately.
-        await policyStore.update(id, working);
-        await proposalStore.remove(proposal.id);
-        // γ-next.policy — fan the just-committed policy doc out to peers.
-        // Only fires when consensus actually resolves on-device (i.e. the
-        // proposal landed as `ready`); for outstanding multi-admin
-        // proposals the broadcast follows the unanimous-approve commit
-        // path (cross-admin proposal-delivery is a V1 follow-up).
-        try { broadcastPolicy({ circleId: id, policy: working }); }
-        catch (err) { console.warn('[kring-policy] broadcast scheduling failed:', err?.message ?? err); }
-      } else {
-        pending = await proposalStore.listForCircle(id);
-      }
+      try { ({ proposals: pending, members: pendingMembers } = await openPolicyProposals(gov, id)); } catch { /* */ }
       // refresh the launcher's voorstellen badge map so the
       // tile reflects the new pending count on the next launcher visit.
       refreshLauncherProposals().catch(() => { /* ignore */ });
@@ -6816,6 +6831,17 @@ async function boot() {
         isPeerConnected: () => agent.isPeerReachable?.() ?? (agent.peer?.status === 'connected'),
         publishEvent: publishEventToLog,
       });
+      // Governance rides the RAIL: signed, circle-scoped statements. The shell exposes the agent's
+      // per-circle signer resolver to the bind sites, and builds the receive-side rail (same declaration
+      // + roster-binding rules) for the peer router's governance ingest below.
+      circleIdentityForShell = agent.circleIdentityFor ?? null;
+      try {
+        const _who = await rawCallSkill('stoop', 'whoAmI', {});
+        govShellRail = makeGovernanceRail({
+          eventLog, circleIdentityFor: circleIdentityForShell,
+          myRef: _who?.webid ?? _who?.webId ?? '', callSkill: rawCallSkill,
+        });
+      } catch { govShellRail = null; }
       // Route the auto-resolving callSkill through the calendar-wrapped one too,
       // so button-driven calendar dispatches fan out as well as the bot path.
       // Pass a catalog GETTER so the resolver skips origins that don't declare the
@@ -7018,7 +7044,7 @@ async function boot() {
           'kring-policy-broadcast':  kringPolicyHandler,
           // Wave C tail A — ingest fanned governance/report events into the one log so a
           // vote/report raised on another device shows here; re-render an open panel.
-          'kring-governance-broadcast': makeKringGovernancePeerHandler({ eventLog, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); }, notify: govNotify }),
+          'kring-governance-broadcast': makeKringGovernancePeerHandler({ eventLog, rail: govShellRail, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); }, notify: govNotify }),
           'kring-report-broadcast':     makeKringReportPeerHandler({ eventLog, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); } }),
           // ε.4 — negotiated catch-up subtypes.
           'catch-up-request':        catchUpProvider.handler,

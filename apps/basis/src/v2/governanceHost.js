@@ -34,6 +34,7 @@ import { foldDisputes } from './governanceChain.js';
 export function makeCircleGovernance({
   callSkill, readGovernanceEvents, appendGovernanceEvent, getPolicy, getMembers,
   localActorRef, setPolicy = null, rotateKey = null, newProposalId, now = () => 0,
+  readGovernanceState = null,
 }) {
   // Map a governed action to the REAL op. removeMember/editGroupRules are stoop skills;
   // policy + key rotation are injected seams (their routing isn't a plain callSkill op).
@@ -46,6 +47,19 @@ export function makeCircleGovernance({
   }
 
   async function getContext(circleId) {
+    // THE RAIL: when the wiring supplies a VERIFIED state reader, the fold's input is the rail's —
+    // signature-verified, binding-resolved events + the disputed set from real fork-proofs. The legacy path
+    // (unsigned chained events + foldDisputes) stands for compositions without a circle signer.
+    if (typeof readGovernanceState === 'function') {
+      const [policy, members, state] = await Promise.all([
+        getPolicy(circleId), getMembers(circleId), readGovernanceState(circleId),
+      ]);
+      return {
+        policy, members: Array.isArray(members) ? members : [],
+        events: Array.isArray(state?.events) ? state.events : [],
+        disputed: state?.disputed instanceof Set ? state.disputed : new Set(),
+      };
+    }
     const [policy, members, events] = await Promise.all([
       getPolicy(circleId), getMembers(circleId), readGovernanceEvents(circleId),
     ]);

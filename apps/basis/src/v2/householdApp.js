@@ -11,7 +11,15 @@
  * The list types are registered via `registerType` (third-party-style); `task` is canonical. Every op is a
  * pure function over the circle store — no agent, no own store. (REMAINING-WORK.md cluster L.)
  */
-import { createCircleStores, memoryDataSource, createGenericAtomHandlers, resolutionRegistryFromManifests, param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+import {
+  createCircleStores, memoryDataSource, createGenericAtomHandlers, resolutionRegistryFromManifests,
+  param, PARAM_SCOPE, PARAM_KIND,
+  // The canonical task functions — the household ops resolve a `match` and then delegate to these, so a
+  // household claim/reassign/complete carries the SAME claim cluster (claimSeq, confirmation, CAS) as any
+  // other task write. Aliased: household exposes its own match-based ops under the same names.
+  addTasks, removeItems,
+  claim as claimTask, reassign as reassignTask, markComplete as markCompleteItems,
+} from '@onderling/item-store';
 import { createRegistry, registerCanonicalTypes } from '@onderling/item-types';
 import { dispatchCapability } from '@onderling/app-manifest';
 import { householdManifest } from '../../../household/manifest.js';
@@ -82,33 +90,49 @@ export const listOpen = async (store, { type } = {}) => {
 };
 // {match}-based mutating ops resolve candidates and NEVER act on an ambiguous match: 0 → not found,
 // >1 → `{ ok:false, ambiguous:[…candidates] }` (the caller renders a disambiguation prompt), 1 → act.
+// After resolution they DELEGATE to the canonical task functions instead of raw-putting the item, so a
+// household mutation carries the same lifecycle semantics as any other task write: completions stamp
+// `completedBy`, claims are CAS-guarded (a racing second claimer gets `already-claimed`, never a silent
+// steal) and advance the claim cluster (`claimSeq` + confirmation), removals pass the removal gate.
 export async function markComplete(store, { match }, { by } = {}) {
   const hits = await findOpenMatches(store, match, COMPLETABLE);
   if (hits.length === 0) return { ok: false, error: 'item not found' };
   if (hits.length > 1)   return { ok: false, ambiguous: hits };
-  return { ok: true, item: await store.put({ ...hits[0], completedAt: Date.now() }, { by }) };
+  const [item] = await markCompleteItems(store, [{ id: hits[0].id }], { actor: by });
+  return { ok: true, item };
 }
-export async function removeItem(store, { match }) {
+export async function removeItem(store, { match }, { by } = {}) {
   const hits = await findOpenMatches(store, match, COMPLETABLE);
   if (hits.length === 0) return { ok: false, error: 'item not found' };
   if (hits.length > 1)   return { ok: false, ambiguous: hits };
-  await store.delete(hits[0].id);
+  await removeItems(store, [{ id: hits[0].id }], { actor: by });
   return { ok: true, removed: hits[0].id };
 }
-export const addTask = (store, { text, assignee, dueAt }, { by } = {}) =>
-  store.put({ type: 'task', text, completedAt: null, ...(assignee ? { assignee } : {}), ...(dueAt ? { dueAt } : {}) }, { by });
+// addTask materialises through the canonical add (id, `addedBy`/`addedAt`, `master`, cycle check); a task
+// created pre-assigned is add + an authoritative reassign, so the assignee holds a REAL claim (cluster set)
+// rather than a bare `assignee` field no lifecycle op recognises.
+export async function addTask(store, { text, assignee, dueAt }, { by } = {}) {
+  const [task] = await addTasks(store, [{ text, ...(dueAt ? { dueAt } : {}) }], { actor: by });
+  if (!assignee) return task;
+  const res = await reassignTask(store, task.id, assignee, { actor: by });
+  return res?.error ? task : res;   // a CAS conflict on the fresh task is near-impossible; fall back to the created task
+}
 export const listTasks = async (store) => (await store.listByType('task')).filter((i) => i.completedAt == null);
 export async function claim(store, { match }, { by } = {}) {
   const hits = await findOpenMatches(store, match, ['task']);
   if (hits.length === 0) return { ok: false, error: 'item not found' };
   if (hits.length > 1)   return { ok: false, ambiguous: hits };
-  return { ok: true, item: await store.put({ ...hits[0], assignee: by }, { by }) };
+  const res = await claimTask(store, hits[0].id, { actor: by });
+  if (res?.error) return { ok: false, error: res.error, current: res.current };
+  return { ok: true, item: res };
 }
 export async function reassign(store, { match, assignee }, { by } = {}) {
   const hits = await findOpenMatches(store, match, ['task']);
   if (hits.length === 0) return { ok: false, error: 'item not found' };
   if (hits.length > 1)   return { ok: false, ambiguous: hits };
-  return { ok: true, item: await store.put({ ...hits[0], assignee }, { by }) };
+  const res = await reassignTask(store, hits[0].id, assignee, { actor: by });
+  if (res?.error) return { ok: false, error: res.error, current: res.current };
+  return { ok: true, item: res };
 }
 
 const OPS = { addItem, listOpen, markComplete, removeItem, addTask, listTasks, claim, reassign };

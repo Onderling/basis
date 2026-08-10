@@ -48,8 +48,10 @@ const ACTOR  = 'webid:anne';
 
 // CircleItemStore stamps createdBy/updatedBy from the acting member, which
 // differs per route (LOCAL webid vs WIRE agent key) and is NOT in the harness's
-// DEFAULT_VOLATILE_KEYS — strip it on every case.
-const HH_VOLATILE = ['createdBy', 'updatedBy'];
+// DEFAULT_VOLATILE_KEYS — strip it on every case. The claim cluster (now that the
+// household ops delegate to the canonical task lifecycle) stamps the actor and a
+// wall-clock the same way: assignees[] + the confirmation triplet vary per route.
+const HH_VOLATILE = ['createdBy', 'updatedBy', 'assignees', 'confirmedAssignee', 'confirmedBy', 'confirmedAt'];
 
 /** Resolve the scope circle from decoded args (circleId/groupId), default CIRCLE. */
 const resolveCircle = (data) => (data?.circleId ?? data?.groupId) || CIRCLE;
@@ -85,7 +87,7 @@ const WIRED = [
   ['markComplete', withBy(householdApp.markComplete), hhOp('markComplete')],
   ['claim',        withBy(householdApp.claim),        hhOp('claim')],
   ['reassign',     withBy(householdApp.reassign),     hhOp('reassign')],
-  ['removeItem',   householdApp.removeItem,           hhOp('removeItem')],       // no `by`
+  ['removeItem',   withBy(householdApp.removeItem),   hhOp('removeItem')],       // gated + attributed like the other writes
   ['listOpen',     listWrap(householdApp.listOpen),   typeOptional(hhOp('listOpen'))],
   ['listTasks',    listWrap(householdApp.listTasks),  hhOp('listTasks')],
 ];

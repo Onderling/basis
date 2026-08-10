@@ -726,7 +726,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     wire('markComplete', withBy(householdApp.markComplete));
     wire('claim',        withBy(householdApp.claim));
     wire('reassign',     withBy(householdApp.reassign));
-    wire('removeItem',   householdApp.removeItem);          // no `by`
+    wire('removeItem',   withBy(householdApp.removeItem));  // removal is gated + attributed like the other writes
     wire('listOpen',     listWrap(householdApp.listOpen), typeOptional(hhOp('listOpen')));
     wire('listTasks',    listWrap(householdApp.listTasks));
   }

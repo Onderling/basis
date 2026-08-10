@@ -47,6 +47,7 @@ export {
   RESOLUTION, DELIVERY, DEFAULT_RESOLUTION, deliveryForResolution,
   createResolutionRegistry, defaultResolutionRegistry, declareManifestPolicies, resolutionRegistryFromManifests,
 } from './resolutionPolicy.js';
+export { createEntryKindRegistry, declareManifestEntryKinds, entryKindRegistryFromManifests } from './entryKindDeclarations.js';  // which signed log-entry kinds a lane carries — declared in the manifest, enforced at the rail
 // The PARAMETER REGISTER (#36) — the second half of the declaration layer. RE-EXPORTED from `@onderling/core`,
 // where it was homed (2026-08-09) so packages below item-store can declare params too. Re-exported here so
 // existing `@onderling/item-store` importers are unaffected. `param()` declares a tunable at its site (scope

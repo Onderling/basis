@@ -11,9 +11,13 @@ import { makeCircleGovernance } from './governanceHost.js';
 import { GOVERNANCE_KIND, governanceEntryId, foldGovernance } from './governanceLog.js';
 import { chainEvent, authorHead } from './governanceChain.js';
 import { makeCircleEntryRail } from './circleEntryRail.js';
+import { entryKindRegistryFromManifests } from '@onderling/item-store';
+import { governanceManifest, GOVERNANCE_LANE } from './governanceManifest.js';
 
-/** The statement kinds the governance lane declares — the fold's own event vocabulary. */
-export const GOVERNANCE_RAIL_KINDS = ['propose', 'vote', 'resolve'];
+/** The statement kinds the governance lane carries — DERIVED from the manifest's declared `appends` rows
+ *  (the declared route: the manifest is the source; the rail enforces it at append AND ingest). They are the
+ *  fold's own event vocabulary (propose/vote/resolve), so the projection needs no mapping table. */
+export const GOVERNANCE_RAIL_KINDS = entryKindRegistryFromManifests(governanceManifest).kindsFor(GOVERNANCE_LANE);
 
 /**
  * Build the governance RAIL: signed, circle-scoped, chained entries on the device log.

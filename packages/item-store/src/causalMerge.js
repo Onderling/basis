@@ -89,6 +89,22 @@ export function causalWinner(local, incoming) {
 // sequence and supersedes it — while two CONCURRENT writes from the same base tie on the sequence and fall to
 // the first-come rule. That is the precise meaning of "immutable-once-set": once set (seq≥1) only a
 // higher-sequence act that read it can change it; a same-sequence race resolves earliest-wins.
+// ── DEFERRED (#32) — this fold is TASK-shaped; generalisation waits for a real consumer ──────────────────
+// The list below is a single, TASK-specific claim vocabulary, and the whole fold (`claimStateOf` / `claimWinner`
+// / `applyClaimOverlay` / `claimClusterEqual`) enumerates it — so the claim channel currently works for `task`
+// only. Generalising it to a PER-ITEM-TYPE claim descriptor (each type naming its own claimant + timestamp and,
+// only if its feature needs them, the confirm / release / reassign rungs) is deliberately deferred to the FIRST
+// real non-task claim consumer (e.g. offer-reservation): the descriptor shape should be driven by that feature's
+// actual lifecycle, not guessed now. `resolutionPolicy.declare` FAILS LOUDLY if a non-task claim is declared
+// before then, so this deferral can't silently rot into a no-op channel.
+//
+// claimSeq — THE UNIFIED-CLOCK LOOSE END: `claimSeq` is meant to be the claim's position in the circle's ONE
+// Lamport coordinate (the same sequencing #33 moved the content channel onto — one ordering mechanism, used
+// everywhere). It idles at 0 (no production writer), so the winner tiebreak below still falls back to WALL-CLOCK
+// `claimedAt` — a residual second ordering mechanism the unification was meant to retire. Wire `claimSeq` to the
+// Lamport clock WHEN this fold is generalised: it changes the tiebreak for tasks too, so it rides that same
+// reviewed change rather than a bespoke one here.
+//
 // The claim cluster the verbs maintain — the ONE list of what "the claim" is. Exported so the declaration
 // layer (`resolutionPolicy.js`) declares exactly these fields as the `claim`-policy channel, rather than
 // keeping a second copy of the cluster (invariant 3 — no duplication).

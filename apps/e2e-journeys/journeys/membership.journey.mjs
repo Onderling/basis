@@ -103,6 +103,10 @@ export async function run({ relayUrl }) {
   const mel   = await device('mel');     // an ordinary member (signs its own join / re-join)
   const all = [alpha, beta, mel];
   for (const x of all) for (const y of all) if (x !== y) x.addPeer(y.address, y.address);
+  // A fourth device — cato, an ordinary member/observer — used only by the catch-up + concurrency scenarios
+  // (8–10). Kept OUT of `all` so scenarios 1–7 and `resetSpines` are untouched; peered with the rest by hand.
+  const cato = await device('cato');
+  for (const x of all) { x.addPeer(cato.address, cato.address); cato.addPeer(x.address, x.address); }
 
   const FOUNDERS = [alpha.id.pubKey, beta.id.pubKey];
   const ship = (from, to, stmt) => from.message(to.address, JSON.stringify(stmt));
@@ -113,6 +117,7 @@ export async function run({ relayUrl }) {
 
   try {
     for (const a of all) await a.start();
+    await cato.start();
     await wait(1800);
     check('all three devices online', all.every((a) => a.transport.connected));
 
@@ -239,7 +244,77 @@ export async function run({ relayUrl }) {
     await wait(900);
     check('scenario 7 — mel’s own leave removes her on both devices; the two converge',
       !roster(alpha).members.includes(mel.id.pubKey) && rosterKey(alpha) === rosterKey(beta));
+
+    // ── Scenario 8 — OFFLINE CATCH-UP: a device that MISSED the eviction folds to the SAME head on reconnect ──
+    // The standing 3-device story (a device offline while the circle changes must not silently diverge). cato
+    // hears nothing while mel joins + is evicted; it then receives the backlog in ARBITRARY order and must land
+    // on the identical roster head — the fold is order- and timing-independent, so catch-up converges.
+    resetSpines(); cato.spine = [];
+    const j8 = signSpine(mel.id,   { kind: 'join',  circleId: CIRCLE, subject: mel.id.pubKey });
+    const e8 = signSpine(alpha.id, { kind: 'evict', circleId: CIRCLE, subject: mel.id.pubKey, deps: [j8.body.hash] });
+    for (const s of [j8, e8]) { await ship(mel, alpha, s); await ship(alpha, beta, s); }   // cato is NOT shipped to
+    await wait(700);
+    check('scenario 8 — cato (offline during the change) has folded nothing yet', cato.spine.length === 0);
+    check('scenario 8 — alpha and beta already converged with mel out',
+      !roster(alpha).members.includes(mel.id.pubKey) && rosterKey(alpha) === rosterKey(beta));
+    for (const s of [e8, j8]) await ship(alpha, cato, s);   // catch-up backlog, delivered REVERSED
+    await wait(800);
+    check('scenario 8 — cato caught up on both statements', cato.spine.length === 2);
+    check('scenario 8 — cato converges to the SAME head as the devices that were online (offline catch-up)',
+      JSON.stringify(foldRoster(cato.spine, { founders: FOUNDERS })) === rosterKey(alpha));
+
+    // ── Scenario 9 — THE CLOCK-SKEW ACCEPTANCE GATE: a wall-clock merge picks the WRONG roster, the causal fold
+    // the RIGHT one (PLAN-membership §red-on-wall-clock / green-on-causal). mel's device clock runs slow, so her
+    // post-eviction re-join carries an EARLIER timestamp than the eviction it causally follows. A naive
+    // last-writer-wins-by-timestamp merge sorts the re-join BEFORE the evict → concludes mel is OUT (wrong). The
+    // spine's causal fold (the re-join deps-on the evict) concludes mel is IN (right). Same statements, opposite
+    // verdicts — that gap is exactly what the causal coordinate buys over a clock. ──
+    resetSpines();
+    const j9 = signSpine(mel.id,   { kind: 'join',  circleId: CIRCLE, subject: mel.id.pubKey });
+    const e9 = signSpine(alpha.id, { kind: 'evict', circleId: CIRCLE, subject: mel.id.pubKey, deps: [j9.body.hash] });
+    // mel SAW the evict (deps) but her skewed clock stamps the re-join EARLIER than the evict it follows.
+    const r9 = signSpine(mel.id,   { kind: 'join',  circleId: CIRCLE, subject: mel.id.pubKey, parent: j9.body.hash, deps: [e9.body.hash] });
+    const wallClock = new Map([[j9.body.hash, 1000], [e9.body.hash, 3000], [r9.body.hash, 2000]]);   // r9 skewed early
+    for (const s of [j9, e9, r9]) { await ship(mel, alpha, s); await ship(mel, beta, s); }
+    await wait(900);
+    // The strawman a wall-clock system uses: apply each subject transition in TIMESTAMP order (last clock wins).
+    const naiveWallClockMelIn = (bodies) => {
+      let inSet = false;
+      for (const b of [...bodies].sort((x, y) => (wallClock.get(x.hash) ?? 0) - (wallClock.get(y.hash) ?? 0))) {
+        if (b.subject !== mel.id.pubKey) continue;
+        inSet = b.kind === 'join';   // join → in; evict/leave → out
+      }
+      return inSet;
+    };
+    check('scenario 9 — all three statements reached both devices', alpha.spine.length === 3 && beta.spine.length === 3);
+    check('scenario 9 — RED: the naive WALL-CLOCK merge is wrong (skewed re-join sorts before the evict → mel OUT)',
+      naiveWallClockMelIn(alpha.spine) === false);
+    check('scenario 9 — GREEN: the CAUSAL spine fold is right (the re-join deps-follows the evict → mel IN)',
+      roster(alpha).members.includes(mel.id.pubKey));
+    check('scenario 9 — and both devices still converge under the causal fold',
+      rosterKey(alpha) === rosterKey(beta));
+
+    // ── Scenario 10 — CONCURRENCY: a re-join CONCURRENT with an evict (neither author saw the other) resolves
+    // IDENTICALLY on every device. Two authors act off the same base with no causal link between their acts;
+    // whatever the deny-wins fold decides, all three devices (incl. the catch-up observer) must decide the same. ──
+    resetSpines(); cato.spine = [];
+    const base10  = signSpine(mel.id,   { kind: 'join',  circleId: CIRCLE, subject: mel.id.pubKey });
+    for (const s of [base10]) { await ship(mel, alpha, s); await ship(mel, beta, s); await ship(mel, cato, s); }
+    await wait(500);
+    // alpha evicts and mel re-joins CONCURRENTLY — both off `base10`, neither carrying the other in deps.
+    const evict10  = signSpine(alpha.id, { kind: 'evict', circleId: CIRCLE, subject: mel.id.pubKey, parent: null, deps: [base10.body.hash] });
+    const rejoin10 = signSpine(mel.id,   { kind: 'join',  circleId: CIRCLE, subject: mel.id.pubKey, parent: base10.body.hash, deps: [base10.body.hash] });
+    for (const s of [evict10, rejoin10]) { await ship(alpha, alpha, s); await ship(alpha, beta, s); await ship(mel, cato, s); }
+    await wait(900);
+    check('scenario 10 — all three devices hold the same three concurrent statements',
+      alpha.spine.length === 3 && beta.spine.length === 3 && cato.spine.length === 3);
+    check('scenario 10 — the concurrent evict-vs-rejoin resolves IDENTICALLY across all three devices (convergence)',
+      rosterKey(alpha) === rosterKey(beta)
+        && JSON.stringify(foldRoster(cato.spine, { founders: FOUNDERS })) === rosterKey(alpha));
+    check('scenario 10 — deny-wins: the concurrent eviction is not overridden by a concurrent re-join (mel OUT)',
+      !roster(alpha).members.includes(mel.id.pubKey));
   } finally {
+    await cato.transport.disconnect().catch(() => {});
     for (const a of all) await a.transport.disconnect().catch(() => {});
   }
   return results;

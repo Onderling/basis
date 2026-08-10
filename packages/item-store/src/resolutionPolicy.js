@@ -85,6 +85,20 @@ export function createResolutionRegistry() {
       if (typeof itemType !== 'string' || !itemType) throw new Error('resolutionRegistry.declare: itemType (string) required');
       if (typeof field !== 'string' || !field) throw new Error('resolutionRegistry.declare: field (string) required');
       if (!isResolution(resolution)) throw new Error(`resolutionRegistry.declare: unknown resolution "${resolution}"`);
+      // LOUD-GUARD (#32): the claim fold (`causalMerge.reconcileClaim`) only understands the task claim
+      // vocabulary (`CLAIM_FIELDS`). A claim policy declared on any OTHER field would route into the fold, find
+      // none of its fields, and SILENTLY fall through to content-LWW — a declared channel that does nothing.
+      // Until the fold is generalised to a per-type claim descriptor (deferred to the first real non-task claim
+      // consumer — see the note in causalMerge.js), make that a boot-time failure instead of a silent no-op.
+      if (resolution === RESOLUTION.CLAIM && !CLAIM_FIELDS.includes(field)) {
+        throw new Error(
+          `resolutionRegistry.declare: claim policy on (${itemType}, ${field}) — the claim fold only resolves the `
+          + `task claim vocabulary [${CLAIM_FIELDS.join(', ')}]. A claim on another field would silently no-op `
+          + `(fall through to content-LWW). Generalising the fold to a per-type claim descriptor is deferred to `
+          + `the first real non-task claim consumer (#32). Until then declare claim only on a task-vocabulary `
+          + `field, or use content/spine.`,
+        );
+      }
       let m = table.get(itemType);
       if (!m) { m = new Map(); table.set(itemType, m); }
       m.set(field, resolution);

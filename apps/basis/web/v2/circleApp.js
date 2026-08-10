@@ -168,6 +168,7 @@ import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals } from '.
 import { makeGovernanceCatchUp } from '../../src/v2/governanceCatchUp.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../src/v2/membershipRail.js';
 import { makeTaskPeerHandler, TASK_BROADCAST, TASK_CATCHUP_SUBTYPES } from '../../src/v2/taskRail.js';
+import { makeFrontierReplay } from '../../src/v2/frontierReplay.js';
 import { wireEventLogPersistence, backendSnapshotIo } from '../../src/v2/eventLogPersistence.js';
 import { buildSubjectLabeler } from '../../src/v2/governanceView.js';
 import { governanceEntryId, foldGovernance } from '../../src/v2/governanceLog.js';
@@ -6875,10 +6876,11 @@ async function boot() {
         sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
         subtypes: MEMBERSHIP_CATCHUP_SUBTYPES,
       }) : null;
-      // The task lane's catch-up: serves the stored entries PLUS signed snapshots of live heads whose
-      // entries aged out (the store row outlives the 14-day lane window), so a long-offline device still
-      // converges on every open task.
-      taskCatchUpShell = agent.taskRail ? makeGovernanceCatchUp({
+      // The task lane's catch-up is the FRONTIER REPLAY (windowed, chunked — content lanes never pull-all):
+      // the receiver sends its head hashes + a limit; the serve set is the stored entries PLUS signed
+      // snapshots of live heads whose entries aged out (the store row outlives the 14-day lane window), so
+      // a long-offline device still converges on every open task, paging as needed.
+      taskCatchUpShell = agent.taskRail ? makeFrontierReplay({
         rail: agent.taskRail,
         sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
         subtypes: TASK_CATCHUP_SUBTYPES,

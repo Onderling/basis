@@ -10,7 +10,7 @@ import {
   makeTaskRail, makeTaskEmitter, makeTaskPeerHandler, routeTaskMirror,
   TASK_BROADCAST, TASK_CATCHUP_SUBTYPES,
 } from '../../src/v2/taskRail.js';
-import { makeGovernanceCatchUp } from '../../src/v2/governanceCatchUp.js';
+import { makeFrontierReplay } from '../../src/v2/frontierReplay.js';
 
 // The content re-root's acceptance (tasks first): a task write on one device rides the device log's task
 // lane as a SIGNED full-item snapshot — fanned, verified at the receiver's rail, and causally merged into
@@ -200,14 +200,17 @@ describe('the task lane — snapshots on the device log, heads causally merged',
     wire.length = 0;                                                    // cato was OFFLINE for all of it
 
     const batches = [];
-    const serve = makeGovernanceCatchUp({
+    const serve = makeFrontierReplay({
       rail: ada.rail, sendToPeer: (a, p) => batches.push(p),
       subtypes: TASK_CATCHUP_SUBTYPES, statementsFor: (cid) => ada.rail.catchUpStatements(cid),
     });
-    const pull = makeGovernanceCatchUp({
+    const pull = makeFrontierReplay({
       rail: cato.rail, sendToPeer: () => {}, subtypes: TASK_CATCHUP_SUBTYPES,
     });
-    await serve.onRequest('peer:cato', { subtype: TASK_CATCHUP_SUBTYPES.request, circleId: CIRCLE });
+    await serve.onRequest('peer:cato', {
+      subtype: TASK_CATCHUP_SUBTYPES.request, circleId: CIRCLE,
+      frontier: pull.localFrontier(CIRCLE),                             // cato's (empty) head set
+    });
     expect(batches).toHaveLength(1);
     expect(batches[0].statements.length).toBe(2);                       // the stored entry + the synthesized head
     const res = await pull.onBatch('peer:ada', batches[0]);

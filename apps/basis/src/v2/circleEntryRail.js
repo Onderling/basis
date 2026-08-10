@@ -95,8 +95,12 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     const ref = v.body.payload?.authorRef;
     if (typeof ref !== 'string' || !ref) return { ok: false, reason: 'missing authorRef' };
     if (!(await bindingOk(v.body.author, ref, circleId))) return { ok: false, reason: 'unverifiable key-ref binding' };
-    const entry = eventLog.appendSilentEntry({ circleId, kind: entryKind, payload: statement, id: entryId(statement) });
-    return { ok: true, entry };
+    // Report whether this statement is NEW here — a windowed catch-up's progress guard must not count a
+    // re-delivered duplicate as progress (that is how two diverged peers would page forever).
+    const id = entryId(statement);
+    const existed = eventLog.query({}).some((e) => e && e.id === id);
+    const entry = eventLog.appendSilentEntry({ circleId, kind: entryKind, payload: statement, id });
+    return { ok: true, entry, existed };
   }
 
   /** Is `author` (a circle key) genuinely `ref`'s key IN this circle? Self-binding, else the injected resolver. */

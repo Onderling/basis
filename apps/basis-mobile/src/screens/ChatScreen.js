@@ -68,6 +68,7 @@ import { makeKringGovernancePeerHandler, makeKringReportPeerHandler } from '../.
 import { makeGovernanceRail } from '../../../basis/src/v2/governanceAppWiring.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../../basis/src/v2/membershipRail.js';
 import { makeTaskPeerHandler, TASK_BROADCAST, TASK_CATCHUP_SUBTYPES } from '../../../basis/src/v2/taskRail.js';
+import { makeFrontierReplay } from '../../../basis/src/v2/frontierReplay.js';
 import { makeGovernanceCatchUp } from '../../../basis/src/v2/governanceCatchUp.js';
 import { governanceEntryId } from '../../../basis/src/v2/governanceLog.js';
 import { makeHandleChatMessage }
@@ -814,10 +815,11 @@ export default function ChatScreen({
           setTimeout(() => { memCatchUp.requestAll({ callSkill: bundle.callSkill }).catch(() => {}); }, 2500);
         }
         // The task lane (the content re-root): the fan receiver verifies at the agent's rail and causally
-        // merges the snapshot into the circle's store head; the catch-up serves stored entries + signed
-        // live heads (the store row outlives the lane's retention window). Same wiring as the web shell.
+        // merges the snapshot into the circle's store head; the catch-up is the windowed FRONTIER REPLAY —
+        // head hashes + a limit, chunked replies, and the serve set includes signed live heads whose
+        // entries aged out (the store row outlives the lane's retention window). Same wiring as the web shell.
         const taskRail = bundle?.agent?.taskRail ?? null;
-        const taskCatchUp = taskRail ? makeGovernanceCatchUp({
+        const taskCatchUp = taskRail ? makeFrontierReplay({
           rail: taskRail,
           sendToPeer: (addr, payload) => bundle?.agent?.sendPeerMessage?.(addr, payload),
           subtypes: TASK_CATCHUP_SUBTYPES,

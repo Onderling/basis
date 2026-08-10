@@ -71,7 +71,7 @@ rows.sort((a, b) => (b.status.startsWith('★') - a.status.startsWith('★')) ||
 let out = '# plans/ INDEX — GENERATED, do not hand-edit\n\n';
 out += `*Run \`node scripts/gen-plan-index.mjs\` to regenerate after adding / renaming / removing a plan; `;
 out += `\`--check\` fails when it is stale. plans/ is gitignored (local). ${files.length} docs.*\n\n`;
-out += 'The ★ rows are the canonical active set (design of record · convergence hub · the two authorities). '
+out += 'The ★ rows are the canonical active set (design of record · convergence spine · the two authorities). '
      + 'Everything else is a plan / note / session-doc / tracker / reference; archived docs live in `plans/archive/`.\n\n';
 out += '| file | what (its H1) | status | modified |\n|---|---|---|---|\n';
 for (const r of rows) out += `| \`${r.f}\` | ${r.title} | ${r.status} | ${r.date} |\n`;

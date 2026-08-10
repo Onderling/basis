@@ -26,13 +26,18 @@ import { createSettingsModule } from '@onderling/local-store';
 // The default VALUE is imported from the declaration site, so there is one source of truth for the number;
 // a fitness test pins that the register's declared default equals the exported const (agreement, not a copy).
 import { ASK_DEFAULT_TTL_MS } from './nearbyAsks.js';
+import { DEFAULT_RETENTION_DAYS } from './retentionPref.js';
 
 /**
  * The settable (kind:user) params basis governs — the worked-example cluster. Grows as more clusters migrate;
  * each entry is `{ key, scope, kind:'user', default }` with the default sourced from the declaration site.
  */
 export const BASIS_USER_PARAMS = [
-  { key: 'nearby.ask.defaultTtlMs', scope: PARAM_SCOPE.AGENT, kind: PARAM_KIND.USER, default: ASK_DEFAULT_TTL_MS },
+  { key: 'nearby.ask.defaultTtlMs', scope: PARAM_SCOPE.AGENT,  kind: PARAM_KIND.USER, default: ASK_DEFAULT_TTL_MS },
+  // The chat-retention window — a genuine device/user preference (declared via param() in retentionPref.js;
+  // same key + default here, so the register's declare-agreement holds). The FIRST real consumer: the eventLog
+  // retention reads it via `agent.getParamValue('retention.chatDays')` (see circleApp), not a bespoke store.
+  { key: 'retention.chatDays',      scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: DEFAULT_RETENTION_DAYS },
 ];
 
 /**

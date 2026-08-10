@@ -77,7 +77,7 @@ import {
 // surface (`createTaskStore`) + the convergence handler (`requestableSkillHandler`)
 // that mints a `request` task instead of executing an offering. Wired below onto the
 // live host agent as the `requestOffering` peer-facing dispatcher op.
-import { createTaskStore, requestableSkillHandler } from '@onderling/item-store';
+import { createTaskStore, requestableSkillHandler, memoryDataSource } from '@onderling/item-store';
 
 /**
  * Pick the right vault for the runtime.  Used here only for the
@@ -371,9 +371,14 @@ export async function createRealHouseholdAgent(opts = {}) {
   // app-origin branch in callSkill below). Device/agent params persist to this agent's local settings homes
   // (`householdDataSource` keyed by the real per-install `deviceId`); circle scope is wired when a circle
   // param lands (degrades safely until then). Hydrate the synced values at boot; boot-safe if none exist yet.
+  // A DEDICATED settings store for the register (per cross-app-settings, settings ≠ item data). In-memory by
+  // default so a set-param persists within a session (and survives a reboot when the SAME store is reused);
+  // injectable via `opts.settingsDataSource` so a pod-backed store — or a SHARED one across a user's devices in
+  // a multi-device journey — can be threaded in.
+  const settingsDataSource = opts.settingsDataSource ?? memoryDataSource();
   const paramsService = createParamsService({
     register:   basisParamRegistry(),
-    dataSource: householdDataSource,
+    dataSource: settingsDataSource,
     deviceId:   chatId?.deviceId ?? null,
   });
   try { await paramsService.hydrate(); } catch { /* settings absent → registered defaults stand */ }
@@ -3029,6 +3034,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     // + createMockHouseholdAgent stay in mockAgent.js as a test fixture.)
     manifest: householdManifest,
     callSkill,
+    // #36 — a consumer's read of a registered param's LIVE value (sync, from the hydrated register), e.g. the
+    // retention window. Reads only; writes go through callSkill('params','set-param',…).
+    getParamValue: (key) => paramsService.register.valueOf(key),
     llmProviders,
     // host-injected claim router; called after every successful
     // claimTask.  Hosts wire `makeAfterClaimHook` here once the agent +

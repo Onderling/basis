@@ -59,7 +59,7 @@ import { circleGateRules } from '../../src/v2/circleGate.js';
 import { interpretToCommand } from '../../src/v2/interpretCommand.js';
 import { createRelayPrefStore, localStorageRelayIo, resolveRelayUrl } from '../../src/v2/relayPref.js';
 import {
-  RETENTION_CHOICES_DAYS, normalizeRetentionDays, retentionFromDays, localStorageRetentionIo,
+  RETENTION_CHOICES_DAYS, normalizeRetentionDays, retentionFromDays, DEFAULT_RETENTION_DAYS,
 } from '../../src/v2/retentionPref.js';
 import { registerCircleAddresses, unregisterCircleAddresses } from '../../src/v2/circleAddressRegistration.js';
 // removing one member from ONE circle, and leaving one, live in shared code: both end by
@@ -1054,8 +1054,11 @@ const agentRequestStore = createAgentRequestStore({
 // P1 §4 tail — the ONE retention control (Frits): the person sets how long conversations are kept;
 // plumbing follows it (never longer) and the audit trail uses it as its DETAIL window, compacting past
 // it rather than dropping. Device-local — never fanned.
-const retentionIo = localStorageRetentionIo();
-const eventLog = new EventLog({ initial: [], muted: [], retention: retentionFromDays(retentionIo.load()) });
+// #36 — the chat-retention window now lives in the PARAMETER REGISTER (device/user `retention.chatDays`), not a
+// bespoke localStorage store. The eventLog boots at the registered DEFAULT; the register's persisted value is
+// applied post-boot (after the agent hydrates it) — see where `circleHouseholdAgent` is assigned. Changing it
+// routes through the one kind-gated `set-param` op (onSetRetention below).
+const eventLog = new EventLog({ initial: [], muted: [], retention: retentionFromDays(DEFAULT_RETENTION_DAYS) });
 
 /**
  * The display-theme preference — read and written by BOTH "My data" and Settings.
@@ -3932,9 +3935,10 @@ async function showMyData() {
     // shortened window is visible in the conversation the user is looking at, not after a reload.
     shareNknAddress: addressSharingIo.load(),
     onSetShareAddress: (allowed) => { addressSharingIo.save(allowed); rerender(); },
-    retentionDays: normalizeRetentionDays(retentionIo.load()),
+    retentionDays: normalizeRetentionDays(circleHouseholdAgent?.getParamValue('retention.chatDays')),
     onSetRetention: (days) => {
-      retentionIo.save(days);
+      // #36 — persist through the ONE kind-gated set-param op (device home), then apply to the live eventLog.
+      circleHouseholdAgent?.callSkill('params', 'set-param', { key: 'retention.chatDays', value: normalizeRetentionDays(days) });
       try { eventLog.setRetention(retentionFromDays(days)); } catch { /* a prune failure must not block the setting */ }
       rerender();
     },
@@ -6733,6 +6737,9 @@ async function boot() {
     });
     agent._circleGroupsIndex = circleGroupsIndex;   // the roster feed fills it (householdRosterPairing)
     circleHouseholdAgent = agent;   // OBJ-2 — expose to showSettings (sibling fn) for the paired-devices panel
+    // #36 — apply the persisted chat-retention (hydrated into the register at agent boot) to the live eventLog,
+    // so a value set on another device (via shared.json/pod) — or last session — takes effect on this boot.
+    try { eventLog.setRetention(retentionFromDays(agent.getParamValue('retention.chatDays'))); } catch { /* prune failure must not block boot */ }
     // 52.25 — wire folio `/zoek`'s SEMANTIC embedder from the ACTIVE circle's
     // embed policy (embedTool ?? llmTool), reusing the SAME resolution the
     // circle retriever uses (`resolveCircleEmbedder` over the live

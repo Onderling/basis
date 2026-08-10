@@ -46,10 +46,13 @@ describe('the set-param op — the kind gate (decision D)', () => {
     expect(routed).toEqual([]);
   });
 
-  it('list-user-params projects only the settable slice (the settings-form seed)', async () => {
+  it('list-user-params projects only the settable (kind:user) slice (the settings-form seed)', async () => {
     const svc = createParamsService();
     const { params } = await svc.callSkill('list-user-params');
-    expect(params.map((p) => p.key)).toEqual(['nearby.ask.defaultTtlMs']);
+    // The kind:user params basis governs today: the ask-ttl (agent) + the chat-retention window (device).
+    expect(params.map((p) => p.key).sort()).toEqual(['nearby.ask.defaultTtlMs', 'retention.chatDays']);
+    // Both are kind:user; internal caps are never here.
+    expect(params.every((p) => ['agent', 'device'].includes(p.scope))).toBe(true);
   });
 });
 

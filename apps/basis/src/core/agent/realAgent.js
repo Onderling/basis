@@ -1381,6 +1381,11 @@ export async function createRealHouseholdAgent(opts = {}) {
   const stoopAgent = await createBrowserStoopAgent({
     bus,
     identityVault: stoopIdentityVault,
+    // Circle-scoped spine signing (principle 5): each membership statement is signed with the PER-CIRCLE
+    // identity (derived from the profile seed — same on every device of the user, never persisted), and
+    // carries the member's ref (webid == the chat pubKey in the basis binding) as the signed authorRef the
+    // roster projection verifies. One global key across circles would re-link memberships; this doesn't.
+    circleSignerFor: async (circleId) => ({ identity: await circleIdentityFor(circleId), ref: chatId.pubKey }),
     // Bind chatAgent's pubKey as the local actor so real stoop
     // skills' `from` lookups resolve back to 'me' (admin role).
     localActor: chatId.pubKey,

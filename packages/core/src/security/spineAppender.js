@@ -36,34 +36,60 @@ async function circleSpineBodies(store, circleId) {
 }
 
 /**
- * Bind a spine appender to a store + the acting device's circle-scoped signer. The signer is the AUTHOR of
- * every statement this emitter appends; `subject` (who/what the transition is about) is passed per call.
+ * Bind a spine appender to a store + the acting device's signer. The signer is the AUTHOR of every statement
+ * this emitter appends; `subject` (who/what the transition is about) is passed per call.
+ *
+ * TWO signer modes:
+ *   • `signer`    — one static identity for every circle (legacy: the device's global identity, whose pubKey
+ *                   IS the member's ref/webid in the basis binding — author and ref coincide).
+ *   • `signerFor` — a PER-CIRCLE resolver `(circleId) => { identity, ref } | identity` — the CIRCLE-SCOPED
+ *                   signer (principle 5: per-circle unlinkability; one global key across circles would re-link
+ *                   a person's memberships). `identity` signs; `ref` is the member ref (webid) the fold keys
+ *                   on. When they differ, the ref rides the SIGNED payload as `authorRef` — a claimed binding
+ *                   the READ side must verify (roster-row circleAddress, or the device's own binding) before
+ *                   folding; an unverifiable binding is ignored (strengthen-only), never trusted.
  *
  * @param {object} deps
  * @param {{ listOpen: Function, addItems: Function }} deps.store  duck-typed circle store (not imported).
- * @param {{ pubKey: string, sign: (bytes: Uint8Array) => Uint8Array }} deps.signer  the acting identity.
+ * @param {{ pubKey: string, sign: (bytes: Uint8Array) => Uint8Array }} [deps.signer]  static acting identity.
+ * @param {(circleId: string) => Promise<object>} [deps.signerFor]  per-circle signer resolver (see above).
  * @returns {(t: { kind: string, circleId: string, subject: string, payload?: object, actor?: string })
- *            => Promise<{ body: object, sig: string, by: string }>}  appends + returns the signed statement.
+ *            => Promise<{ body: object, sig: string, by: string } | null>}  appends + returns the signed statement.
  */
-export function createSpineAppender({ store, signer } = {}) {
+export function createSpineAppender({ store, signer, signerFor } = {}) {
   if (!store || typeof store.addItems !== 'function' || typeof store.listOpen !== 'function') {
     throw new Error('createSpineAppender: a store with listOpen + addItems is required');
   }
-  if (!signer?.pubKey || typeof signer.sign !== 'function') {
-    throw new Error('createSpineAppender: a signer with pubKey + sign is required');
+  if (typeof signerFor !== 'function' && (!signer?.pubKey || typeof signer.sign !== 'function')) {
+    throw new Error('createSpineAppender: a signer with pubKey + sign (or a signerFor resolver) is required');
   }
   return async function appendSpine({ kind, circleId, subject, payload, actor } = {}) {
-    // A `leave` is honoured by the fold ONLY when its author IS its subject (you leave yourself). This signer
-    // authors as `signer.pubKey`, so a leave for anyone else would be a dead statement the fold discards —
-    // never persist one. (A join may be admin-authored; an evict is authority-checked at the fold; only leave
-    // has the author==subject rule, so only leave is guarded here.)
-    if (kind === 'leave' && subject !== signer.pubKey) return null;
+    // Resolve the acting identity + the member ref it represents. Static mode: they coincide (pubKey==ref).
+    let identity = signer;
+    let ref = signer?.pubKey ?? null;
+    if (typeof signerFor === 'function') {
+      let resolved = null;
+      try { resolved = await signerFor(circleId); } catch { resolved = null; }
+      identity = resolved?.identity ?? resolved;
+      ref = resolved?.ref ?? identity?.pubKey ?? null;
+      // No per-circle signer → no statement (additive, same as an absent emitter — the writer's typed item
+      // still records; the spine just gets no entry). Never throw a membership writer over a missing key.
+      if (!identity?.pubKey || typeof identity.sign !== 'function') return null;
+    }
+    // A `leave` is honoured by the fold ONLY when its author IS its subject (you leave yourself). The fold
+    // keys on the member REF, so the guard compares the subject against the ref this signer represents —
+    // a leave for anyone else would be a dead statement the fold discards; never persist one. (A join may be
+    // admin-authored; an evict is authority-checked at the fold; only leave has the author==subject rule.)
+    if (kind === 'leave' && subject !== ref) return null;
     const bodies = await circleSpineBodies(store, circleId);
-    const parent = authorHead(bodies, signer.pubKey);          // this author's own head (null for the first)
+    const parent = authorHead(bodies, identity.pubKey);        // this author's own head (null for the first)
     // The cross-author frontier: the circle's current tips minus this author's own head (which is `parent`).
     // Normally empty; non-empty only when another author wrote concurrently and this device has seen it.
     const deps = frontier(bodies).filter((h) => h !== parent);
-    const statement = signSpine(signer, { kind, circleId, subject, payload, parent, deps });
+    // Circle-scoped mode: the member ref rides the SIGNED payload (covered by hash + signature) so the read
+    // side can verify the key↔ref binding and fold in ref space. Legacy mode adds nothing — byte-identical.
+    const fullPayload = (ref && ref !== identity.pubKey) ? { ...(payload ?? {}), authorRef: ref } : payload;
+    const statement = signSpine(identity, { kind, circleId, subject, payload: fullPayload, parent, deps });
     await store.addItems([{
       type:       SPINE_STATEMENT_ITEM,
       text:       `${kind} ${subject} in ${circleId}`,
@@ -74,7 +100,7 @@ export function createSpineAppender({ store, signer } = {}) {
         statement,
       },
       visibility: 'household',
-    }], { actor: actor ?? signer.pubKey });
+    }], { actor: actor ?? ref ?? identity.pubKey });
     return statement;
   };
 }

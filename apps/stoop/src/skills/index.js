@@ -809,10 +809,13 @@ async function listGroupMembersCore(scope, a, ctx) {
   // injects the store, the MemberMap, the viewer's reveal store, the per-circle membership
   // projection, the shared exit helpers, and the foreign-caller + allowlist gate helpers,
   // and passes the parsed args + carrier context.
-  const { store, members, reveals, groupId, localActor } = scope;
+  const { store, members, reveals, groupId, localActor, circleSignerFor } = scope;
+  // Thread the circle-scoped signer resolver into the projection so it can verify THIS device's own
+  // circle-key↔ref binding when folding spine statements (see projectCircleRoster).
+  const project = circleSignerFor ? ((a2) => projectCircleRoster({ ...a2, circleSignerFor })) : projectCircleRoster;
   return listCircleMembers(
     {
-      store, members, reveals, projectCircleRoster, readCircleExits, isExited,
+      store, members, reveals, projectCircleRoster: project, readCircleExits, isExited,
       rosterCallerIsForeign, gateRosterReplyForPeer,
     },
     { a, from: ctx?.from ?? null, localActor, groupId },
@@ -841,7 +844,7 @@ async function listGroupMembersCore(scope, a, ctx) {
  * @returns {Promise<Array<object>|null>} the circle's members, or `null` when the
  *   circle has NO redemption trail (the caller keeps its pre-trail behaviour).
  */
-async function projectCircleRoster({ store, groupId, memberMapList = [] } = {}) {
+export async function projectCircleRoster({ store, groupId, memberMapList = [], circleSignerFor } = {}) {
   if (!store || typeof store.listOpen !== 'function' || !groupId) return null;
   const list = Array.isArray(memberMapList) ? memberMapList : [];
   let redemptions = [];
@@ -873,6 +876,35 @@ async function projectCircleRoster({ store, groupId, memberMapList = [] } = {}) 
   // deterministically (identical on every device, no wall-clock). Verified on read: only a genuine,
   // untampered, chain-consistent statement for THIS circle folds. When present, `deriveRoster` folds these
   // ON TOP of the trail-derived roster (the pre-spine head); when absent, the trail projection stands alone.
+  // AUTHOR RESOLUTION (circle-scoped signing): a statement signed with a per-circle key carries the member
+  // ref as `payload.authorRef` — a CLAIMED binding that must be VERIFIED before the fold sees it, because the
+  // fold's authority rules (founders, self-authored leave, admin evict) key on member refs. Verification, in
+  // order: (1) THIS device's own binding via the injected `circleSignerFor` (covers every self-authored
+  // statement on the device that wrote it — the whole live surface today); (2) the durable trail: a redemption
+  // row whose proof-checked `circleAddress` matches the author (joiners), or `confirmedByCircleAddress`
+  // (the admin as recorded on a joiner's trail). Unverifiable → the statement is IGNORED — the strengthen-only
+  // fold means it can never corrupt who-is-in. A statement WITHOUT authorRef is legacy (author IS the ref).
+  let selfBinding = null;
+  if (typeof circleSignerFor === 'function') {
+    try {
+      const r = await circleSignerFor(groupId);
+      const id = r?.identity ?? r;
+      if (id?.pubKey) selfBinding = { pubKey: id.pubKey, ref: r?.ref ?? id.pubKey };
+    } catch { selfBinding = null; }
+  }
+  const resolveAuthor = (body) => {
+    const claimed = body?.payload?.authorRef;
+    if (typeof claimed !== 'string' || !claimed) return body;   // legacy: author is already the member ref
+    if (selfBinding && body.author === selfBinding.pubKey && claimed === selfBinding.ref) {
+      return { ...body, author: claimed };
+    }
+    for (const it of forGroup) {
+      const src = it?.source ?? {};
+      if (src.circleAddress === body.author && src.redeemedBy === claimed) return { ...body, author: claimed };
+      if (src.confirmedByCircleAddress === body.author && src.confirmedBy === claimed) return { ...body, author: claimed };
+    }
+    return null;   // claimed binding unverifiable on this device → ignore (never trust, never corrupt)
+  };
   let spineStatements = [];
   try {
     const spineItems = await store.listOpen({ type: SPINE_STATEMENT_ITEM });
@@ -880,7 +912,10 @@ async function projectCircleRoster({ store, groupId, memberMapList = [] } = {}) 
       if (it?.source?.groupId !== groupId) continue;
       const stmt = it?.source?.statement;
       const v = stmt && verifySpine(stmt, { expectedCircleId: groupId });
-      if (v && v.ok) spineStatements.push(v.body);
+      if (v && v.ok) {
+        const resolved = resolveAuthor(v.body);
+        if (resolved) spineStatements.push(resolved);
+      }
     }
   } catch { spineStatements = []; }
 
@@ -1012,12 +1047,12 @@ export const STOOP_CORES = Object.freeze({
 export function buildStoopScope(deps = {}) {
   const {
     store, offeringMatch, notifier, reveals, members, controlAgent,
-    muted, localActor, groupId: explicitGroupId, dataLocationConfig, chat, metrics, bundle,
+    muted, localActor, groupId: explicitGroupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor,
   } = deps;
   const groupId = explicitGroupId ?? offeringMatch?.group ?? null;
   return {
     store, offeringMatch, notifier, reveals, members, controlAgent,
-    muted, localActor, groupId, dataLocationConfig, chat, metrics, bundle,
+    muted, localActor, groupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor,
   };
 }
 
@@ -1047,6 +1082,9 @@ export function buildSkills({
   localActor,
   groupId: explicitGroupId,
   dataLocationConfig,
+  // Circle-scoped spine signer resolver `(circleId) => {identity, ref}` (principle 5) — host-injected;
+  // absent → the legacy global-identity signer below (author==ref by the basis binding).
+  circleSignerFor,
   // G13 step C — route circle traffic to each member's PER-CIRCLE address instead of their one global
   // signing key. **ON since 2026-07-29.**
   //
@@ -1101,7 +1139,7 @@ export function buildSkills({
   // `wireSkill`, and re-attaches the same description/visibility.
   const scope = buildStoopScope({
     store, offeringMatch, notifier, reveals, members, controlAgent,
-    muted, localActor, groupId, dataLocationConfig, chat, metrics, bundle,
+    muted, localActor, groupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor,
   });
   const storeFor = () => scope;
   const op = (id) => {
@@ -1128,7 +1166,8 @@ export function buildSkills({
   const broadcastToCircle = createCircleFanOut({
     chat, members, store, metrics, bundle,
     preferCircleAddress, allowAddressFallback,
-    projectCircleRoster, readCircleExits, isExited,
+    projectCircleRoster: (circleSignerFor ? ((a2) => projectCircleRoster({ ...a2, circleSignerFor })) : projectCircleRoster),
+    readCircleExits, isExited,
     fanOutViaReliableSend: _fanOutViaReliableSend,
     fanOutToMembers: _fanOutToMembers,
     toWireRefEnvelope,
@@ -1136,14 +1175,19 @@ export function buildSkills({
 
   // Puts each membership transition (join/leave/evict) onto the circle's SIGNED spine, the per-author chained
   // log the roster folds deterministically. The membership writers stay identity-free and call this injected
-  // emitter. `bundle.agent.identity` is THIS device's circle-scoped signer; a member's webid IS that signing
-  // key here, so for a self-transition (join on a same-device redeem, leave) the statement's author == `from`,
-  // which the fold requires. Absent (no identity on the bundle) → no emitter: the writer still records its
-  // typed item, just no spine statement — additive, never a regression.
+  // emitter. SIGNER: when the host injects `circleSignerFor` (basis: the per-circle identity derived from the
+  // profile seed + the member's webid ref), statements are CIRCLE-SCOPED (principle 5 — one global key across
+  // circles would re-link a person's memberships) and carry the signed `authorRef` binding the read side
+  // verifies. Absent, the legacy fallback signs with the device's GLOBAL identity — in the basis binding that
+  // pubKey IS the member's webid, so author==ref coincide (this fallback is NOT circle-scoped; the old comment
+  // claiming it was, was wrong). No signer at all → no emitter: the writer still records its typed item, just
+  // no spine statement — additive, never a regression.
   const _spineSigner = bundle?.agent?.identity;
-  const emitSpine = (_spineSigner?.pubKey && typeof _spineSigner.sign === 'function')
-    ? createSpineAppender({ store, signer: _spineSigner })
-    : undefined;
+  const emitSpine = (typeof circleSignerFor === 'function')
+    ? createSpineAppender({ store, signerFor: circleSignerFor })
+    : ((_spineSigner?.pubKey && typeof _spineSigner.sign === 'function')
+        ? createSpineAppender({ store, signer: _spineSigner })
+        : undefined);
 
   return [
     /**

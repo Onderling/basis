@@ -219,6 +219,9 @@ export async function createNeighborhoodAgent({
    * at boot would ignore every change after. Absent → `true`, i.e. exactly today's behaviour.
    */
   allowAddressFallback,
+  // Circle-scoped spine signer resolver `(circleId) => {identity, ref}` — host-injected (basis derives it
+  // from the profile seed via circleIdentityFor). Absent → skills fall back to the global-identity signer.
+  circleSignerFor,
   label = 'NeighborhoodAgent',
 }) {
   if (!offeringMatchOpts?.group || !offeringMatchOpts?.localActor) {
@@ -596,6 +599,7 @@ export async function createNeighborhoodAgent({
       chat,           // Phase 14 — used by sendChatMessage / respondToItem
       metrics,        // Phase 18 — record() called from key handlers
       bundle,         // Phase 20 — sign-in skills mutate bundle.oidcSession + cache
+      circleSignerFor, // circle-scoped spine signing (principle 5) — absent → legacy global-identity signer
       // The per-user address-fallback setting, when the host supplies one (absent → the skills'
       // own `true` default, unchanged).
       ...(allowAddressFallback === undefined ? {} : { allowAddressFallback }),

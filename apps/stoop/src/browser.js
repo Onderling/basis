@@ -84,6 +84,9 @@ export async function createBrowserStoopAgent({
   podReadSince,
   // The per-user address-fallback setting (value or `() => boolean`), threaded to the circle fan.
   allowAddressFallback,
+  // Circle-scoped spine signer resolver `(circleId) => {identity, ref}` — threaded to the skills' spine
+  // emitter + roster projection (principle 5). Absent → the legacy global-identity signer.
+  circleSignerFor,
 }) {
   if (!bus)           throw new TypeError('createBrowserStoopAgent: bus required');
   if (!identityVault) throw new TypeError('createBrowserStoopAgent: identityVault required');
@@ -115,6 +118,7 @@ export async function createBrowserStoopAgent({
     podWrite,       // Phase 3 seam — real shared-pod writer (absent → pod-signal/pod-only degrade)
     podReadSince,   // Phase 3 seam — real shared-pod reader (absent → getMessagesSince = local mirror)
     allowAddressFallback,  // per-user setting → the circle fan's address ladder (absent → allowed, unchanged)
+    circleSignerFor,       // circle-scoped spine signing (absent → legacy global-identity signer, unchanged)
   });
 
   return {

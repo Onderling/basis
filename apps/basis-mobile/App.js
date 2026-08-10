@@ -35,8 +35,8 @@ import {
   makeReceiptSender, asyncStorageDeliveryIo, createDeliverySettingsStore,
   setDeliverySettingsChangedHook,
   createFallbackOffer, setAddressFallbackReportHook,
-  // P1 §4 tail — the retention choice applied to the shared EventLog at boot.
-  asyncStorageRetentionIo, retentionFromDays,
+  // #36 — the retention choice comes from the parameter register, applied to the shared EventLog at boot.
+  retentionFromDays,
 } from '@onderling-app/basis';
 import FirstRunWelcomeScreen from './src/screens/FirstRunWelcomeScreen.js';
 import MnemonicEntryScreen from './src/screens/MnemonicEntryScreen.js';
@@ -119,11 +119,8 @@ export default function App() {
   const eventLogRef = useRef(null);
   if (!eventLogRef.current) {
     eventLogRef.current = new EventLog({ initial: [], muted: [] });
-    // P1 §4 tail — apply the stored retention choice once it reads (async storage). Until then the log
-    // runs on the decided defaults, which is the same thing the user chose if they never changed it.
-    asyncStorageRetentionIo(AsyncStorage).load()
-      .then((days) => eventLogRef.current?.setRetention?.(retentionFromDays(days)))
-      .catch(() => { /* defaults stand */ });
+    // #36 — the chat-retention window now lives in the parameter register; it is applied to the eventLog once
+    // the agent bundle is ready (see below, at `bundleRef.current = b`), parity with web circleApp.
   }
   // ε.1 — single normalization gate for kring-chat inserts.  The
   // inbox owns msgId dedup + envelope validation + ingest mirror +
@@ -492,6 +489,11 @@ export default function App() {
         // closure built above.  Must happen BEFORE the rehydrator
         // fires (next block) so the first ingest call sees callSkill.
         bundleRef.current = b;
+        // #36 — apply the persisted chat-retention (from the parameter register, hydrated at agent boot) to the
+        // shared eventLog, parity with web circleApp. Reads via callSkill('params',…) (the bundle exposes it).
+        b.callSkill?.('params', 'get-param', { key: 'retention.chatDays' })
+          .then((r) => eventLogRef.current?.setRetention?.(retentionFromDays(r?.value)))
+          .catch(() => { /* defaults stand */ });
         // web ≡ mobile: same attach as circleApp.js — the roster feed fills the membrane's index.
         if (b?.agent) b.agent._circleGroupsIndex = circleGroupsIndexRef.current;
         setBundle(b);

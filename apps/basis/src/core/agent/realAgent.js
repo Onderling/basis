@@ -34,6 +34,7 @@ import {
 import { createCircleSenderAuthorization, SENDER_REASON } from '../../v2/circleSenderAuthorization.js';
 import { shareableAddress } from '../../v2/addressSharing.js';
 import { createParamsService, basisParamRegistry } from '../../v2/paramsService.js';   // #36 — settable params surface
+import { settingsSealStrategyForIdentity } from '../../v2/sharedCopyOpener.js';         // #36 pod-sync — seal-to-self for settings
 import { paramsManifest } from '../../v2/paramsManifest.js';   // #36 — the params op contract (gates the waist branch)
 import { VaultMemory, VaultLocalStorage } from '@onderling/vault';
 import { wireSkill } from '@onderling/sdk';
@@ -378,6 +379,24 @@ export async function createRealHouseholdAgent(opts = {}) {
   // else in-memory (tests / transient).
   const settingsDataSource = opts.settingsDataSource
     ?? (opts.settingsPersistDb ? await buildHouseholdDataSource(opts.settingsPersistDb) : memoryDataSource());
+  // Pod-sync the settings store. The settings `CachingDataSource` starts LOCAL; when the shell can reach the
+  // signed-in pod it hands a pod-backed inner (a self-sealed pod DataSource over the settings container) via
+  // `opts.provisionSettingsMedium` — EXACT mirror of `opts.provisionCircleMedium` for circle stores. `attachInner`
+  // swaps it in and auto-flushes the pre-attach local writes (Phase-34), so agent/circle params ride the same
+  // pod the rest of a user's data does — settings stop being a device-local island. Attached BEFORE hydrate so
+  // the boot read falls through to the pod (settings paths are deterministic → read-through needs no catch-up).
+  // Absent/no-pod/failure → stays local (honest degrade), never a broken boot.
+  if (typeof opts.provisionSettingsMedium === 'function' && typeof settingsDataSource?.attachInner === 'function') {
+    try {
+      // The seal-to-self strategy is derived from THIS agent's identity (owner-root → deriveAgentSeed), so it
+      // is identical on every device of the user → agent-scoped settings sealed here open on the user's other
+      // devices. The shell supplies the pod (fetch/podRoot); realAgent supplies the key. No key material
+      // escapes — only the `{seal, open}` closures. Null strategy (no identity) → no pod sync, stays local.
+      const strategy = settingsSealStrategyForIdentity(chatId);
+      const medium   = strategy ? await opts.provisionSettingsMedium(strategy) : null;
+      if (medium) await settingsDataSource.attachInner(medium);
+    } catch (err) { if (typeof console !== 'undefined') console.warn('[settings-medium] provision failed — local only', err?.message ?? err); }
+  }
   const paramsService = createParamsService({
     register:   basisParamRegistry(),
     dataSource: settingsDataSource,

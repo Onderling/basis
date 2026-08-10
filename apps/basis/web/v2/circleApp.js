@@ -38,6 +38,9 @@ import { PodClient, generateKeypair as podGenerateKeypair, createSealedPodClient
   createSealedPodDataSource, podGroupPrefix,
   recipientStrategy as podRecipientStrategy,
   sealingPublicKeyFromNetworkKey as podSealingPublicKeyFromNetworkKey } from '@onderling/pod-client';
+// #36 pod-sync — the shared factory that builds the register's self-sealed, path-mapped settings pod inner
+// (kept in src/ so web ≡ mobile by construction; the shell only composes it, no routing logic — invariant 1).
+import { createSettingsPodMedium } from '../../src/v2/settingsPodMedium.js';
 import { createPseudoPod } from '@onderling/pseudo-pod';
 import { circleVersioningFor, getCircleVersionStore } from '../../src/web/circleVersioning.js';
 import { pickWebBackend } from '../../src/web/persistentBackend.js';
@@ -6703,6 +6706,19 @@ async function boot() {
       // #36 — persist the PARAMETER REGISTER's settings (retention etc.) in IndexedDB so a set-param survives
       // a reload (cross-app-settings shared.json / devices/<id>.json layout, on this store).
       settingsPersistDb: { dbName: 'cc-settings-state', storeName: 'settings' },
+      // #36 pod-sync — when signed in, hand realAgent the SELF-SEALED settings pod inner so agent/circle
+      // params ride the user's OWN pod (not a device-local island): `attachInner` write-throughs the local
+      // cache to `<pod>/basis/settings/…`, sealed to this agent's key. Not signed in → null → local-only
+      // (honest degrade). Same shape as `provisionCircleMedium`; the seal/path-map live in the shared factory.
+      provisionSettingsMedium: async (strategy) => {
+        try {
+          return await createSettingsPodMedium({
+            fetch:   circleAuthedFetch,
+            podRoot: circleRealPodRouting?.podRoot ?? null,
+            strategy,   // seal-to-self, derived by realAgent from the owner-root identity (cross-device stable)
+          });
+        } catch { return null; }
+      },
       stoopControlAgent: circleControlAgentRouter,   // multi-member sealing on redeem/leave
       // Connectivity Phase 3 — LIVE shared-pod key-custody seams (member-side; keyed by circleId). A
       // shared/hybrid circle WITH a pod + group key now really seals→writes the pod + fans a ref

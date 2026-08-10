@@ -26,6 +26,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { memoryDataSource } from '@onderling/item-store';
+import { CachingDataSource } from '@onderling/local-store';
 import { createRealHouseholdAgent } from '../src/core/agent/realAgent.js';
 
 const mk = (settingsDataSource) =>
@@ -96,6 +97,42 @@ describe('parameter register — multi-device journeys (#36, through the real co
     const set = await A.callSkill('params', 'set-param', { key: 'not.a.param', value: 1 });
     expect(set.ok).toBe(false);
     expect(set.error).toBe('param-unknown');
+  });
+
+  it('S7 — agent scope SYNCS through the POD medium: two devices with SEPARATE local caches meet on one pod', async () => {
+    // Unlike S1 (one shared store standing in for the pod), here each device has its OWN local
+    // `CachingDataSource` and they meet ONLY on a shared pod inner handed via `provisionSettingsMedium`
+    // — the real shape (`realAgent` attaches the pod-backed inner before hydrate). Proves the write on A
+    // crosses THROUGH the pod (attachInner write-through), not through a shared local backing.
+    const pod = memoryDataSource();                       // the pod (self-sealed in production)
+    const provisionSettingsMedium = async () => pod;
+
+    const aCache = new CachingDataSource();               // device A: its own local cache
+    const A = await createRealHouseholdAgent({ seedHousehold: false, settingsDataSource: aCache, provisionSettingsMedium });
+    const set = await A.callSkill('params', 'set-param', { key: AGENT_KEY, value: 7 * 60_000 });
+    expect(set.ok).toBe(true);
+    await aCache.flush();                                  // land the write-through on the pod
+
+    const bCache = new CachingDataSource();               // device B: a DIFFERENT local cache, same pod
+    const B = await createRealHouseholdAgent({ seedHousehold: false, settingsDataSource: bCache, provisionSettingsMedium });
+    const got = await B.callSkill('params', 'get-param', { key: AGENT_KEY });
+    expect(got).toEqual({ ok: true, key: AGENT_KEY, value: 7 * 60_000 });
+  });
+
+  it('S8 — device scope stays LOCAL even with a pod: a device-scoped param never crosses the pod', async () => {
+    const pod = memoryDataSource();
+    const provisionSettingsMedium = async () => pod;
+
+    const aCache = new CachingDataSource();
+    const A = await createRealHouseholdAgent({ seedHousehold: false, settingsDataSource: aCache, provisionSettingsMedium });
+    await A.callSkill('params', 'set-param', { key: DEVICE_KEY, value: 42 });
+    await aCache.flush();
+
+    // B is a different install (its own random deviceId) → reads its OWN devices/<id>.json, not A's.
+    const bCache = new CachingDataSource();
+    const B = await createRealHouseholdAgent({ seedHousehold: false, settingsDataSource: bCache, provisionSettingsMedium });
+    const got = await B.callSkill('params', 'get-param', { key: DEVICE_KEY });
+    expect(got.value).toBe(14);                            // the registered default — A's device value did not cross
   });
 
   it('list-user-params includes both the agent- and device-scoped user params', async () => {

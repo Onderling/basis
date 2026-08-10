@@ -14,7 +14,7 @@
  * matching private key from `sealingKeyPairFromNetworkKey(myNetworkSecret)`, so `open` (recipient mode) decrypts
  * it. A copy sealed to SOMEONE ELSE's key is a foreign envelope → `open` throws (deny-safe, never ciphertext).
  */
-import { sealingKeyPairFromNetworkKey, makeOpener } from '@onderling/pod-client';
+import { sealingKeyPairFromNetworkKey, makeOpener, sealingPublicKeyFromNetworkKey, recipientStrategy } from '@onderling/pod-client';
 
 /**
  * The injected `deriveOpener` for `AgentIdentity.sharedCopyOpener`: `(networkSecretB64) => (text) => plaintext`.
@@ -41,4 +41,30 @@ export function openerForIdentity(identity) {
   if (!identity || typeof identity.sharedCopyOpener !== 'function') return null;
   try { return identity.sharedCopyOpener(deviceSharedCopyOpener); }
   catch { return null; }
+}
+
+/**
+ * Build THIS agent's SEAL-TO-SELF strategy for the parameter register's settings store (#36 pod-sync), or
+ * `null` when unavailable (→ settings stay LOCAL). A `{ seal, open }` where:
+ *   • `seal` wraps to the agent's OWN sealing PUBLIC key — `sealingPublicKeyFromNetworkKey(identity.pubKey)`,
+ *     derived from the PUBLIC network key, so no secret is touched to seal;
+ *   • `open` is the encapsulated opener (`openerForIdentity`) — the private key never escapes the identity.
+ *
+ * Because both keys derive from the agent's network identity (itself `deriveAgentSeed`'d from the owner root,
+ * reproducible from the recovery phrase alone), EVERY device of the same user builds the SAME strategy — so
+ * agent-scoped settings sealed on one device open on another. Only this user's key opens them (a foreign
+ * envelope throws → deny-safe). ONE shared source so web ≡ mobile get it by construction (invariants #2/#5).
+ *
+ * @param {{pubKey?:string, sharedCopyOpener?:Function}|null} identity  the core AgentIdentity (`chatAgent.identity`)
+ * @returns {{seal:(t:string)=>string, open:(t:string)=>string}|null}
+ */
+export function settingsSealStrategyForIdentity(identity) {
+  if (!identity || typeof identity.pubKey !== 'string') return null;
+  const open = openerForIdentity(identity);
+  if (typeof open !== 'function') return null;
+  let sealPub;
+  try { sealPub = sealingPublicKeyFromNetworkKey(identity.pubKey); }
+  catch { return null; }
+  const { seal } = recipientStrategy({ recipients: [sealPub] });
+  return { seal, open };
 }

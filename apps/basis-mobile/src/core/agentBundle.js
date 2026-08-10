@@ -252,6 +252,10 @@ export async function bootAgentBundle(opts = {}) {
     ?? (opts.asyncStorage
       ? { dbName: 'cc-household-cache', asyncStorage: opts.asyncStorage }
       : undefined);
+  // #36 — persist the parameter register's settings (retention etc.) across app opens (AsyncStorage), parity
+  // with web circleApp's `settingsPersistDb`.
+  const settingsPersistDb = opts.settingsPersistDb
+    ?? (opts.asyncStorage ? { dbName: 'cc-settings-cache', asyncStorage: opts.asyncStorage } : undefined);
 
   let agent;
   try {
@@ -263,6 +267,7 @@ export async function bootAgentBundle(opts = {}) {
       stoopPersistDb,
       tasksPersistDb,
       householdPersistDb,
+      settingsPersistDb,
       stoopControlAgent: opts.stoopControlAgent,   // S4 — multi-member sealing router (redeem/leave)
       // Connectivity Phase 3 — LIVE shared-pod key-custody seams (member-side, keyed by circleId), RN
       // parity with web circleApp. A shared/hybrid circle WITH a pod + group key seals→writes the pod +

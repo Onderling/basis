@@ -22,7 +22,7 @@ import {
 // P1 §4 tail — how long this device keeps conversations. ONE control (the chat window); plumbing
 // follows it and the audit trail uses it as a DETAIL window, compacting past it. web≡mobile.
 import {
-  RETENTION_CHOICES_DAYS, normalizeRetentionDays, retentionFromDays, asyncStorageRetentionIo,
+  RETENTION_CHOICES_DAYS, normalizeRetentionDays, retentionFromDays,
 } from '../../../../basis/src/v2/retentionPref.js';
 // "Never share my global address" (J-CS8) — the strictest privacy position in the product: one address
 // across everything is what links a person's circles together.
@@ -115,15 +115,19 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
     addressSharingIo.save(next).catch(() => {});
   }, [addressSharingIo, shareNknAddress]);
 
-  const retentionIo = React.useMemo(() => asyncStorageRetentionIo(AsyncStorage), []);
+  // #36 — chat-retention window from the PARAMETER REGISTER (device/user), via callSkill('params',…) — parity
+  // with web circleApp; the bespoke asyncStorage retention store is retired.
   const [retentionDays, setRetentionDays] = useState(null);
-  useEffect(() => { retentionIo.load().then(setRetentionDays).catch(() => {}); }, [retentionIo]);
+  useEffect(() => {
+    callSkill?.('params', 'get-param', { key: 'retention.chatDays' })
+      .then((r) => setRetentionDays(normalizeRetentionDays(r?.value))).catch(() => {});
+  }, [callSkill]);
   const pickRetention = useCallback((days) => {
     const d = normalizeRetentionDays(days);
     setRetentionDays(d);
-    retentionIo.save(d).catch(() => {});
+    callSkill?.('params', 'set-param', { key: 'retention.chatDays', value: d });
     try { eventLog?.setRetention?.(retentionFromDays(d)); } catch { /* a prune failure must not block the setting */ }
-  }, [retentionIo, eventLog]);
+  }, [callSkill, eventLog]);
 
   useEffect(() => { getNativePushState().then(setPush).catch(() => {}); }, []);
   const toggleNativePush = useCallback(async () => {

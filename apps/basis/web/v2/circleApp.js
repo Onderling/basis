@@ -6700,6 +6700,9 @@ async function boot() {
       // OBJ-2 S1e (web) — persist the household store in IndexedDB so items survive
       // a reload (mobile already threads its AsyncStorage descriptor). Parity with stoop.
       householdPersistDb: { dbName: 'cc-household-state', storeName: 'items' },
+      // #36 — persist the PARAMETER REGISTER's settings (retention etc.) in IndexedDB so a set-param survives
+      // a reload (cross-app-settings shared.json / devices/<id>.json layout, on this store).
+      settingsPersistDb: { dbName: 'cc-settings-state', storeName: 'settings' },
       stoopControlAgent: circleControlAgentRouter,   // multi-member sealing on redeem/leave
       // Connectivity Phase 3 — LIVE shared-pod key-custody seams (member-side; keyed by circleId). A
       // shared/hybrid circle WITH a pod + group key now really seals→writes the pod + fans a ref

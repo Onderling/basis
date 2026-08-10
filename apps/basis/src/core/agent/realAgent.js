@@ -371,11 +371,13 @@ export async function createRealHouseholdAgent(opts = {}) {
   // app-origin branch in callSkill below). Device/agent params persist to this agent's local settings homes
   // (`householdDataSource` keyed by the real per-install `deviceId`); circle scope is wired when a circle
   // param lands (degrades safely until then). Hydrate the synced values at boot; boot-safe if none exist yet.
-  // A DEDICATED settings store for the register (per cross-app-settings, settings ≠ item data). In-memory by
-  // default so a set-param persists within a session (and survives a reboot when the SAME store is reused);
-  // injectable via `opts.settingsDataSource` so a pod-backed store — or a SHARED one across a user's devices in
-  // a multi-device journey — can be threaded in.
-  const settingsDataSource = opts.settingsDataSource ?? memoryDataSource();
+  // A DEDICATED settings store for the register (per cross-app-settings, settings ≠ item data). PERSISTENT via
+  // `opts.settingsPersistDb` (the shell passes an IndexedDB/AsyncStorage descriptor → a `CachingDataSource`
+  // that survives across sessions, the same persist path the household store uses); or inject a ready
+  // `opts.settingsDataSource` (a pod-backed store, or a SHARED one across a user's devices in a journey);
+  // else in-memory (tests / transient).
+  const settingsDataSource = opts.settingsDataSource
+    ?? (opts.settingsPersistDb ? await buildHouseholdDataSource(opts.settingsPersistDb) : memoryDataSource());
   const paramsService = createParamsService({
     register:   basisParamRegistry(),
     dataSource: settingsDataSource,

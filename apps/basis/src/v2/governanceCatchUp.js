@@ -29,9 +29,10 @@ const MAX_BATCH = 500;
  *   known peer, and every statement is a SIGNED fact the receiver re-verifies; the residual exposure is the
  *   proposal/vote metadata itself, the same the live fan already carries). Wire a roster check to narrow.
  */
-export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, mayServe = null, subtypes = null } = {}) {
+export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, mayServe = null, subtypes = null, statementsFor = null } = {}) {
   // Lane-parametrized: the governance pair by default; a second lane (membership) passes its own pair —
-  // one mechanism, per-lane wire names.
+  // one mechanism, per-lane wire names. `statementsFor(circleId)` (may be async) overrides what a serve
+  // sends — the task lane uses it to include signed snapshots of live heads whose entries aged out.
   const REQ = subtypes?.request ?? GOV_CATCHUP_REQUEST;
   const BATCH = subtypes?.batch ?? GOV_CATCHUP_BATCH;
   if (!rail || typeof rail.storedStatements !== 'function' || typeof rail.ingest !== 'function') {
@@ -46,7 +47,8 @@ export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, maySe
     if (typeof circleId !== 'string' || !circleId) return;
     try {
       if (mayServe && !(await mayServe(fromPeerAddr, circleId))) return;
-      const statements = rail.storedStatements(circleId).slice(0, MAX_BATCH);
+      const source = typeof statementsFor === 'function' ? await statementsFor(circleId) : rail.storedStatements(circleId);
+      const statements = (source ?? []).slice(0, MAX_BATCH);
       if (statements.length === 0) return;   // nothing to serve — silence, not an empty batch
       await sendToPeer(fromPeerAddr, { subtype: BATCH, circleId, statements });
     } catch { /* serving is best-effort — the requester retries on its next reconnect */ }

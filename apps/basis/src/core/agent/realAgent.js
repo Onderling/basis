@@ -37,6 +37,7 @@ import { createParamsService, basisParamRegistry } from '../../v2/paramsService.
 import { settingsSealStrategyForIdentity } from '../../v2/sharedCopyOpener.js';         // #36 pod-sync — seal-to-self for settings
 import { probeSettingsMedium, isProbeSafeToAttach } from '../../v2/settingsRestoreGate.js'; // #36 — probe-before-flush (no cross-key clobber)
 import { makeMembershipRail, makeMembershipEmitter } from '../../v2/membershipRail.js'; // the membership rider — statements ride the device log
+import { makeTaskRail, makeTaskEmitter, routeTaskMirror, TASK_LANE_TYPES } from '../../v2/taskRail.js'; // the content re-root — task snapshots ride the device log
 import { paramsManifest } from '../../v2/paramsManifest.js';   // #36 — the params op contract (gates the waist branch)
 import { VaultMemory, VaultLocalStorage } from '@onderling/vault';
 import { wireSkill } from '@onderling/sdk';
@@ -242,6 +243,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     dataSource: householdDataSource,
     dataSourceFor: (id) => circleMedia.get(id) ?? null,
   });
+  // The task lane (the content re-root) — ASSIGNED where the device log is handed over, further down; declared
+  // here because `ensureCircleSync` (whose eager boot call runs first) closes over them for the per-type valve.
+  let taskRail = null;
+  let taskEmit = null;
   // The wired household ops (dissolved cores on `householdAgent`). Everything else on the 'household'
   // app-origin (calendar_* passthrough, addMember, getChoreSnapshot, resolveContact, help, registerName)
   // routes to `hostAgent`; `household_briefSummary` is derived from the wired store (see callSkill).
@@ -570,7 +575,15 @@ export async function createRealHouseholdAgent(opts = {}) {
         if (typeof console !== 'undefined') console.info(`[circle-sync] ${id}: pod-carried (peer mirror skipped — no double-carry)`);
       } else {
         const mirror = await ensureCircleMirror(id);
-        wireStoreMirror(circleStore, mirror);
+        // The per-type valve: task items publish as SIGNED lane snapshots on the device log (the content
+        // re-root); everything else keeps the legacy mirror carry. The router is built per publish call so
+        // it sees the task emitter even though this wiring can run at boot, before the rails are handed the
+        // device log. Without a device log (legacy compositions) every type keeps the mirror — one path per
+        // type per composition, honestly.
+        wireStoreMirror(circleStore, {
+          publishItem:        (item)          => routeTaskMirror({ circleId: id, mirror, emitter: taskEmit }).publishItem(item),
+          publishItemRemoved: (rid, removed)  => routeTaskMirror({ circleId: id, mirror, emitter: taskEmit }).publishItemRemoved(rid, removed),
+        });
         wireCircleStoreInbound({
           notifyEnvelope: circleSubstrate.notifyEnvelope,
           store:          circleStore,
@@ -617,7 +630,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     try { items = await householdApp.listOpen(householdService.stores.getStore(id), {}); } catch { return; }
     const mirror = await ensureCircleMirror(id);
     for (const it of (Array.isArray(items) ? items : [])) {
-      try { mirror.publishItem(it); } catch { /* best-effort */ }
+      // Same per-type route as the live publish valve: a task head republishes as a signed lane snapshot
+      // (the receiver's rail verifies + causally merges — idempotent), the rest as legacy mirror envelopes.
+      try {
+        if (taskEmit && it && TASK_LANE_TYPES.has(it.type)) taskEmit.snapshot(id, it);
+        else mirror.publishItem(it);
+      } catch { /* best-effort */ }
     }
   }
   function isNewCirclePeer(circleId, pubKey) {
@@ -1401,6 +1419,25 @@ export async function createRealHouseholdAgent(opts = {}) {
       }).catch(() => { /* fan is best-effort — catch-up reconciles */ }),
     });
     membershipRead = (circleId) => membershipRail.readVerifiedBodies(circleId);
+    // THE CONTENT RE-ROOT (tasks first): each task write ALSO rides the device log's task lane as a signed
+    // full-item snapshot, fanned via broadcastKringTask; receivers verify at their rail and causally merge
+    // the head. The store's publish hook routes task types here instead of the legacy mirror (the per-type
+    // valve in ensureCircleSync below). `storeFor` peeks — it never BUILDS a store, so an inbound statement
+    // for a circle this device hasn't opened parks on the log instead of caching a store without its
+    // pod medium; the head converges when the circle opens and catch-up runs.
+    taskRail = makeTaskRail({
+      eventLog: opts.deviceLog,
+      circleIdentityFor,
+      myRef: chatId.pubKey,
+      callSkill: (...a) => callSkill(...a),
+      storeFor: (circleId) => (householdService.stores.has(circleId) ? householdService.stores.getStore(circleId) : null),
+    });
+    taskEmit = makeTaskEmitter({
+      rail: taskRail,
+      fan: (circleId, statement) => callSkill('stoop', 'broadcastKringTask', {
+        groupId: circleId, event: statement, msgId: `task:${statement.body.hash}`, ts: Date.now(),
+      }).catch(() => { /* fan is best-effort — catch-up reconciles */ }),
+    });
   }
   const stoopAgent = await createBrowserStoopAgent({
     bus,
@@ -3439,6 +3476,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     // The membership rider's rail (null without opts.deviceLog) — the shells register the fan receiver +
     // the catch-up pair over THIS instance so both ends verify with the same declaration + binding rules.
     membershipRail,
+    // The task lane's rail (same contract): the shells register kring-task-broadcast + its catch-up pair
+    // over this instance; its ingest also causally merges the snapshot into the circle's store head.
+    taskRail,
     registerSelfIdentity: (address, identity) => sa.registerSelfIdentity?.(address, identity) ?? false,
     forgetSelfIdentity:   (address) => sa.forgetSelfIdentity?.(address) ?? false,
     installCircleIdentities: (circleIds) => installCircleSigningIdentities({

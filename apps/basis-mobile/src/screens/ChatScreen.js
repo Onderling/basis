@@ -67,6 +67,7 @@ import { makeKringPolicyPeerHandler } from '../../../basis/src/v2/kringPolicyRec
 import { makeKringGovernancePeerHandler, makeKringReportPeerHandler } from '../../../basis/src/v2/kringLogReceiver.js';
 import { makeGovernanceRail } from '../../../basis/src/v2/governanceAppWiring.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../../basis/src/v2/membershipRail.js';
+import { makeTaskPeerHandler, TASK_BROADCAST, TASK_CATCHUP_SUBTYPES } from '../../../basis/src/v2/taskRail.js';
 import { makeGovernanceCatchUp } from '../../../basis/src/v2/governanceCatchUp.js';
 import { governanceEntryId } from '../../../basis/src/v2/governanceLog.js';
 import { makeHandleChatMessage }
@@ -812,10 +813,26 @@ export default function ChatScreen({
           globalThis.__onderlingMemCatchUpKicked = true;
           setTimeout(() => { memCatchUp.requestAll({ callSkill: bundle.callSkill }).catch(() => {}); }, 2500);
         }
+        // The task lane (the content re-root): the fan receiver verifies at the agent's rail and causally
+        // merges the snapshot into the circle's store head; the catch-up serves stored entries + signed
+        // live heads (the store row outlives the lane's retention window). Same wiring as the web shell.
+        const taskRail = bundle?.agent?.taskRail ?? null;
+        const taskCatchUp = taskRail ? makeGovernanceCatchUp({
+          rail: taskRail,
+          sendToPeer: (addr, payload) => bundle?.agent?.sendPeerMessage?.(addr, payload),
+          subtypes: TASK_CATCHUP_SUBTYPES,
+          statementsFor: (cid) => taskRail.catchUpStatements(cid),
+        }) : null;
+        if (taskCatchUp && !globalThis.__onderlingTaskCatchUpKicked) {
+          globalThis.__onderlingTaskCatchUpKicked = true;
+          setTimeout(() => { taskCatchUp.requestAll({ callSkill: bundle.callSkill }).catch(() => {}); }, 3000);
+        }
         return {
           ...(govCatchUp ? { [govCatchUp.subtypes.request]: govCatchUp.onRequest, [govCatchUp.subtypes.batch]: govCatchUp.onBatch } : {}),
           ...(memRail ? { [MEMBERSHIP_BROADCAST]: makeMembershipPeerHandler({ rail: memRail }) } : {}),
           ...(memCatchUp ? { [memCatchUp.subtypes.request]: memCatchUp.onRequest, [memCatchUp.subtypes.batch]: memCatchUp.onBatch } : {}),
+          ...(taskRail ? { [TASK_BROADCAST]: makeTaskPeerHandler({ rail: taskRail }) } : {}),
+          ...(taskCatchUp ? { [taskCatchUp.subtypes.request]: taskCatchUp.onRequest, [taskCatchUp.subtypes.batch]: taskCatchUp.onBatch } : {}),
           'kring-governance-broadcast': makeKringGovernancePeerHandler({
             eventLog: eventLogRef.current,
             rail: govRail,

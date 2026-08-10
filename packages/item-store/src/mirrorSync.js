@@ -17,7 +17,9 @@ export function wireStoreMirror(store, mirror) {
   if (!store || typeof store.setSyncHook !== 'function' || !mirror || typeof mirror !== 'object') return () => {};
   store.setSyncHook({
     publishItem:        (item) => (typeof mirror.publishItem === 'function' ? mirror.publishItem(item) : undefined),
-    publishItemRemoved: (id)   => (typeof mirror.publishItemRemoved === 'function' ? mirror.publishItemRemoved(id) : undefined),
+    // The store hands the removed ITEM alongside the id — forwarded so a routing publisher can pick a
+    // path per item type (a plain mirror just ignores the extra argument).
+    publishItemRemoved: (id, removedItem) => (typeof mirror.publishItemRemoved === 'function' ? mirror.publishItemRemoved(id, removedItem) : undefined),
   });
   return () => store.setSyncHook(null);
 }

@@ -19,7 +19,8 @@ describe('CircleItemStore — setSyncHook (publish-on-write)', () => {
     const item = await store.put({ type: 'task', text: 'x' });
     expect(publishItem).toHaveBeenCalledWith(expect.objectContaining({ id: item.id, type: 'task', text: 'x' }));
     await store.delete(item.id);
-    expect(publishItemRemoved).toHaveBeenCalledWith(item.id);
+    // The removal hands the removed ITEM alongside the id, so a routing publisher can pick a path by type.
+    expect(publishItemRemoved).toHaveBeenCalledWith(item.id, expect.objectContaining({ id: item.id, type: 'task' }));
   });
 
   it('no hook → writes succeed (no-op)', async () => {
@@ -57,7 +58,7 @@ describe('wireStoreMirror', () => {
     const a = await store.put({ type: 'task', text: 'milk' });
     expect(mirror.publishItem).toHaveBeenCalledWith(expect.objectContaining({ id: a.id, text: 'milk' }));
     await store.delete(a.id);
-    expect(mirror.publishItemRemoved).toHaveBeenCalledWith(a.id);
+    expect(mirror.publishItemRemoved).toHaveBeenCalledWith(a.id, expect.objectContaining({ id: a.id }));
 
     detach();
     await store.put({ type: 'task', text: 'after-detach' });

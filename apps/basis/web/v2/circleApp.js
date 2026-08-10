@@ -167,6 +167,7 @@ import { buildSelfMediaComposition, makeResealMediaForCircle } from '../../src/v
 import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals } from '../../src/v2/governanceAppWiring.js';
 import { makeGovernanceCatchUp } from '../../src/v2/governanceCatchUp.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../src/v2/membershipRail.js';
+import { makeTaskPeerHandler, TASK_BROADCAST, TASK_CATCHUP_SUBTYPES } from '../../src/v2/taskRail.js';
 import { wireEventLogPersistence, backendSnapshotIo } from '../../src/v2/eventLogPersistence.js';
 import { buildSubjectLabeler } from '../../src/v2/governanceView.js';
 import { governanceEntryId, foldGovernance } from '../../src/v2/governanceLog.js';
@@ -1314,6 +1315,7 @@ let circleIdentityForShell = null;   // the agent's per-circle signer resolver �
 let govShellRail = null;             // the governance rail for the RECEIVE side (verify-on-ingest)
 let govCatchUpShell = null;          // pull-all governance catch-up (the offline-device half of reliable)
 let memCatchUpShell = null;          // the membership lane's catch-up (same mechanism, its own subtypes)
+let taskCatchUpShell = null;         // the task lane's catch-up (serves stored entries + signed live heads)
 // The pod-session's AUTHED fetch (set on sign-in) — lets embed-ref resolution
 // read the user's OWN private-pod items; null when signed out → resolution falls
 // back to a public fetch (only public cross-pod refs resolve; protected → 🔒).
@@ -6873,6 +6875,15 @@ async function boot() {
         sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
         subtypes: MEMBERSHIP_CATCHUP_SUBTYPES,
       }) : null;
+      // The task lane's catch-up: serves the stored entries PLUS signed snapshots of live heads whose
+      // entries aged out (the store row outlives the 14-day lane window), so a long-offline device still
+      // converges on every open task.
+      taskCatchUpShell = agent.taskRail ? makeGovernanceCatchUp({
+        rail: agent.taskRail,
+        sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
+        subtypes: TASK_CATCHUP_SUBTYPES,
+        statementsFor: (cid) => agent.taskRail.catchUpStatements(cid),
+      }) : null;
       // Route the auto-resolving callSkill through the calendar-wrapped one too,
       // so button-driven calendar dispatches fan out as well as the bot path.
       // Pass a catalog GETTER so the resolver skips origins that don't declare the
@@ -7079,6 +7090,10 @@ async function boot() {
           // The membership rider: the fan receiver (verify-on-ingest at the agent's rail) + its catch-up pair.
           ...(agent.membershipRail ? { [MEMBERSHIP_BROADCAST]: makeMembershipPeerHandler({ rail: agent.membershipRail }) } : {}),
           ...(memCatchUpShell ? { [memCatchUpShell.subtypes.request]: memCatchUpShell.onRequest, [memCatchUpShell.subtypes.batch]: memCatchUpShell.onBatch } : {}),
+          // The task lane (the content re-root): the fan receiver verifies at the agent's rail AND causally
+          // merges the snapshot into the circle's store head; the catch-up pair covers the offline device.
+          ...(agent.taskRail ? { [TASK_BROADCAST]: makeTaskPeerHandler({ rail: agent.taskRail }) } : {}),
+          ...(taskCatchUpShell ? { [taskCatchUpShell.subtypes.request]: taskCatchUpShell.onRequest, [taskCatchUpShell.subtypes.batch]: taskCatchUpShell.onBatch } : {}),
           'kring-governance-broadcast': makeKringGovernancePeerHandler({ eventLog, rail: govShellRail, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); }, notify: govNotify }),
           'kring-report-broadcast':     makeKringReportPeerHandler({ eventLog, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); } }),
           // ε.4 — negotiated catch-up subtypes.
@@ -7216,6 +7231,7 @@ async function boot() {
         // Governance pull-all rides the same kick — any one complete peer suffices (idempotent ingest).
         govCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         memCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
+        taskCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         // Seed the household roster for the active circle (re-fed on open below).
         feedHouseholdRosterForCircle(getActiveCircle()).catch(() => {});
       }, 1500);

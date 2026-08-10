@@ -3801,6 +3801,32 @@ export function buildSkills({
     }),
 
     /**
+     * broadcastKringTask({groupId, event, msgId, ts?})
+     *   — the content re-root: fan a SIGNED task statement (a full-item snapshot, or a remove) to every
+     *   other member; receivers verify it at their task rail before it lands on their device log and
+     *   causally merges into their store head. Same plumbing as broadcastKringMembership; subtype
+     *   kring-task-broadcast. Never wakes an offline device by itself (the head converges via catch-up;
+     *   an assignment nudge belongs to the notifications model, not this fan).
+     */
+    defineSkill('broadcastKringTask', async ({ parts, from }) => {
+      const a = dataArgs(parts);
+      const _groupId = a.groupId ?? groupId;
+      if (!_groupId)                                                  return { error: 'groupId-required' };
+      if (!a.event || typeof a.event !== 'object')                    return { error: 'event-required' };
+      if (typeof a.msgId !== 'string' || !a.msgId)                    return { error: 'msgId-required' };
+      const ts = typeof a.ts === 'number' && Number.isFinite(a.ts) ? a.ts : Date.now();
+      return broadcastToCircle({
+        circleId: _groupId, kind: 'kring-task-broadcast', from,
+        extras: { circleId: _groupId, msgId: a.msgId, ts, event: a.event },
+        metric: 'kring-task-fanout',
+        noWake: true,
+      });
+    }, {
+      description: 'Fan a signed task statement (full-item snapshot or remove) to every other member via subtype:kring-task-broadcast; receivers verify at their task rail and causally merge the head. Never wakes.',
+      visibility:  'authenticated',
+    }),
+
+    /**
      * broadcastKringReport({groupId, event, msgId, ts?})
      *   — Wave C §8: fan a report event to every member (so an admin on another device sees
      *   it). Same plumbing as broadcastKringGovernance; subtype kring-report-broadcast.

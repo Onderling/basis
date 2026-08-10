@@ -95,10 +95,10 @@ export class CircleItemStore {
     try { const r = fn(item); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch { /* best-effort */ }
   }
 
-  #emitRemove(id) {
+  #emitRemove(id, removedItem = null) {
     const fn = this.#syncHook && this.#syncHook.publishItemRemoved;
     if (typeof fn !== 'function') return;
-    try { const r = fn(id); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch { /* best-effort */ }
+    try { const r = fn(id, removedItem); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch { /* best-effort */ }
   }
 
   // ── The per-(device, circle) Lamport clock (content-LWW coordinate; #33 / DESIGN §4) ──────────────────────
@@ -303,8 +303,13 @@ export class CircleItemStore {
 
   /** Delete one item by id (no-op if absent, mirroring DataSource.delete). */
   async delete(id, { sync = true } = {}) {
+    // Read the row BEFORE deleting so the hook receives the removed item alongside the id — a publisher
+    // that routes per item TYPE (e.g. tasks over the signed lane, the rest over the legacy mirror) cannot
+    // route a bare id. Best-effort: an unreadable/absent row hands null and the hook falls back on the id.
+    let removed = null;
+    if (sync !== false) { try { removed = await this.get(id); } catch { removed = null; } }
     if (typeof this.#source.delete === 'function') await this.#source.delete(this.#uri(id));
-    if (sync !== false) this.#emitRemove(id);   // `sync:false` = inbound delete (don't re-publish the removal)
+    if (sync !== false) this.#emitRemove(id, removed);   // `sync:false` = inbound delete (don't re-publish the removal)
   }
 
   /** Every item in the circle (all types). */

@@ -17,14 +17,10 @@
  * Cast: Anna (admin0, admin) · Bram (m0) · Cato (m1) · Dirk (m2, the usual subject — never a device).
  */
 import { describe, it, expect } from 'vitest';
-import { chainEvent, authorHead, detectForks, verifyForkProof, foldDisputes } from '../../src/v2/governanceChain.js';
-import { voteEvent, GOVERNANCE_KIND } from '../../src/v2/governanceLog.js';
+import { authorHead, signSpine, verifySpine } from '@onderling/core';
 import { DECISION_STATUS } from '../../src/v2/governanceDecision.js';
 import { normalizeCirclePolicy } from '../../src/v2/circlePolicy.js';
 import { threeDevices, openProposal } from './helpers/threeDeviceGovernance.js';
-
-/** Read the governance event payloads out of a device's log — the same view the fold gets. */
-const eventsOn = (d) => d.log.query({}).filter((e) => e.type === GOVERNANCE_KIND && e.payload).map((e) => e.payload);
 
 /** Hand-deliver a crafted governance event to ONE device, bypassing the fan. This is what a hostile client
  *  does: it does not broadcast honestly, it shows different things to different peers. */
@@ -37,45 +33,46 @@ const showTo = (d, circleId, event) =>
  * capability a malicious client has (the honest wiring would chain the second to the first).
  */
 function forgeConflictingVotes(h, proposalId) {
-  const parentHash = authorHead(eventsOn(h.devices.admin0), 'admin0');
-  const yes = chainEvent(voteEvent({ proposalId, voter: 'admin0', choice: 'yes' }), { author: 'admin0', parentHash });
-  const no = chainEvent(voteEvent({ proposalId, voter: 'admin0', choice: 'no' }), { author: 'admin0', parentHash });
+  // Anna signs BOTH with her REAL circle key — a hostile client holds its own key, so both statements
+  // verify individually; only holding the PAIR reveals the fork (same author, same parent, two hashes).
+  const bodies = h.devices.admin0.rail.storedStatements('c1').map((s) => s.body);
+  const parentHash = authorHead(bodies, h.cids.admin0.pubKey);
+  const yes = signSpine(h.cids.admin0, { kind: 'vote', circleId: 'c1', subject: proposalId, payload: { voter: 'admin0', choice: 'yes', at: 2, authorRef: 'admin0' }, parent: parentHash });
+  const no  = signSpine(h.cids.admin0, { kind: 'vote', circleId: 'c1', subject: proposalId, payload: { voter: 'admin0', choice: 'no',  at: 3, authorRef: 'admin0' }, parent: parentHash });
   return { yes, no, parentHash };
 }
 
 describe('3.5 — equivocation is detected, and the dispute is IDENTICAL on every replica', () => {
   it('two conflicting events from one parent are a detectable fork, with a verifiable proof', async () => {
-    const h = threeDevices();
+    const h = await threeDevices();
     const proposalId = await openProposal(h);
     const { yes, no, parentHash } = forgeConflictingVotes(h, proposalId);
 
-    // Sanity: they really are a fork and not just two different events — same author, same parent,
-    // different hash. Without this the rest of the suite could pass on a malformed pair.
-    expect(yes.author).toBe(no.author);
-    expect(yes.parentHash).toBe(no.parentHash);
-    expect(yes.parentHash).toBe(parentHash);
-    expect(yes.hash).not.toBe(no.hash);
-
-    const proofs = detectForks([...eventsOn(h.devices.admin0), yes, no]);
-    expect(proofs).toHaveLength(1);
-    expect(proofs[0].author).toBe('admin0');
-    expect(verifyForkProof(proofs[0])).toBe(true);
+    // Sanity: they really are a fork by the rail's own criterion — same author, same parent, different
+    // hash — and EACH verifies individually (a hostile client with a real key signs valid statements; the
+    // proof is only mintable by whoever holds the pair). Without this the suite could pass on a malformed pair.
+    expect(yes.body.author).toBe(no.body.author);
+    expect(yes.body.parentHash).toBe(no.body.parentHash);
+    expect(yes.body.parentHash).toBe(parentHash);
+    expect(yes.body.hash).not.toBe(no.body.hash);
+    expect(verifySpine(yes, { expectedCircleId: 'c1' }).ok).toBe(true);
+    expect(verifySpine(no,  { expectedCircleId: 'c1' }).ok).toBe(true);
   });
 
   it('Bram is shown YES and Cato NO; when the partition heals BOTH mark Anna disputed', async () => {
-    const h = threeDevices();
+    const h = await threeDevices();
     const proposalId = await openProposal(h);
     const { yes, no } = forgeConflictingVotes(h, proposalId);
 
     // The partition: each victim sees only ONE side of Anna's fork, so neither can detect it yet.
-    showTo(h.devices.m0, 'c1', yes);
-    showTo(h.devices.m1, 'c1', no);
+    await showTo(h.devices.m0, 'c1', yes);
+    await showTo(h.devices.m1, 'c1', no);
     expect((await h.devices.m0.gov.view('c1')).hasDisputed).toBe(false);
     expect((await h.devices.m1.gov.view('c1')).hasDisputed).toBe(false);
 
     // Heal: each device now also receives the side it was denied.
-    showTo(h.devices.m0, 'c1', no);
-    showTo(h.devices.m1, 'c1', yes);
+    await showTo(h.devices.m0, 'c1', no);
+    await showTo(h.devices.m1, 'c1', yes);
 
     const bram = await h.devices.m0.gov.view('c1');
     const cato = await h.devices.m1.gov.view('c1');
@@ -87,14 +84,14 @@ describe('3.5 — equivocation is detected, and the dispute is IDENTICAL on ever
   });
 
   it('the dispute is ORDER-INDEPENDENT — whichever side arrives first, the verdict is the same', async () => {
-    const h = threeDevices();
+    const h = await threeDevices();
     const proposalId = await openProposal(h);
     const { yes, no } = forgeConflictingVotes(h, proposalId);
 
-    showTo(h.devices.m0, 'c1', yes);        // Bram: yes then no
-    showTo(h.devices.m0, 'c1', no);
-    showTo(h.devices.m1, 'c1', no);         // Cato: no then yes — the reverse order
-    showTo(h.devices.m1, 'c1', yes);
+    await showTo(h.devices.m0, 'c1', yes);        // Bram: yes then no
+    await showTo(h.devices.m0, 'c1', no);
+    await showTo(h.devices.m1, 'c1', no);         // Cato: no then yes — the reverse order
+    await showTo(h.devices.m1, 'c1', yes);
 
     const bram = await h.devices.m0.gov.view('c1');
     const cato = await h.devices.m1.gov.view('c1');
@@ -102,14 +99,14 @@ describe('3.5 — equivocation is detected, and the dispute is IDENTICAL on ever
   });
 
   it('a disputed member\'s vote is DISCOUNTED — an equivocator cannot sway the tally', async () => {
-    const h = threeDevices();
+    const h = await threeDevices();
     const proposalId = await openProposal(h);      // Anna's propose carries her own auto-yes: 1/4
     const before = await h.tallyOf('m0', proposalId);
     expect(before.yes).toBe(1);                    // non-vacuous: there IS a vote to lose
 
     const { yes, no } = forgeConflictingVotes(h, proposalId);
-    showTo(h.devices.m0, 'c1', yes);
-    showTo(h.devices.m0, 'c1', no);
+    await showTo(h.devices.m0, 'c1', yes);
+    await showTo(h.devices.m0, 'c1', no);
 
     const after = await h.tallyOf('m0', proposalId);
     expect(after.yes).toBe(0);                     // her auto-yes is gone with her
@@ -121,13 +118,13 @@ describe('3.5 — equivocation is detected, and the dispute is IDENTICAL on ever
   });
 
   it('a dispute does not contaminate an HONEST member — only the equivocator is discounted', async () => {
-    const h = threeDevices();
+    const h = await threeDevices();
     const proposalId = await openProposal(h);
-    await h.devices.admin0.gov.vote({ circleId: 'c1', proposalId, voter: 'm0', choice: 'yes' });
+    await h.devices.m0.gov.vote({ circleId: 'c1', proposalId, voter: 'm0', choice: 'yes' });
 
     const { yes, no } = forgeConflictingVotes(h, proposalId);
-    showTo(h.devices.m1, 'c1', yes);
-    showTo(h.devices.m1, 'c1', no);
+    await showTo(h.devices.m1, 'c1', yes);
+    await showTo(h.devices.m1, 'c1', no);
 
     const v = await h.devices.m1.gov.view('c1');
     expect(v.disputed.map((x) => x.ref)).toEqual(['admin0']);   // Bram is NOT swept up
@@ -135,22 +132,22 @@ describe('3.5 — equivocation is detected, and the dispute is IDENTICAL on ever
     expect(tally.yes).toBe(1);                                   // Bram's honest yes survives
   });
 
-  it('foldDisputes over a device\'s OWN log agrees with the view — no second opinion', async () => {
-    const h = threeDevices();
+  it('the rail\'s verified read agrees with the view about who is disputed — no second opinion', async () => {
+    const h = await threeDevices();
     const proposalId = await openProposal(h);
     const { yes, no } = forgeConflictingVotes(h, proposalId);
-    showTo(h.devices.m0, 'c1', yes);
-    showTo(h.devices.m0, 'c1', no);
+    await showTo(h.devices.m0, 'c1', yes);
+    await showTo(h.devices.m0, 'c1', no);
 
-    const direct = foldDisputes({ events: eventsOn(h.devices.m0) });
+    const direct = (await h.devices.m0.rail.readVerified('c1')).disputed;
     const viaView = new Set((await h.devices.m0.gov.view('c1')).disputed.map((x) => x.ref));
-    expect([...viaView]).toEqual([...direct]);
+    expect([...viaView].sort()).toEqual([...direct].sort());
   });
 });
 
 describe('3.3 — the deadline override is an ADMIN escape hatch, never a member one', () => {
   it('past the deadline, only Anna may force it — Bram and Cato never see "Decide now"', async () => {
-    const h = threeDevices({ clock: 1 });
+    const h = await threeDevices({ clock: 1 });
     const proposalId = await openProposal(h, 100);       // a deadline the harness supplies explicitly
 
     // Before expiry nobody may override — including the admin. (Non-vacuous control: proves the later
@@ -164,7 +161,7 @@ describe('3.3 — the deadline override is an ADMIN escape hatch, never a member
   });
 
   it('forcing it lands IDENTICALLY on all three devices', async () => {
-    const h = threeDevices({ clock: 1 });
+    const h = await threeDevices({ clock: 1 });
     const proposalId = await openProposal(h, 100);
     h.setClock(101);
 
@@ -179,7 +176,7 @@ describe('3.3 — the deadline override is an ADMIN escape hatch, never a member
   });
 
   it('a MEMBER calling override directly is refused — the gate is in the model, not the button', async () => {
-    const h = threeDevices({ clock: 1 });
+    const h = await threeDevices({ clock: 1 });
     const proposalId = await openProposal(h, 100);
     h.setClock(101);
 
@@ -195,7 +192,7 @@ describe('3.3 — the deadline override is an ADMIN escape hatch, never a member
   // `makeGovernanceOrchestrator.propose`. In the MODEL, so both shells inherit it rather than each
   // remembering to pass one; and an ENUM so it lands in the shared settings radio surface an admin can use.
   it('a proposal opened the way the SHELLS open it can eventually be overridden', async () => {
-    const h = threeDevices({ clock: 1 });
+    const h = await threeDevices({ clock: 1 });
     const proposalId = await openProposal(h, null);       // exactly what the shells pass
     expect((await h.rowOn('admin0', proposalId)).canOverride).toBe(false);   // not yet — the week is running
 
@@ -205,7 +202,7 @@ describe('3.3 — the deadline override is an ADMIN escape hatch, never a member
   });
 
   it('a circle may opt OUT of the hatch with `decisionDeadline: open-ended`', async () => {
-    const h = threeDevices({
+    const h = await threeDevices({
       clock: 1,
       policy: normalizeCirclePolicy({ governance: { removeMember: 'member-vote' }, decisionDeadline: 'open-ended' }),
     });
@@ -223,7 +220,7 @@ describe('3.6 — a report reaches the admin; it must not reach the person repor
   });
 
   it('Anna (admin) sees the report Cato filed', async () => {
-    const h = threeDevices();
+    const h = await threeDevices();
     await fileReport(h.devices.m1);                        // Cato reports Bram's post
 
     const open = (await h.devices.admin0.gov.reports.list('c1')).open;
@@ -233,7 +230,7 @@ describe('3.6 — a report reaches the admin; it must not reach the person repor
   });
 
   it('acting on it removes the post, and the report closes on every device', async () => {
-    const h = threeDevices();
+    const h = await threeDevices();
     const { reportId } = await fileReport(h.devices.m1);
     await h.devices.admin0.gov.reports.act({ circleId: 'c1', reportId });
 
@@ -245,7 +242,7 @@ describe('3.6 — a report reaches the admin; it must not reach the person repor
   });
 
   it('the reporter can see their OWN report', async () => {
-    const h = threeDevices();
+    const h = await threeDevices();
     await fileReport(h.devices.m1);
     const mine = (await h.devices.m1.gov.reports.list('c1')).open.filter((r) => r.by === 'm1');
     expect(mine).toHaveLength(1);
@@ -258,7 +255,7 @@ describe('3.6 — a report reaches the admin; it must not reach the person repor
   // after delivery, a replayed log) still is not served. The shells' `if (isAdmin)` is now redundant rather
   // than load-bearing.
   it('Bram — the person reported — does not hold the report payload', async () => {
-    const h = threeDevices();
+    const h = await threeDevices();
     await fileReport(h.devices.m1);
 
     const { open } = await h.devices.m0.gov.reports.list('c1');
@@ -266,7 +263,7 @@ describe('3.6 — a report reaches the admin; it must not reach the person repor
   });
 
   it('layer 1 (routing): the report event never lands in a non-admin\'s log', async () => {
-    const h = threeDevices();
+    const h = await threeDevices();
     await fileReport(h.devices.m1);
 
     // Bram is neither the reporter nor an admin — his raw log must not carry the event at all.
@@ -277,7 +274,7 @@ describe('3.6 — a report reaches the admin; it must not reach the person repor
   });
 
   it('layer 2 (access): even holding the event, a non-admin is not served it', async () => {
-    const h = threeDevices();
+    const h = await threeDevices();
     await fileReport(h.devices.m1);
 
     // Force the event onto Bram's device, bypassing the narrowed fan — the demoted-admin / replay case.
@@ -293,7 +290,7 @@ describe('3.6 — a report reaches the admin; it must not reach the person repor
   it('the REPORTER learns the outcome — narrowing the fan must not strand them', async () => {
     // The regression narrowing the fan introduces if the recipient set is admins ALONE: the resolve event
     // never reaches Cato, so his own report sits "open" on his device forever. The fan is admins ∪ reporter.
-    const h = threeDevices();
+    const h = await threeDevices();
     const { reportId } = await fileReport(h.devices.m1);
     expect((await h.devices.m1.gov.reports.list('c1')).open.map((r) => r.reportId)).toEqual([reportId]);
 
@@ -307,7 +304,7 @@ describe('3.6 — a report reaches the admin; it must not reach the person repor
   });
 
   it('an admin still sees the whole picture — the scope marker says so', async () => {
-    const h = threeDevices();
+    const h = await threeDevices();
     await fileReport(h.devices.m1);
     const { open, scope } = await h.devices.admin0.gov.reports.list('c1');
     expect(scope).toBe('all');

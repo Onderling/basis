@@ -15,7 +15,7 @@ import { startRelay } from '@onderling/relay';
 import {
   bootRealAgentNode, connectAgentsOverRelay, pairCircle, until, teardown,
 } from '../support/pairRealAgents.js';
-import { governanceEntryId } from '../../src/v2/governanceLog.js';
+import { signSpine } from '@onderling/core';
 import { reportEntryId } from '../../src/v2/reportModel.js';
 
 const GROUP = 'buurt-relay-route';
@@ -23,6 +23,7 @@ const rnd = () => Math.random().toString(36).slice(2, 8);
 
 describe('relay-route cross-device exchange (self-contained relay)', () => {
   let relay, admin, joiner, joined;
+  const adminCidHolder = {};
 
   beforeAll(async () => {
     // In-process relay on an OS-assigned port — no external :8787, no sqlite.
@@ -30,7 +31,11 @@ describe('relay-route cross-device exchange (self-contained relay)', () => {
     const relayUrl = `ws://127.0.0.1:${relay.port}`;
 
     admin = await bootRealAgentNode('admin');
-    joiner = await bootRealAgentNode('joiner');
+    // The legacy-group harness records no circleAddress roster rows (that trail binding lands with the
+    // membership rider) — the joiner's receive rail gets the ONE genuine binding pinned explicitly.
+    joiner = await bootRealAgentNode('joiner', {
+      verifyGovernanceBinding: async ({ author, ref }) => ref === admin.pubKey && author === adminCidHolder.pubKey,
+    });
     // RELAY-ONLY: connect both agents to the in-process relay (no NKN).
     await connectAgentsOverRelay(admin, joiner, { relayUrl });
 
@@ -59,10 +64,17 @@ describe('relay-route cross-device exchange (self-contained relay)', () => {
 
   it('governance: a Wave C vote event replicates admin -> joiner over the relay', async () => {
     const gid = `g-${rnd()}`;
-    const event = { kind: 'governance', event: 'propose', proposalId: gid, action: 'removeMember', subject: 'x', by: admin.pubKey, hash: `h-${rnd()}`, author: admin.pubKey, parentHash: null };
-    await admin.agent.callSkill('stoop', 'broadcastKringGovernance', { groupId: GROUP, event, msgId: governanceEntryId(event) });
+    // Signed with the admin's REAL per-circle identity — the joiner's rail verifies before it lands.
+    const cid = await admin.agent.circleIdentityFor(GROUP);
+    adminCidHolder.pubKey = cid.pubKey;
+    const event = signSpine(cid, {
+      kind: 'propose', circleId: GROUP, subject: gid,
+      payload: { action: 'removeMember', subject: 'x', by: admin.pubKey, authorRef: admin.pubKey, at: 1 },
+      parent: null,
+    });
+    await admin.agent.callSkill('stoop', 'broadcastKringGovernance', { groupId: GROUP, event, msgId: `gov:${event.body.hash}` });
     const got = await until(
-      () => joiner.chatEvents.some((e) => e?.type === 'governance' && e?.payload?.proposalId === gid),
+      () => joiner.chatEvents.some((e) => e?.type === 'governance' && e?.payload?.body?.subject === gid),
       { timeout: 10000 },
     );
     expect(got, 'joiner ingested the governance vote event over the relay').toBeTruthy();

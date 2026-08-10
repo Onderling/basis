@@ -23,7 +23,9 @@ function host({ governance = {}, localActorRef = 'admin0' } = {}) {
   let n = 0;
   const gov = makeCircleGovernance({
     callSkill,
-    readGovernanceEvents: async () => events,
+    // The host consumes the rail's VERIFIED state; these pure-fake tests supply it directly (no dispute
+    // machinery here — the rail's own suite covers fork-proofs).
+    readGovernanceState: async () => ({ events, disputed: new Set() }),
     appendGovernanceEvent: async (_c, e) => { events.push(e); },
     getPolicy: async () => policy,
     getMembers: async () => members,

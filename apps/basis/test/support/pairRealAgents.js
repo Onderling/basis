@@ -67,6 +67,7 @@ import { EventLog } from '../../src/eventLog.js';
 import { createChatMessageInbox } from '../../src/v2/chatMessageInbox.js';
 import { makeKringChatPeerHandler } from '../../src/v2/kringChatReceiver.js';
 import { makeKringGovernancePeerHandler, makeKringReportPeerHandler } from '../../src/v2/kringLogReceiver.js';
+import { makeGovernanceRail } from '../../src/v2/governanceAppWiring.js';
 
 import {
   initialState as createGroupInitialState,
@@ -105,7 +106,7 @@ export async function until(pred, { timeout = 4000, step = 10 } = {}) {
  *   pendingMap: Map<string, object>,
  * }>}
  */
-export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 8000, agentOpts = {} } = {}) {
+export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 8000, agentOpts = {}, verifyGovernanceBinding = null } = {}) {
   const routerRef = { fn: null };
   const received = [];
   // A sealed circle's log carries key-events + sealed content over the real transport. Key-events are recorded
@@ -190,7 +191,16 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     // Wave C tail A — the REAL governance/report ingest handlers (the exact wiring the shells
     // use): a fanned vote/report lands in THIS node's EventLog, so a headless two-agent run can
     // assert cross-device replication over a genuine transport (not a simulated fan).
-    'kring-governance-broadcast': makeKringGovernancePeerHandler({ eventLog: chatEventLog }),
+    'kring-governance-broadcast': makeKringGovernancePeerHandler({
+      eventLog: chatEventLog,
+      // Verify-before-land, exactly as the shells: the rail off THIS node's real per-circle signer +
+      // the roster's circleAddress rows for foreign bindings.
+      // The key↔ref binding source: the default roster-row lookup, or a test-supplied resolver. This
+      // harness's LEGACY-group pairing records no circleAddress on its roster rows (the trail-recorded
+      // binding for this path lands with the membership rider) — a repro that fans signed governance
+      // supplies the binding explicitly rather than weakening the verify.
+      rail: makeGovernanceRail({ eventLog: chatEventLog, circleIdentityFor: agent.circleIdentityFor, myRef: '', callSkill, verifyBinding: verifyGovernanceBinding ?? undefined }),
+    }),
     'kring-report-broadcast':     makeKringReportPeerHandler({ eventLog: chatEventLog }),
   };
   const sendPeerRedeem = makeSendGroupRedeemRequest({

@@ -8,7 +8,7 @@
  * double-appends. Registered on the peer router under the two broadcast subtypes, next to the
  * chat/policy/rules handlers. `onChange` lets the shell re-render an open governance panel.
  */
-import { GOVERNANCE_KIND, governanceEntryId, governanceWakeHint } from './governanceLog.js';
+import { GOVERNANCE_KIND } from './governanceLog.js';
 import { REPORT_KIND, reportEntryId } from './reportModel.js';
 
 function makeIngestHandler({ eventLog, subtype, kind, idFor, onChange, notify, wakeHint }) {
@@ -39,8 +39,9 @@ function makeIngestHandler({ eventLog, subtype, kind, idFor, onChange, notify, w
  *  rail's ingest — signature + chain + declared kind + the key↔ref binding — before it lands (P9: the gate
  *  binds at the receiver). A bare unsigned event is then REFUSED (no-backcompat: one path per type). Without
  *  a rail (legacy composition) the unsigned path stands unchanged. */
-export function makeKringGovernancePeerHandler({ eventLog, onChange, notify, rail = null } = {}) {
-  if (rail) {
+export function makeKringGovernancePeerHandler({ eventLog, onChange, notify, rail } = {}) {
+  if (!rail) throw new Error('makeKringGovernancePeerHandler: a governance rail is required — a fanned statement must verify before it lands');
+  {
     return async function onKringGovernanceRail(_fromPeerAddr, payload) {
       if (!payload || payload.subtype !== 'kring-governance-broadcast') return;
       const { circleId, event: statement } = payload;
@@ -59,7 +60,6 @@ export function makeKringGovernancePeerHandler({ eventLog, onChange, notify, rai
       } catch { /* ingest is best-effort — never throw on a peer message */ }
     };
   }
-  return makeIngestHandler({ eventLog, subtype: 'kring-governance-broadcast', kind: GOVERNANCE_KIND, idFor: governanceEntryId, onChange, notify, wakeHint: governanceWakeHint });
 }
 
 /** Peer handler for `kring-report-broadcast` → ingest the report event locally. `notify` fires

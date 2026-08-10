@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { bootRealAgentNode, connectAgentsOverRelay, pairCircle, until, teardown } from '../support/pairRealAgents.js';
-import { governanceEntryId } from '../../src/v2/governanceLog.js';
+import { signSpine } from '@onderling/core';
 import { reportEntryId } from '../../src/v2/reportModel.js';
 
 // Wave C tail A over a REAL relay (running on :8787) — governance/report propagation via the
@@ -19,16 +19,28 @@ async function warmMesh(A, B) {
 describe('governance/report propagation over a REAL relay', () => {
   it('broadcastKringGovernance A -> B ingests the vote event over the relay', async () => {
     const A = await bootRealAgentNode('A');
-    const B = await bootRealAgentNode('B');
+    const aCidHolder = {};
+    const B = await bootRealAgentNode('B', {
+      verifyGovernanceBinding: async ({ author, ref }) => ref === A.pubKey && author === aCidHolder.pubKey,
+    });
     await connectAgentsOverRelay(A, B, { relayUrl: RELAY });
     await pairCircle(A, B);
     await warmMesh(A, B);
 
-    const event = { kind: 'governance', event: 'propose', proposalId: 'p-relay', action: 'removeMember', subject: 'x', by: 'A', hash: 'h-' + Math.random().toString(36).slice(2), author: 'A', parentHash: null };
-    const r = await A.agent.callSkill('stoop', 'broadcastKringGovernance', { groupId: 'peer-circle', event, msgId: governanceEntryId(event) });
+    // The legacy-group harness records no circleAddress roster rows (that trail binding lands with the
+    // membership rider) — the repro pins the ONE genuine binding: A's ref ↔ A's real circle key.
+    aCidHolder.pubKey = (await A.agent.circleIdentityFor('peer-circle')).pubKey;
+    // Signed with A's REAL per-circle identity — B's receiver rail verifies before it lands.
+    const cid = await A.agent.circleIdentityFor('peer-circle');
+    const event = signSpine(cid, {
+      kind: 'propose', circleId: 'peer-circle', subject: 'p-relay',
+      payload: { action: 'removeMember', subject: 'x', by: A.pubKey, authorRef: A.pubKey, at: 1 },
+      parent: null,
+    });
+    const r = await A.agent.callSkill('stoop', 'broadcastKringGovernance', { groupId: 'peer-circle', event, msgId: `gov:${event.body.hash}` });
     expect(r?.sent, `broadcast should send over the relay: ${JSON.stringify(r)}`).toBeGreaterThan(0);
 
-    const got = await until(() => B.chatEvents.some((e) => e?.type === 'governance' && e?.payload?.proposalId === 'p-relay'), { timeout: 8000 });
+    const got = await until(() => B.chatEvents.some((e) => e?.type === 'governance' && e?.payload?.body?.subject === 'p-relay'), { timeout: 8000 });
     expect(got, 'B ingested the governance event over the relay').toBeTruthy();
     await teardown(A, B);
   });

@@ -11,8 +11,10 @@ import { readCircleMembers, bindCircleGovernance } from '../../src/v2/governance
 import { EventLog } from '../../src/eventLog.js';
 import { normalizeCirclePolicy } from '../../src/v2/circlePolicy.js';
 import { DECISION_STATUS } from '../../src/v2/governanceDecision.js';
-import { chainEvent } from '../../src/v2/governanceChain.js';
-import { voteEvent } from '../../src/v2/governanceLog.js';
+import { AgentIdentity, signSpine } from '@onderling/core';
+import { VaultMemory } from '@onderling/vault';
+
+const mkCid = () => AgentIdentity.generate(new VaultMemory());
 
 describe('readCircleMembers', () => {
   it('adds this device to the roster (which excludes the caller) and honours roles', async () => {
@@ -46,37 +48,43 @@ describe('bindCircleGovernance — EventLog round-trip', () => {
       return { ok: true };   // removeMember enactor
     });
     let n = 0;
+    const cid = await mkCid();
     const gov = bindCircleGovernance({
       eventLog, callSkill, getPolicy: async () => policy, myRef: 'admin0', genId: () => `p${(n += 1)}`, now: () => 1,
+      circleIdentityFor: async () => cid,
     });
     // admin0 is the sole admin (fallback) → any-admin removeMember enacts immediately
     const r = await gov.propose({ circleId: 'c1', action: 'removeMember', subject: 'm1', actor: { ref: 'admin0' } });
     expect(r.status).toBe(DECISION_STATUS.APPROVED);
     expect(callSkill).toHaveBeenCalledWith('stoop', 'removeMember', { groupId: 'c1', memberWebid: 'm1', policy: 'graceful' });
-    // the propose + resolve entries are in the log, scoped to the circle
+    // the propose + resolve entries are in the log as SIGNED statements, scoped to the circle
     const govEntries = eventLog.query({}).filter((e) => e.type === 'governance' && e.circleId === 'c1');
-    expect(govEntries.map((e) => e.payload.event).sort()).toEqual(['propose', 'resolve']);
+    expect(govEntries.map((e) => e.payload.body.kind).sort()).toEqual(['propose', 'resolve']);
+    for (const e of govEntries) expect(e.payload.sig).toBeTruthy();
   });
 
   it('L3: an equivocating author is disputed and their votes are discounted from the tally', async () => {
     const eventLog = new EventLog({ initial: [] });
     const policy = normalizeCirclePolicy({ governance: { removeMember: 'member-vote' } });
-    // full membership: admin0 + m0 + m1 + m2 (need 3 of 4 for a majority)
+    // full membership: admin0 + m0 + m1 + m2 (need 3 of 4 for a majority). m0's roster row carries his
+    // circleAddress so his (equivocating) statements resolve their key↔ref binding on this device.
+    const m0cid = await mkCid();
     const callSkill = vi.fn(async (origin, op) => (op === 'listGroupRoster'
-      ? { members: [{ addr: 'm0', role: 'member' }, { addr: 'm1', role: 'member' }, { addr: 'm2', role: 'member' }] }
+      ? { members: [{ addr: 'm0', role: 'member', circleAddress: m0cid.pubKey }, { addr: 'm1', role: 'member' }, { addr: 'm2', role: 'member' }] }
       : { ok: true }));
     let n = 0;
-    const gov = bindCircleGovernance({ eventLog, callSkill, getPolicy: async () => policy, myRef: 'admin0', genId: () => `p${(n += 1)}`, now: () => 1 });
+    const cid = await mkCid();
+    const gov = bindCircleGovernance({ eventLog, callSkill, getPolicy: async () => policy, myRef: 'admin0', genId: () => `p${(n += 1)}`, now: () => 1, circleIdentityFor: async () => cid });
 
     // admin0 opens a removeMember vote (auto-casts its own yes → 1/4).
     const { proposalId } = await gov.propose({ circleId: 'c1', action: 'removeMember', subject: 'm2', actor: { ref: 'admin0' }, deadline: 100 });
 
-    // m0 EQUIVOCATES: two conflicting chained votes on p1 from the same (genesis) parent —
-    // "yes" to one peer, "no" to another. Injected directly (simulating cross-partition).
-    const yes = chainEvent(voteEvent({ proposalId, voter: 'm0', choice: 'yes', at: 2 }), { author: 'm0', parentHash: null });
-    const no  = chainEvent(voteEvent({ proposalId, voter: 'm0', choice: 'no',  at: 3 }), { author: 'm0', parentHash: null });
-    eventLog.appendSilentEntry({ circleId: 'c1', kind: 'governance', payload: yes });
-    eventLog.appendSilentEntry({ circleId: 'c1', kind: 'governance', payload: no });
+    // m0 EQUIVOCATES: two conflicting SIGNED votes on p1 from the same (genesis) parent — "yes" to one
+    // peer, "no" to another. Ingested through the rail gate (simulating cross-partition delivery).
+    const yes = signSpine(m0cid, { kind: 'vote', circleId: 'c1', subject: proposalId, payload: { voter: 'm0', choice: 'yes', at: 2, authorRef: 'm0' }, parent: null });
+    const no  = signSpine(m0cid, { kind: 'vote', circleId: 'c1', subject: proposalId, payload: { voter: 'm0', choice: 'no',  at: 3, authorRef: 'm0' }, parent: null });
+    expect((await gov.rail.ingest('c1', yes)).ok).toBe(true);
+    expect((await gov.rail.ingest('c1', no)).ok).toBe(true);
 
     const v = await gov.view('c1');
     // m0 is flagged disputed…
@@ -93,7 +101,8 @@ describe('bindCircleGovernance — EventLog round-trip', () => {
     const policy = normalizeCirclePolicy({ governance: { removeMember: 'member-vote' } });
     const callSkill = vi.fn(async (origin, op) => (op === 'listGroupRoster' ? { members: [{ addr: 'm1', role: 'member' }, { addr: 'm2', role: 'member' }] } : { ok: true }));
     let n = 0;
-    const gov = bindCircleGovernance({ eventLog, callSkill, getPolicy: async () => policy, myRef: 'admin0', genId: () => `p${(n += 1)}`, now: () => 1 });
+    const cid = await mkCid();
+    const gov = bindCircleGovernance({ eventLog, callSkill, getPolicy: async () => policy, myRef: 'admin0', genId: () => `p${(n += 1)}`, now: () => 1, circleIdentityFor: async () => cid });
     await gov.propose({ circleId: 'c1', action: 'removeMember', subject: 'm2', actor: { ref: 'admin0' }, deadline: 100 });
     const otherCircle = eventLog.query({}).filter((e) => e.type === 'governance' && e.circleId === 'c2');
     expect(otherCircle).toHaveLength(0);

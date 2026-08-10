@@ -132,17 +132,11 @@ describe('slice 1 adoption — governance rides the rail', () => {
     expect(notified).toHaveLength(0);
   });
 
-  it('LEGACY composition (no circleIdentityFor): the unsigned path stands unchanged', async () => {
-    const log = fakeEventLog();
-    const gov = bindCircleGovernance({
-      eventLog: log, callSkill: async () => ({ members: [] }), getPolicy: async () => ({ admins: ['webid:a'], governance: { removeMember: 'member-vote' } }),
-      myRef: 'webid:a', genId: () => 'prop-3',
-    });
-    expect(gov.rail).toBeFalsy();
-    await gov.propose({ circleId: CIRCLE, action: 'removeMember', subject: 'webid:mel', actor: { ref: 'webid:a', role: 'admin' } });
-    const stored = log.entries.filter((e) => e.type === GOVERNANCE_KIND);
-    expect(stored.length).toBeGreaterThan(0);
-    expect(stored[0].payload.sig).toBeUndefined();                 // unsigned chained event, as before
+  it('a composition WITHOUT circleIdentityFor is refused at bind — the unsigned legacy path is deleted', async () => {
+    expect(() => bindCircleGovernance({
+      eventLog: fakeEventLog(), callSkill: async () => ({ members: [] }),
+      getPolicy: async () => ({}), myRef: 'webid:a', genId: () => 'prop-3',
+    })).toThrow(/circleIdentityFor is required/);
   });
 });
 

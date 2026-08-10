@@ -16,7 +16,6 @@ import { makeGovernanceOrchestrator } from './governanceOrchestrator.js';
 import { autoEnacts } from './circlePolicy.js';
 import { foldGovernance } from './governanceLog.js';
 import { buildGovernanceView } from './governanceView.js';
-import { foldDisputes } from './governanceChain.js';
 
 /**
  * @param {object} deps
@@ -32,10 +31,13 @@ import { foldDisputes } from './governanceChain.js';
  * @param {()=>number} [deps.now]
  */
 export function makeCircleGovernance({
-  callSkill, readGovernanceEvents, appendGovernanceEvent, getPolicy, getMembers,
+  callSkill, appendGovernanceEvent, getPolicy, getMembers,
   localActorRef, setPolicy = null, rotateKey = null, newProposalId, now = () => 0,
-  readGovernanceState = null,
+  readGovernanceState,
 }) {
+  if (typeof readGovernanceState !== 'function') {
+    throw new Error('makeCircleGovernance: readGovernanceState is required (the rail\'s verified events + disputed set)');
+  }
   // Map a governed action to the REAL op. removeMember/editGroupRules are stoop skills;
   // policy + key rotation are injected seams (their routing isn't a plain callSkill op).
   async function enact(circleId, action, subject) {
@@ -47,26 +49,16 @@ export function makeCircleGovernance({
   }
 
   async function getContext(circleId) {
-    // THE RAIL: when the wiring supplies a VERIFIED state reader, the fold's input is the rail's —
-    // signature-verified, binding-resolved events + the disputed set from real fork-proofs. The legacy path
-    // (unsigned chained events + foldDisputes) stands for compositions without a circle signer.
-    if (typeof readGovernanceState === 'function') {
-      const [policy, members, state] = await Promise.all([
-        getPolicy(circleId), getMembers(circleId), readGovernanceState(circleId),
-      ]);
-      return {
-        policy, members: Array.isArray(members) ? members : [],
-        events: Array.isArray(state?.events) ? state.events : [],
-        disputed: state?.disputed instanceof Set ? state.disputed : new Set(),
-      };
-    }
-    const [policy, members, events] = await Promise.all([
-      getPolicy(circleId), getMembers(circleId), readGovernanceEvents(circleId),
+    // The fold's input is the rail's VERIFIED state: signature-verified, binding-resolved events + the
+    // disputed set from real fork-proofs. (The unsigned event path was deleted with the governance cutover.)
+    const [policy, members, state] = await Promise.all([
+      getPolicy(circleId), getMembers(circleId), readGovernanceState(circleId),
     ]);
-    const evts = Array.isArray(events) ? events : [];
-    // L3: the set of authors caught equivocating on the chained governance events.
-    const disputed = foldDisputes({ events: evts });
-    return { policy, members: Array.isArray(members) ? members : [], events: evts, disputed };
+    return {
+      policy, members: Array.isArray(members) ? members : [],
+      events: Array.isArray(state?.events) ? state.events : [],
+      disputed: state?.disputed instanceof Set ? state.disputed : new Set(),
+    };
   }
 
   // Decision A: an admin (or the appointed caretaker, who is an admin in the roster) enacts.

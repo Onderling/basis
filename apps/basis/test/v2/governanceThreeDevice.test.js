@@ -20,11 +20,11 @@ import { normalizeCirclePolicy } from '../../src/v2/circlePolicy.js';
 
 describe('3.1 — a partitioned voter converges to the same tally, without double-counting', () => {
   it('Cato is offline through the vote, then reconnects to the SAME tally the others already had', async () => {
-    const h = threeDevices();
+    const h = await threeDevices();
     h.partition('m1');                                          // Cato goes offline BEFORE the proposal
 
     const proposalId = await openProposal(h);
-    await h.devices.admin0.gov.vote({ circleId: 'c1', proposalId, voter: 'm0', choice: 'yes' });
+    await h.devices.m0.gov.vote({ circleId: 'c1', proposalId, voter: 'm0', choice: 'yes' });
 
     const tallyOf = async (ref) => {
       const v = await h.devices[ref].gov.view('c1');
@@ -35,23 +35,23 @@ describe('3.1 — a partitioned voter converges to the same tally, without doubl
     expect(await tallyOf('m0')).toEqual(annaTally);                  // Bram agrees
     expect(await tallyOf('m1')).toBeUndefined();                     // Cato saw nothing while away
 
-    h.reconnect('m1');
+    await h.reconnect('m1');
     expect(await tallyOf('m1')).toEqual(annaTally);                  // converges exactly, no drift
   });
 
   it('a vote that reached the others while Cato was away is not double-counted on reconnect', async () => {
-    const h = threeDevices();
+    const h = await threeDevices();
     const proposalId = await openProposal(h);
 
     // Bram votes while Cato is online (Cato receives it), then Cato partitions and the SAME event is
     // re-delivered on reconnect — the classic replay a hold-forward flush produces.
-    await h.devices.admin0.gov.vote({ circleId: 'c1', proposalId, voter: 'm0', choice: 'yes' });
+    await h.devices.m0.gov.vote({ circleId: 'c1', proposalId, voter: 'm0', choice: 'yes' });
     const before = await h.devices.m1.gov.view('c1');
     const beforeTally = [...before.open, ...before.closed].find((r) => r.proposalId === proposalId).tally;
 
     h.partition('m1');
-    await h.devices.admin0.gov.vote({ circleId: 'c1', proposalId, voter: 'm0', choice: 'yes' });   // duplicate
-    h.reconnect('m1');
+    await h.devices.m0.gov.vote({ circleId: 'c1', proposalId, voter: 'm0', choice: 'yes' });   // duplicate
+    await h.reconnect('m1');
 
     const after = await h.devices.m1.gov.view('c1');
     const afterTally = [...after.open, ...after.closed].find((r) => r.proposalId === proposalId).tally;
@@ -61,9 +61,9 @@ describe('3.1 — a partitioned voter converges to the same tally, without doubl
 
 describe('3.2 — a non-admin tipping vote does not enact; the admin does, exactly once', () => {
   it('Cato (non-admin) casts the deciding vote: approved everywhere, but Cato does NOT enact', async () => {
-    const h = threeDevices();
+    const h = await threeDevices();
     const proposalId = await openProposal(h);
-    await h.devices.admin0.gov.vote({ circleId: 'c1', proposalId, voter: 'm0', choice: 'yes' });   // 2/4
+    await h.devices.m0.gov.vote({ circleId: 'c1', proposalId, voter: 'm0', choice: 'yes' });   // 2/4
 
     // The tipping vote is cast ON Cato's own device by Cato.
     await h.devices.m1.gov.vote({ circleId: 'c1', proposalId, voter: 'm1', choice: 'yes' });       // 3/4 → approved
@@ -85,9 +85,9 @@ describe('3.2 — a non-admin tipping vote does not enact; the admin does, exact
   // the decision approved-but-unenacted forever. `settle()` sweeps the open proposals and enacts the ones
   // this device may enact; on a member device it is a no-op by construction.
   it('the real-world removal fires EXACTLY ONCE across all three devices (on the admin, not per voter)', async () => {
-    const h = threeDevices();
+    const h = await threeDevices();
     const proposalId = await openProposal(h);
-    await h.devices.admin0.gov.vote({ circleId: 'c1', proposalId, voter: 'm0', choice: 'yes' });
+    await h.devices.m0.gov.vote({ circleId: 'c1', proposalId, voter: 'm0', choice: 'yes' });
     await h.devices.m1.gov.vote({ circleId: 'c1', proposalId, voter: 'm1', choice: 'yes' });        // approved
 
     // Every device folds an APPROVED proposal; each also SETTLES. Only the admin may turn that into the op —
@@ -106,9 +106,9 @@ describe('3.2 — a non-admin tipping vote does not enact; the admin does, exact
   // lived only on `tally()`'s return value and was never set on a view row — so the chip was dead on web AND
   // mobile, and a member who cast the tipping vote saw "Approved" with no hint that anything was pending.
   it('the voter is TOLD they are waiting for an admin — the chip has a value to read', async () => {
-    const h = threeDevices();
+    const h = await threeDevices();
     const proposalId = await openProposal(h);
-    await h.devices.admin0.gov.vote({ circleId: 'c1', proposalId, voter: 'm0', choice: 'yes' });
+    await h.devices.m0.gov.vote({ circleId: 'c1', proposalId, voter: 'm0', choice: 'yes' });
     await h.devices.m1.gov.vote({ circleId: 'c1', proposalId, voter: 'm1', choice: 'yes' });   // approved
 
     const cato = await h.rowOn('m1', proposalId);
@@ -133,9 +133,9 @@ describe('3.2b — governanceEnactment: settle (default) vs auto', () => {
     normalizeCirclePolicy({ governance: { removeMember: 'member-vote' }, governanceEnactment: mode });
 
   it("DEFAULT 'settle': an approved decision waits — no device enacts on the tipping vote alone", async () => {
-    const h = threeDevices({ policy: withEnactment('settle') });
+    const h = await threeDevices({ policy: withEnactment('settle') });
     const proposalId = await openProposal(h);
-    await h.devices.admin0.gov.vote({ circleId: 'c1', proposalId, voter: 'm0', choice: 'yes' });
+    await h.devices.m0.gov.vote({ circleId: 'c1', proposalId, voter: 'm0', choice: 'yes' });
     await h.devices.m1.gov.vote({ circleId: 'c1', proposalId, voter: 'm1', choice: 'yes' });   // approves
 
     // Everyone can SEE it (including the admin) — but merely viewing does not enact under 'settle'.
@@ -151,9 +151,9 @@ describe('3.2b — governanceEnactment: settle (default) vs auto', () => {
   });
 
   it("'auto': the ADMIN device enacts the moment it VIEWS an approved decision — no explicit tap", async () => {
-    const h = threeDevices({ policy: withEnactment('auto') });
+    const h = await threeDevices({ policy: withEnactment('auto') });
     const proposalId = await openProposal(h);
-    await h.devices.admin0.gov.vote({ circleId: 'c1', proposalId, voter: 'm0', choice: 'yes' });
+    await h.devices.m0.gov.vote({ circleId: 'c1', proposalId, voter: 'm0', choice: 'yes' });
     await h.devices.m1.gov.vote({ circleId: 'c1', proposalId, voter: 'm1', choice: 'yes' });   // approves
 
     // A MEMBER viewing does NOT enact even under 'auto' — the mode changes the trigger, not who may act.
@@ -170,9 +170,9 @@ describe('3.2b — governanceEnactment: settle (default) vs auto', () => {
   });
 
   it("'auto' fires EXACTLY ONCE — a second admin view does not re-enact", async () => {
-    const h = threeDevices({ policy: withEnactment('auto') });
+    const h = await threeDevices({ policy: withEnactment('auto') });
     const proposalId = await openProposal(h);
-    await h.devices.admin0.gov.vote({ circleId: 'c1', proposalId, voter: 'm0', choice: 'yes' });
+    await h.devices.m0.gov.vote({ circleId: 'c1', proposalId, voter: 'm0', choice: 'yes' });
     await h.devices.m1.gov.vote({ circleId: 'c1', proposalId, voter: 'm1', choice: 'yes' });
 
     await h.devices.admin0.gov.view('c1');

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { bootRealAgentNode, connectAgentsOverBus, pairCircle, until, teardown } from '../support/pairRealAgents.js';
-import { governanceEntryId } from '../../src/v2/governanceLog.js';
+import { signSpine } from '@onderling/core';
 import { reportEntryId } from '../../src/v2/reportModel.js';
 
 // Warm the secure mesh so A can reach B: a real circle's members have already exchanged HI
@@ -24,23 +24,36 @@ async function warmMesh(A, B, groupId) {
 describe('governance/report propagation via the REAL receiver (InternalTransport)', () => {
   it('broadcastKringGovernance A -> B ingests the vote event into B\'s log', async () => {
     const A = await bootRealAgentNode('A');
-    const B = await bootRealAgentNode('B');
+    const aCidHolder = {};
+    const B = await bootRealAgentNode('B', {
+      verifyGovernanceBinding: async ({ author, ref }) => ref === A.pubKey && author === aCidHolder.pubKey,
+    });
     await connectAgentsOverBus(A, B);
     await pairCircle(A, B);
     await warmMesh(A, B, 'peer-circle');
 
     const groupId = 'peer-circle';
-    const event = { kind: 'governance', event: 'propose', proposalId: 'p-headless', action: 'removeMember', subject: 'someone', by: 'A', hash: 'h-' + Math.random().toString(36).slice(2), author: 'A', parentHash: null };
-    const r = await A.agent.callSkill('stoop', 'broadcastKringGovernance', { groupId, event, msgId: governanceEntryId(event) });
+    // The legacy-group harness records no circleAddress roster rows (that trail binding lands with the
+    // membership rider), so the repro pins the ONE genuine binding explicitly: A's ref ↔ A's real circle key.
+    aCidHolder.pubKey = (await A.agent.circleIdentityFor(groupId)).pubKey;
+    // Since the governance cutover the fan carries a SIGNED statement — signed with A's REAL per-circle
+    // identity; B's receiver rail verifies it (signature + declared kind + the roster's key↔ref binding).
+    const cid = await A.agent.circleIdentityFor(groupId);
+    const event = signSpine(cid, {
+      kind: 'propose', circleId: groupId, subject: 'p-headless',
+      payload: { action: 'removeMember', subject: 'someone', by: A.pubKey, authorRef: A.pubKey, at: 1 },
+      parent: null,
+    });
+    const r = await A.agent.callSkill('stoop', 'broadcastKringGovernance', { groupId, event, msgId: `gov:${event.body.hash}` });
     expect(r?.error, `broadcast failed: ${JSON.stringify(r)}`).toBeFalsy();
 
     const got = await until(
-      () => B.chatEvents.some((e) => e?.type === 'governance' && e?.payload?.proposalId === 'p-headless'),
+      () => B.chatEvents.some((e) => e?.type === 'governance' && e?.payload?.body?.subject === 'p-headless'),
       { timeout: 3000 },
     );
-    expect(got, 'B ingested the governance event via the REAL receiver').toBeTruthy();
+    expect(got, 'B ingested the governance statement via the REAL receiver').toBeTruthy();
     // and the stable id deduped (exactly one entry for this event)
-    const ingested = B.chatEvents.filter((e) => e?.type === 'governance' && e?.payload?.proposalId === 'p-headless');
+    const ingested = B.chatEvents.filter((e) => e?.type === 'governance' && e?.payload?.body?.subject === 'p-headless');
     expect(ingested).toHaveLength(1);
     await teardown(A, B);
   });

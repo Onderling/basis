@@ -8,8 +8,7 @@
  * plus this device's own row (listGroupRoster excludes the caller).
  */
 import { makeCircleGovernance } from './governanceHost.js';
-import { GOVERNANCE_KIND, governanceEntryId, foldGovernance } from './governanceLog.js';
-import { chainEvent, authorHead } from './governanceChain.js';
+import { GOVERNANCE_KIND, foldGovernance } from './governanceLog.js';
 import { makeCircleEntryRail } from './circleEntryRail.js';
 import { entryKindRegistryFromManifests } from '@onderling/item-store';
 import { governanceManifest, GOVERNANCE_LANE } from './governanceManifest.js';
@@ -45,11 +44,6 @@ export function makeGovernanceRail({ eventLog, circleIdentityFor, myRef, callSki
 }
 import { makeCircleReports } from './reportHost.js';
 import { REPORT_KIND, REPORT_EVENT, reportEntryId } from './reportModel.js';
-
-/** The author of a governance event — the voter (a vote) or the proposer/enactor (propose/resolve). */
-function authorOf(event) {
-  return (event && (event.voter ?? event.by)) || null;
-}
 
 /**
  * The FULL circle membership as `{ref, role}` — the roster's other members plus me.
@@ -93,47 +87,35 @@ export async function readCircleMembers({ callSkill, circleId, myRef, getPolicy 
  *   never lands on the device of the person it is about.
  */
 export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, genId, now = () => Date.now(), broadcast = null, removeReported = null, circleIdentityFor = null, setPolicy = null }) {
-  // The cutover switch: with a per-circle signer resolver, governance rides the RAIL (signed,
-  // circle-scoped, receiver-verified). Without one (legacy compositions/tests) the unsigned path stands.
+  // Governance rides the RAIL, period: signed, circle-scoped, receiver-verified. The unsigned legacy
+  // path was deleted with the cutover (one chained-statement primitive remains — signSpine); a composition
+  // without a per-circle signer is a wiring bug, surfaced here rather than as silently-unsigned governance.
   const rail = makeGovernanceRail({ eventLog, circleIdentityFor, myRef, callSkill });
+  if (!rail) throw new Error('bindCircleGovernance: circleIdentityFor is required — governance entries are signed with the per-circle key');
   const fan = (channel, circleId, event, opts = undefined) => {
     if (typeof broadcast !== 'function') return;
     try { broadcast(channel, circleId, event, opts); } catch { /* fan is best-effort — never block the local write */ }
   };
-  const readGovernanceEvents = async (circleId) => eventLog
-    .query({})
-    .filter((e) => e && e.type === GOVERNANCE_KIND && e.circleId === circleId && e.payload)
-    .map((e) => e.payload);
   // L3: hash-chain each event to its author's previous head before it lands, so equivocation
   // (two events by one author from the same parent) is detectable across replicas. A STABLE
   // entry id (from the chain hash) lets the local copy + any fanned/received copy collapse.
   const appendGovernanceEvent = async (circleId, event) => {
-    // THE RAIL: the event becomes a SIGNED chained statement — kind = the event verb, subject =
-    // the proposalId, everything else rides the signed payload. The fan carries the STATEMENT; receivers
-    // verify before it lands (kringLogReceiver + the rail's ingest). Falls to the legacy unsigned path only
-    // when no circle signer resolves (cutover safety — one path per composition).
-    if (rail) {
-      const { event: verb, proposalId, kind: _k, ...payload } = event ?? {};
-      const res = await rail.append(circleId, { kind: verb, subject: proposalId, payload });
-      if (res) { fan('governance', circleId, res.statement); return res.entry; }
-    }
-    const author = authorOf(event);
-    let payload = event;
-    if (author) {
-      const existing = await readGovernanceEvents(circleId);
-      payload = chainEvent(event, { author, parentHash: authorHead(existing, author) });
-    }
-    const entry = eventLog.appendSilentEntry({ circleId, kind: GOVERNANCE_KIND, payload, id: governanceEntryId(payload) });
-    fan('governance', circleId, payload);   // propagate to members (best-effort)
-    return entry;
+    // THE RAIL: the event becomes a SIGNED chained statement — kind = the event verb, subject = the
+    // proposalId, everything else rides the signed payload. The fan carries the STATEMENT; receivers
+    // verify before it lands (kringLogReceiver → the rail's ingest).
+    const { event: verb, proposalId, kind: _k, ...payload } = event ?? {};
+    const res = await rail.append(circleId, { kind: verb, subject: proposalId, payload });
+    if (!res) return null;   // no per-circle signer resolvable for THIS circle — nothing lands unsigned
+    fan('governance', circleId, res.statement);
+    return res.entry;
   };
   const getMembers = (circleId) => readCircleMembers({ callSkill, circleId, myRef, getPolicy });
 
   const governance = makeCircleGovernance({
-    callSkill, readGovernanceEvents, appendGovernanceEvent, getPolicy, getMembers,
+    callSkill, appendGovernanceEvent, getPolicy, getMembers,
     localActorRef: myRef, newProposalId: genId, now, setPolicy,
-    // Rail read: VERIFIED events + the disputed (equivocator) ref set — replaces the unsigned fold input.
-    readGovernanceState: rail ? ((circleId) => rail.readVerified(circleId)) : null,
+    // The fold's input: VERIFIED events + the disputed (equivocator) ref set, from the rail's read.
+    readGovernanceState: (circleId) => rail.readVerified(circleId),
   });
 
   // §8 reporting — rides the same log (kind `report`, unchained: admin records, not votes);

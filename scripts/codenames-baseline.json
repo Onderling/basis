@@ -2,8 +2,6 @@
   "sites": [
     "apps/agents/manifest.js:P-phase:P1",
     "apps/agents/test/skillExposureOps.test.js:P-phase:P1",
-    "apps/basis-mobile/App.js:P-phase:P1",
-    "apps/basis-mobile/App.js:P-phase:P1",
     "apps/basis-mobile/App.js:plan-label:S4 — ",
     "apps/basis-mobile/App.js:plan-label:S4 — ",
     "apps/basis-mobile/App.js:plan-label:S4 — ",

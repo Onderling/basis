@@ -64,35 +64,7 @@ export function retentionFromDays(days = DEFAULT_RETENTION_DAYS) {
   };
 }
 
-/** localStorage-backed store (web). */
-export function localStorageRetentionIo(storage = globalThis.localStorage) {
-  const KEY = 'cc.retentionDays';
-  return {
-    load: () => { try { return normalizeRetentionDays(storage?.getItem(KEY)); } catch { return DEFAULT_RETENTION_DAYS; } },
-    save: (days) => {
-      try {
-        const d = normalizeRetentionDays(days);
-        if (d === DEFAULT_RETENTION_DAYS) storage?.removeItem(KEY);   // no key for "I changed nothing"
-        else storage?.setItem(KEY, String(d));
-      } catch { /* ignore */ }
-    },
-  };
-}
-
-/** AsyncStorage-backed store (mobile). Same key, same defaulting. */
-export function asyncStorageRetentionIo(AsyncStorage) {
-  const KEY = 'cc.retentionDays';
-  return {
-    load: async () => {
-      try { return normalizeRetentionDays(await AsyncStorage?.getItem(KEY)); }
-      catch { return DEFAULT_RETENTION_DAYS; }
-    },
-    save: async (days) => {
-      try {
-        const d = normalizeRetentionDays(days);
-        if (d === DEFAULT_RETENTION_DAYS) await AsyncStorage?.removeItem(KEY);
-        else await AsyncStorage?.setItem(KEY, String(d));
-      } catch { /* ignore */ }
-    },
-  };
-}
+// The `localStorageRetentionIo` / `asyncStorageRetentionIo` bespoke stores (key `cc.retentionDays`) were
+// RETIRED 2026-08-10 (#36): the chat-retention window is now a registered param (`retention.chatDays`,
+// device/user), set through `callSkill('params','set-param',…)` and read via the register. `DEFAULT_RETENTION_DAYS`
+// (the `param()` above) + `normalizeRetentionDays` + `retentionFromDays` remain the shared model.

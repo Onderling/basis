@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   RETENTION_CHOICES_DAYS, DEFAULT_RETENTION_DAYS,
-  normalizeRetentionDays, retentionFromDays, daysToMs, localStorageRetentionIo,
+  normalizeRetentionDays, retentionFromDays, daysToMs,
 } from '../../src/v2/retentionPref.js';
 import { EventLog } from '../../src/eventLog.js';
 
@@ -76,23 +76,5 @@ describe('applying the choice live', () => {
   });
 });
 
-describe('persistence', () => {
-  it('the default is stored as ABSENT — no key for "I changed nothing"', () => {
-    const mem = new Map();
-    const io = localStorageRetentionIo({
-      getItem: (k) => (mem.has(k) ? mem.get(k) : null),
-      setItem: (k, v) => mem.set(k, v),
-      removeItem: (k) => mem.delete(k),
-    });
-    io.save(30);
-    expect(io.load()).toBe(30);
-    io.save(DEFAULT_RETENTION_DAYS);
-    expect(mem.size).toBe(0);
-    expect(io.load()).toBe(DEFAULT_RETENTION_DAYS);
-  });
-
-  it('a broken storage read degrades to the default', () => {
-    const io = localStorageRetentionIo({ getItem: () => { throw new Error('nope'); }, setItem: () => {}, removeItem: () => {} });
-    expect(io.load()).toBe(DEFAULT_RETENTION_DAYS);
-  });
-});
+// (persistence tests removed 2026-08-10 with `localStorageRetentionIo` — retention now persists through the
+// parameter register's set-param op; the register's own round-trip is covered by the params tests + journeys.)

@@ -279,7 +279,6 @@ export {
 } from './v2/chatFilter.js';
 export {
   RETENTION_CHOICES_DAYS, DEFAULT_RETENTION_DAYS, normalizeRetentionDays, retentionFromDays, daysToMs,
-  localStorageRetentionIo, asyncStorageRetentionIo,
 } from './v2/retentionPref.js';
 export { bindCircleAddressKeys, forgetCircleAddressKeys, circleSigningKeyOf, hasProvenCircleAddress }
                                                 from './v2/circleAddressKeys.js';

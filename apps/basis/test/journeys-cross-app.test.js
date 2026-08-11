@@ -46,14 +46,14 @@ const LOCAL_ACTOR = 'webid:local-demo-user';
  * Adapted from journeys.test.js's bootTestWorkspace so new
  * tests can share the same fixture without coupling to it.
  */
-async function bootWorkspace({ chatVault, secureAgentOpts } = {}) {
+async function bootWorkspace({ chatVault, ownerRootVault, secureAgentOpts } = {}) {
   // Forward-ref so realAgent's publishEvent (used by skill handlers
   // to fire item-changed / notification events) reaches router.deliver
   // — that's the canonical path events take in main.js.  Without
   // this hook, /nudge fires into the void + the eventLog stays empty.
   let routerRef;
   const agent = await createRealHouseholdAgent({
-    chatVault, secureAgentOpts,
+    chatVault, ownerRootVault, secureAgentOpts,
     // These journeys assert the demo experience (seeded members/tasks/posts +
     // the resolveContact demo directory), so opt into the demo scaffolding —
     // it is OFF by default now that a real circle shows only real members.
@@ -969,11 +969,14 @@ describe('CC-XA.10 — mute by webid survives a reload (cross-app)', () => {
   it('mute on first boot is observable on second boot via same vault', async () => {
     const { VaultMemory } = await import('@onderling/vault');
     const sharedChat = new VaultMemory();
-    const ws1 = await bootWorkspace({ chatVault: sharedChat });
+    // The identity root persists across the "reload" too — losing the root while keeping the
+    // chat vault is the different-person case; the at-rest layer starts such a vault clean.
+    const sharedRoot = new VaultMemory();
+    const ws1 = await bootWorkspace({ chatVault: sharedChat, ownerRootVault: sharedRoot });
     await ws1.userInput('/block webid:troublemaker');
     expect(ws1.agent.sa.mute.has('webid:troublemaker')).toBe(true);
 
-    const ws2 = await bootWorkspace({ chatVault: sharedChat });
+    const ws2 = await bootWorkspace({ chatVault: sharedChat, ownerRootVault: sharedRoot });
     expect(ws2.agent.sa.mute.has('webid:troublemaker')).toBe(true);
     const muted = await ws2.userInput('/blocked');
     expect(muted.payload.message).toMatch(/webid:troublemaker/);

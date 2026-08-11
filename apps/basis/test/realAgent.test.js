@@ -315,15 +315,19 @@ describe('createRealHouseholdAgent — OBJ-2 household no-pod sync (S1a/S1c)', (
 
   it('manually-paired peers PERSIST across a reload (same vault → re-fed on boot)', async () => {
     const chatVault = new VaultMemory();
-    const a = await createRealHouseholdAgent({ chatVault });
+    // The owner-root vault persists across the "reload" too — a device that keeps its chat vault but
+    // loses its identity root is not a reboot, it is a different person picking up the storage, and
+    // the vault-at-rest layer deliberately starts such a vault clean (the fingerprint-bound sentinel).
+    const ownerRootVault = new VaultMemory();
+    const a = await createRealHouseholdAgent({ chatVault, ownerRootVault });
     await a.addCirclePeer('peerPersisted');
     expect(a.listHouseholdPeers()).toContain('peerPersisted');
-    // "reload": a fresh agent on the SAME vault re-feeds the saved pairing on boot.
-    const a2 = await createRealHouseholdAgent({ chatVault });
+    // "reload": a fresh agent on the SAME vaults re-feeds the saved pairing on boot.
+    const a2 = await createRealHouseholdAgent({ chatVault, ownerRootVault });
     expect(a2.listHouseholdPeers()).toContain('peerPersisted');
     // remove persists too.
     await a2.removeHouseholdPeer('peerPersisted');
-    const a3 = await createRealHouseholdAgent({ chatVault });
+    const a3 = await createRealHouseholdAgent({ chatVault, ownerRootVault });
     expect(a3.listHouseholdPeers()).not.toContain('peerPersisted');
   });
 

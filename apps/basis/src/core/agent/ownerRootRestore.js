@@ -21,7 +21,8 @@
  *
  * ── What a restore IS ────────────────────────────────────────────────────────────────────────────────────
  * Exactly two writes, in this order:
- *   1. the owner root phrase — the ONE secret per install; everything else derives from it;
+ *   1. the owner root SEED into the platform key door — the ONE secret per install; everything else
+ *      derives from it. (The phrase itself is never persisted; it stays in the user's hands.)
  *   2. the default profile's chat identity, derived from that root via `deriveAgentSeed('default')`.
  *
  * Write 2 is not optional and is not merely a cache: without it a stale chat identity from a previous
@@ -29,10 +30,8 @@
  */
 
 import { Bootstrap } from '@onderling/core';
+import { VaultEncrypted, migrateVaultToEncrypted } from '@onderling/vault';
 import { loadProfile } from '@onderling/agent-registry';
-
-/** The vault key the owner root phrase lives under. One name, so the two doors cannot disagree. */
-export const OWNER_PHRASE_KEY = 'owner-phrase';
 
 /** The profile the chat identity is derived from. */
 export const DEFAULT_PROFILE = 'default';
@@ -40,18 +39,22 @@ export const DEFAULT_PROFILE = 'default';
 /**
  * Restore an identity from its recovery phrase.
  *
- * Pure orchestration over two injected vaults, so it runs identically at first-run (no agent exists yet)
+ * Pure orchestration over injected stores, so it runs identically at first-run (no agent exists yet)
  * and from inside a booted agent.
  *
  * @param {object} a
  * @param {string} a.mnemonic         the 24-word phrase, already normalised by the caller
- * @param {object} a.ownerRootVault   vault for the owner root (`cc-owner-root:`)
- * @param {object} a.chatVault        vault for the default profile's chat identity (`cc-chat-id:`)
+ * @param {object} a.rootKeyStore     the platform key door the root SEED lives behind (the phrase
+ *                                    itself is never persisted — it stays in the user's hands)
+ * @param {object} a.chatVault        the BACKING vault for the default profile's chat identity
+ *                                    (`cc-chat-id:`, unsealed) — this function seals it to the
+ *                                    restored root and writes through the sealed layer, so the
+ *                                    seed never sits in it as plaintext
  * @returns {Promise<{ok: true, pubKey: string} | {ok: false, code: string, detail?: string}>}
  */
-export async function restoreOwnerRoot({ mnemonic, ownerRootVault, chatVault } = {}) {
+export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault } = {}) {
   if (typeof mnemonic !== 'string' || !mnemonic.trim()) return { ok: false, code: 'empty' };
-  if (!ownerRootVault || !chatVault) return { ok: false, code: 'no-vault' };
+  if (!rootKeyStore || !chatVault) return { ok: false, code: 'no-vault' };
 
   let root;
   try { root = Bootstrap.fromMnemonic(mnemonic.trim()); }
@@ -59,14 +62,21 @@ export async function restoreOwnerRoot({ mnemonic, ownerRootVault, chatVault } =
 
   try {
     // 1. The root itself. Written FIRST: if step 2 fails, a boot still recovers the right identity from
-    //    the phrase, where the reverse order would leave a chat key with no root to justify it.
-    await ownerRootVault.set(OWNER_PHRASE_KEY, root.toMnemonic());
+    //    the seeded key door, where the reverse order would leave a chat key with no root to justify it.
+    await rootKeyStore.setSeed(root.secret);
     // 2. The default profile, derived — never from the mnemonic's raw entropy. That was the other half of
     //    the bug: the chat key is a CHILD of the root (`deriveAgentSeed`), not the root re-encoded. Load it
     //    through the shared profile-loader so the "derive a profile's identity into a vault" logic lives in
     //    ONE place (it also derives the per-circle addresses) — a fresh restore vault, so its unconditional
     //    seed-write is exactly right here.
-    const { identity } = await loadProfile({ ownerRoot: root, profileId: DEFAULT_PROFILE, vault: chatVault });
+    //    The write goes through the vault-at-rest layer, sealed to the RESTORED root: the fingerprint-bound
+    //    migration wipes anything the previous identity left in this vault (its sealed entries are
+    //    undecryptable to the new root by construction), and the new seed lands encrypted — the same state
+    //    the next boot's own sealing pass expects, so restore and boot cannot disagree about the format.
+    const atRestKey = root.deriveVaultAtRestKey();
+    await migrateVaultToEncrypted({ backing: chatVault, key: atRestKey, fingerprint: root.fingerprint() });
+    const sealedChat = new VaultEncrypted({ backing: chatVault, key: atRestKey });
+    const { identity } = await loadProfile({ ownerRoot: root, profileId: DEFAULT_PROFILE, vault: sealedChat });
     return { ok: true, pubKey: identity?.pubKey ?? null };
   } catch (err) {
     return { ok: false, code: 'storage', detail: err?.message ?? String(err) };

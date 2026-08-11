@@ -25,9 +25,11 @@
     "test": "vitest run",
     "test:watch": "vitest"
   },
+  "dependencies": {
+    "tweetnacl": "^1.0.3"
+  },
   "devDependencies": {
     "@onderling/core": "workspace:^",
-    "tweetnacl": "^1.0.3",
     "tweetnacl-util": "^0.15.1",
     "vitest": "^2.1.9"
   }

@@ -52,6 +52,16 @@ const SALT_LEN     = 16;
 const _AGENT_SEED_SALT = new TextEncoder().encode('onderling-agent-seed-v1');
 
 /**
+ * FIXED HKDF salt for the vault at-rest key (`deriveVaultAtRestKey`).
+ * **Permanent — never change.** The at-rest key must be reproducible from the
+ * phrase alone (the phrase is the unlock secret; nothing else is persisted),
+ * so the salt is a constant. Changing it would make every encrypted vault
+ * unreadable. Distinct from `_AGENT_SEED_SALT` so the at-rest key can never
+ * collide with any profile's agent seed, whatever labels exist.
+ */
+const _VAULT_AT_REST_SALT = new TextEncoder().encode('onderling-vault-at-rest-v1');
+
+/**
  * Root identity secret + key derivation.
  *
  * Construct via `Bootstrap.create()`, `Bootstrap.fromSeed(bytes)`, or
@@ -198,6 +208,20 @@ export class Bootstrap {
     }
     const info = new TextEncoder().encode(`${HKDF_INFO_NS}agent-seed:${label}`);
     return hkdf(sha256, this.#secret, _AGENT_SEED_SALT, info, HKDF_LEN);
+  }
+
+  /**
+   * The symmetric key that encrypts a device's vault at rest (see
+   * `VaultEncrypted` in @onderling/vault). Deterministic from the phrase alone —
+   * the phrase is the unlock secret; no copy of the key (or the phrase) is
+   * persisted. Its own fixed salt keeps it domain-separated from every agent
+   * seed, so unlocking the vault never exposes key material any identity signs with.
+   *
+   * @returns {Uint8Array} 32-byte key.
+   */
+  deriveVaultAtRestKey() {
+    const info = new TextEncoder().encode(`${HKDF_INFO_NS}vault-at-rest`);
+    return hkdf(sha256, this.#secret, _VAULT_AT_REST_SALT, info, HKDF_LEN);
   }
 
   /**

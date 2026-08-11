@@ -24,6 +24,22 @@
  */
 
 export { Vault }                from './src/Vault.js';
+export {
+  VaultEncrypted,
+  migrateVaultToEncrypted,
+  VAULT_ENC_SENTINEL_KEY,
+  VAULT_ENC_VERSION,
+} from './src/VaultEncrypted.js';
+export {
+  RootKeyStore,
+  RootKeyStoreMemory,
+  RootKeyStoreVault,
+  ROOT_SEED_VAULT_KEY,
+  assertSeed,
+  seedToString,
+  seedFromString,
+} from './src/RootKeyStore.js';
+export { RootKeyStoreWebCrypto } from './src/RootKeyStoreWebCrypto.js';
 export { VaultMemory }          from './src/VaultMemory.js';
 export { VaultLocalStorage }    from './src/VaultLocalStorage.js';
 export { VaultIndexedDB }       from './src/VaultIndexedDB.js';

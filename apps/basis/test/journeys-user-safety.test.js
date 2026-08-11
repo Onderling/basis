@@ -364,19 +364,23 @@ describe('US-6 — Rate limit caps a flooder', () => {
 describe('US-7 — Alice keeps the same pubKey + stableId after a page reload', () => {
   it('createRealHouseholdAgent twice on the same vault → same identity', async () => {
     const sharedVault = new VaultMemory();
-    const a1 = await createRealHouseholdAgent({ chatVault: sharedVault });
+    // The identity root persists across the reload too (the at-rest layer's fingerprint rule).
+    const sharedRoot = new VaultMemory();
+    const a1 = await createRealHouseholdAgent({ chatVault: sharedVault, ownerRootVault: sharedRoot });
     const pub1 = a1.identity.chat.pubKey;
     const stable1 = a1.identity.chat.stableId;
 
     // Simulate reload — factory rebuilds, vault is the same.
-    const a2 = await createRealHouseholdAgent({ chatVault: sharedVault });
+    const a2 = await createRealHouseholdAgent({ chatVault: sharedVault, ownerRootVault: sharedRoot });
     expect(a2.identity.chat.pubKey).toBe(pub1);
     expect(a2.identity.chat.stableId).toBe(stable1);
   });
 
   it('after /rotate-identity the new pubKey replaces the old + persists too', async () => {
     const sharedVault = new VaultMemory();
-    const a1 = await createRealHouseholdAgent({ chatVault: sharedVault });
+    // The identity root persists across the reload too (the at-rest layer's fingerprint rule).
+    const sharedRoot = new VaultMemory();
+    const a1 = await createRealHouseholdAgent({ chatVault: sharedVault, ownerRootVault: sharedRoot });
     const orig = a1.identity.chat.pubKey;
     const r = await a1.rotateChatIdentity();
     expect(r.oldPubKey).toBe(orig);
@@ -384,7 +388,7 @@ describe('US-7 — Alice keeps the same pubKey + stableId after a page reload', 
     const newPub = r.newPubKey;
 
     // Reload — the NEW key should be what's restored, not the old one.
-    const a2 = await createRealHouseholdAgent({ chatVault: sharedVault });
+    const a2 = await createRealHouseholdAgent({ chatVault: sharedVault, ownerRootVault: sharedRoot });
     expect(a2.identity.chat.pubKey).toBe(newPub);
   });
 });

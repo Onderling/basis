@@ -40,7 +40,7 @@ import { makeMembershipRail, makeMembershipEmitter } from '../../v2/membershipRa
 import { makeTaskRail, makeTaskEmitter, routeTaskMirror, TASK_LANE_TYPES } from '../../v2/taskRail.js'; // the content re-root — task snapshots ride the device log
 import { makeChatRail, makeChatEmitter } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
 import { paramsManifest } from '../../v2/paramsManifest.js';   // #36 — the params op contract (gates the waist branch)
-import { VaultMemory, VaultLocalStorage } from '@onderling/vault';
+import { VaultMemory, VaultLocalStorage, VaultEncrypted, migrateVaultToEncrypted } from '@onderling/vault';
 import { wireSkill } from '@onderling/sdk';
 import { createSecureMeshAgent } from '@onderling/secure-agent';
 import { createBrowserMultiCircleTasksAgent } from '@onderling-app/tasks/browser';
@@ -122,26 +122,8 @@ async function restoreOrGenerate(vault) {
   return AgentIdentity.generate(vault);
 }
 
-/**
- * Owner root (step 1 of the identity-profiles substrate — see
- * plans/NOTE-identity-profiles-and-portability.md). ONE Bootstrap secret per
- * install/account, persisted as its 24-word phrase; the default profile derives
- * from it via HKDF so one phrase recovers the (feedback) pseudonym on any device.
- * Read-or-create — never overwrites an existing phrase.
- */
-async function ensureOwnerRoot(vault) {
-  try {
-    const phrase = await vault.get('owner-phrase');
-    if (phrase && typeof phrase === 'string' && phrase.trim().length > 0) {
-      return Bootstrap.fromMnemonic(phrase);
-    }
-  } catch { /* fall through to create */ }
-  const { bootstrap, mnemonic } = Bootstrap.create();
-  await vault.set('owner-phrase', mnemonic);
-  return bootstrap;
-}
-
 import { restoreOwnerRoot } from './ownerRootRestore.js';
+import { ensureOwnerRoot, pickRootKeyStore } from './ownerRootCustody.js';
 import {
   CalendarStore, registerCalendarSkills,
 } from '@onderling-app/calendar';
@@ -291,13 +273,32 @@ export async function createRealHouseholdAgent(opts = {}) {
   // sub-agents still generate independent random seeds until step 2 migrates
   // them onto the root). The default profile (= the chat identity below, which
   // the feedback no-login pseudonym uses) derives from it.
+  // Custody: the SEED lives behind the platform key door; the phrase is never
+  // persisted. The old vault survives only as the legacy migration source —
+  // an install from before the cutover has its cleartext phrase adopted (and
+  // removed) on the first boot through here. See ownerRootCustody.js.
   const ownerRootVault = opts.ownerRootVault ?? makeBrowserVault('cc-owner-root:', { durabilityMatters: true });
-  const ownerRoot      = await ensureOwnerRoot(ownerRootVault);
+  const rootKeyStore   = opts.rootKeyStore ?? pickRootKeyStore({ fallbackVault: ownerRootVault });
+  const ownerRoot      = await ensureOwnerRoot({ rootKeyStore, legacyVault: ownerRootVault });
+
+  // Vault-at-rest: every vault holding KEY MATERIAL or capability tokens reads and writes
+  // SEALED under a key derived from the owner root (never persisted — re-derived each boot).
+  // The one-time migration seals a pre-cutover install's plaintext in place; the sentinel is
+  // bound to this root's fingerprint, so restoring a DIFFERENT phrase starts those vaults
+  // clean rather than leaving the previous person's sealed entries around undecryptable.
+  // Non-secret vaults (trust levels, audit log) deliberately stay plain — sealing them buys
+  // no secrecy and widens the failure surface of an unlock problem.
+  const atRestKey = ownerRoot.deriveVaultAtRestKey();
+  const rootFingerprint = ownerRoot.fingerprint();
+  const sealedVault = async (backing) => {
+    await migrateVaultToEncrypted({ backing, key: atRestKey, fingerprint: rootFingerprint });
+    return new VaultEncrypted({ backing, key: atRestKey });
+  };
 
   // Host agent — in-process app skills (household, tasks-v0, stoop,
   // folio, calendar).  No cross-peer; vault picks the standard browser
   // localStorage path.  Built manually because it's a pure backend.
-  const hostVault = opts.hostVault ?? makeBrowserVault('cc-host-id:');
+  const hostVault = await sealedVault(opts.hostVault ?? makeBrowserVault('cc-host-id:'));
   const hostId    = await restoreOrGenerate(hostVault);
   const hostTransport = new InternalTransport(bus, hostId.pubKey);
   const hostAgent = new Agent({ identity: hostId, transport: hostTransport });
@@ -324,13 +325,19 @@ export async function createRealHouseholdAgent(opts = {}) {
   // Default-profile chat identity: derive from the owner root. Build the vault
   // ourselves (respecting an injected opts.chatVault) so we can pre-seed it, then
   // hand it to the factory — whose restoreOrGenerate then RESTORES this seed.
-  // Only seed a FRESH vault: an existing install keeps its current identity on this
-  // boot (a clean cutover re-keys via a wipe + re-onboard, never silently here).
-  const chatVault = opts.chatVault ?? makeBrowserVault('cc-chat-id:');
+  // Only seed when no READABLE identity exists: an existing install keeps its current
+  // identity on this boot (a clean cutover re-keys via a wipe + re-onboard, never
+  // silently here). An entry that exists but cannot be read (a plaintext write that
+  // slipped past the sealed layer) is unrecoverable either way — re-deriving from the
+  // root is the one repair that keeps the person reachable at their roster addresses.
+  const chatVaultBacking = opts.chatVault ?? makeBrowserVault('cc-chat-id:');
+  const chatVault = await sealedVault(chatVaultBacking);
   // The default profile's seed — the source for both the chat identity AND per-circle addresses
   // (step 5B/C). Kept so the returned agent can expose circleAddressFor(circleId).
   const defaultProfileSeed = ownerRoot.deriveAgentSeed('default');
-  if (!(await chatVault.has('agent-privkey'))) {
+  let chatSeedReadable = false;
+  try { chatSeedReadable = (await chatVault.get('agent-privkey')) != null; } catch { /* unreadable → reseed */ }
+  if (!chatSeedReadable) {
     await AgentIdentity.fromSeed(defaultProfileSeed, chatVault);
   }
 
@@ -722,7 +729,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    *     (householdApp.listOpen) reads the whole store when `type` is absent.  The shared manifest is
    *     untouched (addItem's `type` stays required; the standalone household app is unaffected). */
   {
-    const householdId    = await restoreOrGenerate(makeBrowserVault('cc-household-agent-id:'));
+    const householdId    = await restoreOrGenerate(await sealedVault(makeBrowserVault('cc-household-agent-id:')));
     householdAgent       = new Agent({ identity: householdId, transport: new InternalTransport(bus, householdId.pubKey) });
     const hhOp = (id) => {
       const found = householdManifest.operations.find((o) => o.id === id);
@@ -816,7 +823,7 @@ export async function createRealHouseholdAgent(opts = {}) {
      * (`tokenBacked: false`, the pre-binding behaviour) — never breaks boot. */
     let agentsTokens = null;
     try {
-      const tokenVault = opts.agentsTokenVault ?? makeBrowserVault('cc-agent-tokens:');
+      const tokenVault = await sealedVault(opts.agentsTokenVault ?? makeBrowserVault('cc-agent-tokens:'));
       const tokenRegistry = new TokenRegistry(tokenVault);
       agentsTokens = {
         issue: async ({ subject, skill, expiresIn, constraints }) => {
@@ -1156,7 +1163,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // ONE implementation, shared with the first-run door (`ownerRootRestore.js`) — which used to have
       // its own, and restored nothing. The live chatAgent keeps its current identity until an app RELOAD
       // re-boots realAgent, which then finds this seed + owner root.
-      const r = await restoreOwnerRoot({ mnemonic: root.toMnemonic(), ownerRootVault, chatVault });
+      const r = await restoreOwnerRoot({ mnemonic: root.toMnemonic(), rootKeyStore, chatVault: chatVaultBacking });
       if (!r.ok) return [DataPart({ ok: false, error: r.detail ?? r.code })];
       return [DataPart({ ok: true, reloadRequired: true })];
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'restore-failed' })]; }
@@ -1237,8 +1244,8 @@ export async function createRealHouseholdAgent(opts = {}) {
    * Separate identity vault prefix so circle identity is isolated
    * from chat identity (per integration-plan decision #2).
    */
-  const tasksIdentityVault = opts.tasksIdentityVault
-    ?? makeBrowserVault('cc-tasks-id:');
+  const tasksIdentityVault = await sealedVault(opts.tasksIdentityVault
+    ?? makeBrowserVault('cc-tasks-id:'));
   // Register the chatAgent's pubKey as the local member ("admin")
   // AND keep the legacy webid:* members for demo cross-actor tests.
   // Real tasks-v0 skills use `from` (caller) to look up the actor's
@@ -1399,8 +1406,8 @@ export async function createRealHouseholdAgent(opts = {}) {
    * IndexedDBPersist via opts.persistDb keeps the local cache alive
    * across page reloads.
    */
-  const stoopIdentityVault = opts.stoopIdentityVault
-    ?? makeBrowserVault('cc-stoop-id:');
+  const stoopIdentityVault = await sealedVault(opts.stoopIdentityVault
+    ?? makeBrowserVault('cc-stoop-id:'));
   // THE MEMBERSHIP RIDER: when the shell hands the DEVICE LOG (`opts.deviceLog`), membership statements
   // ride its membership lane — signed with the per-circle key, fanned via broadcastKringMembership,
   // verified on ingest, pull-all caught-up — and the roster folds the rail's VERIFIED bodies
@@ -1614,8 +1621,8 @@ export async function createRealHouseholdAgent(opts = {}) {
    * folio writes (mobile), pass `opts.folioPodRoot` so
    * shareFolder tokens carry the real pod URI.
    */
-  const folioIdentityVault = opts.folioIdentityVault
-    ?? makeBrowserVault('cc-folio-id:');
+  const folioIdentityVault = await sealedVault(opts.folioIdentityVault
+    ?? makeBrowserVault('cc-folio-id:'));
   const folioAgent = await createBrowserFolioAgent({
     bus,
     identityVault: folioIdentityVault,

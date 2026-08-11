@@ -42,8 +42,8 @@ import { createSecureAgent }           from '@onderling/secure-agent';
  * skills needed — these tests touch /block, /blocked, /audit-tail,
  * /rotate-identity, /security-status).
  */
-async function bootSafetyWorkspace({ chatVault, secureAgentOpts } = {}) {
-  const agent = await createRealHouseholdAgent({ chatVault, secureAgentOpts });
+async function bootSafetyWorkspace({ chatVault, ownerRootVault, secureAgentOpts } = {}) {
+  const agent = await createRealHouseholdAgent({ chatVault, ownerRootVault, secureAgentOpts });
   const catalog = mergeManifests(
     [{ manifest: basisManifest }, { manifest: agent.manifest }],
     { runtime: 'browser' },
@@ -171,7 +171,9 @@ describe('Safety integration journeys', () => {
   describe('J-S5 — persistence: agent rebuild on same vaults restores state', () => {
     it('mute set + audit chain survive a fresh createRealHouseholdAgent', async () => {
       const sharedChat = new VaultMemory();
-      const ws1 = await bootSafetyWorkspace({ chatVault: sharedChat });
+      // The identity root persists across the rebuild too (the at-rest layer's fingerprint rule).
+      const sharedRoot = new VaultMemory();
+      const ws1 = await bootSafetyWorkspace({ chatVault: sharedChat, ownerRootVault: sharedRoot });
       await ws1.run('/block app.persist.test');
       await ws1.run('/rotate-identity');
       await Promise.resolve();
@@ -181,7 +183,7 @@ describe('Safety integration journeys', () => {
       expect(beforeMute).toContain('app.persist.test');
 
       // Rebuild from the same vault — simulates a page reload
-      const ws2 = await bootSafetyWorkspace({ chatVault: sharedChat });
+      const ws2 = await bootSafetyWorkspace({ chatVault: sharedChat, ownerRootVault: sharedRoot });
       expect(ws2.agent.sa.mute.list()).toEqual(beforeMute);
       expect(ws2.agent.sa.audit.size).toBe(beforeSize);
       expect(ws2.agent.sa.audit.verify()).toEqual({ ok: true });

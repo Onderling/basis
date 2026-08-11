@@ -140,8 +140,10 @@ describe('the boot path itself keeps the owner root across a restart', () => {
       expect(second.phrase).toBe(first.phrase);                      // the words you were told to write down
       expect(second.pubKey).toBe(first.pubKey);
       expect(second.addresses).toEqual(first.addresses);             // …and still reachable where the roster says
-      // The phrase really is on disk under the owner-root prefix — not merely stable within one process.
-      expect(await asyncStorage.getItem('cc-owner-root:owner-phrase')).toBe(first.phrase);
+      // Custody cutover: what is on disk under the owner-root prefix is the SEED behind the key door
+      // (here the vault-backed fallback — no secureStore passed) — the phrase itself is never at rest.
+      expect(await asyncStorage.getItem('cc-owner-root:owner-root-seed')).toBeTruthy();
+      expect(await asyncStorage.getItem('cc-owner-root:owner-phrase')).toBe(null);
     });
 });
 

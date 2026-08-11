@@ -22,6 +22,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { AgentIdentity, Bootstrap, mnemonicToSeed } from '@onderling/core';
+import { VaultEncrypted } from '@onderling/vault';
 import { VaultAsyncStorage } from '@onderling/react-native/identity/VaultAsyncStorage';
 
 import { bootAgentBundle } from '../src/core/agentBundle.js';
@@ -202,9 +203,10 @@ describe('B1 — first-run "I have a recovery phrase" restores properly (FIXED 2
       // (b) the chat key is the owner-root DEFAULT PROFILE, not the mnemonic's raw entropy. Those are
       //     different keys, and writing the second one produced an install whose identity did not match
       //     its own root.
-      const restored = await AgentIdentity.restore(
-        new VaultAsyncStorage({ prefix: 'cc-chat-id:', asyncStorage: newPhone }),
-      );
+      const restored = await AgentIdentity.restore(new VaultEncrypted({
+        backing: new VaultAsyncStorage({ prefix: 'cc-chat-id:', asyncStorage: newPhone }),
+        key: Bootstrap.fromMnemonic(phrase).deriveVaultAtRestKey(),
+      }));
       expect(restored.pubKey).not.toBe(AgentIdentity.pubKeyFromSeed(mnemonicToSeed(phrase)));
 
       // (c) the install is COHERENT: the phrase it will show is the phrase that was typed.

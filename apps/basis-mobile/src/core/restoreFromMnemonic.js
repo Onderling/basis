@@ -22,8 +22,10 @@
  * decision tree against a Map-backed mock — no RN runtime needed.
  */
 import { validateMnemonic } from '@onderling/core';
+import { RootKeyStoreVault } from '@onderling/vault';
 import { VaultAsyncStorage } from '@onderling/react-native/identity/VaultAsyncStorage';
 import { restoreOwnerRoot } from '../../../basis/src/core/agent/ownerRootRestore.js';
+import { makeSecureStoreRootKeyStore } from './secureStoreRootKeyStore.js';
 
 const REQUIRED_WORDS = 24;
 const CHAT_VAULT_PREFIX = 'cc-chat-id:';
@@ -39,7 +41,7 @@ const OWNER_ROOT_VAULT_PREFIX = 'cc-owner-root:';
  * @param {object} opts.asyncStorage          — AsyncStorage adapter
  * @returns {Promise<{ok: true} | {ok: false, code: string}>}
  */
-export async function restoreFromMnemonic({ mnemonic, asyncStorage }) {
+export async function restoreFromMnemonic({ mnemonic, asyncStorage, secureStore }) {
   const normalized = normalizeMnemonic(mnemonic);
   if (!normalized) return { ok: false, code: 'empty' };
 
@@ -57,10 +59,17 @@ export async function restoreFromMnemonic({ mnemonic, asyncStorage }) {
   // 24 words the app would show next were neither the typed ones nor the new root's. Since a reinstaller
   // has no identity yet, the working in-app wizard was unreachable and this was the ONLY door they had.
   // Now it runs the same `restoreOwnerRoot` the wizard's skill runs.
+  // Custody cutover: the root SEED goes behind the device keystore (expo-secure-store) when the
+  // caller provides it; the AsyncStorage-backed store is the DI/test fallback. Must match the key
+  // door `bootAgentBundle` consults on the next boot — a restore that seeds a different door is a
+  // restore that silently does nothing.
+  const rootKeyStore = secureStore
+    ? makeSecureStoreRootKeyStore(secureStore)
+    : new RootKeyStoreVault({ vault: new VaultAsyncStorage({ prefix: OWNER_ROOT_VAULT_PREFIX, asyncStorage }) });
   const r = await restoreOwnerRoot({
     mnemonic: normalized,
-    ownerRootVault: new VaultAsyncStorage({ prefix: OWNER_ROOT_VAULT_PREFIX, asyncStorage }),
-    chatVault:      new VaultAsyncStorage({ prefix: CHAT_VAULT_PREFIX,       asyncStorage }),
+    rootKeyStore,
+    chatVault: new VaultAsyncStorage({ prefix: CHAT_VAULT_PREFIX, asyncStorage }),
   });
   if (!r.ok) return { ok: false, code: r.code === 'invalid' ? 'invalid' : 'storage', detail: r.detail };
   return { ok: true };

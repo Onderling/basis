@@ -381,6 +381,7 @@ export default function App() {
     const result = await restoreFromMnemonic({
       mnemonic:     phrase,
       asyncStorage: AsyncStorage,
+      secureStore:  SecureStore,   // the root seed's key door — must match the boot's
     });
     if (result.ok) {
       // Mark welcome dismissed too — otherwise next launch would re-show
@@ -460,6 +461,9 @@ export default function App() {
           // identity keypair — stays stable across reboots (otherwise a
           // peer's cached peerAddr from a /share-my-contact QR breaks).
           asyncStorage: AsyncStorage,
+          // The owner-root seed's key door — the OS keystore (Android Keystore / iOS Keychain
+          // via expo-secure-store). The phrase itself is never persisted.
+          secureStore: SecureStore,
           // SILENT out-of-circle delivery — the writer thunk for the bundle's TIERED "shared with me" store
           // (received sealed copies mirror to the user's pod once signed in; local-only while null). Same
           // thunk the launcher's other tiered stores read (getCirclePodWriter → circlePodWriterRef.current).

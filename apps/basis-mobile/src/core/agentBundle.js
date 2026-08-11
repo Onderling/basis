@@ -106,6 +106,8 @@ import { discoverA2A } from '@onderling/core';
 // VaultAsyncStorage from @onderling/react-native is pure JS, accepts an
 // injected asyncStorage instance so vitest works without an RN runtime.
 import { VaultAsyncStorage } from '@onderling/react-native/identity/VaultAsyncStorage';
+import { RootKeyStoreVault } from '@onderling/vault';
+import { makeSecureStoreRootKeyStore } from './secureStoreRootKeyStore.js';
 
 async function loadCreateRealHouseholdAgent() {
   const mod = await import('../../../basis/src/core/agent/realAgent.js');
@@ -224,6 +226,15 @@ export async function bootAgentBundle(opts = {}) {
       ? new VaultAsyncStorage({ prefix: 'cc-owner-root:', asyncStorage: opts.asyncStorage })
       : undefined);
 
+  // Custody cutover: the root SEED lives behind the device keystore (expo-secure-store, passed in
+  // from App bootstrap like asyncStorage is). The AsyncStorage vault above survives as the LEGACY
+  // migration source (pre-cutover installs stored the cleartext phrase there) and as the fallback
+  // door when no keystore module is provided (tests, Expo Go without the native module).
+  const rootKeyStore = opts.rootKeyStore
+    ?? (opts.secureStore ? makeSecureStoreRootKeyStore(opts.secureStore)
+      : ownerRootVault ? new RootKeyStoreVault({ vault: ownerRootVault })
+        : undefined);
+
   // when asyncStorage is provided, also seed the stoop
   // per-agent cache adapter so stoop's web-style boot survives app
   // reloads on Hermes.  createRealHouseholdAgent threads `opts.
@@ -265,6 +276,7 @@ export async function bootAgentBundle(opts = {}) {
       chatVault,
       hostVault,
       ownerRootVault,
+      rootKeyStore,
       stoopPersistDb,
       tasksPersistDb,
       householdPersistDb,

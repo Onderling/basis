@@ -10,7 +10,9 @@ import {
   restoreFromMnemonic, normalizeMnemonic, countMnemonicWords,
   MNEMONIC_WORD_COUNT, CHAT_VAULT_KEY_PREFIX,
 } from '../src/core/restoreFromMnemonic.js';
-import { generateMnemonic } from '@onderling/core';
+import { generateMnemonic, Bootstrap } from '@onderling/core';
+import { VaultEncrypted } from '@onderling/vault';
+import { VaultAsyncStorage } from '@onderling/react-native/identity/VaultAsyncStorage';
 
 function makeStorage() {
   const map = new Map();
@@ -54,11 +56,17 @@ describe('restoreFromMnemonic', () => {
     expect(r.ok).toBe(true);
 
     // The keypair landed under cc-chat-id:agent-privkey — the same key
-    // bootAgentBundle's VaultAsyncStorage will read on next boot.
+    // bootAgentBundle's VaultAsyncStorage will read on next boot — SEALED at rest
+    // (the vault-at-rest layer): the raw value is ciphertext, never the seed envelope.
     const stored = await asyncStorage.getItem(`${CHAT_VAULT_KEY_PREFIX}agent-privkey`);
     expect(stored).toBeTruthy();
-    // The blob is a JSON envelope per AgentIdentity's _writeEntry.
-    const parsed = JSON.parse(stored);
+    expect(stored.startsWith('enc1:')).toBe(true);
+    // …and it decrypts under the key the restored root derives — the same key the boot derives.
+    const sealed = new VaultEncrypted({
+      backing: new VaultAsyncStorage({ prefix: CHAT_VAULT_KEY_PREFIX, asyncStorage }),
+      key: Bootstrap.fromMnemonic(phrase).deriveVaultAtRestKey(),
+    });
+    const parsed = JSON.parse(await sealed.get('agent-privkey'));
     expect(typeof parsed.current).toBe('string');
     expect(parsed.current.length).toBeGreaterThan(0);
   });

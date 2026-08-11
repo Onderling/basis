@@ -24,13 +24,40 @@ function majorityOf(n) { return Math.floor(n / 2) + 1; }
 
 /** Collapse a vote list to each voter's LAST vote (a member may change their mind pre-deadline). */
 function finalVotes(votes) {
-  const last = new Map();
+  // One FINAL vote per voter. The winning revote is decided by the voter's OWN statement chain
+  // (`hash`/`parentHash` — a later vote chains after the earlier one), NEVER by the writer-stamped wall
+  // clock: a skewed or back-dated clock must not resurrect an old vote, and two devices folding the same
+  // statements in different arrival orders must reach the same tally. Where two votes by one voter do not
+  // compare on the chain (an equivocation fork — the rail's disputed set discounts real equivocators
+  // upstream; here it can only be chain-less legacy events), the tiebreak is DETERMINISTIC: higher `at`,
+  // then lexicographically greater hash — the same winner on every device.
+  const byVoter = new Map();
   for (const v of Array.isArray(votes) ? votes : []) {
     if (!v || typeof v.voter !== 'string' || (v.choice !== 'yes' && v.choice !== 'no')) continue;
-    const prev = last.get(v.voter);
-    if (!prev || (v.at ?? 0) >= (prev.at ?? 0)) last.set(v.voter, v);
+    const list = byVoter.get(v.voter) ?? [];
+    list.push(v);
+    byVoter.set(v.voter, list);
   }
-  return [...last.values()];
+  const out = [];
+  for (const list of byVoter.values()) {
+    if (list.length === 1) { out.push(list[0]); continue; }
+    const byHash = new Map(list.filter((v) => typeof v.hash === 'string').map((v) => [v.hash, v]));
+    // A vote that is an ANCESTOR of another of the same voter's votes is superseded.
+    const superseded = new Set();
+    for (const v of list) {
+      let cursor = typeof v.parentHash === 'string' ? v.parentHash : null;
+      const seen = new Set();
+      while (cursor && !seen.has(cursor)) {
+        seen.add(cursor);
+        if (byHash.has(cursor)) superseded.add(cursor);
+        cursor = typeof byHash.get(cursor)?.parentHash === 'string' ? byHash.get(cursor).parentHash : null;
+      }
+    }
+    const alive = list.filter((v) => !(typeof v.hash === 'string' && superseded.has(v.hash)));
+    alive.sort((a, b) => ((b.at ?? 0) - (a.at ?? 0)) || String(b.hash ?? '').localeCompare(String(a.hash ?? '')));
+    out.push(alive[0]);
+  }
+  return out;
 }
 
 /**

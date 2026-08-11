@@ -144,7 +144,9 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
       seenByAuthorParent.set(forkKey, set);
       if (set.size > 1) disputedRefs.add(ref);                    // the self-verifying fork-proof
       const { authorRef, ...payload } = b.payload;
-      events.push({ ...payload, kind: entryKind, event: b.kind, proposalId: b.subject, hash: b.hash });
+      // `hash` + `parentHash` ride into the projection so a fold can order one AUTHOR's statements by
+      // their own chain (a revote supersedes by ancestry, never by a writer-stamped wall clock).
+      events.push({ ...payload, kind: entryKind, event: b.kind, proposalId: b.subject, hash: b.hash, parentHash: b.parentHash ?? null });
     }
     return { events, disputed: disputedRefs };
   }

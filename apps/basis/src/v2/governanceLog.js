@@ -49,24 +49,32 @@ export function foldGovernance(events, { policy, members = [], actor = null, now
   const isDisputed = disputed instanceof Set ? (ref) => disputed.has(ref) : () => false;
   const byId = new Map();
   const get = (id) => {
-    if (!byId.has(id)) byId.set(id, { proposalId: id, action: null, subject: null, by: null, deadline: null, votes: [], closed: false, closedStatus: null, closedBy: null, _proposedAt: 0 });
+    if (!byId.has(id)) byId.set(id, { proposalId: id, action: null, subject: null, by: null, deadline: null, votes: [], closed: false, closedStatus: null, closedBy: null, _proposedAt: 0, _proposeHash: null, _resolveHash: null });
     return byId.get(id);
   };
   for (const e of Array.isArray(events) ? events : []) {
     if (!e || e.kind !== GOVERNANCE_KIND || typeof e.proposalId !== 'string') continue;
     const p = get(e.proposalId);
     if (e.event === GOV_EVENT.PROPOSE) {
-      // First propose wins the proposal's identity (a re-propose of the same id is ignored).
-      if (p.action === null) {
+      // ONE propose owns the proposal's identity — chosen DETERMINISTICALLY (the lexicographically
+      // smallest statement hash), never by fold/arrival order: two devices that received competing
+      // proposes for the same id in different orders must still agree on which one stands.
+      const better = p.action === null
+        || (typeof e.hash === 'string' && String(e.hash).localeCompare(String(p._proposeHash ?? '￿')) < 0);
+      if (better) {
         p.action = e.action; p.subject = e.subject ?? null; p.by = e.by ?? null;
-        p.deadline = e.deadline ?? null; p._proposedAt = e.at ?? 0;
+        p.deadline = e.deadline ?? null; p._proposedAt = e.at ?? 0; p._proposeHash = e.hash ?? null;
       }
     } else if (e.event === GOV_EVENT.VOTE) {
       if (typeof e.voter === 'string' && (e.choice === 'yes' || e.choice === 'no') && !isDisputed(e.voter)) {
-        p.votes.push({ voter: e.voter, choice: e.choice, at: e.at ?? 0 });
+        // hash/parentHash ride along so the tally can order one voter's REVOTES by their own chain.
+        p.votes.push({ voter: e.voter, choice: e.choice, at: e.at ?? 0, hash: e.hash ?? null, parentHash: e.parentHash ?? null });
       }
     } else if (e.event === GOV_EVENT.RESOLVE) {
-      p.closed = true; p.closedStatus = e.status ?? null; p.closedBy = e.by ?? null;
+      // Competing resolves settle deterministically the same way (smallest hash wins the recorded outcome).
+      const better = !p.closed
+        || (typeof e.hash === 'string' && String(e.hash).localeCompare(String(p._resolveHash ?? '￿')) < 0);
+      if (better) { p.closed = true; p.closedStatus = e.status ?? null; p.closedBy = e.by ?? null; p._resolveHash = e.hash ?? null; }
     }
   }
 

@@ -163,12 +163,37 @@ export function makeChatRail({ eventLog, circleIdentityFor, myRef, callSkill, ve
     if (typeof msgId !== 'string' || !msgId) return { ok: false, reason: 'missing msgId' };
     const existing = findEntry(msgId);
     if (existing) {
-      const prevAuthor = existing.payload?.statement?.body?.author ?? null;
+      const prevBody = existing.payload?.statement?.body ?? null;
+      const prevAuthor = prevBody?.author ?? null;
       // The log REPLACES on id — so an id already claimed by ANOTHER author is refused outright
       // (a valid signature must not let anyone overwrite someone else's message).
       if (prevAuthor !== null && prevAuthor !== b.author) return { ok: false, reason: 'msgId claimed by another author' };
-      if (existing.payload?.statement?.body?.hash === b.hash) return { ok: true, entry: existing, existed: true };
-      // Same author, new statement on the same msgId: their own resend/edit — replace stands.
+      if (prevBody?.hash === b.hash) return { ok: true, entry: existing, existed: true };
+      // Same author, different statement on the same msgId (their resend/edit). The winner is decided by
+      // the author's OWN CHAIN, never by arrival order — the live fan and a catch-up batch deliver in
+      // different orders, and both devices must keep the same version:
+      //   • the existing statement is an ANCESTOR of the new one → the new supersedes (a real edit);
+      //   • the new one is an ancestor of the existing → a stale re-delivery, dropped as `existed`;
+      //   • incomparable (a fork off the same head) → the deterministic hash tiebreak, same everywhere.
+      if (prevBody?.hash) {
+        const chain = new Map(storedStatements(circleId).map((s) => [s.body.hash, s.body]));
+        chain.set(b.hash, b);
+        const ancestorOf = (fromHash, target) => {
+          let cursor = fromHash; const seen = new Set();
+          while (cursor && !seen.has(cursor)) {
+            if (cursor === target) return true;
+            seen.add(cursor);
+            cursor = chain.get(cursor)?.parentHash ?? null;
+          }
+          return false;
+        };
+        const newSupersedes = ancestorOf(b.parentHash ?? null, prevBody.hash);
+        const staleRedelivery = !newSupersedes && ancestorOf(prevBody.parentHash ?? null, b.hash);
+        if (staleRedelivery) return { ok: true, entry: existing, existed: true };
+        if (!newSupersedes && String(b.hash).localeCompare(String(prevBody.hash)) < 0) {
+          return { ok: true, entry: existing, existed: true };   // the fork's deterministic loser
+        }
+      }
     }
     // Derive the render entry FROM THE VERIFIED BODY — never from any unsigned wrapper around it.
     const p = b.payload;

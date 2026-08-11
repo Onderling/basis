@@ -55,7 +55,9 @@ describe('the rail — append (signed, chained, declared)', () => {
     });
     expect(fold.proposals).toHaveLength(1);
     expect(fold.proposals[0].action).toBe('changePolicy');
-    expect(fold.proposals[0].votes).toEqual([{ voter: alice.ref, choice: 'yes', at: 2 }]);
+    // votes carry the chain fields now (hash/parentHash — the revote-supersedence coordinate).
+    expect(fold.proposals[0].votes).toMatchObject([{ voter: alice.ref, choice: 'yes', at: 2 }]);
+    expect(fold.proposals[0].votes[0].hash).toBeTruthy();
   });
 
   it('the second append CHAINS on the author\'s first (parent = own head), deps stay empty solo', async () => {

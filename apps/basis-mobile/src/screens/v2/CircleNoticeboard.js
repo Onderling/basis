@@ -28,7 +28,7 @@ const INTENTS = ['ask', 'offer', 'lend'];
 // `media` — THIS circle's sealed-media composition (or null for a p0/p1 circle). Threaded from
 // CircleLauncherScreen (web parity `kringMedia`): gates the 📎 attach affordance (sealed-only —
 // hidden when null) and opens sealed full images through the per-circle gateway on tap.
-export default function CircleNoticeboard({ callSkill, onStoopEvent, onEmbedOpen, media = null, onReportPost = null }) {
+export default function CircleNoticeboard({ callSkill, onStoopEvent, onEmbedOpen, media = null, onReportPost = null, onPeerMuted = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [posts, setPosts] = useState([]);
@@ -160,10 +160,13 @@ export default function CircleNoticeboard({ callSkill, onStoopEvent, onEmbedOpen
       // in the governance Reports section), not the older reportPost item. Falls back if unwired.
       else if (action === 'report') { if (typeof onReportPost === 'function') onReportPost(post); else await callSkill('stoop', 'reportPost', { itemId: post.id }); }
       else if (action === 'markReturned') await callSkill('stoop', 'markReturned', { requestId: post.id });
-      else if (action === 'mute' && post.addedBy) await callSkill('stoop', 'mutePeer', { peerWebid: post.addedBy });
+      else if (action === 'mute' && post.addedBy) {
+        await callSkill('stoop', 'mutePeer', { peerWebid: post.addedBy });
+        try { onPeerMuted?.(); } catch { /* the chat hide-set refresh is best-effort */ }
+      }
     } catch { /* reload reflects the real state */ }
     reload();
-  }, [callSkill, reload]);
+  }, [callSkill, reload, onPeerMuted]);
 
   const submitReply = useCallback(async (post) => {
     const body = replyText.trim();

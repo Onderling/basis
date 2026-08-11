@@ -256,7 +256,7 @@ import { makeKeyEventLogSink, recipientAddrsFromRoster } from '@onderling/kring-
 // "only you" vs "whole kring" — message scope (a data property; the badge renders it).
 import { scopeForReply } from '../../src/v2/messageScope.js';
 import {
-  circleRows, chatRows,
+  circleRows, chatRows, mutedActorSet,
 } from '../../src/v2/circleStream.js';
 // profile-update propagation — the silent roster "pull-me" signal (announce on a real roster
 // write; receive → re-read the changed rows). No values on the wire, no chat bubble, no wake.
@@ -4846,6 +4846,7 @@ function showKring(id, circle, policy) {
   // G16 — the LEDEN tab's trail-roster (canonical Member via normalizeCircleMembers).
   // null = not loaded yet → the tab shows its loading state; [] = loaded empty.
   let kringRoster = null;
+  let kringMutedActors = new Set();   // the person-mute view filter's resolved actor refs (see loadRoster)
   let noticeboardPendingAttachment = null;   // { encoded, thumbnail, name } before posting
   let myWebid = null;   // fetched once, best-effort (whoAmI is a stoop skill, not chat-manifested)
   let myCircleRole = null;   // my role in THIS circle ('admin' | …), for mandate owner-visibility
@@ -4954,6 +4955,13 @@ function showKring(id, circle, policy) {
     try {
       kringRoster = normalizeCircleMembers(await rawCallSkill('stoop', 'listGroupMembers', { groupId: id }));
     } catch { kringRoster = []; }
+    // The person-mute set, resolved to actor refs against this roster — the chat projection hides these
+    // (the sitting's rule: muted messages LAND, the view filters; unmute restores). Loaded with the
+    // roster because the key→ref resolution needs it; refreshed by the mute/unmute actions.
+    try {
+      const mk = (await rawCallSkill('stoop', 'listMutedPeers', {}))?.peers ?? [];
+      kringMutedActors = mutedActorSet(mk, kringRoster);
+    } catch { /* keep the previous set — hiding is best-effort, never a crash */ }
     if (getActiveCircle() === id) {
       rerender();
       // Sender labels (batch 4) — the scherm's noticeboard block stamps from this roster at
@@ -5061,8 +5069,11 @@ function showKring(id, circle, policy) {
       } else if (action === 'markReturned') {
         await stoopCall('stoop', 'markReturned', { requestId: post.id });
       } else if (action === 'mute') {
-        // S3 #9 — mute the post's author (local-only; filters the kring stream).
-        if (post.addedBy) await rawCallSkill('stoop', 'mutePeer', { peerWebid: post.addedBy });
+        // S3 #9 — mute the post's author (local-only; hides them in the kring stream + chat).
+        if (post.addedBy) {
+          await rawCallSkill('stoop', 'mutePeer', { peerWebid: post.addedBy });
+          await loadRoster();   // re-resolve the mute set → the hide takes effect on the next paint
+        }
       } else if (action === 'assign') {
         // S3 #4 — lender assigns a borrower to a lend post.
         const borrowerWebid = (globalThis.prompt?.(t('circle.noticeboard.assign_prompt')) || '').trim();
@@ -5111,6 +5122,8 @@ function showKring(id, circle, policy) {
           circles:   circlesCache,
           circleId:  id,
           kinds,
+          // The person-mute HIDE filter (mute lands + hides; unmute restores — the sitting's rule).
+          excludeActors: kringMutedActors,
           // Sender labels through the reveal ladder (batch 4): the roster is the authority; the
           // projector stamps `senderLabel`/`senderLabelKey`, the renderer only paints. `kringRoster`
           // is null until `loadRoster()` (kicked at open) resolves — rows stay unstamped and the
@@ -6245,6 +6258,7 @@ async function showAdmin(id) {
     },
     onUnmute: async (key) => {
       try { await rawCallSkill('stoop', 'unmutePeer', key.startsWith('webid:') ? { peerWebid: key.slice(6) } : { peerStableId: key }); } catch { /* */ }
+      // (the kring view re-resolves its hide set at the next circle open — loadRoster does it)
       await load();
     },
     onRemove: async (m) => {

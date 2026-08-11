@@ -44,7 +44,7 @@ import {
   // "My things" private notes-list.
   myThingsFromListFiles,
   // kring-scoped event stream + per-row action chips.
-  chatRows, actionsForStreamRow, resolveConversationKinds,
+  chatRows, mutedActorSet, actionsForStreamRow, resolveConversationKinds,
   // recognising an inbound CHAT entry for THIS circle — the same kind + the same circle-id read the
   // conversation projection itself uses, so the refresh cannot key off something the filter ignores.
   CHAT_KIND, eventCircleId,
@@ -2386,6 +2386,7 @@ function CircleDetail({
   // for sender labels the moment it paints, not first when LEDEN is opened.
   const [mandateViewer, setMandateViewer] = useState({ viewerWebid: null, isAdmin: false });
   const [tabMembers, setTabMembers] = useState(null);
+  const [mutedActors, setMutedActors] = useState(new Set());   // the person-mute hide set (web parity)
   const rows = useMemo(() => applyChatFilter({
     rows: chatRows({
       events:    eventLog?.query ? eventLog.query({ excludeMuted: true }) : [],
@@ -2396,6 +2397,8 @@ function CircleDetail({
       // `senderLabel`/`senderLabelKey`, the view only paints. `tabMembers` is null until the
       // circle-open roster load resolves — rows stay unstamped for that window, never a wire name.
       members:   tabMembers,
+      // The person-mute HIDE filter (mute lands + hides; unmute restores — the sitting's rule).
+      excludeActors: mutedActors,
       viewerId:  mandateViewer.viewerWebid ?? null,
       policy:    policy?.revealPolicy ?? 'pairwise',
     }),
@@ -2403,7 +2406,7 @@ function CircleDetail({
     allowedKinds,
     isAgentActor,
   }), [eventLog, circles, circle?.id, allowedKinds, viewerFilter, isAgentActor, streamTick,
-    tabMembers, mandateViewer, policy]);
+    tabMembers, mutedActors, mandateViewer, policy]);
   const onChatFilter = useCallback((next) => {
     const cid = circle?.id ?? null;
     if (!cid) return;
@@ -2500,6 +2503,13 @@ function CircleDetail({
       let mem = [];
       try { mem = normalizeCircleMembers(await rawCallSkill('stoop', 'listGroupMembers', { groupId: circle.id })); } catch { /* keep empty */ }
       if (alive) setTabMembers(mem);
+      // The person-mute set, resolved to actor refs against this roster (web parity: the chat
+      // projection HIDES these — muted messages land, unmute restores). Rides the same effect because
+      // the key→ref resolution needs the roster; `membersReloadTick` refreshes both together.
+      try {
+        const mk = (await rawCallSkill('stoop', 'listMutedPeers', {}))?.peers ?? [];
+        if (alive) setMutedActors(mutedActorSet(mk, mem));
+      } catch { /* keep the previous set — hiding is best-effort */ }
     })();
     return () => { alive = false; };
   }, [circle?.id, rawCallSkill, membersReloadTick]);
@@ -3713,6 +3723,7 @@ function CircleDetail({
           // S1 #1 — the buurt noticeboard (its own composer + post list), scoped to
           // the open circle (S4 per-circle restructure — see stoopCall above).
           <CircleNoticeboard callSkill={stoopCall} onStoopEvent={onStoopEvent} media={circleMedia}
+            onPeerMuted={() => setMembersReloadTick((n) => n + 1)}
             onReportPost={onReportPost}
             onEmbedOpen={({ screen, ref }) => { if (screen) setScreenPanel({ screen, highlightRef: ref }); }} />
         ) : activeTab === 'leden' ? (

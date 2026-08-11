@@ -114,6 +114,7 @@ export function buildCircleStream({ events = [], circles = [] } = {}) {
  */
 export function projectEntries({
   events = [], circles = [], circleId = null, kindFilter = null, kinds = null, lane = null, actor = null,
+  excludeActors = null,
 } = {}) {
   const rows = buildCircleStream({ events, circles });
 
@@ -126,6 +127,14 @@ export function projectEntries({
   // The agent-trail lens (one-log step E): the SAME log, narrowed to one actor — an agent's activity
   // card is `projectEntries({ actor })`, not a second store. Exact match on the entry's stamped actor.
   if (actor != null) out = out.filter((r) => r.actor === actor);
+  // The PERSON-mute view filter (the chat-lane sitting's rule: a muted member's messages LAND on the
+  // log — refusing them at ingest would silently discard history — and are hidden HERE, at the one
+  // projection every chat surface reads; unmute restores everything). `excludeActors` is the resolved
+  // set of muted actor refs (see `mutedActorSet`). An unresolvable/absent actor is never hidden.
+  if (excludeActors && (excludeActors.size ?? excludeActors.length)) {
+    const hide = excludeActors instanceof Set ? excludeActors : new Set(excludeActors);
+    out = out.filter((r) => !(typeof r.actor === 'string' && hide.has(r.actor)));
+  }
 
   // content — lane first (the cheap structural cut), then kinds
   if (lane === 'human') out = out.filter((r) => !isSilentEntry(r.event));
@@ -152,6 +161,26 @@ export function projectEntries({
 /** Every circle, every kind — the cross-circle firehose. */
 export function allCircleRows(opts = {}) {
   return projectEntries({ ...opts, circleId: null });
+}
+
+/**
+ * Resolve the stoop mute-set's KEYS (stableId, or a webid fallback — `_resolveMuteKey`'s contract) into
+ * the ACTOR REFS the log entries carry, against the circle roster. A stableId with no roster row passes
+ * through unchanged (it simply matches nothing — deny-nothing, hide-only-what-resolves). Pure; both
+ * shells build their `excludeActors` through this so the mapping cannot drift per platform.
+ *
+ * @param {string[]} mutedKeys   `listMutedPeers().peers`
+ * @param {Array<{webid?:string, stableId?:string}>|null} members  the circle roster
+ * @returns {Set<string>}
+ */
+export function mutedActorSet(mutedKeys, members) {
+  const out = new Set();
+  for (const k of Array.isArray(mutedKeys) ? mutedKeys : []) {
+    if (typeof k !== 'string' || !k) continue;
+    const m = (Array.isArray(members) ? members : []).find((mm) => mm?.stableId === k);
+    out.add(m?.webid ?? (k.startsWith('webid:') ? k.slice(6) : k));
+  }
+  return out;
 }
 
 /** One circle (or several), any lane — the circle timeline. */

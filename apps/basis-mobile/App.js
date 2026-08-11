@@ -15,7 +15,7 @@
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { View, Pressable, Text, StyleSheet, BackHandler } from 'react-native';
+import { View, Pressable, Text, StyleSheet, BackHandler, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { asyncStorageMappingsStore, MAPPINGS_DEVICE } from './src/core/mappingsStoreRN.js';
@@ -41,7 +41,7 @@ import {
 import FirstRunWelcomeScreen from './src/screens/FirstRunWelcomeScreen.js';
 import MnemonicEntryScreen from './src/screens/MnemonicEntryScreen.js';
 import MnemonicCreateScreen from './src/screens/MnemonicCreateScreen.js';
-import { initLocalisation, subscribeLang } from './src/core/localisation.js';
+import { initLocalisation, subscribeLang, t } from './src/core/localisation.js';
 import { bootAgentBundle } from './src/core/agentBundle.js';
 import {
   shouldShowFirstRunWelcome, markWelcomeDismissed,
@@ -464,6 +464,47 @@ export default function App() {
           // The owner-root seed's key door — the OS keystore (Android Keystore / iOS Keychain
           // via expo-secure-store). The phrase itself is never persisted.
           secureStore: SecureStore,
+          // #44 — the restore choices (web parity; the logic lives in the boot gate, these paint).
+          // Coarse: the pod's settings are sealed under another key — three choices, local is default.
+          onSettingsKeyMismatch: ({ overwrite } = {}) => {
+            Alert.alert(
+              t('circle.settings_restore.mismatch_title'),
+              t('circle.settings_restore.mismatch_body'),
+              [
+                { text: t('circle.settings_restore.choice_local'), style: 'cancel' },
+                { text: t('circle.settings_restore.choice_phrase'), onPress: () => setFirstRun('restore') },
+                {
+                  text: t('circle.settings_restore.choice_overwrite'),
+                  style: 'destructive',
+                  onPress: () => Alert.alert(
+                    t('circle.settings_restore.choice_overwrite'),
+                    t('circle.settings_restore.overwrite_warning'),
+                    [
+                      { text: t('circle.settings_restore.choice_local'), style: 'cancel' },
+                      { text: t('circle.settings_restore.choice_overwrite'), style: 'destructive', onPress: () => { overwrite?.().catch(() => {}); } },
+                    ],
+                  ),
+                },
+              ],
+            );
+          },
+          // Per-param merge: one Alert per differing setting (realistically a handful) — cancel keeps
+          // this device's value (which already stands), the action adopts the pod's.
+          onSettingsConflicts: ({ conflicts = [], keepTheirs } = {}) => {
+            const next = (i) => {
+              if (i >= conflicts.length) return;
+              const c = conflicts[i];
+              Alert.alert(
+                t('circle.settings_restore.conflicts_title'),
+                `${c.key}: ${JSON.stringify(c.mine)} ↔ ${JSON.stringify(c.theirs)}`,
+                [
+                  { text: t('circle.settings_restore.done'), style: 'cancel', onPress: () => next(i + 1) },
+                  { text: t('circle.settings_restore.keep_theirs'), onPress: () => { keepTheirs?.(c.key).catch(() => {}); next(i + 1); } },
+                ],
+              );
+            };
+            next(0);
+          },
           // SILENT out-of-circle delivery — the writer thunk for the bundle's TIERED "shared with me" store
           // (received sealed copies mirror to the user's pod once signed in; local-only while null). Same
           // thunk the launcher's other tiered stores read (getCirclePodWriter → circlePodWriterRef.current).

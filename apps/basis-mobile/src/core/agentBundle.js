@@ -295,6 +295,10 @@ export async function bootAgentBundle(opts = {}) {
       // Settings pod-sync inner (RN parity): realAgent attaches this self-sealed pod medium to the parameter
       // register's settings store on sign-in. App.js passes circlePods' fetch/root; absent → local-only.
       provisionSettingsMedium: opts.provisionSettingsMedium,
+      // #44 — the restore choices (web parity): the coarse mismatch dialog + the per-param
+      // merge list ride the same two realAgent seams; the App shell paints them with Alerts.
+      onSettingsKeyMismatch: opts.onSettingsKeyMismatch,
+      onSettingsConflicts: opts.onSettingsConflicts,
       // The membership rider: the device log (the shells' EventLog) — membership statements ride its lane.
       deviceLog: opts.deviceLog,
       secureAgentOpts:  opts.secureAgentOpts,

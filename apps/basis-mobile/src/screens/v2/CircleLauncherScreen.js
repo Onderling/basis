@@ -245,6 +245,7 @@ import CircleNoticeboard from './CircleNoticeboard.js';
 import CircleListsScreen from './CircleListsScreen.js';   // composable lists (web≡mobile)
 import CircleShareScreen from './CircleShareScreen.js';   // objective L — cross-circle share UI (web≡mobile)
 import CircleProfileScreen from './CircleProfileScreen.js';
+import CircleAdvancedScreen from './CircleAdvancedScreen.js';
 import CircleAdminPanelScreen from './CircleAdminPanelScreen.js';
 import CircleMyDataScreen from './CircleMyDataScreen.js';
 import { resolveMobileRelayUrl } from '../../core/agentBundle.js';
@@ -1342,6 +1343,7 @@ export default function CircleLauncherScreen({
       if (view === 'hop') { setView('availability'); return true; }
       // S2/S5 — Mij sub-views.
       if (view === 'mydata') { setView('profile'); return true; }
+      if (view === 'advanced') { setView('profile'); return true; }
       // S3 — admin panel is a sub-view of the circle detail.
       if (selected && view === 'admin') { setView('detail'); return true; }
       if (selected && view === 'governance') { setView('detail'); return true; }
@@ -1464,7 +1466,16 @@ export default function CircleLauncherScreen({
   if (view === 'profile') {
     return (
       <WithTabBar active="mij" onSelect={onTab}>
-        <CircleProfileScreen callSkill={bundle?.callSkill} onAvailability={() => setView('availability')} onMyData={() => setView('mydata')} onSharedWithMe={() => setView('sharedWithMe')} />
+        <CircleProfileScreen callSkill={bundle?.callSkill} onAvailability={() => setView('availability')} onMyData={() => setView('mydata')} onSharedWithMe={() => setView('sharedWithMe')} onAdvanced={() => setView('advanced')} />
+      </WithTabBar>
+    );
+  }
+  // The ADVANCED surface — sub-view of Mij (web parity: showAdvanced). Every surface-less
+  // op + the settable params, from the shared projections; back returns to profile.
+  if (view === 'advanced') {
+    return (
+      <WithTabBar active="mij" onSelect={onTab}>
+        <CircleAdvancedScreen manifestsByOrigin={buildManifestsByOrigin()} callSkill={bundle?.callSkill} />
       </WithTabBar>
     );
   }

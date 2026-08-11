@@ -366,7 +366,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // a2aTls, rateLimit, usePerfectFwdSec, webidClaim, helloGate, …
     //
     // ⚠ `rateLimit` is deliberately NOT enabled by default, and the reason is worth keeping (2026-07-30).
-    // It DROPS over-quota envelopes, and catch-up replay is a legitimate burst: `catchUpProvider` fetches
+    // It DROPS over-quota envelopes, and catch-up replay is a legitimate burst: a replay serve fetches
     // up to 1000 items, while the limiter's per-peer bucket is burst 30 / refill 5-per-second. Turning it
     // on at the default tuning would silently discard most of a catch-up — message loss on reconnect,
     // which is worse than the flood it defends against.
@@ -1526,12 +1526,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     // circle's per-circle StorageBackend + its live group-key {seal,open}). All keyed by circleId so the
     // ONE stoop agent resolves each circle's member-side custody per call (invariant #6):
     //   • circleDataMove(circleId)          → the send-path data-move branch (policy.pod).
-    //   • podWrite(circleId, envelope)      → seal+write a chat row, return its opaque pod ref (pod-signal fan).
-    //   • podReadSince(circleId, {sinceTs}) → range-query + open the shared pod (getMessagesSince catch-up merge).
-    // Absent (opt not supplied) → the pre-Phase-3 behaviour, unchanged: fan-out-full / local-mirror reads.
+    //   • podWrite(circleId, envelope)      → seal+write a chat statement row, return its opaque pod ref
+    //     (the pod-signal fan / pod-only carry). The READ side lives with the shells now (the pod chat
+    //     catch-up range-reads + verifies at the rail) — stoop no longer reads the chat pod.
+    // Absent (opt not supplied) → fan-out-full, unchanged.
     circleDataMove: opts.stoopCircleDataMove,
     podWrite:       opts.stoopPodWrite,
-    podReadSince:   opts.stoopPodReadSince,
     // The per-user address-fallback setting reaches the FAN too, not only `reliableSend` below.
     // The two enforce different halves of the same choice: the fan decides WHICH address a member
     // is reached at, `reliableSend` decides which transports may carry it. Until now only the

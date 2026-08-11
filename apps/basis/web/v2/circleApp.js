@@ -294,10 +294,8 @@ import { migrateKringChatHistory, CHAT_MIGRATION_MARKER_KEY } from '../../src/v2
 import { createChatMessageInbox } from '../../src/v2/chatMessageInbox.js';
 import { createSelfAuthorCheck } from '../../src/v2/chatSelfAuthor.js';
 // ε.4 — negotiated catch-up protocol substrate.
-import { makeCatchUpProviderHandler } from '../../src/v2/catchUpProvider.js';
-import { makeCatchUpReceiver }        from '../../src/v2/catchUpReceiver.js';
 import {
-  makeRequestCatchUpFromKnownPeers, makeHandleCatchUpRequest,
+  makeRequestCatchUpFromKnownPeers,
 } from '../../src/core/handlers/catchUp.js';
 // γ-next.recipe — receiver + pending-cache substrate for the recipe broadcast.
 import { makeKringRecipePeerHandler } from '../../src/v2/kringRecipeReceiver.js';
@@ -683,7 +681,6 @@ import { renderCircleScreen } from './circleScreen.js';
 import { renderRecipeEditor } from './circleRecipeEditor.js';
 // ε.6 — multi-offer catch-up chooser modal (opt-in via
 // policy.catchUpChooserMode === 'prompt').
-import { renderCatchUpChooser } from './catchUpChooserModal.js';
 import { renderScreensPicker } from './circleScreensPicker.js';
 import { computeAdvice, makeTooBusyEvent } from '../../src/v2/circleAdvisor.js';
 import { normalizeHopMode } from '@onderling/kring-host/circleHop';
@@ -1160,147 +1157,6 @@ const applyIncomingReceipt = makeReceiptReceiver({
     return Array.isArray(r?.members) ? r.members : [];
   },
 });
-
-// ε.5 — "Catching up…" indicator state + notification banner.
-// Status is the latest snapshot fed by the negotiated catch-up
-// receiver's `emitStatus` hook.  Notifications surface inbound
-// `catch-up-request` envelopes for kringen with
-// `policy.catchUpAutoApprove === false` so the host (= provider)
-// gets a [Send all / Last 50 / Last 7 days / Decline] card.
-let _catchUpStatus = null;          // null | {phase, circleId, count?, total?}
-let _catchUpNotifications = [];     // array of pending provider-side cards
-let _catchUpHideTimer = null;
-
-function emitCatchUpStatus(status) {
-  _catchUpStatus = status;
-  if (_catchUpHideTimer) { clearTimeout(_catchUpHideTimer); _catchUpHideTimer = null; }
-  if (status?.phase === 'done' || status?.phase === 'no-offers' || status?.phase === 'timed-out') {
-    _catchUpHideTimer = setTimeout(() => { _catchUpStatus = null; renderCatchUpIndicator(); }, 1500);
-  }
-  // Mirror to /logs so users can debug.
-  try {
-    eventLog.append({
-      id: `catchup-status-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      ts: Date.now(),
-      app: 'basis',
-      type: 'notification',
-      payload: { message: `[catch-up] ${status?.phase ?? '?'}` },
-    });
-  } catch { /* defensive */ }
-  renderCatchUpIndicator();
-}
-
-function renderCatchUpIndicator() {
-  if (typeof document === 'undefined') return;
-  let el = document.getElementById('catch-up-indicator');
-  if (!_catchUpStatus) {
-    if (el) el.remove();
-    return;
-  }
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'catch-up-indicator';
-    el.setAttribute('role', 'status');
-    el.style.cssText = [
-      'position:fixed', 'top:8px', 'right:8px', 'z-index:1000',
-      'background:rgba(0,0,0,0.78)', 'color:#fff', 'padding:6px 10px', // hex-ok: fixed dark overlay
-      'border-radius:12px', 'font-size:12px', 'font-family:system-ui,sans-serif',
-      'box-shadow:0 2px 6px rgba(0,0,0,0.2)',
-    ].join(';');
-    document.body.appendChild(el);
-  }
-  const s = _catchUpStatus;
-  let label;
-  if (s.phase === 'streaming' && Number.isFinite(s.total) && s.total > 0) {
-    label = t('circle.chat.catch_up.streaming_progress', { count: s.count ?? 0, total: s.total });
-  } else if (s.phase === 'done') {
-    label = t('circle.chat.catch_up.done');
-  } else if (s.phase === 'no-offers') {
-    label = t('circle.chat.catch_up.no_offers');
-  } else {
-    label = t('circle.chat.catch_up.requesting');
-  }
-  el.textContent = label;
-}
-
-function emitCatchUpNotification(n, providerHandle) {
-  _catchUpNotifications.push({ n, provider: providerHandle });
-  try {
-    eventLog.append({
-      id: `catchup-req-${n.requestId}`,
-      ts: Date.now(),
-      app: 'basis',
-      type: 'notification',
-      payload: {
-        message: t('circle.chat.catch_up.provider_request_title', {
-          name: n.fromPeerAddr.slice(0, 12), kring: n.groupId,
-        }) + ' · ' + t('circle.chat.catch_up.provider_request_size', {
-          count: n.count, kb: Math.round(n.sizeBytes / 1024) || 1,
-        }),
-      },
-    });
-  } catch { /* defensive */ }
-  renderCatchUpNotifications();
-}
-
-function renderCatchUpNotifications() {
-  if (typeof document === 'undefined') return;
-  let host = document.getElementById('catch-up-notifications');
-  if (_catchUpNotifications.length === 0) {
-    if (host) host.remove();
-    return;
-  }
-  if (!host) {
-    host = document.createElement('div');
-    host.id = 'catch-up-notifications';
-    host.style.cssText = [
-      'position:fixed', 'bottom:8px', 'right:8px', 'z-index:1001',
-      'display:flex', 'flex-direction:column', 'gap:6px',
-      'max-width:340px', 'font-family:system-ui,sans-serif',
-    ].join(';');
-    document.body.appendChild(host);
-  }
-  host.innerHTML = '';
-  for (const { n, provider } of _catchUpNotifications) {
-    const card = document.createElement('div');
-    card.style.cssText = [
-      'background:var(--card)', 'border:1px solid var(--line)', 'border-radius:8px',
-      'padding:10px', 'box-shadow:0 2px 6px rgba(0,0,0,0.18)', 'font-size:13px',
-    ].join(';');
-    const title = document.createElement('div');
-    title.style.fontWeight = '600';
-    title.textContent = t('circle.chat.catch_up.provider_request_title', {
-      name: n.fromPeerAddr.slice(0, 12), kring: n.groupId,
-    });
-    const size = document.createElement('div');
-    size.style.color = 'var(--ink-soft)';
-    size.style.margin = '4px 0 8px';
-    size.textContent = t('circle.chat.catch_up.provider_request_size', {
-      count: n.count, kb: Math.round(n.sizeBytes / 1024) || 1,
-    });
-    const btnRow = document.createElement('div');
-    btnRow.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;';
-    const mkBtn = (label, mode) => {
-      const b = document.createElement('button');
-      b.textContent = label;
-      b.style.cssText = 'padding:4px 10px;border-radius:6px;border:1px solid var(--line);background:var(--paper-2);cursor:pointer;font-size:12px;';
-      b.addEventListener('click', () => {
-        provider.resolveCatchUpRequest({ requestId: n.requestId, mode }).catch(() => {});
-        _catchUpNotifications = _catchUpNotifications.filter((x) => x.n.requestId !== n.requestId);
-        renderCatchUpNotifications();
-      });
-      return b;
-    };
-    btnRow.appendChild(mkBtn(t('circle.chat.catch_up.provider_send_all'),       'all'));
-    btnRow.appendChild(mkBtn(t('circle.chat.catch_up.provider_send_last_50'),   'last-50'));
-    btnRow.appendChild(mkBtn(t('circle.chat.catch_up.provider_send_last_7d'),   'last-7-days'));
-    btnRow.appendChild(mkBtn(t('circle.chat.catch_up.provider_decline'),         null));
-    card.appendChild(title);
-    card.appendChild(size);
-    card.appendChild(btnRow);
-    host.appendChild(card);
-  }
-}
 
 let rootEl = null;
 let tabBarEl = null;
@@ -6770,7 +6626,6 @@ async function boot() {
       // (pod-signal), and catch-up range-queries→opens it; a no-pod circle keeps fan-out-full unchanged.
       stoopCircleDataMove: circleSendDataMove,
       stoopPodWrite:       circlePodWrite,
-      stoopPodReadSince:   circlePodReadSince,
       // Cache-mode mirroring: provision a pod-backed circle's store MEDIUM (a cache-mode PseudoPod that
       // seals→write-throughs to the circle's pod, "pod is truth, local cache is reality"). realAgent calls
       // this once per circle at circle-open, BEFORE the store is built. A no-pod circle → null → the shared
@@ -7061,73 +6916,10 @@ async function boot() {
         dedup:        kringPolicyDedup,
         logger:       console,
       });
-      // ε.4 — negotiated catch-up protocol.  The receiver coordinator
-      // fires `catch-up-request` to known peers, collects offers in a
-      // 3s window, auto-accepts the first, and ingests chunks through
-      // the SAME kringChatInbox the receiver/rehydrator use (shared
-      // LRU + ingest mirror = no double bubbles).  The provider
-      // handler answers inbound requests: fetches via getMessagesSince,
-      // sends an offer, then streams chunks on accept.
-      //
-      // Status emitter is wired to the chat-shell indicator below
-      // (ε.5).  Provider notification is V1 auto-approve (no UI yet);
-      // policy.catchUpAutoApprove=false opt-out path surfaces a
-      // banner through emitCatchUpNotification (also ε.5).
       const sendToPeerForCU = (addr, env) =>
         (typeof agent?.sendPeerMessage === 'function')
           ? agent.sendPeerMessage(addr, env)
           : Promise.reject(new Error('agent.sendPeerMessage unavailable'));
-
-      const catchUpReceiver = makeCatchUpReceiver({
-        sendToPeer: sendToPeerForCU,
-        inbox:      kringChatInbox,
-        emitStatus: (status) => emitCatchUpStatus(status),
-        // ε.6 — opt-in multi-offer chooser.  Reads
-        // `policy.catchUpChooserMode` synchronously from localStorage
-        // (where `localStoragePolicyIo` writes its JSON).  The async
-        // policyStore.get() would need to be awaited inside a non-async
-        // hook signature; reading localStorage directly is cheap and
-        // matches the same source-of-truth the store reads.
-        getChooserMode: (groupId) => {
-          try {
-            const raw = (typeof window !== 'undefined' && window.localStorage)
-              ? window.localStorage.getItem(`cc.circlePolicy.${groupId}`)
-              : null;
-            if (!raw) return 'auto';
-            const parsed = JSON.parse(raw);
-            return parsed?.catchUpChooserMode === 'prompt' ? 'prompt' : 'auto';
-          } catch { return 'auto'; }
-        },
-        chooseOffer: (offers, { circleId }) => new Promise((resolve) => {
-          const circle = circlesCache.find((c) => c.id === circleId);
-          const overlay = document.createElement('div');
-          document.body.appendChild(overlay);
-          renderCatchUpChooser(overlay, {
-            offers,
-            circleId,
-            circleName: circle?.name ?? circleId,
-            // V1 contact-resolver: short-addr fallback is fine here —
-            // member-directory resolution lands in a follow-up slice.
-            resolveContact: null,
-            t,
-            onResolve: (decision) => {
-              try { overlay.remove(); } catch { /* defensive */ }
-              resolve(decision);
-            },
-          });
-        }),
-        logger:     console,
-      });
-      const catchUpProvider = makeCatchUpProviderHandler({
-        callSkill:        agent.callSkill,
-        sendToPeer:       sendToPeerForCU,
-        getCirclePolicy:  async (groupId) => policyStore.get(groupId).catch(() => null),
-        // V1: every member of a kring is "known"; provider notification
-        // surfaces only when policy.catchUpAutoApprove === false.
-        isKnownContact:   () => true,
-        emitNotification: (n) => emitCatchUpNotification(n, catchUpProvider),
-        logger:           console,
-      });
 
       const peerMessageRouter = makePeerRouter({
         handlers: {
@@ -7162,12 +6954,6 @@ async function boot() {
           } : {}),
           'kring-governance-broadcast': makeKringGovernancePeerHandler({ eventLog, rail: govShellRail, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); }, notify: govNotify }),
           'kring-report-broadcast':     makeKringReportPeerHandler({ eventLog, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); } }),
-          // ε.4 — negotiated catch-up subtypes.
-          'catch-up-request':        catchUpProvider.handler,
-          'catch-up-accept':         catchUpProvider.onAccept,
-          'catch-up-offer':          catchUpReceiver.onPeerMessage,
-          'catch-up-chunk':          catchUpReceiver.onPeerMessage,
-          'catch-up-end':            catchUpReceiver.onPeerMessage,
           // Calendar INBOUND — receive what the fan-out sends. invite persists
           // the event locally (→ shows on the calendar surface) + a kring
           // heads-up; rsvp/cancel apply to local calendar state. (A richer
@@ -7249,37 +7035,13 @@ async function boot() {
       _peerAgent = agent; _peerRouter = peerMessageRouter;   // for applyRelayUrl (live relay reconnect)
       tryConnectPeerTransport(agent, peerMessageRouter).catch(() => { /* logged inside */ });
 
-      // ε.4 — auto-fire negotiated catch-up on (re)connect, ONCE per
-      // boot.  For each kring we know about, schedule via the strategy
-      // router: pod-shared kringen route through the pod range-query;
-      // personal/none kringen route through `catchUpReceiver` (the
-      // negotiated path).  knownPeers come from stoop's roster.
-      const peerCatchUpNegotiated = async ({ circleId, sinceTs }) => {
-        let roster = [];
-        try {
-          const r = await agent.callSkill('stoop', 'listGroupRoster', { groupId: circleId });
-          roster = Array.isArray(r?.members) ? r.members : [];
-        } catch { /* roster empty */ }
-        const knownPeers = roster.map((m) => m?.addr).filter(Boolean);
-        return catchUpReceiver.requestCatchUp({
-          circleId,
-          sinceTs:    Number.isFinite(sinceTs) ? sinceTs : 0,
-          knownPeers,
-          fromPeerAddr: agent?.peer?.address ?? '',
-        });
-      };
-      // The kick-off itself is scheduled once peer transport reports
-      // 'connected'.  We don't await — failures log + the next boot
-      // re-tries.  Reuse the existing makeRequestCatchUpFromKnownPeers
-      // dispatcher so the per-kring scheduleCatchUp routing stays in
-      // one place.
+      // The buurt-POST catch-up (a stoop noticeboard concern, untouched by the chat re-root): on
+      // reconnect, poll each circle's peers for posts after the hi-water mark. Chat/tasks/governance/
+      // membership all ride their lanes' own catch-ups below.
       const requestCatchUpAll = makeRequestCatchUpFromKnownPeers({
-        callSkill:             agent.callSkill,
-        sendPeer:              sendToPeerForCU,
-        inbox:                 kringChatInbox,
-        getCirclePolicy:       (id) => policyStore.get(id).catch(() => null),
-        peerCatchUpNegotiated,
-        logger:                console,
+        callSkill: agent.callSkill,
+        sendPeer:  sendToPeerForCU,
+        logger:    console,
       });
       // OBJ-2 S1c-shell — feed the household no-pod sync roster from a circle's
       // MEMBERS (the stoop group roster = people with reachable peer addrs), NOT

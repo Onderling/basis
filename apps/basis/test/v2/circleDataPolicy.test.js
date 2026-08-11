@@ -23,7 +23,6 @@ import {
 } from '../../src/v2/circleDataPolicy.js';
 import { PSEUDO_POD_MODES } from '@onderling/pseudo-pod';
 import { CIRCLE_POLICY_ENUMS } from '../../src/v2/circlePolicy.js';
-import { pickCatchUpStrategy } from '../../src/v2/catchUpStrategy.js';
 
 describe('circleDataPolicy — the one vocabulary', () => {
   it('sources the canonical values from circlePolicy (no drift)', () => {
@@ -120,27 +119,6 @@ describe('back-compat — legacy pod + PseudoPod mode values still map', () => {
       expect(r.dataMove).toBe('fan-out-full');
       expect(r.storeMode).toBe('standalone');
       expect(r.hasPod).toBe(false);
-    }
-  });
-});
-
-describe('the catch-up router now reads the one mapping (behaviour-identical)', () => {
-  // These are exactly the cases the prior hard-coded switch asserted — proving
-  // routing pickCatchUpStrategy through the shared resolver did not change it.
-  it('matches the prior pod-axis → strategy switch', () => {
-    expect(pickCatchUpStrategy({ pod: 'shared' })).toBe('pod');
-    expect(pickCatchUpStrategy({ pod: 'personal' })).toBe('peer');
-    expect(pickCatchUpStrategy({ pod: 'hybrid' })).toBe('hybrid');
-    expect(pickCatchUpStrategy({ pod: 'none' })).toBe('peer');
-    expect(pickCatchUpStrategy({ pod: 'someFutureAxis' })).toBe('peer');
-    expect(pickCatchUpStrategy({})).toBe('peer');
-    expect(pickCatchUpStrategy(null)).toBe('peer');
-    expect(pickCatchUpStrategy(undefined)).toBe('peer');
-  });
-
-  it('agrees with circleCatchUpStrategy for every canonical value', () => {
-    for (const pod of CIRCLE_DATA_POLICIES) {
-      expect(pickCatchUpStrategy({ pod })).toBe(circleCatchUpStrategy({ pod }));
     }
   });
 });

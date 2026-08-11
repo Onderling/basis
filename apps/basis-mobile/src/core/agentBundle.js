@@ -276,7 +276,6 @@ export async function bootAgentBundle(opts = {}) {
       // local-mirror reads. App.js passes circlePods' lazy wrappers; absent → the pre-Phase-3 behaviour.
       stoopCircleDataMove: opts.stoopCircleDataMove,
       stoopPodWrite:       opts.stoopPodWrite,
-      stoopPodReadSince:   opts.stoopPodReadSince,
       // Cache-mode mirroring (RN parity with web circleApp): provision a pod-backed circle's store MEDIUM
       // (a cache-mode PseudoPod sealing→write-throughing to the pod). App.js passes circlePods'
       // `provisionCircleMedium`; absent → no cache media → shared local backing, unchanged.

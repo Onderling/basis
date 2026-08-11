@@ -72,7 +72,7 @@ export function createCirclePodCustody({ ensureCirclePod, policyFor, sealStrateg
     return { ref };
   }
 
-  /** Range-query + open the circle's shared-pod rows since a ts (the getMessagesSince catch-up merge). */
+  /** Range-query + open the circle's shared-pod rows since a ts (the pod chat catch-up's reader). */
   async function circlePodReadSince(circleId, q) {
     const c = await resolveCirclePodCustody(circleId);
     if (!c || (c.sealed && !c.strategy)) return { items: [] };       // no pod / can't open → fall back to the local mirror

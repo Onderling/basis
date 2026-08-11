@@ -209,7 +209,6 @@ export async function createNeighborhoodAgent({
    * the local mirror deduped by msgId. Absent (no-pod circle) → local-mirror
    * behaviour, unchanged.
    */
-  podReadSince,
   /**
    * The per-USER address-fallback setting (2026-07-28), threaded down to the circle FAN so the
    * setting reaches the place that picks an address. `false` = "rather undeliverable than routed
@@ -513,7 +512,6 @@ export async function createNeighborhoodAgent({
     reliableSend: (typeof reliableSend === 'function') ? reliableSend : null,  // host-injected hold-forward sender (kring chat fan-out)
     circleDataMove: (typeof circleDataMove === 'function') ? circleDataMove : null,  // Phase 2 G1/G2 — host-injected data-move resolver (absent → fan-out-full)
     podWrite:       (typeof podWrite       === 'function') ? podWrite       : null,  // Phase 3 seam — real shared-pod writer (absent → pod-signal/pod-only degrade)
-    podReadSince:   (typeof podReadSince   === 'function') ? podReadSince   : null,  // Phase 3 seam — real shared-pod reader (absent → getMessagesSince = local mirror)
     metrics,
     oidcSession: null,
     pushRegistry,                   // Phase 21 — Web-Push subscriptions per webid

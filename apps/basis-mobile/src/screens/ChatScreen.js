@@ -68,6 +68,7 @@ import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUB
 import { makeTaskPeerHandler, TASK_BROADCAST, TASK_CATCHUP_SUBTYPES } from '../../../basis/src/v2/taskRail.js';
 import { makeFrontierReplay } from '../../../basis/src/v2/frontierReplay.js';
 import { makeChatPeerHandler, makePodChatCatchUp, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../../basis/src/v2/chatRail.js';
+import { makeCirclePolicyStoreRN } from '../core/circleStoresRN.js';
 import { circleResolveRef, circlePodReadSince, circleSendDataMove } from '../core/circlePods.js';
 import { makeGovernanceCatchUp } from '../../../basis/src/v2/governanceCatchUp.js';
 import { governanceEntryId } from '../../../basis/src/v2/governanceLog.js';
@@ -85,11 +86,9 @@ import { makeHandleGroupKeyEvent }
                                from '../../../basis/src/core/handlers/groupKeyEvent.js';
 import { recordCircleKeyEvent } from '../core/circlePods.js';
 import {
-  makeHandleCatchUpRequest, makeRequestCatchUpFromKnownPeers,
+  makeRequestCatchUpFromKnownPeers,
 } from '../../../basis/src/core/handlers/catchUp.js';
 // ε.4 — negotiated catch-up protocol substrate.
-import { makeCatchUpProviderHandler } from '../../../basis/src/v2/catchUpProvider.js';
-import { makeCatchUpReceiver }        from '../../../basis/src/v2/catchUpReceiver.js';
 import { makeHandleCalendarRsvp }
                                from '../../../basis/src/core/handlers/calendarRsvp.js';
 import { makeHandleCalendarCancel }
@@ -160,11 +159,9 @@ import ExtensionConsentSheet from './v2/ExtensionConsentSheet.js';
 import { useExtensionInstall } from '../core/extensionInstallRN.js';
 import { asyncStorageMappingsStore, MAPPINGS_DEVICE } from '../core/mappingsStoreRN.js';
 // ε.6 — multi-offer chooser modal (opt-in via policy.catchUpChooserMode='prompt').
-import CircleCatchUpChooserScreen from './v2/CircleCatchUpChooserScreen.js';
 // ε.6 follow-up — read the same per-kring policy the launcher writes so
 // the chooser mode is honoured on mobile (web reads localStorage
 // synchronously; mobile uses a hot cache because AsyncStorage is async).
-import { makeCirclePolicyStoreRN } from '../core/circleStoresRN.js';
 
 // Synthetic message IDs.  Counter is module-level + monotonic for the
 // life of this JS bundle, but threads persist across app launches via
@@ -282,55 +279,12 @@ export default function ChatScreen({
   // E5 — record/mini-page "⤢ Open in full": holds the reply shown in
   // the full-height detail modal, or null when closed.
   const [expandedRecord, setExpandedRecord] = useState(null);
-  // ε.5 — "Catching up…" indicator + provider-side notification cards.
-  // Status is fed by the negotiated catch-up receiver's emitStatus
-  // hook; notifications come from the provider's emitNotification.
-  const [catchUpStatus, setCatchUpStatus] = useState(null);
-  const [catchUpNotifications, setCatchUpNotifications] = useState([]);
-  const catchUpProviderRef = useRef(null);
-  // ε.6 — multi-offer chooser modal state.  `pendingChoice` holds the
-  // currently-visible chooser invocation; the resolver fn settles the
-  // Promise the catch-up receiver is awaiting on.
-  const [pendingCatchUpChoice, setPendingCatchUpChoice] = useState(null);
-  const pendingCatchUpResolverRef = useRef(null);
-  // ε.6 follow-up — per-kring policy hot cache.  AsyncStorage can't be
-  // read synchronously, but ε.6's `getChooserMode` hook is sync (the
-  // receiver state machine doesn't want async there).  We instantiate
-  // the SAME policyStore the launcher uses (shared AsyncStorage prefix
-  // `cc.circlePolicy.<id>`) and serve reads from an in-memory cache.
-  // On a miss, fire the async load + cache; this turn returns 'auto'
-  // (default); subsequent calls return the real value.  Also exposes
-  // an async `getCirclePolicy(id)` for the catchUpProvider's
-  // autoApprove path.
-  const policyStoreRef    = useRef(null);
+  // The per-kring policy store (shared AsyncStorage prefix with the launcher) — the create wizard
+  // persists its chosen policy through it.
+  const policyStoreRef = useRef(null);
   if (!policyStoreRef.current) {
     policyStoreRef.current = makeCirclePolicyStoreRN(AsyncStorage);
   }
-  const policyCacheRef    = useRef(new Map());
-  const policyLoadingRef  = useRef(new Set());
-  const ensurePolicyLoaded = useCallback((circleId) => {
-    if (!circleId) return;
-    if (policyCacheRef.current.has(circleId)) return;
-    if (policyLoadingRef.current.has(circleId)) return;
-    policyLoadingRef.current.add(circleId);
-    Promise.resolve(policyStoreRef.current.get(circleId))
-      .then((p) => { policyCacheRef.current.set(circleId, p ?? {}); })
-      .catch(() => { policyCacheRef.current.set(circleId, {}); })
-      .finally(() => { policyLoadingRef.current.delete(circleId); });
-  }, []);
-  const getChooserModeMobile = useCallback((circleId) => {
-    ensurePolicyLoaded(circleId);
-    const p = policyCacheRef.current.get(circleId);
-    return p?.catchUpChooserMode === 'prompt' ? 'prompt' : 'auto';
-  }, [ensurePolicyLoaded]);
-  const getCirclePolicyMobile = useCallback(async (circleId) => {
-    if (!circleId) return null;
-    try {
-      const p = await policyStoreRef.current.get(circleId);
-      if (p) policyCacheRef.current.set(circleId, p);
-      return p ?? null;
-    } catch { return null; }
-  }, []);
   // Solid OIDC. Hook drives the OAuth dance;
   // OidcSessionRN holds tokens in SecureStore (restored on mount).
   // `buildMobilePodAuth` adapts both into the podAuth shape that
@@ -574,57 +528,6 @@ export default function ChatScreen({
     // Mirrors web's `store.getThread('main').addShellMessage`.
     const addMainBubble = (bubble) => appendBubble('main', bubble);
 
-    // ε.4 — negotiated catch-up coordinator + provider handler.
-    // Built ONLY when we have a shared inbox; the legacy peer-poll
-    // path still works without it (and stays the fallback below).
-    const inboxForNegotiated = kringChatInbox ?? null;
-    const catchUpReceiver = inboxForNegotiated
-      ? makeCatchUpReceiver({
-          sendToPeer: sendPeer,
-          inbox:      inboxForNegotiated,
-          emitStatus: (s) => {
-            setCatchUpStatus(s);
-            // Hide the pill 1.5s after a terminal phase.
-            if (s.phase === 'done' || s.phase === 'no-offers' || s.phase === 'timed-out') {
-              setTimeout(() => setCatchUpStatus((cur) => (cur === s ? null : cur)), 1500);
-            }
-          },
-          // ε.6 — opt-in multi-offer chooser.  Reads the per-kring
-          // policy via the hot cache (see policyCacheRef above).  First
-          // call for a kring returns 'auto' while the async fetch lands
-          // in cache; subsequent calls return the real value.  Default
-          // for unknown kringen / missing field = 'auto' (parity with ε.4).
-          getChooserMode: getChooserModeMobile,
-          chooseOffer: (offers, { circleId }) => new Promise((resolve) => {
-            pendingCatchUpResolverRef.current = (decision) => {
-              try { resolve(decision); }
-              finally {
-                pendingCatchUpResolverRef.current = null;
-                setPendingCatchUpChoice(null);
-              }
-            };
-            setPendingCatchUpChoice({ offers, circleId });
-          }),
-          logger: console,
-        })
-      : null;
-    const catchUpProvider = makeCatchUpProviderHandler({
-      callSkill,
-      sendToPeer: sendPeer,
-      // Reads the same per-kring policy the launcher writes
-      // (`cc.circlePolicy.<id>`).  catchUpProvider awaits this, so a
-      // genuine async read is fine here — the provider state machine
-      // doesn't block boot.  Returns null on miss / error → defaults
-      // to the auto-approve V1 path.
-      getCirclePolicy:  getCirclePolicyMobile,
-      isKnownContact:   () => true,
-      emitNotification: (n) => {
-        setCatchUpNotifications((prev) => [...prev, n]);
-      },
-      logger: console,
-    });
-    catchUpProviderRef.current = catchUpProvider;
-
     const handlers = {
       // Substrate-only handlers — no UI bubble; just persist local
       // state + publish a notification for /logs.
@@ -635,16 +538,6 @@ export default function ChatScreen({
       'circle-address-announce': makeCircleAddressAnnouncePeerHandler({ agent }),
       // G11 — a group-key rotation fanned by another member lands in the local key-event log (web parity).
       'group-key-event':       makeHandleGroupKeyEvent({ recordKeyEvent: recordCircleKeyEvent }),
-      // Legacy peer-poll path kept as fallback for callers / tests
-      // that still drive it.  The new ε.4 'catch-up-request' subtype
-      // is registered alongside via catchUpProvider.handler.
-      'catch-up-request':      catchUpProvider.handler,
-      'catch-up-accept':       catchUpProvider.onAccept,
-      ...(catchUpReceiver ? {
-        'catch-up-offer': catchUpReceiver.onPeerMessage,
-        'catch-up-chunk': catchUpReceiver.onPeerMessage,
-        'catch-up-end':   catchUpReceiver.onPeerMessage,
-      } : {}),
       // a contact-bot's reply in its Contacten DM thread → the shared inbox
       // the open ContactThreadScreen subscribes to (cross-screen, like the kring
       // chat wire).  Guarded: the channel is absent in stub-mode boots.
@@ -654,13 +547,6 @@ export default function ChatScreen({
         [contactChannel.subtypes.in]:  contactChannel.replyHandler((reply) => pushContactReply(reply)),
         [contactChannel.subtypes.out]: contactChannel.messageHandler((msg) => pushContactReply(msg)),
       } : {}),
-      // NOTE: the legacy buurt-post peer-poll path
-      // (`makeHandleCatchUpRequest`) handled the same `catch-up-request`
-      // subtype with a different payload shape (`{sinceMs}` instead of
-      // `{requestId, sinceTs, fromPeerAddr}`).  ε.4's `isValidRequest`
-      // SILENTLY drops the old shape, so legacy peers don't crash us —
-      // they just don't get a reply.  The factory is still imported in
-      // case a follow-up slice needs to opt back in per-kring.
       'calendar-rsvp':         makeHandleCalendarRsvp({ callSkill, publishEvent }),
       'calendar-cancel':       makeHandleCalendarCancel({ callSkill, publishEvent }),
       'buurt-post':            makeHandleBuurtPost({ callSkill, publishEvent }),
@@ -908,56 +794,11 @@ export default function ChatScreen({
       updatePeerDisplay: renamePeer,
       t,
     });
-    // ε.3 (2026-06-01) — `makeRequestCatchUpFromKnownPeers` now routes
-    // each kring through `scheduleCatchUp(policy.pod)`.  We pass the
-    // App-owned `kringChatInbox` so the pod range-query path can route
-    // results through the SAME inbox the receiver / rehydrator use
-    // (shared LRU + ingest mirror = no double bubbles, even if a
-    // catch-up batch overlaps a live NKN delivery).  `getCirclePolicy`
-    // isn't threaded here yet — ChatScreen lives next to the launcher's
-    // policyStore but doesn't read from it directly today — so all
-    // kringen default to `{pod: 'personal'}` ⇒ 'peer' strategy until
-    // the launcher's policy lookup is forwarded down (follow-up slice).
-    // For pod:'shared' kringen the dispatcher would return 'deferred'
-    // without that wiring, so the legacy peer path stays unchanged.
-    const inboxForCatchUp = kringChatInbox ?? null;
-    // ε.4 — the negotiated peer handler.  When the inbox is wired (=
-    // launcher path) we route personal/none kringen through the new
-    // coordinator + roster-driven knownPeers; otherwise the legacy
-    // peer-poll path stays as fallback.
-    const peerCatchUpNegotiated = catchUpReceiver
-      ? async ({ circleId, sinceTs }) => {
-          let roster = [];
-          try {
-            const r = await callSkill('stoop', 'listGroupRoster', { groupId: circleId });
-            roster = Array.isArray(r?.members) ? r.members : [];
-          } catch { /* empty */ }
-          const knownPeers = roster.map((m) => m?.addr).filter(Boolean);
-          // Feed the household no-pod sync roster with this circle's members, through the SHARED helper
-          // both other call sites already use (web's `feedHouseholdRosterForCircle`, the mobile
-          // launcher's circles-load). This was an inline copy, and it had drifted twice over: it called
-          // `addCirclePeer(addr)` with ONE argument where the signature is
-          // `addCirclePeer(circleId, addr)` — so peers read from THIS circle's roster were paired into
-          // whatever circle happened to be active — and it skipped the resync + per-circle key binding
-          // the shared helper also does. Logic that already exists in shared code is called, not
-          // re-written (invariant 1).
-          // Fire-and-forget, like the launcher's call: pairing must not delay the catch-up it precedes.
-          feedHouseholdRoster({ agent, circleId }).catch(() => { /* best-effort */ });
-          return catchUpReceiver.requestCatchUp({
-            circleId,
-            sinceTs:    Number.isFinite(sinceTs) ? sinceTs : 0,
-            knownPeers,
-            fromPeerAddr: '',
-          });
-        }
-      : null;
     return {
       onPeerMessage:  makePeerRouter({ handlers, defaultHandler }),
-      requestCatchUp: makeRequestCatchUpFromKnownPeers({
-        callSkill, sendPeer,
-        inbox: inboxForCatchUp,
-        peerCatchUpNegotiated,
-      }),
+      // The buurt-POST catch-up (a stoop noticeboard concern): the hi-water peer poll. Chat/tasks/
+      // governance/membership ride their device-log lanes' own catch-ups (registered above).
+      requestCatchUp: makeRequestCatchUpFromKnownPeers({ callSkill, sendPeer }),
     };
   }, []);
 
@@ -1879,73 +1720,6 @@ export default function ChatScreen({
             ))}
           </View>
         )}
-        {/* ε.5 — "Catching up…" pill.  Visible while a negotiated
-            catch-up is in flight; hides 1.5s after a terminal phase. */}
-        {catchUpStatus && (
-          <View testID="catch-up-indicator" style={styles.catchUpPill}>
-            <Text style={styles.catchUpPillText}>
-              {catchUpStatus.phase === 'streaming' && Number.isFinite(catchUpStatus.total) && catchUpStatus.total > 0
-                ? t('circle.chat.catch_up.streaming_progress', {
-                    count: catchUpStatus.count ?? 0,
-                    total: catchUpStatus.total,
-                  })
-                : catchUpStatus.phase === 'done'
-                  ? t('circle.chat.catch_up.done')
-                  : catchUpStatus.phase === 'no-offers'
-                    ? t('circle.chat.catch_up.no_offers')
-                    : t('circle.chat.catch_up.requesting')}
-            </Text>
-          </View>
-        )}
-        {/* ε.5 — provider-side notification cards.  One per pending
-            inbound catch-up-request from a non-known contact when
-            policy.catchUpAutoApprove=false.  V1: minimal banner with
-            mode-pick buttons; deeper UI in a follow-up slice. */}
-        {catchUpNotifications.length > 0 && (
-          <View testID="catch-up-notifications">
-            {catchUpNotifications.map((n) => (
-              <View key={n.requestId} style={styles.catchUpCard}>
-                <Text style={styles.catchUpCardTitle}>
-                  {t('circle.chat.catch_up.provider_request_title', {
-                    name: (n.fromPeerAddr || '').slice(0, 12),
-                    kring: n.groupId,
-                  })}
-                </Text>
-                <Text style={styles.catchUpCardSize}>
-                  {t('circle.chat.catch_up.provider_request_size', {
-                    count: n.count,
-                    kb: Math.max(1, Math.round((n.sizeBytes ?? 0) / 1024)),
-                  })}
-                </Text>
-                <View style={styles.catchUpCardBtnRow}>
-                  {[
-                    { label: t('circle.chat.catch_up.provider_send_all'),     mode: 'all' },
-                    { label: t('circle.chat.catch_up.provider_send_last_50'), mode: 'last-50' },
-                    { label: t('circle.chat.catch_up.provider_send_last_7d'), mode: 'last-7-days' },
-                    { label: t('circle.chat.catch_up.provider_decline'),     mode: null },
-                  ].map((opt) => (
-                    <TouchableOpacity
-                      key={opt.label}
-                      style={styles.catchUpCardBtn}
-                      onPress={() => {
-                        try {
-                          catchUpProviderRef.current?.resolveCatchUpRequest?.({
-                            requestId: n.requestId, mode: opt.mode,
-                          }).catch(() => {});
-                        } finally {
-                          setCatchUpNotifications((prev) =>
-                            prev.filter((x) => x.requestId !== n.requestId));
-                        }
-                      }}
-                    >
-                      <Text style={styles.catchUpCardBtnText}>{opt.label}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
       </View>
 
       <ScrollView
@@ -2170,23 +1944,6 @@ export default function ChatScreen({
       {/* Extension install consent sheet (feedback-extension mobile parity). */}
       <ExtensionConsentSheet result={consentResult} onAdd={confirmExtInstall} onDecline={declineExtInstall} />
 
-      {/* ε.6 — multi-offer catch-up chooser.  Only mounted while a
-          chooseOffer() invocation is in flight; the resolver is
-          stashed in pendingCatchUpResolverRef and settles the Promise
-          the receiver is awaiting. */}
-      {pendingCatchUpChoice ? (
-        <CircleCatchUpChooserScreen
-          visible
-          offers={pendingCatchUpChoice.offers}
-          circleId={pendingCatchUpChoice.circleId}
-          circleName={pendingCatchUpChoice.circleId}
-          onResolve={(decision) => {
-            const r = pendingCatchUpResolverRef.current;
-            if (typeof r === 'function') r(decision ?? { decline: true });
-            else setPendingCatchUpChoice(null);
-          }}
-        />
-      ) : null}
     </KeyboardAvoidingView>
   );
 
@@ -2838,26 +2595,6 @@ const styles = StyleSheet.create({
   appBlock:   { marginTop: 8, padding: 8, backgroundColor: '#f7f7f7', borderRadius: 6 },
   appName:    { fontSize: 14, fontWeight: '600' },
   appMeta:    { fontSize: 11, color: '#666', marginTop: 2 },
-
-  // ε.5 — catch-up indicator + provider notification card.
-  catchUpPill: {
-    alignSelf: 'flex-start', marginTop: 6,
-    backgroundColor: '#222', borderRadius: 10,
-    paddingHorizontal: 10, paddingVertical: 4,
-  },
-  catchUpPillText: { color: '#fff', fontSize: 12 },
-  catchUpCard: {
-    marginTop: 8, padding: 10, backgroundColor: '#fff',
-    borderWidth: 1, borderColor: '#ccc', borderRadius: 8,
-  },
-  catchUpCardTitle: { fontSize: 13, fontWeight: '600' },
-  catchUpCardSize:  { fontSize: 12, color: '#555', marginTop: 2, marginBottom: 6 },
-  catchUpCardBtnRow:{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  catchUpCardBtn: {
-    paddingHorizontal: 8, paddingVertical: 4,
-    backgroundColor: '#f4f4f4', borderWidth: 1, borderColor: '#888', borderRadius: 6,
-  },
-  catchUpCardBtnText: { fontSize: 12 },
 
   messageList:        { flex: 1 },
   messageListContent: { padding: 12, gap: 8 },

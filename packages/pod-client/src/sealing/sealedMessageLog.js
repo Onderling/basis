@@ -1,7 +1,7 @@
 // sealedMessageLog.js — a per-message, range-queryable, SEALED circle log over the blind
 // `StorageBackend` port (@onderling/core). The connectivity Phase-3 shared-pod primitive: it is the ONE
 // place that owns the message-row KEY CONVENTION so the WRITE side (stoop `broadcastToCircle`'s podWrite
-// seam) and the READ side (stoop `getMessagesSince`'s podReadSince seam + the receiver's ref resolution)
+// seam) and the READ side (the shells' pod chat catch-up + the receiver's ref resolution)
 // can never drift on how a circle's chat history is laid out at rest.
 //
 // It invents NO crypto and NO new sealing scheme. Sealing is applied ABOVE the store exactly as the port
@@ -142,6 +142,6 @@ export async function readSealedMessagesSince(backend, open, { circleId, sinceTs
   }
   rows.sort((a, b) => (a.ts ?? 0) - (b.ts ?? 0));
   const truncated = rows.length > cap;
-  const items = truncated ? rows.slice(rows.length - cap) : rows;   // keep the freshest N (mirrors getMessagesSince)
+  const items = truncated ? rows.slice(rows.length - cap) : rows;   // keep the freshest N
   return { items, truncated };
 }

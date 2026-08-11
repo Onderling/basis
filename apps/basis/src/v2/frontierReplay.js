@@ -30,7 +30,7 @@
  */
 import { frontier } from '@onderling/core';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
-import { chunkItems, DEFAULT_CHUNK_SIZE } from './catchUpProtocol.js';
+import { chunkItems, DEFAULT_CHUNK_SIZE } from './chunking.js';
 
 /** The most statements one replay round serves. The window a long-offline device converges through —
  *  several rounds page through a bigger backlog. `param()` returns the default (200). */

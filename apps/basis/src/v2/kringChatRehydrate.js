@@ -105,7 +105,7 @@ export async function rehydrateKringChatsFromStoop({
  *
  * Connectivity Phase 2 — this is the strict (`lenient:false`) caller of the
  * ONE canonical `chatEnvelopeFromStoreItem` projection (`@onderling/item-store`),
- * the same store-item→envelope reshaper `stoop getMessagesSince` uses. The
+ * the ONE canonical store-item→envelope reshaper. The
  * hand-maintained copy that used to live here is gone.
  */
 function itemToEnvelope(item) {

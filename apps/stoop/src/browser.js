@@ -81,7 +81,6 @@ export async function createBrowserStoopAgent({
   // Connectivity Phase 3 SEAM — OPTIONAL real shared-pod writer (see Agent.js).
   podWrite,
   // Connectivity Phase 3 SEAM — OPTIONAL real shared-pod reader (see Agent.js).
-  podReadSince,
   // The per-user address-fallback setting (value or `() => boolean`), threaded to the circle fan.
   allowAddressFallback,
   // Circle-scoped spine signer resolver `(circleId) => {identity, ref}` — threaded to the skills' spine
@@ -119,7 +118,6 @@ export async function createBrowserStoopAgent({
     reliableSend,   // host-injected hold-forward sender for kring chat fan-out (absent → chat.send fallback)
     circleDataMove, // Phase 2 G1/G2 — host-injected data-move resolver (absent → fan-out-full)
     podWrite,       // Phase 3 seam — real shared-pod writer (absent → pod-signal/pod-only degrade)
-    podReadSince,   // Phase 3 seam — real shared-pod reader (absent → getMessagesSince = local mirror)
     allowAddressFallback,  // per-user setting → the circle fan's address ladder (absent → allowed, unchanged)
     circleSignerFor,       // circle-scoped spine signing (absent → legacy global-identity signer, unchanged)
     membershipEmit,        // the membership rider's device-log emitter (absent → store-based, unchanged)

@@ -1,34 +1,21 @@
 /**
- * extracted catch-up handlers from main.js.
+ * The buurt-POST catch-up (a stoop noticeboard concern) — reconnect-time peer poll:
  *
- * (catch-up on reconnect):
+ *   - `makeRequestCatchUpFromKnownPeers` — sender-side.  After the peer transport (re)connects, fire
+ *     'catch-up-request' to each known peer in each buurt asking for posts added after our last-seen
+ *     high-water mark (`makeRequestCatchUpForGroup` is the per-circle body).
  *
- *   - `makeRequestCatchUpFromKnownPeers` — sender-side.  After NKN
- *     transport (re)connects, fire 'catch-up-request' to each known
- *     peer in each buurt asking for posts added after our last-seen
- *     high-water mark.
+ *   - `makeHandleCatchUpRequest` — receiver-side.  Looks up missing posts via
+ *     stoop.listBuurtPostsSince + sends each back via the existing 'buurt-post' envelope (which the
+ *     receiver's normal ingest path already handles + deduplicates).
  *
- *   - `makeHandleCatchUpRequest` — receiver-side.  Looks up missing
- *     posts via stoop.listBuurtPostsSince + sends each back via the
- *     existing 'buurt-post' envelope (which the receiver's normal
- *     ingest path already handles + deduplicates).
- *
- * ε.3 (2026-06-01) — the per-group inner loop body is exposed as
- * `makeRequestCatchUpForGroup` so the strategy router
- * (`basis src/v2/catchUpStrategy.scheduleCatchUp`) can use it as
- * the `peerCatchUp` handler for one kring at a time.  The pod side
- * is the new ε.3 `podRangeQuery` handler — calls stoop's
- * `getMessagesSince` and routes results through the ε.1
- * chatMessageInbox with `source: 'pod'`.  When the caller supplies
- * `getCirclePolicy` + `inbox`, the outer loop routes each kring's
- * request through `scheduleCatchUp`; otherwise behaviour is unchanged
- * (peer-only path), so callers that haven't migrated yet keep working
- * bit-for-bit.
+ * POSTS ONLY. The chat/tasks/governance/membership catch-ups all ride their device-log lanes now
+ * (frontier replay with the consent rung · pull-all · the pod read-back); the per-kring strategy
+ * routing and the negotiated chat transfer that used to live here retired with the chat re-root.
  *
  * Same dep pattern as meshIntros.js: callSkill + sendPeer + logger.
  */
 
-import { scheduleCatchUp } from '../../v2/catchUpStrategy.js';
 
 /**
  * @typedef {object} CatchUpDeps
@@ -113,58 +100,6 @@ export function makeRequestCatchUpForGroup({ callSkill, sendPeer, logger = conso
 }
 
 /**
- * ε.3 — pod range-query handler.  Calls stoop's `getMessagesSince`
- * (the receiver's own pod read; no peer consent needed) and routes
- * results through the ε.1 chatMessageInbox with `source: 'pod'`.
- *
- * Inbox's ingest contract is idempotent (msgId LRU + itemStore dedup),
- * so any messages that already arrived via the peer path or the boot
- * rehydrator are deduped — the bubble never renders twice.
- *
- * @param {object} deps
- * @param {(appOrigin: string, opId: string, args: object) => Promise<*>} deps.callSkill
- * @param {{ingestChatMessage: Function}} deps.inbox
- * @param {{info?, warn?}} [deps.logger]
- */
-export function makePodRangeQueryForGroup({ callSkill, inbox, logger = console }) {
-  if (!inbox || typeof inbox.ingestChatMessage !== 'function') {
-    throw new Error('makePodRangeQueryForGroup: inbox.ingestChatMessage required');
-  }
-  return async function podRangeQuery({ circleId, sinceTs } = {}) {
-    if (!circleId) return { count: 0, inserted: 0, deduped: 0, truncated: false, skipped: 'no-circleId' };
-    let res = null;
-    try {
-      res = await callSkill('stoop', 'getMessagesSince', {
-        groupId: circleId,
-        sinceTs: Number.isFinite(sinceTs) ? sinceTs : 0,
-        max:     200,
-      });
-    } catch (err) {
-      logger.warn?.('[catch-up] getMessagesSince failed', circleId, err?.message ?? err);
-      throw err;
-    }
-    const items = Array.isArray(res?.items) ? res.items : [];
-    let inserted = 0;
-    let deduped  = 0;
-    for (const env of items) {
-      try {
-        const r = await inbox.ingestChatMessage(env, { source: 'pod' });
-        if (r?.result === 'inserted') inserted += 1;
-        else if (r?.result === 'deduped') deduped += 1;
-      } catch (err) {
-        logger.warn?.('[catch-up] inbox ingest threw', err?.message ?? err);
-      }
-    }
-    return {
-      count:     items.length,
-      inserted,
-      deduped,
-      truncated: !!res?.truncated,
-    };
-  };
-}
-
-/**
  * @param {CatchUpDeps & {
  *   inbox?: {ingestChatMessage: Function},
  *   getCirclePolicy?: (circleId: string) => Promise<object|null>|object|null,
@@ -195,19 +130,12 @@ export function makePodRangeQueryForGroup({ callSkill, inbox, logger = console }
 export function makeRequestCatchUpFromKnownPeers({
   callSkill,
   sendPeer,
-  inbox = null,
-  getCirclePolicy = null,
-  peerCatchUpNegotiated = null,
   logger = console,
 }) {
-  const perGroupPeerLegacy = makeRequestCatchUpForGroup({ callSkill, sendPeer, logger });
-  const perGroupPod  = (inbox && typeof inbox.ingestChatMessage === 'function')
-    ? makePodRangeQueryForGroup({ callSkill, inbox, logger })
-    : null;
-  // ε.4 — negotiated path overrides legacy when supplied.
-  const perGroupPeer = (typeof peerCatchUpNegotiated === 'function')
-    ? peerCatchUpNegotiated
-    : perGroupPeerLegacy;
+  // POSTS only (the stoop noticeboard's hi-water peer poll). The chat/tasks/governance/membership
+  // catch-ups all ride their device-log lanes now (frontier replay / pull-all / the pod read-back) —
+  // the per-kring strategy routing that used to live here went with them.
+  const perGroup = makeRequestCatchUpForGroup({ callSkill, sendPeer, logger });
 
   return async function requestCatchUpFromKnownPeers() {
     let buurts = [];
@@ -219,29 +147,11 @@ export function makeRequestCatchUpFromKnownPeers({
       return;
     }
     for (const groupId of buurts) {
-      // Resolve per-kring policy.  When no resolver wired, default to
-      // `{pod: 'personal'}` so the strategy router picks 'peer' = the
-      // existing path.  Forward-compat: any unknown axis also falls
-      // back to 'peer' via pickCatchUpStrategy.
-      let policy = { pod: 'personal' };
-      if (typeof getCirclePolicy === 'function') {
-        try {
-          const p = await getCirclePolicy(groupId);
-          if (p && typeof p === 'object') policy = p;
-        } catch { /* fall through to default */ }
-      }
-      const handlers = { peerCatchUp: perGroupPeer };
-      if (perGroupPod) handlers.podRangeQuery = perGroupPod;
       try {
-        const r = await scheduleCatchUp({
-          circleId: groupId,
-          policy,
-          handlers,
-          opts: { sinceTs: undefined },   // peer path falls back to hi-water mark
-        });
-        logger.info?.('[catch-up]', groupId, r.strategy, r.results);
+        const r = await perGroup({ circleId: groupId });
+        logger.info?.('[catch-up]', groupId, r);
       } catch (err) {
-        logger.warn?.('[catch-up] dispatcher failed for', groupId, err?.message ?? err);
+        logger.warn?.('[catch-up] posts poll failed for', groupId, err?.message ?? err);
       }
     }
   };

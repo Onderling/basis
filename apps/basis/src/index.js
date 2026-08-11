@@ -169,13 +169,6 @@ export {
 } from './panelRefresh.js';
 // D1 (§5A) — per-circle action-frequency counter behind the quickActions block.
 export { createActionFrequencyStore } from './v2/actionFrequency.js';
-// ε.2 — per-group catch-up strategy router (substrate).  Decides
-// pod / peer / hybrid / none based on circle.policy.pod, then routes
-// through injected handlers.  Host wiring lands once ε.1 is also in.
-export {
-  pickCatchUpStrategy, scheduleCatchUp,
-  KNOWN_POD_AXES, CATCH_UP_STRATEGIES,
-} from './v2/catchUpStrategy.js';
 // C9 — the ONE circle data-policy: `policy.pod` is the single vocabulary,
 // mapped once to the send-path dataMove branch + the PseudoPod store mode +
 // the catch-up strategy, so no consumer re-derives the pod posture itself.

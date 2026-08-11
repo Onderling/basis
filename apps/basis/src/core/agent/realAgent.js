@@ -38,6 +38,7 @@ import { settingsSealStrategyForIdentity } from '../../v2/sharedCopyOpener.js'; 
 import { probeSettingsMedium, isProbeSafeToAttach } from '../../v2/settingsRestoreGate.js'; // #36 — probe-before-flush (no cross-key clobber)
 import { makeMembershipRail, makeMembershipEmitter } from '../../v2/membershipRail.js'; // the membership rider — statements ride the device log
 import { makeTaskRail, makeTaskEmitter, routeTaskMirror, TASK_LANE_TYPES } from '../../v2/taskRail.js'; // the content re-root — task snapshots ride the device log
+import { makeChatRail, makeChatEmitter } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
 import { paramsManifest } from '../../v2/paramsManifest.js';   // #36 — the params op contract (gates the waist branch)
 import { VaultMemory, VaultLocalStorage } from '@onderling/vault';
 import { wireSkill } from '@onderling/sdk';
@@ -247,6 +248,9 @@ export async function createRealHouseholdAgent(opts = {}) {
   // here because `ensureCircleSync` (whose eager boot call runs first) closes over them for the per-type valve.
   let taskRail = null;
   let taskEmit = null;
+  // The chat lane (same handover point).
+  let chatRail = null;
+  let chatEmit = null;
   // The wired household ops (dissolved cores on `householdAgent`). Everything else on the 'household'
   // app-origin (calendar_* passthrough, addMember, getChoreSnapshot, resolveContact, help, registerName)
   // routes to `hostAgent`; `household_briefSummary` is derived from the wired store (see callSkill).
@@ -1436,6 +1440,22 @@ export async function createRealHouseholdAgent(opts = {}) {
       rail: taskRail,
       fan: (circleId, statement) => callSkill('stoop', 'broadcastKringTask', {
         groupId: circleId, event: statement, msgId: `task:${statement.body.hash}`, ts: Date.now(),
+      }).catch(() => { /* fan is best-effort — catch-up reconciles */ }),
+    });
+    // The chat lane: each sent message appends its SIGNED render entry to the device log (non-silent —
+    // the entry IS the bubble) and fans the statement; receivers verify at their rail, where the roster
+    // binding doubles as the eviction gate. The shells' send sites call chatEmit instead of the
+    // append-then-fan pair; msgId stays the join key inside the signed payload.
+    chatRail = makeChatRail({
+      eventLog: opts.deviceLog,
+      circleIdentityFor,
+      myRef: chatId.pubKey,
+      callSkill: (...a) => callSkill(...a),
+    });
+    chatEmit = makeChatEmitter({
+      rail: chatRail,
+      fan: (circleId, statement) => callSkill('stoop', 'broadcastKringChatStatement', {
+        groupId: circleId, event: statement, msgId: statement.body.subject, ts: Date.now(),
       }).catch(() => { /* fan is best-effort — catch-up reconciles */ }),
     });
   }
@@ -3479,6 +3499,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     // The task lane's rail (same contract): the shells register kring-task-broadcast + its catch-up pair
     // over this instance; its ingest also causally merges the snapshot into the circle's store head.
     taskRail,
+    // The chat lane's rail + emitter: the shells register kring-chat-statement + the windowed catch-up
+    // over the rail, and their SEND sites call chatEmit (append-signed-render-entry + fan) instead of
+    // the legacy append-then-fan pair.
+    chatRail,
+    chatEmit,
     registerSelfIdentity: (address, identity) => sa.registerSelfIdentity?.(address, identity) ?? false,
     forgetSelfIdentity:   (address) => sa.forgetSelfIdentity?.(address) ?? false,
     installCircleIdentities: (circleIds) => installCircleSigningIdentities({

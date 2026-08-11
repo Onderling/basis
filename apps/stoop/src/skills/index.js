@@ -3801,6 +3801,32 @@ export function buildSkills({
     }),
 
     /**
+     * broadcastKringChatStatement({groupId, event, msgId, ts?})
+     *   — the chat re-root: fan a SIGNED chat statement to every other member; receivers verify it at
+     *   their chat rail (signature + roster binding — the eviction gate) before it lands on their device
+     *   log AND renders as the bubble. Same plumbing as the other rail fans; subtype kring-chat-statement.
+     *   A chat message MAY wake an offline device (the shared kind table says the conversation wakes —
+     *   parity with the legacy plain-envelope fan it replaces).
+     */
+    defineSkill('broadcastKringChatStatement', async ({ parts, from }) => {
+      const a = dataArgs(parts);
+      const _groupId = a.groupId ?? groupId;
+      if (!_groupId)                                                  return { error: 'groupId-required' };
+      if (!a.event || typeof a.event !== 'object')                    return { error: 'event-required' };
+      if (typeof a.msgId !== 'string' || !a.msgId)                    return { error: 'msgId-required' };
+      const ts = typeof a.ts === 'number' && Number.isFinite(a.ts) ? a.ts : Date.now();
+      return broadcastToCircle({
+        circleId: _groupId, kind: 'kring-chat-statement', from,
+        extras: { circleId: _groupId, msgId: a.msgId, ts, event: a.event },
+        metric: 'kring-chat-statement-fanout',
+        noWake: !kindWakes('chat-message'),
+      });
+    }, {
+      description: 'Fan a signed chat statement to every other member via subtype:kring-chat-statement; receivers verify at their chat rail before it lands and renders. Wakes per the shared kind table (the conversation may wake).',
+      visibility:  'authenticated',
+    }),
+
+    /**
      * broadcastKringTask({groupId, event, msgId, ts?})
      *   — the content re-root: fan a SIGNED task statement (a full-item snapshot, or a remove) to every
      *   other member; receivers verify it at their task rail before it lands on their device log and

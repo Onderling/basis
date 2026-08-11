@@ -17,11 +17,11 @@ import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
 import { recordFields } from '../../core/screenPanelDrilldown.js';
 
-export default function CircleRecordScreen({ record }) {
+export default function CircleRecordScreen({ record, activity = null }) {
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const fields = recordFields(record);
-  if (!fields.length) {
+  if (!fields.length && !activity) {
     return (
       <View testID="circle-record-screen-empty">
         <Text style={styles.empty}>{t('circle.screen.empty')}</Text>
@@ -36,11 +36,31 @@ export default function CircleRecordScreen({ record }) {
           <Text style={styles.value}>{text}</Text>
         </View>
       ))}
+      {activity ? (
+        /* The ACTIVITY CARD (web parity): the device log narrowed to this one agent —
+         * rows say op/authority/outcome, never content. Empty state is honest. */
+        <View style={styles.activity} testID="agent-activity-card">
+          <Text style={styles.activityTitle}>{t('circle.agent_activity.title')}</Text>
+          {activity.length === 0 ? (
+            <Text style={styles.empty}>{t('circle.agent_activity.empty')}</Text>
+          ) : activity.map((r) => (
+            <View key={r.id ?? `${r.ts}-${r.op}`} style={styles.field}>
+              <Text style={styles.key}>{r.ts ? new Date(r.ts).toLocaleString() : ''}</Text>
+              <Text style={styles.value}>
+                {t('circle.agent_activity.row', { op: r.op ?? '?', outcome: r.outcome ?? '' })}
+                {r.via ? ` · ${t('circle.agent_activity.via', { via: r.via })}` : ''}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
 
 const makeStyles = (theme) => StyleSheet.create({
+  activity: { marginTop: 18 },
+  activityTitle: { fontSize: 13, fontWeight: '700', color: theme.color.ink, marginBottom: 6 },
   empty: { color: theme.color.inkSoft, fontStyle: 'italic', textAlign: 'center', paddingVertical: 24, paddingHorizontal: 12 },
   field: { paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: theme.color.line },
   key:   { fontSize: 11, fontWeight: '700', color: theme.color.inkSoft, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 },

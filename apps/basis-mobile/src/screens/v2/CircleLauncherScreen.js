@@ -44,7 +44,7 @@ import {
   // "My things" private notes-list.
   myThingsFromListFiles,
   // kring-scoped event stream + per-row action chips.
-  chatRows, mutedActorSet, actionsForStreamRow, resolveConversationKinds,
+  chatRows, mutedActorSet, agentActivityRows, actionsForStreamRow, resolveConversationKinds,
   // recognising an inbound CHAT entry for THIS circle — the same kind + the same circle-id read the
   // conversation projection itself uses, so the refresh cannot key off something the filter ignores.
   CHAT_KIND, eventCircleId,
@@ -3071,7 +3071,12 @@ function CircleDetail({
           // a record-shaped DETAIL (e.g. agent-detail) renders as a
           // read-only key→value record, not a list (web parity).
           if (section.shape === 'record') {
-            if (alive) setListScreenData({ shape: 'record', record: recordFromReply(res), appOrigin });
+            // The ACTIVITY CARD on an agent's detail (web parity): the device log narrowed
+            // to this one actor via the shared projection — opened deliberately, per agent.
+            const activity = (screenPanel.screen === 'agent-detail' && screenContext?.agentId)
+              ? agentActivityRows({ actor: screenContext.agentId, events: eventLog?.query?.() ?? [] })
+              : null;
+            if (alive) setListScreenData({ shape: 'record', record: recordFromReply(res), appOrigin, activity });
             return;
           }
           const items = itemsFromReply(res);
@@ -3848,7 +3853,7 @@ function CircleDetail({
             {listScreenData?.shape === 'record' ? (
               /* a record-shaped DETAIL screen (read-only key→value, web parity). */
               <ScrollView>
-                <CircleRecordScreen record={listScreenData.record} />
+                <CircleRecordScreen record={listScreenData.record} activity={listScreenData.activity ?? null} />
               </ScrollView>
             ) : listScreenData ? (
               /* the interactive list-screen (owns its own scroll + search). */

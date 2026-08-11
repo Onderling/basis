@@ -438,6 +438,14 @@
     }
   },
   "chat": {
+    "catchup_offer": {
+      "text": "Er staan {{count}} oudere berichten klaar bij een buur{{size}}. Downloaden?",
+      "doc": "The chat catch-up's consent question — a large history backlog waits at a peer; nothing downloads until the user says yes. {{size}} is ' (~N MB)' or empty."
+    },
+    "catchup_allow": {
+      "text": "Download geschiedenis",
+      "doc": "The consent bubble's download button."
+    },
     "quick_reply": {
       "fallback_label": {
         "text": "Antwoord",

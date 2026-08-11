@@ -169,6 +169,7 @@ import { makeGovernanceCatchUp } from '../../src/v2/governanceCatchUp.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../src/v2/membershipRail.js';
 import { makeTaskPeerHandler, TASK_BROADCAST, TASK_CATCHUP_SUBTYPES } from '../../src/v2/taskRail.js';
 import { makeFrontierReplay } from '../../src/v2/frontierReplay.js';
+import { makeChatPeerHandler, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../src/v2/chatRail.js';
 import { wireEventLogPersistence, backendSnapshotIo } from '../../src/v2/eventLogPersistence.js';
 import { buildSubjectLabeler } from '../../src/v2/governanceView.js';
 import { governanceEntryId, foldGovernance } from '../../src/v2/governanceLog.js';
@@ -327,7 +328,7 @@ import { renderCircleKring } from './circleKring.js';
 import { makeCircleLists } from '@onderling/kring-host/circleLists';  // composable lists (shared web≡mobile)
 // the app-level cross-circle SHARE op. The {onShare, policy} binder + resource-URI resolver are
 // pod-layer, composed at the pod site below; the op logic itself is shared (web≡mobile) in circleShare.js.
-import { sealItem, isCanonicalPosture, createCircleStores, memoryDataSource } from '@onderling/item-store';
+import { sealItem, isCanonicalPosture, createCircleStores, memoryDataSource, toWireEnvelope, fromEventLogItem } from '@onderling/item-store';
 import {
   shareItemAcrossCircles, shareItemToPublishedKey, listSharedResolved, revokeItemShare, listOutboundShares, revokeAllForMember,
   shareErrorStatusKey,
@@ -1317,6 +1318,7 @@ let govShellRail = null;             // the governance rail for the RECEIVE side
 let govCatchUpShell = null;          // pull-all governance catch-up (the offline-device half of reliable)
 let memCatchUpShell = null;          // the membership lane's catch-up (same mechanism, its own subtypes)
 let taskCatchUpShell = null;         // the task lane's catch-up (serves stored entries + signed live heads)
+let chatCatchUpShell = null;         // the chat lane's catch-up (windowed frontier replay + the consent rung)
 // The pod-session's AUTHED fetch (set on sign-in) — lets embed-ref resolution
 // read the user's OWN private-pod items; null when signed out → resolution falls
 // back to a public fetch (only public cross-pod refs resolve; protected → 🔒).
@@ -1785,6 +1787,7 @@ let _kringRender = null;         // { circleId, botBubble(text, opts?) — opts.
 let _clarifyScope = null;        // scope of the last clarify ask(), so a candidate button taps pick() on it
 let _lastKringListing = null;    // { appOrigin, items } from the most-recent list reply, for bulk "/done all"
 const _fileShareInbox = new Map();   // fileId → {name,mime,dataB64,size} of a received peer file, for [Download]
+const _chatCatchUpPendingAllows = new Map();   // circleId → allow() of a pending chat-history offer awaiting the user's yes
 
 // Turn an inline base64 file body (from a received file-share) into a real browser download.
 function triggerBlobDownloadFromBase64(dataB64, name, mime) {
@@ -2287,6 +2290,13 @@ function buildCircleBot(agent) {
       if (action.startsWith('clarify:')) { circleClarify?.pick?.(action.slice('clarify:'.length), _clarifyScope || {}); return; }
       // download a received peer file (bytes stashed when the file-share arrived).
       if (action.startsWith('file-dl:')) { const f = _fileShareInbox.get(action.slice('file-dl:'.length)); if (f) triggerBlobDownloadFromBase64(f.dataB64, f.name, f.mime); return; }
+      // the chat catch-up's consent: the user said yes to a large history download (the offer bubble).
+      if (action === 'chat-catchup-allow') {
+        const cid = _kringRender?.circleId;
+        const allow = cid ? _chatCatchUpPendingAllows.get(cid) : null;
+        if (allow) { _chatCatchUpPendingAllows.delete(cid); Promise.resolve(allow()).catch(() => {}); }
+        return;
+      }
       return;
     }
     if (screen) { openCircleScreenPanel(screen); return; }
@@ -5213,8 +5223,13 @@ function showKring(id, circle, policy) {
   // delivery (the EventLog already idempotents on id).
   // `media` (optional) — the media-card embed; kring-host whitelists it onto the wire.
   function broadcastFanOut({ msgId, text, ts, media }) {
-    // Shared fan-out (Phase 2); onChange = web's rerender.
-    broadcastKringFanOut({ rawCallSkill, circleId: id, msgId, text, ts, media, deliveryStateMap, onChange: rerender });
+    // Shared fan-out (Phase 2); onChange = web's rerender. `signStatement` is the chat lane's cutover
+    // hook: the already-appended entry is signed in place and the SIGNED statement fans (receivers
+    // verify at their rail); without a rail/circle key the legacy plain envelope goes, honestly.
+    broadcastKringFanOut({
+      rawCallSkill, circleId: id, msgId, text, ts, media, deliveryStateMap, onChange: rerender,
+      signStatement: (cid, mid) => _peerAgent?.chatRail?.signEntry?.(cid, mid) ?? null,
+    });
   }
 
   const rerender = () => {
@@ -6917,13 +6932,10 @@ async function boot() {
       // ingest mirror + eventLog append happen in ONE place with
       // shared state.  Sibling of `eventLog` so the rehydrator's
       // backfill + the live NKN handler dedupe through the same LRU.
-      const kringChatInbox = createChatMessageInbox({
-        eventLog,
-        ingest: ingestKringMessage,
-        // Delivery honesty — a LIVE insert ("their app stored it", from our side of the mirror) answers
-        // the sender with a receipt. Policy is entirely in `makeReceiptSender`: only source 'receiver',
-        // setting read per message, fail-closed on a broken settings read.
-        onStored: ((sendReceipt) => (info) => {
+      // Delivery honesty + repaint — SHARED by the legacy-envelope inbox and the signed-statement
+      // receive path (one set of side effects, not two): a LIVE inbound insert answers the sender with
+      // a receipt (policy entirely in `makeReceiptSender`) and repaints the open kring.
+      const onKringStored = ((sendReceipt) => (info) => {
           try { sendReceipt(info); } catch { /* a failed receipt must not stop the repaint below */ }
           // …and REPAINT, because a message that arrived while the kring is open has to APPEAR.
           //
@@ -6950,7 +6962,11 @@ async function boot() {
           sendTo: (to, payload) => (typeof _peerAgent?.sendPeerMessage === 'function'
             ? _peerAgent.sendPeerMessage(to, payload)
             : Promise.reject(new Error('no peer agent'))),
-        })),
+        }));
+      const kringChatInbox = createChatMessageInbox({
+        eventLog,
+        ingest: ingestKringMessage,
+        onStored: onKringStored,
         // Connectivity Phase 3 (receiver side) — resolve a pod-signal REF envelope (a pod-row pointer,
         // no body) into the full chat message by reading + unsealing the circle's shared pod. Absent a
         // pod / group key → the inbox skips the ref (deferred), never crashes the receive loop.
@@ -6966,6 +6982,35 @@ async function boot() {
         logger: console,
       });
       const kringChatHandler = makeKringChatPeerHandler({ inbox: kringChatInbox });
+      // The SIGNED chat receive path (the content re-root): a fanned statement verifies at the agent's
+      // chat rail — signature + the roster binding (the eviction gate) — and lands as the ONE render
+      // entry (bubble + proof). The side effects mirror the legacy inbox's: the store copy (durable
+      // history until it retires), the delivery receipt, and the repaint — through the SAME shared seam.
+      const kringChatStatementHandler = agent.chatRail ? makeChatPeerHandler({
+        rail: agent.chatRail,
+        onLanded: async (cid, entry, fromPeerAddr) => {
+          try {
+            const env = toWireEnvelope(fromEventLogItem(entry));
+            await ingestKringMessage(env, fromPeerAddr);            // the store mirror (history bridge)
+          } catch { /* best-effort — the entry is already the record */ }
+          onKringStored({ msgId: entry.id, circleId: cid, fromPeerAddr, source: 'receiver' });
+        },
+      }) : null;
+      // The chat lane's catch-up: windowed frontier replay with the consent rung. Above the auto-allow
+      // ceiling the user gets the real question as a kring bubble with a download button.
+      chatCatchUpShell = agent.chatRail ? makeFrontierReplay({
+        rail: agent.chatRail,
+        sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
+        subtypes: CHAT_CATCHUP_SUBTYPES,
+        onChange: (cid) => { if (cid === _kringRender?.circleId) { try { _kringRender?.rerender?.(); } catch { /* */ } } },
+        onOffer: ({ circleId: cid, count, approxBytes, allow }) => {
+          const mb = approxBytes > 0 ? ` (~${(approxBytes / 1e6).toFixed(1)} MB)` : '';
+          _kringRender?.botBubble?.(t('circle.chat.catchup_offer', { count, size: mb }), {
+            buttons: [{ action: 'chat-catchup-allow', label: t('circle.chat.catchup_allow') }],
+          });
+          _chatCatchUpPendingAllows.set(cid, allow);
+        },
+      }) : null;
       // boot rehydrator: read stoop's stored chats back
       // into the in-memory eventLog so the GESPREK tab shows history
       // after a reload (eventLog is in-memory; itemStore persists).
@@ -7072,6 +7117,13 @@ async function boot() {
       const peerMessageRouter = makePeerRouter({
         handlers: {
           'kring-chat-message':      kringChatHandler,
+          // The SIGNED chat lane: verify-at-the-rail receive + its windowed, consent-gated catch-up.
+          ...(kringChatStatementHandler ? { [CHAT_STATEMENT_BROADCAST]: kringChatStatementHandler } : {}),
+          ...(chatCatchUpShell ? {
+            [chatCatchUpShell.subtypes.request]: chatCatchUpShell.onRequest,
+            [chatCatchUpShell.subtypes.batch]:   chatCatchUpShell.onBatch,
+            [chatCatchUpShell.subtypes.offer]:   chatCatchUpShell.onOffer,
+          } : {}),
           // Delivery honesty — the peer's app stored our message; advance the shared δ.2 map to `stored`.
           // The shared receiver validates (rebuilt, `from` off the wire), checks the sender against the
           // circle's roster, and the map's monotonic rule orders it. Fire-and-forget: the roster read is a
@@ -7232,6 +7284,7 @@ async function boot() {
         govCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         memCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         taskCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
+        chatCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         // Seed the household roster for the active circle (re-fed on open below).
         feedHouseholdRosterForCircle(getActiveCircle()).catch(() => {});
       }, 1500);

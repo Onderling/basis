@@ -115,6 +115,38 @@ export function makeChatRail({ eventLog, circleIdentityFor, myRef, callSkill, ve
   }
 
   /**
+   * SIGN AN ALREADY-APPENDED ENTRY — the shells' cutover hook. The send sites append the optimistic
+   * render event first (unchanged code); the FAN then calls this to sign it: the wire payload is built
+   * from the entry, the statement is attached in place (`append` replaces on id), and the statement is
+   * returned for the signed fan. What never fans (bot bubbles, self-scoped lines) is never signed.
+   * Returns null when the entry is missing, already signed, or no circle signer resolves.
+   */
+  async function signEntry(circleId, msgId) {
+    const entry = findEntry(msgId);
+    if (!entry || entry.payload?.circleId !== circleId) return null;
+    if (entry.payload?.statement?.sig) return entry.payload.statement;   // already signed (a retry re-fans it)
+    let identity = null;
+    try { identity = await circleIdentityFor(circleId); } catch { identity = null; }
+    if (!identity?.pubKey || typeof identity.sign !== 'function') return null;
+    const p = entry.payload ?? {};
+    const wire = {
+      msgId, ts: entry.ts,
+      ...(typeof p.text === 'string' ? { text: p.text } : {}),
+      ...(p.scope ? { scope: p.scope } : {}),
+      ...(p.embeds?.length ? { embeds: p.embeds } : {}),
+      authorRef: myRef,
+    };
+    const wireMedia = mediaForKringWire(p.media);
+    if (wireMedia) wire.media = wireMedia;
+    const bodies = storedStatements(circleId).map((s) => s.body);
+    const parent = authorHead(bodies, identity.pubKey);
+    const deps = frontier(bodies).filter((h) => h !== parent);
+    const statement = signSpine(identity, { kind: 'message', circleId, subject: msgId, payload: wire, parent, deps });
+    eventLog.append({ ...entry, payload: { ...p, statement } });
+    return statement;
+  }
+
+  /**
    * INGEST — the full gate, then the render append. Returns `{ok, entry, existed}` (frontierReplay's
    * progress guard reads `existed`), or `{ok:false, reason}`.
    */
@@ -152,7 +184,7 @@ export function makeChatRail({ eventLog, circleIdentityFor, myRef, callSkill, ve
     return { ok: true, entry, existed: false };
   }
 
-  return { appendMessage, ingest, storedStatements };
+  return { appendMessage, signEntry, ingest, storedStatements };
 }
 
 /**

@@ -130,16 +130,31 @@ export function classifyFanOut(r) {
   return 'undeliverable';                         // all permanent
 }
 
-export function broadcastKringFanOut({ rawCallSkill, circleId, msgId, text, ts, media, deliveryStateMap, onChange }) {
+export function broadcastKringFanOut({ rawCallSkill, circleId, msgId, text, ts, media, deliveryStateMap, onChange, signStatement = null }) {
   if (typeof rawCallSkill !== 'function') return Promise.resolve();
   const mark = (state) => { deliveryStateMap.set(msgId, state); onChange?.(); };
   mark('pending');
   const wireMedia = mediaForKringWire(media);
   return Promise.resolve()
-    .then(() => rawCallSkill('stoop', 'broadcastKringMessage', {
-      groupId: circleId, text, msgId, ts,
-      ...(wireMedia ? { media: wireMedia } : {}),
-    }))
+    // The chat lane (the content re-root): when the shell hands `signStatement(circleId, msgId)` —
+    // the chat rail's sign-the-appended-entry hook — the fan carries the SIGNED statement and receivers
+    // verify at their rail before anything renders. What fans is signed; a bot bubble or self-scoped
+    // line never fans, so it never needs a signature. Signing unavailable (no rail / no circle key
+    // yet) → the legacy plain envelope, honestly, so a message is never silently unsent.
+    .then(async () => {
+      const statement = typeof signStatement === 'function'
+        ? await Promise.resolve(signStatement(circleId, msgId)).catch(() => null)
+        : null;
+      if (statement) {
+        return rawCallSkill('stoop', 'broadcastKringChatStatement', {
+          groupId: circleId, event: statement, msgId, ts,
+        });
+      }
+      return rawCallSkill('stoop', 'broadcastKringMessage', {
+        groupId: circleId, text, msgId, ts,
+        ...(wireMedia ? { media: wireMedia } : {}),
+      });
+    })
     .then((r) => {
       const state = classifyFanOut(r);
       if (state !== 'maybe-received') console.info('[kring-chat] fan-out', state, '—', r?.error ?? r?.errors);

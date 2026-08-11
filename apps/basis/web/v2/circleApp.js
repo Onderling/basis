@@ -4218,6 +4218,89 @@ function openListsPanel(circleId) {
 // S6.B — open a dedicated screen (tasks / agenda) as a dismissable panel, the
 // chat-triggered "overview" projection. Reuses the Schermen block materializer +
 // renderer (one block, scope:'all'), scoped to the active circle.
+/* ── #44 — the restore choices' dialogs ─────────────────────────────────────────────────────
+ * Two small overlays over the seams realAgent fires at boot. The shell only paints: the HOLD,
+ * the diff and the overwrite action all live in the boot gate (settingsRestoreGate + realAgent).
+ */
+function _restoreOverlay() {
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9000;display:flex;align-items:center;justify-content:center;';
+  const card = document.createElement('div');
+  card.style.cssText = 'background:var(--surface,#fff);color:inherit;max-width:26rem;width:92%;padding:1.25rem;border-radius:8px;max-height:80vh;overflow:auto;';
+  wrap.appendChild(card);
+  document.body.appendChild(wrap);
+  return { wrap, card, close: () => wrap.remove() };
+}
+
+function showSettingsMismatchDialog({ overwrite } = {}) {
+  const { card, close } = _restoreOverlay();
+  const h = document.createElement('h3');
+  h.textContent = t('circle.settings_restore.mismatch_title');
+  const p = document.createElement('p');
+  p.textContent = t('circle.settings_restore.mismatch_body');
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1rem;';
+  const mkBtn = (label, fn) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.addEventListener('click', fn);
+    return b;
+  };
+  // The default, listed first: keep using this device's own settings (the gate already held).
+  row.appendChild(mkBtn(t('circle.settings_restore.choice_local'), close));
+  row.appendChild(mkBtn(t('circle.settings_restore.choice_phrase'), () => {
+    close();
+    try { circleDispatchReady?.({ opId: 'restoreFromMnemonicWizard', args: {} }); } catch { /* wizard unavailable */ }
+  }));
+  row.appendChild(mkBtn(t('circle.settings_restore.choice_overwrite'), async () => {
+    // The one destructive act — spelled out, confirmed, then executed via the handed-over action.
+    if (!window.confirm(t('circle.settings_restore.overwrite_warning'))) return;
+    try { await overwrite?.(); } catch { /* the gate reported; staying local */ }
+    close();
+  }));
+  card.append(h, p, row);
+}
+
+function showSettingsConflictsDialog({ conflicts = [], keepTheirs } = {}) {
+  if (!conflicts.length) return;
+  const { card, close } = _restoreOverlay();
+  const h = document.createElement('h3');
+  h.textContent = t('circle.settings_restore.conflicts_title');
+  const p = document.createElement('p');
+  p.textContent = t('circle.settings_restore.conflicts_body');
+  card.append(h, p);
+  const list = document.createElement('div');
+  for (const c of conflicts) {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:.5rem;align-items:center;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--line,#eee);';
+    const label = document.createElement('div');
+    label.innerHTML = '';
+    label.textContent = `${c.key}: ${JSON.stringify(c.mine)} ↔ ${JSON.stringify(c.theirs)}`;
+    const btn = document.createElement('button');
+    btn.textContent = t('circle.settings_restore.keep_theirs');
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      try { await keepTheirs?.(c.key); btn.textContent = '✓'; } catch { btn.disabled = false; }
+    });
+    row.append(label, btn);
+    list.appendChild(row);
+  }
+  const foot = document.createElement('div');
+  foot.style.cssText = 'display:flex;gap:.5rem;margin-top:1rem;justify-content:flex-end;';
+  const allBtn = document.createElement('button');
+  allBtn.textContent = t('circle.settings_restore.keep_all_theirs');
+  allBtn.addEventListener('click', async () => {
+    allBtn.disabled = true;
+    for (const c of conflicts) { try { await keepTheirs?.(c.key); } catch { /* per-key report stays */ } }
+    close();
+  });
+  const doneBtn = document.createElement('button');
+  doneBtn.textContent = t('circle.settings_restore.done');   // keep-mine = simply done: local already stands
+  doneBtn.addEventListener('click', close);
+  foot.append(allBtn, doneBtn);
+  card.append(list, foot);
+}
+
 async function openCircleScreenPanel(screenId, { highlightRef, context } = {}) {
   const circleId = getActiveCircle();
   // the panel's FETCH CONTEXT: the host materializes `$circleId` (the
@@ -6620,6 +6703,11 @@ async function boot() {
       // The membership rider: hand the DEVICE LOG so membership statements ride its membership lane
       // (signed, fanned, verified, caught-up) and the roster folds the rail's verified bodies.
       deviceLog: eventLog,
+      // #44 — the restore choices. The gate held the pod-write (key mismatch): show the coarse
+      // three-choice dialog. Or it attached with differing values: show the per-param merge list.
+      // Deferred to after boot — the dialogs need the booted surface (and never block it).
+      onSettingsKeyMismatch: ({ overwrite } = {}) => { setTimeout(() => showSettingsMismatchDialog({ overwrite }), 0); },
+      onSettingsConflicts: ({ conflicts, keepTheirs } = {}) => { setTimeout(() => showSettingsConflictsDialog({ conflicts, keepTheirs }), 0); },
       // A message the system has GIVEN UP ON must stop looking fine. Web consumed neither report until
       // 2026-08-02, so a dropped or expired message kept its optimistic state forever — on the shell we
       // are shipping first. Same shared rule mobile uses; the shell injects only its map and logger.

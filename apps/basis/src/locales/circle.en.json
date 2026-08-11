@@ -807,6 +807,52 @@
       "doc": "Bulletin restyle — transparency badge under a bot answer that used the language model. Only shown when the message carries payload.provenance."
     }
   },
+  "settings_restore": {
+    "mismatch_title": {
+      "text": "Your pod's settings can't be opened from this device",
+      "doc": "#44 coarse dialog title — the pod's settings blob is sealed under a different key (fresh install without the phrase). Nothing has been overwritten."
+    },
+    "mismatch_body": {
+      "text": "They're sealed with a key this device doesn't have. Enter your recovery phrase to read and merge them, or keep using this device's own settings. Nothing has been overwritten.",
+      "doc": "#44 coarse dialog body."
+    },
+    "choice_local": {
+      "text": "This device only",
+      "doc": "#44 coarse choice (the DEFAULT): stay local — the gate already held, this just dismisses."
+    },
+    "choice_phrase": {
+      "text": "Enter recovery phrase",
+      "doc": "#44 coarse choice: opens the restore wizard; after the reboot the probe opens the pod and the merge list appears if values differ."
+    },
+    "choice_overwrite": {
+      "text": "Overwrite",
+      "doc": "#44 coarse choice: the one destructive act — replaces the pod's settings with this device's."
+    },
+    "overwrite_warning": {
+      "text": "This replaces the settings your other devices share with this device's settings. That cannot be undone. Continue?",
+      "doc": "#44 confirm before the overwrite executes."
+    },
+    "conflicts_title": {
+      "text": "Settings differ",
+      "doc": "#44 per-param merge list title — this device and the pod hold different values."
+    },
+    "conflicts_body": {
+      "text": "This device and your pod have different values for these settings. Pick which to keep — leaving one alone keeps this device's value.",
+      "doc": "#44 merge list body. Keep-mine is doing nothing: the local value already stands."
+    },
+    "keep_theirs": {
+      "text": "Use the pod's value",
+      "doc": "#44 per-row action: adopt the pod's value (routes through set-param, so it syncs normally)."
+    },
+    "keep_all_theirs": {
+      "text": "Use all pod values",
+      "doc": "#44 the 'all' shortcut."
+    },
+    "done": {
+      "text": "Done",
+      "doc": "#44 close the merge list; whatever wasn't switched keeps this device's value."
+    }
+  },
   "agent_activity": {
     "title": {
       "text": "Activity",

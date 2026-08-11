@@ -807,6 +807,52 @@
       "doc": "Bulletin restyle — transparantie-badge onder een bot-antwoord waarvoor het taalmodel is gebruikt. Alleen getoond als het bericht payload.provenance draagt."
     }
   },
+  "settings_restore": {
+    "mismatch_title": {
+      "text": "De instellingen op je pod zijn vanaf dit apparaat niet te openen",
+      "doc": "#44 grove dialoog — de pod-instellingen zijn verzegeld met een andere sleutel. Er is niets overschreven."
+    },
+    "mismatch_body": {
+      "text": "Ze zijn verzegeld met een sleutel die dit apparaat niet heeft. Voer je herstelzin in om ze te lezen en samen te voegen, of gebruik alleen de instellingen van dit apparaat. Er is niets overschreven.",
+      "doc": "#44 grove dialoog, tekst."
+    },
+    "choice_local": {
+      "text": "Alleen dit apparaat",
+      "doc": "#44 keuze (de standaard): lokaal blijven — de poort hield al vast; dit sluit alleen."
+    },
+    "choice_phrase": {
+      "text": "Herstelzin invoeren",
+      "doc": "#44 keuze: opent de herstel-assistent; na de herstart opent de proef de pod en verschijnt zo nodig de samenvoeglijst."
+    },
+    "choice_overwrite": {
+      "text": "Overschrijven",
+      "doc": "#44 keuze: de ene destructieve handeling — vervangt de pod-instellingen door die van dit apparaat."
+    },
+    "overwrite_warning": {
+      "text": "Dit vervangt de instellingen die je andere apparaten delen door die van dit apparaat. Dat is niet terug te draaien. Doorgaan?",
+      "doc": "#44 bevestiging vóór het overschrijven."
+    },
+    "conflicts_title": {
+      "text": "Instellingen verschillen",
+      "doc": "#44 samenvoeglijst-titel — dit apparaat en de pod hebben verschillende waarden."
+    },
+    "conflicts_body": {
+      "text": "Dit apparaat en je pod hebben voor deze instellingen verschillende waarden. Kies wat je wilt houden — niets kiezen houdt de waarde van dit apparaat.",
+      "doc": "#44 samenvoeglijst-tekst. 'Van mij houden' is niets doen: de lokale waarde staat al."
+    },
+    "keep_theirs": {
+      "text": "Waarde van de pod gebruiken",
+      "doc": "#44 per rij: neem de pod-waarde over (via set-param, dus synchroniseert gewoon)."
+    },
+    "keep_all_theirs": {
+      "text": "Alle pod-waarden gebruiken",
+      "doc": "#44 de 'alles'-sneltoets."
+    },
+    "done": {
+      "text": "Klaar",
+      "doc": "#44 sluit de lijst; wat niet is omgezet houdt de waarde van dit apparaat."
+    }
+  },
   "agent_activity": {
     "title": {
       "text": "Activiteit",

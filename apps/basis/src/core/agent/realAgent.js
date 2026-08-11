@@ -35,7 +35,10 @@ import { createCircleSenderAuthorization, SENDER_REASON } from '../../v2/circleS
 import { shareableAddress } from '../../v2/addressSharing.js';
 import { createParamsService, basisParamRegistry } from '../../v2/paramsService.js';   // #36 — settable params surface
 import { settingsSealStrategyForIdentity } from '../../v2/sharedCopyOpener.js';         // #36 pod-sync — seal-to-self for settings
-import { probeSettingsMedium, isProbeSafeToAttach } from '../../v2/settingsRestoreGate.js'; // #36 — probe-before-flush (no cross-key clobber)
+import {
+  probeSettingsMediumDetailed, isProbeSafeToAttach,
+  computeSettingsConflicts, SETTINGS_SHARED_PROBE_PATH,
+} from '../../v2/settingsRestoreGate.js'; // #36/#44 — probe-before-flush (no cross-key clobber) + the restore choices
 import { makeMembershipRail, makeMembershipEmitter } from '../../v2/membershipRail.js'; // the membership rider — statements ride the device log
 import { makeTaskRail, makeTaskEmitter, routeTaskMirror, TASK_LANE_TYPES } from '../../v2/taskRail.js'; // the content re-root — task snapshots ride the device log
 import { makeChatRail, makeChatEmitter } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
@@ -437,13 +440,34 @@ export async function createRealHouseholdAgent(opts = {}) {
         // key cannot OPEN the pod's owner-sealed blobs (a fresh install signed in WITHOUT the recovery phrase)
         // would silently overwrite them. Probe read-only first; only attach+flush when we own the key
         // (openable) or the pod is fresh (missing). Gate the write on being able to open — never a silent write.
-        const probe = await probeSettingsMedium(medium);
+        const { status: probe, value: podBlob } = await probeSettingsMediumDetailed(medium);
         if (isProbeSafeToAttach(probe)) {
+          // CAPTURE-THEN-FLUSH (the per-param merge list, #44): the attach's flush is local-wins,
+          // so the pod's values from the user's OTHER device would silently lose. The probe already
+          // opened the pod blob — diff it against this device's copy FIRST; the captured `theirs`
+          // values survive the flush in memory, so "keep theirs" stays honorable after it.
+          let conflicts = [];
+          try {
+            const localBlob = await settingsDataSource.read(SETTINGS_SHARED_PROBE_PATH);
+            conflicts = computeSettingsConflicts(localBlob, podBlob);
+          } catch { /* no local blob → no conflicts */ }
           await settingsDataSource.attachInner(medium);
+          if (conflicts.length) {
+            // keepTheirs routes through the ONE kind-gated write (`set-param`), so the adopted value
+            // flushes to the pod like any other settings change. Invoked from the shell after boot.
+            const keepTheirs = (key) => {
+              const c = conflicts.find((x) => x.key === key);
+              return c ? callSkill('params', 'set-param', { key, value: c.theirs }) : Promise.resolve({ ok: false, error: 'unknown-key' });
+            };
+            try { opts.onSettingsConflicts?.({ conflicts, keepTheirs }); } catch { /* a shell hook must not break boot */ }
+          }
         } else if (probe === 'undecryptable') {
           // The pod's settings are sealed under a DIFFERENT key — HOLD: stay local, overwrite nothing. Surface
-          // the recover-or-overwrite choice to the shell (the per-param merge / coarse dialog rides this seam).
-          try { opts.onSettingsKeyMismatch?.(); } catch { /* a shell hook must not break boot */ }
+          // the coarse choice to the shell (#44): recover with the phrase (the existing restore wizard; the
+          // reboot re-probes with the right key) / stay local (default — do nothing) / OVERWRITE, the one
+          // explicit destructive act, handed over as an action so a shell cannot reimplement the flush.
+          const overwrite = async () => { await settingsDataSource.attachInner(medium); return { ok: true }; };
+          try { opts.onSettingsKeyMismatch?.({ overwrite }); } catch { /* a shell hook must not break boot */ }
           if (typeof console !== 'undefined') console.warn('[settings-medium] pod settings are sealed under a different key — staying local; recover with your phrase to sync (nothing overwritten).');
         } else {
           // transport — could not reach the pod to verify. Stay local THIS session WITHOUT declaring a key

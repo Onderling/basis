@@ -70,3 +70,40 @@ describe('isProbeSafeToAttach — only openable/missing may flush', () => {
     expect(isProbeSafeToAttach('transport')).toBe(false);
   });
 });
+
+// ── #44 — the restore choices' substrate ────────────────────────────────────────────────────────
+
+describe('probeSettingsMediumDetailed — the probe with the pod blob in hand', () => {
+  it('openable carries the VALUE (capture-then-flush needs it before attachInner overwrites)', async () => {
+    const blob = { 'retention.chat': 1000 };
+    const { probeSettingsMediumDetailed } = await import('../../src/v2/settingsRestoreGate.js');
+    const res = await probeSettingsMediumDetailed({ read: async () => blob });
+    expect(res).toEqual({ status: 'openable', value: blob });
+  });
+
+  it('missing / undecryptable / transport carry null', async () => {
+    const { probeSettingsMediumDetailed } = await import('../../src/v2/settingsRestoreGate.js');
+    expect(await probeSettingsMediumDetailed({ read: async () => null })).toEqual({ status: 'missing', value: null });
+    expect(await probeSettingsMediumDetailed({ read: async () => { throw new Error('sealing: secretbox open failed'); } }))
+      .toEqual({ status: 'undecryptable', value: null });
+    expect(await probeSettingsMediumDetailed({ read: async () => { throw new Error('fetch failed'); } }))
+      .toEqual({ status: 'transport', value: null });
+  });
+});
+
+describe('computeSettingsConflicts — the one differ both shells ride', () => {
+  it('a conflict is a key BOTH sides hold with different values; one-sided keys are not conflicts', async () => {
+    const { computeSettingsConflicts } = await import('../../src/v2/settingsRestoreGate.js');
+    const conflicts = computeSettingsConflicts(
+      { a: 1, b: 2, mineOnly: 9 },
+      { a: 1, b: 3, theirsOnly: 7 },
+    );
+    expect(conflicts).toEqual([{ key: 'b', mine: 2, theirs: 3 }]);
+  });
+
+  it('null/absent blobs mean no conflicts', async () => {
+    const { computeSettingsConflicts } = await import('../../src/v2/settingsRestoreGate.js');
+    expect(computeSettingsConflicts(null, { a: 1 })).toEqual([]);
+    expect(computeSettingsConflicts({ a: 1 }, null)).toEqual([]);
+  });
+});

@@ -46,14 +46,48 @@ export const isSealingOpenFailure = (err) =>
  *   - `transport`     any other failure (pod unreachable / 5xx) → could not verify → HOLD, do NOT accuse
  */
 export async function probeSettingsMedium(medium, path = SETTINGS_SHARED_PROBE_PATH) {
-  if (!medium || typeof medium.read !== 'function') return 'transport';
+  return (await probeSettingsMediumDetailed(medium, path)).status;
+}
+
+/**
+ * The probe WITH the opened value — the restore-conflict flow needs the pod blob IN HAND
+ * before `attachInner`'s local-wins flush overwrites it (capture-then-flush; nothing is
+ * lost while the user chooses). Same classification as `probeSettingsMedium`.
+ *
+ * @returns {Promise<{status: 'openable'|'missing'|'undecryptable'|'transport', value: any}>}
+ */
+export async function probeSettingsMediumDetailed(medium, path = SETTINGS_SHARED_PROBE_PATH) {
+  if (!medium || typeof medium.read !== 'function') return { status: 'transport', value: null };
   try {
     const value = await medium.read(path);
-    return value == null ? 'missing' : 'openable';
+    return value == null ? { status: 'missing', value: null } : { status: 'openable', value };
   } catch (err) {
-    return isSealingOpenFailure(err) ? 'undecryptable' : 'transport';
+    return { status: isSealingOpenFailure(err) ? 'undecryptable' : 'transport', value: null };
   }
 }
 
 /** Whether a probe status means the flushing attach is safe to proceed. */
 export const isProbeSafeToAttach = (status) => status === 'openable' || status === 'missing';
+
+/**
+ * The per-param CONFLICT SET between this device's settings blob and the pod's — the keys where
+ * BOTH sides hold a value and the values differ. Pure; both shells' merge lists ride this one
+ * differ so the rule cannot drift per platform. Keys only one side holds are NOT conflicts:
+ * a value the other device never set has nothing to disagree with (the normal sync covers it).
+ *
+ * @param {object|null} localBlob  this device's shared-scope settings ({key: value})
+ * @param {object|null} podBlob    the pod's opened shared.json
+ * @returns {Array<{key: string, mine: any, theirs: any}>}
+ */
+export function computeSettingsConflicts(localBlob, podBlob) {
+  const mine = localBlob && typeof localBlob === 'object' ? localBlob : {};
+  const theirs = podBlob && typeof podBlob === 'object' ? podBlob : {};
+  const out = [];
+  for (const key of Object.keys(theirs)) {
+    if (!(key in mine)) continue;
+    if (JSON.stringify(mine[key]) !== JSON.stringify(theirs[key])) {
+      out.push({ key, mine: mine[key], theirs: theirs[key] });
+    }
+  }
+  return out;
+}

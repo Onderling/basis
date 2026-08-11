@@ -125,6 +125,7 @@ export {
   // C15 — per-circle chat projection (excludes the silent system lane).
   buildCircleChat,
 } from './v2/circleStream.js';
+export { agentActivityRows } from './v2/agentActivity.js';
 // profile-update propagation (Phase-4 Wave B) — the roster "pull-me" signal substrate:
 // the diff comparator, the silent-entry kind, the announce (admin) + receive (member) factories.
 export {

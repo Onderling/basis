@@ -807,6 +807,24 @@
       "doc": "Bulletin restyle — transparantie-badge onder een bot-antwoord waarvoor het taalmodel is gebruikt. Alleen getoond als het bericht payload.provenance draagt."
     }
   },
+  "agent_activity": {
+    "title": {
+      "text": "Activiteit",
+      "doc": "Agent-detail activiteitenkaart — het actiespoor van deze agent op dit apparaat."
+    },
+    "empty": {
+      "text": "Nog niets — wat deze agent op je apparaat doet, verschijnt hier.",
+      "doc": "Lege staat van de activiteitenkaart."
+    },
+    "row": {
+      "text": "{op} — {outcome}",
+      "doc": "Eén spoorregel: de uitgevoerde op en de afloop. Nooit inhoud — het spoor zegt DAT, versiegeschiedenis zegt wat."
+    },
+    "via": {
+      "text": "via {via}",
+      "doc": "Het bevoegdheidslabel op een spoorregel (grant:<id> | mandate:<taak> | owner)."
+    }
+  },
   "screen": {
     "filter_placeholder": {
       "text": "Filteren…",

@@ -124,6 +124,7 @@ async function restoreOrGenerate(vault) {
 
 import { restoreOwnerRoot } from './ownerRootRestore.js';
 import { ensureOwnerRoot, pickRootKeyStore } from './ownerRootCustody.js';
+import { makeAgentTrailEntry } from '../../eventLog.js';
 import {
   CalendarStore, registerCalendarSkills,
 } from '@onderling-app/calendar';
@@ -385,6 +386,25 @@ export async function createRealHouseholdAgent(opts = {}) {
   });
   const chatAgent = sa.agent;
   const chatId    = chatAgent.identity;
+
+  // The agent-activity trail — the record of an AGENT acting on this device (one-log step E).
+  // The kernel's dispatch membrane (`runGatedSkill`) reports every gate-passed skill exercise
+  // through the `trailSink` port with a whitelisted shape (who · which op · what authority ·
+  // outcome — never args or content); here the app decides what that means: the OWNER's own
+  // surfaces are NOT an agent acting (every GUI/chat op arrives in-process as the chat or host
+  // identity, and a bot-audit surface must not become self-surveillance), so those callers are
+  // skipped and everything else lands on the device log as an `agent-action` entry. Read back
+  // with `agentTrailRows({actor})` — the agent-detail activity card.
+  if (opts.deviceLog) {
+    const ownIds = new Set([chatId?.pubKey, hostId?.pubKey].filter(Boolean));
+    const trailSink = ({ actor, op, via, outcome }) => {
+      if (!actor || ownIds.has(actor)) return;
+      const entry = makeAgentTrailEntry({ actor, op, via, outcome });
+      if (entry) opts.deviceLog.append(entry);
+    };
+    hostAgent.trailSink = trailSink;
+    chatAgent.trailSink = trailSink;
+  }
 
   // Parameter register (#36) — the settable params surface, reached through the waist (the `params`
   // app-origin branch in callSkill below). Device/agent params persist to this agent's local settings homes
@@ -1837,7 +1857,19 @@ export async function createRealHouseholdAgent(opts = {}) {
       // is the ONE kind-gated write (refuses kind:internal + unknown). circleId carried for circle-scoped
       // params (persistence wired when a circle param lands).
       if (!paramsManifest.operations.some((o) => o.id === opId)) return { ok: false, error: 'unknown-op', app: 'params', op: opId };
-      return paramsService.callSkill(opId, args ?? {}, { circleId: resolveCircleId(args) });
+      const paramsResult = await paramsService.callSkill(opId, args ?? {}, { circleId: resolveCircleId(args) });
+      // A successful set-param is a SETTINGS-CHANGE on the trail (the whitelisted shape: the param
+      // KEY as the target pointer, never its value). Owner-attributed — recording is not display;
+      // the card only ever shows a trail whose actor the viewer explicitly opened.
+      if (opId === 'set-param' && paramsResult?.ok !== false && opts.deviceLog) {
+        const entry = makeAgentTrailEntry({
+          actor: chatId?.pubKey ?? 'owner', op: 'set-param', kind: 'settings-change',
+          target: { kind: 'param', ref: typeof args?.key === 'string' ? args.key : null },
+          via: 'owner', outcome: 'ok',
+        });
+        if (entry) opts.deviceLog.append(entry);
+      }
+      return paramsResult;
     }
     if (appOrigin === 'household') {
       const circleId = resolveCircleId(args);

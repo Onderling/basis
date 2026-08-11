@@ -807,6 +807,24 @@
       "doc": "Bulletin restyle — transparency badge under a bot answer that used the language model. Only shown when the message carries payload.provenance."
     }
   },
+  "agent_activity": {
+    "title": {
+      "text": "Activity",
+      "doc": "Agent-detail activity card heading — the agent's action trail on this device (batch-4 trail emitters)."
+    },
+    "empty": {
+      "text": "Nothing yet — actions this agent performs on your device will appear here.",
+      "doc": "Agent-detail activity card empty state."
+    },
+    "row": {
+      "text": "{op} — {outcome}",
+      "doc": "One trail row: the op exercised and how it ended. Never shows content — the trail records THAT, version history records what."
+    },
+    "via": {
+      "text": "via {via}",
+      "doc": "The authority tag on a trail row (grant:<id> | mandate:<task> | owner)."
+    }
+  },
   "screen": {
     "filter_placeholder": {
       "text": "Filter…",

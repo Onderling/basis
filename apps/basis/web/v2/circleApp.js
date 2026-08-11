@@ -258,6 +258,8 @@ import { scopeForReply } from '../../src/v2/messageScope.js';
 import {
   circleRows, chatRows, mutedActorSet,
 } from '../../src/v2/circleStream.js';
+// The agent-detail activity card's rows — the device log narrowed to one agent (batch-4 trail).
+import { agentActivityRows } from '../../src/v2/agentActivity.js';
 // profile-update propagation — the silent roster "pull-me" signal (announce on a real roster
 // write; receive → re-read the changed rows). No values on the wire, no chat bubble, no wake.
 import { makeRosterUpdatedPeerHandler, makeRosterUpdateAnnouncer } from '../../src/v2/rosterUpdated.js';
@@ -4272,6 +4274,34 @@ async function openCircleScreenPanel(screenId, { highlightRef, context } = {}) {
       if (section.shape === 'record') {
         body.innerHTML = '';
         renderRecordScreen(body, { record: recordFromReply(res), t });
+        // The ACTIVITY CARD under an agent's detail: the device log narrowed to this one
+        // actor (`agentActivityRows` — a projection, opened deliberately per agent, never
+        // a firehose). Rows carry op/authority/outcome — the trail says THAT, never what.
+        if (screenId === 'agent-detail' && screenContext?.agentId) {
+          const rows = agentActivityRows({ actor: screenContext.agentId, events: eventLog.query() });
+          const card = document.createElement('div');
+          card.className = 'agent-activity-card';
+          const h = document.createElement('h4');
+          h.textContent = t('circle.agent_activity.title');
+          card.appendChild(h);
+          if (!rows.length) {
+            const p = document.createElement('p');
+            p.className = 'muted';
+            p.textContent = t('circle.agent_activity.empty');
+            card.appendChild(p);
+          } else {
+            const ul = document.createElement('ul');
+            for (const r of rows) {
+              const li = document.createElement('li');
+              const when = r.ts ? new Date(r.ts).toLocaleString() : '';
+              const via = r.via ? ` · ${t('circle.agent_activity.via', { via: r.via })}` : '';
+              li.textContent = `${when} — ${t('circle.agent_activity.row', { op: r.op ?? '?', outcome: r.outcome ?? '' })}${via}`;
+              ul.appendChild(li);
+            }
+            card.appendChild(ul);
+          }
+          body.appendChild(card);
+        }
         return;
       }
       const items = itemsFromReply(res);

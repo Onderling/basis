@@ -553,6 +553,26 @@ export async function runGatedSkill(agent, {
   // (exact original ordering: after the gate, before the handler).
   const signal = onGatePassed ? onGatePassed() : undefined;
 
+  // ── Activity trail (port) ──────────────────────────────────────────────────
+  // If the composing app set `agent.trailSink`, tell it that a caller exercised a skill
+  // here — AFTER the gate, so refusals stay the security audit's story, and with a
+  // WHITELISTED shape: who (the verified origin when relayed), which skill, under what
+  // authority, and how it ended. Never the parts/args — a trail that carries content
+  // becomes a second copy of the data under different access rules. The kernel holds
+  // only this port; filtering (e.g. "not the owner's own surfaces") is the app's call.
+  // A sink failure must never break dispatch.
+  const emitTrail = (outcome) => {
+    if (typeof agent.trailSink !== 'function') return;
+    try {
+      agent.trailSink({
+        actor: attributedOrigin,
+        op:    skillId,
+        via:   (token && typeof token === 'object' && token.id) ? `grant:${token.id}` : 'peer',
+        outcome,
+      });
+    } catch { /* never break dispatch */ }
+  };
+
   // If `origin` is set we came through a relay. Expose both the immediate
   // sender (`from` = the relay) and the original caller (originFrom).
   const ctx = {
@@ -571,17 +591,19 @@ export async function runGatedSkill(agent, {
   try {
     result = skill.handler(ctx);
   } catch (err) {
+    emitTrail(err?.message ?? 'error');
     return { status: 'failed', error: err?.message ?? String(err), parts: [], handlerError: true, err };
   }
 
   // Async generator → streaming; hand back to the caller's ST/SE machinery.
-  if (isAsyncGen(result)) return { status: 'stream', gen: result, skill, ctx };
+  if (isAsyncGen(result)) { emitTrail('stream'); return { status: 'stream', gen: result, skill, ctx }; }
 
   let resolved;
   try {
     resolved = await result;
   } catch (err) {
-    if (err?.name === 'InputRequired') return { status: 'input-required', irErr: err, skill, ctx };
+    if (err?.name === 'InputRequired') { emitTrail('input-required'); return { status: 'input-required', irErr: err, skill, ctx }; }
+    emitTrail(err?.message ?? 'error');
     return { status: 'failed', error: err?.message ?? String(err), parts: [], handlerError: true, err };
   }
 
@@ -589,6 +611,7 @@ export async function runGatedSkill(agent, {
     : Array.isArray(resolved)          ? resolved
     : Parts.wrap(resolved);
 
+  emitTrail('ok');
   return { status: 'completed', parts: outParts, ctx };
 }
 

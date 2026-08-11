@@ -30,10 +30,10 @@ export function renderCircleMyData(container, {
   // The two delivery settings (2026-07-28). One object, because they are two knobs on one question.
   delivery,               // { sendReceipts, allowFallback } — absent ⇒ the section is omitted
   onSetDelivery,          // (patch) => void
-  // P1 §4 tail — how long this device keeps conversations. `retentionDays` = the current choice;
-  // `onSetRetention(days)` = the pick. Absent ⇒ the section is omitted (unchanged surface).
-  retentionDays = null,
-  onSetRetention = null,
+  // Message cleanup — the conversation is the RECORD and never expires by policy; deleting old messages
+  // is the user's own explicit act. `onPurgeMessages(days)` deletes conversation entries older than that
+  // and returns the count. Absent ⇒ the section is omitted (unchanged surface).
+  onPurgeMessages = null,
   // "Never share my global address" — the strictest privacy position in the product. `shareNknAddress`
   // is the current value; absent ⇒ the section is omitted (unchanged surface).
   shareNknAddress = null,
@@ -293,29 +293,59 @@ export function renderCircleMyData(container, {
     container.appendChild(sec);
   }
 
-  // ── how long this device keeps conversations (P1 §4 tail) ──────────────────
-  // ONE control, for the chat window only — the one number a person has an opinion about. The line
-  // under it says what happens to the rest, because "older messages are removed" would be a lie about
-  // the audit trail, which compacts into a summary instead of disappearing.
-  if (typeof onSetRetention === 'function' && retentionDays != null) {
-    const sec = section(tr('circle.mydata.retention'));
+  // ── message cleanup (the conversation is the RECORD) ────────────────────────
+  // Messages never expire by policy — deleting them is the user's own explicit act: pick an age, then
+  // confirm the clearly-destructive button (two clicks; the first arms it). The result line reports the
+  // real count, and the note says what is NOT touched (decisions/reports compact, they don't delete).
+  if (typeof onPurgeMessages === 'function') {
+    const sec = section(tr('circle.mydata.cleanup'));
 
+    let chosenDays = RETENTION_CHOICES_DAYS[RETENTION_CHOICES_DAYS.length - 1];
     const row = document.createElement('div');
     row.className = 'cc-mydata__retention';
+    const chips = [];
     for (const days of RETENTION_CHOICES_DAYS) {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'cc-mydata__action cc-mydata__retention-choice';
-      if (days === retentionDays) b.classList.add('is-on');
-      b.textContent = tr('circle.mydata.retention_days', { days });
-      b.addEventListener('click', () => onSetRetention(days));
+      if (days === chosenDays) b.classList.add('is-on');
+      b.textContent = tr('circle.mydata.cleanup_older_than', { days });
+      b.addEventListener('click', () => {
+        chosenDays = days;
+        for (const c of chips) c.classList.toggle('is-on', c === b);
+        disarm();
+      });
+      chips.push(b);
       row.appendChild(b);
     }
     sec.appendChild(row);
 
+    const act = document.createElement('button');
+    act.type = 'button';
+    act.className = 'cc-mydata__action cc-mydata__cleanup-run';
+    const result = document.createElement('p');
+    result.className = 'cc-mydata__retention-note';
+    let armed = false;
+    const disarm = () => { armed = false; act.classList.remove('is-armed'); act.textContent = tr('circle.mydata.cleanup_button', { days: chosenDays }); };
+    disarm();
+    act.addEventListener('click', async () => {
+      if (!armed) {
+        armed = true;
+        act.classList.add('is-armed');
+        act.textContent = tr('circle.mydata.cleanup_confirm', { days: chosenDays });
+        return;
+      }
+      let count = 0;
+      try { count = (await onPurgeMessages(chosenDays)) ?? 0; } catch { count = 0; }
+      disarm();
+      result.textContent = tr('circle.mydata.cleanup_done', { count });
+    });
+    sec.appendChild(act);
+    sec.appendChild(result);
+
     const note = document.createElement('p');
     note.className = 'cc-mydata__retention-note';
-    note.textContent = tr('circle.mydata.retention_note');
+    note.textContent = tr('circle.mydata.cleanup_note');
     sec.appendChild(note);
 
     container.appendChild(sec);

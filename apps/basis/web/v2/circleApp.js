@@ -62,7 +62,7 @@ import { circleGateRules } from '../../src/v2/circleGate.js';
 import { interpretToCommand } from '../../src/v2/interpretCommand.js';
 import { createRelayPrefStore, localStorageRelayIo, resolveRelayUrl } from '../../src/v2/relayPref.js';
 import {
-  RETENTION_CHOICES_DAYS, normalizeRetentionDays, retentionFromDays, DEFAULT_RETENTION_DAYS,
+  normalizeRetentionDays, retentionFromDays, DEFAULT_RETENTION_DAYS, daysToMs,
 } from '../../src/v2/retentionPref.js';
 import { registerCircleAddresses, unregisterCircleAddresses } from '../../src/v2/circleAddressRegistration.js';
 // removing one member from ONE circle, and leaving one, live in shared code: both end by
@@ -3947,17 +3947,11 @@ async function showMyData() {
       try { deliverySettingsCache = await deliverySettingsStore.set(patch); } catch { /* keep the old view */ }
       rerender();
     },
-    // P1 §4 tail — the retention choice takes effect NOW (setRetention prunes immediately), so a
-    // shortened window is visible in the conversation the user is looking at, not after a reload.
     shareNknAddress: addressSharingIo.load(),
     onSetShareAddress: (allowed) => { addressSharingIo.save(allowed); rerender(); },
-    retentionDays: normalizeRetentionDays(circleHouseholdAgent?.getParamValue('retention.chatDays')),
-    onSetRetention: (days) => {
-      // #36 — persist through the ONE kind-gated set-param op (device home), then apply to the live eventLog.
-      circleHouseholdAgent?.callSkill('params', 'set-param', { key: 'retention.chatDays', value: normalizeRetentionDays(days) });
-      try { eventLog.setRetention(retentionFromDays(days)); } catch { /* a prune failure must not block the setting */ }
-      rerender();
-    },
+    // Message cleanup — the conversation is the RECORD (never expires by policy); this is the user's own
+    // explicit deletion, taking effect NOW in the conversation they are looking at. Returns the real count.
+    onPurgeMessages: (days) => eventLog.purgeConversation({ olderThanMs: daysToMs(normalizeRetentionDays(days)) }),
     surfacePref: circleSurfacePref.get(), onSetSurfacePref, appLang: currentLang(), onSetAppLang, themePref: getThemePref(), onSetTheme: (v) => { if (setThemePref(v)) rerender(); }, chatAi, userLlm: userLlmCfg, onSaveUserLlm, validateUserLlm: validateUserLlmConfig,
     // in-app relay setting (no rebuild): the field shows the saved setting; env is the placeholder fallback.
     // Objective D / Surface 4: onOpenRelayPanel routes editing into the docked side-panel (openPagePanel).

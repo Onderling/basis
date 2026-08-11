@@ -312,6 +312,34 @@ describe('EventLog — per-kind retention', () => {
     expect(ids).toContain('gov-old');       // the trail did not silently forget
   });
 
+  it('purgeConversation is the explicit act: deletes ONLY old chat messages, never the roster or trail', () => {
+    let clock = 0;
+    const log = new EventLog({ now: () => clock });
+    log.append(ev({ id: 'old-msg', ts: 0, app: 'kring', type: 'chat-message', circleId: 'c1', payload: { text: 'oud' } }));
+    log.append(ev({ id: 'new-msg', ts: 900, app: 'kring', type: 'chat-message', circleId: 'c1', payload: { text: 'nieuw' } }));
+    log.append(ev({ id: 'mem', ts: 0, app: 'system', type: 'membership', circleId: 'c1', payload: {} }));
+    log.append(ev({ id: 'gov', ts: 0, app: 'system', type: 'governance', circleId: 'c1', payload: { event: 'propose' } }));
+    clock = 1000;
+    const deleted = log.purgeConversation({ olderThanMs: 500 });   // everything older than clock-500
+    expect(deleted).toBe(1);
+    const ids = log.query().map((e) => e.id);
+    expect(ids).not.toContain('old-msg');                          // the user's deletion, applied
+    expect(ids).toContain('new-msg');                              // younger than the chosen age
+    expect(ids).toContain('mem');                                  // the roster's record is untouchable here
+    expect(ids).toContain('gov');                                  // so is the trail
+  });
+
+  it('purgeConversation scoped to one circle leaves the other circles alone', () => {
+    let clock = 1000;
+    const log = new EventLog({ now: () => clock });
+    log.append(ev({ id: 'a1', ts: 0, app: 'kring', type: 'chat-message', circleId: 'cA', payload: {} }));
+    log.append(ev({ id: 'b1', ts: 0, app: 'kring', type: 'chat-message', circleId: 'cB', payload: {} }));
+    expect(log.purgeConversation({ olderThanMs: 100, circleId: 'cA' })).toBe(1);
+    const ids = log.query().map((e) => e.id);
+    expect(ids).not.toContain('a1');
+    expect(ids).toContain('b1');
+  });
+
   it('chat messages are the RECORD — no window, however small, ever drops them', () => {
     let clock = 0;
     const log = new EventLog({ now: () => clock, retention: { short: 1, chat: 1, audit: 1 } });

@@ -8,7 +8,7 @@
  * The backup/restore flows reuse the existing RN wizard modals — no reimpl.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, Modal, TextInput } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, Modal, TextInput, Alert } from 'react-native';
 import { t, lang, setLang } from '../../core/localisation.js';
 import { useTheme, useThemePref } from './themeContext.js';
 import { surfacePrefStore } from '../../core/surfacePrefStore.js';
@@ -22,7 +22,7 @@ import {
 // P1 §4 tail — how long this device keeps conversations. ONE control (the chat window); plumbing
 // follows it and the audit trail uses it as a DETAIL window, compacting past it. web≡mobile.
 import {
-  RETENTION_CHOICES_DAYS, normalizeRetentionDays, retentionFromDays,
+  RETENTION_CHOICES_DAYS, normalizeRetentionDays, daysToMs,
 } from '../../../../basis/src/v2/retentionPref.js';
 // "Never share my global address" (J-CS8) — the strictest privacy position in the product: one address
 // across everything is what links a person's circles together.
@@ -115,19 +115,30 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
     addressSharingIo.save(next).catch(() => {});
   }, [addressSharingIo, shareNknAddress]);
 
-  // #36 — chat-retention window from the PARAMETER REGISTER (device/user), via callSkill('params',…) — parity
-  // with web circleApp; the bespoke asyncStorage retention store is retired.
-  const [retentionDays, setRetentionDays] = useState(null);
-  useEffect(() => {
-    callSkill?.('params', 'get-param', { key: 'retention.chatDays' })
-      .then((r) => setRetentionDays(normalizeRetentionDays(r?.value))).catch(() => {});
-  }, [callSkill]);
-  const pickRetention = useCallback((days) => {
-    const d = normalizeRetentionDays(days);
-    setRetentionDays(d);
-    callSkill?.('params', 'set-param', { key: 'retention.chatDays', value: d });
-    try { eventLog?.setRetention?.(retentionFromDays(d)); } catch { /* a prune failure must not block the setting */ }
-  }, [callSkill, eventLog]);
+  // Message cleanup (web parity) — the conversation is the RECORD and never expires by policy; deleting
+  // old messages is the user's own explicit act, confirmed through the platform dialog. The result line
+  // reports the real count from the log itself.
+  const [cleanupDays, setCleanupDays] = useState(RETENTION_CHOICES_DAYS[RETENTION_CHOICES_DAYS.length - 1]);
+  const [cleanupResult, setCleanupResult] = useState(null);
+  const runCleanup = useCallback(() => {
+    const days = normalizeRetentionDays(cleanupDays);
+    Alert.alert(
+      t('circle.mydata.cleanup_button', { days }),
+      t('circle.mydata.cleanup_confirm'),
+      [
+        { text: t('circle.confirm.cancel'), style: 'cancel' },
+        {
+          text: t('circle.mydata.cleanup'),
+          style: 'destructive',
+          onPress: () => {
+            let count = 0;
+            try { count = eventLog?.purgeConversation?.({ olderThanMs: daysToMs(days) }) ?? 0; } catch { count = 0; }
+            setCleanupResult(count);
+          },
+        },
+      ],
+    );
+  }, [cleanupDays, eventLog, t]);
 
   useEffect(() => { getNativePushState().then(setPush).catch(() => {}); }, []);
   const toggleNativePush = useCallback(async () => {
@@ -325,29 +336,34 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
         </Section>
       ) : null}
 
-      {/* P1 §4 tail — ONE retention control (the chat window), web parity. The note says what happens to
-          decisions/reports: they COMPACT into a counted summary, so "removed" alone would be untrue. */}
-      {retentionDays != null ? (
-        <Section title={t('circle.mydata.retention')}>
-          <View style={styles.retentionRow}>
-            {RETENTION_CHOICES_DAYS.map((days) => (
-              <Pressable
-                key={days}
-                onPress={() => pickRetention(days)}
-                accessibilityRole="button"
-                accessibilityState={{ selected: days === retentionDays }}
-                style={[styles.retentionChoice, days === retentionDays && styles.retentionChoiceOn]}
-                testID={`retention-${days}`}
-              >
-                <Text style={[styles.retentionChoiceText, days === retentionDays && styles.retentionChoiceTextOn]}>
-                  {t('circle.mydata.retention_days', { days })}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <Text style={styles.privacyBody}>{t('circle.mydata.retention_note')}</Text>
-        </Section>
-      ) : null}
+      {/* Message cleanup (web parity) — the record never expires by policy; this is the explicit,
+          confirmed deletion. The note says what is NOT touched: decisions/reports compact into a
+          counted summary rather than disappearing. */}
+      <Section title={t('circle.mydata.cleanup')}>
+        <View style={styles.retentionRow}>
+          {RETENTION_CHOICES_DAYS.map((days) => (
+            <Pressable
+              key={days}
+              onPress={() => { setCleanupDays(days); setCleanupResult(null); }}
+              accessibilityRole="button"
+              accessibilityState={{ selected: days === cleanupDays }}
+              style={[styles.retentionChoice, days === cleanupDays && styles.retentionChoiceOn]}
+              testID={`cleanup-${days}`}
+            >
+              <Text style={[styles.retentionChoiceText, days === cleanupDays && styles.retentionChoiceTextOn]}>
+                {t('circle.mydata.cleanup_older_than', { days })}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        <Pressable onPress={runCleanup} accessibilityRole="button" style={styles.action} testID="cleanup-run">
+          <Text style={styles.actionLabel}>{t('circle.mydata.cleanup_button', { days: cleanupDays })}</Text>
+        </Pressable>
+        {cleanupResult != null ? (
+          <Text style={styles.privacyBody}>{t('circle.mydata.cleanup_done', { count: cleanupResult })}</Text>
+        ) : null}
+        <Text style={styles.privacyBody}>{t('circle.mydata.cleanup_note')}</Text>
+      </Section>
 
       <Section title={t('circle.mydata.notifications')}>
         <Text style={styles.privacyBody}>

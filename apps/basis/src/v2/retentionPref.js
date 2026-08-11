@@ -1,30 +1,28 @@
 /**
- * retentionPref — how long this device keeps the conversation.
+ * retentionPref — the windowed-content retention model, and the age choices the CLEANUP control offers.
  *
- * The mechanism is per-KIND (one-log step D: `short` plumbing · `chat` · `audit`, where audit compacts
- * instead of dropping). The SETTING deliberately exposes **only the chat window** (Frits, 2026-07-28):
- * it is the one number a person has an opinion about. Plumbing retention is an implementation detail
- * nobody should have to reason about, and the audit window is not a "how long do I keep things"
- * question at all — audit entries compact rather than disappear, so a control there would promise a
- * deletion it does not perform. If someone later asks for the audit window, it joins as a second line;
- * shipping three controls now would be a settings farm answering a question nobody asked.
+ * Since the chat-lane sitting the conversation itself is RECORD class — it never expires by POLICY.
+ * What the user gets instead (Frits: "an explicit cleanup control") is a deliberate, clearly-destructive
+ * act: "verwijder berichten ouder dan N dagen" — `eventLog.purgeConversation`, surfaced in My data. The
+ * age choices below serve that control now.
  *
- * Device-local: retention is what THIS device keeps. It is not a circle policy and is never fanned —
- * telling a circle how long you keep its messages would be a disclosure nobody asked you to make.
+ * The retention WINDOWS still exist for the windowed classes (`short` plumbing · `chat`-class content
+ * whose durable head lives elsewhere · `audit`, which compacts instead of dropping) — an internal tuning,
+ * no longer a user promise about the conversation.
+ *
+ * Device-local: what THIS device keeps/cleans. Never fanned — telling a circle how long you keep its
+ * messages would be a disclosure nobody asked you to make.
  */
 
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
-/** The offered chat windows, in days. */
+/** The age choices the cleanup control offers ("older than N days"), and the windowed-class windows. */
 export const RETENTION_CHOICES_DAYS = Object.freeze([7, 14, 30, 90]);
 
-// Parameter register (#36) — a GENUINE user preference (the chat-retention window a person actually has an
-// opinion about) and explicitly device-scoped ("what THIS device keeps... not a circle policy"): scope:device,
-// kind:user. Declared here for discoverability + the stale-param census; its SETTABLE home stays the existing
-// retention setting (do NOT also route it through set-param — double-homing would be drift). Folding that
-// bespoke set into the one set-param op is part of the register's read/set adoption (REMAINING-WORK L24).
-/** The decided default — unchanged by this setting existing. */
-export const DEFAULT_RETENTION_DAYS = param({ key: 'retention.chatDays', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: 14 });
+// Parameter register (#36) — INTERNAL since the cleanup redesign: the conversation no longer expires by
+// policy, so there is no user promise here to keep settable; this default only feeds the windowed-class
+// windows (`retentionFromDays`). The user-facing act is `purgeConversation`, an operation, not a param.
+export const DEFAULT_RETENTION_DAYS = param({ key: 'retention.chatDays', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 14 });
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

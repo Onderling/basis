@@ -21,7 +21,9 @@
  *
  * Facts the assertions rely on (registered kind:user params):
  *   • nearby.ask.defaultTtlMs — scope AGENT, default 30*60_000 (1800000)  → syncs
- *   • retention.chatDays      — scope DEVICE, default 14                  → local-only
+ *   • onlineCadence.pollIntervalMs — scope DEVICE, default 5000           → local-only
+ *     (was retention.chatDays until the cleanup redesign demoted that one to INTERNAL — the conversation
+ *     is the record; deleting old messages is an explicit op, not a param)
  * The surface: agent.callSkill('params', 'set-param'|'get-param'|'list-user-params', args).
  */
 import { describe, it, expect } from 'vitest';
@@ -33,7 +35,7 @@ const mk = (settingsDataSource) =>
   createRealHouseholdAgent({ seedHousehold: false, settingsDataSource });
 
 const AGENT_KEY  = 'nearby.ask.defaultTtlMs';
-const DEVICE_KEY = 'retention.chatDays';
+const DEVICE_KEY = 'onlineCadence.pollIntervalMs';
 
 describe('parameter register — multi-device journeys (#36, through the real composition)', () => {
   it('S1 — agent scope SYNCS across devices: B hydrates A\'s persisted value at boot', async () => {
@@ -74,7 +76,7 @@ describe('parameter register — multi-device journeys (#36, through the real co
     const B = await mk(shared);
     const got = await B.callSkill('params', 'get-param', { key: DEVICE_KEY });
     expect(got.ok).toBe(true);
-    expect(got.value).toBe(14);
+    expect(got.value).toBe(5000);
     expect(got.value).not.toBe(30);
   });
 
@@ -132,7 +134,7 @@ describe('parameter register — multi-device journeys (#36, through the real co
     const bCache = new CachingDataSource();
     const B = await createRealHouseholdAgent({ seedHousehold: false, settingsDataSource: bCache, provisionSettingsMedium });
     const got = await B.callSkill('params', 'get-param', { key: DEVICE_KEY });
-    expect(got.value).toBe(14);                            // the registered default — A's device value did not cross
+    expect(got.value).toBe(5000);                          // the registered default — A's device value did not cross
   });
 
   it('list-user-params includes both the agent- and device-scoped user params', async () => {

@@ -34,10 +34,11 @@ import { DEFAULT_RETENTION_DAYS } from './retentionPref.js';
  */
 export const BASIS_USER_PARAMS = [
   { key: 'nearby.ask.defaultTtlMs', scope: PARAM_SCOPE.AGENT,  kind: PARAM_KIND.USER, default: ASK_DEFAULT_TTL_MS },
-  // The chat-retention window — a genuine device/user preference (declared via param() in retentionPref.js;
-  // same key + default here, so the register's declare-agreement holds). The FIRST real consumer: the eventLog
-  // retention reads it via `agent.getParamValue('retention.chatDays')` (see circleApp), not a bespoke store.
-  { key: 'retention.chatDays',      scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: DEFAULT_RETENTION_DAYS },
+  // The windowed-class retention default — INTERNAL since the cleanup redesign (the conversation is the
+  // RECORD and never expires by policy; the user's act is the explicit purgeConversation control, an
+  // operation, not a param). Kept in the register so the boot readers (`getParamValue('retention.chatDays')`)
+  // still resolve; kind matches the declaration site, per the declare-agreement guard.
+  { key: 'retention.chatDays',      scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: DEFAULT_RETENTION_DAYS },
   // Registered 2026-08-10 (review finding 2): declared kind:user at their sites but governed by no register
   // (inert settability). Defaults MUST match the declaration site — the duplicate-vocab guard enforces agreement.
   { key: 'calendarEmission.defaultDurationMin', scope: PARAM_SCOPE.AGENT,  kind: PARAM_KIND.USER, default: 30 },

@@ -343,6 +343,30 @@ export class EventLog {
   }
 
   /**
+   * EXPLICITLY delete conversation entries older than `olderThanMs` — the user's own destructive act,
+   * distinct from retention POLICY. Chat messages are record-class (never auto-expire); this is the one
+   * deliberate way they leave the device. Touches ONLY the conversation kind: membership, governance,
+   * the audit trail and its summaries are never purgeable through it. Optionally scoped to one circle.
+   * Persists the shrunk log; returns how many were deleted (the confirmation the UI reports back).
+   *
+   * @param {{olderThanMs: number, circleId?: string}} args
+   * @returns {number} the number of deleted conversation entries
+   */
+  purgeConversation({ olderThanMs, circleId = null } = {}) {
+    if (typeof olderThanMs !== 'number' || !Number.isFinite(olderThanMs) || olderThanMs < 0) return 0;
+    const cutoff = this.#now() - olderThanMs;
+    const before = this.#events.length;
+    this.#events = this.#events.filter((e) => !(
+      e.type === 'chat-message'
+      && e.ts < cutoff
+      && (circleId == null || e.circleId === circleId)
+    ));
+    const deleted = before - this.#events.length;
+    if (deleted) this.#persist(this.#events.slice()).catch(() => {});
+    return deleted;
+  }
+
+  /**
    * Prune by the entry's retention CLASS (one-log step D). Three fates:
    *
    *   • `short` / `chat` entries older than their window are DROPPED (as before — one window each).

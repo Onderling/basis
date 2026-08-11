@@ -4072,17 +4072,29 @@
       "text": "No AI model is configured.",
       "doc": "S6.D — no provider endpoint."
     },
-    "retention": {
-      "text": "How long messages are kept",
-      "doc": "P1 §4 — heading of the retention control in My data."
+    "cleanup": {
+      "text": "Clean up messages",
+      "doc": "Heading of the message-cleanup control in My data. Messages are the record and never expire by policy; deleting them is the user's own explicit act."
     },
-    "retention_days": {
-      "text": "{{days}} days",
-      "doc": "P1 §4 — a retention choice button."
+    "cleanup_older_than": {
+      "text": "older than {{days}} days",
+      "doc": "An age-choice chip for the cleanup control."
     },
-    "retention_note": {
-      "text": "Older messages are removed from this device. Decisions and reports are not deleted — they collapse into a summary that says how many they cover.",
-      "doc": "P1 §4 — what actually happens; the audit trail compacts rather than disappearing, so \"removed\" alone would be untrue."
+    "cleanup_button": {
+      "text": "Delete messages older than {{days}} days",
+      "doc": "The destructive action button (first click arms it)."
+    },
+    "cleanup_confirm": {
+      "text": "Are you sure? Tap again to delete",
+      "doc": "The armed state of the destructive button — the second click deletes."
+    },
+    "cleanup_done": {
+      "text": "{{count}} messages deleted from this device",
+      "doc": "The honest result line — the real count, from the log itself."
+    },
+    "cleanup_note": {
+      "text": "Messages stay on this device until you delete them. Decisions and reports are not wiped — they collapse into a summary that says how many they cover.",
+      "doc": "What the control does and does NOT touch; the audit trail compacts rather than disappearing."
     },
     "address_sharing": {
       "text": "Your address on the mesh",

@@ -254,9 +254,11 @@ export function toWireEnvelope({ circleId, msgId, ts, text, fromActor, fromWebid
  * @param {(string|null)} a.fromWebid
  * @param {object} [a.media]              already wire-whitelisted (unchanged from toWireEnvelope)
  */
-export function toWireRefEnvelope({ circleId, msgId, ts, ref, fromActor, fromWebid, media }) {
+export function toWireRefEnvelope({ circleId, msgId, ts, ref, fromActor, fromWebid, media, subtype }) {
   return {
-    type: 'p2p-chat', subtype: KRING_CHAT_KIND,
+    // `subtype` rides through so a ref points its RESOLVER at the right receive path: a signed-statement
+    // row's ref routes to the chat rail (verify-then-render), the legacy kind to the legacy inbox.
+    type: 'p2p-chat', subtype: subtype ?? KRING_CHAT_KIND,
     circleId, msgId, ts, ref, fromActor, fromWebid,
     ...(media && typeof media === 'object' && !Array.isArray(media) ? { media } : {}),
   };

@@ -3815,8 +3815,17 @@ export function buildSkills({
       if (!a.event || typeof a.event !== 'object')                    return { error: 'event-required' };
       if (typeof a.msgId !== 'string' || !a.msgId)                    return { error: 'msgId-required' };
       const ts = typeof a.ts === 'number' && Number.isFinite(a.ts) ? a.ts : Date.now();
+      // A real wire ENVELOPE (not just extras) so the circle's data-policy applies to the SIGNED path
+      // exactly as it did to the legacy one: a pod-backed circle's statement is sealed + written to the
+      // shared pod (pod-only: no fan — members read the pod; pod-signal: a ref envelope fans, carrying
+      // this subtype so the resolver routes the row back to the chat rail). The pod stays transport,
+      // never authority — whoever reads the row verifies the statement like any fanned one.
       return broadcastToCircle({
         circleId: _groupId, kind: 'kring-chat-statement', from,
+        envelope: {
+          type: 'p2p-chat', subtype: 'kring-chat-statement',
+          circleId: _groupId, msgId: a.msgId, ts, event: a.event, fromWebid: from,
+        },
         extras: { circleId: _groupId, msgId: a.msgId, ts, event: a.event },
         metric: 'kring-chat-statement-fanout',
         noWake: !kindWakes('chat-message'),

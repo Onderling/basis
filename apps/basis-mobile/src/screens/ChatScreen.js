@@ -68,7 +68,8 @@ import { makeGovernanceRail } from '../../../basis/src/v2/governanceAppWiring.js
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../../basis/src/v2/membershipRail.js';
 import { makeTaskPeerHandler, TASK_BROADCAST, TASK_CATCHUP_SUBTYPES } from '../../../basis/src/v2/taskRail.js';
 import { makeFrontierReplay } from '../../../basis/src/v2/frontierReplay.js';
-import { makeChatPeerHandler, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../../basis/src/v2/chatRail.js';
+import { makeChatPeerHandler, makePodChatCatchUp, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../../basis/src/v2/chatRail.js';
+import { circleResolveRef, circlePodReadSince, circleSendDataMove } from '../core/circlePods.js';
 import { makeGovernanceCatchUp } from '../../../basis/src/v2/governanceCatchUp.js';
 import { governanceEntryId } from '../../../basis/src/v2/governanceLog.js';
 import { makeHandleChatMessage }
@@ -831,6 +832,9 @@ export default function ChatScreen({
         const chatLaneRail = bundle?.agent?.chatRail ?? null;
         const chatStatementHandler = chatLaneRail ? makeChatPeerHandler({
           rail: chatLaneRail,
+          // A pod-signal circle fans a REF to the statement's sealed pod row — resolved through the same
+          // sealed-pod reader the legacy inbox used, then verified at the rail (web parity).
+          resolveRef: circleResolveRef,
           // The persisted log IS the record — no store copy for a landed signed entry (the history
           // migration carried the store era over once). Side effect: the delivery receipt, through the
           // SAME App-owned sender the legacy inbox uses (web's onKringStored parity).
@@ -839,6 +843,24 @@ export default function ChatScreen({
             catch { /* the receipt is best-effort */ }
           },
         }) : null;
+        // POD-ONLY circles never fan — read each pod circle's statement rows back on the same kick the
+        // peer catch-ups use, through the rail's verify gate (web parity).
+        const podChatCatchUp = chatLaneRail ? makePodChatCatchUp({
+          rail: chatLaneRail,
+          podReadSince: circlePodReadSince,
+          dataMoveFor: circleSendDataMove,
+          eventLog: eventLogRef.current,
+        }) : null;
+        if (podChatCatchUp && !globalThis.__onderlingPodChatCatchUpKicked) {
+          globalThis.__onderlingPodChatCatchUpKicked = true;
+          setTimeout(async () => {
+            try {
+              const r = await bundle.callSkill('stoop', 'listMyBuurts', {});
+              const ids = (r?.buurts ?? []).map((b) => b?.groupId ?? b?.id).filter(Boolean);
+              await podChatCatchUp.catchUpAll(ids);
+            } catch { /* best-effort — the next launch retries */ }
+          }, 4000);
+        }
         const chatCatchUp = chatLaneRail ? makeFrontierReplay({
           rail: chatLaneRail,
           sendToPeer: (addr, payload) => bundle?.agent?.sendPeerMessage?.(addr, payload),

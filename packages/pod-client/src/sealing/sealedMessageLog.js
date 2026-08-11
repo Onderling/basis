@@ -39,6 +39,10 @@ function canonicalMessage(env) {
   };
   if (env.fromWebid != null) out.fromWebid = env.fromWebid;
   if (env.media && typeof env.media === 'object' && !Array.isArray(env.media)) out.media = env.media;
+  // The chat re-root: a pod row may carry the SIGNED STATEMENT (`event` = the chained, per-circle-key
+  // signed message) — the pod stays transport, never authority: the reader verifies the statement at its
+  // rail exactly like a fanned one, so a pod cannot inject what a peer could not.
+  if (env.event && typeof env.event === 'object' && !Array.isArray(env.event)) out.event = env.event;
   return out;
 }
 

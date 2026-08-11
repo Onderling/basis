@@ -169,7 +169,7 @@ import { makeGovernanceCatchUp } from '../../src/v2/governanceCatchUp.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../src/v2/membershipRail.js';
 import { makeTaskPeerHandler, TASK_BROADCAST, TASK_CATCHUP_SUBTYPES } from '../../src/v2/taskRail.js';
 import { makeFrontierReplay } from '../../src/v2/frontierReplay.js';
-import { makeChatPeerHandler, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../src/v2/chatRail.js';
+import { makeChatPeerHandler, makePodChatCatchUp, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../src/v2/chatRail.js';
 import { wireEventLogPersistence, backendSnapshotIo } from '../../src/v2/eventLogPersistence.js';
 import { buildSubjectLabeler } from '../../src/v2/governanceView.js';
 import { governanceEntryId, foldGovernance } from '../../src/v2/governanceLog.js';
@@ -1319,6 +1319,7 @@ let govCatchUpShell = null;          // pull-all governance catch-up (the offlin
 let memCatchUpShell = null;          // the membership lane's catch-up (same mechanism, its own subtypes)
 let taskCatchUpShell = null;         // the task lane's catch-up (serves stored entries + signed live heads)
 let chatCatchUpShell = null;         // the chat lane's catch-up (windowed frontier replay + the consent rung)
+let podChatCatchUpShell = null;      // pod-only circles' statement read-back (the pod is the meeting point)
 // The pod-session's AUTHED fetch (set on sign-in) — lets embed-ref resolution
 // read the user's OWN private-pod items; null when signed out → resolution falls
 // back to a public fetch (only public cross-pod refs resolve; protected → 🔒).
@@ -6988,11 +6989,23 @@ async function boot() {
       // history until it retires), the delivery receipt, and the repaint — through the SAME shared seam.
       const kringChatStatementHandler = agent.chatRail ? makeChatPeerHandler({
         rail: agent.chatRail,
+        // A pod-signal circle fans a REF to the statement's sealed pod row — resolved through the same
+        // sealed-pod reader the legacy inbox used, then verified at the rail like any fanned statement.
+        resolveRef: circleResolveRef,
         // The persisted log IS the record — a landed signed entry needs no store copy anymore (the
         // history migration carried the store era over once). Side effects: the receipt + the repaint.
         onLanded: async (cid, entry, fromPeerAddr) => {
           onKringStored({ msgId: entry.id, circleId: cid, fromPeerAddr, source: 'receiver' });
         },
+      }) : null;
+      // POD-ONLY circles never fan — the shared pod is the meeting point. On the same reconnect kick as
+      // the peer catch-ups, range-read each pod circle's statement rows since the local watermark and
+      // ingest them through the rail's verify gate.
+      podChatCatchUpShell = agent.chatRail ? makePodChatCatchUp({
+        rail: agent.chatRail,
+        podReadSince: circlePodReadSince,
+        dataMoveFor: circleSendDataMove,
+        eventLog,
       }) : null;
       // The chat lane's catch-up: windowed frontier replay with the consent rung. Above the auto-allow
       // ceiling the user gets the real question as a kring bubble with a download button.
@@ -7288,6 +7301,14 @@ async function boot() {
         memCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         taskCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         chatCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
+        // The pod read-back kick: same reconnect moment, per live circle (the circles list is loaded here).
+        (async () => {
+          try {
+            const r = await rawCallSkill('stoop', 'listMyBuurts', {});
+            const ids = (r?.buurts ?? []).map((b) => b?.groupId ?? b?.id).filter(Boolean);
+            await podChatCatchUpShell?.catchUpAll(ids);
+          } catch { /* best-effort — the next reconnect retries */ }
+        })();
         // Seed the household roster for the active circle (re-fed on open below).
         feedHouseholdRosterForCircle(getActiveCircle()).catch(() => {});
       }, 1500);

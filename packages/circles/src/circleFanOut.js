@@ -156,6 +156,7 @@ export function createCircleFanOut({
             circleId, msgId: envelope.msgId, ts: envelope.ts, ref,
             fromActor: envelope.fromActor ?? null, fromWebid: envelope.fromWebid ?? null,
             media: envelope.media,
+            subtype: envelope.subtype,   // the ref routes to the same receive path the full envelope would
           });
           // NOTE (unchanged here, worth a look on its own): this ref fan passes no `circleId` /
           // `preferCircleAddress`, so unlike the full fan below it still routes to members' GLOBAL

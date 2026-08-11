@@ -184,7 +184,13 @@ export function makeChatRail({ eventLog, circleIdentityFor, myRef, callSkill, ve
     return { ok: true, entry, existed: false };
   }
 
-  return { appendMessage, signEntry, ingest, storedStatements };
+  /** Is a message with this msgId already landed here? (The ref path checks BEFORE a pod read.) */
+  const hasEntry = (circleId, msgId) => {
+    const e = findEntry(msgId);
+    return !!e && e.payload?.circleId === circleId;
+  };
+
+  return { appendMessage, signEntry, ingest, storedStatements, hasEntry };
 }
 
 /**
@@ -205,19 +211,88 @@ export function makeChatEmitter({ rail, fan = null }) {
 
 /** Peer handler for the signed chat fan → the rail's full ingest gate. `onLanded(circleId, entry)` is
  *  the side-effect seam (delivery receipts, the store-mirror bridge while it still exists). */
-export function makeChatPeerHandler({ rail, onLanded = null } = {}) {
+export function makeChatPeerHandler({ rail, onLanded = null, resolveRef = null } = {}) {
   if (!rail) throw new Error('makeChatPeerHandler: a chat rail is required');
-  return async function onKringChatStatement(_fromPeerAddr, payload) {
+  return async function onKringChatStatement(fromPeerAddr, payload) {
     if (!payload || payload.subtype !== CHAT_STATEMENT_BROADCAST) return;
-    const { circleId, event: statement } = payload;
-    if (typeof circleId !== 'string' || !circleId || !statement?.body || !statement?.sig) return;
+    const { circleId } = payload;
+    if (typeof circleId !== 'string' || !circleId) return;
     try {
+      // Two carriages, one subtype: the statement INLINE (`payload.event` — the peer fan and catch-up
+      // batches), or a POD REF (`payload.ref`, a pod-signal circle's row pointer) resolved through the
+      // injected sealed-pod reader. The row carries the statement and passes the SAME verify gate as a
+      // fanned one — the pod is transport, never authority. A ref for a message already landed is
+      // dropped WITHOUT a pod read.
+      let statement = payload.event ?? null;
+      if (!statement && typeof payload.ref === 'string' && payload.ref && typeof resolveRef === 'function') {
+        if (typeof payload.msgId === 'string' && payload.msgId && rail.hasEntry(circleId, payload.msgId)) return;
+        const row = await resolveRef(payload);
+        statement = row?.event ?? null;
+      }
+      if (!statement?.body || !statement?.sig) return;
       const res = await rail.ingest(circleId, statement);
       if (res?.ok && !res.existed && typeof onLanded === 'function') {
-        try { await onLanded(circleId, res.entry); } catch { /* side effects are best-effort */ }
+        // fromPeerAddr rides along — the delivery receipt cannot answer a sender it was never told about.
+        try { await onLanded(circleId, res.entry, fromPeerAddr); } catch { /* side effects are best-effort */ }
       }
     } catch { /* ingest is best-effort — never throw on a peer message */ }
   };
+}
+
+/**
+ * The POD-ONLY circle's catch-up: no fan ever happens there — the shared pod IS the meeting point, so
+ * on each kick the reader range-queries the pod since just before its newest landed message and ingests
+ * every statement row through the rail's full verify gate (idempotent; the overlap only costs dedup).
+ * Lane entries stay the record; the pod is the transport for members who were offline.
+ *
+ * @param {object} a
+ * @param {object} a.rail                       the chat rail
+ * @param {(circleId:string, q:{sinceTs:number})=>Promise<object[]>} a.podReadSince  the sealed-pod range reader
+ * @param {(circleId:string)=>Promise<string>|string} [a.dataMoveFor]  the circle's data-move branch; absent →
+ *   every listed circle is probed (a pod-less circle's reader just returns nothing)
+ * @param {{query: Function}} a.eventLog        for the since-watermark (newest landed chat entry per circle)
+ */
+export function makePodChatCatchUp({ rail, podReadSince, dataMoveFor = null, eventLog } = {}) {
+  if (!rail || typeof podReadSince !== 'function') return null;
+  const OVERLAP_MS = 60 * 60 * 1000;   // re-read an hour behind the watermark; idempotent ingest dedups
+
+  async function catchUpCircle(circleId) {
+    if (typeof dataMoveFor === 'function') {
+      try {
+        const move = await dataMoveFor(circleId);
+        if (move !== 'pod-only' && move !== 'pod-signal') return { ingested: 0 };
+      } catch { return { ingested: 0 }; }
+    }
+    let sinceTs = 0;
+    try {
+      for (const e of eventLog?.query?.({}) ?? []) {
+        if (e?.type === CHAT_LANE && e.payload?.circleId === circleId && typeof e.ts === 'number' && e.ts > sinceTs) sinceTs = e.ts;
+      }
+    } catch { sinceTs = 0; }
+    let rows = [];
+    try { rows = (await podReadSince(circleId, { sinceTs: Math.max(0, sinceTs - OVERLAP_MS) })) ?? []; }
+    catch { return { ingested: 0 }; }
+    let ingested = 0;
+    for (const row of rows) {
+      const statement = row?.event;
+      if (!statement?.body || !statement?.sig) continue;   // a pre-statement row: the migrated era's copy
+      try { const r = await rail.ingest(circleId, statement); if (r?.ok && !r.existed) ingested += 1; }
+      catch { /* one bad row never blocks the rest */ }
+    }
+    return { ingested };
+  }
+
+  /** Kick every listed circle (the shells pass their live circle list). Best-effort per circle. */
+  async function catchUpAll(circleIds) {
+    let ingested = 0;
+    for (const cid of (Array.isArray(circleIds) ? circleIds : [])) {
+      if (typeof cid !== 'string' || !cid) continue;
+      try { ingested += (await catchUpCircle(cid)).ingested; } catch { /* next circle */ }
+    }
+    return { ingested };
+  }
+
+  return { catchUpCircle, catchUpAll };
 }
 
 /** Should this chat statement wake an offline device? Derived from the one shared kind table. */

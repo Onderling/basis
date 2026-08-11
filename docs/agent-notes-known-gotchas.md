@@ -571,3 +571,14 @@ here (no clean reinstall — see CLAUDE.md "NEVER rm -rf node_modules"). Symptom
   `ln -sfn ../../../../packages/local-store apps/basis/node_modules/@onderling/local-store`. `local-store`
   is dependency-free, so no transitive links were needed — verify with
   `node -e "import('@onderling/<pkg>').then(m=>console.log(Object.keys(m)))"` from the app dir.
+
+## basis-mobile background-fetch deps are hand-materialized (2026-08-11, the tasks-mobile salvage)
+
+`expo-background-fetch` + `expo-task-manager` were COPIED into `apps/basis-mobile/node_modules/` from
+tasks-mobile's tree at its retirement (real dirs, not symlinks — the source app is deleted), and
+`@onderling/sync-engine-rn` is the standard workspace symlink. All three are declared in package.json,
+but remember this tree never survives a clean reinstall (see CLAUDE.md) — if one of these goes missing,
+re-materialize it the same way, don't reinstall. The NATIVE halves need a fresh dev-client build before
+they exist on device; until then `wireBackgroundSync` wires the JS side and reports `registered:false`
+(by design — vitest and stale dev clients stay green). The bundle-load task definition lives in
+`apps/basis-mobile/index.js` (`BASIS_BG_TASK_NAME`) and MUST stay at module load per Expo's TaskManager.

@@ -20,6 +20,7 @@
  * goes through `t()`.
  */
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { wireBackgroundSync } from '../core/backgroundSync.js';
 import {
   Alert, AppState, Image, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
@@ -755,6 +756,22 @@ export default function ChatScreen({
         if (chatCatchUp && !globalThis.__onderlingChatCatchUpKicked) {
           globalThis.__onderlingChatCatchUpKicked = true;
           setTimeout(() => { chatCatchUp.requestAll({ callSkill: bundle.callSkill }).catch(() => {}); }, 3500);
+        }
+        // Background-fetch (salvaged from tasks-mobile): when the OS grants a background slot,
+        // run the SAME catch-ups the boot kicks run — pod chat read-back + frontier replay —
+        // so messages land while the app is backgrounded. Best-effort; wired once per process.
+        if ((podChatCatchUp || chatCatchUp) && !globalThis.__onderlingBgSyncWired) {
+          globalThis.__onderlingBgSyncWired = true;
+          wireBackgroundSync({
+            runOnce: async () => {
+              try {
+                const r = await bundle.callSkill('stoop', 'listMyBuurts', {});
+                const ids = (r?.buurts ?? []).map((b) => b?.groupId ?? b?.id).filter(Boolean);
+                if (podChatCatchUp) await podChatCatchUp.catchUpAll(ids);
+                if (chatCatchUp) await chatCatchUp.requestAll({ callSkill: bundle.callSkill });
+              } catch { /* a background slot is best-effort; the next slot retries */ }
+            },
+          }).catch(() => { /* wiring is best-effort — foreground sync is unaffected */ });
         }
         return {
           ...(govCatchUp ? { [govCatchUp.subtypes.request]: govCatchUp.onRequest, [govCatchUp.subtypes.batch]: govCatchUp.onBatch } : {}),

@@ -1804,6 +1804,7 @@ export default function CircleLauncherScreen({
         catalog={bundle?.catalog}
         policy={selectedPolicy}
         peerGraph={bundle?.peerGraph ?? null}
+        signChatStatement={(cid, mid) => bundle?.agent?.chatRail?.signEntry?.(cid, mid) ?? null}
         myListTasks={myListTasks}
         eventLog={eventLog}
         circles={circles}
@@ -2258,6 +2259,9 @@ function CircleDetail({
   // Passed narrowly rather than handing this component the whole bundle: it needs one lookup, and the file's
   // style is to thread the specific store.
   peerGraph = null,
+  // The chat lane's sign-the-appended-entry hook (`agent.chatRail.signEntry`) — threaded narrowly, the
+  // file's style: the fan needs one function, not the whole bundle.
+  signChatStatement = null,
   eventLog,
   circles = [],
   recipeStore = null, onStoopEvent, sendPersonaUpdate, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null, coreIdentity = null,
@@ -2617,13 +2621,16 @@ function CircleDetail({
     // Shared fan-out (Phase 2). RAW 3-arg callSkill (app-targeted at stoop) — the 2-arg resolving one
     // arg-shifts (op→'stoop') and never delivers. The helper marks δ.2 delivery state; onChange = the
     // RN rerender tick. `media` rides through like on web — the helper's wire whitelist projects it —
-    // so a media-carrying message fans with its embed instead of arriving as bare text.
+    // so a media-carrying message fans with its embed instead of arriving as bare text. `signStatement`
+    // is the chat lane's cutover hook (web parity): the appended entry is signed in place and the
+    // SIGNED statement fans; no rail/circle key yet → the legacy plain envelope, honestly.
     broadcastKringFanOut({
       rawCallSkill, circleId: circle?.id, msgId, text, ts, media,
       deliveryStateMap: deliveryStateMapRef.current,
       onChange: () => setDeliveryTick((n) => n + 1),
+      signStatement: signChatStatement,
     });
-  }, [rawCallSkill, circle?.id]);
+  }, [rawCallSkill, circle?.id, signChatStatement]);
 
   // append a kring chat bubble to the local eventLog (optimistic). Returns {msgId, ts}
   // so the caller can fan out the same id (receiver-side dedup suppresses any mirrored echo).

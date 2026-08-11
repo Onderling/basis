@@ -21,7 +21,7 @@
  */
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
-  AppState, Image, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet,
+  Alert, AppState, Image, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 
@@ -68,6 +68,8 @@ import { makeGovernanceRail } from '../../../basis/src/v2/governanceAppWiring.js
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../../basis/src/v2/membershipRail.js';
 import { makeTaskPeerHandler, TASK_BROADCAST, TASK_CATCHUP_SUBTYPES } from '../../../basis/src/v2/taskRail.js';
 import { makeFrontierReplay } from '../../../basis/src/v2/frontierReplay.js';
+import { makeChatPeerHandler, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../../basis/src/v2/chatRail.js';
+import { toWireEnvelope, fromEventLogItem } from '@onderling/item-store';
 import { makeGovernanceCatchUp } from '../../../basis/src/v2/governanceCatchUp.js';
 import { governanceEntryId } from '../../../basis/src/v2/governanceLog.js';
 import { makeHandleChatMessage }
@@ -821,6 +823,39 @@ export default function ChatScreen({
           globalThis.__onderlingTaskCatchUpKicked = true;
           setTimeout(() => { taskCatchUp.requestAll({ callSkill: bundle.callSkill }).catch(() => {}); }, 3000);
         }
+        // The SIGNED chat lane (web parity): the fan receiver verifies at the agent's chat rail — the
+        // roster binding is the eviction gate — and lands the ONE render entry (bubble + proof); the
+        // landed entry bridges to the stoop store copy (durable history until the store retires)
+        // through the shared inbox's ingest. The catch-up rides the windowed frontier replay; above
+        // the auto-allow ceiling the consent question is the platform dialog.
+        const chatLaneRail = bundle?.agent?.chatRail ?? null;
+        const chatStatementHandler = chatLaneRail ? makeChatPeerHandler({
+          rail: chatLaneRail,
+          onLanded: async (cid, entry, fromPeerAddr) => {
+            try { await callSkill('stoop', 'ingestKringMessage', { payload: toWireEnvelope(fromEventLogItem(entry)), fromPeerAddr }); }
+            catch { /* best-effort — the entry is already the record */ }
+          },
+        }) : null;
+        const chatCatchUp = chatLaneRail ? makeFrontierReplay({
+          rail: chatLaneRail,
+          sendToPeer: (addr, payload) => bundle?.agent?.sendPeerMessage?.(addr, payload),
+          subtypes: CHAT_CATCHUP_SUBTYPES,
+          onOffer: ({ circleId: cid, count, approxBytes, allow }) => {
+            const mb = approxBytes > 0 ? ` (~${(approxBytes / 1e6).toFixed(1)} MB)` : '';
+            Alert.alert(
+              t('circle.chat.catchup_allow'),
+              t('circle.chat.catchup_offer', { count, size: mb }),
+              [
+                { text: t('circle.confirm.cancel'), style: 'cancel' },
+                { text: t('circle.chat.catchup_allow'), onPress: () => { Promise.resolve(allow()).catch(() => {}); } },
+              ],
+            );
+          },
+        }) : null;
+        if (chatCatchUp && !globalThis.__onderlingChatCatchUpKicked) {
+          globalThis.__onderlingChatCatchUpKicked = true;
+          setTimeout(() => { chatCatchUp.requestAll({ callSkill: bundle.callSkill }).catch(() => {}); }, 3500);
+        }
         return {
           ...(govCatchUp ? { [govCatchUp.subtypes.request]: govCatchUp.onRequest, [govCatchUp.subtypes.batch]: govCatchUp.onBatch } : {}),
           ...(memRail ? { [MEMBERSHIP_BROADCAST]: makeMembershipPeerHandler({ rail: memRail }) } : {}),
@@ -830,6 +865,12 @@ export default function ChatScreen({
             [taskCatchUp.subtypes.request]: taskCatchUp.onRequest,
             [taskCatchUp.subtypes.batch]:   taskCatchUp.onBatch,
             [taskCatchUp.subtypes.offer]:   taskCatchUp.onOffer,
+          } : {}),
+          ...(chatStatementHandler ? { [CHAT_STATEMENT_BROADCAST]: chatStatementHandler } : {}),
+          ...(chatCatchUp ? {
+            [chatCatchUp.subtypes.request]: chatCatchUp.onRequest,
+            [chatCatchUp.subtypes.batch]:   chatCatchUp.onBatch,
+            [chatCatchUp.subtypes.offer]:   chatCatchUp.onOffer,
           } : {}),
           'kring-governance-broadcast': makeKringGovernancePeerHandler({
             eventLog: eventLogRef.current,

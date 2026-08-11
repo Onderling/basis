@@ -783,10 +783,14 @@ genuinely concurrent writes settle by deterministic tiebreaks — never "whoever
 **Membership is proof, not an admin table.** Joining is a redemption against a signed invite; an invite
 admits at most its own cap, within the circle's ceiling, within a system-wide cap — three levels, each
 only stricter than the one above. Eviction is a **signed, replayable statement** that rotates the
-circle's group key (what's shared after the eviction is unreadable to the evicted). The membership fold
-is currently **deny-wins and strengthen-only**: a spine event can drop or demote, never re-admit — the
-deliberately safe interim until each member's own device signs its transitions, after which the spine
-becomes the full authority. A founder is never evictable.
+circle's group key (what's shared after the eviction is unreadable to the evicted). Membership
+transitions are signed with a **circle-scoped identity carrying the member's verified ref**, and the
+roster is the **authoritative causal fold** over those statements: ordered by causal depth over the
+statement graph, authority checked at the fold point, deny-wins applied only to genuinely concurrent
+acts — so a causally later re-join re-admits, a concurrent evict-vs-rejoin resolves to the eviction,
+and every device computes the same roster. An equivocating author (two statements off one parent) is
+discounted wholesale. Compositions without the log rail keep a strengthen-only fallback (drop or
+demote, never admit) — safe, and honestly weaker. A founder is never evictable.
 
 **Mute hides, eviction refuses.** Muting a person is a view-time filter at the one projection every chat
 surface reads: their messages still land on the log (an append-only record never silently discards), and

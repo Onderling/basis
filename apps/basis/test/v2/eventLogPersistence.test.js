@@ -98,17 +98,19 @@ describe('device-log durability', () => {
     expect(log.query({}).length).toBe(2);   // the log itself is unaffected
   });
 
-  it('hydration respects retention on load: expired chat prunes, membership survives regardless of age', async () => {
-    const old = Date.now() - 40 * 24 * 3600 * 1000;   // 40 days — far past the 14d chat window
+  it('hydration respects retention on load: expired plumbing prunes, RECORD kinds survive regardless of age', async () => {
+    const old = Date.now() - 40 * 24 * 3600 * 1000;   // 40 days — far past every window
     const storage = memAsyncStorage();
     await storage.setItem('cc-device-log', JSON.stringify([
+      { id: 'old-ping', ts: old, app: 'system', type: 'delivery-state', circleId: 'c1', payload: {}, silent: true },
       { id: 'old-chat', ts: old, app: 'kring', type: 'chat-message', circleId: 'c1', payload: {} },
       { id: 'old-membership', ts: old, app: 'system', type: 'membership', circleId: 'c1', payload: {}, silent: true },
     ]));
     const log = new EventLog({ initial: [] });
     await wireEventLogPersistence({ eventLog: log, io: asyncStorageSnapshotIo(storage) });
     const ids = log.query({}).map((e) => e.id);
-    expect(ids).not.toContain('old-chat');           // the chat window applies on hydrate too
-    expect(ids).toContain('old-membership');         // membership is exempt — the roster stays rebuildable
+    expect(ids).not.toContain('old-ping');           // short-class plumbing still ages out on hydrate
+    expect(ids).toContain('old-chat');               // chat is RECORD class — the conversation never drops
+    expect(ids).toContain('old-membership');         // membership too — the roster stays rebuildable
   });
 });

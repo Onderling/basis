@@ -59,11 +59,13 @@ function connect(a, b, opts = {}) {
       while (wires.a.length) {
         const p = wires.a.shift();
         if (p.subtype === SUBTYPES.request) await ra.onRequest('peer:b', p);
+        else if (p.subtype === ra.subtypes.offer) await ra.onOffer('peer:b', p);
         else await ra.onBatch('peer:b', p);
       }
       while (wires.b.length) {
         const p = wires.b.shift();
         if (p.subtype === SUBTYPES.request) await rb.onRequest('peer:a', p);
+        else if (p.subtype === rb.subtypes.offer) await rb.onOffer('peer:a', p);
         else await rb.onBatch('peer:a', p);
       }
     }
@@ -150,6 +152,55 @@ describe('frontierReplay — the windowed lane catch-up', () => {
     for (const b of batches) landed += (await pull.onBatch('peer:ada', b)).landed;
     expect(landed).toBe(0);                                             // bo had everything — nothing double-lands
     expect(bo.rail.storedStatements(CIRCLE)).toHaveLength(4);
+  });
+
+  it('above the provider threshold an OFFER goes out instead of chunks (size signal, no bytes)', async () => {
+    const bindings = new Map();
+    const ada = await device('webid:ada', bindings);
+    await append(ada, 5);
+    const sent = [];
+    const serve = makeFrontierReplay({
+      rail: ada.rail, subtypes: SUBTYPES, offerThreshold: 3,
+      sendToPeer: (a, p) => sent.push(p),
+    });
+    await serve.onRequest('peer:bo', { subtype: SUBTYPES.request, circleId: CIRCLE, frontier: [] });
+    expect(sent).toHaveLength(1);
+    expect(sent[0].subtype).toBe(serve.subtypes.offer);
+    expect(sent[0].count).toBe(5);
+    expect(sent[0].approxBytes).toBeGreaterThan(0);
+  });
+
+  it('AUTO-ALLOW: an offer within the ceiling re-requests with the allowance and the pair converges', async () => {
+    const bindings = new Map();
+    const ada = await device('webid:ada', bindings);
+    const bo  = await device('webid:bo',  bindings);
+    await append(ada, 6);
+    // Small threshold forces the offer round; auto-allow covers it; small window forces paging WITH the
+    // carried allowance (a re-offer mid-page would deadlock the drain).
+    const { rb, drain } = connect(ada, bo, { offerThreshold: 2, autoAllow: 100, limit: 2, chunkSize: 2 });
+    await rb.requestFrom('peer:ada', CIRCLE);
+    await drain();
+    expect(bo.rail.storedStatements(CIRCLE)).toHaveLength(6);   // converged through offer → allowance → pages
+  });
+
+  it('ABOVE auto-allow the consent seam decides: nothing downloads until allow() is called', async () => {
+    const bindings = new Map();
+    const ada = await device('webid:ada', bindings);
+    const bo  = await device('webid:bo',  bindings);
+    await append(ada, 4);
+    const offers = [];
+    const { rb, drain } = connect(ada, bo, {
+      offerThreshold: 2, autoAllow: 2, limit: 10,
+      onOffer: (o) => offers.push(o),                            // the chat surface's seam
+    });
+    await rb.requestFrom('peer:ada', CIRCLE);
+    await drain();
+    expect(offers).toHaveLength(1);
+    expect(offers[0].count).toBe(4);
+    expect(bo.rail.storedStatements(CIRCLE)).toHaveLength(0);    // consent pending — no bytes moved
+    await offers[0].allow();                                     // the user said yes
+    await drain();
+    expect(bo.rail.storedStatements(CIRCLE)).toHaveLength(4);    // now it converged
   });
 
   it('the no-progress guard: a more-tail with zero landed does NOT page again', async () => {

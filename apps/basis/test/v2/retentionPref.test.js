@@ -44,14 +44,26 @@ describe('what one control governs', () => {
     let clock = 0;
     const log = new EventLog({ now: () => clock, retention: retentionFromDays(7) });
     log.append({ id: 'g1', ts: 0, app: 'system', type: 'governance', circleId: 'c1', payload: { event: 'propose' } });
-    log.append({ id: 'm1', ts: 0, app: 'kring', type: 'chat-message', payload: { text: 'hoi' } });
+    log.append({ id: 'm1', ts: 0, app: 'kring', type: 'vraag', payload: { text: 'hoi' } });
     clock = daysToMs(8);
     log.prune();
     const rows = log.query();
-    expect(rows.map((e) => e.id)).not.toContain('m1');            // chat is gone
+    expect(rows.map((e) => e.id)).not.toContain('m1');            // chat-class content is gone
     expect(rows.map((e) => e.id)).not.toContain('g1');            // the detail is gone…
     const summary = rows.find((e) => e.type === 'audit-summary');
     expect(summary.payload.foldedCount).toBe(1);                  // …but it is COUNTED, not forgotten
+  });
+
+  it('the conversation RECORD is not governed by the setting — chat messages survive every window', () => {
+    // Since the chat-lane sitting, chat-message is RECORD class: the log is the conversation's record, so
+    // the retention control governs the windowed content classes, never the record itself. (Whether a
+    // user keeps a separate, explicitly-destructive "delete old chat" control is an open design call.)
+    let clock = 0;
+    const log = new EventLog({ now: () => clock, retention: retentionFromDays(7) });
+    log.append({ id: 'msg', ts: 0, app: 'kring', type: 'chat-message', payload: { text: 'hoi' } });
+    clock = daysToMs(100);
+    log.prune();
+    expect(log.query().map((e) => e.id)).toContain('msg');
   });
 });
 
@@ -59,7 +71,7 @@ describe('applying the choice live', () => {
   it('setRetention prunes immediately, so a shortened window shows in the open conversation', () => {
     let clock = daysToMs(20);
     const log = new EventLog({ now: () => clock, retention: retentionFromDays(30) });
-    log.append({ id: 'm1', ts: daysToMs(1), app: 'kring', type: 'chat-message', payload: { text: 'oud' } });
+    log.append({ id: 'm1', ts: daysToMs(1), app: 'kring', type: 'vraag', payload: { text: 'oud' } });
     expect(log.query()).toHaveLength(1);
 
     const dropped = log.setRetention(retentionFromDays(7));

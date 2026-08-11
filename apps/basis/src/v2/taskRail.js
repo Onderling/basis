@@ -32,6 +32,7 @@ export const TASK_BROADCAST = 'kring-task-broadcast';
 export const TASK_CATCHUP_SUBTYPES = Object.freeze({
   request: 'kring-task-catchup-request',
   batch:   'kring-task-catchup-batch',
+  offer:   'kring-task-catchup-offer',
 });
 
 /**

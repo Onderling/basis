@@ -826,7 +826,11 @@ export default function ChatScreen({
           ...(memRail ? { [MEMBERSHIP_BROADCAST]: makeMembershipPeerHandler({ rail: memRail }) } : {}),
           ...(memCatchUp ? { [memCatchUp.subtypes.request]: memCatchUp.onRequest, [memCatchUp.subtypes.batch]: memCatchUp.onBatch } : {}),
           ...(taskRail ? { [TASK_BROADCAST]: makeTaskPeerHandler({ rail: taskRail }) } : {}),
-          ...(taskCatchUp ? { [taskCatchUp.subtypes.request]: taskCatchUp.onRequest, [taskCatchUp.subtypes.batch]: taskCatchUp.onBatch } : {}),
+          ...(taskCatchUp ? {
+            [taskCatchUp.subtypes.request]: taskCatchUp.onRequest,
+            [taskCatchUp.subtypes.batch]:   taskCatchUp.onBatch,
+            [taskCatchUp.subtypes.offer]:   taskCatchUp.onOffer,
+          } : {}),
           'kring-governance-broadcast': makeKringGovernancePeerHandler({
             eventLog: eventLogRef.current,
             rail: govRail,

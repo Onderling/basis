@@ -294,9 +294,11 @@ describe('EventLog — C15 silent system-entry lane', () => {
 /* ── One-log step D — per-kind retention + audit compaction (J-L10) ─────────────────────────────────── */
 
 describe('EventLog — per-kind retention', () => {
-  const mk = (over) => ev({ app: 'kring', type: 'chat-message', ...over });
+  // `vraag` is chat-CLASS (windowed content whose durable head lives elsewhere); `chat-message` itself is
+  // RECORD class since the chat-lane sitting — the conversation never drops (asserted below).
+  const mk = (over) => ev({ app: 'kring', type: 'vraag', ...over });
 
-  it('J-L10 — audit outlives chat: past the chat window, chat is gone and governance still answers', () => {
+  it('J-L10 — audit outlives chat-class content: past the window it is gone and governance still answers', () => {
     let clock = 0;
     const log = new EventLog({ now: () => clock, retention: { short: 500, chat: 1000, audit: 5000 } });
     log.append(mk({ id: 'chat-old', ts: 0 }));
@@ -308,6 +310,15 @@ describe('EventLog — per-kind retention', () => {
     expect(ids).not.toContain('chat-old');
     expect(ids).not.toContain('ping-old');
     expect(ids).toContain('gov-old');       // the trail did not silently forget
+  });
+
+  it('chat messages are the RECORD — no window, however small, ever drops them', () => {
+    let clock = 0;
+    const log = new EventLog({ now: () => clock, retention: { short: 1, chat: 1, audit: 1 } });
+    log.append(ev({ id: 'msg', ts: 0, app: 'kring', type: 'chat-message', circleId: 'c1', payload: { text: 'hoi' } }));
+    clock = 10_000_000;
+    log.prune();
+    expect(log.query().map((e) => e.id)).toContain('msg');
   });
 
   it('past the AUDIT window an entry compacts — and the summary says how many it folded', () => {

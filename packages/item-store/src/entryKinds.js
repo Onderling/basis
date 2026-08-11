@@ -25,14 +25,21 @@
  * duplication instead of guarding it.
  */
 
+import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
+
 /** Which surface an entry belongs to. `human` shows in a conversation; `system` is plumbing. */
 export const LANE = Object.freeze({ HUMAN: 'human', SYSTEM: 'system' });
 
 /** Retention classes. Durations are a per-user setting; these are the buckets they apply to. */
 export const RETAIN = Object.freeze({
   SHORT: 'short',   // pure plumbing — roster pings, delivery state
-  CHAT: 'chat',     // the conversation
+  CHAT: 'chat',     // conversational content whose durable head lives ELSEWHERE (e.g. a task's store row)
   AUDIT: 'audit',   // compacts rather than dropping; a trail that silently forgets looks complete
+  // The entry IS the record — NEVER drops, never compacts. Membership (the roster is a fold of these; one
+  // compacting away silently changes who-is-in on rebuild) and chat messages (the conversation's record on
+  // the device log — dropping them is data destruction, "pod kwijt = ongemak, geen verlies"). Consequence,
+  // named: record-class lanes grow without bound, which is the trigger for the log's storage-structure work.
+  RECORD: 'record',
 });
 
 const K = (lane, wakes, retain, audit) => Object.freeze({ lane, wakes, retain, audit });
@@ -43,8 +50,8 @@ const K = (lane, wakes, retain, audit) => Object.freeze({ lane, wakes, retain, a
  */
 export const ENTRY_KINDS = Object.freeze({
   // ── human-facing ──────────────────────────────────────────────────────────
-  'chat-message':    K(LANE.HUMAN, true,  RETAIN.CHAT, false),
-  task:              K(LANE.HUMAN, true,  RETAIN.CHAT, false),
+  'chat-message':    K(LANE.HUMAN, true,  RETAIN.RECORD, false),   // the conversation's RECORD — never drops
+  task:              K(LANE.HUMAN, true,  RETAIN.CHAT, false),     // the store row is the durable head; entries age out
   vraag:             K(LANE.HUMAN, true,  RETAIN.CHAT, false),
   aanbod:            K(LANE.HUMAN, true,  RETAIN.CHAT, false),
   leen:              K(LANE.HUMAN, true,  RETAIN.CHAT, false),
@@ -58,7 +65,7 @@ export const ENTRY_KINDS = Object.freeze({
   'roster-updated':  K(LANE.SYSTEM, false, RETAIN.SHORT, false),
   'delivery-state':  K(LANE.SYSTEM, false, RETAIN.SHORT, false),
   'key-event':       K(LANE.SYSTEM, false, RETAIN.AUDIT, true),
-  membership:        K(LANE.SYSTEM, false, RETAIN.AUDIT, true),
+  membership:        K(LANE.SYSTEM, false, RETAIN.RECORD, true),   // the roster refolds from these — never drops
 
   // ── the agent trail (per-agent action log) ────────────────────────────────
   'agent-action':    K(LANE.SYSTEM, false, RETAIN.AUDIT, true),
@@ -102,13 +109,17 @@ export function retentionOf(kind) { return entryKind(kind).retain; }
  * these are the shared DEFAULTS. Past its window an AUDIT entry COMPACTS into an `audit-summary` (never
  * drops); short/chat past theirs are dropped. The audit-retention agreement guard holds both records to reading THIS table.
  */
+// Declared through the parameter register (the conventions' rule for tunable constants — these were bare
+// literals before, itself a quiet violation). `record` has NO window on purpose: it is not a duration, it
+// is the absence of one.
 export const RETENTION_DEFAULTS = Object.freeze({
-  [RETAIN.SHORT]:  7 * 24 * 60 * 60 * 1000,   // pure plumbing — roster pings, delivery state
-  [RETAIN.CHAT]:  14 * 24 * 60 * 60 * 1000,   // the conversation
-  [RETAIN.AUDIT]: 14 * 24 * 60 * 60 * 1000,   // governance, reports, key events, the agent trail — DETAIL window
+  [RETAIN.SHORT]: param({ key: 'retention.short', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 7 * 24 * 60 * 60 * 1000 }),    // pure plumbing — roster pings, delivery state
+  [RETAIN.CHAT]:  param({ key: 'retention.chat',  scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 14 * 24 * 60 * 60 * 1000 }),   // content whose durable head lives elsewhere
+  [RETAIN.AUDIT]: param({ key: 'retention.audit', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 14 * 24 * 60 * 60 * 1000 }),   // governance, reports, key events, the agent trail — DETAIL window
 });
 
-/** The retention window (ms) for a RETAIN class (falls back to CHAT for an unknown class). */
+/** The retention window (ms) for a RETAIN class (falls back to CHAT for an unknown class).
+ *  `record` deliberately has no entry here — callers must branch on the class BEFORE asking for a window. */
 export function retentionWindowFor(retainClass) {
   return RETENTION_DEFAULTS[retainClass] ?? RETENTION_DEFAULTS[RETAIN.CHAT];
 }

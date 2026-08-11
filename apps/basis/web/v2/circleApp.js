@@ -7095,7 +7095,11 @@ async function boot() {
           // The task lane (the content re-root): the fan receiver verifies at the agent's rail AND causally
           // merges the snapshot into the circle's store head; the catch-up pair covers the offline device.
           ...(agent.taskRail ? { [TASK_BROADCAST]: makeTaskPeerHandler({ rail: agent.taskRail }) } : {}),
-          ...(taskCatchUpShell ? { [taskCatchUpShell.subtypes.request]: taskCatchUpShell.onRequest, [taskCatchUpShell.subtypes.batch]: taskCatchUpShell.onBatch } : {}),
+          ...(taskCatchUpShell ? {
+            [taskCatchUpShell.subtypes.request]: taskCatchUpShell.onRequest,
+            [taskCatchUpShell.subtypes.batch]:   taskCatchUpShell.onBatch,
+            [taskCatchUpShell.subtypes.offer]:   taskCatchUpShell.onOffer,
+          } : {}),
           'kring-governance-broadcast': makeKringGovernancePeerHandler({ eventLog, rail: govShellRail, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); }, notify: govNotify }),
           'kring-report-broadcast':     makeKringReportPeerHandler({ eventLog, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); } }),
           // ε.4 — negotiated catch-up subtypes.

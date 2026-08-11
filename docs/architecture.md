@@ -700,16 +700,78 @@ locally — the same discipline the hash-chain enforces. Full record: [decisions
 
 ---
 
-## 5 · Direction
+## 5 · The five homes
+
+*The system organised by **place**: Agent · Circle · Pod · Surfaces · Connectivity, plus the shared type
+dictionary. Everything above describes mechanisms; this section describes where each mechanism lives and
+what its home guarantees. Written chapter by chapter, only as each home's description matches the running
+code — a chapter here is a claim about reality, not a plan.*
+
+### The Agent home
+
+*Your agent is the thing that acts as you: it holds your identity, signs what you say, remembers what
+other agents did with your things, and can always be rebuilt from one secret you keep.*
+
+**One secret, everything derived.** An account has exactly one root secret, shown once to its owner as a
+24-word recovery phrase (the *herstelzin*). Every key the agent uses derives from it deterministically:
+the default profile's chat identity, a **distinct signing key per circle** (so two circles cannot
+correlate you by pubkey — see the Connectivity notes on the limits of this today), and the key that
+encrypts the agent's stored secrets at rest. Owning the phrase *is* owning the account; the phrase alone
+recovers the same identities, the same per-circle addresses, on any device.
+
+**The phrase is never stored.** What a device persists is the 32-byte root **seed**, kept behind the
+strongest door the platform offers: the OS keystore on mobile (Android Keystore / iOS Keychain,
+device-only — never a cloud keychain backup, because the phrase re-derives it anywhere and a synced copy
+would be one more place the secret lives); on the web, the seed sits in IndexedDB only encrypted under a
+**non-extractable** WebCrypto key, so copying the browser profile yields ciphertext plus a key handle
+that cannot travel. Stated honestly: the web door protects against disk and backup readout, not against
+code running inside the same origin; and on hosts with no key door at all (a headless Node agent), the
+gain is containment — the recovery artifact the product promises "exists only in your hands" is off the
+disk — not hardware secrecy. An install that predates this custody model has its stored phrase adopted
+into the door on first boot, read-back-verified before the cleartext is deleted: a keystore that loses
+the write keeps the phrase rather than losing the only copy of an identity.
+
+**Everything else the agent stores is sealed.** Vaults holding key material or capability tokens — chat
+seed, host identities, per-app identities, token registry — read and write encrypted under a key derived
+from the root each boot (never persisted). The seal is bound to the root's fingerprint: restoring a
+*different* phrase is an identity switch, and those vaults start clean rather than carrying the previous
+person's seeds, tokens, or mute lists — entries sealed to the old root are undecryptable to the new one
+by construction. Trust levels and the audit log stay deliberately plain: sealing them buys no secrecy
+and widens the blast radius of an unlock problem.
+
+**Two records of what happened, one retention vocabulary.** The agent keeps two append-only records with
+different readers: the **security audit** (a signed hash chain of key ceremonies and crypto events — its
+`verify()` walks every signature and link) and the **agent trail** (the record that an agent *acted*:
+which op, on what pointer, under which authority, with what outcome — never arguments or content,
+because a trail that carries content becomes a second copy of the data under different access rules).
+The trail is fed at the one dispatch membrane every skill exercise crosses, in-process and remote alike;
+the owner's own surfaces are filtered out — a bot-audit surface must not become self-surveillance — and
+the per-agent activity card opens one deliberately chosen actor's trail, never a firehose. Both records
+derive their retention window from the **same** shared class table, and audit-class entries never
+silently drop: past the detail window they **compact** into a summary that says how many entries it
+folded and of what, because a trail that forgets silently looks complete, which is worse than honestly
+short. Compacting the signed chain re-chains it so verification still passes end to end.
+
+**Profiles and delegation.** The registry (the single write-truth for a user's agents, with a derived
+A2A card per agent) records which profiles exist; a full-trust device loads the root and can run any of
+them, while a low-trust device receives a revocable delegation of one profile — never the root, so it
+cannot derive or reach the others. Restore is two writes in a fixed order: the root seed into the key
+door first (a failed second step still leaves the next boot able to recover everything from the door),
+then the default profile's identity re-derived from it — never from the phrase's raw entropy, which
+would mint a different key than the roster knows.
+
+*The remaining home chapters (Circle · Pod · Surfaces · Connectivity · the dictionary) follow as their
+content is verified against the running code.*
+
+## 6 · Direction
 
 *Where this is going, and where to read next.*
 
 ### Where this is going
 
-> **A reorganisation of this document is designed but not yet real.** The working design (private plans,
-> "PLAN-homes") organises the system as five homes — Agent · Circle · Pod · Surfaces · Connectivity — plus
-> a shared type dictionary. This file changes **only as that becomes reality**, chapter by chapter; it is
-> not a wishful-thinking document. This pointer is temporary and is removed when the update lands.
+> **The five-homes reorganisation has begun** (§5): the system's description by *place* — Agent · Circle ·
+> Pod · Surfaces · Connectivity, plus the shared type dictionary. Chapters land **only as each matches the
+> running code** — the Agent home is written; the rest follow, and this pointer goes when the last one does.
 
 Two directions are settled and already shaping the work described above:
 

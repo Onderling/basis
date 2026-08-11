@@ -760,8 +760,139 @@ door first (a failed second step still leaves the next boot able to recover ever
 then the default profile's identity re-derived from it — never from the phrase's raw entropy, which
 would mint a different key than the roster knows.
 
-*The remaining home chapters (Circle · Pod · Surfaces · Connectivity · the dictionary) follow as their
-content is verified against the running code.*
+### The Circle home
+
+*A circle is a group that shares one store and agrees on what happened in it — without any member's
+device being the boss.*
+
+**One circle, one store, one log.** A circle owns exactly one item store; whatever that store holds is
+what syncs to the members. Underneath, the source of truth is each device's append-only event log: circle
+statements are **signed and chained** (each carries its author's per-circle signature, a parent link, and
+causal dependencies), and ingest verifies before anything lands — the signature itself, that the signed
+kind matches the declared kind, and that the signing key belongs to the roster member it claims to be.
+Nothing a peer sends is trusted for *being sent*; it is trusted for *verifying*.
+
+**The lanes.** Four kinds of circle state ride the same rail with per-lane semantics: **membership**
+(catch-up is pull-everything, because completeness is the point of a roster), **governance** (proposals
+and votes as typed events; a changed vote supersedes along its author's own chain), **chat** (one entry
+per message *is* the conversation's record — see retention below), and **tasks** (full-item snapshots,
+so a late joiner needs no verb replay). Conflicts resolve **identically on every device**: ordering
+rides one logical clock rather than wall clocks, same-author revisions resolve by chain ancestry, and
+genuinely concurrent writes settle by deterministic tiebreaks — never "whoever heard it first wins."
+
+**Membership is proof, not an admin table.** Joining is a redemption against a signed invite; an invite
+admits at most its own cap, within the circle's ceiling, within a system-wide cap — three levels, each
+only stricter than the one above. Eviction is a **signed, replayable statement** that rotates the
+circle's group key (what's shared after the eviction is unreadable to the evicted). The membership fold
+is currently **deny-wins and strengthen-only**: a spine event can drop or demote, never re-admit — the
+deliberately safe interim until each member's own device signs its transitions, after which the spine
+becomes the full authority. A founder is never evictable.
+
+**Mute hides, eviction refuses.** Muting a person is a view-time filter at the one projection every chat
+surface reads: their messages still land on the log (an append-only record never silently discards), and
+unmuting restores the history intact. Eviction and blocking, by contrast, refuse at the door. Chat
+entries are record-class — nothing auto-deletes; the only way messages leave a device is the owner's
+explicit delete-older-than action.
+
+### The Pod home
+
+*The pod is where your data can live so it survives your devices — storage and transport, never
+authority.*
+
+**Authority stays on the device log; the pod carries and keeps.** A sealed pod row transports the
+*signed statement itself*, so whatever comes back from a pod re-enters through the same verification
+gate as a peer message — a pod (or whoever operates one) cannot originate circle truth. Pod-only
+circles never fan peer-to-peer at all: members read the statement rows back with a watermark and verify
+each on ingest.
+
+**Sealed by default, keyed to people.** The sealing envelope encrypts every resource under a fresh
+content key, wrapped either to each recipient's public key (the writer needs only public keys; the host
+is blind) or to a circle **group key** that is itself distributed by recipient-wrapping — one resource,
+O(1) per member, rotation on eviction. Portable crypto, one implementation across Node, browser, and
+mobile.
+
+**The store rides the pod as a cache feed.** A pod-backed circle's store attaches the pod as a
+read-through, write-behind medium: local is reality, the pod catches up. For the owner's own settings
+the same idea gets a **restoration gate**: before the attach's bulk flush may touch the pod, a
+read-only probe classifies the blob — openable, missing, sealed-under-another-key, or unreachable —
+and only the first two attach. A key mismatch (a fresh install without the phrase) *holds*, surfaces a
+three-choice dialog (recover with the phrase / this device only / explicit overwrite), and a transport
+error is never treated as a mismatch. When both sides hold different values, the pod's copy is captured
+*before* the local-wins flush, so a per-setting merge list can still honour "use the pod's value."
+
+### The Surfaces home
+
+*Everything a person (or model) touches compiles to the same `{opId, args}` — the manifest is the
+contract, and every surface is a projection of it.*
+
+**One declaration, five projections.** An app's manifest declares its operations once; pure projectors
+turn that declaration into the chat tool, the slash command, the deterministic gate verbs, the attach
+menu, and the web/mobile screens. Neither AI nor GUI is privileged — both are compilers to the waist.
+Screens, list→detail drill-downs, and record views render generically from the declaration; a
+capability matrix (circle policy × app) decides what shows. The coverage snapshot records which op has
+which surface, and CI fails when it drifts from the manifests.
+
+**Every op has a default place, by construction.** An op with no bespoke screen is still visible and
+reachable: the **advanced surface** (Mij → Geavanceerd, both platforms) lists exactly the
+coverage-matrix's complement — a no-argument op runs straight through the waist from there; an
+argument-taking op shows its chat form, because the chat route is the argument-taking executor every op
+already has. The same surface exposes the parameter register: every user-tunable value, editable
+through the one kind-gated `set-param` (which refuses internal params and unknown keys, and routes the
+new value to its scope's sync home). A registered param nobody reads fails CI; so does a user-facing
+param with no UX home.
+
+**Parity is structural, not disciplined.** Web and mobile shells are thin composition-and-paint layers
+over shared projections — the same rows, the same locale source (every user-facing string through
+`t()`, Dutch and English), the same manifest. A capability that exists on one shell and not the other
+is a finding, not an idiom.
+
+### The Connectivity home
+
+*How agents reach each other: transports are adapters behind one surface, and every hop is designed
+around "who learns what."*
+
+**Routes, not reach-arounds.** Apps never construct a transport; the mesh builder composes them
+(local network, BLE, NKN, relay) behind one agent and a peer surface. In a circle, **your address is
+your signing key** — one derivation, so knowing where to reach someone *is* holding the key that
+verifies them: no directory, and deliberately no key-id resolver, because a resolver is an observer
+that learns who asks about whom. The full key rides the wire (~14% overhead on a minimal message) as
+the price of first-contact verifiability.
+
+**Contact reveals, so contact is minimised.** A sender uses the *fewest* connection points that achieve
+delivery — sequential fallback, sticky on what worked, backing off from what fails — never race-them-all,
+because every point tried is an extra observer. A member may sit on one point or several (resilience is
+a member's choice, not a circle-wide tax), and "I could not reach them" is a real outcome the UI is
+allowed to say. The relay holds messages 24 hours — an agreement pinned by a test that reads both the
+relay's and the app's value, so the two cannot silently disagree.
+
+**Catch-up is windowed and consented.** A peer rejoining a lane sends its frontier (the head-hashes it
+knows); what comes back is chunked and receiver-limited, and above a threshold the sender first asks —
+"there are N messages (~X MB), download?" — with the thresholds as tunable params and the allowance
+remembered per peer and circle. Membership is the exception: rosters always pull everything.
+
+**Stated gaps, on purpose.** Per-circle *keys* are unlinkable today, but roster and fan-out still ride
+the profile's webid — so a co-member who is also your direct contact **can** link the two identities;
+the per-circle transport/rendezvous cutover that closes this is designed, tracked, and not built.
+Similarly, NKN's addressing cannot alias, so an NKN-carried circle currently trades member-level
+unlinkability for that transport. Writing these down here is the contract that they are gaps, not
+choices.
+
+### The dictionary
+
+*The shared nouns every home speaks — one table per vocabulary, one home per table, a guard on each.*
+
+**Entry kinds** classify every log entry once: its lane (human conversation vs silent system), whether
+it may wake an offline device (silent kinds never do), whether it is auditable, and its **retention
+class** — `short` (housekeeping, drops), `chat` (windowed by the person's one retention setting),
+`audit` (never drops — **compacts** into a summary that says how many entries it folded and of what),
+and `record` (membership, chat messages: the entry *is* the record; pruning one would silently rewrite
+history). **Resolution policies** classify every (item-type, field) write: `content` (last-writer-wins,
+the conservative default), `claim` (first-wins, immutable-once-set — a task's assignee), `spine`
+(deny-wins — membership and authority), each implying its delivery tier (best-effort / at-least-once /
+reliable). The policy is declared by the app's manifest but **enforced by the receiver** against the
+substrate's table, so a sender cannot shape an item to dodge the intended merge. Item types get the
+standard verbs for free and add their own; new closed vocabularies need a home and a guard before they
+ship — the locale file is the fastest index of what already exists.
 
 ## 6 · Direction
 

@@ -11,8 +11,7 @@
  */
 import { describe, it, expect, afterAll } from 'vitest';
 import {
-  bootRealAgentNode, connectAgentsOverBus, pairCircle, until, teardown,
-} from '../support/pairRealAgents.js';
+  bootRealAgentNode, connectAgentsOverBus, pairCircle, until, teardown, sendKringChat } from '../support/pairRealAgents.js';
 
 describe('circle traffic is signed by the circle identity, end to end', () => {
   let A; let B;
@@ -33,7 +32,7 @@ describe('circle traffic is signed by the circle identity, end to end', () => {
 
     const msgId = `kring-${Date.now().toString(36)}`;
     const text = 'de vergadering is verplaatst naar donderdag';
-    const res = await A.agent.callSkill('stoop', 'broadcastKringMessage', { groupId, text, msgId });
+    const res = await sendKringChat(A, { groupId, text, msgId });
     expect(res.error).toBeUndefined();
     expect(await until(() => B.chatEvents.find((e) => e.id === msgId)),
       'it has to actually ARRIVE — otherwise "no canonical key on the wire" is trivially true').toBeTruthy();

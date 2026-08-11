@@ -13,8 +13,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { startRelay } from '@onderling/relay';
 import {
-  bootRealAgentNode, connectAgentsOverRelay, pairCircle, until, teardown,
-} from '../support/pairRealAgents.js';
+  bootRealAgentNode, connectAgentsOverRelay, pairCircle, until, teardown, sendKringChat } from '../support/pairRealAgents.js';
 import { signSpine } from '@onderling/core';
 import { reportEntryId } from '../../src/v2/reportModel.js';
 
@@ -44,7 +43,7 @@ describe('relay-route cross-device exchange (self-contained relay)', () => {
 
     // Warm the secure mesh (HI handshake) with a chat message so later broadcasts route.
     const warm = `warmup-${rnd()}`;
-    await admin.agent.callSkill('stoop', 'broadcastKringMessage', { groupId: GROUP, msgId: `w-${rnd()}`, text: warm });
+    await sendKringChat(admin, { groupId: GROUP, msgId: `w-${rnd()}`, text: warm });
     await until(() => joiner.chatEvents.some((e) => e?.payload?.text === warm), { timeout: 10000 });
   }, 30000);
 

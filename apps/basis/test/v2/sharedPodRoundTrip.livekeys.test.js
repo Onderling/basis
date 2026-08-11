@@ -32,8 +32,8 @@ import { PodClient } from '@onderling/pod-client';
 import { createPseudoPod, createMemoryBackend } from '@onderling/pseudo-pod';
 import { createNeighborhoodAgent } from '@onderling-app/stoop';
 import { createCirclePodProducer } from '../../src/v2/circlePodProducer.js';
-import { createChatMessageInbox } from '../../src/v2/chatMessageInbox.js';
 import { EventLog } from '../../src/eventLog.js';
+import { makeChatRail, makeChatPeerHandler, makePodChatCatchUp, CHAT_STATEMENT_BROADCAST } from '../../src/v2/chatRail.js';
 
 const ANNE = 'https://id.example/anne';   // sender A
 const BOB  = 'https://id.example/bob';    // receiver B
@@ -85,28 +85,16 @@ async function bootSenderA({ backend, seal, circleDataMove, deliver }) {
 }
 
 /** Receiver B (live render path): the real basis inbox whose resolveRef opens the row with the LIVE opener. */
-function bootReceiverB({ backend, open }) {
-  const eventLog = new EventLog({ initial: [], muted: [] });
-  const inbox = createChatMessageInbox({
-    eventLog,
-    resolveRef: (refEnv) => readSealedMessage(backend, open, refEnv.ref),
-    logger: QUIET,
+/** A chat device (sender or receiver): its own rail over a real EventLog, roster-bound to a peer key. */
+async function chatDevice(ref, { trustAuthor = null } = {}) {
+  const cid = await AgentIdentity.generate(new VaultMemory());
+  const eventLog = new EventLog({ initial: [] });
+  const rail = makeChatRail({
+    eventLog, circleIdentityFor: async () => cid, myRef: ref,
+    callSkill: async () => ({}),
+    verifyBinding: async ({ author }) => (trustAuthor ? author === trustAuthor() : true),
   });
-  return { eventLog, inbox, get chatEvents() { return eventLog.query({ excludeMuted: true }); } };
-}
-
-/** Reader B (durable / catch-up path): a real stoop bundle whose podReadSince range-queries the MockPod. */
-async function bootReaderBStoop({ backend, open }) {
-  const id = await AgentIdentity.generate(new VaultMemory());
-  const tx = new InternalTransport(new InternalBus(), id.pubKey);
-  const bundle = await createNeighborhoodAgent({
-    identity: id, transport: tx,
-    offeringMatch: { group: CIRCLE, localActor: BOB, peers: [] },
-    members: [{ webid: BOB, role: 'member' }],
-    podReadSince: (cid, q) => readSealedMessagesSince(backend, open, { circleId: cid, ...q }).then((r) => r.items),
-  });
-  await bundle.offeringMatch.start();
-  return bundle;
+  return { ref, cid, eventLog, rail, get chatEvents() { return eventLog.query({ excludeMuted: true }); } };
 }
 
 async function callSkill(agent, id, args, from = ANNE) {
@@ -121,9 +109,11 @@ describe('Phase 3 (LIVE KEYS) — shared-pod round-trip with REAL circle group-k
     const { strategy } = await liveCircleSealOpen(CIRCLE);
     const delivered = [];
     const A = await bootSenderA({ backend, seal: strategy.seal, circleDataMove: () => 'pod-signal', deliver: (addr, env) => delivered.push({ env }) });
-    const B = bootReceiverB({ backend, open: strategy.open });
+    const B = await chatDevice(BOB);   // trusts any author (the live-key custody is what this file probes)
 
-    const r = await callSkill(A.agent, 'broadcastKringMessage', { groupId: CIRCLE, text: 'hoi via de echte sleutel', msgId: 'lk1', ts: Date.now() });
+    const anne = await chatDevice(ANNE);
+    const { statement } = await anne.rail.appendMessage(CIRCLE, { msgId: 'lk1', ts: Date.now(), text: 'hoi via de echte sleutel' });
+    const r = await callSkill(A.agent, 'broadcastKringChatStatement', { groupId: CIRCLE, event: statement, msgId: 'lk1', ts: Date.now() });
 
     // A really wrote the pod + fanned a ref (not a full-body degrade).
     expect(r.podSignal).toBe(true);
@@ -133,15 +123,18 @@ describe('Phase 3 (LIVE KEYS) — shared-pod round-trip with REAL circle group-k
     const raw = await backend.get(r.ref);
     expect(isSealed(raw)).toBe(true);
     expect(raw.includes('hoi via de echte sleutel')).toBe(false);
-    // The fanned wire envelope is a REF envelope: has ref, no text.
+    // The fanned wire envelope is a REF envelope on the STATEMENT subtype: has ref, no body.
     const wire = delivered[0].env;
     expect(wire.ref).toBe(r.ref);
-    expect(wire.text).toBeUndefined();
+    expect(wire.subtype).toBe(CHAT_STATEMENT_BROADCAST);
+    expect(wire.event).toBeUndefined();
 
-    // B resolves the ref from the pod (with the LIVE opener) → ingests the full message.
-    const verdict = await B.inbox.ingestChatMessage(wire, { source: 'receiver', fromPeerAddr: ANNE });
-    expect(verdict.result).toBe('inserted');
-    expect(B.chatEvents.find((e) => e.id === 'lk1').payload.text).toBe('hoi via de echte sleutel');
+    // B resolves the ref from the pod (LIVE opener) → VERIFIES the statement at its rail → renders.
+    const handler = makeChatPeerHandler({ rail: B.rail, resolveRef: (refEnv) => readSealedMessage(backend, strategy.open, refEnv.ref) });
+    await handler(ANNE, wire);
+    const landed = B.chatEvents.find((e) => e.id === 'lk1');
+    expect(landed.payload.text).toBe('hoi via de echte sleutel');
+    expect(landed.payload.statement.sig).toBeTruthy();
   });
 
   it('pod-only: A seals+writes under the LIVE key + fans NOTHING → B reads it via getMessagesSince', async () => {
@@ -150,17 +143,25 @@ describe('Phase 3 (LIVE KEYS) — shared-pod round-trip with REAL circle group-k
     const delivered = [];
     const A = await bootSenderA({ backend, seal: strategy.seal, circleDataMove: () => 'pod-only', deliver: (addr, env) => delivered.push({ env }) });
 
-    const r = await callSkill(A.agent, 'broadcastKringMessage', { groupId: CIRCLE, text: 'stil, echt gesealed', msgId: 'lk2', ts: 4200 });
+    const anne = await chatDevice(ANNE);
+    const { statement } = await anne.rail.appendMessage(CIRCLE, { msgId: 'lk2', ts: 4200, text: 'stil, echt gesealed' });
+    const r = await callSkill(A.agent, 'broadcastKringChatStatement', { groupId: CIRCLE, event: statement, msgId: 'lk2', ts: 4200 });
     expect(r.podOnly).toBe(true);
     expect(r.sent).toBe(0);
     expect(delivered).toHaveLength(0);
     expect(backend.size).toBe(1);
 
-    const B = await bootReaderBStoop({ backend, open: strategy.open });
-    const since = await callSkill(B.agent, 'getMessagesSince', { groupId: CIRCLE, sinceTs: 0 }, BOB);
-    const got = since.items.find((i) => i.msgId === 'lk2');
-    expect(got).toBeTruthy();
-    expect(got.text).toBe('stil, echt gesealed');
+    // B never received a fan — the pod catch-up range-reads the rows and VERIFIES each at the rail.
+    const B = await chatDevice(BOB);
+    const catchUp = makePodChatCatchUp({
+      rail: B.rail,
+      podReadSince: (cid, q) => readSealedMessagesSince(backend, strategy.open, { circleId: cid, ...q }).then((res) => res.items),
+      eventLog: B.eventLog,
+    });
+    expect((await catchUp.catchUpCircle(CIRCLE)).ingested).toBe(1);
+    const got = B.chatEvents.find((e) => e.id === 'lk2');
+    expect(got.payload.text).toBe('stil, echt gesealed');
+    expect(got.payload.statement.sig).toBeTruthy();
   });
 
   it('non-member: an outsider key resolves NO strategy AND cannot open the sealed row (no silent plaintext)', async () => {

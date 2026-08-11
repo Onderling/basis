@@ -65,7 +65,7 @@ import {
 } from '../../src/v2/circleAddressAnnounce.js';
 import { EventLog } from '../../src/eventLog.js';
 import { createChatMessageInbox } from '../../src/v2/chatMessageInbox.js';
-import { makeKringChatPeerHandler } from '../../src/v2/kringChatReceiver.js';
+import { makeChatRail, makeChatPeerHandler, CHAT_STATEMENT_BROADCAST } from '../../src/v2/chatRail.js';
 import { makeKringGovernancePeerHandler, makeKringReportPeerHandler } from '../../src/v2/kringLogReceiver.js';
 import { makeGovernanceRail } from '../../src/v2/governanceAppWiring.js';
 
@@ -106,7 +106,10 @@ export async function until(pred, { timeout = 4000, step = 10 } = {}) {
  *   pendingMap: Map<string, object>,
  * }>}
  */
-export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 8000, agentOpts = {}, verifyGovernanceBinding = null } = {}) {
+/** Every live node this process booted — the harness default chat-binding resolves through it. */
+const LIVE_NODES = new Set();
+
+export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 8000, agentOpts = {}, verifyGovernanceBinding = null, verifyChatBinding = null } = {}) {
   const routerRef = { fn: null };
   const received = [];
   // A sealed circle's log carries key-events + sealed content over the real transport. Key-events are recorded
@@ -155,14 +158,32 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   const chatEventLog = new EventLog({ initial: [], muted: [] });
   const chatInbox = createChatMessageInbox({
     eventLog: chatEventLog,
-    // Match the browser: the inbox also ingests into stoop's itemStore, so
-    // getMessagesSince (durable mirror / catch-up) reflects received chats too.
+    // The MIGRATION gate only (the store copy's one-time carry-over): live receive is the signed
+    // statement path below.
     ingest: (payload, fromPeerAddr) => callSkill('stoop', 'ingestKringMessage', { payload, fromPeerAddr }),
     logger: QUIET,
   });
-  const kringChatHandler = makeKringChatPeerHandler({ inbox: chatInbox });
+  // The chat RAIL — the exact receive wiring the shells use: a fanned statement verifies (signature +
+  // key↔ref binding) and lands as the ONE render entry. The harness's LEGACY pairing records no
+  // circleAddress roster rows, so the DEFAULT binding here resolves through the live in-process node
+  // registry: it asks the claimed member's OWN agent for its circle key and compares — the same fact a
+  // roster row attests, established through the test process's omniscience instead of the announce flow.
+  // A test probing binding FAILURE overrides with `verifyChatBinding`.
+  const chatRail = makeChatRail({
+    eventLog: chatEventLog,
+    circleIdentityFor: agent.circleIdentityFor,
+    myRef: agent.identity.chat.pubKey,
+    callSkill,
+    verifyBinding: verifyChatBinding ?? (async ({ author, ref, circleId }) => {
+      for (const n of LIVE_NODES) {
+        if (n.pubKey !== ref) continue;
+        try { return (await n.agent.circleIdentityFor(circleId))?.pubKey === author; } catch { return false; }
+      }
+      return false;
+    }),
+  });
   const handlers = {
-    'kring-chat-message': kringChatHandler,
+    [CHAT_STATEMENT_BROADCAST]: makeChatPeerHandler({ rail: chatRail }),
     // ADMIN side: verify the joiner's code + reply, then propagate mesh intros.
     'group-redeem-request': makeHandleGroupRedeemRequest({
       callSkill, sendPeer, propagateMeshIntros, logger: QUIET,
@@ -224,7 +245,8 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     logger: QUIET,
   });
 
-  const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatInbox, _routerRef: routerRef };
+  const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatInbox, chatRail, _routerRef: routerRef };
+  LIVE_NODES.add(node);
   // Live view of the REAL ingested kring chats (the browser reads the same eventLog for its bubble list).
   Object.defineProperty(node, 'chatEvents', { enumerable: true, get: () => chatEventLog.query({ excludeMuted: true }) });
   // `keyEvents` is a LIVE VIEW of the production store (all circles this node holds), so assertions like
@@ -575,7 +597,20 @@ export async function readRoster(node, groupId) {
 
 /** Best-effort shutdown of the underlying secure-mesh agents. */
 export async function teardown(...nodes) {
+  for (const n of nodes) { try { LIVE_NODES.delete(n); } catch { /* */ } }
   for (const n of nodes) {
     try { await n?.agent?.sa?.shutdown?.(); } catch { /* defensive */ }
   }
+}
+
+/**
+ * Send one kring chat over the SIGNED path — the exact production shape: append the signed render entry
+ * on the sender's own log (`chatRail.appendMessage`), then fan the STATEMENT through the real stoop core
+ * (`broadcastKringChatStatement` → transport / pod routing per the circle's policy). The drop-in
+ * replacement for the deleted plain-envelope `broadcastKringMessage` in every journey test.
+ */
+export async function sendKringChat(node, { groupId, msgId, text, ts = Date.now(), media } = {}) {
+  const res = await node.chatRail.appendMessage(groupId, { msgId, ts, text, actor: node.pubKey, media });
+  if (!res) return { error: 'no-circle-signer' };
+  return node.agent.callSkill('stoop', 'broadcastKringChatStatement', { groupId, event: res.statement, msgId, ts });
 }

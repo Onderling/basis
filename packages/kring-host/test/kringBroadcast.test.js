@@ -100,49 +100,33 @@ describe('mediaForKringWire — the wire-boundary whitelist (media P1 fan-out)',
 describe('broadcastKringFanOut', () => {
   const base = { circleId: 'c1', msgId: 'm1', text: 'hi', ts: 9 };
 
-  it('pending → maybe-received on a clean result, and calls the RAW app-targeted skill', async () => {
+  const STATEMENT = { body: { hash: 'h1' }, sig: 'sig1' };
+  const signOk = async () => STATEMENT;
+
+  it('pending → maybe-received on a clean result, fanning the SIGNED statement via the RAW skill', async () => {
     const map = mapOf();
     const calls = [];
     const rawCallSkill = vi.fn(async (app, op, args) => { calls.push([app, op, args]); return {}; });
     const onChange = vi.fn();
-    await broadcastKringFanOut({ ...base, rawCallSkill, deliveryStateMap: map, onChange });
-    // Legacy wire pin: WITHOUT media the args are byte-identical to the pre-media shape
-    // (no `media` key at all — legacy receivers see exactly what they always saw).
-    expect(calls[0]).toEqual(['stoop', 'broadcastKringMessage', { groupId: 'c1', text: 'hi', msgId: 'm1', ts: 9 }]);
+    await broadcastKringFanOut({ ...base, rawCallSkill, deliveryStateMap: map, onChange, signStatement: signOk });
+    expect(calls[0]).toEqual(['stoop', 'broadcastKringChatStatement', { groupId: 'c1', event: STATEMENT, msgId: 'm1', ts: 9 }]);
     expect(map.get('m1')).toBe('maybe-received');
     expect(onChange).toHaveBeenCalledTimes(2);   // pending + sent
   });
 
-  it('carries the media pointer WHITELISTED onto the skill args (media P1 fan-out)', async () => {
+  it('NO signature (no rail / no circle key) is an honest delivery FAILURE — never a silent unsigned send', async () => {
     const map = mapOf();
     const calls = [];
-    const rawCallSkill = vi.fn(async (app, op, args) => { calls.push([app, op, args]); return {}; });
-    const media = {
-      kind: 'media-card', pointer: { type: 'media', ref: 'urn:dec:item:m' },
-      snapshot: { type: 'media', id: 'm', source: { type: 'blob', ref: 'blob://k', enc: { sealed: true } } },
-      stored: false, localPath: '/tmp/photo.jpg',
-    };
-    await broadcastKringFanOut({ ...base, media, rawCallSkill, deliveryStateMap: map });
-    const args = calls[0][2];
-    expect(args.media).toEqual({
-      kind: 'media-card', pointer: { type: 'media', ref: 'urn:dec:item:m' },
-      snapshot: { type: 'media', id: 'm', source: { type: 'blob', ref: 'blob://k', enc: { sealed: true } } },
-    });
-    expect(JSON.stringify(args)).not.toContain('localPath');
-    expect(args.media).not.toHaveProperty('stored');
-    expect(map.get('m1')).toBe('maybe-received');
+    await broadcastKringFanOut({ ...base, rawCallSkill: async (...c) => { calls.push(c); return {}; }, deliveryStateMap: map });
+    expect(calls).toHaveLength(0);              // nothing left the device
+    expect(map.get('m1')).toBe('failed');       // the bubble says so
   });
 
-  it('a non-media-card `media` arg is dropped, not sent (legacy args shape)', async () => {
-    const map = mapOf();
-    const calls = [];
-    await broadcastKringFanOut({ ...base, media: '📷 not-an-embed', rawCallSkill: async (...c) => { calls.push(c); return {}; }, deliveryStateMap: map });
-    expect(calls[0][2]).toEqual({ groupId: 'c1', text: 'hi', msgId: 'm1', ts: 9 });
-  });
+  // (The media wire-whitelist moved into the rail's signEntry — pinned by the media DOM journey.)
 
   it('pending → undeliverable when every error is permanent (recipient-pubkey-unknown)', async () => {
     const map = mapOf();
-    await broadcastKringFanOut({ ...base, rawCallSkill: async () => ({ sent: 0, errors: [{ webid: 'x', reason: 'recipient-pubkey-unknown' }] }), deliveryStateMap: map });
+    await broadcastKringFanOut({ ...base, signStatement: signOk, rawCallSkill: async () => ({ sent: 0, errors: [{ webid: 'x', reason: 'recipient-pubkey-unknown' }] }), deliveryStateMap: map });
     expect(map.get('m1')).toBe('undeliverable');   // retry can't help → no retry affordance
   });
 

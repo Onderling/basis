@@ -1,41 +1,36 @@
 /**
- * basis v2 — media FAN-OUT slice: the media pointer rides the kring
- * fan-out envelope so PEERS render the photo chip (closing the recorded gap
- * where the sender saw the chip and peers only got the '📷 filename' line).
+ * basis v2 — media over the SIGNED chat lane: the media pointer rides the statement's whitelisted wire
+ * payload so PEERS render the photo chip, with the same leakage pins the legacy fan carried.
  *
  * End-to-end with REAL sealing — two shells sharing one circle key:
  *
- *   SENDER  circleMediaGateway (group sealer) → createMediaEmbed (sealed
- *           upload, sealed inline thumb) → broadcastKringFanOut projects the
- *           embed through kring-host's WIRE whitelist (`mediaForKringWire`)
- *           into the broadcastKringMessage args
- *   WIRE    stoop merges the args into the fan-out extras → the peer's
- *           router payload carries `media` top-level (same additive-field
- *           mechanism the recipe/rules/policy broadcasts ride)
- *   PEER    chatMessageInbox lands `media` on the appended event payload →
- *           buildKringStream row → renderCircleKring's existing
- *           payload.media branch → chip, thumbnail OPENED with the circle
- *           opener the RECEIVING shell composes (same group key)
+ *   SENDER  circleMediaGateway (group sealer) → createMediaEmbed (sealed upload, sealed inline thumb) →
+ *           `chatRail.appendMessage` keeps the FULL embed on the LOCAL render entry and projects the
+ *           WIRE copy through `mediaForKringWire` into the SIGNED statement payload
+ *   WIRE    the statement is what fans (or lands in a pod row) — nothing else crosses the boundary
+ *   PEER    `chatRail.ingest` verifies, derives the render entry FROM THE VERIFIED BODY →
+ *           buildKringStream row → renderCircleKring's payload.media branch → chip, thumbnail OPENED
+ *           with the receiving shell's circle opener (same group key)
  *
- * Plus the compat + leakage pins:
- *   • an envelope WITHOUT media renders exactly as today (no chip),
- *   • a legacy-shaped envelope still ingests,
- *   • nothing local-only (device paths / sender bookkeeping / plaintext
- *     bytes) survives the wire boundary.
+ * Plus the pins:
+ *   • a message WITHOUT media renders exactly as today (no chip),
+ *   • a wrong circle key degrades to the placeholder (sealed stays sealed), never a crash,
+ *   • nothing local-only (sender bookkeeping / plaintext bytes) survives into the signed payload.
  *
  * @vitest-environment happy-dom
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 import {
   generateGroupKey, makeGroupSealer, makeGroupOpener, isSealed,
 } from '@onderling/pod-client/sealing';
-import { broadcastKringFanOut } from '@onderling/kring-host/kringBroadcast';
+import { AgentIdentity } from '@onderling/core';
+import { VaultMemory } from '@onderling/vault';
 
 import { createCircleMediaGateway, makeDevMediaBucket } from '../../src/v2/circleMediaGateway.js';
 import { createMediaEmbed } from '../../src/core/handlers/mediaEmbed.js';
-import { createChatMessageInbox } from '../../src/v2/chatMessageInbox.js';
-import { makeKringChatPeerHandler } from '../../src/v2/kringChatReceiver.js';
+import { EventLog } from '../../src/eventLog.js';
+import { makeChatRail } from '../../src/v2/chatRail.js';
 import { buildKringStream } from '../../src/v2/circleStream.js';
 import { renderCircleKring } from '../../web/v2/circleKring.js';
 
@@ -63,9 +58,6 @@ const stubEncodeImage = ({ bytes = fullBytes(), thumb = thumbBytes() } = {}) => 
   thumbnail: `data:image/jpeg;base64,${b64(thumb)}`,
 });
 
-const silentLogger = { warn: () => {}, info: () => {}, debug: () => {} };
-const mapOf = () => ({ set: () => {} });
-
 function mount() {
   const el = document.createElement('div');
   document.body.appendChild(el);
@@ -79,77 +71,73 @@ function circleKeyPair() {
   return { seal: makeGroupSealer(groupKey), open: makeGroupOpener(groupKey) };
 }
 
-/** Sender half: seal + upload the picked file, then run the REAL fan-out
- *  primitive with a capturing rawCallSkill. Returns {embed, wireArgs}. */
-async function senderSide(strategy) {
-  const comp = await createCircleMediaGateway({
-    circleId: CIRCLE.id, getSealStrategy: async () => strategy,
-    localActor: SENDER, bucket: makeDevMediaBucket(),
+/** Sender half: seal + upload the picked file, then SIGN a message carrying the embed through the real
+ *  chat rail. Returns the embed, the sender's circle key, the signed statement, and its wire payload. */
+async function senderSide(strategy, { text = '📷 photo.jpg', withMedia = true } = {}) {
+  const cid = await AgentIdentity.generate(new VaultMemory());
+  const rail = makeChatRail({
+    eventLog: new EventLog({ initial: [] }),
+    circleIdentityFor: async () => cid,
+    myRef: SENDER,
+    callSkill: async () => ({}),
+    verifyBinding: async () => true,
   });
-  const embed = await createMediaEmbed({}, {
-    file: stubFile(), mediaGateway: comp.mediaGateway,
-    encodeImage: stubEncodeImage(), localActor: SENDER, t,
+  let embed = null;
+  if (withMedia) {
+    const comp = await createCircleMediaGateway({
+      circleId: CIRCLE.id, getSealStrategy: async () => strategy,
+      localActor: SENDER, bucket: makeDevMediaBucket(),
+    });
+    embed = await createMediaEmbed({}, {
+      file: stubFile(), mediaGateway: comp.mediaGateway,
+      encodeImage: stubEncodeImage(), localActor: SENDER, t,
+    });
+    expect(embed.ok).not.toBe(false);
+  }
+  const { statement } = await rail.appendMessage(CIRCLE.id, {
+    msgId: 'kring-g1-1', ts: 1735_000_000_000, text, actor: SENDER, ...(embed ? { media: embed } : {}),
   });
-  expect(embed.ok).not.toBe(false);
-
-  let wireArgs = null;
-  await broadcastKringFanOut({
-    rawCallSkill: vi.fn(async (app, op, args) => { wireArgs = args; return {}; }),
-    circleId: CIRCLE.id, msgId: 'kring-g1-1', text: '📷 photo.jpg', ts: 1735_000_000_000,
-    media: embed, deliveryStateMap: mapOf(),
-  });
-  return { embed, wireArgs };
+  return { embed, cid, statement, wire: statement.body.payload };
 }
 
-/** The envelope exactly as stoop's fan-out lays it on the wire: the skill
- *  args become `extras` merged TOP-LEVEL into the chat.send payload
- *  (subtype + body→text mapping per the kring-chat receive contract). */
-function wireEnvelope(wireArgs) {
-  return {
-    subtype:   'kring-chat-message',
-    circleId:  wireArgs.groupId,
-    msgId:     wireArgs.msgId,
-    ts:        wireArgs.ts,
-    text:      wireArgs.text,
-    fromActor: SENDER,
-    ...(wireArgs.media !== undefined ? { media: wireArgs.media } : {}),
-  };
+/** A receiving device: its own rail over a real EventLog, bound to the sender's circle key. */
+async function receiverFor(senderCid) {
+  const eventLog = new EventLog({ initial: [] });
+  const cid = await AgentIdentity.generate(new VaultMemory());
+  const rail = makeChatRail({
+    eventLog, circleIdentityFor: async () => cid, myRef: 'webid:bob',
+    callSkill: async () => ({}),
+    verifyBinding: async ({ author }) => author === senderCid.pubKey,
+  });
+  return { eventLog, rail };
 }
 
-describe('media P1 fan-out — sender seals, the envelope carries the pointer, the PEER chip opens', () => {
-  it('walks sender → wire → receiver → chip end-to-end with one real circle key', async () => {
+describe('media over the signed lane — sender seals, the statement carries the pointer, the PEER chip opens', () => {
+  it('walks sender → signed wire → verified receiver → chip end-to-end with one real circle key', async () => {
     const strategy = circleKeyPair();
-    const { embed, wireArgs } = await senderSide(strategy);
+    const { embed, cid, statement, wire } = await senderSide(strategy);
 
-    /* ── the wire copy: whitelisted, sealed, nothing local-only ── */
-    expect(wireArgs.media.kind).toBe('media-card');
-    expect(wireArgs.media.pointer).toEqual(embed.pointer);
-    expect(wireArgs.media.snapshot.source).toEqual(embed.snapshot.source);   // the manifest line, unchanged
-    expect(wireArgs.media).not.toHaveProperty('stored');                     // sender-local bookkeeping stripped
-    const wireJson = JSON.stringify(wireArgs);
+    /* ── the SIGNED wire copy: whitelisted, sealed, nothing local-only ── */
+    expect(wire.media.kind).toBe('media-card');
+    expect(wire.media.pointer).toEqual(embed.pointer);
+    expect(wire.media.snapshot.source).toEqual(embed.snapshot.source);   // the manifest line, unchanged
+    expect(wire.media).not.toHaveProperty('stored');                     // sender-local bookkeeping stripped
+    const wireJson = JSON.stringify(wire);
     expect(wireJson).not.toContain(b64(fullBytes()));    // no plaintext image bytes
     expect(wireJson).not.toContain(b64(thumbBytes()));   // no plaintext thumb bytes
-    expect(isSealed(wireArgs.media.snapshot.source.enc.thumb)).toBe(true);   // the inline thumb is a sealed envelope
-    expect(wireArgs.media.snapshot.source.enc.keyRef).toBe('urn:circle:g1:content-key');   // a POINTER, not a key
+    expect(isSealed(wire.media.snapshot.source.enc.thumb)).toBe(true);   // the inline thumb is a sealed envelope
+    expect(wire.media.snapshot.source.enc.keyRef).toBe('urn:circle:g1:content-key');   // a POINTER, not a key
 
-    /* ── receiver: the real inbox + peer handler, ingest mirror captured ── */
-    const eventLog = { events: [], append(e) { this.events.push(e); } };
-    const ingested = [];
-    const inbox = createChatMessageInbox({
-      eventLog,
-      ingest: async (payload) => { ingested.push(payload); return { ok: true, itemId: 'it-1' }; },
-      logger: silentLogger,
-    });
-    const handler = makeKringChatPeerHandler({ inbox });
-    await handler('nkn-addr-anne', wireEnvelope(wireArgs));
-
-    expect(eventLog.events).toHaveLength(1);
-    const ev = eventLog.events[0];
-    expect(ev.payload.media).toEqual(wireArgs.media);   // the chip payload landed
-    expect(ingested[0].media).toEqual(wireArgs.media);  // …and the durable mirror got it too
+    /* ── receiver: verify at the rail, land the render entry FROM THE VERIFIED BODY ── */
+    const recv = await receiverFor(cid);
+    const res = await recv.rail.ingest(CIRCLE.id, statement);
+    expect(res.ok).toBe(true);
+    const events = recv.eventLog.query({});
+    expect(events).toHaveLength(1);
+    expect(events[0].payload.media).toEqual(wire.media);   // the chip payload landed
 
     /* ── render on the RECEIVING shell: same circle key → the thumb opens ── */
-    const rows = buildKringStream({ events: eventLog.events, circles: [CIRCLE], circleId: CIRCLE.id });
+    const rows = buildKringStream({ events, circles: [CIRCLE], circleId: CIRCLE.id });
     const el = mount();
     renderCircleKring(el, {
       circle: CIRCLE, rows, t, onSend: () => {},
@@ -166,12 +154,11 @@ describe('media P1 fan-out — sender seals, the envelope carries the pointer, t
   });
 
   it('a WRONG circle key degrades to the placeholder (sealed stays sealed), never a crash', async () => {
-    const { wireArgs } = await senderSide(circleKeyPair());
-    const eventLog = { events: [], append(e) { this.events.push(e); } };
-    const inbox = createChatMessageInbox({ eventLog, logger: silentLogger });
-    await makeKringChatPeerHandler({ inbox })('nkn-addr', wireEnvelope(wireArgs));
+    const { cid, statement } = await senderSide(circleKeyPair());
+    const recv = await receiverFor(cid);
+    await recv.rail.ingest(CIRCLE.id, statement);
 
-    const rows = buildKringStream({ events: eventLog.events, circles: [CIRCLE], circleId: CIRCLE.id });
+    const rows = buildKringStream({ events: recv.eventLog.query({}), circles: [CIRCLE], circleId: CIRCLE.id });
     const el = mount();
     renderCircleKring(el, {
       circle: CIRCLE, rows, t, onSend: () => {},
@@ -183,24 +170,17 @@ describe('media P1 fan-out — sender seals, the envelope carries the pointer, t
     expect(chip.querySelector('.cc-media-placeholder')).not.toBeNull();
   });
 
-  it('an envelope WITHOUT media renders exactly as today, and a legacy-shaped envelope still ingests', async () => {
-    // The fan-out without media produces the LEGACY args — no media key at all.
-    let wireArgs = null;
-    await broadcastKringFanOut({
-      rawCallSkill: async (app, op, args) => { wireArgs = args; return {}; },
-      circleId: CIRCLE.id, msgId: 'kring-g1-2', text: 'Hoi buurt!', ts: 2,
-      deliveryStateMap: mapOf(),
-    });
-    expect(wireArgs).toEqual({ groupId: 'g1', text: 'Hoi buurt!', msgId: 'kring-g1-2', ts: 2 });
+  it('a message WITHOUT media renders exactly as today — no chip, no media key on the wire', async () => {
+    const { cid, statement, wire } = await senderSide(circleKeyPair(), { text: 'Hoi buurt!', withMedia: false });
+    expect(wire).not.toHaveProperty('media');
 
-    const eventLog = { events: [], append(e) { this.events.push(e); } };
-    const inbox = createChatMessageInbox({ eventLog, logger: silentLogger });
-    const handler = makeKringChatPeerHandler({ inbox });
-    await handler('nkn-addr', wireEnvelope(wireArgs));
-    expect(eventLog.events).toHaveLength(1);
-    expect(eventLog.events[0].payload).not.toHaveProperty('media');
+    const recv = await receiverFor(cid);
+    await recv.rail.ingest(CIRCLE.id, statement);
+    const events = recv.eventLog.query({});
+    expect(events).toHaveLength(1);
+    expect(events[0].payload).not.toHaveProperty('media');
 
-    const rows = buildKringStream({ events: eventLog.events, circles: [CIRCLE], circleId: CIRCLE.id });
+    const rows = buildKringStream({ events, circles: [CIRCLE], circleId: CIRCLE.id });
     const el = mount();
     renderCircleKring(el, { circle: CIRCLE, rows, t, onSend: () => {} });
     expect(el.querySelector('.cc-media-card')).toBeNull();      // no chip

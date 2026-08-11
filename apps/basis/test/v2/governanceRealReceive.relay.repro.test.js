@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { bootRealAgentNode, connectAgentsOverRelay, pairCircle, until, teardown } from '../support/pairRealAgents.js';
+import { bootRealAgentNode, connectAgentsOverRelay, pairCircle, until, teardown, sendKringChat } from '../support/pairRealAgents.js';
 import { signSpine } from '@onderling/core';
 import { reportEntryId } from '../../src/v2/reportModel.js';
 
@@ -12,7 +12,7 @@ const RELAY = process.env.PEER_TEST_RELAY || 'ws://127.0.0.1:8787';
 
 async function warmMesh(A, B) {
   const text = 'warmup-' + Math.random().toString(36).slice(2);
-  await A.agent.callSkill('stoop', 'broadcastKringMessage', { groupId: 'peer-circle', msgId: 'w-' + Math.random().toString(36).slice(2), text });
+  await sendKringChat(A, { groupId: 'peer-circle', msgId: 'w-' + Math.random().toString(36).slice(2), text });
   await until(() => B.chatEvents.some((e) => e?.payload?.text === text), { timeout: 8000 });
 }
 

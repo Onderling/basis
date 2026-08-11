@@ -31,10 +31,10 @@ describe('kring chat — one inbox, media-fan parity (web ≡ mobile)', () => {
     expect(appCalls).toHaveLength(1);                       // the singleton, and nothing else
   });
 
-  it('the kring-chat-message subtype routes ONLY through the injected inbox (loud when absent)', () => {
+  it('the legacy plain-envelope receive is GONE — live chat arrives only as signed statements', () => {
     expect(chatScreen).not.toMatch(/makeFallbackInbox/);
-    // The handler registration is gated on the injected singleton.
-    expect(chatScreen).toMatch(/kringChatInbox\s*\?\s*\{\s*'kring-chat-message'/);
+    expect(chatScreen).not.toMatch(/'kring-chat-message'\s*:/);          // no unsigned receive path
+    expect(chatScreen).toMatch(/CHAT_STATEMENT_BROADCAST/);               // the signed one is registered
   });
 
   it('the App singleton carries the full receive config (resolveRef + receipts + self-author)', () => {

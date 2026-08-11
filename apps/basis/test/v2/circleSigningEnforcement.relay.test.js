@@ -35,8 +35,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { startRelay } from '@onderling/relay';
 import {
   bootRealAgentNode, connectNodesOverRelay, createCircle, joinExistingCircle,
-  bindCircleAddresses, readRoster, until, teardown,
-} from '../support/pairRealAgents.js';
+  bindCircleAddresses, readRoster, until, teardown, sendKringChat } from '../support/pairRealAgents.js';
 import { bindCircleAddressKeysFor } from '../../src/v2/householdRosterPairing.js';
 import { primeCircleSecurity, announceCircleAddresses } from '../../src/v2/circleSecurityPriming.js';
 
@@ -220,7 +219,7 @@ describe('per-circle signing is enforced per member (real relay, fallback OFF)',
     // A check that refuses everything is not a check, it is an outage — and every assertion below
     // would pass in one.
     const text = `real-traffic-${rnd()}`;
-    const fan = await admin.agent.callSkill('stoop', 'broadcastKringMessage', {
+    const fan = await sendKringChat(admin, {
       groupId: CIRCLE_A, msgId: `m-${rnd()}`, text,
     });
     expect(fan.errors, `fan reported errors: ${JSON.stringify(fan.errors)}`).toEqual([]);
@@ -279,7 +278,7 @@ describe('per-circle signing is enforced per member (real relay, fallback OFF)',
   it('ADVERSARIAL: …and the same member is still perfectly welcome in circle A', async () => {
     // The other half of "per circle": the refusal above must be about the circle, not about bram.
     const text = `still-welcome-${rnd()}`;
-    const fan = await bram.agent.callSkill('stoop', 'broadcastKringMessage', {
+    const fan = await sendKringChat(bram, {
       groupId: CIRCLE_A, msgId: `m-${rnd()}`, text,
     });
     expect(fan.errors).toEqual([]);

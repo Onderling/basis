@@ -61,8 +61,8 @@ describe('Stoop connectivity Phase 2 (G1/G2) — data-move branch', () => {
     const calls = [];
     bundle.chat.send = vi.fn(async (a) => { calls.push(a); return { ok: true }; });
 
-    const r = await callSkill(bundle.agent, 'broadcastKringMessage',
-      { groupId: 'oosterpoort', text: 'Hoi buurt!', msgId: 'm-nopod', ts: 1 });
+    const r = await callSkill(bundle.agent, 'broadcastKringChatStatement',
+      { groupId: 'oosterpoort', event: { body: { hash: 'h' }, sig: 's' }, msgId: 'm-nopod', ts: 1 });
 
     expect(r.sent).toBe(2);
     expect(r.attempted).toBe(2);
@@ -79,8 +79,8 @@ describe('Stoop connectivity Phase 2 (G1/G2) — data-move branch', () => {
     const calls = [];
     bundle.chat.send = vi.fn(async (a) => { calls.push(a); return { ok: true }; });
 
-    const r = await callSkill(bundle.agent, 'broadcastKringMessage',
-      { groupId: 'oosterpoort', text: 'Hi', msgId: 'm-full', ts: 1 });
+    const r = await callSkill(bundle.agent, 'broadcastKringChatStatement',
+      { groupId: 'oosterpoort', event: { body: { hash: 'h' }, sig: 's' }, msgId: 'm-full', ts: 1 });
 
     expect(r.sent).toBe(2);
     expect(infoSpy.mock.calls.some(([m]) => typeof m === 'string' && m.includes('data-policy'))).toBe(false);
@@ -93,8 +93,8 @@ describe('Stoop connectivity Phase 2 (G1/G2) — data-move branch', () => {
     const calls = [];
     bundle.chat.send = vi.fn(async (a) => { calls.push(a); return { ok: true }; });
 
-    const r = await callSkill(bundle.agent, 'broadcastKringMessage',
-      { groupId: 'oosterpoort', text: 'Hoi buurt!', msgId: 'm-signal', ts: 1 });
+    const r = await callSkill(bundle.agent, 'broadcastKringChatStatement',
+      { groupId: 'oosterpoort', event: { body: { hash: 'h' }, sig: 's' }, msgId: 'm-signal', ts: 1 });
 
     // degrade is honest: the message STILL fans out full to every member.
     expect(r.sent).toBe(2);
@@ -115,8 +115,8 @@ describe('Stoop connectivity Phase 2 (G1/G2) — data-move branch', () => {
     const calls = [];
     bundle.chat.send = vi.fn(async (a) => { calls.push(a); return { ok: true }; });
 
-    const r = await callSkill(bundle.agent, 'broadcastKringMessage',
-      { groupId: 'oosterpoort', text: 'Hi', msgId: 'm-only', ts: 1 });
+    const r = await callSkill(bundle.agent, 'broadcastKringChatStatement',
+      { groupId: 'oosterpoort', event: { body: { hash: 'h' }, sig: 's' }, msgId: 'm-only', ts: 1 });
 
     expect(r.sent).toBe(2);
     expect(calls).toHaveLength(2);
@@ -130,8 +130,8 @@ describe('Stoop connectivity Phase 2 (G1/G2) — data-move branch', () => {
     await bundle.offeringMatch.start();
     bundle.chat.send = vi.fn(async () => ({ ok: true }));
 
-    const r = await callSkill(bundle.agent, 'broadcastKringMessage',
-      { groupId: 'oosterpoort', text: 'Hi', msgId: 'm-async', ts: 1 });
+    const r = await callSkill(bundle.agent, 'broadcastKringChatStatement',
+      { groupId: 'oosterpoort', event: { body: { hash: 'h' }, sig: 's' }, msgId: 'm-async', ts: 1 });
 
     expect(r.sent).toBe(2);
     expect(infoSpy.mock.calls.some(([m]) => typeof m === 'string' && m.includes('selected pod-signal'))).toBe(true);
@@ -143,8 +143,8 @@ describe('Stoop connectivity Phase 2 (G1/G2) — data-move branch', () => {
     for (const bundle of [boom, junk]) {
       await bundle.offeringMatch.start();
       bundle.chat.send = vi.fn(async () => ({ ok: true }));
-      const r = await callSkill(bundle.agent, 'broadcastKringMessage',
-        { groupId: 'oosterpoort', text: 'Hi', msgId: 'm-fallback', ts: 1 });
+      const r = await callSkill(bundle.agent, 'broadcastKringChatStatement',
+        { groupId: 'oosterpoort', event: { body: { hash: 'h' }, sig: 's' }, msgId: 'm-fallback', ts: 1 });
       expect(r.sent).toBe(2);
     }
     expect(infoSpy.mock.calls.some(([m]) => typeof m === 'string' && m.includes('data-policy'))).toBe(false);
@@ -157,8 +157,8 @@ describe('Stoop connectivity Phase 2 (G1/G2) — data-move branch', () => {
     const calls = [];
     bundle.chat.send = vi.fn(async (a) => { calls.push(a); return { ok: true }; });
 
-    const r = await callSkill(bundle.agent, 'broadcastKringMessage',
-      { groupId: 'oosterpoort', text: 'Hi', msgId: 'm-seam', ts: 1 });
+    const r = await callSkill(bundle.agent, 'broadcastKringChatStatement',
+      { groupId: 'oosterpoort', event: { body: { hash: 'h' }, sig: 's' }, msgId: 'm-seam', ts: 1 });
 
     // Phase 3 completes the branch: the pod is written and a REF envelope is
     // fanned (body dropped; the ref rides `extras`) — not a full-body degrade.
@@ -181,8 +181,8 @@ describe('Stoop connectivity Phase 2 (G1/G2) — data-move branch', () => {
     const calls = [];
     bundle.chat.send = vi.fn(async (a) => { calls.push(a); return { ok: true }; });
 
-    const r = await callSkill(bundle.agent, 'broadcastKringMessage',
-      { groupId: 'oosterpoort', text: 'Hi', msgId: 'm-only-real', ts: 1 });
+    const r = await callSkill(bundle.agent, 'broadcastKringChatStatement',
+      { groupId: 'oosterpoort', event: { body: { hash: 'h' }, sig: 's' }, msgId: 'm-only-real', ts: 1 });
 
     expect(podWrite).toHaveBeenCalledTimes(1);
     expect(r.podOnly).toBe(true);
@@ -198,8 +198,8 @@ describe('Stoop connectivity Phase 2 (G1/G2) — data-move branch', () => {
     await bundle.offeringMatch.start();
     bundle.chat.send = vi.fn(async () => ({ ok: true }));
 
-    const r = await callSkill(bundle.agent, 'broadcastKringMessage',
-      { groupId: 'oosterpoort', text: 'Hi', msgId: 'm-podfail', ts: 1 });
+    const r = await callSkill(bundle.agent, 'broadcastKringChatStatement',
+      { groupId: 'oosterpoort', event: { body: { hash: 'h' }, sig: 's' }, msgId: 'm-podfail', ts: 1 });
 
     expect(r.sent).toBe(2);            // honest degrade: full fan still reaches every member
     expect(r.podSignal).toBeUndefined();

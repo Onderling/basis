@@ -134,25 +134,19 @@ export function broadcastKringFanOut({ rawCallSkill, circleId, msgId, text, ts, 
   if (typeof rawCallSkill !== 'function') return Promise.resolve();
   const mark = (state) => { deliveryStateMap.set(msgId, state); onChange?.(); };
   mark('pending');
-  const wireMedia = mediaForKringWire(media);
   return Promise.resolve()
-    // The chat lane (the content re-root): when the shell hands `signStatement(circleId, msgId)` —
-    // the chat rail's sign-the-appended-entry hook — the fan carries the SIGNED statement and receivers
-    // verify at their rail before anything renders. What fans is signed; a bot bubble or self-scoped
-    // line never fans, so it never needs a signature. Signing unavailable (no rail / no circle key
-    // yet) → the legacy plain envelope, honestly, so a message is never silently unsent.
+    // The chat lane: the fan carries a SIGNED statement, always — `signStatement(circleId, msgId)` is
+    // the chat rail's sign-the-appended-entry hook, and receivers verify at their rail before anything
+    // renders. What fans is signed; a bot bubble or self-scoped line never fans, so it never needs a
+    // signature. No signature (no rail / no circle key resolvable) is a DELIVERY FAILURE, marked
+    // honestly on the bubble — the unsigned envelope is gone.
     .then(async () => {
       const statement = typeof signStatement === 'function'
         ? await Promise.resolve(signStatement(circleId, msgId)).catch(() => null)
         : null;
-      if (statement) {
-        return rawCallSkill('stoop', 'broadcastKringChatStatement', {
-          groupId: circleId, event: statement, msgId, ts,
-        });
-      }
-      return rawCallSkill('stoop', 'broadcastKringMessage', {
-        groupId: circleId, text, msgId, ts,
-        ...(wireMedia ? { media: wireMedia } : {}),
+      if (!statement) throw new Error('no circle signing available — message not fanned');
+      return rawCallSkill('stoop', 'broadcastKringChatStatement', {
+        groupId: circleId, event: statement, msgId, ts,
       });
     })
     .then((r) => {

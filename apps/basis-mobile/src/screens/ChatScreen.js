@@ -59,7 +59,6 @@ import {
 import { makePeerRouter }      from '../../../basis/src/core/handlers/peerRouter.js';
 import { makeReceiptReceiver } from '../../../basis/src/v2/deliverySettings.js';
 import { pushContactReply }    from '../core/contactReplyInbox.js';
-import { makeKringChatPeerHandler } from '../../../basis/src/v2/kringChatReceiver.js';
 import { makeKringRecipePeerHandler } from '../../../basis/src/v2/kringRecipeReceiver.js';
 import { makeKringRulesPeerHandler }  from '../../../basis/src/v2/kringRulesReceiver.js';
 import { makeKringPolicyPeerHandler } from '../../../basis/src/v2/kringPolicyReceiver.js';
@@ -735,18 +734,8 @@ export default function ChatScreen({
       ...(sharedWithMeStore
         ? { 'shared-copy': makeHandleSharedCopy({ store: sharedWithMeStore, publishEvent }) }
         : {}),
-      // ε.1 — kring chat-message: routes through the shared inbox
-      // (App.js owns the singleton).  The inbox handles envelope
-      // validation, msgId dedup, ingest mirror into stoop's itemStore
-      // (mute/eviction filtered), resolveRef for pod-signal envelopes,
-      // delivery receipts, and the eventLog append that drives the
-      // GESPREK tab bubbles.  ONE dedup domain shared with the boot
-      // rehydrator and catch-up, so nothing can double-render. Without
-      // the injected inbox the subtype is not routed — kring receive is
-      // OFF loudly, never silently served by a crippled private twin.
-      ...(kringChatInbox
-        ? { 'kring-chat-message': makeKringChatPeerHandler({ inbox: kringChatInbox }) }
-        : (console.warn('[kring-chat] no shared inbox injected — kring chat receive is OFF'), {})),
+      // (the legacy plain-envelope receive is gone — every live chat message arrives as a SIGNED
+      // statement and verifies at the chat rail; the shared inbox remains the migration gate.)
       // Delivery honesty — the peer's app stored our message. The shared receiver validates (rebuilt,
       // `from` off the wire), resolves the message's circle off the log, and only lets someone the
       // circle's ROSTER knows advance it; the map's monotonic rule then orders it. Absent map ⇒ the

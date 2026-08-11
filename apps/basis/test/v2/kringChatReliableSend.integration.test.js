@@ -8,8 +8,7 @@
 import { describe, it, expect, afterAll } from 'vitest';
 
 import {
-  bootRealAgentNode, connectAgentsOverBus, pairCircle, until, teardown, goOffline, goOnline,
-} from '../support/pairRealAgents.js';
+  bootRealAgentNode, connectAgentsOverBus, pairCircle, until, teardown, goOffline, goOnline, sendKringChat } from '../support/pairRealAgents.js';
 
 describe('kring chat send over the unified secure-agent reliable path', () => {
   let A; let B;
@@ -28,7 +27,7 @@ describe('kring chat send over the unified secure-agent reliable path', () => {
     const t1 = Date.now();
     const msgId = `kring-${groupId}-${Date.now().toString(36)}`;
     const text = `hoi kring vanaf A ${Date.now().toString(36)}`;
-    const res = await A.agent.callSkill('stoop', 'broadcastKringMessage', { groupId, text, msgId, ts: Date.now() });
+    const res = await sendKringChat(A, { groupId, text, msgId, ts: Date.now() });
     expect(res.error, `broadcastKringMessage errored: ${res.error}`).toBeUndefined();
     expect(res.sent, `fan-out reached ≥1 recipient — got ${JSON.stringify(res)}`).toBeGreaterThanOrEqual(1);
 
@@ -36,9 +35,9 @@ describe('kring chat send over the unified secure-agent reliable path', () => {
     const rendered = await until(() => B.chatEvents.find((e) => e.id === msgId));
     expect(rendered, 'B rendered the kring message via the real receiver').toBeTruthy();
     expect(rendered.payload.text, 'top-level text (not body)').toBe(text);
-    // Durable mirror (getMessagesSince) reflects the received chat too.
-    const since = await B.agent.callSkill('stoop', 'getMessagesSince', { groupId, sinceTs: 0 });
-    expect(since.items.some((i) => i.msgId === msgId), 'B persisted the kring message').toBe(true);
+    // The device log IS the durable record now (the store mirror is retired): the landed entry carries
+    // the signed statement a cold start re-verifies, and the log persists in production.
+    expect(rendered.payload?.statement?.sig, 'the landed message carries its proof').toBeTruthy();
     const onlineMs = Date.now() - t1;
 
     // ── 2. Offline hold-forward ──────────────────────────────────────────────
@@ -46,7 +45,7 @@ describe('kring chat send over the unified secure-agent reliable path', () => {
     const t2 = Date.now();
     const msgId2 = `kring-${groupId}-off-${Date.now().toString(36)}`;
     const text2 = `hoi terwijl B offline is ${Date.now().toString(36)}`;
-    const res2 = await A.agent.callSkill('stoop', 'broadcastKringMessage', { groupId, text: text2, msgId: msgId2, ts: Date.now() });
+    const res2 = await sendKringChat(A, { groupId, text: text2, msgId: msgId2, ts: Date.now() });
     expect(res2.error).toBeUndefined();
     expect(res2.sent, 'offline send is HELD (counts as sent)').toBeGreaterThanOrEqual(1);
     expect(B.chatEvents.find((e) => e.id === msgId2), 'held, not delivered while offline').toBeFalsy();

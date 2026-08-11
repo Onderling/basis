@@ -290,7 +290,6 @@ import { loadCircleStoragePod } from '../../src/v2/circleStoragePolicy.js';
 // the relay/nkn wire address (`addressesOf`) instead of degrading to the bare pubKey.
 import { decodeInvite as decodeInviteForPopulate, populateAdminAddressesFromInvite } from '../../src/core/wizards/joinGroupState.js';
 import { feedHouseholdRoster, makeCircleReachable } from '../../src/v2/householdRosterPairing.js';
-import { makeKringChatPeerHandler } from '../../src/v2/kringChatReceiver.js';
 import { migrateKringChatHistory, CHAT_MIGRATION_MARKER_KEY } from '../../src/v2/kringChatRehydrate.js';
 import { createChatMessageInbox } from '../../src/v2/chatMessageInbox.js';
 import { createSelfAuthorCheck } from '../../src/v2/chatSelfAuthor.js';
@@ -6982,7 +6981,7 @@ async function boot() {
         localActor: LOCAL_ACTOR,
         logger: console,
       });
-      const kringChatHandler = makeKringChatPeerHandler({ inbox: kringChatInbox });
+      // (the legacy plain-envelope receive is gone — every live chat message arrives as a SIGNED statement)
       // The SIGNED chat receive path (the content re-root): a fanned statement verifies at the agent's
       // chat rail — signature + the roster binding (the eviction gate) — and lands as the ONE render
       // entry (bubble + proof). The side effects mirror the legacy inbox's: the store copy (durable
@@ -7132,7 +7131,6 @@ async function boot() {
 
       const peerMessageRouter = makePeerRouter({
         handlers: {
-          'kring-chat-message':      kringChatHandler,
           // The SIGNED chat lane: verify-at-the-rail receive + its windowed, consent-gated catch-up.
           ...(kringChatStatementHandler ? { [CHAT_STATEMENT_BROADCAST]: kringChatStatementHandler } : {}),
           ...(chatCatchUpShell ? {

@@ -16,7 +16,7 @@ function mount() { const el = document.createElement('div'); document.body.appen
 const circle = { id: 'g1', name: 'Selwerd', memberCount: 3 };
 
 describe('kring chat · composer dispatches the unified send op', () => {
-  it('composer submit fans out via broadcastKringMessage (the op that now routes through reliableSend)', async () => {
+  it('composer submit fans out the SIGNED statement (the op that routes through reliableSend)', async () => {
     const el = mount();
     const events = [];
     const rawCallSkill = vi.fn(async () => ({ sent: 1, attempted: 1, errors: [] }));
@@ -30,6 +30,7 @@ describe('kring chat · composer dispatches the unified send op', () => {
       broadcastKringFanOut({
         rawCallSkill, circleId: 'g1', msgId, text, ts,
         deliveryStateMap: { set() {} },
+        signStatement: async () => ({ body: { hash: 'h1' }, sig: 's1' }),   // the rail's sign-the-entry hook
       });
     };
 
@@ -43,10 +44,11 @@ describe('kring chat · composer dispatches the unified send op', () => {
     expect(events[0].payload.text).toBe('Hoi buurt!');
     // The unified send op dispatched (basis wires this stoop op to the reliable sender).
     await Promise.resolve(); await Promise.resolve();
+    await new Promise((r) => setTimeout(r, 0));   // the sign hook adds a microtask hop before the fan
     expect(rawCallSkill).toHaveBeenCalledTimes(1);
     const [app, op, args] = rawCallSkill.mock.calls[0];
-    expect([app, op]).toEqual(['stoop', 'broadcastKringMessage']);
-    expect(args).toMatchObject({ groupId: 'g1', text: 'Hoi buurt!' });
+    expect([app, op]).toEqual(['stoop', 'broadcastKringChatStatement']);
+    expect(args).toMatchObject({ groupId: 'g1', event: { sig: 's1' } });   // the statement rides, not plain text
     expect(typeof args.msgId).toBe('string');
   });
 });

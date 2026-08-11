@@ -27,8 +27,7 @@ import { AgentIdentity, SecurityLayer, mkEnvelope, P } from '@onderling/core';
 import { RelayTransport } from '../../../../packages/transports/src/RelayTransport.js';
 import { VaultMemory } from '@onderling/vault';
 import {
-  bootRealAgentNode, connectAgentsOverRelay, pairCircle, until, teardown,
-} from '../support/pairRealAgents.js';
+  bootRealAgentNode, connectAgentsOverRelay, pairCircle, until, teardown, sendKringChat } from '../support/pairRealAgents.js';
 
 const GROUP = 'buurt-sender-authorize';
 const rnd = () => Math.random().toString(36).slice(2, 8);
@@ -52,7 +51,7 @@ describe('a stranger cannot speak in a circle, however well they sign (real rela
     // Warm the mesh exactly as the sibling relay test does: a real broadcast from the admin, which
     // is also the POSITIVE CONTROL — a member's traffic must still arrive with the check installed.
     const warm = `warmup-${rnd()}`;
-    await admin.agent.callSkill('stoop', 'broadcastKringMessage', {
+    await sendKringChat(admin, {
       groupId: GROUP, msgId: `w-${rnd()}`, text: warm,
     });
     await until(() => joiner.chatEvents.some((e) => e?.payload?.text === warm), { timeout: 10000 });

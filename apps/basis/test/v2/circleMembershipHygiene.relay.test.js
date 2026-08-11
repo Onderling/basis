@@ -29,8 +29,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { startRelay } from '@onderling/relay';
 import {
   bootRealAgentNode, connectNodesOverRelay, createCircle, joinExistingCircle,
-  bindCircleAddresses, readRoster, until, teardown,
-} from '../support/pairRealAgents.js';
+  bindCircleAddresses, readRoster, until, teardown, sendKringChat } from '../support/pairRealAgents.js';
 import { bindCircleAddressKeysFor } from '../../src/v2/householdRosterPairing.js';
 import { primeCircleSecurity } from '../../src/v2/circleSecurityPriming.js';
 import { removeCircleMember, leaveCircleLocally } from '../../src/v2/circleMembershipHygiene.js';
@@ -102,7 +101,7 @@ describe('B4 — a removed member is silenced in THAT circle only (real relay)',
 
     for (const circleId of [CIRCLE_A, CIRCLE_B]) {
       const text = `before-removal-${circleId}-${rnd()}`;
-      const fan = await bram.agent.callSkill('stoop', 'broadcastKringMessage', {
+      const fan = await sendKringChat(bram, {
         groupId: circleId, msgId: `m-${rnd()}`, text,
       });
       expect(fan.errors, `fan errors in ${circleId}: ${JSON.stringify(fan.errors)}`).toEqual([]);
@@ -147,7 +146,7 @@ describe('B4 — a removed member is silenced in THAT circle only (real relay)',
 
     const before = admin.agent.circleSenderAuthorization();
     const text = `removed-cannot-speak-${rnd()}`;
-    await bram.agent.callSkill('stoop', 'broadcastKringMessage', {
+    await sendKringChat(bram, {
       groupId: CIRCLE_A, msgId: `m-${rnd()}`, text,
     });
     await settle(2500);
@@ -165,7 +164,7 @@ describe('B4 — a removed member is silenced in THAT circle only (real relay)',
     // The other half of "per circle". Without this the test above is satisfied by any change that
     // breaks bram generally — which is exactly the bug being fixed, wearing the fix's clothes.
     const text = `still-welcome-in-B-${rnd()}`;
-    const fan = await bram.agent.callSkill('stoop', 'broadcastKringMessage', {
+    const fan = await sendKringChat(bram, {
       groupId: CIRCLE_B, msgId: `m-${rnd()}`, text,
     });
     expect(fan.errors, `fan errors: ${JSON.stringify(fan.errors)}`).toEqual([]);
@@ -177,7 +176,7 @@ describe('B4 — a removed member is silenced in THAT circle only (real relay)',
     // Removing one member must not narrow the snapshot into an outage for the rest of the circle —
     // the failure mode of "refresh the allow-list" done carelessly.
     const text = `cato-still-speaks-${rnd()}`;
-    const fan = await cato.agent.callSkill('stoop', 'broadcastKringMessage', {
+    const fan = await sendKringChat(cato, {
       groupId: CIRCLE_A, msgId: `m-${rnd()}`, text,
     });
     expect(fan.errors, `fan errors: ${JSON.stringify(fan.errors)}`).toEqual([]);

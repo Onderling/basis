@@ -21,8 +21,7 @@
  */
 import { describe, it, expect, afterAll } from 'vitest';
 import {
-  bootRealAgentNode, connectNodesOverBus, pairCircle, until, teardown, goOffline, goOnline,
-} from '../support/pairRealAgents.js';
+  bootRealAgentNode, connectNodesOverBus, pairCircle, until, teardown, goOffline, goOnline, sendKringChat } from '../support/pairRealAgents.js';
 
 const GROUP = 'peer-circle';
 // `chatEvents` is `EventLog.query()`, which returns MOST-RECENT-FIRST. Reversing here means the rest of
@@ -51,7 +50,7 @@ describe('4.2 — Anna posts to a circle with Bram online and Cato offline', () 
 
     // A baseline message everyone gets, so a later empty inbox can't pass as "nothing was sent".
     const warmup = `warmup-${Date.now().toString(36)}`;
-    await A.agent.callSkill('stoop', 'broadcastKringMessage', { groupId: GROUP, text: warmup, msgId: warmup, ts: Date.now() });
+    await sendKringChat(A, { groupId: GROUP, text: warmup, msgId: warmup, ts: Date.now() });
     await until(() => B.chatEvents.find((e) => e.id === warmup));
     await until(() => C.chatEvents.find((e) => e.id === warmup));
 
@@ -59,8 +58,7 @@ describe('4.2 — Anna posts to a circle with Bram online and Cato offline', () 
     await goOffline(C);
     const burst = ['een', 'twee', 'drie'].map((word) => ({ text: word, msgId: `burst-${word}` }));
     for (const m of burst) {
-      const r = await A.agent.callSkill('stoop', 'broadcastKringMessage',
-        { groupId: GROUP, text: m.text, msgId: m.msgId, ts: Date.now() });
+      const r = await sendKringChat(A, { groupId: GROUP, text: m.text, msgId: m.msgId, ts: Date.now() });
       expect(r.error, `send errored: ${r.error}`).toBeUndefined();
     }
 
@@ -92,27 +90,29 @@ describe('4.2 — Anna posts to a circle with Bram online and Cato offline', () 
     const msgId = `replay-${Date.now().toString(36)}`;
     const text = 'zelfde bericht';
 
-    await A.agent.callSkill('stoop', 'broadcastKringMessage', { groupId: GROUP, text, msgId, ts: Date.now() });
+    await sendKringChat(A, { groupId: GROUP, text, msgId, ts: Date.now() });
     await until(() => C.chatEvents.find((e) => e.id === msgId));
     const before = idsOn(C).filter((id) => id === msgId).length;
     expect(before).toBe(1);
 
     // Send the SAME msgId again — the shape a hold-forward flush replays.
-    await A.agent.callSkill('stoop', 'broadcastKringMessage', { groupId: GROUP, text, msgId, ts: Date.now() });
+    await sendKringChat(A, { groupId: GROUP, text, msgId, ts: Date.now() });
     await new Promise((r) => setTimeout(r, 300));      // give a duplicate every chance to land
 
     expect(idsOn(C).filter((id) => id === msgId)).toHaveLength(1);
     expect(idsOn(B).filter((id) => id === msgId)).toHaveLength(1);
   }, 30_000);
 
-  it('the durable mirror agrees with the live stream — a reconnecting member can rebuild', async () => {
-    // `chatEvents` is what the open screen renders; `getMessagesSince` is what a cold start reads. If the
-    // held burst only reached the first, Cato would see the conversation until he closed the app.
-    const since = await C.agent.callSkill('stoop', 'getMessagesSince', { groupId: GROUP, sinceTs: 0 });
-    const texts = (since?.items ?? []).map((m) => m.text).filter(Boolean);
-    expect(texts.length, 'the durable mirror is empty — nothing to agree with').toBeGreaterThan(0);
+  it('the RECORD carries its proofs — every landed message on Cato\'s log is signed (rebuild-grade)', async () => {
+    // The store mirror is retired: the device log IS the durable record (persisted in production; the
+    // in-memory harness log stands in for it). Rebuild-grade means every landed message carries the
+    // signed statement a peer or pod replay would re-verify against — not just render text.
+    const texts = C.chatEvents.map((e) => e?.payload?.text).filter(Boolean);
     for (const word of ['een', 'twee', 'drie']) {
-      expect(texts, `${word} missing from Cato's durable mirror`).toContain(word);
+      expect(texts, `${word} missing from Cato's record`).toContain(word);
     }
+    const chat = C.chatEvents.filter((e) => e?.type === 'chat-message');
+    expect(chat.length).toBeGreaterThan(0);
+    expect(chat.every((e) => e.payload?.statement?.sig), 'a landed message without its proof').toBe(true);
   }, 30_000);
 });

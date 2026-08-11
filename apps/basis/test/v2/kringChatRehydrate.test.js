@@ -210,21 +210,41 @@ describe('rehydrateKringChatsFromStoop · SP-13.2.2 boot rehydrator', () => {
     expect(eventLog.events[0].payload.senderDisplay).toBe('webid:anne');
   });
 
-  it('shares dedup state with the receiver through the inbox LRU', async () => {
-    // Real inbox; both rehydrator + receiver use it → second arrival is deduped.
+  it('a MIGRATED message never double-renders when its signed statement later arrives at the rail', async () => {
+    // The migration inserts store-era entries WITHOUT statements (id = msgId). If the same message later
+    // arrives on the signed path (a peer's catch-up serving pre-cutover history it re-signed on send, or
+    // an overlap during the cutover window), the rail's id-replace lands the SIGNED copy over the
+    // migrated one — one bubble, upgraded with its proof, never two.
     const { createChatMessageInbox } = await import('../../src/v2/chatMessageInbox.js');
-    const { makeKringChatPeerHandler } = await import('../../src/v2/kringChatReceiver.js');
-    const eventLog = fakeEventLog();
+    const { makeChatRail } = await import('../../src/v2/chatRail.js');
+    const { EventLog } = await import('../../src/eventLog.js');
+    const { AgentIdentity } = await import('@onderling/core');
+    const { VaultMemory } = await import('@onderling/vault');
+
+    const eventLog = new EventLog({ initial: [] });
     const inbox = createChatMessageInbox({ eventLog, logger: silentLogger });
     const callSkill = vi.fn(async () => ({ items: [ item({ msgId: 'mShared', text: 'rehydrated' }) ] }));
     const r = await rehydrateKringChatsFromStoop({ callSkill, inbox, logger: silentLogger });
     expect(r.rehydrated).toBe(1);
-    const handler = makeKringChatPeerHandler({ inbox, logger: silentLogger });
-    await handler('nkn-addr', {
-      subtype: 'kring-chat-message', circleId: 'g1', msgId: 'mShared',
-      text: 'live', ts: 9999, fromActor: 'webid:anne',
+
+    const senderCid = await AgentIdentity.generate(new VaultMemory());
+    const sender = makeChatRail({
+      eventLog: new EventLog({ initial: [] }),
+      circleIdentityFor: async () => senderCid, myRef: 'webid:anne',
+      callSkill: async () => ({}), verifyBinding: async () => true,
     });
-    expect(eventLog.events).toHaveLength(1);
-    expect(eventLog.events[0].payload.text).toBe('rehydrated');
+    const { statement } = await sender.appendMessage('g1', { msgId: 'mShared', ts: 9999, text: 'rehydrated' });
+
+    const receiverCid = await AgentIdentity.generate(new VaultMemory());
+    const rail = makeChatRail({
+      eventLog, circleIdentityFor: async () => receiverCid, myRef: 'webid:bob',
+      callSkill: async () => ({}), verifyBinding: async ({ author }) => author === senderCid.pubKey,
+    });
+    const res = await rail.ingest('g1', statement);
+    expect(res.ok).toBe(true);
+
+    const entries = eventLog.query({}).filter((e) => e.id === 'mShared');
+    expect(entries).toHaveLength(1);                          // one bubble
+    expect(entries[0].payload.statement?.sig).toBeTruthy();   // …upgraded with its proof
   });
 });

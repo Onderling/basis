@@ -67,8 +67,8 @@ describe('kring fan-out — recipients are the circle roster, not the global Mem
       redemption({ groupId: 'circle-b', redeemedBy: CO,       signingPublicKey: CO,       circleAddress: 'addr-co-in-b' }),
     ], { actor: ME });
 
-    const r = await callSkill(bundle.agent, 'broadcastKringMessage',
-      { groupId: 'circle-b', text: 'hoi', msgId: 'm-scope-1', ts: 1 });
+    const r = await callSkill(bundle.agent, 'broadcastKringChatStatement',
+      { groupId: 'circle-b', event: { body: { hash: 'h' }, sig: 's' }, msgId: 'm-scope-1', ts: 1 });
 
     expect(sends).toEqual(['addr-co-in-b']);
     expect(r.attempted).toBe(1);
@@ -95,8 +95,8 @@ describe('kring fan-out — recipients are the circle roster, not the global Mem
     const roster = await callSkill(bundle.agent, 'listGroupMembers', { groupId: 'circle-b' });
     expect((roster.members ?? []).map((m) => m.webid)).toContain(ADMIN);
 
-    const r = await callSkill(bundle.agent, 'broadcastKringMessage',
-      { groupId: 'circle-b', text: 'hoi', msgId: 'm-scope-2', ts: 1 });
+    const r = await callSkill(bundle.agent, 'broadcastKringChatStatement',
+      { groupId: 'circle-b', event: { body: { hash: 'h' }, sig: 's' }, msgId: 'm-scope-2', ts: 1 });
 
     // No per-circle address is knowable for the founder (the joiner's trail never carries one), so this
     // rides the webid rung of the address ladder — the admin's canonical address, which IS routable.
@@ -115,8 +115,8 @@ describe('kring fan-out — recipients are the circle roster, not the global Mem
       ],
     });
 
-    const r = await callSkill(bundle.agent, 'broadcastKringMessage',
-      { groupId: 'seeded-buurt', text: 'hoi', msgId: 'm-scope-3', ts: 1 });
+    const r = await callSkill(bundle.agent, 'broadcastKringChatStatement',
+      { groupId: 'seeded-buurt', event: { body: { hash: 'h' }, sig: 's' }, msgId: 'm-scope-3', ts: 1 });
 
     expect(sends).toEqual([CO]);
     expect(r.attempted).toBe(1);

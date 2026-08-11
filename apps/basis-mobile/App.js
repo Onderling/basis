@@ -53,7 +53,7 @@ import {
 } from './src/core/mnemonicCreate.js';
 import { dlog } from './src/core/devLog.js';
 import { EventLog } from '../basis/src/eventLog.js';
-import { rehydrateKringChatsFromStoop } from '../basis/src/v2/kringChatRehydrate.js';
+import { migrateKringChatHistory, CHAT_MIGRATION_MARKER_KEY } from '../basis/src/v2/kringChatRehydrate.js';
 import { createSettingsPodMedium } from '../basis/src/v2/settingsPodMedium.js';
 import { wireEventLogPersistence, asyncStorageSnapshotIo } from '../basis/src/v2/eventLogPersistence.js';
 import { createChatMessageInbox } from '../basis/src/v2/chatMessageInbox.js';
@@ -201,6 +201,17 @@ export default function App() {
   }, []);
 
   const kringChatInboxRef = useRef(null);
+  // Delivery honesty — ONE receipt sender, shared by the legacy-envelope inbox and the signed-statement
+  // receive path in ChatScreen (web's `onKringStored` parity: one set of side effects, not two).
+  const chatReceiptSenderRef = useRef(null);
+  if (!chatReceiptSenderRef.current) {
+    chatReceiptSenderRef.current = makeReceiptSender({
+      getSettings: () => deliverySettingsStoreRef.current.get(),
+      sendTo: (to, payload) => (typeof bundleRef.current?.sendPeer === 'function'
+        ? bundleRef.current.sendPeer(to, payload)
+        : Promise.reject(new Error('no peer send yet'))),
+    });
+  }
   if (!kringChatInboxRef.current) {
     kringChatInboxRef.current = createChatMessageInbox({
       eventLog: eventLogRef.current,
@@ -215,15 +226,10 @@ export default function App() {
         }
       },
       logger: console,
-      // Delivery honesty — a LIVE insert answers the sender with a receipt. Policy is entirely inside
-      // `makeReceiptSender` (only source 'receiver' · setting read per message · fail-closed on a broken
-      // read). The send reads `bundleRef` lazily, like `ingest` above, because the bundle boots later.
-      onStored: makeReceiptSender({
-        getSettings: () => deliverySettingsStoreRef.current.get(),
-        sendTo: (to, payload) => (typeof bundleRef.current?.sendPeer === 'function'
-          ? bundleRef.current.sendPeer(to, payload)
-          : Promise.reject(new Error('no peer send yet'))),
-      }),
+      // Delivery honesty — a LIVE insert answers the sender with a receipt, through the ONE shared
+      // sender above (policy entirely inside `makeReceiptSender`: only source 'receiver' · setting read
+      // per message · fail-closed on a broken read; reads `bundleRef` lazily — the bundle boots later).
+      onStored: (info) => chatReceiptSenderRef.current(info),
       // Connectivity Phase 3 (receiver side) — resolve a pod-signal REF envelope (a pod-row pointer, no
       // body) into the full chat message by reading + unsealing the circle's shared pod. Absent a pod /
       // group key → the inbox skips the ref (deferred), never crashes the receive loop. Web parity
@@ -526,14 +532,18 @@ export default function App() {
         if (!alreadySeeded) {
           AsyncStorage.setItem(SEED_FLAG, '1').catch(() => { /* non-fatal */ });
         }
-        // boot rehydrator: backfill the in-memory eventLog
-        // with any kring chats already in stoop's itemStore from a
-        // previous session.  Best-effort; failures just leave the
-        // bubble stream empty until new chats arrive.
+        // THE ONE-TIME HISTORY MIGRATION (store copy → persisted device log, web parity): the log is
+        // the record now, so the store-era history lands on it ONCE through the shared inbox and the
+        // AsyncStorage latch skips every later boot. The per-boot rehydrate is retired — this was its
+        // final job; a failed pass leaves the latch unset and retries next boot.
         if (typeof b?.callSkill === 'function' && eventLogRef.current) {
-          rehydrateKringChatsFromStoop({
+          migrateKringChatHistory({
             callSkill: b.callSkill,
             inbox:     kringChatInboxRef.current,
+            marker: {
+              get: () => AsyncStorage.getItem(CHAT_MIGRATION_MARKER_KEY),
+              set: (v) => AsyncStorage.setItem(CHAT_MIGRATION_MARKER_KEY, v),
+            },
           }).catch(() => { /* logged inside */ });
         }
         // probe whether we should display the CREATE-side
@@ -646,6 +656,7 @@ export default function App() {
             bootError={bootError}
             eventLog={eventLogRef.current}
             kringChatInbox={kringChatInboxRef.current}
+            chatStoredReceipt={(info) => chatReceiptSenderRef.current(info)}
             deliveryStateMap={deliveryStateMapRef.current}
             kringRecipePendingStore={kringRecipePendingStoreRef.current}
             kringRecipeDedup={kringRecipeDedupRef.current}

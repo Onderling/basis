@@ -138,3 +138,43 @@ function makeLegacyInsert({ eventLog, dedup }) {
     return true;
   };
 }
+
+/**
+ * THE ONE-TIME CHAT-HISTORY MIGRATION (store copy → persisted device log).
+ *
+ * The blessed exception to the no-backwards-compatibility rule: chat history is the one place a clean
+ * break would break the product promise ("pod kwijt = ongemak, geen verlies"), so the store-era history
+ * gets a REAL migration. Mechanically it is the rehydrator, run ONCE: every stored chat lands on the
+ * device log through the shared inbox — and since the log persists, landing it once is migrating it.
+ * A device-local MARKER latches success; later boots skip straight past. The marker is only set when the
+ * pass reported no error, so a failed read retries on the next boot instead of silently losing history.
+ * Store-era entries are unsigned render events — the record as it was; signed entries begin at the lane
+ * cutover. After the latch, nothing reads the store's chat rows again on this device.
+ *
+ * @param {object} args
+ * @param {Function} args.callSkill
+ * @param {{ingestChatMessage: Function}} args.inbox   the shared inbox (ONE dedup domain)
+ * @param {{get: () => Promise<string|null>|string|null, set: (v: string) => Promise<void>|void}} args.marker
+ *   the device-local latch (web: localStorage; mobile: AsyncStorage)
+ * @param {{warn?, info?}} [args.logger]
+ * @returns {Promise<{migrated: boolean, alreadyDone?: boolean, rehydrated?: number, error?: string}>}
+ */
+export async function migrateKringChatHistory({ callSkill, inbox, marker, logger = console } = {}) {
+  if (!marker || typeof marker.get !== 'function' || typeof marker.set !== 'function') {
+    return { migrated: false, error: 'marker required' };
+  }
+  let done = null;
+  try { done = await marker.get(); } catch { done = null; }
+  if (done) return { migrated: false, alreadyDone: true };
+  const res = await rehydrateKringChatsFromStoop({ callSkill, inbox, logger });
+  if (res?.error) {
+    logger?.warn?.('[chat-migration] history pass failed — will retry next boot:', res.error);
+    return { migrated: false, error: res.error };
+  }
+  try { await marker.set(String(Date.now())); } catch { /* an unset latch just re-runs the idempotent pass */ }
+  logger?.info?.(`[chat-migration] store history → device log: ${res.rehydrated} message(s), one-time`);
+  return { migrated: true, ...res };
+}
+
+/** The migration latch's storage key — one per device, versioned with the migration itself. */
+export const CHAT_MIGRATION_MARKER_KEY = 'cc.chatHistoryMigrated.v1';

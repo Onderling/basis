@@ -291,7 +291,7 @@ import { loadCircleStoragePod } from '../../src/v2/circleStoragePolicy.js';
 import { decodeInvite as decodeInviteForPopulate, populateAdminAddressesFromInvite } from '../../src/core/wizards/joinGroupState.js';
 import { feedHouseholdRoster, makeCircleReachable } from '../../src/v2/householdRosterPairing.js';
 import { makeKringChatPeerHandler } from '../../src/v2/kringChatReceiver.js';
-import { rehydrateKringChatsFromStoop } from '../../src/v2/kringChatRehydrate.js';
+import { migrateKringChatHistory, CHAT_MIGRATION_MARKER_KEY } from '../../src/v2/kringChatRehydrate.js';
 import { createChatMessageInbox } from '../../src/v2/chatMessageInbox.js';
 import { createSelfAuthorCheck } from '../../src/v2/chatSelfAuthor.js';
 // ε.4 — negotiated catch-up protocol substrate.
@@ -328,7 +328,7 @@ import { renderCircleKring } from './circleKring.js';
 import { makeCircleLists } from '@onderling/kring-host/circleLists';  // composable lists (shared web≡mobile)
 // the app-level cross-circle SHARE op. The {onShare, policy} binder + resource-URI resolver are
 // pod-layer, composed at the pod site below; the op logic itself is shared (web≡mobile) in circleShare.js.
-import { sealItem, isCanonicalPosture, createCircleStores, memoryDataSource, toWireEnvelope, fromEventLogItem } from '@onderling/item-store';
+import { sealItem, isCanonicalPosture, createCircleStores, memoryDataSource } from '@onderling/item-store';
 import {
   shareItemAcrossCircles, shareItemToPublishedKey, listSharedResolved, revokeItemShare, listOutboundShares, revokeAllForMember,
   shareErrorStatusKey,
@@ -6988,11 +6988,9 @@ async function boot() {
       // history until it retires), the delivery receipt, and the repaint — through the SAME shared seam.
       const kringChatStatementHandler = agent.chatRail ? makeChatPeerHandler({
         rail: agent.chatRail,
+        // The persisted log IS the record — a landed signed entry needs no store copy anymore (the
+        // history migration carried the store era over once). Side effects: the receipt + the repaint.
         onLanded: async (cid, entry, fromPeerAddr) => {
-          try {
-            const env = toWireEnvelope(fromEventLogItem(entry));
-            await ingestKringMessage(env, fromPeerAddr);            // the store mirror (history bridge)
-          } catch { /* best-effort — the entry is already the record */ }
           onKringStored({ msgId: entry.id, circleId: cid, fromPeerAddr, source: 'receiver' });
         },
       }) : null;
@@ -7011,12 +7009,17 @@ async function boot() {
           _chatCatchUpPendingAllows.set(cid, allow);
         },
       }) : null;
-      // boot rehydrator: read stoop's stored chats back
-      // into the in-memory eventLog so the GESPREK tab shows history
-      // after a reload (eventLog is in-memory; itemStore persists).
-      rehydrateKringChatsFromStoop({
+      // THE ONE-TIME HISTORY MIGRATION (store copy → persisted device log): the log is the record now
+      // (durable since the persistence slice), so the store-era history lands on it ONCE through the
+      // shared inbox and a device-local latch skips every later boot. The per-boot rehydrate is retired
+      // — this was its final job.
+      migrateKringChatHistory({
         callSkill: agent.callSkill,
         inbox:     kringChatInbox,
+        marker: {
+          get: () => { try { return localStorage.getItem(CHAT_MIGRATION_MARKER_KEY); } catch { return null; } },
+          set: (v) => { try { localStorage.setItem(CHAT_MIGRATION_MARKER_KEY, v); } catch { /* retried next boot */ } },
+        },
       }).catch(() => { /* logged inside */ });
       // γ-next.recipe — recipe-broadcast receiver.  Stashes inbound
       // recipes per-kring; the editor pulls on mount + passes via

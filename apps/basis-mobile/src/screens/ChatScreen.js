@@ -69,7 +69,6 @@ import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUB
 import { makeTaskPeerHandler, TASK_BROADCAST, TASK_CATCHUP_SUBTYPES } from '../../../basis/src/v2/taskRail.js';
 import { makeFrontierReplay } from '../../../basis/src/v2/frontierReplay.js';
 import { makeChatPeerHandler, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../../basis/src/v2/chatRail.js';
-import { toWireEnvelope, fromEventLogItem } from '@onderling/item-store';
 import { makeGovernanceCatchUp } from '../../../basis/src/v2/governanceCatchUp.js';
 import { governanceEntryId } from '../../../basis/src/v2/governanceLog.js';
 import { makeHandleChatMessage }
@@ -210,6 +209,7 @@ export default function ChatScreen({
   // share the same instance so dedup state is unified.  Pre-ε.1 prop name
   // `kringChatDedup` no longer exists — App.js owns the inbox now.
   kringChatInbox = null,
+  chatStoredReceipt = null,   // the App-owned receipt sender — shared with the inbox (one policy, two paths)
   // Delivery honesty — the shared per-message map (App.js owns it); inbound receipts advance it here.
   deliveryStateMap = null,
   // γ-next.recipe — pending-recipe cache + dedup, plumbed from App.js
@@ -831,9 +831,12 @@ export default function ChatScreen({
         const chatLaneRail = bundle?.agent?.chatRail ?? null;
         const chatStatementHandler = chatLaneRail ? makeChatPeerHandler({
           rail: chatLaneRail,
+          // The persisted log IS the record — no store copy for a landed signed entry (the history
+          // migration carried the store era over once). Side effect: the delivery receipt, through the
+          // SAME App-owned sender the legacy inbox uses (web's onKringStored parity).
           onLanded: async (cid, entry, fromPeerAddr) => {
-            try { await callSkill('stoop', 'ingestKringMessage', { payload: toWireEnvelope(fromEventLogItem(entry)), fromPeerAddr }); }
-            catch { /* best-effort — the entry is already the record */ }
+            try { chatStoredReceipt?.({ msgId: entry.id, circleId: cid, fromPeerAddr, source: 'receiver' }); }
+            catch { /* the receipt is best-effort */ }
           },
         }) : null;
         const chatCatchUp = chatLaneRail ? makeFrontierReplay({

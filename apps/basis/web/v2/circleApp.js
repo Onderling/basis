@@ -260,6 +260,8 @@ import {
 } from '../../src/v2/circleStream.js';
 // The agent-detail activity card's rows — the device log narrowed to one agent (batch-4 trail).
 import { agentActivityRows } from '../../src/v2/agentActivity.js';
+// The advanced surface's projections (the "default places for any new opId" rule).
+import { advancedOpRows, advancedParamRows } from '../../src/v2/advancedSurface.js';
 // profile-update propagation — the silent roster "pull-me" signal (announce on a real roster
 // write; receive → re-read the changed rows). No values on the wire, no chat bubble, no wake.
 import { makeRosterUpdatedPeerHandler, makeRosterUpdateAnnouncer } from '../../src/v2/rosterUpdated.js';
@@ -3675,6 +3677,8 @@ async function showMij() {
     onConnectionPoints: showConnectionPoints,
     // SILENT out-of-circle delivery — the personal, cross-circle "shared with me" inbox.
     onSharedWithMe: showSharedWithMe,
+    // The advanced surface — every surface-less op + the settable params (the default place).
+    onAdvanced: showAdvanced,
   });
   rerender();
   load();
@@ -3713,6 +3717,112 @@ async function showSharedWithMe() {
 
 // "My data": where your data lives (pod/relay) + privacy + usage + key
 // management (back up · reveal recovery phrase · restore). A sub-screen of Mij.
+/**
+ * The ADVANCED surface (the "default places for any new opId" rule): every op without a
+ * bespoke screen, listed and reachable — no-arg ops run through the waist, arg-taking ops
+ * point at their chat form — plus the register's settable values through `set-param`.
+ * The op list is the coverage matrix's complement (shared `advancedOpRows`), so a new
+ * surface-less opId lands here automatically; nothing can be invisible by omission.
+ */
+async function showAdvanced() {
+  hideCircleTabBar(tabBarEl);
+  const ops = advancedOpRows({ manifests: Object.values(circleManifestsByOrigin) });
+  let params = [];
+  try { params = advancedParamRows(await rawCallSkill('params', 'list-user-params', {})); } catch { /* register absent → ops only */ }
+
+  rootEl.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'cc-advanced';
+  const h = document.createElement('h2');
+  h.textContent = t('circle.advanced.title');
+  wrap.appendChild(h);
+  const back = document.createElement('button');
+  back.type = 'button';
+  back.textContent = t('circle.mydata.back');
+  back.addEventListener('click', () => showMij());
+  wrap.appendChild(back);
+
+  // ── the settable values ────────────────────────────────────────────────────
+  const ph = document.createElement('h3');
+  ph.textContent = t('circle.advanced.params_title');
+  wrap.appendChild(ph);
+  const hint = document.createElement('p');
+  hint.className = 'muted';
+  hint.textContent = t('circle.advanced.params_hint');
+  wrap.appendChild(hint);
+  for (const p of params) {
+    const row = document.createElement('div');
+    row.className = 'cc-advanced__param';
+    row.style.cssText = 'display:flex;gap:.5rem;align-items:center;padding:.25rem 0;';
+    const label = document.createElement('code');
+    label.textContent = `${p.key} (${p.scope})`;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = JSON.stringify(p.value ?? p.default);
+    input.style.cssText = 'width:9rem;';
+    const save = document.createElement('button');
+    save.type = 'button';
+    save.textContent = t('circle.advanced.save');
+    save.addEventListener('click', async () => {
+      let value; try { value = JSON.parse(input.value); } catch { value = input.value; }
+      save.disabled = true;
+      const r = await rawCallSkill('params', 'set-param', { key: p.key, value }).catch(() => ({ ok: false }));
+      save.textContent = r?.ok ? '✓' : '✗';
+      setTimeout(() => { save.disabled = false; save.textContent = t('circle.advanced.save'); }, 1200);
+    });
+    row.append(label, input, save);
+    wrap.appendChild(row);
+  }
+
+  // ── the surface-less ops ───────────────────────────────────────────────────
+  const oh = document.createElement('h3');
+  oh.textContent = t('circle.advanced.ops_title');
+  wrap.appendChild(oh);
+  if (!ops.length) {
+    const empty = document.createElement('p');
+    empty.textContent = t('circle.advanced.ops_empty');
+    wrap.appendChild(empty);
+  }
+  for (const o of ops) {
+    const row = document.createElement('div');
+    row.className = 'cc-advanced__op';
+    row.style.cssText = 'display:flex;gap:.5rem;align-items:baseline;justify-content:space-between;padding:.3rem 0;border-bottom:1px solid var(--line,#eee);';
+    const left = document.createElement('div');
+    const name = document.createElement('code');
+    name.textContent = `${o.app}:${o.op}`;
+    left.appendChild(name);
+    if (o.description) {
+      const d = document.createElement('div');
+      d.className = 'muted';
+      d.textContent = o.description;
+      left.appendChild(d);
+    }
+    const right = document.createElement('div');
+    if (o.runnable) {
+      const run = document.createElement('button');
+      run.type = 'button';
+      run.textContent = t('circle.advanced.run');
+      run.addEventListener('click', async () => {
+        run.disabled = true;
+        const r = await rawCallSkill(o.app, o.op, {}).catch(() => null);
+        run.textContent = r && r.ok !== false ? t('circle.advanced.ran') : '✗';
+        setTimeout(() => { run.disabled = false; run.textContent = t('circle.advanced.run'); }, 1500);
+      });
+      right.appendChild(run);
+    } else {
+      const via = document.createElement('span');
+      via.className = 'muted';
+      via.textContent = o.slash
+        ? t('circle.advanced.via_chat', { slash: o.slash })
+        : t('circle.advanced.via_chat_generic');
+      right.appendChild(via);
+    }
+    row.append(left, right);
+    wrap.appendChild(row);
+  }
+  rootEl.appendChild(wrap);
+}
+
 async function showMyData() {
   try { deliverySettingsCache = await deliverySettingsStore.get(); } catch { /* keep the defaults */ }
   hideCircleTabBar(tabBarEl);

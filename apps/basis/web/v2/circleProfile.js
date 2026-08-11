@@ -40,6 +40,8 @@ export function renderCircleProfile(container, {
   // inbox (sealed copies peers pushed to this device). A Mij sub-screen link, peer of
   // availability/my-data. Absent ⇒ the link is simply omitted (older callers / tests).
   onSharedWithMe,
+  // The advanced surface — surface-less ops + settable params. Absent ⇒ omitted.
+  onAdvanced,
   // D / consumer-switch — the projected PAGE surface for the `me` op
   // (renderWeb(manifest).pages[] entry, selected via pageForOp). When present,
   // the header label is derived from `page.labelKey` via t, making this
@@ -148,6 +150,12 @@ export function renderCircleProfile(container, {
   if (typeof onSharedWithMe === 'function') {
     const shared = button(tr('circle.profile.sharedWithMe'), 'cc-profile__shared-with-me', onSharedWithMe);
     container.appendChild(shared);
+  }
+  // The ADVANCED entry — the default place every op and settable value has (the
+  // "default places for any new opId" rule). Absent ⇒ omitted, like its peers.
+  if (typeof onAdvanced === 'function') {
+    const adv = button(tr('circle.advanced.title'), 'cc-profile__advanced', onAdvanced);
+    container.appendChild(adv);
   }
 
   if (busy) {

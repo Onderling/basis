@@ -807,6 +807,48 @@
       "doc": "Bulletin restyle — transparantie-badge onder een bot-antwoord waarvoor het taalmodel is gebruikt. Alleen getoond als het bericht payload.provenance draagt."
     }
   },
+  "advanced": {
+    "title": {
+      "text": "Geavanceerd",
+      "doc": "Het geavanceerd-tabblad ('default places for any new opId'): ops zonder eigen scherm + de instelbare waarden. Ook het label van de Mij-regel."
+    },
+    "ops_title": {
+      "text": "Alle opdrachten zonder eigen scherm",
+      "doc": "Geavanceerd, kop van de ops-sectie."
+    },
+    "ops_empty": {
+      "text": "Elke opdracht heeft nu een eigen plek.",
+      "doc": "Geavanceerd, lege staat — de gewenste toestand."
+    },
+    "run": {
+      "text": "Uitvoeren",
+      "doc": "Geavanceerd: een opdracht zonder invoer direct uitvoeren."
+    },
+    "ran": {
+      "text": "Klaar",
+      "doc": "Geavanceerd: de opdracht is uitgevoerd."
+    },
+    "via_chat": {
+      "text": "In de chat: {slash}",
+      "doc": "Geavanceerd: een opdracht met invoer loopt via zijn chatvorm."
+    },
+    "via_chat_generic": {
+      "text": "Vraag het de bot in de chat",
+      "doc": "Geavanceerd: opdracht met invoer zonder slash-vorm — bereikbaar via de chat."
+    },
+    "params_title": {
+      "text": "Instelwaarden",
+      "doc": "Geavanceerd, kop van de waarden-sectie."
+    },
+    "params_hint": {
+      "text": "De afstelwaarden waar de app op draait. De standaardwaarden voldoen; verander ze alleen als je weet waarom.",
+      "doc": "Geavanceerd, toelichting (nuchter)."
+    },
+    "save": {
+      "text": "Opslaan",
+      "doc": "Geavanceerd: één waarde opslaan via set-param."
+    }
+  },
   "settings_restore": {
     "mismatch_title": {
       "text": "De instellingen op je pod zijn vanaf dit apparaat niet te openen",

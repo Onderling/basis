@@ -126,6 +126,7 @@ export {
   buildCircleChat,
 } from './v2/circleStream.js';
 export { agentActivityRows } from './v2/agentActivity.js';
+export { advancedOpRows, advancedParamRows } from './v2/advancedSurface.js';
 // profile-update propagation (Phase-4 Wave B) — the roster "pull-me" signal substrate:
 // the diff comparator, the silent-entry kind, the announce (admin) + receive (member) factories.
 export {

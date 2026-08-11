@@ -807,6 +807,48 @@
       "doc": "Bulletin restyle — transparency badge under a bot answer that used the language model. Only shown when the message carries payload.provenance."
     }
   },
+  "advanced": {
+    "title": {
+      "text": "Advanced",
+      "doc": "The advanced tab (the 'default places for any new opId' rule): ops without a bespoke screen + the settable params. Also the Mij entry-row label."
+    },
+    "ops_title": {
+      "text": "All commands without their own screen",
+      "doc": "Advanced tab, ops section heading."
+    },
+    "ops_empty": {
+      "text": "Every command has its own place right now.",
+      "doc": "Advanced tab, ops empty state — the desirable state."
+    },
+    "run": {
+      "text": "Run",
+      "doc": "Advanced tab: execute a no-argument op directly through the waist."
+    },
+    "ran": {
+      "text": "Done",
+      "doc": "Advanced tab: the op ran (its reply is in chat where applicable)."
+    },
+    "via_chat": {
+      "text": "In chat: {slash}",
+      "doc": "Advanced tab: an op that needs input routes via its chat/slash form — the executor every op has by construction."
+    },
+    "via_chat_generic": {
+      "text": "Ask the bot in chat",
+      "doc": "Advanced tab: an op needing input but without a slash command — reachable through the chat route by name."
+    },
+    "params_title": {
+      "text": "Settings values",
+      "doc": "Advanced tab, params section heading — the register's user-settable values."
+    },
+    "params_hint": {
+      "text": "The tuning values the app runs on. The defaults are fine; change them only if you know why.",
+      "doc": "Advanced tab, params section hint (nuchter: no drama, no hype)."
+    },
+    "save": {
+      "text": "Save",
+      "doc": "Advanced tab: write one param via set-param."
+    }
+  },
   "settings_restore": {
     "mismatch_title": {
       "text": "Your pod's settings can't be opened from this device",

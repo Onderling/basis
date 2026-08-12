@@ -148,6 +148,13 @@ export function createCircleSenderAuthorization({
       const signing   = circleSigningKeyOf(m);
       const canonical = (typeof m?.pubKey === 'string' && m.pubKey) ? m.pubKey : null;
       if (typeof signing === 'string' && signing) keys.add(signing);
+      // The member's full PROVEN address SET (`circleAddresses`, primary first — deriveRoster admits
+      // an address into it only on a verified `verifyCircleLink` proof). Under the one-derivation
+      // rule each per-circle address IS the key that signs at it, so every address in the set may
+      // speak here: a member on a second device must not read as a stranger.
+      for (const extra of Array.isArray(m?.circleAddresses) ? m.circleAddresses : []) {
+        if (typeof extra === 'string' && extra) keys.add(extra);
+      }
       if (!canonical) continue;
       // Our own row is neither enforced nor counted: `selfKeys` already decides which keys of ours
       // speak here, and our other devices may still be speaking canonically (see the header).

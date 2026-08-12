@@ -643,7 +643,7 @@ async function _fanOutViaReliableSend({
 }) {
   const list = await members.list();
   const allow = only instanceof Set ? only : (Array.isArray(only) ? new Set(only) : null);
-  const targets = new Map();      // routable address → webid (dedupe by address)
+  const targets = new Map();      // primary routable address → { webid, candidates } (dedupe by address)
   const unresolved = [];
   for (const m of list ?? []) {
     const webid = typeof m === 'string' ? m : (m?.webid ?? m?.webId ?? null);
@@ -653,7 +653,7 @@ async function _fanOutViaReliableSend({
     // every circle. `resolveMemberAddress` owns the ladder (circleAddress → pubKey → webid) so the two fan
     // paths cannot drift, and it REPORTS each fallback: that report is how we learn when step D (dropping
     // the fallback) is safe rather than a guess.
-    const { addr } = await resolveMemberAddress(m, {
+    const { addr, addrs } = await resolveMemberAddress(m, {
       circleId,
       preferCircleAddress,
       // Resolved per fan, not per boot: the user can flip the setting mid-session, and a send after the
@@ -664,30 +664,40 @@ async function _fanOutViaReliableSend({
       onFallback: _reportAddressFallback,
     });
     if (!addr) { unresolved.push(webid); continue; }
-    if (!targets.has(addr)) targets.set(addr, webid);
+    // A member can hold a SET of proven per-circle addresses (a second device, a restored profile) —
+    // the fan tries them IN ORDER, primary first, and stops at the first address that takes the
+    // envelope (delivered or held). Sequential on purpose: one member, one delivery, fewest points.
+    if (!targets.has(addr)) targets.set(addr, { webid, candidates: (addrs && addrs.length) ? addrs : [addr] });
   }
   let sent = 0;
   const errors = unresolved.map((webid) => ({ webid, reason: 'recipient-pubkey-unknown' }));
-  await Promise.all([...targets].map(async ([addr, webid]) => {
-    try {
-      // Circle-scoped: this traffic belongs to `circleId`, and the host constrains it to that circle's
-      // connection points. stoop names the CIRCLE and nothing else — which transports exist, and which of
-      // them the circle rides, are not its business. → plans/NOTE-circle-scoped-routing.md
-      const r = await reliableSend(addr, envelope, { guarantee: 'hold-forward', circleId });
-      // held (offline → queued for hold-forward) AND delivered both count as sent; a send
-      // that explicitly reports neither is the only genuine transient failure.
-      if (r && r.held === false && r.delivered === false) errors.push({ webid, reason: 'not-delivered' });
-      else sent += 1;
-      // Held because this circle has NO route it may use (its points cannot carry per-circle addressing
-      // and the user has not accepted the fallback) — a standing fact, not a peer being briefly offline.
-      // Report it as BLOCKED so it reaches the same offer the other blocked case does: holding silently
-      // is indistinguishable from the app being broken, which is the failure we keep designing against.
-      if (r?.held && r.reason === 'no-eligible-route') {
-        _reportAddressFallback({ circleId, webid, via: 'blocked-by-transport', blocked: true });
+  await Promise.all([...targets.values()].map(async ({ webid, candidates }) => {
+    let failure = null;
+    for (const addr of candidates) {
+      try {
+        // Circle-scoped: this traffic belongs to `circleId`, and the host constrains it to that circle's
+        // connection points. stoop names the CIRCLE and nothing else — which transports exist, and which of
+        // them the circle rides, are not its business. → plans/NOTE-circle-scoped-routing.md
+        const r = await reliableSend(addr, envelope, { guarantee: 'hold-forward', circleId });
+        // held (offline → queued for hold-forward) AND delivered both count as sent; a send
+        // that explicitly reports neither is the only genuine transient failure — try the member's
+        // next proven address before giving up on them.
+        if (r && r.held === false && r.delivered === false) { failure = { webid, reason: 'not-delivered' }; continue; }
+        sent += 1;
+        failure = null;
+        // Held because this circle has NO route it may use (its points cannot carry per-circle addressing
+        // and the user has not accepted the fallback) — a standing fact, not a peer being briefly offline.
+        // Report it as BLOCKED so it reaches the same offer the other blocked case does: holding silently
+        // is indistinguishable from the app being broken, which is the failure we keep designing against.
+        if (r?.held && r.reason === 'no-eligible-route') {
+          _reportAddressFallback({ circleId, webid, via: 'blocked-by-transport', blocked: true });
+        }
+        break;
+      } catch (err) {
+        failure = { webid, reason: String(err?.message ?? err) };
       }
-    } catch (err) {
-      errors.push({ webid, reason: String(err?.message ?? err) });
     }
+    if (failure) errors.push(failure);
   }));
   return { sent, attempted: targets.size + unresolved.length, errors };
 }
@@ -900,10 +910,17 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
     if (selfBinding && body.author === selfBinding.pubKey && claimed === selfBinding.ref) {
       return { ...body, author: claimed };
     }
+    // A trail row can hold a SET of proven addresses (primary slot + the plural extras written by the
+    // announce path) — a statement signed at ANY of them binds to the member, same trust as the
+    // primary: every pair on the row was proof-verified before it was written.
+    const rowHolds = (address, extras, author) => address === author
+      || (Array.isArray(extras) && extras.some((p) => p?.address === author && typeof p?.proof === 'string' && p.proof));
     for (const it of forGroup) {
       const src = it?.source ?? {};
-      if (src.circleAddress === body.author && src.redeemedBy === claimed) return { ...body, author: claimed };
-      if (src.confirmedByCircleAddress === body.author && src.confirmedBy === claimed) return { ...body, author: claimed };
+      if (rowHolds(src.circleAddress, src.circleAddresses, body.author)
+        && src.redeemedBy === claimed) return { ...body, author: claimed };
+      if (rowHolds(src.confirmedByCircleAddress, src.confirmedByCircleAddresses, body.author)
+        && src.confirmedBy === claimed) return { ...body, author: claimed };
     }
     return null;   // claimed binding unverifiable on this device → ignore (never trust, never corrupt)
   };

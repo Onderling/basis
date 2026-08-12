@@ -1,4 +1,4 @@
-import { foldRoster } from '@onderling/core';
+import { foldRoster, verifyCircleLink } from '@onderling/core';
 import { isExited } from './circleExits.js';
 
 /**
@@ -78,6 +78,28 @@ export function deriveRoster({
   /** webid → their most recent `redeemedAt`, so an exit can be compared against their latest join. */
   const joinedAt = new Map();
 
+  /**
+   * webid → the SET of per-circle addresses this member has PROVEN (a second device, a restored
+   * profile, a re-announce). The single `circleAddress` slot used to be the whole story, so a second
+   * proven address was silently lost and the member became unreachable on it. The set is projected
+   * onto the row as `circleAddresses` (primary first) below.
+   *
+   * DENY-BY-DEFAULT ENTRY GATE: an address joins the set ONLY when its proof verifies here
+   * (`verifyCircleLink` — the same check the join and the announce path use before writing). The
+   * PRIMARY `circleAddress` slot keeps its existing trust (proof-verified before it was ever
+   * written to the trail), so a legacy proofless row folds exactly as before — but it cannot grow
+   * the set beyond itself.
+   */
+  const provenAddresses = new Map();
+  const addProvenAddress = (webid, groupId, address, proof) => {
+    if (typeof webid !== 'string' || !webid) return;
+    if (typeof address !== 'string' || !address) return;
+    if (!verifyCircleLink({ groupId, address, proof })) return;   // unproven ⇒ refused, never stored
+    let set = provenAddresses.get(webid);
+    if (!set) provenAddresses.set(webid, (set = new Set()));
+    set.add(address);
+  };
+
   const upsert = (webid, role, trailFields = {}) => {
     if (typeof webid !== 'string' || !webid) return;
     const prev = roster.get(webid) ?? { webid };
@@ -115,6 +137,14 @@ export function deriveRoster({
         personaProperties: (personaProperties && typeof personaProperties === 'object'
           && Object.keys(personaProperties).length) ? personaProperties : undefined,
       });
+      // The member's address SET — every {address, proof} pair this row carries, each admitted only
+      // when its proof verifies. A row holds extra pairs under `circleAddresses` when a later proven
+      // address was recorded WITHOUT evicting the earlier one (`recordCircleAddress`); a second
+      // redemption row with a different address feeds the same set.
+      addProvenAddress(redeemedBy, src.groupId, circleAddress, circleAddressProof);
+      for (const p of Array.isArray(src.circleAddresses) ? src.circleAddresses : []) {
+        addProvenAddress(redeemedBy, src.groupId, p?.address, p?.proof);
+      }
     }
     // The admin's address as recorded on the joiner side (peer-bridge only).
     if (confirmedBy && channel === 'peer') {
@@ -132,6 +162,11 @@ export function deriveRoster({
         // make the per-circle address sealable — a row with only the address is silently skipped.
         pubKey: confirmedBy,
       });
+      // The admin's address set, same gate: primary pair + any extra proven pairs on the row.
+      addProvenAddress(confirmedBy, src.groupId, confirmedByCircleAddress, confirmedByCircleAddressProof);
+      for (const p of Array.isArray(src.confirmedByCircleAddresses) ? src.confirmedByCircleAddresses : []) {
+        addProvenAddress(confirmedBy, src.groupId, p?.address, p?.proof);
+      }
     }
   }
 
@@ -191,7 +226,18 @@ export function deriveRoster({
   const out = [];
   for (const rec of roster.values()) {
     const disp = displayByWebid.get(rec.webid) ?? {};
-    out.push({ ...disp, ...rec });
+    const merged = { ...disp, ...rec };
+    // `circleAddresses` — the member's full proven address SET, primary first. `circleAddress`
+    // stays the primary slot (every existing consumer keeps working); the set is what sender
+    // authorization accepts and what delivery tries in order. The primary leads even when it has
+    // no in-fold-verifiable proof (the legacy row), because its trust was established at write.
+    const primary = (typeof merged.circleAddress === 'string' && merged.circleAddress)
+      ? merged.circleAddress : null;
+    const proven = provenAddresses.get(rec.webid);
+    const addressSet = primary ? [primary] : [];
+    if (proven) for (const a of proven) { if (a !== primary) addressSet.push(a); }
+    if (addressSet.length) merged.circleAddresses = addressSet;
+    out.push(merged);
   }
   return out;
 }

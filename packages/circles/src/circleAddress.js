@@ -41,7 +41,11 @@
  * `deriveRoster` merges trail rows first-non-null-wins: a second row carrying a
  * NEW address would lose to the stale one it was meant to replace. Both shapes
  * are patched — the member's own `circleAddress` and, when they are the admin we
- * joined through, `confirmedByCircleAddress`.
+ * joined through, `confirmedByCircleAddress`. A patch never EVICTS a previously
+ * proven address: the new one takes the primary slot and the prior proven
+ * {address, proof} pairs are kept beside it (`circleAddresses` /
+ * `confirmedByCircleAddresses`), so a member reachable on two addresses (a
+ * second device, a restored profile) stays reachable — and authorized — on both.
  *
  * @param {object} deps
  * @param {object} deps.store                            the circle's ItemStore.
@@ -86,6 +90,24 @@ export async function recordCircleAddress(
 
   let patched = 0;
   let unchanged = 0;
+  // A newly proven address must not EVICT the one already on the row: both belong to the member (a
+  // second device, a restored profile) and delivery + sender authorization must keep accepting the
+  // set. The freshly proven address becomes the primary slot; every PRIOR proven {address, proof}
+  // pair is retained under the plural key. Only pairs carrying their proof survive the demotion —
+  // an address that cannot be re-proven downstream never enters the set (deny-by-default, the same
+  // rule `deriveRoster` applies when it folds the set).
+  const demote = (pairs, newPrimary) => {
+    const kept = [];
+    const seen = new Set([newPrimary]);
+    for (const p of pairs) {
+      if (!p || typeof p.address !== 'string' || !p.address) continue;
+      if (typeof p.proof !== 'string' || !p.proof) continue;
+      if (seen.has(p.address)) continue;
+      seen.add(p.address);
+      kept.push({ address: p.address, proof: p.proof });
+    }
+    return kept;
+  };
   for (const it of forGroup) {
     const src = it.source ?? {};
     let next = null;
@@ -98,9 +120,15 @@ export async function recordCircleAddress(
       if (src.circleAddress === proven.circleAddress
         && src.circleAddressProof === proven.circleAddressProof
         && !releaseChanged) { unchanged += 1; continue; }
+      const kept = demote([
+        { address: src.circleAddress, proof: src.circleAddressProof },
+        ...(Array.isArray(src.circleAddresses) ? src.circleAddresses : []),
+      ], proven.circleAddress);
       next = {
         circleAddress:      proven.circleAddress,
         circleAddressProof: proven.circleAddressProof,
+        // …the previously proven addresses SURVIVE beside the new primary (the set — task above).
+        ...((kept.length || src.circleAddresses) ? { circleAddresses: kept } : {}),
         // A row learned from an intro carries no key at all; without one
         // `bindCircleAddressKeys` skips the address it was just given. webid IS the member's
         // signing address in a basis circle (the same fact the ladder's webid rung relies on).
@@ -113,9 +141,14 @@ export async function recordCircleAddress(
     } else if (src.confirmedBy === webid && src.channel === 'peer') {
       if (src.confirmedByCircleAddress === proven.circleAddress
         && src.confirmedByCircleAddressProof === proven.circleAddressProof) { unchanged += 1; continue; }
+      const kept = demote([
+        { address: src.confirmedByCircleAddress, proof: src.confirmedByCircleAddressProof },
+        ...(Array.isArray(src.confirmedByCircleAddresses) ? src.confirmedByCircleAddresses : []),
+      ], proven.circleAddress);
       next = {
         confirmedByCircleAddress:      proven.circleAddress,
         confirmedByCircleAddressProof: proven.circleAddressProof,
+        ...((kept.length || src.confirmedByCircleAddresses) ? { confirmedByCircleAddresses: kept } : {}),
       };
     }
     if (!next) continue;

@@ -7,7 +7,7 @@
  * `confirmedBy`, display-field left-join, and key backfill from the trail.
  */
 import { describe, it, expect } from 'vitest';
-import { signSpine, AgentIdentity } from '@onderling/core';
+import { signSpine, AgentIdentity, deriveCircleAddress, signCircleLinkFromSeed } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { deriveRoster } from '../src/lib/deriveRoster.js';
 
@@ -132,6 +132,90 @@ describe('deriveRoster', () => {
 
   it('returns [] for a fully empty input (caller falls back to the cache)', () => {
     expect(deriveRoster({})).toEqual([]);
+  });
+
+  // ── The per-circle address SET — a second PROVEN address must not evict the first ─────────────────────
+  describe('the per-circle address set (circleAddresses)', () => {
+    // REAL proofs: an address only enters the set when `verifyCircleLink` accepts its proof, so the
+    // test addresses are genuinely derived and genuinely signed, exactly as a device would.
+    const seedOf  = (n) => new Uint8Array(32).fill(n);
+    const addrOf  = (n) => deriveCircleAddress(seedOf(n), 'g1');
+    const proofOf = (n) => signCircleLinkFromSeed(seedOf(n), 'g1', 'g1', addrOf(n));
+
+    it('a second PROVEN address (a later trail row) joins the set — and the FIRST survives', () => {
+      const roster = deriveRoster({
+        redemptions: [
+          redemption({ redeemedBy: 'B', circleAddress: addrOf(1), circleAddressProof: proofOf(1) }),
+          redemption({ redeemedBy: 'B', circleAddress: addrOf(2), circleAddressProof: proofOf(2) }),
+        ],
+      });
+      const b = roster.find((m) => m.webid === 'B');
+      expect(b.circleAddress, 'the primary slot keeps the FIRST address').toBe(addrOf(1));
+      expect(b.circleAddresses, 'both proven addresses, primary first').toEqual([addrOf(1), addrOf(2)]);
+    });
+
+    it('the patched row shape — primary + plural extras — folds to the full set', () => {
+      // The shape `recordCircleAddress` writes after a re-announce: the new primary in the scalar
+      // slot, the previously proven pair demoted into `circleAddresses`.
+      const roster = deriveRoster({
+        redemptions: [redemption({
+          redeemedBy: 'B',
+          circleAddress: addrOf(2), circleAddressProof: proofOf(2),
+          circleAddresses: [{ address: addrOf(1), proof: proofOf(1) }],
+        })],
+      });
+      const b = roster.find((m) => m.webid === 'B');
+      expect(b.circleAddress).toBe(addrOf(2));
+      expect(b.circleAddresses).toEqual([addrOf(2), addrOf(1)]);
+    });
+
+    it('an UNPROVEN second address is refused — deny-by-default, never a silent admit', () => {
+      const roster = deriveRoster({
+        redemptions: [
+          redemption({ redeemedBy: 'B', circleAddress: addrOf(1), circleAddressProof: proofOf(1) }),
+          // A proof signed by SOMEONE ELSE's key: seeing an address is not holding it.
+          redemption({ redeemedBy: 'B', circleAddress: addrOf(2), circleAddressProof: proofOf(3) }),
+          // No proof at all, in both carrier shapes.
+          redemption({ redeemedBy: 'B', circleAddress: addrOf(4) }),
+          redemption({ redeemedBy: 'B', circleAddresses: [{ address: addrOf(5) }] }),
+        ],
+      });
+      const b = roster.find((m) => m.webid === 'B');
+      expect(b.circleAddresses, 'only the proven address is in the set').toEqual([addrOf(1)]);
+    });
+
+    it('a LEGACY single-address row still folds — primary kept, the set is that address alone', () => {
+      // Pre-set trail: an address recorded before proofs rode along (trusted at write). The primary
+      // keeps working, and it leads the set — but a proofless row cannot GROW the set.
+      const roster = deriveRoster({
+        redemptions: [redemption({ redeemedBy: 'B', circleAddress: 'addrB-legacy' })],
+      });
+      const b = roster.find((m) => m.webid === 'B');
+      expect(b.circleAddress).toBe('addrB-legacy');
+      expect(b.circleAddresses).toEqual(['addrB-legacy']);
+    });
+
+    it('a row with no address at all projects NO circleAddresses key', () => {
+      const roster = deriveRoster({ redemptions: [redemption({ redeemedBy: 'B' })] });
+      const b = roster.find((m) => m.webid === 'B');
+      expect('circleAddresses' in b).toBe(false);
+    });
+
+    it('the admin (confirmedBy) row folds a set through the same gate', () => {
+      const roster = deriveRoster({
+        redemptions: [redemption({
+          redeemedBy: 'B', confirmedBy: 'A', channel: 'peer',
+          confirmedByCircleAddress: addrOf(5), confirmedByCircleAddressProof: proofOf(5),
+          confirmedByCircleAddresses: [
+            { address: addrOf(6), proof: proofOf(6) },
+            { address: addrOf(7), proof: proofOf(3) },   // forged ⇒ refused
+          ],
+        })],
+      });
+      const a = roster.find((m) => m.webid === 'A');
+      expect(a.circleAddress).toBe(addrOf(5));
+      expect(a.circleAddresses).toEqual([addrOf(5), addrOf(6)]);
+    });
   });
 
   // ── The membership SPINE folds DENY-WINS on top of the trail head (the safe cutover) ──────────────────

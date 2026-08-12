@@ -38,14 +38,14 @@ const proofOf = (n, circle = CIRCLE, addr = null) =>
 const BRAM_SEED = 3;
 const ADMIN_SEED = 7;
 
-async function buildBundle() {
+async function buildBundle(reliableSend = async () => ({ held: false, delivered: true })) {
   const id = await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);
   const bundle = await createNeighborhoodAgent({
     identity: id, transport: tx,
     offeringMatch: { group: CIRCLE, localActor: ME, peers: [] },
     members: [],
-    reliableSend: async () => ({ held: false, delivered: true }),
+    reliableSend,
   });
   await bundle.offeringMatch.start();
   return bundle;
@@ -168,6 +168,38 @@ describe('recordCircleAddressAnnouncement — the receive half of per-circle add
     expect(row.circleAddressProof).toBe(proofOf(NEXT));
   });
 
+  it('a RE-ANNOUNCE keeps the PREVIOUS proven address in the set — nothing is evicted', async () => {
+    // The set property (task: a roster row holds a SET of proven addresses). The new address takes
+    // the primary slot (the test above); the first one SURVIVES in `circleAddresses`, so a member
+    // reachable on two addresses (a second device, a restored profile) stays reachable on both.
+    const bundle = await buildBundle();
+    await recordJoin(bundle);
+    await callSkill(bundle.agent, 'recordPeerIntro', { groupId: CIRCLE, peerAddr: BRAM });
+    await announce(bundle);
+
+    const NEXT = 11;
+    await announce(bundle, { circleAddress: addressOf(NEXT), circleAddressProof: proofOf(NEXT) });
+
+    const row = await rowFor(bundle, BRAM);
+    expect(row.circleAddress).toBe(addressOf(NEXT));
+    expect(row.circleAddresses, 'primary first, the earlier proven address kept')
+      .toEqual([addressOf(NEXT), addressOf(BRAM_SEED)]);
+  });
+
+  it('an UNPROVEN address never enters the set, even when a proven one already exists', async () => {
+    const bundle = await buildBundle();
+    await recordJoin(bundle);
+    await callSkill(bundle.agent, 'recordPeerIntro', { groupId: CIRCLE, peerAddr: BRAM });
+    await announce(bundle);
+
+    const res = await announce(bundle, {
+      circleAddress: addressOf(12),
+      circleAddressProof: signCircleLinkFromSeed(seedOf(99), CIRCLE, CIRCLE, addressOf(12)),
+    });
+    expect(res.ok).toBe(false);
+    expect((await rowFor(bundle, BRAM)).circleAddresses).toEqual([addressOf(BRAM_SEED)]);
+  });
+
   it('re-announcing an UNCHANGED address writes nothing at all', async () => {
     const bundle = await buildBundle();
     await recordJoin(bundle);
@@ -249,6 +281,51 @@ describe('recordCircleAddressAnnouncement — the receive half of per-circle add
     }, BRAM);
     expect(res.ok).toBe(true);
     expect((await rowFor(bundle, BRAM)).circleAddress).toBe(addressOf(BRAM_SEED));
+  });
+});
+
+describe('the fan-out tries a member\'s proven address SET in order (primary first)', () => {
+  const NEXT = 11;
+
+  /** Bram proven on TWO addresses: the re-announced one (primary) + the original (kept in the set). */
+  async function bundleWithTwoBramAddresses(reliableSend) {
+    const bundle = await buildBundle(reliableSend);
+    await recordJoin(bundle);
+    await callSkill(bundle.agent, 'recordPeerIntro', { groupId: CIRCLE, peerAddr: BRAM });
+    await announce(bundle);
+    await announce(bundle, { circleAddress: addressOf(NEXT), circleAddressProof: proofOf(NEXT) });
+    return bundle;
+  }
+
+  const bramAddrs = (sends) => sends.filter((a) => a === addressOf(NEXT) || a === addressOf(BRAM_SEED));
+
+  it('falls to the SECOND proven address when the first reports not-delivered', async () => {
+    const sends = [];
+    const bundle = await bundleWithTwoBramAddresses(async (addr) => {
+      sends.push(addr);
+      // The re-announced primary answers nowhere; the surviving earlier address still delivers.
+      if (addr === addressOf(NEXT)) return { held: false, delivered: false };
+      return { held: false, delivered: true };
+    });
+
+    await callSkill(bundle.agent, 'broadcastKringChatStatement',
+      { groupId: CIRCLE, event: { body: { hash: 'h-set' }, sig: 's-set' }, msgId: 'm-set-1', ts: 1 });
+
+    expect(bramAddrs(sends), 'primary tried first, then the kept earlier address')
+      .toEqual([addressOf(NEXT), addressOf(BRAM_SEED)]);
+  });
+
+  it('stops at the FIRST address that takes the envelope — one member, one delivery', async () => {
+    const sends = [];
+    const bundle = await bundleWithTwoBramAddresses(async (addr) => {
+      sends.push(addr);
+      return { held: false, delivered: true };
+    });
+
+    await callSkill(bundle.agent, 'broadcastKringChatStatement',
+      { groupId: CIRCLE, event: { body: { hash: 'h-set' }, sig: 's-set' }, msgId: 'm-set-2', ts: 2 });
+
+    expect(bramAddrs(sends), 'the primary delivered, so the set stops there').toEqual([addressOf(NEXT)]);
   });
 });
 

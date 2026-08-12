@@ -44,7 +44,9 @@ export const ADDRESS_VIA = Object.freeze({
  * @param {boolean} [opts.allowFallback=true]  the PER-USER setting (Frits, 2026-07-28), default OFF in the
  *   product but default TRUE here so existing callers are unchanged. When false and no circle address is
  *   known, we return NO address rather than routing over the member's global key.
- * @returns {Promise<{addr: string|null, via: string|null, webid: string|null}>}
+ * @returns {Promise<{addr: string|null, addrs?: string[], via: string|null, webid: string|null}>}
+ *   `addrs` rides only on the circle-address rung: the member's full proven address set, primary
+ *   first, for a caller that can try more than one.
  */
 export async function resolveMemberAddress(member, {
   circleId = null, resolveByWebid = null, onFallback = null, preferCircleAddress = false,
@@ -54,13 +56,23 @@ export async function resolveMemberAddress(member, {
   const webid = typeof member === 'string' ? member : (m?.webid ?? m?.webId ?? null);
 
   // 1. The per-circle address — the whole point. Recorded on the roster ONLY when its proof verified
-  //    (`verifyCircleLink`), so anything present here is already trustworthy.
+  //    (`verifyCircleLink`), so anything present here is already trustworthy. A member can hold a SET
+  //    of proven addresses (`circleAddresses`, primary first — a second device, a restored profile);
+  //    the resolver returns the whole set as `addrs` so the fan can try them in order, while `addr`
+  //    stays the primary for every single-address caller.
   const circleAddress = typeof m?.circleAddress === 'string' && m.circleAddress ? m.circleAddress : null;
+  const addressSet = [];
+  if (circleAddress) addressSet.push(circleAddress);
+  for (const a of Array.isArray(m?.circleAddresses) ? m.circleAddresses : []) {
+    if (typeof a === 'string' && a && !addressSet.includes(a)) addressSet.push(a);
+  }
   // The ladder stays TRANSPORT-AGNOSTIC on purpose: this expresses an INTENT ("reach them as a member of
   // this circle"), not a routing decision. Whether the live connection can actually carry a per-circle
   // address is a capability of the connection, answered below the waist — the send path maps the address
   // back to the member's canonical one when it cannot. See `createSecureAgent` `addressFor`.
-  if (preferCircleAddress && circleAddress) return { addr: circleAddress, via: ADDRESS_VIA.CIRCLE, webid };
+  if (preferCircleAddress && addressSet.length) {
+    return { addr: addressSet[0], addrs: addressSet, via: ADDRESS_VIA.CIRCLE, webid };
+  }
 
   // The per-user setting, and the whole point of it: with fallback OFF we would rather be UNDELIVERABLE
   // than route over the member's one global key, because that key is what lets a relay link their circles

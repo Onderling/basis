@@ -70,6 +70,39 @@ describe('who may speak at one of our per-circle addresses', () => {
     expect(auth.authorizeSender({ senderKey: anna.circleAddress, ownAddress: OURS_IN_BUURT }).allow).toBe(true);
   });
 
+  it('a member proven on TWO addresses may speak with EITHER — the set, not just the first', () => {
+    // The roster row can carry a SET of proven per-circle addresses (`circleAddresses`, primary
+    // first — deriveRoster admits an address only on a verified proof): a second device, a restored
+    // profile. Under the one-derivation rule each address IS the key that signs at it, so a member
+    // speaking from their second address must not read as a stranger.
+    const auth = createCircleSenderAuthorization();
+    const anna = {
+      ...provenMember('anna'),
+      circleAddresses: ['anna-in-circle', 'anna-second-device-in-circle'],
+    };
+    auth.recordCircleRoster({ circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [anna] });
+
+    expect(auth.authorizeSender({ senderKey: 'anna-in-circle', ownAddress: OURS_IN_BUURT }))
+      .toEqual({ allow: true, reason: SENDER_REASON.MEMBER });
+    expect(auth.authorizeSender({ senderKey: 'anna-second-device-in-circle', ownAddress: OURS_IN_BUURT }))
+      .toEqual({ allow: true, reason: SENDER_REASON.MEMBER });
+    // …while the canonical key stays refused (B6) and a stranger stays a stranger.
+    expect(auth.authorizeSender({ senderKey: anna.pubKey, ownAddress: OURS_IN_BUURT }))
+      .toEqual({ allow: false, reason: SENDER_REASON.CANONICAL_REFUSED });
+    expect(auth.authorizeSender({ senderKey: 'mallory-key', ownAddress: OURS_IN_BUURT }).allow).toBe(false);
+  });
+
+  it('a refresh that DROPS an address from the set stops accepting it — the snapshot replaces', () => {
+    const auth = createCircleSenderAuthorization();
+    const twoAddrs = { ...provenMember('anna'), circleAddresses: ['anna-in-circle', 'anna-old-addr'] };
+    auth.recordCircleRoster({ circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [twoAddrs] });
+    expect(auth.authorizeSender({ senderKey: 'anna-old-addr', ownAddress: OURS_IN_BUURT }).allow).toBe(true);
+
+    auth.recordCircleRoster({ circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [provenMember('anna')] });
+    expect(auth.authorizeSender({ senderKey: 'anna-old-addr', ownAddress: OURS_IN_BUURT }).allow).toBe(false);
+    expect(auth.authorizeSender({ senderKey: 'anna-in-circle', ownAddress: OURS_IN_BUURT }).allow).toBe(true);
+  });
+
   it('a stranger may not, however well they sign', () => {
     const auth = createCircleSenderAuthorization();
     auth.recordCircleRoster({ circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [member('anna')] });

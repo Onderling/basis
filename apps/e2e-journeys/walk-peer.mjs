@@ -44,7 +44,7 @@
  */
 import { createInterface } from 'node:readline';
 import { startRelay } from '@onderling/relay';
-import { bootRealAgentNode } from '../basis/test/support/pairRealAgents.js';
+import { bootRealAgentNode, sendKringChat } from '../basis/test/support/pairRealAgents.js';
 import { makeCircleReachable } from '../basis/src/v2/householdRosterPairing.js';
 import { buildCircleInviteUri, joinCircleFromInvite } from '../basis/src/v2/circleInvite.js';
 import { quickCreateCircle } from '../basis/src/v2/circleCreate.js';
@@ -185,9 +185,9 @@ async function main() {
       // (`broadcastKringFanOut`). This tool did not, so `post` failed with `msgId-required` the first time
       // anyone tried to send from it (2026-07-30). Mirror what a shell does rather than inventing a shape.
       const msgId = `walk-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-      const r = await call('stoop', 'broadcastKringMessage', {
-        groupId: circleId, text, msgId, ts: Date.now(),
-      });
+      // The SIGNED statement path (rider 3b replaced the plain-envelope op): append the render
+      // entry on this node's own rail, then fan the statement — the exact production shape.
+      const r = await sendKringChat(me, { groupId: circleId, msgId, text });
       console.log('sent:', JSON.stringify(r));
       // `sent` counts recipients the send path accepted — HELD counts as sent. If the phone does not
       // show it, that is the interesting part: check the relay log before assuming a UI bug.

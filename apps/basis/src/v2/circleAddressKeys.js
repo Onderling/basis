@@ -50,6 +50,30 @@ export function circleSigningKeyOf(member) {
 }
 
 /**
+ * The member's full per-circle address SET, primary first — `circleAddresses` when the roster
+ * projected one (deriveRoster admits an address into it only on a verified proof), else the single
+ * `circleAddress` slot. Every consumer that must accept or reach "the member's address" and not
+ * merely "the first one recorded" reads this.
+ *
+ * @param {object} member  a roster row
+ * @returns {string[]}
+ */
+export function circleAddressSetOf(member) {
+  const primary = typeof member?.circleAddress === 'string' && member.circleAddress
+    ? member.circleAddress : null;
+  const set = [];
+  const seen = new Set();
+  const add = (a) => {
+    if (typeof a !== 'string' || !a || seen.has(a)) return;
+    seen.add(a);
+    set.push(a);
+  };
+  add(primary);
+  for (const a of Array.isArray(member?.circleAddresses) ? member.circleAddresses : []) add(a);
+  return set;
+}
+
+/**
  * Does this roster row carry a per-circle address the member PROVED?
  *
  * ▸ **This is what decides whether a member is held to per-circle signing** (B6). A row that carries
@@ -95,17 +119,25 @@ export function bindCircleAddressKeys({ members, registerPeerAddress, selfPubKey
   if (typeof registerPeerAddress !== 'function') return { bound, skipped };
 
   for (const m of Array.isArray(members) ? members : []) {
-    const pubKey  = typeof m?.pubKey === 'string' ? m.pubKey : null;
-    const address = typeof m?.circleAddress === 'string' ? m.circleAddress : null;
+    const pubKey    = typeof m?.pubKey === 'string' ? m.pubKey : null;
+    const addresses = circleAddressSetOf(m);
     // A row missing either half is not an error — an older join, or a member who never presented an
     // address. The send path's own ladder (circleAddress → pubKey → webid) already handles them.
-    if (!pubKey || !address) { skipped += 1; continue; }
+    if (!pubKey || !addresses.length) { skipped += 1; continue; }
     if (selfPubKey && pubKey === selfPubKey) { skipped += 1; continue; }
     try {
       // Two keys, one row: `pubKey` is the person (presence, holds, mute), `signingKey` is what
-      // actually signs at this address (Decision 4). See `circleSigningKeyOf`.
-      registerPeerAddress(address, pubKey, { signingKey: circleSigningKeyOf(m) });
-      bound += 1;
+      // actually signs at this address (Decision 4). See `circleSigningKeyOf`. Every address in the
+      // member's proven SET is bound — sealing to their second device's address must not throw
+      // `No pubKey registered` while the first device's address works. The primary keeps the
+      // explicit-override rule; an additional address signs as itself (the one-derivation L2 rule).
+      const primary = typeof m?.circleAddress === 'string' && m.circleAddress ? m.circleAddress : null;
+      for (const address of addresses) {
+        registerPeerAddress(address, pubKey, {
+          signingKey: address === primary ? circleSigningKeyOf(m) : address,
+        });
+      }
+      bound += 1;   // per ROW, as before — the count means "members bound", not addresses
     } catch { skipped += 1; }
   }
   return { bound, skipped };

@@ -13,9 +13,6 @@ import '@expo/metro-runtime';
 import 'expo-dev-client';
 import { registerRootComponent } from 'expo';
 
-import * as TaskManager from 'expo-task-manager';
-import { defineBackgroundTask, bgRunOnce } from '@onderling/sync-engine-rn';
-
 import App from './App.js';
 
 // Background-fetch task definition — MUST be at JS-bundle load time per Expo's
@@ -26,10 +23,19 @@ import App from './App.js';
 // resolves null and the task reports NoData — a safe miss, retried next interval.
 export const BASIS_BG_TASK_NAME = 'basis-mobile-sync-background';
 
-defineBackgroundTask({
-  TaskManager,
-  taskName: BASIS_BG_TASK_NAME,
-  runOnce:  bgRunOnce,
-});
+// Guarded AND lazy: a dev client built BEFORE expo-task-manager was added has no native module
+// for it, and Expo modules can throw at IMPORT time — so both the import and the definition sit
+// behind the guard. Degrades to a no-op (foreground sync unaffected); a dev-client rebuild
+// enables the OS schedule. Expo registers bundle-load tasks before any headless launch uses
+// them, and this IIFE runs in the same tick, so the "define at bundle load" contract holds.
+(async () => {
+  try {
+    const TaskManager = await import('expo-task-manager');
+    const { defineBackgroundTask, bgRunOnce } = await import('@onderling/sync-engine-rn');
+    defineBackgroundTask({ TaskManager, taskName: BASIS_BG_TASK_NAME, runOnce: bgRunOnce });
+  } catch (e) {
+    console.warn('[bg-fetch] task definition skipped (native module absent — rebuild the dev client to enable):', e?.message ?? e);
+  }
+})();
 
 registerRootComponent(App);

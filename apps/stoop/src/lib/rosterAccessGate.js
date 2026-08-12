@@ -31,6 +31,9 @@
  */
 export const PEER_ROSTER_FIELDS = Object.freeze([
   'webid', 'id', 'pubKey', 'sealingPublicKey', 'circleAddress', 'circleAddressProof',
+  // The member's full proven address SET (primary first) — same functional class as
+  // `circleAddress`: a co-member needs every address the member answers on to route + seal to them.
+  'circleAddresses',
   'role', 'handle', 'personaProperties',
 ]);
 

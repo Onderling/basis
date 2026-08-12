@@ -34,6 +34,34 @@ describe('the address ladder', () => {
     expect(r.addr).not.toBe(PUBKEY);
   });
 
+  it('returns the member\'s FULL proven address set as `addrs`, primary first', async () => {
+    // A member can hold a set of proven per-circle addresses (a second device, a restored profile).
+    // `addr` stays the primary for every single-address caller; `addrs` is what the fan tries in order.
+    const SECOND = 'addr-bram-second-device';
+    const r = await resolveMemberAddress(
+      { webid: WEBID, pubKey: PUBKEY, circleAddress: CIRCLE_ADDR, circleAddresses: [CIRCLE_ADDR, SECOND] },
+      { circleId: CIRCLE, ...ON },
+    );
+    expect(r.addr).toBe(CIRCLE_ADDR);
+    expect(r.addrs).toEqual([CIRCLE_ADDR, SECOND]);
+    expect(r.via).toBe(ADDRESS_VIA.CIRCLE);
+  });
+
+  it('a single-address row yields a one-element set — the shapes stay interchangeable', async () => {
+    const r = await resolveMemberAddress(
+      { webid: WEBID, pubKey: PUBKEY, circleAddress: CIRCLE_ADDR }, { circleId: CIRCLE, ...ON },
+    );
+    expect(r.addrs).toEqual([CIRCLE_ADDR]);
+  });
+
+  it('a row carrying only the plural field still routes on the circle rung', async () => {
+    const r = await resolveMemberAddress(
+      { webid: WEBID, pubKey: PUBKEY, circleAddresses: [CIRCLE_ADDR] }, { circleId: CIRCLE, ...ON },
+    );
+    expect(r).toMatchObject({ addr: CIRCLE_ADDR, via: ADDRESS_VIA.CIRCLE });
+    expect(r.addrs).toEqual([CIRCLE_ADDR]);
+  });
+
   it('with the gate OFF (today) the circle address is ignored — B is not finished', async () => {
     // The gate exists because basis's real-agent tests went red: preferring an address nobody listens on
     // silently stops delivery. Off is the shipped default until every transport registers aliases.

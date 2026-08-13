@@ -4172,7 +4172,8 @@
       "text": "Everything here lives on this device only. If you lose it or reinstall, your recovery phrase brings back who you are — not your circles or your conversations. Connect a pod, or export a backup file, to be able to pick this up somewhere else.",
       "doc": "Said where the state is shown, not only when someone tries to leave with it (2026-08-02). A wipe-and-restore walk proved the phrase brings back the identity and no circles; someone who learns that at the moment they switch devices learns it too late to act on."
     },
-    "enroll_device": "Add a device"
+    "enroll_device": "Add a device",
+    "devices": "My devices"
   },
   "admin": {
     "title": {
@@ -4954,6 +4955,10 @@
   },
   "revoke": {
     "title": "Remove a device",
-    "ceremony": "Revoking the device"
+    "ceremony": "Revoking the device",
+    "body": "Type the recovery phrase to remove this device everywhere. Its keys stop being accepted in all your circles; the device itself becomes an island.",
+    "submit": "Remove this device",
+    "done": "Device removed. Every circle now refuses its keys.",
+    "failed": "Removing failed."
   }
 }

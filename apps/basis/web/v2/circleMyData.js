@@ -26,6 +26,8 @@ export function renderCircleMyData(container, {
   onViewMnemonic,
   onRestore,
   onEnroll,
+  devices = [],
+  onRevokeDevice,
   notifications,
   onToggleNotifications,
   // The two delivery settings (2026-07-28). One object, because they are two knobs on one question.
@@ -183,6 +185,32 @@ export function renderCircleMyData(container, {
       keys.appendChild(b);
     }
     container.appendChild(keys);
+  }
+
+  // ── enrolled devices (add-a-device) ─────────────────────────────────────────
+  // One row per registry delegation; tombstones shown struck. The revoke door (the phrase-proven
+  // ceremony) acts on the live rows — gated on the callback like every identity act above.
+  if (typeof onRevokeDevice === 'function' && Array.isArray(devices) && devices.length) {
+    const sec = section(tr('circle.mydata.devices'));
+    for (const d of devices) {
+      const row = document.createElement('div');
+      row.className = 'cc-mydata__device';
+      row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:.6rem;padding:.25rem 0;';
+      const label = document.createElement('span');
+      label.textContent = d.label || d.deviceId;
+      if (d.revoked) label.style.textDecoration = 'line-through';
+      row.appendChild(label);
+      if (!d.revoked) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'cc-mydata__device-revoke';
+        b.textContent = tr('circle.revoke.title');
+        b.addEventListener('click', () => onRevokeDevice(d.deviceId));
+        row.appendChild(b);
+      }
+      sec.appendChild(row);
+    }
+    container.appendChild(sec);
   }
 
   // ── notifications (S5 web-push) ─────────────────────────────────────────────

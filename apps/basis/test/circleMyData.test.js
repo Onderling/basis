@@ -82,6 +82,23 @@ describe('renderCircleMyData', () => {
     expect(onEnroll).toHaveBeenCalled();
   });
 
+  it('devices: live rows get a revoke door, tombstones render struck without one', () => {
+    const onRevokeDevice = vi.fn();
+    const el = renderCircleMyData(document.createElement('div'), {
+      t, podStatus: { signedIn: true }, onRevokeDevice,
+      devices: [
+        { deviceId: 'dev-1', label: 'telefoon', revoked: false },
+        { deviceId: 'dev-2', label: 'verloren', revoked: true },
+      ],
+    });
+    const rows = el.querySelectorAll('.cc-mydata__device');
+    expect(rows.length).toBe(2);
+    const buttons = el.querySelectorAll('.cc-mydata__device-revoke');
+    expect(buttons.length).toBe(1);                      // only the live row
+    buttons[0].click();
+    expect(onRevokeDevice).toHaveBeenCalledWith('dev-1');
+  });
+
   it('renders the push-notification toggle reflecting subscription state', () => {
     const onToggleNotifications = vi.fn();
     const off = renderCircleMyData(document.createElement('div'), {

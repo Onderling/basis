@@ -267,6 +267,7 @@ import { advancedOpRows, advancedParamRows } from '../../src/v2/advancedSurface.
 import { createFlowRunner, renderFlow } from '@onderling/app-manifest';
 import { paramsManifest } from '../../src/v2/paramsManifest.js';
 import { householdManifest } from '../../../household/manifest.js';
+import { deviceDelegationsOf } from '@onderling/agent-registry';
 // profile-update propagation — the silent roster "pull-me" signal (announce on a real roster
 // write; receive → re-read the changed rows). No values on the wire, no chat bubble, no wake.
 import { makeRosterUpdatedPeerHandler, makeRosterUpdateAnnouncer } from '../../src/v2/rosterUpdated.js';
@@ -3835,7 +3836,7 @@ async function showAdvanced() {
 async function showMyData() {
   try { deliverySettingsCache = await deliverySettingsStore.get(); } catch { /* keep the defaults */ }
   hideCircleTabBar(tabBarEl);
-  let dataLocation = {}; let podStatus = {}; let privacy = []; let metrics = {};
+  let dataLocation = {}; let podStatus = {}; let privacy = []; let metrics = {}; let devices = [];
   // the actual pod sign-in state (reuses podAuth), + a sign-in button when local-only.
   const onSignIn = () => Promise.resolve(
     podAuth.startSignIn({ issuer: podAuth.DEFAULT_ISSUER_ID, redirectUrl: window.location.href }),
@@ -3846,6 +3847,9 @@ async function showMyData() {
   const onRestore = () => mountMyDataWizard(renderRestoreFromMnemonicWizard);
   // Add-a-device: the enroll ceremony as its declared flow (the phrase is typed on THIS device).
   const onEnroll = () => showEnrollDeviceFlow();
+  // Device revocation: the ceremony on THIS (surviving) device — re-opens My-data when it closes
+  // so the tombstone shows.
+  const onRevokeDevice = (deviceId) => showRevokeDeviceFlow(deviceId, { onClosed: () => showMyData() });
   const onViewMnemonic = () => showMnemonicReveal();
   // web-push toggle. State is read from the live PushManager so the screen
   // reflects reality; toggling subscribes/unsubscribes + tells stoop.
@@ -3930,7 +3934,7 @@ async function showMyData() {
       backTo: { returnTo: getActiveCircle() || 'chat', label: t('circle.mydata.back'), onNavigate: () => {} },
     });
   };
-  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij, onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, notifications, onToggleNotifications,
+  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij, onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, devices, onRevokeDevice, notifications, onToggleNotifications,
     delivery: deliverySettingsCache,
     onSetDelivery: async (patch) => {
       try { deliverySettingsCache = await deliverySettingsStore.set(patch); } catch { /* keep the old view */ }
@@ -3947,12 +3951,17 @@ async function showMyData() {
     relayUrl: resolveRelayUrl(localStorageRelayIo().load(), ''), relayEnvUrl: CIRCLE_RELAY_ENV, onSaveRelay: applyRelayUrl, onOpenRelayPanel: openRelayPanel });
   getWebPushState().then((s) => { notifications = s; rerender(); }).catch(() => {});
   rerender();
-  const [loc, status, priv, met] = await Promise.all([
+  const [loc, status, priv, met, profProps] = await Promise.all([
     rawCallSkill('stoop', 'getDataLocation', {}).catch(() => null),
     rawCallSkill('stoop', 'podSignInStatus', {}).catch(() => null),
     rawCallSkill('stoop', 'getPrivacyNotice', { lang: currentLang() }).catch(() => null),
     rawCallSkill('stoop', 'getMetrics', {}).catch(() => null),
+    rawCallSkill('agents', 'getProfileProperties', { id: 'default' }).catch(() => null),
   ]);
+  // The enrolled-devices list (add-a-device bookkeeping): one row per registry delegation,
+  // tombstones shown struck — the revoke door acts on the live ones.
+  devices = Object.values(deviceDelegationsOf({ properties: profProps?.properties ?? {} }))
+    .map((d) => ({ deviceId: d.deviceId, label: d.label ?? null, revoked: d.revoked === true }));
   dataLocation = loc ?? {};
   podStatus = status ?? {};
   // Prefer the real Solid session over the (aspirational) stoop op.
@@ -4433,6 +4442,79 @@ function showEnrollDeviceFlow() {
   };
 
   runner.start(FLOW, {}).then((r) => { inst = r; paint(); }).catch(() => close());
+}
+
+function showRevokeDeviceFlow(deviceId, { onClosed } = {}) {
+  // DEVICE REVOCATION (the ceremony, as its declared flow): runs on THIS — a surviving — device;
+  // the phrase is the extra proof. The deviceId rides in prefilled (the My-data device row that
+  // opened this); the one pause paints only the phrase. The fold does the enforcement everywhere.
+  const FLOW = householdManifest.flows.find((f) => f.id === 'revoke-device');
+  const OPS = new Map(householdManifest.operations.map((o) => [o.id, o]));
+  const runner = createFlowRunner({ ops: OPS, callSkill: (opId, args) => rawCallSkill('household', opId, args) });
+  const { card, close } = _restoreOverlay();
+  let inst = null;
+  const done = () => { close(); try { onClosed?.(); } catch { /* */ } };
+
+  const paint = () => {
+    const view = renderFlow(FLOW, inst, { ops: OPS });
+    card.innerHTML = '';
+    const h = document.createElement('h3');
+    h.textContent = t('circle.revoke.title');
+    card.appendChild(h);
+
+    if (view.status === 'awaiting-input' && view.form) {
+      const p = document.createElement('p');
+      p.textContent = t('circle.revoke.body');
+      card.appendChild(p);
+      const input = document.createElement('textarea');
+      input.rows = 3; input.autocomplete = 'off'; input.spellcheck = false;
+      input.placeholder = t('circle.enroll.mnemonic_placeholder');
+      input.style.cssText = 'display:block;width:100%;margin:.4rem 0;';
+      card.appendChild(input);
+      const go = document.createElement('button');
+      go.type = 'button';
+      go.textContent = t('circle.revoke.submit');
+      go.addEventListener('click', () => {
+        runner.resume(FLOW, inst, { input: { mnemonic: input.value, deviceId } })
+          .then((r) => { inst = r; paint(); }).catch(() => done());
+      });
+      card.appendChild(go);
+      const cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.textContent = t('circle.confirm.cancel', { defaultValue: 'Annuleren' });
+      cancel.style.cssText = 'margin-left:.6rem;';
+      cancel.addEventListener('click', () => { runner.cancel(inst); done(); });
+      card.appendChild(cancel);
+      return;
+    }
+
+    const outcome = inst?.steps?.ceremony?.outcome;
+    const msg = document.createElement('p');
+    msg.textContent = outcome === 'ok'
+      ? t('circle.revoke.done')
+      : (outcome === 'wrong-phrase' || outcome === 'invalid-phrase')
+        ? t('circle.enroll.invalid_phrase')
+        : (inst?.steps?.ceremony?.out?.error ?? t('circle.revoke.failed'));
+    card.appendChild(msg);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = outcome === 'ok' ? t('circle.mydata.close', { defaultValue: 'Sluiten' }) : t('circle.enroll.retry');
+    btn.addEventListener('click', () => {
+      if (outcome === 'ok') return done();
+      close(); showRevokeDeviceFlow(deviceId, { onClosed });
+    });
+    card.appendChild(btn);
+    if (outcome !== 'ok') {
+      const cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.textContent = t('circle.confirm.cancel', { defaultValue: 'Annuleren' });
+      cancel.style.cssText = 'margin-left:.6rem;';
+      cancel.addEventListener('click', () => done());
+      card.appendChild(cancel);
+    }
+  };
+
+  runner.start(FLOW, {}).then((r) => { inst = r; paint(); }).catch(() => done());
 }
 
 function showRestoreSettingsFlow() {

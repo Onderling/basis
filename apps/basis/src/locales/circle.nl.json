@@ -4172,7 +4172,8 @@
       "text": "Alles hier staat alleen op dit apparaat. Raak je het kwijt of installeer je opnieuw, dan haalt je herstelzin terug wie je bent — niet je kringen of je gesprekken. Koppel een pod, of exporteer een back-upbestand, om hier ergens anders mee verder te kunnen.",
       "doc": "Said where the state is shown, not only when someone tries to leave with it (2026-08-02). A wipe-and-restore walk proved the phrase brings back the identity and no circles; someone who learns that at the moment they switch devices learns it too late to act on."
     },
-    "enroll_device": "Apparaat toevoegen"
+    "enroll_device": "Apparaat toevoegen",
+    "devices": "Mijn apparaten"
   },
   "admin": {
     "title": {
@@ -4954,6 +4955,10 @@
   },
   "revoke": {
     "title": "Apparaat intrekken",
-    "ceremony": "Apparaat wordt ingetrokken"
+    "ceremony": "Apparaat wordt ingetrokken",
+    "body": "Typ de herstelzin om dit apparaat overal in te trekken. Zijn sleutels worden in al je kringen geweigerd; het apparaat zelf wordt een eiland.",
+    "submit": "Dit apparaat intrekken",
+    "done": "Apparaat ingetrokken. Elke kring weigert nu zijn sleutels.",
+    "failed": "Intrekken is mislukt."
   }
 }

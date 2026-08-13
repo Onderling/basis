@@ -37,9 +37,11 @@
  *           a step with NO `next` ends the flow after it
  *
  * @typedef {object} Binding
- * @property {string} [from]   by-VALUE path: '$flow.needs.<name>' | '$steps.<stepId>.<name>'
- * @property {string} [ref]    by-REFERENCE path (same grammar) — REQUIRED for secret kinds
- * @property {*}      [value]  literal
+ * @property {string}  [from]     by-VALUE path: '$flow.needs.<name>' | '$steps.<stepId>.<name>'
+ * @property {string}  [ref]      by-REFERENCE path (same grammar) — REQUIRED for secret kinds
+ * @property {*}       [value]    literal
+ * @property {boolean} [optional] an unresolvable from/ref binds NOTHING instead of failing the
+ *           instance (the arg is simply absent — composite-compiled threading relies on this)
  */
 
 const PATH_RE = /^\$(flow\.needs|steps\.[A-Za-z0-9_-]+)\.[A-Za-z0-9_.-]+$/;

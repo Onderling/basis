@@ -120,6 +120,28 @@ describe('the flow runner', () => {
     expect(inst.steps.s.out.status).toBe('fine');
   });
 
+  it('an OPTIONAL binding degrades to an absent arg; a required one still fails loud', async () => {
+    const flow = {
+      id: 'f',
+      steps: [
+        { id: 'a', op: 'probe', next: { ok: 'b' } },
+        // 'nothing' does not exist on a's output — optional skips it, the step still runs
+        { id: 'b', op: 'probe', bind: { extra: { from: '$steps.a.nothing', optional: true } } },
+      ],
+    };
+    const { runner, calls } = harness({ probe: { ok: true } });
+    const inst = await runner.start(flow, {});
+    expect(inst.status).toBe('done');
+    expect('extra' in calls[1].args).toBe(false);
+    // the same binding without `optional` fails the instance (the loud default)
+    const strict = structuredClone(flow);
+    delete strict.steps[1].bind.extra.optional;
+    const { runner: r2 } = harness({ probe: { ok: true } });
+    const inst2 = await r2.start(strict, {});
+    expect(inst2.status).toBe('failed');
+    expect(inst2.reason).toBe('unresolved-binding:extra');
+  });
+
   it('a thrown op becomes outcome "error"; cancel is terminal', async () => {
     const runner = createFlowRunner({
       ops: OPS,

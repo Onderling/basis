@@ -90,6 +90,39 @@ is what makes a reader ask "why is `renderAttachments` a peer of the chat shell?
 (`npm run coverage` → `apps/basis/docs/surface-coverage.md`) records which surfaces each op is wired for,
 so the map can't drift from the manifests.
 
+#### Flows — declared multi-step processes
+
+Some things a person does are not one op but a **process**: restoring settings on a new device, enrolling
+a second device, pairing a view. A manifest declares these as **`flows[]`** beside `operations[]` — a flow
+is a **DAG of steps** where every step references an existing op (anything effectful *is* an op — flows add
+no second way to act) or, one level deep, another flow. Routing is declared per step as **outcome → next**
+edges (`null` = the flow ends; `else` = fallback), which is how one declaration covers a probe that can
+branch four ways.
+
+A flow declares three distinct faces:
+
+- **`needs`** — its inputs and preconditions;
+- **`produces`** — its outputs, bound by declared path references to step results;
+- **`effects`** — the world-changes that are *not* return values (writes, key rotations, sends). Effects
+  exist for honesty: they are the consent/review surface ("this flow will: …") and what the trail records.
+
+Steps wire together by **declared path bindings** (`$flow.needs.x` / `$steps.<id>.<name>`), never an
+expression language — the moment something is computational it becomes an op. Secret-kind values obey one
+hard rule end to end: they bind **by reference only**, ride a caller-held transient map at runtime, and
+never enter the persisted instance record — so a resumable, saved-after-every-step flow instance provably
+never contains key material.
+
+One **runner** (`createFlowRunner`) executes any flow as a resumable instance (pausing as
+`awaiting-input` when a step's declared required params aren't satisfied; restarting on version drift),
+and one **projector** (`renderFlow`) turns flow + instance into the view model both shells paint — a step
+gets a bespoke form only the way a screen does, as a registered override beside the generic one. A
+**verifier** (`verifyFlows`) checks the whole grammar — acyclicity, binding resolvability, the secrets
+rule — loud at declare time, cheap at run time.
+
+Composite ops (an op whose `steps` chain existing ops — the extension arc's linear mini-pipelines) are the
+**linear sugar** over this: a composite compiles to a flow and executes on the same runner. There is
+exactly one pipeline engine.
+
 That is the whole of the model. The rest of this document is what happens when it runs.
 
 ---

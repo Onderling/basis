@@ -23,7 +23,13 @@
  * The runner is shared `src/` (NOT a shell), per CLAUDE.md invariant #1
  * (logic lives once) + DESIGN §2.1 (composite runner → `apps/basis/
  * src/`, migrate to `manifest-host` at the repo split).
+ *
+ * Since the flows substrate landed, a composite EXECUTES as a compiled flow on the one
+ * flow runner (see `compileCompositeToFlow` + `runCompositeOp`) — `op.steps` stays as the
+ * extension arc's linear declaration sugar; the execution engine lives once.
  */
+
+import { createFlowRunner } from '@onderling/app-manifest';
 
 /**
  * @typedef {object} CompositeStepResult
@@ -66,33 +72,59 @@ export function resolvePath(obj, path) {
 }
 
 /**
- * Build the args for one composite step: literal `step.args` plus, when
- * an `argRef` is declared, the value threaded from a prior step's result.
- * The resolved value binds under `argRef.as` when given, else under the
- * LAST segment of `argRef.path` (`'item.id'` → `args.id`).
+ * COMPILE a composite op to a flow declaration (the reconciliation: flows are the declared
+ * generalization, and a composite is the LINEAR SUGAR the extension arc keeps — it compiles
+ * onto the ONE flow runner, so there is exactly one pipeline execution engine).
  *
- * @param {import('@onderling/app-manifest').CompositeStep} step
- * @param {CompositeStepResult[]} prior  results of already-run steps
- * @returns {object}
+ * The mapping, per composite semantic:
+ *   - steps s0..sN linear; a step's outcome routes `error → stop-or-continue`, anything
+ *     else proceeds (a composite treats every non-failure result as success);
+ *   - `ctx` merged UNDER each step's args → per-step literal bindings, step args win;
+ *   - `argRef` → an OPTIONAL `$steps.s<i>.<path>` binding (absent path ⇒ arg simply
+ *     omitted — the composite's graceful-degrade contract);
+ *   - step appOrigin rides as the qualified op id `<appOrigin>/<opId>`; the runner's
+ *     callSkill wrapper splits it back out.
+ *
+ * Pure; compiled per run (`ctx` is only known then — composites are small).
+ *
+ * @param {import('@onderling/app-manifest').Operation} op
+ * @param {object} ctx
+ * @returns {object}  a Flow (see @onderling/app-manifest flows.js)
  */
-function resolveStepArgs(step, prior) {
-  const args = { ...(step.args ?? {}) };
-  const ref = step.argRef;
-  if (!ref || typeof ref !== 'object') return args;
-
-  const source = prior[ref.from];
-  // Only successful prior steps carry a payload to thread.
-  const value = source && source.ok ? resolvePath(source.payload, ref.path) : undefined;
-  if (value !== undefined) {
-    const segs = (ref.path ?? '').split('.');
-    const key  = ref.as || segs[segs.length - 1];
-    if (key) args[key] = value;
-  }
-  return args;
+export function compileCompositeToFlow(op, ctx = {}) {
+  const onError = op.onError === 'continue' ? 'continue' : 'stop';
+  const baseCtx = ctx && typeof ctx === 'object' ? ctx : {};
+  const steps = op.steps.map((step, i) => {
+    const bind = {};
+    for (const [k, v] of Object.entries(baseCtx)) bind[k] = { value: v };
+    for (const [k, v] of Object.entries(step.args ?? {})) bind[k] = { value: v };
+    const ref = step.argRef;
+    if (ref && typeof ref === 'object' && typeof ref.from === 'number') {
+      const segs = (ref.path ?? '').split('.');
+      const key  = ref.as || segs[segs.length - 1];
+      if (key) bind[key] = { from: `$steps.s${ref.from}.${ref.path}`, optional: true };
+    }
+    const nextId = i === op.steps.length - 1 ? null : `s${i + 1}`;
+    return {
+      id: `s${i}`,
+      op: `${step.appOrigin}/${step.opId}`,
+      bind,
+      next: onError === 'continue' ? { else: nextId } : { error: null, else: nextId },
+    };
+  });
+  return { id: `composite:${op.id ?? 'anon'}`, kind: 'composite', scope: 'device', steps };
 }
 
 /**
  * Run a composite op's steps sequentially, threading results via `argRef`.
+ *
+ * Since the flows substrate landed this COMPILES to a flow and executes on the ONE flow
+ * runner (`createFlowRunner`) — the sequential loop this file used to own was a parallel
+ * pipeline system, and the no-parallel-structures rule retires it. The public contract is
+ * unchanged: same signature, same `CompositeResult` envelope (adapted back from the flow
+ * instance), ephemeral execution (no instance persistence, no pauses — the runner's
+ * awaiting-input machinery only engages when an `ops` catalog is supplied, and a composite
+ * deliberately runs without one: an unsatisfied param is the op's own failure to report).
  *
  * Best-effort, no rollback (v0).  `onError`:
  *   - 'stop' (default) → stop at the first failing step; remaining steps
@@ -116,48 +148,57 @@ export async function runCompositeOp(op, callSkill, ctx = {}) {
     throw new TypeError('runCompositeOp: callSkill must be a function');
   }
 
-  const onError = op.onError === 'continue' ? 'continue' : 'stop';
-  const baseCtx = ctx && typeof ctx === 'object' ? ctx : {};
+  const flow = compileCompositeToFlow(op, ctx);
 
+  // The runner's callSkill is app-bound; a composite's steps cross apps, so the wrapper
+  // splits the qualified id back into (appOrigin, opId). Throws are normalized here (not
+  // in the runner's catch) to keep the thrown error's `code` on the envelope.
+  const capturedArgs = [];
+  const runner = createFlowRunner({
+    callSkill: async (qualified, args) => {
+      const cut = qualified.indexOf('/');
+      capturedArgs.push(args);
+      try {
+        return await callSkill(qualified.slice(0, cut), qualified.slice(cut + 1), args);
+      } catch (err) {
+        return {
+          ok: false,
+          outcome: 'error',
+          error: { code: err?.code ?? 'composite-step-error', message: err?.message ?? String(err) },
+          __thrown: true,
+        };
+      }
+    },
+  });
+
+  const instance = await runner.start(flow, {});
+
+  // Adapt the flow instance back into the CompositeResult envelope.
   /** @type {CompositeStepResult[]} */
   const steps = [];
   let lastOkPayload = null;
   let firstError = null;
-
   for (let i = 0; i < op.steps.length; i += 1) {
-    const step = op.steps[i];
-    const args = { ...baseCtx, ...resolveStepArgs(step, steps) };
-
-    let payload;
-    try {
-      payload = await callSkill(step.appOrigin, step.opId, args);
-    } catch (err) {
-      const error = {
-        code:    err?.code ?? 'composite-step-error',
-        message: err?.message ?? String(err),
-      };
-      steps.push({ index: i, appOrigin: step.appOrigin, opId: step.opId, args, ok: false, error });
+    const rec = instance.steps[`s${i}`];
+    if (!rec) break; // stop-mode: never ran
+    const src = op.steps[i];
+    const base = { index: i, appOrigin: src.appOrigin, opId: src.opId, args: capturedArgs[i] ?? {} };
+    if (rec.outcome === 'error') {
+      const out = rec.out;
+      const error = out?.__thrown
+        ? out.error
+        : {
+            code:    'composite-step-error',
+            message: typeof out?.error === 'string' ? out.error : (out?.error?.message ?? 'Step failed'),
+          };
+      const entry = { ...base, ok: false, error };
+      if (!out?.__thrown) entry.payload = out;
+      steps.push(entry);
       if (!firstError) firstError = error;
-      if (onError === 'stop') break;
-      continue;
+    } else {
+      steps.push({ ...base, ok: true, payload: rec.out });
+      lastOkPayload = rec.out;
     }
-
-    // Honour the `{ok: false, error}` envelope as a failure (no throw).
-    if (payload && typeof payload === 'object' && payload.ok === false) {
-      const error = {
-        code:    'composite-step-error',
-        message: typeof payload.error === 'string'
-                   ? payload.error
-                   : (payload.error?.message ?? 'Step failed'),
-      };
-      steps.push({ index: i, appOrigin: step.appOrigin, opId: step.opId, args, ok: false, error, payload });
-      if (!firstError) firstError = error;
-      if (onError === 'stop') break;
-      continue;
-    }
-
-    steps.push({ index: i, appOrigin: step.appOrigin, opId: step.opId, args, ok: true, payload });
-    lastOkPayload = payload;
   }
 
   const okCount     = steps.filter((s) => s.ok).length;

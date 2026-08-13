@@ -182,11 +182,24 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `installAgent` | add | ✅ | · | · | · | ✅ | ✅ |  |
 |  | `listDataVersions` | list | ✅ | · | · | · | · | · |  |
 |  | `restoreDataVersion` | update | ✅ | · | · | · | ✅ | ✅ |  |
+| **params** | `set-param` | set-param | · | · | · | · | · | · |  |
+|  | `get-param` | get-param | · | · | · | · | · | · |  |
+|  | `list-user-params` | list-user-params | · | · | · | · | · | · |  |
+|  | `restore-probe` | restore-probe | · | · | · | · | · | · |  |
+|  | `restore-merge` | restore-merge | · | · | · | · | · | · |  |
+|  | `restore-resolve-mismatch` | restore-resolve-mismatch | · | · | · | · | · | · |  |
 |---|---|---|---|---|---|---|---|---|---|
-| **totals** | 178 ops | | 175 | 128 | 34 | 3 | 85 | 48 | |
+| **totals** | 184 ops | | 175 | 128 | 34 | 3 | 85 | 48 | |
+
+### Flows
+
+| app | flow | kind | scope | steps | declared effects |
+|---|---|---|---|---|---|
+| **stoop** | `joinGroup` | wizard | device | 3 |  |
+| **params** | `restore-settings` | ceremony | device | 3 | write:settings, overwrite:pod-settings |
 
 ## Gaps for the gate/LLM + inline-menu work
 
-- **missing gate** (144/178): basis:help, basis:newthread, basis:help-with, basis:threads, basis:startDm, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:compare, basis:signin, basis:reset-thread, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, basis:apps, basis:sendto, household:reassign, tasks:getTaskSnapshot, tasks:removeTask, tasks:attachTaskGrant …
-- **missing inline** (130/178): basis:help, basis:newthread, basis:help-with, basis:threads, basis:startDm, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:compare, basis:signin, basis:reset-thread, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, basis:apps, basis:sendto, household:addItem, household:listOpen, household:help, household:addTask …
-- **missing chat** (3/178): folio:deleteFromPod, folio:deleteLocally, folio:forceRepush
+- **missing gate** (150/184): basis:help, basis:newthread, basis:help-with, basis:threads, basis:startDm, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:compare, basis:signin, basis:reset-thread, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, basis:apps, basis:sendto, household:reassign, tasks:getTaskSnapshot, tasks:removeTask, tasks:attachTaskGrant …
+- **missing inline** (136/184): basis:help, basis:newthread, basis:help-with, basis:threads, basis:startDm, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:compare, basis:signin, basis:reset-thread, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, basis:apps, basis:sendto, household:addItem, household:listOpen, household:help, household:addTask …
+- **missing chat** (9/184): folio:deleteFromPod, folio:deleteLocally, folio:forceRepush, params:set-param, params:get-param, params:list-user-params, params:restore-probe, params:restore-merge, params:restore-resolve-mismatch

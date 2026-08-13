@@ -11,8 +11,9 @@
 import { describe, it, expect, vi } from 'vitest';
 
 import {
-  runCompositeOp, verifyComposite, resolvePath,
+  runCompositeOp, verifyComposite, resolvePath, compileCompositeToFlow,
 } from '../src/composite.js';
+import { verifyFlow } from '@onderling/app-manifest';
 import { runCompositeDispatch } from '../src/dispatch.js';
 import { mergeManifests } from '../src/manifestMerge.js';
 import { resolveDispatch } from '../src/router.js';
@@ -192,6 +193,38 @@ describe('runCompositeOp — onError', () => {
     const result = await runCompositeOp(failingOp('stop'), cs);
     expect(result.ok).toBe(false);
     expect(result.error.message).toBe('exploded');
+  });
+});
+
+// ── compileCompositeToFlow (the reconciliation: ONE pipeline engine) ──
+
+describe('compileCompositeToFlow — a composite is linear sugar over the flow grammar', () => {
+  const op = {
+    id: 'demo', verb: 'list',
+    steps: [
+      { appOrigin: 'a', opId: 'create', args: { title: 'x' } },
+      { appOrigin: 'b', opId: 'complete', argRef: { from: 0, path: 'item.id' } },
+    ],
+  };
+
+  it('the compiled flow PASSES the flow verifier (structure, bindings, acyclicity)', () => {
+    const flow = compileCompositeToFlow(op, { threadId: 'th-1' });
+    // qualified ids resolve like the merged catalog's prefix-on-collision keys
+    const ops = new Map([['a/create', { id: 'a/create', params: [] }], ['b/complete', { id: 'b/complete', params: [] }]]);
+    const r = verifyFlow(flow, { ops });
+    expect(r.problems ?? r.errors ?? []).toEqual([]);
+    expect(r.ok).toBe(true);
+  });
+
+  it('maps steps linearly with qualified op ids + an OPTIONAL threading binding', () => {
+    const flow = compileCompositeToFlow(op, { threadId: 'th-1' });
+    expect(flow.steps.map((s) => s.op)).toEqual(['a/create', 'b/complete']);
+    expect(flow.steps[0].bind.threadId).toEqual({ value: 'th-1' });
+    expect(flow.steps[0].bind.title).toEqual({ value: 'x' });
+    expect(flow.steps[1].bind.id).toEqual({ from: '$steps.s0.item.id', optional: true });
+    // stop-mode routing: error ends the flow, everything else proceeds
+    expect(flow.steps[0].next).toEqual({ error: null, else: 's1' });
+    expect(flow.steps[1].next).toEqual({ error: null, else: null });
   });
 });
 

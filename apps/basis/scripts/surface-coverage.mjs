@@ -23,6 +23,8 @@ const SPECS = [
   { name: 'folio',       path: '../src/core/manifests/mockManifests.js',  pick: (m) => m.mockFolioManifest },
   { name: 'calendar',    path: '../../calendar/manifest.js',              pick: (m) => m.calendarManifest },
   { name: 'agents',      path: '../../agents/manifest.js',                pick: (m) => m.agentsManifest },
+  // params — the register's meta-ops + the restore-settings flow (flows ride the snapshot too)
+  { name: 'params',      path: '../src/v2/paramsManifest.js',             pick: (m) => m.paramsManifest },
 ];
 
 const sources = [];

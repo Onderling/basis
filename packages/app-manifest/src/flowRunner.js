@@ -97,7 +97,7 @@ export function createFlowRunner({ callSkill, saveInstance, genId, isSecretKind,
         if (b.value !== undefined) { args[name] = b.value; continue; }
         const r = resolvePath(b.from ?? b.ref, { flow, instance, transient });
         if (r.found) args[name] = r.value;
-        else (missing ??= []).push(name);
+        else if (!b.optional) (missing ??= []).push(name);
       }
       // input satisfies THIS step only (the awaiting-input round-trip); never persisted here
       if (input && firstStep) Object.assign(args, input);

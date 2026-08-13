@@ -51,9 +51,26 @@ export function renderCoverage(manifestOrList) {
       rows.push(row);
     }
   }
-  const totals = { ops: rows.length };
+  // Flows are part of the declared surface too — one row per flow so the snapshot
+  // records which processes exist, their scope, and their declared effects.
+  const flows = [];
+  for (const m of manifests.filter(Boolean)) {
+    const app = m.appId ?? m.id ?? '';
+    for (const f of (Array.isArray(m.flows) ? m.flows : [])) {
+      flows.push({
+        app,
+        flow:    f.id,
+        kind:    f.kind ?? '',
+        scope:   f.scope ?? 'device',
+        steps:   Array.isArray(f.steps) ? f.steps.length : 0,
+        effects: (Array.isArray(f.effects) ? f.effects : [])
+          .map((e) => `${e.kind}:${e.target ?? ''}`),
+      });
+    }
+  }
+  const totals = { ops: rows.length, flows: flows.length };
   for (const surf of SURFACES) totals[surf.key] = rows.filter((r) => r[surf.key]).length;
-  return { surfaces: SURFACES.map(({ key, label }) => ({ key, label })), rows, totals };
+  return { surfaces: SURFACES.map(({ key, label }) => ({ key, label })), rows, flows, totals };
 }
 
 /** Ops missing a given surface — the work list for that surface (e.g. coverageGaps(cov, 'gate')). */
@@ -79,5 +96,15 @@ export function formatCoverageMarkdown(coverage, { mark = '✅', blank = '·' } 
   }
   out.push(`|${'---|'.repeat(cols.length + 4)}`);
   out.push(`| **totals** | ${totals.ops} ops | | ${surfaces.map((s) => totals[s.key]).join(' | ')} | |`);
+  const flows = coverage.flows ?? [];
+  if (flows.length) {
+    out.push('', '### Flows', '', '| app | flow | kind | scope | steps | declared effects |', `|${'---|'.repeat(6)}`);
+    let last = null;
+    for (const f of flows) {
+      const app = f.app !== last ? `**${f.app || '—'}**` : '';
+      last = f.app;
+      out.push(`| ${app} | \`${f.flow}\` | ${f.kind} | ${f.scope} | ${f.steps} | ${f.effects.join(', ')} |`);
+    }
+  }
   return out.join('\n');
 }

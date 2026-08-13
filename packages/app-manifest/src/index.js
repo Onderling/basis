@@ -161,6 +161,9 @@ export { renderCoverage, coverageGaps, formatCoverageMarkdown } from './renderCo
 // flows — the declared multi-step layer above ops (L7): the DAG declaration +
 // the load-time verifier (bindings resolvable, kinds/secrets rules, acyclic).
 export { verifyFlow, verifyFlows } from './flows.js';
+// flowRunner — executes a declared flow as a resumable instance (pure, DI'd; the
+// secrets rule at runtime: saveInstance never sees secret material).
+export { createFlowRunner } from './flowRunner.js';
 
 // JSDoc typedefs live here; importing the module forces it to be loaded
 // so tooling can resolve type-only references.

@@ -216,6 +216,22 @@ describe('deriveRoster', () => {
       expect(a.circleAddress).toBe(addrOf(5));
       expect(a.circleAddresses).toEqual([addrOf(5), addrOf(6)]);
     });
+
+    it('maxDevicesPerMember caps the projected set — earliest devices keep their place', () => {
+      const redemptions = [
+        redemption({ redeemedBy: 'B', circleAddress: addrOf(1), circleAddressProof: proofOf(1) }),
+        redemption({ redeemedBy: 'B', circleAddress: addrOf(2), circleAddressProof: proofOf(2) }),
+        redemption({ redeemedBy: 'B', circleAddress: addrOf(3), circleAddressProof: proofOf(3) }),
+      ];
+      const capped = deriveRoster({ redemptions, rules: { maxDevicesPerMember: 2 } });
+      expect(capped.find((m) => m.webid === 'B').circleAddresses).toEqual([addrOf(1), addrOf(2)]);
+      // cap 1 = the "no multiple devices" circle: only the primary projects
+      const single = deriveRoster({ redemptions, rules: { maxDevicesPerMember: 1 } });
+      expect(single.find((m) => m.webid === 'B').circleAddresses).toEqual([addrOf(1)]);
+      // no cap declared (or nonsense) → unlimited, exactly as before
+      const open = deriveRoster({ redemptions, rules: { maxDevicesPerMember: 0 } });
+      expect(open.find((m) => m.webid === 'B').circleAddresses).toEqual([addrOf(1), addrOf(2), addrOf(3)]);
+    });
   });
 
   // ── The membership SPINE folds DENY-WINS on top of the trail head (the safe cutover) ──────────────────

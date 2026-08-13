@@ -64,6 +64,11 @@ export function deriveRoster({
   // exit rule retires. FALSE (legacy store path / compositions where author==ref is the global-identity
   // convention) keeps the pre-rider semantics: wall-clock exits + the strengthen-only spine overlay.
   foldAuthoritative = false,
+  // The circle's `group-rules` blob (latest, or null). Read for `maxDevicesPerMember` — the
+  // per-member device ceiling, a CIRCLE policy ("some circles disallow multiple devices"),
+  // enforced HERE because the fold is where the address set becomes authoritative: an address
+  // beyond the cap simply never projects, on every member's device, whatever software announced it.
+  rules = null,
 } = {}) {
   const displayByWebid = new Map();
   for (const m of memberMapForDisplay ?? []) {
@@ -236,6 +241,13 @@ export function deriveRoster({
     const proven = provenAddresses.get(rec.webid);
     const addressSet = primary ? [primary] : [];
     if (proven) for (const a of proven) { if (a !== primary) addressSet.push(a); }
+    // maxDevicesPerMember — the circle's per-member device ceiling. Deterministic on every fold:
+    // primary first, then set insertion order (trail order), truncated at the cap — so the
+    // EARLIEST-proven devices keep their place and a device beyond the cap never projects.
+    // No cap declared → unlimited (the default; the knob is the circle's to set).
+    const cap = Number.isInteger(rules?.maxDevicesPerMember) && rules.maxDevicesPerMember > 0
+      ? rules.maxDevicesPerMember : null;
+    if (cap && addressSet.length > cap) addressSet.length = cap;
     if (addressSet.length) merged.circleAddresses = addressSet;
     out.push(merged);
   }

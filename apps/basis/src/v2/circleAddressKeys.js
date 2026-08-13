@@ -92,9 +92,23 @@ export function circleAddressSetOf(member) {
  * @returns {boolean}
  */
 export function hasProvenCircleAddress(member) {
-  if (typeof member?.circleAddressProof !== 'string' || !member.circleAddressProof) return false;
   const signing = circleSigningKeyOf(member);
-  return typeof signing === 'string' && !!signing;
+  if (typeof member?.circleAddressProof === 'string' && member.circleAddressProof
+    && typeof signing === 'string' && signing) return true;
+  // SET-AWARENESS (add-a-device): a member whose PRIMARY slot is a legacy proofless row but whose
+  // set holds a proven extra has still demonstrated per-circle signing — the extra only exists
+  // because its proof verified. Derived roster rows carry extras as fold-verified strings (the
+  // primary leads the set, so a set of exactly [primary] proves nothing new); trail rows carry
+  // {address, proof} pairs, counted only with their proof (deny-by-default).
+  const set = member?.circleAddresses;
+  if (Array.isArray(set)) {
+    for (const e of set) {
+      if (typeof e === 'string' && e && e !== member?.circleAddress) return true;
+      if (e && typeof e === 'object' && typeof e.address === 'string' && e.address
+        && typeof e.proof === 'string' && e.proof) return true;
+    }
+  }
+  return false;
 }
 
 /**

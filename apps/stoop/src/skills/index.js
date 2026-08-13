@@ -872,10 +872,20 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
   //   2. back-compat — any admin/coordinator-role MemberMap entry (implicit
   //      founder for legacy circles with no rules item; additive, never a filter).
   const founderWebids = new Set();
+  // The circle's policy blob rides the same read: the LATEST rules item's `source.rules`
+  // (same tie-break as _findLatestGroupRules) feeds the fold's maxDevicesPerMember cap.
+  let latestRulesItem = null;
   try {
     const rules = await store.listOpen({ type: 'group-rules' });
     for (const it of rules ?? []) {
       if (it?.source?.groupId !== groupId) continue;
+      if (typeof it?.source?.rules === 'object' && it.source.rules) {
+        if (!latestRulesItem
+          || (it.addedAt ?? 0) > (latestRulesItem.addedAt ?? 0)
+          || ((it.addedAt ?? 0) === (latestRulesItem.addedAt ?? 0) && it.id > latestRulesItem.id)) {
+          latestRulesItem = it;
+        }
+      }
       if (it?.source?.mirrored === true) continue;
       if (typeof it?.addedBy === 'string' && it.addedBy) founderWebids.add(it.addedBy);
     }
@@ -967,6 +977,7 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
     // Authoritative ONLY on the rail path: its statements carry verified per-circle-key bindings. The
     // legacy store path keeps the pre-rider semantics until stoop dissolves.
     foldAuthoritative: typeof membershipRead === 'function',
+    rules: latestRulesItem?.source?.rules ?? null,
     // A removal/leave recorded for THIS circle drops the member from THIS circle only. The
     // trail is already circle-scoped, so nothing here can reach a circle you also share with them.
     exits: await readCircleExits({ store, groupId }),

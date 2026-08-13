@@ -42,9 +42,10 @@ export const householdManifest = {
   itemTypes: [...LIST_TYPES, 'task', 'contact', 'note'],
 
   // B · Layer 1 — domain (non-atom) verbs this manifest ships (F-SP1-e).
-  // `help` (meta) + `register` (identity act, not a plain `add contact`).
+  // `help` (meta) + `register` (identity act, not a plain `add contact`) +
+  // `enroll-device` (the add-a-device ceremony — an identity act on the host).
   // Every other op maps to an SDK atom; the `{atoms:true}` validator enforces it.
-  domainVerbs: ['help', 'register'],
+  domainVerbs: ['help', 'register', 'enroll-device'],
 
   // B · Layer 1 — the (verb × noun) capability surface (PLAN-capability-arc.md).
   // Each key is one of `itemTypes`; each `atoms` entry is a CANONICAL SDK atom
@@ -283,6 +284,47 @@ export const householdManifest = {
           },
         },
       },
+    },
+    {
+      id:   'enrollDevice',
+      verb: 'enroll-device',
+      // The add-a-device CEREMONY (a host identity act, like restoreOwnerPhrase): restores the
+      // owner root from the phrase — typed on THIS, the NEW device — and writes this install's
+      // delegation blob, so the next boot derives per-circle keys from the delegation seed and
+      // presents this device's own address in every circle. The phrase is SECRET-kind: the flow
+      // pauses for it and the runner never persists it.
+      params: [
+        { name: 'mnemonic', kind: 'secret', required: true },
+        { name: 'label',    kind: 'string' },
+      ],
+      // CEREMONY-ONLY: reached through the enroll-device flow (the first-run/settings shells
+      // start it); no chat/slash surface — a phrase does not belong in a chat box.
+      surfaces: {},
+    },
+  ],
+
+  // ── FLOWS — the enroll-a-device ceremony, BORN a flow (the add-a-device model): one declared
+  // step whose op does the whole ceremony; the reload after it lets boot finish the job by
+  // existing machinery (derivation cutover · registry record self-heal · reopen · re-announce).
+  // Declared effects are the consent surface: what this ceremony changes.
+  flows: [
+    {
+      id: 'enroll-device',
+      kind: 'ceremony',
+      scope: 'device',
+      labelKey: 'circle.enroll.title',
+      effects: [
+        { kind: 'overwrite', target: 'owner-root' },
+        { kind: 'write',     target: 'device-delegation' },
+        { kind: 'write',     target: 'registry' },
+      ],
+      produces: [
+        { name: 'deviceId',       kind: 'string',  from: '$steps.ceremony.deviceId' },
+        { name: 'reloadRequired', kind: 'boolean', from: '$steps.ceremony.reloadRequired' },
+      ],
+      steps: [
+        { id: 'ceremony', op: 'enrollDevice', labelKey: 'circle.enroll.ceremony' },
+      ],
     },
   ],
 

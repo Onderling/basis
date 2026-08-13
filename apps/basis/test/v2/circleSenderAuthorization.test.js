@@ -227,6 +227,29 @@ describe('the transitional set — members still allowed by their canonical key 
     expect(auth.authorizeSender({ senderKey: 'ghosted-identity', ownAddress: OURS_IN_BUURT }).allow).toBe(true);
     expect(auth.snapshotFor(OURS_IN_BUURT).canonicalOnly).toBe(2);
   });
+
+  it('SET-AWARENESS: a proven EXTRA closes the canonical door even when the primary is proofless', () => {
+    // Add-a-device: a legacy proofless primary + a fold-verified extra (a second device) means the
+    // member HAS demonstrated per-circle signing — their canonical key must stop being accepted.
+    const auth = createCircleSenderAuthorization();
+    const twoDevices = {
+      webid: 'bram', pubKey: 'bram-identity',
+      circleAddress: 'bram-legacy-primary',                       // no proof on the primary
+      circleAddresses: ['bram-legacy-primary', 'bram-device-2'],  // fold-verified extra
+    };
+    auth.recordCircleRoster({ circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [twoDevices] });
+    expect(auth.authorizeSender({ senderKey: 'bram-identity', ownAddress: OURS_IN_BUURT }).allow).toBe(false);
+    // …while both device addresses speak
+    expect(auth.authorizeSender({ senderKey: 'bram-legacy-primary', ownAddress: OURS_IN_BUURT }).allow).toBe(true);
+    expect(auth.authorizeSender({ senderKey: 'bram-device-2', ownAddress: OURS_IN_BUURT }).allow).toBe(true);
+    // a set of exactly [primary] proves nothing new — the canonical door stays open
+    const onlyPrimary = {
+      webid: 'cas', pubKey: 'cas-identity',
+      circleAddress: 'cas-legacy', circleAddresses: ['cas-legacy'],
+    };
+    auth.recordCircleRoster({ circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [onlyPrimary] });
+    expect(auth.authorizeSender({ senderKey: 'cas-identity', ownAddress: OURS_IN_BUURT }).allow).toBe(true);
+  });
 });
 
 describe('ADVERSARIAL — the three ways someone tries to speak in a circle they may not', () => {

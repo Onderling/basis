@@ -4937,5 +4937,9 @@
       "text": "Tap Start to get going; once you're in, open the chat (← chat) and run /restore-from-mnemonic to swap in your recovery phrase.  A boot-time restore lands in a future update.",
       "doc": "Fallback notice body."
     }
+  },
+  "enroll": {
+    "title": "Add this device",
+    "ceremony": "Enrolling this device"
   }
 }

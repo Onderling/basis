@@ -38,6 +38,12 @@ export { Bootstrap }          from './identity/Bootstrap.js';
 // identity step 3 — per-circle addresses (unlinkability layer)
 export { deriveCircleSeed, deriveCircleAddress, circleIdentity } from './identity/circleAddress.js';
 export { circleLinkMessage, signCircleLink, signCircleLinkFromSeed, verifyCircleLink } from './identity/circleLink.js';
+// The per-device derivation root + the root-signed delegation record (add-a-device):
+// owner root → profile seed → DEVICE seed → per-circle seed; each device presents distinct addresses.
+export {
+  deriveDeviceSeed, deviceDelegationPubKey, deviceDelegationMessage,
+  signDeviceDelegation, verifyDeviceDelegation,
+} from './identity/deviceDelegation.js';
 export {
   CIRCLE_ADDRESS_ANNOUNCE_KIND, circleAddressAnnouncement, ownCircleAddressAnnouncement,
   ownCircleAddressAnnouncementFromSeed, verifyCircleAddressAnnouncement,

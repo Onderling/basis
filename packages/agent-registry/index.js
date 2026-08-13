@@ -39,6 +39,12 @@ export {
   circleMembershipsOf, circleMembershipOf, circleKeyRefOf, circleMembershipsFromProperties,
   setCircleMembership,
 } from './src/circleMembership.js';
+// The enrolled-devices map (add-a-device): root-signed delegation records per deviceId — the
+// auditable device list + the revocation tombstone's home. Same construction as circleMembership.
+export {
+  DEVICE_DELEGATIONS_KEY, isDeviceDelegationRecord, normaliseDeviceDelegation,
+  deviceDelegationsOf, deviceDelegationOf, setDeviceDelegation,
+} from './src/deviceDelegations.js';
 // identity step 5A — encrypted-file/DB export of the profile set
 export { exportProfileRegistry, importProfileRegistry, restoreProfilesInto } from './src/exportRegistry.js';
 export { registerAgentBundle } from './src/registerAgentBundle.js';

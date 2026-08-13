@@ -4937,5 +4937,9 @@
       "text": "Tik op Start om te beginnen; open daarna de chat (← chat) en gebruik /restore-from-mnemonic om je herstelzin in te laden.  Herstellen bij het opstarten komt in een latere update.",
       "doc": "Fallback-melding tekst."
     }
+  },
+  "enroll": {
+    "title": "Dit apparaat toevoegen",
+    "ceremony": "Dit apparaat wordt toegevoegd"
   }
 }

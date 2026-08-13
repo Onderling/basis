@@ -16,13 +16,26 @@
  * Generic over every app manifest that carries `flows` — a second flow is covered the day it is
  * declared. The per-flow exported-steps equivalence is looked up in EXPORTED_STEPS below; a flow
  * with no entry there fails, because a declaration nothing pins is a declaration free to drift.
+ *
+ * TWO GRAMMARS, one guard: the checks above describe the LEGACY wizard shape (`flow.opId` +
+ * linear string `next` + a state module the declaration must match). The flows SUBSTRATE's shape
+ * (op-steps, outcome→next edges, bindings — the ratified model) is verified by the substrate's
+ * own `verifyFlow` instead, and needs NO exported-steps pinning: the declaration IS the machine
+ * the one runner executes, so the machine-vs-declaration drift this guard exists to catch cannot
+ * occur for it by construction. A flow is treated as substrate-shaped when any step carries
+ * `op`/`flow` or an object `next`.
  */
 import { describe, it, expect } from 'vitest';
 import { readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { verifyFlow } from '../packages/app-manifest/src/flows.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+
+/** Substrate-shaped (the ratified op-step grammar) vs the legacy wizard shape. */
+const isSubstrateFlow = (flow) => (flow.steps ?? []).some((s) =>
+  typeof s?.op === 'string' || typeof s?.flow === 'string' || (s?.next != null && typeof s.next === 'object'));
 
 /** flowId → async loader of the state module's exported step list. */
 const EXPORTED_STEPS = {
@@ -53,10 +66,21 @@ describe('G-S3 — flow integrity', () => {
   it('every declared flow: unique step ids, acyclic + fully-reachable next chain, opId declared', async () => {
     for (const { app, manifest } of await manifestsWithFlows()) {
       const opIds = new Set((manifest.operations ?? []).map((o) => o.id));
+      const opsMap = new Map((manifest.operations ?? []).map((o) => [o.id, o]));
+      const flowsIndex = new Map((manifest.flows ?? []).map((f) => [f.id, f]));
       for (const flow of manifest.flows) {
         expect(flow.id, `${app}: a flow needs an id`).toBeTruthy();
         expect(Array.isArray(flow.steps) && flow.steps.length > 0,
           `${app}/${flow.id}: a flow with no steps declares nothing`).toBe(true);
+
+        if (isSubstrateFlow(flow)) {
+          // The substrate's own verifier covers the same promises for its grammar:
+          // acyclicity + reachability over outcome edges, ops declared, bindings resolvable.
+          const r = verifyFlow(flow, { ops: opsMap, flows: flowsIndex });
+          expect(r.problems, `${app}/${flow.id}: verifyFlow`).toEqual([]);
+          expect(r.ok).toBe(true);
+          continue;
+        }
 
         const ids = flow.steps.map((s) => s.id);
         expect(new Set(ids).size, `${app}/${flow.id}: duplicate step ids`).toBe(ids.length);
@@ -85,6 +109,9 @@ describe('G-S3 — flow integrity', () => {
   it('declared steps ≡ the state module\'s exported steps (nothing pins a drift-free declaration but this)', async () => {
     for (const { app, manifest } of await manifestsWithFlows()) {
       for (const flow of manifest.flows) {
+        // Substrate-shaped flows have no separate state module — the declaration is the machine
+        // (the one runner executes it), so there is nothing external to pin it against.
+        if (isSubstrateFlow(flow)) continue;
         const load = EXPORTED_STEPS[flow.id];
         expect(load, `${app}/${flow.id}: no exported-steps entry in flowIntegrity.test.mjs — add one; `
           + 'a declaration nothing pins is a declaration free to drift').toBeTruthy();

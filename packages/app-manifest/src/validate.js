@@ -68,9 +68,13 @@ const SETTING_SCOPE_SET = new Set(SETTING_SCOPES);
 // 'webid' input kinds; reserved 'file' + 'image' for the
 // upload path.  All four pass through the validator forward-additively
 // (older manifests using just string/number/boolean/enum still work).
+// The flows substrate added 'secret' (a value the runner must never persist — the flow verifier
+// enforces by-ref-only bindings for it; shells render it as a masked input) and 'object' (a
+// structured argument, e.g. the restore-merge choices map — no generic form; bespoke or bound).
 const PARAM_KINDS = new Set([
   'string', 'number', 'boolean', 'enum',
   'date', 'webid', 'file', 'image',
+  'secret', 'object',
 ]);
 
 /**

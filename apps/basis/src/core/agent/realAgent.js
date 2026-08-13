@@ -26,7 +26,7 @@
 import {
   Agent, AgentIdentity, Bootstrap, InternalBus, InternalTransport, DataPart, TokenRegistry,
   PolicyEngine, TrustRegistry, deriveCircleAddress, circleAddressSigner, signCircleLinkFromSeed,
-  circleIdentity,
+  circleIdentity, signDeviceDelegation, deviceDelegationPubKey,
 } from '@onderling/core';
 import {
   useCircleSigningIdentity, installCircleSigningIdentities,
@@ -43,7 +43,7 @@ import { makeMembershipRail, makeMembershipEmitter } from '../../v2/membershipRa
 import { makeTaskRail, makeTaskEmitter, routeTaskMirror, TASK_LANE_TYPES } from '../../v2/taskRail.js'; // the content re-root — task snapshots ride the device log
 import { makeChatRail, makeChatEmitter } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
 import { paramsManifest } from '../../v2/paramsManifest.js';   // #36 — the params op contract (gates the waist branch)
-import { VaultMemory, VaultLocalStorage, VaultEncrypted, migrateVaultToEncrypted } from '@onderling/vault';
+import { VaultMemory, VaultLocalStorage, VaultEncrypted, migrateVaultToEncrypted, seedFromString } from '@onderling/vault';
 import { wireSkill } from '@onderling/sdk';
 import { createSecureMeshAgent } from '@onderling/secure-agent';
 import { createBrowserMultiCircleTasksAgent } from '@onderling-app/tasks/browser';
@@ -78,6 +78,7 @@ import {
   driversFromProperties,
   setCircleMembership as registrySetCircleMembership,
   circleMembershipsOf,
+  deviceDelegationOf, setDeviceDelegation as registrySetDeviceDelegation,
   isRequestable,
   effectiveProperties,
 } from '@onderling/agent-registry';
@@ -125,7 +126,7 @@ async function restoreOrGenerate(vault) {
   return AgentIdentity.generate(vault);
 }
 
-import { restoreOwnerRoot } from './ownerRootRestore.js';
+import { restoreOwnerRoot, DEVICE_DELEGATION_VAULT_KEY } from './ownerRootRestore.js';
 import { ensureOwnerRoot, pickRootKeyStore } from './ownerRootCustody.js';
 import { makeAgentTrailEntry } from '../../eventLog.js';
 import {
@@ -351,6 +352,28 @@ export async function createRealHouseholdAgent(opts = {}) {
     await AgentIdentity.fromSeed(defaultProfileSeed, chatVault);
   }
 
+  // ── ADD-A-DEVICE: the device derivation root ─────────────────────────────────────────────────
+  // An ENROLLED device (the delegation blob present — written sealed by the enrollment ceremony,
+  // see ownerRootRestore.js) derives its PER-CIRCLE keys from its DELEGATION seed instead of the
+  // profile seed: every device of one person then presents a DISTINCT address per circle (the
+  // roster row's address set), and revoking one device can never touch another device's keys.
+  // An unenrolled install — the first device, every pre-existing install — keeps the profile
+  // seed: nothing re-keys. The chat identity (the member's webid) stays PROFILE-derived on every
+  // device: the member is one; only the circle addresses are per-device.
+  let deviceDerivationSeed = defaultProfileSeed;
+  let enrolledDevice = null;   // { deviceId, label? } when this boot is an enrolled-device boot
+  try {
+    let blob = await chatVault.get(DEVICE_DELEGATION_VAULT_KEY);
+    if (typeof blob === 'string') { try { blob = JSON.parse(blob); } catch { blob = null; } }
+    if (blob && typeof blob === 'object' && typeof blob.seed === 'string' && typeof blob.deviceId === 'string') {
+      const decoded = seedFromString(blob.seed);
+      if (decoded instanceof Uint8Array && decoded.length === 32) {
+        deviceDerivationSeed = decoded;
+        enrolledDevice = { deviceId: blob.deviceId, ...(blob.label ? { label: blob.label } : {}) };
+      }
+    }
+  } catch { /* unenrolled */ }
+
   // Decision 4 — the per-circle SIGNING identity, one per circle, memoised.
   //
   // Deterministic from the profile seed, so the vault is deliberately EPHEMERAL: nothing here is
@@ -359,11 +382,11 @@ export async function createRealHouseholdAgent(opts = {}) {
   const circleIdentities = new Map();   // circleId → Promise<AgentIdentity>
   const circleIdentityFor = (circleId) => {
     if (!circleIdentities.has(circleId)) {
-      circleIdentities.set(circleId, circleIdentity(defaultProfileSeed, circleId, new VaultMemory()));
+      circleIdentities.set(circleId, circleIdentity(deviceDerivationSeed, circleId, new VaultMemory()));
     }
     return circleIdentities.get(circleId);
   };
-  const circleAddressFor = (circleId) => deriveCircleAddress(defaultProfileSeed, circleId);
+  const circleAddressFor = (circleId) => deriveCircleAddress(deviceDerivationSeed, circleId);
   const sa = await createSecureMeshAgent({
     bus,
     vault:               chatVault,
@@ -850,6 +873,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // that is where write-on-join records {handle,address} (id:'default').
     readSelfCircleMemberships = async () => circleMembershipsOf((await agentsRegistry.lookup('default')) ?? {});
 
+
     // Patch the wrapped-key POINTER into the default profile's membership record for a circle — a
     // FACET MERGE (the pure setter keeps handle/address). No-op if there is no record yet (nothing to
     // attach to) or the ref is absent. Only touches the OWN record; never carries a secret — `keyRef` is a
@@ -1058,6 +1082,30 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (!(await agentsRegistry.lookup('default'))) await agentsProfiles.create({ profileId: 'default', name: 'default' });
     } catch { /* degraded (no owner root / registry) — the on-consent persist simply stays best-effort */ }
 
+    // The enrollment's REGISTRY RECORD self-heals at boot (idempotent, AFTER the default profile is
+    // ensured): an enrolled device whose delegation is not yet on the owner's registry mints +
+    // root-signs it now — the root is resident under current custody, so the ceremony itself never
+    // had to write a registry it could not yet see (pre-reload it was still the old install's).
+    // Best-effort: a failed write retries on the next boot; circles never DEPEND on the record
+    // (every address still proves itself at the roster).
+    if (enrolledDevice) {
+      try {
+        const cur = await agentsRegistry.lookup('default');
+        if (cur && !deviceDelegationOf(cur, enrolledDevice.deviceId)) {
+          const record = signDeviceDelegation(ownerRoot.secret, {
+            profileId: 'default',
+            deviceId:  enrolledDevice.deviceId,
+            pubKey:    deviceDelegationPubKey(deviceDerivationSeed),
+          });
+          if (enrolledDevice.label) record.label = enrolledDevice.label;
+          await agentsRegistry.register({
+            ...cur,
+            properties: registrySetDeviceDelegation(cur.properties ?? {}, enrolledDevice.deviceId, record),
+          });
+        }
+      } catch (err) { console.warn('[enroll] delegation registry record deferred:', err?.message ?? err); }
+    }
+
     /* ─── REQUESTABLE BRIDGE — the HOST-WIRING seam #1 (NOTE-skills-vs-capabilities
      * volleys 2–4 · journey J6) ─────────────────────────────────────────────────
      * A peer (A) invokes a local member's REQUESTABLE offering (a skill-kind driver
@@ -1206,6 +1254,29 @@ export async function createRealHouseholdAgent(opts = {}) {
     try { return [DataPart({ shown: false, mnemonic: ownerRoot.toMnemonic() })]; }
     catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'reveal-failed' })]; }
   }, { visibility: 'trusted' });   // 2.4b — the master recovery phrase: owner-only
+
+  hostAgent.register('enrollDevice', async ({ parts }) => {
+    // The ENROLLMENT CEREMONY (add-a-device): the phrase is typed on THIS — the NEW — device,
+    // never on one that already has authority. Restore the owner root (the same one
+    // implementation both restore doors use) AND write this install's delegation blob, sealed to
+    // the restored root. After the reload, boot does the rest by existing machinery: the
+    // derivation cutover (per-circle keys from the delegation seed), the registry record
+    // self-heal, reopenMemberCircles, and the per-circle boot re-announce that lands this
+    // device's addresses in every roster's set. The phrase itself is never persisted.
+    const mnemonic = String(parts?.[0]?.data?.mnemonic ?? '').trim();
+    const label = typeof parts?.[0]?.data?.label === 'string' ? parts[0].data.label.trim() : '';
+    try {
+      const r = await restoreOwnerRoot({
+        mnemonic, rootKeyStore, chatVault: chatVaultBacking,
+        enrollDevice: { ...(label ? { label } : {}) },
+      });
+      if (!r.ok) {
+        const outcome = (r.code === 'invalid' || r.code === 'empty') ? 'invalid-phrase' : 'error';
+        return [DataPart({ ok: false, outcome, error: r.detail ?? r.code })];
+      }
+      return [DataPart({ ok: true, reloadRequired: true, deviceId: r.deviceId })];
+    } catch (e) { return [DataPart({ ok: false, outcome: 'error', error: e?.message ?? 'enroll-failed' })]; }
+  }, { visibility: 'trusted' });   // overwrites the owner root + enrolls: owner-only
 
   hostAgent.register('restoreOwnerPhrase', async ({ parts }) => {
     const mnemonic = String(parts?.[0]?.data?.mnemonic ?? '').trim();
@@ -2280,7 +2351,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           && typeof realArgs.groupId === 'string' && realArgs.groupId
           && !realArgs.circleAddress) {
         try {
-          realArgs = { ...realArgs, circleAddress: deriveCircleAddress(defaultProfileSeed, realArgs.groupId) };
+          realArgs = { ...realArgs, circleAddress: deriveCircleAddress(deviceDerivationSeed, realArgs.groupId) };
         } catch { /* address derivation is additive — never block the redeem/create */ }
       }
       if (realOpId === 'leaveGroup' && realArgs.confirm !== true) {
@@ -3617,7 +3688,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // The address IS a public key, so registering it on a relay means answering a challenge with the
     // matching private key. This is that signer — it stays beside circleAddressFor because the two are
     // one fact: an address you cannot prove is an address you cannot register.
-    circleAddressSignerFor: (circleId) => circleAddressSigner(defaultProfileSeed, circleId),
+    circleAddressSignerFor: (circleId) => circleAddressSigner(deviceDerivationSeed, circleId),
     // Decision 4 — the per-circle SIGNING identity behind that address, and the one call a shell
     // makes to switch it on. `installCircleIdentities(ids)` must run for every circle this device is
     // in: without it this device cannot OPEN what was sent to its per-circle address, and a shell
@@ -3688,6 +3759,6 @@ export async function createRealHouseholdAgent(opts = {}) {
     // Decision B (SENSITIVE) — sign the cross-circle link challenge with the SOURCE circle's
     // key (seed-derived, no vault) so a "continue as an existing self" claim is PROVABLE. The
     // join wizard passes this on the redeem seam; the admin verifies it before recording.
-    signCircleLink: (circleId, groupId, address) => signCircleLinkFromSeed(defaultProfileSeed, circleId, groupId, address),
+    signCircleLink: (circleId, groupId, address) => signCircleLinkFromSeed(deviceDerivationSeed, circleId, groupId, address),
   };
 }

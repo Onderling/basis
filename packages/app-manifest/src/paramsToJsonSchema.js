@@ -56,6 +56,10 @@ function paramToProperty(p, manifest) {
     // shape so the schema doesn't reject them.
     case 'file':    return extra ? { type: 'object', ...extra } : { type: 'object' };
     case 'image':   return extra ? { type: 'object', ...extra } : { type: 'object' };
+    // flows-substrate kinds: 'secret' is a string the runner never persists (shells mask it —
+    // the writeOnly hint is the JSON-schema spelling of that); 'object' is a structured argument.
+    case 'secret':  return extra ? { type: 'string', writeOnly: true, ...extra } : { type: 'string', writeOnly: true };
+    case 'object':  return extra ? { type: 'object', ...extra } : { type: 'object' };
     default:
       throw new Error(
         `paramsToJsonSchema: unknown kind "${p?.kind}" for param "${p?.name}"`,

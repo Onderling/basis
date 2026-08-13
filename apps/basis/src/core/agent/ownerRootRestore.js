@@ -29,12 +29,36 @@
  * install would be picked up on the next boot in preference to the restored one.
  */
 
-import { Bootstrap } from '@onderling/core';
+import { Bootstrap, deriveDeviceSeed } from '@onderling/core';
 import { VaultEncrypted, migrateVaultToEncrypted } from '@onderling/vault';
 import { loadProfile } from '@onderling/agent-registry';
 
 /** The profile the chat identity is derived from. */
 export const DEFAULT_PROFILE = 'default';
+
+/**
+ * The sealed-vault key holding an enrolled device's delegation: `{ seed, deviceId, label? }` with
+ * `seed` base64url. Its PRESENCE is what makes a boot an ENROLLED boot: per-circle keys derive
+ * from this seed instead of the profile seed, so this device presents its own address in every
+ * circle (the add-a-device model). Written only here, through the vault-at-rest layer.
+ */
+export const DEVICE_DELEGATION_VAULT_KEY = 'device-delegation-seed';
+
+const _b64url = (bytes) => {
+  let s = '';
+  for (const b of bytes) s += String.fromCharCode(b);
+  // btoa is absent on some RN runtimes; Buffer is absent on the web — take whichever exists.
+  const b64 = typeof btoa === 'function' ? btoa(s) : Buffer.from(bytes).toString('base64');
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+
+/** A fresh enrollment id — crypto.randomUUID where available, a random hex fallback elsewhere. */
+const _newDeviceId = () => {
+  try { if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID(); } catch { /* fall through */ }
+  const bytes = new Uint8Array(16);
+  try { crypto.getRandomValues(bytes); } catch { for (let i = 0; i < 16; i += 1) bytes[i] = Math.floor(Math.random() * 256); }
+  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+};
 
 /**
  * Restore an identity from its recovery phrase.
@@ -50,9 +74,18 @@ export const DEFAULT_PROFILE = 'default';
  *                                    (`cc-chat-id:`, unsealed) — this function seals it to the
  *                                    restored root and writes through the sealed layer, so the
  *                                    seed never sits in it as plaintext
- * @returns {Promise<{ok: true, pubKey: string} | {ok: false, code: string, detail?: string}>}
+ * @param {{label?: string}} [a.enrollDevice]
+ *                                    ENROLL this install as a device of the profile (add-a-device):
+ *                                    mints a fresh enrollment deviceId, derives the device's
+ *                                    delegation seed from the restored profile seed, and writes the
+ *                                    delegation blob through the SAME newly-sealed vault — so the
+ *                                    next boot derives per-circle keys from the delegation and this
+ *                                    device presents its own address in every circle. The blob must
+ *                                    be written here, not by the caller: at ceremony time the
+ *                                    caller's live vault wrapper is still sealed to the OLD root.
+ * @returns {Promise<{ok: true, pubKey: string, deviceId?: string} | {ok: false, code: string, detail?: string}>}
  */
-export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault } = {}) {
+export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enrollDevice } = {}) {
   if (typeof mnemonic !== 'string' || !mnemonic.trim()) return { ok: false, code: 'empty' };
   if (!rootKeyStore || !chatVault) return { ok: false, code: 'no-vault' };
 
@@ -77,6 +110,18 @@ export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault } = {
     await migrateVaultToEncrypted({ backing: chatVault, key: atRestKey, fingerprint: root.fingerprint() });
     const sealedChat = new VaultEncrypted({ backing: chatVault, key: atRestKey });
     const { identity } = await loadProfile({ ownerRoot: root, profileId: DEFAULT_PROFILE, vault: sealedChat });
+    // 3. (add-a-device) The enrollment: this install becomes a DEVICE of the profile. The delegation
+    //    seed is deterministic from (phrase, profileId, deviceId) — a ceremony can always re-derive
+    //    it — and lands SEALED to the restored root beside the chat identity.
+    if (enrollDevice) {
+      const deviceId = _newDeviceId();
+      const seed = deriveDeviceSeed(root.deriveAgentSeed(DEFAULT_PROFILE), deviceId);
+      const blob = { seed: _b64url(seed), deviceId };
+      if (typeof enrollDevice.label === 'string' && enrollDevice.label) blob.label = enrollDevice.label;
+      // the vault is a STRING store (VaultEncrypted seals String(value)) — serialize explicitly
+      await sealedChat.set(DEVICE_DELEGATION_VAULT_KEY, JSON.stringify(blob));
+      return { ok: true, pubKey: identity?.pubKey ?? null, deviceId };
+    }
     return { ok: true, pubKey: identity?.pubKey ?? null };
   } catch (err) {
     return { ok: false, code: 'storage', detail: err?.message ?? String(err) };

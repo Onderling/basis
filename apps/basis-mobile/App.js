@@ -15,7 +15,7 @@
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { View, Pressable, Text, StyleSheet, BackHandler, Alert } from 'react-native';
+import { View, Pressable, Text, StyleSheet, BackHandler } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { asyncStorageMappingsStore, MAPPINGS_DEVICE } from './src/core/mappingsStoreRN.js';
@@ -26,6 +26,7 @@ import { ThemeProvider } from './src/screens/v2/themeContext.js';
 
 import ChatScreen from './src/screens/ChatScreen.js';
 import CircleLauncherScreen from './src/screens/v2/CircleLauncherScreen.js';
+import RestoreFlowModal from './src/screens/v2/RestoreFlowModal.js';
 // Delivery honesty (2026-07-28) — the ONE per-message delivery map, lifted here so ChatScreen's
 // peer-router (inbound receipts) and CircleLauncherScreen's bubbles (rendering) share an instance.
 // Two maps would mean receipts advancing a state no bubble reads.
@@ -106,6 +107,9 @@ export default function App() {
   // view as the GESPREK tab (will fill the surface; until then
   // there's a hole where chat used to be reachable as a standalone).
   const [bundle, setBundle] = useState(null);
+  // The restore-settings flow's pending flag — raised by the boot hooks, consumed by the modal
+  // once the bundle is live (React state ordering makes the gate race-free by construction).
+  const [restoreFlowPending, setRestoreFlowPending] = useState(false);
   const [bootError, setBootError] = useState(null);
   // CREATE-side mnemonic display. States:
   //  - 'pending'   — not probed yet (or skipped while bundle still booting).
@@ -464,47 +468,12 @@ export default function App() {
           // The owner-root seed's key door — the OS keystore (Android Keystore / iOS Keychain
           // via expo-secure-store). The phrase itself is never persisted.
           secureStore: SecureStore,
-          // #44 — the restore choices (web parity; the logic lives in the boot gate, these paint).
-          // Coarse: the pod's settings are sealed under another key — three choices, local is default.
-          onSettingsKeyMismatch: ({ overwrite } = {}) => {
-            Alert.alert(
-              t('circle.settings_restore.mismatch_title'),
-              t('circle.settings_restore.mismatch_body'),
-              [
-                { text: t('circle.settings_restore.choice_local'), style: 'cancel' },
-                { text: t('circle.settings_restore.choice_phrase'), onPress: () => setFirstRun('restore') },
-                {
-                  text: t('circle.settings_restore.choice_overwrite'),
-                  style: 'destructive',
-                  onPress: () => Alert.alert(
-                    t('circle.settings_restore.choice_overwrite'),
-                    t('circle.settings_restore.overwrite_warning'),
-                    [
-                      { text: t('circle.settings_restore.choice_local'), style: 'cancel' },
-                      { text: t('circle.settings_restore.choice_overwrite'), style: 'destructive', onPress: () => { overwrite?.().catch(() => {}); } },
-                    ],
-                  ),
-                },
-              ],
-            );
-          },
-          // Per-param merge: one Alert per differing setting (realistically a handful) — cancel keeps
-          // this device's value (which already stands), the action adopts the pod's.
-          onSettingsConflicts: ({ conflicts = [], keepTheirs } = {}) => {
-            const next = (i) => {
-              if (i >= conflicts.length) return;
-              const c = conflicts[i];
-              Alert.alert(
-                t('circle.settings_restore.conflicts_title'),
-                `${c.key}: ${JSON.stringify(c.mine)} ↔ ${JSON.stringify(c.theirs)}`,
-                [
-                  { text: t('circle.settings_restore.done'), style: 'cancel', onPress: () => next(i + 1) },
-                  { text: t('circle.settings_restore.keep_theirs'), onPress: () => { keepTheirs?.(c.key).catch(() => {}); next(i + 1); } },
-                ],
-              );
-            };
-            next(0);
-          },
+          // The restore-settings FLOW (web parity): the boot hooks only raise a flag — they fire
+          // DURING boot, before the bundle exists, and the flow's first act is a waist call. The
+          // modal (gated on the bundle state below) starts the declared flow, whose probe
+          // re-branches; the old per-hook Alert chains are retired with the #44 dialogs.
+          onSettingsKeyMismatch: () => setRestoreFlowPending(true),
+          onSettingsConflicts: () => setRestoreFlowPending(true),
           // SILENT out-of-circle delivery — the writer thunk for the bundle's TIERED "shared with me" store
           // (received sealed copies mirror to the user's pod once signed in; local-only while null). Same
           // thunk the launcher's other tiered stores read (getCirclePodWriter → circlePodWriterRef.current).
@@ -728,6 +697,12 @@ export default function App() {
           kringPolicyPendingStore={kringPolicyPendingStoreRef.current}
           /* no onBack (no chat shell to fall back to) +
              no onChatRoute (the kring view IS the chat, no route). */
+        />
+        <RestoreFlowModal
+          visible={restoreFlowPending && !!bundle}
+          callSkill={bundle?.callSkill}
+          onClose={() => setRestoreFlowPending(false)}
+          onPhrase={startRestore}
         />
       </View>
       </ThemeProvider>

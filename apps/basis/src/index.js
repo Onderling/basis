@@ -127,6 +127,9 @@ export {
 } from './v2/circleStream.js';
 export { agentActivityRows } from './v2/agentActivity.js';
 export { advancedOpRows, advancedParamRows } from './v2/advancedSurface.js';
+// The params manifest carries the restore-settings FLOW declaration — the mobile shell's
+// flow painter reads it (web imports the file directly; same package).
+export { paramsManifest } from './v2/paramsManifest.js';
 // profile-update propagation (Phase-4 Wave B) — the roster "pull-me" signal substrate:
 // the diff comparator, the silent-entry kind, the announce (admin) + receive (member) factories.
 export {

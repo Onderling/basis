@@ -26,7 +26,7 @@
 import {
   Agent, AgentIdentity, Bootstrap, InternalBus, InternalTransport, DataPart, TokenRegistry,
   PolicyEngine, TrustRegistry, deriveCircleAddress, circleAddressSigner, signCircleLinkFromSeed,
-  circleIdentity, signDeviceDelegation, deviceDelegationPubKey,
+  circleIdentity, signDeviceDelegation, deviceDelegationPubKey, deriveDeviceSeed,
 } from '@onderling/core';
 import {
   useCircleSigningIdentity, installCircleSigningIdentities,
@@ -854,6 +854,9 @@ export async function createRealHouseholdAgent(opts = {}) {
   // is scoped) so the restore-and-open boot loop can enumerate this device's circles. Default → none, so a
   // degraded/bare registry simply re-opens nothing rather than throwing at boot.
   let readSelfCircleMemberships = async () => ({});
+  // The registry handle, bridged OUT of the agents block for the host-skill ceremonies
+  // (revokeDevice's tombstone write) — same outer-let idiom as its neighbours.
+  let agentsRegistryRef = null;
   // Patch the wrapped-key POINTER into an EXISTING circle-membership record. Set inside the block; a
   // no-op until then. Returns false when there is no record to attach to (the key facet needs a prior
   // {handle,address} join write) — so it is safe to call at every circle-open, best-effort.
@@ -872,6 +875,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // boot loop reads it to re-open the circles this device belongs to. Own map of the default profile —
     // that is where write-on-join records {handle,address} (id:'default').
     readSelfCircleMemberships = async () => circleMembershipsOf((await agentsRegistry.lookup('default')) ?? {});
+    agentsRegistryRef = agentsRegistry;
 
 
     // Patch the wrapped-key POINTER into the default profile's membership record for a circle — a
@@ -1277,6 +1281,76 @@ export async function createRealHouseholdAgent(opts = {}) {
       return [DataPart({ ok: true, reloadRequired: true, deviceId: r.deviceId })];
     } catch (e) { return [DataPart({ ok: false, outcome: 'error', error: e?.message ?? 'enroll-failed' })]; }
   }, { visibility: 'trusted' });   // overwrites the owner root + enrolls: owner-only
+
+  hostAgent.register('revokeDevice', async ({ parts }) => {
+    // The DEVICE-REVOCATION CEREMONY ("evict my device" — the eviction machinery pointed inward):
+    // runs on a SURVIVING device with the phrase as the extra proof (the loss-takeover rule). Three
+    // acts: (1) verify the phrase IS this owner's (a valid phrase for someone else refuses);
+    // (2) tombstone the device's delegation on the registry ({revoked:true} — the durable subject);
+    // (3) per circle, emit + fan the self-subject `address-revoke` statement for the device's
+    // deterministically re-derived per-circle address — the fold then retires it on every member's
+    // device: sender authorization refuses it, delivery stops trying it, statement bindings stop
+    // accepting it. The revoked device becomes an island; enforcement lives at the OTHER ends.
+    // Group-key rotation & per-device sealing ride the custody refinement (a recorded open call).
+    const mnemonic = String(parts?.[0]?.data?.mnemonic ?? '').trim();
+    const deviceId = String(parts?.[0]?.data?.deviceId ?? '').trim();
+    if (!deviceId) return [DataPart({ ok: false, outcome: 'error', error: 'deviceId-required' })];
+    let root;
+    try { root = Bootstrap.fromMnemonic(mnemonic); }
+    catch { return [DataPart({ ok: false, outcome: 'invalid-phrase', error: 'invalid-phrase' })]; }
+    if (root.fingerprint() !== ownerRoot.fingerprint()) {
+      return [DataPart({ ok: false, outcome: 'wrong-phrase', error: 'wrong-phrase' })];
+    }
+    try {
+      // The ceremony is DERIVATION-BASED — the registry record is bookkeeping, never a
+      // prerequisite (this device may simply not have seen the enrollment's record: registries
+      // are local until a pod syncs them, and the loss-takeover case is exactly a device that
+      // wasn't there). Present → flip the tombstone; absent → mint the full root-signed record
+      // already revoked, so the registry ends self-contained either way. `known` tells the shell
+      // which case it was (the typo-feedback the UI wants), without blocking the act.
+      const revokedSeed = deriveDeviceSeed(root.deriveAgentSeed('default'), deviceId);
+      let known = false;
+      // Best-effort bookkeeping behind a hard timeout: the STATEMENTS below are the enforcement,
+      // and a registry whose sync stalls must never stall the ceremony with it.
+      const bounded = (p, ms = 3000) => Promise.race([p, new Promise((res) => { setTimeout(res, ms); })]);
+      try {
+        const cur = await bounded(agentsRegistryRef?.lookup?.('default'));
+        if (cur) {
+          const rec = deviceDelegationOf(cur, deviceId);
+          known = !!rec;
+          if (!rec) {
+            const minted = signDeviceDelegation(root.secret, {
+              profileId: 'default', deviceId, pubKey: deviceDelegationPubKey(revokedSeed),
+            });
+            await bounded(agentsRegistryRef.register({
+              ...cur,
+              properties: registrySetDeviceDelegation(cur.properties ?? {}, deviceId, { ...minted, revoked: true }),
+            }));
+          } else if (rec.revoked !== true) {
+            await bounded(agentsRegistryRef.register({
+              ...cur,
+              properties: registrySetDeviceDelegation(cur.properties ?? {}, deviceId, { revoked: true }),
+            }));
+          }
+        }
+      } catch { /* tombstone is best-effort bookkeeping — the statements below are the enforcement */ }
+      const circleIds = new Set([
+        ...Object.keys(await readSelfCircleMemberships().catch(() => ({}))),
+        ...(Array.isArray(parts?.[0]?.data?.circleIds) ? parts[0].data.circleIds : []),
+      ]);
+      const revokedIn = [];
+      for (const circleId of circleIds) {
+        if (typeof membershipEmit !== 'function') break;
+        const address = deriveCircleAddress(revokedSeed, circleId);
+        const stmt = await membershipEmit({
+          kind: 'address-revoke', circleId, subject: address,
+          payload: { by: chatId.pubKey }, actor: chatId.pubKey,
+        }).catch(() => null);
+        if (stmt) revokedIn.push({ circleId, address });
+      }
+      return [DataPart({ ok: true, deviceId, known, revokedIn, circles: revokedIn.length })];
+    } catch (e) { return [DataPart({ ok: false, outcome: 'error', error: e?.message ?? 'revoke-failed' })]; }
+  }, { visibility: 'trusted' });   // retires a device's keys everywhere: owner-only, phrase-proven
 
   hostAgent.register('restoreOwnerPhrase', async ({ parts }) => {
     const mnemonic = String(parts?.[0]?.data?.mnemonic ?? '').trim();

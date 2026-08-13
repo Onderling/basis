@@ -4951,5 +4951,9 @@
     "invalid_phrase": "Dat is geen geldige herstelzin.",
     "failed": "Toevoegen is mislukt.",
     "retry": "Opnieuw proberen"
+  },
+  "revoke": {
+    "title": "Apparaat intrekken",
+    "ceremony": "Apparaat wordt ingetrokken"
   }
 }

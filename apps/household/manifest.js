@@ -45,7 +45,7 @@ export const householdManifest = {
   // `help` (meta) + `register` (identity act, not a plain `add contact`) +
   // `enroll-device` (the add-a-device ceremony — an identity act on the host).
   // Every other op maps to an SDK atom; the `{atoms:true}` validator enforces it.
-  domainVerbs: ['help', 'register', 'enroll-device'],
+  domainVerbs: ['help', 'register', 'enroll-device', 'revoke-device'],
 
   // B · Layer 1 — the (verb × noun) capability surface (PLAN-capability-arc.md).
   // Each key is one of `itemTypes`; each `atoms` entry is a CANONICAL SDK atom
@@ -286,6 +286,19 @@ export const householdManifest = {
       },
     },
     {
+      id:   'revokeDevice',
+      verb: 'revoke-device',
+      // The device-revocation CEREMONY (the eviction machinery pointed inward): phrase-proven on a
+      // SURVIVING device; tombstones the delegation and retires the device's per-circle addresses
+      // from every roster set (fold-enforced at every member's end — the device becomes an island).
+      params: [
+        { name: 'mnemonic', kind: 'secret', required: true },
+        { name: 'deviceId', kind: 'string', required: true },
+      ],
+      // CEREMONY-ONLY, like enrollDevice: reached through the revoke-device flow.
+      surfaces: {},
+    },
+    {
       id:   'enrollDevice',
       verb: 'enroll-device',
       // The add-a-device CEREMONY (a host identity act, like restoreOwnerPhrase): restores the
@@ -324,6 +337,23 @@ export const householdManifest = {
       ],
       steps: [
         { id: 'ceremony', op: 'enrollDevice', labelKey: 'circle.enroll.ceremony' },
+      ],
+    },
+    {
+      id: 'revoke-device',
+      kind: 'ceremony',
+      scope: 'device',
+      labelKey: 'circle.revoke.title',
+      effects: [
+        { kind: 'write', target: 'registry' },
+        { kind: 'send',  target: 'circle-address-revoke' },
+      ],
+      produces: [
+        { name: 'deviceId', kind: 'string', from: '$steps.ceremony.deviceId' },
+        { name: 'circles',  kind: 'number', from: '$steps.ceremony.circles' },
+      ],
+      steps: [
+        { id: 'ceremony', op: 'revokeDevice', labelKey: 'circle.revoke.ceremony' },
       ],
     },
   ],

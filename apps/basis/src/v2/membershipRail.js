@@ -24,7 +24,17 @@ export const MEMBERSHIP_CATCHUP_SUBTYPES = Object.freeze({
 
 /** The default key↔ref binding source: the roster's proof-checked circleAddress rows (shared with governance). */
 export function rosterBindingVerifier(callSkill) {
+  // RE-ENTRANCY BREAKER: the roster projection READS the membership rail, and this verifier is
+  // the rail's binding gate — so a binding check that projects the roster recurses back into
+  // itself, unboundedly, the first time a FOREIGN membership statement sits on the rail (a
+  // self-authored one passes the rail's self-check and never reaches here). On re-entry for the
+  // same circle we REFUSE the inner question: the inner projection then folds TRAIL-ONLY — and
+  // the trail carries the address facts this verifier needs (the primary + the announced set),
+  // so the OUTER check still decides against the right rows. Depth caps at two by construction.
+  const inFlight = new Set();
   return async ({ author, ref, circleId }) => {
+    if (inFlight.has(circleId)) return false;
+    inFlight.add(circleId);
     try {
       // The DERIVED roster (`listGroupMembers`) is the projection that carries the address facts:
       // `webid` + the primary `circleAddress` + the proven `circleAddresses` SET (each entry
@@ -42,6 +52,7 @@ export function rosterBindingVerifier(callSkill) {
         && (m.circleAddress === author
           || (Array.isArray(m.circleAddresses) && m.circleAddresses.includes(author))));
     } catch { return false; }
+    finally { inFlight.delete(circleId); }
   };
 }
 

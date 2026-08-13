@@ -21,6 +21,10 @@ export const membershipManifest = Object.freeze({
     { id: 'membership.leave', description: 'A member leaves (self-authored only — the fold enforces author == subject).', appends: [{ lane: MEMBERSHIP_LANE, kind: 'leave' }] },
     { id: 'membership.evict', description: 'An admin removes a member (authority checked at the fold, deny-wins).',       appends: [{ lane: MEMBERSHIP_LANE, kind: 'evict' }] },
     { id: 'membership.role',  description: 'A role change (promote/demote — folds via the causal authority rules).',      appends: [{ lane: MEMBERSHIP_LANE, kind: 'role' }] },
+    // Device revocation (the eviction machinery pointed INWARD): the member stays; ONE of their own
+    // addresses is retired. Self-subject at the fold — the statement acts only on the author's own
+    // row — and deny-wins: a revoked address never re-enters the set, whatever announces later.
+    { id: 'membership.addressRevoke', description: "A member revokes one of their OWN device addresses (self-subject; deny-wins — the revoked address never re-enters the row's set).", appends: [{ lane: MEMBERSHIP_LANE, kind: 'address-revoke' }] },
   ],
 });
 

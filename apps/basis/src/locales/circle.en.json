@@ -4951,5 +4951,9 @@
     "invalid_phrase": "That is not a valid recovery phrase.",
     "failed": "Enrolling failed.",
     "retry": "Try again"
+  },
+  "revoke": {
+    "title": "Remove a device",
+    "ceremony": "Revoking the device"
   }
 }

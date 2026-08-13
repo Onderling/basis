@@ -217,6 +217,58 @@ describe('deriveRoster', () => {
       expect(a.circleAddresses).toEqual([addrOf(5), addrOf(6)]);
     });
 
+    it('address-revoke retires an extra from the set — deny-wins over its announce', () => {
+      const roster = deriveRoster({
+        redemptions: [
+          redemption({ redeemedBy: 'B', circleAddress: addrOf(1), circleAddressProof: proofOf(1) }),
+          redemption({ redeemedBy: 'B', circleAddress: addrOf(2), circleAddressProof: proofOf(2) }),
+        ],
+        spineStatements: [{ kind: 'address-revoke', author: 'B', subject: addrOf(2) }],
+      });
+      const b = roster.find((m) => m.webid === 'B');
+      expect(b.circleAddress).toBe(addrOf(1));
+      expect(b.circleAddresses).toEqual([addrOf(1)]);
+    });
+
+    it('the LOSS TAKEOVER: a revoked PRIMARY hands the slot to the first surviving address', () => {
+      const roster = deriveRoster({
+        redemptions: [
+          redemption({ redeemedBy: 'B', circleAddress: addrOf(1), circleAddressProof: proofOf(1) }),
+          redemption({ redeemedBy: 'B', circleAddress: addrOf(2), circleAddressProof: proofOf(2) }),
+        ],
+        spineStatements: [{ kind: 'address-revoke', author: 'B', subject: addrOf(1) }],
+      });
+      const b = roster.find((m) => m.webid === 'B');
+      expect(b.circleAddress, 'the surviving device takes the primary slot').toBe(addrOf(2));
+      expect(b.circleAddresses).toEqual([addrOf(2)]);
+    });
+
+    it('SELF-SUBJECT: a revocation only ever acts on the AUTHOR\'s own row', () => {
+      const roster = deriveRoster({
+        redemptions: [
+          redemption({ redeemedBy: 'B', circleAddress: addrOf(1), circleAddressProof: proofOf(1) }),
+          redemption({ redeemedBy: 'C', circleAddress: addrOf(3), circleAddressProof: proofOf(3) }),
+        ],
+        // C tries to revoke B's address: the statement lands in C's OWN bucket and touches nothing
+        spineStatements: [{ kind: 'address-revoke', author: 'C', subject: addrOf(1) }],
+      });
+      expect(roster.find((m) => m.webid === 'B').circleAddresses).toEqual([addrOf(1)]);
+      expect(roster.find((m) => m.webid === 'C').circleAddresses).toEqual([addrOf(3)]);
+    });
+
+    it('a member whose EVERY address is revoked keeps the row, loses the address keys', () => {
+      const roster = deriveRoster({
+        redemptions: [
+          redemption({ redeemedBy: 'B', circleAddress: addrOf(1), circleAddressProof: proofOf(1) }),
+        ],
+        spineStatements: [{ kind: 'address-revoke', author: 'B', subject: addrOf(1) }],
+      });
+      const b = roster.find((m) => m.webid === 'B');
+      expect(b, 'the MEMBER remains — only their addresses retire').toBeTruthy();
+      expect('circleAddress' in b).toBe(false);
+      expect('circleAddresses' in b).toBe(false);
+    });
+
     it('maxDevicesPerMember caps the projected set — earliest devices keep their place', () => {
       const redemptions = [
         redemption({ redeemedBy: 'B', circleAddress: addrOf(1), circleAddressProof: proofOf(1) }),

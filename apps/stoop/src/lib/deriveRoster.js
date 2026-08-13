@@ -224,6 +224,25 @@ export function deriveRoster({
     }
   }
 
+  // ── ADDRESS REVOCATION (device revocation — the eviction machinery pointed inward) ────────────────
+  // `address-revoke` statements arrive in the same verified spine feed (author already resolved to
+  // the member ref). SELF-SUBJECT BY CONSTRUCTION: a member's revocations are keyed by the AUTHOR
+  // and applied only to the author's own row below — a statement naming another member's address
+  // lands in the author's own bucket and touches nothing. DENY-WINS: once revoked, an address never
+  // projects again, whatever announces before or after (the statements live on the compaction-exempt
+  // membership lane, so every future fold sees them).
+  const revokedAddresses = new Map();   // webid → Set<address> (their OWN revoked device addresses)
+  if (Array.isArray(spineStatements)) {
+    for (const s of spineStatements) {
+      if (s?.kind !== 'address-revoke') continue;
+      if (typeof s.author !== 'string' || !s.author) continue;
+      if (typeof s.subject !== 'string' || !s.subject) continue;
+      let set = revokedAddresses.get(s.author);
+      if (!set) revokedAddresses.set(s.author, (set = new Set()));
+      set.add(s.subject);
+    }
+  }
+
   // LEFT-JOIN the MemberMap for display fields; the trail wins on existence + keys.
   // Spread disp first, then the derived record: rec only carries keys it actually
   // has a value for, so a trail-captured key overrides the display cache while an
@@ -239,8 +258,19 @@ export function deriveRoster({
     const primary = (typeof merged.circleAddress === 'string' && merged.circleAddress)
       ? merged.circleAddress : null;
     const proven = provenAddresses.get(rec.webid);
-    const addressSet = primary ? [primary] : [];
+    let addressSet = primary ? [primary] : [];
     if (proven) for (const a of proven) { if (a !== primary) addressSet.push(a); }
+    // Revocation applies FIRST (before the cap): a revoked device's slot frees up, and — the loss
+    // takeover — a revoked PRIMARY hands the slot to the first surviving proven address, so the
+    // member stays reachable on the devices they still hold.
+    const revoked = revokedAddresses.get(rec.webid);
+    if (revoked?.size) {
+      addressSet = addressSet.filter((a) => !revoked.has(a));
+      if (primary && revoked.has(primary)) {
+        if (addressSet.length) merged.circleAddress = addressSet[0];
+        else delete merged.circleAddress;
+      }
+    }
     // maxDevicesPerMember — the circle's per-member device ceiling. Deterministic on every fold:
     // primary first, then set insertion order (trail order), truncated at the cap — so the
     // EARLIEST-proven devices keep their place and a device beyond the cap never projects.
@@ -249,6 +279,7 @@ export function deriveRoster({
       ? rules.maxDevicesPerMember : null;
     if (cap && addressSet.length > cap) addressSet.length = cap;
     if (addressSet.length) merged.circleAddresses = addressSet;
+    else delete merged.circleAddresses;
     out.push(merged);
   }
   return out;

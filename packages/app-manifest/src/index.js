@@ -164,6 +164,9 @@ export { verifyFlow, verifyFlows } from './flows.js';
 // flowRunner — executes a declared flow as a resumable instance (pure, DI'd; the
 // secrets rule at runtime: saveInstance never sees secret material).
 export { createFlowRunner } from './flowRunner.js';
+// renderFlow — the ONE flow projector: flow + instance → the view model both shells
+// paint (progress · form-with-labelKeys · actions) — the wizard machinery, generalized.
+export { renderFlow } from './renderFlow.js';
 
 // JSDoc typedefs live here; importing the module forces it to be loaded
 // so tooling can resolve type-only references.

@@ -22,10 +22,15 @@ import { rosterBindingVerifier } from './membershipRail.js';
 /** The statement kinds the task lane carries — DERIVED from the manifest's declared appends. */
 export const TASK_RAIL_KINDS = entryKindRegistryFromManifests(taskManifest).kindsFor(TASK_LANE);
 
-/** The item TYPES that ride the lane instead of the legacy mirror. Tasks only for now — they are the types
- *  whose claim cluster needs the writer-computed snapshot; other types follow when the mirror's remaining
- *  cargo is inventoried for retirement. */
-export const TASK_LANE_TYPES = Object.freeze(new Set(['task']));
+/** The item TYPES that ride the lane instead of the legacy mirror. Tasks came first (the claim cluster
+ *  needs the writer-computed snapshot); the mirror-cargo inventory then moved the four household LIST
+ *  types and the generic `note` over — same mechanics (full-item snapshot + the store's causal merge; no
+ *  claim cluster involved). Still on the legacy mirror: `contact` (identity-adjacent — its feed comes
+ *  from the roster itself; whether it belongs on a signed content lane at all is an open call, so it
+ *  keeps today's carry until decided). The mirror plumbing retires only when the LAST type moves. */
+export const TASK_LANE_TYPES = Object.freeze(new Set([
+  'task', 'shopping', 'errand', 'repair', 'schedule', 'note',
+]));
 
 /** The wire subtypes for the task lane's fan + catch-up (the governance/membership pairs' sibling). */
 export const TASK_BROADCAST = 'kring-task-broadcast';

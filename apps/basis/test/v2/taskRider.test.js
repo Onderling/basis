@@ -99,11 +99,16 @@ describe('the task lane — snapshots on the device log, heads causally merged',
     expect(bo.eventLog.entries).toHaveLength(1);                        // and recorded signed on bo's log
     expect(bo.eventLog.entries[0].payload.sig).toBeTruthy();
 
-    // A NON-task item still rides the legacy mirror, not the lane.
+    // The valve extension: a LIST item rides the lane too now (snapshot + causal merge, no claim
+    // cluster involved) — while `contact` (identity-adjacent, undecided) keeps the legacy mirror.
     await ada.store.put({ id: 'shop-1', type: 'shopping', text: 'milk' }, { by: 'webid:ada' });
     await settle();
-    expect(ada.mirrorCalls.find(([, t]) => t === 'shopping')).toBeTruthy();
-    expect(ada.eventLog.entries).toHaveLength(1);                       // no lane entry for the shopping item
+    expect(ada.mirrorCalls.find(([, t]) => t === 'shopping')).toBeUndefined();
+    expect(ada.eventLog.entries).toHaveLength(2);                       // the shopping snapshot joined the lane
+    await ada.store.put({ id: 'c-1', type: 'contact', displayName: 'bea' }, { by: 'webid:ada' });
+    await settle();
+    expect(ada.mirrorCalls.find(([, t]) => t === 'contact')).toBeTruthy();
+    expect(ada.eventLog.entries).toHaveLength(2);                       // no lane entry for the contact
   });
 
   it('the writer-computed claim cluster travels: a claim lands with claimSeq + confirmation; a later authoritative reassign supersedes it', async () => {
@@ -218,5 +223,22 @@ describe('the task lane — snapshots on the device log, heads causally merged',
 
     expect((await cato.store.get(t1.id))?.text).toBe('recent task');
     expect((await cato.store.get('task-old'))?.text).toBe('ancient but open');   // the aged-out head still arrived
+  });
+
+  it('THE VALVE EXTENSION: list types + note ride the lane; contact keeps the legacy mirror', () => {
+    const laneCalls = []; const mirrorCalls = [];
+    const valve = routeTaskMirror({
+      circleId: 'kring-v',
+      emitter: { snapshot: (cid, it) => laneCalls.push(it.type), remove: (cid, id) => laneCalls.push(`rm:${id}`) },
+      mirror: { publishItem: (it) => mirrorCalls.push(it.type), publishItemRemoved: (id) => mirrorCalls.push(`rm:${id}`) },
+    });
+    for (const type of ['task', 'shopping', 'errand', 'repair', 'schedule', 'note']) {
+      valve.publishItem({ id: `i-${type}`, type });
+    }
+    valve.publishItem({ id: 'i-contact', type: 'contact' });
+    valve.publishItemRemoved('i-shopping', { id: 'i-shopping', type: 'shopping' });
+    valve.publishItemRemoved('i-contact', { id: 'i-contact', type: 'contact' });
+    expect(laneCalls).toEqual(['task', 'shopping', 'errand', 'repair', 'schedule', 'note', 'rm:i-shopping']);
+    expect(mirrorCalls).toEqual(['contact', 'rm:i-contact']);
   });
 });

@@ -30,6 +30,7 @@ import { asyncStorageAddressSharingIo } from '../../../../basis/src/v2/addressSh
 import UserLlmSettings from './UserLlmSettings.js';
 import EncryptedBackupWizardModal from '../../../../basis/src/rn/wizards/encryptedBackupWizardModal.js';
 import RestoreFromMnemonicWizardModal from '../../../../basis/src/rn/wizards/restoreFromMnemonicWizardModal.js';
+import EnrollDeviceModal from './EnrollDeviceModal.js';
 import { enableNativePush, disableNativePush, getNativePushState } from '../../v2/nativePush.js';
 
 const CHAT_AI_KEY = { on: 'chat_ai_on', 'circle-off': 'chat_ai_circle_off', 'no-llm': 'chat_ai_no_llm', 'no-provider': 'chat_ai_no_provider' };
@@ -319,6 +320,10 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
         <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('restore')} testID="mydata-restore">
           <Text style={styles.actionMutedLabel}>{t('circle.mydata.restore')}</Text>
         </Pressable>
+        {/* Add-a-device: run the enroll ceremony ON THIS device (the phrase is typed here). */}
+        <Pressable style={[styles.action, styles.actionMuted]} onPress={() => setWizard('enroll')} testID="mydata-enroll">
+          <Text style={styles.actionMutedLabel}>{t('circle.mydata.enroll_device')}</Text>
+        </Pressable>
       </Section>
 
       {/* J-CS8 — the global-address publication lock, with its cost stated alongside (web parity). */}
@@ -471,6 +476,7 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
 
       <EncryptedBackupWizardModal visible={wizard === 'backup'} callSkill={callSkill} t={t} onClose={() => setWizard(null)} onDispatched={() => {}} />
       <RestoreFromMnemonicWizardModal visible={wizard === 'restore'} callSkill={callSkill} t={t} onClose={() => setWizard(null)} onDispatched={() => {}} />
+      <EnrollDeviceModal visible={wizard === 'enroll'} callSkill={callSkill} onClose={() => setWizard(null)} />
 
       {/* S5 — one-time recovery-phrase reveal (stoop getMnemonicOnce). */}
       <Modal visible={!!mnemonic} animationType="fade" transparent onRequestClose={() => setMnemonic(null)}>

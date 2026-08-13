@@ -45,7 +45,9 @@ async function device(ref, rosterAll, wire) {
   const eventLog = fakeEventLog();
   const row = rosterAll.find((m) => m.webid === ref);
   if (row) row.circleAddress = cid.pubKey;
-  const callSkill = async (o, op) => (op === 'listGroupRoster'
+  // The binding verifier reads the DERIVED roster (listGroupMembers — webid + circleAddress +
+  // the proven set); the routing list (listGroupRoster) stays answered for the fan-out reads.
+  const callSkill = async (o, op) => ((op === 'listGroupMembers' || op === 'listGroupRoster')
     ? { members: rosterAll.filter((m) => m.webid !== ref) } : { ok: true });
   const rail = makeMembershipRail({ eventLog, circleIdentityFor: async () => cid, myRef: ref, callSkill });
   const emit = makeMembershipEmitter({

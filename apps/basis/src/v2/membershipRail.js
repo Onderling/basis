@@ -26,9 +26,21 @@ export const MEMBERSHIP_CATCHUP_SUBTYPES = Object.freeze({
 export function rosterBindingVerifier(callSkill) {
   return async ({ author, ref, circleId }) => {
     try {
-      const r = await callSkill('stoop', 'listGroupRoster', { groupId: circleId });
+      // The DERIVED roster (`listGroupMembers`) is the projection that carries the address facts:
+      // `webid` + the primary `circleAddress` + the proven `circleAddresses` SET (each entry
+      // admitted to the fold only through its own circle-link proof). The flat routing list
+      // (`listGroupRoster`) this used to read carries NEITHER field — every foreign statement
+      // failed the binding by shape, invisibly, because the test harness substituted its own
+      // resolver: the three-device walk was the first thing to run the verifier for real.
+      const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+      // SET-AWARE (add-a-device): a statement signed at ANY of the member's proven addresses
+      // binds to the member; checking the primary alone would refuse every second device's
+      // statements on every rail.
       return (Array.isArray(r?.members) ? r.members : []).some((m) =>
-        m && m.circleAddress === author && (m.addr ?? m.webid ?? m.ref) === ref);
+        m
+        && (m.webid ?? m.addr ?? m.ref) === ref
+        && (m.circleAddress === author
+          || (Array.isArray(m.circleAddresses) && m.circleAddresses.includes(author))));
     } catch { return false; }
   };
 }

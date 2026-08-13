@@ -1,5 +1,5 @@
 /**
- * ENROLLMENT, BORN A FLOW (add-a-device slice 2): the enroll-device flow — declared on the
+ * ENROLLMENT, BORN A FLOW (add-a-device): the enroll-device flow — declared on the
  * household manifest, verified, executed by the one runner against the REAL composition — plus
  * the boot cutover it exists for: an enrolled device derives its per-circle keys from its
  * DELEGATION seed, so two devices holding ONE phrase present DISTINCT addresses per circle,

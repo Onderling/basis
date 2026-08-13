@@ -25,6 +25,7 @@ export function renderCircleMyData(container, {
   onBackup,
   onViewMnemonic,
   onRestore,
+  onEnroll,
   notifications,
   onToggleNotifications,
   // The two delivery settings (2026-07-28). One object, because they are two knobs on one question.
@@ -167,6 +168,9 @@ export function renderCircleMyData(container, {
     ['cc-mydata__backup',   'circle.mydata.backup',         onBackup],
     ['cc-mydata__mnemonic', 'circle.mydata.view_mnemonic',  onViewMnemonic],
     ['cc-mydata__restore',  'circle.mydata.restore',        onRestore],
+    // Add-a-device: run the enroll-device ceremony ON THIS device (the phrase is typed here,
+    // never on a device that already has authority).
+    ['cc-mydata__enroll',   'circle.mydata.enroll_device',  onEnroll],
   ].filter(([, , fn]) => typeof fn === 'function');
   if (acts.length) {
     const keys = section(tr('circle.mydata.keys'));

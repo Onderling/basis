@@ -4171,7 +4171,8 @@
     "pod_local_consequence": {
       "text": "Alles hier staat alleen op dit apparaat. Raak je het kwijt of installeer je opnieuw, dan haalt je herstelzin terug wie je bent — niet je kringen of je gesprekken. Koppel een pod, of exporteer een back-upbestand, om hier ergens anders mee verder te kunnen.",
       "doc": "Said where the state is shown, not only when someone tries to leave with it (2026-08-02). A wipe-and-restore walk proved the phrase brings back the identity and no circles; someone who learns that at the moment they switch devices learns it too late to act on."
-    }
+    },
+    "enroll_device": "Apparaat toevoegen"
   },
   "admin": {
     "title": {
@@ -4940,6 +4941,15 @@
   },
   "enroll": {
     "title": "Dit apparaat toevoegen",
-    "ceremony": "Dit apparaat wordt toegevoegd"
+    "ceremony": "Dit apparaat wordt toegevoegd",
+    "body": "Typ de herstelzin van dit account om dit apparaat toe te voegen. Elk apparaat krijgt eigen sleutels — de herstelzin zelf wordt nooit opgeslagen.",
+    "mnemonic_placeholder": "Herstelzin (24 woorden)",
+    "label_placeholder": "Apparaatnaam (bijv. 'werk-laptop')",
+    "submit": "Dit apparaat toevoegen",
+    "done_reload": "Apparaat toegevoegd. Herlaad om af te ronden — dit apparaat meldt daarna zijn eigen sleutels aan in je kringen.",
+    "reload": "Nu herladen",
+    "invalid_phrase": "Dat is geen geldige herstelzin.",
+    "failed": "Toevoegen is mislukt.",
+    "retry": "Opnieuw proberen"
   }
 }

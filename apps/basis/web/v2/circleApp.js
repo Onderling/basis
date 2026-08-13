@@ -266,6 +266,7 @@ import { advancedOpRows, advancedParamRows } from '../../src/v2/advancedSurface.
 // flow's declaration lives on the params manifest; this shell only paints renderFlow.
 import { createFlowRunner, renderFlow } from '@onderling/app-manifest';
 import { paramsManifest } from '../../src/v2/paramsManifest.js';
+import { householdManifest } from '../../../household/manifest.js';
 // profile-update propagation — the silent roster "pull-me" signal (announce on a real roster
 // write; receive → re-read the changed rows). No values on the wire, no chat bubble, no wake.
 import { makeRosterUpdatedPeerHandler, makeRosterUpdateAnnouncer } from '../../src/v2/rosterUpdated.js';
@@ -3843,6 +3844,8 @@ async function showMyData() {
   // the recovery phrase via the stoop `getMnemonicOnce` skill (shown once).
   const onBackup = () => mountMyDataWizard(renderEncryptedBackupWizard);
   const onRestore = () => mountMyDataWizard(renderRestoreFromMnemonicWizard);
+  // Add-a-device: the enroll ceremony as its declared flow (the phrase is typed on THIS device).
+  const onEnroll = () => showEnrollDeviceFlow();
   const onViewMnemonic = () => showMnemonicReveal();
   // web-push toggle. State is read from the live PushManager so the screen
   // reflects reality; toggling subscribes/unsubscribes + tells stoop.
@@ -3927,7 +3930,7 @@ async function showMyData() {
       backTo: { returnTo: getActiveCircle() || 'chat', label: t('circle.mydata.back'), onNavigate: () => {} },
     });
   };
-  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij, onSignIn, onBackup, onViewMnemonic, onRestore, notifications, onToggleNotifications,
+  const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij, onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, notifications, onToggleNotifications,
     delivery: deliverySettingsCache,
     onSetDelivery: async (patch) => {
       try { deliverySettingsCache = await deliverySettingsStore.set(patch); } catch { /* keep the old view */ }
@@ -4348,6 +4351,88 @@ function _restoreOverlay() {
   wrap.appendChild(card);
   document.body.appendChild(wrap);
   return { wrap, card, close: () => wrap.remove() };
+}
+
+function showEnrollDeviceFlow() {
+  // ADD-A-DEVICE (the enroll ceremony, as its declared flow): the phrase is typed on THIS — the
+  // NEW — device. One pause (the secret-kind phrase + an optional device label), then the
+  // ceremony op restores the owner root + writes this install's delegation; the reload lets boot
+  // finish (derivation cutover · registry record · reopen · re-announce). The runner never
+  // persists the phrase; this painter only paints renderFlow's view model.
+  const FLOW = householdManifest.flows.find((f) => f.id === 'enroll-device');
+  const OPS = new Map(householdManifest.operations.map((o) => [o.id, o]));
+  const runner = createFlowRunner({ ops: OPS, callSkill: (opId, args) => rawCallSkill('household', opId, args) });
+  const { card, close } = _restoreOverlay();
+  let inst = null;
+
+  const paint = () => {
+    const view = renderFlow(FLOW, inst, { ops: OPS });
+    card.innerHTML = '';
+    const h = document.createElement('h3');
+    h.textContent = t('circle.enroll.title');
+    card.appendChild(h);
+
+    if (view.status === 'awaiting-input' && view.form) {
+      const p = document.createElement('p');
+      p.textContent = t('circle.enroll.body');
+      card.appendChild(p);
+      const values = {};
+      for (const param of view.form.params) {
+        const input = document.createElement(param.kind === 'secret' ? 'textarea' : 'input');
+        if (param.kind !== 'secret') input.type = 'text';
+        input.placeholder = t(`circle.enroll.${param.name}_placeholder`, { defaultValue: param.name });
+        input.style.cssText = 'display:block;width:100%;margin:.4rem 0;';
+        if (param.kind === 'secret') { input.rows = 3; input.autocomplete = 'off'; input.spellcheck = false; }
+        input.addEventListener('input', () => { values[param.name] = input.value; });
+        card.appendChild(input);
+      }
+      const go = document.createElement('button');
+      go.type = 'button';
+      go.textContent = t('circle.enroll.submit');
+      go.addEventListener('click', () => {
+        runner.resume(FLOW, inst, { input: values }).then((r) => { inst = r; paint(); }).catch(() => close());
+      });
+      card.appendChild(go);
+      const cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.textContent = t('circle.confirm.cancel', { defaultValue: 'Annuleren' });
+      cancel.style.cssText = 'margin-left:.6rem;';
+      cancel.addEventListener('click', () => { runner.cancel(inst); close(); });
+      card.appendChild(cancel);
+      return;
+    }
+
+    // terminal: the ceremony either enrolled (reload finishes the job) or refused the phrase
+    const outcome = inst?.steps?.ceremony?.outcome;
+    const msg = document.createElement('p');
+    if (outcome === 'ok' && inst?.produces?.reloadRequired) {
+      msg.textContent = t('circle.enroll.done_reload');
+      card.appendChild(msg);
+      const go = document.createElement('button');
+      go.type = 'button';
+      go.textContent = t('circle.enroll.reload');
+      go.addEventListener('click', () => { try { window.location.reload(); } catch { /* */ } });
+      card.appendChild(go);
+    } else {
+      msg.textContent = outcome === 'invalid-phrase'
+        ? t('circle.enroll.invalid_phrase')
+        : (inst?.steps?.ceremony?.out?.error ?? t('circle.enroll.failed'));
+      card.appendChild(msg);
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.textContent = t('circle.enroll.retry');
+      retry.addEventListener('click', () => { close(); showEnrollDeviceFlow(); });
+      card.appendChild(retry);
+      const cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.textContent = t('circle.confirm.cancel', { defaultValue: 'Annuleren' });
+      cancel.style.cssText = 'margin-left:.6rem;';
+      cancel.addEventListener('click', () => close());
+      card.appendChild(cancel);
+    }
+  };
+
+  runner.start(FLOW, {}).then((r) => { inst = r; paint(); }).catch(() => close());
 }
 
 function showRestoreSettingsFlow() {

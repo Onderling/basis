@@ -73,6 +73,15 @@ describe('renderCircleMyData', () => {
     expect(onRestore).toHaveBeenCalled();
   });
 
+  it('add-a-device: the enroll action renders when wired and fires its callback', () => {
+    const onEnroll = vi.fn();
+    const el = renderCircleMyData(document.createElement('div'), {
+      t, podStatus: { signedIn: true }, onEnroll,
+    });
+    el.querySelector('.cc-mydata__enroll').click();
+    expect(onEnroll).toHaveBeenCalled();
+  });
+
   it('renders the push-notification toggle reflecting subscription state', () => {
     const onToggleNotifications = vi.fn();
     const off = renderCircleMyData(document.createElement('div'), {

@@ -46,6 +46,61 @@ export const paramsManifest = {
       params: [],
       surfaces: {},
     },
+
+    // ── The settings-restore ops (#44's choices, promoted from boot-closures to declared ops so the
+    //    restore FLOW below can reference them — every effectful step is an op, per the flow model). ──
+    {
+      id:   'restore-probe',
+      verb: 'restore-probe',
+      // Re-probe the pod settings medium POST-BOOT. Outcomes: clean (openable, attached, values agree) ·
+      // conflicts (openable; the per-param diff rides the result) · undecryptable (sealed under another
+      // key — the coarse choice follows) · transport (could not verify; never accuses) · no-medium.
+      params: [],
+      surfaces: {},
+    },
+    {
+      id:   'restore-merge',
+      verb: 'restore-merge',
+      // Apply the per-param choices over the probe's captured conflicts: 'theirs' adopts the pod's value
+      // through the ONE kind-gated set-param (so it syncs normally); 'mine' is doing nothing — the local
+      // value already stands.
+      params: [{ name: 'choices', kind: 'object', required: true }],
+      surfaces: {},
+    },
+    {
+      id:   'restore-resolve-mismatch',
+      verb: 'restore-resolve-mismatch',
+      // The coarse choice: 'local' (stay held — the default; nothing is written) or 'overwrite' (the one
+      // explicit destructive act: this device's settings replace the pod's).
+      params: [{ name: 'choice', kind: 'string', required: true }],
+      surfaces: {},
+    },
+  ],
+
+  // ── FLOWS (the L7 model, ratified 2026-08-12) — restore-settings is the PROVING migration: ──────────
+  // the #44 hand-wired dialogs become this declaration + the one runner + the one projector. The probe
+  // branches three ways (the case that proved flows must be DAGs); both interactive steps pause as
+  // awaiting-input on their op's required param; scope is device (a restore-in-progress never syncs).
+  flows: [
+    {
+      id: 'restore-settings',
+      kind: 'ceremony',
+      scope: 'device',
+      labelKey: 'circle.settings_restore.mismatch_title',
+      effects: [
+        { kind: 'write', target: 'settings' },
+        { kind: 'overwrite', target: 'pod-settings' },
+      ],
+      produces: [{ name: 'how', kind: 'string', from: '$steps.probe.outcome' }],
+      steps: [
+        {
+          id: 'probe', op: 'restore-probe',
+          next: { clean: null, 'no-medium': null, transport: null, conflicts: 'merge', undecryptable: 'mismatch' },
+        },
+        { id: 'merge', op: 'restore-merge', labelKey: 'circle.settings_restore.conflicts_title' },
+        { id: 'mismatch', op: 'restore-resolve-mismatch', labelKey: 'circle.settings_restore.mismatch_title' },
+      ],
+    },
   ],
 };
 

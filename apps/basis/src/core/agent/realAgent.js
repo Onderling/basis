@@ -299,6 +299,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     return new VaultEncrypted({ backing, key: atRestKey });
   };
 
+  // The settings-restore CONTEXT — retained past the boot block so the restore-settings FLOW's ops
+  // (restore-probe / restore-merge / restore-resolve-mismatch) can act post-boot on the same medium
+  // the gate probed. `conflicts` holds the probe's captured per-param diff WITH the pod values
+  // (capture-then-flush: they survive the local-wins attach so "use theirs" stays honorable).
+  const settingsRestoreCtx = { medium: null, attached: false, conflicts: [] };
+
   // Host agent — in-process app skills (household, tasks-v0, stoop,
   // folio, calendar).  No cross-peer; vault picks the standard browser
   // localStorage path.  Built manually because it's a pure backend.
@@ -435,6 +441,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // escapes — only the `{seal, open}` closures. Null strategy (no identity) → no pod sync, stays local.
       const strategy = settingsSealStrategyForIdentity(chatId);
       const medium   = strategy ? await opts.provisionSettingsMedium(strategy) : null;
+      settingsRestoreCtx.medium = medium;
       if (medium) {
         // RESTORATION GATE (finding 3): attachInner BULK-FLUSHES local settings to the pod, so a device whose
         // key cannot OPEN the pod's owner-sealed blobs (a fresh install signed in WITHOUT the recovery phrase)
@@ -452,6 +459,8 @@ export async function createRealHouseholdAgent(opts = {}) {
             conflicts = computeSettingsConflicts(localBlob, podBlob);
           } catch { /* no local blob → no conflicts */ }
           await settingsDataSource.attachInner(medium);
+          settingsRestoreCtx.attached = true;
+          settingsRestoreCtx.conflicts = conflicts;
           if (conflicts.length) {
             // keepTheirs routes through the ONE kind-gated write (`set-param`), so the adopted value
             // flushes to the pod like any other settings change. Invoked from the shell after boot.
@@ -1881,6 +1890,64 @@ export async function createRealHouseholdAgent(opts = {}) {
       // is the ONE kind-gated write (refuses kind:internal + unknown). circleId carried for circle-scoped
       // params (persistence wired when a circle param lands).
       if (!paramsManifest.operations.some((o) => o.id === opId)) return { ok: false, error: 'unknown-op', app: 'params', op: opId };
+      // ── The settings-restore ops (#44's choices as DECLARED ops — the restore-settings flow's steps). ──
+      if (opId === 'restore-probe') {
+        const ctx = settingsRestoreCtx;
+        if (!ctx.medium) return { ok: true, outcome: 'no-medium' };
+        const { status, value: podBlob } = await probeSettingsMediumDetailed(ctx.medium);
+        if (status === 'undecryptable') return { ok: true, outcome: 'undecryptable' };
+        if (status === 'transport') return { ok: true, outcome: 'transport' };
+        // openable | missing → safe. When the boot already attached, ITS capture is the honest diff —
+        // post-attach the hydrate cycle has reconciled the blob, so a recompute would read the
+        // already-adopted values and claim 'clean' (the hydrate-adoption bug this flow now repairs:
+        // the register holds the POD's value before the user chose, so BOTH merge choices below are
+        // real writes). A fresh attach (the boot held) computes the diff first, then attaches.
+        if (!ctx.attached) {
+          let conflicts = [];
+          try {
+            let localBlob = await settingsDataSource.read(SETTINGS_SHARED_PROBE_PATH);
+            if (typeof localBlob === 'string') { try { localBlob = JSON.parse(localBlob); } catch { localBlob = null; } }
+            let pod = podBlob;
+            if (typeof pod === 'string') { try { pod = JSON.parse(pod); } catch { pod = null; } }
+            conflicts = computeSettingsConflicts(localBlob, pod);
+          } catch { /* no local blob → no conflicts */ }
+          await settingsDataSource.attachInner(ctx.medium);
+          ctx.attached = true;
+          ctx.conflicts = conflicts;
+        }
+        return ctx.conflicts.length
+          ? { ok: true, outcome: 'conflicts', conflicts: ctx.conflicts }
+          : { ok: true, outcome: 'clean' };
+      }
+      if (opId === 'restore-merge') {
+        const choices = args?.choices && typeof args.choices === 'object' ? args.choices : null;
+        if (!choices) return { ok: false, outcome: 'error', error: 'choices-required' };
+        // BOTH choices are real writes (the hydrate-adoption fix): by merge time the live register
+        // already holds the POD's value — hydrate adopted it before the user chose — so 'mine' must
+        // write the local value BACK, not merely do nothing. Found by this migration, 2026-08-13.
+        const applied = [];
+        for (const [key, decision] of Object.entries(choices)) {
+          const c = settingsRestoreCtx.conflicts.find((x) => x.key === key);
+          if (!c) continue;
+          const value = decision === 'theirs' ? c.theirs : decision === 'mine' ? c.mine : undefined;
+          if (value === undefined) continue;
+          const r = await paramsService.callSkill('set-param', { key, value }, { circleId: null });
+          if (r?.ok !== false) applied.push(key);
+        }
+        settingsRestoreCtx.conflicts = settingsRestoreCtx.conflicts.filter((c) => !applied.includes(c.key));
+        return { ok: true, applied };
+      }
+      if (opId === 'restore-resolve-mismatch') {
+        const choice = args?.choice;
+        if (choice === 'local') return { ok: true, choice };   // the default: stay held, write nothing
+        if (choice === 'overwrite') {
+          if (!settingsRestoreCtx.medium) return { ok: false, outcome: 'error', error: 'no-medium' };
+          await settingsDataSource.attachInner(settingsRestoreCtx.medium);
+          settingsRestoreCtx.attached = true;
+          return { ok: true, choice };
+        }
+        return { ok: false, outcome: 'error', error: 'unknown-choice' };
+      }
       const paramsResult = await paramsService.callSkill(opId, args ?? {}, { circleId: resolveCircleId(args) });
       // A successful set-param is a SETTINGS-CHANGE on the trail (the whitelisted shape: the param
       // KEY as the target pointer, never its value). Owner-attributed — recording is not display;

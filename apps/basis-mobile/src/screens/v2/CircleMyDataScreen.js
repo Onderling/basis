@@ -31,6 +31,8 @@ import UserLlmSettings from './UserLlmSettings.js';
 import EncryptedBackupWizardModal from '../../../../basis/src/rn/wizards/encryptedBackupWizardModal.js';
 import RestoreFromMnemonicWizardModal from '../../../../basis/src/rn/wizards/restoreFromMnemonicWizardModal.js';
 import EnrollDeviceModal from './EnrollDeviceModal.js';
+import RevokeDeviceModal from './RevokeDeviceModal.js';
+import { deviceDelegationsOf } from '@onderling/agent-registry';
 import { enableNativePush, disableNativePush, getNativePushState } from '../../v2/nativePush.js';
 
 const CHAT_AI_KEY = { on: 'chat_ai_on', 'circle-off': 'chat_ai_circle_off', 'no-llm': 'chat_ai_no_llm', 'no-provider': 'chat_ai_no_provider' };
@@ -63,7 +65,9 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
   const [signInErr, setSignInErr] = useState('');
   const [privacy, setPrivacy] = useState([]);
   const [metrics, setMetrics] = useState({});
-  const [wizard, setWizard] = useState(null);          // 'backup' | 'restore' | null
+  const [wizard, setWizard] = useState(null);          // 'backup' | 'restore' | 'enroll' | null
+  const [devices, setDevices] = useState([]);          // enrolled-device rows (registry delegations)
+  const [revokeTarget, setRevokeTarget] = useState(null);   // deviceId under the revoke ceremony
   const [mnemonic, setMnemonic] = useState(null);      // { words } | null when closed
   const [push, setPush] = useState({ supported: false, granted: false });   // S6.6 native push
   const [surfacePref, setSurfacePref] = useState(surfacePrefStore.get());    // S6.C surface preference
@@ -161,16 +165,20 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
 
   const load = useCallback(async () => {
     if (typeof callSkill !== 'function') return;
-    const [loc, status, priv, met] = await Promise.all([
+    const [loc, status, priv, met, profProps] = await Promise.all([
       callSkill('stoop', 'getDataLocation', {}).catch(() => null),
       callSkill('stoop', 'podSignInStatus', {}).catch(() => null),
       callSkill('stoop', 'getPrivacyNotice', { lang: lang() }).catch(() => null),
       callSkill('stoop', 'getMetrics', {}).catch(() => null),
+      callSkill('agents', 'getProfileProperties', { id: 'default' }).catch(() => null),
     ]);
     setDataLocation(loc ?? {});
     setPodStatus(status ?? {});
     setPrivacy(Array.isArray(priv?.sections) ? priv.sections : []);
     setMetrics((met?.snapshot && typeof met.snapshot === 'object') ? met.snapshot : {});
+    // The enrolled-devices list (add-a-device bookkeeping) — one row per registry delegation.
+    setDevices(Object.values(deviceDelegationsOf({ properties: profProps?.properties ?? {} }))
+      .map((d) => ({ deviceId: d.deviceId, label: d.label ?? null, revoked: d.revoked === true })));
   }, [callSkill]);
 
   useEffect(() => { load(); }, [load]);
@@ -326,6 +334,25 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
         </Pressable>
       </Section>
 
+      {/* Enrolled devices (add-a-device): one row per registry delegation; tombstones struck,
+          no door. The revoke button opens the phrase-proven ceremony for that device. */}
+      {devices.length > 0 && (
+        <Section title={t('circle.mydata.devices')}>
+          {devices.map((d) => (
+            <View key={d.deviceId} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 }}>
+              <Text style={[styles.privacyBody, d.revoked && { textDecorationLine: 'line-through' }]}>
+                {d.label || d.deviceId}
+              </Text>
+              {!d.revoked && (
+                <Pressable onPress={() => setRevokeTarget(d.deviceId)} testID={`mydata-revoke-${d.deviceId}`}>
+                  <Text style={styles.actionMutedLabel}>{t('circle.revoke.title')}</Text>
+                </Pressable>
+              )}
+            </View>
+          ))}
+        </Section>
+      )}
+
       {/* J-CS8 — the global-address publication lock, with its cost stated alongside (web parity). */}
       {shareNknAddress != null ? (
         <Section title={t('circle.mydata.address_sharing')}>
@@ -477,6 +504,12 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
       <EncryptedBackupWizardModal visible={wizard === 'backup'} callSkill={callSkill} t={t} onClose={() => setWizard(null)} onDispatched={() => {}} />
       <RestoreFromMnemonicWizardModal visible={wizard === 'restore'} callSkill={callSkill} t={t} onClose={() => setWizard(null)} onDispatched={() => {}} />
       <EnrollDeviceModal visible={wizard === 'enroll'} callSkill={callSkill} onClose={() => setWizard(null)} />
+      <RevokeDeviceModal
+        visible={!!revokeTarget}
+        deviceId={revokeTarget}
+        callSkill={callSkill}
+        onClose={() => { setRevokeTarget(null); load(); }}
+      />
 
       {/* S5 — one-time recovery-phrase reveal (stoop getMnemonicOnce). */}
       <Modal visible={!!mnemonic} animationType="fade" transparent onRequestClose={() => setMnemonic(null)}>

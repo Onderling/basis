@@ -1940,6 +1940,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (opId === 'restore-resolve-mismatch') {
         const choice = args?.choice;
         if (choice === 'local') return { ok: true, choice };   // the default: stay held, write nothing
+        if (choice === 'phrase') return { ok: true, choice };  // the shell routes to the recovery wizard
         if (choice === 'overwrite') {
           if (!settingsRestoreCtx.medium) return { ok: false, outcome: 'error', error: 'no-medium' };
           await settingsDataSource.attachInner(settingsRestoreCtx.medium);

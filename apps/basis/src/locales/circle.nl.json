@@ -882,6 +882,10 @@
       "text": "Dit apparaat en je pod hebben voor deze instellingen verschillende waarden. Kies wat je wilt houden — niets kiezen houdt de waarde van dit apparaat.",
       "doc": "#44 samenvoeglijst-tekst. 'Van mij houden' is niets doen: de lokale waarde staat al."
     },
+    "keep_mine": {
+      "text": "Van dit apparaat houden",
+      "doc": "#44/#63 samenvoegregel: houd de LOKALE waarde — een echte terugschrijf sinds de hydrate-adoptie-fix."
+    },
     "keep_theirs": {
       "text": "Waarde van de pod gebruiken",
       "doc": "#44 per rij: neem de pod-waarde over (via set-param, dus synchroniseert gewoon)."

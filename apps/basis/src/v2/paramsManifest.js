@@ -70,9 +70,10 @@ export const paramsManifest = {
     {
       id:   'restore-resolve-mismatch',
       verb: 'restore-resolve-mismatch',
-      // The coarse choice: 'local' (stay held — the default; nothing is written) or 'overwrite' (the one
+      // The coarse choice: 'local' (stay held — the default; nothing is written) · 'phrase' (route to
+      // the recovery wizard — the shell launches it off the flow's produce) · 'overwrite' (the one
       // explicit destructive act: this device's settings replace the pod's).
-      params: [{ name: 'choice', kind: 'string', required: true }],
+      params: [{ name: 'choice', kind: 'enum', of: ['local', 'phrase', 'overwrite'], required: true }],
       surfaces: {},
     },
   ],
@@ -91,7 +92,10 @@ export const paramsManifest = {
         { kind: 'write', target: 'settings' },
         { kind: 'overwrite', target: 'pod-settings' },
       ],
-      produces: [{ name: 'how', kind: 'string', from: '$steps.probe.outcome' }],
+      produces: [
+        { name: 'how', kind: 'string', from: '$steps.probe.outcome' },
+        { name: 'choice', kind: 'string', from: '$steps.mismatch.choice' },
+      ],
       steps: [
         {
           id: 'probe', op: 'restore-probe',

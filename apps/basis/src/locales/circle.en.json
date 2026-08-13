@@ -882,6 +882,10 @@
       "text": "This device and your pod have different values for these settings. Pick which to keep — leaving one alone keeps this device's value.",
       "doc": "#44 merge list body. Keep-mine is doing nothing: the local value already stands."
     },
+    "keep_mine": {
+      "text": "Keep this device's",
+      "doc": "#44/#63 merge row: keep the LOCAL value — a real write-back since the hydrate-adoption fix (the register already holds the pod's value pre-choice)."
+    },
     "keep_theirs": {
       "text": "Use the pod's value",
       "doc": "#44 per-row action: adopt the pod's value (routes through set-param, so it syncs normally)."

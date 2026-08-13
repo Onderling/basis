@@ -262,6 +262,10 @@ import {
 import { agentActivityRows } from '../../src/v2/agentActivity.js';
 // The advanced surface's projections (the "default places for any new opId" rule).
 import { advancedOpRows, advancedParamRows } from '../../src/v2/advancedSurface.js';
+// The flows substrate (#63): the one runner + the one projector — the restore-settings
+// flow's declaration lives on the params manifest; this shell only paints renderFlow.
+import { createFlowRunner, renderFlow } from '@onderling/app-manifest';
+import { paramsManifest } from '../../src/v2/paramsManifest.js';
 // profile-update propagation — the silent roster "pull-me" signal (announce on a real roster
 // write; receive → re-read the changed rows). No values on the wire, no chat bubble, no wake.
 import { makeRosterUpdatedPeerHandler, makeRosterUpdateAnnouncer } from '../../src/v2/rosterUpdated.js';
@@ -1172,6 +1176,10 @@ let resolveCallSkill = null; // (opId, args) => Promise<object|null>
 // code), which would wipe a feedback invite's `?projectId&code` before we read it. Snapshot first.
 const _bootSearch = (typeof window !== 'undefined' && window.location) ? window.location.search : '';
 let rawCallSkill = null;     // (appOrigin, opId, args) — for createGroupV2
+// The restore boot hooks fire DURING boot, before rawCallSkill is bound — the flow panel's first
+// act is a waist call, so launching it straight from the hook would race the binding. The hook
+// only raises this flag; the boot-completion block (where rawCallSkill is assigned) launches.
+let pendingRestoreFlow = false;
 let circleIdentityForShell = null;   // the agent's per-circle signer resolver — governance signs circle-scoped
 let govShellRail = null;             // the governance rail for the RECEIVE side (verify-on-ingest)
 let govCatchUpShell = null;          // pull-all governance catch-up (the offline-device half of reliable)
@@ -4342,73 +4350,124 @@ function _restoreOverlay() {
   return { wrap, card, close: () => wrap.remove() };
 }
 
-function showSettingsMismatchDialog({ overwrite } = {}) {
+function showRestoreSettingsFlow() {
+  // THE FLOW PANEL (#63 shell painter): the restore-settings FLOW replaces the two hand-wired
+  // #44 dialogs. The declaration lives on the params manifest; the runner executes through the
+  // waist; this painter only paints renderFlow's view model. The merge step gets a bespoke form
+  // (the per-param mine/theirs table — a registered override, like a bespoke screen beside the
+  // generic record view); every other pause paints generically from the declared params.
+  const FLOW = paramsManifest.flows.find((f) => f.id === 'restore-settings');
+  const OPS = new Map(paramsManifest.operations.map((o) => [o.id, o]));
+  const runner = createFlowRunner({ ops: OPS, callSkill: (opId, args) => rawCallSkill('params', opId, args) });
   const { card, close } = _restoreOverlay();
-  const h = document.createElement('h3');
-  h.textContent = t('circle.settings_restore.mismatch_title');
-  const p = document.createElement('p');
-  p.textContent = t('circle.settings_restore.mismatch_body');
-  const row = document.createElement('div');
-  row.style.cssText = 'display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1rem;';
-  const mkBtn = (label, fn) => {
-    const b = document.createElement('button');
-    b.textContent = label;
-    b.addEventListener('click', fn);
-    return b;
-  };
-  // The default, listed first: keep using this device's own settings (the gate already held).
-  row.appendChild(mkBtn(t('circle.settings_restore.choice_local'), close));
-  row.appendChild(mkBtn(t('circle.settings_restore.choice_phrase'), () => {
-    close();
-    try { circleDispatchReady?.({ opId: 'restoreFromMnemonicWizard', args: {} }); } catch { /* wizard unavailable */ }
-  }));
-  row.appendChild(mkBtn(t('circle.settings_restore.choice_overwrite'), async () => {
-    // The one destructive act — spelled out, confirmed, then executed via the handed-over action.
-    if (!window.confirm(t('circle.settings_restore.overwrite_warning'))) return;
-    try { await overwrite?.(); } catch { /* the gate reported; staying local */ }
-    close();
-  }));
-  card.append(h, p, row);
-}
+  let inst = null;
 
-function showSettingsConflictsDialog({ conflicts = [], keepTheirs } = {}) {
-  if (!conflicts.length) return;
-  const { card, close } = _restoreOverlay();
-  const h = document.createElement('h3');
-  h.textContent = t('circle.settings_restore.conflicts_title');
-  const p = document.createElement('p');
-  p.textContent = t('circle.settings_restore.conflicts_body');
-  card.append(h, p);
-  const list = document.createElement('div');
-  for (const c of conflicts) {
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;gap:.5rem;align-items:center;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--line,#eee);';
-    const label = document.createElement('div');
-    label.innerHTML = '';
-    label.textContent = `${c.key}: ${JSON.stringify(c.mine)} ↔ ${JSON.stringify(c.theirs)}`;
-    const btn = document.createElement('button');
-    btn.textContent = t('circle.settings_restore.keep_theirs');
-    btn.addEventListener('click', async () => {
-      btn.disabled = true;
-      try { await keepTheirs?.(c.key); btn.textContent = '✓'; } catch { btn.disabled = false; }
-    });
-    row.append(label, btn);
-    list.appendChild(row);
-  }
-  const foot = document.createElement('div');
-  foot.style.cssText = 'display:flex;gap:.5rem;margin-top:1rem;justify-content:flex-end;';
-  const allBtn = document.createElement('button');
-  allBtn.textContent = t('circle.settings_restore.keep_all_theirs');
-  allBtn.addEventListener('click', async () => {
-    allBtn.disabled = true;
-    for (const c of conflicts) { try { await keepTheirs?.(c.key); } catch { /* per-key report stays */ } }
+  const finish = () => {
     close();
-  });
-  const doneBtn = document.createElement('button');
-  doneBtn.textContent = t('circle.settings_restore.done');   // keep-mine = simply done: local already stands
-  doneBtn.addEventListener('click', close);
-  foot.append(allBtn, doneBtn);
-  card.append(list, foot);
+    // The 'phrase' route: the flow ends and the shell launches the existing recovery wizard.
+    if (inst?.produces?.choice === 'phrase') {
+      try { circleDispatchReady?.({ opId: 'restoreFromMnemonicWizard', args: {} }); } catch { /* wizard unavailable */ }
+    }
+  };
+
+  const paint = () => {
+    const view = renderFlow(FLOW, inst, { ops: OPS });
+    card.innerHTML = '';
+    const h = document.createElement('h3');
+    h.textContent = t(view.labelKey);
+    card.appendChild(h);
+    // progress — the honest DAG story
+    const prog = document.createElement('p');
+    prog.className = 'muted';
+    prog.textContent = view.progress.filter((p) => p.state !== 'skipped')
+      .map((p) => `${p.state === 'done' ? '✓' : p.state === 'current' ? '•' : '·'} ${t(p.labelKey, { defaultValue: p.id })}`)
+      .join('   ');
+    card.appendChild(prog);
+
+    if (view.status === 'awaiting-input' && view.form) {
+      if (view.form.step === 'mismatch') {
+        const p = document.createElement('p');
+        p.textContent = t('circle.settings_restore.mismatch_body');
+        card.appendChild(p);
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1rem;';
+        for (const value of OPS.get('restore-resolve-mismatch').params[0].of) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.textContent = t(`circle.settings_restore.choice_${value}`);
+          b.addEventListener('click', () => {
+            if (value === 'overwrite' && !window.confirm(t('circle.settings_restore.overwrite_warning'))) return;
+            submit({ choice: value });
+          });
+          row.appendChild(b);
+        }
+        card.appendChild(row);
+      } else if (view.form.step === 'merge') {
+        const p = document.createElement('p');
+        p.textContent = t('circle.settings_restore.conflicts_body');
+        card.appendChild(p);
+        const conflicts = inst?.steps?.probe?.out?.conflicts ?? [];
+        const picks = {};
+        for (const c of conflicts) {
+          picks[c.key] = 'mine';
+          const row = document.createElement('div');
+          row.style.cssText = 'display:flex;gap:.6rem;align-items:center;justify-content:space-between;padding:.35rem 0;border-bottom:1px solid var(--line,#eee);';
+          const label = document.createElement('code');
+          label.textContent = c.key;
+          const opts = document.createElement('span');
+          for (const [side, val] of [['mine', c.mine], ['theirs', c.theirs]]) {
+            const l = document.createElement('label');
+            l.style.cssText = 'margin-left:.6rem;cursor:pointer;';
+            const r = document.createElement('input');
+            r.type = 'radio'; r.name = `pick-${c.key}`; r.checked = side === 'mine';
+            r.addEventListener('change', () => { picks[c.key] = side; });
+            l.append(r, ` ${t(`circle.settings_restore.keep_${side}`)} (${JSON.stringify(val)})`);
+            opts.appendChild(l);
+          }
+          row.append(label, opts);
+          card.appendChild(row);
+        }
+        const go = document.createElement('button');
+        go.type = 'button';
+        go.textContent = t('circle.settings_restore.done');
+        go.style.cssText = 'margin-top:1rem;';
+        go.addEventListener('click', () => submit({ choices: picks }));
+        card.appendChild(go);
+      } else {
+        // generic fallback: one text input per declared param (no bespoke form registered)
+        const form = document.createElement('div');
+        const values = {};
+        for (const param of view.form.params) {
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.placeholder = t(param.labelKey, { defaultValue: param.name });
+          input.addEventListener('input', () => { values[param.name] = input.value; });
+          form.appendChild(input);
+        }
+        const go = document.createElement('button');
+        go.type = 'button';
+        go.textContent = t('circle.settings_restore.done');
+        go.addEventListener('click', () => submit(values));
+        form.appendChild(go);
+        card.appendChild(form);
+      }
+      if (view.actions.canCancel) {
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.textContent = t('circle.confirm.cancel', { defaultValue: t('circle.settings_restore.choice_local') });
+        cancel.style.cssText = 'margin-top:.6rem;display:block;';
+        cancel.addEventListener('click', () => { runner.cancel(inst); close(); });
+        card.appendChild(cancel);
+      }
+    } else {
+      finish();
+    }
+  };
+
+  const submit = (input) => {
+    runner.resume(FLOW, inst, { input }).then((r) => { inst = r; paint(); }).catch(() => close());
+  };
+  runner.start(FLOW, {}).then((r) => { inst = r; paint(); }).catch(() => close());
 }
 
 async function openCircleScreenPanel(screenId, { highlightRef, context } = {}) {
@@ -6816,8 +6875,10 @@ async function boot() {
       // #44 — the restore choices. The gate held the pod-write (key mismatch): show the coarse
       // three-choice dialog. Or it attached with differing values: show the per-param merge list.
       // Deferred to after boot — the dialogs need the booted surface (and never block it).
-      onSettingsKeyMismatch: ({ overwrite } = {}) => { setTimeout(() => showSettingsMismatchDialog({ overwrite }), 0); },
-      onSettingsConflicts: ({ conflicts, keepTheirs } = {}) => { setTimeout(() => showSettingsConflictsDialog({ conflicts, keepTheirs }), 0); },
+      // #63 — both boot findings start the SAME declared flow (its probe re-branches): the
+      // hand-wired #44 dialogs are retired; the panel paints renderFlow.
+      onSettingsKeyMismatch: () => { pendingRestoreFlow = true; },
+      onSettingsConflicts: () => { pendingRestoreFlow = true; },
       // A message the system has GIVEN UP ON must stop looking fine. Web consumed neither report until
       // 2026-08-02, so a dropped or expired message kept its optimistic state forever — on the shell we
       // are shipping first. Same shared rule mobile uses; the shell injects only its map and logger.
@@ -6951,6 +7012,7 @@ async function boot() {
       // calendar dispatch (schedule/RSVP) fans its invite/RSVP envelopes out
       // over NKN, parity with the classic web shell. Gated on the peer
       // transport being connected; a no-op otherwise.
+      if (pendingRestoreFlow) { pendingRestoreFlow = false; setTimeout(() => showRestoreSettingsFlow(), 0); }
       rawCallSkill = withCalendarOutbound(agent.callSkill, {
         sendPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
         // transport-NEUTRAL: true if NKN OR relay is up (sendPeerMessage routes

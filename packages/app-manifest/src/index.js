@@ -158,6 +158,10 @@ export const SHELL_PROJECTORS = Object.freeze({ renderWeb, renderMobile });
 // attach/web-mobile/inline): scan what's wired where, find gaps, plan menus.
 export { renderCoverage, coverageGaps, formatCoverageMarkdown } from './renderCoverage.js';
 
+// flows — the declared multi-step layer above ops (L7): the DAG declaration +
+// the load-time verifier (bindings resolvable, kinds/secrets rules, acyclic).
+export { verifyFlow, verifyFlows } from './flows.js';
+
 // JSDoc typedefs live here; importing the module forces it to be loaded
 // so tooling can resolve type-only references.
 export { __types__ }           from './schema.js';

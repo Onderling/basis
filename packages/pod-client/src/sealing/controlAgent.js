@@ -101,6 +101,55 @@ export function createControlAgent({ sharing, containerUri, keyStore, controller
     },
 
     /**
+     * DEVICE-GRAINED audience surgery (the custody arc): a member's DEVICES each hold their own
+     * sealing key (derived from their per-circle address — `sealingPublicKeyFromNetworkKey`), and
+     * enrolling/revoking a device changes the key's AUDIENCE without touching the member roster
+     * or the ACL — the MEMBER stays; one of their readers appears or disappears.
+     */
+
+    /** Enroll a device: wrap the current group key to one more recipient (no member-roster change). */
+    async grantRecipient({ publicKey } = {}) {
+      if (typeof publicKey !== 'string' || !publicKey) throw new Error('grantRecipient: publicKey required');
+      const cur = await keyStore.read();
+      if (!cur) throw new Error('grantRecipient: no group key yet (bootstrap the circle first)');
+      if ((cur.recipients ?? []).includes(publicKey)) return { keyResource: cur, granted: false };
+      const next = grantMember(cur, {
+        newRecipient: publicKey,
+        granterPrivateKey: controllerKey.privateKey,
+        currentRecipients: cur.recipients ?? [],
+      });
+      await keyStore.write(next);
+      await emitKeyEvent(next);
+      return { keyResource: next, granted: true };
+    },
+
+    /**
+     * Revoke a device: rotate the group key to every current holder MINUS the device's sealing
+     * key. `policy: 'ban'` additionally re-seals history to exclude it (the stolen-device
+     * default — nothing pod-fetchable remains for the island; what it already downloaded cannot
+     * be clawed back, by any system).
+     */
+    async revokeRecipient({ publicKey, policy = 'ban' } = {}) {
+      if (typeof publicKey !== 'string' || !publicKey) throw new Error('revokeRecipient: publicKey required');
+      const cur = await keyStore.read();
+      if (!cur || !(cur.recipients ?? []).includes(publicKey)) {
+        return { keyResource: cur ?? null, rotated: false };
+      }
+      const holders = new Set(cur.recipients ?? []);
+      holders.delete(publicKey);
+      let next = rotateGroupKeyResource({
+        previous: cur,
+        recipients: recipientsWithController([...holders]),
+      });
+      if (policy === 'ban') {
+        next = banFromHistory(next, { excludePubKey: publicKey, controllerPrivateKey: controllerKey.privateKey });
+      }
+      await keyStore.write(next);
+      await emitKeyEvent(next);
+      return { keyResource: next, rotated: true };
+    },
+
+    /**
      * Leave / remove — enforce ≥1 admin, revoke ACL + rotate the group key (forward secrecy) + revoke the
      * departed's MESH PROOF (the coupling fix: removal is complete, not just content-key rotation).
      *

@@ -127,6 +127,7 @@ async function restoreOrGenerate(vault) {
 }
 
 import { restoreOwnerRoot, DEVICE_DELEGATION_VAULT_KEY } from './ownerRootRestore.js';
+import { sealingPublicKeyFromNetworkKey } from '@onderling/pod-client';
 import { ensureOwnerRoot, pickRootKeyStore } from './ownerRootCustody.js';
 import { makeAgentTrailEntry } from '../../eventLog.js';
 import {
@@ -1355,6 +1356,18 @@ export async function createRealHouseholdAgent(opts = {}) {
           payload: { by: chatId.pubKey }, actor: chatId.pubKey, signer: ceremonySigner,
         }).catch(() => null);
         if (stmt) revokedIn.push({ circleId, address });
+        // KEY ROTATION (custody B1): a SEALED circle whose producer lives on this device rotates
+        // its group key away from the revoked device's sealing key — derived from the revoked
+        // address itself (the ed2curve bridge), so no key distribution is needed. 'ban' policy:
+        // the stolen-device default — history re-seals so nothing pod-fetchable remains for the
+        // island. Best-effort per circle: an unsealed circle (or a producer elsewhere) no-ops.
+        try {
+          await opts.stoopControlAgent?.revokeRecipient?.({
+            groupId: circleId,
+            publicKey: sealingPublicKeyFromNetworkKey(address),
+            policy: 'ban',
+          });
+        } catch { /* sealing degrades gracefully — the statement above is the transport island-ing */ }
       }
       return [DataPart({ ok: true, deviceId, known, revokedIn, circles: revokedIn.length })];
     } catch (e) { return [DataPart({ ok: false, outcome: 'error', error: e?.message ?? 'revoke-failed' })]; }

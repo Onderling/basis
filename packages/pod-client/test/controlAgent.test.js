@@ -215,3 +215,32 @@ describe('controlAgent — removeMember rotates to holders MINUS the departed, n
     expect(canOpen(h.current(), cato.privateKey)).toBe(true);
   });
 });
+
+describe('controlAgent — device-grained audience surgery (the custody arc)', () => {
+  it('the DEVICE STORY end to end: enroll a device (grant) → it reads; revoke ("ban") → it cannot, the member still can', async () => {
+    const { agent, grants, revokes } = setup();
+    const member = generateKeypair();          // the member's first device
+    const device2 = generateKeypair();         // their enrolled second device
+    await agent.addMember({ webId: 'did:bea', publicKey: member.publicKey, role: 'admin' });
+
+    // ENROLL: the second device joins the AUDIENCE — no member-roster change, no ACL churn.
+    const g = await agent.grantRecipient({ publicKey: device2.publicKey });
+    expect(g.granted).toBe(true);
+    expect(unwrapGroupKey(g.keyResource, device2.privateKey)).toBeTruthy();
+    expect(unwrapGroupKey(g.keyResource, member.privateKey)).toBeTruthy();
+    expect(agent.members()).toHaveLength(1);                 // still ONE member
+    expect(grants).toHaveLength(1);                          // no second ACL grant
+    // idempotent
+    expect((await agent.grantRecipient({ publicKey: device2.publicKey })).granted).toBe(false);
+
+    // REVOKE: the group key rotates away from the device; the member's own device keeps reading.
+    const r = await agent.revokeRecipient({ publicKey: device2.publicKey });
+    expect(r.rotated).toBe(true);
+    expect(unwrapGroupKey(r.keyResource, member.privateKey)).toBeTruthy();
+    expect(() => unwrapGroupKey(r.keyResource, device2.privateKey)).toThrow(/not a recipient/);   // the island
+    expect(agent.members()).toHaveLength(1);                 // the MEMBER was never touched
+    expect(revokes).toHaveLength(0);                         // no ACL revoke either
+    // revoking a never-granted key is a no-op, not an error
+    expect((await agent.revokeRecipient({ publicKey: generateKeypair().publicKey })).rotated).toBe(false);
+  });
+});

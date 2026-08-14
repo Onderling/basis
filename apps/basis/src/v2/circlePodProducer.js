@@ -172,6 +172,16 @@ export function createCircleControlAgentRouter(getProducer) {
       if (!webId) return;
       await route(groupId, (ca) => ca.removeMember({ webId, force, policy }));
     },
+    // Device-grained audience surgery (the custody arc): the member stays; one of their devices'
+    // sealing keys joins or leaves the group key's audience.
+    async grantRecipient({ publicKey, groupId }) {
+      if (!publicKey) return;
+      await route(groupId, (ca) => ca.grantRecipient?.({ publicKey }));
+    },
+    async revokeRecipient({ publicKey, policy, groupId }) {
+      if (!publicKey) return;
+      await route(groupId, (ca) => ca.revokeRecipient?.({ publicKey, policy }));
+    },
   };
 }
 

@@ -27,6 +27,7 @@ import { createSettingsModule } from '@onderling/local-store';
 // a fitness test pins that the register's declared default equals the exported const (agreement, not a copy).
 import { ASK_DEFAULT_TTL_MS } from './nearbyAsks.js';
 import { DEFAULT_RETENTION_DAYS } from './retentionPref.js';
+import { DEFAULT_SHARE_NKN_ADDRESS, SHARE_NKN_ADDRESS_PARAM_KEY } from './addressSharing.js';
 
 /**
  * The settable (kind:user) params basis governs — the worked-example cluster. Grows as more clusters migrate;
@@ -56,6 +57,10 @@ export const BASIS_USER_PARAMS = [
   // per install. The Settings CONTROL is the proper door (it runs the whole permission→token→relay
   // chain); a raw form write converges at the next boot's restore.
   { key: 'wake.nudges',                         scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: false },
+  // "Never share my global address" — consolidated from the bare cc.shareNknAddress key. The register
+  // read is now the ENFORCED value everywhere (realAgent's contact-QR gate reads it live); before the
+  // consolidation the enforcement sites read an opt no shell ever passed — the setting was UI-only.
+  { key: SHARE_NKN_ADDRESS_PARAM_KEY,           scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: DEFAULT_SHARE_NKN_ADDRESS },
 ];
 
 /**

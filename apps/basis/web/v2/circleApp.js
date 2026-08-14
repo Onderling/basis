@@ -72,7 +72,7 @@ import { registerCircleAddresses, unregisterCircleAddresses } from '../../src/v2
 import { removeCircleMember, leaveCircleLocally } from '../../src/v2/circleMembershipHygiene.js';
 // "Never share my global address" (Frits, 2026-07-29) — a per-user PUBLICATION lock, distinct from the
 // routing fallback: a global address seen in two contexts collapses two personas into one person.
-import { shareableAddress, localStorageAddressSharingIo } from '../../src/v2/addressSharing.js';
+import { shareableAddress, SHARE_NKN_ADDRESS_PARAM_KEY } from '../../src/v2/addressSharing.js';
 import {
   createConnectionPoints, adoptExistingRelay, localStorageConnectionPointsIo, recordJoinedCirclePoints,
   // Used at module scope to pick the boot relay; it was never imported, so loading the web shell threw
@@ -927,11 +927,11 @@ const recipeStore = createKringRecipeStore({ io: localStorageRecipeIo(), version
 // P1.7 — the viewer's per-circle chat filter (device-local; nothing is fanned — a filter that told the
 // circle what you skip would be a new leak).
 const chatFilterIo = localStorageChatFilterIo();
-const addressSharingIo = localStorageAddressSharingIo();
-/** This device's global address, or null when the user refuses to publish it. Read per call. */
+/** This device's global address, or null when the user refuses to publish it. Read per call —
+ *  the LIVE register value (the device-params consolidation; pre-boot reads serve the default). */
 const myShareableNknAddr = () => shareableAddress(
   circleHouseholdAgent?.peer?.address ?? null,
-  () => addressSharingIo.load(),
+  () => circleHouseholdAgent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY) !== false,
 );
 
 // Which actors are AGENTS, for the filter's people/agents axis. Read off the Contacten roster the app
@@ -3943,8 +3943,11 @@ async function showMyData() {
       try { deliverySettingsCache = await deliverySettingsStore.set(patch); } catch { /* keep the old view */ }
       rerender();
     },
-    shareNknAddress: addressSharingIo.load(),
-    onSetShareAddress: (allowed) => { addressSharingIo.save(allowed); rerender(); },
+    shareNknAddress: circleHouseholdAgent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY) !== false,
+    onSetShareAddress: async (allowed) => {
+      try { await circleHouseholdAgent.callSkill('params', 'set-param', { key: SHARE_NKN_ADDRESS_PARAM_KEY, value: allowed !== false }); } catch { /* the row re-reads */ }
+      rerender();
+    },
     // Message cleanup — the conversation is the RECORD (never expires by policy); this is the user's own
     // explicit deletion, taking effect NOW in the conversation they are looking at. Returns the real count.
     onPurgeMessages: (days) => eventLog.purgeConversation({ olderThanMs: daysToMs(normalizeRetentionDays(days)) }),

@@ -27,6 +27,9 @@
 /** The default: sharing allowed. Off is a deliberate, informed choice. */
 export const DEFAULT_SHARE_NKN_ADDRESS = true;
 
+/** The register param this setting lives in since the device-params consolidation (device scope). */
+export const SHARE_NKN_ADDRESS_PARAM_KEY = 'privacy.shareNknAddress';
+
 /**
  * Normalise the stored value. Anything unrecognised reads as the DEFAULT rather than as "off": a
  * corrupt setting that silently made someone unreachable would look exactly like a broken app, and the
@@ -54,36 +57,4 @@ export function shareableAddress(address, allowed = DEFAULT_SHARE_NKN_ADDRESS) {
   const ok = typeof allowed === 'function' ? allowed() !== false : allowed !== false;
   if (!ok) return null;
   return typeof address === 'string' && address ? address : null;
-}
-
-/** localStorage-backed store (web). Absent key ⇒ the default. */
-export function localStorageAddressSharingIo(storage = globalThis.localStorage) {
-  const KEY = 'cc.shareNknAddress';
-  return {
-    load: () => { try { return normalizeShareNknAddress(storage?.getItem(KEY)); } catch { return DEFAULT_SHARE_NKN_ADDRESS; } },
-    save: (allowed) => {
-      try {
-        // Only the non-default is persisted — no key means "I never changed this".
-        if (allowed === false) storage?.setItem(KEY, 'false');
-        else storage?.removeItem(KEY);
-      } catch { /* ignore */ }
-    },
-  };
-}
-
-/** AsyncStorage-backed store (mobile). Same key, same defaulting. */
-export function asyncStorageAddressSharingIo(AsyncStorage) {
-  const KEY = 'cc.shareNknAddress';
-  return {
-    load: async () => {
-      try { return normalizeShareNknAddress(await AsyncStorage?.getItem(KEY)); }
-      catch { return DEFAULT_SHARE_NKN_ADDRESS; }
-    },
-    save: async (allowed) => {
-      try {
-        if (allowed === false) await AsyncStorage?.setItem(KEY, 'false');
-        else await AsyncStorage?.removeItem(KEY);
-      } catch { /* ignore */ }
-    },
-  };
 }

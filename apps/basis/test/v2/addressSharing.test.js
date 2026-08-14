@@ -12,7 +12,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_SHARE_NKN_ADDRESS, normalizeShareNknAddress, shareableAddress,
-  localStorageAddressSharingIo,
 } from '../../src/v2/addressSharing.js';
 import { publishPeerAddr } from '../../src/web/podStorage.js';
 
@@ -79,22 +78,16 @@ describe('the escape points refuse at the source', () => {
 });
 
 describe('persistence', () => {
-  it('only the non-default is stored — no key means "I never changed this"', () => {
-    const mem = new Map();
-    const io = localStorageAddressSharingIo({
-      getItem: (k) => (mem.has(k) ? mem.get(k) : null),
-      setItem: (k, v) => mem.set(k, v),
-      removeItem: (k) => mem.delete(k),
-    });
-    io.save(false);
-    expect(io.load()).toBe(false);
-    io.save(true);
-    expect(mem.size).toBe(0);
-    expect(io.load()).toBe(true);
-  });
-
-  it('a broken storage read degrades to sharing, not to silent unreachability', () => {
-    const io = localStorageAddressSharingIo({ getItem: () => { throw new Error('nope'); }, setItem: () => {}, removeItem: () => {} });
-    expect(io.load()).toBe(true);
+  it('the setting lives in the parameter register (the device-params consolidation) — one key, one gate', async () => {
+    const { SHARE_NKN_ADDRESS_PARAM_KEY } = await import('../../src/v2/addressSharing.js');
+    const { createParamsService } = await import('../../src/v2/paramsService.js');
+    const svc = createParamsService();
+    const { params } = await svc.callSkill('list-user-params');
+    const row = params.find((p) => p.key === SHARE_NKN_ADDRESS_PARAM_KEY);
+    expect(row).toBeTruthy();
+    expect(row.scope).toBe('device');
+    // default true (share) — turning it OFF is the explicit privacy act, and the register default
+    // must agree with the module's exported default (one source of truth).
+    expect(svc.register.valueOf(SHARE_NKN_ADDRESS_PARAM_KEY)).toBe(true);
   });
 });

@@ -33,7 +33,7 @@ import {
   useCircleSigningIdentity, installCircleSigningIdentities,
 } from '../../v2/circleSigningIdentity.js';
 import { createCircleSenderAuthorization, SENDER_REASON } from '../../v2/circleSenderAuthorization.js';
-import { shareableAddress } from '../../v2/addressSharing.js';
+import { shareableAddress, SHARE_NKN_ADDRESS_PARAM_KEY } from '../../v2/addressSharing.js';
 import { createParamsService, basisParamRegistry } from '../../v2/paramsService.js';   // #36 — settable params surface
 import { settingsSealStrategyForIdentity } from '../../v2/sharedCopyOpener.js';         // #36 pod-sync — seal-to-self for settings
 import {
@@ -2530,7 +2530,12 @@ export async function createRealHouseholdAgent(opts = {}) {
         // …gated by the user's publication lock: a contact card is the single most travelled copy of
         // this address, so "never share my global address" has to hold here first. Off ⇒ the card simply
         // carries no peerAddr and the scanner reaches them by the other rungs.
-        const myPeerAddr = shareableAddress(sa?.peer?.address ?? null, opts.shareNknAddress);
+        const myPeerAddr = shareableAddress(
+          sa?.peer?.address ?? null,
+          // The LIVE register value (device scope) — a flip in my-data binds here immediately.
+          // opts stays as a test override; no shell passes it.
+          opts.shareNknAddress ?? (() => paramsService.register.valueOf(SHARE_NKN_ADDRESS_PARAM_KEY) !== false),
+        );
         if (myPeerAddr) realArgs = { ...realArgs, peerAddr: myPeerAddr };
         if (typeof console !== 'undefined') {
           console.log('[realAgent] getContactShareQr inject peerAddr=' + (myPeerAddr ? myPeerAddr.slice(0,16)+'…' : 'NONE'));

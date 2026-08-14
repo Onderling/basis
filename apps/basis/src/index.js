@@ -283,7 +283,7 @@ export { createCircleSenderAuthorization, SENDER_REASON }
                                                 from './v2/circleSenderAuthorization.js';
 export {
   DEFAULT_SHARE_NKN_ADDRESS, normalizeShareNknAddress, shareableAddress,
-  localStorageAddressSharingIo, asyncStorageAddressSharingIo,
+  SHARE_NKN_ADDRESS_PARAM_KEY,
 } from './v2/addressSharing.js';
 export { registerCircleAddresses, unregisterCircleAddresses }
                                                 from './v2/circleAddressRegistration.js';

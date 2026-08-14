@@ -655,7 +655,7 @@ export async function bootAgentBundle(opts = {}) {
   let wakeNudges = null;
   if (opts.asyncStorage && agent.relay) {
     try {
-      const { createWakeNudges } = await import('../../../../packages/react-native/src/push/wakeNudges.js');
+      const { createWakeNudges } = await import('@onderling/react-native/push');
       wakeNudges = createWakeNudges({
         agent: coreAgent ?? agent,
         relay: agent.relay,

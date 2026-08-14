@@ -24,6 +24,8 @@
     "./identity/bootstrap":           "./src/identity/bootstrapIdentity.js",
     "./identity/VaultAsyncStorage":   "./src/identity/VaultAsyncStorage.js",
 
+    "./push":                         "./src/push/index.js",
+
     "./storage":                      "./src/storage/index.js",
     "./storage/AsyncStorageAdapter":  "./src/storage/AsyncStorageAdapter.js",
     "./pseudo-pod-adapter":           "./src/pseudo-pod-adapter/index.js",

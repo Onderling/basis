@@ -120,7 +120,7 @@ import { revealedMemberLabel } from '../../../../basis/src/v2/circleViewAs.js';
 import { resolveCircleLlm } from '../../../../basis/src/v2/llmPicker.js';
 // Phase 4 §9/§10 — the settings-surface transport state (relayPref) + the shared composer built-in classifier (G17).
 import { resolveRelayUrl, asyncStorageRelayIo } from '../../../../basis/src/v2/relayPref.js';
-import { readWakeNudgesPref } from '../../../../../packages/react-native/src/push/wakeNudges.js';
+import { readWakeNudgesPref } from '@onderling/react-native/push';
 import { parseCircleBuiltin } from '../../../../basis/src/v2/circleComposerBuiltins.js';
 // The SHARED security-status report — the SAME handler web reaches (circleApp.js). Mobile's circle composer
 // classified `/security-status` (it's in CIRCLE_BUILTIN_COMMANDS) but had no branch, so it fell through to the

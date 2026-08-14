@@ -15,6 +15,8 @@ import {
   bootRealAgentNode, connectNodesOverBus, pairCircle, until, teardown,
 } from './support/pairRealAgents.js';
 import { ownAnnouncementFor } from '../src/v2/circleAddressAnnounce.js';
+import { rosterBindingVerifier } from '../src/v2/membershipRail.js';
+import { sealingPublicKeyFromNetworkKey } from '@onderling/pod-client';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST } from '../src/v2/membershipRail.js';
 import { EventLog } from '../src/eventLog.js';
 
@@ -25,12 +27,28 @@ const rowFor = async (node, webid) => {
   return (res?.members ?? []).find((m) => m.webid === webid) ?? null;
 };
 
-describe('the device-revocation ceremony — enroll, then evict the device everywhere', () => {
-  let A; let B; let A2;
+describe('the device-revocation ceremony — the V2 stolen-device walk', () => {
+  let A; let B; let A2; let rotations;
 
   beforeAll(async () => {
     const logOpts = () => ({ agentOpts: { deviceLog: new EventLog({ initial: [], muted: [] }) } });
-    [A, B] = await Promise.all([bootRealAgentNode('A', logOpts()), bootRealAgentNode('B', logOpts())]);
+    // A's control router is a SPY: V2 asserts the ceremony rotates the sealed-circle key away
+    // from the revoked device's sealing key (the wiring pin; the rotation itself is pinned at the
+    // control-agent level).
+    rotations = [];
+    const controlSpy = {
+      addMember: async () => {}, removeMember: async () => {},
+      grantRecipient: async () => {}, revokeRecipient: async (a) => { rotations.push(a); },
+    };
+    // B's chat binding = the PRODUCTION roster verifier — the harness default resolves through
+    // the live node registry and would accept the island's statements forever.
+    const bRef = {};
+    const productionBinding = rosterBindingVerifier((app, op, args) => bRef.node.agent.callSkill(app, op, args));
+    [A, B] = await Promise.all([
+      bootRealAgentNode('A', { agentOpts: { ...logOpts().agentOpts, stoopControlAgent: controlSpy } }),
+      bootRealAgentNode('B', { agentOpts: logOpts().agentOpts, verifyChatBinding: productionBinding }),
+    ]);
+    bRef.node = B;
     await connectNodesOverBus([A, B]);
     await pairCircle(A, B, { groupId: GROUP, name: 'Revoke walk', handle: 'bea' });
     // B ingests fanned membership statements through the PRODUCTION peer handler (the shells'
@@ -140,5 +158,27 @@ describe('the device-revocation ceremony — enroll, then evict the device every
     const after = await rowFor(B, A.pubKey);
     expect(after.circleAddress, 'B refused the forged revocation — the survivor stands').toBe(survivor);
     expect(after.circleAddresses).toContain(survivor);
+
+    // ── THE ISLAND SPEAKS AND NOBODY LISTENS: the stolen device signs a chat statement with its
+    //    (revoked) per-circle key; B's production binding no longer finds the address on the row
+    //    and the statement never renders. ──
+    const islandText = 'ik ben er nog';
+    const islandMsg = await A2.chatRail.appendMessage(GROUP, {
+      msgId: 'island-1', ts: Date.now(), text: islandText, actor: A2.pubKey,
+    });
+    expect(islandMsg?.statement).toBeTruthy();
+    await B._routerRef.fn({ from: 'island', payload: {
+      subtype: 'kring-chat-statement', circleId: GROUP,
+      msgId: 'island-1', ts: Date.now(), event: islandMsg.statement, fromWebid: A2.pubKey,
+    } });
+    expect(B.chatEvents.find((e) => e?.payload?.text === islandText)).toBeUndefined();
+
+    // ── THE ROTATION FIRED: the ceremony asked the sealed-key router to rotate away from the
+    //    revoked device's sealing key, ban policy — nothing pod-fetchable remains for the island. ──
+    expect(rotations.length).toBeGreaterThanOrEqual(1);
+    const rot = rotations.find((r) => r.groupId === GROUP);
+    expect(rot).toBeTruthy();
+    expect(rot.policy).toBe('ban');
+    expect(rot.publicKey).toBe(sealingPublicKeyFromNetworkKey(addrA2));
   }, 120_000);
 });

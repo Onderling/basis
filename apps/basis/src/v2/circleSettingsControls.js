@@ -56,6 +56,10 @@ export function resolveCircleRoute({ policy, transport } = {}) {
     relayConfigured,
     relayAvailable,
     transportKnown: t != null,
+    // Whether THIS platform can receive an OS push wake at all (mobile: yes; web: an open tab
+    // already receives live, there is no killed-app state to wake). Tri-state: true / false /
+    // undefined (shell didn't say — predicates seam to ENABLED, never a faked disable).
+    canWakePush: t && typeof t.canWakePush === 'boolean' ? t.canWakePush : undefined,
   };
 }
 
@@ -75,6 +79,15 @@ export const ENABLED_WHEN = Object.freeze({
     if (route.relayAvailable) return { enabled: true, reason: 'relay-route' };
     if (!route.transportKnown) return { enabled: true, reason: 'route-unknown-default-enabled' };
     return { enabled: false, reason: 'pod-only-no-relay' };
+  },
+
+  // Platform push capability (the wake-nudges toggle): only a platform with an OS push path can
+  // be woken while the app is asleep. The shell states it (`transport.canWakePush`); explicitly
+  // false → disabled with the honest why; unsaid → ENABLED + seam (never a faked disable).
+  pushCapable: (route) => {
+    if (route.canWakePush === true) return { enabled: true, reason: 'push-capable' };
+    if (route.canWakePush === false) return { enabled: false, reason: 'no-push-on-platform' };
+    return { enabled: true, reason: 'route-unknown-default-enabled' };
   },
 });
 

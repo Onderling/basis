@@ -2172,6 +2172,15 @@ export async function createSecureAgent(opts = {}) {
         ? relayTransport.addAddress(a, opts)
         : Promise.resolve({ ok: false, reason: 'not-connected' })),
       removeAddress: (a) => { try { relayTransport?.removeAddress(a); } catch { /* best-effort */ } },
+      // The PUSH half of the transport port (offline delivery, the wake rung) — surfaced here for
+      // the same reason as the alias half: a host registers its wake token through the facade it
+      // already holds, never by reaching for the transport.
+      registerPushToken: (a) => (relayTransport
+        ? relayTransport.registerPushToken(a)
+        : Promise.resolve({ ok: false, reason: 'not-connected' })),
+      unregisterPushToken: () => (relayTransport
+        ? relayTransport.unregisterPushToken()
+        : Promise.resolve({ ok: false, reason: 'not-connected' })),
     },
     get transportMode() { return transportMode; },
     setTransportMode,

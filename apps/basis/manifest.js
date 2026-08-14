@@ -609,6 +609,18 @@ export const basisManifest = {
           labelKey: 'circle.settings.relayEndpoint', hintKey: 'circle.settings.relayEndpoint_hint',
           enabledWhen: 'always',
         },
+        // Wake nudges — device-scoped, OFF by default (silence-by-default). Enabling registers this
+        // device's push token on the relay so a pending message can send a CONTENTLESS wake through
+        // the platform's push service; the hint says exactly what that service learns (that something
+        // is pending, and when — never from whom or what). Greys out where the platform has no OS
+        // push path (web: an open tab already receives live).
+        {
+          id: 'wake-nudges', kind: 'toggle', scope: 'device',
+          opId: 'wake-nudges', arg: 'enabled', stateKey: 'wakeNudges',
+          labelKey: 'circle.settings.wakeNudges', hintKey: 'circle.settings.wakeNudges_hint',
+          disabledHintKey: 'circle.settings.wakeNudges_disabled',
+          enabledWhen: 'pushCapable',
+        },
         // What this circle's conversation contains — circle-policy field, admin-only, options resolved
         // from the entry-kind registry at render time (`optionsFrom`). Added 2026-07-29 as decision 3's
         // missing surface: the axis was persisted and read, and `setConversationKind` had no call site,

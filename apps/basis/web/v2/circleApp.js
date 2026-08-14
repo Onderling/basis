@@ -1319,7 +1319,9 @@ function applyTransportMode(mode) {
 // + mode), so the private-DM grey-out is a REAL disable, not the missing-data seam.
 function currentTransportState() {
   const relayUrl = resolveRelayUrl(localStorageRelayIo().load(), CIRCLE_RELAY_ENV) || '';
-  return { mode: readTransportMode(), relayUrl, relayConnected: !!CIRCLE_RELAY_URL };
+  // canWakePush: false — web has no killed-app state to wake; an open tab already receives live.
+  // (The wake-nudges toggle greys with its honest why; listed in web-mobile-exceptions.)
+  return { mode: readTransportMode(), relayUrl, relayConnected: !!CIRCLE_RELAY_URL, canWakePush: false };
 }
 // media P-live — the DEPLOYED blob-gate edge URL (e.g. `https://relay.example/blob-gate`).
 // EXPLICIT opt-in: only when this is configured do full-size photos go to a real bucket

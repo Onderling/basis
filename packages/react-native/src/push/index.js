@@ -15,3 +15,4 @@
 export { setupPush, requestPushPermission } from './setupPush.js';
 export { usePushOptIn }                     from './usePushOptIn.js';
 export { presentLocalNotification, presentLocalWith } from './presentLocal.js';
+export { createWakeNudges, readWakeNudgesPref, WAKE_NUDGES_KEY } from './wakeNudges.js';

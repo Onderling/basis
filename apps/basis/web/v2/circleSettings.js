@@ -557,6 +557,27 @@ function renderConnectionControls(container, { controls, policy, transport, tr, 
       clear.disabled = !state.enabled;
       clear.addEventListener('click', () => { input.value = ''; dispatch(ctl.opId, { clear: true }); });
       row.append(lab, input, apply, clear);
+    } else if (ctl.kind === 'toggle' && ctl.scope === 'device') {
+      // Device-scoped toggle (wake-nudges): state lives on the DEVICE (`transport`), dispatches its
+      // op via onControl — never a circle-policy emit. Off-by-default; the shell reports the truth.
+      const wrap = document.createElement('label');
+      wrap.className = 'circle-settings__control-toggle';
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.dataset.control = ctl.id;
+      box.checked = !!(transport && ctl.stateKey && transport[ctl.stateKey]);
+      box.disabled = !state.enabled;
+      box.addEventListener('change', () => dispatch(ctl.opId, { [ctl.arg]: box.checked }));
+      const span = document.createElement('span');
+      span.textContent = tr(ctl.labelKey);
+      wrap.append(box, span);
+      row.appendChild(wrap);
+      if (!state.enabled && ctl.disabledHintKey) {
+        const why = document.createElement('div');
+        why.className = 'circle-settings__control-why';
+        why.textContent = tr(ctl.disabledHintKey);
+        row.appendChild(why);
+      }
     } else {   // toggle → a circle-policy field (emit), route-gated by enabledWhen.
       const wrap = document.createElement('label');
       wrap.className = 'circle-settings__control-toggle';

@@ -1554,6 +1554,18 @@
       "text": "Vereist een relay: kringen met alleen een pod kunnen geen privékanaal tussen leden opzetten.",
       "doc": "Phase 4 §7 — shown when the private-chat toggle greys out under pod-only (no relay)."
     },
+    "wakeNudges": {
+      "text": "Dit apparaat wekken bij nieuwe berichten",
+      "doc": "offline delivery M1 — the wake-nudges device toggle (registers the push token on the relay; off by default)."
+    },
+    "wakeNudges_hint": {
+      "text": "Staat standaard uit. Aan: het relay stuurt een leeg weksignaal via de pushdienst van je platform zodra er een bericht klaarstaat. Die dienst ziet alleen dát er iets klaarstaat en wanneer — nooit van wie of wat.",
+      "doc": "offline delivery M1 — states the metadata floor: what the push service learns."
+    },
+    "wakeNudges_disabled": {
+      "text": "Niet beschikbaar op dit platform — een open tabblad ontvangt al live.",
+      "doc": "offline delivery M1 — shown where the platform has no OS push path (web)."
+    },
     "relay_applied": {
       "text": "Relay ingesteld: {{url}}",
       "doc": "G17 — /set-relay built-in confirmation bubble."

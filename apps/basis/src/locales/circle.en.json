@@ -1554,6 +1554,18 @@
       "text": "Needs a relay: pod-only circles can't set up a private channel between members.",
       "doc": "Phase 4 §7 — shown when the private-chat toggle greys out under pod-only (no relay)."
     },
+    "wakeNudges": {
+      "text": "Wake this device for new messages",
+      "doc": "offline delivery M1 — the wake-nudges device toggle (registers the push token on the relay; off by default)."
+    },
+    "wakeNudges_hint": {
+      "text": "Off by default. When on, the relay sends an empty wake signal through your platform's push service when a message is waiting. That service only learns that something is pending, and when — never from whom or what.",
+      "doc": "offline delivery M1 — states the metadata floor: what the push service learns."
+    },
+    "wakeNudges_disabled": {
+      "text": "Not available on this platform — an open tab already receives live.",
+      "doc": "offline delivery M1 — shown where the platform has no OS push path (web)."
+    },
     "relay_applied": {
       "text": "Relay set: {{url}}",
       "doc": "G17 — /set-relay built-in confirmation bubble."

@@ -15,7 +15,7 @@ const CONTROLS = settingsControlsFromManifest(basisManifest);
 describe('§9 settings controls — declared on the manifest (invariant #4)', () => {
   it('the settings op carries its controls, declared in the manifest', () => {
     const ids = CONTROLS.map((c) => c.id);
-    expect(ids).toEqual(['transport-mode', 'relay-endpoint', 'conversation-kinds', 'private-dm']);
+    expect(ids).toEqual(['transport-mode', 'relay-endpoint', 'wake-nudges', 'conversation-kinds', 'private-dm']);
   });
 
   it('the conversation-kinds control resolves its options from the registry, not from the manifest', () => {
@@ -120,5 +120,23 @@ describe('resolveCircleRoute + transportOptionEnabled — pure helpers', () => {
     const noRelay = resolveCircleRoute({ policy: { pod: 'shared' }, transport: { relayUrl: '' } });
     expect(transportOptionEnabled('nkn', noRelay).enabled).toBe(true);
     expect(transportOptionEnabled('relay', noRelay).enabled).toBe(false);
+  });
+});
+
+describe('the wake-nudges platform gate (pushCapable)', () => {
+  const CTL = [{ id: 'wake-nudges', kind: 'toggle', scope: 'device', enabledWhen: 'pushCapable' }];
+  it('a push-capable platform (mobile) enables the toggle', () => {
+    const out = resolveControlEnablement(CTL, { transport: { canWakePush: true }, log: () => {} });
+    expect(out['wake-nudges']).toMatchObject({ enabled: true, reason: 'push-capable' });
+  });
+  it('a platform WITHOUT an OS push path (web) disables it with the honest why', () => {
+    const out = resolveControlEnablement(CTL, { transport: { canWakePush: false }, log: () => {} });
+    expect(out['wake-nudges']).toMatchObject({ enabled: false, reason: 'no-push-on-platform' });
+  });
+  it('a shell that says nothing gets ENABLED + the seam (never a faked disable)', () => {
+    const seams = [];
+    const out = resolveControlEnablement(CTL, { transport: {}, log: (m) => seams.push(m) });
+    expect(out['wake-nudges'].enabled).toBe(true);
+    expect(seams.some((m) => m.includes('wake-nudges'))).toBe(true);
   });
 });

@@ -56,6 +56,7 @@ import { dlog } from './src/core/devLog.js';
 import { EventLog } from '../basis/src/eventLog.js';
 import { migrateKringChatHistory, CHAT_MIGRATION_MARKER_KEY } from '../basis/src/v2/kringChatRehydrate.js';
 import { createSettingsPodMedium } from '../basis/src/v2/settingsPodMedium.js';
+import { createHistoryPodMedium } from '../basis/src/v2/historyMirror.js';
 import { wireEventLogPersistence, asyncStorageSnapshotIo } from '../basis/src/v2/eventLogPersistence.js';
 import { createChatMessageInbox } from '../basis/src/v2/chatMessageInbox.js';
 import { createSelfAuthorCheck } from '../basis/src/v2/chatSelfAuthor.js';
@@ -489,6 +490,13 @@ export default function App() {
           // The membership rider: hand the device log so membership statements ride its lane.
           deviceLog: eventLogRef.current ?? undefined,
           provisionSettingsMedium: async (strategy) => createSettingsPodMedium({
+            fetch:   getCirclePodFetch(),
+            podRoot: getActiveRealPodRouting()?.podRoot ?? null,
+            strategy,
+          }),
+          // The personal history mirror's pod backend (parity with web circleApp): same pod, same
+          // seal-to-self strategy; realAgent gates on the history.mirror switch (off by default).
+          provisionHistoryMirror: async (strategy) => createHistoryPodMedium({
             fetch:   getCirclePodFetch(),
             podRoot: getActiveRealPodRouting()?.podRoot ?? null,
             strategy,

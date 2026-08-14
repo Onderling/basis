@@ -137,6 +137,7 @@ async function loadMdnsTransport() {   // (batch 7) unused — kept one release 
  * @param {object}  [opts.hostVault]           host-side vault (defaults inside factory to makeBrowserVault)
  * @param {object}  [opts.asyncStorage]        when provided AND chatVault/hostVault are NOT, synthesises two VaultAsyncStorage instances (cc-chat-id: + cc-host-id: prefixes). RN runtime path; vitest can pass a mock AsyncStorage to exercise it.
  * @param {function}[opts.provisionSettingsMedium] `(strategy) => medium|null` — the pod-backed self-sealed settings inner realAgent attaches to the parameter register on sign-in (RN parity with web circleApp)
+ * @param {function}[opts.provisionHistoryMirror] `(strategy) => source|null` — the history mirror's sealed pod backend (realAgent gates on the history.mirror switch; RN parity with web circleApp)
  * @param {object}  [opts.secureAgentOpts]     forwarded to createRealHouseholdAgent → createSecureAgent
  * @param {function}[opts.publishEvent]        forwarded; defaults to no-op
  * @param {object}  [opts.nknLib]              optional runtime nkn-sdk module; if present, connectPeerTransport is wired
@@ -295,6 +296,9 @@ export async function bootAgentBundle(opts = {}) {
       // Settings pod-sync inner (RN parity): realAgent attaches this self-sealed pod medium to the parameter
       // register's settings store on sign-in. App.js passes circlePods' fetch/root; absent → local-only.
       provisionSettingsMedium: opts.provisionSettingsMedium,
+      // The personal history mirror's pod backend (RN parity): realAgent gates on the history.mirror
+      // switch (off by default) and seals with the same seal-to-self strategy. Absent → no mirror.
+      provisionHistoryMirror: opts.provisionHistoryMirror,
       // #44 — the restore choices (web parity): the coarse mismatch dialog + the per-param
       // merge list ride the same two realAgent seams; the App shell paints them with Alerts.
       onSettingsKeyMismatch: opts.onSettingsKeyMismatch,

@@ -9,9 +9,11 @@
  * unregisters at the relay AND tears the bridge down. The sender's half of the gate already
  * lives in the shared entry-kind table (silent kinds stamp `noWake` at every fan site).
  *
- * The pref is a device pref (AsyncStorage, same idiom as `cc-transport-mode`); `restore()`
- * re-registers on boot so a relay that lost its memory — or a fresh socket — gets the token
- * back without the person doing anything.
+ * The switch's persistence is an injected {getItem, setItem} seam — in production the app hands
+ * a register-backed adapter (the `wake.nudges` parameter, device scope), so the value lives in
+ * the ONE settings vocabulary; the key below only names this seam. `restore()` re-registers on
+ * boot so a relay that lost its memory — or a fresh socket — gets the token back without the
+ * person doing anything.
  *
  * Pure orchestration: every effect (permission prompt, bridge, relay, storage) is injected, so
  * the whole ladder tests headless.

@@ -660,10 +660,18 @@ export async function bootAgentBundle(opts = {}) {
   if (opts.asyncStorage && agent.relay) {
     try {
       const { createWakeNudges } = await import('@onderling/react-native/push');
+      // The switch's persistence is the parameter register (device scope) since the params
+      // consolidation — the orchestrator keeps its injected storage seam (a package cannot import
+      // app composition), so the app injects a register-backed adapter: reads mirror the live
+      // register value, writes go through the ONE kind-gated set-param.
+      const registerStore = {
+        getItem: async () => (agent.getParamValue?.('wake.nudges') === true ? 'on' : 'off'),
+        setItem: async (_k, v) => { await agent.callSkill('params', 'set-param', { key: 'wake.nudges', value: v === 'on' }); },
+      };
       wakeNudges = createWakeNudges({
         agent: coreAgent ?? agent,
         relay: agent.relay,
-        asyncStorage: opts.asyncStorage,
+        asyncStorage: registerStore,
         projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID,
       });
       wakeNudges.restore()

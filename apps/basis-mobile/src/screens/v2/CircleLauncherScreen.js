@@ -120,7 +120,6 @@ import { revealedMemberLabel } from '../../../../basis/src/v2/circleViewAs.js';
 import { resolveCircleLlm } from '../../../../basis/src/v2/llmPicker.js';
 // Phase 4 §9/§10 — the settings-surface transport state (relayPref) + the shared composer built-in classifier (G17).
 import { resolveRelayUrl, asyncStorageRelayIo } from '../../../../basis/src/v2/relayPref.js';
-import { readWakeNudgesPref } from '@onderling/react-native/push';
 import { parseCircleBuiltin } from '../../../../basis/src/v2/circleComposerBuiltins.js';
 // The SHARED security-status report — the SAME handler web reaches (circleApp.js). Mobile's circle composer
 // classified `/security-status` (it's in CIRCLE_BUILTIN_COMMANDS) but had no branch, so it fell through to the
@@ -437,9 +436,10 @@ export default function CircleLauncherScreen({
       const relayUrl = resolveRelayUrl(await asyncStorageRelayIo(AsyncStorage).load(), process.env.EXPO_PUBLIC_CIRCLE_RELAY_URL) || '';
       let mode = null;
       try { const m = await AsyncStorage.getItem('cc-transport-mode'); if (m === 'nkn' || m === 'relay' || m === 'both') mode = m; } catch { /* best-effort */ }
-      // canWakePush: mobile HAS a killed-app state an OS push can wake; wakeNudges = the persisted
-      // switch (OFF by default) the Settings toggle reads back.
-      const wakeNudges = await readWakeNudgesPref(AsyncStorage);
+      // canWakePush: mobile HAS a killed-app state an OS push can wake; wakeNudges = the register
+      // switch (OFF by default) the Settings toggle reads back — consolidated from the bare
+      // AsyncStorage key into the parameter register (device scope).
+      const wakeNudges = bundle?.agent?.getParamValue?.('wake.nudges') === true;
       setCircleTransport({ mode, relayUrl, relayConnected: !!relayUrl, canWakePush: true, wakeNudges });
     } catch { setCircleTransport(null); }
   }, []);

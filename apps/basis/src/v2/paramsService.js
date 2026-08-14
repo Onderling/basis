@@ -51,6 +51,11 @@ export const BASIS_USER_PARAMS = [
   // the background. Agent-scoped: the window is a preference of the PERSON, not of one device.
   { key: 'history.restore.recencyDays',         scope: PARAM_SCOPE.AGENT,  kind: PARAM_KIND.USER, default: 30 },
   { key: 'history.restore.maxPerCircle',        scope: PARAM_SCOPE.AGENT,  kind: PARAM_KIND.USER, default: 500 },
+  // The wake-nudges switch (offline delivery) — consolidated from the bare cc-wake-nudges
+  // AsyncStorage key (the device-params consolidation's exemplar). DEVICE scope: a wake token is
+  // per install. The Settings CONTROL is the proper door (it runs the whole permission→token→relay
+  // chain); a raw form write converges at the next boot's restore.
+  { key: 'wake.nudges',                         scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: false },
 ];
 
 /**

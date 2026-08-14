@@ -62,6 +62,17 @@ runtime.
 - **Convention (rule):** this doc — register a tunable **at every change**. Adoption is gradual, but new
   tunables are registered as they are written; do not add a raw tunable const alongside the register.
 
+## Who may set
+`set-param` is an OWNER surface today: it is reached only through the person's own interfaces (the
+settings form, the my-data rows, the slash builtins), and a `kind:user` declaration is a promise to
+the OWNER, not to every peer or process. No bot, extension, or IoT device may call `set-param`
+directly. When such an actor should legitimately tune a value (a thermostat adjusting a polling
+cadence, a companion bot adjusting a digest window), the route is a **task-scoped mandate** naming
+the specific param key — the same entrust vocabulary every other delegated capability uses — checked
+by the decision-class table once that ladder lands. The param's declared `{key, scope, kind}` is the
+object such a grant names, which is why consolidating stray device prefs INTO the register precedes
+any bot/IoT authority work: a bare storage key cannot be granted, audited, or refused.
+
 ## Future
 The `param()` spec (`{key, scope, kind, default}`) is a plain object and can grow optional metadata
 (`description`, `unit`, `range`/`enum`, `tags`, `effect`) to make the register self-describing for the settings

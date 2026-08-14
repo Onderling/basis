@@ -41,6 +41,7 @@ import { PodClient, generateKeypair as podGenerateKeypair, createSealedPodClient
 // #36 pod-sync — the shared factory that builds the register's self-sealed, path-mapped settings pod inner
 // (kept in src/ so web ≡ mobile by construction; the shell only composes it, no routing logic — invariant 1).
 import { createSettingsPodMedium } from '../../src/v2/settingsPodMedium.js';
+import { createHistoryPodMedium } from '../../src/v2/historyMirror.js';
 import { createPseudoPod } from '@onderling/pseudo-pod';
 import { circleVersioningFor, getCircleVersionStore } from '../../src/web/circleVersioning.js';
 import { pickWebBackend } from '../../src/web/persistentBackend.js';
@@ -7089,6 +7090,18 @@ async function boot() {
             fetch:   circleAuthedFetch,
             podRoot: circleRealPodRouting?.podRoot ?? null,
             strategy,   // seal-to-self, derived by realAgent from the owner-root identity (cross-device stable)
+          });
+        } catch { return null; }
+      },
+      // The personal history mirror's pod backend — same shape as the settings medium: the shell
+      // supplies the pod, realAgent supplies the seal-to-self strategy and gates on the
+      // `history.mirror` switch (off by default). Not signed in → null → no mirror, honest degrade.
+      provisionHistoryMirror: async (strategy) => {
+        try {
+          return await createHistoryPodMedium({
+            fetch:   circleAuthedFetch,
+            podRoot: circleRealPodRouting?.podRoot ?? null,
+            strategy,
           });
         } catch { return null; }
       },

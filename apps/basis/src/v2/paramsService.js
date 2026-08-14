@@ -43,6 +43,9 @@ export const BASIS_USER_PARAMS = [
   // (inert settability). Defaults MUST match the declaration site — the duplicate-vocab guard enforces agreement.
   { key: 'calendarEmission.defaultDurationMin', scope: PARAM_SCOPE.AGENT,  kind: PARAM_KIND.USER, default: 30 },
   { key: 'onlineCadence.pollIntervalMs',        scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: 5000 },
+  // The personal history mirror's switch — OFF by default: nothing mirrors until the person turns it on
+  // (the connect-storage door flips it; boot reads it to wire the sealed follower sink).
+  { key: 'history.mirror',                      scope: PARAM_SCOPE.AGENT,  kind: PARAM_KIND.USER, default: false },
 ];
 
 /**

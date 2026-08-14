@@ -36,6 +36,7 @@ import { createCircleSenderAuthorization, SENDER_REASON } from '../../v2/circleS
 import { shareableAddress } from '../../v2/addressSharing.js';
 import { createParamsService, basisParamRegistry } from '../../v2/paramsService.js';   // #36 — settable params surface
 import { settingsSealStrategyForIdentity } from '../../v2/sharedCopyOpener.js';         // #36 pod-sync — seal-to-self for settings
+import { createHistoryMirror, HISTORY_MIRROR_PARAM_KEY } from '../../v2/historyMirror.js'; // the personal history store's sealed follower sink
 import {
   probeSettingsMediumDetailed, isProbeSafeToAttach,
   computeSettingsConflicts, SETTINGS_SHARED_PROBE_PATH,
@@ -3573,6 +3574,35 @@ export async function createRealHouseholdAgent(opts = {}) {
   // G7 — turn on live presence now that `_listMyKnownBuurts` + the roster invoke exist. Idempotent.
   _enableReachabilityOracle();
 
+  // The personal history mirror (the sealed follower sink) — param-gated, OFF by default. When the
+  // person has turned `history.mirror` on AND the shell can reach a backend (`opts.provisionHistoryMirror`,
+  // the settings-medium pattern), the device log mirrors outward as sealed batches plus a snapshot head.
+  // Sealed to the SAME seal-to-self strategy settings use — identical across the user's enrolled devices,
+  // re-derived by the phrase ceremony. Fire-and-forget: a failed backend never touches boot; the switch's
+  // runtime flip takes effect on the next boot (the connect-storage door will drive it live).
+  let historyMirror = null;
+  if (typeof opts.provisionHistoryMirror === 'function' && opts.deviceLog) {
+    (async () => {
+      try {
+        if (paramsService.register.valueOf(HISTORY_MIRROR_PARAM_KEY) !== true) return;
+        const strategy = settingsSealStrategyForIdentity(chatId);
+        const source = strategy ? await opts.provisionHistoryMirror(strategy) : null;
+        if (!source) return;
+        historyMirror = createHistoryMirror({
+          eventLog: opts.deviceLog,
+          source,
+          // The snapshot head: the registry rows (circles, key refs, delegations — structure the log
+          // does not derive). Settings ride their own pod-sync; the head does not duplicate them.
+          snapshot: async () => ({ registry: (await agentsRegistryRef?.list?.()) ?? [] }),
+        });
+        await historyMirror.start();
+        if (typeof console !== 'undefined') console.info('[history-mirror] following the device log (sealed)');
+      } catch (err) {
+        if (typeof console !== 'undefined') console.warn('[history-mirror] not started:', err?.message ?? err);
+      }
+    })();
+  }
+
   return {
     // Part G — the REAL household app manifest (item/task vocab) is now the
     // catalog source of truth for the household surface.  (The mock manifest
@@ -3582,6 +3612,8 @@ export async function createRealHouseholdAgent(opts = {}) {
     // #36 — a consumer's read of a registered param's LIVE value (sync, from the hydrated register), e.g. the
     // retention window. Reads only; writes go through callSkill('params','set-param',…).
     getParamValue: (key) => paramsService.register.valueOf(key),
+    /** The history mirror's live status for the my-data surface (null = not running on this boot). */
+    historyMirrorStatus: () => historyMirror?.status?.() ?? null,
     llmProviders,
     // host-injected claim router; called after every successful
     // claimTask.  Hosts wire `makeAfterClaimHook` here once the agent +

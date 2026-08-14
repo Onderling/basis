@@ -529,6 +529,22 @@ export default function CircleSettingsScreen({
                   </View>
                 );
               }
+              if (ctl.kind === 'toggle' && ctl.scope === 'device') {
+                // Device-scoped toggle (wake-nudges): state lives on the DEVICE (`transport`),
+                // dispatches its op via runControl — never a circle-policy patch (web parity).
+                return (
+                  <View key={ctl.id} style={styles.controlRow} testID={`control-${ctl.id}${cs.enabled ? '' : '-disabled'}`}>
+                    <View style={styles.row}>
+                      <Text style={styles.rowLabel}>{t(ctl.labelKey)}</Text>
+                      <Switch trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
+                        disabled={!cs.enabled} value={!!(transport && ctl.stateKey && transport[ctl.stateKey])}
+                        onValueChange={(v) => runControl(ctl.opId, { [ctl.arg]: v })} testID={`control-${ctl.id}-switch`} />
+                    </View>
+                    {ctl.hintKey ? <Text style={styles.hintText}>{t(ctl.hintKey)}</Text> : null}
+                    {!cs.enabled && ctl.disabledHintKey ? <Text style={styles.note}>{t(ctl.disabledHintKey)}</Text> : null}
+                  </View>
+                );
+              }
               // toggle → circle-policy field (patch), route-gated by enabledWhen.
               return (
                 <View key={ctl.id} style={styles.controlRow} testID={`control-${ctl.id}${cs.enabled ? '' : '-disabled'}`}>

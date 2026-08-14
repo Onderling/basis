@@ -120,6 +120,7 @@ import { revealedMemberLabel } from '../../../../basis/src/v2/circleViewAs.js';
 import { resolveCircleLlm } from '../../../../basis/src/v2/llmPicker.js';
 // Phase 4 §9/§10 — the settings-surface transport state (relayPref) + the shared composer built-in classifier (G17).
 import { resolveRelayUrl, asyncStorageRelayIo } from '../../../../basis/src/v2/relayPref.js';
+import { readWakeNudgesPref } from '../../../../../packages/react-native/src/push/wakeNudges.js';
 import { parseCircleBuiltin } from '../../../../basis/src/v2/circleComposerBuiltins.js';
 // The SHARED security-status report — the SAME handler web reaches (circleApp.js). Mobile's circle composer
 // classified `/security-status` (it's in CIRCLE_BUILTIN_COMMANDS) but had no branch, so it fell through to the
@@ -436,7 +437,10 @@ export default function CircleLauncherScreen({
       const relayUrl = resolveRelayUrl(await asyncStorageRelayIo(AsyncStorage).load(), process.env.EXPO_PUBLIC_CIRCLE_RELAY_URL) || '';
       let mode = null;
       try { const m = await AsyncStorage.getItem('cc-transport-mode'); if (m === 'nkn' || m === 'relay' || m === 'both') mode = m; } catch { /* best-effort */ }
-      setCircleTransport({ mode, relayUrl, relayConnected: !!relayUrl });
+      // canWakePush: mobile HAS a killed-app state an OS push can wake; wakeNudges = the persisted
+      // switch (OFF by default) the Settings toggle reads back.
+      const wakeNudges = await readWakeNudgesPref(AsyncStorage);
+      setCircleTransport({ mode, relayUrl, relayConnected: !!relayUrl, canWakePush: true, wakeNudges });
     } catch { setCircleTransport(null); }
   }, []);
   useEffect(() => { loadCircleTransport(); }, [loadCircleTransport]);
@@ -467,6 +471,17 @@ export default function CircleLauncherScreen({
     if (opId === 'transport-mode' && ['nkn', 'relay', 'both'].includes(String(args?.mode))) {
       try { await AsyncStorage.setItem('cc-transport-mode', args.mode); } catch { /* best-effort */ }
       try { bundle?.agent?.setTransportMode?.(args.mode); } catch { /* best-effort */ }
+    }
+    if (opId === 'wake-nudges') {
+      // Offline delivery M1 — the whole enable/disable ladder lives in the bundle's orchestrator
+      // (permission → token → relay registration → persisted switch); this dispatcher only routes
+      // and reports. No orchestrator on this boot (no relay facade) → the honest refusal.
+      if (!bundle?.wakeNudges) return { ok: false, error: 'wake-nudges-unavailable' };
+      const r = args?.enabled === true
+        ? await bundle.wakeNudges.enable()
+        : await bundle.wakeNudges.disable();
+      loadCircleTransport();
+      return r;
     }
     if (opId === 'security-status') {
       // The SHARED security-status report (web≡mobile — circleApp.js): what the circle boundary is ENFORCING.

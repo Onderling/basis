@@ -647,6 +647,29 @@ export async function bootAgentBundle(opts = {}) {
   });
   const coreAgent = agent.sa?.agent ?? null;   // discoverA2A's hello/native-upgrade target
 
+  // Offline delivery M1 — the device's wake-nudge switch (OFF by default; a token reaches the
+  // relay only after the person enables it in Settings). Built lazily so a boot without
+  // AsyncStorage (tests) or without the relay facade simply has no switch. `restore()` is
+  // fire-and-forget: a relay restart forgets sleeping devices, so a switched-on device
+  // re-registers its token on every boot; registerPushToken itself awaits the relay connection.
+  let wakeNudges = null;
+  if (opts.asyncStorage && agent.relay) {
+    try {
+      const { createWakeNudges } = await import('../../../../packages/react-native/src/push/wakeNudges.js');
+      wakeNudges = createWakeNudges({
+        agent: coreAgent ?? agent,
+        relay: agent.relay,
+        asyncStorage: opts.asyncStorage,
+        projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID,
+      });
+      wakeNudges.restore()
+        .then((r) => { if (r.restored) console.log('[cc/boot] wake-nudges: token re-registered on the relay'); })
+        .catch(() => { /* fire-and-forget — the Settings row shows the live truth */ });
+    } catch (err) {
+      console.warn('[cc/boot] wake-nudges unavailable:', err?.message ?? err);
+    }
+  }
+
   // Calendar cross-peer fan-out (web parity) — a successful calendar dispatch
   // fans its invite/RSVP envelopes out over the peer transport. Gated on the
   // transport being connected; a no-op otherwise. The hook's snapshot lookups
@@ -770,6 +793,7 @@ export async function bootAgentBundle(opts = {}) {
     // lists + opens from it. `sharedWithMeOpener` is this device's network-derived sealing opener (or null).
     sharedWithMeStore,
     sharedWithMeOpener,
+    wakeNudges,               // offline delivery M1 — the Settings toggle dispatches through this (null = no switch on this boot)
     get mdns() { return mdns; },
     // The surface. Prefer these over `mdns` in app code — see the import comment above.
     discoverability,

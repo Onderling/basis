@@ -52,10 +52,10 @@ describe('the set-param op — the kind gate (decision D)', () => {
     // The kind:user params basis governs today (the history-mirror switch + the instant-restore
     // recency window joined with the personal history store — all flipped through this same gate).
     expect(params.map((p) => p.key).sort()).toEqual([
-      'calendarEmission.defaultDurationMin', 'history.mirror',
+      'app.lang', 'calendarEmission.defaultDurationMin', 'display.theme', 'history.mirror',
       'history.restore.maxPerCircle', 'history.restore.recencyDays',
       'nearby.ask.defaultTtlMs', 'onlineCadence.pollIntervalMs',
-      'privacy.shareNknAddress', 'surface.pref', 'transport.mode', 'wake.nudges',
+      'privacy.shareNknAddress', 'relay.url', 'surface.pref', 'transport.mode', 'wake.nudges',
     ]);
     // Both are kind:user; internal caps are never here.
     expect(params.every((p) => ['agent', 'device'].includes(p.scope))).toBe(true);

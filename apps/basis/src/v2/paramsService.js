@@ -30,6 +30,7 @@ import { DEFAULT_RETENTION_DAYS } from './retentionPref.js';
 import { DEFAULT_SHARE_NKN_ADDRESS, SHARE_NKN_ADDRESS_PARAM_KEY } from './addressSharing.js';
 import { DEFAULT_SURFACE_PREF, SURFACE_PREF_PARAM_KEY } from './surfacePref.js';
 import { TRANSPORT_MODES } from './circleSettingsControls.js';
+import { DEFAULT_THEME_PREF } from './themePref.js';
 
 /**
  * The settable (kind:user) params basis governs — the worked-example cluster. Grows as more clusters migrate;
@@ -71,6 +72,13 @@ export const BASIS_USER_PARAMS = [
   // boot: the chosen mode silently reset to the default on every restart. realAgent now applies
   // the register value at boot AND on a live set-param.
   { key: 'transport.mode',                      scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: TRANSPORT_MODES[0] },
+  // The three BOOT-ENTANGLED prefs (the consolidation's last keys). Each keeps its bare key as a
+  // PRE-BOOT CACHE (the pre-paint theme hook, i18n init, and the transport connect all run before
+  // the agent exists); the register is the AUTHORITY: every set writes through here, and the
+  // shells reconcile cache←register once the agent is up (register wins; the live apply follows).
+  { key: 'display.theme',                       scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: DEFAULT_THEME_PREF },
+  { key: 'app.lang',                            scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: '' },
+  { key: 'relay.url',                           scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: '' },
 ];
 
 /**

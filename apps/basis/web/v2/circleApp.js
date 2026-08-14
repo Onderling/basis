@@ -880,6 +880,10 @@ function registerCirclePresence(agent = _peerAgent, extraCircleIds = []) {
 // in use (the setting, or the env fallback when cleared). web≡mobile (mobile mirrors this in hostOps).
 async function applyRelayUrl(url) {
   const saved = await relayPrefStore.set(url);
+  // The bare key stays the PRE-BOOT CACHE (the transport connects before the agent boots); the
+  // register is the authority (device-params consolidation). Same-value echoes are idempotent.
+  circleHouseholdAgent?.callSkill?.('params', 'set-param', { key: 'relay.url', value: saved ?? '' })
+    .catch(() => { /* the cache stands */ });
   CIRCLE_RELAY_URL = resolveRelayUrl(saved, CIRCLE_RELAY_ENV);
   if (_peerAgent) {
     try { await tryConnectPeerTransport(_peerAgent, _peerRouter); }
@@ -1097,6 +1101,11 @@ function setThemePref(v) {
     if (v === 'system') localStorage.removeItem('basis.theme');
     else localStorage.setItem('basis.theme', v);
   } catch { /* best-effort */ }
+  // The register is the AUTHORITY (device-params consolidation); localStorage stays the
+  // PRE-PAINT CACHE (index.html's boot hook reads it before any script runs). Same-value
+  // echoes from the reconcile are idempotent.
+  circleHouseholdAgent?.callSkill?.('params', 'set-param', { key: 'display.theme', value: v })
+    .catch(() => { /* the cache stands; the register converges on the next set */ });
   if (v === 'system') delete document.documentElement.dataset.theme;
   else document.documentElement.dataset.theme = v;
   return true;
@@ -3877,7 +3886,11 @@ async function showMyData() {
   const onSetAppLang = async (lng) => {
     if (lng !== 'nl' && lng !== 'en') return;
     await setLang(lng);
+    // localStorage stays the PRE-BOOT CACHE (i18n initialises before the agent); the register is
+    // the authority (device-params consolidation).
     try { localStorage.setItem('circle.app.lang', lng); } catch { /* best-effort */ }
+    circleHouseholdAgent?.callSkill?.('params', 'set-param', { key: 'app.lang', value: lng })
+      .catch(() => { /* the cache stands */ });
     showMij();
   };
   // Display theme: persist + stamp data-theme live (the pre-paint hook in
@@ -7170,6 +7183,26 @@ async function boot() {
     });
     agent._circleGroupsIndex = circleGroupsIndex;   // the roster feed fills it (householdRosterPairing)
     circleHouseholdAgent = agent;   // OBJ-2 — expose to showSettings (sibling fn) for the paired-devices panel
+    // Reconcile the three boot-cached device prefs FROM the register (the authority; the caches
+    // only exist because the pre-paint hook, i18n init, and the transport connect all run before
+    // this line). Register wins; each apply routes through the pref's own live door, whose
+    // write-through then echoes the same value back — idempotent by construction.
+    (() => {
+      try {
+        const th = agent.getParamValue?.('display.theme');
+        if ((th === 'light' || th === 'dark' || th === 'system') && th !== getThemePref()) setThemePref(th);
+        const lg = agent.getParamValue?.('app.lang');
+        let cachedLang = null; try { cachedLang = localStorage.getItem('circle.app.lang'); } catch { /* no storage */ }
+        if ((lg === 'nl' || lg === 'en') && lg !== cachedLang) {
+          try { localStorage.setItem('circle.app.lang', lg); } catch { /* best-effort */ }
+          setLang(lg).catch(() => {});
+        }
+        const ru = agent.getParamValue?.('relay.url');
+        if (typeof ru === 'string' && ru && ru !== (localStorageRelayIo().load() || '')) {
+          applyRelayUrl(ru).catch(() => {});
+        }
+      } catch { /* the caches stand — the next explicit set converges both */ }
+    })();
     // #36 — apply the persisted chat-retention (hydrated into the register at agent boot) to the live eventLog,
     // so a value set on another device (via shared.json/pod) — or last session — takes effect on this boot.
     try { eventLog.setRetention(retentionFromDays(agent.getParamValue('retention.chatDays'))); } catch { /* prune failure must not block boot */ }

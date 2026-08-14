@@ -99,6 +99,34 @@ describe('renderCircleMyData', () => {
     expect(onRevokeDevice).toHaveBeenCalledWith('dev-1');
   });
 
+  it('the history-mirror row: state line reflects off/on/error; the toggle fires the flip', () => {
+    const onToggleHistoryMirror = vi.fn();
+    const off = renderCircleMyData(document.createElement('div'), {
+      t, historyMirror: { enabled: false, status: null }, onToggleHistoryMirror,
+    });
+    expect(off.querySelector('[data-role="history-status"]').textContent).toBe('circle.mydata.history_off');
+    const btn = off.querySelector('.cc-mydata__history-toggle');
+    expect(btn.textContent).toBe('circle.mydata.history_enable');
+    btn.click();
+    expect(onToggleHistoryMirror).toHaveBeenCalled();
+
+    const on = renderCircleMyData(document.createElement('div'), {
+      t, historyMirror: { enabled: true, status: { mirrored: 12, pending: 2, lastError: null } }, onToggleHistoryMirror,
+    });
+    expect(on.querySelector('[data-role="history-status"]').textContent).toContain('circle.mydata.history_on');
+    expect(on.querySelector('[data-role="history-status"]').textContent).toContain('14');   // mirrored + pending
+    expect(on.querySelector('.cc-mydata__history-toggle').textContent).toBe('circle.mydata.history_disable');
+
+    const err = renderCircleMyData(document.createElement('div'), {
+      t, historyMirror: { enabled: true, status: { mirrored: 3, lastError: 'pod weg' } }, onToggleHistoryMirror,
+    });
+    expect(err.querySelector('[data-role="history-status"]').textContent).toContain('circle.mydata.history_error');
+
+    // absent prop → no section (unchanged surface for hosts that don't pass it)
+    const none = renderCircleMyData(document.createElement('div'), { t });
+    expect(none.querySelector('[data-role="history-status"]')).toBe(null);
+  });
+
   it('renders the push-notification toggle reflecting subscription state', () => {
     const onToggleNotifications = vi.fn();
     const off = renderCircleMyData(document.createElement('div'), {

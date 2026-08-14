@@ -267,3 +267,57 @@ export async function hydrateHistory({
 
   return { recent, hydratedIds, tailDone };
 }
+
+/**
+ * The EXPORT fold-in: a full-log export IS "mirror to a file" — the same sink, one shot, into an
+ * in-memory archive, serialized to one JSON document (key → sealed body). No bespoke exporter:
+ * whatever the sink writes is what the file holds, sealed exactly like the pod mirror, and
+ * `archiveSource` feeds the SAME `hydrateHistory` door on the way back — an export is proven
+ * restorable by construction.
+ */
+
+/** A SolidPodSource-shaped backing over a Map — the archive's in-memory body store. */
+function archiveBacking(map = new Map()) {
+  return {
+    map,
+    async read(uri) { if (!map.has(uri)) { const e = new Error('not-found'); e.status = 404; throw e; } return { content: map.get(uri) }; },
+    async write(uri, body) { map.set(uri, String(body)); },
+    async delete(uri) { map.delete(uri); },
+    async list(prefix) { return [...map.keys()].filter((k) => k.startsWith(prefix)); },
+  };
+}
+
+/** The archive document format. */
+const ARCHIVE_V = 1;
+
+/**
+ * One-shot export: run the sink over the LIVE device log into a sealed in-memory archive and
+ * serialize it. `strategy` is the same seal-to-self the pod mirror uses — the file is opaque to
+ * anyone but the owner, and a future install opens it with the phrase-restored identity.
+ *
+ * @returns {Promise<string>} the archive JSON (`{v, exportedAt, entries: {key: sealedBody}}`)
+ */
+export async function exportHistoryArchive({ eventLog, strategy, snapshot = null, laneId = 'export', now = Date.now } = {}) {
+  if (!strategy) throw new Error('exportHistoryArchive: a seal strategy is required (never export unsealed)');
+  const backing = archiveBacking();
+  const sealed = createSealedPodDataSource({ podSource: backing, podUrl: 'mem://', strategy });
+  const sink = createHistoryMirror({
+    eventLog, source: sealed, snapshot, laneId,
+    batchMax: 500, flushMs: 60_000, now,
+  });
+  await sink.start();   // backfills the whole live log, flushes, writes the head
+  await sink.stop();
+  return JSON.stringify({ v: ARCHIVE_V, exportedAt: now(), entries: Object.fromEntries(backing.map) });
+}
+
+/**
+ * Open an archive document as a read-only DataSource — hand it (sealed) to `createSealedPodDataSource`
+ * via `podSource`, or its sealed form directly to `hydrateHistory` after wrapping. Convenience:
+ * `archiveSource(json, strategy)` returns the READY sealed source for `hydrateHistory`.
+ */
+export function archiveSource(json, strategy) {
+  const doc = typeof json === 'string' ? JSON.parse(json) : json;
+  if (!doc || typeof doc.entries !== 'object') throw new Error('archiveSource: not a history archive');
+  const backing = archiveBacking(new Map(Object.entries(doc.entries)));
+  return strategy ? createSealedPodDataSource({ podSource: backing, podUrl: 'mem://', strategy }) : backing;
+}

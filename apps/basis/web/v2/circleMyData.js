@@ -30,6 +30,13 @@ export function renderCircleMyData(container, {
   onRevokeDevice,
   notifications,
   onToggleNotifications,
+  // The personal history mirror (a sealed copy of the device log on the user's own storage).
+  // `historyMirror` = { enabled, status } (status = the agent's live historyMirrorStatus(), null
+  // when not running); absent ⇒ the section is omitted. The toggle flips the `history.mirror`
+  // register param through the one kind-gated write — the agent starts/stops the sink LIVE.
+  historyMirror = null,
+  onToggleHistoryMirror = null,
+  onExportHistory = null,       // one-shot sealed archive download ("mirror to a file")
   // The two delivery settings (2026-07-28). One object, because they are two knobs on one question.
   delivery,               // { sendReceipts, allowFallback } — absent ⇒ the section is omitted
   onSetDelivery,          // (patch) => void
@@ -211,6 +218,40 @@ export function renderCircleMyData(container, {
       sec.appendChild(row);
     }
     container.appendChild(sec);
+  }
+
+  // ── the personal history mirror (sealed copy of the device log on your own storage) ────────
+  if (historyMirror && typeof onToggleHistoryMirror === 'function') {
+    const h = historyMirror;
+    const sec2 = section(tr('circle.mydata.history'));
+    const state = document.createElement('p');
+    state.className = 'cc-mydata__history-status';
+    state.dataset.role = 'history-status';
+    if (!h.enabled) state.textContent = tr('circle.mydata.history_off');
+    else if (h.status?.lastError) state.textContent = tr('circle.mydata.history_error', { error: h.status.lastError });
+    else if (h.status) state.textContent = tr('circle.mydata.history_on', { count: h.status.mirrored + (h.status.pending ?? 0) });
+    else state.textContent = tr('circle.mydata.history_waiting');
+    sec2.appendChild(state);
+    const what = document.createElement('p');
+    what.className = 'cc-mydata__history-what';
+    what.textContent = tr('circle.mydata.history_what');
+    sec2.appendChild(what);
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'cc-mydata__action cc-mydata__history-toggle';
+    toggle.textContent = h.enabled ? tr('circle.mydata.history_disable') : tr('circle.mydata.history_enable');
+    toggle.addEventListener('click', () => onToggleHistoryMirror());
+    sec2.appendChild(toggle);
+    // Export = "mirror to a file" — the same sink, one shot, sealed the same way; needs no pod.
+    if (typeof onExportHistory === 'function') {
+      const exp = document.createElement('button');
+      exp.type = 'button';
+      exp.className = 'cc-mydata__action cc-mydata__history-export';
+      exp.textContent = tr('circle.mydata.history_export');
+      exp.addEventListener('click', () => onExportHistory());
+      sec2.appendChild(exp);
+    }
+    container.appendChild(sec2);
   }
 
   // ── notifications (S5 web-push) ─────────────────────────────────────────────

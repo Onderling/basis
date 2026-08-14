@@ -37,9 +37,9 @@ import { shareableAddress } from '../../v2/addressSharing.js';
 import { createParamsService, basisParamRegistry } from '../../v2/paramsService.js';   // #36 — settable params surface
 import { settingsSealStrategyForIdentity } from '../../v2/sharedCopyOpener.js';         // #36 pod-sync — seal-to-self for settings
 import {
-  createHistoryMirror, hydrateHistory,
+  createHistoryMirror, hydrateHistory, exportHistoryArchive,
   HISTORY_MIRROR_PARAM_KEY, HISTORY_RECENCY_DAYS_KEY, HISTORY_RECENCY_MAX_KEY,
-} from '../../v2/historyMirror.js'; // the personal history store: sealed follower sink + instant-restore hydrate
+} from '../../v2/historyMirror.js'; // the personal history store: sealed follower sink + instant-restore hydrate + archive export
 import {
   probeSettingsMediumDetailed, isProbeSafeToAttach,
   computeSettingsConflicts, SETTINGS_SHARED_PROBE_PATH,
@@ -241,6 +241,11 @@ export async function createRealHouseholdAgent(opts = {}) {
   // here because `ensureCircleSync` (whose eager boot call runs first) closes over them for the per-type valve.
   let taskRail = null;
   let taskEmit = null;
+  // The personal history mirror's state — assigned at the end of boot (the sync block); declared
+  // here so the params dispatch (a live switch flip) can kick the reconciler.
+  let historyMirror = null;
+  let historyMirrorOp = Promise.resolve();
+  let historyMirrorSync = null;
   // The chat lane (same handover point).
   let chatRail = null;
   let chatEmit = null;
@@ -2251,6 +2256,11 @@ export async function createRealHouseholdAgent(opts = {}) {
         });
         if (entry) opts.deviceLog.append(entry);
       }
+      // The history-mirror switch flips LIVE: reconcile the running sink with the new value now,
+      // not on the next boot (on = start following + hydrate a fresh log; off = final flush + stop).
+      if (opId === 'set-param' && paramsResult?.ok !== false && args?.key === HISTORY_MIRROR_PARAM_KEY) {
+        historyMirrorSync?.();
+      }
       return paramsResult;
     }
     if (appOrigin === 'household') {
@@ -3581,13 +3591,24 @@ export async function createRealHouseholdAgent(opts = {}) {
   // person has turned `history.mirror` on AND the shell can reach a backend (`opts.provisionHistoryMirror`,
   // the settings-medium pattern), the device log mirrors outward as sealed batches plus a snapshot head.
   // Sealed to the SAME seal-to-self strategy settings use — identical across the user's enrolled devices,
-  // re-derived by the phrase ceremony. Fire-and-forget: a failed backend never touches boot; the switch's
-  // runtime flip takes effect on the next boot (the connect-storage door will drive it live).
-  let historyMirror = null;
-  if (typeof opts.provisionHistoryMirror === 'function' && opts.deviceLog) {
-    (async () => {
+  // re-derived by the phrase ceremony. `historyMirrorSync` reconciles the running state with the switch:
+  // the boot kicks it once, and a LIVE set-param of the switch kicks it again (the callSkill params branch),
+  // so flipping it on starts following immediately — no reboot. Serialized; failures never touch boot.
+  historyMirrorSync = () => {
+    if (typeof opts.provisionHistoryMirror !== 'function' || !opts.deviceLog) return Promise.resolve();
+    historyMirrorOp = historyMirrorOp.then(async () => {
+      const want = paramsService.register.valueOf(HISTORY_MIRROR_PARAM_KEY) === true;
+      if (!want) {
+        if (historyMirror) {
+          const m = historyMirror;
+          historyMirror = null;
+          await m.stop();   // one final flush — nothing buffered is lost by turning it off
+          if (typeof console !== 'undefined') console.info('[history-mirror] stopped (switch off)');
+        }
+        return;
+      }
+      if (historyMirror) return;   // already following
       try {
-        if (paramsService.register.valueOf(HISTORY_MIRROR_PARAM_KEY) !== true) return;
         const strategy = settingsSealStrategyForIdentity(chatId);
         const source = strategy ? await opts.provisionHistoryMirror(strategy) : null;
         if (!source) return;
@@ -3609,7 +3630,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         }
         // The SINK: this device's own lane (what restore hydrated stays out of it — it already
         // lives in the lane it came from).
-        historyMirror = createHistoryMirror({
+        const m = createHistoryMirror({
           eventLog: opts.deviceLog,
           source,
           laneId: custody.deviceId ?? enrolledDevice?.deviceId ?? 'root',
@@ -3618,13 +3639,16 @@ export async function createRealHouseholdAgent(opts = {}) {
           // does not derive). Settings ride their own pod-sync; the head does not duplicate them.
           snapshot: async () => ({ registry: (await agentsRegistryRef?.list?.()) ?? [] }),
         });
-        await historyMirror.start();
+        await m.start();
+        historyMirror = m;
         if (typeof console !== 'undefined') console.info('[history-mirror] following the device log (sealed)');
       } catch (err) {
         if (typeof console !== 'undefined') console.warn('[history-mirror] not started:', err?.message ?? err);
       }
-    })();
-  }
+    }).catch(() => { /* serialized chain must never wedge */ });
+    return historyMirrorOp;
+  };
+  historyMirrorSync();
 
   return {
     // Part G — the REAL household app manifest (item/task vocab) is now the
@@ -3637,6 +3661,18 @@ export async function createRealHouseholdAgent(opts = {}) {
     getParamValue: (key) => paramsService.register.valueOf(key),
     /** The history mirror's live status for the my-data surface (null = not running on this boot). */
     historyMirrorStatus: () => historyMirror?.status?.() ?? null,
+    /** One-shot sealed export of the whole live device log — "mirror to a file", the same sink and
+     *  the same seal; `archiveSource` + `hydrateHistory` open it again on any future install. */
+    exportHistoryArchive: async () => {
+      if (!opts.deviceLog) throw new Error('no device log on this composition');
+      const strategy = settingsSealStrategyForIdentity(chatId);
+      if (!strategy) throw new Error('no seal identity — sign in first');
+      return exportHistoryArchive({
+        eventLog: opts.deviceLog,
+        strategy,
+        snapshot: async () => ({ registry: (await agentsRegistryRef?.list?.()) ?? [] }),
+      });
+    },
     llmProviders,
     // host-injected claim router; called after every successful
     // claimTask.  Hosts wire `makeAfterClaimHook` here once the agent +

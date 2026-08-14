@@ -3951,7 +3951,30 @@ async function showMyData() {
     surfacePref: circleSurfacePref.get(), onSetSurfacePref, appLang: currentLang(), onSetAppLang, themePref: getThemePref(), onSetTheme: (v) => { if (setThemePref(v)) rerender(); }, chatAi, userLlm: userLlmCfg, onSaveUserLlm, validateUserLlm: validateUserLlmConfig,
     // in-app relay setting (no rebuild): the field shows the saved setting; env is the placeholder fallback.
     // Objective D / Surface 4: onOpenRelayPanel routes editing into the docked side-panel (openPagePanel).
-    relayUrl: resolveRelayUrl(localStorageRelayIo().load(), ''), relayEnvUrl: CIRCLE_RELAY_ENV, onSaveRelay: applyRelayUrl, onOpenRelayPanel: openRelayPanel });
+    relayUrl: resolveRelayUrl(localStorageRelayIo().load(), ''), relayEnvUrl: CIRCLE_RELAY_ENV, onSaveRelay: applyRelayUrl, onOpenRelayPanel: openRelayPanel,
+    // The personal history mirror — live health from the agent + the switch through the one
+    // kind-gated write (the agent starts/stops the sink LIVE on the flip).
+    historyMirror: {
+      enabled: circleHouseholdAgent?.getParamValue?.('history.mirror') === true,
+      status:  circleHouseholdAgent?.historyMirrorStatus?.() ?? null,
+    },
+    onToggleHistoryMirror: async () => {
+      const on = circleHouseholdAgent?.getParamValue?.('history.mirror') === true;
+      try { await circleHouseholdAgent.callSkill('params', 'set-param', { key: 'history.mirror', value: !on }); } catch { /* the row re-reads the truth */ }
+      setTimeout(rerender, 400);   // give the live flip a beat, then show the real state
+      rerender();
+    },
+    onExportHistory: async () => {
+      try {
+        const json = await circleHouseholdAgent.exportHistoryArchive();
+        const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `onderling-geschiedenis-${new Date().toISOString().slice(0, 10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (err) { console.warn('[history-export]', err?.message ?? err); }
+    } });
   getWebPushState().then((s) => { notifications = s; rerender(); }).catch(() => {});
   rerender();
   const [loc, status, priv, met, profProps] = await Promise.all([

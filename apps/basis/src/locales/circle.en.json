@@ -4048,6 +4048,42 @@
       "text": "Notifications",
       "doc": "S5 — web-push section heading."
     },
+    "history": {
+      "text": "History mirror",
+      "doc": "my-data section header — the personal history mirror."
+    },
+    "history_off": {
+      "text": "Off — this device keeps only its local record.",
+      "doc": "history mirror state line when the switch is off."
+    },
+    "history_on": {
+      "text": "On — {{count}} entries mirrored, sealed, to your own storage.",
+      "doc": "history mirror state line when running."
+    },
+    "history_waiting": {
+      "text": "Turning on…",
+      "doc": "history mirror state line between the flip and the first status."
+    },
+    "history_error": {
+      "text": "Trouble reaching your storage: {{error}}. Retrying on the next change.",
+      "doc": "history mirror state line when the last flush failed."
+    },
+    "history_what": {
+      "text": "A sealed copy of everything on this device, on your own storage. Sign in on a new device with your phrase and your history is simply there. Only your key opens it.",
+      "doc": "history mirror explainer under the state line."
+    },
+    "history_enable": {
+      "text": "Turn on",
+      "doc": "history mirror enable button."
+    },
+    "history_disable": {
+      "text": "Turn off",
+      "doc": "history mirror disable button."
+    },
+    "history_export": {
+      "text": "Download sealed archive",
+      "doc": "history mirror export button — one-shot sealed archive of the whole device log."
+    },
     "notif_on": {
       "text": "Push notifications are on for this device.",
       "doc": "S5 — push subscribed state."

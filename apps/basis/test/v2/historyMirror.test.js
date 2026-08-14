@@ -10,7 +10,7 @@ import { AgentIdentity } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { createSealedPodDataSource } from '@onderling/pod-client';
 import { memoryDataSource } from '@onderling/item-store';
-import { createHistoryMirror, createHistoryPodMedium, hydrateHistory } from '../../src/v2/historyMirror.js';
+import { createHistoryMirror, createHistoryPodMedium, hydrateHistory, exportHistoryArchive, archiveSource } from '../../src/v2/historyMirror.js';
 import { settingsSealStrategyForIdentity } from '../../src/v2/sharedCopyOpener.js';
 import { createRealHouseholdAgent } from '../../src/core/agent/realAgent.js';
 import { EventLog } from '../../src/eventLog.js';
@@ -126,8 +126,8 @@ describe('the history mirror — sealed follower of the device log', () => {
     expect(JSON.parse(await mine.read('basis/history/log/root/cursor.json')).batch).toBe(1);
   });
 
-  it('THE BOOT WIRING: off by default provisions nothing; the switch on + a reboot → the log mirrors sealed', async () => {
-    const settings = memoryDataSource();          // ONE user's settings store, shared across "reboots"
+  it('THE LIVE SWITCH: off by default provisions nothing; flipping it starts the sealed mirror NOW (and off stops it)', async () => {
+    const settings = memoryDataSource();
     const podMap = new Map();
     let provisions = 0;
     const provisionHistoryMirror = async (strategy) => {
@@ -135,34 +135,35 @@ describe('the history mirror — sealed follower of the device log', () => {
       return createHistoryPodMedium({ podSource: memoryPodSource(podMap), strategy });
     };
 
-    // Boot 1 — the default (off): the backend is never even provisioned, no status.
-    const log1 = new EventLog({ initial: [], muted: [] });
-    const A1 = await createRealHouseholdAgent({
-      seedHousehold: false, settingsDataSource: settings, deviceLog: log1, provisionHistoryMirror,
+    // Boot — the default (off): the backend is never even provisioned, no status.
+    const log = new EventLog({ initial: [], muted: [] });
+    const A = await createRealHouseholdAgent({
+      seedHousehold: false, settingsDataSource: settings, deviceLog: log, provisionHistoryMirror,
     });
-    await new Promise((r) => setTimeout(r, 50));   // the wiring block is fire-and-forget
+    await new Promise((r) => setTimeout(r, 50));   // the boot kick is fire-and-forget
     expect(provisions).toBe(0);
-    expect(A1.historyMirrorStatus()).toBe(null);
+    expect(A.historyMirrorStatus()).toBe(null);
 
-    // The person flips the switch (through the ONE kind-gated write).
-    const set = await A1.callSkill('params', 'set-param', { key: 'history.mirror', value: true });
+    // The person flips the switch (through the ONE kind-gated write) — the mirror starts LIVE,
+    // no reboot, and a fresh append lands SEALED on the backend.
+    const set = await A.callSkill('params', 'set-param', { key: 'history.mirror', value: true });
     expect(set.ok).toBe(true);
-
-    // Boot 2 — same settings store: the mirror starts and a fresh append lands SEALED on the backend.
-    const log2 = new EventLog({ initial: [], muted: [] });
-    const A2 = await createRealHouseholdAgent({
-      seedHousehold: false, settingsDataSource: settings, deviceLog: log2, provisionHistoryMirror,
-    });
-    await new Promise((r) => setTimeout(r, 50));
+    let deadline = Date.now() + 5000;
+    while (A.historyMirrorStatus() === null && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50));
     expect(provisions).toBe(1);
-    log2.append(entry('m-boot', 'geheim uit de tweede boot'));
-    const deadline = Date.now() + 5000;
-    while ((A2.historyMirrorStatus()?.mirrored ?? 0) < 1 && Date.now() < deadline) {
-      await new Promise((r) => setTimeout(r, 100));
-    }
-    expect(A2.historyMirrorStatus()?.mirrored).toBeGreaterThanOrEqual(1);
+    expect(A.historyMirrorStatus()).not.toBe(null);
+    log.append(entry('m-live', 'geheim uit de live flip'));
+    deadline = Date.now() + 5000;
+    while ((A.historyMirrorStatus()?.mirrored ?? 0) < 1 && Date.now() < deadline) await new Promise((r) => setTimeout(r, 100));
+    expect(A.historyMirrorStatus()?.mirrored).toBeGreaterThanOrEqual(1);
     const raw = [...podMap.values()].join('\n');
     expect(raw).not.toContain('geheim');            // sealed on the backend, by construction
+
+    // …and OFF stops it live too (a final flush first — nothing buffered is lost).
+    await A.callSkill('params', 'set-param', { key: 'history.mirror', value: false });
+    deadline = Date.now() + 5000;
+    while (A.historyMirrorStatus() !== null && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50));
+    expect(A.historyMirrorStatus()).toBe(null);
   }, 30_000);
 
   it('TWO DEVICES, TWO LANES: neither clobbers the other; restore merges both by id', async () => {
@@ -253,4 +254,35 @@ describe('the history mirror — sealed follower of the device log', () => {
     expect(lanesAfter).toBe(lanesBefore);   // B backfilled nothing — hydrated entries stay in A's lane
     expect(B.historyMirrorStatus()).not.toBe(null);                          // …but B's sink IS following
   }, 30_000);
+});
+
+describe('the archive export — "mirror to a file", proven restorable', () => {
+  it('exports the whole live log sealed (no plaintext in the file) and hydrates back on a fresh log', async () => {
+    const identity = await AgentIdentity.generate(new VaultMemory());
+    const log = new EventLog({ initial: [], muted: [] });
+    log.append({ ...entry('m-1', 'geheim archiefbericht'), ts: Date.now() });
+    log.append({ ...entry('m-2', 'tweede bericht'), ts: Date.now() });
+
+    const strategy = settingsSealStrategyForIdentity(identity);
+    const json = await exportHistoryArchive({
+      eventLog: log, strategy,
+      snapshot: async () => ({ registry: [{ id: 'default' }] }),
+    });
+    expect(json).not.toContain('geheim');                       // the FILE is sealed
+    expect(json).not.toContain('chat-message');
+
+    // The owner's key opens it — the SAME hydrate door as the pod mirror.
+    const fresh = new EventLog({ initial: [], muted: [] });
+    const r = await hydrateHistory({ source: archiveSource(json, strategy), eventLog: fresh });
+    await r.tailDone;
+    expect(fresh.query().map((e) => e.id).sort()).toEqual(['m-1', 'm-2']);
+    expect(fresh.query().find((e) => e.id === 'm-1').payload.text).toBe('geheim archiefbericht');
+
+    // A stranger's key opens none of it.
+    const strangerStrategy = settingsSealStrategyForIdentity(await AgentIdentity.generate(new VaultMemory()));
+    const blocked = new EventLog({ initial: [], muted: [] });
+    const rb = await hydrateHistory({ source: archiveSource(json, strangerStrategy), eventLog: blocked, logger: { warn: () => {} } });
+    await rb.tailDone;
+    expect(blocked.query()).toHaveLength(0);
+  });
 });

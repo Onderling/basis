@@ -4048,6 +4048,42 @@
       "text": "Meldingen",
       "doc": "S5 — web-push section heading."
     },
+    "history": {
+      "text": "Geschiedenis-spiegel",
+      "doc": "my-data sectiekop — de persoonlijke geschiedenis-spiegel."
+    },
+    "history_off": {
+      "text": "Uit — dit apparaat houdt alleen zijn lokale geschiedenis.",
+      "doc": "spiegel-statusregel als de schakelaar uit staat."
+    },
+    "history_on": {
+      "text": "Aan — {{count}} berichten gespiegeld, verzegeld, naar je eigen opslag.",
+      "doc": "spiegel-statusregel als hij loopt."
+    },
+    "history_waiting": {
+      "text": "Aanzetten…",
+      "doc": "spiegel-statusregel tussen de flip en de eerste status."
+    },
+    "history_error": {
+      "text": "Opslag niet bereikbaar: {{error}}. Nieuwe poging bij de volgende wijziging.",
+      "doc": "spiegel-statusregel als de laatste schrijfronde faalde."
+    },
+    "history_what": {
+      "text": "Een verzegelde kopie van alles op dit apparaat, op je eigen opslag. Log op een nieuw apparaat in met je herstelzin en je geschiedenis is er gewoon. Alleen jouw sleutel opent hem.",
+      "doc": "spiegel-uitleg onder de statusregel."
+    },
+    "history_enable": {
+      "text": "Aanzetten",
+      "doc": "spiegel-aanknop."
+    },
+    "history_disable": {
+      "text": "Uitzetten",
+      "doc": "spiegel-uitknop."
+    },
+    "history_export": {
+      "text": "Verzegeld archief downloaden",
+      "doc": "spiegel-exportknop — eenmalig verzegeld archief van het hele apparaatlog."
+    },
     "notif_on": {
       "text": "Push-meldingen staan aan op dit apparaat.",
       "doc": "S5 — push subscribed state."

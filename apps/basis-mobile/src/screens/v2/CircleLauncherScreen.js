@@ -459,6 +459,10 @@ export default function CircleLauncherScreen({
       let saveError = null;
       try { await io.save(args?.clear ? '' : String(args?.url ?? '')); }
       catch (err) { saveError = err?.message ?? String(err); }
+      // The register is the authority (device-params consolidation); the bare key stays the
+      // pre-boot connect cache. Fire-and-forget — the read-back below reports the cache truth.
+      bundle?.callSkill?.('params', 'set-param', { key: 'relay.url', value: args?.clear ? '' : String(args?.url ?? '') })
+        .catch(() => { /* the cache stands */ });
       let effective = '';
       try { effective = resolveRelayUrl(await io.load(), process.env.EXPO_PUBLIC_CIRCLE_RELAY_URL) || ''; }
       catch { /* read-back best-effort */ }

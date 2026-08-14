@@ -45,6 +45,8 @@ import MnemonicCreateScreen from './src/screens/MnemonicCreateScreen.js';
 import { initLocalisation, subscribeLang, t } from './src/core/localisation.js';
 import { bootAgentBundle } from './src/core/agentBundle.js';
 import { attachSurfacePrefAgent } from './src/core/surfacePrefStore.js';
+import { attachThemeAgent } from './src/screens/v2/themeContext.js';
+import { asyncStorageRelayIo, resolveRelayUrl } from '../basis/src/v2/relayPref.js';
 import {
   shouldShowFirstRunWelcome, markWelcomeDismissed,
 } from './src/core/firstRun.js';
@@ -541,6 +543,22 @@ export default function App() {
         // Register-backed surface preference (the device-params consolidation): bind the booted
         // agent into the module store, which hydrates the cached value from the register.
         attachSurfacePrefAgent(b.agent);
+        // Same for the theme (the register is the authority; the AsyncStorage key stays the
+        // pre-boot paint cache — the attach reconciles cache←register through the provider).
+        attachThemeAgent(b.agent);
+        // Relay-URL reconcile (register = authority; the bare key is the pre-boot connect cache):
+        // adopt a differing register value into the cache and reconnect live.
+        (async () => {
+          try {
+            const reg = b.agent?.getParamValue?.('relay.url');
+            const io = asyncStorageRelayIo(AsyncStorage);
+            const cached = resolveRelayUrl(await io.load(), '') || '';
+            if (typeof reg === 'string' && reg && reg !== cached) {
+              await io.save(reg);
+              await b.reconnectPeer?.();
+            }
+          } catch { /* the cache stands — the next explicit set converges both */ }
+        })();
         // #36 — apply the persisted chat-retention (from the parameter register, hydrated at agent boot) to the
         // shared eventLog, parity with web circleApp. Reads via callSkill('params',…) (the bundle exposes it).
         b.callSkill?.('params', 'get-param', { key: 'retention.chatDays' })

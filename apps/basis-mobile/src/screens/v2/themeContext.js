@@ -34,6 +34,17 @@ const store = createThemePrefStore(asyncStorageThemePrefIo(AsyncStorage));
 
 const ThemeContext = createContext(null);
 
+// The register is the AUTHORITY for the theme since the device-params consolidation; the shared
+// 'basis.theme' AsyncStorage key stays the PRE-BOOT CACHE (the provider paints before the agent
+// exists). App.js attaches the booted agent here: sets flow through the one kind-gated write, and
+// the attach reconciles cache←register (register wins) through the provider's own state.
+let _agent = null;
+let _onAgentAttached = null;
+export function attachThemeAgent(agent) {
+  _agent = agent ?? null;
+  if (_agent && typeof _onAgentAttached === 'function') _onAgentAttached(_agent);
+}
+
 export function ThemeProvider({ children }) {
   const osScheme = useColorScheme();                     // live OS scheme: 'light' | 'dark' | null
   const [pref, setPrefState] = useState(store.get());    // cached default ('system') until hydrate resolves
@@ -42,7 +53,19 @@ export function ThemeProvider({ children }) {
   useEffect(() => {
     let alive = true;
     store.hydrate().then((p) => { if (alive) setPrefState(p); }).catch(() => {});
-    return () => { alive = false; };
+    // Reconcile from the REGISTER once the agent attaches (register wins over the cache);
+    // the cache follows via store.set so the next pre-boot paint agrees.
+    _onAgentAttached = (agent) => {
+      if (!alive) return;
+      const v = agent.getParamValue?.('display.theme');
+      const next = normalizeThemePref(v);
+      if ((v === 'system' || v === 'light' || v === 'dark') && next !== store.get()) {
+        setPrefState(next);
+        store.set(next).catch(() => {});
+      }
+    };
+    if (_agent) _onAgentAttached(_agent);
+    return () => { alive = false; _onAgentAttached = null; };
   }, []);
 
   const resolved = useMemo(() => resolveTheme(pref, osScheme), [pref, osScheme]);
@@ -54,7 +77,10 @@ export function ThemeProvider({ children }) {
   const setPref = useCallback((v) => {
     const next = normalizeThemePref(v);
     setPrefState(next);
-    store.set(next).catch(() => {});   // best-effort persist (clears the key on 'system')
+    store.set(next).catch(() => {});   // the pre-boot cache (clears the key on 'system')
+    // …and the authority (same-value echoes from the reconcile are idempotent).
+    _agent?.callSkill?.('params', 'set-param', { key: 'display.theme', value: next })
+      .catch(() => { /* the cache stands */ });
   }, []);
 
   const value = useMemo(() => ({ theme: resolved, pref, setPref }), [resolved, pref, setPref]);

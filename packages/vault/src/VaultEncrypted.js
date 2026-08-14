@@ -185,3 +185,38 @@ export async function migrateVaultToEncrypted({ backing, key, drop = [], fingerp
   }
   return reset ? { migrated: true, sealed, dropped, reset: true } : { migrated: true, sealed, dropped };
 }
+
+/**
+ * RESEAL a fully-encrypted vault from one at-rest key to another, in place (the custody
+ * migration: the sealing root moves from the owner root to the device's delegation seed; the
+ * sentinel — bound to the ROOT's fingerprint, the same person — stays as it is).
+ *
+ * Crash-resumable per entry: an entry that already opens under the NEW key is skipped, so a
+ * rerun after a mid-reseal crash completes the job. An entry that opens under NEITHER key is a
+ * genuine fault and throws — silently dropping it would be data loss wearing a success face.
+ *
+ * @param {object} o
+ * @param {Vault}      o.backing  the encrypted vault (sentinel present).
+ * @param {Uint8Array} o.oldKey
+ * @param {Uint8Array} o.newKey
+ * @returns {Promise<{resealed: number, skipped: number}>}
+ */
+export async function resealVault({ backing, oldKey, newKey } = {}) {
+  const oldEnc = new VaultEncrypted({ backing, key: oldKey });
+  const newEnc = new VaultEncrypted({ backing, key: newKey });
+  let resealed = 0; let skipped = 0;
+  for (const k of await backing.list()) {
+    if (k === VAULT_ENC_SENTINEL_KEY) continue;
+    const raw = await backing.get(k);
+    if (raw == null || !VaultEncrypted.isEncryptedValue(raw)) continue;   // plaintext strays: the migrate pass's job
+    let plain;
+    try { plain = await oldEnc.get(k); }
+    catch {
+      try { await newEnc.get(k); skipped += 1; continue; }   // already resealed (crash resume)
+      catch { throw new Error(`resealVault: entry "${k}" opens under neither key — refusing to continue`); }
+    }
+    await newEnc.set(k, plain);
+    resealed += 1;
+  }
+  return { resealed, skipped };
+}

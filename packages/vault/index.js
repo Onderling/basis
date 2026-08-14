@@ -27,6 +27,7 @@ export { Vault }                from './src/Vault.js';
 export {
   VaultEncrypted,
   migrateVaultToEncrypted,
+  resealVault,
   VAULT_ENC_SENTINEL_KEY,
   VAULT_ENC_VERSION,
 } from './src/VaultEncrypted.js';

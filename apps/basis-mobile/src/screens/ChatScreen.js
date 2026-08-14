@@ -70,7 +70,8 @@ import { makeTaskPeerHandler, TASK_BROADCAST, TASK_CATCHUP_SUBTYPES } from '../.
 import { makeFrontierReplay } from '../../../basis/src/v2/frontierReplay.js';
 import { makeChatPeerHandler, makePodChatCatchUp, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../../basis/src/v2/chatRail.js';
 import { makeCirclePolicyStoreRN } from '../core/circleStoresRN.js';
-import { circleResolveRef, circlePodReadSince, circleSendDataMove } from '../core/circlePods.js';
+import { circleResolveRef, circlePodReadSince, circleSendDataMove, circleControlAgentRouter } from '../core/circlePods.js';
+import { sealingPublicKeyFromNetworkKey } from '@onderling/pod-client';
 import { makeGovernanceCatchUp } from '../../../basis/src/v2/governanceCatchUp.js';
 import { governanceEntryId } from '../../../basis/src/v2/governanceLog.js';
 import { makeHandleChatMessage }
@@ -536,7 +537,14 @@ export default function ChatScreen({
       // B2 — inbound per-circle ADDRESS announcements (web parity). Every announcement carries its
       // own proof, so the sender is not trusted; recording refreshes the sealing binding AND the
       // authorize snapshot together, or the member would be reachable and then refused.
-      'circle-address-announce': makeCircleAddressAnnouncePeerHandler({ agent }),
+      'circle-address-announce': makeCircleAddressAnnouncePeerHandler({
+        agent,
+        // Sealed-circle audience (the custody arc): a proven device address joins the group key's
+        // readers when THIS device holds the circle's producer; no-ops otherwise (web parity).
+        grantSealedAudience: (circleId, address) => circleControlAgentRouter.grantRecipient({
+          groupId: circleId, publicKey: sealingPublicKeyFromNetworkKey(address),
+        }),
+      }),
       // G11 — a group-key rotation fanned by another member lands in the local key-event log (web parity).
       'group-key-event':       makeHandleGroupKeyEvent({ recordKeyEvent: recordCircleKeyEvent }),
       // a contact-bot's reply in its Contacten DM thread → the shared inbox

@@ -44,7 +44,7 @@ import { makeMembershipRail, makeMembershipEmitter } from '../../v2/membershipRa
 import { makeTaskRail, makeTaskEmitter, routeTaskMirror, TASK_LANE_TYPES } from '../../v2/taskRail.js'; // the content re-root — task snapshots ride the device log
 import { makeChatRail, makeChatEmitter } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
 import { paramsManifest } from '../../v2/paramsManifest.js';   // #36 — the params op contract (gates the waist branch)
-import { VaultMemory, VaultLocalStorage, VaultEncrypted, migrateVaultToEncrypted, seedFromString } from '@onderling/vault';
+import { VaultMemory, VaultLocalStorage, VaultEncrypted, migrateVaultToEncrypted, resealVault, seedFromString, seedToString } from '@onderling/vault';
 import { wireSkill } from '@onderling/sdk';
 import { createSecureMeshAgent } from '@onderling/secure-agent';
 import { createBrowserMultiCircleTasksAgent } from '@onderling-app/tasks/browser';
@@ -129,7 +129,7 @@ async function restoreOrGenerate(vault) {
 
 import { restoreOwnerRoot, DEVICE_DELEGATION_VAULT_KEY } from './ownerRootRestore.js';
 import { sealingPublicKeyFromNetworkKey } from '@onderling/pod-client';
-import { ensureOwnerRoot, pickRootKeyStore, readCustodyMode } from './ownerRootCustody.js';
+import { ensureOwnerRoot, pickRootKeyStore, readCustodyMode, cutoverToDelegation } from './ownerRootCustody.js';
 import { makeAgentTrailEntry } from '../../eventLog.js';
 import {
   CalendarStore, registerCalendarSkills,
@@ -313,8 +313,13 @@ export async function createRealHouseholdAgent(opts = {}) {
   // no secrecy and widens the failure surface of an unlock problem.
   const atRestKey = ownerRoot ? ownerRoot.deriveVaultAtRestKey() : deriveVaultAtRestKeyFrom(custodySeed);
   const rootFingerprint = ownerRoot ? ownerRoot.fingerprint() : (custody.fingerprint ?? 'delegation');
+  // Every sealed backing is RECORDED: the self-enroll migration (a root-custody device's ceremony
+  // cutting over to delegation custody) must reseal them ALL old-key→new-key — missing one would
+  // strand its entries under a key the next boot no longer derives.
+  const sealedBackings = [];
   const sealedVault = async (backing) => {
     await migrateVaultToEncrypted({ backing, key: atRestKey, fingerprint: rootFingerprint });
+    sealedBackings.push(backing);
     return new VaultEncrypted({ backing, key: atRestKey });
   };
 
@@ -1043,8 +1048,12 @@ export async function createRealHouseholdAgent(opts = {}) {
     // identity step 4 — the createProfile collaborator: derive a new profile from THIS user's owner
     // root + register it. Owner-root-backed (kept out of the dependency-free cores).
     const agentsProfiles = {
-      create: ({ profileId, name, properties }) =>
-        registryCreateProfile({ registry: agentsRegistry, ownerRoot, profileId, name, properties }),
+      // Creating a NAMED profile derives its key from the root — under delegation custody that is
+      // a CEREMONY act (the phrase must be typed), so the door refuses honestly instead of a raw
+      // "ownerRoot required" throw. The ceremony-side profile creation lands with the profiles arc.
+      create: ({ profileId, name, properties }) => (ownerRoot
+        ? registryCreateProfile({ registry: agentsRegistry, ownerRoot, profileId, name, properties })
+        : Promise.resolve({ ok: false, reason: 'ceremony-required' })),
       // Property layer — set/read a coarse property on a profile (curate once, reuse across apps). setProperty
       // merges (setOwn) then re-registers the FULL existing entry (register replaces), preserving key/role/grants.
       setProperty: async ({ profileId, key, value }) => {
@@ -1424,7 +1433,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           payload: { by: chatId.pubKey }, actor: chatId.pubKey, signer: ceremonySigner,
         }).catch(() => null);
         if (stmt) revokedIn.push({ circleId, address });
-        // KEY ROTATION (custody B1): a SEALED circle whose producer lives on this device rotates
+        // KEY ROTATION (custody): a SEALED circle whose producer lives on this device rotates
         // its group key away from the revoked device's sealing key — derived from the revoked
         // address itself (the ed2curve bridge), so no key distribution is needed. 'ban' policy:
         // the stolen-device default — history re-seals so nothing pod-fetchable remains for the
@@ -1437,7 +1446,41 @@ export async function createRealHouseholdAgent(opts = {}) {
           });
         } catch { /* sealing degrades gracefully — the statement above is the transport island-ing */ }
       }
-      return [DataPart({ ok: true, deviceId, known, revokedIn, circles: revokedIn.length })];
+      // THE SELF-ENROLL MIGRATION (the per-ceremony custody cutover): a ROOT-custody device that
+      // just proved the phrase migrates itself — reseal EVERY sealed vault from the root-derived
+      // key to its own delegation-derived one, write the delegation blob (pre-signed record
+      // included), and flip the key door + marker. The running agent still holds the old key in
+      // its wrappers, so the reply asks for a reload; the next boot is a delegation boot.
+      let migrated = false;
+      if (ownerRoot) {
+        try {
+          const selfDeviceId = enrolledDevice?.deviceId
+            ?? ((typeof crypto !== 'undefined' && crypto.randomUUID)
+              ? crypto.randomUUID() : `dev-${Math.random().toString(36).slice(2, 10)}`);
+          const selfSeed = enrolledDevice
+            ? deviceDerivationSeed
+            : deriveDeviceSeed(root.deriveAgentSeed('default'), selfDeviceId);
+          const newKey = deriveVaultAtRestKeyFrom(selfSeed);
+          for (const backing of sealedBackings) {
+            await resealVault({ backing, oldKey: atRestKey, newKey });
+          }
+          const selfRecord = signDeviceDelegation(root.secret, {
+            profileId: 'default', deviceId: selfDeviceId, pubKey: deviceDelegationPubKey(selfSeed),
+          });
+          await new VaultEncrypted({ backing: chatVaultBacking, key: newKey }).set(
+            DEVICE_DELEGATION_VAULT_KEY,
+            JSON.stringify({ seed: seedToString(selfSeed), deviceId: selfDeviceId, record: selfRecord }),
+          );
+          migrated = await cutoverToDelegation({
+            rootKeyStore, markerVault: ownerRootVault,
+            delegationSeed: selfSeed, deviceId: selfDeviceId, fingerprint: ownerRoot.fingerprint(),
+          });
+        } catch (err) { console.warn('[custody] self-enroll migration deferred:', err?.message ?? err); }
+      }
+      return [DataPart({
+        ok: true, deviceId, known, revokedIn, circles: revokedIn.length,
+        ...(migrated ? { migrated: true, reloadRequired: true } : {}),
+      })];
     } catch (e) { return [DataPart({ ok: false, outcome: 'error', error: e?.message ?? 'revoke-failed' })]; }
   }, { visibility: 'trusted' });   // retires a device's keys everywhere: owner-only, phrase-proven
 

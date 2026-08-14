@@ -361,7 +361,7 @@ export function isValidCircleAddressAnnounceEnvelope(p) {
  * @param {{warn?: Function, info?: Function}} [a.logger]
  * @returns {(fromPeerAddr: string, payload: object) => Promise<{recorded: number, refused: number}>}
  */
-export function makeCircleAddressAnnouncePeerHandler({ agent, logger = console } = {}) {
+export function makeCircleAddressAnnouncePeerHandler({ agent, logger = console, grantSealedAudience = null } = {}) {
   return async function onCircleAddressAnnounce(_fromPeerAddr, payload) {
     if (!isValidCircleAddressAnnounceEnvelope(payload)) {
       logger?.warn?.('[circle-address] dropping malformed announcement envelope');
@@ -401,6 +401,17 @@ export function makeCircleAddressAnnouncePeerHandler({ agent, logger = console }
           `[circle-address] recorded ${recorded} address(es) for ${circleId} but could not refresh the `
           + `binding — those members may be unreachable until the next circle open: ${err?.message ?? err}`,
         );
+      }
+      // SEALED-CIRCLE AUDIENCE (the custody arc): a freshly proven device address joins the
+      // group key's readers on the device that holds this circle's producer. REQUIRED under
+      // delegation custody — an enrolled device cannot derive the member sealing key, so without
+      // this grant a sealed circle's second device reads nothing. Best-effort per address: an
+      // unsealed circle (or a producer living elsewhere) no-ops.
+      if (typeof grantSealedAudience === 'function') {
+        for (const one of proven) {
+          try { await grantSealedAudience(circleId, one.circleAddress); }
+          catch (err) { logger?.warn?.('[circle-address] sealed-audience grant failed', err?.message ?? err); }
+        }
       }
     }
     return { recorded, refused };

@@ -7477,7 +7477,14 @@ async function boot() {
           // a member (or the admin, relaying) says where they answer in this circle. Each
           // announcement carries its own proof, so the carrier is not trusted; recording refreshes
           // the sealing binding AND the authorize snapshot together.
-          'circle-address-announce': makeCircleAddressAnnouncePeerHandler({ agent }),
+          'circle-address-announce': makeCircleAddressAnnouncePeerHandler({
+            agent,
+            // Sealed-circle audience (the custody arc): a proven device address joins the group
+            // key's readers when THIS device holds the circle's producer; no-ops otherwise.
+            grantSealedAudience: (circleId, address) => circleControlAgentRouter.grantRecipient({
+              groupId: circleId, publicKey: podSealingPublicKeyFromNetworkKey(address),
+            }),
+          }),
           // No-pod group-key rotation — RECEIVE side: a key-event fanned by the circle's key-event log sink
           // (establish/grant/rotation) lands in this device's local per-circle key-event log. A removed member
           // is never a recipient of the rotation fan → never records the new version → cannot open post-removal

@@ -21,9 +21,10 @@
  * is in: AsyncStorage is app-private and is wiped with the app.
  */
 import { describe, it, expect } from 'vitest';
-import { AgentIdentity, Bootstrap, mnemonicToSeed } from '@onderling/core';
+import { AgentIdentity, Bootstrap, mnemonicToSeed, deriveDeviceSeed, deriveVaultAtRestKeyFrom } from '@onderling/core';
 import { VaultEncrypted } from '@onderling/vault';
 import { VaultAsyncStorage } from '@onderling/react-native/identity/VaultAsyncStorage';
+import { readCustodyMode } from '../../basis/src/core/agent/ownerRootCustody.js';
 
 import { bootAgentBundle } from '../src/core/agentBundle.js';
 import { restoreFromMnemonic } from '../src/core/restoreFromMnemonic.js';
@@ -87,14 +88,24 @@ describe('B1 — the recovery phrase brings back the same person, on a fresh ins
 
       // (i) the same person …
       expect(after.pubKey).toBe(before.pubKey);
-      // (ii) … AND reachable at the same address in every circle they were in. Without this the roster
-      // still lists them and nothing they send or receive lands.
+      // (ii) … on THEIR OWN device addresses. Since the custody cutover a restore ENROLLS: the
+      // reinstall is a new device with its own per-circle keys (announced into every roster's
+      // address set at boot; the lost install's addresses retire at the revoke ceremony). The
+      // OLD pin — "the same address in every circle" — was the pre-device-model semantics; the
+      // same-address world is exactly what made a second device a clone.
       for (const circleId of CIRCLES) {
-        expect(after.addresses[circleId], `circle ${circleId} moved`).toBe(before.addresses[circleId]);
+        expect(after.addresses[circleId], `circle ${circleId}`).not.toBe(before.addresses[circleId]);
+        expect(typeof after.addresses[circleId]).toBe('string');
       }
-      // (iii) and the phrase they can write down afterwards is still the same phrase — a restore that
-      // silently re-keys would strand them again on the NEXT reinstall.
-      expect(await revealPhrase(await bootAgentBundle({ asyncStorage: newPhone }))).toBe(phrase);
+      // …and DETERMINISTIC for this install: another boot derives the identical addresses.
+      const again = identitySnapshot(await bootAgentBundle({ asyncStorage: newPhone }));
+      expect(again.addresses).toEqual(after.addresses);
+      // (iii) the phrase can no longer be re-viewed from the device — the cutover's feature: a
+      // stolen unlocked phone cannot exfiltrate it. The person restoring just TYPED it; it is in
+      // their hands, which is the only place it lives.
+      const reveal = await (await bootAgentBundle({ asyncStorage: newPhone }))
+        .callSkill('household', 'revealOwnerPhrase', {});
+      expect(reveal?.error).toBe('phrase-not-stored');
     });
 
   it('someone else’s phrase is someone else — restore is not a way to arrive as you',
@@ -176,8 +187,12 @@ describe('B1 — first-run "I have a recovery phrase" restores properly (FIXED 2
       const after = identitySnapshot(await bootAgentBundle({ asyncStorage: newPhone }));
 
       expect(after.pubKey).toBe(before.pubKey);
+      // Since the custody cutover a restore ENROLLS: this install's per-circle addresses are its
+      // OWN (delegation-derived), announced into the roster sets at boot — see the wizard-door
+      // test above for the full reasoning.
       for (const circleId of CIRCLES) {
-        expect(after.addresses[circleId]).toBe(before.addresses[circleId]);
+        expect(after.addresses[circleId]).not.toBe(before.addresses[circleId]);
+        expect(typeof after.addresses[circleId]).toBe('string');
       }
     });
 
@@ -200,18 +215,24 @@ describe('B1 — first-run "I have a recovery phrase" restores properly (FIXED 2
       const keys = await newPhone.getAllKeys();
       expect(keys.some((k) => k.startsWith('cc-owner-root:'))).toBe(true);
 
-      // (b) the chat key is the owner-root DEFAULT PROFILE, not the mnemonic's raw entropy. Those are
-      //     different keys, and writing the second one produced an install whose identity did not match
-      //     its own root.
+      // (b) the chat key is the owner-root DEFAULT PROFILE, not the mnemonic's raw entropy. Those
+      //     are different keys, and writing the second one produced an install whose identity did
+      //     not match its own root. Since the custody cutover the vault seals under the
+      //     DELEGATION-derived key (the marker names the enrollment).
+      const mode = await readCustodyMode(new VaultAsyncStorage({ prefix: 'cc-owner-root:', asyncStorage: newPhone }));
+      expect(mode.mode).toBe('delegation');
       const restored = await AgentIdentity.restore(new VaultEncrypted({
         backing: new VaultAsyncStorage({ prefix: 'cc-chat-id:', asyncStorage: newPhone }),
-        key: Bootstrap.fromMnemonic(phrase).deriveVaultAtRestKey(),
+        key: deriveVaultAtRestKeyFrom(deriveDeviceSeed(
+          Bootstrap.fromMnemonic(phrase).deriveAgentSeed('default'), mode.deviceId,
+        )),
       }));
       expect(restored.pubKey).not.toBe(AgentIdentity.pubKeyFromSeed(mnemonicToSeed(phrase)));
 
-      // (c) the install is COHERENT: the phrase it will show is the phrase that was typed.
+      // (c) the install is COHERENT — and the phrase is NOT re-viewable from it (the cutover's
+      //     feature: the typed phrase stays only in the person's hands).
       const booted = await bootAgentBundle({ asyncStorage: newPhone });
-      expect(await revealPhrase(booted)).toBe(phrase);
+      expect((await booted.callSkill('household', 'revealOwnerPhrase', {}))?.error).toBe('phrase-not-stored');
     });
 });
 

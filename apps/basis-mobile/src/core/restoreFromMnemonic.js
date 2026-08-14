@@ -63,13 +63,18 @@ export async function restoreFromMnemonic({ mnemonic, asyncStorage, secureStore 
   // caller provides it; the AsyncStorage-backed store is the DI/test fallback. Must match the key
   // door `bootAgentBundle` consults on the next boot — a restore that seeds a different door is a
   // restore that silently does nothing.
+  const ownerRootVault = new VaultAsyncStorage({ prefix: OWNER_ROOT_VAULT_PREFIX, asyncStorage });
   const rootKeyStore = secureStore
     ? makeSecureStoreRootKeyStore(secureStore)
-    : new RootKeyStoreVault({ vault: new VaultAsyncStorage({ prefix: OWNER_ROOT_VAULT_PREFIX, asyncStorage }) });
+    : new RootKeyStoreVault({ vault: ownerRootVault });
   const r = await restoreOwnerRoot({
     mnemonic: normalized,
     rootKeyStore,
     chatVault: new VaultAsyncStorage({ prefix: CHAT_VAULT_PREFIX, asyncStorage }),
+    // The custody cutover (the non-resident root): the first-run restore ends in DELEGATION
+    // custody like every phrase ceremony — the marker lands in the same owner-root vault the
+    // bundle boot consults, so the next boot runs delegation mode.
+    markerVault: ownerRootVault,
   });
   if (!r.ok) return { ok: false, code: r.code === 'invalid' ? 'invalid' : 'storage', detail: r.detail };
   return { ok: true };

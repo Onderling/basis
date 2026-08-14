@@ -10,9 +10,10 @@ import {
   restoreFromMnemonic, normalizeMnemonic, countMnemonicWords,
   MNEMONIC_WORD_COUNT, CHAT_VAULT_KEY_PREFIX,
 } from '../src/core/restoreFromMnemonic.js';
-import { generateMnemonic, Bootstrap } from '@onderling/core';
+import { generateMnemonic, Bootstrap, deriveDeviceSeed, deriveVaultAtRestKeyFrom } from '@onderling/core';
 import { VaultEncrypted } from '@onderling/vault';
 import { VaultAsyncStorage } from '@onderling/react-native/identity/VaultAsyncStorage';
+import { readCustodyMode } from '../../basis/src/core/agent/ownerRootCustody.js';
 
 function makeStorage() {
   const map = new Map();
@@ -61,10 +62,18 @@ describe('restoreFromMnemonic', () => {
     const stored = await asyncStorage.getItem(`${CHAT_VAULT_KEY_PREFIX}agent-privkey`);
     expect(stored).toBeTruthy();
     expect(stored.startsWith('enc1:')).toBe(true);
-    // …and it decrypts under the key the restored root derives — the same key the boot derives.
+    // …and it decrypts under the key the boot derives — since the custody cutover that is the
+    // DELEGATION-derived key: the restore ceremony enrolled this install as a device, the custody
+    // marker names its deviceId, and the whole chain (phrase → profile seed → device seed →
+    // at-rest key) reproduces it.
+    const mode = await readCustodyMode(new VaultAsyncStorage({ prefix: 'cc-owner-root:', asyncStorage }));
+    expect(mode.mode).toBe('delegation');
+    const delegationSeed = deriveDeviceSeed(
+      Bootstrap.fromMnemonic(phrase).deriveAgentSeed('default'), mode.deviceId,
+    );
     const sealed = new VaultEncrypted({
       backing: new VaultAsyncStorage({ prefix: CHAT_VAULT_KEY_PREFIX, asyncStorage }),
-      key: Bootstrap.fromMnemonic(phrase).deriveVaultAtRestKey(),
+      key: deriveVaultAtRestKeyFrom(delegationSeed),
     });
     const parsed = JSON.parse(await sealed.get('agent-privkey'));
     expect(typeof parsed.current).toBe('string');

@@ -56,4 +56,38 @@ describe('the custody cutover — delegation boots without the root', () => {
     });
     expect(right.ok).toBe(true);
   }, 120_000);
+
+  it('THE SELF-ENROLL MIGRATION: a root-custody device\'s ceremony cuts it over, the reseal holds', async () => {
+    // A root-custody device (a pre-cutover install): first boot mints a root, no marker.
+    const ownerRootVault = new VaultMemory();
+    const rootKeyStore = new RootKeyStoreVault({ vault: ownerRootVault });
+    const chatVault = new VaultMemory();
+    const dev = await createRealHouseholdAgent({ seedHousehold: false, ownerRootVault, rootKeyStore, chatVault });
+    const phrase = (await dev.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
+    const rootSeed = Bootstrap.fromMnemonic(phrase).secret;
+    expect((await readCustodyMode(ownerRootVault)).mode).toBe('root');
+    const addrBefore = dev.circleAddressFor('kring-m');
+
+    // Its next ceremony (any phrase act — here a revoke) migrates it.
+    const r = await dev.callSkill('household', 'revokeDevice', {
+      mnemonic: phrase, deviceId: 'a-lost-device', circleIds: ['kring-m'],
+    });
+    expect(r.ok).toBe(true);
+    expect(r.migrated).toBe(true);
+    expect(r.reloadRequired).toBe(true);
+
+    const mode = await readCustodyMode(ownerRootVault);
+    expect(mode.mode).toBe('delegation');
+    const doorSeed = await rootKeyStore.getSeed();
+    expect(Buffer.from(doorSeed).equals(Buffer.from(rootSeed)), 'the root left the door').toBe(false);
+
+    // The "reload": the delegation boot opens the RESEALED vaults and keeps the identity.
+    const dev2 = await createRealHouseholdAgent({ seedHousehold: false, ownerRootVault, rootKeyStore, chatVault });
+    expect((await dev2.callSkill('household', 'revealOwnerPhrase', {}))?.error).toBe('phrase-not-stored');
+    // an unenrolled root device derives per-circle from the profile seed; its self-enrollment
+    // makes the delegation THE derivation root — a new, distinct address (announced at boot in
+    // production, exactly like any enrolled device's)
+    expect(typeof dev2.circleAddressFor('kring-m')).toBe('string');
+    expect(dev2.circleAddressFor('kring-m')).not.toBe(addrBefore);
+  }, 120_000);
 });

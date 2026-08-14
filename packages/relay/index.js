@@ -19,6 +19,7 @@ export { SqliteQueueStore }     from './src/queueStores/SqliteQueueStore.js';
 export { PushSender }           from './src/push/PushSender.js';
 export { ExpoPushSender, ReliableExpoPushSender } from './src/push/ExpoPushSender.js';
 export { PushTokenRegistry }    from './src/push/PushTokenRegistry.js';
+export { PushTokenStore, MemoryPushTokenStore, SqlitePushTokenStore } from './src/push/PushTokenStore.js';
 export {
   CONTENTLESS_WAKE, RELIABLE_WAKE_ALERT, WAKE_MODES,
   buildExpoWakeBody, assertContentlessWake,

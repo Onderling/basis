@@ -33,13 +33,17 @@
  *   -- push wake (enable by setting PUSH_PROVIDER=expo) --
  *   PUSH_PROVIDER            'expo' to enable Expo push wake (else no push)
  *   EXPO_ACCESS_TOKEN        optional Expo enhanced-security access token
+ *   PUSH_TOKENS_DB           sqlite path for the address↔token map; makes wakes survive a
+ *                            relay restart (a SLEEPING device never reconnects to
+ *                            re-register, so a memory-only registry silently stops waking
+ *                            everyone after a redeploy). Memory-only when unset.
  */
 // Imported by real workspace path, not the '@onderling/relay' bare specifier: the
 // monorepo installs per-package (shared-workspace-lockfile=false), so there is no
 // root node_modules linking @onderling/relay. The package's OWN @onderling/* deps still
 // resolve from packages/relay/node_modules — only this outer hop must be relative.
 import { readFileSync } from 'node:fs';
-import { startRelay, getLanIp, ExpoPushSender } from '../../packages/relay/index.js';
+import { startRelay, getLanIp, ExpoPushSender, PushTokenRegistry, SqlitePushTokenStore } from '../../packages/relay/index.js';
 
 const port = parseInt(process.env.PORT ?? '8787', 10);
 const host = process.env.HOST ?? '0.0.0.0';
@@ -83,11 +87,21 @@ if (process.env.R2_ENDPOINT && process.env.R2_BUCKET) {
 
 // ── push wake (opt-in via PUSH_PROVIDER=expo) ────────────────────────────────
 let pushSender = null;
+let pushTokenRegistry;
 if ((process.env.PUSH_PROVIDER ?? '').toLowerCase() === 'expo') {
   pushSender = new ExpoPushSender({
     fetch: globalThis.fetch,
     accessToken: process.env.EXPO_ACCESS_TOKEN || undefined,
   });
+  // Durable token map (G15): without it, every redeploy silently stops waking every SLEEPING
+  // device — asleep means it never reconnects to re-register. Opt-in via PUSH_TOKENS_DB
+  // (point it at the PaaS volume); a missing better-sqlite3 refuses boot loudly.
+  if (process.env.PUSH_TOKENS_DB) {
+    const { default: Database } = await import('better-sqlite3');
+    pushTokenRegistry = new PushTokenRegistry({
+      store: new SqlitePushTokenStore({ path: process.env.PUSH_TOKENS_DB, Database }),
+    });
+  }
 }
 
 // ── bound mode (batch 7) — the relay refuses clients outside the configured circles ──────────────
@@ -112,6 +126,7 @@ const { port: boundPort, tls } = await startRelay({
   host,
   blobGate,
   pushSender,
+  ...(pushTokenRegistry ? { pushTokenRegistry } : {}),
   acceptedGroups,
   log: true,
 });
@@ -122,7 +137,7 @@ console.log('  @onderling/relay  (PaaS entrypoint)');
 console.log('  ─────────────────────────────────────');
 console.log(`  Listening:  http://${host}:${boundPort}  (proxy terminates TLS → ${wsScheme}://)`);
 console.log(`  Media edge: ${blobGate ? `ON  route=${blobGate.route}  uploaders=${blobGate.uploaders.length}` : 'off (set R2_* to enable)'}`);
-console.log(`  Push wake:  ${pushSender ? 'ON (expo)' : 'off (set PUSH_PROVIDER=expo to enable)'}`);
+console.log(`  Push wake:  ${pushSender ? `ON (expo)${pushTokenRegistry ? `  tokens=${process.env.PUSH_TOKENS_DB}` : '  tokens=memory (lost on redeploy)'}` : 'off (set PUSH_PROVIDER=expo to enable)'}`);
 const lan = getLanIp();
 if (lan) console.log(`  LAN:        ws://${lan}:${boundPort}`);
 console.log('');

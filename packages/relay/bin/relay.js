@@ -8,11 +8,12 @@
  *   TLS_CERT         path to PEM cert (enables wss://)
  *   TLS_KEY          path to PEM key
  *   STATIC_DIR       optional directory to serve over HTTP
- *   PUSH_WAKE        'expo' wires the ExpoPushSender so an offline enqueue can wake a
+ *   PUSH_PROVIDER    'expo' wires the ExpoPushSender so an offline enqueue can wake a
  *                    registered device (EXPO_ACCESS_TOKEN optional — Expo's push API works
  *                    without one unless the project enforces enhanced security). Unset ⇒ no
  *                    push sender: the relay ignores register-push-token and never contacts a
- *                    push provider — the zero-metadata floor.
+ *                    push provider — the zero-metadata floor. Same env name as the PaaS
+ *                    entrypoint (deploy/relay) — one knob, one name.
  *   PUSH_TOKENS_DB   sqlite path for the address↔token map; makes wakes survive a relay
  *                    restart (a sleeping device never reconnects to re-register). Memory-only
  *                    when unset.
@@ -21,7 +22,7 @@
  *   npx @onderling/relay
  *   PORT=9000 STATIC_DIR=./public npx @onderling/relay
  *   TLS_CERT=cert.pem TLS_KEY=key.pem npx @onderling/relay
- *   PUSH_WAKE=expo PUSH_TOKENS_DB=./push-tokens.db npx @onderling/relay
+ *   PUSH_PROVIDER=expo PUSH_TOKENS_DB=./push-tokens.db npx @onderling/relay
  */
 import { readFileSync } from 'node:fs';
 import { startRelay, getLanIp } from '../src/server.js';
@@ -52,7 +53,7 @@ let acceptedGroups;
 // Push wake (the delivery ladder's last rung) — operator-enabled, never on by default.
 let pushSender = null;
 let pushTokenRegistry;
-if (process.env.PUSH_WAKE === 'expo') {
+if ((process.env.PUSH_PROVIDER ?? '').toLowerCase() === 'expo') {
   pushSender = new ExpoPushSender({ accessToken: process.env.EXPO_ACCESS_TOKEN || undefined });
   if (process.env.PUSH_TOKENS_DB) {
     const { default: Database } = await import('better-sqlite3');   // throws loudly when not installed
@@ -60,8 +61,8 @@ if (process.env.PUSH_WAKE === 'expo') {
       store: new SqlitePushTokenStore({ path: process.env.PUSH_TOKENS_DB, Database }),
     });
   }
-} else if (process.env.PUSH_WAKE) {
-  throw new Error(`PUSH_WAKE=${process.env.PUSH_WAKE} is not a known push sender (only 'expo')`);
+} else if (process.env.PUSH_PROVIDER) {
+  throw new Error(`PUSH_PROVIDER=${process.env.PUSH_PROVIDER} is not a known push sender (only 'expo')`);
 }
 
 const { tls } = await startRelay({

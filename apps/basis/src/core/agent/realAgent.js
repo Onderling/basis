@@ -41,7 +41,7 @@ import {
   computeSettingsConflicts, SETTINGS_SHARED_PROBE_PATH,
 } from '../../v2/settingsRestoreGate.js'; // #36/#44 — probe-before-flush (no cross-key clobber) + the restore choices
 import { makeMembershipRail, makeMembershipEmitter } from '../../v2/membershipRail.js'; // the membership rider — statements ride the device log
-import { makeTaskRail, makeTaskEmitter, routeTaskMirror, TASK_LANE_TYPES } from '../../v2/taskRail.js'; // the content re-root — task snapshots ride the device log
+import { makeTaskRail, makeTaskEmitter, routeTaskMirror } from '../../v2/taskRail.js'; // the content re-root — item snapshots ride the device log
 import { makeChatRail, makeChatEmitter } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
 import { paramsManifest } from '../../v2/paramsManifest.js';   // #36 — the params op contract (gates the waist branch)
 import { VaultMemory, VaultLocalStorage, VaultEncrypted, migrateVaultToEncrypted, resealVault, seedFromString, seedToString } from '@onderling/vault';
@@ -712,13 +712,21 @@ export async function createRealHouseholdAgent(opts = {}) {
           publishItem:        (item)          => routeTaskMirror({ circleId: id, mirror, emitter: taskEmit }).publishItem(item),
           publishItemRemoved: (rid, removed)  => routeTaskMirror({ circleId: id, mirror, emitter: taskEmit }).publishItemRemoved(rid, removed),
         });
-        wireCircleStoreInbound({
-          notifyEnvelope: circleSubstrate.notifyEnvelope,
-          store:          circleStore,
-          prefix:         `/household/circles/${id}/items/`,
-        });
+        // The UNSIGNED inbound door only exists for the mirror-carry composition (no device log — the
+        // legacy shape). A device-log composition publishes every type as a SIGNED lane statement and
+        // receives through the rail's verify gate, so leaving this door open there would re-admit
+        // unsigned writes beside the gate the lanes enforce.
+        if (!opts.deviceLog) {
+          wireCircleStoreInbound({
+            notifyEnvelope: circleSubstrate.notifyEnvelope,
+            store:          circleStore,
+            prefix:         `/household/circles/${id}/items/`,
+          });
+        }
         circleSyncWired.add(id);
-        if (typeof console !== 'undefined') console.info(`[circle-sync] ${id}: store<->mirror wired`);
+        if (typeof console !== 'undefined') {
+          console.info(`[circle-sync] ${id}: ${opts.deviceLog ? 'lane-carried (signed; unsigned inbound door closed)' : 'store<->mirror wired'}`);
+        }
       }
     } catch (err) {
       // Best-effort by design — the op must still run locally — but silence here means "items never
@@ -758,10 +766,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     try { items = await householdApp.listOpen(householdService.stores.getStore(id), {}); } catch { return; }
     const mirror = await ensureCircleMirror(id);
     for (const it of (Array.isArray(items) ? items : [])) {
-      // Same per-type route as the live publish valve: a task head republishes as a signed lane snapshot
-      // (the receiver's rail verifies + causally merges — idempotent), the rest as legacy mirror envelopes.
+      // Same route as the live publish valve: with a lane emitter every head republishes as a signed
+      // lane snapshot (the receiver's rail verifies + causally merges — idempotent); only the
+      // no-device-log composition still republishes legacy mirror envelopes.
       try {
-        if (taskEmit && it && TASK_LANE_TYPES.has(it.type)) taskEmit.snapshot(id, it);
+        if (taskEmit && it) taskEmit.snapshot(id, it);
         else mirror.publishItem(it);
       } catch { /* best-effort */ }
     }

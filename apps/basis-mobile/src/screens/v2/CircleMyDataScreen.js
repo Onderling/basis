@@ -8,7 +8,7 @@
  * The backup/restore flows reuse the existing RN wizard modals — no reimpl.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, Modal, TextInput, Alert } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, Modal, TextInput, Alert, Share } from 'react-native';
 import { t, lang, setLang } from '../../core/localisation.js';
 import { useTheme, useThemePref } from './themeContext.js';
 import { surfacePrefStore } from '../../core/surfacePrefStore.js';
@@ -37,7 +37,7 @@ import { enableNativePush, disableNativePush, getNativePushState } from '../../v
 
 const CHAT_AI_KEY = { on: 'chat_ai_on', 'circle-off': 'chat_ai_circle_off', 'no-llm': 'chat_ai_no_llm', 'no-provider': 'chat_ai_no_provider' };
 
-export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi, userLlm, onSaveUserLlm, validateUserLlm, onReconnectPeer,
+export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi, userLlm, onSaveUserLlm, validateUserLlm, onReconnectPeer, agent = null,
   onOpenConnectionPoints, eventLog = null }) {
   // Reactive theme — reading it at render time is what lets the display-theme
   // toggle below recolour THIS screen live (module-level StyleSheets can't).
@@ -58,6 +58,8 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
     </View>
   ), [styles]);
   const [dataLocation, setDataLocation] = useState({});
+  // Re-read tick for the history-mirror row (the flip is live on the agent; the row re-reads it).
+  const [, setHistoryTick] = useState(0);
   const [podStatus, setPodStatus] = useState({});
   // cluster J — pod sign-in entry (the v2 UI had none; sign-in was stranded in the hidden ChatScreen).
   const [issuer, setIssuer] = useState('https://login.inrupt.com');
@@ -396,6 +398,43 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
         ) : null}
         <Text style={styles.privacyBody}>{t('circle.mydata.cleanup_note')}</Text>
       </Section>
+
+      {/* The personal history mirror — live health from the agent; the toggle flips the
+          history.mirror register param through the one kind-gated write (the agent starts/stops
+          the sink LIVE). Web parity: circleMyData.js's history section. Omitted without an agent. */}
+      {agent && typeof agent.historyMirrorStatus === 'function' ? (() => {
+        const on = agent.getParamValue?.('history.mirror') === true;
+        const hs = agent.historyMirrorStatus();
+        const stateLine = !on ? t('circle.mydata.history_off')
+          : hs?.lastError ? t('circle.mydata.history_error', { error: hs.lastError })
+          : hs ? t('circle.mydata.history_on', { count: (hs.mirrored ?? 0) + (hs.pending ?? 0) })
+          : t('circle.mydata.history_waiting');
+        return (
+          <Section title={t('circle.mydata.history')}>
+            <Text style={styles.privacyBody} testID="mydata-history-status">{stateLine}</Text>
+            <Text style={styles.privacyBody}>{t('circle.mydata.history_what')}</Text>
+            <Pressable style={styles.action} testID="mydata-history-toggle"
+              onPress={async () => {
+                try { await callSkill('params', 'set-param', { key: 'history.mirror', value: !on }); } catch { /* the row re-reads the truth */ }
+                setTimeout(() => setHistoryTick((n) => n + 1), 400);
+                setHistoryTick((n) => n + 1);
+              }}>
+              <Text style={styles.actionLabel}>{on ? t('circle.mydata.history_disable') : t('circle.mydata.history_enable')}</Text>
+            </Pressable>
+            {typeof agent.exportHistoryArchive === 'function' ? (
+              <Pressable style={styles.action} testID="mydata-history-export"
+                onPress={async () => {
+                  try {
+                    const json = await agent.exportHistoryArchive();
+                    await Share.share({ message: json, title: 'onderling-geschiedenis.json' });
+                  } catch { /* dismissed or no share target — nothing to report */ }
+                }}>
+                <Text style={styles.actionLabel}>{t('circle.mydata.history_export')}</Text>
+              </Pressable>
+            ) : null}
+          </Section>
+        );
+      })() : null}
 
       <Section title={t('circle.mydata.notifications')}>
         <Text style={styles.privacyBody}>

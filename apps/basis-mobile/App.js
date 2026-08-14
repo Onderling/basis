@@ -44,6 +44,7 @@ import MnemonicEntryScreen from './src/screens/MnemonicEntryScreen.js';
 import MnemonicCreateScreen from './src/screens/MnemonicCreateScreen.js';
 import { initLocalisation, subscribeLang, t } from './src/core/localisation.js';
 import { bootAgentBundle } from './src/core/agentBundle.js';
+import { attachSurfacePrefAgent } from './src/core/surfacePrefStore.js';
 import {
   shouldShowFirstRunWelcome, markWelcomeDismissed,
 } from './src/core/firstRun.js';
@@ -537,6 +538,9 @@ export default function App() {
         // closure built above.  Must happen BEFORE the rehydrator
         // fires (next block) so the first ingest call sees callSkill.
         bundleRef.current = b;
+        // Register-backed surface preference (the device-params consolidation): bind the booted
+        // agent into the module store, which hydrates the cached value from the register.
+        attachSurfacePrefAgent(b.agent);
         // #36 — apply the persisted chat-retention (from the parameter register, hydrated at agent boot) to the
         // shared eventLog, parity with web circleApp. Reads via callSkill('params',…) (the bundle exposes it).
         b.callSkill?.('params', 'get-param', { key: 'retention.chatDays' })

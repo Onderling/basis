@@ -25,11 +25,13 @@ export const TASK_RAIL_KINDS = entryKindRegistryFromManifests(taskManifest).kind
 /** The item TYPES that ride the lane instead of the legacy mirror. Tasks came first (the claim cluster
  *  needs the writer-computed snapshot); the mirror-cargo inventory then moved the four household LIST
  *  types and the generic `note` over — same mechanics (full-item snapshot + the store's causal merge; no
- *  claim cluster involved). Still on the legacy mirror: `contact` (identity-adjacent — its feed comes
- *  from the roster itself; whether it belongs on a signed content lane at all is an open call, so it
- *  keeps today's carry until decided). The mirror plumbing retires only when the LAST type moves. */
+ *  claim cluster involved). `contact` closed the set: the held question ("does an identity-adjacent type
+ *  belong on a signed lane?") dissolved on inspection — the contact ITEM is a plain name record (the
+ *  register-a-name op writes it), while the actual identity data (the ContactBook MemberMap, the roster)
+ *  never was store cargo on any carry. With every store type on the lane, the legacy mirror carries
+ *  nothing — its cargo plumbing can retire. */
 export const TASK_LANE_TYPES = Object.freeze(new Set([
-  'task', 'shopping', 'errand', 'repair', 'schedule', 'note',
+  'task', 'shopping', 'errand', 'repair', 'schedule', 'note', 'contact',
 ]));
 
 /** The wire subtypes for the task lane's fan + catch-up (the governance/membership pairs' sibling). */

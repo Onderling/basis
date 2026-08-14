@@ -51,7 +51,7 @@ import {
   // P1.7 — the viewer's conversation filter (kinds × people/agents), shared model, device-local store.
   applyChatFilter, chatFilterChips, normalizeChatFilter, asyncStorageChatFilterIo,
   // "Never share my global address" — the publication lock (web parity).
-  shareableAddress, asyncStorageAddressSharingIo,
+  shareableAddress,
   deliveryPresentation,
   // Taken (tasks) tab — task-store item → stream-row projection (shared web≡mobile).
   buildTaskRows,
@@ -108,6 +108,7 @@ import { effectiveCapabilities, checkCapability } from '../../../../basis/src/v2
 import { buildCapabilityMatrix } from '@onderling/app-manifest';
 // S6.C — per-user surface preference (inline / screen / minimal), shared selector + the mobile store.
 import { selectSurfaceButtons } from '../../../../basis/src/v2/surfacePref.js';
+import { SHARE_NKN_ADDRESS_PARAM_KEY } from '../../../../basis/src/v2/addressSharing.js';
 // "only you" vs "whole kring" — message scope (data property; the badge renders it).
 import { scopeForReply } from '../../../../basis/src/v2/messageScope.js';
 import { buildFindExtras } from '@onderling/kring-host/findExtras';
@@ -1399,9 +1400,8 @@ export default function CircleLauncherScreen({
   // best-effort: a failure omits the field, never blocks the invite. (`offeringsMatching` stays a listed
   // web-only exception — the board-8 admin draft lives in web localStorage.)
   // The publication lock, read at invite-build time so a flip takes effect without a remount.
-  const addressSharingIo = useMemo(() => asyncStorageAddressSharingIo(AsyncStorage), []);
-  const [shareNknAddress, setShareNknAddress] = useState(true);
-  useEffect(() => { addressSharingIo.load().then(setShareNknAddress).catch(() => {}); }, [addressSharingIo]);
+  // The LIVE register value (device scope, the device-params consolidation) — no bare-key load.
+  const shareNknAddress = bundle?.agent?.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY) !== false;
 
   const openCircleInvite = useCallback(async (circleId) => {
     let r;

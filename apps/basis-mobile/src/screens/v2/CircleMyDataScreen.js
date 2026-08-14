@@ -26,7 +26,7 @@ import {
 } from '../../../../basis/src/v2/retentionPref.js';
 // "Never share my global address" (J-CS8) — the strictest privacy position in the product: one address
 // across everything is what links a person's circles together.
-import { asyncStorageAddressSharingIo } from '../../../../basis/src/v2/addressSharing.js';
+import { SHARE_NKN_ADDRESS_PARAM_KEY } from '../../../../basis/src/v2/addressSharing.js';
 import UserLlmSettings from './UserLlmSettings.js';
 import EncryptedBackupWizardModal from '../../../../basis/src/rn/wizards/encryptedBackupWizardModal.js';
 import RestoreFromMnemonicWizardModal from '../../../../basis/src/rn/wizards/restoreFromMnemonicWizardModal.js';
@@ -113,14 +113,14 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
 
   // P1 §4 tail — the retention choice, applied LIVE (setRetention prunes at once) so a shortened
   // window shows immediately rather than after a restart.
-  const addressSharingIo = React.useMemo(() => asyncStorageAddressSharingIo(AsyncStorage), []);
-  const [shareNknAddress, setShareNknAddress] = useState(null);
-  useEffect(() => { addressSharingIo.load().then(setShareNknAddress).catch(() => {}); }, [addressSharingIo]);
+  // The address-sharing setting lives in the parameter register since the consolidation — the
+  // read is the live enforced value, the write goes through the one kind-gated set-param.
+  const shareNknAddress = agent ? agent.getParamValue?.(SHARE_NKN_ADDRESS_PARAM_KEY) !== false : null;
   const toggleShareAddress = useCallback(async () => {
     const next = !(shareNknAddress !== false);
-    setShareNknAddress(next);
-    addressSharingIo.save(next).catch(() => {});
-  }, [addressSharingIo, shareNknAddress]);
+    try { await callSkill('params', 'set-param', { key: SHARE_NKN_ADDRESS_PARAM_KEY, value: next }); } catch { /* the row re-reads */ }
+    setHistoryTick((n) => n + 1);
+  }, [callSkill, shareNknAddress]);
 
   // Message cleanup (web parity) — the conversation is the RECORD and never expires by policy; deleting
   // old messages is the user's own explicit act, confirmed through the platform dialog. The result line

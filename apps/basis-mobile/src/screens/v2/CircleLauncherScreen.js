@@ -435,8 +435,9 @@ export default function CircleLauncherScreen({
   const loadCircleTransport = useCallback(async () => {
     try {
       const relayUrl = resolveRelayUrl(await asyncStorageRelayIo(AsyncStorage).load(), process.env.EXPO_PUBLIC_CIRCLE_RELAY_URL) || '';
-      let mode = null;
-      try { const m = await AsyncStorage.getItem('cc-transport-mode'); if (m === 'nkn' || m === 'relay' || m === 'both') mode = m; } catch { /* best-effort */ }
+      // The register is the one home since the device-params consolidation.
+      const m = bundle?.agent?.getParamValue?.('transport.mode');
+      const mode = (m === 'nkn' || m === 'relay' || m === 'both') ? m : null;
       // canWakePush: mobile HAS a killed-app state an OS push can wake; wakeNudges = the register
       // switch (OFF by default) the Settings toggle reads back — consolidated from the bare
       // AsyncStorage key into the parameter register (device scope).
@@ -470,8 +471,9 @@ export default function CircleLauncherScreen({
       return { ok: !saveError && reconnect?.ok !== false, effective, error: saveError ?? reconnect?.error ?? null };
     }
     if (opId === 'transport-mode' && ['nkn', 'relay', 'both'].includes(String(args?.mode))) {
-      try { await AsyncStorage.setItem('cc-transport-mode', args.mode); } catch { /* best-effort */ }
-      try { bundle?.agent?.setTransportMode?.(args.mode); } catch { /* best-effort */ }
+      // One home, one application point (web parity): the kind-gated write; realAgent's set-param
+      // hook applies it to the live transport router.
+      try { await bundle?.callSkill?.('params', 'set-param', { key: 'transport.mode', value: args.mode }); } catch { /* the control re-reads */ }
     }
     if (opId === 'wake-nudges') {
       // Offline delivery M1 — the whole enable/disable ladder lives in the bundle's orchestrator

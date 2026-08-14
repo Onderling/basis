@@ -2261,6 +2261,12 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (opId === 'set-param' && paramsResult?.ok !== false && args?.key === HISTORY_MIRROR_PARAM_KEY) {
         historyMirrorSync?.();
       }
+      // The transport mode applies LIVE too — the register is the one home, this hook the one
+      // application point (shells and builtins just set-param).
+      if (opId === 'set-param' && paramsResult?.ok !== false && args?.key === 'transport.mode'
+          && ['nkn', 'relay', 'both'].includes(args?.value)) {
+        try { sa.setTransportMode?.(args.value); } catch { /* the register still holds the value */ }
+      }
       return paramsResult;
     }
     if (appOrigin === 'household') {
@@ -3655,6 +3661,20 @@ export async function createRealHouseholdAgent(opts = {}) {
   };
   historyMirrorSync();
 
+  // The persisted TRANSPORT MODE is applied at boot from the register (device scope). Before the
+  // consolidation the mode lived in three write-only homes and nothing read any of them back — a
+  // restart silently reset every device. Applied ONLY when it differs from the declared default:
+  // the register cannot distinguish "never chosen" from "chose the default", and force-applying
+  // the default would narrow a router that the relay-connect path deliberately widens to 'both'
+  // (the mode is advisory against that upgrade; an explicit set-param always applies live).
+  try {
+    const bootMode = paramsService.register.valueOf('transport.mode');
+    if (['nkn', 'relay', 'both'].includes(bootMode)
+        && bootMode !== paramsService.register.defaultOf?.('transport.mode')) {
+      sa.setTransportMode?.(bootMode);
+    }
+  } catch { /* the default stands */ }
+
   return {
     // Part G — the REAL household app manifest (item/task vocab) is now the
     // catalog source of truth for the household surface.  (The mock manifest
@@ -3860,9 +3880,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     get transportMode() { return sa.transportMode; },
     setTransportMode:    sa.setTransportMode,
 
-    // The slash handlers persist the relay URL + transport mode here.
-    // Expose the SA's identity-vault so /set-relay can stash both
-    // across reloads (key: cc-relay-url; cc-transport-mode).
+    // The slash handlers persist the relay URL here (key: cc-relay-url).
+    // The transport MODE moved to the parameter register (device scope) —
+    // boot applies it and the set-param hook applies a live flip.
     vault: sa.identity?.vault ?? sa.vault ?? null,
 
     /**

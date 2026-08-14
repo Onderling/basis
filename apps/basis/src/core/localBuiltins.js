@@ -1419,7 +1419,6 @@ function formatHelp(catalog, t) {
 /* ─── A1 (2026-05-23) — relay-server slash handlers ─────────── */
 
 const RELAY_VAULT_KEY    = 'cc-relay-url';
-const TRANSPORT_VAULT_KEY = 'cc-transport-mode';
 
 /**
  * `/set-relay <ws://...>` — persist + connect to a relay.
@@ -1462,7 +1461,7 @@ async function setRelay(args, { agent, t }) {
  * outbound peer sends.  Persists to vault; takes effect immediately.
  */
 async function transportMode(args, { agent, t }) {
-  if (typeof agent?.setTransportMode !== 'function' || !agent?.vault?.set) {
+  if (typeof agent?.callSkill !== 'function') {
     return { ok: false, error: t('transport.no_substrate') };
   }
   const mode = String(args?.mode ?? '').trim();
@@ -1470,8 +1469,11 @@ async function transportMode(args, { agent, t }) {
     return { ok: false, error: t('transport.bad_mode', { mode }) };
   }
   try {
-    agent.setTransportMode(mode);
-    await agent.vault.set(TRANSPORT_VAULT_KEY, mode);
+    // The register is the one home (device-params consolidation): the kind-gated write persists it
+    // and realAgent's set-param hook applies it to the live transport router. The old vault key was
+    // write-only — nothing ever read it back at boot.
+    const r = await agent.callSkill('params', 'set-param', { key: 'transport.mode', value: mode });
+    if (r?.ok === false) return { ok: false, error: r.error ?? 'set-param refused' };
     return { ok: true, message: t('transport.mode_set', { mode }) };
   } catch (err) {
     return { ok: false, error: err.message ?? String(err) };

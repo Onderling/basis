@@ -1299,21 +1299,22 @@ let   CIRCLE_RELAY_URL      = bootRelayUrl({
 });
 let   _peerAgent           = null;   // captured at boot so a relay-setting change can reconnect live
 let   _peerRouter          = null;
-// Phase 4 §9 — device transport-mode preference (nkn|relay|both), persisted so the settings
-// surface reflects it + the enabledWhen fold reads it. Shares the vault key the classic shell's
-// /transport-mode built-in uses (localBuiltins TRANSPORT_VAULT_KEY = 'cc-transport-mode').
-const TRANSPORT_MODE_KEY = 'cc-transport-mode';
+// Phase 4 §9 — device transport-mode preference (nkn|relay|both). One home since the
+// device-params consolidation: the parameter register (realAgent applies it at boot + on a
+// live set-param); the classic /transport-mode built-in writes the same param.
 function readTransportMode() {
-  try { const v = localStorage.getItem(TRANSPORT_MODE_KEY); return (v === 'nkn' || v === 'relay' || v === 'both') ? v : null; }
-  catch { return null; }
+  // The register is the one home since the device-params consolidation (realAgent applies it at
+  // boot and on a live set-param); pre-boot reads answer null → the fold's unknown seam.
+  const v = circleHouseholdAgent?.getParamValue?.('transport.mode');
+  return (v === 'nkn' || v === 'relay' || v === 'both') ? v : null;
 }
 function applyTransportMode(mode) {
   if (!['nkn', 'relay', 'both'].includes(String(mode))) return { ok: false, error: 'bad_mode' };
-  try { localStorage.setItem(TRANSPORT_MODE_KEY, mode); } catch { /* best-effort */ }
-  // Take effect live when the peer agent supports it (parity with the classic shell's built-in);
-  // absent ⇒ the persisted preference still drives the fold + next connect.
-  try { _peerAgent?.setTransportMode?.(mode); } catch { /* best-effort */ }
-  return { ok: true, mode };
+  // One home, one application point: the kind-gated write; realAgent's set-param hook applies it
+  // to the live transport router. Fire-and-forget — the control re-reads the register.
+  circleHouseholdAgent?.callSkill?.('params', 'set-param', { key: 'transport.mode', value: mode })
+    .catch(() => { /* the control re-reads the truth */ });
+  return { ok: true };
 }
 // Phase 4 §9 — the current device transport state the settings fold reads (relay availability
 // drives the route × capability grey-out). transportKnown is always true here (we can read relay

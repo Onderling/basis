@@ -29,6 +29,7 @@ import { ASK_DEFAULT_TTL_MS } from './nearbyAsks.js';
 import { DEFAULT_RETENTION_DAYS } from './retentionPref.js';
 import { DEFAULT_SHARE_NKN_ADDRESS, SHARE_NKN_ADDRESS_PARAM_KEY } from './addressSharing.js';
 import { DEFAULT_SURFACE_PREF, SURFACE_PREF_PARAM_KEY } from './surfacePref.js';
+import { TRANSPORT_MODES } from './circleSettingsControls.js';
 
 /**
  * The settable (kind:user) params basis governs — the worked-example cluster. Grows as more clusters migrate;
@@ -65,6 +66,11 @@ export const BASIS_USER_PARAMS = [
   // The bot-reply surface preference (inline / screen / chat) — consolidated from the bare
   // cc.surfacePref key; both shells' stores ride registerSurfacePrefIo.
   { key: SURFACE_PREF_PARAM_KEY,                scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: DEFAULT_SURFACE_PREF },
+  // The device transport mode — consolidated from THREE write-only homes (web localStorage,
+  // mobile AsyncStorage, the classic builtin's vault key), none of which was ever read back at
+  // boot: the chosen mode silently reset to the default on every restart. realAgent now applies
+  // the register value at boot AND on a live set-param.
+  { key: 'transport.mode',                      scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: TRANSPORT_MODES[0] },
 ];
 
 /**

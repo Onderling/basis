@@ -358,19 +358,17 @@ describe('/transports', () => {
 
 describe('/transport-mode', () => {
   function makeAgent() {
-    return {
-      setTransportMode: vi.fn(),
-      vault: { set: vi.fn(async () => {}) },
-    };
+    // The register is the one home (device-params consolidation): the builtin writes through the
+    // kind-gated set-param; realAgent's set-param hook applies it to the live router.
+    return { callSkill: vi.fn(async () => ({ ok: true })) };
   }
 
-  it('persists the mode + applies it via setTransportMode (nkn)', async () => {
+  it('persists the mode through the one kind-gated write (nkn)', async () => {
     const agent = makeAgent();
     const builtins = createLocalBuiltins({ catalog: emptyCatalog(), t, agent });
     const r = await builtins['transport-mode']({ mode: 'nkn' });
     expect(r.ok).toBe(true);
-    expect(agent.setTransportMode).toHaveBeenCalledWith('nkn');
-    expect(agent.vault.set).toHaveBeenCalledWith('cc-transport-mode', 'nkn');
+    expect(agent.callSkill).toHaveBeenCalledWith('params', 'set-param', { key: 'transport.mode', value: 'nkn' });
     expect(r.message).toMatch(/Transport mode set/);
   });
 
@@ -379,7 +377,7 @@ describe('/transport-mode', () => {
     const builtins = createLocalBuiltins({ catalog: emptyCatalog(), t, agent });
     const r = await builtins['transport-mode']({ mode: 'both' });
     expect(r.ok).toBe(true);
-    expect(agent.setTransportMode).toHaveBeenCalledWith('both');
+    expect(agent.callSkill).toHaveBeenCalledWith('params', 'set-param', { key: 'transport.mode', value: 'both' });
   });
 
   it('rejects an invalid mode', async () => {
@@ -388,14 +386,13 @@ describe('/transport-mode', () => {
     const r = await builtins['transport-mode']({ mode: 'tcp' });
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/Bad mode/);
-    expect(agent.setTransportMode).not.toHaveBeenCalled();
-    expect(agent.vault.set).not.toHaveBeenCalled();
+    expect(agent.callSkill).not.toHaveBeenCalled();
   });
 
-  it('reports no_substrate when the agent lacks setTransportMode', async () => {
+  it('reports no_substrate when the agent lacks a callSkill', async () => {
     const builtins = createLocalBuiltins({
       catalog: emptyCatalog(), t,
-      agent: { vault: { set: vi.fn() } },
+      agent: {},
     });
     const r = await builtins['transport-mode']({ mode: 'nkn' });
     expect(r.ok).toBe(false);

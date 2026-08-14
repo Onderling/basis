@@ -68,18 +68,21 @@ export function createSurfacePrefStore(io = {}) {
   };
 }
 
-/** Browser localStorage io for the surface preference. */
-export function localStorageSurfacePrefIo(key = 'cc.surfacePref') {
-  return {
-    get: () => { try { return globalThis.localStorage?.getItem(key); } catch { return null; } },
-    set: (v) => { try { globalThis.localStorage?.setItem(key, v); } catch { /* */ } },
-  };
-}
+/** The register param this preference lives in since the device-params consolidation. */
+export const SURFACE_PREF_PARAM_KEY = 'surface.pref';
 
-/** RN AsyncStorage io for the surface preference (same value shape as web). */
-export function asyncStorageSurfacePrefIo(AsyncStorage, key = 'cc.surfacePref') {
+/**
+ * Register-backed io (the device-params consolidation): the value lives in the parameter
+ * register — reads mirror the live register value, writes go through the ONE kind-gated
+ * set-param. `getAgent` is a thunk because both shells construct the store at module scope,
+ * before the agent boots; `hydrate()` runs post-boot, when the thunk resolves.
+ */
+export function registerSurfacePrefIo(getAgent, key = SURFACE_PREF_PARAM_KEY) {
   return {
-    get: async () => { try { return await AsyncStorage?.getItem(key); } catch { return null; } },
-    set: async (v) => { try { await AsyncStorage?.setItem(key, v); } catch { /* */ } },
+    get: async () => getAgent?.()?.getParamValue?.(key) ?? null,
+    set: async (v) => {
+      const agent = getAgent?.();
+      if (agent) await agent.callSkill('params', 'set-param', { key, value: v });
+    },
   };
 }

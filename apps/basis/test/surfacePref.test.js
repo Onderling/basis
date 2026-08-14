@@ -4,7 +4,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   selectSurfaceButtons, normalizeSurfacePref, createSurfacePrefStore, DEFAULT_SURFACE_PREF,
-  asyncStorageSurfacePrefIo,
+  registerSurfacePrefIo,
 } from '../src/v2/surfacePref.js';
 
 const inline = [{ id: 'claimTask:t1', opId: 'claimTask', itemId: 't1' }];
@@ -52,13 +52,22 @@ describe('createSurfacePrefStore', () => {
     expect(store.get()).toBe('inline');
   });
 
-  it('works over the RN AsyncStorage io (mobile parity)', async () => {
-    const backing = {};
-    const AsyncStorage = { getItem: async (k) => backing[k] ?? null, setItem: async (k, v) => { backing[k] = v; } };
-    const store = createSurfacePrefStore(asyncStorageSurfacePrefIo(AsyncStorage));
+  it('works over the REGISTER io (the device-params consolidation): reads mirror the register, writes ride set-param', async () => {
+    // A minimal agent: the register value + the one kind-gated write.
+    let value = 'inline';
+    const calls = [];
+    const agent = {
+      getParamValue: (k) => (k === 'surface.pref' ? value : undefined),
+      callSkill: async (app, op, args) => { calls.push([app, op, args]); value = args.value; return { ok: true }; },
+    };
+    // The thunk resolves late (both shells construct the store pre-boot).
+    let bound = null;
+    const store = createSurfacePrefStore(registerSurfacePrefIo(() => bound));
+    expect(await store.hydrate()).toBe('inline');          // unbound → default, never a throw
+    bound = agent;
     await store.set('screen');
-    expect(backing['cc.surfacePref']).toBe('screen');
-    const reloaded = createSurfacePrefStore(asyncStorageSurfacePrefIo(AsyncStorage));
-    expect(await reloaded.hydrate()).toBe('screen');
+    expect(calls).toEqual([['params', 'set-param', { key: 'surface.pref', value: 'screen' }]]);
+    const reloaded = createSurfacePrefStore(registerSurfacePrefIo(() => bound));
+    expect(await reloaded.hydrate()).toBe('screen');       // the register is the one persistence
   });
 });

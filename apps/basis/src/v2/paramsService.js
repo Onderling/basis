@@ -28,6 +28,7 @@ import { createSettingsModule } from '@onderling/local-store';
 import { ASK_DEFAULT_TTL_MS } from './nearbyAsks.js';
 import { DEFAULT_RETENTION_DAYS } from './retentionPref.js';
 import { DEFAULT_SHARE_NKN_ADDRESS, SHARE_NKN_ADDRESS_PARAM_KEY } from './addressSharing.js';
+import { DEFAULT_SURFACE_PREF, SURFACE_PREF_PARAM_KEY } from './surfacePref.js';
 
 /**
  * The settable (kind:user) params basis governs — the worked-example cluster. Grows as more clusters migrate;
@@ -61,6 +62,9 @@ export const BASIS_USER_PARAMS = [
   // read is now the ENFORCED value everywhere (realAgent's contact-QR gate reads it live); before the
   // consolidation the enforcement sites read an opt no shell ever passed — the setting was UI-only.
   { key: SHARE_NKN_ADDRESS_PARAM_KEY,           scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: DEFAULT_SHARE_NKN_ADDRESS },
+  // The bot-reply surface preference (inline / screen / chat) — consolidated from the bare
+  // cc.surfacePref key; both shells' stores ride registerSurfacePrefIo.
+  { key: SURFACE_PREF_PARAM_KEY,                scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.USER, default: DEFAULT_SURFACE_PREF },
 ];
 
 /**

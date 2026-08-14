@@ -55,7 +55,7 @@ describe('the set-param op — the kind gate (decision D)', () => {
       'calendarEmission.defaultDurationMin', 'history.mirror',
       'history.restore.maxPerCircle', 'history.restore.recencyDays',
       'nearby.ask.defaultTtlMs', 'onlineCadence.pollIntervalMs',
-      'privacy.shareNknAddress', 'wake.nudges',
+      'privacy.shareNknAddress', 'surface.pref', 'wake.nudges',
     ]);
     // Both are kind:user; internal caps are never here.
     expect(params.every((p) => ['agent', 'device'].includes(p.scope))).toBe(true);

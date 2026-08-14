@@ -182,7 +182,7 @@ import { openThumbnail } from '@onderling/blob-gateway';
 // S6.A — manifest-driven inline buttons on bot replies (the resurrected "inline menu").
 import { embedButtonsForReply, embedsFromReply } from '../../src/v2/replyEmbeds.js';
 // S6.C — per-user preference selecting which projection (inline / screen / minimal) renders.
-import { selectSurfaceButtons, createSurfacePrefStore, localStorageSurfacePrefIo, SURFACE_PREFS } from '../../src/v2/surfacePref.js';
+import { selectSurfaceButtons, createSurfacePrefStore, registerSurfacePrefIo, SURFACE_PREFS } from '../../src/v2/surfacePref.js';
 // S6.D — is the conversational "chat" projection enriched by an LLM here? (user-loaded LLM + circle permits)
 import { resolveChatAi } from '../../src/v2/chatAi.js';
 // §4 storage-policy bridge — the circle `pod` axis drives stoop's authoritative
@@ -1426,7 +1426,9 @@ let circleSyncFolioNoteEmbedder = null; // 52.25 — re-wire folio /zoek's embed
 // publish-a-module-level-handle pattern as the line above.
 let circleResolveRagEmbedder = null;
 // S6.C — per-user surface preference (inline / screen / minimal); hydrated at boot.
-const circleSurfacePref = createSurfacePrefStore(localStorageSurfacePrefIo());
+// Register-backed (the device-params consolidation): the thunk resolves once the agent boots;
+// hydrate() runs post-boot, and set() rides the one kind-gated write.
+const circleSurfacePref = createSurfacePrefStore(registerSurfacePrefIo(() => circleHouseholdAgent));
 let circleContactSkills = null;  // live contact/bot exposed-skill registry (subscribed to agent.peers)
 let circlePeerGraph = null;      // app-owned PeerGraph (contacts roster registry source)
 let circleCoreAgent = null;      // the core chat agent (agent.sa.agent), for discoverA2A

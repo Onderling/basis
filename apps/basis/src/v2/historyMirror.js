@@ -13,14 +13,21 @@
  * key, identical across the user's enrolled devices and re-derived by the phrase ceremony), so
  * nothing this module writes ever reaches the backend as plaintext.
  *
- * Layout under `prefix` (default `basis/history/`):
- *   log/batch-<n>.json   {n, firstSeq, lastSeq, entries:[…]} — append-only, never rewritten
- *   cursor.json          {batch, lastSeq}                     — replace-on-write, the resume point
- *   head.json            {v, writtenAt, …snapshot()}          — replace-on-write, the non-log state
+ * Layout under `prefix` (default `basis/history/`) — one LANE per enrolled device:
+ *   log/<laneId>/batch-<n>.json  {n, firstSeq, lastSeq, entries:[…]} — append-only, never rewritten
+ *   log/<laneId>/cursor.json     {batch, lastSeq}                     — replace-on-write, the resume point
+ *   head.json                    {v, writtenAt, …snapshot()}          — replace-on-write, the non-log state
  *
- * Resumable: `start()` reads the cursor and backfills every LIVE log entry with seq > lastSeq
- * (entries the log already pruned are honestly gone — the mirror is complete from the day it is
- * turned on). A failed flush keeps its buffer and retries on the next one; `status()` says so.
+ * Resumable: `start()` reads the lane's cursor and backfills every LIVE log entry with seq >
+ * lastSeq (entries the log already pruned are honestly gone — the mirror is complete from the day
+ * it is turned on). A failed flush keeps its buffer and retries on the next one; `status()` says so.
+ *
+ * The READ half (`hydrateHistory`) is the instant-restore ladder: merge every lane by entry id,
+ * hydrate the RECENT window first (last N days OR the newest M entries per circle, whichever is
+ * larger — conversations open live), then the long tail in the background (folds are
+ * deterministic, so arrival order cannot change any outcome). Opening a sealed batch IS the
+ * integrity gate: the seal is authenticated encryption under the owner's key, so a tampered or
+ * foreign mirror fails to OPEN — it cannot inject.
  */
 
 import { createSealedPodDataSource } from '@onderling/pod-client';
@@ -45,6 +52,8 @@ export function createHistoryMirror({
   source,
   snapshot = null,
   prefix = 'basis/history/',
+  laneId = 'root',
+  skip = null,
   batchMax = 50,
   flushMs = 2000,
   now = Date.now,
@@ -53,9 +62,15 @@ export function createHistoryMirror({
   if (!eventLog || typeof eventLog.subscribe !== 'function') throw new Error('createHistoryMirror: an event log with subscribe() is required');
   if (!source || typeof source.read !== 'function' || typeof source.write !== 'function') throw new Error('createHistoryMirror: a DataSource-shaped source is required');
 
-  const cursorUri = `${prefix}cursor.json`;
+  // Every ENROLLED DEVICE mirrors its own log into its own LANE (`log/<laneId>/…`): lanes never
+  // clobber each other's batch numbering, and each device's cursor is meaningful only against its
+  // own local seqs (seq is per-instance and never travels). Restore merges all lanes by entry id.
+  // `skip` (a Set of entry ids) excludes what restore just hydrated — those entries came FROM the
+  // mirror, so backfilling them into this device's lane would only duplicate storage.
+  const lane      = `${prefix}log/${laneId}/`;
+  const cursorUri = `${lane}cursor.json`;
   const headUri   = `${prefix}head.json`;
-  const batchUri  = (n) => `${prefix}log/batch-${n}.json`;
+  const batchUri  = (n) => `${lane}batch-${n}.json`;
 
   let buffer = [];          // entries awaiting flush, ascending seq
   let cursor = { batch: 0, lastSeq: 0 };
@@ -132,7 +147,7 @@ export function createHistoryMirror({
       await readCursor();
       // The log's read surface is query() (most-recent-first); mirror ascending.
       const backlog = (typeof eventLog.query === 'function' ? eventLog.query() : [])
-        .filter((e) => Number.isFinite(e?.seq) && e.seq > cursor.lastSeq)
+        .filter((e) => Number.isFinite(e?.seq) && e.seq > cursor.lastSeq && !(skip?.has?.(e.id)))
         .sort((a, b) => a.seq - b.seq);
       buffer = backlog.concat(buffer);
       unsubscribe = eventLog.subscribe(onAppend);
@@ -154,4 +169,101 @@ export function createHistoryMirror({
     /** For the my-data "mirror healthy" row (M3). */
     status: () => ({ mirrored, pending: buffer.length, lastFlushAt, lastError, cursor: { ...cursor } }),
   };
+}
+
+/** Restore params — the recency window's two halves (whichever is larger wins, per circle). */
+export const HISTORY_RECENCY_DAYS_KEY = 'history.restore.recencyDays';
+export const HISTORY_RECENCY_MAX_KEY  = 'history.restore.maxPerCircle';
+
+/** Parse `log/<lane>/batch-<n>.json` keys out of a backend listing (any nesting the backend reports). */
+const BATCH_KEY_RE = /log\/([^/]+)\/batch-(\d+)\.json$/;
+
+async function listBatchKeys(source, prefix) {
+  const keys = new Set();
+  const seen = new Set();
+  async function walk(p) {
+    if (seen.has(p)) return;
+    seen.add(p);
+    let listed = [];
+    try { listed = (await source.list(p)) ?? []; } catch { return; }
+    for (const k of listed) {
+      if (typeof k !== 'string') continue;
+      if (BATCH_KEY_RE.test(k)) keys.add(k);
+      // A pod backend may list containers one level at a time — walk anything that looks deeper.
+      else if (k.endsWith('/') && k !== p) await walk(k);
+    }
+  }
+  await walk(`${prefix}log/`);
+  return [...keys];
+}
+
+/**
+ * The instant-restore hydrate (the ladder's steps 2 + 3). Reads every lane's batches, merges the
+ * entries by id, and hydrates the local device log in two phases:
+ *   RECENT — per circle, everything inside the recency window (ts >= now − recencyDays) PLUS the
+ *            newest maxPerCircle entries, whichever set is larger; awaited, so the caller knows
+ *            when conversations are live.
+ *   TAIL   — the rest, oldest last, in the background (`tailDone` resolves when it lands).
+ *
+ * `EventLog.hydrate` dedupes by id and restamps seq locally, so re-running is idempotent and a
+ * half-restored device just continues. Returns the hydrated ids so the caller can hand them to
+ * the sink's `skip` — what came FROM the mirror must not backfill into this device's lane.
+ *
+ * @returns {Promise<{recent:number, hydratedIds:Set<string>, tailDone:Promise<number>}>}
+ */
+export async function hydrateHistory({
+  source,
+  eventLog,
+  prefix = 'basis/history/',
+  recencyDays = 30,
+  maxPerCircle = 500,
+  now = Date.now,
+  logger = console,
+} = {}) {
+  if (!source || typeof source.list !== 'function') throw new Error('hydrateHistory: a DataSource-shaped source is required');
+  if (!eventLog || typeof eventLog.hydrate !== 'function') throw new Error('hydrateHistory: an event log with hydrate() is required');
+
+  const keys = await listBatchKeys(source, prefix);
+  const byId = new Map();
+  for (const key of keys) {
+    try {
+      const batch = JSON.parse(await source.read(key));
+      for (const e of (batch?.entries ?? [])) {
+        if (e && typeof e.id === 'string' && e.id && !byId.has(e.id)) byId.set(e.id, e);
+      }
+    } catch (err) {
+      // An unopenable batch is a FAILED gate (tampered, or sealed under a foreign key) — skip it
+      // loudly; the rest of the mirror still restores.
+      logger.warn?.(`[history-restore] batch unreadable — skipped: ${key}`, err?.message ?? err);
+    }
+  }
+
+  // Newest first, per the hydrate contract (it walks oldest→newest itself).
+  const all = [...byId.values()].sort((a, b) => (b.ts ?? 0) - (a.ts ?? 0));
+  const cutoff = now() - recencyDays * 24 * 60 * 60 * 1000;
+  const perCircle = new Map();
+  const recentSet = new Set();
+  for (const e of all) {
+    const circle = typeof e.circleId === 'string' && e.circleId ? e.circleId : '';
+    const rank = perCircle.get(circle) ?? 0;
+    perCircle.set(circle, rank + 1);
+    if ((e.ts ?? 0) >= cutoff || rank < maxPerCircle) recentSet.add(e.id);
+  }
+  const recentEntries = all.filter((e) => recentSet.has(e.id));
+  const tailEntries   = all.filter((e) => !recentSet.has(e.id));
+
+  const recent = eventLog.hydrate(recentEntries);
+  const hydratedIds = new Set(byId.keys());
+
+  // A real macrotask, not a microtask — the recent window must be OBSERVABLY live before the
+  // tail lands (that is the ladder's promise), and the event loop gets a turn to paint.
+  const tailDone = new Promise((resolve) => {
+    setTimeout(() => {
+      const n = eventLog.hydrate(tailEntries);
+      if (n) logger.info?.(`[history-restore] tail landed: ${n} older entr${n === 1 ? 'y' : 'ies'}`);
+      resolve(n);
+    }, 0);
+  });
+
+  return { recent, hydratedIds, tailDone };
 }

@@ -49,10 +49,12 @@ describe('the set-param op — the kind gate (decision D)', () => {
   it('list-user-params projects only the settable (kind:user) slice (the settings-form seed)', async () => {
     const svc = createParamsService();
     const { params } = await svc.callSkill('list-user-params');
-    // The kind:user params basis governs today (the history-mirror switch joined with the sealed
-    // follower sink — off by default, flipped through this same gate).
+    // The kind:user params basis governs today (the history-mirror switch + the instant-restore
+    // recency window joined with the personal history store — all flipped through this same gate).
     expect(params.map((p) => p.key).sort()).toEqual([
-      'calendarEmission.defaultDurationMin', 'history.mirror', 'nearby.ask.defaultTtlMs', 'onlineCadence.pollIntervalMs',
+      'calendarEmission.defaultDurationMin', 'history.mirror',
+      'history.restore.maxPerCircle', 'history.restore.recencyDays',
+      'nearby.ask.defaultTtlMs', 'onlineCadence.pollIntervalMs',
     ]);
     // Both are kind:user; internal caps are never here.
     expect(params.every((p) => ['agent', 'device'].includes(p.scope))).toBe(true);

@@ -10,7 +10,7 @@ import { AgentIdentity } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { createSealedPodDataSource } from '@onderling/pod-client';
 import { memoryDataSource } from '@onderling/item-store';
-import { createHistoryMirror, createHistoryPodMedium } from '../../src/v2/historyMirror.js';
+import { createHistoryMirror, createHistoryPodMedium, hydrateHistory } from '../../src/v2/historyMirror.js';
 import { settingsSealStrategyForIdentity } from '../../src/v2/sharedCopyOpener.js';
 import { createRealHouseholdAgent } from '../../src/core/agent/realAgent.js';
 import { EventLog } from '../../src/eventLog.js';
@@ -53,8 +53,8 @@ describe('the history mirror — sealed follower of the device log', () => {
 
     // The batch + cursor + head are on the backend…
     const keys = [...map.keys()];
-    expect(keys).toContain('basis/history/log/batch-1.json');
-    expect(keys).toContain('basis/history/cursor.json');
+    expect(keys).toContain('basis/history/log/root/batch-1.json');
+    expect(keys).toContain('basis/history/log/root/cursor.json');
     expect(keys).toContain('basis/history/head.json');
     // …and NOTHING stored is plaintext: not the message text, not the structure, not the head.
     const allBytes = [...map.values()].join('\n');
@@ -64,13 +64,13 @@ describe('the history mirror — sealed follower of the device log', () => {
 
     // The OWNER'S sealed source opens it all back up, intact.
     const mine = await sealedSourceFor(identity, map);
-    const batch = JSON.parse(await mine.read('basis/history/log/batch-1.json'));
+    const batch = JSON.parse(await mine.read('basis/history/log/root/batch-1.json'));
     expect(batch.entries.map((e) => e.payload.text)).toEqual(['geheim bericht een', 'geheim bericht twee']);
     expect(JSON.parse(await mine.read('basis/history/head.json')).registry[0].label).toBe('thuis');
 
     // A DIFFERENT identity's key opens none of it (deny-safe — the seal is to the owner).
     const stranger = await sealedSourceFor(await AgentIdentity.generate(new VaultMemory()), map);
-    await expect(stranger.read('basis/history/log/batch-1.json')).rejects.toThrow();
+    await expect(stranger.read('basis/history/log/root/batch-1.json')).rejects.toThrow();
   });
 
   it('resumes from the cursor: a fresh mirror over the same backend mirrors only what is NEW', async () => {
@@ -92,7 +92,7 @@ describe('the history mirror — sealed follower of the device log', () => {
     expect(second.status().mirrored).toBe(1);            // only the NEW entry — no re-mirrored history
 
     const mine = await sealedSourceFor(identity, map);
-    const b2 = JSON.parse(await mine.read('basis/history/log/batch-2.json'));
+    const b2 = JSON.parse(await mine.read('basis/history/log/root/batch-2.json'));
     expect(b2.entries.map((e) => e.payload.text)).toEqual(['na de herstart']);
   });
 
@@ -123,7 +123,7 @@ describe('the history mirror — sealed follower of the device log', () => {
     expect(mirror.status().pending).toBe(0);
     expect(mirror.status().mirrored).toBe(1);
     const mine = await sealedSourceFor(identity, map);
-    expect(JSON.parse(await mine.read('basis/history/cursor.json')).batch).toBe(1);
+    expect(JSON.parse(await mine.read('basis/history/log/root/cursor.json')).batch).toBe(1);
   });
 
   it('THE BOOT WIRING: off by default provisions nothing; the switch on + a reboot → the log mirrors sealed', async () => {
@@ -163,5 +163,94 @@ describe('the history mirror — sealed follower of the device log', () => {
     expect(A2.historyMirrorStatus()?.mirrored).toBeGreaterThanOrEqual(1);
     const raw = [...podMap.values()].join('\n');
     expect(raw).not.toContain('geheim');            // sealed on the backend, by construction
+  }, 30_000);
+
+  it('TWO DEVICES, TWO LANES: neither clobbers the other; restore merges both by id', async () => {
+    const identity = await AgentIdentity.generate(new VaultMemory());
+    const map = new Map();
+    const logA = new EventLog({ initial: [], muted: [] });
+    const logB = new EventLog({ initial: [], muted: [] });
+    const mA = createHistoryMirror({ eventLog: logA, source: await sealedSourceFor(identity, map), laneId: 'dev-a', batchMax: 100, flushMs: 5 });
+    const mB = createHistoryMirror({ eventLog: logB, source: await sealedSourceFor(identity, map), laneId: 'dev-b', batchMax: 100, flushMs: 5 });
+    await mA.start(); await mB.start();
+    logA.append({ ...entry('a-1', 'van apparaat a'), ts: Date.now() });
+    logB.append({ ...entry('b-1', 'van apparaat b'), ts: Date.now() });
+    await mA.flush(); await mB.flush();
+    expect([...map.keys()]).toContain('basis/history/log/dev-a/batch-1.json');
+    expect([...map.keys()]).toContain('basis/history/log/dev-b/batch-1.json');
+
+    const fresh = new EventLog({ initial: [], muted: [] });
+    const r = await hydrateHistory({ source: await sealedSourceFor(identity, map), eventLog: fresh });
+    await r.tailDone;
+    expect(fresh.query().map((e) => e.id).sort()).toEqual(['a-1', 'b-1']);
+  });
+
+  it('THE LADDER: the recent window hydrates first (days OR newest-per-circle, larger wins); the tail follows', async () => {
+    const identity = await AgentIdentity.generate(new VaultMemory());
+    const map = new Map();
+    const log = new EventLog({ initial: [], muted: [] });
+    const mirror = createHistoryMirror({ eventLog: log, source: await sealedSourceFor(identity, map), laneId: 'dev-a', batchMax: 500, flushMs: 5 });
+    await mirror.start();
+    const DAY = 24 * 60 * 60 * 1000;
+    const t0 = Date.now();
+    // Circle X: 3 old entries (60d back — outside the window) + 2 recent. maxPerCircle 3 → the
+    // NEWEST 3 = both recent ones + ONE old one join the recent phase; 2 old ones are tail.
+    for (let i = 0; i < 3; i += 1) log.append({ ...entry(`x-old-${i}`, 'oud'), circleId: 'kring-x', ts: t0 - 60 * DAY + i });
+    log.append({ ...entry('x-new-1', 'vers'), circleId: 'kring-x', ts: t0 - DAY });
+    log.append({ ...entry('x-new-2', 'vers'), circleId: 'kring-x', ts: t0 });
+    // Circle Y: one recent entry — untouched by X's cap (the window is PER circle).
+    log.append({ ...entry('y-new-1', 'vers'), circleId: 'kring-y', ts: t0 });
+    await mirror.flush();
+
+    const fresh = new EventLog({ initial: [], muted: [] });
+    const r = await hydrateHistory({
+      source: await sealedSourceFor(identity, map), eventLog: fresh,
+      recencyDays: 30, maxPerCircle: 3, now: () => t0,
+    });
+    expect(r.recent).toBe(4);                                     // x-new-1 x-new-2 x-old-2(rank 3) y-new-1
+    const afterRecent = new Set(fresh.query().map((e) => e.id));
+    expect(afterRecent.has('x-new-1') && afterRecent.has('x-new-2') && afterRecent.has('y-new-1')).toBe(true);
+    expect(afterRecent.has('x-old-0')).toBe(false);               // the tail is not here yet
+    await r.tailDone;
+    expect(fresh.query()).toHaveLength(6);                        // …and now everything is
+    expect(r.hydratedIds.size).toBe(6);
+  });
+
+  it('THE RESTORE BOOT: a fresh device with an empty log hydrates the mirror and does NOT re-mirror it into its own lane', async () => {
+    const settings = memoryDataSource();
+    const podMap = new Map();
+    // ONE user = one chat identity across every device (in production the phrase ceremony restores
+    // it); sharing the identity vaults is that fact in a test — without them each boot would mint
+    // its own seal key and the restore would (correctly) refuse to open the mirror. Both vaults:
+    // the chat vault is sealed at rest under a key the OWNER-ROOT vault's custody decides.
+    const vaults = { ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() };
+    const provisionHistoryMirror = async (strategy) =>
+      createHistoryPodMedium({ podSource: memoryPodSource(podMap), strategy });
+
+    // Device A: switch on (agent-scoped → it will sync to B via the shared settings store),
+    // reboot so the sink runs, write a message.
+    const logA = new EventLog({ initial: [], muted: [] });
+    const A0 = await createRealHouseholdAgent({ seedHousehold: false, settingsDataSource: settings, deviceLog: logA, provisionHistoryMirror, ...vaults });
+    await A0.callSkill('params', 'set-param', { key: 'history.mirror', value: true });
+    const logA2 = new EventLog({ initial: [], muted: [] });
+    const A = await createRealHouseholdAgent({ seedHousehold: false, settingsDataSource: settings, deviceLog: logA2, provisionHistoryMirror, ...vaults });
+    await new Promise((r) => setTimeout(r, 50));
+    logA2.append({ ...entry('a-msg', 'gespiegeld bericht'), ts: Date.now() });
+    let deadline = Date.now() + 5000;
+    while ((A.historyMirrorStatus()?.mirrored ?? 0) < 1 && Date.now() < deadline) await new Promise((r) => setTimeout(r, 100));
+    expect(A.historyMirrorStatus()?.mirrored).toBeGreaterThanOrEqual(1);
+    const lanesBefore = [...podMap.keys()].filter((k) => k.includes('/log/')).length;
+
+    // Device B: FRESH (empty log), same settings store (the switch syncs), same pod. The boot
+    // hydrates the mirror back — instant restore — and its own lane stays empty (skip).
+    const logB = new EventLog({ initial: [], muted: [] });
+    const B = await createRealHouseholdAgent({ seedHousehold: false, settingsDataSource: settings, deviceLog: logB, provisionHistoryMirror, ...vaults });
+    deadline = Date.now() + 5000;
+    while (logB.size < 1 && Date.now() < deadline) await new Promise((r) => setTimeout(r, 100));
+    expect(logB.query().some((e) => e.id === 'a-msg')).toBe(true);          // A's history is HERE
+    await new Promise((r) => setTimeout(r, 300));
+    const lanesAfter = [...podMap.keys()].filter((k) => k.includes('/log/')).length;
+    expect(lanesAfter).toBe(lanesBefore);   // B backfilled nothing — hydrated entries stay in A's lane
+    expect(B.historyMirrorStatus()).not.toBe(null);                          // …but B's sink IS following
   }, 30_000);
 });

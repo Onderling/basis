@@ -36,7 +36,10 @@ import { createCircleSenderAuthorization, SENDER_REASON } from '../../v2/circleS
 import { shareableAddress } from '../../v2/addressSharing.js';
 import { createParamsService, basisParamRegistry } from '../../v2/paramsService.js';   // #36 — settable params surface
 import { settingsSealStrategyForIdentity } from '../../v2/sharedCopyOpener.js';         // #36 pod-sync — seal-to-self for settings
-import { createHistoryMirror, HISTORY_MIRROR_PARAM_KEY } from '../../v2/historyMirror.js'; // the personal history store's sealed follower sink
+import {
+  createHistoryMirror, hydrateHistory,
+  HISTORY_MIRROR_PARAM_KEY, HISTORY_RECENCY_DAYS_KEY, HISTORY_RECENCY_MAX_KEY,
+} from '../../v2/historyMirror.js'; // the personal history store: sealed follower sink + instant-restore hydrate
 import {
   probeSettingsMediumDetailed, isProbeSafeToAttach,
   computeSettingsConflicts, SETTINGS_SHARED_PROBE_PATH,
@@ -3588,9 +3591,29 @@ export async function createRealHouseholdAgent(opts = {}) {
         const strategy = settingsSealStrategyForIdentity(chatId);
         const source = strategy ? await opts.provisionHistoryMirror(strategy) : null;
         if (!source) return;
+        // INSTANT RESTORE (the ladder): a fresh install's log is empty — hydrate the mirror back
+        // FIRST (recent window per circle, then the tail in background), so a device that signed in
+        // with the phrase opens its conversations live. Idempotent (id-dedup); a device with a
+        // lived-in log skips it (its record IS current; the lanes carry what it missed via peers).
+        let skip = null;
+        if (opts.deviceLog.size === 0) {
+          const r = await hydrateHistory({
+            source,
+            eventLog:     opts.deviceLog,
+            recencyDays:  Number(paramsService.register.valueOf(HISTORY_RECENCY_DAYS_KEY)) || 30,
+            maxPerCircle: Number(paramsService.register.valueOf(HISTORY_RECENCY_MAX_KEY)) || 500,
+          });
+          skip = r.hydratedIds;
+          if (typeof console !== 'undefined') console.info(`[history-restore] recent window live: ${r.recent} entries (tail follows)`);
+          r.tailDone.catch(() => { /* logged inside; the recent window is already live */ });
+        }
+        // The SINK: this device's own lane (what restore hydrated stays out of it — it already
+        // lives in the lane it came from).
         historyMirror = createHistoryMirror({
           eventLog: opts.deviceLog,
           source,
+          laneId: custody.deviceId ?? enrolledDevice?.deviceId ?? 'root',
+          skip,
           // The snapshot head: the registry rows (circles, key refs, delegations — structure the log
           // does not derive). Settings ride their own pod-sync; the head does not duplicate them.
           snapshot: async () => ({ registry: (await agentsRegistryRef?.list?.()) ?? [] }),

@@ -46,6 +46,11 @@ export const BASIS_USER_PARAMS = [
   // The personal history mirror's switch — OFF by default: nothing mirrors until the person turns it on
   // (the connect-storage door flips it; boot reads it to wire the sealed follower sink).
   { key: 'history.mirror',                      scope: PARAM_SCOPE.AGENT,  kind: PARAM_KIND.USER, default: false },
+  // Instant restore's recency window (per circle, whichever half is LARGER wins): everything from the
+  // last N days plus the newest M entries hydrate first, so conversations open live; the rest lands in
+  // the background. Agent-scoped: the window is a preference of the PERSON, not of one device.
+  { key: 'history.restore.recencyDays',         scope: PARAM_SCOPE.AGENT,  kind: PARAM_KIND.USER, default: 30 },
+  { key: 'history.restore.maxPerCircle',        scope: PARAM_SCOPE.AGENT,  kind: PARAM_KIND.USER, default: 500 },
 ];
 
 /**

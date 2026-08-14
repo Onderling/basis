@@ -10,6 +10,10 @@
  * Retired 2026-08-10 (the governance cutover — settings consensus rides governance/changePolicy on the log):
  *   circleProposalStore (localStorage side-store) · circleConsensus (the unsigned unanimity model) ·
  *   makeProposalStoreRN · the `cc.circleProposals` storage key.
+ * Retired 2026-08-14 (the lane catch-ups landed — membership/governance/task/chat all pull over their
+ *   device-log lanes with the roster-binding verify): spineCatchUp (the tactical pull prototype) ·
+ *   the `getSpineSince` skill · `ingestSpineItems`. Replacement: the per-lane catch-up subtypes
+ *   (MEMBERSHIP_CATCHUP_SUBTYPES and siblings) over `circleEntryRail`.
  *
  * Comments mentioning the history are fine — the scan targets code-shaped references (import/export/call
  * sites), not prose. Add a row when a cutover retires its next legacy half.
@@ -27,6 +31,8 @@ const RETIRED = [
   { name: 'circleConsensus',      re: /from\s+['"][^'"]*circleConsensus(?:\.js)?['"]|(?<![\w.])makeProposal\s*\(|approveProposal\s*\(|pendingApprovers\s*\(/ },
   { name: 'makeProposalStoreRN',  re: /makeProposalStoreRN\s*\(/ },
   { name: 'cc.circleProposals',   re: /['"]cc\.circleProposals['"]/ },
+  { name: 'spineCatchUp',         re: /from\s+['"][^'"]*spineCatchUp(?:\.js)?['"]|ingestSpineItems\s*\(/ },
+  { name: 'getSpineSince',        re: /['"]getSpineSince['"]/ },
 ];
 
 const isTest = (f) => /(^|\/)(test|tests|e2e|test-browser|__tests__)\//.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(f);

@@ -27,6 +27,7 @@ import {
   Agent, AgentIdentity, Bootstrap, InternalBus, InternalTransport, DataPart, TokenRegistry,
   PolicyEngine, TrustRegistry, deriveCircleAddress, circleAddressSigner, signCircleLinkFromSeed,
   circleIdentity, signDeviceDelegation, deviceDelegationPubKey, deriveDeviceSeed,
+  deriveVaultAtRestKeyFrom,
 } from '@onderling/core';
 import {
   useCircleSigningIdentity, installCircleSigningIdentities,
@@ -128,7 +129,7 @@ async function restoreOrGenerate(vault) {
 
 import { restoreOwnerRoot, DEVICE_DELEGATION_VAULT_KEY } from './ownerRootRestore.js';
 import { sealingPublicKeyFromNetworkKey } from '@onderling/pod-client';
-import { ensureOwnerRoot, pickRootKeyStore } from './ownerRootCustody.js';
+import { ensureOwnerRoot, pickRootKeyStore, readCustodyMode } from './ownerRootCustody.js';
 import { makeAgentTrailEntry } from '../../eventLog.js';
 import {
   CalendarStore, registerCalendarSkills,
@@ -285,7 +286,23 @@ export async function createRealHouseholdAgent(opts = {}) {
   // removed) on the first boot through here. See ownerRootCustody.js.
   const ownerRootVault = opts.ownerRootVault ?? makeBrowserVault('cc-owner-root:', { durabilityMatters: true });
   const rootKeyStore   = opts.rootKeyStore ?? pickRootKeyStore({ fallbackVault: ownerRootVault });
-  const ownerRoot      = await ensureOwnerRoot({ rootKeyStore, legacyVault: ownerRootVault });
+  // THE CUSTODY FORK (the non-resident root): a CUT-OVER device's key door holds its DELEGATION
+  // seed and `ownerRoot` is NULL for the whole boot — the root exists only inside ceremonies,
+  // reconstructed from the typed phrase. A pre-cutover install keeps today's root custody until
+  // its next ceremony migrates it (the self-enroll migration).
+  const custody = await readCustodyMode(ownerRootVault);
+  let ownerRoot = null;
+  let custodySeed = null;            // delegation mode: the key door's (delegation) seed
+  if (custody.mode === 'delegation') {
+    custodySeed = await rootKeyStore.getSeed();
+    if (!(custodySeed instanceof Uint8Array) || custodySeed.length !== 32) {
+      // A marker without a seed is a broken install — surface it, never mint a fresh identity
+      // over it (that is how a person's circles silently become someone else's).
+      throw new Error('delegation custody marked but the key door holds no seed — restore with the recovery phrase');
+    }
+  } else {
+    ownerRoot = await ensureOwnerRoot({ rootKeyStore, legacyVault: ownerRootVault });
+  }
 
   // Vault-at-rest: every vault holding KEY MATERIAL or capability tokens reads and writes
   // SEALED under a key derived from the owner root (never persisted — re-derived each boot).
@@ -294,8 +311,8 @@ export async function createRealHouseholdAgent(opts = {}) {
   // clean rather than leaving the previous person's sealed entries around undecryptable.
   // Non-secret vaults (trust levels, audit log) deliberately stay plain — sealing them buys
   // no secrecy and widens the failure surface of an unlock problem.
-  const atRestKey = ownerRoot.deriveVaultAtRestKey();
-  const rootFingerprint = ownerRoot.fingerprint();
+  const atRestKey = ownerRoot ? ownerRoot.deriveVaultAtRestKey() : deriveVaultAtRestKeyFrom(custodySeed);
+  const rootFingerprint = ownerRoot ? ownerRoot.fingerprint() : (custody.fingerprint ?? 'delegation');
   const sealedVault = async (backing) => {
     await migrateVaultToEncrypted({ backing, key: atRestKey, fingerprint: rootFingerprint });
     return new VaultEncrypted({ backing, key: atRestKey });
@@ -346,10 +363,14 @@ export async function createRealHouseholdAgent(opts = {}) {
   const chatVault = await sealedVault(chatVaultBacking);
   // The default profile's seed — the source for both the chat identity AND per-circle addresses
   // (step 5B/C). Kept so the returned agent can expose circleAddressFor(circleId).
-  const defaultProfileSeed = ownerRoot.deriveAgentSeed('default');
+  const defaultProfileSeed = ownerRoot ? ownerRoot.deriveAgentSeed('default') : null;
   let chatSeedReadable = false;
   try { chatSeedReadable = (await chatVault.get('agent-privkey')) != null; } catch { /* unreadable → reseed */ }
   if (!chatSeedReadable) {
+    // Root custody re-derives the chat identity; delegation custody CANNOT (the root is not
+    // resident) — the identity was persisted at the ceremony, and its absence is a broken vault,
+    // not a re-derivable state. Loud, never silently a new person.
+    if (!defaultProfileSeed) throw new Error('delegation custody: the chat identity vault is unreadable — restore with the recovery phrase');
     await AgentIdentity.fromSeed(defaultProfileSeed, chatVault);
   }
 
@@ -361,16 +382,30 @@ export async function createRealHouseholdAgent(opts = {}) {
   // An unenrolled install — the first device, every pre-existing install — keeps the profile
   // seed: nothing re-keys. The chat identity (the member's webid) stays PROFILE-derived on every
   // device: the member is one; only the circle addresses are per-device.
-  let deviceDerivationSeed = defaultProfileSeed;
-  let enrolledDevice = null;   // { deviceId, label? } when this boot is an enrolled-device boot
+  let deviceDerivationSeed = custodySeed ?? defaultProfileSeed;
+  let enrolledDevice = custody.mode === 'delegation' ? { deviceId: custody.deviceId } : null;
   try {
     let blob = await chatVault.get(DEVICE_DELEGATION_VAULT_KEY);
     if (typeof blob === 'string') { try { blob = JSON.parse(blob); } catch { blob = null; } }
     if (blob && typeof blob === 'object' && typeof blob.seed === 'string' && typeof blob.deviceId === 'string') {
-      const decoded = seedFromString(blob.seed);
-      if (decoded instanceof Uint8Array && decoded.length === 32) {
-        deviceDerivationSeed = decoded;
-        enrolledDevice = { deviceId: blob.deviceId, ...(blob.label ? { label: blob.label } : {}) };
+      if (custody.mode === 'delegation') {
+        // The blob is the LABEL + pre-signed-record carrier here; the key door + marker are the
+        // boot authority.
+        if (enrolledDevice) {
+          if (blob.label) enrolledDevice.label = blob.label;
+          if (blob.record) enrolledDevice.record = blob.record;
+        }
+      } else {
+        // Root custody, enrolled (the pre-cutover interim): the blob supplies the derivation root.
+        const decoded = seedFromString(blob.seed);
+        if (decoded instanceof Uint8Array && decoded.length === 32) {
+          deviceDerivationSeed = decoded;
+          enrolledDevice = {
+            deviceId: blob.deviceId,
+            ...(blob.label ? { label: blob.label } : {}),
+            ...(blob.record ? { record: blob.record } : {}),
+          };
+        }
       }
     }
   } catch { /* unenrolled */ }
@@ -1084,8 +1119,22 @@ export async function createRealHouseholdAgent(opts = {}) {
     // (setProfileProperty) has a profile to land on → cross-app reuse works for the no-login participant too.
     // Guarded on lookup so a later boot never re-registers (which would wipe accumulated properties). Best-effort.
     try {
-      if (!(await agentsRegistry.lookup('default'))) await agentsProfiles.create({ profileId: 'default', name: 'default' });
-    } catch { /* degraded (no owner root / registry) — the on-consent persist simply stays best-effort */ }
+      if (!(await agentsRegistry.lookup('default'))) {
+        if (ownerRoot) {
+          await agentsProfiles.create({ profileId: 'default', name: 'default' });
+        } else {
+          // Delegation custody: no resident root to derive from — but the default profile's
+          // pubKey IS the persisted chat identity, so the entry registers directly (same shape
+          // createProfile produces; ownerFingerprint from the custody marker's captured tag).
+          await agentsRegistry.register({
+            agentId: 'default', pubKey: chatId.pubKey, agentUri: 'profile:default',
+            role: 'profile', name: 'default',
+            ...(custody.fingerprint ? { ownerFingerprint: custody.fingerprint } : {}),
+            properties: {},
+          });
+        }
+      }
+    } catch { /* degraded (no registry) — the on-consent persist simply stays best-effort */ }
 
     // The enrollment's REGISTRY RECORD self-heals at boot (idempotent, AFTER the default profile is
     // ensured): an enrolled device whose delegation is not yet on the owner's registry mints +
@@ -1097,16 +1146,23 @@ export async function createRealHouseholdAgent(opts = {}) {
       try {
         const cur = await agentsRegistry.lookup('default');
         if (cur && !deviceDelegationOf(cur, enrolledDevice.deviceId)) {
-          const record = signDeviceDelegation(ownerRoot.secret, {
-            profileId: 'default',
-            deviceId:  enrolledDevice.deviceId,
-            pubKey:    deviceDelegationPubKey(deviceDerivationSeed),
-          });
-          if (enrolledDevice.label) record.label = enrolledDevice.label;
-          await agentsRegistry.register({
-            ...cur,
-            properties: registrySetDeviceDelegation(cur.properties ?? {}, enrolledDevice.deviceId, record),
-          });
+          // The ceremony PRE-SIGNED the record into the blob (the one moment the root existed);
+          // a root-custody install without one (the pre-cutover interim) mints it here instead.
+          let record = enrolledDevice.record ?? null;
+          if (!record && ownerRoot) {
+            record = signDeviceDelegation(ownerRoot.secret, {
+              profileId: 'default',
+              deviceId:  enrolledDevice.deviceId,
+              pubKey:    deviceDelegationPubKey(deviceDerivationSeed),
+            });
+            if (enrolledDevice.label) record = { ...record, label: enrolledDevice.label };
+          }
+          if (record) {
+            await agentsRegistry.register({
+              ...cur,
+              properties: registrySetDeviceDelegation(cur.properties ?? {}, enrolledDevice.deviceId, record),
+            });
+          }
         }
       } catch (err) { console.warn('[enroll] delegation registry record deferred:', err?.message ?? err); }
     }
@@ -1255,7 +1311,9 @@ export async function createRealHouseholdAgent(opts = {}) {
    * sub-agent seed) and NOT the shared `restoreFromMnemonic` (legacy direct-seed).
    */
   hostAgent.register('revealOwnerPhrase', async () => {
-    // Re-revealable: backing up the phrase again is legitimate; the phrase is stable.
+    // Re-revealable under ROOT custody. A cut-over device does not hold the phrase's seed —
+    // that is the point: a stolen unlocked device cannot exfiltrate it.
+    if (!ownerRoot) return [DataPart({ ok: false, error: 'phrase-not-stored' })];
     try { return [DataPart({ shown: false, mnemonic: ownerRoot.toMnemonic() })]; }
     catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'reveal-failed' })]; }
   }, { visibility: 'trusted' });   // 2.4b — the master recovery phrase: owner-only
@@ -1272,7 +1330,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     const label = typeof parts?.[0]?.data?.label === 'string' ? parts[0].data.label.trim() : '';
     try {
       const r = await restoreOwnerRoot({
-        mnemonic, rootKeyStore, chatVault: chatVaultBacking,
+        mnemonic, rootKeyStore, chatVault: chatVaultBacking, markerVault: ownerRootVault,
         enrollDevice: { ...(label ? { label } : {}) },
       });
       if (!r.ok) {
@@ -1299,8 +1357,18 @@ export async function createRealHouseholdAgent(opts = {}) {
     let root;
     try { root = Bootstrap.fromMnemonic(mnemonic); }
     catch { return [DataPart({ ok: false, outcome: 'invalid-phrase', error: 'invalid-phrase' })]; }
-    if (root.fingerprint() !== ownerRoot.fingerprint()) {
-      return [DataPart({ ok: false, outcome: 'wrong-phrase', error: 'wrong-phrase' })];
+    if (ownerRoot) {
+      if (root.fingerprint() !== ownerRoot.fingerprint()) {
+        return [DataPart({ ok: false, outcome: 'wrong-phrase', error: 'wrong-phrase' })];
+      }
+    } else {
+      // Delegation custody: no resident root to compare — the typed phrase must REPRODUCE this
+      // very device's delegation seed (deterministic derivation), which only the owner's phrase can.
+      const rederived = deriveDeviceSeed(root.deriveAgentSeed('default'), custody.deviceId);
+      const held = custodySeed;
+      const same = held instanceof Uint8Array && rederived.length === held.length
+        && rederived.every((v, i) => v === held[i]);
+      if (!same) return [DataPart({ ok: false, outcome: 'wrong-phrase', error: 'wrong-phrase' })];
     }
     try {
       // The ceremony is DERIVATION-BASED — the registry record is bookkeeping, never a
@@ -1382,7 +1450,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // ONE implementation, shared with the first-run door (`ownerRootRestore.js`) — which used to have
       // its own, and restored nothing. The live chatAgent keeps its current identity until an app RELOAD
       // re-boots realAgent, which then finds this seed + owner root.
-      const r = await restoreOwnerRoot({ mnemonic: root.toMnemonic(), rootKeyStore, chatVault: chatVaultBacking });
+      const r = await restoreOwnerRoot({ mnemonic: root.toMnemonic(), rootKeyStore, chatVault: chatVaultBacking, markerVault: ownerRootVault });
       if (!r.ok) return [DataPart({ ok: false, error: r.detail ?? r.code })];
       return [DataPart({ ok: true, reloadRequired: true })];
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'restore-failed' })]; }

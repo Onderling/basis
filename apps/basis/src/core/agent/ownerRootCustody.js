@@ -74,3 +74,57 @@ export async function ensureOwnerRoot({ rootKeyStore, legacyVault } = {}) {
   await rootKeyStore.setSeed(bootstrap.secret);
   return bootstrap;
 }
+
+// ── DELEGATION CUSTODY (the cutover: the non-resident root) ─────────────────────────────────────
+// On a cut-over device the key door holds the DEVICE'S DELEGATION SEED, not the root — the root is
+// reconstructed from the phrase only at ceremonies and never persisted. The mode marker lives in
+// the UNSEALED owner-root vault (it must be readable before any sealed vault can open: the
+// vault-at-rest key itself derives from whichever seed the door holds).
+
+/** The unsealed-vault marker naming what the key door's seed IS. */
+export const CUSTODY_MODE_KEY = 'custody-mode';
+
+/**
+ * Which custody mode this install runs. `{mode:'root'}` (the default — every pre-cutover install)
+ * or `{mode:'delegation', deviceId}` after the cutover.
+ */
+export async function readCustodyMode(vault) {
+  try {
+    let m = await vault?.get(CUSTODY_MODE_KEY);
+    if (typeof m === 'string') { try { m = JSON.parse(m); } catch { m = null; } }
+    if (m && m.mode === 'delegation' && typeof m.deviceId === 'string' && m.deviceId) {
+      // `fingerprint` = the ROOT's fingerprint captured at the ceremony (a non-secret binding
+      // tag): the sealed vaults' sentinel was written with it, and a delegation boot has no root
+      // to recompute it from.
+      return {
+        mode: 'delegation', deviceId: m.deviceId,
+        fingerprint: typeof m.fingerprint === 'string' ? m.fingerprint : null,
+      };
+    }
+  } catch { /* absent/unreadable → root mode */ }
+  return { mode: 'root' };
+}
+
+/**
+ * THE CUTOVER: the key door's seed becomes the delegation seed; the root stops being resident.
+ * Verified before the marker lands (the readback is the only proof the new custody boots) —
+ * a failed readback changes nothing and reports false, so the caller keeps root custody.
+ * @param {object} o
+ * @param {import('@onderling/vault').RootKeyStore} o.rootKeyStore
+ * @param {import('@onderling/vault').Vault} o.markerVault  the UNSEALED owner-root vault.
+ * @param {Uint8Array} o.delegationSeed
+ * @param {string} o.deviceId
+ * @returns {Promise<boolean>} true when the device now runs delegation custody.
+ */
+export async function cutoverToDelegation({ rootKeyStore, markerVault, delegationSeed, deviceId, fingerprint } = {}) {
+  if (!(delegationSeed instanceof Uint8Array) || delegationSeed.length !== 32 || !deviceId) return false;
+  try {
+    await rootKeyStore.setSeed(delegationSeed);
+    const readback = await rootKeyStore.getSeed();
+    if (!sameBytes(readback, delegationSeed)) return false;
+    await markerVault.set(CUSTODY_MODE_KEY, JSON.stringify({
+      mode: 'delegation', deviceId, ...(fingerprint ? { fingerprint } : {}),
+    }));
+    return true;
+  } catch { return false; }
+}

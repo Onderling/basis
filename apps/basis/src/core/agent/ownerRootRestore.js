@@ -29,9 +29,10 @@
  * install would be picked up on the next boot in preference to the restored one.
  */
 
-import { Bootstrap, deriveDeviceSeed } from '@onderling/core';
+import { Bootstrap, deriveDeviceSeed, deriveVaultAtRestKeyFrom, signDeviceDelegation, deviceDelegationPubKey } from '@onderling/core';
 import { VaultEncrypted, migrateVaultToEncrypted } from '@onderling/vault';
 import { loadProfile } from '@onderling/agent-registry';
+import { cutoverToDelegation } from './ownerRootCustody.js';
 
 /** The profile the chat identity is derived from. */
 export const DEFAULT_PROFILE = 'default';
@@ -83,9 +84,16 @@ const _newDeviceId = () => {
  *                                    device presents its own address in every circle. The blob must
  *                                    be written here, not by the caller: at ceremony time the
  *                                    caller's live vault wrapper is still sealed to the OLD root.
- * @returns {Promise<{ok: true, pubKey: string, deviceId?: string} | {ok: false, code: string, detail?: string}>}
+ * @param {import('@onderling/vault').Vault} [a.markerVault]
+ *                                    the UNSEALED owner-root vault. Supplying it makes the ceremony
+ *                                    END IN DELEGATION CUSTODY (the cutover): the key door holds
+ *                                    the delegation seed, the vault-at-rest key derives from it,
+ *                                    and the ROOT IS NEVER PERSISTED — the phrase stays the only
+ *                                    way to reconstruct it. Absent → the pre-cutover behaviour
+ *                                    (root in the key door) so legacy callers keep working.
+ * @returns {Promise<{ok: true, pubKey: string, deviceId?: string, custody?: string} | {ok: false, code: string, detail?: string}>}
  */
-export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enrollDevice } = {}) {
+export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enrollDevice, markerVault } = {}) {
   if (typeof mnemonic !== 'string' || !mnemonic.trim()) return { ok: false, code: 'empty' };
   if (!rootKeyStore || !chatVault) return { ok: false, code: 'no-vault' };
 
@@ -94,35 +102,54 @@ export async function restoreOwnerRoot({ mnemonic, rootKeyStore, chatVault, enro
   catch { return { ok: false, code: 'invalid' }; }
 
   try {
-    // 1. The root itself. Written FIRST: if step 2 fails, a boot still recovers the right identity from
-    //    the seeded key door, where the reverse order would leave a chat key with no root to justify it.
-    await rootKeyStore.setSeed(root.secret);
-    // 2. The default profile, derived — never from the mnemonic's raw entropy. That was the other half of
-    //    the bug: the chat key is a CHILD of the root (`deriveAgentSeed`), not the root re-encoded. Load it
-    //    through the shared profile-loader so the "derive a profile's identity into a vault" logic lives in
-    //    ONE place (it also derives the per-circle addresses) — a fresh restore vault, so its unconditional
-    //    seed-write is exactly right here.
-    //    The write goes through the vault-at-rest layer, sealed to the RESTORED root: the fingerprint-bound
-    //    migration wipes anything the previous identity left in this vault (its sealed entries are
-    //    undecryptable to the new root by construction), and the new seed lands encrypted — the same state
-    //    the next boot's own sealing pass expects, so restore and boot cannot disagree about the format.
-    const atRestKey = root.deriveVaultAtRestKey();
+    // Every phrase ceremony ENROLLS (a restore is enrollment as this profile's next device); the
+    // delegation seed is deterministic from (phrase, profileId, deviceId).
+    const deviceId = _newDeviceId();
+    const delegationSeed = deriveDeviceSeed(root.deriveAgentSeed(DEFAULT_PROFILE), deviceId);
+    const delegationCustody = !!markerVault;
+
+    // 1. The key door FIRST: if the later steps fail, a boot still finds a working identity.
+    //    Delegation custody: the door holds the DELEGATION seed — the root is never persisted.
+    //    Legacy (no markerVault): the root seed, exactly as before the cutover.
+    if (!delegationCustody) await rootKeyStore.setSeed(root.secret);
+
+    // 2. The default profile, derived — never from the mnemonic's raw entropy: the chat key is a
+    //    CHILD of the root (`deriveAgentSeed`). It lands through the vault-at-rest layer, sealed
+    //    under whichever seed this custody boots from (the fingerprint-bound migration wipes a
+    //    previous identity's leftovers either way — the fingerprint stays the ROOT's, the "same
+    //    person" tag across all their devices).
+    const atRestKey = delegationCustody ? deriveVaultAtRestKeyFrom(delegationSeed) : root.deriveVaultAtRestKey();
     await migrateVaultToEncrypted({ backing: chatVault, key: atRestKey, fingerprint: root.fingerprint() });
     const sealedChat = new VaultEncrypted({ backing: chatVault, key: atRestKey });
     const { identity } = await loadProfile({ ownerRoot: root, profileId: DEFAULT_PROFILE, vault: sealedChat });
-    // 3. (add-a-device) The enrollment: this install becomes a DEVICE of the profile. The delegation
-    //    seed is deterministic from (phrase, profileId, deviceId) — a ceremony can always re-derive
-    //    it — and lands SEALED to the restored root beside the chat identity.
-    if (enrollDevice) {
-      const deviceId = _newDeviceId();
-      const seed = deriveDeviceSeed(root.deriveAgentSeed(DEFAULT_PROFILE), deviceId);
-      const blob = { seed: _b64url(seed), deviceId };
-      if (typeof enrollDevice.label === 'string' && enrollDevice.label) blob.label = enrollDevice.label;
-      // the vault is a STRING store (VaultEncrypted seals String(value)) — serialize explicitly
-      await sealedChat.set(DEVICE_DELEGATION_VAULT_KEY, JSON.stringify(blob));
-      return { ok: true, pubKey: identity?.pubKey ?? null, deviceId };
+
+    // 3. The delegation blob (the label carrier + the enrolled-boot signal for root-custody
+    //    installs; under delegation custody the key door + marker are the boot authority).
+    const blob = { seed: _b64url(delegationSeed), deviceId };
+    if (typeof enrollDevice?.label === 'string' && enrollDevice.label) blob.label = enrollDevice.label;
+    // The ROOT-SIGNED delegation record, pre-signed HERE (the one moment the root exists) and
+    // carried in the blob — the boot's registry self-heal registers it without ever needing the
+    // root again. Non-secret: a statement + a signature.
+    blob.record = signDeviceDelegation(root.secret, {
+      profileId: DEFAULT_PROFILE, deviceId, pubKey: deviceDelegationPubKey(delegationSeed),
+    });
+    if (blob.label) blob.record = { ...blob.record, label: blob.label };
+    await sealedChat.set(DEVICE_DELEGATION_VAULT_KEY, JSON.stringify(blob));
+
+    // 4. THE CUTOVER (delegation custody only): the door's seed becomes the delegation; the
+    //    marker names it + carries the root fingerprint the sealed vaults' sentinel was bound to.
+    //    A failed cutover falls back to root custody so the ceremony never strands the device.
+    if (delegationCustody) {
+      const ok = await cutoverToDelegation({
+        rootKeyStore, markerVault, delegationSeed, deviceId, fingerprint: root.fingerprint(),
+      });
+      if (!ok) {
+        await rootKeyStore.setSeed(root.secret);
+        return { ok: true, pubKey: identity?.pubKey ?? null, deviceId, custody: 'root' };
+      }
+      return { ok: true, pubKey: identity?.pubKey ?? null, deviceId, custody: 'delegation' };
     }
-    return { ok: true, pubKey: identity?.pubKey ?? null };
+    return { ok: true, pubKey: identity?.pubKey ?? null, deviceId, custody: 'root' };
   } catch (err) {
     return { ok: false, code: 'storage', detail: err?.message ?? String(err) };
   }

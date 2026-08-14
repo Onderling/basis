@@ -220,8 +220,20 @@ export class Bootstrap {
    * @returns {Uint8Array} 32-byte key.
    */
   deriveVaultAtRestKey() {
-    const info = new TextEncoder().encode(`${HKDF_INFO_NS}vault-at-rest`);
-    return hkdf(sha256, this.#secret, _VAULT_AT_REST_SALT, info, HKDF_LEN);
+    return deriveVaultAtRestKeyFrom(this.#secret);
+  }
+
+  /**
+   * The delegation-custody twin (the custody cutover): derive the vault-at-rest key from ANY
+   * 32-byte seed — on an enrolled device the DELEGATION seed replaces the root as the sealing
+   * root, so the device's vaults open without the root ever being resident. Same salt + info as
+   * the instance method (one derivation, two possible inputs); a different input yields an
+   * unrelated key, which is exactly the reseal the migration performs.
+   * @param {Uint8Array} seed  32 bytes.
+   * @returns {Uint8Array} 32-byte key.
+   */
+  static deriveVaultAtRestKeyFrom(seed) {
+    return deriveVaultAtRestKeyFrom(seed);
   }
 
   /**
@@ -331,4 +343,18 @@ export class Bootstrap {
   notifyKeyRotated(proof) {
     this.#emitter.emit('key-rotated', proof);
   }
+}
+
+/**
+ * The ONE vault-at-rest derivation (module-level so both custody modes share it byte-for-byte):
+ * root custody feeds the root secret; delegation custody feeds the device's delegation seed.
+ * @param {Uint8Array} seed  32 bytes.
+ * @returns {Uint8Array} 32-byte key.
+ */
+export function deriveVaultAtRestKeyFrom(seed) {
+  if (!(seed instanceof Uint8Array) || seed.length !== SEED_LEN) {
+    throw new Error('deriveVaultAtRestKeyFrom: seed must be a 32-byte Uint8Array');
+  }
+  const info = new TextEncoder().encode(`${HKDF_INFO_NS}vault-at-rest`);
+  return hkdf(sha256, seed, _VAULT_AT_REST_SALT, info, HKDF_LEN);
 }

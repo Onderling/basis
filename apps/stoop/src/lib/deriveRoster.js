@@ -134,6 +134,11 @@ export function deriveRoster({
         pubKey:            signingPublicKey,
         sealingPublicKey,
         circleAddress,
+        // THE CEREMONY ADDRESS (custody D1): the join-time address, pinned immutably — the key
+        // class ceremony statements (address-revoke) must be signed with. An un-patched row's
+        // primary IS join-time; a patched row carries the captured field (`recordCircleAddress`).
+        // First-non-null-wins in the upsert keeps it stable across trail rows.
+        ceremonyAddress: src.ceremonyAddress ?? circleAddress,
         // The proof that came with the address. Carried onto the row so a member can RELAY this
         // member's announcement to someone who was not present when it was proven — the receiver
         // re-verifies it themselves, so relaying grants the relayer no authority
@@ -160,6 +165,8 @@ export function deriveRoster({
         // the per-user address fallback is off. Absent on a pre-2026-07-30 trail: the row is unchanged.
         circleAddress:      confirmedByCircleAddress,
         circleAddressProof: confirmedByCircleAddressProof,
+        // Same ceremony-address pin for the admin-as-seen-by-the-joiner shape (custody D1).
+        ceremonyAddress: src.confirmedByCeremonyAddress ?? confirmedByCircleAddress,
         // …and the admin's SIGNING key, which is `confirmedBy` itself: a basis circle binds
         // webid === the member's chat signing address (the same identity the redeem response was
         // authenticated under, and the same fact the address ladder's webid rung already relies on).

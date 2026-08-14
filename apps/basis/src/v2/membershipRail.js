@@ -57,6 +57,34 @@ export function rosterBindingVerifier(callSkill) {
 }
 
 /** Build the membership rail over the device log. Mirrors `makeGovernanceRail`. */
+/**
+ * The membership lane's binding — rosterBindingVerifier's semantics plus the CEREMONY rule
+ * (custody D1): an `address-revoke` binds ONLY when signed by the row's `ceremonyAddress` — the
+ * phrase-derived per-circle key no single device can mint once the custody cutover lands. A row
+ * without one (the post-cutover join window, before the member's next ceremony re-binds) falls
+ * back to the interim any-attested rule — the arc's named, shrinking window. Same re-entrancy
+ * breaker as the base verifier (the roster projection reads this very lane).
+ */
+export function membershipBindingVerifier(callSkill) {
+  const inFlight = new Set();
+  return async ({ author, ref, circleId, kind }) => {
+    if (inFlight.has(circleId)) return false;
+    inFlight.add(circleId);
+    try {
+      const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+      const row = (Array.isArray(r?.members) ? r.members : [])
+        .find((m) => m && (m.webid ?? m.addr ?? m.ref) === ref);
+      if (!row) return false;
+      if (kind === 'address-revoke' && typeof row.ceremonyAddress === 'string' && row.ceremonyAddress) {
+        return author === row.ceremonyAddress;
+      }
+      return row.circleAddress === author
+        || (Array.isArray(row.circleAddresses) && row.circleAddresses.includes(author));
+    } catch { return false; }
+    finally { inFlight.delete(circleId); }
+  };
+}
+
 export function makeMembershipRail({ eventLog, circleIdentityFor, myRef, callSkill, verifyBinding = null }) {
   if (typeof circleIdentityFor !== 'function') return null;
   return makeCircleEntryRail({
@@ -64,7 +92,7 @@ export function makeMembershipRail({ eventLog, circleIdentityFor, myRef, callSki
     signerFor: async (circleId) => ({ identity: await circleIdentityFor(circleId), ref: myRef }),
     entryKind: MEMBERSHIP_LANE,
     declaredKinds: MEMBERSHIP_RAIL_KINDS,
-    verifyBinding: verifyBinding ?? rosterBindingVerifier(callSkill),
+    verifyBinding: verifyBinding ?? membershipBindingVerifier(callSkill),
   });
 }
 
@@ -78,9 +106,9 @@ export function makeMembershipRail({ eventLog, circleIdentityFor, myRef, callSki
  */
 export function makeMembershipEmitter({ rail, myRef, fan = null }) {
   if (!rail) return null;
-  return async function emitSpine({ kind, circleId, subject, payload, actor } = {}) {
+  return async function emitSpine({ kind, circleId, subject, payload, actor, signer } = {}) {
     if (kind === 'leave' && subject !== myRef) return null;
-    const res = await rail.append(circleId, { kind, subject, payload, actor });
+    const res = await rail.append(circleId, { kind, subject, payload, actor, signer });
     if (!res) return null;
     if (typeof fan === 'function') {
       try { fan(circleId, res.statement); } catch { /* fan is best-effort — never block the writer */ }

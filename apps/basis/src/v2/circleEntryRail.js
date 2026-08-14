@@ -54,13 +54,15 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
    * APPEND — the one write path. Returns `{ entry, statement }`, or null when no circle signer resolves
    * (the caller may fall back to its legacy path during the per-type cutover — one path per type at a time).
    */
-  async function append(circleId, { kind, subject, payload, actor } = {}) {
+  async function append(circleId, { kind, subject, payload, actor, signer } = {}) {
     if (!declaredKinds.includes(kind)) {
       // An undeclared kind is a bug at the DECLARING side — fail loudly at the write, never silently.
       throw new Error(`circleEntryRail(${entryKind}): kind "${kind}" is not declared [${declaredKinds.join(', ')}]`);
     }
     let resolved = null;
-    try { resolved = await signerFor(circleId); } catch { resolved = null; }
+    // A per-call signer override: ceremony statements are signed with the CEREMONY key
+    // (phrase-derived), not the device's circle identity (custody D1).
+    try { resolved = signer ?? await signerFor(circleId); } catch { resolved = null; }
     const identity = resolved?.identity ?? resolved;
     const ref = resolved?.ref ?? identity?.pubKey ?? null;
     if (!identity?.pubKey || typeof identity.sign !== 'function') return null;
@@ -94,7 +96,7 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     if (!declaredKinds.includes(v.body.kind)) return { ok: false, reason: `undeclared kind: ${v.body.kind}` };
     const ref = v.body.payload?.authorRef;
     if (typeof ref !== 'string' || !ref) return { ok: false, reason: 'missing authorRef' };
-    if (!(await bindingOk(v.body.author, ref, circleId))) return { ok: false, reason: 'unverifiable key-ref binding' };
+    if (!(await bindingOk(v.body.author, ref, circleId, v.body.kind))) return { ok: false, reason: 'unverifiable key-ref binding' };
     // Report whether this statement is NEW here — a windowed catch-up's progress guard must not count a
     // re-delivered duplicate as progress (that is how two diverged peers would page forever).
     const id = entryId(statement);
@@ -104,14 +106,14 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
   }
 
   /** Is `author` (a circle key) genuinely `ref`'s key IN this circle? Self-binding, else the injected resolver. */
-  async function bindingOk(author, ref, circleId) {
+  async function bindingOk(author, ref, circleId, kind = null) {
     try {
       const mine = await signerFor(circleId);
       const myId = mine?.identity ?? mine;
       if (myId?.pubKey === author) return (mine?.ref ?? myId.pubKey) === ref;
     } catch { /* fall through to the foreign resolver */ }
     if (typeof verifyBinding === 'function') {
-      try { return !!(await verifyBinding({ author, ref, circleId })); } catch { return false; }
+      try { return !!(await verifyBinding({ author, ref, circleId, kind })); } catch { return false; }
     }
     return false;   // no resolver → only self-signed statements fold (honest single-device degrade)
   }
@@ -137,7 +139,7 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
       if (typeof ref !== 'string' || !ref) continue;
       const actor = b.payload.voter ?? b.payload.by ?? null;
       if (actor !== null && actor !== ref) continue;              // acting-as-someone-else → drop
-      if (!(await bindingOk(b.author, ref, circleId))) continue;  // unverifiable binding → drop
+      if (!(await bindingOk(b.author, ref, circleId, b.kind))) continue;  // unverifiable binding → drop
       const forkKey = `${b.author}|${b.parentHash ?? ''}`;
       const set = seenByAuthorParent.get(forkKey) ?? new Set();
       set.add(b.hash);

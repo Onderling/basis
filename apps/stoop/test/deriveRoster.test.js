@@ -154,6 +154,26 @@ describe('deriveRoster', () => {
       expect(b.circleAddresses, 'both proven addresses, primary first').toEqual([addrOf(1), addrOf(2)]);
     });
 
+    it('the CEREMONY ADDRESS pins to the join-time key — un-patched and patched rows alike', () => {
+      // un-patched: the primary IS join-time
+      const fresh = deriveRoster({
+        redemptions: [redemption({ redeemedBy: 'B', circleAddress: addrOf(1), circleAddressProof: proofOf(1) })],
+      });
+      expect(fresh.find((m) => m.webid === 'B').ceremonyAddress).toBe(addrOf(1));
+      // patched (the announce demoted the join address): the captured field wins over the new primary
+      const patched = deriveRoster({
+        redemptions: [redemption({
+          redeemedBy: 'B',
+          circleAddress: addrOf(2), circleAddressProof: proofOf(2),
+          ceremonyAddress: addrOf(1),
+          circleAddresses: [{ address: addrOf(1), proof: proofOf(1) }],
+        })],
+      });
+      const b = patched.find((m) => m.webid === 'B');
+      expect(b.circleAddress).toBe(addrOf(2));
+      expect(b.ceremonyAddress).toBe(addrOf(1));
+    });
+
     it('the patched row shape — primary + plural extras — folds to the full set', () => {
       // The shape `recordCircleAddress` writes after a re-announce: the new primary in the scalar
       // slot, the previously proven pair demoted into `circleAddresses`.

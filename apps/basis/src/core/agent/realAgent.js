@@ -1339,12 +1339,20 @@ export async function createRealHouseholdAgent(opts = {}) {
         ...(Array.isArray(parts?.[0]?.data?.circleIds) ? parts[0].data.circleIds : []),
       ]);
       const revokedIn = [];
+      const profileSeed = root.deriveAgentSeed('default');
       for (const circleId of circleIds) {
         if (typeof membershipEmit !== 'function') break;
         const address = deriveCircleAddress(revokedSeed, circleId);
+        // Signed with the CEREMONY key (custody D1): the phrase-derived per-circle identity — the
+        // key class the strict binding demands, and the one a stolen device cannot mint once the
+        // custody cutover lands. The phrase is in hand here; the identity lives only in memory.
+        const ceremonySigner = {
+          identity: await circleIdentity(profileSeed, circleId, new VaultMemory()),
+          ref: chatId.pubKey,
+        };
         const stmt = await membershipEmit({
           kind: 'address-revoke', circleId, subject: address,
-          payload: { by: chatId.pubKey }, actor: chatId.pubKey,
+          payload: { by: chatId.pubKey }, actor: chatId.pubKey, signer: ceremonySigner,
         }).catch(() => null);
         if (stmt) revokedIn.push({ circleId, address });
       }

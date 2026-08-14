@@ -922,11 +922,21 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
     }
     // A trail row can hold a SET of proven addresses (primary slot + the plural extras written by the
     // announce path) — a statement signed at ANY of them binds to the member, same trust as the
-    // primary: every pair on the row was proof-verified before it was written.
+    // primary: every pair on the row was proof-verified before it was written. CEREMONY statements
+    // (address-revoke) bind STRICTLY instead: only the row's ceremony address (the join-time,
+    // phrase-derived key — custody D1) may author them, so a stolen device's key cannot revoke.
     const rowHolds = (address, extras, author) => address === author
       || (Array.isArray(extras) && extras.some((p) => p?.address === author && typeof p?.proof === 'string' && p.proof));
+    const isCeremonyKind = body.kind === 'address-revoke';
     for (const it of forGroup) {
       const src = it?.source ?? {};
+      if (isCeremonyKind) {
+        if ((src.ceremonyAddress ?? src.circleAddress) === body.author
+          && src.redeemedBy === claimed) return { ...body, author: claimed };
+        if ((src.confirmedByCeremonyAddress ?? src.confirmedByCircleAddress) === body.author
+          && src.confirmedBy === claimed) return { ...body, author: claimed };
+        continue;
+      }
       if (rowHolds(src.circleAddress, src.circleAddresses, body.author)
         && src.redeemedBy === claimed) return { ...body, author: claimed };
       if (rowHolds(src.confirmedByCircleAddress, src.confirmedByCircleAddresses, body.author)

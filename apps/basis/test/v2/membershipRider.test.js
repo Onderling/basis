@@ -46,7 +46,8 @@ async function device(ref, rosterAll, wire) {
   const row = rosterAll.find((m) => m.webid === ref);
   if (row) row.circleAddress = cid.pubKey;
   // The binding verifier reads the DERIVED roster (listGroupMembers — webid + circleAddress +
-  // the proven set); the routing list (listGroupRoster) stays answered for the fan-out reads.
+  // the proven set + the ceremony address); the routing list (listGroupRoster) stays answered
+  // for the fan-out reads.
   const callSkill = async (o, op) => ((op === 'listGroupMembers' || op === 'listGroupRoster')
     ? { members: rosterAll.filter((m) => m.webid !== ref) } : { ok: true });
   const rail = makeMembershipRail({ eventLog, circleIdentityFor: async () => cid, myRef: ref, callSkill });
@@ -151,5 +152,26 @@ describe('the membership rider — statements on the device log, roster folds th
     const adminView = await rosterOf(admin, rows, memberMap);
     expect(webids(catoView)).toEqual(webids(adminView));             // identical roster, mel out on both
     expect(webids(catoView)).toEqual(['webid:admin', 'webid:cato']);
+  });
+
+  it('THE CEREMONY BINDING (custody): address-revoke binds ONLY to the ceremonyAddress', async () => {
+    const { membershipBindingVerifier } = await import('../../src/v2/membershipRail.js');
+    const row = {
+      webid: 'webid:bea', circleAddress: 'dev-2-addr', ceremonyAddress: 'join-addr',
+      circleAddresses: ['dev-2-addr', 'join-addr', 'dev-3-addr'],
+    };
+    const verify = membershipBindingVerifier(async () => ({ members: [row] }));
+    const args = { ref: 'webid:bea', circleId: 'g1' };
+    // the ceremony key signs a revoke → binds; an ordinary attested device key → refused
+    expect(await verify({ ...args, kind: 'address-revoke', author: 'join-addr' })).toBe(true);
+    expect(await verify({ ...args, kind: 'address-revoke', author: 'dev-2-addr' })).toBe(false);
+    expect(await verify({ ...args, kind: 'address-revoke', author: 'dev-3-addr' })).toBe(false);
+    // every other kind keeps the any-attested rule
+    expect(await verify({ ...args, kind: 'evict', author: 'dev-3-addr' })).toBe(true);
+    // no ceremonyAddress on the row (the post-cutover join window) → the interim rule stands
+    const bare = membershipBindingVerifier(async () => ({
+      members: [{ webid: 'webid:bea', circleAddress: 'dev-2-addr', circleAddresses: ['dev-2-addr'] }],
+    }));
+    expect(await bare({ ...args, kind: 'address-revoke', author: 'dev-2-addr' })).toBe(true);
   });
 });

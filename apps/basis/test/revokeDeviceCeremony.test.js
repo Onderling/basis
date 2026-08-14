@@ -54,7 +54,9 @@ describe('the device-revocation ceremony — enroll, then evict the device every
     expect(enrolled.ok).toBe(true);
     const deviceId = enrolled.deviceId;
     await teardown(pre);
-    A2 = await bootRealAgentNode('A2', { agentOpts: vaults });
+    A2 = await bootRealAgentNode('A2', {
+      agentOpts: { ...vaults, deviceLog: new EventLog({ initial: [], muted: [] }) },
+    });
     const addrA2 = A2.agent.circleAddressFor(GROUP);
 
     // BOTH device addresses reach BOTH rosters via the production announce skill — A's own first
@@ -121,5 +123,22 @@ describe('the device-revocation ceremony — enroll, then evict the device every
     // idempotent: revoking again is still ok (the tombstone already stands)
     const again = await A.agent.callSkill('household', 'revokeDevice', { mnemonic: phrase, deviceId, circleIds: [GROUP] });
     expect(again.ok).toBe(true);
+
+    // ── THE WAR-PROOF (custody): the stolen device CANNOT counter-revoke. The enrolled second
+    //    device's circle key is delegation-derived, NOT the ceremony key; it forges an
+    //    address-revoke against the owner's real address and fans it to B; B's strict binding
+    //    refuses it: only the row's ceremonyAddress (the phrase-derived join-time key) may
+    //    author a revocation. ──
+    const aRowB = await rowFor(B, A.pubKey);
+    const survivor = aRowB.circleAddress;
+    const forged = await A2.agent.membershipRail.append(GROUP, {
+      kind: 'address-revoke', subject: survivor,
+      payload: { by: A.pubKey }, actor: A.pubKey,
+    });
+    expect(forged?.statement, 'the thief CAN sign (with its own device key)').toBeTruthy();
+    await B._routerRef.fn({ from: 'thief', payload: { subtype: MEMBERSHIP_BROADCAST, circleId: GROUP, event: forged.statement } });
+    const after = await rowFor(B, A.pubKey);
+    expect(after.circleAddress, 'B refused the forged revocation — the survivor stands').toBe(survivor);
+    expect(after.circleAddresses).toContain(survivor);
   }, 120_000);
 });

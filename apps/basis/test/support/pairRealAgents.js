@@ -66,6 +66,7 @@ import {
 import { EventLog } from '../../src/eventLog.js';
 import { createChatMessageInbox } from '../../src/v2/chatMessageInbox.js';
 import { makeChatRail, makeChatPeerHandler, CHAT_STATEMENT_BROADCAST } from '../../src/v2/chatRail.js';
+import { rosterBindingVerifier } from '../../src/v2/membershipRail.js';
 import { makeKringGovernancePeerHandler, makeKringReportPeerHandler } from '../../src/v2/kringLogReceiver.js';
 import { makeGovernanceRail } from '../../src/v2/governanceAppWiring.js';
 
@@ -169,17 +170,26 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   // registry: it asks the claimed member's OWN agent for its circle key and compares — the same fact a
   // roster row attests, established through the test process's omniscience instead of the announce flow.
   // A test probing binding FAILURE overrides with `verifyChatBinding`.
+  const rosterBinding = rosterBindingVerifier(callSkill);
   const chatRail = makeChatRail({
     eventLog: chatEventLog,
     circleIdentityFor: agent.circleIdentityFor,
     myRef: agent.identity.chat.pubKey,
     callSkill,
-    verifyBinding: verifyChatBinding ?? (async ({ author, ref, circleId }) => {
+    verifyBinding: verifyChatBinding ?? (async (q) => {
+      const { author, ref, circleId } = q ?? {};
+      // IN-PROCESS first: the test-process omniscience (ask the claimed member's OWN agent for its
+      // circle key) — authoritative and constant-time for every node in THIS process, so the legacy
+      // pairing tests keep their exact ingest timing (a variable-latency verify reorders a
+      // concurrent flush burst — the offline-hold walk pinned that).
       for (const n of LIVE_NODES) {
         if (n.pubKey !== ref) continue;
         try { return (await n.agent.circleIdentityFor(circleId))?.pubKey === author; } catch { return false; }
       }
-      return false;
+      // CROSS-PROCESS: the node is not in this process — the derived roster's proven address set is
+      // the only fact that exists here, and it is exactly what a real device holds. This is the
+      // three-party walk's receive half: three OS processes, one relay, no shared registry.
+      try { return await rosterBinding(q); } catch { return false; }
     }),
   });
   const handlers = {

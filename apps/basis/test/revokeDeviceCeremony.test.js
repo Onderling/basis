@@ -52,7 +52,10 @@ describe('the device-revocation ceremony — the V2 stolen-device walk', () => {
     await connectNodesOverBus([A, B]);
     await pairCircle(A, B, { groupId: GROUP, name: 'Revoke walk', handle: 'bea' });
     // B ingests fanned membership statements through the PRODUCTION peer handler (the shells'
-    // exact receive wiring; the harness router doesn't carry this subtype by default).
+    // exact receive wiring), wired EXPLICITLY and only from here: installing it for every
+    // harness node from boot changes the rail's ingest timeline during pairing and destabilises
+    // the strict-verify equilibrium this walk pins (found 2026-08-15) — the rider handlers stay
+    // an explicit per-test act until that interplay gets its own pass.
     const onMembership = makeMembershipPeerHandler({ rail: B.agent.membershipRail });
     const prior = B._routerRef.fn;
     B._routerRef.fn = (env) => {

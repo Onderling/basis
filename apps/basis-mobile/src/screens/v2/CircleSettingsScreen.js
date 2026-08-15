@@ -49,6 +49,7 @@ import { basisManifest } from '../../../../basis/src/index.js';
 // Phase 4 §9 — the manifest-declared settings controls + the `enabledWhen` fold (route × capability).
 // Same shared source the web renderer uses (invariants #1/#2).
 import { resolveControlEnablement, settingsControlsFromManifest } from '../../../../basis/src/v2/circleSettingsControls.js';
+import { settingsChangeNeedsProposal } from '../../../../basis/src/v2/circlePolicy.js';
 
 // Phase 4 §9 — the Connection & transport controls, read once from the static basisManifest.
 const SETTINGS_CONTROLS = settingsControlsFromManifest(basisManifest);
@@ -203,7 +204,7 @@ export default function CircleSettingsScreen({
     template: working.capabilities || {},
   }) : []), [sources, working]);
 
-  const consensusActive = !!working?.consensusRequired && (working?.admins?.length ?? 0) >= 2;
+  const consensusActive = settingsChangeNeedsProposal(working);   // the ONE decision-table gate (the unification)
 
   // B · consent-card — LOAD + REVIEW: load the pasted recipe (URL/JSON) via the SHARED loadRecipeForReview,
   // build the review model, then open the native consent card. Nothing is persisted here (mirror of web's
@@ -443,13 +444,22 @@ export default function CircleSettingsScreen({
         ))}
 
         <Text style={styles.section}>{t('circle.settings.consensus')}</Text>
-        <View style={styles.row}>
-          <Text style={styles.rowLabel}>{t('circle.settings.consensus_label')}</Text>
-          <Switch trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
-            value={!!working.consensusRequired}
-            onValueChange={(v) => patch({ consensusRequired: v })}
-            testID="consensusRequired"
-          />
+        {/* WHO DECIDES a settings change (the decision-kind unification): writes the ONE decision
+            table (governance.changePolicy); the old consensus boolean asked exactly this question
+            and is retired from the policy shape. Web parity: circleSettings.js. */}
+        <View style={styles.controlRow} testID="whoDecides">
+          <Text style={styles.rowLabel}>{t('circle.settings.whoDecides')}</Text>
+          <View style={styles.chipRow}>
+            {['any-admin', 'admin-quorum', 'member-vote'].map((cls) => {
+              const on = (working.governance?.changePolicy ?? 'any-admin') === cls;
+              return (
+                <Pressable key={cls} onPress={() => patch({ governance: { ...(working.governance ?? {}), changePolicy: cls } })}
+                  style={[styles.chip, on && styles.chipOn]} testID={`whoDecides-${cls}${on ? '-on' : ''}`}>
+                  <Text style={styles.chipText}>{t(`circle.settings.whoDecides_opt.${cls}`)}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
         {consensusActive ? <Text style={styles.note}>{t('circle.settings.pending')}</Text> : null}
         {storageNote ? <Text style={styles.note} testID="circle-settings-storage-note">{storageNote}</Text> : null}

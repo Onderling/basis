@@ -6,6 +6,7 @@ import {
   defaultViewModeFromPolicy, autoEnacts,
   DEFAULT_MEMBER_OVERRIDE, normalizeMemberOverride, mergeMemberOverride,
   shouldPushNotify,
+  DECISION_KINDS, requiredClassFor, settingsChangeNeedsProposal, decisionClassFor, GOVERNANCE_ACTIONS,
 } from '../../src/v2/circlePolicy.js';
 
 describe('circlePolicy · normalizeCirclePolicy', () => {
@@ -364,5 +365,40 @@ describe('circlePolicy · governanceEnactment (the enactment-trigger setting)', 
     expect(autoEnacts({})).toBe(false);          // default is settle
     expect(autoEnacts(null)).toBe(false);
     expect(autoEnacts({ governanceEnactment: 'bogus' })).toBe(false);
+  });
+});
+
+
+describe('THE ONE DECISION TABLE (the decision-kind unification)', () => {
+  it('every governed decision kind maps to a governance action, and the class resolves through it', () => {
+    for (const [kind, action] of Object.entries(DECISION_KINDS)) {
+      expect(GOVERNANCE_ACTIONS).toContain(action);
+      expect(requiredClassFor({}, kind)).toBe(decisionClassFor({}, action));
+    }
+    expect(requiredClassFor({}, 'not-a-kind')).toBe(null);
+  });
+
+  it('report-ban and fork-resolution ride removeMember; settings-change rides changePolicy', () => {
+    const policy = { governance: { removeMember: 'member-vote', changePolicy: 'admin-quorum' } };
+    expect(requiredClassFor(policy, 'report-ban')).toBe('member-vote');
+    expect(requiredClassFor(policy, 'fork-resolution')).toBe('member-vote');
+    expect(requiredClassFor(policy, 'settings-change')).toBe('admin-quorum');
+  });
+
+  it('settingsChangeNeedsProposal — the one gate: any-admin direct · single-admin quorum direct · member-vote always proposes', () => {
+    expect(settingsChangeNeedsProposal({ admins: ['a', 'b'] })).toBe(false);                                    // lived default: any-admin
+    expect(settingsChangeNeedsProposal({ admins: ['a'], governance: { changePolicy: 'admin-quorum' } })).toBe(false);
+    expect(settingsChangeNeedsProposal({ admins: ['a', 'b'], governance: { changePolicy: 'admin-quorum' } })).toBe(true);
+    expect(settingsChangeNeedsProposal({ admins: ['a'], governance: { changePolicy: 'member-vote' } })).toBe(true);
+  });
+
+  it('the LEGACY LIFT: a stored consensusRequired:true becomes changePolicy admin-quorum; an explicit class wins; the boolean never survives', () => {
+    const lifted = normalizeCirclePolicy({ consensusRequired: true });
+    expect(lifted.governance.changePolicy).toBe('admin-quorum');
+    expect('consensusRequired' in lifted).toBe(false);
+    const explicit = normalizeCirclePolicy({ consensusRequired: true, governance: { changePolicy: 'member-vote' } });
+    expect(explicit.governance.changePolicy).toBe('member-vote');
+    const off = normalizeCirclePolicy({ consensusRequired: false });
+    expect(off.governance.changePolicy).toBe('any-admin');
   });
 });

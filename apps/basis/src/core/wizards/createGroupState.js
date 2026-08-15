@@ -187,8 +187,14 @@ export function policyPatchFromState(state) {
   const s = state && typeof state === 'object' ? state : {};
   const patch = {};
   if (s.features && typeof s.features === 'object') patch.features = s.features;
-  for (const ax of ['revealPolicy', 'pod', 'llmTool', 'agents', 'consensusRequired']) {
+  for (const ax of ['revealPolicy', 'pod', 'llmTool', 'agents']) {
     if (s[ax] !== undefined) patch[ax] = s[ax];
+  }
+  // The wizard's "decide together?" axis COMPILES to the decision table (the decision-kind
+  // unification): true → policy changes need admin agreement (admin-quorum); false → an admin
+  // saves directly (any-admin, the lived default). The boolean never reaches the policy shape.
+  if (s.consensusRequired !== undefined) {
+    patch.governance = { changePolicy: s.consensusRequired ? 'admin-quorum' : 'any-admin' };
   }
   // Decision 3 — the two fields the reader has always asked for and nobody ever wrote. Without them a
   // circle cannot remember which template made it, so its conversation has no relation to the kind its

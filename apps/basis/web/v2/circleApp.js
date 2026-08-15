@@ -733,7 +733,7 @@ import { setActiveCircle, getActiveCircle } from '../../src/v2/activeCircle.js';
 import { normalizeCircleMembers, recipientSealKeyFromMembers } from '@onderling/kring-host/circleMembers';
 import { buildFindExtras } from '@onderling/kring-host/findExtras';
 import { executeBulkDispatch } from '../../src/bulkOps.js';
-import { mergeCirclePolicy, mergeMemberOverride, normalizeCirclePolicy } from '../../src/v2/circlePolicy.js';
+import { mergeCirclePolicy, mergeMemberOverride, normalizeCirclePolicy, settingsChangeNeedsProposal } from '../../src/v2/circlePolicy.js';
 // Phase 4 §9 — the manifest-declared settings controls (transport-mode · relay endpoint · private-DM).
 import { settingsControlsFromManifest } from '../../src/v2/circleSettingsControls.js';
 // Phase 4 §10 / G17 — the shared composer built-in classifier (circle/transport slash commands
@@ -6833,7 +6833,7 @@ async function showSettings(id) {
   // surfaced as a note but never blocks the local policy save.
   const baselinePod = working?.pod;
   let storageNote;
-  const consensusActive = () => !!working.consensusRequired && (working.admins?.length ?? 0) >= 2;
+  const consensusActive = () => settingsChangeNeedsProposal(working);   // the ONE decision-table gate (the unification)
   // load pending proposals so the banner can surface the count of
   // outstanding "waiting on N admins" approvals on settings entry — folded off the LOG, so a
   // proposal raised on another admin's device shows here too.

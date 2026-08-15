@@ -26,8 +26,50 @@ export const DEFAULT_GOVERNANCE = {
   removeMember: 'any-admin',
   rotateKey:    'any-admin',
   changeRule:   'admin-quorum',
-  changePolicy: 'admin-quorum',
+  // 'any-admin', not the 2026-07-25 record's aspirational 'admin-quorum': the shipped gate
+  // (the consensus boolean) made settings saves DIRECT unless a circle opted in, and the
+  // decision-kind unification adopts that lived default — a circle opts INTO quorum/vote via
+  // the who-decides control, exactly as it opted into consensus before.
+  changePolicy: 'any-admin',
 };
+
+/**
+ * THE ONE DECISION TABLE (the unification): every governed decision KIND in the product maps to
+ * the governance ACTION whose policy class decides it. A new governed thing gets a ROW here —
+ * never a bespoke boolean or an ad-hoc admin check beside the table. Current subsumptions:
+ *   settings-change  → changePolicy   (retires the `consensusRequired` boolean — one question,
+ *                                      one vocabulary: WHO decides a policy change)
+ *   report-ban       → removeMember   (acting on a reported member rides L4, reportModel)
+ *   fork-resolution  → removeMember   (removing a disputed equivocator is a member removal)
+ */
+export const DECISION_KINDS = Object.freeze({
+  'remove-member':   'removeMember',
+  'report-ban':      'removeMember',
+  'fork-resolution': 'removeMember',
+  'rotate-key':      'rotateKey',
+  'change-rule':     'changeRule',
+  'change-policy':   'changePolicy',
+  'settings-change': 'changePolicy',
+});
+
+/** The required class for a decision KIND (the table row → the policy's class for its action). */
+export function requiredClassFor(policy, kind) {
+  const action = DECISION_KINDS[kind];
+  return action ? decisionClassFor(policy, action) : null;
+}
+
+/**
+ * Does a settings/policy change need a PROPOSAL (the governance flow) on this circle — or may it
+ * save directly? The one gate both shells consult (replaces the scattered
+ * `consensusRequired && admins >= 2` checks): any-admin → direct; admin-quorum with a single
+ * admin → direct (that admin IS the majority); anything else → the proposal flow.
+ */
+export function settingsChangeNeedsProposal(policy) {
+  const cls = requiredClassFor(policy, 'settings-change');
+  if (cls === 'any-admin') return false;
+  if (cls === 'admin-quorum') return (policy?.admins?.length ?? 0) >= 2;
+  return true;   // member-vote — the vote is the point, whatever the roster size
+}
 
 export const CIRCLE_POLICY_ENUMS = {
   // 'cross-stream' RETIRED (wave 1 batch 5, with the Stream view): stored values migrate to 'chat'
@@ -156,7 +198,6 @@ export const DEFAULT_CIRCLE_POLICY = {
   // way ε.4 shipped.
   catchUpChooserMode: 'auto',
   admins:           [],
-  consensusRequired: false,
   // Phase 4 §5 (L4) — per-action decision-class map (admin-set). Absent action ⇒ its
   // DEFAULT_GOVERNANCE class. See governanceDecision.js for the resolver.
   governance:       { ...DEFAULT_GOVERNANCE },
@@ -342,11 +383,16 @@ export function normalizeCirclePolicy(stored = {}) {
     admins:             Array.isArray(p.admins) ? p.admins.filter((x) => typeof x === 'string') : [],
     decisionDeadline:   pickEnum('decisionDeadline'),
     governanceEnactment: pickEnum('governanceEnactment'),
-    consensusRequired:
-      typeof p.consensusRequired === 'boolean' ? p.consensusRequired : DEFAULT_CIRCLE_POLICY.consensusRequired,
     // §5 (L4) — decision-class per governed action; each falls back to DEFAULT_GOVERNANCE,
     // and only the known actions/classes survive (an unknown class → the action's default).
-    governance:         normalizeGovernance(p.governance),
+    // LEGACY LIFT (the decision-kind unification): a stored `consensusRequired: true` becomes
+    // `changePolicy: 'admin-quorum'` unless the map already says otherwise — the boolean gated
+    // exactly this question and is retired from the policy shape.
+    governance:         normalizeGovernance(
+      p.consensusRequired === true && !(p.governance && p.governance.changePolicy)
+        ? { ...(p.governance ?? {}), changePolicy: 'admin-quorum' }
+        : p.governance,
+    ),
     // Phase 4 §7/§9 — member↔member private chat toggle (route-gated in the settings surface).
     privateDm:
       typeof p.privateDm === 'boolean' ? p.privateDm : DEFAULT_CIRCLE_POLICY.privateDm,

@@ -1492,6 +1492,24 @@
       "text": "Consensus tussen admins",
       "doc": "Settings section: co-admin approval for changes."
     },
+    "whoDecides": {
+      "text": "Wie beslist over instellingswijzigingen?",
+      "doc": "de besliskaart-unificatie — de wie-beslist keuze (schrijft governance.changePolicy)."
+    },
+    "whoDecides_opt": {
+      "any-admin": {
+        "text": "Eén beheerder beslist",
+        "doc": "who-decides option: any-admin."
+      },
+      "admin-quorum": {
+        "text": "Meerderheid van beheerders",
+        "doc": "who-decides option: admin-quorum."
+      },
+      "member-vote": {
+        "text": "Ledenstemming",
+        "doc": "who-decides option: member-vote."
+      }
+    },
     "consensus_label": {
       "text": "Wijzigingen vereisen goedkeuring van mede-admins",
       "doc": "consensusRequired toggle label."

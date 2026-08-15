@@ -269,20 +269,33 @@ export function renderCircleSettings(container, {
     container.appendChild(sec);
   }
 
-  // Consensus toggle (a circlePolicy boolean — gates co-admin approval).
+  // WHO DECIDES a settings change (the decision-kind unification): the picker writes the ONE
+  // decision table (`governance.changePolicy`) — the old consensus boolean asked exactly this
+  // question and is retired from the policy shape.
   const consSec = section(tr('circle.settings.consensus'));
   consSec.classList.add('circle-settings__consensus');
-  const consRow = document.createElement('label');
-  consRow.className = 'circle-settings__consensus-toggle';
-  const consBox = document.createElement('input');
-  consBox.type = 'checkbox';
-  consBox.checked = !!policy?.consensusRequired;
-  consBox.dataset.field = 'consensusRequired';
-  consBox.addEventListener('change', () => emit({ consensusRequired: consBox.checked }));
-  const consSpan = document.createElement('span');
-  consSpan.textContent = tr('circle.settings.consensus_label');
-  consRow.append(consBox, consSpan);
-  consSec.appendChild(consRow);
+  const whoLbl = document.createElement('div');
+  whoLbl.className = 'circle-settings__control-label';
+  whoLbl.textContent = tr('circle.settings.whoDecides');
+  consSec.appendChild(whoLbl);
+  const current = policy?.governance?.changePolicy ?? 'any-admin';
+  for (const cls of ['any-admin', 'admin-quorum', 'member-vote']) {
+    const orow = document.createElement('label');
+    orow.className = 'circle-settings__control-opt';
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    radio.name = 'ctl-who-decides';
+    radio.value = cls;
+    radio.checked = current === cls;
+    radio.dataset.field = 'whoDecides';
+    radio.addEventListener('change', () => {
+      if (radio.checked) emit({ governance: { ...(policy?.governance ?? {}), changePolicy: cls } });
+    });
+    const span = document.createElement('span');
+    span.textContent = tr(`circle.settings.whoDecides_opt.${cls}`);
+    orow.append(radio, span);
+    consSec.appendChild(orow);
+  }
   container.appendChild(consSec);
 
   // Phase 4 §9 — the Connection & transport controls (manifest-declared). Rendered only when

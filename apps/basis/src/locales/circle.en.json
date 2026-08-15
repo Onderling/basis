@@ -1492,6 +1492,24 @@
       "text": "Co-admin consensus",
       "doc": "Settings section: co-admin approval for changes."
     },
+    "whoDecides": {
+      "text": "Who decides settings changes?",
+      "doc": "the decision-kind unification — the who-decides picker (writes governance.changePolicy)."
+    },
+    "whoDecides_opt": {
+      "any-admin": {
+        "text": "One admin decides",
+        "doc": "who-decides option: any-admin."
+      },
+      "admin-quorum": {
+        "text": "Majority of admins",
+        "doc": "who-decides option: admin-quorum."
+      },
+      "member-vote": {
+        "text": "Member vote",
+        "doc": "who-decides option: member-vote."
+      }
+    },
     "consensus_label": {
       "text": "Require co-admin approval for changes",
       "doc": "consensusRequired toggle label."

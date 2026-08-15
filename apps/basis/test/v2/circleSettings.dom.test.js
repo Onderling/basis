@@ -132,22 +132,24 @@ describe('renderCircleSettings', () => {
     expect(el.querySelector('[data-role=recipe-status]').textContent).toBe('circle.recipeConsent.declined');
   });
 
-  it('renders the consensus toggle and honours custom saveLabel + note', () => {
+  it('renders the who-decides picker (the decision-kind unification) and honours custom saveLabel + note', () => {
     const el = mount();
     renderCircleSettings(el, { policy: DEFAULT_CIRCLE_POLICY, t, saveLabel: 'Send proposal', note: 'pending note' });
-    expect(el.querySelector('input[data-field=consensusRequired]')).not.toBeNull();
+    const radios = el.querySelectorAll('input[data-field=whoDecides]');
+    expect(radios).toHaveLength(3);                                          // any-admin · admin-quorum · member-vote
+    expect([...radios].find((r) => r.checked)?.value).toBe('any-admin');     // the lived default
     expect(el.querySelector('.circle-settings__save').textContent).toBe('Send proposal');
     expect(el.querySelector('.circle-settings__note').textContent).toBe('pending note');
   });
 
-  it('consensus toggle fires onChange({ consensusRequired })', () => {
+  it('the who-decides picker writes the ONE decision table: onChange({ governance: { changePolicy } })', () => {
     const el = mount();
     const onChange = vi.fn();
     renderCircleSettings(el, { policy: DEFAULT_CIRCLE_POLICY, t, onChange });
-    const c = el.querySelector('input[data-field=consensusRequired]');
-    c.checked = true;
-    c.dispatchEvent(new Event('change'));
-    expect(onChange).toHaveBeenCalledWith({ consensusRequired: true });
+    const quorum = [...el.querySelectorAll('input[data-field=whoDecides]')].find((r) => r.value === 'admin-quorum');
+    quorum.checked = true;
+    quorum.dispatchEvent(new Event('change'));
+    expect(onChange).toHaveBeenCalledWith({ governance: expect.objectContaining({ changePolicy: 'admin-quorum' }) });
   });
 
   it('omits ⓘ consequence toggles when no consequence copy is translated', () => {

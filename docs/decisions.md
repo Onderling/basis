@@ -1135,3 +1135,39 @@ circle B the key to all of circle A's history and retained versions.
 **Reverse it by:** this is the security posture; reverting reopens the cross-circle group-key leak. The
 mechanical revert is dropping the canonical-door gate + restoring the hard error, but do not without a
 replacement.
+
+## 2026-08-16 — ONE decision table; the settings-change default is the LIVED any-admin (Frits — ratified)
+
+**Context.** The 2026-07-25 governance design gave every governed action a decision-class
+(`any-admin | admin-quorum | member-vote`), with `changePolicy` recorded as defaulting to
+`admin-quorum`. In the shipped product, though, a separate `consensusRequired` boolean (default
+off) gated whether a settings save routed through governance at all — so the lived default was a
+DIRECT admin save, and the recorded `admin-quorum` default never actually bound. Two vocabularies
+answered one question, and the answer on paper was not the answer in the product.
+
+**Decision.**
+1. **`DECISION_KINDS` is the one declared table**: every governed decision kind maps to the
+   governance action whose policy class decides it — the four actions themselves, plus
+   `settings-change → changePolicy` and `report-ban` / `fork-resolution → removeMember`. A new
+   governed thing gets a ROW here; a bespoke boolean or an ad-hoc admin check beside the table is
+   a defect. `requiredClassFor` and `settingsChangeNeedsProposal` are the two lookups every gate
+   consults.
+2. **`consensusRequired` is retired from the policy shape.** A stored `true` lifts to
+   `changePolicy: 'admin-quorum'` at normalize (an explicit class wins); the create-wizard's
+   "decide together?" axis remains as template vocabulary and COMPILES to the class at the policy
+   boundary. Both shells' consensus toggle became the three-way who-decides picker, which writes
+   the table.
+3. **The default `changePolicy` is `'any-admin'` — the lived default — amending the 07-25
+   record's aspirational `admin-quorum`.** No existing circle's behavior changes; a circle opts
+   INTO quorum or a member vote through the picker, exactly as it used to opt into consensus. The
+   single-admin quorum degeneracy (one admin IS the majority → direct save) lives inside the one
+   gate.
+
+**Alternatives / why.** Keeping the boolean beside the class map — rejected: two vocabularies for
+one question is precisely the drift class this log keeps recording. Adopting the paper default
+(`admin-quorum`) — rejected: it would silently convert every multi-admin circle's settings saves
+into proposals, a behavior change no one chose.
+
+**Reverse it by:** re-adding the boolean and its gate reads (the mechanical revert), or flipping
+the default back — but flip it as a conscious migration, because by then circles will have chosen
+classes through the picker.

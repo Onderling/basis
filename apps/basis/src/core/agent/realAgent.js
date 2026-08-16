@@ -48,7 +48,7 @@ import { makeMembershipRail, makeMembershipEmitter } from '../../v2/membershipRa
 import { makeTaskRail, makeTaskEmitter, routeTaskMirror } from '../../v2/taskRail.js'; // the content re-root — item snapshots ride the device log
 import { makeChatRail, makeChatEmitter } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
 import { createSurfaceGrants, compileReadFilter } from '../../v2/surfaceGrants.js';   // pair-a-view standing grants (the surface role) + the section→lane-filter compiler
-import { makeSurfaceActHandler } from '../../v2/surfaceRail.js';   // the remote surface's verified acting door
+import { makeSurfaceActHandler, SURFACE_NUDGE_SUBTYPE } from '../../v2/surfaceRail.js'; // the remote surface's verified acting door + the contentless nudge
 import { paramsManifest } from '../../v2/paramsManifest.js';   // #36 — the params op contract (gates the waist branch)
 import { VaultMemory, VaultLocalStorage, VaultEncrypted, migrateVaultToEncrypted, resealVault, seedFromString, seedToString } from '@onderling/vault';
 import { wireSkill } from '@onderling/sdk';
@@ -3751,6 +3751,16 @@ export async function createRealHouseholdAgent(opts = {}) {
             source,
             laneId: w.laneId,
             filter: compileReadFilter(w.reads),
+            // The CONTENTLESS re-pull nudge, per durable flush: lane id only, best-effort over
+            // the reliable peer choke (hold-forward — an offline view gets it on reconnect).
+            // Tests inject `opts.surfaceNudge`; production sends to the view's own address.
+            onFlush: ({ laneId }) => {
+              try {
+                const send = opts.surfaceNudge
+                  ?? ((viewPubKey, lane) => sa.peer.sendTo(viewPubKey, { subtype: SURFACE_NUDGE_SUBTYPE, laneId: lane }, { guarantee: 'hold-forward' }));
+                Promise.resolve(send(w.viewPubKey, laneId)).catch(() => { /* the lane is the truth; the nudge is best-effort */ });
+              } catch { /* best-effort */ }
+            },
           });
           await mirror.start();
           viewLaneMirrors.set(w.viewPubKey, { mirror, readsKey: JSON.stringify(w.reads) });

@@ -1,5 +1,5 @@
 /**
- * THE PAIR-A-VIEW WALK, READING HALF (remote surface slice 2) — the "addressed edition": a
+ * THE PAIR-A-VIEW WALK, READING HALF — the "addressed edition": a
  * paired view's read grant names SECTIONS, and the acting device writes a partial mirror lane
  * holding only those sections, sealed to owner + that view. The view hydrates its lane like a
  * restoring device — with only its own keypair, no live link to the actor — and can open
@@ -16,6 +16,7 @@ import { createHistoryMirror, createHistoryPodMedium, hydrateHistory } from '../
 import { settingsSealStrategyForIdentity, sealStrategyForRecipients } from '../src/v2/sharedCopyOpener.js';
 import { compileReadFilter, normaliseReads, viewLaneId } from '../src/v2/surfaceGrants.js';
 import { createRealHouseholdAgent } from '../src/core/agent/realAgent.js';
+import { makeSurfaceActClient, SURFACE_NUDGE_SUBTYPE } from '../src/v2/surfaceRail.js';
 import { EventLog } from '../src/eventLog.js';
 
 /** A SolidPodSource-shaped memory backend whose raw stored bodies we can byte-inspect. */
@@ -134,11 +135,13 @@ describe('the agent wires it end to end — grant makes the lane, the switch gov
     const podMap = new Map();
     const log = new EventLog({ initial: [], muted: [] });
     const view = await AgentIdentity.generate(new VaultMemory());
+    const nudges = [];
     const A = await createRealHouseholdAgent({
       seedHousehold: false,
       settingsDataSource: memoryDataSource(),
       deviceLog: log,
       provisionHistoryMirror: async (strategy) => createHistoryPodMedium({ podSource: memoryPodSource(podMap), strategy }),
+      surfaceNudge: (viewPubKey, laneId) => { nudges.push({ viewPubKey, laneId }); },
     });
 
     // Content exists BEFORE the grant and the switch — the lane must backfill it later.
@@ -170,6 +173,28 @@ describe('the agent wires it end to end — grant makes the lane, the switch gov
     const ids = viewLog.query().map((e) => e.id);
     expect(ids).toContain('pre-fam');
     expect(ids).not.toContain('pre-werk');
+
+    // THE NUDGE: each durable lane flush pinged the view — lane id only, nothing else. Wired to
+    // the client's ear it drives the re-pull: a fresh fam entry lands, the nudge fires, the
+    // re-hydrate sees it.
+    expect(nudges.length).toBeGreaterThan(0);
+    expect(nudges[0]).toEqual({ viewPubKey: view.pubKey, laneId: lane });
+    const client = makeSurfaceActClient({ identity: view, send: () => {} });
+    let repulled = null;
+    client.onNudge(async ({ laneId }) => {
+      const relog = new EventLog({ initial: [], muted: [] });
+      await hydrateHistory({ source: viewSource, eventLog: relog, lanes: (l) => l === laneId, logger: { warn: () => {} } });
+      repulled = relog.query().map((e) => e.id);
+    });
+    const nudgesBefore = nudges.length;
+    log.append(famEntry('live-fam', 'live geheim'));
+    let deadline2 = Date.now() + 5000;
+    while (nudges.length === nudgesBefore && Date.now() < deadline2) await new Promise((r) => setTimeout(r, 50));
+    expect(nudges.length).toBeGreaterThan(nudgesBefore);
+    expect(client.handleNudge({ subtype: SURFACE_NUDGE_SUBTYPE, laneId: nudges[nudges.length - 1].laneId })).toBe(true);
+    deadline2 = Date.now() + 2000;
+    while (repulled === null && Date.now() < deadline2) await new Promise((r) => setTimeout(r, 20));
+    expect(repulled).toContain('live-fam');
 
     // Revoke ends the edition live: a later fam entry never reaches the lane.
     const before = laneBatches();

@@ -34,6 +34,11 @@ export const SURFACE_ACT_SUBTYPES = Object.freeze({
   result:  'surface-act-result',
 });
 
+/** The CONTENTLESS re-pull nudge: "your edition has a new batch — come read". Carries the lane
+ *  id and NOTHING else (no entries, no counts of what changed, no circle names) — content
+ *  reaches a view only through its sealed lane, never through a wake channel. */
+export const SURFACE_NUDGE_SUBTYPE = 'surface-lane-nudge';
+
 /** Deterministic byte serialisation for signing: JSON with sorted keys, utf-8. */
 function canonicalBytes(obj) {
   const sorted = (v) => {
@@ -97,6 +102,16 @@ export function makeSurfaceActClient({ identity, send, timeoutMs = 8000 } = {}) 
           resolve({ ok: false, code: 'send-failed' });
         });
       });
+    },
+
+    /** Register the re-pull reaction (typically: hydrate the lane again). One listener. */
+    onNudge(cb) { this._nudgeCb = typeof cb === 'function' ? cb : null; },
+
+    /** Router hook for `surface-lane-nudge` payloads — fires the registered re-pull. */
+    handleNudge(payload) {
+      if (!this._nudgeCb) return false;
+      this._nudgeCb({ laneId: payload?.laneId ?? null });
+      return true;
     },
 
     /** Router hook for `surface-act-result` payloads. */

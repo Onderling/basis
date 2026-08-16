@@ -55,6 +55,7 @@ export function createHistoryMirror({
   laneId = 'root',
   skip = null,
   filter = null,
+  onFlush = null,
   batchMax = 50,
   flushMs = 2000,
   now = Date.now,
@@ -110,6 +111,9 @@ export function createHistoryMirror({
       mirrored += entries.length;
       lastFlushAt = now();
       lastError = null;
+      // Observer only, AFTER the batch durably landed — the remote surface's re-pull nudge hangs
+      // here (a reader can now fetch something new). Never allowed to fail the flush.
+      try { onFlush?.({ laneId, batch: n, entries: entries.length }); } catch { /* observer */ }
       await writeHead();   // the head is small; refreshing it per flush keeps restore's step 1 current
     } catch (err) {
       // Put the entries back IN FRONT of anything appended meanwhile — order stays ascending, and

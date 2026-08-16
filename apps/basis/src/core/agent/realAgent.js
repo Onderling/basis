@@ -47,6 +47,8 @@ import {
 import { makeMembershipRail, makeMembershipEmitter } from '../../v2/membershipRail.js'; // the membership rider — statements ride the device log
 import { makeTaskRail, makeTaskEmitter, routeTaskMirror } from '../../v2/taskRail.js'; // the content re-root — item snapshots ride the device log
 import { makeChatRail, makeChatEmitter } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
+import { createSurfaceGrants } from '../../v2/surfaceGrants.js';   // pair-a-view standing grants (the surface role)
+import { makeSurfaceActHandler } from '../../v2/surfaceRail.js';   // the remote surface's verified acting door
 import { paramsManifest } from '../../v2/paramsManifest.js';   // #36 — the params op contract (gates the waist branch)
 import { VaultMemory, VaultLocalStorage, VaultEncrypted, migrateVaultToEncrypted, resealVault, seedFromString, seedToString } from '@onderling/vault';
 import { wireSkill } from '@onderling/sdk';
@@ -1344,6 +1346,45 @@ export async function createRealHouseholdAgent(opts = {}) {
     try { return [DataPart({ shown: false, mnemonic: ownerRoot.toMnemonic() })]; }
     catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'reveal-failed' })]; }
   }, { visibility: 'trusted' });   // 2.4b — the master recovery phrase: owner-only
+
+  /* ─── Remote surfaces: pair-a-view grants ─────────────────────────────────
+   * A paired view (a browser tab, a companion node's client) holds a standing SURFACE role —
+   * one capability token per op the owner picked, issued by this device's canonical identity.
+   * Acting arrives as a signed `surface-act-request` envelope and is verified at the door
+   * (`makeSurfaceActDoor` below) before it reaches `callSkill`; reading rides the sealed
+   * history mirror, not these skills. Grants live issuer-side: revoking here kills every
+   * token the view still holds, because the door consults this registry per act.
+   */
+  const surfaceGrants = createSurfaceGrants({ identity: chatId, agentId: chatId.pubKey });
+
+  hostAgent.register('grantSurface', async ({ parts }) => {
+    const d = parts?.[0]?.data ?? {};
+    const viewPubKey = typeof d.viewPubKey === 'string' ? d.viewPubKey.trim() : '';
+    const ops = Array.isArray(d.ops) ? d.ops.filter((o) => typeof o === 'string' && o.length > 0) : [];
+    if (!viewPubKey || ops.length === 0) {
+      return [DataPart({ ok: false, error: 'viewPubKey-and-ops-required' })];
+    }
+    try {
+      const expiresIn = (typeof d.expiresInDays === 'number' && d.expiresInDays > 0)
+        ? d.expiresInDays * 24 * 60 * 60 * 1000 : undefined;
+      const r = await surfaceGrants.grant({
+        viewPubKey, ops,
+        label: typeof d.label === 'string' && d.label.trim() ? d.label.trim() : null,
+        ...(expiresIn ? { expiresIn } : {}),
+      });
+      return [DataPart({ ok: true, ...r })];
+    } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'grant-failed' })]; }
+  }, { visibility: 'trusted' });   // hands out standing acting authority: owner-only
+
+  hostAgent.register('revokeSurface', async ({ parts }) => {
+    const viewPubKey = String(parts?.[0]?.data?.viewPubKey ?? '').trim();
+    if (!viewPubKey) return [DataPart({ ok: false, error: 'viewPubKey-required' })];
+    return [DataPart({ ok: true, revoked: surfaceGrants.revoke(viewPubKey) })];
+  }, { visibility: 'trusted' });
+
+  hostAgent.register('listSurfaceGrants', async () =>
+    [DataPart({ ok: true, surfaces: surfaceGrants.list() })],
+  { visibility: 'trusted' });
 
   hostAgent.register('enrollDevice', async ({ parts }) => {
     // The ENROLLMENT CEREMONY (add-a-device): the phrase is typed on THIS — the NEW — device,
@@ -3698,6 +3739,17 @@ export async function createRealHouseholdAgent(opts = {}) {
         snapshot: async () => ({ registry: (await agentsRegistryRef?.list?.()) ?? [] }),
       });
     },
+    /** The remote surface's acting door: shells wire the returned handler into their peer
+     *  router under the `surface-act-request` subtype, supplying only the reply channel.
+     *  Verification (token + issuer + revocation + envelope signature + scope) happens in the
+     *  handler before anything reaches `callSkill`. */
+    makeSurfaceActDoor: ({ reply }) => makeSurfaceActHandler({
+      agentPubKey:  chatId.pubKey,
+      issuerPubKey: chatId.pubKey,
+      isRevoked:    (id) => surfaceGrants.isRevoked(id),
+      callSkill:    (group, op, args) => callSkill(group, op, args),
+      reply,
+    }),
     llmProviders,
     // host-injected claim router; called after every successful
     // claimTask.  Hosts wire `makeAfterClaimHook` here once the agent +

@@ -35,7 +35,7 @@ import {
 import { createCircleSenderAuthorization, SENDER_REASON } from '../../v2/circleSenderAuthorization.js';
 import { shareableAddress, SHARE_NKN_ADDRESS_PARAM_KEY } from '../../v2/addressSharing.js';
 import { createParamsService, basisParamRegistry } from '../../v2/paramsService.js';   // #36 — settable params surface
-import { settingsSealStrategyForIdentity } from '../../v2/sharedCopyOpener.js';         // #36 pod-sync — seal-to-self for settings
+import { settingsSealStrategyForIdentity, sealStrategyForRecipients } from '../../v2/sharedCopyOpener.js'; // seal-to-self for settings + recipient-widened seal for view lanes
 import {
   createHistoryMirror, hydrateHistory, exportHistoryArchive,
   HISTORY_MIRROR_PARAM_KEY, HISTORY_RECENCY_DAYS_KEY, HISTORY_RECENCY_MAX_KEY,
@@ -47,7 +47,7 @@ import {
 import { makeMembershipRail, makeMembershipEmitter } from '../../v2/membershipRail.js'; // the membership rider — statements ride the device log
 import { makeTaskRail, makeTaskEmitter, routeTaskMirror } from '../../v2/taskRail.js'; // the content re-root — item snapshots ride the device log
 import { makeChatRail, makeChatEmitter } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
-import { createSurfaceGrants } from '../../v2/surfaceGrants.js';   // pair-a-view standing grants (the surface role)
+import { createSurfaceGrants, compileReadFilter } from '../../v2/surfaceGrants.js';   // pair-a-view standing grants (the surface role) + the section→lane-filter compiler
 import { makeSurfaceActHandler } from '../../v2/surfaceRail.js';   // the remote surface's verified acting door
 import { paramsManifest } from '../../v2/paramsManifest.js';   // #36 — the params op contract (gates the waist branch)
 import { VaultMemory, VaultLocalStorage, VaultEncrypted, migrateVaultToEncrypted, resealVault, seedFromString, seedToString } from '@onderling/vault';
@@ -248,6 +248,9 @@ export async function createRealHouseholdAgent(opts = {}) {
   let historyMirror = null;
   let historyMirrorOp = Promise.resolve();
   let historyMirrorSync = null;
+  /** viewPubKey → { mirror, readsKey } — the per-view "edition" lanes (remote surface reads). */
+  const viewLaneMirrors = new Map();
+  let viewLanesSync = null;   // late-bound; surfaceGrants' change hook calls it before it exists
   // The chat lane (same handover point).
   let chatRail = null;
   let chatEmit = null;
@@ -1355,7 +1358,12 @@ export async function createRealHouseholdAgent(opts = {}) {
    * history mirror, not these skills. Grants live issuer-side: revoking here kills every
    * token the view still holds, because the door consults this registry per act.
    */
-  const surfaceGrants = createSurfaceGrants({ identity: chatId, agentId: chatId.pubKey });
+  const surfaceGrants = createSurfaceGrants({
+    identity: chatId,
+    agentId: chatId.pubKey,
+    // A read-grant change (grant with sections / re-grant / revoke) reconciles the view lanes.
+    onReadGrantChange: () => { viewLanesSync?.(); },
+  });
 
   hostAgent.register('grantSurface', async ({ parts }) => {
     const d = parts?.[0]?.data ?? {};
@@ -1369,10 +1377,17 @@ export async function createRealHouseholdAgent(opts = {}) {
         ? d.expiresInDays * 24 * 60 * 60 * 1000 : undefined;
       const r = await surfaceGrants.grant({
         viewPubKey, ops,
+        // `reads` — the sections this view may SEE ({circles, kinds, device}); compiles to its
+        // own sealed mirror lane (the "edition"). Omitted → acting only, no lane.
+        reads: d.reads ?? null,
         label: typeof d.label === 'string' && d.label.trim() ? d.label.trim() : null,
         ...(expiresIn ? { expiresIn } : {}),
       });
-      return [DataPart({ ok: true, ...r })];
+      // The lane reconciler runs on the grant hook; surface its honest state: a read grant with
+      // the mirror OFF (or no backend) yields no lane until the mirror runs.
+      const laneActive = !!r.reads && paramsService.register.valueOf(HISTORY_MIRROR_PARAM_KEY) === true
+        && typeof opts.provisionHistoryMirror === 'function' && !!opts.deviceLog;
+      return [DataPart({ ok: true, ...r, laneActive })];
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'grant-failed' })]; }
   }, { visibility: 'trusted' });   // hands out standing acting authority: owner-only
 
@@ -2301,6 +2316,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // not on the next boot (on = start following + hydrate a fresh log; off = final flush + stop).
       if (opId === 'set-param' && paramsResult?.ok !== false && args?.key === HISTORY_MIRROR_PARAM_KEY) {
         historyMirrorSync?.();
+        viewLanesSync?.();   // view lanes ride the same switch: off stops them, on resumes granted ones
       }
       // The transport mode applies LIVE too — the register is the one home, this hook the one
       // application point (shells and builtins just set-param).
@@ -3700,7 +3716,53 @@ export async function createRealHouseholdAgent(opts = {}) {
     }).catch(() => { /* serialized chain must never wedge */ });
     return historyMirrorOp;
   };
+
+  // The VIEW LANES (remote surface reads — "the addressed editions"): one partial, sealed lane
+  // per view holding a read grant. The lane's filter is the grant's sections; its seal is the
+  // owner's strategy WIDENED to that view's key (`sealStrategyForRecipients`), so the view opens
+  // its own lane and nothing else — the seal is the gate, on any host. Runs on the same
+  // serialized chain as the main mirror and under the same switch: mirror off → all view lanes
+  // stop (a read grant then waits, recorded but inert, until the mirror runs again). Revoking a
+  // view stops WRITING its lane — every batch after the revoke simply never exists for it, the
+  // subscription-stopped semantics the sitting ratified.
+  viewLanesSync = () => {
+    if (typeof opts.provisionHistoryMirror !== 'function' || !opts.deviceLog) return Promise.resolve();
+    historyMirrorOp = historyMirrorOp.then(async () => {
+      const mirrorOn = paramsService.register.valueOf(HISTORY_MIRROR_PARAM_KEY) === true;
+      const wanted = mirrorOn ? surfaceGrants.readGrants() : [];
+      const wantedBy = new Map(wanted.map((w) => [w.viewPubKey, w]));
+      // Stop lanes whose grant is gone, or whose sections changed (a re-grant rewires the filter).
+      for (const [key, running] of [...viewLaneMirrors]) {
+        const w = wantedBy.get(key);
+        if (w && JSON.stringify(w.reads) === running.readsKey) continue;
+        viewLaneMirrors.delete(key);
+        await running.mirror.stop();
+      }
+      // Start lanes for grants not yet running. Backfill is the sink's own: a fresh lane mirrors
+      // every live entry passing the filter — the grant-time backfill, no extra machinery.
+      for (const w of wanted) {
+        if (viewLaneMirrors.has(w.viewPubKey)) continue;
+        try {
+          const strategy = sealStrategyForRecipients(chatId, [w.viewPubKey]);
+          const source = strategy ? await opts.provisionHistoryMirror(strategy) : null;
+          if (!source) continue;
+          const mirror = createHistoryMirror({
+            eventLog: opts.deviceLog,
+            source,
+            laneId: w.laneId,
+            filter: compileReadFilter(w.reads),
+          });
+          await mirror.start();
+          viewLaneMirrors.set(w.viewPubKey, { mirror, readsKey: JSON.stringify(w.reads) });
+        } catch (err) {
+          if (typeof console !== 'undefined') console.warn('[view-lane] not started:', err?.message ?? err);
+        }
+      }
+    }).catch(() => { /* serialized chain must never wedge */ });
+    return historyMirrorOp;
+  };
   historyMirrorSync();
+  viewLanesSync();
 
   // The persisted TRANSPORT MODE is applied at boot from the register (device scope). Before the
   // consolidation the mode lived in three write-only homes and nothing read any of them back — a

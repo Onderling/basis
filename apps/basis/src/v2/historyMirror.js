@@ -54,6 +54,7 @@ export function createHistoryMirror({
   prefix = 'basis/history/',
   laneId = 'root',
   skip = null,
+  filter = null,
   batchMax = 50,
   flushMs = 2000,
   now = Date.now,
@@ -67,6 +68,9 @@ export function createHistoryMirror({
   // own local seqs (seq is per-instance and never travels). Restore merges all lanes by entry id.
   // `skip` (a Set of entry ids) excludes what restore just hydrated — those entries came FROM the
   // mirror, so backfilling them into this device's lane would only duplicate storage.
+  // `filter` (a predicate over entries) makes this a PARTIAL lane — the remote surface's
+  // per-view "edition": only entries the grant's sections cover are ever written, so combined
+  // with a recipient-widened seal the lane discloses exactly the granted slice and nothing else.
   const lane      = `${prefix}log/${laneId}/`;
   const cursorUri = `${lane}cursor.json`;
   const headUri   = `${prefix}head.json`;
@@ -125,6 +129,7 @@ export function createHistoryMirror({
 
   function onAppend(entry) {
     if (!entry || !Number.isFinite(entry.seq) || entry.seq <= cursor.lastSeq) return;
+    if (filter && !filter(entry)) return;
     buffer.push(entry);
     if (buffer.length >= batchMax) flush();
     else if (!timer) timer = setTimeout(flush, flushMs);
@@ -147,7 +152,8 @@ export function createHistoryMirror({
       await readCursor();
       // The log's read surface is query() (most-recent-first); mirror ascending.
       const backlog = (typeof eventLog.query === 'function' ? eventLog.query() : [])
-        .filter((e) => Number.isFinite(e?.seq) && e.seq > cursor.lastSeq && !(skip?.has?.(e.id)))
+        .filter((e) => Number.isFinite(e?.seq) && e.seq > cursor.lastSeq && !(skip?.has?.(e.id))
+          && (!filter || filter(e)))
         .sort((a, b) => a.seq - b.seq);
       buffer = backlog.concat(buffer);
       unsubscribe = eventLog.subscribe(onAppend);
@@ -178,7 +184,7 @@ export const HISTORY_RECENCY_MAX_KEY  = 'history.restore.maxPerCircle';
 /** Parse `log/<lane>/batch-<n>.json` keys out of a backend listing (any nesting the backend reports). */
 const BATCH_KEY_RE = /log\/([^/]+)\/batch-(\d+)\.json$/;
 
-async function listBatchKeys(source, prefix) {
+async function listBatchKeys(source, prefix, lanes = null) {
   const keys = new Set();
   const seen = new Set();
   async function walk(p) {
@@ -188,7 +194,8 @@ async function listBatchKeys(source, prefix) {
     try { listed = (await source.list(p)) ?? []; } catch { return; }
     for (const k of listed) {
       if (typeof k !== 'string') continue;
-      if (BATCH_KEY_RE.test(k)) keys.add(k);
+      const m = BATCH_KEY_RE.exec(k);
+      if (m) { if (!lanes || lanes(m[1])) keys.add(k); }
       // A pod backend may list containers one level at a time — walk anything that looks deeper.
       else if (k.endsWith('/') && k !== p) await walk(k);
     }
@@ -215,6 +222,7 @@ export async function hydrateHistory({
   source,
   eventLog,
   prefix = 'basis/history/',
+  lanes = null,
   recencyDays = 30,
   maxPerCircle = 500,
   now = Date.now,
@@ -223,7 +231,11 @@ export async function hydrateHistory({
   if (!source || typeof source.list !== 'function') throw new Error('hydrateHistory: a DataSource-shaped source is required');
   if (!eventLog || typeof eventLog.hydrate !== 'function') throw new Error('hydrateHistory: an event log with hydrate() is required');
 
-  const keys = await listBatchKeys(source, prefix);
+  // `lanes` (a predicate over lane ids) narrows which lanes hydrate: a paired view reads ONLY
+  // its own lane (the others are sealed past it anyway — this just skips the noisy failed
+  // opens); a restoring device may exclude view lanes (their entries are subsets, deduped by id
+  // regardless, so this is efficiency, not a gate — the SEAL is the gate).
+  const keys = await listBatchKeys(source, prefix, lanes);
   const byId = new Map();
   for (const key of keys) {
     try {

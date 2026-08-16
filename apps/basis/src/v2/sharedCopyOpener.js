@@ -68,3 +68,28 @@ export function settingsSealStrategyForIdentity(identity) {
   const { seal } = recipientStrategy({ recipients: [sealPub] });
   return { seal, open };
 }
+
+/**
+ * The seal-to-self strategy widened by NAMED extra recipients — the writer-side grant: each
+ * envelope's content key is wrapped to this identity AND to every listed network key's derived
+ * sealing key, so the holders of those keys open what this identity writes, without ever
+ * receiving this identity's own key material. Used for the remote surface's per-view mirror
+ * lanes ("the addressed edition"): the acting device writes, the paired view opens its own lane.
+ * Revocation is the writer's act — stop wrapping to a recipient and everything new is dark to
+ * them at the seal.
+ *
+ * @param {{pubKey?:string, sharedCopyOpener?:Function}|null} identity  this device's AgentIdentity (the writer)
+ * @param {string[]} recipientNetworkKeys  the granted holders' network pubkeys (e.g. a paired view's)
+ * @returns {{seal:(t:string)=>string, open:(t:string)=>string}|null}
+ */
+export function sealStrategyForRecipients(identity, recipientNetworkKeys = []) {
+  if (!identity || typeof identity.pubKey !== 'string') return null;
+  const open = openerForIdentity(identity);
+  if (typeof open !== 'function') return null;
+  let recipients;
+  try {
+    recipients = [identity.pubKey, ...recipientNetworkKeys].map((k) => sealingPublicKeyFromNetworkKey(k));
+  } catch { return null; }
+  const { seal } = recipientStrategy({ recipients });
+  return { seal, open };
+}

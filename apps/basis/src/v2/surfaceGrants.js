@@ -33,6 +33,50 @@ const SURFACE_ROLE_RANK = 30;
 export const SURFACE_GRANT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
+ * Normalise a read grant — the SECTIONS a paired view may see ("what may this screen see?").
+ * Default-strict on every axis: nothing listed → nothing matched.
+ *   circles: string[] | '*'   which circles' entries the view's lane carries ('*' = all)
+ *   kinds:   string[] | '*' | null   restrict to these entry kinds within those circles (null = all kinds)
+ *   device:  boolean          whether DEVICE-scoped entries (no circle — settings changes etc.) are included
+ * @returns {object|null} the frozen normalised reads, or null when nothing is granted
+ */
+export function normaliseReads(reads) {
+  if (!reads || typeof reads !== 'object') return null;
+  const circles = reads.circles === '*' ? '*'
+    : Array.isArray(reads.circles) ? Object.freeze(reads.circles.filter((c) => typeof c === 'string' && c.length > 0)) : null;
+  const kinds = reads.kinds === '*' || reads.kinds == null ? (reads.kinds ?? null)
+    : Array.isArray(reads.kinds) ? Object.freeze(reads.kinds.filter((k) => typeof k === 'string' && k.length > 0)) : null;
+  const device = reads.device === true;
+  const empty = (!circles || (circles !== '*' && circles.length === 0)) && !device;
+  return empty ? null : Object.freeze({ circles: circles ?? Object.freeze([]), kinds, device });
+}
+
+/**
+ * Compile a normalised read grant into the mirror sink's entry predicate — the lane filter.
+ * An entry's circle scope is its first-class `circleId` (falling back to the legacy payload
+ * homes); an entry WITHOUT circle scope is device-scoped and matches only when the grant says
+ * `device: true` — default-strict, an unscoped entry never leaks through a circle pick.
+ */
+export function compileReadFilter(reads) {
+  const r = normaliseReads(reads);
+  if (!r) return () => false;
+  const circleSet = r.circles === '*' ? '*' : new Set(r.circles);
+  const kindSet   = r.kinds == null || r.kinds === '*' ? null : new Set(r.kinds);
+  return (entry) => {
+    if (!entry) return false;
+    if (kindSet && !kindSet.has(entry.kind ?? entry.type)) return false;
+    const circleId = entry.circleId ?? entry.payload?.groupId ?? entry.groupId ?? null;
+    if (circleId == null) return r.device;
+    return circleSet === '*' || circleSet.has(circleId);
+  };
+}
+
+/** The view's mirror lane id — path-safe, derived from its pubkey, distinct from device lanes. */
+export function viewLaneId(viewPubKey) {
+  return `view-${String(viewPubKey).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16)}`;
+}
+
+/**
  * Compile a set of picked op ids into a surface role bundle. Op ids are the waist's skill
  * ids (`group.op`, e.g. `params.set-param`); `.*`-prefix and `*` scopes are accepted by the
  * token layer but a surface grant should name exact ops — the pick IS the boundary.
@@ -69,16 +113,19 @@ export function compileSurfaceBundle(ops, { actingAs, label } = {}) {
  * @param {{pubKey: string, sign: Function}} a.identity  the granting identity (token issuer —
  *   the same identity whose pubKey the dispatch door trusts as issuer)
  * @param {string} [a.agentId]  the token `agentId` binding; defaults to identity.pubKey
+ * @param {(viewPubKey: string) => void} [a.onReadGrantChange]  fired after any grant/revoke
+ *   that changes a view's READ sections — the mirror side reconciles its view lanes on this
  */
-export function createSurfaceGrants({ identity, agentId } = {}) {
+export function createSurfaceGrants({ identity, agentId, onReadGrantChange } = {}) {
   if (!identity || typeof identity.sign !== 'function') {
     throw new Error('createSurfaceGrants: a signing identity is required');
   }
   const boundAgentId = agentId ?? identity.pubKey;
-  /** viewPubKey → { label, ops, tokenIds } */
+  /** viewPubKey → { label, ops, tokenIds, reads } */
   const granted = new Map();
   /** revoked token ids — the dispatch door consults this per act. */
   const revoked = new Set();
+  const readsChanged = (viewPubKey) => { try { onReadGrantChange?.(viewPubKey); } catch { /* observer only */ } };
 
   return {
     /**
@@ -91,11 +138,12 @@ export function createSurfaceGrants({ identity, agentId } = {}) {
      * @param {number} [g.expiresIn=SURFACE_GRANT_TTL_MS]
      * @returns {Promise<{viewPubKey: string, label: string|null, ops: string[], tokens: object[]}>}
      */
-    async grant({ viewPubKey, ops, label = null, expiresIn = SURFACE_GRANT_TTL_MS } = {}) {
+    async grant({ viewPubKey, ops, reads = null, label = null, expiresIn = SURFACE_GRANT_TTL_MS } = {}) {
       if (typeof viewPubKey !== 'string' || viewPubKey.length === 0) {
         throw new Error('surfaceGrants.grant: viewPubKey required');
       }
       const bundle = compileSurfaceBundle(ops, { actingAs: identity.pubKey, label });
+      const normReads = normaliseReads(reads);
       // Rotation: a re-grant invalidates the previous set before issuing the fresh one.
       const previous = granted.get(viewPubKey);
       if (previous) for (const id of previous.tokenIds) revoked.add(id);
@@ -110,8 +158,9 @@ export function createSurfaceGrants({ identity, agentId } = {}) {
           constraints: { role: SURFACE_ROLE, ...(g.actingAs ? { actingAs: g.actingAs } : {}), ...(g.constraints ?? {}) },
         }));
       }
-      granted.set(viewPubKey, { label, ops: [...ops], tokenIds: tokens.map((t) => t.id) });
-      return { viewPubKey, label, ops: [...ops], tokens: tokens.map((t) => t.toJSON()) };
+      granted.set(viewPubKey, { label, ops: [...ops], tokenIds: tokens.map((t) => t.id), reads: normReads });
+      if (normReads || previous?.reads) readsChanged(viewPubKey);
+      return { viewPubKey, label, ops: [...ops], reads: normReads, laneId: normReads ? viewLaneId(viewPubKey) : null, tokens: tokens.map((t) => t.toJSON()) };
     },
 
     /**
@@ -124,15 +173,23 @@ export function createSurfaceGrants({ identity, agentId } = {}) {
       if (!entry) return false;
       for (const id of entry.tokenIds) revoked.add(id);
       granted.delete(viewPubKey);
+      if (entry.reads) readsChanged(viewPubKey);
       return true;
     },
 
     /** The dispatch door's revocation question. */
     isRevoked(tokenId) { return revoked.has(tokenId); },
 
-    /** Current grants, for a settings surface: [{viewPubKey, label, ops}]. */
+    /** Current grants, for a settings surface: [{viewPubKey, label, ops, reads}]. */
     list() {
-      return [...granted.entries()].map(([viewPubKey, e]) => ({ viewPubKey, label: e.label, ops: [...e.ops] }));
+      return [...granted.entries()].map(([viewPubKey, e]) => ({ viewPubKey, label: e.label, ops: [...e.ops], reads: e.reads ?? null }));
+    },
+
+    /** The views holding a READ grant — what the mirror side reconciles its lanes against. */
+    readGrants() {
+      return [...granted.entries()]
+        .filter(([, e]) => e.reads)
+        .map(([viewPubKey, e]) => ({ viewPubKey, label: e.label, reads: e.reads, laneId: viewLaneId(viewPubKey) }));
     },
   };
 }

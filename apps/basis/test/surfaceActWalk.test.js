@@ -57,7 +57,7 @@ describe('the pair-a-view walk — a remote surface acts through the waist over 
     expect(grant.tokens[0].skill).toBe('params.set-param');
 
     const listed = await owner.agent.callSkill('household', 'listSurfaceGrants', {});
-    expect(listed.surfaces).toEqual([{ viewPubKey: view.pubKey, label: 'walk-view', ops: ['params.set-param'] }]);
+    expect(listed.surfaces).toEqual([{ viewPubKey: view.pubKey, label: 'walk-view', ops: ['params.set-param'], reads: null }]);
   });
 
   it('the permitted op ACTS: the reply confirms and the effect lands on the agent', async () => {

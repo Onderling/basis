@@ -25,6 +25,8 @@
  *   out-of-scope       the op is outside this token's granted skill (`offeringMatches` —
  *                      the same matcher `PolicyEngine` applies to presented tokens)
  *   replay             a request id this door has already dispatched
+ *   not-ready          the grant registry has not loaded yet, so the door cannot know what was
+ *                      revoked — and "I don't know" must read as no, not as yes
  */
 import { CapabilityToken, AgentIdentity, offeringMatches, b64encode, b64decode } from '@onderling/core';
 
@@ -133,17 +135,20 @@ export function makeSurfaceActClient({ identity, send, timeoutMs = 8000 } = {}) 
  * @param {string} a.agentPubKey   this acting agent's pubKey (the token `agentId` binding)
  * @param {string} a.issuerPubKey  the granting identity's pubKey — the ONLY trusted issuer
  * @param {(tokenId: string) => boolean} a.isRevoked  the grant registry's revocation answer
+ * @param {() => boolean} [a.isReady]  whether the registry has loaded; while false the door
+ *   refuses everything, because an unloaded revocation set cannot answer "was this revoked?"
  * @param {(group: string, op: string, args: object) => Promise<*>} a.callSkill
  * @param {(payload: object) => (void|Promise<void>)} a.reply  delivers the result back to the view
  * @returns {(fromAddr: string, payload: object) => Promise<void>} a `makePeerRouter` handler
  *   for the `surface-act-request` subtype
  */
-export function makeSurfaceActHandler({ agentPubKey, issuerPubKey, isRevoked, callSkill, reply } = {}) {
+export function makeSurfaceActHandler({ agentPubKey, issuerPubKey, isRevoked, isReady, callSkill, reply } = {}) {
   if (!agentPubKey || !issuerPubKey) throw new Error('makeSurfaceActHandler: agentPubKey + issuerPubKey required');
   if (typeof callSkill !== 'function' || typeof reply !== 'function') {
     throw new Error('makeSurfaceActHandler: callSkill + reply required');
   }
   const revoked = typeof isRevoked === 'function' ? isRevoked : () => false;
+  const registryReady = typeof isReady === 'function' ? isReady : () => true;
   /** Dispatched request ids (replay refusal). Bounded: pruned when large. */
   const seen = new Map();
   const SEEN_CAP = 2048;
@@ -157,6 +162,9 @@ export function makeSurfaceActHandler({ agentPubKey, issuerPubKey, isRevoked, ca
       || typeof sig !== 'string' || !token || typeof viewPubKey !== 'string') {
       return refuse(requestId ?? 'unknown', 'bad-shape');
     }
+    // Before any token check: if the durable registry has not loaded, this door cannot say
+    // whether the token was revoked, and an unanswerable revocation question is a NO.
+    if (!registryReady()) return refuse(requestId, 'not-ready');
     // Token: signature + expiry + this-agent binding, then issuer trust, revocation, subject.
     if (!CapabilityToken.verify(token, agentPubKey)) return refuse(requestId, 'bad-token');
     if (token.issuer !== issuerPubKey)               return refuse(requestId, 'untrusted-issuer');

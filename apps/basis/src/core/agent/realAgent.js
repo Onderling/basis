@@ -1363,7 +1363,15 @@ export async function createRealHouseholdAgent(opts = {}) {
     agentId: chatId.pubKey,
     // A read-grant change (grant with sections / re-grant / revoke) reconciles the view lanes.
     onReadGrantChange: () => { viewLanesSync?.(); },
+    // DURABLE: the registry rides the same device-scoped settings store the params use. Without
+    // it, revocation would live only in this process — and since a surface token is signed by
+    // this device's stable identity, it keeps verifying forever, so the next boot would silently
+    // re-admit every view the owner ever unpaired. The door stays CLOSED until this has loaded.
+    store: opts.settingsDataSource ?? null,
+    uri: 'mem://basis/settings/surfaces.json',
   });
+  // Kick the load; the door refuses until it lands (`isReady`), so a boot cannot race it.
+  const surfaceGrantsReady = surfaceGrants.hydrate().catch(() => false);
 
   hostAgent.register('grantSurface', async ({ parts }) => {
     const d = parts?.[0]?.data ?? {};
@@ -3819,9 +3827,12 @@ export async function createRealHouseholdAgent(opts = {}) {
       agentPubKey:  chatId.pubKey,
       issuerPubKey: chatId.pubKey,
       isRevoked:    (id) => surfaceGrants.isRevoked(id),
+      isReady:      () => surfaceGrants.isReady(),
       callSkill:    (group, op, args) => callSkill(group, op, args),
       reply,
     }),
+    /** Resolves once the durable surface registry has loaded (the door refuses until then). */
+    surfaceGrantsReady: () => surfaceGrantsReady,
     llmProviders,
     // host-injected claim router; called after every successful
     // claimTask.  Hosts wire `makeAfterClaimHook` here once the agent +

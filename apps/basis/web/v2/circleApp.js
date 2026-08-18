@@ -132,6 +132,8 @@ import { renderContactsRoster } from './contactsRoster.js';
 import { renderCircleProfile } from './circleProfile.js';
 import { renderCircleAdminPanel } from './circleAdminPanel.js';
 import { renderCircleMyData } from './circleMyData.js';
+import { connectionRows, connectionOpChoices, connectionSectionChoices, compileConnectionGrant } from '../../src/v2/connections.js';
+import { parsePairingOffer } from '../../src/v2/connectionPairing.js';
 import {
   createDeliverySettingsStore, localStorageDeliveryIo, withDelivery, makeReceiptSender, makeReceiptReceiver,
 } from '../../src/v2/deliverySettings.js';
@@ -1181,6 +1183,29 @@ const applyIncomingReceipt = makeReceiptReceiver({
 let rootEl = null;
 let tabBarEl = null;
 let circlesCache = [];
+// CONNECTIONS — the last `listSurfaceGrants` read, kept so the Mij list paints without awaiting.
+// A cache, never an authority: the grants live in the agent's durable registry and the door reads
+// THAT, so a stale cache can only ever show a stale list, never permit a stale action.
+let connectionsCache = [];
+async function refreshConnections() {
+  try {
+    const r = await circleHouseholdAgent?.callSkill?.('household', 'listSurfaceGrants', {});
+    connectionsCache = Array.isArray(r?.surfaces) ? r.surfaces : [];
+  } catch { /* leave the previous view rather than blanking the list on a transient */ }
+  return connectionsCache;
+}
+/**
+ * The manifests a connection's DO menu is derived from — the module-scope ones plus the live
+ * agent's own. Same principle as the circle bot's catalog: the menu IS the manifest, so nothing is
+ * declared twice. (The bot composes its list inside `buildCircleBot`; this is the render-time
+ * equivalent, and the shared projection withholds the escalation ops from whatever it is given.)
+ */
+const connectionManifestSources = () => [
+  paramsManifest, householdManifest, mockTasksManifest, calendarManifest, agentsManifest,
+  circleHouseholdAgent?.manifest,
+].filter(Boolean);
+/** The circles a connection can be granted sight of — the same list the rest of the shell renders. */
+const circleListForConnections = () => circlesCache.filter(Boolean).map((c) => ({ id: c.id, name: c.name ?? c.label ?? c.id }));
 let sources = {};
 let resolveCallSkill = null; // (opId, args) => Promise<object|null>
 // Capture the boot URL params ONCE at module load — the Solid-OIDC redirect handler
@@ -3954,6 +3979,30 @@ async function showMyData() {
     });
   };
   const rerender = () => renderCircleMyData(rootEl, { dataLocation, podStatus, privacy, metrics, t, onBack: showMij, onSignIn, onBackup, onViewMnemonic, onRestore, onEnroll, devices, onRevokeDevice, notifications, onToggleNotifications,
+    // CONNECTIONS — screens that are yours, somewhere else. The rows and the pick menus come from
+    // the shared projections (the menu IS the manifest); the shell only paints and dispatches, and
+    // every write goes through the waist.
+    connections: connectionRows({ surfaces: connectionsCache, circles: circleListForConnections() }),
+    onUnpairConnection: async (viewPubKey) => {
+      try { await circleHouseholdAgent.callSkill('household', 'revokeSurface', { viewPubKey }); } catch { /* the list re-reads */ }
+      await refreshConnections();
+      rerender();
+    },
+    connectionChoices: {
+      // The SAME manifests the circle bot composes — one source, so the pick menu and the
+      // dispatch catalog can never disagree about what an op is.
+      ops: connectionOpChoices({ manifests: connectionManifestSources() }),
+      sections: connectionSectionChoices({ circles: circleListForConnections() }),
+    },
+    parseConnectionOffer: parsePairingOffer,
+    onPairConnection: async ({ viewPubKey, nonce, label, ops, sections }) => {
+      const args = compileConnectionGrant({ viewPubKey, ops, sections, label });
+      if (!args) return;                      // a pick that grants nothing creates nothing
+      try { await circleHouseholdAgent.callSkill('household', 'grantSurface', { ...args, ...(nonce ? { nonce } : {}) }); }
+      catch { /* the list re-reads; a failure leaves no half-connection */ }
+      await refreshConnections();
+      rerender();
+    },
     delivery: deliverySettingsCache,
     onSetDelivery: async (patch) => {
       try { deliverySettingsCache = await deliverySettingsStore.set(patch); } catch { /* keep the old view */ }

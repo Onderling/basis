@@ -4263,6 +4263,46 @@
     "connection_device_section": {
       "text": "device settings",
       "doc": "The non-circle section: your own settings."
+    },
+    "connection_add": {
+      "text": "Connect a device",
+      "doc": "Heading of the pairing form in My data."
+    },
+    "connection_offer_placeholder": {
+      "text": "Paste the pairing code from the other screen",
+      "doc": "Input for the onderling-connect:// code."
+    },
+    "connection_recognised": {
+      "text": "Recognised: {{name}}. Choose below what it may do.",
+      "doc": "Confirmation that the code parsed — choices come after."
+    },
+    "connection_may_see": {
+      "text": "What it may see",
+      "doc": "Heading of the sections list (read access)."
+    },
+    "connection_may_do": {
+      "text": "What it may do",
+      "doc": "Heading of the actions list (write access)."
+    },
+    "connection_confirm": {
+      "text": "Connect",
+      "doc": "Confirms the pairing with the ticked rights."
+    },
+    "connection_offer_not-a-connect-uri": {
+      "text": "That is not a pairing code.",
+      "doc": "Refusal: wrong kind of code pasted."
+    },
+    "connection_offer_unreadable": {
+      "text": "This pairing code is damaged — copy it again.",
+      "doc": "Refusal: unreadable/truncated."
+    },
+    "connection_offer_wrong-version": {
+      "text": "This pairing code is from a newer version. Update this app.",
+      "doc": "Refusal: higher version; never guessed."
+    },
+    "connection_offer_incomplete": {
+      "text": "This pairing code is incomplete.",
+      "doc": "Refusal: key or nonce missing."
     }
   },
   "admin": {

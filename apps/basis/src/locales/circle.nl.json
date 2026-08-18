@@ -4263,6 +4263,46 @@
     "connection_device_section": {
       "text": "apparaatinstellingen",
       "doc": "De niet-kring sectie: je eigen instellingen."
+    },
+    "connection_add": {
+      "text": "Apparaat koppelen",
+      "doc": "Kop van het koppel-formulier in Mij."
+    },
+    "connection_offer_placeholder": {
+      "text": "Plak hier de koppelcode van het andere scherm",
+      "doc": "Invoerveld voor de onderling-connect:// code."
+    },
+    "connection_recognised": {
+      "text": "Herkend: {{name}}. Kies hieronder wat het mag.",
+      "doc": "Bevestiging dat de code klopt — daarna pas de keuzes."
+    },
+    "connection_may_see": {
+      "text": "Wat het mag zien",
+      "doc": "Kop van de sectie-lijst (leesrechten)."
+    },
+    "connection_may_do": {
+      "text": "Wat het mag doen",
+      "doc": "Kop van de handelingen-lijst (schrijfrechten)."
+    },
+    "connection_confirm": {
+      "text": "Koppelen",
+      "doc": "Bevestigt de koppeling met de aangevinkte rechten."
+    },
+    "connection_offer_not-a-connect-uri": {
+      "text": "Dit is geen koppelcode.",
+      "doc": "Refusal: verkeerd soort code geplakt."
+    },
+    "connection_offer_unreadable": {
+      "text": "Deze koppelcode is beschadigd — kopieer hem opnieuw.",
+      "doc": "Refusal: onleesbaar/afgekapt."
+    },
+    "connection_offer_wrong-version": {
+      "text": "Deze koppelcode komt van een nieuwere versie. Werk deze app bij.",
+      "doc": "Refusal: hogere versie; niet raden."
+    },
+    "connection_offer_incomplete": {
+      "text": "Deze koppelcode is onvolledig.",
+      "doc": "Refusal: sleutel of nonce ontbreekt."
     }
   },
   "admin": {

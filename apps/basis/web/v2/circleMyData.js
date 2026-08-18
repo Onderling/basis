@@ -33,6 +33,12 @@ export function renderCircleMyData(container, {
   // SEE, what it may DO). Absent handler ⇒ the section is omitted, like every other section here.
   connections = [],
   onUnpairConnection = null,
+  // Pairing a NEW connection. `connectionChoices` = { ops, sections } already projected by the
+  // shared module (the shell never derives a menu — the menu IS the manifest, projected once).
+  // `onPairConnection(args)` receives the compiled grant args; absent ⇒ no pairing form.
+  connectionChoices = null,
+  onPairConnection = null,
+  parseConnectionOffer = null,   // the shared parser, injected so the shell holds no format knowledge
   notifications,
   onToggleNotifications,
   // The personal history mirror (a sealed copy of the device log on the user's own storage).
@@ -271,6 +277,87 @@ export function renderCircleMyData(container, {
       row.appendChild(b);
       sec.appendChild(row);
     }
+    container.appendChild(sec);
+  }
+
+  // ── pair a new connection ──────────────────────────────────────────────────────────────────
+  // Two steps on purpose. A person pastes what the other screen shows, and only THEN sees what
+  // they are about to hand over — deciding before you can see the choices is not consent.
+  if (typeof onPairConnection === 'function' && connectionChoices && typeof parseConnectionOffer === 'function') {
+    const sec = section(tr('circle.mydata.connection_add'));
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'cc-mydata__connection-offer';
+    input.placeholder = tr('circle.mydata.connection_offer_placeholder');
+    input.style.cssText = 'width:100%;box-sizing:border-box;margin-bottom:.4rem;';
+    sec.appendChild(input);
+
+    const note = document.createElement('div');
+    note.className = 'cc-mydata__connection-note';
+    note.style.cssText = 'font-size:.9em;opacity:.75;min-height:1.2em;';
+    sec.appendChild(note);
+
+    const picker = document.createElement('div');
+    picker.className = 'cc-mydata__connection-picker';
+    picker.hidden = true;
+    sec.appendChild(picker);
+
+    const tickList = (title, items, idOf, labelOf) => {
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'margin:.4rem 0;';
+      const h = document.createElement('div');
+      h.textContent = title;
+      h.style.cssText = 'font-weight:600;margin-bottom:.2rem;';
+      wrap.appendChild(h);
+      for (const it of items) {
+        const line = document.createElement('label');
+        line.style.cssText = 'display:flex;gap:.4rem;align-items:center;padding:.1rem 0;';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = idOf(it);
+        const txt = document.createElement('span');
+        txt.textContent = labelOf(it);
+        line.append(cb, txt);
+        wrap.appendChild(line);
+      }
+      return wrap;
+    };
+
+    const opsBox = tickList(tr('circle.mydata.connection_may_do'), connectionChoices.ops ?? [],
+      (o) => o.id, (o) => o.label || o.id);
+    const secBox = tickList(tr('circle.mydata.connection_may_see'), connectionChoices.sections ?? [],
+      (x) => x.id, (x) => x.label || tr('circle.mydata.connection_device_section'));
+    picker.append(opsBox, secBox);
+
+    const confirm = document.createElement('button');
+    confirm.type = 'button';
+    confirm.className = 'cc-mydata__connection-confirm';
+    confirm.textContent = tr('circle.mydata.connection_confirm');
+    picker.appendChild(confirm);
+
+    let offer = null;
+    input.addEventListener('input', () => {
+      const parsed = parseConnectionOffer(input.value.trim());
+      offer = parsed && parsed.ok ? parsed : null;
+      picker.hidden = !offer;
+      // A refusal names ITS OWN reason rather than a generic "invalid": a mistyped code, a code
+      // from a newer version and a code for something else entirely are different problems.
+      note.textContent = input.value.trim() === ''
+        ? ''
+        : (offer
+          ? tr('circle.mydata.connection_recognised', { name: offer.label || offer.viewPubKey.slice(0, 8) })
+          : tr(`circle.mydata.connection_offer_${(parsed && parsed.reason) || 'unreadable'}`));
+    });
+
+    confirm.addEventListener('click', () => {
+      if (!offer) return;
+      const picked = (box) => [...box.querySelectorAll('input[type=checkbox]')].filter((c) => c.checked).map((c) => c.value);
+      onPairConnection({
+        viewPubKey: offer.viewPubKey, nonce: offer.nonce, label: offer.label,
+        ops: picked(opsBox), sections: picked(secBox),
+      });
+      input.value = ''; note.textContent = ''; picker.hidden = true; offer = null;
+    });
     container.appendChild(sec);
   }
 

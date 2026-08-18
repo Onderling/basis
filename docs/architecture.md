@@ -154,7 +154,14 @@ surface. It is a *substrate*, not a feature of any surface: any part of the app 
 chat, the cross-circle stream and the activity views are projections over it rather than stores of their own.
 Every entry carries a **kind**, an **actor**, and (usually) a `circleId`; the log is the canonical record.
 
-Three properties are worth knowing before you write to it:
+**Writes go through one path — the rail.** Since the convergence work (decision A, 2026-08) an entry is
+not simply appended: it is **signed with the circle-scoped key, chained (parent + causal deps), appended to
+the device log, and handed to the exchange** — one route, per circle, for every kind of content. That is what
+makes the log a *record* rather than a cache: an entry carries who said it, provably, and a receiver folds it
+only after verifying the signature and the key↔member binding. Ordering is derived at the fold from the
+chain, not from arrival or from a wall clock.
+
+Three further properties are worth knowing before you write to it:
 
 - **Append-only, and auditable entries are immutable.** An entry is de-duplicated on the caller's id; for the
   kinds marked auditable, a repeat id is first-write-wins — a delegated agent cannot rewrite a row it already
@@ -230,6 +237,28 @@ two arguments — not a new query path.
 
 *(Being completed: the projector functions and the kind registry are converging on exactly this shape — see
 the private roadmap. The principle above is the design of record.)*
+
+### The personal history mirror — the record, kept and portable
+
+The log is the record, which raises the obvious question: what happens to it when the device is gone. The
+answer is a **sealed follower**. Turned on (it is off by default), the mirror copies the device log outward,
+batch by batch, into storage the person controls — the pod first, though any read/write/delete/list backend
+fits. It adds no second authority: it follows, and restore hydrates those batches back through the *same*
+verify-on-ingest gates a peer's statements pass, so a tampered mirror can corrupt nothing — it can only fail
+to verify.
+
+Three properties make it worth knowing:
+
+- **Sealed by the source, per device lane.** Batches are written under `log/<deviceId>/…` and sealed to the
+  owner's own derived key, identical across their devices and re-derivable from the recovery phrase. Lanes
+  never clobber each other; restore merges them by entry id.
+- **Restore is a ladder, not a wait.** A fresh install hydrates the *recent window first* (last N days, or
+  the newest M per circle — whichever is larger) so conversations open live, and the long tail lands in the
+  background. Folds are deterministic, so arrival order cannot change any outcome.
+- **Export is the same mechanism pointed at a file** — one sealed archive, opened again by the same hydrate
+  door, and tested by actually re-opening it rather than by checking the file exists.
+
+The same sealed lanes are what lets a **connection** (below) read while the acting device sleeps.
 
 ### Retrieval (RAG) — grounding the circle bot
 
@@ -371,10 +400,25 @@ is what makes "one algebra" affordable: **unify the store and the transport, nev
 dependencies — the row is the materialised head, the transitions are the history. Same shape as the event
 log in Part 2: durable records, derived views.
 
-**Store → the wire.** A store is bridged to the circle's peer mirror by `wireStoreMirror`
-(publish-on-write) and `wireCircleStoreInbound` (ingest, `causalMerge` by origin-timestamp + writer-id,
-`sync:false` on inbound to stop echo). **This is the only fan-out path there should be.** A type that
-reaches a peer some other way is a second implementation of sync, and will drift from this one.
+**Store → the wire — READ THIS TWICE, it changed.** The sentence that used to stand here ("a store is
+bridged to the circle's peer mirror by `wireStoreMirror`… this is the only fan-out path") described the
+pre-convergence world and is no longer how production carries anything.
+
+What is true now: **the device log is the record, and the rail is the carry.** Every store type publishes as
+a **signed lane statement** on the rail; a receiver verifies it and folds it into its own log, and the store
+row is the materialised head of that fold. The routing is decided **per composition, not per type** — when a
+device log is composed (which is every production shell) everything goes as a signed statement and the legacy
+mirror is never touched; only a legacy or test composition without a device log still carries over the mirror
+itself.
+
+The mirror machinery has not vanished, and knowing why avoids a wrong conclusion when you read the code:
+`wireStoreMirror` is still *wired*, but for production what flows through it is the rail's own publish valve
+(`routeTaskMirror` is deliberately mirror-SHAPED so the wrapper is unchanged). So the mirror is the plumbing
+*shape*, not the path. Its full dissolution needs a device log in every composition, and is parked as hygiene
+rather than pretended done.
+
+**The rule survives the change, and is what matters:** there is ONE fan-out path per circle. A type that
+reaches a peer some other way is a second implementation of sync and will drift from this one.
 
 **Two axes, declared.** How an item *reaches* peers and how concurrent writes *reconcile* are separate, declared
 choices — **delivery** and **resolution**. Delivery is the live fan-out above plus the companions for what it
@@ -386,16 +430,21 @@ concern (§4 · Consistency & governance).
 #### Where the runtime does NOT match this yet
 
 Written down on 2026-08-03 because all four were live, and because prose that flatters the code is worse than
-no prose. **Reconciled 2026-08 (wave 2): two of the four are since resolved — verified against the code, not
-claimed.** The durable fix for this section is to make each row a guard (fail-until-built) rather than prose
-that drifts; until then it is maintained by hand.
+no prose. **Reconciled twice since — wave 2 (2026-08-11) and the convergence re-root (2026-08-14): all four
+are now resolved, verified against the code rather than claimed.** The durable fix for this section is to make
+each row a guard (fail-until-built) rather than prose that drifts; until then it is maintained by hand, and
+the honest tail is named below the table rather than dropped.
 
 | | state |
 |---|---|
-| Chat messages live in **both** an `EventLog` and as a `chat-message` item type | OPEN — duplication to resolve; decide which is the record (the one-log convergence, `PLAN-one-log-convergence.md`) |
-| `addTask` exists on the `tasks` app-origin **and** in `HOUSEHOLD_WIRED_OPS` over the circle store | PARTLY resolved — the lightweight `{text, completedAt}` model was folded onto the rich shape (2026-08, `555bdbd5`); the two-routes tail may remain |
+| Chat messages live in **both** an `EventLog` and as a `chat-message` item type | ✅ RESOLVED (the content re-root) — the log entry IS the render event: one signed entry serves both roles, what you see and the proof of who said it. The duplication is gone, and the log is the record |
+| `addTask` exists on the `tasks` app-origin **and** in `HOUSEHOLD_WIRED_OPS` over the circle store | ✅ RESOLVED — the lightweight `{text, completedAt}` model folded onto the rich shape (`555bdbd5`), and the lane set then closed over every store type, so the route is decided per COMPOSITION rather than per type |
 | Tasks are correctly per-circle, and their store is **not** on the fan-out path | ✅ RESOLVED (wave 2) — the one-store collapse put the tasks store on the `ensureCircleSync` fan-out; a task now crosses A→B, proven + guarded by `appTaskFanTwoDevice` (one store per circle + per-type sync arrival) |
 | `household` names circle-level machinery throughout (`addHouseholdPeer`, `getHouseholdScope`) | ✅ RESOLVED (wave 2) — the circle-infra was renamed (`addCirclePeer`, `getCircleScope`, `ensureCircleSync`, …); the remaining `household` is a legitimate template/app name, not circle machinery |
+
+**The honest tail, so the table is not read as "finished":** the mirror OBJECT and the peer-roster machinery
+still serve compositions that have no device log (test fixtures, the manual-pairing skills). Full dissolution
+needs a device log everywhere; it is parked as hygiene, not claimed done.
 
 **The rule these violations share:** each is a place where the code can no longer tell "did not happen"
 from "happened fine". That is the failure mode this architecture is most exposed to — everything here is
@@ -882,6 +931,23 @@ param with no UX home.
 over shared projections — the same rows, the same locale source (every user-facing string through
 `t()`, Dutch and English), the same manifest. A capability that exists on one shell and not the other
 is a finding, not an idiom.
+
+
+**Connections — a screen that is yours, somewhere else.** A paired view (a browser tab, a client on a machine
+you host) is not a device and not a member: it holds no ceremony, no roster row, and signs no circle
+statements. It holds a **standing grant** — one signed capability token per operation its owner ticked — and
+it works on two separate rails that are deliberately not one:
+
+- **Acting** travels as a signed envelope carrying `{opId, args}` plus the presented token, verified at the
+  acting agent's door and dispatched through the ordinary waist. There is no second dispatch path. The
+  view's code is untrusted by construction: it may send anything, and nothing outside its picks verifies.
+- **Reading** does not travel at all — the view hydrates a **filtered lane of the sealed history mirror**,
+  sealed to its key, containing only the sections the owner granted. What crosses the network is a
+  **contentless nudge** carrying a lane id and nothing else.
+
+The gate is where it binds: revoking a connection is the owner's act on their own device, the registry is
+durable, and the door refuses while that registry is still loading rather than guessing. What the view
+already read, it read — the honest semantics of stopping a subscription, not of erasing the past.
 
 ### The Connectivity home
 

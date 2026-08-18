@@ -744,6 +744,70 @@ export async function createSecureAgent(opts = {}) {
   // sent must never vanish quietly.
   const pendingHold = new Map();
   let   holdSeq     = 0;
+  // ── DURABILITY (2026-08-18, Frits) ─────────────────────────────────────────────────────────────
+  // The queue above is process memory, so until now a restart silently dropped every message the
+  // app had already told the user was on its way — the one failure mode a hold queue exists to
+  // prevent. With a `holdStore` (any `{read,write}` DataSource) the queue is written after every
+  // mutation and restored at boot, so "held" survives the thing most likely to happen to a phone.
+  // Without one the behaviour is exactly as before: memory-only, for tests and callers that do not
+  // want a disk. Deliberately NOT a timer — persistence rides the existing event-driven mutations.
+  const holdStore   = (opts.holdStore && typeof opts.holdStore.write === 'function') ? opts.holdStore : null;
+  const holdStoreUri = typeof opts.holdStoreUri === 'string' ? opts.holdStoreUri : 'mem://secure-agent/outbox.json';
+  let   holdPersist = Promise.resolve();
+  let   outboxRestored = Promise.resolve(0);
+
+  /** Serialise the queue. `opts` is JSON round-tripped, so anything unserialisable (a callback) is
+   *  dropped rather than throwing — a resend must not depend on a closure the restart cannot restore. */
+  function persistHolds() {
+    if (!holdStore) return holdPersist;
+    let snapshot;
+    try {
+      snapshot = JSON.stringify({
+        v: 1,
+        peers: [...pendingHold].map(([addr, q]) => [addr, [...q].map(([k, e]) => [k, {
+          payload: e.payload, opts: e.opts ?? null, ts: e.ts ?? Date.now(),
+        }])]),
+      });
+    } catch { return holdPersist; }          // a queue we cannot serialise stays in memory
+    holdPersist = holdPersist.then(async () => {
+      try { await holdStore.write(holdStoreUri, snapshot); }
+      catch (err) { if (typeof console !== 'undefined') console.warn('[secure-agent] outbox persist failed', err?.message ?? err); }
+    });
+    return holdPersist;
+  }
+
+  /** Load the queue written by a previous run. Entries past the TTL are dropped on the way in and
+   *  REPORTED, exactly as the live sweep does — a restart must not resurrect what had already expired. */
+  async function restoreHolds() {
+    if (!holdStore || typeof holdStore.read !== 'function') return 0;
+    let parsed = null;
+    try {
+      const raw = await holdStore.read(holdStoreUri);
+      parsed = raw ? JSON.parse(typeof raw === 'string' ? raw : raw?.content ?? 'null') : null;
+    } catch (err) {
+      if (typeof console !== 'undefined') console.warn('[secure-agent] outbox unreadable — starting empty', err?.message ?? err);
+      return 0;
+    }
+    if (!parsed || parsed.v !== 1 || !Array.isArray(parsed.peers)) return 0;
+    let restored = 0;
+    const now = Date.now();
+    for (const [addr, entries] of parsed.peers) {
+      if (typeof addr !== 'string' || !Array.isArray(entries)) continue;
+      const q = pendingHold.get(addr) ?? new Map();
+      for (const [key, e] of entries) {
+        if (!e || typeof key !== 'string') continue;
+        if (holdTtlMs > 0 && now - (e.ts ?? now) >= holdTtlMs) { dropHeld(addr, e, 'expired'); continue; }
+        if (q.has(key)) continue;            // a live enqueue during boot wins over the stored copy
+        q.set(key, { payload: e.payload, opts: e.opts ?? {}, ts: e.ts ?? now });
+        restored += 1;
+      }
+      if (q.size) pendingHold.set(addr, q);
+    }
+    if (restored && typeof console !== 'undefined') {
+      console.info(`[secure-agent] outbox restored ${restored} held message(s) across ${pendingHold.size} peer(s)`);
+    }
+    return restored;
+  }
   /** How long a held message may wait for its peer. `0`/negative disables the TTL. */
   const holdTtlMs = Number.isFinite(opts.holdTtlMs) ? opts.holdTtlMs : 24 * 60 * 60 * 1000;
   /** Most messages held for ONE peer; the oldest is dropped past this. */
@@ -869,6 +933,7 @@ export async function createSecureAgent(opts = {}) {
     if (typeof console !== 'undefined') {
       console.info(`[secure-agent] peer ${String(addr).slice(0, 16)}… unreachable — holding message (${q.size} queued)`);
     }
+    persistHolds();     // durable: a restart must not lose what the caller was told is held
     return { held: true, delivered: false, deduped: false, msgId, pending: q.size, reason };
   }
 
@@ -961,8 +1026,14 @@ export async function createSecureAgent(opts = {}) {
     if (flushed && typeof console !== 'undefined') {
       console.info(`[secure-agent] presence-flush delivered ${flushed} held message(s) to ${String(addr).slice(0, 16)}…`);
     }
+    persistHolds();     // what got through is now GONE from the durable copy, not just from memory
     return { flushed };
   }
+
+  // Read back the previous run's queue. Kicked here rather than at declaration so every constant it
+  // reads (the TTL, the drop reporter) is initialised; nothing sends before boot completes anyway,
+  // and `outboxRestored()` is the await for a caller that wants to be certain.
+  outboxRestored = restoreHolds().catch(() => 0);
 
   /** Is there a live route to `addr` right now? (route() returns null when no
    *  connected transport reports it can reach the peer.) */
@@ -2211,6 +2282,11 @@ export async function createSecureAgent(opts = {}) {
     // (0 when none) for diagnostics + tests.
     presenceSignal: (addr) => flushPresence(addr),
     heldFor: (addr) => pendingHold.get(addr)?.size ?? 0,
+    /** Resolves once a persisted outbox has been read back (no-op without a `holdStore`). Callers
+     *  that must not send before the previous run's queue is known await this at boot. */
+    outboxRestored: () => outboxRestored,
+    /** Flush any pending durable write — for a caller that wants the queue on disk before exiting. */
+    outboxFlushed: () => holdPersist,
     /**
      * What the (bounded) hold queue currently holds, and the bounds it is held to. Diagnostics + tests:
      * an unbounded queue was invisible until a device got slow, and this is what makes it visible.

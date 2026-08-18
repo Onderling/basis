@@ -27,6 +27,15 @@ import {
 // "Never share my global address" (J-CS8) — the strictest privacy position in the product: one address
 // across everything is what links a person's circles together.
 import { SHARE_NKN_ADDRESS_PARAM_KEY } from '../../../../basis/src/v2/addressSharing.js';
+// CONNECTIONS — the same shared projections the web shell paints from, so the two shells cannot
+// drift on what a connection may see or do (invariant 2: web ≡ mobile by construction).
+import {
+  connectionRows, connectionOpChoices, connectionSectionChoices, compileConnectionGrant,
+} from '../../../../basis/src/v2/connections.js';
+import { parsePairingOffer } from '../../../../basis/src/v2/connectionPairing.js';
+import { _internalManifestList } from '../../core/composeManifests.js';
+import { loadCircles } from '../../../../basis/src/v2/circleModel.js';
+import { circleSourcesFromAgent } from '../../../../basis/src/v2/circleSources.js';
 import UserLlmSettings from './UserLlmSettings.js';
 import EncryptedBackupWizardModal from '../../../../basis/src/rn/wizards/encryptedBackupWizardModal.js';
 import RestoreFromMnemonicWizardModal from '../../../../basis/src/rn/wizards/restoreFromMnemonicWizardModal.js';
@@ -69,6 +78,15 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
   const [metrics, setMetrics] = useState({});
   const [wizard, setWizard] = useState(null);          // 'backup' | 'restore' | 'enroll' | null
   const [devices, setDevices] = useState([]);          // enrolled-device rows (registry delegations)
+  const [connections, setConnections] = useState([]);  // paired views ("gekoppelde apparaten")
+  const [offerText, setOfferText] = useState('');      // the pasted onderling-connect:// code
+  const [pickedOps, setPickedOps] = useState([]);      // what the new connection may DO
+  const [pickedSections, setPickedSections] = useState([]); // what it may SEE
+  const [circlesForConnections, setCirclesForConnections] = useState([]);
+  // The DO menu's source: the SAME composed manifest list the nav model and dispatch read, so the
+  // pick list and the catalog cannot disagree about what an op is. The shared projection withholds
+  // the escalation ops from whatever it is handed.
+  const manifestsForConnections = useMemo(() => _internalManifestList.map((m) => m?.manifest ?? m).filter(Boolean), []);
   const [revokeTarget, setRevokeTarget] = useState(null);   // deviceId under the revoke ceremony
   const [mnemonic, setMnemonic] = useState(null);      // { words } | null when closed
   const [push, setPush] = useState({ supported: false, granted: false });   // S6.6 native push
@@ -181,6 +199,19 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
     // The enrolled-devices list (add-a-device bookkeeping) — one row per registry delegation.
     setDevices(Object.values(deviceDelegationsOf({ properties: profProps?.properties ?? {} }))
       .map((d) => ({ deviceId: d.deviceId, label: d.label ?? null, revoked: d.revoked === true })));
+    // The paired views. A read, never an authority: the grants live in the agent's durable
+    // registry and the acting door reads THAT, so a stale list can only look stale.
+    const conns = await callSkill('household', 'listSurfaceGrants', {}).catch(() => null);
+    setConnections(Array.isArray(conns?.surfaces) ? conns.surfaces : []);
+    // The circles a connection can be granted sight of — through the SAME loader the launcher
+    // uses, not a hand-rolled skill call. (`stoop.listGroups` looks like the op for this and is
+    // not one: the only listGroups is a core GroupManager method, so calling it would have left
+    // this list silently empty forever — the exact `screens/**` trap the gotchas file names.)
+    try {
+      const cs = await loadCircles(circleSourcesFromAgent({ callSkill }));
+      setCirclesForConnections((Array.isArray(cs) ? cs : [])
+        .map((c) => ({ id: c.id, name: c.name ?? c.label ?? c.id })).filter((c) => c.id));
+    } catch { /* leave the previous list rather than blanking it on a transient */ }
   }, [callSkill]);
 
   useEffect(() => { load(); }, [load]);
@@ -354,6 +385,98 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
           ))}
         </Section>
       )}
+
+      {/* CONNECTIONS — screens that are yours, somewhere else. Beside the devices list because it
+          answers the same question ("what else of mine is out there"); the two differ in what they
+          can DO — a device holds your keys, a connection holds only the ticks you gave it. */}
+      {connections.length > 0 && (
+        <Section title={t('circle.mydata.connections')}>
+          {connectionRows({ surfaces: connections }).map((c) => (
+            <View key={c.viewPubKey} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingVertical: 6 }}>
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                <Text style={styles.privacyBody}>{c.label || c.short}</Text>
+                <Text style={styles.privacyBody}>
+                  {c.sees
+                    ? t('circle.mydata.connection_sees', { what: [...c.sees.circles, ...(c.sees.device ? [t('circle.mydata.connection_device_section')] : [])].join(', ') })
+                    /* NOT "0 onderdelen": a connection that cannot read is a real shape. */
+                    : t('circle.mydata.connection_acts_only')}
+                </Text>
+                <Text style={styles.privacyBody}>{t('circle.mydata.connection_does', { count: c.opCount })}</Text>
+              </View>
+              <Pressable
+                testID={`mydata-unpair-${c.viewPubKey.slice(0, 8)}`}
+                onPress={async () => {
+                  try { await callSkill('household', 'revokeSurface', { viewPubKey: c.viewPubKey }); } catch { /* the list re-reads */ }
+                  load();
+                }}
+              >
+                <Text style={styles.actionMutedLabel}>{t('circle.mydata.connection_unpair')}</Text>
+              </Pressable>
+            </View>
+          ))}
+        </Section>
+      )}
+
+      {/* Pair a new one. Two steps, as on web: paste what the other screen shows, and only THEN
+          see what you are about to hand over — deciding before you can see the choices is not
+          consent. Refusals name their own reason; a newer version is told to update, never guessed. */}
+      <Section title={t('circle.mydata.connection_add')}>
+        <TextInput
+          testID="mydata-connection-offer"
+          value={offerText}
+          onChangeText={setOfferText}
+          autoCapitalize="none"
+          autoCorrect={false}
+          placeholder={t('circle.mydata.connection_offer_placeholder')}
+          placeholderTextColor={theme.muted}
+          style={styles.relayInput}
+        />
+        {offerText.trim() !== '' && (() => {
+          const parsed = parsePairingOffer(offerText.trim());
+          if (!parsed.ok) {
+            return <Text style={styles.privacyBody}>{t(`circle.mydata.connection_offer_${parsed.reason}`)}</Text>;
+          }
+          const opChoices = connectionOpChoices({ manifests: manifestsForConnections });
+          const sectionChoices = connectionSectionChoices({ circles: circlesForConnections });
+          const toggle = (list, setList, id) => setList(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
+          return (
+            <View>
+              <Text style={styles.privacyBody}>
+                {t('circle.mydata.connection_recognised', { name: parsed.label || parsed.viewPubKey.slice(0, 8) })}
+              </Text>
+              <Text style={[styles.privacyBody, { fontWeight: '600', marginTop: 6 }]}>{t('circle.mydata.connection_may_do')}</Text>
+              {opChoices.map((o) => (
+                <Pressable key={o.id} testID={`mydata-op-${o.id}`} onPress={() => toggle(pickedOps, setPickedOps, o.id)}>
+                  <Text style={styles.privacyBody}>{(pickedOps.includes(o.id) ? '☑ ' : '☐ ') + (o.label || o.id)}</Text>
+                </Pressable>
+              ))}
+              <Text style={[styles.privacyBody, { fontWeight: '600', marginTop: 6 }]}>{t('circle.mydata.connection_may_see')}</Text>
+              {sectionChoices.map((sc) => (
+                <Pressable key={sc.id} testID={`mydata-section-${sc.id}`} onPress={() => toggle(pickedSections, setPickedSections, sc.id)}>
+                  <Text style={styles.privacyBody}>
+                    {(pickedSections.includes(sc.id) ? '☑ ' : '☐ ') + (sc.label || t('circle.mydata.connection_device_section'))}
+                  </Text>
+                </Pressable>
+              ))}
+              <Pressable
+                testID="mydata-connection-confirm"
+                onPress={async () => {
+                  const args = compileConnectionGrant({
+                    viewPubKey: parsed.viewPubKey, ops: pickedOps, sections: pickedSections, label: parsed.label,
+                  });
+                  if (!args) return;                 // a pick that grants nothing creates nothing
+                  try { await callSkill('household', 'grantSurface', { ...args, ...(parsed.nonce ? { nonce: parsed.nonce } : {}) }); }
+                  catch { /* the list re-reads; a failure leaves no half-connection */ }
+                  setOfferText(''); setPickedOps([]); setPickedSections([]);
+                  load();
+                }}
+              >
+                <Text style={styles.actionLabel}>{t('circle.mydata.connection_confirm')}</Text>
+              </Pressable>
+            </View>
+          );
+        })()}
+      </Section>
 
       {/* J-CS8 — the global-address publication lock, with its cost stated alongside (web parity). */}
       {shareNknAddress != null ? (

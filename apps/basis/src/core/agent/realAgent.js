@@ -1402,18 +1402,33 @@ export async function createRealHouseholdAgent(opts = {}) {
       // offer. Best-effort and non-fatal: the grant EXISTS either way (it is in the registry and
       // the door will honour it), so a delivery failure must not read as "pairing failed" when
       // what actually happened is "the tokens have not arrived yet".
-      let delivered = null;
+      // The delivery STATE, not a boolean. `sendTo` with hold-forward does NOT throw for an
+      // unreachable peer — it HOLDS and answers `{held:true}` — so treating "did not throw" as
+      // "delivered" reports success for a message the view has never seen. A probe caught exactly
+      // that: the owner said delivered:true while the view received nothing. This reads the send's
+      // own answer instead, and uses the delivery vocabulary the app already has rather than
+      // inventing a second one (`deliveryState.js`: `sent` is the weakest claim there is).
+      let delivery = null;
       if (typeof d.nonce === 'string' && d.nonce) {
         try {
-          await (opts.deliverConnectionGrant
+          const res = await (opts.deliverConnectionGrant
             ?? ((to, payload) => sa.peer.sendTo(to, payload, { guarantee: 'hold-forward' })))(
             viewPubKey,
             { subtype: CONNECTION_GRANT_SUBTYPE, nonce: d.nonce, tokens: r.tokens, label: r.label },
           );
-          delivered = true;
-        } catch { delivered = false; }
+          // An injected channel (tests, a shell) that answers nothing has still HANDED IT OVER —
+          // which is `sent`, the honest weakest claim, never `delivered`.
+          delivery = res?.held === true ? 'held'
+            : res?.delivered === true ? 'sent'
+              : res === undefined ? 'sent' : (res?.reason ?? 'sent');
+        } catch { delivery = 'failed'; }
       }
-      return [DataPart({ ok: true, ...r, laneActive, ...(delivered === null ? {} : { delivered }) })];
+      // `delivered` is kept as a convenience for the shells, and it is TRUE only for the state that
+      // means the view can actually have it — a held grant is not a delivered one.
+      return [DataPart({
+        ok: true, ...r, laneActive,
+        ...(delivery === null ? {} : { delivery, delivered: delivery === 'sent' }),
+      })];
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'grant-failed' })]; }
   }, { visibility: 'trusted' });   // hands out standing acting authority: owner-only
 

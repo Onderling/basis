@@ -1,5 +1,5 @@
 {
-  "name": "canopy-monorepo",
+  "name": "basis-monorepo",
   "version": "0.1.0",
   "private": true,
   "description": "@onderling/* packages + mesh-demo example app",

@@ -1171,3 +1171,42 @@ into proposals, a behavior change no one chose.
 **Reverse it by:** re-adding the boolean and its gate reads (the mechanical revert), or flipping
 the default back — but flip it as a conscious migration, because by then circles will have chosen
 classes through the picker.
+
+---
+
+## 2026-08-18 — Per-circle addressing: what is now BUILT (amends the 2026-07-27 entry)
+
+**Status:** settled; the mechanism is built. Amends "What per-circle addressing actually promises"
+(2026-07-27), whose status line — *"design of record; not built"* — is now out of date and was
+understating the system when read fresh.
+
+**What changed.** That entry said the per-circle addresses were "derived, proven at join and stored
+on the roster — but **never used for routing**". Since then the routing half landed:
+
+- `Transport.addAddress` + replay-on-reconnect (the alias mechanism), and its production caller,
+  which registers this device's per-circle addresses on a relay socket.
+- A member's per-circle address is **bound to their identity key** on the roster read, so a peer can
+  seal to it; without that binding, routing to a per-circle address fails at the transport.
+- Circle traffic is **signed with the per-circle identity**, and the receive side actively refuses
+  canonically-signed sends into a circle — a member's own global key is not accepted as a circle
+  author. Unlinkability is enforced by refusing to hear the linkable thing, not merely by not
+  sending it.
+
+**The relay-diversity rule (2026-07-28) is part of the promise, not an optimisation.** A per-circle
+address is registered **only on relays that circle actually rides**. The G13 concession — "the relay
+you chose can correlate your circles" — is therefore **per relay**: someone whose circles ride
+different relays is unlinkable to each of them, because no single relay ever sees two of their
+addresses. Registering every address on every relay would hand each relay a linkage it could not
+otherwise observe, and would silently convert a per-relay concession into a global one.
+
+**The promise is unchanged** — *your circles are unlinkable to everyone except the one relay you
+chose, and you can choose yourself* — but it is now a description of behaviour rather than of intent.
+
+**The two honest leaks that remain, unchanged and still open:**
+1. **One push token per device.** The wake path maps address → token, so registering N addresses
+   writes N rows carrying the same token. Parked mitigations (per-circle push opt-out; polling
+   instead of push) trade wake for unlinkability and fit the existing per-circle policy pattern.
+2. **Addressed traffic uses the GLOBAL identity.** DM, RPC and presence are signed by the global
+   chat key by design, so a direct message is the one act that is not per-circle-scoped. Anyone
+   relying on per-circle unlinkability should know that messaging someone directly steps outside
+   it. (Noticed 2026-08-18 while answering how a DM from a circle relates to a direct contact.)

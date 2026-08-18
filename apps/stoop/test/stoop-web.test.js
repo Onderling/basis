@@ -241,27 +241,6 @@ describe('stoop-web smoke (Slice E.1 + E.2 + E.3 + E.4)', () => {
     expect(cfg.app).toBe('stoop');
   });
 
-  it('serves /mine.html with the data-navmodel-section marker', async () => {
-    const res = await fetch(`${baseUrl}/mine.html`);
-    expect(res.status).toBe(200);
-    expect(res.headers.get('content-type')).toMatch(/text\/html/);
-    const html = await res.text();
-    expect(html.length).toBeGreaterThan(0);
-    // The marker that proves the migrated page picks up the section.
-    expect(html).toContain('data-navmodel-section="mine"');
-    // The migrated page still fetches /navmodel.json (the consumption
-    // hook).
-    expect(html).toContain("fetch('/navmodel.json')");
-    // adopt (2026-05-21) — the page now drives its data-fetch
-    // via the shared `fetchSectionItems` helper (which honours the
-    // manifest's `section.dataSource: {skillId: 'listMyRequests'}`
-    // declaration), removing the prior hard-coded skill call.
-    expect(html).toContain('fetchSectionItems');
-    // Per-row buttons come from `section.itemActions[]` gated by
-    // `itemMatchesAppliesTo` (with a local wildcard work-around).
-    expect(html).toContain('itemMatchesAppliesTo');
-  });
-
   it('serves /lib/web-adapter/fetchSectionItems.js (V0.2 helper overlay)', async () => {
     // The helpers are overlaid by `bin/stoop-web.js`'s
     // `extraStaticFiles` so `mine.html` can `import` them at runtime
@@ -279,38 +258,11 @@ describe('stoop-web smoke (Slice E.1 + E.2 + E.3 + E.4)', () => {
     expect(js).toContain('export function itemMatchesAppliesTo');
   });
 
-  it('serves /index.html (legacy hand-built page still works)', async () => {
-    // only migrates mine.html — the other 15 pages stay
-    // hand-built and serve fine.  Pinning this regression-catches a
-    // misconfigured staticDir that broke the non-migrated pages.
-    const res = await fetch(`${baseUrl}/`);
-    expect(res.status).toBe(200);
-    const html = await res.text();
-    expect(html).toContain('Stoop');
-  });
-
   it('exposes the agent card at /.well-known/agent.json', async () => {
     const res = await fetch(`${baseUrl}/.well-known/agent.json`);
     expect(res.status).toBe(200);
     const card = await res.json();
     expect(card).toHaveProperty('skills');
-  });
-
-  it('serves /privacy.html with the data-navmodel-section marker (E.2)', async () => {
-    const res = await fetch(`${baseUrl}/privacy.html`);
-    expect(res.status).toBe(200);
-    expect(res.headers.get('content-type')).toMatch(/text\/html/);
-    const html = await res.text();
-    expect(html.length).toBeGreaterThan(0);
-    // The marker that proves the migrated page picks up the section.
-    expect(html).toContain('data-navmodel-section="privacy"');
-    // The migrated page fetches /navmodel.json (the consumption hook).
-    expect(html).toContain("fetch('/navmodel.json')");
-    // the page drives its data-location fetch via the shared
-    // `fetchSectionItems` helper (which honours the manifest's
-    // `section.dataSource: {skillId: 'getDataLocation'}`
-    // declaration), removing the prior hard-coded skill call.
-    expect(html).toContain('fetchSectionItems');
   });
 
   it('privacy data-fetches round-trip (getPrivacyNotice + getDataLocation)', async () => {
@@ -334,24 +286,6 @@ describe('stoop-web smoke (Slice E.1 + E.2 + E.3 + E.4)', () => {
     // skill responds with an object.
     expect(typeof loc).toBe('object');
     expect(loc).not.toBeNull();
-  });
-
-  it('serves /settings.html with the data-navmodel-section marker (E.3)', async () => {
-    const res = await fetch(`${baseUrl}/settings.html`);
-    expect(res.status).toBe(200);
-    expect(res.headers.get('content-type')).toMatch(/text\/html/);
-    const html = await res.text();
-    expect(html.length).toBeGreaterThan(0);
-    // The marker that proves the migrated page picks up the section.
-    expect(html).toContain('data-navmodel-section="settings"');
-    // The migrated page fetches /navmodel.json (the consumption hook).
-    expect(html).toContain("fetch('/navmodel.json')");
-    // the page drives its read fetch via the shared
-    // `fetchSectionItems` helper (which honours the manifest's
-    // `section.dataSource: {skillId: 'getSettings'}` declaration),
-    // removing the prior hard-coded `callSkill('getSettings', {})`
-    // call.
-    expect(html).toContain('fetchSectionItems');
   });
 
   it('settings data-fetches round-trip (getSettings + updateSettings)', async () => {

@@ -117,14 +117,6 @@ describe('multi-group launcher (mountLocalUi extraStaticFiles)', () => {
       expect(parsed).toEqual(groupIndex);
     }
 
-    // Sanity: each instance also still serves the static index.html.
-    for (const ui of uis.values()) {
-      const res = await fetch(`${ui.url}/`);
-      expect(res.status).toBe(200);
-      const html = await res.text();
-      expect(html).toContain('group-switcher');
-    }
-
     for (const ui of uis.values()) await ui.stop();
   });
 });

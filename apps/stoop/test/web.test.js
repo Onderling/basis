@@ -1,20 +1,22 @@
 /**
- * H5 V0 web UI smoke — Phase 7 product item #1.
+ * Stoop local-UI smoke — the HTTP contract the app actually serves.
  *
- * Boots a real H5 cluster (alice + bob with paint skill), mounts the
- * web UI on a free port via `mountLocalUi({staticDir, a2aTLSLayer:
- * new LocalUiAuth({localActor: ALICE})})`, then verifies:
- *   1. Static files from `web/` are served on `/` (index.html), `/app.js`,
- *      `/style.css`, `/mine.html`.
- *   2. The agent card is reachable at `/.well-known/agent.json`.
- *   3. `POST /tasks/send` calls a skill (`postRequest`) end-to-end and
- *      returns the H5 result shape — exercising LocalUiAuth's tier-1
- *      authentication for the configured actor.
- *   4. Path traversal is blocked.
+ * Boots a real cluster (alice + bob with paint skill), mounts the local UI on a
+ * free port via `mountLocalUi({staticDir, a2aTLSLayer: new LocalUiAuth({localActor:
+ * ALICE})})`, then verifies:
+ *   1. The agent card is reachable at `/.well-known/agent.json`.
+ *   2. `POST /tasks/send` calls a skill (`postRequest`) end-to-end and returns the
+ *      result shape — exercising LocalUiAuth's tier-1 authentication for the
+ *      configured actor.
+ *   3. The REST surface behind it: intent filtering, mute/report, handle + profile.
+ *   4. Path traversal is blocked and an unknown path 404s.
  *
- * The frontend itself (the HTML/JS in `web/`) is not exercised — that
- * needs a real browser. The smoke validates the contract the frontend
- * relies on (same-origin static + A2A endpoints behind LocalUiAuth).
+ * The STATIC half is deliberately gone. The stoop web shell was retired with the
+ * stoop dissolution, so `web/` no longer exists, and the assertions that served
+ * index.html / mine.html / app.js / style.css / profile.html were retired with it
+ * rather than left permanently red. The mount still takes a `staticDir`; it simply
+ * has nothing to serve — which is exactly why the traversal and 404 cases below
+ * still earn their place.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { fileURLToPath } from 'node:url';
@@ -81,50 +83,6 @@ afterAll(async () => {
 });
 
 describe('H5 V0 web UI smoke', () => {
-  it('serves index.html on /', async () => {
-    const res = await fetch(`${baseUrl}/`);
-    expect(res.status).toBe(200);
-    expect(res.headers.get('content-type')).toMatch(/text\/html/);
-    const html = await res.text();
-    expect(html).toContain('Stoop');
-    expect(html).toContain('post-form');
-  });
-
-  it('serves /mine.html', async () => {
-    const res = await fetch(`${baseUrl}/mine.html`);
-    expect(res.status).toBe(200);
-    expect((await res.text())).toMatch(/Mijn posts|My requests/);
-  });
-
-  it('serves /app.js with javascript content-type', async () => {
-    const res = await fetch(`${baseUrl}/app.js`);
-    expect(res.status).toBe(200);
-    expect(res.headers.get('content-type')).toMatch(/javascript/);
-    const js = await res.text();
-    expect(js).toContain('export async function callSkill');
-  });
-
-  // Regression: app.js parsed as a JS module — catches syntax errors
-  // (e.g. `await` inside a non-async callback) that would otherwise
-  // silently break every page that imports from /app.js.
-  it('app.js parses as a JS module + has the expected exports', async () => {
-    const url = new URL('../web/app.js', import.meta.url).href;
-    const mod = await import(url);
-    for (const name of [
-      'callSkill', 'getActor', 'mountGroupSwitcher', 'mountLive',
-      'mountNotifyBanner', 'renderItems', 'renderMyItems',
-      'renderPostMenu', 'showBanner',
-    ]) {
-      expect(typeof mod[name]).toBe('function');
-    }
-  });
-
-  it('serves /style.css with css content-type', async () => {
-    const res = await fetch(`${baseUrl}/style.css`);
-    expect(res.status).toBe(200);
-    expect(res.headers.get('content-type')).toMatch(/text\/css/);
-  });
-
   it('exposes the agent card at /.well-known/agent.json', async () => {
     const res = await fetch(`${baseUrl}/.well-known/agent.json`);
     expect(res.status).toBe(200);
@@ -246,13 +204,6 @@ describe('Stoop V1 web UI — Phase 5 (intent tabs + moderation)', () => {
 });
 
 describe('Stoop V1 web UI — Phase 6 (profile)', () => {
-  it('serves /profile.html', async () => {
-    const res = await fetch(`${baseUrl}/profile.html`);
-    expect(res.status).toBe(200);
-    const html = await res.text();
-    expect(html).toMatch(/Mijn profiel/);
-  });
-
   it('setMyHandle + getMyProfile via REST', async () => {
     const set = await callRest('setMyHandle', { handle: '@Alice-Test' });
     expect(set.handle).toBe('alice-test');

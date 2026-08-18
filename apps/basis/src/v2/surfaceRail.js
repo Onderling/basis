@@ -138,7 +138,10 @@ export function makeSurfaceActClient({ identity, send, timeoutMs = 8000 } = {}) 
  * @param {() => boolean} [a.isReady]  whether the registry has loaded; while false the door
  *   refuses everything, because an unloaded revocation set cannot answer "was this revoked?"
  * @param {(group: string, op: string, args: object) => Promise<*>} a.callSkill
- * @param {(payload: object) => (void|Promise<void>)} a.reply  delivers the result back to the view
+ * @param {(payload: object, toAddr: string) => (void|Promise<void>)} a.reply  delivers the result
+ *   back to the view. The SENDER'S address is handed to every call, because one door serves every
+ *   paired view: a reply channel fixed at construction could only ever answer one of them. (In
+ *   process the second argument is ignorable; over a wire it is the address to send to.)
  * @returns {(fromAddr: string, payload: object) => Promise<void>} a `makePeerRouter` handler
  *   for the `surface-act-request` subtype
  */
@@ -153,31 +156,32 @@ export function makeSurfaceActHandler({ agentPubKey, issuerPubKey, isRevoked, is
   const seen = new Map();
   const SEEN_CAP = 2048;
 
-  const refuse = (requestId, code) => reply({ subtype: SURFACE_ACT_SUBTYPES.result, requestId, ok: false, code });
+  const refuse = (requestId, code, toAddr) => reply({ subtype: SURFACE_ACT_SUBTYPES.result, requestId, ok: false, code }, toAddr);
 
   return async function handleSurfaceAct(fromAddr, payload) {
+    const refuseTo = (requestId, code) => refuse(requestId, code, fromAddr);
     const { body, sig, token, viewPubKey } = payload ?? {};
     const requestId = body?.requestId;
     if (!requestId || typeof body.group !== 'string' || typeof body.op !== 'string'
       || typeof sig !== 'string' || !token || typeof viewPubKey !== 'string') {
-      return refuse(requestId ?? 'unknown', 'bad-shape');
+      return refuseTo(requestId ?? 'unknown', 'bad-shape');
     }
     // Before any token check: if the durable registry has not loaded, this door cannot say
     // whether the token was revoked, and an unanswerable revocation question is a NO.
-    if (!registryReady()) return refuse(requestId, 'not-ready');
+    if (!registryReady()) return refuseTo(requestId, 'not-ready');
     // Token: signature + expiry + this-agent binding, then issuer trust, revocation, subject.
-    if (!CapabilityToken.verify(token, agentPubKey)) return refuse(requestId, 'bad-token');
-    if (token.issuer !== issuerPubKey)               return refuse(requestId, 'untrusted-issuer');
-    if (revoked(token.id))                           return refuse(requestId, 'revoked');
-    if (token.subject !== viewPubKey)                return refuse(requestId, 'wrong-subject');
+    if (!CapabilityToken.verify(token, agentPubKey)) return refuseTo(requestId, 'bad-token');
+    if (token.issuer !== issuerPubKey)               return refuseTo(requestId, 'untrusted-issuer');
+    if (revoked(token.id))                           return refuseTo(requestId, 'revoked');
+    if (token.subject !== viewPubKey)                return refuseTo(requestId, 'wrong-subject');
     // Envelope: the sender must PROVE it holds the subject key, over the exact body it sent.
     let sigOk = false;
     try { sigOk = AgentIdentity.verify(canonicalBytes(body), b64decode(sig), viewPubKey); } catch { sigOk = false; }
-    if (!sigOk) return refuse(requestId, 'bad-signature');
+    if (!sigOk) return refuseTo(requestId, 'bad-signature');
     // Scope: the op must fall inside the token's granted skill.
-    if (!offeringMatches(token.skill, `${body.group}.${body.op}`)) return refuse(requestId, 'out-of-scope');
+    if (!offeringMatches(token.skill, `${body.group}.${body.op}`)) return refuseTo(requestId, 'out-of-scope');
     // Replay: one dispatch per request id.
-    if (seen.has(requestId)) return refuse(requestId, 'replay');
+    if (seen.has(requestId)) return refuseTo(requestId, 'replay');
     if (seen.size >= SEEN_CAP) {
       const cutoff = [...seen.entries()].sort((a, b) => a[1] - b[1]).slice(0, SEEN_CAP / 2);
       for (const [k] of cutoff) seen.delete(k);
@@ -186,9 +190,9 @@ export function makeSurfaceActHandler({ agentPubKey, issuerPubKey, isRevoked, is
 
     try {
       const parts = await callSkill(body.group, body.op, body.args ?? {});
-      await reply({ subtype: SURFACE_ACT_SUBTYPES.result, requestId, ok: true, parts });
+      await reply({ subtype: SURFACE_ACT_SUBTYPES.result, requestId, ok: true, parts }, fromAddr);
     } catch (e) {
-      await reply({ subtype: SURFACE_ACT_SUBTYPES.result, requestId, ok: false, code: 'op-failed', error: e?.message ?? 'op-failed' });
+      await reply({ subtype: SURFACE_ACT_SUBTYPES.result, requestId, ok: false, code: 'op-failed', error: e?.message ?? 'op-failed' }, fromAddr);
     }
   };
 }

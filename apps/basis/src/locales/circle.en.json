@@ -4239,7 +4239,31 @@
       "doc": "Said where the state is shown, not only when someone tries to leave with it (2026-08-02). A wipe-and-restore walk proved the phrase brings back the identity and no circles; someone who learns that at the moment they switch devices learns it too late to act on."
     },
     "enroll_device": "Add a device",
-    "devices": "My devices"
+    "devices": "My devices",
+    "connections": {
+      "text": "Connected devices",
+      "doc": "Heading of the paired-view list (screens that are yours, elsewhere)."
+    },
+    "connection_sees": {
+      "text": "sees: {{what}}",
+      "doc": "What a connected device may see — the sections you ticked."
+    },
+    "connection_acts_only": {
+      "text": "sees nothing — can only act",
+      "doc": "Honest line for a connection without read access; NOT \"0 sections\"."
+    },
+    "connection_does": {
+      "text": "may do {{count}} action(s)",
+      "doc": "How many actions this device may perform."
+    },
+    "connection_unpair": {
+      "text": "Disconnect",
+      "doc": "Revokes the pairing: new messages stop going to it, and its actions are refused."
+    },
+    "connection_device_section": {
+      "text": "device settings",
+      "doc": "The non-circle section: your own settings."
+    }
   },
   "admin": {
     "title": {

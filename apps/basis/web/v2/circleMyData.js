@@ -28,6 +28,11 @@ export function renderCircleMyData(container, {
   onEnroll,
   devices = [],
   onRevokeDevice,
+  // CONNECTIONS (gekoppelde apparaten) — screens that are yours, somewhere else. Rows come from the
+  // shared `connectionRows` projection; the two columns are the whole product question (what it may
+  // SEE, what it may DO). Absent handler ⇒ the section is omitted, like every other section here.
+  connections = [],
+  onUnpairConnection = null,
   notifications,
   onToggleNotifications,
   // The personal history mirror (a sealed copy of the device log on the user's own storage).
@@ -215,6 +220,55 @@ export function renderCircleMyData(container, {
         b.addEventListener('click', () => onRevokeDevice(d.deviceId));
         row.appendChild(b);
       }
+      sec.appendChild(row);
+    }
+    container.appendChild(sec);
+  }
+
+  // ── connections: screens that are yours, somewhere else ────────────────────────────────────
+  // Placed beside the devices list because that is the question a person is answering here —
+  // "what else of mine is out there" — and the two are told apart by what they can DO: a device
+  // holds your keys, a connection holds only the ticks you gave it.
+  if (typeof onUnpairConnection === 'function' && Array.isArray(connections) && connections.length) {
+    const sec = section(tr('circle.mydata.connections'));
+    for (const c of connections) {
+      const row = document.createElement('div');
+      row.className = 'cc-mydata__connection';
+      row.style.cssText = 'display:flex;justify-content:space-between;align-items:flex-start;gap:.6rem;padding:.35rem 0;';
+
+      const left = document.createElement('div');
+      const name = document.createElement('div');
+      name.className = 'cc-mydata__connection-name';
+      // A key is not a name; the stub keeps two unlabelled connections tellable apart.
+      name.textContent = c.label || c.short;
+      left.appendChild(name);
+
+      // The two columns, as one honest line each.
+      const sees = document.createElement('div');
+      sees.className = 'cc-mydata__connection-sees';
+      sees.style.cssText = 'opacity:.75;font-size:.9em;';
+      sees.textContent = c.sees
+        ? tr('circle.mydata.connection_sees', {
+          what: [...c.sees.circles, ...(c.sees.device ? [tr('circle.mydata.connection_device_section')] : [])].join(', '),
+        })
+        // NOT "0 onderdelen": a connection that cannot read is a real shape, and saying so plainly
+        // is the difference between an honest row and one that looks broken.
+        : tr('circle.mydata.connection_acts_only');
+      left.appendChild(sees);
+
+      const does = document.createElement('div');
+      does.className = 'cc-mydata__connection-does';
+      does.style.cssText = 'opacity:.75;font-size:.9em;';
+      does.textContent = tr('circle.mydata.connection_does', { count: c.opCount });
+      left.appendChild(does);
+      row.appendChild(left);
+
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'cc-mydata__connection-unpair';
+      b.textContent = tr('circle.mydata.connection_unpair');
+      b.addEventListener('click', () => onUnpairConnection(c.viewPubKey));
+      row.appendChild(b);
       sec.appendChild(row);
     }
     container.appendChild(sec);

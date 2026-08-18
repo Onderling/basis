@@ -4239,7 +4239,31 @@
       "doc": "Said where the state is shown, not only when someone tries to leave with it (2026-08-02). A wipe-and-restore walk proved the phrase brings back the identity and no circles; someone who learns that at the moment they switch devices learns it too late to act on."
     },
     "enroll_device": "Apparaat toevoegen",
-    "devices": "Mijn apparaten"
+    "devices": "Mijn apparaten",
+    "connections": {
+      "text": "Gekoppelde apparaten",
+      "doc": "Kop van de lijst met gekoppelde weergaven (schermen die van jou zijn, ergens anders)."
+    },
+    "connection_sees": {
+      "text": "ziet: {{what}}",
+      "doc": "Wat een gekoppeld apparaat mag zien — de secties die je hebt aangevinkt."
+    },
+    "connection_acts_only": {
+      "text": "ziet niets — kan alleen bedienen",
+      "doc": "Eerlijke regel voor een koppeling zonder leesrechten; NIET \"0 onderdelen\"."
+    },
+    "connection_does": {
+      "text": "mag {{count}} handeling(en)",
+      "doc": "Hoeveel handelingen dit apparaat mag doen."
+    },
+    "connection_unpair": {
+      "text": "Ontkoppelen",
+      "doc": "Trekt de koppeling in: nieuwe berichten gaan niet meer mee, en handelingen worden geweigerd."
+    },
+    "connection_device_section": {
+      "text": "apparaatinstellingen",
+      "doc": "De niet-kring sectie: je eigen instellingen."
+    }
   },
   "admin": {
     "title": {

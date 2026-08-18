@@ -49,6 +49,7 @@ import { makeTaskRail, makeTaskEmitter, routeTaskMirror } from '../../v2/taskRai
 import { makeChatRail, makeChatEmitter } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
 import { createSurfaceGrants, compileReadFilter } from '../../v2/surfaceGrants.js';   // pair-a-view standing grants (the surface role) + the section→lane-filter compiler
 import { makeSurfaceActHandler, SURFACE_NUDGE_SUBTYPE } from '../../v2/surfaceRail.js'; // the remote surface's verified acting door + the contentless nudge
+import { CONNECTION_GRANT_SUBTYPE } from '../../v2/connectionPairing.js';   // pairing: how the grant reaches the view that asked for it
 import { paramsManifest } from '../../v2/paramsManifest.js';   // #36 — the params op contract (gates the waist branch)
 import { VaultMemory, VaultLocalStorage, VaultEncrypted, migrateVaultToEncrypted, resealVault, seedFromString, seedToString } from '@onderling/vault';
 import { wireSkill } from '@onderling/sdk';
@@ -1395,7 +1396,24 @@ export async function createRealHouseholdAgent(opts = {}) {
       // the mirror OFF (or no backend) yields no lane until the mirror runs.
       const laneActive = !!r.reads && paramsService.register.valueOf(HISTORY_MIRROR_PARAM_KEY) === true
         && typeof opts.provisionHistoryMirror === 'function' && !!opts.deviceLog;
-      return [DataPart({ ok: true, ...r, laneActive })];
+
+      // PAIRING: when the grant answers an offer (`nonce`), deliver it to the view — which is
+      // reachable at its own pubkey, because that is the address it registered when it made the
+      // offer. Best-effort and non-fatal: the grant EXISTS either way (it is in the registry and
+      // the door will honour it), so a delivery failure must not read as "pairing failed" when
+      // what actually happened is "the tokens have not arrived yet".
+      let delivered = null;
+      if (typeof d.nonce === 'string' && d.nonce) {
+        try {
+          await (opts.deliverConnectionGrant
+            ?? ((to, payload) => sa.peer.sendTo(to, payload, { guarantee: 'hold-forward' })))(
+            viewPubKey,
+            { subtype: CONNECTION_GRANT_SUBTYPE, nonce: d.nonce, tokens: r.tokens, label: r.label },
+          );
+          delivered = true;
+        } catch { delivered = false; }
+      }
+      return [DataPart({ ok: true, ...r, laneActive, ...(delivered === null ? {} : { delivered }) })];
     } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'grant-failed' })]; }
   }, { visibility: 'trusted' });   // hands out standing acting authority: owner-only
 

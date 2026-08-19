@@ -48,7 +48,7 @@ import { makeMembershipRail, makeMembershipEmitter } from '../../v2/membershipRa
 import { makeTaskRail, makeTaskEmitter, routeTaskMirror } from '../../v2/taskRail.js'; // the content re-root — item snapshots ride the device log
 import { makeChatRail, makeChatEmitter } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
 import { createSurfaceGrants, compileReadFilter } from '../../v2/surfaceGrants.js';   // pair-a-view standing grants (the surface role) + the section→lane-filter compiler
-import { makeSurfaceActHandler, SURFACE_NUDGE_SUBTYPE } from '../../v2/surfaceRail.js'; // the remote surface's verified acting door + the contentless nudge
+import { SURFACE_NUDGE_SUBTYPE } from '../../v2/surfaceNudge.js'; // the reading half's contentless re-pull signal
 import { CONNECTION_GRANT_SUBTYPE } from '../../v2/connectionPairing.js';   // pairing: how the grant reaches the view that asked for it
 import { paramsManifest } from '../../v2/paramsManifest.js';   // #36 — the params op contract (gates the waist branch)
 import { VaultMemory, VaultLocalStorage, VaultEncrypted, migrateVaultToEncrypted, resealVault, seedFromString, seedToString } from '@onderling/vault';
@@ -482,9 +482,22 @@ export async function createRealHouseholdAgent(opts = {}) {
     // lowest tier, which is what fail-closed means here). `isRevoked` is a late-bound thunk because the
     // issuer-side token registry is built further down this same factory — the thunk only runs at
     // inbound-verify time, long after boot (the same late-binding shape the surface preference uses).
-    trustRegistry: true,
+    // Peer tiers get their OWN vault, not the chat vault. Sharing it entangles them with custody: a
+    // device-revocation ceremony rotates that vault's secret, and every previously written trust entry
+    // becomes undecryptable — safe (an unreadable tier falls closed to the lowest) but lossy, and it
+    // surfaced as a decryption error the moment a walk did a ceremony and a grant in one account.
+    // Mirrors the host gate, which already keeps `cc-host-trust:` separate.
+    trustRegistry: { vault: opts.peerTrustVault ?? makeBrowserVault('cc-peer-trust:') },
     policyEngine: {
-      isRevoked: async (tokenId) => Boolean(await agentsTokenRegistry?.isRevoked(tokenId)),
+      // BOTH revocation lists, or unpairing does not unpair. `agentsTokenRegistry` holds the ops-side
+      // grants; `surfaceGrants` holds the CONNECTION grants, and revoking a connection marks it only
+      // there. While a bespoke door consulted surfaceGrants directly that was fine; once acting moved
+      // to A2A, this engine became the only thing standing between a revoked connection and the waist —
+      // and it was consulting the wrong list. Caught by the revocation-durability walk during the
+      // migration, which is what that walk is for. Late-bound: both are built further down this factory.
+      isRevoked: async (tokenId) =>
+        Boolean(await agentsTokenRegistry?.isRevoked(tokenId))
+        || Boolean(surfaceGrants?.isRevoked(tokenId)),
     },
     ...(opts.secureAgentOpts ?? {}),
   });
@@ -1011,8 +1024,16 @@ export async function createRealHouseholdAgent(opts = {}) {
       };
       if (typeof sa.policy?.setRevocationCheck === 'function') {
         const callerIsRevoked = opts.secureAgentOpts?.policyEngine?.isRevoked;
+        // THREE lists, and all three must be consulted, because setRevocationCheck REPLACES whatever the
+        // engine was constructed with rather than adding to it. This block predates the engine being
+        // composed at all — it was written for a caller opting in via secureAgentOpts — so when the
+        // reachable agent gained an engine (2026-08-19), it silently clobbered the constructor's check
+        // and CONNECTION revocations stopped being consulted: unpairing left the connection working over
+        // A2A. The revocation-durability walk caught it. `surfaceGrants` is named explicitly here rather
+        // than relied on from the constructor, precisely because this call overwrites that.
         sa.policy.setRevocationCheck(async (tokenId) =>
           (await tokenRegistry.isRevoked(tokenId))
+          || Boolean(surfaceGrants?.isRevoked(tokenId))
           || (typeof callerIsRevoked === 'function' ? Boolean(await callerIsRevoked(tokenId)) : false));
       }
       agentsTokenRegistry = tokenRegistry;
@@ -1382,10 +1403,11 @@ export async function createRealHouseholdAgent(opts = {}) {
   /* ─── Remote surfaces: pair-a-view grants ─────────────────────────────────
    * A paired view (a browser tab, a companion node's client) holds a standing SURFACE role —
    * one capability token per op the owner picked, issued by this device's canonical identity.
-   * Acting arrives as a signed `surface-act-request` envelope and is verified at the door
-   * (`makeSurfaceActDoor` below) before it reaches `callSkill`; reading rides the sealed
-   * history mirror, not these skills. Grants live issuer-side: revoking here kills every
-   * token the view still holds, because the door consults this registry per act.
+   * Acting arrives over A2A — `agent.invoke(owner, 'app.opId', …)` presenting the token, gated by
+   * `PolicyEngine.checkInbound` and dispatched to the op `renderA2A` registered. A bespoke door used
+   * to sit here doing the same verification a second time; it is gone (2026-08-19). Reading rides
+   * the sealed history mirror, not these skills. Grants live issuer-side, so revoking here kills
+   * every token the view still holds.
    */
   const surfaceGrants = createSurfaceGrants({
     identity: chatId,
@@ -3908,19 +3930,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         snapshot: async () => ({ registry: (await agentsRegistryRef?.list?.()) ?? [] }),
       });
     },
-    /** The remote surface's acting door: shells wire the returned handler into their peer
-     *  router under the `surface-act-request` subtype, supplying only the reply channel.
-     *  Verification (token + issuer + revocation + envelope signature + scope) happens in the
-     *  handler before anything reaches `callSkill`. */
-    makeSurfaceActDoor: ({ reply }) => makeSurfaceActHandler({
-      agentPubKey:  chatId.pubKey,
-      issuerPubKey: chatId.pubKey,
-      isRevoked:    (id) => surfaceGrants.isRevoked(id),
-      isReady:      () => surfaceGrants.isReady(),
-      callSkill:    (group, op, args) => callSkill(group, op, args),
-      reply,
-    }),
-    /** Resolves once the durable surface registry has loaded (the door refuses until then). */
+    /** Resolves once the durable surface registry has loaded (grants are refused until then). */
     surfaceGrantsReady: () => surfaceGrantsReady,
     llmProviders,
     // host-injected claim router; called after every successful

@@ -15,12 +15,13 @@ import { AgentIdentity } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { memoryDataSource } from '@onderling/item-store';
 import { createRealHouseholdAgent } from '../src/core/agent/realAgent.js';
-import { makeSurfaceActClient } from '../src/v2/surfaceRail.js';
+import { actAsConnection, trustForGrant } from './support/actAsConnection.js';
 import {
   encodePairingOffer, parsePairingOffer, acceptConnectionGrant,
   CONNECT_SCHEME, CONNECTION_GRANT_SUBTYPE,
 } from '../src/v2/connectionPairing.js';
 import { compileConnectionGrant } from '../src/v2/connections.js';
+import { CONNECTION_MANIFESTS } from '../src/v2/connectionManifests.js';
 
 describe('the pairing offer — deny-safe parsing', () => {
   it('round-trips what the view offers', () => {
@@ -75,6 +76,7 @@ describe('THE WALK — offer → tick → deliver → the view acts', () => {
     // view's own address; here it is captured so the walk can assert what actually crossed.
     const inbox = [];
     const A = await createRealHouseholdAgent({
+      a2aManifests: CONNECTION_MANIFESTS,   // the shells pass this; a walk that acts must too
       seedHousehold: false,
       settingsDataSource: memoryDataSource(),
       deliverConnectionGrant: async (to, payload) => { inbox.push({ to, payload }); },
@@ -100,12 +102,11 @@ describe('THE WALK — offer → tick → deliver → the view acts', () => {
 
     // 4 — THE POINT: the view acts with what it was handed, and the door honours it. Pairing is
     // proven by the connection working, not by a success flag.
-    let client;
-    const door = A.makeSurfaceActDoor({ reply: (p) => client.handleResult(p) });
-    client = makeSurfaceActClient({ identity: view, send: (p) => door('wire', p) });
-    const res = await client.act({
-      group: 'params', op: 'set-param', args: { key: 'display.theme', value: 'dark' },
-      token: accepted.tokens[0],
+    await trustForGrant(A, view.pubKey);
+    const res = await actAsConnection(A, {
+      callerPubKey: view.pubKey, opId: 'params.set-param',
+      args: { key: 'display.theme', value: 'dark' },
+      token: accepted.tokens[0]?.toJSON?.() ?? accepted.tokens[0],
     });
     expect(res.ok, `the paired view could not act: ${JSON.stringify(res)}`).toBe(true);
     expect(A.getParamValue('display.theme')).toBe('dark');
@@ -120,6 +121,7 @@ describe('THE WALK — offer → tick → deliver → the view acts', () => {
     const view = await AgentIdentity.generate(new VaultMemory());
     const inbox = [];
     const A = await createRealHouseholdAgent({
+      a2aManifests: CONNECTION_MANIFESTS,   // the shells pass this; a walk that acts must too
       seedHousehold: false,
       settingsDataSource: memoryDataSource(),
       deliverConnectionGrant: async (to, payload) => { inbox.push({ to, payload }); },

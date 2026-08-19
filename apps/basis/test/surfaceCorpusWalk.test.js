@@ -17,8 +17,9 @@ import { createRealHouseholdAgent } from '../src/core/agent/realAgent.js';
 import { createHistoryMirror, hydrateHistory } from '../src/v2/historyMirror.js';
 import { sealStrategyForRecipients } from '../src/v2/sharedCopyOpener.js';
 import { compileReadFilter, viewLaneId } from '../src/v2/surfaceGrants.js';
-import { makeSurfaceActClient } from '../src/v2/surfaceRail.js';
+import { actAsConnection, trustForGrant } from './support/actAsConnection.js';
 import { EventLog } from '../src/eventLog.js';
+import { CONNECTION_MANIFESTS } from '../src/v2/connectionManifests.js';
 
 function memoryPodSource(map = new Map()) {
   return {
@@ -33,12 +34,19 @@ const sealedOver = (map, strategy) =>
   createSealedPodDataSource({ podSource: memoryPodSource(map), podUrl: 'mem://', strategy });
 const entry = (id, circleId, text) => ({ id, ts: Date.now(), circleId, app: 'circle', type: 'chat-message', payload: { text } });
 
-/** Wire a client straight at an agent's door — the in-process form of the acting rail. */
+/** A granted connection acting — the real A2A path (gate + the op renderA2A registered), not a stand-in. */
 function actor(agent, identity) {
-  let client;
-  const door = agent.makeSurfaceActDoor({ reply: (p) => client.handleResult(p) });
-  client = makeSurfaceActClient({ identity, send: (p) => door('wire', p) });
-  return client;
+  return {
+    act: async ({ group, op, args, token }) => {
+      await trustForGrant(agent, identity.pubKey);
+      const r = await actAsConnection(agent, {
+        callerPubKey: identity.pubKey, opId: `${group}.${op}`, args, token: token?.toJSON?.() ?? token,
+      });
+      // The walks assert on refusal MEANING, so map the kernel's codes onto the words they already use.
+      if (r.ok) return { ok: true };
+      return { ok: false, code: r.code === 'INVALID_TOKEN' ? 'bad-token' : r.code };
+    },
+  };
 }
 
 describe('journey 11 — two connections, disjoint sections', () => {
@@ -92,8 +100,8 @@ describe('journey 13 — what scope a grant actually has', () => {
     // second device is: its own local storage). This pins L29's honest current behaviour rather
     // than asserting the behaviour we might prefer — when L29 is answered, THIS test changes.
     const view = await AgentIdentity.generate(new VaultMemory());
-    const dev1 = await createRealHouseholdAgent({ seedHousehold: false, settingsDataSource: memoryDataSource() });
-    const dev2 = await createRealHouseholdAgent({ seedHousehold: false, settingsDataSource: memoryDataSource() });
+    const dev1 = await createRealHouseholdAgent({ a2aManifests: CONNECTION_MANIFESTS, seedHousehold: false, settingsDataSource: memoryDataSource() });
+    const dev2 = await createRealHouseholdAgent({ a2aManifests: CONNECTION_MANIFESTS, seedHousehold: false, settingsDataSource: memoryDataSource() });
     await dev1.surfaceGrantsReady(); await dev2.surfaceGrantsReady();
 
     await dev1.callSkill('household', 'grantSurface', { viewPubKey: view.pubKey, ops: ['params.set-param'], label: 'tablet' });
@@ -108,7 +116,7 @@ describe('journey 13 — what scope a grant actually has', () => {
 describe('journey 14 — the three layers agree', () => {
   it('what the LIST says, what the TOKENS carry, and what the LANE FILTER admits are one fact', async () => {
     const view = await AgentIdentity.generate(new VaultMemory());
-    const A = await createRealHouseholdAgent({ seedHousehold: false, settingsDataSource: memoryDataSource() });
+    const A = await createRealHouseholdAgent({ a2aManifests: CONNECTION_MANIFESTS, seedHousehold: false, settingsDataSource: memoryDataSource() });
     await A.surfaceGrantsReady();
 
     const ops = ['params.set-param', 'params.get-param'];
@@ -131,7 +139,7 @@ describe('journey 14 — the three layers agree', () => {
 describe('journey 16 — a grant that has expired', () => {
   it('stops acting on its own, without anyone revoking it', async () => {
     const view = await AgentIdentity.generate(new VaultMemory());
-    const A = await createRealHouseholdAgent({ seedHousehold: false, settingsDataSource: memoryDataSource() });
+    const A = await createRealHouseholdAgent({ a2aManifests: CONNECTION_MANIFESTS, seedHousehold: false, settingsDataSource: memoryDataSource() });
     await A.surfaceGrantsReady();
 
     // ~4ms of life. Expiry is a property of the TOKEN, so no registry state is involved.
@@ -155,6 +163,7 @@ describe('journey 17 — a device ceremony and a connection in one account', () 
     const chatVault = new VaultMemory();
     const settings = memoryDataSource();
     const A = await createRealHouseholdAgent({
+      a2aManifests: CONNECTION_MANIFESTS,   // the shells pass this; a walk that acts must too
       seedHousehold: false, ownerRootVault, rootKeyStore, chatVault, settingsDataSource: settings,
     });
     await A.surfaceGrantsReady();
@@ -185,9 +194,14 @@ describe('journey 17 — a device ceremony and a connection in one account', () 
     // reveals, the agent still dispatches, the device machinery is unaffected.
     expect(await A.callSkill('household', 'revokeSurface', { viewPubKey: view.pubKey }))
       .toMatchObject({ ok: true, revoked: true });
+    // `bad-token`, not a distinct `revoked`: the kernel gate answers INVALID_TOKEN for every
+    // invalid-token case and does not say WHICH. That is deliberate — telling a caller whether its
+    // token was revoked, expired or forged tells an attacker the same thing. The bespoke door used to
+    // distinguish them; losing that distinction on the wire is a gain, and what matters here is
+    // unchanged: after unpairing, the connection cannot act.
     expect((await actor(A, view).act({
       group: 'params', op: 'set-param', args: { key: 'display.theme', value: 'dark' }, token: granted.tokens[0],
-    }))).toEqual({ ok: false, code: 'revoked' });
+    }))).toEqual({ ok: false, code: 'bad-token' });
 
     expect((await A.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic, 'unpairing disturbed the owner root').toBe(phrase);
     expect((await A.callSkill('params', 'set-param', { key: 'display.theme', value: 'system' })).ok).toBe(true);

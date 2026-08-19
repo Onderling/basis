@@ -16,7 +16,7 @@ import { createHistoryMirror, createHistoryPodMedium, hydrateHistory } from '../
 import { settingsSealStrategyForIdentity, sealStrategyForRecipients } from '../src/v2/sharedCopyOpener.js';
 import { compileReadFilter, normaliseReads, viewLaneId } from '../src/v2/surfaceGrants.js';
 import { createRealHouseholdAgent } from '../src/core/agent/realAgent.js';
-import { makeSurfaceActClient, SURFACE_NUDGE_SUBTYPE } from '../src/v2/surfaceRail.js';
+import { makeNudgeListener, SURFACE_NUDGE_SUBTYPE } from '../src/v2/surfaceNudge.js';
 import { EventLog } from '../src/eventLog.js';
 
 /** A SolidPodSource-shaped memory backend whose raw stored bodies we can byte-inspect. */
@@ -179,7 +179,7 @@ describe('the agent wires it end to end — grant makes the lane, the switch gov
     // re-hydrate sees it.
     expect(nudges.length).toBeGreaterThan(0);
     expect(nudges[0]).toEqual({ viewPubKey: view.pubKey, laneId: lane });
-    const client = makeSurfaceActClient({ identity: view, send: () => {} });
+    const client = makeNudgeListener();
     let repulled = null;
     client.onNudge(async ({ laneId }) => {
       const relog = new EventLog({ initial: [], muted: [] });

@@ -12,7 +12,8 @@ import { AgentIdentity } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { memoryDataSource } from '@onderling/item-store';
 import { createRealHouseholdAgent } from '../src/core/agent/realAgent.js';
-import { makeSurfaceActClient } from '../src/v2/surfaceRail.js';
+import { actAsConnection, trustForGrant } from './support/actAsConnection.js';
+import { CONNECTION_MANIFESTS } from '../src/v2/connectionManifests.js';
 
 describe('surface revocation durability', () => {
   it('a revoked view must STILL be refused after the agent reboots on the same identity', async () => {
@@ -22,6 +23,7 @@ describe('surface revocation durability', () => {
     const chatVault = new VaultMemory();
     const settings = memoryDataSource();
     const boot = () => createRealHouseholdAgent({
+      a2aManifests: CONNECTION_MANIFESTS,   // the shells pass this; a walk that acts must too
       seedHousehold: false, ownerRootVault, chatVault, settingsDataSource: settings,
     });
 
@@ -34,23 +36,27 @@ describe('surface revocation durability', () => {
     expect(grant.ok).toBe(true);
     const token = grant.tokens[0];
 
+    // Acting is the ordinary A2A path now: present the token, the gate decides. Revocation is what
+    // this walk is about, so it asserts the CODE — a revoked token must fail as a revoked token, not
+    // as some generic denial that a typo would also produce.
     const actThrough = async (agent) => {
-      let client;
-      const door = agent.makeSurfaceActDoor({ reply: (p) => client.handleResult(p) });
-      client = makeSurfaceActClient({ identity: view, send: (p) => door('wire', p) });
-      return client.act({ group: 'params', op: 'set-param', args: { key: 'display.theme', value: 'dark' }, token });
+      await trustForGrant(agent, view.pubKey);
+      return actAsConnection(agent, {
+        callerPubKey: view.pubKey, opId: 'params.set-param',
+        args: { key: 'display.theme', value: 'dark' }, token: token?.toJSON?.() ?? token,
+      });
     };
 
-    expect((await actThrough(A)).ok).toBe(true);                       // paired: acts
+    expect((await actThrough(A)).ok, 'a fresh grant could not act').toBe(true);
     const rev = await A.callSkill('household', 'revokeSurface', { viewPubKey: view.pubKey });
     expect(rev).toMatchObject({ ok: true, revoked: true });
-    expect(await actThrough(A)).toEqual({ ok: false, code: 'revoked' }); // unpaired: refused
+    expect((await actThrough(A)).code, 'unpairing did not stop the connection').toBe('INVALID_TOKEN');
 
     // THE REBOOT. Same owner, same identity, same stored settings — and the view still holds
     // the token blob it was given. Unpairing must outlive the process.
     const B = await boot();
     await B.surfaceGrantsReady();          // the door refuses until the registry lands
     const afterReboot = await actThrough(B);
-    expect(afterReboot, 'a revoked surface acted again after a reboot').toEqual({ ok: false, code: 'revoked' });
+    expect(afterReboot.code, 'a revoked connection acted again after a reboot').toBe('INVALID_TOKEN');
   }, 60_000);
 });

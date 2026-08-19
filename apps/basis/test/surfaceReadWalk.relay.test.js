@@ -29,7 +29,7 @@ import { memoryDataSource } from '@onderling/item-store';
 import { bootRealAgentNode, connectNodesOverRelay, teardown, until } from './support/pairRealAgents.js';
 import { createHistoryPodMedium, hydrateHistory } from '../src/v2/historyMirror.js';
 import { sealStrategyForRecipients } from '../src/v2/sharedCopyOpener.js';
-import { makeSurfaceActClient, SURFACE_NUDGE_SUBTYPE } from '../src/v2/surfaceRail.js';
+import { makeNudgeListener, SURFACE_NUDGE_SUBTYPE } from '../src/v2/surfaceNudge.js';
 import { EventLog } from '../src/eventLog.js';
 
 const SEND = { hold: true, firstSendTimeoutMs: 4000 };
@@ -76,7 +76,7 @@ describe('the reading half over a REAL relay — the nudge crosses, the view re-
     await A.agent.surfaceGrantsReady();
 
     // The view's client + its re-pull reaction: hydrate its own lane from the mailbox.
-    client = makeSurfaceActClient({ identity: view, send: () => {} });
+    client = makeNudgeListener();
     client.onNudge(async ({ laneId }) => {
       const relog = new EventLog({ initial: [], muted: [] });
       const source = createSealedPodDataSource({

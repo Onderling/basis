@@ -3857,6 +3857,34 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
   } catch { /* the default stands */ }
 
+  // THE A2A SURFACE — the declared ops, projected onto the agent peers can reach (2026-08-19).
+  //
+  // An agent could already invoke another agent's skill over A2A, with capability tokens and revocation,
+  // and this app already does it in-process. What was missing was narrow: no manifest op was ever
+  // REGISTERED as a kernel skill, so that path could not reach the waist. `renderA2A` is the projection
+  // that closes it — the same declaration that becomes chat tools and slash commands becomes the ops
+  // another agent may call, gated by the engine composed above.
+  //
+  // Registration is per-op (`app.opId`), so a CapabilityToken for one op cannot name another — the
+  // existing token scoping does the work, with nothing new invented. Ops that must never be delegated
+  // are `policy: 'never'` and refuse before a token is even read: a UI that simply did not offer them
+  // was a convention, and a different client would have asked anyway.
+  //
+  // Inert without `a2aManifests` — the SHELLS own manifest composition, so they pass the list they
+  // already build. Nothing is exposed to a peer until one does.
+  if (Array.isArray(opts.a2aManifests) && opts.a2aManifests.length) {
+    try {
+      const { renderA2A } = await import('@onderling/app-manifest');
+      const skills = renderA2A(opts.a2aManifests, { callSkill });
+      for (const def of skills) chatAgent.skills.register(def.id, def.handler, def);
+      console.info(`[a2a] ${skills.length} declared ops exposed to peers (token-gated)`);
+    } catch (e) {
+      // Never break boot over a surface nobody has asked for yet — but say so, because a silently
+      // missing A2A surface looks exactly like a working one from the outside.
+      console.warn('[a2a] surface NOT exposed:', e?.message ?? e);
+    }
+  }
+
   return {
     // Part G — the REAL household app manifest (item/task vocab) is now the
     // catalog source of truth for the household surface.  (The mock manifest

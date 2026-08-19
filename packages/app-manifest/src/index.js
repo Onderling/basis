@@ -125,6 +125,7 @@ import { renderMobile }      from './renderMobile.js';
 export { renderChat } from './renderChat.js';
 export { renderSlash } from './renderSlash.js';
 export { renderGate } from './renderGate.js';
+export { renderA2A, NEVER_DELEGABLE } from './renderA2A.js';
 export { renderAttachments } from './renderAttachments.js';
 
 // SHELL family (web + mobile surface projection).

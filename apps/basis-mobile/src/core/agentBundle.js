@@ -28,6 +28,7 @@
  * boot-failure error or the real factory's reply).
  */
 import { composeManifests, buildManifestsByOrigin } from './composeManifests.js';
+import { connectionManifests } from '../../../basis/src/v2/connectionManifests.js';
 import { getCircleVersionStore } from './circleVersioning.js';
 // Shared extension-mapping loader (feedback-extension) — web≡mobile core.
 import { loadVerifyMappings } from '../../../basis/src/v2/mappingsLoader.js';
@@ -305,6 +306,10 @@ export async function bootAgentBundle(opts = {}) {
       onSettingsConflicts: opts.onSettingsConflicts,
       // The membership rider: the device log (the shells' EventLog) — membership statements ride its lane.
       deviceLog: opts.deviceLog,
+      // The A2A surface (web parity): these manifests' ops become kernel skills a granted agent can
+      // invoke, each gated by a CapabilityToken naming exactly that op. The list is the SHARED one the
+      // connection menu paints from, so what this shell offers is what it exposes — and matches web.
+      a2aManifests: connectionManifests({ householdManifest: opts.householdManifest }),
       secureAgentOpts:  opts.secureAgentOpts,
       // The per-user address-fallback setting, read LIVE (batch 4) — forwarded as-is (function or
       // bool); realAgent threads it into both halves of the choice (the fan's address pick and

@@ -269,6 +269,7 @@ import { advancedOpRows, advancedParamRows } from '../../src/v2/advancedSurface.
 // flow's declaration lives on the params manifest; this shell only paints renderFlow.
 import { createFlowRunner, renderFlow } from '@onderling/app-manifest';
 import { paramsManifest } from '../../src/v2/paramsManifest.js';
+import { CONNECTION_MANIFESTS } from '../../src/v2/connectionManifests.js';
 import { householdManifest } from '../../../household/manifest.js';
 import { deviceDelegationsOf } from '@onderling/agent-registry';
 // profile-update propagation — the silent roster "pull-me" signal (announce on a real roster
@@ -1200,18 +1201,11 @@ async function refreshConnections() {
  * declared twice. (The bot composes its list inside `buildCircleBot`; this is the render-time
  * equivalent, and the shared projection withholds the escalation ops from whatever it is given.)
  */
-/**
- * THE ONE LIST. What a connection may be OFFERED (the DO menu) and what is actually REACHABLE over A2A
- * must be the same set — two lists here would mean a menu promising ops the surface refuses, or worse a
- * surface exposing ops the menu never showed. So this const feeds both: `connectionManifestSources()`
- * below, and `a2aManifests` at boot. Pinned by connectionSurfaceAgreement.test.js.
- */
-export const CONNECTION_MANIFESTS = [
-  paramsManifest, householdManifest, mockTasksManifest, calendarManifest, agentsManifest,
-];
-// `circleHouseholdAgent?.manifest` used to be appended here; it IS `householdManifest`
-// (realAgent returns it verbatim), so it only ever added a duplicate the projection deduped.
-const connectionManifestSources = () => CONNECTION_MANIFESTS.filter(Boolean);
+// The menu and the A2A surface read the SAME shared list (src/v2/connectionManifests.js) — and so does
+// the mobile shell, which used to list a different set entirely. Pinned by
+// connectionSurfaceAgreement.test.js. `circleHouseholdAgent?.manifest` used to be appended here; it IS
+// `householdManifest` (realAgent returns it verbatim), so it only ever added a duplicate.
+const connectionManifestSources = () => CONNECTION_MANIFESTS;
 /** The circles a connection can be granted sight of — the same list the rest of the shell renders. */
 const circleListForConnections = () => circlesCache.filter(Boolean).map((c) => ({ id: c.id, name: c.name ?? c.label ?? c.id }));
 let sources = {};

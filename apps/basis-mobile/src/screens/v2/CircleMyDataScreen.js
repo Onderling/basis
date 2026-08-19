@@ -33,7 +33,7 @@ import {
   connectionRows, connectionOpChoices, connectionSectionChoices, compileConnectionGrant,
 } from '../../../../basis/src/v2/connections.js';
 import { parsePairingOffer } from '../../../../basis/src/v2/connectionPairing.js';
-import { _internalManifestList } from '../../core/composeManifests.js';
+import { CONNECTION_MANIFESTS } from '../../../../basis/src/v2/connectionManifests.js';
 import { loadCircles } from '../../../../basis/src/v2/circleModel.js';
 import { circleSourcesFromAgent } from '../../../../basis/src/v2/circleSources.js';
 import UserLlmSettings from './UserLlmSettings.js';
@@ -83,10 +83,11 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
   const [pickedOps, setPickedOps] = useState([]);      // what the new connection may DO
   const [pickedSections, setPickedSections] = useState([]); // what it may SEE
   const [circlesForConnections, setCirclesForConnections] = useState([]);
-  // The DO menu's source: the SAME composed manifest list the nav model and dispatch read, so the
-  // pick list and the catalog cannot disagree about what an op is. The shared projection withholds
-  // the escalation ops from whatever it is handed.
-  const manifestsForConnections = useMemo(() => _internalManifestList.map((m) => m?.manifest ?? m).filter(Boolean), []);
+  // The SHARED list, not this shell's dispatch catalog. Reusing the catalog here made the mobile menu a
+  // different set from web's — including stoop, whose manifest declares 92 ops — so the same person
+  // pairing the same screen was offered materially different authority depending on which shell they
+  // happened to use. Both shells and the A2A surface now read one list (invariant 2, by construction).
+  const manifestsForConnections = CONNECTION_MANIFESTS;
   const [revokeTarget, setRevokeTarget] = useState(null);   // deviceId under the revoke ceremony
   const [mnemonic, setMnemonic] = useState(null);      // { words } | null when closed
   const [push, setPush] = useState({ supported: false, granted: false });   // S6.6 native push

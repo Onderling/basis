@@ -20,10 +20,16 @@ import { decodeInvite } from '../../src/core/wizards/joinGroupState.js';
 const ALLOWS = { c1: true };
 const decode = (uri) => { const s = {}; decodeInvite(uri, s); return s.invite; };
 
+// A FIXED expiry, not `Date.now() + …`. Every call used to mint its own, so the two `fullInvite()`
+// calls in "keeps everything a joiner still needs" produced invites whose `expiresAt` differed by a
+// millisecond whenever the clock ticked between them — a real 1-in-N red with nothing wrong in the
+// code under test. A fixture that is supposed to be the SAME invite twice has to actually be constant.
+const EXPIRES_AT = 1_800_000_000_000;   // fixed point, comfortably in the future
+
 const fullInvite = (over = {}) => encodeMembershipCodeUrl({
   groupId: 'c1',
   code: 'CODE-1',
-  expiresAt: Date.now() + 60 * 60_000,
+  expiresAt: EXPIRES_AT,
   adminPeerAddr: 'AAAAadminpubkey',
   adminNknAddr: 'nkn-addr',
   podBacked: true,

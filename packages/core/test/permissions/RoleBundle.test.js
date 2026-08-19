@@ -9,7 +9,7 @@
  *      `requiredRole` gate; a materialized token verifies through checkInbound;
  *   4. revoke → the materialized tokens no longer verify (revocation hook).
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import {
   ROLES, roleRank, isKnownRole, listKnownRoles, isStandardRole,
@@ -261,7 +261,7 @@ describe('RoleBundle enforcement — through PolicyEngine, not an inline check',
     // Revoke the role → the materialized token is on the revocation list …
     const { revokedTokenIds } = await mgr.revoke({ memberPubKey: W, groupId: GROUP });
     expect(revokedTokenIds).toEqual([tokens[0].id]);
-    expect(mgr.isRevoked(tokens[0].id)).toBe(true);
+    expect(await mgr.isRevoked(tokens[0].id)).toBe(true);
     // … and the governance role is gone.
     expect(await admin.gm.getRole(W, GROUP)).toBeNull();
 
@@ -283,8 +283,68 @@ describe('RoleBundle enforcement — through PolicyEngine, not an inline check',
     const first  = await mgr.grant({ memberPubKey: W, groupId: GROUP, roleId: 'warden' });
     const second = await mgr.grant({ memberPubKey: W, groupId: GROUP, roleId: 'warden' });
     // The first token is superseded → revoked; the second stands.
-    expect(mgr.isRevoked(first.tokens[0].id)).toBe(true);
-    expect(mgr.isRevoked(second.tokens[0].id)).toBe(false);
-    expect(mgr.materializedTokenIds(W, GROUP)).toEqual([second.tokens[0].id]);
+    expect(await mgr.isRevoked(first.tokens[0].id)).toBe(true);
+    expect(await mgr.isRevoked(second.tokens[0].id)).toBe(false);
+    expect(await mgr.materializedTokenIds(W, GROUP)).toEqual([second.tokens[0].id]);
+  });
+});
+
+/**
+ * REVOCATION MUST SURVIVE A RESTART.
+ *
+ * The revocation set was memory-only, while the tokens it revoked are signed by a stable identity and stay
+ * valid until their TTL. So every process restart silently re-admitted every holder that had been cut off —
+ * the one failure this whole mechanism exists to prevent, and invisible, because nothing throws when a Set
+ * comes back empty.
+ *
+ * The walk is deliberately shaped as "a new manager over the SAME store": that is what a reboot is.
+ */
+describe('revocation survives a restart', () => {
+  /** A vault-shaped {get,set} port, standing in for whatever durable medium a host supplies. */
+  const memStore = (map = new Map()) => ({
+    map,
+    async get(k) { return map.get(k) ?? null; },
+    async set(k, v) { map.set(k, v); },
+  });
+
+  it('a manager rebuilt over the same store still knows what was revoked', async () => {
+    const admin = await makeAdmin();
+    const GROUP = 'restart-circle';
+    registerRoleBundle({ id: 'keyholder', rank: 71, grants: [{ skill: 'door.open' }] });
+    const M = 'member-pk';
+    await admin.gm.issueProof(M, GROUP, { role: 'member' });
+
+    const store = memStore();
+    const before = new RoleGrantManager({ identity: admin.identity, groupManager: admin.gm, store });
+    const { tokens } = await before.grant({ memberPubKey: M, groupId: GROUP, roleId: 'keyholder' });
+    await before.revoke({ memberPubKey: M, groupId: GROUP });
+    expect(await before.isRevoked(tokens[0].id)).toBe(true);
+
+    // THE RESTART: a brand-new manager, same durable store, nothing carried over in memory.
+    const after = new RoleGrantManager({ identity: admin.identity, groupManager: admin.gm, store });
+    expect(
+      await after.isRevoked(tokens[0].id),
+      'the restarted process re-admitted a revoked token',
+    ).toBe(true);
+  });
+
+  it('without a store it is honestly ephemeral — and says so rather than pretending', async () => {
+    const admin = await makeAdmin();
+    const GROUP = 'ephemeral-circle';
+    registerRoleBundle({ id: 'guest', rank: 10, grants: [{ skill: 'door.peek' }] });
+    const M = 'guest-pk';
+    await admin.gm.issueProof(M, GROUP, { role: 'member' });
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const mgr = new RoleGrantManager({ identity: admin.identity, groupManager: admin.gm });
+    expect(warn, 'a memory-only revocation set must announce itself').toHaveBeenCalledWith(
+      expect.stringContaining('MEMORY-ONLY'),
+    );
+    warn.mockRestore();
+
+    const { tokens } = await mgr.grant({ memberPubKey: M, groupId: GROUP, roleId: 'guest' });
+    await mgr.revoke({ memberPubKey: M, groupId: GROUP });
+    // In-process it still works; it is only the restart that loses it, which is what the warning says.
+    expect(await mgr.isRevoked(tokens[0].id)).toBe(true);
   });
 });

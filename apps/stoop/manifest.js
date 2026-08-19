@@ -1149,6 +1149,373 @@ export const stoopManifest = {
         ui:   { control: 'page', label: 'Statistieken' },
       },
     },
+
+    // ── Joining, leaving, being removed ─────────────────────────────
+    // Membership is the SPINE: signed statements every member folds for themselves, not an admin's table.
+    // Five of these ops are thin wrappers whose state logic now lives in `@onderling/circles` (the §8c
+    // migration, landed); stoop keeps the key-custody seam (`grantKey`/`revokeKey`) and injects it. The
+    // params below are the SUBSTRATE's contract for those — read from circles, not guessed from the wrapper.
+    {
+      id:   'createGroupV2', verb: 'add',
+      // Logic: @onderling/circles circleCreate.js
+      params: [
+        { name: 'groupId',               kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'name',                  kind: 'string' },
+        { name: 'rules',                 kind: 'object' },
+        { name: 'storagePolicy',         kind: 'string' },
+        { name: 'groupPodUri',           kind: 'string' },
+        { name: 'inviteExpiresInHours',  kind: 'number' },
+        { name: 'inviteMaxRedemptions',  kind: 'number' },
+        { name: 'keyRotationMode',       kind: 'string' },
+        { name: 'rotationDays',          kind: 'number' },
+      ],
+      resolves: [{ field: 'membership', policy: 'spine' }],
+      surfaces: {
+        chat: { hint: 'Create a circle you administer, with its rules, storage policy and invite ceiling.' },
+        ui:   { control: 'page', label: 'Kring maken' },
+      },
+    },
+    {
+      id:   'redeemMembershipCode', verb: 'submit',
+      // Logic: @onderling/circles circleMembershipWriters.js. The joiner presents their own per-circle
+      // address WITH its proof; an unproven address is dropped at the substrate, never recorded.
+      params: [
+        { name: 'groupId',             kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'code',                kind: 'string', required: true, ...STR_NONEMPTY },
+        { name: 'circleAddress',       kind: 'string' },
+        { name: 'circleAddressProof',  kind: 'object' },
+      ],
+      resolves: [{ field: 'membership', policy: 'spine' }],
+      surfaces: {
+        chat: { hint: 'Join a circle by redeeming a membership code.' },
+        ui:   { control: 'page', label: 'Kring joinen' },
+      },
+    },
+    {
+      id:   'verifyMembershipCodeForPeer', verb: 'confirm',
+      // Logic: @onderling/circles. The ADMIN half of the peer-bridge join: when a joiner cannot redeem
+      // locally, the admin verifies and answers with a statement the joiner mirrors.
+      params: [
+        { name: 'groupId',             kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'code',                kind: 'string', required: true, ...STR_NONEMPTY },
+        { name: 'requesterWebid',      kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'circleAddress',       kind: 'string' },
+        { name: 'circleAddressProof',  kind: 'object' },
+      ],
+      resolves: [{ field: 'membership', policy: 'spine' }],
+      surfaces: {
+        chat: { hint: "Admin side of a peer-bridged join: verify a joiner's code and confirm them." },
+        ui:   { control: 'page', label: 'Ledenlijst' },
+      },
+    },
+    {
+      id:   'recordRemoteRedemption', verb: 'add',
+      // The JOINER's local mirror of an admin-confirmed join. Carries both sides' per-circle addresses with
+      // their proofs, so the joiner can reach the admin afterwards even with address-fallback off.
+      params: [
+        { name: 'groupId',                        kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'code',                           kind: 'string' },
+        { name: 'codeId',                         kind: 'string' },
+        { name: 'confirmedBy',                    kind: 'string' },
+        { name: 'confirmedByCircleAddress',       kind: 'string' },
+        { name: 'confirmedByCircleAddressProof',  kind: 'object' },
+        { name: 'circleAddress',                  kind: 'string' },
+        { name: 'circleAddressProof',             kind: 'object' },
+        { name: 'peerDisplay',                    kind: 'string' },
+        { name: 'expiresAt',                      kind: 'number' },
+        { name: 'rules',                          kind: 'object' },
+      ],
+      resolves: [{ field: 'membership', policy: 'spine' }],
+      surfaces: {
+        chat: { hint: 'Record a join an admin confirmed over the peer bridge (the joiner\u2019s own mirror).' },
+        ui:   { control: 'page', label: 'Kring joinen' },
+      },
+    },
+    {
+      id:   'removeMember', verb: 'remove',
+      // Logic: @onderling/circles. Admin-only, and NOT just a roster edit — it forces a key rotation and
+      // reseal, so a removed member cannot read what comes next. The island guarantee.
+      params: [
+        { name: 'groupId',         kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'memberWebid',     kind: 'string' },
+        { name: 'memberStableId',  kind: 'string' },
+        { name: 'reason',          kind: 'string' },
+        { name: 'policy',          kind: 'object' },
+      ],
+      surfaces: {
+        chat: { hint: 'Remove a member from a circle. Admin-only; forces a key rotation and reseal.' },
+        ui:   { control: 'button', label: 'Lid verwijderen' },
+      },
+    },
+    {
+      id:   'listGroupRoster', verb: 'list',
+      // Logic: @onderling/circles listCircleRoster — including the foreign-caller gate, so a non-member
+      // asking for a roster is refused at the substrate rather than by the caller remembering to check.
+      params: [{ name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY }],
+      surfaces: {
+        chat: { hint: "A circle's roster. Refused for a caller who is not in that circle." },
+        ui:   { control: 'page', label: 'Ledenlijst' },
+      },
+    },
+    {
+      id:   'getCurrentMembershipCode', verb: 'get',
+      params: [{ name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY }],
+      surfaces: {
+        chat: { hint: "The circle's current membership code, for sharing an invite." },
+        ui:   { control: 'page', label: 'Uitnodigen' },
+      },
+    },
+    {
+      id:   'rotateMyGroupCode', verb: 'revoke',
+      // Rotating INVALIDATES the old code — that is the point, and why it is `revoke` rather than `update`.
+      params: [
+        { name: 'groupId',               kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'inviteExpiresInHours',  kind: 'number' },
+        { name: 'maxRedemptions',        kind: 'number' },
+      ],
+      resolves: [{ field: 'code', policy: 'spine' }],
+      surfaces: {
+        chat: { hint: 'Issue a fresh membership code and invalidate the previous one.' },
+        ui:   { control: 'button', label: 'Nieuwe code' },
+      },
+    },
+    {
+      id:   'editGroupRules', verb: 'update',
+      params: [
+        { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'rules',   kind: 'object', required: true },
+      ],
+      resolves: [{ field: 'rules', policy: 'content' }],
+      surfaces: {
+        chat: { hint: "Edit a circle's rules document." },
+        ui:   { control: 'page', label: 'Kringregels' },
+      },
+    },
+    {
+      id:   'postAnnouncement', verb: 'add',
+      params: [
+        { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'text',    kind: 'string', required: true, ...STR_NONEMPTY },
+      ],
+      resolves: [{ field: 'text', policy: 'content' }],
+      surfaces: {
+        chat: { hint: 'Post an announcement to a circle (admin).' },
+        ui:   { control: 'button', label: 'Mededeling' },
+      },
+    },
+    {
+      id:   'whoAmI', verb: 'get',
+      params: [],
+      surfaces: {
+        chat: { hint: 'Who the caller is on this device — webid, stable id, handle.' },
+        ui:   { control: 'page', label: 'Mijn profiel' },
+      },
+    },
+
+    // ── Reaching each other ─────────────────────────────────────────
+    {
+      id:   'recordPeerIntro', verb: 'add',
+      // A peer announcing itself with an address. Recorded, not trusted: the address still has to prove
+      // itself against the roster before anything is sent to it.
+      params: [
+        { name: 'groupId',      kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'peerAddr',     kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'peerDisplay',  kind: 'string' },
+      ],
+      resolves: [{ field: 'peerAddr', policy: 'content' }],
+      surfaces: {
+        chat: { hint: "Record a peer's introduction (address + display name) for a circle." },
+        ui:   { control: 'page', label: 'Ledenlijst' },
+      },
+    },
+    {
+      id:   'addContactFromQr', verb: 'add',
+      params: [{ name: 'payload', kind: 'object', required: true }],
+      resolves: [{ field: 'contact', policy: 'content' }],
+      surfaces: {
+        chat: { hint: 'Add a contact from a scanned QR payload.' },
+        ui:   { control: 'button', label: 'Contact scannen' },
+      },
+    },
+    {
+      id:   'acceptResponder', verb: 'confirm',
+      params: [
+        { name: 'requestId',       kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'responderWebid',  kind: 'string', required: true, ...ID_NONEMPTY },
+      ],
+      resolves: [{ field: 'contact', policy: 'content' }],
+      resolves: [{ field: 'acceptedBy', policy: 'claim' }],
+      surfaces: {
+        chat: { hint: 'Accept one of the people who responded to a request.' },
+        ui:   { control: 'button', label: 'Accepteren' },
+      },
+    },
+    {
+      id:   'listMutedPeers', verb: 'list',
+      params: [{ name: 'handle', kind: 'string' }],
+      surfaces: {
+        chat: { hint: 'The peers muted on this device.' },
+        ui:   { control: 'page', label: 'Gedempt' },
+      },
+    },
+    {
+      id:   'unmutePeer', verb: 'mute',
+      // Takes peerStableId OR peerWebid — the handler refuses when neither is given, so neither is
+      // marked required on its own.
+      params: [
+        { name: 'peerStableId', kind: 'string' },
+        { name: 'peerWebid',    kind: 'string' },
+      ],
+      surfaces: {
+        chat: { hint: 'Unmute a peer, by stable id or webid.' },
+        ui:   { control: 'button', label: 'Dempen opheffen' },
+      },
+    },
+
+    // ── The circle fan ──────────────────────────────────────────────
+    // The send/receive halves of circle-scoped fan-out. `msgId` + `ts` are the dedup pair: replay is normal
+    // on a mesh, so every receiver must be idempotent, and these carry what makes that possible.
+    // The INGEST ops take `fromPeerAddr` + `fromPubKey` from the AUTHENTICATED envelope, never the payload.
+    {
+      id:   'broadcastCircleMembership', verb: 'share',
+      params: [
+        { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'event',   kind: 'object', required: true },
+        { name: 'msgId',   kind: 'string' },
+        { name: 'ts',      kind: 'number' },
+      ],
+      surfaces: {
+        chat: { hint: 'Fan a membership event to a circle.' },
+        ui:   { control: 'page', label: 'Ledenlijst' },
+      },
+    },
+    {
+      id:   'broadcastCircleChatStatement', verb: 'share',
+      params: [
+        { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'event',   kind: 'object', required: true },
+        { name: 'msgId',   kind: 'string' },
+        { name: 'ts',      kind: 'number' },
+      ],
+      surfaces: {
+        chat: { hint: 'Fan a signed chat statement to a circle.' },
+        ui:   { control: 'page', label: 'Gesprekken' },
+      },
+    },
+    {
+      id:   'broadcastCircleTask', verb: 'share',
+      params: [
+        { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'event',   kind: 'object', required: true },
+        { name: 'msgId',   kind: 'string' },
+        { name: 'ts',      kind: 'number' },
+      ],
+      surfaces: {
+        chat: { hint: 'Fan a task statement to a circle.' },
+        ui:   { control: 'page', label: 'Taken' },
+      },
+    },
+    {
+      id:   'broadcastCirclePolicy', verb: 'share',
+      params: [
+        { name: 'groupId',    kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'policy',     kind: 'object', required: true },
+        { name: 'fromActor',  kind: 'string' },
+        { name: 'msgId',      kind: 'string' },
+        { name: 'ts',         kind: 'number' },
+      ],
+      surfaces: {
+        chat: { hint: "Fan a circle's policy to its members." },
+        ui:   { control: 'page', label: 'Kringinstellingen' },
+      },
+    },
+    {
+      id:   'broadcastCircleRules', verb: 'share',
+      params: [
+        { name: 'groupId',    kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'rulesDoc',   kind: 'object', required: true },
+        { name: 'fromActor',  kind: 'string' },
+        { name: 'msgId',      kind: 'string' },
+        { name: 'ts',         kind: 'number' },
+      ],
+      surfaces: {
+        chat: { hint: "Fan a circle's rules document to its members." },
+        ui:   { control: 'page', label: 'Kringregels' },
+      },
+    },
+    {
+      id:   'broadcastCircleRecipe', verb: 'share',
+      params: [
+        { name: 'groupId',    kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'recipe',     kind: 'object', required: true },
+        { name: 'fromActor',  kind: 'string' },
+        { name: 'msgId',      kind: 'string' },
+        { name: 'ts',         kind: 'number' },
+      ],
+      surfaces: {
+        chat: { hint: 'Fan a circle recipe (a shared template) to its members.' },
+        ui:   { control: 'page', label: 'Kringinstellingen' },
+      },
+    },
+    {
+      id:   'broadcastCircleAddresses', verb: 'share',
+      // Logic: @onderling/circles fanCircleAddresses. The send half of address announcing — each
+      // announcement carries its own proof, and the receiver verifies before recording.
+      params: [
+        { name: 'groupId',        kind: 'string', ...ID_NONEMPTY },
+        { name: 'announcements',  kind: 'object', schema: { type: 'array' } },
+        { name: 'to',             kind: 'object', schema: { type: 'array', items: { type: 'string' } } },
+        { name: 'msgId',          kind: 'string' },
+        { name: 'ts',             kind: 'number' },
+      ],
+      surfaces: {
+        chat: { hint: 'Announce this device\u2019s per-circle addresses to a circle, each with its proof.' },
+        ui:   { control: 'page', label: 'Verbindingen' },
+      },
+    },
+    {
+      id:   'recordCircleAddressAnnouncement', verb: 'add',
+      // Logic: @onderling/circles recordCircleAddress. The RECEIVE half — the proof is verified here and
+      // an unproven address is dropped, which is what stops a peer claiming somebody else's address.
+      params: [
+        { name: 'groupId',             kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'memberWebid',         kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'circleAddress',       kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'circleAddressProof',  kind: 'object', required: true },
+        { name: 'personaProperties',   kind: 'object' },
+      ],
+      resolves: [{ field: 'circleAddress', policy: 'spine' }],
+      surfaces: {
+        chat: { hint: "Record a member's PROVEN per-circle address. An unproven one is dropped." },
+        ui:   { control: 'page', label: 'Ledenlijst' },
+      },
+    },
+    {
+      id:   'ingestCircleMessage', verb: 'add',
+      params: [
+        { name: 'fromPeerAddr', kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'fromPubKey',   kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'payload',      kind: 'object', required: true },
+      ],
+      resolves: [{ field: 'text', policy: 'content' }],
+      surfaces: {
+        chat: { hint: 'Ingest a circle message from an authenticated peer.' },
+        ui:   { control: 'page', label: 'Gesprekken' },
+      },
+    },
+    {
+      id:   'ingestRemotePost', verb: 'add',
+      params: [
+        { name: 'fromPeerAddr', kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'fromPubKey',   kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'payload',      kind: 'object', required: true },
+      ],
+      resolves: [{ field: 'text', policy: 'content' }],
+      surfaces: {
+        chat: { hint: 'Ingest a bulletin post from an authenticated peer.' },
+        ui:   { control: 'page', label: 'Prikbord' },
+      },
+    },
   ],
 
   // first stoop web page via renderWeb.

@@ -100,8 +100,8 @@ describe('stoop manifest — Slice D.1 structural invariants', () => {
   // the op set grew from the D.1 ~14 to 33.  2026-07-18: +1 for the
   // legacy `setMySkills` alias op (kept so the old `/skills` slash trigger
   // still dispatches after the skill→offering op-id rename) → 34.
-  it('ships the full chat+slash surface (one stoop manifest, 66 ops)', () => {
-    expect(stoopManifest.operations.length).toBe(66);
+  it('ships the full chat+slash surface (one stoop manifest, 92 ops)', () => {
+    expect(stoopManifest.operations.length).toBe(92);
   });
 
   // No two ops may declare the same slash command (Part G hard guardrail

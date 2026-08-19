@@ -31,7 +31,7 @@ describe('curated patterns FLAG real internal codenames', () => {
   const cases = [
     ['// cluster K · K2 — composable lists', 'cluster-K'],
     ['// the K2 containment substrate', 'K-spike'],
-    ['// SP-13.2 — kring stream', 'SP-n'],
+    ['// SP-13.2 — circle stream', 'SP-n'],
     ['// SP-3b consumer-switch', 'SP-n'],
     ['// board 5B shows action buttons', 'board-n'],
     ['// Q27 confirm gate', 'Q-n'],

@@ -12,7 +12,7 @@
  * **sealing** keys + WebIDs — and sealing is a ONE-WAY ed2curve derivation of the
  * signing key (non-invertible), so the roster itself cannot yield it. The signing
  * key lives in the `MemberMap`: `members.resolveByWebid(webid).pubKey` — the SAME
- * resolution the kring/chat fan-out uses (`wireChat.send`'s `toPubKey`). We reuse
+ * resolution the circle/chat fan-out uses (`wireChat.send`'s `toPubKey`). We reuse
  * it here; no second source, no guessing.
  *
  * A member whose `pubKey` doesn't resolve (a code-redeemer before the redeem-time

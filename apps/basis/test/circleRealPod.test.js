@@ -44,7 +44,7 @@ describe('realPodRouting', () => {
   });
 
   it('honours a custom circles path', () => {
-    const r = realPodRouting(session, { ...deps, circlesPath: 'kringen' });
-    expect(r.circleRootUri('c1')).toBe('https://me.pod/kringen/c1');
+    const r = realPodRouting(session, { ...deps, circlesPath: 'circles' });
+    expect(r.circleRootUri('c1')).toBe('https://me.pod/circles/c1');
   });
 });

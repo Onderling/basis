@@ -60,7 +60,7 @@
       "text": "A neighbourhood: pairwise reveal, per-member pods, co-admin consensus. Noticeboard-first — open chat off by default.",
       "doc": "N2 — consequence note for a radio option (Gevolgen als je dit kiest)."
     },
-    "vriendenkring": {
+    "friends": {
       "text": "A friend group: relaxed, open reveal, no house rules or member directory. Chat on by default.",
       "doc": "N2 — consequence note for a radio option (Gevolgen als je dit kiest)."
     },

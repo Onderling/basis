@@ -24,7 +24,7 @@ import { t } from '../src/core/localisation.js';
 describe('D / Surface 2 — mobile CircleDetail action roster from the manifest projection', () => {
   it('projects the detail actions (default policy) in live-web-menu order, invite/contacts/share included', () => {
     const ids = circleActionsMobile(basisManifest, { policy: DEFAULT_CIRCLE_POLICY }).map((a) => a.id);
-    // ONE manifest declaration; order mirrors the live web kring menu (back first
+    // ONE manifest declaration; order mirrors the live web circle menu (back first
     // for the detail bar — the ⋯ menus filter it out in-shell).
     expect(ids).toEqual([
       'back', 'invite', 'settings', 'lists', 'contacts', 'override', 'viewAs',

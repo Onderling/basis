@@ -73,9 +73,9 @@ export function buildCircleStream({ events = [], circles = [] } = {}) {
 }
 
 /**
- * kring-scoped Stream projection (right 8C). Tap
- * a kring on the launcher and you land on its content surface: the
- * cross-kring `buildCircleStream` rows narrowed to a single circle,
+ * circle-scoped Stream projection (right 8C). Tap
+ * a circle on the launcher and you land on its content surface: the
+ * cross-circle `buildCircleStream` rows narrowed to a single circle,
  * optionally filtered by a row "kind" (vraag / aanbod / leen / chore /
  * reminder — same enum the chips on render).
  *
@@ -93,21 +93,21 @@ export function buildCircleStream({ events = [], circles = [] } = {}) {
  * THE projector — every circle surface is this function with different arguments.
  *
  * Two axes, and naming them is half the point. Before this there were three functions whose names hid what
- * differed — and two of them were the same word in two languages (`buildCircleStream` / `buildKringStream`;
- * *kring* IS circle), so a reader could not tell which selected a SCOPE and which selected CONTENT.
+ * differed — and two of them were the same word in two languages (`buildCircleStream` / `buildCircleStream`;
+ * *circle* IS circle), so a reader could not tell which selected a SCOPE and which selected CONTENT.
  *
  *   • **scope**   — `circleId`: one circle, a LIST of them, or null for all
  *   • **content** — `lane` (human vs system) and/or `kinds` (specific entry types)
  *
  * A combine-and-filter surface is then just a control that sets these two, not a new query path. Screens
- * (`userScreens.js`) already express exactly this shape — `kringFilter` is scope, `blocks` is content — so
+ * (`userScreens.js`) already express exactly this shape — `circleFilter` is scope, `blocks` is content — so
  * accepting a circle LIST here is what lets `userScreenBlocks` stop looping per circle and merging by hand.
  *
  * @param {object}   [opts]
  * @param {object[]} [opts.events]    LoggedEvent[] (newest-first)
  * @param {object[]} [opts.circles]   normalized circles, for the tag
  * @param {?string|string[]} [opts.circleId]  null = every circle
- * @param {?string}  [opts.kindFilter]  one of KRING_STREAM_KIND_FILTERS, or null
+ * @param {?string}  [opts.kindFilter]  one of CIRCLE_STREAM_KIND_FILTERS, or null
  * @param {?string[]} [opts.kinds]      explicit entry kinds to keep (null = any)
  * @param {?string}  [opts.lane]        'human' keeps conversation only; null = both lanes
  * @returns {ReturnType<typeof buildCircleStream>}
@@ -261,16 +261,18 @@ export function agentTrailRows({ actor, ...opts } = {}) {
   return projectEntries({ ...opts, actor });
 }
 
-/* ── Back-compat aliases ─────────────────────────────────────────────────────
- * The old names, kept so this stays a rename rather than a migration. `buildKringStream`/`buildCircleChat`
- * are re-pointed at the wrappers; call sites move over as they are touched.
+/* The Dutch aliases that used to live here (`buildKringStream`/`buildKringChat`) are gone. They existed
+ * so an earlier rename could be gradual; the standing rule is no backwards compatibility, and keeping a
+ * second name for one function is how a codebase ends up with two words for the same thing — which is
+ * exactly what this sweep is removing. `circleRows` and `chatRows` are the names; `buildCircleStream`
+ * above is the cross-circle builder they wrap.
+ *
+ * `buildCircleChat` stays: unlike the stream one it never collided with anything — it simply IS the
+ * English name for `chatRows`, and it has importers.
  */
 
-/** @deprecated use `circleRows` — the name says which axis it selects. */
-export const buildKringStream = circleRows;
-
-/** @deprecated use `chatRows`. */
+/** The single-circle chat rows. (`chatRows` is the newer spelling; both name one function.) */
 export const buildCircleChat = chatRows;
 
 /** Kind keys the filter strip exposes, in render order. */
-export const KRING_STREAM_KIND_FILTERS = ['all', 'vraag', 'aanbod', 'leen'];
+export const CIRCLE_STREAM_KIND_FILTERS = ['all', 'vraag', 'aanbod', 'leen'];

@@ -40,7 +40,7 @@ describe('the custody cutover — delegation boots without the root', () => {
 
     // The delegation boot: works, and cannot give the phrase up.
     const dev2 = await createRealHouseholdAgent({ seedHousehold: false, ownerRootVault, rootKeyStore, chatVault });
-    expect(typeof dev2.circleAddressFor('kring-x')).toBe('string');
+    expect(typeof dev2.circleAddressFor('circle-x')).toBe('string');
     const reveal = await dev2.callSkill('household', 'revealOwnerPhrase', {});
     expect(reveal?.mnemonic).toBeUndefined();
     expect(reveal?.error).toBe('phrase-not-stored');
@@ -52,7 +52,7 @@ describe('the custody cutover — delegation boots without the root', () => {
     });
     expect(wrong.outcome === 'wrong-phrase' || wrong.outcome === 'invalid-phrase').toBe(true);
     const right = await dev2.callSkill('household', 'revokeDevice', {
-      mnemonic: phrase, deviceId: 'some-lost-device', circleIds: ['kring-x'],
+      mnemonic: phrase, deviceId: 'some-lost-device', circleIds: ['circle-x'],
     });
     expect(right.ok).toBe(true);
   }, 120_000);
@@ -66,11 +66,11 @@ describe('the custody cutover — delegation boots without the root', () => {
     const phrase = (await dev.callSkill('household', 'revealOwnerPhrase', {}))?.mnemonic;
     const rootSeed = Bootstrap.fromMnemonic(phrase).secret;
     expect((await readCustodyMode(ownerRootVault)).mode).toBe('root');
-    const addrBefore = dev.circleAddressFor('kring-m');
+    const addrBefore = dev.circleAddressFor('circle-m');
 
     // Its next ceremony (any phrase act — here a revoke) migrates it.
     const r = await dev.callSkill('household', 'revokeDevice', {
-      mnemonic: phrase, deviceId: 'a-lost-device', circleIds: ['kring-m'],
+      mnemonic: phrase, deviceId: 'a-lost-device', circleIds: ['circle-m'],
     });
     expect(r.ok).toBe(true);
     expect(r.migrated).toBe(true);
@@ -87,7 +87,7 @@ describe('the custody cutover — delegation boots without the root', () => {
     // an unenrolled root device derives per-circle from the profile seed; its self-enrollment
     // makes the delegation THE derivation root — a new, distinct address (announced at boot in
     // production, exactly like any enrolled device's)
-    expect(typeof dev2.circleAddressFor('kring-m')).toBe('string');
-    expect(dev2.circleAddressFor('kring-m')).not.toBe(addrBefore);
+    expect(typeof dev2.circleAddressFor('circle-m')).toBe('string');
+    expect(dev2.circleAddressFor('circle-m')).not.toBe(addrBefore);
   }, 120_000);
 });

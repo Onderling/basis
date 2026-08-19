@@ -9,7 +9,7 @@
  *      dashed "+ vaardigheid of drijfveer" inline form,
  *   2. PERSONA'S — one card per profile; the root card is the truth layer
  *      (rust border); other cards show per key: volgt-algemeen / EIGEN / ∅,
- *   3. PER KRING — who sees what, as stacked cards per circle (a table is
+ *   3. PER CIRCLE — who sees what, as stacked cards per circle (a table is
  *      cramped on mobile — listed web/mobile idiom difference): persona ·
  *      key · niveau · released value · charter line, with the share/withdraw
  *      actions and the dashed share-affordance.
@@ -369,7 +369,7 @@ export default function CircleMijScreen({ callSkill, sendPersonaUpdate, lastShar
         )}
       </Section>
 
-      {/* ── 3 · PER KRING — wie ziet wat (stacked cards, mobile idiom) ────── */}
+      {/* ── 3 · PER CIRCLE — wie ziet wat (stacked cards, mobile idiom) ────── */}
       <Section eyebrowKey="circle.mij.circles_eyebrow" taglineKey="circle.mij.circles_tagline">
         {!(model.circles || []).length ? (
           <Text style={styles.empty}>{t('circle.mij.no_circles')}</Text>

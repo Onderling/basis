@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { materializeScreen } from '../../src/v2/userScreenBlocks.js';
-import { emptyScreen, addKringToScreen } from '../../src/v2/userScreens.js';
-import { addBlock } from '../../src/v2/kringRecipe.js';
+import { emptyScreen, addCircleToScreen } from '../../src/v2/userScreens.js';
+import { addBlock } from '../../src/v2/circleRecipe.js';
 
 function fakeEventLog(events = []) {
   return { query: () => events };
@@ -25,7 +25,7 @@ const events = [
 ];
 
 /* ─────────────────────────────────────────────────────────────────── */
-/* Kring-agnostic blocks                                              */
+/* Circle-agnostic blocks                                              */
 /* ─────────────────────────────────────────────────────────────────── */
 
 describe('materializeScreen · α.2.b — empty + agnostic blocks', () => {
@@ -34,7 +34,7 @@ describe('materializeScreen · α.2.b — empty + agnostic blocks', () => {
     expect(await materializeScreen({ screen: { blocks: [] } })).toEqual([]);
   });
 
-  it('announcement/text/photo render unchanged from per-kring materializer', async () => {
+  it('announcement/text/photo render unchanged from per-circle materializer', async () => {
     const screen = addBlock(addBlock(addBlock(
       emptyScreen('Stream'),
       'announcement', { text: 'Hi!' }),
@@ -49,11 +49,11 @@ describe('materializeScreen · α.2.b — empty + agnostic blocks', () => {
 });
 
 /* ─────────────────────────────────────────────────────────────────── */
-/* noticeboard: cross-kring merge                                     */
+/* noticeboard: cross-circle merge                                     */
 /* ─────────────────────────────────────────────────────────────────── */
 
-describe('materializeScreen · α.2.b — noticeboard (multi-kring)', () => {
-  it('ALL_KRINGEN: merges every circle\'s stream rows, newest-first', async () => {
+describe('materializeScreen · α.2.b — noticeboard (multi-circle)', () => {
+  it('ALL_CIRCLES: merges every circle\'s stream rows, newest-first', async () => {
     const screen = addBlock(emptyScreen('Stream'), 'noticeboard', { limit: 10 });
     const out = await materializeScreen({
       screen,
@@ -72,9 +72,9 @@ describe('materializeScreen · α.2.b — noticeboard (multi-kring)', () => {
     expect(out[0].content.items.map((r) => r.id)).toEqual(['e4', 'e3']);
   });
 
-  it('kringFilter narrows to the picked circles', async () => {
+  it('circleFilter narrows to the picked circles', async () => {
     let screen = addBlock(emptyScreen('Selwerd'), 'noticeboard', { limit: 10 });
-    screen = addKringToScreen(screen, 'g1');
+    screen = addCircleToScreen(screen, 'g1');
     const out = await materializeScreen({
       screen,
       hostOps: { circles, eventLog: fakeEventLog(events) },
@@ -149,9 +149,9 @@ describe('materializeScreen · α.2.b — agenda', () => {
 /* ─────────────────────────────────────────────────────────────────── */
 
 describe('materializeScreen · α.2.b — rules', () => {
-  it('single-kring filter: pulls that kring\'s rules, no multiKring flag', async () => {
+  it('single-circle filter: pulls that circle\'s rules, no multiCircle flag', async () => {
     let screen = addBlock(emptyScreen('Selwerd'), 'rules');
-    screen = addKringToScreen(screen, 'g1');
+    screen = addCircleToScreen(screen, 'g1');
     const callSkill = vi.fn(async () => ({
       rules: { source: { doc: { purpose: 'Buurt zijn' } } },
     }));
@@ -162,11 +162,11 @@ describe('materializeScreen · α.2.b — rules', () => {
     expect(callSkill).toHaveBeenCalledWith('stoop', 'getGroupRules', { groupId: 'g1' });
     expect(out[0].status).toBe('ok');
     expect(out[0].content.doc.purpose).toBe('Buurt zijn');
-    expect(out[0].content.multiKring).toBe(false);
+    expect(out[0].content.multiCircle).toBe(false);
     expect(out[0].content.shownCircleId).toBe('g1');
   });
 
-  it('multi-kring (ALL with > 1 circle): pulls FIRST kring, multiKring=true', async () => {
+  it('multi-circle (ALL with > 1 circle): pulls FIRST circle, multiCircle=true', async () => {
     const screen = addBlock(emptyScreen('Stream'), 'rules');
     const callSkill = vi.fn(async () => ({
       rules: { source: { doc: { purpose: 'Zomaar' } } },
@@ -175,14 +175,14 @@ describe('materializeScreen · α.2.b — rules', () => {
       screen,
       hostOps: { circles, callSkill },
     });
-    expect(out[0].content.multiKring).toBe(true);
+    expect(out[0].content.multiCircle).toBe(true);
     // First circle in the list is g1.
     expect(callSkill.mock.calls[0][2]).toEqual({ groupId: 'g1' });
   });
 
   it('empty rules doc: status empty', async () => {
     let screen = addBlock(emptyScreen('Selwerd'), 'rules');
-    screen = addKringToScreen(screen, 'g1');
+    screen = addCircleToScreen(screen, 'g1');
     const callSkill = vi.fn(async () => ({ rules: null }));
     const out = await materializeScreen({
       screen,
@@ -191,7 +191,7 @@ describe('materializeScreen · α.2.b — rules', () => {
     expect(out[0].status).toBe('empty');
   });
 
-  it('no kringen / no callSkill: empty', async () => {
+  it('no circles / no callSkill: empty', async () => {
     const screen = addBlock(emptyScreen('Stream'), 'rules');
     const out = await materializeScreen({ screen, hostOps: { circles: [] } });
     expect(out[0].status).toBe('empty');
@@ -202,8 +202,8 @@ describe('materializeScreen · α.2.b — rules', () => {
 /* Error tolerance                                                    */
 /* ─────────────────────────────────────────────────────────────────── */
 
-describe('materializeScreen · α.4 — tasks block (multi-kring)', () => {
-  it('ALL_KRINGEN: queries each circle and merges; assignee filter applies', async () => {
+describe('materializeScreen · α.4 — tasks block (multi-circle)', () => {
+  it('ALL_CIRCLES: queries each circle and merges; assignee filter applies', async () => {
     const calls = [];
     const callSkill = vi.fn(async (app, op, args) => {
       calls.push([app, op, args]);
@@ -252,7 +252,7 @@ describe('materializeScreen · α.4 — tasks block (multi-kring)', () => {
       .toEqual(['t-g1-mine', 't-g3-mine'].sort());
   });
 
-  it('scope:"all" returns every open task across active kringen', async () => {
+  it('scope:"all" returns every open task across active circles', async () => {
     const callSkill = vi.fn(async (app, op, args) => ({ items: [
       { id: `${args.circleId}-a`, assignee: 'webid:me' },
       { id: `${args.circleId}-b` },  // unassigned

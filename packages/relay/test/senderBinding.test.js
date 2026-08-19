@@ -134,7 +134,7 @@ describe('relay sender binding — a socket may only send as an address it regis
     // Not a loophole worth closing here: the receiving SecurityLayer rejects a senderless envelope with
     // UNKNOWN_SENDER before any application sees it. Refusing it at the relay would break the several
     // callers that hand `_put` a bare payload object, and buy nothing.
-    send(bram, { type: 'send', to: addr('anna'), envelope: { subtype: 'kring-chat-message', text: 'hoi' } });
+    send(bram, { type: 'send', to: addr('anna'), envelope: { subtype: 'circle-chat-message', text: 'hoi' } });
 
     await waitFor(() => anna.messages.some((m) => m.type === 'message'));
     expect(anna.messages.find((m) => m.type === 'message').envelope.text).toBe('hoi');
@@ -232,7 +232,7 @@ describe('WsServerTransport sender binding', () => {
     const anna = await registered(addr('anna'));
     const bram = await registered(addr('bram'));
 
-    send(bram, { type: 'send', to: addr('anna'), envelope: { subtype: 'kring-chat-message', text: 'hoi' } });
+    send(bram, { type: 'send', to: addr('anna'), envelope: { subtype: 'circle-chat-message', text: 'hoi' } });
     await waitFor(() => anna.messages.some((m) => m.type === 'message'));
     expect(anna.messages.find((m) => m.type === 'message').envelope.text).toBe('hoi');
 

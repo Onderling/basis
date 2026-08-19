@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { bootRealAgentNode, connectAgentsOverNkn, pairCircle, until, teardown } from '../support/pairRealAgents.js';
 
 // GATE over REAL public NKN (the browser's other transport). Relay-only + InternalTransport
-// already pass; this proves the SAME real receiver ingests a kring chat over genuine public
+// already pass; this proves the SAME real receiver ingests a circle chat over genuine public
 // NKN — chat + redeem + HI end-to-end on the mesh, not just in-process.
 //
 // PATIENCE: NKN has a multi-second cold-start — a freshly-connected peer's presence must
@@ -22,7 +22,7 @@ import { bootRealAgentNode, connectAgentsOverNkn, pairCircle, until, teardown } 
 // in two of your circles routes to the same address — which is exactly the trade the per-user address
 // fallback already expresses. If we allow NKN circles on those terms, un-skip this.
 // → `REMAINING-WORK.md` P0.
-describe.skip('GATE — kring chat via the REAL receiver over REAL NKN', () => {
+describe.skip('GATE — circle chat via the REAL receiver over REAL NKN', () => {
   it('broadcastCircleMessage A -> B ingests over NKN', async () => {
     // Larger redeem budget to absorb the mesh cold-start on each leg of the round-trip.
     const A = await bootRealAgentNode('A', { redeemTimeoutMs: 45_000 });

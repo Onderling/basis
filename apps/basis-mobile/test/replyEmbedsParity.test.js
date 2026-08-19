@@ -1,5 +1,5 @@
 /**
- * S6.A (mobile parity) — the inline-button substrate the kring screen relies on:
+ * S6.A (mobile parity) — the inline-button substrate the circle screen relies on:
  * mobile's buildManifestsByOrigin() feeds the SHARED embedButtonsForReply, so a
  * bot reply's items get the same appliesTo-gated manifest buttons as web. The RN
  * render of payload.buttons + the onBubbleButton→dispatch wiring are exercised on

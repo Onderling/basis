@@ -102,8 +102,8 @@ describe('createCirclePodProducer', () => {
     await router.addMember({ webId: 'did:bob', publicKey: bob.publicKey, role: 'member', groupId: 'rg' });
     // now bob can open content sealed by the circle (the local self identity)
     const self = await prod.sealingIdentity.ensure();
-    const sealed = (await prod.controlAgent.sealingStrategy(self.privateKey)).seal('voor de hele kring');
-    expect((await prod.controlAgent.sealingStrategy(bob.privateKey)).open(sealed)).toBe('voor de hele kring');
+    const sealed = (await prod.controlAgent.sealingStrategy(self.privateKey)).seal('voor de hele circle');
+    expect((await prod.controlAgent.sealingStrategy(bob.privateKey)).open(sealed)).toBe('voor de hele circle');
 
     // leave → revoke + rotate; bob can no longer unwrap (forward secrecy)
     await router.removeMember({ webId: 'did:bob', groupId: 'rg' });
@@ -188,8 +188,8 @@ describe('circle group-key provisioning → getCircleSealStrategy activates L1b'
       const ds = createSealedPodDataSource({ podSource: memPodSource(), strategy });
       expect(ds.sealed).toBe(true);
       const uri = `${prod.circleRootUri}/items/x.json`;
-      await ds.write(uri, JSON.stringify({ hoi: 'kring' }));
-      expect(JSON.parse(await ds.read(uri))).toEqual({ hoi: 'kring' });
+      await ds.write(uri, JSON.stringify({ hoi: 'circle' }));
+      expect(JSON.parse(await ds.read(uri))).toEqual({ hoi: 'circle' });
       expect(await ds.list(`${prod.circleRootUri}/items/`)).toEqual([uri]);
     });
 

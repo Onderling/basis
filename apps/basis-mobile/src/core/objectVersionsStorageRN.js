@@ -1,7 +1,7 @@
 /**
  * basis-mobile v2 — AsyncStorage-backed `versions` adapter for the
- * shared kring stores (γ.2 / Phase 9; consolidated onto `@onderling/versioning`
- * per plans/PLAN-pod-versioning-history-recovery.md "Rewire kring").
+ * shared circle stores (γ.2 / Phase 9; consolidated onto `@onderling/versioning`
+ * per plans/PLAN-pod-versioning-history-recovery.md "Rewire circle").
  *
  * Mirror of web's `localStorageObjectVersions`: the shared factory
  * (`createObjectVersionsAdapter`, kring-host) composes the versioning
@@ -22,7 +22,7 @@
 import { createObjectVersionsAdapter } from '@onderling/kring-host/objectVersionsStorage';
 import { createAsBackend } from '@onderling/react-native/pseudo-pod-adapter';
 
-/** AsyncStorage scope for kring version history (disjoint from `pp:`). */
+/** AsyncStorage scope for circle version history (disjoint from `pp:`). */
 export const VERSIONS_AS_SCOPE = 'ccv';
 
 /**

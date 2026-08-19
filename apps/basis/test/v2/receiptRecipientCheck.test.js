@@ -23,7 +23,7 @@ function logWith(entries) {
   return { query: () => entries };
 }
 
-const SENT = [{ id: 'm1', ts: 1, app: 'kring', type: 'chat-message', actor: 'me', payload: { circleId: 'c1', text: 'hoi' } }];
+const SENT = [{ id: 'm1', ts: 1, app: 'circle', type: 'chat-message', actor: 'me', payload: { circleId: 'c1', text: 'hoi' } }];
 
 /** A map with `m1` already marked pending, i.e. a message THIS device sent. */
 function mapWithPendingM1() {

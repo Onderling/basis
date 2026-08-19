@@ -20,7 +20,7 @@ import { sealingPublicKeyFromNetworkKey } from '@onderling/pod-client';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST } from '../src/v2/membershipRail.js';
 import { EventLog } from '../src/eventLog.js';
 
-const GROUP = 'kring-revoke-test';
+const GROUP = 'circle-revoke-test';
 
 const rowFor = async (node, webid) => {
   const res = await node.agent.callSkill('stoop', 'listGroupMembers', { groupId: GROUP });
@@ -171,7 +171,7 @@ describe('the device-revocation ceremony — the V2 stolen-device walk', () => {
     });
     expect(islandMsg?.statement).toBeTruthy();
     await B._routerRef.fn({ from: 'island', payload: {
-      subtype: 'kring-chat-statement', circleId: GROUP,
+      subtype: 'circle-chat-statement', circleId: GROUP,
       msgId: 'island-1', ts: Date.now(), event: islandMsg.statement, fromWebid: A2.pubKey,
     } });
     expect(B.chatEvents.find((e) => e?.payload?.text === islandText)).toBeUndefined();

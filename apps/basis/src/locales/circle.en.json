@@ -74,7 +74,7 @@
       "text": "Screens",
       "doc": "α.3 — primary tab: user's screens (default landing)."
     },
-    "kringen": {
+    "circles": {
       "text": "Circles",
       "doc": "Bottom-nav tab → the circle list (board 1)."
     },
@@ -394,9 +394,9 @@
       "text": "Neighbourhood",
       "doc": "β.3 — launcher section header for kind='buurt' circles."
     },
-    "vriendenkring": {
+    "friends": {
       "text": "Friends",
-      "doc": "β.3 — launcher section header for kind='vriendenkring' circles."
+      "doc": "β.3 — launcher section header for kind='friends' circles."
     },
     "team": {
       "text": "Team",
@@ -404,7 +404,7 @@
     },
     "other": {
       "text": "Other",
-      "doc": "β.3 — launcher section header for circles whose kind isn't household/buurt/vriendenkring."
+      "doc": "β.3 — launcher section header for circles whose kind isn't household/buurt/friends."
     }
   },
   "empty": {
@@ -536,7 +536,7 @@
       "text": "only you",
       "doc": "Message scope badge — private to you (not shared with the kring)."
     },
-    "kring": {
+    "circle": {
       "text": "whole kring",
       "doc": "Message scope badge — reaches every member of the kring."
     }
@@ -721,7 +721,7 @@
       "doc": "B consent-card — status shown after the user declines the recipe."
     }
   },
-  "kring": {
+  "circle": {
     "more": {
       "text": "More",
       "doc": "SP-13 — kring header overflow menu trigger."
@@ -3175,7 +3175,7 @@
     "template": {
       "applied_hint": {
         "text": "Defaults filled in for {{kind}}",
-        "doc": "β.4 — confirmation shown after picking a kind in the C1 create-circle wizard; the matching kringTemplate has just pre-filled the policy axes. {{kind}} is the picked kind id (household / buurt / vriendenkring / team)."
+        "doc": "β.4 — confirmation shown after picking a kind in the C1 create-circle wizard; the matching circleTemplate has just pre-filled the policy axes. {{kind}} is the picked kind id (household / buurt / friends / team)."
       }
     }
   },

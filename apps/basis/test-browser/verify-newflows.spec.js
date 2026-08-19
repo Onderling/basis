@@ -17,11 +17,11 @@ test.beforeEach(async ({ context }) => {
 });
 
 // ── helpers ────────────────────────────────────────────────────────────────
-async function gotoKringen(page, newName = 'Verify Circle') {
+async function gotoCircles(page, newName = 'Verify Circle') {
   page.on('dialog', (d) => d.accept(newName));
   await page.goto('/');
   await page.waitForTimeout(3000);
-  await page.locator('[data-tab="kringen"]').click();
+  await page.locator('[data-tab="circles"]').click();
   await page.waitForTimeout(2000);
 }
 
@@ -34,13 +34,13 @@ async function tileNames(page) {
 }
 
 async function toChat(page) {
-  const chat = page.locator('.circle-kring__view-toggle-btn[data-view-mode="chat"]');
+  const chat = page.locator('.circle-circle__view-toggle-btn[data-view-mode="chat"]');
   if (await chat.count()) { await chat.first().click(); await page.waitForTimeout(1500); }
 }
 
 // Open the auto-provisioned help circle (cc-help / "Onderling") and switch to Chat view.
 async function openHelpCircle(page) {
-  await gotoKringen(page);
+  await gotoCircles(page);
   const names = await tileNames(page);
   let idx = names.findIndex((s) => /onderling|cc-help/i.test(s));
   if (idx < 0) idx = 0;
@@ -51,15 +51,15 @@ async function openHelpCircle(page) {
 }
 
 async function bubbleTexts(page) {
-  return (await page.locator('.circle-kring__bubble').allTextContents()).map((s) => s.replace(/\s+/g, ' ').trim());
+  return (await page.locator('.circle-circle__bubble').allTextContents()).map((s) => s.replace(/\s+/g, ' ').trim());
 }
 async function actionButtonLabels(page) {
-  const sel = '.circle-kring__bubble-action, .circle-kring__bubble button';
+  const sel = '.circle-circle__bubble-action, .circle-circle__bubble button';
   return [...new Set((await page.locator(sel).allTextContents()).map((s) => s.replace(/\s+/g, ' ').trim()).filter(Boolean))];
 }
-async function sendKring(page, text, settle = 3500) {
-  await page.locator('.circle-kring__composer-input').fill(text);
-  await page.locator('.circle-kring__composer-send').click();
+async function sendCircle(page, text, settle = 3500) {
+  await page.locator('.circle-circle__composer-input').fill(text);
+  await page.locator('.circle-circle__composer-send').click();
   await page.waitForTimeout(settle);
 }
 
@@ -77,16 +77,16 @@ test('1 onboarding — help circle + Onderling-bot guided chat', async ({ page }
 test('2 chat restyle — bot card border, me vs bot bubbles, compose', async ({ page }) => {
   await openHelpCircle(page);
   await page.waitForTimeout(2000);
-  await sendKring(page, 'hallo');
-  const mine = await page.locator('.circle-kring__bubble--mine').count();
-  const total = await page.locator('.circle-kring__bubble').count();
-  const composer = await page.locator('.circle-kring__composer-input').count();
-  const card = page.locator('.circle-kring__chat-card').first();
+  await sendCircle(page, 'hallo');
+  const mine = await page.locator('.circle-circle__bubble--mine').count();
+  const total = await page.locator('.circle-circle__bubble').count();
+  const composer = await page.locator('.circle-circle__composer-input').count();
+  const card = page.locator('.circle-circle__chat-card').first();
   const border = await card.evaluate((el) => {
     const s = getComputedStyle(el);
     return `${s.borderTopWidth} ${s.borderStyle} ${s.borderTopColor}`;
   }).catch((e) => 'n/a: ' + e.message);
-  const meBg = await page.locator('.circle-kring__bubble--mine').first()
+  const meBg = await page.locator('.circle-circle__bubble--mine').first()
     .evaluate((el) => getComputedStyle(el).backgroundColor).catch(() => 'n/a');
   console.log('CR mine-bubbles:', mine, 'total:', total, 'composer:', composer);
   console.log('CR chat-card border:', border);
@@ -98,13 +98,13 @@ test('2 chat restyle — bot card border, me vs bot bubbles, compose', async ({ 
 test('3 help Q&A — deterministic answer + transparency badge, then /help topics', async ({ page }) => {
   await openHelpCircle(page);
   await page.waitForTimeout(2000);
-  await sendKring(page, 'is dit veilig?', 4500);
-  const provs = (await page.locator('.circle-kring__bubble-provenance').allTextContents()).map((s) => s.replace(/\s+/g, ' ').trim());
+  await sendCircle(page, 'is dit veilig?', 4500);
+  const provs = (await page.locator('.circle-circle__bubble-provenance').allTextContents()).map((s) => s.replace(/\s+/g, ' ').trim());
   console.log('HELP bubbles after question:', JSON.stringify((await bubbleTexts(page)).slice(-3)));
   console.log('HELP provenance badges:', JSON.stringify(provs));
   await page.screenshot({ path: `${SHOTS}/help-answer.png` });
 
-  await sendKring(page, '/help', 4000);
+  await sendCircle(page, '/help', 4000);
   console.log('HELP /help last bubble:', JSON.stringify((await bubbleTexts(page)).slice(-1)));
   console.log('HELP /help topic chips:', JSON.stringify(await actionButtonLabels(page)));
   await page.screenshot({ path: `${SHOTS}/help-topics.png` });
@@ -143,7 +143,7 @@ test('4 theme toggle — systeem/licht/donker recolours live', async ({ page }) 
 // A fresh circle has the `tasks` app OFF (policy default), so /addtask is denied. Enable it via
 // Circle settings first, then add a task (I own it) → the owner-only "Toevertrouwen" action appears.
 test('5 mandate picker — enable tasks, add a task I own, entrust it', async ({ page }) => {
-  await gotoKringen(page, 'Mandate Circle');
+  await gotoCircles(page, 'Mandate Circle');
   await page.locator('.circle-launcher__new').click();
   await page.waitForTimeout(5000);
   const names = await tileNames(page);
@@ -157,9 +157,9 @@ test('5 mandate picker — enable tasks, add a task I own, entrust it', async ({
   await openCircle();
 
   // Open ⋯ → Circle settings, tick the `tasks` feature, save.
-  await page.locator('.circle-kring__more').click();
+  await page.locator('.circle-circle__more').click();
   await page.waitForTimeout(600);
-  await page.locator('.circle-kring__more-item[data-action="settings"]').click();
+  await page.locator('.circle-circle__more-item[data-action="settings"]').click();
   await page.waitForTimeout(2000);
   const tasksBox = page.locator('input[data-feature="tasks"]');
   console.log('MANDATE tasks checkbox present:', await tasksBox.count());
@@ -171,20 +171,20 @@ test('5 mandate picker — enable tasks, add a task I own, entrust it', async ({
   await page.waitForTimeout(2000);
 
   // Re-open the circle (policy persisted to localStorage) and add a task.
-  await gotoKringen(page, 'Mandate Circle');
+  await gotoCircles(page, 'Mandate Circle');
   await openCircle();
-  await sendKring(page, '/addtask verf kopen', 4000);
+  await sendCircle(page, '/addtask verf kopen', 4000);
   console.log('MANDATE chat bubbles:', JSON.stringify((await bubbleTexts(page)).slice(-2)));
 
   // The task-kind row with the owner-only entrust chip lives in the TAKEN (tasks) tab, not the chat stream.
-  const tabs = page.locator('.circle-kring__tab');
+  const tabs = page.locator('.circle-circle__tab');
   const tabLabels = await tabs.allTextContents();
-  console.log('MANDATE kring tabs:', JSON.stringify(tabLabels.map((s) => s.trim())));
+  console.log('MANDATE circle tabs:', JSON.stringify(tabLabels.map((s) => s.trim())));
   const takenIdx = tabLabels.findIndex((s) => /taken|task/i.test(s));
   if (takenIdx >= 0) {
     await tabs.nth(takenIdx).click();
     await page.waitForTimeout(2500);
-    const taskRows = page.locator('.circle-kring__task');
+    const taskRows = page.locator('.circle-circle__task');
     const rowCount = await taskRows.count();
     const rowText = rowCount ? (await taskRows.first().innerText()).replace(/\s+/g, ' ').trim() : '(no rows)';
     console.log('MANDATE TAKEN-tab task rows:', rowCount, 'first row:', JSON.stringify(rowText));
@@ -192,7 +192,7 @@ test('5 mandate picker — enable tasks, add a task I own, entrust it', async ({
     await page.screenshot({ path: `${SHOTS}/taken-tab.png` });
   }
 
-  const mandBtn = page.locator('.circle-kring__bubble-action--mandate');
+  const mandBtn = page.locator('.circle-circle__bubble-action--mandate');
   const mandCount = await mandBtn.count();
   console.log('MANDATE row-action buttons:', JSON.stringify(await actionButtonLabels(page)), 'entrust-btn:', mandCount);
   if (mandCount > 0) {

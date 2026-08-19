@@ -26,9 +26,9 @@ describe('seal resolver — circle content sealed once, opened by scheme', () =>
     const resource = buildGroupKeyResource({
       version: 1, groupKey: generateGroupKey(), recipients: [anne.publicKey, bob.publicKey],
     });
-    const env = sealForAudience('welkom in de kring', { resource, privateKey: anne.privateKey }, { audience: 'circle' });
+    const env = sealForAudience('welkom in de circle', { resource, privateKey: anne.privateKey }, { audience: 'circle' });
     expect(env.scheme).toBe(SEAL_SCHEMES.GROUP_KEY);
-    expect(openSealedEnvelope(env, { resource, privateKey: bob.privateKey })).toBe('welkom in de kring');
+    expect(openSealedEnvelope(env, { resource, privateKey: bob.privateKey })).toBe('welkom in de circle');
     expect(() => openSealedEnvelope(env, { resource, privateKey: stranger.privateKey })).toThrow();
   });
 

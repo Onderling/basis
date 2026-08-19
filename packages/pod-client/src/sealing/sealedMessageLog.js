@@ -30,7 +30,7 @@ const TS_PAD = 16;
 /** The canonical message fields carried at rest (a projection of the wire/inbox chat envelope). */
 function canonicalMessage(env) {
   const out = {
-    subtype:   env.subtype ?? 'kring-chat-message',
+    subtype:   env.subtype ?? 'circle-chat-message',
     circleId:  env.circleId,
     msgId:     env.msgId,
     ts:        env.ts,

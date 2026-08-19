@@ -44,7 +44,7 @@ window.ONDERLING_PAGE = {
         "naast gebouwd: net genoeg om “hoi, hoe en wanneer?” af te " +
         "spreken, daarna ben je vrij.",
         "Na afloop een kleine afronding: gelukt, een bedankje, misschien " +
-        "een kort woord dat zichtbaar is voor je eigen kring. Genoeg om " +
+        "een kort woord dat zichtbaar is voor je eigen circle. Genoeg om " +
         "te laten merken dat het gewaardeerd wordt, zonder dat het een " +
         "ranglijst wordt. Hoe dit zonder tussenpersoon en met je eigen " +
         "ruimte werkt, staat op [techniek](techniek.html)."

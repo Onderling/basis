@@ -9,7 +9,7 @@ describe('botAddress · botIsAddressed', () => {
   describe('1:1 bot chat → ALWAYS addressed', () => {
     const members = [{ webid: SELF }, BOT];
     it('a plain untagged message is still for the bot', () => {
-      expect(botIsAddressed({ text: 'hoe werkt een kring?', circleMembers: members, selfWebid: SELF, botMember: BOT })).toBe(true);
+      expect(botIsAddressed({ text: 'hoe werkt een circle?', circleMembers: members, selfWebid: SELF, botMember: BOT })).toBe(true);
     });
     it('a self-referential question ("ben jij een bot?") is for the bot', () => {
       expect(botIsAddressed({ text: 'ben jij een bot?', circleMembers: members, selfWebid: SELF, botMember: BOT })).toBe(true);
@@ -26,7 +26,7 @@ describe('botAddress · botIsAddressed', () => {
       expect(botIsAddressed({ text: 'wie brengt het brood mee?', circleMembers: members, selfWebid: SELF, botMember: BOT })).toBe(false);
     });
     it('@-tagging the bot by name → true', () => {
-      expect(botIsAddressed({ text: '@Onderling hoe werkt een kring?', circleMembers: members, selfWebid: SELF, botMember: BOT })).toBe(true);
+      expect(botIsAddressed({ text: '@Onderling hoe werkt een circle?', circleMembers: members, selfWebid: SELF, botMember: BOT })).toBe(true);
     });
     it('the generic @assistent / @bot tag → true', () => {
       expect(botIsAddressed({ text: 'hé @assistent kun je helpen?', circleMembers: members, selfWebid: SELF, botMember: BOT })).toBe(true);

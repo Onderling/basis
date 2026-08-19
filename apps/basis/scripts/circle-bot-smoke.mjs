@@ -45,7 +45,7 @@ const handleCircleTurn = createCircleTurn({
 });
 
 const scope = { id: 'circle-A' };
-const show = (label) => { const e = events.splice(0); console.log(`     ${e.length ? e.map(fmt).join('\n     ') : '·  fell through → kring/normal'}`); };
+const show = (label) => { const e = events.splice(0); console.log(`     ${e.length ? e.map(fmt).join('\n     ') : '·  fell through → circle/normal'}`); };
 const fmt = (e) => e.t === 'DISPATCH' ? `→ DISPATCH ${JSON.stringify(e.cmd)}`
   : e.t === 'ASK' ? `❓ ASK "${e.query}" → [${e.candidates.join(' | ')}]`
   : e.t === 'NOT-FOUND' ? `∅ NOT-FOUND "${e.query}"` : JSON.stringify(e);

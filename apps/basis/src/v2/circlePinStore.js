@@ -2,7 +2,7 @@
  * basis v2 — circle "pin to top" persistence (β.5).
  *
  * Pure portable factory over an injectable `{ load, save }` adapter.
- * Holds a `{ circleId: true }` map of pinned kring ids; the launcher
+ * Holds a `{ circleId: true }` map of pinned circle ids; the launcher
  * partitions tiles into pinned + unpinned within each kind section so
  * pins float to the top of their section without escaping the β.3
  * grouping.

@@ -35,7 +35,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { startRelay } from '@onderling/relay';
 import {
   bootRealAgentNode, connectNodesOverRelay, createCircle, joinExistingCircle,
-  bindCircleAddresses, readRoster, until, teardown, sendKringChat } from '../support/pairRealAgents.js';
+  bindCircleAddresses, readRoster, until, teardown, sendCircleChat } from '../support/pairRealAgents.js';
 import { bindCircleAddressKeysFor } from '../../src/v2/householdRosterPairing.js';
 import { primeCircleSecurity, announceCircleAddresses } from '../../src/v2/circleSecurityPriming.js';
 
@@ -65,9 +65,9 @@ const boot = async (node) => {
 
 const rowFor = (roster, webid) => roster.find((m) => m?.webid === webid) ?? null;
 
-/** A conforming `kring-chat-message` wire envelope — the shape the real fan produces. */
+/** A conforming `circle-chat-message` wire envelope — the shape the real fan produces. */
 const chatEnvelope = (circleId, text) => ({
-  type: 'p2p-chat', subtype: 'kring-chat-message',
+  type: 'p2p-chat', subtype: 'circle-chat-message',
   circleId, msgId: `m-${rnd()}`, ts: Date.now(), text, fromActor: 'test',
 });
 
@@ -219,7 +219,7 @@ describe('per-circle signing is enforced per member (real relay, fallback OFF)',
     // A check that refuses everything is not a check, it is an outage — and every assertion below
     // would pass in one.
     const text = `real-traffic-${rnd()}`;
-    const fan = await sendKringChat(admin, {
+    const fan = await sendCircleChat(admin, {
       groupId: CIRCLE_A, msgId: `m-${rnd()}`, text,
     });
     expect(fan.errors, `fan reported errors: ${JSON.stringify(fan.errors)}`).toEqual([]);
@@ -278,7 +278,7 @@ describe('per-circle signing is enforced per member (real relay, fallback OFF)',
   it('ADVERSARIAL: …and the same member is still perfectly welcome in circle A', async () => {
     // The other half of "per circle": the refusal above must be about the circle, not about bram.
     const text = `still-welcome-${rnd()}`;
-    const fan = await sendKringChat(bram, {
+    const fan = await sendCircleChat(bram, {
       groupId: CIRCLE_A, msgId: `m-${rnd()}`, text,
     });
     expect(fan.errors).toEqual([]);

@@ -25,8 +25,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import { DELIVERY, DELIVERY_ORDER, DELIVERY_TERMINAL } from '../../src/v2/deliveryState.js';
-import { classifyFanOut } from '@onderling/kring-host/kringBroadcast';
-import { KRING_KINDS } from '../../src/v2/kringTemplates.js';
+import { classifyFanOut } from '@onderling/kring-host/circleBroadcast';
+import { CIRCLE_KINDS } from '../../src/v2/circleTemplates.js';
 import { policyPatchFromState, finalSubmit } from '../../src/core/wizards/createGroupState.js';
 
 /**
@@ -38,7 +38,7 @@ const VOCABULARIES = {
   'delivery states': {
     declared: [...DELIVERY_ORDER, ...DELIVERY_TERMINAL],
     produced: () => new Set([
-      DELIVERY.PENDING,                                       // kringBroadcast marks it before the fan-out
+      DELIVERY.PENDING,                                       // circleBroadcast marks it before the fan-out
       classifyFanOut({ errors: [] }),                         // maybe-received
       classifyFanOut({ error: 'chat-unavailable' }),          // failed
       classifyFanOut({ errors: [{ reason: 'some-transient-thing' }] }),      // failed
@@ -57,13 +57,13 @@ const VOCABULARIES = {
 
   'circle kinds': {
     // The wizard offers these; the question is whether a circle can ever CARRY one.
-    declared: [...KRING_KINDS],
+    declared: [...CIRCLE_KINDS],
     produced: () => {
       // The only two writes a create performs: `finalSubmit`'s args, and the policy patch both shells
       // send straight after. If neither carries `kind`, no circle can hold any of these.
       const patch = policyPatchFromState({ kind: 'buurt', features: {}, revealPolicy: 'open' });
       const carriesKind = Object.prototype.hasOwnProperty.call(patch, 'kind');
-      return carriesKind ? new Set(KRING_KINDS) : new Set();
+      return carriesKind ? new Set(CIRCLE_KINDS) : new Set();
     },
     // CLOSED 2026-07-29 (decision 3): `policyPatchFromState` now carries `kind`, so a circle remembers
     // the template that made it. This list is empty on purpose rather than deleted — the entry is what
@@ -131,7 +131,7 @@ describe('FITNESS: a circle can carry the kind it was created as', () => {
     // Was the S3/J-CW2+CW3 gap: the wizard offered four kinds and none was ever stored, so a circle's
     // conversation had no relation to the template its creator picked. Closed by decision 3.
     const spec = VOCABULARIES['circle kinds'];
-    expect([...spec.produced()].sort()).toEqual([...KRING_KINDS].sort());
+    expect([...spec.produced()].sort()).toEqual([...CIRCLE_KINDS].sort());
     expect(Object.keys(spec.knownGaps), 'a kind regressed to unstorable').toEqual([]);
   });
 });

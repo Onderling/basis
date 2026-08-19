@@ -23,7 +23,7 @@ const t = (key) => key;
 function mediaEmbed({ caption = '' } = {}) {
   return {
     kind: 'media-card',
-    appOrigin: 'kring',
+    appOrigin: 'circle',
     snapshot: {
       id: 'i-1', type: 'media', mime: 'image/jpeg', width: 640, height: 480,
       caption,

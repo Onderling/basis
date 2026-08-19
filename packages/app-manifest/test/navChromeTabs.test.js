@@ -21,7 +21,7 @@ const BASE = {
   ],
   tabs: [
     { id: 'screens',   labelKey: 'x.tab.screens',   target: { kind: 'nav', to: 'screens' } },
-    { id: 'kringen',   labelKey: 'x.tab.kringen',   target: { kind: 'nav', to: 'kringen' } },
+    { id: 'circles',   labelKey: 'x.tab.circles',   target: { kind: 'nav', to: 'circles' } },
     { id: 'contacten', labelKey: 'x.tab.contacten', target: { kind: 'nav', to: 'contacten' } },
     { id: 'mij',       labelKey: 'x.tab.mij',       target: { kind: 'op',  opId: 'me' } },
   ],
@@ -30,9 +30,9 @@ const BASE = {
 describe('nav-chrome tabs — renderWeb projection', () => {
   it('projects manifest.tabs into NavModel.tabs, in declaration order', () => {
     const nav = renderWeb(BASE);
-    expect(nav.tabs.map((t) => t.id)).toEqual(['screens', 'kringen', 'contacten', 'mij']);
+    expect(nav.tabs.map((t) => t.id)).toEqual(['screens', 'circles', 'contacten', 'mij']);
     expect(nav.tabs.map((t) => t.labelKey)).toEqual([
-      'x.tab.screens', 'x.tab.kringen', 'x.tab.contacten', 'x.tab.mij',
+      'x.tab.screens', 'x.tab.circles', 'x.tab.contacten', 'x.tab.mij',
     ]);
   });
 

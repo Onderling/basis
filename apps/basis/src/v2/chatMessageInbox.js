@@ -1,12 +1,12 @@
 /**
- * basis v2 — single normalization gate for kring chat-message
+ * basis v2 — single normalization gate for circle chat-message
  * inserts (ε.1, Phase 9 foundation).
  *
- * Today's eventLog is fed kring chats from MULTIPLE paths, each with
+ * Today's eventLog is fed circle chats from MULTIPLE paths, each with
  * their own dedup state + envelope validation + payload shape:
  *
- *   • NKN-inbound peer handler  (`kringChatReceiver.js`)
- *   • boot rehydrator           (`kringChatRehydrate.js`)
+ *   • NKN-inbound peer handler  (`circleChatReceiver.js`)
+ *   • boot rehydrator           (`circleChatRehydrate.js`)
  *   • catch-up replies          (future ε.3/ε.4)
  *   • pod range-query           (future ε.3/ε.4)
  *
@@ -26,7 +26,7 @@
  *     eviction / deduped / error verdicts — same contract as today's
  *     `ingestCircleMessage` skill)
  *   • appends to `eventLog` in the byte-for-byte same shape
- *     `kringChatReceiver` used to produce
+ *     `circleChatReceiver` used to produce
  *
  * All caller-side paths route through `ingestChatMessage` with a
  * `source` tag so future telemetry / strategy routing can see where
@@ -90,9 +90,9 @@ export function createChatMessageInbox({
   const seen = new LruSet(dedupCap);
 
   /**
-   * Normalize + dedupe + ingest + append a kring chat message.
+   * Normalize + dedupe + ingest + append a circle chat message.
    *
-   * @param {object} envelope  same shape `kringChatReceiver` accepts.
+   * @param {object} envelope  same shape `circleChatReceiver` accepts.
    * @param {object} opts
    * @param {string} opts.source         required: 'receiver' | 'rehydrator' | 'catchUp' | 'pod' | ...
    * @param {string} [opts.fromPeerAddr]  required for the `receiver` source.
@@ -114,22 +114,22 @@ export function createChatMessageInbox({
     // never throw out of the receive loop.
     if (isRefEnvelope(envelope)) {
       if (typeof envelope.msgId === 'string' && seen.has(envelope.msgId)) {
-        logger.debug?.('[kring-chat] duplicate ref msgId, skipping', envelope.msgId, source);
+        logger.debug?.('[circle-chat] duplicate ref msgId, skipping', envelope.msgId, source);
         return { result: 'deduped' };
       }
       if (typeof resolveRefFn !== 'function') {
-        logger.warn?.('[kring-chat] ref envelope but no pod resolver wired — skipping', envelope.msgId, source);
+        logger.warn?.('[circle-chat] ref envelope but no pod resolver wired — skipping', envelope.msgId, source);
         return { result: 'deferred', reason: 'no-ref-resolver' };
       }
       let resolved = null;
       try {
         resolved = await resolveRefFn(envelope);
       } catch (err) {
-        logger.warn?.('[kring-chat] pod ref resolution threw — skipping', err?.message ?? err, source);
+        logger.warn?.('[circle-chat] pod ref resolution threw — skipping', err?.message ?? err, source);
         return { result: 'deferred', reason: 'ref-error' };
       }
       if (!isValidChatEnvelope(resolved)) {
-        logger.warn?.('[kring-chat] pod ref resolved to nothing usable — skipping', envelope.msgId, source);
+        logger.warn?.('[circle-chat] pod ref resolved to nothing usable — skipping', envelope.msgId, source);
         return { result: 'deferred', reason: 'ref-unresolved' };
       }
       // The pod row is authoritative for the body; carry the wire ref's `media`
@@ -138,11 +138,11 @@ export function createChatMessageInbox({
     }
 
     if (!isValidChatEnvelope(envelope)) {
-      logger.warn?.('[kring-chat] dropping malformed envelope', { source, envelope });
+      logger.warn?.('[circle-chat] dropping malformed envelope', { source, envelope });
       return { result: 'rejected', reason: 'malformed' };
     }
     if (seen.has(envelope.msgId)) {
-      logger.debug?.('[kring-chat] duplicate msgId, skipping', envelope.msgId, source);
+      logger.debug?.('[circle-chat] duplicate msgId, skipping', envelope.msgId, source);
       return { result: 'deduped' };
     }
     // Reserve the slot BEFORE the ingest call so a concurrent second
@@ -155,15 +155,15 @@ export function createChatMessageInbox({
       try {
         const r = await ingest(envelope, fromPeerAddr);
         if (r?.evicted) {
-          logger.info?.('[kring-chat] dropped (evicted)', envelope.msgId, source);
+          logger.info?.('[circle-chat] dropped (evicted)', envelope.msgId, source);
           return { result: 'evicted' };
         }
         if (r?.muted) {
-          logger.info?.('[kring-chat] dropped (muted)', envelope.msgId, source);
+          logger.info?.('[circle-chat] dropped (muted)', envelope.msgId, source);
           return { result: 'muted' };
         }
         if (r?.error) {
-          logger.warn?.('[kring-chat] ingest error', r.error, source);
+          logger.warn?.('[circle-chat] ingest error', r.error, source);
           return { result: 'rejected', reason: 'ingest-error' };
         }
         // r?.deduped: itemStore already had this msgId — skip the
@@ -172,7 +172,7 @@ export function createChatMessageInbox({
           return { result: 'deduped' };
         }
       } catch (err) {
-        logger.warn?.('[kring-chat] ingest threw — falling back to eventLog only', err?.message ?? err);
+        logger.warn?.('[circle-chat] ingest threw — falling back to eventLog only', err?.message ?? err);
         // fall through — local append still keeps the live render coherent
       }
     }
@@ -224,9 +224,9 @@ export function createChatMessageInbox({
       // makes the restored event byte-identical to the optimistic one the live send appended, so
       // restored history renders exactly like live history instead of merely looking like it.
       ...(selfAuthored ? {} : { senderDisplay: actor }),
-      // A message that ARRIVED here arrived over the circle fan-out, so its reach IS the whole kring.
-      // Both shells render the scope badge as `scope === 'kring' ? "whole kring" : "only you"`
-      // (`circleKring.js` / the mobile bubble), so leaving it unset made every received message — every
+      // A message that ARRIVED here arrived over the circle fan-out, so its reach IS the whole circle.
+      // Both shells render the scope badge as `scope === 'circle' ? "whole circle" : "only you"`
+      // (`circleView.js` / the mobile bubble), so leaving it unset made every received message — every
       // fanned message anyone ever sees — claim it was private to the reader. Untrue, and the most
       // visible kind of untrue.
       //
@@ -234,17 +234,17 @@ export function createChatMessageInbox({
       // presentation field that never rides the envelope (`chatEnvelope.js`), a `scope:'self'` message is
       // never fanned out at all, and a wire field would be the sender asserting its own reach — which the
       // enforceability test says is worth nothing. Arrival is the evidence; the badge states exactly it.
-      scope: 'kring',
+      scope: 'circle',
       ...(media ? { media } : {}),
     }));
-    logger.info?.('[kring-chat] received', envelope.msgId, 'circle=' + envelope.circleId, 'source=' + source);
+    logger.info?.('[circle-chat] received', envelope.msgId, 'circle=' + envelope.circleId, 'source=' + source);
     if (typeof onStored === 'function') {
       // `circleId` rides along so a shell can decide whether this insert affects what is ON SCREEN.
       // Without it the only honest options are "repaint on every stored message" or "never" — and web
-      // took the second, so a received message sat in the log with nothing telling the open kring to
+      // took the second, so a received message sat in the log with nothing telling the open circle to
       // show it (2026-08-03).
       try { onStored({ msgId: envelope.msgId, circleId: envelope.circleId, fromPeerAddr, source }); }
-      catch (err) { logger.warn?.('[kring-chat] onStored hook threw', err?.message ?? err); }
+      catch (err) { logger.warn?.('[circle-chat] onStored hook threw', err?.message ?? err); }
     }
     return { result: 'inserted' };
   }
@@ -253,8 +253,8 @@ export function createChatMessageInbox({
 }
 
 /**
- * Lifted from kringChatReceiver's `isValidEnvelope`.  Same rules:
- * `subtype === 'kring-chat-message'`, non-empty circleId / msgId /
+ * Lifted from circleChatReceiver's `isValidEnvelope`.  Same rules:
+ * `subtype === 'circle-chat-message'`, non-empty circleId / msgId /
  * text, finite numeric ts.  Exported for tests + future strategy
  * routers that want to peek at validity without inserting.
  */
@@ -262,7 +262,7 @@ export function isValidChatEnvelope(p) {
   return (
     p
     && typeof p === 'object'
-    && p.subtype === 'kring-chat-message'
+    && p.subtype === 'circle-chat-message'
     && typeof p.circleId === 'string' && p.circleId
     && typeof p.msgId    === 'string' && p.msgId
     && typeof p.text     === 'string' && p.text

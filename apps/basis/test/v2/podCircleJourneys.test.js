@@ -36,9 +36,9 @@ import { createConnectionPoints, recordJoinedCirclePoints } from '../../src/v2/c
 import { registerCircleAddresses } from '../../src/v2/circleAddressRegistration.js';
 
 /** The pod that was actually running for this walk. Plain http — a local CSS has no TLS. */
-const LIVE_POD = 'http://localhost:3000/anna/circles/podkring';
+const LIVE_POD = 'http://localhost:3000/anna/circles/podcircle';
 /** The same pod, hypothetically behind TLS — the only shape the code accepts. */
-const TLS_POD = 'https://pod.example.org/anna/circles/podkring';
+const TLS_POD = 'https://pod.example.org/anna/circles/podcircle';
 
 /** Create a pod-backed circle through the real create-wizard op path. */
 async function createPodCircle(admin, { groupId, groupPodUri }) {
@@ -78,9 +78,9 @@ describe('J-NP1 — the pod as this circle’s connection point', () => {
     const bo = await bootRealAgentNode('bo');
     try {
       await connectAgentsOverBus(anna, bo);
-      await createPodCircle(anna, { groupId: 'tlskring', groupPodUri: TLS_POD });
+      await createPodCircle(anna, { groupId: 'tlscircle', groupPodUri: TLS_POD });
 
-      const { storage, invite } = await inviteAsShellsBuildIt(anna, 'tlskring');
+      const { storage, invite } = await inviteAsShellsBuildIt(anna, 'tlscircle');
       expect(storage).toEqual({ pod: 'shared', groupPodUri: TLS_POD });
       // The disclosure AND the place both survive the wire (both were silently dropped by the URI
       // encoder until 2026-07-28 — the object-path tests passed while the real pasted invite did not).
@@ -94,15 +94,15 @@ describe('J-NP1 — the pod as this circle’s connection point', () => {
         sendPeerRedeem: bo.sendPeerRedeem,
         handle: 'bobbie',
       });
-      expect(joined).toMatchObject({ ok: true, circleId: 'tlskring' });
+      expect(joined).toMatchObject({ ok: true, circleId: 'tlscircle' });
 
       // Rule 1, on Bo's device: the joined circle's points come from what the invite carried.
       const points = createConnectionPoints({});
-      expect(recordJoinedCirclePoints({ store: points, invite, circleId: 'tlskring' }).recorded)
+      expect(recordJoinedCirclePoints({ store: points, invite, circleId: 'tlscircle' }).recorded)
         .toEqual(['pod']);
       // …and the list shows the POD — not a relay url, not nothing. This is J-NP1's actual claim.
       expect(points.list()).toEqual([expect.objectContaining({
-        url: TLS_POD, kind: 'pod', source: 'join', circles: ['tlskring'],
+        url: TLS_POD, kind: 'pod', source: 'join', circles: ['tlscircle'],
         adopted: true,
         // A pod has no socket, so it is never "active" — the renderers show a pod line instead of
         // active/standby. Claiming a pod was standby would be the same lie in the other direction.
@@ -116,8 +116,8 @@ describe('J-NP1 — the pod as this circle’s connection point', () => {
   it('FIXED — against the real (http) local pod, the point lands and the invite names it', async () => {
     const anna = await bootRealAgentNode('anna-http');
     try {
-      await createPodCircle(anna, { groupId: 'podkring', groupPodUri: LIVE_POD });
-      const { storage, invite } = await inviteAsShellsBuildIt(anna, 'podkring');
+      await createPodCircle(anna, { groupId: 'podcircle', groupPodUri: LIVE_POD });
+      const { storage, invite } = await inviteAsShellsBuildIt(anna, 'podcircle');
 
       expect(storage).toEqual({ pod: 'shared', groupPodUri: LIVE_POD });
 
@@ -134,7 +134,7 @@ describe('J-NP1 — the pod as this circle’s connection point', () => {
       // …so rule 1 records the pod, and "if I remove this, what breaks?" is answerable for a circle
       // with no relay to point at — which is what J-NP1 exists to check.
       const points = createConnectionPoints({});
-      expect(recordJoinedCirclePoints({ store: points, invite, circleId: 'podkring' }).recorded)
+      expect(recordJoinedCirclePoints({ store: points, invite, circleId: 'podcircle' }).recorded)
         .toEqual(['pod']);
       expect(points.list().map((p) => p.url)).toEqual([LIVE_POD]);
     } finally {
@@ -160,8 +160,8 @@ describe('J-NP2 — no admin online is a notice, and the invite survives it', ()
     const bo = await bootRealAgentNode('bo', { redeemTimeoutMs: 1500 });
     try {
       await connectAgentsOverBus(anna, bo);
-      await createPodCircle(anna, { groupId: 'nachtkring', groupPodUri: TLS_POD });
-      const { invite } = await inviteAsShellsBuildIt(anna, 'nachtkring');
+      await createPodCircle(anna, { groupId: 'nachtcircle', groupPodUri: TLS_POD });
+      const { invite } = await inviteAsShellsBuildIt(anna, 'nachtcircle');
       const boCallSkill = (app, op, args) => bo.agent.callSkill(app, op, args);
 
       // 3am: Anna's phone is off.
@@ -180,7 +180,7 @@ describe('J-NP2 — no admin online is a notice, and the invite survives it', ()
       const awake = await joinCircleFromInvite({
         inviteUri: invite, callSkill: boCallSkill, sendPeerRedeem: bo.sendPeerRedeem, handle: 'bobbie',
       });
-      expect(awake).toMatchObject({ ok: true, circleId: 'nachtkring' });
+      expect(awake).toMatchObject({ ok: true, circleId: 'nachtcircle' });
     } finally {
       await teardown(anna, bo);
     }
@@ -189,8 +189,8 @@ describe('J-NP2 — no admin online is a notice, and the invite survives it', ()
   it('DEFECT — the notice exists in the state and NO shell renders it', async () => {
     const anna = await bootRealAgentNode('anna');
     try {
-      await createPodCircle(anna, { groupId: 'stillekring', groupPodUri: TLS_POD });
-      const { invite } = await inviteAsShellsBuildIt(anna, 'stillekring');
+      await createPodCircle(anna, { groupId: 'stillecircle', groupPodUri: TLS_POD });
+      const { invite } = await inviteAsShellsBuildIt(anna, 'stillecircle');
 
       // Drive `joinGroupState.finalSubmit` exactly as both wizards do, with a peer redeem that reaches
       // nobody (the throw an offline admin produces).
@@ -228,8 +228,8 @@ describe('J-NP3 — the pod-host disclosure reaches the JOINER before they redee
   it('podBacked is on the decoded invite before any skill call happens', async () => {
     const anna = await bootRealAgentNode('anna');
     try {
-      await createPodCircle(anna, { groupId: 'openkring', groupPodUri: TLS_POD });
-      const { invite } = await inviteAsShellsBuildIt(anna, 'openkring');
+      await createPodCircle(anna, { groupId: 'opencircle', groupPodUri: TLS_POD });
+      const { invite } = await inviteAsShellsBuildIt(anna, 'opencircle');
 
       // The sequence property, stated where it is actually decided: decoding is what the join wizard
       // does on mount, and the wizard's step 1 (Rules) renders the disclosure off `state.invite
@@ -258,7 +258,7 @@ describe('J-NP3 — the pod-host disclosure reaches the JOINER before they redee
     // Both renderers (`web/v2/circleConnectionPoints.js`, `CircleLauncherScreen`) key the
     // point_pod_host_sees line off `point.kind === 'pod'`, so this is the input that decides it.
     const points = createConnectionPoints({});
-    points.addPodPoint(TLS_POD, 'openkring');
+    points.addPodPoint(TLS_POD, 'opencircle');
     expect(points.list()[0].kind).toBe('pod');
   });
 });
@@ -268,7 +268,7 @@ describe('J-NP3 — the pod-host disclosure reaches the JOINER before they redee
 describe('J-NP6 — a pod-only circle reads as CUT OFF, not merely inconvenienced', () => {
   it('the impact report names this circle, and does not claim a socket was dropped', () => {
     const points = createConnectionPoints({ activeUrl: 'wss://relay.example:8787' });
-    points.addFromJoin('wss://relay.example:8787', 'relaykring');
+    points.addFromJoin('wss://relay.example:8787', 'relaycircle');
     points.addPodPoint(TLS_POD, 'podonly');
 
     const impact = points.impactOfRemoving(TLS_POD);
@@ -280,7 +280,7 @@ describe('J-NP6 — a pod-only circle reads as CUT OFF, not merely inconvenience
 
     // The other circle is untouched by the removal — the report is per-circle, not per-device.
     expect(points.impactOfRemoving('wss://relay.example:8787')).toMatchObject({
-      losesReachability: ['relaykring'], wasActive: true,
+      losesReachability: ['relaycircle'], wasActive: true,
     });
   });
 
@@ -289,7 +289,7 @@ describe('J-NP6 — a pod-only circle reads as CUT OFF, not merely inconvenience
     // impact report cannot warn about a circle it has never heard of. It answers `known:false` —
     // indistinguishable, from the outside, from a circle that is fine.
     const points = createConnectionPoints({});
-    recordJoinedCirclePoints({ store: points, invite: { podBacked: true }, circleId: 'podkring' });
+    recordJoinedCirclePoints({ store: points, invite: { podBacked: true }, circleId: 'podcircle' });
     expect(points.impactOfRemoving(LIVE_POD)).toMatchObject({ known: false, losesReachability: [] });
   });
 });
@@ -302,11 +302,11 @@ describe('found while walking the pod journeys', () => {
     try {
       const callSkill = (app, op, args) => anna.agent.callSkill(app, op, args);
       const state = createGroupInitialState();
-      state.groupId = 'plainkring'; state.name = 'plainkring'; state.purpose = 'no pod at create';
+      state.groupId = 'plaincircle'; state.name = 'plaincircle'; state.purpose = 'no pod at create';
       await createGroupFinalSubmit({ state, callSkill });
 
       const pushed = await pushCircleStoragePolicy({
-        callSkill, circleId: 'plainkring', pod: 'shared', groupPodUri: TLS_POD,
+        callSkill, circleId: 'plaincircle', pod: 'shared', groupPodUri: TLS_POD,
       });
 
       // Was: `ok: true` with the requested policy echoed back, while `podRouting` — a tasks-* concept
@@ -318,7 +318,7 @@ describe('found while walking the pod journeys', () => {
 
       // The circle is unchanged either way — but now the caller was TOLD, so a surface can say
       // "this cannot be changed here" instead of showing a toggle that lies.
-      expect(await loadCircleStoragePod({ callSkill, circleId: 'plainkring' }))
+      expect(await loadCircleStoragePod({ callSkill, circleId: 'plaincircle' }))
         .toEqual({ pod: 'none', groupPodUri: null });
     } finally {
       await teardown(anna);

@@ -128,7 +128,7 @@ describe('relay — push wake (E2c)', () => {
     await waitFor(() => bob.messages.some((m) => m.type === 'registered'));
 
     // A routine governance vote (envelope stamped `noWake`) → hold-forwarded, NO push.
-    send(bob, { type: 'send', to: addr('nw-alice'), envelope: { _p: 'OW', noWake: true, subtype: 'kring-governance-broadcast' } });
+    send(bob, { type: 'send', to: addr('nw-alice'), envelope: { _p: 'OW', noWake: true, subtype: 'circle-governance-broadcast' } });
     // A normal message to a different offline peer → DOES push.
     send(bob, { type: 'send', to: addr('w-dave'), envelope: { _p: 'OW' } });
 

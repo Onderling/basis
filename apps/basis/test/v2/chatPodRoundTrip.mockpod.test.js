@@ -3,7 +3,7 @@
  * real sealing, real stoop fan core). The pod stays transport, never authority: the row carries the signed
  * statement, and whoever reads it back verifies at their chat rail exactly like a fanned statement.
  *
- *   pod-signal  A seals+writes the statement row, fans a REF (subtype kring-chat-statement, no body) →
+ *   pod-signal  A seals+writes the statement row, fans a REF (subtype circle-chat-statement, no body) →
  *               B's statement handler resolves the ref from the pod, VERIFIES, renders.
  *   pod-only    A seals+writes, fans NOTHING → B's pod catch-up range-reads the rows, VERIFIES, renders.
  *   dedup       a ref for a message already landed costs NO pod read.

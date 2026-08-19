@@ -11,8 +11,8 @@
  * Mirrors the BOOK mode of CircleRecipeEditorScreen in shape + styles
  * (recipeRow / recipeName / actionLink), but with screen-specific
  * additions:
- *   - kring-filter summary text next to the name
- *     ("all kringen" / "1 kring" / "N kringen")
+ *   - circle-filter summary text next to the name
+ *     ("all circles" / "1 circle" / "N circles")
  *   - no `onBack`: the picker IS the primary tab; back means switching
  *     to another tab via CircleTabBar.
  *
@@ -25,7 +25,7 @@ import {
 } from 'react-native';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
-import { isAllKringen } from '@onderling-app/basis';
+import { isAllCircles } from '@onderling-app/basis';
 
 export default function CircleScreensPickerScreen({
   book = { screens: [], activeId: null },
@@ -126,7 +126,7 @@ function ScreenRow({ screen, isActive, onOpenScreen, onRenameScreen, onRemoveScr
         testID={`screen-name-${screen.id}`}
       >
         <Text style={styles.screenNameText}>{screen.name || t('circle.screens.untitled')}</Text>
-        <Text style={styles.summary}>{kringFilterSummary(screen)}</Text>
+        <Text style={styles.summary}>{circleFilterSummary(screen)}</Text>
         {isActive ? <Text style={styles.activeBadge}>{t('circle.screens.active')}</Text> : null}
       </Pressable>
       <View style={styles.screenActions}>
@@ -146,9 +146,9 @@ function ScreenRow({ screen, isActive, onOpenScreen, onRenameScreen, onRemoveScr
   );
 }
 
-function kringFilterSummary(screen) {
-  if (isAllKringen(screen)) return t('circle.screens.filter_all');
-  const f = screen?.kringFilter;
+function circleFilterSummary(screen) {
+  if (isAllCircles(screen)) return t('circle.screens.filter_all');
+  const f = screen?.circleFilter;
   if (Array.isArray(f) && f.length === 1) return t('circle.screens.filter_one');
   return t('circle.screens.filter_n', { count: Array.isArray(f) ? f.length : 0 });
 }

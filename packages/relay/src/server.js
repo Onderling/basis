@@ -191,8 +191,8 @@ const DEFAULT_PUSH_THROTTLE_MS = param({ key: 'relay.pushThrottleMs', scope: PAR
 // single connection cannot flood a LIVE peer with unbounded messages in OPEN
 // mode (the group-quota path only throttles grouped deployments; the offline
 // queue caps only bound buffering to OFFLINE peers). Chosen to sit far above
-// normal interactive chat/kring traffic (a human sends a handful of messages
-// per second; a kring broadcast is now one `send` per member, so a circle of
+// normal interactive chat/circle traffic (a human sends a handful of messages
+// per second; a circle broadcast is now one `send` per member, so a circle of
 // N costs N tokens rather than one) while capping a
 // flood: `burst` messages may go through instantly, then `perSec` sustained.
 // A 200-message instantaneous blast delivers ~`burst` then gets `OVER_RATE`.

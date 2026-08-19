@@ -1,7 +1,7 @@
 /**
  * basis v2 — launcher bottom tab bar (web).
  *
- * Screens / Kringen / Contacten / Mij — the four top-level surfaces. Shown on
+ * Screens / Circles / Contacten / Mij — the four top-level surfaces. Shown on
  * the launcher, stream and Me screens; hidden inside a circle + its
  * sub-screens (the host calls `hideCircleTabBar`). Pure render; the host wires
  * handlers.
@@ -15,12 +15,12 @@
 import { circleTabs } from '../../src/v2/tabProjection.js';
 import { basisManifest } from '../../src/index.js';
 
-export function renderCircleTabBar(container, { active, t, onScreens, onKringen, onContacts, onMij } = {}) {
+export function renderCircleTabBar(container, { active, t, onScreens, onCircles, onContacts, onMij } = {}) {
   if (!container) return container;
   const tr = typeof t === 'function' ? t : (k) => k;
   // id → the host-wired handler.  Keyed by the projected tab id, so the
-  // callback contract (onScreens/onKringen/onContacts/onMij) is unchanged.
-  const handlers = { screens: onScreens, kringen: onKringen, contacten: onContacts, mij: onMij };
+  // callback contract (onScreens/onCircles/onContacts/onMij) is unchanged.
+  const handlers = { screens: onScreens, circles: onCircles, contacten: onContacts, mij: onMij };
   container.innerHTML = '';
   container.className = 'circle-tabbar';
   for (const tab of circleTabs(basisManifest)) {

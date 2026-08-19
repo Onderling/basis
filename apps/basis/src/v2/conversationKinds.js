@@ -15,7 +15,7 @@
  * Frits: *"didnt we have circle starting templates? Maybe it should be part of that too!"* — and he is
  * right, because the correct default is already not uniform. The templates disagree today:
  *
- *   household · vriendenkring   `features.chat: true`   — talking is the point
+ *   household · friends   `features.chat: true`   — talking is the point
  *   **buurt**                   `features.chat: FALSE`  — noticeboard-first; a thread appears only when
  *                                                          someone reacts to a vraag or aanbod
  *   team                        `features.chat: true`, noticeboard off
@@ -57,7 +57,7 @@ export function availableConversationKinds() {
  */
 export const TEMPLATE_CONVERSATION_KINDS = Object.freeze({
   household:     null,   // a home: everything, it is all one conversation
-  vriendenkring: null,   // friends: same
+  friends: null,   // friends: same
   team:          null,   // work: tasks belong in the stream
   // A buurt has `features.chat: false` — it is noticeboard-first, and a thread appears only when someone
   // reacts to a vraag or aanbod. So its conversation is those posts, NOT open chat; showing chat messages

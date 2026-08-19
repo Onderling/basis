@@ -60,10 +60,10 @@ import {
 import { makePeerRouter }      from '../../../basis/src/core/handlers/peerRouter.js';
 import { makeReceiptReceiver } from '../../../basis/src/v2/deliverySettings.js';
 import { pushContactReply }    from '../core/contactReplyInbox.js';
-import { makeKringRecipePeerHandler } from '../../../basis/src/v2/kringRecipeReceiver.js';
-import { makeKringRulesPeerHandler }  from '../../../basis/src/v2/kringRulesReceiver.js';
-import { makeKringPolicyPeerHandler } from '../../../basis/src/v2/kringPolicyReceiver.js';
-import { makeKringGovernancePeerHandler, makeKringReportPeerHandler } from '../../../basis/src/v2/kringLogReceiver.js';
+import { makeCircleRecipePeerHandler } from '../../../basis/src/v2/circleRecipeReceiver.js';
+import { makeCircleRulesPeerHandler }  from '../../../basis/src/v2/circleRulesReceiver.js';
+import { makeCirclePolicyPeerHandler } from '../../../basis/src/v2/circlePolicyReceiver.js';
+import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '../../../basis/src/v2/circleLogReceiver.js';
 import { makeGovernanceRail } from '../../../basis/src/v2/governanceAppWiring.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../../basis/src/v2/membershipRail.js';
 import { makeTaskPeerHandler, TASK_BROADCAST, TASK_CATCHUP_SUBTYPES } from '../../../basis/src/v2/taskRail.js';
@@ -161,7 +161,7 @@ import ExtensionConsentSheet from './v2/ExtensionConsentSheet.js';
 import { useExtensionInstall } from '../core/extensionInstallRN.js';
 import { asyncStorageMappingsStore, MAPPINGS_DEVICE } from '../core/mappingsStoreRN.js';
 // ε.6 — multi-offer chooser modal (opt-in via policy.catchUpChooserMode='prompt').
-// ε.6 follow-up — read the same per-kring policy the launcher writes so
+// ε.6 follow-up — read the same per-circle policy the launcher writes so
 // the chooser mode is honoured on mobile (web reads localStorage
 // synchronously; mobile uses a hot cache because AsyncStorage is async).
 
@@ -189,11 +189,11 @@ const FEEDBACK_PROJECT_ID = process.env.EXPO_PUBLIC_FEEDBACK_PROJECT_ID || 'basi
 // ε.1 — fallback inbox builder used only when App.js didn't pass one
 // (e.g. older standalone test mounts).  Production wiring goes through
 // the App-level singleton so dedup state is shared with the rehydrator.
-// The kring-chat inbox is a SINGLETON owned by App.js (validation, msgId dedup, ingest mirror,
+// The circle-chat inbox is a SINGLETON owned by App.js (validation, msgId dedup, ingest mirror,
 // resolveRef, receipts, self-author check — one dedup domain for live receive, rehydrate AND catch-up).
 // There used to be a private fallback inbox built here when the prop was missing; it was a divergent
 // twin (no resolveRef, no receipts) that no mount and no test ever reached — deleted. A missing inbox
-// now means kring chat receive is OFF, loudly, instead of silently crippled.
+// now means circle chat receive is OFF, loudly, instead of silently crippled.
 
 export default function ChatScreen({
   bundle = null,
@@ -206,24 +206,24 @@ export default function ChatScreen({
   // ε.1 — shared inbox singleton (msgId dedup + ingest mirror + eventLog append).
   // The receiver path here routes through it; rehydrator + future catch-up paths
   // share the same instance so dedup state is unified.  Pre-ε.1 prop name
-  // `kringChatDedup` no longer exists — App.js owns the inbox now.
-  kringChatInbox = null,
+  // `circleChatDedup` no longer exists — App.js owns the inbox now.
+  circleChatInbox = null,
   chatStoredReceipt = null,   // the App-owned receipt sender — shared with the inbox (one policy, two paths)
   // Delivery honesty — the shared per-message map (App.js owns it); inbound receipts advance it here.
   deliveryStateMap = null,
   // γ-next.recipe — pending-recipe cache + dedup, plumbed from App.js
   // so the launcher's editor sees the same store the receiver writes to.
-  kringRecipePendingStore = null,
-  kringRecipeDedup = null,
+  circleRecipePendingStore = null,
+  circleRecipeDedup = null,
   // γ-next.rules — pending-rules cache + dedup, mirrors the recipe wire.
   // Launcher's rules editor reads from this store; receiver writes here.
-  kringRulesPendingStore = null,
-  kringRulesDedup = null,
+  circleRulesPendingStore = null,
+  circleRulesDedup = null,
   // γ-next.policy — pending-policy cache + dedup.  Launcher's settings
   // editor reads from this store; receiver writes here.  Completes the
   // γ-next trio (recipe / rules / policy).
-  kringPolicyPendingStore = null,
-  kringPolicyDedup = null,
+  circlePolicyPendingStore = null,
+  circlePolicyDedup = null,
   // 5.4c (2026-05-30) — App.js owns the OidcSessionRN so the v2 circle
   // launcher can build a podWriter from the SAME session.  If absent
   // (standalone mounts / older tests) we fall back to creating one
@@ -281,7 +281,7 @@ export default function ChatScreen({
   // E5 — record/mini-page "⤢ Open in full": holds the reply shown in
   // the full-height detail modal, or null when closed.
   const [expandedRecord, setExpandedRecord] = useState(null);
-  // The per-kring policy store (shared AsyncStorage prefix with the launcher) — the create wizard
+  // The per-circle policy store (shared AsyncStorage prefix with the launcher) — the create wizard
   // persists its chosen policy through it.
   const policyStoreRef = useRef(null);
   if (!policyStoreRef.current) {
@@ -548,7 +548,7 @@ export default function ChatScreen({
       // G11 — a group-key rotation fanned by another member lands in the local key-event log (web parity).
       'group-key-event':       makeHandleGroupKeyEvent({ recordKeyEvent: recordCircleKeyEvent }),
       // a contact-bot's reply in its Contacten DM thread → the shared inbox
-      // the open ContactThreadScreen subscribes to (cross-screen, like the kring
+      // the open ContactThreadScreen subscribes to (cross-screen, like the circle
       // chat wire).  Guarded: the channel is absent in stub-mode boots.
       // S1 #3 — also an inbound PEER DM (contact-msg): a person's message lands in
       // the same inbox (the thread screen routes it by sender address).
@@ -637,32 +637,32 @@ export default function ChatScreen({
       // handler is a no-op, as before. Fire-and-forget: reading the roster is a skill call and the peer
       // router does not await its handlers, so a slow read delays the bubble, never the receive loop.
       'delivery-receipt': (from, payload) => { applyIncomingReceipt?.(payload, from); },
-      // γ-next.recipe — kring scherm recipe broadcast.  Caches the
-      // inbound recipe per-kring; the editor pulls on next open and
+      // γ-next.recipe — circle scherm recipe broadcast.  Caches the
+      // inbound recipe per-circle; the editor pulls on next open and
       // passes via γ.3's `incomingRecipe` opt.  No bubble UI.
-      ...(kringRecipePendingStore ? {
-        'kring-recipe-broadcast': makeKringRecipePeerHandler({
-          pendingStore: kringRecipePendingStore,
-          dedup:        kringRecipeDedup,
+      ...(circleRecipePendingStore ? {
+        'circle-recipe-broadcast': makeCircleRecipePeerHandler({
+          pendingStore: circleRecipePendingStore,
+          dedup:        circleRecipeDedup,
         }),
       } : {}),
-      // γ-next.rules — kring rules document broadcast.  Caches the
-      // inbound rules doc per-kring; the rules editor pulls on next
+      // γ-next.rules — circle rules document broadcast.  Caches the
+      // inbound rules doc per-circle; the rules editor pulls on next
       // open and passes via γ.4's `incomingRules` opt.  No bubble UI.
-      ...(kringRulesPendingStore ? {
-        'kring-rules-broadcast': makeKringRulesPeerHandler({
-          pendingStore: kringRulesPendingStore,
-          dedup:        kringRulesDedup,
+      ...(circleRulesPendingStore ? {
+        'circle-rules-broadcast': makeCircleRulesPeerHandler({
+          pendingStore: circleRulesPendingStore,
+          dedup:        circleRulesDedup,
         }),
       } : {}),
-      // γ-next.policy — kring circlePolicy broadcast.  Caches the
-      // inbound policy doc per-kring; the settings editor pulls on
+      // γ-next.policy — circle circlePolicy broadcast.  Caches the
+      // inbound policy doc per-circle; the settings editor pulls on
       // next open and passes via γ.4's `incomingPolicy` opt.  No
       // bubble UI.  Completes the γ-next trio (recipe / rules / policy).
-      ...(kringPolicyPendingStore ? {
-        'kring-policy-broadcast': makeKringPolicyPeerHandler({
-          pendingStore: kringPolicyPendingStore,
-          dedup:        kringPolicyDedup,
+      ...(circlePolicyPendingStore ? {
+        'circle-policy-broadcast': makeCirclePolicyPeerHandler({
+          pendingStore: circlePolicyPendingStore,
+          dedup:        circlePolicyDedup,
         }),
       } : {}),
       // Wave C tail A — ingest fanned governance/report events into the one log so a
@@ -721,7 +721,7 @@ export default function ChatScreen({
           resolveRef: circleResolveRef,
           // The persisted log IS the record — no store copy for a landed signed entry (the history
           // migration carried the store era over once). Side effect: the delivery receipt, through the
-          // SAME App-owned sender the legacy inbox uses (web's onKringStored parity).
+          // SAME App-owned sender the legacy inbox uses (web's onCircleStored parity).
           onLanded: async (cid, entry, fromPeerAddr) => {
             try { chatStoredReceipt?.({ msgId: entry.id, circleId: cid, fromPeerAddr, source: 'receiver' }); }
             catch { /* the receipt is best-effort */ }
@@ -797,7 +797,7 @@ export default function ChatScreen({
             [chatCatchUp.subtypes.batch]:   chatCatchUp.onBatch,
             [chatCatchUp.subtypes.offer]:   chatCatchUp.onOffer,
           } : {}),
-          'kring-governance-broadcast': makeKringGovernancePeerHandler({
+          'circle-governance-broadcast': makeCircleGovernancePeerHandler({
             eventLog: eventLogRef.current,
             rail: govRail,
             notify: (circleId, event) => {
@@ -811,7 +811,7 @@ export default function ChatScreen({
           }),
         };
       })(),
-      'kring-report-broadcast':     makeKringReportPeerHandler({ eventLog: eventLogRef.current }),
+      'circle-report-broadcast':     makeCircleReportPeerHandler({ eventLog: eventLogRef.current }),
     };
     const defaultHandler = makeHandleChatMessage({
       ensureDmThread:    handleDmThreadOpen,

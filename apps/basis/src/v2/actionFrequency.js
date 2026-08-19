@@ -2,11 +2,11 @@
  * basis v2 — per-circle action-frequency counter (D1 / §5A).
  *
  * The v2 PDF's "Veel-gebruikt" row surfaces the actions THIS user uses
- * most IN THAT kring.  This substrate is the counter behind it: a small
+ * most IN THAT circle.  This substrate is the counter behind it: a small
  * `Map<circleId, Map<actionKey, count>>` that `bump()`s when an action
  * fires and answers `top(circleId, n)` for the renderer.
  *
- * `actionKey` is a kring feature key (`chat`, `noticeboard`, `tasks`,
+ * `actionKey` is a circle feature key (`chat`, `noticeboard`, `tasks`,
  * `lists`, `calendar`, `notes`, `houseRules`, `memberDirectory`) — the
  * same vocabulary the bottom tabs + `enabledFeatures(policy)` use, so
  * the quickActions block can intersect frequency with what's enabled.

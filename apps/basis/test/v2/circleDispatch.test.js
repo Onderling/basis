@@ -16,7 +16,7 @@ function harness({ policy = { llmTool: 'off' }, providers = {}, interpret, botNa
     gate,
     recentTurns,
     dispatch: (slash) => { dispatched.push(slash); },
-    postToKring: (text) => { posted.push(text); },
+    postToCircle: (text) => { posted.push(text); },
     ...(onLlmUnavailable ? { onLlmUnavailable: (text, ctx, info) => { unavailable.push({ text, info }); } } : {}),
     ...(onNoMatch ? { onNoMatch: (text, ctx, opts) => { noMatched.push({ text, reply: opts && opts.reply }); } } : {}),
   });
@@ -32,23 +32,23 @@ describe('createCircleDispatch — routing', () => {
     expect(posted).toEqual([]);
   });
 
-  it('posts free text to the kring when llmTool is off', async () => {
+  it('posts free text to the circle when llmTool is off', async () => {
     const interpret = vi.fn();
     const { cd, dispatched, posted } = harness({ policy: { llmTool: 'off' }, interpret });
     const r = await cd.handle('@bot add milk to the list');
-    expect(r.via).toBe('kring');
+    expect(r.via).toBe('circle');
     expect(interpret).not.toHaveBeenCalled();   // no LLM when off — never accidentally invoked
     expect(dispatched).toEqual([]);
     expect(posted).toEqual(['@bot add milk to the list']);
   });
 
-  it('posts free text to the kring when the bot is NOT addressed (even with llmTool on)', async () => {
+  it('posts free text to the circle when the bot is NOT addressed (even with llmTool on)', async () => {
     const interpret = vi.fn();
     const { cd, dispatched, posted } = harness({
       policy: { llmTool: 'local' }, providers: { local: { invoke: vi.fn() } }, interpret,
     });
     const r = await cd.handle('anyone going to the shop later?');
-    expect(r.via).toBe('kring');
+    expect(r.via).toBe('circle');
     expect(interpret).not.toHaveBeenCalled();   // bystander chatter is never sent to the LLM
     expect(posted).toEqual(['anyone going to the shop later?']);
   });
@@ -91,13 +91,13 @@ describe('createCircleDispatch — routing', () => {
     expect(interpret.mock.calls[0][1].context).toEqual(['you: add milk', 'rag: list has eggs']);
   });
 
-  it('falls back to a kring post when the interpreter returns null', async () => {
+  it('falls back to a circle post when the interpreter returns null', async () => {
     const interpret = vi.fn(async () => null);
     const { cd, dispatched, posted } = harness({
       policy: { llmTool: 'cloud' }, providers: { cloud: { invoke: vi.fn() } }, interpret,
     });
     const r = await cd.handle('@bot what do you think of the weather');
-    expect(r.via).toBe('kring');
+    expect(r.via).toBe('circle');
     expect(dispatched).toEqual([]);
     expect(posted).toEqual(['@bot what do you think of the weather']);
   });
@@ -142,12 +142,12 @@ describe('createCircleDispatch — routing', () => {
     // user mode local + provider present → interprets
     const on = harness({ policy: { llmTool: 'user' }, providers: { local: { invoke: vi.fn() } }, interpret, userDefault: { mode: 'local' }, botName: 'helper' });
     expect((await on.cd.handle('@helper add milk')).via).toBe('llm');
-    // user mode off → no LLM, posts to kring
+    // user mode off → no LLM, posts to circle
     const off = harness({ policy: { llmTool: 'user' }, providers: { local: { invoke: vi.fn() } }, interpret: vi.fn(), userDefault: { mode: 'off' }, botName: 'helper' });
-    expect((await off.cd.handle('@helper add milk')).via).toBe('kring');
+    expect((await off.cd.handle('@helper add milk')).via).toBe('circle');
   });
 
-  it('token gate: a rule routes directly (via rule, no interpret); a skip → kring', async () => {
+  it('token gate: a rule routes directly (via rule, no interpret); a skip → circle', async () => {
     const providers = { local: { invoke: vi.fn() } };
     const interpretRule = vi.fn();
     const rule = harness({ policy: { llmTool: 'local' }, providers, interpret: interpretRule, botName: 'helper',
@@ -161,7 +161,7 @@ describe('createCircleDispatch — routing', () => {
     const skip = harness({ policy: { llmTool: 'local' }, providers, interpret: interpretSkip, botName: 'helper',
       gate: { evaluate: async () => ({ via: 'skip' }) } });
     const r2 = await skip.cd.handle('@helper hi there');
-    expect(r2.via).toBe('kring');
+    expect(r2.via).toBe('circle');
     expect(skip.posted).toEqual(['@helper hi there']);
     expect(interpretSkip).not.toHaveBeenCalled();
   });
@@ -219,8 +219,8 @@ describe('createCircleDispatch — routing', () => {
     expect(posted).toEqual([]);
   });
 
-  it('requires dispatch (the unhandled sink — postToKring/onUnhandled — is optional)', () => {
-    expect(() => createCircleDispatch({ postToKring: () => {} })).toThrow();      // no dispatch → throws
+  it('requires dispatch (the unhandled sink — postToCircle/onUnhandled — is optional)', () => {
+    expect(() => createCircleDispatch({ postToCircle: () => {} })).toThrow();      // no dispatch → throws
     expect(() => createCircleDispatch({ dispatch: () => {} })).not.toThrow();     // dispatch alone is enough now
   });
 });

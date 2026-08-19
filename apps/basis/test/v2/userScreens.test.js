@@ -1,40 +1,40 @@
 // @vitest-environment happy-dom
 import { describe, it, expect } from 'vitest';
 import {
-  EMPTY_SCREEN_BOOK, ALL_KRINGEN,
-  emptyScreen, normalizeScreen, isAllKringen, effectiveKringIds,
-  addKringToScreen, removeKringFromScreen, setAllKringen,
+  EMPTY_SCREEN_BOOK, ALL_CIRCLES,
+  emptyScreen, normalizeScreen, isAllCircles, effectiveCircleIds,
+  addCircleToScreen, removeCircleFromScreen, setAllCircles,
   normalizeScreenBook,
   addScreen, renameScreen, removeScreen, setActiveScreen, getActiveScreen, updateScreen,
   createUserScreenStore, localStorageScreenIo,
 } from '../../src/v2/userScreens.js';
-import { addBlock, moveBlock } from '../../src/v2/kringRecipe.js';
+import { addBlock, moveBlock } from '../../src/v2/circleRecipe.js';
 
 /* ─────────────────────────────────────────────────────────────────── */
 /* Single Screen                                                      */
 /* ─────────────────────────────────────────────────────────────────── */
 
 describe('userScreens · α.2.a — single Screen', () => {
-  it('emptyScreen() mints fresh id + defaults to ALL_KRINGEN', () => {
+  it('emptyScreen() mints fresh id + defaults to ALL_CIRCLES', () => {
     const s = emptyScreen('Stream');
-    expect(s).toMatchObject({ name: 'Stream', kringFilter: ALL_KRINGEN, blocks: [] });
+    expect(s).toMatchObject({ name: 'Stream', circleFilter: ALL_CIRCLES, blocks: [] });
     expect(s.id).toMatch(/^s-/);
     expect(emptyScreen().id).not.toBe(s.id);
   });
 
-  it('emptyScreen with an explicit kringFilter list dedupes + drops blanks', () => {
-    const s = emptyScreen('Two-kring', ['g-a', '', 'g-b', null, 'g-a']);
+  it('emptyScreen with an explicit circleFilter list dedupes + drops blanks', () => {
+    const s = emptyScreen('Two-circle', ['g-a', '', 'g-b', null, 'g-a']);
     // Per implementation: blanks/non-strings dropped, but dup IS kept (only
-    // addKringToScreen dedupes).  Verify via the public shape.
-    expect(s.kringFilter).toEqual(['g-a', 'g-b', 'g-a']);
+    // addCircleToScreen dedupes).  Verify via the public shape.
+    expect(s.circleFilter).toEqual(['g-a', 'g-b', 'g-a']);
   });
 
   it('normalizeScreen coerces malformed input', () => {
-    expect(normalizeScreen(null).kringFilter).toBe(ALL_KRINGEN);
-    const s = normalizeScreen({ id: 'x', name: 7, kringFilter: 'oops', blocks: 42 });
+    expect(normalizeScreen(null).circleFilter).toBe(ALL_CIRCLES);
+    const s = normalizeScreen({ id: 'x', name: 7, circleFilter: 'oops', blocks: 42 });
     expect(s.id).toBe('x');
     expect(s.name).toBe('');         // non-string name → ''
-    expect(s.kringFilter).toBe(ALL_KRINGEN);  // non-array filter → ALL
+    expect(s.circleFilter).toBe(ALL_CIRCLES);  // non-array filter → ALL
     expect(s.blocks).toEqual([]);
   });
 
@@ -47,47 +47,47 @@ describe('userScreens · α.2.a — single Screen', () => {
     expect(s.blocks.map((b) => b.type)).toEqual(['announcement', 'photo']);
   });
 
-  it('isAllKringen returns true for null, undefined, []', () => {
-    expect(isAllKringen({ kringFilter: ALL_KRINGEN })).toBe(true);
-    expect(isAllKringen({})).toBe(true);
-    expect(isAllKringen({ kringFilter: [] })).toBe(true);
-    expect(isAllKringen({ kringFilter: ['g-a'] })).toBe(false);
+  it('isAllCircles returns true for null, undefined, []', () => {
+    expect(isAllCircles({ circleFilter: ALL_CIRCLES })).toBe(true);
+    expect(isAllCircles({})).toBe(true);
+    expect(isAllCircles({ circleFilter: [] })).toBe(true);
+    expect(isAllCircles({ circleFilter: ['g-a'] })).toBe(false);
   });
 
-  it('effectiveKringIds expands ALL → allCircleIds; passes through explicit list', () => {
+  it('effectiveCircleIds expands ALL → allCircleIds; passes through explicit list', () => {
     const s1 = emptyScreen('Stream');
-    expect(effectiveKringIds(s1, ['a', 'b', 'c'])).toEqual(['a', 'b', 'c']);
+    expect(effectiveCircleIds(s1, ['a', 'b', 'c'])).toEqual(['a', 'b', 'c']);
 
     const s2 = emptyScreen('Selwerd', ['g-sel']);
-    expect(effectiveKringIds(s2, ['a', 'b', 'c'])).toEqual(['g-sel']);
+    expect(effectiveCircleIds(s2, ['a', 'b', 'c'])).toEqual(['g-sel']);
   });
 
-  it('addKringToScreen: ALL → [id]; further adds dedupe', () => {
+  it('addCircleToScreen: ALL → [id]; further adds dedupe', () => {
     let s = emptyScreen('S');
-    expect(isAllKringen(s)).toBe(true);
-    s = addKringToScreen(s, 'g-a');
-    expect(s.kringFilter).toEqual(['g-a']);
-    s = addKringToScreen(s, 'g-b');
-    s = addKringToScreen(s, 'g-a');   // dup; no-op
-    expect(s.kringFilter).toEqual(['g-a', 'g-b']);
+    expect(isAllCircles(s)).toBe(true);
+    s = addCircleToScreen(s, 'g-a');
+    expect(s.circleFilter).toEqual(['g-a']);
+    s = addCircleToScreen(s, 'g-b');
+    s = addCircleToScreen(s, 'g-a');   // dup; no-op
+    expect(s.circleFilter).toEqual(['g-a', 'g-b']);
   });
 
-  it('removeKringFromScreen: no-op on ALL; otherwise filters', () => {
+  it('removeCircleFromScreen: no-op on ALL; otherwise filters', () => {
     let s = emptyScreen('S');
-    s = removeKringFromScreen(s, 'g-a');
-    expect(isAllKringen(s)).toBe(true);   // still ALL
+    s = removeCircleFromScreen(s, 'g-a');
+    expect(isAllCircles(s)).toBe(true);   // still ALL
 
-    s = addKringToScreen(s, 'g-a');
-    s = addKringToScreen(s, 'g-b');
-    s = removeKringFromScreen(s, 'g-a');
-    expect(s.kringFilter).toEqual(['g-b']);
+    s = addCircleToScreen(s, 'g-a');
+    s = addCircleToScreen(s, 'g-b');
+    s = removeCircleFromScreen(s, 'g-a');
+    expect(s.circleFilter).toEqual(['g-b']);
   });
 
-  it('setAllKringen drops any explicit list, returns to ALL', () => {
-    let s = addKringToScreen(emptyScreen('S'), 'g-a');
-    expect(isAllKringen(s)).toBe(false);
-    s = setAllKringen(s);
-    expect(isAllKringen(s)).toBe(true);
+  it('setAllCircles drops any explicit list, returns to ALL', () => {
+    let s = addCircleToScreen(emptyScreen('S'), 'g-a');
+    expect(isAllCircles(s)).toBe(false);
+    s = setAllCircles(s);
+    expect(isAllCircles(s)).toBe(true);
   });
 });
 
@@ -101,9 +101,9 @@ describe('userScreens · α.2.a — α.1 block helpers compose with Screen', () 
     s = addBlock(s, 'noticeboard');
     s = addBlock(s, 'agenda');
     expect(s.blocks.map((b) => b.type)).toEqual(['noticeboard', 'agenda']);
-    // addBlock preserves id+name; check id+kringFilter survive.
+    // addBlock preserves id+name; check id+circleFilter survive.
     expect(s.id).toMatch(/^s-/);
-    expect(s.kringFilter).toBe(ALL_KRINGEN);
+    expect(s.circleFilter).toBe(ALL_CIRCLES);
 
     const noticeId = s.blocks[0].id;
     s = moveBlock(s, noticeId, 1);
@@ -135,7 +135,7 @@ describe('userScreens · α.2.a — ScreenBook', () => {
     book = addScreen(book, 'Selwerd', ['g-sel']);
     expect(book.screens).toHaveLength(2);
     expect(book.activeId).toBe(book.screens[0].id);   // active unchanged
-    expect(book.screens[1].kringFilter).toEqual(['g-sel']);
+    expect(book.screens[1].circleFilter).toEqual(['g-sel']);
   });
 
   it('renameScreen: no-op on missing id', () => {
@@ -172,11 +172,11 @@ describe('userScreens · α.2.a — ScreenBook', () => {
   it('updateScreen mutator can use single-screen helpers + α.1 block helpers', () => {
     let book = addScreen(EMPTY_SCREEN_BOOK, 'Stream');
     const sid = book.screens[0].id;
-    // add a kring to the filter
-    book = updateScreen(book, sid, (s) => addKringToScreen(s, 'g-a'));
+    // add a circle to the filter
+    book = updateScreen(book, sid, (s) => addCircleToScreen(s, 'g-a'));
     // add a noticeboard block via the α.1 helper — composes
     book = updateScreen(book, sid, (s) => addBlock(s, 'noticeboard', { limit: 10 }));
-    expect(book.screens[0].kringFilter).toEqual(['g-a']);
+    expect(book.screens[0].circleFilter).toEqual(['g-a']);
     expect(book.screens[0].blocks).toHaveLength(1);
     expect(book.screens[0].blocks[0].config.limit).toBe(10);
   });

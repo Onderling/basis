@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { renderRecipeEditor } from '../../web/v2/circleRecipeEditor.js';
-import { emptyRecipe, addRecipe, setActiveRecipe, addBlock } from '../../src/v2/kringRecipe.js';
+import { emptyRecipe, addRecipe, setActiveRecipe, addBlock } from '../../src/v2/circleRecipe.js';
 
 const t = (key, params) =>
   params && params.name != null ? `${key}:${params.name}`

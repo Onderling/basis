@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { migrateKringChatHistory } from '../../src/v2/kringChatRehydrate.js';
+import { migrateCircleChatHistory } from '../../src/v2/circleChatRehydrate.js';
 
 // The blessed no-backcompat exception: chat history gets a REAL one-time migration (store copy →
 // persisted device log). The latch's promises: it runs the pass once; a FAILED pass leaves the latch
@@ -7,7 +7,7 @@ import { migrateKringChatHistory } from '../../src/v2/kringChatRehydrate.js';
 // chat rows again.
 
 // The strict rehydrator contract: `text` on the ITEM, msgId/circleId/ts on `source`.
-const item = (msgId) => ({ id: msgId, type: 'kring-chat-message', text: `msg ${msgId}`, source: { circleId: 'c1', msgId, ts: 1, fromActor: 'ada' } });
+const item = (msgId) => ({ id: msgId, type: 'circle-chat-message', text: `msg ${msgId}`, source: { circleId: 'c1', msgId, ts: 1, fromActor: 'ada' } });
 
 function fakeInbox() {
   const inserted = [];
@@ -28,12 +28,12 @@ describe('the one-time chat-history migration', () => {
     let storeReads = 0;
     const callSkill = async (app, op) => { storeReads += 1; return { items: [item('m1'), item('m2')] }; };
 
-    const first = await migrateKringChatHistory({ callSkill, inbox, marker });
+    const first = await migrateCircleChatHistory({ callSkill, inbox, marker });
     expect(first.migrated).toBe(true);
     expect(first.rehydrated).toBe(2);
     expect(marker.peek()).toBeTruthy();                 // latched on success
 
-    const second = await migrateKringChatHistory({ callSkill, inbox, marker });
+    const second = await migrateCircleChatHistory({ callSkill, inbox, marker });
     expect(second).toEqual({ migrated: false, alreadyDone: true });
     expect(storeReads).toBe(1);                         // the store was never read again
   });
@@ -48,17 +48,17 @@ describe('the one-time chat-history migration', () => {
       return { items: [item('m1')] };
     };
 
-    const failed = await migrateKringChatHistory({ callSkill, inbox, marker, logger: { warn() {}, info() {} } });
+    const failed = await migrateCircleChatHistory({ callSkill, inbox, marker, logger: { warn() {}, info() {} } });
     expect(failed.migrated).toBe(false);
     expect(marker.peek()).toBeNull();                   // NOT latched
 
-    const retried = await migrateKringChatHistory({ callSkill, inbox, marker, logger: { warn() {}, info() {} } });
+    const retried = await migrateCircleChatHistory({ callSkill, inbox, marker, logger: { warn() {}, info() {} } });
     expect(retried.migrated).toBe(true);                // the next boot completed it
     expect(inbox.inserted).toEqual(['m1']);
   });
 
   it('a missing marker io is refused loudly rather than migrating unlatched forever', async () => {
-    const res = await migrateKringChatHistory({ callSkill: async () => ({ items: [] }), inbox: fakeInbox() });
+    const res = await migrateCircleChatHistory({ callSkill: async () => ({ items: [] }), inbox: fakeInbox() });
     expect(res.migrated).toBe(false);
     expect(res.error).toMatch(/marker/);
   });

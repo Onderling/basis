@@ -5,14 +5,14 @@
  * expectBubbleSoon — were removed 2026-06-29 when the browser suite migrated off classic.html: their only
  * consumers (mesh-and-dm, multi-device-journeys) were retired, the NKN-cross-tab/DM flows having no v2 surface.)
  *
- * v2 DOM conventions: kring composer `.circle-kring__composer-input` / `.circle-kring__composer-send`,
- * bubbles `.circle-kring__bubble`, launcher `.circle-tile` / `.circle-launcher__new`, kringen tab
- * `[data-tab="kringen"]`, chat toggle `.circle-kring__view-toggle-btn`.
+ * v2 DOM conventions: circle composer `.circle-circle__composer-input` / `.circle-circle__composer-send`,
+ * bubbles `.circle-circle__bubble`, launcher `.circle-tile` / `.circle-launcher__new`, circles tab
+ * `[data-tab="circles"]`, chat toggle `.circle-circle__view-toggle-btn`.
  */
 import { expect } from '@playwright/test';
 
-/** Boot the v2 app and open a kring chat composer. Resolves once `.circle-kring__composer-input` is visible.
- *  Lifted from the per-spec `openKringComposer` (circle-kring-*.spec.js) so migrated specs share ONE boot. */
+/** Boot the v2 app and open a circle chat composer. Resolves once `.circle-circle__composer-input` is visible.
+ *  Lifted from the per-spec `openCircleComposer` (circle-circle-*.spec.js) so migrated specs share ONE boot. */
 /**
  * Turn a circle's display name into the `buurt id` the launcher tile actually shows.
  * The wizard requires lowercase letters, digits and hyphens, and the tile renders the ID — not the name.
@@ -58,8 +58,8 @@ export async function createCircleViaWizard(page, name) {
   return id;
 }
 
-/** Boot the v2 app and open a kring chat composer for OUR circle, creating it if needed.
- *  Lifted from the per-spec `openKringComposer` so every spec shares ONE boot. */
+/** Boot the v2 app and open a circle chat composer for OUR circle, creating it if needed.
+ *  Lifted from the per-spec `openCircleComposer` so every spec shares ONE boot. */
 /**
  * Turn the per-circle TASKS feature on, through the settings surface a person would use.
  *
@@ -69,8 +69,8 @@ export async function createCircleViaWizard(page, name) {
  * they used to inherit whatever circle they happened to land in.
  */
 export async function enableTasksFeature(page) {
-  await page.locator('.circle-kring__more').click();
-  await page.locator('.circle-kring__more-item[data-action="settings"]').click();
+  await page.locator('.circle-circle__more').click();
+  await page.locator('.circle-circle__more-item[data-action="settings"]').click();
   await page.waitForTimeout(800);
   const box = page.locator('input[data-feature="tasks"]');
   await expect(box).toBeVisible({ timeout: 5000 });
@@ -79,15 +79,15 @@ export async function enableTasksFeature(page) {
   await page.waitForTimeout(800);
   const back = page.locator('.circle-settings__back');
   if (await back.count()) { await back.click(); await page.waitForTimeout(800); }
-  const chat = page.locator('.circle-kring__view-toggle-btn', { hasText: 'Chat' });
+  const chat = page.locator('.circle-circle__view-toggle-btn', { hasText: 'Chat' });
   if (await chat.count()) { await chat.click(); await page.waitForTimeout(800); }
 }
 
-export async function bootKring(page, circleName = 'Test Circle', { tasks = false } = {}) {
+export async function bootCircle(page, circleName = 'Test Circle', { tasks = false } = {}) {
   const id = circleSlug(circleName);
   await page.goto('/');
   await page.waitForTimeout(2500);
-  await page.locator('[data-tab="kringen"]').click();
+  await page.locator('[data-tab="circles"]').click();
   await page.waitForTimeout(1500);
 
   // Open OUR circle by id — never "the first tile".
@@ -103,20 +103,20 @@ export async function bootKring(page, circleName = 'Test Circle', { tasks = fals
   if (await mine.count() === 0) await createCircleViaWizard(page, circleName);
   await mine.first().click();
   await page.waitForTimeout(2500);
-  await page.locator('.circle-kring__view-toggle-btn', { hasText: 'Chat' }).click();
+  await page.locator('.circle-circle__view-toggle-btn', { hasText: 'Chat' }).click();
   await page.waitForTimeout(1200);
-  await expect(page.locator('.circle-kring__composer-input')).toBeVisible();
+  await expect(page.locator('.circle-circle__composer-input')).toBeVisible();
   if (tasks) await enableTasksFeature(page);
 }
 
-/** Send a kring composer line (explicit send button — no Enter/Escape dropdown dance). */
-export async function sendKring(page, text, settleMs = 2500) {
-  await page.locator('.circle-kring__composer-input').fill(text);
-  await page.locator('.circle-kring__composer-send').click();
+/** Send a circle composer line (explicit send button — no Enter/Escape dropdown dance). */
+export async function sendCircle(page, text, settleMs = 2500) {
+  await page.locator('.circle-circle__composer-input').fill(text);
+  await page.locator('.circle-circle__composer-send').click();
   await page.waitForTimeout(settleMs);
 }
 
-/** All kring bubble texts (the v2 equivalent of reading #messages). */
-export async function kringBubbles(page) {
-  return page.locator('.circle-kring__bubble').allTextContents();
+/** All circle bubble texts (the v2 equivalent of reading #messages). */
+export async function circleBubbles(page) {
+  return page.locator('.circle-circle__bubble').allTextContents();
 }

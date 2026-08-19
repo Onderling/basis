@@ -3,7 +3,7 @@
 // external :8787 dependency), connects two REAL node agents to it RELAY-ONLY, and asserts
 // the full exchange rides the relay end-to-end:
 //   • a genuine invite → group-redeem round-trip (the join handshake),
-//   • a kring chat message,
+//   • a circle chat message,
 //   • a Wave C governance vote event (broadcastCircleGovernance → the one log replicates),
 //   • a §8 report event (broadcastCircleReport).
 //
@@ -13,7 +13,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { startRelay } from '@onderling/relay';
 import {
-  bootRealAgentNode, connectAgentsOverRelay, pairCircle, until, teardown, sendKringChat } from '../support/pairRealAgents.js';
+  bootRealAgentNode, connectAgentsOverRelay, pairCircle, until, teardown, sendCircleChat } from '../support/pairRealAgents.js';
 import { signSpine } from '@onderling/core';
 import { reportEntryId } from '../../src/v2/reportModel.js';
 
@@ -43,7 +43,7 @@ describe('relay-route cross-device exchange (self-contained relay)', () => {
 
     // Warm the secure mesh (HI handshake) with a chat message so later broadcasts route.
     const warm = `warmup-${rnd()}`;
-    await sendKringChat(admin, { groupId: GROUP, msgId: `w-${rnd()}`, text: warm });
+    await sendCircleChat(admin, { groupId: GROUP, msgId: `w-${rnd()}`, text: warm });
     await until(() => joiner.chatEvents.some((e) => e?.payload?.text === warm), { timeout: 10000 });
   }, 30000);
 
@@ -56,9 +56,9 @@ describe('relay-route cross-device exchange (self-contained relay)', () => {
     expect(joined).toBeTruthy();
   });
 
-  it('chat: a kring message reached the joiner over the relay', () => {
+  it('chat: a circle message reached the joiner over the relay', () => {
     // Established in beforeAll (warm-up), asserted here for a distinct signal.
-    expect(joiner.chatEvents.some((e) => e?.type === 'kringChatMessage' || e?.payload?.text?.startsWith('warmup-'))).toBe(true);
+    expect(joiner.chatEvents.some((e) => e?.type === 'circleChatMessage' || e?.payload?.text?.startsWith('warmup-'))).toBe(true);
   });
 
   it('governance: a Wave C vote event replicates admin -> joiner over the relay', async () => {

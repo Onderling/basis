@@ -34,7 +34,7 @@ const STOPWORDS = new Set([
 ]);
 
 // Parameter register (#36) — default offering-match result cap (scope:device, kind:internal).
-const MAX_RESULTS_DEFAULT = param({ key: 'kringHost.maxResults', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 5 });
+const MAX_RESULTS_DEFAULT = param({ key: 'circleHost.maxResults', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 5 });
 
 /**
  * Tokenize free text → lowercased non-stopword tokens.  Exposed for

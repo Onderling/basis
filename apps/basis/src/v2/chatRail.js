@@ -25,7 +25,7 @@
  */
 import { signSpine, verifySpine, authorHead, frontier } from '@onderling/core';
 import { entryKindRegistryFromManifests, toEventLogItem, kindWakes } from '@onderling/item-store';
-import { mediaForKringWire } from '@onderling/kring-host/kringBroadcast';
+import { mediaForCircleWire } from '@onderling/kring-host/circleBroadcast';
 import { chatManifest, CHAT_LANE } from './chatManifest.js';
 import { rosterBindingVerifier } from './membershipRail.js';
 
@@ -34,11 +34,11 @@ export const CHAT_RAIL_KINDS = entryKindRegistryFromManifests(chatManifest).kind
 
 /** The wire subtypes: the signed fan (distinct from the legacy plain-envelope subtype) + the catch-up
  *  trio for the frontier replay (chat is windowed + consent-gated — never pull-all). */
-export const CHAT_STATEMENT_BROADCAST = 'kring-chat-statement';
+export const CHAT_STATEMENT_BROADCAST = 'circle-chat-statement';
 export const CHAT_CATCHUP_SUBTYPES = Object.freeze({
-  request: 'kring-chat-catchup-request',
-  batch:   'kring-chat-catchup-batch',
-  offer:   'kring-chat-catchup-offer',
+  request: 'circle-chat-catchup-request',
+  batch:   'circle-chat-catchup-batch',
+  offer:   'circle-chat-catchup-offer',
 });
 
 /**
@@ -101,7 +101,7 @@ export function makeChatRail({ eventLog, circleIdentityFor, myRef, callSkill, ve
       ...(embeds?.length ? { embeds } : {}),
       authorRef: myRef,
     };
-    const wireMedia = mediaForKringWire(media);
+    const wireMedia = mediaForCircleWire(media);
     if (wireMedia) wire.media = wireMedia;
     const bodies = storedStatements(circleId).map((s) => s.body);
     const parent = authorHead(bodies, identity.pubKey);
@@ -136,7 +136,7 @@ export function makeChatRail({ eventLog, circleIdentityFor, myRef, callSkill, ve
       ...(p.embeds?.length ? { embeds: p.embeds } : {}),
       authorRef: myRef,
     };
-    const wireMedia = mediaForKringWire(p.media);
+    const wireMedia = mediaForCircleWire(p.media);
     if (wireMedia) wire.media = wireMedia;
     const bodies = storedStatements(circleId).map((s) => s.body);
     const parent = authorHead(bodies, identity.pubKey);
@@ -238,7 +238,7 @@ export function makeChatEmitter({ rail, fan = null }) {
  *  the side-effect seam (delivery receipts, the store-mirror bridge while it still exists). */
 export function makeChatPeerHandler({ rail, onLanded = null, resolveRef = null } = {}) {
   if (!rail) throw new Error('makeChatPeerHandler: a chat rail is required');
-  return async function onKringChatStatement(fromPeerAddr, payload) {
+  return async function onCircleChatStatement(fromPeerAddr, payload) {
     if (!payload || payload.subtype !== CHAT_STATEMENT_BROADCAST) return;
     const { circleId } = payload;
     if (typeof circleId !== 'string' || !circleId) return;

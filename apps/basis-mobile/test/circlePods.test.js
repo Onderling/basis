@@ -26,7 +26,7 @@ describe('mobile circlePods', () => {
     initCirclePods(mockAsyncStorage());
     const strat = await getCircleSealStrategy('mob-p2', { storagePosture: 'p2' });
     expect(strat).toBeTruthy();
-    expect(strat.open(strat.seal('hoi kring'))).toBe('hoi kring');
+    expect(strat.open(strat.seal('hoi circle'))).toBe('hoi circle');
   });
 
   it('p0 circle → null strategy (cleartext, no sealing)', async () => {

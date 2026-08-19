@@ -124,7 +124,7 @@ export function withDelivery(rows, deliveryById, isMine = (r) => r?.mine === tru
 /**
  * How a state is PRESENTED — glyph, whether it is retryable, and whether it shows at all.
  *
- * Extracted 2026-07-28 from an if/else chain in `circleKring.js` that hardcoded three states and their
+ * Extracted 2026-07-28 from an if/else chain in `circleView.js` that hardcoded three states and their
  * locale keys. That chain was the *second* implementation of state→label (the first being `DELIVERY_LABELS`)
  * and it had a concrete cost, not just a stylistic one: it knew nothing of the far-end states, so
  * `reached-device` and `stored` would have rendered as silence in the one place they matter.

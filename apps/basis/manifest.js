@@ -49,7 +49,7 @@ export const basisManifest = {
 
     /*
      * NOTE (feedback-split F2, 2026-07-08): the `/feedback` + `/feedback-stop` ops were RETIRED here.
-     * Feedback is no longer a hardwired kring-composer slash command; it attaches through the
+     * Feedback is no longer a hardwired circle-composer slash command; it attaches through the
      * added-agent path (the `fp-bot` contact — invite/QR → `feedbackBotStore` → its own thread),
      * per `plans/design/DESIGN-feedback-surface-contract.md` §Registration. The manifest is the
      * source of truth for surfaces (invariant #4); an op with no live surface no longer belongs here.
@@ -834,33 +834,33 @@ export const basisManifest = {
 
   /**
    * Nav-chrome (D / Surface 1) — the top-level TAB BAR.  These four tabs
-   * (screens · kringen · contacten · mij) WERE hardcoded IDENTICALLY in
+   * (screens · circles · contacten · mij) WERE hardcoded IDENTICALLY in
    * both shells (web `web/v2/circleTabBar.js` + mobile
    * `src/screens/v2/CircleTabBar.js`) — invariant #3 violated by
    * construction (same ids + same locale keys in two files).  Declared
    * ONCE here, the shells project the bar from `renderWeb(manifest).tabs`
    * (via `src/v2/tabProjection.js`) so web ≡ mobile by construction.
    *
-   *   screens · kringen · contacten — app-nav roots that map to NO op
+   *   screens · circles · contacten — app-nav roots that map to NO op
    *     (the shell owns the surface): `target: {kind:'nav', to}`.
    *   mij — the existing `me` op (its `surfaces.page` already backs the
    *     "Mij" profile screen): `target: {kind:'op', opId:'me'}`.
    *
-   * Ids + locale keys preserved EXACTLY (screens/kringen/contacten/mij ·
+   * Ids + locale keys preserved EXACTLY (screens/circles/contacten/mij ·
    * circle.tab.*), so behaviour is unchanged.
    */
   tabs: [
     { id: 'screens',   labelKey: 'circle.tab.screens',   target: { kind: 'nav', to: 'screens' } },
-    { id: 'kringen',   labelKey: 'circle.tab.kringen',   target: { kind: 'nav', to: 'kringen' } },
+    { id: 'circles',   labelKey: 'circle.tab.circles',   target: { kind: 'nav', to: 'circles' } },
     { id: 'contacten', labelKey: 'circle.tab.contacten', target: { kind: 'nav', to: 'contacten' } },
     { id: 'mij',       labelKey: 'circle.tab.mij',       target: { kind: 'op',  opId: 'me' } },
   ],
 
   /**
-   * Nav-chrome (D / Surface 2) — the circle DETAIL ACTION BAR + the live kring
+   * Nav-chrome (D / Surface 2) — the circle DETAIL ACTION BAR + the live circle
    * ⋯ overflow menu.  These sibling-screen buttons WERE hand-written and had
    * DIVERGED across THREE places: web detail bar (`circleDetail.js`
-   * `.circle-detail__bar`), the LIVE web kring menu (`circleKring.js`'s
+   * `.circle-detail__bar`), the LIVE web circle menu (`circleView.js`'s
    * hardcoded `MORE_ITEMS`), and the mobile (`CircleLauncherScreen.js`
    * `CircleDetail` ⋯-menu).  Same drift the tab bar killed (invariant #2/#3, by
    * construction the roster lived in multiple files).  Declared ONCE here; all
@@ -870,10 +870,10 @@ export const basisManifest = {
    *
    * Targets: most destinations are shell-owned nav screens (the shell owns the
    * surface, no op backs them) → `{kind:'nav', to}` app-nav roots, exactly like
-   * the screens/kringen/contacten tabs.  `settings` reuses the existing
+   * the screens/circles/contacten tabs.  `settings` reuses the existing
    * `settings` op (its `surfaces.page` side-panel) → `{kind:'op', opId:'settings'}`.
    *
-   * ORDER mirrors the live web kring menu (the surface users see): back is FIRST
+   * ORDER mirrors the live web circle menu (the surface users see): back is FIRST
    * (the detail-bar back button; both ⋯ menus filter it out — the shells render
    * back as a header affordance, not a menu row), then the web menu order
    * invite · settings · lists · contacts · override · viewAs · advisor · skills ·
@@ -883,7 +883,7 @@ export const basisManifest = {
    * (`isFeatureEnabled(policy, …)`, OR semantics), NOT the finer capability
    * matrix — those keys are what the shells gate on today, so behaviour is
    * byte-for-byte preserved.  This is now the SINGLE feature gate (the web
-   * shell's `showKring` no longer recomputes it).  `platforms` DECLARES a
+   * shell's `showCircle` no longer recomputes it).  `platforms` DECLARES a
    * platform gap so it lives in the manifest, not a divergent hardcoded list:
    * `share` is mobile-only (no web CircleShareScreen yet — see
    * circle.share.screen_title locale doc).  `invite` + `contacts` exist on BOTH

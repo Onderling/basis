@@ -9,10 +9,10 @@
 
 import { circleTint } from '../../src/v2/theme.js';
 
-// β.3 — fixed display order for kring-kind section headers; anything not in
+// β.3 — fixed display order for circle-kind section headers; anything not in
 // this list is bucketed under 'other' (last).  Mirrors the values produced by
 // the create wizard + circleModel.normalizeCircle (`raw.kind ?? raw.tone`).
-const KIND_ORDER = ['household', 'buurt', 'vriendenkring'];
+const KIND_ORDER = ['household', 'buurt', 'friends'];
 
 export function renderCircleLauncher(container, {
   circles = [],
@@ -88,7 +88,7 @@ export function renderCircleLauncher(container, {
   const unpinned = sorted.filter((c) => !pinnedMap?.[c.id]);
   const ordered = [...pinned, ...unpinned];
 
-  // β.3 — group by kring kind in KIND_ORDER, then 'other'.  When all kringen
+  // β.3 — group by circle kind in KIND_ORDER, then 'other'.  When all circles
   // share a single kind the headers are skipped (degenerate-case parity with
   // the pre-β.3 flat list look).
   const groups = new Map();

@@ -1,5 +1,5 @@
 /**
- * kring tile activity-preview tests.
+ * circle tile activity-preview tests.
  */
 import { describe, it, expect } from 'vitest';
 import {
@@ -43,14 +43,14 @@ describe('renderSubtitle', () => {
 });
 
 describe('buildTilePreviews', () => {
-  const circles = [{ id: 'selwerd' }, { id: 'huisgenoten' }, { id: 'leeskring' }];
+  const circles = [{ id: 'selwerd' }, { id: 'huisgenoten' }, { id: 'leescircle' }];
 
   it('seeds an empty preview per known circle when there are no events', () => {
     const map = buildTilePreviews({ events: [], circles });
     expect(map).toEqual({
       selwerd:     { subtitle: null, ts: 0, unread: 0 },
       huisgenoten: { subtitle: null, ts: 0, unread: 0 },
-      leeskring:   { subtitle: null, ts: 0, unread: 0 },
+      leescircle:   { subtitle: null, ts: 0, unread: 0 },
     });
   });
 
@@ -78,11 +78,11 @@ describe('buildTilePreviews', () => {
 
   it('counts everything as unread when seenAt is missing for a circle', () => {
     const events = [
-      mkEvent({ id: 'e1', ts: 100, circleId: 'leeskring' }),
-      mkEvent({ id: 'e2', ts: 200, circleId: 'leeskring' }),
+      mkEvent({ id: 'e1', ts: 100, circleId: 'leescircle' }),
+      mkEvent({ id: 'e2', ts: 200, circleId: 'leescircle' }),
     ];
     const map = buildTilePreviews({ events, circles });
-    expect(map.leeskring.unread).toBe(2);
+    expect(map.leescircle.unread).toBe(2);
   });
 
   it('ignores events for unknown circles', () => {
@@ -90,7 +90,7 @@ describe('buildTilePreviews', () => {
       mkEvent({ id: 'e1', ts: 100, circleId: 'ghost', payload: { text: 'noise' } }),
     ];
     const map = buildTilePreviews({ events, circles });
-    expect(Object.keys(map)).toEqual(['selwerd', 'huisgenoten', 'leeskring']);
+    expect(Object.keys(map)).toEqual(['selwerd', 'huisgenoten', 'leescircle']);
     for (const v of Object.values(map)) expect(v.unread).toBe(0);
   });
 

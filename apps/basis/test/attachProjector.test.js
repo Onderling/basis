@@ -4,7 +4,7 @@
  * Covers the three seams the wiring rests on:
  *   1. renderAttachments(basisManifest) projects the attach menu from each op's
  *      `surfaces.attach` (Bestand/Kaart/Afspraak), in manifest order.
- *   2. the prikbord + kring composers render that menu behind a "+" affordance
+ *   2. the prikbord + circle composers render that menu behind a "+" affordance
  *      (replacing the hand-coded 📎).
  *   3. selecting the FILE entry routes through the media pipeline (onAttach); every
  *      OTHER entry dispatches its {opId} via onAttachCommand (the host → callSkill).
@@ -15,7 +15,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderAttachments } from '@onderling/app-manifest';
 import { basisManifest } from '../manifest.js';
 import { renderCircleNoticeboard } from '../web/v2/circleNoticeboard.js';
-import { renderCircleKring } from '../web/v2/circleKring.js';
+import { renderCircleView } from '../web/v2/circleView.js';
 
 const LABELS = {
   'circle.attach.file': 'Bestand',
@@ -106,26 +106,26 @@ describe('prikbord composer — the projected "+" attach menu', () => {
   });
 });
 
-describe('kring composer — the same projected "+" menu', () => {
+describe('circle composer — the same projected "+" menu', () => {
   const attachMenu = renderAttachments(basisManifest).attachMenu;
   const CIRCLE = { id: 'c1', name: 'Buren' };
 
   it('renders the menu + routes the file entry through onAttachMedia', () => {
     const onAttachMedia = vi.fn();
     const onAttachCommand = vi.fn();
-    const el = renderCircleKring(document.createElement('div'), {
+    const el = renderCircleView(document.createElement('div'), {
       circle: CIRCLE, rows: [], t, onSend: () => {},
       attachMenu, onAttachMedia, onAttachCommand,
     });
-    const items = [...el.querySelectorAll('.circle-kring__attach-item')];
+    const items = [...el.querySelectorAll('.circle-circle__attach-item')];
     expect(items.map((i) => i.dataset.opId)).toEqual(['embed', 'embed-file', 'embed-time']);
 
-    const fileInput = el.querySelector('.circle-kring__file');
+    const fileInput = el.querySelector('.circle-circle__file');
     fileInput.click = vi.fn();
-    el.querySelector('.circle-kring__attach-item[data-op-id="embed-file"]').click();
+    el.querySelector('.circle-circle__attach-item[data-op-id="embed-file"]').click();
     expect(fileInput.click).toHaveBeenCalledTimes(1);
 
-    el.querySelector('.circle-kring__attach-item[data-op-id="embed-time"]').click();
+    el.querySelector('.circle-circle__attach-item[data-op-id="embed-time"]').click();
     expect(onAttachCommand).toHaveBeenCalledWith(expect.objectContaining({ opId: 'embed-time' }));
   });
 });

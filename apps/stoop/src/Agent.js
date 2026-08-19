@@ -171,9 +171,9 @@ export async function createNeighborhoodAgent({
   /**
    * Optional RELIABLE cross-peer sender, injected by a host that owns the
    * secure-agent reliability layer (basis wires `sa.peer.sendTo(...,
-   * {guarantee:'hold-forward'})`). When present, kring chat fan-out
+   * {guarantee:'hold-forward'})`). When present, circle chat fan-out
    * (`broadcastCircleMessage`) routes each recipient through it instead of the
-   * bus-local `chat.send` transport — so a kring chat inherits the SAME
+   * bus-local `chat.send` transport — so a circle chat inherits the SAME
    * failover + offline hold-forward that durable circle content (tasks,
    * noticeboard, key-events) already has. Signature:
    *   `(toAddress, envelope, opts?) => Promise<{held?, delivered?, ...} | any>`
@@ -483,7 +483,7 @@ export async function createNeighborhoodAgent({
     evictionRoster,                  // Phase 35 — drop broadcast-posts from evicted members
     dataSource:    cache,            // Phase 39 — read/write attachment bytes from the cache
     // Wave B — route 1:1 peer DMs (reveal-request / contact-add / peer chat) through the SAME
-    // host-injected hold-forward sender the kring chat fan-out uses, so a DM to a briefly-offline
+    // host-injected hold-forward sender the circle chat fan-out uses, so a DM to a briefly-offline
     // peer is HELD + flushed on reconnect. Absent (standalone stoop / no secure-agent) → the bare
     // per-peer transport, unchanged.
     reliableSend:  (typeof reliableSend === 'function') ? reliableSend : null,
@@ -509,7 +509,7 @@ export async function createNeighborhoodAgent({
     _podCtx: cache ? podCtx : null,   // Phase 2.4 — filled by attachPod
     persist,
     chat,
-    reliableSend: (typeof reliableSend === 'function') ? reliableSend : null,  // host-injected hold-forward sender (kring chat fan-out)
+    reliableSend: (typeof reliableSend === 'function') ? reliableSend : null,  // host-injected hold-forward sender (circle chat fan-out)
     circleDataMove: (typeof circleDataMove === 'function') ? circleDataMove : null,  // Phase 2 G1/G2 — host-injected data-move resolver (absent → fan-out-full)
     podWrite:       (typeof podWrite       === 'function') ? podWrite       : null,  // Phase 3 seam — real shared-pod writer (absent → pod-signal/pod-only degrade)
     metrics,

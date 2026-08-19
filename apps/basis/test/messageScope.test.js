@@ -1,5 +1,5 @@
 /**
- * "only you" vs "whole kring" message scope — the data property the badge renders.
+ * "only you" vs "whole circle" message scope — the data property the badge renders.
  */
 import { describe, it, expect } from 'vitest';
 import { scopeForVerb, scopeForReply, normalizeMessageScope } from '../src/v2/messageScope.js';
@@ -8,9 +8,9 @@ describe('scopeForVerb', () => {
   it('read verbs are private (self)', () => {
     for (const v of ['list', 'help', 'get', 'search', 'brief', 'whoami']) expect(scopeForVerb(v)).toBe('self');
   });
-  it('mutating verbs reach the kring', () => {
+  it('mutating verbs reach the circle', () => {
     for (const v of ['add', 'post', 'claim', 'complete', 'submit', 'approve', 'assign', 'cancel']) {
-      expect(scopeForVerb(v)).toBe('kring');
+      expect(scopeForVerb(v)).toBe('circle');
     }
   });
   it('unknown / missing verb defaults to self', () => {
@@ -20,8 +20,8 @@ describe('scopeForVerb', () => {
 });
 
 describe('scopeForReply', () => {
-  it('a mutating op reply reaches the kring', () => {
-    expect(scopeForReply({ verb: 'add' })).toBe('kring');
+  it('a mutating op reply reaches the circle', () => {
+    expect(scopeForReply({ verb: 'add' })).toBe('circle');
   });
   it('a read op reply is private', () => {
     expect(scopeForReply({ verb: 'list' })).toBe('self');
@@ -33,7 +33,7 @@ describe('scopeForReply', () => {
 
 describe('normalizeMessageScope', () => {
   it('keeps valid scopes, defaults the rest to self', () => {
-    expect(normalizeMessageScope('kring')).toBe('kring');
+    expect(normalizeMessageScope('circle')).toBe('circle');
     expect(normalizeMessageScope('self')).toBe('self');
     expect(normalizeMessageScope('bogus')).toBe('self');
     expect(normalizeMessageScope(undefined)).toBe('self');

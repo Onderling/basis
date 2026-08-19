@@ -20,7 +20,7 @@ describe('the limit itself', () => {
   it('is far above anything the wire legitimately carries', () => {
     // The peer wire is a control plane — files go through the blob gateway and travel as references. The
     // biggest real envelopes are a chat line (500 chars), a card, an invite (1–2 KB).
-    const chat = { subtype: 'kring-chat-message', text: 'x'.repeat(500) };
+    const chat = { subtype: 'circle-chat-message', text: 'x'.repeat(500) };
     expect(envelopeExceedsLimit(chat)).toBeNull();
     expect(envelopeByteLength(chat)).toBeLessThan(MAX_ENVELOPE_BYTES / 100);
   });

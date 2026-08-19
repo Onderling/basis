@@ -1,5 +1,5 @@
 /**
- * basis v2 — the lokale kring's proximity SESSION (the three rules, 2026-07-27).
+ * basis v2 — the lokale circle's proximity SESSION (the three rules, 2026-07-27).
  *
  * `circleNearby.js` renders who is around. This module owns *when we are discoverable* and *what being
  * nearby entitles anyone to* — the two halves that are privacy decisions rather than rendering.

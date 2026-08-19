@@ -79,7 +79,7 @@ describe('createContactThreadChannel — replyHandler via the real peer router',
     const onReply = vi.fn();
     const ch = createContactThreadChannel({ sendToPeer: () => {} });
     const handler = ch.replyHandler(onReply);
-    handler('bot-addr', { subtype: 'kring-chat-message', text: 'not mine' });
+    handler('bot-addr', { subtype: 'circle-chat-message', text: 'not mine' });
     expect(onReply).not.toHaveBeenCalled();
   });
 });

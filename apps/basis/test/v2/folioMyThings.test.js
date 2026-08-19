@@ -10,7 +10,7 @@ const ME = 'webid:alice';
 const OTHER = 'webid:bob';
 
 const mineNote      = { id: 'a', name: 'A', owner: ME,    updatedAt: 100 };
-const mineSharedNote= { id: 'b', name: 'B', owner: ME,    updatedAt: 200, circleId: 'kring-1' };
+const mineSharedNote= { id: 'b', name: 'B', owner: ME,    updatedAt: 200, circleId: 'circle-1' };
 const theirsNote    = { id: 'c', name: 'C', owner: OTHER, updatedAt: 300 };
 const orphanNote    = { id: 'd', name: 'D',               updatedAt: 50  };
 

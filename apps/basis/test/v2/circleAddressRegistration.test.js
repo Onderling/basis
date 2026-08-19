@@ -149,14 +149,14 @@ describe('a pod point is not a relay (2026-07-30, S4 pod walk)', () => {
       transport: { supportsAliases: true, addAddress: async (a) => { registered.push(a); return { ok: true }; } },
       relayUrl: DEFAULT_RELAY,
       defaultRelayUrl: DEFAULT_RELAY,
-      circleIds: ['podkring'],
-      circleAddressFor: () => 'podkring@address',
+      circleIds: ['podcircle'],
+      circleAddressFor: () => 'podcircle@address',
       circlesForPoint: pointsView({
-        podkring: [{ url: 'https://pod.example/anna/', kind: 'pod' }],
+        podcircle: [{ url: 'https://pod.example/anna/', kind: 'pod' }],
       }),
     });
     expect(r.skippedOffRelay).toEqual([]);
-    expect(registered).toEqual(['podkring@address']);
+    expect(registered).toEqual(['podcircle@address']);
   });
 
   it('…while a circle mapped to a different RELAY is still kept off this one', async () => {

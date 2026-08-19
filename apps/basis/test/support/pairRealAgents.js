@@ -67,7 +67,7 @@ import { EventLog } from '../../src/eventLog.js';
 import { createChatMessageInbox } from '../../src/v2/chatMessageInbox.js';
 import { makeChatRail, makeChatPeerHandler, CHAT_STATEMENT_BROADCAST } from '../../src/v2/chatRail.js';
 import { rosterBindingVerifier } from '../../src/v2/membershipRail.js';
-import { makeKringGovernancePeerHandler, makeKringReportPeerHandler } from '../../src/v2/kringLogReceiver.js';
+import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '../../src/v2/circleLogReceiver.js';
 import { makeGovernanceRail } from '../../src/v2/governanceAppWiring.js';
 
 import {
@@ -153,8 +153,8 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
 
   const pendingMap = new Map();
   const propagateMeshIntros = makePropagateMeshIntros({ callSkill, sendPeer, logger: QUIET });
-  // The REAL kring-chat receiver — the exact wiring circleApp.js uses (inbox + peer handler).
-  // The harness previously had NO 'kring-chat-message' handler, so chat fell to the defaultHandler
+  // The REAL circle-chat receiver — the exact wiring circleApp.js uses (inbox + peer handler).
+  // The harness previously had NO 'circle-chat-message' handler, so chat fell to the defaultHandler
   // stub: the blind spot that let a broken chat-receive pass node tests. Wire it for real.
   const chatEventLog = new EventLog({ initial: [], muted: [] });
   const chatInbox = createChatMessageInbox({
@@ -222,7 +222,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     // Wave C tail A — the REAL governance/report ingest handlers (the exact wiring the shells
     // use): a fanned vote/report lands in THIS node's EventLog, so a headless two-agent run can
     // assert cross-device replication over a genuine transport (not a simulated fan).
-    'kring-governance-broadcast': makeKringGovernancePeerHandler({
+    'circle-governance-broadcast': makeCircleGovernancePeerHandler({
       eventLog: chatEventLog,
       // Verify-before-land, exactly as the shells: the rail off THIS node's real per-circle signer +
       // the roster's circleAddress rows for foreign bindings.
@@ -232,7 +232,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
       // supplies the binding explicitly rather than weakening the verify.
       rail: makeGovernanceRail({ eventLog: chatEventLog, circleIdentityFor: agent.circleIdentityFor, myRef: '', callSkill, verifyBinding: verifyGovernanceBinding ?? undefined }),
     }),
-    'kring-report-broadcast':     makeKringReportPeerHandler({ eventLog: chatEventLog }),
+    'circle-report-broadcast':     makeCircleReportPeerHandler({ eventLog: chatEventLog }),
   };
   const sendPeerRedeem = makeSendGroupRedeemRequest({
     sendPeer,
@@ -257,7 +257,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
 
   const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatInbox, chatRail, _routerRef: routerRef };
   LIVE_NODES.add(node);
-  // Live view of the REAL ingested kring chats (the browser reads the same eventLog for its bubble list).
+  // Live view of the REAL ingested circle chats (the browser reads the same eventLog for its bubble list).
   Object.defineProperty(node, 'chatEvents', { enumerable: true, get: () => chatEventLog.query({ excludeMuted: true }) });
   // `keyEvents` is a LIVE VIEW of the production store (all circles this node holds), so assertions like
   // `B.keyEvents.some(e => e.version === 2)` reflect exactly what the production receive handler recorded.
@@ -614,12 +614,12 @@ export async function teardown(...nodes) {
 }
 
 /**
- * Send one kring chat over the SIGNED path — the exact production shape: append the signed render entry
+ * Send one circle chat over the SIGNED path — the exact production shape: append the signed render entry
  * on the sender's own log (`chatRail.appendMessage`), then fan the STATEMENT through the real stoop core
  * (`broadcastCircleChatStatement` → transport / pod routing per the circle's policy). The drop-in
  * replacement for the deleted plain-envelope `broadcastCircleMessage` in every journey test.
  */
-export async function sendKringChat(node, { groupId, msgId, text, ts = Date.now(), media } = {}) {
+export async function sendCircleChat(node, { groupId, msgId, text, ts = Date.now(), media } = {}) {
   const res = await node.chatRail.appendMessage(groupId, { msgId, ts, text, actor: node.pubKey, media });
   if (!res) return { error: 'no-circle-signer' };
   return node.agent.callSkill('stoop', 'broadcastCircleChatStatement', { groupId, event: res.statement, msgId, ts });

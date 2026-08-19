@@ -12,7 +12,7 @@
  * `verify` (deny-by-default), and returns a normalised bundle.
  *
  * NOT this package:
- *   - basis's IN-CIRCLE `kringRecipe*` member-to-member broadcast — a
+ *   - basis's IN-CIRCLE `circleRecipe*` member-to-member broadcast — a
  *     different mechanism (live members, not an external authored file).
  *   - the APPLY-WIRING (loaded recipe → active circle policy) — DEFERRED to
  *     basis, which owns the feature/view enums + installed manifests.

@@ -66,7 +66,7 @@ export default defineConfig({
      * whole test budget and reporting only "timeout exceeded".
      *
      * Playwright's default here is 0 — unbounded — and this config never set it, so every hang consumed
-     * the test's entire allowance: 30s in a default spec, 70s in the kring specs, and a full SEVEN
+     * the test's entire allowance: 30s in a default spec, 70s in the circle specs, and a full SEVEN
      * MINUTES in the journeys/matrix/twopeer trio that set `setTimeout(420_000)`. Three of those in one
      * run is 21 minutes spent learning nothing, which is most of why this suite was too slow to run and
      * too vague to act on when it did fail.
@@ -97,7 +97,7 @@ export default defineConfig({
     /* Cold-boot of this large app on a fresh dedicated port (PEER_TEST_PORT) needs well over 60s —
      * the old default only worked because it reused another job's warm :5173 server. */
     timeout: 240_000,
-    /* Circle-bot smokes (circle-kring-bot.spec.js) need a circle LLM provider to EXIST so the bot
+    /* Circle-bot smokes (circle-circle-bot.spec.js) need a circle LLM provider to EXIST so the bot
      * "engages" — the deterministic gate path (`@assistant add/done X`) never CALLS it, so a dummy
      * loopback URL is enough. Without this the server boots with no provider, the bot stays inert,
      * `@assistant …` just fans out, and the gate smokes fail. Injected here so the harness is

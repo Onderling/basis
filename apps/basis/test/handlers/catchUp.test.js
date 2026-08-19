@@ -3,7 +3,7 @@
  *
  * ε.3 (2026-06-01) — added regression coverage for the new strategy-
  * routed entry points: `makePodRangeQueryForGroup` (pod path) and
- * `makeRequestCatchUpForGroup` (per-kring peer path), plus the
+ * `makeRequestCatchUpForGroup` (per-circle peer path), plus the
  * `getCirclePolicy` + `inbox` deps on `makeRequestCatchUpFromKnownPeers`.
  * The pre-existing slice-5 suite still passes verbatim — default policy
  * `{pod: 'personal'}` ⇒ 'peer' strategy ⇒ bit-for-bit identical to the

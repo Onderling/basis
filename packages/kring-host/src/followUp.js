@@ -2,7 +2,7 @@
  * Conversational follow-up state machine for `needsForm` dispatches — SHARED (web + mobile).
  *
  * Lifted from mobile's `core/followUp.js` (it was always pure / no-RN / no-DOM) so BOTH the classic
- * mobile chat AND the v2 kring composers (web `circleApp.js` + mobile `CircleLauncherScreen.js`) elicit
+ * mobile chat AND the v2 circle composers (web `circleApp.js` + mobile `CircleLauncherScreen.js`) elicit
  * a missing field the same chat-native way, from one source — instead of web popping a modal form and
  * mobile asking inline (which would diverge). The mobile package re-exports these from the barrel for
  * back-compat, so existing importers (`core/followUp.js`) are unchanged.
@@ -15,7 +15,7 @@
  *   4. that returns a `ready` dispatch; the surface runs it through its normal pipeline; clears pending
  *
  * `beginFormFollowUp` / `completeMultiFieldFollowUp` handle the 2+-missing case (mobile renders it as an
- * inline multi-field form bubble; web kring keeps the simpler single-field path + a fallback for now).
+ * inline multi-field form bubble; web circle keeps the simpler single-field path + a fallback for now).
  * Both pending shapes carry a `kind` discriminator so consumers branch cleanly.
  *
  * Pure / portable — no RN, no DOM. The surface owns its pending state; this module owns the transitions.

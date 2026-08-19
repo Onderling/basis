@@ -40,14 +40,14 @@ export const SCOPED_LIST_OPS = new Set(['listOpen', 'listFeed', 'listMyRequests'
  * `listOpen` (no intent) returns them all alongside real `request`/`offer` posts;
  * the prikbord is for asks/offers, so it filters these out.
  *
- * `kring-chat-message` earns its place here for the same reason the others do, but
+ * `circle-chat-message` earns its place here for the same reason the others do, but
  * the symptom was louder: every line typed in a circle's Conversation also appeared
  * on the Noticeboard — with a "Withdraw" action when it was yours — and, because a
  * chat item carries its circle as `source.circleId` (a hint `itemCircleId` does not
  * read), on EVERY circle's Noticeboard, not just its own.
  */
 export const SYSTEM_STOOP_TYPES = new Set([
-  'group-rules', 'membership-code', 'membership-redemption', 'kring-chat-message',
+  'group-rules', 'membership-code', 'membership-redemption', 'circle-chat-message',
 ]);
 
 /** True when `item` is a real noticeboard post (an ask/offer), not a system item. */
@@ -66,9 +66,9 @@ export function isNoticeboardPost(item) {
     if (src.rules != null) return false;                          // group-rules
     if (typeof src.code === 'string' && src.code) return false;   // membership-code
     if (src.redeemedBy != null) return false;                     // membership-redemption
-    // kring-chat-message — the only stoop item keyed by a message id (stoop's
+    // circle-chat-message — the only stoop item keyed by a message id (stoop's
     // `broadcastCircleMessage` local mirror + `ingestCircleMessage` receive mirror are
-    // the only writers of `source.msgId`; the other kring broadcasts put theirs on the
+    // the only writers of `source.msgId`; the other circle broadcasts put theirs on the
     // wire `extras`, never on a stored item).
     if (typeof src.msgId === 'string' && src.msgId) return false;
   }

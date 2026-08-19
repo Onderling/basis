@@ -21,7 +21,7 @@
  *
  * Nothing is simulated: the join is the real wizard chain over the peer bridge, the removal is the
  * shared shell operation both shells call (`removeCircleMember`), the refusal is the real
- * `SecurityLayer` authorizer, and the traffic is the real kring fan.
+ * `SecurityLayer` authorizer, and the traffic is the real circle fan.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 // Through the package barrel, not `packages/relay/src/server.js` — the four sibling relay tests all
@@ -29,7 +29,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { startRelay } from '@onderling/relay';
 import {
   bootRealAgentNode, connectNodesOverRelay, createCircle, joinExistingCircle,
-  bindCircleAddresses, readRoster, until, teardown, sendKringChat } from '../support/pairRealAgents.js';
+  bindCircleAddresses, readRoster, until, teardown, sendCircleChat } from '../support/pairRealAgents.js';
 import { bindCircleAddressKeysFor } from '../../src/v2/householdRosterPairing.js';
 import { primeCircleSecurity } from '../../src/v2/circleSecurityPriming.js';
 import { removeCircleMember, leaveCircleLocally } from '../../src/v2/circleMembershipHygiene.js';
@@ -101,7 +101,7 @@ describe('B4 — a removed member is silenced in THAT circle only (real relay)',
 
     for (const circleId of [CIRCLE_A, CIRCLE_B]) {
       const text = `before-removal-${circleId}-${rnd()}`;
-      const fan = await sendKringChat(bram, {
+      const fan = await sendCircleChat(bram, {
         groupId: circleId, msgId: `m-${rnd()}`, text,
       });
       expect(fan.errors, `fan errors in ${circleId}: ${JSON.stringify(fan.errors)}`).toEqual([]);
@@ -146,7 +146,7 @@ describe('B4 — a removed member is silenced in THAT circle only (real relay)',
 
     const before = admin.agent.circleSenderAuthorization();
     const text = `removed-cannot-speak-${rnd()}`;
-    await sendKringChat(bram, {
+    await sendCircleChat(bram, {
       groupId: CIRCLE_A, msgId: `m-${rnd()}`, text,
     });
     await settle(2500);
@@ -164,7 +164,7 @@ describe('B4 — a removed member is silenced in THAT circle only (real relay)',
     // The other half of "per circle". Without this the test above is satisfied by any change that
     // breaks bram generally — which is exactly the bug being fixed, wearing the fix's clothes.
     const text = `still-welcome-in-B-${rnd()}`;
-    const fan = await sendKringChat(bram, {
+    const fan = await sendCircleChat(bram, {
       groupId: CIRCLE_B, msgId: `m-${rnd()}`, text,
     });
     expect(fan.errors, `fan errors: ${JSON.stringify(fan.errors)}`).toEqual([]);
@@ -176,7 +176,7 @@ describe('B4 — a removed member is silenced in THAT circle only (real relay)',
     // Removing one member must not narrow the snapshot into an outage for the rest of the circle —
     // the failure mode of "refresh the allow-list" done carelessly.
     const text = `cato-still-speaks-${rnd()}`;
-    const fan = await sendKringChat(cato, {
+    const fan = await sendCircleChat(cato, {
       groupId: CIRCLE_A, msgId: `m-${rnd()}`, text,
     });
     expect(fan.errors, `fan errors: ${JSON.stringify(fan.errors)}`).toEqual([]);

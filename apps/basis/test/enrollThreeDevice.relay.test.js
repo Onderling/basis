@@ -18,12 +18,12 @@ import { startRelay } from '@onderling/relay';
 import { CIRCLE_ADDRESS_ANNOUNCE_KIND } from '@onderling/core';
 import {
   bootRealAgentNode, connectNodesOverRelay, pairCircle, bindCircleAddresses, until, teardown,
-  sendKringChat,
+  sendCircleChat,
 } from './support/pairRealAgents.js';
 import { ownAnnouncementFor } from '../src/v2/circleAddressAnnounce.js';
 import { rosterBindingVerifier } from '../src/v2/membershipRail.js';
 
-const GROUP = 'kring-v1-walk';
+const GROUP = 'circle-v1-walk';
 const SEND = { hold: true, firstSendTimeoutMs: 4000, retryDelays: [] };
 
 describe('V1 walk — enroll a second device, announce over a real relay, the roster set grows', () => {
@@ -109,7 +109,7 @@ describe('V1 walk — enroll a second device, announce over a real relay, the ro
     const appended = await A2.chatRail.appendMessage(GROUP, { msgId: 'v1-walk-chat', ts: Date.now(), text, actor: A2.pubKey });
     expect(appended?.statement, 'A′ signed with its per-circle identity').toBeTruthy();
     await A2.agent.sendPeerMessage(B.pubKey, {
-      type: 'p2p-chat', subtype: 'kring-chat-statement',
+      type: 'p2p-chat', subtype: 'circle-chat-statement',
       circleId: GROUP, msgId: 'v1-walk-chat', ts: Date.now(), event: appended.statement, fromWebid: A2.pubKey,
     }, SEND);
     const landed = await until(

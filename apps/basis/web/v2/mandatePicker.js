@@ -33,7 +33,7 @@ import {
   resourceUseRequiresConsent,
 } from '../../src/v2/mandate.js';
 
-// Re-export the shared pure core so existing importers (circleApp, circleKring)
+// Re-export the shared pure core so existing importers (circleApp, circleView)
 // and the picker test keep this file as their single entry point (web≡mobile
 // consume the SAME source; no second definition lives here).
 export {

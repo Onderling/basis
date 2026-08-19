@@ -72,7 +72,7 @@ export async function createBrowserStoopAgent({
   controlAgent,
   // Optional host-injected reliable cross-peer sender (basis wires
   // `sa.peer.sendTo(..., {guarantee:'hold-forward'})`). Threaded straight into
-  // the bundle so kring chat fan-out inherits failover + offline hold-forward.
+  // the bundle so circle chat fan-out inherits failover + offline hold-forward.
   reliableSend,
   // Connectivity Phase 2 (G1/G2) — OPTIONAL host-injected data-move resolver
   // `(circleId) => 'fan-out-full'|'pod-signal'|'pod-only'` (basis derives it
@@ -115,7 +115,7 @@ export async function createBrowserStoopAgent({
     persistDb,
     label,
     controlAgent,   // sealed-pod membership hooks (no-op when absent) — see the param doc above
-    reliableSend,   // host-injected hold-forward sender for kring chat fan-out (absent → chat.send fallback)
+    reliableSend,   // host-injected hold-forward sender for circle chat fan-out (absent → chat.send fallback)
     circleDataMove, // Phase 2 G1/G2 — host-injected data-move resolver (absent → fan-out-full)
     podWrite,       // Phase 3 seam — real shared-pod writer (absent → pod-signal/pod-only degrade)
     allowAddressFallback,  // per-user setting → the circle fan's address ladder (absent → allowed, unchanged)

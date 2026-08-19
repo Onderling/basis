@@ -4,7 +4,7 @@
  * "Anna posts; Bram online, Cato offline → Cato receives on reconnect, in the same order, with no
  * duplicates."
  *
- * `kringChatReliableSend.integration.test.js` proves the mechanism with TWO devices and ONE held message.
+ * `circleChatReliableSend.integration.test.js` proves the mechanism with TWO devices and ONE held message.
  * The story needs three, because the interesting failures only appear with a mixed audience and a burst:
  *   • ORDER — several messages queue while Cato is away; a flush that re-holds a failure, or a Map that
  *     stops being insertion-ordered, silently reorders a conversation. Nothing checked order on the
@@ -15,13 +15,13 @@
  *
  * Real agents over a shared InternalBus (`pairRealAgents.js`), so this drives the production send path
  * (`broadcastCircleMessage` → reliableSend → hold-forward) and the production receive path
- * (`kringChatReceiver` → `chatMessageInbox` → EventLog). No stand-ins.
+ * (`circleChatReceiver` → `chatMessageInbox` → EventLog). No stand-ins.
  *
  * Cast: Anna (A, admin/poster) · Bram (B, online throughout) · Cato (C, offline for the burst).
  */
 import { describe, it, expect, afterAll } from 'vitest';
 import {
-  bootRealAgentNode, connectNodesOverBus, pairCircle, until, teardown, goOffline, goOnline, sendKringChat } from '../support/pairRealAgents.js';
+  bootRealAgentNode, connectNodesOverBus, pairCircle, until, teardown, goOffline, goOnline, sendCircleChat } from '../support/pairRealAgents.js';
 
 const GROUP = 'peer-circle';
 // `chatEvents` is `EventLog.query()`, which returns MOST-RECENT-FIRST. Reversing here means the rest of
@@ -50,7 +50,7 @@ describe('4.2 — Anna posts to a circle with Bram online and Cato offline', () 
 
     // A baseline message everyone gets, so a later empty inbox can't pass as "nothing was sent".
     const warmup = `warmup-${Date.now().toString(36)}`;
-    await sendKringChat(A, { groupId: GROUP, text: warmup, msgId: warmup, ts: Date.now() });
+    await sendCircleChat(A, { groupId: GROUP, text: warmup, msgId: warmup, ts: Date.now() });
     await until(() => B.chatEvents.find((e) => e.id === warmup));
     await until(() => C.chatEvents.find((e) => e.id === warmup));
 
@@ -58,7 +58,7 @@ describe('4.2 — Anna posts to a circle with Bram online and Cato offline', () 
     await goOffline(C);
     const burst = ['een', 'twee', 'drie'].map((word) => ({ text: word, msgId: `burst-${word}` }));
     for (const m of burst) {
-      const r = await sendKringChat(A, { groupId: GROUP, text: m.text, msgId: m.msgId, ts: Date.now() });
+      const r = await sendCircleChat(A, { groupId: GROUP, text: m.text, msgId: m.msgId, ts: Date.now() });
       expect(r.error, `send errored: ${r.error}`).toBeUndefined();
     }
 
@@ -90,13 +90,13 @@ describe('4.2 — Anna posts to a circle with Bram online and Cato offline', () 
     const msgId = `replay-${Date.now().toString(36)}`;
     const text = 'zelfde bericht';
 
-    await sendKringChat(A, { groupId: GROUP, text, msgId, ts: Date.now() });
+    await sendCircleChat(A, { groupId: GROUP, text, msgId, ts: Date.now() });
     await until(() => C.chatEvents.find((e) => e.id === msgId));
     const before = idsOn(C).filter((id) => id === msgId).length;
     expect(before).toBe(1);
 
     // Send the SAME msgId again — the shape a hold-forward flush replays.
-    await sendKringChat(A, { groupId: GROUP, text, msgId, ts: Date.now() });
+    await sendCircleChat(A, { groupId: GROUP, text, msgId, ts: Date.now() });
     await new Promise((r) => setTimeout(r, 300));      // give a duplicate every chance to land
 
     expect(idsOn(C).filter((id) => id === msgId)).toHaveLength(1);

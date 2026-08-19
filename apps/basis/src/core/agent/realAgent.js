@@ -1990,11 +1990,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     // to the joined circle's sealed-pod producer (multi-member sealing). Opt-in; absent
     // → membership hooks no-op (the pre-S4 behaviour).
     controlAgent: opts.stoopControlAgent,
-    // Route kring chat fan-out through the SAME reliable choke durable circle content uses:
-    // `sa.peer.sendTo(..., {guarantee:'hold-forward'})`. This is what gives a kring chat
+    // Route circle chat fan-out through the SAME reliable choke durable circle content uses:
+    // `sa.peer.sendTo(..., {guarantee:'hold-forward'})`. This is what gives a circle chat
     // failover (`_sendWithFailover`) + offline hold-forward — the reliability the bus-local
     // `chat.send` transport (stoop's own in-process agent) never had. The stoop skill builds a
-    // conforming `kring-chat-message` envelope and calls this per recipient; a briefly-offline
+    // conforming `circle-chat-message` envelope and calls this per recipient; a briefly-offline
     // member has the message HELD and flushed on reconnect, exactly like a task/noticeboard fan.
     reliableSend: async (to, envelope, sendOpts = {}) => {
       // Circle-scoped routing (2026-07-29): map the circle to its CONNECTION POINTS and hand those down.
@@ -4263,10 +4263,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     // The membership rider's rail (null without opts.deviceLog) — the shells register the fan receiver +
     // the catch-up pair over THIS instance so both ends verify with the same declaration + binding rules.
     membershipRail,
-    // The task lane's rail (same contract): the shells register kring-task-broadcast + its catch-up pair
+    // The task lane's rail (same contract): the shells register circle-task-broadcast + its catch-up pair
     // over this instance; its ingest also causally merges the snapshot into the circle's store head.
     taskRail,
-    // The chat lane's rail + emitter: the shells register kring-chat-statement + the windowed catch-up
+    // The chat lane's rail + emitter: the shells register circle-chat-statement + the windowed catch-up
     // over the rail, and their SEND sites call chatEmit (append-signed-render-entry + fan) instead of
     // the legacy append-then-fan pair.
     chatRail,

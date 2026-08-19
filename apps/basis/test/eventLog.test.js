@@ -275,7 +275,7 @@ describe('EventLog — C15 silent system-entry lane', () => {
 
   it('isSilentEntry discriminates silent entries from chat messages', () => {
     const silent = makeSilentEntry({ circleId: 'c', kind: 'k' });
-    const chat = { id: 'm1', ts: 1, app: 'kring', type: 'chat-message', payload: { circleId: 'c', text: 'hi' } };
+    const chat = { id: 'm1', ts: 1, app: 'circle', type: 'chat-message', payload: { circleId: 'c', text: 'hi' } };
     expect(isSilentEntry(silent)).toBe(true);
     expect(isSilentEntry(chat)).toBe(false);
     expect(isSilentEntry(null)).toBe(false);
@@ -284,7 +284,7 @@ describe('EventLog — C15 silent system-entry lane', () => {
 
   it('shouldWakeForEntry: silent → false, a chat message → true', () => {
     const silent = makeSilentEntry({ circleId: 'c', kind: 'k' });
-    const chat = { id: 'm1', ts: 1, app: 'kring', type: 'chat-message', payload: { circleId: 'c', text: 'hi' } };
+    const chat = { id: 'm1', ts: 1, app: 'circle', type: 'chat-message', payload: { circleId: 'c', text: 'hi' } };
     expect(shouldWakeForEntry(silent)).toBe(false);
     expect(shouldWakeForEntry(chat)).toBe(true);
     expect(shouldWakeForEntry(null)).toBe(false);
@@ -296,7 +296,7 @@ describe('EventLog — C15 silent system-entry lane', () => {
 describe('EventLog — per-kind retention', () => {
   // `vraag` is chat-CLASS (windowed content whose durable head lives elsewhere); `chat-message` itself is
   // RECORD class since the chat-lane sitting — the conversation never drops (asserted below).
-  const mk = (over) => ev({ app: 'kring', type: 'vraag', ...over });
+  const mk = (over) => ev({ app: 'circle', type: 'vraag', ...over });
 
   it('J-L10 — audit outlives chat-class content: past the window it is gone and governance still answers', () => {
     let clock = 0;
@@ -315,8 +315,8 @@ describe('EventLog — per-kind retention', () => {
   it('purgeConversation is the explicit act: deletes ONLY old chat messages, never the roster or trail', () => {
     let clock = 0;
     const log = new EventLog({ now: () => clock });
-    log.append(ev({ id: 'old-msg', ts: 0, app: 'kring', type: 'chat-message', circleId: 'c1', payload: { text: 'oud' } }));
-    log.append(ev({ id: 'new-msg', ts: 900, app: 'kring', type: 'chat-message', circleId: 'c1', payload: { text: 'nieuw' } }));
+    log.append(ev({ id: 'old-msg', ts: 0, app: 'circle', type: 'chat-message', circleId: 'c1', payload: { text: 'oud' } }));
+    log.append(ev({ id: 'new-msg', ts: 900, app: 'circle', type: 'chat-message', circleId: 'c1', payload: { text: 'nieuw' } }));
     log.append(ev({ id: 'mem', ts: 0, app: 'system', type: 'membership', circleId: 'c1', payload: {} }));
     log.append(ev({ id: 'gov', ts: 0, app: 'system', type: 'governance', circleId: 'c1', payload: { event: 'propose' } }));
     clock = 1000;
@@ -332,8 +332,8 @@ describe('EventLog — per-kind retention', () => {
   it('purgeConversation scoped to one circle leaves the other circles alone', () => {
     let clock = 1000;
     const log = new EventLog({ now: () => clock });
-    log.append(ev({ id: 'a1', ts: 0, app: 'kring', type: 'chat-message', circleId: 'cA', payload: {} }));
-    log.append(ev({ id: 'b1', ts: 0, app: 'kring', type: 'chat-message', circleId: 'cB', payload: {} }));
+    log.append(ev({ id: 'a1', ts: 0, app: 'circle', type: 'chat-message', circleId: 'cA', payload: {} }));
+    log.append(ev({ id: 'b1', ts: 0, app: 'circle', type: 'chat-message', circleId: 'cB', payload: {} }));
     expect(log.purgeConversation({ olderThanMs: 100, circleId: 'cA' })).toBe(1);
     const ids = log.query().map((e) => e.id);
     expect(ids).not.toContain('a1');
@@ -343,7 +343,7 @@ describe('EventLog — per-kind retention', () => {
   it('chat messages are the RECORD — no window, however small, ever drops them', () => {
     let clock = 0;
     const log = new EventLog({ now: () => clock, retention: { short: 1, chat: 1, audit: 1 } });
-    log.append(ev({ id: 'msg', ts: 0, app: 'kring', type: 'chat-message', circleId: 'c1', payload: { text: 'hoi' } }));
+    log.append(ev({ id: 'msg', ts: 0, app: 'circle', type: 'chat-message', circleId: 'c1', payload: { text: 'hoi' } }));
     clock = 10_000_000;
     log.prune();
     expect(log.query().map((e) => e.id)).toContain('msg');

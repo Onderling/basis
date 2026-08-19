@@ -47,7 +47,7 @@ export function onderlingBotMember(name = 'Onderling') {
 
 /**
  * The help circle spec (id + DISPLAY name). The name is the circle's own title (the
- * launcher tile + kring header) and goes through the host's `t()` (localised chrome),
+ * launcher tile + circle header) and goes through the host's `t()` (localised chrome),
  * falling back to 'Uitleg' when no translator is wired. This is DELIBERATELY not the
  * bot's name ('Onderling', `circle.onboarding.help_name`): the circle is named after its
  * purpose so the header never falls back to the raw id ('cc-help'), and so the app, the

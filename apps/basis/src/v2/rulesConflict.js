@@ -3,7 +3,7 @@
  * (Plan γ.4, Phase 9 sync-engine absorption).
  *
  * Thin instantiation of the shared flat-doc conflict layer
- * (`makeKringFlatDocConflict` in `kringKindFactory.js`) — the same shape
+ * (`makeCircleFlatDocConflict` in `circleKindFactory.js`) — the same shape
  * as `policyConflict.js`.  Rules are a FLAT keyed JSON blob (purpose /
  * admins / agreements / conflict / admission / leaving / responsibility)
  * with NO `blocks` array, so every divergence surfaces as a meta-conflict
@@ -20,10 +20,10 @@
  * Purity: no I/O, no Date.now, no Math.random.
  */
 
-import { makeKringFlatDocConflict } from './kringKindFactory.js';
+import { makeCircleFlatDocConflict } from './circleKindFactory.js';
 
 const { detect: detectRulesConflicts, apply: applyRulesResolution } =
-  makeKringFlatDocConflict({ deepIncoming: false });
+  makeCircleFlatDocConflict({ deepIncoming: false });
 
 export { detectRulesConflicts, applyRulesResolution };
-export { decisionsForMerges } from './kringKindFactory.js';
+export { decisionsForMerges } from './circleKindFactory.js';

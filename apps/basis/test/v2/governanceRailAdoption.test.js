@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { AgentIdentity } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { bindCircleGovernance, makeGovernanceRail } from '../../src/v2/governanceAppWiring.js';
-import { makeKringGovernancePeerHandler } from '../../src/v2/kringLogReceiver.js';
+import { makeCircleGovernancePeerHandler } from '../../src/v2/circleLogReceiver.js';
 import { GOVERNANCE_KIND } from '../../src/v2/governanceLog.js';
 
 // RAIL ADOPTION: bindCircleGovernance rides the rail when a circle signer resolves — a propose becomes a
@@ -88,7 +88,7 @@ describe('slice 1 adoption — governance rides the rail', () => {
       eventLog: bobLog, circleIdentityFor: async () => bobCid, myRef: 'webid:bob', callSkill: mkCallSkill('webid:bob'),
     });
     const changes = [];
-    const bobReceiver = makeKringGovernancePeerHandler({ eventLog: bobLog, rail: bobRail, onChange: (cid) => changes.push(cid) });
+    const bobReceiver = makeCircleGovernancePeerHandler({ eventLog: bobLog, rail: bobRail, onChange: (cid) => changes.push(cid) });
 
     // Alice proposes on HER device; the fan delivers the signed statement to bob.
     const aliceLog = fakeEventLog();
@@ -101,7 +101,7 @@ describe('slice 1 adoption — governance rides the rail', () => {
     });
     await aliceGov.propose({ circleId: CIRCLE, action: 'removeMember', subject: 'webid:mel', actor: { ref: 'webid:alice', role: 'admin' } });
     for (const f of fanned) {
-      await bobReceiver('peer:alice', { subtype: 'kring-governance-broadcast', circleId: f.circleId, event: f.event });
+      await bobReceiver('peer:alice', { subtype: 'circle-governance-broadcast', circleId: f.circleId, event: f.event });
     }
     expect(bobLog.entries.length).toBe(fanned.length);             // verified + landed (binding via roster row)
     expect(changes).toContain(CIRCLE);
@@ -123,9 +123,9 @@ describe('slice 1 adoption — governance rides the rail', () => {
       callSkill: async () => ({ members: [] }),
     });
     const notified = [];
-    const receiver = makeKringGovernancePeerHandler({ eventLog: bobLog, rail: bobRail, notify: (c, e) => notified.push(e) });
+    const receiver = makeCircleGovernancePeerHandler({ eventLog: bobLog, rail: bobRail, notify: (c, e) => notified.push(e) });
     await receiver('peer:x', {
-      subtype: 'kring-governance-broadcast', circleId: CIRCLE,
+      subtype: 'circle-governance-broadcast', circleId: CIRCLE,
       event: { kind: 'governance', event: 'propose', proposalId: 'p9', action: 'removeMember', by: 'webid:x', at: 1 },
     });
     expect(bobLog.entries).toHaveLength(0);

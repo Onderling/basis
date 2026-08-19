@@ -123,7 +123,7 @@ export function isSilentEntry(entry) {
  * SEAM: the live wake path is decoupled from the log — it lives in
  * `@onderling/relay` (`push/wakePayload.js`) + `@onderling/notifier`
  * (`PushPolicy`) and is driven off push tokens + `humanInTheLoop`, reached via
- * the kring fan-out (`@onderling/kring-host` `broadcastCircleFanOut` →
+ * the circle fan-out (`@onderling/kring-host` `broadcastCircleFanOut` →
  * `stoop broadcastCircleMessage`). When that path grows an entry-kind gate, it
  * MUST consult `shouldWakeForEntry(entry)` BEFORE enqueuing a wake so a silent
  * system entry can never nudge a device. Until then this is the pure,

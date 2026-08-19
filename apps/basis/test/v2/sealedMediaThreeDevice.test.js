@@ -4,7 +4,7 @@
  *
  * "Anna sends a photo; Bram (member) opens it; Cato (other circle) cannot — even with the ref."
  *
- * `kringMediaFanOut.dom.test.js` already covers the sender→wire→chip walk and pins that a WRONG circle key
+ * `circleMediaFanOut.dom.test.js` already covers the sender→wire→chip walk and pins that a WRONG circle key
  * degrades the inline THUMBNAIL to a placeholder. Two things it cannot express, and this file does:
  *   • the FULL image leg — the thumbnail rides inside the manifest line, but the full bytes go through the
  *     gatekeeper. A member must get through it; an outsider must be refused BY it, and refused again by the

@@ -20,7 +20,7 @@ describe('helpChat · routeHelpMessage', () => {
   });
 
   it('a HIT never offers the LLM, even when one is connected', () => {
-    expect(routeHelpMessage('Hoe werkt een kring?', { lang: 'nl', llmReady: true }).kind).toBe('hit');
+    expect(routeHelpMessage('Hoe werkt een circle?', { lang: 'nl', llmReady: true }).kind).toBe('hit');
   });
 
   it('MISS + an LLM connected → offer the consent card', () => {
@@ -92,7 +92,7 @@ describe('helpChat · helpLlmLabelKeys (#37 honest route wording)', () => {
 
 describe('helpChat · action namespace', () => {
   it('round-trips topic + consent actions', () => {
-    expect(parseHelpAction(helpTopicAction('werking.kringen'))).toEqual({ kind: 'topic', id: 'werking.kringen' });
+    expect(parseHelpAction(helpTopicAction('werking.circles'))).toEqual({ kind: 'topic', id: 'werking.circles' });
     expect(parseHelpAction(helpConsentAction('yes'))).toEqual({ kind: 'consent', value: 'yes' });
     expect(parseHelpAction(helpConsentAction('no'))).toEqual({ kind: 'consent', value: 'no' });
   });

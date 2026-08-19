@@ -9,7 +9,7 @@ import {
 const CIRCLE = 'circle-42';
 
 function envOf({ msgId, ts, text, fromActor = 'alice' }) {
-  return { subtype: 'kring-chat-message', type: 'p2p-chat', circleId: CIRCLE, msgId, ts, text, fromActor, fromWebid: fromActor };
+  return { subtype: 'circle-chat-message', type: 'p2p-chat', circleId: CIRCLE, msgId, ts, text, fromActor, fromWebid: fromActor };
 }
 
 describe('sealedMessageLog — key convention', () => {
@@ -46,7 +46,7 @@ describe('sealedMessageLog — sealed round-trip (p2 group-key via resolveCircle
 
     // Single-ref read opens back to the canonical message.
     const one = await readSealedMessage(backend, open, ref1);
-    expect(one).toMatchObject({ subtype: 'kring-chat-message', circleId: CIRCLE, msgId: 'm1', ts: 1000, text: 'geheim bericht!', fromActor: 'alice' });
+    expect(one).toMatchObject({ subtype: 'circle-chat-message', circleId: CIRCLE, msgId: 'm1', ts: 1000, text: 'geheim bericht!', fromActor: 'alice' });
 
     // Range read: since 1500 → m3(2000), m2(3000), oldest→newest, m1 excluded.
     const { items, truncated } = await readSealedMessagesSince(backend, open, { circleId: CIRCLE, sinceTs: 1500 });

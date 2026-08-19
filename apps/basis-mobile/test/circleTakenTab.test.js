@@ -43,7 +43,7 @@ describe('mobile Taken tab — shared task-row projection + chips', () => {
   });
 
   it('the Taken-tab + chip user strings resolve via the mobile t()', () => {
-    for (const key of ['circle.kring.taken_empty', 'circle.kring.taken_add', 'circle.kring.taken_untitled',
+    for (const key of ['circle.circle.taken_empty', 'circle.circle.taken_add', 'circle.circle.taken_untitled',
       'circle.taskStatus.open', 'circle.taskStatus.claimed', 'circle.streamAction.mandate',
       'circle.streamAction.claim', 'circle.streamAction.done']) {
       const s = t(key);

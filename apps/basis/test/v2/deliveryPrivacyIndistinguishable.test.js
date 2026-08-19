@@ -25,7 +25,7 @@ import {
   DELIVERY, DELIVERY_ORDER, DELIVERY_LABELS, DELIVERY_TERMINAL,
   deliveryAfterSend, receiptPolicy, shouldSendReceipt, receiveReceipt, RECEIPT_MESSAGE,
 } from '../../src/v2/deliveryState.js';
-import { classifyFanOut } from '@onderling/kring-host/kringBroadcast';
+import { classifyFanOut } from '@onderling/kring-host/circleBroadcast';
 
 /**
  * One send, observed the way Anna's client observes it: what the transport reported, plus whatever

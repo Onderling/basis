@@ -191,8 +191,8 @@ describe('renderCircleLauncher', () => {
       expect(sections).toHaveLength(3);
       const headers = Array.from(el.querySelectorAll('.circle-launcher__section-title'))
         .map((h) => h.textContent);
-      // Fixed order: household → buurt → vriendenkring → other.
-      // vriendenkring isn't present, so: household, buurt, other.
+      // Fixed order: household → buurt → friends → other.
+      // friends isn't present, so: household, buurt, other.
       expect(headers).toEqual([
         'circle.kind.household',
         'circle.kind.buurt',
@@ -200,7 +200,7 @@ describe('renderCircleLauncher', () => {
       ]);
     });
 
-    it('skips section headers entirely when all kringen share one kind', () => {
+    it('skips section headers entirely when all circles share one kind', () => {
       const el = mount();
       const all = [
         { id: 'a', name: 'A', kind: 'household' },
@@ -231,10 +231,10 @@ describe('renderCircleLauncher', () => {
       expect(otherIds).toEqual(['g', 'w']);
     });
 
-    it('respects KIND_ORDER (household → buurt → vriendenkring → other) even if input is reordered', () => {
+    it('respects KIND_ORDER (household → buurt → friends → other) even if input is reordered', () => {
       const el = mount();
       const reordered = [
-        { id: 'a', name: 'A', kind: 'vriendenkring' },
+        { id: 'a', name: 'A', kind: 'friends' },
         { id: 'b', name: 'B', kind: 'other-thing' },
         { id: 'c', name: 'C', kind: 'buurt' },
         { id: 'd', name: 'D', kind: 'household' },
@@ -245,7 +245,7 @@ describe('renderCircleLauncher', () => {
       expect(headers).toEqual([
         'circle.kind.household',
         'circle.kind.buurt',
-        'circle.kind.vriendenkring',
+        'circle.kind.friends',
         'circle.kind.other',
       ]);
     });

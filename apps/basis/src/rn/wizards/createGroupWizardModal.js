@@ -22,7 +22,7 @@ import {
   buildRulesObjectFromState, finalSubmit, encodeMembershipCodeUrl,
   newOfferingRow, OFFERING_AXES,
   // N1+E8 — kind picker + buurt size/chat advice + policy patch.
-  KRING_KINDS, setKind, setSize, setChatEnabled, chatAdvice, policyPatchFromState,
+  CIRCLE_KINDS, setKind, setSize, setChatEnabled, chatAdvice, policyPatchFromState,
   // N3 — extra role templates (admin opt-in).
   ROLE_TEMPLATE_IDS, toggleRole,
 } from '../../core/wizards/createGroupState.js';
@@ -30,7 +30,7 @@ import { RULES_QUESTIONS } from '../../v2/circleRules.js';
 import { attachConsequences } from '../../v2/optionConsequences.js';
 import { ROLE_TEMPLATES } from '../../v2/roleTemplates.js';
 // B5 — web ≡ mobile: the same two imports the web wizard uses for the same field.
-import { markAxisTouched } from '../../v2/kringTemplates.js';
+import { markAxisTouched } from '../../v2/circleTemplates.js';
 import { INVITE_REDEMPTION_SYSTEM_CAP } from '@onderling-app/stoop/lib/inviteCeiling';
 
 import {
@@ -134,7 +134,7 @@ export default function CreateGroupWizardModal({
                   label={t('circle.kindPicker')}
                   value={state.kind ?? null}
                   options={attachConsequences('kind',
-                    KRING_KINDS.map((k) => ({ id: k, label: t(`circle.kind.${k}`) })), t)}
+                    CIRCLE_KINDS.map((k) => ({ id: k, label: t(`circle.kind.${k}`) })), t)}
                   onChange={(k) => setState((s) => setKind(s, k))}
                   consequenceLabel={t('common.consequences')}
                 />

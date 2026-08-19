@@ -1,9 +1,9 @@
 /**
- * kring-host — concrete `versions` adapters for the kring stores
+ * kring-host — concrete `versions` adapters for the circle stores
  * (γ.2 / Phase 9; consolidated onto `@onderling/versioning` per
- * plans/PLAN-pod-versioning-history-recovery.md "Rewire kring").
+ * plans/PLAN-pod-versioning-history-recovery.md "Rewire circle").
  *
- * Each kring store accepts an optional `versions = { capture, list, restore }`
+ * Each circle store accepts an optional `versions = { capture, list, restore }`
  * adapter that snapshots every save into per-circle history.  This module
  * composes the shared `createVersionStore` substrate (`@onderling/versioning`)
  * with a concrete StorageBackend (localStorage on web via
@@ -11,7 +11,7 @@
  * `createAsBackend` — see `apps/basis-mobile/src/core/
  * objectVersionsStorageRN.js`).  The former substrate,
  * `@onderling/sync-engine`'s `objectVersions.js`, is retired — one version
- * store now serves Folio-files, kring-objects, and pod-resources alike.
+ * store now serves Folio-files, circle-objects, and pod-resources alike.
  *
  * Storage layout (v2 — one record per version, versionStore's native shape):
  *
@@ -25,7 +25,7 @@
  *
  * Semantics preserved from the retired substrate:
  *   - `fingerprintHex` (FNV-1a over `JSON.stringify(value)`) is the content
- *     identity — moved here, since kring was its only consumer.
+ *     identity — moved here, since circle was its only consumer.
  *   - Capturing a value identical to the NEWEST entry is a no-op with NO
  *     time window.  versionStore expresses dedup as a debounce, so we pass
  *     `debounceMs: Number.MAX_SAFE_INTEGER` ("always inside the window").
@@ -37,8 +37,8 @@
  *     with the value INLINE (substrate `content` → legacy `value`).
  * Improvement over the retired substrate (the consolidation win):
  *   - `restore(circleId, ts)` returns the snapshot's value.  v1 semantics:
- *     restore does NOT write the live kring blob — the adapter has no
- *     handle on the store's own `{load, save}` tier.  The kring stores'
+ *     restore does NOT write the live circle blob — the adapter has no
+ *     handle on the store's own `{load, save}` tier.  The circle stores'
  *     `restoreVersion(...)` persists the returned value through their
  *     normal capture+save path, so a restore lands in live storage AND
  *     appears in history (undoable).
@@ -135,8 +135,8 @@ export function createObjectVersionsAdapter({ storeName, backend, retention, now
     },
     /**
      * Return the value snapshotted at `ts` (a `ts` from `list(...)`), or
-     * `null` when absent.  Does NOT touch the live kring blob — callers
-     * (the kring stores' `restoreVersion`) persist the returned value
+     * `null` when absent.  Does NOT touch the live circle blob — callers
+     * (the circle stores' `restoreVersion`) persist the returned value
      * through their own save path.
      */
     restore: async (circleId, ts) => {
@@ -193,7 +193,7 @@ export function localStorageBackend(storage = globalThis.localStorage) {
 
 /**
  * Convenience composite — build a localStorage-backed versions adapter for
- * a single named store.  Web's `circleApp.js` calls this once per kring
+ * a single named store.  Web's `circleApp.js` calls this once per circle
  * store (policy / recipe / rules).  Signature unchanged across the
  * @onderling/versioning consolidation.
  */

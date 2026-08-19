@@ -2,7 +2,7 @@
  * FITNESS: every wire-message constant is a kebab-case SUBTYPE, matching the peer router.
  *
  * Added 2026-07-28 after the same bug twice in one day: `makePeerRouter` dispatches on `payload.subtype`
- * (kebab-case, like `kring-chat-message`), and both the delivery receipt and all five Nearby messages were
+ * (kebab-case, like `circle-chat-message`), and both the delivery receipt and all five Nearby messages were
  * written as `kind: 'x.y'` — payloads no router would ever dispatch, failing silently. The convention now
  * has a guard instead of relying on the next author having read the router.
  */

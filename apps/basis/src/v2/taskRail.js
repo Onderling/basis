@@ -35,11 +35,11 @@ export const TASK_LANE_TYPES = Object.freeze(new Set([
 ]));
 
 /** The wire subtypes for the task lane's fan + catch-up (the governance/membership pairs' sibling). */
-export const TASK_BROADCAST = 'kring-task-broadcast';
+export const TASK_BROADCAST = 'circle-task-broadcast';
 export const TASK_CATCHUP_SUBTYPES = Object.freeze({
-  request: 'kring-task-catchup-request',
-  batch:   'kring-task-catchup-batch',
-  offer:   'kring-task-catchup-offer',
+  request: 'circle-task-catchup-request',
+  batch:   'circle-task-catchup-batch',
+  offer:   'circle-task-catchup-offer',
 });
 
 /**
@@ -192,10 +192,10 @@ export function routeTaskMirror({ circleId, mirror, emitter, requireSigned = fal
   };
 }
 
-/** Peer handler for `kring-task-broadcast` → the rail's full ingest gate + the head apply. */
+/** Peer handler for `circle-task-broadcast` → the rail's full ingest gate + the head apply. */
 export function makeTaskPeerHandler({ rail, onChange = null } = {}) {
   if (!rail) throw new Error('makeTaskPeerHandler: a task rail is required');
-  return async function onKringTask(_fromPeerAddr, payload) {
+  return async function onCircleTask(_fromPeerAddr, payload) {
     if (!payload || payload.subtype !== TASK_BROADCAST) return;
     const { circleId, event: statement } = payload;
     if (typeof circleId !== 'string' || !circleId || !statement?.body || !statement?.sig) return;

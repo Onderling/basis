@@ -1,5 +1,5 @@
 /**
- * basis v2 — kring tile activity previews.
+ * basis v2 — circle tile activity previews.
  *
  * Today's launcher tiles show member count only.  Activity previews put an
  * activity-style subtitle on each tile ("Mira: brood gehaald ✓",

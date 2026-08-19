@@ -1,7 +1,7 @@
 /**
  * basis v2 — composer slash BUILT-INS (DESIGN-connectivity-phase4 §10 / G17).
  *
- * The v2 kring composer intercepts a handful of slash commands as BUILT-INS — the same
+ * The v2 circle composer intercepts a handful of slash commands as BUILT-INS — the same
  * path `/settings` uses — and dispatches them to the settings/transport handlers instead of
  * routing them to the circle bot/LLM. `/set-relay` + `/transport-mode` (+ `/settings`,
  * `/transports`) used to fall through to `circleBot.handle` and be answered as chat; this

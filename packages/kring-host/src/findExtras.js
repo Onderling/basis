@@ -10,7 +10,7 @@
  *      on, a "search one step further?" card (localised via the injected `t`).
  *
  * Pure decision + fetch; the caller renders the returned shape into its own bubble UI (web botBubble / mobile
- * appendKringMessage). Building blocks (findOfferingMatches / hopPrompt) are the same shared modules.
+ * appendCircleMessage). Building blocks (findOfferingMatches / hopPrompt) are the same shared modules.
  */
 import { findOfferingMatches } from './findOfferingMatches.js';
 import { shouldAutoSuggestHop, buildHopPromptCard } from './hopPrompt.js';

@@ -9,7 +9,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { createSelfAuthorCheck } from '../../src/v2/chatSelfAuthor.js';
 
 const envelope = (over = {}) => ({
-  subtype: 'kring-chat-message', circleId: 'miep', msgId: 'm1',
+  subtype: 'circle-chat-message', circleId: 'miep', msgId: 'm1',
   text: 'zie ik je zaterdag?', ts: 1735_000_000_000, fromActor: 'webid:anne', ...over,
 });
 

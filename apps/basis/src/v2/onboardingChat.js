@@ -6,7 +6,7 @@
  * A `say` step becomes a plain bot bubble and auto-advances; a `choice` step becomes a
  * bot bubble carrying one inline button per option. A picked option submits its value
  * back through the engine (`submitGuidedStep`), which may hand off (→ open the create
- * wizard) or continue. So the whole conversation renders in the kring chat surface with
+ * wizard) or continue. So the whole conversation renders in the circle chat surface with
  * no bespoke UI — the bot's messages + inline buttons the surface already draws.
  */
 import { stepOf, submitGuidedStep } from './guidedSetup.js';

@@ -21,7 +21,7 @@ import { householdManifest } from '../../household/manifest.js';
 
 const FLOW = householdManifest.flows.find((f) => f.id === 'enroll-device');
 const OPS = new Map(householdManifest.operations.map((o) => [o.id, o]));
-const CIRCLE = 'kring-enroll-test';
+const CIRCLE = 'circle-enroll-test';
 
 const freshVaults = () => ({ ownerRootVault: new VaultMemory(), chatVault: new VaultMemory() });
 const boot = (vaults) => createRealHouseholdAgent({ seedHousehold: false, ...vaults });

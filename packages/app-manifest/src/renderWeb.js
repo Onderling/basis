@@ -477,7 +477,7 @@
  *
  * ──── Nav-chrome — D / Surface 1: the top-level TAB BAR (2026-07)
  *
- * Objective D, Surface 1.  The four top-level tabs (screens · kringen ·
+ * Objective D, Surface 1.  The four top-level tabs (screens · circles ·
  * contacten · mij) were hardcoded IDENTICALLY in the web + mobile shells
  * (invariant #3 violated by construction — same ids + same locale keys in
  * two files).  Nav chrome becomes MANIFEST-DECLARED: a manifest declares a

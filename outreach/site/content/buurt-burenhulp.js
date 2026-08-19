@@ -47,7 +47,7 @@ window.ONDERLING_PAGE = {
         "wanneer?\" af te spreken, daarna ben je vrij.",
         "Na afloop een kleine afronding: gelukt, een bedankje, " +
         "misschien een kort woord dat zichtbaar is voor je eigen " +
-        "kring. Genoeg om te laten merken dat het gewaardeerd " +
+        "circle. Genoeg om te laten merken dat het gewaardeerd " +
         "wordt, zonder dat het een ranglijst wordt. Hoe dit zonder " +
         "tussenpersoon en met je eigen ruimte werkt, staat op " +
         "[buurt, technisch gezien](techniek-buurt.html)."

@@ -70,7 +70,7 @@ describe('mobile help-circle provisioning (AsyncStorage IO, idempotent)', () => 
 describe('mobile onboarding driver (bot bubbles + option buttons + handoff)', () => {
   const template = buildOnboardingTemplate('nl');
 
-  it('the first turn posts say-bubbles and parks at the eigen_kring choice with option buttons', () => {
+  it('the first turn posts say-bubbles and parks at the own_circle choice with option buttons', () => {
     const turn = onboardingTurn(template, startGuidedSetup(template));
     expect(turn.awaiting).toBe(true);
     expect(turn.done).toBe(false);

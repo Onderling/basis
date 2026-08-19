@@ -89,10 +89,10 @@ describe('clearMnemonicAck', () => {
 
 describe('partitionMnemonicGrid', () => {
   it('numbers words 1..N and preserves order', () => {
-    const grid = partitionMnemonicGrid('linnen veld tuin brug licht kring');
+    const grid = partitionMnemonicGrid('linnen veld tuin brug licht circle');
     expect(grid).toEqual([
       { n: 1, word: 'linnen' }, { n: 2, word: 'veld' },   { n: 3, word: 'tuin' },
-      { n: 4, word: 'brug' },   { n: 5, word: 'licht' },  { n: 6, word: 'kring' },
+      { n: 4, word: 'brug' },   { n: 5, word: 'licht' },  { n: 6, word: 'circle' },
     ]);
   });
 

@@ -103,7 +103,7 @@ describe('device-log durability', () => {
     const storage = memAsyncStorage();
     await storage.setItem('cc-device-log', JSON.stringify([
       { id: 'old-ping', ts: old, app: 'system', type: 'delivery-state', circleId: 'c1', payload: {}, silent: true },
-      { id: 'old-chat', ts: old, app: 'kring', type: 'chat-message', circleId: 'c1', payload: {} },
+      { id: 'old-chat', ts: old, app: 'circle', type: 'chat-message', circleId: 'c1', payload: {} },
       { id: 'old-membership', ts: old, app: 'system', type: 'membership', circleId: 'c1', payload: {}, silent: true },
     ]));
     const log = new EventLog({ initial: [] });

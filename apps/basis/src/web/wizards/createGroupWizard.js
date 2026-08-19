@@ -27,7 +27,7 @@ import {
   buildRulesObjectFromState, finalSubmit,
   newOfferingRow, OFFERING_AXES,
   // N1+E8 — kind picker + buurt size/chat advice + policy patch.
-  KRING_KINDS, setKind, setSize, setChatEnabled, chatAdvice, policyPatchFromState,
+  CIRCLE_KINDS, setKind, setSize, setChatEnabled, chatAdvice, policyPatchFromState,
   // N3 — extra role templates (admin opt-in).
   ROLE_TEMPLATE_IDS, toggleRole,
 } from '../../core/wizards/createGroupState.js';
@@ -35,7 +35,7 @@ import { ROLE_TEMPLATES } from '../../v2/roleTemplates.js';
 // B5 — the ceiling field. `markAxisTouched` so an explicit choice survives a kind switch (the same
 // rule every other axis follows); the system cap comes from the module that ENFORCES it, so the
 // wizard cannot offer a number the substrate would silently clamp.
-import { markAxisTouched } from '../../v2/kringTemplates.js';
+import { markAxisTouched } from '../../v2/circleTemplates.js';
 import { INVITE_REDEMPTION_SYSTEM_CAP } from '@onderling-app/stoop/lib/inviteCeiling';
 import { RULES_QUESTIONS } from '../../v2/circleRules.js';
 import { createCirclePolicyStore, localStoragePolicyIo } from '../../v2/circlePolicyStore.js';
@@ -141,7 +141,7 @@ function renderIdentityStep(container, doc, state, onNext, onCancel, rerender) {
   // (β.4) in place; for a buurt it also surfaces the size question +
   // chat advice (buurt is noticeboard-first, open chat off by default).
   appendRadioField(wrap, doc, t('circle.kindPicker'), state.kind ?? null,
-    KRING_KINDS.map((k) => ({ id: k, label: t(`circle.kind.${k}`) })),
+    CIRCLE_KINDS.map((k) => ({ id: k, label: t(`circle.kind.${k}`) })),
     (k) => { Object.assign(state, setKind(state, k)); rerender(); },
     { consequenceGroup: 'kind' });
 

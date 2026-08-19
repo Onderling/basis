@@ -28,7 +28,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { startRelay } from '@onderling/relay';
 import {
   bootRealAgentNode, connectNodesOverRelay, createCircle, joinExistingCircle,
-  bindCircleAddresses, readRoster, until, teardown, sendKringChat } from '../support/pairRealAgents.js';
+  bindCircleAddresses, readRoster, until, teardown, sendCircleChat } from '../support/pairRealAgents.js';
 import { bindCircleAddressKeysFor } from '../../src/v2/householdRosterPairing.js';
 import { announceOwnCircleAddress } from '../../src/v2/circleAddressAnnounce.js';
 
@@ -117,7 +117,7 @@ describe('joiner ↔ joiner addressing in a three-member circle (real relay, fal
 
   it('bram → cato: a circle message crosses joiner to joiner, without touching either global key', async () => {
     const text = `joiner-to-joiner-${rnd()}`;
-    const fan = await sendKringChat(bram, {
+    const fan = await sendCircleChat(bram, {
       groupId: GROUP, msgId: `m-${rnd()}`, text,
     });
     // Two recipients: the admin and the other joiner. A member the fan could not address would be an
@@ -131,7 +131,7 @@ describe('joiner ↔ joiner addressing in a three-member circle (real relay, fal
 
   it('cato → bram: and the same in the other direction', async () => {
     const text = `back-again-${rnd()}`;
-    const fan = await sendKringChat(cato, {
+    const fan = await sendCircleChat(cato, {
       groupId: GROUP, msgId: `m-${rnd()}`, text,
     });
     expect(fan.errors).toEqual([]);
@@ -162,7 +162,7 @@ describe('joiner ↔ joiner addressing in a three-member circle (real relay, fal
     // addressable and then refused as a stranger (`SENDER_NOT_AUTHORIZED`) — and a refused envelope
     // is silent, so only a delivery assertion can tell the two apart.
     const text = `after-re-announce-${rnd()}`;
-    const fan = await sendKringChat(bram, {
+    const fan = await sendCircleChat(bram, {
       groupId: GROUP, msgId: `m-${rnd()}`, text,
     });
     expect(fan.errors).toEqual([]);

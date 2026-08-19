@@ -30,7 +30,7 @@ import { initialState, decodeInvite, finalSubmit, existingSelvesFrom, setLinkCho
  * additive: an invite built without a policy carries no template and the join consent step is a no-op.
  *
  * Skills→property fold-in phase C — the invite optionally EMBEDS `offeringsMatching: true`, the
- * circle's "this kring is about skills-matching" charter signal (the board-8 circle-offering record,
+ * circle's "this circle is about skills-matching" charter signal (the board-8 circle-offering record,
  * `offeringsMatchingEnabled` in @onderling/kring-host/circleOfferings — readable only on the ADMIN device
  * that builds the invite, so it must ride the invite to reach the joiner pre-join). The join wizard
  * turns it into the visible pre-checked "share skills as category" default. Purely additive: absent

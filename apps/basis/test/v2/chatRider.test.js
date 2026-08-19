@@ -48,7 +48,7 @@ describe('the chat lane — one signed render entry per message', () => {
     const ada = await device('webid:ada', rosterAll);
     const bo  = await device('webid:bo',  rosterAll);
 
-    const entry = await ada.emit(CIRCLE, { msgId: 'm1', ts: 1000, text: 'hoi buur', actor: 'me', scope: 'kring' });
+    const entry = await ada.emit(CIRCLE, { msgId: 'm1', ts: 1000, text: 'hoi buur', actor: 'me', scope: 'circle' });
     expect(entry.id).toBe('m1');                                   // the entry IS the render event
     expect(entry.type).toBe('chat-message');
     expect(entry.silent).not.toBe(true);                           // visible — the conversation shows it

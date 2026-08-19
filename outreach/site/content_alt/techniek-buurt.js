@@ -49,8 +49,8 @@ window.ONDERLING_PAGE = {
       heading: "Wie ziet wat van wie",
       paragraphs: [
         "Toegang werkt hier anders dan thuis. Een huishouden is een " +
-        "kleine kring met veel wederzijds vertrouwen; een buurt is een " +
-        "ruimere kring waarin je per groep en soms per persoon kiest " +
+        "kleine circle met veel wederzijds vertrouwen; een buurt is een " +
+        "ruimere circle waarin je per groep en soms per persoon kiest " +
         "wat je laat zien. Je profiel kan in je eigen straat meer " +
         "tonen dan in de wijk; je vraag-item kan voor een paar " +
         "buurtgenoten zichtbaar zijn en voor de rest niet.",
@@ -120,7 +120,7 @@ window.ONDERLING_PAGE = {
         "doet dan ze beschikbaar maken voor wie jij toestaat.",
         "**Geen reputatie-systeem met sterren.** Een match is een " +
         "begin van contact; wat er daarna gebeurt regel je zelf. Een " +
-        "kort bedankje achteraf kan, zichtbaar voor je eigen kring; " +
+        "kort bedankje achteraf kan, zichtbaar voor je eigen circle; " +
         "geen ranglijst die van burenhulp een transactie maakt."
       ]
     },

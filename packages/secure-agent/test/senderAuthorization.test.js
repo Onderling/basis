@@ -22,7 +22,7 @@ import nacl from 'tweetnacl';
 import { createSecureAgent } from '../src/createSecureAgent.js';
 
 const FAST = { firstSendTimeoutMs: 800, retryDelays: [] };
-const CIRCLE = 'buurtkring-oosterpoort';
+const CIRCLE = 'circle-oosterpoort';
 
 const agent = (onPeerMessage) =>
   createSecureAgent({ vault: new VaultMemory(), onPeerMessage, warnOnInsecure: false });

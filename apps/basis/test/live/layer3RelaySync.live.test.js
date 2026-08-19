@@ -139,7 +139,7 @@ describe.runIf(LIVE_RELAY)(`LIVE Layer-3 — household no-pod sync over relay @ 
         const entry = catalog.opsById.get(cmd.opId) ?? catalog.opsById.get(`household/${cmd.opId}`);
         return A.callSkill(entry?.appOrigin ?? 'household', cmd.opId, cmd.args ?? {});
       },
-      postToKring: () => {}, onNoMatch: () => {}, onLlmUnavailable: () => {},
+      postToCircle: () => {}, onNoMatch: () => {}, onLlmUnavailable: () => {},
     });
 
     await cd.handle(`@${BOT} add cinnamon to the shopping list`, {});

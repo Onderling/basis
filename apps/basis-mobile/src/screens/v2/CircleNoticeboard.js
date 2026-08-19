@@ -26,7 +26,7 @@ import { bytesToStdB64 } from '../../core/mediaCardModel.js';
 const INTENTS = ['ask', 'offer', 'lend'];
 
 // `media` — THIS circle's sealed-media composition (or null for a p0/p1 circle). Threaded from
-// CircleLauncherScreen (web parity `kringMedia`): gates the 📎 attach affordance (sealed-only —
+// CircleLauncherScreen (web parity `circleMedia`): gates the 📎 attach affordance (sealed-only —
 // hidden when null) and opens sealed full images through the per-circle gateway on tap.
 export default function CircleNoticeboard({ callSkill, onStoopEvent, onEmbedOpen, media = null, onReportPost = null, onPeerMuted = null }) {
   const theme = useTheme();
@@ -201,7 +201,7 @@ export default function CircleNoticeboard({ callSkill, onStoopEvent, onEmbedOpen
         />
         {/* Sealed-only: the 📎 shows ONLY when this circle has a media gateway (p2/p3). A p0/p1
             circle resolves no composition → `media` null → NO attach button (web parity
-            `kringMedia ? ... : null`), so a user never picks an image only to hit the wrapper's
+            `circleMedia ? ... : null`), so a user never picks an image only to hit the wrapper's
             sealed-only refusal. Text posting stays unconditional below. */}
         {media ? (
           <Pressable style={styles.attach} onPress={attachImage} testID="nb-attach"><Text style={styles.attachText}>📎</Text></Pressable>

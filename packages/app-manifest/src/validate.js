@@ -291,7 +291,7 @@ export function validateManifest(manifest, opts = {}) {
   }
 
   // Nav-chrome (D / Surface 1) — `manifest.tabs` declares the ordered
-  // top-level TAB BAR roots (the four screens/kringen/contacten/mij tabs).
+  // top-level TAB BAR roots (the four screens/circles/contacten/mij tabs).
   // Each entry is a NavItem `{ id, labelKey, icon?, target }`.  Validated by
   // `validateNavItem`, the SHARED nav-chrome helper the future `nav-actions`
   // kind (Surface 2) also uses.  Forward-additive: absent → no tab bar.

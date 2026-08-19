@@ -13,8 +13,8 @@
  */
 import { GOV_EVENT } from './governanceLog.js';
 
-export const GOV_CATCHUP_REQUEST = 'kring-governance-catchup-request';
-export const GOV_CATCHUP_BATCH   = 'kring-governance-catchup-batch';
+export const GOV_CATCHUP_REQUEST = 'circle-governance-catchup-request';
+export const GOV_CATCHUP_BATCH   = 'circle-governance-catchup-batch';
 
 /** Far above any real circle's decision count; a runaway/hostile batch is truncated, never trusted. */
 const MAX_BATCH = 500;
@@ -25,7 +25,7 @@ const MAX_BATCH = 500;
  * @param {(peerAddr: string, payload: object) => Promise<*>|*} deps.sendToPeer
  * @param {(circleId: string) => void} [deps.onChange]   re-render an open panel after a batch lands
  * @param {(fromPeerAddr: string, circleId: string) => Promise<boolean>|boolean} [deps.mayServe]
- *   whether to answer this peer's request. Default: serve (the V1 catch-up posture — every kring member is a
+ *   whether to answer this peer's request. Default: serve (the V1 catch-up posture — every circle member is a
  *   known peer, and every statement is a SIGNED fact the receiver re-verifies; the residual exposure is the
  *   proposal/vote metadata itself, the same the live fan already carries). Wire a roster check to narrow.
  */

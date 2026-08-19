@@ -5,7 +5,7 @@
  * (versionable predicate · debounce · empty-first-skip · per-series retention
  * cap · newest-first ordering · restore-is-undoable) but stores each snapshot
  * as one record in an injected `StorageBackend` (get/put/delete/list) instead
- * of a filesystem tree. So ONE store serves Folio-files, kring-objects, AND
+ * of a filesystem tree. So ONE store serves Folio-files, circle-objects, AND
  * pod-resources — the anti-drift consolidation in
  * plans/PLAN-pod-versioning-history-recovery.md.
  *
@@ -206,7 +206,7 @@ export function createVersionStore({
   /**
    * All versions of `uri`, newest-first: [{ ts, sha256, size }]. Pass
    * `{ withContent: true }` to include each snapshot's `content` inline (for
-   * value-inline consumers like the kring object stores) — heavier, opt-in.
+   * value-inline consumers like the circle object stores) — heavier, opt-in.
    */
   async function list(uri, { withContent = false } = {}) {
     if (!versionable(uri)) return [];

@@ -1,7 +1,7 @@
 /**
  * basis v2 — "My things" notes-list (web DOM renderer).
  *
- * The Folio screen scoped to the private kring: my owned, un-shared
+ * The Folio screen scoped to the private circle: my owned, un-shared
  * items.  Reuses the row shape `buildMyThings` returns; the host
  * passes the rendered list + `t` + handlers.
  */

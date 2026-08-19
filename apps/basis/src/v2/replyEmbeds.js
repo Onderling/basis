@@ -1,6 +1,6 @@
 /**
  * replyEmbeds — S6.A foundation: turn a dispatch reply's items into the
- * manifest-driven inline buttons the kring chat renders (the "inline menu").
+ * manifest-driven inline buttons the circle chat renders (the "inline menu").
  *
  * The v2 bot reply is text today; this extracts the item snapshots a reply
  * carries (a created task, a listed set, an event, a file) and runs them through
@@ -65,7 +65,7 @@ const SNAP_TYPE_TO_EMBED = { event: 'calendar-event' };
  * Build `embeds[]` for the SINGLE item a reply ACTED ON (created / modified) —
  * the singular `task`/`item`/`event`/`file` keys, NOT list arrays (a "5 tasks"
  * list shouldn't spawn 5 chips; its items already get inline buttons). The title
- * is taken from the reply, so the kring chip needs no resolution.
+ * is taken from the reply, so the circle chip needs no resolution.
  *
  * @returns {{type:string, ref:string, title?:string}[]}
  */
@@ -92,7 +92,7 @@ export function embedsFromReply(reply, { appOrigin } = {}) {
 }
 
 /**
- * Build the kring inline buttons for a reply's items.
+ * Build the circle inline buttons for a reply's items.
  *
  * @returns {Array<{id, label, opId, itemId}>}  ride `payload.buttons`; the host's
  *          tap handler resolves the op's target arg from the catalog + dispatches.

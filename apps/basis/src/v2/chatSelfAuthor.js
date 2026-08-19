@@ -4,7 +4,7 @@
  * A message you send is appended to the log optimistically with `actor: 'me'` — that stamp is
  * what both shells' bubbles test to decide alignment, whether to print a sender name, whether to
  * offer "report this message", and whether a delivery mark belongs on the row at all
- * (`circleKring.js` / `CircleLauncherScreen.js`, both `row.actor === localActor`).
+ * (`circleView.js` / `CircleLauncherScreen.js`, both `row.actor === localActor`).
  *
  * `'me'` is a purely local stamp: it never leaves the device, so nothing durable records it. What
  * IS stored is the author — stoop's `broadcastCircleMessage` mirrors your outgoing message with

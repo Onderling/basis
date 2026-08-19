@@ -43,7 +43,7 @@ import {
 
 /* ── the two circles, and everything about them that must not reach the relay ───────────────────── */
 
-const CIRCLE_X = { id: 'buurtkring-oosterpoort-7f3a91', name: 'Buurtkring Oosterpoort' };
+const CIRCLE_X = { id: 'circle-oosterpoort-7f3a91', name: 'Buurtcircle Oosterpoort' };
 const CIRCLE_Y = { id: 'huishouden-de-vries-2b6c04',   name: 'Huishouden De Vries' };
 const MESSAGE_TEXT = 'de vergadering is verplaatst naar donderdagavond acht uur';
 const MEMBER_NAMES = ['Anna de Boer', 'Bram Jansen', 'Cato Visser'];
@@ -194,7 +194,7 @@ describe('what a relay learns from a real multi-circle session', () => {
       to: bram.addressIn(CIRCLE_X.id),
       envelope: sealedEnvelope(
         anna.perCircle[CIRCLE_X.id], bram.perCircle[CIRCLE_X.id],
-        { subtype: 'kring-chat-message', text: MESSAGE_TEXT, circleName: CIRCLE_X.name },
+        { subtype: 'circle-chat-message', text: MESSAGE_TEXT, circleName: CIRCLE_X.name },
       ),
     });
     await waitFor(() => bramSock.messages.some(m => m.type === 'message'));
@@ -208,7 +208,7 @@ describe('what a relay learns from a real multi-circle session', () => {
       to: cato.addressIn(CIRCLE_Y.id),
       envelope: sealedEnvelope(
         anna.perCircle[CIRCLE_Y.id], cato.perCircle[CIRCLE_Y.id],
-        { subtype: 'kring-chat-message', text: MESSAGE_TEXT, members: MEMBER_NAMES },
+        { subtype: 'circle-chat-message', text: MESSAGE_TEXT, members: MEMBER_NAMES },
       ),
     });
     await settle(80);

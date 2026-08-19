@@ -4,7 +4,7 @@
  *
  * Contract:
  *   - applyCharterOfferingsDefault: invite.offeringsMatching === true (the circle's
- *     embedded "this kring is about skills-matching" signal) pre-checks the
+ *     embedded "this circle is about skills-matching" signal) pre-checks the
  *     visible share-skills line; any other circle — incl. every older invite
  *     without the field — keeps the protective default-withhold.
  *   - setShareOfferingsAtJoin: the joiner can uncheck (never silent).

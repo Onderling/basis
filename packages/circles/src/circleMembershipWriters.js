@@ -66,7 +66,7 @@ export async function redeemMembershipCode({
     };
   }
 
-  // ── Signing pubKey capture (kring fan-out fix) ────────────────────────
+  // ── Signing pubKey capture (circle fan-out fix) ────────────────────────
   // Bind the joiner's SIGNING pubKey to the AUTHENTICATED sender of the
   // redeem — `from` is the skill-invocation actor (= `envelope._from`,
   // stamped by the transport AFTER signature-verify), NOT a body field the
@@ -77,7 +77,7 @@ export async function redeemMembershipCode({
   // authenticated identity for the joiner is `from` itself.  We DO NOT read
   // any body-supplied pubKey for the binding — a self-asserted key would let
   // a joiner claim another member's routing address.  Recording it lets
-  // kring fan-out (`wireChat.send` → `MemberMap.resolveByWebid(webid).pubKey`)
+  // circle fan-out (`wireChat.send` → `MemberMap.resolveByWebid(webid).pubKey`)
   // route to a code-redeemer instead of returning `recipient-pubkey-unknown`.
   const signingPubKey = (typeof from === 'string' && from) ? from : null;
   // Wave B (SENSITIVE — cross-circle linkability): a presented per-circle address must be

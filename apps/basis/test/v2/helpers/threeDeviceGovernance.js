@@ -21,7 +21,7 @@ import { vi } from 'vitest';
 import { AgentIdentity } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { bindCircleGovernance, makeGovernanceRail } from '../../../src/v2/governanceAppWiring.js';
-import { makeKringGovernancePeerHandler, makeKringReportPeerHandler } from '../../../src/v2/kringLogReceiver.js';
+import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '../../../src/v2/circleLogReceiver.js';
 import { EventLog } from '../../../src/eventLog.js';
 import { normalizeCirclePolicy } from '../../../src/v2/circlePolicy.js';
 
@@ -74,8 +74,8 @@ export async function threeDevices({ policy = defaultPolicy(), clock = 1 } = {})
       online: true,
       enacted: [],                                   // real-world side effects THIS device performed
       removed: [],                                   // reported posts/messages THIS device deleted
-      ingestGovernance: makeKringGovernancePeerHandler({ eventLog: log, rail }),
-      ingestReport: makeKringReportPeerHandler({ eventLog: log }),
+      ingestGovernance: makeCircleGovernancePeerHandler({ eventLog: log, rail }),
+      ingestReport: makeCircleReportPeerHandler({ eventLog: log }),
     };
     held[ref] = [];
   }
@@ -83,7 +83,7 @@ export async function threeDevices({ policy = defaultPolicy(), clock = 1 } = {})
   /** Fan an event from `fromRef` to the OTHER two devices (holding for the partitioned).
    *  Channel-aware: the report channel carries its own subtype and its own ingest handler. */
   const broadcastFrom = (fromRef) => (channel, circleId, event, opts = undefined) => {
-    const subtype = channel === 'report' ? 'kring-report-broadcast' : 'kring-governance-broadcast';
+    const subtype = channel === 'report' ? 'circle-report-broadcast' : 'circle-governance-broadcast';
     // `opts.to` NARROWS the recipient set — what `broadcastCircleReport`'s `to` does on the wire. Modelled
     // here so a report genuinely does not reach a non-admin's log; without it the harness would fan to
     // everyone and quietly contradict the shipped routing.
@@ -105,7 +105,7 @@ export async function threeDevices({ policy = defaultPolicy(), clock = 1 } = {})
   // reads a device only after everything already fanned to it has actually landed (or been refused).
   const pending = [];
   const deliver = (d, payload) => {
-    const done = (payload.subtype === 'kring-report-broadcast')
+    const done = (payload.subtype === 'circle-report-broadcast')
       ? d.ingestReport(null, payload)
       : d.ingestGovernance(null, payload);
     pending.push(Promise.resolve(done).catch(() => { /* refusals are outcomes, not harness errors */ }));

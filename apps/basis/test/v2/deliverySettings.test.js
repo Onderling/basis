@@ -202,7 +202,7 @@ describe('applying an inbound receipt', () => {
 
   it('rejects junk without touching the map', () => {
     const map = createDeliveryStateMap();
-    expect(applyReceipt({ subtype: 'kring-chat-message', messageId: 'm1' }, 'peer-a', map)).toBe(false);
+    expect(applyReceipt({ subtype: 'circle-chat-message', messageId: 'm1' }, 'peer-a', map)).toBe(false);
     expect(applyReceipt(null, 'peer-a', map)).toBe(false);
     expect(map.size()).toBe(0);
   });

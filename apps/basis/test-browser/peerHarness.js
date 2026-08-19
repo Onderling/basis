@@ -170,15 +170,15 @@ export function log(step, verdict, note) {
 // ── navigation / launcher ──────────────────────────────────────────────────────
 
 /**
- * Navigate to the launcher ("Jouw kringen"). In a kring view the bottom nav is
- * hidden, so leave via the "← kringen" back button first (harness gotcha from the
- * drive — the in-kring nav is NOT `[data-tab="kringen"]`).
+ * Navigate to the launcher ("Jouw circles"). In a circle view the bottom nav is
+ * hidden, so leave via the "← circles" back button first (harness gotcha from the
+ * drive — the in-circle nav is NOT `[data-tab="circles"]`).
  */
-export async function gotoKringen(page) {
+export async function gotoCircles(page) {
   await dismissAnyModal(page);
-  const back = page.locator('.circle-kring__back');
+  const back = page.locator('.circle-circle__back');
   if (await back.count()) { await back.first().click(); await page.waitForTimeout(1500); }
-  const tab = page.locator('[data-tab="kringen"]');
+  const tab = page.locator('[data-tab="circles"]');
   if (await tab.count()) { await tab.first().click(); await page.waitForTimeout(1600); }
   else { await page.waitForTimeout(600); }
 }
@@ -246,31 +246,31 @@ export async function openCircleMatching(page, re) {
   return { names, idx };
 }
 
-/** gotoKringen → open the matching circle → switch to Chat view. The common re-entry. */
+/** gotoCircles → open the matching circle → switch to Chat view. The common re-entry. */
 export async function reopenCircle(page, re) {
-  await gotoKringen(page);
+  await gotoCircles(page);
   await openCircleMatching(page, re);
   await toChat(page);
 }
 
-/** Switch the open kring to Chat view. */
+/** Switch the open circle to Chat view. */
 export async function toChat(page) {
-  const chat = page.locator('.circle-kring__view-toggle-btn[data-view-mode="chat"]');
+  const chat = page.locator('.circle-circle__view-toggle-btn[data-view-mode="chat"]');
   if (await chat.count()) { await chat.first().click(); await page.waitForTimeout(1200); }
 }
 
 // ── chat ────────────────────────────────────────────────────────────────────
 
-/** Send a line through the kring composer (explicit send button). */
+/** Send a line through the circle composer (explicit send button). */
 export async function sendChat(page, text, settle = 3000) {
-  await page.locator('.circle-kring__composer-input').fill(text);
-  await page.locator('.circle-kring__composer-send').click();
+  await page.locator('.circle-circle__composer-input').fill(text);
+  await page.locator('.circle-circle__composer-send').click();
   await page.waitForTimeout(settle);
 }
 
 /** All chat bubble texts (normalised). */
 export async function readBubbles(page) {
-  return (await page.locator('.circle-kring__bubble').allTextContents()).map((s) => s.replace(/\s+/g, ' ').trim());
+  return (await page.locator('.circle-circle__bubble').allTextContents()).map((s) => s.replace(/\s+/g, ' ').trim());
 }
 
 /**
@@ -289,9 +289,9 @@ export async function waitForBubble(page, needle, { tries = 16, every = 2500 } =
 
 /** Open ⋯ → a more-menu action by data-action id. Returns false if the item is absent. */
 export async function openMore(page, action) {
-  await page.locator('.circle-kring__more').click();
+  await page.locator('.circle-circle__more').click();
   await page.waitForTimeout(500);
-  const item = page.locator(`.circle-kring__more-item[data-action="${action}"]`);
+  const item = page.locator(`.circle-circle__more-item[data-action="${action}"]`);
   if (!(await item.count())) return false;
   await item.first().click();
   await page.waitForTimeout(1800);
@@ -451,11 +451,11 @@ export async function joinFromInvite(page, inviteUri, { handle = 'joiner', tag =
  */
 export async function pair(creator, joiner, { name = 'Peer Circle', re = /peer.?circle/i, handle = 'peerbee' } = {}) {
   const a = creator.page, b = joiner.page;
-  await gotoKringen(a);
+  await gotoCircles(a);
   await createCircle(a, name);
   await openCircleMatching(a, re);
   await toChat(a);
-  await gotoKringen(b);
+  await gotoCircles(b);
 
   const inviteUri = await getInvite(a, `pair-${creator.label}-invite`);
   if (!inviteUri) return { inviteUri: null, joined: false, outcome: 'no invite', joinerHasTile: false };
@@ -463,7 +463,7 @@ export async function pair(creator, joiner, { name = 'Peer Circle', re = /peer.?
   const { joined, outcome } = await joinFromInvite(b, inviteUri, { handle, tag: `pair-${joiner.label}` });
 
   await b.waitForTimeout(1500);
-  await gotoKringen(b);
+  await gotoCircles(b);
   const joinerHasTile = (await tileNames(b)).some((s) => re.test(s));
   return { inviteUri, joined, outcome, joinerHasTile };
 }
@@ -481,7 +481,7 @@ export async function addTask(page, text, settle = 4000) {
  * just-synced task has time to land.
  */
 export async function openTakenTab(page, { tries = 6, every = 2500 } = {}) {
-  const tabs = page.locator('.circle-kring__tab');
+  const tabs = page.locator('.circle-circle__tab');
   const labels = (await tabs.allTextContents()).map((s) => s.trim());
   const idx = labels.findIndex((s) => /taken|task/i.test(s));
   if (idx < 0) return { present: false, rows: [] };
@@ -489,7 +489,7 @@ export async function openTakenTab(page, { tries = 6, every = 2500 } = {}) {
   await page.waitForTimeout(2500);
   let rows = [];
   for (let i = 0; i < tries; i++) {
-    const rowLoc = page.locator('.circle-kring__task');
+    const rowLoc = page.locator('.circle-circle__task');
     const rc = await rowLoc.count();
     rows = [];
     for (let j = 0; j < rc; j++) rows.push((await rowLoc.nth(j).innerText()).replace(/\s+/g, ' ').trim());
@@ -507,9 +507,9 @@ export async function openTakenTab(page, { tries = 6, every = 2500 } = {}) {
 export async function claimTask(page, re = /verf|./) {
   const { present } = await openTakenTab(page);
   if (!present) return { claimed: false, reason: 'no Taken tab' };
-  const task = page.locator('.circle-kring__task').filter({ hasText: re }).first();
+  const task = page.locator('.circle-circle__task').filter({ hasText: re }).first();
   if (!(await task.count())) return { claimed: false, reason: 'no matching task row' };
-  const chip = task.locator('.circle-kring__task-action, .circle-kring__task-actions button').filter({ hasText: /ik doe|claim|oppak|neem/i });
+  const chip = task.locator('.circle-circle__task-action, .circle-circle__task-actions button').filter({ hasText: /ik doe|claim|oppak|neem/i });
   if (!(await chip.count())) return { claimed: false, reason: 'no claim chip' };
   await chip.first().click();
   await page.waitForTimeout(2000);
@@ -530,14 +530,14 @@ export async function openMandatePicker(page) {
   // intercepted by the open modal's backdrop (a pointer-events-blocking overlay)
   // and hang until the test times out. Uses the existing selector only.
   if (!(await page.locator('.cc-mandate-picker').count())) {
-    const tabs = page.locator('.circle-kring__tab');
+    const tabs = page.locator('.circle-circle__tab');
     const labels = (await tabs.allTextContents()).map((s) => s.trim());
     const idx = labels.findIndex((s) => /taken|task/i.test(s));
     if (idx >= 0) { await tabs.nth(idx).click(); await page.waitForTimeout(2000); }
 
-    let entrust = page.locator('.circle-kring__bubble-action--mandate, .circle-kring__task-action--mandate, [data-action="mandate"]');
+    let entrust = page.locator('.circle-circle__bubble-action--mandate, .circle-circle__task-action--mandate, [data-action="mandate"]');
     if (!(await entrust.count())) {
-      entrust = page.locator('.circle-kring__task button, .circle-kring__task-action, .circle-kring__bubble-action').filter({ hasText: /toevertrouwen/i });
+      entrust = page.locator('.circle-circle__task button, .circle-circle__task-action, .circle-circle__bubble-action').filter({ hasText: /toevertrouwen/i });
     }
     if (!(await entrust.count())) return { opened: false, whoCount: 0, emptyNote: 0, text: '(no entrust chip)' };
 
@@ -588,7 +588,7 @@ export async function entrustFirstMember(page) {
  * rows. Returns `{present}` based on whether a leden tab exists.
  */
 export async function openLedenTab(page) {
-  const tabs = page.locator('.circle-kring__tab');
+  const tabs = page.locator('.circle-circle__tab');
   const labels = (await tabs.allTextContents()).map((s) => s.trim());
   const idx = labels.findIndex((s) => /leden|member/i.test(s));
   if (idx < 0) return { present: false, labels };

@@ -1,5 +1,5 @@
 /**
- * surfacePrefStore — the per-user surface preference singleton (mobile), shared by the kring
+ * surfacePrefStore — the per-user surface preference singleton (mobile), shared by the circle
  * screen (applies it to bot replies) + the My-data screen (sets it). Mirrors web's module-level
  * store in circleApp.js.
  *

@@ -57,7 +57,7 @@ async function offlineWithToken(url, address, token, platform = 'ios') {
 
 /** The wire shape stoop's `broadcastToCircle` produces for a control-plane fan (no chat envelope). */
 const govEnvelope = (event, { noWake }) => ({
-  subtype: 'kring-governance-broadcast',
+  subtype: 'circle-governance-broadcast',
   circleId: 'oosterpoort',
   event,
   ...(noWake ? { noWake: true } : {}),
@@ -176,7 +176,7 @@ describe('4.3 — a decision wakes; the votes that follow do not', () => {
     send(anna, { type: 'register', address: ANNA });
     await offlineWithToken(url, CATO, 'ExponentPushToken[cato]');
 
-    send(anna, { type: 'send', to: CATO, envelope: { subtype: 'kring-report-broadcast', circleId: 'oosterpoort', event: { event: 'report' }, noWake: true } });
+    send(anna, { type: 'send', to: CATO, envelope: { subtype: 'circle-report-broadcast', circleId: 'oosterpoort', event: { event: 'report' }, noWake: true } });
     await settle();
     expect(pushSender.calls).toHaveLength(0);
 
@@ -184,7 +184,7 @@ describe('4.3 — a decision wakes; the votes that follow do not', () => {
     const cato = await openClient(url);
     send(cato, { type: 'register', address: CATO });
     await waitFor(() => cato.messages.some((m) => m.type === 'message'));
-    expect(cato.messages.find((m) => m.type === 'message').envelope.subtype).toBe('kring-report-broadcast');
+    expect(cato.messages.find((m) => m.type === 'message').envelope.subtype).toBe('circle-report-broadcast');
     anna.close(); cato.close();
   });
 });

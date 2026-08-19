@@ -53,7 +53,7 @@ window.ONDERLING_PAGE = {
         "dan stelt de assistent jullie aan elkaar voor en regelen " +
         "jullie het verder zelf — even bellen, of op de stoep. " +
         "Achteraf kan er een klein bedankje of een korte " +
-        "terugkoppeling bij, zichtbaar voor je eigen kring. Geen " +
+        "terugkoppeling bij, zichtbaar voor je eigen circle. Geen " +
         "sterrensysteem: dat maakt van burenhulp een transactie, en " +
         "dat is precies niet de bedoeling."
       ]

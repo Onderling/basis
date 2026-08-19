@@ -1,8 +1,8 @@
 /**
- * Signing-pubKey capture at redeem (kring fan-out fix).
+ * Signing-pubKey capture at redeem (circle fan-out fix).
  *
  * When a joiner redeems a membership code we record their SIGNING pubKey —
- * the transport/chat-agent identity that kring fan-out routes to — on the
+ * the transport/chat-agent identity that circle fan-out routes to — on the
  * redemption item AND in the MemberMap, so `wireChat.send` can resolve a
  * code-redeemer instead of returning `recipient-pubkey-unknown`.
  *
@@ -72,7 +72,7 @@ describe('redeem → capture joiner signing pubKey', () => {
     expect(await bundle.members.resolveByWebid('mallory-key')).toBeNull();
   });
 
-  it('kring fan-out resolves a code-redeemer (no recipient-pubkey-unknown)', async () => {
+  it('circle fan-out resolves a code-redeemer (no recipient-pubkey-unknown)', async () => {
     const bundle = await buildBundle();
     const r = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
 

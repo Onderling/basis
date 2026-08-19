@@ -4,7 +4,7 @@
  * ── Why 256 KB ───────────────────────────────────────────────────────────────────────────────────────
  * The peer wire is a CONTROL plane, not a data plane. Files and media do not travel on it: they go through
  * the blob gateway over HTTP, and the wire carries only the manifest line as a reference (`pointer`,
- * `source.ref` — see `mediaForKringWire`). So the largest legitimate envelopes are small:
+ * `source.ref` — see `mediaForCircleWire`). So the largest legitimate envelopes are small:
  *
  *   a chat message      500 characters (CHAT_MAX_TEXT)
  *   a room card         label 40 + line 140 + 5 tags

@@ -1,5 +1,5 @@
 /**
- * Lokale kring — the two rules that are privacy guarantees rather than UI (2026-07-27).
+ * Lokale circle — the two rules that are privacy guarantees rather than UI (2026-07-27).
  *
  *   (b) discovery ≠ membership — being visible on the same Wi-Fi is not a relationship.
  *   (c) advertise only while the proximity view is open.

@@ -78,8 +78,8 @@ SUITE('per-circle producer — real-pod routing (CSS)', () => {
     const router = createCircleControlAgentRouter((id) => pods.get(id) ?? null);
     await expect(prod.controlAgent.sealingStrategy(bob.privateKey)).rejects.toThrow();
     await router.addMember({ webId: 'did:bob', publicKey: bob.publicKey, role: 'member', groupId: circleId });
-    const sealed = (await prod.controlAgent.sealingStrategy(self.privateKey)).seal('voor de hele kring');
-    expect((await prod.controlAgent.sealingStrategy(bob.privateKey)).open(sealed)).toBe('voor de hele kring');
+    const sealed = (await prod.controlAgent.sealingStrategy(self.privateKey)).seal('voor de hele circle');
+    expect((await prod.controlAgent.sealingStrategy(bob.privateKey)).open(sealed)).toBe('voor de hele circle');
 
     // the group-key resource really persisted on the pod (host holds wrapped keys, not bob's private key)
     const raw = await podClient.read(`${podBase}/${circleId}/.keys/group.json`, { decode: 'string' });

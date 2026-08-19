@@ -574,7 +574,7 @@ async function revokePodAccess(controlAgent, { webId, force = false, policy = 'g
 
 /**
  * Resolve a member roster to the recipient webids (everyone but `selfWebid`) and
- * fan a `chat.send` out to each. The single member-loop the kring `broadcast*`
+ * fan a `chat.send` out to each. The single member-loop the circle `broadcast*`
  * skills share, so the roster filter, per-peer error capture, and the return
  * shape can't drift across them (E1 drift-guard).
  *
@@ -613,15 +613,15 @@ async function _fanOutToMembers({ members, chat, selfWebid, subtype, threadId, b
 }
 
 /**
- * Fan a kring chat message out to every other member over a host-injected RELIABLE
+ * Fan a circle chat message out to every other member over a host-injected RELIABLE
  * sender (`bundle.reliableSend` = basis's `sa.peer.sendTo(..., {guarantee:'hold-forward'})`),
- * instead of the bus-local `chat.send`. This is what lets a kring chat inherit the SAME
+ * instead of the bus-local `chat.send`. This is what lets a circle chat inherit the SAME
  * failover + offline hold-forward durable circle content already has: a member who is
  * briefly offline has the envelope HELD and delivered on their next presence signal
  * (`held:true`), which counts as a successful send — NOT a failure.
  *
- * The envelope is the conforming `kring-chat-message` wire shape the existing receiver
- * (basis peerRouter → `makeKringChatPeerHandler` → chatMessageInbox → `ingestCircleMessage`)
+ * The envelope is the conforming `circle-chat-message` wire shape the existing receiver
+ * (basis peerRouter → `makeCircleChatPeerHandler` → chatMessageInbox → `ingestCircleMessage`)
  * validates and renders — carrying a top-level `text` (the chat.send path emitted `body`,
  * which that receiver rejects), `circleId`, `msgId`, `ts`, `fromActor`. Dedup stays on
  * `msgId` at the receiver; ordering + persistence + catch-up are unchanged.
@@ -634,7 +634,7 @@ async function _fanOutToMembers({ members, chat, selfWebid, subtype, threadId, b
  * @param {{list:()=>Promise<Array>, resolveByWebid:Function}} a.members
  * @param {(addr:string, envelope:object, opts?:object)=>Promise<any>} a.reliableSend
  * @param {string|null} a.selfWebid    webid to omit from the fan-out (the sender)
- * @param {object} a.envelope          the conforming kring-chat-message wire envelope
+ * @param {object} a.envelope          the conforming circle-chat-message wire envelope
  * @returns {Promise<{sent:number, attempted:number, errors:Array<{webid:string,reason:string}>}>}
  */
 async function _fanOutViaReliableSend({
@@ -703,7 +703,7 @@ async function _fanOutViaReliableSend({
 }
 
 /**
- * Shared inbound-peer filter for BOTH ingest paths (kring chat + buurt post),
+ * Shared inbound-peer filter for BOTH ingest paths (circle chat + buurt post),
  * so eviction + mute can't drift between them (E1 drift-guard). Returns a
  * rejection verdict (`{evicted:true}` | `{muted:true}`) or `null` (let through).
  *
@@ -3082,7 +3082,7 @@ export function buildSkills({
       // Eviction + mute filter — shared with ingestCircleMessage so the two ingest
       // paths can't drift (E1 drift-guard via _peerIngestVerdict). NB buurt-posts
       // previously honoured eviction but NOT mute — this closes that gap: a muted
-      // member's posts are dropped too, matching the kring-chat path.
+      // member's posts are dropped too, matching the circle-chat path.
       const verdict = _peerIngestVerdict({
         evictionRoster: bundle?.evictionRoster ?? null,
         muted,
@@ -3575,14 +3575,14 @@ export function buildSkills({
 
     /**
      * broadcastCircleRecipe({groupId, recipe, msgId, ts?})
-     *   — γ-next.recipe — kring scherm recipe fan-out to every member
-     *   of a kring.  Sibling of `broadcastCircleMessage`: same fan-out
+     *   — γ-next.recipe — circle scherm recipe fan-out to every member
+     *   of a circle.  Sibling of `broadcastCircleMessage`: same fan-out
      *   plumbing (chat.send, WebID→pubKey resolution, signing,
      *   transport routing), different subtype + payload.
      *
      *   Receivers route the envelope to basis's
-     *   `makeKringRecipePeerHandler`, which stashes the recipe in a
-     *   per-kring "pending" cache.  The recipe editor reads the cache
+     *   `makeCircleRecipePeerHandler`, which stashes the recipe in a
+     *   per-circle "pending" cache.  The recipe editor reads the cache
      *   on next open and passes it via γ.3's `incomingRecipe` opt; the
      *   resolver pops if the incoming diverges from local.
      *
@@ -3599,27 +3599,27 @@ export function buildSkills({
       const ts = typeof a.ts === 'number' && Number.isFinite(a.ts) ? a.ts : Date.now();
 
       // Fan the recipe out via the ONE shared circle-broadcast core (chat.send
-      // subtype `kring-recipe-broadcast`); receivers cache it as pending.
+      // subtype `circle-recipe-broadcast`); receivers cache it as pending.
       return broadcastToCircle({
-        circleId: _groupId, kind: 'kring-recipe-broadcast', from,
+        circleId: _groupId, kind: 'circle-recipe-broadcast', from,
         extras: { circleId: _groupId, msgId: a.msgId, ts, recipe: a.recipe, fromActor: a.fromActor ?? from ?? null },
-        metric: 'kring-recipe-fanout',
+        metric: 'circle-recipe-fanout',
       });
     }, {
-      description: 'Fan a kring scherm recipe out to every other member via chat.send subtype:kring-recipe-broadcast; receivers cache as pending incomingRecipe for the γ.3 conflict resolver.',
+      description: 'Fan a circle scherm recipe out to every other member via chat.send subtype:circle-recipe-broadcast; receivers cache as pending incomingRecipe for the γ.3 conflict resolver.',
       visibility:  'authenticated',
     }),
 
     /**
      * broadcastCircleRules({groupId, rulesDoc, msgId, ts?})
-     *   — γ-next.rules — kring rules document fan-out to every member
-     *   of a kring.  Sibling of `broadcastCircleRecipe`: same fan-out
+     *   — γ-next.rules — circle rules document fan-out to every member
+     *   of a circle.  Sibling of `broadcastCircleRecipe`: same fan-out
      *   plumbing (chat.send, WebID→pubKey resolution, signing,
      *   transport routing), different subtype + payload.
      *
      *   Receivers route the envelope to basis's
-     *   `makeKringRulesPeerHandler`, which stashes the rules doc in a
-     *   per-kring "pending" cache.  The rules editor reads the cache
+     *   `makeCircleRulesPeerHandler`, which stashes the rules doc in a
+     *   per-circle "pending" cache.  The rules editor reads the cache
      *   on next open and passes it via γ.4's `incomingRules` opt; the
      *   resolver pops if the incoming diverges from local.
      *
@@ -3636,27 +3636,27 @@ export function buildSkills({
       const ts = typeof a.ts === 'number' && Number.isFinite(a.ts) ? a.ts : Date.now();
 
       // Fan the rules doc out via the ONE shared circle-broadcast core (chat.send
-      // subtype `kring-rules-broadcast`); receivers cache it as pending.
+      // subtype `circle-rules-broadcast`); receivers cache it as pending.
       return broadcastToCircle({
-        circleId: _groupId, kind: 'kring-rules-broadcast', from,
+        circleId: _groupId, kind: 'circle-rules-broadcast', from,
         extras: { circleId: _groupId, msgId: a.msgId, ts, rulesDoc: a.rulesDoc, fromActor: a.fromActor ?? from ?? null },
-        metric: 'kring-rules-fanout',
+        metric: 'circle-rules-fanout',
       });
     }, {
-      description: 'Fan a kring rules document out to every other member via chat.send subtype:kring-rules-broadcast; receivers cache as pending incomingRules for the γ.4 conflict resolver.',
+      description: 'Fan a circle rules document out to every other member via chat.send subtype:circle-rules-broadcast; receivers cache as pending incomingRules for the γ.4 conflict resolver.',
       visibility:  'authenticated',
     }),
 
     /**
      * broadcastCirclePolicy({groupId, policy, msgId, ts?})
-     *   — γ-next.policy — kring circlePolicy document fan-out to every
-     *   member of a kring.  Sibling of `broadcastCircleRules`: same fan-out
+     *   — γ-next.policy — circle circlePolicy document fan-out to every
+     *   member of a circle.  Sibling of `broadcastCircleRules`: same fan-out
      *   plumbing (chat.send, WebID→pubKey resolution, signing,
      *   transport routing), different subtype + payload.
      *
      *   Receivers route the envelope to basis's
-     *   `makeKringPolicyPeerHandler`, which stashes the policy doc in a
-     *   per-kring "pending" cache.  The settings editor reads the cache
+     *   `makeCirclePolicyPeerHandler`, which stashes the policy doc in a
+     *   per-circle "pending" cache.  The settings editor reads the cache
      *   on next open and passes it via γ.4's `incomingPolicy` opt; the
      *   resolver pops if the incoming diverges from local.
      *
@@ -3673,14 +3673,14 @@ export function buildSkills({
       const ts = typeof a.ts === 'number' && Number.isFinite(a.ts) ? a.ts : Date.now();
 
       // Fan the policy doc out via the ONE shared circle-broadcast core (chat.send
-      // subtype `kring-policy-broadcast`); receivers cache it as pending.
+      // subtype `circle-policy-broadcast`); receivers cache it as pending.
       return broadcastToCircle({
-        circleId: _groupId, kind: 'kring-policy-broadcast', from,
+        circleId: _groupId, kind: 'circle-policy-broadcast', from,
         extras: { circleId: _groupId, msgId: a.msgId, ts, policy: a.policy, fromActor: a.fromActor ?? from ?? null },
-        metric: 'kring-policy-fanout',
+        metric: 'circle-policy-fanout',
       });
     }, {
-      description: 'Fan a kring circlePolicy document out to every other member via chat.send subtype:kring-policy-broadcast; receivers cache as pending incomingPolicy for the γ.4 conflict resolver.',
+      description: 'Fan a circle circlePolicy document out to every other member via chat.send subtype:circle-policy-broadcast; receivers cache as pending incomingPolicy for the γ.4 conflict resolver.',
       visibility:  'authenticated',
     }),
 
@@ -3703,13 +3703,13 @@ export function buildSkills({
       // comes from the shared substrate table (`@onderling/item-store` entryKinds), so there is one rule.
       const wakes = kindWakes('governance', a.event);
       return broadcastToCircle({
-        circleId: _groupId, kind: 'kring-governance-broadcast', from,
+        circleId: _groupId, kind: 'circle-governance-broadcast', from,
         extras: { circleId: _groupId, msgId: a.msgId, ts, event: a.event },
-        metric: 'kring-governance-fanout',
+        metric: 'circle-governance-fanout',
         noWake: !wakes,
       });
     }, {
-      description: 'Fan a governance event (propose/vote/resolve) to every other member via chat.send subtype:kring-governance-broadcast; receivers ingest it into their local EventLog. Only a propose wakes an offline device (governanceWakeHint).',
+      description: 'Fan a governance event (propose/vote/resolve) to every other member via chat.send subtype:circle-governance-broadcast; receivers ingest it into their local EventLog. Only a propose wakes an offline device (governanceWakeHint).',
       visibility:  'authenticated',
     }),
 
@@ -3717,7 +3717,7 @@ export function buildSkills({
      * broadcastCircleMembership({groupId, event, msgId, ts?})
      *   — the membership rider: fan a SIGNED membership statement (join/leave/evict/role) to every other
      *   member; receivers verify it at their membership rail before it lands on their device log. Same
-     *   plumbing as broadcastCircleGovernance; subtype kring-membership-broadcast. A membership transition
+     *   plumbing as broadcastCircleGovernance; subtype circle-membership-broadcast. A membership transition
      *   never wakes an offline device by itself (the roster converges via catch-up; principle: silent
      *   system lane).
      */
@@ -3729,13 +3729,13 @@ export function buildSkills({
       if (typeof a.msgId !== 'string' || !a.msgId)                    return { error: 'msgId-required' };
       const ts = typeof a.ts === 'number' && Number.isFinite(a.ts) ? a.ts : Date.now();
       return broadcastToCircle({
-        circleId: _groupId, kind: 'kring-membership-broadcast', from,
+        circleId: _groupId, kind: 'circle-membership-broadcast', from,
         extras: { circleId: _groupId, msgId: a.msgId, ts, event: a.event },
-        metric: 'kring-membership-fanout',
+        metric: 'circle-membership-fanout',
         noWake: true,
       });
     }, {
-      description: 'Fan a signed membership statement (join/leave/evict/role) to every other member via subtype:kring-membership-broadcast; receivers verify at their membership rail before it lands. Never wakes.',
+      description: 'Fan a signed membership statement (join/leave/evict/role) to every other member via subtype:circle-membership-broadcast; receivers verify at their membership rail before it lands. Never wakes.',
       visibility:  'authenticated',
     }),
 
@@ -3743,7 +3743,7 @@ export function buildSkills({
      * broadcastCircleChatStatement({groupId, event, msgId, ts?})
      *   — the chat re-root: fan a SIGNED chat statement to every other member; receivers verify it at
      *   their chat rail (signature + roster binding — the eviction gate) before it lands on their device
-     *   log AND renders as the bubble. Same plumbing as the other rail fans; subtype kring-chat-statement.
+     *   log AND renders as the bubble. Same plumbing as the other rail fans; subtype circle-chat-statement.
      *   A chat message MAY wake an offline device (the shared kind table says the conversation wakes —
      *   parity with the legacy plain-envelope fan it replaces).
      */
@@ -3760,17 +3760,17 @@ export function buildSkills({
       // this subtype so the resolver routes the row back to the chat rail). The pod stays transport,
       // never authority — whoever reads the row verifies the statement like any fanned one.
       return broadcastToCircle({
-        circleId: _groupId, kind: 'kring-chat-statement', from,
+        circleId: _groupId, kind: 'circle-chat-statement', from,
         envelope: {
-          type: 'p2p-chat', subtype: 'kring-chat-statement',
+          type: 'p2p-chat', subtype: 'circle-chat-statement',
           circleId: _groupId, msgId: a.msgId, ts, event: a.event, fromWebid: from,
         },
         extras: { circleId: _groupId, msgId: a.msgId, ts, event: a.event },
-        metric: 'kring-chat-statement-fanout',
+        metric: 'circle-chat-statement-fanout',
         noWake: !kindWakes('chat-message'),
       });
     }, {
-      description: 'Fan a signed chat statement to every other member via subtype:kring-chat-statement; receivers verify at their chat rail before it lands and renders. Wakes per the shared kind table (the conversation may wake).',
+      description: 'Fan a signed chat statement to every other member via subtype:circle-chat-statement; receivers verify at their chat rail before it lands and renders. Wakes per the shared kind table (the conversation may wake).',
       visibility:  'authenticated',
     }),
 
@@ -3779,7 +3779,7 @@ export function buildSkills({
      *   — the content re-root: fan a SIGNED task statement (a full-item snapshot, or a remove) to every
      *   other member; receivers verify it at their task rail before it lands on their device log and
      *   causally merges into their store head. Same plumbing as broadcastCircleMembership; subtype
-     *   kring-task-broadcast. Never wakes an offline device by itself (the head converges via catch-up;
+     *   circle-task-broadcast. Never wakes an offline device by itself (the head converges via catch-up;
      *   an assignment nudge belongs to the notifications model, not this fan).
      */
     defineSkill('broadcastCircleTask', async ({ parts, from }) => {
@@ -3790,20 +3790,20 @@ export function buildSkills({
       if (typeof a.msgId !== 'string' || !a.msgId)                    return { error: 'msgId-required' };
       const ts = typeof a.ts === 'number' && Number.isFinite(a.ts) ? a.ts : Date.now();
       return broadcastToCircle({
-        circleId: _groupId, kind: 'kring-task-broadcast', from,
+        circleId: _groupId, kind: 'circle-task-broadcast', from,
         extras: { circleId: _groupId, msgId: a.msgId, ts, event: a.event },
-        metric: 'kring-task-fanout',
+        metric: 'circle-task-fanout',
         noWake: true,
       });
     }, {
-      description: 'Fan a signed task statement (full-item snapshot or remove) to every other member via subtype:kring-task-broadcast; receivers verify at their task rail and causally merge the head. Never wakes.',
+      description: 'Fan a signed task statement (full-item snapshot or remove) to every other member via subtype:circle-task-broadcast; receivers verify at their task rail and causally merge the head. Never wakes.',
       visibility:  'authenticated',
     }),
 
     /**
      * broadcastCircleReport({groupId, event, msgId, ts?})
      *   — Wave C §8: fan a report event to every member (so an admin on another device sees
-     *   it). Same plumbing as broadcastCircleGovernance; subtype kring-report-broadcast.
+     *   it). Same plumbing as broadcastCircleGovernance; subtype circle-report-broadcast.
      */
     defineSkill('broadcastCircleReport', async ({ parts, from }) => {
       const a = dataArgs(parts);
@@ -3819,14 +3819,14 @@ export function buildSkills({
       // Absent `to`, the fan is unnarrowed — older callers behave as before.
       const only = Array.isArray(a.to) ? a.to.filter((x) => typeof x === 'string' && x) : null;
       return broadcastToCircle({
-        circleId: _groupId, kind: 'kring-report-broadcast', from,
+        circleId: _groupId, kind: 'circle-report-broadcast', from,
         extras: { circleId: _groupId, msgId: a.msgId, ts, event: a.event },
-        metric: 'kring-report-fanout',
+        metric: 'circle-report-fanout',
         noWake: true,
         only,
       });
     }, {
-      description: 'Fan a report event via chat.send subtype:kring-report-broadcast; receivers ingest it into their local EventLog. Pass `to` (the circle admins) to narrow the fan — a report must not reach the person it is about. Never wakes an offline device (silent lane).',
+      description: 'Fan a report event via chat.send subtype:circle-report-broadcast; receivers ingest it into their local EventLog. Pass `to` (the circle admins) to narrow the fan — a report must not reach the person it is about. Never wakes an offline device (silent lane).',
       visibility:  'authenticated',
     }),
 
@@ -3899,7 +3899,7 @@ export function buildSkills({
 
     /**
      * listCircleChats({groupId?, sinceTs?, limit?})
-     *   — list stored kring chat-message items, ordered
+     *   — list stored circle chat-message items, ordered
      *   oldest → newest (chat reading order).  Defaults: all circles,
      *   no time bound, capped at 200 most recent.  Hosts (basis
      *   web + mobile) call this at boot to rehydrate eventLog so the
@@ -3910,7 +3910,7 @@ export function buildSkills({
       const limit = Math.max(1, Math.min(1000,
         typeof a.limit === 'number' && Number.isFinite(a.limit) ? a.limit : 200,
       ));
-      const open = await store.listOpen({ type: 'kring-chat-message' });
+      const open = await store.listOpen({ type: 'circle-chat-message' });
       let filtered = open;
       if (typeof a.groupId === 'string' && a.groupId) {
         filtered = filtered.filter((i) => i?.source?.circleId === a.groupId);
@@ -3927,16 +3927,16 @@ export function buildSkills({
       const trimmed = sorted.length > limit ? sorted.slice(sorted.length - limit) : sorted;
       return { items: trimmed };
     }, {
-      description: 'List stored kring chat-message items for boot-time eventLog rehydration.  Filters: groupId, sinceTs (exclusive), limit (default 200, max 1000).',
+      description: 'List stored circle chat-message items for boot-time eventLog rehydration.  Filters: groupId, sinceTs (exclusive), limit (default 200, max 1000).',
       visibility:  'authenticated',
     }),
 
     /**
      * ingestCircleMessage({payload, fromPubKey, fromPeerAddr})
-     *   — receive-side mirror for an inbound kring chat
+     *   — receive-side mirror for an inbound circle chat
      *   envelope.  Sibling of `ingestRemotePost` for the buurt-post
      *   path: dedupe + eviction + mute filtering + addItems.  Hosts
-     *   (basis web + mobile) call this from their kring-chat
+     *   (basis web + mobile) call this from their circle-chat
      *   peer-router handler instead of writing to eventLog directly.
      *
      *   Returns: { ok: true, itemId } | { deduped: true } |
@@ -3967,8 +3967,8 @@ export function buildSkills({
       });
       if (verdict) return verdict;
 
-      // Dedupe by msgId — O(N) over open kring-chat items.
-      const open = await store.listOpen({ type: 'kring-chat-message' });
+      // Dedupe by msgId — O(N) over open circle-chat items.
+      const open = await store.listOpen({ type: 'circle-chat-message' });
       if (open.some((i) => i?.source?.msgId === msgId)) return { deduped: true };
 
       // media — optional media-card pointer+snapshot riding the envelope
@@ -3978,7 +3978,7 @@ export function buildSkills({
         ? payload.media : null;
 
       const [item] = await store.addItems([{
-        type:       'kring-chat-message',
+        type:       'circle-chat-message',
         text,
         visibility: 'household',
         source: {
@@ -3994,10 +3994,10 @@ export function buildSkills({
       }], {
         actor: payload.fromActor ?? payload.fromWebid ?? (fromPubKey ? `pubkey:${fromPubKey.slice(0, 12)}` : 'remote'),
       });
-      metrics?.record?.('kring-chat-ingest');
+      metrics?.record?.('circle-chat-ingest');
       return { ok: true, itemId: item.id };
     }, {
-      description: 'Ingest an inbound kring chat-message envelope into the local itemStore (mute + eviction filtered, dedupes on msgId).',
+      description: 'Ingest an inbound circle chat-message envelope into the local itemStore (mute + eviction filtered, dedupes on msgId).',
       visibility:  'authenticated',
     }),
 

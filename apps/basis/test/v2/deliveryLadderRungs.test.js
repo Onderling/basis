@@ -14,7 +14,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { DELIVERY, DELIVERY_ORDER, DELIVERY_LABELS, DELIVERY_TERMINAL, deliveryAfterSend } from '../../src/v2/deliveryState.js';
-import { classifyFanOut } from '@onderling/kring-host/kringBroadcast';
+import { classifyFanOut } from '@onderling/kring-host/circleBroadcast';
 
 describe('J-D2 — the over-claim is gone', () => {
   it('a clean fan-out is `maybe-received`, not a word that reads like success', () => {

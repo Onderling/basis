@@ -27,7 +27,7 @@ import { VaultMemory } from '@onderling/vault';
 import nacl from 'tweetnacl';
 import { decode as b64decode } from '../../src/crypto/b64.js';
 
-const CIRCLE_A = 'buurtkring-oosterpoort';
+const CIRCLE_A = 'circle-oosterpoort';
 const CIRCLE_B = 'huishouden-de-vries';
 
 const seed = () => new Uint8Array(nacl.randomBytes(32));

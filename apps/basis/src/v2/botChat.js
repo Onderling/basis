@@ -3,7 +3,7 @@
  *
  * The GESPREK chat card shows an "assistant header" strip (green presence dot +
  * the bot's name) ONLY when the conversation is a genuine 1:1 with a bot: you +
- * exactly one other participant, and that participant is a bot. On a group kring
+ * exactly one other participant, and that participant is a bot. On a group circle
  * (any human co-members, or more than one other participant) the strip is hidden.
  *
  * Pure + host-agnostic: the host passes its per-member roster (each carrying an

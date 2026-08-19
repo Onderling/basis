@@ -18,7 +18,7 @@ import { t } from '../../core/localisation.js';
 
 const TOP_TOGGLES = ['chatOff', 'revealOpen', 'agentsMayContactMe'];
 const FLOW_TOGGLES = ['tasksToPersonal', 'calendarToPersonal'];
-// per-kring push toggles (audit). Mirrors web's
+// per-circle push toggles (audit). Mirrors web's
 // PUSH_TOGGLES row pattern; locale namespace is
 // `circle.member.notifications.*`.
 const PUSH_TOGGLES = [

@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { renderScreensPicker } from '../../web/v2/circleScreensPicker.js';
 import {
-  emptyScreen, addKringToScreen, addScreen, setActiveScreen, EMPTY_SCREEN_BOOK,
+  emptyScreen, addCircleToScreen, addScreen, setActiveScreen, EMPTY_SCREEN_BOOK,
 } from '../../src/v2/userScreens.js';
 
 const t = (key, params) =>
@@ -63,7 +63,7 @@ describe('renderScreensPicker · α.3.1 — rows', () => {
   });
 
   it('shows filter summary per row (all / one / n)', () => {
-    let book = addScreen(EMPTY_SCREEN_BOOK, 'Stream');      // ALL_KRINGEN
+    let book = addScreen(EMPTY_SCREEN_BOOK, 'Stream');      // ALL_CIRCLES
     book = addScreen(book, 'Selwerd', ['g-sel']);          // one
     book = addScreen(book, 'Multi', ['g-a', 'g-b', 'g-c']); // n=3
     const el = mount();

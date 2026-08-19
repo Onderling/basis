@@ -22,9 +22,9 @@ import { t } from '../src/core/localisation.js';
 describe('D / Surface 1 — mobile CircleTabBar roster from the manifest projection', () => {
   it('renderMobile projects the four tabs in order with their locale keys', () => {
     const tabs = circleTabsMobile(basisManifest);
-    expect(tabs.map((tab) => tab.id)).toEqual(['screens', 'kringen', 'contacten', 'mij']);
+    expect(tabs.map((tab) => tab.id)).toEqual(['screens', 'circles', 'contacten', 'mij']);
     expect(tabs.map((tab) => tab.labelKey)).toEqual([
-      'circle.tab.screens', 'circle.tab.kringen', 'circle.tab.contacten', 'circle.tab.mij',
+      'circle.tab.screens', 'circle.tab.circles', 'circle.tab.contacten', 'circle.tab.mij',
     ]);
   });
 
@@ -42,7 +42,7 @@ describe('D / Surface 1 — mobile CircleTabBar roster from the manifest project
     const tabs = circleTabsMobile(basisManifest);
     const mij = tabs.find((tab) => tab.id === 'mij');
     expect(mij.target).toEqual({ kind: 'op', opId: 'me' });
-    for (const id of ['screens', 'kringen', 'contacten']) {
+    for (const id of ['screens', 'circles', 'contacten']) {
       expect(tabs.find((tab) => tab.id === id).target).toEqual({ kind: 'nav', to: id });
     }
   });

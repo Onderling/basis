@@ -1,12 +1,12 @@
 /**
  * Shared RN feedback bubbles — the Stage-1 review CARDS and the "Report a problem" PANEL, used by BOTH the
- * contact-thread `FeedbackThreadScreen` and the invite-circle KRING (CircleLauncherScreen). One source so the
+ * contact-thread `FeedbackThreadScreen` and the invite-circle CIRCLE (CircleLauncherScreen). One source so the
  * two mobile containers can't drift (repo invariant #1/#3). The feedback LOGIC is the shared
  * `createFeedbackSurface`; this is only the presentation of its `kind:'review'` / `kind:'report'` emits.
  *
  * Edit affordance is container-configurable:
  *   • contact-thread → INLINE card edit: pass `editing={id,text}` + `onChangeEditText/onSaveEdit/onCancelEdit`.
- *   • kring          → COMPOSER prefill (web parity): pass no `editing`; `onEditPoint(point)` fills the composer.
+ *   • circle          → COMPOSER prefill (web parity): pass no `editing`; `onEditPoint(point)` fills the composer.
  */
 import React from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, StyleSheet } from 'react-native';
@@ -23,7 +23,7 @@ import { theme } from '../screens/v2/theme.js';
  * @param {(text:string)=>void} [a.onChangeEditText]
  * @param {()=>void} [a.onSaveEdit]
  * @param {()=>void} [a.onCancelEdit]
- * @param {(point:object)=>void} a.onEditPoint   ✏ tapped (inline-start on contact-thread; composer-prefill on kring)
+ * @param {(point:object)=>void} a.onEditPoint   ✏ tapped (inline-start on contact-thread; composer-prefill on circle)
  * @param {(pointId:string)=>void} a.onSend      send one point (fp:consent:<id>)
  * @param {()=>void} a.onSendAll                 send all (fp:consent:all)
  * @param {()=>void} a.onSendNone                send nothing (fp:cancel)

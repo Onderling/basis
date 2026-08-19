@@ -28,7 +28,7 @@ describe('senderVerdict — one authenticated address', () => {
   });
 
   it('passes an envelope with no `_from` — there is no claim to disagree with', () => {
-    const v = senderVerdict(null, { subtype: 'kring-chat-message' }, () => 'anna');
+    const v = senderVerdict(null, { subtype: 'circle-chat-message' }, () => 'anna');
     expect(v).toMatchObject({ ok: true, reason: 'no-claimed-sender', claimed: null });
   });
 });

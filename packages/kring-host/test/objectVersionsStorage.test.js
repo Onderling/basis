@@ -1,5 +1,5 @@
 /**
- * γ.2 — objectVersionsStorage: concrete versions adapter for kring stores,
+ * γ.2 — objectVersionsStorage: concrete versions adapter for circle stores,
  * consolidated onto the `@onderling/versioning` substrate (the retired
  * sync-engine `objectVersions.js` semantics must survive the swap):
  *   - Legacy list shape `{ts, sha256, value}` with the value INLINE.
@@ -208,7 +208,7 @@ describe('localStorageBackend', () => {
   });
 });
 
-describe('localStorageObjectVersions × kring scenario', () => {
+describe('localStorageObjectVersions × circle scenario', () => {
   it('a fresh adapter over the same storage sees the prior history', async () => {
     const storage = mockLocalStorage();
     const a = localStorageObjectVersions('policy', storage);

@@ -37,10 +37,10 @@ describe('webSha256', () => {
 describe('circleVersioningFor — build-once + resolution', () => {
   it('builds one store per circle and returns the same instance thereafter', () => {
     const backend = createMemoryBackend();
-    const first = circleVersioningFor('kring-1', 'circle-kring-1', backend);
-    const again = circleVersioningFor('kring-1', 'circle-kring-1', backend);
+    const first = circleVersioningFor('circle-1', 'circle-circle-1', backend);
+    const again = circleVersioningFor('circle-1', 'circle-circle-1', backend);
     expect(again).toBe(first);
-    expect(getCircleVersionStore('kring-1')).toBe(first);
+    expect(getCircleVersionStore('circle-1')).toBe(first);
   });
 
   it('returns null for a circle whose pod was never built', () => {
@@ -51,7 +51,7 @@ describe('circleVersioningFor — build-once + resolution', () => {
 describe('end-to-end — the makeCirclePodClient wiring contract', () => {
   it('a versioned circle pod snapshots displaced bytes and restores them', async () => {
     // Mirror makeCirclePodClient: same backend into store + pod.
-    const circleId = 'kring-e2e';
+    const circleId = 'circle-e2e';
     const deviceId = `circle-${circleId}`;
     const backend  = createMemoryBackend();
     const versioning = circleVersioningFor(circleId, deviceId, backend);

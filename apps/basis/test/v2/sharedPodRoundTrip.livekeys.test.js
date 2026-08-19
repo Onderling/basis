@@ -37,7 +37,7 @@ import { makeChatRail, makeChatPeerHandler, makePodChatCatchUp, CHAT_STATEMENT_B
 
 const ANNE = 'https://id.example/anne';   // sender A
 const BOB  = 'https://id.example/bob';    // receiver B
-const CIRCLE = 'live-key-kring';
+const CIRCLE = 'live-key-circle';
 const QUIET = { warn() {}, info() {}, debug() {} };
 
 /** An in-memory vault for the producer (holds its sealing identity + controller key). */
@@ -169,7 +169,7 @@ describe('Phase 3 (LIVE KEYS) — shared-pod round-trip with REAL circle group-k
     const { producer, strategy } = await liveCircleSealOpen(CIRCLE);
 
     // A member seals + writes one row under the live group key.
-    const ref = await writeSealedMessage(backend, strategy.seal, { circleId: CIRCLE, msgId: 'lk3', ts: 9000, text: 'alleen voor leden', subtype: 'kring-chat-message' });
+    const ref = await writeSealedMessage(backend, strategy.seal, { circleId: CIRCLE, msgId: 'lk3', ts: 9000, text: 'alleen voor leden', subtype: 'circle-chat-message' });
     expect(isSealed(await backend.get(ref))).toBe(true);
 
     // An OUTSIDER (never wrapped into the group key): the membership gate rejects — no strategy at all.

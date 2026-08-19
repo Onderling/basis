@@ -102,11 +102,11 @@ function renderRow(screen, {
   nameBtn.addEventListener('click', () => onOpenScreen?.(screen.id));
   li.appendChild(nameBtn);
 
-  // Kring-filter summary next to the name — gives the user a hint at
-  // a glance: "all kringen" vs "3 kringen" vs "1 kring".
+  // Circle-filter summary next to the name — gives the user a hint at
+  // a glance: "all circles" vs "3 circles" vs "1 circle".
   const summary = document.createElement('span');
   summary.className = 'circle-screens-picker__summary';
-  summary.textContent = kringFilterSummary(screen, tr);
+  summary.textContent = circleFilterSummary(screen, tr);
   li.appendChild(summary);
 
   if (isActive) {
@@ -154,8 +154,8 @@ function renderRow(screen, {
   return li;
 }
 
-function kringFilterSummary(screen, tr) {
-  const f = screen?.kringFilter;
+function circleFilterSummary(screen, tr) {
+  const f = screen?.circleFilter;
   if (f == null || (Array.isArray(f) && f.length === 0)) {
     return tr('circle.screens.filter_all');
   }

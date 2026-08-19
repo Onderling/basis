@@ -64,7 +64,7 @@ describe('a device is reachable at its per-circle addresses', () => {
     await anna.addAddress(...circleAlias('anna@oosterpoort'));
     await settle();
 
-    await bram._put(circleAddr('anna@oosterpoort'), { subtype: 'kring-chat-message', text: 'hoi' });
+    await bram._put(circleAddr('anna@oosterpoort'), { subtype: 'circle-chat-message', text: 'hoi' });
     await waitFor(() => inbox.length >= 1);
     expect(JSON.stringify(inbox[0])).toContain('hoi');
   });
@@ -75,7 +75,7 @@ describe('a device is reachable at its per-circle addresses', () => {
     await anna.addAddress(...circleAlias('anna@oosterpoort'));
     await settle();
 
-    await bram._put(annaId.pubKey, { subtype: 'kring-chat-message', text: 'old-path' });
+    await bram._put(annaId.pubKey, { subtype: 'circle-chat-message', text: 'old-path' });
     await waitFor(() => inbox.length >= 1);
     expect(anna.addresses).toEqual([annaId.pubKey, circleAddr('anna@oosterpoort')]);
   });
@@ -85,7 +85,7 @@ describe('a device is reachable at its per-circle addresses', () => {
     await settle();
 
     for (const c of ['anna@x', 'anna@y', 'anna@z']) {
-      await bram._put(circleAddr(c), { subtype: 'kring-chat-message', to: circleAddr(c) });
+      await bram._put(circleAddr(c), { subtype: 'circle-chat-message', to: circleAddr(c) });
     }
     await waitFor(() => inbox.length >= 3);
     expect(anna.addresses).toHaveLength(4);            // primary + three circles
@@ -101,7 +101,7 @@ describe('a device is reachable at its per-circle addresses', () => {
     await anna.connect();
     await settle(250);
 
-    await bram._put(circleAddr('anna@oosterpoort'), { subtype: 'kring-chat-message', text: 'after-reconnect' });
+    await bram._put(circleAddr('anna@oosterpoort'), { subtype: 'circle-chat-message', text: 'after-reconnect' });
     await waitFor(() => inbox.length >= 1);
   });
 

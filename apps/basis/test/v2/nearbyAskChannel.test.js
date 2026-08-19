@@ -126,7 +126,7 @@ describe('an inbound ask is untrusted', () => {
 
   it('ignores messages that are not asks at all', () => {
     const { ch } = build();
-    expect(ch.receiveAsk({ subtype: 'kring-chat-message', ask: liveAsk() }, 'them')).toBeNull();
+    expect(ch.receiveAsk({ subtype: 'circle-chat-message', ask: liveAsk() }, 'them')).toBeNull();
     expect(ch.receiveAsk(null, 'them')).toBeNull();
     expect(ch.receiveAsk(inbound('not-an-object'), 'them')).toBeNull();
   });

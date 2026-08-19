@@ -2,12 +2,12 @@
  * basis v2 — circle app boot (DEFAULT web entry, `index.html`).
  *
  * The v2 circle app is the landing page.  Per v2 §1 + §4 (and the
- * v2-design-is-canon decision), chat IS the kring view.  The classic
+ * v2-design-is-canon decision), chat IS the circle view.  The classic
  * chat shell (web/main.js + classic.html) was removed 2026-06-29 once
  * the browser suite migrated to v2 and its flows had v2 equivalents.
  * Reuses the same bundled agent factory + shared circle
  * model. Opening a circle sets the active circle (F1) and shows the
- * kring view; the admin's `policy.view` axis chooses whether that lands
+ * circle view; the admin's `policy.view` axis chooses whether that lands
  * on GESPREK (chat) or the recipe'd Scherm (§4).  "+ new circle" creates
  * one via the existing createGroupV2 path and refreshes.
  *
@@ -50,7 +50,7 @@ import { VaultIndexedDB, VaultMemory, VaultLocalStorage } from '@onderling/vault
 // session routes a sealed circle to the user's REAL pod; otherwise the in-memory pseudo-pod.
 import * as podAuth from '../../src/web/podAuth.js';
 import { discoverPodRoot, createPodWriter } from '../../src/web/podStorage.js';
-// Phase 5 — bot + feedback in the kring composer (mirrors mobile CircleLauncherScreen, on the shared
+// Phase 5 — bot + feedback in the circle composer (mirrors mobile CircleLauncherScreen, on the shared
 // engine). The circle bot stack:
 import { mockTasksManifest, mockStoopManifest, mockFolioManifest } from '../../src/core/manifests/mockManifests.js';
 import { calendarManifest } from '@onderling-app/calendar/manifest';
@@ -83,8 +83,8 @@ import { renderConnectionPoints } from './circleConnectionPoints.js';
 import { createCirclePodCustody } from '../../src/v2/circlePodCustody.js';
 import { createCircleCacheMedium } from '../../src/v2/circleCacheMedium.js';
 import { createCircleDispatch, addressesBot } from '../../src/v2/circleDispatch.js';
-// Conversation memory — recent kring turns woven into the bot's interpret context.
-import { recentKringTurns } from '../../src/v2/kringMemory.js';
+// Conversation memory — recent circle turns woven into the bot's interpret context.
+import { recentCircleTurns } from '../../src/v2/circleMemory.js';
 import { createClarifyingDispatch } from '../../src/v2/clarifyingDispatch.js';
 // the shared confirm gate at the dispatch waist (web presenter: confirmDialog.js).
 import { runConfirmGate } from '../../src/v2/confirmGate.js';
@@ -98,7 +98,7 @@ import {
 } from '../../src/v2/screenDrilldown.js';
 import { createInputHistory } from '../../src/v2/commandSuggest.js';
 import { beginFollowUp, completeFollowUp, beginFormFollowUp, completeMultiFieldFollowUp } from '@onderling/kring-host/followUp';
-import { kringReplyText } from '../../src/v2/kringReply.js';
+import { circleReplyText } from '../../src/v2/circleReply.js';
 import { oneToOneBotLabel } from '../../src/v2/botChat.js';
 import { scopeCatalogToApps } from '../../src/v2/circleCatalogScope.js';
 // the default-deny capability gate applied at the user-dispatch waist (dispatchReady).
@@ -163,7 +163,7 @@ import { encodeImageFile } from '../../src/v2/attachmentEncoder.js';
 // media — the LIVE sealed-media composition for the active circle: the circle's own
 // seal strategy + a (dev-grade, in-memory) bucket + the deny-by-default gate feed
 // createMediaEmbed's injected seams. Sealed-only: a p0/p1 circle composes to null and
-// the kring composer shows NO attach affordance. Swap point for real infra (S3/R2 +
+// the circle composer shows NO attach affordance. Swap point for real infra (S3/R2 +
 // Solid verifier) is recorded in circleMediaGateway.js.
 import { createCircleMediaComposition, makeDevMediaBucket } from '../../src/v2/circleMediaGateway.js';
 import { buildSelfMediaComposition, makeResealMediaForCircle } from '../../src/v2/profileMediaReseal.js';
@@ -177,7 +177,7 @@ import { wireEventLogPersistence, backendSnapshotIo } from '../../src/v2/eventLo
 import { buildSubjectLabeler } from '../../src/v2/governanceView.js';
 import { governanceEntryId, foldGovernance } from '../../src/v2/governanceLog.js';
 import { reportEntryId } from '../../src/v2/reportModel.js';
-import { makeKringGovernancePeerHandler, makeKringReportPeerHandler } from '../../src/v2/kringLogReceiver.js';
+import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '../../src/v2/circleLogReceiver.js';
 import { renderGovernancePanel } from './circleGovernancePanel.js';
 import { createMediaEmbed } from '../../src/core/handlers/mediaEmbed.js';
 import { openThumbnail } from '@onderling/blob-gateway';
@@ -249,14 +249,14 @@ import { createUserLlmDefaultStore, localStorageUserLlmIo } from '../../src/v2/u
 import { applyUserLlmRuntime, validateUserLlmConfig } from '../../src/v2/userLlmRuntime.js';
 import { createRealHouseholdAgent } from '../../src/web/realAgent.js';
 import { EventLog } from '../../src/eventLog.js';
-// δ.2 — per-message delivery state for optimistic kring chat sends.
+// δ.2 — per-message delivery state for optimistic circle chat sends.
 // Sibling of the EventLog (which stays append-only); read at render
-// time by circleKring to surface pending/failed icons.
+// time by circleView to surface pending/failed icons.
 import { createDeliveryStateMap } from '@onderling/kring-host/deliveryState';
-// Phase 2 — shared kring chat send primitives (optimistic event + best-effort fan-out), web + mobile.
-import { kringChatMessageEvent, broadcastCircleFanOut } from '@onderling/kring-host/kringBroadcast';
+// Phase 2 — shared circle chat send primitives (optimistic event + best-effort fan-out), web + mobile.
+import { circleChatMessageEvent, broadcastCircleFanOut } from '@onderling/kring-host/circleBroadcast';
 import { makeKeyEventLogSink, recipientAddrsFromRoster } from '@onderling/kring-host/keyEventLogSink';
-// "only you" vs "whole kring" — message scope (a data property; the badge renders it).
+// "only you" vs "whole circle" — message scope (a data property; the badge renders it).
 import { scopeForReply } from '../../src/v2/messageScope.js';
 import {
   circleRows, chatRows, mutedActorSet,
@@ -280,7 +280,7 @@ import {
   makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin,
 } from '../../src/v2/circleAddressAnnounce.js';
 import { isFeatureEnabled, defaultViewModeFromPolicy } from '../../src/v2/circlePolicy.js';
-import { buildKringTabs, DEFAULT_KRING_TAB, featureTabId, featureForTabId } from '../../src/v2/kringTabs.js';
+import { buildCircleTabs, DEFAULT_CIRCLE_TAB, featureTabId, featureForTabId } from '../../src/v2/circleTabs.js';
 import { buildTaskRows } from '../../src/v2/taskRows.js';
 // D1 (§5A) — per-circle action-frequency counter behind the quickActions block.
 import { createActionFrequencyStore } from '../../src/v2/actionFrequency.js';
@@ -304,7 +304,7 @@ import { loadCircleStoragePod } from '../../src/v2/circleStoragePolicy.js';
 // the relay/nkn wire address (`addressesOf`) instead of degrading to the bare pubKey.
 import { decodeInvite as decodeInviteForPopulate, populateAdminAddressesFromInvite } from '../../src/core/wizards/joinGroupState.js';
 import { feedHouseholdRoster, makeCircleReachable } from '../../src/v2/householdRosterPairing.js';
-import { migrateKringChatHistory, CHAT_MIGRATION_MARKER_KEY } from '../../src/v2/kringChatRehydrate.js';
+import { migrateCircleChatHistory, CHAT_MIGRATION_MARKER_KEY } from '../../src/v2/circleChatRehydrate.js';
 import { createChatMessageInbox } from '../../src/v2/chatMessageInbox.js';
 import { createSelfAuthorCheck } from '../../src/v2/chatSelfAuthor.js';
 // ε.4 — negotiated catch-up protocol substrate.
@@ -312,30 +312,30 @@ import {
   makeRequestCatchUpFromKnownPeers,
 } from '../../src/core/handlers/catchUp.js';
 // γ-next.recipe — receiver + pending-cache substrate for the recipe broadcast.
-import { makeKringRecipePeerHandler } from '../../src/v2/kringRecipeReceiver.js';
-import { createKringRecipePendingStoreLocal } from '../../src/v2/kringRecipePendingStorage.js';
+import { makeCircleRecipePeerHandler } from '../../src/v2/circleRecipeReceiver.js';
+import { createCircleRecipePendingStoreLocal } from '../../src/v2/circleRecipePendingStorage.js';
 // γ-next.rules — receiver + pending-cache substrate for the rules broadcast.
-import { makeKringRulesPeerHandler } from '../../src/v2/kringRulesReceiver.js';
-import { createKringRulesPendingStoreLocal } from '../../src/v2/kringRulesPendingStorage.js';
+import { makeCircleRulesPeerHandler } from '../../src/v2/circleRulesReceiver.js';
+import { createCircleRulesPendingStoreLocal } from '../../src/v2/circleRulesPendingStorage.js';
 // γ-next.policy — receiver + pending-cache substrate for the policy broadcast.
-import { makeKringPolicyPeerHandler } from '../../src/v2/kringPolicyReceiver.js';
-import { createKringPolicyPendingStoreLocal } from '../../src/v2/kringPolicyPendingStorage.js';
+import { makeCirclePolicyPeerHandler } from '../../src/v2/circlePolicyReceiver.js';
+import { createCirclePolicyPendingStoreLocal } from '../../src/v2/circlePolicyPendingStorage.js';
 // δ.1 — per-screen materialized-blocks cache (cache-first render + bg refresh).
 import { createScreenBlocksCacheLocal } from '../../src/v2/screenBlocksCacheStorage.js';
 import {
-  createKringRecipeStore, localStorageRecipeIo, getActiveRecipe,
+  createCircleRecipeStore, localStorageRecipeIo, getActiveRecipe,
   addRecipe, renameRecipe, removeRecipe, setActiveRecipe,
   addBlock, removeBlock, moveBlock, updateBlock, updateRecipe,
-} from '../../src/v2/kringRecipe.js';
-import { materializeRecipe, materializeBlock } from '../../src/v2/kringRecipeBlocks.js';
-// α.2 — user-owned cross-kring screens (the Schermen tab) + α.3 picker.
+} from '../../src/v2/circleRecipe.js';
+import { materializeRecipe, materializeBlock } from '../../src/v2/circleRecipeBlocks.js';
+// α.2 — user-owned cross-circle screens (the Schermen tab) + α.3 picker.
 import {
   createUserScreenStore, localStorageScreenIo,
   addScreen as addUserScreen, renameScreen as renameUserScreen,
   removeScreen as removeUserScreen, setActiveScreen, getActiveScreen, updateScreen,
 } from '../../src/v2/userScreens.js';
 import { materializeScreen } from '../../src/v2/userScreenBlocks.js';
-import { renderCircleKring } from './circleKring.js';
+import { renderCircleView } from './circleView.js';
 import { makeCircleLists } from '@onderling/kring-host/circleLists';  // composable lists (shared web≡mobile)
 // the app-level cross-circle SHARE op. The {onShare, policy} binder + resource-URI resolver are
 // pod-layer, composed at the pod site below; the op logic itself is shared (web≡mobile) in circleShare.js.
@@ -353,7 +353,7 @@ import { renderContainerCard } from './containerCard.js';      // the nested con
 import { buildHouseholdDataSource } from '../../../household/src/storage/persist.js';  // portable persistent DataSource (IDB on web) — submodule import so basis's live path no longer loads the retired household skillRegistry/HouseholdAgent via index.js (L3)
 
 // (J4) — the ATTACHMENT projector's menu for the composer "+", projected ONCE from
-// the (static) basis manifest. Feeds BOTH the prikbord + kring composers; each entry
+// the (static) basis manifest. Feeds BOTH the prikbord + circle composers; each entry
 // taps to {opId,args} → dispatch, identical to the matching slash command.
 const basisAttachMenu = renderAttachments(basisManifest).attachMenu;
 
@@ -721,7 +721,7 @@ import {
 } from '../../src/v2/circleRules.js';
 import { renderRulesEditor } from './circleRulesEditor.js';
 // γ.2 — concrete versions adapter (localStorage-backed).  Wired ONCE
-// per kring store at construction time; snapshots every save into
+// per circle store at construction time; snapshots every save into
 // `cc.versions.<storeName>.<circleId>`.  Invisible to the UI in γ.2;
 // γ.3 will surface the history.
 import { localStorageObjectVersions } from '@onderling/kring-host/objectVersionsStorage';
@@ -787,18 +787,18 @@ const LOCAL_ACTOR = 'me';
 // best-effort peer bootstrap. Transport-neutral / local-first: NKN is one transport,
 // not a prerequisite. Bring up whichever is available — NKN (CDN) and/or the relay (VITE_CIRCLE_RELAY_URL).
 // A configured relay alone is enough for the LAN no-pod two-device path; with NKN too the router picks
-// the best route. Doesn't throw if neither is available — the kring view still works locally.
+// the best route. Doesn't throw if neither is available — the circle view still works locally.
 async function tryConnectPeerTransport(agent, peerMessageRouter, { awaitRelayReady = false } = {}) {
   const nknLib =
        (typeof window !== 'undefined' && window.nkn)
     ?? (typeof globalThis !== 'undefined' && globalThis.nkn)
     ?? null;
   if (!nknLib && !CIRCLE_RELAY_URL) {
-    console.info('[circleApp] no nkn-sdk and no relay URL — kring chat is local-only this session');
+    console.info('[circleApp] no nkn-sdk and no relay URL — circle chat is local-only this session');
     return;
   }
   if (typeof agent?.connectPeerTransport !== 'function') {
-    console.info('[circleApp] agent has no connectPeerTransport — kring chat is local-only');
+    console.info('[circleApp] agent has no connectPeerTransport — circle chat is local-only');
     return;
   }
   try {
@@ -818,7 +818,7 @@ async function tryConnectPeerTransport(agent, peerMessageRouter, { awaitRelayRea
     console.info(`[circleApp] peer transport connected (${routes}, routed) + rendezvous`);
     registerCirclePresence(agent);   // G13 — fire-and-forget; see the helper for why boot never waits
   } catch (err) {
-    console.warn('[circleApp] peer connect failed — kring chat is local-only:', err?.message ?? err);
+    console.warn('[circleApp] peer connect failed — circle chat is local-only:', err?.message ?? err);
   }
 }
 
@@ -918,7 +918,7 @@ async function dialRelayUrl(url) {
   }
 }
 
-// γ.2 — versions adapters per kring store.  Wired here at construction
+// γ.2 — versions adapters per circle store.  Wired here at construction
 // so capture happens ABOVE the (localStorage / pod) tier — γ.3 will
 // read these slots for 3-way merge after a remote sync.  Each store
 // keys into its own slot prefix to keep histories isolated.
@@ -927,9 +927,9 @@ const recipeVersions = localStorageObjectVersions('recipe');
 const rulesVersions  = localStorageObjectVersions('rules');
 
 const policyStore = createCirclePolicyStore({ ...localStoragePolicyIo(), versions: policyVersions });
-// α.1c — per-kring recipe book store (multi-recipe per kring, one active).
+// α.1c — per-circle recipe book store (multi-recipe per circle, one active).
 // localStorage now; pod io can swap in later without touching callers.
-const recipeStore = createKringRecipeStore({ io: localStorageRecipeIo(), versions: recipeVersions });
+const recipeStore = createCircleRecipeStore({ io: localStorageRecipeIo(), versions: recipeVersions });
 
 // P1.7 — the viewer's per-circle chat filter (device-local; nothing is fanned — a filter that told the
 // circle what you skip would be a new leak).
@@ -973,7 +973,7 @@ function readActionFreqSnapshot() {
     return raw ? JSON.parse(raw) : {};
   } catch { return {}; }
 }
-// D1 (§5A) — in-memory fallback recipe for a kring with no authored scherm:
+// D1 (§5A) — in-memory fallback recipe for a circle with no authored scherm:
 // just the "Veel-gebruikt" row.  Never persisted.
 const DEFAULT_SCHERM_RECIPE = Object.freeze({
   // #16 — the default scherm leads with quick-actions, then the noticeboard (the
@@ -986,29 +986,29 @@ const DEFAULT_SCHERM_RECIPE = Object.freeze({
 });
 // γ.2 — per-circle rules store (replaces inline localStorage in showRules()).
 const rulesStore  = createCircleRulesStore({ ...localStorageRulesIo(), versions: rulesVersions });
-// γ-next.recipe — per-kring "incoming recipe" cache.  Receiver writes
-// here on every valid kring-recipe-broadcast envelope; the recipe
+// γ-next.recipe — per-circle "incoming recipe" cache.  Receiver writes
+// here on every valid circle-recipe-broadcast envelope; the recipe
 // editor reads on mount + passes the cached recipe via γ.3's
 // `incomingRecipe` opt.  localStorage now; pod-sync swap is the
 // same shape as the other stores.
-const kringRecipePendingStore = createKringRecipePendingStoreLocal();
-// γ-next.rules — per-kring "incoming rules" cache.  Receiver writes
-// here on every valid kring-rules-broadcast envelope; the rules
+const circleRecipePendingStore = createCircleRecipePendingStoreLocal();
+// γ-next.rules — per-circle "incoming rules" cache.  Receiver writes
+// here on every valid circle-rules-broadcast envelope; the rules
 // editor reads on mount + passes the cached doc via γ.4's
 // `incomingRules` opt.  Same shape as the recipe store.
-const kringRulesPendingStore = createKringRulesPendingStoreLocal();
-// γ-next.policy — per-kring "incoming policy" cache.  Receiver writes
-// here on every valid kring-policy-broadcast envelope; the settings
+const circleRulesPendingStore = createCircleRulesPendingStoreLocal();
+// γ-next.policy — per-circle "incoming policy" cache.  Receiver writes
+// here on every valid circle-policy-broadcast envelope; the settings
 // editor reads on mount + passes the cached doc via γ.4's
 // `incomingPolicy` opt.  Same shape as the rules + recipe stores.
-const kringPolicyPendingStore = createKringPolicyPendingStoreLocal();
+const circlePolicyPendingStore = createCirclePolicyPendingStoreLocal();
 // δ.1 — per-screen materialized-blocks cache.  The Schermen view-mode
 // reads this on open to render instantly while the fresh materialize
 // runs in the background; on result the view swaps + the cache
 // re-saves.  Survives reboots so cold-boot users see the previous
 // state immediately instead of a Loading… flash.
 const screenBlocksCache = createScreenBlocksCacheLocal();
-// α.3 — per-user screens store.  One book per user (not per-kring); the
+// α.3 — per-user screens store.  One book per user (not per-circle); the
 // active screen drives the new Schermen tab.
 const userScreenStore = createUserScreenStore({ io: localStorageScreenIo() });
 const overrideStore = createMemberOverrideStore(localStorageOverrideIo());
@@ -1141,31 +1141,31 @@ const disclosureShareMemo = createDisclosureShareMemo(localStorageDisclosureShar
 const announceRosterUpdate = makeRosterUpdateAnnouncer({
   rawCallSkill: (app, op, args) => (typeof rawCallSkill === 'function' ? rawCallSkill(app, op, args) : null),
   eventLog,
-  onChange: () => { try { _kringRender?.rerender?.(); } catch { /* no open kring */ } },
+  onChange: () => { try { _circleRender?.rerender?.(); } catch { /* no open circle */ } },
 });
 // The member-side PULL: a pull-me for the open circle re-reads its roster rows. Silent — the
 // LEDEN rows / member cards just refresh; no bubble, no toast.
 const pullRosterForCircle = async ({ circleId }) => {
-  if (_kringRender?.circleId !== circleId) return;      // not open → next open loads it anyway
-  await _kringRender.refreshRoster?.();
+  if (_circleRender?.circleId !== circleId) return;      // not open → next open loads it anyway
+  await _circleRender.refreshRoster?.();
 };
 // δ.2 — one delivery-state map per agent boot (lifetime matches the
-// in-memory EventLog).  showKring's onSend marks each locally-sent
+// in-memory EventLog).  showCircle's onSend marks each locally-sent
 // msgId 'pending' → 'sent' | 'failed' as broadcastCircleMessage
-// resolves; the kring renderer reads it at render time.
+// resolves; the circle renderer reads it at render time.
 const deliveryStateMap = createDeliveryStateMap();
 // …and REDRAW when a RECEIPT advances a message. `broadcastFanOut` announces its own transitions
 // (`onChange: rerender`), so the receipt was the one writer with nothing to announce it: it arrived, the
 // map advanced to `stored`, and the bubble kept saying "maybe received" until an unrelated render
 // repainted it. The map has had `subscribe` since δ.2; nobody had used it.
 //
-// Narrowed to `stored` — the only state a receipt produces — because web's `rerender` REBUILDS the kring
+// Narrowed to `stored` — the only state a receipt produces — because web's `rerender` REBUILDS the circle
 // DOM, composer included, and an input element rebuilt mid-sentence loses what was typed into it. A
 // repaint here is not free the way a React tick is, which is why mobile's equivalent can be unconditional
 // (it also has an out-of-screen writer for `failed`; web has none).
 deliveryStateMap.subscribe((_msgId, state) => {
   if (state !== 'stored') return;
-  try { _kringRender?.rerender?.(); } catch { /* no open kring */ }
+  try { _circleRender?.rerender?.(); } catch { /* no open circle */ }
 });
 // Delivery honesty (receiver half) — who is ALLOWED to tell us a message arrived. The shared receiver
 // resolves the message's circle off the log and only lets someone that circle's ROSTER knows advance it;
@@ -1235,11 +1235,11 @@ let circleOwnerWebId = null;   // signed-in webid — owner of the ACP grants fo
 // event (recipient's full bytes arrived) can refresh whatever board is on screen.
 let noticeboardRefreshHook = null;
 
-// ── Phase 5 — circle bot in the kring composer ───────────────────────────────────────────────────
+// ── Phase 5 — circle bot in the circle composer ───────────────────────────────────────────────────
 // Mirrors mobile CircleLauncherScreen on the SHARED engine: createCircleDispatch (gate→interpret→
 // dispatch) + createClarifyingDispatch (label→id) + makeCircleLookup (live fetch) + the token gate.
-// Built once post-agent-boot (buildCircleBot). The bot renders INTO the kring stream via `_kringRender`,
-// a small per-circle bridge that showKring sets each time it opens. (Feedback is NOT in the kring
+// Built once post-agent-boot (buildCircleBot). The bot renders INTO the circle stream via `_circleRender`,
+// a small per-circle bridge that showCircle sets each time it opens. (Feedback is NOT in the circle
 // composer — since F2 it attaches via the fp-bot contact thread; see showFeedbackThread.)
 // A root-relative LLM base (e.g. `/llm`, the vite dev-proxy convention in vite.config.js) is same-origin
 // and works with `fetch`, but the feedback config schema validates `llm.baseURL` as an ABSOLUTE url() and
@@ -1295,7 +1295,7 @@ const fallbackOffer = createFallbackOffer({
   onOffer: () => {
     // One-tap accept: the button flips the setting IN the bubble. The cooldown still arms on showing
     // (`decline()`), so an ignored offer stays quiet for a week; a tapped one clears the evidence instead.
-    _kringRender?.botBubble(
+    _circleRender?.botBubble(
       `${t('circle.nearbyScreen.delivery_fallback_hint')} ${t('circle.nearbyScreen.delivery_fallback_cost')}`,
       { buttons: [{ id: 'delivery:allow-fallback', action: 'delivery:allow-fallback', label: t('circle.nearbyScreen.delivery_fallback_enable') }] },
     );
@@ -1313,7 +1313,7 @@ async function acceptFallbackOffer() {
   try { deliverySettingsCache = await deliverySettingsStore.set({ allowFallback: true }); }
   catch { /* the confirm below only fires on success */ return; }
   fallbackOffer.accept();
-  _kringRender?.botBubble(t('circle.nearbyScreen.delivery_fallback_on'));
+  _circleRender?.botBubble(t('circle.nearbyScreen.delivery_fallback_on'));
 }
 // Boot relay: the setting if there is one, else a connection point we already hold (web ≡ mobile,
 // 2026-07-30). Without this a device is only on a circle's relay WHILE joining it — the join dials the
@@ -1452,7 +1452,7 @@ let circleManifestsByOrigin = {}; // {appOrigin → manifest}, module-scoped for
 // `sectionForScreen(circleManifestsByOrigin, screenId)` over renderWeb's
 // NavModel.sections[] — no hardcoded screen literal remains.
 let circleActiveApps = null;     // S6.C deep — the active circle's policy.apps (null = all); narrows the catalog
-let circleRescopeCatalog = null; // re-scope the catalog to circleActiveApps (set in buildCircleBot, called by showKring)
+let circleRescopeCatalog = null; // re-scope the catalog to circleActiveApps (set in buildCircleBot, called by showCircle)
 let circleDispatchReady = null;  // buildCircleBot's dispatchReady({opId,args}) — used to run a completed follow-up
 let circleApplyUserLlm = null;   // (cfg) => {ok,mode}|{ok:false,error} — rebuild the live LLM/embed providers from the member's settings
 let circleEmbedButtonTap = null; // S6.A — dispatch an inline embed button {opId,itemId} from a bot reply
@@ -1585,7 +1585,7 @@ async function resolveCircleMediaComposition(circleId, policy) {
     });
     if (comp && comp.unresolvedMembers > 0 && typeof console !== 'undefined') {
       console.info(`[circleApp] media grant: ${comp.unresolvedMembers} member(s) not yet media-reachable `
-        + '(no captured signing key) — same root cause as kring fan-out');
+        + '(no captured signing key) — same root cause as circle fan-out');
     }
     return comp;
   }
@@ -1695,9 +1695,9 @@ function noteCircleBotTurn(r, query) {
   const reply = r && r.via === 'llm-reply' && typeof r.reply === 'string' ? r.reply.trim() : '';
   circleAwaitingBotReply = reply && /\?/.test(reply) ? { question: reply, query: String(query || '') } : null;
 }
-let _kringRender = null;         // { circleId, botBubble(text, opts?) — opts.buttons/scope/embeds ride payload, fanOut(msgId,text,ts) } — set by showKring
+let _circleRender = null;         // { circleId, botBubble(text, opts?) — opts.buttons/scope/embeds ride payload, fanOut(msgId,text,ts) } — set by showCircle
 let _clarifyScope = null;        // scope of the last clarify ask(), so a candidate button taps pick() on it
-let _lastKringListing = null;    // { appOrigin, items } from the most-recent list reply, for bulk "/done all"
+let _lastCircleListing = null;    // { appOrigin, items } from the most-recent list reply, for bulk "/done all"
 const _fileShareInbox = new Map();   // fileId → {name,mime,dataB64,size} of a received peer file, for [Download]
 const _chatCatchUpPendingAllows = new Map();   // circleId → allow() of a pending chat-history offer awaiting the user's yes
 
@@ -1712,11 +1712,11 @@ function triggerBlobDownloadFromBase64(dataB64, name, mime) {
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }
-// One bash-style command history for the kring composer, module-level so it survives showKring re-renders
+// One bash-style command history for the circle composer, module-level so it survives showCircle re-renders
 // (the classic shell keeps a single global history too). Web↔mobile parity via the shared helper.
-const kringInputHistory = createInputHistory();
+const circleInputHistory = createInputHistory();
 
-// (kringReplyText is now the shared `src/v2/kringReply.js` — verb-aware Added:/Completed: phrasing.)
+// (circleReplyText is now the shared `src/v2/circleReply.js` — verb-aware Added:/Completed: phrasing.)
 
 // Build the bot + feedback once the agent is up (rawCallSkill bound). Stores into the module vars above.
 // F-retrieve persistence: one app-level StorageBackend for the circle-bot RAG
@@ -1781,9 +1781,9 @@ function buildCircleBot(agent) {
     return mappingOrigins.length ? base : undefined;   // undefined → scopeCatalogToApps uses DEFAULT_CIRCLE_ORIGINS
   };
   let catalog = scopeCatalogToApps(filterCatalog(rawCatalog, appRegistry), allowedApps());
-  circleCatalog = catalog;        // expose to showKring's composer (slash-suggest)
+  circleCatalog = catalog;        // expose to showCircle's composer (slash-suggest)
   const rescopeCatalog = () => { catalog = scopeCatalogToApps(filterCatalog(rawCatalog, appRegistry), allowedApps()); circleCatalog = catalog; };
-  circleRescopeCatalog = rescopeCatalog;   // S6.C — showKring calls this on circle-open to apply policy.apps
+  circleRescopeCatalog = rescopeCatalog;   // S6.C — showCircle calls this on circle-open to apply policy.apps
   appRegistry.subscribe(rescopeCatalog);
   // Extension mappings (feedback-extension P2c) — scanned from the V0 localStorage store, verified against the
   // base catalog (sandbox-by-construction: a mapping referencing an unknown opId is refused), then merged in +
@@ -1799,7 +1799,7 @@ function buildCircleBot(agent) {
       rawCatalog = mergeManifests([...baseSources, ...sources], { runtime: 'browser' });
       appRegistry.syncWithCatalog(rawCatalog.appOrigins);
       rescopeCatalog();
-    } catch { /* extensions are best-effort — a bad store/mapping must not break the kring */ }
+    } catch { /* extensions are best-effort — a bad store/mapping must not break the circle */ }
   }
   loadAndMergeMappings();
 
@@ -1870,7 +1870,7 @@ function buildCircleBot(agent) {
     window.onderlingSealingKit = { generateKeypair: podGenerateKeypair, createSealedPodClient, scopeStoopCallSkill };
   }
   circleContactSkills = createContactSkillRegistry({ peerGraph: circlePeerGraph, sendTask: sendContactTask });
-  circleContactSkills.start().catch(() => { /* discovery is best-effort — never blocks the kring */ });
+  circleContactSkills.start().catch(() => { /* discovery is best-effort — never blocks the circle */ });
   if (typeof window !== 'undefined') window.onderlingContactSkills = circleContactSkills;
 
   // the conversational channel (the client end of the bot peer link). The
@@ -1983,12 +1983,12 @@ function buildCircleBot(agent) {
     return { llmTool: raw && typeof raw.llmTool === 'string' ? raw.llmTool : CIRCLE_LLM_POLICY };
   }
 
-  // Feedback (F2, 2026-07-08): the in-kring `/feedback` composer mount was RETIRED. Feedback now attaches
+  // Feedback (F2, 2026-07-08): the in-circle `/feedback` composer mount was RETIRED. Feedback now attaches
   // ONLY through the added-agent path — the `fp-bot` contact (invite/QR → feedbackBotStore → its dedicated
-  // thread, see showFeedbackThread), which builds its own surface/mount. The hardwired kring-composer
+  // thread, see showFeedbackThread), which builds its own surface/mount. The hardwired circle-composer
   // coupling (a `/feedback` op + an inline surface built here) is gone; the F1 public barrel import stays.
 
-  // Live, app-qualified label→candidate lookup (no preloaded base here — the kring stream isn't an item
+  // Live, app-qualified label→candidate lookup (no preloaded base here — the circle stream isn't an item
   // list; the live fetch + the op's appOrigin do the work, scoped to the active circle).
   const lookup = makeCircleLookup({ getBase: () => [], appCallSkill: rawCallSkill, scopeId: () => getActiveCircle() });
 
@@ -1996,19 +1996,19 @@ function buildCircleBot(agent) {
   async function dispatchReady({ opId, args, appOrigin }) {
     let route;
     try { route = resolveDispatch({ kind: 'slash', opId, args: args || {}, appOrigin, command: '(bot)', body: '' }, catalog); }
-    catch { _kringRender?.botBubble(t('circle.bot.unknown')); return; }
+    catch { _circleRender?.botBubble(t('circle.bot.unknown')); return; }
     if (route.kind === 'needsForm') {
       // Conversational elicitation (chat-native, parity with mobile): a single missing field → ask for
-      // it in the kring and capture the user's NEXT message (onSend's pending-follow-up branch).
+      // it in the circle and capture the user's NEXT message (onSend's pending-follow-up branch).
       const pending = beginFollowUp({ dispatch: route, t });
-      if (pending) { circlePendingFollowUp = pending; _kringRender?.botBubble(pending.promptText); return; }
+      if (pending) { circlePendingFollowUp = pending; _circleRender?.botBubble(pending.promptText); return; }
       // 2+ missing fields → render an inline multi-field form (mobile's MultiFieldFormBubble parity), on
-      // the shared followUp.js. The host owns the pending state; renderCircleKring draws the form and
+      // the shared followUp.js. The host owns the pending state; renderCircleView draws the form and
       // onFormSubmit completes the dispatch. rerender() so the form appears immediately.
       const form = beginFormFollowUp({ dispatch: route, t });
-      if (form) { circlePendingFormFollowUp = form; _kringRender?.rerender(); return; }
+      if (form) { circlePendingFormFollowUp = form; _circleRender?.rerender(); return; }
       // Neither single nor multi (e.g. no missing param names) → the simple "needs more info" bubble.
-      _kringRender?.botBubble(t('circle.bot.needsInfo'));
+      _circleRender?.botBubble(t('circle.bot.needsInfo'));
       return;
     }
     // confirm gate — an op declaring surfaces.ui.confirm (warn/danger) NEVER executes without an
@@ -2022,12 +2022,12 @@ function buildCircleBot(agent) {
       await runConfirmGate({
         route, catalog, t,
         present: openCircleConfirmDialog,
-        onCancelNotice: () => _kringRender?.botBubble(t('circle.confirm.cancelled')),
+        onCancelNotice: () => _circleRender?.botBubble(t('circle.confirm.cancelled')),
         execute: async (ready) => { gateReply = await executeResolved(ready); },
       });
       return gateReply;
     }
-    if (route.kind !== 'ready')     { _kringRender?.botBubble(t('circle.bot.unknown')); return; }
+    if (route.kind !== 'ready')     { _circleRender?.botBubble(t('circle.bot.unknown')); return; }
     return await executeResolved(route);
 
     // The execute tail every accepted route runs (direct 'ready' or confirmed 'needsConfirm' → 'ready').
@@ -2038,12 +2038,12 @@ function buildCircleBot(agent) {
       // dispatch itself was not — an op could still run when invoked directly.
       const denyCode = await circleCapabilityDeny(route.appOrigin, route.opId, route.args);
       if (denyCode) {
-        _kringRender?.botBubble(t(denyCode === 'app-disabled' ? 'circle.gate.appDisabled' : 'circle.gate.capabilityDenied'));
+        _circleRender?.botBubble(t(denyCode === 'app-disabled' ? 'circle.gate.appDisabled' : 'circle.gate.capabilityDenied'));
         return;
       }
       let reply;
       try { reply = await runDispatch(scopeReadyDispatch(route, getActiveCircle()), rawCallSkill); }
-      catch (e) { _kringRender?.botBubble(t('circle.bot.failed', { msg: e?.message ?? String(e) })); return; }
+      catch (e) { _circleRender?.botBubble(t('circle.bot.failed', { msg: e?.message ?? String(e) })); return; }
       // The op's verb drives Added:/Completed: phrasing (a bare "✓ X" was identical for add + complete).
       const entry = catalog?.opsById?.get(route.opId);
       const verb = entry?.op?.verb;
@@ -2078,22 +2078,22 @@ function buildCircleBot(agent) {
       const gatedScreen = appEnabled ? screenButton : [];
       // S6.C (per-user) — the user's preference picks the projection (inline / screen / minimal).
       const buttons = selectSurfaceButtons({ inlineButtons, screenButton: gatedScreen, pref: circleSurfacePref.get() });
-      // Scope: a mutating op's reply reaches the whole kring (the action is shared); a
+      // Scope: a mutating op's reply reaches the whole circle (the action is shared); a
       // read/info reply or an error is private to you. (messageScope.js)
       const scope = scopeForReply({ verb, error: !!reply?.error });
       // embeds[] — the bot reply REFERENCES the item it just acted on (the created
       // task / event), so the bubble shows a "See also" chip linking to it. Title
       // is taken from the reply → no resolution needed.
       const embeds = embedsFromReply(reply, { appOrigin: entry?.appOrigin });
-      _kringRender?.botBubble(kringReplyText(reply, { verb, t }), { buttons, scope, embeds });
+      _circleRender?.botBubble(circleReplyText(reply, { verb, t }), { buttons, scope, embeds });
       // Remember the most-recent listing so a bulk "/done all" can fan out over it (classic thread.lastListing).
-      if (Array.isArray(reply?.payload?.items)) _lastKringListing = { appOrigin: entry?.appOrigin, items: reply.payload.items };
+      if (Array.isArray(reply?.payload?.items)) _lastCircleListing = { appOrigin: entry?.appOrigin, items: reply.payload.items };
       // Classic parity: after a /find reply, enrich with in-circle skill matches + an optional hop
       // prompt. Best-effort — never let it break the dispatch.
       try { await appendFindExtras(reply); } catch { /* enrichment is non-essential */ }
       // Return the op's reply so a caller that dispatched through the waist (e.g.
       // the entrust picker) can surface success/failure. The result is ALSO
-      // already surfaced as a kring bubble above — this is an additive channel.
+      // already surfaced as a circle bubble above — this is an additive channel.
       return reply;
     }
   }
@@ -2124,24 +2124,24 @@ function buildCircleBot(agent) {
     });
     if (offeringMatches.length) {
       const lines = offeringMatches.map((m) => `• ${m.label} — ${m.skill}`).join('\n');
-      _kringRender?.botBubble(`${t('circle.offeringMatches.title')}\n${lines}`);
+      _circleRender?.botBubble(`${t('circle.offeringMatches.title')}\n${lines}`);
     }
-    if (hopCard) _kringRender?.botBubble(`${hopCard.title}\n${hopCard.body}`);
+    if (hopCard) _circleRender?.botBubble(`${hopCard.title}\n${hopCard.body}`);
   }
 
   // run a bulk route ("/done all") over the most-recent listing's items; item-changed events fan out
   // cross-thread via the event log. Ported from classic handleBulkRoute.
   async function handleBulkRoute(route) {
-    const itemIds = (_lastKringListing?.items ?? []).map((it) => it.id).filter(Boolean);
-    if (!itemIds.length) { _kringRender?.botBubble(t('circle.bulk.noList')); return; }
+    const itemIds = (_lastCircleListing?.items ?? []).map((it) => it.id).filter(Boolean);
+    if (!itemIds.length) { _circleRender?.botBubble(t('circle.bulk.noList')); return; }
     try {
       const { message } = await executeBulkDispatch({
         bulk: route, itemIds, callSkill: rawCallSkill,
         emitEvent: (e) => { try { publishEventToLog(e); } catch { /* swallow */ } },
         opLabel: route.opId,
       });
-      _kringRender?.botBubble(message);
-    } catch (e) { _kringRender?.botBubble(t('circle.bot.failed', { msg: e?.message ?? String(e) })); }
+      _circleRender?.botBubble(message);
+    } catch (e) { _circleRender?.botBubble(t('circle.bot.failed', { msg: e?.message ?? String(e) })); }
   }
   circleDispatchReady = dispatchReady;   // expose so onSend can run a completed follow-up
 
@@ -2182,17 +2182,17 @@ function buildCircleBot(agent) {
   circleEmbedButtonTap = ({ opId, itemId, screen, action }) => {
     // General in-chat bot menus: a button may carry an `action` callback for a NON-circle bot, routed by
     // source. (Feedback's fp:* buttons render in the fp-bot thread, handled there by onButtonTap →
-    // surface.tapButton — no longer in the kring composer since F2 retired the in-kring mount.)
+    // surface.tapButton — no longer in the circle composer since F2 retired the in-circle mount.)
     if (action) {
       // Feedback language switch (fp-lang:<code>) — a onderling-side action (not a bot control): rebuild the
       // surface in the chosen language. Must be handled before the fp:* surface routing below.
-      if (action.startsWith('fp-lang:')) { switchFeedbackLang(_kringRender?.circleId, action.slice('fp-lang:'.length)); return; }
-      // Feedback bot buttons (fp:consent:*, fp:review, fp:mine, …) render in the kring for an invite-created
+      if (action.startsWith('fp-lang:')) { switchFeedbackLang(_circleRender?.circleId, action.slice('fp-lang:'.length)); return; }
+      // Feedback bot buttons (fp:consent:*, fp:review, fp:mine, …) render in the circle for an invite-created
       // feedback circle — route the tap to that circle's co-hosted surface as a control turn (the surface's
       // parseControl handles the fp:* id). This is the button-tap peer of the composer's text routing.
-      const fbId = _kringRender?.circleId;
+      const fbId = _circleRender?.circleId;
       if (fbId && feedbackCircleSurfaces.has(fbId)) {
-        feedbackCircleSurfaces.get(fbId).handle(action, fbId).catch((e) => _kringRender?.botBubble?.(`⚠ ${e?.message ?? e}`));
+        feedbackCircleSurfaces.get(fbId).handle(action, fbId).catch((e) => _circleRender?.botBubble?.(`⚠ ${e?.message ?? e}`));
         return;
       }
       // Objective D — an ambiguous-slash choice: re-issue the chosen app-qualified command (with the
@@ -2204,7 +2204,7 @@ function buildCircleBot(agent) {
       if (action.startsWith('file-dl:')) { const f = _fileShareInbox.get(action.slice('file-dl:'.length)); if (f) triggerBlobDownloadFromBase64(f.dataB64, f.name, f.mime); return; }
       // the chat catch-up's consent: the user said yes to a large history download (the offer bubble).
       if (action === 'chat-catchup-allow') {
-        const cid = _kringRender?.circleId;
+        const cid = _circleRender?.circleId;
         const allow = cid ? _chatCatchUpPendingAllows.get(cid) : null;
         if (allow) { _chatCatchUpPendingAllows.delete(cid); Promise.resolve(allow()).catch(() => {}); }
         return;
@@ -2228,24 +2228,24 @@ function buildCircleBot(agent) {
     // is captured so the tap hits the right pending command).
     ask: ({ query, candidates }, scope) => {
       _clarifyScope = scope;
-      _kringRender?.botBubble(
+      _circleRender?.botBubble(
         t('circle.clarify.which', { query }),
         { buttons: (candidates || []).map((c) => ({ action: `clarify:${c.id}`, label: c.label })) });
     },
     askMissing: async ({ opId, param, query }) => {
       // A non-empty label that matched nothing → "couldn't find X". But a picker command given with NO
       // value (bare `/complete-task`) shouldn't say "couldn't find '' " — list the options to choose from.
-      if (query && query.trim()) { _kringRender?.botBubble(t('circle.clarify.notFound', { query })); return; }
+      if (query && query.trim()) { _circleRender?.botBubble(t('circle.clarify.notFound', { query })); return; }
       const entry = catalog?.opsById?.get(opId);
       const listOp = (entry?.op?.params || []).find((p) => p.name === param)?.pickerSource?.listOp;
       let items = [];
       try { if (listOp) items = (await lookup(listOp, '', getActiveCircle(), entry?.appOrigin)) || []; } catch { /* keep empty */ }
       if (items.length) {
         // each option is an inline op-button: dispatch <opId> with the chosen id bound to the picker param.
-        _kringRender?.botBubble(t('circle.clarify.whichMissing'),
+        _circleRender?.botBubble(t('circle.clarify.whichMissing'),
           { buttons: items.map((c) => ({ opId, itemId: c.id, label: c.label })) });
       } else {
-        _kringRender?.botBubble(t('circle.clarify.noneToPick'));
+        _circleRender?.botBubble(t('circle.clarify.noneToPick'));
       }
     },
   });
@@ -2256,8 +2256,8 @@ function buildCircleBot(agent) {
     userDefault: () => userDefault,
     llmProviders,
     interpret: interpretToCommand,
-    // Conversation memory — the recent kring turns, so follow-ups resolve against context.
-    recentTurns: () => recentKringTurns({
+    // Conversation memory — the recent circle turns, so follow-ups resolve against context.
+    recentTurns: () => recentCircleTurns({
       rows: circleRows({ events: eventLog.query({ excludeMuted: true }), circles: circlesCache, circleId: getActiveCircle() }),
       limit: 6,
     }),
@@ -2272,7 +2272,7 @@ function buildCircleBot(agent) {
         // qualified forms — and an overridden bare token — parse as normal `slash` and route below.
         if (parsed && parsed.kind === 'ambiguous') {
           const suffix = parsed.body ? ` ${parsed.body}` : '';
-          _kringRender?.botBubble(
+          _circleRender?.botBubble(
             t('circle.slash.ambiguous', { command: parsed.command }),
             { buttons: (parsed.choices || []).map((c) => ({
                 action: `slash:${c.command}${suffix}`,
@@ -2286,7 +2286,7 @@ function buildCircleBot(agent) {
           ? { opId: parsed.opId, args: parsed.args || {}, appOrigin: parsed.appOrigin }
           : null;
       }
-      if (!cmd || !cmd.opId) { _kringRender?.botBubble(t('circle.bot.unknown')); return undefined; }
+      if (!cmd || !cmd.opId) { _circleRender?.botBubble(t('circle.bot.unknown')); return undefined; }
       // E2 bulk fan-out ("/done all"): resolveDispatch flags it (the body is a bulk keyword on a mutation op).
       // Run it over the last listing, bypassing the clarifying dispatch (which would treat "all" as a target).
       try {
@@ -2297,11 +2297,11 @@ function buildCircleBot(agent) {
     },
     // A normal (non-command) message: fan out the ALREADY-appended optimistic bubble (onSend appended it
     // + passed its msgId in ctx) — same as mobile.
-    postToKring: (text, ctx) => { if (ctx?.msgId) _kringRender?.fanOut(ctx.msgId, text, ctx.ts); },
+    postToCircle: (text, ctx) => { if (ctx?.msgId) _circleRender?.fanOut(ctx.msgId, text, ctx.ts); },
     // Addressed the bot, but the LLM mapped it to no tool → reply instead of going silent.
-    onNoMatch: (_text, _ctx, opts) => { _kringRender?.botBubble((opts && opts.reply) || t('circle.bot.unknown')); },
+    onNoMatch: (_text, _ctx, opts) => { _circleRender?.botBubble((opts && opts.reply) || t('circle.bot.unknown')); },
     // Smart chat off / unreachable → plain-language "basic mode" reply (contextual indicator, no badge).
-    onLlmUnavailable: () => { _kringRender?.botBubble(t('circle.bot.basic_mode')); },
+    onLlmUnavailable: () => { _circleRender?.botBubble(t('circle.bot.basic_mode')); },
     // F-retrieve: on the via:'llm' path the gate pulls the circle's relevant items
     // into the LLM prompt (grounding + fewer tokens). `makeCircleRetriever` is now
     // backed by a PERSISTENT `@onderling/pod-search` hybrid index — the circle's items
@@ -2373,13 +2373,13 @@ function buildCircleBot(agent) {
   };
 }
 
-// Top-level tab bar (Kringen / Stroom / Mij). Shown on the three top-level
+// Top-level tab bar (Circles / Stroom / Mij). Shown on the three top-level
 // surfaces; hidden inside a circle + its sub-screens.
 function showTabBar(active) {
   renderCircleTabBar(tabBarEl, {
     active, t,
     onScreens: showScreens,
-    onKringen: showLauncher,
+    onCircles: showLauncher,
     onContacts: showContacts,
     onMij: showMij,
   });
@@ -2427,7 +2427,7 @@ async function loadAllContacts() {
  * pickable recipients (the SHARED `pickableRecipients` selector, applied inside `renderRecipientPicker`);
  * selecting one dispatches `shareItemToContact` with the contact's published key as `recipientNetworkKey`,
  * ALONGSIDE the existing share-to-circle path (`/shareitem` → shareItemIntoCircle). A self-contained modal
- * appended to the body so it doesn't disturb the kring render state. Resolves the result note back to the caller.
+ * appended to the body so it doesn't disturb the circle render state. Resolves the result note back to the caller.
  */
 async function openRecipientPicker({ itemId, fromCircleId, toCircleId, onResult } = {}) {
   const contacts = await loadAllContacts().catch(() => []);
@@ -2467,7 +2467,7 @@ async function openRecipientPicker({ itemId, fromCircleId, toCircleId, onResult 
 // kind 'offering'); Confirm dispatches the ALREADY-registered `attachTaskGrant` op
 // via the tasks appOrigin. The op enforces the creator/admin gate (a non-owner's
 // attach is refused); revoke-on-complete is already wired. A self-contained modal
-// (same pattern as openRecipientPicker) so it doesn't disturb the kring render.
+// (same pattern as openRecipientPicker) so it doesn't disturb the circle render.
 async function openMandatePicker({ taskId, circleId } = {}) {
   if (!taskId || !circleId || typeof rawCallSkill !== 'function') return;
 
@@ -2522,7 +2522,7 @@ async function openMandatePicker({ taskId, circleId } = {}) {
       // shows "weet je het zeker?" + the default-deny capability gate runs) — NO
       // direct callSkill bypass. Hide the picker while the shared confirm dialog
       // (a lower-z-index modal) is up, then reshow with the result. The waist ALSO
-      // surfaces the op reply as a kring bubble; here we read it back to keep the
+      // surfaces the op reply as a circle bubble; here we read it back to keep the
       // picker's own success/failure notice + legibility refresh.
       backdrop.style.display = 'none';
       let reply;
@@ -2604,33 +2604,33 @@ const webLocalStorage = {
 // the surface reusing the same pods (the participant's local Stage-1 survives the switch).
 const feedbackFlowState = new Map();
 
-// The kring bubble renderer for a feedback reply (review → clean per-point layout; else text + buttons).
+// The circle bubble renderer for a feedback reply (review → clean per-point layout; else text + buttons).
 function feedbackEmit(groupId) {
   return ({ text, buttons, kind, points, labels, logText }) => {
-    if (_kringRender?.circleId !== groupId) return;   // render only while this circle's kring is open
+    if (_circleRender?.circleId !== groupId) return;   // render only while this circle's circle is open
     if (kind === 'report') {
       // "Report a problem" — the PII-safe on-device log, shown for review. Web text bubbles are selectable, so
       // the intro + the (monospace-ish) log render as one copyable bubble. Never fanned out — private to you.
       // The Send button (fp:report:send) routes back to this circle's surface (circleEmbedButtonTap → handle),
       // which packages an ANONYMOUS envelope and hands it to the injected sink. Copy stays available too.
-      _kringRender.botBubble?.(`${text}\n\n${logText || ''}`, { scope: 'self', buttons: (buttons || []).map((b) => ({ id: b.id, action: b.id, label: b.label })) });
+      _circleRender.botBubble?.(`${text}\n\n${logText || ''}`, { scope: 'self', buttons: (buttons || []).map((b) => ({ id: b.id, action: b.id, label: b.label })) });
       return;
     }
     if (kind === 'access' || kind === 'access-reveal' || kind === 'access-result') {
       // "Secure your access" (reveal/restore the owner-root recovery phrase). PRIVATE to this device — the
       // recovery phrase never leaves it — so render self-scoped, mirroring the report panel. The backup/restore
       // buttons route back via circleEmbedButtonTap → surface.handle(); the revealed phrase is selectable to copy.
-      _kringRender.botBubble?.(text, { scope: 'self', buttons: (buttons || []).map((b) => ({ id: b.id, action: b.id, label: b.label })) });
+      _circleRender.botBubble?.(text, { scope: 'self', buttons: (buttons || []).map((b) => ({ id: b.id, action: b.id, label: b.label })) });
       return;
     }
     if (kind === 'review' && Array.isArray(points) && points.length) {
       // Converged with the contact-thread flow — render editable per-point CARDS (curated text + the
       // original as a labelled chip + per-card send/✏), not a flattened text bubble.
       const intro = String(text || '').split('\n\n')[0].split('\n')[0];
-      _kringRender.botBubble?.(intro, { review: { intro, points, labels } });
+      _circleRender.botBubble?.(intro, { review: { intro, points, labels } });
       return;
     }
-    _kringRender.botBubble?.(text, { buttons: (buttons || []).map((b) => ({ id: b.id, action: b.id, label: b.label })) });
+    _circleRender.botBubble?.(text, { buttons: (buttons || []).map((b) => ({ id: b.id, action: b.id, label: b.label })) });
   };
 }
 
@@ -2662,8 +2662,8 @@ function buildFeedbackSurface({ projectId, groupId, lang, ownPod, centralPod, co
 // a non-primary speaker sees a line they can read + a one-tap button.
 function emitFeedbackLangOptions(groupId, currentLang) {
   const others = FEEDBACK_OFFERED_LANGS.filter((l) => l !== currentLang && LANG_INFO[l]);
-  if (!others.length || _kringRender?.circleId !== groupId) return;
-  _kringRender.botBubble?.(
+  if (!others.length || _circleRender?.circleId !== groupId) return;
+  _circleRender.botBubble?.(
     `🌐 ${others.map((l) => LANG_INFO[l].prompt).join('  ·  ')}`,
     { buttons: others.map((l) => ({ id: `fp-lang:${l}`, action: `fp-lang:${l}`, label: LANG_INFO[l].name })) },
   );
@@ -2679,7 +2679,7 @@ async function switchFeedbackLang(groupId, newLang) {
   const surface = buildFeedbackSurface({ ...st, groupId, lang: newLang });
   surface._feedbackInvite = { projectId: st.projectId, code: st.code ?? null };
   feedbackCircleSurfaces.set(groupId, surface);
-  try { await surface.start(groupId); } catch (e) { _kringRender?.botBubble?.(`⚠ ${e?.message ?? e}`); }
+  try { await surface.start(groupId); } catch (e) { _circleRender?.botBubble?.(`⚠ ${e?.message ?? e}`); }
   emitFeedbackLangOptions(groupId, newLang);
 }
 
@@ -2734,10 +2734,10 @@ async function attachFeedbackProject({ projectId, code = null, open = true } = {
   // A feedback circle is a CONVERSATION with the bot — land on chat (not the scherm/noticeboard default) so
   // the greeting + composer are immediately visible on first open AND after a reload.
   writeViewMode(groupId, 'chat');
-  // Open it (sets _kringRender.circleId = groupId), then start the bot so its greeting lands in the kring.
+  // Open it (sets _circleRender.circleId = groupId), then start the bot so its greeting lands in the circle.
   if (open) await showDetail(groupId);
   try { await surface.start(groupId); }
-  catch (e) { _kringRender?.botBubble?.(`⚠ ${e?.message ?? e}`); }
+  catch (e) { _circleRender?.botBubble?.(`⚠ ${e?.message ?? e}`); }
   emitFeedbackLangOptions(groupId, lang);   // offer the other languages the lead configured
   return groupId;
 }
@@ -3079,9 +3079,9 @@ function writeSeenAt(map) {
 
 // Chat ↔ Scherm pill: per-circle preference persists in
 // localStorage so the user lands back in whichever mode they last used
-// for that kring.
+// for that circle.
 //
-// §4 — when the member has NO saved override for this kring yet, the
+// §4 — when the member has NO saved override for this circle yet, the
 // landing surface is the admin's `policy.view` front door
 // (defaultViewModeFromPolicy): 'screen' → scherm, 'chat'/'cross-stream'
 // → chat.  Once the user flips the pill, their choice persists and wins.
@@ -3174,7 +3174,7 @@ function showLauncher() {
   // β.1 — Stream/Availability/Hop/Nearby/My-things buttons are gone from the launcher; those surfaces
   // are reachable via the Schermen + Mij tabs. The `show*` functions stay defined below.
   paintLauncher();
-  showTabBar('kringen');
+  showTabBar('circles');
   // Refresh proposal counts in the background so the next launcher render shows yellow badges where
   // consensus is waiting. Async so the first paint isn't blocked.
   refreshLauncherProposals().catch(() => { /* ignore */ });
@@ -3204,7 +3204,7 @@ async function onPinCircle(id) {
   if (getActiveCircle() == null) showLauncher();
 }
 
-// β.5 — toggle the per-kring chatOff override (the mute field already
+// β.5 — toggle the per-circle chatOff override (the mute field already
 // exists in DEFAULT_MEMBER_OVERRIDE / mergeMemberOverride).  No new
 // substrate added; mute is *exposed* here, not invented.
 async function onMuteCircle(id) {
@@ -3216,7 +3216,7 @@ async function onMuteCircle(id) {
   if (getActiveCircle() == null) showLauncher();
 }
 
-// β.5 — Leave kring: confirm, then dispatch `/leave-group` via the
+// β.5 — Leave circle: confirm, then dispatch `/leave-group` via the
 // raw callSkill seam (the stoop op `leaveGroup` already exists in the
 // substrate; the slash-command name maps to that op in the chat shell).
 async function onLeaveCircle(id, circle) {
@@ -3457,7 +3457,7 @@ function handleNearbyAction(action, row) {
   console.warn('[nearby] unhandled action:', action);
 }
 
-// Mijn dingen notes-list (private kring). Files
+// Mijn dingen notes-list (private circle). Files
 // come from the Folio listFiles op filtered for mine + circle-less.  The
 // active user webid stays null on web today; the substrate falls back to
 // "anything without an owner" which matches the V0 single-user state.
@@ -3507,9 +3507,9 @@ async function showHop() {
 //   - 'picker' (default): list of the user's screens with CRUD affordances
 //   - 'view':              render the materialized active screen as blocks
 // First-run seed: when the book is empty, auto-create a "Stream" screen
-// (kringFilter=null + noticeboard block) so the tab is useful right away.
+// (circleFilter=null + noticeboard block) so the tab is useful right away.
 //
-// (mute) honoured: materializeScreen drops muted kringen entirely.
+// (mute) honoured: materializeScreen drops muted circles entirely.
 let _screenSubMode = 'picker';
 let _viewingScreenId = null;
 let _screensBook = null;
@@ -3527,7 +3527,7 @@ async function showScreens() {
   try { book = await userScreenStore.get(); }
   catch { book = { screens: [], activeId: null }; }
   // First-run seed: three default screens so the Schermen tab is
-  // immediately useful — Stream (noticeboard across all kringen),
+  // immediately useful — Stream (noticeboard across all circles),
   // My things (tasks assigned to me, α.4), My calendar (agenda
   // events, α.4).  Once at least one screen exists we never
   // re-seed; the user can delete or rename any of them freely.
@@ -3634,7 +3634,7 @@ async function _showActiveScreen() {
     renderCircleScreen(body, { blocks: null, t });
   }
 
-  // Materialize blocks (with muted-kring filter when available later).
+  // Materialize blocks (with muted-circle filter when available later).
   let blocks = [];
   try {
     blocks = await materializeScreen({
@@ -4309,7 +4309,7 @@ async function showMnemonicReveal() {
 
 // the composable LISTS panel: a circle's `list` containers + their `list-item` children,
 // rendered nested via projectContainer→renderContainerCard. "+ add" creates a contained child (addChildTo);
-// row-actions complete/remove. Self-contained (its own per-circle store) — doesn't touch the kring dispatch.
+// row-actions complete/remove. Self-contained (its own per-circle store) — doesn't touch the circle dispatch.
 function openListsPanel(circleId) {
   const overlay = document.createElement('div');
   overlay.className = 'cc-screen-panel';
@@ -5105,11 +5105,11 @@ let onboardingPosted = false;
 // answer handler advances the SAME template the intro was built from.
 let onboardingTemplate = null;
 
-// Post the driver's bot bubbles into the help circle's kring stream (each a bot message; a choice bubble
-// carries its option buttons). Uses the SAME `_kringRender.botBubble` the circle bot + feedback use.
+// Post the driver's bot bubbles into the help circle's circle stream (each a bot message; a choice bubble
+// carries its option buttons). Uses the SAME `_circleRender.botBubble` the circle bot + feedback use.
 function postOnboardingBubbles(bubbles) {
   for (const b of (Array.isArray(bubbles) ? bubbles : [])) {
-    _kringRender?.botBubble(b.text, b.buttons ? { buttons: b.buttons } : undefined);
+    _circleRender?.botBubble(b.text, b.buttons ? { buttons: b.buttons } : undefined);
   }
 }
 
@@ -5134,7 +5134,7 @@ async function maybeStartOnboarding(id) {
 async function handleOnboardingAnswer(id, value) {
   if (id !== HELP_CIRCLE_ID || !onboardingRunState) return;
   const r = answerOnboarding(onboardingTemplate, onboardingRunState, value);
-  if (r.echo) _kringRender?.userBubble(r.echo);
+  if (r.echo) _circleRender?.userBubble(r.echo);
   onboardingRunState = r.state;
   if (r.handoff) {
     await onboardingFlags.markOnboardingDone();
@@ -5173,7 +5173,7 @@ let helpPendingHelpQuery = null;   // { circleId, query }
 function postHelpTopicChips(id, { honest = false } = {}) {
   const chips = helpTopicChips({ lang: currentLang() });
   const text = honest ? t('circle.help.no_llm_topics') : t('circle.help.pick_topic');
-  _kringRender?.botBubble(text, { buttons: chips });
+  _circleRender?.botBubble(text, { buttons: chips });
 }
 
 // Answer a posted help message. HIT → the card + its transparency badge (deterministic, on-device,
@@ -5183,7 +5183,7 @@ async function answerHelpMessage(id, query) {
   const route = routeHelpMessage(query, { lang: currentLang(), llmReady });
   if (route.kind === 'hit') {
     // provenance.llmUsed === false lights the styled "· direct beantwoord — geen taalmodel gebruikt" badge.
-    _kringRender?.botBubble(route.text, { provenance: route.provenance });
+    _circleRender?.botBubble(route.text, { provenance: route.provenance });
     return;
   }
   if (route.kind === 'consent') {
@@ -5191,7 +5191,7 @@ async function answerHelpMessage(id, query) {
     // #37 — name the route HONESTLY: "vertrouwelijke assistent" only when it truly is confidential.
     const { consentKey } = helpLlmLabelKeys({ confidential: circleHelpLlm ? circleHelpLlm.confidential() : false });
     // The dashed-rust consent card (payload.consent) + the primary/secondary button pair.
-    _kringRender?.botBubble(t(consentKey), {
+    _circleRender?.botBubble(t(consentKey), {
       consent: true,
       buttons: [
         { label: t('circle.help.consent_yes'), action: helpConsentAction('yes'), variant: 'primary' },
@@ -5209,7 +5209,7 @@ async function answerHelpMessage(id, query) {
 async function handleHelpAction(id, help) {
   if (help.kind === 'topic') {
     const ans = resolveHelpTopic(help.id, { lang: currentLang() });
-    if (ans) _kringRender?.botBubble(ans.text, { provenance: ans.provenance });
+    if (ans) _circleRender?.botBubble(ans.text, { provenance: ans.provenance });
     return;
   }
   if (help.kind === 'consent') {
@@ -5228,13 +5228,13 @@ async function handleHelpAction(id, help) {
 async function runHelpLlm(id, query) {
   let reply = null;
   try { reply = circleHelpLlm ? await circleHelpLlm.answer(query) : null; }
-  catch { _kringRender?.botBubble(t('circle.help.llm_unavailable')); return; }
+  catch { _circleRender?.botBubble(t('circle.help.llm_unavailable')); return; }
   if (reply) {
     // #37 — badge the provenance for the ACTUAL route: plain routes get "· via de assistent", not "vertrouwelijke".
     const { badgeKey } = helpLlmLabelKeys({ confidential: circleHelpLlm ? circleHelpLlm.confidential() : false });
-    _kringRender?.botBubble(reply, { provenance: t(badgeKey) }); return;
+    _circleRender?.botBubble(reply, { provenance: t(badgeKey) }); return;
   }
-  _kringRender?.botBubble(t('circle.help.llm_no_answer'));
+  _circleRender?.botBubble(t('circle.help.llm_no_answer'));
   postHelpTopicChips(id);
 }
 
@@ -5252,16 +5252,16 @@ async function showDetail(id) {
   // this circle's unread badge.
   writeSeenAt(bumpSeenAt(readSeenAt(), id));
   const circle = circlesCache.find((c) => c.id === id) || { id };
-  // no chat-shell auto-route anymore. Every kring opens the
-  // kring view; v2 §1 says chat IS the kring view (GESPREK tab).  The
+  // no chat-shell auto-route anymore. Every circle opens the
+  // circle view; v2 §1 says chat IS the circle view (GESPREK tab).  The
   // GESPREK render lands in.
   let detailPolicy = null;
   try { detailPolicy = await policyStore.get(id); }
   catch { /* fresh circle / read failure → fall through */ }
-  showKring(id, circle, detailPolicy);
+  showCircle(id, circle, detailPolicy);
 }
 
-// kring content view. Replaces the action-grid
+// circle content view. Replaces the action-grid
 // CircleDetail as the per-circle landing surface.  Admin actions
 // (Settings, Mine, ViewAs, …) move into the header `⋯` overflow menu,
 // gated on the Functies axis (same gates the old detail used).
@@ -5270,13 +5270,13 @@ async function showDetail(id) {
 // rows as chat bubbles, wire an inline composer that publishes a
 // chat-message event scoped to this circle.  Inbound peer broadcast
 // slash-command parsing land in.
-function showKring(id, circle, policy) {
+function showCircle(id, circle, policy) {
   // S6.C deep — scope the bot catalog (tools + slash-suggest) to the apps THIS
   // circle composes (policy.apps); null = all. Re-scopes on every circle-open.
   circleActiveApps = Array.isArray(policy?.apps) ? policy.apps : null;
   try { circleRescopeCatalog?.(); } catch { /* catalog stays at the previous scope */ }
   // D / Surface 2 — `more` is the host's callback bag keyed by manifest action
-  // id (NOT a roster: `renderCircleKring` projects the roster + gates from
+  // id (NOT a roster: `renderCircleView` projects the roster + gates from
   // `manifest.actions`).  The feature gate now lives ONCE in the manifest
   // (`requires`), evaluated by the shared `circleActions` selector against this
   // `policy` — so viewAs/files/rules are wired UNCONDITIONALLY here (no local
@@ -5303,9 +5303,9 @@ function showKring(id, circle, policy) {
     // Wave C §5 — the governance surface (open decisions + votes + who-decides settings).
     governance: () => showGovernance(id),
   };
-  // per-kring bottom tabs derived from policy.features.
-  const tabs = buildKringTabs(policy, t);
-  let activeTab = DEFAULT_KRING_TAB;
+  // per-circle bottom tabs derived from policy.features.
+  const tabs = buildCircleTabs(policy, t);
+  let activeTab = DEFAULT_CIRCLE_TAB;
   // Chat ↔ Scherm pill state, persisted per circle. §4 — the
   // admin's policy.view sets the landing surface until the user overrides.
   let viewMode = readViewMode(id, policy);
@@ -5336,45 +5336,45 @@ function showKring(id, circle, policy) {
   );
   // Stand up this circle's pod producer (sealing identity + control agent for a sealed
   // posture), then seed its group-key roster with members who joined before it was live.
-  // Best-effort + fire-and-forget; never blocks the kring.
+  // Best-effort + fire-and-forget; never blocks the circle.
   ensureCirclePod(id, policy)
     .then((prod) => { if (prod?.controlAgent) return seedCircleRoster({ callSkill: rawCallSkill, circleId: id, router: circleControlAgentRouter }); })
     .catch(() => { /* best-effort; plain shared path on failure */ });
   // media — resolve this circle's sealed-media composition (async: the seal strategy
   // rides the pod producer). Until it resolves — and for a p0/p1 circle FOREVER (null) —
   // the composer shows no attach affordance: sealed-only, no unsealed upload fallback.
-  let kringMedia = null;
+  let circleMedia = null;
   getCircleMediaComposition(id, policy).then((m) => {
     if (!m) return;   // no seal strategy → affordance stays hidden
-    kringMedia = m;
+    circleMedia = m;
     if (getActiveCircle() === id) rerender();
   });
 
   // media — the attach path: picked file → createMediaEmbed (encode → SEALED upload →
   // canonical media item → {type:'media', ref} pointer) → the embed rides the outgoing
-  // kring message payload EXACTLY as the handler emits it; the bubble renders the
+  // circle message payload EXACTLY as the handler emits it; the bubble renders the
   // media-card chip via the shared domAdapter branch. The fan-out carries the pointer +
   // snapshot too (media fan-out slice): kring-host projects the embed through its
-  // WIRE whitelist (`mediaForKringWire` — sender-local fields like `stored` stripped),
+  // WIRE whitelist (`mediaForCircleWire` — sender-local fields like `stored` stripped),
   // so PEERS render the same chip — the inline thumb is sealed with the circle key the
   // receiving shell's gateway already composes an opener for.
-  async function kringAttachMedia(file) {
-    if (!kringMedia) return;
+  async function circleAttachMedia(file) {
+    if (!circleMedia) return;
     const embed = await createMediaEmbed({}, {
-      file, mediaGateway: kringMedia.mediaGateway, encodeImage: encodeImageFile,
+      file, mediaGateway: circleMedia.mediaGateway, encodeImage: encodeImageFile,
       localActor: LOCAL_ACTOR, t,
     });
     if (!embed || embed.ok === false) {
-      _kringRender?.botBubble(embed?.error ?? t('media.upload_failed', { error: '' }));
+      _circleRender?.botBubble(embed?.error ?? t('media.upload_failed', { error: '' }));
       return;
     }
-    const msgId = `kring-${id}-${Date.now()}-${(seq += 1).toString(36)}`;
+    const msgId = `circle-${id}-${Date.now()}-${(seq += 1).toString(36)}`;
     const ts = Date.now();
     const text = t('circle.media.outgoing', { name: file?.name ?? '' });
     // Local append keeps the FULL embed (incl. `stored`); the fan-out's wire copy is
     // whitelist-projected inside broadcastCircleFanOut.
-    eventLog.append(kringChatMessageEvent({
-      msgId, ts, circleId: id, actor: LOCAL_ACTOR, text, scope: 'kring', media: embed,
+    eventLog.append(circleChatMessageEvent({
+      msgId, ts, circleId: id, actor: LOCAL_ACTOR, text, scope: 'circle', media: embed,
     }));
     rerender();
     broadcastFanOut({ msgId, text, ts, media: embed });
@@ -5387,11 +5387,11 @@ function showKring(id, circle, policy) {
   // circle by the explicit `circleId` arg the tasks resolver reads). Refreshed on open,
   // on tab-switch, after each task op, and after a `/addtask` turn — so a task created
   // any way (button / `/addtask` / bot) appears here.
-  let kringTasks = [];
+  let circleTasks = [];
   // G16 — the LEDEN tab's trail-roster (canonical Member via normalizeCircleMembers).
   // null = not loaded yet → the tab shows its loading state; [] = loaded empty.
-  let kringRoster = null;
-  let kringMutedActors = new Set();   // the person-mute view filter's resolved actor refs (see loadRoster)
+  let circleRoster = null;
+  let circleMutedActors = new Set();   // the person-mute view filter's resolved actor refs (see loadRoster)
   let noticeboardPendingAttachment = null;   // { encoded, thumbnail, name } before posting
   let myWebid = null;   // fetched once, best-effort (whoAmI is a stoop skill, not chat-manifested)
   let myCircleRole = null;   // my role in THIS circle ('admin' | …), for mandate owner-visibility
@@ -5399,7 +5399,7 @@ function showKring(id, circle, policy) {
   // captured best-effort on open by ensureMyRole (same listGroupMembers call). Fed to the
   // shared `oneToOneBotLabel` gate at render time to decide the assistant-header strip.
   // null until resolved → the gate returns null → NO strip (fail-closed).
-  let kringMembers = null;
+  let circleMembers = null;
 
   async function ensureMyWebid() {
     if (myWebid !== null) return myWebid;
@@ -5418,7 +5418,7 @@ function showKring(id, circle, policy) {
     // (relation:'agent'). Source its roster from the shared `helpCircleRoster` so the 1:1-bot
     // gate (`oneToOneBotLabel`) lights the assistant-header strip — no listGroupMembers round-trip.
     if (id === HELP_CIRCLE_ID) {
-      kringMembers = helpCircleRoster({ selfWebid: myWebid || null, botName: t('circle.onboarding.help_name') });
+      circleMembers = helpCircleRoster({ selfWebid: myWebid || null, botName: t('circle.onboarding.help_name') });
       myCircleRole = 'admin';
       if (getActiveCircle() === id) rerender();
       return myCircleRole;
@@ -5426,7 +5426,7 @@ function showKring(id, circle, policy) {
     try {
       const res = await rawCallSkill('stoop', 'listGroupMembers', { groupId: id });
       const members = Array.isArray(res?.members) ? res.members : [];
-      kringMembers = members;   // 1:1-bot gate reads the raw rows (relation/webid) at render time
+      circleMembers = members;   // 1:1-bot gate reads the raw rows (relation/webid) at render time
       const me = members.find((m) => (m?.webid ?? m?.id) === myWebid);
       myCircleRole = me?.role ?? '';
     } catch { myCircleRole = ''; }
@@ -5488,8 +5488,8 @@ function showKring(id, circle, policy) {
     try {
       const res = await rawCallSkill('tasks', 'listOpen', { circleId: id });
       const items = Array.isArray(res?.items) ? res.items : (Array.isArray(res) ? res : []);
-      kringTasks = buildTaskRows(items, { circleId: id });
-    } catch { kringTasks = []; }
+      circleTasks = buildTaskRows(items, { circleId: id });
+    } catch { circleTasks = []; }
     if (getActiveCircle() === id) rerender();
   }
 
@@ -5498,14 +5498,14 @@ function showKring(id, circle, policy) {
   async function loadRoster() {
     await ensureMyWebid();
     try {
-      kringRoster = normalizeCircleMembers(await rawCallSkill('stoop', 'listGroupMembers', { groupId: id }));
-    } catch { kringRoster = []; }
+      circleRoster = normalizeCircleMembers(await rawCallSkill('stoop', 'listGroupMembers', { groupId: id }));
+    } catch { circleRoster = []; }
     // The person-mute set, resolved to actor refs against this roster — the chat projection hides these
     // (the sitting's rule: muted messages LAND, the view filters; unmute restores). Loaded with the
     // roster because the key→ref resolution needs it; refreshed by the mute/unmute actions.
     try {
       const mk = (await rawCallSkill('stoop', 'listMutedPeers', {}))?.peers ?? [];
-      kringMutedActors = mutedActorSet(mk, kringRoster);
+      circleMutedActors = mutedActorSet(mk, circleRoster);
     } catch { /* keep the previous set — hiding is best-effort, never a crash */ }
     if (getActiveCircle() === id) {
       rerender();
@@ -5520,7 +5520,7 @@ function showKring(id, circle, policy) {
   // the list. A `/addtask` typed in the composer reaches the tasks agent by its own path;
   // both end up in the same list via loadTasks().
   async function addTaskFromTab() {
-    const text = (globalThis.prompt?.(t('circle.kring.taken_add_prompt')) || '').trim();
+    const text = (globalThis.prompt?.(t('circle.circle.taken_add_prompt')) || '').trim();
     if (!text) return;
     try {
       if (typeof circleDispatchReady === 'function') {
@@ -5587,9 +5587,9 @@ function showKring(id, circle, policy) {
   // in while the full image resolves, and on a wrong key / denial we keep it.
   async function noticeboardViewAttachment({ att }) {
     const line = att && att.source;
-    if (kringMedia && line && typeof line === 'object' && line.enc) {
+    if (circleMedia && line && typeof line === 'object' && line.enc) {
       try {
-        const { bytes, media } = await kringMedia.openFullImage(line);
+        const { bytes, media } = await circleMedia.openFullImage(line);
         const mime = (media && media.mime) || att.mime || 'image/jpeg';
         showImageModal(`data:${mime};base64,${bytesToStdB64(bytes)}`);
         return;
@@ -5614,7 +5614,7 @@ function showKring(id, circle, policy) {
       } else if (action === 'markReturned') {
         await stoopCall('stoop', 'markReturned', { requestId: post.id });
       } else if (action === 'mute') {
-        // S3 #9 — mute the post's author (local-only; hides them in the kring stream + chat).
+        // S3 #9 — mute the post's author (local-only; hides them in the circle stream + chat).
         if (post.addedBy) {
           await rawCallSkill('stoop', 'mutePeer', { peerWebid: post.addedBy });
           await loadRoster();   // re-resolve the mute set → the hide takes effect on the next paint
@@ -5668,12 +5668,12 @@ function showKring(id, circle, policy) {
           circleId:  id,
           kinds,
           // The person-mute HIDE filter (mute lands + hides; unmute restores — the sitting's rule).
-          excludeActors: kringMutedActors,
+          excludeActors: circleMutedActors,
           // Sender labels through the reveal ladder (batch 4): the roster is the authority; the
-          // projector stamps `senderLabel`/`senderLabelKey`, the renderer only paints. `kringRoster`
+          // projector stamps `senderLabel`/`senderLabelKey`, the renderer only paints. `circleRoster`
           // is null until `loadRoster()` (kicked at open) resolves — rows stay unstamped and the
           // bubbles show no label for that window, never a wire-claimed name.
-          members:  kringRoster,
+          members:  circleRoster,
           viewerId: myWebid || null,
           policy:   policy?.revealPolicy ?? 'pairwise',
         }),
@@ -5683,7 +5683,7 @@ function showKring(id, circle, policy) {
       }),
       deliveryByMessageId,
     );
-    renderCircleKring(rootEl, {
+    renderCircleView(rootEl, {
       circle, rows, t,
       // P1.7 — the chip model is shared; the shell only renders it and persists the tap.
       chatFilter: { ...chatFilterChips({ allowedKinds: kinds, filter: viewerFilter }), filter: viewerFilter },
@@ -5696,14 +5696,14 @@ function showKring(id, circle, policy) {
       },
       // 1:1-bot chat gate — the assistant-header strip shows ONLY when this circle is
       // you + exactly one participant, and that participant is a bot (relation==='agent').
-      // Computed from THIS circle's raw roster (kringMembers, best-effort on open) + my
+      // Computed from THIS circle's raw roster (circleMembers, best-effort on open) + my
       // webid via the SHARED helper; null (roster not yet resolved, group, or 1:1-human)
       // → no strip (fail-closed). The localized default rides in as the helper's fallback,
       // used only for a genuine 1:1 bot with no display name.
       botLabel: oneToOneBotLabel({
-        members: kringMembers,
+        members: circleMembers,
         selfWebid: myWebid || null,
-        fallbackLabel: t('circle.kring.bot_header'),
+        fallbackLabel: t('circle.circle.bot_header'),
       }),
       // Mandate ("entrust") — owner-only visibility of the entrust action. myWebid
       // + my role are best-effort (populated async on open); until then the action
@@ -5718,11 +5718,11 @@ function showKring(id, circle, policy) {
       screenBlocks,
       // Taken (tasks) tab — the circle's tasks (stream rows) + the compose affordance.
       // The view only reads these when the taken tab is active.
-      tasks: kringTasks,
+      tasks: circleTasks,
       onAddTask: addTaskFromTab,
       // G16 — the LEDEN tab's trail-roster + the viewer's own webid (badges "jij").
       // The view only reads these when the leden tab is active.
-      members: kringRoster,
+      members: circleRoster,
       // the circle's realName rule — the members list gates each label with it (never renders raw realName)
       revealPolicy: policy?.revealPolicy ?? 'pairwise',
       selfWebid: myWebid || null,
@@ -5756,19 +5756,19 @@ function showKring(id, circle, policy) {
           const p = (rev.points || []).find((x) => x.id === em[1]);
           if (p) { const st = feedbackFlowState.get(id); if (st) st.editing = { pointId: p.id, text: p.text || '' }; rerender(); return; }
         }
-        _fb.handle(b.id, id).catch((e) => _kringRender?.botBubble?.(`⚠ ${e?.message ?? e}`));
+        _fb.handle(b.id, id).catch((e) => _circleRender?.botBubble?.(`⚠ ${e?.message ?? e}`));
       },
       // ✏ edit pre-fill: the composer opens with the point's current curated text, ready to adjust.
       composerPrefill: feedbackFlowState.get(id)?.editing?.text ?? null,
       // Composer affordances (classic-shell parity): slash-suggest off the merged catalog + bash history.
       catalog: circleCatalog,
-      history: kringInputHistory,
+      history: circleInputHistory,
       // Permission gate — chat disabled for this circle ⇒ read-only composer (classic `allowCommands` analog).
       canPost: isFeatureEnabled(policy, 'chat'),
       // media — the sealed attach affordance + the chip's opener. Both null until the
       // circle's media composition resolves (and forever for p0/p1 — sealed-only).
-      onAttachMedia: kringMedia ? kringAttachMedia : null,
-      media: kringMedia ? { opener: kringMedia.mediaGateway.opener } : null,
+      onAttachMedia: circleMedia ? circleAttachMedia : null,
+      media: circleMedia ? { opener: circleMedia.mediaGateway.opener } : null,
       // (J4) — the projected attach menu for the chat composer's "+". The FILE
       // entry (embed-file) uses onAttachMedia above; every other entry dispatches
       // via onAttachCommand → dispatchReady (params gathered by the form machinery).
@@ -5784,14 +5784,14 @@ function showKring(id, circle, policy) {
         onAction: noticeboardAction,
         onIntent: (it) => { noticeboardIntent = it; rerender(); },
         // inline image attachments. The attach affordance is gated on the SAME
-        // resolved media composition (`kringMedia` = getCircleMediaComposition(id, policy))
-        // the kring composer's own attach uses (see `onAttachMedia` above): a p0/p1 circle
-        // has no seal strategy → no media gateway → `kringMedia` stays null → NO 📎 button.
+        // resolved media composition (`circleMedia` = getCircleMediaComposition(id, policy))
+        // the circle composer's own attach uses (see `onAttachMedia` above): a p0/p1 circle
+        // has no seal strategy → no media gateway → `circleMedia` stays null → NO 📎 button.
         // This matches the sealed-only refusal in scopeStoopCallSkill (getStoopMedia resolves
         // the same composition) so a user never attaches an image only to hit the refusal.
         // Text posting stays unconditional. Same hide the circle's own media already does.
         attachment:       noticeboardPendingAttachment,
-        onAttach:         kringMedia ? noticeboardAttach : null,
+        onAttach:         circleMedia ? noticeboardAttach : null,
         onClearAttach:    () => { noticeboardPendingAttachment = null; rerender(); },
         onViewAttachment: noticeboardViewAttachment,
         // (J4) — the projected attach menu for the prikbord composer's "+".
@@ -5800,7 +5800,7 @@ function showKring(id, circle, policy) {
         attachFileOpId:   'embed-file',
         onAttachCommand:  attachCommandDispatch,
       },
-      // Multi-field inline form (mobile parity). When a kring dispatch trips needsForm with 2+ missing
+      // Multi-field inline form (mobile parity). When a circle dispatch trips needsForm with 2+ missing
       // fields, `circlePendingFormFollowUp` holds the shared `PendingFormFollowUp`; the view renders an
       // inline labelled form. onFormSubmit completes + runs the dispatch, then clears the pending form.
       pendingForm: circlePendingFormFollowUp,
@@ -5808,12 +5808,12 @@ function showKring(id, circle, policy) {
         const pending = circlePendingFormFollowUp;
         if (!pending) return;
         circlePendingFormFollowUp = null;
-        // Echo the user's filled values as a kring bubble (mirrors mobile's form→summary replacement),
+        // Echo the user's filled values as a circle bubble (mirrors mobile's form→summary replacement),
         // then complete + dispatch via the same path a typed command takes.
         const summary = (pending.fields || [])
           .map((f) => `${f.label || f.name}: ${values?.[f.name] ?? ''}`)
           .join(' · ');
-        if (summary) _kringRender?.userBubble(summary);
+        if (summary) _circleRender?.userBubble(summary);
         const ready = completeMultiFieldFollowUp({ pending, values });
         if (circleDispatchReady) await circleDispatchReady({ opId: ready.opId, args: ready.args });
         else rerender();
@@ -5877,7 +5877,7 @@ function showKring(id, circle, policy) {
         // pickable set-topic chips ("of kies zelf"), so a user can pick a topic without typing. Each
         // chip resolves DETERMINISTICALLY to its kaartje answer (no language model).
         if (/^\/(help|hulp)\s*$/i.test(line)) {
-          const hb = (kringMembers || []).find((m) => m && (m.relation === 'agent' || m.isBot === true));
+          const hb = (circleMembers || []).find((m) => m && (m.relation === 'agent' || m.isBot === true));
           if (hb) { postHelpTopicChips(id); return; }
         }
         // a slash command opens a declared list-screen (the CHAT entry; the ⋯ menu is the GUI
@@ -5887,10 +5887,10 @@ function showKring(id, circle, policy) {
         // the cross-circle SHARE op, minimal slash surface (rich picker UI deferred; see report).
         //   /shareitem <itemId> [to] <targetCircleId>  — share one item from THIS circle into another's audience
         //   /shared                                    — list what's shared INTO this circle (deny-by-default read)
-        // A note bubble to the kring stream (bot actor) reports the result — same _kringRender seam the bot uses.
-        const kringNote = (text) => {
-          const mid = `kring-${id}-${Date.now()}-${(seq += 1).toString(36)}-bot`;
-          eventLog.append(kringChatMessageEvent({ msgId: mid, ts: Date.now(), circleId: id, actor: 'bot', text }));
+        // A note bubble to the circle stream (bot actor) reports the result — same _circleRender seam the bot uses.
+        const circleNote = (text) => {
+          const mid = `circle-${id}-${Date.now()}-${(seq += 1).toString(36)}-bot`;
+          eventLog.append(circleChatMessageEvent({ msgId: mid, ts: Date.now(), circleId: id, actor: 'bot', text }));
           rerender();
         };
         // G17 — circle/transport slash commands (`/set-relay`, `/transport-mode`, `/settings`,
@@ -5901,7 +5901,7 @@ function showKring(id, circle, policy) {
           if (builtin.opId === 'settings') { showSettings(id); return; }
           if (builtin.opId === 'set-relay') {
             const r = await applyRelayUrl(builtin.args?.clear ? '' : String(builtin.args?.url ?? ''));
-            kringNote(r?.ok
+            circleNote(r?.ok
               ? t('circle.settings.relay_applied', { url: r.effective || '—' })
               : t('circle.settings.relay_failed', { error: r?.error ?? 'unknown' }));
             return;
@@ -5909,7 +5909,7 @@ function showKring(id, circle, policy) {
           if (builtin.opId === 'transport-mode') {
             const mode = builtin.args?.mode;
             const r = applyTransportMode(mode);
-            kringNote(r?.ok
+            circleNote(r?.ok
               ? t('circle.settings.transport_set', { mode: r.mode })
               : t('circle.settings.transport_bad', { mode: mode ?? '—' }));
             return;
@@ -5922,15 +5922,15 @@ function showKring(id, circle, policy) {
             // until 2026-08-02.
             try {
               const r = await securityStatus({}, { agent: circleHouseholdAgent, t });
-              kringNote(r?.message ?? String(r ?? ''));
+              circleNote(r?.message ?? String(r ?? ''));
             } catch (err) {
-              kringNote(String(err?.message ?? err));
+              circleNote(String(err?.message ?? err));
             }
             return;
           }
           if (builtin.opId === 'transports') {
             const ts = currentTransportState();
-            kringNote(t('circle.settings.transports_status', {
+            circleNote(t('circle.settings.transports_status', {
               mode: ts.mode ?? 'nkn',
               relay: ts.relayUrl || t('circle.settings.transports_none'),
             }));
@@ -5941,7 +5941,7 @@ function showKring(id, circle, policy) {
         if (shareCmd) {
           const [, itemId, toCircleId] = shareCmd;
           const r = await shareItemIntoCircle({ itemId, fromCircleId: id, toCircleId });
-          kringNote(r?.ok
+          circleNote(r?.ok
             ? t('circle.share.done', { item: itemId, circle: toCircleId })
             : t(shareErrorStatusKey(r?.error), { error: r?.error ?? 'unknown' }));
           return;
@@ -5956,7 +5956,7 @@ function showKring(id, circle, policy) {
           const [, itemId, toCircleId] = shareWithCmd;
           await openRecipientPicker({
             itemId, fromCircleId: id, toCircleId,
-            onResult: (r, recip) => kringNote(
+            onResult: (r, recip) => circleNote(
               !r?.ok
                 ? t('circle.share.to_person_failed', { error: r?.error ?? 'unknown' })
                 // via:'copy' — the D2 seal gate re-sealed a COPY (group-key content can't grant in place
@@ -5972,14 +5972,14 @@ function showKring(id, circle, policy) {
         if (unshareCmd) {
           const [, itemId, recipient] = unshareCmd;
           const r = await unshareItemFromCircle({ itemId, fromCircleId: id, recipient });
-          kringNote(r?.ok
+          circleNote(r?.ok
             ? t('circle.share.revoked', { item: itemId, recipient })
             : t('circle.share.revoke_failed', { error: r?.error ?? 'unknown' }));
           return;
         }
         if (/^\/shared\b/i.test(line)) {
           const items = await listSharedItems(id);
-          kringNote(items.length
+          circleNote(items.length
             ? t('circle.share.list', { count: items.length })
               + '\n' + items.map(({ item }) => `• ${item.text ?? item.type ?? item.id}`).join('\n')
             : t('circle.share.empty'));
@@ -5991,8 +5991,8 @@ function showKring(id, circle, policy) {
         if (circlePendingFollowUp) {
           const pending = circlePendingFollowUp;
           circlePendingFollowUp = null;
-          const fMsgId = `kring-${id}-${Date.now()}-${(seq += 1).toString(36)}`;
-          eventLog.append(kringChatMessageEvent({ msgId: fMsgId, ts: Date.now(), circleId: id, actor: LOCAL_ACTOR, text: line }));
+          const fMsgId = `circle-${id}-${Date.now()}-${(seq += 1).toString(36)}`;
+          eventLog.append(circleChatMessageEvent({ msgId: fMsgId, ts: Date.now(), circleId: id, actor: LOCAL_ACTOR, text: line }));
           rerender();
           const ready = completeFollowUp({ pending, text: line });
           if (circleDispatchReady) await circleDispatchReady({ opId: ready.opId, args: ready.args });
@@ -6000,12 +6000,12 @@ function showKring(id, circle, policy) {
         }
         // Conversational follow-up: the bot just asked a free-text question. Route THIS line back to it —
         // force-addressed so it's interpreted (the prior Q&A threaded as `history`) — instead of fanning
-        // out to the kring. So "which list?" → "shopping" continues the conversation, no @assistant needed.
+        // out to the circle. So "which list?" → "shopping" continues the conversation, no @assistant needed.
         if (circleAwaitingBotReply && !line.startsWith('/')) {
           const prev = circleAwaitingBotReply;
           circleAwaitingBotReply = null;
-          const aMsgId = `kring-${id}-${Date.now()}-${(seq += 1).toString(36)}`;
-          eventLog.append(kringChatMessageEvent({ msgId: aMsgId, ts: Date.now(), circleId: id, actor: LOCAL_ACTOR, text: line }));
+          const aMsgId = `circle-${id}-${Date.now()}-${(seq += 1).toString(36)}`;
+          eventLog.append(circleChatMessageEvent({ msgId: aMsgId, ts: Date.now(), circleId: id, actor: LOCAL_ACTOR, text: line }));
           rerender();
           const addressed = addressesBot(line, CIRCLE_BOT_NAME) ? line : `@${CIRCLE_BOT_NAME} ${line}`;
           const history = [
@@ -6016,15 +6016,15 @@ function showKring(id, circle, policy) {
           return;
         }
         // Phase 5 — the circle bot routes the turn (gate → interpret → dispatch), with plain messages
-        // fanning out; replies render into the kring stream via _kringRender. (the in-kring feedback
-        // mount was retired — feedback lives in the fp-bot contact thread, not the kring composer.)
+        // fanning out; replies render into the circle stream via _circleRender. (the in-circle feedback
+        // mount was retired — feedback lives in the fp-bot contact thread, not the circle composer.)
         // Optimistic local append + best-effort peer fan-out. The msgId is shared so receiver-side dedup
         // suppresses any echo. δ.2 tracks delivery state (pending → sent | failed) for the bubble icon.
-        const msgId = `kring-${id}-${Date.now()}-${(seq += 1).toString(36)}`;
+        const msgId = `circle-${id}-${Date.now()}-${(seq += 1).toString(36)}`;
         const ts    = Date.now();
-        // A plain typed line fans out to the whole kring → scope 'kring'. (A line the bot
+        // A plain typed line fans out to the whole circle → scope 'circle'. (A line the bot
         // intercepts as a command posts its OWN scoped reply; the user's words still went out.)
-        eventLog.append(kringChatMessageEvent({ msgId, ts, circleId: id, actor: LOCAL_ACTOR, text: line, scope: 'kring' }));
+        eventLog.append(circleChatMessageEvent({ msgId, ts, circleId: id, actor: LOCAL_ACTOR, text: line, scope: 'circle' }));
         rerender();
         // Task #13 Phase 2 — standing help Q&A. When the Onderling-bot is ADDRESSED in this circle (the
         // 1:1 help circle: always; a group: only when @-tagged, per the shared `botIsAddressed` gate),
@@ -6032,11 +6032,11 @@ function showKring(id, circle, policy) {
         // the consent-gated LLM (when one is connected) or the honest set topics. Feedback circles are
         // exempt — they route all free text to their own co-hosted surface (below).
         if (!feedbackCircleSurfaces.get(id)) {
-          const helpBot = (kringMembers || []).find((m) => m && (m.relation === 'agent' || m.isBot === true));
-          if (helpBot && botIsAddressed({ text: line, circleMembers: kringMembers, selfWebid: myWebid || null, botMember: helpBot })) {
+          const helpBot = (circleMembers || []).find((m) => m && (m.relation === 'agent' || m.isBot === true));
+          if (helpBot && botIsAddressed({ text: line, circleMembers: circleMembers, selfWebid: myWebid || null, botMember: helpBot })) {
             // Strip the @-tag from a GROUP mention before matching; a 1:1 line (no tag) is passed verbatim
             // so a question like "ben jij een bot?" isn't gutted by the tag-stripper's bare-"bot" rule.
-            const solo = oneToOneBotLabel({ members: kringMembers, selfWebid: myWebid || null, fallbackLabel: 'bot' }) != null;
+            const solo = oneToOneBotLabel({ members: circleMembers, selfWebid: myWebid || null, fallbackLabel: 'bot' }) != null;
             const q = solo ? line : stripBotTag(line, helpBot.name ?? helpBot.displayName ?? helpBot.label ?? '');
             await answerHelpMessage(id, q);
             return;
@@ -6049,7 +6049,7 @@ function showKring(id, circle, policy) {
           const _fbSt = feedbackFlowState.get(id);
           if (_fbSt?.editing) {
             const { pointId } = _fbSt.editing; _fbSt.editing = null;
-            try { await _fbSurface.handle(`fp:edit:${pointId}:${line}`, id); } catch (e) { _kringRender?.botBubble?.(`⚠ ${e?.message ?? e}`); }
+            try { await _fbSurface.handle(`fp:edit:${pointId}:${line}`, id); } catch (e) { _circleRender?.botBubble?.(`⚠ ${e?.message ?? e}`); }
             rerender();
             return;
           }
@@ -6057,8 +6057,8 @@ function showKring(id, circle, policy) {
           const _langCmd = line.match(/^\/(?:taal|lang|language)\s+([a-z]{2})\s*$/i);
           if (_langCmd && LANG_INFO[_langCmd[1].toLowerCase()]) { await switchFeedbackLang(id, _langCmd[1].toLowerCase()); return; }
           // a feedback circle routes ALL free text to its co-hosted feedback bot (the user's
-          // line was already appended above; the bot's replies render via emit → _kringRender.botBubble).
-          try { await _fbSurface.handle(line, id); } catch (e) { _kringRender?.botBubble?.(`⚠ ${e?.message ?? e}`); }
+          // line was already appended above; the bot's replies render via emit → _circleRender.botBubble).
+          try { await _fbSurface.handle(line, id); } catch (e) { _circleRender?.botBubble?.(`⚠ ${e?.message ?? e}`); }
         } else if (circleBot) {
           noteCircleBotTurn(await circleBot.handle(line, { id, msgId, ts }), line);
           // A `/addtask` (or any task-touching) turn ran through the bot — refresh the Taken
@@ -6093,35 +6093,35 @@ function showKring(id, circle, policy) {
         const _fb = feedbackCircleSurfaces.get(id);
         if (_fb && typeof action?.action === 'string') {
           if (action.action.startsWith('fp-lang:')) { switchFeedbackLang(id, action.action.slice('fp-lang:'.length)); return; }
-          _fb.handle(action.action, id).catch((e) => _kringRender?.botBubble?.(`⚠ ${e?.message ?? e}`));
+          _fb.handle(action.action, id).catch((e) => _circleRender?.botBubble?.(`⚠ ${e?.message ?? e}`));
           return;
         }
-        console.info('[kring] action', action.action, 'on row', action.payload?.rowId);
+        console.info('[circle] action', action.action, 'on row', action.payload?.rowId);
       },
       more,
     });
   };
-  // Phase 5 — bridge the (module-level) circle bot + feedback to THIS circle's kring stream, so their
-  // replies render here. Reset each time showKring opens a circle.
-  _kringRender = {
+  // Phase 5 — bridge the (module-level) circle bot + feedback to THIS circle's circle stream, so their
+  // replies render here. Reset each time showCircle opens a circle.
+  _circleRender = {
     circleId: id,
     botBubble: (text, opts) => {
-      const mid = `kring-${id}-${Date.now()}-${(seq += 1).toString(36)}-bot`;
-      // S6.A — opts.buttons ride payload.buttons. scope ('self'|'kring') — a bot reply is
+      const mid = `circle-${id}-${Date.now()}-${(seq += 1).toString(36)}-bot`;
+      // S6.A — opts.buttons ride payload.buttons. scope ('self'|'circle') — a bot reply is
       // private unless it represents a shared action; absent → renderer defaults to 'self'.
-      eventLog.append(kringChatMessageEvent({ msgId: mid, ts: Date.now(), circleId: id, actor: 'bot', text, buttons: opts?.buttons, scope: opts?.scope ?? (opts?.review ? 'self' : undefined), embeds: opts?.embeds, review: opts?.review, provenance: opts?.provenance, consent: opts?.consent }));
+      eventLog.append(circleChatMessageEvent({ msgId: mid, ts: Date.now(), circleId: id, actor: 'bot', text, buttons: opts?.buttons, scope: opts?.scope ?? (opts?.review ? 'self' : undefined), embeds: opts?.embeds, review: opts?.review, provenance: opts?.provenance, consent: opts?.consent }));
       rerender();
     },
     // Local echo of the user's own line (used by the feedback mount, which consumes the message before the
     // composer's optimistic append). Local-only — NOT fanned out to peers.
     userBubble: (text) => {
-      const mid = `kring-${id}-${Date.now()}-${(seq += 1).toString(36)}-me`;
+      const mid = `circle-${id}-${Date.now()}-${(seq += 1).toString(36)}-me`;
       // Local-only echo (feedback mount) — private to you, so default 'self' (no scope set).
-      eventLog.append(kringChatMessageEvent({ msgId: mid, ts: Date.now(), circleId: id, actor: LOCAL_ACTOR, text }));
+      eventLog.append(circleChatMessageEvent({ msgId: mid, ts: Date.now(), circleId: id, actor: LOCAL_ACTOR, text }));
       rerender();
     },
     fanOut: (msgId, text, ts) => broadcastFanOut({ msgId, text, ts: ts ?? Date.now() }),
-    // Repaint without appending a bubble — used when module-level kring state changes outside a message
+    // Repaint without appending a bubble — used when module-level circle state changes outside a message
     // (e.g. a multi-field needsForm sets `circlePendingFormFollowUp` and the inline form must appear).
     rerender: () => rerender(),
     // Profile-update propagation — the PULL half: re-read this circle's roster rows (the same op
@@ -6173,7 +6173,7 @@ function showKring(id, circle, policy) {
           fetchImpl: circleAuthedFetch || undefined,
           // Sender labels through the reveal ladder (batch 4) — the noticeboard block stamps
           // `senderLabel` from the roster; `revealPolicy` (not `policy`, taken above) gates names.
-          members: kringRoster, viewerId: myWebid || null,
+          members: circleRoster, viewerId: myWebid || null,
           revealPolicy: policy?.revealPolicy ?? 'pairwise',
         },
       });
@@ -6232,7 +6232,7 @@ function showRecipeEditor(circleId) {
     // γ-next.recipe — pull the cached broadcast (if any).  Editor's
     // resolver decides whether anything actually conflicts; if not,
     // applies straight through.
-    try { incomingRecipe = await kringRecipePendingStore.get(circleId); }
+    try { incomingRecipe = await circleRecipePendingStore.get(circleId); }
     catch { incomingRecipe = null; }
     rerender();
   };
@@ -6244,13 +6244,13 @@ function showRecipeEditor(circleId) {
     // the just-updated active recipe back so we send the post-mutation
     // shape.  Fire-and-forget; per-peer errors are logged inside.
     try { broadcastActiveRecipe({ circleId, book }); }
-    catch (err) { console.warn('[kring-recipe] broadcast scheduling failed:', err?.message ?? err); }
+    catch (err) { console.warn('[circle-recipe] broadcast scheduling failed:', err?.message ?? err); }
     rerender();
   };
 
   const clearPending = () => {
     incomingRecipe = null;
-    kringRecipePendingStore.clear(circleId).catch(() => { /* ignore */ });
+    circleRecipePendingStore.clear(circleId).catch(() => { /* ignore */ });
   };
 
   const rerender = () => {
@@ -6282,7 +6282,7 @@ function showRecipeEditor(circleId) {
 }
 
 /**
- * γ-next.recipe — fan the active recipe out to every other kring
+ * γ-next.recipe — fan the active recipe out to every other circle
  * member via stoop's `broadcastCircleRecipe` skill.  Fire-and-forget:
  * per-peer failures land in the result.errors array; we just log.
  * No-op when rawCallSkill isn't bound yet (pre-agent-boot edits).
@@ -6291,7 +6291,7 @@ function broadcastActiveRecipe({ circleId, book }) {
   if (typeof rawCallSkill !== 'function') return;
   const active = book?.recipes?.find?.((r) => r.id === book.activeId);
   if (!active) return;
-  const msgId = `kring-recipe-${circleId}-${Date.now()}`;
+  const msgId = `circle-recipe-${circleId}-${Date.now()}`;
   const ts    = Date.now();
   rawCallSkill('stoop', 'broadcastCircleRecipe', {
     groupId: circleId,
@@ -6299,9 +6299,9 @@ function broadcastActiveRecipe({ circleId, book }) {
     msgId,
     ts,
   }).then((r) => {
-    if (r?.error) console.warn('[kring-recipe] fan-out skipped:', r.error);
+    if (r?.error) console.warn('[circle-recipe] fan-out skipped:', r.error);
   }).catch((err) => {
-    console.warn('[kring-recipe] fan-out failed:', err?.message ?? err);
+    console.warn('[circle-recipe] fan-out failed:', err?.message ?? err);
   });
 }
 
@@ -6425,12 +6425,12 @@ async function showRules(id) {
   // applies straight through.  When the slot is empty `incomingRules`
   // stays null and the editor renders untouched.
   let incomingRules = null;
-  try { incomingRules = await kringRulesPendingStore.get(id); }
+  try { incomingRules = await circleRulesPendingStore.get(id); }
   catch { incomingRules = null; }
 
   const clearPending = () => {
     incomingRules = null;
-    kringRulesPendingStore.clear(id).catch(() => { /* ignore */ });
+    circleRulesPendingStore.clear(id).catch(() => { /* ignore */ });
   };
 
   const rerender = () => renderRulesEditor(rootEl, {
@@ -6453,7 +6453,7 @@ async function showRules(id) {
       // γ-next.rules — fan the just-saved rules doc out to peers.
       // Fire-and-forget; per-peer errors are logged inside.
       try { broadcastRules({ circleId: id, doc }); }
-      catch (err) { console.warn('[kring-rules] broadcast scheduling failed:', err?.message ?? err); }
+      catch (err) { console.warn('[circle-rules] broadcast scheduling failed:', err?.message ?? err); }
       showDetail(id);
     },
   });
@@ -6461,7 +6461,7 @@ async function showRules(id) {
 }
 
 /**
- * γ-next.rules — fan the rules document out to every other kring
+ * γ-next.rules — fan the rules document out to every other circle
  * member via stoop's `broadcastCircleRules` skill.  Fire-and-forget:
  * per-peer failures land in the result.errors array; we just log.
  * No-op when rawCallSkill isn't bound yet (pre-agent-boot edits).
@@ -6469,7 +6469,7 @@ async function showRules(id) {
 function broadcastRules({ circleId, doc }) {
   if (typeof rawCallSkill !== 'function') return;
   if (!doc || typeof doc !== 'object') return;
-  const msgId = `kring-rules-${circleId}-${Date.now()}`;
+  const msgId = `circle-rules-${circleId}-${Date.now()}`;
   const ts    = Date.now();
   rawCallSkill('stoop', 'broadcastCircleRules', {
     groupId:  circleId,
@@ -6477,9 +6477,9 @@ function broadcastRules({ circleId, doc }) {
     msgId,
     ts,
   }).then((r) => {
-    if (r?.error) console.warn('[kring-rules] fan-out skipped:', r.error);
+    if (r?.error) console.warn('[circle-rules] fan-out skipped:', r.error);
   }).catch((err) => {
-    console.warn('[kring-rules] fan-out failed:', err?.message ?? err);
+    console.warn('[circle-rules] fan-out failed:', err?.message ?? err);
   });
 }
 
@@ -6600,7 +6600,7 @@ function govBroadcast(channel, circleId, event, opts) {
 // this for non-member targets). Best-effort; a missing op just leaves the item (the report
 // still closes actioned). Members route through the governance removeMember class instead.
 function removeReportedItem(circleId, targetType, targetRef) {
-  return rawCallSkill('stoop', 'deleteKringItem', { groupId: circleId, itemId: targetRef })
+  return rawCallSkill('stoop', 'deleteCircleItem', { groupId: circleId, itemId: targetRef })
     .catch(() => rawCallSkill('stoop', 'cancelRequest', { requestId: targetRef }).catch(() => ({ ok: false })));
 }
 
@@ -6754,7 +6754,7 @@ async function showOverride(id) {
 }
 
 // group admin panel (member roster + remove + announcements). Reached from
-// the kring `⋯` menu. Ops are admin-gated server-side; a refusal surfaces a notice.
+// the circle `⋯` menu. Ops are admin-gated server-side; a refusal surfaces a notice.
 async function showAdmin(id) {
   hideCircleTabBar(tabBarEl);
   let members = [];
@@ -6803,7 +6803,7 @@ async function showAdmin(id) {
     },
     onUnmute: async (key) => {
       try { await rawCallSkill('stoop', 'unmutePeer', key.startsWith('webid:') ? { peerWebid: key.slice(6) } : { peerStableId: key }); } catch { /* */ }
-      // (the kring view re-resolves its hide set at the next circle open — loadRoster does it)
+      // (the circle view re-resolves its hide set at the next circle open — loadRoster does it)
       await load();
     },
     onRemove: async (m) => {
@@ -6907,12 +6907,12 @@ async function showSettings(id) {
   // applies straight through.  When the slot is empty `incomingPolicy`
   // stays null and the editor renders untouched.
   let incomingPolicy = null;
-  try { incomingPolicy = await kringPolicyPendingStore.get(id); }
+  try { incomingPolicy = await circlePolicyPendingStore.get(id); }
   catch { incomingPolicy = null; }
 
   const clearPending = () => {
     incomingPolicy = null;
-    kringPolicyPendingStore.clear(id).catch(() => { /* ignore */ });
+    circlePolicyPendingStore.clear(id).catch(() => { /* ignore */ });
   };
 
   // B · consent-card — the recipe reviewed in the consent card (cached between review + Agree so the loaded
@@ -7018,7 +7018,7 @@ async function showSettings(id) {
         // γ-next.policy — fan the just-saved policy doc out to peers.
         // Fire-and-forget; per-peer errors are logged inside.
         try { broadcastPolicy({ circleId: id, policy: working }); }
-        catch (err) { console.warn('[kring-policy] broadcast scheduling failed:', err?.message ?? err); }
+        catch (err) { console.warn('[circle-policy] broadcast scheduling failed:', err?.message ?? err); }
         // §4 storage-policy bridge — when the pod tier changed, drive stoop's
         // authoritative circle storage policy. The skill owns admin-gating + the
         // one-way guard; on failure we keep the local save and show a note.
@@ -7056,7 +7056,7 @@ async function showSettings(id) {
 }
 
 /**
- * γ-next.policy — fan the policy document out to every other kring
+ * γ-next.policy — fan the policy document out to every other circle
  * member via stoop's `broadcastCirclePolicy` skill.  Fire-and-forget:
  * per-peer failures land in the result.errors array; we just log.
  * No-op when rawCallSkill isn't bound yet (pre-agent-boot edits).
@@ -7064,7 +7064,7 @@ async function showSettings(id) {
 function broadcastPolicy({ circleId, policy }) {
   if (typeof rawCallSkill !== 'function') return;
   if (!policy || typeof policy !== 'object') return;
-  const msgId = `kring-policy-${circleId}-${Date.now()}`;
+  const msgId = `circle-policy-${circleId}-${Date.now()}`;
   const ts    = Date.now();
   rawCallSkill('stoop', 'broadcastCirclePolicy', {
     groupId: circleId,
@@ -7072,9 +7072,9 @@ function broadcastPolicy({ circleId, policy }) {
     msgId,
     ts,
   }).then((r) => {
-    if (r?.error) console.warn('[kring-policy] fan-out skipped:', r.error);
+    if (r?.error) console.warn('[circle-policy] fan-out skipped:', r.error);
   }).catch((err) => {
-    console.warn('[kring-policy] fan-out failed:', err?.message ?? err);
+    console.warn('[circle-policy] fan-out failed:', err?.message ?? err);
   });
 }
 
@@ -7365,12 +7365,12 @@ async function boot() {
       // a null catalog by trying all origins).
       resolveCallSkill = makeResolvingCallSkill(rawCallSkill, DEFAULT_CIRCLE_ORIGINS, () => circleCatalog);
       sources = circleSourcesFromAgent({ callSkill: resolveCallSkill, helpCircleName: () => helpCircleSpec(t).name });
-      // Phase 5 — build the kring composer's bot + feedback now that the agent (and its manifest) is up.
+      // Phase 5 — build the circle composer's bot + feedback now that the agent (and its manifest) is up.
       try { buildCircleBot(agent); } catch (err) { console.warn('[circleApp] circle bot setup failed:', err?.message ?? err); }
-      // register a peer-router with the kring-chat-message
+      // register a peer-router with the circle-chat-message
       // handler + connect the NKN transport (best-effort; no-op when
       // nkn-sdk failed to load).  The ingest hook mirrors the envelope
-      // into stoop's itemStore so kring chat history is durable,
+      // into stoop's itemStore so circle chat history is durable,
       // searchable, and mute/eviction-filtered (parity with /post
       // delivery via `ingestRemotePost`).  EventLog append still drives
       // the live bubble render.
@@ -7384,7 +7384,7 @@ async function boot() {
           return { error: String(err?.message ?? err) };
         }
       };
-      // ε.1 — single normalization gate.  Every kring-chat insert
+      // ε.1 — single normalization gate.  Every circle-chat insert
       // path (receiver / rehydrator / future catch-up / pod) routes
       // through this inbox so envelope validation + msgId dedup +
       // ingest mirror + eventLog append happen in ONE place with
@@ -7392,39 +7392,39 @@ async function boot() {
       // backfill + the live NKN handler dedupe through the same LRU.
       // Delivery honesty + repaint — SHARED by the legacy-envelope inbox and the signed-statement
       // receive path (one set of side effects, not two): a LIVE inbound insert answers the sender with
-      // a receipt (policy entirely in `makeReceiptSender`) and repaints the open kring.
-      const onKringStored = ((sendReceipt) => (info) => {
+      // a receipt (policy entirely in `makeReceiptSender`) and repaints the open circle.
+      const onCircleStored = ((sendReceipt) => (info) => {
           try { sendReceipt(info); } catch { /* a failed receipt must not stop the repaint below */ }
-          // …and REPAINT, because a message that arrived while the kring is open has to APPEAR.
+          // …and REPAINT, because a message that arrived while the circle is open has to APPEAR.
           //
           // Storing it was never the problem: the envelope arrives, the inbox appends it to the event
-          // log, and the log is what the kring renders from — but nothing told the open view to render
+          // log, and the log is what the circle renders from — but nothing told the open view to render
           // again, so the message existed and was invisible until some unrelated redraw happened by.
           //
           // This is the same shape as the receipt bug fixed just above ("the one writer with nothing to
           // announce it"), and it is the more serious version: a receipt going stale leaves a bubble
           // saying "maybe received", while this leaves the OTHER PERSON'S MESSAGE off the screen
           // entirely. Measured on 2026-08-03: two paired peers, delivery confirmed in the log
-          // (`[kring-chat] received … source=receiver`), and B's chat read empty.
+          // (`[circle-chat] received … source=receiver`), and B's chat read empty.
           //
           // Narrowed exactly like the receipt subscription, and for the same reason: web's `rerender`
-          // REBUILDS the kring DOM including the composer, and an input rebuilt mid-sentence loses what
+          // REBUILDS the circle DOM including the composer, and an input rebuilt mid-sentence loses what
           // was typed into it. So repaint only for a LIVE inbound insert (`source === 'receiver'`, not a
           // rehydrate or catch-up backfill, both of which are followed by their own render) and only
           // when the message belongs to the circle actually on screen.
           if (info?.source !== 'receiver') return;
-          if (!info?.circleId || info.circleId !== _kringRender?.circleId) return;
-          try { _kringRender?.rerender?.(); } catch { /* no open kring */ }
+          if (!info?.circleId || info.circleId !== _circleRender?.circleId) return;
+          try { _circleRender?.rerender?.(); } catch { /* no open circle */ }
         })(makeReceiptSender({
           getSettings: () => deliverySettingsStore.get(),
           sendTo: (to, payload) => (typeof _peerAgent?.sendPeerMessage === 'function'
             ? _peerAgent.sendPeerMessage(to, payload)
             : Promise.reject(new Error('no peer agent'))),
         }));
-      const kringChatInbox = createChatMessageInbox({
+      const circleChatInbox = createChatMessageInbox({
         eventLog,
         ingest: ingestCircleMessage,
-        onStored: onKringStored,
+        onStored: onCircleStored,
         // Connectivity Phase 3 (receiver side) — resolve a pod-signal REF envelope (a pod-row pointer,
         // no body) into the full chat message by reading + unsealing the circle's shared pod. Absent a
         // pod / group key → the inbox skips the ref (deferred), never crashes the receive loop.
@@ -7444,7 +7444,7 @@ async function boot() {
       // chat rail — signature + the roster binding (the eviction gate) — and lands as the ONE render
       // entry (bubble + proof). The side effects mirror the legacy inbox's: the store copy (durable
       // history until it retires), the delivery receipt, and the repaint — through the SAME shared seam.
-      const kringChatStatementHandler = agent.chatRail ? makeChatPeerHandler({
+      const circleChatStatementHandler = agent.chatRail ? makeChatPeerHandler({
         rail: agent.chatRail,
         // A pod-signal circle fans a REF to the statement's sealed pod row — resolved through the same
         // sealed-pod reader the legacy inbox used, then verified at the rail like any fanned statement.
@@ -7452,7 +7452,7 @@ async function boot() {
         // The persisted log IS the record — a landed signed entry needs no store copy anymore (the
         // history migration carried the store era over once). Side effects: the receipt + the repaint.
         onLanded: async (cid, entry, fromPeerAddr) => {
-          onKringStored({ msgId: entry.id, circleId: cid, fromPeerAddr, source: 'receiver' });
+          onCircleStored({ msgId: entry.id, circleId: cid, fromPeerAddr, source: 'receiver' });
         },
       }) : null;
       // POD-ONLY circles never fan — the shared pod is the meeting point. On the same reconnect kick as
@@ -7465,15 +7465,15 @@ async function boot() {
         eventLog,
       }) : null;
       // The chat lane's catch-up: windowed frontier replay with the consent rung. Above the auto-allow
-      // ceiling the user gets the real question as a kring bubble with a download button.
+      // ceiling the user gets the real question as a circle bubble with a download button.
       chatCatchUpShell = agent.chatRail ? makeFrontierReplay({
         rail: agent.chatRail,
         sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
         subtypes: CHAT_CATCHUP_SUBTYPES,
-        onChange: (cid) => { if (cid === _kringRender?.circleId) { try { _kringRender?.rerender?.(); } catch { /* */ } } },
+        onChange: (cid) => { if (cid === _circleRender?.circleId) { try { _circleRender?.rerender?.(); } catch { /* */ } } },
         onOffer: ({ circleId: cid, count, approxBytes, allow }) => {
           const mb = approxBytes > 0 ? ` (~${(approxBytes / 1e6).toFixed(1)} MB)` : '';
-          _kringRender?.botBubble?.(t('circle.chat.catchup_offer', { count, size: mb }), {
+          _circleRender?.botBubble?.(t('circle.chat.catchup_offer', { count, size: mb }), {
             buttons: [{ action: 'chat-catchup-allow', label: t('circle.chat.catchup_allow') }],
           });
           _chatCatchUpPendingAllows.set(cid, allow);
@@ -7483,40 +7483,40 @@ async function boot() {
       // (durable since the persistence slice), so the store-era history lands on it ONCE through the
       // shared inbox and a device-local latch skips every later boot. The per-boot rehydrate is retired
       // — this was its final job.
-      migrateKringChatHistory({
+      migrateCircleChatHistory({
         callSkill: agent.callSkill,
-        inbox:     kringChatInbox,
+        inbox:     circleChatInbox,
         marker: {
           get: () => { try { return localStorage.getItem(CHAT_MIGRATION_MARKER_KEY); } catch { return null; } },
           set: (v) => { try { localStorage.setItem(CHAT_MIGRATION_MARKER_KEY, v); } catch { /* retried next boot */ } },
         },
       }).catch(() => { /* logged inside */ });
       // γ-next.recipe — recipe-broadcast receiver.  Stashes inbound
-      // recipes per-kring; the editor pulls on mount + passes via
+      // recipes per-circle; the editor pulls on mount + passes via
       // γ.3's `incomingRecipe` opt.
-      const kringRecipeDedup   = new Set();
-      const kringRecipeHandler = makeKringRecipePeerHandler({
-        pendingStore: kringRecipePendingStore,
-        dedup:        kringRecipeDedup,
+      const circleRecipeDedup   = new Set();
+      const circleRecipeHandler = makeCircleRecipePeerHandler({
+        pendingStore: circleRecipePendingStore,
+        dedup:        circleRecipeDedup,
         logger:       console,
       });
       // γ-next.rules — rules-broadcast receiver.  Stashes inbound rules
-      // docs per-kring; the rules editor pulls on mount + passes via
+      // docs per-circle; the rules editor pulls on mount + passes via
       // γ.4's `incomingRules` opt.
-      const kringRulesDedup    = new Set();
-      const kringRulesHandler  = makeKringRulesPeerHandler({
-        pendingStore: kringRulesPendingStore,
-        dedup:        kringRulesDedup,
+      const circleRulesDedup    = new Set();
+      const circleRulesHandler  = makeCircleRulesPeerHandler({
+        pendingStore: circleRulesPendingStore,
+        dedup:        circleRulesDedup,
         logger:       console,
       });
       // γ-next.policy — policy-broadcast receiver.  Stashes inbound policy
-      // docs per-kring; the settings editor pulls on mount + passes via
+      // docs per-circle; the settings editor pulls on mount + passes via
       // γ.4's `incomingPolicy` opt.  Completes the γ-next trio
       // (recipe / rules / policy).
-      const kringPolicyDedup   = new Set();
-      const kringPolicyHandler = makeKringPolicyPeerHandler({
-        pendingStore: kringPolicyPendingStore,
-        dedup:        kringPolicyDedup,
+      const circlePolicyDedup   = new Set();
+      const circlePolicyHandler = makeCirclePolicyPeerHandler({
+        pendingStore: circlePolicyPendingStore,
+        dedup:        circlePolicyDedup,
         logger:       console,
       });
       const sendToPeerForCU = (addr, env) =>
@@ -7527,7 +7527,7 @@ async function boot() {
       const peerMessageRouter = makePeerRouter({
         handlers: {
           // The SIGNED chat lane: verify-at-the-rail receive + its windowed, consent-gated catch-up.
-          ...(kringChatStatementHandler ? { [CHAT_STATEMENT_BROADCAST]: kringChatStatementHandler } : {}),
+          ...(circleChatStatementHandler ? { [CHAT_STATEMENT_BROADCAST]: circleChatStatementHandler } : {}),
           ...(chatCatchUpShell ? {
             [chatCatchUpShell.subtypes.request]: chatCatchUpShell.onRequest,
             [chatCatchUpShell.subtypes.batch]:   chatCatchUpShell.onBatch,
@@ -7538,9 +7538,9 @@ async function boot() {
           // circle's roster, and the map's monotonic rule orders it. Fire-and-forget: the roster read is a
           // skill call and the router does not await handlers, so it delays the bubble, not the receive loop.
           'delivery-receipt':        (from, payload) => { applyIncomingReceipt(payload, from); },
-          'kring-recipe-broadcast':  kringRecipeHandler,
-          'kring-rules-broadcast':   kringRulesHandler,
-          'kring-policy-broadcast':  kringPolicyHandler,
+          'circle-recipe-broadcast':  circleRecipeHandler,
+          'circle-rules-broadcast':   circleRulesHandler,
+          'circle-policy-broadcast':  circlePolicyHandler,
           // Wave C tail A — ingest fanned governance/report events into the one log so a
           // vote/report raised on another device shows here; re-render an open panel.
           ...(govCatchUpShell ? { [govCatchUpShell.subtypes.request]: govCatchUpShell.onRequest, [govCatchUpShell.subtypes.batch]: govCatchUpShell.onBatch } : {}),
@@ -7555,30 +7555,30 @@ async function boot() {
             [taskCatchUpShell.subtypes.batch]:   taskCatchUpShell.onBatch,
             [taskCatchUpShell.subtypes.offer]:   taskCatchUpShell.onOffer,
           } : {}),
-          'kring-governance-broadcast': makeKringGovernancePeerHandler({ eventLog, rail: govShellRail, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); }, notify: govNotify }),
-          'kring-report-broadcast':     makeKringReportPeerHandler({ eventLog, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); } }),
+          'circle-governance-broadcast': makeCircleGovernancePeerHandler({ eventLog, rail: govShellRail, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); }, notify: govNotify }),
+          'circle-report-broadcast':     makeCircleReportPeerHandler({ eventLog, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); } }),
           // Calendar INBOUND — receive what the fan-out sends. invite persists
-          // the event locally (→ shows on the calendar surface) + a kring
+          // the event locally (→ shows on the calendar surface) + a circle
           // heads-up; rsvp/cancel apply to local calendar state. (A richer
-          // time-card-with-RSVP-buttons bubble in the kring is a follow-up.)
+          // time-card-with-RSVP-buttons bubble in the circle is a follow-up.)
           'calendar-invite':         makeHandleCalendarInvite({
             callSkill:     rawCallSkill,
             addMainBubble: (bubble) => {
               const title = bubble?.embed?.snapshot?.title;
-              if (title) _kringRender?.botBubble(t('circle.calendar.invited', { title }));
+              if (title) _circleRender?.botBubble(t('circle.calendar.invited', { title }));
             },
             publishEvent:  publishEventToLog,
           }),
           'calendar-rsvp':           makeHandleCalendarRsvp({ callSkill: rawCallSkill, publishEvent: publishEventToLog }),
           'calendar-cancel':         makeHandleCalendarCancel({ callSkill: rawCallSkill, publishEvent: publishEventToLog }),
-          // a peer shared a file → announce it in the kring with a [Download] button (bytes ride in the
+          // a peer shared a file → announce it in the circle with a [Download] button (bytes ride in the
           // embed; we stash them so the tap can save). Classic parity (handleFileShare).
           'file-share':              makeHandleFileShare({
             addMainBubble: (bubble) => {
               const f = bubble?.embed?.snapshot;
               if (!f?.id || !f?.name || !f?.dataB64) return;
               _fileShareInbox.set(f.id, f);
-              _kringRender?.botBubble(t('circle.fileShare.received', { name: f.name }),
+              _circleRender?.botBubble(t('circle.fileShare.received', { name: f.name }),
                 { buttons: [{ action: `file-dl:${f.id}`, label: t('circle.fileShare.download') }] });
             },
             publishEvent: publishEventToLog,

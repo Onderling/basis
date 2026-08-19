@@ -52,7 +52,7 @@ export async function run() {
 
   // ── GRACEFUL removal ────────────────────────────────────────────────────────
   {
-    const c = await buildCircle('kring-graceful', 'g');
+    const c = await buildCircle('circle-graceful', 'g');
     const before = await c.proofPresent(c.A.webId);
     const r = await c.ca.removeMember({ webId: c.A.webId, policy: 'graceful' });
     const res = c.res();
@@ -71,7 +71,7 @@ export async function run() {
 
   // ── BAN removal (hostile) ───────────────────────────────────────────────────
   {
-    const c = await buildCircle('kring-ban', 'b');
+    const c = await buildCircle('circle-ban', 'b');
     const r = await c.ca.removeMember({ webId: c.A.webId, policy: 'ban' });
     const res = c.res();
     const v2gk = unwrapGroupKey(res, c.controller.privateKey);

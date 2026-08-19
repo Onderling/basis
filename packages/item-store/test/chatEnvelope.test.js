@@ -1,5 +1,5 @@
 /**
- * Connectivity Phase 2 — the ONE canonical kring chat Envelope + its
+ * Connectivity Phase 2 — the ONE canonical circle chat Envelope + its
  * projections. These tests PIN byte-identity to the three hand-maintained
  * shapes the projectors replaced, so the collapse can't silently drift the
  * wire / render / catch-up shapes.
@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  KRING_CHAT_KIND,
+  CIRCLE_CHAT_KIND,
   chatEnvelopeFromStoreItem,
   toEventLogItem,
   fromEventLogItem,
@@ -22,7 +22,7 @@ import {
 
 function goldenOptimisticEvent({ msgId, ts, circleId, actor, text, buttons, scope, embeds, media, review, provenance, consent }) {
   return {
-    id: msgId, ts, app: 'kring', type: 'chat-message', actor,
+    id: msgId, ts, app: 'circle', type: 'chat-message', actor,
     payload: {
       circleId, text, kind: 'chat-message',
       ...(buttons?.length ? { buttons } : {}),
@@ -38,7 +38,7 @@ function goldenOptimisticEvent({ msgId, ts, circleId, actor, text, buttons, scop
 
 function goldenReceivedEvent({ msgId, ts, circleId, actor, text, media }) {
   return {
-    id: msgId, ts, app: 'kring', type: 'chat-message', actor,
+    id: msgId, ts, app: 'circle', type: 'chat-message', actor,
     payload: {
       circleId, text, kind: 'chat-message',
       senderDisplay: actor,
@@ -49,7 +49,7 @@ function goldenReceivedEvent({ msgId, ts, circleId, actor, text, media }) {
 
 function goldenWire({ circleId, msgId, ts, text, fromActor, fromWebid, media }) {
   return {
-    type: 'p2p-chat', subtype: 'kring-chat-message',
+    type: 'p2p-chat', subtype: 'circle-chat-message',
     circleId, msgId, ts, text, fromActor, fromWebid,
     ...(media ? { media } : {}),
   };
@@ -64,7 +64,7 @@ describe('toEventLogItem — byte-identical to the 3 former hand-copies', () => 
   it('optimistic-local: no senderDisplay, carries local-only presentation fields in order', () => {
     const a = {
       msgId: 'm1', ts: 7, circleId: 'c', actor: 'me', text: 'hi',
-      buttons: [{ id: 'a', label: 'A' }], scope: 'kring', embeds: [{ type: 'task', ref: 'r' }],
+      buttons: [{ id: 'a', label: 'A' }], scope: 'circle', embeds: [{ type: 'task', ref: 'r' }],
       media: MEDIA, review: { intro: 'x', points: [] }, provenance: { llmUsed: true }, consent: { ok: 1 },
     };
     expect(toEventLogItem(a)).toEqual(goldenOptimisticEvent(a));
@@ -75,7 +75,7 @@ describe('toEventLogItem — byte-identical to the 3 former hand-copies', () => 
   it('optimistic minimal: bare {circleId, text, kind}, no senderDisplay key at all', () => {
     const a = { msgId: 'm', ts: 1, circleId: 'c', actor: 'me', text: 'hi' };
     const out = toEventLogItem(a);
-    expect(out).toEqual({ id: 'm', ts: 1, app: 'kring', type: 'chat-message', actor: 'me', payload: { circleId: 'c', text: 'hi', kind: 'chat-message' } });
+    expect(out).toEqual({ id: 'm', ts: 1, app: 'circle', type: 'chat-message', actor: 'me', payload: { circleId: 'c', text: 'hi', kind: 'chat-message' } });
     expect(out.payload).not.toHaveProperty('senderDisplay');
     expect(out.payload).not.toHaveProperty('media');
   });
@@ -100,7 +100,7 @@ describe('toEventLogItem — byte-identical to the 3 former hand-copies', () => 
   it('rehydrate legacy: senderDisplay present, no media', () => {
     const a = { msgId: 'm3', ts: 3, circleId: 'c3', actor: 'ann', text: 'hoi', senderDisplay: 'ann' };
     expect(toEventLogItem(a)).toEqual({
-      id: 'm3', ts: 3, app: 'kring', type: 'chat-message', actor: 'ann',
+      id: 'm3', ts: 3, app: 'circle', type: 'chat-message', actor: 'ann',
       payload: { circleId: 'c3', text: 'hoi', kind: 'chat-message', senderDisplay: 'ann' },
     });
   });
@@ -108,9 +108,9 @@ describe('toEventLogItem — byte-identical to the 3 former hand-copies', () => 
 
 describe('toEventLogItem ↔ fromEventLogItem round-trip', () => {
   it('recovers the transferable fields (senderDisplay is a render echo, dropped)', () => {
-    const env = { msgId: 'm1', ts: 7, circleId: 'c', actor: 'me', text: 'hi', media: MEDIA, scope: 'kring' };
+    const env = { msgId: 'm1', ts: 7, circleId: 'c', actor: 'me', text: 'hi', media: MEDIA, scope: 'circle' };
     const back = fromEventLogItem(toEventLogItem(env));
-    expect(back).toEqual({ msgId: 'm1', ts: 7, circleId: 'c', actor: 'me', text: 'hi', media: MEDIA, scope: 'kring' });
+    expect(back).toEqual({ msgId: 'm1', ts: 7, circleId: 'c', actor: 'me', text: 'hi', media: MEDIA, scope: 'circle' });
   });
   it('round-trips a bare message', () => {
     const env = { msgId: 'x', ts: 1, circleId: 'c', actor: 'a', text: 't' };
@@ -124,7 +124,7 @@ describe('chatEnvelopeFromStoreItem (fromItem) — store item → wire/inbox env
   it('lenient (getMessagesSince): full envelope with media', () => {
     const it = storeItem({ circleId: 'g1', msgId: 'a', ts: 100, fromActor: 'bob', media: MEDIA });
     expect(chatEnvelopeFromStoreItem(it, { groupId: 'g1', lenient: true })).toEqual({
-      subtype: KRING_CHAT_KIND, circleId: 'g1', msgId: 'a', ts: 100, text: 'hoi', fromActor: 'bob', media: MEDIA,
+      subtype: CIRCLE_CHAT_KIND, circleId: 'g1', msgId: 'a', ts: 100, text: 'hoi', fromActor: 'bob', media: MEDIA,
     });
   });
 
@@ -137,13 +137,13 @@ describe('chatEnvelopeFromStoreItem (fromItem) — store item → wire/inbox env
 
   it('lenient: msgId falls back to item.id, circleId falls back to groupId, text to empty', () => {
     const env = chatEnvelopeFromStoreItem({ id: 'itemid', text: undefined, source: { ts: 5 } }, { groupId: 'gX', lenient: true });
-    expect(env).toEqual({ subtype: KRING_CHAT_KIND, circleId: 'gX', msgId: 'itemid', ts: 5, text: '', fromActor: null });
+    expect(env).toEqual({ subtype: CIRCLE_CHAT_KIND, circleId: 'gX', msgId: 'itemid', ts: 5, text: '', fromActor: null });
   });
 
   it('strict (rehydrate): valid item → envelope', () => {
     const it = storeItem({ circleId: 'g1', msgId: 'a', ts: 100, fromActor: 'bob', media: MEDIA });
     expect(chatEnvelopeFromStoreItem(it)).toEqual({
-      subtype: KRING_CHAT_KIND, circleId: 'g1', msgId: 'a', ts: 100, text: 'hoi', fromActor: 'bob', media: MEDIA,
+      subtype: CIRCLE_CHAT_KIND, circleId: 'g1', msgId: 'a', ts: 100, text: 'hoi', fromActor: 'bob', media: MEDIA,
     });
   });
 
@@ -178,7 +178,7 @@ describe('toWireEnvelope (toWire) — canonical → fan-out wire', () => {
     const a = { circleId: 'c1', msgId: 'm1', ts: 9, text: 'hi', fromActor: 'me', fromWebid: 'me', media: null };
     const wire = toWireEnvelope(a);
     expect(wire).not.toHaveProperty('media');
-    expect(wire).toEqual({ type: 'p2p-chat', subtype: 'kring-chat-message', circleId: 'c1', msgId: 'm1', ts: 9, text: 'hi', fromActor: 'me', fromWebid: 'me' });
+    expect(wire).toEqual({ type: 'p2p-chat', subtype: 'circle-chat-message', circleId: 'c1', msgId: 'm1', ts: 9, text: 'hi', fromActor: 'me', fromWebid: 'me' });
   });
 
   it('local-only fields never ride the wire: only text + whitelisted media transfer', () => {
@@ -198,7 +198,7 @@ describe('store item → wire round-trip (fromItem then toWire)', () => {
     const item = { id: 'a', text: 'hoi', source: { circleId: 'g1', msgId: 'a', ts: 100, fromActor: 'bob', media: MEDIA } };
     const env = chatEnvelopeFromStoreItem(item, { groupId: 'g1', lenient: true });
     const wire = toWireEnvelope({ circleId: env.circleId, msgId: env.msgId, ts: env.ts, text: env.text, fromActor: env.fromActor, fromWebid: env.fromActor, media: env.media });
-    expect(wire).toMatchObject({ type: 'p2p-chat', subtype: 'kring-chat-message', circleId: 'g1', msgId: 'a', ts: 100, text: 'hoi', fromActor: 'bob', media: MEDIA });
+    expect(wire).toMatchObject({ type: 'p2p-chat', subtype: 'circle-chat-message', circleId: 'g1', msgId: 'a', ts: 100, text: 'hoi', fromActor: 'bob', media: MEDIA });
   });
 });
 
@@ -215,7 +215,7 @@ describe('store item → wire round-trip (fromItem then toWire)', () => {
 
 function goldenRefWire({ circleId, msgId, ts, ref, fromActor, fromWebid, media }) {
   return {
-    type: 'p2p-chat', subtype: 'kring-chat-message',
+    type: 'p2p-chat', subtype: 'circle-chat-message',
     circleId, msgId, ts, ref, fromActor, fromWebid,
     ...(media ? { media } : {}),
   };
@@ -229,7 +229,7 @@ describe('toWireRefEnvelope — the pod-signal ref projection', () => {
     expect(wire).toEqual(goldenRefWire(a));
     expect(wire).not.toHaveProperty('text');
     expect(wire.ref).toBe('urn:pod:g1:row:42');
-    expect(wire.subtype).toBe(KRING_CHAT_KIND);
+    expect(wire.subtype).toBe(CIRCLE_CHAT_KIND);
   });
 
   it('carries a whitelisted media pointer when present (absent → no media key)', () => {

@@ -119,8 +119,8 @@ export {
 } from './v2/roleTemplates.js';
 export {
   eventCircleId, buildCircleStream,
-  // kring-scoped stream + chip filters.
-  buildKringStream, KRING_STREAM_KIND_FILTERS,
+  // circle-scoped stream + chip filters.
+  buildCircleStream, CIRCLE_STREAM_KIND_FILTERS,
   projectEntries, allCircleRows, circleRows, chatRows, agentTrailRows, mutedActorSet,
   // C15 — per-circle chat projection (excludes the silent system lane).
   buildCircleChat,
@@ -145,26 +145,26 @@ export {
   announceOwnCircleAddress, announceOwnCircleAddressIfChanged, propagateCircleAddressesAfterJoin,
   isValidCircleAddressAnnounceEnvelope, makeCircleAddressAnnouncePeerHandler,
 } from './v2/circleAddressAnnounce.js';
-// per-kring bottom tabs derived from policy.features (v2 §1).
-export { buildKringTabs, DEFAULT_KRING_TAB, featureActionLabelKey, featureTabId, featureForTabId } from './v2/kringTabs.js';
+// per-circle bottom tabs derived from policy.features (v2 §1).
+export { buildCircleTabs, DEFAULT_CIRCLE_TAB, featureActionLabelKey, featureTabId, featureForTabId } from './v2/circleTabs.js';
 // δ.2 — per-message delivery state (pending / sent / failed) for the
-// optimistic kring chat send.  Sibling of the in-memory EventLog;
+// optimistic circle chat send.  Sibling of the in-memory EventLog;
 // read at bubble render time so users can see fan-out status + retry
 // failed sends.
 export { createDeliveryStateMap } from '@onderling/kring-host/deliveryState';
-// Phase 2 — shared kring chat send primitives (optimistic event + best-effort fan-out) for web + mobile.
-export { kringChatMessageEvent, broadcastCircleFanOut } from '@onderling/kring-host/kringBroadcast';
+// Phase 2 — shared circle chat send primitives (optimistic event + best-effort fan-out) for web + mobile.
+export { circleChatMessageEvent, broadcastCircleFanOut } from '@onderling/kring-host/circleBroadcast';
 // Phase 3 — the shared circle label→candidate lookup (live fetch + base), web + mobile.
 export { makeCircleLookup } from './v2/circleLookup.js';
 // Shared composer affordances — slash-suggest pool/filter + bash-style input history (web + mobile).
 export { buildCommandPool, suggestCommands, createInputHistory } from './v2/commandSuggest.js';
-// Conversational follow-up for `needsForm` dispatches — shared so the kring composers elicit a missing
+// Conversational follow-up for `needsForm` dispatches — shared so the circle composers elicit a missing
 // field the same chat-native way (web + mobile); the mobile core/followUp.js re-exports these.
 export { beginFollowUp, beginFormFollowUp, completeFollowUp, completeMultiFieldFollowUp, pickPromptKey } from '@onderling/kring-host/followUp';
-// Shared one-line kring bot reply text (web + mobile) — verb-aware Added:/Completed: phrasing.
-export { kringReplyText } from './v2/kringReply.js';
+// Shared one-line circle bot reply text (web + mobile) — verb-aware Added:/Completed: phrasing.
+export { circleReplyText } from './v2/circleReply.js';
 // 1:1-bot chat gate — the GESPREK assistant-header strip shows ONLY in a genuine 1:1-with-a-bot
-// chat, hidden on multi-person kringen (web ≡ mobile; one shared decision).
+// chat, hidden on multi-person circles (web ≡ mobile; one shared decision).
 export { oneToOneBotLabel } from './v2/botChat.js';
 // Part D — scope a circle's catalog to its apps (drops basis infra ops like /me); web + mobile.
 export { scopeCatalogToApps } from './v2/circleCatalogScope.js';
@@ -191,28 +191,28 @@ export {
   normalizeRecipeBook,
   addRecipe, renameRecipe, removeRecipe,
   setActiveRecipe, getActiveRecipe, updateRecipe,
-  createKringRecipeStore, localStorageRecipeIo,
-} from './v2/kringRecipe.js';
+  createCircleRecipeStore, localStorageRecipeIo,
+} from './v2/circleRecipe.js';
 export {
   BLOCK_REGISTRY, materializeBlock, materializeRecipe,
-} from './v2/kringRecipeBlocks.js';
+} from './v2/circleRecipeBlocks.js';
 // γ.3 — recipe conflict detection + resolution (Phase 9 sync absorption).
 export { detectRecipeConflicts, applyResolution } from './v2/recipeConflict.js';
 // γ.4 — rules-doc + circle-policy conflict detection + resolution (same flow).
 export { detectRulesConflicts,  applyRulesResolution, decisionsForMerges } from './v2/rulesConflict.js';
 export { detectPolicyConflicts, applyPolicyResolution } from './v2/policyConflict.js';
 // γ-next.recipe — receiver + pending-cache substrate for the recipe broadcast.
-export { makeKringRecipePeerHandler }              from './v2/kringRecipeReceiver.js';
-export { createKringRecipePendingStore }           from './v2/kringRecipePending.js';
+export { makeCircleRecipePeerHandler }              from './v2/circleRecipeReceiver.js';
+export { createCircleRecipePendingStore }           from './v2/circleRecipePending.js';
 export {
-  createKringRecipePendingStoreLocal,
-  localStorageKringRecipePendingIo,
-} from './v2/kringRecipePendingStorage.js';
-// α.2a/b — user-owned cross-kring screens (Stream / custom views).
+  createCircleRecipePendingStoreLocal,
+  localStorageCircleRecipePendingIo,
+} from './v2/circleRecipePendingStorage.js';
+// α.2a/b — user-owned cross-circle screens (Stream / custom views).
 export {
-  EMPTY_SCREEN_BOOK, ALL_KRINGEN,
-  emptyScreen, normalizeScreen, isAllKringen, effectiveKringIds,
-  addKringToScreen, removeKringFromScreen, setAllKringen,
+  EMPTY_SCREEN_BOOK, ALL_CIRCLES,
+  emptyScreen, normalizeScreen, isAllCircles, effectiveCircleIds,
+  addCircleToScreen, removeCircleFromScreen, setAllCircles,
   normalizeScreenBook,
   addScreen, renameScreen, removeScreen, setActiveScreen, getActiveScreen, updateScreen,
   createUserScreenStore, localStorageScreenIo,
@@ -346,7 +346,7 @@ export {
   normalizeContactHopMode, effectiveHopMode, buildContactHopList,
   HOP_PER_CONTACT_MODES,
 } from './v2/contactHopOverrides.js';
-// Folio "My things" notes-list (private kring).
+// Folio "My things" notes-list (private circle).
 export {
   itemOwner, isMyPrivateItem, buildMyThings, myThingsFromListFiles,
 } from './v2/folioMyThings.js';

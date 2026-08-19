@@ -11,7 +11,7 @@
  */
 import { describe, it, expect, afterAll } from 'vitest';
 import {
-  bootRealAgentNode, connectAgentsOverBus, pairCircle, until, teardown, sendKringChat } from '../support/pairRealAgents.js';
+  bootRealAgentNode, connectAgentsOverBus, pairCircle, until, teardown, sendCircleChat } from '../support/pairRealAgents.js';
 
 describe('circle traffic is signed by the circle identity, end to end', () => {
   let A; let B;
@@ -20,7 +20,7 @@ describe('circle traffic is signed by the circle identity, end to end', () => {
   it('the chat A sends into a circle names neither person on the wire', async () => {
     [A, B] = await Promise.all([bootRealAgentNode('A'), bootRealAgentNode('B')]);
     await connectAgentsOverBus(A, B);
-    const groupId = 'buurtkring-oosterpoort';
+    const groupId = 'circle-oosterpoort';
     const { joined } = await pairCircle(A, B, { groupId, name: 'Oosterpoort', handle: 'bram' });
     expect(joined.ok).toBe(true);
 
@@ -30,9 +30,9 @@ describe('circle traffic is signed by the circle identity, end to end', () => {
     const put = A._busTransport._put.bind(A._busTransport);
     A._busTransport._put = async (to, env) => { wire.push({ to, env }); return put(to, env); };
 
-    const msgId = `kring-${Date.now().toString(36)}`;
+    const msgId = `circle-${Date.now().toString(36)}`;
     const text = 'de vergadering is verplaatst naar donderdag';
-    const res = await sendKringChat(A, { groupId, text, msgId });
+    const res = await sendCircleChat(A, { groupId, text, msgId });
     expect(res.error).toBeUndefined();
     expect(await until(() => B.chatEvents.find((e) => e.id === msgId)),
       'it has to actually ARRIVE — otherwise "no canonical key on the wire" is trivially true').toBeTruthy();

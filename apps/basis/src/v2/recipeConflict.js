@@ -35,12 +35,12 @@
  *
  * `'both'` keeps the local block as-is and ADDS the incoming block
  * with a freshly-minted id, suffixed `-incoming` for greppability.
- * Mirrors `kringRecipe.js`'s `freshBlockId()` shape — `b-<time36>-<seq36>`
+ * Mirrors `circleRecipe.js`'s `freshBlockId()` shape — `b-<time36>-<seq36>`
  * — so the merged recipe round-trips through `normalizeRecipe` without
  * shedding entries.  Suffixed for greppability; the id is still unique.
  *
  * Purity: no I/O, no Math.random.  Date.now is the only impurity
- * (matches `kringRecipe.freshBlockId`).
+ * (matches `circleRecipe.freshBlockId`).
  */
 
 import { objectDiff } from '@onderling/sync-engine/objectDiff';
@@ -86,7 +86,7 @@ export function detectRecipeConflicts(local, incoming, base) {
   const metaConflicts = [];
 
   for (const c of conflicts) {
-    // Path shape per kringRecipe blocks-as-keyed-array regime:
+    // Path shape per circleRecipe blocks-as-keyed-array regime:
     //   ['blocks', <blockId>, ...]
     if (Array.isArray(c.path) && c.path[0] === 'blocks' && typeof c.path[1] === 'string') {
       const blockId = c.path[1];
@@ -223,7 +223,7 @@ export function applyResolution(local, incoming, decisions = {}) {
 let _incomingSeq = 0;
 /**
  * Mint a fresh block id for an incoming-side block kept via 'both'.
- * Shape mirrors `kringRecipe.freshBlockId` (`b-<time36>-<seq36>`) so the
+ * Shape mirrors `circleRecipe.freshBlockId` (`b-<time36>-<seq36>`) so the
  * merged recipe round-trips through `normalizeBlocks` cleanly; the
  * `-incoming` tail makes the origin greppable in stored books.
  */

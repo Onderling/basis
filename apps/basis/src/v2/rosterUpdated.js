@@ -11,7 +11,7 @@
  *   1. **No fat push.** The entry and its wire envelope carry a member REF +
  *      the changed KEY NAMES. Never a value. `rosterUpdatedPayload` is a
  *      whitelist, so a caller who hands it values gets them dropped HERE, at
- *      the boundary (the same discipline as `mediaForKringWire`).
+ *      the boundary (the same discipline as `mediaForCircleWire`).
  *   2. **No chat bubble.** The entry rides the C15 SILENT lane
  *      (`EventLog.appendSilentEntry`): the per-circle chat projection
  *      (`buildCircleChat`) ignores it, the cross-circle Stream firehose still
@@ -27,7 +27,7 @@
  */
 
 import { changedReleaseKeys, releaseUnchanged } from '@onderling/agent-registry';
-import { LruSet } from './kringKindFactory.js';
+import { LruSet } from './circleKindFactory.js';
 
 // The diff lives ONCE, next to the disclosure policy it compares releases of
 // (`@onderling/agent-registry` — the reveal-state home), so the member side here and the roster

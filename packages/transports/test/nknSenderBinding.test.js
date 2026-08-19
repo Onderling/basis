@@ -127,7 +127,7 @@ describe('nknSenderVerdict — the shared rule with nkn’s port', () => {
   });
 
   it('passes an envelope with no `_from` — there is no claim to disagree with', () => {
-    expect(nknSenderVerdict({ src: 'peer-A', isEncrypted: true }, { subtype: 'kring-chat-message' }))
+    expect(nknSenderVerdict({ src: 'peer-A', isEncrypted: true }, { subtype: 'circle-chat-message' }))
       .toMatchObject({ ok: true, reason: 'no-claimed-sender' });
   });
 });

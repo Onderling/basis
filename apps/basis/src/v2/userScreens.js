@@ -9,24 +9,24 @@
  *    circles)"
  *
  * A Screen is a user-defined VIEW that pairs:
- *   - a kringFilter — which kringen contribute data (null = all)
+ *   - a circleFilter — which circles contribute data (null = all)
  *   - a block list  — the same {id, type, config} shape α.1a's Recipe uses;
  *                     reusable with the existing block helpers (addBlock,
  *                     moveBlock, etc).
  *
  * Examples:
- *   - "Stream"    → kringFilter: null, blocks: [{noticeboard}, {agenda}]
- *   - "My buurt"  → kringFilter: ['buurt-selwerd'], blocks: [{noticeboard, limit:10}]
- *   - "Mijn dingen" → kringFilter: null, blocks: [{taken, scope:'assigned-to-me'}]
+ *   - "Stream"    → circleFilter: null, blocks: [{noticeboard}, {agenda}]
+ *   - "My buurt"  → circleFilter: ['buurt-selwerd'], blocks: [{noticeboard, limit:10}]
+ *   - "Mijn dingen" → circleFilter: null, blocks: [{taken, scope:'assigned-to-me'}]
  *                    (the new task block lands in α.4)
  *
  * Per-user storage (per):
  *   One ScreenBook per user; key `cc.userScreens` (NOT per-circle).
- *   Mirrors createKringRecipeStore's injectable {load, save} shape so
+ *   Mirrors createCircleRecipeStore's injectable {load, save} shape so
  *   the host can swap localStorage → pod io later without changing
  *   any callers.
  *
- * The block helpers from `kringRecipe.js` (addBlock, removeBlock,
+ * The block helpers from `circleRecipe.js` (addBlock, removeBlock,
  * moveBlock, updateBlock) operate on anything with `.blocks`, so they
  * compose with Screen unchanged.  Reuse them via:
  *
@@ -40,77 +40,77 @@
 /** Empty book — what a fresh user starts with (host can seed defaults). */
 export const EMPTY_SCREEN_BOOK = Object.freeze({ screens: [], activeId: null });
 
-/** Sentinel for "all kringen" in kringFilter (vs `[circleId, …]`). */
-export const ALL_KRINGEN = null;
+/** Sentinel for "all circles" in circleFilter (vs `[circleId, …]`). */
+export const ALL_CIRCLES = null;
 
 /* ─────────────────────────────────────────────────────────────────────── */
 /* Single-screen helpers                                                  */
 /* ─────────────────────────────────────────────────────────────────────── */
 
 /** Build a fresh empty Screen with a generated id + optional name. */
-export function emptyScreen(name = '', kringFilter = ALL_KRINGEN) {
+export function emptyScreen(name = '', circleFilter = ALL_CIRCLES) {
   return {
     id:          freshScreenId(),
     name:        typeof name === 'string' ? name : '',
-    kringFilter: normalizeKringFilter(kringFilter),
+    circleFilter: normalizeCircleFilter(circleFilter),
     blocks:      [],
   };
 }
 
 /**
  * Coerce raw → canonical Screen.  Mints id when missing, normalises
- * blocks via the same predicate kringRecipe uses (forward-compat: an
- * unknown block type is dropped silently).  kringFilter = null means
- * "all kringen"; an empty array also means all kringen.
+ * blocks via the same predicate circleRecipe uses (forward-compat: an
+ * unknown block type is dropped silently).  circleFilter = null means
+ * "all circles"; an empty array also means all circles.
  */
 export function normalizeScreen(raw) {
   if (!raw || typeof raw !== 'object') return emptyScreen('');
   return {
     id:          typeof raw.id   === 'string' && raw.id   ? raw.id   : freshScreenId(),
     name:        typeof raw.name === 'string'             ? raw.name : '',
-    kringFilter: normalizeKringFilter(raw.kringFilter),
+    circleFilter: normalizeCircleFilter(raw.circleFilter),
     blocks:      normalizeBlocks(raw.blocks),
   };
 }
 
-/** Returns true when the screen's filter matches "all kringen". */
-export function isAllKringen(screen) {
-  const f = screen?.kringFilter;
+/** Returns true when the screen's filter matches "all circles". */
+export function isAllCircles(screen) {
+  const f = screen?.circleFilter;
   return f == null || (Array.isArray(f) && f.length === 0);
 }
 
 /**
- * Resolve the effective list of kring ids for this screen.  When the
+ * Resolve the effective list of circle ids for this screen.  When the
  * filter is "all", returns the supplied `allCircleIds`.  Caller
  * supplies the universe — keeps this helper pure.
  */
-export function effectiveKringIds(screen, allCircleIds = []) {
-  if (isAllKringen(screen)) return [...allCircleIds];
-  return [...screen.kringFilter];
+export function effectiveCircleIds(screen, allCircleIds = []) {
+  if (isAllCircles(screen)) return [...allCircleIds];
+  return [...screen.circleFilter];
 }
 
-/** Add a kring id to the filter (deduped); switches from null → [id]. */
-export function addKringToScreen(screen, circleId) {
+/** Add a circle id to the filter (deduped); switches from null → [id]. */
+export function addCircleToScreen(screen, circleId) {
   if (!screen || typeof circleId !== 'string' || !circleId) return normalizeScreen(screen);
   const cur = normalizeScreen(screen);
-  const next = isAllKringen(cur) ? [] : [...cur.kringFilter];
+  const next = isAllCircles(cur) ? [] : [...cur.circleFilter];
   if (!next.includes(circleId)) next.push(circleId);
-  return { ...cur, kringFilter: next };
+  return { ...cur, circleFilter: next };
 }
 
-/** Remove a kring id from the filter.  No-op if filter is `ALL_KRINGEN`. */
-export function removeKringFromScreen(screen, circleId) {
+/** Remove a circle id from the filter.  No-op if filter is `ALL_CIRCLES`. */
+export function removeCircleFromScreen(screen, circleId) {
   if (!screen) return normalizeScreen(screen);
   const cur = normalizeScreen(screen);
-  if (isAllKringen(cur)) return cur;
-  return { ...cur, kringFilter: cur.kringFilter.filter((id) => id !== circleId) };
+  if (isAllCircles(cur)) return cur;
+  return { ...cur, circleFilter: cur.circleFilter.filter((id) => id !== circleId) };
 }
 
-/** Switch the screen back to "all kringen" (drops any explicit list). */
-export function setAllKringen(screen) {
+/** Switch the screen back to "all circles" (drops any explicit list). */
+export function setAllCircles(screen) {
   if (!screen) return normalizeScreen(screen);
   const cur = normalizeScreen(screen);
-  return { ...cur, kringFilter: ALL_KRINGEN };
+  return { ...cur, circleFilter: ALL_CIRCLES };
 }
 
 /* ─────────────────────────────────────────────────────────────────────── */
@@ -127,9 +127,9 @@ export function normalizeScreenBook(raw) {
   return { screens, activeId };
 }
 
-export function addScreen(book, name = '', kringFilter = ALL_KRINGEN) {
+export function addScreen(book, name = '', circleFilter = ALL_CIRCLES) {
   const cur = normalizeScreenBook(book);
-  const screen = emptyScreen(name, kringFilter);
+  const screen = emptyScreen(name, circleFilter);
   const screens = [...cur.screens, screen];
   return { screens, activeId: cur.activeId ?? screen.id };
 }
@@ -234,21 +234,21 @@ export function localStorageScreenIo(storage = globalThis.localStorage) {
 /* Internals                                                              */
 /* ─────────────────────────────────────────────────────────────────────── */
 
-function normalizeKringFilter(raw) {
-  if (raw == null) return ALL_KRINGEN;
-  if (!Array.isArray(raw)) return ALL_KRINGEN;
+function normalizeCircleFilter(raw) {
+  if (raw == null) return ALL_CIRCLES;
+  if (!Array.isArray(raw)) return ALL_CIRCLES;
   const out = [];
   for (const id of raw) {
     if (typeof id === 'string' && id) out.push(id);
   }
-  // Empty array is canonicalised to null (= all kringen).
-  return out.length > 0 ? out : ALL_KRINGEN;
+  // Empty array is canonicalised to null (= all circles).
+  return out.length > 0 ? out : ALL_CIRCLES;
 }
 
-// Lifted from kringRecipe.js (same shape, same predicate).  Kept
+// Lifted from circleRecipe.js (same shape, same predicate).  Kept
 // inline rather than importing to avoid a circular dependency if
-// kringRecipe ever wants a Screen reference later.  Keep in sync
-// with kringRecipe.BLOCK_TYPES — α.4 added 'tasks'.
+// circleRecipe ever wants a Screen reference later.  Keep in sync
+// with circleRecipe.BLOCK_TYPES — α.4 added 'tasks'.
 const BLOCK_TYPES = ['announcement', 'noticeboard', 'agenda', 'tasks', 'rules', 'photo', 'text'];
 
 function normalizeBlocks(raw) {

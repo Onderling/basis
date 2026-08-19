@@ -9,8 +9,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import { chatRows, stampSenderLabels } from '../src/v2/circleStream.js';
-import { materializeBlock } from '../src/v2/kringRecipeBlocks.js';
-import { renderCircleKring } from '../web/v2/circleKring.js';
+import { materializeBlock } from '../src/v2/circleRecipeBlocks.js';
+import { renderCircleView } from '../web/v2/circleView.js';
 
 const t = (k) => k;
 
@@ -92,22 +92,22 @@ describe('chatRows — the sender stamp', () => {
   });
 });
 
-describe('renderCircleKring — the paint half', () => {
-  const paint = (row) => renderCircleKring(document.createElement('div'), {
+describe('renderCircleView — the paint half', () => {
+  const paint = (row) => renderCircleView(document.createElement('div'), {
     circle: { id: 'c1', name: 'Buren' }, t, activeTab: 'gesprek', rows: [row],
   });
 
   it('paints the stamped label, ignoring any payload-claimed name', () => {
     const [row] = rowsFor([chatEvent('webid:ella', 'hoi', { senderDisplay: 'Aangeklede Leugen' })]);
     const el = paint(row);
-    expect(el.querySelector('.circle-kring__bubble-sender')?.textContent).toBe('@ella');
+    expect(el.querySelector('.circle-circle__bubble-sender')?.textContent).toBe('@ella');
     expect(el.textContent).not.toContain('Aangeklede Leugen');
   });
 
   it('paints the neutral key for a stamped-unknown sender', () => {
     const [row] = rowsFor([chatEvent('webid:vertrokken', 'oud')]);
     const el = paint(row);
-    expect(el.querySelector('.circle-kring__bubble-sender')?.textContent)
+    expect(el.querySelector('.circle-circle__bubble-sender')?.textContent)
       .toBe('circle.chat.unknown_sender');
   });
 
@@ -117,7 +117,7 @@ describe('renderCircleKring — the paint half', () => {
       event: { type: 'chat-message', actor: 'webid:ella',
         payload: { circleId: 'c1', text: 'hoi', senderDisplay: 'Wire Naam' } },
     });
-    expect(el.querySelector('.circle-kring__bubble-sender')).toBeNull();
+    expect(el.querySelector('.circle-circle__bubble-sender')).toBeNull();
     expect(el.textContent).not.toContain('Wire Naam');
   });
 });

@@ -163,7 +163,7 @@ export function shouldSendReceipt(policy) {
  * The wire subtype an app-level receipt travels as.
  *
  * `subtype`, kebab-case — the HOUSE wire convention: the peer router (`makePeerRouter`) dispatches on
- * `payload.subtype`, as every existing peer message does (`kring-chat-message`, `catch-up-offer`, …).
+ * `payload.subtype`, as every existing peer message does (`circle-chat-message`, `catch-up-offer`, …).
  * The first draft said `kind: 'delivery.receipt'`, which no router would ever have dispatched.
  */
 export const RECEIPT_MESSAGE = 'delivery-receipt';

@@ -39,7 +39,7 @@ function makeVersionedCirclePod(circleId) {
 
 describe('agents P3 — restore corrupted / lost data through the real composition', () => {
   it('list + restore over a vandalised circle resource (the J7 arc)', async () => {
-    const circleId = 'kring-recovery';
+    const circleId = 'circle-recovery';
     const { pod, deviceId } = makeVersionedCirclePod(circleId);
     const uri = `pseudo-pod://${deviceId}/group/items/post-1`;
 
@@ -85,7 +85,7 @@ describe('agents P3 — restore corrupted / lost data through the real compositi
       .toMatchObject({ ok: false, error: 'no-version-store' });
 
     const defaultBoot = await createRealHouseholdAgent({ seedHousehold: false });
-    expect(await defaultBoot.callSkill('agents', 'listDataVersions', { circleId: 'kring-x' }))
+    expect(await defaultBoot.callSkill('agents', 'listDataVersions', { circleId: 'circle-x' }))
       .toMatchObject({ ok: false, error: 'no-version-store' });
   });
 });

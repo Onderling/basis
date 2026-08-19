@@ -5,7 +5,7 @@
 //                                          already routes slash upstream, so it defers via onUnhandled)
 //   2. free text + the circle's LLM on + the bot ADDRESSED (@tag/name) → gate (rule → dispatch; skip →
 //                                          unhandled) else interpret via the circle LLM → dispatch
-//   3. otherwise                         → the injected sink (mobile: post to the kring; web: defer)
+//   3. otherwise                         → the injected sink (mobile: post to the circle; web: defer)
 //
 // Platform-neutral: the shell injects HOW to dispatch (slash string OR {opId,args}), the "unhandled"
 // sink, the catalog, per-circle LLM providers, the policy (static OR a per-scope getter), and the
@@ -23,30 +23,30 @@ import { scopeCatalogToApps } from './circleCatalogScope.js';
  * @param {{local?:object,cloud?:object}|null} [a.llmProviders] host-supplied LlmClients
  * @param {(text:string, opts:{catalog,llm,context}) => Promise<{opId:string,args?:object}|null>} [a.interpret]  NL→slash
  * @param {(input:string|{opId:string,args:object}, ctx:object) => any} a.dispatch  run a typed slash STRING or an {opId,args} route
- * @param {(text:string, ctx:object) => any} [a.postToKring]  back-compat sink: posts a kring message (→ the default onUnhandled, reports 'kring')
- * @param {(text:string, ctx:object) => (string|Promise<string>)} [a.onUnhandled]  handle slash(when dispatchSlash:false)/skip/no-match/not-addressed; returns the `via` ('kring' | 'defer' | 'none' | …)
+ * @param {(text:string, ctx:object) => any} [a.postToCircle]  back-compat sink: posts a circle message (→ the default onUnhandled, reports 'circle')
+ * @param {(text:string, ctx:object) => (string|Promise<string>)} [a.onUnhandled]  handle slash(when dispatchSlash:false)/skip/no-match/not-addressed; returns the `via` ('circle' | 'defer' | 'none' | …)
  * @param {boolean} [a.dispatchSlash=true]  when false, a /command is NOT dispatched here (left to onUnhandled — the web shell routes slash itself)
  * @param {object} [a.gate]   optional token gate ({ evaluate })
  * @param {string} [a.botName='assistant']
  */
-export function createCircleDispatch({ catalog, policy, userDefault, llmProviders, interpret, dispatch, postToKring, onUnhandled, onNoMatch, onLlmUnavailable, dispatchSlash = true, gate, botName = 'assistant', recentTurns }) {
+export function createCircleDispatch({ catalog, policy, userDefault, llmProviders, interpret, dispatch, postToCircle, onUnhandled, onNoMatch, onLlmUnavailable, dispatchSlash = true, gate, botName = 'assistant', recentTurns }) {
   if (typeof dispatch !== 'function') {
     throw new Error('createCircleDispatch: dispatch is required');
   }
   const getCatalog     = typeof catalog === 'function' ? catalog : () => catalog;
   const getPolicy      = typeof policy === 'function' ? policy : () => policy;
   const getUserDefault = typeof userDefault === 'function' ? userDefault : () => userDefault;
-  // The "everything-else" sink: an explicit onUnhandled, else a `postToKring` (back-compat → posts +
-  // reports 'kring'), else a no-op reporting 'none'.
+  // The "everything-else" sink: an explicit onUnhandled, else a `postToCircle` (back-compat → posts +
+  // reports 'circle'), else a no-op reporting 'none'.
   const unhandled = typeof onUnhandled === 'function'
     ? onUnhandled
-    : (typeof postToKring === 'function'
-        ? async (text, ctx) => { await postToKring(text, ctx); return 'kring'; }
+    : (typeof postToCircle === 'function'
+        ? async (text, ctx) => { await postToCircle(text, ctx); return 'circle'; }
         : () => 'none');
   const sink = async (text, ctx) => (await unhandled(text, ctx)) ?? 'none';
 
   return {
-    /** Route one typed turn. Returns `{ via: 'slash'|'rule'|'llm'|'kring'|'defer'|'none', cmd? }`. */
+    /** Route one typed turn. Returns `{ via: 'slash'|'rule'|'llm'|'circle'|'defer'|'none', cmd? }`. */
     async handle(text, ctx = {}) {
       const trimmed = String(text ?? '').trim();
       if (!trimmed) return { via: 'none' };
@@ -81,7 +81,7 @@ export function createCircleDispatch({ catalog, policy, userDefault, llmProvider
 
         // The turn needs free-text UNDERSTANDING → the LLM, but only if smart chat is available.
         if (llm) {
-          // Conversation memory — prepend the recent kring turns so follow-ups ("en schoenen ook",
+          // Conversation memory — prepend the recent circle turns so follow-ups ("en schoenen ook",
           // "that one") resolve against what was just said. interpret weaves them into the prompt.
           const turns = typeof recentTurns === 'function' ? (recentTurns() || []) : [];
           if (turns.length) context = [...turns, ...(Array.isArray(context) ? context : [])];

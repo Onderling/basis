@@ -11,7 +11,7 @@ function fakeEventLog() {
 
 function envelope(over = {}) {
   return {
-    subtype:   'kring-chat-message',
+    subtype:   'circle-chat-message',
     circleId:  'g1',
     msgId:     'm1',
     text:      'Hoi buurt!',
@@ -39,7 +39,7 @@ describe('createChatMessageInbox · ε.1 single normalization gate', () => {
     const ev = eventLog.events[0];
     expect(ev.id).toBe('m1');
     expect(ev.ts).toBe(1735_000_000_000);
-    expect(ev.app).toBe('kring');
+    expect(ev.app).toBe('circle');
     expect(ev.type).toBe('chat-message');
     expect(ev.actor).toBe('webid:anne');
     expect(ev.payload).toEqual({
@@ -47,9 +47,9 @@ describe('createChatMessageInbox · ε.1 single normalization gate', () => {
       text:     'Hoi buurt!',
       kind:     'chat-message',
       // Arrival IS the evidence of reach: this envelope came over the circle fan-out, so the bubble may
-      // say "whole kring". Without it both shells' badge fell through to "only you" on every received
+      // say "whole circle". Without it both shells' badge fell through to "only you" on every received
       // message — the visibility chip claiming the opposite of the truth.
-      scope:    'kring',
+      scope:    'circle',
       senderDisplay: 'webid:anne',
     });
   });
@@ -98,10 +98,10 @@ describe('createChatMessageInbox · ε.1 single normalization gate', () => {
     const inbox = createChatMessageInbox({ eventLog, logger: silentLogger });
     const cases = [
       null,
-      { subtype: 'kring-chat-message', circleId: '',  msgId: 'm', text: 't', ts: 1 },
-      { subtype: 'kring-chat-message', circleId: 'g', msgId: '',  text: 't', ts: 1 },
-      { subtype: 'kring-chat-message', circleId: 'g', msgId: 'm', text: '',  ts: 1 },
-      { subtype: 'kring-chat-message', circleId: 'g', msgId: 'm', text: 't', ts: 'x' },
+      { subtype: 'circle-chat-message', circleId: '',  msgId: 'm', text: 't', ts: 1 },
+      { subtype: 'circle-chat-message', circleId: 'g', msgId: '',  text: 't', ts: 1 },
+      { subtype: 'circle-chat-message', circleId: 'g', msgId: 'm', text: '',  ts: 1 },
+      { subtype: 'circle-chat-message', circleId: 'g', msgId: 'm', text: 't', ts: 'x' },
       { subtype: 'something-else',     circleId: 'g', msgId: 'm', text: 't', ts: 1 },
     ];
     for (const c of cases) {
@@ -207,9 +207,9 @@ describe('createChatMessageInbox · ε.1 single normalization gate', () => {
         envelope({ msgId: 'mine2', fromActor: 'webid:me' }),
         { source: 'rehydrator' },
       );
-      // `senderDisplay` ABSENT, exactly as `kringChatMessageEvent` omits it on the send path.
+      // `senderDisplay` ABSENT, exactly as `circleChatMessageEvent` omits it on the send path.
       expect(eventLog.events[0].payload).not.toHaveProperty('senderDisplay');
-      expect(eventLog.events[0].payload.scope).toBe('kring');
+      expect(eventLog.events[0].payload.scope).toBe('circle');
     });
 
     it('covers the other restore paths too — pod replay and catch-up', async () => {

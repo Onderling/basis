@@ -12,7 +12,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { AgentIdentity, signSpine } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { bindCircleGovernance, makeGovernanceRail } from '../../src/v2/governanceAppWiring.js';
-import { makeKringGovernancePeerHandler, makeKringReportPeerHandler } from '../../src/v2/kringLogReceiver.js';
+import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '../../src/v2/circleLogReceiver.js';
 import { EventLog } from '../../src/eventLog.js';
 import { normalizeCirclePolicy } from '../../src/v2/circlePolicy.js';
 import { DECISION_STATUS } from '../../src/v2/governanceDecision.js';
@@ -34,7 +34,7 @@ async function mesh(refs = ['admin0', 'm0', 'm1']) {
   const fanTo = (fromRef, circleId, event) => {
     for (const ref of refs) {
       if (ref === fromRef) continue;
-      devices[ref].ingest(null, { subtype: 'kring-governance-broadcast', circleId, event, ts: Date.now() });
+      devices[ref].ingest(null, { subtype: 'circle-governance-broadcast', circleId, event, ts: Date.now() });
     }
   };
   let n = 0;
@@ -43,8 +43,8 @@ async function mesh(refs = ['admin0', 'm0', 'm1']) {
     const callSkill = vi.fn(async (o, op) => (op === 'listGroupRoster' ? rosterExcluding(ref) : { ok: true }));
     const rail = makeGovernanceRail({ eventLog: log, circleIdentityFor: async () => cids[ref], myRef: ref, callSkill });
     devices[ref] = { ref, log, rail, callSkill };
-    devices[ref].ingest = makeKringGovernancePeerHandler({ eventLog: log, rail });
-    devices[ref].ingestReport = makeKringReportPeerHandler({ eventLog: log });
+    devices[ref].ingest = makeCircleGovernancePeerHandler({ eventLog: log, rail });
+    devices[ref].ingestReport = makeCircleReportPeerHandler({ eventLog: log });
     devices[ref].gov = bindCircleGovernance({
       eventLog: log, callSkill, getPolicy: async () => policy, myRef: ref,
       genId: () => `p${(n += 1)}`, now: () => 1,
@@ -54,7 +54,7 @@ async function mesh(refs = ['admin0', 'm0', 'm1']) {
           const allow = Array.isArray(opts?.to) ? new Set(opts.to) : null;
           for (const r of refs) {
             if (r === ref || (allow && !allow.has(r))) continue;
-            devices[r].ingestReport(null, { subtype: 'kring-report-broadcast', circleId, event, ts: Date.now() });
+            devices[r].ingestReport(null, { subtype: 'circle-report-broadcast', circleId, event, ts: Date.now() });
           }
           return;
         }
@@ -85,15 +85,15 @@ describe('governance propagation (signed statements across the mesh)', () => {
   it('a re-delivered statement does not double-append (stable-id dedup)', async () => {
     const { devices, cids } = await mesh();
     const stmt = signSpine(cids.m0, { kind: 'vote', circleId: 'c1', subject: 'p1', payload: { voter: 'm0', choice: 'yes', authorRef: 'm0' }, parent: null });
-    await devices.admin0.ingest(null, { subtype: 'kring-governance-broadcast', circleId: 'c1', event: stmt, ts: Date.now() });
-    await devices.admin0.ingest(null, { subtype: 'kring-governance-broadcast', circleId: 'c1', event: stmt, ts: Date.now() });
+    await devices.admin0.ingest(null, { subtype: 'circle-governance-broadcast', circleId: 'c1', event: stmt, ts: Date.now() });
+    await devices.admin0.ingest(null, { subtype: 'circle-governance-broadcast', circleId: 'c1', event: stmt, ts: Date.now() });
     expect(devices.admin0.log.query({}).filter((e) => e.type === 'governance').length).toBe(1);
   });
 
   it('an UNSIGNED bare event is refused at the rail receiver — the legacy path is gone', async () => {
     const { devices } = await mesh();
     const bare = { kind: 'governance', event: 'vote', proposalId: 'p1', voter: 'm0', choice: 'yes', hash: 'abc', author: 'm0', parentHash: null };
-    await devices.admin0.ingest(null, { subtype: 'kring-governance-broadcast', circleId: 'c1', event: bare, ts: Date.now() });
+    await devices.admin0.ingest(null, { subtype: 'circle-governance-broadcast', circleId: 'c1', event: bare, ts: Date.now() });
     expect(devices.admin0.log.query({}).filter((e) => e.type === 'governance')).toHaveLength(0);
   });
 
@@ -110,12 +110,12 @@ describe('governance propagation (signed statements across the mesh)', () => {
   it('in-app nudge: a PROPOSE notifies once; a vote does not; a re-delivery does not re-notify', async () => {
     const { devices, cids } = await mesh();
     const notify = vi.fn();
-    const ingest = makeKringGovernancePeerHandler({ eventLog: devices.admin0.log, rail: devices.admin0.rail, notify });
+    const ingest = makeCircleGovernancePeerHandler({ eventLog: devices.admin0.log, rail: devices.admin0.rail, notify });
     const propose = signSpine(cids.m0, { kind: 'propose', circleId: 'c1', subject: 'p9', payload: { action: 'removeMember', by: 'm0', authorRef: 'm0', at: 1 }, parent: null });
     const vote = signSpine(cids.m0, { kind: 'vote', circleId: 'c1', subject: 'p9', payload: { voter: 'm0', choice: 'yes', authorRef: 'm0', at: 2 }, parent: propose.body.hash });
-    await ingest(null, { subtype: 'kring-governance-broadcast', circleId: 'c1', event: propose, ts: Date.now() });
-    await ingest(null, { subtype: 'kring-governance-broadcast', circleId: 'c1', event: propose, ts: Date.now() }); // re-delivery
-    await ingest(null, { subtype: 'kring-governance-broadcast', circleId: 'c1', event: vote, ts: Date.now() });
+    await ingest(null, { subtype: 'circle-governance-broadcast', circleId: 'c1', event: propose, ts: Date.now() });
+    await ingest(null, { subtype: 'circle-governance-broadcast', circleId: 'c1', event: propose, ts: Date.now() }); // re-delivery
+    await ingest(null, { subtype: 'circle-governance-broadcast', circleId: 'c1', event: vote, ts: Date.now() });
     expect(notify).toHaveBeenCalledTimes(1);                 // only the first propose
     expect(notify).toHaveBeenCalledWith('c1', expect.objectContaining({ event: 'propose', proposalId: 'p9', action: 'removeMember' }));
   });

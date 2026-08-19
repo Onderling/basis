@@ -26,7 +26,7 @@
  * while every other locale key stays under `circle.recipe.conflict.*`
  * — the picker copy is identical across the three flows.
  */
-import { BLOCK_REGISTRY } from '../../src/v2/kringRecipeBlocks.js';
+import { BLOCK_REGISTRY } from '../../src/v2/circleRecipeBlocks.js';
 
 /**
  * @param {HTMLElement} container

@@ -90,9 +90,9 @@ describe('addressPossession — an address is a public key, so possession is one
 describe('the per-circle, vault-free path — what makes N aliases as cheap as one', () => {
   it('signs for a derived circle address, and verifies against that address', () => {
     const profileSeed = seed(7);
-    const address = deriveCircleAddress(profileSeed, 'buurtkring');
+    const address = deriveCircleAddress(profileSeed, 'circle');
     const nonce = newAddressChallenge();
-    const proof = signAddressPossessionFromSeed(profileSeed, 'buurtkring', address, nonce);
+    const proof = signAddressPossessionFromSeed(profileSeed, 'circle', address, nonce);
     expect(verifyAddressPossession({ address, nonce, proof })).toBe(true);
   });
 

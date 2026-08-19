@@ -120,7 +120,7 @@ describe('governance catch-up — the offline third device converges (pull-all, 
     const forged = signSpine(rogue, { kind: 'vote', circleId: CIRCLE, subject: 'prop-cu-1', payload: { voter: 'webid:alice', choice: 'yes', authorRef: 'webid:alice' }, parent: null });
     const genuine = A.rail.storedStatements(CIRCLE);
     const catchUpC = makeGovernanceCatchUp({ rail: C.rail, sendToPeer: () => {} });
-    const res = await catchUpC.onBatch('peer:x', { subtype: 'kring-governance-catchup-batch', circleId: CIRCLE, statements: [forged, ...genuine] });
+    const res = await catchUpC.onBatch('peer:x', { subtype: 'circle-governance-catchup-batch', circleId: CIRCLE, statements: [forged, ...genuine] });
     expect(res.landed).toBe(genuine.length);                         // the forgery dropped, the rest landed
     expect(C.eventLog.entries.every((e) => e.payload?.body?.hash !== forged.body.hash)).toBe(true);
     const cFold = await foldOf(C);

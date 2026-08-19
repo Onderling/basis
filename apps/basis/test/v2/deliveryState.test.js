@@ -141,7 +141,7 @@ describe('an inbound receipt is untrusted', () => {
     expect(receiveReceipt({ subtype: RECEIPT_MESSAGE }, 'them')).toBeNull();
     expect(receiveReceipt({ subtype: RECEIPT_MESSAGE, messageId: '' }, 'them')).toBeNull();
     expect(receiveReceipt({ subtype: RECEIPT_MESSAGE, messageId: 'x'.repeat(200) }, 'them')).toBeNull();
-    expect(receiveReceipt({ subtype: 'kring-chat-message', messageId: 'm1' }, 'them')).toBeNull();
+    expect(receiveReceipt({ subtype: 'circle-chat-message', messageId: 'm1' }, 'them')).toBeNull();
     expect(receiveReceipt(null, 'them')).toBeNull();
   });
 });

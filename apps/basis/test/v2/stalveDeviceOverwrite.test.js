@@ -6,14 +6,14 @@
  * and silently overwrites the first), but on the multi-device axis: Anna edits a circle rule on her PHONE
  * while her LAPTOP is offline holding the old document; the laptop reconnects and fans its stale copy.
  *
- * The property: an inbound document is never applied silently. `makeKringKindReceiver` caches it as PENDING
+ * The property: an inbound document is never applied silently. `makeCircleKindReceiver` caches it as PENDING
  * and the human resolves — so a stale broadcast cannot overwrite a newer local edit behind the user's back.
  * These tests pin that, plus the conflict detection the resolver UI reads.
  *
  * Cast: Anna's phone (fresh) · Anna's laptop (stale) · Bram (a third member who must converge, not diverge).
  */
 import { describe, it, expect, vi } from 'vitest';
-import { makeKringPolicyPeerHandler } from '../../src/v2/kringPolicyReceiver.js';
+import { makeCirclePolicyPeerHandler } from '../../src/v2/circlePolicyReceiver.js';
 import { detectRulesConflicts, applyRulesResolution, decisionsForMerges } from '../../src/v2/rulesConflict.js';
 
 /** A device's local doc + the pending slot an inbound broadcast lands in. */
@@ -31,7 +31,7 @@ function device(initialDoc) {
       pending.delete(circleId);
       return applied;
     },
-    handler: makeKringPolicyPeerHandler({
+    handler: makeCirclePolicyPeerHandler({
       pendingStore: { set: async (circleId, doc) => { pending.set(circleId, doc); } },
       logger: { warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
     }),
@@ -39,7 +39,7 @@ function device(initialDoc) {
 }
 
 const envelope = (policy, msgId) => ({
-  subtype: 'kring-policy-broadcast', circleId: 'c1', msgId, ts: Date.now(), policy,
+  subtype: 'circle-policy-broadcast', circleId: 'c1', msgId, ts: Date.now(), policy,
 });
 
 const OLD = { houseRules: ['wees aardig'], quietHours: '22:00' };

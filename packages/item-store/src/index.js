@@ -99,11 +99,11 @@ export { treeOf, createCrossPodRefResolver } from './embeds.js';
 // multiple circles).
 export { audienceFromItem, audienceMatches, audienceMatchesAny } from './audience.js';
 
-// Connectivity Phase 2 — the ONE canonical kring chat Envelope + its declared
+// Connectivity Phase 2 — the ONE canonical circle chat Envelope + its declared
 // projections (fromItem / toItem-render / toWire). Collapses the three
 // hand-maintained chat shapes so a change lands once. See `chatEnvelope.js`.
 export {
-  KRING_CHAT_KIND,
+  CIRCLE_CHAT_KIND,
   chatEnvelopeFromStoreItem,
   toEventLogItem,
   fromEventLogItem,

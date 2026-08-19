@@ -25,7 +25,7 @@ import { threeDevices, openProposal } from './helpers/threeDeviceGovernance.js';
 /** Hand-deliver a crafted governance event to ONE device, bypassing the fan. This is what a hostile client
  *  does: it does not broadcast honestly, it shows different things to different peers. */
 const showTo = (d, circleId, event) =>
-  d.ingestGovernance(null, { subtype: 'kring-governance-broadcast', circleId, event, ts: Date.now() });
+  d.ingestGovernance(null, { subtype: 'circle-governance-broadcast', circleId, event, ts: Date.now() });
 
 /**
  * Anna equivocates: TWO votes on the same proposal, both chained to the SAME parent, so neither is a
@@ -279,7 +279,7 @@ describe('3.6 — a report reaches the admin; it must not reach the person repor
 
     // Force the event onto Bram's device, bypassing the narrowed fan — the demoted-admin / replay case.
     const ev = h.devices.admin0.log.query({}).find((e) => e.type === 'report').payload;
-    h.devices.m0.ingestReport(null, { subtype: 'kring-report-broadcast', circleId: 'c1', event: ev, ts: Date.now() });
+    h.devices.m0.ingestReport(null, { subtype: 'circle-report-broadcast', circleId: 'c1', event: ev, ts: Date.now() });
     expect(h.devices.m0.log.query({}).filter((e) => e.type === 'report')).toHaveLength(1);   // he holds it…
 
     const { open, scope } = await h.devices.m0.gov.reports.list('c1');

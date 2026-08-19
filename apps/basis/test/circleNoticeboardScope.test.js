@@ -66,11 +66,11 @@ describe('isNoticeboardPost — hides system items', () => {
   // A circle CHAT line is mirrored into the same itemStore so the conversation survives a
   // reload (stoop `broadcastCircleMessage` / `ingestCircleMessage`). It is not a noticeboard
   // post — but it was rendered as one, with a "Withdraw" action when it was yours.
-  describe('kring chat lines are not noticeboard posts', () => {
+  describe('circle chat lines are not noticeboard posts', () => {
     const chatItem = (over = {}) => ({
-      type: 'kring-chat-message',
+      type: 'circle-chat-message',
       text: 'zie ik je zaterdag?',
-      source: { circleId: 'miep', msgId: 'kring-miep-1735-1', ts: 1735_000_000_000, fromActor: 'webid:anne' },
+      source: { circleId: 'miep', msgId: 'circle-miep-1735-1', ts: 1735_000_000_000, fromActor: 'webid:anne' },
       ...over,
     });
     it('drops a chat item by type', () => {

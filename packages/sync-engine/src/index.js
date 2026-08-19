@@ -33,6 +33,6 @@ export { diff }      from './diff.js';
 export { objectDiff } from './objectDiff.js';
 
 // γ.2's keyed-object version capture (`objectVersions.js`) was RETIRED
-// (2026-07-09, PLAN-pod-versioning-history-recovery "Rewire kring"): the
-// kring stores now version through the `@onderling/versioning` substrate via
+// (2026-07-09, PLAN-pod-versioning-history-recovery "Rewire circle"): the
+// circle stores now version through the `@onderling/versioning` substrate via
 // `@onderling/kring-host/objectVersionsStorage`.

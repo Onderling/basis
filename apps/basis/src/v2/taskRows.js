@@ -1,7 +1,7 @@
 /**
  * basis v2 — task-store item → Stream-row mapping (shared web≡mobile).
  *
- * The kring "Taken" tab lists a circle's tasks (from the composed tasks
+ * The circle "Taken" tab lists a circle's tasks (from the composed tasks
  * agent's `listOpen`) and surfaces each task's lifecycle actions.  Those
  * actions are chosen by the SAME `actionsForStreamRow` selector the chat
  * stream uses (invariant #1/#3 — logic lives once), so a task item must be

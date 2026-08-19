@@ -1,7 +1,7 @@
 /**
  * basis v2 — recipe editor (Plan α.1d.1, audit gap #1+#9).
  *
- * Admin-facing editor for the per-kring screen recipes (v2 PDF §2
+ * Admin-facing editor for the per-circle screen recipes (v2 PDF §2
  * "RECEPT · SCHERM-WEERGAVE INRICHTEN").  Two render modes:
  *
  *   - 'book'   — list every recipe, mark active, add/rename/delete/setActive
@@ -10,13 +10,13 @@
  * Controlled render: host owns the RecipeBook + the editing-recipe id
  * + ephemeral input state, passes everything in, merges patches on
  * the callbacks, re-renders.  All persistence happens host-side
- * through `createKringRecipeStore`.
+ * through `createCircleRecipeStore`.
  *
  * Pure DOM.  No drag-reorder yet (use ↑/↓ buttons); image picker on
  * the photo block is a follow-up (free-text src for now).
  */
-import { BLOCK_TYPES } from '../../src/v2/kringRecipe.js';
-import { BLOCK_REGISTRY } from '../../src/v2/kringRecipeBlocks.js';
+import { BLOCK_TYPES } from '../../src/v2/circleRecipe.js';
+import { BLOCK_REGISTRY } from '../../src/v2/circleRecipeBlocks.js';
 import { detectRecipeConflicts, applyResolution } from '../../src/v2/recipeConflict.js';
 import { renderRecipeConflictResolver } from './recipeConflictResolver.js';
 
@@ -48,10 +48,10 @@ import { renderRecipeConflictResolver } from './recipeConflictResolver.js';
  *
  * @param {object|null} [args.incomingRecipe]   Recipe arriving from a peer
  *        broadcast / pod-sync.  Optional; null disables γ.3 entirely.
- * @param {object} [args.recipeStore]   The kring recipe store (γ.2).  Used
+ * @param {object} [args.recipeStore]   The circle recipe store (γ.2).  Used
  *        for `listVersions(circleId)` and `update(...)` after resolution.
  * @param {string} [args.circleId]      Required when `incomingRecipe` is
- *        non-null (so we can fetch the version history slot for this kring).
+ *        non-null (so we can fetch the version history slot for this circle).
  * @param {Function} [args.onIncomingApplied]   (mergedRecipe) => void;
  *        called after the user resolved + the merged recipe was saved.
  * @param {Function} [args.onIncomingDiscarded] () => void; called after
@@ -507,7 +507,7 @@ function renderBlockConfigForm(block, { recipeId, tr, onUpdateBlock }) {
       break;
     }
     case 'rules': {
-      // No config — rules block always renders the kring's current
+      // No config — rules block always renders the circle's current
       // houseRules doc.  Show a hint instead.
       const hint = document.createElement('div');
       hint.className = 'circle-recipe-editor__block-hint';

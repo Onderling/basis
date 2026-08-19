@@ -14,7 +14,7 @@
  * per language.
  *
  * Flow: welkom (who the bot is + encrypted + no account) → wat_is_dit (messages/
- * tasks/plans for neighbourhood/household/club) → eigen_kring (choice: "start your
+ * tasks/plans for neighbourhood/household/club) → own_circle (choice: "start your
  * own circle?" — YES hands off to the create wizard, LATER continues) → uitnodigen
  * (point at the invite flow) → klaar. Short, honest, no hype.
  */
@@ -32,8 +32,8 @@ const FLOW = Object.freeze({
   start: 'welkom',
   steps: {
     welkom:      { kind: 'say',    next: 'wat_is_dit' },
-    wat_is_dit:  { kind: 'say',    next: 'eigen_kring' },
-    eigen_kring: {
+    wat_is_dit:  { kind: 'say',    next: 'own_circle' },
+    own_circle: {
       kind: 'choice',
       sets: 'wantsCircle',
       options: [
@@ -49,19 +49,19 @@ const FLOW = Object.freeze({
 /** Per-language leaf copy for each step (the bot's line + any option labels). */
 const COPY = Object.freeze({
   nl: {
-    welkom: 'Hoi, ik ben Onderling. Dit is een kring — een plek waar je met een paar mensen dingen regelt. Ik ben zelf ook gewoon lid van deze kring; je praat met mij zoals met iedereen. Je berichten zijn versleuteld en je hoeft geen account te maken.',
+    welkom: 'Hoi, ik ben Onderling. Dit is een circle — een plek waar je met een paar mensen dingen regelt. Ik ben zelf ook gewoon lid van deze circle; je praat met mij zoals met iedereen. Je berichten zijn versleuteld en je hoeft geen account te maken.',
     wat_is_dit: 'Onderling is voor het dagelijkse: berichten, taken en afspraken. Voor je buurt, je huishouden of een club. Klein en overzichtelijk.',
-    eigen_kring: {
-      ask: 'Wil je zelf een kring beginnen?',
+    own_circle: {
+      ask: 'Wil je zelf een circle beginnen?',
       options: { ja: 'Ja, help me', later: 'Nu even niet' },
     },
-    uitnodigen: 'Prima. Als je een kring hebt, kun je buren of huisgenoten uitnodigen met een link of een QR-code. Dat kan ook later nog.',
+    uitnodigen: 'Prima. Als je een circle hebt, kun je buren of huisgenoten uitnodigen met een link of een QR-code. Dat kan ook later nog.',
     klaar: 'Klaar. Ik blijf hier staan — stel gerust een vraag als je iets wilt weten.',
   },
   en: {
     welkom: "Hi, I'm Onderling. This is a circle — a place where you sort things out with a few people. I'm just a member of this circle too; you talk to me like anyone else. Your messages are encrypted, and you don't need an account.",
     wat_is_dit: 'Onderling is for the everyday: messages, tasks and plans. For your neighbourhood, your household or a club. Small and manageable.',
-    eigen_kring: {
+    own_circle: {
       ask: 'Want to start a circle of your own?',
       options: { ja: 'Yes, help me', later: 'Not right now' },
     },

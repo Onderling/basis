@@ -20,7 +20,7 @@ export const GOVERNANCE_RAIL_KINDS = entryKindRegistryFromManifests(governanceMa
 
 /**
  * Build the governance RAIL: signed, circle-scoped, chained entries on the device log.
- * Shared by the write side (bindCircleGovernance) and the receive side (kringLogReceiver) so both
+ * Shared by the write side (bindCircleGovernance) and the receive side (circleLogReceiver) so both
  * ends verify against the same declaration + binding rules. `circleIdentityFor` is the per-circle
  * signer resolver (realAgent's surface); `myRef` the member ref it represents. The key↔ref binding
  * for FOREIGN statements verifies against the roster's proof-checked circleAddress rows.
@@ -102,7 +102,7 @@ export function bindCircleGovernance({ eventLog, callSkill, getPolicy, myRef, ge
   const appendGovernanceEvent = async (circleId, event) => {
     // THE RAIL: the event becomes a SIGNED chained statement — kind = the event verb, subject = the
     // proposalId, everything else rides the signed payload. The fan carries the STATEMENT; receivers
-    // verify before it lands (kringLogReceiver → the rail's ingest).
+    // verify before it lands (circleLogReceiver → the rail's ingest).
     const { event: verb, proposalId, kind: _k, ...payload } = event ?? {};
     const res = await rail.append(circleId, { kind: verb, subject: proposalId, payload });
     if (!res) return null;   // no per-circle signer resolvable for THIS circle — nothing lands unsigned

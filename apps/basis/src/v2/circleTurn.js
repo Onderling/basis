@@ -5,7 +5,7 @@
 //   - does NOT dispatch slash (`dispatchSlash:false`) — the shell handles it,
 //   - DEFERS everything it doesn't take (`onUnhandled → 'defer'`) so the shell continues,
 //   - returns a BOOLEAN (true = it dispatched a command and the shell should stop).
-// Mobile uses the same engine directly, with a post-to-kring sink and slash dispatch on.
+// Mobile uses the same engine directly, with a post-to-circle sink and slash dispatch on.
 
 import { createCircleDispatch } from './circleDispatch.js';
 import { interpretToCommand } from './interpretCommand.js';

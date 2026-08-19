@@ -151,7 +151,7 @@ export const helpDeck = {
         "nl": "Basis",
         "en": "Basis"
       },
-      "nl": "Basis is onze app voor alles wat je onderling regelt: berichten, een prikbord voor vraag en aanbod, taken en afspraken, in kringen die jij zelf maakt. Zonder verplicht account, versleuteld, en met hulpjes (zoals ik) die je zelf in een kring kunt zetten. Basis werkt in de browser; de Android-app werkt al, maar staat nog niet in de app-winkel. iOS staat op de agenda.",
+      "nl": "Basis is onze app voor alles wat je onderling regelt: berichten, een prikbord voor vraag en aanbod, taken en afspraken, in circles die jij zelf maakt. Zonder verplicht account, versleuteld, en met hulpjes (zoals ik) die je zelf in een circle kunt zetten. Basis werkt in de browser; de Android-app werkt al, maar staat nog niet in de app-winkel. iOS staat op de agenda.",
       "en": "Basis is our app for everything you organize together: messages, a board for asking and offering, tasks and plans, in circles you create yourself. No account required, encrypted, with helpers (like me) you can add to a circle. Basis runs in the browser; the Android app already works, but isn't in the app store yet. iOS is on the roadmap."
     },
     {
@@ -205,7 +205,7 @@ export const helpDeck = {
         "nl": "Voor je buurt",
         "en": "For your neighborhood"
       },
-      "nl": "Voor een buurt is Basis één plek voor wat nu over vijf app-groepen en briefjes verspreid staat: een prikbord voor vraag en aanbod, berichten, taken en afspraken. Geen account nodig; je opent het en doet mee. Wat je deelt blijft binnen je eigen kring, versleuteld.",
+      "nl": "Voor een buurt is Basis één plek voor wat nu over vijf app-groepen en briefjes verspreid staat: een prikbord voor vraag en aanbod, berichten, taken en afspraken. Geen account nodig; je opent het en doet mee. Wat je deelt blijft binnen je eigen circle, versleuteld.",
       "en": "For a neighborhood, Basis is one place for what's now scattered across five group chats and paper notes: a board for asking and offering, messages, tasks, and plans. No account needed; you open it and join in. What you share stays within your own circle, encrypted."
     },
     {
@@ -232,7 +232,7 @@ export const helpDeck = {
         "nl": "Voor besturen en verenigingen",
         "en": "For boards and associations"
       },
-      "nl": "Voor een vereniging of VvE is Basis een plek waar leden zelf dingen regelen: taken verdelen, afspraken plannen, vragen stellen. Kringen hebben eigen regels, die jullie zelf vaststellen. En de ledenlijst blijft gewoon van de vereniging.",
+      "nl": "Voor een vereniging of VvE is Basis een plek waar leden zelf dingen regelen: taken verdelen, afspraken plannen, vragen stellen. Circles hebben eigen regels, die jullie zelf vaststellen. En de ledenlijst blijft gewoon van de vereniging.",
       "en": "For an association or housing co-op, Basis is where members organize things themselves: dividing tasks, planning meetings, asking questions. Circles have their own rules, set by you. And the member list stays with the association."
     },
     {
@@ -402,11 +402,11 @@ export const helpDeck = {
       "en": "All source code is public. You don't have to take our word: anyone can verify what the software does, build on it, host everything themselves, or fork it if we ever went the wrong way. That last part isn't a side note, but a balance of power we build in deliberately."
     },
     {
-      "id": "werking.kringen",
+      "id": "werking.circles",
       "tags": {
         "nl": [
-          "kring",
-          "kringen",
+          "circle",
+          "circles",
           "groep",
           "cirkel",
           "hoe"
@@ -419,10 +419,10 @@ export const helpDeck = {
         ]
       },
       "kop": {
-        "nl": "Kringen",
+        "nl": "Circles",
         "en": "Circles"
       },
-      "nl": "Alles in Basis gebeurt in kringen: je straat, je huis, je club. Een kring maak je zelf, met eigen regels over wie erbij mag en wat gedeeld wordt. Per kring bepaal je wat anderen van je zien; standaard is dat zo min mogelijk.",
+      "nl": "Alles in Basis gebeurt in circles: je straat, je huis, je club. Een circle maak je zelf, met eigen regels over wie erbij mag en wat gedeeld wordt. Per circle bepaal je wat anderen van je zien; standaard is dat zo min mogelijk.",
       "en": "Everything in Basis happens in circles: your street, your house, your club. You create a circle yourself, with its own rules about who joins and what's shared. Per circle you decide what others see of you; the default is as little as possible."
     },
     {
@@ -445,7 +445,7 @@ export const helpDeck = {
         "nl": "Hulpjes",
         "en": "Helpers"
       },
-      "nl": "In een kring kun je hulpjes zetten: bots die vragen beantwoorden, samenvatten of taken bijhouden. Ze werken voor de kring, niet voor ons. Sommige hulpjes draaien op je eigen apparaat; externe hulpjes kunnen alleen bij de gegevens die jij ze zelf geeft.",
+      "nl": "In een circle kun je hulpjes zetten: bots die vragen beantwoorden, samenvatten of taken bijhouden. Ze werken voor de circle, niet voor ons. Sommige hulpjes draaien op je eigen apparaat; externe hulpjes kunnen alleen bij de gegevens die jij ze zelf geeft.",
       "en": "You can add helpers to a circle: bots that answer questions, summarize, or track tasks. They work for the circle, not for us. Some helpers run on your own device; external helpers can only access what you give them yourself."
     },
     {
@@ -471,7 +471,7 @@ export const helpDeck = {
         "nl": "AI, onder jouw zeggenschap",
         "en": "AI, under your control"
       },
-      "nl": "Gebruikt een hulpje AI, dan kies jij het taalmodel: per kring, en ook in je privé-gesprekken. In principe kan dat elk model zijn. Onze aanrader is Privatemode, dat draait in een afgeschermde omgeving: hardware waarin je gegevens ook tijdens de verwerking versleuteld blijven, zodat zelfs de beheerder niet kan meekijken. Draait het model op je eigen apparaat, dan verlaat je vraag je apparaat helemaal niet.",
+      "nl": "Gebruikt een hulpje AI, dan kies jij het taalmodel: per circle, en ook in je privé-gesprekken. In principe kan dat elk model zijn. Onze aanrader is Privatemode, dat draait in een afgeschermde omgeving: hardware waarin je gegevens ook tijdens de verwerking versleuteld blijven, zodat zelfs de beheerder niet kan meekijken. Draait het model op je eigen apparaat, dan verlaat je vraag je apparaat helemaal niet.",
       "en": "When a helper uses AI, you choose the language model: per circle, and in your private chats too. In principle that can be any model. Our recommendation is Privatemode, which runs in a shielded environment: hardware that keeps your data encrypted even during processing, so even the operator can't look in. If the model runs on your own device, your question never leaves it at all."
     },
     {
@@ -498,7 +498,7 @@ export const helpDeck = {
         "nl": "Prikbord, taken en afspraken",
         "en": "Board, tasks, and events"
       },
-      "nl": "Naast berichten heeft een kring een prikbord (vragen, aanbiedingen, leen-verzoeken), taken die leden kunnen oppakken, en afspraken met uitnodigingen. Wat je plaatst blijft binnen de kring, op de apparaten van de leden; er is geen centrale server die alles bewaart.",
+      "nl": "Naast berichten heeft een circle een prikbord (vragen, aanbiedingen, leen-verzoeken), taken die leden kunnen oppakken, en afspraken met uitnodigingen. Wat je plaatst blijft binnen de circle, op de apparaten van de leden; er is geen centrale server die alles bewaart.",
       "en": "Besides messages, a circle has a board (questions, offers, borrow requests), tasks members can pick up, and events with invitations. What you post stays within the circle, on the members' devices; there's no central server keeping it all."
     },
     {
@@ -616,7 +616,7 @@ export const helpDeck = {
         "nl": "De grenzen, eerlijk",
         "en": "The boundaries, honestly"
       },
-      "nl": "Eerlijk is eerlijk: geen enkel systeem beschermt alles. De inhoud van berichten is versleuteld, maar wíe met wie contact heeft is bijvoorbeeld deels zichtbaar voor de doorgeefpunten. En wat je eenmaal gedeeld hebt, staat op de apparaten van je kringgenoten: verwijderen kun je vragen, niet afdwingen. Zulke grenzen benoemen we liever zelf; op de privacy-pagina staat precies wat wel en niet beschermd is.",
+      "nl": "Eerlijk is eerlijk: geen enkel systeem beschermt alles. De inhoud van berichten is versleuteld, maar wíe met wie contact heeft is bijvoorbeeld deels zichtbaar voor de doorgeefpunten. En wat je eenmaal gedeeld hebt, staat op de apparaten van je circlegenoten: verwijderen kun je vragen, niet afdwingen. Zulke grenzen benoemen we liever zelf; op de privacy-pagina staat precies wat wel en niet beschermd is.",
       "en": "Honestly: no system protects everything. Message content is encrypted, but who contacts whom, for example, is partly visible to relay points. And what you've shared lives on your circle members' devices: you can request deletion, not enforce it. We prefer naming such boundaries ourselves; the privacy page states exactly what is and isn't protected."
     },
     {
@@ -643,7 +643,7 @@ export const helpDeck = {
         "nl": "Probeer Basis",
         "en": "Try Basis"
       },
-      "nl": "Basis draait in je browser, zonder account of installatie. Je kunt nu al kringen maken en die met anderen delen. Het is een onderzoeksversie, dus verwacht ruwe randjes. Beginnen: open Basis, maak een kring aan en geef hem een naam. Deel daarna de uitnodiging met wie je erbij wilt hebben. Meer is het niet.",
+      "nl": "Basis draait in je browser, zonder account of installatie. Je kunt nu al circles maken en die met anderen delen. Het is een onderzoeksversie, dus verwacht ruwe randjes. Beginnen: open Basis, maak een circle aan en geef hem een naam. Deel daarna de uitnodiging met wie je erbij wilt hebben. Meer is het niet.",
       "en": "Basis runs in your browser, no account or installation. You can already create circles and share them with others. It's a research release, so expect rough edges. To start: open Basis, create a circle, and give it a name. Then share the invitation with whoever you want in. That's all there is to it."
     },
     {
@@ -670,7 +670,7 @@ export const helpDeck = {
         "nl": "Vandaag beginnen als ontwikkelaar",
         "en": "Start today as a developer"
       },
-      "nl": "Meteen te doen: de tutorials op GitHub en `@onderling/*` op npm. Deze bot is met het platform gebouwd, dus je kijkt nu al naar een werkend voorbeeld. In de proefversie kun je kringen maken en delen; als ontwikkelaar kun je vandaag beginnen.",
+      "nl": "Meteen te doen: de tutorials op GitHub en `@onderling/*` op npm. Deze bot is met het platform gebouwd, dus je kijkt nu al naar een werkend voorbeeld. In de proefversie kun je circles maken en delen; als ontwikkelaar kun je vandaag beginnen.",
       "en": "Ready today: the tutorials on GitHub and `@onderling/*` on npm. This bot is built with the platform, so you're already looking at a working example. In the trial version you can create and share circles; as a developer you can start now."
     },
     {
@@ -835,7 +835,7 @@ export const helpDeck = {
         "nl": "Wie ben ik?",
         "en": "Who am I?"
       },
-      "nl": "Ik ben een Basis-hulpje dat Onderling voor deze website heeft ingericht, hetzelfde soort hulpje dat je zelf in een kring kunt zetten. Dit gesprek is dus meteen een demonstratie. Ik kies mijn antwoorden uit vaste, door mensen geschreven teksten. Een taalmodel helpt soms kiezen en mag ze met een kort zinnetje aan elkaar praten — dat zinnetje is dan van het model, de antwoorden zelf blijven van mensen. Andere organisaties kunnen mij ook inrichten, met hun eigen verhaal.",
+      "nl": "Ik ben een Basis-hulpje dat Onderling voor deze website heeft ingericht, hetzelfde soort hulpje dat je zelf in een circle kunt zetten. Dit gesprek is dus meteen een demonstratie. Ik kies mijn antwoorden uit vaste, door mensen geschreven teksten. Een taalmodel helpt soms kiezen en mag ze met een kort zinnetje aan elkaar praten — dat zinnetje is dan van het model, de antwoorden zelf blijven van mensen. Andere organisaties kunnen mij ook inrichten, met hun eigen verhaal.",
       "en": "I'm a Basis helper that Onderling set up for this website, the same kind of helper you can add to your own circle. This conversation is a demonstration in itself. I choose my answers from fixed, human-written texts. A language model sometimes helps with the choosing and may tie them together with a short sentence — that sentence is the model's, the answers themselves stay human. Other organizations can set me up too, with their own story."
     },
     {

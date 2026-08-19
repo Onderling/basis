@@ -3,7 +3,7 @@
  *
  * Mobile needs NO new production code: it composes the SAME `mergeManifests` (so the synthetic op-less
  * capability ops land in the mobile catalog), dispatches through the SAME `createRealHouseholdAgent` (1d's
- * generic decode), gates with the SAME `checkCapability`, and renders with the SAME `kringReplyText`. This
+ * generic decode), gates with the SAME `checkCapability`, and renders with the SAME `circleReplyText`. This
  * test locks that parity against regression by exercising the MOBILE composition + the exact gate call
  * `CircleLauncherScreen` makes + the shared reply render — all without the RN agent (device verify covers live).
  */
@@ -13,7 +13,7 @@ import { encodeGenericOpId } from '@onderling/app-manifest';
 import { composeManifests, buildManifestsByOrigin } from '../src/core/composeManifests.js';
 import { parseInput, resolveDispatch } from '../../basis/src/index.js';
 import { effectiveCapabilities, checkCapability } from '../../basis/src/v2/capabilityGate.js';
-import { kringReplyText } from '../../basis/src/v2/kringReply.js';
+import { circleReplyText } from '../../basis/src/v2/circleReply.js';
 
 const catalog    = composeManifests();                       // the real mobile dispatch catalog
 const genericAdd = encodeGenericOpId('household', 'add', 'note');
@@ -47,9 +47,9 @@ describe('§1b mobile parity — generic `note` via the shared pipeline', () => 
       .toMatchObject({ allow: false, code: 'app-disabled' });
   });
 
-  it('the shared kringReplyText renders the generic reply on mobile too', () => {
+  it('the shared circleReplyText renders the generic reply on mobile too', () => {
     const t = (k, p) => (p ? `${k}:${p.label}` : k);
     const reply = { payload: { ok: true, via: 'generic', atom: 'add', result: { ok: true, item: { type: 'note', body: 'buy stamps' } } } };
-    expect(kringReplyText(reply, { verb: 'add', t })).toBe('circle.bot.added:buy stamps');
+    expect(circleReplyText(reply, { verb: 'add', t })).toBe('circle.bot.added:buy stamps');
   });
 });

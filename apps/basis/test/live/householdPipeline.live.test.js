@@ -76,7 +76,7 @@ function fmt(transcript) {
     if (t.kind === 'user')       return `\n🧑 ${t.text}`;
     if (t.kind === 'via')        return `   ↳ via=${t.via}${t.cmd ? ` cmd=${t.cmd.opId}(${JSON.stringify(t.cmd.args ?? {})})` : ''}`;
     if (t.kind === 'dispatch')   return `   ⚙️  ${t.opId}(${JSON.stringify(t.args ?? {})}) → ${JSON.stringify(t.reply)?.slice(0, 160)}`;
-    if (t.kind === 'post')       return `   💬 (posted to kring) ${t.text}`;
+    if (t.kind === 'post')       return `   💬 (posted to circle) ${t.text}`;
     if (t.kind === 'no-match')   return `   🤷 (llm-nomatch) "${t.text}"`;
     if (t.kind === 'basic-mode') return `   🔌 (basic-mode reply, reason=${t.reason})`;
     return `   ? ${JSON.stringify(t)}`;
@@ -124,7 +124,7 @@ async function buildBot() {
       transcript.push({ kind: 'dispatch', opId: cmd.opId, args: cmd.args, reply });
       return reply;
     },
-    postToKring:      (text) => { transcript.push({ kind: 'post', text }); },
+    postToCircle:      (text) => { transcript.push({ kind: 'post', text }); },
     onNoMatch:        (text) => { transcript.push({ kind: 'no-match', text }); },
     onLlmUnavailable: (text, _ctx, info) => { transcript.push({ kind: 'basic-mode', text, reason: info?.reason }); },
   });

@@ -4,13 +4,13 @@
  * Frits 2026-06-02: a buurt is noticeboard-first with open chat OFF by
  * default; for a *large* buurt the wizard should advise keeping it off
  * (with reasoning); for a *small* buurt it should just ask.  Covers the
- * pure substrate (kringTemplates) + the wizard state helpers.
+ * pure substrate (circleTemplates) + the wizard state helpers.
  */
 import { describe, it, expect } from 'vitest';
 
 import {
-  KRING_TEMPLATES, SIZE_BANDS, bandForCount, recommendChat,
-} from '../src/v2/kringTemplates.js';
+  CIRCLE_TEMPLATES, SIZE_BANDS, bandForCount, recommendChat,
+} from '../src/v2/circleTemplates.js';
 import {
   initialState, setKind, setSize, setChatEnabled, chatAdvice, policyPatchFromState,
 } from '../src/core/wizards/createGroupState.js';
@@ -19,11 +19,11 @@ import { isFeatureEnabled } from '../src/v2/circlePolicy.js';
 
 describe('buurt template — chat off by default (N1)', () => {
   it('the buurt template ships chat:false (noticeboard-first)', () => {
-    expect(KRING_TEMPLATES.buurt.features.chat).toBe(false);
+    expect(CIRCLE_TEMPLATES.buurt.features.chat).toBe(false);
   });
   it('other kinds keep their chat default', () => {
-    expect(KRING_TEMPLATES.household.features.chat).toBe(true);
-    expect(KRING_TEMPLATES.vriendenkring.features.chat).toBe(true);
+    expect(CIRCLE_TEMPLATES.household.features.chat).toBe(true);
+    expect(CIRCLE_TEMPLATES.friends.features.chat).toBe(true);
   });
   it('setKind("buurt") yields features.chat === false', () => {
     expect(setKind(initialState(), 'buurt').features.chat).toBe(false);

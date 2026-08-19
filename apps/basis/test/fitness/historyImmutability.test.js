@@ -58,7 +58,7 @@ describe('FITNESS: 4b — the skill surface cannot name history-erasing ops', ()
 
 describe('FITNESS: 4b — a hostile bot cannot alter history (behavioral, real composition)', () => {
   it('every route to the history layer is refused; history survives byte-for-byte', async () => {
-    const circleId = 'kring-4b';
+    const circleId = 'circle-4b';
     const deviceId = `circle-${circleId}`;
     const backend  = createMemoryBackend();
     const versioning = circleVersioningFor(circleId, deviceId, backend);

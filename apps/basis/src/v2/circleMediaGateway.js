@@ -329,7 +329,7 @@ export async function createCircleMediaComposition({
       },
     });
     // Surface the honest gap: roster members with no captured signing key are NOT
-    // media-reachable yet (same root cause as kring fan-out). Never silently dropped.
+    // media-reachable yet (same root cause as circle fan-out). Never silently dropped.
     if (composition) composition.unresolvedMembers = unresolved;
     return composition;
   }

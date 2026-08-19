@@ -299,7 +299,7 @@
 }
 .circle-screens-picker__remove:hover { color: var(--danger); }
 
-/* β.5 — per-tile context menu (right-click on a kring tile).
+/* β.5 — per-tile context menu (right-click on a circle tile).
    Positioned absolutely by the renderer at the tile's right edge. */
 .circle-launcher__tile-menu {
   position: absolute; z-index: 100;
@@ -372,19 +372,19 @@
 }
 
 /* ─────────────── LEDEN (members) tab + member cards (§2 · G16) ─────────────── */
-.circle-kring__leden { display: flex; flex-direction: column; gap: 2px; padding: 6px 0; }
-.circle-kring__leden-loading, .circle-kring__leden-empty {
+.circle-circle__leden { display: flex; flex-direction: column; gap: 2px; padding: 6px 0; }
+.circle-circle__leden-loading, .circle-circle__leden-empty {
   padding: 24px 12px; color: var(--ink-soft); font-style: italic; text-align: center;
 }
-.circle-kring__member {
+.circle-circle__member {
   display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
   width: 100%; text-align: left; padding: 10px 12px; background: none;
   border: none; border-bottom: 1px solid var(--line); cursor: pointer; color: inherit; font: inherit;
 }
-.circle-kring__member:hover { background: var(--paper-2); }
-.circle-kring__member-primary { font-weight: 600; }
-.circle-kring__member-secondary { color: var(--ink-soft); font-size: 13px; }
-.circle-kring__member-you {
+.circle-circle__member:hover { background: var(--paper-2); }
+.circle-circle__member-primary { font-weight: 600; }
+.circle-circle__member-secondary { color: var(--ink-soft); font-size: 13px; }
+.circle-circle__member-you {
   margin-left: auto; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
   padding: 2px 8px; border-radius: 999px; background: var(--paper-2); color: var(--ink-soft);
 }
@@ -500,17 +500,17 @@
   border: 1px solid var(--line); border-radius: var(--radius); background: var(--card);
 }
 
-/* ───────────────────── kring view (SP-13.2 · v2 §1+§5) ───────────────────── */
-.circle-kring { display: flex; flex-direction: column; min-height: 100%; padding: 0 14px 12px; }
-.circle-kring__header { display: flex; align-items: center; gap: 12px; padding: 10px 0 4px; }
-.circle-kring__back { background: none; border: none; color: var(--ink-soft); font: inherit; font-size: 13px; cursor: pointer; padding: 4px 6px; }
-.circle-kring__title { flex: 1; margin: 0; font-family: var(--font-sans); font-size: 22px; font-weight: 800; color: var(--ink); }
-.circle-kring__more { background: none; border: none; color: var(--ink-soft); font-size: 20px; cursor: pointer; padding: 4px 10px; }
-.circle-kring__meta { font-size: 12px; color: var(--ink-soft); margin: -2px 0 8px; }
-.circle-kring__more-menu { display: none; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); margin-bottom: 8px; }
-.circle-kring__more-menu.is-open { display: block; }
-.circle-kring__more-item { display: block; width: 100%; text-align: left; background: none; border: none; padding: 9px 12px; font: inherit; font-size: 13px; color: var(--ink); cursor: pointer; }
-.circle-kring__more-item:hover { background: var(--paper); }
+/* ───────────────────── circle view (SP-13.2 · v2 §1+§5) ───────────────────── */
+.circle-circle { display: flex; flex-direction: column; min-height: 100%; padding: 0 14px 12px; }
+.circle-circle__header { display: flex; align-items: center; gap: 12px; padding: 10px 0 4px; }
+.circle-circle__back { background: none; border: none; color: var(--ink-soft); font: inherit; font-size: 13px; cursor: pointer; padding: 4px 6px; }
+.circle-circle__title { flex: 1; margin: 0; font-family: var(--font-sans); font-size: 22px; font-weight: 800; color: var(--ink); }
+.circle-circle__more { background: none; border: none; color: var(--ink-soft); font-size: 20px; cursor: pointer; padding: 4px 10px; }
+.circle-circle__meta { font-size: 12px; color: var(--ink-soft); margin: -2px 0 8px; }
+.circle-circle__more-menu { display: none; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); margin-bottom: 8px; }
+.circle-circle__more-menu.is-open { display: block; }
+.circle-circle__more-item { display: block; width: 100%; text-align: left; background: none; border: none; padding: 9px 12px; font: inherit; font-size: 13px; color: var(--ink); cursor: pointer; }
+.circle-circle__more-item:hover { background: var(--paper); }
 /* P1.7 — the viewer's conversation filter strip (kinds × people/agents). Sits above the stream, only
    in the conversation view. Quiet by default; the whole strip warms when a filter is active, so a
    narrowed conversation never looks like a missing one. */
@@ -526,57 +526,57 @@
 .cc-mydata__retention-choice.is-on { background: var(--cc-accent-soft, rgba(0,0,0,0.07)); border-color: transparent; font-weight: 600; }
 .cc-mydata__retention-note { font-size: 12px; color: var(--cc-ink-soft, #6b6b6b); margin: 6px 0 0; }
 
-.circle-kring__filter { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 10px; }
-.circle-kring__filter--active { background: var(--cc-surface-2, rgba(0,0,0,0.035)); border-radius: 8px; }
-.circle-kring__filter-chip { font: inherit; font-size: 12px; line-height: 1; padding: 5px 9px; border-radius: 999px;
+.circle-circle__filter { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 10px; }
+.circle-circle__filter--active { background: var(--cc-surface-2, rgba(0,0,0,0.035)); border-radius: 8px; }
+.circle-circle__filter-chip { font: inherit; font-size: 12px; line-height: 1; padding: 5px 9px; border-radius: 999px;
   border: 1px solid var(--cc-line, rgba(0,0,0,0.15)); background: transparent; color: var(--cc-ink-soft, #5b5b5b); cursor: pointer; }
-.circle-kring__filter-chip.is-on { background: var(--cc-accent-soft, rgba(0,0,0,0.07)); color: var(--cc-ink, #222); border-color: transparent; }
-.circle-kring__filter-chip:disabled { cursor: default; opacity: 0.55; }
-.circle-kring__filter-sep { width: 1px; height: 14px; background: var(--cc-line, rgba(0,0,0,0.15)); margin: 0 2px; }
-.circle-kring__filter-note { flex-basis: 100%; font-size: 11px; color: var(--cc-ink-soft, #6b6b6b); }
+.circle-circle__filter-chip.is-on { background: var(--cc-accent-soft, rgba(0,0,0,0.07)); color: var(--cc-ink, #222); border-color: transparent; }
+.circle-circle__filter-chip:disabled { cursor: default; opacity: 0.55; }
+.circle-circle__filter-sep { width: 1px; height: 14px; background: var(--cc-line, rgba(0,0,0,0.15)); margin: 0 2px; }
+.circle-circle__filter-note { flex-basis: 100%; font-size: 11px; color: var(--cc-ink-soft, #6b6b6b); }
 
-.circle-kring__list { flex: 1; overflow-y: auto; padding: 4px 0 8px; display: flex; flex-direction: column; gap: 9px; }
-.circle-kring__empty { color: var(--ink-soft); font-style: italic; padding: 16px 4px; text-align: center; }
-.circle-kring__day { align-self: center; font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.8px; padding: 8px 12px; }
+.circle-circle__list { flex: 1; overflow-y: auto; padding: 4px 0 8px; display: flex; flex-direction: column; gap: 9px; }
+.circle-circle__empty { color: var(--ink-soft); font-style: italic; padding: 16px 4px; text-align: center; }
+.circle-circle__day { align-self: center; font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.8px; padding: 8px 12px; }
 /* Bulletin restyle — the GESPREK stream is ONE bot card (mirror of onderling.org's .chatbox):
    a bot-header strip over the message log, in a 2px-ink-bordered --card container. */
-.circle-kring__chat-card { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--card); border: 2px solid var(--ink); border-radius: var(--radius); overflow: hidden; margin-top: 4px; }
-.circle-kring__chat-card .circle-kring__list { padding: 14px; }
+.circle-circle__chat-card { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--card); border: 2px solid var(--ink); border-radius: var(--radius); overflow: hidden; margin-top: 4px; }
+.circle-circle__chat-card .circle-circle__list { padding: 14px; }
 /* Bot-header strip: green presence dot + the assistant's name in bold, a --line hairline under it. */
-.circle-kring__bot-head { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--line); }
-.circle-kring__bot-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex: none; }
-.circle-kring__bot-name { font-size: 12.5px; font-weight: 700; color: var(--ink); }
+.circle-circle__bot-head { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--line); }
+.circle-circle__bot-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex: none; }
+.circle-circle__bot-name { font-size: 12.5px; font-weight: 700; color: var(--ink); }
 /* Others'/bot = --bot-bg card left; mine = --me-bg block right (no border). */
-.circle-kring__bubble { padding: 8px 12px; border: 1px solid var(--bot-line); border-radius: var(--radius); background: var(--bot-bg); max-width: 78%; align-self: flex-start; }
-.circle-kring__bubble--mine { background: var(--me-bg); border: none; align-self: flex-end; max-width: 74%; }
+.circle-circle__bubble { padding: 8px 12px; border: 1px solid var(--bot-line); border-radius: var(--radius); background: var(--bot-bg); max-width: 78%; align-self: flex-start; }
+.circle-circle__bubble--mine { background: var(--me-bg); border: none; align-self: flex-end; max-width: 74%; }
 /* Sender label — others'/bot bubbles only (small mono line at the top). */
-.circle-kring__bubble-sender { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-soft); margin-bottom: 3px; }
+.circle-circle__bubble-sender { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-soft); margin-bottom: 3px; }
 /* Bottom meta line (site .msg .src pattern): delivery · scope · timestamp, one small mono line. */
-.circle-kring__bubble-meta { display: flex; align-items: center; gap: 8px; margin-top: 5px; font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-soft); }
-/* "only you" vs "whole kring" scope (one presentation of the message's scope data) — plain meta text. */
-.circle-kring__scope--self  { color: var(--ink-soft); }
-.circle-kring__scope--kring { color: var(--ink-soft); }
-.circle-kring__bubble-kind { display: inline-block; font-size: 10px; font-weight: 600; letter-spacing: 0.8px; padding: 2px 7px; border-radius: 4px; background: var(--paper); color: var(--accent-ink); margin-right: 6px; vertical-align: middle; }
-.circle-kring__bubble-text { font-size: 14px; color: var(--ink); display: inline; }
+.circle-circle__bubble-meta { display: flex; align-items: center; gap: 8px; margin-top: 5px; font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-soft); }
+/* "only you" vs "whole circle" scope (one presentation of the message's scope data) — plain meta text. */
+.circle-circle__scope--self  { color: var(--ink-soft); }
+.circle-circle__scope--circle { color: var(--ink-soft); }
+.circle-circle__bubble-kind { display: inline-block; font-size: 10px; font-weight: 600; letter-spacing: 0.8px; padding: 2px 7px; border-radius: 4px; background: var(--paper); color: var(--accent-ink); margin-right: 6px; vertical-align: middle; }
+.circle-circle__bubble-text { font-size: 14px; color: var(--ink); display: inline; }
 /* Per-answer transparency badge (site .msg .src): how a bot answer came about, one small mono line. */
-.circle-kring__bubble-provenance { display: block; margin-top: 5px; font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-soft); }
+.circle-circle__bubble-provenance { display: block; margin-top: 5px; font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-soft); }
 /* LLM-forward consent/handoff card — a bot bubble variant: dashed rust border + peach fill, full-width. */
-.circle-kring__bubble--consent { align-self: stretch; max-width: 100%; background: var(--consent-bg); border: 1.5px dashed var(--accent-ink); }
-.circle-kring__consent-btn--primary { background: var(--accent); color: var(--accent-contrast); border: none; border-radius: var(--radius-sm); font-weight: 700; }
-.circle-kring__consent-btn--primary:hover { background: var(--accent-ink); }
-.circle-kring__consent-btn--secondary { background: var(--card); color: var(--ink); border: 1px solid var(--ink); border-radius: var(--radius-sm); }
-.circle-kring__bubble-actions { display: flex; gap: 6px; margin-top: 8px; }
-.circle-kring__bubble-action { padding: 4px 10px; font: inherit; font-size: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); color: var(--ink); cursor: pointer; }
-.circle-kring__bubble-action:hover { border-color: var(--accent); }
+.circle-circle__bubble--consent { align-self: stretch; max-width: 100%; background: var(--consent-bg); border: 1.5px dashed var(--accent-ink); }
+.circle-circle__consent-btn--primary { background: var(--accent); color: var(--accent-contrast); border: none; border-radius: var(--radius-sm); font-weight: 700; }
+.circle-circle__consent-btn--primary:hover { background: var(--accent-ink); }
+.circle-circle__consent-btn--secondary { background: var(--card); color: var(--ink); border: 1px solid var(--ink); border-radius: var(--radius-sm); }
+.circle-circle__bubble-actions { display: flex; gap: 6px; margin-top: 8px; }
+.circle-circle__bubble-action { padding: 4px 10px; font: inherit; font-size: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); color: var(--ink); cursor: pointer; }
+.circle-circle__bubble-action:hover { border-color: var(--accent); }
 /* S6.A — manifest-driven inline buttons on a bot reply (the resurrected inline menu). */
-.circle-kring__embed-buttons { flex-wrap: wrap; }
-.circle-kring__embed-button { border-color: var(--accent); color: var(--accent-ink, var(--accent)); font-weight: 600; }
-/* embeds[] — cross-object "See also" chips on a kring message. */
-.circle-kring__embeds { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
-.circle-kring__embeds-label { font-size: 11px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.4px; }
-.circle-kring__embed { font-size: 12px; color: var(--ink); background: var(--paper-2); border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; }
+.circle-circle__embed-buttons { flex-wrap: wrap; }
+.circle-circle__embed-button { border-color: var(--accent); color: var(--accent-ink, var(--accent)); font-weight: 600; }
+/* embeds[] — cross-object "See also" chips on a circle message. */
+.circle-circle__embeds { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.circle-circle__embeds-label { font-size: 11px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.4px; }
+.circle-circle__embed { font-size: 12px; color: var(--ink); background: var(--paper-2); border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; }
 /* S6.B — a screen button (opens a panel) reads as a filled affordance vs the outline op buttons. */
-.circle-kring__screen-button { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); } /* = .cc-btn--primary (colours) */
+.circle-circle__screen-button { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); } /* = .cc-btn--primary (colours) */
 .cc-screen-panel { position: fixed; inset: 0; z-index: 65; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(0,0,0,.45); }
 .cc-screen-panel__card { width: min(560px, 100%); max-height: 88vh; overflow: auto; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; box-shadow: 0 12px 40px rgba(0,0,0,.25); }
 .cc-screen-panel__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
@@ -599,44 +599,44 @@
 .cc-guided__done { font-size: 14px; color: var(--ink-soft); }
 /* δ.2 — per-message delivery state (lives in the bubble's meta line).  Pending = clock,
    Failed = warning (tap-to-retry).  Sent renders nothing (happy-path stays clean). */
-.circle-kring__bubble-delivery { display: inline-block; font: inherit; line-height: 1; padding: 0; background: none; border: none; }
-.circle-kring__bubble-delivery--pending { color: var(--ink-soft); }
-.circle-kring__bubble-delivery--failed  { color: var(--danger); cursor: pointer; }
-.circle-kring__bubble-delivery--failed:hover { text-decoration: underline; }
-.circle-kring__composer { position: relative; display: flex; gap: 8px; align-items: center; padding: 10px 0 4px; border-top: 1px solid var(--line); margin-top: 4px; }
+.circle-circle__bubble-delivery { display: inline-block; font: inherit; line-height: 1; padding: 0; background: none; border: none; }
+.circle-circle__bubble-delivery--pending { color: var(--ink-soft); }
+.circle-circle__bubble-delivery--failed  { color: var(--danger); cursor: pointer; }
+.circle-circle__bubble-delivery--failed:hover { text-decoration: underline; }
+.circle-circle__composer { position: relative; display: flex; gap: 8px; align-items: center; padding: 10px 0 4px; border-top: 1px solid var(--line); margin-top: 4px; }
 /* Bulletin sketch composer: flat paper input + ink send block (mirror of the site's .chatbox form). */
-.circle-kring__composer-input { flex: 1; padding: 9px 12px; font: inherit; font-size: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); color: var(--ink); }
-.circle-kring__composer-input::placeholder { color: var(--ink-soft); }
-.circle-kring__composer-input:focus { outline: none; border-color: var(--accent); }
-.circle-kring__composer-send { border: none; border-radius: var(--radius-sm); background: var(--accent); color: var(--accent-contrast); font: inherit; font-size: 14px; font-weight: 700; line-height: 1; padding: 9px 15px; cursor: pointer; }
-.circle-kring__composer-send:hover { background: var(--accent-ink); }
+.circle-circle__composer-input { flex: 1; padding: 9px 12px; font: inherit; font-size: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); color: var(--ink); }
+.circle-circle__composer-input::placeholder { color: var(--ink-soft); }
+.circle-circle__composer-input:focus { outline: none; border-color: var(--accent); }
+.circle-circle__composer-send { border: none; border-radius: var(--radius-sm); background: var(--accent); color: var(--accent-contrast); font: inherit; font-size: 14px; font-weight: 700; line-height: 1; padding: 9px 15px; cursor: pointer; }
+.circle-circle__composer-send:hover { background: var(--accent-ink); }
 
 /* media P1 — sealed-media attach button (only rendered when the circle has a seal strategy). */
-.circle-kring__attach {
+.circle-circle__attach {
   cursor: pointer; font-size: 16px; line-height: 1; width: 36px; height: 36px; padding: 0; flex: 0 0 auto;
   border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper, #fff); color: var(--ink-soft);
 }
-.circle-kring__attach:hover { border-color: var(--accent); }
+.circle-circle__attach:hover { border-color: var(--accent); }
 
-/* media P1 — the sealed media-card chip inside a kring bubble (shared domAdapter renderMediaCard;
+/* media P1 — the sealed media-card chip inside a circle bubble (shared domAdapter renderMediaCard;
    class names match the classic shell's web/style.css chip). */
-.circle-kring__bubble .cc-media-card { margin-top: 6px; }
-.circle-kring__bubble .cc-media-card-body { display: flex; flex-direction: column; gap: 5px; padding: 4px 0; }
-.circle-kring__bubble .cc-media-thumb {
+.circle-circle__bubble .cc-media-card { margin-top: 6px; }
+.circle-circle__bubble .cc-media-card-body { display: flex; flex-direction: column; gap: 5px; padding: 4px 0; }
+.circle-circle__bubble .cc-media-thumb {
   max-width: 240px; max-height: 240px; width: auto; height: auto;
   border-radius: var(--radius, 10px); border: 1px solid var(--line); display: block;
 }
-.circle-kring__bubble .cc-media-placeholder { display: flex; gap: 8px; align-items: center; }
-.circle-kring__bubble .cc-media-icon { font-size: 24px; line-height: 1; }
-.circle-kring__bubble .cc-media-details { font-size: 12px; color: var(--ink-soft); }
-.circle-kring__bubble .cc-media-caption { font-size: 13px; word-break: break-word; }
+.circle-circle__bubble .cc-media-placeholder { display: flex; gap: 8px; align-items: center; }
+.circle-circle__bubble .cc-media-icon { font-size: 24px; line-height: 1; }
+.circle-circle__bubble .cc-media-details { font-size: 12px; color: var(--ink-soft); }
+.circle-circle__bubble .cc-media-caption { font-size: 13px; word-break: break-word; }
 /* media P1 — full-image "[View]" affordance on the chip (only rendered when the ctx carries openFull). */
-.circle-kring__bubble .cc-media-thumb--clickable { cursor: zoom-in; }
-.circle-kring__bubble .cc-media-view {
+.circle-circle__bubble .cc-media-thumb--clickable { cursor: zoom-in; }
+.circle-circle__bubble .cc-media-view {
   align-self: flex-start; padding: 3px 10px; font: inherit; font-size: 12px; cursor: pointer;
   color: var(--ink-soft); background: transparent; border: 1px solid var(--line); border-radius: 999px;
 }
-.circle-kring__bubble .cc-media-view:hover { border-color: var(--accent); color: var(--ink); }
+.circle-circle__bubble .cc-media-view:hover { border-color: var(--accent); color: var(--ink); }
 
 /* media P1 — full-image lightbox overlay (self-contained; mirrors confirmDialog / catchUpChooser). */
 .cc-media-lightbox { }
@@ -657,38 +657,38 @@
 .cc-media-lightbox__status--error { opacity: 0.85; }
 
 /* Slash-command auto-suggest dropdown — floats above the composer input (classic-shell parity). */
-.circle-kring__suggest { position: absolute; left: 0; right: 44px; bottom: calc(100% - 2px); margin: 0 0 6px 0; padding: 4px 0; list-style: none; background: var(--paper, #fff); border: 1px solid var(--line); border-radius: 12px; max-height: 280px; overflow-y: auto; box-shadow: 0 -2px 10px rgba(0,0,0,0.10); z-index: 20; }
-.circle-kring__suggest[hidden] { display: none; }
-.circle-kring__suggest-item { display: flex; align-items: baseline; gap: 10px; padding: 6px 12px; cursor: pointer; }
-.circle-kring__suggest-item:hover, .circle-kring__suggest-item.is-active { background: var(--paper-2); }
-.circle-kring__suggest-cmd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--accent); font-weight: 600; font-size: 13px; }
-.circle-kring__suggest-hint { color: var(--ink-soft); font-size: 12px; }
+.circle-circle__suggest { position: absolute; left: 0; right: 44px; bottom: calc(100% - 2px); margin: 0 0 6px 0; padding: 4px 0; list-style: none; background: var(--paper, #fff); border: 1px solid var(--line); border-radius: 12px; max-height: 280px; overflow-y: auto; box-shadow: 0 -2px 10px rgba(0,0,0,0.10); z-index: 20; }
+.circle-circle__suggest[hidden] { display: none; }
+.circle-circle__suggest-item { display: flex; align-items: baseline; gap: 10px; padding: 6px 12px; cursor: pointer; }
+.circle-circle__suggest-item:hover, .circle-circle__suggest-item.is-active { background: var(--paper-2); }
+.circle-circle__suggest-cmd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--accent); font-weight: 600; font-size: 13px; }
+.circle-circle__suggest-hint { color: var(--ink-soft); font-size: 12px; }
 
 /* Permission gate — chat disabled for the circle: read-only note in place of the composer. */
-.circle-kring__composer-disabled { padding: 12px 0 6px; margin-top: 4px; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 13px; font-style: italic; text-align: center; }
+.circle-circle__composer-disabled { padding: 12px 0 6px; margin-top: 4px; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 13px; font-style: italic; text-align: center; }
 
 /* Multi-field inline form (mobile MultiFieldFormBubble parity) — sits between the stream and composer when
-   a kring dispatch trips needsForm with 2+ missing fields. */
-.circle-kring__form { display: flex; flex-direction: column; gap: 10px; padding: 14px; margin-top: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper-2); }
-.circle-kring__form-title { font-weight: 600; font-size: 14px; color: var(--ink); }
-.circle-kring__form-field { display: flex; flex-direction: column; gap: 4px; }
-.circle-kring__form-label { font-size: 12px; color: var(--ink-soft); }
-.circle-kring__form-input { padding: 9px 12px; font: inherit; font-size: 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink); }
-.circle-kring__form-input:focus { outline: none; border-color: var(--accent); }
-.circle-kring__form-submit { align-self: flex-start; padding: 8px 18px; border: none; border-radius: 18px; background: var(--accent); color: var(--accent-contrast); font: inherit; font-size: 14px; cursor: pointer; }
-.circle-kring__form-submit:hover { opacity: 0.92; }
-.circle-kring__form-submit:disabled { background: var(--line); color: var(--ink-soft); cursor: not-allowed; }
+   a circle dispatch trips needsForm with 2+ missing fields. */
+.circle-circle__form { display: flex; flex-direction: column; gap: 10px; padding: 14px; margin-top: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper-2); }
+.circle-circle__form-title { font-weight: 600; font-size: 14px; color: var(--ink); }
+.circle-circle__form-field { display: flex; flex-direction: column; gap: 4px; }
+.circle-circle__form-label { font-size: 12px; color: var(--ink-soft); }
+.circle-circle__form-input { padding: 9px 12px; font: inherit; font-size: 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink); }
+.circle-circle__form-input:focus { outline: none; border-color: var(--accent); }
+.circle-circle__form-submit { align-self: flex-start; padding: 8px 18px; border: none; border-radius: 18px; background: var(--accent); color: var(--accent-contrast); font: inherit; font-size: 14px; cursor: pointer; }
+.circle-circle__form-submit:hover { opacity: 0.92; }
+.circle-circle__form-submit:disabled { background: var(--line); color: var(--ink-soft); cursor: not-allowed; }
 
-/* SP-13.3 — per-kring bottom tab bar + tab-coming placeholder. */
-.circle-kring__tabs { display: flex; justify-content: space-around; align-items: stretch; border-top: 1px solid var(--line); margin-top: 4px; }
-.circle-kring__tab { flex: 1; padding: 12px 6px; background: none; border: none; font: inherit; font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--ink-soft); cursor: pointer; border-top: 2px solid transparent; margin-top: -1px; }
-.circle-kring__tab.is-active { color: var(--accent-ink); border-top-color: var(--accent-ink); }
-.circle-kring__placeholder { padding: 24px 12px; color: var(--ink-soft); font-style: italic; text-align: center; }
+/* SP-13.3 — per-circle bottom tab bar + tab-coming placeholder. */
+.circle-circle__tabs { display: flex; justify-content: space-around; align-items: stretch; border-top: 1px solid var(--line); margin-top: 4px; }
+.circle-circle__tab { flex: 1; padding: 12px 6px; background: none; border: none; font: inherit; font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--ink-soft); cursor: pointer; border-top: 2px solid transparent; margin-top: -1px; }
+.circle-circle__tab.is-active { color: var(--accent-ink); border-top-color: var(--accent-ink); }
+.circle-circle__placeholder { padding: 24px 12px; color: var(--ink-soft); font-style: italic; text-align: center; }
 
 /* SP-13.4 — Chat ↔ Scherm header pill (v2 §4 "De Schakelaar"). */
-.circle-kring__view-toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--paper); }
-.circle-kring__view-toggle-btn { background: none; border: none; padding: 5px 12px; font: inherit; font-size: 12px; letter-spacing: 0.4px; color: var(--ink-soft); cursor: pointer; }
-.circle-kring__view-toggle-btn.is-active { background: var(--accent); color: var(--accent-contrast); }
+.circle-circle__view-toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--paper); }
+.circle-circle__view-toggle-btn { background: none; border: none; padding: 5px 12px; font: inherit; font-size: 12px; letter-spacing: 0.4px; color: var(--ink-soft); cursor: pointer; }
+.circle-circle__view-toggle-btn.is-active { background: var(--accent); color: var(--accent-contrast); }
 
 /* ─────────────── α.5c — compact rows on list-shaped blocks ─────────────── *
  * Opt-in via block.config.compact on the four list-shaped block types
@@ -917,10 +917,10 @@
 .cc-prikbord__embeds-label { font-size: 11px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.4px; }
 .cc-prikbord__embed { font-size: 12px; color: var(--ink); background: var(--paper-2); border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; }
 /* tappable embed chips (a button styled as a chip) — open the referenced item. */
-.cc-prikbord__embed--tappable, .circle-screen__embed--tappable, .circle-kring__embed--tappable {
+.cc-prikbord__embed--tappable, .circle-screen__embed--tappable, .circle-circle__embed--tappable {
   cursor: pointer; font-family: inherit; line-height: inherit;
 }
-.cc-prikbord__embed--tappable:hover, .circle-screen__embed--tappable:hover, .circle-kring__embed--tappable:hover {
+.cc-prikbord__embed--tappable:hover, .circle-screen__embed--tappable:hover, .circle-circle__embed--tappable:hover {
   border-color: var(--accent); color: var(--accent-ink, var(--accent));
 }
 .cc-prikbord__actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }

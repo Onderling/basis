@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { bootRealAgentNode, connectAgentsOverBus, pairCircle, until, teardown, sendKringChat } from '../support/pairRealAgents.js';
+import { bootRealAgentNode, connectAgentsOverBus, pairCircle, until, teardown, sendCircleChat } from '../support/pairRealAgents.js';
 
-// REPRO: a kring chat fanned as a SIGNED STATEMENT (the one live path) is VERIFIED at the receiver's
+// REPRO: a circle chat fanned as a SIGNED STATEMENT (the one live path) is VERIFIED at the receiver's
 // chat rail and lands as the render entry the bubbles read. The legacy-paired circle records no
 // circleAddress rows, so the binding is supplied explicitly (the same shape the governance repro uses).
-describe('REPRO — kring chat via the REAL receiver (InternalTransport)', () => {
+describe('REPRO — circle chat via the REAL receiver (InternalTransport)', () => {
   it('a signed statement A -> B verifies at the rail and renders', async () => {
     const A = await bootRealAgentNode('A');
     const aCid = await A.agent.circleIdentityFor('peer-circle');
@@ -16,7 +16,7 @@ describe('REPRO — kring chat via the REAL receiver (InternalTransport)', () =>
     const groupId = 'peer-circle';
     const msgId = 'm-' + Math.random().toString(36).slice(2);
     const text = 'hello via the real receiver';
-    const r = await sendKringChat(A, { groupId, msgId, text });
+    const r = await sendCircleChat(A, { groupId, msgId, text });
     expect(r?.error).toBeUndefined();
     const got = await until(() => B.chatEvents.some((e) => e?.payload?.text === text), { timeout: 3000 });
     expect(got, 'B verified + rendered the signed chat statement').toBeTruthy();

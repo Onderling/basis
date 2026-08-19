@@ -28,9 +28,9 @@ describe('key-events in the log — establish, fold, read', () => {
 
     // The admin folds its log, seals content under the current version, fans it; bob reads it.
     const adminChain = readKeyChain([event], { groupId: GID, opener: opener(admin) });
-    const env = seal(currentGroupKey(adminChain), 'hallo kring');
+    const env = seal(currentGroupKey(adminChain), 'hallo circle');
     expect(readKeyChain([event], { groupId: GID, opener: opener(bob) }).length).toBe(1);
-    expect(openAcrossKeyChain(env, readKeyChain([event], { groupId: GID, opener: opener(bob) }))).toBe('hallo kring');
+    expect(openAcrossKeyChain(env, readKeyChain([event], { groupId: GID, opener: opener(bob) }))).toBe('hallo circle');
 
     // A stranger is not a recipient of the key-event → empty chain → cannot open.
     expect(readKeyChain([event], { groupId: GID, opener: opener(stranger) })).toEqual([]);

@@ -1,7 +1,7 @@
 /**
  * basis v2 — Folio "My things" private view.
  *
- * This view reframes the user's private Folio as the private kring: a
+ * This view reframes the user's private Folio as the private circle: a
  * notes-list of items the user owns that aren't shared anywhere.  This
  * substrate is the pure projector — given the raw Folio list and the
  * user's webid, return the rows the notes-list view should render.

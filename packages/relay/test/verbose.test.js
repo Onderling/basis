@@ -124,7 +124,7 @@ describe('verbose — env-var gating', () => {
   it('flags a bare application object handed straight to the wire', () => {
     // No envelope around it at all — the `_put(bare payload)` case. Readable by the relay, so it
     // is a leak, and the canary should say so rather than judge the prose.
-    const leak = findPlaintextLeak({ subtype: 'kring-chat-message', text: 'hoi allemaal' });
+    const leak = findPlaintextLeak({ subtype: 'circle-chat-message', text: 'hoi allemaal' });
     expect(leak.marker).toBe('readable-outside-payload');
   });
 

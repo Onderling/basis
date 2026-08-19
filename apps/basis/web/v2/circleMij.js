@@ -8,7 +8,7 @@
  *      dashed "+ vaardigheid of drijfveer" inline form,
  *   2. PERSONA'S — one card per profile; the root card is the truth layer
  *      (rust border); other cards show per key: volgt-algemeen / EIGEN / ∅,
- *   3. PER KRING — the who-sees-what table (persona × key × rung × released
+ *   3. PER CIRCLE — the who-sees-what table (persona × key × rung × released
  *      value + a charter column), with dashed share-affordances.
  *
  * Pure render — the host (`circleApp.js`) owns the op calls:
@@ -291,7 +291,7 @@ function renderPersonas(tr, model, { onCreatePersona }) {
   return sec;
 }
 
-// ── 3 · PER KRING — wie ziet wat ────────────────────────────────────────────
+// ── 3 · PER CIRCLE — wie ziet wat ────────────────────────────────────────────
 function renderCircles(tr, model, { onToggleDisclosure, onShareToCircle }) {
   const sec = section(tr, 'circle.mij.circles_eyebrow', 'circle.mij.circles_tagline');
   const circles = model.circles || [];

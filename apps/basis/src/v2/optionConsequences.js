@@ -1,7 +1,7 @@
 /**
  * basis — N2: per-option "consequences" registry.
  *
- * Many choice forms (the create wizard's policy axes, kring settings,
+ * Many choice forms (the create wizard's policy axes, circle settings,
  * personal overrides, hop settings, skill creation) present radio
  * options whose effect isn't obvious.  Frits 2026-06-02: each option
  * should carry an ⓘ revealing *"Gevolgen als je dit kiest: …"*.
@@ -27,7 +27,7 @@ export const CONSEQUENCE_OPTIONS = Object.freeze({
   conflictPolicy: ['admin-decides', 'mediation', 'vote'],
   storagePolicy:  ['no-pod', 'decentralised', 'centralised'],
   // create wizard — N1 kind picker + buurt size
-  kind:           ['household', 'buurt', 'vriendenkring', 'team'],
+  kind:           ['household', 'buurt', 'friends', 'team'],
   size:           ['small', 'large'],
   // N2.b — skill axes (create-wizard skills step + skill editor)
   openness:       ['private', 'circle', 'contacts', 'public'],

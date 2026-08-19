@@ -49,7 +49,7 @@ window.ONDERLING_PAGE = {
       type: "prose",
       heading: "Wie heeft toegang waartoe",
       paragraphs: [
-        "Een huishouden is een kleine kring met veel wederzijds " +
+        "Een huishouden is een kleine circle met veel wederzijds " +
         "vertrouwen. De toegangsstructuur weerspiegelt dat: huisgenoten " +
         "hebben standaard toegang tot het gedeelde, en niet tot het " +
         "persoonlijke. Geen ingewikkelde rollen, geen aparte rechten " +

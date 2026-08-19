@@ -1,7 +1,7 @@
 /**
  * basis v2 — per-message delivery state (δ.2).
  *
- * The kring chat send is optimistic: the local user's message is
+ * The circle chat send is optimistic: the local user's message is
  * appended to the in-memory EventLog the moment the composer fires,
  * then a best-effort `broadcastCircleMessage` fan-out runs in the
  * background.  Before δ.2, failures were silent — the user never
@@ -29,7 +29,7 @@
  * (or `null` when the entry was cleared).
  *
  * Platform: neutral (plain JS).  Used by both web (circleApp.js) and
- * mobile (CircleLauncherScreen.js) kring chat send paths.
+ * mobile (CircleLauncherScreen.js) circle chat send paths.
  */
 
 /**

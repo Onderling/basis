@@ -4,7 +4,7 @@
  *
  * On mobile, ChatScreen owns the peer router (it stays mounted) while the
  * Contacten thread lives in CircleLauncherScreen — two separate screens. This
- * singleton bridges them the same way the kring chat / rules / recipe wires do
+ * singleton bridges them the same way the circle chat / rules / recipe wires do
  * (ChatScreen's router writes; the launcher screen reads): ChatScreen registers
  * `bundle.contactChannel.replyHandler(r => contactReplyInbox.push(r))` under the
  * channel's reply subtype, and the open ContactThreadScreen subscribes for its

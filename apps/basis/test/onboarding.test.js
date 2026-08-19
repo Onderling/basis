@@ -39,10 +39,10 @@ describe('onboarding template', () => {
     // import), so a Dutch app gets Dutch bubbles. Lock the per-language leaf copy here.
     const nl = buildOnboardingTemplate('nl');
     expect(nl.steps.welkom.say).toContain('Hoi, ik ben Onderling');
-    expect(nl.steps.eigen_kring.options.map((o) => o.label)).toContain('Ja, help me');
+    expect(nl.steps.own_circle.options.map((o) => o.label)).toContain('Ja, help me');
     const en = buildOnboardingTemplate('en');
     expect(en.steps.welkom.say).toContain("Hi, I'm Onderling");
-    expect(en.steps.eigen_kring.options.map((o) => o.label)).toContain('Yes, help me');
+    expect(en.steps.own_circle.options.map((o) => o.label)).toContain('Yes, help me');
   });
 
   it('walks welcome → choice → handoff when the user says yes', () => {
@@ -50,7 +50,7 @@ describe('onboarding template', () => {
     let s = startGuidedSetup(T);
     expect(stepOf(T, s).say).toMatch(/Onderling/);          // welkom
     s = submitGuidedStep(T, s, undefined).state;            // → wat_is_dit
-    s = submitGuidedStep(T, s, undefined).state;            // → eigen_kring (choice)
+    s = submitGuidedStep(T, s, undefined).state;            // → own_circle (choice)
     expect(stepOf(T, s).kind).toBe('choice');
     const r = submitGuidedStep(T, s, 'ja');                 // pick "ja" → per-option handoff
     expect(r.handoff).toBe(true);
@@ -61,7 +61,7 @@ describe('onboarding template', () => {
     const T = buildOnboardingTemplate('nl');
     let s = startGuidedSetup(T);
     s = submitGuidedStep(T, s, undefined).state;            // wat_is_dit
-    s = submitGuidedStep(T, s, undefined).state;            // eigen_kring
+    s = submitGuidedStep(T, s, undefined).state;            // own_circle
     let r = submitGuidedStep(T, s, 'later');                // → uitnodigen
     expect(r.handoff).toBe(false);
     s = r.state;
@@ -88,7 +88,7 @@ describe('onboarding chat driver', () => {
     const turn = onboardingTurn(T, startGuidedSetup(T));
     expect(turn.awaiting).toBe(true);
     expect(turn.done).toBe(false);
-    // welkom + wat_is_dit (say bubbles) + eigen_kring (the choice prompt) = 3 bubbles.
+    // welkom + wat_is_dit (say bubbles) + own_circle (the choice prompt) = 3 bubbles.
     expect(turn.bubbles.length).toBe(3);
     const last = turn.bubbles[turn.bubbles.length - 1];
     expect(last.buttons.map((b) => b.action)).toEqual([onboardingActionFor('ja'), onboardingActionFor('later')]);

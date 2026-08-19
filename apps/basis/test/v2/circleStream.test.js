@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   eventCircleId, buildCircleStream, buildCircleChat,
-  buildKringStream, KRING_STREAM_KIND_FILTERS,
+  CIRCLE_STREAM_KIND_FILTERS,
   projectEntries, allCircleRows, circleRows, chatRows, agentTrailRows,
 } from '../../src/v2/circleStream.js';
 import { makeSilentEntry, makeAgentTrailEntry } from '../../src/eventLog.js';
@@ -37,7 +37,7 @@ describe('eventCircleId', () => {
 });
 
 describe('C15 silent system-entry lane', () => {
-  const chatEvent = { id: 'c1', ts: 200, app: 'kring', type: 'chat-message', payload: { circleId: 'circle-1', text: 'hi', kind: 'chat-message' } };
+  const chatEvent = { id: 'c1', ts: 200, app: 'circle', type: 'chat-message', payload: { circleId: 'circle-1', text: 'hi', kind: 'chat-message' } };
   const silent = makeSilentEntry({ circleId: 'circle-1', kind: 'membership-changed', payload: { who: 'ann' }, id: 's1', ts: 100 });
 
   it('buildCircleStream (the firehose) INCLUDES silent entries, tagged by first-class circleId', () => {
@@ -54,9 +54,9 @@ describe('C15 silent system-entry lane', () => {
   });
 
   it('buildCircleChat is behaviour-preserving when there are no silent entries', () => {
-    const events = [chatEvent, { id: 'c2', ts: 50, app: 'kring', type: 'chat-message', payload: { circleId: 'circle-1', text: 'yo' } }];
+    const events = [chatEvent, { id: 'c2', ts: 50, app: 'circle', type: 'chat-message', payload: { circleId: 'circle-1', text: 'yo' } }];
     expect(buildCircleChat({ events, circles, circleId: 'circle-1' }).map((r) => r.id))
-      .toEqual(buildKringStream({ events, circles, circleId: 'circle-1' }).map((r) => r.id));
+      .toEqual(circleRows({ events, circles, circleId: 'circle-1' }).map((r) => r.id));
   });
 });
 
@@ -119,7 +119,7 @@ describe('buildCircleStream', () => {
   });
 });
 
-describe('buildKringStream (SP-13)', () => {
+describe('circleRows (SP-13)', () => {
   const events = [
     { id: 'a', ts: 300, app: 'stoop',    type: 'buurt-post', payload: { groupId: 'grp-9',  kind: 'vraag' } },
     { id: 'b', ts: 250, app: 'stoop',    type: 'buurt-post', payload: { groupId: 'grp-9',  kind: 'aanbod' } },
@@ -130,41 +130,41 @@ describe('buildKringStream (SP-13)', () => {
   ];
 
   it('exposes the canonical chip set', () => {
-    expect(KRING_STREAM_KIND_FILTERS).toEqual(['all', 'vraag', 'aanbod', 'leen']);
+    expect(CIRCLE_STREAM_KIND_FILTERS).toEqual(['all', 'vraag', 'aanbod', 'leen']);
   });
 
-  it('with circleId narrows to that kring (newest first)', () => {
-    const rows = buildKringStream({ events, circles, circleId: 'grp-9' });
+  it('with circleId narrows to that circle (newest first)', () => {
+    const rows = circleRows({ events, circles, circleId: 'grp-9' });
     expect(rows.map((r) => r.id)).toEqual(['a', 'b', 'c']);
   });
 
-  it('with no circleId returns the full cross-kring stream', () => {
-    expect(buildKringStream({ events, circles }).map((r) => r.id))
+  it('with no circleId returns the full cross-circle stream', () => {
+    expect(circleRows({ events, circles }).map((r) => r.id))
       .toEqual(['a', 'b', 'c', 'd', 'e', 'f']);
   });
 
   it('with kindFilter narrows to that kind only', () => {
-    expect(buildKringStream({ events, circles, circleId: 'grp-9', kindFilter: 'vraag' })
+    expect(circleRows({ events, circles, circleId: 'grp-9', kindFilter: 'vraag' })
       .map((r) => r.id)).toEqual(['a']);
-    expect(buildKringStream({ events, circles, circleId: 'grp-9', kindFilter: 'aanbod' })
+    expect(circleRows({ events, circles, circleId: 'grp-9', kindFilter: 'aanbod' })
       .map((r) => r.id)).toEqual(['b']);
   });
 
   it('treats kindFilter=null / "all" as no filter', () => {
     const expected = ['a', 'b', 'c'];
-    expect(buildKringStream({ events, circles, circleId: 'grp-9', kindFilter: null })
+    expect(circleRows({ events, circles, circleId: 'grp-9', kindFilter: null })
       .map((r) => r.id)).toEqual(expected);
-    expect(buildKringStream({ events, circles, circleId: 'grp-9', kindFilter: 'all' })
+    expect(circleRows({ events, circles, circleId: 'grp-9', kindFilter: 'all' })
       .map((r) => r.id)).toEqual(expected);
   });
 
   it('unknown kind → no rows (helper does not invent)', () => {
-    expect(buildKringStream({ events, circles, circleId: 'grp-9', kindFilter: 'nope' }))
+    expect(circleRows({ events, circles, circleId: 'grp-9', kindFilter: 'nope' }))
       .toEqual([]);
   });
 
   it('unknown circle → no rows', () => {
-    expect(buildKringStream({ events, circles, circleId: 'ghost' })).toEqual([]);
+    expect(circleRows({ events, circles, circleId: 'ghost' })).toEqual([]);
   });
 });
 
@@ -172,7 +172,7 @@ describe('buildKringStream (SP-13)', () => {
  * One projector, two axes (C15 slice 2, 2026-07-27).
  *
  * There used to be three functions whose names hid what differed — and two were the same word in two
- * languages (`buildCircleStream` / `buildKringStream`; *kring* IS circle), so a reader could not tell which
+ * languages (`buildCircleStream` / `circleRows`; *circle* IS circle), so a reader could not tell which
  * selected a SCOPE and which selected CONTENT. These pin the axes, and that the wrappers are genuinely the
  * same function with different arguments.
  */
@@ -229,7 +229,7 @@ describe('the wrappers are the projector with arguments', () => {
   });
 
   it('the old names still work — this is a rename, not a migration', () => {
-    expect(buildKringStream({ events, circles, circleId: 'x' })).toEqual(circleRows({ events, circles, circleId: 'x' }));
+    expect(circleRows({ events, circles, circleId: 'x' })).toEqual(circleRows({ events, circles, circleId: 'x' }));
     expect(buildCircleChat({ events, circles, circleId: 'x' })).toEqual(chatRows({ events, circles, circleId: 'x' }));
   });
 });
@@ -241,14 +241,14 @@ describe('agentTrailRows — the trail is a lens, not a second store (J-L6/J-L7)
     makeAgentTrailEntry({ actor: 'bot-x', op: 'addItems', via: 'grant:g9', circleId: 'c1', ts: 30, id: 't1' }),
     makeAgentTrailEntry({ actor: 'bot-x', op: 'setRelayUrl', kind: 'settings-change', via: 'mandate:task-7', circleId: null, ts: 20, id: 't2' }),
     makeAgentTrailEntry({ actor: 'bot-y', op: 'addItems', via: 'owner', circleId: 'c1', ts: 10, id: 't3' }),
-    { id: 'm1', ts: 5, app: 'kring', type: 'chat-message', actor: 'anna', payload: { circleId: 'c1', text: 'hoi' } },
+    { id: 'm1', ts: 5, app: 'circle', type: 'chat-message', actor: 'anna', payload: { circleId: 'c1', text: 'hoi' } },
   ];
-  const circles = [{ id: 'c1', name: 'Kring 1' }];
+  const circles = [{ id: 'c1', name: 'Circle 1' }];
 
   it("one actor's rows, every circle + the un-scoped ones, newest first, via readable per row", () => {
     const rows = agentTrailRows({ events, circles, actor: 'bot-x' });
     expect(rows.map((r) => r.id)).toEqual(['t1', 't2']);
-    expect(rows[0].circleName).toBe('Kring 1');
+    expect(rows[0].circleName).toBe('Circle 1');
     expect(rows[1].circleId).toBeNull();               // a non-circle action still shows in the trail
     // J-L7 — `via` records the AUTHORITY, so the answer survives the grant's revocation.
     expect(rows.map((r) => r.event.payload.via)).toEqual(['grant:g9', 'mandate:task-7']);

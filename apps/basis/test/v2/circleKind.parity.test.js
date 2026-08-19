@@ -1,6 +1,6 @@
 /**
  * β.3 — locale parity for the four `circle.kind.*` section-header keys
- * the launcher uses to group tiles (household / buurt / vriendenkring /
+ * the launcher uses to group tiles (household / buurt / friends /
  * other).  Confirms the keys exist in BOTH locales of BOTH apps + that
  * the en↔nl key sets match overall.
  *
@@ -17,7 +17,7 @@ import nlWebRaw from '../../locales/nl.json' with { type: 'json' };
 import enMobRaw from '../../../basis-mobile/locales/en.json' with { type: 'json' };
 import nlMobRaw from '../../../basis-mobile/locales/nl.json' with { type: 'json' };
 import { sharedCircleLocale } from '../../src/locales/index.js';
-import { KRING_KINDS } from '../../src/v2/kringTemplates.js';
+import { CIRCLE_KINDS } from '../../src/v2/circleTemplates.js';
 // `circle.*` is now the SHARED source both shells merge — so web ≡ mobile for circle by construction.
 const enWeb = { ...enWebRaw, circle: sharedCircleLocale.en };
 const nlWeb = { ...nlWebRaw, circle: sharedCircleLocale.nl };
@@ -38,12 +38,12 @@ function flatKeys(obj, prefix = '') {
 /**
  * `circle.kind.*` serves TWO readers: the launcher's section headers and the create wizard's kind
  * picker. They are not the same set — the launcher needs a catch-all (`other`) that is not a kind you
- * can pick, and the wizard needs every kind in `KRING_KINDS`. Derive the union rather than hardcoding
- * it: this list was pinned at four while `KRING_KINDS` grew to include `team`, so the picker rendered
+ * can pick, and the wizard needs every kind in `CIRCLE_KINDS`. Derive the union rather than hardcoding
+ * it: this list was pinned at four while `CIRCLE_KINDS` grew to include `team`, so the picker rendered
  * the raw key `circle.kind.team` on screen in both languages (found walking S3, 2026-07-29) and this
  * test still passed. A hardcoded list of a vocabulary that lives elsewhere only ever goes stale.
  */
-const KIND_KEYS = [...new Set([...KRING_KINDS, 'other'])]
+const KIND_KEYS = [...new Set([...CIRCLE_KINDS, 'other'])]
   .map((k) => `circle.kind.${k}`).sort();
 
 describe('β.3 — circle.kind.* locale parity', () => {

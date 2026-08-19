@@ -24,7 +24,7 @@ describe('renderCircleSettings', () => {
     // obj L — sharePosture axis is editable; default 'closed' reflects DEFAULT_CIRCLE_POLICY.
     expect(el.querySelector('.circle-settings__axis[data-axis=sharePosture] input[value=closed]').checked).toBe(true);
     // 5.9a — view axis is editable; default flipped to 'screen' so
-    // tap-on-kring opens the per-circle detail instead of auto-
+    // tap-on-circle opens the per-circle detail instead of auto-
     // routing to the classic chat shell (see DEFAULT_CIRCLE_POLICY).
     expect(el.querySelector('.circle-settings__axis[data-axis=view] input[value=screen]').checked).toBe(true);
   });

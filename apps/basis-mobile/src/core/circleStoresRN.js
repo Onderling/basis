@@ -22,7 +22,7 @@ import {
   createSharedWithMeStore, podSharedWithMeIo, tieredSharedWithMeIo,
   // multi-admin proposal persistence on RN.
   // α.1a — scherm recipe book store.
-  createKringRecipeStore,
+  createCircleRecipeStore,
   // α.2 — per-user screens store.
   createUserScreenStore,
   // β.5 — per-user pin-to-top store.
@@ -140,11 +140,11 @@ export function sessionToPodWriterRN(session) {
   catch { return null; }
 }
 
-/** α.1a — per-kring recipe book store (one book per kring; key:
+/** α.1a — per-circle recipe book store (one book per circle; key:
  *  `cc.circleRecipe.<circleId>`).  γ.2 — version capture above storage. */
-export function makeKringRecipeStoreRN(storage) {
+export function makeCircleRecipeStoreRN(storage) {
   const versions = asyncStorageObjectVersions('recipe', storage);
-  return createKringRecipeStore({
+  return createCircleRecipeStore({
     io: asyncKeyedIo('cc.circleRecipe.', storage),
     versions,
   });

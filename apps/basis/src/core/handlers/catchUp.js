@@ -10,7 +10,7 @@
  *     receiver's normal ingest path already handles + deduplicates).
  *
  * POSTS ONLY. The chat/tasks/governance/membership catch-ups all ride their device-log lanes now
- * (frontier replay with the consent rung · pull-all · the pod read-back); the per-kring strategy
+ * (frontier replay with the consent rung · pull-all · the pod read-back); the per-circle strategy
  * routing and the negotiated chat transfer that used to live here retired with the chat re-root.
  *
  * Same dep pattern as meshIntros.js: callSkill + sendPeer + logger.
@@ -28,11 +28,11 @@
 /**
  * ε.3 — per-group peer catch-up handler.  Lifts the inner body of
  * `makeRequestCatchUpFromKnownPeers`'s for-of loop into a reusable
- * unit so the strategy router can call it ONE KRING AT A TIME (the
+ * unit so the strategy router can call it ONE CIRCLE AT A TIME (the
  * `peerCatchUp` handler shape that `scheduleCatchUp` expects).
  *
  * Roster-empty short-circuit + sinceMs lookup preserved — when a
- * kring has no known peers OR no posts yet, the function logs the
+ * circle has no known peers OR no posts yet, the function logs the
  * "skipped" status and returns without sending anything.  The
  * returned shape is informational; the dispatcher's `result` field
  * keeps the trace for diagnostics.
@@ -106,23 +106,23 @@ export function makeRequestCatchUpForGroup({ callSkill, sendPeer, logger = conso
  *   peerCatchUpNegotiated?: ({circleId, sinceTs}) => Promise<*>,
  * }} deps
  *
- * ε.3 — when `getCirclePolicy` is supplied, each kring's catch-up
- * routes through `scheduleCatchUp(policy.pod)` so pod-shared kringen
- * use the pod range-query and personal/none kringen keep the peer
+ * ε.3 — when `getCirclePolicy` is supplied, each circle's catch-up
+ * routes through `scheduleCatchUp(policy.pod)` so pod-shared circles
+ * use the pod range-query and personal/none circles keep the peer
  * path.  Without `getCirclePolicy` we default the policy to
  * `{pod: 'personal'}` (= 'peer' strategy = today's behaviour),
  * preserving bit-for-bit semantics for callers that haven't migrated.
  *
  * `inbox` is required for the pod path; when omitted, the pod handler
  * isn't wired and `scheduleCatchUp` returns `deferred` for shared
- * kringen — same forward-compat contract as catchUpStrategy.js
+ * circles — same forward-compat contract as catchUpStrategy.js
  * documents.
  *
  * ε.4 — when `peerCatchUpNegotiated` is supplied, the strategy
  * router's `peerCatchUp` handler is REPLACED with it for
- * personal/none kringen.  The legacy single-message peer-poll path
+ * personal/none circles.  The legacy single-message peer-poll path
  * (`makeRequestCatchUpForGroup`) is kept as a fallback so callers
- * that haven't migrated keep working, AND so personal-pod kringen
+ * that haven't migrated keep working, AND so personal-pod circles
  * with no negotiated coordinator wired (e.g. a half-migrated boot)
  * still cover the basic catch-up case.  Both paths produce results
  * the inbox can dedupe through.
@@ -134,7 +134,7 @@ export function makeRequestCatchUpFromKnownPeers({
 }) {
   // POSTS only (the stoop noticeboard's hi-water peer poll). The chat/tasks/governance/membership
   // catch-ups all ride their device-log lanes now (frontier replay / pull-all / the pod read-back) —
-  // the per-kring strategy routing that used to live here went with them.
+  // the per-circle strategy routing that used to live here went with them.
   const perGroup = makeRequestCatchUpForGroup({ callSkill, sendPeer, logger });
 
   return async function requestCatchUpFromKnownPeers() {

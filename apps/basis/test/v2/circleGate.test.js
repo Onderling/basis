@@ -123,7 +123,7 @@ describe('circle bot + manifest gate — routing precedence', () => {
       llmProviders: { local: { chat: async () => '' } },             // truthy llm so the gate path runs
       interpret,
       dispatch: (cmd) => dispatched.push(cmd),
-      postToKring: () => {},
+      postToCircle: () => {},
       gate: gate(),
     });
     return { bot, dispatched, interpret };

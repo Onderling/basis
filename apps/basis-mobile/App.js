@@ -57,7 +57,7 @@ import {
 } from './src/core/mnemonicCreate.js';
 import { dlog } from './src/core/devLog.js';
 import { EventLog } from '../basis/src/eventLog.js';
-import { migrateKringChatHistory, CHAT_MIGRATION_MARKER_KEY } from '../basis/src/v2/kringChatRehydrate.js';
+import { migrateCircleChatHistory, CHAT_MIGRATION_MARKER_KEY } from '../basis/src/v2/circleChatRehydrate.js';
 import { createSettingsPodMedium } from '../basis/src/v2/settingsPodMedium.js';
 import { createHistoryPodMedium } from '../basis/src/v2/historyMirror.js';
 import { wireEventLogPersistence, asyncStorageSnapshotIo } from '../basis/src/v2/eventLogPersistence.js';
@@ -65,22 +65,22 @@ import { createChatMessageInbox } from '../basis/src/v2/chatMessageInbox.js';
 import { createSelfAuthorCheck } from '../basis/src/v2/chatSelfAuthor.js';
 import { OidcSessionRN } from '@onderling/oidc-session-rn';
 import { buildCirclePodWriter } from './src/core/circleStoresRN.js';
-// γ-next.recipe — per-kring pending-recipe cache (AsyncStorage-backed).
+// γ-next.recipe — per-circle pending-recipe cache (AsyncStorage-backed).
 // One store per app; shared between ChatScreen (receiver) and
 // CircleLauncherScreen (editor pull + send-side clear).
-import { makeKringRecipePendingStoreRN } from './src/core/kringRecipePendingStorageRN.js';
+import { makeCircleRecipePendingStoreRN } from './src/core/circleRecipePendingStorageRN.js';
 import { initCirclePods, circleControlAgentRouter, setCirclePodSession, setCircleKeyEventWiring, provisionCircleMedium, circleSendDataMove, circlePodWrite, circleResolveRef, getCirclePodFetch, getActiveRealPodRouting } from './src/core/circlePods.js';
 import { discoverPodRoot } from '../basis/src/web/podStorage.js';
-// γ-next.rules — per-kring pending-rules cache (AsyncStorage-backed).
+// γ-next.rules — per-circle pending-rules cache (AsyncStorage-backed).
 // Mirrors the recipe wire: ChatScreen writes via the receiver,
 // CircleLauncherScreen reads on rules-screen open + clears after the
 // γ.4 resolver applies / discards.
-import { makeKringRulesPendingStoreRN } from './src/core/kringRulesPendingStorageRN.js';
-// γ-next.policy — per-kring pending-policy cache (AsyncStorage-backed).
+import { makeCircleRulesPendingStoreRN } from './src/core/circleRulesPendingStorageRN.js';
+// γ-next.policy — per-circle pending-policy cache (AsyncStorage-backed).
 // Mirrors the rules wire: ChatScreen writes via the receiver,
 // CircleLauncherScreen's settings editor reads on open + clears after
 // the γ.4 resolver applies / discards.
-import { makeKringPolicyPendingStoreRN } from './src/core/kringPolicyPendingStorageRN.js';
+import { makeCirclePolicyPendingStoreRN } from './src/core/circlePolicyPendingStorageRN.js';
 import { makeCircleMembraneOpts, makeCircleGroupsIndex } from '../basis/src/v2/circleMembrane.js';
 import { makeMemberOverrideStoreRN } from './src/core/circleStoresRN.js';
 
@@ -107,7 +107,7 @@ export default function App() {
   // there is no separate classic chat shell as a
   // routable screen.  ChatScreen stays mounted invisibly so its peer-
   // wiring keeps routing inbound DMs / mesh events; the launcher is the
-  // ONLY visible top-level surface.  Chat now lives inside the kring
+  // ONLY visible top-level surface.  Chat now lives inside the circle
   // view as the GESPREK tab (will fill the surface; until then
   // there's a hole where chat used to be reachable as a standalone).
   const [bundle, setBundle] = useState(null);
@@ -132,7 +132,7 @@ export default function App() {
     // #36 — the chat-retention window now lives in the parameter register; it is applied to the eventLog once
     // the agent bundle is ready (see below, at `bundleRef.current = b`), parity with web circleApp.
   }
-  // ε.1 — single normalization gate for kring-chat inserts.  The
+  // ε.1 — single normalization gate for circle-chat inserts.  The
   // inbox owns msgId dedup + envelope validation + ingest mirror +
   // eventLog append.  Both the boot rehydrator (below) AND
   // ChatScreen's NKN peer-router route through this one instance, so
@@ -162,16 +162,16 @@ export default function App() {
       .catch(() => { /* keep defaults */ });
   }
   // The fallback OFFER (2026-07-28), mobile half. The offer logic is app-level (its evidence and cooldown
-  // must survive circle switches); the MOUTH is whichever kring chat is open, registered below. When the
-  // offer fires with no kring open it is BUFFERED, not dropped — the moment a chat mounts, it speaks and
+  // must survive circle switches); the MOUTH is whichever circle chat is open, registered below. When the
+  // offer fires with no circle open it is BUFFERED, not dropped — the moment a chat mounts, it speaks and
   // arms the cooldown. Same dormancy as web: nothing fires until `preferCircleAddress` is enabled.
-  const kringBotSinkRef = useRef(null);
+  const circleBotSinkRef = useRef(null);
   const pendingFallbackOfferRef = useRef(null);
   const fallbackOfferRef = useRef(null);
   if (!fallbackOfferRef.current) {
     fallbackOfferRef.current = createFallbackOffer({
       onOffer: (payload) => {
-        const sink = kringBotSinkRef.current;
+        const sink = circleBotSinkRef.current;
         if (sink) { sink(payload); fallbackOfferRef.current.decline(); }
         else pendingFallbackOfferRef.current = payload;
       },
@@ -184,7 +184,7 @@ export default function App() {
     try { await deliverySettingsStoreRef.current.set({ allowFallback: true }); }
     catch { return; }   // confirm only on success
     fallbackOfferRef.current?.accept();
-    kringBotSinkRef.current?.({ messageKey: 'circle.nearbyScreen.delivery_fallback_on' });
+    circleBotSinkRef.current?.({ messageKey: 'circle.nearbyScreen.delivery_fallback_on' });
   }, []);
 
   // "The circle list is stale" — a counter, owned here because BOTH screens stay mounted.
@@ -197,20 +197,20 @@ export default function App() {
   const [circlesRevision, setCirclesRevision] = useState(0);
   const onCirclesChanged = useCallback(() => setCirclesRevision((n) => n + 1), []);
 
-  const registerKringBotSink = useCallback((fn) => {
-    kringBotSinkRef.current = typeof fn === 'function' ? fn : null;
+  const registerCircleBotSink = useCallback((fn) => {
+    circleBotSinkRef.current = typeof fn === 'function' ? fn : null;
     // A buffered offer speaks as soon as a mouth exists — and only then arms the cooldown, so an offer
     // that never got shown does not silently burn its one chance.
-    if (kringBotSinkRef.current && pendingFallbackOfferRef.current) {
-      kringBotSinkRef.current(pendingFallbackOfferRef.current);
+    if (circleBotSinkRef.current && pendingFallbackOfferRef.current) {
+      circleBotSinkRef.current(pendingFallbackOfferRef.current);
       pendingFallbackOfferRef.current = null;
       fallbackOfferRef.current.decline();
     }
   }, []);
 
-  const kringChatInboxRef = useRef(null);
+  const circleChatInboxRef = useRef(null);
   // Delivery honesty — ONE receipt sender, shared by the legacy-envelope inbox and the signed-statement
-  // receive path in ChatScreen (web's `onKringStored` parity: one set of side effects, not two).
+  // receive path in ChatScreen (web's `onCircleStored` parity: one set of side effects, not two).
   const chatReceiptSenderRef = useRef(null);
   if (!chatReceiptSenderRef.current) {
     chatReceiptSenderRef.current = makeReceiptSender({
@@ -220,8 +220,8 @@ export default function App() {
         : Promise.reject(new Error('no peer send yet'))),
     });
   }
-  if (!kringChatInboxRef.current) {
-    kringChatInboxRef.current = createChatMessageInbox({
+  if (!circleChatInboxRef.current) {
+    circleChatInboxRef.current = createChatMessageInbox({
       eventLog: eventLogRef.current,
       ingest: async (payload, fromPeerAddr) => {
         const callSkill = bundleRef.current?.callSkill;
@@ -229,7 +229,7 @@ export default function App() {
         try {
           return await callSkill('stoop', 'ingestCircleMessage', { payload, fromPeerAddr });
         } catch (err) {
-          console.warn('[kring-chat] ingestCircleMessage failed:', err?.message ?? err);
+          console.warn('[circle-chat] ingestCircleMessage failed:', err?.message ?? err);
           return { error: String(err?.message ?? err) };
         }
       },
@@ -256,48 +256,48 @@ export default function App() {
       localActor: 'me',
     });
   }
-  // γ-next.recipe — shared kring-recipe-broadcast pending store.
+  // γ-next.recipe — shared circle-recipe-broadcast pending store.
   // ChatScreen's peer-router writes via the receiver handler;
   // CircleLauncherScreen's editor reads on mount + clears after the
   // γ.3 resolver applies/discards.
-  const kringRecipePendingStoreRef = useRef(null);
-  if (!kringRecipePendingStoreRef.current) {
-    kringRecipePendingStoreRef.current = makeKringRecipePendingStoreRN(AsyncStorage);
+  const circleRecipePendingStoreRef = useRef(null);
+  if (!circleRecipePendingStoreRef.current) {
+    circleRecipePendingStoreRef.current = makeCircleRecipePendingStoreRN(AsyncStorage);
   }
   // S4 — wire the durable AsyncStorage vault for per-circle pod producers (sealing
   // identities + group keys); enables content sealing on a p2/p3 circle (web parity).
   initCirclePods(AsyncStorage);
   // γ-next.recipe — shared LRU dedup for the recipe-broadcast handler.
-  const kringRecipeDedupRef = useRef(null);
-  if (!kringRecipeDedupRef.current) {
-    kringRecipeDedupRef.current = new Set();
+  const circleRecipeDedupRef = useRef(null);
+  if (!circleRecipeDedupRef.current) {
+    circleRecipeDedupRef.current = new Set();
   }
-  // γ-next.rules — shared kring-rules-broadcast pending store.
+  // γ-next.rules — shared circle-rules-broadcast pending store.
   // ChatScreen's peer-router writes via the receiver handler;
   // CircleLauncherScreen's rules editor reads on mount + clears after
   // the γ.4 resolver applies/discards.
-  const kringRulesPendingStoreRef = useRef(null);
-  if (!kringRulesPendingStoreRef.current) {
-    kringRulesPendingStoreRef.current = makeKringRulesPendingStoreRN(AsyncStorage);
+  const circleRulesPendingStoreRef = useRef(null);
+  if (!circleRulesPendingStoreRef.current) {
+    circleRulesPendingStoreRef.current = makeCircleRulesPendingStoreRN(AsyncStorage);
   }
   // γ-next.rules — shared LRU dedup for the rules-broadcast handler.
-  const kringRulesDedupRef = useRef(null);
-  if (!kringRulesDedupRef.current) {
-    kringRulesDedupRef.current = new Set();
+  const circleRulesDedupRef = useRef(null);
+  if (!circleRulesDedupRef.current) {
+    circleRulesDedupRef.current = new Set();
   }
-  // γ-next.policy — shared kring-policy-broadcast pending store.
+  // γ-next.policy — shared circle-policy-broadcast pending store.
   // ChatScreen's peer-router writes via the receiver handler;
   // CircleLauncherScreen's settings editor reads on mount + clears after
   // the γ.4 resolver applies/discards.  Completes the γ-next trio
   // (recipe / rules / policy).
-  const kringPolicyPendingStoreRef = useRef(null);
-  if (!kringPolicyPendingStoreRef.current) {
-    kringPolicyPendingStoreRef.current = makeKringPolicyPendingStoreRN(AsyncStorage);
+  const circlePolicyPendingStoreRef = useRef(null);
+  if (!circlePolicyPendingStoreRef.current) {
+    circlePolicyPendingStoreRef.current = makeCirclePolicyPendingStoreRN(AsyncStorage);
   }
   // γ-next.policy — shared LRU dedup for the policy-broadcast handler.
-  const kringPolicyDedupRef = useRef(null);
-  if (!kringPolicyDedupRef.current) {
-    kringPolicyDedupRef.current = new Set();
+  const circlePolicyDedupRef = useRef(null);
+  if (!circlePolicyDedupRef.current) {
+    circlePolicyDedupRef.current = new Set();
   }
 
   // 5.4c (2026-05-30) — single OidcSessionRN, lifted from ChatScreen so
@@ -580,9 +580,9 @@ export default function App() {
         // AsyncStorage latch skips every later boot. The per-boot rehydrate is retired — this was its
         // final job; a failed pass leaves the latch unset and retries next boot.
         if (typeof b?.callSkill === 'function' && eventLogRef.current) {
-          migrateKringChatHistory({
+          migrateCircleChatHistory({
             callSkill: b.callSkill,
-            inbox:     kringChatInboxRef.current,
+            inbox:     circleChatInboxRef.current,
             marker: {
               get: () => AsyncStorage.getItem(CHAT_MIGRATION_MARKER_KEY),
               set: (v) => AsyncStorage.setItem(CHAT_MIGRATION_MARKER_KEY, v),
@@ -688,7 +688,7 @@ export default function App() {
         {/* ChatScreen stays mounted (peer-wiring keeps routing
             inbound DMs / mesh) but is visually hidden behind the launcher
             overlay.  No "← chat" route reveals it; chat now lives inside
-            the kring view as the GESPREK tab.
+            the circle view as the GESPREK tab.
             The styles.hiddenChat below uses absolute positioning so the
             ChatScreen is mounted + peer-wired but never visible. */}
         <View style={styles.hiddenChat} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
@@ -698,15 +698,15 @@ export default function App() {
             bundle={bundle}
             bootError={bootError}
             eventLog={eventLogRef.current}
-            kringChatInbox={kringChatInboxRef.current}
+            circleChatInbox={circleChatInboxRef.current}
             chatStoredReceipt={(info) => chatReceiptSenderRef.current(info)}
             deliveryStateMap={deliveryStateMapRef.current}
-            kringRecipePendingStore={kringRecipePendingStoreRef.current}
-            kringRecipeDedup={kringRecipeDedupRef.current}
-            kringRulesPendingStore={kringRulesPendingStoreRef.current}
-            kringRulesDedup={kringRulesDedupRef.current}
-            kringPolicyPendingStore={kringPolicyPendingStoreRef.current}
-            kringPolicyDedup={kringPolicyDedupRef.current}
+            circleRecipePendingStore={circleRecipePendingStoreRef.current}
+            circleRecipeDedup={circleRecipeDedupRef.current}
+            circleRulesPendingStore={circleRulesPendingStoreRef.current}
+            circleRulesDedup={circleRulesDedupRef.current}
+            circlePolicyPendingStore={circlePolicyPendingStoreRef.current}
+            circlePolicyDedup={circlePolicyDedupRef.current}
             sessionRef={sessionRef}
             onSessionChanged={refreshCirclePodWriter}
             onPodAuthReady={setPodAuth}
@@ -715,18 +715,18 @@ export default function App() {
         <CircleLauncherScreen
           bundle={bundle}
           deliveryStateMap={deliveryStateMapRef.current}
-          registerKringBotSink={registerKringBotSink}
+          registerCircleBotSink={registerCircleBotSink}
           onAcceptFallback={acceptFallbackOffer}
           // Bumped when a circle is joined/created from another surface → the launcher reloads its list.
           circlesRevision={circlesRevision}
           sessionRef={sessionRef}
           podAuth={podAuth}
           eventLog={eventLogRef.current}
-          kringRecipePendingStore={kringRecipePendingStoreRef.current}
-          kringRulesPendingStore={kringRulesPendingStoreRef.current}
-          kringPolicyPendingStore={kringPolicyPendingStoreRef.current}
+          circleRecipePendingStore={circleRecipePendingStoreRef.current}
+          circleRulesPendingStore={circleRulesPendingStoreRef.current}
+          circlePolicyPendingStore={circlePolicyPendingStoreRef.current}
           /* no onBack (no chat shell to fall back to) +
-             no onChatRoute (the kring view IS the chat, no route). */
+             no onChatRoute (the circle view IS the chat, no route). */
         />
         <RestoreFlowModal
           visible={restoreFlowPending && !!bundle}

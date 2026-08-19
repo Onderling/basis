@@ -22,10 +22,10 @@ export { OFFERING_AXES };
 // pre-fills the policy axes (features / revealPolicy / pod / llmTool /
 // agents / consensusRequired) with the matching template's defaults
 // for any axis the user hasn't already overridden.
-import { applyTemplate, markAxisTouched, KRING_KINDS, SIZE_BANDS, recommendChat } from '../../v2/kringTemplates.js';
+import { applyTemplate, markAxisTouched, CIRCLE_KINDS, SIZE_BANDS, recommendChat } from '../../v2/circleTemplates.js';
 import { INVITE_CEILING_FALLBACK } from '@onderling-app/stoop/lib/inviteCeiling';
 import { ROLE_TEMPLATE_IDS, applyRoleTemplates } from '../../v2/roleTemplates.js';
-export { KRING_KINDS, SIZE_BANDS, ROLE_TEMPLATE_IDS };
+export { CIRCLE_KINDS, SIZE_BANDS, ROLE_TEMPLATE_IDS };
 
 /* ─── Policy catalogs ───────────────────────────────────────── */
 
@@ -90,16 +90,16 @@ export function labelOf(options, id) {
 }
 
 /**
- * β.4 — pick a kind and pre-fill policy axes from `kringTemplates`.
+ * β.4 — pick a kind and pre-fill policy axes from `circleTemplates`.
  *
  * Returns a new state object (does NOT mutate the input).  The merge
  * preserves every axis the user has already set — picking a kind only
  * fills the gaps.  Switching kinds is therefore essentially a no-op
- * for axes the previous kind already filled (see kringTemplates.js
+ * for axes the previous kind already filled (see circleTemplates.js
  * header for the design call).
  *
  * @param {object} state — current wizard state
- * @param {string} kind  — kind picked (household / buurt / vriendenkring / team)
+ * @param {string} kind  — kind picked (household / buurt / friends / team)
  * @returns {object} new state with `kind` + policy axes filled
  */
 export function setKind(state, kind) {

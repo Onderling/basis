@@ -1,14 +1,14 @@
 /**
  * basis — createGroupState wire-up tests for β.4 (kind-aware
  * "+ new circle" templates).  Verifies that `setKind` consumes the
- * `kringTemplates` substrate to fill policy axes in the wizard state
+ * `circleTemplates` substrate to fill policy axes in the wizard state
  * and respects user-set overrides.
  */
 import { describe, it, expect } from 'vitest';
 import {
-  initialState, setKind, setChatEnabled, KRING_KINDS,
+  initialState, setKind, setChatEnabled, CIRCLE_KINDS,
 } from '../../../src/core/wizards/createGroupState.js';
-import { KRING_TEMPLATES } from '../../../src/v2/kringTemplates.js';
+import { CIRCLE_TEMPLATES } from '../../../src/v2/circleTemplates.js';
 
 describe('initialState', () => {
   it('starts with kind=null + no policy axes set', () => {
@@ -31,7 +31,7 @@ describe('setKind — fills policy axes from the template', () => {
     const s0 = initialState();
     const s1 = setKind(s0, 'household');
     expect(s1.kind).toBe('household');
-    expect(s1.features).toEqual(KRING_TEMPLATES.household.features);
+    expect(s1.features).toEqual(CIRCLE_TEMPLATES.household.features);
     expect(s1.revealPolicy).toBe('open');
     expect(s1.pod).toBe('shared');
     expect(s1.llmTool).toBe('local');
@@ -55,9 +55,9 @@ describe('setKind — fills policy axes from the template', () => {
   it('picking an unknown kind falls back to _default', () => {
     const s = setKind(initialState(), 'unknownStyle');
     expect(s.kind).toBe('unknownStyle');
-    expect(s.revealPolicy).toBe(KRING_TEMPLATES._default.revealPolicy);
-    expect(s.pod).toBe(KRING_TEMPLATES._default.pod);
-    expect(s.llmTool).toBe(KRING_TEMPLATES._default.llmTool);
+    expect(s.revealPolicy).toBe(CIRCLE_TEMPLATES._default.revealPolicy);
+    expect(s.pod).toBe(CIRCLE_TEMPLATES._default.pod);
+    expect(s.llmTool).toBe(CIRCLE_TEMPLATES._default.llmTool);
   });
 
   it('does not mutate the input state', () => {
@@ -69,7 +69,7 @@ describe('setKind — fills policy axes from the template', () => {
 });
 
 describe('setKind — the USER\'s choices survive; a previous template\'s do not (decision 4, 2026-07-29)', () => {
-  // See kringTemplates.js: the merge now keys on provenance rather than on "is it already set", so a
+  // See circleTemplates.js: the merge now keys on provenance rather than on "is it already set", so a
   // kind switch gives you the kind you asked for instead of the first one wearing a new label.
 
   it('a feature the user toggled before picking is not clobbered', () => {
@@ -94,20 +94,20 @@ describe('setKind — the USER\'s choices survive; a previous template\'s do not
   it('…and a choice made along the way still survives it', () => {
     const buurt = setKind(initialState(), 'buurt');
     const chose = setChatEnabled(buurt, true);
-    const swapped = setKind(chose, 'vriendenkring');
+    const swapped = setKind(chose, 'friends');
     expect(swapped.features.chat).toBe(true);
-    // everything else now matches a fresh vriendenkring — the J-CW1 walk, as a test
-    const fresh = setKind(initialState(), 'vriendenkring');
+    // everything else now matches a fresh friends — the J-CW1 walk, as a test
+    const fresh = setKind(initialState(), 'friends');
     expect(swapped.revealPolicy).toBe(fresh.revealPolicy);
     expect(swapped.features.tasks).toBe(fresh.features.tasks);
     expect(swapped.features.houseRules).toBe(fresh.features.houseRules);
   });
 });
 
-describe('KRING_KINDS — re-exported from createGroupState', () => {
+describe('CIRCLE_KINDS — re-exported from createGroupState', () => {
   it('exposes the four canonical kinds', () => {
-    expect(KRING_KINDS.slice().sort()).toEqual(
-      ['buurt', 'household', 'team', 'vriendenkring'],
+    expect(CIRCLE_KINDS.slice().sort()).toEqual(
+      ['buurt', 'friends', 'household', 'team'],
     );
   });
 });

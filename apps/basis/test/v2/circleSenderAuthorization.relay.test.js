@@ -27,7 +27,7 @@ import { AgentIdentity, SecurityLayer, mkEnvelope, P } from '@onderling/core';
 import { RelayTransport } from '../../../../packages/transports/src/RelayTransport.js';
 import { VaultMemory } from '@onderling/vault';
 import {
-  bootRealAgentNode, connectAgentsOverRelay, pairCircle, until, teardown, sendKringChat } from '../support/pairRealAgents.js';
+  bootRealAgentNode, connectAgentsOverRelay, pairCircle, until, teardown, sendCircleChat } from '../support/pairRealAgents.js';
 
 const GROUP = 'buurt-sender-authorize';
 const rnd = () => Math.random().toString(36).slice(2, 8);
@@ -51,7 +51,7 @@ describe('a stranger cannot speak in a circle, however well they sign (real rela
     // Warm the mesh exactly as the sibling relay test does: a real broadcast from the admin, which
     // is also the POSITIVE CONTROL — a member's traffic must still arrive with the check installed.
     const warm = `warmup-${rnd()}`;
-    await sendKringChat(admin, {
+    await sendCircleChat(admin, {
       groupId: GROUP, msgId: `w-${rnd()}`, text: warm,
     });
     await until(() => joiner.chatEvents.some((e) => e?.payload?.text === warm), { timeout: 10000 });
@@ -98,7 +98,7 @@ describe('a stranger cannot speak in a circle, however well they sign (real rela
     const before = joiner.agent.circleSenderAuthorization();
     const forgedText = `stranger-${rnd()}`;
     await tx._send(victimAddress, mkEnvelope(P.OW, strangerId.pubKey, victimAddress, {
-      type: 'p2p-chat', subtype: 'kring-chat-broadcast',
+      type: 'p2p-chat', subtype: 'circle-chat-broadcast',
       groupId: GROUP, msgId: `s-${rnd()}`, text: forgedText, sentAt: Date.now(),
     }));
     await settle(600);

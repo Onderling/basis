@@ -1,7 +1,7 @@
 /**
  * basis v2 — screen renderer (Plan α.1c.1 · audit gap #1).
  *
- * Consumes materialized blocks from `kringRecipeBlocks.js` and produces
+ * Consumes materialized blocks from `circleRecipeBlocks.js` and produces
  * the DOM for scherm-mode (v2 §4 pill, §2 RECEPT · SCHERM-WEERGAVE
  * INRICHTEN).
  *
@@ -23,7 +23,7 @@
  *   error   → red border + error message (per-block, page keeps rendering)
  */
 
-import { featureActionLabelKey } from '../../src/v2/kringTabs.js';
+import { featureActionLabelKey } from '../../src/v2/circleTabs.js';
 import { embedChipsOf, embedTypeLabelKey, shortRef, screenForEmbedType } from '../../src/v2/embedChips.js';
 
 /**

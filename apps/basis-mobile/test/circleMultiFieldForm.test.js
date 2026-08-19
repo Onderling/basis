@@ -1,5 +1,5 @@
 /**
- * Multi-field inline form (mobile parity with web) — the v2 kring now renders an
+ * Multi-field inline form (mobile parity with web) — the v2 circle now renders an
  * inline form for a 2+-missing needsForm (the existing MultiFieldFormBubble,
  * previously only wired in the classic shell). The RN render is exercised on
  * device; here (portable vitest) we guard the shared substrate the wiring uses:

@@ -229,7 +229,7 @@ describe('the task lane — snapshots on the device log, heads causally merged',
   it('THE VALVE, CLOSED: every store type rides the lane — the legacy mirror carries nothing', () => {
     const laneCalls = []; const mirrorCalls = [];
     const valve = routeTaskMirror({
-      circleId: 'kring-v',
+      circleId: 'circle-v',
       emitter: { snapshot: (cid, it) => laneCalls.push(it.type), remove: (cid, id) => laneCalls.push(`rm:${id}`) },
       mirror: { publishItem: (it) => mirrorCalls.push(it.type), publishItemRemoved: (id) => mirrorCalls.push(`rm:${id}`) },
     });

@@ -1,20 +1,20 @@
 /**
- * @onderling/item-store — the ONE canonical kring chat Envelope + its
+ * @onderling/item-store — the ONE canonical circle chat Envelope + its
  * declared projections (the "one canonical envelope" collapse).
  *
- * A single kring chat message used to exist in THREE hand-maintained shapes
+ * A single circle chat message used to exist in THREE hand-maintained shapes
  * kept in sync by copy-paste reshapers — and that drift was the bug:
  *
  *   1. the in-memory EventLog render event
- *        `{ id, ts, app:'kring', type:'chat-message', actor, payload:{ circleId, text, kind, … } }`
- *      — built by hand in `kring-host/kringChatMessageEvent` (optimistic local append),
- *        `basis chatMessageInbox` (received append), and `basis kringChatRehydrate` (legacy insert).
+ *        `{ id, ts, app:'circle', type:'chat-message', actor, payload:{ circleId, text, kind, … } }`
+ *      — built by hand in `kring-host/circleChatMessageEvent` (optimistic local append),
+ *        `basis chatMessageInbox` (received append), and `basis circleChatRehydrate` (legacy insert).
  *   2. the peer fan-out WIRE envelope
- *        `{ type:'p2p-chat', subtype:'kring-chat-message', circleId, msgId, ts, text, fromActor, fromWebid, media? }`
+ *        `{ type:'p2p-chat', subtype:'circle-chat-message', circleId, msgId, ts, text, fromActor, fromWebid, media? }`
  *      — built by hand in `stoop broadcastCircleMessage`.
  *   3. the durable itemStore item's `source` (persisted by `stoop broadcastCircleMessage`/`ingestCircleMessage`),
  *      later RESHAPED back to the wire/inbox shape by hand in `stoop getMessagesSince`
- *      and `basis kringChatRehydrate.itemToEnvelope`.
+ *      and `basis circleChatRehydrate.itemToEnvelope`.
  *
  * This module makes those shapes PROJECTIONS of one canonical Envelope so a
  * change lands in one place. Every projector is pure (no store, no I/O) and
@@ -25,7 +25,7 @@
  *   { id, circleId, author, kind, ts, hashPrev?, body?, ref?, extras? }
  *     id       = msgId
  *     author   = the sender ("fromActor" / "fromWebid")
- *     kind     = the message subtype (kring chat → 'kring-chat-message')
+ *     kind     = the message subtype (circle chat → 'circle-chat-message')
  *     body     = the text
  *     extras   = everything else a projection may carry (media, senderDisplay,
  *                fromWebid/fromPubKey/fromPeerAddr, and the LOCAL-ONLY
@@ -41,17 +41,17 @@
  * node_modules plumbing.
  */
 
-/** The kring chat message subtype/kind. */
-export const KRING_CHAT_KIND = 'kring-chat-message';
+/** The circle chat message subtype/kind. */
+export const CIRCLE_CHAT_KIND = 'circle-chat-message';
 
 /**
- * `fromItem` — project a durable itemStore `kring-chat-message` item onto the
+ * `fromItem` — project a durable itemStore `circle-chat-message` item onto the
  * WIRE/inbox chat envelope shape that `chatMessageInbox.ingestChatMessage`
  * consumes:  `{ subtype, circleId, msgId, ts, text, fromActor, media? }`.
  *
  * This replaces the two hand-maintained reshapers that read a stored item's
  * `source` and re-emit the envelope — `stoop getMessagesSince`'s `.map(...)`
- * and `basis kringChatRehydrate.itemToEnvelope`. They differ only in their
+ * and `basis circleChatRehydrate.itemToEnvelope`. They differ only in their
  * leniency toward malformed items, expressed here as one explicit flag rather
  * than as two silently-drifting copies:
  *
@@ -79,7 +79,7 @@ export function chatEnvelopeFromStoreItem(item, { groupId = null, lenient = fals
     const fromActor = src.fromActor ?? src.fromWebid ?? null;
     const media = isMediaObject(src.media) ? src.media : null;
     return {
-      subtype: KRING_CHAT_KIND,
+      subtype: CIRCLE_CHAT_KIND,
       circleId,
       msgId,
       ts,
@@ -99,7 +99,7 @@ export function chatEnvelopeFromStoreItem(item, { groupId = null, lenient = fals
   if (typeof text     !== 'string' || !text)     return null;
   const media = isMediaObject(src.media) ? src.media : null;
   return {
-    subtype: KRING_CHAT_KIND,
+    subtype: CIRCLE_CHAT_KIND,
     circleId,
     msgId,
     ts,
@@ -114,12 +114,12 @@ export function chatEnvelopeFromStoreItem(item, { groupId = null, lenient = fals
  * EventLog render event. This is the ONE builder behind all three former
  * hand-copies:
  *
- *   - the optimistic local append (`kring-host kringChatMessageEvent`) — passes
+ *   - the optimistic local append (`kring-host circleChatMessageEvent`) — passes
  *     the LOCAL-ONLY presentation fields (buttons/scope/embeds/review/
  *     provenance/consent) and NO `senderDisplay`;
  *   - the received append (`basis chatMessageInbox`) — passes `senderDisplay`
  *     + an already-guarded `media`;
- *   - the rehydrate legacy append (`basis kringChatRehydrate`) — passes only
+ *   - the rehydrate legacy append (`basis circleChatRehydrate`) — passes only
  *     `senderDisplay`.
  *
  * The optional keys are appended in the SAME order and under the SAME
@@ -149,7 +149,7 @@ export function toEventLogItem({
   senderDisplay, buttons, scope, embeds, media, review, provenance, consent,
 }) {
   return {
-    id: msgId, ts, app: 'kring', type: 'chat-message', actor,
+    id: msgId, ts, app: 'circle', type: 'chat-message', actor,
     payload: {
       circleId, text, kind: 'chat-message',
       // `senderDisplay` distinguishes "not provided" (optimistic-local caller
@@ -198,9 +198,9 @@ export function fromEventLogItem(evt) {
  * `toWire` — project the canonical fields onto the peer fan-out WIRE
  * envelope that `stoop broadcastCircleMessage` sends over the reliable
  * transport:
- *   `{ type:'p2p-chat', subtype:'kring-chat-message', circleId, msgId, ts, text, fromActor, fromWebid, media? }`
+ *   `{ type:'p2p-chat', subtype:'circle-chat-message', circleId, msgId, ts, text, fromActor, fromWebid, media? }`
  *
- * The media wire-allowlist (`kring-host mediaForKringWire`) runs UPSTREAM
+ * The media wire-allowlist (`kring-host mediaForCircleWire`) runs UPSTREAM
  * inside `broadcastCircleFanOut` before the pointer reaches this projection,
  * so `media` here is already the whitelisted, circle-safe shape (sender-local
  * fields such as `stored` / device paths already dropped). This projector
@@ -219,7 +219,7 @@ export function fromEventLogItem(evt) {
  */
 export function toWireEnvelope({ circleId, msgId, ts, text, fromActor, fromWebid, media }) {
   return {
-    type: 'p2p-chat', subtype: KRING_CHAT_KIND,
+    type: 'p2p-chat', subtype: CIRCLE_CHAT_KIND,
     circleId, msgId, ts, text, fromActor, fromWebid,
     ...(media && typeof media === 'object' && !Array.isArray(media) ? { media } : {}),
   };
@@ -258,7 +258,7 @@ export function toWireRefEnvelope({ circleId, msgId, ts, ref, fromActor, fromWeb
   return {
     // `subtype` rides through so a ref points its RESOLVER at the right receive path: a signed-statement
     // row's ref routes to the chat rail (verify-then-render), the legacy kind to the legacy inbox.
-    type: 'p2p-chat', subtype: subtype ?? KRING_CHAT_KIND,
+    type: 'p2p-chat', subtype: subtype ?? CIRCLE_CHAT_KIND,
     circleId, msgId, ts, ref, fromActor, fromWebid,
     ...(media && typeof media === 'object' && !Array.isArray(media) ? { media } : {}),
   };

@@ -16,10 +16,10 @@ import { membershipManifest, MEMBERSHIP_LANE } from './membershipManifest.js';
 export const MEMBERSHIP_RAIL_KINDS = entryKindRegistryFromManifests(membershipManifest).kindsFor(MEMBERSHIP_LANE);
 
 /** The wire subtypes for the membership lane's fan + catch-up (the governance pair's sibling). */
-export const MEMBERSHIP_BROADCAST = 'kring-membership-broadcast';
+export const MEMBERSHIP_BROADCAST = 'circle-membership-broadcast';
 export const MEMBERSHIP_CATCHUP_SUBTYPES = Object.freeze({
-  request: 'kring-membership-catchup-request',
-  batch:   'kring-membership-catchup-batch',
+  request: 'circle-membership-catchup-request',
+  batch:   'circle-membership-catchup-batch',
 });
 
 /** The default key↔ref binding source: the roster's proof-checked circleAddress rows (shared with governance). */
@@ -117,11 +117,11 @@ export function makeMembershipEmitter({ rail, myRef, fan = null }) {
   };
 }
 
-/** Peer handler for `kring-membership-broadcast` → the rail's full ingest gate (verify + declared kind +
+/** Peer handler for `circle-membership-broadcast` → the rail's full ingest gate (verify + declared kind +
  *  key↔ref binding) before a fanned statement lands on this device's log. Signed-only, like governance. */
 export function makeMembershipPeerHandler({ rail, onChange = null } = {}) {
   if (!rail) throw new Error('makeMembershipPeerHandler: a membership rail is required');
-  return async function onKringMembership(_fromPeerAddr, payload) {
+  return async function onCircleMembership(_fromPeerAddr, payload) {
     if (!payload || payload.subtype !== MEMBERSHIP_BROADCAST) return;
     const { circleId, event: statement } = payload;
     if (typeof circleId !== 'string' || !circleId || !statement?.body || !statement?.sig) return;

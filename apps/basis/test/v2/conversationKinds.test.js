@@ -7,7 +7,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { ENTRY_KINDS, LANE } from '@onderling/item-store';
-import { KRING_KINDS, applyTemplate, markAxisTouched } from '../../src/v2/kringTemplates.js';
+import { CIRCLE_KINDS, applyTemplate, markAxisTouched } from '../../src/v2/circleTemplates.js';
 import {
   defaultConversationKinds, availableConversationKinds, TEMPLATE_CONVERSATION_KINDS,
   resolveConversationKinds, setConversationKind, withDerivedChatFeature, chatIsInConversation,
@@ -42,7 +42,7 @@ describe('the template axis', () => {
   it('names only REAL circle kinds', () => {
     // Guards against the failure that happened while writing this: inventing a template kind that the
     // wizard has never heard of, which would silently never apply.
-    expect(Object.keys(TEMPLATE_CONVERSATION_KINDS).filter((k) => !KRING_KINDS.includes(k))).toEqual([]);
+    expect(Object.keys(TEMPLATE_CONVERSATION_KINDS).filter((k) => !CIRCLE_KINDS.includes(k))).toEqual([]);
   });
 
   it('a buurt shows the noticeboard, NOT open chat — matching its own template', () => {
@@ -118,7 +118,7 @@ describe('the wizard axis (J-CW1/J-CW2)', () => {
     // Since decision 4 (2026-07-29) "the user chose it" is recorded rather than inferred from the value
     // being set — setting the field alone no longer claims a person did it.
     let st = applyTemplate({}, 'buurt');
-    st = applyTemplate(markAxisTouched({ ...st, conversationKinds: ['chat-message'] }, 'conversationKinds'), 'vriendenkring');
+    st = applyTemplate(markAxisTouched({ ...st, conversationKinds: ['chat-message'] }, 'conversationKinds'), 'friends');
     expect(st.conversationKinds).toEqual(['chat-message']);
   });
 
@@ -154,7 +154,7 @@ describe('features.chat is a VIEW of the kinds list (decision 3, 2026-07-29)', (
   });
 
   it('chatIsInConversation agrees with what the conversation will render', () => {
-    for (const kind of ['buurt', 'household', 'vriendenkring', 'team']) {
+    for (const kind of ['buurt', 'household', 'friends', 'team']) {
       const kinds = resolveConversationKinds({ templateKind: kind });
       expect(chatIsInConversation({ templateKind: kind })).toBe(kinds.includes('chat-message'));
     }
@@ -200,8 +200,8 @@ describe('conversationKindsRows — the admin control’s model (decision 3’s 
   });
 
   it('the rows agree with what the conversation will actually render', () => {
-    const rows = conversationKindsRows({ templateKind: 'vriendenkring' });
-    const shown = resolveConversationKinds({ templateKind: 'vriendenkring' });
+    const rows = conversationKindsRows({ templateKind: 'friends' });
+    const shown = resolveConversationKinds({ templateKind: 'friends' });
     for (const r of rows) expect(r.on).toBe(shown.includes(r.kind));
   });
 });

@@ -196,11 +196,11 @@ describe('the history mirror — sealed follower of the device log', () => {
     const t0 = Date.now();
     // Circle X: 3 old entries (60d back — outside the window) + 2 recent. maxPerCircle 3 → the
     // NEWEST 3 = both recent ones + ONE old one join the recent phase; 2 old ones are tail.
-    for (let i = 0; i < 3; i += 1) log.append({ ...entry(`x-old-${i}`, 'oud'), circleId: 'kring-x', ts: t0 - 60 * DAY + i });
-    log.append({ ...entry('x-new-1', 'vers'), circleId: 'kring-x', ts: t0 - DAY });
-    log.append({ ...entry('x-new-2', 'vers'), circleId: 'kring-x', ts: t0 });
+    for (let i = 0; i < 3; i += 1) log.append({ ...entry(`x-old-${i}`, 'oud'), circleId: 'circle-x', ts: t0 - 60 * DAY + i });
+    log.append({ ...entry('x-new-1', 'vers'), circleId: 'circle-x', ts: t0 - DAY });
+    log.append({ ...entry('x-new-2', 'vers'), circleId: 'circle-x', ts: t0 });
     // Circle Y: one recent entry — untouched by X's cap (the window is PER circle).
-    log.append({ ...entry('y-new-1', 'vers'), circleId: 'kring-y', ts: t0 });
+    log.append({ ...entry('y-new-1', 'vers'), circleId: 'circle-y', ts: t0 });
     await mirror.flush();
 
     const fresh = new EventLog({ initial: [], muted: [] });

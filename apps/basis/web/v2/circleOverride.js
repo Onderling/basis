@@ -15,7 +15,7 @@ import { buildCapabilityMatrix } from '@onderling/app-manifest';
 
 const TOP_TOGGLES = ['chatOff', 'revealOpen', 'agentsMayContactMe'];
 const FLOW_TOGGLES = ['tasksToPersonal', 'calendarToPersonal'];
-// per-kring push toggles (audit). Same shape as
+// per-circle push toggles (audit). Same shape as
 // the existing TOP_TOGGLES / FLOW_TOGGLES row pattern; the locale lives
 // under its own namespace (`circle.member.notifications.*`) so the four
 // strings are reusable by mobile + chat without sitting under the

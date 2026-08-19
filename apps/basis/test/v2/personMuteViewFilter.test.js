@@ -5,7 +5,7 @@ import { chatRows, projectEntries, mutedActorSet } from '../../src/v2/circleStre
 // — refusing at ingest would silently discard history — and are hidden at the ONE projection every chat
 // surface reads. Unmute restores everything, because nothing was discarded.
 
-const ev = (id, actor, text) => ({ id, ts: id.length, app: 'kring', type: 'chat-message', actor, circleId: 'c1', payload: { circleId: 'c1', text } });
+const ev = (id, actor, text) => ({ id, ts: id.length, app: 'circle', type: 'chat-message', actor, circleId: 'c1', payload: { circleId: 'c1', text } });
 const CIRCLES = [{ id: 'c1', name: 'Selwerd' }];
 
 describe('the person-mute view filter', () => {
@@ -25,7 +25,7 @@ describe('the person-mute view filter', () => {
 
   it('an entry with NO actor is never hidden (never hide people by accident)', () => {
     const rows = projectEntries({
-      events: [{ id: 'x', ts: 1, app: 'kring', type: 'chat-message', circleId: 'c1', payload: { circleId: 'c1', text: '?' } }],
+      events: [{ id: 'x', ts: 1, app: 'circle', type: 'chat-message', circleId: 'c1', payload: { circleId: 'c1', text: '?' } }],
       circles: CIRCLES, circleId: 'c1', excludeActors: new Set(['webid:ada']),
     });
     expect(rows).toHaveLength(1);

@@ -17,7 +17,7 @@ const CASES = {
     ['Wie zit hier eigenlijk achter?', 'onderling.wie-erachter'],
     ['Wat is Basis?', 'product.basis'],
     ['Wat is feedback?', 'product.feedback'],
-    ['Hoe werkt een kring?', 'werking.kringen'],
+    ['Hoe werkt een circle?', 'werking.circles'],
     ['Wat kost het?', 'praktisch.kosten'],
     ['Is het gratis?', 'praktisch.kosten'],
     ['Wie ben jij?', 'meta.bot'],
@@ -55,7 +55,7 @@ const CASES = {
   en: [
     ['What is Onderling?', 'onderling.wat'],
     ['What is Basis?', 'product.basis'],
-    ['How do circles work?', 'werking.kringen'],
+    ['How do circles work?', 'werking.circles'],
     ['What does it cost?', 'praktisch.kosten'],
     ['Is it free?', 'praktisch.kosten'],
     ['Who are you?', 'meta.bot'],
@@ -177,7 +177,7 @@ describe('helpAnswer · NL ≡ EN parity', () => {
   const PAIRS = [
     ['Wat is Onderling?', 'What is Onderling?', 'onderling.wat'],
     ['Wat is Basis?', 'What is Basis?', 'product.basis'],
-    ['Hoe werkt een kring?', 'How do circles work?', 'werking.kringen'],
+    ['Hoe werkt een circle?', 'How do circles work?', 'werking.circles'],
     ['Wat kost het?', 'What does it cost?', 'praktisch.kosten'],
     ['Wie ben jij?', 'Who are you?', 'meta.bot'],
     ['Is dit veilig?', 'Is this safe?', 'veilig.kern'],

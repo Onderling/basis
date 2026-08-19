@@ -314,6 +314,64 @@ export const householdManifest = {
       // start it); no chat/slash surface — a phrase does not belong in a chat box.
       surfaces: {},
     },
+    {
+      id:   'revealOwnerPhrase',
+      verb: 'reveal-owner-phrase',
+      // Shows the owner recovery phrase to the person already holding the device. Takes nothing:
+      // possession of an unlocked device IS the authority, and asking for a secret to reveal a
+      // secret would be theatre. Owner-only at the dispatch gate.
+      params: [],
+      // No chat/slash surface, for the same reason as the ceremonies: a phrase does not belong in
+      // a transcript. Reached from the my-data screen on both shells.
+      surfaces: {},
+    },
+    {
+      id:   'restoreOwnerPhrase',
+      verb: 'restore-owner-phrase',
+      // The other direction: adopt an owner root from a phrase typed on THIS device. Distinct from
+      // enrollDevice, which also writes a delegation blob for a device joining an existing account.
+      params: [
+        { name: 'mnemonic', kind: 'secret', required: true },
+      ],
+      surfaces: {},
+    },
+    {
+      id:   'grantSurface',
+      verb: 'grant-surface',
+      // CONNECTIONS — a thing that is not this device (a screen, a bot, an always-on companion)
+      // acting as you within limits you ticked. `ops` is the boundary: the pick IS the grant, and
+      // nothing outside it verifies at the door. `reads` names which sections its lane may carry.
+      params: [
+        { name: 'viewPubKey', kind: 'string', required: true },
+        // There is no list KIND in the vocabulary (string · number · boolean · enum · date · webid ·
+        // file · image · secret · object). `schema` is the documented escape hatch — keywords the
+        // per-kind switch does not model ride through it — so the array shape is declared there
+        // rather than by inventing a kind, which would need its own home and guard.
+        { name: 'ops',        kind: 'object', required: true, schema: { type: 'array', items: { type: 'string' } } },
+        { name: 'reads',      kind: 'object' },
+        { name: 'label',      kind: 'string' },
+        { name: 'nonce',      kind: 'string' },
+      ],
+      // Owner-only and deliberately unreachable from chat: granting authority by talking to an
+      // assistant is exactly the escalation this vocabulary exists to prevent.
+      surfaces: {},
+    },
+    {
+      id:   'revokeSurface',
+      verb: 'revoke-surface',
+      // Unpairing. Revoke-wins: the grant stops working regardless of what the other side still holds.
+      params: [
+        { name: 'viewPubKey', kind: 'string', required: true },
+      ],
+      surfaces: {},
+    },
+    {
+      id:   'listSurfaceGrants',
+      verb: 'list-surface-grants',
+      // What is currently connected, and what each may do — the read behind the connections list.
+      params: [],
+      surfaces: {},
+    },
   ],
 
   // ── FLOWS — the enroll-a-device ceremony, BORN a flow (the add-a-device model): one declared

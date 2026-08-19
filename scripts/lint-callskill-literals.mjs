@@ -75,7 +75,12 @@ if (!declared.size) {
   process.exit(1);
 }
 
-const isSource = (f) => /\.[cm]?[jt]sx?$/.test(f) && !f.includes('/node_modules/')
+// Tests are OUT OF SCOPE, and deliberately so: a test that proves an unknown op is refused has to name
+// one (`callSkill('not-a-real-app', 'listOpen')`). Those are correct code, and baselining them would bury
+// the real signal under fixtures. The guard is about production call sites.
+const isTest = (f) => /(^|\/)(test|tests|e2e|test-browser|__tests__)\//.test(f)
+  || /\.(test|spec)\.[cm]?[jt]sx?$/.test(f);
+const isSource = (f) => /\.[cm]?[jt]sx?$/.test(f) && !f.includes('/node_modules/') && !isTest(f)
   && !f.startsWith('scripts/lint-callskill-literals');
 const stripComments = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 

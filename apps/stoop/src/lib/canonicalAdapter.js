@@ -94,11 +94,11 @@ export function validateStoopItem(item) {
  *                             outside the canonical scope by design.
  */
 export const STOOP_TYPE_MAPPING = Object.freeze({
-  // "Aanbod" button → "I have something to give"
+  // "Offer" button → "I have something to give"
   'offer':   { type: 'offer',   defaultKind: 'give' },
   // "Te leen" button → "I have something to lend (with return)"
   'lend':    { type: 'offer',   defaultKind: 'lend' },
-  // "Vragen" button → "I want to borrow" (most common neighbourhood case;
+  // "Asks" button → "I want to borrow" (most common neighbourhood case;
   // grow the UI later to let users pick `share` for consumables or
   // `receive` for gift-asks).
   'ask':     { type: 'request', defaultKind: 'borrow' },
@@ -118,7 +118,7 @@ export const STOOP_TYPE_MAPPING = Object.freeze({
  *   - Canonical intents (`ask` / `offer` / `lend` / `request`) →
  *     `{type, kind}` from STOOP_TYPE_MAPPING. Caller-supplied
  *     `kindOverride` wins over `defaultKind` so a future UI
- *     sub-choice (e.g. "Lenen / Iets klein om te delen / Iets
+ *     sub-choice (e.g. "Lend / Iets klein om te delen / Iets
  *     gratis krijgen") can pin the canonical kind directly.
  *
  *   - Bespoke intents (`report`, `membership-code`, `group-rules`,

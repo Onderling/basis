@@ -177,8 +177,8 @@ async function spawnAgent({ webid, role, displayName }) {
     });
     // Backfill: pull the existing peer's open items into the new
     // member's mirror so a member who joins AFTER the admin already
-    // posted things still sees them on the prikbord.  pubsub itself
-    // doesn't replay; without this the prikbord is asymmetric.
+    // posted things still sees them on the noticeboard.  pubsub itself
+    // doesn't replay; without this the noticeboard is asymmetric.
     try {
       const existing = await m.bundle.itemStore.listOpen();
       await mirror.backfillFrom(m.identity.pubKey, existing);

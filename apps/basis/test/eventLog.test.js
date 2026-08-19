@@ -294,9 +294,9 @@ describe('EventLog — C15 silent system-entry lane', () => {
 /* ── One-log step D — per-kind retention + audit compaction (J-L10) ─────────────────────────────────── */
 
 describe('EventLog — per-kind retention', () => {
-  // `vraag` is chat-CLASS (windowed content whose durable head lives elsewhere); `chat-message` itself is
+  // `ask` is chat-CLASS (windowed content whose durable head lives elsewhere); `chat-message` itself is
   // RECORD class since the chat-lane sitting — the conversation never drops (asserted below).
-  const mk = (over) => ev({ app: 'circle', type: 'vraag', ...over });
+  const mk = (over) => ev({ app: 'circle', type: 'ask', ...over });
 
   it('J-L10 — audit outlives chat-class content: past the window it is gone and governance still answers', () => {
     let clock = 0;

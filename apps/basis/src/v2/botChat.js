@@ -1,7 +1,7 @@
 /**
  * basis v2 — 1:1-bot chat gate (shared web + mobile).
  *
- * The GESPREK chat card shows an "assistant header" strip (green presence dot +
+ * The CONVERSATION chat card shows an "assistant header" strip (green presence dot +
  * the bot's name) ONLY when the conversation is a genuine 1:1 with a bot: you +
  * exactly one other participant, and that participant is a bot. On a group circle
  * (any human co-members, or more than one other participant) the strip is hidden.

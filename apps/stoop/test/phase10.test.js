@@ -10,7 +10,7 @@ import { AgentIdentity, InternalBus, InternalTransport } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 
 import { createNeighborhoodAgent } from '../src/index.js';
-import { ITEM_TYPES, PRIKBORD_KINDS } from '../src/lib/itemTypes.js';
+import { ITEM_TYPES, NOTICEBOARD_KINDS } from '../src/lib/itemTypes.js';
 import { callSkill } from './util.js';
 
 const ANNE = 'https://id.example/anne';
@@ -115,7 +115,7 @@ describe('Stoop V1 — ITEM_TYPES constants', () => {
     expect(ITEM_TYPES.GROUP_LEAVE).toBe('group-leave');
   });
 
-  it('PRIKBORD_KINDS lists the three user-facing kinds', () => {
-    expect(PRIKBORD_KINDS).toEqual(['ask', 'offer', 'lend']);
+  it('NOTICEBOARD_KINDS lists the three user-facing kinds', () => {
+    expect(NOTICEBOARD_KINDS).toEqual(['ask', 'offer', 'lend']);
   });
 });

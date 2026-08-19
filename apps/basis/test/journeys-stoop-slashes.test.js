@@ -12,7 +12,7 @@
  *   /tree         → getItemTree      (read-only graph walk)
  *   sign-out → signOutOfPod (confirm-gated)
  *   /report       → reportPost       (moderation)
- *   /bulletin     → listOpen         (cross-app substrate — read prikbord)
+ *   /bulletin     → listOpen         (cross-app substrate — read noticeboard)
  *
  * SUBSTRATE GAP SURFACED — `apps/basis/src/core/manifests/
  * mockManifests.js`'s `mockStoopManifest` does NOT declare these eight
@@ -460,7 +460,7 @@ describe('CC-ST.A7 — /report wires reportPost', () => {
 });
 
 /* ════════════════════════════════════════════════════════════
- * 8. /bulletin — listOpen (cross-app substrate, read prikbord)
+ * 8. /bulletin — listOpen (cross-app substrate, read noticeboard)
  *    No-arg by default (intent + skill filters optional via
  *    match.body:'type-only').  Returns the open feed.
  * ══════════════════════════════════════════════════════════ */

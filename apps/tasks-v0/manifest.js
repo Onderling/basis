@@ -426,7 +426,7 @@ export const tasksManifest = {
           // Removed; the morning brief uses the open-tasks count (listOpen), not "my tasks".
           search: { searchSkill:  'searchTasks' },
         },
-        // S6.B — this overview op can open a dedicated screen (the Schermen
+        // S6.B — this overview op can open a dedicated screen (the Screens
         // `tasks` block) instead of only listing inline. The host renders an
         // "Open …" affordance + a panel; the label is locale-resolved.
         ui: { screen: 'tasks' },

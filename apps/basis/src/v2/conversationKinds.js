@@ -7,8 +7,8 @@
  *
  * Frits' decision: **the admin decides, and the default is permissive.**
  *
- *   human kinds (chat · task · vraag · leen)   → on
- *   offerings (`aanbod`)                        → on
+ *   human kinds (chat · task · ask · leen)   → on
+ *   offerings (`offer`)                        → on
  *   system / technical                          → off, but the admin may turn any of them on
  *
  * ── Why it is seeded from the circle TEMPLATE ────────────────────────────────────────────────────────────
@@ -17,7 +17,7 @@
  *
  *   household · friends   `features.chat: true`   — talking is the point
  *   **neighbourhood**                   `features.chat: FALSE`  — noticeboard-first; a thread appears only when
- *                                                          someone reacts to a vraag or aanbod
+ *                                                          someone reacts to a ask or offer
  *   team                        `features.chat: true`, noticeboard off
  *
  * So a neighbourhood's conversation showing chat messages contradicts its own template. That is the case this axis
@@ -60,9 +60,9 @@ export const TEMPLATE_CONVERSATION_KINDS = Object.freeze({
   friends: null,   // friends: same
   team:          null,   // work: tasks belong in the stream
   // A neighbourhood has `features.chat: false` — it is noticeboard-first, and a thread appears only when someone
-  // reacts to a vraag or aanbod. So its conversation is those posts, NOT open chat; showing chat messages
+  // reacts to a ask or offer. So its conversation is those posts, NOT open chat; showing chat messages
   // there would contradict the template that created it.
-  neighbourhood: Object.freeze(['vraag', 'aanbod', 'task', 'leen']),
+  neighbourhood: Object.freeze(['ask', 'offer', 'task', 'lend']),
 });
 
 /**

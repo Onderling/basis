@@ -1,6 +1,6 @@
 // J-circle: the real stoop neighbourhood flow over the relay — host creates a
 // circle + invite code, a stranger joins (admin-verified), host posts to the
-// prikbord, the stranger sees it, replies, and that spins a private 1:1 chat.
+// noticeboard, the stranger sees it, replies, and that spins a private 1:1 chat.
 import { AgentIdentity, DataPart } from '@onderling/core';
 import { VaultMemory }             from '@onderling/vault';
 import { Reveals }                 from '@onderling/identity-resolver';
@@ -8,7 +8,7 @@ import { RelayTransport }          from '@onderling/transports';
 import { createNeighborhoodAgent, attachSubstrateMirror } from '@onderling-app/stoop';
 import { wait, checker }           from './_util.mjs';
 
-export const name = 'J-circle (join → prikbord → private chat)';
+export const name = 'J-circle (join → noticeboard → private chat)';
 
 export async function run({ relayUrl }) {
   const { results, check } = checker();
@@ -57,12 +57,12 @@ export async function run({ relayUrl }) {
     await wait(700);
 
     const posted = await call(host, 'postRequest', { text: 'Iemand een boormachine te leen?', intent: 'ask' }, HOST);
-    check('host posted to the prikbord', !!(posted?.item?.id ?? posted?.id ?? posted?.requestId));
+    check('host posted to the noticeboard', !!(posted?.item?.id ?? posted?.id ?? posted?.requestId));
     await wait(1800);
 
     const openItems = await stranger.itemStore.listOpen({});
     const seenPost = openItems.find((i) => i.source?.broadcast) ?? openItems.find((i) => i.text?.includes('boormachine'));
-    check('stranger sees the prikbord post (mirror over relay)', !!seenPost);
+    check('stranger sees the noticeboard post (mirror over relay)', !!seenPost);
 
     let reply;
     if (seenPost) {

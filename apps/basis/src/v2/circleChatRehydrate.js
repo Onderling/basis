@@ -1,7 +1,7 @@
 /**
  * basis v2 — circle-chat boot-time rehydrator.
  *
- * The circle view's GESPREK tab reads from `eventLog` which lives in
+ * The circle view's CONVERSATION tab reads from `eventLog` which lives in
  * memory.  On page reload the log starts empty, so historical chats
  * (durable in stoop's itemStore from 's hybrid storage path)
  * wouldn't be visible until new chats arrived.

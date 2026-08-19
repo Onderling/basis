@@ -5,7 +5,7 @@
  *     source.targets[{kind:'group',groupId}] (posts) / source.groupId (system items) →
  *     every item looked unscoped → keepForCircle kept everything (cross-circle leak).
  *  2. listOpen returns system items (group-rules/membership-code/membership-redemption)
- *     alongside posts; the prikbord must show only asks/offers.
+ *     alongside posts; the noticeboard must show only asks/offers.
  */
 import { describe, it, expect } from 'vitest';
 import { itemCircleId, isInCircle } from '../src/v2/circleScope.js';

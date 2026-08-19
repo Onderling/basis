@@ -50,7 +50,7 @@ async function makeStoopMedia({ strategy = sealedStrategy() } = {}) {
   return { composition, strategy, getMedia };
 }
 
-describe('mobile stoop media — seals a picked prikbord image per-circle (web parity)', () => {
+describe('mobile stoop media — seals a picked noticeboard image per-circle (web parity)', () => {
   it('picker shape → opaque {type:media, source:blob} pointer; NO plaintext reaches stoop', async () => {
     const { strategy, getMedia } = await makeStoopMedia();
     const cs = vi.fn().mockResolvedValue({ ok: true });

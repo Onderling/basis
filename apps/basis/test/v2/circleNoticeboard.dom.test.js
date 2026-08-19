@@ -15,9 +15,9 @@ describe('renderCircleNoticeboard — embeds[] surfacing', () => {
         { type: 'calendar-event', ref: 'evt-1' },
       ],
     }] });
-    const chips = el.querySelectorAll('.cc-prikbord__embed');
+    const chips = el.querySelectorAll('.cc-noticeboard__embed');
     expect(chips).toHaveLength(2);
-    expect(el.querySelector('.cc-prikbord__embeds-label').textContent).toBe('circle.embed.see_also');
+    expect(el.querySelector('.cc-noticeboard__embeds-label').textContent).toBe('circle.embed.see_also');
     // identity t() returns the key → the renderer falls back to the RAW type
     // (in the app t() returns the localized "Task"). icon + type + the label.
     expect(chips[0].textContent).toBe('✅ task: Solar install');
@@ -31,13 +31,13 @@ describe('renderCircleNoticeboard — embeds[] surfacing', () => {
     renderCircleNoticeboard(el, { t, posts: [{
       id: 'p2', type: 'offer', text: 'x', source: { embeds: [{ type: 'request', ref: 'P-1' }] },
     }] });
-    expect(el.querySelectorAll('.cc-prikbord__embed')).toHaveLength(1);
+    expect(el.querySelectorAll('.cc-noticeboard__embed')).toHaveLength(1);
   });
 
   it('renders no embeds block when a post has none', () => {
     const el = mount();
     renderCircleNoticeboard(el, { t, posts: [{ id: 'p3', type: 'ask', text: 'plain' }] });
-    expect(el.querySelector('.cc-prikbord__embeds')).toBeNull();
+    expect(el.querySelector('.cc-noticeboard__embeds')).toBeNull();
   });
 
   it('a task chip is tappable + a tap fires onEmbedOpen with the screen', () => {
@@ -46,7 +46,7 @@ describe('renderCircleNoticeboard — embeds[] surfacing', () => {
     renderCircleNoticeboard(el, { t, onEmbedOpen, posts: [{
       id: 'p4', type: 'ask', text: 'help', embeds: [{ type: 'task', ref: 't9', label: 'Wire it' }],
     }] });
-    const chip = el.querySelector('.cc-prikbord__embed--tappable');
+    const chip = el.querySelector('.cc-noticeboard__embed--tappable');
     expect(chip.tagName).toBe('BUTTON');
     chip.click();
     expect(onEmbedOpen).toHaveBeenCalledWith({ type: 'task', ref: 't9', screen: 'tasks' });

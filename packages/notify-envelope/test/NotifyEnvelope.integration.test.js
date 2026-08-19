@@ -147,16 +147,16 @@ describe('Integration — no-pod circle (full-payload always)', () => {
       type:       'offer',
       ref:        'pseudo-pod://anne/sharing/offers/abc',
       etag:       '"hash-1"',
-      payload:    { body: 'ladder lenen' },
+      payload:    { body: 'ladder lend' },
       recipients: ['bob'],
       fromActor:  'pseudo-pod://anne/agent',
       circleId:     'household-xyz',
     });
 
     expect(got).toHaveLength(1);
-    expect(got[0].payload).toEqual({ body: 'ladder lenen' });
+    expect(got[0].payload).toEqual({ body: 'ladder lend' });
     expect((await bob.pseudoPod.read('pseudo-pod://anne/sharing/offers/abc'))?.bytes)
-      .toEqual({ body: 'ladder lenen' });
+      .toEqual({ body: 'ladder lend' });
     expect(await anne.ne.pendingCount()).toBe(0);
 
     anne.ne.stop(); bob.ne.stop();

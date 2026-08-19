@@ -517,8 +517,8 @@ describe('renderWeb D-mig-1a — list-surface field selectors', () => {
         searchFields:  ['label', 'handle'],
       },
       {
-        id:            'prikbord',
-        title:         'Prikbord',
+        id:            'noticeboard',
+        title:         'Noticeboard',
         type:          'post',
         dataSource:    { skillId: 'listOpen' },
         categoryField: 'kind',
@@ -536,8 +536,8 @@ describe('renderWeb D-mig-1a — list-surface field selectors', () => {
     expect(c.itemType).toBe('contact');
   });
 
-  it('projects categoryField (kind) onto the prikbord section; labelField absent', () => {
-    const p = renderWeb(MANIFEST).sections.find((s) => s.id === 'prikbord');
+  it('projects categoryField (kind) onto the noticeboard section; labelField absent', () => {
+    const p = renderWeb(MANIFEST).sections.find((s) => s.id === 'noticeboard');
     expect(p.categoryField).toBe('kind');
     expect(p).not.toHaveProperty('labelField');
     expect(p.dataSource).toEqual({ skillId: 'listOpen' });
@@ -557,14 +557,14 @@ describe('renderWeb D-mig-1a — list-surface field selectors', () => {
   });
 
   it('a view without searchFields projects none (consumer defaults to [labelField])', () => {
-    const p = renderWeb(MANIFEST).sections.find((s) => s.id === 'prikbord');
+    const p = renderWeb(MANIFEST).sections.find((s) => s.id === 'noticeboard');
     expect(p).not.toHaveProperty('searchFields');
     const plain = renderWeb(MANIFEST).sections.find((s) => s.id === 'plain');
     expect(plain).not.toHaveProperty('searchFields');
   });
 });
 
-/* ─── D-mig-1a: real stoop manifest projects contacts + prikbord ─────── */
+/* ─── D-mig-1a: real stoop manifest projects contacts + noticeboard ─────── */
 
 describe('renderWeb D-mig-1a — stoop manifest projection', () => {
   it('stoop contacts section carries listContacts + label + category', async () => {
@@ -579,14 +579,14 @@ describe('renderWeb D-mig-1a — stoop manifest projection', () => {
     expect(c.searchFields).toEqual(['label', 'handle']);
   });
 
-  it('stoop prikbord section carries listOpen + kind + post', async () => {
+  it('stoop noticeboard section carries listOpen + kind + post', async () => {
     const { stoopManifest } = await import('../../../apps/stoop/manifest.js');
-    const p = renderWeb(stoopManifest).sections.find((s) => s.id === 'prikbord');
+    const p = renderWeb(stoopManifest).sections.find((s) => s.id === 'noticeboard');
     expect(p).toBeDefined();
     expect(p.itemType).toBe('post');
     expect(p.dataSource).toEqual({ skillId: 'listOpen' });
     expect(p.categoryField).toBe('kind');
-    // D-mig-2 — prikbord's label IS the post body; searchFields formalises the
+    // D-mig-2 — noticeboard's label IS the post body; searchFields formalises the
     // label-only default explicitly (no distinct secondary field exists).
     expect(p.searchFields).toEqual(['label']);
     expect(p).not.toHaveProperty('labelField');

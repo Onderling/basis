@@ -1,7 +1,7 @@
 /**
- * basis v2 — circle noticeboard / prikbord (web DOM renderer, S1 #1).
+ * basis v2 — circle noticeboard / noticeboard (web DOM renderer, S1 #1).
  *
- * The circle noticeboard surface inside a circle's PRIKBORD tab: a post composer
+ * The circle noticeboard surface inside a circle's NOTICEBOARD tab: a post composer
  * (ask / offer / lend + text) and the open-post list with per-row actions. Pure
  * render — the host (`circleApp.js`) fetches `listOpen`, computes `mine`, and
  * dispatches the stoop ops (`postRequest` / `respondToItem` / `cancelRequest` /
@@ -43,18 +43,18 @@ export function renderCircleNoticeboard(container, {
   if (!container) return container;
   const tr = typeof t === 'function' ? t : (k) => k;
   container.innerHTML = '';
-  container.className = 'cc-prikbord';
+  container.className = 'cc-noticeboard';
 
   // ── composer ────────────────────────────────────────────────────────────
   const composer = document.createElement('form');
-  composer.className = 'cc-prikbord__composer';
+  composer.className = 'cc-noticeboard__composer';
 
   const pills = document.createElement('div');
-  pills.className = 'cc-prikbord__intents';
+  pills.className = 'cc-noticeboard__intents';
   for (const it of INTENTS) {
     const pill = document.createElement('button');
     pill.type = 'button';
-    pill.className = `cc-prikbord__intent${it === intent ? ' is-active' : ''}`;
+    pill.className = `cc-noticeboard__intent${it === intent ? ' is-active' : ''}`;
     pill.dataset.intent = it;
     pill.textContent = tr(`circle.noticeboard.intent.${it}`);
     pill.addEventListener('click', () => { if (typeof onIntent === 'function') onIntent(it); });
@@ -63,10 +63,10 @@ export function renderCircleNoticeboard(container, {
   composer.appendChild(pills);
 
   const row = document.createElement('div');
-  row.className = 'cc-prikbord__composer-row';
+  row.className = 'cc-noticeboard__composer-row';
   const input = document.createElement('input');
   input.type = 'text';
-  input.className = 'cc-prikbord__input';
+  input.className = 'cc-noticeboard__input';
   input.placeholder = tr(`circle.noticeboard.placeholder.${intent}`);
   row.appendChild(input);
   // (J4) — the projector-driven "+" attach affordance (replaces the hand-coded
@@ -75,13 +75,13 @@ export function renderCircleNoticeboard(container, {
   // usable — a sealed-only p0/p1 circle (no onAttach) with no menu shows none.
   const attachControl = buildAttachControl({
     attachMenu, attachFileOpId, onAttach, onAttachCommand,
-    cls: (s) => `cc-prikbord__${s}`,
+    cls: (s) => `cc-noticeboard__${s}`,
     tr, menuLabelKey: 'circle.noticeboard.attach',
   });
   if (attachControl) row.appendChild(attachControl);
   const post = document.createElement('button');
   post.type = 'submit';
-  post.className = 'cc-prikbord__post';
+  post.className = 'cc-noticeboard__post';
   post.textContent = tr('circle.noticeboard.post');
   row.appendChild(post);
   composer.appendChild(row);
@@ -89,16 +89,16 @@ export function renderCircleNoticeboard(container, {
   // pending-attachment preview (thumbnail + remove).
   if (attachment && attachment.thumbnail) {
     const preview = document.createElement('div');
-    preview.className = 'cc-prikbord__attach-preview';
+    preview.className = 'cc-noticeboard__attach-preview';
     const img = document.createElement('img');
-    img.className = 'cc-prikbord__attach-thumb';
+    img.className = 'cc-noticeboard__attach-thumb';
     img.src = attachment.thumbnail;
     img.alt = attachment.name || tr('circle.noticeboard.attach');
     preview.appendChild(img);
     if (typeof onClearAttach === 'function') {
       const rm = document.createElement('button');
       rm.type = 'button';
-      rm.className = 'cc-prikbord__attach-remove';
+      rm.className = 'cc-noticeboard__attach-remove';
       rm.textContent = '✕';
       rm.setAttribute('aria-label', tr('circle.noticeboard.attach_remove'));
       rm.addEventListener('click', () => onClearAttach());
@@ -111,12 +111,12 @@ export function renderCircleNoticeboard(container, {
   let due = null;
   if (intent === 'lend') {
     const dueRow = document.createElement('label');
-    dueRow.className = 'cc-prikbord__due';
+    dueRow.className = 'cc-noticeboard__due';
     const dueLabel = document.createElement('span');
     dueLabel.textContent = tr('circle.noticeboard.due');
     due = document.createElement('input');
     due.type = 'date';
-    due.className = 'cc-prikbord__due-input';
+    due.className = 'cc-noticeboard__due-input';
     dueRow.appendChild(dueLabel);
     dueRow.appendChild(due);
     composer.appendChild(dueRow);
@@ -134,7 +134,7 @@ export function renderCircleNoticeboard(container, {
 
   if (busy) {
     const b = document.createElement('div');
-    b.className = 'cc-prikbord__busy';
+    b.className = 'cc-noticeboard__busy';
     b.textContent = tr('circle.noticeboard.posting');
     container.appendChild(b);
   }
@@ -142,26 +142,26 @@ export function renderCircleNoticeboard(container, {
   // ── post list ───────────────────────────────────────────────────────────
   if (!posts.length) {
     const empty = document.createElement('div');
-    empty.className = 'cc-prikbord__empty';
+    empty.className = 'cc-noticeboard__empty';
     empty.textContent = tr('circle.noticeboard.empty');
     container.appendChild(empty);
     return container;
   }
 
   const list = document.createElement('ul');
-  list.className = 'cc-prikbord__list';
+  list.className = 'cc-noticeboard__list';
   for (const p of posts) {
     const li = document.createElement('li');
-    li.className = `cc-prikbord__post-row cc-prikbord__post-row--${p.type || 'ask'}`;
+    li.className = `cc-noticeboard__post-row cc-noticeboard__post-row--${p.type || 'ask'}`;
     li.dataset.postId = p.id;
 
     const badge = document.createElement('span');
-    badge.className = `cc-prikbord__badge cc-prikbord__badge--${p.type || 'ask'}`;
+    badge.className = `cc-noticeboard__badge cc-noticeboard__badge--${p.type || 'ask'}`;
     badge.textContent = tr(`circle.noticeboard.intent.${p.type || 'ask'}`);
     li.appendChild(badge);
 
     const text = document.createElement('div');
-    text.className = 'cc-prikbord__text';
+    text.className = 'cc-noticeboard__text';
     text.textContent = p.text ?? p.label ?? '';
     li.appendChild(text);
 
@@ -171,9 +171,9 @@ export function renderCircleNoticeboard(container, {
     const embeds = embedChipsOf(p);
     if (embeds.length) {
       const wrap = document.createElement('div');
-      wrap.className = 'cc-prikbord__embeds';
+      wrap.className = 'cc-noticeboard__embeds';
       const heading = document.createElement('span');
-      heading.className = 'cc-prikbord__embeds-label';
+      heading.className = 'cc-noticeboard__embeds-label';
       heading.textContent = tr('circle.embed.see_also');
       wrap.appendChild(heading);
       for (const e of embeds) {
@@ -181,7 +181,7 @@ export function renderCircleNoticeboard(container, {
         const tappable = !!(screen && !e.locked && typeof onEmbedOpen === 'function');
         const chip = document.createElement(tappable ? 'button' : 'span');
         if (tappable) chip.type = 'button';
-        chip.className = `cc-prikbord__embed cc-prikbord__embed--${e.type}${tappable ? ' cc-prikbord__embed--tappable' : ''}`;
+        chip.className = `cc-noticeboard__embed cc-noticeboard__embed--${e.type}${tappable ? ' cc-noticeboard__embed--tappable' : ''}`;
         chip.dataset.ref = e.ref;
         const typeKey = embedTypeLabelKey(e.type);
         const typeLabel = tr(typeKey);
@@ -197,11 +197,11 @@ export function renderCircleNoticeboard(container, {
     const atts = Array.isArray(p.attachments) ? p.attachments : [];
     if (atts.length) {
       const gallery = document.createElement('div');
-      gallery.className = 'cc-prikbord__attachments';
+      gallery.className = 'cc-noticeboard__attachments';
       for (const att of atts) {
         if (!att?.thumbnail) continue;
         const img = document.createElement('img');
-        img.className = 'cc-prikbord__att';
+        img.className = 'cc-noticeboard__att';
         img.src = att.thumbnail;
         img.alt = tr('circle.noticeboard.attach');
         img.loading = 'lazy';
@@ -219,22 +219,22 @@ export function renderCircleNoticeboard(container, {
     // The existing "respond" chip below IS the anonymous reach-out (respondToItem → @handle DM).
     if (p.resonance?.reason) {
       const badge = document.createElement('div');
-      badge.className = 'cc-prikbord__resonance';
+      badge.className = 'cc-noticeboard__resonance';
       badge.textContent = `✨ ${tr('circle.noticeboard.resonates', { reason: p.resonance.reason })}`;
       li.appendChild(badge);
     }
 
     const meta = document.createElement('div');
-    meta.className = 'cc-prikbord__meta';
+    meta.className = 'cc-noticeboard__meta';
     meta.textContent = [p.addedByLabel || p.addedBy, p.when].filter(Boolean).join(' · ');
     li.appendChild(meta);
 
     const actions = document.createElement('div');
-    actions.className = 'cc-prikbord__actions';
+    actions.className = 'cc-noticeboard__actions';
     const chip = (action, labelKey, extraClass = '') => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = `cc-prikbord__chip${extraClass}`;
+      b.className = `cc-noticeboard__chip${extraClass}`;
       b.dataset.action = action;
       b.textContent = tr(labelKey);
       b.addEventListener('click', () => { if (typeof onAction === 'function') onAction({ action, post: p }); });
@@ -244,8 +244,8 @@ export function renderCircleNoticeboard(container, {
     if (p.type === 'lend' && p.mine) chip('assign', 'circle.noticeboard.action.assign');
     if (p.type === 'lend' && p.mine) chip('markReturned', 'circle.noticeboard.action.returned');
     if (p.mine) chip('cancel', 'circle.noticeboard.action.cancel');
-    if (!p.mine) chip('report', 'circle.noticeboard.action.report', ' cc-prikbord__chip--muted');
-    if (!p.mine) chip('mute', 'circle.noticeboard.action.mute', ' cc-prikbord__chip--muted');
+    if (!p.mine) chip('report', 'circle.noticeboard.action.report', ' cc-noticeboard__chip--muted');
+    if (!p.mine) chip('mute', 'circle.noticeboard.action.mute', ' cc-noticeboard__chip--muted');
     li.appendChild(actions);
 
     list.appendChild(li);

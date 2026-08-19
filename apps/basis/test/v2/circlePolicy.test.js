@@ -106,7 +106,7 @@ describe('circlePolicy · enabledFeatures (P6.1)', () => {
 describe('circlePolicy · defaultViewModeFromPolicy (§4)', () => {
   it("maps each view axis value to its landing mode", () => {
     expect(defaultViewModeFromPolicy({ view: 'chat' })).toBe('chat');
-    expect(defaultViewModeFromPolicy({ view: 'screen' })).toBe('scherm');
+    expect(defaultViewModeFromPolicy({ view: 'screen' })).toBe('screen');
     // retired value (batch 5) — an OLD stored blob still lands on chat, never on the 'screen' default
     expect(defaultViewModeFromPolicy({ view: 'cross-stream' })).toBe('chat');
   });
@@ -114,22 +114,22 @@ describe('circlePolicy · defaultViewModeFromPolicy (§4)', () => {
   it("MIGRATION (batch 5): a stored 'cross-stream' view normalizes to 'chat', not to the default", () => {
     expect(normalizeCirclePolicy({ view: 'cross-stream' }).view).toBe('chat');
     // …and the retired value is gone from the settable enum (no radio renders it any more).
-    expect(defaultViewModeFromPolicy({ view: 'garbage' })).toBe('scherm');
+    expect(defaultViewModeFromPolicy({ view: 'garbage' })).toBe('screen');
   });
 
-  it("falls back to the policy default ('screen' → scherm) for missing/invalid input", () => {
-    // DEFAULT_CIRCLE_POLICY.view is 'screen' → 'scherm'.
-    expect(defaultViewModeFromPolicy(null)).toBe('scherm');
-    expect(defaultViewModeFromPolicy(undefined)).toBe('scherm');
-    expect(defaultViewModeFromPolicy('garbage')).toBe('scherm');
-    expect(defaultViewModeFromPolicy(42)).toBe('scherm');
-    expect(defaultViewModeFromPolicy({})).toBe('scherm');           // no view key
-    expect(defaultViewModeFromPolicy({ view: 'bogus' })).toBe('scherm'); // invalid enum
+  it("falls back to the policy default ('screen' → screen) for missing/invalid input", () => {
+    // DEFAULT_CIRCLE_POLICY.view is 'screen' → 'screen'.
+    expect(defaultViewModeFromPolicy(null)).toBe('screen');
+    expect(defaultViewModeFromPolicy(undefined)).toBe('screen');
+    expect(defaultViewModeFromPolicy('garbage')).toBe('screen');
+    expect(defaultViewModeFromPolicy(42)).toBe('screen');
+    expect(defaultViewModeFromPolicy({})).toBe('screen');           // no view key
+    expect(defaultViewModeFromPolicy({ view: 'bogus' })).toBe('screen'); // invalid enum
   });
 
-  it("only ever returns one of the two Schakelaar values", () => {
+  it("only ever returns one of the two mode switch values", () => {
     for (const v of ['chat', 'screen', 'cross-stream', 'bogus', undefined]) {
-      expect(['chat', 'scherm']).toContain(defaultViewModeFromPolicy({ view: v }));
+      expect(['chat', 'screen']).toContain(defaultViewModeFromPolicy({ view: v }));
     }
   });
 });

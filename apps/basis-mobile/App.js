@@ -108,7 +108,7 @@ export default function App() {
   // routable screen.  ChatScreen stays mounted invisibly so its peer-
   // wiring keeps routing inbound DMs / mesh events; the launcher is the
   // ONLY visible top-level surface.  Chat now lives inside the circle
-  // view as the GESPREK tab (will fill the surface; until then
+  // view as the CONVERSATION tab (will fill the surface; until then
   // there's a hole where chat used to be reachable as a standalone).
   const [bundle, setBundle] = useState(null);
   // The restore-settings flow's pending flag — raised by the boot hooks, consumed by the modal
@@ -688,7 +688,7 @@ export default function App() {
         {/* ChatScreen stays mounted (peer-wiring keeps routing
             inbound DMs / mesh) but is visually hidden behind the launcher
             overlay.  No "← chat" route reveals it; chat now lives inside
-            the circle view as the GESPREK tab.
+            the circle view as the CONVERSATION tab.
             The styles.hiddenChat below uses absolute positioning so the
             ChatScreen is mounted + peer-wired but never visible. */}
         <View style={styles.hiddenChat} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">

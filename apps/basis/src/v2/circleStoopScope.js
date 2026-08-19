@@ -5,9 +5,9 @@
  * The dispatch path (slash / AI) already binds the active circle via
  * `scopeReadyDispatch` (router.js): it injects the circle id into the stoop scope
  * key so a post lands in — and a list reads from — the open circle. But the GUI
- * surfaces (the prikbord noticeboard, etc.) call `callSkill('stoop', op, args)`
+ * surfaces (the noticeboard noticeboard, etc.) call `callSkill('stoop', op, args)`
  * DIRECTLY, bypassing that binding — so without this wrapper every circle's
- * prikbord hits the one shared `cc-default-circle` and they all see each other's
+ * noticeboard hits the one shared `cc-default-circle` and they all see each other's
  * posts. This wrapper closes that gap the same way:
  *   • item-creating / mutating stoop ops get the circle id injected as `groupId`
  *     (stoop's per-call scope key — realAgent maps it to `source.targets[]`), so
@@ -38,7 +38,7 @@ export const SCOPED_LIST_OPS = new Set(['listOpen', 'listFeed', 'listMyRequests'
  * lifecycle + rules documents (internal bookkeeping), and the circle CHAT lines,
  * which live in the same itemStore purely so a conversation survives a reload.
  * `listOpen` (no intent) returns them all alongside real `request`/`offer` posts;
- * the prikbord is for asks/offers, so it filters these out.
+ * the noticeboard is for asks/offers, so it filters these out.
  *
  * `circle-chat-message` earns its place here for the same reason the others do, but
  * the symptom was louder: every line typed in a circle's Conversation also appeared
@@ -174,7 +174,7 @@ function openItemAttachmentThumbs(it, opener) {
  * circle's `{seal, open}` content strategy (cached by the caller). When present, a
  * `postRequest` body is SEALED before it reaches the pod (the host stores ciphertext)
  * and list items are OPENED after read — so every GUI reader/writer that routes through
- * this wrapper (prikbord + scherm noticeboard block) is transparently E2E-sealed. A p0/p1
+ * this wrapper (noticeboard + screen noticeboard block) is transparently E2E-sealed. A p0/p1
  * circle resolves no strategy → plaintext, unchanged.
  *
  * Image attachments seal the SAME way, through the SAME circle path basis's own

@@ -21,7 +21,7 @@ import {
   // SILENT out-of-circle delivery — the per-user "shared with me" store (received sealed copies).
   createSharedWithMeStore, podSharedWithMeIo, tieredSharedWithMeIo,
   // multi-admin proposal persistence on RN.
-  // α.1a — scherm recipe book store.
+  // α.1a — screen recipe book store.
   createCircleRecipeStore,
   // α.2 — per-user screens store.
   createUserScreenStore,

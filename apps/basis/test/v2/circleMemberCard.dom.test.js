@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 //
-// §2 — the two LEDEN-tab card views: member-persona ("what this member reveals to me")
+// §2 — the two MEMBERS-tab card views: member-persona ("what this member reveals to me")
 // and self-view ("how others see me"). Thin DOM projectors over the shared
 // memberCards.js splits — these assert the sees/hides columns render + the self-view
 // viewer picker reaches the host.

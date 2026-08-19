@@ -37,7 +37,7 @@
  *
  * Owner DECIDE markers resolved 2026-05-21 (this commit) — see commit
  * message for the resolution table.  Naming choices favour English
- * (open-source convention); Dutch synonyms (`buurt`, `prikbord`,
+ * (open-source convention); Dutch synonyms (`buurt`, `noticeboard`,
  * `mijn`, `reageer`, `intrekken`, `teruggebracht`, …) are kept as
  * `match.verbs` aliases.
  *
@@ -83,7 +83,7 @@ const ITEM_TYPES = [
   // ── Part G dissolve (2026-06-17) — app-local types the chat-shell
   //    ops folded in from the former mockStoopManifest reference.
   //    Non-canonical (F-SP1-a); permitted by validateManifest.
-  //  - 'post'    — the chat-shell vocabulary for a prikbord item.  The
+  //  - 'post'    — the chat-shell vocabulary for a noticeboard item.  The
   //    listOpen/listFeed reply adapter maps the substrate's canonical
   //    ask/offer/lend/request rows to `type:'post'` (realAgent.js
   //    adaptStoopReply), and respondToItem/markReturned/dispute gate
@@ -98,9 +98,9 @@ const ITEM_TYPES = [
   'member',
 ];
 
-// The trio that renders on the prikbord (ask / offer / lend) — used as
+// The trio that renders on the noticeboard (ask / offer / lend) — used as
 // the enum for `postRequest({intent})` and `listOpen({intent})`.
-const PRIKBORD_INTENTS = ['ask', 'offer', 'lend'];
+const NOTICEBOARD_INTENTS = ['ask', 'offer', 'lend'];
 
 /** @type {import('@onderling/app-manifest').__types__} */
 export const stoopManifest = {
@@ -149,7 +149,7 @@ export const stoopManifest = {
         { name: 'text',   kind: 'string', required: true, ...STR_NONEMPTY },
         // `intent` picks one of {ask, offer, lend}; the skill translates
         // this to canonical {type, kind} via `intentToCanonicalDraft`.
-        { name: 'intent', kind: 'enum', of: PRIKBORD_INTENTS, required: false },
+        { name: 'intent', kind: 'enum', of: NOTICEBOARD_INTENTS, required: false },
         // Optional lend-only field (epoch-ms due date).
         { name: 'dueAt',  kind: 'number' },
         // Optional skill tag the post requires/offers (single string;
@@ -192,11 +192,11 @@ export const stoopManifest = {
     {
       id:   'listOpen',
       verb: 'list',
-      // listOpen spans the three prikbord types — no appliesTo.type
+      // listOpen spans the three noticeboard types — no appliesTo.type
       // narrowing (same as postRequest).
       params: [
         // Optional filter — the underlying skill accepts both.
-        { name: 'intent', kind: 'enum', of: PRIKBORD_INTENTS },
+        { name: 'intent', kind: 'enum', of: NOTICEBOARD_INTENTS },
         { name: 'skill',  kind: 'string' },
       ],
       surfaces: {
@@ -212,7 +212,7 @@ export const stoopManifest = {
           // Resolved 2026-05-21 (owner): `/bulletin` (EN — open-source
           // convention).  `/list` would collide with household.listOpen;
           // `/bulletin` is collision-free and the English equivalent of
-          // the in-app term "prikbord"/"buurt".
+          // the in-app term "noticeboard"/"buurt".
           //
           // Part C gate audit (folded in from the former mockStoopManifest
           // at the Part G dissolve, 2026-06-17) — REMOVED the gate `match`:
@@ -1540,7 +1540,7 @@ export const stoopManifest = {
   // Stoop has 16 web pages today (per Project Files/projects/audit-stoop-folio-surfaces.md).
   // After E.3, THREE pages are NavModel-driven (`mine.html`,
   // `privacy.html`, `settings.html`); 13 pages remain hand-built
-  // (`index.html` prikbord, `chat.html`, `contacts.html`,
+  // (`index.html` noticeboard, `chat.html`, `contacts.html`,
   // `create-group.html`, `group.html`, `profile.html`, `onboard.html`,
   // `sign-in.html`, `auth-callback.html`, `push.html`, `restore.html`,
   // `welcome.html`, `metrics.html`) and will land in follow-on E.x
@@ -1884,7 +1884,7 @@ export const stoopManifest = {
     { id: 'feed',     title: 'Feed',     type: 'post' },
 
     // ──── D-mig-1a (objective D, step 1a) — project the live LIST-screen
-    //      surfaces (contacts + prikbord) FROM this manifest.  These two
+    //      surfaces (contacts + noticeboard) FROM this manifest.  These two
     //      views make renderWeb able to project what the basis
     //      `LIST_SCREENS` literal (web/v2/circleApp.js) used to hardcode:
     //      the row LABEL field + the group/filter CATEGORY field.  The live
@@ -1909,23 +1909,23 @@ export const stoopManifest = {
       // OR handle (case-insensitive contains).
       searchFields:  ['label', 'handle'],
     },
-    //  prikbord → listOpen (spans ask/offer/lend; the reply adapter maps
+    //  noticeboard → listOpen (spans ask/offer/lend; the reply adapter maps
     //      those canonical rows to the chat-shell `type:'post'`, same type
-    //      the `feed` view uses).  Prikbord rows group by `kind`
+    //      the `feed` view uses).  Noticeboard rows group by `kind`
     //      (LIST_SCREENS `categoryField:'kind'`); labelField omitted — the
     //      default 'label' matches what listScreen.js renders (`row.label`).
     {
-      id:            'prikbord',
-      title:         'Prikbord',
+      id:            'noticeboard',
+      title:         'Noticeboard',
       type:          'post',
       dataSource:    { skillId: 'listOpen' },
       categoryField: 'kind',
-      // D-mig-2 — the free-text filter grammar.  A prikbord post row (the
+      // D-mig-2 — the free-text filter grammar.  A noticeboard post row (the
       // listOpen reply adapter, realAgent.js) sets `label = post.text` —
       // the label ALREADY IS the full post body.  There is no separate
       // title/summary field distinct from the label to search, so we
       // declare the default explicitly (`['label']`) rather than invent a
-      // field the data doesn't carry.  Formalises the default: a prikbord
+      // field the data doesn't carry.  Formalises the default: a noticeboard
       // search matches the post body, exactly as before.
       searchFields:  ['label'],
     },

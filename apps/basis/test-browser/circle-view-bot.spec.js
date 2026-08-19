@@ -16,8 +16,8 @@ async function openCircleComposer(page) {
 }
 
 async function send(page, text) {
-  await page.locator('.circle-circle__composer-input').fill(text);
-  await page.locator('.circle-circle__composer-send').click();
+  await page.locator('.circle-view__composer-input').fill(text);
+  await page.locator('.circle-view__composer-send').click();
   await page.waitForTimeout(2500);
 }
 
@@ -33,9 +33,9 @@ test('circleApp boots clean (bot built, no page error)', async ({ page }) => {
 
 test('"@assistant add X" engages the bot → user bubble + a bot reply (the gate dispatched addTask)', async ({ page }) => {
   await openCircleComposer(page);
-  const before = await page.locator('.circle-circle__bubble').count();
+  const before = await page.locator('.circle-view__bubble').count();
   await send(page, '@assistant add p5milk');
-  const bubbles = await page.locator('.circle-circle__bubble').allTextContents();
+  const bubbles = await page.locator('.circle-view__bubble').allTextContents();
   console.log('=== bubbles after add:', JSON.stringify(bubbles));
   // engaged + dispatched ⇒ the user line AND a bot reply bubble (≥ 2 new). If the bot had NOT engaged,
   // the line would just post to the circle (1 bubble, no reply).
@@ -46,7 +46,7 @@ test('"@assistant done X" resolves the label + completes (bot reply, no error bu
   await openCircleComposer(page);
   await send(page, '@assistant add p5sock');
   await send(page, '@assistant done p5sock');
-  const bubbles = await page.locator('.circle-circle__bubble').allTextContents();
+  const bubbles = await page.locator('.circle-view__bubble').allTextContents();
   console.log('=== bubbles after add+done:', JSON.stringify(bubbles));
   const blob = bubbles.join(' | ').toLowerCase();
   expect(blob).not.toContain('item not found');

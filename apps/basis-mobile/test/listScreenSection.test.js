@@ -1,6 +1,6 @@
 /**
  * D-mig-mobile-1b (web≡mobile) — the mobile list-screen surface (`contacts` /
- * `prikbord`) now SOURCES its fetch/render config from the projected manifest
+ * `noticeboard`) now SOURCES its fetch/render config from the projected manifest
  * SECTION via the shared `sectionForScreen` selector, instead of the retired
  * hardcoded literal that used to live in CircleLauncherScreen.js.
  *
@@ -17,12 +17,12 @@ import { buildManifestsByOrigin } from '../src/core/composeManifests.js';
 import { sectionForScreen } from '../../basis/src/v2/pageProjection.js';
 
 // The exact config the deleted `LIST_SCREENS` literal supplied (the invariant
-// the migration must preserve). `prikbord` had no `searchFields` in the literal
+// the migration must preserve). `noticeboard` had no `searchFields` in the literal
 // → CircleListScreen's buildScreenModel defaulted to `[labelField]` (= ['label']),
 // which the projected section now declares explicitly (same behaviour).
 const RETIRED_LITERAL = {
   contacts: { appOrigin: 'stoop', listOp: 'listContacts', categoryField: 'category', searchFields: ['label', 'handle'] },
-  prikbord: { appOrigin: 'stoop', listOp: 'listOpen',     categoryField: 'kind' },
+  noticeboard: { appOrigin: 'stoop', listOp: 'listOpen',     categoryField: 'kind' },
 };
 
 describe('mobile list-screen config sourced from the projected manifest section', () => {
@@ -40,13 +40,13 @@ describe('mobile list-screen config sourced from the projected manifest section'
     expect(section.labelField ?? 'label').toBe('label');
   });
 
-  it('sectionForScreen("prikbord") == the retired literal config (listOpen, kind)', () => {
-    const found = sectionForScreen(manifestsByOrigin, 'prikbord');
+  it('sectionForScreen("noticeboard") == the retired literal config (listOpen, kind)', () => {
+    const found = sectionForScreen(manifestsByOrigin, 'noticeboard');
     expect(found).toBeTruthy();
     const { section, appOrigin } = found;
-    expect(appOrigin).toBe(RETIRED_LITERAL.prikbord.appOrigin);
-    expect(section.dataSource.skillId).toBe(RETIRED_LITERAL.prikbord.listOp);
-    expect(section.categoryField).toBe(RETIRED_LITERAL.prikbord.categoryField);
+    expect(appOrigin).toBe(RETIRED_LITERAL.noticeboard.appOrigin);
+    expect(section.dataSource.skillId).toBe(RETIRED_LITERAL.noticeboard.listOp);
+    expect(section.categoryField).toBe(RETIRED_LITERAL.noticeboard.categoryField);
     // labelField omitted in the literal → default 'label'.
     expect(section.labelField ?? 'label').toBe('label');
     // searchFields: the literal omitted it (buildScreenModel default [labelField]);

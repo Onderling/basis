@@ -197,7 +197,7 @@
     "toggle_label_admin":    { "text": "Beschikbaarheid-hints inschakelen voor deze kring", "doc": "Checkbox-label voor de admin-only aan-vlag." }
   },
   "compensation": {
-    "section_heading":  { "text": "Vergoeding", "doc": "Sectiekop op /circle.html voor de V2.2 facturatie-paneel. Alleen zichtbaar voor admins + paid-pro-leden." },
+    "section_heading":  { "text": "Vergoeding", "doc": "Sectiekop op /circle.html voor de V2.2 facturatie-paneel. Alleen zichtbaar voor admins + paid-pro-members." },
     "section_intro":    { "text": "Vergoede leden krijgen één factuurregel per afgeronde taak. Maandtotalen hier zijn informatief — de daadwerkelijke facturatie loopt buiten Tasks.", "doc": "Inleidende paragraaf boven de per-pro-tabel op /circle.html." },
     "toggle_label":     { "text": "Vergoedingen bijhouden voor paid-pro-leden", "doc": "Checkbox-label voor de per-circle compensation.enabled-vlag (alleen admin)." },
     "rate_label":       { "text": "Tarief", "doc": "Kolomkop voor het per-lid uurtarief (alleen admin-bewerkbaar)." },

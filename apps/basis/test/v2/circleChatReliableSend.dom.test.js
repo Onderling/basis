@@ -35,9 +35,9 @@ describe('circle chat · composer dispatches the unified send op', () => {
     };
 
     renderCircleView(el, { circle, rows: [], t, onSend });
-    const input = el.querySelector('.circle-circle__composer-input');
+    const input = el.querySelector('.circle-view__composer-input');
     input.value = 'Hoi circle!';
-    el.querySelector('.circle-circle__composer').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    el.querySelector('.circle-view__composer').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 
     // Optimistic bubble appended locally.
     expect(events).toHaveLength(1);
@@ -82,8 +82,8 @@ describe('circle chat · inbound reliable-path envelope renders into the circle 
     const rows = buildCircleStream({ events, circles: [circle], circleId: 'g1' });
     const el = mount();
     renderCircleView(el, { circle, rows, t });
-    const bubbles = el.querySelectorAll('.circle-circle__bubble');
+    const bubbles = el.querySelectorAll('.circle-view__bubble');
     expect(bubbles).toHaveLength(1);
-    expect(bubbles[0].querySelector('.circle-circle__bubble-text').textContent).toBe('hallo vanaf een peer');
+    expect(bubbles[0].querySelector('.circle-view__bubble-text').textContent).toBe('hallo vanaf een peer');
   });
 });

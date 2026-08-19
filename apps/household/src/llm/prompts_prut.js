@@ -69,7 +69,7 @@ clearList(list?: string)
 
 ---
 
-## VOORBEELDEN
+## EXAMPLES
 
 User: melk is op
 Assistant:

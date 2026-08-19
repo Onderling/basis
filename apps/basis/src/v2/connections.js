@@ -19,7 +19,7 @@
  * "Gekoppelde apparaten" / connected devices — Frits' word, because *"my subscriptions" sounds more
  * external than the thing actually is*. Deliberately NOT bare "verbindingen": `Verbindingspunten`
  * (relays) and `Verbinding & transport` already exist in settings and a third neighbour would blur
- * all three. Deliberately NOT "scherm" either — that is the Screens tab.
+ * all three. Deliberately NOT "screen" either — that is the Screens tab.
  *
  * Pure projections. The shells paint and dispatch; every write goes through the waist
  * (`grantSurface` · `revokeSurface` · `listSurfaceGrants`).

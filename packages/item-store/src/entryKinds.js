@@ -52,9 +52,9 @@ export const ENTRY_KINDS = Object.freeze({
   // ── human-facing ──────────────────────────────────────────────────────────
   'chat-message':    K(LANE.HUMAN, true,  RETAIN.RECORD, false),   // the conversation's RECORD — never drops
   task:              K(LANE.HUMAN, true,  RETAIN.CHAT, false),     // the store row is the durable head; entries age out
-  vraag:             K(LANE.HUMAN, true,  RETAIN.CHAT, false),
-  aanbod:            K(LANE.HUMAN, true,  RETAIN.CHAT, false),
-  leen:              K(LANE.HUMAN, true,  RETAIN.CHAT, false),
+  ask:             K(LANE.HUMAN, true,  RETAIN.CHAT, false),
+  offer:            K(LANE.HUMAN, true,  RETAIN.CHAT, false),
+  lend:              K(LANE.HUMAN, true,  RETAIN.CHAT, false),
 
   // ── system lane ───────────────────────────────────────────────────────────
   // `governance` carries ONE per-event exception, which stays explicit rather than becoming a second

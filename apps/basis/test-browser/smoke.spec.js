@@ -1,7 +1,7 @@
 /**
  * Playwright smoke test (v2 app) — verifies the scaffold itself works:
  *   1. The dev server is reachable + the v2 app boots with no page error.
- *   2. The circle (GESPREK) composer renders.
+ *   2. The circle (CONVERSATION) composer renders.
  *   3. A deterministic slash command dispatches and a bot reply bubble lands.
  *
  * (Migrated off the classic shell 2026-06-29 — classic's `/me` identity command has no v2 circle

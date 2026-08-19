@@ -79,9 +79,9 @@
     "no_member_map":   "Member map is not configured.",
     "no_reveals":      "Reveal store is not configured."
   },
-  "prikbord": {
-    "title":          "On the prikbord",
-    "empty":          "Nothing on the prikbord yet.",
+  "noticeboard": {
+    "title":          "On the noticeboard",
+    "empty":          "Nothing on the noticeboard yet.",
     "post_button":    "+ Post something",
     "filter_all":     "All",
     "filter_ask":     "Asks",
@@ -168,11 +168,11 @@
     "status_looks_ok":    { "text": "Looks good ✓", "doc": "Inline status when the structural check passes." }
   },
   "feed": {
-    "heading":           { "text": "Pinboard", "doc": "Heading on the FeedScreen (Prikbord)." },
+    "heading":           { "text": "Pinboard", "doc": "Heading on the FeedScreen (the noticeboard)." },
     "empty_no_items":    { "text": "No posts in this neighbourhood yet.", "doc": "Empty state when the feed has no items at all." },
     "empty_filtered":    { "text": "No posts for this filter.", "doc": "Empty state when items exist but the active filter excludes them all." },
-    "kind_vraag":        { "text": "Asks", "doc": "Filter chip label for kind=vraag (asks/help-needed posts)." },
-    "kind_aanbod":       { "text": "Offers", "doc": "Filter chip label for kind=aanbod (offer/help-available posts)." },
+    "kind_ask":        { "text": "Asks", "doc": "Filter chip label for kind=ask (asks/help-needed posts)." },
+    "kind_offer":       { "text": "Offers", "doc": "Filter chip label for kind=offer (offer/help-available posts)." },
     "no_group":          { "text": "Join a group first to see the pinboard.", "doc": "Empty-state on mobile FeedScreen when no agent is active (no group joined yet). Stoop V3 mobile." }
   },
   "tabs": {
@@ -185,10 +185,10 @@
   },
   "compose": {
     "heading":               { "text": "New post", "doc": "Heading on PostComposeScreen." },
-    "placeholder_vraag":     { "text": "What do you need?", "doc": "Multiline input placeholder when kind=vraag." },
-    "placeholder_aanbod":    { "text": "What are you offering?", "doc": "Multiline input placeholder when kind=aanbod." },
-    "kind_vraag":            { "text": "Ask", "doc": "Kind-toggle chip label for kind=vraag on PostComposeScreen." },
-    "kind_aanbod":           { "text": "Offer", "doc": "Kind-toggle chip label for kind=aanbod on PostComposeScreen." },
+    "placeholder_ask":     { "text": "What do you need?", "doc": "Multiline input placeholder when kind=ask." },
+    "placeholder_offer":    { "text": "What are you offering?", "doc": "Multiline input placeholder when kind=offer." },
+    "kind_ask":            { "text": "Ask", "doc": "Kind-toggle chip label for kind=ask on PostComposeScreen." },
+    "kind_offer":           { "text": "Offer", "doc": "Kind-toggle chip label for kind=offer on PostComposeScreen." },
     "distance_label":        { "text": "Maximum distance", "doc": "Section heading above the distance ChipRow on PostComposeScreen." },
     "distance_any":          { "text": "No limit", "doc": "Distance preset 'any' — no max." },
     "distance_km":           { "text": "{n} km", "doc": "Distance preset format — {n} is one of 1/2/5/10/25." },

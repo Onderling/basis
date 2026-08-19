@@ -2,11 +2,11 @@
   "app": {
     "name": {
       "text": "basis",
-      "doc": "App-display in headers + over-scherm"
+      "doc": "App-display in headers + over-screen"
     },
     "tagline": {
       "text": "Jouw buurt, jouw taken, jouw bestanden — één chat.",
-      "doc": "Splash + over-scherm"
+      "doc": "Splash + over-screen"
     }
   },
   "chat": {
@@ -536,7 +536,7 @@
       },
       "lede": {
         "text": "Typ de 24 woorden die je hebt opgeschreven toen je de app voor het eerst gebruikte. Ze halen je identiteit terug — dezelfde jij, bereikbaar op dezelfde adressen. Je kringen komen NIET terug: vraag een beheerder je opnieuw uit te nodigen, dan houd je de naam die je had.",
-        "doc": "2026-08-02 — beloofde eerder 'identiteit en kringen'. Een wipe-and-restore op een echt toestel liet zien dat de kringen niet terugkomen: lidmaatschap staat in lokale opslag die een herinstallatie wist."
+        "doc": "2026-08-02 — beloofde eerder 'identiteit en circles'. Een wipe-and-restore op een echt toestel liet zien dat de circles niet terugkomen: lidmaatschap staat in lokale opslag die een herinstallatie wist."
       },
       "placeholder": {
         "text": "linnen veld tuin …"

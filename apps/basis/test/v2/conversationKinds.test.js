@@ -24,7 +24,7 @@ describe('the defaults are derived, not copied', () => {
 
   it('technical kinds are off by default, and offerings are on', () => {
     const def = defaultConversationKinds();
-    expect(def).toContain('aanbod');            // Frits said "maybe"; the per-circle setting resolves it
+    expect(def).toContain('offer');            // Frits said "maybe"; the per-circle setting resolves it
     expect(def).not.toContain('roster-updated');
     expect(def).not.toContain('agent-action');
   });
@@ -50,7 +50,7 @@ describe('the template axis', () => {
     // template that created the circle.
     const kinds = resolveConversationKinds({ templateKind: 'neighbourhood' });
     expect(kinds).not.toContain('chat-message');
-    expect(kinds).toEqual(expect.arrayContaining(['vraag', 'aanbod']));
+    expect(kinds).toEqual(expect.arrayContaining(['ask', 'offer']));
   });
 
   it('a household shows everything', () => {
@@ -100,15 +100,15 @@ describe('toggling one kind', () => {
     // Otherwise turning one kind off silently adopts the whole default set as an explicit choice, freezing
     // the circle against future registry changes.
     const resolved = resolveConversationKinds({ templateKind: 'household' });
-    const after = setConversationKind(resolved, 'leen', false);
+    const after = setConversationKind(resolved, 'lend', false);
     expect(after).toContain('chat-message');
-    expect(after).not.toContain('leen');
+    expect(after).not.toContain('lend');
   });
 });
 
 describe('the wizard axis (J-CW1/J-CW2)', () => {
   it('a fresh template pre-fills the axis', () => {
-    expect(applyTemplate({}, 'neighbourhood').conversationKinds).toEqual(['vraag', 'aanbod', 'task', 'leen']);
+    expect(applyTemplate({}, 'neighbourhood').conversationKinds).toEqual(['ask', 'offer', 'task', 'lend']);
     expect(applyTemplate({}, 'household').conversationKinds).toBeNull();   // null = the living default
   });
 
@@ -128,7 +128,7 @@ describe('the wizard axis (J-CW1/J-CW2)', () => {
     // mismatch between the two was the smell. Under provenance the name is true.
     let st = applyTemplate({}, 'household');       // null (the living default)
     st = applyTemplate(st, 'neighbourhood');
-    expect(st.conversationKinds).toEqual(['vraag', 'aanbod', 'task', 'leen']);
+    expect(st.conversationKinds).toEqual(['ask', 'offer', 'task', 'lend']);
   });
 });
 
@@ -141,7 +141,7 @@ describe('features.chat is a VIEW of the kinds list (decision 3, 2026-07-29)', (
   });
 
   it('an explicit list beats the template', () => {
-    const p = withDerivedChatFeature({ kind: 'neighbourhood', conversationKinds: ['chat-message', 'vraag'], features: {} });
+    const p = withDerivedChatFeature({ kind: 'neighbourhood', conversationKinds: ['chat-message', 'ask'], features: {} });
     expect(p.features.chat).toBe(true);
   });
 
@@ -164,9 +164,9 @@ describe('features.chat is a VIEW of the kinds list (decision 3, 2026-07-29)', (
 describe('conversationKindsRows — the admin control’s model (decision 3’s missing surface)', () => {
   it('offers every HUMAN kind, on or off, so an admin sees what a conversation could contain', () => {
     const rows = conversationKindsRows({ templateKind: 'neighbourhood' });
-    expect(rows.map((r) => r.kind).sort()).toEqual(['aanbod', 'chat-message', 'leen', 'task', 'vraag'].sort());
+    expect(rows.map((r) => r.kind).sort()).toEqual(['offer', 'chat-message', 'lend', 'task', 'ask'].sort());
     expect(rows.find((r) => r.kind === 'chat-message').on).toBe(false);   // a neighbourhood starts without chat
-    expect(rows.find((r) => r.kind === 'vraag').on).toBe(true);
+    expect(rows.find((r) => r.kind === 'ask').on).toBe(true);
   });
 
   it('offers NO governance kind — the projection enforces the lane, so a checkbox would do nothing', () => {
@@ -181,10 +181,10 @@ describe('conversationKindsRows — the admin control’s model (decision 3’s 
     const rows = conversationKindsRows({ templateKind: 'neighbourhood' });
     const chat = rows.find((r) => r.kind === 'chat-message');
     expect(chat.next).toContain('chat-message');                 // tapping an off row turns it on
-    const vraag = rows.find((r) => r.kind === 'vraag');
-    expect(vraag.next).not.toContain('vraag');                   // tapping an on row turns it off
+    const ask = rows.find((r) => r.kind === 'ask');
+    expect(ask.next).not.toContain('ask');                   // tapping an on row turns it off
     // …and the rest of the list is untouched either way.
-    expect(vraag.next).toContain('aanbod');
+    expect(ask.next).toContain('offer');
   });
 
   it('an admin MAY empty the conversation — unlike a reader, who cannot empty their own filter', () => {

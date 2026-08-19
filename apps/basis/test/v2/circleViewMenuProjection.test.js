@@ -34,7 +34,7 @@ function fullMore() {
 }
 
 const menuActions = (el) =>
-  [...el.querySelectorAll('.circle-circle__more-menu .circle-circle__more-item')].map((b) => b.dataset.action);
+  [...el.querySelectorAll('.circle-view__more-menu .circle-view__more-item')].map((b) => b.dataset.action);
 
 describe('circle circle ⋯ menu — projected from manifest.actions (MORE_ITEMS gone)', () => {
   it('renders exactly the projected+gated web set, in manifest order (not a hardcoded list)', () => {
@@ -77,7 +77,7 @@ describe('circle circle ⋯ menu — projected from manifest.actions (MORE_ITEMS
     const el = mount();
     const more = fullMore();
     renderCircleView(el, { circle, rows: [], t, policy: DEFAULT_CIRCLE_POLICY, more });
-    el.querySelector('.circle-circle__more-menu [data-action="contacts"]').click();
+    el.querySelector('.circle-view__more-menu [data-action="contacts"]').click();
     expect(more.contacts).toHaveBeenCalledTimes(1);
   });
 

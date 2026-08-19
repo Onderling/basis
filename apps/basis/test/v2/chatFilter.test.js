@@ -11,13 +11,13 @@ import {
   localStorageChatFilterIo,
 } from '../../src/v2/chatFilter.js';
 
-const ALLOWED = ['chat-message', 'task', 'vraag'];
+const ALLOWED = ['chat-message', 'task', 'ask'];
 const row = (type, actor, id) => ({ id, type, actor, event: { type, actor } });
 const ROWS = [
   row('chat-message', 'anna', 'm1'),
   row('chat-message', 'bot-x', 'm2'),
   row('task',         'anna', 't1'),
-  row('vraag',        'bot-x', 'v1'),
+  row('ask',        'bot-x', 'v1'),
 ];
 const isAgentActor = (actor) => String(actor ?? '').startsWith('bot-');
 
@@ -63,7 +63,7 @@ describe("the author axis — Frits' case: an automated agents' chat", () => {
 describe('the kind axis — chat itself is filterable', () => {
   it('chat-message can be filtered OUT like any other kind', () => {
     const out = applyChatFilter({
-      rows: ROWS, filter: { kinds: ['task', 'vraag'] }, allowedKinds: ALLOWED, isAgentActor,
+      rows: ROWS, filter: { kinds: ['task', 'ask'] }, allowedKinds: ALLOWED, isAgentActor,
     });
     expect(out.map((r) => r.id)).toEqual(['t1', 'v1']);
   });
@@ -79,19 +79,19 @@ describe('the kind axis — chat itself is filterable', () => {
 
 describe('the circle setting is a CEILING the reader cannot lift', () => {
   it('a stored kind the circle no longer allows is dropped', () => {
-    const f = normalizeChatFilter({ kinds: ['task', 'aanbod'] }, ALLOWED);
-    expect(f.kinds).toEqual(['task']);   // 'aanbod' is not in this circle's conversation
+    const f = normalizeChatFilter({ kinds: ['task', 'offer'] }, ALLOWED);
+    expect(f.kinds).toEqual(['task']);   // 'offer' is not in this circle's conversation
   });
 
   it('a set covering everything allowed normalises to null, so a NEWLY allowed kind appears', () => {
     const f = normalizeChatFilter({ kinds: [...ALLOWED] }, ALLOWED);
     expect(f.kinds).toBeNull();
     // …and with the circle later allowing one more, the reader sees it.
-    expect(applyChatFilter({ rows: ROWS, filter: f, allowedKinds: [...ALLOWED, 'aanbod'] })).toHaveLength(4);
+    expect(applyChatFilter({ rows: ROWS, filter: f, allowedKinds: [...ALLOWED, 'offer'] })).toHaveLength(4);
   });
 
   it('a stored set that survives nothing falls back to showing everything', () => {
-    expect(normalizeChatFilter({ kinds: ['aanbod'] }, ALLOWED).kinds).toBeNull();
+    expect(normalizeChatFilter({ kinds: ['offer'] }, ALLOWED).kinds).toBeNull();
   });
 });
 
@@ -108,7 +108,7 @@ describe('the chips', () => {
   it('a tap returns the NEXT filter — the shells hold no filter logic', () => {
     const { kindChips } = chatFilterChips({ allowedKinds: ALLOWED });
     const next = kindChips.find((c) => c.kind === 'task').nextFilter;
-    expect(next.kinds).toEqual(['chat-message', 'vraag']);
+    expect(next.kinds).toEqual(['ask', 'chat-message']);
     expect(chatFilterChips({ allowedKinds: ALLOWED, filter: next }).active).toBe(true);
   });
 

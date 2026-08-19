@@ -55,7 +55,7 @@ export function renderCircleLauncher(container, {
   container.appendChild(heading);
 
   // β.1 — top-row Stream/Availability/Hop/Nearby/My-things buttons removed;
-  // those surfaces are now reachable via the Schermen + Mij tabs.
+  // those surfaces are now reachable via the Screens + Mij tabs.
 
   if (loading) {
     const l = document.createElement('div');

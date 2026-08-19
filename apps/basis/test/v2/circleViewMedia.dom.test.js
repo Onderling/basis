@@ -108,9 +108,9 @@ describe('circle composer — the attach affordance', () => {
   it('renders NO attach button when the host wired no onAttachMedia (p0/p1 / unresolved)', () => {
     const el = mount();
     renderCircleView(el, { circle: CIRCLE, rows: [], t, onSend: () => {} });
-    expect(el.querySelector('.circle-circle__composer')).not.toBeNull();
-    expect(el.querySelector('.circle-circle__attach')).toBeNull();
-    expect(el.querySelector('.circle-circle__file')).toBeNull();
+    expect(el.querySelector('.circle-view__composer')).not.toBeNull();
+    expect(el.querySelector('.circle-view__attach')).toBeNull();
+    expect(el.querySelector('.circle-view__file')).toBeNull();
   });
 
   it('renders the 📎 button + hidden file input, and a picked file reaches onAttachMedia', async () => {
@@ -120,10 +120,10 @@ describe('circle composer — the attach affordance', () => {
       circle: CIRCLE, rows: [], t, onSend: () => {},
       onAttachMedia: (f) => picked.push(f),
     });
-    const btn = el.querySelector('.circle-circle__attach');
+    const btn = el.querySelector('.circle-view__attach');
     expect(btn).not.toBeNull();
     expect(btn.getAttribute('aria-label')).toBe('circle.circle.attach');
-    const fileInput = el.querySelector('.circle-circle__file');
+    const fileInput = el.querySelector('.circle-view__file');
     expect(fileInput).not.toBeNull();
     expect(fileInput.getAttribute('accept')).toContain('image/');
     const f = stubFile();
@@ -166,7 +166,7 @@ describe('the live path — pick → sealed upload → payload.media → chip �
       media: { opener: comp.mediaGateway.opener },
     });
     rerender();
-    const fileInput = el.querySelector('.circle-circle__file');
+    const fileInput = el.querySelector('.circle-view__file');
     Object.defineProperty(fileInput, 'files', { value: [stubFile()], configurable: true });
     fileInput.dispatchEvent(new Event('change'));
     const embed = await attachDone;
@@ -187,7 +187,7 @@ describe('the live path — pick → sealed upload → payload.media → chip �
     expect(JSON.stringify([...bucket.store.values()])).not.toContain(b64(encoded));
 
     // The chip renders in the thread via the shared domAdapter branch, thumbnail open.
-    const chip = el.querySelector('.circle-circle__bubble .cc-media-card');
+    const chip = el.querySelector('.circle-view__bubble .cc-media-card');
     expect(chip).not.toBeNull();
     const img = chip.querySelector('img.cc-media-thumb');
     expect(img).not.toBeNull();
@@ -230,7 +230,7 @@ describe('the live path — pick → sealed upload → payload.media → chip �
         openFull: (line) => { opened = line; return { bytes: fullBytes(), media: { mime: 'image/jpeg' } }; },
       },
     });
-    const chip = el.querySelector('.circle-circle__bubble .cc-media-card');
+    const chip = el.querySelector('.circle-view__bubble .cc-media-card');
     const view = chip.querySelector('.cc-media-view');
     expect(view).not.toBeNull();
     // `t: tr` threads through circleView → the label is localised (identity t → the key).
@@ -257,7 +257,7 @@ describe('the live path — pick → sealed upload → payload.media → chip �
       circle: CIRCLE, rows: [mediaRow(embed)], t, onSend: () => {},
       media: { opener: comp.mediaGateway.opener },   // opener but NO openFull
     });
-    const chip = el.querySelector('.circle-circle__bubble .cc-media-card');
+    const chip = el.querySelector('.circle-view__bubble .cc-media-card');
     expect(chip.querySelector('img.cc-media-thumb')).not.toBeNull();   // thumbnail still renders
     expect(chip.querySelector('.cc-media-view')).toBeNull();           // but no View affordance
   });
@@ -272,7 +272,7 @@ describe('the live path — pick → sealed upload → payload.media → chip �
     });
     const el = mount();
     renderCircleView(el, { circle: CIRCLE, rows: [mediaRow(embed)], t, onSend: () => {} });   // no media ctx
-    const chip = el.querySelector('.circle-circle__bubble .cc-media-card');
+    const chip = el.querySelector('.circle-view__bubble .cc-media-card');
     expect(chip).not.toBeNull();
     expect(chip.querySelector('img.cc-media-thumb')).toBeNull();
     expect(chip.querySelector('.cc-media-placeholder .cc-media-details').textContent).toContain('image/jpeg');

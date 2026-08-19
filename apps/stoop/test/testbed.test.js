@@ -295,7 +295,7 @@ describe('H5 testbed — multi-user onboarding flow', () => {
   it('member who joins AFTER admin posted still sees admin\'s posts (backfill)', async () => {
     // Reproduces the user-reported bug: the bug was that pubsub doesn't
     // replay history, so a new member never saw admin's earlier posts
-    // (asymmetric prikbord).  The fix backfills `m.bundle.itemStore.listOpen()`
+    // (asymmetric noticeboard).  The fix backfills `m.bundle.itemStore.listOpen()`
     // through the new member's mirror on join.
     const adminBundle = cluster.get(ADMIN_WEBID).bundle;
     const beforeJoinId = (await callSkill(adminUrl, 'postRequest', {
@@ -310,7 +310,7 @@ describe('H5 testbed — multi-user onboarding flow', () => {
     });
     expect(eve.error).toBeUndefined();
 
-    // Eve's prikbord includes admin's pre-existing post.
+    // Eve's noticeboard includes admin's pre-existing post.
     const eveOpen = await callSkill(eve.spawnedUrl, 'listOpen', {});
     expect(eveOpen.items.some((i) =>
       i?.text === 'Admin posted before Eve joined'

@@ -31,7 +31,7 @@ import {
   oneToOneBotLabel,
   // per-circle feature-flag consumption.
   isFeatureEnabled,
-  // §4 — admin's policy.view → default Chat/Scherm landing surface.
+  // §4 — admin's policy.view → default Chat/Screen landing surface.
   defaultViewModeFromPolicy,
   // per-circle activity preview + unread badge.
   buildTilePreviews, bumpSeenAt,
@@ -59,7 +59,7 @@ import {
   buildCircleTabs, DEFAULT_CIRCLE_TAB,
   // D1 (§5A) — quickActions row: feature↔tab mapping + frequency counter.
   featureTabId, featureForTabId, createActionFrequencyStore,
-  // α.1a/b — scherm recipe model + per-block materializer.
+  // α.1a/b — screen recipe model + per-block materializer.
   getActiveRecipe, materializeRecipe, materializeBlock,
   // α.1d.3 — recipe-editor mutation helpers.
   addRecipe, renameRecipe, removeRecipe, setActiveRecipe,
@@ -163,7 +163,7 @@ import { circleGateRules } from '../../../../basis/src/v2/circleGate.js';
 import { interpretToCommand } from '../../../../basis/src/v2/interpretCommand.js';
 import { scopeStoopCallSkill } from '../../../../basis/src/v2/circleStoopScope.js';
 // Sealed media (2026-07-11): the per-circle media composition is SHARED src/ (platform-neutral,
-// no DOM). Mobile reuses it verbatim — same seal path as web's stoop noticeboard — so a prikbord
+// no DOM). Mobile reuses it verbatim — same seal path as web's stoop noticeboard — so a noticeboard
 // image seals per-circle instead of being refused. Do NOT reimplement sealing in the shell.
 import { createCircleMediaComposition, makeDevMediaBucket } from '../../../../basis/src/v2/circleMediaGateway.js';
 import { buildSelfMediaComposition, makeResealMediaForCircle } from '../../../../basis/src/v2/profileMediaReseal.js';
@@ -192,7 +192,7 @@ import {
   // Objective D — session → podWriter so the availability pref publishes.
   sessionToPodWriterRN,
   // persisted multi-admin proposals.
-  // α.1e — scherm recipe book persistence.
+  // α.1e — screen recipe book persistence.
   makeCircleRecipeStoreRN,
   // α.3 — per-user screens persistence.
   makeUserScreenStoreRN,
@@ -346,10 +346,10 @@ AsyncStorage.getItem(ACTION_FREQ_KEY).then((raw) => {
 }).catch(() => {});
 
 // D1 (§5A) — in-memory fallback recipe (just the Veel-gebruikt row) for a
-// circle with no authored scherm.  Never persisted.
+// circle with no authored screen.  Never persisted.
 const DEFAULT_SCHERM_RECIPE = Object.freeze({
-  // #16 — quick-actions + the noticeboard (circle prikbord via stoop listOpen), so a
-  // scherm-landing circle surfaces the open posts even with the chat tab hidden.
+  // #16 — quick-actions + the noticeboard (circle noticeboard via stoop listOpen), so a
+  // screen-landing circle surfaces the open posts even with the chat tab hidden.
   id: '__default__', name: '', blocks: [
     { id: 'qa-default', type: 'quickActions', config: { limit: 4 } },
     { id: 'nb-default', type: 'noticeboard',  config: { limit: 8 } },
@@ -410,7 +410,7 @@ export default function CircleLauncherScreen({
   // M3 — sub-view within the launcher: 'list' | 'availability' | 'detail'
   // | 'settings' | 'override'.  `selected` carries the active circle for
   // detail/settings/override.
-  // boot lands on the Schermen tab (primary). Was 'list' (= Circles).
+  // boot lands on the Screens tab (primary). Was 'list' (= Circles).
   const [view, setView] = useState('screens');
   // The member's saved assistant endpoint config (settings → My data). Persisted to AsyncStorage;
   // CircleDetail re-reads it on mount, so a save applies the next time a circle opens.
@@ -773,14 +773,14 @@ export default function CircleLauncherScreen({
       setPolicy: (cid, patch) => policyStore.update(cid, patch),
     });
   }, [bundle, eventLog, policyStore]);
-  // α.1e — per-circle scherm recipe book (multi-recipe; one marked active).
+  // α.1e — per-circle screen recipe book (multi-recipe; one marked active).
   const recipeStore       = useMemo(() => makeCircleRecipeStoreRN(AsyncStorage), []);
   // α.3 — per-user screens store.  One book per user.
   const userScreenStore   = useMemo(() => makeUserScreenStoreRN(AsyncStorage), []);
   // δ.1 — per-screen materialized-blocks cache (cache-first render +
   // background refresh).  Instantiated inline rather than threaded
   // through App.js as a ref because this cache is purely a UI optimisation
-  // owned by the Schermen tab; no peer-receiver writes to it from outside.
+  // owned by the Screens tab; no peer-receiver writes to it from outside.
   const screenBlocksCache = useMemo(() => makeScreenBlocksCacheRN(AsyncStorage), []);
   // β.5 — per-user "pin to top" store + cached maps.  Pin = float a tile
   // to the top of its kind section; mute = per-circle `chatOff` override
@@ -938,7 +938,7 @@ export default function CircleLauncherScreen({
     try { book = await userScreenStore.get(); }
     catch { book = { screens: [], activeId: null }; }
     // First-run seed: three default screens (Stream, My things,
-    // My calendar) so the Schermen tab is immediately useful.  Once
+    // My calendar) so the Screens tab is immediately useful.  Once
     // any screen exists we never re-seed.
     if (book.screens.length === 0) {
       book = await userScreenStore.update((cur) => {
@@ -1204,7 +1204,7 @@ export default function CircleLauncherScreen({
       return next;
     });
     // no chat-route fallback anymore. Every tap-on-circle
-    // opens the circle view (which will host the GESPREK tab in).
+    // opens the circle view (which will host the CONVERSATION tab in).
     setSelected(c);
     setView('detail');
     setItems([]);
@@ -1347,7 +1347,7 @@ export default function CircleLauncherScreen({
       if (menuCircle) { setMenuCircle(null); return true; }
       // Inline cancel: creating-circle input row.
       if (creating) { setCreating(false); return true; }   // back closes the create wizard
-      // α.3 — viewing a screen (Schermen tab "view" sub-mode) → back to
+      // α.3 — viewing a screen (Screens tab "view" sub-mode) → back to
       // the picker (the screens-tab equivalent of returning from a
       // sub-view to the list).
       if (view === 'screens' && screensSubMode === 'view') {
@@ -1384,7 +1384,7 @@ export default function CircleLauncherScreen({
     return () => sub.remove();
   }, [view, selected, creating, menuCircle, screensSubMode]);
 
-  // Bottom tab bar (Screens / Circles / Mij).  α.3 — Schermen is the
+  // Bottom tab bar (Screens / Circles / Mij).  α.3 — Screens is the
   // new primary; Stroom is retired (now lives as the seeded "Stream"
   // screen on the Screens tab).
   const onTab = (id) => {
@@ -1952,7 +1952,7 @@ export default function CircleLauncherScreen({
 
             {/* β.1 — Nearby + Mijn dingen launcher shortcuts removed.
                 Nearby lives under the Mij tab; My-things is a seeded screen
-                under the Schermen tab. */}
+                under the Screens tab. */}
             {circles.length === 0 ? (
               <Text style={styles.muted}>{t('circle.empty')}</Text>
             ) : (
@@ -2323,14 +2323,14 @@ function CircleDetail({
   // handle; the store is a stateless AsyncStorage wrapper, so a second instance is free.
   const overrideStore = useMemo(() => makeMemberOverrideStoreRN(AsyncStorage), []);
   // Per-circle stoop restructure (parity with web circleApp.js `stoopCall`): the
-  // prikbord + scherm noticeboard block call the raw 3-arg `callSkill('stoop', …)`
+  // noticeboard + screen noticeboard block call the raw 3-arg `callSkill('stoop', …)`
   // directly, bypassing scopeReadyDispatch — so scope them to THIS circle here.
   // Writes get the circle id as the stoop scope key; list reads are filtered to the
   // circle. One shared agent, per-circle scope key (NOT N agents). NB: the 3-arg raw
   // dispatch is the `rawCallSkill` PROP (the parent's `bundle.callSkill`) — `bundle`
   // is not in scope in this component.
   // Sealed media (2026-07-11): thread THIS circle's media gateway into the wrapper (4th arg,
-  // web parity with circleApp.js `getStoopMedia`) so a prikbord image attachment seals + rides
+  // web parity with circleApp.js `getStoopMedia`) so a noticeboard image attachment seals + rides
   // the SAME `{type:'media'}` blob pointer basis's own circle chat images use — one
   // circle's gateway per wrapper ⇒ per-circle by construction (no cross-seal). A p0/p1 circle
   // resolves no composition → the wrapper refuses attachments (sealed-only) and the 📎 hides.
@@ -2411,11 +2411,11 @@ function CircleDetail({
     return (list ?? []).some((p) => (p?.pubKey === actor || p?.url === actor)
       && (p?.type === 'a2a' || p?.type === 'hybrid' || (Array.isArray(p?.skills) && p.skills.length > 0)));
   }, [peerGraph]);
-  // Declared HERE (not with the entrust/LEDEN blocks below) because the rows memo reads them: the
+  // Declared HERE (not with the entrust/MEMBERS blocks below) because the rows memo reads them: the
   // viewer signals gate the owner-only entrust action AND the reveal-gated sender labels, and the
   // roster is what the labels resolve against. The circle roster via listGroupMembers (web≡mobile);
   // null = not loaded yet, [] = loaded empty. Loads at circle OPEN (batch 4): the chat tab needs it
-  // for sender labels the moment it paints, not first when LEDEN is opened.
+  // for sender labels the moment it paints, not first when MEMBERS is opened.
   const [mandateViewer, setMandateViewer] = useState({ viewerWebid: null, isAdmin: false });
   const [tabMembers, setTabMembers] = useState(null);
   const [mutedActors, setMutedActors] = useState(new Set());   // the person-mute hide set (web parity)
@@ -2505,7 +2505,7 @@ function CircleDetail({
   // per-circle bottom tabs derived from policy.features.
   const tabs = useMemo(() => buildCircleTabs(policy, t), [policy]);
   const [activeTab, setActiveTab] = useState(DEFAULT_CIRCLE_TAB);
-  // Reset to GESPREK whenever we switch circles so a non-default tab
+  // Reset to CONVERSATION whenever we switch circles so a non-default tab
   // doesn't persist across opens.
   useEffect(() => { setActiveTab(DEFAULT_CIRCLE_TAB); }, [circle?.id]);
 
@@ -2567,7 +2567,7 @@ function CircleDetail({
     return () => { alive = false; };
   }, [activeTab, circle?.id, rawCallSkill, tasksReloadTick]);
 
-  // α.1e — materialized scherm blocks for the active recipe.  null
+  // α.1e — materialized screen blocks for the active recipe.  null
   // until the load below resolves; [] when the book is empty.
   // D1 — `screenReloadTick` bumps after a quickActions tap to re-rank.
   const [screenBlocks, setScreenBlocks] = useState(null);
@@ -2580,7 +2580,7 @@ function CircleDetail({
       try {
         const book = await recipeStore.get(circle.id);
         // D1 (§5A) — fall back to the quickActions-only default recipe so
-        // every scherm leads with the Veel-gebruikt row.
+        // every screen leads with the Veel-gebruikt row.
         const active = getActiveRecipe(book) ?? DEFAULT_SCHERM_RECIPE;
         const blocks = await materializeRecipe({
           recipe:   active,
@@ -2588,7 +2588,7 @@ function CircleDetail({
           // D1 — policy + actionFrequency feed the quickActions block. The block
           // materializers call `callSkill(appOrigin, opId, args)` (3-arg), so pass
           // the RAW 3-arg dispatch, not the 2-arg `callSkill` resolver (#16; also
-          // un-breaks the tasks/agenda scherm blocks that shared the latent bug).
+          // un-breaks the tasks/agenda screen blocks that shared the latent bug).
           // `stoopCall` = the raw 3-arg `rawCallSkill` scoped to this circle (the
           // earlier `bundle?.callSkill` was undefined here — `bundle` isn't a prop).
           hostOps:  {
@@ -2610,11 +2610,11 @@ function CircleDetail({
   }, [recipeStore, circle?.id, callSkill, eventLog, circles, policy, screenReloadTick,
     tabMembers, mandateViewer]);
 
-  // Chat ↔ Scherm pill state (v2 §4 "De Schakelaar").
+  // Chat ↔ Screen pill state (v2 §4 "De mode switch").
   // Per-circle preference persists in AsyncStorage at cc.circleViewMode.
   // §4 — until the member has flipped the pill for this circle, the
   // landing surface is the admin's policy.view front door
-  // (defaultViewModeFromPolicy): 'screen' → scherm, else → chat.
+  // (defaultViewModeFromPolicy): 'screen' → screen, else → chat.
   const [viewMode, setViewModeState] = useState(() => defaultViewModeFromPolicy(policy));
   useEffect(() => {
     let alive = true;
@@ -2625,13 +2625,13 @@ function CircleDetail({
         const raw = await AsyncStorage.getItem('cc.circleViewMode');
         const map = raw ? JSON.parse(raw) : {};
         const saved = map?.[circle.id];
-        if (alive) setViewModeState(saved === 'scherm' || saved === 'chat' ? saved : fallback);
+        if (alive) setViewModeState(saved === 'screen' || saved === 'chat' ? saved : fallback);
       } catch { if (alive) setViewModeState(fallback); }
     })();
     return () => { alive = false; };
   }, [circle?.id, policy]);
   const setViewMode = useCallback(async (mode) => {
-    if (mode !== 'chat' && mode !== 'scherm') return;
+    if (mode !== 'chat' && mode !== 'screen') return;
     setViewModeState(mode);
     if (!circle?.id) return;
     try {
@@ -3043,7 +3043,7 @@ function CircleDetail({
 
   // S6.B — chat-triggered screen panel ({screen} | null) + its materialized blocks.
   const [screenPanel, setScreenPanel] = useState(null);
-  // §2 — the LEDEN-tab card overlay: `{ member, self }` when a member row is tapped
+  // §2 — the MEMBERS-tab card overlay: `{ member, self }` when a member row is tapped
   // (self = the row is the viewer's own → self-view; otherwise the member-persona card).
   const [memberCard, setMemberCard] = useState(null);
   const [panelBlocks, setPanelBlocks] = useState(null);
@@ -3453,7 +3453,7 @@ function CircleDetail({
     const text = composerText.trim();
     if (!text || !eventLog?.append || !circle?.id) return;
     // a slash command opens a declared list-screen (the CHAT entry; web≡mobile).
-    const scr = text.match(/^\/(contacts|prikbord)\b/i);
+    const scr = text.match(/^\/(contacts|noticeboard)\b/i);
     if (scr && sectionForScreen(manifestsByOrigin, scr[1].toLowerCase())) { setComposerText(''); setScreenPanel({ screen: scr[1].toLowerCase() }); return; }
     // G17 — circle/transport slash commands (`/set-relay`, `/transport-mode`, `/settings`, `/transports`)
     // dispatch as BUILT-INS (settings/transport handlers) instead of routing to the bot/LLM. Same shared
@@ -3617,7 +3617,7 @@ function CircleDetail({
         <Pressable onPress={onBack} accessibilityRole="button">
           <Text style={styles.back}>{t('circle.back')}</Text>
         </Pressable>
-        {/* Chat ↔ Scherm pill (v2 §4).
+        {/* Chat ↔ Screen pill (v2 §4).
             React Native's accessibilityRole vocabulary doesn't include
             'group' (that's a web-only ARIA role).  The buttons inside
             carry their own role + accessibilityState; the wrapper just
@@ -3627,7 +3627,7 @@ function CircleDetail({
           accessibilityLabel={t('circle.circle.view_toggle_label')}
           testID="circle-detail-view-toggle"
         >
-          {['chat', 'scherm'].map((mode) => (
+          {['chat', 'screen'].map((mode) => (
             <Pressable
               key={mode}
               accessibilityRole="button"
@@ -3706,21 +3706,21 @@ function CircleDetail({
         </View>
       ) : null}
 
-      {/* body switches by active tab. GESPREK = chat-style
+      {/* body switches by active tab. CONVERSATION = chat-style
           mixed stream; other tabs are placeholders until their content
           surfaces land in follow-up slices.
-          scherm-mode wins over the tab body: the whole pane
+          screen-mode wins over the tab body: the whole pane
           becomes the (placeholder) recept'd page. */}
-      {/* Bulletin restyle — the GESPREK chat stream renders as ONE bot card (mirror of
-          onderling.org's .chatbox / web's circle-circle__chat-card): a header strip (green
+      {/* Bulletin restyle — the CONVERSATION chat stream renders as ONE bot card (mirror of
+          onderling.org's .chatbox / web's circle-view__chat-card): a header strip (green
           presence dot + the circle assistant's name) over the message log, framed by a
-          2px-ink border. The prikbord / scherm / leden tabs keep the plain body. The
+          2px-ink border. The noticeboard / screen / members tabs keep the plain body. The
           header + the bordered scroll are stacked siblings that read as one contiguous
           card (matching 2px-ink sides). */}
       {/* P1.7 — the viewer's conversation filter strip (kinds × people/agents), web parity. Only in the
           conversation view: elsewhere it would read as a control over tabs it does not touch. The chip
           model is shared, so a tap means the same thing on both platforms. */}
-      {viewMode !== 'scherm' && activeTab === 'gesprek' ? (
+      {viewMode !== 'screen' && activeTab === 'conversation' ? (
         <ChatFilterStrip
           model={chatFilterChips({ allowedKinds, filter: viewerFilter })}
           onPick={onChatFilter}
@@ -3728,15 +3728,15 @@ function CircleDetail({
           styles={styles}
         />
       ) : null}
-      {viewMode !== 'scherm' && activeTab === 'gesprek' && botLabel ? (
+      {viewMode !== 'screen' && activeTab === 'conversation' && botLabel ? (
         <View style={styles.chatHead} testID="circle-detail-bot-head">
           <View style={styles.chatDot} />
           <Text style={styles.chatName}>{botLabel}</Text>
         </View>
       ) : null}
       <ScrollView
-        contentContainerStyle={viewMode !== 'scherm' && activeTab === 'gesprek' ? [styles.list, styles.chatListPad] : styles.list}
-        style={viewMode !== 'scherm' && activeTab === 'gesprek' ? styles.chatScroll : undefined}
+        contentContainerStyle={viewMode !== 'screen' && activeTab === 'conversation' ? [styles.list, styles.chatListPad] : styles.list}
+        style={viewMode !== 'screen' && activeTab === 'conversation' ? styles.chatScroll : undefined}
         testID="circle-detail-stream"
         ref={streamScrollRef}
         // "My own message never appears in the Conversation" — it DID appear, at the bottom, below the
@@ -3744,31 +3744,31 @@ function CircleDetail({
         // viewport, so a send into a conversation that already filled the screen looked like a message
         // that had been dropped (it reached the peers the whole time). The sibling chat surface
         // (`ChatScreen`) has had this since it was written; this one never got it.
-        // Gated on the chat tab: the prikbord / leden / taken bodies are lists you read from the top.
+        // Gated on the chat tab: the noticeboard / members / taken bodies are lists you read from the top.
         onContentSizeChange={() => {
-          if (viewMode === 'scherm' || activeTab !== 'gesprek') return;
+          if (viewMode === 'screen' || activeTab !== 'conversation') return;
           streamScrollRef.current?.scrollToEnd?.({ animated: true });
         }}
       >
-        {viewMode === 'scherm' ? (
+        {viewMode === 'screen' ? (
           // α.1e — render the materialized recipe blocks.  CircleScreenView
           // handles per-block status (ok / empty / error) + top-level
           // empty-state when no recipe is set up yet.
           <CircleScreenView blocks={screenBlocks} onAction={onScreenAction}
             onEmbedOpen={({ screen, ref }) => { if (screen) setScreenPanel({ screen, highlightRef: ref }); }} />
-        ) : activeTab === 'prikbord' ? (
+        ) : activeTab === 'noticeboard' ? (
           // S1 #1 — the circle noticeboard (its own composer + post list), scoped to
           // the open circle (S4 per-circle restructure — see stoopCall above).
           <CircleNoticeboard callSkill={stoopCall} onStoopEvent={onStoopEvent} media={circleMedia}
             onPeerMuted={() => setMembersReloadTick((n) => n + 1)}
             onReportPost={onReportPost}
             onEmbedOpen={({ screen, ref }) => { if (screen) setScreenPanel({ screen, highlightRef: ref }); }} />
-        ) : activeTab === 'leden' ? (
-          // LEDEN — the circle's member roster (listGroupMembers → normalizeCircleMembers). web≡mobile.
+        ) : activeTab === 'members' ? (
+          // MEMBERS — the circle's member roster (listGroupMembers → normalizeCircleMembers). web≡mobile.
           tabMembers == null ? (
-            <Text style={styles.placeholder}>{t('circle.leden_tab.loading')}</Text>
+            <Text style={styles.placeholder}>{t('circle.members_tab.loading')}</Text>
           ) : tabMembers.length === 0 ? (
-            <Text style={styles.placeholder}>{t('circle.leden_tab.empty')}</Text>
+            <Text style={styles.placeholder}>{t('circle.members_tab.empty')}</Text>
           ) : (
             tabMembers.map((m) => {
               const isSelf = mandateViewer.viewerWebid != null && m.id === mandateViewer.viewerWebid;
@@ -3792,7 +3792,7 @@ function CircleDetail({
                       return sec ? <Text style={styles.memberName} numberOfLines={1}>{sec}</Text> : null;
                     })()}
                   </View>
-                  {isSelf ? <Text style={styles.memberYou}>{t('circle.leden_tab.you')}</Text> : null}
+                  {isSelf ? <Text style={styles.memberYou}>{t('circle.members_tab.you')}</Text> : null}
                 </Pressable>
               );
             })
@@ -3841,7 +3841,7 @@ function CircleDetail({
               ))
             )}
           </View>
-        ) : activeTab !== 'gesprek' ? (
+        ) : activeTab !== 'conversation' ? (
           <Text style={styles.placeholder}>
             {t('circle.circle.tab_coming', { tab: t(`circle.tabs.${activeTab}`) })}
           </Text>
@@ -3928,7 +3928,7 @@ function CircleDetail({
         </View>
       </Modal>
 
-      {/* §2 — member-persona card / self-view, opened by tapping a LEDEN-tab row. */}
+      {/* §2 — member-persona card / self-view, opened by tapping a MEMBERS-tab row. */}
       <Modal visible={!!memberCard} animationType="slide" transparent onRequestClose={() => setMemberCard(null)}>
         <View style={styles.panelBackdrop}>
           <View style={styles.panelCard}>
@@ -3979,7 +3979,7 @@ function CircleDetail({
       />
 
       {/* 2+-field needsForm → an inline labelled form above the composer (parity with web). */}
-      {pendingForm && viewMode !== 'scherm' && activeTab === 'gesprek' ? (
+      {pendingForm && viewMode !== 'screen' && activeTab === 'conversation' ? (
         <MultiFieldFormBubble pending={pendingForm} onSubmit={onFormSubmit} />
       ) : null}
 
@@ -3987,16 +3987,16 @@ function CircleDetail({
           the local EventLog so the user sees their own write; peer
           broadcast lands in. Slash commands stay as a
           deeper follow-up (would need the chat-shell composition).
-          composer suppressed in scherm-mode (recept page is
+          composer suppressed in screen-mode (recept page is
           not a chat surface). */}
-      {/* S1 #1 — the noticeboard (prikbord) tab owns its own composer. */}
-      {viewMode !== 'scherm' && activeTab === 'prikbord' ? null
-      : viewMode !== 'scherm' && !canPost ? (
+      {/* S1 #1 — the noticeboard (noticeboard) tab owns its own composer. */}
+      {viewMode !== 'screen' && activeTab === 'noticeboard' ? null
+      : viewMode !== 'screen' && !canPost ? (
         /* Permission gate — chat disabled for this circle; read-only note in place of the composer. */
         <Text style={styles.composerDisabled} testID="circle-detail-composer-disabled">
           {t('circle.circle.chat_disabled')}
         </Text>
-      ) : viewMode !== 'scherm' ? (
+      ) : viewMode !== 'screen' ? (
       <>
         {/* Slash-command auto-suggest — sits above the composer, mirrors the web dropdown. Tap a row
             to fill the command + a trailing space (then keep typing args). Hidden when there's no
@@ -4044,8 +4044,8 @@ function CircleDetail({
       {/* per-circle bottom tab bar (derived from policy.features).
           Only renders when there are ≥ 2 tabs (a single-tab circle has
           nothing to switch between).
-          also suppress in scherm-mode. */}
-      {tabs.length >= 2 && viewMode !== 'scherm' ? (
+          also suppress in screen-mode. */}
+      {tabs.length >= 2 && viewMode !== 'screen' ? (
         <View style={styles.circleTabs} testID="circle-detail-tabs">
           {tabs.map((tab) => (
             <Pressable
@@ -4943,7 +4943,7 @@ function MyThingsScreen({ files = [], onBack }) {
  * `insets` — the safe-area insets of the screen this stylesheet is for (`useSafeAreaInsets()`).
  *
  * Every screen in this file is a full-bleed `styles.page` whose FIRST child is a header bar with the
- * `← circles` back button and (on the detail screen) the Chat/Scherm toggle. With a flat 12px top pad
+ * `← circles` back button and (on the detail screen) the Chat/Screen toggle. With a flat 12px top pad
  * those controls render level with the system clock: their upper halves are behind the status bar and
  * simply do not receive touches — `← circles` could not be hit at all. So the inset belongs to `page`,
  * the one style all of them share, rather than to each header.
@@ -5027,8 +5027,8 @@ const makeStyles = (theme, insets = null) => StyleSheet.create({
   moreMenu:       { borderWidth: 1, borderColor: theme.color.line, borderRadius: 8, backgroundColor: theme.color.card, padding: 4, marginTop: 4, marginBottom: 4 },
   moreItem:       { paddingVertical: 9, paddingHorizontal: 12 },
   moreItemText:   { fontSize: 13, color: theme.color.ink },
-  // Bulletin restyle — the GESPREK stream is ONE bot card (mirror of onderling.org's
-  // .chatbox / web's circle-circle__chat-card). The header strip + the bordered scroll
+  // Bulletin restyle — the CONVERSATION stream is ONE bot card (mirror of onderling.org's
+  // .chatbox / web's circle-view__chat-card). The header strip + the bordered scroll
   // are stacked siblings sharing a 2px-ink frame so they read as one card.
   chatHead:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: theme.color.card, borderTopWidth: 2, borderLeftWidth: 2, borderRightWidth: 2, borderColor: theme.color.ink, borderTopLeftRadius: theme.radius.md, borderTopRightRadius: theme.radius.md, borderBottomWidth: 1, borderBottomColor: theme.color.line },
   // P1.7 — the conversation filter strip. Quiet by default; the strip warms when a filter is active so
@@ -5086,7 +5086,7 @@ const makeStyles = (theme, insets = null) => StyleSheet.create({
   circleTabActive:   { borderTopColor: theme.color.accent },
   circleTabText:     { fontSize: 11, color: theme.color.inkSoft, textTransform: 'uppercase', letterSpacing: 1.4 },
   circleTabTextActive:{ color: theme.color.accentInk, fontWeight: '600' },
-  // Chat ↔ Scherm header pill.
+  // Chat ↔ Screen header pill.
   viewToggle:          { flexDirection: 'row', borderWidth: 1, borderColor: theme.color.line, borderRadius: 999, overflow: 'hidden', backgroundColor: theme.color.paper, marginLeft: 'auto', marginRight: 8 },
   viewToggleBtn:       { paddingHorizontal: 12, paddingVertical: 5 },
   viewToggleBtnActive: { backgroundColor: theme.color.accent },

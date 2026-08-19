@@ -73,7 +73,7 @@ describe('pageProjection — selectors over renderWeb(manifest).pages', () => {
 describe('sectionForScreen — section selector over renderWeb(manifest).sections', () => {
   // Built the SAME way circleApp.js builds circleManifestsByOrigin: key each
   // composed manifest under its `app` (+ `appId`).  The real stoop manifest
-  // (step 1a) declares the `contacts` + `prikbord` views.
+  // (step 1a) declares the `contacts` + `noticeboard` views.
   const manifestsByOrigin = {};
   for (const m of [stoopManifest]) {
     if (m.app)   manifestsByOrigin[m.app]   = m;
@@ -89,13 +89,13 @@ describe('sectionForScreen — section selector over renderWeb(manifest).section
     expect(found.section.labelField).toBe('label');
   });
 
-  it('resolves `prikbord` → stoop / listOpen / kind (from the real manifest)', () => {
-    const found = sectionForScreen(manifestsByOrigin, 'prikbord');
+  it('resolves `noticeboard` → stoop / listOpen / kind (from the real manifest)', () => {
+    const found = sectionForScreen(manifestsByOrigin, 'noticeboard');
     expect(found).not.toBeNull();
     expect(found.appOrigin).toBe('stoop');
     expect(found.section.dataSource.skillId).toBe('listOpen');
     expect(found.section.categoryField).toBe('kind');
-    // labelField omitted on the prikbord view → the panel defaults to 'label'.
+    // labelField omitted on the noticeboard view → the panel defaults to 'label'.
     expect(found.section.labelField).toBeUndefined();
   });
 

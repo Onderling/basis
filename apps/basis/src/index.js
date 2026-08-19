@@ -88,7 +88,7 @@ export {
   DEFAULT_CIRCLE_POLICY, normalizeCirclePolicy, mergeCirclePolicy,
   // feature-flag consumption seam.
   isFeatureEnabled, enabledFeatures,
-  // §4 — admin's policy.view → default Chat/Scherm landing surface.
+  // §4 — admin's policy.view → default Chat/Screen landing surface.
   defaultViewModeFromPolicy,
   DEFAULT_MEMBER_OVERRIDE, normalizeMemberOverride, mergeMemberOverride,
   // split @-mention vs every-message push toggles.
@@ -163,7 +163,7 @@ export { buildCommandPool, suggestCommands, createInputHistory } from './v2/comm
 export { beginFollowUp, beginFormFollowUp, completeFollowUp, completeMultiFieldFollowUp, pickPromptKey } from '@onderling/kring-host/followUp';
 // Shared one-line circle bot reply text (web + mobile) — verb-aware Added:/Completed: phrasing.
 export { circleReplyText } from './v2/circleReply.js';
-// 1:1-bot chat gate — the GESPREK assistant-header strip shows ONLY in a genuine 1:1-with-a-bot
+// 1:1-bot chat gate — the CONVERSATION assistant-header strip shows ONLY in a genuine 1:1-with-a-bot
 // chat, hidden on multi-person circles (web ≡ mobile; one shared decision).
 export { oneToOneBotLabel } from './v2/botChat.js';
 // Part D — scope a circle's catalog to its apps (drops basis infra ops like /me); web + mobile.
@@ -182,8 +182,8 @@ export {
   LEGACY_MODE_TO_POLICY, normalizeDataPolicy, resolveCircleDataPolicy,
   circleDataMove, circleStoreMode, circleCatchUpStrategy, circleHasPod,
 } from './v2/circleDataPolicy.js';
-// α.1a/b — scherm "recipe book" model + per-block content materializer
-// (v2 §2 RECEPT · SCHERM-WEERGAVE INRICHTEN).
+// α.1a/b — screen "recipe book" model + per-block content materializer
+// (v2 §2 RECEPT · SCREEN-WEERGAVE INRICHTEN).
 export {
   BLOCK_TYPES, EMPTY_RECIPE_BOOK,
   emptyRecipe, normalizeRecipe, defaultConfigForBlock,
@@ -356,7 +356,7 @@ export {
   buildSharedFiles, sharedFilesFromListFiles,
 } from './v2/folioSharedFilters.js';
 export { VIEWER_KINDS, viewAsDirectory } from './v2/circleViewAs.js';
-// LEDEN tab → member-persona card + self-view (thin projections over the C7 reveal-state +
+// MEMBERS tab → member-persona card + self-view (thin projections over the C7 reveal-state +
 // amount presets `handle → profile → full`).
 export {
   personaAttributes, memberPersonaView, selfViewSplit,

@@ -3,7 +3,7 @@
  *
  * RN counterpart of web's circleScreen.js — consumes the same
  * materialized blocks (`materializeRecipe(...)`) and renders the
- * scherm-mode page.
+ * screen-mode page.
  *
  * Per-type render:
  *   announcement → serif headline card

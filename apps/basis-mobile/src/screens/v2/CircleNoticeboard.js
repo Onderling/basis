@@ -1,8 +1,8 @@
 /**
- * basis-mobile v2 — circle noticeboard / prikbord (RN, S1 #1 parity).
+ * basis-mobile v2 — circle noticeboard / noticeboard (RN, S1 #1 parity).
  *
  * RN mirror of web's `circleNoticeboard.js`: the circle noticeboard inside a
- * circle's PRIKBORD tab — an ask/offer/lend composer and the open-post list with
+ * circle's NOTICEBOARD tab — an ask/offer/lend composer and the open-post list with
  * per-row actions. Self-contained: loads `listOpen` and dispatches `postRequest`/
  * `respondToItem`/`cancelRequest`/`reportPost`/`markReturned` via the injected
  * `callSkill` (the same already-wired stoop ops). Shows the shared circle's posts

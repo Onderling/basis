@@ -322,7 +322,7 @@ describe('renderCircleScreen · D1 (§5A) — quickActions pills', () => {
     expect(pills).toHaveLength(3);
     expect([...pills].map((p) => p.dataset.actionKey)).toEqual(['chat', 'tasks', 'houseRules']);
     // labels resolve via featureActionLabelKey → tab/settings locale keys.
-    expect(pills[0].textContent).toBe('circle.tabs.gesprek');
+    expect(pills[0].textContent).toBe('circle.tabs.conversation');
     expect(pills[2].textContent).toBe('circle.settings.feat.houseRules');
   });
 

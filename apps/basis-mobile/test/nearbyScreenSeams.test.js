@@ -145,7 +145,7 @@ describe('conversation kinds reach mobile identically', () => {
   it('a circle shows the noticeboard, not open chat — the same answer as web', () => {
     const kinds = resolveConversationKinds({ templateKind: 'neighbourhood' });
     expect(kinds).not.toContain('chat-message');
-    expect(kinds).toEqual(expect.arrayContaining(['vraag', 'aanbod']));
+    expect(kinds).toEqual(expect.arrayContaining(['ask', 'offer']));
   });
 
   it("and an admin's choice wins on mobile too", () => {

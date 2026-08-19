@@ -3,7 +3,7 @@
  *
  * Builds the composer's attach control from `renderAttachments(manifest).attachMenu`
  * (the ATTACHMENT projector, a family-(b) peer of renderSlash). It REPLACES the
- * hand-coded 📎 file button that BOTH the prikbord composer (`circleNoticeboard.js`)
+ * hand-coded 📎 file button that BOTH the noticeboard composer (`circleNoticeboard.js`)
  * and the circle composer (`circleView.js`) used to hard-wire — the exact drift a
  * projector should own (invariants #3/#4: one manifest declaration, every surface).
  *

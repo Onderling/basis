@@ -79,10 +79,10 @@ describe('stoop-web smoke (Slice E.1 + E.2 + E.3 + E.4)', () => {
     // mockStoopManifest — they come AFTER the E.x pages so the original
     // four keep their declaration order + indices.  Order = manifest
     // .views[] order (: deterministic declaration order). D-mig-1a
-    // (objective D, step 1a) APPENDED the `prikbord` list-surface view
+    // (objective D, step 1a) APPENDED the `noticeboard` list-surface view
     // (contacts pre-existed; it gained dataSource/label/category fields
     // but its position is unchanged) after `contacts`.
-    expect(nav.sections.map((s) => s.id)).toEqual(['mine', 'privacy', 'settings', 'profile', 'feed', 'contacts', 'prikbord']);
+    expect(nav.sections.map((s) => s.id)).toEqual(['mine', 'privacy', 'settings', 'profile', 'feed', 'contacts', 'noticeboard']);
 
     // D-mig-1a — the two live LIST-screen surfaces now project from the
     // manifest (additive groundwork; the app still reads LIST_SCREENS).
@@ -91,11 +91,11 @@ describe('stoop-web smoke (Slice E.1 + E.2 + E.3 + E.4)', () => {
     expect(contacts.dataSource).toEqual({ skillId: 'listContacts' });
     expect(contacts.labelField).toBe('label');
     expect(contacts.categoryField).toBe('category');
-    const prikbord = nav.sections.find((s) => s.id === 'prikbord');
-    expect(prikbord.itemType).toBe('post');
-    expect(prikbord.dataSource).toEqual({ skillId: 'listOpen' });
-    expect(prikbord.categoryField).toBe('kind');
-    expect(prikbord).not.toHaveProperty('labelField');
+    const noticeboard = nav.sections.find((s) => s.id === 'noticeboard');
+    expect(noticeboard.itemType).toBe('post');
+    expect(noticeboard.dataSource).toEqual({ skillId: 'listOpen' });
+    expect(noticeboard.categoryField).toBe('kind');
+    expect(noticeboard).not.toHaveProperty('labelField');
 
     const mine = nav.sections[0];
     expect(mine.id).toBe('mine');

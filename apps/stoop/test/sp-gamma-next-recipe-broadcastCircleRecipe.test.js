@@ -1,7 +1,7 @@
 /**
  * Stoop γ-next.recipe — broadcastCircleRecipe skill.
  *
- * Mirror of sp-13-2-1-broadcastCircleMessage: fan a circle scherm recipe
+ * Mirror of sp-13-2-1-broadcastCircleMessage: fan a circle screen recipe
  * out to every other member via chat.send (subtype
  * `circle-recipe-broadcast`).  Mocks chat.send so the test captures the
  * per-recipient envelope shape without the full NKN transport plumbing.
@@ -53,7 +53,7 @@ async function buildBundle(members) {
 
 const SAMPLE_RECIPE = {
   id: 'r-1',
-  name: 'Circle scherm',
+  name: 'Circle screen',
   blocks: [{ id: 'b1', type: 'tasks', config: {} }],
 };
 
@@ -198,6 +198,6 @@ describe('Stoop γ-next.recipe — cross-agent: Anne → Bob.pendingStore', () =
     await handler('a', env);
     await handler('a', { ...env, recipe: { ...SAMPLE_RECIPE, name: 'attempted overwrite' } });
     // dedup on msgId kept the first recipe.
-    expect((await pending.get('oosterpoort')).name).toBe('Circle scherm');
+    expect((await pending.get('oosterpoort')).name).toBe('Circle screen');
   });
 });

@@ -5,7 +5,7 @@
  * to add an LLM agent participant must wait for admin approval first.
  * Design shows the request card: "Pieter wil 'notulist'
  * toevoegen aan Selwerd" with Who / What it does / Access details + a
- * [Goedkeur] / [Weiger] / [Vragen…] row.  On unanimous approve, the
+ * [Goedkeur] / [Weiger] / [Asks…] row.  On unanimous approve, the
  * agent joins; on any reject, the request closes.
  *
  * Mirrors the multi-admin consensus shape: pure orchestrator +

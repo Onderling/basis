@@ -5,17 +5,17 @@
  * message stream + inline composer.  No separate chat shell exists; chat
  * IS the circle view.
  *
- * Renders per v2 §1 board "VOORBEELD 1 · CIRCLE":
+ * Renders per v2 §1 board "EXAMPLE 1 · CIRCLE":
  *
  *   [← back]  Circle name  [⋯ more]
- *             N LEDEN · functies meta
+ *             N MEMBERS · functies meta
  *   ─ dated divider ─
  *   ┌─ bubble (sender)
  *   │  text
  *   │  [Ik help] [Negeer]   (per-row action chips)
  *   └─
- *   ┌─ PRIKBORD card
- *   │  "3 nieuwe vragen vandaag."
+ *   ┌─ NOTICEBOARD card
+ *   │  "3 nieuwe asks vandaag."
  *   └─
  *   ┌─ AANKONDIGING card
  *   │  "Circle drinks zaterdag 17u"
@@ -31,8 +31,8 @@
  *   - `more`          overflow-menu callbacks (settings / mine / files / …)
  *   - `composerPlaceholder`  circle-specific placeholder text (optional)
  *
- * Per-circle bottom tabs (GESPREK / PRIKBORD / LEDEN etc.) live in
- * ; this slice focuses on the GESPREK render.
+ * Per-circle bottom tabs (CONVERSATION / NOTICEBOARD / MEMBERS etc.) live in
+ * ; this slice focuses on the CONVERSATION render.
  */
 
 import { actionsForStreamRow } from '../../src/v2/streamActions.js';
@@ -71,7 +71,7 @@ export function renderCircleView(container, {
   more = null,
   composerPlaceholder = null,
   composerPrefill = null,   // convergence — the ✏ edit opens the composer with the point's current text
-  // The label shown in the GESPREK chat-card's assistant-header strip (green presence
+  // The label shown in the CONVERSATION chat-card's assistant-header strip (green presence
   // dot + this name). GATE: the host computes it via the shared `oneToOneBotLabel` and
   // passes a non-empty string ONLY for a genuine 1:1-with-a-bot chat; on a group circle
   // (or a 1:1-with-a-human) it passes null → NO strip. The localized default
@@ -83,20 +83,20 @@ export function renderCircleView(container, {
   // exactly as before. The shell holds no filter logic: each chip already carries its `nextFilter`.
   chatFilter = null,
   onChatFilter = null,
-  // per-circle bottom tabs (board Voorbeeld 1-3).
+  // per-circle bottom tabs (board Example 1-3).
   // `tabs`     `[{id, label}]` produced by `buildCircleTabs(policy, t)`
-  // `activeTab` current tab id (defaults to first / 'gesprek')
+  // `activeTab` current tab id (defaults to first / 'conversation')
   // `onTab(id)` host switches its content render when a tab is tapped
   tabs = null,
   activeTab = null,
   onTab,
-  // Chat ↔ Scherm header pill (v2 §4 board "De Schakelaar").
-  // `viewMode`   one of 'chat' | 'scherm' (default 'chat')
+  // Chat ↔ Screen header pill (v2 §4 board "De mode switch").
+  // `viewMode`   one of 'chat' | 'screen' (default 'chat')
   // `onViewMode(mode)`  host flips between the chat-style stream and
-  //   the admin-recept'd scherm-weergave.
+  //   the admin-recept'd screen-weergave.
   viewMode = 'chat',
   onViewMode,
-  // α.1c — materialized scherm blocks (circleRecipeBlocks.materializeRecipe).
+  // α.1c — materialized screen blocks (circleRecipeBlocks.materializeRecipe).
   // null = host hasn't loaded yet (show empty-state placeholder);
   // [] = book is empty; [...] = render each block via circleScreen.
   screenBlocks = null,
@@ -135,7 +135,7 @@ export function renderCircleView(container, {
   // needsForm still elicits conversationally (one bubble + the next message); this is the 2+ case only.
   pendingForm = null,
   onFormSubmit = null,
-  // S1 #1 — noticeboard (prikbord tab). When the active tab is `prikbord`, the body
+  // S1 #1 — noticeboard (noticeboard tab). When the active tab is `noticeboard`, the body
   // renders the circle noticeboard (post composer + open posts) instead of the
   // tab-coming placeholder, and the chat composer is suppressed (the noticeboard has
   // its own). `null` = host hasn't loaded it → falls back to the placeholder.
@@ -150,7 +150,7 @@ export function renderCircleView(container, {
   //   `onAddTask()` — the tab's compose affordance (host adds a task, then refreshes).
   tasks = null,
   onAddTask = null,
-  // G16 — the real LEDEN (members) tab. When the active tab is `leden`, the body
+  // G16 — the real MEMBERS (members) tab. When the active tab is `members`, the body
   // lists the circle's trail-roster (the canonical Member via `normalizeCircleMembers`),
   // one tappable row per member. `members` is the host-loaded roster
   // (`[{ id, handle, realName, reveals }]`); `null` = not loaded yet → loading state,
@@ -173,7 +173,7 @@ export function renderCircleView(container, {
   onAttachMedia = null,
   media = null,
   // (J4) — the ATTACHMENT projector's menu for the chat composer's "+". Same
-  // contract as the prikbord composer: `attachMenu` is
+  // contract as the noticeboard composer: `attachMenu` is
   // `renderAttachments(basisManifest).attachMenu` (host-computed); the FILE entry
   // (`attachFileOpId`) routes through the media pipeline (`onAttachMedia`), every
   // other entry dispatches via `onAttachCommand(entry)` (host → callSkill).
@@ -188,36 +188,36 @@ export function renderCircleView(container, {
 } = {}) {
   const tr = typeof t === 'function' ? t : (k) => k;
   container.innerHTML = '';
-  container.classList.add('circle-circle');
+  container.classList.add('circle-view');
 
   // Header — back · title · more.
   const header = document.createElement('div');
-  header.className = 'circle-circle__header';
+  header.className = 'circle-view__header';
 
   const back = document.createElement('button');
   back.type = 'button';
-  back.className = 'circle-circle__back';
+  back.className = 'circle-view__back';
   back.textContent = tr('circle.back');
   back.addEventListener('click', () => { if (typeof onBack === 'function') onBack(); });
   header.appendChild(back);
 
   const title = document.createElement('h2');
-  title.className = 'circle-circle__title';
+  title.className = 'circle-view__title';
   title.textContent = circle.name || circle.id || '';
   header.appendChild(title);
 
-  // Chat ↔ Scherm pill (v2 §4 board "De Schakelaar").
+  // Chat ↔ Screen pill (v2 §4 board "De mode switch").
   // Only renders when the host wires `onViewMode`; otherwise the
   // header stays clean (some hosts may want to suppress it).
   if (typeof onViewMode === 'function') {
     const toggle = document.createElement('div');
-    toggle.className = 'circle-circle__view-toggle';
+    toggle.className = 'circle-view__view-toggle';
     toggle.setAttribute('role', 'group');
     toggle.setAttribute('aria-label', tr('circle.circle.view_toggle_label'));
-    for (const mode of ['chat', 'scherm']) {
+    for (const mode of ['chat', 'screen']) {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'circle-circle__view-toggle-btn';
+      btn.className = 'circle-view__view-toggle-btn';
       btn.dataset.viewMode = mode;
       if (mode === viewMode) btn.classList.add('is-active');
       btn.setAttribute('aria-pressed', mode === viewMode ? 'true' : 'false');
@@ -234,11 +234,11 @@ export function renderCircleView(container, {
   if (moreActions.length > 0) {
     const moreBtn = document.createElement('button');
     moreBtn.type = 'button';
-    moreBtn.className = 'circle-circle__more';
+    moreBtn.className = 'circle-view__more';
     moreBtn.setAttribute('aria-label', tr('circle.circle.more'));
     moreBtn.textContent = '⋯';
     moreBtn.addEventListener('click', () => {
-      const menu = container.querySelector('.circle-circle__more-menu');
+      const menu = container.querySelector('.circle-view__more-menu');
       if (menu) menu.classList.toggle('is-open');
     });
     header.appendChild(moreBtn);
@@ -247,18 +247,18 @@ export function renderCircleView(container, {
 
   if (circle.memberCount != null) {
     const meta = document.createElement('div');
-    meta.className = 'circle-circle__meta';
+    meta.className = 'circle-view__meta';
     meta.textContent = tr('circle.members', { count: circle.memberCount });
     container.appendChild(meta);
   }
 
   if (moreActions.length > 0) {
     const menu = document.createElement('div');
-    menu.className = 'circle-circle__more-menu';
+    menu.className = 'circle-view__more-menu';
     for (const a of moreActions) {
       const item = document.createElement('button');
       item.type = 'button';
-      item.className = 'circle-circle__more-item';
+      item.className = 'circle-view__more-item';
       item.dataset.action = a.id;
       item.textContent = a.label;
       item.addEventListener('click', () => {
@@ -270,37 +270,37 @@ export function renderCircleView(container, {
     container.appendChild(menu);
   }
 
-  // body switches by active tab. GESPREK = the chat-style
+  // body switches by active tab. CONVERSATION = the chat-style
   // bubble stream + day-dividers; all other tabs are placeholders for
   // now (per-tab content lands in -followups). Composer stays
-  // pinned at the bottom regardless — per v2 §1 all 3 voorbeeld boards
+  // pinned at the bottom regardless — per v2 §1 all 3 example boards
   // show the composer present whatever the body is.
   // `??` would treat the `Array.isArray && tabs[0]?.id` short-circuit's
   // false as non-nullish; fall back through plain `||` instead so the
-  // no-tabs case ends up on 'gesprek' (the GESPREK render path).
+  // no-tabs case ends up on 'conversation' (the CONVERSATION render path).
   const firstTabId = Array.isArray(tabs) && tabs.length > 0 ? tabs[0].id : null;
-  const effectiveTab = activeTab || firstTabId || 'gesprek';
+  const effectiveTab = activeTab || firstTabId || 'conversation';
   // S1 #1 — in the noticeboard tab the body owns its own composer, so the chat
   // composer + inline form below are suppressed.
-  const inPrikbord = effectiveTab === 'prikbord' && !!noticeboard;
+  const inPrikbord = effectiveTab === 'noticeboard' && !!noticeboard;
   // P1.7 — the filter strip, above the stream and only in the conversation view. Rendering it only
   // where it applies keeps it from reading as a global control over tabs it does not touch.
-  if (chatFilter && typeof onChatFilter === 'function' && effectiveTab === 'gesprek' && viewMode !== 'scherm') {
+  if (chatFilter && typeof onChatFilter === 'function' && effectiveTab === 'conversation' && viewMode !== 'screen') {
     container.appendChild(buildChatFilterStrip(chatFilter, onChatFilter, tr));
   }
 
   const body = document.createElement('div');
-  body.className = 'circle-circle__list';
+  body.className = 'circle-view__list';
   body.dataset.activeTab = effectiveTab;
   body.dataset.viewMode  = viewMode;
-  if (viewMode === 'scherm') {
+  if (viewMode === 'screen') {
     // α.1c — render the materialized recipe blocks.  `screenBlocks`
     // is an array from circleRecipeBlocks.materializeRecipe; null
     // means "host hasn't loaded yet" — show the empty-state for
     // a clean first paint.  circleScreen handles per-block status
     // (ok / empty / error) internally.
     renderCircleScreen(body, { blocks: screenBlocks ?? [], t: tr, onAction: onScreenAction, onEmbedOpen });
-  } else if (effectiveTab === 'prikbord' && noticeboard) {
+  } else if (effectiveTab === 'noticeboard' && noticeboard) {
     // S1 #1 — the circle noticeboard (its own composer + post list).
     renderCircleNoticeboard(body, {
       posts:    noticeboard.posts ?? [],
@@ -325,19 +325,19 @@ export function renderCircleView(container, {
       tasks: Array.isArray(tasks) ? tasks : [],
       tr, onAction, onAddTask, viewerWebid, viewerIsAdmin,
     });
-  } else if (effectiveTab === 'leden') {
+  } else if (effectiveTab === 'members') {
     // G16 — the real member roster (trail-derived), one tappable row per member.
     renderLedenTab(body, { members, selfWebid, revealPolicy, tr, onMemberTap });
-  } else if (effectiveTab !== 'gesprek') {
+  } else if (effectiveTab !== 'conversation') {
     const placeholder = document.createElement('div');
-    placeholder.className = 'circle-circle__placeholder';
+    placeholder.className = 'circle-view__placeholder';
     placeholder.textContent = tr('circle.circle.tab_coming', {
       tab: tr(`circle.tabs.${effectiveTab}`),
     });
     body.appendChild(placeholder);
   } else if (!rows.length) {
     const empty = document.createElement('div');
-    empty.className = 'circle-circle__empty';
+    empty.className = 'circle-view__empty';
     empty.textContent = tr('circle.circle.empty');
     body.appendChild(empty);
   } else {
@@ -363,29 +363,29 @@ export function renderCircleView(container, {
     }
   }
 
-  // Bulletin restyle — the GESPREK chat stream renders as ONE bot card: a header
+  // Bulletin restyle — the CONVERSATION chat stream renders as ONE bot card: a header
   // strip (a green presence dot + the circle assistant's name) sitting over the message
   // log, in a single 2px-ink-bordered card (mirrors onderling.org's `.chatbox`). The
-  // prikbord / scherm tabs keep the plain body — they aren't the assistant conversation.
-  const isChatStream = viewMode !== 'scherm' && effectiveTab === 'gesprek';
+  // noticeboard / screen tabs keep the plain body — they aren't the assistant conversation.
+  const isChatStream = viewMode !== 'screen' && effectiveTab === 'conversation';
   if (isChatStream) {
     const card = document.createElement('div');
-    card.className = 'circle-circle__chat-card';
+    card.className = 'circle-view__chat-card';
     // Gate — the assistant-header strip (green dot + bot name) shows ONLY in a
     // genuine 1:1-with-a-bot chat. The host computes `botLabel` via the shared
     // `oneToOneBotLabel` gate; a non-empty string means "this IS a 1:1 bot chat"
     // (the localized fallback now rides through the helper, not an always-on `||`
     // here). Null/empty → group or 1:1-human → NO strip. The chat CARD itself still
-    // renders for the gesprek stream — only the HEAD is gated.
+    // renders for the conversation stream — only the HEAD is gated.
     if (botLabel) {
       const head = document.createElement('div');
-      head.className = 'circle-circle__bot-head';
+      head.className = 'circle-view__bot-head';
       const dot = document.createElement('span');
-      dot.className = 'circle-circle__bot-dot';
+      dot.className = 'circle-view__bot-dot';
       dot.setAttribute('aria-hidden', 'true');
       head.appendChild(dot);
       const name = document.createElement('span');
-      name.className = 'circle-circle__bot-name';
+      name.className = 'circle-view__bot-name';
       name.textContent = botLabel;
       head.appendChild(name);
       card.appendChild(head);
@@ -398,34 +398,34 @@ export function renderCircleView(container, {
 
   // Multi-field inline form (mobile parity). Rendered between the stream and the composer when the host
   // has a `pendingForm` (a 2+-missing-field needsForm). Pure render: the host owns the pending state and
-  // the submit handler. Suppressed in scherm-mode (not a chat surface). See `renderPendingForm`.
-  if (pendingForm && viewMode !== 'scherm' && !inPrikbord && typeof onFormSubmit === 'function') {
+  // the submit handler. Suppressed in screen-mode (not a chat surface). See `renderPendingForm`.
+  if (pendingForm && viewMode !== 'screen' && !inPrikbord && typeof onFormSubmit === 'function') {
     container.appendChild(renderPendingForm(pendingForm, { tr, onFormSubmit }));
   }
 
-  // Composer — text input + send button.  Suppressed in scherm-mode
+  // Composer — text input + send button.  Suppressed in screen-mode
   // because the recept'd page isn't a chat surface; user flips back
-  // to Chat to write something.  Also suppressed in the prikbord tab (it
+  // to Chat to write something.  Also suppressed in the noticeboard tab (it
   // renders its own post composer).
   if (inPrikbord) {
     // no chat composer — the noticeboard body owns posting
-  } else if (typeof onSend === 'function' && viewMode !== 'scherm' && !canPost) {
+  } else if (typeof onSend === 'function' && viewMode !== 'screen' && !canPost) {
     // Permission gate — chat is disabled for this circle; show a read-only note in place of the composer.
     const note = document.createElement('div');
-    note.className = 'circle-circle__composer-disabled';
+    note.className = 'circle-view__composer-disabled';
     note.setAttribute('role', 'note');
     note.textContent = tr('circle.circle.chat_disabled');
     container.appendChild(note);
-  } else if (typeof onSend === 'function' && viewMode !== 'scherm') {
+  } else if (typeof onSend === 'function' && viewMode !== 'screen') {
     const form = document.createElement('form');
-    form.className = 'circle-circle__composer';
+    form.className = 'circle-view__composer';
     form.setAttribute('autocomplete', 'off');
 
     // Slash-command auto-suggest dropdown (rendered first, positioned ABOVE the input via CSS). Hidden
     // until the user types a "/command" word; populated from the injected catalog. Mirrors the classic
     // shell (#cmd-suggest); behaviour ported into the shared `suggestCommands`.
     const suggestEl = document.createElement('ul');
-    suggestEl.className = 'circle-circle__suggest';
+    suggestEl.className = 'circle-view__suggest';
     suggestEl.setAttribute('role', 'listbox');
     suggestEl.hidden = true;
     form.appendChild(suggestEl);
@@ -434,18 +434,18 @@ export function renderCircleView(container, {
     // 📎). The FILE entry still routes through the sealed media pipeline
     // (`onAttachMedia`) — a p0/p1 circle wires no `onAttachMedia`, so the file entry
     // drops and only dispatchable entries (if any) remain. The menu is projected
-    // from the manifest via renderAttachments (shared with the prikbord composer).
+    // from the manifest via renderAttachments (shared with the noticeboard composer).
     const attachControl = buildAttachControl({
       attachMenu, attachFileOpId,
       onAttach: onAttachMedia, onAttachCommand,
-      cls: (s) => `circle-circle__${s}`,
+      cls: (s) => `circle-view__${s}`,
       tr, menuLabelKey: 'circle.circle.attach',
     });
     if (attachControl) form.appendChild(attachControl);
 
     const input = document.createElement('input');
     input.type = 'text';
-    input.className = 'circle-circle__composer-input';
+    input.className = 'circle-view__composer-input';
     input.placeholder = composerPlaceholder ?? tr('circle.circle.composer_placeholder');
     input.setAttribute('aria-label', tr('circle.circle.composer_placeholder'));
     if (composerPrefill) { input.value = composerPrefill; setTimeout(() => { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }, 0); }
@@ -453,7 +453,7 @@ export function renderCircleView(container, {
 
     const send = document.createElement('button');
     send.type = 'submit';
-    send.className = 'circle-circle__composer-send';
+    send.className = 'circle-view__composer-send';
     send.setAttribute('aria-label', tr('circle.circle.send'));
     send.textContent = '↑';
     form.appendChild(send);
@@ -469,16 +469,16 @@ export function renderCircleView(container, {
       if (activeIdx < 0 || activeIdx >= matches.length) activeIdx = 0;
       matches.forEach((m, i) => {
         const li = document.createElement('li');
-        li.className = `circle-circle__suggest-item${i === activeIdx ? ' is-active' : ''}`;
+        li.className = `circle-view__suggest-item${i === activeIdx ? ' is-active' : ''}`;
         li.setAttribute('role', 'option');
         li.setAttribute('aria-selected', i === activeIdx ? 'true' : 'false');
         const cmd = document.createElement('span');
-        cmd.className = 'circle-circle__suggest-cmd';
+        cmd.className = 'circle-view__suggest-cmd';
         cmd.textContent = m.command;
         li.appendChild(cmd);
         if (m.hint) {
           const hint = document.createElement('span');
-          hint.className = 'circle-circle__suggest-hint';
+          hint.className = 'circle-view__suggest-hint';
           hint.textContent = m.hint;
           li.appendChild(hint);
         }
@@ -543,16 +543,16 @@ export function renderCircleView(container, {
   // list with ≥ 2 entries is supplied (a single-tab circle has no
   // bar to switch on).  The launcher's global Circles/Stroom/Mij
   // bar sits in a different DOM root, so the two never collide.
-  // also suppress in scherm-mode (scherm is one canonical
+  // also suppress in screen-mode (screen is one canonical
   // page, no sub-tabs).
-  if (Array.isArray(tabs) && tabs.length >= 2 && viewMode !== 'scherm') {
+  if (Array.isArray(tabs) && tabs.length >= 2 && viewMode !== 'screen') {
     const bar = document.createElement('nav');
-    bar.className = 'circle-circle__tabs';
+    bar.className = 'circle-view__tabs';
     bar.setAttribute('aria-label', tr('circle.circle.tabs_label'));
     for (const tab of tabs) {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'circle-circle__tab';
+      btn.className = 'circle-view__tab';
       btn.dataset.tab = tab.id;
       if (tab.id === effectiveTab) btn.classList.add('is-active');
       btn.textContent = tab.label ?? tr(tab.labelKey);
@@ -566,7 +566,7 @@ export function renderCircleView(container, {
 
   // The newest bubble must be the one you can SEE.
   //
-  // Bubbles render oldest-first into `.circle-circle__list`, which is its own `overflow-y: auto` box, and
+  // Bubbles render oldest-first into `.circle-view__list`, which is its own `overflow-y: auto` box, and
   // this renderer rebuilds that box from scratch on every repaint — so it came back scrolled to the TOP
   // and the message just sent sat below the fold. It reads exactly like a message that was dropped, which
   // is the same complaint the mobile Conversation produced from the same cause (web ≡ mobile).
@@ -597,14 +597,14 @@ export function renderCircleView(container, {
  */
 function renderTakenTab(body, { tasks = [], tr, onAction, onAddTask, viewerWebid = null, viewerIsAdmin = false } = {}) {
   const wrap = document.createElement('div');
-  wrap.className = 'circle-circle__taken';
+  wrap.className = 'circle-view__taken';
 
   // Compose affordance — add a task straight from the tab. `/addtask` in the composer
   // lands here too (both flow through the tasks agent); this is the explicit button.
   if (typeof onAddTask === 'function') {
     const add = document.createElement('button');
     add.type = 'button';
-    add.className = 'circle-circle__taken-add';
+    add.className = 'circle-view__taken-add';
     add.textContent = tr('circle.circle.taken_add');
     add.addEventListener('click', () => onAddTask());
     wrap.appendChild(add);
@@ -612,7 +612,7 @@ function renderTakenTab(body, { tasks = [], tr, onAction, onAddTask, viewerWebid
 
   if (!tasks.length) {
     const empty = document.createElement('div');
-    empty.className = 'circle-circle__taken-empty';
+    empty.className = 'circle-view__taken-empty';
     empty.textContent = tr('circle.circle.taken_empty');
     wrap.appendChild(empty);
     body.appendChild(wrap);
@@ -621,17 +621,17 @@ function renderTakenTab(body, { tasks = [], tr, onAction, onAddTask, viewerWebid
 
   for (const row of tasks) {
     const card = document.createElement('div');
-    card.className = 'circle-circle__task';
+    card.className = 'circle-view__task';
     card.dataset.taskId = row.taskId ?? '';
 
     const textEl = document.createElement('div');
-    textEl.className = 'circle-circle__task-text';
+    textEl.className = 'circle-view__task-text';
     textEl.textContent = row.text || tr('circle.circle.taken_untitled');
     card.appendChild(textEl);
 
     const status = row.status ?? 'open';
     const statusEl = document.createElement('span');
-    statusEl.className = `circle-circle__task-status circle-circle__task-status--${status}`;
+    statusEl.className = `circle-view__task-status circle-view__task-status--${status}`;
     statusEl.textContent = tr(`circle.taskStatus.${status}`, { defaultValue: status });
     card.appendChild(statusEl);
 
@@ -639,12 +639,12 @@ function renderTakenTab(body, { tasks = [], tr, onAction, onAddTask, viewerWebid
     const actions = actionsForStreamRow(row, { viewerWebid, isAdmin: viewerIsAdmin });
     if (actions.length) {
       const actRow = document.createElement('div');
-      actRow.className = 'circle-circle__task-actions';
+      actRow.className = 'circle-view__task-actions';
       for (const a of actions) {
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'circle-circle__bubble-action';
-        if (a.action === 'mandate') btn.classList.add('circle-circle__bubble-action--mandate');
+        btn.className = 'circle-view__bubble-action';
+        if (a.action === 'mandate') btn.classList.add('circle-view__bubble-action--mandate');
         btn.dataset.action = a.action;
         btn.textContent = tr(a.label);
         btn.addEventListener('click', () => { if (typeof onAction === 'function') onAction(a, row); });
@@ -658,7 +658,7 @@ function renderTakenTab(body, { tasks = [], tr, onAction, onAddTask, viewerWebid
 }
 
 /**
- * G16 — LEDEN (members) tab body: one tappable row per member of the circle's
+ * G16 — MEMBERS (members) tab body: one tappable row per member of the circle's
  * trail-roster (`normalizeCircleMembers` → canonical Member). A row shows the
  * member's handle + real name (whatever the roster carries); the viewer's own row
  * is badged "jij". Tapping a row calls `onMemberTap(member)` — the host opens the
@@ -669,20 +669,20 @@ function renderTakenTab(body, { tasks = [], tr, onAction, onAddTask, viewerWebid
  */
 function renderLedenTab(body, { members = null, selfWebid = null, revealPolicy = 'pairwise', tr, onMemberTap } = {}) {
   const wrap = document.createElement('div');
-  wrap.className = 'circle-circle__leden';
+  wrap.className = 'circle-view__leden';
 
   if (members == null) {
     const loading = document.createElement('div');
-    loading.className = 'circle-circle__leden-loading';
-    loading.textContent = tr('circle.leden_tab.loading');
+    loading.className = 'circle-view__leden-loading';
+    loading.textContent = tr('circle.members_tab.loading');
     wrap.appendChild(loading);
     body.appendChild(wrap);
     return;
   }
   if (!members.length) {
     const empty = document.createElement('div');
-    empty.className = 'circle-circle__leden-empty';
-    empty.textContent = tr('circle.leden_tab.empty');
+    empty.className = 'circle-view__leden-empty';
+    empty.textContent = tr('circle.members_tab.empty');
     wrap.appendChild(empty);
     body.appendChild(wrap);
     return;
@@ -692,7 +692,7 @@ function renderLedenTab(body, { members = null, selfWebid = null, revealPolicy =
     const self = selfWebid != null && m.id === selfWebid;
     const row = document.createElement('button');
     row.type = 'button';
-    row.className = `circle-circle__member${self ? ' circle-circle__member--self' : ''}`;
+    row.className = `circle-view__member${self ? ' circle-view__member--self' : ''}`;
     row.dataset.memberId = m.id ?? '';
     if (self) row.dataset.self = 'true';
 
@@ -700,22 +700,22 @@ function renderLedenTab(body, { members = null, selfWebid = null, revealPolicy =
     // computed, never read straight off the row — an unrevealed member shows their handle, not their name.
     const label = revealedMemberLabel(m, { viewerId: selfWebid, policy: revealPolicy });
     const primary = document.createElement('span');
-    primary.className = 'circle-circle__member-primary';
+    primary.className = 'circle-view__member-primary';
     primary.textContent = label.primary;
     row.appendChild(primary);
 
     // The real name as a secondary line — only when this viewer may actually see it.
     if (label.secondary) {
       const secondary = document.createElement('span');
-      secondary.className = 'circle-circle__member-secondary';
+      secondary.className = 'circle-view__member-secondary';
       secondary.textContent = label.secondary;
       row.appendChild(secondary);
     }
 
     if (self) {
       const badge = document.createElement('span');
-      badge.className = 'circle-circle__member-you';
-      badge.textContent = tr('circle.leden_tab.you');
+      badge.className = 'circle-view__member-you';
+      badge.textContent = tr('circle.members_tab.you');
       row.appendChild(badge);
     }
 
@@ -744,7 +744,7 @@ function renderBubble(row, {
   onReportMessage = null,
 } = {}) {
   const el = document.createElement('div');
-  el.className = 'circle-circle__bubble';
+  el.className = 'circle-view__bubble';
   el.dataset.rowId = row.id ?? '';
 
   // Bulletin restyle — the LLM-forward consent/handoff card. A bot bubble carrying
@@ -753,7 +753,7 @@ function renderBubble(row, {
   // doorsturen" / "nee, ik kies zelf" pair (rendered + wired by the embedButtons path
   // below). SEAM: nothing emits a consent bubble in the circle yet — this restyle lights
   // up when the LLM-forward consent flow stamps one. No backend consent logic is invented.
-  if (row.event?.payload?.consent) el.classList.add('circle-circle__bubble--consent');
+  if (row.event?.payload?.consent) el.classList.add('circle-view__bubble--consent');
 
   // Bulletin restyle — my own chat messages align right (me-bg block, no sender
   // header).  Same condition the delivery icon uses: a locally-authored
@@ -761,7 +761,7 @@ function renderBubble(row, {
   const isMine = localActor != null
     && row?.actor === localActor
     && (row?.type === 'chat-message' || row?.event?.type === 'chat-message');
-  if (isMine) el.classList.add('circle-circle__bubble--mine');
+  if (isMine) el.classList.add('circle-view__bubble--mine');
 
   // Sender label (top, small mono) — others'/bot bubbles only; my own name is noise.
   // Stamped by `chatRows` through the reveal ladder (batch 4) — the renderer only paints. An
@@ -772,7 +772,7 @@ function renderBubble(row, {
     : (row?.senderLabel ?? (row?.senderLabelKey ? tr(row.senderLabelKey) : null));
   if (senderText && !isMine) {
     const sender = document.createElement('div');
-    sender.className = 'circle-circle__bubble-sender';
+    sender.className = 'circle-view__bubble-sender';
     sender.textContent = senderText;
     el.appendChild(sender);
   }
@@ -786,16 +786,16 @@ function renderBubble(row, {
   if (_payload && _payload.kind === 'chat-message') {
     const scope = _payload.scope === 'circle' ? 'circle' : 'self';
     scopeEl = document.createElement('span');
-    scopeEl.className = `circle-circle__scope circle-circle__scope--${scope}`;
+    scopeEl.className = `circle-view__scope circle-view__scope--${scope}`;
     scopeEl.textContent = tr(`circle.scope.${scope}`);
   }
 
-  // Kind pill (small, inline before text — matches the v2 PRIKBORD card
+  // Kind pill (small, inline before text — matches the v2 NOTICEBOARD card
   // shape).  For chat-only messages the kind is null and no pill renders.
   const kind = pickKindLabel(row);
   if (kind) {
     const tag = document.createElement('span');
-    tag.className = 'circle-circle__bubble-kind';
+    tag.className = 'circle-view__bubble-kind';
     tag.textContent = kind;
     el.appendChild(tag);
   }
@@ -806,7 +806,7 @@ function renderBubble(row, {
   const reviewData = row.event?.payload?.review;
   const fullText = pickRowText(row) ?? tr(`circle.streamAction.${row.type ?? 'unknown'}`) ?? '';
   const text = document.createElement('div');
-  text.className = 'circle-circle__bubble-text';
+  text.className = 'circle-view__bubble-text';
   if (reviewData) {
     try { el.appendChild(renderReviewCards(reviewData, tr, (b) => { if (typeof onReview === 'function') onReview(b, row); })); }
     catch { text.textContent = fullText; el.appendChild(text); }   // any render failure → the intro text still stands
@@ -820,7 +820,7 @@ function renderBubble(row, {
       let open = false;
       const toggle = document.createElement('button');
       toggle.type = 'button';
-      toggle.className = 'circle-circle__bubble-more';
+      toggle.className = 'circle-view__bubble-more';
       const paint = () => {
         text.textContent = open ? fullText : `${head}…`;
         toggle.textContent = tr(open ? 'circle.feedback.show_less' : 'circle.feedback.show_more', { defaultValue: open ? 'Show less' : 'Show more' });
@@ -856,7 +856,7 @@ function renderBubble(row, {
   const provenance = row.event?.payload?.provenance;
   if (provenance != null && row.event?.actor === 'bot') {
     const prov = document.createElement('div');
-    prov.className = 'circle-circle__bubble-provenance';
+    prov.className = 'circle-view__bubble-provenance';
     if (typeof provenance === 'string') {
       prov.textContent = provenance;
     } else {
@@ -872,12 +872,12 @@ function renderBubble(row, {
   const actions = actionsForStreamRow(row, { viewerWebid, isAdmin: viewerIsAdmin, isOwn: rowIsOwn });
   if (actions.length) {
     const actRow = document.createElement('div');
-    actRow.className = 'circle-circle__bubble-actions';
+    actRow.className = 'circle-view__bubble-actions';
     for (const a of actions) {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'circle-circle__bubble-action';
-      if (a.action === 'mandate') btn.classList.add('circle-circle__bubble-action--mandate');
+      btn.className = 'circle-view__bubble-action';
+      if (a.action === 'mandate') btn.classList.add('circle-view__bubble-action--mandate');
       btn.dataset.action = a.action;
       btn.textContent = tr(a.label);
       btn.addEventListener('click', () => {
@@ -893,7 +893,7 @@ function renderBubble(row, {
   if (typeof onReportMessage === 'function' && !rowIsOwn && row?.actor !== 'bot' && row?.id) {
     const rep = document.createElement('button');
     rep.type = 'button';
-    rep.className = 'circle-circle__bubble-report';
+    rep.className = 'circle-view__bubble-report';
     rep.textContent = tr('circle.governance.report_message');
     rep.addEventListener('click', () => onReportMessage(row.id, row));
     el.appendChild(rep);
@@ -915,9 +915,9 @@ function renderBubble(row, {
   const msgEmbeds = embedChipsOf(row.event?.payload);
   if (msgEmbeds.length) {
     const wrap = document.createElement('div');
-    wrap.className = 'circle-circle__embeds';
+    wrap.className = 'circle-view__embeds';
     const heading = document.createElement('span');
-    heading.className = 'circle-circle__embeds-label';
+    heading.className = 'circle-view__embeds-label';
     heading.textContent = tr('circle.embed.see_also');
     wrap.appendChild(heading);
     for (const e of msgEmbeds) {
@@ -925,7 +925,7 @@ function renderBubble(row, {
       const tappable = !!(screen && !e.locked && typeof onEmbedOpen === 'function');
       const chip = document.createElement(tappable ? 'button' : 'span');
       if (tappable) chip.type = 'button';
-      chip.className = `circle-circle__embed circle-circle__embed--${e.type}${tappable ? ' circle-circle__embed--tappable' : ''}`;
+      chip.className = `circle-view__embed circle-view__embed--${e.type}${tappable ? ' circle-view__embed--tappable' : ''}`;
       chip.dataset.ref = e.ref;
       const typeKey = embedTypeLabelKey(e.type);
       const typeLabel = tr(typeKey);
@@ -943,7 +943,7 @@ function renderBubble(row, {
   const embedButtons = Array.isArray(row.event?.payload?.buttons) ? row.event.payload.buttons : [];
   if (embedButtons.length && typeof onEmbedButton === 'function') {
     const bRow = document.createElement('div');
-    bRow.className = 'circle-circle__bubble-actions circle-circle__embed-buttons';
+    bRow.className = 'circle-view__bubble-actions circle-view__embed-buttons';
     for (const b of embedButtons) {
       if (!b?.opId && !b?.screen && !b?.action) continue;   // `action` = a non-circle bot's callback (general in-chat menus)
       const btn = document.createElement('button');
@@ -952,9 +952,9 @@ function renderBubble(row, {
       const isScreen = !!b.screen;
       // Bulletin restyle — a consent-card button carries `variant` so the "ja, doorsturen"
       // (primary, filled ink) / "nee, ik kies zelf" (secondary, ink-outline) pair reads right.
-      const variantCls = b.variant === 'primary' ? ' circle-circle__consent-btn--primary'
-        : b.variant === 'secondary' ? ' circle-circle__consent-btn--secondary' : '';
-      btn.className = `circle-circle__bubble-action circle-circle__embed-button${isScreen ? ' circle-circle__screen-button' : ''}${variantCls}`;
+      const variantCls = b.variant === 'primary' ? ' circle-view__consent-btn--primary'
+        : b.variant === 'secondary' ? ' circle-view__consent-btn--secondary' : '';
+      btn.className = `circle-view__bubble-action circle-view__embed-button${isScreen ? ' circle-view__screen-button' : ''}${variantCls}`;
       if (b.opId) btn.dataset.opId = b.opId;
       if (b.itemId != null) btn.dataset.itemId = String(b.itemId);
       if (b.screen) btn.dataset.screen = b.screen;
@@ -981,7 +981,7 @@ function renderBubble(row, {
     if (p) {
       const label = tr(p.labelKey);
       const el2 = document.createElement(p.retryable ? 'button' : 'span');
-      el2.className = `circle-circle__bubble-delivery circle-circle__bubble-delivery--${p.state}`;
+      el2.className = `circle-view__bubble-delivery circle-view__bubble-delivery--${p.state}`;
       el2.dataset.deliveryState = p.state;
       el2.setAttribute('aria-label', label);
       el2.title = label;
@@ -1007,13 +1007,13 @@ function renderBubble(row, {
   const timeText = formatTimeLabel(row.ts);
   if (timeText) {
     const time = document.createElement('span');
-    time.className = 'circle-circle__bubble-time';
+    time.className = 'circle-view__bubble-time';
     time.textContent = timeText;
     metaChildren.push(time);
   }
   if (metaChildren.length) {
     const meta = document.createElement('div');
-    meta.className = 'circle-circle__bubble-meta';
+    meta.className = 'circle-view__bubble-meta';
     for (const c of metaChildren) meta.appendChild(c);
     el.appendChild(meta);
   }
@@ -1040,19 +1040,19 @@ function renderPendingForm(pending, { tr, onFormSubmit }) {
   const values = Object.create(null);
 
   const form = document.createElement('form');
-  form.className = 'circle-circle__form';
+  form.className = 'circle-view__form';
   form.setAttribute('autocomplete', 'off');
 
   if (pending?.title) {
     const title = document.createElement('div');
-    title.className = 'circle-circle__form-title';
+    title.className = 'circle-view__form-title';
     title.textContent = pending.title;
     form.appendChild(title);
   }
 
   const submit = document.createElement('button');
   submit.type = 'submit';
-  submit.className = 'circle-circle__form-submit';
+  submit.className = 'circle-view__form-submit';
   submit.textContent = tr('chat.form_submit');
 
   // All fields are required (they're the op's missing required params) → submit enabled only once every
@@ -1064,16 +1064,16 @@ function renderPendingForm(pending, { tr, onFormSubmit }) {
 
   for (const f of fields) {
     const wrap = document.createElement('label');
-    wrap.className = 'circle-circle__form-field';
+    wrap.className = 'circle-view__form-field';
 
     const label = document.createElement('span');
-    label.className = 'circle-circle__form-label';
+    label.className = 'circle-view__form-label';
     label.textContent = f.label || f.name;
     wrap.appendChild(label);
 
     const input = document.createElement('input');
     input.type = 'text';
-    input.className = 'circle-circle__form-input';
+    input.className = 'circle-view__form-input';
     input.name = f.name;
     input.dataset.field = f.name;
     if (f.placeholder) input.placeholder = f.placeholder;
@@ -1097,7 +1097,7 @@ function renderPendingForm(pending, { tr, onFormSubmit }) {
 
 function renderDayDivider(ts, tr) {
   const el = document.createElement('div');
-  el.className = 'circle-circle__day';
+  el.className = 'circle-view__day';
   el.textContent = formatDayLabel(ts, tr);
   return el;
 }
@@ -1170,13 +1170,13 @@ function collectMoreActions(more, tr, policy) {
  */
 function buildChatFilterStrip(model, onChatFilter, tr) {
   const strip = document.createElement('div');
-  strip.className = 'circle-circle__filter';
-  if (model.active) strip.classList.add('circle-circle__filter--active');
+  strip.className = 'circle-view__filter';
+  if (model.active) strip.classList.add('circle-view__filter--active');
 
   const chip = (label, { selected, disabled, nextFilter, title }) => {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'circle-circle__filter-chip';
+    b.className = 'circle-view__filter-chip';
     if (selected) b.classList.add('is-on');
     b.textContent = label;
     if (title) b.title = title;
@@ -1194,7 +1194,7 @@ function buildChatFilterStrip(model, onChatFilter, tr) {
     strip.appendChild(chip(tr(`circle.chatFilter.kind.${c.kind}`, { defaultValue: c.kind }), c));
   }
   const sep = document.createElement('span');
-  sep.className = 'circle-circle__filter-sep';
+  sep.className = 'circle-view__filter-sep';
   sep.setAttribute('aria-hidden', 'true');
   strip.appendChild(sep);
   for (const c of model.authorChips ?? []) {
@@ -1202,7 +1202,7 @@ function buildChatFilterStrip(model, onChatFilter, tr) {
   }
 
   const note = document.createElement('span');
-  note.className = 'circle-circle__filter-note';
+  note.className = 'circle-view__filter-note';
   note.textContent = tr('circle.chatFilter.note');
   strip.appendChild(note);
   return strip;

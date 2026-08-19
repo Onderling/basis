@@ -79,7 +79,7 @@
     "no_member_map":   "Lidmaatschapskaart is niet geconfigureerd.",
     "no_reveals":      "Reveal-store is niet geconfigureerd."
   },
-  "prikbord": {
+  "noticeboard": {
     "title":          "Op het prikbord",
     "empty":          "Niets op het prikbord.",
     "post_button":    "+ Iets posten",
@@ -168,11 +168,11 @@
     "status_looks_ok":    { "text": "Ziet er goed uit ✓", "doc": "Inline status when the structural check passes." }
   },
   "feed": {
-    "heading":           { "text": "Prikbord", "doc": "Heading on the FeedScreen (Prikbord)." },
+    "heading":           { "text": "Prikbord", "doc": "Heading on the FeedScreen (Noticeboard)." },
     "empty_no_items":    { "text": "Nog geen posts in deze buurt.", "doc": "Empty state when the feed has no items at all." },
     "empty_filtered":    { "text": "Geen posts voor deze filter.", "doc": "Empty state when items exist but the active filter excludes them all." },
-    "kind_vraag":        { "text": "Vragen", "doc": "Filter chip label for kind=vraag (asks/help-needed posts)." },
-    "kind_aanbod":       { "text": "Aanbod", "doc": "Filter chip label for kind=aanbod (offer/help-available posts)." },
+    "kind_ask":        { "text": "Vragen", "doc": "Filter chip label for kind=ask (asks/help-needed posts)." },
+    "kind_offer":       { "text": "Aanbod", "doc": "Filter chip label for kind=offer (offer/help-available posts)." },
     "no_group":          { "text": "Sluit eerst aan bij een groep om het prikbord te zien.", "doc": "Empty-state on mobile FeedScreen when no agent is active." }
   },
   "tabs": {
@@ -185,10 +185,10 @@
   },
   "compose": {
     "heading":               { "text": "Nieuwe post", "doc": "Heading on PostComposeScreen." },
-    "placeholder_vraag":     { "text": "Wat heb je nodig?", "doc": "Multiline input placeholder when kind=vraag." },
-    "placeholder_aanbod":    { "text": "Wat bied je aan?", "doc": "Multiline input placeholder when kind=aanbod." },
-    "kind_vraag":            { "text": "Vraag", "doc": "Kind-toggle chip label for kind=vraag on PostComposeScreen." },
-    "kind_aanbod":           { "text": "Aanbod", "doc": "Kind-toggle chip label for kind=aanbod on PostComposeScreen." },
+    "placeholder_ask":     { "text": "Wat heb je nodig?", "doc": "Multiline input placeholder when kind=ask." },
+    "placeholder_offer":    { "text": "Wat bied je aan?", "doc": "Multiline input placeholder when kind=offer." },
+    "kind_ask":            { "text": "Vraag", "doc": "Kind-toggle chip label for kind=ask on PostComposeScreen." },
+    "kind_offer":           { "text": "Aanbod", "doc": "Kind-toggle chip label for kind=offer on PostComposeScreen." },
     "distance_label":        { "text": "Maximale afstand", "doc": "Section heading above the distance ChipRow." },
     "distance_any":          { "text": "Geen limiet", "doc": "Distance preset 'any' — no max." },
     "distance_km":           { "text": "{n} km", "doc": "Distance preset format." },
@@ -527,7 +527,7 @@
 
     "flag_share_location":     { "text": "Locatie delen", "doc": "Per-contact toggle: share my location with this contact." },
     "flag_hop_through":        { "text": "Hop via mijn apparaat toestaan", "doc": "Per-contact toggle: let this contact relay messages through my device." },
-    "flag_auto_match":         { "text": "Auto-aanbod-match toestaan", "doc": "Per-contact toggle: accept auto-aanbod-match suggestions from this contact." },
+    "flag_auto_match":         { "text": "Auto-aanbod-match toestaan", "doc": "Per-contact toggle: accept auto-offer-match suggestions from this contact." },
     "flag_on":                 { "text": "aan", "doc": "Lower-case 'on' suffix for per-contact flag buttons." },
     "flag_off":                { "text": "uit", "doc": "Lower-case 'off' suffix for per-contact flag buttons." },
     "tags_placeholder":        { "text": "tags (komma-gescheiden)", "doc": "Placeholder for the per-contact tags input." },
@@ -607,7 +607,7 @@
     "q1_name":        { "text": "1. Wat heet deze groep?", "doc": "Field label for the group's display name. Numbered question." },
     "q1_name_ph":     { "text": "bv. Oosterpoort skills", "doc": "Placeholder for the group-name input. 'bv.' = 'bijvoorbeeld' (e.g.)." },
     "q1_purpose":     { "text": "1b. Wat is hij voor (twee zinnen)?", "doc": "Field label for the two-sentence purpose statement." },
-    "q1_purpose_ph":  { "text": "bv. Buurtgenoten in Groningen-Oosterpoort die elkaar willen helpen met klusjes, lenen en weten wat er speelt.", "doc": "Placeholder for the purpose textarea. Example for a Groningen-Oosterpoort buurt." },
+    "q1_purpose_ph":  { "text": "bv. Buurtgenoten in Groningen-Oosterpoort die elkaar willen helpen met klusjes, lenen en weten wat er speelt.", "doc": "Placeholder for the purpose textarea. Example for a Groningen-Oosterpoort neighbourhood." },
     "q2_admins":      { "text": "2. Wie is admin? (WebID's, één per regel)", "doc": "Field label for the admins-list textarea." },
     "q2_admins_hint": { "text": "We raden minstens twee admins aan.", "doc": "Hint under the admins textarea recommending two admins." },
     "q3_rules":       { "text": "3. Huisregels — wat hoort er wel/niet bij? (één per regel)", "doc": "Field label for the house-rules textarea." },
@@ -795,7 +795,7 @@
     "online_empty_placeholder":{ "text": "leeg", "doc": "Placeholder text in the online-window number inputs when no value is set. Should signal 'optional / unset'." },
 
     "broadcastable_label":    { "text": "Auto-aanbod-match", "doc": "Label for the broadcastable toggle. Shared-scoped." },
-    "broadcastable_hint":     { "text": "Mag een onbekend contact mij een aanbod-suggestie sturen die door mijn agent gefilterd wordt? Bij een match krijg je een melding; geen match = stilte.", "doc": "Hint under the auto-aanbod-match toggle. Explains the filtering + match-only-notification semantics." },
+    "broadcastable_hint":     { "text": "Mag een onbekend contact mij een aanbod-suggestie sturen die door mijn agent gefilterd wordt? Bij een match krijg je een melding; geen match = stilte.", "doc": "Hint under the auto-offer-match toggle. Explains the filtering + match-only-notification semantics." },
 
     "default_share_location_label": { "text": "Standaard locatie delen met nieuwe contacten?", "doc": "Label for the default-share-location toggle. Shared-scoped." },
     "default_share_location_hint":  { "text": "Bepaalt of <code>shareLocation</code> default aan staat als je iemand toevoegt. Per-contact altijd handmatig aan/uit te zetten.", "doc": "Hint under the default-share-location toggle. Contains <code> tag for the field name." },
@@ -871,7 +871,7 @@
     "step3_body":           { "text": "De herstelde identiteit is direct actief. Geen herstart nodig.", "doc": "Lead text in step 3. Phase 31 removed the manual restart step." },
     "step3_hint":           { "text": "Wil je je oude posts, contacten en instellingen op dit apparaat terughalen? Log in op je pod — dat trekt automatisch alles op. Anders kun je gewoon doorgaan.", "doc": "Hint paragraph in step 3 explaining the optional pod-sign-in for full state restore." },
     "step3_pod_button":     { "text": "Inloggen op pod", "doc": "Button in step 3 linking to /sign-in.html for the optional pod sync." },
-    "step3_home_button":    { "text": "Naar de buurt", "doc": "Secondary button in step 3 linking to / (the buurt-prikbord) for users who don't need pod sync." },
+    "step3_home_button":    { "text": "Naar de buurt", "doc": "Secondary button in step 3 linking to / (the neighbourhood-noticeboard) for users who don't need pod sync." },
     "nav_back":             { "text": "← Terug", "doc": "Back link in the page header — returns to /welcome.html." }
   }
 }

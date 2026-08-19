@@ -142,7 +142,7 @@ export const CIRCLE_POLICY_ENUMS = {
 // today (chat + noticeboard + houseRules + memberDirectory).  The focus-apps
 // in the store ('Circle door Onderling', 'Huishouden door Onderling', 'OR-bot')
 // will override these at pin-time to lock to their narrower surface.
-// (S1 #1, 2026-06-15: noticeboard flipped on now that its prikbord surface exists.)
+// (S1 #1, 2026-06-15: noticeboard flipped on now that its noticeboard surface exists.)
 export const DEFAULT_CIRCLE_POLICY = {
   // Decision 3 (2026-07-29) — a circle remembers which template made it, and which kinds its
   // conversation shows. `null` on both means "never chosen": no template, and the living default list.
@@ -201,7 +201,7 @@ export const DEFAULT_CIRCLE_POLICY = {
   // Phase 4 §5 (L4) — per-action decision-class map (admin-set). Absent action ⇒ its
   // DEFAULT_GOVERNANCE class. See governanceDecision.js for the resolver.
   governance:       { ...DEFAULT_GOVERNANCE },
-  // Connectivity Phase 4 §7/§9 — member↔member private chat (prikbord/DM). Off by default
+  // Connectivity Phase 4 §7/§9 — member↔member private chat (noticeboard/DM). Off by default
   // (conservative); the settings surface only lets an admin enable it when the circle's route
   // supports a peer pairwise key (relay/rendezvous available), greyed under pod-only (no relay).
   privateDm:        false,
@@ -244,11 +244,11 @@ export function enabledFeatures(policy) {
 }
 
 // §4 — map the admin's `view` axis ('chat' | 'screen')
-// to the circle's default Schakelaar mode ('chat' | 'scherm').  This is the
+// to the circle's default view mode ('chat' | 'screen').  This is the
 // *front door* the admin chose: which surface a member lands on when they
 // open the circle before they've ever toggled the pill themselves.
 //
-//   'screen'       → 'scherm'  (admin recipe'd page is the landing surface)
+//   'screen'       → 'screen'  (admin recipe'd page is the landing surface)
 //   'chat'         → 'chat'    (v2 §4 default: chat IS the home view)
 //
 // ('cross-stream' retired with the Stream view, batch 5 — normalizeCirclePolicy migrates a stored
@@ -257,16 +257,16 @@ export function enabledFeatures(policy) {
 //
 // The per-user pill (cc.circleViewMode) overrides this once the member has
 // flipped it — see readViewMode() (web) / the viewMode useEffect (mobile).
-const VIEW_AXIS_TO_MODE = { screen: 'scherm', chat: 'chat', 'cross-stream': 'chat' };
+const VIEW_AXIS_TO_MODE = { screen: 'screen', chat: 'chat', 'cross-stream': 'chat' };
 
 /**
- * §4 — the default Schakelaar mode ('chat' | 'scherm') for a circle whose
+ * §4 — the default view mode ('chat' | 'screen') for a circle whose
  * member has no saved per-user pill preference yet.  Driven by the admin's
  * `policy.view` axis; falls back to the policy default ('screen') for
  * missing/invalid input so the result is always one of the two pill values.
  *
  * @param {object|null|undefined} policy — raw or normalised policy
- * @returns {'chat'|'scherm'}
+ * @returns {'chat'|'screen'}
  */
 export function defaultViewModeFromPolicy(policy) {
   // A RETIRED-but-mapped value ('cross-stream', batch 5) still lands where it always did — this reads

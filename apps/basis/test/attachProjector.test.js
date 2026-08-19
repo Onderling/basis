@@ -4,7 +4,7 @@
  * Covers the three seams the wiring rests on:
  *   1. renderAttachments(basisManifest) projects the attach menu from each op's
  *      `surfaces.attach` (Bestand/Kaart/Afspraak), in manifest order.
- *   2. the prikbord + circle composers render that menu behind a "+" affordance
+ *   2. the noticeboard + circle composers render that menu behind a "+" affordance
  *      (replacing the hand-coded 📎).
  *   3. selecting the FILE entry routes through the media pipeline (onAttach); every
  *      OTHER entry dispatches its {opId} via onAttachCommand (the host → callSkill).
@@ -52,17 +52,17 @@ describe('renderAttachments(basisManifest) — the ATTACHMENT projector', () => 
   });
 });
 
-describe('prikbord composer — the projected "+" attach menu', () => {
+describe('noticeboard composer — the projected "+" attach menu', () => {
   const attachMenu = renderAttachments(basisManifest).attachMenu;
 
   it('renders a "+" trigger + a menu item per entry (not the hardcoded 📎)', () => {
     const el = renderCircleNoticeboard(document.createElement('div'), {
       posts: [], t, attachMenu, onAttach: () => {}, onAttachCommand: () => {},
     });
-    const trigger = el.querySelector('.cc-prikbord__attach');
+    const trigger = el.querySelector('.cc-noticeboard__attach');
     expect(trigger).not.toBeNull();
     expect(trigger.textContent).toBe('+');            // "+" affordance, no 📎
-    const items = [...el.querySelectorAll('.cc-prikbord__attach-item')];
+    const items = [...el.querySelectorAll('.cc-noticeboard__attach-item')];
     expect(items.map((i) => i.dataset.opId)).toEqual(['embed', 'embed-file', 'embed-time']);
     expect(items.map((i) => i.textContent)).toEqual(['Kaart', 'Bestand', 'Afspraak']);
   });
@@ -71,9 +71,9 @@ describe('prikbord composer — the projected "+" attach menu', () => {
     const el = renderCircleNoticeboard(document.createElement('div'), {
       posts: [], t, attachMenu, onAttach: () => {}, onAttachCommand: () => {},
     });
-    const menu = el.querySelector('.cc-prikbord__attach-menu');
+    const menu = el.querySelector('.cc-noticeboard__attach-menu');
     expect(menu.hidden).toBe(true);
-    el.querySelector('.cc-prikbord__attach').click();
+    el.querySelector('.cc-noticeboard__attach').click();
     expect(menu.hidden).toBe(false);
   });
 
@@ -83,9 +83,9 @@ describe('prikbord composer — the projected "+" attach menu', () => {
     const el = renderCircleNoticeboard(document.createElement('div'), {
       posts: [], t, attachMenu, onAttach, onAttachCommand,
     });
-    const fileInput = el.querySelector('.cc-prikbord__file');
+    const fileInput = el.querySelector('.cc-noticeboard__file');
     fileInput.click = vi.fn();   // the file entry opens the picker (media pipeline)
-    el.querySelector('.cc-prikbord__attach-item[data-op-id="embed-file"]').click();
+    el.querySelector('.cc-noticeboard__attach-item[data-op-id="embed-file"]').click();
     expect(fileInput.click).toHaveBeenCalledTimes(1);
     expect(onAttachCommand).not.toHaveBeenCalled();
 
@@ -101,7 +101,7 @@ describe('prikbord composer — the projected "+" attach menu', () => {
     const el = renderCircleNoticeboard(document.createElement('div'), {
       posts: [], t, attachMenu, onAttach: () => {}, onAttachCommand,
     });
-    el.querySelector('.cc-prikbord__attach-item[data-op-id="embed-time"]').click();
+    el.querySelector('.cc-noticeboard__attach-item[data-op-id="embed-time"]').click();
     expect(onAttachCommand).toHaveBeenCalledWith(expect.objectContaining({ opId: 'embed-time' }));
   });
 });
@@ -117,15 +117,15 @@ describe('circle composer — the same projected "+" menu', () => {
       circle: CIRCLE, rows: [], t, onSend: () => {},
       attachMenu, onAttachMedia, onAttachCommand,
     });
-    const items = [...el.querySelectorAll('.circle-circle__attach-item')];
+    const items = [...el.querySelectorAll('.circle-view__attach-item')];
     expect(items.map((i) => i.dataset.opId)).toEqual(['embed', 'embed-file', 'embed-time']);
 
-    const fileInput = el.querySelector('.circle-circle__file');
+    const fileInput = el.querySelector('.circle-view__file');
     fileInput.click = vi.fn();
-    el.querySelector('.circle-circle__attach-item[data-op-id="embed-file"]').click();
+    el.querySelector('.circle-view__attach-item[data-op-id="embed-file"]').click();
     expect(fileInput.click).toHaveBeenCalledTimes(1);
 
-    el.querySelector('.circle-circle__attach-item[data-op-id="embed-time"]').click();
+    el.querySelector('.circle-view__attach-item[data-op-id="embed-time"]').click();
     expect(onAttachCommand).toHaveBeenCalledWith(expect.objectContaining({ opId: 'embed-time' }));
   });
 });

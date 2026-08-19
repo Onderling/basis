@@ -44,7 +44,7 @@ describe('what one control governs', () => {
     let clock = 0;
     const log = new EventLog({ now: () => clock, retention: retentionFromDays(7) });
     log.append({ id: 'g1', ts: 0, app: 'system', type: 'governance', circleId: 'c1', payload: { event: 'propose' } });
-    log.append({ id: 'm1', ts: 0, app: 'circle', type: 'vraag', payload: { text: 'hoi' } });
+    log.append({ id: 'm1', ts: 0, app: 'circle', type: 'ask', payload: { text: 'hoi' } });
     clock = daysToMs(8);
     log.prune();
     const rows = log.query();
@@ -71,7 +71,7 @@ describe('applying the choice live', () => {
   it('setRetention prunes immediately, so a shortened window shows in the open conversation', () => {
     let clock = daysToMs(20);
     const log = new EventLog({ now: () => clock, retention: retentionFromDays(30) });
-    log.append({ id: 'm1', ts: daysToMs(1), app: 'circle', type: 'vraag', payload: { text: 'oud' } });
+    log.append({ id: 'm1', ts: daysToMs(1), app: 'circle', type: 'ask', payload: { text: 'oud' } });
     expect(log.query()).toHaveLength(1);
 
     const dropped = log.setRetention(retentionFromDays(7));

@@ -2,7 +2,7 @@
  * basis v2 — per-screen materialized-blocks cache (δ.1).
  *
  * Tiny store that stashes the LAST `materializeScreen(...)` result per
- * screenId.  The Schermen-tab view-mode reads on screen open and renders
+ * screenId.  The Screens-tab view-mode reads on screen open and renders
  * the cached blocks immediately while a fresh materialize runs in the
  * background; on result the view swaps + the cache re-saves the fresh
  * payload.  Result: tapping a screen feels instant (the 200–800ms

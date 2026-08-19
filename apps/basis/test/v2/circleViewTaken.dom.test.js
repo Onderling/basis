@@ -17,7 +17,7 @@ function mount() {
 }
 
 const circle = { id: 'huis', name: 'Huishouden', memberCount: 3 };
-const tabs = [{ id: 'gesprek', label: 'Gesprek' }, { id: 'taken', label: 'Taken' }];
+const tabs = [{ id: 'conversation', label: 'Conversation' }, { id: 'taken', label: 'Taken' }];
 
 describe('renderCircleView · Taken tab', () => {
   it('renders task rows (not the tab-coming placeholder)', () => {
@@ -28,32 +28,32 @@ describe('renderCircleView · Taken tab', () => {
     ], { circleId: 'huis' });
     renderCircleView(el, { circle, rows: [], tabs, activeTab: 'taken', tasks, t });
 
-    expect(el.querySelector('.circle-circle__placeholder')).toBeNull();
-    const cards = el.querySelectorAll('.circle-circle__task');
+    expect(el.querySelector('.circle-view__placeholder')).toBeNull();
+    const cards = el.querySelectorAll('.circle-view__task');
     expect(cards.length).toBe(2);
-    expect(cards[0].querySelector('.circle-circle__task-text').textContent).toBe('Afwas doen');
+    expect(cards[0].querySelector('.circle-view__task-text').textContent).toBe('Afwas doen');
     expect(cards[0].dataset.taskId).toBe('task-1');
     // The true lifecycle status shows (not the mapped chip-kind).
-    expect(cards[0].querySelector('.circle-circle__task-status').textContent).toBe('circle.taskStatus.open');
-    expect(cards[1].querySelector('.circle-circle__task-status').textContent).toBe('circle.taskStatus.claimed');
+    expect(cards[0].querySelector('.circle-view__task-status').textContent).toBe('circle.taskStatus.open');
+    expect(cards[1].querySelector('.circle-view__task-status').textContent).toBe('circle.taskStatus.claimed');
   });
 
   it('shows a friendly empty state (not the placeholder) when there are no tasks', () => {
     const el = mount();
     renderCircleView(el, { circle, rows: [], tabs, activeTab: 'taken', tasks: [], t });
-    expect(el.querySelector('.circle-circle__placeholder')).toBeNull();
-    expect(el.querySelector('.circle-circle__taken-empty').textContent).toBe('circle.circle.taken_empty');
+    expect(el.querySelector('.circle-view__placeholder')).toBeNull();
+    expect(el.querySelector('.circle-view__taken-empty').textContent).toBe('circle.circle.taken_empty');
   });
 
   it('an open task row surfaces claim + snooze + the owner-only entrust chip (viewer is admin)', () => {
     const el = mount();
     const tasks = buildTaskRows([{ id: 'task-1', text: 'X', state: 'open' }], { circleId: 'huis' });
     renderCircleView(el, { circle, rows: [], tabs, activeTab: 'taken', tasks, viewerIsAdmin: true, t });
-    const chips = [...el.querySelectorAll('.circle-circle__task .circle-circle__bubble-action')].map((b) => b.dataset.action);
+    const chips = [...el.querySelectorAll('.circle-view__task .circle-view__bubble-action')].map((b) => b.dataset.action);
     expect(chips).toContain('claim');
     expect(chips).toContain('snooze');
     expect(chips).toContain('mandate');
-    expect(el.querySelector('.circle-circle__bubble-action--mandate')).not.toBeNull();
+    expect(el.querySelector('.circle-view__bubble-action--mandate')).not.toBeNull();
   });
 
   it('tapping the entrust chip calls onAction with the mandate action (carrying the taskId) → host opens the picker', () => {
@@ -61,7 +61,7 @@ describe('renderCircleView · Taken tab', () => {
     const onAction = vi.fn();
     const tasks = buildTaskRows([{ id: 'task-42', text: 'X', state: 'open' }], { circleId: 'huis' });
     renderCircleView(el, { circle, rows: [], tabs, activeTab: 'taken', tasks, viewerIsAdmin: true, onAction, t });
-    el.querySelector('.circle-circle__bubble-action--mandate').click();
+    el.querySelector('.circle-view__bubble-action--mandate').click();
     expect(onAction).toHaveBeenCalledTimes(1);
     const [action] = onAction.mock.calls[0];
     expect(action.action).toBe('mandate');
@@ -72,7 +72,7 @@ describe('renderCircleView · Taken tab', () => {
     const el = mount();
     const onAddTask = vi.fn();
     renderCircleView(el, { circle, rows: [], tabs, activeTab: 'taken', tasks: [], onAddTask, t });
-    const add = el.querySelector('.circle-circle__taken-add');
+    const add = el.querySelector('.circle-view__taken-add');
     expect(add).not.toBeNull();
     add.click();
     expect(onAddTask).toHaveBeenCalledTimes(1);

@@ -58,7 +58,7 @@
     },
     "switch_prompt": {
       "text": "Continue in English? Tap below.",
-      "doc": "Kring feedback language-switch offer, shown IN this locale's language (read in the target language) so a speaker of it recognises the invite."
+      "doc": "Circle feedback language-switch offer, shown IN this locale's language (read in the target language) so a speaker of it recognises the invite."
     },
     "save_edit": {
       "text": "Save",
@@ -331,18 +331,18 @@
     "text": "{{count}} members",
     "doc": "Member count on a circle tile; {{count}} interpolated."
   },
-  "leden_tab": {
+  "members_tab": {
     "loading": {
       "text": "Loading members…",
-      "doc": "LEDEN tab — while the roster (listGroupMembers) loads."
+      "doc": "MEMBERS tab — while the roster (listGroupMembers) loads."
     },
     "empty": {
       "text": "No members yet.",
-      "doc": "LEDEN tab — the circle's roster is empty."
+      "doc": "MEMBERS tab — the circle's roster is empty."
     },
     "you": {
       "text": "You",
-      "doc": "LEDEN tab — badge on the viewer's own row."
+      "doc": "MEMBERS tab — badge on the viewer's own row."
     }
   },
   "tile_unread": {
@@ -357,7 +357,7 @@
     "menu": {
       "pin": {
         "text": "Pin to top",
-        "doc": "β.5 — context-menu item: float this kring to the top of its section."
+        "doc": "β.5 — context-menu item: float this circle to the top of its section."
       },
       "unpin": {
         "text": "Unpin",
@@ -365,19 +365,19 @@
       },
       "mute": {
         "text": "Mute",
-        "doc": "β.5 — context-menu item: silence this kring (toggles per-member chatOff override)."
+        "doc": "β.5 — context-menu item: silence this circle (toggles per-member chatOff override)."
       },
       "unmute": {
         "text": "Unmute",
-        "doc": "β.5 — context-menu item: re-enable chat for this kring."
+        "doc": "β.5 — context-menu item: re-enable chat for this circle."
       },
       "settings": {
         "text": "Settings",
-        "doc": "β.5 — context-menu item: open this kring's settings screen."
+        "doc": "β.5 — context-menu item: open this circle's settings screen."
       },
       "leave": {
-        "text": "Leave kring",
-        "doc": "β.5 — context-menu item: leave this kring (dispatches /leave-group)."
+        "text": "Leave circle",
+        "doc": "β.5 — context-menu item: leave this circle (dispatches /leave-group)."
       },
       "leave_confirm": {
         "text": "Leave {{name}}? This can't be undone.",
@@ -463,11 +463,11 @@
       },
       "pending": {
         "text": "Sending…",
-        "doc": "δ.2 — bubble icon caption while the kring fan-out (broadcastKringMessage) is in flight."
+        "doc": "δ.2 — bubble icon caption while the circle fan-out (broadcastKringMessage) is in flight."
       },
       "failed": {
         "text": "Send failed (tap to retry)",
-        "doc": "δ.2 — bubble icon caption + accessible label when the kring fan-out rejected or returned errors; tapping re-fires broadcastKringMessage with the same msgId."
+        "doc": "δ.2 — bubble icon caption + accessible label when the circle fan-out rejected or returned errors; tapping re-fires broadcastKringMessage with the same msgId."
       },
       "undeliverable": {
         "text": "Couldn't reach some members",
@@ -480,11 +480,11 @@
     }
   },
   "tabs": {
-    "gesprek": {
+    "conversation": {
       "text": "Conversation",
-      "doc": "SP-13.3 — kring bottom-tab label (board Voorbeeld 1-3, always first)."
+      "doc": "SP-13.3 — circle bottom-tab label (board examples 1-3, always first)."
     },
-    "prikbord": {
+    "noticeboard": {
       "text": "Noticeboard",
       "doc": "SP-13.3 — bottom-tab when policy.features.noticeboard is on."
     },
@@ -504,7 +504,7 @@
       "text": "Agenda",
       "doc": "SP-13.3 — bottom-tab when calendar is on."
     },
-    "leden": {
+    "members": {
       "text": "Members",
       "doc": "SP-13.3 — bottom-tab when memberDirectory is on (renders last per board ordering)."
     }
@@ -534,17 +534,17 @@
   "scope": {
     "self": {
       "text": "only you",
-      "doc": "Message scope badge — private to you (not shared with the kring)."
+      "doc": "Message scope badge — private to you (not shared with the circle)."
     },
     "circle": {
-      "text": "whole kring",
-      "doc": "Message scope badge — reaches every member of the kring."
+      "text": "whole circle",
+      "doc": "Message scope badge — reaches every member of the circle."
     }
   },
   "calendar": {
     "invited": {
       "text": "📅 You're invited: {title} — it's on your calendar.",
-      "doc": "Inbound calendar-invite kring heads-up; {title} is the event title."
+      "doc": "Inbound calendar-invite circle heads-up; {title} is the event title."
     }
   },
   "embed": {
@@ -618,7 +618,7 @@
   "help": {
     "circle_name": {
       "text": "Help",
-      "doc": "Display name of the first-run help circle (the standing 1:1 with the Onderling-bot) — the tile + kring header title. Distinct from the BOT's name (circle.onboarding.help_name = 'Onderling'); named after the circle's purpose so the header never falls back to the raw id 'cc-help'."
+      "doc": "Display name of the first-run help circle (the standing 1:1 with the Onderling-bot) — the tile + circle header title. Distinct from the BOT's name (circle.onboarding.help_name = 'Onderling'); named after the circle's purpose so the header never falls back to the raw id 'cc-help'."
     },
     "consent_prompt": {
       "text": "I don't have a set answer for that. Shall I ask the confidential assistant? Your question would then be forwarded.",
@@ -724,14 +724,14 @@
   "circle": {
     "more": {
       "text": "More",
-      "doc": "SP-13 — kring header overflow menu trigger."
+      "doc": "SP-13 — circle header overflow menu trigger."
     },
     "empty": {
       "text": "Nothing here yet — be the first to write.",
-      "doc": "SP-13.2 — empty state for the kring's chat-style GESPREK view."
+      "doc": "SP-13.2 — empty state for the circle's chat-style CONVERSATION view."
     },
     "composer_placeholder": {
-      "text": "Write to the kring…",
+      "text": "Write to the circle…",
       "doc": "SP-13.2 — inline composer placeholder; hosts can pass a circle-specific one (e.g. 'Write to the neighbourhood…')."
     },
     "chat_disabled": {
@@ -752,7 +752,7 @@
     },
     "tab_coming": {
       "text": "{{tab}} content lands in a follow-up slice.",
-      "doc": "SP-13.3 — placeholder body for a tab whose content surface isn't built yet (e.g. PRIKBORD / LEDEN)."
+      "doc": "SP-13.3 — placeholder body for a tab whose content surface isn't built yet (e.g. NOTICEBOARD / MEMBERS)."
     },
     "taken_empty": {
       "text": "No tasks in this circle yet.",
@@ -771,32 +771,32 @@
       "doc": "Taken (tasks) tab — fallback when a task has no text."
     },
     "tabs_label": {
-      "text": "Kring tabs",
-      "doc": "SP-13.3 — a11y label on the per-kring bottom tab bar."
+      "text": "Circle tabs",
+      "doc": "SP-13.3 — a11y label on the per-circle bottom tab bar."
     },
     "view_chat": {
       "text": "Chat",
-      "doc": "SP-13.4 — Chat ↔ Scherm header toggle, chat-mode label (v2 §4)."
+      "doc": "SP-13.4 — Chat ↔ Screen header toggle, chat-mode label (v2 §4)."
     },
-    "view_scherm": {
+    "view_screen": {
       "text": "Screen",
-      "doc": "SP-13.4 — Chat ↔ Scherm toggle, scherm-mode label."
+      "doc": "SP-13.4 — Chat ↔ Screen toggle, screen-mode label."
     },
     "view_toggle_label": {
       "text": "Switch between chat and screen view",
-      "doc": "SP-13.4 — a11y group label on the Chat | Scherm pill."
+      "doc": "SP-13.4 — a11y group label on the Chat | Screen pill."
     },
-    "scherm_coming": {
+    "screen_coming": {
       "text": "Screen view (admin's recept'd page) lands in a follow-up slice.",
       "doc": "SP-13.4 — placeholder until the recept renderer is built."
     },
     "attach": {
       "text": "Attach a photo",
-      "doc": "media P1 — kring composer attach button (sealed media path); only shown when the circle has a content seal strategy."
+      "doc": "media P1 — circle composer attach button (sealed media path); only shown when the circle has a content seal strategy."
     },
     "bot_header": {
-      "text": "the kring assistant",
-      "doc": "Bulletin restyle — default label in the GESPREK chat-card's bot-header strip (green dot + name). Seam: no per-kring bot identity yet; hosts may pass a real name via botLabel."
+      "text": "the circle assistant",
+      "doc": "Bulletin restyle — default label in the CONVERSATION chat-card's bot-header strip (green dot + name). Seam: no per-circle bot identity yet; hosts may pass a real name via botLabel."
     },
     "provenance_direct": {
       "text": "· answered directly — no language model used",
@@ -950,7 +950,7 @@
     },
     "empty": {
       "text": "The admin hasn't set up a screen yet.",
-      "doc": "α.1c — shown when the kring's recipe book is empty."
+      "doc": "α.1c — shown when the circle's recipe book is empty."
     },
     "loading": {
       "text": "Loading…",
@@ -1036,11 +1036,11 @@
     },
     "seed_my_things": {
       "text": "My things",
-      "doc": "α.4 — seeded screen aggregating tasks assigned to me across kringen."
+      "doc": "α.4 — seeded screen aggregating tasks assigned to me across circles."
     },
     "seed_my_calendar": {
       "text": "My calendar",
-      "doc": "α.4 — seeded screen aggregating upcoming events across kringen."
+      "doc": "α.4 — seeded screen aggregating upcoming events across circles."
     }
   },
   "recipe": {
@@ -1180,7 +1180,7 @@
         "doc": "α.1d — agenda horizon."
       },
       "rules_hint": {
-        "text": "Renders the kring's current house rules.",
+        "text": "Renders the circle's current house rules.",
         "doc": "α.1d — rules block has no config."
       }
     },
@@ -1562,7 +1562,7 @@
     },
     "privateDm": {
       "text": "Private member-to-member chat",
-      "doc": "Phase 4 §7/§9 — the member↔member private chat (prikbord/DM) toggle."
+      "doc": "Phase 4 §7/§9 — the member↔member private chat (noticeboard/DM) toggle."
     },
     "privateDm_hint": {
       "text": "Let members message each other directly, not only the whole circle.",
@@ -1999,7 +1999,7 @@
     "notifications": {
       "section_title": {
         "text": "Notifications",
-        "doc": "α.5b · audit #6 — heading of the per-kring push-toggles block on the personal override sheet (board 6A)."
+        "doc": "α.5b · audit #6 — heading of the per-circle push-toggles block on the personal override sheet (board 6A)."
       },
       "on_mention": {
         "text": "On @-mention",
@@ -2328,7 +2328,7 @@
     },
     "my_things_title": {
       "text": "My things",
-      "doc": "Board 10A heading (P6.M7) — Folio shown as the private kring."
+      "doc": "Board 10A heading (P6.M7) — Folio shown as the private circle."
     },
     "my_things_empty": {
       "text": "Nothing here yet — items you keep to yourself land here.",
@@ -2418,7 +2418,7 @@
   "fileShare": {
     "received": {
       "text": "📎 {{name}} shared with you",
-      "doc": "Kring bubble when a peer shares a file."
+      "doc": "Circle bubble when a peer shares a file."
     },
     "download": {
       "text": "Download",
@@ -3043,15 +3043,15 @@
         "text": "Tasks",
         "doc": "P1.7 — kind chip."
       },
-      "vraag": {
+      "ask": {
         "text": "Questions",
         "doc": "P1.7 — kind chip."
       },
-      "aanbod": {
+      "offer": {
         "text": "Offers",
         "doc": "P1.7 — kind chip."
       },
-      "leen": {
+      "lend": {
         "text": "Lending",
         "doc": "P1.7 — kind chip."
       }
@@ -5009,19 +5009,19 @@
       "text": "Chat",
       "doc": "Label for the chat-message conversation kind in the admin control."
     },
-    "vraag": {
+    "ask": {
       "text": "Questions",
-      "doc": "Label for the vraag conversation kind in the admin control."
+      "doc": "Label for the ask conversation kind in the admin control."
     },
-    "aanbod": {
+    "offer": {
       "text": "Offers",
-      "doc": "Label for the aanbod conversation kind in the admin control."
+      "doc": "Label for the offer conversation kind in the admin control."
     },
     "task": {
       "text": "Tasks",
       "doc": "Label for the task conversation kind in the admin control."
     },
-    "leen": {
+    "lend": {
       "text": "Borrowing",
       "doc": "Label for the leen conversation kind in the admin control."
     }

@@ -2,7 +2,7 @@
  * basis v2 — recipe editor (Plan α.1d.1, audit gap #1+#9).
  *
  * Admin-facing editor for the per-circle screen recipes (v2 PDF §2
- * "RECEPT · SCHERM-WEERGAVE INRICHTEN").  Two render modes:
+ * "RECEPT · SCREEN-WEERGAVE INRICHTEN").  Two render modes:
  *
  *   - 'book'   — list every recipe, mark active, add/rename/delete/setActive
  *   - 'recipe' — edit a single recipe's block list (add/remove/move/edit)

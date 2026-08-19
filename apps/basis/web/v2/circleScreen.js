@@ -2,7 +2,7 @@
  * basis v2 — screen renderer (Plan α.1c.1 · audit gap #1).
  *
  * Consumes materialized blocks from `circleRecipeBlocks.js` and produces
- * the DOM for scherm-mode (v2 §4 pill, §2 RECEPT · SCHERM-WEERGAVE
+ * the DOM for screen-mode (v2 §4 pill, §2 RECEPT · SCREEN-WEERGAVE
  * INRICHTEN).
  *
  * Pure DOM render (web).  Mobile parity ships as α.1e using the same

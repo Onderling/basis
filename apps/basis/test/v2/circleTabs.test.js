@@ -9,51 +9,51 @@ const t = (k) => k;
 
 describe('buildCircleTabs · SP-13.3', () => {
   it('exposes the canonical default-tab id', () => {
-    expect(DEFAULT_CIRCLE_TAB).toBe('gesprek');
+    expect(DEFAULT_CIRCLE_TAB).toBe('conversation');
   });
 
-  it('default policy → GESPREK + PRIKBORD + LEDEN (chat + noticeboard + memberDirectory are default on)', () => {
-    // S1 #1 (2026-06-15): noticeboard flipped on by default now that its prikbord surface exists.
+  it('default policy → CONVERSATION + NOTICEBOARD + MEMBERS (chat + noticeboard + memberDirectory are default on)', () => {
+    // S1 #1 (2026-06-15): noticeboard flipped on by default now that its noticeboard surface exists.
     const tabs = buildCircleTabs(DEFAULT_CIRCLE_POLICY).map((t) => t.id);
-    expect(tabs).toEqual(['gesprek', 'prikbord', 'leden']);
+    expect(tabs).toEqual(['conversation', 'noticeboard', 'members']);
   });
 
-  it('circle-shape policy → GESPREK / PRIKBORD / LEDEN (board Voorbeeld 1)', () => {
+  it('circle-shape policy → CONVERSATION / NOTICEBOARD / MEMBERS (board Example 1)', () => {
     const policy = {
       features: { chat: true, noticeboard: true, memberDirectory: true },
     };
     expect(buildCircleTabs(policy).map((t) => t.id))
-      .toEqual(['gesprek', 'prikbord', 'leden']);
+      .toEqual(['conversation', 'noticeboard', 'members']);
   });
 
-  it('huishouden-shape policy → GESPREK / TAKEN / LIJSTEN (board Voorbeeld 2)', () => {
+  it('huishouden-shape policy → CONVERSATION / TAKEN / LIJSTEN (board Example 2)', () => {
     const policy = {
-      // noticeboard explicitly off — a huishouden circle uses tasks/lists, not the circle prikbord.
+      // noticeboard explicitly off — a huishouden circle uses tasks/lists, not the circle noticeboard.
       features: { chat: true, noticeboard: false, tasks: true, lists: true, memberDirectory: false },
     };
     expect(buildCircleTabs(policy).map((t) => t.id))
-      .toEqual(['gesprek', 'taken', 'lijsten']);
+      .toEqual(['conversation', 'taken', 'lijsten']);
   });
 
-  it('privé-shape policy → GESPREK / NOTITIES / TAKEN (board Voorbeeld 3)', () => {
+  it('privé-shape policy → CONVERSATION / NOTITIES / TAKEN (board Example 3)', () => {
     const policy = {
       features: { chat: true, noticeboard: false, notes: true, tasks: true, memberDirectory: false },
     };
     expect(buildCircleTabs(policy).map((t) => t.id))
-      .toEqual(['gesprek', 'taken', 'notities']);
+      .toEqual(['conversation', 'taken', 'notities']);
   });
 
-  it('GESPREK is always first even when the chat feature is explicitly off', () => {
+  it('CONVERSATION is always first even when the chat feature is explicitly off', () => {
     // v2 §1 — chat is the circle core; turning it "off" hides PUSH /
     // settings UI for chat-notifications but the tab itself stays
     // because every circle needs at least one reachable surface.
     const policy = { features: { chat: false, noticeboard: true } };
     const ids = buildCircleTabs(policy).map((t) => t.id);
-    expect(ids[0]).toBe('gesprek');
-    expect(ids).toContain('prikbord');
+    expect(ids[0]).toBe('conversation');
+    expect(ids).toContain('noticeboard');
   });
 
-  it('LEDEN renders last when memberDirectory is on (per board ordering)', () => {
+  it('MEMBERS renders last when memberDirectory is on (per board ordering)', () => {
     const policy = {
       features: {
         chat: true, noticeboard: true, tasks: true,
@@ -61,7 +61,7 @@ describe('buildCircleTabs · SP-13.3', () => {
       },
     };
     const ids = buildCircleTabs(policy).map((t) => t.id);
-    expect(ids[ids.length - 1]).toBe('leden');
+    expect(ids[ids.length - 1]).toBe('members');
   });
 
   it('all-features-on policy → full ordered tab list', () => {
@@ -74,48 +74,48 @@ describe('buildCircleTabs · SP-13.3', () => {
     };
     // houseRules has NO tab — lives in `⋯` overflow as "Huisregels".
     expect(buildCircleTabs(policy).map((t) => t.id))
-      .toEqual(['gesprek', 'prikbord', 'taken', 'lijsten', 'notities', 'agenda', 'leden']);
+      .toEqual(['conversation', 'noticeboard', 'taken', 'lijsten', 'notities', 'agenda', 'members']);
   });
 
   it('houseRules does not produce a tab', () => {
     // Explicitly turn memberDirectory off so the only on-by-default
     // feature besides chat doesn't show up in the assertion.
     const policy = { features: { chat: true, noticeboard: false, houseRules: true, memberDirectory: false } };
-    expect(buildCircleTabs(policy).map((t) => t.id)).toEqual(['gesprek']);
+    expect(buildCircleTabs(policy).map((t) => t.id)).toEqual(['conversation']);
   });
 
   it('includes resolved `label` strings only when a translator is passed', () => {
     const policy = { features: { chat: true } };
     expect(buildCircleTabs(policy)[0]).toEqual({
-      id: 'gesprek', feature: 'chat', labelKey: 'circle.tabs.gesprek',
+      id: 'conversation', feature: 'chat', labelKey: 'circle.tabs.conversation',
     });
     expect(buildCircleTabs(policy, t)[0]).toEqual({
-      id: 'gesprek', feature: 'chat',
-      labelKey: 'circle.tabs.gesprek',
-      label:    'circle.tabs.gesprek',
+      id: 'conversation', feature: 'chat',
+      labelKey: 'circle.tabs.conversation',
+      label:    'circle.tabs.conversation',
     });
   });
 
   it('handles null / empty / garbage policy gracefully (treats as defaults)', () => {
-    expect(buildCircleTabs(null).map((t) => t.id)).toEqual(['gesprek', 'prikbord', 'leden']);
-    expect(buildCircleTabs(undefined).map((t) => t.id)).toEqual(['gesprek', 'prikbord', 'leden']);
-    expect(buildCircleTabs('nope').map((t) => t.id)).toEqual(['gesprek', 'prikbord', 'leden']);
+    expect(buildCircleTabs(null).map((t) => t.id)).toEqual(['conversation', 'noticeboard', 'members']);
+    expect(buildCircleTabs(undefined).map((t) => t.id)).toEqual(['conversation', 'noticeboard', 'members']);
+    expect(buildCircleTabs('nope').map((t) => t.id)).toEqual(['conversation', 'noticeboard', 'members']);
   });
 });
 
 describe('circleTabs · D1 (§5A) feature helpers', () => {
   it('featureActionLabelKey maps all 8 features + falls back to the raw key', () => {
-    expect(featureActionLabelKey('chat')).toBe('circle.tabs.gesprek');
+    expect(featureActionLabelKey('chat')).toBe('circle.tabs.conversation');
     expect(featureActionLabelKey('tasks')).toBe('circle.tabs.taken');
-    expect(featureActionLabelKey('memberDirectory')).toBe('circle.tabs.leden');
+    expect(featureActionLabelKey('memberDirectory')).toBe('circle.tabs.members');
     expect(featureActionLabelKey('houseRules')).toBe('circle.settings.feat.houseRules');
     expect(featureActionLabelKey('bogus')).toBe('bogus');
   });
 
   it('featureTabId maps tab features to ids; houseRules has no tab', () => {
-    expect(featureTabId('chat')).toBe('gesprek');
+    expect(featureTabId('chat')).toBe('conversation');
     expect(featureTabId('tasks')).toBe('taken');
-    expect(featureTabId('memberDirectory')).toBe('leden');
+    expect(featureTabId('memberDirectory')).toBe('members');
     expect(featureTabId('houseRules')).toBe(null);
     expect(featureTabId('bogus')).toBe(null);
   });

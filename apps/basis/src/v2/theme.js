@@ -33,9 +33,9 @@ export const THEME = {
     botBg:     '#f1f4ee', // bot/other chat bubble fill (left-aligned)
     botLine:   '#dfe6da', // bot bubble hairline border (soft green-grey)
     consentBg: '#faf1ea', // consent/handoff card fill (light peach; border = accentInk dashed)
-    green:   '#2e7d4f', greenBg: '#e9efe6', // STATUS only: delivered / lokaal / AANBOD
-    blue:    '#3f4f76', blueBg:  '#e0e4ee', // betaald / VRAAG / "via hop"
-    amber:   '#7a5a1f', amberBg: '#ede5cf', // LENEN
+    green:   '#2e7d4f', greenBg: '#e9efe6', // STATUS only: delivered / lokaal / OFFER
+    blue:    '#3f4f76', blueBg:  '#e0e4ee', // betaald / ASK / "via hop"
+    amber:   '#7a5a1f', amberBg: '#ede5cf', // LEND
     danger:  '#963528', dangerBg:'#f5e7e2', // blocked / warning — deeper than accentInk rust
     trackOff:'#c9c8c0', // pill-toggle off track
     white:   '#ffffff',
@@ -101,12 +101,10 @@ export function circleTint(seed) {
 export function tagColors(kind, palette = THEME.color) {
   const c = palette;
   switch (String(kind || '').toLowerCase()) {
-    case 'vraag':
-    case 'question':
+    case 'ask':
     case 'hop':       return { fg: c.blue,  bg: c.blueBg };
-    case 'aanbod':
     case 'offer':     return { fg: c.green, bg: c.greenBg };
-    case 'lenen':
+    case 'lend':
     case 'borrow':
     case 'loan':      return { fg: c.amber, bg: c.amberBg };
     case 'agent':     return { fg: c.inkSoft, bg: c.paper2 };

@@ -1,7 +1,7 @@
 /**
- * basis v2 — member-card projections (LEDEN tab → persona card + self-view).
+ * basis v2 — member-card projections (MEMBERS tab → persona card + self-view).
  *
- * Two thin projections the LEDEN (members) tab taps into, both PURE and both
+ * Two thin projections the MEMBERS (members) tab taps into, both PURE and both
  * reusing the already-built machinery — no new visibility logic lives here:
  *
  *   • member-persona — tap a member row → what THIS viewer (me) may see of THAT

@@ -782,7 +782,7 @@
   "chat": {
     "followup_prompt": {
       "text": "What's your {{param}}? (for /{{opId}})",
-      "doc": "Generic prompt when a kring command trips needsForm with a single missing field — the bot asks, the user's next message answers (shared src/v2/followUp.js)."
+      "doc": "Generic prompt when a circle command trips needsForm with a single missing field — the bot asks, the user's next message answers (shared src/v2/followUp.js)."
     },
     "followup_prompt_respond_to_item_body": {
       "text": "What help are you offering?",
@@ -790,11 +790,11 @@
     },
     "form_title": {
       "text": "Complete /{{opId}}",
-      "doc": "Title at the top of the multi-field kring form bubble (2+ missing fields → beginFormFollowUp). Mirrors basis-mobile so web≡mobile."
+      "doc": "Title at the top of the multi-field circle form bubble (2+ missing fields → beginFormFollowUp). Mirrors basis-mobile so web≡mobile."
     },
     "form_submit": {
       "text": "Submit",
-      "doc": "Submit button on the multi-field kring form bubble."
+      "doc": "Submit button on the multi-field circle form bubble."
     },
     "form_label_body": {
       "text": "Body",

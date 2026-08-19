@@ -782,7 +782,7 @@
   "chat": {
     "followup_prompt": {
       "text": "Wat is je {{param}}? (voor /{{opId}})",
-      "doc": "Generieke prompt als een kring-commando needsForm geeft met één ontbrekend veld — de bot vraagt, het volgende bericht is het antwoord (gedeeld src/v2/followUp.js)."
+      "doc": "Generieke prompt als een circle-commando needsForm geeft met één ontbrekend veld — de bot vraagt, het volgende bericht is het antwoord (gedeeld src/v2/followUp.js)."
     },
     "followup_prompt_respond_to_item_body": {
       "text": "Welke hulp bied je aan?",
@@ -790,11 +790,11 @@
     },
     "form_title": {
       "text": "Voltooi /{{opId}}",
-      "doc": "Titel boven het multi-field kring-formulier (2+ ontbrekende velden → beginFormFollowUp). Spiegelt basis-mobile zodat web≡mobile."
+      "doc": "Titel boven het multi-field circle-formulier (2+ ontbrekende velden → beginFormFollowUp). Spiegelt basis-mobile zodat web≡mobile."
     },
     "form_submit": {
       "text": "Verstuur",
-      "doc": "Submit-knop op het multi-field kring-formulier."
+      "doc": "Submit-knop op het multi-field circle-formulier."
     },
     "form_label_body": {
       "text": "Bericht",

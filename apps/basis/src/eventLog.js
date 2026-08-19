@@ -59,7 +59,7 @@ export const RETENTION_MS = RETENTION_DEFAULTS.chat;
 /* ─── C15 "one stream" substrate (Phase-4 Wave B) ─────────────────
  *
  * North star: the EventLog is THE canonical per-circle log. Chat / Stream /
- * LEDEN are projections of it. Two primitives land here — additive, so every
+ * MEMBERS are projections of it. Two primitives land here — additive, so every
  * existing entry, projection, and consumer keeps working byte-for-byte:
  *
  *   1. First-class `circleId` — a logged entry MAY carry a top-level

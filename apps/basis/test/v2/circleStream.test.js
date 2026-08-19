@@ -121,16 +121,16 @@ describe('buildCircleStream', () => {
 
 describe('circleRows (SP-13)', () => {
   const events = [
-    { id: 'a', ts: 300, app: 'stoop',    type: 'circle-post', payload: { groupId: 'grp-9',  kind: 'vraag' } },
-    { id: 'b', ts: 250, app: 'stoop',    type: 'circle-post', payload: { groupId: 'grp-9',  kind: 'aanbod' } },
-    { id: 'c', ts: 200, app: 'stoop',    type: 'circle-post', payload: { groupId: 'grp-9',  kind: 'leen' } },
-    { id: 'd', ts: 150, app: 'stoop',    type: 'circle-post', payload: { groupId: 'circle-1', kind: 'vraag' } },
+    { id: 'a', ts: 300, app: 'stoop',    type: 'circle-post', payload: { groupId: 'grp-9',  kind: 'ask' } },
+    { id: 'b', ts: 250, app: 'stoop',    type: 'circle-post', payload: { groupId: 'grp-9',  kind: 'offer' } },
+    { id: 'c', ts: 200, app: 'stoop',    type: 'circle-post', payload: { groupId: 'grp-9',  kind: 'lend' } },
+    { id: 'd', ts: 150, app: 'stoop',    type: 'circle-post', payload: { groupId: 'circle-1', kind: 'ask' } },
     { id: 'e', ts: 100, app: 'tasks', type: 'task-claimed', payload: { circleId: 'circle-1' } },
     { id: 'f', ts:  50, app: 'household',type: 'note-added',   payload: {} },
   ];
 
   it('exposes the canonical chip set', () => {
-    expect(CIRCLE_STREAM_KIND_FILTERS).toEqual(['all', 'vraag', 'aanbod', 'leen']);
+    expect(CIRCLE_STREAM_KIND_FILTERS).toEqual(['all', 'ask', 'offer', 'lend']);
   });
 
   it('with circleId narrows to that circle (newest first)', () => {
@@ -144,9 +144,9 @@ describe('circleRows (SP-13)', () => {
   });
 
   it('with kindFilter narrows to that kind only', () => {
-    expect(circleRows({ events, circles, circleId: 'grp-9', kindFilter: 'vraag' })
+    expect(circleRows({ events, circles, circleId: 'grp-9', kindFilter: 'ask' })
       .map((r) => r.id)).toEqual(['a']);
-    expect(circleRows({ events, circles, circleId: 'grp-9', kindFilter: 'aanbod' })
+    expect(circleRows({ events, circles, circleId: 'grp-9', kindFilter: 'offer' })
       .map((r) => r.id)).toEqual(['b']);
   });
 

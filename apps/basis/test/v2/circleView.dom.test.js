@@ -31,12 +31,12 @@ const rows = [
   {
     id: 'r2', ts: now - 60_000, app: 'stoop', type: 'circle-post',
     actor: 'Pieter', circleId: 'g1', senderLabel: 'Pieter',
-    event: { id: 'r2', type: 'circle-post', payload: { kind: 'aanbod', text: 'Boekje te geef.', authorName: 'Pieter' } },
+    event: { id: 'r2', type: 'circle-post', payload: { kind: 'offer', text: 'Boekje te geef.', authorName: 'Pieter' } },
   },
   {
     id: 'r1', ts: yest, app: 'stoop', type: 'circle-post',
     actor: 'Anne', circleId: 'g1', senderLabel: 'Anne',
-    event: { id: 'r1', type: 'circle-post', payload: { kind: 'vraag', text: 'Heeft iemand een ladder t/m vrijdag?', authorName: 'Anne' } },
+    event: { id: 'r1', type: 'circle-post', payload: { kind: 'ask', text: 'Heeft iemand een ladder t/m vrijdag?', authorName: 'Anne' } },
   },
 ];
 
@@ -44,22 +44,22 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
   it('renders header (back + title + members meta)', () => {
     const el = mount();
     renderCircleView(el, { circle, rows, t });
-    expect(el.querySelector('.circle-circle__back').textContent).toBe('circle.back');
-    expect(el.querySelector('.circle-circle__title').textContent).toBe('Selwerd');
-    expect(el.querySelector('.circle-circle__meta').textContent).toBe('circle.members:87');
+    expect(el.querySelector('.circle-view__back').textContent).toBe('circle.back');
+    expect(el.querySelector('.circle-view__title').textContent).toBe('Selwerd');
+    expect(el.querySelector('.circle-view__meta').textContent).toBe('circle.members:87');
   });
 
   it('renders message bubbles chronologically (oldest at top)', () => {
     const el = mount();
     renderCircleView(el, { circle, rows, t });
-    const bubbles = el.querySelectorAll('.circle-circle__bubble');
+    const bubbles = el.querySelectorAll('.circle-view__bubble');
     expect([...bubbles].map((b) => b.dataset.rowId)).toEqual(['r1', 'r2', 'r3']);
   });
 
   it('groups bubbles under dated day-dividers', () => {
     const el = mount();
     renderCircleView(el, { circle, rows, t });
-    const days = el.querySelectorAll('.circle-circle__day');
+    const days = el.querySelectorAll('.circle-view__day');
     expect(days.length).toBe(2);
     // First divider = yesterday's date (precedes r1).
     expect(days[0].textContent).toBe('circle.circle.day_yesterday');
@@ -70,35 +70,35 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
   it('shows a KIND pill on bubbles whose payload carries a kind ≠ message', () => {
     const el = mount();
     renderCircleView(el, { circle, rows, t });
-    const bubbles = el.querySelectorAll('.circle-circle__bubble');
-    // r1 vraag, r2 aanbod, r3 chat-message (no pill).
-    expect(bubbles[0].querySelector('.circle-circle__bubble-kind').textContent).toBe('VRAAG');
-    expect(bubbles[1].querySelector('.circle-circle__bubble-kind').textContent).toBe('AANBOD');
-    expect(bubbles[2].querySelector('.circle-circle__bubble-kind')).toBeNull();
+    const bubbles = el.querySelectorAll('.circle-view__bubble');
+    // r1 ask, r2 offer, r3 chat-message (no pill).
+    expect(bubbles[0].querySelector('.circle-view__bubble-kind').textContent).toBe('ASK');
+    expect(bubbles[1].querySelector('.circle-view__bubble-kind').textContent).toBe('OFFER');
+    expect(bubbles[2].querySelector('.circle-view__bubble-kind')).toBeNull();
   });
 
   it('renders sender label + body text + substrate action chips', () => {
     const el = mount();
     renderCircleView(el, { circle, rows, t });
-    const bubbles = el.querySelectorAll('.circle-circle__bubble');
-    // r1 = vraag → [help, ignore] via streamActions.
-    expect(bubbles[0].querySelector('.circle-circle__bubble-sender').textContent).toBe('Anne');
-    expect(bubbles[0].querySelector('.circle-circle__bubble-text').textContent)
+    const bubbles = el.querySelectorAll('.circle-view__bubble');
+    // r1 = ask → [help, ignore] via streamActions.
+    expect(bubbles[0].querySelector('.circle-view__bubble-sender').textContent).toBe('Anne');
+    expect(bubbles[0].querySelector('.circle-view__bubble-text').textContent)
       .toBe('Heeft iemand een ladder t/m vrijdag?');
-    const acts = bubbles[0].querySelectorAll('.circle-circle__bubble-action');
+    const acts = bubbles[0].querySelectorAll('.circle-view__bubble-action');
     expect([...acts].map((b) => b.dataset.action)).toEqual(['help', 'ignore']);
   });
 
   it('renders the inline composer when onSend is wired', () => {
     const el = mount();
     renderCircleView(el, { circle, rows, t });
-    expect(el.querySelector('.circle-circle__composer')).toBeNull();
+    expect(el.querySelector('.circle-view__composer')).toBeNull();
 
     const el2 = mount();
     const onSend = vi.fn();
     renderCircleView(el2, { circle, rows, t, onSend });
-    const form  = el2.querySelector('.circle-circle__composer');
-    const input = el2.querySelector('.circle-circle__composer-input');
+    const form  = el2.querySelector('.circle-view__composer');
+    const input = el2.querySelector('.circle-view__composer-input');
     expect(form).not.toBeNull();
     expect(input.placeholder).toBe('circle.circle.composer_placeholder');
   });
@@ -107,8 +107,8 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
     const el = mount();
     const onSend = vi.fn();
     renderCircleView(el, { circle, rows, t, onSend });
-    const input = el.querySelector('.circle-circle__composer-input');
-    const form  = el.querySelector('.circle-circle__composer');
+    const input = el.querySelector('.circle-view__composer-input');
+    const form  = el.querySelector('.circle-view__composer');
     input.value = '  Hoi circle!  ';
     form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     expect(onSend).toHaveBeenCalledTimes(1);
@@ -120,8 +120,8 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
     const el = mount();
     const onSend = vi.fn();
     renderCircleView(el, { circle, rows, t, onSend });
-    const input = el.querySelector('.circle-circle__composer-input');
-    const form  = el.querySelector('.circle-circle__composer');
+    const input = el.querySelector('.circle-view__composer-input');
+    const form  = el.querySelector('.circle-view__composer');
     input.value = '   ';
     form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     expect(onSend).not.toHaveBeenCalled();
@@ -133,28 +133,28 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
       circle, rows, t, onSend: () => {},
       composerPlaceholder: 'Schrijf naar de circle…',
     });
-    expect(el.querySelector('.circle-circle__composer-input').placeholder)
+    expect(el.querySelector('.circle-view__composer-input').placeholder)
       .toBe('Schrijf naar de circle…');
   });
 
   it('empty state shows when rows = []', () => {
     const el = mount();
     renderCircleView(el, { circle, rows: [], t });
-    expect(el.querySelector('.circle-circle__empty').textContent).toBe('circle.circle.empty');
-    expect(el.querySelectorAll('.circle-circle__bubble')).toHaveLength(0);
+    expect(el.querySelector('.circle-view__empty').textContent).toBe('circle.circle.empty');
+    expect(el.querySelectorAll('.circle-view__bubble')).toHaveLength(0);
   });
 
   it('overflow menu hides until a `more` action is provided + toggles on click', () => {
     const el = mount();
     renderCircleView(el, { circle, rows, t });
-    expect(el.querySelector('.circle-circle__more')).toBeNull();
+    expect(el.querySelector('.circle-view__more')).toBeNull();
 
     const el2 = mount();
     const onSettings = vi.fn();
     renderCircleView(el2, { circle, rows, t, more: { settings: onSettings } });
-    const trigger = el2.querySelector('.circle-circle__more');
+    const trigger = el2.querySelector('.circle-view__more');
     expect(trigger).not.toBeNull();
-    const menu = el2.querySelector('.circle-circle__more-menu');
+    const menu = el2.querySelector('.circle-view__more-menu');
     expect(menu.classList.contains('is-open')).toBe(false);
     trigger.click();
     expect(menu.classList.contains('is-open')).toBe(true);
@@ -167,7 +167,7 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
     const el = mount();
     const onAction = vi.fn();
     renderCircleView(el, { circle, rows, t, onAction });
-    el.querySelector('.circle-circle__bubble .circle-circle__bubble-action[data-action=help]').click();
+    el.querySelector('.circle-view__bubble .circle-view__bubble-action[data-action=help]').click();
     expect(onAction).toHaveBeenCalledTimes(1);
     expect(onAction.mock.calls[0][0].action).toBe('help');
     expect(onAction.mock.calls[0][1].id).toBe('r1');
@@ -183,34 +183,34 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
     it('is hidden by default (no viewer signals threaded)', () => {
       const el = mount();
       renderCircleView(el, { circle, rows: [choreRow], t });
-      expect(el.querySelector('.circle-circle__bubble-action[data-action=mandate]')).toBeNull();
+      expect(el.querySelector('.circle-view__bubble-action[data-action=mandate]')).toBeNull();
     });
 
     it('appears for the owner (viewer WebID matches the row creator)', () => {
       const el = mount();
       renderCircleView(el, { circle, rows: [choreRow], t, viewerWebid: 'https://me.example/#me' });
-      const btn = el.querySelector('.circle-circle__bubble-action[data-action=mandate]');
+      const btn = el.querySelector('.circle-view__bubble-action[data-action=mandate]');
       expect(btn).not.toBeNull();
-      expect(btn.classList.contains('circle-circle__bubble-action--mandate')).toBe(true);
+      expect(btn.classList.contains('circle-view__bubble-action--mandate')).toBe(true);
     });
 
     it('stays hidden for a non-owner viewer', () => {
       const el = mount();
       renderCircleView(el, { circle, rows: [choreRow], t, viewerWebid: 'https://someone-else.example/#me' });
-      expect(el.querySelector('.circle-circle__bubble-action[data-action=mandate]')).toBeNull();
+      expect(el.querySelector('.circle-view__bubble-action[data-action=mandate]')).toBeNull();
     });
 
     it('appears for a circle admin', () => {
       const el = mount();
       renderCircleView(el, { circle, rows: [choreRow], t, viewerIsAdmin: true });
-      expect(el.querySelector('.circle-circle__bubble-action[data-action=mandate]')).not.toBeNull();
+      expect(el.querySelector('.circle-view__bubble-action[data-action=mandate]')).not.toBeNull();
     });
 
     it('onAction receives the mandate action carrying the taskId', () => {
       const el = mount();
       const onAction = vi.fn();
       renderCircleView(el, { circle, rows: [choreRow], t, onAction, viewerIsAdmin: true });
-      el.querySelector('.circle-circle__bubble-action[data-action=mandate]').click();
+      el.querySelector('.circle-view__bubble-action[data-action=mandate]').click();
       expect(onAction.mock.calls[0][0].action).toBe('mandate');
       expect(onAction.mock.calls[0][0].payload.taskId).toBe('task-77');
     });
@@ -229,77 +229,77 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
   /* ─── — per-circle bottom tabs ─── */
 
   const circleTabs = [
-    { id: 'gesprek',  label: 'GESPREK' },
-    { id: 'prikbord', label: 'PRIKBORD' },
-    { id: 'leden',    label: 'LEDEN' },
+    { id: 'conversation',  label: 'CONVERSATION' },
+    { id: 'noticeboard', label: 'NOTICEBOARD' },
+    { id: 'members',    label: 'MEMBERS' },
   ];
 
   it('tab bar hides when fewer than 2 tabs are supplied', () => {
     const el = mount();
-    renderCircleView(el, { circle, rows, t, tabs: [{ id: 'gesprek', label: 'GESPREK' }] });
-    expect(el.querySelector('.circle-circle__tabs')).toBeNull();
+    renderCircleView(el, { circle, rows, t, tabs: [{ id: 'conversation', label: 'CONVERSATION' }] });
+    expect(el.querySelector('.circle-view__tabs')).toBeNull();
   });
 
   it('renders one tab button per entry with the active one marked', () => {
     const el = mount();
-    renderCircleView(el, { circle, rows, t, tabs: circleTabs, activeTab: 'prikbord' });
-    const btns = el.querySelectorAll('.circle-circle__tab');
-    expect([...btns].map((b) => b.dataset.tab)).toEqual(['gesprek', 'prikbord', 'leden']);
-    expect(el.querySelector('.circle-circle__tab.is-active').dataset.tab).toBe('prikbord');
+    renderCircleView(el, { circle, rows, t, tabs: circleTabs, activeTab: 'noticeboard' });
+    const btns = el.querySelectorAll('.circle-view__tab');
+    expect([...btns].map((b) => b.dataset.tab)).toEqual(['conversation', 'noticeboard', 'members']);
+    expect(el.querySelector('.circle-view__tab.is-active').dataset.tab).toBe('noticeboard');
   });
 
-  it('non-GESPREK tabs render the placeholder body (V0 of SP-13.3)', () => {
+  it('non-CONVERSATION tabs render the placeholder body (V0 of SP-13.3)', () => {
     const el = mount();
-    renderCircleView(el, { circle, rows, t, tabs: circleTabs, activeTab: 'prikbord' });
-    expect(el.querySelector('.circle-circle__placeholder')).not.toBeNull();
+    renderCircleView(el, { circle, rows, t, tabs: circleTabs, activeTab: 'noticeboard' });
+    expect(el.querySelector('.circle-view__placeholder')).not.toBeNull();
     // Bubble list is suppressed for non-chat tabs.
-    expect(el.querySelectorAll('.circle-circle__bubble')).toHaveLength(0);
+    expect(el.querySelectorAll('.circle-view__bubble')).toHaveLength(0);
   });
 
-  it('GESPREK tab still renders the bubble list', () => {
+  it('CONVERSATION tab still renders the bubble list', () => {
     const el = mount();
-    renderCircleView(el, { circle, rows, t, tabs: circleTabs, activeTab: 'gesprek' });
-    expect(el.querySelector('.circle-circle__placeholder')).toBeNull();
-    expect(el.querySelectorAll('.circle-circle__bubble')).toHaveLength(3);
+    renderCircleView(el, { circle, rows, t, tabs: circleTabs, activeTab: 'conversation' });
+    expect(el.querySelector('.circle-view__placeholder')).toBeNull();
+    expect(el.querySelectorAll('.circle-view__bubble')).toHaveLength(3);
   });
 
   it('clicking a non-active tab fires onTab(id); clicking the active one is a no-op', () => {
     const el = mount();
     const onTab = vi.fn();
-    renderCircleView(el, { circle, rows, t, tabs: circleTabs, activeTab: 'gesprek', onTab });
-    el.querySelector('.circle-circle__tab[data-tab=leden]').click();
+    renderCircleView(el, { circle, rows, t, tabs: circleTabs, activeTab: 'conversation', onTab });
+    el.querySelector('.circle-view__tab[data-tab=members]').click();
     expect(onTab).toHaveBeenCalledTimes(1);
-    expect(onTab.mock.calls[0][0]).toBe('leden');
-    el.querySelector('.circle-circle__tab[data-tab=gesprek]').click();
+    expect(onTab.mock.calls[0][0]).toBe('members');
+    el.querySelector('.circle-view__tab[data-tab=conversation]').click();
     expect(onTab).toHaveBeenCalledTimes(1); // unchanged — re-tap on active = no-op
   });
 
   it('defaults activeTab to the first tab id when caller omits it', () => {
     const el = mount();
     renderCircleView(el, { circle, rows, t, tabs: circleTabs });
-    expect(el.querySelector('.circle-circle__tab.is-active').dataset.tab).toBe('gesprek');
+    expect(el.querySelector('.circle-view__tab.is-active').dataset.tab).toBe('conversation');
   });
 
   it('composer stays visible regardless of active tab (v2 §1 boards)', () => {
     const el = mount();
-    renderCircleView(el, { circle, rows, t, tabs: circleTabs, activeTab: 'leden', onSend: () => {} });
-    expect(el.querySelector('.circle-circle__composer')).not.toBeNull();
+    renderCircleView(el, { circle, rows, t, tabs: circleTabs, activeTab: 'members', onSend: () => {} });
+    expect(el.querySelector('.circle-view__composer')).not.toBeNull();
   });
 
-  /* ─── — Chat ↔ Scherm header pill (v2 §4 "De Schakelaar") ─── */
+  /* ─── — Chat ↔ Screen header pill (v2 §4 "De mode switch") ─── */
 
   it('view-toggle pill hides unless onViewMode is wired', () => {
     const el = mount();
     renderCircleView(el, { circle, rows, t });
-    expect(el.querySelector('.circle-circle__view-toggle')).toBeNull();
+    expect(el.querySelector('.circle-view__view-toggle')).toBeNull();
   });
 
-  it('renders both Chat and Scherm buttons with the active one marked', () => {
+  it('renders both Chat and Screen buttons with the active one marked', () => {
     const el = mount();
     renderCircleView(el, { circle, rows, t, viewMode: 'chat', onViewMode: () => {} });
-    const btns = el.querySelectorAll('.circle-circle__view-toggle-btn');
-    expect([...btns].map((b) => b.dataset.viewMode)).toEqual(['chat', 'scherm']);
-    expect(el.querySelector('.circle-circle__view-toggle-btn.is-active').dataset.viewMode).toBe('chat');
+    const btns = el.querySelectorAll('.circle-view__view-toggle-btn');
+    expect([...btns].map((b) => b.dataset.viewMode)).toEqual(['chat', 'screen']);
+    expect(el.querySelector('.circle-view__view-toggle-btn.is-active').dataset.viewMode).toBe('chat');
     expect(btns[0].getAttribute('aria-pressed')).toBe('true');
     expect(btns[1].getAttribute('aria-pressed')).toBe('false');
   });
@@ -308,25 +308,25 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
     const el = mount();
     const onViewMode = vi.fn();
     renderCircleView(el, { circle, rows, t, viewMode: 'chat', onViewMode });
-    el.querySelector('.circle-circle__view-toggle-btn[data-view-mode=scherm]').click();
+    el.querySelector('.circle-view__view-toggle-btn[data-view-mode=screen]').click();
     expect(onViewMode).toHaveBeenCalledTimes(1);
-    expect(onViewMode.mock.calls[0][0]).toBe('scherm');
-    el.querySelector('.circle-circle__view-toggle-btn[data-view-mode=chat]').click();
+    expect(onViewMode.mock.calls[0][0]).toBe('screen');
+    el.querySelector('.circle-view__view-toggle-btn[data-view-mode=chat]').click();
     expect(onViewMode).toHaveBeenCalledTimes(1); // unchanged — re-tap on active = no-op
   });
 
-  it('scherm-mode renders the screen body (α.1c) and suppresses bubbles', () => {
+  it('screen-mode renders the screen body (α.1c) and suppresses bubbles', () => {
     // No screenBlocks wired → renderCircleScreen falls through to its
     // own empty-state.  The body must contain a circle-screen subtree
     // (not chat bubbles).
     const el = mount();
-    renderCircleView(el, { circle, rows, t, viewMode: 'scherm', onViewMode: () => {} });
+    renderCircleView(el, { circle, rows, t, viewMode: 'screen', onViewMode: () => {} });
     expect(el.querySelector('.circle-screen')).not.toBeNull();
     expect(el.querySelector('.circle-screen__empty').textContent).toBe('circle.screen.empty');
-    expect(el.querySelectorAll('.circle-circle__bubble')).toHaveLength(0);
+    expect(el.querySelectorAll('.circle-view__bubble')).toHaveLength(0);
   });
 
-  it('scherm-mode with screenBlocks renders each materialized block', () => {
+  it('screen-mode with screenBlocks renders each materialized block', () => {
     const el = mount();
     const blocks = [
       { blockId: 'b1', type: 'announcement', status: 'ok', content: { text: 'Hi!' } },
@@ -334,7 +334,7 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
     ];
     renderCircleView(el, {
       circle, rows, t,
-      viewMode: 'scherm', onViewMode: () => {},
+      viewMode: 'screen', onViewMode: () => {},
       screenBlocks: blocks,
     });
     expect(el.querySelectorAll('.circle-screen__block')).toHaveLength(2);
@@ -342,20 +342,20 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
     expect(el.querySelector('.circle-screen__block--text')).not.toBeNull();
   });
 
-  it('scherm-mode suppresses the composer even when onSend is wired', () => {
+  it('screen-mode suppresses the composer even when onSend is wired', () => {
     const el = mount();
     renderCircleView(el, {
-      circle, rows, t, viewMode: 'scherm', onViewMode: () => {}, onSend: () => {},
+      circle, rows, t, viewMode: 'screen', onViewMode: () => {}, onSend: () => {},
     });
-    expect(el.querySelector('.circle-circle__composer')).toBeNull();
+    expect(el.querySelector('.circle-view__composer')).toBeNull();
   });
 
-  it('scherm-mode suppresses the bottom tab bar even when ≥ 2 tabs are wired', () => {
+  it('screen-mode suppresses the bottom tab bar even when ≥ 2 tabs are wired', () => {
     const el = mount();
     renderCircleView(el, {
-      circle, rows, t, viewMode: 'scherm', onViewMode: () => {}, tabs: circleTabs,
+      circle, rows, t, viewMode: 'screen', onViewMode: () => {}, tabs: circleTabs,
     });
-    expect(el.querySelector('.circle-circle__tabs')).toBeNull();
+    expect(el.querySelector('.circle-view__tabs')).toBeNull();
   });
 
   /* ─── δ.2 — per-message delivery state ─── */
@@ -378,7 +378,7 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
       localActor: LOCAL,
     });
     const bubble = el.querySelector('[data-row-id="mine-1"]');
-    const icon = bubble.querySelector('.circle-circle__bubble-delivery--pending');
+    const icon = bubble.querySelector('.circle-view__bubble-delivery--pending');
     expect(icon).not.toBeNull();
     expect(icon.getAttribute('aria-label')).toBe('circle.chat.delivery.pending');
   });
@@ -391,7 +391,7 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
       localActor: LOCAL,
     });
     const bubble = el.querySelector('[data-row-id="mine-1"]');
-    expect(bubble.querySelector('.circle-circle__bubble-delivery')).toBeNull();
+    expect(bubble.querySelector('.circle-view__bubble-delivery')).toBeNull();
   });
 
   it('failed state renders a warning button + tap fires onRetryDelivery(msgId)', () => {
@@ -403,7 +403,7 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
       localActor: LOCAL,
       onRetryDelivery,
     });
-    const btn = el.querySelector('.circle-circle__bubble-delivery--failed');
+    const btn = el.querySelector('.circle-view__bubble-delivery--failed');
     expect(btn).not.toBeNull();
     expect(btn.tagName).toBe('BUTTON');
     expect(btn.getAttribute('aria-label')).toBe('circle.chat.delivery.failed');
@@ -419,7 +419,7 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
       deliveryStateFor: () => 'pending',
       localActor: LOCAL,
     });
-    expect(el.querySelector('.circle-circle__bubble-delivery')).toBeNull();
+    expect(el.querySelector('.circle-view__bubble-delivery')).toBeNull();
   });
 
   it('non-chat-message local rows (e.g. circle-post mirror) get no delivery icon', () => {
@@ -427,20 +427,20 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
     const localPost = {
       id: 'mine-circle', ts: now + 1_000, app: 'stoop', type: 'circle-post',
       actor: LOCAL, circleId: 'g1',
-      event: { id: 'mine-circle', type: 'circle-post', payload: { kind: 'aanbod', text: 'Hi' } },
+      event: { id: 'mine-circle', type: 'circle-post', payload: { kind: 'offer', text: 'Hi' } },
     };
     renderCircleView(el, {
       circle, rows: [localPost], t,
       deliveryStateFor: () => 'pending',
       localActor: LOCAL,
     });
-    expect(el.querySelector('.circle-circle__bubble-delivery')).toBeNull();
+    expect(el.querySelector('.circle-view__bubble-delivery')).toBeNull();
   });
 
   it('no delivery icon renders when the host omits the delivery-state plumbing', () => {
     const el = mount();
     renderCircleView(el, { circle, rows: [localRow], t });
-    expect(el.querySelector('.circle-circle__bubble-delivery')).toBeNull();
+    expect(el.querySelector('.circle-view__bubble-delivery')).toBeNull();
   });
 });
 
@@ -450,53 +450,53 @@ describe('renderCircleView · bulletin restyle (bot card · transparency · cons
     event: { id: 'b1', type: 'chat-message', actor: 'bot', payload: { text: 'Klaar.', ...payload } },
   });
 
-  it('GESPREK renders the chat card wrapping the log, but NO assistant-header strip on a group circle (no botLabel)', () => {
+  it('CONVERSATION renders the chat card wrapping the log, but NO assistant-header strip on a group circle (no botLabel)', () => {
     const el = mount();
     renderCircleView(el, { circle, rows, t });   // no botLabel → group / non-bot → gate closed
-    const card = el.querySelector('.circle-circle__chat-card');
+    const card = el.querySelector('.circle-view__chat-card');
     expect(card).not.toBeNull();
     // the head strip is gated OFF without a 1:1-bot botLabel
-    expect(card.querySelector('.circle-circle__bot-head')).toBeNull();
-    expect(card.querySelector('.circle-circle__bot-dot')).toBeNull();
-    expect(card.querySelector('.circle-circle__bot-name')).toBeNull();
+    expect(card.querySelector('.circle-view__bot-head')).toBeNull();
+    expect(card.querySelector('.circle-view__bot-dot')).toBeNull();
+    expect(card.querySelector('.circle-view__bot-name')).toBeNull();
     // the message log still lives inside the card
-    expect(card.querySelector('.circle-circle__list')).not.toBeNull();
+    expect(card.querySelector('.circle-view__list')).not.toBeNull();
   });
 
   it('shows the assistant-header strip (green dot + name) ONLY with a 1:1-bot botLabel', () => {
     const el = mount();
     renderCircleView(el, { circle, rows, t, botLabel: 'de uitleg-bot' });
-    const card = el.querySelector('.circle-circle__chat-card');
-    expect(card.querySelector('.circle-circle__bot-head')).not.toBeNull();
-    expect(card.querySelector('.circle-circle__bot-dot')).not.toBeNull();
-    expect(card.querySelector('.circle-circle__bot-name').textContent).toBe('de uitleg-bot');
+    const card = el.querySelector('.circle-view__chat-card');
+    expect(card.querySelector('.circle-view__bot-head')).not.toBeNull();
+    expect(card.querySelector('.circle-view__bot-dot')).not.toBeNull();
+    expect(card.querySelector('.circle-view__bot-name').textContent).toBe('de uitleg-bot');
   });
 
-  it('scherm-mode renders no bot card (not the assistant conversation)', () => {
+  it('screen-mode renders no bot card (not the assistant conversation)', () => {
     const el = mount();
-    renderCircleView(el, { circle, rows, t, viewMode: 'scherm', onViewMode: () => {} });
-    expect(el.querySelector('.circle-circle__chat-card')).toBeNull();
+    renderCircleView(el, { circle, rows, t, viewMode: 'screen', onViewMode: () => {} });
+    expect(el.querySelector('.circle-view__chat-card')).toBeNull();
   });
 
   it('transparency badge stays dormant when a bot message carries no provenance', () => {
     const el = mount();
     renderCircleView(el, { circle, rows: [botRow({})], t });
-    expect(el.querySelector('.circle-circle__bubble-provenance')).toBeNull();
+    expect(el.querySelector('.circle-view__bubble-provenance')).toBeNull();
   });
 
   it('transparency badge renders a verbatim string provenance under a bot message', () => {
     const el = mount();
     renderCircleView(el, { circle, rows: [botRow({ provenance: '· direct beantwoord' })], t });
-    expect(el.querySelector('.circle-circle__bubble-provenance').textContent).toBe('· direct beantwoord');
+    expect(el.querySelector('.circle-view__bubble-provenance').textContent).toBe('· direct beantwoord');
   });
 
   it('transparency badge localizes an object provenance ({ llmUsed })', () => {
     const el = mount();
     renderCircleView(el, { circle, rows: [botRow({ provenance: { llmUsed: false } })], t });
-    expect(el.querySelector('.circle-circle__bubble-provenance').textContent).toBe('circle.circle.provenance_direct');
+    expect(el.querySelector('.circle-view__bubble-provenance').textContent).toBe('circle.circle.provenance_direct');
     const el2 = mount();
     renderCircleView(el2, { circle, rows: [botRow({ provenance: { llmUsed: true } })], t });
-    expect(el2.querySelector('.circle-circle__bubble-provenance').textContent).toBe('circle.circle.provenance_llm');
+    expect(el2.querySelector('.circle-view__bubble-provenance').textContent).toBe('circle.circle.provenance_llm');
   });
 
   it('a consent bubble gets the --consent card variant + primary/secondary button classes', () => {
@@ -509,10 +509,10 @@ describe('renderCircleView · bulletin restyle (bot card · transparency · cons
       ],
     });
     renderCircleView(el, { circle, rows: [consentRow], t, onEmbedButton: vi.fn() });
-    const bubble = el.querySelector('.circle-circle__bubble--consent');
+    const bubble = el.querySelector('.circle-view__bubble--consent');
     expect(bubble).not.toBeNull();
-    expect(bubble.querySelector('.circle-circle__consent-btn--primary').textContent).toBe('ja, doorsturen');
-    expect(bubble.querySelector('.circle-circle__consent-btn--secondary').textContent).toBe('nee, ik kies zelf');
+    expect(bubble.querySelector('.circle-view__consent-btn--primary').textContent).toBe('ja, doorsturen');
+    expect(bubble.querySelector('.circle-view__consent-btn--secondary').textContent).toBe('nee, ik kies zelf');
   });
 });
 
@@ -525,8 +525,8 @@ describe('renderCircleView · composer parity (slash-suggest + permission gate)'
   it('permission gate: canPost=false renders a read-only note in place of the composer', () => {
     const el = mount();
     renderCircleView(el, { circle, rows, t, onSend: () => {}, canPost: false });
-    expect(el.querySelector('.circle-circle__composer')).toBeNull();
-    const note = el.querySelector('.circle-circle__composer-disabled');
+    expect(el.querySelector('.circle-view__composer')).toBeNull();
+    const note = el.querySelector('.circle-view__composer-disabled');
     expect(note).not.toBeNull();
     expect(note.textContent).toBe('circle.circle.chat_disabled');
   });
@@ -534,19 +534,19 @@ describe('renderCircleView · composer parity (slash-suggest + permission gate)'
   it('permission gate: canPost (default) renders the composer form, no note', () => {
     const el = mount();
     renderCircleView(el, { circle, rows, t, onSend: () => {} });
-    expect(el.querySelector('.circle-circle__composer')).not.toBeNull();
-    expect(el.querySelector('.circle-circle__composer-disabled')).toBeNull();
+    expect(el.querySelector('.circle-view__composer')).not.toBeNull();
+    expect(el.querySelector('.circle-view__composer-disabled')).toBeNull();
   });
 
   it('slash-suggest: typing "/" opens the dropdown; a space (into args) closes it', () => {
     const el = mount();
     renderCircleView(el, { circle, rows, t, onSend: () => {}, catalog });
-    const input = el.querySelector('.circle-circle__composer-input');
-    const suggest = el.querySelector('.circle-circle__suggest');
+    const input = el.querySelector('.circle-view__composer-input');
+    const suggest = el.querySelector('.circle-view__suggest');
     input.value = '/';
     input.dispatchEvent(new Event('input'));
     expect(suggest.hidden).toBe(false);
-    expect(el.querySelectorAll('.circle-circle__suggest-item').length).toBe(2);
+    expect(el.querySelectorAll('.circle-view__suggest-item').length).toBe(2);
     input.value = '/addtask milk';
     input.dispatchEvent(new Event('input'));
     expect(suggest.hidden).toBe(true);
@@ -555,19 +555,19 @@ describe('renderCircleView · composer parity (slash-suggest + permission gate)'
   it('slash-suggest: a prefix filters the list', () => {
     const el = mount();
     renderCircleView(el, { circle, rows, t, onSend: () => {}, catalog });
-    const input = el.querySelector('.circle-circle__composer-input');
+    const input = el.querySelector('.circle-view__composer-input');
     input.value = '/comp';
     input.dispatchEvent(new Event('input'));
-    expect([...el.querySelectorAll('.circle-circle__suggest-cmd')].map((n) => n.textContent)).toEqual(['/complete-task']);
+    expect([...el.querySelectorAll('.circle-view__suggest-cmd')].map((n) => n.textContent)).toEqual(['/complete-task']);
   });
 
   it('no catalog → no suggest dropdown wiring (composer still works)', () => {
     const el = mount();
     renderCircleView(el, { circle, rows, t, onSend: () => {} });
-    const input = el.querySelector('.circle-circle__composer-input');
+    const input = el.querySelector('.circle-view__composer-input');
     input.value = '/';
     input.dispatchEvent(new Event('input'));
-    expect(el.querySelector('.circle-circle__suggest').hidden).toBe(true);
+    expect(el.querySelector('.circle-view__suggest').hidden).toBe(true);
   });
 
   it('history: submit records the message into the injected history (ArrowUp would recall it)', () => {
@@ -575,9 +575,9 @@ describe('renderCircleView · composer parity (slash-suggest + permission gate)'
     const history = createInputHistory();
     const onSend = vi.fn();
     renderCircleView(el, { circle, rows, t, onSend, catalog, history });
-    const input = el.querySelector('.circle-circle__composer-input');
+    const input = el.querySelector('.circle-view__composer-input');
     input.value = 'hello circle';
-    el.querySelector('.circle-circle__composer').dispatchEvent(new Event('submit'));
+    el.querySelector('.circle-view__composer').dispatchEvent(new Event('submit'));
     expect(onSend).toHaveBeenCalledWith('hello circle');
     expect(history.prev()).toBe('hello circle');
   });
@@ -601,12 +601,12 @@ describe('renderCircleView · multi-field inline form (mobile MultiFieldFormBubb
   it('renders a titled form with one labelled input per missing field', () => {
     const el = mount();
     renderCircleView(el, { circle, rows, t, onSend: vi.fn(), pendingForm, onFormSubmit: vi.fn() });
-    const form = el.querySelector('.circle-circle__form');
+    const form = el.querySelector('.circle-view__form');
     expect(form).toBeTruthy();
-    expect(form.querySelector('.circle-circle__form-title').textContent).toBe('Complete /respondToItem');
-    const inputs = form.querySelectorAll('.circle-circle__form-input');
+    expect(form.querySelector('.circle-view__form-title').textContent).toBe('Complete /respondToItem');
+    const inputs = form.querySelectorAll('.circle-view__form-input');
     expect(inputs).toHaveLength(2);
-    expect([...form.querySelectorAll('.circle-circle__form-label')].map((l) => l.textContent)).toEqual(['Body', 'When']);
+    expect([...form.querySelectorAll('.circle-view__form-label')].map((l) => l.textContent)).toEqual(['Body', 'When']);
     expect(inputs[0].dataset.field).toBe('body');
     expect(inputs[1].dataset.field).toBe('when');
   });
@@ -614,8 +614,8 @@ describe('renderCircleView · multi-field inline form (mobile MultiFieldFormBubb
   it('keeps submit disabled until every field is filled', () => {
     const el = mount();
     renderCircleView(el, { circle, rows, t, onSend: vi.fn(), pendingForm, onFormSubmit: vi.fn() });
-    const submit = el.querySelector('.circle-circle__form-submit');
-    const [bodyInput, whenInput] = el.querySelectorAll('.circle-circle__form-input');
+    const submit = el.querySelector('.circle-view__form-submit');
+    const [bodyInput, whenInput] = el.querySelectorAll('.circle-view__form-input');
     expect(submit.disabled).toBe(true);
     bodyInput.value = 'I can help'; bodyInput.dispatchEvent(new Event('input'));
     expect(submit.disabled).toBe(true);          // still one empty
@@ -627,10 +627,10 @@ describe('renderCircleView · multi-field inline form (mobile MultiFieldFormBubb
     const el = mount();
     const onFormSubmit = vi.fn();
     renderCircleView(el, { circle, rows, t, onSend: vi.fn(), pendingForm, onFormSubmit });
-    const [bodyInput, whenInput] = el.querySelectorAll('.circle-circle__form-input');
+    const [bodyInput, whenInput] = el.querySelectorAll('.circle-view__form-input');
     bodyInput.value = 'I can help'; bodyInput.dispatchEvent(new Event('input'));
     whenInput.value = 'Friday';     whenInput.dispatchEvent(new Event('input'));
-    el.querySelector('.circle-circle__form').dispatchEvent(new Event('submit'));
+    el.querySelector('.circle-view__form').dispatchEvent(new Event('submit'));
     expect(onFormSubmit).toHaveBeenCalledWith({ body: 'I can help', when: 'Friday' });
   });
 
@@ -638,52 +638,52 @@ describe('renderCircleView · multi-field inline form (mobile MultiFieldFormBubb
     const el = mount();
     const onFormSubmit = vi.fn();
     renderCircleView(el, { circle, rows, t, onSend: vi.fn(), pendingForm, onFormSubmit });
-    const [bodyInput] = el.querySelectorAll('.circle-circle__form-input');
+    const [bodyInput] = el.querySelectorAll('.circle-view__form-input');
     bodyInput.value = 'I can help'; bodyInput.dispatchEvent(new Event('input'));
-    el.querySelector('.circle-circle__form').dispatchEvent(new Event('submit'));
+    el.querySelector('.circle-view__form').dispatchEvent(new Event('submit'));
     expect(onFormSubmit).not.toHaveBeenCalled();
   });
 
   it('renders no form when pendingForm is null', () => {
     const el = mount();
     renderCircleView(el, { circle, rows, t, onSend: vi.fn() });
-    expect(el.querySelector('.circle-circle__form')).toBeNull();
+    expect(el.querySelector('.circle-view__form')).toBeNull();
   });
 
-  it('suppresses the form in scherm view-mode (not a chat surface)', () => {
+  it('suppresses the form in screen view-mode (not a chat surface)', () => {
     const el = mount();
-    renderCircleView(el, { circle, rows, t, onSend: vi.fn(), pendingForm, onFormSubmit: vi.fn(), viewMode: 'scherm' });
-    expect(el.querySelector('.circle-circle__form')).toBeNull();
+    renderCircleView(el, { circle, rows, t, onSend: vi.fn(), pendingForm, onFormSubmit: vi.fn(), viewMode: 'screen' });
+    expect(el.querySelector('.circle-view__form')).toBeNull();
   });
 });
 
-describe('renderCircleView · prikbord tab → noticeboard (S1 #1)', () => {
+describe('renderCircleView · noticeboard tab → noticeboard (S1 #1)', () => {
   const tabs = [
-    { id: 'gesprek', feature: 'chat', labelKey: 'circle.tabs.gesprek' },
-    { id: 'prikbord', feature: 'noticeboard', labelKey: 'circle.tabs.prikbord' },
+    { id: 'conversation', feature: 'chat', labelKey: 'circle.tabs.conversation' },
+    { id: 'noticeboard', feature: 'noticeboard', labelKey: 'circle.tabs.noticeboard' },
   ];
 
-  it('renders the noticeboard (not the tab-coming placeholder) when prikbord is active', () => {
+  it('renders the noticeboard (not the tab-coming placeholder) when noticeboard is active', () => {
     const onPost = vi.fn();
     const el = mount();
     renderCircleView(el, {
       circle, rows, t, onSend: vi.fn(),
-      tabs, activeTab: 'prikbord',
+      tabs, activeTab: 'noticeboard',
       noticeboard: { posts: [{ id: 'p1', type: 'ask', text: 'boormachine?', mine: false }], intent: 'ask', onPost },
     });
     // noticeboard body present, placeholder absent
-    expect(el.querySelector('.cc-prikbord')).not.toBeNull();
-    expect(el.querySelector('.circle-circle__placeholder')).toBeNull();
-    expect(el.querySelector('.cc-prikbord__post-row')).not.toBeNull();
+    expect(el.querySelector('.cc-noticeboard')).not.toBeNull();
+    expect(el.querySelector('.circle-view__placeholder')).toBeNull();
+    expect(el.querySelector('.cc-noticeboard__post-row')).not.toBeNull();
     // the chat composer is suppressed (the noticeboard owns its own)
-    expect(el.querySelector('.circle-circle__composer')).toBeNull();
+    expect(el.querySelector('.circle-view__composer')).toBeNull();
   });
 
   it('falls back to the tab-coming placeholder when no noticeboard prop is supplied', () => {
     const el = mount();
-    renderCircleView(el, { circle, rows, t, onSend: vi.fn(), tabs, activeTab: 'prikbord' });
-    expect(el.querySelector('.cc-prikbord')).toBeNull();
-    expect(el.querySelector('.circle-circle__placeholder')).not.toBeNull();
+    renderCircleView(el, { circle, rows, t, onSend: vi.fn(), tabs, activeTab: 'noticeboard' });
+    expect(el.querySelector('.cc-noticeboard')).toBeNull();
+    expect(el.querySelector('.circle-view__placeholder')).not.toBeNull();
   });
 });
 
@@ -698,7 +698,7 @@ describe('renderCircleView · help Q&A seams (transparency badge + consent card)
   it('a deterministic hit shows the "answered directly" badge (llmUsed:false)', () => {
     const el = mount();
     renderCircleView(el, { circle, rows: botRow({ provenance: { llmUsed: false } }), t });
-    const badge = el.querySelector('.circle-circle__bubble-provenance');
+    const badge = el.querySelector('.circle-view__bubble-provenance');
     expect(badge).not.toBeNull();
     expect(badge.textContent).toBe('circle.circle.provenance_direct');
   });
@@ -706,7 +706,7 @@ describe('renderCircleView · help Q&A seams (transparency badge + consent card)
   it('an LLM answer stamps a verbatim provenance string', () => {
     const el = mount();
     renderCircleView(el, { circle, rows: botRow({ provenance: '· via de vertrouwelijke assistent' }), t });
-    expect(el.querySelector('.circle-circle__bubble-provenance').textContent).toBe('· via de vertrouwelijke assistent');
+    expect(el.querySelector('.circle-view__bubble-provenance').textContent).toBe('· via de vertrouwelijke assistent');
   });
 
   it('a consent bubble styles as the consent card and renders variant buttons', () => {
@@ -719,9 +719,9 @@ describe('renderCircleView · help Q&A seams (transparency badge + consent card)
       ] }),
       t, onEmbedButton: vi.fn(),
     });
-    expect(el.querySelector('.circle-circle__bubble--consent')).not.toBeNull();
-    expect(el.querySelector('.circle-circle__consent-btn--primary')).not.toBeNull();
-    expect(el.querySelector('.circle-circle__consent-btn--secondary')).not.toBeNull();
+    expect(el.querySelector('.circle-view__bubble--consent')).not.toBeNull();
+    expect(el.querySelector('.circle-view__consent-btn--primary')).not.toBeNull();
+    expect(el.querySelector('.circle-view__consent-btn--secondary')).not.toBeNull();
   });
 });
 
@@ -739,7 +739,7 @@ describe('renderCircleView · §8 message report affordance', () => {
     const el = mount();
     const onReportMessage = vi.fn();
     renderCircleView(el, { circle, rows: chatRows, t, localActor: 'me', onReportMessage });
-    const rep = el.querySelector('.circle-circle__bubble-report');
+    const rep = el.querySelector('.circle-view__bubble-report');
     expect(rep).toBeTruthy();
     rep.click();
     expect(onReportMessage).toHaveBeenCalledWith('m1', expect.objectContaining({ id: 'm1' }));
@@ -748,14 +748,14 @@ describe('renderCircleView · §8 message report affordance', () => {
   it('no report button on your OWN message, or on a bot message, or when unwired', () => {
     const own = mount();
     renderCircleView(own, { circle, rows: chatRows, t, localActor: 'Pieter', onReportMessage: () => {} });
-    expect(own.querySelector('.circle-circle__bubble-report')).toBeNull();
+    expect(own.querySelector('.circle-view__bubble-report')).toBeNull();
 
     const bot = mount();
     renderCircleView(bot, { circle, rows: botRows, t, localActor: 'me', onReportMessage: () => {} });
-    expect(bot.querySelector('.circle-circle__bubble-report')).toBeNull();
+    expect(bot.querySelector('.circle-view__bubble-report')).toBeNull();
 
     const unwired = mount();
     renderCircleView(unwired, { circle, rows: chatRows, t, localActor: 'me' });
-    expect(unwired.querySelector('.circle-circle__bubble-report')).toBeNull();
+    expect(unwired.querySelector('.circle-view__bubble-report')).toBeNull();
   });
 });

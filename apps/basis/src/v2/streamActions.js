@@ -15,11 +15,10 @@
  */
 
 const KIND_CHIPS = {
-  question:    ['help', 'ignore'],
-  vraag:       ['help', 'ignore'],
+  ask:         ['help', 'ignore'],
+  lend:        ['offer', 'ignore'],
   borrow:      ['offer', 'ignore'],
-  leen:        ['offer', 'ignore'],
-  aanbod:      ['take', 'ignore'],
+  offer:       ['take', 'ignore'],
   chore:       ['claim', 'snooze'],
   reminder:    ['done', 'snooze'],
 };

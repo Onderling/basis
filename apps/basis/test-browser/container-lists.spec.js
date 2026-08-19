@@ -12,9 +12,9 @@ test('Lists panel: create a list, add a nested item, complete it', async ({ page
   await bootCircle(page, 'Lists Circle');
 
   // open the circle more-menu → Lists
-  await page.locator('.circle-circle__more').click();
+  await page.locator('.circle-view__more').click();
   await page.waitForTimeout(400);
-  await page.locator('.circle-circle__more-item[data-action="lists"]').click();
+  await page.locator('.circle-view__more-item[data-action="lists"]').click();
   await page.waitForTimeout(400);
   await expect(page.locator('.cc-lists-panel')).toBeVisible();
 
@@ -47,9 +47,9 @@ test('Lists panel: create a list, add a nested item, complete it', async ({ page
 
 test('board container: "+ add" shows the ambiguous-type picker → pick Item', async ({ page }) => {
   await bootCircle(page, 'Board Circle');
-  await page.locator('.circle-circle__more').click();
+  await page.locator('.circle-view__more').click();
   await page.waitForTimeout(400);
-  await page.locator('.circle-circle__more-item[data-action="lists"]').click();
+  await page.locator('.circle-view__more-item[data-action="lists"]').click();
   await page.waitForTimeout(400);
   await expect(page.locator('.cc-lists-panel')).toBeVisible();
 

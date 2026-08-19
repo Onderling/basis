@@ -21,9 +21,9 @@ export const LINEN_THEME = {
     accentInk: '#8a3a26', // terracotta text on light
     card:      '#fbf8ed', // framed-card inner / bot bubble
     meBg:      '#f6e6e0', // "me" chat bubble (warm)
-    green:   '#4a6230', greenBg: '#e0e7d2', // lokaal / AANBOD / "ongewijzigd"
-    blue:    '#3f4f76', blueBg:  '#dde2ee', // betaald / VRAAG / "via hop"
-    amber:   '#7a5a1f', amberBg: '#ede0c4', // LENEN
+    green:   '#4a6230', greenBg: '#e0e7d2', // lokaal / OFFER / "ongewijzigd"
+    blue:    '#3f4f76', blueBg:  '#dde2ee', // betaald / ASK / "via hop"
+    amber:   '#7a5a1f', amberBg: '#ede0c4', // LEND
     danger:  '#b04a30', dangerBg:'#f6e6e0', // blocked / warning (reuses terracotta)
     trackOff:'#cfc7b0', // pill-toggle off track
     white:   '#ffffff',

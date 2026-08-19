@@ -1,7 +1,7 @@
 /**
  * Per-circle stoop scoping (S4 GUI slice) — scopeStoopCallSkill injects the active
  * circle id as the stoop scope key on writes and filters list reads to the circle,
- * so each circle's prikbord is isolated through the ONE shared stoop agent (not N
+ * so each circle's noticeboard is isolated through the ONE shared stoop agent (not N
  * agents). Mirrors the dispatch-path scopeReadyDispatch for the direct-callSkill path.
  */
 import { describe, it, expect, vi } from 'vitest';

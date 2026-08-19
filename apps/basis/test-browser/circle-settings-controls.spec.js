@@ -32,12 +32,12 @@ test('/settings (G17 built-in) opens the settings panel with the Connection cont
   // G17 — `/settings` dispatches as a built-in: it opens the settings panel (showSettings) rather
   // than routing to the bot. Had it gone to the bot, the circle view would stay and a bubble would
   // appear instead of the settings surface.
-  await page.locator('.circle-circle__composer-input').fill('/settings');
-  await page.locator('.circle-circle__composer-send').click();
+  await page.locator('.circle-view__composer-input').fill('/settings');
+  await page.locator('.circle-view__composer-send').click();
 
   // The settings panel replaces the circle view (the built-in path showSettings).
   await expect(page.locator('.circle-settings')).toBeVisible({ timeout: LONG });
-  await expect(page.locator('.circle-circle__composer-input')).toHaveCount(0);   // the circle composer is gone → we're in the panel, not chat
+  await expect(page.locator('.circle-view__composer-input')).toHaveCount(0);   // the circle composer is gone → we're in the panel, not chat
 
   // §9 — the manifest-declared Connection & transport controls render.
   const connection = page.locator('.circle-settings__connection');

@@ -651,7 +651,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    */
   const householdCircleId = opts.householdCircleId ?? 'household';
   const householdEnvelopeAdapter = createSecureMeshEnvelopeAdapter({
-    // Durable circle content (tasks, noticeboard/prikbord items — every item-sync
+    // Durable circle content (tasks, noticeboard/noticeboard items — every item-sync
     // envelope this mirror fans) rides with the hold-forward delivery guarantee:
     // a member who is briefly offline has the envelope HELD locally and delivered
     // on their next presence signal, instead of silently lost. One well-placed

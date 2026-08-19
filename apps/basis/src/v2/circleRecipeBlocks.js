@@ -178,8 +178,8 @@ function materializePhoto(block) {
 async function materializeNoticeboard(block, circleId, { callSkill, eventLog, circles, members, viewerId, revealPolicy } = {}) {
   const limit = clampInt(block.config?.limit, 1, 50, 5);
   let rows = [];
-  // #16 — prefer the REAL open posts (stoop `listOpen`) so the scherm noticeboard
-  // surfaces the prikbord even when the chat tab (where the prikbord lives) is
+  // #16 — prefer the REAL open posts (stoop `listOpen`) so the screen noticeboard
+  // surfaces the noticeboard even when the chat tab (where the noticeboard lives) is
   // hidden. Map each post into the StreamRow shape the renderer's pickSender/
   // pickRowText read. Falls back to the eventLog stream when no callSkill.
   let listOpenSucceeded = false;

@@ -94,20 +94,20 @@ describe('chatRows — the sender stamp', () => {
 
 describe('renderCircleView — the paint half', () => {
   const paint = (row) => renderCircleView(document.createElement('div'), {
-    circle: { id: 'c1', name: 'Buren' }, t, activeTab: 'gesprek', rows: [row],
+    circle: { id: 'c1', name: 'Buren' }, t, activeTab: 'conversation', rows: [row],
   });
 
   it('paints the stamped label, ignoring any payload-claimed name', () => {
     const [row] = rowsFor([chatEvent('webid:ella', 'hoi', { senderDisplay: 'Aangeklede Leugen' })]);
     const el = paint(row);
-    expect(el.querySelector('.circle-circle__bubble-sender')?.textContent).toBe('@ella');
+    expect(el.querySelector('.circle-view__bubble-sender')?.textContent).toBe('@ella');
     expect(el.textContent).not.toContain('Aangeklede Leugen');
   });
 
   it('paints the neutral key for a stamped-unknown sender', () => {
     const [row] = rowsFor([chatEvent('webid:vertrokken', 'oud')]);
     const el = paint(row);
-    expect(el.querySelector('.circle-circle__bubble-sender')?.textContent)
+    expect(el.querySelector('.circle-view__bubble-sender')?.textContent)
       .toBe('circle.chat.unknown_sender');
   });
 
@@ -117,12 +117,12 @@ describe('renderCircleView — the paint half', () => {
       event: { type: 'chat-message', actor: 'webid:ella',
         payload: { circleId: 'c1', text: 'hoi', senderDisplay: 'Wire Naam' } },
     });
-    expect(el.querySelector('.circle-circle__bubble-sender')).toBeNull();
+    expect(el.querySelector('.circle-view__bubble-sender')).toBeNull();
     expect(el.textContent).not.toContain('Wire Naam');
   });
 });
 
-describe('materializeNoticeboard — the scherm shares the stamp', () => {
+describe('materializeNoticeboard — the screen shares the stamp', () => {
   it('stamps senderLabel from the roster; the full addedBy webid is the match key', async () => {
     const callSkill = async (app, op) => (op === 'listOpen'
       ? { items: [{ id: 'p1', type: 'request', intent: 'ask', text: 'wie helpt?', addedBy: 'webid:ella' }] }

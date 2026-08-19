@@ -15,8 +15,8 @@ async function openCircleComposer(page) {
 }
 
 async function send(page, text) {
-  await page.locator('.circle-circle__composer-input').fill(text);
-  await page.locator('.circle-circle__composer-send').click();
+  await page.locator('.circle-view__composer-input').fill(text);
+  await page.locator('.circle-view__composer-send').click();
   await page.waitForTimeout(2500);
 }
 
@@ -25,7 +25,7 @@ test('needsForm → conversational follow-up: bot asks for the missing field, th
 
   // A bare typed slash `/addtask` is dispatched verbatim by the bot; `text` (required) is empty ⇒ needsForm.
   await send(page, '/addtask');
-  const afterAsk = (await page.locator('.circle-circle__bubble').allTextContents()).join(' | ');
+  const afterAsk = (await page.locator('.circle-view__bubble').allTextContents()).join(' | ');
   // The bot asked for the missing field (generic followup prompt: "What's your text? (for /addTask)").
   expect(afterAsk, `bot should have asked for the missing field, got: ${afterAsk}`).toMatch(/what's your|wat is je/i);
   // …and it must NOT have just errored or dispatched blindly.
@@ -33,6 +33,6 @@ test('needsForm → conversational follow-up: bot asks for the missing field, th
 
   // The user's NEXT message is the answer — it completes the pending dispatch (not a new command).
   await send(page, 'p5followmilk');
-  const afterAnswer = (await page.locator('.circle-circle__bubble').allTextContents()).join(' | ');
+  const afterAnswer = (await page.locator('.circle-view__bubble').allTextContents()).join(' | ');
   expect(afterAnswer, `the answer should have created the task, got: ${afterAnswer}`).toMatch(/p5followmilk/);
 });

@@ -39,8 +39,8 @@ describe('rnSha256', () => {
 describe('circleVersioningFor — build-once + resolution', () => {
   it('builds one store per circle and returns the same instance thereafter', () => {
     const backend = createMemoryBackend();
-    const first = circleVersioningFor('circle-1', 'circle-circle-1', backend);
-    const again = circleVersioningFor('circle-1', 'circle-circle-1', backend);
+    const first = circleVersioningFor('circle-1', 'circle-view-1', backend);
+    const again = circleVersioningFor('circle-1', 'circle-view-1', backend);
     expect(again).toBe(first);
     expect(getCircleVersionStore('circle-1')).toBe(first);
   });

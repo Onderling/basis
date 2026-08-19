@@ -1,7 +1,7 @@
 /**
  * basis v2 — Screens picker (Plan α.3.1).
  *
- * The Schermen tab's list view: the user's screens (with active badge),
+ * The Screens tab's list view: the user's screens (with active badge),
  * plus add / rename / delete / setActive / open affordances.  Pure DOM,
  * controlled-render — same shape as `circleRecipeEditor`'s book mode:
  *

@@ -18,14 +18,14 @@ beforeAll(async () => {
 describe('Stoop V1 — localisation wrapper', () => {
   it('translates a known key in en', () => {
     expect(t('common.save')).toBe('Save');
-    expect(t('prikbord.title')).toBe('On the prikbord');
+    expect(t('noticeboard.title')).toBe('On the noticeboard');
   });
 
   it('switches to nl', async () => {
     await setLang('nl');
     expect(getLang()).toBe('nl');
     expect(t('common.save')).toBe('Opslaan');
-    expect(t('prikbord.title')).toBe('Op het prikbord');
+    expect(t('noticeboard.title')).toBe('Op het prikbord');
   });
 
   it('falls back to en for keys missing from nl (configured fallback)', async () => {

@@ -34,7 +34,7 @@ async function tileNames(page) {
 }
 
 async function toChat(page) {
-  const chat = page.locator('.circle-circle__view-toggle-btn[data-view-mode="chat"]');
+  const chat = page.locator('.circle-view__view-toggle-btn[data-view-mode="chat"]');
   if (await chat.count()) { await chat.first().click(); await page.waitForTimeout(1500); }
 }
 
@@ -51,15 +51,15 @@ async function openHelpCircle(page) {
 }
 
 async function bubbleTexts(page) {
-  return (await page.locator('.circle-circle__bubble').allTextContents()).map((s) => s.replace(/\s+/g, ' ').trim());
+  return (await page.locator('.circle-view__bubble').allTextContents()).map((s) => s.replace(/\s+/g, ' ').trim());
 }
 async function actionButtonLabels(page) {
-  const sel = '.circle-circle__bubble-action, .circle-circle__bubble button';
+  const sel = '.circle-view__bubble-action, .circle-view__bubble button';
   return [...new Set((await page.locator(sel).allTextContents()).map((s) => s.replace(/\s+/g, ' ').trim()).filter(Boolean))];
 }
 async function sendCircle(page, text, settle = 3500) {
-  await page.locator('.circle-circle__composer-input').fill(text);
-  await page.locator('.circle-circle__composer-send').click();
+  await page.locator('.circle-view__composer-input').fill(text);
+  await page.locator('.circle-view__composer-send').click();
   await page.waitForTimeout(settle);
 }
 
@@ -78,15 +78,15 @@ test('2 chat restyle — bot card border, me vs bot bubbles, compose', async ({ 
   await openHelpCircle(page);
   await page.waitForTimeout(2000);
   await sendCircle(page, 'hallo');
-  const mine = await page.locator('.circle-circle__bubble--mine').count();
-  const total = await page.locator('.circle-circle__bubble').count();
-  const composer = await page.locator('.circle-circle__composer-input').count();
-  const card = page.locator('.circle-circle__chat-card').first();
+  const mine = await page.locator('.circle-view__bubble--mine').count();
+  const total = await page.locator('.circle-view__bubble').count();
+  const composer = await page.locator('.circle-view__composer-input').count();
+  const card = page.locator('.circle-view__chat-card').first();
   const border = await card.evaluate((el) => {
     const s = getComputedStyle(el);
     return `${s.borderTopWidth} ${s.borderStyle} ${s.borderTopColor}`;
   }).catch((e) => 'n/a: ' + e.message);
-  const meBg = await page.locator('.circle-circle__bubble--mine').first()
+  const meBg = await page.locator('.circle-view__bubble--mine').first()
     .evaluate((el) => getComputedStyle(el).backgroundColor).catch(() => 'n/a');
   console.log('CR mine-bubbles:', mine, 'total:', total, 'composer:', composer);
   console.log('CR chat-card border:', border);
@@ -99,7 +99,7 @@ test('3 help Q&A — deterministic answer + transparency badge, then /help topic
   await openHelpCircle(page);
   await page.waitForTimeout(2000);
   await sendCircle(page, 'is dit veilig?', 4500);
-  const provs = (await page.locator('.circle-circle__bubble-provenance').allTextContents()).map((s) => s.replace(/\s+/g, ' ').trim());
+  const provs = (await page.locator('.circle-view__bubble-provenance').allTextContents()).map((s) => s.replace(/\s+/g, ' ').trim());
   console.log('HELP bubbles after question:', JSON.stringify((await bubbleTexts(page)).slice(-3)));
   console.log('HELP provenance badges:', JSON.stringify(provs));
   await page.screenshot({ path: `${SHOTS}/help-answer.png` });
@@ -157,9 +157,9 @@ test('5 mandate picker — enable tasks, add a task I own, entrust it', async ({
   await openCircle();
 
   // Open ⋯ → Circle settings, tick the `tasks` feature, save.
-  await page.locator('.circle-circle__more').click();
+  await page.locator('.circle-view__more').click();
   await page.waitForTimeout(600);
-  await page.locator('.circle-circle__more-item[data-action="settings"]').click();
+  await page.locator('.circle-view__more-item[data-action="settings"]').click();
   await page.waitForTimeout(2000);
   const tasksBox = page.locator('input[data-feature="tasks"]');
   console.log('MANDATE tasks checkbox present:', await tasksBox.count());
@@ -177,14 +177,14 @@ test('5 mandate picker — enable tasks, add a task I own, entrust it', async ({
   console.log('MANDATE chat bubbles:', JSON.stringify((await bubbleTexts(page)).slice(-2)));
 
   // The task-kind row with the owner-only entrust chip lives in the TAKEN (tasks) tab, not the chat stream.
-  const tabs = page.locator('.circle-circle__tab');
+  const tabs = page.locator('.circle-view__tab');
   const tabLabels = await tabs.allTextContents();
   console.log('MANDATE circle tabs:', JSON.stringify(tabLabels.map((s) => s.trim())));
   const takenIdx = tabLabels.findIndex((s) => /taken|task/i.test(s));
   if (takenIdx >= 0) {
     await tabs.nth(takenIdx).click();
     await page.waitForTimeout(2500);
-    const taskRows = page.locator('.circle-circle__task');
+    const taskRows = page.locator('.circle-view__task');
     const rowCount = await taskRows.count();
     const rowText = rowCount ? (await taskRows.first().innerText()).replace(/\s+/g, ' ').trim() : '(no rows)';
     console.log('MANDATE TAKEN-tab task rows:', rowCount, 'first row:', JSON.stringify(rowText));
@@ -192,7 +192,7 @@ test('5 mandate picker — enable tasks, add a task I own, entrust it', async ({
     await page.screenshot({ path: `${SHOTS}/taken-tab.png` });
   }
 
-  const mandBtn = page.locator('.circle-circle__bubble-action--mandate');
+  const mandBtn = page.locator('.circle-view__bubble-action--mandate');
   const mandCount = await mandBtn.count();
   console.log('MANDATE row-action buttons:', JSON.stringify(await actionButtonLabels(page)), 'entrust-btn:', mandCount);
   if (mandCount > 0) {

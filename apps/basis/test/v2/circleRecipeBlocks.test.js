@@ -65,7 +65,7 @@ describe('circleRecipeBlocks · α.1b — materializeBlock (pure types)', () => 
     expect(r.status).toBe('error');
   });
 
-  it('noticeboard block pulls stoop listOpen (#16 — scherm shows the prikbord)', async () => {
+  it('noticeboard block pulls stoop listOpen (#16 — screen shows the noticeboard)', async () => {
     const callSkill = async (app, op) => (app === 'stoop' && op === 'listOpen'
       ? { items: [{ id: 'p1', text: 'wie heeft een boormachine?', addedBy: 'https://alice.example/me' }] }
       : null);

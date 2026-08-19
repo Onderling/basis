@@ -33,7 +33,7 @@ import {
   toBroadcastShape,
   attachmentPath,
   freshAttachmentId,
-  MAX_PRIKBORD_BYTES_PER_ATT,
+  MAX_NOTICEBOARD_BYTES_PER_ATT,
   MAX_CHAT_BYTES_PER_ATT,
   MAX_ATTACHMENTS_PER_POST,
 } from '../src/lib/Attachments.js';
@@ -114,7 +114,7 @@ describe('Phase 39 — Attachments lib (sealed)', () => {
   });
 
   it('size caps are sensible defaults', () => {
-    expect(MAX_PRIKBORD_BYTES_PER_ATT).toBeGreaterThan(MAX_CHAT_BYTES_PER_ATT);
+    expect(MAX_NOTICEBOARD_BYTES_PER_ATT).toBeGreaterThan(MAX_CHAT_BYTES_PER_ATT);
     expect(MAX_ATTACHMENTS_PER_POST).toBeGreaterThanOrEqual(1);
   });
 });

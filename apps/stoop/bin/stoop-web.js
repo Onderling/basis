@@ -23,7 +23,7 @@
  *   - Single-list page (one `listMyRequests` skill, one `<ul>` of items)
  *   - The skill it calls (`listMyRequests`) IS in the manifest
  *     (`listMyRequests` op declared D.1, line 158)
- *   - Smaller than `index.html` (prikbord has filters + multi-intent
+ *   - Smaller than `index.html` (noticeboard has filters + multi-intent
  *     tabs) — strictly less risky to migrate as the first proof
  *
  * Why `privacy.html` (E.2)?

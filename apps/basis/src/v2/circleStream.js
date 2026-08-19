@@ -76,7 +76,7 @@ export function buildCircleStream({ events = [], circles = [] } = {}) {
  * circle-scoped Stream projection (right 8C). Tap
  * a circle on the launcher and you land on its content surface: the
  * cross-circle `buildCircleStream` rows narrowed to a single circle,
- * optionally filtered by a row "kind" (vraag / aanbod / leen / chore /
+ * optionally filtered by a row "kind" (ask / offer / leen / chore /
  * reminder — same enum the chips on render).
  *
  * `kindFilter = null` (or 'all') = no kind filter.  Unknown kinds pass
@@ -193,7 +193,7 @@ export function circleRows(opts = {}) {
  *
  * Today "conversation" means *not the silent system lane*, which is exactly the pre-existing behaviour.
  * C15's tail is to narrow this further to the conversation KINDS (`conversationKinds()` from the shared
- * table), which would drop tasks and circle rows out of GESPREK — a product call, deliberately NOT taken
+ * table), which would drop tasks and circle rows out of CONVERSATION — a product call, deliberately NOT taken
  * here. When it is, this wrapper is the only place that changes.
  */
 export function chatRows(opts = {}) {
@@ -275,4 +275,4 @@ export function agentTrailRows({ actor, ...opts } = {}) {
 export const buildCircleChat = chatRows;
 
 /** Kind keys the filter strip exposes, in render order. */
-export const CIRCLE_STREAM_KIND_FILTERS = ['all', 'vraag', 'aanbod', 'leen'];
+export const CIRCLE_STREAM_KIND_FILTERS = ['all', 'ask', 'offer', 'lend'];

@@ -16,11 +16,11 @@ async function openCircleComposer(page) {
   await bootCircle(page, 'P5 Circle', { tasks: true });
 }
 async function send(page, text) {
-  await page.locator('.circle-circle__composer-input').fill(text);
-  await page.locator('.circle-circle__composer-send').click();
+  await page.locator('.circle-view__composer-input').fill(text);
+  await page.locator('.circle-view__composer-send').click();
   await page.waitForTimeout(2500);
 }
-const blob = async (page) => (await page.locator('.circle-circle__bubble').allTextContents()).join(' | ');
+const blob = async (page) => (await page.locator('.circle-view__bubble').allTextContents()).join(' | ');
 
 test('#5 add vs complete replies are distinct (Added: / Completed:)', async ({ page }) => {
   await openCircleComposer(page);

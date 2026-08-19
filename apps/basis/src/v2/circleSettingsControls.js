@@ -7,7 +7,7 @@
  * new mechanism they need: `enabledWhen`, a predicate that FOLDS over a circle's route +
  * data-policy to grey out incompatible options — the route × capability matrix from §7:
  *
- *   route                          | member↔member private chat (prikbord/DM)
+ *   route                          | member↔member private chat (noticeboard/DM)
  *   -------------------------------|------------------------------------------
  *   pod-only, no relay             | ✗ — pseudonymous pod mediation gives no peer pairwise key
  *   relay / rendezvous available   | ✓ — the direct channel enables the key exchange

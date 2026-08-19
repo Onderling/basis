@@ -143,7 +143,7 @@ describe('media over the signed lane — sender seals, the statement carries the
       circle: CIRCLE, rows, t, onSend: () => {},
       media: { opener: strategy.open },   // the receiver's own circle opener (gateway-cached per circle)
     });
-    const chip = el.querySelector('.circle-circle__bubble .cc-media-card');
+    const chip = el.querySelector('.circle-view__bubble .cc-media-card');
     expect(chip).not.toBeNull();
     const img = chip.querySelector('img.cc-media-thumb');
     expect(img).not.toBeNull();           // sealed thumb OPENED — not the placeholder
@@ -164,7 +164,7 @@ describe('media over the signed lane — sender seals, the statement carries the
       circle: CIRCLE, rows, t, onSend: () => {},
       media: { opener: circleKeyPair().open },   // a DIFFERENT circle's key
     });
-    const chip = el.querySelector('.circle-circle__bubble .cc-media-card');
+    const chip = el.querySelector('.circle-view__bubble .cc-media-card');
     expect(chip).not.toBeNull();
     expect(chip.querySelector('img.cc-media-thumb')).toBeNull();
     expect(chip.querySelector('.cc-media-placeholder')).not.toBeNull();

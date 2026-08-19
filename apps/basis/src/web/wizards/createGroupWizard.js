@@ -45,7 +45,7 @@ import { t } from '../../localisation.js';
 /**
  * N1+E8 — persist the wizard's chosen policy axes (features incl. the
  * neighbourhood chat-off default, reveal/pod/llm/agents/consensus) onto the new
- * circle's policy, so the launcher's GESPREK gating honours
+ * circle's policy, so the launcher's CONVERSATION gating honours
  * them.  Shares the launcher's localStorage key (`cc.circlePolicy.<id>`).
  * Only writes axes a template actually filled.  Best-effort.
  */

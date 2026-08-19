@@ -1,9 +1,9 @@
 /**
- * basis v2 — circle scherm "recipe book" model (Plan α.1a · audit #1).
+ * basis v2 — circle screen "recipe book" model (Plan α.1a · audit #1).
  *
  * Per: a circle can have MULTIPLE named recipes (e.g. "Standaard",
  * "Eventfocus", "Zomeruitgave").  One is marked `activeId` — that's
- * what scherm-mode (v2 §4 pill) renders.  Admins manage the library;
+ * what screen-mode (v2 §4 pill) renders.  Admins manage the library;
  * non-admins see the active recipe.  Per-user override (member picks
  * a different recipe) is a later concern that can live on top of the
  * existing memberOverride store.
@@ -18,7 +18,7 @@
  *
  *   RecipeBook = {
  *     recipes: [Recipe],      // 0..N, order = library display order
- *     activeId: <string|null>,// which recipe scherm-mode shows
+ *     activeId: <string|null>,// which recipe screen-mode shows
  *   }
  *
  * Block types per v2 PDF §2 palette: announcement, noticeboard, agenda,
@@ -37,7 +37,7 @@
 export const BLOCK_TYPES = Object.freeze([
   'quickActions',     // D1 (§5A) — "Veel-gebruikt" top-N most-used actions
   'announcement',     // pinned admin message (free text)
-  'noticeboard',      // top-N recent posts (vragen/aanbod)
+  'noticeboard',      // top-N recent posts (asks/offer)
   'agenda',           // upcoming calendar events
   'tasks',            // α.4 — tasks aggregated across circles (assignee filter)
   'rules',            // rendered houseRules doc
@@ -68,7 +68,7 @@ const DEFAULT_CONFIGS = Object.freeze({
   text:         () => ({ text: '' }),
 });
 
-/** Empty recipe book — what an un-customised circle shows for scherm-mode. */
+/** Empty recipe book — what an un-customised circle shows for screen-mode. */
 export const EMPTY_RECIPE_BOOK = Object.freeze({ recipes: [], activeId: null });
 
 /* ─────────────────────────────────────────────────────────────────────── */

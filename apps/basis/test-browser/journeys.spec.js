@@ -329,10 +329,10 @@ test.fixme('equivocation — a forked author is flagged disputed and reviewable'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // member-persona — tap a member; their persona card shows only what they revealed to me.
-// Surface: LEDEN (members) tab → tap a member → persona/reveal card.
+// Surface: MEMBERS (members) tab → tap a member → persona/reveal card.
 // Assert: the card shows exactly the properties that member revealed to the viewer.
-// GREEN IN: Phase 4 (the real LEDEN tab with tappable rows → persona card — G16).
-// FIXME: G16 — the LEDEN tab is a placeholder; the persona card off a member row isn't built.
+// GREEN IN: Phase 4 (the real MEMBERS tab with tappable rows → persona card — G16).
+// FIXME: G16 — the MEMBERS tab is a placeholder; the persona card off a member row isn't built.
 // ─────────────────────────────────────────────────────────────────────────────
 test.fixme('member-persona — a member row opens their reveal-scoped persona card', async ({ browser }) => {
   const peers = await H.bootPeers(browser, 2);
@@ -341,11 +341,11 @@ test.fixme('member-persona — a member row opens their reveal-scoped persona ca
     const res = await H.pair(A, B, { name: 'Peer Circle' });
     test.skip(!res.joinerHasTile, 'B never joined — pairing precondition');
     await H.reopenCircle(A.page, /peer.?circle/i);
-    const leden = await H.openLedenTab(A.page);
-    console.log('member-persona LEDEN tab present:', leden.present, 'tabs:', JSON.stringify(leden.labels));
+    const members = await H.openLedenTab(A.page);
+    console.log('member-persona MEMBERS tab present:', members.present, 'tabs:', JSON.stringify(members.labels));
     // Intended (Phase 4): tap B's row → assert the persona card lists only B's revealed-to-A properties.
     // await H.tapMemberRow(A.page, /B|peerbee/); expect(await H.personaCardFields(A.page)).toEqual(bRevealedToA);
-    expect(leden.present, 'the real LEDEN tab exists (G16 — Phase 4)').toBeTruthy();
+    expect(members.present, 'the real MEMBERS tab exists (G16 — Phase 4)').toBeTruthy();
   } finally {
     await H.teardown(peers);
   }
@@ -353,10 +353,10 @@ test.fixme('member-persona — a member row opens their reveal-scoped persona ca
 
 // ─────────────────────────────────────────────────────────────────────────────
 // self-view — tap yourself → "View as…"; the sees/hides split matches reveal rules.
-// Surface: LEDEN tab → tap self → "View as <viewer>" → the visible/hidden split.
+// Surface: MEMBERS tab → tap self → "View as <viewer>" → the visible/hidden split.
 // Assert: for a chosen viewer, the shown vs hidden properties match my reveal policy.
 // GREEN IN: Phase 4 (reuse the viewAs / circleViewAs / viewAsAttributes machinery).
-// FIXME: depends on the same unbuilt LEDEN tab (G16) + a "View as" affordance on the self row.
+// FIXME: depends on the same unbuilt MEMBERS tab (G16) + a "View as" affordance on the self row.
 // ─────────────────────────────────────────────────────────────────────────────
 test.fixme('self-view — "View as" shows the reveal split for a chosen viewer', async ({ browser }) => {
   const peers = await H.bootPeers(browser, 2);
@@ -365,11 +365,11 @@ test.fixme('self-view — "View as" shows the reveal split for a chosen viewer',
     const res = await H.pair(A, B, { name: 'Peer Circle' });
     test.skip(!res.joinerHasTile, 'B never joined — pairing precondition');
     await H.reopenCircle(A.page, /peer.?circle/i);
-    const leden = await H.openLedenTab(A.page);
+    const members = await H.openLedenTab(A.page);
     // Intended (Phase 4): tap A's own row → "View as B" → assert visible == A-revealed-to-B, hidden == rest.
     // await H.tapMemberRow(A.page, /jij|A/); await H.viewAs(A.page, /B|peerbee/);
     // expect(await H.visibleFields(A.page)).toEqual(aRevealedToB);
-    expect(leden.present, 'the real LEDEN tab exists (G16 — Phase 4)').toBeTruthy();
+    expect(members.present, 'the real MEMBERS tab exists (G16 — Phase 4)').toBeTruthy();
   } finally {
     await H.teardown(peers);
   }

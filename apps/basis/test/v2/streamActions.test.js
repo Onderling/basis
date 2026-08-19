@@ -25,8 +25,8 @@ describe('actionsForStreamRow', () => {
     expect(actionsForStreamRow(row)).toEqual([]);
   });
 
-  it('emits help + ignore for a question/vraag', () => {
-    const row = mkRow({ kind: 'question' });
+  it('emits help + ignore for an ask', () => {
+    const row = mkRow({ kind: 'ask' });
     const actions = actionsForStreamRow(row);
     expect(actions.map((a) => a.action)).toEqual(['help', 'ignore']);
     expect(actions[0].label).toBe('circle.streamAction.help');
@@ -35,12 +35,12 @@ describe('actionsForStreamRow', () => {
   it('emits offer + ignore for borrow/leen', () => {
     expect(actionsForStreamRow(mkRow({ kind: 'borrow' })).map((a) => a.action))
       .toEqual(['offer', 'ignore']);
-    expect(actionsForStreamRow(mkRow({ kind: 'leen' })).map((a) => a.action))
+    expect(actionsForStreamRow(mkRow({ kind: 'lend' })).map((a) => a.action))
       .toEqual(['offer', 'ignore']);
   });
 
-  it('emits take + ignore for aanbod', () => {
-    expect(actionsForStreamRow(mkRow({ kind: 'aanbod' })).map((a) => a.action))
+  it('emits take + ignore for offer', () => {
+    expect(actionsForStreamRow(mkRow({ kind: 'offer' })).map((a) => a.action))
       .toEqual(['take', 'ignore']);
   });
 
@@ -55,12 +55,12 @@ describe('actionsForStreamRow', () => {
   });
 
   it('reads kind from event.type when payload.kind is absent', () => {
-    const row = mkRow({ type: 'question', payload: { kind: undefined } });
+    const row = mkRow({ type: 'ask', payload: { kind: undefined } });
     expect(actionsForStreamRow(row).map((a) => a.action)).toEqual(['help', 'ignore']);
   });
 
   it('normalises case (KIND, Kind, kind)', () => {
-    expect(actionsForStreamRow(mkRow({ kind: 'QUESTION' })).map((a) => a.action))
+    expect(actionsForStreamRow(mkRow({ kind: 'ASK' })).map((a) => a.action))
       .toEqual(['help', 'ignore']);
   });
 
@@ -74,7 +74,7 @@ describe('actionsForStreamRow', () => {
   });
 
   it('passes through a payload.ref when present (e.g. itemRef)', () => {
-    const row = mkRow({ kind: 'question', payload: { ref: 'item-99' } });
+    const row = mkRow({ kind: 'ask', payload: { ref: 'item-99' } });
     expect(actionsForStreamRow(row)[0].payload.ref).toBe('item-99');
   });
 
@@ -117,7 +117,7 @@ describe('actionsForStreamRow', () => {
     });
 
     it('never appears on non-task kinds even for an admin', () => {
-      for (const kind of ['question', 'aanbod', 'leen']) {
+      for (const kind of ['question', 'offer', 'lend']) {
         const actions = actionsForStreamRow(mkRow({ kind }), { isAdmin: true });
         expect(actions.map((a) => a.action)).not.toContain('mandate');
       }

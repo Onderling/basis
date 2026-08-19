@@ -144,7 +144,7 @@ export function isValidRosterUpdatedEnvelope(p) {
  * MEMBER-side inbound handler for the pull-me signal. Registered on the peer
  * router under `roster-updated`. It records the silent entry locally (so the
  * Stream firehose shows what happened) and then asks the host to RE-READ the
- * roster — the pull. No bubble, no toast: `onPull` refreshes the LEDEN rows /
+ * roster — the pull. No bubble, no toast: `onPull` refreshes the MEMBERS rows /
  * member cards and nothing else.
  *
  * @param {object} a

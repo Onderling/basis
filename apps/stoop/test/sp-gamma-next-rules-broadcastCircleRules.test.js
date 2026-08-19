@@ -51,7 +51,7 @@ async function buildBundle(members) {
 }
 
 const SAMPLE_RULES = {
-  purpose:    'Circle scherm',
+  purpose:    'Circle screen',
   admins:     'Anne en Bob',
   agreements: 'Be kind, mind chores',
   conflict:   'Talk it out',
@@ -198,6 +198,6 @@ describe('Stoop γ-next.rules — cross-agent: Anne → Bob.pendingStore', () =>
     await handler('a', env);
     await handler('a', { ...env, rulesDoc: { ...SAMPLE_RULES, purpose: 'attempted overwrite' } });
     // dedup on msgId kept the first rules doc.
-    expect((await pending.get('oosterpoort')).purpose).toBe('Circle scherm');
+    expect((await pending.get('oosterpoort')).purpose).toBe('Circle screen');
   });
 });

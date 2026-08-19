@@ -44,46 +44,46 @@ test('opening a circle shows its detail and back returns to the launcher', async
 
   // a tile opens the CIRCLE view (chat IS the circle view); the old action-grid CircleDetail
   // (.circle-detail__*) was replaced as the per-circle landing surface by showCircle.
-  await expect(page.locator('.circle-circle__title')).toBeVisible({ timeout: LONG });
-  await page.locator('.circle-circle__back').click();
+  await expect(page.locator('.circle-view__title')).toBeVisible({ timeout: LONG });
+  await page.locator('.circle-view__back').click();
   await expect(page.locator('.circle-launcher__title')).toBeVisible({ timeout: LONG });
 });
 
-// G16 + §2 — the real LEDEN (members) tab renders the trail-roster as tappable rows,
+// G16 + §2 — the real MEMBERS (members) tab renders the trail-roster as tappable rows,
 // and a tap opens the member card (your own row → the self-view). Guards the wiring
 // added in Phase-4 Wave A2. A single-account circle has exactly the creator as a
 // member, so its own row is the "jij"-badged self row → tapping it is the self-view path.
-test('LEDEN tab renders member rows and a tap opens the member card / self-view', async ({ page }) => {
+test('MEMBERS tab renders member rows and a tap opens the member card / self-view', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', (e) => pageErrors.push(e.message));
 
   await page.goto('/');
   await page.locator('[data-tab="circles"]').click();
   await expect(page.locator('.circle-launcher__title')).toBeVisible({ timeout: LONG });
-  await createCircleViaWizard(page, 'Leden Circle');
+  await createCircleViaWizard(page, 'Members Circle');
 
   const tile = page.locator('.circle-tile').first();
   await expect(tile).toBeVisible({ timeout: LONG });
   await tile.click();
-  await expect(page.locator('.circle-circle__title')).toBeVisible({ timeout: LONG });
+  await expect(page.locator('.circle-view__title')).toBeVisible({ timeout: LONG });
 
-  // A fresh circle lands in scherm-mode (default view='screen'), which hides the
-  // per-circle tab bar — flip to Chat so the bottom tabs (incl. LEDEN) render.
-  await page.locator('.circle-circle__view-toggle-btn[data-view-mode="chat"]').click();
+  // A fresh circle lands in screen-mode (default view='screen'), which hides the
+  // per-circle tab bar — flip to Chat so the bottom tabs (incl. MEMBERS) render.
+  await page.locator('.circle-view__view-toggle-btn[data-view-mode="chat"]').click();
 
-  // Switch to the LEDEN tab (memberDirectory is on by default → the tab is present).
-  const ledenTab = page.locator('.circle-circle__tab', { hasText: /leden|member/i });
+  // Switch to the MEMBERS tab (memberDirectory is on by default → the tab is present).
+  const ledenTab = page.locator('.circle-view__tab', { hasText: /members|member/i });
   await expect(ledenTab).toBeVisible({ timeout: LONG });
   await ledenTab.click();
 
   // The real tab body renders (not the tab-coming placeholder).
-  await expect(page.locator('.circle-circle__leden')).toBeVisible({ timeout: LONG });
-  expect(await page.locator('.circle-circle__placeholder').count()).toBe(0);
+  await expect(page.locator('.circle-view__leden')).toBeVisible({ timeout: LONG });
+  expect(await page.locator('.circle-view__placeholder').count()).toBe(0);
 
   // The creator's own row appears + is badged, and tapping it opens the self-view card.
-  const selfRow = page.locator('.circle-circle__member--self');
+  const selfRow = page.locator('.circle-view__member--self');
   await expect(selfRow).toBeVisible({ timeout: LONG });
-  await expect(page.locator('.circle-circle__member-you')).toBeVisible();
+  await expect(page.locator('.circle-view__member-you')).toBeVisible();
   await selfRow.click();
   await expect(page.locator('.circle-membercard--self')).toBeVisible({ timeout: LONG });
   // the self-view offers the viewer picker (stranger / agent at minimum).
@@ -91,7 +91,7 @@ test('LEDEN tab renders member rows and a tap opens the member card / self-view'
 
   // back returns to the circle view.
   await page.locator('.circle-membercard__back').click();
-  await expect(page.locator('.circle-circle__title')).toBeVisible({ timeout: LONG });
+  await expect(page.locator('.circle-view__title')).toBeVisible({ timeout: LONG });
 
   expect(pageErrors, `no page errors: ${pageErrors.join(' | ')}`).toEqual([]);
 });

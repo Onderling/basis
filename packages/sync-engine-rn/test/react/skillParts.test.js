@@ -30,8 +30,8 @@ describe('@onderling/sync-engine-rn/react skillParts.unwrapParts', () => {
 
 describe('@onderling/sync-engine-rn/react skillParts.toParts', () => {
   it('wraps an object in a single DataPart', () => {
-    expect(toParts({ kind: 'vraag' })).toEqual([
-      { type: 'DataPart', data: { kind: 'vraag' } },
+    expect(toParts({ kind: 'ask' })).toEqual([
+      { type: 'DataPart', data: { kind: 'ask' } },
     ]);
   });
   it('passes arrays through verbatim', () => {

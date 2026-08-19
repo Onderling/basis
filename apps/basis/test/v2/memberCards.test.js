@@ -1,4 +1,4 @@
-// LEDEN-tab card projections (§2) — thin projectors over the built reveal machinery.
+// MEMBERS-tab card projections (§2) — thin projectors over the built reveal machinery.
 // These assert the member-persona + self-view splits re-run the SAME openness rules
 // `isVisibleTo`/`splitViewAsAttributes` already own, so no visibility logic drifts here.
 import { describe, it, expect } from 'vitest';

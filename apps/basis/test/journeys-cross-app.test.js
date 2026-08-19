@@ -286,7 +286,7 @@ describe('CC-HH.7 — remove an item by keyword', () => {
  * Stoop — CC-ST
  * ══════════════════════════════════════════════════════════ */
 
-describe('CC-ST.1 — post a vraag', () => {
+describe('CC-ST.1 — post a ask', () => {
   let ws;
   beforeEach(async () => { ws = await bootWorkspace(); });
 

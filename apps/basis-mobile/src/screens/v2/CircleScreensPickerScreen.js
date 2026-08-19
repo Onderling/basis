@@ -1,7 +1,7 @@
 /**
  * basis-mobile v2 — Screens picker (α.3.3a).
  *
- * RN counterpart of web's circleScreensPicker.  The Schermen tab's
+ * RN counterpart of web's circleScreensPicker.  The Screens tab's
  * list view: the user's screens (with active badge), plus add /
  * rename / delete / setActive / open affordances.
  *

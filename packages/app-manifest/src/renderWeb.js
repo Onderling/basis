@@ -241,7 +241,7 @@
  *
  * ──── — `appliesTo.type: '*'` wildcard (locked 2026-05-21)
  *
- * Surfaced by E.1: stoop's `cancelRequest` spans all 3 prikbord
+ * Surfaced by E.1: stoop's `cancelRequest` spans all 3 noticeboard
  * types (ask/offer/lend); `markReturned` only matches `lend` but
  * conceptually belongs on every per-row button. + F-SP3-a's
  * multi-type array helps but is manual per-op.

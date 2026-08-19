@@ -97,7 +97,7 @@ export default defineConfig({
     /* Cold-boot of this large app on a fresh dedicated port (PEER_TEST_PORT) needs well over 60s —
      * the old default only worked because it reused another job's warm :5173 server. */
     timeout: 240_000,
-    /* Circle-bot smokes (circle-circle-bot.spec.js) need a circle LLM provider to EXIST so the bot
+    /* Circle-bot smokes (circle-view-bot.spec.js) need a circle LLM provider to EXIST so the bot
      * "engages" — the deterministic gate path (`@assistant add/done X`) never CALLS it, so a dummy
      * loopback URL is enough. Without this the server boots with no provider, the bot stays inert,
      * `@assistant …` just fans out, and the gate smokes fail. Injected here so the harness is

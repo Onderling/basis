@@ -64,7 +64,7 @@ export const CIRCLE_TEMPLATES = Object.freeze({
   // A neighbourhood — bigger group, pairwise reveal, personal pods,
   // governance matters (co-admin consensus on changes).  N1 (2026-06-02,
   // Frits): a neighbourhood is noticeboard-first with **open chat OFF by default**
-  // — a thread appears only when someone reacts to a vraag/aanbod
+  // — a thread appears only when someone reacts to a ask/offer
   // (the `/help-with` per-post DM-spawn).  `recommendChat` below turns
   // this into wizard advice: for bigger neighbourhoods chat-off is *advised*
   // (with reasoning); for smaller ones the wizard just *asks*.

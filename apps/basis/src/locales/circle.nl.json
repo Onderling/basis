@@ -58,7 +58,7 @@
     },
     "switch_prompt": {
       "text": "Verder in het Nederlands? Tik hieronder.",
-      "doc": "Kring feedback language-switch offer, shown IN this locale's language (read in the target language) so a speaker of it recognises the invite."
+      "doc": "Circle feedback language-switch offer, shown IN this locale's language (read in the target language) so a speaker of it recognises the invite."
     },
     "save_edit": {
       "text": "Opslaan",
@@ -331,18 +331,18 @@
     "text": "{{count}} leden",
     "doc": "Member count on a circle tile; {{count}} interpolated."
   },
-  "leden_tab": {
+  "members_tab": {
     "loading": {
       "text": "Leden laden…",
-      "doc": "LEDEN tab — while the roster (listGroupMembers) loads."
+      "doc": "MEMBERS tab — while the roster (listGroupMembers) loads."
     },
     "empty": {
       "text": "Nog geen leden.",
-      "doc": "LEDEN tab — the circle's roster is empty."
+      "doc": "MEMBERS tab — the circle's roster is empty."
     },
     "you": {
       "text": "Jij",
-      "doc": "LEDEN tab — badge on the viewer's own row."
+      "doc": "MEMBERS tab — badge on the viewer's own row."
     }
   },
   "tile_unread": {
@@ -357,7 +357,7 @@
     "menu": {
       "pin": {
         "text": "Vastzetten boven",
-        "doc": "β.5 — context-menu item: float this kring to the top of its section."
+        "doc": "β.5 — context-menu item: float this circle to the top of its section."
       },
       "unpin": {
         "text": "Losmaken",
@@ -365,19 +365,19 @@
       },
       "mute": {
         "text": "Dempen",
-        "doc": "β.5 — context-menu item: silence this kring (toggles per-member chatOff override)."
+        "doc": "β.5 — context-menu item: silence this circle (toggles per-member chatOff override)."
       },
       "unmute": {
         "text": "Dempen opheffen",
-        "doc": "β.5 — context-menu item: re-enable chat for this kring."
+        "doc": "β.5 — context-menu item: re-enable chat for this circle."
       },
       "settings": {
         "text": "Instellingen",
-        "doc": "β.5 — context-menu item: open this kring's settings screen."
+        "doc": "β.5 — context-menu item: open this circle's settings screen."
       },
       "leave": {
         "text": "Kring verlaten",
-        "doc": "β.5 — context-menu item: leave this kring (dispatches /leave-group)."
+        "doc": "β.5 — context-menu item: leave this circle (dispatches /leave-group)."
       },
       "leave_confirm": {
         "text": "{{name}} verlaten? Dit kan niet ongedaan worden.",
@@ -463,11 +463,11 @@
       },
       "pending": {
         "text": "Bezig met versturen…",
-        "doc": "δ.2 — bubble icon caption while the kring fan-out (broadcastKringMessage) is in flight."
+        "doc": "δ.2 — bubble icon caption while the circle fan-out (broadcastKringMessage) is in flight."
       },
       "failed": {
         "text": "Versturen mislukt (tik om opnieuw te proberen)",
-        "doc": "δ.2 — bubble icon caption + accessible label when the kring fan-out rejected or returned errors; tapping re-fires broadcastKringMessage with the same msgId."
+        "doc": "δ.2 — bubble icon caption + accessible label when the circle fan-out rejected or returned errors; tapping re-fires broadcastKringMessage with the same msgId."
       },
       "undeliverable": {
         "text": "Kon sommige leden niet bereiken",
@@ -480,11 +480,11 @@
     }
   },
   "tabs": {
-    "gesprek": {
+    "conversation": {
       "text": "Gesprek",
-      "doc": "SP-13.3 — kring bottom-tab."
+      "doc": "SP-13.3 — circle bottom-tab."
     },
-    "prikbord": {
+    "noticeboard": {
       "text": "Prikbord",
       "doc": "SP-13.3."
     },
@@ -504,7 +504,7 @@
       "text": "Agenda",
       "doc": "SP-13.3."
     },
-    "leden": {
+    "members": {
       "text": "Leden",
       "doc": "SP-13.3."
     }
@@ -534,17 +534,17 @@
   "scope": {
     "self": {
       "text": "alleen jij",
-      "doc": "Message scope badge — private to you (not shared with the kring)."
+      "doc": "Message scope badge — private to you (not shared with the circle)."
     },
     "circle": {
       "text": "hele kring",
-      "doc": "Message scope badge — reaches every member of the kring."
+      "doc": "Message scope badge — reaches every member of the circle."
     }
   },
   "calendar": {
     "invited": {
       "text": "📅 Je bent uitgenodigd: {title} — het staat in je agenda.",
-      "doc": "Inbound calendar-invite kring heads-up; {title} is the event title."
+      "doc": "Inbound calendar-invite circle heads-up; {title} is the event title."
     }
   },
   "embed": {
@@ -618,7 +618,7 @@
   "help": {
     "circle_name": {
       "text": "Uitleg",
-      "doc": "Display name of the first-run help circle (the standing 1:1 with the Onderling-bot) — the tile + kring header title. Distinct from the BOT's name (circle.onboarding.help_name = 'Onderling'); named after the circle's purpose so the header never falls back to the raw id 'cc-help'."
+      "doc": "Display name of the first-run help circle (the standing 1:1 with the Onderling-bot) — the tile + circle header title. Distinct from the BOT's name (circle.onboarding.help_name = 'Onderling'); named after the circle's purpose so the header never falls back to the raw id 'cc-help'."
     },
     "consent_prompt": {
       "text": "Daar heb ik geen vast antwoord op. Wil je dat ik het aan de vertrouwelijke assistent vraag? Je vraag wordt dan doorgestuurd.",
@@ -732,11 +732,11 @@
     },
     "composer_placeholder": {
       "text": "Schrijf naar de kring…",
-      "doc": "SP-13.2 — composer placeholder (hosts kunnen kring-specifieke tekst meegeven)."
+      "doc": "SP-13.2 — composer placeholder (hosts kunnen circle-specifieke tekst meegeven)."
     },
     "chat_disabled": {
       "text": "Chat staat uit in deze kring.",
-      "doc": "Permission gate — getoond in plaats van de composer als de 'chat'-functie van de kring uit staat (analoog aan allowCommands in de klassieke shell)."
+      "doc": "Permission gate — getoond in plaats van de composer als de 'chat'-functie van de circle uit staat (analoog aan allowCommands in de klassieke shell)."
     },
     "send": {
       "text": "Verstuur",
@@ -752,7 +752,7 @@
     },
     "tab_coming": {
       "text": "{{tab}} komt in een vervolg-slice.",
-      "doc": "SP-13.3 — placeholder voor tabs zonder eigen scherm (yet)."
+      "doc": "SP-13.3 — placeholder voor tabs zonder eigen screen (yet)."
     },
     "taken_empty": {
       "text": "Nog geen taken in deze kring.",
@@ -776,27 +776,27 @@
     },
     "view_chat": {
       "text": "Chat",
-      "doc": "SP-13.4 — Chat ↔ Scherm header toggle (v2 §4)."
+      "doc": "SP-13.4 — Chat ↔ Screen header toggle (v2 §4)."
     },
-    "view_scherm": {
+    "view_screen": {
       "text": "Scherm",
-      "doc": "SP-13.4 — scherm-mode label."
+      "doc": "SP-13.4 — screen-mode label."
     },
     "view_toggle_label": {
       "text": "Wissel tussen chat en scherm",
       "doc": "SP-13.4 — a11y group label."
     },
-    "scherm_coming": {
+    "screen_coming": {
       "text": "Scherm-weergave (admin-recept) komt in een vervolg-slice.",
       "doc": "SP-13.4 — placeholder."
     },
     "attach": {
       "text": "Foto toevoegen",
-      "doc": "media P1 — bijlage-knop in de kring-composer (verzegeld media-pad); alleen zichtbaar als de kring een content-verzegelstrategie heeft."
+      "doc": "media P1 — bijlage-knop in de circle-composer (verzegeld media-pad); alleen zichtbaar als de circle een content-verzegelstrategie heeft."
     },
     "bot_header": {
       "text": "de kring-assistent",
-      "doc": "Bulletin restyle — standaardlabel in de bot-header van de GESPREK-chatkaart (groene stip + naam). Seam: nog geen bot-identiteit per kring; hosts kunnen een echte naam meegeven via botLabel."
+      "doc": "Bulletin restyle — standaardlabel in de bot-header van de CONVERSATION-chatkaart (groene stip + naam). Seam: nog geen bot-identiteit per circle; hosts kunnen een echte naam meegeven via botLabel."
     },
     "provenance_direct": {
       "text": "· direct beantwoord — geen taalmodel gebruikt",
@@ -810,7 +810,7 @@
   "advanced": {
     "title": {
       "text": "Geavanceerd",
-      "doc": "Het geavanceerd-tabblad ('default places for any new opId'): ops zonder eigen scherm + de instelbare waarden. Ook het label van de Mij-regel."
+      "doc": "Het geavanceerd-tabblad ('default places for any new opId'): ops zonder eigen screen + de instelbare waarden. Ook het label van de Mij-regel."
     },
     "ops_title": {
       "text": "Alle opdrachten zonder eigen scherm",
@@ -1341,11 +1341,11 @@
       },
       "use_standing": {
         "text": "Vooraf toegestaan",
-        "doc": "Toevertrouwen-kiezer (bron) — gebruik-toestemming: doorlopend, geen vraag per gebruik."
+        "doc": "Toevertrouwen-kiezer (bron) — gebruik-toestemming: doorlopend, geen ask per gebruik."
       },
       "use_hint_requestable": {
         "text": "Ze krijgen toegang, maar wordt gevraagd het even te checken vóór elk gebruik.",
-        "doc": "Toevertrouwen-kiezer (bron) — voor beide kanten leesbare hint bij de 'vraag elke keer'-toestemming."
+        "doc": "Toevertrouwen-kiezer (bron) — voor beide kanten leesbare hint bij de 'ask elke keer'-toestemming."
       },
       "use_hint_standing": {
         "text": "Ze kunnen het gebruiken zonder opnieuw te vragen tot de taak klaar is.",
@@ -1562,7 +1562,7 @@
     },
     "privateDm": {
       "text": "Privéchat tussen leden",
-      "doc": "Phase 4 §7/§9 — the member↔member private chat (prikbord/DM) toggle."
+      "doc": "Phase 4 §7/§9 — the member↔member private chat (noticeboard/DM) toggle."
     },
     "privateDm_hint": {
       "text": "Laat leden elkaar rechtstreeks berichten, niet alleen de hele kring.",
@@ -1930,7 +1930,7 @@
     },
     "storagePosture": {
       "text": "Opslag (in rust)",
-      "doc": "Kring-instellingen — opslaghouding in rust (menukaart P0–P3)."
+      "doc": "Circle-instellingen — opslaghouding in rust (menukaart P0–P3)."
     },
     "sharePosture": {
       "text": "Delen buiten de kring",
@@ -1999,7 +1999,7 @@
     "notifications": {
       "section_title": {
         "text": "Meldingen",
-        "doc": "α.5b · audit #6 — heading of the per-kring push-toggles block on the personal override sheet (board 6A)."
+        "doc": "α.5b · audit #6 — heading of the per-circle push-toggles block on the personal override sheet (board 6A)."
       },
       "on_mention": {
         "text": "Bij @-vermelding",
@@ -2418,7 +2418,7 @@
   "fileShare": {
     "received": {
       "text": "📎 {{name}} met je gedeeld",
-      "doc": "Kring bubble when a peer shares a file."
+      "doc": "Circle bubble when a peer shares a file."
     },
     "download": {
       "text": "Downloaden",
@@ -3043,15 +3043,15 @@
         "text": "Taken",
         "doc": "P1.7 — kind chip."
       },
-      "vraag": {
+      "ask": {
         "text": "Vragen",
         "doc": "P1.7 — kind chip."
       },
-      "aanbod": {
+      "offer": {
         "text": "Aanbod",
         "doc": "P1.7 — kind chip."
       },
-      "leen": {
+      "lend": {
         "text": "Lenen",
         "doc": "P1.7 — kind chip."
       }
@@ -3412,7 +3412,7 @@
     },
     "link_warning": {
       "text": "Deze mensen zitten buiten deze kring. Delen legt een verbinding tussen jullie die beide kanten kunnen zien.",
-      "doc": "grants-over-Peer D7 — waarschuwing bij delen buiten de kring, op de ontvangerskiezer. Informatie vooraf, geen blokkade: delen via een gepubliceerde netwerksleutel legt bewust een 1-op-1 verbinding die beide kanten zien."
+      "doc": "grants-over-Peer D7 — waarschuwing bij delen buiten de circle, op de ontvangerskiezer. Informatie vooraf, geen blokkade: delen via een gepubliceerde netwerksleutel legt bewust een 1-op-1 verbinding die beide kanten zien."
     },
     "pick_cancel": {
       "text": "Annuleren",
@@ -4242,7 +4242,7 @@
     "devices": "Mijn apparaten",
     "connections": {
       "text": "Gekoppelde apparaten",
-      "doc": "Kop van de lijst met gekoppelde weergaven (schermen die van jou zijn, ergens anders)."
+      "doc": "Kop van de lijst met gekoppelde weergaven (screens die van jou zijn, ergens anders)."
     },
     "connection_sees": {
       "text": "ziet: {{what}}",
@@ -4262,7 +4262,7 @@
     },
     "connection_device_section": {
       "text": "apparaatinstellingen",
-      "doc": "De niet-kring sectie: je eigen instellingen."
+      "doc": "De niet-circle sectie: je eigen instellingen."
     },
     "connection_add": {
       "text": "Apparaat koppelen",
@@ -4440,7 +4440,7 @@
     "view": {
       "label": {
         "text": "Bekijken",
-        "doc": "media P1 — de volledige-afbeelding-knop op de media-chip; alleen zichtbaar als de render-context een openFull-lezer draagt (de beveiligde volledige lees-actie van de kring)."
+        "doc": "media P1 — de volledige-afbeelding-knop op de media-chip; alleen zichtbaar als de render-context een openFull-lezer draagt (de beveiligde volledige lees-actie van de circle)."
       },
       "loading": {
         "text": "Laden…",
@@ -4459,7 +4459,7 @@
     },
     "title": {
       "text": "Over mij",
-      "doc": "personas#1 — kop van het Over-mij-scherm."
+      "doc": "personas#1 — kop van het Over-mij-screen."
     },
     "title_named": {
       "text": "Over mij — {{name}}",
@@ -4491,7 +4491,7 @@
     },
     "sharing": {
       "text": "Wat je deelt, per kring",
-      "doc": "personas#1 — titel van de per-kring-deelsectie."
+      "doc": "personas#1 — titel van de per-circle-deelsectie."
     },
     "sharing_intro": {
       "text": "Delen staat standaard uit. Zet alleen aan wat een kring mag zien.",
@@ -4499,15 +4499,15 @@
     },
     "no_circles": {
       "text": "Je zit nog in geen enkele kring.",
-      "doc": "personas#1 — geen kringen om delen voor in te stellen."
+      "doc": "personas#1 — geen circles om delen voor in te stellen."
     },
     "you_share": {
       "text": "Deze kring ziet: {{keys}}",
-      "doc": "personas#1 — eerlijke samenvatting van wat een kring echt ziet."
+      "doc": "personas#1 — eerlijke samenvatting van wat een circle echt ziet."
     },
     "you_share_nothing": {
       "text": "Deze kring ziet niets.",
-      "doc": "personas#1 — niets gedeeld met deze kring."
+      "doc": "personas#1 — niets gedeeld met deze circle."
     },
     "set_a_property_first": {
       "text": "Vul hierboven eerst een eigenschap in — je kunt alleen delen wat je hebt ingevuld.",
@@ -4519,7 +4519,7 @@
     },
     "share_to_circle": {
       "text": "Deel met deze kring",
-      "doc": "personas#2 — knop: zet de huidige openbaarmaking op de ledenlijst van de kring (na deelname)."
+      "doc": "personas#2 — knop: zet de huidige openbaarmaking op de ledenlijst van de circle (na deelname)."
     },
     "drivers": {
       "text": "Jouw drijfveren",
@@ -4577,7 +4577,7 @@
     },
     "shared_ok": {
       "text": "Gedeeld ✓",
-      "doc": "personas#2 — de openbaarmaking is bij de kring-ledenlijst aangekomen."
+      "doc": "personas#2 — de openbaarmaking is bij de circle-ledenlijst aangekomen."
     },
     "share_failed": {
       "text": "Delen mislukt: {{reason}}",
@@ -4610,7 +4610,7 @@
       },
       "location": {
         "text": "Locatie",
-        "doc": "location-fold-in (audit §4) — label van de gebundelde coarse plaats-eigenschap (ladder: wijk→gemeente→regio→in de buurt→∅)."
+        "doc": "location-fold-in (audit §4) — label van de gebundelde coarse plaats-eigenschap (ladder: wijk→gemeente→regio→in de neighbourhood→∅)."
       }
     }
   },
@@ -4800,7 +4800,7 @@
       },
       "in-area": {
         "text": "in de buurt (j/n)",
-        "doc": "location-fold-in (audit §4) — laddersport: het in-de-buurt-predicaat, grofste nuttige plaats-sport (geen ruwe plek)."
+        "doc": "location-fold-in (audit §4) — laddersport: het in-de-neighbourhood-predicaat, grofste nuttige plaats-sport (geen ruwe plek)."
       },
       "band": {
         "text": "band",
@@ -4935,7 +4935,7 @@
     },
     "col_circle": {
       "text": "kring",
-      "doc": "mij#personas — tabelkop: kring."
+      "doc": "mij#personas — tabelkop: circle."
     },
     "col_persona": {
       "text": "persona",
@@ -4955,7 +4955,7 @@
     },
     "col_charter": {
       "text": "charter",
-      "doc": "mij#personas — tabelkop: wat de kring via haar charter vraagt (indien bekend)."
+      "doc": "mij#personas — tabelkop: wat de circle via haar charter vraagt (indien bekend)."
     },
     "level_all": {
       "text": "alles",
@@ -4963,11 +4963,11 @@
     },
     "nothing_shared": {
       "text": "deelt hier niets",
-      "doc": "mij#personas — nette lege staat: geen enkele persona deelt iets in deze kring."
+      "doc": "mij#personas — nette lege staat: geen enkele persona deelt iets in deze circle."
     },
     "share_add": {
       "text": "+ deel een eigenschap",
-      "doc": "mij#personas — gestippelde affordance: nog een eigenschap in deze kring delen (opt-up)."
+      "doc": "mij#personas — gestippelde affordance: nog een eigenschap in deze circle delen (opt-up)."
     },
     "share_remove": {
       "text": "Stop met delen van {{key}}",
@@ -4975,15 +4975,15 @@
     },
     "no_circles": {
       "text": "Je zit nog in geen enkele kring.",
-      "doc": "mij#personas — lege staat: geen kringen om delen voor te tonen."
+      "doc": "mij#personas — lege staat: geen circles om delen voor te tonen."
     },
     "charter_none": {
       "text": "—",
-      "doc": "mij#personas — charter-cel wanneer de kring geen attributen vraagt (nette lege staat)."
+      "doc": "mij#personas — charter-cel wanneer de circle geen attributen vraagt (nette lege staat)."
     },
     "charter_max": {
       "text": "≤ {{rung}}",
-      "doc": "mij#personas — charter-cel: de kring vraagt deze eigenschap tot maximaal deze sport."
+      "doc": "mij#personas — charter-cel: de circle vraagt deze eigenschap tot maximaal deze sport."
     }
   },
   "attach": {
@@ -5009,19 +5009,19 @@
       "text": "Chat",
       "doc": "Label for the chat-message conversation kind in the admin control."
     },
-    "vraag": {
+    "ask": {
       "text": "Vragen",
-      "doc": "Label for the vraag conversation kind in the admin control."
+      "doc": "Label for the ask conversation kind in the admin control."
     },
-    "aanbod": {
+    "offer": {
       "text": "Aanbod",
-      "doc": "Label for the aanbod conversation kind in the admin control."
+      "doc": "Label for the offer conversation kind in the admin control."
     },
     "task": {
       "text": "Taken",
       "doc": "Label for the task conversation kind in the admin control."
     },
-    "leen": {
+    "lend": {
       "text": "Lenen",
       "doc": "Label for the leen conversation kind in the admin control."
     }

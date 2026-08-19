@@ -8,7 +8,7 @@
  *
  *   { mime, dataB64, width, height, thumbnail }
  *
- * The full image is capped to the 600KB prikbord limit by longest-edge resize +
+ * The full image is capped to the 600KB noticeboard limit by longest-edge resize +
  * compression; the ~120px JPEG `thumbnail` (a `data:` URL) is what travels in the
  * broadcast. The native modules are injected (`picker`, `manipulator`) so the
  * shaping logic is unit-testable with fakes — mirrors the web encoder's seam.
@@ -18,7 +18,7 @@ import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 // Parameter register (#36) — attachment caps. Reuse the SHARED keys (same tunable as the web encoder + stoop
 // Attachments) so the by-value mirror is documented as one param. scope:device, kind:internal.
-export const MAX_PRIKBORD_BYTES_PER_ATT = param({ key: 'attachment.maxPrikbordBytesPerAtt', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 600_000 });   // mirror web encoder / stoop Attachments
+export const MAX_NOTICEBOARD_BYTES_PER_ATT = param({ key: 'attachment.maxNoticeboardBytesPerAtt', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 600_000 });   // mirror web encoder / stoop Attachments
 const DEFAULT_MAX_DIM = param({ key: 'attachment.maxImageDim', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1280 });
 const THUMB_DIM = 120;
 

@@ -25,12 +25,12 @@ describe('toCanonicalShape — Stoop type → canonical type+kind', () => {
     expect(out).toMatchObject({ type: 'offer', kind: 'lend' });
   });
 
-  it('maps legacy "offer" → offer + kind=give (Aanbod default)', () => {
+  it('maps legacy "offer" → offer + kind=give (Offer default)', () => {
     const out = toCanonicalShape({ ...COMMON, type: 'offer' });
     expect(out).toMatchObject({ type: 'offer', kind: 'give' });
   });
 
-  it('maps legacy "ask" → request + kind=borrow (Vragen default)', () => {
+  it('maps legacy "ask" → request + kind=borrow (Asks default)', () => {
     const out = toCanonicalShape({ ...COMMON, type: 'ask' });
     expect(out).toMatchObject({ type: 'request', kind: 'borrow' });
   });
@@ -76,7 +76,7 @@ describe('toCanonicalShape — Stoop type → canonical type+kind', () => {
 });
 
 describe('validateStoopItem — warn-only validation pipeline', () => {
-  it('returns {ok: true} for a well-shaped Stoop offer ("Aanbod")', () => {
+  it('returns {ok: true} for a well-shaped Stoop offer ("Offer")', () => {
     const v = validateStoopItem({
       ...COMMON,
       type: 'offer',
@@ -90,7 +90,7 @@ describe('validateStoopItem — warn-only validation pipeline', () => {
     expect(v.ok).toBe(true);
   });
 
-  it('returns {ok: true} for a well-shaped Stoop ask ("Vragen")', () => {
+  it('returns {ok: true} for a well-shaped Stoop ask ("Asks")', () => {
     const v = validateStoopItem({ ...COMMON, type: 'ask' });
     expect(v.ok).toBe(true);
   });
@@ -121,11 +121,11 @@ describe('validateStoopItem — warn-only validation pipeline', () => {
 });
 
 describe('intentToCanonicalDraft — write-side cut-over helper', () => {
-  it('Vragen button → {type: request, kind: borrow}', () => {
+  it('Asks button → {type: request, kind: borrow}', () => {
     expect(intentToCanonicalDraft('ask')).toEqual({ type: 'request', kind: 'borrow' });
   });
 
-  it('Aanbod button → {type: offer, kind: give}', () => {
+  it('Offer button → {type: offer, kind: give}', () => {
     expect(intentToCanonicalDraft('offer')).toEqual({ type: 'offer', kind: 'give' });
   });
 
@@ -138,7 +138,7 @@ describe('intentToCanonicalDraft — write-side cut-over helper', () => {
   });
 
   it('caller-supplied kindOverride wins over defaultKind', () => {
-    // Vragen + UI sub-choice "Iets klein om te delen" → kind: share.
+    // Asks + UI sub-choice "Iets klein om te delen" → kind: share.
     expect(intentToCanonicalDraft('ask', 'share')).toEqual({ type: 'request', kind: 'share' });
     expect(intentToCanonicalDraft('ask', 'receive')).toEqual({ type: 'request', kind: 'receive' });
   });

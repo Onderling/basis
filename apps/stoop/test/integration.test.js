@@ -241,7 +241,7 @@ describe('H5 — group isolation', () => {
 
 // Stoop V1 regression (2026-05-06): cross-member kind chip visibility.
 // Reported by manual testing — non-author members saw posts but no
-// "Te leen" / "Aanbod" chip because groupMirror flattened type to
+// "Te leen" / "Offer" chip because groupMirror flattened type to
 // 'request'. Fix in skills/index.js (thread `kind` + `dueAt` through
 // the broadcast payload) + groupMirror.js (use payload.kind).
 /**

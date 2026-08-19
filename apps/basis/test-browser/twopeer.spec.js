@@ -41,7 +41,7 @@ async function bootPeer(browser, label) {
 // Navigate to the launcher ("Jouw circles"). In a circle view the bottom nav is
 // hidden, so leave via the "← circles" back button first.
 async function gotoCircles(page) {
-  const back = page.locator('.circle-circle__back');
+  const back = page.locator('.circle-view__back');
   if (await back.count()) { await back.first().click(); await page.waitForTimeout(1500); }
   const tab = page.locator('[data-tab="circles"]');
   if (await tab.count()) { await tab.first().click(); await page.waitForTimeout(1600); }
@@ -72,25 +72,25 @@ async function openCircleMatching(page, re) {
 }
 
 async function toChat(page) {
-  const chat = page.locator('.circle-circle__view-toggle-btn[data-view-mode="chat"]');
+  const chat = page.locator('.circle-view__view-toggle-btn[data-view-mode="chat"]');
   if (await chat.count()) { await chat.first().click(); await page.waitForTimeout(1200); }
 }
 
 async function sendComposer(page, text, settle = 3000) {
-  await page.locator('.circle-circle__composer-input').fill(text);
-  await page.locator('.circle-circle__composer-send').click();
+  await page.locator('.circle-view__composer-input').fill(text);
+  await page.locator('.circle-view__composer-send').click();
   await page.waitForTimeout(settle);
 }
 
 async function bubbles(page) {
-  return (await page.locator('.circle-circle__bubble').allTextContents()).map((s) => s.replace(/\s+/g, ' ').trim());
+  return (await page.locator('.circle-view__bubble').allTextContents()).map((s) => s.replace(/\s+/g, ' ').trim());
 }
 
 // Open ⋯ → a more-menu action by data-action id.
 async function openMore(page, action) {
-  await page.locator('.circle-circle__more').click();
+  await page.locator('.circle-view__more').click();
   await page.waitForTimeout(500);
-  const item = page.locator(`.circle-circle__more-item[data-action="${action}"]`);
+  const item = page.locator(`.circle-view__more-item[data-action="${action}"]`);
   if (!(await item.count())) return false;
   await item.first().click();
   await page.waitForTimeout(1800);
@@ -271,7 +271,7 @@ test('two peers pair over the app transport + collaborate', async ({ browser }) 
     await sendComposer(a, '/addtask verf kopen', 4000);
     console.log('A bubbles after addtask:', JSON.stringify((await bubbles(a)).slice(-3)));
     await b.waitForTimeout(3500);
-    const bTabs = b.locator('.circle-circle__tab');
+    const bTabs = b.locator('.circle-view__tab');
     const bTabLabels = (await bTabs.allTextContents()).map((s) => s.trim());
     console.log('B circle tabs:', JSON.stringify(bTabLabels));
     const takenIdx = bTabLabels.findIndex((s) => /taken|task/i.test(s));
@@ -281,7 +281,7 @@ test('two peers pair over the app transport + collaborate', async ({ browser }) 
       await b.waitForTimeout(2500);
       // let it sync + re-poll
       for (let i = 0; i < 6 && !seen; i++) {
-        const rows = b.locator('.circle-circle__task');
+        const rows = b.locator('.circle-view__task');
         const rc = await rows.count();
         rowText = rc ? (await rows.first().innerText()).replace(/\s+/g, ' ').trim() : '(no task rows)';
         seen = /verf/i.test(rowText);
@@ -296,15 +296,15 @@ test('two peers pair over the app transport + collaborate', async ({ browser }) 
   // ── Step 4c: A opens the mandate picker → WIE lists peer B → entrust B ─────
   try {
     await toChat(a);
-    const aTabs = a.locator('.circle-circle__tab');
+    const aTabs = a.locator('.circle-view__tab');
     const aTabLabels = (await aTabs.allTextContents()).map((s) => s.trim());
     const takenIdxA = aTabLabels.findIndex((s) => /taken|task/i.test(s));
     if (takenIdxA >= 0) { await aTabs.nth(takenIdxA).click(); await a.waitForTimeout(2000); }
 
     // find the owner-only entrust action on the task row
-    let entrust = a.locator('.circle-circle__bubble-action--mandate, .circle-circle__task-action--mandate, [data-action="mandate"]');
+    let entrust = a.locator('.circle-view__bubble-action--mandate, .circle-view__task-action--mandate, [data-action="mandate"]');
     if (!(await entrust.count())) {
-      entrust = a.locator('.circle-circle__task button, .circle-circle__task-action, .circle-circle__bubble-action').filter({ hasText: /toevertrouwen/i });
+      entrust = a.locator('.circle-view__task button, .circle-view__task-action, .circle-view__bubble-action').filter({ hasText: /toevertrouwen/i });
     }
     const ec = await entrust.count();
     console.log('A entrust action count:', ec);

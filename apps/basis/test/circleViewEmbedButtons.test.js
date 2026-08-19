@@ -21,13 +21,13 @@ describe('renderCircleView — S6.A inline embed buttons', () => {
     const onEmbedButton = vi.fn();
     const el = renderCircleView(document.createElement('div'), {
       circle: { id: 'c1', name: 'Buren' }, t,
-      activeTab: 'gesprek',
+      activeTab: 'conversation',
       rows: [botRowWithButtons([
         { id: 'claimTask:t1', label: 'Claim · boodschappen', opId: 'claimTask', itemId: 't1' },
       ])],
       onEmbedButton,
     });
-    const btn = el.querySelector('.circle-circle__embed-button');
+    const btn = el.querySelector('.circle-view__embed-button');
     expect(btn).toBeTruthy();
     expect(btn.textContent).toMatch(/Claim/);
     expect(btn.dataset.opId).toBe('claimTask');
@@ -39,11 +39,11 @@ describe('renderCircleView — S6.A inline embed buttons', () => {
   it('S6.B — renders a screen button (opens a panel) + a tap fires onEmbedButton with {screen}', () => {
     const onEmbedButton = vi.fn();
     const el = renderCircleView(document.createElement('div'), {
-      circle: { id: 'c1' }, t, activeTab: 'gesprek',
+      circle: { id: 'c1' }, t, activeTab: 'conversation',
       rows: [botRowWithButtons([{ id: 'screen:tasks', label: 'All tasks →', screen: 'tasks' }])],
       onEmbedButton,
     });
-    const btn = el.querySelector('.circle-circle__screen-button');
+    const btn = el.querySelector('.circle-view__screen-button');
     expect(btn).toBeTruthy();
     expect(btn.dataset.screen).toBe('tasks');
     expect(btn.dataset.opId).toBeUndefined();
@@ -57,29 +57,29 @@ describe('renderCircleView — S6.A inline embed buttons', () => {
     const selfRow = { id: 'k2', ts: Date.now(), type: 'chat-message', actor: 'bot', circleId: 'c1',
       event: { type: 'chat-message', actor: 'bot', payload: { circleId: 'c1', text: 'private answer', kind: 'chat-message' } } };
     const el = renderCircleView(document.createElement('div'), {
-      circle: { id: 'c1' }, t, activeTab: 'gesprek', rows: [circleRow, selfRow],
+      circle: { id: 'c1' }, t, activeTab: 'conversation', rows: [circleRow, selfRow],
     });
-    const badges = [...el.querySelectorAll('.circle-circle__scope')];
+    const badges = [...el.querySelectorAll('.circle-view__scope')];
     expect(badges).toHaveLength(2);
-    expect(el.querySelector('.circle-circle__scope--circle').textContent).toContain('circle.scope.circle');
-    expect(el.querySelector('.circle-circle__scope--self').textContent).toContain('circle.scope.self');
+    expect(el.querySelector('.circle-view__scope--circle').textContent).toContain('circle.scope.circle');
+    expect(el.querySelector('.circle-view__scope--self').textContent).toContain('circle.scope.self');
   });
 
   it('renders no embed buttons when the row carries none', () => {
     const el = renderCircleView(document.createElement('div'), {
-      circle: { id: 'c1' }, t, activeTab: 'gesprek',
+      circle: { id: 'c1' }, t, activeTab: 'conversation',
       rows: [botRowWithButtons(undefined)],
       onEmbedButton: () => {},
     });
-    expect(el.querySelector('.circle-circle__embed-button')).toBeNull();
+    expect(el.querySelector('.circle-view__embed-button')).toBeNull();
   });
 
   it('skips embed buttons when no onEmbedButton handler is wired', () => {
     const el = renderCircleView(document.createElement('div'), {
-      circle: { id: 'c1' }, t, activeTab: 'gesprek',
+      circle: { id: 'c1' }, t, activeTab: 'conversation',
       rows: [botRowWithButtons([{ id: 'x:1', label: 'X', opId: 'x', itemId: '1' }])],
     });
-    expect(el.querySelector('.circle-circle__embed-button')).toBeNull();
+    expect(el.querySelector('.circle-view__embed-button')).toBeNull();
   });
 });
 
@@ -92,10 +92,10 @@ describe('renderCircleView — embeds[] "See also" chips on a bot row', () => {
 
   it('renders a chip per embed the message carries (icon + type + title)', () => {
     const el = renderCircleView(document.createElement('div'), {
-      circle: { id: 'c1' }, t, activeTab: 'gesprek',
+      circle: { id: 'c1' }, t, activeTab: 'conversation',
       rows: [botRowWithEmbeds([{ type: 'task', ref: 't2', title: 'Fix the gate' }])],
     });
-    const chips = el.querySelectorAll('.circle-circle__embed');
+    const chips = el.querySelectorAll('.circle-view__embed');
     expect(chips).toHaveLength(1);
     expect(chips[0].dataset.ref).toBe('t2');
     expect(chips[0].textContent).toBe('✅ task: Fix the gate');   // identity t() → raw type fallback
@@ -103,19 +103,19 @@ describe('renderCircleView — embeds[] "See also" chips on a bot row', () => {
 
   it('renders no embeds block when the message carries none', () => {
     const el = renderCircleView(document.createElement('div'), {
-      circle: { id: 'c1' }, t, activeTab: 'gesprek', rows: [botRowWithEmbeds(undefined)],
+      circle: { id: 'c1' }, t, activeTab: 'conversation', rows: [botRowWithEmbeds(undefined)],
     });
-    expect(el.querySelector('.circle-circle__embeds')).toBeNull();
+    expect(el.querySelector('.circle-view__embeds')).toBeNull();
   });
 
   it('a task chip is TAPPABLE (a button) + a tap opens the tasks screen', () => {
     const onEmbedOpen = vi.fn();
     const el = renderCircleView(document.createElement('div'), {
-      circle: { id: 'c1' }, t, activeTab: 'gesprek',
+      circle: { id: 'c1' }, t, activeTab: 'conversation',
       rows: [botRowWithEmbeds([{ type: 'task', ref: 't2', title: 'Fix the gate' }])],
       onEmbedOpen,
     });
-    const chip = el.querySelector('.circle-circle__embed--tappable');
+    const chip = el.querySelector('.circle-view__embed--tappable');
     expect(chip).toBeTruthy();
     expect(chip.tagName).toBe('BUTTON');
     chip.click();
@@ -124,11 +124,11 @@ describe('renderCircleView — embeds[] "See also" chips on a bot row', () => {
 
   it('a chip with no screen (note) stays a non-tappable span even with onEmbedOpen', () => {
     const el = renderCircleView(document.createElement('div'), {
-      circle: { id: 'c1' }, t, activeTab: 'gesprek',
+      circle: { id: 'c1' }, t, activeTab: 'conversation',
       rows: [botRowWithEmbeds([{ type: 'note', ref: 'n1', title: 'A note' }])],
       onEmbedOpen: vi.fn(),
     });
-    expect(el.querySelector('.circle-circle__embed--tappable')).toBeNull();
-    expect(el.querySelector('.circle-circle__embed').tagName).toBe('SPAN');
+    expect(el.querySelector('.circle-view__embed--tappable')).toBeNull();
+    expect(el.querySelector('.circle-view__embed').tagName).toBe('SPAN');
   });
 });

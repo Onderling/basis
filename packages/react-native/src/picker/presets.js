@@ -1,7 +1,7 @@
 /**
  * Image-picker presets — knobs that tune resize / quality. Apps
  * provide their own presets per use case (chat thumbnail, avatar,
- * prikbord post, deliverable photo, …).
+ * noticeboard post, deliverable photo, …).
  *
  * Lifted from apps/stoop-mobile/src/lib/imagePicker.js 2026-05-09
  * (Phase 41.0 L3; Tasks-mobile is the second consumer). Stoop's

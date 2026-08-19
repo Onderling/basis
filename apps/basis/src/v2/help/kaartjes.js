@@ -188,8 +188,8 @@ export const helpDeck = {
           "buurt",
           "straat",
           "buren",
-          "prikbord",
-          "lenen",
+          "noticeboard",
+          "lend",
           "delen"
         ],
         "en": [
@@ -216,7 +216,7 @@ export const helpDeck = {
           "vereniging",
           "club",
           "vve",
-          "leden",
+          "members",
           "secretaris"
         ],
         "en": [
@@ -479,9 +479,9 @@ export const helpDeck = {
       "tags": {
         "nl": [
           "taken",
-          "prikbord",
-          "vraag",
-          "aanbod",
+          "noticeboard",
+          "ask",
+          "offer",
           "agenda",
           "afspraken"
         ],
@@ -558,7 +558,7 @@ export const helpDeck = {
       "tags": {
         "nl": [
           "deze",
-          "vraag",
+          "ask",
           "chat",
           "bot",
           "waar",

@@ -6,7 +6,7 @@
  *
  *   { mime, dataB64, width, height, thumbnail }
  *
- * - resizes the full image to fit `maxDim` (keeps it under the prikbord byte
+ * - resizes the full image to fit `maxDim` (keeps it under the noticeboard byte
  *   cap) and re-encodes as JPEG/PNG/WebP,
  * - generates a ~120px JPEG `thumbnail` data-URL (this is what travels in the
  *   broadcast; full bytes are fetched on demand),
@@ -23,9 +23,9 @@ import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 
 // Parameter register (#36) — attachment size/dimension caps (scope:device, kind:internal — safety bounds).
 // `param()` returns each existing default. NOTE the by-value mirror below is a known duplication with
-// stoop's Attachments.MAX_PRIKBORD_BYTES_PER_ATT (app→app import is forbidden); unifying both on the shared
-// `attachment.maxPrikbordBytesPerAtt` key is a follow-up once the register is read at runtime (L24).
-export const MAX_PRIKBORD_BYTES_PER_ATT = param({ key: 'attachment.maxPrikbordBytesPerAtt', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 600_000 });     // mirror Attachments.MAX_PRIKBORD_BYTES_PER_ATT
+// stoop's Attachments.MAX_NOTICEBOARD_BYTES_PER_ATT (app→app import is forbidden); unifying both on the shared
+// `attachment.maxNoticeboardBytesPerAtt` key is a follow-up once the register is read at runtime (L24).
+export const MAX_NOTICEBOARD_BYTES_PER_ATT = param({ key: 'attachment.maxNoticeboardBytesPerAtt', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 600_000 });     // mirror Attachments.MAX_NOTICEBOARD_BYTES_PER_ATT
 export const ALLOWED_MIMES = Object.freeze(new Set(['image/jpeg', 'image/png', 'image/webp']));
 const THUMB_DIM = param({ key: 'attachment.thumbDim', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 120 });
 const DEFAULT_MAX_DIM = param({ key: 'attachment.maxImageDim', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 1280 });
@@ -82,7 +82,7 @@ function defaultMakeCanvas(width, height) {
  */
 export async function encodeImageFile(file, {
   maxDim = DEFAULT_MAX_DIM,
-  maxBytes = MAX_PRIKBORD_BYTES_PER_ATT,
+  maxBytes = MAX_NOTICEBOARD_BYTES_PER_ATT,
   loadImage = defaultLoadImage,
   makeCanvas = defaultMakeCanvas,
 } = {}) {

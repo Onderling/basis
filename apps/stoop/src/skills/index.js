@@ -156,7 +156,7 @@ function isCircleAdmin(role) {
 
 /**
  * Cross-pod ref soft cap on `postRequest({embeds: [...]})`. Eight
- * keeps the prikbord card from overflowing while still allowing
+ * keeps the noticeboard card from overflowing while still allowing
  * "this offer touches several other items" use cases. A4 / V2
  * functional design §4b.
  */
@@ -1277,7 +1277,7 @@ export function buildSkills({
      * 'report' | ...). Items are stored with the canonical
      * `@onderling/item-types` shape — `type` + `kind` — via the
      * translator in `lib/canonicalAdapter.js`. The optional `kind`
-     * arg lets a future UI sub-choice ("Lenen / Iets klein om te
+     * arg lets a future UI sub-choice ("Lend / Iets klein om te
      * delen / Iets gratis krijgen") pin the canonical kind directly.
      *
      * For lend-shaped writes (`intent: 'lend'` / canonical
@@ -1655,7 +1655,7 @@ export function buildSkills({
       if (a.intent) {
         const canon = intentToCanonicalDraft(a.intent);
         filter.type = canon.type;
-        // For 'offer' intent we narrow to kind:give (the "Aanbod"
+        // For 'offer' intent we narrow to kind:give (the "Offer"
         // tab); for 'lend' we narrow to kind:lend. Other intents
         // ('ask', 'request', 'report', bespoke) match by `type`
         // alone — no kind narrowing.
@@ -3575,7 +3575,7 @@ export function buildSkills({
 
     /**
      * broadcastCircleRecipe({groupId, recipe, msgId, ts?})
-     *   — γ-next.recipe — circle scherm recipe fan-out to every member
+     *   — γ-next.recipe — circle screen recipe fan-out to every member
      *   of a circle.  Sibling of `broadcastCircleMessage`: same fan-out
      *   plumbing (chat.send, WebID→pubKey resolution, signing,
      *   transport routing), different subtype + payload.
@@ -3606,7 +3606,7 @@ export function buildSkills({
         metric: 'circle-recipe-fanout',
       });
     }, {
-      description: 'Fan a circle scherm recipe out to every other member via chat.send subtype:circle-recipe-broadcast; receivers cache as pending incomingRecipe for the γ.3 conflict resolver.',
+      description: 'Fan a circle screen recipe out to every other member via chat.send subtype:circle-recipe-broadcast; receivers cache as pending incomingRecipe for the γ.3 conflict resolver.',
       visibility:  'authenticated',
     }),
 
@@ -3903,7 +3903,7 @@ export function buildSkills({
      *   oldest → newest (chat reading order).  Defaults: all circles,
      *   no time bound, capped at 200 most recent.  Hosts (basis
      *   web + mobile) call this at boot to rehydrate eventLog so the
-     *   GESPREK tab shows historical chats after a reload.
+     *   CONVERSATION tab shows historical chats after a reload.
      */
     defineSkill('listCircleChats', async ({ parts }) => {
       const a = dataArgs(parts);

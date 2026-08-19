@@ -176,7 +176,7 @@ export function log(step, verdict, note) {
  */
 export async function gotoCircles(page) {
   await dismissAnyModal(page);
-  const back = page.locator('.circle-circle__back');
+  const back = page.locator('.circle-view__back');
   if (await back.count()) { await back.first().click(); await page.waitForTimeout(1500); }
   const tab = page.locator('[data-tab="circles"]');
   if (await tab.count()) { await tab.first().click(); await page.waitForTimeout(1600); }
@@ -255,7 +255,7 @@ export async function reopenCircle(page, re) {
 
 /** Switch the open circle to Chat view. */
 export async function toChat(page) {
-  const chat = page.locator('.circle-circle__view-toggle-btn[data-view-mode="chat"]');
+  const chat = page.locator('.circle-view__view-toggle-btn[data-view-mode="chat"]');
   if (await chat.count()) { await chat.first().click(); await page.waitForTimeout(1200); }
 }
 
@@ -263,14 +263,14 @@ export async function toChat(page) {
 
 /** Send a line through the circle composer (explicit send button). */
 export async function sendChat(page, text, settle = 3000) {
-  await page.locator('.circle-circle__composer-input').fill(text);
-  await page.locator('.circle-circle__composer-send').click();
+  await page.locator('.circle-view__composer-input').fill(text);
+  await page.locator('.circle-view__composer-send').click();
   await page.waitForTimeout(settle);
 }
 
 /** All chat bubble texts (normalised). */
 export async function readBubbles(page) {
-  return (await page.locator('.circle-circle__bubble').allTextContents()).map((s) => s.replace(/\s+/g, ' ').trim());
+  return (await page.locator('.circle-view__bubble').allTextContents()).map((s) => s.replace(/\s+/g, ' ').trim());
 }
 
 /**
@@ -289,9 +289,9 @@ export async function waitForBubble(page, needle, { tries = 16, every = 2500 } =
 
 /** Open ⋯ → a more-menu action by data-action id. Returns false if the item is absent. */
 export async function openMore(page, action) {
-  await page.locator('.circle-circle__more').click();
+  await page.locator('.circle-view__more').click();
   await page.waitForTimeout(500);
-  const item = page.locator(`.circle-circle__more-item[data-action="${action}"]`);
+  const item = page.locator(`.circle-view__more-item[data-action="${action}"]`);
   if (!(await item.count())) return false;
   await item.first().click();
   await page.waitForTimeout(1800);
@@ -481,7 +481,7 @@ export async function addTask(page, text, settle = 4000) {
  * just-synced task has time to land.
  */
 export async function openTakenTab(page, { tries = 6, every = 2500 } = {}) {
-  const tabs = page.locator('.circle-circle__tab');
+  const tabs = page.locator('.circle-view__tab');
   const labels = (await tabs.allTextContents()).map((s) => s.trim());
   const idx = labels.findIndex((s) => /taken|task/i.test(s));
   if (idx < 0) return { present: false, rows: [] };
@@ -489,7 +489,7 @@ export async function openTakenTab(page, { tries = 6, every = 2500 } = {}) {
   await page.waitForTimeout(2500);
   let rows = [];
   for (let i = 0; i < tries; i++) {
-    const rowLoc = page.locator('.circle-circle__task');
+    const rowLoc = page.locator('.circle-view__task');
     const rc = await rowLoc.count();
     rows = [];
     for (let j = 0; j < rc; j++) rows.push((await rowLoc.nth(j).innerText()).replace(/\s+/g, ' ').trim());
@@ -507,9 +507,9 @@ export async function openTakenTab(page, { tries = 6, every = 2500 } = {}) {
 export async function claimTask(page, re = /verf|./) {
   const { present } = await openTakenTab(page);
   if (!present) return { claimed: false, reason: 'no Taken tab' };
-  const task = page.locator('.circle-circle__task').filter({ hasText: re }).first();
+  const task = page.locator('.circle-view__task').filter({ hasText: re }).first();
   if (!(await task.count())) return { claimed: false, reason: 'no matching task row' };
-  const chip = task.locator('.circle-circle__task-action, .circle-circle__task-actions button').filter({ hasText: /ik doe|claim|oppak|neem/i });
+  const chip = task.locator('.circle-view__task-action, .circle-view__task-actions button').filter({ hasText: /ik doe|claim|oppak|neem/i });
   if (!(await chip.count())) return { claimed: false, reason: 'no claim chip' };
   await chip.first().click();
   await page.waitForTimeout(2000);
@@ -530,14 +530,14 @@ export async function openMandatePicker(page) {
   // intercepted by the open modal's backdrop (a pointer-events-blocking overlay)
   // and hang until the test times out. Uses the existing selector only.
   if (!(await page.locator('.cc-mandate-picker').count())) {
-    const tabs = page.locator('.circle-circle__tab');
+    const tabs = page.locator('.circle-view__tab');
     const labels = (await tabs.allTextContents()).map((s) => s.trim());
     const idx = labels.findIndex((s) => /taken|task/i.test(s));
     if (idx >= 0) { await tabs.nth(idx).click(); await page.waitForTimeout(2000); }
 
-    let entrust = page.locator('.circle-circle__bubble-action--mandate, .circle-circle__task-action--mandate, [data-action="mandate"]');
+    let entrust = page.locator('.circle-view__bubble-action--mandate, .circle-view__task-action--mandate, [data-action="mandate"]');
     if (!(await entrust.count())) {
-      entrust = page.locator('.circle-circle__task button, .circle-circle__task-action, .circle-circle__bubble-action').filter({ hasText: /toevertrouwen/i });
+      entrust = page.locator('.circle-view__task button, .circle-view__task-action, .circle-view__bubble-action').filter({ hasText: /toevertrouwen/i });
     }
     if (!(await entrust.count())) return { opened: false, whoCount: 0, emptyNote: 0, text: '(no entrust chip)' };
 
@@ -579,18 +579,18 @@ export async function entrustFirstMember(page) {
 // ── surfaces not yet built (Phase 3/4) — reachers for the fixme journeys ────────
 // These wrap the INTENDED affordance so the journey documents the target surface.
 // They must not guess stable selectors for UI that doesn't exist; where the surface
-// is a known placeholder (G16 LEDEN tab, G17 composer slash dispatch), the journey is
+// is a known placeholder (G16 MEMBERS tab, G17 composer slash dispatch), the journey is
 // a fixme and these return "not reachable yet" rather than a fabricated success.
 
 /**
- * Open the LEDEN (members) tab. G16: this tab is a PLACEHOLDER today — the roster only
+ * Open the MEMBERS (members) tab. G16: this tab is a PLACEHOLDER today — the roster only
  * lives in the admin panel + mandate picker. Phase 4 builds the real tab with tappable
- * rows. Returns `{present}` based on whether a leden tab exists.
+ * rows. Returns `{present}` based on whether a members tab exists.
  */
 export async function openLedenTab(page) {
-  const tabs = page.locator('.circle-circle__tab');
+  const tabs = page.locator('.circle-view__tab');
   const labels = (await tabs.allTextContents()).map((s) => s.trim());
-  const idx = labels.findIndex((s) => /leden|member/i.test(s));
+  const idx = labels.findIndex((s) => /members|member/i.test(s));
   if (idx < 0) return { present: false, labels };
   await tabs.nth(idx).click();
   await page.waitForTimeout(1500);

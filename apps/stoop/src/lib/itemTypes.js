@@ -27,7 +27,7 @@ export const ITEM_TYPES = Object.freeze({
 });
 
 /** All Stoop kinds the board renders alongside one another. */
-export const PRIKBORD_KINDS = Object.freeze([
+export const NOTICEBOARD_KINDS = Object.freeze([
   ITEM_TYPES.ASK,
   ITEM_TYPES.OFFER,
   ITEM_TYPES.LEND,

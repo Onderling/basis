@@ -51,10 +51,34 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
   const entryId = (stmt) => `${entryKind}:${stmt.body.hash}`;
 
   /**
-   * APPEND — the one write path. Returns `{ entry, statement }`, or null when no circle signer resolves
+   * APPEND IS SERIALISED PER CIRCLE — and this is a correctness requirement, not a performance one.
+   *
+   * `appendOne` computes its `parent` by READING the log (`authorHead`), then awaits the signer, then
+   * appends. Two appends that overlap in that gap both read the same head and both stamp the SAME parent —
+   * so ONE device writing twice quickly emits two statements by one author off one parent. That is the
+   * exact shape this rail defines as EQUIVOCATION (see the fold below: `${author}|${parent}` → a fork), so
+   * a device would fork against ITSELF and the fold would discount both. Observed live: create a task and
+   * claim it in the same tick, and the claim never reaches the peer.
+   *
+   * Nothing about the caller can prevent it — `store.put`'s publish hook fires the append without awaiting
+   * it, which is correct (a local write must not block on the carry). So the ordering has to be the rail's
+   * own guarantee. The queue is per circleId: appends to different circles stay concurrent.
+   */
+  const appendQueues = new Map();   // circleId → promise chain tail
+  function append(circleId, opts = {}) {
+    const prior = appendQueues.get(circleId) ?? Promise.resolve();
+    // `.then(() => …)` on a settled-or-rejected tail: a failed append must not wedge the lane, so the
+    // chain is rebuilt from a caught tail.
+    const run = prior.then(() => appendOne(circleId, opts), () => appendOne(circleId, opts));
+    appendQueues.set(circleId, run.then(() => undefined, () => undefined));
+    return run;
+  }
+
+  /**
+   * The one write path. Returns `{ entry, statement }`, or null when no circle signer resolves
    * (the caller may fall back to its legacy path during the per-type cutover — one path per type at a time).
    */
-  async function append(circleId, { kind, subject, payload, actor, signer } = {}) {
+  async function appendOne(circleId, { kind, subject, payload, actor, signer } = {}) {
     if (!declaredKinds.includes(kind)) {
       // An undeclared kind is a bug at the DECLARING side — fail loudly at the write, never silently.
       throw new Error(`circleEntryRail(${entryKind}): kind "${kind}" is not declared [${declaredKinds.join(', ')}]`);

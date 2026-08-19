@@ -276,7 +276,7 @@ export const stoopManifest = {
         },
         // appliesTo-gated row button on /feed posts.  Click → form
         // prompts for body, then dispatches.
-        ui: { control: 'button', label: 'Help with' },
+        ui: { control: 'button' },
       },
     },
     {
@@ -316,7 +316,7 @@ export const stoopManifest = {
             onEmpty: { skillId: 'cancelRequest', args: {} },
           },
         },
-        ui: { control: 'button', label: 'Trek in' },
+        ui: { control: 'button' },
       },
     },
 
@@ -374,7 +374,7 @@ export const stoopManifest = {
             onEmpty: { skillId: 'markReturned', args: {} },
           },
         },
-        ui: { control: 'button', label: 'Teruggebracht' },
+        ui: { control: 'button' },
       },
     },
 
@@ -405,7 +405,7 @@ export const stoopManifest = {
             onEmpty: { skillId: 'reportPost', args: {} },
           },
         },
-        ui: { control: 'button', label: 'Rapporteer' },
+        ui: { control: 'button' },
       },
     },
     {
@@ -657,7 +657,7 @@ export const stoopManifest = {
       params: [{ name: 'webid', kind: 'string', required: true }],
       surfaces: {
         chat: { reply: 'text', hint: 'open a DM with this peer' },
-        ui:   { control: 'button', label: 'DM' },
+        ui:   { control: 'button' },
       },
     },
 
@@ -719,7 +719,7 @@ export const stoopManifest = {
       surfaces: {
         slash: { command: '/remove-contact' },
         chat:  { reply: 'text', hint: 'remove a contact' },
-        ui:    { control: 'button', label: 'Remove' },
+        ui:    { control: 'button' },
       },
     },
     {
@@ -767,7 +767,7 @@ export const stoopManifest = {
         slash: { command: '/dispute', body: 'flags' },
         chat:  { hint: 'raise a conflict-resolution dispute in your buurt' },
         page:  { kind: 'side-panel', title: 'Raise a dispute' },
-        ui:    { control: 'button', label: 'Dispute' },
+        ui:    { control: 'button' },
       },
     },
     {
@@ -856,23 +856,23 @@ export const stoopManifest = {
         { name: 'categoryId', kind: 'string', required: true },
         { name: 'freeTags',   kind: 'object', schema: { type: 'array', items: { type: 'string' } } },
       ],
-      surfaces: { chat: { hint: 'Add something you can offer to your neighbours, by category id (see listOfferingCategories). Optional free tags.' } , ui: { control: 'button', label: 'Aanbod toevoegen' } },
+      surfaces: { chat: { hint: 'Add something you can offer to your neighbours, by category id (see listOfferingCategories). Optional free tags.' } , ui: { control: 'button' } },
     },
     {
       id:   'removeMyOffering', verb: 'remove',
       params: [{ name: 'categoryId', kind: 'string', required: true }],
-      surfaces: { chat: { hint: 'Stop offering a category you had listed.' } , ui: { control: 'button', label: 'Aanbod verwijderen' } },
+      surfaces: { chat: { hint: 'Stop offering a category you had listed.' } , ui: { control: 'button' } },
     },
     {
       id:   'listMyOfferings', verb: 'list',
       params: [],
-      surfaces: { chat: { hint: 'List what this person currently offers.' } , ui: { control: 'page', label: 'Mijn aanbod' } },
+      surfaces: { chat: { hint: 'List what this person currently offers.' } , ui: { control: 'page' } },
     },
     {
       id:   'listOfferingCategories', verb: 'list',
       // The offering taxonomy with localised labels; `lang` picks the label set.
       params: [{ name: 'lang', kind: 'string' }],
-      surfaces: { chat: { hint: 'The offering-category taxonomy with localised labels; pass `lang` for the label set.' } , ui: { control: 'page', label: 'Categorieën' } },
+      surfaces: { chat: { hint: 'The offering-category taxonomy with localised labels; pass `lang` for the label set.' } , ui: { control: 'page' } },
     },
 
     // ── Where you are ───────────────────────────────────────────────
@@ -888,29 +888,29 @@ export const stoopManifest = {
         { name: 'lon',   kind: 'number', required: true },
         { name: 'label', kind: 'string' },
       ],
-      surfaces: { chat: { hint: "Set this person's coarse location (lat/lon, optional label) — what a circle sees is approximate by design." } , ui: { control: 'button', label: 'Locatie instellen' } },
+      surfaces: { chat: { hint: "Set this person's coarse location (lat/lon, optional label) — what a circle sees is approximate by design." } , ui: { control: 'button' } },
     },
     {
       id:   'clearMyLocation', verb: 'remove',
       params: [],
-      surfaces: { chat: { hint: "Remove this person's stored location entirely." } , ui: { control: 'button', label: 'Locatie wissen' } },
+      surfaces: { chat: { hint: "Remove this person's stored location entirely." } , ui: { control: 'button' } },
     },
     {
       id:   'getMyLocation', verb: 'list',
       params: [],
-      surfaces: { chat: { hint: "Show this person's stored coarse location, if any." } , ui: { control: 'page', label: 'Mijn locatie' } },
+      surfaces: { chat: { hint: "Show this person's stored coarse location, if any." } , ui: { control: 'page' } },
     },
     {
       id:   'geocode', verb: 'list',
       params: [{ name: 'query', kind: 'string', required: true }],
-      surfaces: { chat: { hint: 'Turn a typed place name into coordinates. A lookup only — it stores nothing.' } , ui: { control: 'button', label: 'Plaats opzoeken' } },
+      surfaces: { chat: { hint: 'Turn a typed place name into coordinates. A lookup only — it stores nothing.' } , ui: { control: 'button' } },
     },
     {
       id:   'getDataLocation', verb: 'list',
       // Not a place in the world — WHERE THIS PERSON'S BYTES REST (pod vs device). It sits in this
       // group only because the word collides; it answers the my-data screen's "where is my stuff".
       params: [],
-      surfaces: { chat: { hint: "Where this person's data actually rests (their pod, or this device) — not a place in the world." } , ui: { control: 'page', label: 'Waar staat mijn data' } },
+      surfaces: { chat: { hint: "Where this person's data actually rests (their pod, or this device) — not a place in the world." } , ui: { control: 'page' } },
     },
 
     // ── Who you are, per circle ─────────────────────────────────────
@@ -921,7 +921,7 @@ export const stoopManifest = {
       params: [{ name: 'handle', kind: 'string', required: true, ...STR_NONEMPTY }],
       surfaces: {
         chat: { hint: "Set this person's handle in the current circle. Refuses if the handle is taken there." },
-        ui:   { control: 'button', label: 'Handle instellen' },
+        ui:   { control: 'button' },
       },
     },
     {
@@ -929,7 +929,7 @@ export const stoopManifest = {
       params: [{ name: 'displayName', kind: 'string', required: true, ...STR_NONEMPTY }],
       surfaces: {
         chat: { hint: 'Set the display name others see for this person.' },
-        ui:   { control: 'button', label: 'Weergavenaam' },
+        ui:   { control: 'button' },
       },
     },
     {
@@ -937,7 +937,7 @@ export const stoopManifest = {
       params: [],
       surfaces: {
         chat: { hint: 'List the handles this person uses, one per circle they have joined.' },
-        ui:   { control: 'page', label: 'Mijn namen' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -945,7 +945,7 @@ export const stoopManifest = {
       params: [],
       surfaces: {
         chat: { hint: "This person's own profile — handle, display name, offerings, location." },
-        ui:   { control: 'page', label: 'Mijn profiel' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -955,7 +955,7 @@ export const stoopManifest = {
       params: [],
       surfaces: {
         chat: { hint: "The interest profile derived locally from this person's own activity." },
-        ui:   { control: 'page', label: 'Mijn interesses' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -972,7 +972,7 @@ export const stoopManifest = {
       resolves: [{ field: 'personaProperties', policy: 'content' }],
       surfaces: {
         chat: { hint: "Record a member's released persona properties on the circle roster (admin side)." },
-        ui:   { control: 'page', label: 'Ledenlijst' },
+        ui:   { control: 'page' },
       },
     },
 
@@ -985,7 +985,7 @@ export const stoopManifest = {
       resolves: [{ field: 'subscription', policy: 'content' }],
       surfaces: {
         chat: { hint: 'Register a web-push subscription for this device.' },
-        ui:   { control: 'button', label: 'Meldingen aanzetten' },
+        ui:   { control: 'button' },
       },
     },
     {
@@ -993,7 +993,7 @@ export const stoopManifest = {
       params: [{ name: 'endpoint', kind: 'string', required: true, ...ID_NONEMPTY }],
       surfaces: {
         chat: { hint: 'Remove a web-push subscription by endpoint.' },
-        ui:   { control: 'button', label: 'Meldingen uitzetten' },
+        ui:   { control: 'button' },
       },
     },
     {
@@ -1002,7 +1002,7 @@ export const stoopManifest = {
       resolves: [{ field: 'token', policy: 'content' }],
       surfaces: {
         chat: { hint: "Register this device's Expo push token (the mobile twin of subscribeWebPush)." },
-        ui:   { control: 'button', label: 'Meldingen aanzetten' },
+        ui:   { control: 'button' },
       },
     },
     {
@@ -1010,7 +1010,7 @@ export const stoopManifest = {
       params: [{ name: 'token', kind: 'string', required: true, ...ID_NONEMPTY }],
       surfaces: {
         chat: { hint: "Remove this device's Expo push token." },
-        ui:   { control: 'button', label: 'Meldingen uitzetten' },
+        ui:   { control: 'button' },
       },
     },
     {
@@ -1018,7 +1018,7 @@ export const stoopManifest = {
       params: [],
       surfaces: {
         chat: { hint: "The relay's VAPID public key, which a browser needs before it can subscribe." },
-        ui:   { control: 'page', label: 'Meldingen' },
+        ui:   { control: 'page' },
       },
     },
 
@@ -1031,7 +1031,7 @@ export const stoopManifest = {
       params: [{ name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY }],
       surfaces: {
         chat: { hint: "Where this circle's data rests, and under which storage policy." },
-        ui:   { control: 'page', label: 'Opslag' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -1044,7 +1044,7 @@ export const stoopManifest = {
       resolves: [{ field: 'storagePolicy', policy: 'content' }],
       surfaces: {
         chat: { hint: "Set where this circle's data rests. An admin decision — it moves everyone's bytes." },
-        ui:   { control: 'button', label: 'Opslag wijzigen' },
+        ui:   { control: 'button' },
       },
     },
     {
@@ -1052,7 +1052,7 @@ export const stoopManifest = {
       params: [],
       surfaces: {
         chat: { hint: 'Whether this person is signed in to a Solid pod, read-only.' },
-        ui:   { control: 'page', label: 'Pod-status' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -1062,7 +1062,7 @@ export const stoopManifest = {
       params: [{ name: 'passphrase', kind: 'secret', required: true }],
       surfaces: {
         chat: { hint: "Produce a passphrase-sealed backup of this person's data." },
-        ui:   { control: 'button', label: 'Back-up maken' },
+        ui:   { control: 'button' },
       },
     },
     {
@@ -1075,7 +1075,7 @@ export const stoopManifest = {
       ],
       surfaces: {
         chat: { hint: 'Restore this person\u2019s identity from a recovery phrase. Requires confirm:true.' },
-        ui:   { control: 'button', label: 'Herstellen' },
+        ui:   { control: 'button' },
       },
     },
 
@@ -1087,7 +1087,7 @@ export const stoopManifest = {
       params: [],
       surfaces: {
         chat: { hint: 'The circles this person has joined.' },
-        ui:   { control: 'page', label: 'Mijn kringen' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -1098,7 +1098,7 @@ export const stoopManifest = {
       ],
       surfaces: {
         chat: { hint: 'Posts in one circle since a timestamp — the bulletin catch-up.' },
-        ui:   { control: 'page', label: 'Prikbord' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -1110,7 +1110,7 @@ export const stoopManifest = {
       ],
       surfaces: {
         chat: { hint: 'Chat messages in one circle, newest first, optionally since a timestamp.' },
-        ui:   { control: 'page', label: 'Gesprekken' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -1119,7 +1119,7 @@ export const stoopManifest = {
       params: [{ name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY }],
       surfaces: {
         chat: { hint: 'When the newest post in a circle arrived — the cheap freshness probe.' },
-        ui:   { control: 'page', label: 'Prikbord' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -1129,7 +1129,7 @@ export const stoopManifest = {
       params: [{ name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY }],
       surfaces: {
         chat: { hint: 'Members of a circle who have consented to be reached.' },
-        ui:   { control: 'page', label: 'Ledenlijst' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -1137,7 +1137,7 @@ export const stoopManifest = {
       params: [{ name: 'lang', kind: 'string' }],
       surfaces: {
         chat: { hint: 'The privacy notice text, in the requested language.' },
-        ui:   { control: 'page', label: 'Privacy' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -1146,7 +1146,7 @@ export const stoopManifest = {
       params: [],
       surfaces: {
         chat: { hint: "This device's own local counters. Nothing here is sent anywhere." },
-        ui:   { control: 'page', label: 'Statistieken' },
+        ui:   { control: 'page' },
       },
     },
 
@@ -1172,7 +1172,7 @@ export const stoopManifest = {
       resolves: [{ field: 'membership', policy: 'spine' }],
       surfaces: {
         chat: { hint: 'Create a circle you administer, with its rules, storage policy and invite ceiling.' },
-        ui:   { control: 'page', label: 'Kring maken' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -1188,7 +1188,7 @@ export const stoopManifest = {
       resolves: [{ field: 'membership', policy: 'spine' }],
       surfaces: {
         chat: { hint: 'Join a circle by redeeming a membership code.' },
-        ui:   { control: 'page', label: 'Kring joinen' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -1205,7 +1205,7 @@ export const stoopManifest = {
       resolves: [{ field: 'membership', policy: 'spine' }],
       surfaces: {
         chat: { hint: "Admin side of a peer-bridged join: verify a joiner's code and confirm them." },
-        ui:   { control: 'page', label: 'Ledenlijst' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -1228,7 +1228,7 @@ export const stoopManifest = {
       resolves: [{ field: 'membership', policy: 'spine' }],
       surfaces: {
         chat: { hint: 'Record a join an admin confirmed over the peer bridge (the joiner\u2019s own mirror).' },
-        ui:   { control: 'page', label: 'Kring joinen' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -1244,7 +1244,7 @@ export const stoopManifest = {
       ],
       surfaces: {
         chat: { hint: 'Remove a member from a circle. Admin-only; forces a key rotation and reseal.' },
-        ui:   { control: 'button', label: 'Lid verwijderen' },
+        ui:   { control: 'button' },
       },
     },
     {
@@ -1254,7 +1254,7 @@ export const stoopManifest = {
       params: [{ name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY }],
       surfaces: {
         chat: { hint: "A circle's roster. Refused for a caller who is not in that circle." },
-        ui:   { control: 'page', label: 'Ledenlijst' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -1262,7 +1262,7 @@ export const stoopManifest = {
       params: [{ name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY }],
       surfaces: {
         chat: { hint: "The circle's current membership code, for sharing an invite." },
-        ui:   { control: 'page', label: 'Uitnodigen' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -1276,7 +1276,7 @@ export const stoopManifest = {
       resolves: [{ field: 'code', policy: 'spine' }],
       surfaces: {
         chat: { hint: 'Issue a fresh membership code and invalidate the previous one.' },
-        ui:   { control: 'button', label: 'Nieuwe code' },
+        ui:   { control: 'button' },
       },
     },
     {
@@ -1288,7 +1288,7 @@ export const stoopManifest = {
       resolves: [{ field: 'rules', policy: 'content' }],
       surfaces: {
         chat: { hint: "Edit a circle's rules document." },
-        ui:   { control: 'page', label: 'Kringregels' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -1300,7 +1300,7 @@ export const stoopManifest = {
       resolves: [{ field: 'text', policy: 'content' }],
       surfaces: {
         chat: { hint: 'Post an announcement to a circle (admin).' },
-        ui:   { control: 'button', label: 'Mededeling' },
+        ui:   { control: 'button' },
       },
     },
     {
@@ -1308,7 +1308,7 @@ export const stoopManifest = {
       params: [],
       surfaces: {
         chat: { hint: 'Who the caller is on this device — webid, stable id, handle.' },
-        ui:   { control: 'page', label: 'Mijn profiel' },
+        ui:   { control: 'page' },
       },
     },
 
@@ -1325,7 +1325,7 @@ export const stoopManifest = {
       resolves: [{ field: 'peerAddr', policy: 'content' }],
       surfaces: {
         chat: { hint: "Record a peer's introduction (address + display name) for a circle." },
-        ui:   { control: 'page', label: 'Ledenlijst' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -1334,7 +1334,7 @@ export const stoopManifest = {
       resolves: [{ field: 'contact', policy: 'content' }],
       surfaces: {
         chat: { hint: 'Add a contact from a scanned QR payload.' },
-        ui:   { control: 'button', label: 'Contact scannen' },
+        ui:   { control: 'button' },
       },
     },
     {
@@ -1347,7 +1347,7 @@ export const stoopManifest = {
       resolves: [{ field: 'acceptedBy', policy: 'claim' }],
       surfaces: {
         chat: { hint: 'Accept one of the people who responded to a request.' },
-        ui:   { control: 'button', label: 'Accepteren' },
+        ui:   { control: 'button' },
       },
     },
     {
@@ -1355,7 +1355,7 @@ export const stoopManifest = {
       params: [{ name: 'handle', kind: 'string' }],
       surfaces: {
         chat: { hint: 'The peers muted on this device.' },
-        ui:   { control: 'page', label: 'Gedempt' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -1368,7 +1368,7 @@ export const stoopManifest = {
       ],
       surfaces: {
         chat: { hint: 'Unmute a peer, by stable id or webid.' },
-        ui:   { control: 'button', label: 'Dempen opheffen' },
+        ui:   { control: 'button' },
       },
     },
 
@@ -1386,7 +1386,7 @@ export const stoopManifest = {
       ],
       surfaces: {
         chat: { hint: 'Fan a membership event to a circle.' },
-        ui:   { control: 'page', label: 'Ledenlijst' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -1399,7 +1399,7 @@ export const stoopManifest = {
       ],
       surfaces: {
         chat: { hint: 'Fan a signed chat statement to a circle.' },
-        ui:   { control: 'page', label: 'Gesprekken' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -1412,7 +1412,7 @@ export const stoopManifest = {
       ],
       surfaces: {
         chat: { hint: 'Fan a task statement to a circle.' },
-        ui:   { control: 'page', label: 'Taken' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -1426,7 +1426,7 @@ export const stoopManifest = {
       ],
       surfaces: {
         chat: { hint: "Fan a circle's policy to its members." },
-        ui:   { control: 'page', label: 'Kringinstellingen' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -1440,7 +1440,7 @@ export const stoopManifest = {
       ],
       surfaces: {
         chat: { hint: "Fan a circle's rules document to its members." },
-        ui:   { control: 'page', label: 'Kringregels' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -1454,7 +1454,7 @@ export const stoopManifest = {
       ],
       surfaces: {
         chat: { hint: 'Fan a circle recipe (a shared template) to its members.' },
-        ui:   { control: 'page', label: 'Kringinstellingen' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -1470,7 +1470,7 @@ export const stoopManifest = {
       ],
       surfaces: {
         chat: { hint: 'Announce this device\u2019s per-circle addresses to a circle, each with its proof.' },
-        ui:   { control: 'page', label: 'Verbindingen' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -1487,7 +1487,7 @@ export const stoopManifest = {
       resolves: [{ field: 'circleAddress', policy: 'spine' }],
       surfaces: {
         chat: { hint: "Record a member's PROVEN per-circle address. An unproven one is dropped." },
-        ui:   { control: 'page', label: 'Ledenlijst' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -1500,7 +1500,7 @@ export const stoopManifest = {
       resolves: [{ field: 'text', policy: 'content' }],
       surfaces: {
         chat: { hint: 'Ingest a circle message from an authenticated peer.' },
-        ui:   { control: 'page', label: 'Gesprekken' },
+        ui:   { control: 'page' },
       },
     },
     {
@@ -1513,7 +1513,7 @@ export const stoopManifest = {
       resolves: [{ field: 'text', policy: 'content' }],
       surfaces: {
         chat: { hint: 'Ingest a bulletin post from an authenticated peer.' },
-        ui:   { control: 'page', label: 'Prikbord' },
+        ui:   { control: 'page' },
       },
     },
   ],

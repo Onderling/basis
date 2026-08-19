@@ -66,6 +66,7 @@ import {
 import { EventLog } from '../../src/eventLog.js';
 import { createChatMessageInbox } from '../../src/v2/chatMessageInbox.js';
 import { makeChatRail, makeChatPeerHandler, CHAT_STATEMENT_BROADCAST } from '../../src/v2/chatRail.js';
+import { makeTaskPeerHandler, TASK_BROADCAST } from '../../src/v2/taskRail.js';
 import { rosterBindingVerifier } from '../../src/v2/membershipRail.js';
 import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '../../src/v2/circleLogReceiver.js';
 import { makeGovernanceRail } from '../../src/v2/governanceAppWiring.js';
@@ -110,8 +111,21 @@ export async function until(pred, { timeout = 4000, step = 10 } = {}) {
 /** Every live node this process booted — the harness default chat-binding resolves through it. */
 const LIVE_NODES = new Set();
 
-export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 8000, agentOpts = {}, verifyGovernanceBinding = null, verifyChatBinding = null } = {}) {
+/**
+ * `taskLane: true` composes a DEVICE LOG into this node and registers the task-lane receiver, so item
+ * writes ride the signed lane instead of the legacy unsigned mirror — the production carry on both shells.
+ *
+ * It is opt-in rather than the harness default ON PURPOSE. A device log also turns on the membership
+ * rider and re-roots chat, and wiring those into every node is exactly the change that broke the
+ * stolen-device walk's strict-verify equilibrium once before (reverted, three-party-walk session). Tests
+ * that need items to CROSS between agents ask for the lane; tests probing verify/eviction equilibrium
+ * keep the minimal composition. Same shape as `verifyChatBinding`: the harness offers the production
+ * wiring, the test decides it needs it.
+ */
+export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 8000, agentOpts = {}, verifyGovernanceBinding = null, verifyChatBinding = null, taskLane = false } = {}) {
   const routerRef = { fn: null };
+  // The device log the lane rides. Handed to the factory below exactly as both shells hand theirs.
+  const deviceLog = taskLane ? new EventLog({ initial: [], muted: [] }) : null;
   const received = [];
   // A sealed circle's log carries key-events + sealed content over the real transport. Key-events are recorded
   // by the PRODUCTION receive handler (`makeHandleGroupKeyEvent`) into the PRODUCTION per-circle key-event log
@@ -139,6 +153,9 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     // A fresh, code-minting REAL circle must show only real members — keep demo
     // scaffolding off so rosters carry exactly the creator + real joiners.
     seedDemoData: false,
+    // Opt-in (see `taskLane` above): with a device log the factory builds the task rail + emitter, and
+    // the publish valve routes every item write onto the signed lane instead of the unsigned mirror.
+    ...(deviceLog ? { deviceLog } : {}),
     // Per-test agent options, threaded straight into the production factory. The one this exists
     // for today is `allowAddressFallback: false` — the per-user "rather undeliverable than routed
     // over my one global key" setting. A test that claims to prove per-circle addressing works
@@ -233,6 +250,11 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
       rail: makeGovernanceRail({ eventLog: chatEventLog, circleIdentityFor: agent.circleIdentityFor, myRef: '', callSkill, verifyBinding: verifyGovernanceBinding ?? undefined }),
     }),
     'circle-report-broadcast':     makeCircleReportPeerHandler({ eventLog: chatEventLog }),
+    // The task lane's receive half — the same registration both shells make (`circleApp.js` /
+    // `ChatScreen.js`), over the rail the factory built on this node's device log. Its ingest verifies
+    // the statement and causally merges the item snapshot into the circle's store head, which is what
+    // makes an item written on A appear in B's store.
+    ...(agent.taskRail ? { [TASK_BROADCAST]: makeTaskPeerHandler({ rail: agent.taskRail }) } : {}),
   };
   const sendPeerRedeem = makeSendGroupRedeemRequest({
     sendPeer,
@@ -255,7 +277,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     logger: QUIET,
   });
 
-  const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatInbox, chatRail, _routerRef: routerRef };
+  const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatInbox, chatRail, deviceLog, _routerRef: routerRef };
   LIVE_NODES.add(node);
   // Live view of the REAL ingested circle chats (the browser reads the same eventLog for its bubble list).
   Object.defineProperty(node, 'chatEvents', { enumerable: true, get: () => chatEventLog.query({ excludeMuted: true }) });

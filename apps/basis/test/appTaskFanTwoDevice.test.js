@@ -42,7 +42,7 @@
 import { describe, it, expect, afterAll } from 'vitest';
 
 import {
-  bootRealAgentNode, connectAgentsOverBus,
+  bootRealAgentNode, connectAgentsOverBus, pairCircle,
   until, teardown,
 } from './support/pairRealAgents.js';
 
@@ -79,13 +79,16 @@ describe('a task created on one device reaches another device\'s TASKS store (th
   afterAll(async () => { await teardown(A, B); });
 
   it('crosses a task from A to B\'s tasks store — guards the tasks store being mirrored out with nothing writing the inbound back', async () => {
-    [A, B] = await Promise.all([bootRealAgentNode('A'), bootRealAgentNode('B')]);
+    [A, B] = await Promise.all([bootRealAgentNode('A', { taskLane: true }), bootRealAgentNode('B', { taskLane: true })]);
     await connectAgentsOverBus(A, B);
     // Reinstall the production inbound routing on B so fanned envelopes drive B's stores.
     wireInboundLikeShell(B);
 
-    // B is a sync peer of A's tasks circle mirror, so A's task writes fan to B.
-    await A.agent.addCirclePeer(CIRCLE_ID, B.pubKey);
+    // A REAL join, not a hand-wired peer. The item now crosses on the signed task lane, and the lane
+    // verifies the sender's key↔ref binding against the circle roster — so a `addCirclePeer` stand-in
+    // (which records a transport peer but no membership) is refused, correctly. Pairing for real is
+    // what gives B a roster to verify A against.
+    await pairCircle(A, B, { groupId: CIRCLE_ID, name: 'Shared chores', handle: 'bee' });
 
     // Warm the handshake while both are online (so delivery is deterministic, not a
     // first-contact HI failure).

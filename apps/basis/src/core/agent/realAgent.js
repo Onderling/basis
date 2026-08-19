@@ -470,6 +470,22 @@ export async function createRealHouseholdAgent(opts = {}) {
     // Flooding IS defended, at the layer that can afford to be strict: the nearby room's per-author ask
     // budget (`createAskBudget`, nearbyRoom.js), which protects the expensive half — matching, which can
     // call a language model. Enabling this one properly needs a catch-up exemption first.
+    //
+    // The INBOUND GATE on the externally reachable agent (2026-08-19). This agent is the one peers can
+    // actually reach; the host agent that holds the skill registry runs on an InternalTransport and no
+    // external peer can address it. Until now this agent had no PolicyEngine at all, so it was safe only
+    // because it registers no skills — safe by emptiness, not by policy. Anything that later exposes an op
+    // here would have been reachable with no verification, so the gate is composed FIRST and separately
+    // from exposing anything through it.
+    //
+    // `trustRegistry` is required by the substrate for a policy engine (unknown peers resolve to the
+    // lowest tier, which is what fail-closed means here). `isRevoked` is a late-bound thunk because the
+    // issuer-side token registry is built further down this same factory — the thunk only runs at
+    // inbound-verify time, long after boot (the same late-binding shape the surface preference uses).
+    trustRegistry: true,
+    policyEngine: {
+      isRevoked: async (tokenId) => Boolean(await agentsTokenRegistry?.isRevoked(tokenId)),
+    },
     ...(opts.secureAgentOpts ?? {}),
   });
   const chatAgent = sa.agent;

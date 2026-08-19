@@ -321,21 +321,22 @@ describe('joinGroupState', () => {
     expect(callSkill.mock.calls[2][2].rules).toEqual({ purpose: 'P' });
   });
 
-  it('finalSubmit legacy invite path: gate + handle + redeem', async () => {
+  // This test used to assert the legacy-invite chain (gate → handle → redeemInvite) and passed by
+  // MOCKING redeemInvite to return {ok:true} — an op that does not exist in this app, so the mock was
+  // the only thing keeping a dead path looking alive. The real dispatch throws `Unknown skill`.
+  // What is asserted now is the honest behaviour: anything that is not a membership code is refused
+  // BY NAME, and no skill is dispatched at all.
+  it('finalSubmit refuses a non-membership-code invite by name, dispatching nothing', async () => {
     const state = JG.initialState();
-    state.invite = { groupId: 'b2' };   // no kind field → legacy path
+    state.invite = { groupId: 'b2' };   // no kind field
     state.handle = 'anne';
     state.rulesAccepted = true;
     state.privacyAccepted = true;
-    const callSkill = vi.fn()
-      .mockResolvedValueOnce({ ok: true })   // redeemInviteWithGate
-      .mockResolvedValueOnce({ ok: true })   // setMyHandle
-      .mockResolvedValueOnce({ ok: true });  // redeemInvite
+    const callSkill = vi.fn();
     const { result } = await JG.finalSubmit({ state, callSkill });
-    expect(result.ok).toBe(true);
-    expect(callSkill.mock.calls.map((c) => c[1])).toEqual([
-      'redeemInviteWithGate', 'setMyHandle', 'redeemInvite',
-    ]);
+    expect(result, 'a refused join must not report a result').toBeUndefined();
+    expect(state.submitError, 'the refusal must name what was wrong').toMatch(/not a membership code/i);
+    expect(callSkill, 'a refused join must not dispatch anything').not.toHaveBeenCalled();
   });
 
   it('finalSubmit aborts on first error + sets submitError', async () => {

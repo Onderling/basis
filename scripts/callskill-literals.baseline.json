@@ -50,8 +50,6 @@
   "apps/basis/src/core/wizards/encryptedBackupState.js::stoop.encryptedBackup",
   "apps/basis/src/core/wizards/joinGroupState.js::stoop.listMyHandles",
   "apps/basis/src/core/wizards/joinGroupState.js::stoop.recordRemoteRedemption",
-  "apps/basis/src/core/wizards/joinGroupState.js::stoop.redeemInvite",
-  "apps/basis/src/core/wizards/joinGroupState.js::stoop.redeemInviteWithGate",
   "apps/basis/src/core/wizards/joinGroupState.js::stoop.redeemMembershipCode",
   "apps/basis/src/core/wizards/joinGroupState.js::stoop.setMyHandle",
   "apps/basis/src/core/wizards/restoreFromMnemonicState.js::stoop.restoreFromMnemonic",

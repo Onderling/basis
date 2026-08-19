@@ -662,16 +662,20 @@ export function initialState() {
 }
 
 /**
- * Final submission chain.  Two paths depending on invite.kind.
+ * Final submission chain.  ONE path: `kind:'membershipCode'`.
  * Mutates state.submitting / state.submitError.  Returns
  * `{result?, state}` so the caller can react to success.
  *
- * Path A — kind:'membershipCode': setMyHandle → redeemMembershipCode
- *   → (on invalid-or-expired-code) sendPeerRedeem fallback →
- *   recordRemoteRedemption mirror.
+ * setMyHandle → redeemMembershipCode → (on invalid-or-expired-code)
+ *   sendPeerRedeem fallback → recordRemoteRedemption mirror.
  *
- * Path B — legacy GroupManager invite: redeemInviteWithGate →
- *   setMyHandle → redeemInvite.
+ * A second path used to sit here for the old GroupManager invite
+ * (`redeemInviteWithGate` → setMyHandle → redeemInvite). It was removed
+ * 2026-08-19: BOTH halves of that mechanism were already gone. `issueInvite`
+ * and `redeemInvite` live in `@onderling/identity-resolver` and are wired only
+ * by the retired tasks-v0 app, so this app could neither mint such an invite nor
+ * redeem one — the branch ended in a call that threw `Unknown skill`. Anything
+ * that is not a membership code is now refused by NAME instead.
  *
  * `circleAddressFor(circleId)` (optional) is the spine's per-circle address
  * presenter; it lets the SENSITIVE "continue as an existing self" choice present a
@@ -941,28 +945,10 @@ async function runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddre
     };
   }
 
-  // Path B — legacy GroupManager invite.
-  const gate = await callSkill('stoop', 'redeemInviteWithGate', {
-    invite:          inv,
-    privacyAccepted: state.privacyAccepted,
-    rulesAccepted:   state.rulesAccepted,
-  });
-  if (gate?.ok === false || gate?.error) {
-    throw new Error(gate.error ?? 'Gate refused the redeem.');
-  }
-  const handle = await callSkill('stoop', 'setMyHandle', { handle: state.handle });
-  if (handle?.reason === 'handle-taken') throw handleTakenError();
-  if (handle?.ok === false || handle?.error) {
-    throw new Error(handle.error ?? "Couldn't set handle.");
-  }
-  const redeem = await callSkill('stoop', 'redeemInvite', { invite: inv });
-  if (redeem?.ok === false || redeem?.error) {
-    throw new Error(redeem.error ?? "Couldn't redeem invite.");
-  }
-  return {
-    ok:      true,
-    message: `✓ Joined circle "${inv.groupId}" as ${state.handle}.`,
-    groupId: inv.groupId,
-    handle:  state.handle,
-  };
+  // Not a membership code. REFUSE BY NAME rather than falling off the end: a bare `return`
+  // here would hand the caller `undefined`, and every caller reads a missing result as "nothing
+  // went wrong", which is how an unjoined circle would report itself as joined.
+  throw new Error(
+    `This invite is not a membership code (kind: ${inv?.kind ?? 'none'}) — ask for a new invite link.`,
+  );
 }

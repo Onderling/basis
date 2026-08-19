@@ -24,6 +24,7 @@
  * Pure projections. The shells paint and dispatch; every write goes through the waist
  * (`grantSurface` · `revokeSurface` · `listSurfaceGrants`).
  */
+import { NEVER_DELEGABLE } from '@onderling/app-manifest';
 
 /** Sections a person can grant, beyond their circles. Kept tiny on purpose — a section is a thing
  *  someone can picture, not an entry-kind taxonomy. */
@@ -42,14 +43,13 @@ export const DEVICE_SECTION = 'device';
  * @returns {Array<{id:string, app:string, op:string, label:string, description:string}>} sorted
  */
 export function connectionOpChoices({ manifests = [] } = {}) {
-  const withheld = new Set([
-    'household.revealOwnerPhrase',   // the account itself
-    'household.enrollDevice',        // makes a DEVICE, which outranks a connection
-    'household.revokeDevice',
-    'household.grantSurface',        // a connection that can pair connections is not bounded
-    'household.revokeSurface',
-    'household.listSurfaceGrants',
-  ]);
+  // ONE withhold list, shared with the A2A surface. It used to be a second copy here, and the copies
+  // had already diverged: this one was missing `restoreOwnerPhrase` — the op that ADOPTS an identity
+  // from a phrase — so the menu offered a connection the ability to overwrite the account, while the
+  // surface refused it. Caught by connectionSurfaceAgreement.test.js on its first run. A menu that
+  // merely omits an op is a convention anyway; the list is enforced at the door (`policy: 'never'`),
+  // and reading the same constant is what keeps the two honest.
+  const withheld = NEVER_DELEGABLE;
   const rows = [];
   for (const m of manifests) {
     if (!m || !Array.isArray(m.operations)) continue;

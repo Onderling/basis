@@ -1200,10 +1200,18 @@ async function refreshConnections() {
  * declared twice. (The bot composes its list inside `buildCircleBot`; this is the render-time
  * equivalent, and the shared projection withholds the escalation ops from whatever it is given.)
  */
-const connectionManifestSources = () => [
+/**
+ * THE ONE LIST. What a connection may be OFFERED (the DO menu) and what is actually REACHABLE over A2A
+ * must be the same set — two lists here would mean a menu promising ops the surface refuses, or worse a
+ * surface exposing ops the menu never showed. So this const feeds both: `connectionManifestSources()`
+ * below, and `a2aManifests` at boot. Pinned by connectionSurfaceAgreement.test.js.
+ */
+export const CONNECTION_MANIFESTS = [
   paramsManifest, householdManifest, mockTasksManifest, calendarManifest, agentsManifest,
-  circleHouseholdAgent?.manifest,
-].filter(Boolean);
+];
+// `circleHouseholdAgent?.manifest` used to be appended here; it IS `householdManifest`
+// (realAgent returns it verbatim), so it only ever added a duplicate the projection deduped.
+const connectionManifestSources = () => CONNECTION_MANIFESTS.filter(Boolean);
 /** The circles a connection can be granted sight of — the same list the rest of the shell renders. */
 const circleListForConnections = () => circlesCache.filter(Boolean).map((c) => ({ id: c.id, name: c.name ?? c.label ?? c.id }));
 let sources = {};
@@ -7133,6 +7141,10 @@ async function boot() {
       // The membership rider: hand the DEVICE LOG so membership statements ride its membership lane
       // (signed, fanned, verified, caught-up) and the roster folds the rail's verified bodies.
       deviceLog: eventLog,
+      // The A2A surface: these manifests' ops become kernel skills another agent can invoke, each
+      // gated by a CapabilityToken naming exactly that op, with the escalation family refused
+      // outright. Same list the connection DO menu is built from — see CONNECTION_MANIFESTS.
+      a2aManifests: CONNECTION_MANIFESTS,
       // #44 — the restore choices. The gate held the pod-write (key mismatch): show the coarse
       // three-choice dialog. Or it attached with differing values: show the per-param merge list.
       // Deferred to after boot — the dialogs need the booted surface (and never block it).

@@ -161,14 +161,29 @@ export function makeTaskEmitter({ rail, fan = null }) {
  * over every store type, the routing is per COMPOSITION, not per type: with a lane emitter (a device log
  * was composed — every production shell) EVERYTHING publishes as a signed lane statement and the legacy
  * mirror is never touched; without one (legacy/test compositions) the mirror stays the only carry.
+ *
+ * `requireSigned` closes the downgrade window. The emitter is handed over AFTER boot, while this valve is
+ * wired when a circle opens — so a write in between would have taken the unsigned mirror silently, on a
+ * composition that had asked for signed lanes. A composition that carries a device log therefore REFUSES
+ * to publish rather than quietly falling back to an unsigned carry.
  */
-export function routeTaskMirror({ circleId, mirror, emitter } = {}) {
+export function routeTaskMirror({ circleId, mirror, emitter, requireSigned = false } = {}) {
+  const noDowngrade = () => {
+    if (requireSigned && !emitter) {
+      throw new Error(
+        `routeTaskMirror(${circleId}): a signed lane was required but no emitter is wired yet — `
+        + 'refusing to fall back to the unsigned mirror carry',
+      );
+    }
+  };
   return {
     publishItem(item) {
+      noDowngrade();
       if (emitter && item) return emitter.snapshot(circleId, item);
       return mirror?.publishItem?.(item);
     },
     publishItemRemoved(id, removedItem) {
+      noDowngrade();
       // A removal needs only the id on the lane; the removed item's type (when the store could still
       // supply it) is informational. Idempotent on every receiver.
       if (emitter) return emitter.remove(circleId, id);

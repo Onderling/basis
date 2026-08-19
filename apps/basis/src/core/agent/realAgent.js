@@ -724,8 +724,8 @@ export async function createRealHouseholdAgent(opts = {}) {
         // device log. Without a device log (legacy compositions) every type keeps the mirror — one path per
         // type per composition, honestly.
         wireStoreMirror(circleStore, {
-          publishItem:        (item)          => routeTaskMirror({ circleId: id, mirror, emitter: taskEmit }).publishItem(item),
-          publishItemRemoved: (rid, removed)  => routeTaskMirror({ circleId: id, mirror, emitter: taskEmit }).publishItemRemoved(rid, removed),
+          publishItem:        (item)          => routeTaskMirror({ circleId: id, mirror, emitter: taskEmit, requireSigned: !!opts.deviceLog }).publishItem(item),
+          publishItemRemoved: (rid, removed)  => routeTaskMirror({ circleId: id, mirror, emitter: taskEmit, requireSigned: !!opts.deviceLog }).publishItemRemoved(rid, removed),
         });
         // The UNSIGNED inbound door only exists for the mirror-carry composition (no device log — the
         // legacy shape). A device-log composition publishes every type as a SIGNED lane statement and

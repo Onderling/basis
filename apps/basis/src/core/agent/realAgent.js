@@ -796,10 +796,22 @@ export async function createRealHouseholdAgent(opts = {}) {
     let items = [];
     try { items = await householdApp.listOpen(householdService.stores.getStore(id), {}); } catch { return; }
     const mirror = await ensureCircleMirror(id);
+    // The live publish valve refuses to downgrade; this site had the valve's SHAPE but not its guard, so
+    // on a device-log composition whose emitter was not yet handed over, a catch-up would have gone out as
+    // unsigned mirror envelopes — and a catch-up is the worst place for that, because it republishes the
+    // whole existing list at once. The check is hoisted ABOVE the loop deliberately: the per-item `try`
+    // below swallows errors (a catch-up is best-effort), so a throw inside it would be silent again.
+    // Skipping is safe — a catch-up recurs on the next pairing; publishing unsigned is not.
+    if (opts.deviceLog && !taskEmit) {
+      console.warn(
+        `[circle-sync] ${id}: skipping catch-up republish — a signed lane is required and no emitter is `
+        + 'wired yet. Refusing to fall back to the unsigned mirror carry.',
+      );
+      return;
+    }
     for (const it of (Array.isArray(items) ? items : [])) {
-      // Same route as the live publish valve: with a lane emitter every head republishes as a signed
-      // lane snapshot (the receiver's rail verifies + causally merges — idempotent); only the
-      // no-device-log composition still republishes legacy mirror envelopes.
+      // With a lane emitter every head republishes as a signed lane snapshot (the receiver's rail verifies
+      // + causally merges — idempotent); only a no-device-log composition still uses mirror envelopes.
       try {
         if (taskEmit && it) taskEmit.snapshot(id, it);
         else mirror.publishItem(it);

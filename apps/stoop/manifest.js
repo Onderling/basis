@@ -912,6 +912,243 @@ export const stoopManifest = {
       params: [],
       surfaces: { chat: { hint: "Where this person's data actually rests (their pod, or this device) — not a place in the world." } , ui: { control: 'page', label: 'Waar staat mijn data' } },
     },
+
+    // ── Who you are, per circle ─────────────────────────────────────
+    // A handle is per-circle by design: the same person can be "anne" in one circle and "a.dijkstra"
+    // in another, and nothing links the two. That is why listMyHandles is plural.
+    {
+      id:   'setMyHandle', verb: 'set',
+      params: [{ name: 'handle', kind: 'string', required: true, ...STR_NONEMPTY }],
+      surfaces: {
+        chat: { hint: "Set this person's handle in the current circle. Refuses if the handle is taken there." },
+        ui:   { control: 'button', label: 'Handle instellen' },
+      },
+    },
+    {
+      id:   'setMyDisplayName', verb: 'set',
+      params: [{ name: 'displayName', kind: 'string', required: true, ...STR_NONEMPTY }],
+      surfaces: {
+        chat: { hint: 'Set the display name others see for this person.' },
+        ui:   { control: 'button', label: 'Weergavenaam' },
+      },
+    },
+    {
+      id:   'listMyHandles', verb: 'list',
+      params: [],
+      surfaces: {
+        chat: { hint: 'List the handles this person uses, one per circle they have joined.' },
+        ui:   { control: 'page', label: 'Mijn namen' },
+      },
+    },
+    {
+      id:   'getMyProfile', verb: 'list',
+      params: [],
+      surfaces: {
+        chat: { hint: "This person's own profile — handle, display name, offerings, location." },
+        ui:   { control: 'page', label: 'Mijn profiel' },
+      },
+    },
+    {
+      id:   'getInterestProfile', verb: 'list',
+      // Derived ON THE DEVICE from this person's own reading and posting. It leaves the device only
+      // through an explicit disclosure act, never as a side effect of someone reading their profile.
+      params: [],
+      surfaces: {
+        chat: { hint: "The interest profile derived locally from this person's own activity." },
+        ui:   { control: 'page', label: 'Mijn interesses' },
+      },
+    },
+    {
+      id:   'recordMemberPersonaProperties', verb: 'set',
+      // ADMIN side: the circle admin owns the roster, so a member sends their released properties and the
+      // admin records them. `memberWebid` comes from the AUTHENTICATED peer address at the call site,
+      // never from the payload — a member speaks only for their own row.
+      params: [
+        { name: 'groupId',           kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'memberWebid',       kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'personaProperties', kind: 'object', required: true },
+        { name: 'circleAddress',     kind: 'string' },
+      ],
+      resolves: [{ field: 'personaProperties', policy: 'content' }],
+      surfaces: {
+        chat: { hint: "Record a member's released persona properties on the circle roster (admin side)." },
+        ui:   { control: 'page', label: 'Ledenlijst' },
+      },
+    },
+
+    // ── Waking a device ─────────────────────────────────────────────
+    // Registration only. WHETHER something may wake you is the recipient's own attention setting,
+    // enforced on the device and at the relay; holding a token buys no right to interrupt.
+    {
+      id:   'subscribeWebPush', verb: 'add',
+      params: [{ name: 'subscription', kind: 'object', required: true }],
+      resolves: [{ field: 'subscription', policy: 'content' }],
+      surfaces: {
+        chat: { hint: 'Register a web-push subscription for this device.' },
+        ui:   { control: 'button', label: 'Meldingen aanzetten' },
+      },
+    },
+    {
+      id:   'unsubscribeWebPush', verb: 'remove',
+      params: [{ name: 'endpoint', kind: 'string', required: true, ...ID_NONEMPTY }],
+      surfaces: {
+        chat: { hint: 'Remove a web-push subscription by endpoint.' },
+        ui:   { control: 'button', label: 'Meldingen uitzetten' },
+      },
+    },
+    {
+      id:   'subscribeExpoPush', verb: 'add',
+      params: [{ name: 'token', kind: 'string', required: true, ...ID_NONEMPTY }],
+      resolves: [{ field: 'token', policy: 'content' }],
+      surfaces: {
+        chat: { hint: "Register this device's Expo push token (the mobile twin of subscribeWebPush)." },
+        ui:   { control: 'button', label: 'Meldingen aanzetten' },
+      },
+    },
+    {
+      id:   'unsubscribeExpoPush', verb: 'remove',
+      params: [{ name: 'token', kind: 'string', required: true, ...ID_NONEMPTY }],
+      surfaces: {
+        chat: { hint: "Remove this device's Expo push token." },
+        ui:   { control: 'button', label: 'Meldingen uitzetten' },
+      },
+    },
+    {
+      id:   'getVapidPublicKey', verb: 'list',
+      params: [],
+      surfaces: {
+        chat: { hint: "The relay's VAPID public key, which a browser needs before it can subscribe." },
+        ui:   { control: 'page', label: 'Meldingen' },
+      },
+    },
+
+    // ── Where the bytes rest ────────────────────────────────────────
+    // The pod is a SHAPE, not a place — a contract any dumb medium can hold, and always ciphertext.
+    // These ops say where a circle's bytes rest and let a person carry them off; none of them can
+    // read anything, because the medium never holds plaintext.
+    {
+      id:   'getCircleStoragePolicy', verb: 'list',
+      params: [{ name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY }],
+      surfaces: {
+        chat: { hint: "Where this circle's data rests, and under which storage policy." },
+        ui:   { control: 'page', label: 'Opslag' },
+      },
+    },
+    {
+      id:   'setCircleStoragePolicy', verb: 'set',
+      params: [
+        { name: 'groupId',       kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'storagePolicy', kind: 'string', required: true, ...STR_NONEMPTY },
+        { name: 'groupPodUri',   kind: 'string' },
+      ],
+      resolves: [{ field: 'storagePolicy', policy: 'content' }],
+      surfaces: {
+        chat: { hint: "Set where this circle's data rests. An admin decision — it moves everyone's bytes." },
+        ui:   { control: 'button', label: 'Opslag wijzigen' },
+      },
+    },
+    {
+      id:   'podSignInStatus', verb: 'list',
+      params: [],
+      surfaces: {
+        chat: { hint: 'Whether this person is signed in to a Solid pod, read-only.' },
+        ui:   { control: 'page', label: 'Pod-status' },
+      },
+    },
+    {
+      id:   'encryptedBackup', verb: 'list',
+      // Returns a SEALED archive. The passphrase never leaves the device and is not stored — losing it
+      // loses the archive, which is the point: nobody else can open it either.
+      params: [{ name: 'passphrase', kind: 'secret', required: true }],
+      surfaces: {
+        chat: { hint: "Produce a passphrase-sealed backup of this person's data." },
+        ui:   { control: 'button', label: 'Back-up maken' },
+      },
+    },
+    {
+      id:   'restoreFromMnemonic', verb: 'set',
+      // Destructive: adopts an identity from a phrase. `confirm` exists so a single stray call cannot
+      // overwrite the identity in place.
+      params: [
+        { name: 'mnemonic', kind: 'secret',  required: true },
+        { name: 'confirm',  kind: 'boolean' },
+      ],
+      surfaces: {
+        chat: { hint: 'Restore this person\u2019s identity from a recovery phrase. Requires confirm:true.' },
+        ui:   { control: 'button', label: 'Herstellen' },
+      },
+    },
+
+    // ── Reading a circle back ───────────────────────────────────────
+    // The catch-up reads. Each is scoped to ONE circle on purpose: you fetch the circle you are in,
+    // never a cross-circle view, because a cross-circle read is exactly the re-linking the design refuses.
+    {
+      id:   'listMyCircles', verb: 'list',
+      params: [],
+      surfaces: {
+        chat: { hint: 'The circles this person has joined.' },
+        ui:   { control: 'page', label: 'Mijn kringen' },
+      },
+    },
+    {
+      id:   'listCirclePostsSince', verb: 'list',
+      params: [
+        { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'sinceMs', kind: 'number' },
+      ],
+      surfaces: {
+        chat: { hint: 'Posts in one circle since a timestamp — the bulletin catch-up.' },
+        ui:   { control: 'page', label: 'Prikbord' },
+      },
+    },
+    {
+      id:   'listCircleChats', verb: 'list',
+      params: [
+        { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'sinceTs', kind: 'number' },
+        { name: 'limit',   kind: 'number' },
+      ],
+      surfaces: {
+        chat: { hint: 'Chat messages in one circle, newest first, optionally since a timestamp.' },
+        ui:   { control: 'page', label: 'Gesprekken' },
+      },
+    },
+    {
+      id:   'getLatestPostAddedAt', verb: 'list',
+      // The cheap "is there anything new" probe — a timestamp, so a poll costs one number rather than a feed.
+      params: [{ name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY }],
+      surfaces: {
+        chat: { hint: 'When the newest post in a circle arrived — the cheap freshness probe.' },
+        ui:   { control: 'page', label: 'Prikbord' },
+      },
+    },
+    {
+      id:   'listConsentingPeers', verb: 'list',
+      // Who in this circle has agreed to be reachable for this purpose. Consent is the filter, not
+      // membership: being in a circle is not by itself permission to be contacted.
+      params: [{ name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY }],
+      surfaces: {
+        chat: { hint: 'Members of a circle who have consented to be reached.' },
+        ui:   { control: 'page', label: 'Ledenlijst' },
+      },
+    },
+    {
+      id:   'getPrivacyNotice', verb: 'list',
+      params: [{ name: 'lang', kind: 'string' }],
+      surfaces: {
+        chat: { hint: 'The privacy notice text, in the requested language.' },
+        ui:   { control: 'page', label: 'Privacy' },
+      },
+    },
+    {
+      id:   'getMetrics', verb: 'list',
+      // LOCAL counters only — this device's own tallies. Nothing is reported anywhere.
+      params: [],
+      surfaces: {
+        chat: { hint: "This device's own local counters. Nothing here is sent anywhere." },
+        ui:   { control: 'page', label: 'Statistieken' },
+      },
+    },
   ],
 
   // first stoop web page via renderWeb.

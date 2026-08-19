@@ -499,6 +499,16 @@ export async function createRealHouseholdAgent(opts = {}) {
         Boolean(await agentsTokenRegistry?.isRevoked(tokenId))
         || Boolean(surfaceGrants?.isRevoked(tokenId)),
     },
+    // THE SENDER OUTBOX, made durable. The hold queue is what stands between "the app told me it sent"
+    // and the message actually leaving; in memory, a restart dropped every held message silently — the
+    // one failure a hold queue exists to prevent. The persistence was built (persist + restore + TTL on
+    // the way back in) but no boot door ever passed a store, so it sat inert.
+    //
+    // `householdDataSource` and NOT the settings source, deliberately: settings can be pod-attached
+    // (`provisionSettingsMedium`) and therefore SHARED across a user's devices, and a shared outbox means
+    // another device resends this device's pending messages. An outbox is device-local by definition.
+    // No persistDb (tests) → this is the in-memory source and the behaviour is exactly as before.
+    holdStore: householdDataSource,
     ...(opts.secureAgentOpts ?? {}),
   });
   const chatAgent = sa.agent;

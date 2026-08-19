@@ -14,7 +14,7 @@ import { describe, it, expect } from 'vitest';
 import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 
-import { createNeighborhoodAgent } from '../src/index.js';
+import { createNeighbourhoodAgent } from '../src/index.js';
 
 const ADMIN = 'https://id.example/admin';
 const ANNE  = 'https://id.example/anne';
@@ -34,7 +34,7 @@ async function callSkill(agent, skillId, args, fromWebid = ADMIN) {
 async function buildBundle({ actor = ADMIN, role = 'admin' } = {}) {
   const id = await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);
-  const bundle = await createNeighborhoodAgent({
+  const bundle = await createNeighbourhoodAgent({
     identity: id, transport: tx,
     offeringMatch: { group: 'oosterpoort', localActor: actor, peers: [] },
     members:    [{ webid: actor, role }],

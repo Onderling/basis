@@ -4,11 +4,11 @@
  * NOTE-online-agent-surface §5's anti-virus claim).
  *
  * Two halves:
- *  1. SKILL SURFACE (static): no manifest op across the composed catalog
+ *  1. SKILL SURFACE (static): no manifest op across the composed catalogue
  *     names the version store's privileged `drop`/`prune`, and the agents
  *     app's wired skill set is exactly its manifest ops — history-erasing
  *     capability is structurally not grantable.
- *  2. HOSTILE BOT (behavioral): through the REAL composition, every route a
+ *  2. HOSTILE BOT (behavioural): through the REAL composition, every route a
  *     bot has to the history layer is refused — restoreDataVersion aimed AT
  *     a history key (NOT_VERSIONABLE), direct pod write/delete
  *     (HISTORY_IMMUTABLE, incl. cache mode's _assertLocalWrite bypass), and
@@ -56,7 +56,7 @@ describe('FITNESS: 4b — the skill surface cannot name history-erasing ops', ()
   });
 });
 
-describe('FITNESS: 4b — a hostile bot cannot alter history (behavioral, real composition)', () => {
+describe('FITNESS: 4b — a hostile bot cannot alter history (behavioural, real composition)', () => {
   it('every route to the history layer is refused; history survives byte-for-byte', async () => {
     const circleId = 'circle-4b';
     const deviceId = `circle-${circleId}`;

@@ -3,8 +3,8 @@
  * repo-split W4, objective F).
  *
  * Platform-independent: the caller injects the store (web localStorage /
- * mobile AsyncStorage / a real pseudo-pod) + the base catalog. Loads the pod
- * `mappings/` folder, runs the sandbox verify gate against the catalog, and
+ * mobile AsyncStorage / a real pseudo-pod) + the base catalogue. Loads the pod
+ * `mappings/` folder, runs the sandbox verify gate against the catalogue, and
  * returns the `mergeManifests` sources for the accepted mappings (to merge in)
  * plus the rejected/dropped for surfacing. Both the web (`circleApp.js`) and
  * mobile (`agentBundle.js`) composition roots reach this so the load+verify
@@ -28,21 +28,21 @@ import { loadMappings } from '@onderling/pod-routing/mappings';
  * @param {object} args
  * @param {{list:Function, read:Function}} args.store   pseudo-pod-subset store
  * @param {string} args.deviceId
- * @param {{ opsById: Map }} args.catalog               the base catalog to verify against
- * @param {(mappings:Array, catalog:object)=>{accepted:object[], rejected:Array<{id,missing:string[]}>}} args.verifyMappings
- *        catalog verify gate — injected (basis `src/mappings.js`)
+ * @param {{ opsById: Map }} args.catalogue               the base catalogue to verify against
+ * @param {(mappings:Array, catalogue:object)=>{accepted:object[], rejected:Array<{id,missing:string[]}>}} args.verifyMappings
+ *        catalogue verify gate — injected (basis `src/mappings.js`)
  * @param {(accepted:object[])=>{sources:Array<{manifest:object}>, dropped:Array<{id,errors:object[]}>}} args.mappingsToSources
  *        manifest-shape gate — injected (basis `src/mappings.js`)
  * @returns {Promise<{ sources: Array<{manifest:object}>, accepted: object[],
  *                     rejected: Array<{id,missing}>, dropped: Array<{id,errors}>,
  *                     mappingOrigins: string[] }>}
  */
-export async function loadVerifyMappings({ store, deviceId, catalog, verifyMappings, mappingsToSources }) {
+export async function loadVerifyMappings({ store, deviceId, catalogue, verifyMappings, mappingsToSources }) {
   if (typeof verifyMappings !== 'function' || typeof mappingsToSources !== 'function') {
     throw new TypeError('loadVerifyMappings: verifyMappings and mappingsToSources must be injected');
   }
   const { mappings } = await loadMappings({ pseudoPod: store, deviceId });
-  const { accepted, rejected } = verifyMappings(mappings, catalog);
+  const { accepted, rejected } = verifyMappings(mappings, catalogue);
   const { sources, dropped } = mappingsToSources(accepted);
   return {
     sources,

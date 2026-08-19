@@ -82,7 +82,7 @@ describe('phase D — roster skills → root persona', () => {
     expect(empty.props[OFFERINGS_MIGRATION_KEY].value).toBe('c9'); // no rescan next load
   });
 
-  it('honors the LEGACY marker key so a pre-rename circle never re-runs', async () => {
+  it('honours the LEGACY marker key so a pre-rename circle never re-runs', async () => {
     const host = makeHost({ rosterSkills: [{ categoryId: 'klussen', freeTags: ['x'] }], legacyMarkerValue: 'c1,c2' });
     const res = await migrateRosterOfferings({ callSkill: host.callSkill, circleId: 'c1' });
     expect(res).toMatchObject({ ok: true, migrated: 0, already: true });

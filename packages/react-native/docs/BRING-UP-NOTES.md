@@ -913,7 +913,7 @@ Reference implementation:
 - `apps/stoop-mobile/src/ServiceContext.js` — boots one agent,
   registers `buildSkills({getBundle})` once, builds GroupStates
   for each joined group.
-- `apps/stoop/src/Agent.js`'s `createNeighborhoodAgent({
+- `apps/stoop/src/Agent.js`'s `createNeighbourhoodAgent({
   registerSkills: false })` opt-out for the per-group registration
   path.
 

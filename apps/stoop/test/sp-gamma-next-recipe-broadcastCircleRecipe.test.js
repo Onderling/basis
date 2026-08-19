@@ -15,7 +15,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
-import { createNeighborhoodAgent } from '../src/index.js';
+import { createNeighbourhoodAgent } from '../src/index.js';
 // Receiver side substrate lives in basis; we import directly via
 // relative path (the package wire is identical to how circleChatReceiver
 // is referenced from basis-mobile).
@@ -40,7 +40,7 @@ async function callSkill(agent, skillId, args, fromWebid = ANNE) {
 async function buildBundle(members) {
   const id = await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);
-  return createNeighborhoodAgent({
+  return createNeighbourhoodAgent({
     identity: id, transport: tx,
     offeringMatch: { group: 'oosterpoort', localActor: ANNE, peers: [] },
     members:    members ?? [

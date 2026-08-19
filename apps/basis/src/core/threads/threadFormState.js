@@ -21,8 +21,8 @@
 export const KNOWN_EVENT_TYPES = ['notification', 'item-changed', 'reminder', 'mention'];
 
 /**
- * Merge the catalog's contributed event types with the chat-shell's
- * built-in list, de-duped, declaration-order preserved (catalog
+ * Merge the catalogue's contributed event types with the chat-shell's
+ * built-in list, de-duped, declaration-order preserved (catalogue
  * entries first so apps can "promote" a type to the front of the UI
  * chip list by re-declaring it).
  *
@@ -38,7 +38,7 @@ export function mergeKnownEventTypes(extra) {
 /**
  * Parse a comma- or whitespace-separated string into a trimmed,
  * non-empty token list.  Used for the form's "actors" field where
- * peer/actor ids are too dynamic to render as a chip catalog.
+ * peer/actor ids are too dynamic to render as a chip catalogue.
  *
  * @param {string} raw
  * @returns {string[]}

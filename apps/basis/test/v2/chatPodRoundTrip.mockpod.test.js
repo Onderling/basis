@@ -15,7 +15,7 @@ import {
   resolveCircleStorage, generateGroupKey, isSealed,
   writeSealedMessage, readSealedMessage, readSealedMessagesSince,
 } from '@onderling/pod-client';
-import { createNeighborhoodAgent } from '@onderling-app/stoop';
+import { createNeighbourhoodAgent } from '@onderling-app/stoop';
 import { EventLog } from '../../src/eventLog.js';
 import { makeChatRail, makeChatPeerHandler, makePodChatCatchUp, CHAT_STATEMENT_BROADCAST } from '../../src/v2/chatRail.js';
 
@@ -49,7 +49,7 @@ async function chatDevice(ref, rosterAll) {
 async function bootSenderA({ backend, seal, circleDataMove, deliver }) {
   const id = await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);
-  const bundle = await createNeighborhoodAgent({
+  const bundle = await createNeighbourhoodAgent({
     identity: id, transport: tx,
     offeringMatch: { group: CIRCLE, localActor: ANNE, peers: [] },
     members: [{ webid: ANNE, role: 'member' }, { webid: BOB, role: 'member' }],

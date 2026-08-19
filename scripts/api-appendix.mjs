@@ -386,10 +386,10 @@ function staticExports(entryFile, seen = new Set()) {
 // ── analysis ─────────────────────────────────────────────────────────────────
 
 /**
- * Analyze one package: union of all subpath exports, each resolved to its defining file,
+ * Analyse one package: union of all subpath exports, each resolved to its defining file,
  * JSDoc, kind and signature.
  */
-export async function analyzePackage(name) {
+export async function analysePackage(name) {
   const pj = readPkgJson(name);
   const subs = subpathsOf(name);
   const symbols = new Map(); // exported name → record
@@ -405,7 +405,7 @@ export async function analyzePackage(name) {
       kinds = rt.exports;
     } else {
       names = staticExports(entry).sort();
-      subpathNotes.set(sub, `could not be imported outside its peer context (${rt.error}); analyzed statically`);
+      subpathNotes.set(sub, `could not be imported outside its peer context (${rt.error}); analysed statically`);
     }
     for (const exportName of names) {
       const spec = `@onderling/${name}${sub === '.' ? '' : sub.slice(1)}`;
@@ -441,9 +441,9 @@ export async function analyzePackage(name) {
   return { name, description: pj.description ?? '', version: pj.version, subs, subpathNotes, symbols };
 }
 
-export async function analyzeAll() {
+export async function analyseAll() {
   const out = [];
-  for (const name of WAVE1) out.push(await analyzePackage(name));
+  for (const name of WAVE1) out.push(await analysePackage(name));
   return out;
 }
 
@@ -594,7 +594,7 @@ export function renderIndex(models) {
 // ── main ─────────────────────────────────────────────────────────────────────
 
 export async function generateAll() {
-  const models = await analyzeAll();
+  const models = await analyseAll();
   const files = new Map(); // relative path under docs/api → content
   for (const model of models) files.set(`${model.name}.md`, renderPackage(model));
   files.set('README.md', renderIndex(models));

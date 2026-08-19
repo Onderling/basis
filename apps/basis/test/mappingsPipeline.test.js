@@ -2,7 +2,7 @@
  * P2c end-to-end — the full extension pipeline with the REAL pod-routing loader:
  * localStorage store → writeMapping (install) → loadMappings (boot scan) →
  * verifyMappings (sandbox gate) → mappingsToSources → mergeManifests. Proves an
- * installed extension reaches the dispatch catalog, and an unsafe one is refused.
+ * installed extension reaches the dispatch catalogue, and an unsafe one is refused.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -27,7 +27,7 @@ const base = () => [{
 }];
 
 describe('P2c pipeline (localStorage → loadMappings → verify → merge)', () => {
-  it('an installed extension mapping reaches the dispatch catalog', async () => {
+  it('an installed extension mapping reaches the dispatch catalogue', async () => {
     const store = localStorageMappingsStore(fakeStorage());
     const deviceId = WEB_MAPPINGS_DEVICE;
 
@@ -36,9 +36,9 @@ describe('P2c pipeline (localStorage → loadMappings → verify → merge)', ()
       ops: [{ id: 'feedback', verb: 'submit', steps: [{ appOrigin: 'household', opId: 'addItem' }] }],
     } });
 
-    const baseCatalog = mergeManifests(base());
+    const baseCatalogue = mergeManifests(base());
     const { mappings } = await loadMappings({ pseudoPod: store, deviceId });
-    const { accepted, rejected } = verifyMappings(mappings, baseCatalog);
+    const { accepted, rejected } = verifyMappings(mappings, baseCatalogue);
     const { sources, dropped } = mappingsToSources(accepted);
     const full = mergeManifests([...base(), ...sources]);
 

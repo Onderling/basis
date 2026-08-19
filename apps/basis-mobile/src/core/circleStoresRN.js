@@ -36,7 +36,7 @@ import {
 // as podStorage above).
 import { asyncStorageObjectVersions } from './objectVersionsStorageRN.js';
 // 5.4c — pod-writer build is also imported via relative path (Metro doesn't
-// honor package.json "exports" subpaths; same pattern as podPeerAddr.js).
+// honour package.json "exports" subpaths; same pattern as podPeerAddr.js).
 import {
   discoverPodRoot as _discoverPodRoot,
   createPodWriter as _createPodWriter,

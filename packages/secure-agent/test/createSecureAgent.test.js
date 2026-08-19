@@ -731,7 +731,7 @@ describe('createSecureAgent — S4 identity-resolver', () => {
     ]));
   });
 
-  it('mute by webid is honored at receive (alias-fanout)', async () => {
+  it('mute by webid is honoured at receive (alias-fanout)', async () => {
     const mm = makeFakeMemberMap([
       { webid: 'https://attacker.example/#me', pubKey: 'pk-bad', stableId: 'sid-bad' },
     ]);
@@ -761,7 +761,7 @@ describe('createSecureAgent — S4 identity-resolver', () => {
     await sa.shutdown();
   });
 
-  it('mute by stableId is also honored', async () => {
+  it('mute by stableId is also honoured', async () => {
     const mm = makeFakeMemberMap([
       { webid: 'https://b.example/#me', pubKey: 'pk-b', stableId: 'sid-banned' },
     ]);
@@ -776,7 +776,7 @@ describe('createSecureAgent — S4 identity-resolver', () => {
     await sa.shutdown();
   });
 
-  it('mute by pubKey is honored', async () => {
+  it('mute by pubKey is honoured', async () => {
     const mm = makeFakeMemberMap([
       { webid: 'https://c.example/#me', pubKey: 'pk-c', stableId: 'sid-c' },
     ]);
@@ -1031,7 +1031,7 @@ describe('createSecureAgent — 5.7c circle override enforcement', () => {
     // predicate that the sa.circleEnforcement.isInboundBlocked surface
     // exposes; that surface is the only stable observation point
     // without reaching into the (intentionally private) peerTransport.
-    // Verifying the surface honors mute-set membership before the
+    // Verifying the surface honours mute-set membership before the
     // circle gate would require exposing peerTransport, which we
     // deliberately don't — the order is documented at the receive site
     // and exercised by the integration suite (basis 1117 / 1130).
@@ -1111,7 +1111,7 @@ describe('createSecureAgent — S5 trust + caps + policy', () => {
     await sa.shutdown();
   });
 
-  it('capabilityIssuer: { defaultExpiresIn } honored', async () => {
+  it('capabilityIssuer: { defaultExpiresIn } honoured', async () => {
     const sa = await createSecureAgent({
       vault: new VaultMemory(),
       capabilityIssuer: { defaultExpiresIn: 100 },

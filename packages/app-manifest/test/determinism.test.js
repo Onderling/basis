@@ -62,13 +62,13 @@ describe('determinism', () => {
     const b = renderChat(fixture, { skillRegistry, toSkillCtx });
 
     const serialise = (out) => JSON.stringify({
-      toolCatalog: out.toolCatalog,
+      toolCatalogue: out.toolCatalogue,
       systemPrompt: out.systemPrompt,
       commandMenu: out.commandMenu,
     });
 
     expect(serialise(a)).toBe(serialise(b));
-    expect(a.toolCatalog.map((t) => t.id)).toEqual(['addNote', 'claim']);
+    expect(a.toolCatalogue.map((t) => t.id)).toEqual(['addNote', 'claim']);
     // commandMenu only includes ops with surfaces.slash.command — claim has no slash.
     expect(a.commandMenu.map((c) => c.command)).toEqual(['/add']);
   });

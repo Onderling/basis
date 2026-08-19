@@ -43,12 +43,12 @@ function buildHarness() {
     },
     peer:    { address: 'app.abcdef0123456789', status: 'connected' },
   };
-  const catalog = {
+  const catalogue = {
     opsById:    new Map(),
     appOrigins: new Set(['basis']),
     appsById:   new Map([['basis', { id: 'basis', ops: [] }]]),
-    // Bundle G1 — runBrief + runFind require these catalog
-    // methods.  Production catalog (mergeManifests) provides them;
+    // Bundle G1 — runBrief + runFind require these catalogue
+    // methods.  Production catalogue (mergeManifests) provides them;
     // here we return empty lists so the runners produce a clean
     // empty-result reply instead of throwing.
     briefAggregations:  () => [],
@@ -57,7 +57,7 @@ function buildHarness() {
   const callSkill = async () => ({ ok: false, error: 'no-substrate-in-test' });
   const handlers  = buildMobileLocalBuiltins({
     threadStateRef, setThreadState,
-    agent, catalog, callSkill, t,
+    agent, catalogue, callSkill, t,
   });
   return { handlers, getState: () => threadStateRef.current };
 }
@@ -190,7 +190,7 @@ describe('Bundle G3 (#265) — /lookup-peer + /publish-peer with sessionRef wire
       identity: { chat: { pubKey: 'x', stableId: 'y' }, host: { webid: 'https://a/#me' } },
       peer:     { address: 'app.aaa', status: 'connected' },
     };
-    const catalog = {
+    const catalogue = {
       opsById: new Map(), appOrigins: new Set(['basis']),
       appsById: new Map([['basis', { id: 'basis', ops: [] }]]),
       briefAggregations: () => [], searchAggregations: () => [],
@@ -227,7 +227,7 @@ describe('Bundle G3 (#265) — /lookup-peer + /publish-peer with sessionRef wire
     };
     const handlers = buildMobileLocalBuiltins({
       threadStateRef, setThreadState,
-      agent, catalog, callSkill: async () => ({}), t,
+      agent, catalogue, callSkill: async () => ({}), t,
       sessionRef,
     });
     const r = await handlers['lookup-peer']({ webid: 'https://bob.example/profile/card#me' });

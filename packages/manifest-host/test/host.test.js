@@ -187,9 +187,9 @@ describe('createManifestHost', () => {
       return host;
     }
 
-    it('toolCatalog ids are namespaced appId.opId, in mount-insertion order', () => {
+    it('toolCatalogue ids are namespaced appId.opId, in mount-insertion order', () => {
       const composed = makeHost().compose();
-      const ids = composed.toolCatalog.map((t) => t.id);
+      const ids = composed.toolCatalogue.map((t) => t.id);
       expect(ids).toEqual([
         'household.addItem',
         'household.doneItem',
@@ -199,9 +199,9 @@ describe('createManifestHost', () => {
       ]);
     });
 
-    it('toolCatalog entries preserve description + schema', () => {
+    it('toolCatalogue entries preserve description + schema', () => {
       const composed = makeHost().compose();
-      const addItem = composed.toolCatalog.find((t) => t.id === 'household.addItem');
+      const addItem = composed.toolCatalogue.find((t) => t.id === 'household.addItem');
       expect(addItem.description).toBe('Add an item');
       expect(addItem.schema.type).toBe('object');
       expect(addItem.schema.properties.text).toEqual({ type: 'string' });
@@ -289,7 +289,7 @@ describe('createManifestHost', () => {
       });
 
       const first = host.compose();
-      expect(first.toolCatalog.map((t) => t.id)).toEqual([
+      expect(first.toolCatalogue.map((t) => t.id)).toEqual([
         'household.addItem',
         'household.doneItem',
       ]);
@@ -299,7 +299,7 @@ describe('createManifestHost', () => {
         skillRegistry: stubRegistry(tasksLike), toSkillCtx: (c) => c,
       });
       const second = host.compose();
-      expect(second.toolCatalog.map((t) => t.id)).toEqual([
+      expect(second.toolCatalogue.map((t) => t.id)).toEqual([
         'household.addItem',
         'household.doneItem',
         'tasks.addTask',
@@ -312,7 +312,7 @@ describe('createManifestHost', () => {
 
       host.unmount('household');
       const third = host.compose();
-      expect(third.toolCatalog.map((t) => t.id)).toEqual([
+      expect(third.toolCatalogue.map((t) => t.id)).toEqual([
         'tasks.addTask',
         'tasks.claim',
         'tasks.approve',

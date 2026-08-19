@@ -14,7 +14,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
-import { createNeighborhoodAgent } from '../src/index.js';
+import { createNeighbourhoodAgent } from '../src/index.js';
 
 const ADMIN = 'https://id.example/admin';
 const BOB   = 'https://id.example/bob';   // stands in for BOB's secure-mesh signing address
@@ -30,7 +30,7 @@ async function callSkill(agent, skillId, args, from = ADMIN) {
 async function buildBundle({ controlAgent } = {}) {
   const id = await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);
-  const bundle = await createNeighborhoodAgent({
+  const bundle = await createNeighbourhoodAgent({
     identity: id, transport: tx,
     offeringMatch: { group: GROUP, localActor: ADMIN, peers: [] },
     members: [{ webid: ADMIN, role: 'admin' }],

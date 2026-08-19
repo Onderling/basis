@@ -99,7 +99,7 @@
  * @property {string}      chatId
  * @property {string}      senderWebid
  * @property {string}      bridgeId
- * @property {object}     [agent]           For tool-catalog access from classifyAndExtract
+ * @property {object}     [agent]           For tool-catalogue access from classifyAndExtract
  */
 
 /**

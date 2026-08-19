@@ -22,7 +22,7 @@ import { OFFERINGS_TAXONOMY } from '@onderling/agent-registry';
 /** Marker property on the default profile: comma-joined migrated circle ids.
  *  Not a charter key and not a driver value, so no surface renders it. */
 export const OFFERINGS_MIGRATION_KEY = '_migrations.offeringsRoster';
-/** Legacy marker (pre-offering rename). Still honored on read so an already-
+/** Legacy marker (pre-offering rename). Still honoured on read so an already-
  *  migrated circle never re-runs — no destructive migration. */
 export const LEGACY_SKILLS_MIGRATION_KEY = '_migrations.skillsRoster';
 

@@ -1,6 +1,6 @@
 /**
  * loadVerifyMappings (shared core) — load the store → verify against the
- * catalog → return mergeable sources for accepted, rejected for the rest.
+ * catalogue → return mergeable sources for accepted, rejected for the rest.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -19,7 +19,7 @@ function fakeStorage() {
   };
 }
 
-const catalog = { opsById: new Map([['household/addItem', { op: {}, appOrigin: 'household' }]]) };
+const catalogue = { opsById: new Map([['household/addItem', { op: {}, appOrigin: 'household' }]]) };
 
 describe('loadVerifyMappings', () => {
   it('returns sources for an accepted mapping + its origin', async () => {
@@ -28,7 +28,7 @@ describe('loadVerifyMappings', () => {
       id: 'fb', scope: 'app',
       ops: [{ id: 'feedback', verb: 'submit', steps: [{ appOrigin: 'household', opId: 'addItem' }] }],
     } });
-    const r = await loadVerifyMappings({ store, deviceId: WEB_MAPPINGS_DEVICE, catalog });
+    const r = await loadVerifyMappings({ store, deviceId: WEB_MAPPINGS_DEVICE, catalogue });
     expect(r.sources.map((s) => s.manifest.app)).toEqual(['fb']);
     expect(r.mappingOrigins).toEqual(['fb']);
     expect(r.rejected).toEqual([]);
@@ -39,14 +39,14 @@ describe('loadVerifyMappings', () => {
     await writeMapping({ pseudoPod: store, deviceId: WEB_MAPPINGS_DEVICE, mapping: {
       id: 'bad', ops: [{ id: 'x', verb: 'submit', steps: [{ appOrigin: 'ghost', opId: 'nope' }] }],
     } });
-    const r = await loadVerifyMappings({ store, deviceId: WEB_MAPPINGS_DEVICE, catalog });
+    const r = await loadVerifyMappings({ store, deviceId: WEB_MAPPINGS_DEVICE, catalogue });
     expect(r.sources).toEqual([]);
     expect(r.rejected[0].missing).toEqual(['ghost/nope']);
   });
 
   it('empty store → no sources, no rejects', async () => {
     const store = localStorageMappingsStore(fakeStorage());
-    const r = await loadVerifyMappings({ store, deviceId: WEB_MAPPINGS_DEVICE, catalog });
+    const r = await loadVerifyMappings({ store, deviceId: WEB_MAPPINGS_DEVICE, catalogue });
     expect(r).toMatchObject({ sources: [], rejected: [], mappingOrigins: [] });
   });
 });

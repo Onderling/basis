@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 
-import { createNeighborhoodAgent } from '../src/index.js';
+import { createNeighbourhoodAgent } from '../src/index.js';
 import { update as updateInterest } from '../src/lib/InterestProfile.js';
 import { RevealsCache, REVEALS_STORAGE_PATH } from '../src/lib/RevealsCache.js';
 import { InterestProfileCache, INTEREST_PROFILE_STORAGE_PATH } from '../src/lib/InterestProfileCache.js';
@@ -43,7 +43,7 @@ async function makeTmpDir() {
 async function buildBundle({ persistPath } = {}) {
   const id = await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);
-  const bundle = await createNeighborhoodAgent({
+  const bundle = await createNeighbourhoodAgent({
     identity: id, transport: tx,
     offeringMatch: { group: 'oosterpoort', localActor: ANNE, peers: [] },
     members:    [{ webid: ANNE }],

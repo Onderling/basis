@@ -24,7 +24,7 @@ It is also a useful design tool. Asking the question tells you *where the gate a
 
 ## Worked examples in this repo
 
-- **Per-skill exposure is a discovery FILTER.** Hiding a skill removes it from cards and catalogs; it
+- **Per-skill exposure is a discovery FILTER.** Hiding a skill removes it from cards and catalogues; it
   stops no dispatch. The grant/token check at dispatch is the enforcement. It follows that hiding also
   does **not** revoke — a hidden skill keeps its grant on the card, because telling someone they had
   revoked something they had not is the same lie pointing the other way.

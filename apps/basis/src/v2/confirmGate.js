@@ -15,7 +15,7 @@
  *   - `confirmRequestFromRoute(route, {t})` — the presentation model the
  *     shell UI renders (severity styling hint + the MANIFEST's message,
  *     localised chrome via t()).
- *   - `readyFromConfirm(route, catalog)` — the explicit-accept
+ *   - `readyFromConfirm(route, catalogue)` — the explicit-accept
  *     continuation: the same dispatch, re-tagged 'ready' (verb looked up
  *     so scopeReadyDispatch keeps working).
  *   - `runConfirmGate({...})` — the driver both shells call at their
@@ -70,18 +70,18 @@ export function confirmRequestFromRoute(route, { t } = {}) {
  * The explicit-accept continuation: the confirmed route, re-tagged
  * `'ready'` so the shell's normal execute path (capability gate →
  * scopeReadyDispatch → runDispatch) runs it unchanged.  The op's verb is
- * looked up from the catalog (needsConfirm doesn't carry it) so the
+ * looked up from the catalogue (needsConfirm doesn't carry it) so the
  * active-circle scope injection keeps working for mutation verbs.
  *
  * @param {import('../router.js').NeedsConfirmDispatch} route
- * @param {import('../manifestMerge.js').MergedCatalog} [catalog]
+ * @param {import('../manifestMerge.js').MergedCatalogue} [catalogue]
  * @returns {import('../router.js').ReadyDispatch}
  */
-export function readyFromConfirm(route, catalog) {
+export function readyFromConfirm(route, catalogue) {
   if (!route || route.kind !== 'needsConfirm') {
     throw new TypeError('readyFromConfirm: a needsConfirm route is required');
   }
-  const entry = catalog?.opsById?.get(route.opId);
+  const entry = catalogue?.opsById?.get(route.opId);
   return {
     kind:       'ready',
     opId:       route.opId,
@@ -101,7 +101,7 @@ export function readyFromConfirm(route, catalog) {
  *
  * @param {object}   args
  * @param {import('../router.js').NeedsConfirmDispatch} args.route
- * @param {import('../manifestMerge.js').MergedCatalog} [args.catalog]
+ * @param {import('../manifestMerge.js').MergedCatalogue} [args.catalogue]
  * @param {Function} [args.t]
  * @param {(request: ConfirmRequest) => (boolean|Promise<boolean>)} args.present
  *        per-shell UI: resolve truthy ONLY on the user's explicit accept
@@ -109,7 +109,7 @@ export function readyFromConfirm(route, catalog) {
  * @param {() => any} [args.onCancelNotice]  quiet cancel notice (no-op dispatch)
  * @returns {Promise<{executed: boolean}>}
  */
-export async function runConfirmGate({ route, catalog, t, present, execute, onCancelNotice } = {}) {
+export async function runConfirmGate({ route, catalogue, t, present, execute, onCancelNotice } = {}) {
   if (!route || route.kind !== 'needsConfirm') {
     throw new TypeError('runConfirmGate: a needsConfirm route is required');
   }
@@ -124,6 +124,6 @@ export async function runConfirmGate({ route, catalog, t, present, execute, onCa
     onCancelNotice?.();
     return { executed: false };
   }
-  await execute(readyFromConfirm(route, catalog));
+  await execute(readyFromConfirm(route, catalogue));
   return { executed: true };
 }

@@ -3,19 +3,19 @@
  *
  * A downloaded mapping (loaded from the pod `mappings/` folder by
  * `@onderling/pod-routing` `loadMappings`) declares ops that are COMPOSITES of
- * existing opIds. Before any such mapping is merged into the catalog, every
+ * existing opIds. Before any such mapping is merged into the catalogue, every
  * composite op must pass the **sandbox-by-construction** check ('s
  * `verifyComposite`): each step's opId must resolve to a declared op/atom in
- * the catalog. A mapping that references an unknown opId is REFUSED at load
+ * the catalogue. A mapping that references an unknown opId is REFUSED at load
  * time — this is what makes loading a THIRD-PARTY mapping safe, and it's the
  * "verifier fail → refuse to load" path in DESIGN §1.5.
  *
  * Pure (no I/O): the caller injects the already-loaded mappings + the merged
- * catalog, so this never imports pod-routing — keeping the logic dep-free
+ * catalogue, so this never imports pod-routing — keeping the logic dep-free
  * (the composition root wires loadMappings → verifyMappings → merge).
  *
  * Remote-binding ops (a bot's exposed skill — `binding: 'remote-skill@contact'`)
- * are NOT catalog-verified: their handler is the bot, not a local atom, so the
+ * are NOT catalogue-verified: their handler is the bot, not a local atom, so the
  * contact-scoped bridge vouches for them instead.
  */
 
@@ -28,20 +28,20 @@ function isRemoteBinding(op) {
 }
 
 /**
- * Verify ONE mapping against the catalog. A mapping is valid only when every
+ * Verify ONE mapping against the catalogue. A mapping is valid only when every
  * composite op's steps resolve. Returns the union of unresolved `<app>/<op>`
  * refs across the mapping.
  *
  * @param {import('@onderling/pod-routing').Mapping} mapping
- * @param {{ opsById: Map<string, object> } | { has?: Function }} catalog
+ * @param {{ opsById: Map<string, object> } | { has?: Function }} catalogue
  * @returns {{ ok: boolean, missing: string[] }}
  */
-export function verifyMapping(mapping, catalog) {
+export function verifyMapping(mapping, catalogue) {
   const missing = new Set();
   for (const op of mapping?.ops ?? []) {
-    if (isRemoteBinding(op)) continue;          // bot vouches, not the catalog
+    if (isRemoteBinding(op)) continue;          // bot vouches, not the catalogue
     if (Array.isArray(op?.steps)) {
-      const res = verifyComposite(op, catalog);
+      const res = verifyComposite(op, catalogue);
       for (const m of res.missing) missing.add(m);
     }
     // A non-composite, non-remote op declares no references → nothing to verify.
@@ -54,14 +54,14 @@ export function verifyMapping(mapping, catalog) {
  * refused (with the opIds they're missing — surfaced to the user).
  *
  * @param {Array<import('@onderling/pod-routing').Mapping>} mappings
- * @param {{ opsById: Map<string, object> }} catalog
+ * @param {{ opsById: Map<string, object> }} catalogue
  * @returns {{ accepted: Array<object>, rejected: Array<{id: string, missing: string[]}> }}
  */
-export function verifyMappings(mappings, catalog) {
+export function verifyMappings(mappings, catalogue) {
   const accepted = [];
   const rejected = [];
   for (const mapping of mappings ?? []) {
-    const { ok, missing } = verifyMapping(mapping, catalog);
+    const { ok, missing } = verifyMapping(mapping, catalogue);
     if (ok) accepted.push(mapping);
     else rejected.push({ id: mapping?.id, missing });
   }
@@ -73,7 +73,7 @@ export function verifyMappings(mappings, catalog) {
  * needs NO special `callSkill`: its composite ops carry `steps`, so the router
  * emits a `composite` dispatch and `runCompositeOp` runs the steps through
  * the existing global `callSkill` — which already routes each step by its
- * `appOrigin`. So the mapping's ops just need to land in the catalog.
+ * `appOrigin`. So the mapping's ops just need to land in the catalogue.
  *
  * @param {import('@onderling/pod-routing').Mapping} mapping
  * @returns {{ app: string, operations: object[] }}
@@ -89,7 +89,7 @@ export function mappingToManifest(mapping) {
 /**
  * Build `mergeManifests` sources from VERIFIED mappings, validating each one's
  * manifest and DROPPING any that's structurally invalid (so one bad mapping
- * can't throw the whole merge). Pair with `verifyMappings` first (the catalog
+ * can't throw the whole merge). Pair with `verifyMappings` first (the catalogue
  * gate); this is the manifest-shape gate.
  *
  * @param {Array<import('@onderling/pod-routing').Mapping>} mappings

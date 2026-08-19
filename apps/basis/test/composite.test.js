@@ -209,7 +209,7 @@ describe('compileCompositeToFlow — a composite is linear sugar over the flow g
 
   it('the compiled flow PASSES the flow verifier (structure, bindings, acyclicity)', () => {
     const flow = compileCompositeToFlow(op, { threadId: 'th-1' });
-    // qualified ids resolve like the merged catalog's prefix-on-collision keys
+    // qualified ids resolve like the merged catalogue's prefix-on-collision keys
     const ops = new Map([['a/create', { id: 'a/create', params: [] }], ['b/complete', { id: 'b/complete', params: [] }]]);
     const r = verifyFlow(flow, { ops });
     expect(r.problems ?? r.errors ?? []).toEqual([]);
@@ -231,7 +231,7 @@ describe('compileCompositeToFlow — a composite is linear sugar over the flow g
 // ── verifyComposite (the sandbox-by-construction fitness fn) ──────────
 
 describe('verifyComposite — sandbox-by-construction', () => {
-  const catalog = mergeManifests([
+  const catalogue = mergeManifests([
     {
       manifest: {
         app: 'a', itemTypes: ['x'],
@@ -250,7 +250,7 @@ describe('verifyComposite — sandbox-by-construction', () => {
         { appOrigin: 'a', opId: 'opA' },
         { appOrigin: 'a', opId: 'opB' },
       ],
-    } : demoOp, catalog);
+    } : demoOp, catalogue);
     expect(ok).toEqual({ ok: true, missing: [] });
   });
 
@@ -262,13 +262,13 @@ describe('verifyComposite — sandbox-by-construction', () => {
         { appOrigin: 'a', opId: 'doesNotExist' },
       ],
     };
-    const res = verifyComposite(bad, catalog);
+    const res = verifyComposite(bad, catalogue);
     expect(res.ok).toBe(false);
     expect(res.missing).toEqual(['a/doesNotExist']);
   });
 
   it('treats a non-composite op as trivially ok', () => {
-    expect(verifyComposite({ id: 'plain', verb: 'list' }, catalog))
+    expect(verifyComposite({ id: 'plain', verb: 'list' }, catalogue))
       .toEqual({ ok: true, missing: [] });
   });
 
@@ -321,12 +321,12 @@ describe('validateManifest — composite Operation.steps / onError', () => {
 
 describe('runCompositeDispatch — via parse → router', () => {
   it('router emits a composite dispatch; runner fires the chain', async () => {
-    const catalog = mergeManifests([
+    const catalogue = mergeManifests([
       { manifest: { app: 'demoApp', itemTypes: ['x'], operations: [demoOp] } },
     ]);
 
-    const parse = parseInput('/demo', catalog, { threadId: 't-1' });
-    const dispatch = resolveDispatch(parse, catalog);
+    const parse = parseInput('/demo', catalogue, { threadId: 't-1' });
+    const dispatch = resolveDispatch(parse, catalogue);
     expect(dispatch.kind).toBe('composite');
 
     const calls = [];
@@ -345,7 +345,7 @@ describe('runCompositeDispatch — via parse → router', () => {
   });
 
   it('surfaces a failing composite as reply.error (stop default)', async () => {
-    const catalog = mergeManifests([
+    const catalogue = mergeManifests([
       { manifest: { app: 'demoApp', itemTypes: ['x'], operations: [
         { ...demoOp, steps: [
           { appOrigin: 'a', opId: 'opA' },
@@ -353,8 +353,8 @@ describe('runCompositeDispatch — via parse → router', () => {
         ] },
       ] } },
     ]);
-    const parse = parseInput('/demo', catalog, { threadId: 't-2' });
-    const dispatch = resolveDispatch(parse, catalog);
+    const parse = parseInput('/demo', catalogue, { threadId: 't-2' });
+    const dispatch = resolveDispatch(parse, catalogue);
 
     const callSkill = async (appOrigin, opId) =>
       opId === 'opB' ? { ok: false, error: 'nope' } : { ok: true };

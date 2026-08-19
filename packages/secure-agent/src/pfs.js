@@ -33,7 +33,7 @@
  *
  * Messages may arrive out of order (UDP-like).  We cache derived
  * messageKeys for any skipped sequence numbers (up to maxSkip).
- * Past-deletion-after-use is honored — once a skipped key has been
+ * Past-deletion-after-use is honoured — once a skipped key has been
  * consumed, it's dropped from the cache.
  *
  * # Wire format (per message)

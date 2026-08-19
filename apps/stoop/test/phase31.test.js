@@ -18,7 +18,7 @@ import { AgentIdentity, InternalBus, InternalTransport, DataPart, generateMnemon
 import { VaultMemory } from '@onderling/vault';
 import nacl from 'tweetnacl';
 
-import { createNeighborhoodAgent } from '../src/index.js';
+import { createNeighbourhoodAgent } from '../src/index.js';
 
 const ANNE = 'https://id.example/anne';
 
@@ -38,7 +38,7 @@ async function buildBundle(vault) {
     ? await AgentIdentity.generate(vault)
     : await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);
-  const bundle = await createNeighborhoodAgent({
+  const bundle = await createNeighbourhoodAgent({
     identity: id, transport: tx,
     offeringMatch: { group: 'oosterpoort', localActor: ANNE, peers: [] },
     members:    [{ webid: ANNE }],

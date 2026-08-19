@@ -79,8 +79,8 @@ import {
   // Conversational follow-up for needsForm (shared) — ask for a missing field, next message answers.
   // beginFormFollowUp/completeMultiFieldFollowUp drive the 2+-field inline form (parity with web).
   beginFollowUp, completeFollowUp, beginFormFollowUp, completeMultiFieldFollowUp,
-  // Shared one-line bot reply (verb-aware Added:/Completed:) + Part D catalog scoping (drops /me etc.).
-  circleReplyText, scopeCatalogToApps,
+  // Shared one-line bot reply (verb-aware Added:/Completed:) + Part D catalogue scoping (drops /me etc.).
+  circleReplyText, scopeCatalogueToApps,
   // B (circle bot) — dispatch primitives to run an interpreted command in the circle.
   parseInput, resolveDispatch, runDispatch, scopeReadyDispatch, executeBulkDispatch,
   // profile-update propagation — the silent "pull-me" entry kind (the roster PULL trigger).
@@ -595,7 +595,7 @@ export default function CircleLauncherScreen({
   // memberDirectory).  Falls back to null on read failure → the helper
   // applies feature defaults.
   // Read the active circle's policy from the store into `selectedPolicy` (the prop CircleDetail's
-  // gate + tabs + catalog react to). Extracted so an in-place settings save can re-run it — otherwise
+  // gate + tabs + catalogue react to). Extracted so an in-place settings save can re-run it — otherwise
   // CircleDetail keeps the policy it loaded on open and a newly-(dis)abled app stays (un)gated until
   // the circle is fully re-opened (device-verify #80, 2026-07-02).
   const reloadSelectedPolicy = useCallback(async () => {
@@ -1018,11 +1018,11 @@ export default function CircleLauncherScreen({
   }, [view, screensSubMode, viewingScreenId, screensBook, callSkill, eventLog, circles, screenBlocksCache]);
 
   const callSkill = useMemo(
-    // Pass a catalog getter so the resolver skips origins that don't declare the op
+    // Pass a catalogue getter so the resolver skips origins that don't declare the op
     // (no probe-storm). Lazy → read at dispatch time. The launcher-level resolver uses
-    // the RAW merged catalog (`bundle.catalog`); per-circle app scoping happens in
-    // CircleDetail. (`catalog` is CircleDetail-local — not in scope here.)
-    () => (bundle?.callSkill ? makeResolvingCallSkill(bundle.callSkill, undefined, () => bundle?.catalog) : null),
+    // the RAW merged catalogue (`bundle.catalogue`); per-circle app scoping happens in
+    // CircleDetail. (`catalogue` is CircleDetail-local — not in scope here.)
+    () => (bundle?.callSkill ? makeResolvingCallSkill(bundle.callSkill, undefined, () => bundle?.catalogue) : null),
     [bundle],
   );
 
@@ -1673,7 +1673,7 @@ export default function CircleLauncherScreen({
         // for device-scoped controls (transport-mode · relay endpoint). web parity with circleApp.js.
         transport={circleTransport}
         onControl={onCircleControl}
-        // #80 — re-read the just-saved policy so CircleDetail's gate/tabs/catalog update live
+        // #80 — re-read the just-saved policy so CircleDetail's gate/tabs/catalogue update live
         // (the settings onSave awaits store.update before calling onBack, so this sees the new value).
         onBack={() => { refreshProposals(); reloadSelectedPolicy(); setView('detail'); }}
       />
@@ -1833,7 +1833,7 @@ export default function CircleLauncherScreen({
         items={items}
         callSkill={callSkill}
         rawCallSkill={bundle?.callSkill}
-        catalog={bundle?.catalog}
+        catalogue={bundle?.catalogue}
         policy={selectedPolicy}
         peerGraph={bundle?.peerGraph ?? null}
         signChatStatement={(cid, mid) => bundle?.agent?.chatRail?.signEntry?.(cid, mid) ?? null}
@@ -2280,7 +2280,7 @@ function LauncherTile({ circle: c, preview, pending, isPinned = false, isMuted =
 // Added:/Completed: phrasing); web + mobile use it so add/complete no longer read identically.
 
 function CircleDetail({
-  circle, items, callSkill, rawCallSkill, catalog: rawCatalog, policy, myListTasks = [],
+  circle, items, callSkill, rawCallSkill, catalogue: rawCatalogue, policy, myListTasks = [],
   deliveryStateMap = null,
   registerCircleBotSink = null,
   onAcceptFallback = null,
@@ -2305,11 +2305,11 @@ function CircleDetail({
   const theme = useTheme();
   const insets = useSafeAreaInsets();   // clear the status bar so the header bar is fully tappable
   const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
-  // Part D — scope the bot/suggest catalog to the circle's apps: drops basis's infra ops (/me etc.)
+  // Part D — scope the bot/suggest catalogue to the circle's apps: drops basis's infra ops (/me etc.)
   // that the circle bot can't run (they threw `circle.bot.failed`) and keeps them out of the suggest list.
-  const catalog = useMemo(
-    () => (rawCatalog ? scopeCatalogToApps(rawCatalog, policy?.apps) : rawCatalog),
-    [rawCatalog, policy],
+  const catalogue = useMemo(
+    () => (rawCatalogue ? scopeCatalogueToApps(rawCatalogue, policy?.apps) : rawCatalogue),
+    [rawCatalogue, policy],
   );
   // S6.A — {appOrigin → manifest} for computing inline buttons on bot replies.
   const manifestsByOrigin = useMemo(() => buildManifestsByOrigin(), []);
@@ -2492,13 +2492,13 @@ function CircleDetail({
     const reply = r && r.via === 'llm-reply' && typeof r.reply === 'string' ? r.reply.trim() : '';
     setAwaitingBotReply(reply && /\?/.test(reply) ? { question: reply, query: String(query || '') } : null);
   }, []);
-  // Composer parity — slash-command auto-suggest off the merged catalog (shared `suggestCommands`,
+  // Composer parity — slash-command auto-suggest off the merged catalogue (shared `suggestCommands`,
   // same logic + set as web's dropdown). Tapping a row fills the command; the bash-style ArrowUp/Down
   // history that web also has is a keyboard affordance with no touch-gesture equivalent, so it's
   // intentionally desktop-only (the suggest list is the mobile parity surface).
   const suggestMatches = useMemo(
-    () => (catalog ? suggestCommands(catalog, composerText) : []),
-    [catalog, composerText],
+    () => (catalogue ? suggestCommands(catalogue, composerText) : []),
+    [catalogue, composerText],
   );
   // Permission gate (classic shell's `allowCommands` analog): chat disabled for this circle ⇒ read-only.
   const canPost = isFeatureEnabled(policy, 'chat');
@@ -2803,16 +2803,16 @@ function CircleDetail({
     return () => { cancelled = true; };
   }, [circle?.id, rawCallSkill]);
 
-  // B (circle bot) — run a FULLY-RESOLVED command ({opId, args}) against the circle's catalog, scoped
+  // B (circle bot) — run a FULLY-RESOLVED command ({opId, args}) against the circle's catalogue, scoped
   // to THIS circle, and post a one-line bot reply. Local-only (the command's substrate effect reaches
   // members on its own). Target resolution / ambiguity is handled upstream by the clarifying dispatch.
   const runCircleCommandResolved = useCallback(async ({ opId, args, appOrigin }) => {
-    if (!catalog) { appendCircleMessage({ actor: 'bot', text: t('circle.bot.unknown') }); return; }
+    if (!catalogue) { appendCircleMessage({ actor: 'bot', text: t('circle.bot.unknown') }); return; }
     let dispatch;
     try {
       // K0 de-shadow: forward the app-origin hint so a colliding bare op-id (from the gate) routes to the
       // gate's app, not the merge's first-declarer (web≡mobile parity with circleApp.dispatchReady).
-      dispatch = resolveDispatch({ kind: 'slash', opId, args: args || {}, appOrigin, command: '(bot)', body: '' }, catalog);
+      dispatch = resolveDispatch({ kind: 'slash', opId, args: args || {}, appOrigin, command: '(bot)', body: '' }, catalogue);
     } catch { appendCircleMessage({ actor: 'bot', text: t('circle.bot.unknown') }); return; }
     if (dispatch.kind === 'needsForm') {
       // Conversational elicitation (parity with web): single missing field → ask in the circle + capture
@@ -2830,7 +2830,7 @@ function CircleDetail({
     // Alert.alert with a destructive accept is only the presenter). Cancel = quiet notice.
     if (dispatch.kind === 'needsConfirm') {
       await runConfirmGate({
-        route: dispatch, catalog, t,
+        route: dispatch, catalogue, t,
         present: alertConfirmPresenter(Alert.alert),
         onCancelNotice: () => appendCircleMessage({ actor: 'bot', text: t('circle.confirm.cancelled') }),
         execute: executeResolved,
@@ -2847,7 +2847,7 @@ function CircleDetail({
       // Enablement comes from the SAME per-circle source the UI uses (isAppSurfaceEnabled → policy.features,
       // already consulted for the screen button below); the pure (verb×noun) gate evaluates the capability.
       if (circle?.id) {
-        const gateEntry = catalog?.opsById?.get(dispatch.opId);
+        const gateEntry = catalogue?.opsById?.get(dispatch.opId);
         const gOrigin = dispatch.appOrigin || gateEntry?.appOrigin;
         if (gOrigin) {
           const enabled = isAppSurfaceEnabled(gOrigin, policy, isFeatureEnabled);
@@ -2872,7 +2872,7 @@ function CircleDetail({
       try { reply = await runDispatch(scoped, rawCallSkill); }
       catch (e) { appendCircleMessage({ actor: 'bot', text: t('circle.bot.failed', { msg: e?.message ?? String(e) }) }); return; }
       // The op's verb drives Added:/Completed: phrasing (a bare "✓ X" was identical for add + complete).
-      const entry = catalog?.opsById?.get(dispatch.opId);
+      const entry = catalogue?.opsById?.get(dispatch.opId);
       const verb = entry?.op?.verb;
       // S6.A — manifest-driven inline buttons for the reply's item(s), gated by appliesTo (web parity).
       // B · (4c) — grey/hide affordances per the member's effective capability + consequence (web≡mobile).
@@ -2910,7 +2910,7 @@ function CircleDetail({
         if (hopCard) appendCircleMessage({ actor: 'bot', text: `${hopCard.title}\n${hopCard.body}` });
       } catch { /* enrichment is non-essential */ }
     }
-  }, [catalog, circle?.id, rawCallSkill, appendCircleMessage, manifestsByOrigin, policy, capabilitySources, overrideStore]);
+  }, [catalogue, circle?.id, rawCallSkill, appendCircleMessage, manifestsByOrigin, policy, capabilitySources, overrideStore]);
 
   // Entrust (mandate) — open the task-scoped grant picker. Gathers WHO (the circle
   // roster), WHAT (MY offerings, kind 'offering'), my WebID (the granter), and any
@@ -3017,7 +3017,7 @@ function CircleDetail({
   // B (clarification) — wraps dispatch: a unique target dispatches; an ambiguous one posts a bot
   // message with candidate BUTTONS (tapping → pick → re-run bound to that id); a missing one asks.
   const clarify = useMemo(() => createClarifyingDispatch({
-    catalog: () => catalog,
+    catalogue: () => catalogue,
     lookup: circleLookup,
     dispatchReady: runCircleCommandResolved,
     ask: ({ query, candidates }) => appendCircleMessage({
@@ -3029,7 +3029,7 @@ function CircleDetail({
       // A non-empty label that matched nothing → "couldn't find X". A picker command given with NO value
       // (bare /complete-task) shouldn't say «couldn't find ''» — list the options to choose from.
       if (query && query.trim()) { appendCircleMessage({ actor: 'bot', text: t('circle.clarify.notFound', { query }) }); return; }
-      const entry = catalog?.opsById?.get(opId);
+      const entry = catalogue?.opsById?.get(opId);
       const listOp = (entry?.op?.params || []).find((p) => p.name === param)?.pickerSource?.listOp;
       let cand = [];
       try { if (listOp) cand = (await circleLookup(listOp, '', circle?.id, entry?.appOrigin)) || []; } catch { /* keep empty */ }
@@ -3039,7 +3039,7 @@ function CircleDetail({
         appendCircleMessage({ actor: 'bot', text: t('circle.clarify.noneToPick') });
       }
     },
-  }), [catalog, circleLookup, runCircleCommandResolved, appendCircleMessage, circle?.id]);
+  }), [catalogue, circleLookup, runCircleCommandResolved, appendCircleMessage, circle?.id]);
 
   // S6.B — chat-triggered screen panel ({screen} | null) + its materialized blocks.
   const [screenPanel, setScreenPanel] = useState(null);
@@ -3165,7 +3165,7 @@ function CircleDetail({
     }
     if (button?.screen) { setScreenPanel({ screen: button.screen }); return; }
     if (button?.opId) {
-      const op = catalog?.opsById?.get(button.opId)?.op;
+      const op = catalogue?.opsById?.get(button.opId)?.op;
       const arg = op?.surfaces?.slash?.match?.arg
         ?? (op?.params || []).find((p) => p?.pickerSource)?.name
         ?? 'id';
@@ -3173,7 +3173,7 @@ function CircleDetail({
       return;
     }
     if (button?.id) clarify.pick(button.id, { id: circle?.id });
-  }, [clarify, circle?.id, catalog, runCircleCommandResolved, switchCircleFeedbackLang, onAcceptFallback]);
+  }, [clarify, circle?.id, catalogue, runCircleCommandResolved, switchCircleFeedbackLang, onAcceptFallback]);
 
   // B (two-level LLM policy) — the member's PERSONAL default, consulted when the circle policy is
   // 'user'. Persisted via AsyncStorage; seeded from the configured route until a settings UI lands
@@ -3230,7 +3230,7 @@ function CircleDetail({
   const hasEmbedProvider = !!(llmRuntime.embedProviders.local || llmRuntime.embedProviders.cloud);
 
   const circleBot = useMemo(() => createCircleDispatch({
-    catalog,
+    catalogue,
     // Circle policy is authoritative (this circle's own llmTool); 'user' delegates to the member default.
     // `apps` scopes the LLM's tool list to the relevant app origins (was never passed → all 105 tools).
     // Per-circle (circle policy.apps) with the deployment env as fallback.
@@ -3277,13 +3277,13 @@ function CircleDetail({
     dispatch: (input) => {
       let cmd = input;
       if (typeof input === 'string') {
-        const parsed = catalog ? parseInput(input, catalog) : null;
+        const parsed = catalogue ? parseInput(input, catalogue) : null;
         cmd = parsed && parsed.kind === 'slash' && parsed.opId ? { opId: parsed.opId, args: parsed.args || {} } : null;
       }
       if (!cmd || !cmd.opId) { appendCircleMessage({ actor: 'bot', text: t('circle.bot.unknown') }); return; }
       // E2 bulk fan-out ("/done all"): resolveDispatch flags it; run over the last listing, bypassing clarify.
       try {
-        const r = resolveDispatch({ kind: 'slash', opId: cmd.opId, args: cmd.args || {} }, catalog);
+        const r = resolveDispatch({ kind: 'slash', opId: cmd.opId, args: cmd.args || {} }, catalogue);
         if (r && r.kind === 'bulk') return handleCircleBulk(r);
       } catch { /* not bulk → normal path */ }
       return clarify.run(cmd, { id: circle?.id });
@@ -3293,7 +3293,7 @@ function CircleDetail({
     onNoMatch: (_text, _ctx, opts) => { appendCircleMessage({ actor: 'bot', text: (opts && opts.reply) || t('circle.bot.unknown') }); },
     // Smart chat off / unreachable → plain-language "basic mode" reply (contextual indicator, no badge).
     onLlmUnavailable: () => { appendCircleMessage({ actor: 'bot', text: t('circle.bot.basic_mode') }); },
-  }), [catalog, clarify, circle?.id, callSkill, appendCircleMessage, broadcastFanOut, llmRuntime, hasEmbedProvider, circleLlmPolicy, llmApps, handleCircleBulk]);
+  }), [catalogue, clarify, circle?.id, callSkill, appendCircleMessage, broadcastFanOut, llmRuntime, hasEmbedProvider, circleLlmPolicy, llmApps, handleCircleBulk]);
 
   // ── Task #13 — onboarding-as-bot-chat + standing help Q&A (thin twin of web circleApp.js) ──────────
   // The confidential-route-aware help LLM binding (parity with web's circleHelpLlm): ready() reflects

@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 
-import { createNeighborhoodAgent } from '../src/index.js';
+import { createNeighbourhoodAgent } from '../src/index.js';
 
 const ANNE = 'https://id.example/anne';
 
@@ -41,7 +41,7 @@ describe('Stoop V1 Phase 15 — persistPath wires FilePersist into the factory',
     try {
       const id = await AgentIdentity.generate(new VaultMemory());
       const tx = new InternalTransport(new InternalBus(), id.pubKey);
-      const bundle = await createNeighborhoodAgent({
+      const bundle = await createNeighbourhoodAgent({
         identity: id, transport: tx,
         offeringMatch: { group: 'oosterpoort', localActor: ANNE, peers: [] },
         members:    [{ webid: ANNE }],
@@ -55,7 +55,7 @@ describe('Stoop V1 Phase 15 — persistPath wires FilePersist into the factory',
   it('null bundle.persist when persistPath omitted', async () => {
     const id = await AgentIdentity.generate(new VaultMemory());
     const tx = new InternalTransport(new InternalBus(), id.pubKey);
-    const bundle = await createNeighborhoodAgent({
+    const bundle = await createNeighbourhoodAgent({
       identity: id, transport: tx,
       offeringMatch: { group: 'oosterpoort', localActor: ANNE, peers: [] },
       members:    [{ webid: ANNE }],
@@ -69,7 +69,7 @@ describe('Stoop V1 Phase 15 — persistPath wires FilePersist into the factory',
       // Session 1.
       const id1 = await AgentIdentity.generate(new VaultMemory());
       const tx1 = new InternalTransport(new InternalBus(), id1.pubKey);
-      const b1 = await createNeighborhoodAgent({
+      const b1 = await createNeighbourhoodAgent({
         identity: id1, transport: tx1,
         offeringMatch: { group: 'g', localActor: ANNE, peers: [] },
         members:    [{ webid: ANNE }],
@@ -85,7 +85,7 @@ describe('Stoop V1 Phase 15 — persistPath wires FilePersist into the factory',
       // Session 2 — new agent, same persistPath.
       const id2 = await AgentIdentity.generate(new VaultMemory());
       const tx2 = new InternalTransport(new InternalBus(), id2.pubKey);
-      const b2 = await createNeighborhoodAgent({
+      const b2 = await createNeighbourhoodAgent({
         identity: id2, transport: tx2,
         offeringMatch: { group: 'g', localActor: ANNE, peers: [] },
         members:    [{ webid: ANNE }],

@@ -141,7 +141,7 @@ export async function startHouseholdWeb(opts = {}) {
   // ──: real HouseholdAgent on the SAME store ─────────────
   // HouseholdAgent.constructor wires the regex fast path + (when an
   // LLM is configured) the `@onderling/chat-agent` ChatAgent built from
-  // the manifest's renderChat projection (toolCatalog/toolHandlers/
+  // the manifest's renderChat projection (toolCatalogue/toolHandlers/
   // systemPrompt).  We use a MockBridge as a placeholder — the chat
   // skill below calls `householdAgent.onMessage(msg)` directly and
   // reads the returned Reply, so no outbound bridge dispatch is

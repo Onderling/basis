@@ -72,7 +72,7 @@ export function createStoopService({
   manifest = stoopManifest,
 } = {}) {
   const itemStore = store ?? createTaskStore(
-    new CircleItemStore({ dataSource: new MemorySource(), rootContainer: 'mem://neighborhood/' }),
+    new CircleItemStore({ dataSource: new MemorySource(), rootContainer: 'mem://neighbourhood/' }),
   );
 
   // Build the dep bag ONCE (hoisting the offeringMatch/muted defaults) so the wire

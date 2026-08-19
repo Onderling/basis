@@ -10,9 +10,9 @@ const BASE  = process.env.VITE_CIRCLE_LLM_BASEURL || 'http://127.0.0.1:11434/v1'
 const MODEL = process.env.VITE_CIRCLE_LLM_MODEL   || 'qwen2.5:7b-instruct';
 const BOT   = 'assistant';
 
-// A household-circle-shaped catalog (the LLM's tool list). markComplete takes an id-like `target`
+// A household-circle-shaped catalogue (the LLM's tool list). markComplete takes an id-like `target`
 // (pickerSource → listOpen) so the clarification turn can resolve a label to a concrete item.
-const catalog = { opsById: new Map([
+const catalogue = { opsById: new Map([
   ['addTask',      { op: { id: 'addTask',      params: [{ name: 'title', kind: 'string', required: true }],
                           surfaces: { chat: { hint: 'add an item/task to the household list' } } } }],
   ['markComplete', { op: { id: 'markComplete', params: [{ name: 'target', kind: 'string', required: true, pickerSource: { listOp: 'listOpen' } }],
@@ -30,7 +30,7 @@ const LISTING = [
 const providers = buildCircleLlmProviders({ localBaseUrl: BASE, model: MODEL });
 const events = [];   // what the shell would do
 const clarify = createClarifyingDispatch({
-  catalog: () => catalog,
+  catalogue: () => catalogue,
   lookup: () => LISTING,
   dispatchReady: (cmd) => { events.push({ t: 'DISPATCH', cmd }); },
   ask: (q) => { events.push({ t: 'ASK', query: q.query, candidates: q.candidates.map((c) => c.label) }); },
@@ -39,7 +39,7 @@ const clarify = createClarifyingDispatch({
 const handleCircleTurn = createCircleTurn({
   policyFor: () => ({ llmTool: 'local' }),
   llmProviders: providers,
-  catalog: () => catalog,
+  catalogue: () => catalogue,
   botName: BOT,
   dispatchCommand: (cmd, scope) => clarify.run(cmd, scope),
 });

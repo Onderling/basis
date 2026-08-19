@@ -48,7 +48,7 @@ function buildHarness({ openFilePicker } = {}) {
   const handlers = buildMobileLocalBuiltins({
     threadStateRef, setThreadState,
     agent,
-    catalog:   { opsById: new Map(), appOrigins: new Set(['basis']), appsById: new Map() },
+    catalogue:   { opsById: new Map(), appOrigins: new Set(['basis']), appsById: new Map() },
     callSkill: async () => ({}),
     t,
     openFilePicker,

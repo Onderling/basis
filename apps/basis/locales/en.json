@@ -106,7 +106,7 @@
     },
     "no_factory": {
       "text": "No app declares a Q29 cardSnapshotSkill yet.",
-      "doc": "When the merged catalog has no embed-producing op."
+      "doc": "When the merged catalogue has no embed-producing op."
     }
   },
   "embed-file": {
@@ -508,7 +508,7 @@
     },
     "empty": {
       "text": "(none)",
-      "doc": "When no apps in the catalog."
+      "doc": "When no apps in the catalogue."
     },
     "no_registry": {
       "text": "App registry not available in this build.",

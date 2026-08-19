@@ -7,7 +7,7 @@
  *   - `approve` rejects symmetrically when the parent has DoD-lifecycle deps.
  *   - Removed-or-missing dep is treated as satisfied (doesn't block forever).
  *   - `ctx.actionOverride` bypasses the gate AND replaces the audit action label.
- *   - `addItems` honors `ctx.actionOverride` for force-spawn audit entries.
+ *   - `addItems` honours `ctx.actionOverride` for force-spawn audit entries.
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -116,7 +116,7 @@ describe('V2.7 — ItemStore enforce-dependencies gate', () => {
     expect(err).toBeInstanceOf(DependenciesOpenError);
   });
 
-  it('addItems honors actionOverride for force-spawn audit entries', async () => {
+  it('addItems honours actionOverride for force-spawn audit entries', async () => {
     const [parent] = await store.addItems([{ type: 'task', text: 'P' }], { actor: ANNE });
     const [child] = await store.addItems(
       [{ type: 'task', text: 'C', parentTaskId: parent.id }],

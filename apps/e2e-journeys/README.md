@@ -38,7 +38,7 @@ Exit `0` = every journey fully green · `1` = a failure · `2` = usage error.
 Each journey uses fresh identities, so they can share one relay without collision.
 `two-party` / `offline` / `multi-party` are SDK-level (relay only). `sealed` spins up
 a real `@onderling-app/companion-node` with the inbox enabled. `j-circle` drives two
-real `@onderling-app/stoop` `createNeighborhoodAgent` instances with the substrate mirror.
+real `@onderling-app/stoop` `createNeighbourhoodAgent` instances with the substrate mirror.
 `task-claim` is **hermetic** — it uses the in-process partitionable transport (you
 cannot tell a real relay to partition on command), so it ignores the relay URL and
 reuses the real tasks-v0 claim + substrate-mirror conflict machinery.

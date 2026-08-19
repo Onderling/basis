@@ -3,7 +3,7 @@
 // credential delegation: given a request (op + path) it decides whether a
 // presented token actually authorizes that request, deny-by-default.
 //
-// R2b.0 (PLAN-companion-node-remote-hosting.md §R2b): NO pod honors a
+// R2b.0 (PLAN-companion-node-remote-hosting.md §R2b): NO pod honours a
 // `PodCapabilityToken` today — issue / verify / matchesScope / verifyChain live
 // in core, `CapabilityAuth` `pod-direct` presents the Bearer, but nothing on the
 // pod side checks scope/expiry/revocation. This is that missing check. It runs

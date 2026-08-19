@@ -84,7 +84,7 @@ yours: keep the group key in an `@onderling/vault` store, never on the pod it se
   once two devices race on the same item.
 - **Latency**: every operation is an HTTP round trip. Production apps put a local cache in
   front and sync on a cadence ("pod is truth, local cache is reality").
-- **Offline development**: `@onderling/pseudo-pod` gives the same Solid-shaped behavior fully
+- **Offline development**: `@onderling/pseudo-pod` gives the same Solid-shaped behaviour fully
   in memory — see journey J4 in [`apps/sdk-journeys/`](../../apps/sdk-journeys/).
 
 Related: [`pod-client`](../../packages/pod-client/README.md) · [`item-store`](../../packages/item-store/README.md) READMEs.

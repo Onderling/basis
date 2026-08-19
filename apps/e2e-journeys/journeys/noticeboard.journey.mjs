@@ -5,7 +5,7 @@ import { AgentIdentity, DataPart } from '@onderling/core';
 import { VaultMemory }             from '@onderling/vault';
 import { Reveals }                 from '@onderling/identity-resolver';
 import { RelayTransport }          from '@onderling/transports';
-import { createNeighborhoodAgent, attachSubstrateMirror } from '@onderling-app/stoop';
+import { createNeighbourhoodAgent, attachSubstrateMirror } from '@onderling-app/stoop';
 import { wait, checker }           from './_util.mjs';
 
 export const name = 'J-circle (join → noticeboard → private chat)';
@@ -16,7 +16,7 @@ export async function run({ relayUrl }) {
 
   const hostId     = await AgentIdentity.generate(new VaultMemory());
   const strangerId = await AgentIdentity.generate(new VaultMemory());
-  const mk = (id, me, peer, peerWebid) => createNeighborhoodAgent({
+  const mk = (id, me, peer, peerWebid) => createNeighbourhoodAgent({
     identity: id, transport: new RelayTransport({ relayUrl, identity: id }),
     offeringMatch: { group: GROUP, localActor: me, peers: [{ pubKey: peer.pubKey }] },
     members: [

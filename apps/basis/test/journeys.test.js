@@ -2,7 +2,7 @@
  * basis — user-journey integration tests.
  *
  * One describe-block per J1–J10 from `DESIGN-basis-journeys.md`.
- * Boots the same catalog + agent that `web/main.js` does (sans
+ * Boots the same catalogue + agent that `web/main.js` does (sans
  * DOM) — `bootTestWorkspace()` mirrors the real wiring so a test
  * failure here is a real demo failure.
  *
@@ -30,7 +30,7 @@ import {
   parseInput, mergeManifests, resolveDispatch, runDispatch,
   renderReply, ThreadStore, createDefaultThreadStore, createEventRouter,
   basisManifest,
-  AppRegistry, filterCatalog,
+  AppRegistry, filterCatalogue,
   runBrief, createBriefCache,
   runFind,
   EventLog,
@@ -55,7 +55,7 @@ async function bootTestWorkspace() {
   // opt into the demo scaffolding explicitly — it is OFF by default now that a
   // real circle must show only real members + no phantom tasks.
   const agent = await createRealHouseholdAgent({ seedDemoData: true });
-  const rawCatalog = mergeManifests([
+  const rawCatalogue = mergeManifests([
     { manifest: basisManifest },
     { manifest: agent.manifest },
     { manifest: mockTasksManifest },
@@ -65,9 +65,9 @@ async function bootTestWorkspace() {
   ], { runtime: 'browser' });
 
   const appRegistry = new AppRegistry();
-  appRegistry.syncWithCatalog(rawCatalog.appOrigins);
-  let catalog = filterCatalog(rawCatalog, appRegistry);
-  appRegistry.subscribe(() => { catalog = filterCatalog(rawCatalog, appRegistry); });
+  appRegistry.syncWithCatalogue(rawCatalogue.appOrigins);
+  let catalogue = filterCatalogue(rawCatalogue, appRegistry);
+  appRegistry.subscribe(() => { catalogue = filterCatalogue(rawCatalogue, appRegistry); });
 
   const store = createDefaultThreadStore();   // creates Main + Inbox
   const SIM_PEERS = {
@@ -98,7 +98,7 @@ async function bootTestWorkspace() {
     }
     if (appOrigin === 'stoop') {
       // Post-slice-2b (integration-plan 2026-05-23): stoop is the
-      // real NeighborhoodAgent.  realAgent.callSkill knows the
+      // real NeighbourhoodAgent.  realAgent.callSkill knows the
       // listFeed→listOpen alias + getStoopProfile/revealPeer adapters.
       return agent.callSkill('stoop', opId, args);
     }
@@ -138,26 +138,26 @@ async function bootTestWorkspace() {
   });
 
   const localBuiltins = createLocalBuiltins({
-    catalog: rawCatalog, t: (k, p) => p ? `${k}(${JSON.stringify(p)})` : k,
+    catalogue: rawCatalogue, t: (k, p) => p ? `${k}(${JSON.stringify(p)})` : k,
     threadStore: store,
     setActive: (id) => store.setActiveThread(id),
     callSkill, localActor: LOCAL_ACTOR, simPeers: SIM_PEERS,
     appRegistry, eventLog,
-    briefRunner: (opts) => runBrief({ catalog, callSkill, cache: briefCache, bypassCache: opts?.bypassCache }),
-    findRunner:  (opts) => runFind({ catalog, callSkill, query: opts?.query }),
+    briefRunner: (opts) => runBrief({ catalogue, callSkill, cache: briefCache, bypassCache: opts?.bypassCache }),
+    findRunner:  (opts) => runFind({ catalogue, callSkill, query: opts?.query }),
   });
 
   // Drive a user message through the pipeline.  Returns the reply.
   async function userInput(text, threadId = 'main') {
-    const parsed = parseInput(text, catalog, { threadId });
+    const parsed = parseInput(text, catalogue, { threadId });
     if (parsed.kind !== 'slash') return { kind: 'not-a-slash', text };
-    const route = resolveDispatch(parsed, catalog);
+    const route = resolveDispatch(parsed, catalogue);
     if (route.kind !== 'ready') return route;
     return runDispatch(route, callSkill);
   }
 
   return {
-    agent, catalog: () => catalog, store, router, eventLog,
+    agent, catalogue: () => catalogue, store, router, eventLog,
     appRegistry, callSkill, userInput, LOCAL_ACTOR, SIM_PEERS,
   };
 }
@@ -244,7 +244,7 @@ describe('J3 — Anne is moving in (cross-app follow-ups)', () => {
   });
 
   it("collectFollowUps suggests folio.shareFolder + stoop.postRequest after addMember", () => {
-    const followUps = collectFollowUps('addMember', 'household', { ok: true }, ws.catalog());
+    const followUps = collectFollowUps('addMember', 'household', { ok: true }, ws.catalogue());
     const apps = followUps.map((f) => f.appOrigin);
     expect(apps).toContain('folio');
     expect(apps).toContain('stoop');
@@ -525,9 +525,9 @@ describe('Bonus — /apps toggle (OQ-4.B)', () => {
   let ws;
   beforeEach(async () => { ws = await bootTestWorkspace(); });
 
-  it("toggling stoop off removes its commands from the catalog", async () => {
+  it("toggling stoop off removes its commands from the catalogue", async () => {
     ws.appRegistry.setEnabled('stoop', false);
-    const cat = ws.catalog();
+    const cat = ws.catalogue();
     const stoopCmds = cat.commandMenu.filter((e) => e.appOrigin === 'stoop');
     expect(stoopCmds).toEqual([]);
   });

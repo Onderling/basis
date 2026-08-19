@@ -2,13 +2,13 @@
  * basis — contact-skill → manifest bridge tests (synthesis,
  * feedback-extension Mode-1 "bot-exposed skills").
  *
- * Covers DESIGN §1.2 (the SCOPED CATALOG: a remote-skill entry is
+ * Covers DESIGN §1.2 (the SCOPED CATALOGUE: a remote-skill entry is
  * contact-thread-scoped, dispatched to that bot) + §2.2, for the PURE
  * synthesis + routing core (NOT the live PeerGraph/ChatScreen wiring):
  *   - SkillCards → a manifest whose ops carry `binding:'remote-skill@contact'`
  *     + `bindRef` + a `/`-slash surface, and that passes `validateManifest`;
  *   - merging that manifest via `mergeManifests` lands the ops in `opsById`;
- *   - `verifyMapping` (the catalog gate) treats these ops as ok (remote
+ *   - `verifyMapping` (the catalogue gate) treats these ops as ok (remote
  *     bindings skip the gate — the bot vouches);
  *   - `makeRemoteCallSkill` routes a dispatch to the injected `sendA2ATask`
  *     with the right `(peerUrl, skillId, args)`;
@@ -82,34 +82,34 @@ describe('skillCardToOp', () => {
 describe('mergeManifests over a contact manifest', () => {
   it('lands the remote-skill ops in opsById', () => {
     const m = skillCardsToManifest(CONTACT, CARDS);
-    const catalog = mergeManifests([{ manifest: m }]);
+    const catalogue = mergeManifests([{ manifest: m }]);
 
-    expect(catalog.opsById.has('summarise')).toBe(true);
-    expect(catalog.opsById.has('translate')).toBe(true);
+    expect(catalogue.opsById.has('summarise')).toBe(true);
+    expect(catalogue.opsById.has('translate')).toBe(true);
 
-    const entry = catalog.opsById.get('summarise');
+    const entry = catalogue.opsById.get('summarise');
     expect(entry.appOrigin).toBe(contactManifestApp(CONTACT));
     expect(entry.op.binding).toBe(REMOTE_SKILL_BINDING);
     expect(entry.op.bindRef.skillId).toBe('summarise');
 
     // The `/`-slash surface rides through into the command menu.
-    const cmd = catalog.commandMenu.find((c) => c.command === '/summarise');
+    const cmd = catalogue.commandMenu.find((c) => c.command === '/summarise');
     expect(cmd).toBeTruthy();
     expect(cmd.opId).toBe('summarise');
   });
 });
 
-describe('verifyMapping treats remote-skill ops as ok (catalog gate skip)', () => {
-  it('does not require the bot skill to resolve in the catalog', () => {
+describe('verifyMapping treats remote-skill ops as ok (catalogue gate skip)', () => {
+  it('does not require the bot skill to resolve in the catalogue', () => {
     // Shape the synthesised ops as a `mapping` (ops[]) — verifyMapping reads
-    // `mapping.ops` and skips remote bindings (the bot vouches, not the catalog).
+    // `mapping.ops` and skips remote bindings (the bot vouches, not the catalogue).
     const { operations } = skillCardsToManifest(CONTACT, CARDS);
     const mapping = { id: contactManifestApp(CONTACT), ops: operations };
 
-    // An EMPTY catalog: a composite op would fail to resolve, but a remote op
+    // An EMPTY catalogue: a composite op would fail to resolve, but a remote op
     // must still pass because it's skipped.
-    const emptyCatalog = { opsById: new Map() };
-    const { ok, missing } = verifyMapping(mapping, emptyCatalog);
+    const emptyCatalogue = { opsById: new Map() };
+    const { ok, missing } = verifyMapping(mapping, emptyCatalogue);
 
     expect(ok).toBe(true);
     expect(missing).toEqual([]);
@@ -127,8 +127,8 @@ describe('contactSkillSources', () => {
     expect(src.manifest.app).toBe(contactManifestApp(CONTACT));
 
     // The tagged source still merges (mergeManifests ignores the extra keys).
-    const catalog = mergeManifests(sources);
-    expect(catalog.opsById.has('summarise')).toBe(true);
+    const catalogue = mergeManifests(sources);
+    expect(catalogue.opsById.has('summarise')).toBe(true);
   });
 
   it('returns [] when there are no usable cards', () => {
@@ -172,7 +172,7 @@ describe('makeRemoteCallSkill', () => {
     expect(sendA2ATask).not.toHaveBeenCalled();
   });
 
-  it('accepts an explicit opsResolver Map (e.g. the merged catalog)', () => {
+  it('accepts an explicit opsResolver Map (e.g. the merged catalogue)', () => {
     const sendA2ATask = vi.fn(() => 'ok');
     const op = skillCardToOp(CONTACT, { id: 'summarise' });
     const opsResolver = new Map([['summarise', op]]);

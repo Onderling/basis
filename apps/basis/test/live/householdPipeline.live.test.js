@@ -85,7 +85,7 @@ function fmt(transcript) {
 
 async function buildBot() {
   const agent   = await createRealHouseholdAgent();
-  const catalog = mergeManifests([{ manifest: agent.manifest }]);
+  const catalogue = mergeManifests([{ manifest: agent.manifest }]);
 
   // Live LLM — generous timeout (a cold 7B on CPU can exceed the app's 12s default).
   const llm = new LlmClient({ provider: ollamaProvider({ baseUrl: OLLAMA_BASEURL, model: OLLAMA_MODEL, apiKey: LLM_APIKEY, timeoutMs: 90_000 }) });
@@ -109,7 +109,7 @@ async function buildBot() {
 
   const transcript = [];
   const cd = createCircleDispatch({
-    catalog,
+    catalogue,
     policy: { llmTool: 'local' },
     llmProviders,
     interpret: interpretToCommand,
@@ -118,7 +118,7 @@ async function buildBot() {
     dispatch: async (input) => {
       const cmd = typeof input === 'string' ? null : input;
       if (!cmd?.opId) return null;
-      const entry = catalog.opsById.get(cmd.opId) ?? catalog.opsById.get(`household/${cmd.opId}`);
+      const entry = catalogue.opsById.get(cmd.opId) ?? catalogue.opsById.get(`household/${cmd.opId}`);
       const appOrigin = entry?.appOrigin ?? 'household';
       const reply = await agent.callSkill(appOrigin, cmd.opId, cmd.args ?? {});
       transcript.push({ kind: 'dispatch', opId: cmd.opId, args: cmd.args, reply });

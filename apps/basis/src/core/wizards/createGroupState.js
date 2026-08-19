@@ -2,7 +2,7 @@
  * createGroup — state-machine helpers lifted from
  * src/web/wizards/createGroupWizard.js (2026-05-24).
  *
- * Zero DOM — pure value transforms + policy catalogs + the
+ * Zero DOM — pure value transforms + policy catalogues + the
  * finalSubmit substrate chain.  The web wizard's render layer
  * keeps the DOM construction (5 steps + success screen);
  * basis-mobile's RN wizard imports these helpers verbatim.
@@ -27,7 +27,7 @@ import { INVITE_CEILING_FALLBACK } from '@onderling-app/stoop/lib/inviteCeiling'
 import { ROLE_TEMPLATE_IDS, applyRoleTemplates } from '../../v2/roleTemplates.js';
 export { CIRCLE_KINDS, SIZE_BANDS, ROLE_TEMPLATE_IDS };
 
-/* ─── Policy catalogs ───────────────────────────────────────── */
+/* ─── Policy catalogues ───────────────────────────────────────── */
 
 export const ACCESS_POLICIES = Object.freeze([
   { id: 'invite-only', label: 'Invite only (admins issue invites)' },

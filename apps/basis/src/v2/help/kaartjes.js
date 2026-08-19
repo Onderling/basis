@@ -25,7 +25,7 @@ export const helpDeck = {
       "Gewoon nieuwsgierig"
     ],
     "en": [
-      "I live in a neighborhood",
+      "I live in a neighbourhood",
       "I'm on a board",
       "I build software",
       "Just curious"
@@ -72,7 +72,7 @@ export const helpDeck = {
         "en": "What is Onderling?"
       },
       "nl": "Onderling is een organisatie die software maakt waarmee mensen dingen samen regelen: in hun buurt, hun huis, hun club. We bouwen op één overtuiging: gereedschap voor gemeenschappen hoort van die gemeenschappen zelf te zijn. Daarom is alles open source, en staan jouw gegevens op je eigen apparaat. Wat naar anderen gaat, bepaal jij.",
-      "en": "Onderling is an organization that builds software for people to organize things together: in their neighborhood, their house, their club. We build on one conviction: tools for communities should belong to those communities. That's why everything is open source, and your data lives on your own device. What goes to others is up to you."
+      "en": "Onderling is an organization that builds software for people to organize things together: in their neighbourhood, their house, their club. We build on one conviction: tools for communities should belong to those communities. That's why everything is open source, and your data lives on your own device. What goes to others is up to you."
     },
     {
       "id": "onderling.missie",
@@ -99,7 +99,7 @@ export const helpDeck = {
         "en": "What we believe"
       },
       "nl": "Wij geloven dat buurten, huishoudens en clubs prima zelf hun zaken kunnen regelen (iets vragen, iets delen, iets afspreken) als het gereedschap daarvoor van henzelf is. Dat gereedschap maken wij. Ook de AI erin staat onder zeggenschap van de mensen die hem gebruiken.",
-      "en": "We believe neighborhoods, households, and clubs are perfectly able to run their own affairs (asking, sharing, planning) when the tools for it are their own. We make those tools. The AI inside answers to the people using it, too."
+      "en": "We believe neighbourhoods, households, and clubs are perfectly able to run their own affairs (asking, sharing, planning) when the tools for it are their own. We make those tools. The AI inside answers to the people using it, too."
     },
     {
       "id": "onderling.wie-erachter",
@@ -193,9 +193,9 @@ export const helpDeck = {
           "delen"
         ],
         "en": [
-          "neighborhood",
+          "neighbourhood",
           "street",
-          "neighbors",
+          "neighbours",
           "board",
           "borrow",
           "share"
@@ -203,10 +203,10 @@ export const helpDeck = {
       },
       "kop": {
         "nl": "Voor je buurt",
-        "en": "For your neighborhood"
+        "en": "For your neighbourhood"
       },
       "nl": "Voor een buurt is Basis één plek voor wat nu over vijf app-groepen en briefjes verspreid staat: een prikbord voor vraag en aanbod, berichten, taken en afspraken. Geen account nodig; je opent het en doet mee. Wat je deelt blijft binnen je eigen circle, versleuteld.",
-      "en": "For a neighborhood, Basis is one place for what's now scattered across five group chats and paper notes: a board for asking and offering, messages, tasks, and plans. No account needed; you open it and join in. What you share stays within your own circle, encrypted."
+      "en": "For a neighbourhood, Basis is one place for what's now scattered across five group chats and paper notes: a board for asking and offering, messages, tasks, and plans. No account needed; you open it and join in. What you share stays within your own circle, encrypted."
     },
     {
       "id": "intro.bestuur",
@@ -284,7 +284,7 @@ export const helpDeck = {
         "en": "In short"
       },
       "nl": "In het kort: wij maken software waarmee je met je buurt, huis of club dingen regelt, in een omgeving die van jullie zelf is. Vraag me wat je wilt, of begin bij \"Wat is Onderling?\" hieronder.",
-      "en": "In short: we make software for organizing things with your neighborhood, house, or club, in a place that's yours. Ask me anything, or start with \"What is Onderling?\" below."
+      "en": "In short: we make software for organizing things with your neighbourhood, house, or club, in a place that's yours. Ask me anything, or start with \"What is Onderling?\" below."
     },
     {
       "id": "principe.zeggenschap",

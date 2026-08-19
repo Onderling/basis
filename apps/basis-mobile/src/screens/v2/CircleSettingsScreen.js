@@ -379,7 +379,7 @@ export default function CircleSettingsScreen({
           </View>
         ))}
 
-        {/* S6.C deep — which whole apps this circle composes (catalog scope). */}
+        {/* S6.C deep — which whole apps this circle composes (catalogue scope). */}
         <Text style={styles.section}>{t('circle.settings.apps')}</Text>
         {DEFAULT_CIRCLE_ORIGINS.map((app) => {
           const current = Array.isArray(working.apps) ? working.apps : DEFAULT_CIRCLE_ORIGINS;

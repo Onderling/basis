@@ -221,7 +221,7 @@ Capability **U** from the V2 functional design. Closes the door on "I marked the
 - `@onderling/item-store`:
   - `ItemStore` constructor accepts `enforceDependencies?: boolean` (default `false` — back-compat). When `true`, `markComplete` and `approve` walk `current.dependencies`, look each up, filter out missing-or-removed (treat as satisfied), reject when any open dep remains.
   - New typed error `DependenciesOpenError extends Error` with `code: 'DEPENDENCIES_OPEN'` + `openDeps[]`. Re-exported from the package barrel.
-  - `markComplete` / `approve` / `addItems` honor a new `ctx.actionOverride` string (replaces the audit entry's `action` field; used for `force-complete` and `force-spawn`) plus `ctx.reason` (lands in `details.reason`).
+  - `markComplete` / `approve` / `addItems` honour a new `ctx.actionOverride` string (replaces the audit entry's `action` field; used for `force-complete` and `force-spawn`) plus `ctx.reason` (lands in `details.reason`).
   - 7 substrate tests in `packages/item-store/test/V2_7-enforce-dependencies.test.js`. Stoop is unaffected — its items don't pass `enforceDependencies: true`.
 
 ### App-side
@@ -241,14 +241,14 @@ Capability **U** from the V2 functional design. Closes the door on "I marked the
 
 ### Tests
 
-- ✅ 7 added in `packages/item-store/test/V2_7-enforce-dependencies.test.js`: gate-off back-compat; gate-on rejection on `markComplete` + `approve`; missing-dep treated as satisfied; happy-path close-after-child; `actionOverride` bypasses gate + relabels audit; `addItems` honors `actionOverride`.
+- ✅ 7 added in `packages/item-store/test/V2_7-enforce-dependencies.test.js`: gate-off back-compat; gate-on rejection on `markComplete` + `approve`; missing-dep treated as satisfied; happy-path close-after-child; `actionOverride` bypasses gate + relabels audit; `addItems` honours `actionOverride`.
 - ✅ 11 added in `apps/tasks-v0/test/v2_7-hard-deps.test.js`: error shape; child-then-parent close; `approve` symmetry; `forceCompleteTask` admin-only + reason-mandatory + bypasses gate + audit logged + no-cascade; `addSubtask` post-submit blocking + `proposalRequired`; `proposeSubtask` master-only; `approveSubtaskProposal` spawns + rolls back + preserves `submit`; `declineSubtaskProposal` keeps submission valid; assignee-only on approve/decline; `forceSpawnSubtask` admin-only + reason-mandatory + audit logged; assignee can self-spawn during their own submission.
 
 Tests now: **308 across 29 files** (Tasks) + **61 across 4 files** (item-store) — Stoop's 429 untouched.
 
 ### UI wiring (added in the same release)
 
-- ✅ `web/app.js` — `renderTasks` honors `item.status === 'waiting'` / `'blocked'` from the DAG-status field. The "Mark complete" and "Approve" buttons render disabled with a tooltip listing open-dep short-ids when the gate would fire. Admin-only "Force complete" button appears next to them (only when `depsBlocking && status !== 'complete'`); clicking opens a `prompt` for the mandatory reason. The "+ Sub-task" button switches to "Propose sub-task — needs <assignee>'s approval" when the parent is `submitted` and the caller isn't the assignee; clicking calls `proposeSubtask` instead of `addSubtask`.
+- ✅ `web/app.js` — `renderTasks` honours `item.status === 'waiting'` / `'blocked'` from the DAG-status field. The "Mark complete" and "Approve" buttons render disabled with a tooltip listing open-dep short-ids when the gate would fire. Admin-only "Force complete" button appears next to them (only when `depsBlocking && status !== 'complete'`); clicking opens a `prompt` for the mandatory reason. The "+ Sub-task" button switches to "Propose sub-task — needs <assignee>'s approval" when the parent is `submitted` and the caller isn't the assignee; clicking calls `proposeSubtask` instead of `addSubtask`.
 - ✅ `src/skills/index.js` + `src/skills/workspace.js` — `listMine`, `listMyMasteredTasks`, and `listAwaitingApproval` now annotate items with the DAG `status` so the gate state surfaces in My work + Review (V1 only computed it on `listOpen`).
 - ✅ `web/{index,mine,review}.html` — ctx wires `onForceComplete` and `onProposeSubtask`. `onComplete` and `onApprove` translate `{error: 'has-open-dependencies', openDeps[]}` to a `alert(…)` for the rare case the disabled-button is bypassed by a race.
 - ✅ `web/inbox.html` — handles two new button-id prefixes: `approveSubtaskProposal:<proposalId>` (with a confirm-dialog warning about the auto-rollback) and `declineSubtaskProposal:<proposalId>` (with an optional decline-note prompt). New `eventLabel` case for `subtask-proposal`.
@@ -267,7 +267,7 @@ The original design said *"No new bot verbs for. The propose/approve flow is web
   - `proposals` → `bot.listProposals` (assignee glance)
   - `force-complete <id> reason: …` → `bot.forceComplete` (admin)
   HELP_TEXT updated with the new lines.
-- ✅ `src/bot/skills.js` — five new `bot.*` skills mirroring the web flow. Each renders chat-friendly output:`Proposed sub-task to kid. They'll see it in their inbox.`, `Approved. Sub-task '...' spawned; your submission rolled back to claimed.`, `No subtask-proposals waiting on you. ✓`, etc. All declared with the shared `BOT_SKILL_OPTS` so PolicyEngine validates the cap-token; all use `effectiveActor({from, envelope})` so cap-token mode honors the bound webid.
+- ✅ `src/bot/skills.js` — five new `bot.*` skills mirroring the web flow. Each renders chat-friendly output:`Proposed sub-task to kid. They'll see it in their inbox.`, `Approved. Sub-task '...' spawned; your submission rolled back to claimed.`, `No subtask-proposals waiting on you. ✓`, etc. All declared with the shared `BOT_SKILL_OPTS` so PolicyEngine validates the cap-token; all use `effectiveActor({from, envelope})` so cap-token mode honours the bound webid.
 - ✅ Tests: 11 added in `test/v2_7-bot-propose.test.js` — dispatcher routing for all five verbs (incl. usage-hint reply paths); end-to-end propose → accept; end-to-end propose → decline; force-complete admin gate; empty-state for `proposals`.
 
 Tests now: **319 across 30 files** (Tasks).

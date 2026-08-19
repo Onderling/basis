@@ -9,7 +9,7 @@
  *   - hostAgent   — household skills + calendar
  *   - chatAgent   — user-facing surface (via @onderling/secure-agent)
  *   - tasksCircle   — real tasks-v0 Circle agent
- *   - stoopAgent  — real Stoop NeighborhoodAgent
+ *   - stoopAgent  — real Stoop NeighbourhoodAgent
  *   - folioAgent  — real Folio browser agent (web-only handlers today)
  *
  * Portability rules (per Project Files/conventions/node-portability):
@@ -65,18 +65,18 @@ import { buildAgentSkills } from '@onderling-app/agents/wireSkills';
 // Canonical Member projectors — the chat-shell `listGroupMembers` item is a
 // PROJECTION of the ONE Member (kring-host), not a hand-reshape.
 import { memberFrom, memberToChatItem } from '@onderling/kring-host/circleMembers';
-// install — the curated-catalog SOURCE. commons-governance G1: when a
+// install — the curated-catalogue SOURCE. commons-governance G1: when a
 // bootstrap endorser root is configured (opts.commonsRoot), the default source
-// is the REAL endorsement-backed catalog (createCatalogSource over signed,
+// is the REAL endorsement-backed catalogue (createCatalogueSource over signed,
 // cardHash-bound recommendations); otherwise the local stub keeps the surface
 // exercisable. Both satisfy the same { list, get } contract, so wireSkills /
-// installCores are unchanged. Overridable via opts.agentsCatalog.
-import { createStubCatalog } from '@onderling-app/agents/defaultCatalog';
+// installCores are unchanged. Overridable via opts.agentsCatalogue.
+import { createStubCatalogue } from '@onderling-app/agents/defaultCatalogue';
 import {
   registerAgentBundle,
   createAgentRegistry,
   createEndorsementResource,
-  createCatalogSource,
+  createCatalogueSource,
   createCommunitySubscriptions,
   createProfile as registryCreateProfile,
   setOwn,
@@ -1045,10 +1045,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     // Absent → listDataVersions/restoreDataVersion answer the honest
     // `no-version-store` miss.
     const versionStoreFor = typeof opts.versionStoreFor === 'function' ? opts.versionStoreFor : null;
-    // install: the curated-catalog SOURCE. A caller may inject a source via
-    // opts.agentsCatalog (wins). Otherwise, commons-governance: when curator
+    // install: the curated-catalogue SOURCE. A caller may inject a source via
+    // opts.agentsCatalogue (wins). Otherwise, commons-governance: when curator
     // root pubKey(s) are configured, the default source is the REAL
-    // endorsement-backed catalog. G2 makes it a WEB OF TRUST — opts.commonsRoots
+    // endorsement-backed catalogue. G2 makes it a WEB OF TRUST — opts.commonsRoots
     // is an ARRAY of curator roots; the source WALKS the endorsement graph
     // (transitive, bounded depth) from all of them, verifies each signed
     // recommend (Ed25519 + cardHash-binding), and returns a list ranked by
@@ -1065,10 +1065,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     // commons-governance G3 — FEDERATION: the user's subscribed COMMUNITIES
     // (circles) contribute their admins as extra curator roots. `opts.communities`
     // maps a subscribed circleId → { admins, list } (the circle's admin pubKeys +
-    // its admin-gated community catalog's endorsement list); joining a community =
+    // its admin-gated community catalogue's endorsement list); joining a community =
     // trusting its curation. Subscriptions union with the pinned `commonsRoots`
     // above; the walk (G2) still applies within each community's admin roots. The
-    // community catalog resource itself is an ordinary pod resource that CAN be
+    // community catalogue resource itself is an ordinary pod resource that CAN be
     // hosted on the community's companion node (R1-R3) — a deployment choice, not
     // wired here. With no communities configured this is inert (commonsRoots-only).
     const communitySubs = (opts.communities && typeof opts.communities === 'object')
@@ -1078,15 +1078,15 @@ export async function createRealHouseholdAgent(opts = {}) {
           initial: Array.isArray(opts.subscribedCommunities) ? opts.subscribedCommunities : Object.keys(opts.communities),
         })
       : null;
-    let agentsCatalog;
-    if (opts.agentsCatalog) {
-      agentsCatalog = opts.agentsCatalog;
+    let agentsCatalogue;
+    if (opts.agentsCatalogue) {
+      agentsCatalogue = opts.agentsCatalogue;
     } else if (communitySubs) {
       // Subscribed-community roots (live thunk) unioned with any pinned
       // commonsRoots; per-endorser records come from the subscriptions (their
-      // community catalogs) plus the same shared endorsement resource pool.
+      // community catalogues) plus the same shared endorsement resource pool.
       const endorsements = createEndorsementResource({ pseudoPod: circleSubstrate.pseudoPod, deviceId: chatId.pubKey });
-      agentsCatalog = createCatalogSource({
+      agentsCatalogue = createCatalogueSource({
         roots: async () => [...new Set([...commonsRoots, ...(await communitySubs.roots())])],
         resolveEndorsements: async (pk) => {
           const fromCommunities = await communitySubs.resolveEndorsements(pk);
@@ -1105,14 +1105,14 @@ export async function createRealHouseholdAgent(opts = {}) {
         pseudoPod: circleSubstrate.pseudoPod,
         deviceId:  chatId.pubKey,
       });
-      agentsCatalog = createCatalogSource({
+      agentsCatalogue = createCatalogueSource({
         endorsementResource: endorsements,
         roots:               commonsRoots,
         resolveCard:         opts.agentsCardResolver ?? null,
         maxDepth:            opts.commonsMaxDepth,
       });
     } else {
-      agentsCatalog = createStubCatalog();
+      agentsCatalogue = createStubCatalogue();
     }
     // 2.4b — owner-only CONTROL ops require 'trusted' (only the seeded in-process chat identity
     // clears it); reads (list/view) stay 'authenticated'. Chat-scoped: the shared wireSkills.js
@@ -1194,7 +1194,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         return releaseFromPolicy({ getProfile: (id) => byId[id] ?? null, profileId, defaultProfileId }, request, self?.disclosure ?? { perContext: {} }, contextId);
       },
     };
-    for (const { id, handler, visibility } of buildAgentSkills({ registry: agentsRegistry, tokens: agentsTokens, versionStoreFor, catalog: agentsCatalog, profiles: agentsProfiles })) {
+    for (const { id, handler, visibility } of buildAgentSkills({ registry: agentsRegistry, tokens: agentsTokens, versionStoreFor, catalogue: agentsCatalogue, profiles: agentsProfiles })) {
       hostAgent.register(id, handler, { visibility: TRUSTED_AGENT_OPS.has(id) ? 'trusted' : visibility });
     }
     // Property layer — REGISTER the default profile (the pseudonym) ONCE so a coarse property curated at consent
@@ -1892,7 +1892,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    *
    * Replaces the previous mock-stoop handlers (~85 lines: listFeed,
    * postRequest, searchPosts, stoop_briefSummary, getStoopProfile,
-   * revealPeer) with the actual Stoop NeighborhoodAgent composed
+   * revealPeer) with the actual Stoop NeighbourhoodAgent composed
    * in-process.  Boots 110 real stoop skills; ~6 surface via chat
    * ops today, the rest reachable via agent.callSkill('stoop', …).
    *
@@ -2141,10 +2141,10 @@ export async function createRealHouseholdAgent(opts = {}) {
    *                    via slice-1 integration; 110 skills).  Part G
    *                    (2026-06-17): the app-origin is now `'tasks'`
    *                    (was `'tasks-v0'`) — the merged manifest's
-   *                    `.app` is `'tasks'`, and the catalog keys ops
+   *                    `.app` is `'tasks'`, and the catalogue keys ops
    *                    by `m.app`.  The directory / npm package
    *                    (`@onderling-app/tasks`) keep their names.
-   *   - 'stoop'      → stoopAgent.address (slice-2b NeighborhoodAgent)
+   *   - 'stoop'      → stoopAgent.address (slice-2b NeighbourhoodAgent)
    *   - 'folio'      → folioAgent.address (slice-4 web-only agent)
    *
    * Some opIds are renamed across the boundary (the chat surface
@@ -3909,7 +3909,7 @@ export async function createRealHouseholdAgent(opts = {}) {
 
   return {
     // Part G — the REAL household app manifest (item/task vocab) is now the
-    // catalog source of truth for the household surface.  (The mock manifest
+    // catalogue source of truth for the household surface.  (The mock manifest
     // + createMockHouseholdAgent stay in mockAgent.js as a test fixture.)
     manifest: householdManifest,
     callSkill,

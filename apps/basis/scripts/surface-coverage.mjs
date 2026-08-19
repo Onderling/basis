@@ -14,7 +14,7 @@
 import { renderCoverage, coverageGaps, formatCoverageMarkdown } from '@onderling/app-manifest';
 
 // Resilient: a manifest that fails to import is skipped, not fatal.
-// The circle catalog set — exactly what composeManifests composes (the unified chat surface).
+// The circle catalogue set — exactly what composeManifests composes (the unified chat surface).
 const SPECS = [
   { name: 'basis', path: '../manifest.js',                          pick: (m) => m.basisManifest },
   { name: 'household',   path: '../../household/manifest.js',             pick: (m) => m.householdManifest },

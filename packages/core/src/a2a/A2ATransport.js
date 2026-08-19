@@ -102,7 +102,7 @@ export class A2ATransport extends Transport {
     });
 
     await new Promise((resolve, reject) => {
-      // When host is null, Node binds on all interfaces (legacy behavior).
+      // When host is null, Node binds on all interfaces (legacy behaviour).
       // When host is set (e.g. '127.0.0.1'), the server is reachable only
       // on that interface.
       if (this.#host) this.#server.listen(this.#port, this.#host, resolve);

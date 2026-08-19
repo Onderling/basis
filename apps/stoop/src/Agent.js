@@ -1,5 +1,5 @@
 /**
- * NeighborhoodAgent — composition of substrates for H5 V0
+ * NeighbourhoodAgent — composition of substrates for H5 V0
  * (non-anonymous; Q-H5 anonymity model is parked).
  *
  * Wires:
@@ -82,7 +82,7 @@ import { EvictionRoster }    from './lib/EvictionRoster.js';
  *   items (legacy shape preserved for back-compat).
  * @param {object} [args.identity]                        pre-built AgentIdentity (tests / shared-cluster setups)
  * @param {object} [args.transport]                       transport for `core.Agent` (default: InternalTransport over a fresh InternalBus)
- * @param {string} [args.label='NeighborhoodAgent']
+ * @param {string} [args.label='NeighbourhoodAgent']
  * @returns {Promise<{
  *   agent:      Agent,
  *   itemStore:  ItemStore,
@@ -93,7 +93,7 @@ import { EvictionRoster }    from './lib/EvictionRoster.js';
  *   muted:      Set<string>,
  * }>}
  */
-export async function createNeighborhoodAgent({
+export async function createNeighbourhoodAgent({
   offeringMatch:    offeringMatchOpts,
   members:       initialMembers,
   pod:           podCfg,
@@ -224,13 +224,13 @@ export async function createNeighborhoodAgent({
   // The membership rider (host-injected): the device-log emitter + verified reader — see skills/index.js.
   membershipEmit,
   membershipRead,
-  label = 'NeighborhoodAgent',
+  label = 'NeighbourhoodAgent',
 }) {
   if (!offeringMatchOpts?.group || !offeringMatchOpts?.localActor) {
-    throw new TypeError('createNeighborhoodAgent: offeringMatch.{group, localActor} required');
+    throw new TypeError('createNeighbourhoodAgent: offeringMatch.{group, localActor} required');
   }
   if (podCfg && initialMembers) {
-    throw new TypeError('createNeighborhoodAgent: pass either `pod` or `members`, not both');
+    throw new TypeError('createNeighbourhoodAgent: pass either `pod` or `members`, not both');
   }
 
   // ── Substrates ─────────────────────────────────────────────────────────────
@@ -326,7 +326,7 @@ export async function createNeighborhoodAgent({
   // wrapped by the thin `createTaskStore` ItemStore-compat surface (Emitter +
   // audit + inbound-sync). Stoop passes NO rolePolicy — parity with the old
   // `new ItemStore({...})` which took none here (the facade defaults to allow).
-  const circleStore = new CircleItemStore({ dataSource, rootContainer: 'mem://neighborhood/' });
+  const circleStore = new CircleItemStore({ dataSource, rootContainer: 'mem://neighbourhood/' });
   const itemStore = createTaskStore(circleStore);
   // Member roster: pod-config-backed (Phase 4.1 contract) when `pod` is
   // supplied; hand-built array otherwise. The two paths are mutually
@@ -347,7 +347,7 @@ export async function createNeighborhoodAgent({
     // on restart even with `persistPath` set.
     members = await MemberMapCache.load({
       dataSource:    cache,
-      rootContainer: 'mem://neighborhood/',
+      rootContainer: 'mem://neighbourhood/',
     });
     // Hydrate with the caller-provided initial roster on top of what
     // came back from the cache (initialMembers wins on the same key).
@@ -357,7 +357,7 @@ export async function createNeighborhoodAgent({
     memberMapDetach = MemberMapCache.attach({
       map:           members,
       dataSource:    cache,
-      rootContainer: 'mem://neighborhood/',
+      rootContainer: 'mem://neighbourhood/',
     });
   } else {
     members = new MemberMap({ initial: initialMembers ?? [] });
@@ -373,7 +373,7 @@ export async function createNeighborhoodAgent({
   if (providedAgent) {
     agent = providedAgent;
     id = identity ?? agent.identity;
-    if (!id) throw new TypeError('createNeighborhoodAgent: providedAgent missing identity');
+    if (!id) throw new TypeError('createNeighbourhoodAgent: providedAgent missing identity');
   } else {
     id = identity ?? await AgentIdentity.generate(new VaultMemory());
     const tx = transport ?? new InternalTransport(new InternalBus(), id.pubKey);

@@ -46,15 +46,15 @@ const DEFAULT_CACHE_TTL_MS = param({ key: 'brief.cacheTtlMs', scope: PARAM_SCOPE
  * Run the /brief fan-out.
  *
  * @param {object} args
- * @param {import('./manifestMerge.js').MergedCatalog} args.catalog
+ * @param {import('./manifestMerge.js').MergedCatalogue} args.catalogue
  * @param {(appOrigin: string, opId: string, args: object) => Promise<*>} args.callSkill
  * @param {object}  [args.cache]            optional cache instance
  * @param {boolean} [args.bypassCache]      true → ignore cached result
  * @returns {Promise<BriefReply>}
  */
-export async function runBrief({ catalog, callSkill, cache, bypassCache }) {
-  if (!catalog || typeof catalog.briefAggregations !== 'function') {
-    throw new TypeError('runBrief: catalog with briefAggregations required');
+export async function runBrief({ catalogue, callSkill, cache, bypassCache }) {
+  if (!catalogue || typeof catalogue.briefAggregations !== 'function') {
+    throw new TypeError('runBrief: catalogue with briefAggregations required');
   }
   if (typeof callSkill !== 'function') {
     throw new TypeError('runBrief: callSkill required');
@@ -65,7 +65,7 @@ export async function runBrief({ catalog, callSkill, cache, bypassCache }) {
     if (cached) return cached;
   }
 
-  const decls = catalog.briefAggregations();
+  const decls = catalogue.briefAggregations();
   // Fan out in parallel — apps shouldn't block each other.
   const results = await Promise.all(decls.map(async (decl) => {
     try {

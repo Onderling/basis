@@ -5,7 +5,7 @@
  * Standalone Telegram bot that bypasses HouseholdAgent entirely and
  * wires ChatAgent directly with a conversational system prompt and
  * a minimal multi-list tool catalogue.  Shared internals (prompt,
- * catalog, store, handlers, contextBuilder) live in
+ * catalogue, store, handlers, contextBuilder) live in
  * `./lib/freetext-core.js` so both this script and `cli-freetext.js`
  * (terminal REPL) iterate against the same code.
  *
@@ -47,7 +47,7 @@ import { homedir }    from 'node:os';
 import { resolve }    from 'node:path';
 
 import {
-  TOOL_CATALOG,
+  TOOL_CATALOGUE,
   createListStore,
   createPersistedListStore,
   createToolHandlers,
@@ -185,7 +185,7 @@ async function main() {
   const agent = new ChatAgent({
     bridges:        [bridge],
     llm,
-    toolCatalog:    TOOL_CATALOG,
+    toolCatalogue:    TOOL_CATALOGUE,
     toolHandlers,
     systemPrompt:   SYSTEM_PROMPT,
     contextBuilder,

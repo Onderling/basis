@@ -1,8 +1,8 @@
 /**
- * catalogSource — the endorsement-backed curated catalog (commons-governance).
+ * catalogueSource — the endorsement-backed curated catalogue (commons-governance).
  *
- * Fills the `{ list, get }` seam that 's `createStubCatalog` stubbed. It is a
- * CQRS read-view: it never stores a canonical list — it DERIVES the catalog by
+ * Fills the `{ list, get }` seam that 's `createStubCatalogue` stubbed. It is a
+ * CQRS read-view: it never stores a canonical list — it DERIVES the catalogue by
  * WALKING the web-of-trust of signed endorsements from a set of curator roots,
  * resolving each endorsed agent's Agent Card, and keeping only the ones whose
  * signed `recommend` verifies (`verifyEndorsement` — Ed25519 sig + expiry +
@@ -11,7 +11,7 @@
  *
  * ── G2 scope: MULTIPLE roots + TRANSITIVE walk + proximity ranking ──────────
  * G1 was single-root + flat (an endorsement counted only if its endorser was a
- * root). G2 generalises: `roots` is an array; the catalog is the union of what
+ * root). G2 generalises: `roots` is an array; the catalogue is the union of what
  * is reachable from ANY root along a bounded transitive endorsement walk
  * (`walkTrustGraph` — see trustGraph.js for the walk, the curator-vs-agent
  * rule, flag precedence, and cycle safety). Ranking is by trust-path proximity
@@ -30,11 +30,11 @@
  *
  * ── Offline cache (optional) ────────────────────────────────────────────────
  * Pass `cache: { read(): entries|null, write(entries): void }` and the derived,
- * ranked catalog is written on every successful build and READ BACK when a
+ * ranked catalogue is written on every successful build and READ BACK when a
  * build throws (endorsement resources / network unreachable) — the surface
  * survives offline. Same `{ list, get }` shape; entries are the ranked cards.
  *
- * The returned entries are plain Agent Cards (the SAME shape createStubCatalog
+ * The returned entries are plain Agent Cards (the SAME shape createStubCatalogue
  * returned) with additive `x-onderling.endorsement` ranking metadata — so 's
  * installCores (`cardId`/`declaredSkills`/`cardToEntry`) consumes them
  * unchanged and the install still runs through the capability-security grant
@@ -46,7 +46,7 @@
 import { walkTrustGraph, DEFAULT_MAX_DEPTH } from './trustGraph.js';
 
 /**
- * createCatalogSource — a `{ list, get }` source over the endorsement graph.
+ * createCatalogueSource — a `{ list, get }` source over the endorsement graph.
  *
  * @param {object} opts
  * @param {(endorser: string) => (object[]|Promise<object[]>)} [opts.resolveEndorsements]
@@ -66,7 +66,7 @@ import { walkTrustGraph, DEFAULT_MAX_DEPTH } from './trustGraph.js';
  * @param {() => number} [opts.now]  — injectable clock (expiry; tests)
  * @returns {{ list: () => Promise<object[]>, get: (id: string) => Promise<object|null> }}
  */
-export function createCatalogSource({
+export function createCatalogueSource({
   resolveEndorsements,
   endorsementResource,
   roots,
@@ -79,7 +79,7 @@ export function createCatalogSource({
   const hasResource = endorsementResource && typeof endorsementResource.list === 'function';
   if (!hasResolver && !hasResource) {
     throw Object.assign(
-      new Error('createCatalogSource: resolveEndorsements(pubKey) or endorsementResource with list() required'),
+      new Error('createCatalogueSource: resolveEndorsements(pubKey) or endorsementResource with list() required'),
       { code: 'INVALID_ARGUMENT' },
     );
   }
@@ -116,7 +116,7 @@ export function createCatalogSource({
   }
 
   /**
-   * Derive the verified, ranked catalog as a Map keyed by card id (so `list`
+   * Derive the verified, ranked catalogue as a Map keyed by card id (so `list`
    * and `get` share one build and one card can't appear twice). Ordered by the
    * deterministic ranking: proximity (depth asc), breadth (count desc), id asc.
    */

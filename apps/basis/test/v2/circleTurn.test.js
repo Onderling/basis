@@ -1,14 +1,14 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createCircleTurn } from '../../src/v2/circleTurn.js';
 
-const CATALOG = { opsById: new Map([['addTask', { op: { id: 'addTask', params: [{ name: 'title', kind: 'string', required: true }] } }]]) };
+const CATALOGUE = { opsById: new Map([['addTask', { op: { id: 'addTask', params: [{ name: 'title', kind: 'string', required: true }] } }]]) };
 
 function setup({ llmTool = 'local', providers = { local: { invoke: vi.fn() } }, interpret, userDefault, gate } = {}) {
   const dispatched = [];
   const handle = createCircleTurn({
     policyFor: (scope) => scope?.policy ?? { llmTool },
     llmProviders: providers,
-    catalog: () => CATALOG,
+    catalogue: () => CATALOGUE,
     botName: 'helper',
     userDefault,
     gate,

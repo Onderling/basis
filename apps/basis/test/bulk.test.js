@@ -32,10 +32,10 @@ const manifest = {
     },
   ],
 };
-const catalog = mergeManifests([{ manifest }]);
+const catalogue = mergeManifests([{ manifest }]);
 
 const route = (text) =>
-  resolveDispatch(parseInput(text, catalog, { threadId: 'main' }), catalog);
+  resolveDispatch(parseInput(text, catalogue, { threadId: 'main' }), catalogue);
 
 describe('isBulkKeyword', () => {
   it('matches the en + nl keyword set, case/space-insensitively', () => {

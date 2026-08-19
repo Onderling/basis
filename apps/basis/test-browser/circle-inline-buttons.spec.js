@@ -76,7 +76,7 @@ test('S6.C gate + S6.B — the tasks screen is gated per-circle; enabling tasks 
   await expect(page.locator('.cc-screen-panel')).toContainText('s6bpanel');
 });
 
-test('S6.C deep — scoping an app out of the circle (policy.apps) drops its commands from the catalog', async ({ page }) => {
+test('S6.C deep — scoping an app out of the circle (policy.apps) drops its commands from the catalogue', async ({ page }) => {
   await openCircleComposer(page);
 
   // Tasks is composed by default (policy.apps = all) → /addtask dispatches + confirms.
@@ -84,7 +84,7 @@ test('S6.C deep — scoping an app out of the circle (policy.apps) drops its com
   let bubbles = (await page.locator('.circle-view__bubble').allTextContents()).join(' | ');
   expect(bubbles).toContain('scopeon');
 
-  // Uncheck the Tasks app in settings → it leaves THIS circle's catalog.
+  // Uncheck the Tasks app in settings → it leaves THIS circle's catalogue.
   await page.locator('.circle-view__more').click();
   await page.locator('.circle-view__more-item[data-action="settings"]').click();
   await page.waitForTimeout(800);
@@ -98,7 +98,7 @@ test('S6.C deep — scoping an app out of the circle (policy.apps) drops its com
   const chat = page.locator('.circle-view__view-toggle-btn', { hasText: 'Chat' });
   if (await chat.count()) { await chat.click(); await page.waitForTimeout(800); }
 
-  // Now /addtask is not in the scoped catalog → the bot can't resolve it.
+  // Now /addtask is not in the scoped catalogue → the bot can't resolve it.
   await send(page, '/addtask scopeoff');
   bubbles = (await page.locator('.circle-view__bubble').allTextContents()).join(' | ').toLowerCase();
   expect(bubbles).toContain('turn that into an action');   // circle.bot.unknown — addTask is gone

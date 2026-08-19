@@ -12,7 +12,7 @@
  *      `threadStore`-shaped adapter (matching the surface that
  *      localBuiltins' /threads + /newthread expect).
  *   2. Constructing dependency-injected `localBuiltins` with the
- *      adapter, the booted agent, the merged catalog, and `t`.
+ *      adapter, the booted agent, the merged catalogue, and `t`.
  *   3. Returning the `{opId: handler}` dispatch table that
  *      ChatScreen consults BEFORE its "not wired" fallback.
  *
@@ -29,7 +29,7 @@
  * the synchronous source of truth between renders).
  */
 // Relative path (not the `@onderling-app/basis/core-localBuiltins`
-// subpath export) — Metro on RN doesn't honor package.json "exports"
+// subpath export) — Metro on RN doesn't honour package.json "exports"
 // subpaths the way Node does.  Same pattern agentBundle.js uses for
 // realAgent.js.
 import { createLocalBuiltins }   from '../../../basis/src/core/localBuiltins.js';
@@ -46,8 +46,8 @@ import {
 } from './threadState.js';
 
 // Bundle G1 — portable runners web wires from main.js:1390-1394.
-// brief.js + find.js are pure logic (catalog fan-out → callSkill);
-// AppRegistry is a class with subscribe + syncWithCatalog.  All three
+// brief.js + find.js are pure logic (catalogue fan-out → callSkill);
+// AppRegistry is a class with subscribe + syncWithCatalogue.  All three
 // already lift cleanly — same unifier pattern as Bundle F.
 import { runBrief, createBriefCache } from '../../../basis/src/brief.js';
 import { runFind }                    from '../../../basis/src/find.js';
@@ -125,7 +125,7 @@ function buildThreadStoreAdapter({ threadStateRef, setThreadState }) {
  * @param {React.MutableRefObject}      args.threadStateRef
  * @param {function}                    args.setThreadState
  * @param {object}                      args.agent       booted agent (from bundle)
- * @param {object}                      args.catalog     merged catalog (from bundle)
+ * @param {object}                      args.catalogue     merged catalogue (from bundle)
  * @param {function}                    args.callSkill   bundle.callSkill (for /embed which calls back into substrate skills)
  * @param {function}                    args.t           localiser
  * @param {object} [args.eventLog] EventLog instance
@@ -134,7 +134,7 @@ function buildThreadStoreAdapter({ threadStateRef, setThreadState }) {
  */
 export function buildMobileLocalBuiltins({
   threadStateRef, setThreadState,
-  agent, catalog, callSkill, t,
+  agent, catalogue, callSkill, t,
   eventLog, openLogsPanel, openQrScanner,
   openFilePicker,
   // Media mobile twin (2026-07) — the sealed-media seams. All optional:
@@ -160,12 +160,12 @@ export function buildMobileLocalBuiltins({
 
   // Bundle G1 — runner + registry singletons scoped to this
   // build of the handler table.  /brief reads the cache across
-  // invocations; /apps subscribes the registry to catalog changes
-  // (mobile catalog is built-once today, so syncWithCatalog runs
+  // invocations; /apps subscribes the registry to catalogue changes
+  // (mobile catalogue is built-once today, so syncWithCatalogue runs
   // immediately + the subscriber is informational).
   const _briefCache = createBriefCache();
   const _appRegistry = new AppRegistry();
-  if (catalog?.appOrigins) _appRegistry.syncWithCatalog(catalog.appOrigins);
+  if (catalogue?.appOrigins) _appRegistry.syncWithCatalogue(catalogue.appOrigins);
 
   // setActive shim for /newthread / /dm.  Mobile's setActiveThread is
   // a pure reducer; we update the ref + schedule a re-render.
@@ -182,7 +182,7 @@ export function buildMobileLocalBuiltins({
     ?? 'mobile-actor';
 
   const builtinDeps = {
-    catalog,
+    catalogue,
     t,
     threadStore,
     setActive,
@@ -207,12 +207,12 @@ export function buildMobileLocalBuiltins({
     // briefCache is per-bundle-build so the 60s cache survives across
     // multiple /brief invocations within one session.
     briefRunner: (opts) => runBrief({
-      catalog,
+      catalogue,
       callSkill,
       cache: _briefCache,
       bypassCache: opts?.bypassCache,
     }),
-    findRunner:  (opts) => runFind({ catalog, callSkill, query: opts?.query }),
+    findRunner:  (opts) => runFind({ catalogue, callSkill, query: opts?.query }),
     appRegistry: _appRegistry,
     // Bundle G2 — /peer-connect reconnects the NKN transport.
     // realAgent's connectPeerTransport REQUIRES nknLib explicitly

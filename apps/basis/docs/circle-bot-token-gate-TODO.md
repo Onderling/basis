@@ -13,7 +13,7 @@ circleGate 9; full suites green (app-manifest 261 · household 588 · basis 2271
 **Remaining: device re-verify** ("add milk to the list" lands `via:'rule'` + the item shows in the
 list). **Follow-ups:** (a) optionally route household's `HouseholdAgent` through `createTokenGate(
 renderGate(...))` too for an identical ENGINE (it already shares the matcher); (b) project more circle
-apps by adding their manifests to `renderGate([...])`; (c) per-circle catalog scoping.
+apps by adding their manifests to `renderGate([...])`; (c) per-circle catalogue scoping.
 
 ## Why
 Device run (2026-06-10, Fairphone) **verified the mobile circle-bot wiring end-to-end**:
@@ -29,11 +29,11 @@ free-text → `@assistant` detect → per-circle policy gate → local LLM (olla
 **But the action was wrong.** The small local model (Qwen2.5) picked `opId:"me"` (= `/me`,
 show agent identity) instead of `addTask`, and used arg `item` instead of `text`. So nothing
 was added to any list — the bot just echoed a generic "done". Root cause: **a small model
-choosing from a 125-op flat aggregate catalog is unreliable.** Not a wiring bug.
+choosing from a 125-op flat aggregate catalogue is unreliable.** Not a wiring bug.
 
 ## Decision (user, 2026-06-10)
 **Gate rules first.** Wire the already-built `createTokenGate` so common verbs route
-deterministically (no LLM). **Catalog scoping** (narrow the 125 ops per-circle) is a SEPARATE
+deterministically (no LLM). **Catalogue scoping** (narrow the 125 ops per-circle) is a SEPARATE
 follow-up branch — the structural fix for the general case.
 
 ## Findings from this session (don't re-derive)
@@ -45,7 +45,7 @@ follow-up branch — the structural fix for the general case.
 - **`createCircleDispatch` already accepts a `gate` param** and runs it before the LLM
   (`src/v2/circleDispatch.js` ~L52-60). It's just **never passed** on web or mobile. Wiring =
   build a rule set + pass `gate`.
-- **Real op targets (aggregate catalog, app-native opIds):**
+- **Real op targets (aggregate catalogue, app-native opIds):**
   - `add`: tasks-v0 **`addTask`**, param **`text`** (plain required string, NO pickerSource).
     → CLEAN: `"add X [to the list]"` → `{opId:'addTask', args:{text:X}}`. **This is the exact
     failure; ship this rule.**
@@ -67,7 +67,7 @@ follow-up branch — the structural fix for the general case.
    - `claim`: `/^(?:claim|i'?ll (?:do|take))\b/i` → `{opId:'claimTask', args:{id:label}}`
    - (English-first; add Dutch variants in the nl path. All strings via `t()` where surfaced.)
 2. For done/claim resolution: add `pickerSource:{listOp:'listOpen'}` to completeTask.id +
-   claimTask.id — either in the catalog the bot consumes, or scope the gate to add-only for v1
+   claimTask.id — either in the catalogue the bot consumes, or scope the gate to add-only for v1
    and do done/claim in a second slice. (add-only is a fully correct minimal v1.)
 3. Pass `gate: createTokenGate({rules})` into `createCircleDispatch` on **web** (`circleTurn.js`)
    and **mobile** (CircleLauncherScreen circleBot useMemo ~L1565).
@@ -85,6 +85,6 @@ follow-up branch — the structural fix for the general case.
   `circleBot` useMemo cache after edits.
 
 ## Follow-up branch (separate)
-**Per-circle catalog scoping** — narrow the 125-op aggregate to the apps a circle actually
+**Per-circle catalogue scoping** — narrow the 125-op aggregate to the apps a circle actually
 uses, so the LLM (and the gate) only see relevant ops and mis-picks like `/me` aren't even
 candidates. Needs a circle→apps notion.

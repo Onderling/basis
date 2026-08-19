@@ -9,7 +9,7 @@ import { loadMappings } from '@onderling/pod-routing/mappings';
 import { buildConsentModel, installMapping, uninstallMapping } from '../src/v2/extensionInstall.js';
 import { localStorageMappingsStore, WEB_MAPPINGS_DEVICE } from '@onderling/kring-host/mappingsStore';
 
-const catalog = {
+const catalogue = {
   opsById: new Map([
     ['addItem', { op: {}, appOrigin: 'household' }],
     ['household/addItem', { op: {}, appOrigin: 'household' }],
@@ -42,7 +42,7 @@ function fakeStorage() {
 
 describe('buildConsentModel', () => {
   it('builds a plain card enumerating commands, what they invoke, needs + scope', () => {
-    const { ok, card } = buildConsentModel(mapping(), catalog);
+    const { ok, card } = buildConsentModel(mapping(), catalogue);
     expect(ok).toBe(true);
     expect(card.title).toBe('Circle plan feedback');
     expect(card.scope).toBe('circle');
@@ -53,7 +53,7 @@ describe('buildConsentModel', () => {
 
   it('refuses a mapping referencing an unknown op (no card, missing listed)', () => {
     const bad = mapping({ ops: [{ id: 'x', verb: 'submit', steps: [{ appOrigin: 'ghost', opId: 'nope' }] }] });
-    const res = buildConsentModel(bad, catalog);
+    const res = buildConsentModel(bad, catalogue);
     expect(res.ok).toBe(false);
     expect(res.card).toBeNull();
     expect(res.missing).toEqual(['ghost/nope']);
@@ -63,7 +63,7 @@ describe('buildConsentModel', () => {
 describe('installMapping / uninstallMapping', () => {
   it('install writes a safe mapping; load then finds it', async () => {
     const store = localStorageMappingsStore(fakeStorage());
-    const res = await installMapping({ store, deviceId: WEB_MAPPINGS_DEVICE, mapping: mapping(), catalog });
+    const res = await installMapping({ store, deviceId: WEB_MAPPINGS_DEVICE, mapping: mapping(), catalogue });
     expect(res.ok).toBe(true);
     const { mappings } = await loadMappings({ pseudoPod: store, deviceId: WEB_MAPPINGS_DEVICE });
     expect(mappings.map((m) => m.id)).toEqual(['feedback-circle plan']);
@@ -72,7 +72,7 @@ describe('installMapping / uninstallMapping', () => {
   it('install refuses an unsafe mapping and writes nothing', async () => {
     const store = localStorageMappingsStore(fakeStorage());
     const bad = mapping({ id: 'bad', ops: [{ id: 'x', verb: 'submit', steps: [{ appOrigin: 'ghost', opId: 'nope' }] }] });
-    const res = await installMapping({ store, deviceId: WEB_MAPPINGS_DEVICE, mapping: bad, catalog });
+    const res = await installMapping({ store, deviceId: WEB_MAPPINGS_DEVICE, mapping: bad, catalogue });
     expect(res.ok).toBe(false);
     expect(res.missing).toEqual(['ghost/nope']);
     const { mappings } = await loadMappings({ pseudoPod: store, deviceId: WEB_MAPPINGS_DEVICE });
@@ -81,7 +81,7 @@ describe('installMapping / uninstallMapping', () => {
 
   it('uninstall removes it', async () => {
     const store = localStorageMappingsStore(fakeStorage());
-    await installMapping({ store, deviceId: WEB_MAPPINGS_DEVICE, mapping: mapping(), catalog });
+    await installMapping({ store, deviceId: WEB_MAPPINGS_DEVICE, mapping: mapping(), catalogue });
     await uninstallMapping({ store, deviceId: WEB_MAPPINGS_DEVICE, id: 'feedback-circle plan' });
     const { mappings } = await loadMappings({ pseudoPod: store, deviceId: WEB_MAPPINGS_DEVICE });
     expect(mappings).toEqual([]);

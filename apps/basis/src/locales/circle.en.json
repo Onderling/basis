@@ -1712,7 +1712,7 @@
     },
     "apps": {
       "text": "Apps in this circle",
-      "doc": "S6.C — which whole apps the circle composes (catalog scope)."
+      "doc": "S6.C — which whole apps the circle composes (catalogue scope)."
     },
     "app": {
       "basis": {
@@ -1720,7 +1720,7 @@
         "doc": "B/Q3 — app label (basis) for the capability freedom-matrix header."
       },
       "stoop": {
-        "text": "Neighborhood",
+        "text": "Neighbourhood",
         "doc": "S6.C — app label (stoop)."
       },
       "tasks": {

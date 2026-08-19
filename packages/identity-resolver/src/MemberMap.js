@@ -49,7 +49,7 @@ export class MemberMap extends Emitter {
    * (see `apps/folio-mobile/src/lib/serviceBuilder.js` for the canonical
    * `PodClient` construction pattern).
    *
-   * Schema (per H5 design — `Project Files/Substrates/apps/H5-neighborhood.md`):
+   * Schema (per H5 design — `Project Files/Substrates/apps/H5-neighbourhood.md`):
    *
    *     { members: [
    *         { webid, displayName?, pubKey?, externalIds?, role? },

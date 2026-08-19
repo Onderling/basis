@@ -369,7 +369,7 @@ export class NknTransport extends Transport {
     // Metro (unlike Node) requires a dynamic import's specifier to be a STRING LITERAL — it resolves the
     // dependency graph statically, so `import(pkg)` is an "Invalid call" and the whole bundle fails to
     // build. Spelling both out keeps the same behaviour (try the lighter wrapper, fall back to the SDK)
-    // while staying analyzable. Found 2026-07-29 by running the app: it bundles on Node and not on RN.
+    // while staying analysable. Found 2026-07-29 by running the app: it bundles on Node and not on RN.
     try {
       const mod = await import('nkn-multiclient');
       return mod.default ?? mod;

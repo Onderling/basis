@@ -16,7 +16,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 
-import { createNeighborhoodAgent, attachSubstrateMirror } from '../src/index.js';
+import { createNeighbourhoodAgent, attachSubstrateMirror } from '../src/index.js';
 
 const ALICE = 'https://id.example/alice';
 const BOB   = 'https://id.example/bob';
@@ -55,7 +55,7 @@ async function buildCluster(specs) {
 
   const bundles = await Promise.all(specs.map(async (s, i) => {
     const id = identities[i];
-    return createNeighborhoodAgent({
+    return createNeighbourhoodAgent({
       identity:  id,
       transport: new InternalTransport(bus, id.pubKey),
       label:     `H5-${s.actor}`,

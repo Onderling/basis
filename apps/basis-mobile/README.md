@@ -157,7 +157,7 @@ single most common Hermes footgun.
    section counts (basis, household, tasks-v0, stoop, folio,
    calendar — 6 NavModel rows).
 3. The bottom-right "/" FAB is visible; tap → modal opens; typing
-   `/` shows slash suggestions from the merged catalog.
+   `/` shows slash suggestions from the merged catalogue.
 4. Kill + relaunch — VaultAsyncStorage + AsyncStoragePersist should
    restore identity + stoop's cached state (no second onboarding).
 5. NknTransport's "Mesh transport ready" banner appears

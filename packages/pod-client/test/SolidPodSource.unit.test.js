@@ -151,17 +151,17 @@ describe('SolidPodSource — read', () => {
     // Regression: a `mem://` logical key was being string-joined onto
     // the pod root → `…/mem://…` → silent 404. Must throw, not 404.
     source = new SolidPodSource({ podUrl: POD, fetch: makeFetch({}) });
-    await expect(source.read('mem://neighborhood/items/x.json'))
+    await expect(source.read('mem://neighbourhood/items/x.json'))
       .rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
     await expect(source.write('pseudo-pod://dev/x', 'data'))
       .rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
     // A normal relative path (colons mid-segment, no scheme) still resolves.
     const fetchFn = makeFetch({
-      [`GET ${POD}neighborhood/members/webid:local:abc`]: makeRes({ body: 'ok', contentType: 'text/plain' }),
-      [`HEAD ${POD}neighborhood/members/webid:local:abc`]: makeRes({ body: '', contentType: 'text/plain' }),
+      [`GET ${POD}neighbourhood/members/webid:local:abc`]: makeRes({ body: 'ok', contentType: 'text/plain' }),
+      [`HEAD ${POD}neighbourhood/members/webid:local:abc`]: makeRes({ body: '', contentType: 'text/plain' }),
     });
     const s2 = new SolidPodSource({ podUrl: POD, fetch: fetchFn });
-    const r = await s2.read('neighborhood/members/webid:local:abc');
+    const r = await s2.read('neighbourhood/members/webid:local:abc');
     expect(new TextDecoder().decode(r.content)).toBe('ok');
   });
 });
@@ -190,7 +190,7 @@ describe('SolidPodSource — write', () => {
     expect(put).toBeTruthy();
   });
 
-  it('honors If-Match — happy path 200', async () => {
+  it('honours If-Match — happy path 200', async () => {
     const fetchFn = makeFetch({
       [`PUT ${POD}note.txt`]: ({ init }) => {
         // If-Match must have been forwarded.
@@ -273,7 +273,7 @@ describe('SolidPodSource — delete', () => {
     await expect(source.delete('/ghost.txt')).resolves.toBeUndefined();
   });
 
-  it('honors If-Match: 412 → CONFLICT', async () => {
+  it('honours If-Match: 412 → CONFLICT', async () => {
     const fetchFn = makeFetch({
       [`DELETE ${POD}note.txt`]: makeRes({ status: 412, statusText: 'Precondition Failed' }),
     });

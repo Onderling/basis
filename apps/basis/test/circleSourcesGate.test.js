@@ -1,7 +1,7 @@
 /**
- * Regression: circles whose source op is ABSENT from the manifest catalog must still
+ * Regression: circles whose source op is ABSENT from the manifest catalogue must still
  * load. `listMyCircles` (stoop) + `getMyCircles` are agent skills, not manifest ops; the
- * catalog "perf gate" used to skip them on every origin → loadCircles returned nothing
+ * catalogue "perf gate" used to skip them on every origin → loadCircles returned nothing
  * → "No circles yet" on reload even though the data persisted. (Fix in circleSources.js.)
  */
 import { describe, it, expect } from 'vitest';
@@ -9,33 +9,33 @@ import { makeResolvingCallSkill, circleSourcesFromAgent } from '../src/v2/circle
 import { loadCircles } from '../src/v2/circleModel.js';
 import { HELP_CIRCLE_ID } from '../src/v2/helpCircle.js';
 
-describe('makeResolvingCallSkill — catalog gate', () => {
-  it('tries an op the catalog does NOT know on all origins (the listMyCircles fix)', async () => {
+describe('makeResolvingCallSkill — catalogue gate', () => {
+  it('tries an op the catalogue does NOT know on all origins (the listMyCircles fix)', async () => {
     const calls = [];
     const raw = async (origin, opId) => {
       calls.push(`${origin}/${opId}`);
       if (origin === 'stoop' && opId === 'listMyCircles') return { circles: ['kleurenwiezen', 'boi'] };
       return null;
     };
-    // catalog knows getMyCircles@tasks but NOTHING about listMyCircles
-    const catalog = { opsById: new Map([['tasks/getMyCircles', { appOrigin: 'tasks' }]]) };
-    const callSkill = makeResolvingCallSkill(raw, undefined, () => catalog);
+    // catalogue knows getMyCircles@tasks but NOTHING about listMyCircles
+    const catalogue = { opsById: new Map([['tasks/getMyCircles', { appOrigin: 'tasks' }]]) };
+    const callSkill = makeResolvingCallSkill(raw, undefined, () => catalogue);
     const r = await callSkill('listMyCircles', {});
     expect(r).toEqual({ circles: ['kleurenwiezen', 'boi'] });
     expect(calls).toContain('stoop/listMyCircles');     // stoop was NOT skipped
   });
 
-  it('still gates a catalog-KNOWN op to its declared origin (getMyCircles → tasks only)', async () => {
+  it('still gates a catalogue-KNOWN op to its declared origin (getMyCircles → tasks only)', async () => {
     const calls = [];
     const raw = async (origin, opId) => { calls.push(origin); if (origin === 'tasks' && opId === 'getMyCircles') return { circles: [] }; return null; };
-    const catalog = { opsById: new Map([['tasks/getMyCircles', { appOrigin: 'tasks' }]]) };
-    const callSkill = makeResolvingCallSkill(raw, undefined, () => catalog);
+    const catalogue = { opsById: new Map([['tasks/getMyCircles', { appOrigin: 'tasks' }]]) };
+    const callSkill = makeResolvingCallSkill(raw, undefined, () => catalogue);
     await callSkill('getMyCircles', {});
-    expect(calls).not.toContain('stoop');   // skipped: catalog says getMyCircles is on tasks
+    expect(calls).not.toContain('stoop');   // skipped: catalogue says getMyCircles is on tasks
     expect(calls).toContain('tasks');
   });
 
-  it('loadCircles surfaces groups from listMyCircles with an empty catalog', async () => {
+  it('loadCircles surfaces groups from listMyCircles with an empty catalogue', async () => {
     const raw = async (origin, opId) => (origin === 'stoop' && opId === 'listMyCircles'
       ? { circles: ['kleurenwiezen', 'boi', 'mai'] } : null);
     const callSkill = makeResolvingCallSkill(raw, undefined, () => ({ opsById: new Map() }));
@@ -43,7 +43,7 @@ describe('makeResolvingCallSkill — catalog gate', () => {
     expect(circles.map((c) => c.id).sort()).toEqual(['boi', 'kleurenwiezen', 'mai']);
   });
 
-  it('null catalog → tries every origin (unchanged)', async () => {
+  it('null catalogue → tries every origin (unchanged)', async () => {
     const raw = async (origin, opId) => (origin === 'stoop' && opId === 'listMyCircles' ? { circles: ['x'] } : null);
     const callSkill = makeResolvingCallSkill(raw, undefined, () => null);
     expect(await callSkill('listMyCircles', {})).toEqual({ circles: ['x'] });

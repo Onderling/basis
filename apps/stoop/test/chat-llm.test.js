@@ -23,7 +23,7 @@ import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderl
 import { VaultMemory } from '@onderling/vault';
 import { mockProvider, LlmClient } from '@onderling/llm-client';
 
-import { createNeighborhoodAgent } from '../src/index.js';
+import { createNeighbourhoodAgent } from '../src/index.js';
 import { stoopManifest }           from '../manifest.js';
 import {
   createLlmChat,
@@ -36,7 +36,7 @@ const ANNE = 'https://id.example/anne';
 async function buildBundle() {
   const id = await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);
-  const bundle = await createNeighborhoodAgent({
+  const bundle = await createNeighbourhoodAgent({
     identity: id, transport: tx,
     offeringMatch: { group: 'oosterpoort', localActor: ANNE, peers: [] },
     members:    [{ webid: ANNE }],
@@ -83,7 +83,7 @@ describe('Stoop Slice D.2 — LLM tool-calling on chat via renderChat', () => {
     const provider = mockProvider({ responses: [{ replyText: null }] });
     const llm = new LlmClient({ provider });
     const { chatAgent } = createLlmChat({ bundle, llm, localActor: ANNE });
-    // ChatAgent stores #toolCatalog privately; introspect via a probe
+    // ChatAgent stores #toolCatalogue privately; introspect via a probe
     // request by triggering an invoke that captures the tools array.
     let capturedTools = null;
     const captureLlm = {

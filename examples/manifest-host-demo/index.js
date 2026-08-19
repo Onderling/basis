@@ -6,7 +6,7 @@
  *
  * Composes household + tasks-v0 (multi-circle) in one process via
  * `@canopy/manifest-host`, drives a chat-agent over the merged tool
- * catalog with a scripted LLM, prints the conversation + final state.
+ * catalogue with a scripted LLM, prints the conversation + final state.
  *
  * Matching test at `test/recombination.test.js` asserts the same
  * scenario without the console noise.
@@ -31,11 +31,11 @@ async function main() {
   const runtime = await setupRecombinationDemo();
 
   log('mounted apps:        ' + runtime.host.list().join(', '));
-  log('composed toolCatalog: ' + runtime.composed.toolCatalog.length + ' tools');
+  log('composed toolCatalogue: ' + runtime.composed.toolCatalogue.length + ' tools');
   log('  household tools:   ' +
-    runtime.composed.toolCatalog.filter((t) => t.id.startsWith('household.')).length);
+    runtime.composed.toolCatalogue.filter((t) => t.id.startsWith('household.')).length);
   log('  tasks tools:       ' +
-    runtime.composed.toolCatalog.filter((t) => t.id.startsWith('tasks.')).length);
+    runtime.composed.toolCatalogue.filter((t) => t.id.startsWith('tasks.')).length);
   log('command collisions:  ' + runtime.composed.collisions.length);
   log();
 
@@ -70,10 +70,10 @@ async function main() {
   log('— SP-11b: cross-surface recombination —');
   const three = await setupRecombinationDemo({ mountStoop: true });
   log('mounted apps:        ' + three.host.list().join(', '));
-  log('composed toolCatalog: ' + three.composed.toolCatalog.length + ' tools');
+  log('composed toolCatalogue: ' + three.composed.toolCatalogue.length + ' tools');
   for (const app of three.host.list()) {
     log(`  ${app} tools:` .padEnd(20) +
-      three.composed.toolCatalog.filter((t) => t.id.startsWith(app + '.')).length);
+      three.composed.toolCatalogue.filter((t) => t.id.startsWith(app + '.')).length);
   }
   log('command collisions:  ' + three.composed.collisions.length);
   log('per-app prompts:     ' + Object.keys(three.composed.perAppSystemPrompts).sort().join(', '));

@@ -133,7 +133,7 @@ async function loadMdnsTransport() {   // (batch 7) unused — kept one release 
  * Boot the agent bundle.  See module-doc for the three boot modes.
  *
  * @param {object}  [opts]
- * @param {object}  [opts.householdManifest]   merge an extra manifest into the catalog
+ * @param {object}  [opts.householdManifest]   merge an extra manifest into the catalogue
  * @param {object}  [opts.chatVault]           secure-agent chat-side vault (e.g. VaultMemory in tests, VaultAsyncStorage on RN)
  * @param {object}  [opts.hostVault]           host-side vault (defaults inside factory to makeBrowserVault)
  * @param {object}  [opts.asyncStorage]        when provided AND chatVault/hostVault are NOT, synthesises two VaultAsyncStorage instances (cc-chat-id: + cc-host-id: prefixes). RN runtime path; vitest can pass a mock AsyncStorage to exercise it.
@@ -148,7 +148,7 @@ async function loadMdnsTransport() {   // (batch 7) unused — kept one release 
  * @param {function}[opts.skillStub]           test-only — bypass the real factory entirely
  *
  * @returns {Promise<{
- *   catalog: object,
+ *   catalogue: object,
  *   callSkill: (appOrigin: string, opId: string, args?: object) => Promise<object>,
  *   agent: object | null,
  *   transport: { kind: 'none' | 'nkn' | 'stub', connected?: boolean } ,
@@ -157,21 +157,21 @@ async function loadMdnsTransport() {   // (batch 7) unused — kept one release 
  * }>}
  */
 export async function bootAgentBundle(opts = {}) {
-  let catalog             = composeManifests({ householdManifest: opts.householdManifest });
+  let catalogue             = composeManifests({ householdManifest: opts.householdManifest });
   // Extension mappings (feedback-extension mobile parity) — OPT-IN via opts.mappingsStore so node-vitest
-  // boots (no store passed) skip the AsyncStorage path. Best-effort: verify each against the base catalog
+  // boots (no store passed) skip the AsyncStorage path. Best-effort: verify each against the base catalogue
   // (sandbox-by-construction; unknown-op mappings refused), then re-merge the accepted ones. Never blocks boot.
   if (opts.mappingsStore) {
     try {
       const { sources } = await loadVerifyMappings({
-        store: opts.mappingsStore, deviceId: opts.mappingsDeviceId || 'mobile', catalog,
+        store: opts.mappingsStore, deviceId: opts.mappingsDeviceId || 'mobile', catalogue,
       });
       if (sources.length) {
-        catalog = composeManifests({ householdManifest: opts.householdManifest, extraSources: sources });
+        catalogue = composeManifests({ householdManifest: opts.householdManifest, extraSources: sources });
       }
     } catch { /* extensions never block boot */ }
   }
-  // Same source-of-truth as the catalog — used by renderReply opts so
+  // Same source-of-truth as the catalogue — used by renderReply opts so
   // list bubbles get per-row inline-keyboard buttons (see
   // docs/manifest-pipeline.md + test/chatRender.test.js).
   const manifestsByOrigin = buildManifestsByOrigin({ householdManifest: opts.householdManifest });
@@ -184,7 +184,7 @@ export async function bootAgentBundle(opts = {}) {
     const callSkill = async (appOrigin, opId, args) =>
       opts.skillStub(opId, args ?? {}, { appOrigin });
     return {
-      catalog,
+      catalogue,
       manifestsByOrigin,
       callSkill,
       agent:     null,
@@ -632,7 +632,7 @@ export async function bootAgentBundle(opts = {}) {
   // are APP-OWNED: one PeerGraph the skill registry + the Contacten roster
   // read, populated as bots are discovered/added. The agent stays the transport
   // (sendPeerMessage → core RoutingStrategy: mdns > rendezvous > relay > nkn). The
-  // registry synthesises a contact-thread catalog + a router (sendA2ATask for
+  // registry synthesises a contact-thread catalogue + a router (sendA2ATask for
   // a2a bots); the channel carries the conversation over sa.peer. Exposed on
   // the bundle for the Contacten screens + Detox.
   // Persist the roster so v2 Contacten survives a reload (AsyncStorage on RN);
@@ -776,7 +776,7 @@ export async function bootAgentBundle(opts = {}) {
   // connect() resolves a tick later).  Callers should not cache the
   // returned value across renders.
   return {
-    catalog,
+    catalogue,
     manifestsByOrigin,
     callSkill,
     agent,

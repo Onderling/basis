@@ -21,7 +21,7 @@ for the full plan, the 10 scenarios (S1–S10), and the bring-up runbook.
 | Kernel/adapter package | Primitive | Used for | Justification |
 |---|---|---|---|
 | `@onderling/core` | `Agent`, `AgentIdentity`, `Bootstrap`, `RelayTransport`, `RendezvousTransport`, `OfflineTransport`, `defineSkill`, capability tokens, A2A bridge | Each scenario (S1–S10) exercises a different kernel/adapter area: bootstrap, vault migration, pod sync, capability share, identity rotation, governance, skills-pubsub, A2A-sealed, battery-sleep, etc. | This is the harness whose entire purpose is exercising the kernel + adapters directly — the architectural-layering doc lists `sdk-smoke` as the canonical exemption. Substrate composition would defeat the point. |
-| `@onderling/relay` | `RelayTransport` (client side), token register | Real-relay validation: scenarios that need a remote peer use the relay for connection. | Same as above — the relay is the transport adapter whose hardware behavior is under test. |
+| `@onderling/relay` | `RelayTransport` (client side), token register | Real-relay validation: scenarios that need a remote peer use the relay for connection. | Same as above — the relay is the transport adapter whose hardware behaviour is under test. |
 | `@onderling/react-native` | `KeychainVault`, `MdnsTransport`, `BleTransport`, `MobilePushBridge`, `ExpoNotificationsAdapter`, `createMeshAgent`, `requestMeshPermissions`, `platform/polyfills` | RN platform layer — every scenario runs on a real device, so RN-specific bring-up is exercised end-to-end. | Same as above. |
 | `@onderling/pod-client` | `PodClient` | Pod-sync scenarios (S3, S4) write/read against a real Solid pod. | Same as above. |
 

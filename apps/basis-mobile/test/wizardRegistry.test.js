@@ -6,7 +6,7 @@
  * registry here because it transitively imports the RN modal
  * component (JSX), which vitest's vite-jsx pipeline doesn't parse
  * from a plain .js file outside src/rn/.  The registry's
- * single-entry behavior is trivial; Detox verifies the modal
+ * single-entry behaviour is trivial; Detox verifies the modal
  * launch end-to-end.
  *
  * What this file pins:

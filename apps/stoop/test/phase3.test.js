@@ -14,7 +14,7 @@ import { Reveals } from '@onderling/identity-resolver';
 import { Notifier, InMemoryScheduleStore } from '@onderling/notifier';
 import { InMemoryBridge } from '@onderling/chat-agent';
 
-import { createNeighborhoodAgent } from '../src/index.js';
+import { createNeighbourhoodAgent } from '../src/index.js';
 
 const ANNE = 'https://id.example/anne';
 const BOB  = 'https://id.example/bob';
@@ -34,7 +34,7 @@ async function callSkill(agent, skillId, args, fromWebid = ANNE) {
 async function buildAgent({ notifier, reveals, members } = {}) {
   const id = await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);
-  const bundle = await createNeighborhoodAgent({
+  const bundle = await createNeighbourhoodAgent({
     identity: id,
     transport: tx,
     offeringMatch: { group: 'oosterpoort', localActor: ANNE, peers: [] },

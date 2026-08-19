@@ -61,20 +61,20 @@ describe('Phase 3.3b — cross-app type-index via pullFromInner', () => {
     });
     const cache = new CachingDataSource({ inner, innerKeyMap });
 
-    const n = await cache.pullFromInner('mem://neighborhood/items/');
+    const n = await cache.pullFromInner('mem://neighbourhood/items/');
     expect(n).toBe(2);
 
     // Both re-keyed to the LOGICAL mem:// space, regardless of author.
-    expect(await cache.read('mem://neighborhood/items/01STOOP.json'))
+    expect(await cache.read('mem://neighbourhood/items/01STOOP.json'))
       .toBe('{"origin":"stoop","kind":"share"}');
-    expect(await cache.read('mem://neighborhood/items/01OTHER.json'))
+    expect(await cache.read('mem://neighbourhood/items/01OTHER.json'))
       .toBe('{"origin":"other-app","kind":"borrow"}');
 
     // Local listing (logical keys) shows exactly the two items —
     // the `members` resource was not in the items container.
-    expect((await cache.list('mem://neighborhood/items/')).sort()).toEqual([
-      'mem://neighborhood/items/01OTHER.json',
-      'mem://neighborhood/items/01STOOP.json',
+    expect((await cache.list('mem://neighbourhood/items/')).sort()).toEqual([
+      'mem://neighbourhood/items/01OTHER.json',
+      'mem://neighbourhood/items/01STOOP.json',
     ]);
   });
 
@@ -86,12 +86,12 @@ describe('Phase 3.3b — cross-app type-index via pullFromInner', () => {
     });
     const cache = new CachingDataSource({ inner, innerKeyMap });
 
-    const n = await cache.pullFromInner('mem://neighborhood/members/');
+    const n = await cache.pullFromInner('mem://neighbourhood/members/');
     expect(n).toBe(2);
-    expect(await cache.read('mem://neighborhood/members/webid%3Alocal%3ApeerA')).toBe('{"p":"A"}');
-    expect((await cache.list('mem://neighborhood/')).sort()).toEqual([
-      'mem://neighborhood/members/webid%3Alocal%3ApeerA',
-      'mem://neighborhood/members/webid%3Alocal%3ApeerB',
+    expect(await cache.read('mem://neighbourhood/members/webid%3Alocal%3ApeerA')).toBe('{"p":"A"}');
+    expect((await cache.list('mem://neighbourhood/')).sort()).toEqual([
+      'mem://neighbourhood/members/webid%3Alocal%3ApeerA',
+      'mem://neighbourhood/members/webid%3Alocal%3ApeerB',
     ]);
   });
 });

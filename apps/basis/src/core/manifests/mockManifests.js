@@ -23,7 +23,7 @@
  *
  * Future rename candidates (not done in this slice): `mockTasksManifest`
  * → `tasksSlashManifest`, etc.  Deferred — names are load-bearing
- * across imports + the rename adds churn without behavior change.
+ * across imports + the rename adds churn without behaviour change.
  */
 
 /**
@@ -38,7 +38,7 @@
  * tests, navModel) keeps working unchanged.
  *
  * The merged manifest's `.app` is now `'tasks'` (NOT `'tasks-v0'`): the
- * catalog (`manifestMerge.js`) keys ops by `m.app`, so dispatch now
+ * catalogue (`manifestMerge.js`) keys ops by `m.app`, so dispatch now
  * routes the tasks circle under appOrigin `'tasks'` (realAgent.js's
  * callSkill matches `'tasks'`).  The vocab adapter bridges
  * (rejectTask reason→note, submitTask note-default) are removed — the
@@ -53,7 +53,7 @@ export const mockTasksManifest = tasksManifest;
  * stoop manifest — Part G dissolve (2026-06-17).
  *
  * This file's former `mockStoopManifest` literal (the chat-shell slash/
- * gate surface for the REAL stoop NeighborhoodAgent skills) has been
+ * gate surface for the REAL stoop NeighbourhoodAgent skills) has been
  * FOLDED INTO the real `apps/stoop/manifest.js`, which is now the ONE
  * stoop manifest (same move folio + tasks already made).  We re-export
  * it under the historical name so every importer (circleGate.js, web/

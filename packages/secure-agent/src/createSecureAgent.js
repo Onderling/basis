@@ -1539,7 +1539,7 @@ export async function createSecureAgent(opts = {}) {
    *
    * `firstSendTimeoutMs` opt at factory time lets transport-heavy
    * apps (RN, slow networks) extend the wait; set to 0 to opt out
-   * (fall back to old eager-send behavior).
+   * (fall back to old eager-send behaviour).
    */
   /**
    * Phase-2 · Piece-1 (C1) — THE ONE routing owner for the secure send

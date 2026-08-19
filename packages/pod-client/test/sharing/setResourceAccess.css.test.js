@@ -22,7 +22,7 @@
  *   (a) an UNAUTHENTICATED reader CAN read it            → 200
  *   (b) a NON-owner (stranger) CANNOT write it           → 403
  *   (c) the OWNER CAN write it                            → ok
- * On a community-catalog-shaped resource with an added **admin-write** grant:
+ * On a community-catalogue-shaped resource with an added **admin-write** grant:
  *   (d) the configured admin (2nd WebID) CAN write it     → ok
  *       (and, absent that grant, the stranger still can't — covered by (b))
  *
@@ -116,7 +116,7 @@ SUITE('setResourceAccess — CSS integration (real-pod ACP/WAC proof)', () => {
     await client.close?.();
   });
 
-  it('community catalog: adding admin-write lets the admin write, public-read stays', async () => {
+  it('community catalogue: adding admin-write lets the admin write, public-read stays', async () => {
     if (!HAVE_STRANGER) return;                              // needs a 2nd account to act as the admin
     const client = await owner();
     const uri = `${CSS_URL}${scratch}community-${Date.now()}`;

@@ -25,7 +25,7 @@ class MemVault {
   async delete(k) { this.entries.delete(k); }
 }
 
-/** Fake Inrupt Session — captures login/callback/fetch behavior. */
+/** Fake Inrupt Session — captures login/callback/fetch behaviour. */
 class FakeSession {
   constructor() {
     this.events = new EventEmitter();

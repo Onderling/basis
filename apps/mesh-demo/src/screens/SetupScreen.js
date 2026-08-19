@@ -35,7 +35,7 @@ export function SetupScreen({ onDone }) {
   return (
     <KeyboardAvoidingView
       style={s.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behaviour={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={s.inner}>
         <Text style={s.title}>@onderling</Text>

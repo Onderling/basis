@@ -151,7 +151,7 @@ export class Scheduler {
    *
    * 5.7c — the suppression predicate is consulted just like a scheduled
    * fire, so users can verify their quiet-hours config from the
-   * settings UX ("send now" honors the same gate the scheduler does).
+   * settings UX ("send now" honours the same gate the scheduler does).
    * Pass `force: true` to bypass suppression (e.g. an admin-issued
    * /digest command).
    */

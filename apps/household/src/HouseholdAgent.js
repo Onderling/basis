@@ -105,11 +105,11 @@ export class HouseholdAgent {
     // session state + tool dispatch; HouseholdAgent owns the
     // bridge/regex layers above it.  `renderChat` projects the manifest
     // (`../manifest.js`) onto the ChatAgent ctor input — byte-equal to
-    // the retired hand-catalogues (V0_TOOL_CATALOG /
+    // the retired hand-catalogues (V0_TOOL_CATALOGUE /
     // SYSTEM_PROMPT_CLASSIFY / buildHouseholdToolHandlers), proven by
     // `test/manifest-equivalence.test.js`.
     if (this.#llm) {
-      const { toolCatalog, toolHandlers, systemPrompt } = renderChat(
+      const { toolCatalogue, toolHandlers, systemPrompt } = renderChat(
         householdManifest,
         {
           skillRegistry: SKILL_REGISTRY,
@@ -136,7 +136,7 @@ export class HouseholdAgent {
       this.#chatAgent = new ChatAgent({
         bridges:        [],          // headless — Household sends replies itself
         llm:            this.#llm,
-        toolCatalog,
+        toolCatalogue,
         toolHandlers,
         systemPrompt,
         contextBuilder: noopContextBuilder,

@@ -49,7 +49,7 @@
  */
 
 /**
- * @typedef {object} MergedCatalogLite
+ * @typedef {object} MergedCatalogueLite
  * @property {Array<{ command: string, opId: string, body?: 'match' | 'reject' | 'flags' }>} commandMenu
  *   Each entry maps a slash command (e.g. '/done') to an opId.  `body`
  *   is the body-parse rule:
@@ -64,18 +64,18 @@
  * Parse user input.  Pure function — no I/O, no state.
  *
  * @param {string}             rawInput   the user's message text
- * @param {MergedCatalogLite}  catalog    merged manifest commandMenu
+ * @param {MergedCatalogueLite}  catalogue    merged manifest commandMenu
  * @param {object}             [ctx]
  * @param {string|null}        [ctx.threadId=null]  thread id from caller (passes through to result)
  * @returns {ParseResult}
  */
-export function parseInput(rawInput, catalog, ctx = {}) {
+export function parseInput(rawInput, catalogue, ctx = {}) {
   const threadId = ctx.threadId ?? null;
   const text     = String(rawInput ?? '');
   const trimmed  = text.trim();
 
   if (trimmed.startsWith('/')) {
-    const slashResult = parseSlash(trimmed, catalog, { threadId });
+    const slashResult = parseSlash(trimmed, catalogue, { threadId });
     if (slashResult) return slashResult;
     // unmatched slash → fall through to unknown
   }
@@ -85,18 +85,18 @@ export function parseInput(rawInput, catalog, ctx = {}) {
 }
 
 /**
- * Attempt to parse a slash-prefixed input against the catalog.
+ * Attempt to parse a slash-prefixed input against the catalogue.
  *
  * @param {string}             trimmed   input with leading whitespace stripped
- * @param {MergedCatalogLite}  catalog
+ * @param {MergedCatalogueLite}  catalogue
  * @param {object}             [ctx]
  * @param {string|null}        [ctx.threadId=null]
  * @returns {SlashParseResult | null}  null if no command matches
  */
-export function parseSlash(trimmed, catalog, ctx = {}) {
+export function parseSlash(trimmed, catalogue, ctx = {}) {
   const threadId = ctx.threadId ?? null;
   if (!trimmed.startsWith('/')) return null;
-  if (!catalog || !Array.isArray(catalog.commandMenu)) return null;
+  if (!catalogue || !Array.isArray(catalogue.commandMenu)) return null;
 
   // Split off the command token (first whitespace-separated chunk).
   const spaceIdx = trimmed.indexOf(' ');
@@ -105,7 +105,7 @@ export function parseSlash(trimmed, catalog, ctx = {}) {
 
   // Lookup — case-sensitive match (matches Telegram conventions +
   // existing manifests' command declarations).
-  const entry = catalog.commandMenu.find((e) => e.command === command);
+  const entry = catalogue.commandMenu.find((e) => e.command === command);
   if (!entry) return null;
 
   // Objective D — a colliding bare command with no per-host override winner is

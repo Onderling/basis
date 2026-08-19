@@ -3,7 +3,7 @@
  * ollama-tool-probe.js — single-shot diagnostic.
  *
  * Hits Ollama's OpenAI-compatible chat-completions endpoint with the
- * free-text experiment's TOOL_CATALOG and a sample user message,
+ * free-text experiment's TOOL_CATALOGUE and a sample user message,
  * then prints the RAW response so you can see exactly what the
  * model emits — structured `tool_calls`, free text, or both.
  *
@@ -21,7 +21,7 @@
  *   HOUSEHOLD_LLM_BASE_URL=http://other:11434 node scripts/ollama-tool-probe.js
  */
 
-import { TOOL_CATALOG, SYSTEM_PROMPT } from './lib/freetext-core.js';
+import { TOOL_CATALOGUE, SYSTEM_PROMPT } from './lib/freetext-core.js';
 
 const DEFAULT_MODEL  = 'bramvanroy/geitje-7b-ultra:Q4_K_M';
 const DEFAULT_PROMPT = 'voeg kaas, boter en peren toe aan boodschappen';
@@ -35,7 +35,7 @@ const model  = process.argv[2] ?? DEFAULT_MODEL;
 const prompt = process.argv[3] ?? DEFAULT_PROMPT;
 const baseUrl = (process.env.HOUSEHOLD_LLM_BASE_URL ?? 'http://127.0.0.1:11434').replace(/\/$/, '');
 
-const tools = TOOL_CATALOG.map((t) => ({
+const tools = TOOL_CATALOGUE.map((t) => ({
   type: 'function',
   function: { name: t.id, description: t.description ?? '', parameters: t.schema ?? {} },
 }));

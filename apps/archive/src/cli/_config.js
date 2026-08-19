@@ -3,7 +3,7 @@
  *
  * Config lives at `~/.config/archive/config.json` by default.  Override the
  * directory with `ARCHIVE_CONFIG_DIR` (used by tests).  `XDG_CONFIG_HOME`
- * is honored when set.
+ * is honoured when set.
  *
  * Shape (all keys optional unless marked):
  *   {
@@ -32,7 +32,7 @@ export function configPath() {
 
 /**
  * Default DB path: `~/.local/share/archive/archive.db` (XDG).
- * `XDG_DATA_HOME` honored when set.
+ * `XDG_DATA_HOME` honoured when set.
  */
 export function defaultDbPath() {
   const xdg = process.env.XDG_DATA_HOME;

@@ -1712,7 +1712,7 @@
     },
     "apps": {
       "text": "Apps in deze kring",
-      "doc": "S6.C — which whole apps the circle composes (catalog scope)."
+      "doc": "S6.C — which whole apps the circle composes (catalogue scope)."
     },
     "app": {
       "basis": {
@@ -2291,7 +2291,7 @@
       "doc": "File filter: all files."
     },
     "favourites": {
-      "text": "Favorieten",
+      "text": "Favourites",
       "doc": "File filter: favourited files."
     },
     "recent": {

@@ -97,7 +97,7 @@ export function setCircleKeyEventWiring(wiring) { _keyEventWiring = wiring ?? nu
 /** The no-pod distribution sink for ONE circle — a membership change (notably a REMOVE → rotation) fans the
  * new versioned key AS a log key-event to the circle's REMAINING members over the SAME peer channel content
  * rides — sealed to them only, so the departed cannot open post-removal content with no shared pod. The pod
- * key resource is still written (defense-in-depth); the log is the source for a no-pod circle. */
+ * key resource is still written (defence-in-depth); the log is the source for a no-pod circle. */
 function makeCircleKeyEventLog(circleId) {
   return makeKeyEventLogSink({
     groupId: circleId,
@@ -227,7 +227,7 @@ export async function getCircleSealStrategy(circleId, policy) {
     if (prod?.controlAgent && prod.sealingIdentity) {
       const idKey = await prod.sealingIdentity.ensure();
       strat = await prod.controlAgent.sealingStrategy(idKey.privateKey);
-      // G11 — no-pod defense-in-depth: content sealed under a version carried only in the key-event LOG
+      // G11 — no-pod defence-in-depth: content sealed under a version carried only in the key-event LOG
       // (a rotation fanned to this device) still opens. Shared wrapper; lazy read at open time (web parity).
       if (strat && idKey?.privateKey) {
         strat = wrapStrategyWithKeyEventFold(strat, {

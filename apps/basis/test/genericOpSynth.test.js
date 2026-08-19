@@ -1,10 +1,10 @@
 /**
- * basis — §1b: catalog synthesis of GENERIC (op-less) capabilities.
+ * basis — §1b: catalogue synthesis of GENERIC (op-less) capabilities.
  *
  * "Declare a noun → get CRUD free": a manifest can declare a noun with CRUD atoms and NO implementing op.
- * `synthesizeGenericOps` + `mergeManifests` turn each such op-less capability into a SYNTHETIC catalog op
+ * `synthesizeGenericOps` + `mergeManifests` turn each such op-less capability into a SYNTHETIC catalogue op
  * so the EXISTING projectors carry it unchanged:
- *   - it lands in `catalog.opsById` under `__generic__:<app>:<atom>:<noun>` with `verb` + `appliesTo.type`
+ *   - it lands in `catalogue.opsById` under `__generic__:<app>:<atom>:<noun>` with `verb` + `appliesTo.type`
  *     (so the op-keyed gate authorises it by (atom × noun) with no gate change),
  *   - `renderSlash` matches its slash form (`/add-note` → `{ body }`),
  *   - `buildToolDescriptors` mints an LLM tool for it,
@@ -89,7 +89,7 @@ describe('synthesizeGenericOps — the pure helper', () => {
   });
 });
 
-describe('mergeManifests — synthetic generic ops in the catalog', () => {
+describe('mergeManifests — synthetic generic ops in the catalogue', () => {
   it('adds each op-less capability to opsById under its generic id', () => {
     const cat = mergeManifests([{ manifest: notesApp }]);
     const entry = cat.opsById.get(encodeGenericOpId('notes', 'add', 'note'));

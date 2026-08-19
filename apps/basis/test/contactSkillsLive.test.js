@@ -134,16 +134,16 @@ describe('createContactSkillRegistry — removal + change events', () => {
   });
 });
 
-describe('createContactSkillRegistry — catalog merge + isolation', () => {
-  it("contact sources merge into a catalog whose ops carry the remote binding", async () => {
+describe('createContactSkillRegistry — catalogue merge + isolation', () => {
+  it("contact sources merge into a catalogue whose ops carry the remote binding", async () => {
     const peers = new PeerGraph();
     const reg = createContactSkillRegistry({ peerGraph: peers, sendTask: vi.fn() });
     await reg.start();
     await peers.upsert(botPeer('https://bot.example', ['summarise']));
     await reg.refresh();
 
-    const catalog = mergeManifests(reg.sources(), { runtime: 'browser' });
-    const entry = catalog.opsById.get('summarise');
+    const catalogue = mergeManifests(reg.sources(), { runtime: 'browser' });
+    const entry = catalogue.opsById.get('summarise');
     expect(entry).toBeTruthy();
     expect(entry.op.binding).toBe('remote-skill@contact');
     expect(entry.op.bindRef).toMatchObject({ contactId: 'https://bot.example', skillId: 'summarise' });

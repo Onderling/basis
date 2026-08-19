@@ -156,7 +156,7 @@ export function resolveConfigDir(explicit) {
  *                                         `PodClient` (§R3 decision #4's deferred follow-up).
  *                                         An obviously out-of-scope request is denied LOCALLY
  *                                         (opaque `POD_FORBIDDEN`) WITHOUT a relay round-trip —
- *                                         a latency optimization + defense-in-depth 2nd layer.
+ *                                         a latency optimization + defence-in-depth 2nd layer.
  *                                         The pre-filter is ADVISORY only: on a local PASS it
  *                                         delegates to the proxy `PodClient`, which ships the
  *                                         request to the DEVICE, which re-checks AUTHORITATIVELY.
@@ -331,7 +331,7 @@ export async function startCompanionNode(opts = {}) {
     // (§R3 decision #4's deferred follow-up.) The host derives scope from
     // (op, uri) with its held token + the R2b.0 verifier; an obviously
     // out-of-scope request is denied LOCALLY (opaque `POD_FORBIDDEN`) WITHOUT
-    // proxying — no relay round-trip (a latency optimization + a defense-in-depth
+    // proxying — no relay round-trip (a latency optimization + a defence-in-depth
     // 2nd layer). On a local PASS the ScopedPodClient delegates to `proxyClient`,
     // which ships the request to the DEVICE, which re-checks AUTHORITATIVELY —
     // TWO independent gates, the DEVICE load-bearing. The pre-filter is purely
@@ -432,7 +432,7 @@ export async function startCompanionNode(opts = {}) {
       //     R3-advisory (decision #4): `buildProxyPodSource` now composes the
       //     advisory `ScopedPodClient` as a LOCAL pre-filter in FRONT of that
       //     proxy client (default on; `podPreFilter: false` bypasses it). The
-      //     pre-filter is a latency optimization + defense-in-depth — it can only
+      //     pre-filter is a latency optimization + defence-in-depth — it can only
       //     DENY out-of-its-own-grant requests locally and never ALLOWS anything
       //     the device wouldn't; the DEVICE stays provably the sole authority
       //     (its deny carries the distinct `FORBIDDEN` code, the pre-filter's

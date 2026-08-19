@@ -41,16 +41,16 @@ import { INSTALL_CORES } from './installCores.js';
  *   its RN twin). Without it the recovery ops answer an honest
  *   `{ok:false, error:'no-version-store'}` — always wired, never hidden,
  *   so route parity stays unconditional.
- * @param {object} [args.catalog]  optional pluggable curated-catalog
+ * @param {object} [args.catalogue]  optional pluggable curated-catalogue
  *   SOURCE ({ list, get }) backing the install ops (default: the local
- *   `createStubCatalog`). Without it `listCatalog` answers the honest
- *   `no-catalog` "coming with the community catalog" state and only the
+ *   `createStubCatalogue`). Without it `listCatalogue` answers the honest
+ *   `no-catalogue` "coming with the community catalogue" state and only the
  *   power-user override (install from a pasted card) works.
  *   commons-governance: the source's trust/curation is designed
  *   separately — buildAgentSkills treats it as opaque data.
  * @returns {Array<{ id: string, handler: Function, visibility: string }>}
  */
-export function buildAgentSkills({ registry, tokens, versionStoreFor, catalog, profiles, roleGrants } = {}) {
+export function buildAgentSkills({ registry, tokens, versionStoreFor, catalogue, profiles, roleGrants } = {}) {
   if (!registry || typeof registry.list !== 'function') {
     throw new TypeError('buildAgentSkills: registry (agent-registry) with list() required');
   }
@@ -60,8 +60,8 @@ export function buildAgentSkills({ registry, tokens, versionStoreFor, catalog, p
   if (versionStoreFor != null && typeof versionStoreFor !== 'function') {
     throw new TypeError('buildAgentSkills: versionStoreFor must be a function when supplied');
   }
-  if (catalog != null && typeof catalog.list !== 'function') {
-    throw new TypeError('buildAgentSkills: catalog must expose list() when supplied');
+  if (catalogue != null && typeof catalogue.list !== 'function') {
+    throw new TypeError('buildAgentSkills: catalogue must expose list() when supplied');
   }
 
   // Single-user surface — the store is the injected bundle for every ctx.
@@ -69,7 +69,7 @@ export function buildAgentSkills({ registry, tokens, versionStoreFor, catalog, p
     registry,
     tokens:          tokens ?? null,
     versionStoreFor: versionStoreFor ?? null,
-    catalog:         catalog ?? null,
+    catalogue:         catalogue ?? null,
     profiles:        profiles ?? null,   // identity step 4 — createProfile collaborator (owner-root-backed)
     roleGrants:      roleGrants ?? null, // grantRole collaborator (core RoleGrantManager: setRole + materialize bundle)
   };
@@ -100,7 +100,7 @@ export function buildAgentSkills({ registry, tokens, versionStoreFor, catalog, p
     'purgeAgent',
     'listDataVersions',
     'restoreDataVersion',
-    'listCatalog',
+    'listCatalogue',
     'installAgent',
   ];
   const operations = WIRED_IDS.map((id) => {

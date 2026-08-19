@@ -16,7 +16,7 @@
  * The walker mirrors `apps/folio/src/scanPod.js` — single-shot BFS over
  * containers, calling PodClient.list with `recursive: false`.  This keeps
  * us compatible with both the real PodClient and the FsBackedMockPodClient
- * (the mock doesn't honor `recursive: true` for nested containers in the
+ * (the mock doesn't honour `recursive: true` for nested containers in the
  * way list-as-container-tree implementations do).
  */
 import { createHash } from 'node:crypto';

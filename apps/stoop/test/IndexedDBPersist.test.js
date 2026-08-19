@@ -72,7 +72,7 @@ describe('IndexedDBPersist — load / save round-trip', () => {
     const p = new IndexedDBPersist({ dbName });
     const m = new Map([['k', 'v']]);
     await p.save(m);
-    // Mutate timestamp behavior by re-calling save with the same Map:
+    // Mutate timestamp behaviour by re-calling save with the same Map:
     // we can't see it from outside, but at minimum the second call
     // must not throw + the value remains identical on subsequent load.
     await p.save(m);

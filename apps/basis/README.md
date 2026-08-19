@@ -155,7 +155,7 @@ Tracking per `/Project Files/basis/coding-plan.md` § Phase v0.1:
 | Sub-slice | Scope | Status |
 |---|---|---|
 | 4.0 | Q31 (`followUps`) + Q32 (`op.runtime`) substrate adds | shipped 2026-05-22 |
-| 4.1 | Cross-app surface (4 apps in catalog) + op-prefix-on-collision + Q32 runtime filter | shipped 2026-05-22 |
+| 4.1 | Cross-app surface (4 apps in catalogue) + op-prefix-on-collision + Q32 runtime filter | shipped 2026-05-22 |
 | 4.2 | Follow-up registry + inline-button UI | shipped 2026-05-22 |
 | 4.3 | `resolveContact` skill convention + folio runtime tags | shipped 2026-05-22 |
 

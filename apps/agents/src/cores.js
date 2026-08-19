@@ -182,7 +182,7 @@ export async function viewAgent(store, args = {}) {
  * setAgentSkillExposure — hide or show ONE of an agent's skills, agent-wide or inside one circle.
  *
  * **This decides what people SEE, not what they may DO.** Exposure is a discovery filter: it removes
- * the skill from the cards and catalogs others read, and stops nothing. Someone on a modified client
+ * the skill from the cards and catalogues others read, and stops nothing. Someone on a modified client
  * who knows the skill id can still dispatch it — the grant/token check refuses that, not this. Callers
  * that surface this op must say so; promising protection here would be a lie (the enforceability test).
  *

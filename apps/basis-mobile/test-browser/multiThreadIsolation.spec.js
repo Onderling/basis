@@ -1,7 +1,7 @@
 /**
  * Phase A — per-thread message isolation (step 5 invariant).
  *
- * Pins the reducer behavior that 17 vitest tests already cover, but
+ * Pins the reducer behaviour that 17 vitest tests already cover, but
  * end-to-end through the real React render path on react-native-web:
  * a bubble produced in thread A must NOT leak into thread B's view
  * when the user switches.

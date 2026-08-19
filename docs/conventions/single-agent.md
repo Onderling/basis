@@ -45,7 +45,7 @@ per scope. Don't.
 // ❌ Wrong — each group gets its own Agent + its own transport stack.
 for (const groupId of joinedGroups) {
   const agent = await buildMeshAgent({ identity, ... });   // one per group
-  const bundle = await createNeighborhoodAgent({ agent, ... });
+  const bundle = await createNeighbourhoodAgent({ agent, ... });
   groups.set(groupId, bundle);
 }
 ```

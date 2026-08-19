@@ -13,7 +13,7 @@ function okJson(card) { return { ok: true, json: async () => card }; }
 
 describe('G2 — createWellKnownCardResolver (injected fetch)', () => {
   it('fetches <url>/.well-known/agent from the endorsement url hint', async () => {
-    const card = { name: 'A', 'x-onderling': { id: 'catalog:a', pubKey: 'pk-a' } };
+    const card = { name: 'A', 'x-onderling': { id: 'catalogue:a', pubKey: 'pk-a' } };
     const calls = [];
     const fetchImpl = async (u) => { calls.push(u); return okJson(card); };
     const resolve = createWellKnownCardResolver({ fetch: fetchImpl });

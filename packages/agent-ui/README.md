@@ -23,7 +23,7 @@ localhost-only (`Project Files/Substrates/L1d-agent-ui.md`).
 > `taskExchange` / `A2AAuth`. Consumers silently lost group filtering,
 > tier visibility, capability tokens, and streaming. They were deleted
 > when all three downstream consumers (`apps/tasks-v0`,
-> `apps/neighborhood-v0`, `apps/archive`) migrated to the real
+> `apps/neighbourhood-v0`, `apps/archive`) migrated to the real
 > `core.Agent` dispatch path.
 
 ## Server side

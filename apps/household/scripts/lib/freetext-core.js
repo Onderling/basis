@@ -8,7 +8,7 @@
  *   - SYSTEM_PROMPT (the conversational system prompt — directive)
  *   - SYSTEM_PROMPT_TRIMMED (~50% shorter — for confused models)
  *   - SYSTEM_PROMPT_BASELINE (pre-directive — kept for revert)
- *   - TOOL_CATALOG (the addToList / removeFromList / showList tools)
+ *   - TOOL_CATALOGUE (the addToList / removeFromList / showList tools)
  *   - createListStore() (in-memory Map-based store)
  *   - createToolHandlers(store) (binds handlers to the store)
  *   - createContextBuilder(store) (lazy NL summary of list state)
@@ -429,9 +429,9 @@ User: "Kun je een kluslijst maken met timmeren, zagen en hakken?"
 → reply: "Klusjeslijst aangemaakt."
 `;
 
-// ─── TOOL CATALOG ─────────────────────────────────────────────────
+// ─── TOOL CATALOGUE ─────────────────────────────────────────────────
 
-export const TOOL_CATALOG = [
+export const TOOL_CATALOGUE = [
   {
     id: 'addToList',
     description: 'Add a single item to a named list.  Use the list name the user mentions or implies — no fixed taxonomy; new list names are created on first use.  Call once per item if the user mentions multiple.',

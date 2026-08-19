@@ -15,7 +15,7 @@ import { describe, it, expect } from 'vitest';
 import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 
-import { createNeighborhoodAgent } from '../src/index.js';
+import { createNeighbourhoodAgent } from '../src/index.js';
 
 const ADMIN = 'https://id.example/admin';
 const BRAM  = 'https://id.example/bram';
@@ -34,7 +34,7 @@ async function callSkill(agent, skillId, args, fromWebid = ADMIN) {
 async function buildTwoCircles() {
   const id = await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);
-  const bundle = await createNeighborhoodAgent({
+  const bundle = await createNeighbourhoodAgent({
     identity: id, transport: tx,
     offeringMatch: { group: A, localActor: ADMIN, peers: [] },
     members: [{ webid: ADMIN, role: 'admin' }],
@@ -123,7 +123,7 @@ describe('B4 — removing a member is per circle', () => {
     // A removal that names only a stableId used to write a row the projection could not match, i.e.
     // an audit entry with no effect. The skill resolves the webid before writing.
     const id = await AgentIdentity.generate(new VaultMemory());
-    const bundle = await createNeighborhoodAgent({
+    const bundle = await createNeighbourhoodAgent({
       identity: id, transport: new InternalTransport(new InternalBus(), id.pubKey),
       offeringMatch: { group: A, localActor: ADMIN, peers: [] },
       members: [{ webid: ADMIN, role: 'admin' }, { webid: BRAM, role: 'member', stableId: 'sid-bram' }],
@@ -194,7 +194,7 @@ describe('B4 — a circle with no redemption trail is still per-circle', () => {
     // an effect — via the global cache deletion, which was the bug. It is now exit-filtered per
     // circle instead, so removal still works here and still cannot reach another circle.
     const id = await AgentIdentity.generate(new VaultMemory());
-    const bundle = await createNeighborhoodAgent({
+    const bundle = await createNeighbourhoodAgent({
       identity: id, transport: new InternalTransport(new InternalBus(), id.pubKey),
       offeringMatch: { group: 'legacy-circle', localActor: ADMIN, peers: [] },
       members: [{ webid: ADMIN, role: 'admin' }, { webid: BRAM, role: 'member' }, { webid: CATO, role: 'member' }],

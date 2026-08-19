@@ -404,7 +404,7 @@ paramsToJsonSchema(params, opts = {})
 ```
 
 params[] → plain JSON Schema object.  Output shape matches what the
-current household `V0_TOOL_CATALOG` feeds the LLM — no `$schema`, no
+current household `V0_TOOL_CATALOGUE` feeds the LLM — no `$schema`, no
 draft pragma — so 's byte-equivalence gate can diff cleanly.
 
 Properties + required preserve param declaration order (determinism;
@@ -461,7 +461,7 @@ internal/order.js invariant the other projectors share).
 renderChat(manifest, args, opts = {})
 ```
 
-Render the chat-surface projection of a manifest: `toolCatalog` + `toolHandlers` + `systemPrompt`
+Render the chat-surface projection of a manifest: `toolCatalogue` + `toolHandlers` + `systemPrompt`
 (the `ChatAgent` ctor shape) plus the structured chat affordance lookups (`commandMenu`,
 `inlineKeyboardFor`, `replyShapeFor`, `followUpsFor`, `runtimeFor`, `embedSnapshotFor`, `briefFor`,
 `searchFor`). Ops without a matching skill in `skillRegistry` are omitted from `toolHandlers`;
@@ -478,7 +478,7 @@ outputs follow manifest declaration order. Throws when `manifest`, `skillRegistr
 - `[opts]` `object`
 - `[opts.prompt]` `{preamble?: string, perToolLine?: function, postamble?: string}` — prompt builder overrides (ignored when the manifest carries a verbatim `systemPrompt` string).
 
-**Returns:** `{toolCatalog: Array<object>, toolHandlers: Record<string, function>, systemPrompt: string, commandMenu: Array<object>, inlineKeyboardFor: function, replyShapeFor: function, followUpsFor: function, runtimeFor: function, embedSnapshotFor: function, briefFor: function, searchFor: function}`
+**Returns:** `{toolCatalogue: Array<object>, toolHandlers: Record<string, function>, systemPrompt: string, commandMenu: Array<object>, inlineKeyboardFor: function, replyShapeFor: function, followUpsFor: function, runtimeFor: function, embedSnapshotFor: function, briefFor: function, searchFor: function}`
 
 ## `src/renderCoverage.js`
 

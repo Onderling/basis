@@ -3,7 +3,7 @@
 How to play with the household bot's behaviour without breaking the
 production code path.  Three levers, fast iteration loop, a
 `tg-freetext.js` sandbox script that lets you run alternative
-prompt + tool-catalog combinations against a real Telegram bot.
+prompt + tool-catalogue combinations against a real Telegram bot.
 
 ---
 
@@ -41,13 +41,13 @@ old-vs-new entries cleanly in audit logs.
 
 **File**: `apps/household/src/skills/classifyAndExtract.js`
 
-`V0_TOOL_CATALOG` (~line 26) is a hand-built array of 5 tools
+`V0_TOOL_CATALOGUE` (~line 26) is a hand-built array of 5 tools
 (`addItem`, `listOpen`, `markComplete`, `removeItem`, `help`).  Each
 has `id`, `description`, `schema`.
 
 **What to play with:**
 - **Drop tools entirely** for pure free-text mode.  Just
-  `export const V0_TOOL_CATALOG = [];`.  See whether the bare model
+  `export const V0_TOOL_CATALOGUE = [];`.  See whether the bare model
   + good prompt outperforms the constrained tool-pick framing.
 - **Drop just `listOpen`** to see if removing the easily-confused
   "list vs add" choice helps Dutch / questioning phrasings.
@@ -95,7 +95,7 @@ tests will tell you when something's off.
 ## Fast iteration loop
 
 ```bash
-# 1. Edit one lever (prompt / catalog / rendering)
+# 1. Edit one lever (prompt / catalogue / rendering)
 
 # 2. Run the smoke against a warm Ollama (~30s with model loaded)
 HOUSEHOLD_LLM_MODEL=qwen2.5:3b-instruct \
@@ -128,7 +128,7 @@ Before you start mutating prompts:
 - **Keep a baseline.**  Add a `SYSTEM_PROMPT_CLASSIFY_v3_baseline`
   constant next to your edited version — one-line swap to A/B
   compare when an experiment makes things worse.
-- Same for the tool catalog: `V0_TOOL_CATALOG_baseline`.
+- Same for the tool catalogue: `V0_TOOL_CATALOGUE_baseline`.
 - Bump `PROMPT_VERSION` when you commit a new candidate.  Audit
   layer hashes by version so you can attribute live behaviour to
   the prompt that produced it.
@@ -162,8 +162,8 @@ apps/household/src/cli.js                  apps/household/scripts/
 └─────┬───────────────┬──────┘                     │
       │               │                            │
       ▼               ▼                            ▼
-catalog used:                            catalog used:
-V0_TOOL_CATALOG                          TOOL_CATALOG (inline)
+catalogue used:                            catalogue used:
+V0_TOOL_CATALOGUE                          TOOL_CATALOGUE (inline)
 = [addItem, listOpen,                    = [addToList,
    markComplete,                            removeFromList,
    removeItem, help]                        showList]
@@ -200,7 +200,7 @@ apps/household/src/storage/              Map<string, string[]>
            │  ChatAgent.processMessage(msg) →           │
            │   1. get/create per-chat session           │
            │   2. build context (contextBuilder hook)   │
-           │   3. call LLM with toolCatalog             │
+           │   3. call LLM with toolCatalogue             │
            │   4. dispatch returned tool_calls to       │
            │      registered toolHandlers               │
            │   5. return {replies, toolResults}         │
@@ -341,7 +341,7 @@ the 5–15s of a real Telegram round-trip.
 The `lib/freetext-core.js` module is the single source of truth for
 the system prompt, tool catalogue, store, handlers, and context
 builder.  Both `tg-freetext.js` and `cli-freetext.js` import from
-it, so editing the prompt or catalog there updates both bots.
+it, so editing the prompt or catalogue there updates both bots.
 
 ---
 
@@ -507,7 +507,7 @@ experiment's prompt; mistral 7B still violates it occasionally.)
 3. Look at the `[bot]` reply:
    - Has a `[buttons]` block? → real `showList` ran.
    - Has a markdown list but no `[buttons]` block? → LLM faked it.
-4. Iterate on prompt / catalog in `lib/freetext-core.js` and re-run.
+4. Iterate on prompt / catalogue in `lib/freetext-core.js` and re-run.
 
 ---
 

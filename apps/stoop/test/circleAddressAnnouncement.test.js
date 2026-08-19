@@ -22,7 +22,7 @@ import {
   deriveCircleAddress, signCircleLinkFromSeed,
 } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
-import { createNeighborhoodAgent } from '../src/index.js';
+import { createNeighbourhoodAgent } from '../src/index.js';
 import { resolveMemberAddress, ADDRESS_VIA } from '../src/lib/memberAddress.js';
 
 const CIRCLE = 'circle-42';
@@ -41,7 +41,7 @@ const ADMIN_SEED = 7;
 async function buildBundle(reliableSend = async () => ({ held: false, delivered: true })) {
   const id = await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);
-  const bundle = await createNeighborhoodAgent({
+  const bundle = await createNeighbourhoodAgent({
     identity: id, transport: tx,
     offeringMatch: { group: CIRCLE, localActor: ME, peers: [] },
     members: [],

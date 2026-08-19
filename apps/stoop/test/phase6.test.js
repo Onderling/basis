@@ -12,7 +12,7 @@ import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderl
 import { VaultMemory } from '@onderling/vault';
 
 import { validateHandle, HANDLE_RULES } from '../src/lib/handle.js';
-import { createNeighborhoodAgent } from '../src/index.js';
+import { createNeighbourhoodAgent } from '../src/index.js';
 import { Reveals } from '@onderling/identity-resolver';
 
 const ANNE = 'https://id.example/anne';
@@ -32,7 +32,7 @@ async function callSkill(agent, skillId, args, fromWebid = ANNE) {
 async function buildAgent({ reveals, members } = {}) {
   const id = await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);
-  const bundle = await createNeighborhoodAgent({
+  const bundle = await createNeighbourhoodAgent({
     identity: id, transport: tx,
     offeringMatch: { group: 'oosterpoort', localActor: ANNE, peers: [] },
     members:  members ?? [{ webid: ANNE }],     // ANNE pre-exists in MemberMap so updates are upserts
@@ -161,7 +161,7 @@ describe('Stoop V1 — setPeerReveal / setGroupReveal', () => {
   it('reveals is auto-wired by default (Phase 14 fix)', async () => {
     // Without an explicit `reveals: ...` opt, the factory mints a
     // default in-memory Reveals so requestReveal / setPeerReveal
-    // work out of the box.  Earlier behavior was `error: 'no-reveals'`.
+    // work out of the box.  Earlier behaviour was `error: 'no-reveals'`.
     const bundle = await buildAgent();
     const r = await callSkill(bundle.agent, 'setPeerReveal', { peerWebid: BOB });
     expect(r.peerWebid).toBe(BOB);

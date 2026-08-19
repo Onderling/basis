@@ -10,7 +10,7 @@
     "./manifest": "./manifest.js",
     "./cores": "./src/cores.js",
     "./wireSkills": "./src/wireSkills.js",
-    "./defaultCatalog": "./src/defaultCatalog.js"
+    "./defaultCatalogue": "./src/defaultCatalogue.js"
   },
   "scripts": {
     "test": "vitest run",

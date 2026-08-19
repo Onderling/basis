@@ -87,7 +87,7 @@ import { mountLocalUi, LocalUiAuth }              from '@onderling/agent-ui';
 import { renderWeb }                              from '@onderling/app-manifest';
 
 import { stoopManifest }                           from '../manifest.js';
-import { createNeighborhoodAgent }                 from '../src/index.js';
+import { createNeighbourhoodAgent }                 from '../src/index.js';
 
 const DEFAULT_ACTOR = 'https://id.example/anne';
 const DEFAULT_GROUP = 'block-42';
@@ -115,7 +115,7 @@ export async function startStoopWeb(opts = {}) {
   // substrate mirror, no relay — this is the manifest-driven web smoke.
   // Production launchers (`stoop-ui.js`, `stoop-testbed.js`) wire the
   // full plumbing and are out of E.1 scope.
-  const bundle = await createNeighborhoodAgent({
+  const bundle = await createNeighbourhoodAgent({
     identity:  id,
     transport,
     label:     `stoop-web-${actor}`,

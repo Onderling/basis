@@ -108,7 +108,7 @@ export function NoteEditScreen() {
   return (
     <KeyboardAvoidingView
       style={s.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behaviour={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <TextInput
         value={content}

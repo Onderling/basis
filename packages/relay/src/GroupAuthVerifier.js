@@ -79,7 +79,7 @@ export class GroupAuthVerifier {
       : DEFAULT_ROLE_RANKS;
   }
 
-  /** True if the verifier is configured for open mode (legacy behavior). */
+  /** True if the verifier is configured for open mode (legacy behaviour). */
   get isOpen() {
     return this.#acceptedGroups.length === 0;
   }

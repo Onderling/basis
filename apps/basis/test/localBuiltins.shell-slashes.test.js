@@ -26,15 +26,15 @@ beforeAll(async () => {
   await initLocalisation({ lng: 'en' });
 });
 
-const emptyCatalog = () => mergeManifests([{ manifest: basisManifest }]);
+const emptyCatalogue = () => mergeManifests([{ manifest: basisManifest }]);
 
-/** Hand-rolled catalog stub matching the shape /send-to + /embed read:
+/** Hand-rolled catalogue stub matching the shape /send-to + /embed read:
  *   - opsById is iterable ([opId, entry] pairs)
  *   - embedSnapshotFor(opId) returns { snapshotSkill, appOrigin } for the
  *     first op that declares one.
  * Bypasses the manifest validator (which rejects unknown chat.reply
  * shapes); we are testing dispatch-wiring, not manifest validation. */
-function catalogWithEmbedFactory({ opId = 'cardSnap', appOrigin = 'household',
+function catalogueWithEmbedFactory({ opId = 'cardSnap', appOrigin = 'household',
                                    snapshotSkill = 'cardSnap' } = {}) {
   return {
     opsById: new Map([[opId, { op: { id: opId }, appOrigin }]]),
@@ -56,7 +56,7 @@ describe('/dm', () => {
   it('creates a new DM thread with the given peer + activates it', async () => {
     const setActiveCalls = [];
     const builtins = createLocalBuiltins({
-      catalog: emptyCatalog(), t,
+      catalogue: emptyCatalogue(), t,
       threadStore: store,
       setActive: (id) => setActiveCalls.push(id),
     });
@@ -73,7 +73,7 @@ describe('/dm', () => {
 
   it('re-uses an existing DM thread with the same peer (idempotent)', async () => {
     const builtins = createLocalBuiltins({
-      catalog: emptyCatalog(), t,
+      catalogue: emptyCatalogue(), t,
       threadStore: store,
       setActive: () => {},
     });
@@ -87,7 +87,7 @@ describe('/dm', () => {
 
   it('rejects when no peer id is supplied', async () => {
     const builtins = createLocalBuiltins({
-      catalog: emptyCatalog(), t, threadStore: store, setActive: () => {},
+      catalogue: emptyCatalogue(), t, threadStore: store, setActive: () => {},
     });
     const r = await builtins.startDm({});
     expect(r.ok).toBe(false);
@@ -108,12 +108,12 @@ describe('/send-to', () => {
   });
 
   it("synthesises an embed-card into the peer's thread + reports success", async () => {
-    const catalog  = catalogWithEmbedFactory();
+    const catalogue  = catalogueWithEmbedFactory();
     const callSkill = vi.fn(async () => ({
       id: 'c-1', title: 'Dishwasher', type: 'chore', state: 'open',
     }));
     const builtins = createLocalBuiltins({
-      catalog, t,
+      catalogue, t,
       threadStore: store,
       callSkill,
       localActor: 'webid:me',
@@ -135,7 +135,7 @@ describe('/send-to', () => {
 
   it('rejects unknown peer', async () => {
     const builtins = createLocalBuiltins({
-      catalog: catalogWithEmbedFactory(), t,
+      catalogue: catalogueWithEmbedFactory(), t,
       threadStore: store, callSkill: vi.fn(), simPeers,
     });
     const r = await builtins.sendto({ peer: 'mallory', itemId: 'c-1' });
@@ -145,7 +145,7 @@ describe('/send-to', () => {
 
   it('rejects missing args (no peer / no itemId)', async () => {
     const builtins = createLocalBuiltins({
-      catalog: catalogWithEmbedFactory(), t,
+      catalogue: catalogueWithEmbedFactory(), t,
       threadStore: store, callSkill: vi.fn(), simPeers,
     });
     const r1 = await builtins.sendto({});
@@ -162,10 +162,10 @@ describe('/send-to', () => {
 describe('/apps on|off', () => {
   it('enables an app via positional args parsed from _match', async () => {
     const registry = new AppRegistry();
-    registry.syncWithCatalog(['household', 'stoop']);
+    registry.syncWithCatalogue(['household', 'stoop']);
     registry.setEnabled('stoop', false);
-    const catalog = emptyCatalog();
-    const builtins = createLocalBuiltins({ catalog, t, appRegistry: registry });
+    const catalogue = emptyCatalogue();
+    const builtins = createLocalBuiltins({ catalogue, t, appRegistry: registry });
     const r = await builtins.apps({ _match: 'on stoop' });
     expect(r.ok).toBe(true);
     expect(r.message).toMatch(/enabled/);
@@ -174,9 +174,9 @@ describe('/apps on|off', () => {
 
   it('disables an app via positional args', async () => {
     const registry = new AppRegistry();
-    registry.syncWithCatalog(['household']);
+    registry.syncWithCatalogue(['household']);
     const builtins = createLocalBuiltins({
-      catalog: emptyCatalog(), t, appRegistry: registry,
+      catalogue: emptyCatalogue(), t, appRegistry: registry,
     });
     const r = await builtins.apps({ _match: 'off household' });
     expect(r.ok).toBe(true);
@@ -186,9 +186,9 @@ describe('/apps on|off', () => {
 
   it('accepts explicit action+app args (not just _match)', async () => {
     const registry = new AppRegistry();
-    registry.syncWithCatalog(['folio']);
+    registry.syncWithCatalogue(['folio']);
     const builtins = createLocalBuiltins({
-      catalog: emptyCatalog(), t, appRegistry: registry,
+      catalogue: emptyCatalogue(), t, appRegistry: registry,
     });
     const r = await builtins.apps({ action: 'off', app: 'folio' });
     expect(r.ok).toBe(true);
@@ -197,9 +197,9 @@ describe('/apps on|off', () => {
 
   it('rejects an unknown action', async () => {
     const registry = new AppRegistry();
-    registry.syncWithCatalog(['household']);
+    registry.syncWithCatalogue(['household']);
     const builtins = createLocalBuiltins({
-      catalog: emptyCatalog(), t, appRegistry: registry,
+      catalogue: emptyCatalogue(), t, appRegistry: registry,
     });
     const r = await builtins.apps({ _match: 'toggle household' });
     expect(r.ok).toBe(false);
@@ -208,9 +208,9 @@ describe('/apps on|off', () => {
 
   it('reports missing-name when action is given without an app', async () => {
     const registry = new AppRegistry();
-    registry.syncWithCatalog(['household']);
+    registry.syncWithCatalogue(['household']);
     const builtins = createLocalBuiltins({
-      catalog: emptyCatalog(), t, appRegistry: registry,
+      catalogue: emptyCatalogue(), t, appRegistry: registry,
     });
     const r = await builtins.apps({ _match: 'on' });
     expect(r.ok).toBe(false);
@@ -224,7 +224,7 @@ describe('/peer-connect', () => {
   it('invokes connectPeer + reports the resulting address', async () => {
     const connectPeer = vi.fn(async () => ({ address: 'app.deadbeef.1234' }));
     const builtins = createLocalBuiltins({
-      catalog: emptyCatalog(), t, connectPeer,
+      catalogue: emptyCatalogue(), t, connectPeer,
     });
     const r = await builtins['peer-connect']({});
     expect(connectPeer).toHaveBeenCalledTimes(1);
@@ -235,7 +235,7 @@ describe('/peer-connect', () => {
   it('returns an error when connectPeer rejects', async () => {
     const connectPeer = vi.fn(async () => { throw new Error('relay-unreachable'); });
     const builtins = createLocalBuiltins({
-      catalog: emptyCatalog(), t, connectPeer,
+      catalogue: emptyCatalogue(), t, connectPeer,
     });
     const r = await builtins['peer-connect']({});
     expect(r.ok).toBe(false);
@@ -243,7 +243,7 @@ describe('/peer-connect', () => {
   });
 
   it('reports unavailable when no connectPeer dep is wired', async () => {
-    const builtins = createLocalBuiltins({ catalog: emptyCatalog(), t });
+    const builtins = createLocalBuiltins({ catalogue: emptyCatalogue(), t });
     const r = await builtins['peer-connect']({});
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/not available/);
@@ -259,7 +259,7 @@ describe('/test-peer', () => {
       sendPeerMessage,
       peer: { status: 'connected', address: 'app.me' },
     };
-    const builtins = createLocalBuiltins({ catalog: emptyCatalog(), t, agent });
+    const builtins = createLocalBuiltins({ catalogue: emptyCatalogue(), t, agent });
     const r = await builtins['test-peer']({ addr: 'app.peer.7777', text: 'howdy' });
     expect(sendPeerMessage).toHaveBeenCalledTimes(1);
     const [addr, env] = sendPeerMessage.mock.calls[0];
@@ -277,14 +277,14 @@ describe('/test-peer', () => {
   it("defaults the text to 'hello' when none supplied", async () => {
     const sendPeerMessage = vi.fn(async () => true);
     const agent = { sendPeerMessage, peer: { status: 'connected' } };
-    const builtins = createLocalBuiltins({ catalog: emptyCatalog(), t, agent });
+    const builtins = createLocalBuiltins({ catalogue: emptyCatalogue(), t, agent });
     await builtins['test-peer']({ addr: 'app.peer' });
     expect(sendPeerMessage.mock.calls[0][1].body).toBe('hello');
   });
 
   it('rejects when not yet connected', async () => {
     const agent = { sendPeerMessage: vi.fn(), peer: { status: 'idle' } };
-    const builtins = createLocalBuiltins({ catalog: emptyCatalog(), t, agent });
+    const builtins = createLocalBuiltins({ catalogue: emptyCatalogue(), t, agent });
     const r = await builtins['test-peer']({ addr: 'app.x' });
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/Not connected/);
@@ -295,7 +295,7 @@ describe('/test-peer', () => {
     const agent = {
       sendPeerMessage: vi.fn(), peer: { status: 'connected' },
     };
-    const builtins = createLocalBuiltins({ catalog: emptyCatalog(), t, agent });
+    const builtins = createLocalBuiltins({ catalogue: emptyCatalogue(), t, agent });
     const r = await builtins['test-peer']({});
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/peer NKN address/);
@@ -307,7 +307,7 @@ describe('/test-peer', () => {
   it('accepts the legacy `address` arg name for back-compat', async () => {
     const sendPeerMessage = vi.fn(async () => true);
     const agent = { sendPeerMessage, peer: { status: 'connected' } };
-    const builtins = createLocalBuiltins({ catalog: emptyCatalog(), t, agent });
+    const builtins = createLocalBuiltins({ catalogue: emptyCatalogue(), t, agent });
     const r = await builtins['test-peer']({ address: 'app.legacy.peer', text: 'hi' });
     expect(sendPeerMessage).toHaveBeenCalledTimes(1);
     expect(sendPeerMessage.mock.calls[0][0]).toBe('app.legacy.peer');
@@ -324,7 +324,7 @@ describe('/transports', () => {
       peer:  { status: 'connected', address: 'app.me' },
       relay: { status: 'connected', url: 'wss://relay.example', error: null },
     };
-    const builtins = createLocalBuiltins({ catalog: emptyCatalog(), t, agent });
+    const builtins = createLocalBuiltins({ catalogue: emptyCatalogue(), t, agent });
     const r = await builtins['transports']();
     expect(r.title).toMatch(/Transports/i);
     expect(r.mode).toBe('both');
@@ -337,7 +337,7 @@ describe('/transports', () => {
 
   it('fills defaults when peer/relay fields are missing', async () => {
     const agent = {}; // no peer / relay / mode
-    const builtins = createLocalBuiltins({ catalog: emptyCatalog(), t, agent });
+    const builtins = createLocalBuiltins({ catalogue: emptyCatalogue(), t, agent });
     const r = await builtins['transports']();
     expect(r.mode).toBe('nkn');
     expect(r.nknStatus).toBe('idle');
@@ -347,7 +347,7 @@ describe('/transports', () => {
   });
 
   it('reports no_substrate when agent is missing', async () => {
-    const builtins = createLocalBuiltins({ catalog: emptyCatalog(), t });
+    const builtins = createLocalBuiltins({ catalogue: emptyCatalogue(), t });
     const r = await builtins['transports']();
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/Transport-mode control not wired/);
@@ -365,7 +365,7 @@ describe('/transport-mode', () => {
 
   it('persists the mode through the one kind-gated write (nkn)', async () => {
     const agent = makeAgent();
-    const builtins = createLocalBuiltins({ catalog: emptyCatalog(), t, agent });
+    const builtins = createLocalBuiltins({ catalogue: emptyCatalogue(), t, agent });
     const r = await builtins['transport-mode']({ mode: 'nkn' });
     expect(r.ok).toBe(true);
     expect(agent.callSkill).toHaveBeenCalledWith('params', 'set-param', { key: 'transport.mode', value: 'nkn' });
@@ -374,7 +374,7 @@ describe('/transport-mode', () => {
 
   it('accepts the "both" mode', async () => {
     const agent = makeAgent();
-    const builtins = createLocalBuiltins({ catalog: emptyCatalog(), t, agent });
+    const builtins = createLocalBuiltins({ catalogue: emptyCatalogue(), t, agent });
     const r = await builtins['transport-mode']({ mode: 'both' });
     expect(r.ok).toBe(true);
     expect(agent.callSkill).toHaveBeenCalledWith('params', 'set-param', { key: 'transport.mode', value: 'both' });
@@ -382,7 +382,7 @@ describe('/transport-mode', () => {
 
   it('rejects an invalid mode', async () => {
     const agent = makeAgent();
-    const builtins = createLocalBuiltins({ catalog: emptyCatalog(), t, agent });
+    const builtins = createLocalBuiltins({ catalogue: emptyCatalogue(), t, agent });
     const r = await builtins['transport-mode']({ mode: 'tcp' });
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/Bad mode/);
@@ -391,7 +391,7 @@ describe('/transport-mode', () => {
 
   it('reports no_substrate when the agent lacks a callSkill', async () => {
     const builtins = createLocalBuiltins({
-      catalog: emptyCatalog(), t,
+      catalogue: emptyCatalogue(), t,
       agent: {},
     });
     const r = await builtins['transport-mode']({ mode: 'nkn' });
@@ -417,7 +417,7 @@ describe('/set-relay', () => {
 
   it('persists the URL + connects via sa.relay.connect', async () => {
     const agent = makeAgent();
-    const builtins = createLocalBuiltins({ catalog: emptyCatalog(), t, agent });
+    const builtins = createLocalBuiltins({ catalogue: emptyCatalogue(), t, agent });
     const r = await builtins['set-relay']({ url: 'wss://relay.example:9090' });
     expect(r.ok).toBe(true);
     expect(agent.vault.set).toHaveBeenCalledWith('cc-relay-url', 'wss://relay.example:9090');
@@ -428,7 +428,7 @@ describe('/set-relay', () => {
 
   it('disconnects-before-reconnect when already connected', async () => {
     const agent = makeAgent({ relayStatus: 'connected' });
-    const builtins = createLocalBuiltins({ catalog: emptyCatalog(), t, agent });
+    const builtins = createLocalBuiltins({ catalogue: emptyCatalogue(), t, agent });
     await builtins['set-relay']({ url: 'wss://relay2.example' });
     expect(agent.relay.disconnect).toHaveBeenCalledTimes(1);
     expect(agent.relay.connect).toHaveBeenCalledWith({ relayUrl: 'wss://relay2.example' });
@@ -436,7 +436,7 @@ describe('/set-relay', () => {
 
   it('--clear disconnects + drops the persisted URL', async () => {
     const agent = makeAgent({ relayStatus: 'connected' });
-    const builtins = createLocalBuiltins({ catalog: emptyCatalog(), t, agent });
+    const builtins = createLocalBuiltins({ catalogue: emptyCatalogue(), t, agent });
     const r = await builtins['set-relay']({ clear: true });
     expect(r.ok).toBe(true);
     expect(agent.relay.disconnect).toHaveBeenCalledTimes(1);
@@ -446,7 +446,7 @@ describe('/set-relay', () => {
 
   it('rejects a URL missing the ws:// scheme', async () => {
     const agent = makeAgent();
-    const builtins = createLocalBuiltins({ catalog: emptyCatalog(), t, agent });
+    const builtins = createLocalBuiltins({ catalogue: emptyCatalogue(), t, agent });
     const r = await builtins['set-relay']({ url: 'relay.example' });
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/Bad relay URL/);
@@ -455,7 +455,7 @@ describe('/set-relay', () => {
 
   it('reports no_substrate when agent.relay is absent', async () => {
     const builtins = createLocalBuiltins({
-      catalog: emptyCatalog(), t,
+      catalogue: emptyCatalogue(), t,
       agent: { vault: { set: vi.fn() } }, // no relay
     });
     const r = await builtins['set-relay']({ url: 'wss://x' });
@@ -495,7 +495,7 @@ describe('/debug-dump', () => {
         { ts: 1_700_000_001_000, dir: 'recv', from: 'app.peer.bbbb', subtype: 'file-share', size: 1024 },
       ],
     });
-    const builtins = createLocalBuiltins({ catalog: emptyCatalog(), t, agent });
+    const builtins = createLocalBuiltins({ catalogue: emptyCatalogue(), t, agent });
     const r = await builtins['debug-dump']();
     expect(r.message).toMatch(/basis debug-dump/);
     expect(r.message).toMatch(/pub-abcd/);
@@ -513,14 +513,14 @@ describe('/debug-dump', () => {
 
   it('handles the empty-recent-buffer case', async () => {
     const agent = makeSa({ recent: [] });
-    const builtins = createLocalBuiltins({ catalog: emptyCatalog(), t, agent });
+    const builtins = createLocalBuiltins({ catalogue: emptyCatalogue(), t, agent });
     const r = await builtins['debug-dump']();
     expect(r.message).toMatch(/No peer traffic recorded yet/);
   });
 
   it('returns an error when agent.sa is missing', async () => {
     const builtins = createLocalBuiltins({
-      catalog: emptyCatalog(), t, agent: {},
+      catalogue: emptyCatalogue(), t, agent: {},
     });
     const r = await builtins['debug-dump']();
     expect(r.ok).toBe(false);
@@ -544,7 +544,7 @@ describe('/reset-thread', () => {
     expect(active.messages.length).toBe(2);
 
     const builtins = createLocalBuiltins({
-      catalog: emptyCatalog(), t, threadStore: store,
+      catalogue: emptyCatalogue(), t, threadStore: store,
     });
     const r = await builtins['reset-thread']();
     expect(r.ok).toBe(true);
@@ -555,7 +555,7 @@ describe('/reset-thread', () => {
   it('reports no_thread when there is no active thread', async () => {
     const empty = new ThreadStore();
     const builtins = createLocalBuiltins({
-      catalog: emptyCatalog(), t, threadStore: empty,
+      catalogue: emptyCatalogue(), t, threadStore: empty,
     });
     const r = await builtins['reset-thread']();
     expect(r.ok).toBe(false);
@@ -565,7 +565,7 @@ describe('/reset-thread', () => {
   // 2026-05-27 slash audit close-out — distinguishes "no store" from
   // "no active thread".  Two separate conditions, two locale keys.
   it('reports no_store when threadStore is not wired', async () => {
-    const builtins = createLocalBuiltins({ catalog: emptyCatalog(), t });
+    const builtins = createLocalBuiltins({ catalogue: emptyCatalogue(), t });
     const r = await builtins['reset-thread']();
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/Thread store not available/);

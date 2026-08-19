@@ -8,15 +8,15 @@
 // (see web-mobile-consolidation-plan.md; [[basis-unifier-principle]], [[platform-parity]]).
 
 /**
- * Build the slash-command pool from a merged catalog: every op that declares a `surfaces.slash.command`,
+ * Build the slash-command pool from a merged catalogue: every op that declares a `surfaces.slash.command`,
  * as `{ command, hint, opId }`, sorted by command. The `hint` is the op's `surfaces.chat.hint` (falls
  * back to the op id). Mirrors classic `commandPool()` (main.js).
  *
- * @param {{opsById?: Map<string, any>}} catalog  the merged + filtered catalog (mergeManifests → filterCatalog)
+ * @param {{opsById?: Map<string, any>}} catalogue  the merged + filtered catalogue (mergeManifests → filterCatalogue)
  * @returns {Array<{command: string, hint: string, opId: string}>}
  */
-export function buildCommandPool(catalog) {
-  const ops = catalog && catalog.opsById;
+export function buildCommandPool(catalogue) {
+  const ops = catalogue && catalogue.opsById;
   if (!ops || typeof ops.values !== 'function') return [];
   const out = [];
   for (const entry of ops.values()) {
@@ -38,16 +38,16 @@ export function buildCommandPool(catalog) {
  * type a space they're into args, so the list closes). Prefix match, case-insensitive. Mirrors classic
  * `refreshSuggest()` (main.js).
  *
- * @param {object} catalog
+ * @param {object} catalogue
  * @param {string} inputValue
  * @param {{limit?: number}} [opts]
  * @returns {Array<{command: string, hint: string, opId: string}>}
  */
-export function suggestCommands(catalog, inputValue, { limit = 12 } = {}) {
+export function suggestCommands(catalogue, inputValue, { limit = 12 } = {}) {
   const v = typeof inputValue === 'string' ? inputValue : '';
   if (!v.startsWith('/') || v.includes(' ')) return [];
   const needle = v.toLowerCase();
-  return buildCommandPool(catalog)
+  return buildCommandPool(catalogue)
     .filter((m) => m.command.toLowerCase().startsWith(needle))
     .slice(0, limit);
 }

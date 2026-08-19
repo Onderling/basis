@@ -152,4 +152,4 @@ const person = await graph.findByIdentifier({ kind: 'email', value: 'alice@examp
 ## See also
 
 - `Project Files/Substrates/L1h-identity-resolver.md` — sketch.
-- `Project Files/Substrates/apps/H4-tasks.md` + `H5-neighborhood.md` + `H7-archive.md` — primary consumers.
+- `Project Files/Substrates/apps/H4-tasks.md` + `H5-neighbourhood.md` + `H7-archive.md` — primary consumers.

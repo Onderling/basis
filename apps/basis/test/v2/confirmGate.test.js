@@ -23,7 +23,7 @@ import { mergeManifests } from '../../src/manifestMerge.js';
 import { resolveDispatch } from '../../src/router.js';
 import { confirmRequestFromRoute, readyFromConfirm, runConfirmGate } from '../../src/v2/confirmGate.js';
 
-const catalog = mergeManifests([{ manifest: agentsManifest }]);
+const catalogue = mergeManifests([{ manifest: agentsManifest }]);
 const t = (k) => k;
 
 /** The three danger ops with COMPLETE args (so needsForm can't front the gate). */
@@ -34,7 +34,7 @@ const DANGER_FIXTURES = [
 ];
 
 function routeFor({ opId, args }) {
-  return resolveDispatch({ kind: 'slash', opId, args, command: '(bot)', body: '' }, catalog);
+  return resolveDispatch({ kind: 'slash', opId, args, command: '(bot)', body: '' }, catalogue);
 }
 
 describe('emission — an op with surfaces.ui.confirm + complete args resolves to needsConfirm', () => {
@@ -56,10 +56,10 @@ describe('emission — an op with surfaces.ui.confirm + complete args resolves t
 // localised default), so issuing a mandate can never bypass the "weet je het
 // zeker?" gate. This is the mechanism the entrust picker relies on (2026-07-18).
 describe('mandate — attachTaskGrant routes through the confirm waist', () => {
-  const tasksCatalog = mergeManifests([{ manifest: tasksManifest }]);
+  const tasksCatalogue = mergeManifests([{ manifest: tasksManifest }]);
   const routeMandate = () => resolveDispatch(
     { kind: 'slash', opId: 'attachTaskGrant', args: { taskId: 't1', member: 'ed25519:bob' }, command: '(bot)', body: '' },
-    tasksCatalog,
+    tasksCatalogue,
   );
 
   it('resolves attachTaskGrant to needsConfirm (severity warn) before any execute', () => {
@@ -80,14 +80,14 @@ describe('mandate — attachTaskGrant routes through the confirm waist', () => {
 
   it('accept → executes exactly once with the confirmed ready dispatch; cancel → never executes', async () => {
     const acceptExec = vi.fn();
-    const accepted = await runConfirmGate({ route: routeMandate(), catalog: tasksCatalog, t, present: async () => true, execute: acceptExec, onCancelNotice: vi.fn() });
+    const accepted = await runConfirmGate({ route: routeMandate(), catalogue: tasksCatalogue, t, present: async () => true, execute: acceptExec, onCancelNotice: vi.fn() });
     expect(accepted.executed).toBe(true);
     expect(acceptExec).toHaveBeenCalledTimes(1);
     expect(acceptExec).toHaveBeenCalledWith(expect.objectContaining({ kind: 'ready', opId: 'attachTaskGrant' }));
 
     const cancelExec = vi.fn();
     const onCancelNotice = vi.fn();
-    const cancelled = await runConfirmGate({ route: routeMandate(), catalog: tasksCatalog, t, present: async () => false, execute: cancelExec, onCancelNotice });
+    const cancelled = await runConfirmGate({ route: routeMandate(), catalogue: tasksCatalogue, t, present: async () => false, execute: cancelExec, onCancelNotice });
     expect(cancelled.executed).toBe(false);
     expect(cancelExec).not.toHaveBeenCalled();
     expect(onCancelNotice).toHaveBeenCalledTimes(1);
@@ -118,9 +118,9 @@ describe('confirmRequestFromRoute — the presentation model', () => {
 });
 
 describe('readyFromConfirm — the explicit-accept continuation', () => {
-  it('re-tags the confirmed route ready, args + appOrigin + replyShape intact, verb from the catalog', () => {
+  it('re-tags the confirmed route ready, args + appOrigin + replyShape intact, verb from the catalogue', () => {
     const route = routeFor(DANGER_FIXTURES[1]);
-    const ready = readyFromConfirm(route, catalog);
+    const ready = readyFromConfirm(route, catalogue);
     expect(ready).toEqual({
       kind: 'ready',
       opId: 'purgeAgent',
@@ -133,7 +133,7 @@ describe('readyFromConfirm — the explicit-accept continuation', () => {
   });
 
   it('rejects a non-needsConfirm route (the gate cannot be skipped by mislabeling)', () => {
-    expect(() => readyFromConfirm({ kind: 'ready' }, catalog)).toThrow(TypeError);
+    expect(() => readyFromConfirm({ kind: 'ready' }, catalogue)).toThrow(TypeError);
   });
 });
 
@@ -143,7 +143,7 @@ describe('runConfirmGate — accept executes exactly once; cancel never executes
       const route = routeFor(fx);
       const execute = vi.fn();
       const onCancelNotice = vi.fn();
-      const r = await runConfirmGate({ route, catalog, t, present: async () => true, execute, onCancelNotice });
+      const r = await runConfirmGate({ route, catalogue, t, present: async () => true, execute, onCancelNotice });
       expect(r.executed).toBe(true);
       expect(execute).toHaveBeenCalledTimes(1);
       expect(execute).toHaveBeenCalledWith(expect.objectContaining({ kind: 'ready', opId: fx.opId, args: fx.args }));
@@ -154,7 +154,7 @@ describe('runConfirmGate — accept executes exactly once; cancel never executes
       const route = routeFor(fx);
       const execute = vi.fn();
       const onCancelNotice = vi.fn();
-      const r = await runConfirmGate({ route, catalog, t, present: async () => false, execute, onCancelNotice });
+      const r = await runConfirmGate({ route, catalogue, t, present: async () => false, execute, onCancelNotice });
       expect(r.executed).toBe(false);
       expect(execute).not.toHaveBeenCalled();
       expect(onCancelNotice).toHaveBeenCalledTimes(1);
@@ -166,7 +166,7 @@ describe('runConfirmGate — accept executes exactly once; cancel never executes
     const execute = vi.fn();
     const onCancelNotice = vi.fn();
     const r = await runConfirmGate({
-      route, catalog, t, present: async () => { throw new Error('boom'); }, execute, onCancelNotice,
+      route, catalogue, t, present: async () => { throw new Error('boom'); }, execute, onCancelNotice,
     });
     expect(r.executed).toBe(false);
     expect(execute).not.toHaveBeenCalled();

@@ -190,7 +190,7 @@ describe('protocol — multi-recipient + relay restart (durable SQLite queue)', 
     await relay.stop();
 
     // Close + reopen the store handle so we exercise the reload path
-    // (better-sqlite3 honors WAL + foreign keys; reopening proves the
+    // (better-sqlite3 honours WAL + foreign keys; reopening proves the
     // durable rows survived).
     await store.close();
     store = new SqliteQueueStore({ path: dbPath });

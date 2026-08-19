@@ -138,7 +138,7 @@ describe('writeWithConvention — inline path (small content)', () => {
     expect(JSON.parse(new TextDecoder().decode(stored.content))).toEqual(obj);
   });
 
-  it('honors explicit opts.contentType', async () => {
+  it('honours explicit opts.contentType', async () => {
     await writeWithConvention(pod, store, '/notes/hi.txt', 'hi', { contentType: 'text/markdown' });
     expect(pod.write.mock.calls[0][2].contentType).toBe('text/markdown');
   });

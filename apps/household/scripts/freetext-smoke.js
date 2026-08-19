@@ -34,7 +34,7 @@ import { LlmClient }      from '../src/llm/LlmClient.js';
 import { ollamaProvider } from '../src/llm/providers/ollama.js';
 
 import {
-  TOOL_CATALOG,
+  TOOL_CATALOGUE,
   createListStore,
   createToolHandlers,
   createContextBuilder,
@@ -389,7 +389,7 @@ async function runFixture(fixture, model) {
   const agent = new ChatAgent({
     bridges:        [bridge],
     llm,
-    toolCatalog:    TOOL_CATALOG,
+    toolCatalogue:    TOOL_CATALOGUE,
     toolHandlers:   recordingHandlers,
     systemPrompt:   SYSTEM_PROMPT,
     contextBuilder: createContextBuilder(store),

@@ -16,7 +16,7 @@
  * bridge every v2 screen uses; reads re-run after each edit so the surface
  * reflects the PERSISTED state (verify the result, not the dispatch).
  */
-// Relative paths (not `@onderling-app/basis` subpaths) — Metro doesn't honor
+// Relative paths (not `@onderling-app/basis` subpaths) — Metro doesn't honour
 // package.json "exports" subpaths (same pattern as hostOps.js). The loader
 // itself is the SHARED one (phase-D consolidation): web and mobile run the
 // identical sequence by construction; pass `activeCircleId` to also run the

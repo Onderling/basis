@@ -1,29 +1,29 @@
 /**
- * agents — install through the commons-governance G2 WEB-OF-TRUST catalog.
+ * agents — install through the commons-governance G2 WEB-OF-TRUST catalogue.
  *
  * Extends installEndorsed.test.js (G1, single-root) to the G2 graph source:
  *   1. TRANSITIVE INSTALL — an agent discovered by WALKING the graph (root →
  *      curator B → agent X, depth 2) installs end-to-end with 's
  *      capability-security (only granted+declared caps land).
  *   2. cardHash-AT-INSTALL — a card SWAPPED after listing (endorse-then-escalate)
- *      fails the re-verify inside `catalog.get`, so install can't proceed. Proves
+ *      fails the re-verify inside `catalogue.get`, so install can't proceed. Proves
  *      the cardHash binding holds not just at list time but at install time.
  *   3. MULTI-ROOT — a card reachable only from the SECOND root still installs.
  *
  * Real primitives: Ed25519 AgentIdentity, the endorsement records, the real
- * createCatalogSource graph walk — no catalog mock.
+ * createCatalogueSource graph walk — no catalogue mock.
  */
 import { describe, it, expect } from 'vitest';
 
 import { AgentIdentity }        from '../../../packages/core/src/identity/AgentIdentity.js';
 import { VaultMemory }          from '../../../packages/vault/src/VaultMemory.js';
 import { createAgentRegistry }  from '../../../packages/agent-registry/src/AgentRegistry.js';
-import { createCatalogSource }  from '../../../packages/agent-registry/src/catalogSource.js';
+import { createCatalogueSource }  from '../../../packages/agent-registry/src/catalogueSource.js';
 import { issueEndorsement }     from '../../../packages/agent-registry/src/endorsement.js';
 
 import { INSTALL_CORES } from '../src/installCores.js';
 
-const { installAgent, listCatalog } = INSTALL_CORES;
+const { installAgent, listCatalogue } = INSTALL_CORES;
 
 /* ── Fixtures ──────────────────────────────────────────────────────────── */
 
@@ -78,24 +78,24 @@ describe('agents — G2 transitive discovery → install with capability-securit
     const X     = await makeIdentity();
     g.card(root, curatorCard(root.pubKey, { id: 'root' }));
     g.card(B, curatorCard(B.pubKey, { id: 'curatorB' }));
-    g.card(X, agentCard(X.pubKey, { id: 'catalog:X' }));
+    g.card(X, agentCard(X.pubKey, { id: 'catalogue:X' }));
     g.endorse(root, B);   // trust curator B
     g.endorse(B, X, { tags: ['files'] });   // B recommends agent X → depth 2
 
-    const catalog = createCatalogSource({ resolveEndorsements: g.resolveEndorsements, roots: [root.pubKey], resolveCard: g.resolveCard, maxDepth: 4 });
+    const catalogue = createCatalogueSource({ resolveEndorsements: g.resolveEndorsements, roots: [root.pubKey], resolveCard: g.resolveCard, maxDepth: 4 });
     const registry = buildRegistry();
 
-    const listed = await listCatalog({ registry, catalog }, {});
-    expect(listed.catalog.map((c) => c.id)).toEqual(['catalog:X']);
+    const listed = await listCatalogue({ registry, catalogue }, {});
+    expect(listed.catalogue.map((c) => c.id)).toEqual(['catalogue:X']);
 
-    const res = await installAgent({ registry, catalog }, { catalogId: 'catalog:X', grants: ['summarise.thread', 'evil.exfiltrate'] });
+    const res = await installAgent({ registry, catalogue }, { catalogueId: 'catalogue:X', grants: ['summarise.thread', 'evil.exfiltrate'] });
     expect(res.ok).toBe(true);
     expect(res.installed).toBe(true);
-    expect(res.source).toBe('catalog');
+    expect(res.source).toBe('catalogue');
     expect(res.granted.map((gr) => gr.skill)).toEqual(['summarise.thread']);
     expect(res.rejected).toEqual([{ skill: 'evil.exfiltrate', reason: 'not-declared' }]);
 
-    const entry = await registry.lookup('catalog:X');
+    const entry = await registry.lookup('catalogue:X');
     expect(entry.capabilities).toEqual(['summarise.thread']);
     expect(entry.pubKey).toBe(X.pubKey);
   });
@@ -107,15 +107,15 @@ describe('agents — G2 transitive discovery → install with capability-securit
     const Y     = await makeIdentity();
     g.card(rootA, curatorCard(rootA.pubKey, { id: 'rootA' }));
     g.card(rootB, curatorCard(rootB.pubKey, { id: 'rootB' }));
-    g.card(Y, agentCard(Y.pubKey, { id: 'catalog:Y' }));
+    g.card(Y, agentCard(Y.pubKey, { id: 'catalogue:Y' }));
     g.endorse(rootB, Y);   // only rootB vouches for Y
 
-    const catalog = createCatalogSource({ resolveEndorsements: g.resolveEndorsements, roots: [rootA.pubKey, rootB.pubKey], resolveCard: g.resolveCard, maxDepth: 4 });
+    const catalogue = createCatalogueSource({ resolveEndorsements: g.resolveEndorsements, roots: [rootA.pubKey, rootB.pubKey], resolveCard: g.resolveCard, maxDepth: 4 });
     const registry = buildRegistry();
-    expect((await listCatalog({ registry, catalog }, {})).catalog.map((c) => c.id)).toEqual(['catalog:Y']);
-    const res = await installAgent({ registry, catalog }, { catalogId: 'catalog:Y', grants: ['summarise.thread'] });
+    expect((await listCatalogue({ registry, catalogue }, {})).catalogue.map((c) => c.id)).toEqual(['catalogue:Y']);
+    const res = await installAgent({ registry, catalogue }, { catalogueId: 'catalogue:Y', grants: ['summarise.thread'] });
     expect(res.ok).toBe(true);
-    expect((await registry.lookup('catalog:Y')).capabilities).toEqual(['summarise.thread']);
+    expect((await registry.lookup('catalogue:Y')).capabilities).toEqual(['summarise.thread']);
   });
 });
 
@@ -126,22 +126,22 @@ describe('agents — G2 cardHash re-verify holds at install time', () => {
     const root = await makeIdentity();
     const X    = await makeIdentity();
     g.card(root, curatorCard(root.pubKey, { id: 'root' }));
-    g.card(X, agentCard(X.pubKey, { id: 'catalog:X', skills: ['summarise.thread'] }));
+    g.card(X, agentCard(X.pubKey, { id: 'catalogue:X', skills: ['summarise.thread'] }));
     g.endorse(root, X);
 
-    const catalog = createCatalogSource({ resolveEndorsements: g.resolveEndorsements, roots: [root.pubKey], resolveCard: g.resolveCard, maxDepth: 4 });
+    const catalogue = createCatalogueSource({ resolveEndorsements: g.resolveEndorsements, roots: [root.pubKey], resolveCard: g.resolveCard, maxDepth: 4 });
     const registry = buildRegistry();
 
     // At list time the endorsed card is present.
-    expect((await listCatalog({ registry, catalog }, {})).catalog.map((c) => c.id)).toEqual(['catalog:X']);
+    expect((await listCatalogue({ registry, catalogue }, {})).catalogue.map((c) => c.id)).toEqual(['catalogue:X']);
 
     // The agent SWAPS its card (adds an egress skill) — same pubKey, new content.
-    g.setCard(X.pubKey, agentCard(X.pubKey, { id: 'catalog:X', skills: ['summarise.thread', 'net.exfiltrate'] }));
+    g.setCard(X.pubKey, agentCard(X.pubKey, { id: 'catalogue:X', skills: ['summarise.thread', 'net.exfiltrate'] }));
 
     // Install re-derives → cardHash no longer matches the endorsement → dropped.
-    const res = await installAgent({ registry, catalog }, { catalogId: 'catalog:X', grants: ['summarise.thread'] });
+    const res = await installAgent({ registry, catalogue }, { catalogueId: 'catalogue:X', grants: ['summarise.thread'] });
     expect(res.ok).toBe(false);
-    expect(res.error).toBe('catalog-entry-not-found');
-    expect(await registry.lookup('catalog:X')).toBeNull();
+    expect(res.error).toBe('catalogue-entry-not-found');
+    expect(await registry.lookup('catalogue:X')).toBeNull();
   });
 });

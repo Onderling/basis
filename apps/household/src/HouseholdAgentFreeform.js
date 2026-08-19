@@ -25,7 +25,7 @@
  *   tool-call (qwen).  Both score 100% on lite.
  *
  * Code organisation note: the bulk of this agent's logic still lives
- * in `apps/household/scripts/lib/freetext-core.js` (TOOL_CATALOG,
+ * in `apps/household/scripts/lib/freetext-core.js` (TOOL_CATALOGUE,
  * SYSTEM_PROMPT, the store factories, slash-command preprocessor).
  * Phase 2 will move that lib into `src/freeform/` proper; for Phase
  * 1 we import across the scripts/src boundary deliberately to keep
@@ -35,7 +35,7 @@
 import { ChatAgent } from '@onderling/chat-agent';
 
 import {
-  TOOL_CATALOG,
+  TOOL_CATALOGUE,
   SYSTEM_PROMPT,
   createListStore,
   createPersistedListStore,
@@ -75,7 +75,7 @@ export class HouseholdAgentFreeform {
    * @param {string} [args.systemPrompt]
    *   System prompt to use.  Defaults to the directive `SYSTEM_PROMPT`
    *   from freetext-core (proven on lite-3).
-   * @param {Array} [args.toolCatalog]
+   * @param {Array} [args.toolCatalogue]
    *   Tool descriptors for ChatAgent.  Defaults to the experiment's
    *   3-tool catalogue (addToList / removeFromList / showList).
    * @param {Record<string, Function>} [args.toolHandlers]
@@ -97,7 +97,7 @@ export class HouseholdAgentFreeform {
     persist        = false,
     listsPath,
     systemPrompt   = SYSTEM_PROMPT,
-    toolCatalog    = TOOL_CATALOG,
+    toolCatalogue    = TOOL_CATALOGUE,
     toolHandlers,
     contextBuilder,
     sessionTtlMs   = DEFAULT_SESSION_TTL_MS,
@@ -135,7 +135,7 @@ export class HouseholdAgentFreeform {
     this.#chatAgent = new ChatAgent({
       bridges,
       llm,
-      toolCatalog,
+      toolCatalogue,
       toolHandlers: handlers,
       systemPrompt,
       contextBuilder: ctx,

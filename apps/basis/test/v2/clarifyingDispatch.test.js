@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createClarifyingDispatch } from '../../src/v2/clarifyingDispatch.js';
 
-const CATALOG = { opsById: new Map([
+const CATALOGUE = { opsById: new Map([
   ['markComplete', { op: { id: 'markComplete', params: [
     { name: 'target', kind: 'string', required: true, pickerSource: { listOp: 'listOpen' } } ] } }],
 ]) };
@@ -11,7 +11,7 @@ function harness(items) {
   const asked = [];
   const missed = [];
   const cd = createClarifyingDispatch({
-    catalog: () => CATALOG,
+    catalogue: () => CATALOGUE,
     lookup: async () => items,
     dispatchReady: (cmd) => { dispatched.push(cmd); },
     ask: (q) => { asked.push(q); },

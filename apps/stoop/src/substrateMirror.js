@@ -4,7 +4,7 @@ import { buildSubstrateStack } from './lib/substrateStack.js';
 
 /**
  * Attach the substrate stack + mirror to an existing Stoop bundle
- * (the return value of `createNeighborhoodAgent`). Mutates `bundle`
+ * (the return value of `createNeighbourhoodAgent`). Mutates `bundle`
  * to add `pseudoPod`, `notifyEnvelope`, `substrateDeviceId`,
  * `_substrateStop`, `mirror`, and (when `agentRegistry` is not
  * `false`) `agentRegistry`.
@@ -14,7 +14,7 @@ import { buildSubstrateStack } from './lib/substrateStack.js';
  *  - `apps/stoop/bin/stoop-testbed.js`
  *  - Stoop's test suites (replacing legacy `wireGroupBroadcastMirror`).
  *
- * @param {object} bundle               return of createNeighborhoodAgent
+ * @param {object} bundle               return of createNeighbourhoodAgent
  * @param {object} opts
  * @param {string} opts.group
  * @param {Array<{pubKey: string}>} [opts.peers]

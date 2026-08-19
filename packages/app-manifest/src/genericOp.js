@@ -2,10 +2,10 @@
  * genericOp — the identity codec for a GENERIC (op-less) capability's synthetic op-id (PLAN-capability-arc §1b).
  *
  * A capability declared on a noun with NO implementing op ("declare a noun → get CRUD free") still needs a
- * stable handle so the standard machinery can carry it: the catalog synthesises a virtual op whose id encodes
+ * stable handle so the standard machinery can carry it: the catalogue synthesises a virtual op whose id encodes
  * `(app, atom, noun)`, `renderSlash`/`buildToolDescriptors` project it onto slash + LLM surfaces, the gate
  * authorises it by `(atom × noun)`, and the dispatch waist decodes it back to route to the generic handler
- * (`createGenericAtomHandlers` via a service's `callCapability`). Both the SYNTH side (catalog) and the DECODE
+ * (`createGenericAtomHandlers` via a service's `callCapability`). Both the SYNTH side (catalogue) and the DECODE
  * side (real-agent callSkill) key off this one codec so the format can't drift.
  *
  * Format: `__generic__:<app>:<atom>:<noun>` — `__generic__` can't collide with a real op-id, and app/atom/noun

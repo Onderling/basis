@@ -656,10 +656,10 @@ function validateOperation(op, path, manifest, errors, idSet, opts = {}) {
   // (feedback-extension DESIGN §1.3) — `op.steps` makes this op a
   // COMPOSITE: a pure-data sequence of EXISTING opIds run by
   // `runCompositeOp`.  Validate STRUCTURE here (each step has a string
-  // appOrigin + opId; `args`/`argRef` are well-shaped).  The CATALOG-
+  // appOrigin + opId; `args`/`argRef` are well-shaped).  The CATALOGUE-
   // level check — "every step's opId actually resolves" — is the
   // verifier's job (`verifyComposite`, sandbox-by-construction), because
-  // it needs the merged cross-app catalog, not a single manifest.
+  // it needs the merged cross-app catalogue, not a single manifest.
   if (op.steps !== undefined) {
     if (!Array.isArray(op.steps)) {
       errors.push({ path: `${path}/steps`, message: 'op.steps must be an array if present' });

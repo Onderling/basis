@@ -3,7 +3,7 @@
  *
  * Silence-by-default is the recipient's half of the attention gate: no token ever reaches the
  * relay until the person turns this on, so with the switch off ZERO push metadata leaves the
- * device (the honored floor — the relay ignores wakes for addresses it holds no token for).
+ * device (the honoured floor — the relay ignores wakes for addresses it holds no token for).
  * Turning it on runs the whole enable chain: OS permission → push token (via the existing
  * `setupPush` bridge) → `relay.registerPushToken` on the transport facade. Turning it off
  * unregisters at the relay AND tears the bridge down. The sender's half of the gate already

@@ -1,6 +1,6 @@
 # basis
 
-**Basis** is a decentralized app for communities — households, neighborhoods, clubs — where
+**Basis** is a decentralized app for communities — households, neighbourhoods, clubs — where
 people exchange messages, tasks, questions, and files **without a required central server**.
 Everything runs on the user's own devices, encrypted end to end; a [Solid](https://solidproject.org)
 pod is an optional portability layer, never a dependency.
@@ -93,7 +93,7 @@ Layering is a project invariant: apps compose substrates, substrates compose the
 | App | What it does |
 |---|---|
 | **basis** (`apps/basis`, `apps/basis-mobile`) | The unified front door — one chat + GUI shell composing every module below through the merged manifest. Web is static-deployable; mobile is Expo/React Native. Web and mobile are peers — one shared core, two thin shells. |
-| **household · stoop · tasks · folio · calendar** | Functionality modules — shared household state, neighborhood sharing and offering-matching (*aanbod*), tasks and circles, pod file sharing, events with cross-peer RSVP. Their manifests are the source of truth; Basis composes them as one product. (`@onderling-app/tasks` is the task ledger; its directory is still `apps/tasks-v0`.) |
+| **household · stoop · tasks · folio · calendar** | Functionality modules — shared household state, neighbourhood sharing and offering-matching (*aanbod*), tasks and circles, pod file sharing, events with cross-peer RSVP. Their manifests are the source of truth; Basis composes them as one product. (`@onderling-app/tasks` is the task ledger; its directory is still `apps/tasks-v0`.) |
 | **feedback** | Privacy-first community feedback — split to its own repository: [Onderling/feedback](https://github.com/Onderling/feedback). It consumes the published platform like any third party. |
 
 ## Engineering principles

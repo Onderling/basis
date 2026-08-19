@@ -16,7 +16,7 @@
  *                   DataPart out: {member}
  *
  * Lifted from the duplicate copies in apps/tasks-v0 and
- * apps/neighborhood-v0 (rule-of-two). Migrated 2026-05-04 from the
+ * apps/neighbourhood-v0 (rule-of-two). Migrated 2026-05-04 from the
  * legacy `(args, ctx) => result` shape to `defineSkill` shape as part
  * of L1d Phase 3.1 (substrate-vs-SDK refactor).
  */

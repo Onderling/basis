@@ -45,8 +45,8 @@ describe('SP-4b + SP-11: recombination demo (household + tasks-v0)', () => {
       expect(runtime.host.list().sort()).toEqual(['household', 'tasks']);
     });
 
-    it('composed toolCatalog covers tools from both apps with appId.opId namespacing', () => {
-      const ids = runtime.composed.toolCatalog.map((t) => t.id);
+    it('composed toolCatalogue covers tools from both apps with appId.opId namespacing', () => {
+      const ids = runtime.composed.toolCatalogue.map((t) => t.id);
       // household tools (sample — at least these must be present).
       expect(ids).toContain('household.addItem');
       expect(ids).toContain('household.listOpen');
@@ -98,7 +98,7 @@ describe('SP-4b + SP-11: recombination demo (household + tasks-v0)', () => {
     it('cross-app isolation — household tasks list is empty even after tasks.addTask', async () => {
       // tasks.addTask writes to tasks-v0's itemStore, NOT household's
       // tasks list — even though household ALSO has an addTask op
-      // (SP-2).  Namespacing in the composed catalog prevents the
+      // (SP-2).  Namespacing in the composed catalogue prevents the
       // confusion at dispatch time.
       await runScriptedConversation(runtime, [
         DEMO_USER_MESSAGES[0],
@@ -163,8 +163,8 @@ describe('SP-11b: stoop as a 3rd mounted app', () => {
       .toBeGreaterThan(0);
   });
 
-  it('composed toolCatalog namespaces all THREE apps with appId.opId', () => {
-    const ids = runtime.composed.toolCatalog.map((t) => t.id);
+  it('composed toolCatalogue namespaces all THREE apps with appId.opId', () => {
+    const ids = runtime.composed.toolCatalogue.map((t) => t.id);
 
     // Every id is namespaced to one of the three mounted apps.
     expect(ids.every((id) => /^(household|tasks|stoop)\./.test(id))).toBe(true);
@@ -176,7 +176,7 @@ describe('SP-11b: stoop as a 3rd mounted app', () => {
 
     // Namespacing is what keeps a shared bare op-name (e.g. `listOpen`,
     // which household, tasks AND stoop all define) collision-free in
-    // the tool catalog: three distinct ids, one per app.
+    // the tool catalogue: three distinct ids, one per app.
     expect(ids).toContain('household.listOpen');
     expect(ids).toContain('tasks.listOpen');
     expect(ids).toContain('stoop.listOpen');

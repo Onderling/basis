@@ -9,7 +9,7 @@
 //
 // Platform-neutral: the shell injects `lookup(listOp, query, scope) → items[]` (the CIRCLE-SCOPED
 // candidate search — this is what confines resolution to the active circle, and why the same label in
-// another circle can't be hit) and the catalog. Screens are filtered views of one circle, so a label
+// another circle can't be hit) and the catalogue. Screens are filtered views of one circle, so a label
 // can still match several items inside a circle — that surfaces here as `clarify`.
 //
 // Outcomes:
@@ -19,14 +19,14 @@
 
 /**
  * @param {{opId:string, args:object}} command
- * @param {{catalog:object, lookup:(listOp:string, query:string, scope:object)=>(any[]|Promise<any[]>), scope?:object}} deps
+ * @param {{catalogue:object, lookup:(listOp:string, query:string, scope:object)=>(any[]|Promise<any[]>), scope?:object}} deps
  * @returns {Promise<{kind:'ready'|'clarify'|'unresolved', opId:string, args:object, param?:string, query?:string, candidates?:Array<{id:string,label:string,hint?:string}>}>}
  */
-export async function clarifyCommandTargets({ opId, args, appOrigin }, { catalog, lookup, scope } = {}) {
+export async function clarifyCommandTargets({ opId, args, appOrigin }, { catalogue, lookup, scope } = {}) {
   // K0 de-shadow: when an app-origin hint is present (a gate/slash command knows its app), prefer the
   // app-qualified entry (`<app>/<opId>`) so a COLLIDING bare op-id resolves to the right app's op +
   // params — not the merge's first-declarer. Falls back to the bare entry (no hint / hint is the owner).
-  const ops = catalog && catalog.opsById ? catalog.opsById : null;
+  const ops = catalogue && catalogue.opsById ? catalogue.opsById : null;
   const entry = ops
     ? ((appOrigin && ops.get(`${appOrigin}/${opId}`)) || ops.get(opId) || null)
     : null;

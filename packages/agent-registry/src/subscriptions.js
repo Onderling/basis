@@ -12,22 +12,22 @@
  *      starts from. Subscribe adds a community's admins; unsubscribe removes
  *      them. (Plus any `adoptedEndorsers` a forked community exposes — a fork's
  *      copied statements keep the SOURCE curator as `endorser`, so the source
- *      must be a root for D's subscribers to reach them. See communityCatalog
+ *      must be a root for D's subscribers to reach them. See communityCatalogue
  *      `fork`.)
  *   2. `resolveEndorsements(pubKey)` — the per-endorser seam `walkTrustGraph`
  *      consumes: that pubKey's published `recommend`/`flag` records, unioned
- *      across every subscribed community's catalog resource, PLUS an optional
+ *      across every subscribed community's catalogue resource, PLUS an optional
  *      `resolveEndorsements` fallback for endorsers whose records live in their
  *      OWN pod (transitive curators a community admin vouches for). The walk
  *      itself re-filters `endorser === pubKey` and re-verifies every edge, so a
  *      loose union here is safe.
  *
- * Wire `roots` + `resolveEndorsements` straight into `createCatalogSource`
+ * Wire `roots` + `resolveEndorsements` straight into `createCatalogueSource`
  * (`roots` accepts a thunk, so subscribe/unsubscribe take effect live). This is
  * FEDERATION by construction: subscribing to two communities UNIONS their
- * catalogs; the bounded-depth WoT walk still applies WITHIN each community's
+ * catalogues; the bounded-depth WoT walk still applies WITHIN each community's
  * admin roots. The whole thing is advisory — the power-user override installs
- * off-catalog regardless — and exit is a right (unsubscribe, or fork + diverge).
+ * off-catalogue regardless — and exit is a right (unsubscribe, or fork + diverge).
  */
 
 /**
@@ -37,11 +37,11 @@
  * @param {object} opts
  * @param {(circleId: string) => ({ admins?: string[]|(() => (string[]|Promise<string[]>)), list?: () => (object[]|Promise<object[]>) } | Promise<...>)} opts.resolveCommunity
  *   — for a subscribed circleId, the community's ADMIN pubKeys (the curator
- *     roots) and its catalog `list()` (the community's endorsements). Typically
- *     `{ admins: circleAdminPubKeys, list: communityCatalog.list }`.
+ *     roots) and its catalogue `list()` (the community's endorsements). Typically
+ *     `{ admins: circleAdminPubKeys, list: communityCatalogue.list }`.
  * @param {(pubKey: string) => (object[]|Promise<object[]>)} [opts.resolveEndorsements]
  *   — optional fallback per-endorser resolver for endorsers whose records live
- *     outside the community catalogs (personal curator pods → transitive WoT).
+ *     outside the community catalogues (personal curator pods → transitive WoT).
  * @param {Iterable<string>} [opts.initial]  — initially-subscribed circleIds.
  * @returns {{ subscribe, unsubscribe, has, list, roots, resolveEndorsements }}
  */
@@ -94,7 +94,7 @@ export function createCommunitySubscriptions({ resolveCommunity, resolveEndorsem
 
     /**
      * The per-endorser records the walk asks for: this pubKey's endorsements
-     * across every subscribed community catalog, plus the optional fallback.
+     * across every subscribed community catalogue, plus the optional fallback.
      */
     async resolveEndorsements(pubKey) {
       const acc = [];

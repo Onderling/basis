@@ -1,9 +1,9 @@
 // NL → slash command, via the circle's LLM — the `interpret` half of the v2 circle free-text
-// surface (`circleDispatch.js`). Maps the dispatch catalog's operations onto LLM tool descriptors,
+// surface (`circleDispatch.js`). Maps the dispatch catalogue's operations onto LLM tool descriptors,
 // hands the addressed free text to the LLM, and returns the tool it called as `{opId, args}` — or
 // `null` when the model treats it as chat / no command fits. The shell then dispatches `{opId,args}`
 // exactly as it dispatches a button tap. Mirrors household's `classifyAndExtract` (LLM tool-call →
-// dispatch by id+args), generalized to basis's manifest-merged catalog.
+// dispatch by id+args), generalized to basis's manifest-merged catalogue.
 
 /** Default tool-selection prompt. Internal (LLM-facing), not a user-visible string. */
 export const DEFAULT_INTERPRET_SYSTEM =
@@ -21,22 +21,22 @@ export const DEFAULT_INTERPRET_SYSTEM =
 const KIND_TO_JSON_TYPE = { string: 'string', number: 'number', integer: 'integer', boolean: 'boolean' };
 
 /**
- * Project a merged catalog's operations onto `@onderling/llm-client` ToolDescriptors
- * (`{id, description, schema}`). The tool `id` is the catalog's canonical key, so a returned
+ * Project a merged catalogue's operations onto `@onderling/llm-client` ToolDescriptors
+ * (`{id, description, schema}`). The tool `id` is the catalogue's canonical key, so a returned
  * tool-call resolves straight back through `resolveDispatch` / the button-tap path.
  *
- * @param {{opsById?: Map<string, {op: object, appOrigin?: string}>}} catalog
+ * @param {{opsById?: Map<string, {op: object, appOrigin?: string}>}} catalogue
  * @returns {Array<{id:string, description:string, schema:object}>}
  */
-export function buildToolDescriptors(catalog) {
+export function buildToolDescriptors(catalogue) {
   const tools = [];
-  const opsById = catalog && catalog.opsById;
+  const opsById = catalogue && catalogue.opsById;
   if (!opsById || typeof opsById.forEach !== 'function') return tools;
   for (const [key, entry] of opsById) {
     const op = entry && entry.op ? entry.op : entry;
     if (!op) continue;
     // Part G enabler — only ops that declare a chat surface are LLM tools. No-op for the current
-    // catalog (every op has surfaces.chat); it lets a merged REAL manifest carry internal/destructive
+    // catalogue (every op has surfaces.chat); it lets a merged REAL manifest carry internal/destructive
     // ops (deleteFromPod, forceRepush, …) without the model ever proposing them.
     if (!op.surfaces || !op.surfaces.chat) continue;
     const params = Array.isArray(op.params) ? op.params : [];
@@ -67,17 +67,17 @@ export function buildToolDescriptors(catalog) {
  * `null` (chat / no command). Signature matches what `createCircleDispatch` calls as `interpret`.
  *
  * @param {string} text
- * @param {{catalog?: object, llm?: {invoke: Function}, system?: string, options?: object, context?: any[],
+ * @param {{catalogue?: object, llm?: {invoke: Function}, system?: string, options?: object, context?: any[],
  *          history?: Array<{role:'user'|'assistant', content:string}>}} [opts]
  *        `context` = RAG items (e.g. from the token gate's `retrieve`) woven into the system prompt.
  *        `history` = prior conversation turns threaded as real messages — so a clarifying follow-up
  *        ("which list?" → "shopping") resolves against what the bot just asked, not a stateless guess.
  * @returns {Promise<{opId:string, args:object}|{reply:string}|null>}
  */
-export async function interpretToCommand(text, { catalog, llm, system, options, context, history } = {}) {
+export async function interpretToCommand(text, { catalogue, llm, system, options, context, history } = {}) {
   const q = String(text ?? '').trim();
   if (!q || !llm || typeof llm.invoke !== 'function') return null;
-  const tools = buildToolDescriptors(catalog);
+  const tools = buildToolDescriptors(catalogue);
   if (tools.length === 0) return null;                       // nothing dispatchable → never call the LLM
 
   const priorMsgs = Array.isArray(history)

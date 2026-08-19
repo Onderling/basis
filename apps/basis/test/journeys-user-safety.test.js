@@ -151,7 +151,7 @@ describe('US-2 — Carol cannot impersonate Alice', () => {
       webid: 'https://alice.example/profile/card#me',
     });
     const forgedAsAlice = { ...carolBody, pubKey: alice.pubKey };
-    // The defense: verification recomputes the sig over the body
+    // The defence: verification recomputes the sig over the body
     // (which now contains Alice's pubKey).  Carol's sig was over a
     // DIFFERENT body (with her own pubKey).  Verifier checks
     // sig against (canonicalized body, alice.pubKey) — fails.
@@ -161,7 +161,7 @@ describe('US-2 — Carol cannot impersonate Alice', () => {
   });
 
   it('Carol\'s own claim is bound to Carol — apps comparing identifier reject it', async () => {
-    // This is the "app-layer defense" companion to the cryptographic
+    // This is the "app-layer defence" companion to the cryptographic
     // test above: even when Carol picks Alice's webid string, the
     // bound pubKey in her own (valid) claim is Carol's — so an app
     // comparing "claim.pubKey === expected.pubKey for this webid"
@@ -396,7 +396,7 @@ describe('US-7 — Alice keeps the same pubKey + stableId after a page reload', 
 /* ─── slash-pipeline helper (real dispatch) ───────────── */
 
 async function bootSafetyHelpers(agent) {
-  const catalog = mergeManifests(
+  const catalogue = mergeManifests(
     [{ manifest: basisManifest }, { manifest: agent.manifest }],
     { runtime: 'browser' },
   );
@@ -409,7 +409,7 @@ async function bootSafetyHelpers(agent) {
     return { ok: false, error: `${appOrigin}.${opId} not wired` };
   };
   const localBuiltins = createLocalBuiltins({
-    catalog, t, threadStore,
+    catalogue, t, threadStore,
     setActive: (id) => threadStore.setActiveThread(id),
     callSkill, localActor: 'webid:local-demo-user',
     simPeers: {}, appRegistry: { allowsOrigin: () => true, subscribe: () => () => {} },
@@ -421,14 +421,14 @@ async function bootSafetyHelpers(agent) {
   });
 
   async function run(line) {
-    const parsed = parseInput(line, catalog, { threadId: null });
-    const route  = resolveDispatch(parsed, catalog);
+    const parsed = parseInput(line, catalogue, { threadId: null });
+    const route  = resolveDispatch(parsed, catalogue);
     if (route.kind !== 'ready') return { ok: false, error: route.error ?? 'parse fail' };
     const reply = await runDispatch(route, callSkill);
     if (reply.error) return { ok: false, error: reply.error.message };
     return reply.payload ?? { ok: true };
   }
-  return { run, catalog, callSkill };
+  return { run, catalogue, callSkill };
 }
 
 /* ─── Minimal fake NKN — single-client (no loopback) ──── */

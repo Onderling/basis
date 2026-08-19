@@ -8,7 +8,7 @@ Every wave-1 package README must satisfy all of these. Verify each doc against t
 it is. A reader knows in 5 seconds whether this package is for them.
 
 **R2 — Orientation ≤ 1 paragraph.** What it does, when to use it, at most ONE sentence of
-layering/placement. No philosophy unless it explains observable behavior (e.g. "PII-safe by
+layering/placement. No philosophy unless it explains observable behaviour (e.g. "PII-safe by
 construction" describes the API's shape — allowed; mission statements — not).
 
 **R3 — Install line.** `npm install @onderling/<name>` near the top, plus peer/lazy-dep notes
@@ -30,7 +30,7 @@ changesets; link to the repo.
 (https://github.com/Onderling/basis). Never link into private paths (plans/, _archive/).
 
 **R9 — Language.** Clean English throughout. No Dutch words or Dutch-isms; product terms
-translated (kring → circle, buurt → neighborhood).
+translated (kring → circle, buurt → neighbourhood).
 
 **R10 — Format.** ~60–150 lines; GitHub-flavored markdown; fenced code blocks with language
 tags; sentence-case headings; no emoji headings.

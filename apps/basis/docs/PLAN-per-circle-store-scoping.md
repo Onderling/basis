@@ -47,7 +47,7 @@ The active `circleId` already arrives in `args` for create/mutate verbs (`scopeR
 
 - **Phase 3 — tasks + stoop.** tasks-v0: verify (already per-circle); fix the chat `/mytasks` read-scope
   gap. stoop: close the read-leak — ensure every per-circle read goes through the `groupId`-tag +
-  `keepForCircle` filter (full per-store parity via `createNeighborhoodCluster` is a follow-up).
+  `keepForCircle` filter (full per-store parity via `createNeighbourhoodCluster` is a follow-up).
 
 - **Phase 4 — migration.** Zero-cost default: `getHouseholdScope('household')` (and no-active-circle)
   returns the **legacy root** `mem://household/` — the existing pile stays reachable as the

@@ -16,7 +16,7 @@ import { dirname, join } from 'node:path';
 import { DataPart } from '@onderling/core';
 import { mountLocalUi, LocalUiAuth } from '@onderling/agent-ui';
 
-import { createNeighborhoodCluster } from '../src/cluster.js';
+import { createNeighbourhoodCluster } from '../src/cluster.js';
 
 const ANNE = 'https://id.example/anne';
 const WEB_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'web');
@@ -32,9 +32,9 @@ async function callSkill(agent, skillId, args, fromWebid) {
   });
 }
 
-describe('createNeighborhoodCluster', () => {
+describe('createNeighbourhoodCluster', () => {
   it('shares identity across groups; per-group item-stores are isolated', async () => {
-    const cluster = await createNeighborhoodCluster({
+    const cluster = await createNeighbourhoodCluster({
       groups: [
         { groupId: 'block-42', localActor: ANNE },
         { groupId: 'book-club', localActor: ANNE },
@@ -66,7 +66,7 @@ describe('createNeighborhoodCluster', () => {
   });
 
   it('rejects duplicate groupId in groups[]', async () => {
-    await expect(createNeighborhoodCluster({
+    await expect(createNeighbourhoodCluster({
       groups: [
         { groupId: 'block-42', localActor: ANNE },
         { groupId: 'block-42', localActor: ANNE },
@@ -75,14 +75,14 @@ describe('createNeighborhoodCluster', () => {
   });
 
   it('rejects empty groups', async () => {
-    await expect(createNeighborhoodCluster({ groups: [] }))
+    await expect(createNeighbourhoodCluster({ groups: [] }))
       .rejects.toThrow(/at least one/);
   });
 });
 
 describe('multi-group launcher (mountLocalUi extraStaticFiles)', () => {
   it('serves a runtime-built /groups.json under each per-group UI', async () => {
-    const cluster = await createNeighborhoodCluster({
+    const cluster = await createNeighbourhoodCluster({
       groups: [
         { groupId: 'block-42', localActor: ANNE },
         { groupId: 'book-club', localActor: ANNE },

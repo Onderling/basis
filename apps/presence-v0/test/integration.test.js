@@ -165,7 +165,7 @@ describe('H8 — token verification', () => {
   });
 });
 
-describe('H8 — TTL behavior', () => {
+describe('H8 — TTL behaviour', () => {
   it('honours custom ttlMs', async () => {
     let now = 1_700_000_000_000;
     const customHome = new HomeAgent({

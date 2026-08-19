@@ -2,7 +2,7 @@
  * Pure slash-suggest filter lifted from
  * apps/basis/web/main.js's `refreshSuggest` (2026-05-24).
  *
- * Zero DOM — pure value transform over the catalog's commandMenu.
+ * Zero DOM — pure value transform over the catalogue's commandMenu.
  * The RN SlashFAB (and the web slash auto-suggest, if it ever
  * adopts this) call this to derive `matches[]` from user input.
  *
@@ -11,7 +11,7 @@
  *   - User has already typed a space (e.g. `/post hello`) → no
  *     matches; they're in args mode, suggest dropdown closes.
  *   - Otherwise → case-insensitive prefix match against
- *     catalog.commandMenu[].command; up to `limit` results
+ *     catalogue.commandMenu[].command; up to `limit` results
  *     (default 12, matches the web).
  *
  * Tested in test/core/slashFilter.test.js.
@@ -26,16 +26,16 @@ export const DEFAULT_SUGGEST_LIMIT = param({ key: 'basisMobile.slashSuggestLimit
 /**
  * @param {object}   args
  * @param {string}   args.input            current text in the slash input
- * @param {object}   args.catalog          merged-manifest catalog from composeManifests()
+ * @param {object}   args.catalogue          merged-manifest catalogue from composeManifests()
  * @param {number}   [args.limit=12]       cap on returned matches
  * @returns {Array<{command: string, appOrigin: string, opId: string, hint?: string}>}
  */
-export function filterSlashSuggestions({ input, catalog, limit = DEFAULT_SUGGEST_LIMIT }) {
+export function filterSlashSuggestions({ input, catalogue, limit = DEFAULT_SUGGEST_LIMIT }) {
   const v = String(input ?? '');
   if (!v.startsWith('/')) return [];
   if (v.includes(' '))    return [];          // args mode — close
   const needle = v.toLowerCase();
-  const pool   = catalog?.commandMenu ?? [];
+  const pool   = catalogue?.commandMenu ?? [];
   const out    = [];
   for (const m of pool) {
     if (typeof m?.command === 'string' && m.command.toLowerCase().startsWith(needle)) {

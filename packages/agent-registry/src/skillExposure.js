@@ -3,7 +3,7 @@
  *
  * ── What this is, and what it deliberately is NOT ────────────────────────────────────────────────────
  * Exposure is a **discovery filter**, not access control. Hiding a skill removes it from the cards and
- * catalogs other people read; it does not — and cannot — stop a dispatch. Someone running a modified
+ * catalogues other people read; it does not — and cannot — stop a dispatch. Someone running a modified
  * client who already knows the skill id can call it anyway, so presenting "hidden" as protection would
  * be a lie in the UI (the enforceability test, CLAUDE.md). What actually holds is the **grant/token
  * check at dispatch** (`grants[]` + `CapabilityToken`): that is where an unauthorised call is refused,
@@ -80,7 +80,7 @@ export function isSkillExposed({ exposure, skillId, circleId = null } = {}) {
 
 /**
  * Filter a skill list down to what is advertised in `circleId`. Accepts skill cards (`{id}`) or bare
- * id strings and returns the same shape it was given, so it can sit directly in a card/catalog
+ * id strings and returns the same shape it was given, so it can sit directly in a card/catalogue
  * projection.
  *
  * @param {object} a

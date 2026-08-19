@@ -17,7 +17,7 @@ import { describe, it, expect } from 'vitest';
 import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 
-import { createNeighborhoodAgent } from '../src/index.js';
+import { createNeighbourhoodAgent } from '../src/index.js';
 import {
   INVITE_REDEMPTION_SYSTEM_CAP, INVITE_CEILING_FALLBACK, INVITE_LIMIT_REACHED,
   circleInviteCeiling, clampInviteMaxRedemptions,
@@ -34,7 +34,7 @@ async function callSkill(agent, skillId, args, fromWebid = ADMIN) {
 
 async function buildAdmin() {
   const id = await AgentIdentity.generate(new VaultMemory());
-  const bundle = await createNeighborhoodAgent({
+  const bundle = await createNeighbourhoodAgent({
     identity: id, transport: new InternalTransport(new InternalBus(), id.pubKey),
     offeringMatch: { group: G, localActor: ADMIN, peers: [] },
     members: [{ webid: ADMIN, role: 'admin' }],

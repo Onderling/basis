@@ -3,7 +3,7 @@
  *
  * Config lives at `~/.config/folio/config.json` by default.  Override the
  * directory with `FOLIO_CONFIG_DIR` (used by tests).  `XDG_CONFIG_HOME`
- * is honored when set.
+ * is honoured when set.
  *
  * Shape (all keys optional unless marked):
  *   {

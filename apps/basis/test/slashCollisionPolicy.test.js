@@ -1,7 +1,7 @@
 /**
  * Objective D — slash-collision policy end-to-end in basis.
  *
- * Two mounted apps declare the SAME bare `/done` command. The merged catalog
+ * Two mounted apps declare the SAME bare `/done` command. The merged catalogue
  * (`mergeManifests`) must, via `@onderling/manifest-host`'s `resolveSlash`:
  *   - expose the app-qualified forms (`/tasks:done`, `/stoop:done`) that always
  *     route to the right app;

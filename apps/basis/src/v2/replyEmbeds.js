@@ -95,7 +95,7 @@ export function embedsFromReply(reply, { appOrigin } = {}) {
  * Build the circle inline buttons for a reply's items.
  *
  * @returns {Array<{id, label, opId, itemId}>}  ride `payload.buttons`; the host's
- *          tap handler resolves the op's target arg from the catalog + dispatches.
+ *          tap handler resolves the op's target arg from the catalogue + dispatches.
  */
 export function embedButtonsForReply({ reply, appOrigin, manifestsByOrigin, maxButtons = 12, capabilityMatrix = [] } = {}) {
   if (!appOrigin || !manifestsByOrigin) return [];

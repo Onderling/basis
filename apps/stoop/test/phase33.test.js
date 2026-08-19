@@ -14,7 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
-import { createNeighborhoodAgent } from '../src/index.js';
+import { createNeighbourhoodAgent } from '../src/index.js';
 import {
   loadSettings,
   saveSettings,
@@ -42,7 +42,7 @@ function makeFakeCache() {
 async function buildBundle() {
   const id = await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);
-  const bundle = await createNeighborhoodAgent({
+  const bundle = await createNeighbourhoodAgent({
     identity: id, transport: tx,
     offeringMatch: { group: 'oosterpoort', localActor: ANNE, peers: [] },
     members:    [{ webid: ANNE }],
@@ -249,7 +249,7 @@ describe('Phase 33.3 — legacy migration', () => {
 });
 
 describe('Phase 33 — bundle integration', () => {
-  it('createNeighborhoodAgent exposes bundle.deviceId from the identity', async () => {
+  it('createNeighbourhoodAgent exposes bundle.deviceId from the identity', async () => {
     const bundle = await buildBundle();
     expect(typeof bundle.deviceId).toBe('string');
     expect(bundle.deviceId.length).toBeGreaterThan(0);

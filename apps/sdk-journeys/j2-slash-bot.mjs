@@ -3,7 +3,7 @@
  * manifest instead of hand-written command parsing.
  *
  * The imagined developer: someone building a small utility bot (here: a
- * note-keeping bot) who wants slash commands AND an AI tool catalog without
+ * note-keeping bot) who wants slash commands AND an AI tool catalogue without
  * writing either surface by hand. They author one `manifest.js`, validate
  * it, and let the pure projectors derive every surface.
  *
@@ -11,7 +11,7 @@
  *   1. author a small manifest (two operations over the canonical `note` type),
  *   2. validate it strictly (`validateManifest` with `strict: true`),
  *   3. project it — `renderSlash` compiles the deterministic slash grammar,
- *      `renderChat` compiles the AI tool catalog — from the same declaration,
+ *      `renderChat` compiles the AI tool catalogue — from the same declaration,
  *   4. dispatch a parsed command through the platform waist: the projector's
  *      `{ skillId, args }` output is exactly the `{ opId, args }` shape that
  *      `callSkill` consumes, handled by a `wireSkill`-generated handler.
@@ -94,17 +94,17 @@ for (const op of manifest.operations) {
 }
 step(4, 'registered one wireSkill-generated handler per manifest operation');
 
-// ── 3c. Project the chat surface — the AI tool catalog from the same ops ───
+// ── 3c. Project the chat surface — the AI tool catalogue from the same ops ───
 const chat = renderChat(manifest, {
   skillRegistry: Object.fromEntries(manifest.operations.map((op) => [op.id, () => null])),
   toSkillCtx:    (toolCtx) => toolCtx,
 });
-const toolIds = chat.toolCatalog.map((t) => t.id).sort();
-assert.deepEqual(toolIds, ['addNote', 'listNotes'], 'chat tool catalog covers exactly the manifest ops');
-const addTool = chat.toolCatalog.find((t) => t.id === 'addNote');
+const toolIds = chat.toolCatalogue.map((t) => t.id).sort();
+assert.deepEqual(toolIds, ['addNote', 'listNotes'], 'chat tool catalogue covers exactly the manifest ops');
+const addTool = chat.toolCatalogue.find((t) => t.id === 'addNote');
 assert.ok(addTool.schema, 'each tool carries a JSON schema derived from op.params');
 assert.equal(addTool.description, 'Save a note for later.', 'tool description comes from the chat hint');
-step(5, `renderChat: tool catalog [${toolIds.join(', ')}] with JSON schemas — same declaration, second surface`);
+step(5, `renderChat: tool catalogue [${toolIds.join(', ')}] with JSON schemas — same declaration, second surface`);
 
 // ── 4. Dispatch the parsed op through the waist ─────────────────────────────
 // The projector output IS the waist shape: { opId, args } → callSkill.

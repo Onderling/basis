@@ -25,7 +25,7 @@ import { AgentIdentity, InternalBus, InternalTransport } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { mountLocalUi, LocalUiAuth } from '@onderling/agent-ui';
 
-import { createNeighborhoodAgent } from '../src/index.js';
+import { createNeighbourhoodAgent } from '../src/index.js';
 
 const ALICE   = 'https://id.example/alice';
 const BOB     = 'https://id.example/bob';
@@ -39,7 +39,7 @@ beforeAll(async () => {
   const aliceId = await AgentIdentity.generate(new VaultMemory());
   const bobId   = await AgentIdentity.generate(new VaultMemory());
 
-  const alice = await createNeighborhoodAgent({
+  const alice = await createNeighbourhoodAgent({
     identity:  aliceId,
     transport: new InternalTransport(bus, aliceId.pubKey),
     label:     'H5-alice',
@@ -50,7 +50,7 @@ beforeAll(async () => {
       peers:      [{ pubKey: bobId.pubKey }],
     },
   });
-  const bob = await createNeighborhoodAgent({
+  const bob = await createNeighbourhoodAgent({
     identity:  bobId,
     transport: new InternalTransport(bus, bobId.pubKey),
     label:     'H5-bob',

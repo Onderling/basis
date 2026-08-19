@@ -18,7 +18,7 @@ vi.mock('../src/core/refreshList.js', () => ({
 import { refreshList } from '../src/core/refreshList.js';
 import { autoRefreshStalePanels } from '../src/core/panelAutoRefresh.js';
 
-const catalog = {
+const catalogue = {
   opsById: new Map([
     ['getTask', { op: { verb: 'get' } }],   // read → refreshable
     ['addTask', { op: { verb: 'add' } }],   // mutation → not refreshable
@@ -49,7 +49,7 @@ describe('autoRefreshStalePanels', () => {
     const applied = [];
     const n = await autoRefreshStalePanels({
       itemRef: REF, threads: threads(), excludeThreadId: 'T',
-      catalog, manifestsByOrigin: {}, callSkill: vi.fn(), t: (k) => k,
+      catalogue, manifestsByOrigin: {}, callSkill: vi.fn(), t: (k) => k,
       applyRefresh: (tid, mid, fresh) => applied.push({ tid, mid, kind: fresh.kind }),
     });
     expect(n).toBe(1);
@@ -64,15 +64,15 @@ describe('autoRefreshStalePanels', () => {
     const applied = [];
     await autoRefreshStalePanels({
       itemRef: REF, threads: [{ id: 'A', messages: [recordMsg('a1', 'getTask')] }],
-      catalog, manifestsByOrigin: {}, callSkill: vi.fn(), t: (k) => k,
+      catalogue, manifestsByOrigin: {}, callSkill: vi.fn(), t: (k) => k,
       applyRefresh: (tid, mid, fresh) => applied.push({ mid, msgId: fresh.messageId }),
     });
     expect(applied[0]).toEqual({ mid: 'a1', msgId: 'r-a1' });
   });
 
   it('does nothing for a null itemRef or missing applyRefresh', async () => {
-    expect(await autoRefreshStalePanels({ itemRef: null, threads: threads(), catalog, applyRefresh: () => {} })).toBe(0);
-    expect(await autoRefreshStalePanels({ itemRef: REF, threads: threads(), catalog })).toBe(0);
+    expect(await autoRefreshStalePanels({ itemRef: null, threads: threads(), catalogue, applyRefresh: () => {} })).toBe(0);
+    expect(await autoRefreshStalePanels({ itemRef: REF, threads: threads(), catalogue })).toBe(0);
   });
 
   it('skips a panel whose refreshList re-run fails (returns null)', async () => {
@@ -81,7 +81,7 @@ describe('autoRefreshStalePanels', () => {
     const applied = [];
     const n = await autoRefreshStalePanels({
       itemRef: REF, threads: [{ id: 'A', messages: [recordMsg('a1', 'getTask')] }],
-      catalog, manifestsByOrigin: {}, callSkill: vi.fn(), t: (k) => k,
+      catalogue, manifestsByOrigin: {}, callSkill: vi.fn(), t: (k) => k,
       applyRefresh: (tid, mid) => applied.push(mid),
     });
     expect(n).toBe(0);

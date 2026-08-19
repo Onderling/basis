@@ -53,7 +53,7 @@ projected from.
 The invariants — a violation is a bug, not a style nit:
 
 - **Logic lives once, in shared code.** Web and mobile shells are thin adapters, nothing else.
-- **web ≡ mobile.** Neither platform is the primitive one; shared behavior exists in both by
+- **web ≡ mobile.** Neither platform is the primitive one; shared behaviour exists in both by
   construction.
 - **No duplication.** A string, op, or function is defined once. Editing the same thing in two
   files is the signal to consolidate.

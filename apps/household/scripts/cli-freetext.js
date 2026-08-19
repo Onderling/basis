@@ -42,7 +42,7 @@ import { openaiProvider }    from '../src/llm/providers/openai.js';
 import { anthropicProvider } from '../src/llm/providers/anthropic.js';
 
 import {
-  TOOL_CATALOG,
+  TOOL_CATALOGUE,
   createListStore,
   createToolHandlers,
   createContextBuilder,
@@ -157,7 +157,7 @@ async function buildAgent() {
   const agent = new ChatAgent({
     bridges:        [bridge],
     llm,
-    toolCatalog:    TOOL_CATALOG,
+    toolCatalogue:    TOOL_CATALOGUE,
     toolHandlers,
     systemPrompt:   SYSTEM_PROMPT,
     contextBuilder,

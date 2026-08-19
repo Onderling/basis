@@ -204,7 +204,7 @@ encrypted to the old key still decrypt.
 
 **Pre-req**: this slash command is currently STUBBED (it lives in
 the design doc but isn't wired yet).  If `/show-mnemonic` isn't in
-the catalog, mark this as ⏭ and revisit when the command lands.
+the catalogue, mark this as ⏭ and revisit when the command lands.
 
 **Steps**
 

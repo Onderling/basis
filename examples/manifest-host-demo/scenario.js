@@ -3,7 +3,7 @@
  *
  * One process hosts household + tasks-v0 (multi-circle) together via
  * `@canopy/manifest-host`.  A chat-agent drives a mocked LLM over the
- * composed tool catalog.  Both apps' state mutates from one
+ * composed tool catalogue.  Both apps' state mutates from one
  * conversation; the demo runner (`index.js`) logs the trace and the
  * test runner (`test/recombination.test.js`) asserts the state lands
  * in the right app's store.
@@ -41,7 +41,7 @@ import {
 // apps/stoop/manifest.js".  Relative imports resolve stoop's own deps
 // from `apps/stoop/node_modules`, so the heavy substrate wires itself.
 import stoopManifest                          from '../../apps/stoop/manifest.js';
-import { createNeighborhoodCluster }          from '../../apps/stoop/src/index.js';
+import { createNeighbourhoodCluster }          from '../../apps/stoop/src/index.js';
 import { buildStoopSkillRegistry }            from '../../apps/stoop/src/chat/llmChat.js';
 
 /* ─── stoop mount constants ──────────────────────────────────────── */
@@ -52,9 +52,9 @@ const STOOP_ACTOR = 'https://id.example/anne';
 /* ─── scripted LLM responses ─────────────────────────────────────── */
 
 /**
- * The chat-agent feeds the LLM the composed toolCatalog
+ * The chat-agent feeds the LLM the composed toolCatalogue
  * (`{id: "appId.opId", ...}`).  A real LLM would pick a tool from
- * that catalog; here we script the choices so the demo + test run
+ * that catalogue; here we script the choices so the demo + test run
  * deterministically.
  *
  * Pattern: each user turn → exactly one tool call → reply.
@@ -83,7 +83,7 @@ export const DEMO_LLM_SCRIPT = [
  * "Generic preamble" policy for `perAppSystemPrompts` (per the
  * manifest-host README's "Potential conflicts" recommendation for ≥2
  * apps).  Lists which apps are mounted; lets the tool descriptions
- * (already in the composed catalog) carry the rest.
+ * (already in the composed catalogue) carry the rest.
  */
 export function buildSystemPrompt(perAppSystemPrompts) {
   const apps = Object.keys(perAppSystemPrompts).sort();
@@ -101,7 +101,7 @@ export function buildSystemPrompt(perAppSystemPrompts) {
  * Build a stoop mountable for `host.mount('stoop', stoopManifest, …)`.
  *
  * Stoop is a heavy closed-group substrate (identity, MemberMap,
- * SkillMatch, ItemStore).  `createNeighborhoodCluster` boots one
+ * SkillMatch, ItemStore).  `createNeighbourhoodCluster` boots one
  * in-memory bundle with a fresh identity + InternalBus — no pods, no
  * network — the same headless path stoop's own `chat-llm` test uses.
  * `buildStoopSkillRegistry` then walks `stoopManifest.operations` and
@@ -118,7 +118,7 @@ export function buildSystemPrompt(perAppSystemPrompts) {
  * }>}
  */
 export async function createStoopMountable() {
-  const cluster = await createNeighborhoodCluster({
+  const cluster = await createNeighbourhoodCluster({
     groups: [{
       groupId:    STOOP_GROUP,
       localActor: STOOP_ACTOR,
@@ -202,7 +202,7 @@ export async function setupRecombinationDemo({
   const chatAgent = new ChatAgent({
     bridges:        [bridge],
     llm,
-    toolCatalog:    composed.toolCatalog,
+    toolCatalogue:    composed.toolCatalogue,
     toolHandlers:   composed.toolHandlers,
     systemPrompt:   buildSystemPrompt(composed.perAppSystemPrompts),
     contextBuilder: async () => '',

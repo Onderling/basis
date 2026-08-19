@@ -41,7 +41,7 @@
  */
 export const agentsManifest = {
   app:       'agents',
-  itemTypes: ['agent', 'data-version', 'catalog-entry'],
+  itemTypes: ['agent', 'data-version', 'catalogue-entry'],
 
   // Layer-1 capability surface — (verb × noun) atoms this app ships.
   // CONTROL: `revoke` (revokeAgent / revokeGrant), `update`
@@ -51,12 +51,12 @@ export const agentsManifest = {
   // (listDataVersions) + `update` (restoreDataVersion — writes a prior
   // state back to the live resource).
   nouns: {
-    // INSTALL adds `add` (installAgent — adds a catalog/override card
+    // INSTALL adds `add` (installAgent — adds a catalogue/override card
     // to your agents, default-deny).
     agent:          { atoms: ['list', 'revoke', 'update', 'remove', 'add'] },
     'data-version': { atoms: ['list', 'update'] },
-    // INSTALL: the pluggable curated-catalog source, browsed read-only.
-    'catalog-entry': { atoms: ['list'] },
+    // INSTALL: the pluggable curated-catalogue source, browsed read-only.
+    'catalogue-entry': { atoms: ['list'] },
   },
 
   operations: [
@@ -118,7 +118,7 @@ export const agentsManifest = {
         chat: {
           reply: 'text',
           hint:  'Show or hide one of an agent\'s skills — agent-wide (owner) or inside one circle '
-               + '(admin, hide only). This changes what OTHERS SEE in catalogs and cards; it does not '
+               + '(admin, hide only). This changes what OTHERS SEE in catalogues and cards; it does not '
                + 'restrict what the agent may do — a grant does that.',
         },
       },
@@ -433,22 +433,22 @@ export const agentsManifest = {
      * Install an agent into "your agents" with CAPABILITY-SECURITY: the
      * entry is registered default-deny (no ambient authority); only the
      * user-picked, card-DECLARED skills are granted, each through the
-     * token-first grant path.  Two sources: a curated catalog (pluggable
-     * `store.catalog`) and the power-user override (a pasted/fetched card
-     * that bypasses the catalog).  commons-governance: the catalog's
+     * token-first grant path.  Two sources: a curated catalogue (pluggable
+     * `store.catalogue`) and the power-user override (a pasted/fetched card
+     * that bypasses the catalogue).  commons-governance: the catalogue's
      * trust/curation is designed separately — here it is a data source.
      */
     {
-      id:        'listCatalog',
+      id:        'listCatalogue',
       verb:      'list',
-      appliesTo: { type: 'catalog-entry' },
+      appliesTo: { type: 'catalogue-entry' },
       params:    [],
       surfaces: {
-        slash: { command: '/agent-catalog' },
+        slash: { command: '/agent-catalogue' },
         chat: {
           reply: 'list',
-          hint:  'List the curated agent catalog: installable agents (id, name, description, '
-               + 'the skills each declares). Read-only. Until the community catalog ships this '
+          hint:  'List the curated agent catalogue: installable agents (id, name, description, '
+               + 'the skills each declares). Read-only. Until the community catalogue ships this '
                + 'may be empty/placeholder — use installAgent with a pasted card to install '
                + 'from any source.',
         },
@@ -459,11 +459,11 @@ export const agentsManifest = {
       verb:      'add',
       appliesTo: { type: 'agent' },
       params: [
-        // CURATED path — the id of a catalog entry (from listCatalog).
-        { name: 'catalogId', kind: 'string' },
+        // CURATED path — the id of a catalogue entry (from listCatalogue).
+        { name: 'catalogueId', kind: 'string' },
         // OVERRIDE path (power-user) — an A2A Agent Card, passed as a
         // pasted/fetched JSON string (or an object, programmatically);
-        // bypasses the catalog. Supply this OR catalogId.
+        // bypasses the catalogue. Supply this OR catalogueId.
         { name: 'card',      kind: 'string' },
         // The user-picked grant set (default-deny: omitted ⇒ inert
         // install). A JSON array of skill strings OR
@@ -476,7 +476,7 @@ export const agentsManifest = {
       surfaces: {
         chat: {
           reply: 'record',
-          hint:  'Install an agent into your agents. Provide catalogId (a curated catalog entry) '
+          hint:  'Install an agent into your agents. Provide catalogueId (a curated catalogue entry) '
                + 'OR card (an A2A agent card object/JSON — the power-user override, any source). '
                + 'The agent is registered with NO capabilities by default; pass grants (skill '
                + 'names, or {skill,capability,expiresInDays,subject}) to grant ONLY those — and '
@@ -582,21 +582,21 @@ export const agentsManifest = {
       },
     },
 
-    /* ── INSTALL view — the curated catalog (pluggable source) ───────
+    /* ── INSTALL view — the curated catalogue (pluggable source) ───────
      * Browse installable agents (rows: id · name · description · declared
-     * skills, exposed as `items` with id/label by listCatalog). The
+     * skills, exposed as `items` with id/label by listCatalogue). The
      * install act is the `add`-verb `installAgent` op, which auto-surfaces
      * as the "Install agent" affordance on the `agents` roster section
      * (verb === 'add' → section affordance). commons-governance: what the
-     * catalog contains / who curates it is the commons thread's call — this
+     * catalogue contains / who curates it is the commons thread's call — this
      * view just renders whatever the source returns.
      */
     {
-      id:         'catalog',
-      title:      'Agent catalog',
-      type:       'catalog-entry',
+      id:         'catalogue',
+      title:      'Agent catalogue',
+      type:       'catalogue-entry',
       labelField: 'name',
-      dataSource: { skillId: 'listCatalog' },
+      dataSource: { skillId: 'listCatalogue' },
     },
 
     /* ── RECOVERY views — "restore corrupted / lost data" by screen ──

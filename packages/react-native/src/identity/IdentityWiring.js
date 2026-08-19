@@ -4,7 +4,7 @@
  *
  * Per Q-B.2 (locked 2026-04-29: side-by-side migration).  This module is
  * only invoked when `createMeshAgent` is called with a `pod: { ... }` opt.
- * When the opt is absent, the existing local-only Vault behavior is
+ * When the opt is absent, the existing local-only Vault behaviour is
  * preserved unchanged — there is no fallback path through this module.
  *
  * The wiring is intentionally minimal:

@@ -34,7 +34,7 @@ import { AgentIdentity, InternalBus, InternalTransport, GroupManager } from '@on
 import { VaultMemory } from '@onderling/vault';
 import { mountLocalUi, LocalUiAuth } from '@onderling/agent-ui';
 
-import { createNeighborhoodAgent }   from '../src/Agent.js';
+import { createNeighbourhoodAgent }   from '../src/Agent.js';
 import { buildOnboardingSkills }     from '../src/onboarding.js';
 import { wireSubstrateMirror }       from '../src/substrateMirror.js';
 import { buildSubstrateStack }       from '../src/lib/substrateStack.js';
@@ -98,7 +98,7 @@ async function spawnAgent({ webid, role, displayName }) {
   // crossRegister() pass below propagates THIS new agent back.
   const peers = [...cluster.values()].map((m) => ({ pubKey: m.identity.pubKey }));
 
-  const bundle = await createNeighborhoodAgent({
+  const bundle = await createNeighbourhoodAgent({
     identity:  id,
     transport,
     label:     `H5-${webid}`,

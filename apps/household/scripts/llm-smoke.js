@@ -28,7 +28,7 @@ import { ollamaProvider }    from '../src/llm/providers/ollama.js';
 import { openaiProvider }    from '../src/llm/providers/openai.js';
 import { anthropicProvider } from '../src/llm/providers/anthropic.js';
 import { SYSTEM_PROMPT_CLASSIFY, PROMPT_VERSION } from '../src/llm/prompts.js';
-import { V0_TOOL_CATALOG }   from '../src/skills/classifyAndExtract.js';
+import { V0_TOOL_CATALOGUE }   from '../src/skills/classifyAndExtract.js';
 
 // ── Test fixtures ────────────────────────────────────────────────
 //
@@ -151,7 +151,7 @@ async function main() {
       result = await llm.invoke({
         system:   SYSTEM_PROMPT_CLASSIFY,
         messages: [{ role: 'user', content: fx.text }],
-        tools:    V0_TOOL_CATALOG,
+        tools:    V0_TOOL_CATALOGUE,
       });
     } catch (e) { err = e; }
     if (err) {

@@ -19,7 +19,7 @@ import { bootAgentBundle }   from '../src/core/agentBundle.js';
 import { composeManifests }  from '../src/core/composeManifests.js';
 
 describe('#237 folio surface — manifest exposure', () => {
-  it('folio exposes the manifest-surfaced ops in the mobile catalog', () => {
+  it('folio exposes the manifest-surfaced ops in the mobile catalogue', () => {
     const c = composeManifests();
     const folioOps = [...c.opsById.values()].filter((e) => e.appOrigin === 'folio');
     const ids = folioOps.map((e) => e.op.id).sort();
@@ -38,7 +38,7 @@ describe('#237 folio surface — manifest exposure', () => {
     }
   });
 
-  it('folio slash commands (/share, /folio-status) reach the catalog commandMenu', () => {
+  it('folio slash commands (/share, /folio-status) reach the catalogue commandMenu', () => {
     const c = composeManifests();
     const folioCmds = (c.commandMenu ?? []).filter((e) =>
       ['shareFolder', 'folioStatus', 'readNote'].includes(e.opId),

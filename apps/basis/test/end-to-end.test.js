@@ -46,7 +46,7 @@ const chores = [
 describe('basis v0.1.2 — J1 dishwasher journey end-to-end', () => {
   it('user lists, picks via fuzzy match, marks done, action menu disables', async () => {
     /* setup */
-    const catalog = mergeManifests([{ manifest: householdManifest }]);
+    const catalogue = mergeManifests([{ manifest: householdManifest }]);
     const thread  = new Thread({ id: 'main' });
     const manifestsByOrigin = { household: householdManifest };
 
@@ -62,8 +62,8 @@ describe('basis v0.1.2 — J1 dishwasher journey end-to-end', () => {
     /* turn 1 — user lists */
     thread.addUserMessage('/mine');
     {
-      const parse = parseInput('/mine', catalog, { threadId: thread.id });
-      const route = resolveDispatch(parse, catalog);
+      const parse = parseInput('/mine', catalogue, { threadId: thread.id });
+      const route = resolveDispatch(parse, catalogue);
       expect(route.kind).toBe('ready');
       expect(route.opId).toBe('listOpen');
       const reply = await runDispatch(route, callSkill);
@@ -97,8 +97,8 @@ describe('basis v0.1.2 — J1 dishwasher journey end-to-end', () => {
 
     {
       // Simulate the chat shell substituting the resolved id for _match.
-      const parse = parseInput(`/done ${fuzzy}`, catalog, { threadId: thread.id });
-      const route = resolveDispatch(parse, catalog);
+      const parse = parseInput(`/done ${fuzzy}`, catalogue, { threadId: thread.id });
+      const route = resolveDispatch(parse, catalogue);
       expect(route.kind).toBe('ready');
       expect(route.args).toEqual({ choreId: 'c-1' });
       const reply = await runDispatch(route, callSkill);
@@ -126,12 +126,12 @@ describe('basis v0.1.2 — J1 dishwasher journey end-to-end', () => {
   });
 
   it('unknown command → unknown route → no skill call', async () => {
-    const catalog = mergeManifests([{ manifest: householdManifest }]);
+    const catalogue = mergeManifests([{ manifest: householdManifest }]);
     const thread  = new Thread();
 
     thread.addUserMessage('hello');
-    const parse = parseInput('hello', catalog, { threadId: thread.id });
-    const route = resolveDispatch(parse, catalog);
+    const parse = parseInput('hello', catalogue, { threadId: thread.id });
+    const route = resolveDispatch(parse, catalogue);
     expect(route.kind).toBe('unknown');
 
     // Chat shell renders an "I didn't understand" message (mocked here).

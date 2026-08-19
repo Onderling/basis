@@ -45,7 +45,7 @@ export default function CircleRecipeEditorScreen({
   // the host fetches the latest captured version (γ.2 versions adapter)
   // through `recipeStore` + `circleId`, runs the 3-way diff, and — if
   // anything diverges — overlays CircleRecipeConflictScreen.  Existing
-  // call sites that pass none of these opts keep their pre-γ.3 behavior.
+  // call sites that pass none of these opts keep their pre-γ.3 behaviour.
   incomingRecipe = null,
   recipeStore,
   circleId,

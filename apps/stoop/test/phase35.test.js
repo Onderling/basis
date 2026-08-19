@@ -15,7 +15,7 @@ import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderl
 import { VaultMemory } from '@onderling/vault';
 import { ItemStore } from '@onderling/item-store';
 import { MemorySource } from '@onderling/core';
-import { createNeighborhoodAgent, attachSubstrateMirror } from '../src/index.js';
+import { createNeighbourhoodAgent, attachSubstrateMirror } from '../src/index.js';
 import { EvictionRoster, EVICTION_GRACE_MS } from '../src/lib/EvictionRoster.js';
 
 const ANNE = 'https://id.example/anne';
@@ -25,7 +25,7 @@ const EVE  = 'https://id.example/eve';
 async function buildBundle() {
   const id = await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);
-  const bundle = await createNeighborhoodAgent({
+  const bundle = await createNeighbourhoodAgent({
     identity:   id,
     transport:  tx,
     offeringMatch: { group: 'oosterpoort', localActor: ANNE, peers: [] },

@@ -64,7 +64,7 @@ export {
   opNouns,
   capabilityKey,
 } from './capabilities.js';
-// §1b — the synthetic op-id codec for GENERIC (op-less) capabilities (catalog synth ⇄ dispatch decode).
+// §1b — the synthetic op-id codec for GENERIC (op-less) capabilities (catalogue synth ⇄ dispatch decode).
 export { encodeGenericOpId, isGenericOpId, decodeGenericOpId } from './genericOp.js';
 
 // B · (ruling) — the admin freedom template + the narrowed effective set the gate reads.

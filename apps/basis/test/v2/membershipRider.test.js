@@ -66,7 +66,7 @@ const rosterOf = async (dev, redemptionRows, memberMapList = []) => projectCircl
 const webids = (roster) => (roster ?? []).map((r) => r.webid).sort();
 
 describe('the membership rider — statements on the device log, roster folds them authoritatively', () => {
-  it('join-with-proof admits; a self-join WITHOUT its redemption row defers (deny-favoring)', async () => {
+  it('join-with-proof admits; a self-join WITHOUT its redemption row defers (deny-favouring)', async () => {
     const rosterAll = [{ webid: 'webid:admin', role: 'admin' }, { webid: 'webid:mel', role: 'member' }];
     const wire = [];
     const admin = await device('webid:admin', rosterAll, wire);

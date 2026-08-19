@@ -56,32 +56,32 @@ export function circleSourcesFromAgent({ callSkill, circlesStore, helpCircleName
 /** App origins probed when resolving an op to its owning app (both surfaces). */
 // 'agents' LAST (2026-07-09) — the read-only "your agents" surface. Personal
 // (the user's own agent-registry, not per-circle data), but it must be in the
-// composed-app scope for its ops to survive scopeCatalogToApps and reach the
+// composed-app scope for its ops to survive scopeCatalogueToApps and reach the
 // slash-suggest / LLM tool list on web. Matches the merge order in
 // circleApp.js baseSources + mobile composeManifests.js (manifest-pipeline.md).
 export const DEFAULT_CIRCLE_ORIGINS = ['stoop', 'tasks', 'household', 'calendar', 'folio', 'agents'];
 
-// Perf #2 (2026-05-30) — does `catalog` declare `opId` on `origin`?
-// The merged catalog stores ops under either the bare `opId` (then
+// Perf #2 (2026-05-30) — does `catalogue` declare `opId` on `origin`?
+// The merged catalogue stores ops under either the bare `opId` (then
 // `entry.appOrigin` names the source) OR `'<origin>/<opId>'` for
 // disambiguated declarations.  Treat either form as a hit.  Returns
-// `true` when no catalog is supplied so callers without one keep the
+// `true` when no catalogue is supplied so callers without one keep the
 // legacy probe-everything behaviour.
-function catalogHasOp(catalog, origin, opId) {
-  if (!catalog || typeof catalog !== 'object' || !catalog.opsById) return true;
-  if (catalog.opsById.get(`${origin}/${opId}`)) return true;
-  const bare = catalog.opsById.get(opId);
+function catalogueHasOp(catalogue, origin, opId) {
+  if (!catalogue || typeof catalogue !== 'object' || !catalogue.opsById) return true;
+  if (catalogue.opsById.get(`${origin}/${opId}`)) return true;
+  const bare = catalogue.opsById.get(opId);
   return !!(bare && bare.appOrigin === origin);
 }
 
-// Positive-only: does the catalog POSITIVELY declare `opId` on `origin`? Unlike
-// catalogHasOp it does NOT default-true on a missing catalog — used to decide
-// whether the catalog "knows" an op anywhere (so the gate only filters ops the
-// catalog actually placed, never agent-skill ops absent from every manifest).
-function catalogDeclaresOp(catalog, origin, opId) {
-  if (!catalog || typeof catalog !== 'object' || !catalog.opsById) return false;
-  if (catalog.opsById.get(`${origin}/${opId}`)) return true;
-  const bare = catalog.opsById.get(opId);
+// Positive-only: does the catalogue POSITIVELY declare `opId` on `origin`? Unlike
+// catalogueHasOp it does NOT default-true on a missing catalogue — used to decide
+// whether the catalogue "knows" an op anywhere (so the gate only filters ops the
+// catalogue actually placed, never agent-skill ops absent from every manifest).
+function catalogueDeclaresOp(catalogue, origin, opId) {
+  if (!catalogue || typeof catalogue !== 'object' || !catalogue.opsById) return false;
+  if (catalogue.opsById.get(`${origin}/${opId}`)) return true;
+  const bare = catalogue.opsById.get(opId);
   return !!(bare && bare.appOrigin === origin);
 }
 
@@ -91,34 +91,34 @@ function catalogDeclaresOp(catalog, origin, opId) {
  * origin and returning the first non-null result. Web's `agent.callSkill`
  * and mobile's `bundle.callSkill` share this signature, so both reuse it.
  *
- * `catalog` is optional but recommended: when supplied, the resolver
+ * `catalogue` is optional but recommended: when supplied, the resolver
  * skips origins whose manifests don't declare `opId`, which avoids
  * pointless transport round-trips for aspirational ops (Perf #2,
- * 2026-05-30).  Pass the merged catalog returned by `mergeManifests`.
+ * 2026-05-30).  Pass the merged catalogue returned by `mergeManifests`.
  */
-export function makeResolvingCallSkill(rawCallSkill, origins = DEFAULT_CIRCLE_ORIGINS, catalog = null) {
-  // `catalog` may be a live GETTER (so a later rescope — app toggle / policy.apps
+export function makeResolvingCallSkill(rawCallSkill, origins = DEFAULT_CIRCLE_ORIGINS, catalogue = null) {
+  // `catalogue` may be a live GETTER (so a later rescope — app toggle / policy.apps
   // — is honoured) or a static object. Resolved per call.
-  const getCatalog = typeof catalog === 'function' ? catalog : () => catalog;
+  const getCatalogue = typeof catalogue === 'function' ? catalogue : () => catalogue;
   return async (opId, args) => {
     if (typeof rawCallSkill !== 'function') return null;
-    // A broken catalog getter (e.g. one closing over an out-of-scope var) must NOT take
+    // A broken catalogue getter (e.g. one closing over an out-of-scope var) must NOT take
     // down resolution — that silently turned every circle-source call into a throw the
     // caller's safe() swallowed → "No circles yet". Treat a throwing/absent getter as an
-    // unknown catalog (→ try all origins).
+    // unknown catalogue (→ try all origins).
     let cat = null;
-    try { cat = getCatalog(); } catch { cat = null; }
-    // The catalog gate (Perf #2) skips an origin the catalog says doesn't declare
-    // the op — but ONLY when the catalog positively knows the op on SOME origin
+    try { cat = getCatalogue(); } catch { cat = null; }
+    // The catalogue gate (Perf #2) skips an origin the catalogue says doesn't declare
+    // the op — but ONLY when the catalogue positively knows the op on SOME origin
     // (an "aspirational op" like getFeed/listNotes declared elsewhere). Essential
     // circle-source ops that are AGENT skills, not manifest ops — `getMyCircles`
-    // (tasks), `listMyCircles` (stoop) — appear on NO origin in the catalog, so the
+    // (tasks), `listMyCircles` (stoop) — appear on NO origin in the catalogue, so the
     // per-origin gate used to skip them everywhere → loadCircles returned nothing →
-    // "No circles yet" on every reload. When the op is unknown to the catalog, try
+    // "No circles yet" on every reload. When the op is unknown to the catalogue, try
     // all origins (the gate is a perf hint, not a hard filter).
-    const knownSomewhere = origins.some((app) => catalogDeclaresOp(cat, app, opId));
+    const knownSomewhere = origins.some((app) => catalogueDeclaresOp(cat, app, opId));
     for (const app of origins) {
-      if (knownSomewhere && !catalogHasOp(cat, app, opId)) continue;
+      if (knownSomewhere && !catalogueHasOp(cat, app, opId)) continue;
       try {
         const r = await rawCallSkill(app, opId, args ?? {});
         if (r != null) return r;

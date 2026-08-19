@@ -29,7 +29,7 @@ import { createManifestHost, resolveSlash } from '@onderling/manifest-host';
 import { synthesizeGenericOps } from './genericOpSynth.js';
 
 /**
- * @typedef {object} MergedCatalog
+ * @typedef {object} MergedCatalogue
  * @property {Array<{ command: string, opId: string, appOrigin: string }>} commandMenu
  * @property {Map<string, { op: object, appOrigin: string }>}              opsById
  * @property {(opId: string) => string | undefined}                        replyShapeFor
@@ -46,7 +46,7 @@ import { synthesizeGenericOps } from './genericOpSynth.js';
  *   - 'node'    → keeps 'node' or 'both'; drops 'browser'
  *   - 'both'    → no filtering (default)
  *   Per OQ-1.A: basis in the browser passes 'browser' so folio's
- *   sync/watch family (runtime: 'node') stays out of the catalog.  A
+ *   sync/watch family (runtime: 'node') stays out of the catalogue.  A
  *   future sidecar deployment passes 'both' to re-include them.
  * @property {Object<string,string>} [slashOverrides]
  *   Objective D — per-host slash-collision WINNER pins (`command → appId`;
@@ -59,10 +59,10 @@ import { synthesizeGenericOps } from './genericOpSynth.js';
 
 /**
  * Merge an array of `{manifest, callSkill?}` pairs into a basis
- * catalog.  Composes `@onderling/manifest-host` underneath.
+ * catalogue.  Composes `@onderling/manifest-host` underneath.
  *
  * Op-prefix-on-collision policy:
- *   - When op-ids are unique across all manifests, the catalog uses
+ *   - When op-ids are unique across all manifests, the catalogue uses
  *     bare opIds (`'markComplete'`).
  *   - When ≥2 manifests declare the SAME opId, the second-and-later
  *     declarations surface in `opsById` as `'<appOrigin>/<opId>'`
@@ -76,12 +76,12 @@ import { synthesizeGenericOps } from './genericOpSynth.js';
  *     surfaces the choices instead of firing one app).  Non-colliding commands
  *     keep the bare form unchanged — in practice apps coordinate slash names,
  *     so this whole pass is inert (no collisions → no qualified forms added).
- *     The resolution is exposed as `catalog.slashPolicy` (from
+ *     The resolution is exposed as `catalogue.slashPolicy` (from
  *     `@onderling/manifest-host`'s `resolveSlash`).
  *
  * @param {Array<{ manifest: object, callSkill?: Function }>} sources
  * @param {MergeOptions} [opts]
- * @returns {MergedCatalog}
+ * @returns {MergedCatalogue}
  */
 export function mergeManifests(sources, opts = {}) {
   if (!Array.isArray(sources)) {
@@ -173,7 +173,7 @@ export function mergeManifests(sources, opts = {}) {
 
       // commandMenu: first-wins by slash command (bare commands).
       // `standaloneOnly` slashes are deliberately NOT contributed to the unified
-      // catalog — they exist for the app's OWN standalone surface (bot / byte-
+      // catalogue — they exist for the app's OWN standalone surface (bot / byte-
       // equivalence) but defer to the shell's equivalent in a merged circle
       // (e.g. household's /help → the basis shell's global /help, which
       // already introspects every app). Skipped here = no collision, no warning.
@@ -250,7 +250,7 @@ export function mergeManifests(sources, opts = {}) {
     for (const synthOp of synthesizeGenericOps(m)) {
       // Runtime filter for parity with real ops (synthetic ops are runtime-agnostic → always kept).
       if (!matchesRuntime(synthOp.runtime ?? 'both', wantRuntime)) continue;
-      // Guard: never shadow a real op already in the catalog (belt-and-braces — ids can't collide).
+      // Guard: never shadow a real op already in the catalogue (belt-and-braces — ids can't collide).
       if (opsById.has(synthOp.id)) continue;
 
       // commandMenu: first-wins by slash command (real ops already claimed theirs above).
@@ -308,7 +308,7 @@ export function mergeManifests(sources, opts = {}) {
       // Ambiguous: strip the silently-fired opId; carry the qualified choices
       // so the parser returns kind:'ambiguous' and the shell offers them.
       // Keep an `appOrigin` (the first declarer) purely so the entry survives
-      // catalog scoping/filtering (which key on appOrigin) — it is NEVER used
+      // catalogue scoping/filtering (which key on appOrigin) — it is NEVER used
       // to dispatch (the missing opId + `ambiguous` flag block that).
       commandMenu[idx] = {
         command: entry.command,

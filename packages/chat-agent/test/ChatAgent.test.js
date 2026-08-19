@@ -4,7 +4,7 @@ import { ChatAgent, InMemoryBridge } from '../src/index.js';
 
 const SYS = 'You are a test assistant.';
 
-const TOOL_CATALOG = [
+const TOOL_CATALOGUE = [
   { id: 'addItems', description: 'Add items', schema: { type: 'object' } },
   { id: 'markComplete', description: 'Mark items complete', schema: { type: 'object' } },
 ];
@@ -15,7 +15,7 @@ function buildAgent({ responses, toolHandlers = {}, contextBuilder, ...extra } =
   const agent = new ChatAgent({
     bridges:        [bridge],
     llm,
-    toolCatalog:    TOOL_CATALOG,
+    toolCatalogue:    TOOL_CATALOGUE,
     toolHandlers,
     systemPrompt:   SYS,
     contextBuilder: contextBuilder ?? (async () => 'No open items.'),
@@ -42,7 +42,7 @@ describe('ChatAgent — basics', () => {
     const llm = new LlmClient({ provider: mockProvider({ responses: [{ replyText: 'ok' }] }) });
     const agent = new ChatAgent({
       llm,
-      toolCatalog:    TOOL_CATALOG,
+      toolCatalogue:    TOOL_CATALOGUE,
       toolHandlers:   {},
       systemPrompt:   SYS,
       contextBuilder: async () => '',
@@ -271,10 +271,10 @@ describe('ChatAgent — outbound dispatch', () => {
 });
 
 describe('ChatAgent — schema fallback for typo\'d tool names', () => {
-  it('routes an unknown tool to the only schema-matching catalog entry', async () => {
+  it('routes an unknown tool to the only schema-matching catalogue entry', async () => {
     const addItems = vi.fn().mockResolvedValue({});
     const markComplete = vi.fn().mockResolvedValue({});
-    const catalog = [
+    const catalogue = [
       { id: 'addItems',     schema: { type: 'object', required: ['listName', 'item']  } },
       { id: 'markComplete', schema: { type: 'object', required: ['listName', 'match'] } },
     ];
@@ -285,7 +285,7 @@ describe('ChatAgent — schema fallback for typo\'d tool names', () => {
         toolCall:       { id: 'addodelist', args: { listName: 'b', item: 'kaas' } },
         classification: 'actionable',
       }] }) }),
-      toolCatalog:    catalog,
+      toolCatalogue:    catalogue,
       toolHandlers:   { addItems, markComplete },
       systemPrompt:   SYS,
       contextBuilder: async () => '',
@@ -299,7 +299,7 @@ describe('ChatAgent — schema fallback for typo\'d tool names', () => {
 
   it('drops the call when args match more than one tool', async () => {
     const handler = vi.fn();
-    const catalog = [
+    const catalogue = [
       { id: 'addItems', schema: { type: 'object', required: ['listName'] } },
       { id: 'showList', schema: { type: 'object', required: ['listName'] } },
     ];
@@ -310,7 +310,7 @@ describe('ChatAgent — schema fallback for typo\'d tool names', () => {
         toolCall:       { id: 'mystery', args: { listName: 'b' } },
         classification: 'actionable',
       }] }) }),
-      toolCatalog:    catalog,
+      toolCatalogue:    catalogue,
       toolHandlers:   { addItems: handler, showList: handler },
       systemPrompt:   SYS,
       contextBuilder: async () => '',
@@ -391,7 +391,7 @@ describe('ChatAgent — history records silent tool calls', () => {
     const agent = new ChatAgent({
       bridges:        [bridge],
       llm:            new LlmClient({ provider }),
-      toolCatalog:    TOOL_CATALOG,
+      toolCatalogue:    TOOL_CATALOGUE,
       toolHandlers:   { addItems: vi.fn().mockResolvedValue({}) },
       systemPrompt:   SYS,
       contextBuilder: async () => '',

@@ -2,7 +2,7 @@
 
 > **Layer:** Platform layer (the RN side of the SDK).
 > **Convention:** Platform-glue substrates aggregate here; standalone
-> behaviors with a clear non-RN core live in their own packages.
+> behaviours with a clear non-RN core live in their own packages.
 
 React Native platform layer + adapters for the onderling agent SDK.
 

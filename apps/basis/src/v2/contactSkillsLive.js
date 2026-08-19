@@ -24,10 +24,10 @@
  * each shell adds only its `sendTask` binding + its refresh hook. (Invariant #1:
  * logic lives once in shared `src/`.)
  *
- * Scope note: contact-thread ops are NOT merged into the circle/app catalog —
+ * Scope note: contact-thread ops are NOT merged into the circle/app catalogue —
  * they belong to a particular contact's thread (a DM with the bot). The host
- * scopes a contact thread's catalog to `sourcesFor(contactId)` and dispatches
- * through this module's `callSkill`; the circle bot's catalog stays clean.
+ * scopes a contact thread's catalogue to `sourcesFor(contactId)` and dispatches
+ * through this module's `callSkill`; the circle bot's catalogue stays clean.
  */
 
 import { contactSkillSources, makeRemoteCallSkill } from './contactSkills.js';
@@ -189,7 +189,7 @@ export function createContactSkillRegistry({ peerGraph, sendTask, onChange, isCo
     return all;
   }
 
-  /** One contact thread's sources — scope a DM thread's catalog to just this. */
+  /** One contact thread's sources — scope a DM thread's catalogue to just this. */
   function sourcesFor(contactId) {
     return byContact.get(contactId)?.sources ?? [];
   }

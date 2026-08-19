@@ -83,7 +83,7 @@ export default function CircleMyDataScreen({ callSkill, podAuth, onBack, chatAi,
   const [pickedOps, setPickedOps] = useState([]);      // what the new connection may DO
   const [pickedSections, setPickedSections] = useState([]); // what it may SEE
   const [circlesForConnections, setCirclesForConnections] = useState([]);
-  // The SHARED list, not this shell's dispatch catalog. Reusing the catalog here made the mobile menu a
+  // The SHARED list, not this shell's dispatch catalogue. Reusing the catalogue here made the mobile menu a
   // different set from web's — including stoop, whose manifest declares 92 ops — so the same person
   // pairing the same screen was offered materially different authority depending on which shell they
   // happened to use. Both shells and the A2A surface now read one list (invariant 2, by construction).

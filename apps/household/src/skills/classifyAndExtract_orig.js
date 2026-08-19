@@ -3,13 +3,13 @@
  *
  * Called by HouseholdAgent when the regex parser couldn't parse a
  * message AND an LlmClient is configured.  Hands the raw text to the
- * LLM with the agent's tool catalog; if the LLM tool-calls, we
+ * LLM with the agent's tool catalogue; if the LLM tool-calls, we
  * dispatch to the corresponding skill via `ctx.agent.invokeSkill`
  * and return its reply.  If the LLM classifies as "noise" we return
  * an empty reply.  If the LLM emits a free reply we relay it.
  *
- * v0 tool catalog is hand-built from the static skill set (the
- * `programming-plan.md` flagged the "tool-catalog accessor on
+ * v0 tool catalogue is hand-built from the static skill set (the
+ * `programming-plan.md` flagged the "tool-catalogue accessor on
  * SkillRegistry" as deferrable until H3 needs it).  When that L0
  * SDK addition lands, this skill switches to using it.
  *
@@ -20,10 +20,10 @@
 import { SYSTEM_PROMPT_CLASSIFY } from '../llm/prompts.js';
 
 /**
- * Hand-built tool catalog for v0.  The schemas are intentionally
+ * Hand-built tool catalogue for v0.  The schemas are intentionally
  * loose; the agent tolerates extra fields and missing optionals.
  */
-export const V0_TOOL_CATALOG = Object.freeze([
+export const V0_TOOL_CATALOGUE = Object.freeze([
   {
     id: 'addItem',
     description: 'Add a new open item to the household pod.',
@@ -105,7 +105,7 @@ export async function classifyAndExtract(args, ctx) {
     result = await llm.invoke({
       system:   SYSTEM_PROMPT_CLASSIFY,
       messages: [{ role: 'user', content: text }],
-      tools:    V0_TOOL_CATALOG,
+      tools:    V0_TOOL_CATALOGUE,
     });
   } catch (err) {
     return {
@@ -116,7 +116,7 @@ export async function classifyAndExtract(args, ctx) {
 
   // Tool call → dispatch.
   if (result.toolCall && result.toolCall.id) {
-    const target = V0_TOOL_CATALOG.find((t) => t.id === result.toolCall.id);
+    const target = V0_TOOL_CATALOGUE.find((t) => t.id === result.toolCall.id);
     if (!target) {
       return {
         replies: [{ text: `(LLM picked an unknown tool '${result.toolCall.id}'; ignoring.)` }],

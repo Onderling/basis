@@ -129,7 +129,7 @@ describe('GroupManager — role on issueProof', () => {
     expect(proof.role).toBe('member');
   });
 
-  it('honors explicit role on issueProof', async () => {
+  it('honours explicit role on issueProof', async () => {
     const a  = await makeAgent();
     const gm = new GroupManager({ identity: a.identity, vault: a.vault });
     const proof = await gm.issueProof('peer-pubkey', 'g1', { role: 'coordinator' });

@@ -141,7 +141,7 @@ describe('createRealHouseholdAgent — Agent boot + skill dispatch', () => {
   it("rejects unknown appOrigin", async () => {
     const a = await createRealHouseholdAgent();
     // Post-slice-2b: 'stoop' is now a wired branch (real
-    // NeighborhoodAgent).  Use a genuinely unrecognised origin to
+    // NeighbourhoodAgent).  Use a genuinely unrecognised origin to
     // verify the throw still fires for unknown apps.
     await expect(a.callSkill('not-a-real-app', 'listOpen', {})).rejects.toThrow(
       /unknown appOrigin/,
@@ -192,12 +192,12 @@ describe('createRealHouseholdAgent — pipeline integration', () => {
     } = await import('../src/index.js');
 
     const a = await createRealHouseholdAgent();
-    const catalog = mergeManifests([{ manifest: a.manifest }]);
+    const catalogue = mergeManifests([{ manifest: a.manifest }]);
     const thread  = new Thread();
 
     // /list shopping  → the real household list op (type-only body).
     thread.addUserMessage('/list shopping');
-    const r1 = resolveDispatch(parseInput('/list shopping', catalog), catalog);
+    const r1 = resolveDispatch(parseInput('/list shopping', catalogue), catalogue);
     const reply1 = await runDispatch(r1, a.callSkill);
     const rendered1 = renderReply(reply1, {
       appOrigin: r1.appOrigin,
@@ -209,7 +209,7 @@ describe('createRealHouseholdAgent — pipeline integration', () => {
 
     // /done Milk  → markComplete({match:'Milk'}) via the real skill.
     thread.addUserMessage('/done Milk');
-    const r2 = resolveDispatch(parseInput('/done Milk', catalog), catalog);
+    const r2 = resolveDispatch(parseInput('/done Milk', catalogue), catalogue);
     const reply2 = await runDispatch(r2, a.callSkill);
     const rendered2 = renderReply(reply2);
     thread.addShellMessage(rendered2);

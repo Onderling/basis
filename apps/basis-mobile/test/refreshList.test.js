@@ -37,7 +37,7 @@ function makeMockBundle() {
   chores.set('c2', { id: 'c2', type: 'shopping', title: 'Bread',          state: 'open' });
   chores.set('c3', { id: 'c3', type: 'shopping', title: 'Apples',         state: 'open' });
 
-  const catalog           = composeManifests();
+  const catalogue           = composeManifests();
   const manifestsByOrigin = buildManifestsByOrigin();
 
   const callSkill = async (appOrigin, opId, args = {}) => {
@@ -58,14 +58,14 @@ function makeMockBundle() {
     throw new Error(`mock callSkill: unknown op ${opId}`);
   };
 
-  return { catalog, manifestsByOrigin, callSkill, chores };
+  return { catalogue, manifestsByOrigin, callSkill, chores };
 }
 
 describe('#253 step 3 — refreshList state morphing', () => {
   it('initial render of /list shopping has all 3 open items with buttons', async () => {
-    const { catalog, manifestsByOrigin, callSkill } = makeMockBundle();
-    const parsed   = parseInput('/list shopping', catalog);
-    const dispatch = resolveDispatch(parsed, catalog);
+    const { catalogue, manifestsByOrigin, callSkill } = makeMockBundle();
+    const parsed   = parseInput('/list shopping', catalogue);
+    const dispatch = resolveDispatch(parsed, catalogue);
     expect(dispatch.kind).toBe('ready');
     const reply    = await runDispatch(dispatch, callSkill);
     const rendered = renderReply(reply, {
@@ -79,7 +79,7 @@ describe('#253 step 3 — refreshList state morphing', () => {
 
   it('refreshList re-runs the source dispatch and drops the completed chore', async () => {
     const bundle = makeMockBundle();
-    const { catalog, manifestsByOrigin, callSkill, chores } = bundle;
+    const { catalogue, manifestsByOrigin, callSkill, chores } = bundle;
 
     // Snapshot the source dispatch (the listOpen the bubble came from).
     const sourceDispatch = snapshotSourceDispatch({
@@ -121,13 +121,13 @@ describe('#253 step 3 — refreshList state morphing', () => {
     expect(r2).toBeNull();
   });
 
-  it('refreshList returns null when the op is not in the catalog', async () => {
+  it('refreshList returns null when the op is not in the catalogue', async () => {
     const bundle = makeMockBundle();
     const r = await refreshList({
       ...bundle,
       sourceDispatch: {
         kind:      'ready',
-        opId:      'doesNotExistInCatalog',
+        opId:      'doesNotExistInCatalogue',
         args:      {},
         appOrigin: 'household',
       },

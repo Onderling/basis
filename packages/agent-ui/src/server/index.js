@@ -18,7 +18,7 @@
  *
  * Legacy primitives (composeAgent / SkillRouter / EventBroadcaster /
  * ctxActor) were deleted 2026-05-04 once all three consumers
- * (tasks-v0, neighborhood-v0, archive) migrated to the real `core.Agent`
+ * (tasks-v0, neighbourhood-v0, archive) migrated to the real `core.Agent`
  * dispatch path.
  */
 

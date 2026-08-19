@@ -104,15 +104,15 @@ Web's GESPREK composer (`circleApp.js onSend`, ~line 961) only fans out plain me
 its own bot + feedback, mirroring mobile `CircleLauncherScreen` but assembling the now-SHARED pieces.
 **Scoped (2026-06-11):** `circleApp.js` today has only the agent (`createRealHouseholdAgent` →
 `rawCallSkill`/`resolveCallSkill`), `eventLog`, `deliveryStateMap`, `policy`, and the kring stream. It
-has NO catalog/LLM/gate/feedback. Build, in `circleApp.js` (the v2 launcher is browser-check-flagged —
+has NO catalogue/LLM/gate/feedback. Build, in `circleApp.js` (the v2 launcher is browser-check-flagged —
 verify in a browser as you go):
-1. **Catalog** — replicate `main.js`: `mergeManifests([...the same manifest set...])` → `filterCatalog(rawCatalog, appRegistry)`.
+1. **Catalogue** — replicate `main.js`: `mergeManifests([...the same manifest set...])` → `filterCatalogue(rawCatalogue, appRegistry)`.
 2. **LLM providers** — `buildCircleLlmProviders({ localBaseUrl: import.meta.env.VITE_CIRCLE_LLM_BASEURL, model })`.
 3. **Gate** — `createTokenGate({ rules: circleGateRules(currentLang()) })`.
 4. **Feedback** — `createFeedbackSurface(...)` + `createFeedbackMount({ surface, appendUserBubble, appendBotBubble })` where the bubbles `eventLog.append(kringChatMessageEvent({...actor:'bot'...}))` into the kring stream.
 5. **Lookup** — `makeCircleLookup({ getBase: () => <loaded kring items>, appCallSkill: rawCallSkill, scopeId: () => id })`.
-6. **Clarify** — `createClarifyingDispatch({ catalog: () => catalog, lookup, dispatchReady: <runDispatch + render a 'bot' kring bubble>, ask/askMissing: <kring bubble + candidate buttons> })`.
-7. **Bot** — `createCircleDispatch({ catalog: () => catalog, policy: { llmTool }, userDefault, llmProviders, interpret: interpretToCommand, dispatch: <parseInput→clarify.run | clarify.run>, gate, botName, postToKring: <the EXISTING optimistic-append + broadcastFanOut> })`.
+6. **Clarify** — `createClarifyingDispatch({ catalogue: () => catalogue, lookup, dispatchReady: <runDispatch + render a 'bot' kring bubble>, ask/askMissing: <kring bubble + candidate buttons> })`.
+7. **Bot** — `createCircleDispatch({ catalogue: () => catalogue, policy: { llmTool }, userDefault, llmProviders, interpret: interpretToCommand, dispatch: <parseInput→clarify.run | clarify.run>, gate, botName, postToKring: <the EXISTING optimistic-append + broadcastFanOut> })`.
 8. **onSend rewire** — `async (text) => { if (await feedbackMount.tryHandle(text, id)) return; await bot.handle(text, { id }); }`. The bot's `postToKring` sink = the current append+fan-out, so a plain message still fans out exactly as today.
 9. **Dispatch rendering** — id-mutations now need the circle scope (router.js MUTATE_VERBS, already shared) — pass `scopeReadyDispatch(route, id)` in the clarify `dispatchReady`, like mobile.
 **Verify (browser, v2 launcher / index.html):** `@assistant add X`→addTask · `done X`→completeTask (no "item not found") · `/feedback → text → /klaar → /feedback-stop` · a plain message still fans out.
@@ -128,7 +128,7 @@ missing the classic shell's composer-UX affordances. Triaged into **ported** vs 
 
 **✅ PORTED (web + mobile, shared `src/v2/commandSuggest.js` — write-once):**
 - **Slash-command auto-suggest dropdown** — type `/pre…` → ranked command list w/ hints; Tab/Enter
-  accept, ↑/↓ navigate, Esc dismiss (web); tap-to-fill (mobile). `suggestCommands(catalog, input)`.
+  accept, ↑/↓ navigate, Esc dismiss (web); tap-to-fill (mobile). `suggestCommands(catalogue, input)`.
 - **Bash-style input history** — ↑/↓ recall prior sends + draft restore, de-dup, cap.
   `createInputHistory()`. **Web only by nature** — arrow-key recall has no touch-gesture equivalent;
   mobile gets the suggest list (the tappable parity surface) but not key-history.

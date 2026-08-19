@@ -4,7 +4,7 @@
  * (proven byte-equivalent, see `test/manifest-equivalence.test.js`):
  * the five user-facing operations (addItem, listOpen, markComplete,
  * removeItem, help) reproduce the pre-manifest hand-catalogues exactly
- * (V0_TOOL_CATALOG + SYSTEM_PROMPT_CLASSIFY + regexParse grammar).
+ * (V0_TOOL_CATALOGUE + SYSTEM_PROMPT_CLASSIFY + regexParse grammar).
  *
  * (this delta, owner-approved 2026-05-19): household grows tasks +
  * named members.  Adds canonical `task` + `contact` item types, five new
@@ -20,7 +20,7 @@
  * F-SP1-b — slash grammar spec covers EN/NL aliases, multi-word verb
  *           phrases ("voeg toe"), specials, item splitting.
  * F-SP1-c — string params use `schema: { minLength: 1 }` for
- *           byte-equivalence with V0_TOOL_CATALOG.
+ *           byte-equivalence with V0_TOOL_CATALOGUE.
  * F-SP1-d — `systemPrompt` is re-exported from `src/llm/prompts.js`.
  * F-SP1-e — `help` and `register` are non-canonical verbs (app-specific).
  * F-SP2-a — `'text-only'` body kind in `surfaces.slash.match` (whole
@@ -79,7 +79,7 @@ export const householdManifest = {
   systemPrompt: SYSTEM_PROMPT_CLASSIFY,
 
   operations: [
-    // ── ops (byte-equal to V0_TOOL_CATALOG) ────────────────────
+    // ── ops (byte-equal to V0_TOOL_CATALOGUE) ────────────────────
     {
       id:   'addItem',
       verb: 'add',
@@ -130,7 +130,7 @@ export const householdManifest = {
       verb:      'complete',
       // surface as per-item button across all list-type
       // sections + tasks.  Multi-type via F-SP3-a; safe vs renderChat
-      // byte-equivalence (toolCatalog ignores appliesTo).
+      // byte-equivalence (toolCatalogue ignores appliesTo).
       appliesTo: { type: [...LIST_TYPES, 'task'] },
       params: [
         { name: 'match', kind: 'string', required: true, ...STR_NONEMPTY },
@@ -185,7 +185,7 @@ export const householdManifest = {
           // bot + the byte-equivalence grammar + the bare-command fallback
           // target). But in a merged circle the basis SHELL owns the global
           // `/help` (it introspects every app, including household), so this one
-          // is NOT contributed to the unified catalog — `standaloneOnly` makes
+          // is NOT contributed to the unified catalogue — `standaloneOnly` makes
           // mergeManifests skip it (no /help collision). See manifestMerge.js.
           standaloneOnly: true,
         },
@@ -241,7 +241,7 @@ export const householdManifest = {
       surfaces: {
         chat:  { hint: 'Grab an open task to do it.  match = id, id-prefix, or keyword.' },
         slash: {
-          // `/grab` (not `/claim`): in basis's unified catalog, `/claim`
+          // `/grab` (not `/claim`): in basis's unified catalogue, `/claim`
           // + the "claim/pak/neem" gate verbs are owned by tasks-v0 (the
           // dedicated circle-task system).  Household's task-claim uses a distinct
           // command + verbs so the two never collide (Part G de-ambiguation
@@ -430,7 +430,7 @@ export const householdManifest = {
     // one section per canonical list-type.  `addItem` / `markComplete`
     // `removeItem` surface in each section via renderWeb's type
     // enum fallback (see DESIGN-navmodel-sketch.md). No impact
-    // on renderChat output (toolCatalog + systemPrompt unchanged).
+    // on renderChat output (toolCatalogue + systemPrompt unchanged).
     //
     // adoption (2026-05-21) — `dataSource` makes the
     // per-section list skill EXPLICIT.  The four list-types could

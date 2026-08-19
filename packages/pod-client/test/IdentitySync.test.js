@@ -243,10 +243,10 @@ describe('IdentitySync — idempotent pulls', () => {
     // the list no longer includes it, our current pull won't visit the
     // missing path.  Force a direct re-pull by listing the cache and
     // re-checking — the simplest user-facing model is "stale cache for
-    // missing pod resources".  Document the current behavior.
+    // missing pod resources".  Document the current behaviour.
     const r2 = await sync.now();
     expect(r2.pulls).toBe(0);
-    // Cache entry remains (acceptable v1 behavior — pod-side deletes need
+    // Cache entry remains (acceptable v1 behaviour — pod-side deletes need
     // an explicit cache-eviction call from the deleter).
     expect(await vault.has('identity-cache:devices/device-x.enc')).toBe(true);
   });

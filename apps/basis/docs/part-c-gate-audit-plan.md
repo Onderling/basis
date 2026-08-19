@@ -8,7 +8,7 @@ I've verified all load-bearing claims against the live main-tree files: the cano
 
 # Part C — NL Gate Wiring: Implementation Plan
 
-All proposals target the **mock catalog the gate actually consumes** (`mockManifests.js` + `mockAgent.js` + `apps/calendar/manifest.js`), not the app-local `manifest.js` skill files. Schema conventions verified against the live `claimTask`/`completeTask`/`addtask` blocks: multiword verbs are token arrays (`['new','task']`), `match` keys are `verbs`/`body`/`arg`/`dropTrailing`, and label→id ops carry `pickerSource:{ listOp }` on the target param.
+All proposals target the **mock catalogue the gate actually consumes** (`mockManifests.js` + `mockAgent.js` + `apps/calendar/manifest.js`), not the app-local `manifest.js` skill files. Schema conventions verified against the live `claimTask`/`completeTask`/`addtask` blocks: multiword verbs are token arrays (`['new','task']`), `match` keys are `verbs`/`body`/`arg`/`dropTrailing`, and label→id ops carry `pickerSource:{ listOp }` on the target param.
 
 **Collision decisions are folded in below** — losers already have the bare token removed from their `verbs` list.
 

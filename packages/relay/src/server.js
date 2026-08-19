@@ -106,7 +106,7 @@
  * The relay verifies the proof's signature, expiry, and configured
  * `requiredRole` (if any) before accepting the registration.  When
  * `acceptedGroups` is unset or empty, the relay accepts every client
- * (legacy behavior, fully backward compatible).
+ * (legacy behaviour, fully backward compatible).
  *
  * Phase 2 (Stoop V1 — 2026-05-05):
  *
@@ -186,7 +186,7 @@ const DEFAULT_QUEUE_CAP        = param({ key: 'relay.queueCap', scope: PARAM_SCO
 const DEFAULT_QUEUE_CAP_RATIO  = param({ key: 'relay.queueCapRatio', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 4 });
 const DEFAULT_PUSH_THROTTLE_MS = param({ key: 'relay.pushThrottleMs', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 30_000 });     // do not push more than once / 30s / address
 
-// Default per-connection message rate limit (J-security flood defense).
+// Default per-connection message rate limit (J-security flood defence).
 // A token-bucket over the data-plane frame (`send`) so a
 // single connection cannot flood a LIVE peer with unbounded messages in OPEN
 // mode (the group-quota path only throttles grouped deployments; the offline
@@ -281,7 +281,7 @@ const MIME = {
  *   app registers custom roles via `Roles.registerCustomRole`).  Merged
  *   on top of the standard 5-role rank table.
  * @param {{ perSec?: number, burst?: number } | false} [opts.messageRateLimit]
- *   Default per-connection message rate limit (J-security flood defense),
+ *   Default per-connection message rate limit (J-security flood defence),
  *   applied to `send` frames in EVERY mode (open + grouped;
  *   it complements the per-group day quotas, it does not replace them). A
  *   token-bucket per connection: up to `burst` messages instantly, then
@@ -369,7 +369,7 @@ export async function startRelay(opts = {}) {
   }
 
   // Q-E.2: optional group-membership gate.  Open mode (no acceptedGroups)
-  // preserves the legacy behavior — every existing relay test still passes.
+  // preserves the legacy behaviour — every existing relay test still passes.
   const groupAuth = new GroupAuthVerifier({
     acceptedGroups: acceptedGroups ?? [],
     roleRanks,
@@ -578,7 +578,7 @@ export async function startRelay(opts = {}) {
     const openChallenges = new Map();
     /** The push token this socket registered, if any — reapplied to every address it later registers. */
     let socketPushToken = null;
-    // J-security: per-connection message rate limit (flood defense). One
+    // J-security: per-connection message rate limit (flood defence). One
     // bucket per socket — absorbs bursts, throttles a sustained flood. Null
     // when disabled via `messageRateLimit: false`.
     const msgBucket = rateLimitCfg ? createTokenBucket(rateLimitCfg) : null;

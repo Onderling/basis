@@ -19,7 +19,7 @@
 import { describe, it, expect } from 'vitest';
 import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
-import { createNeighborhoodAgent } from '../src/index.js';
+import { createNeighbourhoodAgent } from '../src/index.js';
 
 const ANNE  = 'https://id.example/anne';
 const BOB   = 'https://id.example/bob';
@@ -36,7 +36,7 @@ async function callSkill(agent, skillId, args, from = ANNE) {
 async function buildBundle({ group = GROUP, localActor = ANNE, members } = {}) {
   const id = await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);
-  const bundle = await createNeighborhoodAgent({
+  const bundle = await createNeighbourhoodAgent({
     identity: id, transport: tx,
     offeringMatch: { group, localActor, peers: [] },
     // Pre-seed both webids so setMyHandle upserts an existing row.

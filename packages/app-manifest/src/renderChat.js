@@ -2,7 +2,7 @@
  * Render the chat-surface projection of a manifest.
  *
  * Output is exactly what `@onderling/chat-agent`'s `ChatAgent` ctor expects
- * (`toolCatalog` + `toolHandlers` + `systemPrompt`), plus the structured
+ * (`toolCatalogue` + `toolHandlers` + `systemPrompt`), plus the structured
  * chat affordances (`commandMenu` for Telegram `setMyCommands`,
  * `inlineKeyboardFor(item)` for per-item inline buttons) that the manifest
  * also feeds.
@@ -26,7 +26,7 @@ import { paramsToJsonSchema } from './paramsToJsonSchema.js';
 import { buildPrompt }         from './internal/prompt.js';
 
 /**
- * Render the chat-surface projection of a manifest: `toolCatalog` + `toolHandlers` + `systemPrompt`
+ * Render the chat-surface projection of a manifest: `toolCatalogue` + `toolHandlers` + `systemPrompt`
  * (the `ChatAgent` ctor shape) plus the structured chat affordance lookups (`commandMenu`,
  * `inlineKeyboardFor`, `replyShapeFor`, `followUpsFor`, `runtimeFor`, `embedSnapshotFor`, `briefFor`,
  * `searchFor`). Ops without a matching skill in `skillRegistry` are omitted from `toolHandlers`;
@@ -42,7 +42,7 @@ import { buildPrompt }         from './internal/prompt.js';
  * @param {object} [opts]
  * @param {{preamble?: string, perToolLine?: function, postamble?: string}} [opts.prompt] — prompt
  *   builder overrides (ignored when the manifest carries a verbatim `systemPrompt` string).
- * @returns {{toolCatalog: Array<object>, toolHandlers: Record<string, function>,
+ * @returns {{toolCatalogue: Array<object>, toolHandlers: Record<string, function>,
  *   systemPrompt: string, commandMenu: Array<object>, inlineKeyboardFor: function,
  *   replyShapeFor: function, followUpsFor: function, runtimeFor: function,
  *   embedSnapshotFor: function, briefFor: function, searchFor: function}}
@@ -62,7 +62,7 @@ export function renderChat(manifest, args, opts = {}) {
   const ops = Array.isArray(manifest.operations) ? manifest.operations : [];
 
   // (a) free-text channel — exactly what ChatAgent expects.
-  const toolCatalog = ops.map((op) => ({
+  const toolCatalogue = ops.map((op) => ({
     id:          op.id,
     description: op?.surfaces?.chat?.hint ?? op.id,
     schema:      paramsToJsonSchema(op.params ?? [], { manifest }),
@@ -233,7 +233,7 @@ export function renderChat(manifest, args, opts = {}) {
   const searchFor = (opId) => searchByOp.get(opId);
 
   return {
-    toolCatalog, toolHandlers, systemPrompt, commandMenu,
+    toolCatalogue, toolHandlers, systemPrompt, commandMenu,
     inlineKeyboardFor, replyShapeFor, followUpsFor, runtimeFor,
     embedSnapshotFor, briefFor, searchFor,
   };

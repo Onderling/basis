@@ -37,7 +37,7 @@ paramsToJsonSchema(params, { manifest? })
                                          → JSON Schema object
 renderChat(manifest,
            { skillRegistry, toSkillCtx, onStateUpdates? }, opts?)
-                                         → { toolCatalog, toolHandlers,
+                                         → { toolCatalogue, toolHandlers,
                                              systemPrompt, commandMenu,
                                              inlineKeyboardFor }
 renderSlash(manifest)                    → { parse(text) → null | Call | Call[] }
@@ -47,7 +47,7 @@ All four are **deterministic** — same input ⇒ byte-identical output;
 declaration order preserved throughout.
 
 `renderChat`'s output plugs straight into `@onderling/chat-agent`'s
-`ChatAgent` constructor (`toolCatalog` + `toolHandlers` + `systemPrompt`).
+`ChatAgent` constructor (`toolCatalogue` + `toolHandlers` + `systemPrompt`).
 `renderSlash().parse` has the same return shape as household's
 `regexParse` (drop-in for SP-1's byte-equivalence gate).
 
@@ -134,7 +134,7 @@ const chat = renderChat(manifest, {
   },
   toSkillCtx: (toolCtx) => ({ chatId: toolCtx.chatId }),
 });
-// chat.toolCatalog, chat.toolHandlers, chat.systemPrompt, …
+// chat.toolCatalogue, chat.toolHandlers, chat.systemPrompt, …
 
 const { parse } = renderSlash(manifest);
 parse('add buy milk');   // → { skillId: 'addNote', args: { match: 'buy milk' } }
@@ -160,7 +160,7 @@ paramsToJsonSchema(params, { manifest? })
         kind:'enum' + of:[…]         uses the inline array.
 
 renderChat(manifest, { skillRegistry, toSkillCtx, onStateUpdates? }, opts?)
-  → { toolCatalog:        Array<{id, description, schema}>,
+  → { toolCatalogue:        Array<{id, description, schema}>,
       toolHandlers:        Record<id, (args, toolCtx) => ToolResult>,
       systemPrompt:        string,
       commandMenu:         Array<{command, description}>,

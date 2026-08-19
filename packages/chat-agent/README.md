@@ -27,7 +27,7 @@ const llm = new LlmClient({
 const agent = new ChatAgent({
   bridges: [bridge],
   llm,
-  toolCatalog: [
+  toolCatalogue: [
     { id: 'addItems',     description: 'Add items to the household list', schema: {/*...*/} },
     { id: 'markComplete', description: 'Mark items complete',             schema: {/*...*/} },
   ],
@@ -69,7 +69,7 @@ agent.on('tool-call', ({chatId, member, tool, args, result}) => {
 new ChatAgent({
   bridges:        MessagingBridge[],
   llm:            { invoke(req): result },
-  toolCatalog:    Array<{id, description?, schema?}>,
+  toolCatalogue:    Array<{id, description?, schema?}>,
   toolHandlers:   Record<string, ToolHandler>,
   systemPrompt:   string,
   contextBuilder: (chatId, member) => Promise<string>,

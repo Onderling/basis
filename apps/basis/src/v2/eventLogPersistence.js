@@ -35,7 +35,7 @@ function debounced(save, ms) {
     if (timer) clearTimeout(timer);
     timer = setTimeout(flush, ms);
     if (typeof timer?.unref === 'function') timer.unref();
-    // The log chains on the persist result — honor its promise contract (errors surface in flush).
+    // The log chains on the persist result — honour its promise contract (errors surface in flush).
     return Promise.resolve();
   };
 }

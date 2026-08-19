@@ -29,7 +29,7 @@
  *                        injected ⇒ lexical-only, exactly like browser default).
  *
  * NOT wired in R1 (deferred): the `CapabilityAuth` `pod-direct` delegation that
- * turns the pod source into a token-honoring bundled pod — that is R1.5/R2's
+ * turns the pod source into a token-honouring bundled pod — that is R1.5/R2's
  * concern per PLAN-companion-node-remote-hosting.md.
  */
 

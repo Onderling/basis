@@ -22,14 +22,14 @@
  * `apps/stoop/manifest.js` (the slash-only D.1 stoop manifest).
  *
  * So `bootWorkspace` in `journeys-cross-app.test.js`, which merges
- * the mock catalog, would return `unknown-op` for 7/8 of these.  This
+ * the mock catalogue, would return `unknown-op` for 7/8 of these.  This
  * file uses a sibling helper that merges the REAL stoop manifest
  * INSTEAD of the mock — same realAgent backing (110 real skills), and
  * a substrate-truth slash surface.
  *
  * The audit is now closed: the slashes exist + dispatch through the
  * pipeline.  If the basis shell ever needs them in the mock
- * catalog (e.g. for the chat-only demo without the real agent), the
+ * catalogue (e.g. for the chat-only demo without the real agent), the
  * fix is to mirror the 8 entries into `mockStoopManifest` — that's
  * tracked as a follow-up; not in scope here.
  *
@@ -42,7 +42,7 @@ import 'fake-indexeddb/auto';
 import {
   parseInput, mergeManifests, resolveDispatch, runDispatch,
   createDefaultThreadStore, createEventRouter,
-  EventLog, AppRegistry, filterCatalog,
+  EventLog, AppRegistry, filterCatalogue,
   runBrief, createBriefCache, runFind,
   basisManifest,
 } from '../src/index.js';
@@ -66,7 +66,7 @@ const LOCAL_ACTOR = 'webid:local-demo-user';
  * Boot a workspace identical in shape to journeys-cross-app's
  * bootWorkspace EXCEPT it merges the REAL stoopManifest (D.1 slash-
  * only declarations) instead of mockStoopManifest, so the 8 audit
- * slashes resolve at the catalog layer.
+ * slashes resolve at the catalogue layer.
  */
 async function bootWorkspaceWithRealStoop({ chatVault, secureAgentOpts } = {}) {
   let routerRef;
@@ -74,7 +74,7 @@ async function bootWorkspaceWithRealStoop({ chatVault, secureAgentOpts } = {}) {
     chatVault, secureAgentOpts,
     publishEvent: (event) => { if (routerRef) routerRef.deliver(event); },
   });
-  const rawCatalog = mergeManifests([
+  const rawCatalogue = mergeManifests([
     { manifest: basisManifest },
     { manifest: agent.manifest },
     { manifest: mockTasksManifest },
@@ -84,9 +84,9 @@ async function bootWorkspaceWithRealStoop({ chatVault, secureAgentOpts } = {}) {
   ], { runtime: 'browser' });
 
   const appRegistry = new AppRegistry();
-  appRegistry.syncWithCatalog(rawCatalog.appOrigins);
-  let catalog = filterCatalog(rawCatalog, appRegistry);
-  appRegistry.subscribe(() => { catalog = filterCatalog(rawCatalog, appRegistry); });
+  appRegistry.syncWithCatalogue(rawCatalogue.appOrigins);
+  let catalogue = filterCatalogue(rawCatalogue, appRegistry);
+  appRegistry.subscribe(() => { catalogue = filterCatalogue(rawCatalogue, appRegistry); });
 
   const store = createDefaultThreadStore();
   const router = createEventRouter({ threadStore: store });
@@ -107,7 +107,7 @@ async function bootWorkspaceWithRealStoop({ chatVault, secureAgentOpts } = {}) {
   };
 
   const localBuiltins = createLocalBuiltins({
-    catalog: rawCatalog,
+    catalogue: rawCatalogue,
     t: (k, p) => p ? `${k}(${JSON.stringify(p)})` : k,
     threadStore: store,
     setActive: (id) => store.setActiveThread(id),
@@ -115,10 +115,10 @@ async function bootWorkspaceWithRealStoop({ chatVault, secureAgentOpts } = {}) {
     simPeers: {},
     appRegistry, eventLog,
     briefRunner: (opts) => runBrief({
-      catalog, callSkill, cache: briefCache,
+      catalogue, callSkill, cache: briefCache,
       bypassCache: opts?.bypassCache,
     }),
-    findRunner: (opts) => runFind({ catalog, callSkill, query: opts?.query }),
+    findRunner: (opts) => runFind({ catalogue, callSkill, query: opts?.query }),
     agent, podAuth: null, externalFlow: null, openFilePicker: null,
     connectPeer: async () => agent.peer,
   });
@@ -128,9 +128,9 @@ async function bootWorkspaceWithRealStoop({ chatVault, secureAgentOpts } = {}) {
    *  envelope unchanged (so confirm-gate / needsForm shapes are
    *  visible to the asserter). */
   async function userInput(text, threadId = 'main') {
-    const parsed = parseInput(text, catalog, { threadId });
+    const parsed = parseInput(text, catalogue, { threadId });
     if (parsed.kind !== 'slash') return { kind: 'not-a-slash', text, parsed };
-    const route = resolveDispatch(parsed, catalog);
+    const route = resolveDispatch(parsed, catalogue);
     if (route.kind !== 'ready') return route;
     return runDispatch(route, callSkill);
   }
@@ -138,9 +138,9 @@ async function bootWorkspaceWithRealStoop({ chatVault, secureAgentOpts } = {}) {
   /** Same, but DOES dispatch through a confirm-gate (synthesises the
    *  user-said-yes step) — needed for /sign-out and any -gated op. */
   async function userInputForceDispatch(text, threadId = 'main') {
-    const parsed = parseInput(text, catalog, { threadId });
+    const parsed = parseInput(text, catalogue, { threadId });
     if (parsed.kind !== 'slash') return { kind: 'not-a-slash', text };
-    const route = resolveDispatch(parsed, catalog);
+    const route = resolveDispatch(parsed, catalogue);
     if (route.kind === 'ready') return runDispatch(route, callSkill);
     if (route.kind === 'needsConfirm') {
       // Synthesise the post-confirm dispatch — same shape `runDispatch`
@@ -160,23 +160,23 @@ async function bootWorkspaceWithRealStoop({ chatVault, secureAgentOpts } = {}) {
   }
 
   return {
-    agent, catalog: () => catalog, store, router, eventLog,
+    agent, catalogue: () => catalogue, store, router, eventLog,
     appRegistry, callSkill, userInput, userInputForceDispatch, LOCAL_ACTOR,
   };
 }
 
 /* ════════════════════════════════════════════════════════════
- * Catalog-presence sanity — confirms the real-manifest merge
+ * Catalogue-presence sanity — confirms the real-manifest merge
  * surfaces every audited slash in the commandMenu (catches any
  * future regression where stoopManifest drops one).
  * ══════════════════════════════════════════════════════════ */
 
-describe('CC-ST-audit — catalog has all 8 audit slashes', () => {
+describe('CC-ST-audit — catalogue has all 8 audit slashes', () => {
   let ws;
   beforeEach(async () => { ws = await bootWorkspaceWithRealStoop(); });
 
   it('commandMenu declares /lend-assign /lend-return /skills /leave-group /tree /sign-out /report /bulletin', () => {
-    const cmds = new Set(ws.catalog().commandMenu.map((e) => e.command));
+    const cmds = new Set(ws.catalogue().commandMenu.map((e) => e.command));
     for (const cmd of [
       '/lend-assign', '/lend-return', '/skills', '/leave-group',
       '/tree', '/sign-out', '/report', '/bulletin',
@@ -186,7 +186,7 @@ describe('CC-ST-audit — catalog has all 8 audit slashes', () => {
   });
 
   it('every audit slash is owned by stoop', () => {
-    const menu = ws.catalog().commandMenu;
+    const menu = ws.catalogue().commandMenu;
     const audit = [
       '/lend-assign', '/lend-return', '/skills', '/leave-group',
       '/tree', '/sign-out', '/report', '/bulletin',

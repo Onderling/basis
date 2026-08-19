@@ -127,7 +127,7 @@ script:
 import { LlmClient }      from '../src/llm/LlmClient.js';
 import { ollamaProvider } from '../src/llm/providers/ollama.js';
 import { SYSTEM_PROMPT_CLASSIFY } from '../src/llm/prompts.js';
-import { V0_TOOL_CATALOG }        from '../src/skills/classifyAndExtract.js';
+import { V0_TOOL_CATALOGUE }        from '../src/skills/classifyAndExtract.js';
 
 const llm = new LlmClient({ provider: ollamaProvider() });
 
@@ -143,7 +143,7 @@ for (const s of samples) {
   const r = await llm.invoke({
     system:   SYSTEM_PROMPT_CLASSIFY,
     messages: [{ role: 'user', content: s }],
-    tools:    V0_TOOL_CATALOG,
+    tools:    V0_TOOL_CATALOGUE,
   });
   console.log(s, '→', r.toolCall ?? r.classification ?? r.replyText);
 }

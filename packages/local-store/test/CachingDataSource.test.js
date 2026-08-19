@@ -23,12 +23,12 @@ function mkInner() {
 // A representative mem://→pod mapper (mirrors the Phase 1 intent).
 const podMap = {
   toInner: (p) =>
-    p.startsWith('mem://neighborhood/')
-      ? p.replace('mem://neighborhood/', 'https://pod/sharing/')
+    p.startsWith('mem://neighbourhood/')
+      ? p.replace('mem://neighbourhood/', 'https://pod/sharing/')
       : p.replace('mem://', 'https://pod/'),
   fromInner: (u) =>
     u.startsWith('https://pod/sharing/')
-      ? u.replace('https://pod/sharing/', 'mem://neighborhood/')
+      ? u.replace('https://pod/sharing/', 'mem://neighbourhood/')
       : u.replace('https://pod/', 'mem://'),
 };
 
@@ -36,10 +36,10 @@ describe('CachingDataSource — innerKeyMap seam', () => {
   it('identity default: inner receives the exact logical keys (behaviour-neutral)', async () => {
     const inner = mkInner();
     const c = new CachingDataSource({ inner });
-    await c.write('mem://neighborhood/items/1.json', 'A');
-    expect(inner.map.get('mem://neighborhood/items/1.json')).toBe('A');
-    await c.delete('mem://neighborhood/items/1.json');
-    expect(inner.map.has('mem://neighborhood/items/1.json')).toBe(false);
+    await c.write('mem://neighbourhood/items/1.json', 'A');
+    expect(inner.map.get('mem://neighbourhood/items/1.json')).toBe('A');
+    await c.delete('mem://neighbourhood/items/1.json');
+    expect(inner.map.has('mem://neighbourhood/items/1.json')).toBe(false);
 
     const inner2 = mkInner();
     inner2.map.set('mem://x', 'V');
@@ -51,14 +51,14 @@ describe('CachingDataSource — innerKeyMap seam', () => {
     const inner = mkInner();
     const c = new CachingDataSource({ inner, innerKeyMap: podMap });
 
-    await c.write('mem://neighborhood/items/1.json', 'A');
+    await c.write('mem://neighbourhood/items/1.json', 'A');
     // inner got the MAPPED uri, never the logical key
     expect(inner.map.get('https://pod/sharing/items/1.json')).toBe('A');
-    expect(inner.map.has('mem://neighborhood/items/1.json')).toBe(false);
+    expect(inner.map.has('mem://neighbourhood/items/1.json')).toBe(false);
     // local cache stays keyed by the logical key
-    expect(await c.list('mem://')).toContain('mem://neighborhood/items/1.json');
+    expect(await c.list('mem://')).toContain('mem://neighbourhood/items/1.json');
 
-    await c.delete('mem://neighborhood/items/1.json');
+    await c.delete('mem://neighbourhood/items/1.json');
     expect(inner.map.has('https://pod/sharing/items/1.json')).toBe(false);
   });
 
@@ -67,17 +67,17 @@ describe('CachingDataSource — innerKeyMap seam', () => {
     inner.map.set('https://pod/sharing/items/9.json', 'Z');
     const c = new CachingDataSource({ inner, innerKeyMap: podMap });
 
-    const n = await c.pullFromInner('mem://neighborhood/');
+    const n = await c.pullFromInner('mem://neighbourhood/');
     expect(n).toBe(1);
     // read hits the local cache under the LOGICAL key
-    expect(await c.read('mem://neighborhood/items/9.json')).toBe('Z');
+    expect(await c.read('mem://neighbourhood/items/9.json')).toBe('Z');
   });
 
   it('read miss maps the logical key to the inner URI', async () => {
     const inner = mkInner();
     inner.map.set('https://pod/sharing/items/7.json', 'Q');
     const c = new CachingDataSource({ inner, innerKeyMap: podMap });
-    expect(await c.read('mem://neighborhood/items/7.json')).toBe('Q');
+    expect(await c.read('mem://neighbourhood/items/7.json')).toBe('Q');
   });
 
   it('an invalid innerKeyMap falls back to identity (no throw)', async () => {

@@ -204,7 +204,7 @@ wire — bytes only.
 
 ## Folder-name conventions
 
-Folder names drive the pod's ACL.  These are honored by `PathMap.aclFor`:
+Folder names drive the pod's ACL.  These are honoured by `PathMap.aclFor`:
 
 | Local path             | Pod ACL       |
 |------------------------|---------------|

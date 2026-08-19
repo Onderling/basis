@@ -10,7 +10,7 @@
  * The substrate loader therefore takes those two functions by INJECTION. This shim is the app-side
  * composition seam: it binds basis's `verifyMappings`/`mappingsToSources` into the neutral loader so
  * existing callers (web `circleApp.js`, mobile `agentBundle.js`, the test) keep calling
- * `loadVerifyMappings({ store, deviceId, catalog })` unchanged.
+ * `loadVerifyMappings({ store, deviceId, catalogue })` unchanged.
  */
 import { loadVerifyMappings as loadVerifyMappingsNeutral } from '@onderling/kring-host/mappingsLoader';
 import { verifyMappings, mappingsToSources } from '../mappings.js';

@@ -2,7 +2,7 @@
  * basis — router.
  *
  * Resolves a `ParseResult` (from `parser.js`) against the merged
- * catalog (from `manifestMerge.js`) and produces a tagged-union
+ * catalogue (from `manifestMerge.js`) and produces a tagged-union
  * `RouteResult`:
  *
  *   { kind: 'ready',        ...dispatchable }       — go ahead, fire
@@ -98,12 +98,12 @@ const BULK_READ_VERBS = new Set([
  * Resolve a parser result into a route result.
  *
  * @param {import('./parser.js').ParseResult} parseResult
- * @param {import('./manifestMerge.js').MergedCatalog} catalog
+ * @param {import('./manifestMerge.js').MergedCatalogue} catalogue
  * @returns {RouteResult}
  */
-export function resolveDispatch(parseResult, catalog) {
-  if (!parseResult || !catalog) {
-    throw new TypeError('resolveDispatch: parseResult + catalog required');
+export function resolveDispatch(parseResult, catalogue) {
+  if (!parseResult || !catalogue) {
+    throw new TypeError('resolveDispatch: parseResult + catalogue required');
   }
 
   if (parseResult.kind === 'unknown') {
@@ -133,13 +133,13 @@ export function resolveDispatch(parseResult, catalog) {
   // the bare key (no hint, or the hint IS the bare owner).
   let entry = null;
   if (hintOrigin) {
-    const prefixed = catalog.opsById.get(`${hintOrigin}/${opId}`);
-    const bare     = catalog.opsById.get(opId);
+    const prefixed = catalogue.opsById.get(`${hintOrigin}/${opId}`);
+    const bare     = catalogue.opsById.get(opId);
     if (prefixed) entry = prefixed;
     else if (bare && bare.appOrigin === hintOrigin) entry = bare;
     else entry = bare ?? null;
   } else {
-    entry = catalog.opsById.get(opId);
+    entry = catalogue.opsById.get(opId);
   }
   if (!entry) {
     return {
@@ -166,7 +166,7 @@ export function resolveDispatch(parseResult, catalog) {
       args,
       appOrigin,
       threadId:   threadId ?? null,
-      replyShape: effectiveReplyShape(opId, op, catalog),
+      replyShape: effectiveReplyShape(opId, op, catalogue),
       verb:       op?.verb ?? null,
     };
   }
@@ -187,7 +187,7 @@ export function resolveDispatch(parseResult, catalog) {
       argName:    target.name,
       baseArgs,
       threadId:   threadId ?? null,
-      replyShape: effectiveReplyShape(opId, op, catalog),
+      replyShape: effectiveReplyShape(opId, op, catalogue),
       verb:       op?.verb ?? null,
     };
   }
@@ -198,7 +198,7 @@ export function resolveDispatch(parseResult, catalog) {
 
   // Find missing required params (excluding any we just bound).
   const missing = findMissingRequired(op.params ?? [], boundArgs);
-  const replyShape = effectiveReplyShape(opId, op, catalog);
+  const replyShape = effectiveReplyShape(opId, op, catalogue);
 
   if (missing.length > 0) {
     return {
@@ -383,7 +383,7 @@ function findMissingRequired(params, boundArgs) {
 /**
  * Compute the effective reply shape:
  *
- *   1. Declared `surfaces.chat.reply` (looked up via the catalog).
+ *   1. Declared `surfaces.chat.reply` (looked up via the catalogue).
  *   2. Fallback by `op.verb`: 'list' → 'list', others → 'text'.
  *
  * v0.1 ships with only `text` + `list` renderers; later phases
@@ -392,11 +392,11 @@ function findMissingRequired(params, boundArgs) {
  *
  * @param {string}                                          opId
  * @param {object}                                          op
- * @param {import('./manifestMerge.js').MergedCatalog}      catalog
+ * @param {import('./manifestMerge.js').MergedCatalogue}      catalogue
  * @returns {string}
  */
-function effectiveReplyShape(opId, op, catalog) {
-  const declared = catalog.replyShapeFor?.(opId);
+function effectiveReplyShape(opId, op, catalogue) {
+  const declared = catalogue.replyShapeFor?.(opId);
   if (declared) return declared;
   if (op?.verb === 'list') return 'list';
   return 'text';

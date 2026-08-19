@@ -31,7 +31,7 @@ export const ENDORSEMENT_RESOURCE_VERSION = 1;
  * Shared-readable endorsement-list path for an endorser's pod / device.
  *
  * Lives under `/public/` (contrast the registry's `/private/`) because the
- * catalog read-path reads it cross-pod. The pseudo-pod path is the default,
+ * catalogue read-path reads it cross-pod. The pseudo-pod path is the default,
  * same as the registry.
  *
  * // real-pod: public-read ACP — on a real Solid pod this resource carries a
@@ -105,7 +105,7 @@ export function normaliseEndorsementResource(raw) {
  * @param {(uri: string) => (any|Promise<any>)} [opts.ensureAccess]
  *   — best-effort real-pod access-control hook. Wired by the app to
  *   `@onderling/pod-client`'s `setResourceAccess` (public-read + owner-write for
- *   G1; + admin-write for a G3 community catalog). Fires once, best-effort,
+ *   G1; + admin-write for a G3 community catalogue). Fires once, best-effort,
  *   after the first successful write to a real (https) pod URI; NEVER on a
  *   `pseudo-pod://` URI (hermetic no-op). A throwing hook must NOT break the
  *   write. Also exposed as `ensureAccess()` for explicit/idempotent use.

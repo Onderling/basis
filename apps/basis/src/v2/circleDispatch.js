@@ -8,20 +8,20 @@
 //   3. otherwise                         → the injected sink (mobile: post to the circle; web: defer)
 //
 // Platform-neutral: the shell injects HOW to dispatch (slash string OR {opId,args}), the "unhandled"
-// sink, the catalog, per-circle LLM providers, the policy (static OR a per-scope getter), and the
+// sink, the catalogue, per-circle LLM providers, the policy (static OR a per-scope getter), and the
 // NL→slash interpret. The household bot + the feedback v2 rewire reuse the same core — they differ only
-// in the catalog/interpret.
+// in the catalogue/interpret.
 
 import { resolveCircleLlm } from './llmPicker.js';
-import { scopeCatalogToApps } from './circleCatalogScope.js';
+import { scopeCatalogueToApps } from './circleCatalogueScope.js';
 
 /**
  * @param {object} a
- * @param {object|(()=>object)} [a.catalog]   the dispatch catalog (LLM tool list); static or a getter
+ * @param {object|(()=>object)} [a.catalogue]   the dispatch catalogue (LLM tool list); static or a getter
  * @param {object|((ctx:object)=>object|Promise<object>)} [a.policy]  the circle policy; static OR a per-scope getter (web's `policyFor`)
  * @param {object|(()=>object)} [a.userDefault]   the member's personal default (only when policy is 'user'); static or a getter
  * @param {{local?:object,cloud?:object}|null} [a.llmProviders] host-supplied LlmClients
- * @param {(text:string, opts:{catalog,llm,context}) => Promise<{opId:string,args?:object}|null>} [a.interpret]  NL→slash
+ * @param {(text:string, opts:{catalogue,llm,context}) => Promise<{opId:string,args?:object}|null>} [a.interpret]  NL→slash
  * @param {(input:string|{opId:string,args:object}, ctx:object) => any} a.dispatch  run a typed slash STRING or an {opId,args} route
  * @param {(text:string, ctx:object) => any} [a.postToCircle]  back-compat sink: posts a circle message (→ the default onUnhandled, reports 'circle')
  * @param {(text:string, ctx:object) => (string|Promise<string>)} [a.onUnhandled]  handle slash(when dispatchSlash:false)/skip/no-match/not-addressed; returns the `via` ('circle' | 'defer' | 'none' | …)
@@ -29,11 +29,11 @@ import { scopeCatalogToApps } from './circleCatalogScope.js';
  * @param {object} [a.gate]   optional token gate ({ evaluate })
  * @param {string} [a.botName='assistant']
  */
-export function createCircleDispatch({ catalog, policy, userDefault, llmProviders, interpret, dispatch, postToCircle, onUnhandled, onNoMatch, onLlmUnavailable, dispatchSlash = true, gate, botName = 'assistant', recentTurns }) {
+export function createCircleDispatch({ catalogue, policy, userDefault, llmProviders, interpret, dispatch, postToCircle, onUnhandled, onNoMatch, onLlmUnavailable, dispatchSlash = true, gate, botName = 'assistant', recentTurns }) {
   if (typeof dispatch !== 'function') {
     throw new Error('createCircleDispatch: dispatch is required');
   }
-  const getCatalog     = typeof catalog === 'function' ? catalog : () => catalog;
+  const getCatalogue     = typeof catalogue === 'function' ? catalogue : () => catalogue;
   const getPolicy      = typeof policy === 'function' ? policy : () => policy;
   const getUserDefault = typeof userDefault === 'function' ? userDefault : () => userDefault;
   // The "everything-else" sink: an explicit onUnhandled, else a `postToCircle` (back-compat → posts +
@@ -86,12 +86,12 @@ export function createCircleDispatch({ catalog, policy, userDefault, llmProvider
           const turns = typeof recentTurns === 'function' ? (recentTurns() || []) : [];
           if (turns.length) context = [...turns, ...(Array.isArray(context) ? context : [])];
           // Part D — scope the LLM's tool list to the circle's apps. Gate/dispatch unaffected.
-          const scopedCatalog = scopeCatalogToApps(getCatalog(), circlePolicy?.apps);
+          const scopedCatalogue = scopeCatalogueToApps(getCatalogue(), circlePolicy?.apps);
           let cmd = null;
           try {
             // `ctx.history` carries a follow-up's prior turns (the bot's question + the original ask) so a
             // bare answer ("shopping") resolves against what was just asked. interpret threads it as messages.
-            cmd = await interpret(stripped, { catalog: scopedCatalog, llm, context, history: Array.isArray(ctx?.history) ? ctx.history : undefined });   // → {opId,args}|{reply}|null
+            cmd = await interpret(stripped, { catalogue: scopedCatalogue, llm, context, history: Array.isArray(ctx?.history) ? ctx.history : undefined });   // → {opId,args}|{reply}|null
           } catch (err) {
             // Smart chat is configured but the endpoint is UNREACHABLE (server down). Reply in plain
             // words ("basic mode") rather than failing the turn — buttons + commands still work.

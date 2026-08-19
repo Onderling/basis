@@ -4,7 +4,7 @@
  * Proves that the new `apps/household/manifest.js` + `@onderling/app-manifest`
  * projectors produce output identical to the existing hand-catalogues:
  *
- *   - `renderChat(manifest).toolCatalog`     ≡  `V0_TOOL_CATALOG`
+ *   - `renderChat(manifest).toolCatalogue`     ≡  `V0_TOOL_CATALOGUE`
  *     (`src/skills/classifyAndExtract.js`)
  *   - `renderChat(manifest).systemPrompt`    ≡  `SYSTEM_PROMPT_CLASSIFY`
  *     (`src/llm/prompts.js`)
@@ -13,7 +13,7 @@
  *
  * Round A keeps the originals in place; the gate is the diff.  Round B
  * swaps `HouseholdAgent` to the projector output and deletes the
- * originals.  Per PLAN §1.4 + §1.6: parse + toolCatalog are byte-equal;
+ * originals.  Per PLAN §1.4 + §1.6: parse + toolCatalogue are byte-equal;
  * the system prompt is byte-equal here because the manifest re-exports
  * the verbatim string (F-SP1-d).
  */
@@ -23,13 +23,13 @@ import { describe, it, expect } from 'vitest';
 import { renderChat, renderSlash } from '@onderling/app-manifest';
 
 import { householdManifest }       from '../manifest.js';
-import { V0_TOOL_CATALOG }         from '../src/skills/classifyAndExtract.js';
+import { V0_TOOL_CATALOGUE }         from '../src/skills/classifyAndExtract.js';
 import { SYSTEM_PROMPT_CLASSIFY }  from '../src/llm/prompts.js';
 import { regexParse }              from '../src/parsers/regexCommands.js';
 import * as Skills                 from '../src/skills/index.js';
 
 // renderChat needs a skillRegistry + toSkillCtx; their actual behaviour
-// doesn't matter for the toolCatalog/systemPrompt byte-equality check.
+// doesn't matter for the toolCatalogue/systemPrompt byte-equality check.
 const noopRegistry = {
   addItem:      Skills.addItem,
   listOpen:     Skills.listOpen,
@@ -39,10 +39,10 @@ const noopRegistry = {
 };
 const noopCtxAdapter = (toolCtx) => ({ ...toolCtx });
 
-describe('SP-1 equivalence: toolCatalog === V0_TOOL_CATALOG', () => {
+describe('SP-1 equivalence: toolCatalogue === V0_TOOL_CATALOGUE', () => {
   // grew the manifest with new ops (addTask, listTasks, claim,
   // reassign, registerName). The byte-equivalence still holds
-  // we filter to the original five op ids.  The remaining toolCatalog
+  // we filter to the original five op ids.  The remaining toolCatalogue
   // entries beyond the set are the additions.
   const SP1_IDS = new Set(['addItem', 'listOpen', 'markComplete', 'removeItem', 'help']);
 
@@ -51,9 +51,9 @@ describe('SP-1 equivalence: toolCatalog === V0_TOOL_CATALOG', () => {
       skillRegistry: noopRegistry,
       toSkillCtx:    noopCtxAdapter,
     });
-    const filtered = out.toolCatalog.filter((t) => SP1_IDS.has(t.id));
+    const filtered = out.toolCatalogue.filter((t) => SP1_IDS.has(t.id));
     expect(JSON.stringify(filtered, null, 2))
-      .toBe(JSON.stringify(V0_TOOL_CATALOG, null, 2));
+      .toBe(JSON.stringify(V0_TOOL_CATALOGUE, null, 2));
   });
 
   it('SP-1 entries appear first, in declaration order', () => {
@@ -61,7 +61,7 @@ describe('SP-1 equivalence: toolCatalog === V0_TOOL_CATALOG', () => {
       skillRegistry: noopRegistry,
       toSkillCtx:    noopCtxAdapter,
     });
-    expect(out.toolCatalog.slice(0, 5).map((t) => t.id))
+    expect(out.toolCatalogue.slice(0, 5).map((t) => t.id))
       .toEqual(['addItem', 'listOpen', 'markComplete', 'removeItem', 'help']);
   });
 });

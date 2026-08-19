@@ -22,7 +22,7 @@ import { createMockHouseholdAgent }  from '../src/core/agent/mockAgent.js';
 
 function makeApp() {
   const agent   = createMockHouseholdAgent();
-  const catalog = mergeManifests([{ manifest: agent.manifest }]);
+  const catalogue = mergeManifests([{ manifest: agent.manifest }]);
   const thread  = new Thread();
   const manifestsByOrigin = { household: agent.manifest };
   const container = document.createElement('div');
@@ -32,8 +32,8 @@ function makeApp() {
 
   async function handleUserText(text) {
     thread.addUserMessage(text);
-    const parse = parseInput(text, catalog);
-    const route = resolveDispatch(parse, catalog);
+    const parse = parseInput(text, catalogue);
+    const route = resolveDispatch(parse, catalogue);
     if (route.kind !== 'ready') {
       const rendered = renderReply({
         payload: `unhandled: ${route.kind}`, shape: 'text',
@@ -50,14 +50,14 @@ function makeApp() {
 
   async function onButtonTap(opId, itemId) {
     thread.addUserMessage(`(tap: ${opId} ${itemId})`);
-    const entry    = catalog.opsById.get(opId);
+    const entry    = catalogue.opsById.get(opId);
     const firstReq = (entry.op.params ?? []).find(
       (p) => p?.required && (p.kind === 'string' || p.kind === 'enum'),
     );
     const args = firstReq ? { [firstReq.name]: itemId } : { id: itemId };
     const parse = { kind: 'slash', opId, args, threadId: null,
                     command: '(button)', body: itemId };
-    const route = resolveDispatch(parse, catalog);
+    const route = resolveDispatch(parse, catalogue);
     if (route.kind !== 'ready') return;
     const reply = await runDispatch(route, agent.callSkill);
     const rendered = renderReply(reply, {
@@ -70,7 +70,7 @@ function makeApp() {
     renderStream(container, thread.messages, { ...ctxBase, onButtonTap });
   }
 
-  return { agent, catalog, thread, container, handleUserText, onButtonTap, rerender };
+  return { agent, catalogue, thread, container, handleUserText, onButtonTap, rerender };
 }
 
 describe('basis v0.1.4 web smoke', () => {

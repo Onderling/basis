@@ -1,5 +1,5 @@
 /**
- * genericOpSynth — synthesize SYNTHETIC catalog ops for a manifest's GENERIC (op-less) capabilities
+ * genericOpSynth — synthesize SYNTHETIC catalogue ops for a manifest's GENERIC (op-less) capabilities
  * (PLAN-capability-arc 1b).
  *
  * "Declare a noun → get CRUD free": a manifest can declare a noun with CRUD atoms and NO implementing op

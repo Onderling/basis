@@ -16,7 +16,7 @@ function roundtrip(mem, ctx) {
 
 describe('podPathMap.classify/unclassify', () => {
   it('offers/requests → group/<circle>/items (round-trips)', () => {
-    const c = roundtrip('mem://neighborhood/items/01ABC.json', { circleId: 'C' });
+    const c = roundtrip('mem://neighbourhood/items/01ABC.json', { circleId: 'C' });
     expect(c).toEqual({ storageFn: 'group/C/items', tail: '01ABC.json' });
   });
 
@@ -24,7 +24,7 @@ describe('podPathMap.classify/unclassify', () => {
     // Real runtime key: MemberMapCache already encodeURIComponent's
     // the peer id, so the mem:// segment is ALREADY `webid%3Alocal%3A…`.
     // The classifier must NOT re-encode it (that produced `%253A`).
-    const c = roundtrip('mem://neighborhood/members/webid%3Alocal%3AOVUaJV0', { circleId: 'C' });
+    const c = roundtrip('mem://neighbourhood/members/webid%3Alocal%3AOVUaJV0', { circleId: 'C' });
     expect(c.storageFn).toBe('group/C/members');
     expect(c.tail).toBe('webid%3Alocal%3AOVUaJV0');     // verbatim — no %253A
     expect(c.tail).not.toContain('%253A');
@@ -36,12 +36,12 @@ describe('podPathMap.classify/unclassify', () => {
   });
 
   it('group governance → group/<circle>/governance', () => {
-    const c = roundtrip('mem://neighborhood/groups/G1/config.json', { circleId: 'C' });
+    const c = roundtrip('mem://neighbourhood/groups/G1/config.json', { circleId: 'C' });
     expect(c.storageFn).toBe('group/C/governance');
   });
 
   it('group audit log → group/<circle>/audit (device-pass #2 UNROUTED gap)', () => {
-    const c = roundtrip('mem://neighborhood/audit/01KRVSN68BDV6JA896N7N4RJBY.json', { circleId: 'C' });
+    const c = roundtrip('mem://neighbourhood/audit/01KRVSN68BDV6JA896N7N4RJBY.json', { circleId: 'C' });
     expect(c.storageFn).toBe('group/C/audit');
     expect(c.tail).toBe('01KRVSN68BDV6JA896N7N4RJBY.json');
   });
@@ -65,11 +65,11 @@ describe('podPathMap.classify/unclassify', () => {
   it('returns null for out-of-scope / unroutable keys', () => {
     expect(classify('mem://stoop/settings/shared.json')).toBeNull();      // cross-app-settings.md owns these
     expect(classify('mem://stoop/settings/devices/d.json')).toBeNull();
-    expect(classify('mem://neighborhood/weird/x')).toBeNull();
+    expect(classify('mem://neighbourhood/weird/x')).toBeNull();
     expect(classify('not-a-mem-key')).toBeNull();
     // circle-scoped key but no active circle → skip (don't half-route)
-    expect(classify('mem://neighborhood/items/1.json')).toBeNull();
-    expect(classify('mem://neighborhood/items/1.json', {})).toBeNull();
+    expect(classify('mem://neighbourhood/items/1.json')).toBeNull();
+    expect(classify('mem://neighbourhood/items/1.json', {})).toBeNull();
   });
 
   it('unclassify rejects garbage', () => {

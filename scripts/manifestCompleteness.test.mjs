@@ -45,7 +45,7 @@ describe('G-S1 — manifest completeness', () => {
     const manifest = m.default ?? m.basisManifest;
     const { createLocalBuiltins } = await load('apps/basis/src/core/localBuiltins.js');
     // Deps are closed over, consulted only at CALL time — stubs suffice to enumerate the surface.
-    const impl = new Set(Object.keys(createLocalBuiltins({ catalog: { apps: [] }, t: (k) => k })));
+    const impl = new Set(Object.keys(createLocalBuiltins({ catalogue: { apps: [] }, t: (k) => k })));
     const decl = new Set((manifest.operations ?? []).map((o) => o.id));
 
     const declaredUnimplemented = [...decl]

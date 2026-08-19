@@ -32,7 +32,7 @@ import {
  * @property {(threadId: string) => void}                onSelect
  *   Called when the user clicks a thread (request to set active).
  * @property {() => string[]}                            [knownApps]
- *   Returns the list of known app origins (from the catalog).  Used
+ *   Returns the list of known app origins (from the catalogue).  Used
  *   to render clickable chip-suggestions in the new/edit thread form.
  * @property {() => string[]}                            [knownEventTypes]
  *   Returns common event types ('notification', 'item-changed', etc.)
@@ -225,7 +225,7 @@ function renderThreadForm(ctx, existingThread, onDone) {
     addLabel:    tr('sidebar.form_add_custom_type'),
   }));
 
-  // Actors (CSV — peer/actor ids are dynamic per-app, no fixed catalog).
+  // Actors (CSV — peer/actor ids are dynamic per-app, no fixed catalogue).
   const actorsLabel = doc.createElement('label');
   actorsLabel.textContent = tr('sidebar.form_peers');
   const actorsInput = doc.createElement('input');
@@ -284,7 +284,7 @@ function renderThreadForm(ctx, existingThread, onDone) {
 /**
  * Render a chip-toggle row.  Known values render as buttons that
  * toggle membership in `selected` on click.  An adjacent "+ custom"
- * input lets the user add a value not in the catalog (which then
+ * input lets the user add a value not in the catalogue (which then
  * also renders as a chip).
  *
  * `selected` is a Set that mutates in place — callers read it on
@@ -312,7 +312,7 @@ function renderChipGroup({ doc, label, hint, knownValues, selected, onChange, ad
   wrap.appendChild(chipRow);
 
   // Union of known + already-selected (so editing a thread shows its
-  // custom values as chips even when the catalog doesn't list them).
+  // custom values as chips even when the catalogue doesn't list them).
   const all = [...new Set([...knownValues, ...selected])];
 
   const drawChip = (value) => {

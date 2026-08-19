@@ -47,7 +47,7 @@ export function renderGate(manifestOrList, opts = {}) {
         // Carry the owning app so the downstream resolver can disambiguate a COLLIDING bare op-id (e.g.
         // `addTask`/`listOpen`, declared by household + tasks-v0 + stoop) to the app whose manifest this
         // gate rule came from — instead of the merge's first-declarer (the de-shadow, K0). `manifest.app`
-        // matches the merged catalog's `appOrigin`. Harmless to consumers that ignore the field.
+        // matches the merged catalogue's `appOrigin`. Harmless to consumers that ignore the field.
         return call ? { opId: call.skillId, args: call.args, appOrigin: manifest.app } : null;
       },
     };

@@ -18,9 +18,9 @@ import { t, initLocalisation, setLang }    from '../src/core/localisation.js';
 
 describe('#222 basis-mobile portable-core boot', () => {
   it('composeManifests merges all 6 apps without validator errors', () => {
-    const catalog = composeManifests();
+    const catalogue = composeManifests();
     // All 6 expected apps land in appOrigins (Set).
-    const apps = [...catalog.appOrigins];
+    const apps = [...catalogue.appOrigins];
     expect(apps).toContain('basis');
     expect(apps).toContain('household');   // 2026-05-26 — mockHouseholdManifest is now the default (was opts-only)
     expect(apps).toContain('tasks');
@@ -32,7 +32,7 @@ describe('#222 basis-mobile portable-core boot', () => {
     // exposed as `stoop/startDm`).  These benign warnings are
     // fine; any UNEXPECTED warning should fail the test.
     const benign = /op-id collision: "\w+" also declared by/;
-    const unexpected = (catalog.warnings ?? []).filter((w) => !benign.test(w));
+    const unexpected = (catalogue.warnings ?? []).filter((w) => !benign.test(w));
     expect(unexpected).toEqual([]);
   });
 
@@ -46,9 +46,9 @@ describe('#222 basis-mobile portable-core boot', () => {
     // 2026-05-26 dual-truth contract — see docs/manifest-pipeline.md
     // for the rationale.  A household-missing bug surfaced exactly
     // because these two lists drifted; this test pins them in sync.
-    const catalogApps = [...composeManifests().appOrigins];
+    const catalogueApps = [...composeManifests().appOrigins];
     const navApps     = buildNavModels().map((n) => n.appOrigin);
-    expect(navApps).toEqual(catalogApps);
+    expect(navApps).toEqual(catalogueApps);
   });
 
   it('buildNavModels produces one NavModel per app via renderMobile', () => {

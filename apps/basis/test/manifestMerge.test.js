@@ -1,7 +1,7 @@
 /**
  * basis — manifestMerge tests. v0.1.
  *
- * Verifies the merged catalog has the right commandMenu entries,
+ * Verifies the merged catalogue has the right commandMenu entries,
  * opsById map, replyShapeFor lookup, and collision warnings.
  */
 import { describe, it, expect } from 'vitest';
@@ -37,7 +37,7 @@ const tasksLite = {
 };
 
 describe('mergeManifests — basic shape', () => {
-  it('returns a catalog with commandMenu + opsById + replyShapeFor + appOrigins', () => {
+  it('returns a catalogue with commandMenu + opsById + replyShapeFor + appOrigins', () => {
     const cat = mergeManifests([
       { manifest: householdLite },
       { manifest: tasksLite },
@@ -77,7 +77,7 @@ describe('mergeManifests — basic shape', () => {
 });
 
 describe('mergeManifests — empty / minimal cases', () => {
-  it('empty source array → empty catalog', () => {
+  it('empty source array → empty catalogue', () => {
     const cat = mergeManifests([]);
     expect(cat.commandMenu).toEqual([]);
     expect(cat.opsById.size).toBe(0);
@@ -85,7 +85,7 @@ describe('mergeManifests — empty / minimal cases', () => {
     expect(cat.warnings).toEqual([]);
   });
 
-  it('single-app source → single-app catalog', () => {
+  it('single-app source → single-app catalogue', () => {
     const cat = mergeManifests([{ manifest: tasksLite }]);
     expect(cat.appOrigins).toEqual(['tasks']);
     expect(cat.commandMenu).toEqual([

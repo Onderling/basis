@@ -33,14 +33,14 @@
  * Run the /find fan-out.
  *
  * @param {object} args
- * @param {import('./manifestMerge.js').MergedCatalog} args.catalog
+ * @param {import('./manifestMerge.js').MergedCatalogue} args.catalogue
  * @param {(appOrigin: string, opId: string, args: object) => Promise<*>} args.callSkill
  * @param {string}  args.query
  * @returns {Promise<FindReply>}
  */
-export async function runFind({ catalog, callSkill, query }) {
-  if (!catalog || typeof catalog.searchAggregations !== 'function') {
-    throw new TypeError('runFind: catalog with searchAggregations required');
+export async function runFind({ catalogue, callSkill, query }) {
+  if (!catalogue || typeof catalogue.searchAggregations !== 'function') {
+    throw new TypeError('runFind: catalogue with searchAggregations required');
   }
   if (typeof callSkill !== 'function') {
     throw new TypeError('runFind: callSkill required');
@@ -50,7 +50,7 @@ export async function runFind({ catalog, callSkill, query }) {
     return { query: '', groups: [], generatedAt: Date.now() };
   }
 
-  const decls = catalog.searchAggregations();
+  const decls = catalogue.searchAggregations();
   const results = await Promise.all(decls.map(async (decl) => {
     try {
       const payload = await callSkill(decl.appOrigin, decl.searchSkill, { query: q });

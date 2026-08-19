@@ -120,9 +120,9 @@ export function renderCircleView(container, {
   viewerIsAdmin = false,
   // Composer affordances (web↔mobile parity, ported from the classic shell). Both optional — without
   // them the composer renders exactly as before.
-  //   `catalog`  the merged dispatch catalog → drives the slash-command auto-suggest dropdown.
+  //   `catalogue`  the merged dispatch catalogue → drives the slash-command auto-suggest dropdown.
   //   `history`  a `createInputHistory()` instance (host-owned so it survives re-renders) → ArrowUp/Down.
-  catalog = null,
+  catalogue = null,
   history = null,
   // Permission gate (classic shell's `allowCommands` analog): when the circle's `chat` feature is off,
   // the composer is read-only — `canPost=false` renders a disabled note instead of the input. The host
@@ -422,7 +422,7 @@ export function renderCircleView(container, {
     form.setAttribute('autocomplete', 'off');
 
     // Slash-command auto-suggest dropdown (rendered first, positioned ABOVE the input via CSS). Hidden
-    // until the user types a "/command" word; populated from the injected catalog. Mirrors the classic
+    // until the user types a "/command" word; populated from the injected catalogue. Mirrors the classic
     // shell (#cmd-suggest); behaviour ported into the shared `suggestCommands`.
     const suggestEl = document.createElement('ul');
     suggestEl.className = 'circle-view__suggest';
@@ -488,7 +488,7 @@ export function renderCircleView(container, {
       });
       suggestEl.hidden = false;
     };
-    const refreshSuggest = () => paintSuggest(catalog ? suggestCommands(catalog, input.value) : []);
+    const refreshSuggest = () => paintSuggest(catalogue ? suggestCommands(catalogue, input.value) : []);
     const acceptSuggest = (i) => {
       const m = entries[i];
       if (!m) return;
@@ -497,7 +497,7 @@ export function renderCircleView(container, {
       input.focus();
     };
 
-    if (catalog) {
+    if (catalogue) {
       input.addEventListener('input', () => { if (history) history.reset(); refreshSuggest(); });
       input.addEventListener('focus', refreshSuggest);
       // Defer so a click/mousedown on a suggestion item fires before the list closes.
@@ -505,7 +505,7 @@ export function renderCircleView(container, {
     }
 
     input.addEventListener('keydown', (e) => {
-      const open = catalog && !suggestEl.hidden && entries.length > 0;
+      const open = catalogue && !suggestEl.hidden && entries.length > 0;
       if (open) {
         // Dropdown navigation takes the arrow/Tab/Enter/Escape keys (classic parity).
         if (e.key === 'ArrowDown') { e.preventDefault(); activeIdx = (activeIdx + 1) % entries.length; paintSuggest(entries); return; }

@@ -178,7 +178,7 @@ describe('GroupAuthVerifier — requiredRole (D3 composition)', () => {
     expect(v.verify(proof)).toEqual({ ok: false, reason: 'INSUFFICIENT_ROLE' });
   });
 
-  it('honors a custom roleRanks override', async () => {
+  it('honours a custom roleRanks override', async () => {
     // App registers a custom 'vip' role that ranks between observer and member.
     const proof = await mintProof({ groupId: 'my-block', role: 'observer' });
     const v = new GroupAuthVerifier({

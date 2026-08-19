@@ -13,7 +13,7 @@ import { VaultMemory } from '@onderling/vault';
 
 import { CachingDataSource } from '../src/lib/CachingDataSource.js';
 import { SyncCadence }       from '../src/lib/SyncCadence.js';
-import { createNeighborhoodAgent } from '../src/index.js';
+import { createNeighbourhoodAgent } from '../src/index.js';
 
 const ANNE = 'https://id.example/anne';
 
@@ -302,7 +302,7 @@ describe('Stoop V1 — Agent factory exposes bundle.cache', () => {
   async function build({ itemBackend, cache } = {}) {
     const id = await AgentIdentity.generate(new VaultMemory());
     const tx = new InternalTransport(new InternalBus(), id.pubKey);
-    const bundle = await createNeighborhoodAgent({
+    const bundle = await createNeighbourhoodAgent({
       identity: id,
       transport: tx,
       offeringMatch: { group: 'oosterpoort', localActor: ANNE, peers: [] },
@@ -346,7 +346,7 @@ describe('Stoop V1 — Agent factory exposes bundle.cache', () => {
       [{ type: 'offer', text: 'tax help' }],
       { actor: ANNE },
     );
-    const podPaths = await pod.list('');     // ItemStore prefixes with rootContainer (mem://neighborhood/)
+    const podPaths = await pod.list('');     // ItemStore prefixes with rootContainer (mem://neighbourhood/)
     expect(podPaths.some(p => p.includes('items/'))).toBe(true);
   });
 

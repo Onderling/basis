@@ -203,12 +203,12 @@ documentation. Folio mobile's README shows the right level of detail.
 
 ---
 
-## Worked example — `apps/neighborhood-v0`
+## Worked example — `apps/neighbourhood-v0`
 
 A complete README following this scheme:
 
 ````markdown
-# H5 — neighborhood-v0
+# H5 — neighbourhood-v0
 
 Non-anonymous closed-group skill matchmaking. V0 of the substrate-first
 plan.
@@ -234,7 +234,7 @@ section will document the justification at that time.]
 ## Bring it up
 
 ```bash
-cd apps/neighborhood-v0
+cd apps/neighbourhood-v0
 npm install
 npm test          # 9 integration tests
 ```
@@ -245,11 +245,11 @@ V2 multi-process bring-up: see
 ## What's in here
 
 ```
-apps/neighborhood-v0/
+apps/neighbourhood-v0/
 ├── README.md                 ← this file
 ├── package.json
 ├── src/
-│   ├── Agent.js              ← createNeighborhoodAgent factory
+│   ├── Agent.js              ← createNeighbourhoodAgent factory
 │   ├── index.js
 │   └── skills/index.js       ← postRequest / acceptResponder / cancelRequest / list…
 └── test/
@@ -273,7 +273,7 @@ following apps are non-conforming:
 - `apps/mesh-demo` — same; pending migration to substrates per checklist.
 - `apps/household` — same.
 - `apps/tasks-v0` — same.
-- `apps/neighborhood-v0` — same; migration is straightforward (worked example above).
+- `apps/neighbourhood-v0` — same; migration is straightforward (worked example above).
 - `apps/import-bridge-v0` — same; will be touched during L1g/L1a refactors anyway.
 - `apps/archive` — same.
 - `apps/presence-v0` — same.

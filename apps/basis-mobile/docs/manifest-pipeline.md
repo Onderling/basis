@@ -1,4 +1,4 @@
-# Manifest → catalog → screen pipeline
+# Manifest → catalogue → screen pipeline
 
 How the per-app manifests feed into both the dispatch pipeline and
 the on-screen nav UI in basis-mobile.  Written 2026-05-26
@@ -26,7 +26,7 @@ projections**, which then drive different runtime concerns:
    │   merges all manifests  │         │   projects EACH one    │
    │   via mergeManifests()  │         │   via renderMobile()   │
    │                         │         │                        │
-   │ → catalog               │         │ → [{appOrigin, nav}…]  │
+   │ → catalogue               │         │ → [{appOrigin, nav}…]  │
    │   { opsById,            │         │   one entry per app    │
    │     appOrigins,         │         │                        │
    │     commandMenu, … }    │         │                        │
@@ -79,7 +79,7 @@ NavModel keys end up using.
 ### `composeManifests({ householdManifest? })`
 
 `apps/basis-mobile/src/core/composeManifests.js`.  Merges
-every manifest into one **catalog** via the shared
+every manifest into one **catalogue** via the shared
 `mergeManifests()` from `@onderling/app-manifest`.
 
 What you get back:
@@ -92,7 +92,7 @@ What you get back:
 }
 ```
 
-The catalog is what the **dispatch pipeline** consumes
+The catalogue is what the **dispatch pipeline** consumes
 (`parseInput` looks up commands here, `resolveDispatch` finds the
 op + its appOrigin).  The default-included set is:
 1. `basisManifest`
@@ -108,15 +108,15 @@ op + its appOrigin).  The default-included set is:
 manifests and projects each through **`renderMobile()`** to get a
 per-app NavModel.
 
-Why a parallel list instead of deriving from the catalog?  The
-catalog is a flat dispatch index optimised for "given an op, who
+Why a parallel list instead of deriving from the catalogue?  The
+catalogue is a flat dispatch index optimised for "given an op, who
 handles it?"; NavModels are a per-app *surface* projection
 optimised for "what screens does this app want to show?".  The two
 shapes don't fold into each other cleanly today.
 
 The contract: **its result has one entry per manifest, in the same
 order as composeManifests's input.** When they drift, the
-boot-debug list desyncs from the merged catalog — the symptom is
+boot-debug list desyncs from the merged catalogue — the symptom is
 exactly the "5 apps but I see /post and /feed work fine" mismatch
 we hit 2026-05-26.
 
@@ -146,7 +146,7 @@ NavModel shape:
 `bootAgentBundle()` returns:
 ```
 {
-  catalog,     // from composeManifests — feeds the dispatch pipeline
+  catalogue,     // from composeManifests — feeds the dispatch pipeline
   callSkill,   // (appOrigin, opId, args) → Promise<payload>
                //   routes through the in-process realAgent
   agent,       // the realAgent controller (or null in test stubs)
@@ -162,7 +162,7 @@ NavModel shape:
 - folio (via `createBrowserFolioAgent`)
 - calendar — depends on whether the calendar browser-factory has
   been composed in; currently the calendar manifest is in the
-  catalog but the dispatch may not have a backing agent on mobile
+  catalogue but the dispatch may not have a backing agent on mobile
   yet (see #238).
 
 It **does NOT know about `basis`** as an app — those ops are
@@ -179,10 +179,10 @@ User input enters via either the bottom `TextInput` or the
 which runs:
 
 ```
-parseInput(rawInput, catalog)
+parseInput(rawInput, catalogue)
    → ParseResult {kind: 'slash'|'unknown'|'error', opId?, args?, threadId?}
 
-resolveDispatch(parseResult, catalog)
+resolveDispatch(parseResult, catalogue)
    → Dispatch {kind: 'ready'|'unknown'|'error', opId, args, appOrigin,
                threadId, replyShape}
 
@@ -191,7 +191,7 @@ if (dispatch.appOrigin === 'basis')      // short-circuit V1
 else if (dispatch.kind === 'ready')
    → runDispatch(dispatch, bundle.callSkill)
         → Reply {payload, shape, threadId, error?}
-   → renderReply(reply, {catalog})
+   → renderReply(reply, {catalogue})
         → RenderedReply {kind: 'text'|'list'|'error', …}
 ```
 
@@ -214,7 +214,7 @@ The dispatch pipeline routed a basis-host op to the agent's
 `apps/basis/src/core/localBuiltins.js` — that's #253's
 later sub-step).
 
-### "I added a manifest but the catalog is missing ops"
+### "I added a manifest but the catalogue is missing ops"
 
 Check that the manifest was passed to `mergeManifests` (i.e. is in
 the `composeManifests` entries list) AND has a sensible
@@ -237,7 +237,7 @@ derive from the other:
   argument (a single shared `MANIFESTS` constant exported from a
   third file).  Both functions consume that constant.  Minimal
   churn; one source of truth.
-- **Option B:** `buildNavModels` takes the *catalog* and derives
+- **Option B:** `buildNavModels` takes the *catalogue* and derives
   NavModels by re-reading per-app subsets.  Higher coupling but
   removes the duplication entirely.
 

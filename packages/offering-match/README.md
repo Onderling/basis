@@ -107,4 +107,4 @@ topic pubsub) + Track D's `SkillsPubSub.js` (in flight) + the H4
 ## See also
 
 - `Project Files/Substrates/L1e-skill-match.md` — sketch.
-- `Project Files/Substrates/apps/{H4-tasks.md, H5-neighborhood.md, H8-presence.md}` — primary consumers.
+- `Project Files/Substrates/apps/{H4-tasks.md, H5-neighbourhood.md, H8-presence.md}` — primary consumers.

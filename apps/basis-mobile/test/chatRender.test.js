@@ -5,7 +5,7 @@
  * on-device walk-through:
  *
  *   1. List bubbles had no buttons.  Root cause: ChatScreen called
- *      `renderReply(reply, { catalog })` but the renderer needs
+ *      `renderReply(reply, { catalogue })` but the renderer needs
  *      `{ appOrigin, manifestsByOrigin }` to look up
  *      `renderChat.inlineKeyboardFor`.  Without it, every list row
  *      came out with `buttons: []`.
@@ -87,10 +87,10 @@ function makeHouseholdListReply() {
 }
 
 describe('#253 step 2 — list reply with inline keyboards', () => {
-  it('REGRESSION: with only { catalog } opts, list items have NO buttons (the bug)', () => {
-    const catalog  = composeManifests();
+  it('REGRESSION: with only { catalogue } opts, list items have NO buttons (the bug)', () => {
+    const catalogue  = composeManifests();
     const reply    = makeHouseholdListReply();
-    const rendered = renderReply(reply, { catalog });
+    const rendered = renderReply(reply, { catalogue });
     expect(rendered.kind).toBe('list');
     expect(rendered.items.length).toBe(2);
     // Captures the V1 broken state — without manifestsByOrigin +

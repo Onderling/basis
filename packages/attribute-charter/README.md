@@ -24,13 +24,13 @@ import {
 
 // 1. The project lead fixes the request up front — at most 3 attributes.
 const charter = createCharter({
-  projectId: 'neighborhood-42',
+  projectId: 'neighbourhood-42',
   attributes: ['place', 'ageBand'],
 });
 const hash = charterHash(charter);   // binds every consent to THIS request
 
 // 2. The participant curates a reusable disclosure profile (all opt-in).
-let p = createDisclosureProfile({ projectId: 'neighborhood-42' });
+let p = createDisclosureProfile({ projectId: 'neighbourhood-42' });
 p = setValue(p, 'place', 'Utrecht');
 p = setEnabled(p, 'place', true);    // valued AND enabled → released
 p = setValue(p, 'ageBand', '35-54'); // valued but NOT enabled → withheld

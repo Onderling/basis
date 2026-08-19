@@ -215,7 +215,7 @@ describe('attachIdentityToAgent (B4)', () => {
 
 // ── Integration: createMeshAgent without `pod` opt (regression / no-op). ──
 // Verifies Q-B.2 side-by-side guarantee: callers that don't pass `pod`
-// see EXACTLY today's behavior.  We rely on the existing createMeshAgent
+// see EXACTLY today's behaviour.  We rely on the existing createMeshAgent
 // test mocks for native modules; this test re-uses those mocks via a
 // targeted import.
 

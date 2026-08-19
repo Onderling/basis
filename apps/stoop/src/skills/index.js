@@ -950,7 +950,7 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
     // reader returns VERIFIED bodies with the key↔ref binding already resolved. Two fold-side gates apply
     // HERE (where the trail rows are at hand), per the join-proof decision:
     //   • a SELF-authored join must carry `payload.redemptionRef` naming an existing redemption row for the
-    //     same subject — deny-favoring: a row that hasn't arrived yet defers the join to the next read;
+    //     same subject — deny-favouring: a row that hasn't arrived yet defers the join to the next read;
     //   • a join authored by SOMEONE ELSE stands only on a FOUNDER's authority (dynamic non-founder-admin
     //     authority is the deferred causal-authority slice).
     try {
@@ -1388,9 +1388,9 @@ export function buildSkills({
         }
         // Patch the just-stored item record with the (opaque, sealed) attachment
         // pointers.  ItemStore writes via `bundle.cache` under the
-        // `mem://neighborhood/items/<id>.json` path; rewrite the same key.
+        // `mem://neighbourhood/items/<id>.json` path; rewrite the same key.
         item.source = { ...(item.source ?? {}), attachments: persistedAttachments };
-        await bundle.cache.write(`mem://neighborhood/items/${item.id}.json`, JSON.stringify(item));
+        await bundle.cache.write(`mem://neighbourhood/items/${item.id}.json`, JSON.stringify(item));
       }
 
       // Lend lifecycle: schedule a return reminder when applicable.

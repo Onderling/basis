@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 
-import { createNeighborhoodAgent } from '../src/index.js';
+import { createNeighbourhoodAgent } from '../src/index.js';
 import {
   startPodSignIn,
   completePodSignIn,
@@ -61,7 +61,7 @@ function makeFakeSession({ webid = WEBID, expirationDate = Date.now() + 60_000 }
 async function buildBundle() {
   const id = await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);
-  return createNeighborhoodAgent({
+  return createNeighbourhoodAgent({
     identity: id, transport: tx,
     offeringMatch: { group: 'oosterpoort', localActor: ANNE, peers: [] },
     members:    [{ webid: ANNE }],

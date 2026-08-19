@@ -71,13 +71,13 @@
     },
     {
       "file": "apps/agents/test/installCommunityG3.test.js",
-      "specifier": "../../../packages/agent-registry/src/catalogSource.js",
+      "specifier": "../../../packages/agent-registry/src/catalogueSource.js",
       "reachesInto": "@onderling/agent-registry",
       "category": "test"
     },
     {
       "file": "apps/agents/test/installCommunityG3.test.js",
-      "specifier": "../../../packages/agent-registry/src/communityCatalog.js",
+      "specifier": "../../../packages/agent-registry/src/communityCatalogue.js",
       "reachesInto": "@onderling/agent-registry",
       "category": "test"
     },
@@ -119,7 +119,7 @@
     },
     {
       "file": "apps/agents/test/installEndorsed.test.js",
-      "specifier": "../../../packages/agent-registry/src/catalogSource.js",
+      "specifier": "../../../packages/agent-registry/src/catalogueSource.js",
       "reachesInto": "@onderling/agent-registry",
       "category": "test"
     },
@@ -155,7 +155,7 @@
     },
     {
       "file": "apps/agents/test/installEndorsedG2.test.js",
-      "specifier": "../../../packages/agent-registry/src/catalogSource.js",
+      "specifier": "../../../packages/agent-registry/src/catalogueSource.js",
       "reachesInto": "@onderling/agent-registry",
       "category": "test"
     },
@@ -256,7 +256,7 @@
       "category": "test"
     },
     {
-      "file": "packages/agent-registry/test/communityCatalog.test.js",
+      "file": "packages/agent-registry/test/communityCatalogue.test.js",
       "specifier": "../../vault/src/VaultMemory.js",
       "reachesInto": "@onderling/vault",
       "category": "test"

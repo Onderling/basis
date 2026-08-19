@@ -18,7 +18,7 @@ import {
   mockTasksManifest, mockStoopManifest, mockFolioManifest,
 } from '../../../basis/src/core/manifests/mockManifests.js';
 // Part G (2026-06-17) — the REAL `apps/household` manifest (item/task vocab)
-// is the household catalog source of truth, replacing the chore-vocab mock.
+// is the household catalogue source of truth, replacing the chore-vocab mock.
 import { householdManifest as realHouseholdManifest } from '../../../household/manifest.js';
 import { calendarManifest } from '../../../calendar/manifest.js';
 // agents (2026-07-09) — the read-only "your agents" surface. Relative import for
@@ -29,7 +29,7 @@ import { agentsManifest } from '../../../agents/manifest.js';
 
 /**
  * Single source of truth for the per-app manifest list — used by
- * composeManifests (dispatch catalog), buildManifestsByOrigin
+ * composeManifests (dispatch catalogue), buildManifestsByOrigin
  * (renderReply opts), and indirectly by buildNavModels.  See
  * docs/manifest-pipeline.md for the rationale + the dual-truth
  * pitfall the household-missing bug surfaced 2026-05-26.
@@ -60,7 +60,7 @@ function manifestList({ householdManifest } = {}) {
  *                                             householdManifest (e.g. when
  *                                             the agent bundle injects its
  *                                             own manifest instance)
- * @returns {object}  raw merged catalog
+ * @returns {object}  raw merged catalogue
  */
 export function composeManifests({ householdManifest, extraSources = [] } = {}) {
   const entries = [

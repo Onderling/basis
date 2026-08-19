@@ -1,7 +1,7 @@
 /**
  * stoop — browser entry for basis composition.
  *
- * Lets basis boot a real Stoop NeighborhoodAgent inside its
+ * Lets basis boot a real Stoop NeighbourhoodAgent inside its
  * own browser bundle, sharing an `InternalBus` so basis's
  * chatAgent can `.invoke(stoopAgent.address, skillId, parts)` to
  * reach every real stoop skill (postRequest, listFeed,
@@ -19,11 +19,11 @@
 import { AgentIdentity, InternalTransport } from '@onderling/core';
 import { SolidPodSource } from '@onderling/pod-client';
 
-import { createNeighborhoodAgent } from './Agent.js';
+import { createNeighbourhoodAgent } from './Agent.js';
 import { attachPodToBundle, detachPodFromBundle } from './lib/attachPodToBundle.js';
 
 /**
- * Build a Stoop NeighborhoodAgent on the shared bus.
+ * Build a Stoop NeighbourhoodAgent on the shared bus.
  *
  * @param {object} args
  * @param {InternalBus}    args.bus              shared bus (basis owns it)
@@ -56,7 +56,7 @@ import { attachPodToBundle, detachPodFromBundle } from './lib/attachPodToBundle.
  *                                               which a circle's sealed-pod control-agent reaches the
  *                                               redeem/leave hooks the underlying agent already exposes.
  * @returns {Promise<{
- *   bundle: ReturnType<typeof createNeighborhoodAgent>,
+ *   bundle: ReturnType<typeof createNeighbourhoodAgent>,
  *   address: string,
  *   close:   () => Promise<void>,
  * }>}
@@ -107,7 +107,7 @@ export async function createBrowserStoopAgent({
     ? members
     : [{ webid: localActor, displayName: 'me', role: 'admin' }];
 
-  const bundle = await createNeighborhoodAgent({
+  const bundle = await createNeighbourhoodAgent({
     identity,
     transport: new InternalTransport(bus, identity.pubKey),
     members:   seedMembers,

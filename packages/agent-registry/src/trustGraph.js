@@ -1,8 +1,8 @@
 /**
  * trustGraph — the web-of-trust endorsement walk (commons-governance G2).
  *
- * G1 shipped a SINGLE-root, FLAT catalog: an endorsement counted only if its
- * `endorser` was one of the configured roots. G2 makes the catalog a real
+ * G1 shipped a SINGLE-root, FLAT catalogue: an endorsement counted only if its
+ * `endorser` was one of the configured roots. G2 makes the catalogue a real
  * web-of-trust: MULTIPLE curator roots and a TRANSITIVE walk over the
  * endorsement graph to a bounded depth, ranked by trust-path proximity.
  *
@@ -13,7 +13,7 @@
  * The walk is a bounded BFS from the roots (depth 0) over these edges.
  *
  * ── The one design rule the plan left to pick (documented) ───────────────────
- * "Endorses a curator" (extends the walk) vs "endorses an agent" (a catalog
+ * "Endorses a curator" (extends the walk) vs "endorses an agent" (a catalogue
  * candidate). Because an endorsement BINDS to a cardHash, endorsing anything —
  * agent OR curator — requires that thing to have a resolvable Agent Card (the
  * hash is checked at verify). So "resolveCard succeeds ⇒ agent" cannot tell the
@@ -23,7 +23,7 @@
  *      in the graph as a node at depth+1 (the "endorser ∈ the graph" rule), so
  *      the walk continues through it (bounded, cycle-guarded). A pure agent that
  *      published no endorsements simply contributes no further edges — harmless.
- *   2. CANDIDACY is by card ROLE — a subject is offered for INSTALL (a catalog
+ *   2. CANDIDACY is by card ROLE — a subject is offered for INSTALL (a catalogue
  *      candidate) unless its card declares a curator role
  *      (`x-onderling.role ∈ {curator, community}`). A curator identity card is a
  *      trust node you walk THROUGH, not an agent you install. Every other role

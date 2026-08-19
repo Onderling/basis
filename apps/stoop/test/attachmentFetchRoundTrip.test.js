@@ -17,7 +17,7 @@ import { describe, it, expect } from 'vitest';
 import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import { openBlob, openThumbnail } from '@onderling/blob-gateway';
-import { createNeighborhoodAgent } from '../src/index.js';
+import { createNeighbourhoodAgent } from '../src/index.js';
 import { makeSealCircle, makeSealedImageAttachment, TINY_PNG_B64 } from './helpers/sealedAttachment.js';
 
 const ANNE = 'https://id.example/anne';
@@ -25,7 +25,7 @@ const BOB  = 'https://id.example/bob';
 
 async function buildBundle({ bus = new InternalBus(), actor = ANNE } = {}) {
   const id = await AgentIdentity.generate(new VaultMemory());
-  const bundle = await createNeighborhoodAgent({
+  const bundle = await createNeighbourhoodAgent({
     identity: id,
     transport: new InternalTransport(bus, id.pubKey),
     offeringMatch: { group: 'oosterpoort', localActor: actor, peers: [] },

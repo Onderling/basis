@@ -38,7 +38,7 @@ describe('FITNESS: surface-coverage snapshot', () => {
     expect(stdout.trim(), 'coverage snapshot is stale — run `npm run coverage` in apps/basis and commit').toBe(committed.trim());
   });
 
-  it('composes every catalog manifest without a silent skip', () => {
+  it('composes every catalogue manifest without a silent skip', () => {
     // The generator prints `(skip <name>: …)` to stderr when a manifest fails to
     // import — a silently-dropped manifest hides coverage drift.
     const { stderr } = (() => {

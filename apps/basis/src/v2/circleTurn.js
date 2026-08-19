@@ -14,7 +14,7 @@ import { interpretToCommand } from './interpretCommand.js';
  * @param {object} a
  * @param {(scope:object) => ({llmTool?:'off'|'local'|'cloud'|'user'}|null|Promise<object>)} a.policyFor  the circle policy for a scope (may be async, e.g. load from a store)
  * @param {{local?:object,cloud?:object}|null} a.llmProviders   host-supplied LlmClients
- * @param {object|(() => object)} a.catalog                     the merged catalog (static or getter)
+ * @param {object|(() => object)} a.catalogue                     the merged catalogue (static or getter)
  * @param {(cmd:{opId:string,args:object}, scope:object) => any|Promise<any>} a.dispatchCommand  dispatch {opId,args} within the circle scope
  * @param {{mode?:'off'|'local'|'cloud'}|(() => {mode?:string})} [a.userDefault]  the member's personal default — used only when the circle policy is 'user'
  * @param {object} [a.gate]                                     optional token gate ({ evaluate })
@@ -22,10 +22,10 @@ import { interpretToCommand } from './interpretCommand.js';
  * @param {Function} [a.interpret]                              override the NL→slash interpreter (tests)
  * @returns {(text:string, scope:object) => Promise<boolean>}
  */
-export function createCircleTurn({ policyFor, llmProviders, catalog, dispatchCommand, userDefault, gate, botName = 'assistant', interpret = interpretToCommand }) {
+export function createCircleTurn({ policyFor, llmProviders, catalogue, dispatchCommand, userDefault, gate, botName = 'assistant', interpret = interpretToCommand }) {
   if (typeof dispatchCommand !== 'function') throw new Error('createCircleTurn: dispatchCommand required');
   const engine = createCircleDispatch({
-    catalog,
+    catalogue,
     policy: typeof policyFor === 'function' ? policyFor : () => null,
     userDefault,
     llmProviders,

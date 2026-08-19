@@ -115,7 +115,7 @@ function adaptSdkSkill(skillDef, agent) {
  * skipped (renderChat treats them as "unknown tool" at runtime, which
  * is the manifest-drift signal — better than silent failure).
  *
- * @param {object} bundle  the bundle returned by `createNeighborhoodAgent`
+ * @param {object} bundle  the bundle returned by `createNeighbourhoodAgent`
  * @returns {{ skillRegistry: Record<string, function>, missing: string[] }}
  *   `missing` is a diagnostic for tests / boot-time logging.
  */
@@ -176,7 +176,7 @@ export const STOOP_SHELL_ONLY_OPS = SHELL_ONLY_OPS;
  * Create the LLM chat adapter for a live stoop bundle.
  *
  * @param {object} args
- * @param {object} args.bundle    a `createNeighborhoodAgent` bundle
+ * @param {object} args.bundle    a `createNeighbourhoodAgent` bundle
  * @param {object} args.llm       any LlmClient-shaped object (`invoke(req)`)
  * @param {string} [args.localActor]  webid to attribute LLM-triggered
  *   skill calls to.  Defaults to `bundle.agent.identity?.webid` or
@@ -199,7 +199,7 @@ export function createLlmChat({ bundle, llm, localActor, chatAgentOpts = {} } = 
 
   const { skillRegistry, missing } = buildStoopSkillRegistry(bundle);
 
-  const { toolCatalog, toolHandlers, systemPrompt } = renderChat(stoopManifest, {
+  const { toolCatalogue, toolHandlers, systemPrompt } = renderChat(stoopManifest, {
     skillRegistry,
     // Each tool call hands the SDK adapter a `skillCtx` matching the
     // stoop skill convention (`senderWebid` is the actor).  ChatAgent
@@ -217,7 +217,7 @@ export function createLlmChat({ bundle, llm, localActor, chatAgentOpts = {} } = 
   const chatAgent = new ChatAgent({
     bridges:        [],            // headless — caller drives via onFreeText
     llm,
-    toolCatalog,
+    toolCatalogue,
     toolHandlers,
     systemPrompt,
     contextBuilder: noopContextBuilder,

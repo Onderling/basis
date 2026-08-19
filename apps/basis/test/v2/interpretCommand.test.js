@@ -6,12 +6,12 @@ import { buildToolDescriptors, interpretToCommand } from '../../src/v2/interpret
 const llmReturning = (result) => ({ invoke: async () => result });
 const llmInspecting = (capture) => ({ invoke: async (req) => { capture(req); return { toolCall: null, raw: {} }; } });
 
-// A merged-catalog stand-in: just the `opsById` Map the descriptors are built from.
-function catalogOf(ops) {
+// A merged-catalogue stand-in: just the `opsById` Map the descriptors are built from.
+function catalogueOf(ops) {
   return { opsById: new Map(ops.map((o) => [o.key ?? o.id, { op: o, appOrigin: o.appOrigin ?? 'household' }])) };
 }
 
-const CHORES = catalogOf([
+const CHORES = catalogueOf([
   { id: 'addTask', params: [{ name: 'title', kind: 'string', required: true }],
     surfaces: { chat: { hint: 'add a task to the list' } } },
   { id: 'markComplete', verb: 'complete', params: [{ name: 'choreId', kind: 'string', required: true }],
@@ -31,7 +31,7 @@ describe('buildToolDescriptors', () => {
   });
 
   it('passes enum values into the param schema (so the model knows the valid choices)', () => {
-    const cat = catalogOf([
+    const cat = catalogueOf([
       { id: 'addItem', verb: 'add', surfaces: { chat: { hint: 'add to a list' } },
         params: [
           { name: 'type', kind: 'enum', of: ['shopping', 'errand', 'repair', 'schedule'], required: true },
@@ -43,7 +43,7 @@ describe('buildToolDescriptors', () => {
     expect(t.schema.required).toEqual(['type', 'text']);
   });
 
-  it('falls back to verb / id for the description and tolerates a missing catalog', () => {
+  it('falls back to verb / id for the description and tolerates a missing catalogue', () => {
     expect(buildToolDescriptors(null)).toEqual([]);
     expect(buildToolDescriptors({}).length).toBe(0);
     const t = buildToolDescriptors(CHORES).find((x) => x.id === 'markComplete');
@@ -54,19 +54,19 @@ describe('buildToolDescriptors', () => {
 describe('interpretToCommand', () => {
   it('returns {opId,args} when the LLM tool-calls', async () => {
     const llm = llmReturning({ toolCall: { id: 'addTask', args: { title: 'milk' } }, classification: 'actionable' });
-    const cmd = await interpretToCommand('add milk to the list', { catalog: CHORES, llm });
+    const cmd = await interpretToCommand('add milk to the list', { catalogue: CHORES, llm });
     expect(cmd).toEqual({ opId: 'addTask', args: { title: 'milk' } });
   });
 
   it('returns {reply} when the LLM emits a free reply (no tool call) — bot can converse', async () => {
     const llm = llmReturning({ toolCall: null, replyText: 'nice weather' });
-    const cmd = await interpretToCommand('how are you?', { catalog: CHORES, llm });
+    const cmd = await interpretToCommand('how are you?', { catalogue: CHORES, llm });
     expect(cmd).toEqual({ reply: 'nice weather' });
   });
 
   it('returns null when there is neither a tool call nor any reply text', async () => {
     const llm = llmReturning({ toolCall: null, replyText: '' });
-    const cmd = await interpretToCommand('…', { catalog: CHORES, llm });
+    const cmd = await interpretToCommand('…', { catalogue: CHORES, llm });
     expect(cmd).toBeNull();
   });
 
@@ -74,39 +74,39 @@ describe('interpretToCommand', () => {
     let seenMessages = null;
     const llm = llmInspecting((req) => { seenMessages = req.messages; });
     await interpretToCommand('shopping', {
-      catalog: CHORES, llm,
+      catalogue: CHORES, llm,
       history: [{ role: 'user', content: 'what is on the list' }, { role: 'assistant', content: 'which list?' }],
     });
     expect(seenMessages.map((m) => m.role)).toEqual(['user', 'assistant', 'user']);
     expect(seenMessages[2].content).toBe('shopping');
   });
 
-  it('passes the catalog ops to the LLM as tools', async () => {
+  it('passes the catalogue ops to the LLM as tools', async () => {
     let seenTools = null;
     const llm = llmInspecting((req) => { seenTools = req.tools; });
-    await interpretToCommand('do something', { catalog: CHORES, llm });
+    await interpretToCommand('do something', { catalogue: CHORES, llm });
     expect(seenTools.map((t) => t.id)).toEqual(['addTask', 'markComplete', 'listOpen']);
   });
 
-  it('never calls the LLM when text is blank, llm missing, or catalog empty', async () => {
+  it('never calls the LLM when text is blank, llm missing, or catalogue empty', async () => {
     let called = 0;
     const llm = { invoke: async () => { called++; return { toolCall: null, raw: {} }; } };
-    expect(await interpretToCommand('   ', { catalog: CHORES, llm })).toBeNull();
-    expect(await interpretToCommand('x', { catalog: CHORES, llm: null })).toBeNull();
-    expect(await interpretToCommand('x', { catalog: catalogOf([]), llm })).toBeNull();
+    expect(await interpretToCommand('   ', { catalogue: CHORES, llm })).toBeNull();
+    expect(await interpretToCommand('x', { catalogue: CHORES, llm: null })).toBeNull();
+    expect(await interpretToCommand('x', { catalogue: catalogueOf([]), llm })).toBeNull();
     expect(called).toBe(0);
   });
 
   it('coerces a missing args object to {}', async () => {
     const llm = llmReturning({ toolCall: { id: 'listOpen' } });   // no args
-    const cmd = await interpretToCommand('what is open?', { catalog: CHORES, llm });
+    const cmd = await interpretToCommand('what is open?', { catalogue: CHORES, llm });
     expect(cmd).toEqual({ opId: 'listOpen', args: {} });
   });
 
   it('weaves RAG context into the system prompt (strings, entries, and {entry,score})', async () => {
     let seenSystem = null;
     const llm = llmInspecting((req) => { seenSystem = req.system; });
-    await interpretToCommand('add milk', { catalog: CHORES, llm, context: [
+    await interpretToCommand('add milk', { catalogue: CHORES, llm, context: [
       'wash the dishes',
       { meaning: 'buy bread' },
       { entry: { label: 'take out bins' }, score: 0.8 },
@@ -120,7 +120,7 @@ describe('interpretToCommand', () => {
   it('no context → the base system prompt is unchanged', async () => {
     let seenSystem = null;
     const llm = llmInspecting((req) => { seenSystem = req.system; });
-    await interpretToCommand('x', { catalog: CHORES, llm });
+    await interpretToCommand('x', { catalogue: CHORES, llm });
     expect(seenSystem).not.toMatch(/Relevant items/);
   });
 });

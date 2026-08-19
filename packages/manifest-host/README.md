@@ -15,7 +15,7 @@ A host owns the *runtime* side of the manifest model:
 - It accepts manifests via `mount(appId, manifest, opts)`.
 - It composes their projector outputs into a single `compose()` view
   with `appId.opId` namespacing — so a chat / bot / UI consumer sees
-  one merged `toolCatalog` without app-id collisions.
+  one merged `toolCatalogue` without app-id collisions.
 - It **detects but does not resolve** slash-command collisions across
   apps; resolution is a consumer concern.
 
@@ -25,7 +25,7 @@ createManifestHost() → Host
 host.mount(appId, manifest, { skillRegistry, toSkillCtx, onStateUpdates? })
 host.unmount(appId)
 host.list()    → string[]
-host.compose() → { toolCatalog, toolHandlers, commandMenu, collisions,
+host.compose() → { toolCatalogue, toolHandlers, commandMenu, collisions,
                    inlineKeyboardFor, perAppSystemPrompts }
 ```
 
@@ -57,7 +57,7 @@ host.mount('tasks', tasksManifest, {
 });
 
 const composed = host.compose();
-//   composed.toolCatalog: [
+//   composed.toolCatalogue: [
 //     {id:"household.addItem",  description:"...", schema:{...}},
 //     {id:"household.listOpen", ...},
 //     {id:"tasks.addTask",      ...},
@@ -173,7 +173,7 @@ interface Host {
 }
 
 interface ComposedView {
-  toolCatalog:         Array<{ id: string; description: string; schema: object }>
+  toolCatalogue:         Array<{ id: string; description: string; schema: object }>
   toolHandlers:        Record<string, (args: object, toolCtx: object) => Promise<object>>
   commandMenu:         Array<{ command: string; description: string; appId: string }>
   collisions:          Array<{ command: string; appIds: string[] }>

@@ -66,14 +66,14 @@
 3. **Noise/refusal training varies wildly across families.** qwen2.5 nailed it; llama3.2 catastrophically over-classifies; phi4-mini under-classifies.
 4. **Hallucination matters at this scale.** llama3.2 invented Dutch text that wasn't in the input. Tiny models with weaker grounding will fabricate; tiny models with stronger grounding (qwen2.5) won't.
 5. **Prompt-engineering plateaus quickly.** Earlier in the session, prompt v1 → v2 → v3 bought 22 percentage points; v3 → v4 lost 6. Beyond v3 the marginal returns are negative.
-6. **Adding new tools to the catalog reshuffles the whole decision space.** The askClarification experiment dropped qwen2.5:3b from 89% → 45-59% across 3 runs WITHOUT any prompt change, just by adding one extra tool. Catalog growth is overtraining-equivalent.
+6. **Adding new tools to the catalogue reshuffles the whole decision space.** The askClarification experiment dropped qwen2.5:3b from 89% → 45-59% across 3 runs WITHOUT any prompt change, just by adding one extra tool. Catalogue growth is overtraining-equivalent.
 
 ## Production setting
 
 - **Provider:** Ollama (local)
 - **Model:** `qwen2.5:3b-instruct`
 - **Prompt:** v3 (in `prompts.js`, PROMPT_VERSION = 3)
-- **Tool catalog:** 5 tools (`addItem`, `listOpen`, `markComplete`, `removeItem`, `help`) — see `V0_TOOL_CATALOG` in `classifyAndExtract.js`
+- **Tool catalogue:** 5 tools (`addItem`, `listOpen`, `markComplete`, `removeItem`, `help`) — see `V0_TOOL_CATALOGUE` in `classifyAndExtract.js`
 - **Smoke baseline:** 16-17/18 (89-94%) across multiple runs
 
 ## Reproducing

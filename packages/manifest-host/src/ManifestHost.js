@@ -14,7 +14,7 @@
  *
  * Composed view (everything namespaced; collisions detected, not resolved):
  *   {
- *     toolCatalog:        [{id:"appId.opId", description, schema}],
+ *     toolCatalogue:        [{id:"appId.opId", description, schema}],
  *     toolHandlers:       {"appId.opId": handler},
  *     commandMenu:        [{command, description, appId}],
  *     collisions:         [{command, appIds: string[]}],
@@ -120,7 +120,7 @@ function assertAppId(appId) {
  * mount-insertion order drives output order (Map preserves insertion).
  */
 function composeMounts(mounts) {
-  const toolCatalog  = [];
+  const toolCatalogue  = [];
   const toolHandlers = {};
   const commandMenu  = [];
   const perAppSystemPrompts = {};
@@ -132,8 +132,8 @@ function composeMounts(mounts) {
   for (const [appId, m] of mounts) {
     const { rendered } = m;
 
-    for (const t of rendered.toolCatalog) {
-      toolCatalog.push({
+    for (const t of rendered.toolCatalogue) {
+      toolCatalogue.push({
         id:          `${appId}.${t.id}`,
         description: t.description,
         schema:      t.schema,
@@ -188,7 +188,7 @@ function composeMounts(mounts) {
   };
 
   return {
-    toolCatalog,
+    toolCatalogue,
     toolHandlers,
     commandMenu,
     collisions,

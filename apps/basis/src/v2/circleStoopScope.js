@@ -17,7 +17,7 @@
  *     `loadCircleItems` (`keepForCircle`): an item with no per-item circle hint is
  *     kept — the op already scoped it — so pre-existing unscoped posts don't vanish.
  *
- * This is the invariant-honoring shape: ONE stoop agent (service-context) with a
+ * This is the invariant-honouring shape: ONE stoop agent (service-context) with a
  * per-circle scope key threaded through ops — NOT N agents for N circles
  * (CLAUDE.md invariant #6). Pure + transport-free, so mobile reuses it verbatim.
  */

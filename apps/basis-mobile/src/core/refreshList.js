@@ -34,7 +34,7 @@ import { dlog } from './devLog.js';
  * @param {object} args
  * @param {object} args.sourceDispatch     the original dispatch (with
  *                                          kind:'ready', opId, args, appOrigin)
- * @param {object} args.catalog            from bundle.catalog
+ * @param {object} args.catalogue            from bundle.catalogue
  * @param {object} args.manifestsByOrigin  from bundle.manifestsByOrigin
  * @param {function} args.callSkill        from bundle.callSkill
  * @param {function} [args.t]              localiser for sync hints + button labels
@@ -43,14 +43,14 @@ import { dlog } from './devLog.js';
  *   the source dispatch can't be re-run (missing op, non-ready, etc.).
  */
 export async function refreshList({
-  sourceDispatch, catalog, manifestsByOrigin, callSkill, t,
+  sourceDispatch, catalogue, manifestsByOrigin, callSkill, t,
 }) {
   if (!sourceDispatch || sourceDispatch.kind !== 'ready') {
     dlog.warn('refreshList: skip, sourceDispatch not ready', sourceDispatch?.kind);
     return null;
   }
-  if (!catalog?.opsById?.get(sourceDispatch.opId)) {
-    dlog.warn('refreshList: skip, opId not in catalog', sourceDispatch.opId);
+  if (!catalogue?.opsById?.get(sourceDispatch.opId)) {
+    dlog.warn('refreshList: skip, opId not in catalogue', sourceDispatch.opId);
     return null;
   }
   try {
@@ -104,13 +104,13 @@ export function snapshotSourceDispatch({ opId, args, appOrigin, threadId, replyS
 
 /**
  * Resolve the source dispatch from a list bubble's reply context
- * via the catalog (alternative to snapshotSourceDispatch when we
+ * via the catalogue (alternative to snapshotSourceDispatch when we
  * only have opId + args at the call site).  Mostly here as a seam
  * for tests.
  */
-export function resolveSourceDispatch({ opId, args, catalog, threadId }) {
+export function resolveSourceDispatch({ opId, args, catalogue, threadId }) {
   return resolveDispatch({
     kind: 'slash', opId, args: args ?? {}, threadId: threadId ?? null,
     command: '(refresh)', body: '',
-  }, catalog);
+  }, catalogue);
 }

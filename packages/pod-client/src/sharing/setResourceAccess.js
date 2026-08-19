@@ -9,7 +9,7 @@
  * ── Why a primitive (and not raw `sharing.grant` at each call site) ──
  * The commons + registry resources (`@onderling/agent-registry`) each carry
  * a fixed access posture:
- *   - endorsement / community catalogs → **public-read + owner-write**
+ *   - endorsement / community catalogues → **public-read + owner-write**
  *     (+ admin-write for a community's circle admins);
  *   - the agent registry (`/private/`) → **owner-only** (the pod's
  *     default — no grant needed; the owner already holds `control`).
@@ -61,7 +61,7 @@ function flagsToModes(flags) {
  *   e.g. `{ read: true }` for a shared-readable commons resource.
  * @param {Record<string, AccessFlags>} [opts.agents]
  *   — per-WebID grants, e.g. `{ 'https://…/card#me': { read: true, write: true } }`
- *   for a community catalog's circle admins.
+ *   for a community catalogue's circle admins.
  * @param {(err: Error, ctx: object) => void} [opts.onError]
  *   — invoked per failed grant (never throws out of here regardless).
  * @returns {Promise<{
@@ -141,7 +141,7 @@ export async function setResourceAccess({ sharing, resourceUri, public: pub, age
     await _grant({ resourceUri, public: true, modes: publicModes }, { subject: 'public' });
   }
 
-  // Per-agent (WebID) grants — a community catalog's admin-write set.
+  // Per-agent (WebID) grants — a community catalogue's admin-write set.
   if (agents && typeof agents === 'object') {
     for (const [webId, flags] of Object.entries(agents)) {
       const modes = flagsToModes(flags);

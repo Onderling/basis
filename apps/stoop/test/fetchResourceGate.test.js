@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
-import { createNeighborhoodAgent } from '../src/index.js';
+import { createNeighbourhoodAgent } from '../src/index.js';
 import { attachSubstrateMirror }   from '../src/substrateMirror.js';
 
 const ANNE  = 'https://id.example/anne';
@@ -18,7 +18,7 @@ const GROUP = 'oosterpoort';
 async function makeBundle() {
   const id = await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);
-  const bundle = await createNeighborhoodAgent({
+  const bundle = await createNeighbourhoodAgent({
     identity:   id,
     transport:  tx,
     offeringMatch: { group: GROUP, localActor: ANNE, peers: [] },

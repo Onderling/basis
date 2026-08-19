@@ -1,5 +1,5 @@
 /**
- * Community catalog — a CIRCLE-scoped, admin-gated endorsement resource
+ * Community catalogue — a CIRCLE-scoped, admin-gated endorsement resource
  * (commons-governance G3, the federation + moderation slice).
  *
  * ── What it is ──────────────────────────────────────────────────────────────
@@ -25,7 +25,7 @@
  * `@onderling/circles` here) preserves the substrate layering: `@onderling/agent-
  * registry` stays circle-agnostic; the app wires the concrete circle policy.
  * A non-admin's endorsement is REJECTED (deny-by-default): if no predicate is
- * supplied the catalog refuses to build rather than silently ungating.
+ * supplied the catalogue refuses to build rather than silently ungating.
  *
  * ── webid ↔ pubKey seam ─────────────────────────────────────────────────────
  * An endorsement's `endorser` is a pubKey; a circle roster stores WebIDs. In
@@ -46,13 +46,13 @@ import { createEndorsementResource } from './endorsementResource.js';
 import { verifyEndorsement }         from './endorsement.js';
 
 /**
- * Circle-scoped shared-readable resource URI for a community catalog. Distinct
+ * Circle-scoped shared-readable resource URI for a community catalogue. Distinct
  * from the per-endorser G1 path (`/public/endorsements`) so a device can host
  * both its own endorsements AND a community it admins, keyed by circleId.
  */
-export function communityCatalogUri({ circleId, anchorPodUri, deviceId, preferPodUri = false } = {}) {
+export function communityCatalogueUri({ circleId, anchorPodUri, deviceId, preferPodUri = false } = {}) {
   if (typeof circleId !== 'string' || circleId.length === 0) {
-    throw Object.assign(new Error('communityCatalogUri: circleId is required'), { code: 'INVALID_ARGUMENT' });
+    throw Object.assign(new Error('communityCatalogueUri: circleId is required'), { code: 'INVALID_ARGUMENT' });
   }
   const seg = encodeURIComponent(circleId);
   if (preferPodUri && typeof anchorPodUri === 'string' && anchorPodUri.length > 0) {
@@ -67,13 +67,13 @@ export function communityCatalogUri({ circleId, anchorPodUri, deviceId, preferPo
     return `${base}/public/communities/${seg}/endorsements`;
   }
   throw Object.assign(
-    new Error('communityCatalogUri: deviceId (preferred) or anchorPodUri is required'),
+    new Error('communityCatalogueUri: deviceId (preferred) or anchorPodUri is required'),
     { code: 'INVALID_ARGUMENT' },
   );
 }
 
 /**
- * createCommunityCatalog — an admin-gated, circle-owned endorsement resource.
+ * createCommunityCatalogue — an admin-gated, circle-owned endorsement resource.
  *
  * Writes (`endorse`, `revoke`, `fork`) are gated to the circle's admins via the
  * injected `isAdmin` predicate; reads (`list`, `get`) are open (the resource is
@@ -94,14 +94,14 @@ export function communityCatalogUri({ circleId, anchorPodUri, deviceId, preferPo
  * @param {() => string} [opts.now]
  * @param {(uri: string) => (any|Promise<any>)} [opts.ensureAccess]
  *   — best-effort real-pod access-control hook, forwarded to the underlying
- *   endorsement resource. For a community catalog the app wires it to
+ *   endorsement resource. For a community catalogue the app wires it to
  *   `setResourceAccess` with **public-read + owner-write + admin-write** (the
  *   circle's admins' WebIDs — resolve admin pubKeys→WebIDs via the identity
  *   resolver / `AgentRegistryMemberMap`; in basis webid===pubKey today).
  *   Hermetic no-op on the pseudo-pod. // G3-seam: admin WebIDs via MemberMap.
  * @returns {{ endorse, revoke, fork, list, get, ensureAccess, circleId: string, resourceUri: string }}
  */
-export function createCommunityCatalog({
+export function createCommunityCatalogue({
   circleId,
   isAdmin,
   pseudoPod,
@@ -115,17 +115,17 @@ export function createCommunityCatalog({
   now,
 } = {}) {
   if (typeof circleId !== 'string' || circleId.length === 0) {
-    throw Object.assign(new Error('createCommunityCatalog: circleId is required'), { code: 'INVALID_ARGUMENT' });
+    throw Object.assign(new Error('createCommunityCatalogue: circleId is required'), { code: 'INVALID_ARGUMENT' });
   }
   if (typeof isAdmin !== 'function') {
-    // Deny-by-default: a community catalog with NO admin gate would be an open
+    // Deny-by-default: a community catalogue with NO admin gate would be an open
     // write surface. Refuse to build rather than silently ungate the commons.
     throw Object.assign(
-      new Error('createCommunityCatalog: isAdmin(endorserPubKey) gate is required (reuse the circle policy — do not ungate)'),
+      new Error('createCommunityCatalogue: isAdmin(endorserPubKey) gate is required (reuse the circle policy — do not ungate)'),
       { code: 'INVALID_ARGUMENT' },
     );
   }
-  const uri = resourceUri ?? communityCatalogUri({ circleId, anchorPodUri, deviceId, preferPodUri });
+  const uri = resourceUri ?? communityCatalogueUri({ circleId, anchorPodUri, deviceId, preferPodUri });
   const resource = createEndorsementResource({
     pseudoPod, resourceUri: uri, maxRetries, onPersistentConflict,
     ...(typeof ensureAccess === 'function' ? { ensureAccess } : {}),
@@ -134,26 +134,26 @@ export function createCommunityCatalog({
 
   async function _assertAdmin(pubKey, action) {
     if (typeof pubKey !== 'string' || pubKey.length === 0) {
-      throw Object.assign(new Error(`community-catalog: ${action} requires an actor pubKey`), { code: 'INVALID_ARGUMENT' });
+      throw Object.assign(new Error(`community-catalogue: ${action} requires an actor pubKey`), { code: 'INVALID_ARGUMENT' });
     }
     let ok = false;
     try { ok = await isAdmin(pubKey); } catch { ok = false; }
     if (!ok) {
       throw Object.assign(
-        new Error(`community-catalog: ${pubKey} is not an admin of circle ${circleId} (${action} rejected)`),
+        new Error(`community-catalogue: ${pubKey} is not an admin of circle ${circleId} (${action} rejected)`),
         { code: 'FORBIDDEN' },
       );
     }
   }
 
   /**
-   * Publish a signed endorsement into the community catalog. The endorsement's
+   * Publish a signed endorsement into the community catalogue. The endorsement's
    * `endorser` MUST be a circle admin — a non-admin write is REJECTED
    * (`code:'FORBIDDEN'`). The circle policy IS the gate.
    */
   async function endorse(rec) {
     if (!rec || typeof rec !== 'object' || typeof rec.endorser !== 'string') {
-      throw Object.assign(new Error('community-catalog: endorse(rec) requires a signed endorsement'), { code: 'INVALID_ARGUMENT' });
+      throw Object.assign(new Error('community-catalogue: endorse(rec) requires a signed endorsement'), { code: 'INVALID_ARGUMENT' });
     }
     await _assertAdmin(rec.endorser, 'endorse');
     return resource.append(rec);
@@ -161,7 +161,7 @@ export function createCommunityCatalog({
 
   /**
    * Moderation revoke: an ADMIN removes an endorsement by id → it drops from
-   * every subscriber's derived catalog. `by` (the acting admin pubKey) is gated.
+   * every subscriber's derived catalogue. `by` (the acting admin pubKey) is gated.
    */
   async function revoke(id, { by } = {}) {
     await _assertAdmin(by, 'revoke');

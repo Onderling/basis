@@ -9,8 +9,8 @@
  *
  * NB (V0): the installed mapping is persisted to AsyncStorage and surfaces as a
  * slash-command on the NEXT boot (the boot wiring in agentBundle loads it). A
- * LIVE catalog refresh on mobile needs the base sources exposed from boot — a
- * clean follow-up; on web the catalog is a mutable module var so it refreshes in
+ * LIVE catalogue refresh on mobile needs the base sources exposed from boot — a
+ * clean follow-up; on web the catalogue is a mutable module var so it refreshes in
  * place. `onInstalled` is the seam for that.
  */
 
@@ -22,17 +22,17 @@ let _trigger = null;
 export function triggerInstall(mapping) { if (_trigger) _trigger(mapping); }
 
 /**
- * @param {{ store: object, deviceId: string, catalog: {opsById: Map},
+ * @param {{ store: object, deviceId: string, catalogue: {opsById: Map},
  *           onInstalled?: (mapping: object) => void }} args
  * @returns {{ consentResult: object|null, confirm: () => Promise<void>, decline: () => void }}
  */
-export function useExtensionInstall({ store, deviceId, catalog, onInstalled }) {
+export function useExtensionInstall({ store, deviceId, catalogue, onInstalled }) {
   const [pending, setPending] = useState(null);   // { result, mapping } | null
 
   const requestInstall = useCallback((mapping) => {
     if (!mapping || typeof mapping !== 'object') return;
-    setPending({ result: buildConsentModel(mapping, catalog), mapping });
-  }, [catalog]);
+    setPending({ result: buildConsentModel(mapping, catalogue), mapping });
+  }, [catalogue]);
 
   // Register the global/dev trigger while this hook is mounted.
   useEffect(() => {
@@ -46,10 +46,10 @@ export function useExtensionInstall({ store, deviceId, catalog, onInstalled }) {
     setPending(null);
     if (!p) return;
     try {
-      const r = await installMapping({ store, deviceId, mapping: p.mapping, catalog });
+      const r = await installMapping({ store, deviceId, mapping: p.mapping, catalogue });
       if (r.ok) onInstalled?.(p.mapping);
     } catch { /* install is best-effort */ }
-  }, [pending, store, deviceId, catalog, onInstalled]);
+  }, [pending, store, deviceId, catalogue, onInstalled]);
 
   const decline = useCallback(() => setPending(null), []);
 

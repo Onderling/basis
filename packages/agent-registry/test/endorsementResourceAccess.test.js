@@ -1,6 +1,6 @@
 /**
  * Hermetic wiring test for the real-pod `ensureAccess` hook on the
- * endorsement resource + community catalog (feat/real-pod-acp).
+ * endorsement resource + community catalogue (feat/real-pod-acp).
  *
  * The LIVE proof that the underlying `setResourceAccess` primitive really
  * enforces access on a Solid pod (public-read → unauth 200; non-granted
@@ -10,11 +10,11 @@
  *   - the hook fires (once) after the first write to a REAL (https) pod URI;
  *   - it NEVER fires on a `pseudo-pod://` URI (the hermetic no-op);
  *   - a throwing hook does NOT break the write (best-effort);
- *   - the community catalog forwards the hook to its underlying resource.
+ *   - the community catalogue forwards the hook to its underlying resource.
  */
 import { describe, it, expect } from 'vitest';
 import { createEndorsementResource } from '../src/endorsementResource.js';
-import { createCommunityCatalog }    from '../src/communityCatalog.js';
+import { createCommunityCatalogue }    from '../src/communityCatalogue.js';
 
 /** In-memory pseudo-pod (etag-CAS honoured by createEndorsementResource). */
 function makePod() {
@@ -83,10 +83,10 @@ describe('real-pod ensureAccess wiring — endorsement resource', () => {
   });
 });
 
-describe('real-pod ensureAccess wiring — community catalog forwards the hook', () => {
+describe('real-pod ensureAccess wiring — community catalogue forwards the hook', () => {
   it('fires the (admin-write) hook on the first admin write to an https URI', async () => {
     const calls = [];
-    const cat = createCommunityCatalog({
+    const cat = createCommunityCatalogue({
       circleId: 'c1',
       isAdmin: (pk) => pk === 'pk:admin',
       pseudoPod: makePod(),

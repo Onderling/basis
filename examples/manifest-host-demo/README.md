@@ -3,7 +3,7 @@
 > **SP-4b + SP-11 (merged 2026-05-20).**  Composes household +
 > tasks-v0 (with its real multi-circle runtime) in one process via
 > `@onderling/manifest-host`, drives a chat-agent over the merged tool
-> catalog with a scripted LLM, and shows state landing in both apps'
+> catalogue with a scripted LLM, and shows state landing in both apps'
 > stores from one conversation.
 >
 > See `PLAN-uniforme-representatie.md` § SP-4b + § SP-11 (in the repo
@@ -14,8 +14,8 @@
 ## What this proves
 
 1. **Cross-app composition** — `@onderling/manifest-host`'s `compose()`
-   merges N manifests into one toolCatalog with `appId.opId`
-   namespacing.  The chat-agent uses that merged catalog directly,
+   merges N manifests into one toolCatalogue with `appId.opId`
+   namespacing.  The chat-agent uses that merged catalogue directly,
    one mount per app.
 2. **Multi-circle dispatch through the host** — tasks-v0's real
    multi-circle machinery (`bundleResolver` / `wireSkills` /
@@ -49,7 +49,7 @@ You'll see something like:
 — composing household + tasks-v0 in one chat surface
 
 mounted apps:        household, tasks
-composed toolCatalog: 22 tools
+composed toolCatalogue: 22 tools
   household tools:   10
   tasks tools:       12
 command collisions:  0
@@ -85,7 +85,7 @@ npm test
 ```text
                      ┌─────────────────────────────────────┐
                      │       ChatAgent (LLM-mediated)      │
-                     │ toolCatalog: [{id:"household.add…"} │
+                     │ toolCatalogue: [{id:"household.add…"} │
                      │              {id:"tasks.addTask"}…] │
                      └────────────────┬────────────────────┘
                                       │ toolCall {id, args}
@@ -124,7 +124,7 @@ npm test
   explicit.
 
 - **System-prompt composition: generic preamble.**  Lists the mounted
-  apps; lets the merged tool catalog's per-tool descriptions carry
+  apps; lets the merged tool catalogue's per-tool descriptions carry
   the rest.  Recommended for ≥2 apps in
   `packages/manifest-host/README.md` § "Potential conflicts".
   Alternatives ("concat", "pick primary") fit other scenarios — pick

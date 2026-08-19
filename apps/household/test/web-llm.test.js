@@ -51,7 +51,7 @@ describe('household web UI — Slice A.4 LLM passthrough', () => {
     // Mock provider: every invoke increments a counter so we can
     // assert the LLM was reached (vs the regex fast-path).  Scripts a
     // single `addItem(shopping, milk)` tool call — matches the
-    // manifest's toolCatalog shape exactly.
+    // manifest's toolCatalogue shape exactly.
     const provider = {
       id: 'web-llm-mock',
       requiresKey: false,

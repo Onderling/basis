@@ -5,7 +5,7 @@
  * Settings is a panel of mostly-independent controls (locale +
  * transport-mode + stoop handle/displayName/holiday-mode) — there
  * isn't much step-machine here, but the LOAD + SAVE substrate
- * calls + the language/transport option catalogs ARE portable.
+ * calls + the language/transport option catalogues ARE portable.
  *
  * Mobile parity: RN's settings screen reuses these helpers so the
  * substrate-call patterns + UX taxonomies stay in lockstep.

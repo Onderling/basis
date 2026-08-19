@@ -63,12 +63,12 @@ describe('renderChat — arg validation', () => {
   });
 });
 
-describe('renderChat — toolCatalog', () => {
+describe('renderChat — toolCatalogue', () => {
   it('shape matches ChatAgent expectation + follows op declaration order', () => {
     const out = renderChat(baseManifest, { skillRegistry, toSkillCtx });
-    expect(out.toolCatalog).toHaveLength(3);
-    expect(out.toolCatalog.map((t) => t.id)).toEqual(['addTask', 'claim', 'help']);
-    expect(out.toolCatalog[0]).toEqual({
+    expect(out.toolCatalogue).toHaveLength(3);
+    expect(out.toolCatalogue.map((t) => t.id)).toEqual(['addTask', 'claim', 'help']);
+    expect(out.toolCatalogue[0]).toEqual({
       id:          'addTask',
       description: 'add a task',
       schema: {
@@ -78,7 +78,7 @@ describe('renderChat — toolCatalog', () => {
       },
     });
     // help: no surfaces.chat.hint → fall back to op.id as description.
-    expect(out.toolCatalog[2].description).toBe('help');
+    expect(out.toolCatalogue[2].description).toBe('help');
   });
 });
 

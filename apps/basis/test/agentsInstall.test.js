@@ -2,13 +2,13 @@
  * agents — INSTALL through the REAL composition.
  *
  * Proves realAgent.js wires the install surface end-to-end:
- *   - `callSkill('agents', 'listCatalog')` returns the default stub
- *     catalog source's installable cards (the pluggable source is wired).
- *   - `callSkill('agents', 'installAgent', { catalogId, grants })` installs
+ *   - `callSkill('agents', 'listCatalogue')` returns the default stub
+ *     catalogue source's installable cards (the pluggable source is wired).
+ *   - `callSkill('agents', 'installAgent', { catalogueId, grants })` installs
  *     a curated card into the user's registry with a REAL token-backed
  *     grant — and ONLY the granted skill (capability-security through the
  *     live composition, not just the unit cores).
- *   - the power-user override installs a NON-catalog card (pasted JSON).
+ *   - the power-user override installs a NON-catalogue card (pasted JSON).
  *   - an undeclared grant is REJECTED (never issued a token).
  *   uninstall reuses purge (the installed agent is gone).
  *
@@ -26,9 +26,9 @@ const OVERRIDE_CARD = {
 };
 
 describe('agents P3 — install through the real composition', () => {
-  it('listCatalog returns the wired default (stub) catalog source', async () => {
+  it('listCatalogue returns the wired default (stub) catalogue source', async () => {
     const a = await createRealHouseholdAgent({ seedHousehold: false });
-    const cat = await a.callSkill('agents', 'listCatalog', {});
+    const cat = await a.callSkill('agents', 'listCatalogue', {});
     expect(cat.ok).toBe(true);
     expect(cat.count).toBeGreaterThanOrEqual(1);
     expect(cat.items.every((i) => typeof i.id === 'string')).toBe(true);
@@ -36,18 +36,18 @@ describe('agents P3 — install through the real composition', () => {
 
   it('installs a curated card token-backed, granting ONLY the requested skill', async () => {
     const a = await createRealHouseholdAgent({ seedHousehold: false });
-    const cat = await a.callSkill('agents', 'listCatalog', {});
-    const entry = cat.catalog[0];
+    const cat = await a.callSkill('agents', 'listCatalogue', {});
+    const entry = cat.catalogue[0];
     // Grant only the FIRST declared skill of the chosen card.
     const grantSkill = entry.skills[0];
 
     const res = await a.callSkill('agents', 'installAgent', {
-      catalogId: entry.id,
+      catalogueId: entry.id,
       grants:    JSON.stringify([grantSkill]),
     });
     expect(res.ok).toBe(true);
     expect(res.installed).toBe(true);
-    expect(res.source).toBe('catalog');
+    expect(res.source).toBe('catalogue');
     expect(res.tokenBacked).toBe(true);                       // real issuer-side token
     expect(res.granted.map((g) => g.skill)).toEqual([grantSkill]);
     expect(res.granted[0].tokenId.startsWith('local-')).toBe(false);
@@ -59,7 +59,7 @@ describe('agents P3 — install through the real composition', () => {
     expect(await a.agentsTokenRegistry.isRevoked(res.granted[0].tokenId)).toBe(false);
   });
 
-  it('power-user override installs a non-catalog card; undeclared grants are rejected', async () => {
+  it('power-user override installs a non-catalogue card; undeclared grants are rejected', async () => {
     const a = await createRealHouseholdAgent({ seedHousehold: false });
 
     const res = await a.callSkill('agents', 'installAgent', {

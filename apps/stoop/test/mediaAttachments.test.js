@@ -27,7 +27,7 @@ import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderl
 import { VaultMemory } from '@onderling/vault';
 import { openBlob, openThumbnail } from '@onderling/blob-gateway';
 import { isSealed } from '@onderling/pod-client/sealing';
-import { createNeighborhoodAgent } from '../src/index.js';
+import { createNeighbourhoodAgent } from '../src/index.js';
 import {
   persistInboundAttachment,
   validateInboundAttachment,
@@ -51,7 +51,7 @@ function makePlaintextInbound(extra = {}) {
 async function buildBundle(actorWebid = ANNE) {
   const id = await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);
-  const bundle = await createNeighborhoodAgent({
+  const bundle = await createNeighbourhoodAgent({
     identity:   id,
     transport:  tx,
     offeringMatch: { group: 'oosterpoort', localActor: actorWebid, peers: [] },

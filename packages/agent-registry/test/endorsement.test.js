@@ -1,15 +1,15 @@
 /**
  * commons-governance G1 — signed endorsements + the endorsement-backed
- * curated catalog read-view.
+ * curated catalogue read-view.
  *
  *   1. verifyEndorsement — a validly-signed endorsement verifies; a tampered
  *      field / bad sig / expired / cardHash-mismatch (card mutated AFTER
  *      endorsement) / unknown-claim / subject-mismatch each → invalid.
  *   2. endorsement resource — append/list/revoke over a real in-memory
  *      pseudo-pod at a SHARED-READABLE (/public/) path.
- *   3. createCatalogSource — reads a single root's endorsements, returns ONLY
+ *   3. createCatalogueSource — reads a single root's endorsements, returns ONLY
  *      verified cards; a flagged / invalid / non-root endorsement is excluded;
- *      an empty root → empty catalog.
+ *      an empty root → empty catalogue.
  *
  * Real primitives throughout: Ed25519 AgentIdentity, the pseudo-pod, the
  * endorsement resource — no crypto/pod mocks.
@@ -24,13 +24,13 @@ import {
   verifyEndorsement,
   cardHash,
   createEndorsementResource,
-  createCatalogSource,
+  createCatalogueSource,
 } from '../index.js';
 
 /* ── Fixtures ──────────────────────────────────────────────────────────── */
 
 /** An Agent Card whose x-onderling.pubKey = the given endorsed-agent pubKey. */
-function makeCard(pubKey, { id = 'catalog:summariser', skills = ['summarise.thread', 'summarise.document'] } = {}) {
+function makeCard(pubKey, { id = 'catalogue:summariser', skills = ['summarise.thread', 'summarise.document'] } = {}) {
   return {
     name: 'Summariser', description: 'Summarises threads.',
     url: 'https://example.invalid/agents/summariser', version: '1.0',
@@ -119,7 +119,7 @@ describe('G1 — verifyEndorsement (deny-by-default; cardHash defeats escalate)'
     const rec    = issueEndorsement(root, { subject: agentA.pubKey, card: cardA });
 
     // Present the endorsement against a DIFFERENT agent's card.
-    const cardB = makeCard(agentB.pubKey, { id: 'catalog:other' });
+    const cardB = makeCard(agentB.pubKey, { id: 'catalogue:other' });
     expect(verifyEndorsement(rec, cardB)).toBe(false);
     // No card at all → can't verify the binding → invalid.
     expect(verifyEndorsement(rec, null)).toBe(false);
@@ -157,8 +157,8 @@ describe('G1 — endorsement resource (append/list/revoke, shared-readable path)
   });
 });
 
-/* ── 3. createCatalogSource (single-root, flat, verified) ───────────────── */
-describe('G1 — createCatalogSource (single root → only verified cards)', () => {
+/* ── 3. createCatalogueSource (single-root, flat, verified) ───────────────── */
+describe('G1 — createCatalogueSource (single root → only verified cards)', () => {
   async function seed() {
     const root  = await makeIdentity();
     const res   = createEndorsementResource({ pseudoPod: mkPod(), deviceId: 'root-device' });
@@ -167,9 +167,9 @@ describe('G1 — createCatalogSource (single root → only verified cards)', () 
     return { root, res, resolvers, resolveCard };
   }
 
-  it('empty root → empty catalog', async () => {
+  it('empty root → empty catalogue', async () => {
     const { root, res, resolveCard } = await seed();
-    const cat = createCatalogSource({ endorsementResource: res, roots: [root.pubKey], resolveCard });
+    const cat = createCatalogueSource({ endorsementResource: res, roots: [root.pubKey], resolveCard });
     expect(await cat.list()).toEqual([]);
     expect(await cat.get('anything')).toBeNull();
   });
@@ -178,8 +178,8 @@ describe('G1 — createCatalogSource (single root → only verified cards)', () 
     const { root, res, resolvers, resolveCard } = await seed();
     const other = await makeIdentity();                    // a NON-root endorser
 
-    const a1 = await makeIdentity(); const cardA = makeCard(a1.pubKey, { id: 'catalog:A' });
-    const b1 = await makeIdentity(); const cardB = makeCard(b1.pubKey, { id: 'catalog:B' });
+    const a1 = await makeIdentity(); const cardA = makeCard(a1.pubKey, { id: 'catalogue:A' });
+    const b1 = await makeIdentity(); const cardB = makeCard(b1.pubKey, { id: 'catalogue:B' });
     resolvers.set(a1.pubKey, cardA);
     resolvers.set(b1.pubKey, cardB);
 
@@ -190,24 +190,24 @@ describe('G1 — createCatalogSource (single root → only verified cards)', () 
     await res.append(issueEndorsement(root,  { subject: b1.pubKey, card: cardB }));
     await res.append(issueEndorsement(other, { subject: b1.pubKey, card: cardB }));
 
-    const cat  = createCatalogSource({ endorsementResource: res, roots: [root.pubKey], resolveCard });
+    const cat  = createCatalogueSource({ endorsementResource: res, roots: [root.pubKey], resolveCard });
     const list = await cat.list();
     const ids  = list.map((c) => c['x-onderling'].id).sort();
-    expect(ids).toEqual(['catalog:A', 'catalog:B']);
+    expect(ids).toEqual(['catalogue:A', 'catalogue:B']);
     // The non-root endorsement did not inflate B's count.
-    const bEntry = list.find((c) => c['x-onderling'].id === 'catalog:B');
+    const bEntry = list.find((c) => c['x-onderling'].id === 'catalogue:B');
     expect(bEntry['x-onderling'].endorsement.count).toBe(1);
     expect(bEntry['x-onderling'].endorsement.endorsers).toEqual([root.pubKey]);
     // get() resolves the same verified card.
-    expect((await cat.get('catalog:A'))['x-onderling'].id).toBe('catalog:A');
+    expect((await cat.get('catalogue:A'))['x-onderling'].id).toBe('catalogue:A');
   });
 
   it('excludes a FLAGGED subject, an INVALID endorsement, and a cardHash-mismatch', async () => {
     const { root, res, resolvers, resolveCard } = await seed();
 
-    const good = await makeIdentity(); const cardGood = makeCard(good.pubKey, { id: 'catalog:good' });
-    const bad  = await makeIdentity(); const cardBad  = makeCard(bad.pubKey,  { id: 'catalog:bad'  });
-    const flg  = await makeIdentity(); const cardFlg  = makeCard(flg.pubKey,  { id: 'catalog:flagged' });
+    const good = await makeIdentity(); const cardGood = makeCard(good.pubKey, { id: 'catalogue:good' });
+    const bad  = await makeIdentity(); const cardBad  = makeCard(bad.pubKey,  { id: 'catalogue:bad'  });
+    const flg  = await makeIdentity(); const cardFlg  = makeCard(flg.pubKey,  { id: 'catalogue:flagged' });
     resolvers.set(good.pubKey, cardGood);
     resolvers.set(flg.pubKey,  cardFlg);
 
@@ -217,16 +217,16 @@ describe('G1 — createCatalogSource (single root → only verified cards)', () 
     // returns the escalated card) → cardHash-mismatch → dropped.
     const badRec = issueEndorsement(root, { subject: bad.pubKey, card: cardBad });
     await res.append(badRec);
-    resolvers.set(bad.pubKey, makeCard(bad.pubKey, { id: 'catalog:bad', skills: ['summarise.thread', 'net.exfiltrate'] }));
+    resolvers.set(bad.pubKey, makeCard(bad.pubKey, { id: 'catalogue:bad', skills: ['summarise.thread', 'net.exfiltrate'] }));
 
     // flagged: BOTH a recommend and a flag by the root → flag wins, excluded.
     await res.append(issueEndorsement(root, { subject: flg.pubKey, card: cardFlg, claim: 'recommend' }));
     await res.append(issueEndorsement(root, { subject: flg.pubKey, card: cardFlg, claim: 'flag' }));
 
-    const cat = createCatalogSource({ endorsementResource: res, roots: [root.pubKey], resolveCard });
+    const cat = createCatalogueSource({ endorsementResource: res, roots: [root.pubKey], resolveCard });
     const ids = (await cat.list()).map((c) => c['x-onderling'].id);
-    expect(ids).toEqual(['catalog:good']);
-    expect(await cat.get('catalog:bad')).toBeNull();
-    expect(await cat.get('catalog:flagged')).toBeNull();
+    expect(ids).toEqual(['catalogue:good']);
+    expect(await cat.get('catalogue:bad')).toBeNull();
+    expect(await cat.get('catalogue:flagged')).toBeNull();
   });
 });

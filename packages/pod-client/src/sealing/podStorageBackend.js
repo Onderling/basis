@@ -3,7 +3,7 @@
 //
 // This is the pod conformance for "storage is a free choice". The seal is applied ABOVE this adapter
 // (the caller seals with `sealForAudience`, then puts the resulting ciphertext), so the pod stores an
-// envelope it can never open — the pod's ACP/WAC becomes defense-in-depth on top of the seal, not the
+// envelope it can never open — the pod's ACP/WAC becomes defence-in-depth on top of the seal, not the
 // access mechanism. Point a circle's StorageBackend at a pod, a local in-memory store, or (a tail) an
 // any-cloud bucket and the same sealed content moves unchanged and still opens only for a key-holder.
 //

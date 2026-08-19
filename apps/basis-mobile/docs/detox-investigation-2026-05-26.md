@@ -199,7 +199,7 @@ Hermes-only crashes are the canonical suspect.  Candidates:
    `boot.agent_wiring_failed` route in `agentBundle.js`.  In debug
    mode with Metro the JS reloads from source could be masking
    something.
-2. **`__DEV__`-gated code that flips behavior** — devLog defaults
+2. **`__DEV__`-gated code that flips behaviour** — devLog defaults
    to ON in `__DEV__`; in release `__DEV__ === false`.  Could cascade
    into something that assumed the dev path.
 3. **ProGuard / minification breaking** something — release builds

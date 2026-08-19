@@ -40,13 +40,13 @@ function decTail(p) { return p; }
 // injective key that `unclassify` maps back to `prefix`; `fn(circleId)`
 // = the pod-routing storage-function. `circle` rules require a circleId.
 const RULES = [
-  { family: 'g-items',   prefix: 'mem://neighborhood/items/',   circle: true,
+  { family: 'g-items',   prefix: 'mem://neighbourhood/items/',   circle: true,
     fn: (c) => `group/${c}/items` },
-  { family: 'g-members', prefix: 'mem://neighborhood/members/', circle: true,
+  { family: 'g-members', prefix: 'mem://neighbourhood/members/', circle: true,
     fn: (c) => `group/${c}/members` },
-  { family: 'g-gov',     prefix: 'mem://neighborhood/groups/',  circle: true,
+  { family: 'g-gov',     prefix: 'mem://neighbourhood/groups/',  circle: true,
     fn: (c) => `group/${c}/governance` },
-  { family: 'g-audit',   prefix: 'mem://neighborhood/audit/',   circle: true,
+  { family: 'g-audit',   prefix: 'mem://neighbourhood/audit/',   circle: true,
     fn: (c) => `group/${c}/audit` },
   // Attachments live under `mem://stoop/items/<id>/attachments/…`;
   // distinct family so the round-trip stays bijective vs g-items.
@@ -114,10 +114,10 @@ export function unclassify(storageFn, tail) {
     const rest = storageFn.slice('group/'.length);
     const sub  = rest.slice(rest.indexOf('/') + 1); // drop <circleId>/
     const decoded = decTail(tail);
-    if (sub === 'items')            return 'mem://neighborhood/items/'   + decoded;
-    if (sub === 'members')          return 'mem://neighborhood/members/' + decoded;
-    if (sub === 'governance')       return 'mem://neighborhood/groups/'  + decoded;
-    if (sub === 'audit')            return 'mem://neighborhood/audit/'   + decoded;
+    if (sub === 'items')            return 'mem://neighbourhood/items/'   + decoded;
+    if (sub === 'members')          return 'mem://neighbourhood/members/' + decoded;
+    if (sub === 'governance')       return 'mem://neighbourhood/groups/'  + decoded;
+    if (sub === 'audit')            return 'mem://neighbourhood/audit/'   + decoded;
     if (sub === 'item-attachments') return 'mem://stoop/items/'          + decoded;
   }
   return null;

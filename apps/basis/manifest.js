@@ -27,11 +27,11 @@ export const basisManifest = {
 
   operations: [
     /**
-     * `/help` — list every command available in the merged catalog.
+     * `/help` — list every command available in the merged catalogue.
      *
      * Chat-shell built-in (handled locally by the web entry; not
      * routed to any app agent).  The handler lives in
-     * `src/core/localBuiltins.js` and introspects the merged catalog
+     * `src/core/localBuiltins.js` and introspects the merged catalogue
      * to produce its reply, so it picks up new apps automatically.
      */
     {
@@ -349,7 +349,7 @@ export const basisManifest = {
 
     /**
      * `/apps` — v0.6 OQ-4.B chat-inline app-toggle.  Subcommands:
-     *   /apps             → list every catalog app + enabled state
+     *   /apps             → list every catalogue app + enabled state
      *   /apps on <name>   → enable an app
      *   /apps off <name>  → disable an app
      *

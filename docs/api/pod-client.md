@@ -706,7 +706,7 @@ remains (`force` bypasses); pure orchestration — pod I/O is injected via `shar
 - `a.controllerKey` `{ publicKey: string, privateKey: string }` — the agent's own keypair (always a recipient)
 - `[a.modes]` `string[]` — ACL modes granted to members (default read+write)
 - `[a.roster]` `Array<{webId,publicKey,role}>` — initial member roster
-- `[a.keyEventLog]` `{ append: (event:object) => any }` — optional log sink — when present, every key establishment/grant/rotation ALSO emits the versioned key AS a log key-event (self-distributing, no-pod). The pod key resource is still written (defense-in-depth); the LOG is the source. Absent → pod-only, unchanged.
+- `[a.keyEventLog]` `{ append: (event:object) => any }` — optional log sink — when present, every key establishment/grant/rotation ALSO emits the versioned key AS a log key-event (self-distributing, no-pod). The pod key resource is still written (defence-in-depth); the LOG is the source. Absent → pod-only, unchanged.
 - `[a.groupId]` `string` — circle id stamped onto emitted key-events.
 
 ## `src/sealing/envelope.js`
@@ -1748,7 +1748,7 @@ Apply an access policy to a resource, best-effort.
 - `opts.sharing` `{ grant: Function }` — a `client.sharing` namespace (`podClient.sharing`) OR any object exposing a compatible `grant`.
 - `opts.resourceUri` `string` — the resource to set access on.
 - `[opts.public]` `AccessFlags` — public (unauthenticated) access, e.g. `{ read: true }` for a shared-readable commons resource.
-- `[opts.agents]` `Record<string, AccessFlags>` — per-WebID grants, e.g. `{ 'https://…/card#me': { read: true, write: true } }` for a community catalog's circle admins.
+- `[opts.agents]` `Record<string, AccessFlags>` — per-WebID grants, e.g. `{ 'https://…/card#me': { read: true, write: true } }` for a community catalogue's circle admins.
 - `[opts.onError]` `(err: Error, ctx: object) => void` — invoked per failed grant (never throws out of here regardless).
 
 **Returns:** `Promise<{ resourceUri: string, applied: Array<{ subject: 'public'|'agent', agent?: string, modes: string[] }>, errors: Array<{ subject: 'public'|'agent', agent?: string, code?: string, message: string }>, }>`

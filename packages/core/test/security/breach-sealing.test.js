@@ -128,6 +128,6 @@ describe('§7.6 — hostile relay: confidentiality holds, sender unforgeable', (
     // The routing target IS visible to the relay (this is the metadata leak).
     expect(wire.targetPubKey).toBe(carol.pubKey);
     // (Drop/reorder are inherent to any relay holding the transport; not asserted
-    //  as a defense because there is none — see SECURITY-FINDINGS.)
+    //  as a defence because there is none — see SECURITY-FINDINGS.)
   });
 });

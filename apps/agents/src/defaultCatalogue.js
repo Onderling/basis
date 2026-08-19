@@ -1,10 +1,10 @@
 /**
- * agents — the DEFAULT catalog source (stub).
+ * agents — the DEFAULT catalogue source (stub).
  *
- * The curated catalog is a PLUGGABLE SOURCE behind a `{ list, get }`
+ * The curated catalogue is a PLUGGABLE SOURCE behind a `{ list, get }`
  * contract; installCores treats it as opaque data. This module ships a
  * local placeholder source so the install surface is exercisable
- * end-to-end before the real catalog exists.
+ * end-to-end before the real catalogue exists.
  *
  * ── commons-governance ─────────────────────────────────────────────────
  * The REAL curated source — who may publish, signing keys, review,
@@ -16,11 +16,11 @@
  *
  * An installable entry is an A2A Agent Card (+ `x-onderling`) per
  * SPEC-agents-registry — the same shape `projectAgentCard` emits — so a
- * catalog card and a registry-projection card are interchangeable.
+ * catalogue card and a registry-projection card are interchangeable.
  */
 
 /** Placeholder installable cards. NOT curated — a dev stand-in only. */
-export const STUB_CATALOG_CARDS = Object.freeze([
+export const STUB_CATALOGUE_CARDS = Object.freeze([
   Object.freeze({
     name:        'Summariser',
     description: 'Summarises long threads and documents on request.',
@@ -32,7 +32,7 @@ export const STUB_CATALOG_CARDS = Object.freeze([
     ]),
     authentication: Object.freeze({ schemes: Object.freeze(['Bearer']) }),
     'x-onderling': Object.freeze({
-      id:     'catalog:summariser',
+      id:     'catalogue:summariser',
       pubKey: 'pub-stub-summariser',
       role:   'service',
     }),
@@ -47,7 +47,7 @@ export const STUB_CATALOG_CARDS = Object.freeze([
     ]),
     authentication: Object.freeze({ schemes: Object.freeze(['Bearer']) }),
     'x-onderling': Object.freeze({
-      id:     'catalog:translator',
+      id:     'catalogue:translator',
       pubKey: 'pub-stub-translator',
       role:   'service',
     }),
@@ -55,13 +55,13 @@ export const STUB_CATALOG_CARDS = Object.freeze([
 ]);
 
 /**
- * createStubCatalog — a `{ list, get }` catalog source over a fixed card
+ * createStubCatalogue — a `{ list, get }` catalogue source over a fixed card
  * list. Keyed by `x-onderling.id` (legacy `x-onderling.id`, then agentId/pubKey).
  *
  * @param {Array<object>} [cards]  installable cards (defaults to the stub set)
  * @returns {{ list: () => Promise<object[]>, get: (id: string) => Promise<object|null> }}
  */
-export function createStubCatalog(cards = STUB_CATALOG_CARDS) {
+export function createStubCatalogue(cards = STUB_CATALOGUE_CARDS) {
   const idOf = (c) => c?.['x-onderling']?.id ?? c?.agentId ?? c?.['x-onderling']?.pubKey ?? c?.pubKey ?? null;
   const byId = new Map();
   for (const c of cards) {

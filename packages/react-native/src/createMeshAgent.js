@@ -57,7 +57,7 @@ import { loadRendezvousRtcLib }  from './transport/rendezvousRtcLib.js';
  * @param {object}  [opts.pod]                 — opt in to identity-as-pod-content sync (Track B).
  *                                              When present, builds Bootstrap + IdentityPodStore +
  *                                              IdentitySync and attaches them; absent = today's
- *                                              local-only Vault behavior is preserved unchanged
+ *                                              local-only Vault behaviour is preserved unchanged
  *                                              (Q-B.2 side-by-side migration, locked 2026-04-29).
  *                                              Shape: `{ webid, mnemonic, podClient, podRoot,
  *                                              intervalMs?, bootstrap? }`.  See

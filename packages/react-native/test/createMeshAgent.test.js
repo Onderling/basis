@@ -299,7 +299,7 @@ describe('createMeshAgent', () => {
   });
 
   // ── Track B / identity-as-pod-content wiring (opt-in via `pod`) ──────
-  // Q-B.2 side-by-side: absence of `pod` preserves today's behavior; presence
+  // Q-B.2 side-by-side: absence of `pod` preserves today's behaviour; presence
   // attaches IdentitySync + materializes the pod manifest before agent.start.
 
   it('does not attach identity wiring when `pod` opt is absent', async () => {

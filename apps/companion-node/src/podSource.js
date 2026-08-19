@@ -3,7 +3,7 @@
  *
  * Per PLAN-companion-node-remote-hosting.md §R1, R1 uses "the simplest real
  * path that proves the mesh": folio's existing dev pseudo-pod backend, NOT a
- * token-honoring bundled pod.  The `CapabilityAuth` / `PodCapabilityToken`
+ * token-honouring bundled pod.  The `CapabilityAuth` / `PodCapabilityToken`
  * `pod-direct` delegation (Option A) is explicitly R1.5/R2's concern.
  *
  * We reuse folio's own `FsBackedMockPodClient` (the in-memory pod client its

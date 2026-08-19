@@ -2,7 +2,7 @@
   "name": "@onderling-app/stoop",
   "version": "0.2.0",
   "private": true,
-  "description": "Stoop \u2014 neighbourhood-skill-app. V2 of the H5 / neighborhood-v0 closed-group skill-matchmaking app, renamed 2026-05-06.",
+  "description": "Stoop \u2014 neighbourhood-skill-app. V2 of the H5 / neighbourhood-v0 closed-group skill-matchmaking app, renamed 2026-05-06.",
   "type": "module",
   "main": "src/index.js",
   "exports": {

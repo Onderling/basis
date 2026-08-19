@@ -1,8 +1,8 @@
 /**
- * contactSkills — contact/bot exposed-skill → catalog bridge
+ * contactSkills — contact/bot exposed-skill → catalogue bridge
  * (feedback-extension, Mode-1 "bot-exposed skills").
  *
- * DESIGN-feedback-extension §1.2 (the SCOPED CATALOG) gives every entry a
+ * DESIGN-feedback-extension §1.2 (the SCOPED CATALOGUE) gives every entry a
  * `scope` ∈ {app, circle, contact-thread} + a `binding` ∈
  * {local-op, composite, remote-skill@contact}. A **remote-skill** entry is
  * ALWAYS contact-thread-scoped: its handler is a particular contact's bot,
@@ -13,7 +13,7 @@
  *
  *   1. a `mergeManifests`-ready manifest (`skillCardsToManifest`), one op per
  *      card, carrying the `remote-skill@contact` binding shape that
- *      `mappings.js` `verifyMapping` already SKIPS (the catalog gate doesn't
+ *      `mappings.js` `verifyMapping` already SKIPS (the catalogue gate doesn't
  *      vouch for a bot's skill — the contact-thread bridge does);
  *   2. a `callSkill` (`makeRemoteCallSkill`) that ROUTES a dispatch of one of
  *      those ops to the bot via an injected `sendA2ATask` (so it's testable
@@ -30,7 +30,7 @@ import { validateManifest } from '@onderling/app-manifest';
 
 /** The binding tag a remote (bot-exposed) skill op carries. */
 export const REMOTE_SKILL_BINDING = 'remote-skill@contact';
-/** The catalog scope a contact's exposed skills live in. */
+/** The catalogue scope a contact's exposed skills live in. */
 export const CONTACT_THREAD_SCOPE = 'contact-thread';
 
 /**
@@ -51,7 +51,7 @@ export function contactManifestApp(contactId) {
 }
 
 /**
- * Synthesize the catalog op for ONE discovered SkillCard. The op carries the
+ * Synthesize the catalogue op for ONE discovered SkillCard. The op carries the
  * SAME binding shape `verifyMapping` skips (`binding: 'remote-skill@contact'`
  * AND `bindRef.skillId`), a `contact-thread` scope tag, and a `/`-prefixed
  * slash surface so the skill is invocable as `/<skillId>`.
@@ -108,7 +108,7 @@ export function skillCardsToManifest(contactId, skillCards) {
  *
  * The `scope` + `contactId` tags ride ALONGSIDE the standard `{ manifest }`
  * shape `mergeManifests` reads; `mergeManifests` ignores the extra keys
- * (forward-additive), while the live wiring can use them to know which catalog
+ * (forward-additive), while the live wiring can use them to know which catalogue
  * entries belong to which contact thread.
  *
  * @param {string} contactId
@@ -138,7 +138,7 @@ export function contactSkillSources(contactId, skillCards) {
  * The op → skillId map comes from `opsResolver`: either a `Map`/object keyed by
  * opId, or a function `(opId) -> op`. By default it reads the manifest this
  * module synthesised for `contactId`, so a caller can wire it from just the
- * cards. Passing the merged catalog's lookup keeps it aligned with what the
+ * cards. Passing the merged catalogue's lookup keeps it aligned with what the
  * router actually dispatches.
  *
  * Routing is GATED to this contact: a dispatch for an op that isn't one of this

@@ -7,7 +7,7 @@
  * an appliesTo gate in renderChat.
  *
  * Lives in basis-mobile/test/ rather than packages/app-manifest
- * because the merged catalog already pulls every consumed manifest
+ * because the merged catalogue already pulls every consumed manifest
  * through composeManifests + buildManifestsByOrigin — exactly the
  * union the dispatcher sees at runtime.  No need to import each app
  * individually here.
@@ -85,17 +85,17 @@ describe('#240 manifest convergence — canonical shapes', () => {
     expect(violations).toEqual([]);
   });
 
-  it('the composed catalog still validates clean (no new warnings from this slice)', () => {
-    // The merged catalog should not surface any UNEXPECTED warnings.  Benign
+  it('the composed catalogue still validates clean (no new warnings from this slice)', () => {
+    // The merged catalogue should not surface any UNEXPECTED warnings.  Benign
     // collision warnings are the documented first-mount-wins policy:
     //   - op-id collisions (e.g. startDm in both basis + stoop) →
     //     prefixed as `<app>/<op>`.
     //   - slash collisions (Part G 2026-06-17: the REAL household shares
     //     generic commands like `/help`, `/claim`, `/done` with basis /
     //     tasks; first-mount keeps the command).  These are policy, not bugs.
-    const catalog  = composeManifests();
+    const catalogue  = composeManifests();
     const benign = /(op-id|slash) collision: ".+" (also declared|declared) by/;
-    const unexpected = (catalog.warnings ?? []).filter((w) => !benign.test(w));
+    const unexpected = (catalogue.warnings ?? []).filter((w) => !benign.test(w));
     expect(unexpected).toEqual([]);
   });
 });

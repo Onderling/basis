@@ -1079,7 +1079,7 @@ header .lang-toggle { margin: 0.4rem 0 0; font-size: 0.8rem; color: var(--fg-mut
      their own line even when many messages cluster.  display:block
      alone wasn't always enough — adjacent absolute/inline blocks
      could still pack horizontally if the parent had flex-row.  Add
-     an explicit clear + width:100% as defense in depth. */
+     an explicit clear + width:100% as defence in depth. */
   clear: both;
   width:  100%;
 }

@@ -4,10 +4,10 @@
  * Some ops declared on basis's own manifest (`/help` today,
  * `/brief` + `/threads` in later phases) don't dispatch to any
  * app agent.  They're handled LOCALLY by the chat shell: the
- * handler reads from the merged catalog + chat-shell state and
+ * handler reads from the merged catalogue + chat-shell state and
  * returns a regular skill payload.
  *
- * Pattern: pass `catalog` + `t` into `createLocalBuiltins`; the
+ * Pattern: pass `catalogue` + `t` into `createLocalBuiltins`; the
  * returned object maps `(opId) → handler(args) → payload`.
  * `web/main.js` checks `appOrigin === 'basis'` in callSkill
  * and routes to one of these handlers; everything else goes to the
@@ -39,19 +39,19 @@ async function parseDateLazy(input) {
  * Build the local-builtins dispatcher.
  *
  * @param {object} deps
- * @param {import('../manifestMerge.js').MergedCatalog} deps.catalog
+ * @param {import('../manifestMerge.js').MergedCatalogue} deps.catalogue
  * @param {(key: string, params?: object) => string}   deps.t
  * @param {import('../threadStore.js').ThreadStore}    [deps.threadStore]
  *   Required for /newthread and /threads.
  * @param {(threadId: string) => void}                 [deps.setActive]
  *   Called by /newthread to switch active thread to the new one.
  * @param {(appOrigin: string, opId: string, args: object) => Promise<*>} [deps.callSkill]
- *   Required for /embed — fetches the snapshot via the catalog's
+ *   Required for /embed — fetches the snapshot via the catalogue's
  *   declaration.
  * @returns {{[opId: string]: (args: object) => Promise<*>}}
  */
 export function createLocalBuiltins({
-  catalog, t, threadStore, setActive, callSkill, localActor,
+  catalogue, t, threadStore, setActive, callSkill, localActor,
   simPeers,                  // v0.5.6 — { '<peer>': { threadId, webid } }
   appRegistry,               // v0.6 OQ-4.B
   externalFlow,              // v0.6.2 — { open, getActiveThreadId, mockSigninUrl }
@@ -72,22 +72,22 @@ export function createLocalBuiltins({
   storeMediaItem,             // media — item-store seam for the `media` item; optional (absent ⇒ item rides on the embed)
 }) {
   return {
-    help: async () => formatHelp(catalog, t),
+    help: async () => formatHelp(catalogue, t),
     newthread: async (args) => createNewThread(args, { threadStore, setActive, t }),
     threads:   async ()     => listThreads({ threadStore, t }),
     // dm <webid> opens a DM thread with the given peer.
     // Same outcome as the [DM] row button (which intercepts in main.js).
     startDm:   async (args) => createDmThread(args, { threadStore, setActive, t }),
-    embed:     async (args) => createEmbed(args, { catalog, callSkill, t, localActor }),
+    embed:     async (args) => createEmbed(args, { catalogue, callSkill, t, localActor }),
     'embed-file': async (args) => createFileEmbed(args, {
       localActor, t, simPeers, threadStore, callSkill, openFilePicker,
       mediaGateway, encodeImage, storeMediaItem,
     }),
     'embed-time': async (args) => createTimeEmbed(args, { localActor, t, simPeers, threadStore, callSkill }),
     sendto:    async (args) => sendToPeer(args, {
-      catalog, callSkill, t, localActor, simPeers, threadStore,
+      catalogue, callSkill, t, localActor, simPeers, threadStore,
     }),
-    apps:      async (args) => appsToggle(args, { catalog, appRegistry, t }),
+    apps:      async (args) => appsToggle(args, { catalogue, appRegistry, t }),
     // v0.7.5 / v0.7.1c — also expose openLogsPanel reachable to
     // handlers (currently only used by /logs but reads well at this
     // layer).
@@ -816,7 +816,7 @@ async function signOutFlow(_args, { podAuth, t, onSignOut }) {
  * Bare call lists apps + enabled state.  With action+name, toggles
  * and reports.
  */
-async function appsToggle(args, { catalog, appRegistry, t }) {
+async function appsToggle(args, { catalogue, appRegistry, t }) {
   if (!appRegistry) return { ok: false, error: t('apps.no_registry') };
 
   // Positional binding: '/apps off stoop' parses to args._match='off stoop'
@@ -831,7 +831,7 @@ async function appsToggle(args, { catalog, appRegistry, t }) {
   if (!action) {
     // List mode.
     const lines = [t('apps.heading')];
-    const origins = catalog?.appOrigins ?? [];
+    const origins = catalogue?.appOrigins ?? [];
     for (const origin of origins) {
       const on = appRegistry.isEnabled(origin) ? '●' : '○';
       lines.push(`  ${on} ${origin}`);
@@ -860,7 +860,7 @@ async function appsToggle(args, { catalog, appRegistry, t }) {
  * `/send-to <peer> <itemId>` — v0.5.6 simulated cross-peer demo.
  *
  * Resolves the peer's destination thread from simPeers, builds an
- * embed against the catalog's factory (same path as /embed),
+ * embed against the catalogue's factory (same path as /embed),
  * then appends a synthesised embed-card shell message DIRECTLY to
  * the peer's thread.  Returns a text confirmation in the sender's
  * active thread.
@@ -868,7 +868,7 @@ async function appsToggle(args, { catalog, appRegistry, t }) {
  * This fakes the round-trip in a single browser tab.  Real cross-
  * peer delivery rides on the hosting app's chat surface (per v0.5.3).
  */
-async function sendToPeer(args, { catalog, callSkill, t, localActor, simPeers, threadStore }) {
+async function sendToPeer(args, { catalogue, callSkill, t, localActor, simPeers, threadStore }) {
   const peer   = String(args?.peer ?? '').trim();
   const itemId = String(args?.itemId ?? '').trim();
   if (!peer)   return { ok: false, error: t('sendto.no_peer') };
@@ -887,8 +887,8 @@ async function sendToPeer(args, { catalog, callSkill, t, localActor, simPeers, t
   // the destination thread renders the [Claim] button because the
   // recipient (peer) is NOT the issuer.
   let snapshotSkill = null, snapshotAppOrigin = null;
-  for (const [opId] of catalog.opsById) {
-    const decl = catalog.embedSnapshotFor?.(opId);
+  for (const [opId] of catalogue.opsById) {
+    const decl = catalogue.embedSnapshotFor?.(opId);
     if (decl) { snapshotSkill = decl.snapshotSkill; snapshotAppOrigin = decl.appOrigin; break; }
   }
   if (!snapshotSkill) return { ok: false, error: t('embed.no_factory') };
@@ -1219,7 +1219,7 @@ function parseDuration(text) {
 }
 
 /**
- * `/embed <itemId>` — scan the merged catalog for ops that declare
+ * `/embed <itemId>` — scan the merged catalogue for ops that declare
  * a cardSnapshotSkill, fetch a snapshot, and return an embed
  * card reply.
  *
@@ -1233,7 +1233,7 @@ function parseDuration(text) {
  * envelope; the source app delivers.  Not in basis's scope
  * to compose @onderling/chat-p2p directly (per v0.5.3 audit).
  */
-async function createEmbed(args, { catalog, callSkill, t, localActor }) {
+async function createEmbed(args, { catalogue, callSkill, t, localActor }) {
   // Parse args — supports both flag-style (--claim) and bare itemId.
   // The router's flag parser already split these for `/embed`; if
   // the user typed `/embed c-1 --claim`, args.itemId='c-1' and
@@ -1249,8 +1249,8 @@ async function createEmbed(args, { catalog, callSkill, t, localActor }) {
 
   let snapshotSkill = null;
   let snapshotAppOrigin = null;
-  for (const [opId, entry] of catalog.opsById) {
-    const decl = catalog.embedSnapshotFor?.(opId);
+  for (const [opId, entry] of catalogue.opsById) {
+    const decl = catalogue.embedSnapshotFor?.(opId);
     if (decl) {
       snapshotSkill     = decl.snapshotSkill;
       snapshotAppOrigin = decl.appOrigin;
@@ -1369,12 +1369,12 @@ function listThreads({ threadStore, t }) {
  * commands by appOrigin so the user can see at a glance which app
  * owns what.
  *
- * @param {import('../manifestMerge.js').MergedCatalog} catalog
+ * @param {import('../manifestMerge.js').MergedCatalogue} catalogue
  * @param {(key: string, params?: object) => string}   t
  * @returns {{ message: string }}
  */
-function formatHelp(catalog, t) {
-  const commands = catalog?.commandMenu ?? [];
+function formatHelp(catalogue, t) {
+  const commands = catalogue?.commandMenu ?? [];
   if (commands.length === 0) {
     return { message: t('help.empty') };
   }
@@ -1383,7 +1383,7 @@ function formatHelp(catalog, t) {
   /** @type {Map<string, Array<{command: string, opId: string, hint: string}>>} */
   const byOrigin = new Map();
   for (const entry of commands) {
-    const op   = catalog.opsById?.get(entry.opId)?.op;
+    const op   = catalogue.opsById?.get(entry.opId)?.op;
     const hint = op?.surfaces?.chat?.hint ?? op?.id ?? '';
     const arr  = byOrigin.get(entry.appOrigin) ?? [];
     arr.push({ command: entry.command, opId: entry.opId, hint });

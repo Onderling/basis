@@ -21,15 +21,15 @@ const WHAT_IF_DENY = 'Nothing is added or changed — you can open the link agai
 
 /**
  * Build the plain consent-card model from a mapping, AFTER the sandbox check.
- * If the mapping references opIds not in the catalog it is refused (`ok:false`
+ * If the mapping references opIds not in the catalogue it is refused (`ok:false`
  * + the missing refs); otherwise the card enumerates exactly what it can do.
  *
  * @param {import('@onderling/pod-routing').Mapping} mapping
- * @param {{ opsById: Map<string, object> }} catalog
+ * @param {{ opsById: Map<string, object> }} catalogue
  * @returns {{ ok: boolean, missing: string[], card: object|null }}
  */
-export function buildConsentModel(mapping, catalog) {
-  const { ok, missing } = verifyMapping(mapping, catalog);
+export function buildConsentModel(mapping, catalogue) {
+  const { ok, missing } = verifyMapping(mapping, catalogue);
   if (!ok) return { ok: false, missing, card: null };
 
   const commands = (mapping?.ops ?? []).map((op) => ({
@@ -58,8 +58,8 @@ export function buildConsentModel(mapping, catalog) {
  *
  * @returns {Promise<{ ok: boolean, missing?: string[], uri?: string }>}
  */
-export async function installMapping({ store, deviceId, mapping, catalog }) {
-  const { ok, missing } = verifyMapping(mapping, catalog);
+export async function installMapping({ store, deviceId, mapping, catalogue }) {
+  const { ok, missing } = verifyMapping(mapping, catalogue);
   if (!ok) return { ok: false, missing };
   const res = await writeMapping({ pseudoPod: store, deviceId, mapping });
   return { ok: true, uri: res.uri };

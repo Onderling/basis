@@ -16,9 +16,9 @@
  *                                         a specific shape)
  *
  * Resolution: after a successful dispatch (`reply.error` absent),
- * `collectFollowUps(opId, appOrigin, reply, catalog)` returns the
+ * `collectFollowUps(opId, appOrigin, reply, catalogue)` returns the
  * combined list of:
- *   Per-op hints from the catalog (same-app)
+ *   Per-op hints from the catalogue (same-app)
  *   - Cross-app chains from this registry whose `trigger` matches
  *
  * Phase v0.4 per `/Project Files/basis/coding-plan.md`.
@@ -84,17 +84,17 @@ export const DEFAULT_CROSS_APP_CHAINS = [
  * @param {object}        [opts]
  * @param {CrossAppChain[]} [opts.chains]
  * @returns {(opId: string, appOrigin: string, reply: object,
- *            catalog: import('./manifestMerge.js').MergedCatalog)
+ *            catalogue: import('./manifestMerge.js').MergedCatalogue)
  *           => FollowUpEntry[]}
  */
 export function createFollowUpResolver({ chains } = {}) {
   const chainList = Array.isArray(chains) ? chains : DEFAULT_CROSS_APP_CHAINS;
 
-  return function collectFollowUps(opId, appOrigin, reply, catalog) {
+  return function collectFollowUps(opId, appOrigin, reply, catalogue) {
     const out = [];
 
-    // (1) Per-op hints (from the catalog's followUpsFor lookup).
-    const perOp = catalog?.followUpsFor?.(opId);
+    // (1) Per-op hints (from the catalogue's followUpsFor lookup).
+    const perOp = catalogue?.followUpsFor?.(opId);
     if (Array.isArray(perOp)) {
       for (const hint of perOp) {
         // Per-op hints are same-app by default; appOrigin = trigger's.
@@ -130,11 +130,11 @@ export function createFollowUpResolver({ chains } = {}) {
  * @param {string} opId
  * @param {string} appOrigin
  * @param {object} reply
- * @param {import('./manifestMerge.js').MergedCatalog} catalog
+ * @param {import('./manifestMerge.js').MergedCatalogue} catalogue
  * @returns {FollowUpEntry[]}
  */
-export function collectFollowUps(opId, appOrigin, reply, catalog) {
-  return createFollowUpResolver()(opId, appOrigin, reply, catalog);
+export function collectFollowUps(opId, appOrigin, reply, catalogue) {
+  return createFollowUpResolver()(opId, appOrigin, reply, catalogue);
 }
 
 function dedupe(entries) {

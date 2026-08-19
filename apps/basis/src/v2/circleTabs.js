@@ -8,19 +8,19 @@
  *
  *   chat            → CONVERSATION   (always present + first)
  *   noticeboard     → NOTICEBOARD
- *   tasks           → TAKEN
- *   lists           → LIJSTEN
- *   notes           → NOTITIES
- *   calendar        → AGENDA
+ *   tasks           → TASKS
+ *   lists           → LISTS
+ *   notes           → NOTES
+ *   calendar        → CALENDAR
  *   memberDirectory → MEMBERS     (always rendered last when on)
  *
  * `houseRules` doesn't get a tab — it lives in the circle header's
- * overflow `⋯` menu as "Huisregels" (per).
+ * overflow `⋯` menu as the house rules (per).
  *
  * Boards in `Onderling interface · v2 — circle als bouwsteen · print.pdf`:
  *   - Example 1 · NEIGHBOURHOOD     → CONVERSATION / NOTICEBOARD / MEMBERS
- *   - Example 2 · HUISHOUDEN → CONVERSATION / TAKEN / LIJSTEN
- *   - Example 3 · PRIVÉ     → CONVERSATION / NOTITIES / TAKEN
+ *   - Example 2 · HOUSEHOLD → CONVERSATION / TASKS / LISTS
+ *   - Example 3 · PRIVATE   → CONVERSATION / NOTES / TASKS
  *
  * Pure: hosts pass a policy + `t`, get back `[{id, labelKey, label}]`
  * in render order.  CONVERSATION is always the first tab so users always

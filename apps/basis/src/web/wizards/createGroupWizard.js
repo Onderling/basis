@@ -17,7 +17,7 @@
  * everything).  Custom renderer in main.js's WIZARD_RENDERERS map.
  */
 
-// Policy catalogs + state helpers moved to
+// Policy catalogues + state helpers moved to
 // ../../core/wizards/createGroupState.js so basis
 // mobile's RN wizard can reuse them.
 import {

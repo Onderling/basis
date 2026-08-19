@@ -51,7 +51,7 @@ These mean the chat surface and the real handler disagree — a dispatch can fai
      Param vocab → real skill: `rejectTask` declares `note` (was `reason`); the redundant realAgent vocab
      bridges (rejectTask reason→note, submitTask note-default) were REMOVED. The SEMANTIC aliases
      (`listMine`/`getMyTasks`→`listOpen`, `myInbox`→`listMyInbox`) + `adaptTasksReply` were KEPT — intentional
-     product behavior, not drift. web `b12aca7e` + mobile `7f3fbcd7`; tasks-v0 703 / basis 2693 green.
+     product behaviour, not drift. web `b12aca7e` + mobile `7f3fbcd7`; tasks-v0 703 / basis 2693 green.
 2. **stoop + household** (slash duplicated + param drift):
    - **stoop — ✅ DONE 2026-06-17 (`e488df9a`).** Same pattern as tasks (one manifest + kept adapter); NO app-origin
      migration (both `app:'stoop'`). Merged the two slash grammars with **richer-slash-wins**; real param vocab

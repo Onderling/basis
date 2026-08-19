@@ -13,22 +13,22 @@ import { clarifyCommandTargets } from './clarifyTargets.js';
 
 /**
  * @param {object} a
- * @param {() => object} a.catalog                                     getter for the current catalog
+ * @param {() => object} a.catalogue                                     getter for the current catalogue
  * @param {(listOp:string, query:string, scope:object)=>any[]|Promise<any[]>} a.lookup  circle-scoped candidate search
  * @param {(cmd:{opId:string,args:object}, scope:object)=>any|Promise<any>} a.dispatchReady  dispatch a fully-resolved command
  * @param {(q:{opId:string,param:string,query:string,candidates:Array<{id,label,hint?}>}, scope:object)=>any|Promise<any>} a.ask  present the "which one?" question
  * @param {(m:{opId:string,param:string,query:string}, scope:object)=>any|Promise<any>} [a.askMissing]  required target not found
  */
-export function createClarifyingDispatch({ catalog, lookup, dispatchReady, ask, askMissing }) {
+export function createClarifyingDispatch({ catalogue, lookup, dispatchReady, ask, askMissing }) {
   if (typeof dispatchReady !== 'function' || typeof ask !== 'function') {
     throw new Error('createClarifyingDispatch: dispatchReady + ask are required');
   }
-  const getCatalog = typeof catalog === 'function' ? catalog : () => catalog;
+  const getCatalogue = typeof catalogue === 'function' ? catalogue : () => catalogue;
   const pending = new Map();                                  // scopeKey → {opId, args, param}
   const keyOf = (scope) => (scope && (scope.id ?? scope)) ?? '_';
 
   async function run(command, scope = {}) {
-    const r = await clarifyCommandTargets(command, { catalog: getCatalog(), lookup, scope });
+    const r = await clarifyCommandTargets(command, { catalogue: getCatalogue(), lookup, scope });
     if (r.kind === 'ready') {
       pending.delete(keyOf(scope));
       await dispatchReady({ opId: r.opId, args: r.args, appOrigin: r.appOrigin }, scope);

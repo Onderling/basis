@@ -6,7 +6,7 @@
  * imports (`src/core/confirmDispatch.js` — the shared confirmGate bound
  * to an injected `Alert.alert`), matching how the other mobile screen
  * tests assert models rather than native renders (vitest excludes
- * src/screens entirely).  The catalog is mobile's OWN composition
+ * src/screens entirely).  The catalogue is mobile's OWN composition
  * (`composeManifests`), so the fixtures are the real merged danger ops:
  * agents revokeAgent / purgeAgent / restoreDataVersion.
  *
@@ -22,7 +22,7 @@ import { composeManifests } from '../src/core/composeManifests.js';
 import { runConfirmGate, confirmRequestFromRoute, alertConfirmPresenter } from '../src/core/confirmDispatch.js';
 import { agentsManifest } from '../../agents/manifest.js';
 
-const catalog = composeManifests();
+const catalogue = composeManifests();
 const t = (k) => k;
 
 /** The three danger ops with COMPLETE args (so needsForm can't front the gate). */
@@ -34,7 +34,7 @@ const DANGER_FIXTURES = [
 
 function routeFor({ opId, args }) {
   // The exact resolve call runCircleCommandResolved makes (appOrigin hint included).
-  return resolveDispatch({ kind: 'slash', opId, args, appOrigin: 'agents', command: '(bot)', body: '' }, catalog);
+  return resolveDispatch({ kind: 'slash', opId, args, appOrigin: 'agents', command: '(bot)', body: '' }, catalogue);
 }
 
 /** A fake Alert.alert that records the call and lets the test press a button. */
@@ -102,7 +102,7 @@ describe('the full mobile chain — gate + Alert presenter + dispatch', () => {
       const execute = vi.fn();
       const onCancelNotice = vi.fn();
       const run = runConfirmGate({
-        route: routeFor(fx), catalog, t,
+        route: routeFor(fx), catalogue, t,
         present: alertConfirmPresenter(alert), execute, onCancelNotice,
       });
       last().buttons[1].onPress();      // the destructive accept
@@ -120,7 +120,7 @@ describe('the full mobile chain — gate + Alert presenter + dispatch', () => {
       const execute = vi.fn();
       const onCancelNotice = vi.fn();
       const run = runConfirmGate({
-        route: routeFor(fx), catalog, t,
+        route: routeFor(fx), catalogue, t,
         present: alertConfirmPresenter(alert), execute, onCancelNotice,
       });
       last().buttons[0].onPress();      // cancel

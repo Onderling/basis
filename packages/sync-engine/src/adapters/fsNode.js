@@ -1,7 +1,7 @@
 /**
  * fsNode — the default `FsAdapter` for SyncEngine + helpers.
  *
- * Wraps `node:fs/promises` 1:1 so behavior across Folio's existing tests
+ * Wraps `node:fs/promises` 1:1 so behaviour across Folio's existing tests
  * is byte-for-byte identical.  The purpose of the wrapper is purely to
  * satisfy the adapter contract (so the engine code can swap in the RN
  * adapter at runtime) — there is no transformation here.

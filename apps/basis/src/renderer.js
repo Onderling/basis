@@ -1,7 +1,7 @@
 /**
  * basis — renderer.
  *
- * Takes a `Reply` envelope (from `dispatch.js`) + the merged catalog
+ * Takes a `Reply` envelope (from `dispatch.js`) + the merged catalogue
  * and produces a platform-neutral `RenderedReply` data structure.
  * The DOM / RN adapter consumes this; v0.1 emits the data structure
  * so headless tests can verify rendering without a browser.

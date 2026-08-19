@@ -10,7 +10,7 @@
  *
  * All 7 wizards landed 2026-05-26 — same opIds as web's map.
  *
- * Relative-path imports because Metro doesn't honor pkg.json
+ * Relative-path imports because Metro doesn't honour pkg.json
  * subpath exports (same pattern as hostOps.js, agentBundle.js).
  */
 import { flowForOp } from '../../../basis/src/v2/pageProjection.js';

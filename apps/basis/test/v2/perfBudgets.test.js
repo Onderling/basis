@@ -14,9 +14,9 @@ import {
   DEFAULT_CIRCLE_ORIGINS,
 } from '../../src/v2/circleSources.js';
 
-// ── Perf #2: catalog-aware resolver short-circuits ─────────────────
+// ── Perf #2: catalogue-aware resolver short-circuits ─────────────────
 
-describe('makeResolvingCallSkill — catalog short-circuit (Perf #2)', () => {
+describe('makeResolvingCallSkill — catalogue short-circuit (Perf #2)', () => {
   function makeSpy() {
     const calls = [];
     return {
@@ -30,21 +30,21 @@ describe('makeResolvingCallSkill — catalog short-circuit (Perf #2)', () => {
     };
   }
 
-  it('no catalog → probes EVERY origin (legacy behaviour preserved)', async () => {
+  it('no catalogue → probes EVERY origin (legacy behaviour preserved)', async () => {
     const spy = makeSpy();
     const call = makeResolvingCallSkill(spy.raw);
     await call('listNotes', {});
     expect(spy.calls.length).toBe(DEFAULT_CIRCLE_ORIGINS.length);
   });
 
-  it('catalog → only probes origins that declare the op', async () => {
+  it('catalogue → only probes origins that declare the op', async () => {
     const spy = makeSpy();
-    const catalog = {
+    const catalogue = {
       opsById: new Map([
         ['listNotes', { op: { id: 'listNotes' }, appOrigin: 'tasks' }],
       ]),
     };
-    const call = makeResolvingCallSkill(spy.raw, DEFAULT_CIRCLE_ORIGINS, catalog);
+    const call = makeResolvingCallSkill(spy.raw, DEFAULT_CIRCLE_ORIGINS, catalogue);
     await call('listNotes', {});
     // Exactly one probe (tasks-v0), zero wasted probes on stoop / household /
     // calendar / folio.  Replaces 5 probes with 1.
@@ -52,25 +52,25 @@ describe('makeResolvingCallSkill — catalog short-circuit (Perf #2)', () => {
     expect(spy.calls[0].origin).toBe('tasks');
   });
 
-  // An op UNKNOWN to the catalog falls back to probing every origin (9fe27799): the catalog gate is a perf
+  // An op UNKNOWN to the catalogue falls back to probing every origin (9fe27799): the catalogue gate is a perf
   // HINT, not a hard filter — agent skills absent from the manifest must still resolve. The perf win lives in
   // the KNOWN-op short-circuit above; circleSourcesGate.test.js covers the agent-skill fallback end-to-end.
-  it('catalog with an UNKNOWN op → falls back to probing every origin (gate is a hint, not a filter)', async () => {
+  it('catalogue with an UNKNOWN op → falls back to probing every origin (gate is a hint, not a filter)', async () => {
     const spy = makeSpy();
-    const catalog = { opsById: new Map() };   // op declared nowhere
-    const call = makeResolvingCallSkill(spy.raw, DEFAULT_CIRCLE_ORIGINS, catalog);
+    const catalogue = { opsById: new Map() };   // op declared nowhere
+    const call = makeResolvingCallSkill(spy.raw, DEFAULT_CIRCLE_ORIGINS, catalogue);
     await call('aspirational-op', {});
     expect(spy.calls).toHaveLength(DEFAULT_CIRCLE_ORIGINS.length);
   });
 
   it('respects the prefixed-key form `<origin>/<opId>`', async () => {
     const spy = makeSpy();
-    const catalog = {
+    const catalogue = {
       opsById: new Map([
         ['stoop/getBulletin', { op: { id: 'getBulletin' }, appOrigin: 'stoop' }],
       ]),
     };
-    const call = makeResolvingCallSkill(spy.raw, DEFAULT_CIRCLE_ORIGINS, catalog);
+    const call = makeResolvingCallSkill(spy.raw, DEFAULT_CIRCLE_ORIGINS, catalogue);
     await call('getBulletin', {});
     expect(spy.calls).toHaveLength(1);
     expect(spy.calls[0].origin).toBe('stoop');
@@ -86,13 +86,13 @@ describe('makeResolvingCallSkill — catalog short-circuit (Perf #2)', () => {
         return null;
       },
     };
-    const catalog = {
+    const catalogue = {
       opsById: new Map([
         ['stoop/x',    { op: { id: 'x' }, appOrigin: 'stoop'    }],
         ['tasks-v0/x', { op: { id: 'x' }, appOrigin: 'tasks' }],
       ]),
     };
-    const call = makeResolvingCallSkill(spy.raw, DEFAULT_CIRCLE_ORIGINS, catalog);
+    const call = makeResolvingCallSkill(spy.raw, DEFAULT_CIRCLE_ORIGINS, catalogue);
     const r = await call('x', {});
     expect(r).toEqual({ items: ['hit'] });
     expect(spy.calls).toHaveLength(1);

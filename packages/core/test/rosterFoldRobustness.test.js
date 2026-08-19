@@ -3,7 +3,7 @@
  * plans/REVIEW-33-deps-dag.md). The fold's comments CLAIM these properties; nothing pinned them:
  *   1. a DANGLING dep (a forged / not-yet-seen hash) never breaks determinism or drops the statement;
  *   2. DUPLICATE statements fold idempotently (redelivery is free);
- *   3. a GAP that fills later re-folds to the complete answer, and the gapped fold is DENY-FAVORING —
+ *   3. a GAP that fills later re-folds to the complete answer, and the gapped fold is DENY-FAVOURING —
  *      omission can hide a re-admission (deny) but never an eviction (admit) — the "lying by omission is
  *      safe" argument, tested instead of asserted;
  *   4. a FORGED item in the store can poison a victim's frontier only into a dangling dep — verify drops the
@@ -62,7 +62,7 @@ describe('robustness 2 — duplicate statements (redelivery)', () => {
   });
 });
 
-describe('robustness 3 — a gap that fills later (offline catch-up), and deny-favoring omission', () => {
+describe('robustness 3 — a gap that fills later (offline catch-up), and deny-favouring omission', () => {
   it('re-folding once the missing statement arrives converges to the complete answer', async () => {
     const { founder, bob } = await ids();
     const join   = body(bob, 'join', bob);
@@ -74,7 +74,7 @@ describe('robustness 3 — a gap that fills later (offline catch-up), and deny-f
     const gapped  = foldRoster([join, evict], { founders: [founder.pubKey] });
     const refolded = foldRoster([join, evict, rejoin], { founders: [founder.pubKey] });
     expect(JSON.stringify(refolded)).toBe(JSON.stringify(complete));
-    // DENY-FAVORING: what the gap HID was a re-admission — so the gapped view showed bob OUT (deny), never
+    // DENY-FAVOURING: what the gap HID was a re-admission — so the gapped view showed bob OUT (deny), never
     // wrongly IN. Omission can only under-admit, never over-admit: that is why lost delivery is safe-degrade.
     expect(gapped.members).not.toContain(bob.pubKey);
   });

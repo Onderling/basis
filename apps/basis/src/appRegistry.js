@@ -2,7 +2,7 @@
  * basis — app-toggle registry.
  *
  * Per OQ-4.B user resolution (2026-05-23): apps in the merged
- * catalog can be toggled on/off from chat-inline.  Disabled apps'
+ * catalogue can be toggled on/off from chat-inline.  Disabled apps'
  * ops disappear from `/help`, fail dispatch with a friendly error,
  * and their notifications stop routing.
  *
@@ -39,13 +39,13 @@ export class AppRegistry {
   }
 
   /**
-   * Set the known appOrigins (called when the catalog is rebuilt).
+   * Set the known appOrigins (called when the catalogue is rebuilt).
    * Apps not in the list lose their state.  New apps default to
    * enabled.
    *
    * @param {string[]} appOrigins
    */
-  syncWithCatalog(appOrigins) {
+  syncWithCatalogue(appOrigins) {
     if (!Array.isArray(appOrigins)) return;
     const known = new Set(appOrigins);
     for (const k of [...this.#state.keys()]) {
@@ -60,7 +60,7 @@ export class AppRegistry {
   /** @param {string} appOrigin */
   isEnabled(appOrigin) {
     // Unknown app → treat as enabled (forward-additive; new apps that
-    // enter the catalog before sync are usable immediately).
+    // enter the catalogue before sync are usable immediately).
     if (!this.#state.has(appOrigin)) return true;
     return this.#state.get(appOrigin) === true;
   }
@@ -109,26 +109,26 @@ export class AppRegistry {
 }
 
 /**
- * Filter a merged catalog by the registry's enabled-set.  Returns
- * a NEW catalog with disabled apps' ops removed from commandMenu +
+ * Filter a merged catalogue by the registry's enabled-set.  Returns
+ * a NEW catalogue with disabled apps' ops removed from commandMenu +
  * opsById (replyShapeFor / followUpsFor / embedSnapshotFor still
  * look up by opId — unchanged, just won't find ops that aren't in
  * opsById).
  *
- * @param {import('./manifestMerge.js').MergedCatalog} catalog
+ * @param {import('./manifestMerge.js').MergedCatalogue} catalogue
  * @param {AppRegistry} registry
- * @returns {import('./manifestMerge.js').MergedCatalog}
+ * @returns {import('./manifestMerge.js').MergedCatalogue}
  */
-export function filterCatalog(catalog, registry) {
-  if (!catalog || !registry) return catalog;
+export function filterCatalogue(catalogue, registry) {
+  if (!catalogue || !registry) return catalogue;
   const filteredOpsById = new Map();
-  for (const [key, entry] of catalog.opsById) {
+  for (const [key, entry] of catalogue.opsById) {
     if (registry.isEnabled(entry.appOrigin)) filteredOpsById.set(key, entry);
   }
   return {
-    ...catalog,
+    ...catalogue,
     opsById:     filteredOpsById,
-    commandMenu: catalog.commandMenu.filter((e) => registry.isEnabled(e.appOrigin)),
-    appOrigins:  catalog.appOrigins.filter((a) => registry.isEnabled(a)),
+    commandMenu: catalogue.commandMenu.filter((e) => registry.isEnabled(e.appOrigin)),
+    appOrigins:  catalogue.appOrigins.filter((a) => registry.isEnabled(a)),
   };
 }

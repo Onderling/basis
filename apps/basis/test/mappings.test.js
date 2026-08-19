@@ -1,6 +1,6 @@
 /**
  * mappings — the extension-mapping verify gate (P2b). A mapping is accepted
- * only when every composite op's steps resolve in the catalog
+ * only when every composite op's steps resolve in the catalogue
  * (sandbox-by-construction); otherwise it's refused with the missing opIds.
  */
 
@@ -8,8 +8,8 @@ import { describe, it, expect } from 'vitest';
 import { verifyMapping, verifyMappings, mappingToManifest, mappingsToSources } from '../src/mappings.js';
 import { mergeManifests } from '../src/manifestMerge.js';
 
-// Minimal catalog: opsById keyed bare + app-qualified, like mergeManifests produces.
-const catalog = {
+// Minimal catalogue: opsById keyed bare + app-qualified, like mergeManifests produces.
+const catalogue = {
   opsById: new Map([
     ['addItem', { op: {}, appOrigin: 'household' }],
     ['household/addItem', { op: {}, appOrigin: 'household' }],
@@ -25,7 +25,7 @@ describe('verifyMapping', () => {
       { appOrigin: 'household', opId: 'addItem' },
       { appOrigin: 'core', opId: 'sendMessage' },
     ])] };
-    expect(verifyMapping(m, catalog)).toEqual({ ok: true, missing: [] });
+    expect(verifyMapping(m, catalogue)).toEqual({ ok: true, missing: [] });
   });
 
   it('refuses a composite that references an unknown opId, listing it', () => {
@@ -33,21 +33,21 @@ describe('verifyMapping', () => {
       { appOrigin: 'household', opId: 'addItem' },
       { appOrigin: 'ghost', opId: 'doesNotExist' },
     ])] };
-    const res = verifyMapping(m, catalog);
+    const res = verifyMapping(m, catalogue);
     expect(res.ok).toBe(false);
     expect(res.missing).toEqual(['ghost/doesNotExist']);
   });
 
-  it('skips remote-skill bindings (the bot vouches, not the catalog)', () => {
+  it('skips remote-skill bindings (the bot vouches, not the catalogue)', () => {
     const m = { id: 'bot', ops: [
       { id: 'ask', binding: 'remote-skill@contact', bindRef: { contactId: 'c1', skillId: 'ask' } },
       { id: 'poll', bindRef: { skillId: 'poll' } },
     ] };
-    expect(verifyMapping(m, catalog)).toEqual({ ok: true, missing: [] });
+    expect(verifyMapping(m, catalogue)).toEqual({ ok: true, missing: [] });
   });
 
   it('a non-composite, non-remote op has nothing to verify', () => {
-    expect(verifyMapping({ id: 'x', ops: [{ id: 'plain', verb: 'noop' }] }, catalog))
+    expect(verifyMapping({ id: 'x', ops: [{ id: 'plain', verb: 'noop' }] }, catalogue))
       .toEqual({ ok: true, missing: [] });
   });
 });
@@ -56,13 +56,13 @@ describe('verifyMappings', () => {
   it('partitions accepted vs rejected with their missing refs', () => {
     const good = { id: 'good', ops: [composite('a', [{ appOrigin: 'household', opId: 'addItem' }])] };
     const bad = { id: 'bad', ops: [composite('b', [{ appOrigin: 'x', opId: 'nope' }])] };
-    const { accepted, rejected } = verifyMappings([good, bad], catalog);
+    const { accepted, rejected } = verifyMappings([good, bad], catalogue);
     expect(accepted.map((m) => m.id)).toEqual(['good']);
     expect(rejected).toEqual([{ id: 'bad', missing: ['x/nope'] }]);
   });
 
   it('tolerates an empty / nullish list', () => {
-    expect(verifyMappings(undefined, catalog)).toEqual({ accepted: [], rejected: [] });
+    expect(verifyMappings(undefined, catalogue)).toEqual({ accepted: [], rejected: [] });
   });
 });
 
@@ -84,7 +84,7 @@ describe('mappingToManifest / mappingsToSources', () => {
     expect(dropped[0].errors.length).toBeGreaterThan(0);
   });
 
-  it("a mapping's composite op lands in the merged catalog (dispatchable)", () => {
+  it("a mapping's composite op lands in the merged catalogue (dispatchable)", () => {
     const base = { manifest: { app: 'household', itemTypes: [], operations: [{ id: 'addItem', verb: 'add' }] } };
     const mapping = { id: 'fb', scope: 'app', ops: [composite('feedback', [{ appOrigin: 'household', opId: 'addItem' }])] };
     const { sources } = mappingsToSources([mapping]);

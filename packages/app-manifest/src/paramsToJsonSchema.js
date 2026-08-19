@@ -1,6 +1,6 @@
 /**
  * params[] → plain JSON Schema object.  Output shape matches what the
- * current household `V0_TOOL_CATALOG` feeds the LLM — no `$schema`, no
+ * current household `V0_TOOL_CATALOGUE` feeds the LLM — no `$schema`, no
  * draft pragma — so 's byte-equivalence gate can diff cleanly.
  *
  * Properties + required preserve param declaration order (determinism;
@@ -23,7 +23,7 @@ export function paramsToJsonSchema(params, opts = {}) {
   }
 
   // Omit `required` when empty — matches what hand-written JSON-Schema-based
-  // tool catalogues do (e.g. household's `V0_TOOL_CATALOG.help`) and keeps
+  // tool catalogues do (e.g. household's `V0_TOOL_CATALOGUE.help`) and keeps
   // byte-equivalence on the gate.
   const out = { type: 'object', properties };
   if (required.length > 0) out.required = required;
@@ -32,7 +32,7 @@ export function paramsToJsonSchema(params, opts = {}) {
 
 function paramToProperty(p, manifest) {
   // F-SP1-c (locked 2026-05-19): inline JSON Schema fragment is spread AFTER
-  // `type` so the per-kind type stays first (matches V0_TOOL_CATALOG key order)
+  // `type` so the per-kind type stays first (matches V0_TOOL_CATALOGUE key order)
   // and any keywords the per-kind switch doesn't model (minLength, pattern,
   // maxLength, …) ride through.
   const extra = (p?.schema && typeof p.schema === 'object') ? p.schema : null;

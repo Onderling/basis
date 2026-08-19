@@ -30,7 +30,7 @@ import {
 } from '@onderling/pod-client';
 import { PodClient } from '@onderling/pod-client';
 import { createPseudoPod, createMemoryBackend } from '@onderling/pseudo-pod';
-import { createNeighborhoodAgent } from '@onderling-app/stoop';
+import { createNeighbourhoodAgent } from '@onderling-app/stoop';
 import { createCirclePodProducer } from '../../src/v2/circlePodProducer.js';
 import { EventLog } from '../../src/eventLog.js';
 import { makeChatRail, makeChatPeerHandler, makePodChatCatchUp, CHAT_STATEMENT_BROADCAST } from '../../src/v2/chatRail.js';
@@ -72,7 +72,7 @@ async function liveCircleSealOpen(circleId) {
 async function bootSenderA({ backend, seal, circleDataMove, deliver }) {
   const id = await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);
-  const bundle = await createNeighborhoodAgent({
+  const bundle = await createNeighbourhoodAgent({
     identity: id, transport: tx,
     offeringMatch: { group: CIRCLE, localActor: ANNE, peers: [] },
     members: [{ webid: ANNE, role: 'member' }, { webid: BOB, role: 'member' }],

@@ -27,18 +27,18 @@ import { theme }                   from '../screens/v2/theme.js';
 
 /**
  * @param {object}   props
- * @param {object}   props.catalog                merged catalog (from composeManifests())
+ * @param {object}   props.catalogue                merged catalogue (from composeManifests())
  * @param {function} props.onDispatch             (commandLine: string) => Promise<any>
  * @param {boolean}  [props.visible=true]         render the FAB (false to opt out)
  */
-export default function SlashFAB({ catalog, onDispatch, visible = true }) {
+export default function SlashFAB({ catalogue, onDispatch, visible = true }) {
   const [open, setOpen]         = useState(false);
   const [input, setInput]       = useState('/');
   const [busy, setBusy]         = useState(false);
 
   const matches = useMemo(
-    () => filterSlashSuggestions({ input, catalog }),
-    [input, catalog],
+    () => filterSlashSuggestions({ input, catalogue }),
+    [input, catalogue],
   );
 
   const close = useCallback(() => {

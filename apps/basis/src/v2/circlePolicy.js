@@ -396,10 +396,10 @@ export function normalizeCirclePolicy(stored = {}) {
     // Phase 4 §7/§9 — member↔member private chat toggle (route-gated in the settings surface).
     privateDm:
       typeof p.privateDm === 'boolean' ? p.privateDm : DEFAULT_CIRCLE_POLICY.privateDm,
-    // S6.C deep — which whole apps this circle composes into its catalog (the bot's
+    // S6.C deep — which whole apps this circle composes into its catalogue (the bot's
     // tools + slash-suggest). null/absent = all DEFAULT_CIRCLE_ORIGINS; a list
     // narrows (e.g. ['stoop'] for a circle-only circle). Validation is loose here —
-    // the catalog scoping intersects with the apps that actually have ops.
+    // the catalogue scoping intersects with the apps that actually have ops.
     apps:               Array.isArray(p.apps) ? p.apps.filter((x) => typeof x === 'string') : null,
     // kept as plain object maps; per-entry coercion happens at read time
     // (freedom.js resolveRow for capabilities; the manifest schema for settings).

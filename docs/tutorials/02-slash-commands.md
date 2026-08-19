@@ -1,7 +1,7 @@
 # Tutorial 2 — one manifest, every surface
 
 Declare an app's operations **once**, in a manifest — and project that single declaration into a
-slash-command grammar, an AI tool catalog, and dispatchable skill handlers. This is the core
+slash-command grammar, an AI tool catalogue, and dispatchable skill handlers. This is the core
 pattern of the platform: interfaces are pass-throughs; the manifest is the contract.
 
 Runnable version: [`apps/sdk-journeys/j2-slash-bot.mjs`](../../apps/sdk-journeys/j2-slash-bot.mjs).
@@ -76,7 +76,7 @@ for (const op of manifest.operations) {
 }
 ```
 
-## 4. Project surface two: the AI tool catalog
+## 4. Project surface two: the AI tool catalogue
 
 The *same* declaration compiles into tools an LLM can call — each with a JSON schema derived
 from `op.params` and a description from the chat hint:
@@ -87,7 +87,7 @@ const chat = renderChat(manifest, {
   toSkillCtx:    (toolCtx) => toolCtx,
 });
 
-chat.toolCatalog.map((t) => t.id);   // → ['addNote', 'listNotes']
+chat.toolCatalogue.map((t) => t.id);   // → ['addNote', 'listNotes']
 ```
 
 The projector output is the platform's narrow waist — `{ opId, args }` — so a parsed slash

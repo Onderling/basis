@@ -76,7 +76,7 @@ function makeGateway() {
 
 function makeBuiltins(overrides = {}) {
   return createLocalBuiltins({
-    catalog: { opsById: new Map() }, t,
+    catalogue: { opsById: new Map() }, t,
     localActor: WEBID,
     ...overrides,
   });

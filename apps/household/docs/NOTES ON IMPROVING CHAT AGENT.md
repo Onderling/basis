@@ -26,7 +26,7 @@ User ↔ Agent loop (Qwen-Agent or LangGraph)
 1. **Get the model serving working.** Stand up vLLM or Ollama with Qwen, confirm `/v1/chat/completions` responds. Test with curl before touching anything else.
 2. **Wire up a bare chat loop.** Plain Python using the OpenAI SDK pointed at the local endpoint. Multi-turn working in-process (just a list of messages). No memory yet.
 3. **Add Mem0.** Initialize with the local model as the extractor LLM and a local vector store. On each user turn: retrieve relevant memories, inject them into the system prompt, send to LLM, then write new facts to Mem0 after the response.
-4. **Write the system prompt.** This is where the "Claude-like" behavior actually comes from. It should cover:
+4. **Write the system prompt.** This is where the "Claude-like" behaviour actually comes from. It should cover:
     - When to ask clarifying questions vs. proceed with reasonable assumptions (the bar: ask only when ambiguity would meaningfully change the answer).
     - Honesty about uncertainty.
     - Formatting preferences (concise prose by default, lists only when useful).

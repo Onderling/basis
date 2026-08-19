@@ -70,14 +70,14 @@ const householdLite = {
   views: [{ id: 'tasks', title: 'Chores', type: 'chore' }],
 };
 
-const catalog = mergeManifests([{ manifest: householdLite }]);
+const catalogue = mergeManifests([{ manifest: householdLite }]);
 
 /* ───── tests ───── */
 
 describe('resolveDispatch — ready paths', () => {
   it('returns ready for a no-param op', () => {
-    const parse = parseInput('/donow', catalog);
-    const r = resolveDispatch(parse, catalog);
+    const parse = parseInput('/donow', catalogue);
+    const r = resolveDispatch(parse, catalogue);
     expect(r).toEqual({
       kind: 'ready',
       opId: 'doNow',
@@ -90,15 +90,15 @@ describe('resolveDispatch — ready paths', () => {
   });
 
   it("uses 'list' default shape for verb:'list' (no Q28)", () => {
-    const parse = parseInput('/mine', catalog);
-    const r = resolveDispatch(parse, catalog);
+    const parse = parseInput('/mine', catalogue);
+    const r = resolveDispatch(parse, catalogue);
     expect(r.kind).toBe('ready');
     expect(r.replyShape).toBe('list');
   });
 
   it('binds _match positional to the first required string param', () => {
-    const parse = parseInput('/done dishwasher', catalog);
-    const r = resolveDispatch(parse, catalog);
+    const parse = parseInput('/done dishwasher', catalogue);
+    const r = resolveDispatch(parse, catalogue);
     expect(r).toMatchObject({
       kind: 'ready',
       opId: 'markComplete',
@@ -120,22 +120,22 @@ describe('resolveDispatch — ready paths', () => {
       command: '/done',
       body: 'explicit',
     };
-    const r = resolveDispatch(parse, catalog);
+    const r = resolveDispatch(parse, catalogue);
     expect(r.kind).toBe('ready');
     expect(r.args.choreText).toBe('explicit');   // explicit wins
     expect(r.args._match).toBeUndefined();        // dropped after bind
   });
 
   it("passes threadId through from the parse result", () => {
-    const parse = parseInput('/donow', catalog, { threadId: 't-99' });
-    expect(resolveDispatch(parse, catalog).threadId).toBe('t-99');
+    const parse = parseInput('/donow', catalogue, { threadId: 't-99' });
+    expect(resolveDispatch(parse, catalogue).threadId).toBe('t-99');
   });
 });
 
 describe('resolveDispatch — needsForm', () => {
   it('emits needsForm when required params missing', () => {
-    const parse = parseInput('/addchore', catalog);
-    const r = resolveDispatch(parse, catalog);
+    const parse = parseInput('/addchore', catalogue);
+    const r = resolveDispatch(parse, catalogue);
     expect(r.kind).toBe('needsForm');
     expect(r.opId).toBe('addChore');
     expect(r.missing).toEqual(['text']);
@@ -145,8 +145,8 @@ describe('resolveDispatch — needsForm', () => {
   });
 
   it('emits ready (not needsForm) when required param IS bound via _match', () => {
-    const parse = parseInput('/done dishwasher', catalog);
-    const r = resolveDispatch(parse, catalog);
+    const parse = parseInput('/done dishwasher', catalogue);
+    const r = resolveDispatch(parse, catalogue);
     expect(r.kind).toBe('ready');
   });
 
@@ -155,7 +155,7 @@ describe('resolveDispatch — needsForm', () => {
       kind: 'slash', opId: 'addChore',
       args: { text: '' }, threadId: null, command: '/addchore', body: '',
     };
-    const r = resolveDispatch(parse, catalog);
+    const r = resolveDispatch(parse, catalogue);
     expect(r.kind).toBe('needsForm');
     expect(r.missing).toContain('text');
   });
@@ -166,7 +166,7 @@ describe('resolveDispatch — needsForm', () => {
       args: { text: 'pick up bread' },
       threadId: null, command: '/addchore', body: 'pick up bread',
     };
-    const r = resolveDispatch(parse, catalog);
+    const r = resolveDispatch(parse, catalogue);
     expect(r.kind).toBe('ready');
     expect(r.args).toEqual({ text: 'pick up bread' });
   });
@@ -174,8 +174,8 @@ describe('resolveDispatch — needsForm', () => {
 
 describe('resolveDispatch — Q27 confirm gates', () => {
   it("emits needsConfirm for severity: 'warn'", () => {
-    const parse = parseInput('/archiveall', catalog);
-    const r = resolveDispatch(parse, catalog);
+    const parse = parseInput('/archiveall', catalogue);
+    const r = resolveDispatch(parse, catalogue);
     expect(r).toMatchObject({
       kind: 'needsConfirm',
       severity: 'warn',
@@ -187,16 +187,16 @@ describe('resolveDispatch — Q27 confirm gates', () => {
   });
 
   it("emits needsConfirm for severity: 'danger'", () => {
-    const parse = parseInput('/clearinbox', catalog);
-    const r = resolveDispatch(parse, catalog);
+    const parse = parseInput('/clearinbox', catalogue);
+    const r = resolveDispatch(parse, catalogue);
     expect(r.kind).toBe('needsConfirm');
     expect(r.severity).toBe('danger');
     expect(r.message).toBe('This cannot be undone.');
   });
 
   it("does NOT gate severity: 'info' — goes straight to ready", () => {
-    const parse = parseInput('/stats', catalog);
-    const r = resolveDispatch(parse, catalog);
+    const parse = parseInput('/stats', catalogue);
+    const r = resolveDispatch(parse, catalogue);
     expect(r.kind).toBe('ready');
     expect(r.opId).toBe('reportStats');
   });
@@ -301,10 +301,10 @@ describe('scopeReadyDispatch — F1 active-circle binding (5.3)', () => {
   });
 
   it('end-to-end: parse → resolveDispatch → scopeReadyDispatch', () => {
-    const listRoute = resolveDispatch(parseInput('/mine', catalog), catalog);  // verb 'list'
+    const listRoute = resolveDispatch(parseInput('/mine', catalogue), catalogue);  // verb 'list'
     expect(scopeReadyDispatch(listRoute, 'c1')).toBe(listRoute);               // read → not scoped
 
-    const addRoute = resolveDispatch(parseInput('/donow', catalog), catalog);  // verb 'add'
+    const addRoute = resolveDispatch(parseInput('/donow', catalogue), catalogue);  // verb 'add'
     const scoped = scopeReadyDispatch(addRoute, 'circle-7');
     expect(scoped.args.circleId).toBe('circle-7');
     expect(itemCircleId(scoped.args)).toBe('circle-7');
@@ -313,8 +313,8 @@ describe('scopeReadyDispatch — F1 active-circle binding (5.3)', () => {
 
 describe('resolveDispatch — pass-through + error paths', () => {
   it('returns unknown for unknown parse', () => {
-    const parse = parseInput('hello', catalog, { threadId: 't-1' });
-    const r = resolveDispatch(parse, catalog);
+    const parse = parseInput('hello', catalogue, { threadId: 't-1' });
+    const r = resolveDispatch(parse, catalogue);
     expect(r).toEqual({ kind: 'unknown', text: 'hello', threadId: 't-1' });
   });
 
@@ -323,14 +323,14 @@ describe('resolveDispatch — pass-through + error paths', () => {
       kind: 'slash', opId: 'doesNotExist', args: {},
       threadId: 't-2', command: '/x', body: '',
     };
-    const r = resolveDispatch(parse, catalog);
+    const r = resolveDispatch(parse, catalogue);
     expect(r.kind).toBe('error');
     expect(r.code).toBe('unknown-op');
     expect(r.threadId).toBe('t-2');
   });
 
   it('throws on null inputs', () => {
-    expect(() => resolveDispatch(null, catalog)).toThrow();
+    expect(() => resolveDispatch(null, catalogue)).toThrow();
     expect(() => resolveDispatch({ kind: 'unknown', text: '' }, null)).toThrow();
   });
 });

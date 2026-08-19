@@ -7,12 +7,12 @@
  *   3. both shells, which must offer the same thing (invariant 2, web ≡ mobile)
  *
  * (3) had already broken before this module existed. The web shell listed five manifests; the mobile
- * shell reused its full dispatch catalog — a different seven, including stoop, whose manifest now
+ * shell reused its full dispatch catalogue — a different seven, including stoop, whose manifest now
  * declares 92 ops. So the same person pairing the same screen was offered a materially different set
  * depending on which shell they paired from, and after the A2A surface landed that difference would
  * have become a difference in what a peer could actually invoke. Not a paint bug.
  *
- * The list is deliberately NARROWER than the dispatch catalog. A connection is a thing acting as you
+ * The list is deliberately NARROWER than the dispatch catalogue. A connection is a thing acting as you
  * somewhere else, so the default answer to "may it do this?" is no, and each entry here is a decision
  * that a whole app's ops are reasonable to delegate at all. Widening it is a product call, not a
  * refactor — which is why it lives in one named place instead of being implied by whatever a shell
@@ -39,7 +39,7 @@ export function connectionManifests({ householdManifest: injected } = {}) {
     injected ?? householdManifest,
     mockTasksManifest,
     calendarManifest,
-    // agents LAST, matching both shells' catalog order so a future op-id collision resolves the same way
+    // agents LAST, matching both shells' catalogue order so a future op-id collision resolves the same way
     agentsManifest,
   ].filter(Boolean);
 }

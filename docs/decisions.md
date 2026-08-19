@@ -700,7 +700,7 @@ the roster, the relay.
 
 First consequences, both built:
 - **Per-skill exposure is a discovery FILTER, not access control.** Hiding a skill removes it from the
-  cards and catalogs others read and stops nothing; someone who knows the skill id can still dispatch.
+  cards and catalogues others read and stops nothing; someone who knows the skill id can still dispatch.
   What refuses an unauthorised call is the grant/token check. Hiding therefore also does **not** revoke:
   a hidden skill keeps its grant on the card, because telling someone they had revoked something they
   had not would be the same lie in the other direction.
@@ -1158,7 +1158,7 @@ answered one question, and the answer on paper was not the answer in the product
    boundary. Both shells' consensus toggle became the three-way who-decides picker, which writes
    the table.
 3. **The default `changePolicy` is `'any-admin'` — the lived default — amending the 07-25
-   record's aspirational `admin-quorum`.** No existing circle's behavior changes; a circle opts
+   record's aspirational `admin-quorum`.** No existing circle's behaviour changes; a circle opts
    INTO quorum or a member vote through the picker, exactly as it used to opt into consensus. The
    single-admin quorum degeneracy (one admin IS the majority → direct save) lives inside the one
    gate.
@@ -1166,7 +1166,7 @@ answered one question, and the answer on paper was not the answer in the product
 **Alternatives / why.** Keeping the boolean beside the class map — rejected: two vocabularies for
 one question is precisely the drift class this log keeps recording. Adopting the paper default
 (`admin-quorum`) — rejected: it would silently convert every multi-admin circle's settings saves
-into proposals, a behavior change no one chose.
+into proposals, a behaviour change no one chose.
 
 **Reverse it by:** re-adding the boolean and its gate reads (the mechanical revert), or flipping
 the default back — but flip it as a conscious migration, because by then circles will have chosen

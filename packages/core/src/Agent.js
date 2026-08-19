@@ -472,7 +472,7 @@ export class Agent extends Emitter {
    * `{ transport, name, tier, latencyEstimate? }` otherwise — see
    * `routing/ReachabilityTier.js`.
    *
-   * Additive — does not change behavior of `transportFor()` /
+   * Additive — does not change behaviour of `transportFor()` /
    * `routeFor()`; intended for apps that want to surface the link
    * quality / privacy posture per peer.
    *

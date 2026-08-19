@@ -375,7 +375,7 @@ export async function runDiagnostics(reporter, deps = {}) {
       pass('pod-container', 'pod root container exists (createContainer is idempotent)');
     } catch (err) {
       fail('pod-container', 'pod root container exists',
-        'your pod server doesn\'t honor LDP createContainerAt', err);
+        'your pod server doesn\'t honour LDP createContainerAt', err);
       skipRemaining([
         'probe-write', 'probe-read', 'probe-delete', 'scan-pod',
       ]);
@@ -500,7 +500,7 @@ export function recommendFix(steps) {
     case 'pod-head':
       return 'pod unreachable; if 401 sign in again, if 403 your WebID lacks write access.';
     case 'pod-container':
-      return 'your pod server doesn\'t honor LDP createContainerAt; check pod compatibility.';
+      return 'your pod server doesn\'t honour LDP createContainerAt; check pod compatibility.';
     case 'probe-write':
     case 'probe-read':
       return 'pod write/read probe failed; verify ACL grants for your WebID.';

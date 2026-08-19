@@ -9,7 +9,7 @@
 //   (2) FANS it to the circle's remaining members over the SAME peer channel content rides. The event is
 //       sealed multi-recipient to the then-current members only, so a removed member — absent from the
 //       event's `recipients` — never receives a version it can fold and cannot open post-removal content
-//       (backward secrecy, no pod). The pod key resource is still written as defense-in-depth; the LOG is
+//       (backward secrecy, no pod). The pod key resource is still written as defence-in-depth; the LOG is
 //       the source for a no-pod circle.
 //
 // Environment-neutral by construction: the caller injects HOW to resolve the recipient members' peer

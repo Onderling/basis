@@ -36,7 +36,7 @@ export async function subscribe(agent, publisherAddress, topic, callback) {
   // Return a cleanup function that fully tears down the subscription:
   // both the local listener AND the publisher-side registration. This
   // is additive — callers that ignore the return value get the same
-  // behavior as before (the listener stays registered).
+  // behaviour as before (the listener stays registered).
   return async () => {
     agent.off('publish', listener);
     try { await unsubscribe(agent, publisherAddress, topic); }

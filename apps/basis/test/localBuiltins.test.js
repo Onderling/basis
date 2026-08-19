@@ -27,12 +27,12 @@ beforeAll(async () => {
 });
 
 describe('/help', () => {
-  it('lists every command from the merged catalog, grouped by app', async () => {
-    const catalog  = mergeManifests([
+  it('lists every command from the merged catalogue, grouped by app', async () => {
+    const catalogue  = mergeManifests([
       { manifest: basisManifest },
       { manifest: householdLite },
     ]);
-    const builtins = createLocalBuiltins({ catalog, t });
+    const builtins = createLocalBuiltins({ catalogue, t });
     const r = await builtins.help();
     expect(typeof r.message).toBe('string');
     expect(r.message).toMatch(/Available commands/);
@@ -46,11 +46,11 @@ describe('/help', () => {
   });
 
   it("puts basis (built-ins) section first", async () => {
-    const catalog = mergeManifests([
+    const catalogue = mergeManifests([
       { manifest: householdLite },
       { manifest: basisManifest },
     ]);
-    const r = await createLocalBuiltins({ catalog, t }).help();
+    const r = await createLocalBuiltins({ catalogue, t }).help();
     const chatIdx = r.message.indexOf('Chat');
     const appIdx  = r.message.indexOf('household');
     expect(chatIdx).toBeGreaterThan(-1);
@@ -59,22 +59,22 @@ describe('/help', () => {
   });
 
   it("respects locale (Dutch heading)", async () => {
-    const catalog = mergeManifests([{ manifest: basisManifest }]);
+    const catalogue = mergeManifests([{ manifest: basisManifest }]);
     await setLang('nl');
-    const r = await createLocalBuiltins({ catalog, t }).help();
+    const r = await createLocalBuiltins({ catalogue, t }).help();
     expect(r.message).toMatch(/Beschikbare commando's/);
     await setLang('en');
   });
 
-  it("renders 'empty' message when catalog has no commands", async () => {
-    const catalog = mergeManifests([]);
-    const r = await createLocalBuiltins({ catalog, t }).help();
+  it("renders 'empty' message when catalogue has no commands", async () => {
+    const catalogue = mergeManifests([]);
+    const r = await createLocalBuiltins({ catalogue, t }).help();
     expect(r.message).toBe('No commands available yet.');
   });
 
   it("sorts commands alphabetically within an app section", async () => {
-    const catalog = mergeManifests([{ manifest: householdLite }]);
-    const r = await createLocalBuiltins({ catalog, t }).help();
+    const catalogue = mergeManifests([{ manifest: householdLite }]);
+    const r = await createLocalBuiltins({ catalogue, t }).help();
     const doneIdx = r.message.indexOf('/done');
     const mineIdx = r.message.indexOf('/mine');
     expect(doneIdx).toBeLessThan(mineIdx);   // /done before /mine alphabetically
@@ -95,9 +95,9 @@ describe('basisManifest now carries /help', () => {
     expect(result.ok).toBe(true);
   });
 
-  it("/help appears in the merged catalog's commandMenu", () => {
-    const catalog = mergeManifests([{ manifest: basisManifest }]);
-    const helpEntry = catalog.commandMenu.find((e) => e.command === '/help');
+  it("/help appears in the merged catalogue's commandMenu", () => {
+    const catalogue = mergeManifests([{ manifest: basisManifest }]);
+    const helpEntry = catalogue.commandMenu.find((e) => e.command === '/help');
     expect(helpEntry).toBeTruthy();
     expect(helpEntry.appOrigin).toBe('basis');
     expect(helpEntry.opId).toBe('help');
@@ -114,9 +114,9 @@ describe('/newthread', () => {
   });
 
   it("creates a new thread + switches active", async () => {
-    const catalog  = mergeManifests([{ manifest: basisManifest }]);
+    const catalogue  = mergeManifests([{ manifest: basisManifest }]);
     const builtins = createLocalBuiltins({
-      catalog, t, threadStore: store,
+      catalogue, t, threadStore: store,
       setActive: (id) => setActiveCalls.push(id),
     });
     const r = await builtins.newthread({ name: 'Project Alpha' });
@@ -130,7 +130,7 @@ describe('/newthread', () => {
 
   it("rejects empty name", async () => {
     const builtins = createLocalBuiltins({
-      catalog: mergeManifests([{ manifest: basisManifest }]),
+      catalogue: mergeManifests([{ manifest: basisManifest }]),
       t, threadStore: store, setActive: () => {},
     });
     const r1 = await builtins.newthread({});
@@ -143,7 +143,7 @@ describe('/newthread', () => {
 
   it("fails gracefully when no threadStore wired", async () => {
     const builtins = createLocalBuiltins({
-      catalog: mergeManifests([{ manifest: basisManifest }]),
+      catalogue: mergeManifests([{ manifest: basisManifest }]),
       t,
     });
     const r = await builtins.newthread({ name: 'X' });
@@ -163,7 +163,7 @@ describe('/threads', () => {
 
   it('lists every thread with active marker', async () => {
     const builtins = createLocalBuiltins({
-      catalog:     mergeManifests([{ manifest: basisManifest }]),
+      catalogue:     mergeManifests([{ manifest: basisManifest }]),
       t,
       threadStore: store,
     });
@@ -177,7 +177,7 @@ describe('/threads', () => {
   it('shows "no threads" when store empty', async () => {
     const empty = new ThreadStore();
     const builtins = createLocalBuiltins({
-      catalog: mergeManifests([{ manifest: basisManifest }]),
+      catalogue: mergeManifests([{ manifest: basisManifest }]),
       t, threadStore: empty,
     });
     const r = await builtins.threads();

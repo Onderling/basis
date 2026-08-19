@@ -14,9 +14,9 @@
  *     result).  Best-effort, NO rollback (v0 non-goal); honours
  *     `op.onError` ('stop' default | 'continue').
  *
- *   - `verifyComposite(op, catalog) -> { ok, missing }` — the SANDBOX-BY-
+ *   - `verifyComposite(op, catalogue) -> { ok, missing }` — the SANDBOX-BY-
  *     CONSTRUCTION fitness function (DESIGN §2.3): asserts every step's
- *     opId resolves in the merged catalog.  A composite that references an
+ *     opId resolves in the merged catalogue.  A composite that references an
  *     unknown opId is refused — at load time (reject the mapping) and in
  *     CI (reject first-party drift).  Exported so CI can reuse it.
  *
@@ -123,7 +123,7 @@ export function compileCompositeToFlow(op, ctx = {}) {
  * pipeline system, and the no-parallel-structures rule retires it. The public contract is
  * unchanged: same signature, same `CompositeResult` envelope (adapted back from the flow
  * instance), ephemeral execution (no instance persistence, no pauses — the runner's
- * awaiting-input machinery only engages when an `ops` catalog is supplied, and a composite
+ * awaiting-input machinery only engages when an `ops` catalogue is supplied, and a composite
  * deliberately runs without one: an unsatisfied param is the op's own failure to report).
  *
  * Best-effort, no rollback (v0).  `onError`:
@@ -225,7 +225,7 @@ export async function runCompositeOp(op, callSkill, ctx = {}) {
  * The composite VERIFIER (DESIGN §2.3 — sandbox-by-construction).
  *
  * A composite is valid only when EVERY step's opId resolves to a declared
- * op in the merged catalog.  Refuse a composite whose steps reference
+ * op in the merged catalogue.  Refuse a composite whose steps reference
  * unknown opIds — this is what makes loading a THIRD-PARTY mapping safe
  * (it can only ever bottom out in atoms already present + consented).
  *
@@ -233,23 +233,23 @@ export async function runCompositeOp(op, callSkill, ctx = {}) {
  * manifests (reject drift) and the load-time mapping loader can run it to
  * reject an unsatisfiable extension.
  *
- * Resolution is forgiving of the catalog's prefix-on-collision policy
+ * Resolution is forgiving of the catalogue's prefix-on-collision policy
  * (`manifestMerge.js`): a step resolves when EITHER the bare `opId` OR the
- * app-qualified `'<appOrigin>/<opId>'` key is present in the catalog.
+ * app-qualified `'<appOrigin>/<opId>'` key is present in the catalogue.
  *
  * @param {import('@onderling/app-manifest').Operation} op   the composite op
- * @param {{ opsById: Map<string, {op: object, appOrigin: string}> } | { has?: Function }} catalog
- *        a `MergedCatalog` (uses `.opsById`) or any object exposing
+ * @param {{ opsById: Map<string, {op: object, appOrigin: string}> } | { has?: Function }} catalogue
+ *        a `MergedCatalogue` (uses `.opsById`) or any object exposing
  *        `has(opId)` / `opsById`.
  * @returns {{ ok: boolean, missing: string[] }}
  *        `missing` lists the unresolved `'<appOrigin>/<opId>'` refs.
  */
-export function verifyComposite(op, catalog) {
+export function verifyComposite(op, catalogue) {
   if (!op || !Array.isArray(op.steps)) {
     // Not a composite → nothing to verify; trivially ok.
     return { ok: true, missing: [] };
   }
-  const has = catalogHas(catalog);
+  const has = catalogueHas(catalogue);
   const missing = [];
   for (const step of op.steps) {
     const opId      = step?.opId;
@@ -263,24 +263,24 @@ export function verifyComposite(op, catalog) {
 }
 
 /**
- * Adapt a catalog into a `has(opId) -> boolean` probe.  Accepts a
- * `MergedCatalog` (`.opsById` Map), a bare `Map`/`Set`, or an object with
+ * Adapt a catalogue into a `has(opId) -> boolean` probe.  Accepts a
+ * `MergedCatalogue` (`.opsById` Map), a bare `Map`/`Set`, or an object with
  * its own `has`.
  *
- * @param {*} catalog
+ * @param {*} catalogue
  * @returns {(opId: string) => boolean}
  */
-function catalogHas(catalog) {
-  if (!catalog) return () => false;
-  if (catalog.opsById instanceof Map) {
-    const m = catalog.opsById;
+function catalogueHas(catalogue) {
+  if (!catalogue) return () => false;
+  if (catalogue.opsById instanceof Map) {
+    const m = catalogue.opsById;
     return (id) => m.has(id);
   }
-  if (catalog instanceof Map || catalog instanceof Set) {
-    return (id) => catalog.has(id);
+  if (catalogue instanceof Map || catalogue instanceof Set) {
+    return (id) => catalogue.has(id);
   }
-  if (typeof catalog.has === 'function') {
-    return (id) => catalog.has(id);
+  if (typeof catalogue.has === 'function') {
+    return (id) => catalogue.has(id);
   }
   return () => false;
 }

@@ -122,11 +122,11 @@ describe('legibility rows (existing mandates)', () => {
 });
 
 describe('confirm ROUTING — attachTaskGrant hits the shared confirm gate over the mobile composition', () => {
-  const catalog = composeManifests();
+  const catalogue = composeManifests();
   it('resolves to needsConfirm (never a silent execute)', () => {
     const route = resolveDispatch(
       { kind: 'slash', opId: 'attachTaskGrant', args: { taskId: 'task-1', member: 'https://alice.example/#me' }, appOrigin: 'tasks', command: '(bot)', body: '' },
-      catalog,
+      catalogue,
     );
     expect(route.kind).toBe('needsConfirm');
   });

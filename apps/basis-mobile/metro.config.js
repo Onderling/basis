@@ -116,7 +116,7 @@ const _cfg = withOnderlingPreset({
     '@onderling-app/folio':       path.resolve(repoRoot, 'apps/folio'),
     '@onderling-app/calendar':    path.resolve(repoRoot, 'apps/calendar'),
     // realAgent.js's skill wiring (added 2026-07-09). Bare import → the `.` export (src/cores.js); the
-    // /wireSkills + /defaultCatalog subpaths go through extraSubpathResolvers (package-exports disabled).
+    // /wireSkills + /defaultCatalogue subpaths go through extraSubpathResolvers (package-exports disabled).
     '@onderling-app/agents':      path.resolve(repoRoot, 'apps/agents'),
 
     // Transitive @onderling/* not declared in package.json deps.
@@ -195,9 +195,9 @@ const _cfg = withOnderlingPreset({
       }
 
       // 4b. @onderling-app/agents subpaths (realAgent.js skill wiring). exports map: ./wireSkills →
-      //     src/wireSkills.js, ./defaultCatalog → src/defaultCatalog.js, ./cores → src/cores.js,
+      //     src/wireSkills.js, ./defaultCatalogue → src/defaultCatalogue.js, ./cores → src/cores.js,
       //     ./manifest → manifest.js. Package-exports disabled, so map directly.
-      const agentsMatch = moduleName.match(/^@onderling-app\/agents\/(wireSkills|defaultCatalog|cores)$/);
+      const agentsMatch = moduleName.match(/^@onderling-app\/agents\/(wireSkills|defaultCatalogue|cores)$/);
       if (agentsMatch) {
         return { filePath: path.resolve(repoRoot, 'apps/agents/src', `${agentsMatch[1]}.js`), type: 'sourceFile' };
       }

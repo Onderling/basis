@@ -482,7 +482,7 @@ export function wireChat({
       const dataB64 = data.dataB64;
       if (typeof itemId !== 'string' || typeof attId !== 'string'
           || typeof dataB64 !== 'string') return;
-      // Defensive size cap on inbound bytes (defense in depth — the
+      // Defensive size cap on inbound bytes (defence in depth — the
       // sender is supposed to honour the post's max).
       const approxBytes = Math.floor(dataB64.length * 0.75);
       if (approxBytes > maxBytesPerAttachment * 4) return;     // hard cap (4× the soft cap)
@@ -509,7 +509,7 @@ export function wireChat({
             },
           };
           // Same write-trick as postRequest: rewrite at the item-store path.
-          await dataSource.write(`mem://neighborhood/items/${itemId}.json`, JSON.stringify(updated))
+          await dataSource.write(`mem://neighbourhood/items/${itemId}.json`, JSON.stringify(updated))
             .catch(() => { /* best-effort */ });
         }
       }

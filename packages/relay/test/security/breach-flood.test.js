@@ -46,7 +46,7 @@ const publishFrame = (to, topic, n) => ({ type: 'send', to, topic, envelope: { _
 let relay;
 afterEach(async () => { await relay?.stop(); relay = null; });
 
-describe('§7.10 — bounded offline queue (memory-exhaustion defense)', () => {
+describe('§7.10 — bounded offline queue (memory-exhaustion defence)', () => {
   it('DEFENDED: per-address global ceiling (queueCapTotal) caps a many-topic flood', async () => {
     // queueCap=2 → queueCapTotal = 2*4 = 8. Flood 30 distinct topics at an
     // offline peer; total buffered must not exceed the global ceiling.
@@ -143,7 +143,7 @@ describe('§7.10 — DEFENDED: open-mode per-connection message rate limit', () 
     sender.close(); receiver.close();
   });
 
-  it('messageRateLimit:false restores the unthrottled legacy behavior', async () => {
+  it('messageRateLimit:false restores the unthrottled legacy behaviour', async () => {
     relay = await startRelay({ port: 0, messageRateLimit: false });
     const attacker = await openClient(`ws://127.0.0.1:${relay.port}`);
     const victim   = await openClient(`ws://127.0.0.1:${relay.port}`);

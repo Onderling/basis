@@ -52,7 +52,7 @@ Mobile mirror (C-track) at
 [`CHANGELOG.md`](./CHANGELOG.md) for the per-slice breakdown.
 
 **Status:** V1.5 demo-ready (2026-05-06). This package was
-H5 / `apps/neighborhood-v0` until 2026-05-06; renamed in place.
+H5 / `apps/neighbourhood-v0` until 2026-05-06; renamed in place.
 Phases 0–22 of the coding plan have landed:
 
 - 0–10: scaffold, substrate / relay extensions, skill layer,
@@ -315,7 +315,7 @@ apps/stoop/
 ├── package.json             ← @onderling-app/stoop
 ├── vitest.config.js
 ├── src/
-│   ├── Agent.js             ← createNeighborhoodAgent factory wiring substrates
+│   ├── Agent.js             ← createNeighbourhoodAgent factory wiring substrates
 │   ├── cluster.js
 │   ├── groupMirror.js
 │   ├── index.js
@@ -383,6 +383,6 @@ V2 (deferred per the advice doc):
 - Threat model: `Project Files/Stoop/privacy-and-safety-2026-05-05.md`
 - User-empathy: `Project Files/Stoop/potential-user-complaints-2026-05-05.md`
 - Group governance starter: `Project Files/Stoop/group-governance-starter-2026-05-05.md`
-- Original H5 design: `Project Files/projects/02-neighborhood-app/README.md`
+- Original H5 design: `Project Files/projects/02-neighbourhood-app/README.md`
 - Mockup: `Project Files/Stoop/shareskills_app_mockup.html`
 - Brainstorm: `Project Files/Stoop/Stoop - brainstorm.txt`

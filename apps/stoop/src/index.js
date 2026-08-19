@@ -1,5 +1,5 @@
-export { createNeighborhoodAgent }     from './Agent.js';
-export { createNeighborhoodCluster }   from './cluster.js';
+export { createNeighbourhoodAgent }     from './Agent.js';
+export { createNeighbourhoodCluster }   from './cluster.js';
 export { buildSkills, setAddressFallbackReportHook } from './skills/index.js';
 export { buildOnboardingSkills }       from './onboarding.js';
 /**

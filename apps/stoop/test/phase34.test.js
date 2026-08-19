@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
-import { createNeighborhoodAgent } from '../src/index.js';
+import { createNeighbourhoodAgent } from '../src/index.js';
 import { CachingDataSource } from '../src/lib/CachingDataSource.js';
 import {
   SETTINGS_SHARED_PATH,
@@ -37,7 +37,7 @@ function makeStubPod() {
 async function buildBundle({ persistPath } = {}) {
   const id = await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);
-  const bundle = await createNeighborhoodAgent({
+  const bundle = await createNeighbourhoodAgent({
     identity:   id,
     transport:  tx,
     offeringMatch: { group: 'oosterpoort', localActor: ANNE, peers: [] },
@@ -98,11 +98,11 @@ describe('Phase 34.1 — attachInner bulk-sync', () => {
     expect(cache.hasInner).toBe(false);
 
     // Five items + reveals + settings written offline.
-    await cache.write('mem://neighborhood/a', '"item-A"');
-    await cache.write('mem://neighborhood/b', '"item-B"');
-    await cache.write('mem://neighborhood/c', '"item-C"');
-    await cache.write('mem://neighborhood/d', '"item-D"');
-    await cache.write('mem://neighborhood/e', '"item-E"');
+    await cache.write('mem://neighbourhood/a', '"item-A"');
+    await cache.write('mem://neighbourhood/b', '"item-B"');
+    await cache.write('mem://neighbourhood/c', '"item-C"');
+    await cache.write('mem://neighbourhood/d', '"item-D"');
+    await cache.write('mem://neighbourhood/e', '"item-E"');
     await cache.write('mem://stoop/reveals/x.json',  '{"x":1}');
     await cache.write(SETTINGS_SHARED_PATH,          '{"broadcastable":true}');
 
@@ -124,7 +124,7 @@ describe('Phase 34.1 — attachInner bulk-sync', () => {
 
   it('idempotent: second attachInner does not re-push paths already on the inner', async () => {
     const cache = new CachingDataSource();
-    await cache.write('mem://neighborhood/a', '"A"');
+    await cache.write('mem://neighbourhood/a', '"A"');
     const pod1 = makeStubPod();
     await cache.attachInner(pod1);
     expect(pod1.writes.length).toBe(1);
@@ -151,7 +151,7 @@ describe('Phase 34.3 — bulk-sync respects localOnlyPrefixes', () => {
     const deviceId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
     // Plant a mix of pod-bound + local-only paths.
-    await cache.write('mem://neighborhood/x',                                           '"item"');
+    await cache.write('mem://neighbourhood/x',                                           '"item"');
     await cache.write(SETTINGS_SHARED_PATH,                                             '{"broadcastable":true}');
     await cache.write(`mem://stoop/settings/devices/${deviceId}.json`,                  '{"pollIntervalMs":2000}');
     await cache.write('mem://stoop/settings/.migrated-from-v2',                         '{"done":true}');
@@ -161,7 +161,7 @@ describe('Phase 34.3 — bulk-sync respects localOnlyPrefixes', () => {
 
     const pushed = pod.writes.map(w => w.path).sort();
     expect(pushed).toEqual([
-      'mem://neighborhood/x',
+      'mem://neighbourhood/x',
       SETTINGS_SHARED_PATH,
     ].sort());
     expect(pushed).not.toContain(`mem://stoop/settings/devices/${deviceId}.json`);

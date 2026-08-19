@@ -18,7 +18,7 @@
 import { describe, it, expect } from 'vitest';
 import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
-import { createNeighborhoodAgent } from '../src/index.js';
+import { createNeighbourhoodAgent } from '../src/index.js';
 
 // basis circles bind webid === the member's chat pubKey, so these read like real rows.
 const ME       = 'pk-me';
@@ -30,7 +30,7 @@ const ADMIN    = 'pk-admin';        // the circle's founder, as a JOINER sees th
 async function buildBundle({ members, sends }) {
   const id = await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);
-  const bundle = await createNeighborhoodAgent({
+  const bundle = await createNeighbourhoodAgent({
     identity: id, transport: tx,
     offeringMatch: { group: 'circle-b', localActor: ME, peers: [] },
     members,

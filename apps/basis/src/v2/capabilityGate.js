@@ -1,7 +1,7 @@
 /**
  * capabilityGate — B ·: the DEFAULT-DENY authorization boundary at the dispatch waist.
  *
- * Today's per-circle app scoping (`policy.apps` → `scopeCatalogToApps`) is INTERFACE-ONLY: it hides
+ * Today's per-circle app scoping (`policy.apps` → `scopeCatalogueToApps`) is INTERFACE-ONLY: it hides
  * ops from the LLM tool-list and slash-suggest, but nothing refuses an op that's invoked directly
  * (a gate rule, a stale button, a crafted message) — the leakage risk the B design flags.  This
  * module turns the same policy into a REAL boundary: a pure decision function the dispatcher calls

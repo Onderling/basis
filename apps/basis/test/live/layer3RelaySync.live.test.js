@@ -123,11 +123,11 @@ describe.runIf(LIVE_RELAY)(`LIVE Layer-3 — household no-pod sync over relay @ 
     const APIKEY  = process.env.LLM_APIKEY     || undefined;
     const BOT     = 'assistant';
 
-    const catalog = mergeManifests([{ manifest: A.manifest }]);
+    const catalogue = mergeManifests([{ manifest: A.manifest }]);
     const llm = new LlmClient({ provider: ollamaProvider({ baseUrl: BASEURL, model: MODEL, apiKey: APIKEY, timeoutMs: 90_000 }) });
 
     const cd = createCircleDispatch({
-      catalog,
+      catalogue,
       policy: { llmTool: 'local' },
       llmProviders: { local: llm },
       interpret: interpretToCommand,
@@ -136,7 +136,7 @@ describe.runIf(LIVE_RELAY)(`LIVE Layer-3 — household no-pod sync over relay @ 
       dispatch: async (input) => {
         const cmd = typeof input === 'string' ? null : input;
         if (!cmd?.opId) return null;
-        const entry = catalog.opsById.get(cmd.opId) ?? catalog.opsById.get(`household/${cmd.opId}`);
+        const entry = catalogue.opsById.get(cmd.opId) ?? catalogue.opsById.get(`household/${cmd.opId}`);
         return A.callSkill(entry?.appOrigin ?? 'household', cmd.opId, cmd.args ?? {});
       },
       postToCircle: () => {}, onNoMatch: () => {}, onLlmUnavailable: () => {},

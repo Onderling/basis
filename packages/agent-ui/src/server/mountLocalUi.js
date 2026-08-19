@@ -45,7 +45,7 @@ import { A2ATransport } from '@onderling/core';
  *   alongside the A2A endpoints. The browser POSTs to `/tasks/send` etc.
  *   directly — no SDK needed in the page. Path-traversal-hardened. Used
  *   by H5 V2's per-member web UI (Phase 7); see
- *   `apps/neighborhood-v0/web/` for the canonical example.
+ *   `apps/neighbourhood-v0/web/` for the canonical example.
  * @param {string} [opts.indexFile='index.html']
  *   File served when the requested path is `/`.
  * @param {Record<string, string|Uint8Array>} [opts.extraStaticFiles]

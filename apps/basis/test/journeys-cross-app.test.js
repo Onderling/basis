@@ -27,7 +27,7 @@ import { PodCapabilityToken } from '@onderling/core';
 import {
   parseInput, mergeManifests, resolveDispatch, runDispatch, scopeReadyDispatch,
   createDefaultThreadStore, createEventRouter,
-  EventLog, AppRegistry, filterCatalog,
+  EventLog, AppRegistry, filterCatalogue,
   runBrief, createBriefCache, runFind,
   basisManifest, itemCircleId,
   loadCircleItems, makeResolvingCallSkill,
@@ -62,7 +62,7 @@ async function bootWorkspace({ chatVault, ownerRootVault, secureAgentOpts } = {}
       if (routerRef) routerRef.deliver(event);
     },
   });
-  const rawCatalog = mergeManifests([
+  const rawCatalogue = mergeManifests([
     { manifest: basisManifest },
     { manifest: agent.manifest },
     { manifest: mockTasksManifest },
@@ -72,9 +72,9 @@ async function bootWorkspace({ chatVault, ownerRootVault, secureAgentOpts } = {}
   ], { runtime: 'browser' });
 
   const appRegistry = new AppRegistry();
-  appRegistry.syncWithCatalog(rawCatalog.appOrigins);
-  let catalog = filterCatalog(rawCatalog, appRegistry);
-  appRegistry.subscribe(() => { catalog = filterCatalog(rawCatalog, appRegistry); });
+  appRegistry.syncWithCatalogue(rawCatalogue.appOrigins);
+  let catalogue = filterCatalogue(rawCatalogue, appRegistry);
+  appRegistry.subscribe(() => { catalogue = filterCatalogue(rawCatalogue, appRegistry); });
 
   const store = createDefaultThreadStore();
   const router = createEventRouter({ threadStore: store });
@@ -94,7 +94,7 @@ async function bootWorkspace({ chatVault, ownerRootVault, secureAgentOpts } = {}
       return agent.callSkill('tasks', opId, args);
     }
     if (appOrigin === 'stoop') {
-      // Post-slice-2b: stoop is the real NeighborhoodAgent composed
+      // Post-slice-2b: stoop is the real NeighbourhoodAgent composed
       // in realAgent.js (110 real skills).
       return agent.callSkill('stoop', opId, args);
     }
@@ -110,7 +110,7 @@ async function bootWorkspace({ chatVault, ownerRootVault, secureAgentOpts } = {}
   };
 
   const localBuiltins = createLocalBuiltins({
-    catalog: rawCatalog,
+    catalogue: rawCatalogue,
     t: (k, p) => p ? `${k}(${JSON.stringify(p)})` : k,
     threadStore: store,
     setActive: (id) => store.setActiveThread(id),
@@ -118,25 +118,25 @@ async function bootWorkspace({ chatVault, ownerRootVault, secureAgentOpts } = {}
     simPeers: {},
     appRegistry, eventLog,
     briefRunner: (opts) => runBrief({
-      catalog, callSkill, cache: briefCache,
+      catalogue, callSkill, cache: briefCache,
       bypassCache: opts?.bypassCache,
     }),
-    findRunner: (opts) => runFind({ catalog, callSkill, query: opts?.query }),
+    findRunner: (opts) => runFind({ catalogue, callSkill, query: opts?.query }),
     agent, podAuth: null, externalFlow: null, openFilePicker: null,
     connectPeer: async () => agent.peer,
   });
 
   // Drive a user message through the full pipeline; return Reply envelope.
   async function userInput(text, threadId = 'main') {
-    const parsed = parseInput(text, catalog, { threadId });
+    const parsed = parseInput(text, catalogue, { threadId });
     if (parsed.kind !== 'slash') return { kind: 'not-a-slash', text };
-    const route = resolveDispatch(parsed, catalog);
+    const route = resolveDispatch(parsed, catalogue);
     if (route.kind !== 'ready') return route;
     return runDispatch(route, callSkill);
   }
 
   return {
-    agent, catalog: () => catalog, store, router, eventLog,
+    agent, catalogue: () => catalogue, store, router, eventLog,
     appRegistry, callSkill, userInput, LOCAL_ACTOR,
   };
 }
@@ -447,8 +447,8 @@ describe('CC-TK.F1 — active-circle → app-scope binding (5.3)', () => {
       calls.push({ origin, opId, args });
       return ws.callSkill(origin, opId, args);
     };
-    const parsed = parseInput(text, ws.catalog(), { threadId: 'main' });
-    const route  = resolveDispatch(parsed, ws.catalog());
+    const parsed = parseInput(text, ws.catalogue(), { threadId: 'main' });
+    const route  = resolveDispatch(parsed, ws.catalogue());
     if (route.kind !== 'ready') return { route, calls };
     const reply = await runDispatch(scopeReadyDispatch(route, circleId), spy);
     return { route, reply, calls };
@@ -516,8 +516,8 @@ describe('CC-ST.F1 — active-circle → stoop-scope binding (5.3d)', () => {
   // so an open circle binds the post-write to that circle's groupId,
   // then run the dispatch through the full pipeline.
   async function dispatchInCircle(text, circleId) {
-    const parsed = parseInput(text, ws.catalog(), { threadId: 'main' });
-    const route  = resolveDispatch(parsed, ws.catalog());
+    const parsed = parseInput(text, ws.catalogue(), { threadId: 'main' });
+    const route  = resolveDispatch(parsed, ws.catalogue());
     if (route.kind !== 'ready') return { route };
     const reply = await runDispatch(scopeReadyDispatch(route, circleId), ws.callSkill);
     return { route, reply };

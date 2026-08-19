@@ -124,7 +124,7 @@ export function SignInScreen({ issuer: initialIssuer = DEFAULT_INRUPT_ISSUER } =
   }, [busy, pendingTokens, podBaseInput, podFolderInput, adoptTokens]);
 
   return (
-    <KeyboardAvoidingView style={s.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={s.root} behaviour={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
         <Text style={s.h1}>Folio</Text>
         <Text style={s.h2}>Your markdown notes, mirrored into your Solid pod.</Text>

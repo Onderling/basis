@@ -35,11 +35,11 @@ function toInner(resolve, mem, circleId) {
 }
 
 const KEYS = [
-  'mem://neighborhood/items/01KRVSN5V4KE7ND8DMGH474XCQ.json',
-  'mem://neighborhood/members/webid%3Alocal%3AOVUaJV0',
-  'mem://neighborhood/members/OVUaJV0',
-  'mem://neighborhood/audit/01KRVSN68BDV6JA896N7N4RJBY.json',
-  'mem://neighborhood/groups/G1/config.json',
+  'mem://neighbourhood/items/01KRVSN5V4KE7ND8DMGH474XCQ.json',
+  'mem://neighbourhood/members/webid%3Alocal%3AOVUaJV0',
+  'mem://neighbourhood/members/OVUaJV0',
+  'mem://neighbourhood/audit/01KRVSN68BDV6JA896N7N4RJBY.json',
+  'mem://neighbourhood/groups/G1/config.json',
   'mem://stoop/items/01X/attachments/a.jpg',
   'mem://stoop/threads/t1.json',
   'mem://stoop/reveals.json',

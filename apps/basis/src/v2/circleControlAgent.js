@@ -32,7 +32,7 @@ const SEALED_POSTURES = new Set(['p2', 'p3']);
  * @param {{ append: (event:object) => any }} [deps.keyEventLog]  optional no-pod distribution sink — when
  *   present, every key establish/grant/rotation ALSO emits the versioned key AS a log key-event (fanned to
  *   the then-current members, self-distributing with no pod). The pod key resource is still written
- *   (defense-in-depth); the LOG is the source for a no-pod circle. Absent → pod-only, unchanged.
+ *   (defence-in-depth); the LOG is the source for a no-pod circle. Absent → pod-only, unchanged.
  * @returns {object|null}  the control-agent facade, or `null` for an unsealed (p0/p1) circle.
  */
 export function createCircleControlAgent({

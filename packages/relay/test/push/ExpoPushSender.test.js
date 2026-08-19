@@ -113,7 +113,7 @@ describe('ExpoPushSender', () => {
     expect(await sender.send(null, {})).toEqual({ ok: false, error: 'invalid-token' });
   });
 
-  it('honors a custom endpoint', async () => {
+  it('honours a custom endpoint', async () => {
     const fetchFn = mockFetch(() => jsonResponse({ data: { status: 'ok' } }));
     const sender = new ExpoPushSender({ fetch: fetchFn, endpoint: 'https://my-proxy.example/push' });
     await sender.send('t', {});

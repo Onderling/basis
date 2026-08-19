@@ -143,17 +143,17 @@ null/unknown rung — collapses to the bare state string (dropping any free-text
 
 - `[key='availability']` `string`
 
-## `src/catalogSource.js`
+## `src/catalogueSource.js`
 
-### `createCatalogSource`
+### `createCatalogueSource`
 
-**Kind:** function · **Import:** `createCatalogSource` from `'@onderling/agent-registry'`
+**Kind:** function · **Import:** `createCatalogueSource` from `'@onderling/agent-registry'`
 
 ```js
-createCatalogSource({ resolveEndorsements, endorsementResource, roots, resolveCard, maxDepth = DEFAULT_MAX_DEPTH, cache, now, } = {})
+createCatalogueSource({ resolveEndorsements, endorsementResource, roots, resolveCard, maxDepth = DEFAULT_MAX_DEPTH, cache, now, } = {})
 ```
 
-createCatalogSource — a `{ list, get }` source over the endorsement graph.
+createCatalogueSource — a `{ list, get }` source over the endorsement graph.
 
 **Parameters**
 
@@ -168,29 +168,29 @@ createCatalogSource — a `{ list, get }` source over the endorsement graph.
 
 **Returns:** `{ list: () => Promise<object[]>, get: (id: string) => Promise<object|null> }`
 
-## `src/communityCatalog.js`
+## `src/communityCatalogue.js`
 
-### `communityCatalogUri`
+### `communityCatalogueUri`
 
-**Kind:** function · **Import:** `communityCatalogUri` from `'@onderling/agent-registry'`
+**Kind:** function · **Import:** `communityCatalogueUri` from `'@onderling/agent-registry'`
 
 ```js
-communityCatalogUri({ circleId, anchorPodUri, deviceId, preferPodUri = false } = {})
+communityCatalogueUri({ circleId, anchorPodUri, deviceId, preferPodUri = false } = {})
 ```
 
-Circle-scoped shared-readable resource URI for a community catalog. Distinct
+Circle-scoped shared-readable resource URI for a community catalogue. Distinct
 from the per-endorser G1 path (`/public/endorsements`) so a device can host
 both its own endorsements AND a community it admins, keyed by circleId.
 
-### `createCommunityCatalog`
+### `createCommunityCatalogue`
 
-**Kind:** function · **Import:** `createCommunityCatalog` from `'@onderling/agent-registry'`
+**Kind:** function · **Import:** `createCommunityCatalogue` from `'@onderling/agent-registry'`
 
 ```js
-createCommunityCatalog({ circleId, isAdmin, pseudoPod, anchorPodUri, deviceId, preferPodUri = false, resourceUri, maxRetries, onPersistentConflict, ensureAccess, now, } = {})
+createCommunityCatalogue({ circleId, isAdmin, pseudoPod, anchorPodUri, deviceId, preferPodUri = false, resourceUri, maxRetries, onPersistentConflict, ensureAccess, now, } = {})
 ```
 
-createCommunityCatalog — an admin-gated, circle-owned endorsement resource.
+createCommunityCatalogue — an admin-gated, circle-owned endorsement resource.
 
 Writes (`endorse`, `revoke`, `fork`) are gated to the circle's admins via the
 injected `isAdmin` predicate; reads (`list`, `get`) are open (the resource is
@@ -210,7 +210,7 @@ shared-readable, authority = the signature). Built ON TOP of the G1
 - `[opts.maxRetries]` `number`
 - `[opts.onPersistentConflict]` `(err: Error) => void`
 - `[opts.now]` `() => string`
-- `[opts.ensureAccess]` `(uri: string) => (any|Promise<any>)` — best-effort real-pod access-control hook, forwarded to the underlying endorsement resource. For a community catalog the app wires it to `setResourceAccess` with **public-read + owner-write + admin-write** (the circle's admins' WebIDs — resolve admin pubKeys→WebIDs via the identity resolver / `AgentRegistryMemberMap`; in basis webid===pubKey today). Hermetic no-op on the pseudo-pod. // G3-seam: admin WebIDs via MemberMap.
+- `[opts.ensureAccess]` `(uri: string) => (any|Promise<any>)` — best-effort real-pod access-control hook, forwarded to the underlying endorsement resource. For a community catalogue the app wires it to `setResourceAccess` with **public-read + owner-write + admin-write** (the circle's admins' WebIDs — resolve admin pubKeys→WebIDs via the identity resolver / `AgentRegistryMemberMap`; in basis webid===pubKey today). Hermetic no-op on the pseudo-pod. // G3-seam: admin WebIDs via MemberMap.
 
 **Returns:** `{ endorse, revoke, fork, list, get, ensureAccess, circleId: string, resourceUri: string }`
 
@@ -906,7 +906,7 @@ Valid iff ALL hold:
 Any throw / mismatch → returns `false` (never an exception). On success
 returns the verified "actor" view `{ endorser, subject, claim, cardHash,
 tags, note, issuedAt, expiresAt }` — truthy, and carrying `claim` so the
-catalog can separate `recommend` from `flag`.
+catalogue can separate `recommend` from `flag`.
 
 **Parameters**
 
@@ -936,7 +936,7 @@ endorsementResourceUri({ anchorPodUri, deviceId, preferPodUri = false } = {})
 Shared-readable endorsement-list path for an endorser's pod / device.
 
 Lives under `/public/` (contrast the registry's `/private/`) because the
-catalog read-path reads it cross-pod. The pseudo-pod path is the default,
+catalogue read-path reads it cross-pod. The pseudo-pod path is the default,
 same as the registry.
 
 // real-pod: public-read ACP — on a real Solid pod this resource carries a
@@ -995,7 +995,7 @@ endorsement list, with etag-CAS (reused from concurrency.js).
 - `[opts.maxRetries=3]` `number`
 - `[opts.onPersistentConflict]` `(err: Error) => void`
 - `[opts.now]` `() => string`
-- `[opts.ensureAccess]` `(uri: string) => (any|Promise<any>)` — best-effort real-pod access-control hook. Wired by the app to `@onderling/pod-client`'s `setResourceAccess` (public-read + owner-write for G1; + admin-write for a G3 community catalog). Fires once, best-effort, after the first successful write to a real (https) pod URI; NEVER on a `pseudo-pod://` URI (hermetic no-op). A throwing hook must NOT break the write. Also exposed as `ensureAccess()` for explicit/idempotent use.
+- `[opts.ensureAccess]` `(uri: string) => (any|Promise<any>)` — best-effort real-pod access-control hook. Wired by the app to `@onderling/pod-client`'s `setResourceAccess` (public-read + owner-write for G1; + admin-write for a G3 community catalogue). Fires once, best-effort, after the first successful write to a real (https) pod URI; NEVER on a `pseudo-pod://` URI (hermetic no-op). A throwing hook must NOT break the write. Also exposed as `ensureAccess()` for explicit/idempotent use.
 
 **Returns:** `{ append, revoke, list, get, ensureAccess, resourceUri: string }`
 
@@ -1715,8 +1715,8 @@ project them to trust-graph roots + a per-endorser resolver.
 **Parameters**
 
 - `opts` `object`
-- `opts.resolveCommunity` `(circleId: string) => ({ admins?: string[]|(() => (string[]|Promise<string[]>)), list?: () => (object[]|Promise<object[]>) } | Promise<...>)` — for a subscribed circleId, the community's ADMIN pubKeys (the curator roots) and its catalog `list()` (the community's endorsements). Typically `{ admins: circleAdminPubKeys, list: communityCatalog.list }`.
-- `[opts.resolveEndorsements]` `(pubKey: string) => (object[]|Promise<object[]>)` — optional fallback per-endorser resolver for endorsers whose records live outside the community catalogs (personal curator pods → transitive WoT).
+- `opts.resolveCommunity` `(circleId: string) => ({ admins?: string[]|(() => (string[]|Promise<string[]>)), list?: () => (object[]|Promise<object[]>) } | Promise<...>)` — for a subscribed circleId, the community's ADMIN pubKeys (the curator roots) and its catalogue `list()` (the community's endorsements). Typically `{ admins: circleAdminPubKeys, list: communityCatalogue.list }`.
+- `[opts.resolveEndorsements]` `(pubKey: string) => (object[]|Promise<object[]>)` — optional fallback per-endorser resolver for endorsers whose records live outside the community catalogues (personal curator pods → transitive WoT).
 - `[opts.initial]` `Iterable<string>` — initially-subscribed circleIds.
 
 **Returns:** `{ subscribe, unsubscribe, has, list, roots, resolveEndorsements }`

@@ -1,7 +1,7 @@
 /**
  * Endorsement — a signed CLAIM over an Agent Card (commons-governance G1).
  *
- * The governed object of the curated agent catalog. An endorsement is a
+ * The governed object of the curated agent catalogue. An endorsement is a
  * self-verifying Ed25519 statement — `recommend` or `flag` — whose authority
  * comes from WHO signed it, not WHERE it is stored (contrast the agent
  * registry, whose authority = the `/private/` storage location). It is
@@ -15,9 +15,9 @@
  * ── Why it lives in @onderling/agent-registry (invariant #5) ──────────────────
  * The endorsement is bound to an Agent Card (`SPEC-agents-registry` — the
  * `{name,url,skills[],x-onderling.pubKey}` unit this package already projects via
- * `projectAgentCard`). Agent Cards + the catalog read-view are a SUBSTRATE
+ * `projectAgentCard`). Agent Cards + the catalogue read-view are a SUBSTRATE
  * concern, not kernel: putting card-governance into `@onderling/core` would make
- * the kernel know about catalog curation. So the primitive lives here in the
+ * the kernel know about catalogue curation. So the primitive lives here in the
  * substrate, reusing the kernel crypto (`@onderling/core`) — the substrate → core
  * dependency direction invariant #5 mandates. App wiring stays in the app.
  *
@@ -160,7 +160,7 @@ export function issueEndorsement(endorserIdentity, opts = {}) {
  * Any throw / mismatch → returns `false` (never an exception). On success
  * returns the verified "actor" view `{ endorser, subject, claim, cardHash,
  * tags, note, issuedAt, expiresAt }` — truthy, and carrying `claim` so the
- * catalog can separate `recommend` from `flag`.
+ * catalogue can separate `recommend` from `flag`.
  *
  * @param {object} rec   — an endorsement record
  * @param {object} card  — the Agent Card the endorsement's subject resolves to

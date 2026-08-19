@@ -243,7 +243,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `grantRole` | update | ✅ | · | · | · | · | · |  |
 |  | `revokeGrant` | revoke | ✅ | · | · | · | · | · |  |
 |  | `purgeAgent` | remove | ✅ | · | · | · | ✅ | ✅ |  |
-|  | `listCatalog` | list | ✅ | ✅ | · | · | · | · |  |
+|  | `listCatalogue` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `installAgent` | add | ✅ | · | · | · | ✅ | ✅ |  |
 |  | `listDataVersions` | list | ✅ | · | · | · | · | · |  |
 |  | `restoreDataVersion` | update | ✅ | · | · | · | ✅ | ✅ |  |

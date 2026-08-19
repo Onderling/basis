@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest';
 import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 
-import { createNeighborhoodAgent } from '../src/index.js';
+import { createNeighbourhoodAgent } from '../src/index.js';
 
 const ANNE = 'https://id.example/anne';
 const BOB  = 'https://id.example/bob';
@@ -28,7 +28,7 @@ async function callSkill(agent, skillId, args, fromWebid = ANNE) {
 async function buildBundle(actor = ANNE, peers = []) {
   const id = await AgentIdentity.generate(new VaultMemory());
   const tx = new InternalTransport(new InternalBus(), id.pubKey);
-  const bundle = await createNeighborhoodAgent({
+  const bundle = await createNeighbourhoodAgent({
     identity: id, transport: tx,
     offeringMatch: { group: 'oosterpoort', localActor: actor, peers },
     members:    [{ webid: actor }],
@@ -41,13 +41,13 @@ async function buildPair() {
   const bus = new InternalBus();
   const anneId = await AgentIdentity.generate(new VaultMemory());
   const bobId  = await AgentIdentity.generate(new VaultMemory());
-  const anne = await createNeighborhoodAgent({
+  const anne = await createNeighbourhoodAgent({
     identity: anneId, transport: new InternalTransport(bus, anneId.pubKey),
     offeringMatch: { group: 'oosterpoort', localActor: ANNE,
                   peers: [{ pubKey: bobId.pubKey }] },
     members: [{ webid: ANNE }, { webid: BOB, pubKey: bobId.pubKey }],
   });
-  const bob = await createNeighborhoodAgent({
+  const bob = await createNeighbourhoodAgent({
     identity: bobId, transport: new InternalTransport(bus, bobId.pubKey),
     offeringMatch: { group: 'oosterpoort', localActor: BOB,
                   peers: [{ pubKey: anneId.pubKey }] },

@@ -171,7 +171,7 @@ describe('RoutingStrategy.tierFor', () => {
     expect(t.name).toBe('relay');
   });
 
-  it('honors priority — direct wins over mesh when both present', async () => {
+  it('honours priority — direct wins over mesh when both present', async () => {
     const rs = new RoutingStrategy({
       transports: {
         relay: mkTransport('relay'),
@@ -219,7 +219,7 @@ describe('RoutingStrategy.tierFor', () => {
     expect(t.transport).toBeTruthy();
   });
 
-  it('does not change selectTransport behavior (regression guard)', async () => {
+  it('does not change selectTransport behaviour (regression guard)', async () => {
     const rs = new RoutingStrategy({
       transports: {
         relay: mkTransport('relay'),

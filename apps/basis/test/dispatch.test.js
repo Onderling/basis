@@ -105,7 +105,7 @@ describe('runDispatch — input validation', () => {
 });
 
 describe('runDispatch — integration with parser + router + manifestMerge', () => {
-  it('end-to-end: parse → resolve → dispatch on a real-ish catalog', async () => {
+  it('end-to-end: parse → resolve → dispatch on a real-ish catalogue', async () => {
     const { parseInput }      = await import('../src/parser.js');
     const { mergeManifests }  = await import('../src/manifestMerge.js');
     const { resolveDispatch } = await import('../src/router.js');
@@ -119,7 +119,7 @@ describe('runDispatch — integration with parser + router + manifestMerge', () 
       }],
       views: [{ id: 'tasks', title: 'C', type: 'chore' }],
     };
-    const catalog = mergeManifests([{ manifest: m }]);
+    const catalogue = mergeManifests([{ manifest: m }]);
 
     const calls = [];
     const callSkill = async (appOrigin, opId, args) => {
@@ -127,8 +127,8 @@ describe('runDispatch — integration with parser + router + manifestMerge', () 
       return { ok: true };
     };
 
-    const parse = parseInput('/done dishwasher', catalog, { threadId: 't-9' });
-    const ready = resolveDispatch(parse, catalog);
+    const parse = parseInput('/done dishwasher', catalogue, { threadId: 't-9' });
+    const ready = resolveDispatch(parse, catalogue);
     expect(ready.kind).toBe('ready');
 
     const reply = await runDispatch(ready, callSkill);

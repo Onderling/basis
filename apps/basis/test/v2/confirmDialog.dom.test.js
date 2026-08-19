@@ -19,7 +19,7 @@ import { resolveDispatch } from '../../src/router.js';
 import { confirmRequestFromRoute, runConfirmGate } from '../../src/v2/confirmGate.js';
 import { renderConfirmDialog } from '../../web/v2/confirmDialog.js';
 
-const catalog = mergeManifests([{ manifest: agentsManifest }]);
+const catalogue = mergeManifests([{ manifest: agentsManifest }]);
 const t = (k) => k;
 const REVOKE_MSG = agentsManifest.operations.find((o) => o.id === 'revokeAgent').surfaces.ui.confirm.message;
 
@@ -28,7 +28,7 @@ function mount() { const el = document.createElement('div'); document.body.appen
 function revokeRoute() {
   return resolveDispatch(
     { kind: 'slash', opId: 'revokeAgent', args: { agentId: 'summary-bot' }, command: '(bot)', body: '' },
-    catalog,
+    catalogue,
   );
 }
 
@@ -77,7 +77,7 @@ describe('the full web chain — gate + dialog + dispatch', () => {
     const execute = vi.fn();
     const onCancelNotice = vi.fn();
     const run = runConfirmGate({
-      route: revokeRoute(), catalog, t,
+      route: revokeRoute(), catalogue, t,
       present: domPresenter(el), execute, onCancelNotice,
     });
     // The dialog is up with the manifest's message; click the red confirm.
@@ -98,7 +98,7 @@ describe('the full web chain — gate + dialog + dispatch', () => {
     const execute = vi.fn();
     const onCancelNotice = vi.fn();
     const run = runConfirmGate({
-      route: revokeRoute(), catalog, t,
+      route: revokeRoute(), catalogue, t,
       present: domPresenter(el), execute, onCancelNotice,
     });
     document.querySelector('.cc-confirm__cancel').click();
@@ -113,7 +113,7 @@ describe('the full web chain — gate + dialog + dispatch', () => {
     const el = mount();
     const execute = vi.fn();
     const run = runConfirmGate({
-      route: revokeRoute(), catalog, t,
+      route: revokeRoute(), catalogue, t,
       present: domPresenter(el), execute, onCancelNotice: () => {},
     });
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));

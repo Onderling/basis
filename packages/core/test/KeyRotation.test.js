@@ -122,14 +122,14 @@ describe('KeyRotation.applyToRegistry', () => {
     const newId = await makeId();
     const tr    = new TrustRegistry(new VaultMemory());
     await tr.addGroup(oldId.pubKey, 'home');
-    await tr.addGroup(oldId.pubKey, 'neighborhood');
+    await tr.addGroup(oldId.pubKey, 'neighbourhood');
 
     const proof = await KeyRotation.buildProof(oldId, newId.pubKey);
     await KeyRotation.applyToRegistry(proof, tr);
 
     const rec = await tr.getRecord(newId.pubKey);
     expect(rec.groups).toContain('home');
-    expect(rec.groups).toContain('neighborhood');
+    expect(rec.groups).toContain('neighbourhood');
   });
 
   it('demotes old key when removeOld = true', async () => {

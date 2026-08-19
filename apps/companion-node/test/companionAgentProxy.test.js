@@ -761,7 +761,7 @@ describe('companion-node R3.3 — agent-proxy SIZE CAP: the base64-over-WS safet
 describe('companion-node R3-advisory — host-side local scope pre-filter (advisory; device stays authoritative)', () => {
   // The advisory pre-filter re-adds R2b.1's `ScopedPodClient` in FRONT of the
   // agent-proxy `PodClient` (§R3 decision #4's deferred follow-up). It is a
-  // latency optimization + defense-in-depth: an obviously out-of-scope request
+  // latency optimization + defence-in-depth: an obviously out-of-scope request
   // is denied LOCALLY, without a relay round-trip. The DEVICE remains the sole
   // load-bearing authority (proven by the BYPASSED-pre-filter tests above and by
   // DEVICE STILL AUTHORITATIVE below). The two gates carry DISTINCT deny codes —
@@ -810,12 +810,12 @@ describe('companion-node R3-advisory — host-side local scope pre-filter (advis
   it('DEVICE STILL AUTHORITATIVE: with the pre-filter BYPASSED, the SAME out-of-scope read round-trips and is denied BY THE DEVICE', async () => {
     const owner = await AgentIdentity.generate(new VaultMemory());
     const devicePod = makeDevicePod({
-      secret: 'oidc-access-SECRET-defense',
+      secret: 'oidc-access-SECRET-defence',
       files: [{ path: '/photos/secret.jpg', body: 'PRIVATE-PHOTO-BYTES', contentType: 'image/jpeg' }],
     });
     // IDENTICAL scenario to FAST LOCAL DENY, but the advisory pre-filter is
     // BYPASSED — so the DEVICE is the ONLY gate. This proves the device remains
-    // load-bearing: the pre-filter is defense-in-depth, never the sole authority.
+    // load-bearing: the pre-filter is defence-in-depth, never the sole authority.
     const host   = await bootProxyHost({ owner, container: 'photos/', preFilter: false });
     const device = await makeOwnerDevice(host, owner, devicePod);
 

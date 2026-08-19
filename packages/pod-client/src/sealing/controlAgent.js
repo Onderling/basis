@@ -34,7 +34,7 @@ function normalizeMember(m) {
  * @param {Array<{webId,publicKey,role}>} [a.roster]             initial member roster
  * @param {{ append: (event:object) => any }} [a.keyEventLog]     optional log sink — when present, every key
  *   establishment/grant/rotation ALSO emits the versioned key AS a log key-event (self-distributing, no-pod).
- *   The pod key resource is still written (defense-in-depth); the LOG is the source. Absent → pod-only, unchanged.
+ *   The pod key resource is still written (defence-in-depth); the LOG is the source. Absent → pod-only, unchanged.
  * @param {string} [a.groupId]                                    circle id stamped onto emitted key-events.
  */
 export function createControlAgent({ sharing, containerUri, keyStore, controllerKey, modes = ['read', 'write'], roster = [], revokeMeshProof = null, keyEventLog = null, groupId = null }) {
@@ -51,7 +51,7 @@ export function createControlAgent({ sharing, containerUri, keyStore, controller
   const recipientsWithController = (pubs) => [...new Set([...pubs, controllerKey.publicKey])];
 
   /** Emit the just-written key RESOURCE as a log key-event too, so the SAME versioned key self-distributes with
-   *  no pod (the resource is defense-in-depth; the log is the source). Best-effort: a sink failure never breaks
+   *  no pod (the resource is defence-in-depth; the log is the source). Best-effort: a sink failure never breaks
    *  the membership op — the pod resource still carries the key. No-op when no `keyEventLog` was injected. */
   async function emitKeyEvent(resource) {
     if (!keyEventLog || typeof keyEventLog.append !== 'function' || !resource) return;

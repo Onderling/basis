@@ -63,7 +63,7 @@ export {
 } from './followUps.js';
 export { buildEmbed, claimEmbed, actionsFor as embedActionsFor } from './embed.js';
 export { formatSyncHints, formatLastSync, relativeAgo } from './syncHints.js';
-export { AppRegistry, filterCatalog } from './appRegistry.js';
+export { AppRegistry, filterCatalogue } from './appRegistry.js';
 export {
   openExternalFlow, parseCallbackUrl, resumeInFlightFlows,
   generateSessionId, IN_FLIGHT_STORE_KEY,
@@ -166,8 +166,8 @@ export { circleReplyText } from './v2/circleReply.js';
 // 1:1-bot chat gate — the CONVERSATION assistant-header strip shows ONLY in a genuine 1:1-with-a-bot
 // chat, hidden on multi-person circles (web ≡ mobile; one shared decision).
 export { oneToOneBotLabel } from './v2/botChat.js';
-// Part D — scope a circle's catalog to its apps (drops basis infra ops like /me); web + mobile.
-export { scopeCatalogToApps } from './v2/circleCatalogScope.js';
+// Part D — scope a circle's catalogue to its apps (drops basis infra ops like /me); web + mobile.
+export { scopeCatalogueToApps } from './v2/circleCatalogueScope.js';
 // E3 — shared record-panel auto-refresh helpers (web EventRouter + mobile post-mutation).
 export {
   REFRESHABLE_VERBS, panelMatchesItemRef, itemRefFromReply, collectStalePanels,

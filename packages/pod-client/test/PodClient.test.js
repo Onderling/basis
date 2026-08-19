@@ -114,14 +114,14 @@ describe('PodClient.read', () => {
     expect(r.content).toEqual(obj);
   });
 
-  it('honors decode: bytes', async () => {
+  it('honours decode: bytes', async () => {
     const bytes = new TextEncoder().encode('hello');
     ps.read.mockResolvedValue({ content: bytes, contentType: 'text/plain', lastModified: 'x', etag: '"e4"', size: 5 });
     const r = await client.read('/note.txt', { decode: 'bytes' });
     expect(r.content).toBe(bytes);
   });
 
-  it('honors decode: json', async () => {
+  it('honours decode: json', async () => {
     const bytes = new TextEncoder().encode('{"x":42}');
     ps.read.mockResolvedValue({ content: bytes, contentType: 'text/plain', lastModified: 'x', etag: '"e5"', size: bytes.byteLength });
     const r = await client.read('/x.txt', { decode: 'json' });
@@ -317,7 +317,7 @@ describe('PodClient.patch', () => {
     expect(inrupt.removeUrl).toHaveBeenCalledWith(expect.any(Object), 'https://schema.org/knows', 'https://bob.example/p#me');
   });
 
-  it('honors a custom applyFn that mutates the dataset', async () => {
+  it('honours a custom applyFn that mutates the dataset', async () => {
     const applyFn = vi.fn((ds) => ({ ...ds, custom: true }));
     await client.patch('/x', { applyFn });
     expect(applyFn).toHaveBeenCalled();

@@ -95,7 +95,7 @@ export { requestForm } from './src/requestForm.js';
 export { egressReceipt, gateEgress } from './src/requestGate.js';
 
 // commons-governance G1 — signed endorsements of Agent Cards + the
-// endorsement-backed curated catalog read-view (fills 's catalogSource seam).
+// endorsement-backed curated catalogue read-view (fills 's catalogueSource seam).
 export {
   issueEndorsement,
   verifyEndorsement,
@@ -109,19 +109,19 @@ export {
   emptyEndorsementResource,
   ENDORSEMENT_RESOURCE_VERSION,
 } from './src/endorsementResource.js';
-export { createCatalogSource } from './src/catalogSource.js';
+export { createCatalogueSource } from './src/catalogueSource.js';
 
 // commons-governance G2 — the web-of-trust graph walk (multiple roots,
 // transitive bounded-depth endorsement walk, trust-path-proximity ranking)
-// that createCatalogSource consumes, plus a real A2A well-known card resolver
+// that createCatalogueSource consumes, plus a real A2A well-known card resolver
 // seam (injected fetch; the hermetic default is an injected map).
 export { walkTrustGraph, CURATOR_ROLES, DEFAULT_MAX_DEPTH } from './src/trustGraph.js';
 export { createWellKnownCardResolver } from './src/wellKnownCardResolver.js';
 
 // commons-governance G3 — federation + moderation: circle-scoped, admin-gated
-// COMMUNITY catalogs (a community = a circle; writes gated to its admins via
+// COMMUNITY catalogues (a community = a circle; writes gated to its admins via
 // the circle's own policy), SUBSCRIBE/unsubscribe (a community's admins become
 // the user's curator roots), fork/exit, and revoke. `expiresAt` lapse is
 // already enforced by verifyEndorsement (G1) — the walk drops lapsed edges.
-export { createCommunityCatalog, communityCatalogUri } from './src/communityCatalog.js';
+export { createCommunityCatalogue, communityCatalogueUri } from './src/communityCatalogue.js';
 export { createCommunitySubscriptions } from './src/subscriptions.js';

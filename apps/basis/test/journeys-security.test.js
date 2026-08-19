@@ -44,7 +44,7 @@ import { createSecureAgent }           from '@onderling/secure-agent';
  */
 async function bootSafetyWorkspace({ chatVault, ownerRootVault, secureAgentOpts } = {}) {
   const agent = await createRealHouseholdAgent({ chatVault, ownerRootVault, secureAgentOpts });
-  const catalog = mergeManifests(
+  const catalogue = mergeManifests(
     [{ manifest: basisManifest }, { manifest: agent.manifest }],
     { runtime: 'browser' },
   );
@@ -58,7 +58,7 @@ async function bootSafetyWorkspace({ chatVault, ownerRootVault, secureAgentOpts 
   };
 
   const localBuiltins = createLocalBuiltins({
-    catalog, t, threadStore,
+    catalogue, t, threadStore,
     setActive: (id) => threadStore.setActiveThread(id),
     callSkill, localActor: 'webid:local-demo-user',
     simPeers: {}, appRegistry: { allowsOrigin: () => true, subscribe: () => () => {} },
@@ -79,8 +79,8 @@ async function bootSafetyWorkspace({ chatVault, ownerRootVault, secureAgentOpts 
    * journeys.test.js.
    */
   async function run(line) {
-    const parsed = parseInput(line, catalog, { threadId: null });
-    const route  = resolveDispatch(parsed, catalog);
+    const parsed = parseInput(line, catalogue, { threadId: null });
+    const route  = resolveDispatch(parsed, catalogue);
     if (route.kind !== 'ready') {
       return { ok: false, error: route.error ?? route.message ?? 'parse failure', route };
     }
@@ -126,7 +126,7 @@ describe('Safety integration journeys', () => {
       expect(ws.agent.sa.mute.has('app.target.123')).toBe(true);
       // sa.peer.sendTo throws "peer transport not connected" BEFORE
       // the mute check when peer is idle — that's a different code
-      // path.  The behavior we want to verify here is that mute is
+      // path.  The behaviour we want to verify here is that mute is
       // persisted + visible.  The receive-side drop is verified at
       // the secure-agent unit-test level (S1).
       // What we CAN verify integration-side: securityStatus reflects mute

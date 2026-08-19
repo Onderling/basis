@@ -513,7 +513,7 @@ export default function App() {
           // remaining members). The bundle injects its peer sender + skill dispatch at boot.
           setKeyEventWiring: setCircleKeyEventWiring,
           // Extension mappings (feedback-extension) — load installed extensions from AsyncStorage at boot,
-          // verify them against the base catalog, and merge the accepted ones into the dispatch catalog.
+          // verify them against the base catalogue, and merge the accepted ones into the dispatch catalogue.
           mappingsStore:    asyncStorageMappingsStore(AsyncStorage),
           mappingsDeviceId: MAPPINGS_DEVICE,
           // Skip the demo seed on warm boot.  Saves ~2.5s of boot time.
@@ -533,8 +533,8 @@ export default function App() {
         if (cancelled) { b.dispose?.(); return; }
         dlog.boot('bundle ready (App)', {
           transport:  b.transport,
-          appOrigins: [...b.catalog.appOrigins],
-          opCount:    b.catalog.opsById?.size ?? 0,
+          appOrigins: [...b.catalogue.appOrigins],
+          opCount:    b.catalogue.opsById?.size ?? 0,
         });
         // ε.1 — expose the bundle to the inbox's lazy-bound ingest
         // closure built above.  Must happen BEFORE the rehydrator

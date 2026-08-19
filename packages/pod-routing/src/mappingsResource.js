@@ -8,7 +8,7 @@
  *
  *   pseudo-pod://<deviceId>/private/mappings/<id>
  *
- * and are SCANNED at startup → merged into the catalog (the merge + the
+ * and are SCANNED at startup → merged into the catalogue (the merge + the
  * sandbox-by-construction verifier `verifyComposite` run LATER, at merge
  * time; this module is I/O + shape only). This is the folder analogue of
  * `configResource.js` (a single resource).
@@ -59,7 +59,7 @@ export function mappingResourceUri({ deviceId, id }) {
  */
 
 /**
- * Validate + freeze one mapping object (SHAPE only — catalog resolution of
+ * Validate + freeze one mapping object (SHAPE only — catalogue resolution of
  * the ops happens later via `verifyComposite`). Throws on a structural defect.
  *
  * @param {*} raw

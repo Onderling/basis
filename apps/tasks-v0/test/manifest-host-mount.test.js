@@ -76,7 +76,7 @@ describe('SP-4b: tasks-v0 multi-circle through manifest-host', () => {
   it('host.compose() namespaces every tasks op as tasks.opId', async () => {
     const { host } = await setup();
     const composed = host.compose();
-    const ids = composed.toolCatalog.map((t) => t.id).sort();
+    const ids = composed.toolCatalogue.map((t) => t.id).sort();
     for (const op of tasksManifest.operations) {
       expect(ids).toContain(`tasks.${op.id}`);
     }
@@ -148,7 +148,7 @@ describe('SP-4b: tasks-v0 multi-circle through manifest-host', () => {
     const composed = host.compose();
     expect(composed.collisions).toEqual([]);   // no overlapping commands
     // Both apps' tools coexist:
-    const ids = composed.toolCatalog.map((t) => t.id);
+    const ids = composed.toolCatalogue.map((t) => t.id);
     expect(ids).toContain('tasks.addTask');
     expect(ids).toContain('synthetic.addNote');
   });

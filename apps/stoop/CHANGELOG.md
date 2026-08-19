@@ -44,14 +44,14 @@ ride the canonical media noun instead of a bespoke shape.
 New export: `@onderling-app/stoop/browser` →
 `createBrowserStoopAgent({bus, identityVault, localActor, group?, members?, persistDb?, label?})`.
 
-Lets basis boot a real Stoop NeighborhoodAgent on its shared
+Lets basis boot a real Stoop NeighbourhoodAgent on its shared
 bus.  Replaces basis's ~85 lines of mock stoop handlers
 (listFeed / postRequest / searchPosts / getStoopProfile /
 revealPeer) with the actual 110-skill stoop agent.  ~6 skills
 surface via chat slash commands; the rest are reachable via
 `agent.callSkill('stoop', ...)` for future expansion.
 
-Implementation: thin wrapper around `createNeighborhoodAgent` that
+Implementation: thin wrapper around `createNeighbourhoodAgent` that
 generates an InternalTransport on the shared bus + restores/creates
 identity from a vault.  Uses the slice-2a `persistDb` opt for
 IndexedDB persistence in the browser.
@@ -260,7 +260,7 @@ Phase 52.9.2 `groupMirror` retirement.
 
 ## [0.2.0] — 2026-05-06
 
-V2 of what was H5 / neighborhood-v0. Renamed in place; the package
+V2 of what was H5 / neighbourhood-v0. Renamed in place; the package
 is now `@onderling-app/stoop`.
 
 Substrate extensions (Phase 1 — landed in `packages/`):
@@ -320,7 +320,7 @@ identity-resolver 30→49, notifier 40→45, relay 121→126.
 
 H5 V0 — initial release (non-anonymous).
 
-- `createNeighborhoodAgent({skillMatch, members?, itemBackend?})` factory.
+- `createNeighbourhoodAgent({skillMatch, members?, itemBackend?})` factory.
 - Skills: `postRequest`, `acceptResponder`, `cancelRequest`, `listMyRequests`, `listOpen`, `resolveMember`.
 - 9 integration tests.
 

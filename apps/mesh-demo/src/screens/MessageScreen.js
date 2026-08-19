@@ -94,7 +94,7 @@ export function MessageScreen({ route }) {
   return (
     <KeyboardAvoidingView
       style={s.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behaviour={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       {/* Peer info bar */}
       <View style={s.peerBar}>

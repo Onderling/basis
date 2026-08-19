@@ -132,7 +132,7 @@ export default function CircleMemberCardScreen({
   );
 }
 
-// keep VIEWER_KINDS referenced so the import documents the shared vocabulary this screen honors.
+// keep VIEWER_KINDS referenced so the import documents the shared vocabulary this screen honours.
 export { VIEWER_KINDS };
 
 const makeStyles = (theme) => StyleSheet.create({

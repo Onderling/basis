@@ -27,7 +27,7 @@ import 'fake-indexeddb/auto';
 import {
   parseInput, mergeManifests, resolveDispatch, runDispatch,
   createDefaultThreadStore, createEventRouter,
-  EventLog, AppRegistry, filterCatalog,
+  EventLog, AppRegistry, filterCatalogue,
   runBrief, createBriefCache, runFind,
   basisManifest,
 } from '../src/index.js';
@@ -52,7 +52,7 @@ async function bootWorkspace({ chatVault } = {}) {
     chatVault,
     publishEvent: (event) => { if (routerRef) routerRef.deliver(event); },
   });
-  const rawCatalog = mergeManifests([
+  const rawCatalogue = mergeManifests([
     { manifest: basisManifest },
     { manifest: agent.manifest },
     { manifest: mockTasksManifest },
@@ -62,9 +62,9 @@ async function bootWorkspace({ chatVault } = {}) {
   ], { runtime: 'browser' });
 
   const appRegistry = new AppRegistry();
-  appRegistry.syncWithCatalog(rawCatalog.appOrigins);
-  let catalog = filterCatalog(rawCatalog, appRegistry);
-  appRegistry.subscribe(() => { catalog = filterCatalog(rawCatalog, appRegistry); });
+  appRegistry.syncWithCatalogue(rawCatalogue.appOrigins);
+  let catalogue = filterCatalogue(rawCatalogue, appRegistry);
+  appRegistry.subscribe(() => { catalogue = filterCatalogue(rawCatalogue, appRegistry); });
 
   const store = createDefaultThreadStore();
   const router = createEventRouter({ threadStore: store });
@@ -85,31 +85,31 @@ async function bootWorkspace({ chatVault } = {}) {
   };
 
   const localBuiltins = createLocalBuiltins({
-    catalog: rawCatalog,
+    catalogue: rawCatalogue,
     t: (k, p) => p ? `${k}(${JSON.stringify(p)})` : k,
     threadStore: store,
     setActive: (id) => store.setActiveThread(id),
     callSkill, localActor: LOCAL_ACTOR,
     simPeers: {}, appRegistry, eventLog,
     briefRunner: (opts) => runBrief({
-      catalog, callSkill, cache: briefCache,
+      catalogue, callSkill, cache: briefCache,
       bypassCache: opts?.bypassCache,
     }),
-    findRunner: (opts) => runFind({ catalog, callSkill, query: opts?.query }),
+    findRunner: (opts) => runFind({ catalogue, callSkill, query: opts?.query }),
     agent, podAuth: null, externalFlow: null, openFilePicker: null,
     connectPeer: async () => agent.peer,
   });
 
   async function userInput(text, threadId = 'main') {
-    const parsed = parseInput(text, catalog, { threadId });
+    const parsed = parseInput(text, catalogue, { threadId });
     if (parsed.kind !== 'slash') return { kind: 'not-a-slash', text };
-    const route = resolveDispatch(parsed, catalog);
+    const route = resolveDispatch(parsed, catalogue);
     if (route.kind !== 'ready') return route;
     return runDispatch(route, callSkill);
   }
 
   return {
-    agent, catalog: () => catalog, store, router, eventLog,
+    agent, catalogue: () => catalogue, store, router, eventLog,
     appRegistry, callSkill, userInput, LOCAL_ACTOR,
   };
 }
@@ -175,7 +175,7 @@ describe('JM-2 — offline post, online sync (substrate persistence)', () => {
    *   Anne loses signal while drafting a stoop post.  She finishes
    *   it, hits send; basis-mobile queues it.  Five minutes
    *   later she's back on Wi-Fi; the post fans out via mesh + her
-   *   phone shows the ack from a neighbor who saw it.
+   *   phone shows the ack from a neighbour who saw it.
    *
    * Substrate spine testable at Layer 1: post is created + visible
    * in the same boot's feed.  The actual offline-queue + reconnect

@@ -382,7 +382,7 @@ describe('startRelay — group auth (Q-E.2)', () => {
     try { ws.close(); } catch {}
   });
 
-  it('open mode (no acceptedGroups) accepts every client (legacy behavior)', async () => {
+  it('open mode (no acceptedGroups) accepts every client (legacy behaviour)', async () => {
     const openRelay = await startRelay({ port: 0 }); // no acceptedGroups
     try {
       const ws = await openClient(`ws://127.0.0.1:${openRelay.port}`);

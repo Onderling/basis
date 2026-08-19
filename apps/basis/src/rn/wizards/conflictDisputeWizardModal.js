@@ -2,7 +2,7 @@
  * **Platform: RN**.  Mobile parity for
  * `src/web/wizards/conflictDisputeWizard.js` (Bundle F,
  * 2026-05-26).  Consumes the SAME portable state machine
- * (`src/core/wizards/conflictDisputeState.js`) so behavior stays
+ * (`src/core/wizards/conflictDisputeState.js`) so behaviour stays
  * aligned across web + mobile.
  *
  * 3-step dispute flow:

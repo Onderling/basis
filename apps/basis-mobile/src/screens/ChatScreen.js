@@ -416,7 +416,7 @@ export default function ChatScreen({
     return buildMobileLocalBuiltins({
       threadStateRef, setThreadState,
       agent:         bootState.bundle.agent,
-      catalog:       bootState.bundle.catalog,
+      catalogue:       bootState.bundle.catalogue,
       callSkill:     bootState.bundle.callSkill,
       t,
       eventLog:       eventLogRef.current,
@@ -443,9 +443,9 @@ export default function ChatScreen({
   // buildConsentModel/installMapping (sandbox gate + store write). Trigger via globalThis.onderlingInstallExtension
   // (set by the hook). V0: the mapping persists to AsyncStorage and surfaces as a slash-command on the next boot.
   const extStore = useMemo(() => asyncStorageMappingsStore(AsyncStorage), []);
-  const extCatalog = bootState.kind === 'ready' ? bootState.bundle.catalog : { opsById: new Map() };
+  const extCatalogue = bootState.kind === 'ready' ? bootState.bundle.catalogue : { opsById: new Map() };
   const { consentResult, confirm: confirmExtInstall, decline: declineExtInstall } = useExtensionInstall({
-    store: extStore, deviceId: MAPPINGS_DEVICE, catalog: extCatalog, onInstalled: () => {},
+    store: extStore, deviceId: MAPPINGS_DEVICE, catalogue: extCatalogue, onInstalled: () => {},
   });
 
   // M1 (2026-05-29) — the agent bundle is booted ONCE in App.js and
@@ -833,8 +833,8 @@ export default function ChatScreen({
     const { agent, callSkill } = bootState.bundle;
     dlog.boot('attaching peer wiring', {
       transport:  bootState.bundle.transport,
-      appOrigins: [...bootState.bundle.catalog.appOrigins],
-      opCount:    bootState.bundle.catalog.opsById?.size ?? 0,
+      appOrigins: [...bootState.bundle.catalogue.appOrigins],
+      opCount:    bootState.bundle.catalogue.opsById?.size ?? 0,
     });
     bootState.bundle.attachPeerWiring?.(buildPeerWiring({ agent, callSkill, contactChannel: bootState.bundle.contactChannel, pendingPeerRedeems: bootState.bundle.pendingPeerRedeems, pendingPersonaProps: bootState.bundle.pendingPersonaProps, sharedWithMeStore: bootState.bundle.sharedWithMeStore }));
   }, [bootState, buildPeerWiring]);
@@ -1073,7 +1073,7 @@ export default function ChatScreen({
       // auto-refresh any open record/mini-page/embed panel in OTHER
       // threads showing that item (mirrors web's onPanelStale path,
       // which excludes the dispatching thread).  Fire-and-forget.
-      const verb = bootState.bundle.catalog?.opsById?.get(dispatch.opId)?.op?.verb;
+      const verb = bootState.bundle.catalogue?.opsById?.get(dispatch.opId)?.op?.verb;
       if (dispatch.kind === 'ready' && verb && !REFRESHABLE_VERBS.has(verb)) {
         const itemRef = itemRefFromReply(replyForRefresh, dispatch.appOrigin);
         if (itemRef) {
@@ -1081,7 +1081,7 @@ export default function ChatScreen({
             itemRef,
             threads:           listThreads(threadStateRef.current),
             excludeThreadId:   targetThreadId,
-            catalog:           bootState.bundle.catalog,
+            catalogue:           bootState.bundle.catalogue,
             manifestsByOrigin: bootState.bundle.manifestsByOrigin,
             callSkill:         bootState.bundle.callSkill,
             t,
@@ -1232,7 +1232,7 @@ export default function ChatScreen({
         if (origin?.sourceDispatch) {
           const refreshed = await refreshList({
             sourceDispatch:    origin.sourceDispatch,
-            catalog:           bootState.bundle.catalog,
+            catalogue:           bootState.bundle.catalogue,
             manifestsByOrigin: bootState.bundle.manifestsByOrigin,
             callSkill:         bootState.bundle.callSkill,
             t,
@@ -1247,9 +1247,9 @@ export default function ChatScreen({
       return;
     }
 
-    const catalog  = bootState.bundle.catalog;
-    const parsed   = parseInput(text, catalog);
-    const dispatch = resolveDispatch(parsed, catalog);
+    const catalogue  = bootState.bundle.catalogue;
+    const parsed   = parseInput(text, catalogue);
+    const dispatch = resolveDispatch(parsed, catalogue);
 
     // slashes for wizard ops launch the modal directly
     // (mirrors web's pageSurfaceOpen path).  Without this the wizard
@@ -1319,8 +1319,8 @@ export default function ChatScreen({
       return;
     }
 
-    const catalog = bootState.bundle.catalog;
-    const entry = catalog.opsById?.get(opId);
+    const catalogue = bootState.bundle.catalogue;
+    const entry = catalogue.opsById?.get(opId);
     if (!entry) {
       await dispatchAndAppend({
         dispatch: {
@@ -1345,7 +1345,7 @@ export default function ChatScreen({
       kind: 'slash', opId, args, threadId: null,
       command: '(button)', body: itemId,
     };
-    const dispatch = resolveDispatch(parse, catalog);
+    const dispatch = resolveDispatch(parse, catalogue);
 
     if (dispatch.kind === 'needsForm') {
       // Try single-field first; fall back to multi-field form bubble
@@ -1406,7 +1406,7 @@ export default function ChatScreen({
       if (sourceDispatch) {
         const refreshed = await refreshList({
           sourceDispatch,
-          catalog,
+          catalogue,
           manifestsByOrigin: bootState.bundle.manifestsByOrigin,
           callSkill:         bootState.bundle.callSkill,
           t,
@@ -1656,7 +1656,7 @@ export default function ChatScreen({
       if (origin?.sourceDispatch) {
         const refreshed = await refreshList({
           sourceDispatch:    origin.sourceDispatch,
-          catalog:           bootState.bundle.catalog,
+          catalogue:           bootState.bundle.catalogue,
           manifestsByOrigin: bootState.bundle.manifestsByOrigin,
           callSkill:         bootState.bundle.callSkill,
           t,
@@ -1685,7 +1685,7 @@ export default function ChatScreen({
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behaviour={Platform.OS === 'ios' ? 'padding' : undefined}
       testID="chat-screen"
     >
       <View style={styles.header}>
@@ -1804,7 +1804,7 @@ export default function ChatScreen({
 
       {bootState.kind === 'ready' && (
         <SlashFAB
-          catalog={bootState.bundle.catalog}
+          catalogue={bootState.bundle.catalogue}
           onDispatch={submitInput}
         />
       )}

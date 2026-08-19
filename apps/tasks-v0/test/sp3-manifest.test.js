@@ -7,7 +7,7 @@
  *     `src/skills/index.js`'s `buildSkills()` output (so the manifest
  *     and the agent stay in sync — if a skill is renamed / removed,
  *     this test catches it before the LLM hits a wall).
- *   - `renderChat(manifest)` produces a well-formed toolCatalog
+ *   - `renderChat(manifest)` produces a well-formed toolCatalogue
  *     covering every op with the expected shape.
  *   - `commandMenu` is empty (no `surfaces.slash` in V0 — chat-only).
  *
@@ -96,7 +96,7 @@ describe('SP-3 V0: tasks-v0 manifest', () => {
     expect(mode.of).toEqual(['auto', 'explicit']);
   });
 
-  it('renderChat produces well-formed toolCatalog covering every op', () => {
+  it('renderChat produces well-formed toolCatalogue covering every op', () => {
     const stub = Object.fromEntries(
       tasksManifest.operations.map((op) => [
         op.id,
@@ -108,10 +108,10 @@ describe('SP-3 V0: tasks-v0 manifest', () => {
       toSkillCtx:    (c) => c,
     });
 
-    expect(out.toolCatalog).toHaveLength(tasksManifest.operations.length);
+    expect(out.toolCatalogue).toHaveLength(tasksManifest.operations.length);
     expect(Object.keys(out.toolHandlers)).toHaveLength(tasksManifest.operations.length);
 
-    for (const t of out.toolCatalog) {
+    for (const t of out.toolCatalogue) {
       expect(t.id).toBeTruthy();
       expect(typeof t.description).toBe('string');
       expect(t.description.length).toBeGreaterThan(0);

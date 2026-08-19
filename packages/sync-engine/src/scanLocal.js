@@ -67,7 +67,7 @@ async function walk(absDir, relDir, out, pathMap, fs, hash) {
   }
   for (const ent of dirents) {
     const childRel = relDir === '' ? ent.name : `${relDir}/${ent.name}`;
-    // Use POSIX joining for adapter-portable behavior.  The Node fs
+    // Use POSIX joining for adapter-portable behaviour.  The Node fs
     // adapter accepts `/` paths fine on POSIX (and handles Windows-style
     // separators internally for the path-join call sites that still need
     // them, e.g. test setup).

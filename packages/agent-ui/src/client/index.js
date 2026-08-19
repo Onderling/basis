@@ -4,7 +4,7 @@
  *
  * Legacy `AgentUiClient` (bespoke `POST /api/skills/:id` shape) was
  * deleted 2026-05-04 once all three consumers (tasks-v0,
- * neighborhood-v0, archive) migrated to A2A.
+ * neighbourhood-v0, archive) migrated to A2A.
  */
 
 export { LocalAgentClient } from './LocalAgentClient.js';

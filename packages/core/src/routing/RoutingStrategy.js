@@ -243,7 +243,7 @@ export class RoutingStrategy {
    * `routing/ReachabilityTier.js` for definitions.
    *
    * Additive accessor on top of `selectTransport()` — does not change
-   * routing behavior, only exposes it.
+   * routing behaviour, only exposes it.
    *
    * @param {string} peerId
    * @param {object} [opts]

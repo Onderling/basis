@@ -6,17 +6,17 @@
  * user's `@onderling/agent-registry` ("your agents") with ONLY the
  * capabilities the user grants at install — capability-security,
  * default-deny, NO ambient authority.  Two ways in:
- *   • CURATED default — `installAgent({ catalogId })` fetches the card
- *     from a pluggable catalog SOURCE (`store.catalog`, a `list()`/
+ *   • CURATED default — `installAgent({ catalogueId })` fetches the card
+ *     from a pluggable catalogue SOURCE (`store.catalogue`, a `list()`/
  *     `get(id)`-shaped collaborator).  The default source is a local
- *     stub (see defaultCatalog.js).
+ *     stub (see defaultCatalogue.js).
  *   • POWER-USER override — `installAgent({ card })` installs an
- *     arbitrary card (paste / URL-fetched JSON) BYPASSING the catalog.
+ *     arbitrary card (paste / URL-fetched JSON) BYPASSING the catalogue.
  *
  * ── commons-governance seam ────────────────────────────────────────────
- * The catalog's trust/curation (signing keys, review, reputation, who is
+ * The catalogue's trust/curation (signing keys, review, reputation, who is
  * allowed to publish) is DESIGNED SEPARATELY — the community-commons
- * governance thread (NOTE-online-agent-surface §3). treats the catalog
+ * governance thread (NOTE-online-agent-surface §3). treats the catalogue
  * as a pluggable DATA SOURCE and hardcodes NO governance decision. A real
  * curated source drops in behind the same `{ list, get }` contract.
  *
@@ -64,7 +64,7 @@ function registryOf(store) {
   if (store && typeof store.list === 'function') return store;
   const registry = store?.registry;
   if (!registry || typeof registry.list !== 'function') {
-    throw new TypeError('install cores: store must be a registry or { registry, catalog?, tokens? }');
+    throw new TypeError('install cores: store must be a registry or { registry, catalogue?, tokens? }');
   }
   return registry;
 }
@@ -82,7 +82,7 @@ function coerceCard(card) {
 }
 
 /**
- * The stable catalog / registry id for a card: `x-onderling.id`, else a
+ * The stable catalogue / registry id for a card: `x-onderling.id`, else a
  * top-level `agentId`, else the pubKey.
  */
 function cardId(card) {
@@ -155,31 +155,31 @@ function normaliseGrants(grants) {
 }
 
 /**
- * listCatalog — the curated catalog roster (the pluggable source).
+ * listCatalogue — the curated catalogue roster (the pluggable source).
  *
- * Reads `store.catalog.list()`; each entry is an installable card. When
+ * Reads `store.catalogue.list()`; each entry is an installable card. When
  * NO source is injected the op answers the honest "coming with the
- * community catalog" state (`ok:false, error:'no-catalog'`) rather than
+ * community catalogue" state (`ok:false, error:'no-catalogue'`) rather than
  * throwing — the curated commons is blocked on the governance thread.
  *
- * commons-governance: `store.catalog` is a DATA SOURCE only; what makes a
+ * commons-governance: `store.catalogue` is a DATA SOURCE only; what makes a
  * source trusted/curated is decided by the commons thread, not here.
  *
  * Additive `items:[{id,label,…}]` for the list renderer (same convention
  * as recoveryCores.listDataVersions).
  */
-export async function listCatalog(store, _args = {}) {
-  const catalog = store?.catalog;
-  if (!catalog || typeof catalog.list !== 'function') {
+export async function listCatalogue(store, _args = {}) {
+  const catalogue = store?.catalogue;
+  if (!catalogue || typeof catalogue.list !== 'function') {
     return {
       ok:      false,
-      error:   'no-catalog',
-      message: 'The curated catalog arrives with the community commons (governance designed separately).',
-      catalog: [],
+      error:   'no-catalogue',
+      message: 'The curated catalogue arrives with the community commons (governance designed separately).',
+      catalogue: [],
       items:   [],
     };
   }
-  const cards = await catalog.list();
+  const cards = await catalogue.list();
   const rows = (Array.isArray(cards) ? cards : []).map((card) => {
     const id = cardId(card);
     return {
@@ -187,25 +187,25 @@ export async function listCatalog(store, _args = {}) {
       name:        card?.name ?? id,
       description: card?.description ?? null,
       skills:      declaredSkills(card),
-      source:      'catalog',
+      source:      'catalogue',
     };
   });
   return {
     ok:      true,
-    catalog: rows,
+    catalogue: rows,
     count:   rows.length,
     items:   rows.map((r) => ({ ...r, label: r.name ?? r.id })),
   };
 }
 
 /**
- * installAgent — the install act.  Resolve a card (curated `catalogId` OR
+ * installAgent — the install act.  Resolve a card (curated `catalogueId` OR
  * power-user `card`), register it default-deny, then grant ONLY the
  * requested-and-declared skills through the token-first grant path.
  *
- * @param {object} store  `{ registry, catalog?, tokens? }`
+ * @param {object} store  `{ registry, catalogue?, tokens? }`
  * @param {object} args
- * @param {string} [args.catalogId]  install a curated catalog entry
+ * @param {string} [args.catalogueId]  install a curated catalogue entry
  * @param {object|string} [args.card]  install an arbitrary card (override)
  * @param {Array<string|{skill,capability?,expiresInDays?,subject?}>} [args.grants]
  *   the user-picked grant set (default-deny: omitted ⇒ inert install)
@@ -218,22 +218,22 @@ export async function installAgent(store, args = {}) {
   // 1. Resolve the card + its source (curated vs override).
   let card;
   let source;
-  if (typeof args?.catalogId === 'string' && args.catalogId.length > 0) {
-    const catalog = store?.catalog;
-    if (!catalog || typeof catalog.get !== 'function') {
-      return { ok: false, error: 'no-catalog', installed: false };
+  if (typeof args?.catalogueId === 'string' && args.catalogueId.length > 0) {
+    const catalogue = store?.catalogue;
+    if (!catalogue || typeof catalogue.get !== 'function') {
+      return { ok: false, error: 'no-catalogue', installed: false };
     }
     // commons-governance: the curated source's trust/curation is designed
     // separately — here it is just a keyed lookup.
-    card = coerceCard(await catalog.get(args.catalogId));
-    if (!card) return { ok: false, error: 'catalog-entry-not-found', installed: false, catalogId: args.catalogId };
-    source = 'catalog';
+    card = coerceCard(await catalogue.get(args.catalogueId));
+    if (!card) return { ok: false, error: 'catalogue-entry-not-found', installed: false, catalogueId: args.catalogueId };
+    source = 'catalogue';
   } else if (args?.card != null) {
     card = coerceCard(args.card);
     if (!card) return { ok: false, error: 'card-parse-failed', installed: false };
-    source = 'override';   // the power-user override — bypasses the catalog
+    source = 'override';   // the power-user override — bypasses the catalogue
   } else {
-    return { ok: false, error: 'card-or-catalogId-required', installed: false };
+    return { ok: false, error: 'card-or-catalogueId-required', installed: false };
   }
 
   // 2. Card → default-deny entry (NO ambient authority).
@@ -290,6 +290,6 @@ export async function installAgent(store, args = {}) {
 }
 
 export const INSTALL_CORES = Object.freeze({
-  listCatalog,
+  listCatalogue,
   installAgent,
 });

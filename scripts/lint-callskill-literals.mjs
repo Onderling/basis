@@ -28,7 +28,7 @@ const HERE = path.dirname(new URL(import.meta.url).pathname);
 
 /**
  * Where each app origin's ops are DECLARED. This deliberately differs from surface-coverage.mjs on three
- * rows: coverage renders the composed CHAT catalog (which carries the mock stand-ins for stoop/tasks/folio),
+ * rows: coverage renders the composed CHAT catalogue (which carries the mock stand-ins for stoop/tasks/folio),
  * while a call-site check needs the app's REAL declaration — `apps/stoop/manifest.js` declares 34 ops where
  * the mock declares a handful. Both entries are listed; every op either source declares counts as declared.
  */

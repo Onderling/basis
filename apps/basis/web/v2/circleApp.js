@@ -30,7 +30,7 @@ import { initLocalisation, t, setLang, detectDeviceLang, currentLang,
   scopeStoopCallSkill, createCirclePodProducer, createCircleControlAgentRouter, realPodRouting, seedCircleRoster,
   circleStoreMode,
   isNoticeboardPost,
-  basisManifest, AppRegistry, filterCatalog } from '../../src/index.js';
+  basisManifest, AppRegistry, filterCatalogue } from '../../src/index.js';
 // S4 pod foundation — per-circle sealed storage producer. The pod-client + in-memory
 // pseudo-pod machinery is web-layer (kept out of the shared src so it stays portable);
 // the producer just consumes the injected makePodClient/generateKeypair.
@@ -100,7 +100,7 @@ import { createInputHistory } from '../../src/v2/commandSuggest.js';
 import { beginFollowUp, completeFollowUp, beginFormFollowUp, completeMultiFieldFollowUp } from '@onderling/kring-host/followUp';
 import { circleReplyText } from '../../src/v2/circleReply.js';
 import { oneToOneBotLabel } from '../../src/v2/botChat.js';
-import { scopeCatalogToApps } from '../../src/v2/circleCatalogScope.js';
+import { scopeCatalogueToApps } from '../../src/v2/circleCatalogueScope.js';
 // the default-deny capability gate applied at the user-dispatch waist (dispatchReady).
 import { effectiveCapabilities, checkCapability } from '../../src/v2/capabilityGate.js';
 // B · (4c) — the member's capability matrix drives affordance greying/hiding on reply buttons.
@@ -1197,7 +1197,7 @@ async function refreshConnections() {
 }
 /**
  * The manifests a connection's DO menu is derived from — the module-scope ones plus the live
- * agent's own. Same principle as the circle bot's catalog: the menu IS the manifest, so nothing is
+ * agent's own. Same principle as the circle bot's catalogue: the menu IS the manifest, so nothing is
  * declared twice. (The bot composes its list inside `buildCircleBot`; this is the render-time
  * equivalent, and the shared projection withholds the escalation ops from whatever it is given.)
  */
@@ -1442,7 +1442,7 @@ const _fbThreads = new Map();   // botId → { name, messages:[], surface, mount
 let _activeFbThread = null;     // { botId }
 let circleBot = null;            // createCircleDispatch instance (handle(text, ctx) → {via,cmd})
 let circleClarify = null;        // createClarifyingDispatch (for candidate-button picks, later)
-let circleCatalog = null;        // the merged dispatch catalog (built in buildCircleBot) — feeds the composer slash-suggest
+let circleCatalogue = null;        // the merged dispatch catalogue (built in buildCircleBot) — feeds the composer slash-suggest
 let circleBaseSources = [];      // the merged manifest sources (module-scoped so showSettings/showOverride can build the settings form + freedom matrix)
 let circleManifestsByOrigin = {}; // {appOrigin → manifest}, module-scoped for the list-screen panel's row actions
 
@@ -1451,8 +1451,8 @@ let circleManifestsByOrigin = {}; // {appOrigin → manifest}, module-scoped for
 // screen's config (appOrigin / fetch skill / label + category field) via
 // `sectionForScreen(circleManifestsByOrigin, screenId)` over renderWeb's
 // NavModel.sections[] — no hardcoded screen literal remains.
-let circleActiveApps = null;     // S6.C deep — the active circle's policy.apps (null = all); narrows the catalog
-let circleRescopeCatalog = null; // re-scope the catalog to circleActiveApps (set in buildCircleBot, called by showCircle)
+let circleActiveApps = null;     // S6.C deep — the active circle's policy.apps (null = all); narrows the catalogue
+let circleRescopeCatalogue = null; // re-scope the catalogue to circleActiveApps (set in buildCircleBot, called by showCircle)
 let circleDispatchReady = null;  // buildCircleBot's dispatchReady({opId,args}) — used to run a completed follow-up
 let circleApplyUserLlm = null;   // (cfg) => {ok,mode}|{ok:false,error} — rebuild the live LLM/embed providers from the member's settings
 let circleEmbedButtonTap = null; // S6.A — dispatch an inline embed button {opId,itemId} from a bot reply
@@ -1528,7 +1528,7 @@ async function getCircleSealStrategy(circleId, policy) {
     if (prod?.controlAgent && prod.sealingIdentity) {
       const idKey = await prod.sealingIdentity.ensure();
       strat = await prod.controlAgent.sealingStrategy(idKey.privateKey);
-      // No-pod defense-in-depth: wrap the reader so content sealed under a group-key version carried in the
+      // No-pod defence-in-depth: wrap the reader so content sealed under a group-key version carried in the
       // LOG (a key-event fanned to this device, not the pod key resource) still opens. The pod strategy is
       // tried FIRST and unchanged; only on its miss do we trial the chain FOLDED from the recorded key-events,
       // using this device's per-circle sealing opener. The events are read lazily at open time (later fans land
@@ -1631,7 +1631,7 @@ async function ensureCirclePod(circleId, policy) {
     // No-pod key distribution: attach a key-event log sink so a membership change (notably a REMOVE →
     // rotation) fans the new versioned key AS a log key-event to the circle's REMAINING members over the
     // SAME peer channel content rides — sealed to them only, so the departed cannot open post-removal
-    // content with no shared pod. The pod key resource is still written (defense-in-depth); the log is the
+    // content with no shared pod. The pod key resource is still written (defence-in-depth); the log is the
     // source for a no-pod circle. Lazy refs (rawCallSkill / _peerAgent are set at boot; the sink only fires
     // on a later membership change).
     const keyEventLog = makeKeyEventLogSink({
@@ -1728,7 +1728,7 @@ const circleInputHistory = createInputHistory();
 const circleSearchVectorStore = pickWebBackend('cc-circle-rag');
 
 function buildCircleBot(agent) {
-  // Merged catalog (the LLM tool list + dispatch catalog) — mirrors main.js.
+  // Merged catalogue (the LLM tool list + dispatch catalogue) — mirrors main.js.
   const baseSources = [
     { manifest: basisManifest },
     // tasks BEFORE the household agent: a circle's items are TASKS, so colliding bare op-ids
@@ -1748,7 +1748,7 @@ function buildCircleBot(agent) {
     { manifest: agentsManifest },
   ];
   circleBaseSources = baseSources;   // expose to the module-level showSettings/showOverride
-  let rawCatalog = mergeManifests(baseSources, { runtime: 'browser' });
+  let rawCatalogue = mergeManifests(baseSources, { runtime: 'browser' });
   // S6.A — manifests keyed by appOrigin, for computing inline embed buttons on
   // bot replies (computeEmbedButtons looks ops up here by the op's appOrigin).
   const manifestsByOrigin = {};
@@ -1759,7 +1759,7 @@ function buildCircleBot(agent) {
   }
   circleManifestsByOrigin = manifestsByOrigin;   // expose to the module-level list-screen panel
   const appRegistry = new AppRegistry();
-  appRegistry.syncWithCatalog(rawCatalog.appOrigins);
+  appRegistry.syncWithCatalogue(rawCatalogue.appOrigins);
   // Scope to the circle apps (Part D) — drops basis's account/transport INFRA ops (`/me` etc.) that
   // the circle bot can't actually run (they threw `circle.bot.failed` when dispatched, 2026-06-12) and
   // keeps them out of the slash-suggest dropdown. Default scope = the 5 circle apps (DEFAULT_CIRCLE_ORIGINS).
@@ -1778,32 +1778,32 @@ function buildCircleBot(agent) {
       const scoped = base.filter((a) => want.has(a));
       if (scoped.length) return scoped;
     }
-    return mappingOrigins.length ? base : undefined;   // undefined → scopeCatalogToApps uses DEFAULT_CIRCLE_ORIGINS
+    return mappingOrigins.length ? base : undefined;   // undefined → scopeCatalogueToApps uses DEFAULT_CIRCLE_ORIGINS
   };
-  let catalog = scopeCatalogToApps(filterCatalog(rawCatalog, appRegistry), allowedApps());
-  circleCatalog = catalog;        // expose to showCircle's composer (slash-suggest)
-  const rescopeCatalog = () => { catalog = scopeCatalogToApps(filterCatalog(rawCatalog, appRegistry), allowedApps()); circleCatalog = catalog; };
-  circleRescopeCatalog = rescopeCatalog;   // S6.C — showCircle calls this on circle-open to apply policy.apps
-  appRegistry.subscribe(rescopeCatalog);
+  let catalogue = scopeCatalogueToApps(filterCatalogue(rawCatalogue, appRegistry), allowedApps());
+  circleCatalogue = catalogue;        // expose to showCircle's composer (slash-suggest)
+  const rescopeCatalogue = () => { catalogue = scopeCatalogueToApps(filterCatalogue(rawCatalogue, appRegistry), allowedApps()); circleCatalogue = catalogue; };
+  circleRescopeCatalogue = rescopeCatalogue;   // S6.C — showCircle calls this on circle-open to apply policy.apps
+  appRegistry.subscribe(rescopeCatalogue);
   // Extension mappings (feedback-extension P2c) — scanned from the V0 localStorage store, verified against the
-  // base catalog (sandbox-by-construction: a mapping referencing an unknown opId is refused), then merged in +
-  // re-scoped. Best-effort: extensions never block boot. Callable so an install can refresh the catalog. Swap the
+  // base catalogue (sandbox-by-construction: a mapping referencing an unknown opId is refused), then merged in +
+  // re-scoped. Best-effort: extensions never block boot. Callable so an install can refresh the catalogue. Swap the
   // store for a real pseudo-pod when the web pod layer (3.3c) lands — `loadMappings` is store-agnostic.
   async function loadAndMergeMappings() {
     try {
       const { mappings } = await loadMappings({ pseudoPod: mappingsStore, deviceId: WEB_MAPPINGS_DEVICE });
-      const { accepted } = verifyMappings(mappings, rawCatalog);
+      const { accepted } = verifyMappings(mappings, rawCatalogue);
       const { sources } = mappingsToSources(accepted);
       if (!sources.length) return;
       mappingOrigins = sources.map((s) => s.manifest.app);
-      rawCatalog = mergeManifests([...baseSources, ...sources], { runtime: 'browser' });
-      appRegistry.syncWithCatalog(rawCatalog.appOrigins);
-      rescopeCatalog();
+      rawCatalogue = mergeManifests([...baseSources, ...sources], { runtime: 'browser' });
+      appRegistry.syncWithCatalogue(rawCatalogue.appOrigins);
+      rescopeCatalogue();
     } catch { /* extensions are best-effort — a bad store/mapping must not break the circle */ }
   }
   loadAndMergeMappings();
 
-  // Install entry (P2c-3) — open a link/paste → plain consent card → on Add writeMapping + refresh the catalog.
+  // Install entry (P2c-3) — open a link/paste → plain consent card → on Add writeMapping + refresh the catalogue.
   // Accepts a Mapping object, a JSON string, or a base64-encoded JSON string (a `?install=` link).
   async function installExtensionFromLink(input) {
     let mapping = input;
@@ -1812,10 +1812,10 @@ function buildCircleBot(agent) {
       try { mapping = JSON.parse(s.startsWith('{') ? s : atob(s)); } catch { return; }
     }
     if (!mapping || typeof mapping !== 'object') return;
-    const result = buildConsentModel(mapping, rawCatalog);
+    const result = buildConsentModel(mapping, rawCatalogue);
     showConsentCard(result, {
       onAdd: async () => {
-        const r = await installMapping({ store: mappingsStore, deviceId: WEB_MAPPINGS_DEVICE, mapping, catalog: rawCatalog });
+        const r = await installMapping({ store: mappingsStore, deviceId: WEB_MAPPINGS_DEVICE, mapping, catalogue: rawCatalogue });
         if (r.ok) await loadAndMergeMappings();
       },
     });
@@ -1831,9 +1831,9 @@ function buildCircleBot(agent) {
   // (feedback-extension) — contact/bot exposed skills, LIVE. A bot discovered
   // via `agent.discoverA2A` lands in `agent.peers` with its skills already as
   // SkillCards; the registry subscribes to that PeerGraph and, per bot, synthesises
-  // a contact-thread catalog + a router that hands a dispatch to the bot over A2A
+  // a contact-thread catalogue + a router that hands a dispatch to the bot over A2A
   // (`sendA2ATask` → await the Task's result). It is kept SEPARATE from the circle
-  // catalog (contact ops are contact-thread-scoped, not app-scoped), so it never
+  // catalogue (contact ops are contact-thread-scoped, not app-scoped), so it never
   // pollutes the circle bot's command pool. The contact-thread VIEW that renders a
   // bot's commands in its own DM thread is; this wiring makes the bridge live
   // + drivable now (`window.onderlingContactSkills` for the view + e2e).
@@ -1992,10 +1992,10 @@ function buildCircleBot(agent) {
   // list; the live fetch + the op's appOrigin do the work, scoped to the active circle).
   const lookup = makeCircleLookup({ getBase: () => [], appCallSkill: rawCallSkill, scopeId: () => getActiveCircle() });
 
-  // Run a fully-resolved {opId,args} against the catalog, scoped to the active circle, then post a reply.
+  // Run a fully-resolved {opId,args} against the catalogue, scoped to the active circle, then post a reply.
   async function dispatchReady({ opId, args, appOrigin }) {
     let route;
-    try { route = resolveDispatch({ kind: 'slash', opId, args: args || {}, appOrigin, command: '(bot)', body: '' }, catalog); }
+    try { route = resolveDispatch({ kind: 'slash', opId, args: args || {}, appOrigin, command: '(bot)', body: '' }, catalogue); }
     catch { _circleRender?.botBubble(t('circle.bot.unknown')); return; }
     if (route.kind === 'needsForm') {
       // Conversational elicitation (chat-native, parity with mobile): a single missing field → ask for
@@ -2020,7 +2020,7 @@ function buildCircleBot(agent) {
       // means the user CANCELLED (or a broken presenter) → the op never ran.
       let gateReply;
       await runConfirmGate({
-        route, catalog, t,
+        route, catalogue, t,
         present: openCircleConfirmDialog,
         onCancelNotice: () => _circleRender?.botBubble(t('circle.confirm.cancelled')),
         execute: async (ready) => { gateReply = await executeResolved(ready); },
@@ -2045,7 +2045,7 @@ function buildCircleBot(agent) {
       try { reply = await runDispatch(scopeReadyDispatch(route, getActiveCircle()), rawCallSkill); }
       catch (e) { _circleRender?.botBubble(t('circle.bot.failed', { msg: e?.message ?? String(e) })); return; }
       // The op's verb drives Added:/Completed: phrasing (a bare "✓ X" was identical for add + complete).
-      const entry = catalog?.opsById?.get(route.opId);
+      const entry = catalogue?.opsById?.get(route.opId);
       const verb = entry?.op?.verb;
       // S6.A — manifest-driven inline buttons for the item(s) this reply carries
       // (Claim / Mark complete / RSVP …), gated by appliesTo. Ride payload.buttons.
@@ -2160,9 +2160,9 @@ function buildCircleBot(agent) {
   async function circleCapabilityDeny(appOrigin, opId, args) {
     const circleId = getActiveCircle();
     if (circleId == null) return null;                          // outside a circle → no per-circle gate
-    const origin = appOrigin || catalog?.opsById?.get(opId)?.appOrigin;
+    const origin = appOrigin || catalogue?.opsById?.get(opId)?.appOrigin;
     if (!origin) return null;                                   // unattributable → don't block here
-    const op = catalog?.opsById?.get(opId)?.op;
+    const op = catalogue?.opsById?.get(opId)?.op;
     const enabled = await isOpAppEnabledForActiveCircle(origin);
     let policy = {}; let override = {};
     try { policy = (await policyStore.get(circleId)) ?? {}; } catch { /* default */ }
@@ -2213,7 +2213,7 @@ function buildCircleBot(agent) {
     }
     if (screen) { openCircleScreenPanel(screen); return; }
     if (!opId) return;
-    const op = catalog?.opsById?.get(opId)?.op;
+    const op = catalogue?.opsById?.get(opId)?.op;
     const arg = op?.surfaces?.slash?.match?.arg
       ?? (op?.params || []).find((p) => p?.pickerSource)?.name
       ?? 'id';
@@ -2221,7 +2221,7 @@ function buildCircleBot(agent) {
   };
 
   circleClarify = createClarifyingDispatch({
-    catalog: () => catalog,
+    catalogue: () => catalogue,
     lookup,
     dispatchReady,
     // Interactive candidate buttons: tapping `clarify:<id>` re-runs pick() with the choice bound (the scope
@@ -2236,7 +2236,7 @@ function buildCircleBot(agent) {
       // A non-empty label that matched nothing → "couldn't find X". But a picker command given with NO
       // value (bare `/complete-task`) shouldn't say "couldn't find '' " — list the options to choose from.
       if (query && query.trim()) { _circleRender?.botBubble(t('circle.clarify.notFound', { query })); return; }
-      const entry = catalog?.opsById?.get(opId);
+      const entry = catalogue?.opsById?.get(opId);
       const listOp = (entry?.op?.params || []).find((p) => p.name === param)?.pickerSource?.listOp;
       let items = [];
       try { if (listOp) items = (await lookup(listOp, '', getActiveCircle(), entry?.appOrigin)) || []; } catch { /* keep empty */ }
@@ -2251,7 +2251,7 @@ function buildCircleBot(agent) {
   });
 
   circleBot = createCircleDispatch({
-    catalog: () => catalog,
+    catalogue: () => catalogue,
     policy: policyFor,
     userDefault: () => userDefault,
     llmProviders,
@@ -2266,7 +2266,7 @@ function buildCircleBot(agent) {
     dispatch: (input, ctx) => {
       let cmd = input;
       if (typeof input === 'string') {
-        const parsed = catalog ? parseInput(input, catalog) : null;
+        const parsed = catalogue ? parseInput(input, catalogue) : null;
         // Objective D — a colliding bare slash (`/done`) with no per-host override is AMBIGUOUS: offer the
         // app-qualified choices (`/tasks:done`, `/stoop:done`) instead of silently firing one app. The
         // qualified forms — and an overridden bare token — parse as normal `slash` and route below.
@@ -2290,7 +2290,7 @@ function buildCircleBot(agent) {
       // E2 bulk fan-out ("/done all"): resolveDispatch flags it (the body is a bulk keyword on a mutation op).
       // Run it over the last listing, bypassing the clarifying dispatch (which would treat "all" as a target).
       try {
-        const r = resolveDispatch({ kind: 'slash', opId: cmd.opId, args: cmd.args || {}, appOrigin: cmd.appOrigin }, catalog);
+        const r = resolveDispatch({ kind: 'slash', opId: cmd.opId, args: cmd.args || {}, appOrigin: cmd.appOrigin }, catalogue);
         if (r && r.kind === 'bulk') return handleBulkRoute(r);
       } catch { /* not bulk → normal path */ }
       return circleClarify.run(cmd, ctx);
@@ -3992,7 +3992,7 @@ async function showMyData() {
     },
     connectionChoices: {
       // The SAME manifests the circle bot composes — one source, so the pick menu and the
-      // dispatch catalog can never disagree about what an op is.
+      // dispatch catalogue can never disagree about what an op is.
       ops: connectionOpChoices({ manifests: connectionManifestSources() }),
       sections: connectionSectionChoices({ circles: circleListForConnections() }),
     },
@@ -5271,10 +5271,10 @@ async function showDetail(id) {
 // chat-message event scoped to this circle.  Inbound peer broadcast
 // slash-command parsing land in.
 function showCircle(id, circle, policy) {
-  // S6.C deep — scope the bot catalog (tools + slash-suggest) to the apps THIS
+  // S6.C deep — scope the bot catalogue (tools + slash-suggest) to the apps THIS
   // circle composes (policy.apps); null = all. Re-scopes on every circle-open.
   circleActiveApps = Array.isArray(policy?.apps) ? policy.apps : null;
-  try { circleRescopeCatalog?.(); } catch { /* catalog stays at the previous scope */ }
+  try { circleRescopeCatalogue?.(); } catch { /* catalogue stays at the previous scope */ }
   // D / Surface 2 — `more` is the host's callback bag keyed by manifest action
   // id (NOT a roster: `renderCircleView` projects the roster + gates from
   // `manifest.actions`).  The feature gate now lives ONCE in the manifest
@@ -5760,8 +5760,8 @@ function showCircle(id, circle, policy) {
       },
       // ✏ edit pre-fill: the composer opens with the point's current curated text, ready to adjust.
       composerPrefill: feedbackFlowState.get(id)?.editing?.text ?? null,
-      // Composer affordances (classic-shell parity): slash-suggest off the merged catalog + bash history.
-      catalog: circleCatalog,
+      // Composer affordances (classic-shell parity): slash-suggest off the merged catalogue + bash history.
+      catalogue: circleCatalogue,
       history: circleInputHistory,
       // Permission gate — chat disabled for this circle ⇒ read-only composer (classic `allowCommands` analog).
       canPost: isFeatureEnabled(policy, 'chat'),
@@ -7355,15 +7355,15 @@ async function boot() {
       }) : null;
       // Route the auto-resolving callSkill through the calendar-wrapped one too,
       // so button-driven calendar dispatches fan out as well as the bot path.
-      // Pass a catalog GETTER so the resolver skips origins that don't declare the
+      // Pass a catalogue GETTER so the resolver skips origins that don't declare the
       // op (no probe-storm) AND honours later rescopes (app toggle / policy.apps).
-      // BUGFIX: `catalog` is a LOCAL of buildCircleBot (defined far below + only after
+      // BUGFIX: `catalogue` is a LOCAL of buildCircleBot (defined far below + only after
       // buildCircleBot runs); referencing it here threw ReferenceError on every resolved
-      // call, so the catalog getter crashed → loadCircles silently returned [] → circles
+      // call, so the catalogue getter crashed → loadCircles silently returned [] → circles
       // never appeared even though createGroupV2 + listMyCircles worked. Use the module-level
-      // `circleCatalog` (null until buildCircleBot sets it; makeResolvingCallSkill tolerates
-      // a null catalog by trying all origins).
-      resolveCallSkill = makeResolvingCallSkill(rawCallSkill, DEFAULT_CIRCLE_ORIGINS, () => circleCatalog);
+      // `circleCatalogue` (null until buildCircleBot sets it; makeResolvingCallSkill tolerates
+      // a null catalogue by trying all origins).
+      resolveCallSkill = makeResolvingCallSkill(rawCallSkill, DEFAULT_CIRCLE_ORIGINS, () => circleCatalogue);
       sources = circleSourcesFromAgent({ callSkill: resolveCallSkill, helpCircleName: () => helpCircleSpec(t).name });
       // Phase 5 — build the circle composer's bot + feedback now that the agent (and its manifest) is up.
       try { buildCircleBot(agent); } catch (err) { console.warn('[circleApp] circle bot setup failed:', err?.message ?? err); }

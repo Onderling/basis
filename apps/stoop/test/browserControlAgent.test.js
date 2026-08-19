@@ -1,6 +1,6 @@
 /**
  * Browser-factory control-agent seam — `createBrowserStoopAgent` is the entry basis uses to boot a
- * real Stoop NeighborhoodAgent as its circle-membership substrate. The underlying agent already threads a
+ * real Stoop NeighbourhoodAgent as its circle-membership substrate. The underlying agent already threads a
  * `controlAgent` to the sealed-pod membership hooks (redeem → addMember, leaveGroup → removeMember); this
  * test proves the BROWSER factory now forwards it too (it previously dropped the param silently), so a
  * circle's sealed-pod control-agent can reach those hooks once a producer wires one.

@@ -151,7 +151,7 @@ mobile's package.json — e.g. `src/core/mediaCardModel.js` → blob-gateway (20
 props/state (`bundle`, `onCircleControl`, `setView`, …) are **not** in `CircleDetail`'s scope. When
 chat/command/feedback logic is moved into the sibling, references to the parent's scope compile fine
 (they look like they'll resolve "from the outer function") but throw the instant the component's
-render or a `useX` **dependency array** is evaluated. A *lazy* leak (a `() => catalog` getter, a
+render or a `useX` **dependency array** is evaluated. A *lazy* leak (a `() => catalogue` getter, a
 `c.inkSoft` inside a `<TextInput placeholderTextColor>`) survives longer — it only throws when the
 closure runs — so it hides from a quick smoke test. The stale dev client masked all of these because
 it was running old JS; the rebuild is what surfaced them (found 5 across 2 files, 2026-07-25).
@@ -220,12 +220,12 @@ when the mobile app boots or its Vitest suite runs. RN-bundle-safe: the barrel p
 
 ## Metro couldn't resolve `@onderling-app/agents/wireSkills` (mobile bundle broke since 2026-07-09)
 
-`apps/basis/src/core/agent/realAgent.js` imports `@onderling-app/agents/{wireSkills,defaultCatalog}`
-(added 2026-07-09). The web/vite build honors the `apps/agents` package `exports` map; **Metro has
+`apps/basis/src/core/agent/realAgent.js` imports `@onderling-app/agents/{wireSkills,defaultCatalogue}`
+(added 2026-07-09). The web/vite build honours the `apps/agents` package `exports` map; **Metro has
 `unstable_enablePackageExports` disabled**, so it couldn't resolve those subpaths — the whole mobile bundle
 failed (`Unable to resolve "@onderling-app/agents/wireSkills"`). The mobile app had been un-bundleable via Metro
 since then. **Fix (2026-07-13):** added `@onderling-app/agents` to `metro.config.js` `extraNodeModules` +
-`extraSubpathResolvers` cases mapping `/wireSkills`→`apps/agents/src/wireSkills.js`, `/defaultCatalog`,
+`extraSubpathResolvers` cases mapping `/wireSkills`→`apps/agents/src/wireSkills.js`, `/defaultCatalogue`,
 `/cores`, and `/manifest`→`apps/agents/manifest.js` (mirrors the existing stoop/llm-client subpath resolvers).
 **Tell:** a bare `@onderling-app/<app>/<subpath>` import that resolves in vite/web but throws in Metro → it needs
 an `extraSubpathResolvers` case (package-exports stays disabled). (Added 2026-07-13, mobile feedback parity.)

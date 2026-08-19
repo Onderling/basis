@@ -1,5 +1,5 @@
 /**
- * createNeighborhoodCluster — multi-group bring-up for a single user.
+ * createNeighbourhoodCluster — multi-group bring-up for a single user.
  *
  * H5 V2 product item #3 (group switcher). Per
  * `Project Files/coding-plans/H5-V2-product-items.md`, V0 picks model
@@ -13,10 +13,10 @@
  *     per group is the V0 contract).
  *
  * The cluster is otherwise just a thin wrapper around N
- * `createNeighborhoodAgent` calls — each per-group bundle is the same
+ * `createNeighbourhoodAgent` calls — each per-group bundle is the same
  * shape `{agent, itemStore, members, offeringMatch, notifier}` that
  * single-group consumers already get, so apps can keep treating each
- * group's bundle as an independent neighborhood agent.
+ * group's bundle as an independent neighbourhood agent.
  *
  * Returns:
  *   {
@@ -28,7 +28,7 @@
 import { AgentIdentity, InternalBus, InternalTransport } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 
-import { createNeighborhoodAgent } from './Agent.js';
+import { createNeighbourhoodAgent } from './Agent.js';
 
 /**
  * @param {object} args
@@ -53,7 +53,7 @@ import { createNeighborhoodAgent } from './Agent.js';
  *   stop:           () => Promise<void>,
  * }>}
  */
-export async function createNeighborhoodCluster({
+export async function createNeighbourhoodCluster({
   groups,
   identity,
   bus,
@@ -61,15 +61,15 @@ export async function createNeighborhoodCluster({
   label = 'H5-cluster',
 }) {
   if (!Array.isArray(groups) || groups.length === 0) {
-    throw new TypeError('createNeighborhoodCluster: groups[] required (at least one)');
+    throw new TypeError('createNeighbourhoodCluster: groups[] required (at least one)');
   }
   for (const g of groups) {
     if (!g.groupId || !g.localActor) {
-      throw new TypeError('createNeighborhoodCluster: each group needs {groupId, localActor}');
+      throw new TypeError('createNeighbourhoodCluster: each group needs {groupId, localActor}');
     }
   }
   if (new Set(groups.map(g => g.groupId)).size !== groups.length) {
-    throw new TypeError('createNeighborhoodCluster: duplicate groupId in groups[]');
+    throw new TypeError('createNeighbourhoodCluster: duplicate groupId in groups[]');
   }
 
   const sharedIdentity = identity ?? await AgentIdentity.generate(new VaultMemory());
@@ -80,7 +80,7 @@ export async function createNeighborhoodCluster({
 
   const bundles = new Map();
   for (const g of groups) {
-    const bundle = await createNeighborhoodAgent({
+    const bundle = await createNeighbourhoodAgent({
       identity:  sharedIdentity,
       transport: tx({ identity: sharedIdentity, groupId: g.groupId }),
       label:     `${label}-${g.groupId}`,

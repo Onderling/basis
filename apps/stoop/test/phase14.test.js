@@ -11,7 +11,7 @@ import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderl
 import { VaultMemory } from '@onderling/vault';
 import { Reveals } from '@onderling/identity-resolver';
 
-import { createNeighborhoodAgent, attachSubstrateMirror } from '../src/index.js';
+import { createNeighbourhoodAgent, attachSubstrateMirror } from '../src/index.js';
 
 const ANNE = 'https://id.example/anne';
 const BOB  = 'https://id.example/bob';
@@ -36,7 +36,7 @@ async function buildPair() {
   const anneId = await AgentIdentity.generate(new VaultMemory());
   const bobId  = await AgentIdentity.generate(new VaultMemory());
 
-  const anne = await createNeighborhoodAgent({
+  const anne = await createNeighbourhoodAgent({
     identity:  anneId,
     transport: new InternalTransport(bus, anneId.pubKey),
     offeringMatch: { group: 'oosterpoort', localActor: ANNE,
@@ -47,7 +47,7 @@ async function buildPair() {
     ],
     reveals: new Reveals(),
   });
-  const bob = await createNeighborhoodAgent({
+  const bob = await createNeighbourhoodAgent({
     identity:  bobId,
     transport: new InternalTransport(bus, bobId.pubKey),
     offeringMatch: { group: 'oosterpoort', localActor: BOB,
@@ -267,7 +267,7 @@ describe('Stoop V1 Phase 14 — bilateral reveal handshake', () => {
     // box.  This test pins the new default.
     const id = await AgentIdentity.generate(new VaultMemory());
     const tx = new InternalTransport(new InternalBus(), id.pubKey);
-    const bundle = await createNeighborhoodAgent({
+    const bundle = await createNeighbourhoodAgent({
       identity: id, transport: tx,
       offeringMatch: { group: 'oosterpoort', localActor: ANNE, peers: [] },
       members:    [{ webid: ANNE }],

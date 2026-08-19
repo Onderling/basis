@@ -75,7 +75,7 @@ Session and shows the full `attachInner` wiring deterministically.
 npx web-push generate-vapid-keys
 
 # Bring up Stoop with the keys (extend bin/stoop-ui.js to forward
-# --vapid-public-key + --vapid-private-key into createNeighborhoodAgent):
+# --vapid-public-key + --vapid-private-key into createNeighbourhoodAgent):
 npm run ui -- \
   --actor https://id.example/anne --group block-42 \
   --vapid-public-key "<pub>" --vapid-private-key "<priv>" \

@@ -9,7 +9,7 @@
  * `apps/basis/src/web/podStorage.js`) are portable — pure
  * URL/string/`session.fetch` work, no DOM, no Node. Mobile imports
  * them directly via the same relative-path pattern hostOps.js uses
- * for `localBuiltins.js` (Metro doesn't honor package.json
+ * for `localBuiltins.js` (Metro doesn't honour package.json
  * "exports" subpaths).
  *
  * What's different from web:

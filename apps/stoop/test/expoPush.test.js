@@ -10,7 +10,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
-import { createNeighborhoodAgent } from '../src/index.js';
+import { createNeighbourhoodAgent } from '../src/index.js';
 import { ExpoPushSender, expoTokenOf, isExpoSubscription } from '../src/lib/ExpoPushSender.js';
 
 const ANNE = 'https://id.example/anne';
@@ -21,7 +21,7 @@ const callSkill = (agent, skillId, args) =>
 
 async function buildBundle({ pushSender = null, expoPushSender = null } = {}) {
   const id = await AgentIdentity.generate(new VaultMemory());
-  return createNeighborhoodAgent({
+  return createNeighbourhoodAgent({
     identity: id, transport: new InternalTransport(new InternalBus(), id.pubKey),
     offeringMatch: { group: 'oosterpoort', localActor: ANNE, peers: [] },
     members: [{ webid: ANNE }],

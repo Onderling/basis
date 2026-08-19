@@ -17,7 +17,7 @@
  * access is gated by the seal and not by the backend, the same sealed content is
  * portable across backends: put it in a local in-memory store, an IndexedDB
  * mirror, or a Solid pod and it still opens for a key-holder and stays closed to
- * everyone else. A pod's ACP/WAC then becomes defense-in-depth on top of the
+ * everyone else. A pod's ACP/WAC then becomes defence-in-depth on top of the
  * seal, not the mechanism.
  *
  * Contrast with `DataSource` (read/write/delete/list, plaintext-capable, the

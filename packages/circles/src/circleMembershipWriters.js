@@ -148,7 +148,7 @@ export async function redeemMembershipCode({
   // subject = the joiner) and chains it to their frontier. Additive: the typed redemption item above is
   // unchanged. Optional — a caller that has not wired the spine simply skips it.
   // The join's authorization rides the SIGNED payload: the redemption row it stands on. The fold admits a
-  // self-authored join only when that row exists (deny-favoring: a not-yet-arrived row defers, never forges).
+  // self-authored join only when that row exists (deny-favouring: a not-yet-arrived row defers, never forges).
   await emitSpine?.({ kind: 'join', circleId: a.groupId, subject: from, actor: from, payload: { redemptionRef: item.id } });
   return {
     redemptionId: item.id,

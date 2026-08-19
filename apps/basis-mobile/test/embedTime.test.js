@@ -59,7 +59,7 @@ describe('Bundle F P5 — localBuiltins.createTimeEmbed natural-language fallbac
     const handlers = buildMobileLocalBuiltins({
       threadStateRef, setThreadState: (v) => { threadStateRef.current = typeof v === 'function' ? v(threadStateRef.current) : v; },
       agent:   { identity: { chat: { pubKey: 'pk', stableId: 'sid' }, host: { webid: 'https://a/profile#me' } } },
-      catalog: { opsById: new Map(), appOrigins: new Set(), appsById: new Map() },
+      catalogue: { opsById: new Map(), appOrigins: new Set(), appsById: new Map() },
       callSkill: async (origin, opId, args) => {
         calls.push({ origin, opId, args });
         if (origin === 'calendar' && opId === 'addEvent')         return { ok: true, itemId: 'ev-1' };

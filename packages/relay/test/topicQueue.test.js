@@ -1,8 +1,8 @@
 /**
  * Topic-aware offline queueing — Phase 7 step 4.
  *
- * Verifies the per-(addr, topic) bucketing behavior added 2026-05-04:
- *   - Wire frame `{type:'send', to, envelope, topic?}` honors the optional
+ * Verifies the per-(addr, topic) bucketing behaviour added 2026-05-04:
+ *   - Wire frame `{type:'send', to, envelope, topic?}` honours the optional
  *     `topic` hint set by `RelayTransport._put` for `publishOneWay` envelopes.
  *   - Each (addr, topic) bucket caps independently at `queueCap`.
  *   - Non-publish sends share a single legacy bucket (topic=null).

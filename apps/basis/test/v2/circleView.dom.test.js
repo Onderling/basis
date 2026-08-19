@@ -127,7 +127,7 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
     expect(onSend).not.toHaveBeenCalled();
   });
 
-  it('composer honors a circle-specific placeholder when the host passes one', () => {
+  it('composer honours a circle-specific placeholder when the host passes one', () => {
     const el = mount();
     renderCircleView(el, {
       circle, rows, t, onSend: () => {},
@@ -517,7 +517,7 @@ describe('renderCircleView · bulletin restyle (bot card · transparency · cons
 });
 
 describe('renderCircleView · composer parity (slash-suggest + permission gate)', () => {
-  const catalog = { opsById: new Map([
+  const catalogue = { opsById: new Map([
     ['addTask',      { op: { id: 'addTask',      surfaces: { slash: { command: '/addtask' },       chat: { hint: 'add a task' } } } }],
     ['completeTask', { op: { id: 'completeTask', surfaces: { slash: { command: '/complete-task' }, chat: { hint: 'finish a task' } } } }],
   ]) };
@@ -540,7 +540,7 @@ describe('renderCircleView · composer parity (slash-suggest + permission gate)'
 
   it('slash-suggest: typing "/" opens the dropdown; a space (into args) closes it', () => {
     const el = mount();
-    renderCircleView(el, { circle, rows, t, onSend: () => {}, catalog });
+    renderCircleView(el, { circle, rows, t, onSend: () => {}, catalogue });
     const input = el.querySelector('.circle-view__composer-input');
     const suggest = el.querySelector('.circle-view__suggest');
     input.value = '/';
@@ -554,14 +554,14 @@ describe('renderCircleView · composer parity (slash-suggest + permission gate)'
 
   it('slash-suggest: a prefix filters the list', () => {
     const el = mount();
-    renderCircleView(el, { circle, rows, t, onSend: () => {}, catalog });
+    renderCircleView(el, { circle, rows, t, onSend: () => {}, catalogue });
     const input = el.querySelector('.circle-view__composer-input');
     input.value = '/comp';
     input.dispatchEvent(new Event('input'));
     expect([...el.querySelectorAll('.circle-view__suggest-cmd')].map((n) => n.textContent)).toEqual(['/complete-task']);
   });
 
-  it('no catalog → no suggest dropdown wiring (composer still works)', () => {
+  it('no catalogue → no suggest dropdown wiring (composer still works)', () => {
     const el = mount();
     renderCircleView(el, { circle, rows, t, onSend: () => {} });
     const input = el.querySelector('.circle-view__composer-input');
@@ -574,7 +574,7 @@ describe('renderCircleView · composer parity (slash-suggest + permission gate)'
     const el = mount();
     const history = createInputHistory();
     const onSend = vi.fn();
-    renderCircleView(el, { circle, rows, t, onSend, catalog, history });
+    renderCircleView(el, { circle, rows, t, onSend, catalogue, history });
     const input = el.querySelector('.circle-view__composer-input');
     input.value = 'hello circle';
     el.querySelector('.circle-view__composer').dispatchEvent(new Event('submit'));

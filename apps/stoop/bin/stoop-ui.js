@@ -100,7 +100,7 @@ const id = (await _idVault.get('agent-privkey'))
   : await AgentIdentity.generate(_idVault);
 
 if (isMultiGroup) {
-  const { createNeighborhoodCluster } = await import('../src/cluster.js');
+  const { createNeighbourhoodCluster } = await import('../src/cluster.js');
   const groupIds = values.groups.split(',').map(s => s.trim()).filter(Boolean);
   if (peers.length || skills.length || Object.keys(posture).length) {
     console.error('--peers / --skills / --posture are single-group flags; configure each group separately for multi-group runs (V0 launcher).');
@@ -108,7 +108,7 @@ if (isMultiGroup) {
   }
 
   const bus = new InternalBus();
-  const cluster = await createNeighborhoodCluster({
+  const cluster = await createNeighbourhoodCluster({
     identity: id,
     bus,
     groups:   groupIds.map((gid) => ({ groupId: gid, localActor: values.actor })),
@@ -161,7 +161,7 @@ if (isMultiGroup) {
     process.exit(0);
   }
 } else {
-  const { createNeighborhoodAgent } = await import('../src/index.js');
+  const { createNeighbourhoodAgent } = await import('../src/index.js');
   const bus = new InternalBus();
   // Build the agent WITH a RoutingStrategy (mirrors @onderling/react-native
   // createMeshAgent). Root cause of "web never HIs the phone over the
@@ -176,7 +176,7 @@ if (isMultiGroup) {
     routing:   new RoutingStrategy({ transports: new Map(), peerGraph: _peerGraph, fallbackTable: new FallbackTable() }),
     label:     `H5-${values.actor}`,
   });
-  const bundle = await createNeighborhoodAgent({
+  const bundle = await createNeighbourhoodAgent({
     identity:  id,
     agent:     _meshAgent,
     label:     `H5-${values.actor}`,

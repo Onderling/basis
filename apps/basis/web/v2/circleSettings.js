@@ -219,7 +219,7 @@ export function renderCircleSettings(container, {
   container.appendChild(featSection);
 
   // S6.C deep — Apps: which whole apps this circle composes into the bot's tools +
-  // slash-suggest. Unset (all checked) = all 5; unchecking narrows the catalog.
+  // slash-suggest. Unset (all checked) = all 5; unchecking narrows the catalogue.
   const appsSection = section(tr('circle.settings.apps'));
   const enabledApps = Array.isArray(policy?.apps) && policy.apps.length ? new Set(policy.apps) : null;
   for (const app of DEFAULT_CIRCLE_ORIGINS) {

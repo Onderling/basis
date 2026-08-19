@@ -54,7 +54,7 @@
  * @property {(absPath: string, content: string|Uint8Array|Buffer, opts?: { encoding?: 'utf8' }) => Promise<void>} writeFile
  *   Write `content` to `absPath`, creating parent directories implicitly
  *   on RN.  On Node the caller is expected to `mkdir(dirname)` first
- *   (matches existing SyncEngine behavior).
+ *   (matches existing SyncEngine behaviour).
  *
  * @property {(absPath: string) => Promise<void>} unlink
  *   Delete a file.  ENOENT MUST throw an error with `.code === 'ENOENT'`
@@ -62,7 +62,7 @@
  *
  * @property {(absPath: string) => Promise<void>} rmdir
  *   Remove an empty directory.  ENOENT throws `.code === 'ENOENT'`.
- *   ENOTEMPTY behavior is platform-defined; callers shouldn't rely on it.
+ *   ENOTEMPTY behaviour is platform-defined; callers shouldn't rely on it.
  *
  * @property {(absPath: string, opts?: { recursive?: boolean }) => Promise<void>} mkdir
  *   Create a directory.  `{ recursive: true }` is the default mode used

@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { buildCommandPool, suggestCommands, createInputHistory } from '../../src/v2/commandSuggest.js';
 
-// Minimal catalog stub: opsById is a Map<opId, { op }> (the mergeManifests/filterCatalog shape).
-function catalogOf(ops) {
+// Minimal catalogue stub: opsById is a Map<opId, { op }> (the mergeManifests/filterCatalogue shape).
+function catalogueOf(ops) {
   return { opsById: new Map(ops.map((op) => [op.id, { op }])) };
 }
-const SAMPLE = catalogOf([
+const SAMPLE = catalogueOf([
   { id: 'addTask',      surfaces: { slash: { command: '/addtask' }, chat: { hint: 'add a task' } } },
   { id: 'completeTask', surfaces: { slash: { command: '/complete-task' }, chat: { hint: 'finish a task' } } },
   { id: 'apps',         surfaces: { slash: { command: '/apps' } } },                 // no chat.hint → falls back to id
@@ -26,7 +26,7 @@ describe('buildCommandPool', () => {
     const cat = { opsById: new Map([['x', { id: 'x', surfaces: { slash: { command: '/x' } } }]]) };
     expect(buildCommandPool(cat).map((m) => m.command)).toEqual(['/x']);
   });
-  it('returns [] for a missing / malformed catalog', () => {
+  it('returns [] for a missing / malformed catalogue', () => {
     expect(buildCommandPool(null)).toEqual([]);
     expect(buildCommandPool({})).toEqual([]);
     expect(buildCommandPool({ opsById: {} })).toEqual([]);

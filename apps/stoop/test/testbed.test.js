@@ -20,7 +20,7 @@ import { AgentIdentity, InternalBus, InternalTransport, GroupManager } from '@on
 import { VaultMemory } from '@onderling/vault';
 import { mountLocalUi, LocalUiAuth } from '@onderling/agent-ui';
 
-import { createNeighborhoodAgent }    from '../src/Agent.js';
+import { createNeighbourhoodAgent }    from '../src/Agent.js';
 import { buildOnboardingSkills }      from '../src/onboarding.js';
 import { attachSubstrateMirror }      from '../src/substrateMirror.js';
 
@@ -79,7 +79,7 @@ beforeAll(async () => {
     const id = await AgentIdentity.generate(new VaultMemory());
     const transport = new InternalTransport(bus, id.pubKey);
     const peers = [...cluster.values()].map((m) => ({ pubKey: m.identity.pubKey }));
-    const bundle = await createNeighborhoodAgent({
+    const bundle = await createNeighbourhoodAgent({
       identity:  id, transport, label: `H5-${webid}`,
       members:   [...cluster.values()].map((m) => ({
         webid: m.webid, displayName: m.displayName, role: m.role, pubKey: m.identity.pubKey,
@@ -265,7 +265,7 @@ describe('H5 testbed — multi-user onboarding flow', () => {
     // Wire admin to claim paint requests via the appHandler. We use
     // `negotiable` so the handler actually runs — `always` would
     // short-circuit straight to auto-claim and bypass our observation
-    // hook (matching OfferingMatch's documented behavior).
+    // hook (matching OfferingMatch's documented behaviour).
     const adminBundle = cluster.get(ADMIN_WEBID).bundle;
     const heard = [];
     adminBundle.offeringMatch.subscribe(async ({request, decide}) => {

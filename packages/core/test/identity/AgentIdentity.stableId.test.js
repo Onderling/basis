@@ -58,7 +58,7 @@ describe('AgentIdentity — Phase 32 deterministic stableId', () => {
     const idA = await AgentIdentity.fromMnemonic(phrase, vaultA);
 
     // Restore on a 2nd device.  Stoop's restoreFromMnemonic clears
-    // any existing stableId (defense in depth — but with Phase 32,
+    // any existing stableId (defence in depth — but with Phase 32,
     // the re-derivation produces the same value anyway).
     const vaultB = new VaultMemory();
     await vaultB.set('agent-stable-id', 'will-be-deleted');

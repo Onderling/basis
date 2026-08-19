@@ -153,7 +153,7 @@ describe('materializeScreen · α.2.b — rules', () => {
     let screen = addBlock(emptyScreen('Selwerd'), 'rules');
     screen = addCircleToScreen(screen, 'g1');
     const callSkill = vi.fn(async () => ({
-      rules: { source: { doc: { purpose: 'Buurt zijn' } } },
+      rules: { source: { doc: { purpose: 'Circle zijn' } } },
     }));
     const out = await materializeScreen({
       screen,
@@ -161,7 +161,7 @@ describe('materializeScreen · α.2.b — rules', () => {
     });
     expect(callSkill).toHaveBeenCalledWith('stoop', 'getGroupRules', { groupId: 'g1' });
     expect(out[0].status).toBe('ok');
-    expect(out[0].content.doc.purpose).toBe('Buurt zijn');
+    expect(out[0].content.doc.purpose).toBe('Circle zijn');
     expect(out[0].content.multiCircle).toBe(false);
     expect(out[0].content.shownCircleId).toBe('g1');
   });

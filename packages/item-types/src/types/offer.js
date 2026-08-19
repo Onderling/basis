@@ -1,7 +1,7 @@
 /**
  * `offer` — "I have X available." Author's stance: providing something
  * to others. The inner `kind` carries the verb (lend / give / sell /
- * help). Scales across buurt sharing, gift economy, time-banking, and
+ * help). Scales across neighbourhood sharing, gift economy, time-banking, and
  * marketplace-style flows without renaming the type.
  *
  * Standardisation: Phase 52.1 vocabulary refresh (2026-05-12).

@@ -101,7 +101,7 @@
     "kind_project":            { "text": "Project", "doc": "Circle kind option." },
     "kind_team":               { "text": "Team", "doc": "Circle kind option." },
     "kind_friends":            { "text": "Friends", "doc": "Circle kind option." },
-    "kind_maintenance":        { "text": "Neighbourhood maintenance", "doc": "Circle kind option (Stoop-adjacent — used when a buurt sets up its own task ledger)." },
+    "kind_maintenance":        { "text": "Neighbourhood maintenance", "doc": "Circle kind option (Stoop-adjacent — used when a neighbourhood sets up its own task ledger)." },
     "q5_storage":              { "text": "5. Where does the circle's state live?", "doc": "Wizard step 5 — storage-policy fieldset legend. Mirrors Stoop V2 web's A3 picker." },
     "q5_storage_intro":        { "text": "Default keeps the circle <strong>on your devices</strong> (no Solid pod needed). You can upgrade later. Once pod-having → no way back.", "doc": "Hint under the storage-policy legend. Contains <strong>." },
     "storage_no_pod_label":    { "text": "On our devices (no-pod, default).", "doc": "Bold label for the no-pod storage radio." },

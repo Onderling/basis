@@ -119,7 +119,7 @@ export const mockFolioManifest = folioManifest;
 // across these to produce the morning brief. Household's decl
 // lives in `mockAgent.js`.
 mockStoopManifest.operations.find((o) => o.id === 'listFeed')
-  .surfaces.chat.brief = { summarySkill: 'briefSummary', order: 30, label: 'Buurt' };
+  .surfaces.chat.brief = { summarySkill: 'briefSummary', order: 30, label: 'Circle' };
 mockFolioManifest.operations.find((o) => o.id === 'readNote')
   .surfaces.chat.brief = { summarySkill: 'briefSummary', order: 20, label: 'Folio' };
 

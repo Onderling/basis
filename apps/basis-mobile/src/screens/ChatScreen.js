@@ -76,7 +76,7 @@ import { makeGovernanceCatchUp } from '../../../basis/src/v2/governanceCatchUp.j
 import { governanceEntryId } from '../../../basis/src/v2/governanceLog.js';
 import { makeHandleChatMessage }
                                from '../../../basis/src/core/handlers/chatMessage.js';
-import { makeHandleBuurtPeerIntro }
+import { makeHandleCirclePeerIntro }
                                from '../../../basis/src/core/handlers/meshIntros.js';
 // B2 — per-circle ADDRESS announcing (web parity): the receive half + the admin's post-join
 // propagation. Same shared source both shells call; each only passes its own `agent`.
@@ -95,7 +95,7 @@ import { makeHandleCalendarRsvp }
                                from '../../../basis/src/core/handlers/calendarRsvp.js';
 import { makeHandleCalendarCancel }
                                from '../../../basis/src/core/handlers/calendarCancel.js';
-import { makeHandleBuurtPost } from '../../../basis/src/core/handlers/buurtPost.js';
+import { makeHandleCirclePost } from '../../../basis/src/core/handlers/circlePost.js';
 import {
   makeHandleGroupRedeemRequest,
   makeHandleGroupRedeemResponse,
@@ -533,7 +533,7 @@ export default function ChatScreen({
     const handlers = {
       // Substrate-only handlers — no UI bubble; just persist local
       // state + publish a notification for /logs.
-      'buurt-peer-intro':      makeHandleBuurtPeerIntro({ callSkill }),
+      'circle-peer-intro':      makeHandleCirclePeerIntro({ callSkill }),
       // B2 — inbound per-circle ADDRESS announcements (web parity). Every announcement carries its
       // own proof, so the sender is not trusted; recording refreshes the sealing binding AND the
       // authorize snapshot together, or the member would be reachable and then refused.
@@ -558,7 +558,7 @@ export default function ChatScreen({
       } : {}),
       'calendar-rsvp':         makeHandleCalendarRsvp({ callSkill, publishEvent }),
       'calendar-cancel':       makeHandleCalendarCancel({ callSkill, publishEvent }),
-      'buurt-post':            makeHandleBuurtPost({ callSkill, publishEvent }),
+      'circle-post':            makeHandleCirclePost({ callSkill, publishEvent }),
       'group-redeem-request':  makeHandleGroupRedeemRequest({
         callSkill, sendPeer, publishEvent,
         // …and return OUR per-circle address for the circle being joined, proven the same way the joiner
@@ -740,7 +740,7 @@ export default function ChatScreen({
           setTimeout(async () => {
             try {
               const r = await bundle.callSkill('stoop', 'listMyCircles', {});
-              const ids = (r?.buurts ?? []).map((b) => b?.groupId ?? b?.id).filter(Boolean);
+              const ids = (r?.circles ?? []).map((b) => b?.groupId ?? b?.id).filter(Boolean);
               await podChatCatchUp.catchUpAll(ids);
             } catch { /* best-effort — the next launch retries */ }
           }, 4000);
@@ -774,7 +774,7 @@ export default function ChatScreen({
             runOnce: async () => {
               try {
                 const r = await bundle.callSkill('stoop', 'listMyCircles', {});
-                const ids = (r?.buurts ?? []).map((b) => b?.groupId ?? b?.id).filter(Boolean);
+                const ids = (r?.circles ?? []).map((b) => b?.groupId ?? b?.id).filter(Boolean);
                 if (podChatCatchUp) await podChatCatchUp.catchUpAll(ids);
                 if (chatCatchUp) await chatCatchUp.requestAll({ callSkill: bundle.callSkill });
               } catch { /* a background slot is best-effort; the next slot retries */ }
@@ -821,7 +821,7 @@ export default function ChatScreen({
     });
     return {
       onPeerMessage:  makePeerRouter({ handlers, defaultHandler }),
-      // The buurt-POST catch-up (a stoop noticeboard concern): the hi-water peer poll. Chat/tasks/
+      // The neighbourhood-POST catch-up (a stoop noticeboard concern): the hi-water peer poll. Chat/tasks/
       // governance/membership ride their device-log lanes' own catch-ups (registered above).
       requestCatchUp: makeRequestCatchUpFromKnownPeers({ callSkill, sendPeer }),
     };
@@ -1873,7 +1873,7 @@ export default function ChatScreen({
               ? (bootState.bundle.agent?.peer?.address ?? null)
               : null}
             // N1+E8 — persist the create wizard's chosen policy (incl. the
-            // buurt chat-off default) onto the new circle, reusing the same
+            // neighbourhood chat-off default) onto the new circle, reusing the same
             // AsyncStorage policy store the launcher reads.  Only consumed
             // by CreateGroupWizardModal; other wizards ignore it.
             persistPolicy={(groupId, patch) => policyStoreRef.current?.update(groupId, patch)}

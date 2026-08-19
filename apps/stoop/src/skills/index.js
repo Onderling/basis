@@ -703,7 +703,7 @@ async function _fanOutViaReliableSend({
 }
 
 /**
- * Shared inbound-peer filter for BOTH ingest paths (circle chat + buurt post),
+ * Shared inbound-peer filter for BOTH ingest paths (circle chat + circle post),
  * so eviction + mute can't drift between them (E1 drift-guard). Returns a
  * rejection verdict (`{evicted:true}` | `{muted:true}`) or `null` (let through).
  *
@@ -1692,7 +1692,7 @@ export function buildSkills({
           id:    it.id,
           label: it.text ?? it.id,
         })),
-        message: `${open.length} buurt request${open.length === 1 ? '' : 's'}`,
+        message: `${open.length} circle request${open.length === 1 ? '' : 's'}`,
       };
     }, {
       description: 'Q30 brief-summary contributor: open-posts count + topmost rows.',
@@ -2642,9 +2642,9 @@ export function buildSkills({
      *   added after `sinceMs`.  Used by the catch-up flow:
      *
      *     - Joiner comes online → asks each peer "anything new in
-     *       buurt X since timestamp T?"
+     *       circle X since timestamp T?"
      *     - Peer (admin or member) calls this skill → packages each
-     *       result as a buurt-post envelope back to the joiner
+     *       result as a circle-post envelope back to the joiner
      *
      *   Output items match what fan-out's payload-builder needs:
      *   {requestId, text, type, kind, from, targets, ...} so the
@@ -2667,7 +2667,7 @@ export function buildSkills({
         const ts = it.addedAt ?? 0;
         if (ts <= sinceMs) continue;
         // Reuse the broadcast payload shape (Phase 52.7.2) so the
-        // caller can dispatch via the existing buurt-post envelope.
+        // caller can dispatch via the existing circle-post envelope.
         posts.push({
           requestId:      it.source?.requestId ?? it.id,
           text:           it.text ?? '',
@@ -2681,7 +2681,7 @@ export function buildSkills({
           skillTags:      Array.isArray(it.source?.skillTags) ? it.source.skillTags : [],
           requiredSkills: it.requiredSkills ?? [],
           targets,
-          // toBroadcastShape — this payload feeds buurt-post envelopes
+          // toBroadcastShape — this payload feeds circle-post envelopes
           // to a catching-up joiner; the local-only `ref` (install-local
           // cache path) must never ride along (Phase 39 privacy
           // invariant — previously leaked here).
@@ -2770,7 +2770,7 @@ export function buildSkills({
       }], { actor: from });
       return { ok: true, introId: item.id, _sync: simulateSync() };
     }, {
-      description: 'Joiner-side mirror: record a mesh introduction for another buurt member.',
+      description: 'Joiner-side mirror: record a mesh introduction for another circle member.',
       visibility:  'authenticated',
     }),
 
@@ -2845,7 +2845,7 @@ export function buildSkills({
       }
       return { peers, _sync: simulateSync() };
     }, {
-      description: 'List buurt members who consented to mesh address-sharing.',
+      description: 'List circle members who consented to mesh address-sharing.',
       visibility:  'authenticated',
     }),
 
@@ -2895,17 +2895,17 @@ export function buildSkills({
      * listMyCircles()
      *   — 2026-05-24 cross-instance fan-out support.
      *
-     *   Returns the set of buurt groupIds the calling actor is in,
+     *   Returns the set of circle groupIds the calling actor is in,
      *   from TWO sources combined:
      *
      *   1. `membership-redemption` items where redeemedBy === from
      *      (joiner side — the actor redeemed someone else's code).
      *   2. `group-rules` items where addedBy === from (creator/admin
-     *      side — admins don't have a redemption for buurts they
+     *      side — admins don't have a redemption for circles they
      *      created themselves; they ARE the implicit owner).
      *
      *   Used by the basis fan-out layer to address every
-     *   relevant buurt when /post doesn't pin one explicitly.
+     *   relevant circle when /post doesn't pin one explicitly.
      */
     defineSkill('listMyCircles', async ({ from }) => {
       const ids = new Set();
@@ -2939,9 +2939,9 @@ export function buildSkills({
         const exits = collectCircleExits({ items: exitItems, groupId: gid });
         if (isExited(exits, from, myJoinedAt.get(gid) ?? 0)) ids.delete(gid);
       }
-      return { buurts: [...ids], _sync: simulateSync() };
+      return { circles: [...ids], _sync: simulateSync() };
     }, {
-      description: 'List the buurt groupIds the calling actor is a member or admin of.',
+      description: 'List the circle groupIds the calling actor is a member or admin of.',
       visibility:  'authenticated',
     }),
 
@@ -2981,7 +2981,7 @@ export function buildSkills({
      * listGroupRoster({groupId})
      *   — 2026-05-24 cross-instance fan-out support.
      *
-     *   Returns the addresses we know for the calling actor's buurt
+     *   Returns the addresses we know for the calling actor's circle
      *   peers, drawn from `membership-redemption` items.  The chat
      *   layer uses this to fan out /post envelopes over NKN.
      *
@@ -3007,7 +3007,7 @@ export function buildSkills({
         { a: dataArgs(parts), from, localActor },
       );
     }, {
-      description: 'List addresses for the calling actor\'s buurt peers (fan-out roster).',
+      description: 'List addresses for the calling actor\'s circle peers (fan-out roster).',
       visibility:  'authenticated',
     }),
 
@@ -3053,7 +3053,7 @@ export function buildSkills({
      *   — 2026-05-24 cross-instance fan-out (chat-layer bridge).
      *
      *   Called by basis when an NKN envelope of `subtype:
-     *   'buurt-post'` arrives.  Mirrors substrateMirror.mirror()'s
+     *   'circle-post'` arrives.  Mirrors substrateMirror.mirror()'s
      *   logic — dedupe by `payload.requestId`, eviction-filter by
      *   `payload.from`, draft + addItems with the same shape stoop's
      *   substrate-mirror produces.  This way local UI surfaces the
@@ -3080,7 +3080,7 @@ export function buildSkills({
       const requestId = payload.requestId;
       if (typeof requestId !== 'string' || !requestId) return { error: 'payload.requestId required' };
       // Eviction + mute filter — shared with ingestCircleMessage so the two ingest
-      // paths can't drift (E1 drift-guard via _peerIngestVerdict). NB buurt-posts
+      // paths can't drift (E1 drift-guard via _peerIngestVerdict). NB circle-posts
       // previously honoured eviction but NOT mute — this closes that gap: a muted
       // member's posts are dropped too, matching the circle-chat path.
       const verdict = _peerIngestVerdict({
@@ -3934,7 +3934,7 @@ export function buildSkills({
     /**
      * ingestCircleMessage({payload, fromPubKey, fromPeerAddr})
      *   — receive-side mirror for an inbound circle chat
-     *   envelope.  Sibling of `ingestRemotePost` for the buurt-post
+     *   envelope.  Sibling of `ingestRemotePost` for the circle-post
      *   path: dedupe + eviction + mute filtering + addItems.  Hosts
      *   (basis web + mobile) call this from their circle-chat
      *   peer-router handler instead of writing to eventLog directly.
@@ -4877,7 +4877,7 @@ export function buildSkills({
       // swapIdentity → SecurityLayer.swapIdentity).
       //
       // V3 mobile note: when the restore flow lands on a device with
-      // pre-existing peer subscriptions (rejoining a buurt), this is
+      // pre-existing peer subscriptions (rejoining a circle), this is
       // where we'd `await offeringMatch.stop(); await offeringMatch.start()`
       // to re-bind topic listeners.  Today it's a no-op.
 

@@ -25,7 +25,7 @@ import { VaultMemory } from '@onderling/vault';
 import { createNeighborhoodAgent } from '../src/index.js';
 import { resolveMemberAddress, ADDRESS_VIA } from '../src/lib/memberAddress.js';
 
-const CIRCLE = 'buurt-42';
+const CIRCLE = 'circle-42';
 const ME     = 'pk-me';         // this device (webid === the chat signing key)
 const BRAM   = 'pk-bram';       // a co-member we joined alongside
 const ADMIN  = 'pk-admin';

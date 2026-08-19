@@ -22,12 +22,12 @@ describe('circleRecipeBlocks · α.1b — registry', () => {
 
 describe('circleRecipeBlocks · α.1b — materializeBlock (pure types)', () => {
   it('announcement: ok when text present, empty when blank', async () => {
-    const r1 = await materializeBlock({ block: { id: 'b', type: 'announcement', config: { text: 'Buurtfeest!' } } });
+    const r1 = await materializeBlock({ block: { id: 'b', type: 'announcement', config: { text: 'Street party!' } } });
     // α.5c — announcement is list-shaped, so the materializer surfaces a
     // `config: { compact }` flag for the renderer; falsy by default.
     expect(r1).toEqual({
       blockId: 'b', type: 'announcement', status: 'ok',
-      content: { text: 'Buurtfeest!' },
+      content: { text: 'Street party!' },
       config: { compact: false },
     });
 
@@ -181,7 +181,7 @@ describe('circleRecipeBlocks · α.1b — materializeBlock (data-fetching types)
       rules: {
         id: 'item-1',
         source: { doc: {
-          purpose:    'Een fijne buurt zijn',
+          purpose:    'Een fijne circle zijn',
           agreements: 'Geen herrie na 22u',
         } },
       },
@@ -193,7 +193,7 @@ describe('circleRecipeBlocks · α.1b — materializeBlock (data-fetching types)
     });
     expect(callSkill).toHaveBeenCalledWith('stoop', 'getGroupRules', { groupId: 'g1' });
     expect(r.status).toBe('ok');
-    expect(r.content.doc.purpose).toBe('Een fijne buurt zijn');
+    expect(r.content.doc.purpose).toBe('Een fijne circle zijn');
     expect(r.content.doc.agreements).toBe('Geen herrie na 22u');
   });
 

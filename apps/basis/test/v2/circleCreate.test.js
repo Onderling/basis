@@ -8,11 +8,11 @@ describe('quickCreateCircle', () => {
       expect(op).toBe('createGroupV2');
       return { groupId: args.groupId, code: 'X' };
     });
-    const res = await quickCreateCircle({ callSkill, name: 'Selwerd Buurt!' });
+    const res = await quickCreateCircle({ callSkill, name: 'Selwerd Circle!' });
     const args = callSkill.mock.calls[0][2];
-    expect(args.name).toBe('Selwerd Buurt!');
-    expect(args.groupId).toBe('selwerd-buurt'); // slugified
-    expect(res.groupId).toBe('selwerd-buurt');
+    expect(args.name).toBe('Selwerd Circle!');
+    expect(args.groupId).toBe('selwerd-circle'); // slugified
+    expect(res.groupId).toBe('selwerd-circle');
   });
 
   it('rejects an empty name', async () => {

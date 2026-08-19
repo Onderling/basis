@@ -35,10 +35,10 @@ function host(profileSeed = seed()) {
 describe('installing a per-circle signing identity', () => {
   it('installs the identity under the address the circle is addressed at', async () => {
     const h = host();
-    const address = await useCircleSigningIdentity({ circleId: 'buurt-42', ...h });
-    expect(address).toBe(h.circleAddressFor('buurt-42'));
+    const address = await useCircleSigningIdentity({ circleId: 'circle-42', ...h });
+    expect(address).toBe(h.circleAddressFor('circle-42'));
     expect(h.installed.get(address).pubKey).toBe(
-      (await circleIdentity(h.profileSeed, 'buurt-42', new VaultMemory())).pubKey,
+      (await circleIdentity(h.profileSeed, 'circle-42', new VaultMemory())).pubKey,
     );
   });
 
@@ -47,9 +47,9 @@ describe('installing a per-circle signing identity', () => {
     const broken = { ...h, circleIdentityFor: (cid) => (cid === 'bad' ? Promise.reject(new Error('x')) : h.circleIdentityFor(cid)) };
     const onFailed = vi.fn();
     const r = await installCircleSigningIdentities({
-      circleIds: ['buurt-42', 'bad', 'werk-7'], ...broken, onFailed,
+      circleIds: ['circle-42', 'bad', 'werk-7'], ...broken, onFailed,
     });
-    expect(r.installed).toEqual(['buurt-42', 'werk-7']);
+    expect(r.installed).toEqual(['circle-42', 'werk-7']);
     expect(r.failed).toEqual(['bad']);
     expect(onFailed).toHaveBeenCalledWith('bad');
     // The point of best-effort: one broken circle does not cost the others their identity.
@@ -57,7 +57,7 @@ describe('installing a per-circle signing identity', () => {
   });
 
   it('is null-safe rather than throwing, so a host without the seams degrades visibly', async () => {
-    expect(await useCircleSigningIdentity({ circleId: 'buurt-42' })).toBeNull();
+    expect(await useCircleSigningIdentity({ circleId: 'circle-42' })).toBeNull();
     expect(await useCircleSigningIdentity({ ...host() })).toBeNull();          // no circleId
     const r = await installCircleSigningIdentities({ circleIds: ['a'] });
     expect(r).toEqual({ installed: [], failed: ['a'] });
@@ -69,7 +69,7 @@ describe('installing a per-circle signing identity', () => {
     const detachedKey = { pubKey: 'a-key-unrelated-to-the-address', sign: () => {}, box: () => {} };
     const installed = new Map();
     const address = await useCircleSigningIdentity({
-      circleId: 'buurt-42',
+      circleId: 'circle-42',
       circleAddressFor: () => 'the-address',
       circleIdentityFor: () => detachedKey,
       registerSelfIdentity: (a, id) => { installed.set(a, id); return true; },
@@ -84,7 +84,7 @@ describe('binding a member’s per-circle address to the key that signs there', 
   const member = {
     webid: 'webid:anna',
     pubKey: 'ANNAS-GLOBAL-IDENTITY-KEY',
-    circleAddress: deriveCircleAddress(memberSeed, 'buurt-42'),
+    circleAddress: deriveCircleAddress(memberSeed, 'circle-42'),
   };
 
   it('binds the CIRCLE signing key for the crypto, and the person for everything else', () => {

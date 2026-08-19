@@ -116,7 +116,7 @@ describe('circle fan-out — recipients are the circle roster, not the global Me
     });
 
     const r = await callSkill(bundle.agent, 'broadcastCircleChatStatement',
-      { groupId: 'seeded-buurt', event: { body: { hash: 'h' }, sig: 's' }, msgId: 'm-scope-3', ts: 1 });
+      { groupId: 'seeded-circle', event: { body: { hash: 'h' }, sig: 's' }, msgId: 'm-scope-3', ts: 1 });
 
     expect(sends).toEqual([CO]);
     expect(r.attempted).toBe(1);

@@ -12,7 +12,7 @@ import { circleTint } from '../../src/v2/theme.js';
 // β.3 — fixed display order for circle-kind section headers; anything not in
 // this list is bucketed under 'other' (last).  Mirrors the values produced by
 // the create wizard + circleModel.normalizeCircle (`raw.kind ?? raw.tone`).
-const KIND_ORDER = ['household', 'buurt', 'friends'];
+const KIND_ORDER = ['household', 'neighbourhood', 'friends'];
 
 export function renderCircleLauncher(container, {
   circles = [],

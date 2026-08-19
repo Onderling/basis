@@ -31,10 +31,10 @@ describe('loadProfile — materialize a profile on a device (step 4)', () => {
   it('exposes per-circle addresses (unlinkable) matching the derivation', async () => {
     const root = Bootstrap.create().bootstrap;
     const loaded = await loadProfile({ ownerRoot: root, profileId: 'default', vault: new VaultMemory() });
-    expect(loaded.circleAddress('buurt-42')).toBe(profileCircleAddress(root, 'default', 'buurt-42'));
-    expect(loaded.circleAddress('buurt-42')).not.toBe(loaded.circleAddress('werk-7'));   // per-circle distinct
-    expect(loaded.circleAddress('buurt-42')).not.toBe(loaded.pubKey);                    // != the profile key
-    expect(loaded.circleSeed('buurt-42')).toBeInstanceOf(Uint8Array);
+    expect(loaded.circleAddress('circle-42')).toBe(profileCircleAddress(root, 'default', 'circle-42'));
+    expect(loaded.circleAddress('circle-42')).not.toBe(loaded.circleAddress('werk-7'));   // per-circle distinct
+    expect(loaded.circleAddress('circle-42')).not.toBe(loaded.pubKey);                    // != the profile key
+    expect(loaded.circleSeed('circle-42')).toBeInstanceOf(Uint8Array);
   });
 
   it('verifies against the registry: loading a createProfile-registered profile agrees', async () => {
@@ -59,7 +59,7 @@ describe('loadProfile — materialize a profile on a device (step 4)', () => {
 
   it('circleIdentity(circleId): the per-circle signing identity has the circle address as its pubKey', async () => {
     const loaded = await loadProfile({ ownerRoot: Bootstrap.create().bootstrap, profileId: 'default', vault: new VaultMemory() });
-    const cid = await loaded.circleIdentity('buurt-42', new VaultMemory());
-    expect(cid.pubKey).toBe(loaded.circleAddress('buurt-42'));
+    const cid = await loaded.circleIdentity('circle-42', new VaultMemory());
+    expect(cid.pubKey).toBe(loaded.circleAddress('circle-42'));
   });
 });

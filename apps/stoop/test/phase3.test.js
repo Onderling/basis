@@ -215,7 +215,7 @@ describe('Stoop V1 — moderation skills (mute / report)', () => {
 
     const r = await callSkill(bundle.agent, 'reportPost', {
       itemId: original.requestId,
-      reason: 'irrelevant for the buurt',
+      reason: 'irrelevant for the circle',
     });
     expect(r.reportId).toBeTruthy();
 
@@ -223,7 +223,7 @@ describe('Stoop V1 — moderation skills (mute / report)', () => {
     expect(stored.type).toBe('report');
     expect(stored.text).toMatch(/Report on/);
     expect(stored.source.reportTarget).toBe(original.requestId);
-    expect(stored.source.reason).toBe('irrelevant for the buurt');
+    expect(stored.source.reason).toBe('irrelevant for the circle');
   });
 
   it('reportPost rejects missing itemId', async () => {

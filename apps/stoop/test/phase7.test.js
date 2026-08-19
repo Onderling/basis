@@ -50,7 +50,7 @@ describe('Stoop V1 — group governance wizard', () => {
       groupId: 'oosterpoort-skills',
       name:    'Oosterpoort skills',
       rules: {
-        purpose:        'Buurtgenoten die elkaar willen helpen.',
+        purpose:        'Neighbours die elkaar willen helpen.',
         admins:         [ANNE],
         houseRules:     ['Geen reclame', 'Geen politiek'],
         conflictPolicy: 'mediation',

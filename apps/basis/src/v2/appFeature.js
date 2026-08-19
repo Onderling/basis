@@ -4,7 +4,7 @@
  * OFF (the existing tab gate, `circlePolicy.js`) then also shows no inline/screen
  * buttons for those apps in chat — the per-circle half of "by preference".
  *
- * Apps NOT listed are core/always-on (stoop = the buurt, household, basis
+ * Apps NOT listed are core/always-on (stoop = the circle, household, basis
  * itself). Pure + shared web↔mobile.
  */
 

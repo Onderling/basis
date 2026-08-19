@@ -38,7 +38,7 @@ describe('defaultsForKind', () => {
 
   it('lists the four known kinds', () => {
     expect(CIRCLE_KINDS.slice().sort()).toEqual(
-      ['buurt', 'friends', 'household', 'team'],
+      ['friends', 'household', 'neighbourhood', 'team'],
     );
   });
 });
@@ -106,21 +106,21 @@ describe('applyTemplate — the USER\'s choices win, and only theirs (decision 4
 
   it('THE CHANGE — switching kinds now re-fills the axes only a template had set', () => {
     const afterHousehold = applyTemplate({}, 'household');
-    const afterBuurt     = applyTemplate(afterHousehold, 'buurt');
-    const freshBuurt     = applyTemplate({}, 'buurt');
+    const afterNeighbourhood     = applyTemplate(afterHousehold, 'neighbourhood');
+    const freshNeighbourhood     = applyTemplate({}, 'neighbourhood');
 
-    expect(afterBuurt.kind).toBe('buurt');
-    // Nobody touched anything, so switching gives you the buurt you asked for — not a household wearing
-    // a buurt label, which is what the old rule produced.
+    expect(afterNeighbourhood.kind).toBe('neighbourhood');
+    // Nobody touched anything, so switching gives you the circle you asked for — not a household wearing
+    // a circle label, which is what the old rule produced.
     for (const axis of ['revealPolicy', 'pod', 'llmTool', 'agents', 'consensusRequired']) {
-      expect(afterBuurt[axis], `${axis} did not follow the new kind`).toEqual(freshBuurt[axis]);
+      expect(afterNeighbourhood[axis], `${axis} did not follow the new kind`).toEqual(freshNeighbourhood[axis]);
     }
-    expect(afterBuurt.features).toEqual(freshBuurt.features);
+    expect(afterNeighbourhood.features).toEqual(freshNeighbourhood.features);
   });
 
   it('…while a choice made along the way still survives the switch', () => {
-    const buurt   = applyTemplate({}, 'buurt');
-    const chosen  = markAxisTouched({ ...buurt, features: { ...buurt.features, chat: true } }, 'features.chat');
+    const neighbourhood = applyTemplate({}, 'neighbourhood');
+    const chosen  = markAxisTouched({ ...neighbourhood, features: { ...neighbourhood.features, chat: true } }, 'features.chat');
     const swapped = applyTemplate(chosen, 'friends');
     expect(swapped.features.chat).toBe(true);
     // and everything she never touched now matches a fresh friends

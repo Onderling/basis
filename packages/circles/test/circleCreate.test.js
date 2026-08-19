@@ -25,14 +25,14 @@ describe('createGroupWithRules — zero-key circle-creation writer (§8c slice-a
     const store = fakeStore();
     const r = await createGroupWithRules(
       { store, simulateSync },
-      { a: { groupId: 'g1', name: 'Buurt', rules: { quorum: 2 } }, from: 'webid:anne' },
+      { a: { groupId: 'g1', name: 'Circle', rules: { quorum: 2 } }, from: 'webid:anne' },
     );
     expect(r.rulesId).toBeTruthy();
     expect(r.groupId).toBe('g1');
     expect(r._sync).toEqual({ synced: true });
     expect(store.items).toHaveLength(1);
     expect(store.items[0]).toMatchObject({
-      type: 'group-rules', text: 'Buurt',
+      type: 'group-rules', text: 'Circle',
       source: { groupId: 'g1', rules: { quorum: 2 }, version: 1 },
       visibility: 'household', _actor: 'webid:anne',
     });
@@ -65,7 +65,7 @@ describe('createGroupV2 — zero-key self-create writer (§8c slice-a lift)', ()
     const added = [];
     const members = { resolveByWebid: async () => null, addMember: async (m) => added.push(m) };
     const calls = { metrics: [], policy: [] };
-    const r = await createGroupV2(deps(store, members, calls), { a: { groupId: 'g1', name: 'Buurt', rules: { q: 1 } }, from: 'webid:anne' });
+    const r = await createGroupV2(deps(store, members, calls), { a: { groupId: 'g1', name: 'Circle', rules: { q: 1 } }, from: 'webid:anne' });
 
     expect(r).toMatchObject({ groupId: 'g1', code: 'CODE-123', keyRotationMode: 'admin-only', rotationDays: 30, storage: { policy: 'no-pod' } });
     expect(r.rulesId).toBeTruthy();

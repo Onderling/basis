@@ -112,17 +112,17 @@ SUITE('per-circle sealing — CSS integration (real pod)', () => {
     const stratA = await cca.sealingStrategy(alice.privateKey);
     const sealed = createSealedPodClient(podClient, stratA);
     const noteUri = `${root}/shared/post.txt`;
-    await sealed.write(noteUri, 'hallo buurt — alleen voor de circle');
+    await sealed.write(noteUri, 'hallo circle — alleen voor de circle');
 
     // the host sees CIPHERTEXT (read raw, undecoded) — confidentiality holds on a real pod
     const rawNote = await podClient.read(noteUri, { decode: 'text' });
     const rawNoteText = typeof rawNote === 'string' ? rawNote : rawNote?.content;
-    expect(rawNoteText).not.toContain('hallo buurt');
+    expect(rawNoteText).not.toContain('hallo circle');
 
     // Bob (also a current recipient) opens it transparently → plaintext round-trip over the pod
     const stratB = await cca.sealingStrategy(bob.privateKey);
     const opened = await createSealedPodClient(podClient, stratB).read(noteUri);
-    expect(opened.content).toBe('hallo buurt — alleen voor de circle');
+    expect(opened.content).toBe('hallo circle — alleen voor de circle');
 
     // Alice leaves: ACL revoked + group key rotated on the pod → she can no longer unwrap
     await cca.removeMember({ webId: 'did:alice' });

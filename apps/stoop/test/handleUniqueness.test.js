@@ -25,7 +25,7 @@ const ANNE  = 'https://id.example/anne';
 const BOB   = 'https://id.example/bob';
 const CAROL = 'https://id.example/carol';
 const GROUP = 'oosterpoort';
-const RULES = { purpose: 'buurt', admins: [ANNE], houseRules: ['wees aardig'] };
+const RULES = { purpose: 'circle', admins: [ANNE], houseRules: ['wees aardig'] };
 
 async function callSkill(agent, skillId, args, from = ANNE) {
   const def = agent.skills.get(skillId);
@@ -149,9 +149,9 @@ describe('join-redeem — per-circle handle uniqueness (admin/host side)', () =>
     // One admin store hosting two circles; the same peerDisplay in each is fine.
     const bundle = await buildBundle({ members: [{ webid: ANNE, role: 'admin' }] });
     const a = await callSkill(bundle.agent, 'createGroupV2',
-      { groupId: 'circle-a', name: 'A', rules: { purpose: 'buurt', admins: [ANNE] } }, ANNE);
+      { groupId: 'circle-a', name: 'A', rules: { purpose: 'circle', admins: [ANNE] } }, ANNE);
     const b = await callSkill(bundle.agent, 'createGroupV2',
-      { groupId: 'circle-b', name: 'B', rules: { purpose: 'buurt', admins: [ANNE] } }, ANNE);
+      { groupId: 'circle-b', name: 'B', rules: { purpose: 'circle', admins: [ANNE] } }, ANNE);
 
     const inA = await callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
       { groupId: 'circle-a', code: a.code, requesterWebid: BOB, peerDisplay: 'jan' }, ANNE);

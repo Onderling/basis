@@ -140,7 +140,7 @@ describe('J-A14 — the room refuses over-long content instead of shortening it 
     const seen = receiveInvite({
       subtype: INVITE_MESSAGE,
       invite: {
-        uri: 'onderling-invite://abc', circleId: 'buurt',
+        uri: 'onderling-invite://abc', circleId: 'circle',
         circleName: 'n'.repeat(5000), expiresAt: Date.now() + 5 * MIN,
       },
     }, 'them');

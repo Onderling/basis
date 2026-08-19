@@ -98,7 +98,7 @@ export const STOOP_TYPE_MAPPING = Object.freeze({
   'offer':   { type: 'offer',   defaultKind: 'give' },
   // "Te leen" button → "I have something to lend (with return)"
   'lend':    { type: 'offer',   defaultKind: 'lend' },
-  // "Vragen" button → "I want to borrow" (most common buurt case;
+  // "Vragen" button → "I want to borrow" (most common neighbourhood case;
   // grow the UI later to let users pick `share` for consumables or
   // `receive` for gift-asks).
   'ask':     { type: 'request', defaultKind: 'borrow' },

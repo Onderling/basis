@@ -142,14 +142,14 @@ describe('the delivery ladder is ONE vocabulary, shared', () => {
 });
 
 describe('conversation kinds reach mobile identically', () => {
-  it('a buurt shows the noticeboard, not open chat — the same answer as web', () => {
-    const kinds = resolveConversationKinds({ templateKind: 'buurt' });
+  it('a circle shows the noticeboard, not open chat — the same answer as web', () => {
+    const kinds = resolveConversationKinds({ templateKind: 'neighbourhood' });
     expect(kinds).not.toContain('chat-message');
     expect(kinds).toEqual(expect.arrayContaining(['vraag', 'aanbod']));
   });
 
   it("and an admin's choice wins on mobile too", () => {
-    expect(resolveConversationKinds({ circleSetting: ['chat-message'], templateKind: 'buurt' }))
+    expect(resolveConversationKinds({ circleSetting: ['chat-message'], templateKind: 'neighbourhood' }))
       .toEqual(['chat-message']);
   });
 });

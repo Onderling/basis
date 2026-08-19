@@ -180,8 +180,8 @@ import * as JG from '../../../src/core/wizards/joinGroupState.js';
 
 describe('joinGroupState', () => {
   it('privacyNoticeFor picks the right language; falls back to en', () => {
-    expect(JG.privacyNoticeFor('nl')).toMatch(/buurt|leden/i);
-    expect(JG.privacyNoticeFor('en')).toMatch(/buurt|posts/i);
+    expect(JG.privacyNoticeFor('nl')).toMatch(/circle|leden/i);
+    expect(JG.privacyNoticeFor('en')).toMatch(/circle|posts/i);
     expect(JG.privacyNoticeFor('xx')).toBe(JG.PRIVACY_NOTICE.en);
   });
 
@@ -482,14 +482,14 @@ describe('createGroupState', () => {
   });
 
   it('slugify normalises arbitrary names', () => {
-    expect(CG.slugify('Mijn Buurt')).toBe('mijn-buurt');
+    expect(CG.slugify('Mijn Circle')).toBe('mijn-circle');
     expect(CG.slugify('  --!!--  ')).toBe('');
     expect(CG.slugify('Café 123 ✓')).toBe('caf-123');
     expect(CG.slugify('a'.repeat(50))).toHaveLength(30);
   });
 
   it('isValidSlug: same rules as joinGroup.isValidHandle', () => {
-    expect(CG.isValidSlug('buurt-1')).toBe(true);
+    expect(CG.isValidSlug('circle-1')).toBe(true);
     expect(CG.isValidSlug('UPPER')).toBe(false);
     expect(CG.isValidSlug('')).toBe(false);   // empty fails
     expect(CG.isValidSlug('a'.repeat(31))).toBe(false);
@@ -516,14 +516,14 @@ describe('createGroupState', () => {
     const s = CG.initialState();
     s.tags = 'tools, gardening,, ';
     s.additionalAdmins = 'webid:a, webid:b';
-    s.purpose = 'Test buurt';
+    s.purpose = 'Test circle';
     s.rulesDoc.agreements = 'Be kind.';
     s.rulesDoc.conflict   = 'Mediation by two.';
     s.rulesDoc.admission  = 'Admins must approve.';
     const r = CG.buildRulesObjectFromState(s);
     expect(r.tags).toEqual(['tools', 'gardening']);
     expect(r.additionalAdmins).toEqual(['webid:a', 'webid:b']);
-    expect(r.purpose).toBe('Test buurt');           // Step 1 → rules doc
+    expect(r.purpose).toBe('Test circle');           // Step 1 → rules doc
     expect(r.agreements).toBe('Be kind.');           // 5.5a — structured doc
     expect(r.conflict).toBe('Mediation by two.');
     expect(r.admission).toBe('Admins must approve.');
@@ -534,14 +534,14 @@ describe('createGroupState', () => {
   it('finalSubmit happy-path: calls createGroupV2 with composed rules', async () => {
     const state = CG.initialState();
     state.groupId = 'b1';
-    state.name    = 'Buurt 1';
+    state.name    = 'Circle 1';
     state.purpose = 'Test';
     const callSkill = vi.fn().mockResolvedValue({ ok: true, groupId: 'b1', code: 'JOIN-CODE' });
     const { result } = await CG.finalSubmit({ state, callSkill });
     expect(result.code).toBe('JOIN-CODE');
     const args = callSkill.mock.calls[0][2];
     expect(args.groupId).toBe('b1');
-    expect(args.name).toBe('Buurt 1');
+    expect(args.name).toBe('Circle 1');
     expect(args.rules.purpose).toBe('Test');
     expect(args.storagePolicy).toBe('no-pod');
     expect(args.groupPodUri).toBeUndefined();
@@ -551,10 +551,10 @@ describe('createGroupState', () => {
     const state = CG.initialState();
     state.groupId = 'b1';
     state.storagePolicy = 'centralised';
-    state.groupPodUri = 'https://pods.example/buurt-1/';
+    state.groupPodUri = 'https://pods.example/circle-1/';
     const callSkill = vi.fn().mockResolvedValue({ ok: true });
     await CG.finalSubmit({ state, callSkill });
-    expect(callSkill.mock.calls[0][2].groupPodUri).toBe('https://pods.example/buurt-1/');
+    expect(callSkill.mock.calls[0][2].groupPodUri).toBe('https://pods.example/circle-1/');
   });
 
   it('finalSubmit failure: surfaces error', async () => {

@@ -1,6 +1,6 @@
 /**
  * β.3 — locale parity for the four `circle.kind.*` section-header keys
- * the launcher uses to group tiles (household / buurt / friends /
+ * the launcher uses to group tiles (household / circle / friends /
  * other).  Confirms the keys exist in BOTH locales of BOTH apps + that
  * the en↔nl key sets match overall.
  *

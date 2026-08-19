@@ -1,7 +1,7 @@
 /**
  * basis v2 — kind-aware "+ new circle" templates (β.4).
  *
- * Each known kind (household / buurt / friends / team) maps to a
+ * Each known kind (household / neighbourhood / friends / team) maps to a
  * partial policy that the create wizard pre-fills when the user picks
  * the kind in the C1 create flow. The user can override any
  * axis before submitting; the merge here is strictly "template fills
@@ -20,7 +20,7 @@
  * `additionalAdmins` field at submit time.
  *
  * Switch-kind semantics: if the user picks `household` then changes to
- * `buurt`, the second `applyTemplate` is essentially a no-op for axes
+ * `neighbourhood`, the second `applyTemplate` is essentially a no-op for axes
  * the first template already filled.  This preserves every choice the
  * user made along the way (even by virtue of an earlier template) and
  * avoids surprise overwrites.  Design call documented inline below.
@@ -63,12 +63,12 @@ export const CIRCLE_TEMPLATES = Object.freeze({
   },
   // A neighbourhood — bigger group, pairwise reveal, personal pods,
   // governance matters (co-admin consensus on changes).  N1 (2026-06-02,
-  // Frits): a buurt is noticeboard-first with **open chat OFF by default**
+  // Frits): a neighbourhood is noticeboard-first with **open chat OFF by default**
   // — a thread appears only when someone reacts to a vraag/aanbod
   // (the `/help-with` per-post DM-spawn).  `recommendChat` below turns
-  // this into wizard advice: for bigger buurten chat-off is *advised*
+  // this into wizard advice: for bigger neighbourhoods chat-off is *advised*
   // (with reasoning); for smaller ones the wizard just *asks*.
-  buurt: {
+  neighbourhood: {
     features: {
       chat: false,  noticeboard: true,  tasks: true,  lists: false,
       calendar: false,  notes: false,  houseRules: true,  memberDirectory: true,
@@ -129,14 +129,14 @@ export const CIRCLE_TEMPLATES = Object.freeze({
  * enforces exactly that. This is a membership setting, not a policy axis.
  *
  * The numbers follow how each kind actually onboards: a household is a handful of people who already
- * live together; a buurt takes a street in waves off one code read out at a door. The `_default` value
+ * live together; a neighbourhood takes a street in waves off one code read out at a door. The `_default` value
  * is the same one the substrate uses for a circle whose rules say nothing
  * (`@onderling-app/stoop/lib/inviteCeiling` → `INVITE_CEILING_FALLBACK`), so "nobody chose" means one
  * number everywhere rather than two that drift.
  */
 export const TEMPLATE_INVITE_MAX_REDEMPTIONS = Object.freeze({
   household:     6,
-  buurt:         50,
+  neighbourhood:         50,
   friends: 15,
   team:          25,
   _default:      INVITE_CEILING_FALLBACK,
@@ -187,8 +187,8 @@ export function applyTemplate(state, kind) {
   const t = defaultsForKind(kind);
   // PROVENANCE (decision 4, 2026-07-29). The rule used to be "keep anything already set", which cannot
   // tell *the user chose this* from *the previous template chose this*. Since the first template fills
-  // every axis, a kind switch could never move anything: picking buurt and then switching to
-  // friends changed the label and nothing else — ten axes kept buurt's values, and the wizard's own
+  // every axis, a kind switch could never move anything: picking neighbourhood and then switching to
+  // friends changed the label and nothing else — ten axes kept neighbourhood's values, and the wizard's own
   // promise (a template is a starting point, not a track) was true only for the first pick.
   //
   // So the question is now "did the USER set this", answered by `touched`. Everything they never touched
@@ -253,7 +253,7 @@ export const SIZE_BANDS = Object.freeze(['small', 'large']);
 
 /**
  * Heuristic: map an expected member/household count to a size band.
- * The 20-member cut mirrors the design note ("bigger buurten" — past a
+ * The 20-member cut mirrors the design note ("bigger neighbourhoods" — past a
  * couple dozen households open chat stops scaling).  Returns null for a
  * non-numeric input so callers can fall back to asking explicitly.
  *
@@ -269,26 +269,26 @@ export function bandForCount(n) {
  * N1 — recommend the `chat` feature value for a kind, plus *how strongly*
  * to surface that recommendation in the create wizard.
  *
- * Only the **buurt** is size-sensitive (Frits 2026-06-02): a buurt always
- * defaults chat OFF, but for a *large* buurt the wizard should advise
- * keeping it off (with reasoning), whereas for a *small* buurt it should
+ * Only the **neighbourhood** is size-sensitive (Frits 2026-06-02): a neighbourhood always
+ * defaults chat OFF, but for a *large* neighbourhood the wizard should advise
+ * keeping it off (with reasoning), whereas for a *small* neighbourhood it should
  * just ask the user.  Every other kind follows its template's chat value
  * with no special advice.
  *
  * `mode` values:
- *   - `'advise-off'`  — recommend off + show the reasoning (large buurt)
- *   - `'ask'`         — default off but prompt the user (small buurt)
- *   - `'default-off'` — buurt with no size chosen yet (off, neutral note)
- *   - `'default'`     — non-buurt; follow the template, no advice
+ *   - `'advise-off'`  — recommend off + show the reasoning (large neighbourhood)
+ *   - `'ask'`         — default off but prompt the user (small neighbourhood)
+ *   - `'default-off'` — neighbourhood with no size chosen yet (off, neutral note)
+ *   - `'default'`     — non-neighbourhood; follow the template, no advice
  *
  * @param {{ kind?: string|null, size?: 'small'|'large'|null }} [opts]
  * @returns {{ value: boolean, mode: string, reasonKey: string|null }}
  */
 export function recommendChat({ kind = null, size = null } = {}) {
-  if (kind === 'buurt') {
-    if (size === 'large') return { value: false, mode: 'advise-off',  reasonKey: 'circle.chatAdvice.buurtLarge' };
-    if (size === 'small') return { value: false, mode: 'ask',         reasonKey: 'circle.chatAdvice.buurtSmall' };
-    return                       { value: false, mode: 'default-off', reasonKey: 'circle.chatAdvice.buurtDefault' };
+  if (kind === 'neighbourhood') {
+    if (size === 'large') return { value: false, mode: 'advise-off',  reasonKey: 'circle.chatAdvice.neighbourhoodLarge' };
+    if (size === 'small') return { value: false, mode: 'ask',         reasonKey: 'circle.chatAdvice.neighbourhoodSmall' };
+    return                       { value: false, mode: 'default-off', reasonKey: 'circle.chatAdvice.neighbourhoodDefault' };
   }
   const tpl = defaultsForKind(kind);
   return { value: !!tpl.features?.chat, mode: 'default', reasonKey: null };

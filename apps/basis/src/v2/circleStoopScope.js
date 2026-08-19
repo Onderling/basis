@@ -7,7 +7,7 @@
  * key so a post lands in — and a list reads from — the open circle. But the GUI
  * surfaces (the prikbord noticeboard, etc.) call `callSkill('stoop', op, args)`
  * DIRECTLY, bypassing that binding — so without this wrapper every circle's
- * prikbord hits the one shared `cc-default-buurt` and they all see each other's
+ * prikbord hits the one shared `cc-default-circle` and they all see each other's
  * posts. This wrapper closes that gap the same way:
  *   • item-creating / mutating stoop ops get the circle id injected as `groupId`
  *     (stoop's per-call scope key — realAgent maps it to `source.targets[]`), so

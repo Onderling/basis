@@ -14,10 +14,10 @@ const admin = () => AgentIdentity.generate(new VaultMemory());
 describe('signEviction / verifyEviction (the `evict` spine kind)', () => {
   it('round-trips: subject IS the evicted member; kind is `evict`', async () => {
     const a = await admin();
-    const stmt = signEviction(a, { circleId: 'buurt-x', evicted: 'circ:bram' });
+    const stmt = signEviction(a, { circleId: 'circle-x', evicted: 'circ:bram' });
     expect(stmt.by).toBe(a.pubKey);
-    expect(stmt.body).toMatchObject({ v: SPINE_STMT_VERSION, kind: EVICTION_KIND, circleId: 'buurt-x', subject: 'circ:bram' });
-    const res = verifyEviction(stmt, { expectedCircleId: 'buurt-x' });
+    expect(stmt.body).toMatchObject({ v: SPINE_STMT_VERSION, kind: EVICTION_KIND, circleId: 'circle-x', subject: 'circ:bram' });
+    const res = verifyEviction(stmt, { expectedCircleId: 'circle-x' });
     expect(res.ok).toBe(true);
     expect(res.body.subject).toBe('circ:bram');
   });

@@ -22,7 +22,7 @@ const trailX = [
     pubKey: 'anna-signing-pub',
     sealingPublicKey: 'anna-sealing-X',
     circleAddress: 'anna@circleX-addr',
-    personaProperties: { buurt: 'oost' },
+    personaProperties: { circle: 'oost' },
   },
   {
     webid: 'https://bram.example/me',
@@ -85,7 +85,7 @@ describe('peerFacade — per-circle projection', () => {
       reachability: true,
       relation: 'group-member',
       trust: 'trusted', // PeerGraph tier wins
-      props: { buurt: 'oost' },
+      props: { circle: 'oost' },
     });
   });
 
@@ -158,7 +158,7 @@ describe('peerFacade — per-circle keying, no global id (Decision A)', () => {
     expect(annaY.circleAddress).toBe('anna@circleY-addr');
     expect(annaX.circleAddress).not.toBe(annaY.circleAddress);
     expect(annaX.sealingKey).not.toBe(annaY.sealingKey);
-    expect(annaX.props).toEqual({ buurt: 'oost' });
+    expect(annaX.props).toEqual({ circle: 'oost' });
     expect(annaY.props).toEqual({ klas: '3b' }); // per-circle disclosure, independent
 
     // No `stableId` / global id field on either record.

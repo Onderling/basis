@@ -8,11 +8,11 @@
  */
 
 export const ITEM_TYPES = Object.freeze({
-  /** Buurtgenoot has a question / needs help. */
+  /** Neighbour has a question / needs help. */
   ASK:           'ask',
-  /** Buurtgenoot offers a skill / time / item. */
+  /** Neighbour offers a skill / time / item. */
   OFFER:         'offer',
-  /** Buurtgenoot is willing to lend an item; needs a `dueAt`. */
+  /** Neighbour is willing to lend an item; needs a `dueAt`. */
   LEND:          'lend',
   /** A report filed against another item (moderation). */
   REPORT:        'report',

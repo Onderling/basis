@@ -348,7 +348,7 @@ AsyncStorage.getItem(ACTION_FREQ_KEY).then((raw) => {
 // D1 (§5A) — in-memory fallback recipe (just the Veel-gebruikt row) for a
 // circle with no authored scherm.  Never persisted.
 const DEFAULT_SCHERM_RECIPE = Object.freeze({
-  // #16 — quick-actions + the noticeboard (buurt prikbord via stoop listOpen), so a
+  // #16 — quick-actions + the noticeboard (circle prikbord via stoop listOpen), so a
   // scherm-landing circle surfaces the open posts even with the chat tab hidden.
   id: '__default__', name: '', blocks: [
     { id: 'qa-default', type: 'quickActions', config: { limit: 4 } },
@@ -2149,7 +2149,7 @@ export default function CircleLauncherScreen({
 // β.3 — fixed display order for circle-kind section headers; anything not in
 // this list is bucketed under 'other' (last).  Mirrors web circleLauncher.js
 // and the values produced by the create wizard + circleModel.normalizeCircle.
-const KIND_ORDER = ['household', 'buurt', 'friends'];
+const KIND_ORDER = ['household', 'neighbourhood', 'friends'];
 
 /**
  * β.1+β.2+β.3+β.5 — render the circles list:
@@ -3757,7 +3757,7 @@ function CircleDetail({
           <CircleScreenView blocks={screenBlocks} onAction={onScreenAction}
             onEmbedOpen={({ screen, ref }) => { if (screen) setScreenPanel({ screen, highlightRef: ref }); }} />
         ) : activeTab === 'prikbord' ? (
-          // S1 #1 — the buurt noticeboard (its own composer + post list), scoped to
+          // S1 #1 — the circle noticeboard (its own composer + post list), scoped to
           // the open circle (S4 per-circle restructure — see stoopCall above).
           <CircleNoticeboard callSkill={stoopCall} onStoopEvent={onStoopEvent} media={circleMedia}
             onPeerMuted={() => setMembersReloadTick((n) => n + 1)}

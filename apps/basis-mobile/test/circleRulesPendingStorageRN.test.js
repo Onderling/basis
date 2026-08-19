@@ -27,11 +27,11 @@ describe('γ-next.rules — circleRulesPendingStorageRN', () => {
 
   it('round-trips a rules doc through save / load', async () => {
     const io = asyncStorageCircleRulesPendingIo(storage);
-    await io.save('g1', { purpose: 'Buurt', agreements: 'be kind' });
+    await io.save('g1', { purpose: 'Neighbourhood', agreements: 'be kind' });
     expect(storage.map.get('cc.circleRulesPending.g1')).toBe(
-      JSON.stringify({ purpose: 'Buurt', agreements: 'be kind' }),
+      JSON.stringify({ purpose: 'Neighbourhood', agreements: 'be kind' }),
     );
-    expect(await io.load('g1')).toEqual({ purpose: 'Buurt', agreements: 'be kind' });
+    expect(await io.load('g1')).toEqual({ purpose: 'Neighbourhood', agreements: 'be kind' });
   });
 
   it('returns null when no entry', async () => {

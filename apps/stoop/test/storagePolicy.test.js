@@ -67,9 +67,9 @@ describe('A3 — createGroupV2 storage policy', () => {
       name:          'Test',
       rules:         {},
       storagePolicy: 'centralised',
-      groupPodUri:   'https://buurt.pod/',
+      groupPodUri:   'https://circle.pod/',
     });
-    expect(r.storage).toEqual({ policy: 'centralised', groupPodUri: 'https://buurt.pod/' });
+    expect(r.storage).toEqual({ policy: 'centralised', groupPodUri: 'https://circle.pod/' });
   });
 
   it('rejects centralised without groupPodUri', async () => {
@@ -151,10 +151,10 @@ describe('A3 — getCircleStoragePolicy', () => {
       name:          'Test',
       rules:         {},
       storagePolicy: 'centralised',
-      groupPodUri:   'https://buurt.pod/',
+      groupPodUri:   'https://circle.pod/',
     });
     const r = await callSkill(bundle.agent, 'getCircleStoragePolicy', { groupId: 'g-live' });
-    expect(r).toEqual({ policy: 'centralised', groupPodUri: 'https://buurt.pod/' });
+    expect(r).toEqual({ policy: 'centralised', groupPodUri: 'https://circle.pod/' });
   });
 });
 

@@ -717,7 +717,7 @@ header .lang-toggle { margin: 0.4rem 0 0; font-size: 0.8rem; color: var(--fg-mut
   padding: 0;
   margin: 0 0 0.6rem;
 }
-/* N1 — buurt chat advice banner + open-chat toggle. */
+/* N1 — neighbourhood chat advice banner + open-chat toggle. */
 .cc-wizard-advice {
   font-size: 0.85rem;
   line-height: 1.4;

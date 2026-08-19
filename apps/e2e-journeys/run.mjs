@@ -18,7 +18,7 @@ import * as twoParty    from './journeys/twoParty.journey.mjs';
 import * as offline     from './journeys/offline.journey.mjs';
 import * as circle      from './journeys/circle.journey.mjs';
 import * as sealedInbox from './journeys/sealedInbox.journey.mjs';
-import * as buurt       from './journeys/buurt.journey.mjs';
+import * as noticeboard from './journeys/noticeboard.journey.mjs';
 import * as companion   from './journeys/companion.journey.mjs';
 import * as taskClaim   from './journeys/taskClaim.journey.mjs';
 import * as security    from './journeys/security.journey.mjs';
@@ -35,7 +35,7 @@ import * as governance   from './journeys/governance.journey.mjs';
 import * as reachability  from './journeys/reachability.journey.mjs';
 import * as membership    from './journeys/membership.journey.mjs';
 
-const ALL = [twoParty, offline, circle, sealedInbox, buurt, companion, taskClaim, security, notifications, feedback, manage, bot, keyexchange, telegram, media, removal, mute, governance, reachability, membership];
+const ALL = [twoParty, offline, circle, sealedInbox, noticeboard, companion, taskClaim, security, notifications, feedback, manage, bot, keyexchange, telegram, media, removal, mute, governance, reachability, membership];
 const KEY = (n) => n.split(' ')[0].toLowerCase().replace(/[^a-z-]/g, ''); // "two-party messaging" -> "two-party"
 
 const args = process.argv.slice(2);

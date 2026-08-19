@@ -1,6 +1,6 @@
 /**
  * `chat-message` type — a single chat message in a thread.
- * Shared across Stoop's buurt chat + Tasks's appeal flow +
+ * Shared across Stoop's circle chat + Tasks's appeal flow +
  * any future chat-bearing app.
  */
 

@@ -24,7 +24,7 @@ describe('recentCircleTurns', () => {
   it('skips non-chat rows + empty text', () => {
     const rows = [
       row(1, 'me', '  '),
-      { id: 'x', ts: 2, actor: 'me', event: { payload: { kind: 'buurt-post', text: 'a post' } } },
+      { id: 'x', ts: 2, actor: 'me', event: { payload: { kind: 'circle-post', text: 'a post' } } },
       row(3, 'bot', 'real reply'),
     ];
     expect(recentCircleTurns({ rows })).toEqual(['assistant: real reply']);

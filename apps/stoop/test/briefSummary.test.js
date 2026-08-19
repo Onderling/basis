@@ -62,7 +62,7 @@ describe('stoop_briefSummary — Q30 contributor', () => {
     expect(Array.isArray(reply.items)).toBe(true);
     expect(reply.items.length).toBeGreaterThanOrEqual(1);
     expect(reply.items.length).toBeLessThanOrEqual(3);
-    expect(reply.message).toMatch(/buurt request/);
+    expect(reply.message).toMatch(/circle request/);
   });
 
   it('caps items[] at 3 even with many open posts', async () => {
@@ -85,6 +85,6 @@ describe('stoop_briefSummary — Q30 contributor', () => {
       text:   'Borrowable drill',
     });
     const reply = await callSkill(bundle.agent, 'stoop_briefSummary');
-    expect(reply.message).toBe('1 buurt request');
+    expect(reply.message).toBe('1 circle request');
   });
 });

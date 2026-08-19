@@ -83,9 +83,9 @@ reg.registerType('my-app/widget', WIDGET_SCHEMA);
 | `claim`             | `itemRef`              | A specific claim against an offer or request. Coordination lifecycle (requested → agreed → in-progress → completed | cancelled). |
 | `contact`           | `displayName`          | Address-book entry with `trustLevel`.       |
 | `calendar-event`    | `title`, `startsAt`    | Shared agenda event.                        |
-| `announcement`      | `body`                 | One-way buurt-broadcast.                    |
+| `announcement`      | `body`                 | One-way circle-broadcast.                    |
 | `reveal-request`    | `requester`, `target`  | Sender ↔ recipient identity disclosure.     |
-| `neighbourhood-job` | `body`                 | Coordinated buurt-job lifecycle.            |
+| `neighbourhood-job` | `body`                 | Coordinated circle-job lifecycle.            |
 | `media`             | `source`               | Pointer-only media item (images first; `mime` distinguishes). `source` is an embeds-shaped `{type, ref, enc?}` storage pointer — blob-gateway's manifest line slots in directly. Optional writer-asserted `mime`/`width`/`height` + `caption`. |
 
 Every type ships under the **`dec:`** namespace

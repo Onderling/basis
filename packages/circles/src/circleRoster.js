@@ -342,7 +342,7 @@ export async function listCircleMembers(
   // call keeps the fallback's pre-trail behaviour unchanged.
   if (!scoped) {
     if (foreign) return { groupId: _groupId, members: [], reason: 'not-a-member' };
-    // Legacy back-compat: a group with NO redemption trail (a seeded single-buurt roster from before
+    // Legacy back-compat: a group with NO redemption trail (a seeded single-circle roster from before
     // code-minting) falls back to the full MemberMap so those setups are unchanged. Still
     // EXIT-FILTERED, or removal would silently do nothing on circles with no other representation.
     const exits = await readCircleExits({ store, groupId: _groupId });

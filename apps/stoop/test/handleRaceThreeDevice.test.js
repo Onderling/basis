@@ -24,7 +24,7 @@ const BOB = 'https://id.example/bob';
 const CAROL = 'https://id.example/carol';
 const DAVE = 'https://id.example/dave';
 const GROUP = 'oosterpoort';
-const RULES = { purpose: 'buurt', admins: [ANNE], houseRules: ['wees aardig'] };
+const RULES = { purpose: 'circle', admins: [ANNE], houseRules: ['wees aardig'] };
 
 async function callSkill(agent, skillId, args, from = ANNE) {
   const def = agent.skills.get(skillId);

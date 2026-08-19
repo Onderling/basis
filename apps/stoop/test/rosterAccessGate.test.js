@@ -23,7 +23,7 @@ const row = (over = {}) => ({
   avatarUrl: 'https://x/bram.png',       // ← local cache — PRIVATE
   viewerNameOptIn: true,                  // ← this viewer's own preference — PRIVATE
   relation: 'contact', trustLevel: 'vertrouwd',   // ← this device's classification — PRIVATE
-  personaProperties: { realName: 'B. de Wit', buurt: 'oost' },   // ← the member's RELEASE — public to circle
+  personaProperties: { realName: 'B. de Wit', circle: 'oost' },   // ← the member's RELEASE — public to circle
   ...over,
 });
 
@@ -57,7 +57,7 @@ describe('projectRosterRowForPeer — the allowlist', () => {
     expect(out).toMatchObject({
       webid: 'webid:bram', pubKey: 'webid:bram', sealingPublicKey: 'seal-bram',
       circleAddress: 'bram@c1', circleAddressProof: 'proof-bram', role: 'member', handle: 'bram',
-      personaProperties: { realName: 'B. de Wit', buurt: 'oost' },
+      personaProperties: { realName: 'B. de Wit', circle: 'oost' },
     });
     // dropped — the local cache and the viewer's private classifications
     expect(out).not.toHaveProperty('displayName');

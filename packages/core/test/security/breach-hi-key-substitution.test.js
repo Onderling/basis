@@ -52,7 +52,7 @@ import { mkEnvelope, P }         from '../../src/Envelope.js';
 const newIdentity = () => AgentIdentity.generate(new VaultMemory());
 
 /** The per-circle address the roster says belongs to Alice. Mallory never controls the key behind it. */
-const ALICE_CIRCLE_ADDR = 'circle-addr-alice-buurt';
+const ALICE_CIRCLE_ADDR = 'circle-addr-alice-circle';
 
 describe('an inbound HI cannot overwrite a roster-backed binding', () => {
   it('refuses the substitution, and the substituting HI fails against the incumbent key', async () => {

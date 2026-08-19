@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import { createCircleSenderAuthorization, SENDER_REASON } from '../../src/v2/circleSenderAuthorization.js';
 
-const OURS_IN_BUURT = 'ours-in-buurt';
+const OURS_IN_CIRCLE = 'ours-in-circle';
 const OURS_IN_KOOR  = 'ours-in-koor';
 
 /**
@@ -32,10 +32,10 @@ describe('who may speak at one of our per-circle addresses', () => {
     const auth = createCircleSenderAuthorization();
     const anna = provenMember('anna');
     expect(auth.recordCircleRoster({
-      circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [anna],
+      circleId: 'circle', ownAddress: OURS_IN_CIRCLE, members: [anna],
     })).toBeGreaterThanOrEqual(2);
 
-    expect(auth.authorizeSender({ senderKey: anna.circleAddress, ownAddress: OURS_IN_BUURT }))
+    expect(auth.authorizeSender({ senderKey: anna.circleAddress, ownAddress: OURS_IN_CIRCLE }))
       .toEqual({ allow: true, reason: SENDER_REASON.MEMBER });
   });
 
@@ -45,17 +45,17 @@ describe('who may speak at one of our per-circle addresses', () => {
     // unlinkability decisions 1 and 4 exist to provide was never actually guaranteed to anyone.
     const auth = createCircleSenderAuthorization();
     const anna = provenMember('anna');
-    auth.recordCircleRoster({ circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [anna] });
+    auth.recordCircleRoster({ circleId: 'circle', ownAddress: OURS_IN_CIRCLE, members: [anna] });
 
-    expect(auth.authorizeSender({ senderKey: anna.pubKey, ownAddress: OURS_IN_BUURT }))
+    expect(auth.authorizeSender({ senderKey: anna.pubKey, ownAddress: OURS_IN_CIRCLE }))
       .toEqual({ allow: false, reason: SENDER_REASON.CANONICAL_REFUSED });
     // Counted APART from a stranger: same refusal, completely different operator response. One is
     // an outsider probing the circle; the other is a member's own device on an old code path.
     expect(auth.refusedCanonicalSigners).toBe(1);
     expect(auth.refusedStrangers).toBe(0);
     // …and the key is not merely absent from the allow-list; the snapshot names it as excluded.
-    expect(auth.snapshotFor(OURS_IN_BUURT).refusedCanonical).toEqual([anna.pubKey]);
-    expect(auth.snapshotFor(OURS_IN_BUURT).keys).not.toContain(anna.pubKey);
+    expect(auth.snapshotFor(OURS_IN_CIRCLE).refusedCanonical).toEqual([anna.pubKey]);
+    expect(auth.snapshotFor(OURS_IN_CIRCLE).keys).not.toContain(anna.pubKey);
   });
 
   it('a member whose row proves NO address keeps their canonical key — or they go undeliverable', () => {
@@ -64,10 +64,10 @@ describe('who may speak at one of our per-circle addresses', () => {
     // see the counting tests below.
     const auth = createCircleSenderAuthorization();
     const anna = member('anna');   // an address, but nothing proving it is hers
-    auth.recordCircleRoster({ circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [anna] });
+    auth.recordCircleRoster({ circleId: 'circle', ownAddress: OURS_IN_CIRCLE, members: [anna] });
 
-    expect(auth.authorizeSender({ senderKey: anna.pubKey, ownAddress: OURS_IN_BUURT }).allow).toBe(true);
-    expect(auth.authorizeSender({ senderKey: anna.circleAddress, ownAddress: OURS_IN_BUURT }).allow).toBe(true);
+    expect(auth.authorizeSender({ senderKey: anna.pubKey, ownAddress: OURS_IN_CIRCLE }).allow).toBe(true);
+    expect(auth.authorizeSender({ senderKey: anna.circleAddress, ownAddress: OURS_IN_CIRCLE }).allow).toBe(true);
   });
 
   it('a member proven on TWO addresses may speak with EITHER — the set, not just the first', () => {
@@ -80,34 +80,34 @@ describe('who may speak at one of our per-circle addresses', () => {
       ...provenMember('anna'),
       circleAddresses: ['anna-in-circle', 'anna-second-device-in-circle'],
     };
-    auth.recordCircleRoster({ circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [anna] });
+    auth.recordCircleRoster({ circleId: 'circle', ownAddress: OURS_IN_CIRCLE, members: [anna] });
 
-    expect(auth.authorizeSender({ senderKey: 'anna-in-circle', ownAddress: OURS_IN_BUURT }))
+    expect(auth.authorizeSender({ senderKey: 'anna-in-circle', ownAddress: OURS_IN_CIRCLE }))
       .toEqual({ allow: true, reason: SENDER_REASON.MEMBER });
-    expect(auth.authorizeSender({ senderKey: 'anna-second-device-in-circle', ownAddress: OURS_IN_BUURT }))
+    expect(auth.authorizeSender({ senderKey: 'anna-second-device-in-circle', ownAddress: OURS_IN_CIRCLE }))
       .toEqual({ allow: true, reason: SENDER_REASON.MEMBER });
     // …while the canonical key stays refused (B6) and a stranger stays a stranger.
-    expect(auth.authorizeSender({ senderKey: anna.pubKey, ownAddress: OURS_IN_BUURT }))
+    expect(auth.authorizeSender({ senderKey: anna.pubKey, ownAddress: OURS_IN_CIRCLE }))
       .toEqual({ allow: false, reason: SENDER_REASON.CANONICAL_REFUSED });
-    expect(auth.authorizeSender({ senderKey: 'mallory-key', ownAddress: OURS_IN_BUURT }).allow).toBe(false);
+    expect(auth.authorizeSender({ senderKey: 'mallory-key', ownAddress: OURS_IN_CIRCLE }).allow).toBe(false);
   });
 
   it('a refresh that DROPS an address from the set stops accepting it — the snapshot replaces', () => {
     const auth = createCircleSenderAuthorization();
     const twoAddrs = { ...provenMember('anna'), circleAddresses: ['anna-in-circle', 'anna-old-addr'] };
-    auth.recordCircleRoster({ circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [twoAddrs] });
-    expect(auth.authorizeSender({ senderKey: 'anna-old-addr', ownAddress: OURS_IN_BUURT }).allow).toBe(true);
+    auth.recordCircleRoster({ circleId: 'circle', ownAddress: OURS_IN_CIRCLE, members: [twoAddrs] });
+    expect(auth.authorizeSender({ senderKey: 'anna-old-addr', ownAddress: OURS_IN_CIRCLE }).allow).toBe(true);
 
-    auth.recordCircleRoster({ circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [provenMember('anna')] });
-    expect(auth.authorizeSender({ senderKey: 'anna-old-addr', ownAddress: OURS_IN_BUURT }).allow).toBe(false);
-    expect(auth.authorizeSender({ senderKey: 'anna-in-circle', ownAddress: OURS_IN_BUURT }).allow).toBe(true);
+    auth.recordCircleRoster({ circleId: 'circle', ownAddress: OURS_IN_CIRCLE, members: [provenMember('anna')] });
+    expect(auth.authorizeSender({ senderKey: 'anna-old-addr', ownAddress: OURS_IN_CIRCLE }).allow).toBe(false);
+    expect(auth.authorizeSender({ senderKey: 'anna-in-circle', ownAddress: OURS_IN_CIRCLE }).allow).toBe(true);
   });
 
   it('a stranger may not, however well they sign', () => {
     const auth = createCircleSenderAuthorization();
-    auth.recordCircleRoster({ circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [member('anna')] });
+    auth.recordCircleRoster({ circleId: 'circle', ownAddress: OURS_IN_CIRCLE, members: [member('anna')] });
 
-    expect(auth.authorizeSender({ senderKey: 'mallory-key', ownAddress: OURS_IN_BUURT }))
+    expect(auth.authorizeSender({ senderKey: 'mallory-key', ownAddress: OURS_IN_CIRCLE }))
       .toEqual({ allow: false, reason: SENDER_REASON.STRANGER });
     expect(auth.refusedStrangers).toBe(1);
   });
@@ -116,34 +116,34 @@ describe('who may speak at one of our per-circle addresses', () => {
     const auth = createCircleSenderAuthorization();
     const anna = member('anna');
     const bram = member('bram');
-    auth.recordCircleRoster({ circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [anna] });
+    auth.recordCircleRoster({ circleId: 'circle', ownAddress: OURS_IN_CIRCLE, members: [anna] });
     auth.recordCircleRoster({ circleId: 'koor',  ownAddress: OURS_IN_KOOR,  members: [bram] });
 
-    expect(auth.authorizeSender({ senderKey: anna.circleAddress, ownAddress: OURS_IN_BUURT }).allow).toBe(true);
+    expect(auth.authorizeSender({ senderKey: anna.circleAddress, ownAddress: OURS_IN_CIRCLE }).allow).toBe(true);
     expect(auth.authorizeSender({ senderKey: anna.circleAddress, ownAddress: OURS_IN_KOOR }).allow).toBe(false);
-    expect(auth.authorizeSender({ senderKey: bram.circleAddress, ownAddress: OURS_IN_BUURT }).allow).toBe(false);
+    expect(auth.authorizeSender({ senderKey: bram.circleAddress, ownAddress: OURS_IN_CIRCLE }).allow).toBe(false);
   });
 
   it('a refreshed roster REPLACES the old one — a removed member stops being able to speak', () => {
     const auth = createCircleSenderAuthorization();
     const anna = member('anna');
     const bram = member('bram');
-    auth.recordCircleRoster({ circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [anna, bram] });
-    expect(auth.authorizeSender({ senderKey: bram.circleAddress, ownAddress: OURS_IN_BUURT }).allow).toBe(true);
+    auth.recordCircleRoster({ circleId: 'circle', ownAddress: OURS_IN_CIRCLE, members: [anna, bram] });
+    expect(auth.authorizeSender({ senderKey: bram.circleAddress, ownAddress: OURS_IN_CIRCLE }).allow).toBe(true);
 
-    auth.recordCircleRoster({ circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [anna] });
-    expect(auth.authorizeSender({ senderKey: bram.circleAddress, ownAddress: OURS_IN_BUURT }).allow).toBe(false);
-    expect(auth.authorizeSender({ senderKey: anna.circleAddress, ownAddress: OURS_IN_BUURT }).allow).toBe(true);
+    auth.recordCircleRoster({ circleId: 'circle', ownAddress: OURS_IN_CIRCLE, members: [anna] });
+    expect(auth.authorizeSender({ senderKey: bram.circleAddress, ownAddress: OURS_IN_CIRCLE }).allow).toBe(false);
+    expect(auth.authorizeSender({ senderKey: anna.circleAddress, ownAddress: OURS_IN_CIRCLE }).allow).toBe(true);
   });
 
   it('we may always speak to ourselves — our circle key and our canonical key both count', () => {
     const auth = createCircleSenderAuthorization();
     auth.recordCircleRoster({
-      circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [member('anna')],
+      circleId: 'circle', ownAddress: OURS_IN_CIRCLE, members: [member('anna')],
       selfKeys: ['our-circle-key', 'our-canonical-key'],
     });
-    for (const k of ['our-circle-key', 'our-canonical-key', OURS_IN_BUURT]) {
-      expect(auth.authorizeSender({ senderKey: k, ownAddress: OURS_IN_BUURT }).allow, k).toBe(true);
+    for (const k of ['our-circle-key', 'our-canonical-key', OURS_IN_CIRCLE]) {
+      expect(auth.authorizeSender({ senderKey: k, ownAddress: OURS_IN_CIRCLE }).allow, k).toBe(true);
     }
   });
 
@@ -154,14 +154,14 @@ describe('who may speak at one of our per-circle addresses', () => {
     const auth = createCircleSenderAuthorization();
     const me = { ...provenMember('me'), pubKey: 'our-canonical-key' };
     auth.recordCircleRoster({
-      circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [me, provenMember('anna')],
+      circleId: 'circle', ownAddress: OURS_IN_CIRCLE, members: [me, provenMember('anna')],
       selfKeys: ['our-circle-key', 'our-canonical-key'],
     });
-    expect(auth.authorizeSender({ senderKey: 'our-canonical-key', ownAddress: OURS_IN_BUURT }).allow).toBe(true);
-    expect(auth.snapshotFor(OURS_IN_BUURT).refusedCanonical).toEqual(['anna-identity']);
+    expect(auth.authorizeSender({ senderKey: 'our-canonical-key', ownAddress: OURS_IN_CIRCLE }).allow).toBe(true);
+    expect(auth.snapshotFor(OURS_IN_CIRCLE).refusedCanonical).toEqual(['anna-identity']);
     // …and we are not counted as part of the transition either: our own row is not a member we are
     // waiting on, and inflating the number would make it useless as a thing to watch go down.
-    expect(auth.snapshotFor(OURS_IN_BUURT).canonicalOnly).toBe(0);
+    expect(auth.snapshotFor(OURS_IN_CIRCLE).canonicalOnly).toBe(0);
   });
 });
 
@@ -169,13 +169,13 @@ describe('the transitional set — members still allowed by their canonical key 
   it('is counted, per circle and in total', () => {
     const auth = createCircleSenderAuthorization();
     auth.recordCircleRoster({
-      circleId: 'buurt', ownAddress: OURS_IN_BUURT,
+      circleId: 'circle', ownAddress: OURS_IN_CIRCLE,
       members: [provenMember('anna'), member('bram'), member('cato')],
     });
     auth.recordCircleRoster({
       circleId: 'koor', ownAddress: OURS_IN_KOOR, members: [provenMember('dana'), member('eef')],
     });
-    expect(auth.snapshotFor(OURS_IN_BUURT).canonicalOnly).toBe(2);
+    expect(auth.snapshotFor(OURS_IN_CIRCLE).canonicalOnly).toBe(2);
     expect(auth.snapshotFor(OURS_IN_KOOR).canonicalOnly).toBe(1);
     expect(auth.canonicalOnlyMembers, 'the whole transition, across every circle').toBe(3);
   });
@@ -185,11 +185,11 @@ describe('the transitional set — members still allowed by their canonical key 
     // never repeats hides the shrink. So: once per size — silence means "unchanged".
     const warned = [];
     const auth = createCircleSenderAuthorization({ onCanonicalOnlyMembers: (i) => warned.push(i) });
-    const roster = (members) => auth.recordCircleRoster({ circleId: 'buurt', ownAddress: OURS_IN_BUURT, members });
+    const roster = (members) => auth.recordCircleRoster({ circleId: 'circle', ownAddress: OURS_IN_CIRCLE, members });
 
     roster([provenMember('anna'), member('bram'), member('cato')]);
     roster([provenMember('anna'), member('bram'), member('cato')]);   // unchanged ⇒ silent
-    expect(warned).toEqual([{ ownAddress: OURS_IN_BUURT, circleId: 'buurt', count: 2, of: 3 }]);
+    expect(warned).toEqual([{ ownAddress: OURS_IN_CIRCLE, circleId: 'circle', count: 2, of: 3 }]);
 
     roster([provenMember('anna'), provenMember('bram'), member('cato')]);   // one healed
     expect(warned.length, 'a shrink is audible').toBe(2);
@@ -204,16 +204,16 @@ describe('the transitional set — members still allowed by their canonical key 
     const auth = createCircleSenderAuthorization({ onCanonicalOnlyMembers: (i) => warned.push(i) });
     const bram = member('bram');
 
-    auth.recordCircleRoster({ circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [provenMember('anna'), bram] });
+    auth.recordCircleRoster({ circleId: 'circle', ownAddress: OURS_IN_CIRCLE, members: [provenMember('anna'), bram] });
     expect(auth.canonicalOnlyMembers).toBe(1);
-    expect(auth.authorizeSender({ senderKey: bram.pubKey, ownAddress: OURS_IN_BUURT }).allow).toBe(true);
+    expect(auth.authorizeSender({ senderKey: bram.pubKey, ownAddress: OURS_IN_CIRCLE }).allow).toBe(true);
 
     // …bram's device announces its per-circle address; the roster is re-read and re-recorded.
     auth.recordCircleRoster({
-      circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [provenMember('anna'), provenMember('bram')],
+      circleId: 'circle', ownAddress: OURS_IN_CIRCLE, members: [provenMember('anna'), provenMember('bram')],
     });
     expect(auth.canonicalOnlyMembers, 'the transition is over for this circle').toBe(0);
-    expect(auth.authorizeSender({ senderKey: bram.pubKey, ownAddress: OURS_IN_BUURT }))
+    expect(auth.authorizeSender({ senderKey: bram.pubKey, ownAddress: OURS_IN_CIRCLE }))
       .toEqual({ allow: false, reason: SENDER_REASON.CANONICAL_REFUSED });
     expect(warned.length, 'and reaching zero is not itself a warning').toBe(1);
   });
@@ -223,9 +223,9 @@ describe('the transitional set — members still allowed by their canonical key 
     // and treating it as a demonstration of per-circle signing would refuse a member's only key.
     const auth = createCircleSenderAuthorization();
     const ghosted = { webid: 'ghosted', pubKey: 'ghosted-identity', circleAddressProof: 'a-proof-of-what' };
-    auth.recordCircleRoster({ circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [ghosted, member('anna')] });
-    expect(auth.authorizeSender({ senderKey: 'ghosted-identity', ownAddress: OURS_IN_BUURT }).allow).toBe(true);
-    expect(auth.snapshotFor(OURS_IN_BUURT).canonicalOnly).toBe(2);
+    auth.recordCircleRoster({ circleId: 'circle', ownAddress: OURS_IN_CIRCLE, members: [ghosted, member('anna')] });
+    expect(auth.authorizeSender({ senderKey: 'ghosted-identity', ownAddress: OURS_IN_CIRCLE }).allow).toBe(true);
+    expect(auth.snapshotFor(OURS_IN_CIRCLE).canonicalOnly).toBe(2);
   });
 
   it('SET-AWARENESS: a proven EXTRA closes the canonical door even when the primary is proofless', () => {
@@ -237,18 +237,18 @@ describe('the transitional set — members still allowed by their canonical key 
       circleAddress: 'bram-legacy-primary',                       // no proof on the primary
       circleAddresses: ['bram-legacy-primary', 'bram-device-2'],  // fold-verified extra
     };
-    auth.recordCircleRoster({ circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [twoDevices] });
-    expect(auth.authorizeSender({ senderKey: 'bram-identity', ownAddress: OURS_IN_BUURT }).allow).toBe(false);
+    auth.recordCircleRoster({ circleId: 'circle', ownAddress: OURS_IN_CIRCLE, members: [twoDevices] });
+    expect(auth.authorizeSender({ senderKey: 'bram-identity', ownAddress: OURS_IN_CIRCLE }).allow).toBe(false);
     // …while both device addresses speak
-    expect(auth.authorizeSender({ senderKey: 'bram-legacy-primary', ownAddress: OURS_IN_BUURT }).allow).toBe(true);
-    expect(auth.authorizeSender({ senderKey: 'bram-device-2', ownAddress: OURS_IN_BUURT }).allow).toBe(true);
+    expect(auth.authorizeSender({ senderKey: 'bram-legacy-primary', ownAddress: OURS_IN_CIRCLE }).allow).toBe(true);
+    expect(auth.authorizeSender({ senderKey: 'bram-device-2', ownAddress: OURS_IN_CIRCLE }).allow).toBe(true);
     // a set of exactly [primary] proves nothing new — the canonical door stays open
     const onlyPrimary = {
       webid: 'cas', pubKey: 'cas-identity',
       circleAddress: 'cas-legacy', circleAddresses: ['cas-legacy'],
     };
-    auth.recordCircleRoster({ circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [onlyPrimary] });
-    expect(auth.authorizeSender({ senderKey: 'cas-identity', ownAddress: OURS_IN_BUURT }).allow).toBe(true);
+    auth.recordCircleRoster({ circleId: 'circle', ownAddress: OURS_IN_CIRCLE, members: [onlyPrimary] });
+    expect(auth.authorizeSender({ senderKey: 'cas-identity', ownAddress: OURS_IN_CIRCLE }).allow).toBe(true);
   });
 });
 
@@ -256,14 +256,14 @@ describe('ADVERSARIAL — the three ways someone tries to speak in a circle they
   const auth = () => {
     const a = createCircleSenderAuthorization();
     a.recordCircleRoster({
-      circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [provenMember('anna'), provenMember('bram')],
+      circleId: 'circle', ownAddress: OURS_IN_CIRCLE, members: [provenMember('anna'), provenMember('bram')],
     });
     a.recordCircleRoster({ circleId: 'koor', ownAddress: OURS_IN_KOOR, members: [provenMember('cato')] });
     return a;
   };
 
   it('a stranger is refused, however well they sign', () => {
-    expect(auth().authorizeSender({ senderKey: 'mallory-key', ownAddress: OURS_IN_BUURT }))
+    expect(auth().authorizeSender({ senderKey: 'mallory-key', ownAddress: OURS_IN_CIRCLE }))
       .toEqual({ allow: false, reason: SENDER_REASON.STRANGER });
   });
 
@@ -277,19 +277,19 @@ describe('ADVERSARIAL — the three ways someone tries to speak in a circle they
 
   it('a member of THIS circle is refused when they sign canonically', () => {
     const a = auth();
-    expect(a.authorizeSender({ senderKey: 'anna-identity', ownAddress: OURS_IN_BUURT }))
+    expect(a.authorizeSender({ senderKey: 'anna-identity', ownAddress: OURS_IN_CIRCLE }))
       .toEqual({ allow: false, reason: SENDER_REASON.CANONICAL_REFUSED });
-    expect(a.authorizeSender({ senderKey: 'bram-identity', ownAddress: OURS_IN_BUURT }).allow).toBe(false);
+    expect(a.authorizeSender({ senderKey: 'bram-identity', ownAddress: OURS_IN_CIRCLE }).allow).toBe(false);
     // …while the circle's real traffic is untouched. A check that refuses everything is an outage.
-    expect(a.authorizeSender({ senderKey: 'anna-in-circle', ownAddress: OURS_IN_BUURT }).allow).toBe(true);
-    expect(a.authorizeSender({ senderKey: 'bram-in-circle', ownAddress: OURS_IN_BUURT }).allow).toBe(true);
+    expect(a.authorizeSender({ senderKey: 'anna-in-circle', ownAddress: OURS_IN_CIRCLE }).allow).toBe(true);
+    expect(a.authorizeSender({ senderKey: 'bram-in-circle', ownAddress: OURS_IN_CIRCLE }).allow).toBe(true);
   });
 });
 
 describe('what it deliberately does NOT refuse', () => {
   it('traffic that is not circle-scoped passes — that is where first contact lives', () => {
     const auth = createCircleSenderAuthorization();
-    auth.recordCircleRoster({ circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [member('anna')] });
+    auth.recordCircleRoster({ circleId: 'circle', ownAddress: OURS_IN_CIRCLE, members: [member('anna')] });
     // `ownAddress` is null when the envelope was sealed to our canonical identity: a contact, a
     // pairing, a join request from someone who is by definition not a member yet.
     expect(auth.authorizeSender({ senderKey: 'a-stranger', ownAddress: null }))
@@ -322,42 +322,42 @@ describe('what it deliberately does NOT refuse', () => {
 describe('a roster read that came back empty records nothing', () => {
   it('because an empty member list is a failed skill call far more often than a real circle', () => {
     const auth = createCircleSenderAuthorization();
-    expect(auth.recordCircleRoster({ circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [] })).toBe(0);
+    expect(auth.recordCircleRoster({ circleId: 'circle', ownAddress: OURS_IN_CIRCLE, members: [] })).toBe(0);
     expect(auth.circleAddressCount).toBe(0);
     // …so the circle stays in the "never read" state and its traffic is accepted, rather than being
     // locked out on the strength of a failure.
-    expect(auth.authorizeSender({ senderKey: 'anna-in-circle', ownAddress: OURS_IN_BUURT }).allow).toBe(true);
+    expect(auth.authorizeSender({ senderKey: 'anna-in-circle', ownAddress: OURS_IN_CIRCLE }).allow).toBe(true);
   });
 
   it('and a row missing both keys contributes nothing', () => {
     const auth = createCircleSenderAuthorization();
     expect(auth.recordCircleRoster({
-      circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [{ webid: 'ghost' }],
+      circleId: 'circle', ownAddress: OURS_IN_CIRCLE, members: [{ webid: 'ghost' }],
     })).toBe(0);
   });
 
   it('an absent own address records nothing at all', () => {
     const auth = createCircleSenderAuthorization();
-    expect(auth.recordCircleRoster({ circleId: 'buurt', ownAddress: null, members: [member('anna')] })).toBe(0);
+    expect(auth.recordCircleRoster({ circleId: 'circle', ownAddress: null, members: [member('anna')] })).toBe(0);
   });
 });
 
 describe('leaving a circle', () => {
   it('drops its snapshot, so nothing is authorized against a roster we no longer hold', () => {
     const auth = createCircleSenderAuthorization();
-    auth.recordCircleRoster({ circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [member('anna')] });
+    auth.recordCircleRoster({ circleId: 'circle', ownAddress: OURS_IN_CIRCLE, members: [member('anna')] });
     expect(auth.circleAddressCount).toBe(1);
-    expect(auth.forgetCircleSenders('buurt')).toBe(true);
+    expect(auth.forgetCircleSenders('circle')).toBe(true);
     expect(auth.circleAddressCount).toBe(0);
-    expect(auth.forgetCircleSenders('buurt')).toBe(false);   // idempotent
+    expect(auth.forgetCircleSenders('circle')).toBe(false);   // idempotent
   });
 
   it('snapshotFor is a diagnostic, and says which circle an address belongs to', () => {
     const auth = createCircleSenderAuthorization();
-    auth.recordCircleRoster({ circleId: 'buurt', ownAddress: OURS_IN_BUURT, members: [member('anna')] });
-    expect(auth.snapshotFor(OURS_IN_BUURT).circleId).toBe('buurt');
-    expect(auth.snapshotFor(OURS_IN_BUURT).keys).toContain('anna-in-circle');
-    expect(auth.snapshotFor(OURS_IN_BUURT).canonicalOnly).toBe(1);
+    auth.recordCircleRoster({ circleId: 'circle', ownAddress: OURS_IN_CIRCLE, members: [member('anna')] });
+    expect(auth.snapshotFor(OURS_IN_CIRCLE).circleId).toBe('circle');
+    expect(auth.snapshotFor(OURS_IN_CIRCLE).keys).toContain('anna-in-circle');
+    expect(auth.snapshotFor(OURS_IN_CIRCLE).canonicalOnly).toBe(1);
     expect(auth.snapshotFor('unknown')).toBeNull();
   });
 });

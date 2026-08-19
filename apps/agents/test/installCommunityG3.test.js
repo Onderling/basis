@@ -62,9 +62,9 @@ describe('agents — G3 community-catalog discovery → P3 install with capabili
     const resolveCard = (subject) => cards.get(subject) ?? null;
 
     // A circle whose admin roster is the real circles policy gate.
-    const circle = { id: 'buurt', roles: { admin: [adminId.pubKey] } };
+    const circle = { id: 'circle', roles: { admin: [adminId.pubKey] } };
     const community = createCommunityCatalog({
-      circleId: 'buurt',
+      circleId: 'circle',
       isAdmin: (pk) => inAudience(pk, 'role:admin', { roleMembers: circle.roles }),
       pseudoPod: memPod(), deviceId: 'companion-node',   // <- CAN be the community's companion node (R1-R3)
     });
@@ -72,9 +72,9 @@ describe('agents — G3 community-catalog discovery → P3 install with capabili
 
     // The user subscribes to the community → its admins are their curator roots.
     const subs = createCommunitySubscriptions({
-      resolveCommunity: (id) => id === 'buurt' ? { admins: [adminId.pubKey], list: community.list } : null,
+      resolveCommunity: (id) => id === 'circle' ? { admins: [adminId.pubKey], list: community.list } : null,
     });
-    subs.subscribe('buurt');
+    subs.subscribe('circle');
 
     const catalog = createCatalogSource({
       roots: () => subs.roots(),

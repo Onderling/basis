@@ -5,7 +5,7 @@
  * 3-step flow:
  *   1. Rules — fetched from the invite or via stoop.getGroupRules
  *   2. Privacy — acknowledge + mesh-consent toggle
- *   3. Handle — pick a buurt handle with suggestions
+ *   3. Handle — pick a circle handle with suggestions
  *
  * Shares src/core/wizards/joinGroupState.js with web.
  */

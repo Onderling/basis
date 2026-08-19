@@ -14,7 +14,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { primeCircleSecurity, knownCircleIds } from '../../src/v2/circleSecurityPriming.js';
 
 /** An agent that answers the two substrate reads and records what was asked of it. */
-function fakeAgent({ circles = ['buurt', 'koor'], members = {}, failMembersFor = [] } = {}) {
+function fakeAgent({ circles = ['circle', 'koor'], members = {}, failMembersFor = [] } = {}) {
   const installed = [];
   const recorded = [];
   return {
@@ -25,7 +25,7 @@ function fakeAgent({ circles = ['buurt', 'koor'], members = {}, failMembersFor =
     installCircleIdentities: async (ids) => { installed.push([...ids]); },
     recordCircleSenders: async ({ circleId, members: m }) => { recorded.push({ circleId, count: m?.length ?? 0 }); },
     callSkill: async (app, op, args) => {
-      if (op === 'listMyCircles') return { buurts: circles };
+      if (op === 'listMyCircles') return { circles: circles };
       if (op === 'listGroupMembers') {
         if (failMembersFor.includes(args.groupId)) throw new Error('substrate unavailable');
         return { members: members[args.groupId] ?? [] };
@@ -37,26 +37,26 @@ function fakeAgent({ circles = ['buurt', 'koor'], members = {}, failMembersFor =
 
 describe('the floor is the substrate, not what you looked at', () => {
   it('primes EVERY circle the substrate knows, with no ids passed in', async () => {
-    const agent = fakeAgent({ members: { buurt: [{ pubKey: 'a' }], koor: [{ pubKey: 'b' }] } });
+    const agent = fakeAgent({ members: { circle: [{ pubKey: 'a' }], koor: [{ pubKey: 'b' }] } });
     const out = await primeCircleSecurity({ agent });
 
-    expect(out.circleIds.sort()).toEqual(['buurt', 'koor']);
-    expect(agent.installed[0].sort()).toEqual(['buurt', 'koor']);
-    expect(agent.recorded.map((r) => r.circleId).sort()).toEqual(['buurt', 'koor']);
+    expect(out.circleIds.sort()).toEqual(['circle', 'koor']);
+    expect(agent.installed[0].sort()).toEqual(['circle', 'koor']);
+    expect(agent.recorded.map((r) => r.circleId).sort()).toEqual(['circle', 'koor']);
   });
 
   it('UNIONS an explicit list rather than being narrowed by it', async () => {
     // a caller passing "the circles I just rendered" must not lower the floor
-    const agent = fakeAgent({ circles: ['buurt', 'koor'] });
+    const agent = fakeAgent({ circles: ['circle', 'koor'] });
     const out = await primeCircleSecurity({ agent, circleIds: ['nieuw'] });
-    expect(out.circleIds.sort()).toEqual(['buurt', 'koor', 'nieuw']);
+    expect(out.circleIds.sort()).toEqual(['circle', 'koor', 'nieuw']);
   });
 
   it('does not depend on a render cache being warm — the cold-boot case', async () => {
     // web used to prime from `circlesCache`, which is empty exactly when priming matters most
-    const agent = fakeAgent({ circles: ['buurt'] });
+    const agent = fakeAgent({ circles: ['circle'] });
     const out = await primeCircleSecurity({ agent, circleIds: [] });
-    expect(out.circleIds).toEqual(['buurt']);
+    expect(out.circleIds).toEqual(['circle']);
   });
 });
 
@@ -100,7 +100,7 @@ describe('ordering and degradation', () => {
 
   it('reports when identity installation failed rather than swallowing it', async () => {
     const warn = vi.fn();
-    const agent = fakeAgent({ circles: ['buurt'] });
+    const agent = fakeAgent({ circles: ['circle'] });
     agent.installCircleIdentities = async () => { throw new Error('vault gone'); };
     const out = await primeCircleSecurity({ agent, onWarn: warn });
     expect(out.identitiesInstalled).toBe(false);

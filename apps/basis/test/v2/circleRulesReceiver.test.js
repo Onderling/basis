@@ -25,7 +25,7 @@ function envelope(over = {}) {
     circleId: 'g1',
     msgId:    'mr1',
     ts:       1735_000_000_000,
-    rulesDoc: { purpose: 'Buurt', agreements: 'be kind' },
+    rulesDoc: { purpose: 'Neighbourhood', agreements: 'be kind' },
     ...over,
   };
 }
@@ -43,7 +43,7 @@ describe('makeCircleRulesPeerHandler · γ-next.rules receiver', () => {
     await handler('nkn-addr-of-anne', envelope());
     expect(pending.calls).toHaveLength(1);
     expect(pending.calls[0].circleId).toBe('g1');
-    expect(pending.calls[0].rulesDoc.purpose).toBe('Buurt');
+    expect(pending.calls[0].rulesDoc.purpose).toBe('Neighbourhood');
     expect(pending.cache.get('g1').agreements).toBe('be kind');
   });
 
@@ -92,7 +92,7 @@ describe('makeCircleRulesPeerHandler · γ-next.rules receiver', () => {
     await handler('a', envelope({ msgId: 'C' }));   // evicts A
     await handler('a', envelope({ msgId: 'A', rulesDoc: { purpose: 'replayed' } }));
     expect(pending.calls.map((c) => c.rulesDoc.purpose))
-      .toEqual(['Buurt', 'Buurt', 'Buurt', 'replayed']);
+      .toEqual(['Neighbourhood', 'Neighbourhood', 'Neighbourhood', 'replayed']);
   });
 
   it('last-write-wins when distinct broadcasts arrive for the same circle', async () => {

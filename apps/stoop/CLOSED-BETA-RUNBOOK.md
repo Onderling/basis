@@ -1,6 +1,6 @@
 # Stoop closed-beta runbook
 
-For the facilitator running a real buurt pilot.  Companion to
+For the facilitator running a real circle pilot.  Companion to
 [`README.md`](./README.md); skip the conceptual layering and treat
 this as the operational checklist.
 
@@ -9,7 +9,7 @@ this as the operational checklist.
 - **Closed-group skill app.**  Members post `vragen` / `aanbod` /
   `te leen`; replies happen in private chat threads.
 - **Decentralised** — every member runs their own agent process.
-  No central server holds buurt content.  A relay carries
+  No central server holds circle content.  A relay carries
   ciphertext only.
 - **Recovery is the user's job.**  No password reset.  Members
   who lose their device + recovery phrase + encrypted backup are
@@ -24,7 +24,7 @@ npm test                            # expect 252 tests passing
 ```
 
 If any test fails, **stop**.  Do not deploy a red build to a
-buurt.  Open an issue with the failing test name.
+circle.  Open an issue with the failing test name.
 
 ## Bring-up modes
 
@@ -32,7 +32,7 @@ buurt.  Open an issue with the failing test name.
 
 The testbed launches one in-process agent per member with the
 admin's invite issuer + spawn-on-redemption wired in.  Use this
-to rehearse the onboarding flow with the buurt facilitators
+to rehearse the onboarding flow with the circle facilitators
 *before* sending the real invites:
 
 ```bash

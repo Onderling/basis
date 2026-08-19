@@ -16,11 +16,11 @@
  * right, because the correct default is already not uniform. The templates disagree today:
  *
  *   household · friends   `features.chat: true`   — talking is the point
- *   **buurt**                   `features.chat: FALSE`  — noticeboard-first; a thread appears only when
+ *   **neighbourhood**                   `features.chat: FALSE`  — noticeboard-first; a thread appears only when
  *                                                          someone reacts to a vraag or aanbod
  *   team                        `features.chat: true`, noticeboard off
  *
- * So a buurt's conversation showing chat messages contradicts its own template. That is the case this axis
+ * So a neighbourhood's conversation showing chat messages contradicts its own template. That is the case this axis
  * exists for, and it comes from the existing templates rather than a hypothetical.
  *
  * So the template picks the starting point and the admin setting overrides it — exactly how `features`,
@@ -59,10 +59,10 @@ export const TEMPLATE_CONVERSATION_KINDS = Object.freeze({
   household:     null,   // a home: everything, it is all one conversation
   friends: null,   // friends: same
   team:          null,   // work: tasks belong in the stream
-  // A buurt has `features.chat: false` — it is noticeboard-first, and a thread appears only when someone
+  // A neighbourhood has `features.chat: false` — it is noticeboard-first, and a thread appears only when someone
   // reacts to a vraag or aanbod. So its conversation is those posts, NOT open chat; showing chat messages
   // there would contradict the template that created it.
-  buurt: Object.freeze(['vraag', 'aanbod', 'task', 'leen']),
+  neighbourhood: Object.freeze(['vraag', 'aanbod', 'task', 'leen']),
 });
 
 /**
@@ -118,7 +118,7 @@ export const CHAT_KIND = 'chat-message';
  * 2026-07-29).
  *
  * `features.chat` and `conversationKinds` were two vocabularies for one thing: the wizard wrote the
- * first, the conversation read the second, and nothing reconciled them. That is how a buurt created with
+ * first, the conversation read the second, and nothing reconciled them. That is how a neighbourhood created with
  * chat OFF ended up showing a chat surface (S3/J-CW3) — each half was correct about its own field.
  *
  * The kinds list wins, because it is the richer of the two: it already carries the resolver, the

@@ -225,7 +225,7 @@
       "doc": "Bot bubble after scanning a onderling-contact:// QR and addContactFromQr succeeds."
     },
     "scanned_invite": {
-      "text": "Opening join-buurt wizard with scanned invite…",
+      "text": "Opening join-circle wizard with scanned invite…",
       "doc": "Bot bubble after scanning a onderling-invite://; the wizard takes over."
     },
     "scan_failed": {

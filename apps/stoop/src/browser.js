@@ -36,7 +36,7 @@ import { attachPodToBundle, detachPodFromBundle } from './lib/attachPodToBundle.
  *                                               passes its synthetic
  *                                               'webid:local-demo-user' or
  *                                               the real WebID after sign-in)
- * @param {string}         [args.group='cc-default-buurt']  closed-group id
+ * @param {string}         [args.group='cc-default-circle']  closed-group id
  * @param {Array}          [args.members]        seed roster; defaults to the
  *                                               local actor only
  * @param {object}         [args.persistDb]      `{dbName, storeName?}` for
@@ -65,7 +65,7 @@ export async function createBrowserStoopAgent({
   bus,
   identityVault,
   localActor,
-  group = 'cc-default-buurt',
+  group = 'cc-default-circle',
   members,
   persistDb,
   label = 'StoopAgent',

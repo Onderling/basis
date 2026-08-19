@@ -346,7 +346,7 @@ describe('CC-ST.A4 — /leave-group wires leaveGroup (irreversible guard)', () =
     // confirm flag would need a future grammar extension to surface
     // via slash; substrate-direct dispatch is the smoke-path here.
     const r = await ws.callSkill('stoop', 'leaveGroup', {
-      groupId: 'cc-default-buurt',
+      groupId: 'cc-default-circle',
       confirm: true,  // chat-layer guard
     });
     // Substrate may return {marker, deleted} (success), {error}

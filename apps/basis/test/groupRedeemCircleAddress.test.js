@@ -20,13 +20,13 @@ describe('peer redeem — joiner presents circleAddress', () => {
       signCircleAddress: (gid, addr) => `sig(${gid},${addr})`,
     });
     // don't await the (never-resolving) promise — we only assert the outbound envelope
-    send({ adminPeerAddr: 'admin@nkn', groupId: 'buurt-42', code: 'ABC' });
+    send({ adminPeerAddr: 'admin@nkn', groupId: 'circle-42', code: 'ABC' });
     await Promise.resolve();
     expect(sent).toHaveLength(1);
-    expect(sent[0].payload.circleAddress).toBe('addr-for-buurt-42');
+    expect(sent[0].payload.circleAddress).toBe('addr-for-circle-42');
     // The address is PROVEN, never merely asserted — the admin drops anything unproven, so omitting the
     // proof is what used to leave peer-redeemed members with no per-circle address at all.
-    expect(sent[0].payload.circleAddressProof).toBe('sig(buurt-42,addr-for-buurt-42)');
+    expect(sent[0].payload.circleAddressProof).toBe('sig(circle-42,addr-for-circle-42)');
   });
 
   it('sends NOTHING it cannot prove: an address without a signer is omitted', async () => {
@@ -37,7 +37,7 @@ describe('peer redeem — joiner presents circleAddress', () => {
       circleAddressFor: (gid) => `addr-for-${gid}`,   // derivable…
       // …but no signCircleAddress → unprovable → deny-by-default.
     });
-    send({ adminPeerAddr: 'admin@nkn', groupId: 'buurt-42', code: 'ABC' });
+    send({ adminPeerAddr: 'admin@nkn', groupId: 'circle-42', code: 'ABC' });
     await Promise.resolve();
     expect('circleAddress' in sent[0].payload).toBe(false);
   });
@@ -50,7 +50,7 @@ describe('peer redeem — joiner presents circleAddress', () => {
       circleAddressFor: (gid) => `addr-for-${gid}`,
       signCircleAddress: (gid, addr) => `sig(${gid},${addr})`,
     });
-    send({ adminPeerAddr: 'admin@nkn', groupId: 'buurt-42', code: 'ABC',
+    send({ adminPeerAddr: 'admin@nkn', groupId: 'circle-42', code: 'ABC',
            circleAddress: 'my-addr-in-circle-x', circleAddressProof: 'proof-from-x' });
     await Promise.resolve();
     expect(sent[0].payload.circleAddress).toBe('my-addr-in-circle-x');
@@ -63,7 +63,7 @@ describe('peer redeem — joiner presents circleAddress', () => {
       sendPeer: async (addr, payload) => { sent.push({ addr, payload }); },
       pendingMap: new Map(),
     });
-    send({ adminPeerAddr: 'admin@nkn', groupId: 'buurt-42', code: 'ABC' });
+    send({ adminPeerAddr: 'admin@nkn', groupId: 'circle-42', code: 'ABC' });
     await Promise.resolve();
     expect('circleAddress' in sent[0].payload).toBe(false);
   });
@@ -75,7 +75,7 @@ describe('peer redeem — admin forwards the joiner circleAddress', () => {
     const handle = makeHandleGroupRedeemRequest({
       callSkill, sendPeer: async () => {}, logger: { warn() {}, error() {} },
     });
-    await handle('joiner@nkn', { requestId: 'r1', groupId: 'buurt-42', code: 'ABC', circleAddress: 'joiner-addr' });
+    await handle('joiner@nkn', { requestId: 'r1', groupId: 'circle-42', code: 'ABC', circleAddress: 'joiner-addr' });
     const [, opId, args] = callSkill.mock.calls[0];
     expect(opId).toBe('verifyMembershipCodeForPeer');
     expect(args.circleAddress).toBe('joiner-addr');
@@ -85,7 +85,7 @@ describe('peer redeem — admin forwards the joiner circleAddress', () => {
   it('forwards no circleAddress when the envelope carries none', async () => {
     const callSkill = vi.fn(async () => ({ ok: true }));
     const handle = makeHandleGroupRedeemRequest({ callSkill, sendPeer: async () => {}, logger: { warn() {}, error() {} } });
-    await handle('joiner@nkn', { requestId: 'r1', groupId: 'buurt-42', code: 'ABC' });
+    await handle('joiner@nkn', { requestId: 'r1', groupId: 'circle-42', code: 'ABC' });
     expect('circleAddress' in callSkill.mock.calls[0][2]).toBe(false);
   });
 });
@@ -108,12 +108,12 @@ describe('peer redeem — the admin returns ITS OWN circleAddress on the respons
       signCircleAddress: (gid, addr) => `sig(${gid},${addr})`,
       logger: { warn() {}, error() {} },
     });
-    await handle('joiner@nkn', { requestId: 'r1', groupId: 'buurt-42', code: 'ABC' });
+    await handle('joiner@nkn', { requestId: 'r1', groupId: 'circle-42', code: 'ABC' });
 
     expect(sent).toHaveLength(1);
     expect(sent[0].payload.subtype).toBe('group-redeem-response');
-    expect(sent[0].payload.circleAddress).toBe('admin-addr-for-buurt-42');
-    expect(sent[0].payload.circleAddressProof).toBe('sig(buurt-42,admin-addr-for-buurt-42)');
+    expect(sent[0].payload.circleAddress).toBe('admin-addr-for-circle-42');
+    expect(sent[0].payload.circleAddressProof).toBe('sig(circle-42,admin-addr-for-circle-42)');
   });
 
   it('sends NOTHING it cannot prove (same deny-by-default as the request direction)', async () => {
@@ -125,7 +125,7 @@ describe('peer redeem — the admin returns ITS OWN circleAddress on the respons
       // …but no signer → unprovable → omitted.
       logger: { warn() {}, error() {} },
     });
-    await handle('joiner@nkn', { requestId: 'r1', groupId: 'buurt-42', code: 'ABC' });
+    await handle('joiner@nkn', { requestId: 'r1', groupId: 'circle-42', code: 'ABC' });
     expect('circleAddress' in sent[0].payload).toBe(false);
   });
 
@@ -138,7 +138,7 @@ describe('peer redeem — the admin returns ITS OWN circleAddress on the respons
       signCircleAddress: (gid, addr) => `sig(${gid},${addr})`,
       logger: { warn() {}, error() {} },
     });
-    await handle('stranger@nkn', { requestId: 'r1', groupId: 'buurt-42', code: 'WRONG' });
+    await handle('stranger@nkn', { requestId: 'r1', groupId: 'circle-42', code: 'WRONG' });
     expect(sent[0].payload.error).toBe('invalid-or-expired-code');
     expect('circleAddress' in sent[0].payload).toBe(false);
   });
@@ -150,7 +150,7 @@ describe('peer redeem — the admin returns ITS OWN circleAddress on the respons
       sendPeer: async (addr, payload) => { sent.push({ addr, payload }); },
       logger: { warn() {}, error() {} },
     });
-    await handle('joiner@nkn', { requestId: 'r1', groupId: 'buurt-42', code: 'ABC' });
+    await handle('joiner@nkn', { requestId: 'r1', groupId: 'circle-42', code: 'ABC' });
     expect('circleAddress' in sent[0].payload).toBe(false);
     expect(sent[0].payload.ok).toBe(true);
   });

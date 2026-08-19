@@ -15,7 +15,7 @@ const t = (key, params) =>
 
 // Default fixture: mixed kinds → β.3 grouping is exercised.
 const circles = [
-  { id: 'g1', name: 'Selwerd',     kind: 'buurt',         memberCount: 87 },
+  { id: 'g1', name: 'Selwerd',     kind: 'neighbourhood',         memberCount: 87 },
   { id: 'h1', name: 'Huisgenoten', kind: 'household',     memberCount: 4 },
   { id: 'p1', name: 'My things',                          memberCount: null },
 ];
@@ -36,7 +36,7 @@ describe('renderCircleLauncher', () => {
     const byId = Object.fromEntries(
       Array.from(tiles).map((tl) => [tl.dataset.circleId, tl]),
     );
-    expect(byId.g1.dataset.kind).toBe('buurt');
+    expect(byId.g1.dataset.kind).toBe('neighbourhood');
     expect(byId.h1.dataset.kind).toBe('household');
     expect(byId.g1.querySelector('.circle-tile__name').textContent).toBe('Selwerd');
     expect(byId.g1.querySelector('.circle-tile__meta').textContent).toBe('circle.members:87');
@@ -187,15 +187,15 @@ describe('renderCircleLauncher', () => {
       const el = mount();
       renderCircleLauncher(el, { circles, t });
       const sections = el.querySelectorAll('.circle-launcher__section');
-      // Three distinct kinds: 'household', 'buurt', 'other' (p1 has no kind).
+      // Three distinct kinds: 'household', 'neighbourhood', 'other' (p1 has no kind).
       expect(sections).toHaveLength(3);
       const headers = Array.from(el.querySelectorAll('.circle-launcher__section-title'))
         .map((h) => h.textContent);
-      // Fixed order: household → buurt → friends → other.
-      // friends isn't present, so: household, buurt, other.
+      // Fixed order: household → circle → friends → other.
+      // friends isn't present, so: household, circle, other.
       expect(headers).toEqual([
         'circle.kind.household',
-        'circle.kind.buurt',
+        'circle.kind.neighbourhood',
         'circle.kind.other',
       ]);
     });
@@ -231,12 +231,12 @@ describe('renderCircleLauncher', () => {
       expect(otherIds).toEqual(['g', 'w']);
     });
 
-    it('respects KIND_ORDER (household → buurt → friends → other) even if input is reordered', () => {
+    it('respects KIND_ORDER (household → neighbourhood → friends → other) even if input is reordered', () => {
       const el = mount();
       const reordered = [
         { id: 'a', name: 'A', kind: 'friends' },
         { id: 'b', name: 'B', kind: 'other-thing' },
-        { id: 'c', name: 'C', kind: 'buurt' },
+        { id: 'c', name: 'C', kind: 'neighbourhood' },
         { id: 'd', name: 'D', kind: 'household' },
       ];
       renderCircleLauncher(el, { circles: reordered, t });
@@ -244,7 +244,7 @@ describe('renderCircleLauncher', () => {
         .map((h) => h.textContent);
       expect(headers).toEqual([
         'circle.kind.household',
-        'circle.kind.buurt',
+        'circle.kind.neighbourhood',
         'circle.kind.friends',
         'circle.kind.other',
       ]);
@@ -255,8 +255,8 @@ describe('renderCircleLauncher', () => {
       const mixed = [
         { id: 'h-old', name: 'H-old', kind: 'household' },
         { id: 'h-new', name: 'H-new', kind: 'household' },
-        { id: 'b-old', name: 'B-old', kind: 'buurt' },
-        { id: 'b-new', name: 'B-new', kind: 'buurt' },
+        { id: 'b-old', name: 'B-old', kind: 'neighbourhood' },
+        { id: 'b-new', name: 'B-new', kind: 'neighbourhood' },
       ];
       const previews = {
         'h-old': { ts: 1 }, 'h-new': { ts: 99 },
@@ -265,7 +265,7 @@ describe('renderCircleLauncher', () => {
       renderCircleLauncher(el, { circles: mixed, previews, t });
       // Household section comes first; inside, h-new (99) before h-old (1).
       const hSection = el.querySelector('.circle-launcher__section[data-kind="household"]');
-      const bSection = el.querySelector('.circle-launcher__section[data-kind="buurt"]');
+      const bSection = el.querySelector('.circle-launcher__section[data-kind="neighbourhood"]');
       const hIds = Array.from(hSection.querySelectorAll('.circle-tile')).map((tl) => tl.dataset.circleId);
       const bIds = Array.from(bSection.querySelectorAll('.circle-tile')).map((tl) => tl.dataset.circleId);
       expect(hIds).toEqual(['h-new', 'h-old']);
@@ -421,23 +421,23 @@ describe('renderCircleLauncher', () => {
 
     it('pin partition does NOT escape kind sections', () => {
       const el = mount();
-      // Pinning a HOUSEHOLD tile must NOT float it above the buurt tiles
-      // (buurt comes after household in KIND_ORDER, so the pinned
+      // Pinning a HOUSEHOLD tile must NOT float it above the circle tiles
+      // (neighbourhood comes after household in KIND_ORDER, so the pinned
       // household stays inside the household section).
       const mixed = [
         { id: 'h1', name: 'Home',    kind: 'household' },
         { id: 'h2', name: 'Home2',   kind: 'household' },
-        { id: 'b1', name: 'Selwerd', kind: 'buurt' },
+        { id: 'b1', name: 'Selwerd', kind: 'neighbourhood' },
       ];
       renderCircleLauncher(el, {
         circles: mixed,
         t,
         pinnedMap: { h2: true },
       });
-      // Sections are still household → buurt; b1 is NOT first.
+      // Sections are still household → neighbourhood; b1 is NOT first.
       const sections = Array.from(el.querySelectorAll('.circle-launcher__section'))
         .map((s) => s.dataset.kind);
-      expect(sections).toEqual(['household', 'buurt']);
+      expect(sections).toEqual(['household', 'neighbourhood']);
       // Inside household, h2 (pinned) precedes h1.
       const hSection = el.querySelector('.circle-launcher__section[data-kind="household"]');
       const hIds = Array.from(hSection.querySelectorAll('.circle-tile'))

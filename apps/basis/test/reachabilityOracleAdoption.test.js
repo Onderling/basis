@@ -3,7 +3,7 @@
  *
  * The original gap was "no live presence signal": basis never called `enableReachabilityOracle()` at all.
  * Trying to fix it surfaced why that was fortunate — the skill answers with a SIGNED list of every peer this
- * device can reach, which in a neighbourhood app is a contact graph handed to any authenticated caller.
+ * device can reach, which in a circle app is a contact graph handed to any authenticated caller.
  *
  * So the substrate was fixed first (deny-by-default unless the host says what each caller may learn), and
  * this is the second half: basis enabling it WITH a scope. The test that matters is not "is the skill

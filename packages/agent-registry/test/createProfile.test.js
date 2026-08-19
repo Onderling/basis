@@ -57,8 +57,8 @@ describe('createProfile — root-derived profile entries', () => {
 
   it('profileCircleAddress (step 3): reproducible, distinct per circle, != the profile pubKey', () => {
     const root = Bootstrap.create().bootstrap;
-    const a = profileCircleAddress(root, 'default', 'buurt-42');
-    expect(a).toBe(profileCircleAddress(root, 'default', 'buurt-42'));           // reproducible (recovery)
+    const a = profileCircleAddress(root, 'default', 'circle-42');
+    expect(a).toBe(profileCircleAddress(root, 'default', 'circle-42'));           // reproducible (recovery)
     expect(a).not.toBe(profileCircleAddress(root, 'default', 'werk-7'));         // unlinkable per circle
     expect(a).not.toBe(profilePubKey(root, 'default'));                          // circle address != profile key
   });

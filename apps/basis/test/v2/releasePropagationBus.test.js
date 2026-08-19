@@ -60,7 +60,7 @@ describe('release propagation over the BUS — per-circle gated delivery to a th
     await connectNodesOverBus([admin, cato, anne, yuri]);
 
     // Circle X — admin, cato, anne
-    await createCircle(admin, { groupId: X, name: 'Buurt X' });
+    await createCircle(admin, { groupId: X, name: 'Circle X' });
     await settle(admin, X);
     expect((await joinExistingCircle(admin, cato, { groupId: X, handle: 'cato' })).joined.ok).toBe(true);
     await settle(cato, X);
@@ -68,7 +68,7 @@ describe('release propagation over the BUS — per-circle gated delivery to a th
     await settle(anne, X);
 
     // Circle Y — admin, cato (SAME person, second circle), yuri
-    await createCircle(admin, { groupId: Y, name: 'Buurt Y' });
+    await createCircle(admin, { groupId: Y, name: 'Circle Y' });
     await settle(admin, Y);
     expect((await joinExistingCircle(admin, cato, { groupId: Y, handle: 'cato-y' })).joined.ok).toBe(true);
     await settle(cato, Y);

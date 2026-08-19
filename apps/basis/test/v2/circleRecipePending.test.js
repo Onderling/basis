@@ -24,11 +24,11 @@ describe('createCircleRecipePendingStore', () => {
     const io = fakeIo();
     const store = createCircleRecipePendingStore(io);
 
-    await store.set('g1', { id: 'r1', name: 'Buurt' });
-    expect(io.save).toHaveBeenCalledWith('g1', { id: 'r1', name: 'Buurt' });
+    await store.set('g1', { id: 'r1', name: 'Circle' });
+    expect(io.save).toHaveBeenCalledWith('g1', { id: 'r1', name: 'Circle' });
 
     const r = await store.get('g1');
-    expect(r).toEqual({ id: 'r1', name: 'Buurt' });
+    expect(r).toEqual({ id: 'r1', name: 'Circle' });
 
     await store.clear('g1');
     expect(io.remove).toHaveBeenCalledWith('g1');

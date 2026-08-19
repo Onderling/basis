@@ -686,8 +686,8 @@
     "settings": { "text": "Settings",  "doc": "Top-nav link to /settings.html — user-tunable settings." }
   },
   "group_switcher": {
-    "join_other":  { "text": "+ Join another buurt", "doc": "Menu item on the active-group badge dropdown — opens /onboard.html (#245)." },
-    "create_new":  { "text": "+ Create new buurt",   "doc": "Menu item on the active-group badge dropdown — opens /create-group.html (#245)." }
+    "join_other":  { "text": "+ Join another circle", "doc": "Menu item on the active-group badge dropdown — opens /onboard.html (#245)." },
+    "create_new":  { "text": "+ Create new circle",   "doc": "Menu item on the active-group badge dropdown — opens /create-group.html (#245)." }
   },
   "group": {
     "eviction_banner_title":  { "text": "Expired memberships", "doc": "Heading of the orange banner on /group.html shown when one or more members' codes have expired past the grace window." },
@@ -871,7 +871,7 @@
     "step3_body":           { "text": "The restored identity is active right now. No restart needed.", "doc": "Lead text in step 3. Phase 31 removed the manual restart step." },
     "step3_hint":           { "text": "Want to bring your old posts, contacts and settings back to this device? Sign in to your pod — Stoop pulls everything automatically. Otherwise, just keep going.", "doc": "Hint paragraph in step 3 explaining the optional pod-sign-in for full state restore." },
     "step3_pod_button":     { "text": "Sign in to pod", "doc": "Button in step 3 linking to /sign-in.html for the optional pod sync." },
-    "step3_home_button":    { "text": "Go to the buurt", "doc": "Secondary button in step 3 linking to / (the buurt-prikbord) for users who don't need pod sync." },
+    "step3_home_button":    { "text": "Go to the circle", "doc": "Secondary button in step 3 linking to / (the circle noticeboard) for users who don't need pod sync." },
     "nav_back":             { "text": "← Back", "doc": "Back link in the page header — returns to /welcome.html." }
   }
 }

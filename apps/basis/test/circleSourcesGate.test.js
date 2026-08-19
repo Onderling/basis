@@ -14,14 +14,14 @@ describe('makeResolvingCallSkill — catalog gate', () => {
     const calls = [];
     const raw = async (origin, opId) => {
       calls.push(`${origin}/${opId}`);
-      if (origin === 'stoop' && opId === 'listMyCircles') return { buurts: ['kleurenwiezen', 'boi'] };
+      if (origin === 'stoop' && opId === 'listMyCircles') return { circles: ['kleurenwiezen', 'boi'] };
       return null;
     };
     // catalog knows getMyCircles@tasks but NOTHING about listMyCircles
     const catalog = { opsById: new Map([['tasks/getMyCircles', { appOrigin: 'tasks' }]]) };
     const callSkill = makeResolvingCallSkill(raw, undefined, () => catalog);
     const r = await callSkill('listMyCircles', {});
-    expect(r).toEqual({ buurts: ['kleurenwiezen', 'boi'] });
+    expect(r).toEqual({ circles: ['kleurenwiezen', 'boi'] });
     expect(calls).toContain('stoop/listMyCircles');     // stoop was NOT skipped
   });
 
@@ -37,25 +37,25 @@ describe('makeResolvingCallSkill — catalog gate', () => {
 
   it('loadCircles surfaces groups from listMyCircles with an empty catalog', async () => {
     const raw = async (origin, opId) => (origin === 'stoop' && opId === 'listMyCircles'
-      ? { buurts: ['kleurenwiezen', 'boi', 'mai'] } : null);
+      ? { circles: ['kleurenwiezen', 'boi', 'mai'] } : null);
     const callSkill = makeResolvingCallSkill(raw, undefined, () => ({ opsById: new Map() }));
     const circles = await loadCircles(circleSourcesFromAgent({ callSkill }));
     expect(circles.map((c) => c.id).sort()).toEqual(['boi', 'kleurenwiezen', 'mai']);
   });
 
   it('null catalog → tries every origin (unchanged)', async () => {
-    const raw = async (origin, opId) => (origin === 'stoop' && opId === 'listMyCircles' ? { buurts: ['x'] } : null);
+    const raw = async (origin, opId) => (origin === 'stoop' && opId === 'listMyCircles' ? { circles: ['x'] } : null);
     const callSkill = makeResolvingCallSkill(raw, undefined, () => null);
-    expect(await callSkill('listMyCircles', {})).toEqual({ buurts: ['x'] });
+    expect(await callSkill('listMyCircles', {})).toEqual({ circles: ['x'] });
   });
 });
 
 describe('circleSourcesFromAgent — help-circle display name', () => {
   // listMyCircles returns bare ids, so the help circle's tile/header used to fall back to the raw id
   // 'cc-help'. The shell injects a localised name; the adapter relabels ONLY the help circle.
-  const callSkillFor = (buurts) => async (opId) => (opId === 'listMyCircles' ? { buurts } : null);
+  const callSkillFor = (circles) => async (opId) => (opId === 'listMyCircles' ? { circles } : null);
 
-  it('relabels the help circle with the injected name, leaving other buurts untouched', async () => {
+  it('relabels the help circle with the injected name, leaving other circles untouched', async () => {
     const sources = circleSourcesFromAgent({
       callSkill: callSkillFor([HELP_CIRCLE_ID, 'kleurenwiezen']),
       helpCircleName: 'Uitleg',
@@ -64,7 +64,7 @@ describe('circleSourcesFromAgent — help-circle display name', () => {
     const help = groups.find((g) => g.id === HELP_CIRCLE_ID);
     const other = groups.find((g) => g.id === 'kleurenwiezen');
     expect(help.name).toBe('Uitleg');           // NOT the raw id
-    expect(other.name).toBe('kleurenwiezen');    // unrelated buurts keep the id-name fallback
+    expect(other.name).toBe('kleurenwiezen');    // unrelated circles keep the id-name fallback
   });
 
   it('accepts a live-language getter for the help name', async () => {

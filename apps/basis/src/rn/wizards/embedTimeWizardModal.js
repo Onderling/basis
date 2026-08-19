@@ -65,7 +65,7 @@ export default function EmbedTimeWizardModal({
                 label="Title"
                 value={state.title}
                 onChangeText={(v) => setState((s) => ({ ...s, title: v }))}
-                placeholder="e.g. Buurt BBQ"
+                placeholder="e.g. Circle BBQ"
               />
               <Field
                 label="When"

@@ -27,11 +27,11 @@ describe('γ-next.recipe — circleRecipePendingStorageRN', () => {
 
   it('round-trips a recipe through save / load', async () => {
     const io = asyncStorageCircleRecipePendingIo(storage);
-    await io.save('g1', { id: 'r1', name: 'Buurt', blocks: [] });
+    await io.save('g1', { id: 'r1', name: 'Circle', blocks: [] });
     expect(storage.map.get('cc.circleRecipePending.g1')).toBe(
-      JSON.stringify({ id: 'r1', name: 'Buurt', blocks: [] }),
+      JSON.stringify({ id: 'r1', name: 'Circle', blocks: [] }),
     );
-    expect(await io.load('g1')).toEqual({ id: 'r1', name: 'Buurt', blocks: [] });
+    expect(await io.load('g1')).toEqual({ id: 'r1', name: 'Circle', blocks: [] });
   });
 
   it('returns null when no entry', async () => {

@@ -25,7 +25,7 @@ function envelope(over = {}) {
     circleId: 'g1',
     msgId:    'mr1',
     ts:       1735_000_000_000,
-    recipe:   { id: 'r1', name: 'Buurt', blocks: [] },
+    recipe:   { id: 'r1', name: 'Circle', blocks: [] },
     ...over,
   };
 }
@@ -44,7 +44,7 @@ describe('makeCircleRecipePeerHandler · γ-next.recipe receiver', () => {
     expect(pending.calls).toHaveLength(1);
     expect(pending.calls[0].circleId).toBe('g1');
     expect(pending.calls[0].recipe.id).toBe('r1');
-    expect(pending.cache.get('g1').name).toBe('Buurt');
+    expect(pending.cache.get('g1').name).toBe('Circle');
   });
 
   it('dedupes by msgId — second envelope with same msgId is a no-op', async () => {
@@ -92,7 +92,7 @@ describe('makeCircleRecipePeerHandler · γ-next.recipe receiver', () => {
     await handler('a', envelope({ msgId: 'C' }));   // evicts A
     await handler('a', envelope({ msgId: 'A', recipe: { id: 'r1', name: 'replayed', blocks: [] } }));
     expect(pending.calls.map((c) => c.recipe.name))
-      .toEqual(['Buurt', 'Buurt', 'Buurt', 'replayed']);
+      .toEqual(['Circle', 'Circle', 'Circle', 'replayed']);
   });
 
   it('last-write-wins when distinct broadcasts arrive for the same circle', async () => {

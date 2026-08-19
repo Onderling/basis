@@ -14,7 +14,7 @@ import { expect } from '@playwright/test';
 /** Boot the v2 app and open a circle chat composer. Resolves once `.circle-circle__composer-input` is visible.
  *  Lifted from the per-spec `openCircleComposer` (circle-circle-*.spec.js) so migrated specs share ONE boot. */
 /**
- * Turn a circle's display name into the `buurt id` the launcher tile actually shows.
+ * Turn a circle's display name into the `circle id` the launcher tile actually shows.
  * The wizard requires lowercase letters, digits and hyphens, and the tile renders the ID — not the name.
  */
 export function circleSlug(name) {
@@ -26,11 +26,11 @@ export function circleSlug(name) {
  *
  * Circle creation used to be a `prompt()`, which is why every spec here did
  * `page.on('dialog', d => d.accept(name))`. It is now a five-step wizard — Identity · Governance · Rules ·
- * Offerings · Tech — ending in "Review →" then "Create buurt". No dialog is ever raised, so the old
+ * Offerings · Tech — ending in "Review →" then "Create circle". No dialog is ever raised, so the old
  * approach could not create a circle at all: it accepted a prompt that never appeared, then clicked a tile
  * that never existed.
  *
- * Only the two REQUIRED fields are filled (Name, Buurt id); every other step is accepted as it comes, so
+ * Only the two REQUIRED fields are filled (Name, Circle id); every other step is accepted as it comes, so
  * this helper keeps working when a step gains a field and fails loudly if a step gains a required one.
  */
 export async function createCircleViaWizard(page, name) {

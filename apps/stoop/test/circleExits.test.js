@@ -21,7 +21,7 @@ const ADMIN = 'https://id.example/admin';
 const BRAM  = 'https://id.example/bram';
 const CATO  = 'https://id.example/cato';
 
-const A = 'buurt-a';
+const A = 'circle-a';
 const B = 'koor-b';
 
 async function callSkill(agent, skillId, args, fromWebid = ADMIN) {
@@ -171,12 +171,12 @@ describe('B4 — leaving a circle prunes it on the leaver\'s side', () => {
     // Without this filter the next boot would re-record the authorize snapshot for a circle you left
     // and re-register its address on the relay — silently undoing both halves, one restart later.
     const bundle = await buildTwoCircles();
-    const before = (await callSkill(bundle.agent, 'listMyCircles', undefined, BRAM)).buurts.sort();
+    const before = (await callSkill(bundle.agent, 'listMyCircles', undefined, BRAM)).circles.sort();
     expect(before).toEqual([A, B].sort());
     await callSkill(bundle.agent, 'leaveGroup', { groupId: A }, BRAM);
-    expect((await callSkill(bundle.agent, 'listMyCircles', undefined, BRAM)).buurts).toEqual([B]);
+    expect((await callSkill(bundle.agent, 'listMyCircles', undefined, BRAM)).circles).toEqual([B]);
     // …and the admin, who left nothing, still has both.
-    expect((await callSkill(bundle.agent, 'listMyCircles', undefined, ADMIN)).buurts.sort())
+    expect((await callSkill(bundle.agent, 'listMyCircles', undefined, ADMIN)).circles.sort())
       .toEqual([A, B].sort());
   });
 
@@ -189,21 +189,21 @@ describe('B4 — leaving a circle prunes it on the leaver\'s side', () => {
 
 describe('B4 — a circle with no redemption trail is still per-circle', () => {
   it('the legacy MemberMap fallback honours this circle\'s removals', async () => {
-    // A seeded single-buurt roster from before code-minting has no trail to project from, so the
+    // A seeded single-circle roster from before code-minting has no trail to project from, so the
     // roster falls back to the whole MemberMap. That fallback used to be the ONLY place removal had
     // an effect — via the global cache deletion, which was the bug. It is now exit-filtered per
     // circle instead, so removal still works here and still cannot reach another circle.
     const id = await AgentIdentity.generate(new VaultMemory());
     const bundle = await createNeighborhoodAgent({
       identity: id, transport: new InternalTransport(new InternalBus(), id.pubKey),
-      offeringMatch: { group: 'legacy-buurt', localActor: ADMIN, peers: [] },
+      offeringMatch: { group: 'legacy-circle', localActor: ADMIN, peers: [] },
       members: [{ webid: ADMIN, role: 'admin' }, { webid: BRAM, role: 'member' }, { webid: CATO, role: 'member' }],
     });
     await bundle.offeringMatch.start();
-    expect(await webidsIn(bundle, 'legacy-buurt')).toEqual([ADMIN, BRAM, CATO].sort());
-    await callSkill(bundle.agent, 'removeMember', { groupId: 'legacy-buurt', memberWebid: BRAM });
-    expect(await webidsIn(bundle, 'legacy-buurt')).toEqual([ADMIN, CATO].sort());
+    expect(await webidsIn(bundle, 'legacy-circle')).toEqual([ADMIN, BRAM, CATO].sort());
+    await callSkill(bundle.agent, 'removeMember', { groupId: 'legacy-circle', memberWebid: BRAM });
+    expect(await webidsIn(bundle, 'legacy-circle')).toEqual([ADMIN, CATO].sort());
     // …and a DIFFERENT legacy group on the same device is untouched.
-    expect(await webidsIn(bundle, 'other-legacy-buurt')).toEqual([ADMIN, BRAM, CATO].sort());
+    expect(await webidsIn(bundle, 'other-legacy-circle')).toEqual([ADMIN, BRAM, CATO].sort());
   });
 });

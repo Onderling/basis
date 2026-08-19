@@ -14,7 +14,7 @@ import {
 // A membership-flavoured serializer: identity is the eviction content, NOT the volatile `at`.
 const serialize = (e) => `${e.kind}|${e.circleId}|${e.evicted}|${e.seq}`;
 const chain = createAuthorChain(serialize);
-const evt = (evicted, seq, at = 1) => ({ kind: 'eviction', circleId: 'buurt-x', evicted, seq, at });
+const evt = (evicted, seq, at = 1) => ({ kind: 'eviction', circleId: 'circle-x', evicted, seq, at });
 
 describe('createAuthorChain — reusable across domains', () => {
   it('requires a serializer', () => {

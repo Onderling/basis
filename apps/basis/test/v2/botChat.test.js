@@ -7,9 +7,9 @@ describe('botChat · oneToOneBotLabel', () => {
   it('1:1 with a bot → the bot label', () => {
     const members = [
       { webid: SELF, displayName: 'Me' },
-      { webid: 'https://bot.example/#a', relation: 'agent', displayName: 'Buurtbot' },
+      { webid: 'https://bot.example/#a', relation: 'agent', displayName: 'Circle bot' },
     ];
-    expect(oneToOneBotLabel({ members, selfWebid: SELF })).toBe('Buurtbot');
+    expect(oneToOneBotLabel({ members, selfWebid: SELF })).toBe('Circle bot');
   });
 
   it('1:1 with a human → null (no strip)', () => {
@@ -23,7 +23,7 @@ describe('botChat · oneToOneBotLabel', () => {
   it('group (2+ others, even if one is a bot) → null', () => {
     const members = [
       { webid: SELF, displayName: 'Me' },
-      { webid: 'https://bot.example/#a', relation: 'agent', displayName: 'Buurtbot' },
+      { webid: 'https://bot.example/#a', relation: 'agent', displayName: 'Circle bot' },
       { webid: 'https://sara.example/#me', relation: 'group-member', displayName: 'Sara' },
     ];
     expect(oneToOneBotLabel({ members, selfWebid: SELF })).toBe(null);

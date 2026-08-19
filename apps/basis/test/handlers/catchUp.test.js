@@ -20,9 +20,9 @@ import {
 const silentLogger = { info: () => {}, warn: () => {}, error: () => {} };
 
 describe('requestCatchUpFromKnownPeers', () => {
-  it('iterates every known buurt + sends a catch-up-request to each roster peer', async () => {
+  it('iterates every known circle + sends a catch-up-request to each roster peer', async () => {
     const callSkill = vi.fn(async (_app, op, args) => {
-      if (op === 'listMyCircles')          return { buurts: ['westend', 'noord'] };
+      if (op === 'listMyCircles')          return { circles: ['westend', 'noord'] };
       if (op === 'getLatestPostAddedAt')  return { latestAt: args.groupId === 'westend' ? 1000 : 2000 };
       if (op === 'listGroupRoster')       return { members: [{ addr: 'addr-a' }, { addr: 'addr-b' }] };
       return null;
@@ -31,26 +31,26 @@ describe('requestCatchUpFromKnownPeers', () => {
     const fn = makeRequestCatchUpFromKnownPeers({ callSkill, sendPeer, logger: silentLogger });
 
     await fn();
-    // 2 buurts × 2 peers = 4 sends
+    // 2 circles × 2 peers = 4 sends
     expect(sendPeer).toHaveBeenCalledTimes(4);
     const envelopes = sendPeer.mock.calls.map((c) => c[1]);
     expect(envelopes.every((e) => e.subtype === 'catch-up-request')).toBe(true);
-    // Two distinct sinceMs values, one per buurt
+    // Two distinct sinceMs values, one per circle
     const westendCalls = sendPeer.mock.calls.filter((c) => c[1].groupId === 'westend');
     expect(westendCalls.every((c) => c[1].sinceMs === 1000)).toBe(true);
   });
 
   it('skips silently when listMyCircles fails', async () => {
-    const callSkill = vi.fn(async () => { throw new Error('no buurts'); });
+    const callSkill = vi.fn(async () => { throw new Error('no circles'); });
     const sendPeer = vi.fn();
     const fn = makeRequestCatchUpFromKnownPeers({ callSkill, sendPeer, logger: silentLogger });
     await fn();
     expect(sendPeer).not.toHaveBeenCalled();
   });
 
-  it('skips empty rosters but still iterates next buurt', async () => {
+  it('skips empty rosters but still iterates next circle', async () => {
     const callSkill = vi.fn(async (_app, op, args) => {
-      if (op === 'listMyCircles')          return { buurts: ['empty', 'full'] };
+      if (op === 'listMyCircles')          return { circles: ['empty', 'full'] };
       if (op === 'getLatestPostAddedAt')  return { latestAt: 0 };
       if (op === 'listGroupRoster')
         return { members: args.groupId === 'full' ? [{ addr: 'addr-a' }] : [] };
@@ -65,7 +65,7 @@ describe('requestCatchUpFromKnownPeers', () => {
 });
 
 describe('handleCatchUpRequest', () => {
-  it('replies with one buurt-post envelope per matching post', async () => {
+  it('replies with one circle-post envelope per matching post', async () => {
     const post1 = { requestId: 'r1', text: 'old', from: 'addr-a', type: 'request', _addedAt: 100 };
     const post2 = { requestId: 'r2', text: 'new', from: 'addr-a', type: 'request', _addedAt: 200 };
     const callSkill = vi.fn(async (_app, op) => {
@@ -82,7 +82,7 @@ describe('handleCatchUpRequest', () => {
     await fn('addr-asking', { groupId: 'westend', sinceMs: 50 });
     expect(sendPeer).toHaveBeenCalledTimes(2);
     const envelopes = sendPeer.mock.calls.map((c) => c[1]);
-    expect(envelopes.every((e) => e.subtype === 'buurt-post')).toBe(true);
+    expect(envelopes.every((e) => e.subtype === 'circle-post')).toBe(true);
     expect(envelopes.every((e) => e.catchUp === true)).toBe(true);
     expect(envelopes.every((e) => e.groupId === 'westend')).toBe(true);
     // _addedAt is stripped from the inner payload (not sent on the wire).

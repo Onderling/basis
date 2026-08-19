@@ -25,9 +25,9 @@ describe('localStorageCircleRecipePendingIo · γ-next.recipe', () => {
   it('writes to cc.circleRecipePending.<id> as JSON', async () => {
     const s = memStorage();
     const io = localStorageCircleRecipePendingIo(s);
-    await io.save('g1', { id: 'r1', name: 'Buurt', blocks: [] });
+    await io.save('g1', { id: 'r1', name: 'Circle', blocks: [] });
     expect(s._backing.get('cc.circleRecipePending.g1')).toBe(
-      JSON.stringify({ id: 'r1', name: 'Buurt', blocks: [] }),
+      JSON.stringify({ id: 'r1', name: 'Circle', blocks: [] }),
     );
   });
 

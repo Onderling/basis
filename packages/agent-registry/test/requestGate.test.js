@@ -14,16 +14,16 @@ const vocab = createVocabulary([
 
 describe('requestForm', () => {
   it('projects one field per item; label defaults to key; required defaults false', () => {
-    const req = createRequest({ requesterId: 'buurt-42', purpose: 'segment feedback', items: [
-      { key: 'place', why: 'which neighbourhoods' }, { key: 'ageBand', why: 'age spread' },
+    const req = createRequest({ requesterId: 'circle-42', purpose: 'segment feedback', items: [
+      { key: 'place', why: 'which circles' }, { key: 'ageBand', why: 'age spread' },
     ] });
     const form = requestForm(req);
-    expect(form.requesterId).toBe('buurt-42');
+    expect(form.requesterId).toBe('circle-42');
     expect(form.purpose).toBe('segment feedback');
     expect(form.fields.map((f) => f.key)).toEqual(['ageBand', 'place']);   // canonical sorted order preserved
     const place = form.fields.find((f) => f.key === 'place');
     expect(place.label).toBe('place');            // defaults to key
-    expect(place.why).toBe('which neighbourhoods');
+    expect(place.why).toBe('which circles');
     expect(place.required).toBe(false);           // disclosure is opt-in
   });
 
@@ -56,7 +56,7 @@ describe('requestForm', () => {
 });
 
 describe('egressReceipt', () => {
-  const req = createRequest({ requesterId: 'buurt', purpose: 'segment', vocabulary: vocab, items: [
+  const req = createRequest({ requesterId: 'circle', purpose: 'segment', vocabulary: vocab, items: [
     { key: 'place', why: 'w' }, { key: 'ageBand', why: 'w' },
   ] });
 
@@ -87,7 +87,7 @@ describe('egressReceipt', () => {
 
 describe('gateEgress', () => {
   it('passes a benign request through — payload === released', () => {
-    const req = createRequest({ requesterId: 'buurt', purpose: 'segment', vocabulary: vocab, items: [{ key: 'place', why: 'w' }] });
+    const req = createRequest({ requesterId: 'circle', purpose: 'segment', vocabulary: vocab, items: [{ key: 'place', why: 'w' }] });
     const released = { place: 'Groningen' };
     const g = gateEgress({ request: req, released, contextType: 'community-feedback', vocabulary: vocab });
     expect(g.allow).toBe(true);

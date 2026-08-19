@@ -9,7 +9,7 @@
       "doc": "N2 — consequence note for a radio option (Gevolgen als je dit kiest)."
     },
     "open": {
-      "text": "Anyone who knows the buurt id joins instantly — no gate. Easiest to grow, hardest to keep private.",
+      "text": "Anyone who knows the circle id joins instantly — no gate. Easiest to grow, hardest to keep private.",
       "doc": "N2 — consequence note for a radio option (Gevolgen als je dit kiest)."
     }
   },
@@ -19,7 +19,7 @@
       "doc": "N2 — consequence note for a radio option (Gevolgen als je dit kiest)."
     },
     "notify-first": {
-      "text": "Leavers post a notice before going, so the buurt sees who left and why.",
+      "text": "Leavers post a notice before going, so the circle sees who left and why.",
       "doc": "N2 — consequence note for a radio option (Gevolgen als je dit kiest)."
     }
   },
@@ -33,7 +33,7 @@
       "doc": "N2 — consequence note for a radio option (Gevolgen als je dit kiest)."
     },
     "vote": {
-      "text": "The whole buurt votes. Most democratic, but heavy for small disputes.",
+      "text": "The whole circle votes. Most democratic, but heavy for small disputes.",
       "doc": "N2 — consequence note for a radio option (Gevolgen als je dit kiest)."
     }
   },
@@ -56,7 +56,7 @@
       "text": "A home: everyone sees each other, one shared pod, light governance. Chat on by default.",
       "doc": "N2 — consequence note for a radio option (Gevolgen als je dit kiest)."
     },
-    "buurt": {
+    "neighbourhood": {
       "text": "A neighbourhood: pairwise reveal, per-member pods, co-admin consensus. Noticeboard-first — open chat off by default.",
       "doc": "N2 — consequence note for a radio option (Gevolgen als je dit kiest)."
     },
@@ -131,7 +131,7 @@
       "doc": "N2.b — consequence note for a radio option."
     },
     "neighbourhood": {
-      "text": "Reaches the whole buurt.",
+      "text": "Reaches the whole circle.",
       "doc": "N2.b — consequence note for a radio option."
     },
     "city": {

@@ -32,7 +32,7 @@ import {
 import { bindCircleAddressKeysFor } from '../../src/v2/householdRosterPairing.js';
 import { announceOwnCircleAddress } from '../../src/v2/circleAddressAnnounce.js';
 
-const GROUP = 'buurt-joiner-addressing';
+const GROUP = 'circle-joiner-addressing';
 const rnd = () => Math.random().toString(36).slice(2, 8);
 
 /** The two steps every shell performs after a join (`makeCircleReachable` + the harness half). */
@@ -59,7 +59,7 @@ describe('joiner ↔ joiner addressing in a three-member circle (real relay, fal
     ]);
     await connectNodesOverRelay([admin, bram, cato], { relayUrl });
 
-    await createCircle(admin, { groupId: GROUP, name: 'Buurt (addressing)' });
+    await createCircle(admin, { groupId: GROUP, name: 'Circle (addressing)' });
     await settleMember(admin, GROUP);
 
     const joinedB = await joinExistingCircle(admin, bram, { groupId: GROUP, handle: 'bram' });

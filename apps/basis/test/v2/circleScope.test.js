@@ -51,7 +51,7 @@ describe('circleScope · isInCircle / scopeItems', () => {
   const items = [
     { id: 1, circleId: 'home' },
     { id: 2, circleId: 'home' },        // alias → same circle
-    { id: 3, audience: 'circle:buurt' },
+    { id: 3, audience: 'circle:circle' },
     { id: 4 },                        // unscoped item
   ];
   it('null active circle keeps everything', () => {
@@ -60,7 +60,7 @@ describe('circleScope · isInCircle / scopeItems', () => {
   });
   it('filters to the active circle (circleId aliases circleId)', () => {
     expect(scopeItems(items, 'home').map((i) => i.id)).toEqual([1, 2]);
-    expect(scopeItems(items, 'buurt').map((i) => i.id)).toEqual([3]);
+    expect(scopeItems(items, 'circle').map((i) => i.id)).toEqual([3]);
   });
   it('tolerates non-array input', () => {
     expect(scopeItems(undefined, 'home')).toEqual([]);

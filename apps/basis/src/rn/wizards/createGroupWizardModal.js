@@ -21,7 +21,7 @@ import {
   initialState, slugify, isValidSlug, labelOf,
   buildRulesObjectFromState, finalSubmit, encodeMembershipCodeUrl,
   newOfferingRow, OFFERING_AXES,
-  // N1+E8 — kind picker + buurt size/chat advice + policy patch.
+  // N1+E8 — kind picker + neighbourhood size/chat advice + policy patch.
   CIRCLE_KINDS, setKind, setSize, setChatEnabled, chatAdvice, policyPatchFromState,
   // N3 — extra role templates (admin opt-in).
   ROLE_TEMPLATE_IDS, toggleRole,
@@ -45,7 +45,7 @@ export default function CreateGroupWizardModal({
   // has no local copy of the code (cross-device).
   getMyPeerAddr,
   // N1+E8 — optional (groupId, patch) => Promise persister; writes the
-  // wizard's chosen policy (incl. buurt chat-off) onto the new circle.
+  // wizard's chosen policy (incl. neighbourhood chat-off) onto the new circle.
   persistPolicy,
 }) {
   const [state, setState] = useState(() => initialState());
@@ -64,7 +64,7 @@ export default function CreateGroupWizardModal({
     setState(next);
     const { result, state: after } = await finalSubmit({ state: next, callSkill });
     setState({ ...after, successResult: result ?? null });
-    // N1+E8 — persist the chosen policy (features incl. buurt chat-off,
+    // N1+E8 — persist the chosen policy (features incl. neighbourhood chat-off,
     // reveal/pod/llm/agents/consensus) so the new circle opens with the
     // right surfaces.  Best-effort; creation already succeeded.
     if (result && typeof persistPolicy === 'function') {
@@ -73,7 +73,7 @@ export default function CreateGroupWizardModal({
     }
     if (result && typeof onDispatched === 'function') {
       // 2026-05-27 (Bundle I).  Surface the invite URL + a scannable QR
-      // so the admin can share the buurt right away — the web wizard's
+      // so the admin can share the circle right away — the web wizard's
       // success-screen path, ported to mobile.  Build the same
       // onderling-invite:// URL the web emits + send it back as a
       // `record`-shape reply; ChatScreen's record-bubble auto-renders
@@ -88,8 +88,8 @@ export default function CreateGroupWizardModal({
           ok: true,
           kind: 'record',
           title: (typeof t === 'function')
-            ? t('chat.buurt_created', { name: after.name })
-            : `✓ Buurt "${after.name}" created.`,
+            ? t('chat.circle_created', { name: after.name })
+            : `✓ Circle "${after.name}" created.`,
           payload: {
             inviteUrl,
             groupId:   enriched.groupId,
@@ -104,8 +104,8 @@ export default function CreateGroupWizardModal({
           // Keep the legacy `message` + raw result for backwards-compat
           // (web wizard's onDispatched still consumes the text path).
           message: (typeof t === 'function')
-            ? t('chat.buurt_created', { name: after.name })
-            : `✓ Buurt "${after.name}" created.`,
+            ? t('chat.circle_created', { name: after.name })
+            : `✓ Circle "${after.name}" created.`,
           ...enriched,
         });
       } catch {}
@@ -126,9 +126,9 @@ export default function CreateGroupWizardModal({
           <Steps labels={STEP_NAMES} current={state.step} />
           <ScrollView style={styles.scroll}>
             {state.step === 1 && (
-              <Body title="Create a buurt" intro="A buurt is a self-governing neighbourhood group.">
+              <Body title="Create a circle" intro="A circle is a self-governing circle group.">
                 {/* N1+E8 — kind picker.  Applies the matching template
-                    (β.4) in place; for a buurt it also surfaces the size
+                    (β.4) in place; for a neighbourhood it also surfaces the size
                     question + chat advice (noticeboard-first, chat off). */}
                 <RadioGroup
                   label={t('circle.kindPicker')}
@@ -138,7 +138,7 @@ export default function CreateGroupWizardModal({
                   onChange={(k) => setState((s) => setKind(s, k))}
                   consequenceLabel={t('common.consequences')}
                 />
-                {state.kind === 'buurt' && (
+                {state.kind === 'neighbourhood' && (
                   <>
                     <RadioGroup
                       label={t('circle.size.label')}
@@ -165,10 +165,10 @@ export default function CreateGroupWizardModal({
                   label="Name"
                   value={state.name}
                   onChangeText={updateName}
-                  placeholder="e.g. Onze Buurt"
+                  placeholder="e.g. Onze Circle"
                 />
                 <Field
-                  label="Buurt id (lowercase, digits, _ or -; 3-30 chars)"
+                  label="Circle id (lowercase, digits, _ or -; 3-30 chars)"
                   value={state.groupId}
                   onChangeText={(v) => setState((s) => ({ ...s, groupId: v }))}
                   placeholder="auto-derived from name"
@@ -366,10 +366,10 @@ export default function CreateGroupWizardModal({
             {state.step === 6 && (() => {
               const rules = buildRulesObjectFromState(state);
               return (
-                <Body title="Review" intro="Confirm the settings, then create the buurt.">
+                <Body title="Review" intro="Confirm the settings, then create the circle.">
                   <ReviewList items={[
                     { label: 'Name',        value: state.name },
-                    { label: 'Buurt id',    value: state.groupId, monospace: true },
+                    { label: 'Circle id',    value: state.groupId, monospace: true },
                     ...(rules.purpose      ? [{ label: 'Purpose',    value: rules.purpose }]      : []),
                     ...(rules.tags         ? [{ label: 'Tags',       value: rules.tags.join(', ') }] : []),
                     ...(rules.additionalAdmins ? [{ label: 'Extra admins', value: rules.additionalAdmins.join(', ') }] : []),
@@ -399,7 +399,7 @@ export default function CreateGroupWizardModal({
                     ...(state.groupPodUri  ? [{ label: 'Group pod', value: state.groupPodUri, monospace: true }] : []),
                   ]} />
                   <ErrorBanner message={state.submitError} />
-                  <Submitting visible={state.submitting} label="Creating buurt…" />
+                  <Submitting visible={state.submitting} label="Creating circle…" />
                 </Body>
               );
             })()}
@@ -418,7 +418,7 @@ export default function CreateGroupWizardModal({
             return [
               { label: t('common.back'),   onPress: () => setStep(STEP_NAMES.length - 1), kind: 'secondary', disabled: state.submitting },
               { label: t('common.cancel'), onPress: onClose, kind: 'secondary', disabled: state.submitting },
-              { label: 'Create buurt',     onPress: onCreate, kind: 'primary', disabled: state.submitting },
+              { label: 'Create circle',     onPress: onCreate, kind: 'primary', disabled: state.submitting },
             ];
           })()} />
         </Pressable>

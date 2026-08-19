@@ -53,7 +53,7 @@ async function buildBundle(members) {
 
 const SAMPLE_RECIPE = {
   id: 'r-1',
-  name: 'Buurt scherm',
+  name: 'Circle scherm',
   blocks: [{ id: 'b1', type: 'tasks', config: {} }],
 };
 
@@ -198,6 +198,6 @@ describe('Stoop γ-next.recipe — cross-agent: Anne → Bob.pendingStore', () =
     await handler('a', env);
     await handler('a', { ...env, recipe: { ...SAMPLE_RECIPE, name: 'attempted overwrite' } });
     // dedup on msgId kept the first recipe.
-    expect((await pending.get('oosterpoort')).name).toBe('Buurt scherm');
+    expect((await pending.get('oosterpoort')).name).toBe('Circle scherm');
   });
 });

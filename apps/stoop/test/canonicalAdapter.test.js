@@ -61,7 +61,7 @@ describe('toCanonicalShape — Stoop type → canonical type+kind', () => {
     const out = toCanonicalShape({
       ...COMMON,
       type:    'lend',
-      source:  { groupId: 'buurt-abc' },
+      source:  { groupId: 'circle-abc' },
       dueAt:   1234,
     });
     expect(out).toMatchObject({
@@ -69,7 +69,7 @@ describe('toCanonicalShape — Stoop type → canonical type+kind', () => {
       addedAt: 1715419200000,
       addedBy: 'agent://anne',
       text:    'paint the fence',
-      source:  { groupId: 'buurt-abc' },
+      source:  { groupId: 'circle-abc' },
       dueAt:   1234,
     });
   });

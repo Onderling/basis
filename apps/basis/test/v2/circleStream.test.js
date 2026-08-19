@@ -12,11 +12,11 @@ const circles = [
 ];
 
 describe('eventCircleId', () => {
-  it('reads circleId / circleId / groupId / buurtId off the payload', () => {
+  it('reads circleId / circleId / groupId / circleId off the payload', () => {
     expect(eventCircleId({ payload: { circleId: 'circle-1' } })).toBe('circle-1');
     expect(eventCircleId({ payload: { circleId: 'circle-1' } })).toBe('circle-1');
     expect(eventCircleId({ payload: { groupId: 'grp-9' } })).toBe('grp-9');
-    expect(eventCircleId({ payload: { buurtId: 'grp-9' } })).toBe('grp-9');
+    expect(eventCircleId({ payload: { circleId: 'grp-9' } })).toBe('grp-9');
   });
 
   it('falls back to itemRef.circleId, else null', () => {
@@ -63,7 +63,7 @@ describe('C15 silent system-entry lane', () => {
 describe('buildCircleStream', () => {
   it('tags each event with its circle name and keeps newest-first', () => {
     const events = [
-      { id: 'e1', ts: 300, app: 'stoop',    type: 'buurt-post',   payload: { groupId: 'grp-9' } },
+      { id: 'e1', ts: 300, app: 'stoop',    type: 'circle-post',   payload: { groupId: 'grp-9' } },
       { id: 'e2', ts: 100, app: 'tasks', type: 'task-claimed', payload: { circleId: 'circle-1' } },
       { id: 'e3', ts: 200, app: 'household',type: 'note-added',   payload: {} },
     ];
@@ -98,7 +98,7 @@ describe('buildCircleStream', () => {
   describe('task provenance (taskId + addedBy)', () => {
     it('stamps taskId + addedBy on task/chore/reminder rows', () => {
       const events = [
-        { id: 'e1', ts: 3, app: 'tasks', type: 'buurt-post', payload: { circleId: 'circle-1', kind: 'chore', ref: 'task-77', addedBy: 'https://me.example/#me' } },
+        { id: 'e1', ts: 3, app: 'tasks', type: 'circle-post', payload: { circleId: 'circle-1', kind: 'chore', ref: 'task-77', addedBy: 'https://me.example/#me' } },
         { id: 'e2', ts: 2, app: 'tasks', type: 'task', payload: { circleId: 'circle-1', taskId: 'task-9', creator: 'https://al.example/#me' } },
         { id: 'e3', ts: 1, app: 'tasks', type: 'reminder', payload: { circleId: 'circle-1' } },
       ];
@@ -111,7 +111,7 @@ describe('buildCircleStream', () => {
     });
 
     it('does NOT add provenance fields to non-task rows (backwards-compatible)', () => {
-      const events = [{ id: 'e1', ts: 1, app: 'stoop', type: 'buurt-post', payload: { circleId: 'circle-1', kind: 'question', ref: 'q-1' } }];
+      const events = [{ id: 'e1', ts: 1, app: 'stoop', type: 'circle-post', payload: { circleId: 'circle-1', kind: 'question', ref: 'q-1' } }];
       const [row] = buildCircleStream({ events, circles });
       expect(row).not.toHaveProperty('taskId');
       expect(row).not.toHaveProperty('addedBy');
@@ -121,10 +121,10 @@ describe('buildCircleStream', () => {
 
 describe('circleRows (SP-13)', () => {
   const events = [
-    { id: 'a', ts: 300, app: 'stoop',    type: 'buurt-post', payload: { groupId: 'grp-9',  kind: 'vraag' } },
-    { id: 'b', ts: 250, app: 'stoop',    type: 'buurt-post', payload: { groupId: 'grp-9',  kind: 'aanbod' } },
-    { id: 'c', ts: 200, app: 'stoop',    type: 'buurt-post', payload: { groupId: 'grp-9',  kind: 'leen' } },
-    { id: 'd', ts: 150, app: 'stoop',    type: 'buurt-post', payload: { groupId: 'circle-1', kind: 'vraag' } },
+    { id: 'a', ts: 300, app: 'stoop',    type: 'circle-post', payload: { groupId: 'grp-9',  kind: 'vraag' } },
+    { id: 'b', ts: 250, app: 'stoop',    type: 'circle-post', payload: { groupId: 'grp-9',  kind: 'aanbod' } },
+    { id: 'c', ts: 200, app: 'stoop',    type: 'circle-post', payload: { groupId: 'grp-9',  kind: 'leen' } },
+    { id: 'd', ts: 150, app: 'stoop',    type: 'circle-post', payload: { groupId: 'circle-1', kind: 'vraag' } },
     { id: 'e', ts: 100, app: 'tasks', type: 'task-claimed', payload: { circleId: 'circle-1' } },
     { id: 'f', ts:  50, app: 'household',type: 'note-added',   payload: {} },
   ];

@@ -66,7 +66,7 @@ describe('StorageBackend port — podStorageBackend (Solid pod adapter)', () => 
     const groupKey = generateGroupKey();
     const plaintext = 'ledenvergadering donderdag 20:00';
     const env = sealForAudience(plaintext, { groupKey }, { audience: 'circle' });
-    const ref = 'circle/buurt/msg/1';
+    const ref = 'circle/circle/msg/1';
 
     await backend.put(ref, JSON.stringify(env));
     // What the pod actually holds is the sealed envelope string — never the plaintext.
@@ -86,7 +86,7 @@ describe('StorageBackend port — storage-swap / seal is the gate', () => {
     const plaintext = 'de sleutel is de poort, niet de opslag';
     const env = sealForAudience(plaintext, { groupKey }, { audience: 'circle' });
     const wire = JSON.stringify(env);
-    const ref = 'circle/buurt/msg/42';
+    const ref = 'circle/circle/msg/42';
 
     // Two DIFFERENT, independent backends of different kinds (in-memory + pod-backed).
     const backendA = new MemoryStorageBackend();
@@ -114,8 +114,8 @@ describe('StorageBackend port — storage-swap / seal is the gate', () => {
     const env = sealForAudience('geheim', { groupKey }, { audience: 'circle' });
 
     const backend = new MemoryStorageBackend();
-    await backend.put('circle/buurt/msg/9', JSON.stringify(env));
-    const got = await backend.get('circle/buurt/msg/9');
+    await backend.put('circle/circle/msg/9', JSON.stringify(env));
+    const got = await backend.get('circle/circle/msg/9');
 
     // The right key opens; the wrong key throws (the secretbox auth tag rejects it) — the store is
     // irrelevant to who can read. A wrong-key holder gets nothing from a perfectly readable store.

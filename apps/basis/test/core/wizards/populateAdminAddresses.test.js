@@ -26,7 +26,7 @@ describe('slice 2b — populateAdminAddressesFromInvite', () => {
   it('after decoding an invite carrying both admin addresses, addressesOf resolves BOTH (relay=pubKey, nkn=native)', async () => {
     // Build the real invite URL the admin would show, then decode it as a joiner.
     const uri = encodeMembershipCodeUrl({
-      groupId: 'buurt-1', code: 'JOIN-CODE', expiresAt: Date.now() + 60_000,
+      groupId: 'circle-1', code: 'JOIN-CODE', expiresAt: Date.now() + 60_000,
       adminPeerAddr: ADMIN_PUBKEY, adminNknAddr: ADMIN_NKN,
     });
     const state = {};
@@ -48,7 +48,7 @@ describe('slice 2b — populateAdminAddressesFromInvite', () => {
 
   it('a relay-only admin (no NKN up at invite time) populates just the relay address', async () => {
     const uri = encodeMembershipCodeUrl({
-      groupId: 'buurt-2', code: 'C', expiresAt: 1, adminPeerAddr: ADMIN_PUBKEY,
+      groupId: 'circle-2', code: 'C', expiresAt: 1, adminPeerAddr: ADMIN_PUBKEY,
     });
     const state = {};
     decodeInvite(uri, state);

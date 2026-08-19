@@ -2,8 +2,8 @@
 import { describe, it, expect } from 'vitest';
 import { createCharter, charterHash, charterKeys, CHARTER_MAX_ATTRIBUTES } from '../src/charter.js';
 
-const ok = { projectId: 'buurt-42', attributes: [
-  { key: 'place', purpose: 'which neighbourhoods are represented' },
+const ok = { projectId: 'circle-42', attributes: [
+  { key: 'place', purpose: 'which circles are represented' },
   { key: 'ageBand', purpose: 'age spread' },
 ] };
 
@@ -44,7 +44,7 @@ describe('createCharter', () => {
 describe('charterHash', () => {
   it('is deterministic + order-independent (same content → same hash)', () => {
     const a = createCharter(ok);
-    const b = createCharter({ projectId: 'buurt-42', attributes: [ok.attributes[1], ok.attributes[0]] });
+    const b = createCharter({ projectId: 'circle-42', attributes: [ok.attributes[1], ok.attributes[0]] });
     expect(charterHash(a)).toBe(charterHash(b));
     expect(charterHash(a)).toMatch(/^[0-9a-f]{64}$/);
   });

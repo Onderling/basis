@@ -11,7 +11,7 @@ import { Modal, View, ScrollView, StyleSheet, Pressable, Text, TouchableOpacity 
 
 import {
   TRUST_OPTS, DISTANCE_OPTS,
-  initialState, canSubmit, loadAvailableBuurts, submitPost,
+  initialState, canSubmit, loadAvailableCircles, submitPost,
 } from '../../core/wizards/postAudienceState.js';
 
 import { Body, Field, Textarea, RadioGroup, Actions, ErrorBanner, Submitting } from './_kit.js';
@@ -31,7 +31,7 @@ export default function PostAudienceWizardModal({
     let active = true;
     (async () => {
       const next = { ...state };
-      await loadAvailableBuurts({ state: next, callSkill });
+      await loadAvailableCircles({ state: next, callSkill });
       if (active) setState(next);
     })();
     return () => { active = false; };
@@ -110,12 +110,12 @@ export default function PostAudienceWizardModal({
                 onChangeText={(v) => setState((s) => ({ ...s, recipients: v }))}
                 placeholder="leave blank to use audience filter"
               />
-              {state.availableBuurts && state.availableBuurts.length > 1 && (
+              {state.availableCircles && state.availableCircles.length > 1 && (
                 <RadioGroup
-                  label="Target buurt"
-                  value={state.selectedBuurt ?? ''}
-                  options={state.availableBuurts.map((b) => ({ id: b.id, label: b.label }))}
-                  onChange={(v) => setState((s) => ({ ...s, selectedBuurt: v }))}
+                  label="Target circle"
+                  value={state.selectedCircle ?? ''}
+                  options={state.availableCircles.map((b) => ({ id: b.id, label: b.label }))}
+                  onChange={(v) => setState((s) => ({ ...s, selectedCircle: v }))}
                 />
               )}
               <ErrorBanner message={state.submitError} />

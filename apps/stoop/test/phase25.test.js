@@ -45,7 +45,7 @@ async function buildBundle({ actor = ADMIN, role = 'admin' } = {}) {
 
 const GROUP = 'oosterpoort';
 const RULES = {
-  purpose: 'buurt-skills',
+  purpose: 'circle-skills',
   admins:  [ADMIN],
   houseRules: ['wees aardig'],
 };

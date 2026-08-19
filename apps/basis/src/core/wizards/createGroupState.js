@@ -32,12 +32,12 @@ export { CIRCLE_KINDS, SIZE_BANDS, ROLE_TEMPLATE_IDS };
 export const ACCESS_POLICIES = Object.freeze([
   { id: 'invite-only', label: 'Invite only (admins issue invites)' },
   { id: 'request',     label: 'Request to join (admins approve)' },
-  { id: 'open',        label: 'Open (anyone with the buurt id joins)' },
+  { id: 'open',        label: 'Open (anyone with the circle id joins)' },
 ]);
 
 export const LEAVE_POLICIES = Object.freeze([
   { id: 'anyone',       label: 'Anyone can leave at any time' },
-  { id: 'notify-first', label: 'Leavers notify the buurt before going' },
+  { id: 'notify-first', label: 'Leavers notify the circle before going' },
 ]);
 
 export const CONFLICT_POLICIES = Object.freeze([
@@ -70,7 +70,7 @@ export function newOfferingRow() {
 
 /* ─── Helpers ───────────────────────────────────────────────── */
 
-/** Slugify a free-form name into a buurt-id candidate. */
+/** Slugify a free-form name into a circle-id candidate. */
 export function slugify(s) {
   return String(s ?? '').toLowerCase().trim()
     .replace(/[^a-z0-9-]+/g, '-')
@@ -78,7 +78,7 @@ export function slugify(s) {
     .slice(0, 30);
 }
 
-/** Validate a buurt id: lowercase, digits, _ / -; 3-30 chars. */
+/** Validate a circle id: lowercase, digits, _ / -; 3-30 chars. */
 export function isValidSlug(s) {
   return typeof s === 'string'
     && /^[a-z0-9](?:[a-z0-9_-]{1,28}[a-z0-9])?$/.test(s);
@@ -99,18 +99,18 @@ export function labelOf(options, id) {
  * header for the design call).
  *
  * @param {object} state — current wizard state
- * @param {string} kind  — kind picked (household / buurt / friends / team)
+ * @param {string} kind  — kind picked (household / neighbourhood / friends / team)
  * @returns {object} new state with `kind` + policy axes filled
  */
 export function setKind(state, kind) {
   return applyTemplate(state, kind);
 }
 
-/* ─── N1 — buurt size + chat advice ─────────────────────────────── */
+/* ─── N1 — neighbourhood size + chat advice ─────────────────────────────── */
 
 /**
- * N1 — record the expected buurt size (drives the chat recommendation).
- * Pure; does not mutate `features.chat` (the buurt template already
+ * N1 — record the expected neighbourhood size (drives the chat recommendation).
+ * Pure; does not mutate `features.chat` (the neighbourhood template already
  * defaults it OFF) — only the advice *strength* changes with size.
  *
  * @param {object} state
@@ -175,7 +175,7 @@ export function toggleRole(state, templateId) {
 
 /**
  * N1+E8 — the circle-policy patch the create wizard persists onto the
- * new circle (features incl. the buurt chat-off default, plus the
+ * new circle (features incl. the neighbourhood chat-off default, plus the
  * template's reveal/pod/llm/agents/consensus axes).  Only includes axes
  * a template actually filled.  Shared by the web + RN wizards so both
  * write the same policy.
@@ -219,8 +219,8 @@ export function initialState() {
     // default so the wizard renders the picker before any template
     // applies.
     kind:                  null,
-    // N1 — expected buurt size; drives the chat-feature advice (large
-    // buurt → advise chat off; small → ask).  null until chosen.
+    // N1 — expected neighbourhood size; drives the chat-feature advice (large
+    // neighbourhood → advise chat off; small → ask).  null until chosen.
     size:                  null,
     // N1 — true once the user explicitly toggles the chat feature, so
     // a later re-derivation respects their choice over the template.

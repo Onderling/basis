@@ -88,10 +88,10 @@ describe('Phase 2 — Circle envelope', () => {
       const loaded = await loadCircleConfig({
         dataSource: bundle.cache,
         circleId:     'maintenance-circle',
-        fallback:   { circleId: 'maintenance-circle', name: 'Buurttuin', kind: 'maintenance' },
+        fallback:   { circleId: 'maintenance-circle', name: 'Community garden', kind: 'maintenance' },
       });
       expect(loaded.kind).toBe('maintenance');
-      expect(loaded.name).toBe('Buurttuin');
+      expect(loaded.name).toBe('Community garden');
     });
 
     it('rejects bad inputs', async () => {

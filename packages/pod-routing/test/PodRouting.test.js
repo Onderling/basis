@@ -123,12 +123,12 @@ describe('podRouting.resolve — group routing via circle policy', () => {
       deviceId:     'd',
       anchorPodUri: 'https://anne.pod',
     });
-    await r.setCirclePolicy('buurt-abc', {
+    await r.setCirclePolicy('circle-abc', {
       policy:      'centralised',
       groupPodUri: 'https://anne.pod',
     });
-    expect(r.resolve('group/buurt-abc/tasks/x'))
-      .toBe('https://anne.pod/buurt-abc/tasks/x');
+    expect(r.resolve('group/circle-abc/tasks/x'))
+      .toBe('https://anne.pod/circle-abc/tasks/x');
   });
 
   it('no-pod circle resolves to pseudo-pod replication-ring path', async () => {
@@ -177,10 +177,10 @@ describe('podRouting.resolve — group routing via circle policy', () => {
       anchorPodUri: 'https://anne.pod',
     });
     await r.updateMapping({
-      fn:  'group/buurt-abc/*',
+      fn:  'group/circle-abc/*',
       uri: 'https://other.pod/special/',
     });
-    expect(r.resolve('group/buurt-abc/tasks/x'))
+    expect(r.resolve('group/circle-abc/tasks/x'))
       .toBe('https://other.pod/special/tasks/x');
   });
 

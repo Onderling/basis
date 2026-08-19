@@ -459,7 +459,7 @@
  * (validated by: `{kind: 'side-panel'|'modal'|'screen', title?,
  * route?}`) — the Settings side-panel, the Cluster-C wizards (restore
  * identity, dispute, audience picker, encrypted backup, create/join
- * buurt), etc.  Before this slice, renderWeb DROPPED these declarations:
+ * circle), etc.  Before this slice, renderWeb DROPPED these declarations:
  * pages surfaced neither in the NavModel nor in renderCoverage's
  * web/mobile column, so the coverage snapshot under-counted the web
  * surface (invariant #4 honesty gap).

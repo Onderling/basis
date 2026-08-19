@@ -18,7 +18,7 @@
  * overflow `⋯` menu as "Huisregels" (per).
  *
  * Boards in `Onderling interface · v2 — circle als bouwsteen · print.pdf`:
- *   - Voorbeeld 1 · BUURT     → GESPREK / PRIKBORD / LEDEN
+ *   - Voorbeeld 1 · NEIGHBOURHOOD     → GESPREK / PRIKBORD / LEDEN
  *   - Voorbeeld 2 · HUISHOUDEN → GESPREK / TAKEN / LIJSTEN
  *   - Voorbeeld 3 · PRIVÉ     → GESPREK / NOTITIES / TAKEN
  *

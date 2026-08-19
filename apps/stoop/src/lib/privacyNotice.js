@@ -60,7 +60,7 @@ export const PRIVACY_NOTICE = Object.freeze({
     { heading: 'This is a research preview',
       body:    'Not a mature product. Do not rely on it for things that must not break.' },
     { heading: 'What not to put in this app',
-      body:    'No medical, financial or otherwise sensitive information. Stoop is for casual buurt questions and offers, not a digital vault.' },
+      body:    'No medical, financial or otherwise sensitive information. Stoop is for casual neighbourhood questions and offers, not a digital vault.' },
     { heading: 'How to leave',
       body:    'You can sign out, leave a group, or delete your pod from the profile screen at any time. Other members will see that you are gone.' },
   ]),

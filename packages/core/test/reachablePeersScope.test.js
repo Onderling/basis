@@ -4,7 +4,7 @@
  * The claim's body is this device's contact graph: every directly-connected peer's pubKey, signed. The
  * skill is `authenticated`, so before this change any known peer could ask a device "who are you connected
  * to?" and get a signed answer back. That is fine in a mesh demo and not fine in an app whose users are in
- * neighbourhood circles — it is strictly worse than the linkability gap G13 describes, because it does not
+ * circle circles — it is strictly worse than the linkability gap G13 describes, because it does not
  * merely let an observer CORRELATE identities, it lets any peer ENUMERATE a graph on request.
  *
  * The fix scopes the ANSWER, not just the gate — the same lesson as the report-visibility decision

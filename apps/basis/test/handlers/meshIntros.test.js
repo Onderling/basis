@@ -6,7 +6,7 @@
  * envelope shapes + filter behaviour (self-exclusion, opt-out path).
  */
 import { describe, it, expect, vi } from 'vitest';
-import { makePropagateMeshIntros, makeHandleBuurtPeerIntro } from '../../src/core/handlers/meshIntros.js';
+import { makePropagateMeshIntros, makeHandleCirclePeerIntro } from '../../src/core/handlers/meshIntros.js';
 
 const silentLogger = { info: () => {}, warn: () => {}, error: () => {} };
 
@@ -43,7 +43,7 @@ describe('propagateMeshIntros (Slice 4)', () => {
     expect(sendPeer).toHaveBeenCalledTimes(2);
     for (const call of sendPeer.mock.calls) {
       expect(call[0]).toBe('addr-new');
-      expect(call[1].subtype).toBe('buurt-peer-intro');
+      expect(call[1].subtype).toBe('circle-peer-intro');
       expect(call[1].groupId).toBe('westend');
       expect(['addr-a', 'addr-b']).toContain(call[1].peerAddr);
     }
@@ -111,10 +111,10 @@ describe('propagateMeshIntros (Slice 4)', () => {
   });
 });
 
-describe('handleBuurtPeerIntro (Slice 4)', () => {
+describe('handleCirclePeerIntro (Slice 4)', () => {
   it('forwards groupId + peerAddr + peerDisplay to recordPeerIntro', async () => {
     const callSkill = vi.fn(async () => ({ ok: true, introId: 'intro-1' }));
-    const handle = makeHandleBuurtPeerIntro({ callSkill, logger: silentLogger });
+    const handle = makeHandleCirclePeerIntro({ callSkill, logger: silentLogger });
 
     const result = await handle('admin-addr', {
       groupId:     'westend',
@@ -131,7 +131,7 @@ describe('handleBuurtPeerIntro (Slice 4)', () => {
 
   it('rejects malformed payloads (missing fields)', async () => {
     const callSkill = vi.fn();
-    const handle = makeHandleBuurtPeerIntro({ callSkill, logger: silentLogger });
+    const handle = makeHandleCirclePeerIntro({ callSkill, logger: silentLogger });
 
     const result = await handle('admin-addr', { peerAddr: 'addr-bob' });   // no groupId
     expect(result.ok).toBe(false);
@@ -141,7 +141,7 @@ describe('handleBuurtPeerIntro (Slice 4)', () => {
 
   it('surfaces substrate errors without throwing', async () => {
     const callSkill = vi.fn(async () => ({ error: 'duplicate' }));
-    const handle = makeHandleBuurtPeerIntro({ callSkill, logger: silentLogger });
+    const handle = makeHandleCirclePeerIntro({ callSkill, logger: silentLogger });
     const result = await handle('admin-addr', {
       groupId: 'westend', peerAddr: 'addr-bob',
     });

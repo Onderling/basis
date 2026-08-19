@@ -29,7 +29,7 @@ const view = {
   properties: { place: 'Amsterdam', ageBand: '35-54' },
   disclosure: { perContext: { 'circle-1': { place: { enabled: true, rung: null } } } },
 };
-const circles = [{ id: 'circle-1', name: 'Buurt' }, { id: 'circle-2', name: 'Werk' }];
+const circles = [{ id: 'circle-1', name: 'Circle' }, { id: 'circle-2', name: 'Werk' }];
 
 describe('buildPersonaViewModel', () => {
   it('lists every charter attribute with the persona value or null', () => {
@@ -188,7 +188,7 @@ const mijPersonas = [
   },
 ];
 const mijCircles = [
-  { id: 'circle-1', name: 'Buurt', charter: { requests: [{ key: 'place', maxRung: 'municipality', purpose: 'spreiding' }] } },
+  { id: 'circle-1', name: 'Circle', charter: { requests: [{ key: 'place', maxRung: 'municipality', purpose: 'spreiding' }] } },
   { id: 'circle-2', name: 'Werkclub' },
 ];
 const mijReleases = {

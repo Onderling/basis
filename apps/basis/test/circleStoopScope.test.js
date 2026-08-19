@@ -91,8 +91,8 @@ describe('scopeStoopCallSkill', () => {
   it('seals a postRequest body before it reaches the pod (sealed circle)', async () => {
     const cs = vi.fn().mockResolvedValue({ ok: true });
     const scoped = scopeStoopCallSkill(cs, 'circle-a', async () => fakeStrategy);
-    await scoped('stoop', 'postRequest', { intent: 'ask', text: 'hoi buurt' });
-    expect(cs.mock.calls[0][2]).toMatchObject({ text: 'SEALED(hoi buurt)', groupId: 'circle-a' });
+    await scoped('stoop', 'postRequest', { intent: 'ask', text: 'hoi circle' });
+    expect(cs.mock.calls[0][2]).toMatchObject({ text: 'SEALED(hoi circle)', groupId: 'circle-a' });
   });
 
   it('opens sealed list items on read, leaves non-recipient/plaintext bodies as-is', async () => {

@@ -1897,7 +1897,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * ops today, the rest reachable via agent.callSkill('stoop', …).
    *
    * Separate identity vault prefix (`cc-stoop-id:`) so stoop's per-
-   * buurt identity is isolated from chat + tasks (decision #2).
+   * circle identity is isolated from chat + tasks (decision #2).
    * IndexedDBPersist via opts.persistDb keeps the local cache alive
    * across page reloads.
    */
@@ -1974,11 +1974,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     // Bind chatAgent's pubKey as the local actor so real stoop
     // skills' `from` lookups resolve back to 'me' (admin role).
     localActor: chatId.pubKey,
-    group:      opts.stoopGroup ?? 'cc-default-buurt',
+    group:      opts.stoopGroup ?? 'cc-default-circle',
     members:    opts.stoopMembers ?? [
       { webid: chatId.pubKey,     displayName: 'me',    role: 'admin'       },
       // Demo-only phantom members — gated behind seedDemoData (OFF by default)
-      // so a fresh REAL buurt's roster shows only the creator + actual joiners.
+      // so a fresh REAL circle's roster shows only the creator + actual joiners.
       ...(seedDemoData ? [
         { webid: 'webid:anne',      displayName: 'Anne',  role: 'coordinator' },
         { webid: 'webid:karl',      displayName: 'Karl',  role: 'member'      },
@@ -2066,7 +2066,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   }
 
   // Pre-seed 3 demo posts so /feed has content out of the box.  DEMO-ONLY
-  // (the posts name the demo members) — a real buurt starts with an empty
+  // (the posts name the demo members) — a real circle starts with an empty
   // feed, so this is gated behind the opt-in seedDemoData flag (OFF by
   // default).  seedStoopPosts:false remains an independent opt-out.
   //
@@ -2224,14 +2224,14 @@ export async function createRealHouseholdAgent(opts = {}) {
   // sendToPeer (task). sa.peer.sendTo handles it transparently.
   // Wrapper alias kept for the existing fan-out callsite so the diff
   // stays small; new code can call sa.peer.sendTo directly.
-  // The one caller is the buurt-post/request fan-out (durable circle content), so it
+  // The one caller is the circle-post/request fan-out (durable circle content), so it
   // rides with the hold-forward delivery guarantee: a member offline at fan time has
   // the post HELD and delivered on reconnect rather than dropped. Online delivery is
   // unchanged (reachable peer delivered immediately).
   const _saSendWithRetry = (sa, addr, payload) => sa.peer.sendTo(addr, payload, { guarantee: 'hold-forward' });
 
   /**
-   * 2026-05-24 — list the buurts this user has peer-confirmed
+   * 2026-05-24 — list the circles this user has peer-confirmed
    * memberships in (their own `membership-redemption` items).
    * Used by the cross-instance /post fan-out to decide WHICH
    * rosters to address when the caller didn't pin an explicit
@@ -2255,7 +2255,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     try {
       chatAgent.enableReachabilityOracle({
         peerScope: makeSharedCirclePeerScope({
-          myCircleIds: () => _listMyKnownBuurts(),
+          myCircleIds: () => _listMyKnownCircles(),
           rosterOf: async (circleId) => {
             const reply = await chatAgent.invoke(
               stoopAgent.address, 'listGroupRoster', [DataPart({ groupId: circleId })],
@@ -2271,13 +2271,13 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
   }
 
-  async function _listMyKnownBuurts() {
+  async function _listMyKnownCircles() {
     try {
       const result = await chatAgent.invoke(
         stoopAgent.address, 'listMyCircles', [DataPart({})],
       );
-      const buurts = result?.[0]?.data?.buurts ?? [];
-      return Array.isArray(buurts) ? buurts : [];
+      const circles = result?.[0]?.data?.circles ?? [];
+      return Array.isArray(circles) ? circles : [];
     } catch {
       return [];
     }
@@ -2608,7 +2608,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         if (items.length === 0) return { ok: true };   // empty → /brief skips
         return {
           items:   items.slice(0, 3).map((p) => ({ id: p.id, label: p.text ?? p.label })),
-          message: `${items.length} buurt request${items.length === 1 ? '' : 's'}`,
+          message: `${items.length} circle request${items.length === 1 ? '' : 's'}`,
         };
       }
       // Derived: searchPosts (no dedicated skill in stoop today).
@@ -2696,7 +2696,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         }
       }
       // F1 5.3d — per-circle posts.  Stoop's browser bundle in
-      // basis runs single-group (`cc-default-buurt`); the
+      // basis runs single-group (`cc-default-circle`); the
       // substrate's `postRequest` falls back to that bundle groupId
       // when `args.targets` is empty, so a per-call `groupId` (from
       // `scopeReadyDispatch`) would otherwise be silently dropped.
@@ -2713,8 +2713,8 @@ export async function createRealHouseholdAgent(opts = {}) {
           targets: [{ kind: 'group', groupId: realArgs.groupId }],
         };
       }
-      // buurt/group skills. Several require groupId; the
-      // chat-shell knows which buurt this agent is in (single-buurt
+      // circle/group skills. Several require groupId; the
+      // chat-shell knows which circle this agent is in (single-circle
       // mode), so auto-inject when missing.
       const REQUIRES_GROUP_ID = new Set([
         'getGroupRules', 'leaveGroup', 'getMyMembershipStatus',
@@ -2723,7 +2723,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (REQUIRES_GROUP_ID.has(realOpId) && !realArgs.groupId) {
         realArgs = {
           ...realArgs,
-          groupId: opts.stoopGroup ?? 'cc-default-buurt',
+          groupId: opts.stoopGroup ?? 'cc-default-circle',
         };
       }
       // Identity 5B/C — present THIS device's per-circle ADDRESS
@@ -2746,24 +2746,24 @@ export async function createRealHouseholdAgent(opts = {}) {
         // style two-step confirm. Short-circuit before invoke.
         return {
           ok: false,
-          error: 'Leaving your buurt is irreversible. Re-run with --confirm=true to proceed.',
+          error: 'Leaving your circle is irreversible. Re-run with --confirm=true to proceed.',
         };
       }
       // Synthesize a `/groups` op locally — there's no listMyGroups
-      // skill in single-buurt mode; we render what we know.  After
+      // skill in single-circle mode; we render what we know.  After
       // invoke for member count.
       if (realOpId === 'getCurrentGroup') {
         const membersResult = await chatAgent.invoke(
           stoopAgent.address, 'listGroupMembers',
-          [DataPart({ groupId: opts.stoopGroup ?? 'cc-default-buurt' })],
+          [DataPart({ groupId: opts.stoopGroup ?? 'cc-default-circle' })],
         );
         const members = membersResult?.[0]?.data?.members ?? [];
         return {
-          title:       'Your buurt',
-          groupId:     opts.stoopGroup ?? 'cc-default-buurt',
+          title:       'Your circle',
+          groupId:     opts.stoopGroup ?? 'cc-default-circle',
           memberCount: members.length,
-          mode:        'single-buurt (V0)',
-          note:        'Multi-buurt support requires multi-agent topology — separate slice.',
+          mode:        'single-circle (V0)',
+          note:        'Multi-circle support requires multi-agent topology — separate slice.',
         };
       }
       const parts = [DataPart(realArgs)];
@@ -2772,9 +2772,9 @@ export async function createRealHouseholdAgent(opts = {}) {
       const reply  = first?.data ?? null;
 
       // cross-instance fan-out (chat-layer bridge).
-      // After a local postRequest succeeds, look up the buurt roster
+      // After a local postRequest succeeds, look up the circle roster
       // (peers we know via membership-redemption items) + fan out a
-      // 'buurt-post' envelope over NKN.  Each recipient's onPeerMessage
+      // 'circle-post' envelope over NKN.  Each recipient's onPeerMessage
       // handler in main.js calls stoop.ingestRemotePost to write the
       // payload into THEIR feed.  Reuses the existing broadcast payload
       // shape (Phase 52.7.2) so a future substrate-multi-transport
@@ -2788,11 +2788,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       }
       if (realOpId === 'postRequest' && reply?.requestId && sa?.peer?.status === 'connected') {
         // follow-up. The substrate bundle's
-        // group is a hardcoded 'cc-default-buurt' from bundle bring-
-        // up, but real buurts (the ones users /create- or /join-) are
+        // group is a hardcoded 'cc-default-circle' from bundle bring-
+        // up, but real circles (the ones users /create- or /join-) are
         // tagged on membership-redemption items with their REAL
         // groupId (e.g. 'westend').  Caller-explicit > targets-derived
-        // > '_any-known' fallback (= all buurts the user has peer-
+        // > '_any-known' fallback (= all circles the user has peer-
         // confirmed memberships in).
         const explicitGroupId = realArgs.groupId
           ?? (Array.isArray(realArgs.targets)
@@ -2802,27 +2802,27 @@ export async function createRealHouseholdAgent(opts = {}) {
         // Fire-and-forget: don't block the user on remote delivery.
         (async () => {
           try {
-            // Resolve the target buurt(s).  Explicit takes precedence;
-            // otherwise list-all-my-buurts from membership-redemption
+            // Resolve the target circle(s).  Explicit takes precedence;
+            // otherwise list-all-my-circles from membership-redemption
             // items so cross-instance posts reach the right peers
             // regardless of the substrate's static bundle group.
-            const buurtIds = explicitGroupId
+            const circleIds = explicitGroupId
               ? [explicitGroupId]
-              : await _listMyKnownBuurts();
+              : await _listMyKnownCircles();
             if (typeof console !== 'undefined') {
               console.info('[realAgent] postRequest fan-out: explicitGroupId=' + explicitGroupId
-                + ' buurtIds=' + JSON.stringify(buurtIds));
+                + ' circleIds=' + JSON.stringify(circleIds));
             }
-            if (buurtIds.length === 0) {
+            if (circleIds.length === 0) {
               if (typeof console !== 'undefined') {
-                console.warn('[realAgent] postRequest fan-out: no buurts to address. '
-                  + 'Posts from outside a buurt-scoped thread + with no targets arg fall here. '
-                  + 'Post from inside the Buurt:<id> thread (Slice 3) or pass --targets.');
+                console.warn('[realAgent] postRequest fan-out: no circles to address. '
+                  + 'Posts from outside a circle-scoped thread + with no targets arg fall here. '
+                  + 'Post from inside the Circle:<id> thread (Slice 3) or pass --targets.');
               }
               return;
             }
-            const sent = new Set();   // dedupe addrs across multiple buurts
-            for (const groupId of buurtIds) {
+            const sent = new Set();   // dedupe addrs across multiple circles
+            for (const groupId of circleIds) {
               const rosterReply = await chatAgent.invoke(
                 stoopAgent.address, 'listGroupRoster',
                 [DataPart({ groupId })],
@@ -2854,7 +2854,7 @@ export async function createRealHouseholdAgent(opts = {}) {
                 try {
                   await _saSendWithRetry(sa, m.addr, {
                     type:    'p2p-chat',
-                    subtype: 'buurt-post',
+                    subtype: 'circle-post',
                     groupId,
                     fromPubKey: chatId.pubKey,
                     payload,
@@ -2862,13 +2862,13 @@ export async function createRealHouseholdAgent(opts = {}) {
                   });
                 } catch (err) {
                   if (typeof console !== 'undefined') {
-                    console.warn('[realAgent] buurt-post fan-out failed for', m.addr, err);
+                    console.warn('[realAgent] circle-post fan-out failed for', m.addr, err);
                   }
                 }
               }
             }
             if (typeof console !== 'undefined') {
-              console.info(`[realAgent] buurt-post fanned out to ${sent.size} peer(s) across ${buurtIds.length} buurt(s)`);
+              console.info(`[realAgent] circle-post fanned out to ${sent.size} peer(s) across ${circleIds.length} circle(s)`);
             }
           } catch (err) {
             if (typeof console !== 'undefined') {
@@ -3477,7 +3477,7 @@ export async function createRealHouseholdAgent(opts = {}) {
    * against:
    *   postRequest     → {ok, message, itemId, _sync}
    *   listFeed/Open   → {items: [{id, label, state, ...}], _sync}
-   *   getMyProfile    → {title, handle, displayName, buurt, ...}
+   *   getMyProfile    → {title, handle, displayName, circle, ...}
    *   setPeerReveal   → {ok, message, peer, action}
    */
   function adaptStoopReply(opId, data, args) {
@@ -3537,14 +3537,14 @@ export async function createRealHouseholdAgent(opts = {}) {
       };
     }
     // getMyProfile: real returns {entry: {handle, displayName, ...}|null}
-    // → adapt to {title, handle, displayName, buurt}.
+    // → adapt to {title, handle, displayName, circle}.
     if (opId === 'getStoopProfile') {
       const e = data.entry ?? {};
       return {
         title:       'Stoop profile',
         handle:      e.handle ?? null,
         displayName: e.displayName ?? null,
-        buurt:       opts.stoopGroup ?? 'cc-default-buurt',
+        circle:       opts.stoopGroup ?? 'cc-default-circle',
       };
     }
     // setPeerReveal: real returns {} on success → adapt to chat shape.
@@ -3679,11 +3679,11 @@ export async function createRealHouseholdAgent(opts = {}) {
         return {
           title:   'Group rules',
           status:  'no-rules-set',
-          message: 'No rules have been set for this buurt yet.',
+          message: 'No rules have been set for this circle yet.',
         };
       }
       const item = data.rules ?? data.item ?? data;
-      // 2026-05-24 fix — when the buurt was created without freeform
+      // 2026-05-24 fix — when the circle was created without freeform
       // rulesText (user left the textarea blank in C1), the structured
       // rules object exists but has no `rulesText` field.  Synthesize
       // a human-readable summary from the structured fields instead of
@@ -3726,7 +3726,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       clearCirclePeers(args?.groupId ?? args?.circleId ?? args?.circleId).catch(() => {});
       return {
         ok: true,
-        message: '👋 Left the buurt. Your local data stays; you no longer receive feed updates.',
+        message: '👋 Left the circle. Your local data stays; you no longer receive feed updates.',
         _sync: simulateSync(),
       };
     }
@@ -3743,7 +3743,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     ? opts.llmProviders
     : {};
 
-  // G7 — turn on live presence now that `_listMyKnownBuurts` + the roster invoke exist. Idempotent.
+  // G7 — turn on live presence now that `_listMyKnownCircles` + the roster invoke exist. Idempotent.
   _enableReachabilityOracle();
 
   // The personal history mirror (the sealed follower sink) — param-gated, OFF by default. When the
@@ -4133,7 +4133,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       // OBJ-2 (S1a) — consume household substrate-sync envelopes off the inbound
       // peer-message stream BEFORE the shell router. handleInbound returns true
       // (consumed) only for tagged household-item envelopes; everything else
-      // (DMs, buurt-posts, calendar invites) falls through to the shell's
+      // (DMs, circle-posts, calendar invites) falls through to the shell's
       // onPeerMessage unchanged.
       //
       // The secure-mesh receive path delivers a SINGLE `{ from, payload, ts }` env

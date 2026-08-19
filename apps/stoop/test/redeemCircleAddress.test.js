@@ -24,7 +24,7 @@ import { createNeighborhoodAgent } from '../src/index.js';
 const ADMIN = 'https://id.example/admin';
 const BOB   = 'https://id.example/bob';
 const GROUP = 'oosterpoort';
-const RULES = { purpose: 'buurt', admins: [ADMIN], houseRules: ['wees aardig'] };
+const RULES = { purpose: 'circle', admins: [ADMIN], houseRules: ['wees aardig'] };
 
 // Real per-circle addresses + the join-link proof for BOB (the key behind BOB_ADDR signs the
 // challenge bound to GROUP). ADMIN presents their own (create-path, no proof needed).

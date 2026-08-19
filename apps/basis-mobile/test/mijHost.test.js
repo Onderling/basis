@@ -40,7 +40,7 @@ const REGISTRY = {
   },
 };
 const CIRCLES = [
-  { id: 'circle-1', name: 'Buurt', charter: { requests: [{ key: 'place', maxRung: 'municipality', purpose: 'spreiding' }] } },
+  { id: 'circle-1', name: 'Circle', charter: { requests: [{ key: 'place', maxRung: 'municipality', purpose: 'spreiding' }] } },
   { id: 'circle-2', name: 'Werkclub' },
 ];
 

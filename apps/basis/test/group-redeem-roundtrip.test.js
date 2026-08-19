@@ -142,7 +142,7 @@ describe('group-redeem cross-device round-trip', () => {
 
     const reply = await sendPeerRedeem({
       adminPeerAddr: adminAddr,
-      groupId:  'buurt-oost',
+      groupId:  'circle-oost',
       code:     'SECRET-123',
       peerDisplay: 'Anne',
     });
@@ -151,7 +151,7 @@ describe('group-redeem cross-device round-trip', () => {
     expect(reply.codeId).toBe('code-1');
     // Admin actually ran the substrate verification with our fields.
     expect(adminVerify).toHaveBeenCalledWith(
-      expect.objectContaining({ groupId: 'buurt-oost', code: 'SECRET-123', peerDisplay: 'Anne' }),
+      expect.objectContaining({ groupId: 'circle-oost', code: 'SECRET-123', peerDisplay: 'Anne' }),
     );
   });
 
@@ -162,7 +162,7 @@ describe('group-redeem cross-device round-trip', () => {
 
     const reply = await sendPeerRedeem({
       adminPeerAddr: adminAddr,
-      groupId:  'buurt-oost',
+      groupId:  'circle-oost',
       code:     'WRONG',
     });
 

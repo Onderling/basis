@@ -40,7 +40,7 @@ export const helpDeck = {
     "en": "answered directly — no language model used"
   },
   "chipTargets": [
-    "intro.buurt",
+    "intro.neighbourhood",
     "intro.bestuur",
     "intro.dev",
     "intro.nieuwsgierig"
@@ -182,7 +182,7 @@ export const helpDeck = {
       "en": "Feedback is our second product: honest, anonymous feedback within organizations. Participants speak freely to a chat bot. The cleaning and anonymizing is done by a language model in a shielded environment, and participants approve what gets shared. It runs on the same building blocks as Basis."
     },
     {
-      "id": "intro.buurt",
+      "id": "intro.neighbourhood",
       "tags": {
         "nl": [
           "buurt",

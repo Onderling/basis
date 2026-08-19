@@ -977,7 +977,7 @@ function readActionFreqSnapshot() {
 // just the "Veel-gebruikt" row.  Never persisted.
 const DEFAULT_SCHERM_RECIPE = Object.freeze({
   // #16 — the default scherm leads with quick-actions, then the noticeboard (the
-  // buurt prikbord via stoop listOpen), so a scherm-landing circle still surfaces
+  // circle prikbord via stoop listOpen), so a scherm-landing circle still surfaces
   // the open posts even though the prikbord tab lives in the (hidden) chat view.
   id: '__default__', name: '', blocks: [
     { id: 'qa-default', type: 'quickActions', config: { limit: 4 } },
@@ -5846,7 +5846,7 @@ function showCircle(id, circle, policy) {
         // count the tab use so the quickActions row reflects reality.
         const f = featureForTabId(tabId);
         if (f) actionFrequency.bump(id, f);
-        if (tabId === 'prikbord') loadNoticeboard();   // lazy-load the buurt posts
+        if (tabId === 'prikbord') loadNoticeboard();   // lazy-load the circle posts
         if (tabId === 'taken') loadTasks();            // Taken — lazy-load the circle's tasks
         if (tabId === 'leden')  loadRoster();          // G16 — lazy-load the member roster
         rerender();
@@ -7645,7 +7645,7 @@ async function boot() {
       _peerAgent = agent; _peerRouter = peerMessageRouter;   // for applyRelayUrl (live relay reconnect)
       tryConnectPeerTransport(agent, peerMessageRouter).catch(() => { /* logged inside */ });
 
-      // The buurt-POST catch-up (a stoop noticeboard concern, untouched by the chat re-root): on
+      // The circle-POST catch-up (a stoop noticeboard concern, untouched by the chat re-root): on
       // reconnect, poll each circle's peers for posts after the hi-water mark. Chat/tasks/governance/
       // membership all ride their lanes' own catch-ups below.
       const requestCatchUpAll = makeRequestCatchUpFromKnownPeers({
@@ -7675,7 +7675,7 @@ async function boot() {
         (async () => {
           try {
             const r = await rawCallSkill('stoop', 'listMyCircles', {});
-            const ids = (r?.buurts ?? []).map((b) => b?.groupId ?? b?.id).filter(Boolean);
+            const ids = (r?.circles ?? []).map((b) => b?.groupId ?? b?.id).filter(Boolean);
             await podChatCatchUpShell?.catchUpAll(ids);
           } catch { /* best-effort — the next reconnect retries */ }
         })();

@@ -390,9 +390,9 @@
       "text": "Huishouden",
       "doc": "β.3 — launcher section header for kind='household' circles."
     },
-    "buurt": {
+    "neighbourhood": {
       "text": "Buurt",
-      "doc": "β.3 — launcher section header for kind='buurt' circles."
+      "doc": "β.3 — launcher section header for kind='neighbourhood' circles."
     },
     "friends": {
       "text": "Vriendenkring",
@@ -404,7 +404,7 @@
     },
     "other": {
       "text": "Overig",
-      "doc": "β.3 — launcher section header for circles whose kind isn't household/buurt/friends."
+      "doc": "β.3 — launcher section header for circles whose kind isn't household/neighbourhood/friends."
     }
   },
   "empty": {
@@ -3175,7 +3175,7 @@
     "template": {
       "applied_hint": {
         "text": "Standaardwaarden ingevuld voor {{kind}}",
-        "doc": "β.4 — confirmation shown after picking a kind in the C1 create-circle wizard; the matching circleTemplate has just pre-filled the policy axes. {{kind}} is the picked kind id (household / buurt / friends / team)."
+        "doc": "β.4 — confirmation shown after picking a kind in the C1 create-circle wizard; the matching circleTemplate has just pre-filled the policy axes. {{kind}} is the picked kind id (household / neighbourhood / friends / team)."
       }
     }
   },
@@ -3186,15 +3186,15 @@
   "size": {
     "label": {
       "text": "Hoe groot wordt deze buurt?",
-      "doc": "N1 — buurt size question driving the chat advice."
+      "doc": "N1 — neighbourhood size question driving the chat advice."
     },
     "small": {
       "text": "Klein (een paar huishoudens)",
-      "doc": "N1 — small buurt size option."
+      "doc": "N1 — small neighbourhood size option."
     },
     "large": {
       "text": "Groot (een hele buurt)",
-      "doc": "N1 — large buurt size option."
+      "doc": "N1 — large neighbourhood size option."
     }
   },
   "chatToggle": {
@@ -3202,17 +3202,17 @@
     "doc": "N1 — the chat-feature toggle in the create wizard."
   },
   "chatAdvice": {
-    "buurtLarge": {
+    "neighbourhoodLarge": {
       "text": "Voor een grotere buurt raden we open chat AF te laten — een drukke iedereen-met-iedereen-chat overweldigt mensen. Reacties op een bericht starten alsnog een gericht gesprek.",
-      "doc": "N1 — advice for a large buurt (chat off)."
+      "doc": "N1 — advice for a large neighbourhood (chat off)."
     },
-    "buurtSmall": {
+    "neighbourhoodSmall": {
       "text": "Voor een kleine buurt kan het allebei — open chat kan werken. Standaard staat het uit (prikbord-eerst); zet het aan als jullie dat willen.",
-      "doc": "N1 — advice for a small buurt (ask)."
+      "doc": "N1 — advice for a small neighbourhood (ask)."
     },
-    "buurtDefault": {
+    "neighbourhoodDefault": {
       "text": "Buurten beginnen prikbord-eerst: open chat staat uit, en een gesprek verschijnt pas als iemand op een vraag of aanbod reageert.",
-      "doc": "N1 — neutral buurt chat default note."
+      "doc": "N1 — neutral neighbourhood chat default note."
     }
   },
   "bulk": {

@@ -5,7 +5,7 @@ import { loadRecipe, validateRecipe, RECIPE_CODES, ISSUE_CODES } from '../src/in
 // template row, an "<app>.<key>" setting, and a surface layout.
 function goodRecipe() {
   return {
-    name: 'Buurt starter',
+    name: 'Circle starter',
     version: '1.0.0',
     capabilities: {
       task: { atoms: ['add', 'list', 'complete'] },
@@ -36,7 +36,7 @@ describe('loadRecipe — happy path (object source, no verify)', () => {
     expect(res.recipe.freedoms['stoop complete task']).toEqual({ enabled: false });
     expect(res.recipe.settings['stoop.digestFrequency']).toBe('weekly');
     expect(res.recipe.surfaces).toEqual({ features: { chat: true, tasks: true, calendar: false }, view: 'screen' });
-    expect(res.recipe.name).toBe('Buurt starter');
+    expect(res.recipe.name).toBe('Circle starter');
   });
 });
 

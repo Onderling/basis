@@ -27,13 +27,13 @@ test.describe('#224 Phase A — thread drawer', () => {
     await expect(page.getByTestId('thread-row-main')).toBeVisible();
 
     // Create a new thread via the inline + form.
-    await page.getByTestId('thread-drawer-new-input').fill('Buurt');
+    await page.getByTestId('thread-drawer-new-input').fill('Circle');
     await page.getByTestId('thread-drawer-new-submit').click();
 
     // createThread auto-switches, drawer closes, active-thread name
     // updates in the header.
     await expect(drawer).toBeHidden();
-    await expect(page.getByTestId('chat-active-thread-name')).toHaveText('Buurt');
+    await expect(page.getByTestId('chat-active-thread-name')).toHaveText('Circle');
 
     // Re-open the drawer to confirm both threads are listed + the
     // new one is active.

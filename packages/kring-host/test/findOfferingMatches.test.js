@@ -27,12 +27,12 @@ describe('tokenize', () => {
 
 describe('findOfferingMatches', () => {
   const members = [
-    { id: 'm1', displayName: 'Anne',   skills: [{ text: 'Fietsband plakken', openness: 'buurt' }] },
+    { id: 'm1', displayName: 'Anne',   skills: [{ text: 'Fietsband plakken', openness: 'circle' }] },
     { id: 'm2', displayName: 'Bob',    skills: [{ text: 'Belasting-aangifte' }] },
     { id: 'm3', displayName: 'wielen-mei', skills: [{ text: 'Fiets-reparatie en onderhoud' }] },
   ];
   const agents = [
-    { id: 'a1', displayName: 'Buurtwerkplaats', skills: [{ text: 'Fietsen — algemeen onderhoud' }] },
+    { id: 'a1', displayName: 'Community workshop', skills: [{ text: 'Fietsen — algemeen onderhoud' }] },
   ];
   const hopCandidates = [
     { id: 'h1', displayName: 'Sjoerd', skills: [{ text: 'Fietsband repareren via Bert' }] },
@@ -70,8 +70,8 @@ describe('findOfferingMatches', () => {
   it('includes the agent when the query token overlaps the agent skill', () => {
     const out = findOfferingMatches({ query: 'fietsen onderhoud', members, agents });
     const labels = out.map((m) => m.label);
-    expect(labels).toContain('Buurtwerkplaats');
-    expect(out.find((m) => m.label === 'Buurtwerkplaats').source).toBe('agent');
+    expect(labels).toContain('Community workshop');
+    expect(out.find((m) => m.label === 'Community workshop').source).toBe('agent');
   });
 
   it('breaks ties by source rank (human > agent > via-hop)', () => {

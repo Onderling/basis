@@ -4,7 +4,7 @@
  *
  * basis — C2 join-group wizard (2026-05-24).
  *
- * 3-step rules-gate wizard that lands new buurt members.  First
+ * 3-step rules-gate wizard that lands new circle members.  First
  * customRenderer hook on the `openPagePanel` infrastructure;
  * the pattern here is the template other Cluster C wizards reuse.
  *

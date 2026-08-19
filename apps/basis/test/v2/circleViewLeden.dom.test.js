@@ -15,7 +15,7 @@ function mount() {
   return el;
 }
 
-const circle = { id: 'buurt', name: 'Buurt' };
+const circle = { id: 'circle', name: 'Circle' };
 const tabs = [{ id: 'gesprek', label: 'Gesprek' }, { id: 'leden', label: 'Leden' }];
 // Neither member RELEASED a name to this circle (`realName` is release-sourced, so it is null);
 // each holds their own name only locally (`ownDisplayName`), which reaches nobody but the

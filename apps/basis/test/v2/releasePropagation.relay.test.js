@@ -22,7 +22,7 @@ import {
 import { bindCircleAddressKeysFor } from '../../src/v2/householdRosterPairing.js';
 import { announcementsFromRoster } from '../../src/v2/circleAddressAnnounce.js';
 
-const GROUP = 'buurt-release-prop';
+const GROUP = 'circle-release-prop';
 async function settle(node) {
   await bindCircleAddresses([node], GROUP);
   await bindCircleAddressKeysFor({ agent: node.agent, circleId: GROUP });

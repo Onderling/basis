@@ -17,7 +17,7 @@ const ADMIN = 'https://id.example/anna';
 const BRAM  = 'https://id.example/bram';
 const CATO  = 'https://id.example/cato';
 const GROUP = 'oosterpoort';
-const RULES = { purpose: 'buurt', admins: [ADMIN], houseRules: ['wees aardig'] };
+const RULES = { purpose: 'circle', admins: [ADMIN], houseRules: ['wees aardig'] };
 
 async function callSkill(agent, skillId, args, from = ADMIN) {
   const def = agent.skills.get(skillId);

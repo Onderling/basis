@@ -79,7 +79,7 @@ describe('Stoop V1 Phase 16 — listGroupMembers', () => {
     expect(r.members.find((m) => m.webid === ANNE)?.sealingPublicKey).toBeUndefined();   // founder, no redemption
   });
 
-  it('falls back to the full roster when a group has no redemption data (legacy single-buurt)', async () => {
+  it('falls back to the full roster when a group has no redemption data (legacy single-circle)', async () => {
     const bundle = await buildAgentAs('admin');
     await bundle.itemStore.addItems([
       { type: 'membership-redemption', text: 'r', source: { groupId: 'circle-a', redeemedBy: BOB }, visibility: 'household' },
@@ -94,11 +94,11 @@ describe('Stoop V1 Phase 16 — listGroupMembers', () => {
 describe('Stoop V1 Phase 16 — postAnnouncement', () => {
   it('admin can post; item appears with kind:"announcement"', async () => {
     const bundle = await buildAgentAs('admin');
-    const r = await callSkill(bundle.agent, 'postAnnouncement', { text: 'Buurtfeest zaterdag' });
+    const r = await callSkill(bundle.agent, 'postAnnouncement', { text: 'Street party zaterdag' });
     expect(r.announcementId).toBeTruthy();
     const item = await bundle.itemStore.getById(r.announcementId);
     expect(item.type).toBe('announcement');
-    expect(item.text).toBe('Buurtfeest zaterdag');
+    expect(item.text).toBe('Street party zaterdag');
     expect(item.source.postedBy).toBe(ANNE);
   });
 

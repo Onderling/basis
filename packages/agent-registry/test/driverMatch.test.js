@@ -157,9 +157,9 @@ describe('matchable-aware matcher (P4c) — profile↔profile on the matchable s
       hobby: own(createDriver({ kind: 'hobby', text: 'bird-watching', tags: ['bird-watching'] })),
     } } }[id] ?? null);
     let candPolicy = createDisclosurePolicy();
-    candPolicy = setDisclosure(candPolicy, 'buurt-42', 'hobby', { matchable: true });
+    candPolicy = setDisclosure(candPolicy, 'circle-42', 'hobby', { matchable: true });
     const candidateMatchable = releasedForMatching(
-      { getProfile: candProfile, profileId: 'default', defaultProfileId: 'default' }, null, candPolicy, 'buurt-42');
+      { getProfile: candProfile, profileId: 'default', defaultProfileId: 'default' }, null, candPolicy, 'circle-42');
 
     const matches = await matchProfilesMatchable({ properties: myProperties, candidateMatchable });
     expect(matches).toHaveLength(1);

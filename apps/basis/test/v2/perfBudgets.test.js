@@ -110,7 +110,7 @@ describe('requestCatchUpFromKnownPeers — 0-peer short-circuit (Perf #4)', () =
     const sendPeerLog = [];
     const callSkill = async (origin, opId, args) => {
       callLog.push(opId);
-      if (opId === 'listMyCircles')      return { buurts: ['bert', 'oosterpoort'] };
+      if (opId === 'listMyCircles')      return { circles: ['bert', 'oosterpoort'] };
       if (opId === 'listGroupRoster')   return { members: [] };   // 0 peers everywhere
       if (opId === 'getLatestPostAddedAt') return { latestAt: 999 };
       return null;
@@ -121,7 +121,7 @@ describe('requestCatchUpFromKnownPeers — 0-peer short-circuit (Perf #4)', () =
     });
     await run();
 
-    // listMyCircles once + listGroupRoster per buurt (2 buurts → 2 rosters).
+    // listMyCircles once + listGroupRoster per circle (2 circles → 2 rosters).
     // CRITICALLY: zero getLatestPostAddedAt calls AND zero sendPeer calls.
     expect(callLog).toEqual(['listMyCircles', 'listGroupRoster', 'listGroupRoster']);
     expect(callLog).not.toContain('getLatestPostAddedAt');
@@ -135,7 +135,7 @@ describe('requestCatchUpFromKnownPeers — 0-peer short-circuit (Perf #4)', () =
     const sendPeerLog = [];
     const callSkill = async (origin, opId, args) => {
       callLog.push(opId);
-      if (opId === 'listMyCircles')      return { buurts: ['bert'] };
+      if (opId === 'listMyCircles')      return { circles: ['bert'] };
       if (opId === 'listGroupRoster')   return { members: [{ addr: 'peer-A' }, { addr: 'peer-B' }] };
       if (opId === 'getLatestPostAddedAt') return { latestAt: 999 };
       return null;

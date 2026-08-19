@@ -11,7 +11,7 @@
  * version-vector substrate exists but the user-facing dispute ops
  * don't).  V0 fallback per [[quality-over-cheap]]: persist as a
  * `kind: 'dispute'` stoop request via the existing `postRequest`
- * skill.  The buurt feed becomes the V0 escalation surface; future
+ * skill.  The circle feed becomes the V0 escalation surface; future
  * C4.5 slice swaps in the real escalation skills when they land.
  *
  * The wizard collects all three steps' data and packages them into a
@@ -51,7 +51,7 @@ export function renderConflictDisputeWizard(opts) {
 
   function renderRaiseStep() {
     const body = mkBody(doc, 'Raise a dispute',
-      'Describe what happened.  This goes to the buurt; admins and (if your conflict-policy is mediation) two random members see it.');
+      'Describe what happened.  This goes to the circle; admins and (if your conflict-policy is mediation) two random members see it.');
     const validSummary = () => isSummaryValid(state.summary);
     // 2026-05-24 — when launched from a row button (postId pre-filled),
     // show the post text as a read-only context card instead of a raw
@@ -142,7 +142,7 @@ export function renderConflictDisputeWizard(opts) {
 
 function renderSuccessStep(container, doc, state, onClose) {
   const body = mkBody(doc, '✓ Dispute filed',
-    'Admins (and mediators if you picked mediation) will see it in the buurt feed.');
+    'Admins (and mediators if you picked mediation) will see it in the circle feed.');
   container.appendChild(body);
   mkActions(container, doc, [{ label: 'Done', onClick: onClose, kind: 'primary' }]);
 }

@@ -38,7 +38,7 @@ await ne.publish({
   payload:    { text: 'paint the fence' },
   recipients: ['agent://bob', 'agent://carol'],
   fromActor:  'agent://anne',
-  circleId:     'buurt-abc',
+  circleId:     'circle-abc',
 });
 
 ne.subscribe({

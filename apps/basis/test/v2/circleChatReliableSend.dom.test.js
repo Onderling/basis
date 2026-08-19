@@ -36,12 +36,12 @@ describe('circle chat · composer dispatches the unified send op', () => {
 
     renderCircleView(el, { circle, rows: [], t, onSend });
     const input = el.querySelector('.circle-circle__composer-input');
-    input.value = 'Hoi buurt!';
+    input.value = 'Hoi circle!';
     el.querySelector('.circle-circle__composer').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 
     // Optimistic bubble appended locally.
     expect(events).toHaveLength(1);
-    expect(events[0].payload.text).toBe('Hoi buurt!');
+    expect(events[0].payload.text).toBe('Hoi circle!');
     // The unified send op dispatched (basis wires this stoop op to the reliable sender).
     await Promise.resolve(); await Promise.resolve();
     await new Promise((r) => setTimeout(r, 0));   // the sign hook adds a microtask hop before the fan

@@ -29,14 +29,14 @@ const rows = [
     event: { id: 'r3', type: 'chat-message', payload: { text: 'Bedankt!', senderDisplay: 'Pieter' } },
   },
   {
-    id: 'r2', ts: now - 60_000, app: 'stoop', type: 'buurt-post',
+    id: 'r2', ts: now - 60_000, app: 'stoop', type: 'circle-post',
     actor: 'Pieter', circleId: 'g1', senderLabel: 'Pieter',
-    event: { id: 'r2', type: 'buurt-post', payload: { kind: 'aanbod', text: 'Boekje te geef.', authorName: 'Pieter' } },
+    event: { id: 'r2', type: 'circle-post', payload: { kind: 'aanbod', text: 'Boekje te geef.', authorName: 'Pieter' } },
   },
   {
-    id: 'r1', ts: yest, app: 'stoop', type: 'buurt-post',
+    id: 'r1', ts: yest, app: 'stoop', type: 'circle-post',
     actor: 'Anne', circleId: 'g1', senderLabel: 'Anne',
-    event: { id: 'r1', type: 'buurt-post', payload: { kind: 'vraag', text: 'Heeft iemand een ladder t/m vrijdag?', authorName: 'Anne' } },
+    event: { id: 'r1', type: 'circle-post', payload: { kind: 'vraag', text: 'Heeft iemand een ladder t/m vrijdag?', authorName: 'Anne' } },
   },
 ];
 
@@ -109,10 +109,10 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
     renderCircleView(el, { circle, rows, t, onSend });
     const input = el.querySelector('.circle-circle__composer-input');
     const form  = el.querySelector('.circle-circle__composer');
-    input.value = '  Hoi buurt!  ';
+    input.value = '  Hoi circle!  ';
     form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     expect(onSend).toHaveBeenCalledTimes(1);
-    expect(onSend.mock.calls[0][0]).toBe('Hoi buurt!');
+    expect(onSend.mock.calls[0][0]).toBe('Hoi circle!');
     expect(input.value).toBe('');
   });
 
@@ -131,10 +131,10 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
     const el = mount();
     renderCircleView(el, {
       circle, rows, t, onSend: () => {},
-      composerPlaceholder: 'Schrijf naar de buurt…',
+      composerPlaceholder: 'Schrijf naar de circle…',
     });
     expect(el.querySelector('.circle-circle__composer-input').placeholder)
-      .toBe('Schrijf naar de buurt…');
+      .toBe('Schrijf naar de circle…');
   });
 
   it('empty state shows when rows = []', () => {
@@ -176,8 +176,8 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
   // ── Mandate ("entrust") — owner-only action + legibility on task rows ────────
   describe('entrust (mandate) action', () => {
     const choreRow = {
-      id: 'chore-1', ts: now, circleId: circle.id, type: 'buurt-post', actor: 'Anne',
-      event: { id: 'chore-1', type: 'buurt-post', payload: { kind: 'chore', text: 'Vuilnis buiten zetten', ref: 'task-77', addedBy: 'https://me.example/#me' } },
+      id: 'chore-1', ts: now, circleId: circle.id, type: 'circle-post', actor: 'Anne',
+      event: { id: 'chore-1', type: 'circle-post', payload: { kind: 'chore', text: 'Vuilnis buiten zetten', ref: 'task-77', addedBy: 'https://me.example/#me' } },
     };
 
     it('is hidden by default (no viewer signals threaded)', () => {
@@ -228,7 +228,7 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
 
   /* ─── — per-circle bottom tabs ─── */
 
-  const buurtTabs = [
+  const circleTabs = [
     { id: 'gesprek',  label: 'GESPREK' },
     { id: 'prikbord', label: 'PRIKBORD' },
     { id: 'leden',    label: 'LEDEN' },
@@ -242,7 +242,7 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
 
   it('renders one tab button per entry with the active one marked', () => {
     const el = mount();
-    renderCircleView(el, { circle, rows, t, tabs: buurtTabs, activeTab: 'prikbord' });
+    renderCircleView(el, { circle, rows, t, tabs: circleTabs, activeTab: 'prikbord' });
     const btns = el.querySelectorAll('.circle-circle__tab');
     expect([...btns].map((b) => b.dataset.tab)).toEqual(['gesprek', 'prikbord', 'leden']);
     expect(el.querySelector('.circle-circle__tab.is-active').dataset.tab).toBe('prikbord');
@@ -250,7 +250,7 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
 
   it('non-GESPREK tabs render the placeholder body (V0 of SP-13.3)', () => {
     const el = mount();
-    renderCircleView(el, { circle, rows, t, tabs: buurtTabs, activeTab: 'prikbord' });
+    renderCircleView(el, { circle, rows, t, tabs: circleTabs, activeTab: 'prikbord' });
     expect(el.querySelector('.circle-circle__placeholder')).not.toBeNull();
     // Bubble list is suppressed for non-chat tabs.
     expect(el.querySelectorAll('.circle-circle__bubble')).toHaveLength(0);
@@ -258,7 +258,7 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
 
   it('GESPREK tab still renders the bubble list', () => {
     const el = mount();
-    renderCircleView(el, { circle, rows, t, tabs: buurtTabs, activeTab: 'gesprek' });
+    renderCircleView(el, { circle, rows, t, tabs: circleTabs, activeTab: 'gesprek' });
     expect(el.querySelector('.circle-circle__placeholder')).toBeNull();
     expect(el.querySelectorAll('.circle-circle__bubble')).toHaveLength(3);
   });
@@ -266,7 +266,7 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
   it('clicking a non-active tab fires onTab(id); clicking the active one is a no-op', () => {
     const el = mount();
     const onTab = vi.fn();
-    renderCircleView(el, { circle, rows, t, tabs: buurtTabs, activeTab: 'gesprek', onTab });
+    renderCircleView(el, { circle, rows, t, tabs: circleTabs, activeTab: 'gesprek', onTab });
     el.querySelector('.circle-circle__tab[data-tab=leden]').click();
     expect(onTab).toHaveBeenCalledTimes(1);
     expect(onTab.mock.calls[0][0]).toBe('leden');
@@ -276,13 +276,13 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
 
   it('defaults activeTab to the first tab id when caller omits it', () => {
     const el = mount();
-    renderCircleView(el, { circle, rows, t, tabs: buurtTabs });
+    renderCircleView(el, { circle, rows, t, tabs: circleTabs });
     expect(el.querySelector('.circle-circle__tab.is-active').dataset.tab).toBe('gesprek');
   });
 
   it('composer stays visible regardless of active tab (v2 §1 boards)', () => {
     const el = mount();
-    renderCircleView(el, { circle, rows, t, tabs: buurtTabs, activeTab: 'leden', onSend: () => {} });
+    renderCircleView(el, { circle, rows, t, tabs: circleTabs, activeTab: 'leden', onSend: () => {} });
     expect(el.querySelector('.circle-circle__composer')).not.toBeNull();
   });
 
@@ -353,7 +353,7 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
   it('scherm-mode suppresses the bottom tab bar even when ≥ 2 tabs are wired', () => {
     const el = mount();
     renderCircleView(el, {
-      circle, rows, t, viewMode: 'scherm', onViewMode: () => {}, tabs: buurtTabs,
+      circle, rows, t, viewMode: 'scherm', onViewMode: () => {}, tabs: circleTabs,
     });
     expect(el.querySelector('.circle-circle__tabs')).toBeNull();
   });
@@ -361,7 +361,7 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
   /* ─── δ.2 — per-message delivery state ─── */
 
   // Local-actor rows mimic what showCircle's onSend appends: actor === LOCAL_ACTOR
-  // and type === 'chat-message'.  Buurt-post mirrors are NOT locally-sent so
+  // and type === 'chat-message'.  Circle-post mirrors are NOT locally-sent so
   // they never get a delivery icon, even when the actor coincidentally matches.
   const LOCAL = 'me';
   const localRow = {
@@ -422,12 +422,12 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
     expect(el.querySelector('.circle-circle__bubble-delivery')).toBeNull();
   });
 
-  it('non-chat-message local rows (e.g. buurt-post mirror) get no delivery icon', () => {
+  it('non-chat-message local rows (e.g. circle-post mirror) get no delivery icon', () => {
     const el = mount();
     const localPost = {
-      id: 'mine-buurt', ts: now + 1_000, app: 'stoop', type: 'buurt-post',
+      id: 'mine-circle', ts: now + 1_000, app: 'stoop', type: 'circle-post',
       actor: LOCAL, circleId: 'g1',
-      event: { id: 'mine-buurt', type: 'buurt-post', payload: { kind: 'aanbod', text: 'Hi' } },
+      event: { id: 'mine-circle', type: 'circle-post', payload: { kind: 'aanbod', text: 'Hi' } },
     };
     renderCircleView(el, {
       circle, rows: [localPost], t,

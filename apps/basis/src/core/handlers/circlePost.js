@@ -1,7 +1,7 @@
 import { notifyIfResonant } from './driverMatchNotify.js';
 
 /**
- * Inbound buurt-post handler. Bundle H Phase 2 — lifted from
+ * Inbound circle-post handler. Bundle H Phase 2 — lifted from
  * `apps/basis/web/main.js:807` (2026-05-24).
  *
  * Ingests a peer's fan-out post into the local stoop substrate via
@@ -20,21 +20,21 @@ import { notifyIfResonant } from './driverMatchNotify.js';
  * @param {{info?, warn?, error?}}                                         [args.logger]
  * @returns {(fromAddr: string, envelope: object) => Promise<void>}
  */
-export function makeHandleBuurtPost({
+export function makeHandleCirclePost({
   callSkill, publishEvent, getDrivers, personaId = 'default', logger = console,
 } = {}) {
-  if (typeof callSkill !== 'function') throw new Error('makeHandleBuurtPost: callSkill required');
+  if (typeof callSkill !== 'function') throw new Error('makeHandleCirclePost: callSkill required');
   // Drivers #5 — load MY private drivers on-device to match incoming posts (default: the default persona).
   const loadDrivers = typeof getDrivers === 'function'
     ? getDrivers
     : async () => (await callSkill('agents', 'getProfileDrivers', { id: personaId }))?.drivers ?? {};
 
-  return async function handleBuurtPost(fromAddr, envelope) {
+  return async function handleCirclePost(fromAddr, envelope) {
     const { groupId, fromPubKey, payload } = envelope ?? {};
-    logger.info?.('[peer] buurt-post received: groupId=' + groupId
+    logger.info?.('[peer] circle-post received: groupId=' + groupId
       + ' from=' + String(fromAddr).slice(0, 16) + '… requestId=' + payload?.requestId);
     if (!payload?.requestId) {
-      logger.warn?.('[peer] buurt-post missing payload.requestId', envelope);
+      logger.warn?.('[peer] circle-post missing payload.requestId', envelope);
       return;
     }
     let result;
@@ -45,7 +45,7 @@ export function makeHandleBuurtPost({
         fromPeerAddr: fromAddr,
       });
     } catch (err) {
-      logger.error?.('[peer] handleBuurtPost failed', err);
+      logger.error?.('[peer] handleCirclePost failed', err);
       return;
     }
     if (result?.error) {
@@ -53,20 +53,20 @@ export function makeHandleBuurtPost({
       return;
     }
     if (result?.deduped) {
-      logger.info?.('[peer] buurt-post deduped (already have requestId=' + payload.requestId + ')');
+      logger.info?.('[peer] circle-post deduped (already have requestId=' + payload.requestId + ')');
       return;
     }
     if (result?.evicted) {
-      logger.info?.('[peer] buurt-post from evicted member dropped', payload.from);
+      logger.info?.('[peer] circle-post from evicted member dropped', payload.from);
       return;
     }
-    logger.info?.('[peer] buurt-post ingested: new itemId=' + result?.itemId);
+    logger.info?.('[peer] circle-post ingested: new itemId=' + result?.itemId);
     publishEvent?.({
       app:   'stoop',
       type:  'notification',
       actor: payload.from ?? fromAddr,
       payload: {
-        message: `📥 ${payload.kind ?? payload.type ?? 'post'} in ${groupId ?? 'buurt'}: ${payload.text ?? '(no text)'}`,
+        message: `📥 ${payload.kind ?? payload.type ?? 'post'} in ${groupId ?? 'circle'}: ${payload.text ?? '(no text)'}`,
         ...(payload.requestId ? { postId: payload.requestId } : {}),
         ...(groupId           ? { groupId }                   : {}),
       },

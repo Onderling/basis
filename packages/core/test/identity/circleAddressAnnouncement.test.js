@@ -16,7 +16,7 @@ import {
 } from '../../src/identity/circleAddressAnnouncement.js';
 
 const seedFor = (name) => Bootstrap.fromMnemonic(Bootstrap.create().mnemonic).deriveAgentSeed(name);
-const CIRCLE = 'buurt-42';
+const CIRCLE = 'circle-42';
 
 /** What a host's seams look like — the two functions `realAgent` already exposes. */
 const seamsFor = (seed) => ({

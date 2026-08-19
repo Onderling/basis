@@ -96,7 +96,7 @@ describe('the expiry ceiling', () => {
 
 describe('an inbound invite is untrusted', () => {
   const inbound = (invite) => ({ subtype: INVITE_MESSAGE, invite });
-  const live = (over = {}) => ({ uri: URI, circleId: 'c1', circleName: 'Buurt', expiresAt: T0 + 60_000, ...over });
+  const live = (over = {}) => ({ uri: URI, circleId: 'c1', circleName: 'Circle', expiresAt: T0 + 60_000, ...over });
 
   it('`from` comes from the WIRE — a broadcast cannot attribute a circle to someone else', () => {
     const inv = receiveInvite(inbound(live({ from: 'someone-else' })), 'actual-sender', at(0));

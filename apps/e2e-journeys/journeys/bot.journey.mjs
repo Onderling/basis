@@ -23,7 +23,7 @@ function makePseudoPod() {
 
 export async function run({ relayUrl }) {
   const { results, check } = checker();
-  const BOT_NAME = 'Buurtbot';
+  const BOT_NAME = 'Circlebot';
   const DEVICE = 'shared-circle-registry';
 
   const mk = async () => {

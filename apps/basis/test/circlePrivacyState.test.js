@@ -4,11 +4,11 @@ import { describe, it, expect } from 'vitest';
 import { charterFromConfig, emptyConsent, setConsentValue, toggleConsent } from '../src/feedback/charterConsent.js';
 import { circlePrivacyState } from '../src/feedback/circlePrivacyState.js';
 
-const charter = charterFromConfig('buurt-42', { attributes: [
-  { key: 'place', purpose: 'neighbourhoods' }, { key: 'ageBand', purpose: 'age' }, { key: 'role', purpose: 'role' },
+const charter = charterFromConfig('circle-42', { attributes: [
+  { key: 'place', purpose: 'circles' }, { key: 'ageBand', purpose: 'age' }, { key: 'role', purpose: 'role' },
 ] });
 const share = (keys) => {
-  let c = emptyConsent('buurt-42');
+  let c = emptyConsent('circle-42');
   for (const [k, v] of keys) c = toggleConsent(setConsentValue(c, k, v), k, true);
   return c;
 };
@@ -19,7 +19,7 @@ describe('circlePrivacyState', () => {
   });
 
   it('quiet when nothing is shared', () => {
-    expect(circlePrivacyState({ charter, consent: emptyConsent('buurt-42') }))
+    expect(circlePrivacyState({ charter, consent: emptyConsent('circle-42') }))
       .toMatchObject({ applicable: true, level: 'quiet', shared: [], warn: false });
   });
 

@@ -15,14 +15,14 @@ import { Bootstrap } from '@onderling/core';
 import { deriveCircleAddress, signCircleLinkFromSeed, verifyCircleLink } from '@onderling/core';
 
 const JOINING = 'werk-7';   // the circle being joined
-const SOURCE = 'buurt-42';  // my existing self lives here
+const SOURCE = 'circle-42';  // my existing self lives here
 
 /** A joiner state that has chosen to continue as the existing self in SOURCE. */
 function linkableState() {
   const state = {
     invite: { kind: 'membershipCode', code: 'CODE123', groupId: JOINING },
     handle: 'jan',
-    existingSelves: [{ circleId: SOURCE, name: 'Buurt' }],
+    existingSelves: [{ circleId: SOURCE, name: 'Circle' }],
     linkChoice: 'fresh',
   };
   setLinkChoice(state, SOURCE);   // guarded to a known existing self

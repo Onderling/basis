@@ -21,7 +21,7 @@ import {
   isValidCircleAddressAnnounceEnvelope, CIRCLE_ADDRESS_ANNOUNCE_KIND,
 } from '../../src/v2/circleAddressAnnounce.js';
 
-const CIRCLE = 'buurt-42';
+const CIRCLE = 'circle-42';
 const QUIET = { warn() {}, info() {} };
 
 const seedOf = (n) => new Uint8Array(32).fill(n);

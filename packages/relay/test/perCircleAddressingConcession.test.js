@@ -127,15 +127,15 @@ describe('J-R5 — the token maps to the socket, never to a circle', () => {
     const dev = new RelayTransport({ relayUrl: url, identity: id });
     await dev.connect();
     await dev.registerPushToken?.({ token: 'ExponentPushToken[dev]', platform: 'android' });
-    await dev.addAddress(...alias('dev', 'someone@buurt'));
+    await dev.addAddress(...alias('dev', 'someone@circle'));
     await settle();
 
-    const row = registry.get(circleAddr('dev', 'someone@buurt'));
+    const row = registry.get(circleAddr('dev', 'someone@circle'));
     expect(row).toBeTruthy();
     // The shape IS the guarantee: a relay that stored a circle id here would know which circles a device
     // belongs to, which is strictly more than the token already leaks.
     expect(Object.keys(row).sort()).toEqual(['lastPushedAt', 'platform', 'registeredAt', 'token']);
-    expect(JSON.stringify(row)).not.toContain('buurt');
+    expect(JSON.stringify(row)).not.toContain('circle');
     await dev.disconnect();
   });
 

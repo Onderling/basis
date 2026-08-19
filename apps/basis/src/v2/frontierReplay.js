@@ -197,10 +197,10 @@ export function makeFrontierReplay({
 
   /** The reconnect kick — same roster walk as the pull-all catch-up (any ONE complete peer suffices). */
   async function requestAll({ callSkill }) {
-    let buurts = [];
-    try { buurts = (await callSkill('stoop', 'listMyCircles', {}))?.buurts ?? []; } catch { return { requested: 0 }; }
+    let circles = [];
+    try { circles = (await callSkill('stoop', 'listMyCircles', {}))?.circles ?? []; } catch { return { requested: 0 }; }
     let requested = 0;
-    for (const b of buurts) {
+    for (const b of circles) {
       const circleId = b?.groupId ?? b?.id;
       if (typeof circleId !== 'string' || !circleId) continue;
       let members = [];

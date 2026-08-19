@@ -23,7 +23,7 @@ ride the canonical media noun instead of a bespoke shape.
   the legacy shape — mixed-version peers keep working because the
   render keys (`id`/`mime`/`bytes`/`width`/`height`/`thumbnail`)
   are unchanged in both shapes.
-- **Leak fix:** `listBuurtPostsSince` (joiner catch-up) shipped raw
+- **Leak fix:** `listCirclePostsSince` (joiner catch-up) shipped raw
   `source.attachments` INCLUDING the local `ref` — now routed
   through `toBroadcastShape` (Phase 39 privacy invariant).
 - Web renderer reads the canonical media shape (writer-asserted

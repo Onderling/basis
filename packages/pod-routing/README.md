@@ -41,9 +41,9 @@ routing.resolve('private/identity-vault');
 routing.resolve('sharing/tasks/abc');
 //   → 'https://anne.pod/sharing/tasks/abc'
 
-routing.resolve('group/buurt-abc/tasks/x');
-//   → 'https://anne.pod/buurt-abc/tasks/x'   (centralised circle)
-//   or 'pseudo-pod://laptop-anne/group/buurt-abc/tasks/x'  (no-pod circle)
+routing.resolve('group/circle-abc/tasks/x');
+//   → 'https://anne.pod/circle-abc/tasks/x'   (centralised circle)
+//   or 'pseudo-pod://laptop-anne/group/circle-abc/tasks/x'  (no-pod circle)
 
 routing.isPodReachable();          // true / false (cache-backed)
 ```
@@ -120,10 +120,10 @@ Wire shape (forward-additive):
   "defaultPolicy": "one-pod",
   "mappings": {
     "sharing/*": "https://anne.pod/sharing/",
-    "group/buurt-abc/*": "https://anne.pod/sharing/stoop/abc/"
+    "group/circle-abc/*": "https://anne.pod/sharing/stoop/abc/"
   },
   "circlePolicies": {
-    "buurt-abc":     {"policy": "centralised", "groupPodUri": "https://anne.pod"},
+    "circle-abc":     {"policy": "centralised", "groupPodUri": "https://anne.pod"},
     "household-xyz": {"policy": "no-pod"},
     "project-def":   {"policy": "decentralised"}
   },
@@ -136,7 +136,7 @@ API:
 ```js
 await routing.reload();
 await routing.updateMapping({ fn: 'sharing/*', uri: 'https://other.pod/sharing/' });
-await routing.setCirclePolicy('buurt-xyz', { policy: 'no-pod' });
+await routing.setCirclePolicy('circle-xyz', { policy: 'no-pod' });
 ```
 
 `reload()` pulls the latest config from the pseudo-pod. `null`

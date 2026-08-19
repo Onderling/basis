@@ -6,7 +6,7 @@
  * createEnvelopeBridge — pair the scheduler with notify-envelope.
  *
  * Phase 52.9.1: apps that want time-shifted envelope delivery
- * (e.g. "remind the buurt about Anne's expiring offer in 24h",
+ * (e.g. "remind the circle about Anne's expiring offer in 24h",
  * "weekly digest of new neighbourhood-jobs") build the bridge once
  * + call `scheduleEnvelope({...})` for each scheduled item.
  *

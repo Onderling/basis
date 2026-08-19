@@ -101,12 +101,12 @@ describe('Bundle F P1 — buildMobileLocalBuiltins', () => {
 
   it('/newthread creates a thread + auto-switches (verified via threadStateRef)', async () => {
     const before = h.getState().threads.size;
-    const r = await h.handlers.newthread({ name: 'Buurt' });
+    const r = await h.handlers.newthread({ name: 'Circle' });
     expect(r.ok).toBe(true);
     const after = h.getState();
     expect(after.threads.size).toBe(before + 1);
     expect(after.activeThreadId).toBe(r.threadId);
-    expect(after.threads.get(r.threadId).name).toBe('Buurt');
+    expect(after.threads.get(r.threadId).name).toBe('Circle');
   });
 
   it('/reset-thread clears the active thread\'s messages', async () => {

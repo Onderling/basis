@@ -14,7 +14,7 @@ function envelope(over = {}) {
     subtype:   'circle-chat-message',
     circleId:  'g1',
     msgId:     'm1',
-    text:      'Hoi buurt!',
+    text:      'Hoi circle!',
     ts:        1735_000_000_000,
     fromActor: 'webid:anne',
     ...over,
@@ -44,7 +44,7 @@ describe('createChatMessageInbox · ε.1 single normalization gate', () => {
     expect(ev.actor).toBe('webid:anne');
     expect(ev.payload).toEqual({
       circleId: 'g1',
-      text:     'Hoi buurt!',
+      text:     'Hoi circle!',
       kind:     'chat-message',
       // Arrival IS the evidence of reach: this envelope came over the circle fan-out, so the bubble may
       // say "whole circle". Without it both shells' badge fell through to "only you" on every received
@@ -67,7 +67,7 @@ describe('createChatMessageInbox · ε.1 single normalization gate', () => {
     expect(r).toEqual({ result: 'inserted' });
     expect(eventLog.events[0].payload.media).toEqual(media);
     // The rest of the payload is unchanged by the media ride-along.
-    expect(eventLog.events[0].payload.text).toBe('Hoi buurt!');
+    expect(eventLog.events[0].payload.text).toBe('Hoi circle!');
     expect(eventLog.events[0].payload.kind).toBe('chat-message');
   });
 
@@ -89,7 +89,7 @@ describe('createChatMessageInbox · ε.1 single normalization gate', () => {
     }
     for (const ev of eventLog.events) {
       expect(ev.payload).not.toHaveProperty('media');
-      expect(ev.payload.text).toBe('Hoi buurt!');
+      expect(ev.payload.text).toBe('Hoi circle!');
     }
   });
 

@@ -66,8 +66,8 @@ describe('chat keeps replace-on-redelivery — it relies on it', () => {
 
   it('an UNREGISTERED kind also replaces — immutability is opt-in, never assumed', () => {
     const log = new EventLog({ initial: [] });
-    log.append(entry('x1', 'buurt-post', { text: 'a' }));
-    log.append(entry('x1', 'buurt-post', { text: 'b' }));
+    log.append(entry('x1', 'circle-post', { text: 'a' }));
+    log.append(entry('x1', 'circle-post', { text: 'b' }));
     expect(log.query({}).find((e) => e.id === 'x1').payload).toEqual({ text: 'b' });
   });
 });

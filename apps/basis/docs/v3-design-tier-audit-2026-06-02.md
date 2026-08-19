@@ -35,9 +35,9 @@ current truth and v3's sketch is the older intent.
 
 | Sketch | Tier | Evidence / note |
 |--------|------|-----------------|
-| 2A · store-landing — Onderling / Buurt / Huishouden / OR-bot pakketten | 🔴 | Product/store-packaging strategy. One app today; no multi-package store listing. |
+| 2A · store-landing — Onderling / Circle / Huishouden / OR-bot pakketten | 🔴 | Product/store-packaging strategy. One app today; no multi-package store listing. |
 | 2B · twee niveaus schil — kring-kiezer verborgen vs aanwezig | 🔴 | No package-level shell variant (hide kring-switcher / pin-one-kring). |
-| 2C · gemengd deelnemerschap · zelfde pod (Anne Buurt-app + Bob volle Onderling) | 🟡 | "Data leeft op de pod" is real (pod-storage, cross-pod refs). The *mixed-package* membership it illustrates is 🔴. |
+| 2C · gemengd deelnemerschap · zelfde pod (Anne Circle-app + Bob volle Onderling) | 🟡 | "Data leeft op de pod" is real (pod-storage, cross-pod refs). The *mixed-package* membership it illustrates is 🔴. |
 
 ## §3 · Eerste momenten
 
@@ -79,13 +79,13 @@ current truth and v3's sketch is the older intent.
 | 7A · hop wordt zichtbaar · "1 mogelijke match HOP" · drie regels | 🟢 | Auto-hop-prompt when no in-circle match (#344);`circleHop.js` `buildHopChain` / `MAX_HOPS=1` / anonymised relay. |
 | 7B · Bert's hop-instellingen · per contact (Uit / Aan-met-goedkeuring / Altijd) | 🟢 | Per-contact hop override (, #336`contactHopOverrides.js`); respects Stoop trust-tiers. |
 
-## §8 · Skill-vragen en -aanbod · het buurt-stuk
+## §8 · Skill-vragen en -aanbod · het circle-stuk
 
 | Sketch | Tier | Evidence / note |
 |--------|------|-----------------|
 | 8A · een skill aanmaken (openheid · houding · status · radius) | 🟢 | `circleSkills.js` `SKILL_AXES` (openness/posture/status/radius) + consequence ⓘ (N2.b); `CircleSkillEditorScreen`. |
 | 8B · skill-match in actie (mens + agent in één lijst · VIA HOP) | 🟢 | `buildSkillMatches` `MATCH_SOURCES` inline match list under posted question (#345). |
-| 8C · lokale ontdekking · op de buurt-BBQ (wifi/BLE · 5 mensen · geen GPS) | 🟢 | Nearby screen + mDNS skill broadcast + HIER tab (#346); presence-v0 (5.9c/5.9d). |
+| 8C · lokale ontdekking · op de circle-BBQ (wifi/BLE · 5 mensen · geen GPS) | 🟢 | Nearby screen + mDNS skill broadcast + HIER tab (#346); presence-v0 (5.9c/5.9d). |
 
 ## §9 · 'Anne komt erbij wonen' — de cross-kring-test
 

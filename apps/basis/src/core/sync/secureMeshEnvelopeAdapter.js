@@ -20,7 +20,7 @@
  * (which validates `transport.publishEnvelope`/`subscribeEnvelopes` and reads
  * `kind`/`ref`/`payload`/`etag`/`_v`/`fromActor` off the inbound envelope) is a
  * drop-in. Envelopes are namespaced under a `tag` key on the peer-message
- * payload so the router can tell them apart from DMs / buurt-posts / calendar
+ * payload so the router can tell them apart from DMs / circle-posts / calendar
  * invites that share the same `sendPeerMessage` channel.
  *
  * @param {object} args

@@ -25,7 +25,7 @@ describe('collectFollowUps — per-op Q31 hints', () => {
       // household.addMember → folio.shareFolder + stoop.postRequest)
       { opId: 'listOpen', appOrigin: 'household', prefilledArgs: undefined, label: undefined },
       { opId: 'shareFolder', appOrigin: 'folio',  prefilledArgs: {}, label: 'Share folio folder' },
-      { opId: 'postRequest', appOrigin: 'stoop',  prefilledArgs: undefined, label: 'Post intro on buurt' },
+      { opId: 'postRequest', appOrigin: 'stoop',  prefilledArgs: undefined, label: 'Post intro on circle' },
     ]);
   });
 

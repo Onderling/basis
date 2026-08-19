@@ -390,9 +390,9 @@
       "text": "Household",
       "doc": "β.3 — launcher section header for kind='household' circles."
     },
-    "buurt": {
+    "neighbourhood": {
       "text": "Neighbourhood",
-      "doc": "β.3 — launcher section header for kind='buurt' circles."
+      "doc": "β.3 — launcher section header for kind='neighbourhood' circles."
     },
     "friends": {
       "text": "Friends",
@@ -404,7 +404,7 @@
     },
     "other": {
       "text": "Other",
-      "doc": "β.3 — launcher section header for circles whose kind isn't household/buurt/friends."
+      "doc": "β.3 — launcher section header for circles whose kind isn't household/neighbourhood/friends."
     }
   },
   "empty": {
@@ -732,7 +732,7 @@
     },
     "composer_placeholder": {
       "text": "Write to the kring…",
-      "doc": "SP-13.2 — inline composer placeholder; hosts can pass a kring-specific one (e.g. 'Schrijf naar de buurt…')."
+      "doc": "SP-13.2 — inline composer placeholder; hosts can pass a circle-specific one (e.g. 'Write to the neighbourhood…')."
     },
     "chat_disabled": {
       "text": "Chat isn't enabled in this circle.",
@@ -3175,7 +3175,7 @@
     "template": {
       "applied_hint": {
         "text": "Defaults filled in for {{kind}}",
-        "doc": "β.4 — confirmation shown after picking a kind in the C1 create-circle wizard; the matching circleTemplate has just pre-filled the policy axes. {{kind}} is the picked kind id (household / buurt / friends / team)."
+        "doc": "β.4 — confirmation shown after picking a kind in the C1 create-circle wizard; the matching circleTemplate has just pre-filled the policy axes. {{kind}} is the picked kind id (household / neighbourhood / friends / team)."
       }
     }
   },
@@ -3185,16 +3185,16 @@
   },
   "size": {
     "label": {
-      "text": "How big will this buurt be?",
-      "doc": "N1 — buurt size question driving the chat advice."
+      "text": "How big will this neighbourhood be?",
+      "doc": "N1 — neighbourhood size question driving the chat advice."
     },
     "small": {
       "text": "Small (a few households)",
-      "doc": "N1 — small buurt size option."
+      "doc": "N1 — small neighbourhood size option."
     },
     "large": {
       "text": "Large (a whole neighbourhood)",
-      "doc": "N1 — large buurt size option."
+      "doc": "N1 — large neighbourhood size option."
     }
   },
   "chatToggle": {
@@ -3202,17 +3202,17 @@
     "doc": "N1 — the chat-feature toggle in the create wizard."
   },
   "chatAdvice": {
-    "buurtLarge": {
-      "text": "For a larger buurt we recommend keeping open chat OFF — a busy all-to-all chat overwhelms people. Reactions to a notice still spin up a focused thread.",
-      "doc": "N1 — advice for a large buurt (chat off)."
+    "neighbourhoodLarge": {
+      "text": "For a larger neighbourhood we recommend keeping open chat OFF — a busy all-to-all chat overwhelms people. Reactions to a notice still spin up a focused thread.",
+      "doc": "N1 — advice for a large neighbourhood (chat off)."
     },
-    "buurtSmall": {
-      "text": "For a small buurt you can go either way — open chat can work. By default it stays off (noticeboard-first); turn it on if your group wants it.",
-      "doc": "N1 — advice for a small buurt (ask)."
+    "neighbourhoodSmall": {
+      "text": "For a small neighbourhood you can go either way — open chat can work. By default it stays off (noticeboard-first); turn it on if your group wants it.",
+      "doc": "N1 — advice for a small neighbourhood (ask)."
     },
-    "buurtDefault": {
-      "text": "Buurten start noticeboard-first: open chat is off, and a thread appears only when someone reacts to a vraag or aanbod.",
-      "doc": "N1 — neutral buurt chat default note."
+    "neighbourhoodDefault": {
+      "text": "Neighbourhoods start noticeboard-first: open chat is off, and a thread appears only when someone reacts to a request or an offer.",
+      "doc": "N1 — neutral neighbourhood chat default note."
     }
   },
   "bulk": {

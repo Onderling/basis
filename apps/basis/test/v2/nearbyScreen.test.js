@@ -647,7 +647,7 @@ describe('broadcast circle invites (step H)', () => {
   }
 
   const inbound = (over = {}) => ({
-    uri: URI, circleId: 'c1', circleName: 'Buurt', expiresAt: T0 + 60_000, from: 'them', ...over,
+    uri: URI, circleId: 'c1', circleName: 'Circle', expiresAt: T0 + 60_000, from: 'them', ...over,
   });
 
   it('publishing is refused for a circle that was not allowed', async () => {
@@ -661,7 +661,7 @@ describe('broadcast circle invites (step H)', () => {
   it('publishing an allowed circle reports the real reach', async () => {
     const { screen, broadcastKind } = withInvites({ invitePublish: { c1: true } });
     screen.open();
-    const r = await screen.publishInvite({ uri: URI, circleId: 'c1', circleName: 'Buurt' });
+    const r = await screen.publishInvite({ uri: URI, circleId: 'c1', circleName: 'Circle' });
     expect(r).toMatchObject({ ok: true, sent: 4, peers: 4 });
     expect(broadcastKind).toHaveBeenCalledWith('nearby-invite', { invite: expect.objectContaining({ circleId: 'c1' }) });
   });
@@ -687,7 +687,7 @@ describe('broadcast circle invites (step H)', () => {
     screen.open();
     invite(inbound());
     const [row] = screen.model().invites;
-    expect(row.invite.circleName).toBe('Buurt');
+    expect(row.invite.circleName).toBe('Circle');
     expect(row.actions).toEqual(['join-published-circle']);
     expect(row.note).toBe('join-is-a-join');
   });

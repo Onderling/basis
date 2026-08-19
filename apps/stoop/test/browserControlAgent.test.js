@@ -15,8 +15,8 @@ import { createBrowserStoopAgent } from '../src/browser.js';
 
 const ADMIN = 'https://id.example/admin';
 const BOB   = 'https://id.example/bob';
-const GROUP = 'cc-test-buurt';
-const RULES = { purpose: 'buurt', admins: [ADMIN], houseRules: ['wees aardig'] };
+const GROUP = 'cc-test-circle';
+const RULES = { purpose: 'circle', admins: [ADMIN], houseRules: ['wees aardig'] };
 const SEAL_PUB = 'bob-sealing-public-key-b64url';
 
 function mockControlAgent() {

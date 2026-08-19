@@ -171,7 +171,7 @@ describe('media over the signed lane — sender seals, the statement carries the
   });
 
   it('a message WITHOUT media renders exactly as today — no chip, no media key on the wire', async () => {
-    const { cid, statement, wire } = await senderSide(circleKeyPair(), { text: 'Hoi buurt!', withMedia: false });
+    const { cid, statement, wire } = await senderSide(circleKeyPair(), { text: 'Hoi circle!', withMedia: false });
     expect(wire).not.toHaveProperty('media');
 
     const recv = await receiverFor(cid);
@@ -184,6 +184,6 @@ describe('media over the signed lane — sender seals, the statement carries the
     const el = mount();
     renderCircleView(el, { circle: CIRCLE, rows, t, onSend: () => {} });
     expect(el.querySelector('.cc-media-card')).toBeNull();      // no chip
-    expect(el.textContent).toContain('Hoi buurt!');             // the bubble is untouched
+    expect(el.textContent).toContain('Hoi circle!');             // the bubble is untouched
   });
 });

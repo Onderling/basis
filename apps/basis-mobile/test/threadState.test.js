@@ -36,10 +36,10 @@ describe('createInitialThreadState', () => {
 describe('createThread', () => {
   it('adds a new thread + switches to it', () => {
     const s0 = createInitialThreadState();
-    const { state: s1, newId } = createThread(s0, { name: 'Buurt' });
+    const { state: s1, newId } = createThread(s0, { name: 'Circle' });
     expect(s1.threads.size).toBe(2);
     expect(s1.activeThreadId).toBe(newId);
-    expect(getActiveThread(s1).name).toBe('Buurt');
+    expect(getActiveThread(s1).name).toBe('Circle');
   });
 
   it('falls back to the auto-id when name is empty', () => {

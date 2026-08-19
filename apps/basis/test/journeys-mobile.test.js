@@ -122,7 +122,7 @@ async function bootWorkspace({ chatVault } = {}) {
 describe('JM-1 — compose across apps (stoop → DM → task)', () => {
   /*
    * Roadmap quote:
-   *   Anne is in a buurt thread on her phone.  Frits posts "Anyone
+   *   Anne is in a circle thread on her phone.  Frits posts "Anyone
    *   got a ladder?" (stoop).  Anne taps [Help with] → spawns a DM
    *   with Frits; mid-conversation, she clicks [Convert to task] →
    *   spawns a tasks-v0 task for "Bring ladder Saturday" in her

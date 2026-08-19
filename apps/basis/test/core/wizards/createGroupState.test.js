@@ -42,9 +42,9 @@ describe('setKind — fills policy axes from the template', () => {
     expect(s1.accessPolicy).toBe('invite-only');
   });
 
-  it('picking buurt fills the buurt template', () => {
-    const s = setKind(initialState(), 'buurt');
-    expect(s.kind).toBe('buurt');
+  it('picking neighbourhood fills the neighbourhood template', () => {
+    const s = setKind(initialState(), 'neighbourhood');
+    expect(s.kind).toBe('neighbourhood');
     expect(s.features.noticeboard).toBe(true);
     expect(s.features.calendar).toBe(false);
     expect(s.revealPolicy).toBe('pairwise');
@@ -82,9 +82,9 @@ describe('setKind — the USER\'s choices survive; a previous template\'s do not
 
   it('THE CHANGE — switching kinds re-fills every axis the user never touched', () => {
     const s1 = setKind(initialState(), 'household');
-    const s2 = setKind(s1, 'buurt');
-    const fresh = setKind(initialState(), 'buurt');
-    expect(s2.kind).toBe('buurt');
+    const s2 = setKind(s1, 'neighbourhood');
+    const fresh = setKind(initialState(), 'neighbourhood');
+    expect(s2.kind).toBe('neighbourhood');
     for (const axis of ['revealPolicy', 'pod', 'llmTool', 'agents', 'consensusRequired']) {
       expect(s2[axis], `${axis} kept the household value`).toEqual(fresh[axis]);
     }
@@ -92,8 +92,8 @@ describe('setKind — the USER\'s choices survive; a previous template\'s do not
   });
 
   it('…and a choice made along the way still survives it', () => {
-    const buurt = setKind(initialState(), 'buurt');
-    const chose = setChatEnabled(buurt, true);
+    const circle = setKind(initialState(), 'neighbourhood');
+    const chose = setChatEnabled(circle, true);
     const swapped = setKind(chose, 'friends');
     expect(swapped.features.chat).toBe(true);
     // everything else now matches a fresh friends — the J-CW1 walk, as a test
@@ -107,7 +107,7 @@ describe('setKind — the USER\'s choices survive; a previous template\'s do not
 describe('CIRCLE_KINDS — re-exported from createGroupState', () => {
   it('exposes the four canonical kinds', () => {
     expect(CIRCLE_KINDS.slice().sort()).toEqual(
-      ['buurt', 'friends', 'household', 'team'],
+      ['friends', 'household', 'neighbourhood', 'team'],
     );
   });
 });

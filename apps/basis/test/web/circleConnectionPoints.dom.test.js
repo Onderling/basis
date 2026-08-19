@@ -11,7 +11,7 @@ import { renderConnectionPoints } from '../../web/v2/circleConnectionPoints.js';
 
 const t = (k) => k;
 const point = (over = {}) => ({
-  url: 'wss://a.example', source: 'join', addedAt: 1, adopted: true, circles: ['Buurt'], ...over,
+  url: 'wss://a.example', source: 'join', addedAt: 1, adopted: true, circles: ['Circle'], ...over,
 });
 
 function render(opts = {}) {
@@ -43,7 +43,7 @@ describe('the list', () => {
   });
 
   it('shows what rides each point (the both-ways mapping)', () => {
-    const el = render({ points: [point({ circles: ['Buurt', 'Straat'] })] });
+    const el = render({ points: [point({ circles: ['Circle', 'Straat'] })] });
     expect(el.querySelector('.circle-points__carries').textContent)
       .toBe('circle.nearbyScreen.point_carries');
   });
@@ -73,7 +73,7 @@ describe('removal is honest', () => {
   it('THE ONE THAT MATTERS: cut-off and still-reachable are SEPARATE statements', () => {
     const el = render({
       points: [point()],
-      removing: { url: 'wss://a.example', losesReachability: ['Buurt'], stillReachable: ['Straat'] },
+      removing: { url: 'wss://a.example', losesReachability: ['Circle'], stillReachable: ['Straat'] },
     });
     const impact = el.querySelector('.circle-points__impact');
     expect(impact.getAttribute('role')).toBe('alert');
@@ -116,7 +116,7 @@ describe('removal is honest', () => {
     const onConfirmRemove = vi.fn(); const onCancelRemove = vi.fn();
     const el = render({
       points: [point()],
-      removing: { url: 'wss://a.example', losesReachability: ['Buurt'], stillReachable: [] },
+      removing: { url: 'wss://a.example', losesReachability: ['Circle'], stillReachable: [] },
       onConfirmRemove, onCancelRemove,
     });
     el.querySelector('.circle-points__confirm').click();
@@ -138,7 +138,7 @@ describe('invariant 8', () => {
   it('no untranslated strings anywhere', () => {
     const el = render({
       points: [point(), point({ url: 'wss://b.example', source: 'suggested', adopted: false, circles: [] })],
-      removing: { url: 'wss://a.example', losesReachability: ['Buurt'], stillReachable: ['Straat'] },
+      removing: { url: 'wss://a.example', losesReachability: ['Circle'], stillReachable: ['Straat'] },
       onBack: () => {},
     });
     const sel = 'button, .circle-points__intro, .circle-points__source, .circle-points__carries,'

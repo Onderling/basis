@@ -35,7 +35,7 @@ import { primeCircleSecurity } from '../../src/v2/circleSecurityPriming.js';
 import { removeCircleMember, leaveCircleLocally } from '../../src/v2/circleMembershipHygiene.js';
 import { buildCircleInviteUri, joinCircleFromInvite } from '../../src/v2/circleInvite.js';
 
-const CIRCLE_A = 'buurt-membership-hygiene';
+const CIRCLE_A = 'circle-membership-hygiene';
 const CIRCLE_B = 'koor-membership-hygiene';
 const rnd = () => Math.random().toString(36).slice(2, 8);
 const settle = (ms = 1500) => new Promise((r) => setTimeout(r, ms));
@@ -66,7 +66,7 @@ describe('B4 — a removed member is silenced in THAT circle only (real relay)',
     await connectNodesOverRelay([admin, bram, cato], { relayUrl });
 
     // Circle A: admin + bram + cato. Circle B: admin + bram.
-    await createCircle(admin, { groupId: CIRCLE_A, name: 'Buurt (hygiene)' });
+    await createCircle(admin, { groupId: CIRCLE_A, name: 'Circle (hygiene)' });
     await settleMember(admin, CIRCLE_A);
     expect((await joinExistingCircle(admin, bram, { groupId: CIRCLE_A, handle: 'bram' })).joined.ok).toBe(true);
     await settleMember(bram, CIRCLE_A);
@@ -219,7 +219,7 @@ describe('B4 — a removed member is silenced in THAT circle only (real relay)',
 describe('B5 — the invite ceiling is refused by the ISSUER, over a real relay', () => {
   let relay; let relayUrl;
   let admin; let one; let two;
-  const CIRCLE = 'buurt-invite-ceiling';
+  const CIRCLE = 'circle-invite-ceiling';
 
   beforeAll(async () => {
     relay = await startRelay({ port: 0, log: false });

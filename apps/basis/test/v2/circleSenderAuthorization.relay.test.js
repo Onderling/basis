@@ -29,7 +29,7 @@ import { VaultMemory } from '@onderling/vault';
 import {
   bootRealAgentNode, connectAgentsOverRelay, pairCircle, until, teardown, sendCircleChat } from '../support/pairRealAgents.js';
 
-const GROUP = 'buurt-sender-authorize';
+const GROUP = 'circle-sender-authorize';
 const rnd = () => Math.random().toString(36).slice(2, 8);
 const settle = (ms = 200) => new Promise((r) => setTimeout(r, ms));
 
@@ -45,7 +45,7 @@ describe('a stranger cannot speak in a circle, however well they sign (real rela
     await connectAgentsOverRelay(admin, joiner, { relayUrl });
 
     ({ joined } = await pairCircle(admin, joiner, {
-      groupId: GROUP, name: 'Buurt (authorize)', handle: 'joiner',
+      groupId: GROUP, name: 'Circle (authorize)', handle: 'joiner',
     }));
 
     // Warm the mesh exactly as the sibling relay test does: a real broadcast from the admin, which

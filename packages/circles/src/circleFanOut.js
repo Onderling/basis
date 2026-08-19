@@ -100,7 +100,7 @@ export function createCircleFanOut({
     // writes only the joiner's own row, so the admin exists solely as `confirmedBy` on the trail —
     // which is why joiner→admin chat silently never left the device while admin→joiner worked, and why
     // catch-up (roster-driven) reached the peer the chat fan-out could not.
-    // No trail (legacy seeded single-buurt) → `null` → the MemberMap, exactly as before.
+    // No trail (legacy seeded single-circle) → `null` → the MemberMap, exactly as before.
     let memberMapList = [];
     try { memberMapList = (await members.list()) ?? []; } catch { memberMapList = []; }
     const roster = await projectCircleRoster({ store, groupId: circleId, memberMapList });

@@ -2,7 +2,7 @@
 //
 // Mirror of the original real-device gap: user tapped [Dispute] on
 // a stoop post + got the "not wired on mobile yet" bubble.  Now:
-//   1. /feed shows the buurt feed (stoop list bubble with row buttons)
+//   1. /feed shows the circle feed (stoop list bubble with row buttons)
 //   2. Tap [Dispute] on the first post
 //   3. The wizard modal opens with the 3-step stepper
 //   4. We can advance through the steps (validators gate Next)
@@ -23,9 +23,9 @@ describe('conflict-dispute wizard launch', () => {
   });
 
   it('[Dispute] on a stoop post opens the wizard + Next is gated by the validator', async () => {
-    // Render the buurt feed.  /feed is a stoop substrate slash that
+    // Render the circle feed.  /feed is a stoop substrate slash that
     // returns a list bubble with row buttons including [Dispute] for
-    // open posts.  The seeded buurt has at least one open post.
+    // open posts.  The seeded circle has at least one open post.
     await element(by.id('chat-input')).typeText('/feed');
     await element(by.id('chat-send')).tap();
 

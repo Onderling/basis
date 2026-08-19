@@ -45,10 +45,10 @@ describe('the template axis', () => {
     expect(Object.keys(TEMPLATE_CONVERSATION_KINDS).filter((k) => !CIRCLE_KINDS.includes(k))).toEqual([]);
   });
 
-  it('a buurt shows the noticeboard, NOT open chat — matching its own template', () => {
-    // `features.chat: false` for a buurt. A conversation full of chat messages would contradict the
+  it('a neighbourhood shows the noticeboard, NOT open chat — matching its own template', () => {
+    // `features.chat: false` for a circle. A conversation full of chat messages would contradict the
     // template that created the circle.
-    const kinds = resolveConversationKinds({ templateKind: 'buurt' });
+    const kinds = resolveConversationKinds({ templateKind: 'neighbourhood' });
     expect(kinds).not.toContain('chat-message');
     expect(kinds).toEqual(expect.arrayContaining(['vraag', 'aanbod']));
   });
@@ -65,7 +65,7 @@ describe('the template axis', () => {
 
 describe('precedence: circle → template → default', () => {
   it("the admin's choice beats the template", () => {
-    const kinds = resolveConversationKinds({ circleSetting: ['chat-message'], templateKind: 'buurt' });
+    const kinds = resolveConversationKinds({ circleSetting: ['chat-message'], templateKind: 'neighbourhood' });
     expect(kinds).toEqual(['chat-message']);
   });
 
@@ -82,7 +82,7 @@ describe('precedence: circle → template → default', () => {
 
 describe('toggling one kind', () => {
   it('adds and removes', () => {
-    const start = resolveConversationKinds({ templateKind: 'buurt' });
+    const start = resolveConversationKinds({ templateKind: 'neighbourhood' });
     const withChat = setConversationKind(start, 'chat-message', true);
     expect(withChat).toContain('chat-message');
     expect(setConversationKind(withChat, 'chat-message', false)).not.toContain('chat-message');
@@ -108,7 +108,7 @@ describe('toggling one kind', () => {
 
 describe('the wizard axis (J-CW1/J-CW2)', () => {
   it('a fresh template pre-fills the axis', () => {
-    expect(applyTemplate({}, 'buurt').conversationKinds).toEqual(['vraag', 'aanbod', 'task', 'leen']);
+    expect(applyTemplate({}, 'neighbourhood').conversationKinds).toEqual(['vraag', 'aanbod', 'task', 'leen']);
     expect(applyTemplate({}, 'household').conversationKinds).toBeNull();   // null = the living default
   });
 
@@ -117,31 +117,31 @@ describe('the wizard axis (J-CW1/J-CW2)', () => {
     // deliberate choice is the failure that makes people distrust every default in the wizard.
     // Since decision 4 (2026-07-29) "the user chose it" is recorded rather than inferred from the value
     // being set — setting the field alone no longer claims a person did it.
-    let st = applyTemplate({}, 'buurt');
+    let st = applyTemplate({}, 'neighbourhood');
     st = applyTemplate(markAxisTouched({ ...st, conversationKinds: ['chat-message'] }, 'conversationKinds'), 'friends');
     expect(st.conversationKinds).toEqual(['chat-message']);
   });
 
   it('an untouched axis DOES follow the new kind — which it now genuinely does', () => {
     // This test's NAME and its body used to disagree: it asserted that household's `null` survived a
-    // switch to buurt, i.e. that the axis did NOT follow. That was the old no-op semantics, and the
+    // switch to circle, i.e. that the axis did NOT follow. That was the old no-op semantics, and the
     // mismatch between the two was the smell. Under provenance the name is true.
     let st = applyTemplate({}, 'household');       // null (the living default)
-    st = applyTemplate(st, 'buurt');
+    st = applyTemplate(st, 'neighbourhood');
     expect(st.conversationKinds).toEqual(['vraag', 'aanbod', 'task', 'leen']);
   });
 });
 
 
 describe('features.chat is a VIEW of the kinds list (decision 3, 2026-07-29)', () => {
-  it('a buurt reports no chat, whatever the stored flag says', () => {
-    const p = withDerivedChatFeature({ kind: 'buurt', features: { chat: true, tasks: true } });
+  it('a circle reports no chat, whatever the stored flag says', () => {
+    const p = withDerivedChatFeature({ kind: 'neighbourhood', features: { chat: true, tasks: true } });
     expect(p.features.chat).toBe(false);
     expect(p.features.tasks).toBe(true);        // only the one derived key is touched
   });
 
   it('an explicit list beats the template', () => {
-    const p = withDerivedChatFeature({ kind: 'buurt', conversationKinds: ['chat-message', 'vraag'], features: {} });
+    const p = withDerivedChatFeature({ kind: 'neighbourhood', conversationKinds: ['chat-message', 'vraag'], features: {} });
     expect(p.features.chat).toBe(true);
   });
 
@@ -154,7 +154,7 @@ describe('features.chat is a VIEW of the kinds list (decision 3, 2026-07-29)', (
   });
 
   it('chatIsInConversation agrees with what the conversation will render', () => {
-    for (const kind of ['buurt', 'household', 'friends', 'team']) {
+    for (const kind of ['neighbourhood', 'household', 'friends', 'team']) {
       const kinds = resolveConversationKinds({ templateKind: kind });
       expect(chatIsInConversation({ templateKind: kind })).toBe(kinds.includes('chat-message'));
     }
@@ -163,9 +163,9 @@ describe('features.chat is a VIEW of the kinds list (decision 3, 2026-07-29)', (
 
 describe('conversationKindsRows — the admin control’s model (decision 3’s missing surface)', () => {
   it('offers every HUMAN kind, on or off, so an admin sees what a conversation could contain', () => {
-    const rows = conversationKindsRows({ templateKind: 'buurt' });
+    const rows = conversationKindsRows({ templateKind: 'neighbourhood' });
     expect(rows.map((r) => r.kind).sort()).toEqual(['aanbod', 'chat-message', 'leen', 'task', 'vraag'].sort());
-    expect(rows.find((r) => r.kind === 'chat-message').on).toBe(false);   // a buurt starts without chat
+    expect(rows.find((r) => r.kind === 'chat-message').on).toBe(false);   // a neighbourhood starts without chat
     expect(rows.find((r) => r.kind === 'vraag').on).toBe(true);
   });
 
@@ -178,7 +178,7 @@ describe('conversationKindsRows — the admin control’s model (decision 3’s 
   });
 
   it('each row carries the WHOLE next list, so a shell persists what it displayed', () => {
-    const rows = conversationKindsRows({ templateKind: 'buurt' });
+    const rows = conversationKindsRows({ templateKind: 'neighbourhood' });
     const chat = rows.find((r) => r.kind === 'chat-message');
     expect(chat.next).toContain('chat-message');                 // tapping an off row turns it on
     const vraag = rows.find((r) => r.kind === 'vraag');
@@ -190,7 +190,7 @@ describe('conversationKindsRows — the admin control’s model (decision 3’s 
   it('an admin MAY empty the conversation — unlike a reader, who cannot empty their own filter', () => {
     // The admin decides what the circle IS; the reader decides what they look at. `chatFilterChips`
     // refuses to produce an empty filter; this deliberately does not.
-    let list = resolveConversationKinds({ templateKind: 'buurt' });
+    let list = resolveConversationKinds({ templateKind: 'neighbourhood' });
     for (const k of [...list]) {
       const row = conversationKindsRows({ circleSetting: list }).find((r) => r.kind === k);
       list = row.next;

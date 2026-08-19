@@ -1,9 +1,9 @@
-// buurt-post handler → drivers match→notify hook (#5). On ingest, the handler matches the post against
+// circle-post handler → drivers match→notify hook (#5). On ingest, the handler matches the post against
 // MY drivers on-device (getProfileDrivers) and fires a SEPARATE resonance notification on an explainable
 // match — working off the post's text/tags even without an explicit driverSignature.
 import { describe, it, expect, vi } from 'vitest';
 import { createDriver } from '@onderling/agent-registry';
-import { makeHandleBuurtPost } from '../src/core/handlers/buurtPost.js';
+import { makeHandleCirclePost } from '../src/core/handlers/circlePost.js';
 
 function harness({ drivers }) {
   const events = [];
@@ -12,16 +12,16 @@ function harness({ drivers }) {
     if (op === 'getProfileDrivers') return { ok: true, drivers };
     return {};
   });
-  const handler = makeHandleBuurtPost({ callSkill, publishEvent: (e) => events.push(e), logger: { info() {}, warn() {}, error() {} } });
+  const handler = makeHandleCirclePost({ callSkill, publishEvent: (e) => events.push(e), logger: { info() {}, warn() {}, error() {} } });
   return { handler, events, callSkill };
 }
 
 const SAILING = { sailing: createDriver({ kind: 'goal', text: 'learn to sail', tags: ['sailing'] }) };
 
-describe('buurt-post → driver match→notify (#5)', () => {
+describe('circle-post → driver match→notify (#5)', () => {
   it('fires a resonance notification when a post matches my drivers (via text/tags fallback)', async () => {
     const { handler, events } = harness({ drivers: SAILING });
-    await handler('peer.addr', { groupId: 'buurt-oost', payload: { requestId: 'r1', text: 'sailing lessons?', tags: ['sailing'], from: 'anne' } });
+    await handler('peer.addr', { groupId: 'circle-oost', payload: { requestId: 'r1', text: 'sailing lessons?', tags: ['sailing'], from: 'anne' } });
 
     // the normal "post received" notification + the resonance nudge
     const resonance = events.find((e) => e.payload?.driverMatch);

@@ -32,7 +32,7 @@ describe('P2c pipeline (localStorage → loadMappings → verify → merge)', ()
     const deviceId = WEB_MAPPINGS_DEVICE;
 
     await writeMapping({ pseudoPod: store, deviceId, mapping: {
-      id: 'feedback-buurtplan', scope: 'app',
+      id: 'feedback-circle plan', scope: 'app',
       ops: [{ id: 'feedback', verb: 'submit', steps: [{ appOrigin: 'household', opId: 'addItem' }] }],
     } });
 
@@ -44,7 +44,7 @@ describe('P2c pipeline (localStorage → loadMappings → verify → merge)', ()
 
     expect(rejected).toEqual([]);
     expect(dropped).toEqual([]);
-    expect(full.opsById.has('feedback') || full.opsById.has('feedback-buurtplan/feedback')).toBe(true);
+    expect(full.opsById.has('feedback') || full.opsById.has('feedback-circle plan/feedback')).toBe(true);
   });
 
   it('a mapping referencing an unknown op is refused (never merged)', async () => {

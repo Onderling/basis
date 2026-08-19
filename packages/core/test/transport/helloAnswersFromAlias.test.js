@@ -35,13 +35,13 @@ describe('sendHello stamps the address it is told to answer as', () => {
   let tx;
   beforeEach(async () => {
     tx = new RecordingTransport({ identity, address: 'primary-addr' });
-    await tx.addAddress('circle-addr-buurt');
+    await tx.addAddress('circle-addr-circle');
     await tx.addAddress('circle-addr-friends');
   });
 
   it('uses the alias when told to — the fix', async () => {
-    await tx.sendHello('peer-1', { pubKey: 'pk-self' }, { from: 'circle-addr-buurt' });
-    expect(tx.sent.at(-1).envelope._from).toBe('circle-addr-buurt');
+    await tx.sendHello('peer-1', { pubKey: 'pk-self' }, { from: 'circle-addr-circle' });
+    expect(tx.sent.at(-1).envelope._from).toBe('circle-addr-circle');
   });
 
   it('still defaults to the primary address when not told', async () => {
@@ -55,10 +55,10 @@ describe('sendHello stamps the address it is told to answer as', () => {
   });
 
   it('each circle answers as its OWN address — otherwise the circles are linkable', async () => {
-    await tx.sendHello('peer-1', { pubKey: 'pk-self' }, { from: 'circle-addr-buurt' });
+    await tx.sendHello('peer-1', { pubKey: 'pk-self' }, { from: 'circle-addr-circle' });
     await tx.sendHello('peer-2', { pubKey: 'pk-self' }, { from: 'circle-addr-friends' });
     const froms = tx.sent.map((s) => s.envelope._from);
-    expect(froms).toEqual(['circle-addr-buurt', 'circle-addr-friends']);
+    expect(froms).toEqual(['circle-addr-circle', 'circle-addr-friends']);
     // …and neither leaked the canonical address, which is the property being protected.
     expect(froms).not.toContain('primary-addr');
   });
@@ -86,8 +86,8 @@ describe('an address we do not hold cannot be claimed', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
       await tx.sendHello('peer-1', { pubKey: 'pk-self' });
-      await tx.addAddress?.('circle-addr-buurt');
-      await tx.sendHello('peer-1', { pubKey: 'pk-self' }, { from: 'circle-addr-buurt' });
+      await tx.addAddress?.('circle-addr-circle');
+      await tx.sendHello('peer-1', { pubKey: 'pk-self' }, { from: 'circle-addr-circle' });
       expect(warn).not.toHaveBeenCalled();
     } finally { warn.mockRestore(); }
   });
@@ -100,12 +100,12 @@ describe('an address we do not hold cannot be claimed', () => {
   });
 
   it('an alias REMOVED is no longer claimable', async () => {
-    await tx.addAddress('circle-addr-buurt');
-    await tx.sendHello('p', { pubKey: 'pk-self' }, { from: 'circle-addr-buurt' });
-    expect(tx.sent.at(-1).envelope._from).toBe('circle-addr-buurt');
+    await tx.addAddress('circle-addr-circle');
+    await tx.sendHello('p', { pubKey: 'pk-self' }, { from: 'circle-addr-circle' });
+    expect(tx.sent.at(-1).envelope._from).toBe('circle-addr-circle');
 
-    await tx.removeAddress?.('circle-addr-buurt');
-    await tx.sendHello('p', { pubKey: 'pk-self' }, { from: 'circle-addr-buurt' });
+    await tx.removeAddress?.('circle-addr-circle');
+    await tx.sendHello('p', { pubKey: 'pk-self' }, { from: 'circle-addr-circle' });
     expect(tx.sent.at(-1).envelope._from).toBe('primary-addr');
   });
 });
@@ -129,8 +129,8 @@ describe('the reply-to atom, not an invented field', () => {
 describe('the envelope is otherwise unchanged', () => {
   it('still an HI carrying the payload, addressed to the peer', async () => {
     const tx = new RecordingTransport({ identity, address: 'primary-addr' });
-    await tx.addAddress('circle-addr-buurt');
-    await tx.sendHello('peer-1', { pubKey: 'pk-self' }, { from: 'circle-addr-buurt', re: 'their-env-id' });
+    await tx.addAddress('circle-addr-circle');
+    await tx.sendHello('peer-1', { pubKey: 'pk-self' }, { from: 'circle-addr-circle', re: 'their-env-id' });
     const { to, envelope } = tx.sent.at(-1);
     expect(to).toBe('peer-1');
     expect(envelope._to).toBe('peer-1');

@@ -331,10 +331,10 @@ async function main() {
 
   async function listCircles() {
     try {
-      // `listMyBuurts` is what the shells use (circleSources.fetchGroups) — it returns EVERY circle the
+      // `listMyCircles` is what the shells use (circleSources.fetchGroups) — it returns EVERY circle the
       // actor is in, including one just created. `getCurrentGroup` only ever returned the active one.
-      const r = await call('stoop', 'listMyBuurts', {});
-      const ids = Array.isArray(r?.buurts) ? r.buurts : [];
+      const r = await call('stoop', 'listMyCircles', {});
+      const ids = Array.isArray(r?.circles) ? r.circles : [];
       return { circles: ids.map((b) => (typeof b === 'string' ? { id: b } : b)) };
     } catch { return { circles: [] }; }
   }

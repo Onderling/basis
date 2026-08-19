@@ -67,7 +67,7 @@ describe('legacy v1 (AES-256-GCM) envelopes still open', () => {
 
   it('group mode: new openWithGroupKey() reads a v1 group envelope', () => {
     const gk = generateGroupKey();   // v2-generated key string — format is just a b64url 32-byte key
-    const sealed = sealV1Group('legacy buurt — v1 group', gk);
-    expect(openWithGroupKey(sealed, gk)).toBe('legacy buurt — v1 group');
+    const sealed = sealV1Group('legacy circle — v1 group', gk);
+    expect(openWithGroupKey(sealed, gk)).toBe('legacy circle — v1 group');
   });
 });

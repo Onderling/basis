@@ -1,5 +1,5 @@
 /**
- * `neighbourhood-job` type — Stoop's coordinated buurt-job
+ * `neighbourhood-job` type — Stoop's coordinated neighbourhood-job
  * lifecycle (paint the wall, clean the park). Tracks the
  * "someone needs help → people commit → work happens → done"
  * arc.
@@ -9,7 +9,7 @@ import { BASE_PROPERTIES, BASE_REQUIRED, NAMESPACE } from '../baseSchema.js';
 
 export const NEIGHBOURHOOD_JOB_SCHEMA = {
   iri:         `${NAMESPACE}NeighbourhoodJob`,
-  description: 'A coordinated buurt-job with a lifecycle (open → committed → in-progress → closed).',
+  description: 'A coordinated neighbourhood-job with a lifecycle (open → committed → in-progress → closed).',
   type:        'object',
   required:    [...BASE_REQUIRED, 'body'],
   properties: {

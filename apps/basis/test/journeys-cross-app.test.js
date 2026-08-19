@@ -548,9 +548,9 @@ describe('CC-ST.F1 — active-circle → stoop-scope binding (5.3d)', () => {
     expect(bLabels).not.toContain('alpha post');
   });
 
-  it('seeded buurt posts (no active circle at boot) do NOT leak into an arbitrary circle', async () => {
+  it('seeded circle posts (no active circle at boot) do NOT leak into an arbitrary circle', async () => {
     // The boot seeds 3 stoop posts (Anne/Karl/Maria) into the
-    // bundle's default group (`cc-default-buurt`); none of them
+    // bundle's default group (`cc-default-circle`); none of them
     // should appear for a fresh circle the user just opened.
     const resolving = makeResolvingCallSkill(ws.callSkill);
     const circleItems = await loadCircleItems({ callSkill: resolving, circleId: 'fresh-circle' });

@@ -63,7 +63,7 @@ export const DEFAULT_CROSS_APP_CHAINS = [
     trigger:    { appOrigin: 'household', opId: 'addMember' },
     suggestion: {
       appOrigin: 'stoop', opId: 'postRequest',
-      label:         'Post intro on buurt',
+      label:         'Post intro on circle',
     },
   },
   // After stoop.postRequest, suggest checking the feed for replies.

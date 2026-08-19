@@ -122,8 +122,8 @@
       "text": "(no fields)",
       "doc": "Fallback when a record-shape reply has no fields (C2 follow-up 2026-05-27)"
     },
-    "buurt_created": {
-      "text": "✓ Buurt \"{{name}}\" created.",
+    "circle_created": {
+      "text": "✓ Circle \"{{name}}\" created.",
       "doc": "/create-group success message (C1 follow-up 2026-05-27)"
     },
     "dm_send_failed": {
@@ -167,7 +167,7 @@
       "doc": "Bot bubble after onderling-contact:// scan + addContactFromQr succeeds"
     },
     "scan_invite_open": {
-      "text": "Opening join-buurt wizard with scanned invite…",
+      "text": "Opening join-circle wizard with scanned invite…",
       "doc": "Bot bubble before opening joinGroup wizard with pre-filled invite"
     },
     "scan_failed": {
@@ -432,7 +432,7 @@
         "doc": "Step-1 title"
       },
       "raise_intro": {
-        "text": "Describe what happened. This goes to the buurt; admins and (if your conflict policy is mediation) two random members see it.",
+        "text": "Describe what happened. This goes to the circle; admins and (if your conflict policy is mediation) two random members see it.",
         "doc": "Step-1 intro"
       },
       "about_post_label": {
@@ -524,7 +524,7 @@
         "doc": "Success step title"
       },
       "success_intro": {
-        "text": "Admins (and mediators if you picked mediation) will see it in the buurt feed.",
+        "text": "Admins (and mediators if you picked mediation) will see it in the circle feed.",
         "doc": "Success step intro"
       }
     }

@@ -24,7 +24,7 @@ import {
 } from '../src/lib/inviteCeiling.js';
 
 const ADMIN = 'https://id.example/admin';
-const G = 'buurt-ceiling';
+const G = 'circle-ceiling';
 
 async function callSkill(agent, skillId, args, fromWebid = ADMIN) {
   const def = agent.skills.get(skillId);

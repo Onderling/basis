@@ -72,7 +72,7 @@ describe('createGroupState — toggleRole + persistence', () => {
   });
   it('buildRulesObjectFromState carries rules.roles from the selection', () => {
     const s = toggleRole(toggleRole(initialState(), 'guest'), 'externalVolunteer');
-    s.name = 'Buurt'; s.groupId = 'buurt';
+    s.name = 'Circle'; s.groupId = 'circle';
     const rules = buildRulesObjectFromState(s);
     expect(rules.roles.map((r) => r.id)).toEqual(['guest', 'external']);
   });

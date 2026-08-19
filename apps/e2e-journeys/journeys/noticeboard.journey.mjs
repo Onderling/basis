@@ -1,4 +1,4 @@
-// J-buurt: the real stoop neighbourhood flow over the relay — host creates a
+// J-circle: the real stoop neighbourhood flow over the relay — host creates a
 // circle + invite code, a stranger joins (admin-verified), host posts to the
 // prikbord, the stranger sees it, replies, and that spins a private 1:1 chat.
 import { AgentIdentity, DataPart } from '@onderling/core';
@@ -8,11 +8,11 @@ import { RelayTransport }          from '@onderling/transports';
 import { createNeighborhoodAgent, attachSubstrateMirror } from '@onderling-app/stoop';
 import { wait, checker }           from './_util.mjs';
 
-export const name = 'J-buurt (join → prikbord → private chat)';
+export const name = 'J-circle (join → prikbord → private chat)';
 
 export async function run({ relayUrl }) {
   const { results, check } = checker();
-  const GROUP = 'e2e-buurt', HOST = 'https://id.example/anne', STRANGER = 'https://id.example/bob';
+  const GROUP = 'e2e-circle', HOST = 'https://id.example/anne', STRANGER = 'https://id.example/bob';
 
   const hostId     = await AgentIdentity.generate(new VaultMemory());
   const strangerId = await AgentIdentity.generate(new VaultMemory());
@@ -41,7 +41,7 @@ export async function run({ relayUrl }) {
     check('host + stranger on the relay',
       host.agent.transport.connected && stranger.agent.transport.connected);
 
-    const created = await call(host, 'createGroupV2', { groupId: GROUP, name: 'Buurt Oosterpoort', rules: {} }, HOST);
+    const created = await call(host, 'createGroupV2', { groupId: GROUP, name: 'Circle Oosterpoort', rules: {} }, HOST);
     check('host created circle + invite code', typeof created?.code === 'string' && created.code.length > 0);
     await wait(1200);
 

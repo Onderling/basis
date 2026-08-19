@@ -29,7 +29,7 @@ export function eventCircleId(event) {
   return (
     p.circleId
     ?? p.groupId
-    ?? p.buurtId
+    ?? p.circleId
     ?? p.audience
     ?? event?.itemRef?.circleId
     ?? null
@@ -193,7 +193,7 @@ export function circleRows(opts = {}) {
  *
  * Today "conversation" means *not the silent system lane*, which is exactly the pre-existing behaviour.
  * C15's tail is to narrow this further to the conversation KINDS (`conversationKinds()` from the shared
- * table), which would drop tasks and buurt rows out of GESPREK — a product call, deliberately NOT taken
+ * table), which would drop tasks and circle rows out of GESPREK — a product call, deliberately NOT taken
  * here. When it is, this wrapper is the only place that changes.
  */
 export function chatRows(opts = {}) {

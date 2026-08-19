@@ -27,11 +27,11 @@ describe('matchMapping', () => {
   });
 
   it('prefers longer prefix when multiple globs match', () => {
-    const m = matchMapping('group/buurt-abc/tasks/x', {
+    const m = matchMapping('group/circle-abc/tasks/x', {
       'group/*':            '<a>/group/',
-      'group/buurt-abc/*':  '<anne>/sharing/stoop/abc/',
+      'group/circle-abc/*':  '<anne>/sharing/stoop/abc/',
     });
-    expect(m.pattern).toBe('group/buurt-abc/*');
+    expect(m.pattern).toBe('group/circle-abc/*');
     expect(m.tail).toBe('tasks/x');
   });
 

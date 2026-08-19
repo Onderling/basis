@@ -90,7 +90,7 @@ describe('createCircleControlAgent', () => {
     expect(typeof strat?.seal).toBe('function');
     expect(typeof strat?.open).toBe('function');
     // round-trips through the group-key seal.
-    expect(strat.open(strat.seal('hallo buurt'))).toBe('hallo buurt');
+    expect(strat.open(strat.seal('hallo circle'))).toBe('hallo circle');
 
     // Leaving revokes ACL + rotates the key → Alice can no longer unwrap (forward secrecy).
     await cca.removeMember({ webId: 'did:alice' });

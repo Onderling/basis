@@ -51,13 +51,13 @@ function recordingCallSkill(trace, { redeemOk = true } = {}) {
     trace.push(`skill:${op}`);
     if (op === 'setMyHandle') return { ok: true };
     if (op === 'redeemMembershipCode') {
-      return redeemOk ? { ok: true, groupId: 'buurttest' } : { error: 'invalid-or-expired-code' };
+      return redeemOk ? { ok: true, groupId: 'testcircle' } : { error: 'invalid-or-expired-code' };
     }
     return {};
   };
 }
 
-const INVITE = { kind: 'membershipCode', groupId: 'buurttest', code: 'abc-123', relayUrl: RELAY };
+const INVITE = { kind: 'membershipCode', groupId: 'testcircle', code: 'abc-123', relayUrl: RELAY };
 
 describe('the join dials before it redeems', () => {
   it('the dial happens BEFORE the first skill call — the whole point', async () => {
@@ -111,7 +111,7 @@ describe('the join dials before it redeems', () => {
     });
     // The chain continued and the join completed over whatever transport was already there.
     expect(trace).toContain('skill:redeemMembershipCode');
-    expect(r).toMatchObject({ ok: true, circleId: 'buurttest' });
+    expect(r).toMatchObject({ ok: true, circleId: 'testcircle' });
   });
 
   it('no seam ⇒ unchanged behaviour, so callers that manage their own transport are untouched', async () => {
@@ -130,7 +130,7 @@ describe('a failed join says WHY, not just that it failed', () => {
   // `joinCircleFromInvite` read a field those branches never set. So "this invite has expired — ask for a
   // fresh one" and "the admin is offline — try again later" were the same string, and they call for
   // opposite actions from the person joining.
-  const INV = { kind: 'membershipCode', groupId: 'buurttest', code: 'abc-123', relayUrl: RELAY, adminPeerAddr: 'admin-key' };
+  const INV = { kind: 'membershipCode', groupId: 'testcircle', code: 'abc-123', relayUrl: RELAY, adminPeerAddr: 'admin-key' };
 
   it('an EXPIRED code is reported as expired', async () => {
     const callSkill = async (app, op) => {
@@ -171,9 +171,9 @@ describe('a failed join says WHY, not just that it failed', () => {
   });
 
   it('a success carries no reason at all — this is not a new field on the happy path', async () => {
-    const ok = async (app, op) => (op === 'redeemMembershipCode' ? { ok: true, groupId: 'buurttest' } : { ok: true });
+    const ok = async (app, op) => (op === 'redeemMembershipCode' ? { ok: true, groupId: 'testcircle' } : { ok: true });
     const r = await joinCircleFromInvite({ inviteUri: INV, callSkill: ok, handle: 'bo' });
-    expect(r).toMatchObject({ ok: true, circleId: 'buurttest' });
+    expect(r).toMatchObject({ ok: true, circleId: 'testcircle' });
     expect(r.reason).toBeUndefined();
   });
 });

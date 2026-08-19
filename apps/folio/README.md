@@ -193,7 +193,7 @@ out to peers, so this rule mostly bites Folio's mobile companion
 when notes are shared. The project-wide rule in
 `Project Files/projects/README.md`
 applies the moment Folio adds any peer-broadcast surface (e.g.
-sharing a note with a buurt-member): no pod URL ever crosses the
+sharing a note with a circle-member): no pod URL ever crosses the
 wire — bytes only.
 
 ## Reference

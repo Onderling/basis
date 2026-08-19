@@ -275,7 +275,7 @@
     "apps/basis/src/web/wizards/joinGroupWizard.js:journey-id:J-NP3",
     "apps/basis/test-browser/circle-settings-controls.spec.js:plan-label:A3 — ",
     "apps/basis/test/attachmentEncoder.test.js:plan-label:S5 — ",
-    "apps/basis/test/buurtChatAdvice.test.js:plan-label:E8 — ",
+    "apps/basis/test/neighbourhoodChatAdvice.test.js:plan-label:E8 — ",
     "apps/basis/test/circleMyDataWizards.test.js:plan-label:S5 — ",
     "apps/basis/test/circlePodProducer.css.test.js:plan-bucket:Objective L",
     "apps/basis/test/circlePodProducer.test.js:plan-label:L1b: ",

@@ -35,7 +35,7 @@ async function mkDevice(ref, rosterAll, { policy }) {
   row.circleAddress = cid.pubKey;
   const callSkill = async (o, op, args) => {
     if (op === 'listGroupRoster') return { members: rosterAll.filter((m) => m.webid !== ref) };
-    if (op === 'listMyCircles') return { buurts: [{ groupId: CIRCLE }] };
+    if (op === 'listMyCircles') return { circles: [{ groupId: CIRCLE }] };
     return { ok: true };
   };
   const circleIdentityFor = async () => cid;
@@ -133,7 +133,7 @@ describe('governance catch-up — the offline third device converges (pull-all, 
     const rail = { storedStatements: () => [], ingest: async () => ({ ok: false }) };
     const cu = makeGovernanceCatchUp({ rail, sendToPeer: (addr, payload) => sent.push({ addr, subtype: payload.subtype }) });
     const callSkill = async (o, op) => {
-      if (op === 'listMyCircles') return { buurts: [{ groupId: 'c1' }, { groupId: 'c2' }] };
+      if (op === 'listMyCircles') return { circles: [{ groupId: 'c1' }, { groupId: 'c2' }] };
       if (op === 'listGroupRoster') return { members: [{ webid: 'w1', addr: 'addr:1' }, { webid: 'w2' /* unreachable */ }] };
       return {};
     };

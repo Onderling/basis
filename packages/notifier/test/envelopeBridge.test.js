@@ -140,7 +140,7 @@ describe('scheduleEnvelope — end-to-end with the Notifier scheduler', () => {
       payload:     { body: 'expiring offer reminder' },
       recipients:  ['agent://bob', 'agent://carol'],
       fromActor:   'agent://anne',
-      circleId:      'buurt-abc',
+      circleId:      'circle-abc',
     });
 
     // Before the timer fires, nothing has been published.
@@ -156,7 +156,7 @@ describe('scheduleEnvelope — end-to-end with the Notifier scheduler', () => {
       payload:     { body: 'expiring offer reminder' },
       recipients:  ['agent://bob', 'agent://carol'],
       fromActor:   'agent://anne',
-      circleId:      'buurt-abc',
+      circleId:      'circle-abc',
     });
 
     await notifier.stop();

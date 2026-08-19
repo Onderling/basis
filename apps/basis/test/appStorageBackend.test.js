@@ -55,7 +55,7 @@ describe('StorageBackend — storage-swap / the seal is the gate (real sealed ci
     await until(() => B.keyEvents.length >= 1);
 
     // A seals content ONCE via the seal resolver and fans it; B records the sealed envelope.
-    const plaintext = 'buurtvergadering donderdag 20:00';
+    const plaintext = 'circle meeting donderdag 20:00';
     const env = await postSealed({ admin: A, members: [B], groupId: GID, text: plaintext });
     await until(() => B.sealedContent.length >= 1);
 

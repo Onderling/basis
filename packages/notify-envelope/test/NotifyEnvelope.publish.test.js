@@ -129,7 +129,7 @@ describe('publish — graceful degradation (pod-having, unreachable)', () => {
       payload:    { text: 'paint' },
       recipients: ['agent://bob'],
       fromActor:  'agent://anne',
-      circleId:     'buurt-abc',
+      circleId:     'circle-abc',
     });
     expect(result.mode).toBe('full-payload');
     expect(result.queued).toBe(true);
@@ -143,7 +143,7 @@ describe('publish — graceful degradation (pod-having, unreachable)', () => {
     expect(pending[0]).toMatchObject({
       uri:        'https://anne.pod/sharing/tasks/abc.ttl',
       type:       'task',
-      circleId:     'buurt-abc',
+      circleId:     'circle-abc',
       recipients: ['agent://bob'],
     });
   });

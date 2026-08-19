@@ -64,7 +64,7 @@ describe('createCrossPodRefResolver — per-scheme dispatch', () => {
 describe('treeOf + createCrossPodRefResolver — decentralised cross-pod read', () => {
   // Local root item embeds a ref into ANOTHER member's pod.
   const local = {
-    R: { id: 'R', type: 'item', embeds: [{ type: 'item', ref: 'https://bob.pod/buurt/items/X.json' }] },
+    R: { id: 'R', type: 'item', embeds: [{ type: 'item', ref: 'https://bob.pod/circle/items/X.json' }] },
   };
   const getItem = async (id) => local[id] ?? null;
 
@@ -85,6 +85,6 @@ describe('treeOf + createCrossPodRefResolver — decentralised cross-pod read', 
     const tree = await treeOf({ rootId: 'R', getItem, resolveExternalRef });
     expect(tree.embeds[0].source).toBe('placeholder');
     expect(tree.embeds[0].reason).toBe('PERMISSION_DENIED');
-    expect(tree.embeds[0].ref).toBe('https://bob.pod/buurt/items/X.json');
+    expect(tree.embeds[0].ref).toBe('https://bob.pod/circle/items/X.json');
   });
 });

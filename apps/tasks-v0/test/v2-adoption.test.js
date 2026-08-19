@@ -120,10 +120,10 @@ describe('Tasks V2 — circleConfig.storage', () => {
   it('honours centralised + groupPodUri from the config', async () => {
     const { circle } = await makeCircle({
       policy:      'centralised',
-      groupPodUri: 'https://buurt.pod/',
+      groupPodUri: 'https://circle.pod/',
     });
     const r = await callSkill(circle.agent, 'getCircleStoragePolicy', { circleId: 'oss-tools' });
-    expect(r).toEqual({ policy: 'centralised', groupPodUri: 'https://buurt.pod/' });
+    expect(r).toEqual({ policy: 'centralised', groupPodUri: 'https://circle.pod/' });
   });
 
   it('forward-additive: unknown policies fall back to no-pod silently', async () => {

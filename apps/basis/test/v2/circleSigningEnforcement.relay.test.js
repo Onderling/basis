@@ -39,7 +39,7 @@ import {
 import { bindCircleAddressKeysFor } from '../../src/v2/householdRosterPairing.js';
 import { primeCircleSecurity, announceCircleAddresses } from '../../src/v2/circleSecurityPriming.js';
 
-const CIRCLE_A = 'buurt-signing-enforced';
+const CIRCLE_A = 'circle-signing-enforced';
 const CIRCLE_B = 'koor-signing-enforced';
 const rnd = () => Math.random().toString(36).slice(2, 8);
 const settle = (ms = 1200) => new Promise((r) => setTimeout(r, ms));
@@ -91,7 +91,7 @@ describe('per-circle signing is enforced per member (real relay, fallback OFF)',
     // Circle A: admin + bram. Circle B: admin + cato. Two circles with ONE member in common is the
     // arrangement the cross-circle assertion needs — bram and cato are strangers to each other's.
     // NOBODY boots here: the first tests are about the state a join alone leaves behind.
-    await createCircle(admin, { groupId: CIRCLE_A, name: 'Buurt (enforced)' });
+    await createCircle(admin, { groupId: CIRCLE_A, name: 'Circle (enforced)' });
     await settleMember(admin, CIRCLE_A);
     const joinedB = await joinExistingCircle(admin, bram, { groupId: CIRCLE_A, handle: 'bram' });
     expect(joinedB.joined.ok, 'bram joined circle A').toBe(true);

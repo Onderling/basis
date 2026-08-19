@@ -140,7 +140,7 @@ export const CIRCLE_POLICY_ENUMS = {
 // Defaults match the "full Onderling" surface (strategy B): the
 // orchestrator app lights up the features whose UI is already rendered
 // today (chat + noticeboard + houseRules + memberDirectory).  The focus-apps
-// in the store ('Buurt door Onderling', 'Huishouden door Onderling', 'OR-bot')
+// in the store ('Circle door Onderling', 'Huishouden door Onderling', 'OR-bot')
 // will override these at pin-time to lock to their narrower surface.
 // (S1 #1, 2026-06-15: noticeboard flipped on now that its prikbord surface exists.)
 export const DEFAULT_CIRCLE_POLICY = {
@@ -370,7 +370,7 @@ export function normalizeCirclePolicy(stored = {}) {
     // Decision 3 (2026-07-29) — the circle's KIND and its conversation KINDS are part of the policy, so
     // they survive a create. Until then neither was persisted anywhere: `finalSubmit` never sent `kind`
     // and this patch never carried `conversationKinds`, so every circle fell through to the permissive
-    // default and a buurt created with chat off still showed a chat surface (S3/J-CW2, J-CW3).
+    // default and a circle created with chat off still showed a chat surface (S3/J-CW2, J-CW3).
     //
     // `kind` is free-form here rather than an enum: a circle created by a newer app version may name a
     // kind this one has never heard of, and the resolver already treats an unknown kind as "no template".
@@ -398,7 +398,7 @@ export function normalizeCirclePolicy(stored = {}) {
       typeof p.privateDm === 'boolean' ? p.privateDm : DEFAULT_CIRCLE_POLICY.privateDm,
     // S6.C deep — which whole apps this circle composes into its catalog (the bot's
     // tools + slash-suggest). null/absent = all DEFAULT_CIRCLE_ORIGINS; a list
-    // narrows (e.g. ['stoop'] for a buurt-only circle). Validation is loose here —
+    // narrows (e.g. ['stoop'] for a circle-only circle). Validation is loose here —
     // the catalog scoping intersects with the apps that actually have ops.
     apps:               Array.isArray(p.apps) ? p.apps.filter((x) => typeof x === 'string') : null,
     // kept as plain object maps; per-entry coercion happens at read time

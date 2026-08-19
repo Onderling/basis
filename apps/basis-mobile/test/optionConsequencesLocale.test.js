@@ -35,8 +35,8 @@ describe('mobile consequence locales', () => {
       const node = k.split('.').reduce((o, seg) => (o == null ? o : o[seg]), en);
       return node?.text ?? k;
     };
-    const out = attachConsequences('kind', [{ id: 'buurt', label: 'B' }], t);
-    expect(out[0].consequence).toBe(en.consequence.kind.buurt.text);
-    expect(consequenceKeyFor('kind', 'buurt')).toBe('consequence.kind.buurt');
+    const out = attachConsequences('kind', [{ id: 'neighbourhood', label: 'B' }], t);
+    expect(out[0].consequence).toBe(en.consequence.kind.neighbourhood.text);
+    expect(consequenceKeyFor('kind', 'neighbourhood')).toBe('consequence.kind.neighbourhood');
   });
 });

@@ -43,7 +43,7 @@ import {
 
 /* ── the two circles, and everything about them that must not reach the relay ───────────────────── */
 
-const CIRCLE_X = { id: 'circle-oosterpoort-7f3a91', name: 'Buurtcircle Oosterpoort' };
+const CIRCLE_X = { id: 'circle-oosterpoort-7f3a91', name: 'Circle circle Oosterpoort' };
 const CIRCLE_Y = { id: 'huishouden-de-vries-2b6c04',   name: 'Huishouden De Vries' };
 const MESSAGE_TEXT = 'de vergadering is verplaatst naar donderdagavond acht uur';
 const MEMBER_NAMES = ['Anna de Boer', 'Bram Jansen', 'Cato Visser'];

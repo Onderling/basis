@@ -61,7 +61,7 @@ const VOCABULARIES = {
     produced: () => {
       // The only two writes a create performs: `finalSubmit`'s args, and the policy patch both shells
       // send straight after. If neither carries `kind`, no circle can hold any of these.
-      const patch = policyPatchFromState({ kind: 'buurt', features: {}, revealPolicy: 'open' });
+      const patch = policyPatchFromState({ kind: 'neighbourhood', features: {}, revealPolicy: 'open' });
       const carriesKind = Object.prototype.hasOwnProperty.call(patch, 'kind');
       return carriesKind ? new Set(CIRCLE_KINDS) : new Set();
     },

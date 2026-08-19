@@ -24,11 +24,11 @@ describe('createCircleRulesPendingStore', () => {
     const io = fakeIo();
     const store = createCircleRulesPendingStore(io);
 
-    await store.set('g1', { purpose: 'Buurt' });
-    expect(io.save).toHaveBeenCalledWith('g1', { purpose: 'Buurt' });
+    await store.set('g1', { purpose: 'Circle' });
+    expect(io.save).toHaveBeenCalledWith('g1', { purpose: 'Circle' });
 
     const r = await store.get('g1');
-    expect(r).toEqual({ purpose: 'Buurt' });
+    expect(r).toEqual({ purpose: 'Circle' });
 
     await store.clear('g1');
     expect(io.remove).toHaveBeenCalledWith('g1');

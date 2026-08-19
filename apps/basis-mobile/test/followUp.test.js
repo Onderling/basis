@@ -116,7 +116,7 @@ describe('#253 step 6 — beginFormFollowUp', () => {
       threadId:     null,
       replyShape:   'text',
       missing:      ['title', 'body'],
-      prefilledArgs:{ audience: 'buurt' },
+      prefilledArgs:{ audience: 'circle' },
       params:       [
         { name: 'audience', kind: 'string', required: true },
         { name: 'title',    kind: 'string', required: true },
@@ -136,7 +136,7 @@ describe('#253 step 6 — beginFormFollowUp', () => {
     expect(pending.opId).toBe('composePost');
     expect(pending.fields).toHaveLength(2);
     expect(pending.fields.map((f) => f.name)).toEqual(['title', 'body']);
-    expect(pending.prefilledArgs).toEqual({ audience: 'buurt' });
+    expect(pending.prefilledArgs).toEqual({ audience: 'circle' });
     expect(pending.originMessageId).toBe('m9');
     // Each field has a label resolved via t() (stubT echoes the key).
     expect(pending.fields[1].label).toContain('chat.form_label_body');
@@ -163,7 +163,7 @@ describe('#253 step 6 — completeMultiFieldFollowUp', () => {
       appOrigin:    'stoop',
       threadId:     null,
       replyShape:   'text',
-      prefilledArgs:{ audience: 'buurt' },
+      prefilledArgs:{ audience: 'circle' },
       fields: [
         { name: 'title', kind: 'string', label: 'Title' },
         { name: 'body',  kind: 'string', label: 'Body'  },
@@ -179,7 +179,7 @@ describe('#253 step 6 — completeMultiFieldFollowUp', () => {
     expect(ready.kind).toBe('ready');
     expect(ready.opId).toBe('composePost');
     expect(ready.args).toEqual({
-      audience: 'buurt',
+      audience: 'circle',
       title:    'Need a ladder',
       body:     'Anyone got one to borrow?',
     });

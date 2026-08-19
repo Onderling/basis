@@ -57,9 +57,9 @@ describe('adaptForCanonical', () => {
   });
 
   it('maps text → body (for Stoop / Folio / message-shaped types)', () => {
-    const out = adaptForCanonical({ type: 'announcement', text: 'hello buurt' });
-    expect(out.body).toBe('hello buurt');
-    expect(out.text).toBe('hello buurt');     // input field preserved
+    const out = adaptForCanonical({ type: 'announcement', text: 'hello circle' });
+    expect(out.body).toBe('hello circle');
+    expect(out.text).toBe('hello circle');     // input field preserved
   });
 
   it('does NOT clobber body when both are set', () => {

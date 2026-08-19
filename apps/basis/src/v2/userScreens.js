@@ -16,7 +16,7 @@
  *
  * Examples:
  *   - "Stream"    → circleFilter: null, blocks: [{noticeboard}, {agenda}]
- *   - "My buurt"  → circleFilter: ['buurt-selwerd'], blocks: [{noticeboard, limit:10}]
+ *   - "My neighbourhood"  → circleFilter: ['neighbourhood-selwerd'], blocks: [{noticeboard, limit:10}]
  *   - "Mijn dingen" → circleFilter: null, blocks: [{taken, scope:'assigned-to-me'}]
  *                    (the new task block lands in α.4)
  *

@@ -18,7 +18,7 @@ describe('buildCircleTabs · SP-13.3', () => {
     expect(tabs).toEqual(['gesprek', 'prikbord', 'leden']);
   });
 
-  it('buurt-shape policy → GESPREK / PRIKBORD / LEDEN (board Voorbeeld 1)', () => {
+  it('circle-shape policy → GESPREK / PRIKBORD / LEDEN (board Voorbeeld 1)', () => {
     const policy = {
       features: { chat: true, noticeboard: true, memberDirectory: true },
     };
@@ -28,7 +28,7 @@ describe('buildCircleTabs · SP-13.3', () => {
 
   it('huishouden-shape policy → GESPREK / TAKEN / LIJSTEN (board Voorbeeld 2)', () => {
     const policy = {
-      // noticeboard explicitly off — a huishouden circle uses tasks/lists, not the buurt prikbord.
+      // noticeboard explicitly off — a huishouden circle uses tasks/lists, not the circle prikbord.
       features: { chat: true, noticeboard: false, tasks: true, lists: true, memberDirectory: false },
     };
     expect(buildCircleTabs(policy).map((t) => t.id))

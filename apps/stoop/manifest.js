@@ -91,7 +91,7 @@ const ITEM_TYPES = [
   //  - 'contact' — the ContactBook graph (listContacts / addContact /
   //    removeContact / setContactTrust / startDm appliesTo + the
   //    `contacts` view).
-  //  - 'member'  — buurt roster rows (listGroupMembers appliesTo + the
+  //  - 'member'  — circle roster rows (listGroupMembers appliesTo + the
   //    [DM] row button via startDm's `['contact','member']` gate).
   'post',
   'contact',
@@ -108,7 +108,7 @@ export const stoopManifest = {
   itemTypes: ITEM_TYPES,
 
   // B · Layer 1 — domain (non-atom) verbs: moderation (`report`/`mute`),
-  // profile/config (`set`), and neighbourhood-graph traversal (`tree`).
+  // profile/config (`set`), and circle-graph traversal (`tree`).
   // All other ops map to SDK atoms; the `{atoms:true}` validator enforces it.
   domainVerbs: ['report', 'mute', 'set', 'tree'],
 
@@ -206,7 +206,7 @@ export const stoopManifest = {
           // across apps that declare `surfaces.chat.brief`; the
           // `stoop_briefSummary` skill (defined in skills/index.js)
           // returns a count of open posts + the topmost rows.
-          brief: { summarySkill: 'stoop_briefSummary', order: 30, label: 'Buurt' },
+          brief: { summarySkill: 'stoop_briefSummary', order: 30, label: 'Circle' },
         },
         slash: {
           // Resolved 2026-05-21 (owner): `/bulletin` (EN — open-source
@@ -624,7 +624,7 @@ export const stoopManifest = {
       params: [],
       surfaces: {
         slash: { command: '/feed' },
-        chat:  { reply: 'list', hint: "list your buurt's feed" },
+        chat:  { reply: 'list', hint: "list your circle's feed" },
         // S6.B — the morning brief + /find decls for listFeed
         // are re-attached post-hoc in mockManifests.js (mirrors how the
         // folio brief/search attach there) to keep this file declarative.
@@ -765,7 +765,7 @@ export const stoopManifest = {
       ],
       surfaces: {
         slash: { command: '/dispute', body: 'flags' },
-        chat:  { hint: 'raise a conflict-resolution dispute in your buurt' },
+        chat:  { hint: 'raise a conflict-resolution dispute in your circle' },
         page:  { kind: 'side-panel', title: 'Raise a dispute' },
         ui:    { control: 'button' },
       },
@@ -795,8 +795,8 @@ export const stoopManifest = {
       params: [],
       surfaces: {
         slash: { command: '/create-group' },
-        chat:  { hint: 'create a new buurt: 5-step wizard' },
-        page:  { kind: 'side-panel', title: 'Create buurt' },
+        chat:  { hint: 'create a new circle: 5-step wizard' },
+        page:  { kind: 'side-panel', title: 'Create circle' },
       },
     },
     {
@@ -806,20 +806,20 @@ export const stoopManifest = {
       ],
       surfaces: {
         slash: { command: '/join-group' },
-        chat:  { hint: 'join a buurt: open the 3-step rules-gate wizard' },
-        page:  { kind: 'side-panel', title: 'Join buurt' },
+        chat:  { hint: 'join a circle: open the 3-step rules-gate wizard' },
+        page:  { kind: 'side-panel', title: 'Join circle' },
       },
     },
 
-    // ── Buurt / group surface (B1 B2) ───────────────────────────
-    // V0: single-buurt info per agent instance.  realAgent.js
+    // ── Circle / group surface (B1 B2) ───────────────────────────
+    // V0: single-circle info per agent instance.  realAgent.js
     // auto-injects the configured groupId + synthesizes getCurrentGroup.
     {
       id:   'getCurrentGroup', verb: 'list',
       params: [],
       surfaces: {
         slash: { command: '/groups' },
-        chat:  { reply: 'record', hint: 'show your current buurt' },
+        chat:  { reply: 'record', hint: 'show your current circle' },
       },
     },
     {
@@ -828,7 +828,7 @@ export const stoopManifest = {
       params: [],
       surfaces: {
         slash: { command: '/group-members' },
-        chat:  { reply: 'list', hint: 'list members of your buurt' },
+        chat:  { reply: 'list', hint: 'list members of your circle' },
       },
     },
     {
@@ -836,7 +836,7 @@ export const stoopManifest = {
       params: [],
       surfaces: {
         slash: { command: '/group-rules' },
-        chat:  { reply: 'record', hint: 'show your buurt\'s rules' },
+        chat:  { reply: 'record', hint: 'show your circle\'s rules' },
       },
     },
 

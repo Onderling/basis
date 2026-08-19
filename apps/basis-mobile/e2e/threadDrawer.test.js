@@ -27,8 +27,8 @@ describe('thread drawer create + switch', () => {
     // Seed 'Main' row is visible.
     await expect(element(by.id('thread-row-main'))).toBeVisible();
 
-    // Create 'Buurt'.
-    await element(by.id('thread-drawer-new-input')).typeText('Buurt');
+    // Create 'Circle'.
+    await element(by.id('thread-drawer-new-input')).typeText('Circle');
     await element(by.id('thread-drawer-new-submit')).tap();
 
     // createThread auto-switches + closes the drawer.
@@ -36,7 +36,7 @@ describe('thread drawer create + switch', () => {
       .not.toBeVisible()
       .withTimeout(5_000);
     await waitFor(element(by.id('chat-active-thread-name')))
-      .toHaveText('Buurt')
+      .toHaveText('Circle')
       .withTimeout(5_000);
 
     // Re-open the drawer + tap Main to switch back.

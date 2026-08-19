@@ -382,13 +382,13 @@ describe('cards and chat, each behind its allow (step G)', () => {
 
 describe('circles advertised in the room (step H)', () => {
   const entry = (over = {}) => ({
-    invite: { uri: 'onderling-invite://abc', circleId: 'c1', circleName: 'Buurt' },
+    invite: { uri: 'onderling-invite://abc', circleId: 'c1', circleName: 'Circle' },
     actions: ['join-published-circle'], note: 'join-is-a-join', ...over,
   });
 
   it('lists an advertised circle by name, with one action', () => {
     const el = render(model({ invites: [entry()] }));
-    expect(el.querySelector('.circle-nearby__invite-name').textContent).toBe('Buurt');
+    expect(el.querySelector('.circle-nearby__invite-name').textContent).toBe('Circle');
     const actions = [...el.querySelectorAll('.circle-nearby__invite-action')].map((b) => b.dataset.action);
     expect(actions).toEqual(['join-published-circle']);
   });

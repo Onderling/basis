@@ -20,7 +20,7 @@ const nl = { ...nlRaw, consequence: sharedConsequenceLocale.nl };
 describe('hasConsequence', () => {
   it('is true for registered (group, option) pairs', () => {
     expect(hasConsequence('accessPolicy', 'open')).toBe(true);
-    expect(hasConsequence('kind', 'buurt')).toBe(true);
+    expect(hasConsequence('kind', 'neighbourhood')).toBe(true);
     expect(hasConsequence('size', 'large')).toBe(true);
   });
   it('is false for unknown groups / options', () => {
@@ -55,8 +55,8 @@ describe('attachConsequences (mobile option enrichment)', () => {
   });
 
   it('is a no-op without a t function or options array', () => {
-    expect(attachConsequences('kind', [{ id: 'buurt', label: 'x' }], null))
-      .toEqual([{ id: 'buurt', label: 'x' }]);
+    expect(attachConsequences('kind', [{ id: 'neighbourhood', label: 'x' }], null))
+      .toEqual([{ id: 'neighbourhood', label: 'x' }]);
     expect(attachConsequences('kind', null, t)).toEqual([]);
   });
 });

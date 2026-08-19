@@ -25,18 +25,18 @@
 import { mkBody, mkActions, mkField, mkTextarea, mkRadioGroup, mkError, mkSubmitting, refreshActions } from './_wizardKit.js';
 import {
   TRUST_OPTS, DISTANCE_OPTS,
-  initialState, canSubmit, loadAvailableBuurts, submitPost,
+  initialState, canSubmit, loadAvailableCircles, submitPost,
 } from '../../core/wizards/postAudienceState.js';
 
 export function renderPostAudienceWizard(opts) {
   const { container, doc, args, callSkill, onClose, onDispatched } = opts;
   const state = initialState(args);
 
-  // Lazy-load the buurt list.  Failures fall back silently to the
-  // single-buurt default ('cc-default-buurt'); the picker just won't
+  // Lazy-load the circle list.  Failures fall back silently to the
+  // single-circle default ('cc-default-circle'); the picker just won't
   // render and substrate-side default applies.
   (async () => {
-    await loadAvailableBuurts({ state, callSkill });
+    await loadAvailableCircles({ state, callSkill });
     rerender();
   })();
 
@@ -45,14 +45,14 @@ export function renderPostAudienceWizard(opts) {
   function rerender() {
     container.innerHTML = '';
     const body = mkBody(doc, 'Post with audience',
-      'Pick a target audience.  Empty = everyone in your buurt.');
+      'Pick a target audience.  Empty = everyone in your circle.');
 
-    // Buurt picker (only when we have a real list).  Single-buurt
-    // users see one radio for clarity; multi-buurt users see all.
-    if (Array.isArray(state.availableBuurts) && state.availableBuurts.length > 0) {
-      mkRadioGroup(body, doc, 'Buurt', state.selectedBuurt ?? state.availableBuurts[0].id,
-        state.availableBuurts.map(b => ({ id: b.id, label: b.label })),
-        (v) => { state.selectedBuurt = v; });
+    // Circle picker (only when we have a real list).  Single-circle
+    // users see one radio for clarity; multi-circle users see all.
+    if (Array.isArray(state.availableCircles) && state.availableCircles.length > 0) {
+      mkRadioGroup(body, doc, 'Circle', state.selectedCircle ?? state.availableCircles[0].id,
+        state.availableCircles.map(b => ({ id: b.id, label: b.label })),
+        (v) => { state.selectedCircle = v; });
     }
     const validText = () => state.text.trim().length > 0;
     mkTextarea(body, doc, 'Post text', state.text, (v) => {
@@ -104,7 +104,7 @@ export function renderPostAudienceWizard(opts) {
         const { result } = await submitPost({ state, callSkill });
         if (result) {
           if (typeof onDispatched === 'function') {
-            try { onDispatched({ ok: true, message: '✓ Posted to your buurt.', ...result }); } catch {}
+            try { onDispatched({ ok: true, message: '✓ Posted to your circle.', ...result }); } catch {}
           }
           onClose();
           return;

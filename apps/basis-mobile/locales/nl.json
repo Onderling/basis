@@ -122,7 +122,7 @@
       "text": "(geen velden)",
       "doc": "Fallback wanneer een record-shape geen velden heeft (C2 follow-up 2026-05-27)"
     },
-    "buurt_created": {
+    "circle_created": {
       "text": "✓ Buurt \"{{name}}\" aangemaakt.",
       "doc": "/create-group success-bericht (C1 follow-up 2026-05-27)"
     },

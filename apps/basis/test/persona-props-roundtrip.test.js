@@ -109,14 +109,14 @@ describe('persona-props post-join round-trip', () => {
 
     const reply = await sendPersonaUpdate({
       adminPeerAddr: adminAddr,
-      groupId: 'buurt-oost',
+      groupId: 'circle-oost',
       personaProperties: { place: 'Groningen' },
     });
 
     expect(reply.ok).toBe(true);
     // Admin recorded against the AUTHENTICATED peer address, not a payload-supplied webid.
     expect(adminRecord).toHaveBeenCalledWith(expect.objectContaining({
-      groupId: 'buurt-oost',
+      groupId: 'circle-oost',
       memberWebid: 'app.member.test',
       personaProperties: { place: 'Groningen' },
     }));

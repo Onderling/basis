@@ -57,16 +57,16 @@ describe('disclosure policy — default-withhold', () => {
     const getProfile = reg({ default: { properties: { place: own('Groningen'), role: own('resident') } } });
     const req = { items: [{ key: 'place' }, { key: 'role' }] };
     const policy = createDisclosurePolicy();
-    expect(releasedValues({ getProfile, profileId: 'default', defaultProfileId: 'default' }, req, policy, 'buurt-42')).toEqual({});
-    expect(getDisclosure(policy, 'buurt-42', 'place')).toEqual({ enabled: false, rung: null, matchable: false, requestable: false });
+    expect(releasedValues({ getProfile, profileId: 'default', defaultProfileId: 'default' }, req, policy, 'circle-42')).toEqual({});
+    expect(getDisclosure(policy, 'circle-42', 'place')).toEqual({ enabled: false, rung: null, matchable: false, requestable: false });
   });
 
   it('releases only enabled keys the request asks for; withheld absent', () => {
     const getProfile = reg({ default: { properties: { place: own('Groningen'), role: own('resident') } } });
     const req = { items: [{ key: 'place' }, { key: 'role' }] };
     let policy = createDisclosurePolicy();
-    policy = setDisclosure(policy, 'buurt-42', 'place', { enabled: true });   // share place, withhold role
-    expect(releasedValues({ getProfile, profileId: 'default', defaultProfileId: 'default' }, req, policy, 'buurt-42'))
+    policy = setDisclosure(policy, 'circle-42', 'place', { enabled: true });   // share place, withhold role
+    expect(releasedValues({ getProfile, profileId: 'default', defaultProfileId: 'default' }, req, policy, 'circle-42'))
       .toEqual({ place: 'Groningen' });
   });
 
@@ -128,22 +128,22 @@ describe('three disclosure axes — disclosed · matchable · requestable (P4 fo
   it('matchable:true + disclosed:false — matchable is TRUE, disclosed FALSE, and the VALUE never leaks', () => {
     // the whole point: I do not publish my hobby, but the on-device matcher may check it.
     let policy = createDisclosurePolicy();
-    policy = setDisclosure(policy, 'buurt-42', 'hobby', { matchable: true });
-    expect(isMatchable(policy, 'buurt-42', 'hobby')).toBe(true);
-    expect(isDisclosed(policy, 'buurt-42', 'hobby')).toBe(false);
+    policy = setDisclosure(policy, 'circle-42', 'hobby', { matchable: true });
+    expect(isMatchable(policy, 'circle-42', 'hobby')).toBe(true);
+    expect(isDisclosed(policy, 'circle-42', 'hobby')).toBe(false);
     // matchable NEVER leaks the value — releasedValues keys off the disclosed axis only.
-    expect(releasedValues({ getProfile, profileId: 'default', defaultProfileId: 'default' }, req, policy, 'buurt-42')).toEqual({});
+    expect(releasedValues({ getProfile, profileId: 'default', defaultProfileId: 'default' }, req, policy, 'circle-42')).toEqual({});
   });
 
   it('requestable defaults FALSE and is set independently of the other axes', () => {
     let policy = createDisclosurePolicy();
-    expect(isRequestable(policy, 'buurt-42', 'hobby')).toBe(false);               // default withhold
-    policy = setDisclosure(policy, 'buurt-42', 'hobby', { requestable: true });
-    expect(isRequestable(policy, 'buurt-42', 'hobby')).toBe(true);
-    expect(isDisclosed(policy, 'buurt-42', 'hobby')).toBe(false);                 // untouched
-    expect(isMatchable(policy, 'buurt-42', 'hobby')).toBe(false);                 // untouched
+    expect(isRequestable(policy, 'circle-42', 'hobby')).toBe(false);               // default withhold
+    policy = setDisclosure(policy, 'circle-42', 'hobby', { requestable: true });
+    expect(isRequestable(policy, 'circle-42', 'hobby')).toBe(true);
+    expect(isDisclosed(policy, 'circle-42', 'hobby')).toBe(false);                 // untouched
+    expect(isMatchable(policy, 'circle-42', 'hobby')).toBe(false);                 // untouched
     // still no value released — requestable is not a value-release axis.
-    expect(releasedValues({ getProfile, profileId: 'default', defaultProfileId: 'default' }, req, policy, 'buurt-42')).toEqual({});
+    expect(releasedValues({ getProfile, profileId: 'default', defaultProfileId: 'default' }, req, policy, 'circle-42')).toEqual({});
   });
 
   it('all three axes toggle INDEPENDENTLY — setting one never clobbers the others', () => {
@@ -165,11 +165,11 @@ describe('three disclosure axes — disclosed · matchable · requestable (P4 fo
 
   it('backward-compat — an OLD policy with only {enabled,rung} reads as matchable:false/requestable:false', () => {
     // a legacy persisted policy, never touched by the new setter.
-    const legacy = { perContext: { buurt: { hobby: { enabled: true, rung: 'municipality' } } } };
-    expect(getDisclosure(legacy, 'buurt', 'hobby')).toEqual({ enabled: true, rung: 'municipality', matchable: false, requestable: false });
-    expect(isDisclosed(legacy, 'buurt', 'hobby')).toBe(true);
-    expect(isMatchable(legacy, 'buurt', 'hobby')).toBe(false);
-    expect(isRequestable(legacy, 'buurt', 'hobby')).toBe(false);
+    const legacy = { perContext: { circle: { hobby: { enabled: true, rung: 'municipality' } } } };
+    expect(getDisclosure(legacy, 'circle', 'hobby')).toEqual({ enabled: true, rung: 'municipality', matchable: false, requestable: false });
+    expect(isDisclosed(legacy, 'circle', 'hobby')).toBe(true);
+    expect(isMatchable(legacy, 'circle', 'hobby')).toBe(false);
+    expect(isRequestable(legacy, 'circle', 'hobby')).toBe(false);
   });
 
   it('the three helpers default FALSE for an unknown key/context', () => {
@@ -190,16 +190,16 @@ describe('releasedForMatching — the matching surface, keyed off matchable, NOT
   it('a matchable:true + disclosed:false property is INCLUDED in releasedForMatching, EXCLUDED from releasedValues', () => {
     // THE INVARIANT: it matches, but never discloses.
     let policy = createDisclosurePolicy();
-    policy = setDisclosure(policy, 'buurt-42', 'hobby', { matchable: true });   // matchable, NOT disclosed
+    policy = setDisclosure(policy, 'circle-42', 'hobby', { matchable: true });   // matchable, NOT disclosed
     const req = { items: [{ key: 'hobby' }] };
 
     // surfaced to the matcher…
-    expect(releasedForMatching(ctx, req, policy, 'buurt-42')).toEqual({
+    expect(releasedForMatching(ctx, req, policy, 'circle-42')).toEqual({
       hobby: createDriver({ kind: 'hobby', text: 'bird-watching', tags: ['bird-watching'] }),
     });
     // …but absent from the disclosed/released (roster) set — the value never leaks that way.
-    expect(releasedValues(ctx, req, policy, 'buurt-42')).toEqual({});
-    expect(isDisclosed(policy, 'buurt-42', 'hobby')).toBe(false);
+    expect(releasedValues(ctx, req, policy, 'circle-42')).toEqual({});
+    expect(isDisclosed(policy, 'circle-42', 'hobby')).toBe(false);
   });
 
   it('a disclosed:false property is absent from the disclosed set even while matchable surfaces it', () => {

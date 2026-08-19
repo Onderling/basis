@@ -1,15 +1,15 @@
 /**
  * basis v2 — circle noticeboard / prikbord (web DOM renderer, S1 #1).
  *
- * The buurt noticeboard surface inside a circle's PRIKBORD tab: a post composer
+ * The circle noticeboard surface inside a circle's PRIKBORD tab: a post composer
  * (ask / offer / lend + text) and the open-post list with per-row actions. Pure
  * render — the host (`circleApp.js`) fetches `listOpen`, computes `mine`, and
  * dispatches the stoop ops (`postRequest` / `respondToItem` / `cancelRequest` /
  * `reportPost` / `markReturned`) behind `onPost` / `onAction`. Mirrors the other
  * `renderX(container, ctx)` components so it's happy-dom-testable.
  *
- * Scope note (S1): basis runs ONE shared stoop agent today (`cc-default-buurt`),
- * so this shows the shared buurt's posts; per-circle scoping arrives with the pod
+ * Scope note (S1): basis runs ONE shared stoop agent today (`cc-default-circle`),
+ * so this shows the shared circle's posts; per-circle scoping arrives with the pod
  * foundation (REMAINING-WORK §4 E2 / S4).
  */
 

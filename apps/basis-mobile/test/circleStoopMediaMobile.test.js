@@ -106,12 +106,12 @@ describe('mobile stoop media — seals a picked prikbord image per-circle (web p
     const { strategy, getMedia } = await makeStoopMedia();
     const cs = vi.fn().mockResolvedValue({ ok: true });
     const scoped = scopeStoopCallSkill(cs, 'circle-a', async () => strategy, getMedia);
-    await scoped('stoop', 'postRequest', { intent: 'ask', text: 'hoi buurt' });
+    await scoped('stoop', 'postRequest', { intent: 'ask', text: 'hoi circle' });
     const sent = cs.mock.calls[0][2];
     expect(sent.groupId).toBe('circle-a');
     expect(sent.attachments).toBeUndefined();
-    expect(sent.text).not.toBe('hoi buurt');   // sealed at rest
-    expect(strategy.open(sent.text)).toBe('hoi buurt');
+    expect(sent.text).not.toBe('hoi circle');   // sealed at rest
+    expect(strategy.open(sent.text)).toBe('hoi circle');
   });
 });
 

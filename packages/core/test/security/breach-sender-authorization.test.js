@@ -61,7 +61,7 @@ describe('a valid signature from a non-member is refused', () => {
     const victim   = new SecurityLayer({ identity: victimId });
 
     // The victim's own per-circle identity, and the circle's roster: one other member.
-    const OUR_ADDRESS = 'victim-in-buurt';
+    const OUR_ADDRESS = 'victim-in-circle';
     const ours   = await memberOf(victim, OUR_ADDRESS);
     const member = await newIdentity();
     victim.setSenderAuthorizer(rosterAuthorizer(new Map([[OUR_ADDRESS, new Set([member.pubKey])]])));
@@ -87,11 +87,11 @@ describe('a valid signature from a non-member is refused', () => {
   it('and claiming a member\'s ADDRESS buys nothing either — `_from` authorizes nothing', async () => {
     const victimId = await newIdentity();
     const victim   = new SecurityLayer({ identity: victimId });
-    const OUR_ADDRESS = 'victim-in-buurt';
+    const OUR_ADDRESS = 'victim-in-circle';
     const ours = await memberOf(victim, OUR_ADDRESS);
 
     const memberId = await newIdentity();
-    const MEMBER_ADDRESS = 'anna-in-buurt';
+    const MEMBER_ADDRESS = 'anna-in-circle';
     victim.registerPeer(MEMBER_ADDRESS, memberId.pubKey);     // the roster binding, from the join
     victim.setSenderAuthorizer(rosterAuthorizer(new Map([[OUR_ADDRESS, new Set([memberId.pubKey])]])));
 
@@ -114,11 +114,11 @@ describe('a valid signature from a non-member is refused', () => {
   it('a member speaks normally — the check is a check, not an outage', async () => {
     const victimId = await newIdentity();
     const victim   = new SecurityLayer({ identity: victimId });
-    const OUR_ADDRESS = 'victim-in-buurt';
+    const OUR_ADDRESS = 'victim-in-circle';
     const ours = await memberOf(victim, OUR_ADDRESS);
 
     const memberId = await newIdentity();
-    const MEMBER_ADDRESS = 'anna-in-buurt';
+    const MEMBER_ADDRESS = 'anna-in-circle';
     victim.registerPeer(MEMBER_ADDRESS, memberId.pubKey);
     victim.setSenderAuthorizer(rosterAuthorizer(new Map([[OUR_ADDRESS, new Set([memberId.pubKey])]])));
 
@@ -138,7 +138,7 @@ describe('a key that belongs in ONE circle does not belong in another', () => {
     const victimId = await newIdentity();
     const victim   = new SecurityLayer({ identity: victimId });
 
-    const IN_A = 'victim-in-buurt';
+    const IN_A = 'victim-in-circle';
     const IN_B = 'victim-in-koor';
     const oursA = await memberOf(victim, IN_A);
     const oursB = await memberOf(victim, IN_B);
@@ -146,7 +146,7 @@ describe('a key that belongs in ONE circle does not belong in another', () => {
     // Anna is in circle A only. Her per-circle key there is a real, roster-recorded key — just not
     // one circle B has ever heard of.
     const annaInA = await newIdentity();
-    const ANNA_IN_A = 'anna-in-buurt';
+    const ANNA_IN_A = 'anna-in-circle';
     victim.registerPeer(ANNA_IN_A, annaInA.pubKey);
     victim.setSenderAuthorizer(rosterAuthorizer(new Map([
       [IN_A, new Set([annaInA.pubKey])],
@@ -159,8 +159,8 @@ describe('a key that belongs in ONE circle does not belong in another', () => {
 
     // In circle A: fine.
     expect(victim.decryptAndVerify(annaSec.encrypt(
-      mkEnvelope(P.OW, ANNA_IN_A, oursA.pubKey, { text: 'in de buurt' }),
-    )).payload.text).toBe('in de buurt');
+      mkEnvelope(P.OW, ANNA_IN_A, oursA.pubKey, { text: 'in de circle' }),
+    )).payload.text).toBe('in de circle');
 
     // The same key, the same sender, one address to our left: refused.
     expect(() => victim.decryptAndVerify(annaSec.encrypt(
@@ -173,7 +173,7 @@ describe('a key that belongs in ONE circle does not belong in another', () => {
     // roster is the authority inside a circle, and "we have met" is not membership.
     const victimId = await newIdentity();
     const victim   = new SecurityLayer({ identity: victimId });
-    const OUR_ADDRESS = 'victim-in-buurt';
+    const OUR_ADDRESS = 'victim-in-circle';
     const ours = await memberOf(victim, OUR_ADDRESS);
     victim.setSenderAuthorizer(rosterAuthorizer(new Map([
       [OUR_ADDRESS, new Set([(await newIdentity()).pubKey])],
@@ -205,13 +205,13 @@ describe('the carried key cannot be swapped', () => {
     const victimId = await newIdentity();
     const victim   = new SecurityLayer({ identity: victimId });
     const memberId = await newIdentity();
-    victim.registerPeer('anna-in-buurt', memberId.pubKey);
+    victim.registerPeer('anna-in-circle', memberId.pubKey);
 
     const strangerId  = await newIdentity();
     const strangerSec = new SecurityLayer({ identity: strangerId });
     strangerSec.registerPeer(victimId.pubKey, victimId.pubKey);
     const forged = strangerSec.encrypt(
-      mkEnvelope(P.OW, 'anna-in-buurt', victimId.pubKey, { text: 'ik ben Anna' }),
+      mkEnvelope(P.OW, 'anna-in-circle', victimId.pubKey, { text: 'ik ben Anna' }),
     );
     forged[SENDER_KEY_FIELD] = memberId.pubKey;   // claim the member's key without holding it
 
@@ -260,17 +260,17 @@ describe('a replayed envelope is refused, authorized or not', () => {
   it('the second copy of an accepted circle envelope is a DUPLICATE', async () => {
     const victimId = await newIdentity();
     const victim   = new SecurityLayer({ identity: victimId });
-    const OUR_ADDRESS = 'victim-in-buurt';
+    const OUR_ADDRESS = 'victim-in-circle';
     const ours = await memberOf(victim, OUR_ADDRESS);
 
     const memberId = await newIdentity();
-    victim.registerPeer('anna-in-buurt', memberId.pubKey);
+    victim.registerPeer('anna-in-circle', memberId.pubKey);
     victim.setSenderAuthorizer(rosterAuthorizer(new Map([[OUR_ADDRESS, new Set([memberId.pubKey])]])));
 
     const memberSec = new SecurityLayer({ identity: memberId });
     memberSec.registerPeer(ours.pubKey, ours.pubKey);
     const env = memberSec.encrypt(
-      mkEnvelope(P.OW, 'anna-in-buurt', ours.pubKey, { text: 'eenmaal' }),
+      mkEnvelope(P.OW, 'anna-in-circle', ours.pubKey, { text: 'eenmaal' }),
     );
 
     expect(victim.decryptAndVerify(env).payload.text).toBe('eenmaal');

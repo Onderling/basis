@@ -19,7 +19,7 @@ import { createNeighborhoodAgent } from '../src/index.js';
 const ADMIN = 'https://id.example/admin';
 const BOB   = 'https://id.example/bob';   // stands in for BOB's secure-mesh signing address
 const GROUP = 'oosterpoort';
-const RULES = { purpose: 'buurt', admins: [ADMIN], houseRules: ['wees aardig'] };
+const RULES = { purpose: 'circle', admins: [ADMIN], houseRules: ['wees aardig'] };
 
 async function callSkill(agent, skillId, args, from = ADMIN) {
   const def = agent.skills.get(skillId);

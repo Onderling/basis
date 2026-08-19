@@ -147,19 +147,19 @@ import * as PA from '../../../src/core/wizards/postAudienceState.js';
 
 describe('postAudienceState', () => {
   it('initialState pre-seeds from args', () => {
-    const s = PA.initialState({ text: 'hi', kind: 'offer', groupId: 'buurt-x' });
+    const s = PA.initialState({ text: 'hi', kind: 'offer', groupId: 'circle-x' });
     expect(s.text).toBe('hi');
     expect(s.kind).toBe('offer');
-    expect(s.selectedBuurt).toBe('buurt-x');
+    expect(s.selectedCircle).toBe('circle-x');
     expect(s.minTrust).toBe('all');
-    expect(s.availableBuurts).toBe(null);    // loading state
+    expect(s.availableCircles).toBe(null);    // loading state
   });
 
   it('initialState defaults when args are empty', () => {
     const s = PA.initialState();
     expect(s.text).toBe('');
     expect(s.kind).toBe('ask');
-    expect(s.selectedBuurt).toBe(null);
+    expect(s.selectedCircle).toBe(null);
   });
 
   it('canSubmit requires non-blank text + not submitting', () => {
@@ -188,7 +188,7 @@ describe('postAudienceState', () => {
     });
   });
 
-  it('buildPostRequestArgs includes targets when buurt selected', () => {
+  it('buildPostRequestArgs includes targets when circle selected', () => {
     const s = PA.initialState({ text: 'need a ladder', kind: 'ask', groupId: 'b1' });
     const a = PA.buildPostRequestArgs(s);
     expect(a.text).toBe('need a ladder');
@@ -198,20 +198,20 @@ describe('postAudienceState', () => {
     expect(a.audience).toBeUndefined();    // no audience opts set
   });
 
-  it('loadAvailableBuurts uses substrate reply + auto-selects when single', async () => {
+  it('loadAvailableCircles uses substrate reply + auto-selects when single', async () => {
     const state = PA.initialState();
-    const callSkill = vi.fn().mockResolvedValue({ groupId: 'b1', title: 'My Buurt' });
-    await PA.loadAvailableBuurts({ state, callSkill });
-    expect(state.availableBuurts).toEqual([{ id: 'b1', label: 'My Buurt' }]);
-    expect(state.selectedBuurt).toBe('b1');   // auto-selected
+    const callSkill = vi.fn().mockResolvedValue({ groupId: 'b1', title: 'My Circle' });
+    await PA.loadAvailableCircles({ state, callSkill });
+    expect(state.availableCircles).toEqual([{ id: 'b1', label: 'My Circle' }]);
+    expect(state.selectedCircle).toBe('b1');   // auto-selected
   });
 
-  it('loadAvailableBuurts gracefully degrades on failure', async () => {
+  it('loadAvailableCircles gracefully degrades on failure', async () => {
     const state = PA.initialState();
     const callSkill = vi.fn().mockRejectedValue(new Error('offline'));
-    await PA.loadAvailableBuurts({ state, callSkill });
-    expect(state.availableBuurts).toEqual([]);
-    expect(state.selectedBuurt).toBe(null);
+    await PA.loadAvailableCircles({ state, callSkill });
+    expect(state.availableCircles).toEqual([]);
+    expect(state.selectedCircle).toBe(null);
   });
 
   it('submitPost happy-path: returns {result, state}', async () => {

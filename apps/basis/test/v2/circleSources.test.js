@@ -7,7 +7,7 @@ const callSkill = async (op) => {
     return { circles: [{ circleId: 'c1', name: 'Circle', counts: { members: 3 } }] };
   }
   if (op === 'listMyCircles') {
-    return { buurts: ['selwerd', 'akkerstraat'] };
+    return { circles: ['selwerd', 'akkerstraat'] };
   }
   return null;
 };
@@ -34,7 +34,7 @@ describe('circleSources', () => {
   // That is the shape worth remembering: a green test over an injected fake says the code works IF something
   // calls it. It says nothing about whether anything does. The fake was the only caller it ever had.
 
-  it('feeds loadCircles end-to-end (circles + buurts merged + normalised)', async () => {
+  it('feeds loadCircles end-to-end (circles + circles merged + normalised)', async () => {
     const list = await loadCircles(circleSourcesFromAgent({ callSkill }));
     expect(list.map((c) => c.id).sort()).toEqual(['akkerstraat', 'c1', 'selwerd']);
     expect(list.find((c) => c.id === 'c1').memberCount).toBe(3);

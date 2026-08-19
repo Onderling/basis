@@ -26,8 +26,8 @@ export const CONSEQUENCE_OPTIONS = Object.freeze({
   leavePolicy:    ['anyone', 'notify-first'],
   conflictPolicy: ['admin-decides', 'mediation', 'vote'],
   storagePolicy:  ['no-pod', 'decentralised', 'centralised'],
-  // create wizard — N1 kind picker + buurt size
-  kind:           ['household', 'buurt', 'friends', 'team'],
+  // create wizard — N1 kind picker + neighbourhood size
+  kind:           ['household', 'neighbourhood', 'friends', 'team'],
   size:           ['small', 'large'],
   // N2.b — skill axes (create-wizard skills step + skill editor)
   openness:       ['private', 'circle', 'contacts', 'public'],

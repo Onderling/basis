@@ -42,7 +42,7 @@ describe('getItemTree skill (Phase 3.3c wiring)', () => {
     })));
     // Stoop persists embeds under source.embeds — not top-level.
     const skill = skillsWith({
-      R: { id: 'R', type: 'request', source: { embeds: [{ type: 'item', ref: 'https://bob.pod/buurt/items/X.json' }] } },
+      R: { id: 'R', type: 'request', source: { embeds: [{ type: 'item', ref: 'https://bob.pod/circle/items/X.json' }] } },
     });
     const { tree, error } = await call(skill, 'R');
     expect(error).toBeUndefined();

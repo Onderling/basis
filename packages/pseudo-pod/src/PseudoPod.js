@@ -22,7 +22,7 @@
  *   - **Per-URI mode override** (`setMode(uri, mode)`): a single
  *                           PseudoPod can run different modes for
  *                           different resources (e.g. notes in cache;
- *                           buurt items in replication-ring).
+ *                           circle items in replication-ring).
  *
  * URI scheme:
  *   `pseudo-pod://<deviceId>/<path>` — local namespace.

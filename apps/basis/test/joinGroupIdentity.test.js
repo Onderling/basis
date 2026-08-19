@@ -49,10 +49,10 @@ describe('resolveJoinRevealPreset — override > personal default > fallback', (
 describe('existingSelvesFrom — one self per existing circle, excludes the joining one', () => {
   it('excludes the circle being joined and labels by name (fallback to id)', () => {
     const out = existingSelvesFrom(
-      [{ id: 'a', name: 'Buurt-West' }, { id: 'b' }, { id: 'join-me', name: 'X' }],
+      [{ id: 'a', name: 'Circle-West' }, { id: 'b' }, { id: 'join-me', name: 'X' }],
       'join-me',
     );
-    expect(out).toEqual([{ circleId: 'a', name: 'Buurt-West' }, { circleId: 'b', name: 'b' }]);
+    expect(out).toEqual([{ circleId: 'a', name: 'Circle-West' }, { circleId: 'b', name: 'b' }]);
   });
   it('non-array → []', () => {
     expect(existingSelvesFrom(null, 'x')).toEqual([]);

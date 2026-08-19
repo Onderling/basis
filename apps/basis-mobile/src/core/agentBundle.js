@@ -491,7 +491,7 @@ export async function bootAgentBundle(opts = {}) {
   const liveCircleIds = async () => {
     try {
       const res = await agent.callSkill?.('stoop', 'listMyCircles', {});
-      const ids = (Array.isArray(res?.buurts) ? res.buurts : [])
+      const ids = (Array.isArray(res?.circles) ? res.circles : [])
         .map((b) => (typeof b === 'string' ? b : b?.id))
         .filter(Boolean);
       // Union with the cached list: a circle the substrate has not caught up on yet must not be

@@ -6,7 +6,7 @@
  * 5-step wizard surfacing stoop.createGroupV2 — substantially richer
  * than C2 (join-group): 14 distinct configuration questions across
  * identity, governance, rules, and technical settings.  Lands the
- * buurt + mints the first membership code (shown ONCE per stoop's
+ * circle + mints the first membership code (shown ONCE per stoop's
  * design — the user must copy it or it's lost).
  *
  * Substrate skill: stoop.createGroupV2
@@ -26,7 +26,7 @@ import {
   initialState, slugify, isValidSlug, labelOf,
   buildRulesObjectFromState, finalSubmit,
   newOfferingRow, OFFERING_AXES,
-  // N1+E8 — kind picker + buurt size/chat advice + policy patch.
+  // N1+E8 — kind picker + neighbourhood size/chat advice + policy patch.
   CIRCLE_KINDS, setKind, setSize, setChatEnabled, chatAdvice, policyPatchFromState,
   // N3 — extra role templates (admin opt-in).
   ROLE_TEMPLATE_IDS, toggleRole,
@@ -44,7 +44,7 @@ import { t } from '../../localisation.js';
 
 /**
  * N1+E8 — persist the wizard's chosen policy axes (features incl. the
- * buurt chat-off default, reveal/pod/llm/agents/consensus) onto the new
+ * neighbourhood chat-off default, reveal/pod/llm/agents/consensus) onto the new
  * circle's policy, so the launcher's GESPREK gating honours
  * them.  Shares the launcher's localStorage key (`cc.circlePolicy.<id>`).
  * Only writes axes a template actually filled.  Best-effort.
@@ -102,12 +102,12 @@ export function renderCreateGroupWizard(opts) {
         // joiner's wizard step 1 can show them directly (their local
         // substrate has no group-rules item until after they join).
         result.rules = buildRulesObjectFromState(state);
-        // N1+E8 — write the chosen policy (incl. buurt chat-off) so the
+        // N1+E8 — write the chosen policy (incl. neighbourhood chat-off) so the
         // new circle opens with the right surfaces.
         await persistCreatedCirclePolicy(result.groupId, state);
         state.successResult = result;
         if (typeof onDispatched === 'function') {
-          try { onDispatched({ ok: true, message: `✓ Buurt "${result.groupId}" created.`, ...result }); } catch { /* swallow */ }
+          try { onDispatched({ ok: true, message: `✓ Circle "${result.groupId}" created.`, ...result }); } catch { /* swallow */ }
         }
       }
       rerender();
@@ -134,18 +134,18 @@ function renderStepHeader(container, doc, step) {
 }
 
 function renderIdentityStep(container, doc, state, onNext, onCancel, rerender) {
-  const wrap = makeBody(doc, 'Buurt identity & purpose',
-    'A buurt is a closed group with its own posts, members, and rules.');
+  const wrap = makeBody(doc, 'Circle identity & purpose',
+    'A circle is a closed group with its own posts, members, and rules.');
 
   // N1+E8 — kind picker.  Picking a kind applies the matching template
-  // (β.4) in place; for a buurt it also surfaces the size question +
-  // chat advice (buurt is noticeboard-first, open chat off by default).
+  // (β.4) in place; for a neighbourhood it also surfaces the size question +
+  // chat advice (neighbourhood is noticeboard-first, open chat off by default).
   appendRadioField(wrap, doc, t('circle.kindPicker'), state.kind ?? null,
     CIRCLE_KINDS.map((k) => ({ id: k, label: t(`circle.kind.${k}`) })),
     (k) => { Object.assign(state, setKind(state, k)); rerender(); },
     { consequenceGroup: 'kind' });
 
-  if (state.kind === 'buurt') {
+  if (state.kind === 'neighbourhood') {
     appendRadioField(wrap, doc, t('circle.size.label'), state.size ?? null,
       [{ id: 'small', label: t('circle.size.small') },
        { id: 'large', label: t('circle.size.large') }],
@@ -171,8 +171,8 @@ function renderIdentityStep(container, doc, state, onNext, onCancel, rerender) {
       if (groupIdInputRef) groupIdInputRef.value = derived;
       refreshNextBtn();
     },
-    { placeholder: 'e.g. Buurt Westend' });
-  appendField(wrap, doc, 'Buurt id *', 'groupId',
+    { placeholder: 'e.g. Circle Westend' });
+  appendField(wrap, doc, 'Circle id *', 'groupId',
     state.groupId, (v) => { state.groupId = v; refreshNextBtn(); },
     { placeholder: 'auto-slugified from name', monospace: true,
       hint: 'Lowercase letters, digits, hyphens. Must be unique.' });
@@ -182,7 +182,7 @@ function renderIdentityStep(container, doc, state, onNext, onCancel, rerender) {
 
   appendField(wrap, doc, 'Purpose', 'purpose',
     state.purpose, (v) => { state.purpose = v; },
-    { placeholder: 'One sentence: what is this buurt for?' });
+    { placeholder: 'One sentence: what is this circle for?' });
   appendField(wrap, doc, 'Tags (CSV)', 'tags',
     state.tags, (v) => { state.tags = v; },
     { placeholder: 'e.g. neighbourhood, tools, kids' });
@@ -205,7 +205,7 @@ function refreshActionsLocal(container, ok) {
 
 function renderGovernanceStep(container, doc, state, onNext, onBack, onCancel, rerender) {
   const wrap = makeBody(doc, 'Members & governance',
-    'Who runs the buurt + how people join + how they leave.');
+    'Who runs the circle + how people join + how they leave.');
 
   appendField(wrap, doc, 'Additional admins (CSV of webids)', 'additionalAdmins',
     state.additionalAdmins, (v) => { state.additionalAdmins = v; },
@@ -338,7 +338,7 @@ function renderOfferingsStep(container, doc, state, onNext, onBack, onCancel, re
 
 function renderTechStep(container, doc, state, onNext, onBack, onCancel, rerender) {
   const wrap = makeBody(doc, 'Tech & storage',
-    'How the buurt stores its data + how the encryption key rotates.');
+    'How the circle stores its data + how the encryption key rotates.');
 
   appendRadioField(wrap, doc, 'Storage policy', state.storagePolicy, STORAGE_POLICIES,
     (v) => { state.storagePolicy = v; rerender(); }, { consequenceGroup: 'storagePolicy' });
@@ -347,7 +347,7 @@ function renderTechStep(container, doc, state, onNext, onBack, onCancel, rerende
   if (state.storagePolicy === 'centralised' || state.storagePolicy === 'hybrid') {
     appendField(wrap, doc, 'Group pod URI *', 'groupPodUri',
       state.groupPodUri, (v) => { state.groupPodUri = v; },
-      { placeholder: 'https://group-pod.example/onderling/buurt/',
+      { placeholder: 'https://group-pod.example/onderling/circle/',
         hint: 'Required for centralised + hybrid storage.', monospace: true });
     // NKN+pod circle (J-NP3) — the CREATE half of the disclosure shown at both ends: choosing a shared
     // pod means its host can see the membership. Said here, next to the choice that causes it, so the
@@ -365,7 +365,7 @@ function renderTechStep(container, doc, state, onNext, onBack, onCancel, rerende
     String(state.rotationDays),
     (v) => { state.rotationDays = Math.max(1, Math.min(365, parseInt(v, 10) || 30)); },
     { type: 'number',
-      hint: 'How often the buurt-wide encryption key rotates. 30 d default suits most buurts; drop lower for higher-sensitivity groups. (Invite expiry is configured separately in Governance.)' });
+      hint: 'How often the circle-wide encryption key rotates. 30 d default suits most circles; drop lower for higher-sensitivity groups. (Invite expiry is configured separately in Governance.)' });
 
   const needsUri = (state.storagePolicy === 'centralised' || state.storagePolicy === 'hybrid');
   const uriOk    = !needsUri || /^https?:\/\//.test(state.groupPodUri.trim());
@@ -379,12 +379,12 @@ function renderTechStep(container, doc, state, onNext, onBack, onCancel, rerende
 }
 
 function renderReviewStep(container, doc, state, onBack, onCancel, rerender, onSubmit) {
-  const wrap = makeBody(doc, 'Review & create', 'Everything you\'ve configured.  After [Create buurt] you\'ll get a one-time membership code to hand out.');
+  const wrap = makeBody(doc, 'Review & create', 'Everything you\'ve configured.  After [Create circle] you\'ll get a one-time membership code to hand out.');
 
   const dl = doc.createElement('dl');
   dl.className = 'cc-wizard-review';
   appendReview(dl, doc, 'Name',           state.name);
-  appendReview(dl, doc, 'Buurt id',       state.groupId);
+  appendReview(dl, doc, 'Circle id',       state.groupId);
   if (state.purpose) appendReview(dl, doc, 'Purpose', state.purpose);
   if (state.tags)    appendReview(dl, doc, 'Tags', state.tags);
   if (state.additionalAdmins) appendReview(dl, doc, 'Additional admins', state.additionalAdmins);
@@ -422,7 +422,7 @@ function renderReviewStep(container, doc, state, onBack, onCancel, rerender, onS
   if (state.submitting) {
     const status = doc.createElement('div');
     status.className = 'cc-wizard-submitting';
-    status.textContent = 'Creating buurt…';
+    status.textContent = 'Creating circle…';
     wrap.appendChild(status);
   }
 
@@ -430,12 +430,12 @@ function renderReviewStep(container, doc, state, onBack, onCancel, rerender, onS
   renderActions(container, doc, [
     { label: '← Back',         onClick: onBack,                       kind: 'secondary', disabled: state.submitting },
     { label: 'Cancel',         onClick: onCancel,                     kind: 'secondary', disabled: state.submitting },
-    { label: 'Create buurt',   onClick: onSubmit,                     kind: 'primary',   disabled: state.submitting },
+    { label: 'Create circle',   onClick: onSubmit,                     kind: 'primary',   disabled: state.submitting },
   ]);
 }
 
 function renderSuccessStep(container, doc, state, onClose) {
-  const wrap = makeBody(doc, '✓ Buurt created', `${state.successResult.groupId} is live.`);
+  const wrap = makeBody(doc, '✓ Circle created', `${state.successResult.groupId} is live.`);
 
   // Encode {kind, groupId, code, expiresAt, adminPeerAddr?} as a onderling-invite://
   // URL so the invitee can paste a single string into /join-group.  The
@@ -666,7 +666,7 @@ function appendRadioField(wrap, doc, label, value, options, onPick, opts = {}) {
   wrap.appendChild(group);
 }
 
-// N1 — buurt chat advice banner + the open-chat toggle.  The banner's
+// N1 — neighbourhood chat advice banner + the open-chat toggle.  The banner's
 // emphasis tracks the recommendation mode (`advise-off` is the loudest;
 // `ask` is neutral).  The toggle writes through `setChatEnabled` so a
 // user override is remembered (`chatUserSet`).

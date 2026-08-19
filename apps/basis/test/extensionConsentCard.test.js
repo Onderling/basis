@@ -13,7 +13,7 @@ afterEach(() => { document.body.innerHTML = ''; });   // happy-dom persists body
 const t = (k, vars) => (vars ? `${k}:${JSON.stringify(vars)}` : k);
 
 const okResult = { ok: true, card: {
-  id: 'fb', title: 'Buurtplan', scope: 'circle',
+  id: 'fb', title: 'Circle plan', scope: 'circle',
   needs: ['call-LLM'], commands: [{ command: '/feedback', invokes: ['household/addItem'] }],
 } };
 

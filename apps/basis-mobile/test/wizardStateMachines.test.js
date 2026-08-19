@@ -17,9 +17,9 @@ import * as encryptedBackupState     from '../../basis/src/core/wizards/encrypte
 import * as settingsState            from '../../basis/src/core/wizards/settingsState.js';
 
 describe('Bundle F P2 — createGroup state machine', () => {
-  it('slugify produces buurt-id-shaped strings', () => {
-    expect(createGroupState.slugify('Onze Buurt 2026!')).toBe('onze-buurt-2026');
-    expect(createGroupState.isValidSlug('onze-buurt')).toBe(true);
+  it('slugify produces circle-id-shaped strings', () => {
+    expect(createGroupState.slugify('Onze Circle 2026!')).toBe('onze-circle-2026');
+    expect(createGroupState.isValidSlug('onze-circle')).toBe(true);
     expect(createGroupState.isValidSlug('UPPERCASE')).toBe(false);
   });
 
@@ -30,8 +30,8 @@ describe('Bundle F P2 — createGroup state machine', () => {
       return { ok: true, groupId: args.groupId };
     };
     const s = createGroupState.initialState();
-    s.name              = 'Onze Buurt';
-    s.groupId           = 'onze-buurt';
+    s.name              = 'Onze Circle';
+    s.groupId           = 'onze-circle';
     s.purpose           = 'Sharing tools';
     s.tags              = 'tools, quiet';
     s.additionalAdmins  = 'https://alice.example/#me';
@@ -42,7 +42,7 @@ describe('Bundle F P2 — createGroup state machine', () => {
     expect(result?.ok).toBe(true);
     expect(calls).toHaveLength(1);
     expect(calls[0].op).toBe('createGroupV2');
-    expect(calls[0].args.groupId).toBe('onze-buurt');
+    expect(calls[0].args.groupId).toBe('onze-circle');
     expect(calls[0].args.rules.purpose).toBe('Sharing tools');
     expect(calls[0].args.rules.tags).toEqual(['tools', 'quiet']);
     expect(calls[0].args.rules.accessPolicy).toBe('request');

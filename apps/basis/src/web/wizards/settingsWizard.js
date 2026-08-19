@@ -54,7 +54,7 @@ export function renderSettingsWizard(opts) {
       renderTransportControl(doc, opts),
     ]));
 
-    body.appendChild(renderSection(doc, 'Stoop / Buurt', [
+    body.appendChild(renderSection(doc, 'Stoop / Circle', [
       renderHandleControl(doc, state, callSkill, rerender),
       renderDisplayNameControl(doc, state, callSkill, rerender),
       renderHolidayControl(doc, state, callSkill, rerender),

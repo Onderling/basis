@@ -33,7 +33,7 @@ export async function clarifyCommandTargets({ opId, args, appOrigin }, { catalog
   const op = entry && entry.op ? entry.op : entry;
   // The op's owning app — passed to `lookup` so the picker's `listOp` resolves on the SAME app as the
   // op, not by probe-first-origin. Without it a shared op name (e.g. `listOpen`, declared by both
-  // stoop and tasks-v0) resolves to the wrong app — "done <task>" searched stoop's buurt feed and
+  // stoop and tasks-v0) resolves to the wrong app — "done <task>" searched stoop's circle feed and
   // never found the task (device-verify 2026-06-11). Lookups ignoring the 4th arg keep prior behaviour.
   const entryOrigin = entry && entry.appOrigin ? entry.appOrigin : null;
   const params = (op && Array.isArray(op.params)) ? op.params : [];

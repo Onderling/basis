@@ -19,10 +19,10 @@ function mkPod(deviceId = 'd1') {
   return createPseudoPod({ backend: createMemoryBackend(), mode: 'standalone', deviceId });
 }
 
-const validMapping = (id = 'feedback-buurtplan') => ({
+const validMapping = (id = 'feedback-circle plan') => ({
   id,
   version: '1',
-  title: 'Buurtplan feedback',
+  title: 'Circle plan feedback',
   scope: 'circle',
   needs: ['call-LLM', 'write-pod'],
   ops: [
@@ -47,7 +47,7 @@ describe('URI derivation', () => {
 describe('validateMapping', () => {
   it('accepts a valid mapping and freezes it', () => {
     const m = validateMapping(validMapping());
-    expect(m.id).toBe('feedback-buurtplan');
+    expect(m.id).toBe('feedback-circle plan');
     expect(m.scope).toBe('circle');
     expect(m.needs).toEqual(['call-LLM', 'write-pod']);
     expect(Object.isFrozen(m)).toBe(true);

@@ -4,7 +4,7 @@
  * Maps the host's dispatch onto the `loadCircles` fetchers, reusing
  * EXISTING ops only — `getMyCircles` (tasks circles, shape
  * `{circles:[{circleId,name,kind,counts}]}`) and `getCurrentGroup` (the stoop
- * buurt record behind `/groups`) — plus an optional `@onderling/circles`
+ * circle record behind `/groups`) — plus an optional `@onderling/circles`
  * store. No new ops are invented; the host injects `callSkill` (web: its
  * dispatch; mobile: hostOps) so the same adapter drives both launchers.
  */
@@ -27,13 +27,13 @@ export function circleSourcesFromAgent({ callSkill, circlesStore, helpCircleName
       return Array.isArray(res?.circles) ? res.circles : [];
     },
     fetchGroups: async () => {
-      // listMyCircles → { buurts: [groupId, ...] } — ALL buurts the actor is
+      // listMyCircles → { circles: [groupId, ...] } — ALL circles the actor is
       // in (incl. one just created via createGroupV2). getCurrentGroup only
-      // returned the single active buurt, so new circles never surfaced.
+      // returned the single active circle, so new circles never surfaced.
       const res = await call('listMyCircles');
-      const buurts = Array.isArray(res?.buurts) ? res.buurts : [];
+      const circles = Array.isArray(res?.circles) ? res.circles : [];
       const helpName = resolveHelpName();
-      return buurts.map((b) => {
+      return circles.map((b) => {
         const raw = (typeof b === 'string') ? { id: b, name: b } : { ...b };
         // The help circle is a system circle whose title is localised chrome; listMyCircles
         // only carries ids, so relabel it here — otherwise its tile/header shows the raw id.

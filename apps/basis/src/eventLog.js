@@ -104,7 +104,7 @@ export function isSilentEntry(entry) {
   // DERIVED from the shared kind table (2026-07-27) rather than read off a flag someone remembered to
   // stamp — so a new system kind cannot arrive in a conversation because one append site forgot it.
   //
-  // ONLY for kinds the table KNOWS. The log holds entries whose types predate this registry (`buurt`,
+  // ONLY for kinds the table KNOWS. The log holds entries whose types predate this registry (`circle`,
   // reactions, app-specific rows); treating an unlisted type as "system" would silently delete them from
   // every conversation — caught by `eventLog.test.js` when I first wrote it the other way. So an unknown
   // type falls back to the flag, which is the old behaviour exactly. The conservative UNKNOWN_KIND default

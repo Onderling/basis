@@ -33,10 +33,10 @@ describe('multi-field needsForm → inline form substrate', () => {
 
   it('completing the form merges the filled values onto the prefilled args → a ready dispatch', () => {
     const pending = beginFormFollowUp({ dispatch: needsForm(['title', 'date']), t });
-    const ready = completeMultiFieldFollowUp({ pending, values: { title: 'Buurt-bbq', date: '2026-07-01' } });
+    const ready = completeMultiFieldFollowUp({ pending, values: { title: 'Circle-bbq', date: '2026-07-01' } });
     expect(ready).toMatchObject({
       kind: 'ready', opId: 'addEvent',
-      args: { circleId: 'c1', title: 'Buurt-bbq', date: '2026-07-01' },
+      args: { circleId: 'c1', title: 'Circle-bbq', date: '2026-07-01' },
     });
   });
 });

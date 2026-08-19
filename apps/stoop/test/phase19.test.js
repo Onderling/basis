@@ -1,9 +1,9 @@
 /**
  * Stoop V1 — Phase 19 closed-beta hardening smoke.
  *
- * One end-to-end pass through the buurt-deployable flow that the
+ * One end-to-end pass through the circle-deployable flow that the
  * runbook (`CLOSED-BETA-RUNBOOK.md`) tells facilitators to verify
- * before bringing a real buurt online:
+ * before bringing a real circle online:
  *
  *   1. Member redeems via the gated path (privacy + rules).
  *   2. One-shot recovery-phrase reveal works once, then locks.

@@ -17,7 +17,7 @@ import {
 import { signSpine } from '@onderling/core';
 import { reportEntryId } from '../../src/v2/reportModel.js';
 
-const GROUP = 'buurt-relay-route';
+const GROUP = 'circle-relay-route';
 const rnd = () => Math.random().toString(36).slice(2, 8);
 
 describe('relay-route cross-device exchange (self-contained relay)', () => {
@@ -39,7 +39,7 @@ describe('relay-route cross-device exchange (self-contained relay)', () => {
     await connectAgentsOverRelay(admin, joiner, { relayUrl });
 
     // Real invite → group-redeem round-trip over the relay (createGroupV2 + redeem).
-    ({ joined } = await pairCircle(admin, joiner, { groupId: GROUP, name: 'Buurt (relay route)', handle: 'joiner' }));
+    ({ joined } = await pairCircle(admin, joiner, { groupId: GROUP, name: 'Circle (relay route)', handle: 'joiner' }));
 
     // Warm the secure mesh (HI handshake) with a chat message so later broadcasts route.
     const warm = `warmup-${rnd()}`;

@@ -5,7 +5,7 @@
  * message stream + inline composer.  No separate chat shell exists; chat
  * IS the circle view.
  *
- * Renders per v2 §1 board "VOORBEELD 1 · BUURT":
+ * Renders per v2 §1 board "VOORBEELD 1 · CIRCLE":
  *
  *   [← back]  Circle name  [⋯ more]
  *             N LEDEN · functies meta
@@ -18,10 +18,10 @@
  *   │  "3 nieuwe vragen vandaag."
  *   └─
  *   ┌─ AANKONDIGING card
- *   │  "Buurtborrel zaterdag 17u"
+ *   │  "Circle drinks zaterdag 17u"
  *   └─
  *   …
- *   [+] [Schrijf naar de buurt…       ] [↑]
+ *   [+] [Schrijf naar de circle…       ] [↑]
  *
  * Pure render: the host wires:
  *   - `rows`          buildCircleStream output (already scoped to this circle)
@@ -136,7 +136,7 @@ export function renderCircleView(container, {
   pendingForm = null,
   onFormSubmit = null,
   // S1 #1 — noticeboard (prikbord tab). When the active tab is `prikbord`, the body
-  // renders the buurt noticeboard (post composer + open posts) instead of the
+  // renders the circle noticeboard (post composer + open posts) instead of the
   // tab-coming placeholder, and the chat composer is suppressed (the noticeboard has
   // its own). `null` = host hasn't loaded it → falls back to the placeholder.
   //   `{ posts, intent, busy, onPost, onAction, onIntent }`
@@ -301,7 +301,7 @@ export function renderCircleView(container, {
     // (ok / empty / error) internally.
     renderCircleScreen(body, { blocks: screenBlocks ?? [], t: tr, onAction: onScreenAction, onEmbedOpen });
   } else if (effectiveTab === 'prikbord' && noticeboard) {
-    // S1 #1 — the buurt noticeboard (its own composer + post list).
+    // S1 #1 — the circle noticeboard (its own composer + post list).
     renderCircleNoticeboard(body, {
       posts:    noticeboard.posts ?? [],
       intent:   noticeboard.intent ?? 'ask',
@@ -967,7 +967,7 @@ function renderBubble(row, {
 
   // δ.2 — delivery-state icon for locally-sent chat messages.  Only
   // surfaces when (a) the host supplied a lookup and (b) the bubble is a
-  // locally-authored chat-message (`isMine`; other row kinds — buurt-post
+  // locally-authored chat-message (`isMine`; other row kinds — circle-post
   // mirrors etc. — never have delivery state).  The happy path
   // ('sent' / null) renders nothing so it doesn't clutter the timeline.
   // Bulletin restyle: the icon now sits in the bottom meta line (below),

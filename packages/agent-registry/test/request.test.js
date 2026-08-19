@@ -12,11 +12,11 @@ const vocab = createVocabulary([
 
 describe('createRequest', () => {
   it('builds a canonical request (items sorted by key)', () => {
-    const r = createRequest({ requesterId: 'buurt-42', purpose: 'segment feedback', items: [
-      { key: 'place', why: 'which neighbourhoods' }, { key: 'ageBand', why: 'age spread' },
+    const r = createRequest({ requesterId: 'circle-42', purpose: 'segment feedback', items: [
+      { key: 'place', why: 'which circles' }, { key: 'ageBand', why: 'age spread' },
     ] });
     expect(requestKeys(r)).toEqual(['ageBand', 'place']);   // sorted
-    expect(r.requesterId).toBe('buurt-42');
+    expect(r.requesterId).toBe('circle-42');
   });
 
   it('requires requesterId, purpose, ≥1 item, and a per-item why', () => {
@@ -63,7 +63,7 @@ describe('checkRequestAllowed (governed request side)', () => {
   });
 
   it('allows a benign ask + surfaces warns; no rule for a context → allowed', () => {
-    const req = createRequest({ requesterId: 'buurt', purpose: 'segment', vocabulary: vocab, items: [{ key: 'place', why: 'w' }] });
+    const req = createRequest({ requesterId: 'circle', purpose: 'segment', vocabulary: vocab, items: [{ key: 'place', why: 'w' }] });
     expect(checkRequestAllowed(req, 'employment', DEFAULT_GOVERNED_POLICY, vocab)).toEqual({ allowed: true, forbidden: [], warn: [] });
     const t = checkRequestAllowed(createRequest({ requesterId: 'll', purpose: 'rent', vocabulary: vocab, items: [{ key: 'ageBand', why: 'w' }] }), 'tenancy', DEFAULT_GOVERNED_POLICY, vocab);
     expect(t).toEqual({ allowed: true, forbidden: [], warn: ['ageBand'] });   // warned, not forbidden

@@ -13,7 +13,7 @@ function mount() {
 
 const okAnnouncement = {
   blockId: 'b1', type: 'announcement', status: 'ok',
-  content: { text: 'Buurtfeest zaterdag!' },
+  content: { text: 'Street party zaterdag!' },
 };
 const okText = {
   blockId: 'b2', type: 'text', status: 'ok',
@@ -38,13 +38,13 @@ const okNoticeboard = {
 const okAgenda = {
   blockId: 'b5', type: 'agenda', status: 'ok',
   content: { items: [
-    { id: 'e1', label: 'Buurtborrel zaterdag 17u', type: 'calendar-event', state: 'open' },
+    { id: 'e1', label: 'Circle drinks zaterdag 17u', type: 'calendar-event', state: 'open' },
     { id: 'e2', label: 'Plantjes ruilen zondag',   type: 'calendar-event', state: 'open' },
   ] },
 };
 const okRules = {
   blockId: 'b6', type: 'rules', status: 'ok',
-  content: { doc: { purpose: 'Een fijne buurt zijn', agreements: 'Geen herrie na 22u',
+  content: { doc: { purpose: 'Een fijne circle zijn', agreements: 'Geen herrie na 22u',
                     admins: '', conflict: '', admission: '', leaving: '', responsibility: '' } },
 };
 
@@ -83,7 +83,7 @@ describe('renderCircleScreen · α.1c.1 — block shapes', () => {
     expect(block.dataset.blockId).toBe('b1');
     expect(block.dataset.status).toBe('ok');
     expect(block.querySelector('.circle-screen__announcement-text').textContent)
-      .toBe('Buurtfeest zaterdag!');
+      .toBe('Street party zaterdag!');
   });
 
   it('text: writes a paragraph body', () => {
@@ -149,7 +149,7 @@ describe('renderCircleScreen · α.1c.1 — block shapes', () => {
     expect(rows).toHaveLength(2);
     expect(rows[0].dataset.eventId).toBe('e1');
     expect(rows[0].querySelector('.circle-screen__agenda-label').textContent)
-      .toBe('Buurtborrel zaterdag 17u');
+      .toBe('Circle drinks zaterdag 17u');
   });
 
   it('tasks (α.4): titled list of rows with circle tag + text', () => {
@@ -176,7 +176,7 @@ describe('renderCircleScreen · α.1c.1 — block shapes', () => {
     const fields = el.querySelectorAll('.circle-screen__rules-field');
     expect(fields).toHaveLength(2);  // purpose + agreements only — others are empty
     expect(el.querySelector('.circle-screen__rules-field--purpose .circle-screen__rules-value').textContent)
-      .toBe('Een fijne buurt zijn');
+      .toBe('Een fijne circle zijn');
     expect(el.querySelector('.circle-screen__rules-field--agreements .circle-screen__rules-value').textContent)
       .toBe('Geen herrie na 22u');
   });

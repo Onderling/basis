@@ -35,9 +35,9 @@ export const PRIVACY_NOTICE = Object.freeze({
 leden je posts kunnen zien, je kunnen aanspreken en — afhankelijk van
 groepsregels — kunnen oordelen over conflicten. Buurt-admins hebben
 geen toegang tot je privé-chats, alleen tot wat je publiek post.`,
-  en: `Joining a buurt means other members can see
+  en: `Joining a circle means other members can see
 your posts, contact you, and — depending on group rules — weigh in on
-conflicts. Buurt admins have no access to your private chats, only to
+conflicts. Circle admins have no access to your private chats, only to
 what you post publicly.`,
 });
 
@@ -109,7 +109,7 @@ export async function loadPriorHandles({ callSkill } = {}) {
   }
 }
 
-/** Validate a buurt handle: lowercase, digits, _ / -; 3-30 chars. */
+/** Validate a circle handle: lowercase, digits, _ / -; 3-30 chars. */
 export function isValidHandle(handle) {
   return typeof handle === 'string'
     && /^[a-z0-9](?:[a-z0-9_-]{1,28}[a-z0-9])?$/.test(handle);

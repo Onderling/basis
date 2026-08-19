@@ -23,7 +23,7 @@ import { EventLog, isSilentEntry, shouldWakeForEntry } from '../src/eventLog.js'
 import { buildCircleChat, buildCircleStream } from '../src/v2/circleStream.js';
 import { PROFILE_PICTURE_KEY, isSealedMediaRef } from '@onderling/agent-registry';
 
-const CIRCLE = 'buurt-oost';
+const CIRCLE = 'circle-oost';
 const MEMBER = 'app.member.test';
 
 describe('the diff-gate (changedReleaseKeys / releaseUnchanged)', () => {

@@ -17,8 +17,8 @@ const catalog = {
 };
 
 const mapping = (overrides = {}) => ({
-  id: 'feedback-buurtplan',
-  title: 'Buurtplan feedback',
+  id: 'feedback-circle plan',
+  title: 'Circle plan feedback',
   scope: 'circle',
   needs: ['call-LLM', 'write-pod'],
   ops: [{
@@ -44,7 +44,7 @@ describe('buildConsentModel', () => {
   it('builds a plain card enumerating commands, what they invoke, needs + scope', () => {
     const { ok, card } = buildConsentModel(mapping(), catalog);
     expect(ok).toBe(true);
-    expect(card.title).toBe('Buurtplan feedback');
+    expect(card.title).toBe('Circle plan feedback');
     expect(card.scope).toBe('circle');
     expect(card.needs).toEqual(['call-LLM', 'write-pod']);
     expect(card.commands).toEqual([{ command: '/feedback', invokes: ['household/addItem'] }]);
@@ -66,7 +66,7 @@ describe('installMapping / uninstallMapping', () => {
     const res = await installMapping({ store, deviceId: WEB_MAPPINGS_DEVICE, mapping: mapping(), catalog });
     expect(res.ok).toBe(true);
     const { mappings } = await loadMappings({ pseudoPod: store, deviceId: WEB_MAPPINGS_DEVICE });
-    expect(mappings.map((m) => m.id)).toEqual(['feedback-buurtplan']);
+    expect(mappings.map((m) => m.id)).toEqual(['feedback-circle plan']);
   });
 
   it('install refuses an unsafe mapping and writes nothing', async () => {
@@ -82,7 +82,7 @@ describe('installMapping / uninstallMapping', () => {
   it('uninstall removes it', async () => {
     const store = localStorageMappingsStore(fakeStorage());
     await installMapping({ store, deviceId: WEB_MAPPINGS_DEVICE, mapping: mapping(), catalog });
-    await uninstallMapping({ store, deviceId: WEB_MAPPINGS_DEVICE, id: 'feedback-buurtplan' });
+    await uninstallMapping({ store, deviceId: WEB_MAPPINGS_DEVICE, id: 'feedback-circle plan' });
     const { mappings } = await loadMappings({ pseudoPod: store, deviceId: WEB_MAPPINGS_DEVICE });
     expect(mappings).toEqual([]);
   });

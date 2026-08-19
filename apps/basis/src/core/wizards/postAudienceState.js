@@ -9,7 +9,7 @@
 
 /** Trust-level options shown in the radio group. */
 export const TRUST_OPTS = Object.freeze([
-  { id: 'all',     label: 'Everyone in the buurt' },
+  { id: 'all',     label: 'Everyone in the circle' },
   { id: 'known',   label: 'Known contacts only'    },
   { id: 'trusted', label: 'Trusted contacts only'  },
 ]);
@@ -29,8 +29,8 @@ export function initialState(args = {}) {
     tags:             '',
     distanceKm:       0,
     recipients:       '',
-    availableBuurts:  null,        // null = loading, [] = failed, [...] = loaded
-    selectedBuurt:    args.groupId ?? null,
+    availableCircles:  null,        // null = loading, [] = failed, [...] = loaded
+    selectedCircle:    args.groupId ?? null,
     submitting:       false,
     submitError:      null,
   };
@@ -64,30 +64,30 @@ export function buildAudience(state) {
  */
 export function buildPostRequestArgs(state) {
   const audience = buildAudience(state);
-  const targets  = state.selectedBuurt
-    ? [{ kind: 'group', groupId: state.selectedBuurt }]
+  const targets  = state.selectedCircle
+    ? [{ kind: 'group', groupId: state.selectedCircle }]
     : undefined;
   return {
     text: state.text, kind: state.kind,
-    ...(targets ? { targets, groupId: state.selectedBuurt } : {}),
+    ...(targets ? { targets, groupId: state.selectedCircle } : {}),
     ...(Object.keys(audience).length > 0 ? { audience } : {}),
   };
 }
 
 /**
- * Lazy-load the buurt list via stoop.getCurrentGroup.  Mutates
- * state.availableBuurts in place; returns the mutated state.
+ * Lazy-load the circle list via stoop.getCurrentGroup.  Mutates
+ * state.availableCircles in place; returns the mutated state.
  */
-export async function loadAvailableBuurts({ state, callSkill }) {
+export async function loadAvailableCircles({ state, callSkill }) {
   try {
     const reply  = await callSkill('stoop', 'getCurrentGroup', {});
     const groups = reply?.groupId
       ? [{ id: reply.groupId, label: reply.title ?? reply.groupId }]
       : [];
-    state.availableBuurts = groups;
-    if (groups.length === 1 && !state.selectedBuurt) state.selectedBuurt = groups[0].id;
+    state.availableCircles = groups;
+    if (groups.length === 1 && !state.selectedCircle) state.selectedCircle = groups[0].id;
   } catch {
-    state.availableBuurts = [];
+    state.availableCircles = [];
   }
   return state;
 }

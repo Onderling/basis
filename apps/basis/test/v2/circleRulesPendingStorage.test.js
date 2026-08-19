@@ -25,9 +25,9 @@ describe('localStorageCircleRulesPendingIo · γ-next.rules', () => {
   it('writes to cc.circleRulesPending.<id> as JSON', async () => {
     const s = memStorage();
     const io = localStorageCircleRulesPendingIo(s);
-    await io.save('g1', { purpose: 'Buurt', agreements: 'be kind' });
+    await io.save('g1', { purpose: 'Neighbourhood', agreements: 'be kind' });
     expect(s._backing.get('cc.circleRulesPending.g1')).toBe(
-      JSON.stringify({ purpose: 'Buurt', agreements: 'be kind' }),
+      JSON.stringify({ purpose: 'Neighbourhood', agreements: 'be kind' }),
     );
   });
 

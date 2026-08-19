@@ -1,12 +1,12 @@
 /**
- * The buurt-POST catch-up (a stoop noticeboard concern) — reconnect-time peer poll:
+ * The circle-POST catch-up (a stoop noticeboard concern) — reconnect-time peer poll:
  *
  *   - `makeRequestCatchUpFromKnownPeers` — sender-side.  After the peer transport (re)connects, fire
- *     'catch-up-request' to each known peer in each buurt asking for posts added after our last-seen
+ *     'catch-up-request' to each known peer in each circle asking for posts added after our last-seen
  *     high-water mark (`makeRequestCatchUpForGroup` is the per-circle body).
  *
  *   - `makeHandleCatchUpRequest` — receiver-side.  Looks up missing posts via
- *     stoop.listCirclePostsSince + sends each back via the existing 'buurt-post' envelope (which the
+ *     stoop.listCirclePostsSince + sends each back via the existing 'circle-post' envelope (which the
  *     receiver's normal ingest path already handles + deduplicates).
  *
  * POSTS ONLY. The chat/tasks/governance/membership catch-ups all ride their device-log lanes now
@@ -39,7 +39,7 @@
  *
  * Note: catch-up's `sinceTs` in the strategy contract is per-message
  * timestamp; here the peer envelope uses `sinceMs` keyed off
- * `getLatestPostAddedAt`'s `latestAt` (the buurt-post hi-water mark).
+ * `getLatestPostAddedAt`'s `latestAt` (the circle-post hi-water mark).
  * For ε.3 we honour the caller's `sinceTs` when supplied, and fall
  * back to the hi-water mark when not — keeps the existing default
  * for callers that haven't migrated to negotiated cursors yet.
@@ -62,7 +62,7 @@ export function makeRequestCatchUpForGroup({ callSkill, sendPeer, logger = conso
     }
     // Caller may pass an explicit sinceTs > 0 (negotiated cursor — ε.4
     // territory).  Anything else (undefined / null / 0) means "use the
-    // hi-water mark" — the legacy behaviour the buurt-post receiver
+    // hi-water mark" — the legacy behaviour the circle-post receiver
     // filter expects.  Treating 0 as "no cursor" matches the strategy
     // router's default (it normalises missing sinceTs to 0) without
     // requiring the dispatcher to leak that detail.
@@ -138,15 +138,15 @@ export function makeRequestCatchUpFromKnownPeers({
   const perGroup = makeRequestCatchUpForGroup({ callSkill, sendPeer, logger });
 
   return async function requestCatchUpFromKnownPeers() {
-    let buurts = [];
+    let circles = [];
     try {
       const r = await callSkill('stoop', 'listMyCircles', {});
-      buurts = r?.buurts ?? [];
+      circles = r?.circles ?? [];
     } catch (err) {
       logger.warn?.('[catch-up] listMyCircles failed', err);
       return;
     }
-    for (const groupId of buurts) {
+    for (const groupId of circles) {
       try {
         const r = await perGroup({ circleId: groupId });
         logger.info?.('[catch-up]', groupId, r);
@@ -181,7 +181,7 @@ export function makeHandleCatchUpRequest({ callSkill, sendPeer, getMyPubKey, log
       try {
         await sendPeer(fromAddr, {
           type:       'p2p-chat',
-          subtype:    'buurt-post',
+          subtype:    'circle-post',
           groupId,
           fromPubKey: payloadCore.fromPubKey ?? (typeof getMyPubKey === 'function' ? getMyPubKey() : null),
           payload:    payloadCore,

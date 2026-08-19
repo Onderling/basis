@@ -58,7 +58,7 @@ import {
   makeSendGroupRedeemRequest,
   makeHandleGroupRedeemResponse,
 } from '../../src/core/handlers/groupRedeem.js';
-import { makePropagateMeshIntros, makeHandleBuurtPeerIntro } from '../../src/core/handlers/meshIntros.js';
+import { makePropagateMeshIntros, makeHandleCirclePeerIntro } from '../../src/core/handlers/meshIntros.js';
 // B2 — the exact per-circle address announcing wiring both shells use.
 import {
   makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin,
@@ -209,7 +209,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     // JOINER side: resolve the pending redeem promise.
     'group-redeem-response': makeHandleGroupRedeemResponse({ pendingMap, logger: QUIET }),
     // Both sides: record a mesh-introduced peer into the local roster.
-    'buurt-peer-intro': makeHandleBuurtPeerIntro({ callSkill, logger: QUIET }),
+    'circle-peer-intro': makeHandleCirclePeerIntro({ callSkill, logger: QUIET }),
     // B2 receive half — record an announced per-circle address, then refresh the binding + the
     // authorize snapshot from one roster read.
     'circle-address-announce': makeCircleAddressAnnouncePeerHandler({ agent, logger: QUIET }),

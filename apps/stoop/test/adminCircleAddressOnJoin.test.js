@@ -25,7 +25,7 @@ import { VaultMemory } from '@onderling/vault';
 import { createNeighborhoodAgent } from '../src/index.js';
 import { resolveMemberAddress, ADDRESS_VIA } from '../src/lib/memberAddress.js';
 
-const CIRCLE = 'buurt-42';
+const CIRCLE = 'circle-42';
 const ME     = 'pk-joiner';          // this device (basis binds webid === the chat signing key)
 const ADMIN  = 'pk-admin';           // the admin, known to a joiner only through `confirmedBy`
 

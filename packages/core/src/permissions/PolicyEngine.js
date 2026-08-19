@@ -282,11 +282,24 @@ export class PolicyEngine {
     // issuer-side revocation list (optional). Catches "I revoked this
     // token I issued" before the handler runs, even when the holder still has
     // it stored locally.
+    //
+    // A THROWING check counts as REVOKED (2026-08-19). It used to be swallowed into
+    // `revoked = false`, which meant an unreachable or broken revocation source admitted every token
+    // it was supposed to be guarding — the one failure mode this list exists to prevent, and silent.
+    // Safety over liveness (principles §10): for a security boundary, deny wins. A caller whose
+    // revocation source is flaky sees denials, which is loud and fixable; the alternative was
+    // admitting revoked tokens, which is neither.
     if (this.#isRevoked) {
-      let revoked = false;
-      try { revoked = await this.#isRevoked(parsed.id); } catch { revoked = false; }
+      let revoked = true;
+      let checkFailed = null;
+      try { revoked = await this.#isRevoked(parsed.id); } catch (e) { revoked = true; checkFailed = e; }
       if (revoked) {
-        throw new PolicyDeniedError('INVALID_TOKEN', 'Token has been revoked');
+        throw new PolicyDeniedError(
+          'INVALID_TOKEN',
+          checkFailed
+            ? `Revocation check failed (${checkFailed?.message ?? 'unknown'}) — denying`
+            : 'Token has been revoked',
+        );
       }
     }
   }

@@ -19,6 +19,7 @@ import { PolicyEngine } from '../../src/permissions/PolicyEngine.js';
 import { TrustRegistry, TIER_LEVEL } from '../../src/permissions/TrustRegistry.js';
 import { VaultMemory } from '@onderling/vault';
 import { defineSkill } from '../../src/skills/defineSkill.js';
+import { CapabilityToken } from '../../src/permissions/CapabilityToken.js';
 
 const engineWith = async (skillRegistry, callerTier) => {
   const owner = await AgentIdentity.generate(new VaultMemory());
@@ -78,5 +79,55 @@ describe('the two defaults are opposite ends, on purpose', () => {
     // trip it. If this ever stops throwing, the gate above is the only thing left.
     expect(() => defineSkill('x', async () => ({}), { visibility: 'household' }))
       .toThrow(/unknown visibility tier/);
+  });
+});
+
+/**
+ * The same rule, one layer in: a revocation check that THROWS counts as revoked.
+ *
+ * The issuer-side revocation list is the thing that catches "I revoked this token" even when the holder
+ * still has the blob. Its failure was swallowed into `revoked = false`, so an unreachable or broken
+ * revocation source admitted exactly the tokens it existed to stop — silently, and precisely when the
+ * source is having a bad day. Deny wins.
+ */
+describe('a revocation check that fails counts as REVOKED', () => {
+  const engineWithRevocation = async (isRevoked) => {
+    const owner  = await AgentIdentity.generate(new VaultMemory());
+    const caller = await AgentIdentity.generate(new VaultMemory());
+    const trust  = new TrustRegistry(new VaultMemory());
+    await trust.setTier(caller.pubKey, 'trusted');   // the caller clears the skill's bar
+    await trust.setTier(owner.pubKey,  'trusted');   // …and the token's issuer is trusted
+    const engine = new PolicyEngine({
+      trustRegistry: trust,
+      agentPubKey:   owner.pubKey,
+      skillRegistry: new Map([['op', { enabled: true, visibility: 'authenticated', policy: 'requires-token' }]]),
+      isRevoked,
+    });
+    const token = await CapabilityToken.issue(owner, {
+      subject: caller.pubKey, agentId: owner.pubKey, skill: 'op', expiresIn: 60_000,
+    });
+    return { caller, engine, token: token.toJSON() };
+  };
+
+  it('admits the call when the check answers cleanly', async () => {
+    const { caller, engine, token } = await engineWithRevocation(async () => false);
+    await expect(engine.checkInbound({ peerPubKey: caller.pubKey, skillId: 'op', token }))
+      .resolves.toMatchObject({ allowed: true });
+  });
+
+  it('DENIES when the check throws — a broken revocation source must not admit tokens', async () => {
+    const { caller, engine, token } = await engineWithRevocation(async () => {
+      throw new Error('revocation store unreachable');
+    });
+    await expect(
+      engine.checkInbound({ peerPubKey: caller.pubKey, skillId: 'op', token }),
+      'a throwing revocation check admitted the token it was guarding',
+    ).rejects.toMatchObject({ code: 'INVALID_TOKEN' });
+  });
+
+  it('still denies a plainly revoked token', async () => {
+    const { caller, engine, token } = await engineWithRevocation(async () => true);
+    await expect(engine.checkInbound({ peerPubKey: caller.pubKey, skillId: 'op', token }))
+      .rejects.toMatchObject({ code: 'INVALID_TOKEN' });
   });
 });

@@ -54,7 +54,9 @@
     "fix:versions": "npx --yes syncpack@13 fix-mismatches",
     "tree:fix": "bash scripts/reconstruct-tree.sh",
     "lint:callskill": "node scripts/lint-callskill-literals.mjs",
-    "lint:callskill:update": "node scripts/lint-callskill-literals.mjs --update"
+    "lint:callskill:update": "node scripts/lint-callskill-literals.mjs --update",
+    "lint:unconstructed": "node scripts/lint-unconstructed-classes.mjs",
+    "lint:unconstructed:update": "node scripts/lint-unconstructed-classes.mjs --update"
   },
   "devDependencies": {
     "@babel/parser": "^7.29.3",

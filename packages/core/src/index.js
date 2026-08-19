@@ -134,7 +134,7 @@ export {
 // `@onderling/transports` — import them from there. `core` no longer re-exports
 // them (kills the kernel→concrete-adapter coupling; guarded by
 // test/layering.enforcement.test.js). Transport (base), InternalBus/
-// InternalTransport, LocalTransport, OfflineTransport and HubDelegateTransport
+// InternalTransport, LocalTransport and OfflineTransport
 // stay here.
 // `Transport` is a PORT — the compatibility contract a third-party network
 // adapter implements (extend it, override `_put`). See docs/conventions/ports.md
@@ -153,7 +153,6 @@ export {
 export { senderVerdict, createSenderBinding } from './transport/senderBinding.js';
 export { createNearbyPeerSource }         from './transport/nearbyPeers.js';
 export { InternalBus, InternalTransport } from './transport/InternalTransport.js';
-export { HubDelegateTransport }           from './transport/HubDelegateTransport.js';
 export { LocalTransport }                 from './transport/LocalTransport.js';
 export { OfflineTransport }               from './transport/OfflineTransport.js';
 
@@ -306,7 +305,6 @@ export {
   lastWriteWins,
   MergeContracts,
 }                            from './storage/MergeContracts/index.js';
-export { FederatedReader }   from './storage/FederatedReader.js';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 export { AgentConfig } from './config/AgentConfig.js';

@@ -6,7 +6,7 @@
  * base (imported from '@onderling/core') and lazy-imports its native lib.
  *
  * Import the base class, InternalTransport/LocalTransport/OfflineTransport and
- * HubDelegateTransport from '@onderling/core' — those stay in core.
+ * from '@onderling/core' — those stay in core.
  */
 export { NknTransport }        from './NknTransport.js';
 // The nkn half of sender binding (the shared rule lives in core). Exported because the react-native NKN

@@ -4,8 +4,8 @@
 // the full exchange rides the relay end-to-end:
 //   • a genuine invite → group-redeem round-trip (the join handshake),
 //   • a kring chat message,
-//   • a Wave C governance vote event (broadcastKringGovernance → the one log replicates),
-//   • a §8 report event (broadcastKringReport).
+//   • a Wave C governance vote event (broadcastCircleGovernance → the one log replicates),
+//   • a §8 report event (broadcastCircleReport).
 //
 // Why this exists: the mobile shell only reached this path after the /set-relay persist fix
 // (asyncStorageRelayIo `.save`, commit 7de8b661) let the phone actually dial the relay. This
@@ -71,7 +71,7 @@ describe('relay-route cross-device exchange (self-contained relay)', () => {
       payload: { action: 'removeMember', subject: 'x', by: admin.pubKey, authorRef: admin.pubKey, at: 1 },
       parent: null,
     });
-    await admin.agent.callSkill('stoop', 'broadcastKringGovernance', { groupId: GROUP, event, msgId: `gov:${event.body.hash}` });
+    await admin.agent.callSkill('stoop', 'broadcastCircleGovernance', { groupId: GROUP, event, msgId: `gov:${event.body.hash}` });
     const got = await until(
       () => joiner.chatEvents.some((e) => e?.type === 'governance' && e?.payload?.body?.subject === gid),
       { timeout: 10000 },
@@ -82,7 +82,7 @@ describe('relay-route cross-device exchange (self-contained relay)', () => {
   it('report: a §8 report event replicates admin -> joiner over the relay', async () => {
     const rid = `r-${rnd()}`;
     const event = { kind: 'report', event: 'report', reportId: rid, targetType: 'member', targetRef: 'x', reason: 'spam', by: admin.pubKey };
-    await admin.agent.callSkill('stoop', 'broadcastKringReport', { groupId: GROUP, event, msgId: reportEntryId(event) });
+    await admin.agent.callSkill('stoop', 'broadcastCircleReport', { groupId: GROUP, event, msgId: reportEntryId(event) });
     const got = await until(
       () => joiner.chatEvents.some((e) => e?.type === 'report' && e?.payload?.reportId === rid),
       { timeout: 10000 },

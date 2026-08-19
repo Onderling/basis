@@ -167,16 +167,16 @@ describe('B4 — leaving a circle prunes it on the leaver\'s side', () => {
   });
 
   it('a left circle stops being one of "my circles" — so a reboot cannot undo the leave', async () => {
-    // `listMyBuurts` drives `primeCircleSecurity` and the relay's per-circle address registration.
+    // `listMyCircles` drives `primeCircleSecurity` and the relay's per-circle address registration.
     // Without this filter the next boot would re-record the authorize snapshot for a circle you left
     // and re-register its address on the relay — silently undoing both halves, one restart later.
     const bundle = await buildTwoCircles();
-    const before = (await callSkill(bundle.agent, 'listMyBuurts', undefined, BRAM)).buurts.sort();
+    const before = (await callSkill(bundle.agent, 'listMyCircles', undefined, BRAM)).buurts.sort();
     expect(before).toEqual([A, B].sort());
     await callSkill(bundle.agent, 'leaveGroup', { groupId: A }, BRAM);
-    expect((await callSkill(bundle.agent, 'listMyBuurts', undefined, BRAM)).buurts).toEqual([B]);
+    expect((await callSkill(bundle.agent, 'listMyCircles', undefined, BRAM)).buurts).toEqual([B]);
     // …and the admin, who left nothing, still has both.
-    expect((await callSkill(bundle.agent, 'listMyBuurts', undefined, ADMIN)).buurts.sort())
+    expect((await callSkill(bundle.agent, 'listMyCircles', undefined, ADMIN)).buurts.sort())
       .toEqual([A, B].sort());
   });
 

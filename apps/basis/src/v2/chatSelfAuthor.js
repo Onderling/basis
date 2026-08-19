@@ -7,7 +7,7 @@
  * (`circleKring.js` / `CircleLauncherScreen.js`, both `row.actor === localActor`).
  *
  * `'me'` is a purely local stamp: it never leaves the device, so nothing durable records it. What
- * IS stored is the author — stoop's `broadcastKringMessage` mirrors your outgoing message with
+ * IS stored is the author — stoop's `broadcastCircleMessage` mirrors your outgoing message with
  * `source.fromActor = <you>`, exactly as it stores a peer's with theirs. So on the next launch the
  * rehydrator read your own words back, saw an author instead of `'me'`, and rendered them as
  * somebody else's: left-aligned, with a sender label and a "report" affordance on your own

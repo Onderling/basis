@@ -839,6 +839,79 @@ export const stoopManifest = {
         chat:  { reply: 'record', hint: 'show your buurt\'s rules' },
       },
     },
+
+    // ── What you offer ──────────────────────────────────────────────
+    // Declared 2026-08-19. These have had handlers all along and the shells have been calling them;
+    // nothing declared them, so the manifest was not the contract it is supposed to be (invariant 4)
+    // and a typo'd op id resolved to silence. Params are derived from the handlers, not invented.
+    // Surfaces are deliberately empty where the shells reach these through their own screens: an op
+    // with a screen does not need a slash command invented for it.
+    {
+      id:   'addMyOffering', verb: 'add',
+      // An offering set converges per CATEGORY: two devices adding different categories must both
+      // survive, and the same category added twice is one entry. Last write wins WITHIN a category
+      // (its free tags), which is content, not a claim — nobody is racing for exclusive ownership.
+      resolves: [{ field: 'freeTags', policy: 'content' }],
+      params: [
+        { name: 'categoryId', kind: 'string', required: true },
+        { name: 'freeTags',   kind: 'object', schema: { type: 'array', items: { type: 'string' } } },
+      ],
+      surfaces: { chat: { hint: 'Add something you can offer to your neighbours, by category id (see listOfferingCategories). Optional free tags.' } , ui: { control: 'button', label: 'Aanbod toevoegen' } },
+    },
+    {
+      id:   'removeMyOffering', verb: 'remove',
+      params: [{ name: 'categoryId', kind: 'string', required: true }],
+      surfaces: { chat: { hint: 'Stop offering a category you had listed.' } , ui: { control: 'button', label: 'Aanbod verwijderen' } },
+    },
+    {
+      id:   'listMyOfferings', verb: 'list',
+      params: [],
+      surfaces: { chat: { hint: 'List what this person currently offers.' } , ui: { control: 'page', label: 'Mijn aanbod' } },
+    },
+    {
+      id:   'listOfferingCategories', verb: 'list',
+      // The offering taxonomy with localised labels; `lang` picks the label set.
+      params: [{ name: 'lang', kind: 'string' }],
+      surfaces: { chat: { hint: 'The offering-category taxonomy with localised labels; pass `lang` for the label set.' } , ui: { control: 'page', label: 'Categorieën' } },
+    },
+
+    // ── Where you are ───────────────────────────────────────────────
+    // Coarse by design: a circle knows roughly where you are, not precisely. `geocode` turns a typed
+    // place into coordinates without storing anything — it is the lookup, not the setting.
+    {
+      id:   'setMyLocation', verb: 'add',
+      // One value, so the newest wins. A location is content, not a claim: two devices setting it
+      // concurrently is a person moving, not a contest, and either answer is defensible.
+      resolves: [{ field: 'location', policy: 'content' }],
+      params: [
+        { name: 'lat',   kind: 'number', required: true },
+        { name: 'lon',   kind: 'number', required: true },
+        { name: 'label', kind: 'string' },
+      ],
+      surfaces: { chat: { hint: "Set this person's coarse location (lat/lon, optional label) — what a circle sees is approximate by design." } , ui: { control: 'button', label: 'Locatie instellen' } },
+    },
+    {
+      id:   'clearMyLocation', verb: 'remove',
+      params: [],
+      surfaces: { chat: { hint: "Remove this person's stored location entirely." } , ui: { control: 'button', label: 'Locatie wissen' } },
+    },
+    {
+      id:   'getMyLocation', verb: 'list',
+      params: [],
+      surfaces: { chat: { hint: "Show this person's stored coarse location, if any." } , ui: { control: 'page', label: 'Mijn locatie' } },
+    },
+    {
+      id:   'geocode', verb: 'list',
+      params: [{ name: 'query', kind: 'string', required: true }],
+      surfaces: { chat: { hint: 'Turn a typed place name into coordinates. A lookup only — it stores nothing.' } , ui: { control: 'button', label: 'Plaats opzoeken' } },
+    },
+    {
+      id:   'getDataLocation', verb: 'list',
+      // Not a place in the world — WHERE THIS PERSON'S BYTES REST (pod vs device). It sits in this
+      // group only because the word collides; it answers the my-data screen's "where is my stuff".
+      params: [],
+      surfaces: { chat: { hint: "Where this person's data actually rests (their pod, or this device) — not a place in the world." } , ui: { control: 'page', label: 'Waar staat mijn data' } },
+    },
   ],
 
   // first stoop web page via renderWeb.

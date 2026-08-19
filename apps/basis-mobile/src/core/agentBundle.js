@@ -485,7 +485,7 @@ export async function bootAgentBundle(opts = {}) {
   // a bare `registerCirclePresence()` correct from any caller, which is what the post-join seam needs.
   const liveCircleIds = async () => {
     try {
-      const res = await agent.callSkill?.('stoop', 'listMyBuurts', {});
+      const res = await agent.callSkill?.('stoop', 'listMyCircles', {});
       const ids = (Array.isArray(res?.buurts) ? res.buurts : [])
         .map((b) => (typeof b === 'string' ? b : b?.id))
         .filter(Boolean);

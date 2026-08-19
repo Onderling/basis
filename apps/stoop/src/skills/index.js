@@ -621,7 +621,7 @@ async function _fanOutToMembers({ members, chat, selfWebid, subtype, threadId, b
  * (`held:true`), which counts as a successful send — NOT a failure.
  *
  * The envelope is the conforming `kring-chat-message` wire shape the existing receiver
- * (basis peerRouter → `makeKringChatPeerHandler` → chatMessageInbox → `ingestKringMessage`)
+ * (basis peerRouter → `makeKringChatPeerHandler` → chatMessageInbox → `ingestCircleMessage`)
  * validates and renders — carrying a top-level `text` (the chat.send path emitted `body`,
  * which that receiver rejects), `circleId`, `msgId`, `ts`, `fromActor`. Dedup stays on
  * `msgId` at the receiver; ordering + persistence + catch-up are unchanged.
@@ -1223,7 +1223,7 @@ export function buildSkills({
     return defineSkill(id, wireSkill(coreFn, op(id), { storeFor }), opts);
   };
 
-  // The circle fan-out CORE — the ONE fan the whole `broadcastKring*` family
+  // The circle fan-out CORE — the ONE fan the whole `broadcastCircle*` family
   // rides (roster-fan, transport choice, the pod data-move branch, delivery-state
   // accounting, the `{sent, attempted, errors}` contract) — now lives in
   // `@onderling/circles`. Stoop wires it ONCE here with its deps + the helpers it
@@ -1232,7 +1232,7 @@ export function buildSkills({
   // (`_fanOutViaReliableSend`/`_fanOutToMembers`, which close over the member-address
   // resolver, so they stay in stoop and are injected). `toWireRefEnvelope` is injected
   // rather than imported into the package so the package needs no item-store dep.
-  // Every `broadcastKring*` skill keeps calling `broadcastToCircle(...)` unchanged.
+  // Every `broadcastCircle*` skill keeps calling `broadcastToCircle(...)` unchanged.
   const broadcastToCircle = createCircleFanOut({
     chat, members, store, metrics, bundle,
     preferCircleAddress, allowAddressFallback,
@@ -2637,7 +2637,7 @@ export function buildSkills({
     }),
 
     /**
-     * listBuurtPostsSince({groupId, sinceMs})
+     * listCirclePostsSince({groupId, sinceMs})
      *   — (2026-05-24). Returns broadcast posts in groupId
      *   added after `sinceMs`.  Used by the catch-up flow:
      *
@@ -2650,7 +2650,7 @@ export function buildSkills({
      *   {requestId, text, type, kind, from, targets, ...} so the
      *   caller can re-package without extra lookups.
      */
-    defineSkill('listBuurtPostsSince', async ({ parts, from }) => {
+    defineSkill('listCirclePostsSince', async ({ parts, from }) => {
       const a = dataArgs(parts);
       if (typeof a.groupId !== 'string' || !a.groupId)
         return { error: 'groupId required' };
@@ -2892,7 +2892,7 @@ export function buildSkills({
     }),
 
     /**
-     * listMyBuurts()
+     * listMyCircles()
      *   — 2026-05-24 cross-instance fan-out support.
      *
      *   Returns the set of buurt groupIds the calling actor is in,
@@ -2907,7 +2907,7 @@ export function buildSkills({
      *   Used by the basis fan-out layer to address every
      *   relevant buurt when /post doesn't pin one explicitly.
      */
-    defineSkill('listMyBuurts', async ({ from }) => {
+    defineSkill('listMyCircles', async ({ from }) => {
       const ids = new Set();
       /** groupId → my latest join there, so an exit can be compared against it (B4). */
       const myJoinedAt = new Map();
@@ -3079,7 +3079,7 @@ export function buildSkills({
       if (!payload || typeof payload !== 'object') return { error: 'payload required' };
       const requestId = payload.requestId;
       if (typeof requestId !== 'string' || !requestId) return { error: 'payload.requestId required' };
-      // Eviction + mute filter — shared with ingestKringMessage so the two ingest
+      // Eviction + mute filter — shared with ingestCircleMessage so the two ingest
       // paths can't drift (E1 drift-guard via _peerIngestVerdict). NB buurt-posts
       // previously honoured eviction but NOT mute — this closes that gap: a muted
       // member's posts are dropped too, matching the kring-chat path.
@@ -3574,9 +3574,9 @@ export function buildSkills({
     }),
 
     /**
-     * broadcastKringRecipe({groupId, recipe, msgId, ts?})
+     * broadcastCircleRecipe({groupId, recipe, msgId, ts?})
      *   — γ-next.recipe — kring scherm recipe fan-out to every member
-     *   of a kring.  Sibling of `broadcastKringMessage`: same fan-out
+     *   of a kring.  Sibling of `broadcastCircleMessage`: same fan-out
      *   plumbing (chat.send, WebID→pubKey resolution, signing,
      *   transport routing), different subtype + payload.
      *
@@ -3589,7 +3589,7 @@ export function buildSkills({
      *   Best-effort + fire-and-forget: per-peer failures land in the
      *   returned `errors[]` array but never throw.
      */
-    defineSkill('broadcastKringRecipe', async ({ parts, from }) => {
+    defineSkill('broadcastCircleRecipe', async ({ parts, from }) => {
       const a = dataArgs(parts);
       const _groupId = a.groupId ?? groupId;
       if (!_groupId)                                              return { error: 'groupId-required' };
@@ -3611,9 +3611,9 @@ export function buildSkills({
     }),
 
     /**
-     * broadcastKringRules({groupId, rulesDoc, msgId, ts?})
+     * broadcastCircleRules({groupId, rulesDoc, msgId, ts?})
      *   — γ-next.rules — kring rules document fan-out to every member
-     *   of a kring.  Sibling of `broadcastKringRecipe`: same fan-out
+     *   of a kring.  Sibling of `broadcastCircleRecipe`: same fan-out
      *   plumbing (chat.send, WebID→pubKey resolution, signing,
      *   transport routing), different subtype + payload.
      *
@@ -3626,7 +3626,7 @@ export function buildSkills({
      *   Best-effort + fire-and-forget: per-peer failures land in the
      *   returned `errors[]` array but never throw.
      */
-    defineSkill('broadcastKringRules', async ({ parts, from }) => {
+    defineSkill('broadcastCircleRules', async ({ parts, from }) => {
       const a = dataArgs(parts);
       const _groupId = a.groupId ?? groupId;
       if (!_groupId)                                                  return { error: 'groupId-required' };
@@ -3648,9 +3648,9 @@ export function buildSkills({
     }),
 
     /**
-     * broadcastKringPolicy({groupId, policy, msgId, ts?})
+     * broadcastCirclePolicy({groupId, policy, msgId, ts?})
      *   — γ-next.policy — kring circlePolicy document fan-out to every
-     *   member of a kring.  Sibling of `broadcastKringRules`: same fan-out
+     *   member of a kring.  Sibling of `broadcastCircleRules`: same fan-out
      *   plumbing (chat.send, WebID→pubKey resolution, signing,
      *   transport routing), different subtype + payload.
      *
@@ -3663,7 +3663,7 @@ export function buildSkills({
      *   Best-effort + fire-and-forget: per-peer failures land in the
      *   returned `errors[]` array but never throw.
      */
-    defineSkill('broadcastKringPolicy', async ({ parts, from }) => {
+    defineSkill('broadcastCirclePolicy', async ({ parts, from }) => {
       const a = dataArgs(parts);
       const _groupId = a.groupId ?? groupId;
       if (!_groupId)                                                  return { error: 'groupId-required' };
@@ -3685,12 +3685,12 @@ export function buildSkills({
     }),
 
     /**
-     * broadcastKringGovernance({groupId, event, msgId, ts?})
+     * broadcastCircleGovernance({groupId, event, msgId, ts?})
      *   — Wave C: fan a governance event (a propose / vote / resolve) out to every member
      *   so the one circle log replicates. Receivers ingest it into their local EventLog
-     *   (deduped by the event's stable id). Sibling of broadcastKringPolicy; same plumbing.
+     *   (deduped by the event's stable id). Sibling of broadcastCirclePolicy; same plumbing.
      */
-    defineSkill('broadcastKringGovernance', async ({ parts, from }) => {
+    defineSkill('broadcastCircleGovernance', async ({ parts, from }) => {
       const a = dataArgs(parts);
       const _groupId = a.groupId ?? groupId;
       if (!_groupId)                                                  return { error: 'groupId-required' };
@@ -3714,14 +3714,14 @@ export function buildSkills({
     }),
 
     /**
-     * broadcastKringMembership({groupId, event, msgId, ts?})
+     * broadcastCircleMembership({groupId, event, msgId, ts?})
      *   — the membership rider: fan a SIGNED membership statement (join/leave/evict/role) to every other
      *   member; receivers verify it at their membership rail before it lands on their device log. Same
-     *   plumbing as broadcastKringGovernance; subtype kring-membership-broadcast. A membership transition
+     *   plumbing as broadcastCircleGovernance; subtype kring-membership-broadcast. A membership transition
      *   never wakes an offline device by itself (the roster converges via catch-up; principle: silent
      *   system lane).
      */
-    defineSkill('broadcastKringMembership', async ({ parts, from }) => {
+    defineSkill('broadcastCircleMembership', async ({ parts, from }) => {
       const a = dataArgs(parts);
       const _groupId = a.groupId ?? groupId;
       if (!_groupId)                                                  return { error: 'groupId-required' };
@@ -3740,14 +3740,14 @@ export function buildSkills({
     }),
 
     /**
-     * broadcastKringChatStatement({groupId, event, msgId, ts?})
+     * broadcastCircleChatStatement({groupId, event, msgId, ts?})
      *   — the chat re-root: fan a SIGNED chat statement to every other member; receivers verify it at
      *   their chat rail (signature + roster binding — the eviction gate) before it lands on their device
      *   log AND renders as the bubble. Same plumbing as the other rail fans; subtype kring-chat-statement.
      *   A chat message MAY wake an offline device (the shared kind table says the conversation wakes —
      *   parity with the legacy plain-envelope fan it replaces).
      */
-    defineSkill('broadcastKringChatStatement', async ({ parts, from }) => {
+    defineSkill('broadcastCircleChatStatement', async ({ parts, from }) => {
       const a = dataArgs(parts);
       const _groupId = a.groupId ?? groupId;
       if (!_groupId)                                                  return { error: 'groupId-required' };
@@ -3775,14 +3775,14 @@ export function buildSkills({
     }),
 
     /**
-     * broadcastKringTask({groupId, event, msgId, ts?})
+     * broadcastCircleTask({groupId, event, msgId, ts?})
      *   — the content re-root: fan a SIGNED task statement (a full-item snapshot, or a remove) to every
      *   other member; receivers verify it at their task rail before it lands on their device log and
-     *   causally merges into their store head. Same plumbing as broadcastKringMembership; subtype
+     *   causally merges into their store head. Same plumbing as broadcastCircleMembership; subtype
      *   kring-task-broadcast. Never wakes an offline device by itself (the head converges via catch-up;
      *   an assignment nudge belongs to the notifications model, not this fan).
      */
-    defineSkill('broadcastKringTask', async ({ parts, from }) => {
+    defineSkill('broadcastCircleTask', async ({ parts, from }) => {
       const a = dataArgs(parts);
       const _groupId = a.groupId ?? groupId;
       if (!_groupId)                                                  return { error: 'groupId-required' };
@@ -3801,11 +3801,11 @@ export function buildSkills({
     }),
 
     /**
-     * broadcastKringReport({groupId, event, msgId, ts?})
+     * broadcastCircleReport({groupId, event, msgId, ts?})
      *   — Wave C §8: fan a report event to every member (so an admin on another device sees
-     *   it). Same plumbing as broadcastKringGovernance; subtype kring-report-broadcast.
+     *   it). Same plumbing as broadcastCircleGovernance; subtype kring-report-broadcast.
      */
-    defineSkill('broadcastKringReport', async ({ parts, from }) => {
+    defineSkill('broadcastCircleReport', async ({ parts, from }) => {
       const a = dataArgs(parts);
       const _groupId = a.groupId ?? groupId;
       if (!_groupId)                                                  return { error: 'groupId-required' };
@@ -3832,7 +3832,7 @@ export function buildSkills({
 
     /**
      * broadcastRosterUpdated({groupId, memberRef, keys?, msgId, ts?})
-     *   — the roster "pull-me" signal. Sibling of the `broadcastKring*`
+     *   — the roster "pull-me" signal. Sibling of the `broadcastCircle*`
      *   family (same fan-out plumbing, subtype `roster-updated`), with one
      *   defining difference: it carries NO CONTENT. Only a member REF and the
      *   NAMES of the properties that changed ride the wire; every receiver
@@ -3898,14 +3898,14 @@ export function buildSkills({
     }),
 
     /**
-     * listKringChats({groupId?, sinceTs?, limit?})
+     * listCircleChats({groupId?, sinceTs?, limit?})
      *   — list stored kring chat-message items, ordered
      *   oldest → newest (chat reading order).  Defaults: all circles,
      *   no time bound, capped at 200 most recent.  Hosts (basis
      *   web + mobile) call this at boot to rehydrate eventLog so the
      *   GESPREK tab shows historical chats after a reload.
      */
-    defineSkill('listKringChats', async ({ parts }) => {
+    defineSkill('listCircleChats', async ({ parts }) => {
       const a = dataArgs(parts);
       const limit = Math.max(1, Math.min(1000,
         typeof a.limit === 'number' && Number.isFinite(a.limit) ? a.limit : 200,
@@ -3932,7 +3932,7 @@ export function buildSkills({
     }),
 
     /**
-     * ingestKringMessage({payload, fromPubKey, fromPeerAddr})
+     * ingestCircleMessage({payload, fromPubKey, fromPeerAddr})
      *   — receive-side mirror for an inbound kring chat
      *   envelope.  Sibling of `ingestRemotePost` for the buurt-post
      *   path: dedupe + eviction + mute filtering + addItems.  Hosts
@@ -3942,7 +3942,7 @@ export function buildSkills({
      *   Returns: { ok: true, itemId } | { deduped: true } |
      *            { evicted: true } | { muted: true } | { error }.
      */
-    defineSkill('ingestKringMessage', async ({ parts }) => {
+    defineSkill('ingestCircleMessage', async ({ parts }) => {
       const a = dataArgs(parts);
       const payload = a.payload;
       const fromPubKey = typeof a.fromPubKey === 'string' ? a.fromPubKey : null;

@@ -45,7 +45,15 @@ export const householdManifest = {
   // `help` (meta) + `register` (identity act, not a plain `add contact`) +
   // `enroll-device` (the add-a-device ceremony — an identity act on the host).
   // Every other op maps to an SDK atom; the `{atoms:true}` validator enforces it.
-  domainVerbs: ['help', 'register', 'enroll-device', 'revoke-device'],
+  // The ceremonies and the authority grants are their own verbs on purpose. None of them maps onto an SDK
+  // atom without lying: revealing a recovery phrase is not a `list`, and granting a connection the right to
+  // act as you is not an `add`. Declaring them here is what the atom-discipline guard asks for — it refuses
+  // an undeclared verb rather than letting one drift in under a borrowed atom.
+  domainVerbs: [
+    'help', 'register',
+    'enroll-device', 'revoke-device', 'reveal-owner-phrase', 'restore-owner-phrase',
+    'grant-surface', 'revoke-surface', 'list-surface-grants',
+  ],
 
   // B · Layer 1 — the (verb × noun) capability surface (PLAN-capability-arc.md).
   // Each key is one of `itemTypes`; each `atoms` entry is a CANONICAL SDK atom

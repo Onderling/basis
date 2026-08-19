@@ -3,7 +3,7 @@
  *
  * The kring chat send is optimistic: the local user's message is
  * appended to the in-memory EventLog the moment the composer fires,
- * then a best-effort `broadcastKringMessage` fan-out runs in the
+ * then a best-effort `broadcastCircleMessage` fan-out runs in the
  * background.  Before δ.2, failures were silent — the user never
  * knew if their message reached peers.
  *

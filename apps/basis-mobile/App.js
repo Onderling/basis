@@ -227,9 +227,9 @@ export default function App() {
         const callSkill = bundleRef.current?.callSkill;
         if (typeof callSkill !== 'function') return { ok: false };
         try {
-          return await callSkill('stoop', 'ingestKringMessage', { payload, fromPeerAddr });
+          return await callSkill('stoop', 'ingestCircleMessage', { payload, fromPeerAddr });
         } catch (err) {
-          console.warn('[kring-chat] ingestKringMessage failed:', err?.message ?? err);
+          console.warn('[kring-chat] ingestCircleMessage failed:', err?.message ?? err);
           return { error: String(err?.message ?? err) };
         }
       },

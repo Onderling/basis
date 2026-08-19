@@ -254,7 +254,7 @@ import { EventLog } from '../../src/eventLog.js';
 // time by circleKring to surface pending/failed icons.
 import { createDeliveryStateMap } from '@onderling/kring-host/deliveryState';
 // Phase 2 — shared kring chat send primitives (optimistic event + best-effort fan-out), web + mobile.
-import { kringChatMessageEvent, broadcastKringFanOut } from '@onderling/kring-host/kringBroadcast';
+import { kringChatMessageEvent, broadcastCircleFanOut } from '@onderling/kring-host/kringBroadcast';
 import { makeKeyEventLogSink, recipientAddrsFromRoster } from '@onderling/kring-host/keyEventLogSink';
 // "only you" vs "whole kring" — message scope (a data property; the badge renders it).
 import { scopeForReply } from '../../src/v2/messageScope.js';
@@ -1150,7 +1150,7 @@ const pullRosterForCircle = async ({ circleId }) => {
 };
 // δ.2 — one delivery-state map per agent boot (lifetime matches the
 // in-memory EventLog).  showKring's onSend marks each locally-sent
-// msgId 'pending' → 'sent' | 'failed' as broadcastKringMessage
+// msgId 'pending' → 'sent' | 'failed' as broadcastCircleMessage
 // resolves; the kring renderer reads it at render time.
 const deliveryStateMap = createDeliveryStateMap();
 // …and REDRAW when a RECEIPT advances a message. `broadcastFanOut` announces its own transitions
@@ -5370,7 +5370,7 @@ function showKring(id, circle, policy) {
     const ts = Date.now();
     const text = t('circle.media.outgoing', { name: file?.name ?? '' });
     // Local append keeps the FULL embed (incl. `stored`); the fan-out's wire copy is
-    // whitelist-projected inside broadcastKringFanOut.
+    // whitelist-projected inside broadcastCircleFanOut.
     eventLog.append(kringChatMessageEvent({
       msgId, ts, circleId: id, actor: LOCAL_ACTOR, text, scope: 'kring', media: embed,
     }));
@@ -5636,7 +5636,7 @@ function showKring(id, circle, policy) {
     // Shared fan-out (Phase 2); onChange = web's rerender. `signStatement` is the chat lane's cutover
     // hook: the already-appended entry is signed in place and the SIGNED statement fans (receivers
     // verify at their rail); without a rail/circle key the legacy plain envelope goes, honestly.
-    broadcastKringFanOut({
+    broadcastCircleFanOut({
       rawCallSkill, circleId: id, msgId, text, ts, media, deliveryStateMap, onChange: rerender,
       signStatement: (cid, mid) => _peerAgent?.chatRail?.signEntry?.(cid, mid) ?? null,
     });
@@ -6281,7 +6281,7 @@ function showRecipeEditor(circleId) {
 
 /**
  * γ-next.recipe — fan the active recipe out to every other kring
- * member via stoop's `broadcastKringRecipe` skill.  Fire-and-forget:
+ * member via stoop's `broadcastCircleRecipe` skill.  Fire-and-forget:
  * per-peer failures land in the result.errors array; we just log.
  * No-op when rawCallSkill isn't bound yet (pre-agent-boot edits).
  */
@@ -6291,7 +6291,7 @@ function broadcastActiveRecipe({ circleId, book }) {
   if (!active) return;
   const msgId = `kring-recipe-${circleId}-${Date.now()}`;
   const ts    = Date.now();
-  rawCallSkill('stoop', 'broadcastKringRecipe', {
+  rawCallSkill('stoop', 'broadcastCircleRecipe', {
     groupId: circleId,
     recipe:  active,
     msgId,
@@ -6460,7 +6460,7 @@ async function showRules(id) {
 
 /**
  * γ-next.rules — fan the rules document out to every other kring
- * member via stoop's `broadcastKringRules` skill.  Fire-and-forget:
+ * member via stoop's `broadcastCircleRules` skill.  Fire-and-forget:
  * per-peer failures land in the result.errors array; we just log.
  * No-op when rawCallSkill isn't bound yet (pre-agent-boot edits).
  */
@@ -6469,7 +6469,7 @@ function broadcastRules({ circleId, doc }) {
   if (!doc || typeof doc !== 'object') return;
   const msgId = `kring-rules-${circleId}-${Date.now()}`;
   const ts    = Date.now();
-  rawCallSkill('stoop', 'broadcastKringRules', {
+  rawCallSkill('stoop', 'broadcastCircleRules', {
     groupId:  circleId,
     rulesDoc: doc,
     msgId,
@@ -6586,7 +6586,7 @@ function govNotify(circleId, event) {
   } catch { /* best-effort */ }
 }
 function govBroadcast(channel, circleId, event, opts) {
-  const op = channel === 'report' ? 'broadcastKringReport' : 'broadcastKringGovernance';
+  const op = channel === 'report' ? 'broadcastCircleReport' : 'broadcastCircleGovernance';
   const msgId = channel === 'report' ? reportEntryId(event) : (event?.body?.hash ? `gov:${event.body.hash}` : governanceEntryId(event));
   // `opts.to` narrows the fan — the report channel passes the circle's admins, so a report never lands on
   // the device of the person it is about (story 3.6). Undefined for governance: those fan to everyone.
@@ -7055,7 +7055,7 @@ async function showSettings(id) {
 
 /**
  * γ-next.policy — fan the policy document out to every other kring
- * member via stoop's `broadcastKringPolicy` skill.  Fire-and-forget:
+ * member via stoop's `broadcastCirclePolicy` skill.  Fire-and-forget:
  * per-peer failures land in the result.errors array; we just log.
  * No-op when rawCallSkill isn't bound yet (pre-agent-boot edits).
  */
@@ -7064,7 +7064,7 @@ function broadcastPolicy({ circleId, policy }) {
   if (!policy || typeof policy !== 'object') return;
   const msgId = `kring-policy-${circleId}-${Date.now()}`;
   const ts    = Date.now();
-  rawCallSkill('stoop', 'broadcastKringPolicy', {
+  rawCallSkill('stoop', 'broadcastCirclePolicy', {
     groupId: circleId,
     policy,
     msgId,
@@ -7354,7 +7354,7 @@ async function boot() {
       // BUGFIX: `catalog` is a LOCAL of buildCircleBot (defined far below + only after
       // buildCircleBot runs); referencing it here threw ReferenceError on every resolved
       // call, so the catalog getter crashed → loadCircles silently returned [] → circles
-      // never appeared even though createGroupV2 + listMyBuurts worked. Use the module-level
+      // never appeared even though createGroupV2 + listMyCircles worked. Use the module-level
       // `circleCatalog` (null until buildCircleBot sets it; makeResolvingCallSkill tolerates
       // a null catalog by trying all origins).
       resolveCallSkill = makeResolvingCallSkill(rawCallSkill, DEFAULT_CIRCLE_ORIGINS, () => circleCatalog);
@@ -7368,13 +7368,13 @@ async function boot() {
       // searchable, and mute/eviction-filtered (parity with /post
       // delivery via `ingestRemotePost`).  EventLog append still drives
       // the live bubble render.
-      const ingestKringMessage = async (payload, fromPeerAddr) => {
+      const ingestCircleMessage = async (payload, fromPeerAddr) => {
         try {
-          return await agent.callSkill('stoop', 'ingestKringMessage', {
+          return await agent.callSkill('stoop', 'ingestCircleMessage', {
             payload, fromPeerAddr,
           });
         } catch (err) {
-          console.warn('[circleApp] ingestKringMessage failed:', err?.message ?? err);
+          console.warn('[circleApp] ingestCircleMessage failed:', err?.message ?? err);
           return { error: String(err?.message ?? err) };
         }
       };
@@ -7417,7 +7417,7 @@ async function boot() {
         }));
       const kringChatInbox = createChatMessageInbox({
         eventLog,
-        ingest: ingestKringMessage,
+        ingest: ingestCircleMessage,
         onStored: onKringStored,
         // Connectivity Phase 3 (receiver side) — resolve a pod-signal REF envelope (a pod-row pointer,
         // no body) into the full chat message by reading + unsealing the circle's shared pod. Absent a
@@ -7668,7 +7668,7 @@ async function boot() {
         // The pod read-back kick: same reconnect moment, per live circle (the circles list is loaded here).
         (async () => {
           try {
-            const r = await rawCallSkill('stoop', 'listMyBuurts', {});
+            const r = await rawCallSkill('stoop', 'listMyCircles', {});
             const ids = (r?.buurts ?? []).map((b) => b?.groupId ?? b?.id).filter(Boolean);
             await podChatCatchUpShell?.catchUpAll(ids);
           } catch { /* best-effort — the next reconnect retries */ }

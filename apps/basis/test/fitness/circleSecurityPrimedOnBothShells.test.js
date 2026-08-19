@@ -56,7 +56,7 @@ describe('the primer stands on its own', () => {
   const bare = code('apps/basis/src/v2/circleSecurityPriming.js');
 
   it('asks the SUBSTRATE for the circle list, not a render cache', () => {
-    expect(bare).toMatch(/listMyBuurts/);
+    expect(bare).toMatch(/listMyCircles/);
     expect(bare).not.toMatch(/circlesCache/);
   });
 

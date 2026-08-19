@@ -6,7 +6,7 @@
 // unconfirmed message is `maybe-received`.
 
 import { describe, it, expect, vi } from 'vitest';
-import { kringChatMessageEvent, broadcastKringFanOut, classifyFanOut, mediaForKringWire } from '../src/kringBroadcast.js';
+import { kringChatMessageEvent, broadcastCircleFanOut, classifyFanOut, mediaForKringWire } from '../src/kringBroadcast.js';
 
 const mapOf = () => {
   const m = new Map();
@@ -97,7 +97,7 @@ describe('mediaForKringWire — the wire-boundary whitelist (media P1 fan-out)',
   });
 });
 
-describe('broadcastKringFanOut', () => {
+describe('broadcastCircleFanOut', () => {
   const base = { circleId: 'c1', msgId: 'm1', text: 'hi', ts: 9 };
 
   const STATEMENT = { body: { hash: 'h1' }, sig: 'sig1' };
@@ -108,8 +108,8 @@ describe('broadcastKringFanOut', () => {
     const calls = [];
     const rawCallSkill = vi.fn(async (app, op, args) => { calls.push([app, op, args]); return {}; });
     const onChange = vi.fn();
-    await broadcastKringFanOut({ ...base, rawCallSkill, deliveryStateMap: map, onChange, signStatement: signOk });
-    expect(calls[0]).toEqual(['stoop', 'broadcastKringChatStatement', { groupId: 'c1', event: STATEMENT, msgId: 'm1', ts: 9 }]);
+    await broadcastCircleFanOut({ ...base, rawCallSkill, deliveryStateMap: map, onChange, signStatement: signOk });
+    expect(calls[0]).toEqual(['stoop', 'broadcastCircleChatStatement', { groupId: 'c1', event: STATEMENT, msgId: 'm1', ts: 9 }]);
     expect(map.get('m1')).toBe('maybe-received');
     expect(onChange).toHaveBeenCalledTimes(2);   // pending + sent
   });
@@ -117,7 +117,7 @@ describe('broadcastKringFanOut', () => {
   it('NO signature (no rail / no circle key) is an honest delivery FAILURE — never a silent unsigned send', async () => {
     const map = mapOf();
     const calls = [];
-    await broadcastKringFanOut({ ...base, rawCallSkill: async (...c) => { calls.push(c); return {}; }, deliveryStateMap: map });
+    await broadcastCircleFanOut({ ...base, rawCallSkill: async (...c) => { calls.push(c); return {}; }, deliveryStateMap: map });
     expect(calls).toHaveLength(0);              // nothing left the device
     expect(map.get('m1')).toBe('failed');       // the bubble says so
   });
@@ -126,13 +126,13 @@ describe('broadcastKringFanOut', () => {
 
   it('pending → undeliverable when every error is permanent (recipient-pubkey-unknown)', async () => {
     const map = mapOf();
-    await broadcastKringFanOut({ ...base, signStatement: signOk, rawCallSkill: async () => ({ sent: 0, errors: [{ webid: 'x', reason: 'recipient-pubkey-unknown' }] }), deliveryStateMap: map });
+    await broadcastCircleFanOut({ ...base, signStatement: signOk, rawCallSkill: async () => ({ sent: 0, errors: [{ webid: 'x', reason: 'recipient-pubkey-unknown' }] }), deliveryStateMap: map });
     expect(map.get('m1')).toBe('undeliverable');   // retry can't help → no retry affordance
   });
 
   it('pending → failed when at least one error is transient (retryable)', async () => {
     const map = mapOf();
-    await broadcastKringFanOut({ ...base, rawCallSkill: async () => ({ sent: 0, errors: [
+    await broadcastCircleFanOut({ ...base, rawCallSkill: async () => ({ sent: 0, errors: [
       { webid: 'x', reason: 'recipient-pubkey-unknown' },   // permanent
       { webid: 'y', reason: 'send-timeout' },               // transient → whole fan-out stays retryable
     ] }), deliveryStateMap: map });
@@ -141,16 +141,16 @@ describe('broadcastKringFanOut', () => {
 
   it('pending → failed on an {error} envelope and on a throw', async () => {
     const m1 = mapOf();
-    await broadcastKringFanOut({ ...base, rawCallSkill: async () => ({ error: 'nope' }), deliveryStateMap: m1 });
+    await broadcastCircleFanOut({ ...base, rawCallSkill: async () => ({ error: 'nope' }), deliveryStateMap: m1 });
     expect(m1.get('m1')).toBe('failed');
     const m2 = mapOf();
-    await broadcastKringFanOut({ ...base, rawCallSkill: async () => { throw new Error('boom'); }, deliveryStateMap: m2 });
+    await broadcastCircleFanOut({ ...base, rawCallSkill: async () => { throw new Error('boom'); }, deliveryStateMap: m2 });
     expect(m2.get('m1')).toBe('failed');
   });
 
   it('is a no-op when rawCallSkill is missing (never marks pending)', async () => {
     const map = mapOf();
-    await broadcastKringFanOut({ ...base, rawCallSkill: null, deliveryStateMap: map });
+    await broadcastCircleFanOut({ ...base, rawCallSkill: null, deliveryStateMap: map });
     expect(map.get('m1')).toBeNull();
   });
 });

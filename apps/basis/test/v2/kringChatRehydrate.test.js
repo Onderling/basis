@@ -48,7 +48,7 @@ describe('rehydrateKringChatsFromStoop · SP-13.2.2 boot rehydrator', () => {
     ] }));
     const r = await rehydrateKringChatsFromStoop({ callSkill, eventLog, logger: silentLogger });
 
-    expect(callSkill).toHaveBeenCalledWith('stoop', 'listKringChats', expect.any(Object));
+    expect(callSkill).toHaveBeenCalledWith('stoop', 'listCircleChats', expect.any(Object));
     expect(r.rehydrated).toBe(2);
     expect(eventLog.events).toHaveLength(2);
     expect(eventLog.events[0].id).toBe('mA');

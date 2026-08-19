@@ -14,7 +14,7 @@
  *   • The ONLINE member must be unaffected — a held message for Cato must not delay or duplicate Bram's.
  *
  * Real agents over a shared InternalBus (`pairRealAgents.js`), so this drives the production send path
- * (`broadcastKringMessage` → reliableSend → hold-forward) and the production receive path
+ * (`broadcastCircleMessage` → reliableSend → hold-forward) and the production receive path
  * (`kringChatReceiver` → `chatMessageInbox` → EventLog). No stand-ins.
  *
  * Cast: Anna (A, admin/poster) · Bram (B, online throughout) · Cato (C, offline for the burst).

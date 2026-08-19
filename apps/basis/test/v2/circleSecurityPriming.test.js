@@ -25,7 +25,7 @@ function fakeAgent({ circles = ['buurt', 'koor'], members = {}, failMembersFor =
     installCircleIdentities: async (ids) => { installed.push([...ids]); },
     recordCircleSenders: async ({ circleId, members: m }) => { recorded.push({ circleId, count: m?.length ?? 0 }); },
     callSkill: async (app, op, args) => {
-      if (op === 'listMyBuurts') return { buurts: circles };
+      if (op === 'listMyCircles') return { buurts: circles };
       if (op === 'listGroupMembers') {
         if (failMembersFor.includes(args.groupId)) throw new Error('substrate unavailable');
         return { members: members[args.groupId] ?? [] };

@@ -22,7 +22,7 @@ const silentLogger = { info: () => {}, warn: () => {}, error: () => {} };
 describe('requestCatchUpFromKnownPeers', () => {
   it('iterates every known buurt + sends a catch-up-request to each roster peer', async () => {
     const callSkill = vi.fn(async (_app, op, args) => {
-      if (op === 'listMyBuurts')          return { buurts: ['westend', 'noord'] };
+      if (op === 'listMyCircles')          return { buurts: ['westend', 'noord'] };
       if (op === 'getLatestPostAddedAt')  return { latestAt: args.groupId === 'westend' ? 1000 : 2000 };
       if (op === 'listGroupRoster')       return { members: [{ addr: 'addr-a' }, { addr: 'addr-b' }] };
       return null;
@@ -40,7 +40,7 @@ describe('requestCatchUpFromKnownPeers', () => {
     expect(westendCalls.every((c) => c[1].sinceMs === 1000)).toBe(true);
   });
 
-  it('skips silently when listMyBuurts fails', async () => {
+  it('skips silently when listMyCircles fails', async () => {
     const callSkill = vi.fn(async () => { throw new Error('no buurts'); });
     const sendPeer = vi.fn();
     const fn = makeRequestCatchUpFromKnownPeers({ callSkill, sendPeer, logger: silentLogger });
@@ -50,7 +50,7 @@ describe('requestCatchUpFromKnownPeers', () => {
 
   it('skips empty rosters but still iterates next buurt', async () => {
     const callSkill = vi.fn(async (_app, op, args) => {
-      if (op === 'listMyBuurts')          return { buurts: ['empty', 'full'] };
+      if (op === 'listMyCircles')          return { buurts: ['empty', 'full'] };
       if (op === 'getLatestPostAddedAt')  return { latestAt: 0 };
       if (op === 'listGroupRoster')
         return { members: args.groupId === 'full' ? [{ addr: 'addr-a' }] : [] };
@@ -69,7 +69,7 @@ describe('handleCatchUpRequest', () => {
     const post1 = { requestId: 'r1', text: 'old', from: 'addr-a', type: 'request', _addedAt: 100 };
     const post2 = { requestId: 'r2', text: 'new', from: 'addr-a', type: 'request', _addedAt: 200 };
     const callSkill = vi.fn(async (_app, op) => {
-      if (op === 'listBuurtPostsSince') return { posts: [post1, post2] };
+      if (op === 'listCirclePostsSince') return { posts: [post1, post2] };
       return null;
     });
     const sendPeer = vi.fn(async () => ({}));

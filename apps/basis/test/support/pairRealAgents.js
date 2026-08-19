@@ -161,7 +161,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     eventLog: chatEventLog,
     // The MIGRATION gate only (the store copy's one-time carry-over): live receive is the signed
     // statement path below.
-    ingest: (payload, fromPeerAddr) => callSkill('stoop', 'ingestKringMessage', { payload, fromPeerAddr }),
+    ingest: (payload, fromPeerAddr) => callSkill('stoop', 'ingestCircleMessage', { payload, fromPeerAddr }),
     logger: QUIET,
   });
   // The chat RAIL — the exact receive wiring the shells use: a fanned statement verifies (signature +
@@ -616,11 +616,11 @@ export async function teardown(...nodes) {
 /**
  * Send one kring chat over the SIGNED path — the exact production shape: append the signed render entry
  * on the sender's own log (`chatRail.appendMessage`), then fan the STATEMENT through the real stoop core
- * (`broadcastKringChatStatement` → transport / pod routing per the circle's policy). The drop-in
- * replacement for the deleted plain-envelope `broadcastKringMessage` in every journey test.
+ * (`broadcastCircleChatStatement` → transport / pod routing per the circle's policy). The drop-in
+ * replacement for the deleted plain-envelope `broadcastCircleMessage` in every journey test.
  */
 export async function sendKringChat(node, { groupId, msgId, text, ts = Date.now(), media } = {}) {
   const res = await node.chatRail.appendMessage(groupId, { msgId, ts, text, actor: node.pubKey, media });
   if (!res) return { error: 'no-circle-signer' };
-  return node.agent.callSkill('stoop', 'broadcastKringChatStatement', { groupId, event: res.statement, msgId, ts });
+  return node.agent.callSkill('stoop', 'broadcastCircleChatStatement', { groupId, event: res.statement, msgId, ts });
 }

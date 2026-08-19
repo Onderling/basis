@@ -71,7 +71,7 @@ import {
   // δ.2 — per-message delivery state for optimistic kring chat sends.
   createDeliveryStateMap,
   // Phase 2 — shared kring chat send primitives (optimistic event + best-effort fan-out).
-  kringChatMessageEvent, broadcastKringFanOut,
+  kringChatMessageEvent, broadcastCircleFanOut,
   // Phase 3 — the shared circle label→candidate lookup (base items + app-qualified live fetch).
   makeCircleLookup,
   // Composer parity — the classic shell's slash-command suggest, shared so mobile renders the same set.
@@ -697,7 +697,7 @@ export default function CircleLauncherScreen({
     const circleId = selected?.id; if (!circleId || !targetRef) return;
     try {
       const broadcast = (channel, cid, event, opts) => {
-        const op = channel === 'report' ? 'broadcastKringReport' : 'broadcastKringGovernance';
+        const op = channel === 'report' ? 'broadcastCircleReport' : 'broadcastCircleGovernance';
         const msgId = channel === 'report' ? reportEntryId(event) : (event?.body?.hash ? `gov:${event.body.hash}` : governanceEntryId(event));
         // `opts.to` narrows the fan to the circle's admins on the report channel (story 3.6) — web parity.
         const to = Array.isArray(opts?.to) ? opts.to : undefined;
@@ -761,7 +761,7 @@ export default function CircleLauncherScreen({
   const govPolicy = useMemo(() => {
     if (!bundle?.callSkill || !eventLog) return null;
     const broadcast = (channel, cid, event, opts) => {
-      const op = channel === 'report' ? 'broadcastKringReport' : 'broadcastKringGovernance';
+      const op = channel === 'report' ? 'broadcastCircleReport' : 'broadcastCircleGovernance';
       const msgId = event?.body?.hash ? `gov:${event.body.hash}` : governanceEntryId(event);
       const to = Array.isArray(opts?.to) ? opts.to : undefined;
       bundle.callSkill('stoop', op, { groupId: cid, event, msgId, ts: Date.now(), ...(to ? { to } : {}) })?.catch?.(() => {});
@@ -836,7 +836,7 @@ export default function CircleLauncherScreen({
     if (!active) return;
     const msgId = `kring-recipe-${cid}-${Date.now()}`;
     const ts    = Date.now();
-    bundle.callSkill('stoop', 'broadcastKringRecipe', {
+    bundle.callSkill('stoop', 'broadcastCircleRecipe', {
       groupId: cid, recipe: active, msgId, ts,
     }).then((r) => {
       if (r?.error) console.warn('[kring-recipe] fan-out skipped:', r.error);
@@ -1624,7 +1624,7 @@ export default function CircleLauncherScreen({
     // Send-side: the settings editor owns the `store.update` call (so
     // proposal + commit paths route through one place); we wrap the
     // store here so a fresh update fans the post-save policy out to
-    // peers via stoop's `broadcastKringPolicy`.  Fire-and-forget;
+    // peers via stoop's `broadcastCirclePolicy`.  Fire-and-forget;
     // per-peer errors land in result.errors which we log.  No-op when
     // callSkill / no agent.
     const broadcastingStore = {
@@ -1634,7 +1634,7 @@ export default function CircleLauncherScreen({
         if (next && typeof next === 'object' && typeof bundle?.callSkill === 'function') {
           const msgId = `kring-policy-${cid}-${Date.now()}`;
           const ts    = Date.now();
-          bundle.callSkill('stoop', 'broadcastKringPolicy', {
+          bundle.callSkill('stoop', 'broadcastCirclePolicy', {
             groupId: cid, policy: next, msgId, ts,
           }).then((res) => {
             if (res?.error) console.warn('[kring-policy] fan-out skipped:', res.error);
@@ -1771,7 +1771,7 @@ export default function CircleLauncherScreen({
           if (doc && typeof bundle?.callSkill === 'function') {
             const msgId = `kring-rules-${selected.id}-${Date.now()}`;
             const ts    = Date.now();
-            bundle.callSkill('stoop', 'broadcastKringRules', {
+            bundle.callSkill('stoop', 'broadcastCircleRules', {
               groupId: selected.id, rulesDoc: doc, msgId, ts,
             }).then((r) => {
               if (r?.error) console.warn('[kring-rules] fan-out skipped:', r.error);
@@ -2666,7 +2666,7 @@ function CircleDetail({
     // so a media-carrying message fans with its embed instead of arriving as bare text. `signStatement`
     // is the chat lane's cutover hook (web parity): the appended entry is signed in place and the
     // SIGNED statement fans; no rail/circle key yet → the legacy plain envelope, honestly.
-    broadcastKringFanOut({
+    broadcastCircleFanOut({
       rawCallSkill, circleId: circle?.id, msgId, text, ts, media,
       deliveryStateMap: deliveryStateMapRef.current,
       onChange: () => setDeliveryTick((n) => n + 1),

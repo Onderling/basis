@@ -17,7 +17,7 @@ async function warmMesh(A, B) {
 }
 
 describe('governance/report propagation over a REAL relay', () => {
-  it('broadcastKringGovernance A -> B ingests the vote event over the relay', async () => {
+  it('broadcastCircleGovernance A -> B ingests the vote event over the relay', async () => {
     const A = await bootRealAgentNode('A');
     const aCidHolder = {};
     const B = await bootRealAgentNode('B', {
@@ -37,7 +37,7 @@ describe('governance/report propagation over a REAL relay', () => {
       payload: { action: 'removeMember', subject: 'x', by: A.pubKey, authorRef: A.pubKey, at: 1 },
       parent: null,
     });
-    const r = await A.agent.callSkill('stoop', 'broadcastKringGovernance', { groupId: 'peer-circle', event, msgId: `gov:${event.body.hash}` });
+    const r = await A.agent.callSkill('stoop', 'broadcastCircleGovernance', { groupId: 'peer-circle', event, msgId: `gov:${event.body.hash}` });
     expect(r?.sent, `broadcast should send over the relay: ${JSON.stringify(r)}`).toBeGreaterThan(0);
 
     const got = await until(() => B.chatEvents.some((e) => e?.type === 'governance' && e?.payload?.body?.subject === 'p-relay'), { timeout: 8000 });
@@ -45,7 +45,7 @@ describe('governance/report propagation over a REAL relay', () => {
     await teardown(A, B);
   });
 
-  it('broadcastKringReport A -> B ingests the report event over the relay', async () => {
+  it('broadcastCircleReport A -> B ingests the report event over the relay', async () => {
     const A = await bootRealAgentNode('A');
     const B = await bootRealAgentNode('B');
     await connectAgentsOverRelay(A, B, { relayUrl: RELAY });
@@ -53,7 +53,7 @@ describe('governance/report propagation over a REAL relay', () => {
     await warmMesh(A, B);
 
     const event = { kind: 'report', event: 'report', reportId: 'r-relay', targetType: 'member', targetRef: 'x', reason: 'spam', by: 'A' };
-    const r = await A.agent.callSkill('stoop', 'broadcastKringReport', { groupId: 'peer-circle', event, msgId: reportEntryId(event) });
+    const r = await A.agent.callSkill('stoop', 'broadcastCircleReport', { groupId: 'peer-circle', event, msgId: reportEntryId(event) });
     expect(r?.sent).toBeGreaterThan(0);
 
     const got = await until(() => B.chatEvents.some((e) => e?.type === 'report' && e?.payload?.reportId === 'r-relay'), { timeout: 8000 });

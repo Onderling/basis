@@ -18,7 +18,7 @@ export { normalizeCircleMembers, circleMemberCount, recipientSealKeyFromMembers,
   memberFrom, memberToChatItem, memberToViewAs } from './circleMembers.js';
 export { pickPromptKey, beginFollowUp, beginFormFollowUp, completeMultiFieldFollowUp, completeFollowUp } from './followUp.js';
 export { createDeliveryStateMap } from './deliveryState.js';
-export { kringChatMessageEvent, PERMANENT_FANOUT_REASONS, classifyFanOut, broadcastKringFanOut } from './kringBroadcast.js';
+export { kringChatMessageEvent, PERMANENT_FANOUT_REASONS, classifyFanOut, broadcastCircleFanOut } from './kringBroadcast.js';
 export { WEB_MAPPINGS_DEVICE, localStorageMappingsStore } from './mappingsStore.js';
 
 // W4 extraction: two v2 leaves untangled from their invariant-violating couplings — objectVersionsStorage

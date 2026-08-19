@@ -113,7 +113,7 @@ describe('Phase 3 (LIVE KEYS) — shared-pod round-trip with REAL circle group-k
 
     const anne = await chatDevice(ANNE);
     const { statement } = await anne.rail.appendMessage(CIRCLE, { msgId: 'lk1', ts: Date.now(), text: 'hoi via de echte sleutel' });
-    const r = await callSkill(A.agent, 'broadcastKringChatStatement', { groupId: CIRCLE, event: statement, msgId: 'lk1', ts: Date.now() });
+    const r = await callSkill(A.agent, 'broadcastCircleChatStatement', { groupId: CIRCLE, event: statement, msgId: 'lk1', ts: Date.now() });
 
     // A really wrote the pod + fanned a ref (not a full-body degrade).
     expect(r.podSignal).toBe(true);
@@ -145,7 +145,7 @@ describe('Phase 3 (LIVE KEYS) — shared-pod round-trip with REAL circle group-k
 
     const anne = await chatDevice(ANNE);
     const { statement } = await anne.rail.appendMessage(CIRCLE, { msgId: 'lk2', ts: 4200, text: 'stil, echt gesealed' });
-    const r = await callSkill(A.agent, 'broadcastKringChatStatement', { groupId: CIRCLE, event: statement, msgId: 'lk2', ts: 4200 });
+    const r = await callSkill(A.agent, 'broadcastCircleChatStatement', { groupId: CIRCLE, event: statement, msgId: 'lk2', ts: 4200 });
     expect(r.podOnly).toBe(true);
     expect(r.sent).toBe(0);
     expect(delivered).toHaveLength(0);

@@ -49,7 +49,7 @@ describe('Relay wake-gate — the governance/report fan sets the no-wake flag', 
     const bundle = await buildBundle(sent);
     await bundle.offeringMatch.start();
 
-    const r = await callSkill(bundle.agent, 'broadcastKringGovernance', {
+    const r = await callSkill(bundle.agent, 'broadcastCircleGovernance', {
       groupId: 'oosterpoort', msgId: 'g-propose',
       event: { kind: 'governance', event: 'propose', proposalId: 'p1', action: 'removeMember', by: ANNE },
     });
@@ -64,7 +64,7 @@ describe('Relay wake-gate — the governance/report fan sets the no-wake flag', 
     const bundle = await buildBundle(sent);
     await bundle.offeringMatch.start();
 
-    const r = await callSkill(bundle.agent, 'broadcastKringGovernance', {
+    const r = await callSkill(bundle.agent, 'broadcastCircleGovernance', {
       groupId: 'oosterpoort', msgId: 'g-vote',
       event: { kind: 'governance', event: 'vote', proposalId: 'p1', voter: BOB, choice: 'yes' },
     });
@@ -79,7 +79,7 @@ describe('Relay wake-gate — the governance/report fan sets the no-wake flag', 
     const bundle = await buildBundle(sent);
     await bundle.offeringMatch.start();
 
-    await callSkill(bundle.agent, 'broadcastKringGovernance', {
+    await callSkill(bundle.agent, 'broadcastCircleGovernance', {
       groupId: 'oosterpoort', msgId: 'g-resolve',
       event: { kind: 'governance', event: 'resolve', proposalId: 'p1', status: 'approved' },
     });
@@ -92,7 +92,7 @@ describe('Relay wake-gate — the governance/report fan sets the no-wake flag', 
     const bundle = await buildBundle(sent);
     await bundle.offeringMatch.start();
 
-    const r = await callSkill(bundle.agent, 'broadcastKringReport', {
+    const r = await callSkill(bundle.agent, 'broadcastCircleReport', {
       groupId: 'oosterpoort', msgId: 'r-1',
       event: { kind: 'report', targetType: 'message', targetRef: 'm-9', reason: 'spam', by: ANNE },
     });

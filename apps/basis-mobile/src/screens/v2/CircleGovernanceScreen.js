@@ -36,7 +36,7 @@ export default function CircleGovernanceScreen({ callSkill, eventLog, getPolicy,
     let myWebid = '';
     try { const r = await callSkill('stoop', 'whoAmI', {}); myWebid = r?.webid ?? r?.webId ?? ''; } catch { /* */ }
     const broadcast = (channel, circleId, event, opts) => {
-      const op = channel === 'report' ? 'broadcastKringReport' : 'broadcastKringGovernance';
+      const op = channel === 'report' ? 'broadcastCircleReport' : 'broadcastCircleGovernance';
       const msgId = channel === 'report' ? reportEntryId(event) : (event?.body?.hash ? `gov:${event.body.hash}` : governanceEntryId(event));
       // `opts.to` narrows the fan to the circle's admins on the report channel (story 3.6) — web parity.
       const to = Array.isArray(opts?.to) ? opts.to : undefined;

@@ -67,7 +67,7 @@ export function isNoticeboardPost(item) {
     if (typeof src.code === 'string' && src.code) return false;   // membership-code
     if (src.redeemedBy != null) return false;                     // membership-redemption
     // kring-chat-message — the only stoop item keyed by a message id (stoop's
-    // `broadcastKringMessage` local mirror + `ingestKringMessage` receive mirror are
+    // `broadcastCircleMessage` local mirror + `ingestCircleMessage` receive mirror are
     // the only writers of `source.msgId`; the other kring broadcasts put theirs on the
     // wire `extras`, never on a stored item).
     if (typeof src.msgId === 'string' && src.msgId) return false;

@@ -3,7 +3,7 @@
  *
  * ── RETIRED IN PART, 2026-07-27 ──────────────────────────────────────────────────────────────────────────
  * This file used to drive TWO copies of the rule and require them to agree: `governanceWakeHint` in basis,
- * and an inline `a.event.event === 'propose'` in stoop's `broadcastKringGovernance`, which existed because
+ * and an inline `a.event.event === 'propose'` in stoop's `broadcastCircleGovernance`, which existed because
  * stoop cannot import basis app code (invariant #5). The duplication is GONE — the rule moved to the shared
  * substrate table (`@onderling/item-store` `entryKinds.js`) and both now call `kindWakes`.
  *
@@ -48,7 +48,7 @@ describe('there is exactly one wake rule', () => {
 
   it('a REPORT fan is unconditionally silent — not governed by the rule at all', () => {
     const src = stoopSrc();
-    const start = src.indexOf("defineSkill('broadcastKringReport'");
+    const start = src.indexOf("defineSkill('broadcastCircleReport'");
     expect(start).toBeGreaterThan(-1);
     const body = src.slice(start, src.indexOf('visibility:', start));
     expect(body).toContain('noWake: true');

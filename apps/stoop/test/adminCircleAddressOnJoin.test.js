@@ -139,7 +139,7 @@ describe('the property: joiner → admin resolves WITHOUT the global-key fallbac
       confirmedByCircleAddressProof: ADMIN_PROOF,
     });
 
-    await callSkill(bundle.agent, 'broadcastKringChatStatement',
+    await callSkill(bundle.agent, 'broadcastCircleChatStatement',
       { groupId: CIRCLE, event: { body: { hash: 'h1' }, sig: 'sig1' }, msgId: 'm-admin-1', ts: 1 });
 
     expect(sends).toEqual([ADMIN_CIRCLE_ADDRESS]);

@@ -1,7 +1,7 @@
 /**
- * Stoop γ-next.recipe — broadcastKringRecipe skill.
+ * Stoop γ-next.recipe — broadcastCircleRecipe skill.
  *
- * Mirror of sp-13-2-1-broadcastKringMessage: fan a kring scherm recipe
+ * Mirror of sp-13-2-1-broadcastCircleMessage: fan a kring scherm recipe
  * out to every other member via chat.send (subtype
  * `kring-recipe-broadcast`).  Mocks chat.send so the test captures the
  * per-recipient envelope shape without the full NKN transport plumbing.
@@ -57,14 +57,14 @@ const SAMPLE_RECIPE = {
   blocks: [{ id: 'b1', type: 'tasks', config: {} }],
 };
 
-describe('Stoop γ-next.recipe — broadcastKringRecipe', () => {
+describe('Stoop γ-next.recipe — broadcastCircleRecipe', () => {
   it('fans the recipe envelope out to every other member via chat.send', async () => {
     const bundle = await buildBundle();
     await bundle.offeringMatch.start();
     const calls = [];
     bundle.chat.send = vi.fn(async (args) => { calls.push(args); return { ok: true }; });
 
-    const r = await callSkill(bundle.agent, 'broadcastKringRecipe', {
+    const r = await callSkill(bundle.agent, 'broadcastCircleRecipe', {
       groupId: 'oosterpoort',
       recipe:  SAMPLE_RECIPE,
       msgId:   'mr-1',
@@ -92,7 +92,7 @@ describe('Stoop γ-next.recipe — broadcastKringRecipe', () => {
     await bundle.offeringMatch.start();
     const calls = [];
     bundle.chat.send = vi.fn(async (args) => { calls.push(args); return { ok: true }; });
-    await callSkill(bundle.agent, 'broadcastKringRecipe',
+    await callSkill(bundle.agent, 'broadcastCircleRecipe',
       { groupId: 'oosterpoort', recipe: SAMPLE_RECIPE, msgId: 'mr-2' }, BOB);
     expect(calls.map((c) => c.toWebid).sort()).toEqual([ANNE, CARLA].sort());
   });
@@ -104,7 +104,7 @@ describe('Stoop γ-next.recipe — broadcastKringRecipe', () => {
       if (args.toWebid === BOB) return { ok: false, reason: 'recipient-pubkey-unknown' };
       throw new Error('boom');
     });
-    const r = await callSkill(bundle.agent, 'broadcastKringRecipe',
+    const r = await callSkill(bundle.agent, 'broadcastCircleRecipe',
       { groupId: 'oosterpoort', recipe: SAMPLE_RECIPE, msgId: 'mr-3' });
     expect(r.sent).toBe(0);
     expect(r.attempted).toBe(2);
@@ -117,16 +117,16 @@ describe('Stoop γ-next.recipe — broadcastKringRecipe', () => {
   it('rejects when recipe is missing or non-object', async () => {
     const bundle = await buildBundle();
     await bundle.offeringMatch.start();
-    expect(await callSkill(bundle.agent, 'broadcastKringRecipe',
+    expect(await callSkill(bundle.agent, 'broadcastCircleRecipe',
       { groupId: 'oosterpoort', msgId: 'm' })).toEqual({ error: 'recipe-required' });
-    expect(await callSkill(bundle.agent, 'broadcastKringRecipe',
+    expect(await callSkill(bundle.agent, 'broadcastCircleRecipe',
       { groupId: 'oosterpoort', recipe: 'not an object', msgId: 'm' })).toEqual({ error: 'recipe-required' });
   });
 
   it('rejects missing msgId', async () => {
     const bundle = await buildBundle();
     await bundle.offeringMatch.start();
-    expect(await callSkill(bundle.agent, 'broadcastKringRecipe',
+    expect(await callSkill(bundle.agent, 'broadcastCircleRecipe',
       { groupId: 'oosterpoort', recipe: SAMPLE_RECIPE })).toEqual({ error: 'msgId-required' });
   });
 });
@@ -148,7 +148,7 @@ describe('Stoop γ-next.recipe — cross-agent: Anne → Bob.pendingStore', () =
     const captured = [];
     anne.chat.send = vi.fn(async (args) => { captured.push(args); return { ok: true }; });
 
-    const r = await callSkill(anne.agent, 'broadcastKringRecipe', {
+    const r = await callSkill(anne.agent, 'broadcastCircleRecipe', {
       groupId: 'oosterpoort',
       recipe:  SAMPLE_RECIPE,
       msgId:   'cross-r-1',

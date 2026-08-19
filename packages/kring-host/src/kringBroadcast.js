@@ -13,7 +13,7 @@ import { toEventLogItem } from '@onderling/item-store';
 
 /**
  * Build the optimistic kring chat-message event for the local (append-only) EventLog. The same `msgId`
- * is later passed to `broadcastKringFanOut`, so receiver-side dedup suppresses any mirrored echo.
+ * is later passed to `broadcastCircleFanOut`, so receiver-side dedup suppresses any mirrored echo.
  *
  * @param {{msgId:string, ts:number, circleId:string, actor:string, text:string, buttons?:Array, scope?:string, embeds?:Array, media?:object, provenance?:(string|{llmUsed?:boolean}), consent?:*}} a
  */
@@ -87,7 +87,7 @@ function pickFields(src, names) {
 
 /**
  * Best-effort fan-out of a kring chat message to the circle's members via stoop's
- * `broadcastKringMessage`, tracking δ.2 delivery state (pending → sent | failed). Uses the RAW 3-arg
+ * `broadcastCircleMessage`, tracking δ.2 delivery state (pending → sent | failed). Uses the RAW 3-arg
  * callSkill (app-targeted at stoop) — the 2-arg *resolving* callSkill arg-shifts (op→'stoop') and never
  * delivers. Fire-and-forget for callers; returns the promise so tests can await it.
  *
@@ -113,7 +113,7 @@ function pickFields(src, names) {
 export const PERMANENT_FANOUT_REASONS = new Set(['recipient-pubkey-unknown']);
 
 /**
- * Classify a `broadcastKringMessage` result → a delivery state.
+ * Classify a `broadcastCircleMessage` result → a delivery state.
  *   'sent'          — no per-recipient errors.
  *   'failed'        — a whole-op error OR at least one TRANSIENT recipient error (retryable).
  *   'undeliverable' — every recipient error is permanent (retry can't help) — NOT retryable.
@@ -130,7 +130,7 @@ export function classifyFanOut(r) {
   return 'undeliverable';                         // all permanent
 }
 
-export function broadcastKringFanOut({ rawCallSkill, circleId, msgId, text, ts, media, deliveryStateMap, onChange, signStatement = null }) {
+export function broadcastCircleFanOut({ rawCallSkill, circleId, msgId, text, ts, media, deliveryStateMap, onChange, signStatement = null }) {
   if (typeof rawCallSkill !== 'function') return Promise.resolve();
   const mark = (state) => { deliveryStateMap.set(msgId, state); onChange?.(); };
   mark('pending');
@@ -145,7 +145,7 @@ export function broadcastKringFanOut({ rawCallSkill, circleId, msgId, text, ts, 
         ? await Promise.resolve(signStatement(circleId, msgId)).catch(() => null)
         : null;
       if (!statement) throw new Error('no circle signing available — message not fanned');
-      return rawCallSkill('stoop', 'broadcastKringChatStatement', {
+      return rawCallSkill('stoop', 'broadcastCircleChatStatement', {
         groupId: circleId, event: statement, msgId, ts,
       });
     })

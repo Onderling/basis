@@ -224,7 +224,7 @@ export async function recordMemberPersonaProperties(
 
 /**
  * `fanRosterUpdated(deps, args)` — the roster "pull-me" signal. Sibling of the
- * `broadcastKring*` family (same fan-out plumbing, subtype `roster-updated`), with one
+ * `broadcastCircle*` family (same fan-out plumbing, subtype `roster-updated`), with one
  * defining difference: it carries NO CONTENT. Only a member REF and the NAMES of the
  * properties that changed ride the wire; every receiver re-reads the changed rows from
  * the roster itself.

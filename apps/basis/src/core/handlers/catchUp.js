@@ -6,7 +6,7 @@
  *     high-water mark (`makeRequestCatchUpForGroup` is the per-circle body).
  *
  *   - `makeHandleCatchUpRequest` — receiver-side.  Looks up missing posts via
- *     stoop.listBuurtPostsSince + sends each back via the existing 'buurt-post' envelope (which the
+ *     stoop.listCirclePostsSince + sends each back via the existing 'buurt-post' envelope (which the
  *     receiver's normal ingest path already handles + deduplicates).
  *
  * POSTS ONLY. The chat/tasks/governance/membership catch-ups all ride their device-log lanes now
@@ -140,10 +140,10 @@ export function makeRequestCatchUpFromKnownPeers({
   return async function requestCatchUpFromKnownPeers() {
     let buurts = [];
     try {
-      const r = await callSkill('stoop', 'listMyBuurts', {});
+      const r = await callSkill('stoop', 'listMyCircles', {});
       buurts = r?.buurts ?? [];
     } catch (err) {
-      logger.warn?.('[catch-up] listMyBuurts failed', err);
+      logger.warn?.('[catch-up] listMyCircles failed', err);
       return;
     }
     for (const groupId of buurts) {
@@ -166,10 +166,10 @@ export function makeHandleCatchUpRequest({ callSkill, sendPeer, getMyPubKey, log
     if (!groupId) return;
     let posts = [];
     try {
-      const r = await callSkill('stoop', 'listBuurtPostsSince', { groupId, sinceMs: sinceMs ?? 0 });
+      const r = await callSkill('stoop', 'listCirclePostsSince', { groupId, sinceMs: sinceMs ?? 0 });
       posts = r?.posts ?? [];
     } catch (err) {
-      logger.warn?.('[catch-up] listBuurtPostsSince failed', err);
+      logger.warn?.('[catch-up] listCirclePostsSince failed', err);
       return;
     }
     if (posts.length === 0) {

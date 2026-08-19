@@ -249,7 +249,7 @@ describe('3.6 — a report reaches the admin; it must not reach the person repor
   });
 
   // ✅ FIXED 2026-07-26, in two layers. (1) ROUTING: `appendReportEvent` now fans only to the circle's admin
-  // refs (`opts.to`, threaded through both shells into `broadcastKringReport`), so the payload never reaches
+  // refs (`opts.to`, threaded through both shells into `broadcastCircleReport`), so the payload never reaches
   // the reported person's device at all. (2) ACCESS: `reports.list` is viewer-scoped — admin sees all,
   // anyone else sees only what they filed — so a report that lands on a device anyway (an admin demoted
   // after delivery, a replayed log) still is not served. The shells' `if (isAdmin)` is now redundant rather

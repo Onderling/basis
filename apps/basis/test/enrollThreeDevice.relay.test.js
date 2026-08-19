@@ -105,7 +105,7 @@ describe('V1 walk — enroll a second device, announce over a real relay, the ro
     const text = 'hallo vanaf het tweede apparaat';
     // Sign through A′'s own chat rail (its per-circle key), then carry the statement to B directly
     // — the roster-driven fan has nobody to fan to on a fresh device (the same registry/QR-offer
-    // hand-off as above); the wire envelope is byte-shaped like broadcastKringChatStatement's.
+    // hand-off as above); the wire envelope is byte-shaped like broadcastCircleChatStatement's.
     const appended = await A2.chatRail.appendMessage(GROUP, { msgId: 'v1-walk-chat', ts: Date.now(), text, actor: A2.pubKey });
     expect(appended?.statement, 'A′ signed with its per-circle identity').toBeTruthy();
     await A2.agent.sendPeerMessage(B.pubKey, {

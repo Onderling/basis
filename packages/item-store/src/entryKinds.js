@@ -20,7 +20,7 @@
  * ── Why this lives in a substrate package ────────────────────────────────────────────────────────────────
  * stoop decides whether a fanned governance event may wake a device, and basis decides whether the same
  * event shows in chat. stoop cannot import basis app code (invariant 5), so before this the wake rule
- * existed TWICE — in `governanceLog.js` and again inline in stoop's `broadcastKringGovernance` — held
+ * existed TWICE — in `governanceLog.js` and again inline in stoop's `broadcastCircleGovernance` — held
  * together only by a fitness test. A shared substrate module is importable by both, which retires the
  * duplication instead of guarding it.
  */

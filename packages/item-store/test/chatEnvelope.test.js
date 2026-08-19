@@ -168,7 +168,7 @@ describe('chatEnvelopeFromStoreItem (fromItem) — store item → wire/inbox env
 });
 
 describe('toWireEnvelope (toWire) — canonical → fan-out wire', () => {
-  it('byte-identical to the former broadcastKringMessage literal (with media)', () => {
+  it('byte-identical to the former broadcastCircleMessage literal (with media)', () => {
     const a = { circleId: 'c1', msgId: 'm1', ts: 9, text: 'hi', fromActor: 'me', fromWebid: 'https://id/me', media: MEDIA };
     expect(toWireEnvelope(a)).toEqual(goldenWire(a));
     expect(JSON.stringify(toWireEnvelope(a))).toBe(JSON.stringify(goldenWire(a)));

@@ -84,7 +84,7 @@ export async function threeDevices({ policy = defaultPolicy(), clock = 1 } = {})
    *  Channel-aware: the report channel carries its own subtype and its own ingest handler. */
   const broadcastFrom = (fromRef) => (channel, circleId, event, opts = undefined) => {
     const subtype = channel === 'report' ? 'kring-report-broadcast' : 'kring-governance-broadcast';
-    // `opts.to` NARROWS the recipient set — what `broadcastKringReport`'s `to` does on the wire. Modelled
+    // `opts.to` NARROWS the recipient set — what `broadcastCircleReport`'s `to` does on the wire. Modelled
     // here so a report genuinely does not reach a non-admin's log; without it the harness would fan to
     // everyone and quietly contradict the shipped routing.
     const allow = Array.isArray(opts?.to) ? new Set(opts.to) : null;

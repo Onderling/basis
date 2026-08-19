@@ -1,7 +1,3 @@
-
-> @onderling-app/basis@0.1.0-dev coverage
-> node scripts/surface-coverage.mjs
-
 # Surface coverage — op × chat / slash / gate / web·mobile / inline
 
 _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mobile = screen (renderWeb ≡ renderMobile) · inline = button affordance_
@@ -144,6 +140,15 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `getCurrentGroup` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `listGroupMembers` | list | ✅ | ✅ | · | · | · | · |  |
 |  | `getGroupRules` | list | ✅ | ✅ | · | · | · | · |  |
+|  | `addMyOffering` | add | ✅ | · | · | · | ✅ | ✅ |  |
+|  | `removeMyOffering` | remove | ✅ | · | · | · | ✅ | ✅ |  |
+|  | `listMyOfferings` | list | ✅ | · | · | · | ✅ | · |  |
+|  | `listOfferingCategories` | list | ✅ | · | · | · | ✅ | · |  |
+|  | `setMyLocation` | add | ✅ | · | · | · | ✅ | ✅ |  |
+|  | `clearMyLocation` | remove | ✅ | · | · | · | ✅ | ✅ |  |
+|  | `getMyLocation` | list | ✅ | · | · | · | ✅ | · |  |
+|  | `geocode` | list | ✅ | · | · | · | ✅ | ✅ |  |
+|  | `getDataLocation` | list | ✅ | · | · | · | ✅ | · |  |
 | **folio** | `deleteFromPod` | remove | · | · | · | · | ✅ | ✅ |  |
 |  | `deleteLocally` | remove | · | · | · | · | ✅ | ✅ |  |
 |  | `forceRepush` | sync | · | · | · | · | ✅ | ✅ |  |
@@ -200,7 +205,7 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 |  | `restore-merge` | restore-merge | · | · | · | · | · | · |  |
 |  | `restore-resolve-mismatch` | restore-resolve-mismatch | · | · | · | · | · | · |  |
 |---|---|---|---|---|---|---|---|---|---|
-| **totals** | 191 ops | | 175 | 128 | 34 | 3 | 85 | 48 | |
+| **totals** | 200 ops | | 184 | 128 | 34 | 3 | 94 | 53 | |
 
 ### Flows
 
@@ -213,6 +218,6 @@ _chat = LLM tool · slash = /command · gate = deterministic NL verbs · web/mob
 
 ## Gaps for the gate/LLM + inline-menu work
 
-- **missing gate** (157/191): basis:help, basis:newthread, basis:help-with, basis:threads, basis:startDm, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:compare, basis:signin, basis:reset-thread, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, basis:apps, basis:sendto, household:reassign, household:revokeDevice, household:enrollDevice, household:revealOwnerPhrase …
-- **missing inline** (143/191): basis:help, basis:newthread, basis:help-with, basis:threads, basis:startDm, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:compare, basis:signin, basis:reset-thread, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, basis:apps, basis:sendto, household:addItem, household:listOpen, household:help, household:addTask …
-- **missing chat** (16/191): household:revokeDevice, household:enrollDevice, household:revealOwnerPhrase, household:restoreOwnerPhrase, household:grantSurface, household:revokeSurface, household:listSurfaceGrants, folio:deleteFromPod, folio:deleteLocally, folio:forceRepush, params:set-param, params:get-param, params:list-user-params, params:restore-probe, params:restore-merge, params:restore-resolve-mismatch
+- **missing gate** (166/200): basis:help, basis:newthread, basis:help-with, basis:threads, basis:startDm, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:compare, basis:signin, basis:reset-thread, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, basis:apps, basis:sendto, household:reassign, household:revokeDevice, household:enrollDevice, household:revealOwnerPhrase …
+- **missing inline** (147/200): basis:help, basis:newthread, basis:help-with, basis:threads, basis:startDm, basis:embed, basis:embed-file, basis:embed-time, basis:logs, basis:scanQr, basis:find, basis:brief, basis:compare, basis:signin, basis:reset-thread, basis:whoami, basis:me, basis:send-file, basis:lookup-peer, basis:publish-peer, basis:rotate-identity, basis:security-status, basis:set-relay, basis:transport-mode, basis:transports, basis:settings, basis:mute, basis:unmute, basis:muted, basis:debug-dump, basis:audit-tail, basis:peer-connect, basis:test-peer, basis:signout, basis:apps, basis:sendto, household:addItem, household:listOpen, household:help, household:addTask …
+- **missing chat** (16/200): household:revokeDevice, household:enrollDevice, household:revealOwnerPhrase, household:restoreOwnerPhrase, household:grantSurface, household:revokeSurface, household:listSurfaceGrants, folio:deleteFromPod, folio:deleteLocally, folio:forceRepush, params:set-param, params:get-param, params:list-user-params, params:restore-probe, params:restore-merge, params:restore-resolve-mismatch

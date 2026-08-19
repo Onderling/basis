@@ -308,7 +308,7 @@ describe('the fan-out tries a member\'s proven address SET in order (primary fir
       return { held: false, delivered: true };
     });
 
-    await callSkill(bundle.agent, 'broadcastKringChatStatement',
+    await callSkill(bundle.agent, 'broadcastCircleChatStatement',
       { groupId: CIRCLE, event: { body: { hash: 'h-set' }, sig: 's-set' }, msgId: 'm-set-1', ts: 1 });
 
     expect(bramAddrs(sends), 'primary tried first, then the kept earlier address')
@@ -322,7 +322,7 @@ describe('the fan-out tries a member\'s proven address SET in order (primary fir
       return { held: false, delivered: true };
     });
 
-    await callSkill(bundle.agent, 'broadcastKringChatStatement',
+    await callSkill(bundle.agent, 'broadcastCircleChatStatement',
       { groupId: CIRCLE, event: { body: { hash: 'h-set' }, sig: 's-set' }, msgId: 'm-set-2', ts: 2 });
 
     expect(bramAddrs(sends), 'the primary delivered, so the set stops there').toEqual([addressOf(NEXT)]);

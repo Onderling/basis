@@ -2,7 +2,7 @@
  * basis v2 — governance/report ingest receivers (Wave C propagation).
  *
  * Governance rides the ONE circle log; these handlers ingest a fanned governance or report
- * event (from the stoop `broadcastKring{Governance,Report}` skills) into the LOCAL EventLog,
+ * event (from the stoop `broadcastCircle{Governance,Report}` skills) into the LOCAL EventLog,
  * so a vote/report raised on one device shows up on every member's device. The EventLog dedups
  * by the STABLE entry id (governanceEntryId / reportEntryId), so a re-delivered event never
  * double-appends. Registered on the peer router under the two broadcast subtypes, next to the

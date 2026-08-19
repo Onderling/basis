@@ -64,7 +64,7 @@ describe('isNoticeboardPost — hides system items', () => {
   });
 
   // A circle CHAT line is mirrored into the same itemStore so the conversation survives a
-  // reload (stoop `broadcastKringMessage` / `ingestKringMessage`). It is not a noticeboard
+  // reload (stoop `broadcastCircleMessage` / `ingestCircleMessage`). It is not a noticeboard
   // post — but it was rendered as one, with a "Withdraw" action when it was yours.
   describe('kring chat lines are not noticeboard posts', () => {
     const chatItem = (over = {}) => ({

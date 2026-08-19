@@ -1,6 +1,6 @@
 /**
  * v2 circle app — web e2e (the automated guard for the launcher → create →
- * detail flow that unit tests can't cover, e.g. the create→listMyBuurts
+ * detail flow that unit tests can't cover, e.g. the create→listMyCircles
  * integration). The v2 circle app is the only route ('/') — the classic shell was removed 2026-06-29.
  *
  * Run: `npx playwright test circle-v2` (needs the dev server; see
@@ -23,7 +23,7 @@ test('launcher renders + "+ new circle" creates a circle that then appears', asy
 
   await createCircleViaWizard(page, 'Test Circle');
 
-  // createGroupV2 → reload via listMyBuurts → a tile appears. The tile name
+  // createGroupV2 → reload via listMyCircles → a tile appears. The tile name
   // is the groupId slug today (name enrichment is a later polish).
   await expect(
     page.locator('.circle-tile__name', { hasText: 'test-circle' }),

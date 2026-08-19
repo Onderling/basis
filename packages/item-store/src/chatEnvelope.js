@@ -11,8 +11,8 @@
  *        `basis chatMessageInbox` (received append), and `basis kringChatRehydrate` (legacy insert).
  *   2. the peer fan-out WIRE envelope
  *        `{ type:'p2p-chat', subtype:'kring-chat-message', circleId, msgId, ts, text, fromActor, fromWebid, media? }`
- *      — built by hand in `stoop broadcastKringMessage`.
- *   3. the durable itemStore item's `source` (persisted by `stoop broadcastKringMessage`/`ingestKringMessage`),
+ *      — built by hand in `stoop broadcastCircleMessage`.
+ *   3. the durable itemStore item's `source` (persisted by `stoop broadcastCircleMessage`/`ingestCircleMessage`),
  *      later RESHAPED back to the wire/inbox shape by hand in `stoop getMessagesSince`
  *      and `basis kringChatRehydrate.itemToEnvelope`.
  *
@@ -196,12 +196,12 @@ export function fromEventLogItem(evt) {
 
 /**
  * `toWire` — project the canonical fields onto the peer fan-out WIRE
- * envelope that `stoop broadcastKringMessage` sends over the reliable
+ * envelope that `stoop broadcastCircleMessage` sends over the reliable
  * transport:
  *   `{ type:'p2p-chat', subtype:'kring-chat-message', circleId, msgId, ts, text, fromActor, fromWebid, media? }`
  *
  * The media wire-allowlist (`kring-host mediaForKringWire`) runs UPSTREAM
- * inside `broadcastKringFanOut` before the pointer reaches this projection,
+ * inside `broadcastCircleFanOut` before the pointer reaches this projection,
  * so `media` here is already the whitelisted, circle-safe shape (sender-local
  * fields such as `stored` / device paths already dropped). This projector
  * only re-emits it; it never re-admits a raw embed. Absent → byte-identical

@@ -9,7 +9,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderCircleKring } from '../../web/v2/circleKring.js';
 import { buildKringStream } from '../../src/v2/circleStream.js';
 import { createChatMessageInbox } from '../../src/v2/chatMessageInbox.js';
-import { kringChatMessageEvent, broadcastKringFanOut } from '@onderling/kring-host/kringBroadcast';
+import { kringChatMessageEvent, broadcastCircleFanOut } from '@onderling/kring-host/kringBroadcast';
 
 const t = (key) => key;
 function mount() { const el = document.createElement('div'); document.body.appendChild(el); return el; }
@@ -27,7 +27,7 @@ describe('kring chat · composer dispatches the unified send op', () => {
       const msgId = `kring-g1-${(seq += 1)}`;
       const ts = Date.now();
       events.push(kringChatMessageEvent({ msgId, ts, circleId: 'g1', actor: 'me', text }));
-      broadcastKringFanOut({
+      broadcastCircleFanOut({
         rawCallSkill, circleId: 'g1', msgId, text, ts,
         deliveryStateMap: { set() {} },
         signStatement: async () => ({ body: { hash: 'h1' }, sig: 's1' }),   // the rail's sign-the-entry hook
@@ -47,7 +47,7 @@ describe('kring chat · composer dispatches the unified send op', () => {
     await new Promise((r) => setTimeout(r, 0));   // the sign hook adds a microtask hop before the fan
     expect(rawCallSkill).toHaveBeenCalledTimes(1);
     const [app, op, args] = rawCallSkill.mock.calls[0];
-    expect([app, op]).toEqual(['stoop', 'broadcastKringChatStatement']);
+    expect([app, op]).toEqual(['stoop', 'broadcastCircleChatStatement']);
     expect(args).toMatchObject({ groupId: 'g1', event: { sig: 's1' } });   // the statement rides, not plain text
     expect(typeof args.msgId).toBe('string');
   });

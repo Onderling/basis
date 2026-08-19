@@ -1,7 +1,7 @@
 /**
- * Stoop γ-next.policy — broadcastKringPolicy skill.
+ * Stoop γ-next.policy — broadcastCirclePolicy skill.
  *
- * Mirror of sp-gamma-next-rules-broadcastKringRules: fan a kring
+ * Mirror of sp-gamma-next-rules-broadcastCircleRules: fan a kring
  * circlePolicy document out to every other member via chat.send (subtype
  * `kring-policy-broadcast`).  Mocks chat.send so the test captures the
  * per-recipient envelope shape without the full NKN transport plumbing.
@@ -65,14 +65,14 @@ const SAMPLE_POLICY = {
   consensusRequired:  false,
 };
 
-describe('Stoop γ-next.policy — broadcastKringPolicy', () => {
+describe('Stoop γ-next.policy — broadcastCirclePolicy', () => {
   it('fans the policy envelope out to every other member via chat.send', async () => {
     const bundle = await buildBundle();
     await bundle.offeringMatch.start();
     const calls = [];
     bundle.chat.send = vi.fn(async (args) => { calls.push(args); return { ok: true }; });
 
-    const r = await callSkill(bundle.agent, 'broadcastKringPolicy', {
+    const r = await callSkill(bundle.agent, 'broadcastCirclePolicy', {
       groupId: 'oosterpoort',
       policy:  SAMPLE_POLICY,
       msgId:   'mp-1',
@@ -100,7 +100,7 @@ describe('Stoop γ-next.policy — broadcastKringPolicy', () => {
     await bundle.offeringMatch.start();
     const calls = [];
     bundle.chat.send = vi.fn(async (args) => { calls.push(args); return { ok: true }; });
-    await callSkill(bundle.agent, 'broadcastKringPolicy',
+    await callSkill(bundle.agent, 'broadcastCirclePolicy',
       { groupId: 'oosterpoort', policy: SAMPLE_POLICY, msgId: 'mp-2' }, BOB);
     expect(calls.map((c) => c.toWebid).sort()).toEqual([ANNE, CARLA].sort());
   });
@@ -112,7 +112,7 @@ describe('Stoop γ-next.policy — broadcastKringPolicy', () => {
       if (args.toWebid === BOB) return { ok: false, reason: 'recipient-pubkey-unknown' };
       throw new Error('boom');
     });
-    const r = await callSkill(bundle.agent, 'broadcastKringPolicy',
+    const r = await callSkill(bundle.agent, 'broadcastCirclePolicy',
       { groupId: 'oosterpoort', policy: SAMPLE_POLICY, msgId: 'mp-3' });
     expect(r.sent).toBe(0);
     expect(r.attempted).toBe(2);
@@ -125,16 +125,16 @@ describe('Stoop γ-next.policy — broadcastKringPolicy', () => {
   it('rejects when policy is missing or non-object', async () => {
     const bundle = await buildBundle();
     await bundle.offeringMatch.start();
-    expect(await callSkill(bundle.agent, 'broadcastKringPolicy',
+    expect(await callSkill(bundle.agent, 'broadcastCirclePolicy',
       { groupId: 'oosterpoort', msgId: 'm' })).toEqual({ error: 'policy-required' });
-    expect(await callSkill(bundle.agent, 'broadcastKringPolicy',
+    expect(await callSkill(bundle.agent, 'broadcastCirclePolicy',
       { groupId: 'oosterpoort', policy: 'not an object', msgId: 'm' })).toEqual({ error: 'policy-required' });
   });
 
   it('rejects missing msgId', async () => {
     const bundle = await buildBundle();
     await bundle.offeringMatch.start();
-    expect(await callSkill(bundle.agent, 'broadcastKringPolicy',
+    expect(await callSkill(bundle.agent, 'broadcastCirclePolicy',
       { groupId: 'oosterpoort', policy: SAMPLE_POLICY })).toEqual({ error: 'msgId-required' });
   });
 });
@@ -156,7 +156,7 @@ describe('Stoop γ-next.policy — cross-agent: Anne → Bob.pendingStore', () =
     const captured = [];
     anne.chat.send = vi.fn(async (args) => { captured.push(args); return { ok: true }; });
 
-    const r = await callSkill(anne.agent, 'broadcastKringPolicy', {
+    const r = await callSkill(anne.agent, 'broadcastCirclePolicy', {
       groupId: 'oosterpoort',
       policy:  SAMPLE_POLICY,
       msgId:   'cross-p-1',

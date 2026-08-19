@@ -9,7 +9,7 @@
  * Since ε.1, every kring-chat insert path routes through the shared
  * `chatMessageInbox`.  This rehydrator:
  *
- *   • fetches stored chats via the `listKringChats` skill
+ *   • fetches stored chats via the `listCircleChats` skill
  *   • normalizes each `item` into the same envelope shape NKN delivers
  *     (`{ subtype, circleId, msgId, ts, text, fromActor }`)
  *   • hands the envelope to `inbox.ingestChatMessage(env, { source:
@@ -78,7 +78,7 @@ export async function rehydrateKringChatsFromStoop({
 
   let res;
   try {
-    res = await callSkill('stoop', 'listKringChats', { groupId, sinceTs, limit });
+    res = await callSkill('stoop', 'listCircleChats', { groupId, sinceTs, limit });
   } catch (err) {
     logger.warn?.('[kring-chat] rehydrate failed:', err?.message ?? err);
     return { rehydrated: 0, skipped: 0, error: String(err?.message ?? err) };
@@ -99,7 +99,7 @@ export async function rehydrateKringChatsFromStoop({
 }
 
 /**
- * Convert a stoop `listKringChats` item into the NKN envelope shape
+ * Convert a stoop `listCircleChats` item into the NKN envelope shape
  * the inbox expects.  Returns `null` for items that are missing
  * msgId / circleId / text so the caller counts them as skipped.
  *

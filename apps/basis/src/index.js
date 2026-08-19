@@ -153,7 +153,7 @@ export { buildKringTabs, DEFAULT_KRING_TAB, featureActionLabelKey, featureTabId,
 // failed sends.
 export { createDeliveryStateMap } from '@onderling/kring-host/deliveryState';
 // Phase 2 — shared kring chat send primitives (optimistic event + best-effort fan-out) for web + mobile.
-export { kringChatMessageEvent, broadcastKringFanOut } from '@onderling/kring-host/kringBroadcast';
+export { kringChatMessageEvent, broadcastCircleFanOut } from '@onderling/kring-host/kringBroadcast';
 // Phase 3 — the shared circle label→candidate lookup (live fetch + base), web + mobile.
 export { makeCircleLookup } from './v2/circleLookup.js';
 // Shared composer affordances — slash-suggest pool/filter + bash-style input history (web + mobile).

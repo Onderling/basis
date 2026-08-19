@@ -73,13 +73,13 @@ export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, maySe
 
   /**
    * The reconnect kick: request every circle's governance statements from that circle's reachable members
-   * (same member source the chat catch-up uses — `listMyBuurts` + `listGroupRoster` addrs). Best-effort,
+   * (same member source the chat catch-up uses — `listMyCircles` + `listGroupRoster` addrs). Best-effort,
    * deduped per (peer, circle); a failed peer costs nothing — any ONE complete peer suffices (pull-all +
    * idempotent ingest converge regardless of who answers).
    */
   async function requestAll({ callSkill }) {
     let buurts = [];
-    try { buurts = (await callSkill('stoop', 'listMyBuurts', {}))?.buurts ?? []; } catch { return { requested: 0 }; }
+    try { buurts = (await callSkill('stoop', 'listMyCircles', {}))?.buurts ?? []; } catch { return { requested: 0 }; }
     let requested = 0;
     for (const b of buurts) {
       const circleId = b?.groupId ?? b?.id;

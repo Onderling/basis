@@ -172,7 +172,7 @@ export async function createNeighborhoodAgent({
    * Optional RELIABLE cross-peer sender, injected by a host that owns the
    * secure-agent reliability layer (basis wires `sa.peer.sendTo(...,
    * {guarantee:'hold-forward'})`). When present, kring chat fan-out
-   * (`broadcastKringMessage`) routes each recipient through it instead of the
+   * (`broadcastCircleMessage`) routes each recipient through it instead of the
    * bus-local `chat.send` transport — so a kring chat inherits the SAME
    * failover + offline hold-forward that durable circle content (tasks,
    * noticeboard, key-events) already has. Signature:

@@ -45,10 +45,10 @@ describe('kring chat — one inbox, media-fan parity (web ≡ mobile)', () => {
   });
 
   it('BOTH shells thread `media` through the shared kring fan helper', () => {
-    // The agreement: the shared broadcastKringFanOut receives the media embed on both platforms.
-    const mobileFan = launcher.slice(launcher.indexOf('broadcastKringFanOut({'));
+    // The agreement: the shared broadcastCircleFanOut receives the media embed on both platforms.
+    const mobileFan = launcher.slice(launcher.indexOf('broadcastCircleFanOut({'));
     expect(mobileFan.slice(0, 300)).toMatch(/\bmedia\b/);
-    const webFanIdx = webShell.indexOf('broadcastKringFanOut({');
+    const webFanIdx = webShell.indexOf('broadcastCircleFanOut({');
     expect(webFanIdx).toBeGreaterThan(-1);
     expect(webShell.slice(webFanIdx, webFanIdx + 300)).toMatch(/\bmedia\b/);
     // And the mobile retry re-fans the ORIGINAL media, exactly like web's retry.

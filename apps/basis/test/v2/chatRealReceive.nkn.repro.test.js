@@ -23,7 +23,7 @@ import { bootRealAgentNode, connectAgentsOverNkn, pairCircle, until, teardown } 
 // fallback already expresses. If we allow NKN circles on those terms, un-skip this.
 // → `REMAINING-WORK.md` P0.
 describe.skip('GATE — kring chat via the REAL receiver over REAL NKN', () => {
-  it('broadcastKringMessage A -> B ingests over NKN', async () => {
+  it('broadcastCircleMessage A -> B ingests over NKN', async () => {
     // Larger redeem budget to absorb the mesh cold-start on each leg of the round-trip.
     const A = await bootRealAgentNode('A', { redeemTimeoutMs: 45_000 });
     const B = await bootRealAgentNode('B', { redeemTimeoutMs: 45_000 });
@@ -39,7 +39,7 @@ describe.skip('GATE — kring chat via the REAL receiver over REAL NKN', () => {
     const msgId = 'm-' + Math.random().toString(36).slice(2);
     const text = 'hello over real NKN';
     const tChat = Date.now();
-    const r = await A.agent.callSkill('stoop', 'broadcastKringMessage', { groupId, msgId, text });
+    const r = await A.agent.callSkill('stoop', 'broadcastCircleMessage', { groupId, msgId, text });
     console.log('[gate-nkn] broadcast result:', JSON.stringify(r));
 
     // Poll patiently — the chat send rides the already-established handshake, but NKN delivery

@@ -13,16 +13,16 @@ async function warmMesh(A, B, groupId) {
 }
 
 // Wave C tail A — extended headless model: a governance/report event fanned via the REAL
-// stoop broadcastKring{Governance,Report} skill ingests into the OTHER agent's EventLog via
+// stoop broadcastCircle{Governance,Report} skill ingests into the OTHER agent's EventLog via
 // the REAL peer router + governance receiver, over a genuine transport (InternalTransport).
 // This is the two-device replication the unit tests SIMULATE, exercised end-to-end.
 //
 // (Previously skipped: this journey CAUGHT a pre-existing gap — broadcastToCircle, the shared
-// fan behind ALL broadcastKring* siblings, sent to member webids while the mesh keys by chat
+// fan behind ALL broadcastCircle* siblings, sent to member webids while the mesh keys by chat
 // pubKey. Fixed by routing every broadcast through the reliable sender (webid→pubKey +
 // hold-forward), synthesising a wire envelope for the control-plane broadcasts. Now green.)
 describe('governance/report propagation via the REAL receiver (InternalTransport)', () => {
-  it('broadcastKringGovernance A -> B ingests the vote event into B\'s log', async () => {
+  it('broadcastCircleGovernance A -> B ingests the vote event into B\'s log', async () => {
     const A = await bootRealAgentNode('A');
     const aCidHolder = {};
     const B = await bootRealAgentNode('B', {
@@ -44,7 +44,7 @@ describe('governance/report propagation via the REAL receiver (InternalTransport
       payload: { action: 'removeMember', subject: 'someone', by: A.pubKey, authorRef: A.pubKey, at: 1 },
       parent: null,
     });
-    const r = await A.agent.callSkill('stoop', 'broadcastKringGovernance', { groupId, event, msgId: `gov:${event.body.hash}` });
+    const r = await A.agent.callSkill('stoop', 'broadcastCircleGovernance', { groupId, event, msgId: `gov:${event.body.hash}` });
     expect(r?.error, `broadcast failed: ${JSON.stringify(r)}`).toBeFalsy();
 
     const got = await until(
@@ -58,7 +58,7 @@ describe('governance/report propagation via the REAL receiver (InternalTransport
     await teardown(A, B);
   });
 
-  it('broadcastKringReport A -> B ingests the report event into B\'s log', async () => {
+  it('broadcastCircleReport A -> B ingests the report event into B\'s log', async () => {
     const A = await bootRealAgentNode('A');
     const B = await bootRealAgentNode('B');
     await connectAgentsOverBus(A, B);
@@ -67,7 +67,7 @@ describe('governance/report propagation via the REAL receiver (InternalTransport
 
     const groupId = 'peer-circle';
     const event = { kind: 'report', event: 'report', reportId: 'r-headless', targetType: 'member', targetRef: 'someone', reason: 'spam', by: 'A' };
-    const r = await A.agent.callSkill('stoop', 'broadcastKringReport', { groupId, event, msgId: reportEntryId(event) });
+    const r = await A.agent.callSkill('stoop', 'broadcastCircleReport', { groupId, event, msgId: reportEntryId(event) });
     expect(r?.error, `broadcast failed: ${JSON.stringify(r)}`).toBeFalsy();
 
     const got = await until(

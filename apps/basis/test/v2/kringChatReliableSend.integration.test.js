@@ -1,9 +1,9 @@
 /**
  * Verification — kring chat SEND fans through the unified secure-agent reliable path
  * (basis injects `sa.peer.sendTo(..., {guarantee:'hold-forward'})` as `reliableSend`;
- * `broadcastKringMessage` uses it), and RECORDS through B's REAL receive path — the
+ * `broadcastCircleMessage` uses it), and RECORDS through B's REAL receive path — the
  * harness now wires the real `kringChatReceiver → chatMessageInbox` (eventLog +
- * ingestKringMessage), no stand-in. Plus offline hold-forward for chat.
+ * ingestCircleMessage), no stand-in. Plus offline hold-forward for chat.
  */
 import { describe, it, expect, afterAll } from 'vitest';
 
@@ -28,7 +28,7 @@ describe('kring chat send over the unified secure-agent reliable path', () => {
     const msgId = `kring-${groupId}-${Date.now().toString(36)}`;
     const text = `hoi kring vanaf A ${Date.now().toString(36)}`;
     const res = await sendKringChat(A, { groupId, text, msgId, ts: Date.now() });
-    expect(res.error, `broadcastKringMessage errored: ${res.error}`).toBeUndefined();
+    expect(res.error, `broadcastCircleMessage errored: ${res.error}`).toBeUndefined();
     expect(res.sent, `fan-out reached ≥1 recipient — got ${JSON.stringify(res)}`).toBeGreaterThanOrEqual(1);
 
     // B ingests through its real kringChatReceiver → eventLog (chatEvents).

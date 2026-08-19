@@ -73,7 +73,7 @@ describe('chat pod re-root — the SIGNED statement over the shared pod', () => 
 
     // Anne writes locally (the signed render entry) and fans THROUGH the stoop core.
     const { statement } = await anne.rail.appendMessage(CIRCLE, { msgId: 'p1', ts: Date.now(), text: 'hoi via de pod', actor: 'me' });
-    const r = await callSkill(A.agent, 'broadcastKringChatStatement', { groupId: CIRCLE, event: statement, msgId: 'p1', ts: Date.now() });
+    const r = await callSkill(A.agent, 'broadcastCircleChatStatement', { groupId: CIRCLE, event: statement, msgId: 'p1', ts: Date.now() });
 
     expect(r.podSignal).toBe(true);
     const raw = await backend.get(r.ref);
@@ -107,7 +107,7 @@ describe('chat pod re-root — the SIGNED statement over the shared pod', () => 
     const A = await bootSenderA({ backend, seal, circleDataMove: () => 'pod-only', deliver: (addr, env) => delivered.push(env) });
 
     const { statement } = await anne.rail.appendMessage(CIRCLE, { msgId: 'q1', ts: Date.now(), text: 'stil naar de pod', actor: 'me' });
-    const r = await callSkill(A.agent, 'broadcastKringChatStatement', { groupId: CIRCLE, event: statement, msgId: 'q1', ts: Date.now() });
+    const r = await callSkill(A.agent, 'broadcastCircleChatStatement', { groupId: CIRCLE, event: statement, msgId: 'q1', ts: Date.now() });
     expect(r.podOnly).toBe(true);
     expect(delivered).toHaveLength(0);                      // truly no fan
 

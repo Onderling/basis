@@ -82,7 +82,7 @@ export async function readCircleMembers({ callSkill, circleId, myRef, getPolicy 
  * @param {()=>number} [deps.now]
  * @param {(channel:'governance'|'report', circleId:string, event:object, opts?:{to?:string[]})=>void} [deps.broadcast]
  *   fan a just-appended event to the circle's members (the shell wires it to the stoop
- *   broadcastKring{Governance,Report} skill). Absent ⇒ local-only (single-device).
+ *   broadcastCircle{Governance,Report} skill). Absent ⇒ local-only (single-device).
  *   `opts.to` NARROWS the recipient set — the report channel passes the circle's admin refs, so a report
  *   never lands on the device of the person it is about.
  */

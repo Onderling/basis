@@ -1,6 +1,6 @@
 /**
  * `createCircleFanOut(deps)` — the ONE circle-broadcast fan the whole
- * `broadcastKring*` family rides. Lifted verbatim out of stoop's `buildSkills`
+ * `broadcastCircle*` family rides. Lifted verbatim out of stoop's `buildSkills`
  * so the roster-fan, transport choice, delivery-state accounting, the
  * data-move (pod) branch, and the `{sent, attempted, errors}` return contract
  * live once, in the circles substrate, and cannot drift across the callers

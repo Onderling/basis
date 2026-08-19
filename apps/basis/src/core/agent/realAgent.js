@@ -1870,7 +1870,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   const stoopIdentityVault = await sealedVault(opts.stoopIdentityVault
     ?? makeBrowserVault('cc-stoop-id:'));
   // THE MEMBERSHIP RIDER: when the shell hands the DEVICE LOG (`opts.deviceLog`), membership statements
-  // ride its membership lane — signed with the per-circle key, fanned via broadcastKringMembership,
+  // ride its membership lane — signed with the per-circle key, fanned via broadcastCircleMembership,
   // verified on ingest, pull-all caught-up — and the roster folds the rail's VERIFIED bodies
   // authoritatively. Absent → the store-based spine path stands (legacy compositions/tests).
   let membershipRail = null;
@@ -1886,13 +1886,13 @@ export async function createRealHouseholdAgent(opts = {}) {
     membershipEmit = makeMembershipEmitter({
       rail: membershipRail,
       myRef: chatId.pubKey,
-      fan: (circleId, statement) => callSkill('stoop', 'broadcastKringMembership', {
+      fan: (circleId, statement) => callSkill('stoop', 'broadcastCircleMembership', {
         groupId: circleId, event: statement, msgId: `mem:${statement.body.hash}`, ts: Date.now(),
       }).catch(() => { /* fan is best-effort — catch-up reconciles */ }),
     });
     membershipRead = (circleId) => membershipRail.readVerifiedBodies(circleId);
     // THE CONTENT RE-ROOT (tasks first): each task write ALSO rides the device log's task lane as a signed
-    // full-item snapshot, fanned via broadcastKringTask; receivers verify at their rail and causally merge
+    // full-item snapshot, fanned via broadcastCircleTask; receivers verify at their rail and causally merge
     // the head. The store's publish hook routes task types here instead of the legacy mirror (the per-type
     // valve in ensureCircleSync below). `storeFor` peeks — it never BUILDS a store, so an inbound statement
     // for a circle this device hasn't opened parks on the log instead of caching a store without its
@@ -1906,7 +1906,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     });
     taskEmit = makeTaskEmitter({
       rail: taskRail,
-      fan: (circleId, statement) => callSkill('stoop', 'broadcastKringTask', {
+      fan: (circleId, statement) => callSkill('stoop', 'broadcastCircleTask', {
         groupId: circleId, event: statement, msgId: `task:${statement.body.hash}`, ts: Date.now(),
       }).catch(() => { /* fan is best-effort — catch-up reconciles */ }),
     });
@@ -1922,7 +1922,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     });
     chatEmit = makeChatEmitter({
       rail: chatRail,
-      fan: (circleId, statement) => callSkill('stoop', 'broadcastKringChatStatement', {
+      fan: (circleId, statement) => callSkill('stoop', 'broadcastCircleChatStatement', {
         groupId: circleId, event: statement, msgId: statement.body.subject, ts: Date.now(),
       }).catch(() => { /* fan is best-effort — catch-up reconciles */ }),
     });
@@ -2240,7 +2240,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   async function _listMyKnownBuurts() {
     try {
       const result = await chatAgent.invoke(
-        stoopAgent.address, 'listMyBuurts', [DataPart({})],
+        stoopAgent.address, 'listMyCircles', [DataPart({})],
       );
       const buurts = result?.[0]?.data?.buurts ?? [];
       return Array.isArray(buurts) ? buurts : [];

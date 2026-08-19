@@ -3,7 +3,7 @@
  *
  * The roster "pull-me" signal fans out to every OTHER member via chat.send (subtype
  * `roster-updated`), carrying ONLY a member ref + the NAMES of the changed properties — never a
- * value. Sibling of the broadcastKring* family; the defining property under test is that no
+ * value. Sibling of the broadcastCircle* family; the defining property under test is that no
  * disclosed value ever rides this wire.
  *
  * The cross-agent journey feeds a captured envelope into basis's `makeRosterUpdatedPeerHandler`

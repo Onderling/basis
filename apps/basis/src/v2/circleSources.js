@@ -16,7 +16,7 @@ export function circleSourcesFromAgent({ callSkill, circlesStore, helpCircleName
     if (typeof callSkill !== 'function') return null;
     return callSkill(opId, args ?? {});
   };
-  // `helpCircleName` may be a string or a `() => string` getter (live-language). listMyBuurts
+  // `helpCircleName` may be a string or a `() => string` getter (live-language). listMyCircles
   // returns bare ids, so without this the help circle's tile/header falls back to the raw id.
   const resolveHelpName = () =>
     (typeof helpCircleName === 'function' ? helpCircleName() : helpCircleName) || null;
@@ -27,15 +27,15 @@ export function circleSourcesFromAgent({ callSkill, circlesStore, helpCircleName
       return Array.isArray(res?.circles) ? res.circles : [];
     },
     fetchGroups: async () => {
-      // listMyBuurts → { buurts: [groupId, ...] } — ALL buurts the actor is
+      // listMyCircles → { buurts: [groupId, ...] } — ALL buurts the actor is
       // in (incl. one just created via createGroupV2). getCurrentGroup only
       // returned the single active buurt, so new circles never surfaced.
-      const res = await call('listMyBuurts');
+      const res = await call('listMyCircles');
       const buurts = Array.isArray(res?.buurts) ? res.buurts : [];
       const helpName = resolveHelpName();
       return buurts.map((b) => {
         const raw = (typeof b === 'string') ? { id: b, name: b } : { ...b };
-        // The help circle is a system circle whose title is localised chrome; listMyBuurts
+        // The help circle is a system circle whose title is localised chrome; listMyCircles
         // only carries ids, so relabel it here — otherwise its tile/header shows the raw id.
         if (helpName && raw.id === HELP_CIRCLE_ID) raw.name = helpName;
         return raw;
@@ -48,7 +48,7 @@ export function circleSourcesFromAgent({ callSkill, circlesStore, helpCircleName
     // (removed 2026-08-03).
     //
     // Not re-wired on purpose. Standing up `createCirclesStore` here would create a SECOND circle registry
-    // beside stoop's `getMyCircles`/`listMyBuurts`, which is the confusion the planned stoop→circles
+    // beside stoop's `getMyCircles`/`listMyCircles`, which is the confusion the planned stoop→circles
     // extraction exists to remove — see `DESIGN-ops-flows-nav` §8c. The list of circles has one home.
   };
 }
@@ -112,7 +112,7 @@ export function makeResolvingCallSkill(rawCallSkill, origins = DEFAULT_CIRCLE_OR
     // the op — but ONLY when the catalog positively knows the op on SOME origin
     // (an "aspirational op" like getFeed/listNotes declared elsewhere). Essential
     // circle-source ops that are AGENT skills, not manifest ops — `getMyCircles`
-    // (tasks), `listMyBuurts` (stoop) — appear on NO origin in the catalog, so the
+    // (tasks), `listMyCircles` (stoop) — appear on NO origin in the catalog, so the
     // per-origin gate used to skip them everywhere → loadCircles returned nothing →
     // "No circles yet" on every reload. When the op is unknown to the catalog, try
     // all origins (the gate is a perf hint, not a hard filter).

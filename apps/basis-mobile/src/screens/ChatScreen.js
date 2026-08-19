@@ -739,7 +739,7 @@ export default function ChatScreen({
           globalThis.__onderlingPodChatCatchUpKicked = true;
           setTimeout(async () => {
             try {
-              const r = await bundle.callSkill('stoop', 'listMyBuurts', {});
+              const r = await bundle.callSkill('stoop', 'listMyCircles', {});
               const ids = (r?.buurts ?? []).map((b) => b?.groupId ?? b?.id).filter(Boolean);
               await podChatCatchUp.catchUpAll(ids);
             } catch { /* best-effort — the next launch retries */ }
@@ -773,7 +773,7 @@ export default function ChatScreen({
           wireBackgroundSync({
             runOnce: async () => {
               try {
-                const r = await bundle.callSkill('stoop', 'listMyBuurts', {});
+                const r = await bundle.callSkill('stoop', 'listMyCircles', {});
                 const ids = (r?.buurts ?? []).map((b) => b?.groupId ?? b?.id).filter(Boolean);
                 if (podChatCatchUp) await podChatCatchUp.catchUpAll(ids);
                 if (chatCatchUp) await chatCatchUp.requestAll({ callSkill: bundle.callSkill });

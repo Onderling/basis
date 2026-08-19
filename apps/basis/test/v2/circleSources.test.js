@@ -6,7 +6,7 @@ const callSkill = async (op) => {
   if (op === 'getMyCircles') {
     return { circles: [{ circleId: 'c1', name: 'Circle', counts: { members: 3 } }] };
   }
-  if (op === 'listMyBuurts') {
+  if (op === 'listMyCircles') {
     return { buurts: ['selwerd', 'akkerstraat'] };
   }
   return null;
@@ -18,7 +18,7 @@ describe('circleSources', () => {
     expect(await s.fetchTasksCircles()).toHaveLength(1);
   });
 
-  it('fetchGroups maps listMyBuurts groupId strings to circle objects', async () => {
+  it('fetchGroups maps listMyCircles groupId strings to circle objects', async () => {
     const g = await circleSourcesFromAgent({ callSkill }).fetchGroups();
     expect(g.map((x) => x.id)).toEqual(['selwerd', 'akkerstraat']);
     expect(g[0].name).toBe('selwerd');

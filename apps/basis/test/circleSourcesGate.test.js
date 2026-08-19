@@ -1,6 +1,6 @@
 /**
  * Regression: circles whose source op is ABSENT from the manifest catalog must still
- * load. `listMyBuurts` (stoop) + `getMyCircles` are agent skills, not manifest ops; the
+ * load. `listMyCircles` (stoop) + `getMyCircles` are agent skills, not manifest ops; the
  * catalog "perf gate" used to skip them on every origin → loadCircles returned nothing
  * → "No circles yet" on reload even though the data persisted. (Fix in circleSources.js.)
  */
@@ -10,19 +10,19 @@ import { loadCircles } from '../src/v2/circleModel.js';
 import { HELP_CIRCLE_ID } from '../src/v2/helpCircle.js';
 
 describe('makeResolvingCallSkill — catalog gate', () => {
-  it('tries an op the catalog does NOT know on all origins (the listMyBuurts fix)', async () => {
+  it('tries an op the catalog does NOT know on all origins (the listMyCircles fix)', async () => {
     const calls = [];
     const raw = async (origin, opId) => {
       calls.push(`${origin}/${opId}`);
-      if (origin === 'stoop' && opId === 'listMyBuurts') return { buurts: ['kleurenwiezen', 'boi'] };
+      if (origin === 'stoop' && opId === 'listMyCircles') return { buurts: ['kleurenwiezen', 'boi'] };
       return null;
     };
-    // catalog knows getMyCircles@tasks but NOTHING about listMyBuurts
+    // catalog knows getMyCircles@tasks but NOTHING about listMyCircles
     const catalog = { opsById: new Map([['tasks/getMyCircles', { appOrigin: 'tasks' }]]) };
     const callSkill = makeResolvingCallSkill(raw, undefined, () => catalog);
-    const r = await callSkill('listMyBuurts', {});
+    const r = await callSkill('listMyCircles', {});
     expect(r).toEqual({ buurts: ['kleurenwiezen', 'boi'] });
-    expect(calls).toContain('stoop/listMyBuurts');     // stoop was NOT skipped
+    expect(calls).toContain('stoop/listMyCircles');     // stoop was NOT skipped
   });
 
   it('still gates a catalog-KNOWN op to its declared origin (getMyCircles → tasks only)', async () => {
@@ -35,8 +35,8 @@ describe('makeResolvingCallSkill — catalog gate', () => {
     expect(calls).toContain('tasks');
   });
 
-  it('loadCircles surfaces groups from listMyBuurts with an empty catalog', async () => {
-    const raw = async (origin, opId) => (origin === 'stoop' && opId === 'listMyBuurts'
+  it('loadCircles surfaces groups from listMyCircles with an empty catalog', async () => {
+    const raw = async (origin, opId) => (origin === 'stoop' && opId === 'listMyCircles'
       ? { buurts: ['kleurenwiezen', 'boi', 'mai'] } : null);
     const callSkill = makeResolvingCallSkill(raw, undefined, () => ({ opsById: new Map() }));
     const circles = await loadCircles(circleSourcesFromAgent({ callSkill }));
@@ -44,16 +44,16 @@ describe('makeResolvingCallSkill — catalog gate', () => {
   });
 
   it('null catalog → tries every origin (unchanged)', async () => {
-    const raw = async (origin, opId) => (origin === 'stoop' && opId === 'listMyBuurts' ? { buurts: ['x'] } : null);
+    const raw = async (origin, opId) => (origin === 'stoop' && opId === 'listMyCircles' ? { buurts: ['x'] } : null);
     const callSkill = makeResolvingCallSkill(raw, undefined, () => null);
-    expect(await callSkill('listMyBuurts', {})).toEqual({ buurts: ['x'] });
+    expect(await callSkill('listMyCircles', {})).toEqual({ buurts: ['x'] });
   });
 });
 
 describe('circleSourcesFromAgent — help-circle display name', () => {
-  // listMyBuurts returns bare ids, so the help circle's tile/header used to fall back to the raw id
+  // listMyCircles returns bare ids, so the help circle's tile/header used to fall back to the raw id
   // 'cc-help'. The shell injects a localised name; the adapter relabels ONLY the help circle.
-  const callSkillFor = (buurts) => async (opId) => (opId === 'listMyBuurts' ? { buurts } : null);
+  const callSkillFor = (buurts) => async (opId) => (opId === 'listMyCircles' ? { buurts } : null);
 
   it('relabels the help circle with the injected name, leaving other buurts untouched', async () => {
     const sources = circleSourcesFromAgent({

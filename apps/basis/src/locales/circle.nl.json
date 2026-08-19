@@ -488,19 +488,19 @@
       "text": "Prikbord",
       "doc": "SP-13.3."
     },
-    "taken": {
+    "tasks": {
       "text": "Taken",
       "doc": "SP-13.3."
     },
-    "lijsten": {
+    "lists": {
       "text": "Lijsten",
       "doc": "SP-13.3."
     },
-    "notities": {
+    "notes": {
       "text": "Notities",
       "doc": "SP-13.3."
     },
-    "agenda": {
+    "calendar": {
       "text": "Agenda",
       "doc": "SP-13.3."
     },
@@ -512,23 +512,23 @@
   "taskStatus": {
     "open": {
       "text": "open",
-      "doc": "Taken-tab — status-badge: taak is nog niet opgepakt."
+      "doc": "tasks tab — status-badge: taak is nog niet opgepakt."
     },
     "claimed": {
       "text": "opgepakt",
-      "doc": "Taken-tab — status-badge: iemand doet de taak."
+      "doc": "tasks tab — status-badge: iemand doet de taak."
     },
     "submitted": {
       "text": "ingediend",
-      "doc": "Taken-tab — status-badge: ingediend ter beoordeling."
+      "doc": "tasks tab — status-badge: ingediend ter beoordeling."
     },
     "done": {
       "text": "klaar",
-      "doc": "Taken-tab — status-badge: taak afgerond."
+      "doc": "tasks tab — status-badge: taak afgerond."
     },
     "completed": {
       "text": "klaar",
-      "doc": "Taken-tab — status-badge: taak afgerond (alias)."
+      "doc": "tasks tab — status-badge: taak afgerond (alias)."
     }
   },
   "scope": {
@@ -721,7 +721,7 @@
       "doc": "B consent-card — status shown after the user declines the recipe."
     }
   },
-  "circle": {
+  "view": {
     "more": {
       "text": "Meer",
       "doc": "SP-13 — overflow menu trigger."
@@ -754,21 +754,21 @@
       "text": "{{tab}} komt in een vervolg-slice.",
       "doc": "SP-13.3 — placeholder voor tabs zonder eigen screen (yet)."
     },
-    "taken_empty": {
+    "tasks_empty": {
       "text": "Nog geen taken in deze kring.",
-      "doc": "Taken-tab — lege staat (geen taken)."
+      "doc": "tasks tab — lege staat (geen taken)."
     },
-    "taken_add": {
+    "tasks_add": {
       "text": "＋ Taak toevoegen",
-      "doc": "Taken-tab — compose-knop om een taak toe te voegen."
+      "doc": "tasks tab — compose-knop om een taak toe te voegen."
     },
-    "taken_add_prompt": {
+    "tasks_add_prompt": {
       "text": "Wat moet er gedaan worden?",
-      "doc": "Taken-tab — prompt bij het toevoegen van een taak."
+      "doc": "tasks tab — prompt bij het toevoegen van een taak."
     },
-    "taken_untitled": {
+    "tasks_untitled": {
       "text": "(naamloze taak)",
-      "doc": "Taken-tab — fallback als een taak geen tekst heeft."
+      "doc": "tasks tab — fallback als een taak geen tekst heeft."
     },
     "tabs_label": {
       "text": "Kring-tabs",
@@ -943,7 +943,7 @@
         "text": "Alle taken →",
         "doc": "S6.B — open the tasks panel from a bot reply."
       },
-      "agenda": {
+      "calendar": {
         "text": "Volledige agenda →",
         "doc": "S6.B — open the agenda panel from a bot reply."
       }
@@ -1057,7 +1057,7 @@
         "text": "Prikbord",
         "doc": "α.1b — block palette label."
       },
-      "agenda": {
+      "calendar": {
         "text": "Agenda",
         "doc": "α.1b — block palette label."
       },
@@ -2365,7 +2365,7 @@
       "doc": "Populated PoL state with {{time}} substitution."
     }
   },
-  "wederkerigheid": {
+  "reciprocity": {
     "unavailable": {
       "text": "{{name}} ontvangt geen chat-berichten in {{circle}}.",
       "doc": "Board 5C notice (P6.4)."

@@ -1,5 +1,5 @@
 /**
- * Taken-tab row mapping — a tasks `listOpen` item projected into the stream-row
+ * tasks tab row mapping — a tasks `listOpen` item projected into the stream-row
  * shape `actionsForStreamRow` reads, so the Taken tab's chips + the owner-only
  * entrust action come from the SAME selector the chat stream uses.
  */

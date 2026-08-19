@@ -122,7 +122,7 @@ describe('circle composer — the attach affordance', () => {
     });
     const btn = el.querySelector('.circle-view__attach');
     expect(btn).not.toBeNull();
-    expect(btn.getAttribute('aria-label')).toBe('circle.circle.attach');
+    expect(btn.getAttribute('aria-label')).toBe('circle.view.attach');
     const fileInput = el.querySelector('.circle-view__file');
     expect(fileInput).not.toBeNull();
     expect(fileInput.getAttribute('accept')).toContain('image/');

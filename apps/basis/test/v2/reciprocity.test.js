@@ -1,13 +1,13 @@
 /**
- * wederkerigheid (chat-off consumer-side) tests.
+ * reciprocity (chat-off consumer-side) tests.
  *
  * Map-backed IO drives the queue without touching real storage.
  */
 import { describe, it, expect, vi } from 'vitest';
 import {
   isRecipientUnavailable, buildUnavailableNotice,
-  createMessageQueue, WEDERKERIGHEID_STORE_KEY,
-} from '../../src/v2/wederkerigheid.js';
+  createMessageQueue, RECIPROCITY_STORE_KEY,
+} from '../../src/v2/reciprocity.js';
 
 function makeIo(initial = {}) {
   const map = new Map(Object.entries(initial));
@@ -72,9 +72,9 @@ describe('isRecipientUnavailable', () => {
 
 describe('buildUnavailableNotice', () => {
   const t = (key, vars = {}) => {
-    if (key === 'circle.wederkerigheid.unavailable')
+    if (key === 'circle.reciprocity.unavailable')
       return `${vars.name} doesn't receive chat in ${vars.circle}.`;
-    if (key === 'circle.wederkerigheid.unavailable_anon')
+    if (key === 'circle.reciprocity.unavailable_anon')
       return `This person doesn't receive chat in this circle.`;
     return key;
   };
@@ -92,7 +92,7 @@ describe('buildUnavailableNotice', () => {
 
   it('uses key identity when no translator is supplied', () => {
     const s = buildUnavailableNotice({ recipientName: 'Bob', circleName: 'Selwerd' });
-    expect(s).toBe('circle.wederkerigheid.unavailable');
+    expect(s).toBe('circle.reciprocity.unavailable');
   });
 });
 
@@ -149,7 +149,7 @@ describe('createMessageQueue', () => {
     expect((await q.listFor('bob', 'c')).map((m) => m.id)).toEqual([b.id]);
     await q.remove(b.id);
     expect(await q.listFor('bob', 'c')).toEqual([]);
-    expect(io.map.get(WEDERKERIGHEID_STORE_KEY)?.['c:bob']).toBeUndefined();
+    expect(io.map.get(RECIPROCITY_STORE_KEY)?.['c:bob']).toBeUndefined();
   });
 
   it('countFor returns the bucket size', async () => {

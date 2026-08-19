@@ -67,7 +67,7 @@ describe('circle settings/screen locale coverage', () => {
 
     it(`[${lang}] the ⋯-menu / bot-reply screen labels resolve`, () => {
       // Screen list-surfaces reachable from the overflow menu or a bot reply.
-      for (const screen of ['contacts', 'tasks', 'agenda']) {
+      for (const screen of ['contacts', 'tasks', 'calendar']) {
         expect(resolve(tree, `circle.screen.open.${screen}`), `circle.screen.open.${screen}`).toBeTypeOf('string');
       }
     });

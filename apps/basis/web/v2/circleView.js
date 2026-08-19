@@ -75,7 +75,7 @@ export function renderCircleView(container, {
   // dot + this name). GATE: the host computes it via the shared `oneToOneBotLabel` and
   // passes a non-empty string ONLY for a genuine 1:1-with-a-bot chat; on a group circle
   // (or a 1:1-with-a-human) it passes null → NO strip. The localized default
-  // (`circle.circle.bot_header`) rides in as the helper's fallback for a named-less bot,
+  // (`circle.view.bot_header`) rides in as the helper's fallback for a named-less bot,
   // never as an always-on default here. Null → the chat card renders without a head.
   botLabel = null,
   // P1.7 — the viewer's conversation filter. `chatFilter` is the SHARED chip model
@@ -213,7 +213,7 @@ export function renderCircleView(container, {
     const toggle = document.createElement('div');
     toggle.className = 'circle-view__view-toggle';
     toggle.setAttribute('role', 'group');
-    toggle.setAttribute('aria-label', tr('circle.circle.view_toggle_label'));
+    toggle.setAttribute('aria-label', tr('circle.view.view_toggle_label'));
     for (const mode of ['chat', 'screen']) {
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -221,7 +221,7 @@ export function renderCircleView(container, {
       btn.dataset.viewMode = mode;
       if (mode === viewMode) btn.classList.add('is-active');
       btn.setAttribute('aria-pressed', mode === viewMode ? 'true' : 'false');
-      btn.textContent = tr(`circle.circle.view_${mode}`);
+      btn.textContent = tr(`circle.view.view_${mode}`);
       btn.addEventListener('click', () => {
         if (mode !== viewMode) onViewMode(mode);
       });
@@ -235,7 +235,7 @@ export function renderCircleView(container, {
     const moreBtn = document.createElement('button');
     moreBtn.type = 'button';
     moreBtn.className = 'circle-view__more';
-    moreBtn.setAttribute('aria-label', tr('circle.circle.more'));
+    moreBtn.setAttribute('aria-label', tr('circle.view.more'));
     moreBtn.textContent = '⋯';
     moreBtn.addEventListener('click', () => {
       const menu = container.querySelector('.circle-view__more-menu');
@@ -317,7 +317,7 @@ export function renderCircleView(container, {
       onViewAttachment: noticeboard.onViewAttachment,
       onEmbedOpen,
     });
-  } else if (effectiveTab === 'taken') {
+  } else if (effectiveTab === 'tasks') {
     // Taken (tasks) tab — list the circle's tasks with their lifecycle chips + the
     // owner-only entrust chip (via the shared actionsForStreamRow). This is what makes
     // the Mandate/entrust picker reachable in the GUI.
@@ -331,14 +331,14 @@ export function renderCircleView(container, {
   } else if (effectiveTab !== 'conversation') {
     const placeholder = document.createElement('div');
     placeholder.className = 'circle-view__placeholder';
-    placeholder.textContent = tr('circle.circle.tab_coming', {
+    placeholder.textContent = tr('circle.view.tab_coming', {
       tab: tr(`circle.tabs.${effectiveTab}`),
     });
     body.appendChild(placeholder);
   } else if (!rows.length) {
     const empty = document.createElement('div');
     empty.className = 'circle-view__empty';
-    empty.textContent = tr('circle.circle.empty');
+    empty.textContent = tr('circle.view.empty');
     body.appendChild(empty);
   } else {
     // Render chronologically (oldest at top), grouped by day.  rows from
@@ -414,7 +414,7 @@ export function renderCircleView(container, {
     const note = document.createElement('div');
     note.className = 'circle-view__composer-disabled';
     note.setAttribute('role', 'note');
-    note.textContent = tr('circle.circle.chat_disabled');
+    note.textContent = tr('circle.view.chat_disabled');
     container.appendChild(note);
   } else if (typeof onSend === 'function' && viewMode !== 'screen') {
     const form = document.createElement('form');
@@ -439,22 +439,22 @@ export function renderCircleView(container, {
       attachMenu, attachFileOpId,
       onAttach: onAttachMedia, onAttachCommand,
       cls: (s) => `circle-view__${s}`,
-      tr, menuLabelKey: 'circle.circle.attach',
+      tr, menuLabelKey: 'circle.view.attach',
     });
     if (attachControl) form.appendChild(attachControl);
 
     const input = document.createElement('input');
     input.type = 'text';
     input.className = 'circle-view__composer-input';
-    input.placeholder = composerPlaceholder ?? tr('circle.circle.composer_placeholder');
-    input.setAttribute('aria-label', tr('circle.circle.composer_placeholder'));
+    input.placeholder = composerPlaceholder ?? tr('circle.view.composer_placeholder');
+    input.setAttribute('aria-label', tr('circle.view.composer_placeholder'));
     if (composerPrefill) { input.value = composerPrefill; setTimeout(() => { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }, 0); }
     form.appendChild(input);
 
     const send = document.createElement('button');
     send.type = 'submit';
     send.className = 'circle-view__composer-send';
-    send.setAttribute('aria-label', tr('circle.circle.send'));
+    send.setAttribute('aria-label', tr('circle.view.send'));
     send.textContent = '↑';
     form.appendChild(send);
 
@@ -548,7 +548,7 @@ export function renderCircleView(container, {
   if (Array.isArray(tabs) && tabs.length >= 2 && viewMode !== 'screen') {
     const bar = document.createElement('nav');
     bar.className = 'circle-view__tabs';
-    bar.setAttribute('aria-label', tr('circle.circle.tabs_label'));
+    bar.setAttribute('aria-label', tr('circle.view.tabs_label'));
     for (const tab of tabs) {
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -605,7 +605,7 @@ function renderTakenTab(body, { tasks = [], tr, onAction, onAddTask, viewerWebid
     const add = document.createElement('button');
     add.type = 'button';
     add.className = 'circle-view__taken-add';
-    add.textContent = tr('circle.circle.taken_add');
+    add.textContent = tr('circle.view.tasks_add');
     add.addEventListener('click', () => onAddTask());
     wrap.appendChild(add);
   }
@@ -613,7 +613,7 @@ function renderTakenTab(body, { tasks = [], tr, onAction, onAddTask, viewerWebid
   if (!tasks.length) {
     const empty = document.createElement('div');
     empty.className = 'circle-view__taken-empty';
-    empty.textContent = tr('circle.circle.taken_empty');
+    empty.textContent = tr('circle.view.tasks_empty');
     wrap.appendChild(empty);
     body.appendChild(wrap);
     return;
@@ -626,7 +626,7 @@ function renderTakenTab(body, { tasks = [], tr, onAction, onAddTask, viewerWebid
 
     const textEl = document.createElement('div');
     textEl.className = 'circle-view__task-text';
-    textEl.textContent = row.text || tr('circle.circle.taken_untitled');
+    textEl.textContent = row.text || tr('circle.view.tasks_untitled');
     card.appendChild(textEl);
 
     const status = row.status ?? 'open';
@@ -669,11 +669,11 @@ function renderTakenTab(body, { tasks = [], tr, onAction, onAddTask, viewerWebid
  */
 function renderLedenTab(body, { members = null, selfWebid = null, revealPolicy = 'pairwise', tr, onMemberTap } = {}) {
   const wrap = document.createElement('div');
-  wrap.className = 'circle-view__leden';
+  wrap.className = 'circle-view__members';
 
   if (members == null) {
     const loading = document.createElement('div');
-    loading.className = 'circle-view__leden-loading';
+    loading.className = 'circle-view__members-loading';
     loading.textContent = tr('circle.members_tab.loading');
     wrap.appendChild(loading);
     body.appendChild(wrap);
@@ -681,7 +681,7 @@ function renderLedenTab(body, { members = null, selfWebid = null, revealPolicy =
   }
   if (!members.length) {
     const empty = document.createElement('div');
-    empty.className = 'circle-view__leden-empty';
+    empty.className = 'circle-view__members-empty';
     empty.textContent = tr('circle.members_tab.empty');
     wrap.appendChild(empty);
     body.appendChild(wrap);
@@ -860,7 +860,7 @@ function renderBubble(row, {
     if (typeof provenance === 'string') {
       prov.textContent = provenance;
     } else {
-      prov.textContent = tr(provenance.llmUsed ? 'circle.circle.provenance_llm' : 'circle.circle.provenance_direct');
+      prov.textContent = tr(provenance.llmUsed ? 'circle.view.provenance_llm' : 'circle.view.provenance_direct');
     }
     el.appendChild(prov);
   }
@@ -1117,8 +1117,8 @@ function formatDayLabel(ts, tr) {
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
   const isYesterday = d.toDateString() === yesterday.toDateString();
-  if (sameDay)     return tr('circle.circle.day_today');
-  if (isYesterday) return tr('circle.circle.day_yesterday');
+  if (sameDay)     return tr('circle.view.day_today');
+  if (isYesterday) return tr('circle.view.day_yesterday');
   return d.toLocaleDateString();
 }
 

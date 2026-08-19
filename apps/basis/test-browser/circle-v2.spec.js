@@ -77,7 +77,7 @@ test('MEMBERS tab renders member rows and a tap opens the member card / self-vie
   await ledenTab.click();
 
   // The real tab body renders (not the tab-coming placeholder).
-  await expect(page.locator('.circle-view__leden')).toBeVisible({ timeout: LONG });
+  await expect(page.locator('.circle-view__members')).toBeVisible({ timeout: LONG });
   expect(await page.locator('.circle-view__placeholder').count()).toBe(0);
 
   // The creator's own row appears + is badged, and tapping it opens the self-view card.

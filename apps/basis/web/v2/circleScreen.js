@@ -86,7 +86,7 @@ export function renderCircleScreen(container, { blocks = [], t, refreshing = fal
 
 // α.5c — list-shaped block types that honour the optional
 // `config.compact` flag (tighter rows + smaller text on the screen).
-const COMPACTABLE_TYPES = new Set(['announcement', 'noticeboard', 'agenda', 'tasks']);
+const COMPACTABLE_TYPES = new Set(['announcement', 'noticeboard', 'calendar', 'tasks']);
 
 // An embed `ref` may be a full URN (urn:dec:item:T2) while a rendered row
 // carries only the local id (T2).  Match the raw ref OR its local-id tail so a
@@ -132,7 +132,7 @@ function renderBlock(block, { tr, onAction, onEmbedOpen, highlightRef }) {
     case 'text':         renderText(section, block, tr);         break;
     case 'photo':        renderPhoto(section, block, tr);        break;
     case 'noticeboard':  renderNoticeboard(section, block, tr);  break;
-    case 'agenda':       renderAgenda(section, block, tr, highlightRef);       break;
+    case 'calendar':       renderAgenda(section, block, tr, highlightRef);       break;
     case 'tasks':        renderTasks(section, block, tr, onEmbedOpen, highlightRef); break;
     case 'rules':        renderRules(section, block, tr);        break;
     default:
@@ -228,7 +228,7 @@ function renderNoticeboard(section, block, tr) {
 function renderAgenda(section, block, tr, highlightRef) {
   const title = document.createElement('h3');
   title.className = 'circle-screen__block-title';
-  title.textContent = tr('circle.recipe.block.agenda');
+  title.textContent = tr('circle.recipe.block.calendar');
   section.appendChild(title);
 
   const list = document.createElement('ul');

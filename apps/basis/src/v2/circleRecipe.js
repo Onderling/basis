@@ -38,7 +38,7 @@ export const BLOCK_TYPES = Object.freeze([
   'quickActions',     // D1 (§5A) — "Veel-gebruikt" top-N most-used actions
   'announcement',     // pinned admin message (free text)
   'noticeboard',      // top-N recent posts (asks/offer)
-  'agenda',           // upcoming calendar events
+  'calendar',           // upcoming calendar events
   'tasks',            // α.4 — tasks aggregated across circles (assignee filter)
   'rules',            // rendered houseRules doc
   'photo',            // static image with optional caption (folio-backed src)
@@ -58,7 +58,7 @@ const DEFAULT_CONFIGS = Object.freeze({
   quickActions: () => ({ limit: 4 }),
   announcement: () => ({ text: '', compact: false }),
   noticeboard:  () => ({ limit: 5, compact: false }),
-  agenda:       () => ({ limit: 5, horizonDays: 14, compact: false }),
+  calendar:       () => ({ limit: 5, horizonDays: 14, compact: false }),
   // α.4 — tasks block: scope filters by assignee.  V0 supports
   // 'assigned-to-me' (the Mijn dingen aggregation); 'all' shows
   // every open task across the active circles.

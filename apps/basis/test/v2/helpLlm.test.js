@@ -56,7 +56,7 @@ describe('help LLM · answerHelpViaLlm', () => {
     expect(out).toEqual({ text: 'Daar heb ik geen vast antwoord op.' });
     // Digest fallback → the block references multiple cards' text (more than a single top-N hit).
     const basis = helpDeck.kaartjes.find((k) => k.id === 'product.basis').nl;
-    const circles = helpDeck.kaartjes.find((k) => k.id === 'werking.circles').nl;
+    const circles = helpDeck.kaartjes.find((k) => k.id === 'werking.kringen').nl;
     expect(sink.req.system).toContain(basis);
     expect(sink.req.system).toContain(circles);
   });

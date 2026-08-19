@@ -372,8 +372,8 @@
 }
 
 /* ─────────────── MEMBERS (members) tab + member cards (§2 · G16) ─────────────── */
-.circle-view__leden { display: flex; flex-direction: column; gap: 2px; padding: 6px 0; }
-.circle-view__leden-loading, .circle-view__leden-empty {
+.circle-view__members { display: flex; flex-direction: column; gap: 2px; padding: 6px 0; }
+.circle-view__members-loading, .circle-view__members-empty {
   padding: 24px 12px; color: var(--ink-soft); font-style: italic; text-align: center;
 }
 .circle-view__member {

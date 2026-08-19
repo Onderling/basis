@@ -70,7 +70,7 @@ describe('embedTypeLabelKey', () => {
 describe('screenForEmbedType', () => {
   it('maps the screen-backed types, null otherwise', () => {
     expect(screenForEmbedType('task')).toBe('tasks');
-    expect(screenForEmbedType('calendar-event')).toBe('agenda');
+    expect(screenForEmbedType('calendar-event')).toBe('calendar');
     expect(screenForEmbedType('note')).toBeNull();
     expect(screenForEmbedType('request')).toBeNull();
   });

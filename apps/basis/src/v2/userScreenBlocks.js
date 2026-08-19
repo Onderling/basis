@@ -75,7 +75,7 @@ async function materializeOneBlock({ block, activeCircleIds, hostOps, screenIsAl
       case 'noticeboard':
         return materializeNoticeboard(block, activeCircleIds, hostOps);
 
-      case 'agenda':
+      case 'calendar':
         return await materializeAgenda(block, activeCircleIds, hostOps);
 
       case 'tasks':
@@ -118,7 +118,7 @@ async function materializeAgenda(block, activeCircleIds, { callSkill } = {}) {
   const limit       = clampInt(block.config?.limit,       1, 100, 5);
   const horizonDays = clampInt(block.config?.horizonDays, 1, 365, 14);
   if (typeof callSkill !== 'function') {
-    return { blockId: block.id, type: 'agenda', status: 'empty', content: { items: [] } };
+    return { blockId: block.id, type: 'calendar', status: 'empty', content: { items: [] } };
   }
   // Calendar's listEvents is user-scoped today (no circleId arg).
   // When the screen narrows to a circle subset, we'd ideally filter
@@ -127,12 +127,12 @@ async function materializeAgenda(block, activeCircleIds, { callSkill } = {}) {
   // when ANY circle is active (covers the common "Stream"/"all" case)
   // and empty when EVERY circle in the filter is muted.
   if (activeCircleIds.length === 0) {
-    return { blockId: block.id, type: 'agenda', status: 'empty', content: { items: [] } };
+    return { blockId: block.id, type: 'calendar', status: 'empty', content: { items: [] } };
   }
   const res = await callSkill('calendar', 'listEvents', { days: horizonDays });
   const items = Array.isArray(res?.items) ? res.items.slice(0, limit) : [];
   return {
-    blockId: block.id, type: 'agenda',
+    blockId: block.id, type: 'calendar',
     status: items.length > 0 ? 'ok' : 'empty',
     content: { items },
   };

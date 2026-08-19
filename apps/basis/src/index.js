@@ -229,12 +229,12 @@ export { buildTilePreviews, renderSubtitle, bumpSeenAt } from './v2/circleTilePr
 // claim router: mirror claimed tasks into the personal circle
 // when the per-circle override has flowThrough.tasksToPersonal.
 export { routeClaim, makeAfterClaimHook } from './v2/claimRouter.js';
-// wederkerigheid (chat-off consumer-side): pure helpers + the
+// reciprocity (chat-off consumer-side): pure helpers + the
 // save-for-later message queue.  Compose integration is the follow-up.
 export {
   isRecipientUnavailable, buildUnavailableNotice,
   createMessageQueue,
-} from './v2/wederkerigheid.js';
+} from './v2/reciprocity.js';
 // auto-hop-prompt when a skill search returns no in-circle hits.
 export {
   shouldAutoSuggestHop, buildHopPromptCard,

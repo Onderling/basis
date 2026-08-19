@@ -14,7 +14,7 @@ function tasksBlock(items) {
   return { blockId: 'b1', type: 'tasks', status: 'ok', config: {}, content: { items } };
 }
 function agendaBlock(items) {
-  return { blockId: 'b2', type: 'agenda', status: 'ok', config: {}, content: { items } };
+  return { blockId: 'b2', type: 'calendar', status: 'ok', config: {}, content: { items } };
 }
 
 describe('renderCircleScreen — highlightRef scroll-to/flash', () => {

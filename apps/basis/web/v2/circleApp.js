@@ -975,7 +975,7 @@ function readActionFreqSnapshot() {
 }
 // D1 (§5A) — in-memory fallback recipe for a circle with no authored screen:
 // just the "Veel-gebruikt" row.  Never persisted.
-const DEFAULT_SCHERM_RECIPE = Object.freeze({
+const DEFAULT_SCREEN_RECIPE = Object.freeze({
   // #16 — the default screen leads with quick-actions, then the noticeboard (the
   // circle noticeboard via stoop listOpen), so a screen-landing circle still surfaces
   // the open posts even though the noticeboard tab lives in the (hidden) chat view.
@@ -3541,7 +3541,7 @@ async function showScreens() {
       next = updateScreen(next, id, (s) => addBlock(s, 'tasks'));
       next = addUserScreen(next, t('circle.screens.seed_my_calendar'));
       id   = next.screens[next.screens.length - 1].id;
-      next = updateScreen(next, id, (s) => addBlock(s, 'agenda'));
+      next = updateScreen(next, id, (s) => addBlock(s, 'calendar'));
       return next;
     });
   }
@@ -5511,7 +5511,7 @@ function showCircle(id, circle, policy) {
       rerender();
       // Sender labels (batch 4) — the screen's noticeboard block stamps from this roster at
       // materialize time, so blocks built BEFORE the roster landed must be rebuilt once it has.
-      loadScherm().catch(() => {});
+      loadScreen().catch(() => {});
     }
   }
 
@@ -5520,7 +5520,7 @@ function showCircle(id, circle, policy) {
   // the list. A `/addtask` typed in the composer reaches the tasks agent by its own path;
   // both end up in the same list via loadTasks().
   async function addTaskFromTab() {
-    const text = (globalThis.prompt?.(t('circle.circle.taken_add_prompt')) || '').trim();
+    const text = (globalThis.prompt?.(t('circle.view.tasks_add_prompt')) || '').trim();
     if (!text) return;
     try {
       if (typeof circleDispatchReady === 'function') {
@@ -5703,7 +5703,7 @@ function showCircle(id, circle, policy) {
       botLabel: oneToOneBotLabel({
         members: circleMembers,
         selfWebid: myWebid || null,
-        fallbackLabel: t('circle.circle.bot_header'),
+        fallbackLabel: t('circle.view.bot_header'),
       }),
       // Mandate ("entrust") — owner-only visibility of the entrust action. myWebid
       // + my role are best-effort (populated async on open); until then the action
@@ -5847,7 +5847,7 @@ function showCircle(id, circle, policy) {
         const f = featureForTabId(tabId);
         if (f) actionFrequency.bump(id, f);
         if (tabId === 'noticeboard') loadNoticeboard();   // lazy-load the circle posts
-        if (tabId === 'taken') loadTasks();            // Taken — lazy-load the circle's tasks
+        if (tabId === 'tasks') loadTasks();            // Taken — lazy-load the circle's tasks
         if (tabId === 'members')  loadRoster();          // G16 — lazy-load the member roster
         rerender();
       },
@@ -5867,7 +5867,7 @@ function showCircle(id, circle, policy) {
         }
         rerender();
         // Re-materialize so the row's own ordering reflects the new count.
-        loadScherm();
+        loadScreen();
       },
       onBack:   showLauncher,
       onSend:   async (text) => {
@@ -6063,7 +6063,7 @@ function showCircle(id, circle, policy) {
           noteCircleBotTurn(await circleBot.handle(line, { id, msgId, ts }), line);
           // A `/addtask` (or any task-touching) turn ran through the bot — refresh the Taken
           // tab so a newly-created task appears there without a manual reload.
-          if (activeTab === 'taken') loadTasks();
+          if (activeTab === 'tasks') loadTasks();
         }
         else { broadcastFanOut({ msgId, text: line, ts }); }   // fallback before the bot is built
       },
@@ -6150,14 +6150,14 @@ function showCircle(id, circle, policy) {
   // screen-mode shows the empty-state.  Failure (e.g. corrupt store)
   // falls through to the empty-state too.  D1 re-runs this after a
   // quickActions tap so the row's own ordering reflects the new count.
-  async function loadScherm() {
+  async function loadScreen() {
     try {
       const book = await recipeStore.get(id);
       // D1 (§5A) — every screen leads with the "Veel-gebruikt" row.  When
       // the admin hasn't authored a recipe yet, fall back to an in-memory
       // default that's just the quickActions block (not persisted, so the
       // admin can still start from a clean recipe in the editor).
-      const active = getActiveRecipe(book) ?? DEFAULT_SCHERM_RECIPE;
+      const active = getActiveRecipe(book) ?? DEFAULT_SCREEN_RECIPE;
       const blocks = await materializeRecipe({
         recipe:   active,
         circleId: id,
@@ -6185,7 +6185,7 @@ function showCircle(id, circle, policy) {
       if (getActiveCircle() === id) rerender();
     }
   }
-  loadScherm();
+  loadScreen();
 }
 
 

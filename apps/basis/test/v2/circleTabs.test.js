@@ -32,7 +32,7 @@ describe('buildCircleTabs · SP-13.3', () => {
       features: { chat: true, noticeboard: false, tasks: true, lists: true, memberDirectory: false },
     };
     expect(buildCircleTabs(policy).map((t) => t.id))
-      .toEqual(['conversation', 'taken', 'lijsten']);
+      .toEqual(['conversation', 'tasks', 'lists']);
   });
 
   it('privé-shape policy → CONVERSATION / NOTITIES / TAKEN (board Example 3)', () => {
@@ -40,7 +40,7 @@ describe('buildCircleTabs · SP-13.3', () => {
       features: { chat: true, noticeboard: false, notes: true, tasks: true, memberDirectory: false },
     };
     expect(buildCircleTabs(policy).map((t) => t.id))
-      .toEqual(['conversation', 'taken', 'notities']);
+      .toEqual(['conversation', 'tasks', 'notes']);
   });
 
   it('CONVERSATION is always first even when the chat feature is explicitly off', () => {
@@ -74,7 +74,7 @@ describe('buildCircleTabs · SP-13.3', () => {
     };
     // houseRules has NO tab — lives in `⋯` overflow as "Huisregels".
     expect(buildCircleTabs(policy).map((t) => t.id))
-      .toEqual(['conversation', 'noticeboard', 'taken', 'lijsten', 'notities', 'agenda', 'members']);
+      .toEqual(['conversation', 'noticeboard', 'tasks', 'lists', 'notes', 'calendar', 'members']);
   });
 
   it('houseRules does not produce a tab', () => {
@@ -106,7 +106,7 @@ describe('buildCircleTabs · SP-13.3', () => {
 describe('circleTabs · D1 (§5A) feature helpers', () => {
   it('featureActionLabelKey maps all 8 features + falls back to the raw key', () => {
     expect(featureActionLabelKey('chat')).toBe('circle.tabs.conversation');
-    expect(featureActionLabelKey('tasks')).toBe('circle.tabs.taken');
+    expect(featureActionLabelKey('tasks')).toBe('circle.tabs.tasks');
     expect(featureActionLabelKey('memberDirectory')).toBe('circle.tabs.members');
     expect(featureActionLabelKey('houseRules')).toBe('circle.settings.feat.houseRules');
     expect(featureActionLabelKey('bogus')).toBe('bogus');
@@ -114,7 +114,7 @@ describe('circleTabs · D1 (§5A) feature helpers', () => {
 
   it('featureTabId maps tab features to ids; houseRules has no tab', () => {
     expect(featureTabId('chat')).toBe('conversation');
-    expect(featureTabId('tasks')).toBe('taken');
+    expect(featureTabId('tasks')).toBe('tasks');
     expect(featureTabId('memberDirectory')).toBe('members');
     expect(featureTabId('houseRules')).toBe(null);
     expect(featureTabId('bogus')).toBe(null);

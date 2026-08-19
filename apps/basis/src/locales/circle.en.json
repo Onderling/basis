@@ -488,19 +488,19 @@
       "text": "Noticeboard",
       "doc": "SP-13.3 — bottom-tab when policy.features.noticeboard is on."
     },
-    "taken": {
+    "tasks": {
       "text": "Tasks",
       "doc": "SP-13.3 — bottom-tab when tasks is on."
     },
-    "lijsten": {
+    "lists": {
       "text": "Lists",
       "doc": "SP-13.3 — bottom-tab when lists is on."
     },
-    "notities": {
+    "notes": {
       "text": "Notes",
       "doc": "SP-13.3 — bottom-tab when notes is on."
     },
-    "agenda": {
+    "calendar": {
       "text": "Agenda",
       "doc": "SP-13.3 — bottom-tab when calendar is on."
     },
@@ -721,7 +721,7 @@
       "doc": "B consent-card — status shown after the user declines the recipe."
     }
   },
-  "circle": {
+  "view": {
     "more": {
       "text": "More",
       "doc": "SP-13 — circle header overflow menu trigger."
@@ -754,19 +754,19 @@
       "text": "{{tab}} content lands in a follow-up slice.",
       "doc": "SP-13.3 — placeholder body for a tab whose content surface isn't built yet (e.g. NOTICEBOARD / MEMBERS)."
     },
-    "taken_empty": {
+    "tasks_empty": {
       "text": "No tasks in this circle yet.",
       "doc": "Taken (tasks) tab — empty state (no tasks)."
     },
-    "taken_add": {
+    "tasks_add": {
       "text": "＋ Add task",
       "doc": "Taken (tasks) tab — compose button to add a task."
     },
-    "taken_add_prompt": {
+    "tasks_add_prompt": {
       "text": "What needs doing?",
       "doc": "Taken (tasks) tab — prompt when adding a task."
     },
-    "taken_untitled": {
+    "tasks_untitled": {
       "text": "(untitled task)",
       "doc": "Taken (tasks) tab — fallback when a task has no text."
     },
@@ -943,7 +943,7 @@
         "text": "All tasks →",
         "doc": "S6.B — open the tasks panel from a bot reply."
       },
-      "agenda": {
+      "calendar": {
         "text": "Full agenda →",
         "doc": "S6.B — open the agenda panel from a bot reply."
       }
@@ -1057,7 +1057,7 @@
         "text": "Noticeboard",
         "doc": "α.1b — block palette label."
       },
-      "agenda": {
+      "calendar": {
         "text": "Agenda",
         "doc": "α.1b — block palette label."
       },
@@ -2365,7 +2365,7 @@
       "doc": "Shown when a reader returns a populated status."
     }
   },
-  "wederkerigheid": {
+  "reciprocity": {
     "unavailable": {
       "text": "{{name}} doesn't receive chat in {{circle}}.",
       "doc": "Board 5C notice (P6.4) shown in the chat-compose area when the recipient has chat-off for this circle."

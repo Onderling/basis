@@ -19,7 +19,7 @@ describe('circleRecipe · α.1a — single Recipe', () => {
     // α.4 added 'tasks' between agenda and rules.
     // D1 (§5A) prepended 'quickActions' as the top "Veel-gebruikt" rail.
     expect(BLOCK_TYPES).toEqual([
-      'quickActions', 'announcement', 'noticeboard', 'agenda', 'tasks', 'rules', 'photo', 'text',
+      'quickActions', 'announcement', 'noticeboard', 'calendar', 'tasks', 'rules', 'photo', 'text',
     ]);
   });
 
@@ -58,7 +58,7 @@ describe('circleRecipe · α.1a — single Recipe', () => {
     // are not list-shaped and deliberately omit the key.
     expect(defaultConfigForBlock('announcement')).toEqual({ text: '', compact: false });
     expect(defaultConfigForBlock('noticeboard')).toEqual({ limit: 5, compact: false });
-    expect(defaultConfigForBlock('agenda')).toEqual({ limit: 5, horizonDays: 14, compact: false });
+    expect(defaultConfigForBlock('calendar')).toEqual({ limit: 5, horizonDays: 14, compact: false });
     expect(defaultConfigForBlock('tasks')).toEqual({ scope: 'assigned-to-me', limit: 10, compact: false });
     expect(defaultConfigForBlock('rules')).toEqual({});
     expect(defaultConfigForBlock('photo')).toEqual({ src: '', caption: '' });
@@ -68,7 +68,7 @@ describe('circleRecipe · α.1a — single Recipe', () => {
   it('α.5c — DEFAULT_CONFIGS: list-shaped types include compact:false, others omit it', () => {
     // Mirrors the renderer/editor convention: only the four list-shaped
     // types expose the Compact toggle.
-    for (const t of ['announcement', 'noticeboard', 'agenda', 'tasks']) {
+    for (const t of ['announcement', 'noticeboard', 'calendar', 'tasks']) {
       const cfg = defaultConfigForBlock(t);
       expect(cfg).toHaveProperty('compact', false);
     }

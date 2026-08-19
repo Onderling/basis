@@ -38,7 +38,7 @@ export function taskStatusOf(item) {
 /**
  * Project ONE task-store item into the stream-row shape `actionsForStreamRow`
  * reads, carrying first-class `taskId` + `addedBy` (owner-check provenance)
- * plus `text` / `status` / `assignee` for the Taken-tab render.
+ * plus `text` / `status` / `assignee` for the tasks tab render.
  *
  * @param {object} item      a tasks `listOpen` item (`{id, text|title, state|status, assignee, addedBy, ...}`)
  * @param {{circleId?: string|null}} [ctx]
@@ -68,7 +68,7 @@ export function taskItemToStreamRow(item, { circleId = null } = {}) {
 }
 
 /**
- * Project a list of task-store items into Taken-tab stream rows.
+ * Project a list of task-store items into tasks tab stream rows.
  * @param {Array<object>} items
  * @param {{circleId?: string|null}} [ctx]
  * @returns {Array<object>}

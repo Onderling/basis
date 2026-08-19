@@ -17,7 +17,7 @@ function mount() {
 }
 
 const circle = { id: 'huis', name: 'Huishouden', memberCount: 3 };
-const tabs = [{ id: 'conversation', label: 'Conversation' }, { id: 'taken', label: 'Taken' }];
+const tabs = [{ id: 'conversation', label: 'Conversation' }, { id: 'tasks', label: 'Taken' }];
 
 describe('renderCircleView · Taken tab', () => {
   it('renders task rows (not the tab-coming placeholder)', () => {
@@ -26,7 +26,7 @@ describe('renderCircleView · Taken tab', () => {
       { id: 'task-1', text: 'Afwas doen', state: 'open' },
       { id: 'task-2', text: 'Vuilnis buiten', state: 'claimed' },
     ], { circleId: 'huis' });
-    renderCircleView(el, { circle, rows: [], tabs, activeTab: 'taken', tasks, t });
+    renderCircleView(el, { circle, rows: [], tabs, activeTab: 'tasks', tasks, t });
 
     expect(el.querySelector('.circle-view__placeholder')).toBeNull();
     const cards = el.querySelectorAll('.circle-view__task');
@@ -40,15 +40,15 @@ describe('renderCircleView · Taken tab', () => {
 
   it('shows a friendly empty state (not the placeholder) when there are no tasks', () => {
     const el = mount();
-    renderCircleView(el, { circle, rows: [], tabs, activeTab: 'taken', tasks: [], t });
+    renderCircleView(el, { circle, rows: [], tabs, activeTab: 'tasks', tasks: [], t });
     expect(el.querySelector('.circle-view__placeholder')).toBeNull();
-    expect(el.querySelector('.circle-view__taken-empty').textContent).toBe('circle.circle.taken_empty');
+    expect(el.querySelector('.circle-view__taken-empty').textContent).toBe('circle.view.tasks_empty');
   });
 
   it('an open task row surfaces claim + snooze + the owner-only entrust chip (viewer is admin)', () => {
     const el = mount();
     const tasks = buildTaskRows([{ id: 'task-1', text: 'X', state: 'open' }], { circleId: 'huis' });
-    renderCircleView(el, { circle, rows: [], tabs, activeTab: 'taken', tasks, viewerIsAdmin: true, t });
+    renderCircleView(el, { circle, rows: [], tabs, activeTab: 'tasks', tasks, viewerIsAdmin: true, t });
     const chips = [...el.querySelectorAll('.circle-view__task .circle-view__bubble-action')].map((b) => b.dataset.action);
     expect(chips).toContain('claim');
     expect(chips).toContain('snooze');
@@ -60,7 +60,7 @@ describe('renderCircleView · Taken tab', () => {
     const el = mount();
     const onAction = vi.fn();
     const tasks = buildTaskRows([{ id: 'task-42', text: 'X', state: 'open' }], { circleId: 'huis' });
-    renderCircleView(el, { circle, rows: [], tabs, activeTab: 'taken', tasks, viewerIsAdmin: true, onAction, t });
+    renderCircleView(el, { circle, rows: [], tabs, activeTab: 'tasks', tasks, viewerIsAdmin: true, onAction, t });
     el.querySelector('.circle-view__bubble-action--mandate').click();
     expect(onAction).toHaveBeenCalledTimes(1);
     const [action] = onAction.mock.calls[0];
@@ -71,7 +71,7 @@ describe('renderCircleView · Taken tab', () => {
   it('the compose affordance calls onAddTask', () => {
     const el = mount();
     const onAddTask = vi.fn();
-    renderCircleView(el, { circle, rows: [], tabs, activeTab: 'taken', tasks: [], onAddTask, t });
+    renderCircleView(el, { circle, rows: [], tabs, activeTab: 'tasks', tasks: [], onAddTask, t });
     const add = el.querySelector('.circle-view__taken-add');
     expect(add).not.toBeNull();
     add.click();

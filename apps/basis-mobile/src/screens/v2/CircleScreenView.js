@@ -109,7 +109,7 @@ function BlockSection({ block, onAction, onEmbedOpen, highlightRef, highlightRow
     case 'text':         body = renderText(block, styles); break;
     case 'photo':        body = renderPhoto(block, styles); break;
     case 'noticeboard':  body = renderNoticeboard(block, styles); break;
-    case 'agenda':       body = renderAgenda(block, highlightRef, highlightRowRef, onHighlightLayout, styles); break;
+    case 'calendar':       body = renderAgenda(block, highlightRef, highlightRowRef, onHighlightLayout, styles); break;
     case 'tasks':        body = renderTasks(block, onEmbedOpen, highlightRef, highlightRowRef, onHighlightLayout, styles); break;
     case 'rules':        body = renderRules(block, styles); break;
     default:
@@ -203,7 +203,7 @@ function renderAgenda(block, highlightRef, highlightRowRef = null, onHighlightLa
   const labelStyle = isCompact ? styles.agendaLabelCompact : styles.agendaLabel;
   return (
     <View>
-      <Text style={styles.blockTitle}>{t('circle.recipe.block.agenda')}</Text>
+      <Text style={styles.blockTitle}>{t('circle.recipe.block.calendar')}</Text>
       {items.map((ev) => {
         // S6.B — a chip-tap referenced this row: highlight it AND (now) scroll to
         // it.  The hit row carries the parent's ref + fires onHighlightLayout once

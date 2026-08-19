@@ -10,7 +10,7 @@ function fakeEventLog(events = []) {
 
 describe('circleRecipeBlocks · α.1b — registry', () => {
   it('lists every BLOCK_TYPES entry with metadata', () => {
-    for (const t of ['announcement', 'noticeboard', 'agenda', 'rules', 'photo', 'text']) {
+    for (const t of ['announcement', 'noticeboard', 'calendar', 'rules', 'photo', 'text']) {
       expect(BLOCK_REGISTRY[t]).toMatchObject({
         labelKey: expect.stringMatching(/^circle\.recipe\.block\./),
         emoji:    expect.any(String),
@@ -130,7 +130,7 @@ describe('circleRecipeBlocks · α.1b — materializeBlock (data-fetching types)
       { id: 'e3', label: 'koffie', type: 'calendar-event', state: 'open' },
     ] }));
     const r = await materializeBlock({
-      block: { id: 'b', type: 'agenda', config: { limit: 2, horizonDays: 7 } },
+      block: { id: 'b', type: 'calendar', config: { limit: 2, horizonDays: 7 } },
       hostOps: { callSkill },
     });
     expect(callSkill).toHaveBeenCalledWith('calendar', 'listEvents', { days: 7 });
@@ -141,7 +141,7 @@ describe('circleRecipeBlocks · α.1b — materializeBlock (data-fetching types)
   it('agenda: empty when no events come back', async () => {
     const callSkill = vi.fn(async () => ({ items: [] }));
     const r = await materializeBlock({
-      block: { id: 'b', type: 'agenda', config: {} },
+      block: { id: 'b', type: 'calendar', config: {} },
       hostOps: { callSkill },
     });
     expect(r.status).toBe('empty');
@@ -149,7 +149,7 @@ describe('circleRecipeBlocks · α.1b — materializeBlock (data-fetching types)
 
   it('agenda: empty (not error) when callSkill is missing', async () => {
     const r = await materializeBlock({
-      block: { id: 'b', type: 'agenda', config: {} },
+      block: { id: 'b', type: 'calendar', config: {} },
       hostOps: {},
     });
     expect(r.status).toBe('empty');
@@ -281,7 +281,7 @@ describe('circleRecipeBlocks · α.1b — error tolerance', () => {
   it('materializeBlock catches per-type throws, returns status:"error"', async () => {
     const callSkill = vi.fn(async () => { throw new Error('calendar offline'); });
     const r = await materializeBlock({
-      block: { id: 'b', type: 'agenda', config: {} },
+      block: { id: 'b', type: 'calendar', config: {} },
       hostOps: { callSkill },
     });
     expect(r.status).toBe('error');

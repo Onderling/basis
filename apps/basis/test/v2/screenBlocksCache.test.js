@@ -81,7 +81,7 @@ describe('createScreenBlocksCache', () => {
     const blocks = [
       { blockId: 'b1', type: 'announcement', status: 'ok', content: { text: 'Hi' } },
       { blockId: 'b2', type: 'tasks', status: 'ok', content: { items: [{ id: 't1', text: 'A' }] } },
-      { blockId: 'b3', type: 'agenda', status: 'empty', content: {} },
+      { blockId: 'b3', type: 'calendar', status: 'empty', content: {} },
     ];
     await store.set('s2', blocks);
     expect(await store.get('s2')).toEqual(blocks);

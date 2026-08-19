@@ -36,7 +36,7 @@ const okNoticeboard = {
   ] },
 };
 const okAgenda = {
-  blockId: 'b5', type: 'agenda', status: 'ok',
+  blockId: 'b5', type: 'calendar', status: 'ok',
   content: { items: [
     { id: 'e1', label: 'Circle drinks zaterdag 17u', type: 'calendar-event', state: 'open' },
     { id: 'e2', label: 'Plantjes ruilen zondag',   type: 'calendar-event', state: 'open' },
@@ -284,10 +284,10 @@ describe('renderCircleScreen · α.1c.1 — status branches', () => {
   it('status:"error" renders an error block with the error message', () => {
     const el = mount();
     renderCircleScreen(el, {
-      blocks: [{ blockId: 'x', type: 'agenda', status: 'error', content: {}, error: 'calendar offline' }],
+      blocks: [{ blockId: 'x', type: 'calendar', status: 'error', content: {}, error: 'calendar offline' }],
       t,
     });
-    const block = el.querySelector('.circle-screen__block--agenda');
+    const block = el.querySelector('.circle-screen__block--calendar');
     expect(block.classList.contains('circle-screen__block--error')).toBe(true);
     expect(block.textContent).toContain('calendar offline');
   });
@@ -295,7 +295,7 @@ describe('renderCircleScreen · α.1c.1 — status branches', () => {
   it('mixed render: error/empty blocks DO NOT break later ok blocks', () => {
     const el = mount();
     renderCircleScreen(el, { blocks: [
-      { blockId: 'err', type: 'agenda', status: 'error', content: {}, error: 'down' },
+      { blockId: 'err', type: 'calendar', status: 'error', content: {}, error: 'down' },
       okText,
       { blockId: 'emp', type: 'announcement', status: 'empty', content: { text: '' } },
       okAnnouncement,

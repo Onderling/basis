@@ -32,7 +32,7 @@ describe('initLocalisation + t', () => {
       'circle.bot.failed', 'circle.bot.unknown', 'circle.bot.added', 'circle.bot.completed',
       'circle.bot.ok', 'circle.bot.done', 'circle.bot.listed', 'circle.bot.listEmpty', 'circle.bot.needsInfo',
       'circle.clarify.notFound', 'circle.clarify.which', 'circle.clarify.whichMissing', 'circle.clarify.noneToPick',
-      'circle.circle.chat_disabled', 'circle.circle.composer_placeholder',
+      'circle.view.chat_disabled', 'circle.view.composer_placeholder',
     ];
     await setLang('en');
     for (const k of keys) expect(t(k), `${k} (en) did not resolve — raw key returned`).not.toBe(k);

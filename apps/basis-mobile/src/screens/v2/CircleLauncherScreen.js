@@ -347,7 +347,7 @@ AsyncStorage.getItem(ACTION_FREQ_KEY).then((raw) => {
 
 // D1 (§5A) — in-memory fallback recipe (just the Veel-gebruikt row) for a
 // circle with no authored screen.  Never persisted.
-const DEFAULT_SCHERM_RECIPE = Object.freeze({
+const DEFAULT_SCREEN_RECIPE = Object.freeze({
   // #16 — quick-actions + the noticeboard (circle noticeboard via stoop listOpen), so a
   // screen-landing circle surfaces the open posts even with the chat tab hidden.
   id: '__default__', name: '', blocks: [
@@ -950,7 +950,7 @@ export default function CircleLauncherScreen({
         next = updateScreen(next, id, (s) => addBlock(s, 'tasks'));
         next = addUserScreen(next, t('circle.screens.seed_my_calendar'));
         id   = next.screens[next.screens.length - 1].id;
-        next = updateScreen(next, id, (s) => addBlock(s, 'agenda'));
+        next = updateScreen(next, id, (s) => addBlock(s, 'calendar'));
         return next;
       });
     }
@@ -2554,7 +2554,7 @@ function CircleDetail({
   const [circleTasks, setCircleTasks] = useState([]);
   const [tasksReloadTick, setTasksReloadTick] = useState(0);
   useEffect(() => {
-    if (activeTab !== 'taken' || !circle?.id || typeof rawCallSkill !== 'function') return undefined;
+    if (activeTab !== 'tasks' || !circle?.id || typeof rawCallSkill !== 'function') return undefined;
     let alive = true;
     (async () => {
       let items = [];
@@ -2581,7 +2581,7 @@ function CircleDetail({
         const book = await recipeStore.get(circle.id);
         // D1 (§5A) — fall back to the quickActions-only default recipe so
         // every screen leads with the Veel-gebruikt row.
-        const active = getActiveRecipe(book) ?? DEFAULT_SCHERM_RECIPE;
+        const active = getActiveRecipe(book) ?? DEFAULT_SCREEN_RECIPE;
         const blocks = await materializeRecipe({
           recipe:   active,
           circleId: circle.id,
@@ -2783,7 +2783,7 @@ function CircleDetail({
         const roster = helpCircleRoster({ selfWebid: webid || null, botName: t('circle.onboarding.help_name') });
         if (!cancelled) {
           circleMembersRef.current = roster;
-          setBotLabel(oneToOneBotLabel({ members: roster, selfWebid: webid, fallbackLabel: t('circle.circle.bot_header') }));
+          setBotLabel(oneToOneBotLabel({ members: roster, selfWebid: webid, fallbackLabel: t('circle.view.bot_header') }));
           setMandateViewer({ viewerWebid: webid, isAdmin: true });
         }
         return;
@@ -2796,7 +2796,7 @@ function CircleDetail({
         const me = mem.find((m) => (m?.webid ?? m?.id) === webid);
         isAdmin = me?.role === 'admin';
         // Shared gate — decides the assistant-header strip from the raw roster (carries `relation`).
-        if (!cancelled) setBotLabel(oneToOneBotLabel({ members: mem, selfWebid: webid, fallbackLabel: t('circle.circle.bot_header') }));
+        if (!cancelled) setBotLabel(oneToOneBotLabel({ members: mem, selfWebid: webid, fallbackLabel: t('circle.view.bot_header') }));
       } catch { /* creator/own-row path still works; the handler gate is the real boundary */ }
       if (!cancelled) setMandateViewer({ viewerWebid: webid, isAdmin });
     })();
@@ -3589,7 +3589,7 @@ function CircleDetail({
       noteBotTurn(r, text);
       // An /addtask (or any task-touching) turn ran through the bot — refresh the Taken tab
       // so a newly-created task appears there without a manual reload.
-      if (activeTab === 'taken') setTasksReloadTick((n) => n + 1);
+      if (activeTab === 'tasks') setTasksReloadTick((n) => n + 1);
     }).catch(() => {});
   }, [composerText, eventLog, circle?.id, appendCircleMessage, circleBot, pendingFollowUp, runCircleCommandResolved, awaitingBotReply, noteBotTurn, manifestsByOrigin, buildFeedbackMount, emitFeedbackLangOptions, postHelpTopicChips, answerHelpMessage, activeTab, onCircleControl, circleTransport, onSettings, t]);
 
@@ -3624,7 +3624,7 @@ function CircleDetail({
             needs a label for screen-reader context. */}
         <View
           style={styles.viewToggle}
-          accessibilityLabel={t('circle.circle.view_toggle_label')}
+          accessibilityLabel={t('circle.view.view_toggle_label')}
           testID="circle-detail-view-toggle"
         >
           {['chat', 'screen'].map((mode) => (
@@ -3637,14 +3637,14 @@ function CircleDetail({
               style={[styles.viewToggleBtn, mode === viewMode && styles.viewToggleBtnActive]}
             >
               <Text style={[styles.viewToggleText, mode === viewMode && styles.viewToggleTextActive]}>
-                {t(`circle.circle.view_${mode}`)}
+                {t(`circle.view.view_${mode}`)}
               </Text>
             </Pressable>
           ))}
         </View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={t('circle.circle.more')}
+          accessibilityLabel={t('circle.view.more')}
           testID="circle-detail-more"
           onPress={() => setMenuOpen((v) => !v)}
           style={styles.moreBtn}
@@ -3797,7 +3797,7 @@ function CircleDetail({
               );
             })
           )
-        ) : activeTab === 'taken' ? (
+        ) : activeTab === 'tasks' ? (
           // Taken (tasks) tab — list the circle's tasks with their lifecycle chips + the
           // owner-only entrust chip (the same seam the chat stream uses). Tapping entrust
           // opens the mandate picker; claim/done route to the tasks agent. web≡mobile.
@@ -3808,15 +3808,15 @@ function CircleDetail({
               testID="circle-taken-add"
               onPress={() => setComposerText('/addtask ')}
             >
-              <Text style={styles.takenAddText}>{t('circle.circle.taken_add')}</Text>
+              <Text style={styles.takenAddText}>{t('circle.view.tasks_add')}</Text>
             </Pressable>
             {circleTasks.length === 0 ? (
-              <Text style={styles.placeholder}>{t('circle.circle.taken_empty')}</Text>
+              <Text style={styles.placeholder}>{t('circle.view.tasks_empty')}</Text>
             ) : (
               circleTasks.map((row) => (
                 <View key={row.id} style={styles.taskCard} testID="circle-task-row">
                   <Text style={styles.taskText} numberOfLines={2}>
-                    {row.text || t('circle.circle.taken_untitled')}
+                    {row.text || t('circle.view.tasks_untitled')}
                   </Text>
                   <Text style={styles.taskStatus}>
                     {t(`circle.taskStatus.${row.status || 'open'}`, { defaultValue: row.status || '' })}
@@ -3843,10 +3843,10 @@ function CircleDetail({
           </View>
         ) : activeTab !== 'conversation' ? (
           <Text style={styles.placeholder}>
-            {t('circle.circle.tab_coming', { tab: t(`circle.tabs.${activeTab}`) })}
+            {t('circle.view.tab_coming', { tab: t(`circle.tabs.${activeTab}`) })}
           </Text>
         ) : rows.length === 0 ? (
-          <Text style={styles.muted}>{t('circle.circle.empty')}</Text>
+          <Text style={styles.muted}>{t('circle.view.empty')}</Text>
         ) : (
           renderBubblesWithDayDividers(rows, t, {
             deliveryStateFor,
@@ -3994,7 +3994,7 @@ function CircleDetail({
       : viewMode !== 'screen' && !canPost ? (
         /* Permission gate — chat disabled for this circle; read-only note in place of the composer. */
         <Text style={styles.composerDisabled} testID="circle-detail-composer-disabled">
-          {t('circle.circle.chat_disabled')}
+          {t('circle.view.chat_disabled')}
         </Text>
       ) : viewMode !== 'screen' ? (
       <>
@@ -4022,16 +4022,16 @@ function CircleDetail({
             style={styles.composerInput}
             value={composerText}
             onChangeText={setComposerText}
-            placeholder={t('circle.circle.composer_placeholder')}
+            placeholder={t('circle.view.composer_placeholder')}
             placeholderTextColor={theme.color.inkSoft}
-            accessibilityLabel={t('circle.circle.composer_placeholder')}
+            accessibilityLabel={t('circle.view.composer_placeholder')}
             returnKeyType="send"
             onSubmitEditing={sendCircleChat}
           />
           <Pressable
             style={styles.composerSend}
             accessibilityRole="button"
-            accessibilityLabel={t('circle.circle.send')}
+            accessibilityLabel={t('circle.view.send')}
             testID="circle-detail-composer-send"
             onPress={sendCircleChat}
           >
@@ -4246,7 +4246,7 @@ function renderBubble(row, t, deliveryOpts = null, styles) {
         <Text style={styles.bubbleProvenance} testID={`circle-provenance-${row.id}`}>
           {typeof payload.provenance === 'string'
             ? payload.provenance
-            : t(payload.provenance.llmUsed ? 'circle.circle.provenance_llm' : 'circle.circle.provenance_direct')}
+            : t(payload.provenance.llmUsed ? 'circle.view.provenance_llm' : 'circle.view.provenance_direct')}
         </Text>
       ) : null}
       {embedChipsOf(payload).length > 0 ? (
@@ -4360,8 +4360,8 @@ function formatDayLabel(ts, t) {
   const sameDay = d.toDateString() === today.toDateString();
   const yest = new Date(today); yest.setDate(today.getDate() - 1);
   const isYest = d.toDateString() === yest.toDateString();
-  if (sameDay) return t('circle.circle.day_today');
-  if (isYest)  return t('circle.circle.day_yesterday');
+  if (sameDay) return t('circle.view.day_today');
+  if (isYest)  return t('circle.view.day_yesterday');
   return d.toLocaleDateString();
 }
 

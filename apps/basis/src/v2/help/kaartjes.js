@@ -40,7 +40,7 @@ export const helpDeck = {
     "en": "answered directly — no language model used"
   },
   "chipTargets": [
-    "intro.neighbourhood",
+    "intro.buurt",
     "intro.bestuur",
     "intro.dev",
     "intro.nieuwsgierig"
@@ -182,14 +182,14 @@ export const helpDeck = {
       "en": "Feedback is our second product: honest, anonymous feedback within organizations. Participants speak freely to a chat bot. The cleaning and anonymizing is done by a language model in a shielded environment, and participants approve what gets shared. It runs on the same building blocks as Basis."
     },
     {
-      "id": "intro.neighbourhood",
+      "id": "intro.buurt",
       "tags": {
         "nl": [
           "buurt",
           "straat",
           "buren",
-          "noticeboard",
-          "lend",
+          "prikbord",
+          "lenen",
           "delen"
         ],
         "en": [
@@ -216,7 +216,7 @@ export const helpDeck = {
           "vereniging",
           "club",
           "vve",
-          "members",
+          "leden",
           "secretaris"
         ],
         "en": [
@@ -402,11 +402,11 @@ export const helpDeck = {
       "en": "All source code is public. You don't have to take our word: anyone can verify what the software does, build on it, host everything themselves, or fork it if we ever went the wrong way. That last part isn't a side note, but a balance of power we build in deliberately."
     },
     {
-      "id": "werking.circles",
+      "id": "werking.kringen",
       "tags": {
         "nl": [
-          "circle",
-          "circles",
+          "kring",
+          "kringen",
           "groep",
           "cirkel",
           "hoe"
@@ -479,9 +479,9 @@ export const helpDeck = {
       "tags": {
         "nl": [
           "taken",
-          "noticeboard",
-          "ask",
-          "offer",
+          "prikbord",
+          "vraag",
+          "aanbod",
           "agenda",
           "afspraken"
         ],
@@ -558,7 +558,7 @@ export const helpDeck = {
       "tags": {
         "nl": [
           "deze",
-          "ask",
+          "vraag",
           "chat",
           "bot",
           "waar",

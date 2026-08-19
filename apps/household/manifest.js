@@ -224,7 +224,7 @@ export const householdManifest = {
         chat:  { hint: 'List open tasks.' },
         slash: {
           command: '/tasks',
-          match: { verbs: ['tasks', 'taken'], body: 'none' },
+          match: { verbs: ['tasks', 'tasks'], body: 'none' },
         },
       },
     },

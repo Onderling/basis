@@ -63,13 +63,13 @@ describe('renderCircleView · MEMBERS tab', () => {
   it('shows a loading state when the roster is not loaded yet (members == null)', () => {
     const el = mount();
     renderCircleView(el, { circle, rows: [], tabs, activeTab: 'members', members: null, t });
-    expect(el.querySelector('.circle-view__leden-loading').textContent).toBe('circle.members_tab.loading');
+    expect(el.querySelector('.circle-view__members-loading').textContent).toBe('circle.members_tab.loading');
     expect(el.querySelector('.circle-view__member')).toBeNull();
   });
 
   it('shows an empty state when the roster loaded empty', () => {
     const el = mount();
     renderCircleView(el, { circle, rows: [], tabs, activeTab: 'members', members: [], t });
-    expect(el.querySelector('.circle-view__leden-empty').textContent).toBe('circle.members_tab.empty');
+    expect(el.querySelector('.circle-view__members-empty').textContent).toBe('circle.members_tab.empty');
   });
 });

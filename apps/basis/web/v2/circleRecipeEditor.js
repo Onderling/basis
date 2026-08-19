@@ -448,7 +448,7 @@ function renderBlockRow(block, index, total, {
 
 // α.5c — list-shaped block types that expose a "Compact" toggle in
 // their per-block config drawer (mirrors the renderer's COMPACTABLE_TYPES).
-const COMPACTABLE_TYPES = new Set(['announcement', 'noticeboard', 'agenda', 'tasks']);
+const COMPACTABLE_TYPES = new Set(['announcement', 'noticeboard', 'calendar', 'tasks']);
 
 function renderBlockConfigForm(block, { recipeId, tr, onUpdateBlock }) {
   const wrap = document.createElement('div');
@@ -496,7 +496,7 @@ function renderBlockConfigForm(block, { recipeId, tr, onUpdateBlock }) {
       wrap.appendChild(renderLimitField(block, 'limit', 'noticeboard_limit_label', { tr, emit }));
       break;
     }
-    case 'agenda': {
+    case 'calendar': {
       wrap.appendChild(renderLimitField(block, 'limit', 'agenda_limit_label', { tr, emit }));
       wrap.appendChild(renderLimitField(block, 'horizonDays', 'agenda_horizon_label', { tr, emit }));
       break;

@@ -7,7 +7,7 @@
  *      without manually picking a new date.
  *   2. "Anderen die jou aanspreken zien: 'Bob is t/m 9 jun even niet
  *      bereikbaar'" — an outgoing auto-reply preview the peer-ping
- *      consumer (wederkerigheid notice) shows when someone
+ *      consumer (reciprocity notice) shows when someone
  *      tries to reach an away user.
  *
  * Pure: hosts pass current availability + a (`+N days` or absolute)
@@ -64,7 +64,7 @@ export function setHolidayUntil(availability, untilIso) {
  * Build the auto-reply text shown to *other* members trying to reach
  * the user during holiday mode.  Returns null when holiday isn't
  * active (the peer-side notice should fall back to the standard
- * wederkerigheid copy).
+ * reciprocity copy).
  *
  * @param {object} args
  * @param {object} args.availability

@@ -45,7 +45,7 @@ export const BLOCK_REGISTRY = Object.freeze({
   quickActions: { order: 0, labelKey: 'circle.recipe.block.quickActions', emoji: '⭐' },
   announcement: { order: 1, labelKey: 'circle.recipe.block.announcement', emoji: '📣' },
   noticeboard:  { order: 2, labelKey: 'circle.recipe.block.noticeboard',  emoji: '📌' },
-  agenda:       { order: 3, labelKey: 'circle.recipe.block.agenda',       emoji: '📅' },
+  calendar:       { order: 3, labelKey: 'circle.recipe.block.calendar',       emoji: '📅' },
   tasks:        { order: 4, labelKey: 'circle.recipe.block.tasks',        emoji: '✅' },
   rules:        { order: 5, labelKey: 'circle.recipe.block.rules',        emoji: '📜' },
   photo:        { order: 6, labelKey: 'circle.recipe.block.photo',        emoji: '🖼️' },
@@ -77,7 +77,7 @@ export async function materializeBlock({ block, circleId, hostOps = {} } = {}) {
       case 'text':         return materializeText(block);
       case 'photo':        return materializePhoto(block);
       case 'noticeboard':  return await materializeNoticeboard(block, circleId, hostOps);
-      case 'agenda':       return await materializeAgenda(block, hostOps);
+      case 'calendar':       return await materializeAgenda(block, hostOps);
       case 'tasks':        return await materializeTasks(block, circleId, hostOps);
       case 'rules':        return await materializeRules(block, circleId, hostOps);
       default:             return errorOut(block.id, block.type, 'unhandled type');
@@ -227,12 +227,12 @@ async function materializeAgenda(block, { callSkill } = {}) {
   const limit       = clampInt(block.config?.limit,       1, 50,  5);
   const horizonDays = clampInt(block.config?.horizonDays, 1, 365, 14);
   if (typeof callSkill !== 'function') {
-    return { blockId: block.id, type: 'agenda', status: 'empty', content: { items: [] } };
+    return { blockId: block.id, type: 'calendar', status: 'empty', content: { items: [] } };
   }
   const res = await callSkill('calendar', 'listEvents', { days: horizonDays });
   const items = Array.isArray(res?.items) ? res.items.slice(0, limit) : [];
   return {
-    blockId: block.id, type: 'agenda',
+    blockId: block.id, type: 'calendar',
     status: items.length > 0 ? 'ok' : 'empty',
     content: { items },
     // α.5c — surface the compact flag so the renderer can tighten rows.

@@ -256,7 +256,7 @@ describe('renderRecipeEditor · α.1d.1 — RECIPE mode', () => {
   });
 
   it('agenda block: two limit fields (limit + horizonDays)', () => {
-    const r = addBlock(emptyRecipe('A'), 'agenda');
+    const r = addBlock(emptyRecipe('A'), 'calendar');
     const el = mount();
     renderRecipeEditor(el, {
       book: { recipes: [r], activeId: r.id }, mode: 'recipe',
@@ -285,7 +285,7 @@ describe('renderRecipeEditor · α.1d.1 — RECIPE mode', () => {
   });
 
   it('α.5c — Compact checkbox appears on every list-shaped block type (announcement/noticeboard/agenda/tasks)', () => {
-    for (const type of ['announcement', 'noticeboard', 'agenda', 'tasks']) {
+    for (const type of ['announcement', 'noticeboard', 'calendar', 'tasks']) {
       const r = addBlock(emptyRecipe('A'), type);
       const el = mount();
       renderRecipeEditor(el, {

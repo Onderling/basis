@@ -31,7 +31,7 @@ import CircleRecipeConflictScreen from './CircleRecipeConflictScreen.js';
 
 // α.5c — list-shaped block types that expose the Compact toggle in
 // the per-block config drawer (mirrors web's COMPACTABLE_TYPES).
-const COMPACTABLE_TYPES = new Set(['announcement', 'noticeboard', 'agenda', 'tasks']);
+const COMPACTABLE_TYPES = new Set(['announcement', 'noticeboard', 'calendar', 'tasks']);
 
 export default function CircleRecipeEditorScreen({
   book = { recipes: [], activeId: null },
@@ -462,7 +462,7 @@ function renderTypeBody(block, emit, styles) {
       );
     case 'noticeboard':
       return <LimitField block={block} configKey="limit" labelKeySuffix="noticeboard_limit_label" emit={emit} />;
-    case 'agenda':
+    case 'calendar':
       return (
         <View>
           <LimitField block={block} configKey="limit"       labelKeySuffix="agenda_limit_label"   emit={emit} />

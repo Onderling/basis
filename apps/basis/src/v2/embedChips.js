@@ -33,7 +33,7 @@ export function embedTypeLabelKey(type) {
 // (request/offer/note today) render a non-tappable chip.
 const EMBED_TYPE_SCREEN = Object.freeze({
   'task':           'tasks',
-  'calendar-event': 'agenda',
+  'calendar-event': 'calendar',
 });
 
 /** The screen a chip of this type opens, or null (→ non-tappable chip). */

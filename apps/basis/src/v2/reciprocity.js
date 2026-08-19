@@ -1,5 +1,5 @@
 /**
- * basis v2 — wederkerigheid (chat-off consumer side).
+ * basis v2 — reciprocity (chat-off consumer side).
  *
  * When member Bob has `memberOverride.chatOff === true` for circle Selwerd,
  * member Anne attempting to DM Bob in that circle's context should see an
@@ -57,18 +57,18 @@ export async function isRecipientUnavailable({ recipientId, circleId, getRecipie
 export function buildUnavailableNotice({ recipientName, circleName, t } = {}) {
   const tr = typeof t === 'function' ? t : (k) => k;
   if (recipientName && circleName) {
-    return tr('circle.wederkerigheid.unavailable', {
+    return tr('circle.reciprocity.unavailable', {
       name: recipientName, circle: circleName,
     });
   }
-  return tr('circle.wederkerigheid.unavailable_anon');
+  return tr('circle.reciprocity.unavailable_anon');
 }
 
 /* ──────────────────────────────────────────────────────────────────
  * Save-for-later queue: messages Anne writes while Bob has chat-off.
  * ────────────────────────────────────────────────────────────────── */
 
-const STORE_KEY = 'cc.wederkerigheidQueue';
+const STORE_KEY = 'cc.reciprocityQueue';
 
 /**
  * Create a queue over a pluggable IO adapter ({load(key),save(key,value)},
@@ -155,4 +155,4 @@ export function createMessageQueue({ io, storeKey = STORE_KEY } = {}) {
   return { add, listFor, remove, countFor, flushFor };
 }
 
-export const WEDERKERIGHEID_STORE_KEY = STORE_KEY;
+export const RECIPROCITY_STORE_KEY = STORE_KEY;

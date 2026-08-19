@@ -33,13 +33,13 @@ import { isFeatureEnabled } from './circlePolicy.js';
 
 /** Canonical tab id ↔ feature key ↔ locale-key triples, in render order. */
 const TAB_DEFS = [
-  { id: 'conversation',  feature: 'chat',            labelKey: 'circle.tabs.conversation'  },
-  { id: 'noticeboard', feature: 'noticeboard',     labelKey: 'circle.tabs.noticeboard' },
-  { id: 'taken',    feature: 'tasks',           labelKey: 'circle.tabs.taken'    },
-  { id: 'lijsten',  feature: 'lists',           labelKey: 'circle.tabs.lijsten'  },
-  { id: 'notities', feature: 'notes',           labelKey: 'circle.tabs.notities' },
-  { id: 'agenda',   feature: 'calendar',        labelKey: 'circle.tabs.agenda'   },
-  { id: 'members',    feature: 'memberDirectory', labelKey: 'circle.tabs.members'    },
+  { id: 'conversation', feature: 'chat',            labelKey: 'circle.tabs.conversation' },
+  { id: 'noticeboard',  feature: 'noticeboard',     labelKey: 'circle.tabs.noticeboard'  },
+  { id: 'tasks',        feature: 'tasks',           labelKey: 'circle.tabs.tasks'        },
+  { id: 'lists',        feature: 'lists',           labelKey: 'circle.tabs.lists'        },
+  { id: 'notes',        feature: 'notes',           labelKey: 'circle.tabs.notes'        },
+  { id: 'calendar',     feature: 'calendar',        labelKey: 'circle.tabs.calendar'     },
+  { id: 'members',      feature: 'memberDirectory', labelKey: 'circle.tabs.members'      },
 ];
 
 /**
@@ -79,10 +79,10 @@ export const DEFAULT_CIRCLE_TAB = 'conversation';
 const FEATURE_LABEL_KEYS = Object.freeze({
   chat:            'circle.tabs.conversation',
   noticeboard:     'circle.tabs.noticeboard',
-  tasks:           'circle.tabs.taken',
-  lists:           'circle.tabs.lijsten',
-  notes:           'circle.tabs.notities',
-  calendar:        'circle.tabs.agenda',
+  tasks:           'circle.tabs.tasks',
+  lists:           'circle.tabs.lists',
+  notes:           'circle.tabs.notes',
+  calendar:        'circle.tabs.calendar',
   memberDirectory: 'circle.tabs.members',
   houseRules:      'circle.settings.feat.houseRules',
 });

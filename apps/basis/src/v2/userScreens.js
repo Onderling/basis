@@ -249,7 +249,7 @@ function normalizeCircleFilter(raw) {
 // inline rather than importing to avoid a circular dependency if
 // circleRecipe ever wants a Screen reference later.  Keep in sync
 // with circleRecipe.BLOCK_TYPES — α.4 added 'tasks'.
-const BLOCK_TYPES = ['announcement', 'noticeboard', 'agenda', 'tasks', 'rules', 'photo', 'text'];
+const BLOCK_TYPES = ['announcement', 'noticeboard', 'calendar', 'tasks', 'rules', 'photo', 'text'];
 
 function normalizeBlocks(raw) {
   const arr = Array.isArray(raw) ? raw : [];

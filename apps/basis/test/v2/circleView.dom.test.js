@@ -62,9 +62,9 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
     const days = el.querySelectorAll('.circle-view__day');
     expect(days.length).toBe(2);
     // First divider = yesterday's date (precedes r1).
-    expect(days[0].textContent).toBe('circle.circle.day_yesterday');
+    expect(days[0].textContent).toBe('circle.view.day_yesterday');
     // Second divider = today's date (precedes r2 + r3).
-    expect(days[1].textContent).toBe('circle.circle.day_today');
+    expect(days[1].textContent).toBe('circle.view.day_today');
   });
 
   it('shows a KIND pill on bubbles whose payload carries a kind ≠ message', () => {
@@ -100,7 +100,7 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
     const form  = el2.querySelector('.circle-view__composer');
     const input = el2.querySelector('.circle-view__composer-input');
     expect(form).not.toBeNull();
-    expect(input.placeholder).toBe('circle.circle.composer_placeholder');
+    expect(input.placeholder).toBe('circle.view.composer_placeholder');
   });
 
   it('composer submit fires onSend(text) and clears the input', () => {
@@ -140,7 +140,7 @@ describe('renderCircleView · SP-13.2 chat-style circle view', () => {
   it('empty state shows when rows = []', () => {
     const el = mount();
     renderCircleView(el, { circle, rows: [], t });
-    expect(el.querySelector('.circle-view__empty').textContent).toBe('circle.circle.empty');
+    expect(el.querySelector('.circle-view__empty').textContent).toBe('circle.view.empty');
     expect(el.querySelectorAll('.circle-view__bubble')).toHaveLength(0);
   });
 
@@ -493,10 +493,10 @@ describe('renderCircleView · bulletin restyle (bot card · transparency · cons
   it('transparency badge localizes an object provenance ({ llmUsed })', () => {
     const el = mount();
     renderCircleView(el, { circle, rows: [botRow({ provenance: { llmUsed: false } })], t });
-    expect(el.querySelector('.circle-view__bubble-provenance').textContent).toBe('circle.circle.provenance_direct');
+    expect(el.querySelector('.circle-view__bubble-provenance').textContent).toBe('circle.view.provenance_direct');
     const el2 = mount();
     renderCircleView(el2, { circle, rows: [botRow({ provenance: { llmUsed: true } })], t });
-    expect(el2.querySelector('.circle-view__bubble-provenance').textContent).toBe('circle.circle.provenance_llm');
+    expect(el2.querySelector('.circle-view__bubble-provenance').textContent).toBe('circle.view.provenance_llm');
   });
 
   it('a consent bubble gets the --consent card variant + primary/secondary button classes', () => {
@@ -528,7 +528,7 @@ describe('renderCircleView · composer parity (slash-suggest + permission gate)'
     expect(el.querySelector('.circle-view__composer')).toBeNull();
     const note = el.querySelector('.circle-view__composer-disabled');
     expect(note).not.toBeNull();
-    expect(note.textContent).toBe('circle.circle.chat_disabled');
+    expect(note.textContent).toBe('circle.view.chat_disabled');
   });
 
   it('permission gate: canPost (default) renders the composer form, no note', () => {
@@ -700,7 +700,7 @@ describe('renderCircleView · help Q&A seams (transparency badge + consent card)
     renderCircleView(el, { circle, rows: botRow({ provenance: { llmUsed: false } }), t });
     const badge = el.querySelector('.circle-view__bubble-provenance');
     expect(badge).not.toBeNull();
-    expect(badge.textContent).toBe('circle.circle.provenance_direct');
+    expect(badge.textContent).toBe('circle.view.provenance_direct');
   });
 
   it('an LLM answer stamps a verbatim provenance string', () => {

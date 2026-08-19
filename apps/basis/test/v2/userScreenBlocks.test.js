@@ -117,7 +117,7 @@ describe('materializeScreen · α.2.b — noticeboard (multi-circle)', () => {
 
 describe('materializeScreen · α.2.b — agenda', () => {
   it('calls calendar.listEvents with horizonDays, slices to limit', async () => {
-    const screen = addBlock(emptyScreen('Stream'), 'agenda', { limit: 2, horizonDays: 7 });
+    const screen = addBlock(emptyScreen('Stream'), 'calendar', { limit: 2, horizonDays: 7 });
     const callSkill = vi.fn(async () => ({ items: [
       { id: 'a', label: 'one' },
       { id: 'b', label: 'two' },
@@ -132,7 +132,7 @@ describe('materializeScreen · α.2.b — agenda', () => {
   });
 
   it('all-muted: agenda renders empty (no events fetched)', async () => {
-    const screen = addBlock(emptyScreen('Stream'), 'agenda');
+    const screen = addBlock(emptyScreen('Stream'), 'calendar');
     const callSkill = vi.fn(async () => ({ items: [] }));
     const out = await materializeScreen({
       screen,
@@ -281,7 +281,7 @@ describe('materializeScreen · α.4 — tasks block (multi-circle)', () => {
 describe('materializeScreen · α.2.b — error tolerance', () => {
   it('a per-type throw lands as status:"error" on that block; others succeed', async () => {
     const screen = addBlock(
-      addBlock(emptyScreen('Stream'), 'agenda'),
+      addBlock(emptyScreen('Stream'), 'calendar'),
       'text', { text: 'survives' });
     const callSkill = vi.fn(async () => { throw new Error('calendar down'); });
     const out = await materializeScreen({

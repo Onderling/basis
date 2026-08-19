@@ -99,15 +99,15 @@ describe('userScreens · α.2.a — α.1 block helpers compose with Screen', () 
   it('addBlock/moveBlock work directly on a Screen (.blocks shape match)', () => {
     let s = emptyScreen('Stream');
     s = addBlock(s, 'noticeboard');
-    s = addBlock(s, 'agenda');
-    expect(s.blocks.map((b) => b.type)).toEqual(['noticeboard', 'agenda']);
+    s = addBlock(s, 'calendar');
+    expect(s.blocks.map((b) => b.type)).toEqual(['noticeboard', 'calendar']);
     // addBlock preserves id+name; check id+circleFilter survive.
     expect(s.id).toMatch(/^s-/);
     expect(s.circleFilter).toBe(ALL_CIRCLES);
 
     const noticeId = s.blocks[0].id;
     s = moveBlock(s, noticeId, 1);
-    expect(s.blocks.map((b) => b.type)).toEqual(['agenda', 'noticeboard']);
+    expect(s.blocks.map((b) => b.type)).toEqual(['calendar', 'noticeboard']);
   });
 });
 

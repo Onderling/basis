@@ -170,3 +170,29 @@ describe('hold queue — the bounds are visible', () => {
     await a.shutdown();
   });
 });
+
+describe('hold queue — receipt-keyed removal (removeHeld)', () => {
+  it('removes exactly the confirmed message for exactly that peer — nothing else, and no drop report', async () => {
+    const dropped = [];
+    const a = await agent({ onHoldDropped: (d) => dropped.push(d) });
+    const OTHER = 'other-peer-address-0000000000000000000000000';
+
+    await a.peer.sendTo(DEAD, { msgId: 'm-1', text: 'one' }, HOLD);
+    await a.peer.sendTo(DEAD, { msgId: 'm-2', text: 'two' }, HOLD);
+    await a.peer.sendTo(OTHER, { msgId: 'm-1', text: 'one (their copy)' }, HOLD);
+    expect(a.heldFor(DEAD)).toBe(2);
+    expect(a.heldFor(OTHER)).toBe(1);
+
+    // The peer's app-level receipt for m-1 arrived — their held copy is obsolete.
+    expect(a.removeHeld({ addr: DEAD, msgId: 'm-1' })).toBe(1);
+
+    expect(a.heldFor(DEAD), 'only the confirmed message left the queue').toBe(1);
+    expect(a.heldFor(OTHER), "another peer's copy of the same msgId is UNTOUCHED — receipts are per-peer").toBe(1);
+    expect(dropped, 'a positive removal is not a drop, so nothing is reported').toEqual([]);
+
+    // Unknown message / malformed args → 0, never a throw.
+    expect(a.removeHeld({ addr: DEAD, msgId: 'no-such' })).toBe(0);
+    expect(a.removeHeld({})).toBe(0);
+    await a.shutdown();
+  });
+});

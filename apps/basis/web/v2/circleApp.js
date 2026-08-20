@@ -1179,6 +1179,10 @@ const applyIncomingReceipt = makeReceiptReceiver({
     const r = await rawCallSkill('stoop', 'listGroupMembers', { groupId: circleId });
     return Array.isArray(r?.members) ? r.members : [];
   },
+  // Receipt-keyed outbox removal: their app confirmed the message arrived, so the copy still held for
+  // THEM is obsolete (a presence flush would resend it). Late-bound — the agent lands after this module
+  // evaluates; a receipt arrives much later still.
+  removeHeld: (a) => _peerAgent?.removeHeld?.(a),
 });
 
 let rootEl = null;

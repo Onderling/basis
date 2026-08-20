@@ -515,6 +515,9 @@ export default function ChatScreen({
           const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId });
           return Array.isArray(r?.members) ? r.members : [];
         },
+        // Receipt-keyed outbox removal (web parity): their app confirmed the message arrived, so the
+        // copy still held for THEM is obsolete — a presence flush would resend it.
+        removeHeld: (a) => bundle?.agent?.removeHeld?.(a),
       })
       : null;
 

@@ -499,16 +499,14 @@ export async function createRealHouseholdAgent(opts = {}) {
         Boolean(await agentsTokenRegistry?.isRevoked(tokenId))
         || Boolean(surfaceGrants?.isRevoked(tokenId)),
     },
-    // THE SENDER OUTBOX, made durable. The hold queue is what stands between "the app told me it sent"
-    // and the message actually leaving; in memory, a restart dropped every held message silently — the
-    // one failure a hold queue exists to prevent. The persistence was built (persist + restore + TTL on
-    // the way back in) but no boot door ever passed a store, so it sat inert.
-    //
-    // `householdDataSource` and NOT the settings source, deliberately: settings can be pod-attached
-    // (`provisionSettingsMedium`) and therefore SHARED across a user's devices, and a shared outbox means
-    // another device resends this device's pending messages. An outbox is device-local by definition.
-    // No persistDb (tests) → this is the in-memory source and the behaviour is exactly as before.
-    holdStore: householdDataSource,
+    // THE SENDER OUTBOX is a PROJECTION, not a second store. basis deliberately passes NO `holdStore`:
+    // the content a held envelope carries is ALREADY on the device log (the optimistic local append
+    // happens before the fan holds anything), so persisting the queue here would write a duplicate copy
+    // beside the one record — the drift this repo keeps undoing. What survives a restart instead:
+    // received `stored` receipts ride the log as silent entries, and at circle open the still-owed
+    // statements (own, recent, unreceipted) re-fan over the signed lane — receiver-side dedup makes
+    // that idempotent. The `holdStore` port itself stays in the substrate for consumers that have no
+    // log (a companion node, a headless agent).
     ...(opts.secureAgentOpts ?? {}),
   });
   const chatAgent = sa.agent;
@@ -4242,6 +4240,10 @@ export async function createRealHouseholdAgent(opts = {}) {
     /** Diagnostics: how many messages are currently held for a peer. */
     heldFor(targetAddress) {
       return sa.heldFor(targetAddress);
+    },
+    /** Receipt-keyed hold removal (per peer + msgId) — the receipt receiver's outbox hook. */
+    removeHeld(a) {
+      return sa.removeHeld?.(a) ?? 0;
     },
 
     /**

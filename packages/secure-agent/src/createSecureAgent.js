@@ -991,6 +991,37 @@ export async function createSecureAgent(opts = {}) {
     return false;
   }
 
+  /**
+   * POSITIVE removal — the message REACHED this peer by another path (their app-level receipt says so),
+   * so every copy still held for them is obsolete: keep re-sending it and the recipient pays for a
+   * duplicate on every presence flush. Sweeps the peer's WHOLE identity (the address the receipt came
+   * back on is whichever route their device happens to be using — the held copy may sit under another
+   * of their aliases). Deliberately per-PEER, never global: in a circle, one member's receipt says
+   * nothing about the copy still owed to a different, still-offline member.
+   *
+   * Not a drop — nothing is reported through `onHoldDropped`, because nothing was lost.
+   *
+   * @param {object} a
+   * @param {string} a.addr   any address of the peer whose receipt arrived
+   * @param {string} a.msgId  the confirmed message
+   * @returns {number} how many held entries were removed
+   */
+  function removeHeld({ addr, msgId } = {}) {
+    if (typeof addr !== 'string' || !addr || typeof msgId !== 'string' || !msgId) return 0;
+    let removed = 0;
+    for (const a2 of addressesOfIdentity(addr)) {
+      const q = pendingHold.get(a2);
+      if (!q) continue;
+      for (const [key, entry] of q) {
+        const heldId = entry?.payload?.msgId ?? entry?.payload?.id ?? entry?.payload?._id ?? null;
+        if (heldId === msgId) { q.delete(key); removed += 1; }
+      }
+      if (q.size === 0) pendingHold.delete(a2);
+    }
+    if (removed) persistHolds();
+    return removed;
+  }
+
   async function flushPresence(addr) {
     let flushed = 0;
     // Presence is PROOF of life, so it also clears the give-up counter for every address of this peer —
@@ -2282,6 +2313,9 @@ export async function createSecureAgent(opts = {}) {
     // (0 when none) for diagnostics + tests.
     presenceSignal: (addr) => flushPresence(addr),
     heldFor: (addr) => pendingHold.get(addr)?.size ?? 0,
+    /** Receipt-keyed removal: the peer's app confirmed `msgId` arrived, so every copy still held for
+     *  them (any of their addresses) is obsolete. Per-peer, never global; not a drop, so not reported. */
+    removeHeld: (a) => removeHeld(a),
     /** Resolves once a persisted outbox has been read back (no-op without a `holdStore`). Callers
      *  that must not send before the previous run's queue is known await this at boot. */
     outboxRestored: () => outboxRestored,

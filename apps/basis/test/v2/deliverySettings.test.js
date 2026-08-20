@@ -16,7 +16,7 @@ import * as mod from '../../src/v2/deliverySettings.js';
 import {
   deliverySettings, createDeliverySettingsStore,
   localStorageDeliveryIo, asyncStorageDeliveryIo,
-  deliveryLabelFor, withDelivery, makeReceiptSender, applyReceipt,
+  deliveryLabelFor, withDelivery, makeReceiptSender, applyReceipt, makeReceiptReceiver,
 } from '../../src/v2/deliverySettings.js';
 import { RECEIPT_MESSAGE } from '../../src/v2/deliveryState.js';
 import { createDeliveryStateMap } from '@onderling/kring-host/deliveryState';
@@ -217,3 +217,40 @@ describe('applying an inbound receipt', () => {
   });
 });
 
+
+describe('receipt-keyed outbox removal — the receiver\'s removeHeld hook', () => {
+  const sentLog = (msgId, circleId) => ({ query: () => [{ id: msgId, payload: { circleId } }] });
+  const roster = [{ circleAddress: 'addr-bee', webid: 'w-bee' }];
+
+  it('a VALID receipt removes the sender\'s held copy for that peer', async () => {
+    const removed = [];
+    const map = createDeliveryStateMap();
+    map.set('m-1', DELIVERY.PENDING);   // a message THIS device sent
+    const onReceipt = makeReceiptReceiver({
+      deliveryMap: map,
+      eventLog: sentLog('m-1', 'c-1'),
+      listCircleMembers: async () => roster,
+      removeHeld: (a) => removed.push(a),
+    });
+    expect(await onReceipt({ subtype: RECEIPT_MESSAGE, messageId: 'm-1' }, 'addr-bee')).toBe(true);
+    expect(map.get('m-1')).toBe(DELIVERY.STORED);
+    expect(removed).toEqual([{ addr: 'addr-bee', msgId: 'm-1' }]);
+  });
+
+  it('a REFUSED receipt removes nothing — an impostor must not empty a queue', async () => {
+    const removed = [];
+    const map = createDeliveryStateMap();
+    map.set('m-1', DELIVERY.PENDING);
+    const onReceipt = makeReceiptReceiver({
+      deliveryMap: map,
+      eventLog: sentLog('m-1', 'c-1'),
+      listCircleMembers: async () => roster,
+      removeHeld: (a) => removed.push(a),
+    });
+    // Not a recipient (unknown address) → refused by the roster gate → no removal.
+    expect(await onReceipt({ subtype: RECEIPT_MESSAGE, messageId: 'm-1' }, 'addr-stranger')).toBe(false);
+    // A message this device never sent → refused by the id gate → no removal.
+    expect(await onReceipt({ subtype: RECEIPT_MESSAGE, messageId: 'm-ghost' }, 'addr-bee')).toBe(false);
+    expect(removed).toEqual([]);
+  });
+});

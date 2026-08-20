@@ -279,7 +279,7 @@ export function makeReceiptSender({ getSettings, sendTo, logger = console } = {}
  * @param {(circleId: string) => Promise<Array<object>>} deps.listCircleMembers  roster rows for a circle
  * @returns {(payload: object, fromAddress: string|null) => Promise<boolean>} whether a receipt was applied
  */
-export function makeReceiptReceiver({ deliveryMap, eventLog, listCircleMembers } = {}) {
+export function makeReceiptReceiver({ deliveryMap, eventLog, listCircleMembers, removeHeld = null } = {}) {
   /** circleId → Set of every address the roster knows for its members. */
   const byCircle = new Map();
 
@@ -317,9 +317,18 @@ export function makeReceiptReceiver({ deliveryMap, eventLog, listCircleMembers }
     if (allowed && typeof fromAddress === 'string' && !allowed.has(fromAddress)) {
       allowed = await addressesFor(circleId, { refresh: true });
     }
-    return applyReceipt(payload, fromAddress, deliveryMap, allowed
+    const applied = applyReceipt(payload, fromAddress, deliveryMap, allowed
       ? { isRecipient: (from) => typeof from === 'string' && allowed.has(from) }
       : {});
+    // Receipt-keyed OUTBOX removal: this peer's app confirmed the message arrived (by whatever path),
+    // so any copy still held for THEM is obsolete — without this, the presence flush re-sends what
+    // they already have. Per-peer by construction (the receipt's own sender), never global: in a
+    // circle, one member's receipt says nothing about the copy owed to a still-offline member. Only
+    // after a VALIDATED receipt — an impostor's receipt must not empty a queue either.
+    if (applied && typeof removeHeld === 'function' && typeof fromAddress === 'string' && msgId) {
+      try { removeHeld({ addr: fromAddress, msgId }); } catch { /* the map advance already stands */ }
+    }
+    return applied;
   };
 }
 

@@ -1,39 +1,92 @@
 /**
- * basis v2 — per-message delivery state (δ.2).
+ * THE delivery-state vocabulary + the per-message state map — ONE home (the substrate-audit's single
+ * real extraction, 2026-08-20). The ladder used to live in `apps/basis/src/v2/deliveryState.js` while
+ * this package hardcoded its own copy of the states — two layers holding the same fact, and they had
+ * already diverged (this file's typedef still documented states the app had retired). The vocabulary
+ * now lives HERE, where the package that needs it may import it and the app re-exports it; the
+ * duplicate-vocab guard registers this home so a second frozen copy fails CI.
  *
- * The circle chat send is optimistic: the local user's message is
- * appended to the in-memory EventLog the moment the composer fires,
- * then a best-effort `broadcastCircleMessage` fan-out runs in the
- * background.  Before δ.2, failures were silent — the user never
- * knew if their message reached peers.
+ * ── The ladder (G8/G9/G10, decided 2026-07-28; decision 1, 2026-07-29) ──────────────────────────────
  *
- * δ.2 keeps a SIBLING map (keyed by `msgId`) of one of:
- *   - `'pending'`  — fan-out in flight; bubble shows a clock icon
- *   - `'sent'`     — fan-out resolved with no errors; bubble shows nothing (happy-path stays clean)
- *   - `'failed'`   — fan-out rejected or returned `errors[]`; bubble shows a warning that taps to retry
+ * Every rung is named for what it PROVES rather than for how it feels:
  *
- * **Extended 2026-07-28 (G8/G9/G10)** with the far end of the same journey — what happened on the PEER's
- * side, which δ.2 had no way to know:
- *   - `'maybe-received'`  — we asked for a transport ack, got none, and sent it fire-and-forget anyway
- *   - `'reached-device'`  — their transport acknowledged (before their app saw it)
- *   - `'stored'`          — their app accepted and stored it
+ *   pending         the fan-out is in flight.
+ *   maybe-received  it left this device and nobody confirmed anything. It MAY have arrived and the
+ *                   confirmation may have been lost — genuinely unknown. (Frits' word, and the right
+ *                   one: "sent" over-claims here and "failed" under-claims.)
+ *   stored          their APP accepted and stored it — the strongest claim we make, and the only
+ *                   positive evidence admitted: a receipt the recipient CHOSE to send.
  *
- * One map, not two. `apps/basis/src/v2/deliveryState.js` owns the ladder and its ordering; this owns the
- * per-message storage and the subscription. Splitting them across two maps was the near-miss that produced
- * `docs/conventions/shared-vocabularies.md`.
+ * Two states were RETIRED (decision 1): `sent` read as success while meaning only "the fan-out
+ * accepted it"; `reached-device` is the transport ack, deliberately never shown — a phone acks
+ * whatever its owner's receipt setting says, so surfacing it would identify a receipts-off peer by
+ * where their ladder stops.
  *
- * The EventLog stays append-only.  This map is a separate piece of
- * UI state read at render time and re-fired when state flips.
+ * The terminal negatives sit OUTSIDE the ladder — they are where a message stopped, not how far it
+ * got: `failed` (the send did not go; retryable) and `undeliverable` (no address at all).
  *
- * Subscribers receive `(msgId, state)` where `state` is the new value
- * (or `null` when the entry was cleared).
+ * ── Two rules that are easy to get wrong ────────────────────────────────────────────────────────────
  *
- * Platform: neutral (plain JS).  Used by both web (circleApp.js) and
- * mobile (CircleLauncherScreen.js) circle chat send paths.
+ * **1. The ladder only goes up.** Acks and receipts arrive out of order, and a late transport-ack
+ * after an app-receipt must not demote a message. `advanceDelivery` enforces that — with ONE
+ * deliberate exception from the shipped flow: `pending` may leave a terminal state, because a RETRY
+ * is an act, not an arrival.
+ *
+ * **2. There is NO state meaning "they turned receipts off."** Receipts are disableable for privacy,
+ * and a state that said so would broadcast the setting to everyone who messages you. Absence stays
+ * ambiguous; `deliveryStates()` is asserted against that in the tests.
+ *
+ * There is deliberately no read receipt. Frits: *"reading confirmation is not important now."*
  */
 
+export const DELIVERY = Object.freeze({
+  PENDING: 'pending',
+  FAILED: 'failed',
+  UNDELIVERABLE: 'undeliverable',
+  MAYBE: 'maybe-received',
+  STORED: 'stored',
+});
+
+/** The terminal negatives. Not on the ladder: they are where a message stopped, not how far it got. */
+export const DELIVERY_TERMINAL = Object.freeze([DELIVERY.FAILED, DELIVERY.UNDELIVERABLE]);
+
+/** Ordered weakest → strongest. The order IS the semantics; see rule 1. */
+export const DELIVERY_ORDER = Object.freeze([
+  DELIVERY.PENDING, DELIVERY.MAYBE, DELIVERY.STORED,
+]);
+
+/** The states that exist. Exported so a test can assert nothing was added that leaks a setting. */
+export function deliveryStates() { return [...DELIVERY_ORDER]; }
+
+export function isDeliveryState(v) {
+  return DELIVERY_ORDER.includes(v) || DELIVERY_TERMINAL.includes(v);
+}
+
 /**
- * @typedef {'pending'|'sent'|'maybe-received'|'reached-device'|'stored'|'failed'|'undeliverable'|null} DeliveryState
+ * Move a message's state forward, never back.
+ *
+ * Out-of-order arrival is normal, not exceptional: the app receipt travels the same unreliable network
+ * as the transport ack and can overtake it. Taking the max is the only rule that survives that.
+ */
+export function advanceDelivery(current, next) {
+  // A terminal state is where a message STOPPED, so it is not compared on the ladder: it replaces
+  // whatever came before, and a stale ack must not resurrect a message the user was told did not go.
+  //
+  // ONE exception, and it comes from the shipped flow rather than from theory: `pending → failed →
+  // (retry) pending → …`. A retry is an ACT, not an arrival, so `pending` is allowed out of a terminal
+  // state and nothing else is.
+  if (DELIVERY_TERMINAL.includes(current)) return next === DELIVERY.PENDING ? next : current;
+  if (DELIVERY_TERMINAL.includes(next)) return next;
+
+  const a = DELIVERY_ORDER.indexOf(current);
+  const b = DELIVERY_ORDER.indexOf(next);
+  if (b < 0) return isDeliveryState(current) ? current : DELIVERY.PENDING;
+  if (a < 0) return next;
+  return b > a ? next : current;
+}
+
+/**
+ * @typedef {'pending'|'maybe-received'|'stored'|'failed'|'undeliverable'|null} DeliveryState
  */
 
 /**
@@ -41,23 +94,14 @@
  * @property {(msgId: string) => DeliveryState} get
  *   Returns the current state for `msgId`, or `null` if not tracked.
  * @property {(msgId: string, state: DeliveryState) => void} set
- *   Sets the state for `msgId`.  Pass `null` (or `undefined`) to
- *   clear the entry — useful so the map doesn't grow unbounded as
- *   sent messages accumulate.  Notifies subscribers either way.
+ *   Sets the state for `msgId` (through `advanceDelivery` — monotonic).  Pass `null` (or `undefined`)
+ *   to clear the entry — useful so the map doesn't grow unbounded as sent messages accumulate.
+ *   Notifies subscribers either way.
  * @property {(msgId: string) => boolean} clear
- *   Convenience: equivalent to `set(msgId, null)`.  Returns `true`
- *   if an entry was actually removed.
- * @property {() => number} pruneSent
- *   Drop every `'sent'` entry from the map.  Renderers treat `'sent'`
- *   and `null` identically (no icon either way), so this is invisible
- *   to the UI — its purpose is to keep the in-memory map from growing
- *   unbounded over a long session of heavy chat.  Subscribers receive
- *   one `(msgId, null)` notification per cleared entry.  Returns the
- *   number of entries pruned.  Callers wire this on whatever cadence
- *   makes sense (e.g. a `setInterval`, an EventLog prune hook, or
- *   on-demand from the chat-shell).  Not auto-wired by the substrate
- *   because the map dies with the agent boot anyway — growth is
- *   bounded by session length even without pruning.
+ *   Convenience: equivalent to `set(msgId, null)`.  Returns `true` if an entry was actually removed.
+ * @property {() => number} pruneUnconfirmed
+ *   Drop every unconfirmed (`maybe-received`) entry — keeps a long-lived map from accumulating them.
+ *   Subscribers receive one `(msgId, null)` notification per cleared entry; returns the count.
  * @property {() => number} size
  *   Number of tracked entries (post-clear).
  * @property {(fn: (msgId: string, state: DeliveryState) => void) => () => void} subscribe
@@ -65,39 +109,11 @@
  */
 
 /**
- * Factory.  One map per agent boot — instantiated alongside the
- * EventLog so its lifetime matches the in-memory event stream.
+ * Factory.  One map per agent boot — instantiated alongside the EventLog so its lifetime matches the
+ * in-memory event stream (rehydrated from the log at boot by `rehydrateDeliveryState` in basis).
  *
  * @returns {DeliveryStateMap}
  */
-/** The full ladder, weakest → strongest. Terminals sit outside it (see `advance`). */
-// Decision 1 (2026-07-29): `sent` and `reached-device` are retired. `sent` read as success while meaning
-// only "the fan-out accepted it"; `reached-device` is the transport ack, which is deliberately never
-// shown because a phone acks whatever its owner's receipt setting says. See deliveryState.js in basis.
-const LADDER = ['pending', 'maybe-received', 'stored'];
-const TERMINAL = new Set(['failed', 'undeliverable']);
-const KNOWN_STATES = new Set([...LADDER, ...TERMINAL]);
-
-/**
- * Forward-only, with one deliberate exception.
- *
- * From a TERMINAL state (`failed` / `undeliverable`) the only move allowed is back to `pending` — a RETRY,
- * which is an act by the user or the app, not a message arriving. Everything else is ignored, so a late
- * transport-ack cannot quietly un-fail a message the user was already told did not send.
- *
- * That exception is not hypothetical: the existing flow is `pending → failed → (retry) pending → sent`, and
- * a test has pinned it since δ.2. Making terminals fully absorbing broke it — which is the second time
- * today that reading what already exists changed the design rather than confirming it.
- */
-function advance(current, next) {
-  if (current == null) return next;
-  if (TERMINAL.has(current)) return next === 'pending' ? next : current;
-  if (TERMINAL.has(next)) return next;
-  const a = LADDER.indexOf(current);
-  const b = LADDER.indexOf(next);
-  return b > a ? next : current;
-}
-
 export function createDeliveryStateMap() {
   /** @type {Map<string, Exclude<DeliveryState, null>>} */
   const map = new Map();
@@ -123,12 +139,11 @@ export function createDeliveryStateMap() {
         notify(msgId, null);
         return;
       }
-      if (!KNOWN_STATES.has(state)) return;
-      // Monotonic: acks and receipts race, and a late transport-ack must not demote a message the app
-      // receipt already advanced. A TERMINAL state (failed/undeliverable) replaces whatever came before and
-      // is never itself replaced — the user was told it did not go, and a stale ack must not rewrite that.
+      if (!isDeliveryState(state)) return;
+      // Monotonic through the ONE rule (`advanceDelivery`) — the map no longer carries its own copy of
+      // the ladder, so it cannot drift from the vocabulary again.
       const current = map.get(msgId);
-      const next = advance(current, state);
+      const next = advanceDelivery(current, state);
       if (next === current) return;
       map.set(msgId, next);
       notify(msgId, next);
@@ -142,16 +157,14 @@ export function createDeliveryStateMap() {
     },
     /**
      * Drop the entries that never got confirmed, so a long-lived map does not accumulate them.
-     *
-     * Was `pruneSent`, which pruned the retired `sent` state. Renamed with its meaning: the resting state
-     * for an unconfirmed message is now `maybe-received`. (It has no production caller either way — worth
-     * knowing before relying on it.)
+     * (The resting state for an unconfirmed message is `maybe-received`. No production caller yet —
+     * worth knowing before relying on it.)
      */
     pruneUnconfirmed() {
       // Collect IDs first so we don't mutate the Map while iterating.
       const toClear = [];
       for (const [id, st] of map.entries()) {
-        if (st === 'maybe-received') toClear.push(id);
+        if (st === DELIVERY.MAYBE) toClear.push(id);
       }
       for (const id of toClear) {
         map.delete(id);

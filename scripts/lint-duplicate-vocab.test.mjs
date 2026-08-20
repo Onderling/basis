@@ -19,11 +19,14 @@ describe('lint-duplicate-vocab', () => {
     expect(r.status).toBe(0);
   });
 
-  it('extracts depth-1 keys from a frozen export — literal AND computed', () => {
+  it('extracts depth-1 LITERAL keys from a frozen export — computed keys are references, not copies', () => {
     const [a] = frozenExports(`export const T = Object.freeze({ short: 1, chat: 2, audit: 3 });`);
     expect([...a.keys].sort()).toEqual(['audit', 'chat', 'short']);
+    // A computed-key table (`[RETAIN.SHORT]: …`) CONSUMES the vocabulary it is keyed by — flagging it
+    // as a second definition would push call sites toward literal copies, the actual drift. So it
+    // contributes NO keys and can never match a registration.
     const [b] = frozenExports(`export const U = Object.freeze({ [RETAIN.SHORT]: 1, [RETAIN.CHAT]: 2, [RETAIN.AUDIT]: 3 });`);
-    expect([...b.keys].sort()).toEqual(['audit', 'chat', 'short']);
+    expect([...b.keys]).toEqual([]);
     // nested objects must not leak their keys up to depth 1
     const [c] = frozenExports(`export const V = Object.freeze({ a: { nestedKey: 1 }, b: 2 });`);
     expect([...c.keys].sort()).toEqual(['a', 'b']);

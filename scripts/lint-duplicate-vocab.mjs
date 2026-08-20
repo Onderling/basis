@@ -26,7 +26,12 @@ export const VOCABULARIES = [
   {
     name: 'retention-classes',
     home: 'packages/item-store/src/entryKinds.js',
-    keys: ['audit', 'chat', 'short'],   // the RETAIN classes — the per-class retention table
+    keys: ['audit', 'chat', 'named', 'record', 'short'],   // the RETAIN classes (the home's literal keys — computed-key TABLES over them are references, not copies)
+  },
+  {
+    name: 'delivery-ladder',
+    home: 'packages/kring-host/src/deliveryState.js',
+    keys: ['failed', 'maybe', 'pending', 'stored', 'undeliverable'],   // DELIVERY — the one delivery vocabulary (the substrate-audit extraction)
   },
 ];
 
@@ -73,7 +78,14 @@ export function frozenExports(src) {
       if (c === '}') { depth--; if (depth === 0) break; continue; }
       if (depth === 1 && atEntryStart) {
         const km = src.slice(i).match(/^\s*(\[[^\]]+\]|['"][^'"]+['"]|[A-Za-z0-9_$]+)\s*:/);
-        if (km) { keys.add(normKey(km[1])); i += km[0].length - 1; atEntryStart = false; continue; }
+        if (km) {
+          // A COMPUTED key (`[DELIVERY.PENDING]: …`) is a REFERENCE to a vocabulary, not a second
+          // definition of it — a label map keyed by the home's export is the correct consumption
+          // pattern, and flagging it would push call sites toward literal copies (the actual drift).
+          // Only literal keys count toward a definition's key-set.
+          if (!km[1].startsWith('[')) keys.add(normKey(km[1]));
+          i += km[0].length - 1; atEntryStart = false; continue;
+        }
       }
       if (c === ',' && depth === 1) atEntryStart = true;
     }

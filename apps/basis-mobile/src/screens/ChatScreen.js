@@ -66,6 +66,7 @@ import { makeCirclePolicyPeerHandler } from '../../../basis/src/v2/circlePolicyR
 import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '../../../basis/src/v2/circleLogReceiver.js';
 import { makeGovernanceRail } from '../../../basis/src/v2/governanceAppWiring.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../../basis/src/v2/membershipRail.js';
+import { GRANTS_BROADCAST } from '../../../basis/src/v2/grantsRail.js';
 import { makeTaskPeerHandler, TASK_BROADCAST, TASK_CATCHUP_SUBTYPES } from '../../../basis/src/v2/taskRail.js';
 import { makeFrontierReplay } from '../../../basis/src/v2/frontierReplay.js';
 import { makeChatPeerHandler, makePodChatCatchUp, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../../basis/src/v2/chatRail.js';
@@ -703,6 +704,14 @@ export default function ChatScreen({
           globalThis.__onderlingMemCatchUpKicked = true;
           setTimeout(() => { memCatchUp.requestAll({ callSkill: bundle.callSkill }).catch(() => {}); }, 2500);
         }
+        // The grants lane (connections belong to the person): pull my own devices' grant/revoke
+        // statements on connect, so a revoke made elsewhere binds at this door before a stale
+        // view is served. Handlers ride the agent's ready-made receiver + catch-up pair below.
+        const grantsCatchUp = bundle?.agent?.grantsCatchUp ?? null;
+        if (grantsCatchUp && !globalThis.__onderlingGrantsCatchUpKicked) {
+          globalThis.__onderlingGrantsCatchUpKicked = true;
+          setTimeout(() => { grantsCatchUp.requestFromSiblings().catch(() => {}); }, 2500);
+        }
         // The task lane (the content re-root): the fan receiver verifies at the agent's rail and causally
         // merges the snapshot into the circle's store head; the catch-up is the windowed FRONTIER REPLAY —
         // head hashes + a limit, chunked replies, and the serve set includes signed live heads whose
@@ -795,6 +804,13 @@ export default function ChatScreen({
           ...(govCatchUp ? { [govCatchUp.subtypes.request]: govCatchUp.onRequest, [govCatchUp.subtypes.batch]: govCatchUp.onBatch } : {}),
           ...(memRail ? { [MEMBERSHIP_BROADCAST]: makeMembershipPeerHandler({ rail: memRail }) } : {}),
           ...(memCatchUp ? { [memCatchUp.subtypes.request]: memCatchUp.onRequest, [memCatchUp.subtypes.batch]: memCatchUp.onBatch } : {}),
+          // The grants lane: a sibling device's grant/revoke lands through the agent's ready-made
+          // receiver and refolds the door's grant set live (same wiring as the web shell).
+          ...(bundle?.agent?.grantsPeerHandler ? { [GRANTS_BROADCAST]: bundle.agent.grantsPeerHandler } : {}),
+          ...(grantsCatchUp ? {
+            [grantsCatchUp.subtypes.request]: grantsCatchUp.onRequest,
+            [grantsCatchUp.subtypes.batch]:   grantsCatchUp.onBatch,
+          } : {}),
           ...(taskRail ? { [TASK_BROADCAST]: makeTaskPeerHandler({ rail: taskRail }) } : {}),
           ...(taskCatchUp ? {
             [taskCatchUp.subtypes.request]: taskCatchUp.onRequest,

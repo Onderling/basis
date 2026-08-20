@@ -93,3 +93,31 @@ describe('BOTH shells consume both reports (invariant 2)', () => {
     });
   }
 });
+
+describe('THE SEAM CROSSED — a real TTL drop ends at the bubble state (T10 verification, 2026-08-20)', () => {
+  // The two flanking proofs existed (the queue fires the hook; the consumer sets 'failed') with the
+  // seam between them only text-pinned. This drives the WHOLE chain in one composition: a real
+  // secure agent, the shared consumers spread into its opts exactly as both shells spread them, a
+  // held message outliving its TTL — and the delivery map the bubble reads saying 'failed'.
+  it('a held message that expires flips the bubble map to failed — the UI cannot keep looking fine', async () => {
+    const { VaultMemory } = await import('@onderling/vault');
+    const { createSecureAgent } = await import('@onderling/secure-agent');
+    const deliveryMap = new Map();
+    const warns = [];
+    const a = await createSecureAgent({
+      vault: new VaultMemory(), warnOnInsecure: false, holdTtlMs: 1,
+      ...makeGiveUpConsumers({ deliveryMap, onWarn: (m) => warns.push(m) }),
+    });
+    const HOLD = { firstSendTimeoutMs: 200, retryDelays: [], guarantee: 'hold-forward' };
+    const DEAD = 'dead-peer-address-0000000000000000000000000';
+
+    const first = await a.peer.sendTo(DEAD, { msgId: 'bubble-1', text: 'hoi' }, HOLD);
+    expect(first.held).toBe(true);
+    await new Promise((r) => setTimeout(r, 5));
+    await a.peer.sendTo(DEAD, { msgId: 'bubble-2', text: 'hoi 2' }, HOLD);   // the sweep is enqueue-driven
+
+    expect(deliveryMap.get('bubble-1'), 'the expired message must read failed').toBe('failed');
+    expect(warns.some((m) => m.includes('bubble-1')), 'and the drop is logged').toBe(true);
+    await a.shutdown();
+  });
+});

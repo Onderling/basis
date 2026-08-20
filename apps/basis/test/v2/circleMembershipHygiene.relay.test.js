@@ -256,6 +256,7 @@ describe('B5 — the invite ceiling is refused by the ISSUER, over a real relay'
 
     const first = await joinCircleFromInvite({
       inviteUri: invite.uri,
+      rulesAccepted: true,   // task #80 — these tests simulate a joiner who ticked the rules
       callSkill: (app, op, args) => one.agent.callSkill(app, op, args),
       sendPeerRedeem: one.sendPeerRedeem,
       handle: 'one',
@@ -264,6 +265,7 @@ describe('B5 — the invite ceiling is refused by the ISSUER, over a real relay'
 
     const second = await joinCircleFromInvite({
       inviteUri: invite.uri,
+      rulesAccepted: true,   // task #80 — these tests simulate a joiner who ticked the rules
       callSkill: (app, op, args) => two.agent.callSkill(app, op, args),
       sendPeerRedeem: two.sendPeerRedeem,
       handle: 'two',
@@ -297,6 +299,7 @@ describe('B5 — the invite ceiling is refused by the ISSUER, over a real relay'
     });
     const again = await joinCircleFromInvite({
       inviteUri: invite.uri,
+      rulesAccepted: true,   // task #80 — these tests simulate a joiner who ticked the rules
       callSkill: (app, op, args) => one.agent.callSkill(app, op, args),
       sendPeerRedeem: one.sendPeerRedeem,
       handle: 'one',

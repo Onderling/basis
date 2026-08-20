@@ -46,6 +46,7 @@ describe('J-A6 — an invite stops working when it says it will (FIXED 2026-07-3
 
       const redeem = (label, offset) => atClockOffset(offset, () => call('stoop', 'verifyMembershipCodeForPeer', {
         groupId, code, requesterWebid: `walker-${label}`, peerDisplay: `walker${label}`,
+        rulesAccepted: '1',   // task #80 — these walkers simulate joiners who ticked the rules
       }));
 
       // Inside its life: admitted, as it should be.
@@ -72,7 +73,7 @@ describe('J-A6 — an invite stops working when it says it will (FIXED 2026-07-3
       const built = await buildCircleInviteUri({ callSkill: call, circleId: groupId, adminPeerAddr: admin.pubKey });
       const code = codeOf(built.uri);
       const r = await call('stoop', 'verifyMembershipCodeForPeer', {
-        groupId, code, requesterWebid: 'skew-walker', peerDisplay: 'skewwalker',
+        groupId, code, requesterWebid: 'skew-walker', peerDisplay: 'skewwalker', rulesAccepted: '1',
       });
       expect(r.redemptionId).toBeTruthy();
     } finally {
@@ -106,13 +107,13 @@ describe('J-A8 — rotating the membership code kills the old one (FIXED 2026-07
       // only add a newer row while the gate accepted any row inside `expiresAt + 24h` — so for a day after
       // rotating, the leaked code still admitted strangers.
       const withOld = await call('stoop', 'verifyMembershipCodeForPeer', {
-        groupId, code: oldCode, requesterWebid: 'holder-of-old-code', peerDisplay: 'oldholder',
+        groupId, code: oldCode, requesterWebid: 'holder-of-old-code', peerDisplay: 'oldholder', rulesAccepted: '1',
       });
       expect(withOld.error).toBe('invalid-or-expired-code');
 
       // …and the fresh code works, so "rotation removes" is not satisfied by breaking rotation.
       const withNew = await call('stoop', 'verifyMembershipCodeForPeer', {
-        groupId, code: rotated.code, requesterWebid: 'holder-of-new-code', peerDisplay: 'newholder',
+        groupId, code: rotated.code, requesterWebid: 'holder-of-new-code', peerDisplay: 'newholder', rulesAccepted: '1',
       });
       expect(withNew.redemptionId).toBeTruthy();
     } finally {

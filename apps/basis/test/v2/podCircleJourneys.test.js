@@ -90,6 +90,7 @@ describe('J-NP1 — the pod as this circle’s connection point', () => {
       // A REAL join over the real peer bridge.
       const joined = await joinCircleFromInvite({
         inviteUri: invite,
+      rulesAccepted: true,   // task #80 — these tests simulate a joiner who ticked the rules
         callSkill: (app, op, args) => bo.agent.callSkill(app, op, args),
         sendPeerRedeem: bo.sendPeerRedeem,
         handle: 'bobbie',
@@ -168,6 +169,7 @@ describe('J-NP2 — no admin online is a notice, and the invite survives it', ()
       await goOffline(anna);
       const asleep = await joinCircleFromInvite({
         inviteUri: invite, callSkill: boCallSkill, sendPeerRedeem: bo.sendPeerRedeem, handle: 'bobbie',
+      rulesAccepted: true,   // task #80 — these tests simulate a joiner who ticked the rules
       });
       // The distinction that matters: not "join-failed", not "invalid-or-expired-code".
       expect(asleep).toMatchObject({
@@ -179,6 +181,7 @@ describe('J-NP2 — no admin online is a notice, and the invite survives it', ()
       await goOnline(anna, { announceTo: bo });
       const awake = await joinCircleFromInvite({
         inviteUri: invite, callSkill: boCallSkill, sendPeerRedeem: bo.sendPeerRedeem, handle: 'bobbie',
+      rulesAccepted: true,   // task #80 — these tests simulate a joiner who ticked the rules
       });
       expect(awake).toMatchObject({ ok: true, circleId: 'nachtcircle' });
     } finally {
@@ -245,6 +248,7 @@ describe('J-NP3 — the pod-host disclosure reaches the JOINER before they redee
       const calls = [];
       await joinCircleFromInvite({
         inviteUri: invite,
+      rulesAccepted: true,   // task #80 — these tests simulate a joiner who ticked the rules
         callSkill: async (app, op) => { calls.push(op); return op === 'setMyHandle' ? { ok: true } : {}; },
         handle: 'bobbie',
       });

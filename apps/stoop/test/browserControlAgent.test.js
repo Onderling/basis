@@ -48,7 +48,7 @@ describe('createBrowserStoopAgent — control-agent seam (basis circle membershi
     const bundle = await buildBrowserBundle({ controlAgent: ca });
     const created = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
     const redeem = await callSkill(bundle.agent, 'redeemMembershipCode',
-      { groupId: GROUP, code: created.code, sealingPublicKey: SEAL_PUB }, BOB);
+      { rulesAccepted: '1', groupId: GROUP, code: created.code, sealingPublicKey: SEAL_PUB }, BOB);
 
     expect(redeem.redemptionId).toBeTruthy();
     expect(ca.addMember).toHaveBeenCalledWith({ webId: BOB, publicKey: SEAL_PUB, role: 'member', groupId: GROUP });
@@ -68,7 +68,7 @@ describe('createBrowserStoopAgent — control-agent seam (basis circle membershi
     const bundle = await buildBrowserBundle({ controlAgent: ca });
     const created = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
     const redeem = await callSkill(bundle.agent, 'redeemMembershipCode',
-      { groupId: GROUP, code: created.code }, BOB);
+      { rulesAccepted: '1', groupId: GROUP, code: created.code }, BOB);
 
     expect(redeem.redemptionId).toBeTruthy();      // redemption still works
     expect(ca.addMember).not.toHaveBeenCalled();
@@ -78,7 +78,7 @@ describe('createBrowserStoopAgent — control-agent seam (basis circle membershi
     const bundle = await buildBrowserBundle();      // no controlAgent
     const created = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
     const redeem = await callSkill(bundle.agent, 'redeemMembershipCode',
-      { groupId: GROUP, code: created.code, sealingPublicKey: SEAL_PUB }, BOB);
+      { rulesAccepted: '1', groupId: GROUP, code: created.code, sealingPublicKey: SEAL_PUB }, BOB);
 
     expect(redeem.redemptionId).toBeTruthy();        // works fine with the seam unused
   });

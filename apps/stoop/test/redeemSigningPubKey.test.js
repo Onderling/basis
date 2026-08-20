@@ -44,7 +44,7 @@ describe('redeem → capture joiner signing pubKey', () => {
   it('records the AUTHENTICATED sender pubKey on the item + MemberMap', async () => {
     const bundle = await buildBundle();
     const r = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
-    const redeem = await callSkill(bundle.agent, 'redeemMembershipCode', { groupId: GROUP, code: r.code }, BOB);
+    const redeem = await callSkill(bundle.agent, 'redeemMembershipCode', { rulesAccepted: '1', groupId: GROUP, code: r.code }, BOB);
     expect(redeem.redemptionId).toBeTruthy();
 
     // Bonus the task asks us to assert: resolveByWebid(joiner).pubKey === joiner's signing key.
@@ -63,7 +63,7 @@ describe('redeem → capture joiner signing pubKey', () => {
     const r = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
     // Attacker (redeeming as BOB) tries to claim MALLORY's routing key via the body.
     await callSkill(bundle.agent, 'redeemMembershipCode',
-      { groupId: GROUP, code: r.code, pubKey: 'mallory-key', myPubKey: 'mallory-key', signingPublicKey: 'mallory-key' }, BOB);
+      { rulesAccepted: '1', groupId: GROUP, code: r.code, pubKey: 'mallory-key', myPubKey: 'mallory-key', signingPublicKey: 'mallory-key' }, BOB);
 
     const row = await bundle.members.resolveByWebid(BOB);
     expect(row.pubKey).toBe(BOB);            // authenticated `from`, not the body claim
@@ -81,7 +81,7 @@ describe('redeem → capture joiner signing pubKey', () => {
     expect(before.ok).toBe(false);
     expect(before.reason).toBe('recipient-pubkey-unknown');
 
-    await callSkill(bundle.agent, 'redeemMembershipCode', { groupId: GROUP, code: r.code }, BOB);
+    await callSkill(bundle.agent, 'redeemMembershipCode', { rulesAccepted: '1', groupId: GROUP, code: r.code }, BOB);
 
     // After redeem, the pubKey resolves — send no longer bails on the pubkey gate.
     const after = await bundle.chat.send({ toWebid: BOB, subtype: 'reveal-request', threadId: GROUP });
@@ -93,7 +93,7 @@ describe('redeem → capture joiner signing pubKey', () => {
     const bundle = await buildBundle({ controlAgent: ca });
     const r = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
     // No sealing key, no body pubKey — an older client shape.
-    const redeem = await callSkill(bundle.agent, 'redeemMembershipCode', { groupId: GROUP, code: r.code }, BOB);
+    const redeem = await callSkill(bundle.agent, 'redeemMembershipCode', { rulesAccepted: '1', groupId: GROUP, code: r.code }, BOB);
     expect(redeem.redemptionId).toBeTruthy();          // redemption unaffected
     expect(ca.addMember).not.toHaveBeenCalled();        // sealing path still gated on sealingPublicKey
     expect((await bundle.members.resolveByWebid(BOB)).pubKey).toBe(BOB); // signing pubKey still captured
@@ -102,7 +102,7 @@ describe('redeem → capture joiner signing pubKey', () => {
   it('listGroupMembers backfills pubKey from the redemption trail on reload', async () => {
     const bundle = await buildBundle();
     const r = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
-    await callSkill(bundle.agent, 'redeemMembershipCode', { groupId: GROUP, code: r.code }, BOB);
+    await callSkill(bundle.agent, 'redeemMembershipCode', { rulesAccepted: '1', groupId: GROUP, code: r.code }, BOB);
 
     // Simulate a reload where the roster row lost its pubKey but the redemption
     // item (with signingPublicKey) survives — the reduction should backfill it.
@@ -123,7 +123,7 @@ describe('verifyMembershipCodeForPeer → capture requester signing pubKey (admi
     // `from` is the ADMIN; requesterWebid is set by the admin handler from the
     // authenticated NKN fromAddr (here BOB).
     await callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
-      { groupId: GROUP, code: r.code, requesterWebid: BOB }, ADMIN);
+      { rulesAccepted: '1', groupId: GROUP, code: r.code, requesterWebid: BOB }, ADMIN);
 
     expect((await bundle.members.resolveByWebid(BOB)).pubKey).toBe(BOB);
     const items = await bundle.itemStore.listOpen({ type: 'membership-redemption' });

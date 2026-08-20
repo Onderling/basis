@@ -874,10 +874,19 @@ async function runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddre
       catch { personaProperties = undefined; }
     }
     const personaArg = (personaProperties && Object.keys(personaProperties).length) ? { personaProperties } : {};
+    // Rules acceptance (task #80, sitting-A decision): the wizard's tick becomes the CURRENT rules
+    // version as a string on the redeem — the writer records it verbatim onto the SIGNED join
+    // statement, and every receiving device's fold is what judges it. Unticked (a programmatic caller
+    // that did not pass acceptance) sends nothing, and a rules-gated fold refuses the join — the
+    // statement is the record, never the tick-box. Versions are monotonic integers from 1
+    // (createGroupV2 / updateGroupRules), so an invite without an embedded rules doc means v1.
+    const rulesArg = state.rulesAccepted === true
+      ? { rulesAccepted: String(inv.rules?.version ?? 1) }
+      : {};
     const redeem = await callSkill('stoop', 'redeemMembershipCode', {
       groupId: inv.groupId, code: inv.code,
       ...(state.handle ? { peerDisplay: state.handle } : {}),
-      ...personaArg, ...circleAddressArg,
+      ...personaArg, ...circleAddressArg, ...rulesArg,
     });
     if (redeem?.error === 'handle-taken') throw handleTakenError();
     // Cross-instance fallback.
@@ -897,6 +906,7 @@ async function runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddre
           peerDisplay: state.handle,
           ...personaArg,
           ...circleAddressArg,
+          ...rulesArg,   // the remote path carries the SAME acceptance (task #80) — the admin forwards it onto the join it signs
         });
       } catch {
         throw adminUnreachableError();     // could not even reach them — the clearest offline signal

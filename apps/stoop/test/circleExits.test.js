@@ -46,11 +46,11 @@ async function buildTwoCircles() {
     expect(r.groupId).toBe(groupId);
     // Bram joins BOTH circles; cato joins A only.
     await callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
-      { groupId, code: r.code, requesterWebid: BRAM }, ADMIN);
+      { rulesAccepted: '1', groupId, code: r.code, requesterWebid: BRAM }, ADMIN);
   }
   const codeA = await callSkill(bundle.agent, 'getCurrentMembershipCode', { groupId: A });
   await callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
-    { groupId: A, code: codeA.code, requesterWebid: CATO }, ADMIN);
+    { rulesAccepted: '1', groupId: A, code: codeA.code, requesterWebid: CATO }, ADMIN);
   return bundle;
 }
 
@@ -131,7 +131,7 @@ describe('B4 — removing a member is per circle', () => {
     await bundle.offeringMatch.start();
     const created = await callSkill(bundle.agent, 'createGroupV2', { groupId: A, name: A, rules: {} });
     await callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
-      { groupId: A, code: created.code, requesterWebid: BRAM }, ADMIN);
+      { rulesAccepted: '1', groupId: A, code: created.code, requesterWebid: BRAM }, ADMIN);
     const r = await callSkill(bundle.agent, 'removeMember', { groupId: A, memberStableId: 'sid-bram' });
     const item = await bundle.itemStore.getById(r.removalId);
     expect(item.source.memberWebid).toBe(BRAM);
@@ -146,7 +146,7 @@ describe('B4 — removing a member is per circle', () => {
     // A fresh invite, redeemed after the removal.
     const rot = await callSkill(bundle.agent, 'rotateMyGroupCode', { groupId: A });
     const again = await callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
-      { groupId: A, code: rot.code, requesterWebid: BRAM }, ADMIN);
+      { rulesAccepted: '1', groupId: A, code: rot.code, requesterWebid: BRAM }, ADMIN);
     expect(again.redemptionId).toBeTruthy();
     expect(await webidsIn(bundle, A)).toContain(BRAM);
   });

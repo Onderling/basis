@@ -56,7 +56,7 @@ describe('redeem → capture joiner per-circle address', () => {
     const bundle = await buildBundle();
     const r = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
     await callSkill(bundle.agent, 'redeemMembershipCode',
-      { groupId: GROUP, code: r.code, circleAddress: BOB_ADDR, circleAddressProof: BOB_PROOF }, BOB);
+      { rulesAccepted: '1', groupId: GROUP, code: r.code, circleAddress: BOB_ADDR, circleAddressProof: BOB_PROOF }, BOB);
 
     const row = await bundle.members.resolveByWebid(BOB);
     expect(row.circleAddress).toBe(BOB_ADDR);
@@ -79,7 +79,7 @@ describe('redeem → capture joiner per-circle address', () => {
     const r = await callSkill(bundle.agent, 'createGroupV2',
       { groupId: GROUP, name: 'X', rules: RULES, circleAddress: ADMIN_ADDR });
     await callSkill(bundle.agent, 'redeemMembershipCode',
-      { groupId: GROUP, code: r.code, circleAddress: BOB_ADDR, circleAddressProof: BOB_PROOF }, BOB);
+      { rulesAccepted: '1', groupId: GROUP, code: r.code, circleAddress: BOB_ADDR, circleAddressProof: BOB_PROOF }, BOB);
 
     const out = await callSkill(bundle.agent, 'listGroupMembers', { groupId: GROUP });
     const adminRow = out.members.find((m) => m.webid === ADMIN);
@@ -92,7 +92,7 @@ describe('redeem → capture joiner per-circle address', () => {
     const bundle = await buildBundle();
     const r = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
     await callSkill(bundle.agent, 'redeemMembershipCode',
-      { groupId: GROUP, code: r.code, circleAddress: BOB_ADDR, circleAddressProof: BOB_PROOF }, BOB);
+      { rulesAccepted: '1', groupId: GROUP, code: r.code, circleAddress: BOB_ADDR, circleAddressProof: BOB_PROOF }, BOB);
 
     // Reload where the roster row lost its circleAddress but the redemption item survives.
     await bundle.members.addMember({ webid: BOB, circleAddress: null });
@@ -107,20 +107,20 @@ describe('redeem → capture joiner per-circle address', () => {
     const bundle = await buildBundle();
     const r = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
     // an attacker presents BOB's address but no proof (they've only SEEN it)
-    await callSkill(bundle.agent, 'redeemMembershipCode', { groupId: GROUP, code: r.code, circleAddress: BOB_ADDR }, BOB);
+    await callSkill(bundle.agent, 'redeemMembershipCode', { rulesAccepted: '1', groupId: GROUP, code: r.code, circleAddress: BOB_ADDR }, BOB);
     expect((await bundle.members.resolveByWebid(BOB)).circleAddress).toBeNull();
 
     // and a proof for a DIFFERENT joining circle doesn't count either (no cross-circle replay)
     const r2 = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
     const wrongProof = signCircleLinkFromSeed(_bobSeed, GROUP, 'another-circle', BOB_ADDR);
-    await callSkill(bundle.agent, 'redeemMembershipCode', { groupId: GROUP, code: r2.code, circleAddress: BOB_ADDR, circleAddressProof: wrongProof }, BOB);
+    await callSkill(bundle.agent, 'redeemMembershipCode', { rulesAccepted: '1', groupId: GROUP, code: r2.code, circleAddress: BOB_ADDR, circleAddressProof: wrongProof }, BOB);
     expect((await bundle.members.resolveByWebid(BOB)).circleAddress).toBeNull();
   });
 
   it('back-compat: a redeem WITHOUT a circle address still works + records none', async () => {
     const bundle = await buildBundle();
     const r = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
-    const redeem = await callSkill(bundle.agent, 'redeemMembershipCode', { groupId: GROUP, code: r.code }, BOB);
+    const redeem = await callSkill(bundle.agent, 'redeemMembershipCode', { rulesAccepted: '1', groupId: GROUP, code: r.code }, BOB);
     expect(redeem.redemptionId).toBeTruthy();
     expect((await bundle.members.resolveByWebid(BOB)).circleAddress).toBeNull();
     const out = await callSkill(bundle.agent, 'listGroupMembers', { groupId: GROUP });

@@ -1,3 +1,4 @@
+import { hasHumanRules } from './circleRulesDoc.js';
 /**
  * Key-coupled membership WRITERS — pure-body lift out of stoop's `buildSkills` (the §8c migration, slice-b).
  * These persist a circle's membership STATE transitions as typed `store.addItems([{type}])` items
@@ -35,6 +36,35 @@
  * @returns {Promise<object>} `{redemptionId, groupId, validUntil, _sync}` (or `{…, alreadyRedeemed:true}` on
  *   an idempotent repeat), or `{error}`.
  */
+
+/**
+ * RULES-GATED ADMISSION (the rules-acceptance decision, sitting 2026-08-20 — added when the
+ * modified-client journey proved fold-only gating toothless: the
+ * post-join address announce seeds a roster row on every device regardless of the spine, so refusal
+ * must ALSO happen at the ADMITTING device, before any announce fires). A circle with a rules doc
+ * refuses a redeem that carries no accepted version, or an unknown one — {1..current}, versions being
+ * monotonic integers, so acceptance of a then-current version stays valid after a rules change.
+ * A circle WITHOUT a rules doc admits exactly as before. The joiner does not control this device.
+ */
+async function rulesAcceptanceRefusal(store, groupId, rulesAccepted) {
+  let latest = null;
+  try {
+    const rules = await store.listOpen({ type: 'group-rules' });
+    for (const it of rules ?? []) {
+      if (it?.source?.groupId !== groupId) continue;
+      if (typeof it?.source?.rules !== 'object' || !it.source.rules) continue;
+      if (!latest || (it.addedAt ?? 0) > (latest.addedAt ?? 0)
+        || ((it.addedAt ?? 0) === (latest.addedAt ?? 0) && it.id > latest.id)) latest = it;
+    }
+  } catch { latest = null; }
+  if (!latest || !hasHumanRules(latest.source?.rules)) return null;   // operational-only doc → nothing to accept
+  const current = Number.parseInt(latest.source?.version ?? latest.source?.rules?.version ?? 1, 10);
+  const top = Number.isFinite(current) && current >= 1 ? current : 1;
+  const v = typeof rulesAccepted === 'string' ? Number.parseInt(rulesAccepted, 10) : NaN;
+  if (Number.isFinite(v) && v >= 1 && v <= top) return null;    // accepted a version this circle has had
+  return { error: 'rules-acceptance-required', currentRulesVersion: String(top) };
+}
+
 export async function redeemMembershipCode({
   store, members, metrics, simulateSync, grantKey, emitSpine,
   codeRedeemableNow, inviteRedemptionVerdict, INVITE_LIMIT_REACHED, verifyCircleLink,
@@ -47,6 +77,9 @@ export async function redeemMembershipCode({
   const now = Date.now();
   const valid = forGroup.find(i => i.source.code === a.code && codeRedeemableNow(i, now));
   if (!valid) return { error: 'invalid-or-expired-code' };
+  // Rules-gated admission (task #80) — refused BEFORE any row, key grant, announce or spine entry exists.
+  const rulesRefusal = await rulesAcceptanceRefusal(store, a.groupId, a.rulesAccepted);
+  if (rulesRefusal) return rulesRefusal;
 
   // The invite ceiling, checked on the store that HOLDS the code (this path is the same-device
   // redeem, so the issuer and the redeemer are the same store). A repeat by the same identity is
@@ -149,7 +182,12 @@ export async function redeemMembershipCode({
   // unchanged. Optional — a caller that has not wired the spine simply skips it.
   // The join's authorization rides the SIGNED payload: the redemption row it stands on. The fold admits a
   // self-authored join only when that row exists (deny-favouring: a not-yet-arrived row defers, never forges).
-  await emitSpine?.({ kind: 'join', circleId: a.groupId, subject: from, actor: from, payload: { redemptionRef: item.id } });
+  await emitSpine?.({ kind: 'join', circleId: a.groupId, subject: from, actor: from, payload: {
+    redemptionRef: item.id,
+    // Rules acceptance rides the SIGNED join (task #80): the version the joiner accepted, or absent —
+    // and absence is what a rules-gated fold refuses, on every receiving device.
+    ...(typeof a.rulesAccepted === 'string' && a.rulesAccepted ? { rulesAccepted: a.rulesAccepted } : {}),
+  } });
   return {
     redemptionId: item.id,
     groupId:      a.groupId,
@@ -185,6 +223,9 @@ export async function verifyMembershipCodeForPeer({
   const now = Date.now();
   const valid = forGroup.find(i => i.source.code === a.code && codeRedeemableNow(i, now));
   if (!valid) return { error: 'invalid-or-expired-code' };
+  // Rules-gated admission (task #80) — refused BEFORE any row, key grant, announce or spine entry exists.
+  const rulesRefusal = await rulesAcceptanceRefusal(store, a.groupId, a.rulesAccepted);
+  if (rulesRefusal) return rulesRefusal;
 
   // The invite-ceiling gate. This runs on the ADMIN's device, which is the device that writes the
   // membership; a joiner on any build, patched or not, cannot get past it, because getting in is
@@ -319,7 +360,13 @@ export async function verifyMembershipCodeForPeer({
   // ADMIN's device confirming a REMOTE joiner, who is not here to sign — so the ADMIN signs `join` with their
   // own identity (author = admin, subject = the joiner). Admin authorship is sound: the admin is the authority
   // that validated the code + enforced the ceiling, and a join needs no authority in the fold anyway. Additive.
-  await emitSpine?.({ kind: 'join', circleId: a.groupId, subject: a.requesterWebid, actor: from, payload: { redemptionRef: item.id } });
+  await emitSpine?.({ kind: 'join', circleId: a.groupId, subject: a.requesterWebid, actor: from, payload: {
+    redemptionRef: item.id,
+    // The remote joiner's acceptance, forwarded from the redeem request (task #80). The admin signs the
+    // join; the acceptance value is the joiner's — recorded verbatim, refused-at-fold when absent on a
+    // rules-gated circle.
+    ...(typeof a.rulesAccepted === 'string' && a.rulesAccepted ? { rulesAccepted: a.rulesAccepted } : {}),
+  } });
   return {
     redemptionId: item.id,
     codeId:       valid.id,

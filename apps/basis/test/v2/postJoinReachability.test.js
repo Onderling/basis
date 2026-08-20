@@ -119,6 +119,7 @@ describe('the seam fires from the WIZARD path, not just the programmatic one', (
     const seen = [];
     const r = await joinCircleFromInvite({
       inviteUri: INVITE, callSkill: joiningCallSkill(), handle: 'cato', onJoined: (a) => seen.push(a),
+      rulesAccepted: true,   // task #80 — these tests simulate a joiner who ticked the rules
     });
     expect(r).toMatchObject({ ok: true, circleId: 'rt3' });
     expect(seen).toEqual([{ circleId: 'rt3' }]);
@@ -128,6 +129,7 @@ describe('the seam fires from the WIZARD path, not just the programmatic one', (
     const trace = [];
     await joinCircleFromInvite({
       inviteUri: INVITE,
+      rulesAccepted: true,   // task #80 — these tests simulate a joiner who ticked the rules
       callSkill: joiningCallSkill(trace),
       handle: 'cato',
       onJoined: () => { trace.push('onJoined'); },
@@ -140,6 +142,7 @@ describe('the seam fires from the WIZARD path, not just the programmatic one', (
     const failing = async (app, op) => (op === 'setMyHandle' ? { ok: true } : { error: 'invalid-or-expired-code' });
     const r = await joinCircleFromInvite({
       inviteUri: INVITE, callSkill: failing, handle: 'cato', onJoined: (a) => seen.push(a),
+      rulesAccepted: true,   // task #80 — these tests simulate a joiner who ticked the rules
     });
     expect(r.ok).toBeUndefined();
     expect(seen, 'registered an address for a circle we are not in').toEqual([]);
@@ -148,6 +151,7 @@ describe('the seam fires from the WIZARD path, not just the programmatic one', (
   it('a throwing seam does not turn a completed join into a reported failure', async () => {
     const r = await joinCircleFromInvite({
       inviteUri: INVITE,
+      rulesAccepted: true,   // task #80 — these tests simulate a joiner who ticked the rules
       callSkill: joiningCallSkill(),
       handle: 'cato',
       onJoined: () => { throw new Error('relay unreachable'); },
@@ -158,6 +162,7 @@ describe('the seam fires from the WIZARD path, not just the programmatic one', (
   it('no seam at all ⇒ unchanged behaviour', async () => {
     const r = await joinCircleFromInvite({
       inviteUri: INVITE, callSkill: joiningCallSkill(), handle: 'cato',
+      rulesAccepted: true,   // task #80 — these tests simulate a joiner who ticked the rules
     });
     expect(r).toMatchObject({ ok: true, circleId: 'rt3' });
   });

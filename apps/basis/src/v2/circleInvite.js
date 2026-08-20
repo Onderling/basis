@@ -137,6 +137,11 @@ export async function joinCircleFromInvite({
   inviteUri, callSkill, sendPeerRedeem, handle, shareAddress = true,
   linkChoice = 'fresh', circles = null, circleAddressFor = null, signCircleLink = null,
   dialEndpoint = null, activeEndpointUrl = null, onJoined = null,
+  // task #80 (sitting-A decision): the PROGRAMMATIC path passes acceptance EXPLICITLY — no exemption.
+  // `true` means the caller has shown/accepted the circle's rules and the join statement will carry the
+  // current version; the default (false) sends nothing, and a rules-gated fold refuses the join on
+  // every member's device. There is deliberately no way to join a rules-gated circle without saying so.
+  rulesAccepted = false,
 } = {}) {
   const h = String(handle ?? '').trim();
   if (!h) return { error: 'handle-required' };
@@ -146,6 +151,7 @@ export async function joinCircleFromInvite({
   if (!state.invite || !state.invite.groupId) return { error: 'bad-invite' };
   state.handle = h;
   state.shareAddress = shareAddress !== false;
+  state.rulesAccepted = rulesAccepted === true;   // task #80 — explicit, never inferred
   // Wave B — the "continue as an existing self" choice (default fresh/unlinkable). Populate the
   // existing-selves list so setLinkChoice VALIDATES the chosen source circle before honouring it
   // (an unknown/absent choice ⇒ fresh). The signing proof is generated inside finalSubmit from the

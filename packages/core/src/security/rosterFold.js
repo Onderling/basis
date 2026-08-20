@@ -26,7 +26,7 @@
 import { parentsOf } from './authorChain.js';
 
 /** Kinds this fold understands; anything else is ignored (a future kind folds where its own head does). */
-const MEMBERSHIP_KINDS = new Set(['join', 'leave', 'evict', 'role']);
+const MEMBERSHIP_KINDS = new Set(['join', 'leave', 'evict', 'role', 'rules-accept']);
 
 /** Authors that equivocated (two statements off the same parent with different content) — discount them all. */
 function equivocators(stmts) {
@@ -78,9 +78,20 @@ function depthOf(stmts) {
  *   pre-spine materialised HEAD at cutover (the current trail-derived roster). Seed members/admins are the
  *   starting state; UNLIKE founders they are ordinary members (evictable, demotable). Absent (the default) the
  *   fold starts from the founders alone, exactly as before — so pure-spine callers are unchanged.
- * @returns {{ members: string[], admins: string[] }}  sorted for a stable, comparable result.
+ * @param {{ versions?: string[]|Set<string> }} [opts.rulesGate]  RULES-GATED JOINS (task #80, sitting-A
+ *   decision). When present, a `join` folds ONLY if its signed payload carries a non-empty
+ *   `rulesAccepted` string — and, when `versions` is a non-empty set, one that is IN it (the set of
+ *   rules-doc versions this circle has ever had; acceptance of a then-current version stays valid
+ *   forever). Deny-favouring both ways: no acceptance → the join does not fold, on every device
+ *   independently — the statement stays on the log as evidence, the joiner lands on nobody's roster.
+ *   Founders and seed members never fold via `join`, so the gate cannot touch them. Absent (the
+ *   default), joins fold exactly as before — the projector opts in, the kernel stays pure.
+ * @returns {{ members: string[], admins: string[], rulesAccepted: Record<string,string> }}
+ *   sorted members/admins for a stable, comparable result, plus each member's latest accepted
+ *   rules version (from the join's payload, superseded by later `rules-accept` statements — the
+ *   per-member "accepted v1, current v2" visibility rides this map).
  */
-export function foldRoster(statements, { founders = [], seed = null } = {}) {
+export function foldRoster(statements, { founders = [], seed = null, rulesGate = null } = {}) {
   const stmts = (Array.isArray(statements) ? statements : []).filter(
     (s) => s && typeof s === 'object' && MEMBERSHIP_KINDS.has(s.kind)
       && typeof s.author === 'string' && typeof s.subject === 'string' && typeof s.hash === 'string',
@@ -102,6 +113,18 @@ export function foldRoster(statements, { founders = [], seed = null } = {}) {
   // start IN but are ordinary (evictable) — a later evict/leave in the spine removes them like any member.
   const members = new Set([...founderSet, ...asKeys(seed?.members)]);
   const admins  = new Set([...founderSet, ...asKeys(seed?.admins)]);
+  const rulesAccepted = Object.create(null);   // subject → latest accepted rules version (fold-ordered)
+
+  // The rules gate (see the option's doc above). `versions` normalised once; empty set = presence-only.
+  const gateVersions = rulesGate
+    ? new Set([...(rulesGate.versions ?? [])].filter((v) => typeof v === 'string' && v))
+    : null;
+  const joinPassesGate = (s) => {
+    if (!rulesGate) return true;
+    const v = s.payload && typeof s.payload === 'object' ? s.payload.rulesAccepted : undefined;
+    if (typeof v !== 'string' || !v) return false;               // deny-favouring: no acceptance, no fold
+    return gateVersions.size === 0 || gateVersions.has(v);       // wrong/unknown version → refused too
+  };
 
   // Process DEPTH-BATCHED so concurrent (same-depth) conflicts resolve by DENY-WINS, not by the tiebreak: at a
   // depth, a removal (leave/evict) beats a join for the same subject, and a demotion beats a concurrent
@@ -136,16 +159,37 @@ export function foldRoster(statements, { founders = [], seed = null } = {}) {
       else if (s.kind === 'evict' && canEvict(s.author) && !founderSet.has(s.subject)) removed.add(s.subject);
     }
     const joined = new Set();
-    for (const s of batch) if (s.kind === 'join') joined.add(s.subject);
+    for (const s of batch) {
+      if (s.kind !== 'join' || !joinPassesGate(s)) continue;
+      joined.add(s.subject);
+      // The acceptance rides the join's signed payload — record it with the membership it establishes.
+      const v = s.payload && typeof s.payload === 'object' ? s.payload.rulesAccepted : undefined;
+      if (typeof v === 'string' && v) rulesAccepted[s.subject] = v;
+    }
 
     // Apply: removals win over same-depth joins/promotes (deny-wins).
-    for (const x of removed)  { members.delete(x); admins.delete(x); }
+    for (const x of removed)  { members.delete(x); admins.delete(x); delete rulesAccepted[x]; }
     for (const x of joined)   if (!removed.has(x)) members.add(x);
     for (const x of promoted) if (!removed.has(x)) { members.add(x); admins.add(x); }
     for (const x of demoted)  admins.delete(x);
+
+    // `rules-accept` — re-acceptance after a rules change (task #80 slice d's statement kind; the fold
+    // understands it from day one so catch-up replay is version-independent). SELF-only (author signs
+    // for their own ref: the rail's read gate already pins authorRef = actor; here the subject must be
+    // the statement's own authorRef so nobody accepts on another's behalf), and only for someone who IS
+    // a member after this depth's joins/removals — an outsider's "acceptance" records nothing.
+    for (const s of batch) {
+      if (s.kind !== 'rules-accept') continue;
+      const p = s.payload && typeof s.payload === 'object' ? s.payload : {};
+      const v = p.rulesAccepted;
+      if (typeof v !== 'string' || !v) continue;
+      if (p.authorRef !== s.subject) continue;             // self-only
+      if (!members.has(s.subject)) continue;               // members only
+      rulesAccepted[s.subject] = v;
+    }
   }
 
-  return { members: [...members].sort(), admins: [...admins].sort() };
+  return { members: [...members].sort(), admins: [...admins].sort(), rulesAccepted };
 }
 
 export default foldRoster;

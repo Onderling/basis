@@ -57,3 +57,4 @@ export { createGroupWithRules, createGroupV2, redeemInviteWithGate } from './cir
 export {
   redeemMembershipCode, verifyMembershipCodeForPeer, leaveGroup, removeMember,
 } from './circleMembershipWriters.js';
+export { hasHumanRules } from './circleRulesDoc.js';

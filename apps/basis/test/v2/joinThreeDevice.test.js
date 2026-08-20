@@ -62,6 +62,7 @@ describe('joining with three devices — offline admin, provable self-links, fre
     await goOffline(A);
     const whileOffline = await joinCircleFromInvite({
       inviteUri: invite.uri,
+      rulesAccepted: true,   // task #80 — these tests simulate a joiner who ticked the rules
       callSkill: (app, op, args) => C.agent.callSkill(app, op, args),
       sendPeerRedeem: C.sendPeerRedeem,
       handle: 'cato',
@@ -76,6 +77,7 @@ describe('joining with three devices — offline admin, provable self-links, fre
     await goOnline(A, { announceTo: C });
     const retry = await joinCircleFromInvite({
       inviteUri: invite.uri,
+      rulesAccepted: true,   // task #80 — these tests simulate a joiner who ticked the rules
       callSkill: (app, op, args) => C.agent.callSkill(app, op, args),
       sendPeerRedeem: C.sendPeerRedeem,
       handle: 'cato',
@@ -86,6 +88,7 @@ describe('joining with three devices — offline admin, provable self-links, fre
     // the SAME membership: one row, not two people named cato.
     const again = await joinCircleFromInvite({
       inviteUri: invite.uri,
+      rulesAccepted: true,   // task #80 — these tests simulate a joiner who ticked the rules
       callSkill: (app, op, args) => C.agent.callSkill(app, op, args),
       sendPeerRedeem: C.sendPeerRedeem,
       handle: 'cato',
@@ -110,6 +113,7 @@ describe('joining with three devices — offline admin, provable self-links, fre
     expect(xAddress).toBeTruthy();
     const linked = await joinCircleFromInvite({
       inviteUri: invite.uri,
+      rulesAccepted: true,   // task #80 — these tests simulate a joiner who ticked the rules
       callSkill: (app, op, args) => C.agent.callSkill(app, op, args),
       sendPeerRedeem: C.sendPeerRedeem,
       handle: 'cato',
@@ -132,6 +136,7 @@ describe('joining with three devices — offline admin, provable self-links, fre
     });
     const forged = await joinCircleFromInvite({
       inviteUri: invite.uri,
+      rulesAccepted: true,   // task #80 — these tests simulate a joiner who ticked the rules
       callSkill: (app, op, args) => B.agent.callSkill(app, op, args),
       sendPeerRedeem: B.sendPeerRedeem,
       handle: 'bram',
@@ -168,6 +173,7 @@ describe('joining with three devices — offline admin, provable self-links, fre
     });
     const fresh = await joinCircleFromInvite({
       inviteUri: invite.uri,
+      rulesAccepted: true,   // task #80 — these tests simulate a joiner who ticked the rules
       callSkill: (app, op, args) => C.agent.callSkill(app, op, args),
       sendPeerRedeem: C.sendPeerRedeem,
       handle: 'cato',

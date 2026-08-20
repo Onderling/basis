@@ -485,6 +485,7 @@ export async function joinExistingCircle(admin, joiner, { groupId = 'peer-circle
     callSkill: joinerCallSkill,
     sendPeerRedeem: joiner.sendPeerRedeem,
     handle,
+    rulesAccepted: true,   // task #80 — the harness join IS "the person ticked the rules"
   });
   return { invite, joined, groupId };
 }

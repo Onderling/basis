@@ -46,7 +46,7 @@ async function buildAdmin() {
 /** A joiner presenting the code to the ADMIN's substrate — the real issuer-side path. */
 const redeemAs = (bundle, code, who, extra = {}) =>
   callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
-    { groupId: G, code, requesterWebid: who, ...extra }, ADMIN);
+    { rulesAccepted: '1', groupId: G, code, requesterWebid: who, ...extra }, ADMIN);
 
 const rosterSize = async (bundle) =>
   (await callSkill(bundle.agent, 'listGroupMembers', { groupId: G })).members.length;
@@ -178,9 +178,9 @@ describe('B5 — ADVERSARIAL: the ISSUER refuses the redemption past the ceiling
     const created = await callSkill(bundle.agent, 'createGroupV2',
       { groupId: G, name: G, rules: {}, inviteMaxRedemptions: 1 });
     expect((await callSkill(bundle.agent, 'redeemMembershipCode',
-      { groupId: G, code: created.code }, 'webid:local-one')).redemptionId).toBeTruthy();
+      { rulesAccepted: '1', groupId: G, code: created.code }, 'webid:local-one')).redemptionId).toBeTruthy();
     const second = await callSkill(bundle.agent, 'redeemMembershipCode',
-      { groupId: G, code: created.code }, 'webid:local-two');
+      { rulesAccepted: '1', groupId: G, code: created.code }, 'webid:local-two');
     expect(second.error).toBe(INVITE_LIMIT_REACHED);
   });
 });
@@ -218,9 +218,9 @@ describe('B5 — a repeat redeem by the SAME identity is an idempotent success',
     const created = await callSkill(bundle.agent, 'createGroupV2',
       { groupId: G, name: G, rules: {}, inviteMaxRedemptions: 3 });
     const first  = await callSkill(bundle.agent, 'redeemMembershipCode',
-      { groupId: G, code: created.code }, 'webid:local-one');
+      { rulesAccepted: '1', groupId: G, code: created.code }, 'webid:local-one');
     const second = await callSkill(bundle.agent, 'redeemMembershipCode',
-      { groupId: G, code: created.code }, 'webid:local-one');
+      { rulesAccepted: '1', groupId: G, code: created.code }, 'webid:local-one');
     expect(second.redemptionId).toBe(first.redemptionId);
     expect(second.alreadyRedeemed).toBe(true);
     expect((await trailRows(bundle)).length).toBe(1);

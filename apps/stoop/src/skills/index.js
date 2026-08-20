@@ -988,6 +988,9 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
     // legacy store path keeps the pre-rider semantics until stoop dissolves.
     foldAuthoritative: typeof membershipRead === 'function',
     rules: latestRulesItem?.source?.rules ?? null,
+    // task #80 — the CURRENT rules version (monotonic integer: createGroupV2 starts at 1,
+    // updateGroupRules increments). The fold's rules gate derives its valid set {1..current} from it.
+    rulesVersion: latestRulesItem?.source?.version ?? latestRulesItem?.source?.rules?.version ?? null,
     // A removal/leave recorded for THIS circle drops the member from THIS circle only. The
     // trail is already circle-scoped, so nothing here can reach a circle you also share with them.
     exits: await readCircleExits({ store, groupId }),
@@ -4060,7 +4063,7 @@ export function buildSkills({
         source:     { groupId: a.groupId, rules: a.rules, version: (a.rules.version ?? 0) + 1 },
         visibility: 'household',
       }], { actor: from });
-      return { rulesId: item.id, version: a.rules.version ?? 0 + 1 };
+      return { rulesId: item.id, version: (a.rules.version ?? 0) + 1 };
     }, {
       description: 'Admin-only: replace the group\'s rules with a new version.',
       visibility:  'authenticated',

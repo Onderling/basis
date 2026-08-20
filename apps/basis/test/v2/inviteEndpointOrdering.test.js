@@ -64,6 +64,7 @@ describe('the join dials before it redeems', () => {
     const trace = [];
     await joinCircleFromInvite({
       inviteUri: INVITE,
+      rulesAccepted: true,   // task #80 — these tests simulate a joiner who ticked the rules
       callSkill: recordingCallSkill(trace),
       handle: 'bo',
       dialEndpoint: async (url) => { trace.push(`dial:${url}`); },
@@ -79,6 +80,7 @@ describe('the join dials before it redeems', () => {
     const trace = [];
     await joinCircleFromInvite({
       inviteUri: INVITE,
+      rulesAccepted: true,   // task #80 — these tests simulate a joiner who ticked the rules
       callSkill: recordingCallSkill(trace),
       handle: 'bo',
       dialEndpoint: async (url) => { trace.push(`dial:${url}`); },
@@ -92,6 +94,7 @@ describe('the join dials before it redeems', () => {
     let current = 'ws://old:8787';
     await joinCircleFromInvite({
       inviteUri: INVITE,
+      rulesAccepted: true,   // task #80 — these tests simulate a joiner who ticked the rules
       callSkill: recordingCallSkill(trace),
       handle: 'bo',
       dialEndpoint: async (url) => { trace.push(`dial:${url}`); current = url; },
@@ -104,6 +107,7 @@ describe('the join dials before it redeems', () => {
     const trace = [];
     const r = await joinCircleFromInvite({
       inviteUri: INVITE,
+      rulesAccepted: true,   // task #80 — these tests simulate a joiner who ticked the rules
       callSkill: recordingCallSkill(trace),
       handle: 'bo',
       dialEndpoint: async () => { throw new Error('relay refused'); },
@@ -118,6 +122,7 @@ describe('the join dials before it redeems', () => {
     const trace = [];
     const r = await joinCircleFromInvite({
       inviteUri: INVITE, callSkill: recordingCallSkill(trace), handle: 'bo',
+      rulesAccepted: true,   // task #80 — these tests simulate a joiner who ticked the rules
     });
     expect(r).toMatchObject({ ok: true });
     expect(trace.filter((t) => t.startsWith('dial:'))).toEqual([]);
@@ -139,7 +144,7 @@ describe('a failed join says WHY, not just that it failed', () => {
       return {};
     };
     // No peer fallback available, so the local refusal is the answer.
-    const r = await joinCircleFromInvite({ inviteUri: INV, callSkill, handle: 'bo' });
+    const r = await joinCircleFromInvite({ inviteUri: INV, rulesAccepted: true, callSkill, handle: 'bo' });
     expect(r.reason).toBe('invalid-or-expired-code');
     expect(r.error).toMatch(/invalid-or-expired-code/);
   });
@@ -153,7 +158,7 @@ describe('a failed join says WHY, not just that it failed', () => {
     };
     // …and the admin cannot be reached.
     const sendPeerRedeem = async () => { throw new Error('peer did not respond with HI'); };
-    const r = await joinCircleFromInvite({ inviteUri: INV, callSkill, sendPeerRedeem, handle: 'bo' });
+    const r = await joinCircleFromInvite({ inviteUri: INV, rulesAccepted: true, callSkill, sendPeerRedeem, handle: 'bo' });
 
     expect(r.reason, 'an offline admin still reads as a bad invite').toBe('admin-unreachable');
     // …and it carries the locale key that says the invitation is still valid, so the UI can say "later".
@@ -162,9 +167,10 @@ describe('a failed join says WHY, not just that it failed', () => {
 
   it('the two are distinguishable, which is the whole point', async () => {
     const expired = async (app, op) => (op === 'setMyHandle' ? { ok: true } : { error: 'invalid-or-expired-code' });
-    const a = await joinCircleFromInvite({ inviteUri: INV, callSkill: expired, handle: 'bo' });
+    const a = await joinCircleFromInvite({ inviteUri: INV, rulesAccepted: true, callSkill: expired, handle: 'bo' });
     const b = await joinCircleFromInvite({
       inviteUri: INV, callSkill: expired, handle: 'bo',
+      rulesAccepted: true,   // task #80 — these tests simulate a joiner who ticked the rules
       sendPeerRedeem: async () => { throw new Error('offline'); },
     });
     expect(a.reason).not.toBe(b.reason);
@@ -172,7 +178,7 @@ describe('a failed join says WHY, not just that it failed', () => {
 
   it('a success carries no reason at all — this is not a new field on the happy path', async () => {
     const ok = async (app, op) => (op === 'redeemMembershipCode' ? { ok: true, groupId: 'testcircle' } : { ok: true });
-    const r = await joinCircleFromInvite({ inviteUri: INV, callSkill: ok, handle: 'bo' });
+    const r = await joinCircleFromInvite({ inviteUri: INV, rulesAccepted: true, callSkill: ok, handle: 'bo' });
     expect(r).toMatchObject({ ok: true, circleId: 'testcircle' });
     expect(r.reason).toBeUndefined();
   });

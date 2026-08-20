@@ -113,12 +113,12 @@ describe('join-redeem — per-circle handle uniqueness (admin/host side)', () =>
   it('rejects a second joiner claiming a handle already taken in the circle', async () => {
     const { bundle, code } = await adminWithCode();
     const first = await callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
-      { groupId: GROUP, code, requesterWebid: BOB, peerDisplay: 'jan' }, ANNE);
+      { rulesAccepted: '1', groupId: GROUP, code, requesterWebid: BOB, peerDisplay: 'jan' }, ANNE);
     expect(first.error).toBeUndefined();
     expect(first.redemptionId).toBeTruthy();
 
     const clash = await callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
-      { groupId: GROUP, code, requesterWebid: CAROL, peerDisplay: 'jan' }, ANNE);
+      { rulesAccepted: '1', groupId: GROUP, code, requesterWebid: CAROL, peerDisplay: 'jan' }, ANNE);
     expect(clash.error).toBe('handle-taken');
 
     // The rejected join must NOT have written a redemption for CAROL.
@@ -129,18 +129,18 @@ describe('join-redeem — per-circle handle uniqueness (admin/host side)', () =>
   it('is case-insensitive — `Jan` collides with a joiner already on `jan`', async () => {
     const { bundle, code } = await adminWithCode();
     await callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
-      { groupId: GROUP, code, requesterWebid: BOB, peerDisplay: 'jan' }, ANNE);
+      { rulesAccepted: '1', groupId: GROUP, code, requesterWebid: BOB, peerDisplay: 'jan' }, ANNE);
     const clash = await callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
-      { groupId: GROUP, code, requesterWebid: CAROL, peerDisplay: 'Jan' }, ANNE);
+      { rulesAccepted: '1', groupId: GROUP, code, requesterWebid: CAROL, peerDisplay: 'Jan' }, ANNE);
     expect(clash.error).toBe('handle-taken');
   });
 
   it('lets the SAME joiner re-present their own handle (not a collision)', async () => {
     const { bundle, code } = await adminWithCode();
     await callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
-      { groupId: GROUP, code, requesterWebid: BOB, peerDisplay: 'jan' }, ANNE);
+      { rulesAccepted: '1', groupId: GROUP, code, requesterWebid: BOB, peerDisplay: 'jan' }, ANNE);
     const again = await callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
-      { groupId: GROUP, code, requesterWebid: BOB, peerDisplay: 'jan' }, ANNE);
+      { rulesAccepted: '1', groupId: GROUP, code, requesterWebid: BOB, peerDisplay: 'jan' }, ANNE);
     expect(again.error).toBeUndefined();
     expect(again.redemptionId).toBeTruthy();
   });
@@ -154,9 +154,9 @@ describe('join-redeem — per-circle handle uniqueness (admin/host side)', () =>
       { groupId: 'circle-b', name: 'B', rules: { purpose: 'circle', admins: [ANNE] } }, ANNE);
 
     const inA = await callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
-      { groupId: 'circle-a', code: a.code, requesterWebid: BOB, peerDisplay: 'jan' }, ANNE);
+      { rulesAccepted: '1', groupId: 'circle-a', code: a.code, requesterWebid: BOB, peerDisplay: 'jan' }, ANNE);
     const inB = await callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
-      { groupId: 'circle-b', code: b.code, requesterWebid: CAROL, peerDisplay: 'jan' }, ANNE);
+      { rulesAccepted: '1', groupId: 'circle-b', code: b.code, requesterWebid: CAROL, peerDisplay: 'jan' }, ANNE);
     expect(inA.error).toBeUndefined();
     expect(inB.error).toBeUndefined();
     expect(inB.redemptionId).toBeTruthy();

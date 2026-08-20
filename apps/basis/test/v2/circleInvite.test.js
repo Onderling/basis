@@ -124,7 +124,7 @@ describe('joinCircleFromInvite', () => {
       if (op === 'redeemMembershipCode') return { ok: true };
       return {};
     });
-    const r = await joinCircleFromInvite({ inviteUri: uri, callSkill: joinSkill, handle: 'frits' });
+    const r = await joinCircleFromInvite({ inviteUri: uri, rulesAccepted: true, callSkill: joinSkill, handle: 'frits' });
     expect(r.ok).toBe(true);
     expect(r.circleId).toBe('kaas');
     expect(joinSkill).toHaveBeenCalledWith('stoop', 'redeemMembershipCode', expect.objectContaining({ groupId: 'kaas', code: 'CODE-9' }));
@@ -132,8 +132,8 @@ describe('joinCircleFromInvite', () => {
 
   it('requires a handle and rejects a bad invite', async () => {
     const callSkill = vi.fn();
-    expect(await joinCircleFromInvite({ inviteUri: 'onderling-invite://x', callSkill, handle: '' })).toEqual({ error: 'handle-required' });
-    const bad = await joinCircleFromInvite({ inviteUri: 'not-an-invite', callSkill, handle: 'me' });
+    expect(await joinCircleFromInvite({ inviteUri: 'onderling-invite://x', rulesAccepted: true, callSkill, handle: '' })).toEqual({ error: 'handle-required' });
+    const bad = await joinCircleFromInvite({ inviteUri: 'not-an-invite', rulesAccepted: true, callSkill, handle: 'me' });
     expect(bad.error).toBeTruthy();
     expect(callSkill).not.toHaveBeenCalled();
   });
@@ -153,6 +153,7 @@ describe('joinCircleFromInvite', () => {
     const signCircleLink = vi.fn((src, gid, addr) => `PROOF(${src},${gid},${addr})`);
     const r = await joinCircleFromInvite({
       inviteUri: uri, callSkill: joinSkill, handle: 'frits',
+      rulesAccepted: true,   // task #80 — these tests simulate a joiner who ticked the rules
       linkChoice: 'brood', circles: [{ id: 'brood', name: 'Brood' }], circleAddressFor, signCircleLink,
     });
     expect(r.ok).toBe(true);
@@ -163,7 +164,7 @@ describe('joinCircleFromInvite', () => {
 
   it('default is fresh/unlinkable — no circleAddress or proof reaches the redeem (back-compat)', async () => {
     const { uri, joinSkill, redeemArgs } = await buildJoinFixture();
-    await joinCircleFromInvite({ inviteUri: uri, callSkill: joinSkill, handle: 'frits' });
+    await joinCircleFromInvite({ inviteUri: uri, rulesAccepted: true, callSkill: joinSkill, handle: 'frits' });
     expect('circleAddress' in redeemArgs()).toBe(false);
     expect('circleAddressProof' in redeemArgs()).toBe(false);
   });
@@ -173,6 +174,7 @@ describe('joinCircleFromInvite', () => {
     const circleAddressFor = vi.fn(() => 'X');
     await joinCircleFromInvite({
       inviteUri: uri, callSkill: joinSkill, handle: 'frits',
+      rulesAccepted: true,   // task #80 — these tests simulate a joiner who ticked the rules
       linkChoice: 'a-circle-im-not-in', circles: [{ id: 'brood' }], circleAddressFor, signCircleLink: () => 'P',
     });
     // Deny-by-default is about NOT presenting the SOURCE circle's key: the chosen source is never resolved
@@ -187,6 +189,7 @@ describe('joinCircleFromInvite', () => {
     const { uri, joinSkill, redeemArgs } = await buildJoinFixture();
     await joinCircleFromInvite({
       inviteUri: uri, callSkill: joinSkill, handle: 'frits',
+      rulesAccepted: true,   // task #80 — these tests simulate a joiner who ticked the rules
       linkChoice: 'brood', circles: [{ id: 'brood' }], circleAddressFor: () => 'ADDR-BROOD',
     });
     expect(redeemArgs().circleAddress).toBe('ADDR-BROOD');

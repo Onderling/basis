@@ -29,8 +29,8 @@ async function buildBundle() {
 }
 async function seedTwoMembers(bundle) {
   const r = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
-  await callSkill(bundle.agent, 'redeemMembershipCode', { groupId: GROUP, code: r.code }, BOB);
-  await callSkill(bundle.agent, 'redeemMembershipCode', { groupId: GROUP, code: r.code }, CARA);
+  await callSkill(bundle.agent, 'redeemMembershipCode', { rulesAccepted: '1', groupId: GROUP, code: r.code }, BOB);
+  await callSkill(bundle.agent, 'redeemMembershipCode', { rulesAccepted: '1', groupId: GROUP, code: r.code }, CARA);
 }
 
 describe('listGroupMembers — viewer-scoped pairwise reveal projection (Wave B)', () => {

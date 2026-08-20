@@ -166,7 +166,7 @@ describe('Stoop V2 Phase 25.4 — redeemMembershipCode', () => {
       groupId: GROUP, name: 'X', rules: RULES,
     });
     const redeem = await callSkill(bundle.agent, 'redeemMembershipCode',
-      { groupId: GROUP, code: r.code }, BOB);
+      { rulesAccepted: '1', groupId: GROUP, code: r.code }, BOB);
     expect(redeem.redemptionId).toBeTruthy();
     expect(redeem.validUntil).toBe(r.expiresAt);
   });
@@ -177,7 +177,7 @@ describe('Stoop V2 Phase 25.4 — redeemMembershipCode', () => {
       groupId: GROUP, name: 'X', rules: RULES,
     });
     const r = await callSkill(bundle.agent, 'redeemMembershipCode',
-      { groupId: GROUP, code: 'wrong-code-xx' }, BOB);
+      { rulesAccepted: '1', groupId: GROUP, code: 'wrong-code-xx' }, BOB);
     expect(r).toEqual({ error: 'invalid-or-expired-code' });
   });
 
@@ -197,7 +197,7 @@ describe('Stoop V2 Phase 25.4 — redeemMembershipCode', () => {
     });
     await callSkill(bundle.agent, 'rotateMyGroupCode', { groupId: GROUP });
     const redeem = await callSkill(bundle.agent, 'redeemMembershipCode',
-      { groupId: GROUP, code: r1.code }, BOB);
+      { rulesAccepted: '1', groupId: GROUP, code: r1.code }, BOB);
     expect(redeem).toEqual({ error: 'invalid-or-expired-code' });
   });
 
@@ -207,7 +207,7 @@ describe('Stoop V2 Phase 25.4 — redeemMembershipCode', () => {
     await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
     const rotated = await callSkill(bundle.agent, 'rotateMyGroupCode', { groupId: GROUP });
     const redeem = await callSkill(bundle.agent, 'redeemMembershipCode',
-      { groupId: GROUP, code: rotated.code }, BOB);
+      { rulesAccepted: '1', groupId: GROUP, code: rotated.code }, BOB);
     expect(redeem.redemptionId).toBeTruthy();
   });
 });
@@ -229,7 +229,7 @@ describe('Stoop V2 Phase 25.7 — getMyMembershipStatus', () => {
     const c = (await callSkill(bundle.agent, 'createGroupV2', {
       groupId: GROUP, name: 'X', rules: RULES,
     })).code;
-    await callSkill(bundle.agent, 'redeemMembershipCode', { groupId: GROUP, code: c }, BOB);
+    await callSkill(bundle.agent, 'redeemMembershipCode', { rulesAccepted: '1', groupId: GROUP, code: c }, BOB);
     const r = await callSkill(bundle.agent, 'getMyMembershipStatus', { groupId: GROUP }, BOB);
     expect(r.redeemed).toBe(true);
     expect(r.isActive).toBe(true);
@@ -256,7 +256,7 @@ describe("a code's expiry is enforced at the redeem, not merely displayed", () =
       { source: { ...codes[0].source, expiresAt: Date.now() - 10 * 60 * 1000 } }, { actor: ADMIN });
 
     const redeem = await callSkill(bundle.agent, 'redeemMembershipCode',
-      { groupId: GROUP, code: rotated.code }, BOB);
+      { rulesAccepted: '1', groupId: GROUP, code: rotated.code }, BOB);
     expect(redeem).toEqual({ error: 'invalid-or-expired-code' });
   });
 
@@ -272,7 +272,7 @@ describe("a code's expiry is enforced at the redeem, not merely displayed", () =
       { source: { ...codes[0].source, expiresAt: Date.now() - 30 * 1000 } }, { actor: ADMIN });
 
     const redeem = await callSkill(bundle.agent, 'redeemMembershipCode',
-      { groupId: GROUP, code: rotated.code }, BOB);
+      { rulesAccepted: '1', groupId: GROUP, code: rotated.code }, BOB);
     expect(redeem.redemptionId).toBeTruthy();
   });
 
@@ -286,7 +286,7 @@ describe("a code's expiry is enforced at the redeem, not merely displayed", () =
     await bundle.itemStore.update(codes[0].id, { source: noExpiry }, { actor: ADMIN });
 
     const redeem = await callSkill(bundle.agent, 'redeemMembershipCode',
-      { groupId: GROUP, code: rotated.code }, BOB);
+      { rulesAccepted: '1', groupId: GROUP, code: rotated.code }, BOB);
     expect(redeem).toEqual({ error: 'invalid-or-expired-code' });
   });
 });

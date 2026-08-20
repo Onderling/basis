@@ -27,7 +27,7 @@ async function buildBundle() {
 }
 async function joinBob(bundle, personaProperties) {
   const r = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
-  await callSkill(bundle.agent, 'redeemMembershipCode', { groupId: GROUP, code: r.code, ...(personaProperties ? { personaProperties } : {}) }, BOB);
+  await callSkill(bundle.agent, 'redeemMembershipCode', { rulesAccepted: '1', groupId: GROUP, code: r.code, ...(personaProperties ? { personaProperties } : {}) }, BOB);
 }
 
 describe('recordMemberPersonaProperties — post-join "share to this circle"', () => {

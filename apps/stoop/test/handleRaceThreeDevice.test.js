@@ -64,9 +64,9 @@ describe('2.1 — two joiners redeem the same invite and both pick @jan', () => 
     // delivering two group-redeem-requests back to back produces exactly this.
     const [bram, cato] = await Promise.all([
       callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
-        { groupId: GROUP, code, requesterWebid: BOB, peerDisplay: 'jan' }, ANNE),
+        { rulesAccepted: '1', groupId: GROUP, code, requesterWebid: BOB, peerDisplay: 'jan' }, ANNE),
       callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
-        { groupId: GROUP, code, requesterWebid: CAROL, peerDisplay: 'jan' }, ANNE),
+        { rulesAccepted: '1', groupId: GROUP, code, requesterWebid: CAROL, peerDisplay: 'jan' }, ANNE),
     ]);
 
     const won = [bram, cato].filter((r) => !r.error);
@@ -84,9 +84,9 @@ describe('2.1 — two joiners redeem the same invite and both pick @jan', () => 
     const { bundle, code } = await adminWithCode();
     const [bram, cato] = await Promise.all([
       callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
-        { groupId: GROUP, code, requesterWebid: BOB, peerDisplay: 'jan' }, ANNE),
+        { rulesAccepted: '1', groupId: GROUP, code, requesterWebid: BOB, peerDisplay: 'jan' }, ANNE),
       callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
-        { groupId: GROUP, code, requesterWebid: CAROL, peerDisplay: 'jan' }, ANNE),
+        { rulesAccepted: '1', groupId: GROUP, code, requesterWebid: CAROL, peerDisplay: 'jan' }, ANNE),
     ]);
     const loserWebid = bram.error ? BOB : CAROL;
 
@@ -100,7 +100,7 @@ describe('2.1 — two joiners redeem the same invite and both pick @jan', () => 
     const { bundle, code } = await adminWithCode();
     const results = await Promise.all([BOB, CAROL, DAVE].map((who) =>
       callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
-        { groupId: GROUP, code, requesterWebid: who, peerDisplay: 'jan' }, ANNE)));
+        { rulesAccepted: '1', groupId: GROUP, code, requesterWebid: who, peerDisplay: 'jan' }, ANNE)));
 
     expect(results.filter((r) => !r.error)).toHaveLength(1);
     expect(results.filter((r) => r.error === 'handle-taken')).toHaveLength(2);
@@ -113,7 +113,7 @@ describe('2.1 — two joiners redeem the same invite and both pick @jan', () => 
     const { bundle, code } = await adminWithCode();
     const results = await Promise.all([[BOB, 'jan'], [CAROL, 'piet'], [DAVE, 'klaas']].map(([who, h]) =>
       callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
-        { groupId: GROUP, code, requesterWebid: who, peerDisplay: h }, ANNE)));
+        { rulesAccepted: '1', groupId: GROUP, code, requesterWebid: who, peerDisplay: h }, ANNE)));
 
     expect(results.filter((r) => r.error)).toHaveLength(0);
     expect((await claimedHandles(bundle)).sort()).toEqual(['jan', 'klaas', 'piet']);
@@ -123,7 +123,7 @@ describe('2.1 — two joiners redeem the same invite and both pick @jan', () => 
     const { bundle, code } = await adminWithCode();
     const results = await Promise.all([[BOB, 'jan'], [CAROL, 'Jan'], [DAVE, 'JAN']].map(([who, h]) =>
       callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
-        { groupId: GROUP, code, requesterWebid: who, peerDisplay: h }, ANNE)));
+        { rulesAccepted: '1', groupId: GROUP, code, requesterWebid: who, peerDisplay: h }, ANNE)));
     expect(results.filter((r) => !r.error)).toHaveLength(1);
     expect((await claimedHandles(bundle))).toHaveLength(1);
   });
@@ -133,7 +133,7 @@ describe('2.1 — two joiners redeem the same invite and both pick @jan', () => 
     const { bundle, code } = await adminWithCode();
     const results = await Promise.all([1, 2, 3].map(() =>
       callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
-        { groupId: GROUP, code, requesterWebid: BOB, peerDisplay: 'jan' }, ANNE)));
+        { rulesAccepted: '1', groupId: GROUP, code, requesterWebid: BOB, peerDisplay: 'jan' }, ANNE)));
 
     expect(results.filter((r) => r.error)).toHaveLength(0);          // every retry accepted
     expect((await claimedHandles(bundle)).filter((h) => h === 'jan').length).toBeGreaterThan(0);

@@ -40,7 +40,7 @@ export function makeHandleGroupRedeemRequest({
   if (typeof sendPeer  !== 'function') throw new Error('makeHandleGroupRedeemRequest: sendPeer required');
 
   return async function handleGroupRedeemRequest(fromAddr, payload) {
-    const { requestId, groupId, code, shareCard, peerDisplay, circleAddress, circleAddressProof, personaProperties } = payload ?? {};
+    const { requestId, groupId, code, shareCard, peerDisplay, circleAddress, circleAddressProof, personaProperties, rulesAccepted } = payload ?? {};
     if (!requestId || !groupId || !code) {
       logger.warn?.('[peer] group-redeem-request missing fields', payload);
       return;
@@ -58,6 +58,8 @@ export function makeHandleGroupRedeemRequest({
         // linkage must be provable, never a bare claim a co-member could forge).
         ...(circleAddress ? { circleAddress } : {}),
         ...(circleAddressProof ? { circleAddressProof } : {}),
+        // task #80 — the joiner's acceptance, recorded verbatim onto the admin-signed join statement.
+        ...(typeof rulesAccepted === 'string' && rulesAccepted ? { rulesAccepted } : {}),
         // Property layer — the joiner's disclosed persona properties, forwarded to the admin's roster.
         ...(personaProperties && Object.keys(personaProperties).length ? { personaProperties } : {}),
       });
@@ -185,6 +187,7 @@ export function makeSendGroupRedeemRequest({
   return async function sendGroupRedeemRequest({
     adminPeerAddr, groupId, code, shareCard, peerDisplay, personaProperties,
     circleAddress: presentedCircleAddress, circleAddressProof,
+    rulesAccepted,   // task #80 — the version string the joiner accepted, forwarded for the admin-signed join
   }) {
     if (!peerUp()) {
       throw new Error('Peer transport not connected. Try /peer-connect first.');
@@ -232,6 +235,7 @@ export function makeSendGroupRedeemRequest({
         ...(shareCard   ? { shareCard: true } : {}),
         ...(peerDisplay ? { peerDisplay }     : {}),
         ...linkArg,
+        ...(typeof rulesAccepted === 'string' && rulesAccepted ? { rulesAccepted } : {}),
         // Property layer — the joiner's disclosed persona properties (from finalSubmit), forwarded to the admin.
         ...(personaProperties && Object.keys(personaProperties).length ? { personaProperties } : {}),
         sentAt: Date.now(),

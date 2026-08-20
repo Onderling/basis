@@ -28,7 +28,7 @@ describe('redeem → capture the joiner disclosed persona properties', () => {
   it('records personaProperties on the roster row + surfaces them in listGroupMembers', async () => {
     const bundle = await buildBundle();
     const r = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
-    await callSkill(bundle.agent, 'redeemMembershipCode', { groupId: GROUP, code: r.code, personaProperties: { place: 'Groningen', ageBand: '35-54' } }, BOB);
+    await callSkill(bundle.agent, 'redeemMembershipCode', { rulesAccepted: '1', groupId: GROUP, code: r.code, personaProperties: { place: 'Groningen', ageBand: '35-54' } }, BOB);
 
     const row = await bundle.members.resolveByWebid(BOB);
     expect(row.personaProperties).toEqual({ place: 'Groningen', ageBand: '35-54' });
@@ -40,7 +40,7 @@ describe('redeem → capture the joiner disclosed persona properties', () => {
   it('back-compat: a redeem WITHOUT persona properties records/surfaces none (default-withhold)', async () => {
     const bundle = await buildBundle();
     const r = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
-    await callSkill(bundle.agent, 'redeemMembershipCode', { groupId: GROUP, code: r.code }, BOB);
+    await callSkill(bundle.agent, 'redeemMembershipCode', { rulesAccepted: '1', groupId: GROUP, code: r.code }, BOB);
     expect((await bundle.members.resolveByWebid(BOB)).personaProperties).toBeNull();
     const out = await callSkill(bundle.agent, 'listGroupMembers', { groupId: GROUP });
     expect(out.members.find((m) => m.webid === BOB)?.personaProperties ?? null).toBeNull();

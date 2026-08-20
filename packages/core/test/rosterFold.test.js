@@ -165,3 +165,76 @@ describe('foldRoster — the deterministic membership head', () => {
     expect(r.admins).toContain(founder.pubKey);
   });
 });
+
+describe('foldRoster — the rules gate (task #80, sitting-A decision 2026-08-20)', () => {
+  // The receiver-side half of the rules-acceptance journeys (plans/JOURNEYS.md): acceptance rides the
+  // SIGNED join, refusal happens at every device's fold, staleness is visible and never a lockout.
+
+  it('fold half — a join carrying an accepted version folds, and the version is projected', async () => {
+    const { founder, bob } = await ids();
+    const stmts = [body(bob, 'join', bob, { payload: { rulesAccepted: 'v1' } })];
+    const r = foldRoster(stmts, { founders: [founder.pubKey], rulesGate: { versions: ['v1'] } });
+    expect(r.members).toContain(bob.pubKey);
+    expect(r.rulesAccepted[bob.pubKey]).toBe('v1');
+  });
+
+  it('fold half — the modified client: a join WITHOUT acceptance folds on nobody\'s roster', async () => {
+    const { founder, mallory } = await ids();
+    const stmts = [body(mallory, 'join', mallory, { payload: { redemptionRef: 'r1' } })];
+    const r = foldRoster(stmts, { founders: [founder.pubKey], rulesGate: { versions: ['v1'] } });
+    expect(r.members).not.toContain(mallory.pubKey);       // the statement is evidence; the roster refuses
+    // …and an UNKNOWN version is refused the same way (deny-favouring, not presence-theatre):
+    const forged = [body(mallory, 'join', mallory, { payload: { rulesAccepted: 'v99' } })];
+    expect(foldRoster(forged, { founders: [founder.pubKey], rulesGate: { versions: ['v1'] } }).members)
+      .not.toContain(mallory.pubKey);
+  });
+
+  it('fold half — a rules change makes acceptance STALE, never a removal: v1 stays valid, visibly', async () => {
+    const { founder, bob } = await ids();
+    const stmts = [body(bob, 'join', bob, { payload: { rulesAccepted: 'v1' } })];
+    // After the change the circle has had BOTH versions — acceptance of a then-current version stays valid.
+    const r = foldRoster(stmts, { founders: [founder.pubKey], rulesGate: { versions: ['v1', 'v2'] } });
+    expect(r.members).toContain(bob.pubKey);               // no lockout
+    expect(r.rulesAccepted[bob.pubKey]).toBe('v1');        // the staleness is what the member card shows
+  });
+
+  it('fold half — a self-signed rules-accept updates the version; a non-member\'s records nothing', async () => {
+    const { founder, bob, mallory } = await ids();
+    const join = body(bob, 'join', bob, { payload: { rulesAccepted: 'v1' } });
+    const reaccept = body(bob, 'rules-accept', bob, {
+      payload: { rulesAccepted: 'v2', authorRef: bob.pubKey }, parent: join.hash,
+    });
+    const outsider = body(mallory, 'rules-accept', mallory, {
+      payload: { rulesAccepted: 'v2', authorRef: mallory.pubKey },
+    });
+    const r = foldRoster([join, reaccept, outsider], {
+      founders: [founder.pubKey], rulesGate: { versions: ['v1', 'v2'] },
+    });
+    expect(r.rulesAccepted[bob.pubKey]).toBe('v2');
+    expect(r.members).not.toContain(mallory.pubKey);       // accepting rules does not make you a member
+    expect(r.rulesAccepted[mallory.pubKey]).toBeUndefined();
+  });
+
+  it('nobody accepts on another\'s behalf — a rules-accept whose subject is not its own signer is ignored', async () => {
+    const { founder, bob } = await ids();
+    const join = body(bob, 'join', bob, { payload: { rulesAccepted: 'v1' } });
+    // the founder tries to mark BOB as having accepted v2 (subject=bob, authorRef=founder)
+    const impersonated = body(founder, 'rules-accept', bob, {
+      payload: { rulesAccepted: 'v2', authorRef: founder.pubKey },
+    });
+    const r = foldRoster([join, impersonated], { founders: [founder.pubKey], rulesGate: { versions: ['v1', 'v2'] } });
+    expect(r.rulesAccepted[bob.pubKey]).toBe('v1');
+  });
+
+  it('WITHOUT a gate, behaviour is exactly as before — and eviction clears the accepted version', async () => {
+    const { founder, bob } = await ids();
+    const join = body(bob, 'join', bob, { payload: { rulesAccepted: 'v1' } });
+    const noGate = foldRoster([join], { founders: [founder.pubKey] });
+    expect(noGate.members).toContain(bob.pubKey);          // ungated circles are untouched (opt-in)
+    expect(noGate.rulesAccepted[bob.pubKey]).toBe('v1');   // …but the record still projects
+    const evict = body(founder, 'evict', bob, { deps: [join.hash] });
+    const after = foldRoster([join, evict], { founders: [founder.pubKey] });
+    expect(after.members).not.toContain(bob.pubKey);
+    expect(after.rulesAccepted[bob.pubKey]).toBeUndefined();
+  });
+});

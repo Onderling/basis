@@ -44,7 +44,7 @@ describe('sealed-pod membership — join', () => {
     const bundle = await buildBundle({ controlAgent: ca });
     const r = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
     const redeem = await callSkill(bundle.agent, 'redeemMembershipCode',
-      { groupId: GROUP, code: r.code, sealingPublicKey: SEAL_PUB }, BOB);
+      { rulesAccepted: '1', groupId: GROUP, code: r.code, sealingPublicKey: SEAL_PUB }, BOB);
 
     expect(redeem.redemptionId).toBeTruthy();
     expect(ca.addMember).toHaveBeenCalledWith({ webId: BOB, publicKey: SEAL_PUB, role: 'member', groupId: GROUP });
@@ -54,7 +54,7 @@ describe('sealed-pod membership — join', () => {
     const ca = mockControlAgent();
     const bundle = await buildBundle({ controlAgent: ca });
     const r = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
-    const redeem = await callSkill(bundle.agent, 'redeemMembershipCode', { groupId: GROUP, code: r.code }, BOB);
+    const redeem = await callSkill(bundle.agent, 'redeemMembershipCode', { rulesAccepted: '1', groupId: GROUP, code: r.code }, BOB);
     expect(redeem.redemptionId).toBeTruthy();        // redemption still works
     expect(ca.addMember).not.toHaveBeenCalled();
   });
@@ -63,7 +63,7 @@ describe('sealed-pod membership — join', () => {
     const bundle = await buildBundle();              // no controlAgent
     const r = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
     const redeem = await callSkill(bundle.agent, 'redeemMembershipCode',
-      { groupId: GROUP, code: r.code, sealingPublicKey: SEAL_PUB }, BOB);
+      { rulesAccepted: '1', groupId: GROUP, code: r.code, sealingPublicKey: SEAL_PUB }, BOB);
     expect(redeem.redemptionId).toBeTruthy();
   });
 
@@ -72,7 +72,7 @@ describe('sealed-pod membership — join', () => {
     const bundle = await buildBundle({ controlAgent: ca });
     const r = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
     const redeem = await callSkill(bundle.agent, 'redeemMembershipCode',
-      { groupId: GROUP, code: r.code, sealingPublicKey: SEAL_PUB }, BOB);
+      { rulesAccepted: '1', groupId: GROUP, code: r.code, sealingPublicKey: SEAL_PUB }, BOB);
     expect(redeem.redemptionId).toBeTruthy();        // audit record still written
     expect(ca.addMember).toHaveBeenCalled();
   });
@@ -84,7 +84,7 @@ describe('sealed-pod membership — peer (admin-side) join', () => {
     const bundle = await buildBundle({ controlAgent: ca });
     const r = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
     await callSkill(bundle.agent, 'verifyMembershipCodeForPeer',
-      { groupId: GROUP, code: r.code, requesterWebid: BOB, sealingPublicKey: SEAL_PUB }, ADMIN);
+      { rulesAccepted: '1', groupId: GROUP, code: r.code, requesterWebid: BOB, sealingPublicKey: SEAL_PUB }, ADMIN);
     expect(ca.addMember).toHaveBeenCalledWith({ webId: BOB, publicKey: SEAL_PUB, role: 'member', groupId: GROUP });
   });
 });

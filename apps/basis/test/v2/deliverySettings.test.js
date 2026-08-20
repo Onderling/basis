@@ -16,7 +16,7 @@ import * as mod from '../../src/v2/deliverySettings.js';
 import {
   deliverySettings, createDeliverySettingsStore,
   localStorageDeliveryIo, asyncStorageDeliveryIo,
-  deliveryLabelFor, withDelivery, makeReceiptSender, applyReceipt, makeReceiptReceiver,
+  deliveryLabelFor, withDelivery, makeReceiptSender, applyReceipt, makeReceiptReceiver, rehydrateDeliveryState,
 } from '../../src/v2/deliverySettings.js';
 import { RECEIPT_MESSAGE } from '../../src/v2/deliveryState.js';
 import { createDeliveryStateMap } from '@onderling/kring-host/deliveryState';
@@ -252,5 +252,62 @@ describe('receipt-keyed outbox removal — the receiver\'s removeHeld hook', () 
     // A message this device never sent → refused by the id gate → no removal.
     expect(await onReceipt({ subtype: RECEIPT_MESSAGE, messageId: 'm-ghost' }, 'addr-bee')).toBe(false);
     expect(removed).toEqual([]);
+  });
+});
+
+describe('the outbox as a PROJECTION — receipts on the log, the ladder rebuilt after a restart', () => {
+  const CHAT = 'chat-message';
+  const logOf = (entries) => ({
+    entries,
+    query: () => entries,
+    appendSilentEntry: (e) => { entries.push({ type: e.kind, silent: true, ...e }); return e; },
+  });
+
+  it('a VALIDATED receipt lands on the log as a silent delivery-state entry', async () => {
+    const log = logOf([{ id: 'm-1', type: CHAT, actor: 'me', ts: Date.now(), payload: { circleId: 'c-1' } }]);
+    const map = createDeliveryStateMap();
+    map.set('m-1', DELIVERY.PENDING);
+    const onReceipt = makeReceiptReceiver({
+      deliveryMap: map, eventLog: log,
+      listCircleMembers: async () => [{ circleAddress: 'addr-bee', webid: 'w-bee' }],
+    });
+    expect(await onReceipt({ subtype: RECEIPT_MESSAGE, messageId: 'm-1' }, 'addr-bee')).toBe(true);
+    const rec = log.entries.find((e) => e.type === 'delivery-state');
+    expect(rec?.payload).toEqual({ msgId: 'm-1', state: DELIVERY.STORED, from: 'addr-bee' });
+    expect(rec?.circleId).toBe('c-1');
+  });
+
+  it('rehydrateDeliveryState rebuilds the ladder: own recent sends → maybe-received, logged receipts → stored, old/foreign entries ignored', () => {
+    const now = Date.now();
+    const log = logOf([
+      { id: 'm-new', type: CHAT, actor: 'me', ts: now - 1000, payload: {} },
+      { id: 'm-confirmed', type: CHAT, actor: 'me', ts: now - 2000, payload: {} },
+      { id: 'm-old', type: CHAT, actor: 'me', ts: now - 48 * 3600 * 1000, payload: {} },      // outlived the TTL
+      { id: 'm-theirs', type: CHAT, actor: 'peer-x', ts: now - 1000, payload: {} },           // not my send
+      { type: 'delivery-state', ts: now - 500, payload: { msgId: 'm-confirmed', state: DELIVERY.STORED, from: 'addr-bee' } },
+      { type: 'delivery-state', ts: now - 400, payload: { msgId: 'm-ghost', state: DELIVERY.STORED, from: 'addr-x' } },  // receipt for a send the log does not hold
+    ]);
+    const map = createDeliveryStateMap();
+    const r = rehydrateDeliveryState({ eventLog: log, deliveryMap: map, localActor: 'me' });
+    expect(r).toEqual({ seeded: 2, stored: 1 });
+    expect(map.get('m-new')).toBe(DELIVERY.MAYBE);
+    expect(map.get('m-confirmed')).toBe(DELIVERY.STORED);
+    expect(map.get('m-old')).toBeNull();
+    expect(map.get('m-theirs')).toBeNull();
+    expect(map.get('m-ghost')).toBeNull();
+  });
+
+  it('THE RESTART GAP CLOSED: a receipt arriving after a reboot now advances the pre-reboot send', async () => {
+    const now = Date.now();
+    const log = logOf([{ id: 'm-1', type: CHAT, actor: 'me', ts: now - 1000, payload: { circleId: 'c-1' } }]);
+    const freshMap = createDeliveryStateMap();   // the post-restart map: EMPTY — the old id-gate refused everything
+    rehydrateDeliveryState({ eventLog: log, deliveryMap: freshMap, localActor: 'me' });
+    const onReceipt = makeReceiptReceiver({
+      deliveryMap: freshMap, eventLog: log,
+      listCircleMembers: async () => [{ circleAddress: 'addr-bee', webid: 'w-bee' }],
+    });
+    expect(await onReceipt({ subtype: RECEIPT_MESSAGE, messageId: 'm-1' }, 'addr-bee'),
+      'the late receipt is accepted because rehydration restored the key set').toBe(true);
+    expect(freshMap.get('m-1')).toBe(DELIVERY.STORED);
   });
 });

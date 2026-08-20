@@ -322,3 +322,36 @@ export function makePodChatCatchUp({ rail, podReadSince, dataMoveFor = null, eve
 
 /** Should this chat statement wake an offline device? Derived from the one shared kind table. */
 export const chatStatementWakes = () => kindWakes(CHAT_LANE);
+
+/**
+ * What is still OWED after a restart — the outbox as a PROJECTION of the one log (recorded
+ * 2026-08-18: no duplicate store). A statement is owed when it is MINE (my authorRef inside the
+ * signature), recent enough that the hold promise still stands (the hold TTL), and no `delivery-state`
+ * receipt for it has landed on the log. Re-fanning these is idempotent end to end: every receiver's
+ * rail dedups by entry, and a receipt that arrives meanwhile removes the held copy (receipt-keyed
+ * removal) and excludes the message from the next boot's list.
+ *
+ * @param {object} a
+ * @param {{query: Function}} a.eventLog
+ * @param {string} a.circleId
+ * @param {string} a.myRef
+ * @param {number} [a.ttlMs]
+ * @returns {Array<{ msgId: string, ts: number, statement: object }>} oldest-first
+ */
+export function owedChatStatements({ eventLog, circleId, myRef, ttlMs = 24 * 60 * 60 * 1000 } = {}) {
+  if (typeof eventLog?.query !== 'function' || !circleId || !myRef) return [];
+  let entries = [];
+  try { entries = eventLog.query({}) ?? []; } catch { return []; }
+  const receipted = new Set();
+  for (const e of entries) {
+    if (e?.type === 'delivery-state' && typeof e?.payload?.msgId === 'string') receipted.add(e.payload.msgId);
+  }
+  const now = Date.now();
+  return entries
+    .filter((e) => e && e.type === CHAT_LANE && e.payload?.circleId === circleId && e.payload?.statement?.body)
+    .filter((e) => (now - (e.ts ?? 0)) <= ttlMs)
+    .filter((e) => e.payload.statement.body?.payload?.authorRef === myRef)
+    .filter((e) => !receipted.has(e.id))
+    .map((e) => ({ msgId: e.id, ts: e.ts ?? 0, statement: e.payload.statement }))
+    .reverse();   // the log is most-recent-first; re-fan oldest-first
+}

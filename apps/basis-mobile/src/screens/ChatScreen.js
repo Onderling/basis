@@ -58,7 +58,7 @@ import {
   ensureDmThread, updatePeerDisplay,
 } from '../core/threadState.js';
 import { makePeerRouter }      from '../../../basis/src/core/handlers/peerRouter.js';
-import { makeReceiptReceiver } from '../../../basis/src/v2/deliverySettings.js';
+import { makeReceiptReceiver, rehydrateDeliveryState } from '../../../basis/src/v2/deliverySettings.js';
 import { pushContactReply }    from '../core/contactReplyInbox.js';
 import { makeCircleRecipePeerHandler } from '../../../basis/src/v2/circleRecipeReceiver.js';
 import { makeCircleRulesPeerHandler }  from '../../../basis/src/v2/circleRulesReceiver.js';
@@ -520,6 +520,13 @@ export default function ChatScreen({
         removeHeld: (a) => bundle?.agent?.removeHeld?.(a),
       })
       : null;
+    // Rebuild the delivery ladder from the ONE log (web parity — the outbox-as-projection): my recent
+    // sends seed maybe-received (restoring the receipt gate's key set after a restart), logged receipts
+    // advance to stored.
+    if (deliveryStateMap && eventLogRef.current) {
+      try { rehydrateDeliveryState({ eventLog: eventLogRef.current, deliveryMap: deliveryStateMap, localActor: 'me' }); }
+      catch { /* the live ladder still works from here on */ }
+    }
 
     // profile-update propagation — on a REAL roster write (admin recording a member's disclosure
     // change) drop the SILENT `roster-updated` entry on the shared eventLog + fan the refs out.

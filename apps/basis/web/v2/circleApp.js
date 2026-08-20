@@ -135,7 +135,7 @@ import { renderCircleMyData } from './circleMyData.js';
 import { connectionRows, connectionOpChoices, connectionSectionChoices, compileConnectionGrant } from '../../src/v2/connections.js';
 import { parsePairingOffer } from '../../src/v2/connectionPairing.js';
 import {
-  createDeliverySettingsStore, localStorageDeliveryIo, withDelivery, makeReceiptSender, makeReceiptReceiver,
+  createDeliverySettingsStore, localStorageDeliveryIo, withDelivery, makeReceiptSender, makeReceiptReceiver, rehydrateDeliveryState,
 } from '../../src/v2/deliverySettings.js';
 import { createFallbackOffer } from '../../src/v2/addressFallback.js';
 import { setAddressFallbackReportHook } from '@onderling-app/stoop';
@@ -7653,6 +7653,12 @@ async function boot() {
         },
       });
       _peerAgent = agent; _peerRouter = peerMessageRouter;   // for applyRelayUrl (live relay reconnect)
+      // Rebuild the delivery ladder from the ONE log (the outbox-as-projection): my recent sends seed
+      // maybe-received (which also restores the receipt gate's key set — an empty post-restart map was
+      // refusing receipts for pre-restart sends), logged receipts advance to stored. The agent's own
+      // circle-open re-fan pushes what is still owed.
+      try { rehydrateDeliveryState({ eventLog, deliveryMap: deliveryStateMap, localActor: LOCAL_ACTOR }); }
+      catch { /* the live ladder still works from here on */ }
       tryConnectPeerTransport(agent, peerMessageRouter).catch(() => { /* logged inside */ });
 
       // The circle-POST catch-up (a stoop noticeboard concern, untouched by the chat re-root): on

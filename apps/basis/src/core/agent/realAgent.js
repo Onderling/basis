@@ -46,7 +46,7 @@ import {
 } from '../../v2/settingsRestoreGate.js'; // #36/#44 — probe-before-flush (no cross-key clobber) + the restore choices
 import { makeMembershipRail, makeMembershipEmitter } from '../../v2/membershipRail.js'; // the membership rider — statements ride the device log
 import { makeTaskRail, makeTaskEmitter, routeTaskMirror } from '../../v2/taskRail.js'; // the content re-root — item snapshots ride the device log
-import { makeChatRail, makeChatEmitter } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
+import { makeChatRail, makeChatEmitter, owedChatStatements } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
 import { createSurfaceGrants, compileReadFilter } from '../../v2/surfaceGrants.js';   // pair-a-view standing grants (the surface role) + the section→lane-filter compiler
 import { SURFACE_NUDGE_SUBTYPE } from '../../v2/surfaceNudge.js'; // the reading half's contentless re-pull signal
 import { CONNECTION_GRANT_SUBTYPE } from '../../v2/connectionPairing.js';   // pairing: how the grant reaches the view that asked for it
@@ -749,6 +749,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (_cacheMedium) {
         circleSyncWired.add(id);
         if (typeof console !== 'undefined') console.info(`[circle-sync] ${id}: pod-carried (peer mirror skipped — no double-carry)`);
+        reFanOwedChat(id);   // chat statements ride the peer fan whatever the store's pod posture
       } else {
         await ensureCircleMirror(id);   // the peer ROSTER object (list/persist/clear + the legacy inbound door) — no publish carry
         // The publish valve: every circle-content write rides the SIGNED lane (the content re-root); the
@@ -759,6 +760,7 @@ export async function createRealHouseholdAgent(opts = {}) {
           publishItem:        (item)          => routeTaskMirror({ circleId: id, emitter: taskEmit, requireSigned: !!opts.deviceLog }).publishItem(item),
           publishItemRemoved: (rid, removed)  => routeTaskMirror({ circleId: id, emitter: taskEmit, requireSigned: !!opts.deviceLog }).publishItemRemoved(rid, removed),
         });
+        reFanOwedChat(id);   // what a restart still owes this circle goes out again (idempotent)
         // The UNSIGNED inbound door only exists for the mirror-carry composition (no device log — the
         // legacy shape). A device-log composition publishes every type as a SIGNED lane statement and
         // receives through the rail's verify gate, so leaving this door open there would re-admit
@@ -832,6 +834,23 @@ export async function createRealHouseholdAgent(opts = {}) {
       try { if (it) taskEmit.snapshot(id, it); } catch { /* best-effort */ }
     }
   }
+  // The owed RE-FAN — the durable outbox as a projection (no second store): at the first open of a
+  // circle each boot, re-fan my own recent chat statements that have no logged receipt. A restart
+  // therefore cannot silently break the hold promise: what was still owed goes out again, receivers'
+  // rails dedup what they already have, and receipt-keyed removal stops the copies that arrive.
+  const reFannedCircles = new Set();
+  function reFanOwedChat(circleId) {
+    if (!opts.deviceLog || !chatRail || reFannedCircles.has(circleId)) return;
+    reFannedCircles.add(circleId);
+    try {
+      for (const owed of owedChatStatements({ eventLog: opts.deviceLog, circleId, myRef: chatId.pubKey })) {
+        callSkill('stoop', 'broadcastCircleChatStatement', {
+          groupId: circleId, event: owed.statement, msgId: owed.msgId, ts: owed.ts,
+        }).catch(() => { /* best-effort — the next boot, or the member's own catch-up, retries */ });
+      }
+    } catch { /* the projection is best-effort; live sends are unaffected */ }
+  }
+
   function isNewCirclePeer(circleId, pubKey) {
     if (!pubKey) return false;
     try { return !(circleMirrors.get(circleId || 'household')?.listPeers?.() ?? []).includes(pubKey); } catch { return true; }

@@ -19,6 +19,7 @@
  * receipts off is precisely the disclosure `deliveryState.js` refuses to make — it would let anyone spot
  * the setting by looking at a conversation.
  */
+import { CHAT_KIND } from './conversationKinds.js';
 import {
   DELIVERY, DELIVERY_LABELS, isDeliveryState, shouldSendReceipt, receiveReceipt, RECEIPT_MESSAGE,
 } from './deliveryState.js';
@@ -328,8 +329,64 @@ export function makeReceiptReceiver({ deliveryMap, eventLog, listCircleMembers, 
     if (applied && typeof removeHeld === 'function' && typeof fromAddress === 'string' && msgId) {
       try { removeHeld({ addr: fromAddress, msgId }); } catch { /* the map advance already stands */ }
     }
+    // The receipt lands on the ONE log as a silent `delivery-state` entry (the kind existed in the
+    // entry-kind table, declared and unwritten, SHORT retention). This is what makes the delivery
+    // ladder a PROJECTION instead of process memory: after a restart, `rehydrateDeliveryState`
+    // rebuilds the map from these entries, and the owed re-fan skips what was already confirmed —
+    // the durable outbox without a second store.
+    if (applied && msgId) {
+      try {
+        eventLog?.appendSilentEntry?.({
+          circleId: circleId ?? undefined,
+          kind: 'delivery-state',
+          payload: { msgId, state: DELIVERY.STORED, from: fromAddress ?? null },
+        });
+      } catch { /* the live map advance already stands; the log copy is the restart's concern */ }
+    }
     return applied;
   };
+}
+
+/**
+ * Rebuild the delivery map from the ONE log after a restart — the outbox-as-PROJECTION half of the
+ * durable-sender design (recorded 2026-08-18: no duplicate store; "what is still owed" is derivable).
+ *
+ * Two passes, both bounded by the hold TTL:
+ *   1. every chat message THIS device sent (its own render entries) seeds `maybe-received` — it left
+ *      here in a previous run, and that is exactly what the ladder may honestly claim. Seeding also
+ *      restores the receipt gate's key set ("a receipt may only advance a message I sent"), which an
+ *      empty post-restart map silently broke: receipts arriving after a reboot were refused.
+ *   2. every logged `delivery-state` receipt advances its message to `stored` — the map's monotonic
+ *      rule keeps ordering honest.
+ *
+ * @param {object} a
+ * @param {{query: Function}} a.eventLog
+ * @param {{get: Function, set: Function}} a.deliveryMap
+ * @param {string} a.localActor   the actor label this shell stamps on its OWN sends
+ * @param {number} [a.ttlMs]      how far back a send can still be "owed" (the hold TTL)
+ * @returns {{ seeded: number, stored: number }}
+ */
+export function rehydrateDeliveryState({ eventLog, deliveryMap, localActor, ttlMs = 24 * 60 * 60 * 1000 } = {}) {
+  if (typeof eventLog?.query !== 'function' || typeof deliveryMap?.set !== 'function') return { seeded: 0, stored: 0 };
+  let entries = [];
+  try { entries = eventLog.query({}) ?? []; } catch { entries = []; }
+  const now = Date.now();
+  let seeded = 0; let stored = 0;
+  for (const e of entries) {
+    if (e?.type === CHAT_KIND && e?.actor === localActor && typeof e.id === 'string'
+      && (now - (e.ts ?? 0)) <= ttlMs && deliveryMap.get(e.id) == null) {
+      deliveryMap.set(e.id, DELIVERY.MAYBE);
+      seeded += 1;
+    }
+  }
+  for (const e of entries) {
+    if (e?.type === 'delivery-state' && e?.payload?.state === DELIVERY.STORED
+      && typeof e.payload.msgId === 'string' && deliveryMap.get(e.payload.msgId) != null) {
+      deliveryMap.set(e.payload.msgId, DELIVERY.STORED);
+      stored += 1;
+    }
+  }
+  return { seeded, stored };
 }
 
 export function applyReceipt(payload, fromAddress, deliveryMap, { isRecipient = null } = {}) {

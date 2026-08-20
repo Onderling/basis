@@ -88,3 +88,36 @@ describe('stoop_briefSummary — Q30 contributor', () => {
     expect(reply.message).toBe('1 circle request');
   });
 });
+
+describe('the brief counts only REAL noticeboard posts (the shared gate)', () => {
+  it('chat lines and membership/rules bookkeeping neither count nor show as circle requests', async () => {
+    const bundle = await makeBundle();
+    // One real ask…
+    await callSkill(bundle.agent, 'postRequest', { intent: 'ask', text: 'Need a ladder' });
+    // …beside the store's system residents: a chat line (keyed by msgId — the shape the brief
+    // displayed as a withdrawable "request" for a month), a rules doc, and a membership code.
+    await bundle.itemStore.addItems([
+      { type: 'circle-chat-message', text: 'hoi allemaal', visibility: 'household',
+        source: { circleId: 'c-1', msgId: 'm-1' } },
+      { type: 'group-rules', text: 'huisregels', visibility: 'household',
+        source: { groupId: 'c-1', rules: { purpose: 'circle' }, version: 1 } },
+      { type: 'membership-code', text: 'code', visibility: 'household',
+        source: { groupId: 'c-1', code: 'ABC123', expiresAt: Date.now() + 60000 } },
+    ], { actor: ANNE });
+
+    const reply = await callSkill(bundle.agent, 'stoop_briefSummary');
+    expect(reply.message).toBe('1 circle request');
+    expect(reply.items).toHaveLength(1);
+    expect(reply.items[0].label).toBe('Need a ladder');
+    expect(reply.items.some((i) => i.label === 'hoi allemaal'), 'no chat line in the brief').toBe(false);
+  });
+
+  it('a store holding ONLY system items reads as empty — brief.js skips the section', async () => {
+    const bundle = await makeBundle();
+    await bundle.itemStore.addItems([
+      { type: 'circle-chat-message', text: 'alleen chat', visibility: 'household',
+        source: { circleId: 'c-1', msgId: 'm-2' } },
+    ], { actor: ANNE });
+    expect(await callSkill(bundle.agent, 'stoop_briefSummary')).toEqual({ ok: true });
+  });
+});

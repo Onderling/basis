@@ -66,7 +66,7 @@ import { wireSkill } from '@onderling/sdk';
 import { stoopManifest } from '../../manifest.js';
 import nacl from 'tweetnacl';
 import { resolve as resolveMember } from '@onderling/identity-resolver';
-import { validateCanonical } from '@onderling/item-types';
+import { validateCanonical, isNoticeboardPost } from '@onderling/item-types';
 // The ONE release comparator (the disclosure home) — the roster gates its own writes on it so an
 // unchanged "share to this circle" never touches the row, never acks a change, never announces one.
 import { changedReleaseKeys } from '@onderling/agent-registry';
@@ -1687,8 +1687,12 @@ export function buildSkills({
      * a count.  Takes no args.
      */
     defineSkill('stoop_briefSummary', async () => {
-      const open = await store.listOpen();
-      if (!open || open.length === 0) {
+      // Only REAL noticeboard posts count as "circle requests" — the store also holds chat lines and
+      // the membership/rules bookkeeping, and an unfiltered listOpen counted (and displayed!) them.
+      // The gate is the shared one every posts surface uses (@onderling/item-types), importable here
+      // since it moved out of basis into the type taxonomy.
+      const open = (await store.listOpen() ?? []).filter(isNoticeboardPost);
+      if (open.length === 0) {
         return { ok: true };          // brief.js's isEmpty skips this section
       }
       return {

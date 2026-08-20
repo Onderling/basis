@@ -33,47 +33,11 @@ export const SCOPED_WRITE_OPS = new Set([
 /** stoop list ops whose `{ items }` are filtered to the active circle. */
 export const SCOPED_LIST_OPS = new Set(['listOpen', 'listFeed', 'listMyRequests', 'getBulletin']);
 
-/**
- * Stoop item types that are NOT user-facing noticeboard posts — the membership
- * lifecycle + rules documents (internal bookkeeping), and the circle CHAT lines,
- * which live in the same itemStore purely so a conversation survives a reload.
- * `listOpen` (no intent) returns them all alongside real `request`/`offer` posts;
- * the noticeboard is for asks/offers, so it filters these out.
- *
- * `circle-chat-message` earns its place here for the same reason the others do, but
- * the symptom was louder: every line typed in a circle's Conversation also appeared
- * on the Noticeboard — with a "Withdraw" action when it was yours — and, because a
- * chat item carries its circle as `source.circleId` (a hint `itemCircleId` does not
- * read), on EVERY circle's Noticeboard, not just its own.
- */
-export const SYSTEM_STOOP_TYPES = new Set([
-  'group-rules', 'membership-code', 'membership-redemption', 'circle-chat-message',
-]);
-
-/** True when `item` is a real noticeboard post (an ask/offer), not a system item. */
-export function isNoticeboardPost(item) {
-  if (SYSTEM_STOOP_TYPES.has(item?.type)) return false;
-  // The local-first substrate/pseudo-pod collapses every stoop item to `type:'post'`,
-  // losing the semantic type — but the original `source` shape survives. Recognise the
-  // membership lifecycle + rules documents by their distinctive source fields so they
-  // don't surface as noticeboard posts even when the type is flattened.
-  //
-  // This is not a belt-and-braces branch: basis's own `adaptStoopReply` (realAgent.js)
-  // rewrites `type: 'post'` onto EVERY `listOpen` row, so on the live path the type
-  // check above never fires and the recognisers below are the whole filter.
-  const src = item?.source;
-  if (src && typeof src === 'object') {
-    if (src.rules != null) return false;                          // group-rules
-    if (typeof src.code === 'string' && src.code) return false;   // membership-code
-    if (src.redeemedBy != null) return false;                     // membership-redemption
-    // circle-chat-message — the only stoop item keyed by a message id (stoop's
-    // `broadcastCircleMessage` local mirror + `ingestCircleMessage` receive mirror are
-    // the only writers of `source.msgId`; the other circle broadcasts put theirs on the
-    // wire `extras`, never on a stored item).
-    if (typeof src.msgId === 'string' && src.msgId) return false;
-  }
-  return true;
-}
+// The "what is a noticeboard post" gate lives in `@onderling/item-types` now (its type-taxonomy
+// home) — stoop needed it too (`/brief` counted chat lines as circle requests for a month because
+// it could not import an app) and both apps already depend on that package. Re-exported here so
+// every basis call site keeps its import path.
+export { SYSTEM_STOOP_TYPES, isNoticeboardPost } from '@onderling/item-types';
 
 /**
  * Keep `item` for `circleId` — lenient: an item carrying NO circle hint is kept

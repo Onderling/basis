@@ -148,7 +148,19 @@ const ANNOTATED = /\bledger\s+(?:L\d+|n\/a)/i;
 const privateDocs = existsSync(PRIVATE_DIR)
   ? readdirSync(PRIVATE_DIR).filter((f) => f.endsWith('.md')).map((f) => join('plans', f))
   : [];
-const scanned = ['REMAINING-WORK.md', ...privateDocs];
+// QUESTIONS.md is part of the register itself (the capped queue of open Frits-decisions, agreed
+// 2026-08-20) — scanning it would demand the queue annotate itself, exactly the ledger's own
+// exemption one file over. Its generated INDEX/DOC-STATUS rows quote its H1, so they inherit the
+// exemption too (a row ABOUT the register is not a stray question).
+const REGISTER_FILES = new Set(['plans/QUESTIONS.md']);
+const registerH1s = [...REGISTER_FILES]
+  .filter((f) => existsSync(join(ROOT, f)))
+  .map((f) => readFileSync(join(ROOT, f), 'utf8').split('\n')[0].replace(/^#\s*/, '').trim())
+  .filter(Boolean);
+const registerNames = [...REGISTER_FILES].map((f) => f.split('/').pop());
+const quotesRegister = (line) => registerNames.some((n) => line.includes(n))
+  || registerH1s.some((h1) => h1 && line.includes(h1.slice(0, 40)));
+const scanned = ['REMAINING-WORK.md', ...privateDocs].filter((f) => !REGISTER_FILES.has(f));
 
 // The ledger section is itself full of marker phrases (its own heading, its drift warning, its items).
 // Those ARE the ledger, so scanning them would demand that the list annotate itself.
@@ -166,6 +178,7 @@ for (const rel of scanned) {
     if (isLedgerFile && lineNo >= ledgerFirstLine && lineNo <= ledgerLastLine) return;
     if (!MARKER.test(line)) return;
     if (ANNOTATED.test(line)) return;
+    if (quotesRegister(line)) return;   // an index/status row quoting the register's own title
     sites.push(`${rel}:${lineNo}`);
   });
 }

@@ -1304,6 +1304,22 @@ export const stoopManifest = {
       },
     },
     {
+      // The rules-update rider's RECEIVE half: land a peer-carried rules doc as the local mirror
+      // head (idempotent by version; the statement's admin authority is verified at the caller).
+      id:   'recordGroupRulesUpdate', verb: 'update',
+      params: [
+        { name: 'groupId',   kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'rules',     kind: 'object', required: true },
+        { name: 'version',   kind: 'number', required: true },
+        { name: 'updatedBy', kind: 'string', required: false },
+      ],
+      resolves: [{ field: 'rules', policy: 'content' }],
+      surfaces: {
+        chat: { hint: 'Plumbing: record a peer-carried rules update locally (not user-invoked).' },
+        ui:   { control: 'none' },
+      },
+    },
+    {
       id:   'postAnnouncement', verb: 'add',
       params: [
         { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
@@ -1388,6 +1404,19 @@ export const stoopManifest = {
     // The send/receive halves of circle-scoped fan-out. `msgId` + `ts` are the dedup pair: replay is normal
     // on a mesh, so every receiver must be idempotent, and these carry what makes that possible.
     // The INGEST ops take `fromPeerAddr` + `fromPubKey` from the AUTHENTICATED envelope, never the payload.
+    {
+      id:   'broadcastCircleGovernance', verb: 'share',
+      params: [
+        { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'event',   kind: 'object', required: true },
+        { name: 'msgId',   kind: 'string' },
+        { name: 'ts',      kind: 'number' },
+      ],
+      surfaces: {
+        chat: { hint: 'Fan a governance statement (propose/vote/resolve/rules-update) to a circle.' },
+        ui:   { control: 'page' },
+      },
+    },
     {
       id:   'broadcastCircleMembership', verb: 'share',
       params: [

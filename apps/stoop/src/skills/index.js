@@ -887,7 +887,16 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
           latestRulesItem = it;
         }
       }
-      if (it?.source?.mirrored === true) continue;
+      if (it?.source?.mirrored === true) {
+        // A MIRROR's `addedBy` is the local recorder, never the founder — but a peer-carried rules
+        // UPDATE stamps `source.updatedBy` with the statement's VERIFIED admin author (signed,
+        // binding-resolved, role-checked at apply), which is an authority fact of exactly the class
+        // the memberMap admin-role line below already admits. Without it a joiner's device holds NO
+        // founder-authority at all (its only rules item is the mirror), so every admin-authored
+        // join statement was founder-gated out and the authoritative fold never engaged there.
+        if (typeof it.source.updatedBy === 'string' && it.source.updatedBy) founderWebids.add(it.source.updatedBy);
+        continue;
+      }
       if (typeof it?.addedBy === 'string' && it.addedBy) founderWebids.add(it.addedBy);
     }
   } catch { /* no rules item → the MemberMap-admin + trail paths still stand */ }
@@ -1159,6 +1168,10 @@ export function buildSkills({
   // rail's VERIFIED bodies for the roster fold. Absent → the legacy store-based spine path, unchanged.
   membershipEmit,
   membershipRead,
+  // THE RULES-UPDATE RIDER (host-injected): a rules-doc edit also appends + fans a signed
+  // `rules-update` statement on the governance lane, so the new doc reaches every member
+  // peer-to-peer (pod-free) and their stale-banner lights. Absent → store-local only, unchanged.
+  rulesUpdateEmit,
   // G13 step C — route circle traffic to each member's PER-CIRCLE address instead of their one global
   // signing key. **ON since 2026-07-29.**
   //
@@ -4072,15 +4085,57 @@ export function buildSkills({
         const isAdmin = isCircleAdmin(me?.role);
         if (!isAdmin) return { error: 'admin-only' };
       }
+      const newVersion = (a.rules.version ?? 0) + 1;
       const [item] = await store.addItems([{
         type:       'group-rules',
         text:       a.rules.name ?? a.groupId,
-        source:     { groupId: a.groupId, rules: a.rules, version: (a.rules.version ?? 0) + 1 },
+        source:     { groupId: a.groupId, rules: a.rules, version: newVersion },
         visibility: 'household',
       }], { actor: from });
-      return { rulesId: item.id, version: (a.rules.version ?? 0) + 1 };
+      // The rules-update rider: the new doc + version also ride the governance lane as a signed
+      // statement, so every member's device learns the CURRENT version peer-to-peer (their
+      // stale-banner lights without a pod). Best-effort — the local write above is the head.
+      if (typeof rulesUpdateEmit === 'function') {
+        try { await rulesUpdateEmit({ groupId: a.groupId, rules: a.rules, version: newVersion }); }
+        catch { /* the fan is best-effort — catch-up reconciles */ }
+      }
+      return { rulesId: item.id, version: newVersion };
     }, {
       description: 'Admin-only: replace the group\'s rules with a new version.',
+      visibility:  'authenticated',
+    }),
+
+    /**
+     * recordGroupRulesUpdate({groupId, rules, version})
+     *   — the RECEIVE half of the rules-update rider: land a peer-carried rules doc as the local
+     *   mirrored `group-rules` item. The AUTHORITY check (the statement's author holds the admin
+     *   role) happens at the caller (`applyRulesUpdates`), against the signed statement — this
+     *   skill only guards idempotency: a version at or below the local head never writes.
+     */
+    defineSkill('recordGroupRulesUpdate', async ({ parts, from }) => {
+      const a = dataArgs(parts);
+      if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
+      if (typeof a.rules !== 'object' || a.rules === null) return { error: 'rules object required' };
+      const version = Number.parseInt(a.version, 10);
+      if (!Number.isFinite(version) || version < 1) return { error: 'version must be a positive integer' };
+      const latest = await _findLatestGroupRules(store, a.groupId);
+      const localVersion = Number.parseInt(latest?.source?.version ?? latest?.source?.rules?.version ?? 0, 10) || 0;
+      if (version <= localVersion) return { applied: false, version: localVersion };
+      const [item] = await store.addItems([{
+        type:       'group-rules',
+        text:       a.rules.name ?? a.groupId,
+        // `updatedBy` — the statement's verified admin author, carried so the roster's
+        // founder-authority derivation has an authority fact on the RECEIVING device (whose only
+        // rules item is this mirror; a mirror's `addedBy` is the local recorder, not the admin).
+        source:     {
+          groupId: a.groupId, rules: a.rules, version, mirrored: true,
+          ...(typeof a.updatedBy === 'string' && a.updatedBy ? { updatedBy: a.updatedBy } : {}),
+        },
+        visibility: 'household',
+      }], { actor: from });
+      return { applied: true, rulesId: item.id, version };
+    }, {
+      description: 'Land a peer-carried rules-doc update locally (idempotent by version; authority verified at the statement).',
       visibility:  'authenticated',
     }),
 

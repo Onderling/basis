@@ -35,6 +35,9 @@ async function mkDevice(ref, rosterAll, { policy }) {
   row.circleAddress = cid.pubKey;
   const callSkill = async (o, op, args) => {
     if (op === 'listGroupRoster') return { members: rosterAll.filter((m) => m.webid !== ref) };
+    // The rail's default binding reads the DERIVED roster (webid + proven circleAddress rows) —
+    // serve the full set, self included, exactly as listGroupMembers projects it.
+    if (op === 'listGroupMembers') return { members: rosterAll };
     if (op === 'listMyCircles') return { circles: [{ groupId: CIRCLE }] };
     return { ok: true };
   };

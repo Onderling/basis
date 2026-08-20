@@ -63,7 +63,7 @@ export async function threeDevices({ policy = defaultPolicy(), clock = 1 } = {})
 
   for (const ref of DEVICE_REFS) {
     const log = new EventLog({ initial: [] });
-    const rosterCallSkill = async (app, op) => (op === 'listGroupRoster' ? rosterExcluding(ref) : { ok: true });
+    const rosterCallSkill = async (app, op) => ((op === 'listGroupRoster' || op === 'listGroupMembers') ? rosterExcluding(ref) : { ok: true });
     const rail = makeGovernanceRail({
       eventLog: log, circleIdentityFor: async () => cids[ref], myRef: ref, callSkill: rosterCallSkill,
     });
@@ -118,7 +118,7 @@ export async function threeDevices({ policy = defaultPolicy(), clock = 1 } = {})
     d.gov = bindCircleGovernance({
       eventLog: d.log,
       callSkill: vi.fn(async (app, op, args) => {
-        if (op === 'listGroupRoster') return rosterExcluding(ref);
+        if (op === 'listGroupRoster' || op === 'listGroupMembers') return rosterExcluding(ref);
         // Every non-roster op is a real-world side effect — record WHICH device performed it.
         d.enacted.push({ op, args });
         return { ok: true };

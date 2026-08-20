@@ -54,6 +54,10 @@ import {
   makeGrantsRail, makeGrantsFan, makeGrantsCatchUp, makeGrantsPeerHandler,
   deviceSetBindingVerifier, siblingDeviceAddresses,
 } from '../../v2/grantsRail.js';
+// The rules-update rider: a rules-doc edit fans a signed statement on the governance lane so the
+// new doc + version reach every member peer-to-peer (pod-free — V1 closing wave row 2).
+import { makeGovernanceRail } from '../../v2/governanceAppWiring.js';
+import { makeRulesUpdateEmitter } from '../../v2/rulesUpdateLane.js';
 import { SURFACE_NUDGE_SUBTYPE } from '../../v2/surfaceNudge.js'; // the reading half's contentless re-pull signal
 import { CONNECTION_GRANT_SUBTYPE } from '../../v2/connectionPairing.js';   // pairing: how the grant reaches the view that asked for it
 import { paramsManifest } from '../../v2/paramsManifest.js';   // #36 — the params op contract (gates the waist branch)
@@ -2058,6 +2062,23 @@ export async function createRealHouseholdAgent(opts = {}) {
       }).catch(() => { /* fan is best-effort — catch-up reconciles */ }),
     });
   }
+  // THE RULES-UPDATE RIDER: `editGroupRules` also fans the new doc + version as a signed statement
+  // on the governance lane (this rail instance shares the device log with the shells' receive-side
+  // rail — same lane, same declaration, the multi-instance shape governance already has). Without
+  // a device log the append lands on an ephemeral log — the live fan still carries the statement
+  // (receivers verify at their OWN rail); only local restart durability degrades, like the other
+  // riders.
+  const rulesUpdateEmit = makeRulesUpdateEmitter({
+    rail: makeGovernanceRail({
+      eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
+      circleIdentityFor,
+      myRef: chatId.pubKey,
+      callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
+    }),
+    fan: (circleId, statement) => callSkill('stoop', 'broadcastCircleGovernance', {
+      groupId: circleId, event: statement, msgId: `rules:${statement.body.hash}`, ts: Date.now(),
+    }).catch(() => { /* fan is best-effort — catch-up reconciles */ }),
+  });
   const stoopAgent = await createBrowserStoopAgent({
     bus,
     identityVault: stoopIdentityVault,
@@ -2068,6 +2089,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     circleSignerFor: async (circleId) => ({ identity: await circleIdentityFor(circleId), ref: chatId.pubKey }),
     membershipEmit,
     membershipRead,
+    rulesUpdateEmit,
     // Bind chatAgent's pubKey as the local actor so real stoop
     // skills' `from` lookups resolve back to 'me' (admin role).
     localActor: chatId.pubKey,

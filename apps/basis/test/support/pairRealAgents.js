@@ -71,6 +71,7 @@ import { GRANTS_BROADCAST } from '../../src/v2/grantsRail.js';
 import { rosterBindingVerifier } from '../../src/v2/membershipRail.js';
 import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '../../src/v2/circleLogReceiver.js';
 import { makeGovernanceRail } from '../../src/v2/governanceAppWiring.js';
+import { applyRulesUpdates } from '../../src/v2/rulesUpdateLane.js';
 
 import {
   initialState as createGroupInitialState,
@@ -240,16 +241,22 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     // Wave C tail A — the REAL governance/report ingest handlers (the exact wiring the shells
     // use): a fanned vote/report lands in THIS node's EventLog, so a headless two-agent run can
     // assert cross-device replication over a genuine transport (not a simulated fan).
-    'circle-governance-broadcast': makeCircleGovernancePeerHandler({
-      eventLog: chatEventLog,
+    'circle-governance-broadcast': (() => {
       // Verify-before-land, exactly as the shells: the rail off THIS node's real per-circle signer +
       // the roster's circleAddress rows for foreign bindings.
       // The key↔ref binding source: the default roster-row lookup, or a test-supplied resolver. This
       // harness's LEGACY-group pairing records no circleAddress on its roster rows (the trail-recorded
       // binding for this path lands with the membership rider) — a repro that fans signed governance
       // supplies the binding explicitly rather than weakening the verify.
-      rail: makeGovernanceRail({ eventLog: chatEventLog, circleIdentityFor: agent.circleIdentityFor, myRef: '', callSkill, verifyBinding: verifyGovernanceBinding ?? undefined }),
-    }),
+      const govRail = makeGovernanceRail({ eventLog: chatEventLog, circleIdentityFor: agent.circleIdentityFor, myRef: '', callSkill, verifyBinding: verifyGovernanceBinding ?? undefined });
+      return makeCircleGovernancePeerHandler({
+        eventLog: chatEventLog,
+        rail: govRail,
+        // The rules-update rider's receive half, exactly as the shells: a landed statement may carry
+        // a new rules doc — fold it into this node's local rules head (cheap pre-scan; vote churn no-ops).
+        onChange: (cid) => { applyRulesUpdates({ rail: govRail, callSkill, circleId: cid }).catch(() => {}); },
+      });
+    })(),
     'circle-report-broadcast':     makeCircleReportPeerHandler({ eventLog: chatEventLog }),
     // The task lane's receive half — the same registration both shells make (`circleApp.js` /
     // `ChatScreen.js`), over the rail the factory built on this node's device log. Its ingest verifies

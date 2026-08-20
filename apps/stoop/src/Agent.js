@@ -224,6 +224,9 @@ export async function createNeighbourhoodAgent({
   // The membership rider (host-injected): the device-log emitter + verified reader — see skills/index.js.
   membershipEmit,
   membershipRead,
+  // The rules-update rider (host-injected): a rules edit also fans a signed governance-lane
+  // statement so the new doc reaches every member peer-to-peer — see skills/index.js.
+  rulesUpdateEmit,
   label = 'NeighbourhoodAgent',
 }) {
   if (!offeringMatchOpts?.group || !offeringMatchOpts?.localActor) {
@@ -603,6 +606,7 @@ export async function createNeighbourhoodAgent({
       circleSignerFor, // circle-scoped spine signing (principle 5) — absent → legacy global-identity signer
       membershipEmit,  // the membership rider's device-log emitter (absent → the store-based spine path)
       membershipRead,  // the rider's verified statement reader for the roster fold
+      rulesUpdateEmit, // the rules-update rider's governance-lane emitter (absent → store-local only)
       // The per-user address-fallback setting, when the host supplies one (absent → the skills'
       // own `true` default, unchanged).
       ...(allowAddressFallback === undefined ? {} : { allowAddressFallback }),

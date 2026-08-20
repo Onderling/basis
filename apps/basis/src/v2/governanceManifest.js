@@ -24,6 +24,10 @@ export const governanceManifest = Object.freeze({
     { id: 'governance.propose', description: 'Open a proposal (a governed action + subject) on the circle log.', appends: [{ lane: GOVERNANCE_LANE, kind: 'propose' }] },
     { id: 'governance.vote',    description: 'Cast a yes/no vote on an open proposal.',                          appends: [{ lane: GOVERNANCE_LANE, kind: 'vote' }] },
     { id: 'governance.resolve', description: 'Record a proposal\'s close (enacted, rejected, or cancelled).',    appends: [{ lane: GOVERNANCE_LANE, kind: 'resolve' }] },
+    // The rules-doc UPDATE rides the same lane (pod-free): the statement carries the new document +
+    // its monotonic version; receivers verify the author's ADMIN role before applying (the fold's
+    // propose/vote/resolve machinery ignores this kind — it is a carried fact, not a decision).
+    { id: 'governance.rulesUpdate', description: 'An admin replaces the circle\'s rules document (the new doc + version travel to every member peer-to-peer; receiver-verified admin authority).', appends: [{ lane: GOVERNANCE_LANE, kind: 'rules-update' }] },
   ],
 });
 

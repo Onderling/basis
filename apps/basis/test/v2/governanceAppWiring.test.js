@@ -69,8 +69,12 @@ describe('bindCircleGovernance — EventLog round-trip', () => {
     // full membership: admin0 + m0 + m1 + m2 (need 3 of 4 for a majority). m0's roster row carries his
     // circleAddress so his (equivocating) statements resolve their key↔ref binding on this device.
     const m0cid = await mkCid();
-    const callSkill = vi.fn(async (origin, op) => (op === 'listGroupRoster'
-      ? { members: [{ addr: 'm0', role: 'member', circleAddress: m0cid.pubKey }, { addr: 'm1', role: 'member' }, { addr: 'm2', role: 'member' }] }
+    // The rail's default binding is the DERIVED roster's set-aware verifier (listGroupMembers rows:
+    // webid + proven circleAddress/set) — the same shape both shells project; listGroupRoster stays
+    // the flat routing list the membership reader consumes.
+    const rosterRows = [{ addr: 'm0', webid: 'm0', role: 'member', circleAddress: m0cid.pubKey }, { addr: 'm1', webid: 'm1', role: 'member' }, { addr: 'm2', webid: 'm2', role: 'member' }];
+    const callSkill = vi.fn(async (origin, op) => (op === 'listGroupRoster' || op === 'listGroupMembers'
+      ? { members: rosterRows }
       : { ok: true }));
     let n = 0;
     const cid = await mkCid();

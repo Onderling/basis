@@ -171,6 +171,7 @@ import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals } from '.
 import { makeGovernanceCatchUp } from '../../src/v2/governanceCatchUp.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../src/v2/membershipRail.js';
 import { GRANTS_BROADCAST } from '../../src/v2/grantsRail.js';
+import { applyRulesUpdates } from '../../src/v2/rulesUpdateLane.js';
 import { makeTaskPeerHandler, TASK_BROADCAST, TASK_CATCHUP_SUBTYPES } from '../../src/v2/taskRail.js';
 import { makeFrontierReplay } from '../../src/v2/frontierReplay.js';
 import { makeChatPeerHandler, makePodChatCatchUp, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../src/v2/chatRail.js';
@@ -7343,10 +7344,17 @@ async function boot() {
       } catch { govShellRail = null; }
       // The offline-device half of the reliable tier: on reconnect, pull every circle's governance
       // statements from its reachable members; each passes the rail's full ingest gate.
+      // Any governance change (live fan below, or a catch-up batch here) may carry a rules-update
+      // statement — fold it into the local rules head, then re-render. Fire-and-forget: the apply
+      // pre-scans the lane cheaply and no-ops when nothing rules-shaped landed.
+      const govChanged = (cid) => {
+        applyRulesUpdates({ rail: govShellRail, callSkill: rawCallSkill, circleId: cid }).catch(() => {});
+        if (getActiveCircle() === cid) _govRerender?.();
+      };
       govCatchUpShell = govShellRail ? makeGovernanceCatchUp({
         rail: govShellRail,
         sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
-        onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); },
+        onChange: govChanged,
       }) : null;
       // The membership lane's catch-up: the same lane-parametrized mechanism over the agent's rail.
       memCatchUpShell = agent.membershipRail ? makeGovernanceCatchUp({
@@ -7573,7 +7581,12 @@ async function boot() {
             [taskCatchUpShell.subtypes.batch]:   taskCatchUpShell.onBatch,
             [taskCatchUpShell.subtypes.offer]:   taskCatchUpShell.onOffer,
           } : {}),
-          'circle-governance-broadcast': makeCircleGovernancePeerHandler({ eventLog, rail: govShellRail, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); }, notify: govNotify }),
+          'circle-governance-broadcast': makeCircleGovernancePeerHandler({ eventLog, rail: govShellRail, onChange: (cid) => {
+            // A landed statement may be a rules-update — fold it into the local rules head (cheap
+            // pre-scan; no-op for vote churn), then re-render.
+            applyRulesUpdates({ rail: govShellRail, callSkill: rawCallSkill, circleId: cid }).catch(() => {});
+            if (getActiveCircle() === cid) _govRerender?.();
+          }, notify: govNotify }),
           'circle-report-broadcast':     makeCircleReportPeerHandler({ eventLog, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); } }),
           // Calendar INBOUND — receive what the fan-out sends. invite persists
           // the event locally (→ shows on the calendar surface) + a circle

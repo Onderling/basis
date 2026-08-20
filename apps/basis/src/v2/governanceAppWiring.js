@@ -12,6 +12,7 @@ import { GOVERNANCE_KIND, foldGovernance } from './governanceLog.js';
 import { makeCircleEntryRail } from './circleEntryRail.js';
 import { entryKindRegistryFromManifests } from '@onderling/item-store';
 import { governanceManifest, GOVERNANCE_LANE } from './governanceManifest.js';
+import { rosterBindingVerifier } from './membershipRail.js';
 
 /** The statement kinds the governance lane carries — DERIVED from the manifest's declared `appends` rows
  *  (the declared route: the manifest is the source; the rail enforces it at append AND ingest). They are the
@@ -27,19 +28,19 @@ export const GOVERNANCE_RAIL_KINDS = entryKindRegistryFromManifests(governanceMa
  */
 export function makeGovernanceRail({ eventLog, circleIdentityFor, myRef, callSkill, verifyBinding = null }) {
   if (typeof circleIdentityFor !== 'function') return null;
-  const defaultVerifyBinding = async ({ author, ref, circleId }) => {
-    try {
-      const r = await callSkill('stoop', 'listGroupRoster', { groupId: circleId });
-      return (Array.isArray(r?.members) ? r.members : []).some((m) =>
-        m && m.circleAddress === author && (m.addr ?? m.webid ?? m.ref) === ref);
-    } catch { return false; }
-  };
+  // The default binding is the SAME set-aware verifier the membership rail uses (the derived
+  // roster's proven circleAddress SET, add-a-device aware). The old inline default read
+  // `listGroupRoster` — whose rows are flat `{addr, role}` and carry NO circleAddress — so it
+  // could never match a foreign author: every fanned statement from another member was silently
+  // refused as "unverifiable key-ref binding" wherever a composition relied on the default
+  // (found 2026-08-20 while putting rules-updates on this lane; the harness had been supplying
+  // the binding explicitly, which is why node repros passed).
   return makeCircleEntryRail({
     eventLog,
     signerFor: async (circleId) => ({ identity: await circleIdentityFor(circleId), ref: myRef }),
     entryKind: GOVERNANCE_KIND,
     declaredKinds: GOVERNANCE_RAIL_KINDS,
-    verifyBinding: verifyBinding ?? defaultVerifyBinding,
+    verifyBinding: verifyBinding ?? rosterBindingVerifier(callSkill),
   });
 }
 import { makeCircleReports } from './reportHost.js';

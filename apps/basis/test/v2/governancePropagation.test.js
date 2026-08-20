@@ -40,7 +40,7 @@ async function mesh(refs = ['admin0', 'm0', 'm1']) {
   let n = 0;
   for (const ref of refs) {
     const log = new EventLog({ initial: [] });
-    const callSkill = vi.fn(async (o, op) => (op === 'listGroupRoster' ? rosterExcluding(ref) : { ok: true }));
+    const callSkill = vi.fn(async (o, op) => ((op === 'listGroupRoster' || op === 'listGroupMembers') ? rosterExcluding(ref) : { ok: true }));
     const rail = makeGovernanceRail({ eventLog: log, circleIdentityFor: async () => cids[ref], myRef: ref, callSkill });
     devices[ref] = { ref, log, rail, callSkill };
     devices[ref].ingest = makeCircleGovernancePeerHandler({ eventLog: log, rail });

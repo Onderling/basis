@@ -212,10 +212,10 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
       if (!declaredKinds.includes(b.kind)) continue;
       const ref = b.payload?.authorRef;
       if (typeof ref !== 'string' || !ref) continue;
-      // `kind` is deliberately NOT passed here (unlike ingest): the body-shaped read predates the
-      // kind-aware verifiers, and passing it would retroactively apply membership's ceremony rule to
-      // interim-rule statements already landed — un-doing a legitimate address-revoke on re-read.
-      if (!(await bindingOk(b.author, ref, circleId, null, b.payload))) continue;
+      // The read side verifies with the SAME kind-aware rule as ingest (decided 2026-08-20): what
+      // the fold consumes must pass the gate the wire passed — a statement whose kind demands a
+      // stricter signer (membership's ceremony rule) is held to it on every re-read too.
+      if (!(await bindingOk(b.author, ref, circleId, b.kind, b.payload))) continue;
       const forkKey = `${b.author}|${b.parentHash ?? ''}`;
       const set = seenByAuthorParent.get(forkKey) ?? new Set();
       set.add(b.hash);

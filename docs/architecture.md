@@ -945,9 +945,23 @@ it works on two separate rails that are deliberately not one:
   sealed to its key, containing only the sections the owner granted. What crosses the network is a
   **contentless nudge** carrying a lane id and nothing else.
 
-The gate is where it binds: revoking a connection is the owner's act on their own device, the registry is
-durable, and the door refuses while that registry is still loading rather than guessing. What the view
-already read, it read — the honest semantics of stopping a subscription, not of erasing the past.
+The gate is where it binds: revoking a connection is the owner's act, the door refuses while its grant
+state is still loading rather than guessing, and telling the view to drop is a convenience — never the
+gate. What the view already read, it read — the honest semantics of stopping a subscription, not of
+erasing the past.
+
+**A connection belongs to the person, not to the device that paired it** (decided 2026-08-19). Grants
+and revocations are entries on the device log's **grants lane** — the active-grant set is a projection
+folded from those entries (never a separate store), which makes revocation survive a restart by
+construction and makes restore carry it for free. A person's own devices exchange the grants lane the
+way circle peers exchange circle lanes, so a revoke made on the phone reaches the laptop's door live —
+"unpairing the kitchen tablet on your phone must not leave your laptop still admitting it." The trust
+base for that exchange is the add-a-device enrollment: a grant or revoke statement counts only when
+signed by one of the owner's enrolled, unrevoked devices, and on any ordering conflict **revoke wins**.
+*Status, honestly:* the model above is the decided design; the running code still holds grants in a
+per-device persisted registry (revocation survives restart, but does not yet travel between the
+owner's devices). The cutover is the V1 closing wave's first build; until it lands, treat this
+paragraph as the contract the code is being brought to — not as a description of today's runtime.
 
 ### The Connectivity home
 

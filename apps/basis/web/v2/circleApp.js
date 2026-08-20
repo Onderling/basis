@@ -5723,6 +5723,12 @@ function showCircle(id, circle, policy) {
       // G16 — the MEMBERS tab's trail-roster + the viewer's own webid (badges "jij").
       // The view only reads these when the members tab is active.
       members: circleRoster,
+      // Stale-rules banner: re-accept the circle's CURRENT rules version (the member's own signed
+      // rules-accept on the membership spine), then reload the roster so the line updates.
+      onAcceptRules: async () => {
+        try { await rawCallSkill('stoop', 'acceptGroupRules', { groupId: id }); } catch { /* voluntary — banner stays */ }
+        loadRoster();
+      },
       // the circle's realName rule — the members list gates each label with it (never renders raw realName)
       revealPolicy: policy?.revealPolicy ?? 'pairwise',
       selfWebid: myWebid || null,

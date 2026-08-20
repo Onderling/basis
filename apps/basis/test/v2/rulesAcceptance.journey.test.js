@@ -8,7 +8,8 @@
  * never a harness default — the router-default version broke the stolen-device walk's equilibrium).
  */
 import { describe, it, expect, afterAll } from 'vitest';
-import { bootRealAgentNode, connectNodesOverBus, createCircle, joinExistingCircle, until, teardown } from '../support/pairRealAgents.js';
+import { bootRealAgentNode, connectNodesOverBus, createCircle, joinExistingCircle, bindCircleAddresses, until, teardown } from '../support/pairRealAgents.js';
+import { bindCircleAddressKeysFor } from '../../src/v2/householdRosterPairing.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST } from '../../src/v2/membershipRail.js';
 import { joinCircleFromInvite, buildCircleInviteUri } from '../../src/v2/circleInvite.js';
 
@@ -46,8 +47,12 @@ describe('rules acceptance — J-RA1 + J-RA2 over the production join path', () 
     // B joins THROUGH THE WIZARD CHAIN with the rules ticked (rulesAccepted: true → 'v'1 on the statement).
     const okJoin = await joinExistingCircle(A, B, { groupId: C, handle: 'bee' });
     expect(okJoin.joined?.ok, JSON.stringify(okJoin.joined)).toBe(true);
+    // The post-join binds the shells do (and pairCircle does): listen on the per-circle addresses +
+    // bind every member's circleAddress → pubKey. Without them the membership fan sends into the void.
+    await bindCircleAddresses([A, B], C);
+    await Promise.all([A, B].map((n) => bindCircleAddressKeysFor({ agent: n.agent, circleId: C })));
 
-    // X joins through the SAME production path but never accepts — the modified client (J-RA2).
+    // X joins through the SAME production path but never accepts — the modified client.
     const invite = await buildCircleInviteUri({
       callSkill: (app, op, args) => A.agent.callSkill(app, op, args), circleId: C, adminPeerAddr: A.pubKey,
     });
@@ -63,13 +68,19 @@ describe('rules acceptance — J-RA1 + J-RA2 over the production join path', () 
 
     const onA = await members(A);
     const onB = await members(B);
-    console.log('DIAG A roster:', onA.map((m) => `${(m.webid ?? '').slice(0, 8)} rules=${m.rulesAccepted ?? '-'}`));
-    console.log('DIAG B roster:', onB.map((m) => `${(m.webid ?? '').slice(0, 8)} rules=${m.rulesAccepted ?? '-'}`));
 
     // Acceptance-on-record — B's acceptance is visible ON A's device, read from the fold's projection.
     const bOnA = rowOf(onA, B.pubKey);
     expect(bOnA, 'B is on A\'s roster').toBeTruthy();
     expect(bOnA.rulesAccepted, 'B\'s accepted version projects to A').toBe('1');
+
+    // …and it survives the FULL display chain: the row the shells actually paint (normalizeCircleMembers
+    // → the canonical Member's computed `rules`) says "accepted v1, current v1, not stale". This is the
+    // member-card line, asserted through the same projection both shells consume.
+    const { normalizeCircleMembers } = await import('@onderling/kring-host/circleMembers');
+    const painted = normalizeCircleMembers({ members: onA });
+    const bPainted = painted.find((m) => m.id === B.pubKey);
+    expect(bPainted?.rules, 'the member-card rules line on A').toEqual({ accepted: '1', current: '1', stale: false });
 
     // The modified client joins NOWHERE. Walking this journey forced a design addition: the
     // fold gate alone was toothless, because the post-join address announce seeds a roster row on
@@ -80,6 +91,41 @@ describe('rules acceptance — J-RA1 + J-RA2 over the production join path', () 
     expect(rowOf(onA, X.pubKey), 'X must not exist on the admitting device either').toBeNull();
     expect(rowOf(onB, X.pubKey), 'X must not fold on any other device').toBeNull();
   }, 90000);
+
+  it('a rules change makes acceptance STALE (visible, never a lockout) · re-accept supersedes, everywhere', async () => {
+    // A (admin) raises the rules to v2. The rules DOC travels by store/pod sync, not the peer fan —
+    // so each assertion below is scoped to what that device can honestly know.
+    const cur = (await A.agent.callSkill('stoop', 'getGroupRules', { groupId: C }))?.rules ?? {};
+    const edited = await A.agent.callSkill('stoop', 'editGroupRules', {
+      groupId: C, rules: { ...cur, agreements: 'be kind, now with feeling', version: 1 },
+    });
+    expect(edited.version).toBe(2);
+
+    // On A: B's acceptance is now STALE — visible ("accepted v1, current v2") and still folded:
+    // staleness is information, membership is untouched.
+    const { normalizeCircleMembers } = await import('@onderling/kring-host/circleMembers');
+    const onA2 = normalizeCircleMembers({ members: await members(A) });
+    const bStale = onA2.find((m) => m.id === B.pubKey);
+    expect(bStale, 'B still a member after the rules change').toBeTruthy();
+    expect(bStale.rules).toEqual({ accepted: '1', current: '2', stale: true });
+
+    // A (a founder — never carried a join acceptance) re-accepts the current version through the OP.
+    // The statement is A's own signed `rules-accept` on the membership spine; the fan carries it.
+    const accepted = await A.agent.callSkill('stoop', 'acceptGroupRules', { groupId: C });
+    expect(accepted.acceptanceId, 'the V1 audit item (the onboarding contract)').toBeTruthy();
+    expect(accepted.rulesAccepted, 'the spine half emitted').toBe('2');
+
+    await new Promise((r) => setTimeout(r, 600));   // let the fan land
+
+    // The re-acceptance projects on A's own roster…
+    const aOnA = rowOf(await members(A), A.pubKey);
+    expect(aOnA?.rulesAccepted, 'A\'s re-acceptance on A').toBe('2');
+    // …and on B's device too: B's fold applied the fanned statement. (B's own current-version is
+    // still v1 there — the doc hasn't synced — so the row reads accepted '2' against current '1';
+    // the acceptance FACT is device-independent even while the doc lags.)
+    const aOnB = rowOf(await members(B), A.pubKey);
+    expect(aOnB?.rulesAccepted, 'A\'s re-acceptance folded on B').toBe('2');
+  }, 60000);
 });
 
 describe('the human-rules field list — one agreement, two homes', () => {

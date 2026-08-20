@@ -384,6 +384,17 @@
 .circle-view__member:hover { background: var(--paper-2); }
 .circle-view__member-primary { font-weight: 600; }
 .circle-view__member-secondary { color: var(--ink-soft); font-size: 13px; }
+.circle-view__member-rules { color: var(--ink-soft); font-size: 12px; }
+.circle-view__member-rules--stale { color: var(--accent-ink); }
+.circle-view__rules-banner {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 12px; border-bottom: 1px solid var(--line);
+  color: var(--ink-soft); font-size: 13px;
+}
+.circle-view__rules-banner-accept {
+  border: 1px solid var(--accent-ink); background: none; color: var(--accent-ink);
+  border-radius: 999px; padding: 4px 12px; cursor: pointer; font: inherit; font-size: 13px;
+}
 .circle-view__member-you {
   margin-left: auto; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
   padding: 2px 8px; border-radius: 999px; background: var(--paper-2); color: var(--ink-soft);

@@ -839,6 +839,18 @@ export const stoopManifest = {
         chat:  { reply: 'record', hint: 'show your circle\'s rules' },
       },
     },
+    {
+      // Re-accept the circle's current rules version after a rules change (the member's own signed
+      // `rules-accept` on the membership spine). Voluntary: an older acceptance stays valid, visibly
+      // stale — the shells offer this from the stale-rules banner, so no slash surface is invented.
+      id:   'acceptGroupRules', verb: 'add',
+      // A member's acceptance is SELF-ONLY (the fold ignores anyone else's statement about them) and
+      // versions are monotonic, so two of their own devices converge on the causally-later acceptance —
+      // content, not a claim: nobody races for exclusive ownership of someone's own consent.
+      resolves: [{ field: 'rulesAccepted', policy: 'content' }],
+      params: [{ name: 'groupId', kind: 'string', required: true }],
+      surfaces: { chat: { hint: 'Accept the circle\'s current rules version.' }, ui: { control: 'button' } },
+    },
 
     // ── What you offer ──────────────────────────────────────────────
     // Declared 2026-08-19. These have had handlers all along and the shells have been calling them;

@@ -487,3 +487,38 @@ export async function removeMember({
   }
   return { removalId: item.id, revoked, policy };
 }
+
+/**
+ * acceptGroupRules(deps, {a, from})
+ *   — RE-ACCEPTANCE after a rules change: the calling member signs that they stand on the circle's
+ *   CURRENT rules version. Emits a `rules-accept` statement on the membership spine (self-subject:
+ *   the fold ignores any authored for someone else) which supersedes the version on their signed
+ *   join. Always the member's own act — an older acceptance is stale-but-valid, so nothing here is
+ *   an obligation, and there is nothing to accept in a circle without HUMAN rules.
+ *
+ * @returns {Promise<object>} `{ok, rulesAccepted}` or `{error}`.
+ */
+export async function acceptGroupRules({ store, emitSpine }, { a, from } = {}) {
+  if (typeof a?.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
+  if (typeof from !== 'string' || !from) return { error: 'not-authenticated' };
+  let latest = null;
+  try {
+    const rules = await store.listOpen({ type: 'group-rules' });
+    for (const it of rules ?? []) {
+      if (it?.source?.groupId !== a.groupId) continue;
+      if (typeof it?.source?.rules !== 'object' || !it.source.rules) continue;
+      if (!latest || (it.addedAt ?? 0) > (latest.addedAt ?? 0)
+        || ((it.addedAt ?? 0) === (latest.addedAt ?? 0) && it.id > latest.id)) latest = it;
+    }
+  } catch { latest = null; }
+  if (!latest || !hasHumanRules(latest.source?.rules)) return { error: 'no-rules-to-accept' };
+  const current = Number.parseInt(latest.source?.version ?? latest.source?.rules?.version ?? 1, 10);
+  const version = String(Number.isFinite(current) && current >= 1 ? current : 1);
+  if (typeof emitSpine !== 'function') return { error: 'no-membership-rail' };
+  const stmt = await emitSpine({
+    kind: 'rules-accept', circleId: a.groupId, subject: from, actor: from,
+    payload: { rulesAccepted: version },
+  });
+  if (!stmt) return { error: 'no-membership-rail' };
+  return { ok: true, rulesAccepted: version };
+}

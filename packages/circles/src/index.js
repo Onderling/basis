@@ -55,6 +55,6 @@ export { createGroupWithRules, createGroupV2, redeemInviteWithGate } from './cir
 // `revokeKey` hook, so circles never holds the key custodian (`controlAgent`). Stoop binds the hook to
 // `grant/revokePodAccess`.
 export {
-  redeemMembershipCode, verifyMembershipCodeForPeer, leaveGroup, removeMember,
+  redeemMembershipCode, verifyMembershipCodeForPeer, leaveGroup, removeMember, acceptGroupRules,
 } from './circleMembershipWriters.js';
 export { hasHumanRules } from './circleRulesDoc.js';

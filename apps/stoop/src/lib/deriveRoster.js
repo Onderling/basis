@@ -212,19 +212,21 @@ export function deriveRoster({
   if (Array.isArray(spineStatements) && spineStatements.length > 0) {
     const seedMembers = [...roster.keys()];
     const seedAdmins  = [...roster.values()].filter((r) => r.role === 'admin').map((r) => r.webid);
-    // RULES-GATED JOINS (task #80, sitting-A decision) — only on the AUTHORITATIVE path (the rail's
-    // verified statements are where the fold ADMITS; the legacy overlay never admits, so it has nothing
-    // to gate). A circle with a rules doc requires a join statement to carry an accepted version; the
-    // valid set is {1..current} because versions are monotonic integers — acceptance of a then-current
-    // version stays valid forever (a rules change makes it STALE, visibly, never a removal). KNOWN
-    // CUTOVER TAIL, stated plainly: the trail (redemption rows) still SEEDS the roster, and seed members
-    // are not gated — so this binds the SPINE propagation path (catch-up joiners, other devices) while a
-    // directly-redeemed trail row still lands locally. The writer-side refusal that would close that
-    // half is a design point for the slice-(a+b) review, not smuggled in here.
+    // RULES-GATED JOINS (the rules-acceptance decision, 2026-08-20) — only on the AUTHORITATIVE path
+    // (the rail's verified statements are where the fold ADMITS; the legacy overlay never admits, so it
+    // has nothing to gate). A circle with HUMAN rules requires a join statement to carry an accepted
+    // version; the valid set is {1..current} because versions are monotonic integers — acceptance of a
+    // then-current version stays valid forever (a rules change makes it STALE, visibly, never a
+    // removal). The trail (redemption rows) still SEEDS the roster and seed members are not gated —
+    // that half is closed at the ADMITTING device instead: the membership writers refuse a redeem
+    // without acceptance (`rules-acceptance-required`) before any trail row exists, so nothing
+    // acceptance-less reaches the seed. Two layers, reviewed and kept.
     let rulesGate = null;
+    let rulesTop = null;
     if (foldAuthoritative && hasHumanRules(rules)) {
       const current = Number.parseInt(rulesVersion ?? rules.version ?? 1, 10);
       const top = Number.isFinite(current) && current >= 1 ? current : 1;
+      rulesTop = String(top);
       const versions = [];
       for (let v = 1; v <= top; v++) versions.push(String(v));
       rulesGate = { versions };
@@ -251,13 +253,16 @@ export function deriveRoster({
         else if (inAdmins.has(webid)) roster.get(webid).role = 'admin';
       }
     }
-    // Rules acceptance (task #80): the fold projects each member's latest accepted rules version (from
-    // the signed join, superseded by rules-accept statements). Riding the roster row puts it on
+    // Rules acceptance: the fold projects each member's latest accepted rules version (from the
+    // signed join, superseded by rules-accept statements). Riding the roster row puts it on
     // `listGroupMembers`, which is what the member card reads — "accepted v1, current v2" is this field
-    // against the circle's current rules version. Visibility only; the GATE is the fold's `rulesGate`
-    // option, wired when the circle's policy declares rules-gated joins.
+    // against the circle's CURRENT version, stamped alongside it so the display state is computable
+    // from the row alone. Visibility only; the GATE is the fold's `rulesGate` option above.
     for (const [webid, v] of Object.entries(folded.rulesAccepted ?? {})) {
       if (roster.has(webid)) roster.get(webid).rulesAccepted = v;
+    }
+    if (rulesTop != null) {
+      for (const rec of roster.values()) rec.rulesCurrentVersion = rulesTop;
     }
   }
 

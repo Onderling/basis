@@ -343,6 +343,22 @@
     "you": {
       "text": "You",
       "doc": "MEMBERS tab — badge on the viewer's own row."
+    },
+    "rules_ok": {
+      "text": "rules v{{version}} ✓",
+      "doc": "MEMBERS tab — the member accepted the circle's current rules version (their signed join / re-accept)."
+    },
+    "rules_stale": {
+      "text": "accepted v{{accepted}}, current v{{current}}",
+      "doc": "MEMBERS tab — the member accepted an older rules version than the circle's current one. Stale-but-valid, visible, never a lockout: re-acceptance is theirs to give."
+    },
+    "rules_banner": {
+      "text": "The circle's agreements changed: you accepted v{{accepted}}, the current version is v{{current}}.",
+      "doc": "MEMBERS tab banner on the viewer's OWN stale acceptance. Informative + voluntary — staleness never locks anyone out."
+    },
+    "rules_banner_accept": {
+      "text": "Accept current agreements",
+      "doc": "The banner's button → acceptGroupRules (the member's own signed rules-accept statement)."
     }
   },
   "tile_unread": {
@@ -5030,6 +5046,10 @@
     "invalid_handle": {
       "handle-taken": "That name is already taken in this circle. Pick another.",
       "handle-taken_hint": "If you restored this device, the circle may still hold your previous name — pick a new one, or ask an admin to remove the old entry."
+    },
+    "rules_acceptance_required": {
+      "text": "This circle asks you to accept its agreements before joining.",
+      "doc": "The admitting device refused the join because no accepted rules version rode the request (`rules-acceptance-required`). The wizard's consent step is the fix; a programmatic join must pass rulesAccepted."
     }
   },
   "firstRun": {

@@ -25,6 +25,11 @@ export const membershipManifest = Object.freeze({
     // addresses is retired. Self-subject at the fold — the statement acts only on the author's own
     // row — and deny-wins: a revoked address never re-enters the set, whatever announces later.
     { id: 'membership.addressRevoke', description: "A member revokes one of their OWN device addresses (self-subject; deny-wins — the revoked address never re-enters the row's set).", appends: [{ lane: MEMBERSHIP_LANE, kind: 'address-revoke' }] },
+    // Re-acceptance after a rules change: a member signs that they stand on the circle's CURRENT rules
+    // version. Self-subject at the fold (nobody accepts on another's behalf); an older acceptance is
+    // stale-but-valid, so this statement is always the member's own act, never an obligation the fold
+    // enforces — rule churn must not become invisible exclusion.
+    { id: 'membership.rulesAccept', description: "A member re-accepts the circle's current rules version (self-subject; supersedes the version on their signed join).", appends: [{ lane: MEMBERSHIP_LANE, kind: 'rules-accept' }] },
   ],
 });
 

@@ -161,6 +161,10 @@ export function renderCircleView(container, {
   selfWebid = null,
   revealPolicy = 'pairwise',   // the circle's realName reveal rule; gates the member labels
   onMemberTap = null,
+  // Stale-rules banner: when the viewer's OWN row accepted an older rules version than the
+  // circle's current one, the members tab opens with a re-accept affordance. The host wires
+  // this to the acceptGroupRules op; absent → the banner still informs, without a button.
+  onAcceptRules = null,
   // media — the sealed media path (live wiring). Both optional; without them the
   // composer + bubbles render exactly as before.
   //   `onAttachMedia(file)`  host runs the picked image through createMediaEmbed (sealed
@@ -327,7 +331,7 @@ export function renderCircleView(container, {
     });
   } else if (effectiveTab === 'members') {
     // G16 — the real member roster (trail-derived), one tappable row per member.
-    renderLedenTab(body, { members, selfWebid, revealPolicy, tr, onMemberTap });
+    renderLedenTab(body, { members, selfWebid, revealPolicy, tr, onMemberTap, onAcceptRules });
   } else if (effectiveTab !== 'conversation') {
     const placeholder = document.createElement('div');
     placeholder.className = 'circle-view__placeholder';
@@ -667,7 +671,7 @@ function renderTakenTab(body, { tasks = [], tr, onAction, onAddTask, viewerWebid
  *
  * `members === null` → loading; `[]` → empty; otherwise the rows.
  */
-function renderLedenTab(body, { members = null, selfWebid = null, revealPolicy = 'pairwise', tr, onMemberTap } = {}) {
+function renderLedenTab(body, { members = null, selfWebid = null, revealPolicy = 'pairwise', tr, onMemberTap, onAcceptRules = null } = {}) {
   const wrap = document.createElement('div');
   wrap.className = 'circle-view__members';
 
@@ -686,6 +690,28 @@ function renderLedenTab(body, { members = null, selfWebid = null, revealPolicy =
     wrap.appendChild(empty);
     body.appendChild(wrap);
     return;
+  }
+
+  // Stale-rules banner — YOUR acceptance is older than the circle's current rules version.
+  // Informative + voluntary (stale is valid; the fold never locks anyone out): one line, one button.
+  const selfRow = selfWebid != null ? members.find((m) => m.id === selfWebid) : null;
+  if (selfRow?.rules?.stale) {
+    const banner = document.createElement('div');
+    banner.className = 'circle-view__rules-banner';
+    const msg = document.createElement('span');
+    msg.textContent = tr('circle.members_tab.rules_banner', {
+      accepted: selfRow.rules.accepted, current: selfRow.rules.current,
+    });
+    banner.appendChild(msg);
+    if (typeof onAcceptRules === 'function') {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'circle-view__rules-banner-accept';
+      btn.textContent = tr('circle.members_tab.rules_banner_accept');
+      btn.addEventListener('click', () => onAcceptRules());
+      banner.appendChild(btn);
+    }
+    wrap.appendChild(banner);
   }
 
   for (const m of members) {
@@ -710,6 +736,18 @@ function renderLedenTab(body, { members = null, selfWebid = null, revealPolicy =
       secondary.className = 'circle-view__member-secondary';
       secondary.textContent = label.secondary;
       row.appendChild(secondary);
+    }
+
+    // Rules acceptance — which rules version this member's signed join/re-accept carries, against
+    // the circle's current one. Computed in shared code (`memberRulesStatus` rides the normalised
+    // member as `m.rules`); stale is visible-but-valid, never a lockout. Pure paint here.
+    if (m.rules) {
+      const rules = document.createElement('span');
+      rules.className = `circle-view__member-rules${m.rules.stale ? ' circle-view__member-rules--stale' : ''}`;
+      rules.textContent = m.rules.stale
+        ? tr('circle.members_tab.rules_stale', { accepted: m.rules.accepted, current: m.rules.current })
+        : tr('circle.members_tab.rules_ok', { version: m.rules.accepted });
+      row.appendChild(rules);
     }
 
     if (self) {

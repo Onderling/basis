@@ -88,7 +88,33 @@ export function memberFrom(entry) {
       ? m.personaProperties : null,
   };
   if (m.circleAddress != null) out.circleAddress = m.circleAddress;
+  // Rules acceptance (visibility): which rules version this member accepted (their signed join /
+  // re-accept, folded) and the circle's CURRENT version, both stamped by `deriveRoster` on gated
+  // circles only. Carried so `memberRulesStatus` can compute the display state from the Member alone.
+  if (m.rulesAccepted != null) out.rulesAccepted = String(m.rulesAccepted);
+  if (m.rulesCurrentVersion != null) out.rulesCurrentVersion = String(m.rulesCurrentVersion);
   return out;
+}
+
+/**
+ * `memberRulesStatus` — the ONE compute for the member-card "rules" line (web ≡ mobile paint it,
+ * neither computes it). Returns `null` when there is nothing to show: an ungated circle, or a row
+ * with no recorded acceptance (founders and pre-gate members never accepted — silence, not blame).
+ * Otherwise `{ accepted, current, stale }`: `stale` iff the circle's current version is known and
+ * newer than the accepted one — "accepted v1, current v2", visible and valid, never a lockout.
+ *
+ * @param {Member|object} member
+ * @returns {{ accepted: string, current: string|null, stale: boolean }|null}
+ */
+export function memberRulesStatus(member) {
+  const m = member && typeof member === 'object' ? member : {};
+  const accepted = m.rulesAccepted != null ? String(m.rulesAccepted) : null;
+  if (!accepted) return null;
+  const current = m.rulesCurrentVersion != null ? String(m.rulesCurrentVersion) : null;
+  const a = Number.parseInt(accepted, 10);
+  const c = current != null ? Number.parseInt(current, 10) : NaN;
+  const stale = Number.isFinite(a) && Number.isFinite(c) && a < c;
+  return { accepted, current, stale };
 }
 
 /**
@@ -140,6 +166,10 @@ export function memberToViewAs(member) {
     // Carried for the sender-label index (an actor that never resolved past its transport address
     // still matches its roster row); display never reads it.
     ...(m.circleAddress != null ? { circleAddress: m.circleAddress } : {}),
+    // The member-card "rules" line, computed HERE (shells only paint) — see memberRulesStatus.
+    // ADDITIVE: the key exists only when there is something to show, so rows from ungated circles
+    // (and every pre-acceptance consumer's expected shape) stay byte-identical.
+    ...((() => { const r = memberRulesStatus(m); return r ? { rules: r } : {}; })()),
   };
 }
 

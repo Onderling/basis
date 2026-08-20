@@ -82,6 +82,7 @@ import {
   redeemMembershipCode as redeemMembershipCodeCore,
   verifyMembershipCodeForPeer as verifyMembershipCodeForPeerCore,
   leaveGroup as leaveGroupCore,
+  acceptGroupRules as acceptGroupRulesCore,
   removeMember as removeMemberCore,
 } from '@onderling/circles';
 import { validateStoopItem, intentToCanonicalDraft } from '../lib/canonicalAdapter.js';
@@ -988,8 +989,8 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
     // legacy store path keeps the pre-rider semantics until stoop dissolves.
     foldAuthoritative: typeof membershipRead === 'function',
     rules: latestRulesItem?.source?.rules ?? null,
-    // task #80 — the CURRENT rules version (monotonic integer: createGroupV2 starts at 1,
-    // updateGroupRules increments). The fold's rules gate derives its valid set {1..current} from it.
+    // The CURRENT rules version (monotonic integer: createGroupV2 starts at 1, updateGroupRules
+    // increments). The fold's rules gate derives its valid set {1..current} from it.
     rulesVersion: latestRulesItem?.source?.version ?? latestRulesItem?.source?.rules?.version ?? null,
     // A removal/leave recorded for THIS circle drops the member from THIS circle only. The
     // trail is already circle-scoped, so nothing here can reach a circle you also share with them.
@@ -3147,8 +3148,13 @@ export function buildSkills({
 
     /**
      * acceptGroupRules({groupId})
-     *   — record that the calling actor read + accepted the rules
-     *   (audit trail item, kind: 'rules-accept').
+     *   — the calling actor read + accepted the circle's CURRENT rules. TWO records of the one act:
+     *   the V1 audit item (kind: 'rules-accept', what getOnboardingState reads) as always, PLUS —
+     *   when the circle currently has HUMAN rules and the membership rail is wired — the member's own
+     *   signed `rules-accept` statement on the membership spine, which supersedes the version on their
+     *   signed join on EVERY device (the re-accept half of the rules-acceptance decision, 2026-08-20).
+     *   The spine half is best-effort by the legacy contract: no rules doc / no rail still returns the
+     *   audit id; `rulesAccepted` rides the result only when the statement was emitted.
      */
     defineSkill('acceptGroupRules', async ({ parts, from }) => {
       const a = dataArgs(parts);
@@ -3162,9 +3168,14 @@ export function buildSkills({
         }],
         { actor: from },
       );
-      return { acceptanceId: item.id, _sync: simulateSync() };
+      const spine = await acceptGroupRulesCore({ store, emitSpine }, { a, from });
+      return {
+        acceptanceId: item.id,
+        ...(spine?.ok ? { rulesAccepted: spine.rulesAccepted } : {}),
+        _sync: simulateSync(),
+      };
     }, {
-      description: 'Record acceptance of a group\'s rules (audit).',
+      description: 'Accept the circle\'s current rules: the V1 audit item + (when rules-gated) the member\'s signed rules-accept on the membership spine.',
       visibility:  'authenticated',
     }),
 

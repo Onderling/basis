@@ -343,6 +343,22 @@
     "you": {
       "text": "Jij",
       "doc": "MEMBERS tab — badge on the viewer's own row."
+    },
+    "rules_ok": {
+      "text": "afspraken v{{version}} ✓",
+      "doc": "MEMBERS tab — the member accepted the circle's current rules version (their signed join / re-accept)."
+    },
+    "rules_stale": {
+      "text": "akkoord met v{{accepted}}, huidig v{{current}}",
+      "doc": "MEMBERS tab — the member accepted an older rules version than the circle's current one. Stale-but-valid, visible, never a lockout: re-acceptance is theirs to give."
+    },
+    "rules_banner": {
+      "text": "De afspraken van deze kring zijn veranderd: jij ging akkoord met v{{accepted}}, de huidige versie is v{{current}}.",
+      "doc": "MEMBERS tab banner on the viewer's OWN stale acceptance. Informative + voluntary — staleness never locks anyone out."
+    },
+    "rules_banner_accept": {
+      "text": "Akkoord met huidige afspraken",
+      "doc": "The banner's button → acceptGroupRules (the member's own signed rules-accept statement)."
     }
   },
   "tile_unread": {
@@ -5030,6 +5046,10 @@
     "invalid_handle": {
       "handle-taken": "Die naam is al bezet in deze kring. Kies een andere.",
       "handle-taken_hint": "Als je dit apparaat hersteld hebt, houdt de kring je vorige naam misschien nog vast — kies een nieuwe, of vraag een beheerder de oude te verwijderen."
+    },
+    "rules_acceptance_required": {
+      "text": "Deze kring vraagt je eerst akkoord te gaan met de afspraken voordat je lid wordt.",
+      "doc": "The admitting device refused the join because no accepted rules version rode the request (`rules-acceptance-required`). The wizard's consent step is the fix; a programmatic join must pass rulesAccepted."
     }
   },
   "firstRun": {

@@ -768,6 +768,14 @@ export async function finalSubmit({
       // again later. The state keeps the decoded invite, so retrying is the same wizard, same step.
       state.submitErrorKey = 'circle.nearbyScreen.join_no_admin';
       state.submitErrorReason = 'admin-unreachable';
+    } else if (/rules-acceptance-required/.test(String(err?.message ?? ''))) {
+      // The admitting device's rules gate: this circle's agreements must be accepted before joining.
+      // The wizard's consent step normally guarantees the acceptance rides the redeem, so this reaches
+      // a person only via a programmatic join (or a modified client) — still a sentence, not a raw
+      // substrate string, and typed so `joinCircleFromInvite` callers can act on it.
+      state.submitError = err?.message ?? String(err);
+      state.submitErrorKey = 'circle.errors.rules_acceptance_required';
+      state.submitErrorReason = 'rules-acceptance-required';
     } else {
       state.submitError = err?.message ?? String(err);
       // An expired or rotated-away code arrives as the substrate's own string. Naming it here means a

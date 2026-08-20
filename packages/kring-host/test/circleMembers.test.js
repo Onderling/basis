@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   normalizeCircleMembers, circleMemberCount,
-  memberFrom, memberToChatItem, memberToViewAs,
+  memberFrom, memberToChatItem, memberToViewAs, memberRulesStatus,
 } from '../src/circleMembers.js';
 
 describe('normalizeCircleMembers', () => {
@@ -120,5 +120,38 @@ describe('canonical Member projections', () => {
   it('chat-item round-trips through the Member for the fields it carries', () => {
     const item = { id: 'did:anne', type: 'member', webid: 'did:anne', label: 'Anne de Vries', handle: '@anne', role: 'admin', circleAddress: 'addr-1' };
     expect(memberToChatItem(memberFrom(item))).toEqual(item);
+  });
+});
+
+describe('memberRulesStatus — the member-card rules line (one compute, both shells paint)', () => {
+  it('no recorded acceptance → null (ungated circles, founders, pre-gate members: silence, not blame)', () => {
+    expect(memberRulesStatus({ webid: 'w' })).toBeNull();
+    expect(memberRulesStatus({ webid: 'w', rulesCurrentVersion: '2' })).toBeNull();
+    expect(memberRulesStatus(null)).toBeNull();
+  });
+
+  it('accepted the current version → not stale', () => {
+    expect(memberRulesStatus({ rulesAccepted: '2', rulesCurrentVersion: '2' }))
+      .toEqual({ accepted: '2', current: '2', stale: false });
+  });
+
+  it('accepted an older version → stale, both versions carried for "accepted v1, current v2"', () => {
+    expect(memberRulesStatus({ rulesAccepted: '1', rulesCurrentVersion: '3' }))
+      .toEqual({ accepted: '1', current: '3', stale: true });
+  });
+
+  it('current version unknown on the row → shown as accepted, never guessed stale', () => {
+    expect(memberRulesStatus({ rulesAccepted: '1' }))
+      .toEqual({ accepted: '1', current: null, stale: false });
+  });
+
+  it('rides the normalised member: roster row → memberToViewAs carries the computed `rules`', () => {
+    const [viewAs] = normalizeCircleMembers({ members: [
+      { webid: 'w1', handle: 'ann', rulesAccepted: '1', rulesCurrentVersion: '2' },
+    ] });
+    expect(viewAs.rules).toEqual({ accepted: '1', current: '2', stale: true });
+    // And a row without the stamps stays byte-identical — no phantom key on ungated circles.
+    const [plain] = normalizeCircleMembers({ members: [{ webid: 'w2', handle: 'bob' }] });
+    expect('rules' in plain).toBe(false);
   });
 });

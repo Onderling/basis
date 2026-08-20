@@ -67,6 +67,7 @@ import { EventLog } from '../../src/eventLog.js';
 import { createChatMessageInbox } from '../../src/v2/chatMessageInbox.js';
 import { makeChatRail, makeChatPeerHandler, CHAT_STATEMENT_BROADCAST } from '../../src/v2/chatRail.js';
 import { makeTaskPeerHandler, TASK_BROADCAST } from '../../src/v2/taskRail.js';
+import { GRANTS_BROADCAST } from '../../src/v2/grantsRail.js';
 import { rosterBindingVerifier } from '../../src/v2/membershipRail.js';
 import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '../../src/v2/circleLogReceiver.js';
 import { makeGovernanceRail } from '../../src/v2/governanceAppWiring.js';
@@ -255,6 +256,14 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     // the statement and causally merges the item snapshot into the circle's store head, which is what
     // makes an item written on A appear in B's store.
     ...(agent.taskRail ? { [TASK_BROADCAST]: makeTaskPeerHandler({ rail: agent.taskRail }) } : {}),
+    // The grants lane (connections belong to the person) — the agent's ready-made receiver + its
+    // catch-up pair, the same registration both shells make. A sibling device's grant/revoke lands
+    // through the full ingest gate and refolds this node's door.
+    ...(agent.grantsPeerHandler ? { [GRANTS_BROADCAST]: agent.grantsPeerHandler } : {}),
+    ...(agent.grantsCatchUp ? {
+      [agent.grantsCatchUp.subtypes.request]: agent.grantsCatchUp.onRequest,
+      [agent.grantsCatchUp.subtypes.batch]:   agent.grantsCatchUp.onBatch,
+    } : {}),
   };
   const sendPeerRedeem = makeSendGroupRedeemRequest({
     sendPeer,

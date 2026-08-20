@@ -170,6 +170,7 @@ import { buildSelfMediaComposition, makeResealMediaForCircle } from '../../src/v
 import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals } from '../../src/v2/governanceAppWiring.js';
 import { makeGovernanceCatchUp } from '../../src/v2/governanceCatchUp.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../src/v2/membershipRail.js';
+import { GRANTS_BROADCAST } from '../../src/v2/grantsRail.js';
 import { makeTaskPeerHandler, TASK_BROADCAST, TASK_CATCHUP_SUBTYPES } from '../../src/v2/taskRail.js';
 import { makeFrontierReplay } from '../../src/v2/frontierReplay.js';
 import { makeChatPeerHandler, makePodChatCatchUp, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../src/v2/chatRail.js';
@@ -7557,6 +7558,13 @@ async function boot() {
           // The membership rider: the fan receiver (verify-on-ingest at the agent's rail) + its catch-up pair.
           ...(agent.membershipRail ? { [MEMBERSHIP_BROADCAST]: makeMembershipPeerHandler({ rail: agent.membershipRail }) } : {}),
           ...(memCatchUpShell ? { [memCatchUpShell.subtypes.request]: memCatchUpShell.onRequest, [memCatchUpShell.subtypes.batch]: memCatchUpShell.onBatch } : {}),
+          // The grants lane (connections belong to the person): a sibling device's grant/revoke
+          // lands through the agent's ready-made receiver and refolds the door's grant set live.
+          ...(agent.grantsPeerHandler ? { [GRANTS_BROADCAST]: agent.grantsPeerHandler } : {}),
+          ...(agent.grantsCatchUp ? {
+            [agent.grantsCatchUp.subtypes.request]: agent.grantsCatchUp.onRequest,
+            [agent.grantsCatchUp.subtypes.batch]:   agent.grantsCatchUp.onBatch,
+          } : {}),
           // The task lane (the content re-root): the fan receiver verifies at the agent's rail AND causally
           // merges the snapshot into the circle's store head; the catch-up pair covers the offline device.
           ...(agent.taskRail ? { [TASK_BROADCAST]: makeTaskPeerHandler({ rail: agent.taskRail }) } : {}),
@@ -7685,6 +7693,9 @@ async function boot() {
         // Governance pull-all rides the same kick — any one complete peer suffices (idempotent ingest).
         govCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         memCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
+        // The grants lane's pull: my own devices — a revoke made elsewhere while this device was
+        // offline binds at this door now, before a stale view is served.
+        agent.grantsCatchUp?.requestFromSiblings().catch(() => {});
         taskCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         chatCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         // The pod read-back kick: same reconnect moment, per live circle (the circles list is loaded here).

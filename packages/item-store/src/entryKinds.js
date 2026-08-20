@@ -66,6 +66,7 @@ export const ENTRY_KINDS = Object.freeze({
   'delivery-state':  K(LANE.SYSTEM, false, RETAIN.SHORT, false),
   'key-event':       K(LANE.SYSTEM, false, RETAIN.AUDIT, true),
   membership:        K(LANE.SYSTEM, false, RETAIN.RECORD, true),   // the roster refolds from these — never drops
+  grants:            K(LANE.SYSTEM, false, RETAIN.RECORD, true),   // the connection-grant set refolds from these — a revoke that compacts away silently re-admits a view
 
   // ── the agent trail (per-agent action log) ────────────────────────────────
   'agent-action':    K(LANE.SYSTEM, false, RETAIN.AUDIT, true),

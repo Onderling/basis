@@ -17,6 +17,7 @@ import { createRealHouseholdAgent } from '../src/core/agent/realAgent.js';
 import { createHistoryMirror, hydrateHistory } from '../src/v2/historyMirror.js';
 import { sealStrategyForRecipients } from '../src/v2/sharedCopyOpener.js';
 import { compileReadFilter, viewLaneId } from '../src/v2/surfaceGrants.js';
+import { GRANTS_BROADCAST, OWN_DEVICES_SCOPE } from '../src/v2/grantsRail.js';
 import { actAsConnection, trustForGrant } from './support/actAsConnection.js';
 import { EventLog } from '../src/eventLog.js';
 import { CONNECTION_MANIFESTS } from '../src/v2/connectionManifests.js';
@@ -95,20 +96,45 @@ describe('journey 11 — two connections, disjoint sections', () => {
 });
 
 describe('journey 13 — what scope a grant actually has', () => {
-  it('PINS the current answer: the registry is DEVICE-scoped, so a second device does not know the grant', async () => {
-    // Two devices of the same owner = two agents on SEPARATE settings stores (that is what a
-    // second device is: its own local storage). This pins L29's honest current behaviour rather
-    // than asserting the behaviour we might prefer — when L29 is answered, THIS test changes.
+  it('a grant is the PERSON\'s: a statement carried to the second device makes (and unmakes) the grant there', async () => {
+    // L29 is answered (2026-08-19): the grant set is a fold of the grants LANE, and the lane
+    // travels between the owner's own devices. Two agents on the SAME owner vaults are two
+    // devices of one person; this composition has no transport, so the fan is hand-carried —
+    // each statement passes the receiving device's full ingest gate (signature + declared kind +
+    // device-set binding), exactly what the live fan/catch-up delivers. The transport walk lives
+    // in grantsLane journeys; this pins the person-scoped SEMANTICS.
     const view = await AgentIdentity.generate(new VaultMemory());
-    const dev1 = await createRealHouseholdAgent({ a2aManifests: CONNECTION_MANIFESTS, seedHousehold: false, settingsDataSource: memoryDataSource() });
-    const dev2 = await createRealHouseholdAgent({ a2aManifests: CONNECTION_MANIFESTS, seedHousehold: false, settingsDataSource: memoryDataSource() });
+    const ownerRootVault = new VaultMemory();
+    const chatVault = new VaultMemory();
+    const boot = () => createRealHouseholdAgent({
+      a2aManifests: CONNECTION_MANIFESTS, seedHousehold: false, ownerRootVault, chatVault,
+    });
+    const dev1 = await boot();
+    const dev2 = await boot();
     await dev1.surfaceGrantsReady(); await dev2.surfaceGrantsReady();
+
+    // The hand-carried fan: every grants-lane statement `from` holds, through `to`'s receiver.
+    const carryLane = async (from, to) => {
+      for (const stmt of from.grantsRail.storedStatements(OWN_DEVICES_SCOPE)) {
+        await to.grantsPeerHandler('sibling', { subtype: GRANTS_BROADCAST, event: stmt });
+      }
+    };
 
     await dev1.callSkill('household', 'grantSurface', { viewPubKey: view.pubKey, ops: ['params.set-param'], label: 'tablet' });
     expect((await dev1.callSkill('household', 'listSurfaceGrants', {})).surfaces).toHaveLength(1);
+    await carryLane(dev1, dev2);
     expect(
       (await dev2.callSkill('household', 'listSurfaceGrants', {})).surfaces,
-      'device-scoped today: the second device does not see the first device\'s connection',
+      'person-scoped: the second device holds the grant the first device made',
+    ).toHaveLength(1);
+
+    // And the revoke is the person's too — made on the SECOND device, it unmakes the grant on the first.
+    const rev = await dev2.callSkill('household', 'revokeSurface', { viewPubKey: view.pubKey });
+    expect(rev).toMatchObject({ ok: true, revoked: true });
+    await carryLane(dev2, dev1);
+    expect(
+      (await dev1.callSkill('household', 'listSurfaceGrants', {})).surfaces,
+      'a revoke made on any device unpairs the view everywhere',
     ).toHaveLength(0);
   }, 60_000);
 });

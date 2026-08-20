@@ -958,10 +958,16 @@ way circle peers exchange circle lanes, so a revoke made on the phone reaches th
 "unpairing the kitchen tablet on your phone must not leave your laptop still admitting it." The trust
 base for that exchange is the add-a-device enrollment: a grant or revoke statement counts only when
 signed by one of the owner's enrolled, unrevoked devices, and on any ordering conflict **revoke wins**.
-*Status, honestly:* the model above is the decided design; the running code still holds grants in a
-per-device persisted registry (revocation survives restart, but does not yet travel between the
-owner's devices). The cutover is the V1 closing wave's first build; until it lands, treat this
-paragraph as the contract the code is being brought to — not as a description of today's runtime.
+This is the running model: the grant registry is a projection folded from the device log's grants
+lane, statements sign with the device-derivation key (the delegation key on an enrolled device; the
+profile key itself on an unenrolled first one — the binding floor every sibling verifies locally),
+an enrolled device's statements carry their root-signed delegation record so a sibling verifies the
+chain without the owner's registry (the registry supplies only the deny-wins tombstone), and the
+fan targets the proven per-circle address set the owner's own roster rows carry. Revoke-wins is
+CAUSAL: a grant stands only when every revoke of that view is in its causal past, so a concurrent
+re-grant loses to the revoke it never saw, and re-admitting the view is a deliberate new grant made
+after the merge. One honest edge: a person in no circles has no live fan target between their
+devices — restore-time (the log itself) is the designed floor there.
 
 ### The Connectivity home
 

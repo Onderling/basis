@@ -24,7 +24,7 @@ import nacl from 'tweetnacl';
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { AgentIdentity } from './AgentIdentity.js';
-import { encode as b64encode } from '../crypto/b64.js';
+import { encode as b64encode, decode as b64decode } from '../crypto/b64.js';
 
 // HKDF domain-separation inputs — mirror circleAddress.js. The salt is PERMANENT: changing it
 // re-derives every enrolled device's keys (a mass re-enroll), never do that.
@@ -84,6 +84,27 @@ export function signDeviceDelegation(rootSecret, { profileId, deviceId, pubKey }
     by:        b64encode(kp.publicKey),
     sig:       b64encode(nacl.sign.detached(msg, kp.secretKey)),
   };
+}
+
+/**
+ * The owner-root FINGERPRINT a signing key presents — the same 16-hex-char scheme as
+ * `Bootstrap.fingerprint` (first 16 hex chars of SHA-256 over the raw Ed25519 pubkey), computable
+ * from a record's `by` field alone. This is what lets a sibling device bind a carried delegation
+ * record to "the same owner as me" without the owner's registry: both custodies hold the root's
+ * fingerprint (root custody derives it; delegation custody carries it on the marker), and a record
+ * whose `by` does not hash to it belongs to some other root. Returns null for undecodable input.
+ * @param {string} pubKeyB64  a base64(url) Ed25519 pubkey — e.g. a delegation record's `by`.
+ * @returns {string|null} the 16 hex-character fingerprint, or null.
+ */
+export function ownerRootFingerprint(pubKeyB64) {
+  try {
+    const key = b64decode(pubKeyB64);
+    if (!(key instanceof Uint8Array) || key.length !== 32) return null;
+    const digest = sha256(key);
+    let hex = '';
+    for (let i = 0; i < digest.length; i++) hex += digest[i].toString(16).padStart(2, '0');
+    return hex.slice(0, 16);
+  } catch { return null; }
 }
 
 /**

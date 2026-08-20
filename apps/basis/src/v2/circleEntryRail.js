@@ -29,9 +29,11 @@ import { signSpine, verifySpine, authorHead, frontier } from '@onderling/core';
  *   the circle-scoped signer + the member ref it represents (basis: realAgent's circleSignerFor).
  * @param {string} deps.entryKind      the EventLog lane these statements ride (e.g. 'governance')
  * @param {string[]} deps.declaredKinds  the statement kinds the manifest declares for this lane (D6 gate)
- * @param {(a:{author:string, ref:string, circleId:string})=>Promise<boolean>|boolean} [deps.verifyBinding]
- *   verifies a FOREIGN author-key ↔ ref binding (roster circleAddress lookup). Absent → only self-signed
- *   statements resolve (single-device honest degrade; the fan's ingest supplies the full resolver).
+ * @param {(a:{author:string, ref:string, circleId:string, kind?:string, payload?:object})=>Promise<boolean>|boolean} [deps.verifyBinding]
+ *   verifies a FOREIGN author-key ↔ ref binding (roster circleAddress lookup). Receives the statement's
+ *   verified kind + payload alongside, for verifiers whose proof rides the statement itself (the grants
+ *   lane's carried delegation record). Absent → only self-signed statements resolve (single-device honest
+ *   degrade; the fan's ingest supplies the full resolver).
  */
 export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKinds, verifyBinding } = {}) {
   if (!eventLog || typeof eventLog.query !== 'function' || typeof eventLog.appendSilentEntry !== 'function') {
@@ -136,7 +138,7 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     if (!declaredKinds.includes(v.body.kind)) return { ok: false, reason: `undeclared kind: ${v.body.kind}` };
     const ref = v.body.payload?.authorRef;
     if (typeof ref !== 'string' || !ref) return { ok: false, reason: 'missing authorRef' };
-    if (!(await bindingOk(v.body.author, ref, circleId, v.body.kind))) return { ok: false, reason: 'unverifiable key-ref binding' };
+    if (!(await bindingOk(v.body.author, ref, circleId, v.body.kind, v.body.payload))) return { ok: false, reason: 'unverifiable key-ref binding' };
     // Report whether this statement is NEW here — a windowed catch-up's progress guard must not count a
     // re-delivered duplicate as progress (that is how two diverged peers would page forever).
     const id = entryId(statement);
@@ -146,14 +148,14 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
   }
 
   /** Is `author` (a circle key) genuinely `ref`'s key IN this circle? Self-binding, else the injected resolver. */
-  async function bindingOk(author, ref, circleId, kind = null) {
+  async function bindingOk(author, ref, circleId, kind = null, payload = null) {
     try {
       const mine = await signerFor(circleId);
       const myId = mine?.identity ?? mine;
       if (myId?.pubKey === author) return (mine?.ref ?? myId.pubKey) === ref;
     } catch { /* fall through to the foreign resolver */ }
     if (typeof verifyBinding === 'function') {
-      try { return !!(await verifyBinding({ author, ref, circleId, kind })); } catch { return false; }
+      try { return !!(await verifyBinding({ author, ref, circleId, kind, payload })); } catch { return false; }
     }
     return false;   // no resolver → only self-signed statements fold (honest single-device degrade)
   }
@@ -179,7 +181,7 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
       if (typeof ref !== 'string' || !ref) continue;
       const actor = b.payload.voter ?? b.payload.by ?? null;
       if (actor !== null && actor !== ref) continue;              // acting-as-someone-else → drop
-      if (!(await bindingOk(b.author, ref, circleId, b.kind))) continue;  // unverifiable binding → drop
+      if (!(await bindingOk(b.author, ref, circleId, b.kind, b.payload))) continue;  // unverifiable binding → drop
       const forkKey = `${b.author}|${b.parentHash ?? ''}`;
       const set = seenByAuthorParent.get(forkKey) ?? new Set();
       set.add(b.hash);
@@ -210,7 +212,10 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
       if (!declaredKinds.includes(b.kind)) continue;
       const ref = b.payload?.authorRef;
       if (typeof ref !== 'string' || !ref) continue;
-      if (!(await bindingOk(b.author, ref, circleId))) continue;
+      // `kind` is deliberately NOT passed here (unlike ingest): the body-shaped read predates the
+      // kind-aware verifiers, and passing it would retroactively apply membership's ceremony rule to
+      // interim-rule statements already landed — un-doing a legitimate address-revoke on re-read.
+      if (!(await bindingOk(b.author, ref, circleId, null, b.payload))) continue;
       const forkKey = `${b.author}|${b.parentHash ?? ''}`;
       const set = seenByAuthorParent.get(forkKey) ?? new Set();
       set.add(b.hash);

@@ -42,7 +42,7 @@ export { circleLinkMessage, signCircleLink, signCircleLinkFromSeed, verifyCircle
 // owner root → profile seed → DEVICE seed → per-circle seed; each device presents distinct addresses.
 export {
   deriveDeviceSeed, deviceDelegationPubKey, deviceDelegationMessage,
-  signDeviceDelegation, verifyDeviceDelegation,
+  signDeviceDelegation, verifyDeviceDelegation, ownerRootFingerprint,
 } from './identity/deviceDelegation.js';
 export {
   CIRCLE_ADDRESS_ANNOUNCE_KIND, circleAddressAnnouncement, ownCircleAddressAnnouncement,

@@ -3,15 +3,18 @@
  *
  * The acting door refuses on three token facts (signature/expiry/agent binding, the trusted
  * issuer, and the revocation set) — and the revocation set is the ONLY one of the three that
- * depends on this process's memory. The token itself is signed by the device's stable identity,
- * so it keeps verifying forever. If the registry does not survive a restart, a view the owner
- * unpaired starts acting again the next time the app boots, holding the very blob they revoked.
+ * depends on this process's memory. The token itself is signed by the profile's stable identity,
+ * so it keeps verifying forever. Since the grants-lane re-root, the revocation set is a FOLD of
+ * the device log's grants lane: it survives a restart because the log does — there is no separate
+ * registry file to lose or to go stale. This walk reboots the agent over the persisted log
+ * snapshot (exactly what the shells' `wireEventLogPersistence` carries across a reload) and
+ * demands the unpaired view stays refused.
  */
 import { describe, it, expect } from 'vitest';
 import { AgentIdentity } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
-import { memoryDataSource } from '@onderling/item-store';
 import { createRealHouseholdAgent } from '../src/core/agent/realAgent.js';
+import { EventLog } from '../src/eventLog.js';
 import { actAsConnection, trustForGrant } from './support/actAsConnection.js';
 import { CONNECTION_MANIFESTS } from '../src/v2/connectionManifests.js';
 
@@ -21,14 +24,14 @@ describe('surface revocation durability', () => {
     // boot is the SAME owner, exactly as a real app restart is.
     const ownerRootVault = new VaultMemory();
     const chatVault = new VaultMemory();
-    const settings = memoryDataSource();
-    const boot = () => createRealHouseholdAgent({
+    const boot = (deviceLog) => createRealHouseholdAgent({
       a2aManifests: CONNECTION_MANIFESTS,   // the shells pass this; a walk that acts must too
-      seedHousehold: false, ownerRootVault, chatVault, settingsDataSource: settings,
+      seedHousehold: false, ownerRootVault, chatVault, deviceLog,
     });
 
     const view = await AgentIdentity.generate(new VaultMemory());
-    const A = await boot();
+    const logA = new EventLog({ initial: [], muted: [] });
+    const A = await boot(logA);
 
     const grant = await A.callSkill('household', 'grantSurface', {
       viewPubKey: view.pubKey, ops: ['params.set-param'], label: 'tablet',
@@ -52,10 +55,11 @@ describe('surface revocation durability', () => {
     expect(rev).toMatchObject({ ok: true, revoked: true });
     expect((await actThrough(A)).code, 'unpairing did not stop the connection').toBe('INVALID_TOKEN');
 
-    // THE REBOOT. Same owner, same identity, same stored settings — and the view still holds
-    // the token blob it was given. Unpairing must outlive the process.
-    const B = await boot();
-    await B.surfaceGrantsReady();          // the door refuses until the registry lands
+    // THE REBOOT. Same owner, same identity — and a device log HYDRATED FROM THE SNAPSHOT the
+    // first boot's log holds (the shells persist exactly this array and hydrate it at boot). The
+    // view still holds the token blob it was given; the refolded lane must refuse it.
+    const B = await boot(new EventLog({ initial: logA.query({}), muted: [] }));
+    await B.surfaceGrantsReady();          // the door refuses until the lane's first fold lands
     const afterReboot = await actThrough(B);
     expect(afterReboot.code, 'a revoked connection acted again after a reboot').toBe('INVALID_TOKEN');
   }, 60_000);

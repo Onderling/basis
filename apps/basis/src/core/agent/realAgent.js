@@ -48,6 +48,12 @@ import { makeMembershipRail, makeMembershipEmitter } from '../../v2/membershipRa
 import { makeTaskRail, makeTaskEmitter, routeTaskMirror } from '../../v2/taskRail.js'; // the content re-root — item snapshots ride the device log
 import { makeChatRail, makeChatEmitter, owedChatStatements } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
 import { createSurfaceGrants, compileReadFilter } from '../../v2/surfaceGrants.js';   // pair-a-view standing grants (the surface role) + the section→lane-filter compiler
+// The grants LANE (V1 closing wave row 1): grant/revoke statements ride the device log between the
+// owner's own devices; the registry above is a projection of this lane.
+import {
+  makeGrantsRail, makeGrantsFan, makeGrantsCatchUp, makeGrantsPeerHandler,
+  deviceSetBindingVerifier, siblingDeviceAddresses,
+} from '../../v2/grantsRail.js';
 import { SURFACE_NUDGE_SUBTYPE } from '../../v2/surfaceNudge.js'; // the reading half's contentless re-pull signal
 import { CONNECTION_GRANT_SUBTYPE } from '../../v2/connectionPairing.js';   // pairing: how the grant reaches the view that asked for it
 import { paramsManifest } from '../../v2/paramsManifest.js';   // #36 — the params op contract (gates the waist branch)
@@ -86,7 +92,7 @@ import {
   driversFromProperties,
   setCircleMembership as registrySetCircleMembership,
   circleMembershipsOf,
-  deviceDelegationOf, setDeviceDelegation as registrySetDeviceDelegation,
+  deviceDelegationOf, deviceDelegationsOf, setDeviceDelegation as registrySetDeviceDelegation,
   isRequestable,
   effectiveProperties,
 } from '@onderling/agent-registry';
@@ -137,7 +143,7 @@ async function restoreOrGenerate(vault) {
 import { restoreOwnerRoot, DEVICE_DELEGATION_VAULT_KEY } from './ownerRootRestore.js';
 import { sealingPublicKeyFromNetworkKey } from '@onderling/pod-client';
 import { ensureOwnerRoot, pickRootKeyStore, readCustodyMode, cutoverToDelegation } from './ownerRootCustody.js';
-import { makeAgentTrailEntry } from '../../eventLog.js';
+import { makeAgentTrailEntry, EventLog } from '../../eventLog.js';
 import {
   CalendarStore, registerCalendarSkills,
 } from '@onderling-app/calendar';
@@ -495,9 +501,11 @@ export async function createRealHouseholdAgent(opts = {}) {
       // to A2A, this engine became the only thing standing between a revoked connection and the waist —
       // and it was consulting the wrong list. Caught by the revocation-durability walk during the
       // migration, which is what that walk is for. Late-bound: both are built further down this factory.
+      // `surfaceGrants.isRevoked` is ASYNC (it awaits the grants lane's fold — fail-closed until
+      // the first fold lands), so it must be awaited: Boolean(promise) is true for every token.
       isRevoked: async (tokenId) =>
         Boolean(await agentsTokenRegistry?.isRevoked(tokenId))
-        || Boolean(surfaceGrants?.isRevoked(tokenId)),
+        || Boolean(await surfaceGrants?.isRevoked(tokenId)),
     },
     // THE SENDER OUTBOX is a PROJECTION, not a second store. basis deliberately passes NO `holdStore`:
     // the content a held envelope carries is ALREADY on the device log (the optimistic local append
@@ -1053,7 +1061,7 @@ export async function createRealHouseholdAgent(opts = {}) {
         // than relied on from the constructor, precisely because this call overwrites that.
         sa.policy.setRevocationCheck(async (tokenId) =>
           (await tokenRegistry.isRevoked(tokenId))
-          || Boolean(surfaceGrants?.isRevoked(tokenId))
+          || Boolean(await surfaceGrants?.isRevoked(tokenId))
           || (typeof callerIsRevoked === 'function' ? Boolean(await callerIsRevoked(tokenId)) : false));
       }
       agentsTokenRegistry = tokenRegistry;
@@ -1422,26 +1430,80 @@ export async function createRealHouseholdAgent(opts = {}) {
 
   /* ─── Remote surfaces: pair-a-view grants ─────────────────────────────────
    * A paired view (a browser tab, a companion node's client) holds a standing SURFACE role —
-   * one capability token per op the owner picked, issued by this device's canonical identity.
+   * one capability token per op the owner picked, issued by the PROFILE's canonical identity
+   * (every device derives the same one, so the token verifies at every device's door).
    * Acting arrives over A2A — `agent.invoke(owner, 'app.opId', …)` presenting the token, gated by
    * `PolicyEngine.checkInbound` and dispatched to the op `renderA2A` registered. A bespoke door used
    * to sit here doing the same verification a second time; it is gone (2026-08-19). Reading rides
-   * the sealed history mirror, not these skills. Grants live issuer-side, so revoking here kills
-   * every token the view still holds.
+   * the sealed history mirror, not these skills.
+   *
+   * A connection is a property of the PERSON (decided 2026-08-19): every grant/revoke is a signed
+   * statement on the device log's GRANTS LANE, the registry is a fold of that lane, and statements
+   * fan live to the owner's other devices — so revoking here kills every token the view still
+   * holds, on THIS device by the fold and on the siblings by the fan (catch-up as the floor).
+   * Durability is the log's own (no snapshot file); a composition without a device log runs the
+   * lane over an ephemeral in-process log — the honest memory-only degrade, one code path.
    */
+  // The lane's signer: the device-derivation identity — the delegation key on an enrolled device
+  // (per-device, revocable), the profile key itself on an unenrolled first device (the floor).
+  const grantsSignerPromise = (async () => {
+    try {
+      if (deviceDerivationSeed) {
+        const id = await AgentIdentity.fromSeed(deviceDerivationSeed, new VaultMemory());
+        return { identity: id, ref: chatId.pubKey };
+      }
+    } catch { /* degrade to the profile key below */ }
+    return { identity: chatId, ref: chatId.pubKey };
+  })();
+  const grantsRail = makeGrantsRail({
+    eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
+    signerFor: () => grantsSignerPromise,
+    verifyBinding: deviceSetBindingVerifier({
+      selfPubKey: chatId.pubKey,
+      rootFingerprint,
+      // The registry supplies the deny-wins tombstone + the no-record fallback. Late-bound via the
+      // outer ref (null until the agents block runs) and best-effort: a degraded registry means the
+      // carried record alone binds.
+      lookupDelegations: async () => deviceDelegationsOf(await agentsRegistryRef?.lookup('default')),
+    }),
+  });
+  const grantsSiblings = () => siblingDeviceAddresses({
+    callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
+    selfPubKey: chatId.pubKey,
+    circleAddressFor,
+  });
+  const grantsFan = makeGrantsFan({
+    siblings: grantsSiblings,
+    sendToPeer: (to, payload) => sa.peer.sendTo(to, payload, { guarantee: 'hold-forward' }),
+  });
   const surfaceGrants = createSurfaceGrants({
     identity: chatId,
     agentId: chatId.pubKey,
-    // A read-grant change (grant with sections / re-grant / revoke) reconciles the view lanes.
+    // A read-grant change (grant with sections / re-grant / revoke — local or arrived from a
+    // sibling device) reconciles the view lanes.
     onReadGrantChange: () => { viewLanesSync?.(); },
-    // DURABLE: the registry rides the same device-scoped settings store the params use. Without
-    // it, revocation would live only in this process — and since a surface token is signed by
-    // this device's stable identity, it keeps verifying forever, so the next boot would silently
-    // re-admit every view the owner ever unpaired. The door stays CLOSED until this has loaded.
-    store: opts.settingsDataSource ?? null,
-    uri: 'mem://basis/settings/surfaces.json',
+    rail: grantsRail,
+    fan: grantsFan,
+    // Carried on every statement so a sibling verifies the chain without the owner's registry.
+    delegationRecord: enrolledDevice?.record ?? null,
   });
-  // Kick the load; the door refuses until it lands (`isReady`), so a boot cannot race it.
+  // The fan's receive half, ready-made (the shells register it under GRANTS_BROADCAST): a landed
+  // statement refolds the projection, so a sibling's revoke binds at THIS door live.
+  const grantsPeerHandler = makeGrantsPeerHandler({
+    rail: grantsRail,
+    onChange: () => surfaceGrants.recompute(),
+  });
+  // The catch-up pair (shells register its handlers + kick requestFromSiblings on connect); a
+  // landed batch refolds the projection, which is what makes an offline revoke bind before serving.
+  const grantsCatchUp = makeGrantsCatchUp({
+    rail: grantsRail,
+    sendToPeer: (to, payload) => sa.peer.sendTo(to, payload, { guarantee: 'hold-forward' }),
+    siblings: grantsSiblings,
+    selfPubKey: chatId.pubKey,
+    onChange: () => surfaceGrants.recompute(),
+  });
+  // Kick the first fold; the door refuses until it lands (`isRevoked` fails closed), so a boot
+  // cannot race it.
   const surfaceGrantsReady = surfaceGrants.hydrate().catch(() => false);
 
   hostAgent.register('grantSurface', async ({ parts }) => {
@@ -1505,7 +1567,7 @@ export async function createRealHouseholdAgent(opts = {}) {
   hostAgent.register('revokeSurface', async ({ parts }) => {
     const viewPubKey = String(parts?.[0]?.data?.viewPubKey ?? '').trim();
     if (!viewPubKey) return [DataPart({ ok: false, error: 'viewPubKey-required' })];
-    return [DataPart({ ok: true, revoked: surfaceGrants.revoke(viewPubKey) })];
+    return [DataPart({ ok: true, revoked: await surfaceGrants.revoke(viewPubKey) })];
   }, { visibility: 'trusted' });
 
   hostAgent.register('listSurfaceGrants', async () =>
@@ -4302,6 +4364,13 @@ export async function createRealHouseholdAgent(opts = {}) {
     // The membership rider's rail (null without opts.deviceLog) — the shells register the fan receiver +
     // the catch-up pair over THIS instance so both ends verify with the same declaration + binding rules.
     membershipRail,
+    // The grants lane (connections belong to the person): the shells register the ready-made fan
+    // receiver (`grantsPeerHandler` under GRANTS_BROADCAST) + the catch-up pair, and kick
+    // `grantsCatchUp.requestFromSiblings()` on connect so a revoke made elsewhere binds at this
+    // door before a stale view is served.
+    grantsRail,
+    grantsPeerHandler,
+    grantsCatchUp,
     // The task lane's rail (same contract): the shells register circle-task-broadcast + its catch-up pair
     // over this instance; its ingest also causally merges the snapshot into the circle's store head.
     taskRail,

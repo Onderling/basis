@@ -95,6 +95,35 @@ describe('the rail — verified read (the receiver-enforced half)', () => {
     expect(events.filter((e) => e.event === 'vote')).toHaveLength(0);   // authorRef ≠ claimed voter → dropped
   });
 
+  it('CONCURRENT APPENDS CHAIN, NOT FORK — the append-order contract', async () => {
+    // The CONTRACT this pins: two appends fired without awaiting between them still chain one line —
+    // the second's parent IS the first's hash, and the fold sees no equivocation.
+    //
+    // Honest provenance (2026-08-20 review): the per-circle append queue landed claiming to fix a
+    // "device forks against itself" bug observed live. Re-derivation showed that bug could NOT occur in
+    // the prior code either — its one await sits BEFORE the log read, and read→sign→append is
+    // synchronous, so each call completes atomically after resuming; this test passes against the
+    // pre-queue code too. The "parent: null" probe that spawned the theory read `body.parent`, and the
+    // field is `body.parentHash`. The queue STAYS because it makes the contract structural rather than
+    // incidental: the moment any future edit introduces an await between the head read and the append
+    // (an async signer step, an async log), the fork becomes real — and with the queue gone this test
+    // is what goes red.
+    const log = fakeEventLog();
+    const alice = await member('webid:alice');
+    const rail = railFor(log, alice);
+    const [a, b] = await Promise.all([
+      rail.append(CIRCLE, { kind: 'propose', subject: 'p1', payload: { action: 'changePolicy', subject: { theme: 'dark' }, by: alice.ref, at: 1 } }),
+      rail.append(CIRCLE, { kind: 'vote',    subject: 'p1', payload: { voter: alice.ref, choice: 'yes', at: 2 } }),
+    ]);
+    // The second statement chains off the first — one author, one line, no shared parent.
+    expect(a.statement.body.parentHash).toBe(null);
+    expect(b.statement.body.parentHash).toBe(a.statement.body.hash);
+    // And the verified read agrees: nobody is disputed.
+    const { events, disputed } = await rail.readVerified(CIRCLE);
+    expect(events).toHaveLength(2);
+    expect(disputed.size).toBe(0);
+  });
+
   it('EQUIVOCATION: two votes off one parent → the fork-proof marks the author disputed; the fold discounts them', async () => {
     const log = fakeEventLog();
     const alice = await member('webid:alice');

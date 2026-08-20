@@ -3769,8 +3769,33 @@ function CircleDetail({
             <Text style={styles.placeholder}>{t('circle.members_tab.loading')}</Text>
           ) : tabMembers.length === 0 ? (
             <Text style={styles.placeholder}>{t('circle.members_tab.empty')}</Text>
-          ) : (
-            tabMembers.map((m) => {
+          ) : (<>
+            {/* Stale-rules banner (web parity) — YOUR acceptance is older than the circle's current
+                rules version. Informative + voluntary: staleness never locks anyone out. The button
+                emits the member's own signed rules-accept, then reloads the roster. */}
+            {(() => {
+              const selfRow = mandateViewer.viewerWebid != null
+                ? tabMembers.find((m) => m.id === mandateViewer.viewerWebid) : null;
+              if (!selfRow?.rules?.stale) return null;
+              return (
+                <View style={styles.rulesBanner} testID="circle-rules-banner">
+                  <Text style={styles.rulesBannerText}>
+                    {t('circle.members_tab.rules_banner', { accepted: selfRow.rules.accepted, current: selfRow.rules.current })}
+                  </Text>
+                  <Pressable
+                    style={styles.rulesBannerBtn}
+                    accessibilityRole="button"
+                    onPress={async () => {
+                      try { await stoopCall('stoop', 'acceptGroupRules', { groupId: circle.id }); } catch { /* voluntary */ }
+                      setMembersReloadTick((n) => n + 1);
+                    }}
+                  >
+                    <Text style={styles.rulesBannerBtnText}>{t('circle.members_tab.rules_banner_accept')}</Text>
+                  </Pressable>
+                </View>
+              );
+            })()}
+            {tabMembers.map((m) => {
               const isSelf = mandateViewer.viewerWebid != null && m.id === mandateViewer.viewerWebid;
               return (
                 // §2 — tap a member row → their persona card; tap your own row → self-view.
@@ -3791,12 +3816,21 @@ function CircleDetail({
                       const sec = revealedMemberLabel(m, { viewerId: mandateViewer.viewerWebid ?? null, policy: policy?.revealPolicy ?? 'pairwise' }).secondary;
                       return sec ? <Text style={styles.memberName} numberOfLines={1}>{sec}</Text> : null;
                     })()}
+                    {/* Rules acceptance — computed in shared code (memberRulesStatus rides the
+                        normalised member as m.rules); stale is visible-but-valid. web≡mobile. */}
+                    {m.rules ? (
+                      <Text style={[styles.memberRules, m.rules.stale ? styles.memberRulesStale : null]} numberOfLines={1}>
+                        {m.rules.stale
+                          ? t('circle.members_tab.rules_stale', { accepted: m.rules.accepted, current: m.rules.current })
+                          : t('circle.members_tab.rules_ok', { version: m.rules.accepted })}
+                      </Text>
+                    ) : null}
                   </View>
                   {isSelf ? <Text style={styles.memberYou}>{t('circle.members_tab.you')}</Text> : null}
                 </Pressable>
               );
-            })
-          )
+            })}
+          </>)
         ) : activeTab === 'tasks' ? (
           // Taken (tasks) tab — list the circle's tasks with their lifecycle chips + the
           // owner-only entrust chip (the same seam the chat stream uses). Tapping entrust
@@ -5096,6 +5130,12 @@ const makeStyles = (theme, insets = null) => StyleSheet.create({
   memberRow:        { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: theme.color.line },
   memberHandle:     { fontSize: 15, color: theme.color.ink, fontWeight: '600' },
   memberName:       { fontSize: 13, color: theme.color.inkSoft, marginTop: 1 },
+  memberRules:      { fontSize: 12, color: theme.color.inkSoft, marginTop: 1 },
+  memberRulesStale: { color: theme.color.accent },
+  rulesBanner:        { padding: 10, borderBottomWidth: 1, borderBottomColor: theme.color.line, gap: 8 },
+  rulesBannerText:    { fontSize: 13, color: theme.color.inkSoft },
+  rulesBannerBtn:     { alignSelf: 'flex-start', borderWidth: 1, borderColor: theme.color.accent, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4 },
+  rulesBannerBtnText: { fontSize: 13, color: theme.color.accent, fontWeight: '600' },
   memberYou:        { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, color: theme.color.inkSoft, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: theme.color.card },
   // Per-row action buttons (Ik help / Negeer …) — used by chat bubbles.
   rowActions:     { flexDirection: 'row', gap: 6, marginTop: 8, flexWrap: 'wrap' },

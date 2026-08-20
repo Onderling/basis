@@ -1950,9 +1950,24 @@ export async function createRealHouseholdAgent(opts = {}) {
     });
     taskEmit = makeTaskEmitter({
       rail: taskRail,
+      // Best-effort, but REPORTING: the fan's own contract is {sent, attempted, errors} and swallowing
+      // it made a lost statement invisible (a claim fanned right after its task never reached the peer,
+      // and nothing said so — 2026-08-20). Under-delivery and rejection both warn; catch-up reconciles
+      // either way, but now the log says WHEN it will have to.
       fan: (circleId, statement) => callSkill('stoop', 'broadcastCircleTask', {
         groupId: circleId, event: statement, msgId: `task:${statement.body.hash}`, ts: Date.now(),
-      }).catch(() => { /* fan is best-effort — catch-up reconciles */ }),
+      }).then((r) => {
+        if (r?.error || (r?.errors?.length ?? 0) > 0 || (r?.sent ?? 0) < (r?.attempted ?? 0)) {
+          console.warn(`[task-lane] fan under-delivered for ${circleId} ${statement.body.kind}`
+            + ` hash=${statement.body.hash.slice(0, 8)}: sent=${r?.sent ?? 0}/${r?.attempted ?? 0}`
+            + (r?.error ? ` error=${r.error}` : '')
+            + ((r?.errors?.length ?? 0) > 0 ? ` errors=${JSON.stringify(r.errors).slice(0, 200)}` : ''));
+        }
+        return r;
+      }, (err) => {
+        console.warn(`[task-lane] fan REJECTED for ${circleId} ${statement.body.kind}`
+          + ` hash=${statement.body.hash.slice(0, 8)}:`, err?.message ?? err);
+      }),
     });
     // The chat lane: each sent message appends its SIGNED render entry to the device log (non-silent —
     // the entry IS the bubble) and fans the statement; receivers verify at their rail, where the roster

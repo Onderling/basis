@@ -51,27 +51,39 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
   const entryId = (stmt) => `${entryKind}:${stmt.body.hash}`;
 
   /**
-   * APPEND IS SERIALISED PER CIRCLE — and this is a correctness requirement, not a performance one.
+   * THE LANE IS SERIALISED PER CIRCLE — one queue that both append and ingest ride.
    *
-   * `appendOne` computes its `parent` by READING the log (`authorHead`), then awaits the signer, then
-   * appends. Two appends that overlap in that gap both read the same head and both stamp the SAME parent —
-   * so ONE device writing twice quickly emits two statements by one author off one parent. That is the
-   * exact shape this rail defines as EQUIVOCATION (see the fold below: `${author}|${parent}` → a fork), so
-   * a device would fork against ITSELF and the fold would discount both. Observed live: create a task and
-   * claim it in the same tick, and the claim never reaches the peer.
+   * APPEND: `appendOne` computes its `parent` by READING the log, then appends. Today the section after
+   * its one await is synchronous, so overlapping appends happen not to interleave — but that is
+   * incidental, one refactor away from a self-fork (one author, two statements, one parent = the fold's
+   * equivocation shape). The queue makes the append-order contract STRUCTURAL; the pin in
+   * circleEntryRail.test.js goes red without it the moment an await lands in that window.
    *
-   * Nothing about the caller can prevent it — `store.put`'s publish hook fires the append without awaiting
-   * it, which is correct (a local write must not block on the carry). So the ordering has to be the rail's
-   * own guarantee. The queue is per circleId: appends to different circles stay concurrent.
+   * INGEST — and this one is a live bug fixed, not a hardening (2026-08-20): the binding verifier
+   * (`rosterBindingVerifier`) carries a per-circle re-entrancy breaker, because the roster projection it
+   * calls reads the membership rail, which verifies through the same gate — true recursion, correctly
+   * refused. But the breaker's `inFlight` set cannot tell recursion from CONCURRENT SIBLINGS: two
+   * statements arriving in the same tick both reach `await listGroupMembers`, and the second is refused
+   * as "unverifiable key-ref binding" — a valid, signed, correctly-bound statement silently dropped.
+   * Observed live: a task and its claim fanned back-to-back; the second arrival never landed on the
+   * peer's log. Serialising ingest per circle means sibling verifies never overlap, so the breaker only
+   * ever trips on genuine recursion.
+   *
+   * ONE queue for both: an append never calls ingest and an ingest never calls append (folds only read;
+   * `applyToHead` writes with sync:false, which fires no publish hook), so sharing cannot deadlock — and
+   * it also stops an append's head-read racing an ingest's landing. Different circles stay concurrent.
    */
-  const appendQueues = new Map();   // circleId → promise chain tail
+  const laneQueues = new Map();   // circleId → promise chain tail
+  function serialised(circleId, run) {
+    const prior = laneQueues.get(circleId) ?? Promise.resolve();
+    // A failed step must not wedge the lane: the chain is rebuilt from a caught tail.
+    const next = prior.then(run, run);
+    laneQueues.set(circleId, next.then(() => undefined, () => undefined));
+    return next;
+  }
+
   function append(circleId, opts = {}) {
-    const prior = appendQueues.get(circleId) ?? Promise.resolve();
-    // `.then(() => …)` on a settled-or-rejected tail: a failed append must not wedge the lane, so the
-    // chain is rebuilt from a caught tail.
-    const run = prior.then(() => appendOne(circleId, opts), () => appendOne(circleId, opts));
-    appendQueues.set(circleId, run.then(() => undefined, () => undefined));
-    return run;
+    return serialised(circleId, () => appendOne(circleId, opts));
   }
 
   /**
@@ -114,7 +126,11 @@ export function makeCircleEntryRail({ eventLog, signerFor, entryKind, declaredKi
     catch (err) { return { ok: false, reason: `unverifiable: ${err?.message ?? err}` }; }
   };
 
-  async function ingest(circleId, statement) {
+  function ingest(circleId, statement) {
+    return serialised(circleId, () => ingestOne(circleId, statement));
+  }
+
+  async function ingestOne(circleId, statement) {
     const v = statement && safeVerify(statement, circleId);
     if (!v || !v.ok) return { ok: false, reason: v?.reason ?? 'malformed' };
     if (!declaredKinds.includes(v.body.kind)) return { ok: false, reason: `undeclared kind: ${v.body.kind}` };

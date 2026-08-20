@@ -146,7 +146,13 @@ export function makeTaskEmitter({ rail, fan = null }) {
     const res = await rail.append(circleId, { kind, subject, payload });
     if (!res) return null;
     if (typeof fan === 'function') {
-      try { fan(circleId, res.statement); } catch { /* fan is best-effort — catch-up reconciles */ }
+      // Best-effort stays best-effort — the local write never blocks on delivery — but a refusal is
+      // REPORTED, never swallowed. A fan that fails silently is indistinguishable from one that
+      // delivered, which is exactly how a lost statement cost a bisect to find (2026-08-20).
+      try { fan(circleId, res.statement); }
+      catch (err) {
+        console.warn(`[task-lane] fan threw for ${circleId} ${kind}(${String(subject).slice(0, 24)}):`, err?.message ?? err);
+      }
     }
     return res.statement;
   }

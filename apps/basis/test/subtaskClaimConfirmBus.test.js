@@ -10,7 +10,7 @@
  */
 import { describe, it, expect, afterAll } from 'vitest';
 
-import { bootRealAgentNode, connectAgentsOverBus, until, teardown } from './support/pairRealAgents.js';
+import { bootRealAgentNode, connectAgentsOverBus, pairCircle, until, teardown } from './support/pairRealAgents.js';
 
 const CIRCLE_ID = 'shared-chores-claim';
 const WARM = { hold: true, firstSendTimeoutMs: 2000, retryDelays: [] };
@@ -45,13 +45,13 @@ describe('subtask claim-confirmation over a real bus (§7)', () => {
   afterAll(async () => { await teardown(A, B); });
 
   it('a confirmed claim + its containment subtree, created on A, arrive intact on B', async () => {
-    [A, B] = await Promise.all([bootRealAgentNode('A'), bootRealAgentNode('B')]);
+    [A, B] = await Promise.all([bootRealAgentNode('A', { taskLane: true }), bootRealAgentNode('B', { taskLane: true })]);
     await connectAgentsOverBus(A, B);
     wireInboundLikeShell(A);
     wireInboundLikeShell(B);
-    // Bidirectional sync peers so writes fan BOTH ways.
-    await A.agent.addCirclePeer(CIRCLE_ID, B.pubKey);
-    await B.agent.addCirclePeer(CIRCLE_ID, A.pubKey);
+    // A REAL join, not hand-wired peers: the signed task lane verifies the sender's key↔ref binding
+    // against the circle roster, so `addCirclePeer` (a transport peer, no membership) is refused.
+    await pairCircle(A, B, { groupId: CIRCLE_ID, name: 'Claim circle', handle: 'bee' });
     await warm(A, B);
     await warm(B, A);
 

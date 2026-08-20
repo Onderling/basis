@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 
 import { startRelay } from '@onderling/relay';
-import { bootRealAgentNode, connectNodesOverRelay, until, teardown } from './support/pairRealAgents.js';
+import { bootRealAgentNode, connectNodesOverRelay, pairCircle, until, teardown } from './support/pairRealAgents.js';
 
 const CIRCLE_ID = 'relay-race-chores';
 const WARM = { hold: true, firstSendTimeoutMs: 4000, retryDelays: [] };
@@ -40,12 +40,13 @@ describe('subtask claim-confirmation race over a real relay (§7)', () => {
   beforeAll(async () => {
     relay = await startRelay({ port: 0, log: false });
     relayUrl = `ws://127.0.0.1:${relay.port}`;
-    [A, B] = await Promise.all([bootRealAgentNode('A'), bootRealAgentNode('B')]);
+    [A, B] = await Promise.all([bootRealAgentNode('A', { taskLane: true }), bootRealAgentNode('B', { taskLane: true })]);
     await connectNodesOverRelay([A, B], { relayUrl });
     wireInboundLikeShell(A);
     wireInboundLikeShell(B);
-    await A.agent.addCirclePeer(CIRCLE_ID, B.pubKey);
-    await B.agent.addCirclePeer(CIRCLE_ID, A.pubKey);
+    // A REAL join, not hand-wired peers: the signed task lane verifies the sender's key↔ref binding
+    // against the circle roster, so `addCirclePeer` (a transport peer, no membership) is refused.
+    await pairCircle(A, B, { groupId: CIRCLE_ID, name: 'Claim circle (relay)', handle: 'bee' });
     await warm(A, B);
     await warm(B, A);
   }, 90000);

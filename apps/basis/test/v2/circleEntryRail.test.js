@@ -124,6 +124,37 @@ describe('the rail — verified read (the receiver-enforced half)', () => {
     expect(disputed.size).toBe(0);
   });
 
+  it('CONCURRENT INGESTS NEVER OVERLAP-VERIFY — the sibling-vs-recursion pin', async () => {
+    // The live bug this pins (2026-08-20): the roster binding verifier carries a per-circle re-entrancy
+    // breaker (`inFlight`) for TRUE recursion — the roster projection reads the membership rail, which
+    // verifies through the same gate. But an inFlight set cannot tell recursion from concurrent
+    // SIBLINGS: two statements arriving in the same tick both reached the verifier, and the second was
+    // refused "unverifiable key-ref binding" — a valid claim silently dropped on the receive side
+    // (a task + its claim fanned back-to-back; the peer kept only one). The rail therefore serialises
+    // ingest per circle, so sibling verifies never overlap and the breaker only trips on recursion.
+    // This test's verifier REFUSES on overlap, exactly like the production breaker — remove the
+    // serialisation and it goes red.
+    const log = fakeEventLog();
+    const alice = await member('webid:alice');
+    const bob   = await member('webid:bob');
+    let inFlight = false;
+    const rail = railFor(log, alice, {
+      verifyBinding: async ({ author, ref }) => {
+        if (inFlight) return false;                       // the production breaker's shape
+        inFlight = true;
+        await new Promise((r) => setTimeout(r, 5));       // the roster read's async window
+        inFlight = false;
+        return author === bob.identity.pubKey && ref === bob.ref;
+      },
+    });
+    const s1 = signSpine(bob.identity, { kind: 'propose', circleId: CIRCLE, subject: 'p1', payload: { action: 'changePolicy', subject: {}, by: bob.ref, at: 1, authorRef: bob.ref }, parent: null });
+    const s2 = signSpine(bob.identity, { kind: 'vote', circleId: CIRCLE, subject: 'p1', payload: { voter: bob.ref, choice: 'yes', at: 2, authorRef: bob.ref }, parent: s1.body.hash });
+    const [r1, r2] = await Promise.all([rail.ingest(CIRCLE, s1), rail.ingest(CIRCLE, s2)]);
+    expect(r1.ok, r1.reason).toBe(true);
+    expect(r2.ok, r2.reason).toBe(true);                  // pre-fix: 'unverifiable key-ref binding'
+    expect((await rail.readVerified(CIRCLE)).events).toHaveLength(2);
+  });
+
   it('EQUIVOCATION: two votes off one parent → the fork-proof marks the author disputed; the fold discounts them', async () => {
     const log = fakeEventLog();
     const alice = await member('webid:alice');

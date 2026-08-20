@@ -67,6 +67,7 @@ import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '..
 import { makeGovernanceRail } from '../../../basis/src/v2/governanceAppWiring.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../../basis/src/v2/membershipRail.js';
 import { GRANTS_BROADCAST } from '../../../basis/src/v2/grantsRail.js';
+import { applyRulesUpdates } from '../../../basis/src/v2/rulesUpdateLane.js';
 import { makeTaskPeerHandler, TASK_BROADCAST, TASK_CATCHUP_SUBTYPES } from '../../../basis/src/v2/taskRail.js';
 import { makeFrontierReplay } from '../../../basis/src/v2/frontierReplay.js';
 import { makeChatPeerHandler, makePodChatCatchUp, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../../basis/src/v2/chatRail.js';
@@ -686,9 +687,16 @@ export default function ChatScreen({
         const govRail = bundle?.agent?.circleIdentityFor
           ? makeGovernanceRail({ eventLog: eventLogRef.current, circleIdentityFor: bundle.agent.circleIdentityFor, myRef: '', callSkill: bundle.callSkill })
           : null;
+        // Any governance change (live fan below, or a catch-up batch) may carry a rules-update
+        // statement — fold it into the local rules head (cheap pre-scan; no-op for vote churn).
+        // Same wiring as the web shell.
+        const govChanged = (cid) => {
+          if (govRail) applyRulesUpdates({ rail: govRail, callSkill: bundle.callSkill, circleId: cid }).catch(() => {});
+        };
         const govCatchUp = govRail ? makeGovernanceCatchUp({
           rail: govRail,
           sendToPeer: (addr, payload) => bundle?.agent?.sendPeerMessage?.(addr, payload),
+          onChange: govChanged,
         }) : null;
         if (govCatchUp && !globalThis.__onderlingGovCatchUpKicked) {
           globalThis.__onderlingGovCatchUpKicked = true;
@@ -826,6 +834,7 @@ export default function ChatScreen({
           'circle-governance-broadcast': makeCircleGovernancePeerHandler({
             eventLog: eventLogRef.current,
             rail: govRail,
+            onChange: govChanged,
             notify: (circleId, event) => {
               try {
                 eventLogRef.current?.append({

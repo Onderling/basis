@@ -1,6 +1,6 @@
 /**
- * THE GRANTS LANE OVER A REAL RELAY — the marquee stories (J-GL1 pair-on-P-act-at-L · J-GL2
- * live revoke) on the transport where per-device addressing is REAL: a ws relay socket, alias
+ * THE GRANTS LANE OVER A REAL RELAY — the marquee stories (pair on the phone, act at the laptop's
+ * door; then the live revoke) on the transport where per-device addressing is REAL: a ws relay socket, alias
  * binding answered with the per-circle key's signed challenge, and the fan riding hold-forward.
  * The in-process bus walk (`grantsLaneJourneys.test.js`) covers all nine journeys; this closes
  * the seam the bus cannot: the production relay transport end-to-end.

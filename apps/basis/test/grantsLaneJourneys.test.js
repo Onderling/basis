@@ -137,7 +137,7 @@ describe('the grants lane — a connection belongs to the person (J-GL1…J-GL9)
     await teardown(P, L, B, N);
   });
 
-  let firstTokens;   // the J-GL1 grant's tokens (V holds these blobs)
+  let firstTokens;   // the first grant's tokens (V holds these blobs)
 
   it('J-GL1 — a grant is Anna\'s, not her phone\'s: paired on P, V acts through L\'s door', async () => {
     const grant = await P.agent.callSkill('household', 'grantSurface', {
@@ -186,7 +186,7 @@ describe('the grants lane — a connection belongs to the person (J-GL1…J-GL9)
     }, { timeout: 10000, step: 50 });
     expect(refused, 'L\'s door kept admitting after the revoke').toBeTruthy();
 
-    // J-GL7 — the gate never depends on the view's cooperation: V "ignores the drop" and keeps
+    // The gate never depends on the view's cooperation: V "ignores the drop" and keeps
     // sending; every device's door refuses regardless.
     expect((await act(P, firstTokens[0])).code).toBe('INVALID_TOKEN');
     expect((await act(L, firstTokens[0])).code).toBe('INVALID_TOKEN');
@@ -207,7 +207,7 @@ describe('the grants lane — a connection belongs to the person (J-GL1…J-GL9)
   let narrowTokens;
 
   it('J-GL8 — re-granting rotates everywhere: the old tokens die on every device, the new picks bind at L untouched', async () => {
-    // The deliberate re-pair after a revoke (also J-GL9\'s coda shape): a NEW grant made after the
+    // The deliberate re-pair after a revoke (the concurrent-fork story's coda shape): a NEW grant made after the
     // revoke stands — revoke-wins is causal, not terminal.
     const broad = await P.agent.callSkill('household', 'grantSurface', {
       viewPubKey: V.pubKey, ops: ['params.set-param', 'params.get-param'], label: 'hallway screen',

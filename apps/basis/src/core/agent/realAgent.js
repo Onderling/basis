@@ -697,10 +697,6 @@ export async function createRealHouseholdAgent(opts = {}) {
         circleId:       id,
         selfPubKey:     chatId.pubKey,
       });
-      store.setSyncHook({
-        publishItem:        (item) => mirror.publishItem(item),
-        publishItemRemoved: (rid)  => mirror.publishItemRemoved(rid),
-      });
       circleMirrors.set(id, mirror);
       // Restore this circle's persisted manual pairings (best-effort).
       try {
@@ -756,15 +752,14 @@ export async function createRealHouseholdAgent(opts = {}) {
         circleSyncWired.add(id);
         if (typeof console !== 'undefined') console.info(`[circle-sync] ${id}: pod-carried (peer mirror skipped — no double-carry)`);
       } else {
-        const mirror = await ensureCircleMirror(id);
-        // The per-type valve: task items publish as SIGNED lane snapshots on the device log (the content
-        // re-root); everything else keeps the legacy mirror carry. The router is built per publish call so
-        // it sees the task emitter even though this wiring can run at boot, before the rails are handed the
-        // device log. Without a device log (legacy compositions) every type keeps the mirror — one path per
-        // type per composition, honestly.
+        await ensureCircleMirror(id);   // the peer ROSTER object (list/persist/clear + the legacy inbound door) — no publish carry
+        // The publish valve: every circle-content write rides the SIGNED lane (the content re-root); the
+        // unsigned mirror carry is deleted. The valve is built per publish call so it sees the task
+        // emitter even though this wiring can run at boot, before the rails are handed the device log;
+        // on a device-log composition a pre-emitter write REFUSES loudly instead of silently not-fanning.
         wireStoreMirror(circleStore, {
-          publishItem:        (item)          => routeTaskMirror({ circleId: id, mirror, emitter: taskEmit, requireSigned: !!opts.deviceLog }).publishItem(item),
-          publishItemRemoved: (rid, removed)  => routeTaskMirror({ circleId: id, mirror, emitter: taskEmit, requireSigned: !!opts.deviceLog }).publishItemRemoved(rid, removed),
+          publishItem:        (item)          => routeTaskMirror({ circleId: id, emitter: taskEmit, requireSigned: !!opts.deviceLog }).publishItem(item),
+          publishItemRemoved: (rid, removed)  => routeTaskMirror({ circleId: id, emitter: taskEmit, requireSigned: !!opts.deviceLog }).publishItemRemoved(rid, removed),
         });
         // The UNSIGNED inbound door only exists for the mirror-carry composition (no device log — the
         // legacy shape). A device-log composition publishes every type as a SIGNED lane statement and
@@ -818,27 +813,25 @@ export async function createRealHouseholdAgent(opts = {}) {
     const id = circleId || 'household';
     let items = [];
     try { items = await householdApp.listOpen(householdService.stores.getStore(id), {}); } catch { return; }
-    const mirror = await ensureCircleMirror(id);
-    // The live publish valve refuses to downgrade; this site had the valve's SHAPE but not its guard, so
-    // on a device-log composition whose emitter was not yet handed over, a catch-up would have gone out as
-    // unsigned mirror envelopes — and a catch-up is the worst place for that, because it republishes the
-    // whole existing list at once. The check is hoisted ABOVE the loop deliberately: the per-item `try`
-    // below swallows errors (a catch-up is best-effort), so a throw inside it would be silent again.
-    // Skipping is safe — a catch-up recurs on the next pairing; publishing unsigned is not.
-    if (opts.deviceLog && !taskEmit) {
-      console.warn(
-        `[circle-sync] ${id}: skipping catch-up republish — a signed lane is required and no emitter is `
-        + 'wired yet. Refusing to fall back to the unsigned mirror carry.',
-      );
+    // A catch-up republish rides the SIGNED lane only (the unsigned mirror carry is deleted). Without an
+    // emitter there is nothing safe to republish over: on a device-log composition that is a loud skip
+    // (the emitter is handed over after boot; the catch-up recurs on the next pairing), and on a
+    // composition without a device log there is simply no peer carry. The check is hoisted ABOVE the
+    // loop deliberately: the per-item `try` swallows errors (best-effort), so a throw inside it would
+    // be silent.
+    if (!taskEmit) {
+      if (opts.deviceLog) {
+        console.warn(
+          `[circle-sync] ${id}: skipping catch-up republish — a signed lane is required and no emitter `
+          + 'is wired yet.',
+        );
+      }
       return;
     }
     for (const it of (Array.isArray(items) ? items : [])) {
-      // With a lane emitter every head republishes as a signed lane snapshot (the receiver's rail verifies
-      // + causally merges — idempotent); only a no-device-log composition still uses mirror envelopes.
-      try {
-        if (taskEmit && it) taskEmit.snapshot(id, it);
-        else mirror.publishItem(it);
-      } catch { /* best-effort */ }
+      // Every head republishes as a signed lane snapshot (the receiver's rail verifies + causally
+      // merges — idempotent).
+      try { if (it) taskEmit.snapshot(id, it); } catch { /* best-effort */ }
     }
   }
   function isNewCirclePeer(circleId, pubKey) {

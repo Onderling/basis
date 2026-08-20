@@ -354,14 +354,17 @@ describe('createRealHouseholdAgent — OBJ-2 household no-pod sync (S1a/S1c)', (
     expect(a.householdSync.handleInbound('peerB', { someDM: 'hi' })).toBe(false);
   });
 
-  it('S1d — a local addItem via the skills fans out to the roster (publish-on-write)', async () => {
+  it('the unsigned mirror carry stays DELETED — a write never reaches mirror.publishItem', async () => {
+    // This test used to pin the opposite (publish-on-write over the unsigned mirror). That carry is
+    // deleted: production fan is the SIGNED task lane, proven end-to-end by appTaskFanTwoDevice +
+    // appCircleFanOfflineDelivery (real joins, real wire, store-head assertions). What must not
+    // regress HERE is the closure itself: even with a hand-paired transport peer, a write on a
+    // no-lane composition calls no mirror publish — there is no unsigned fallback left to take.
     const a = await createRealHouseholdAgent();
     a.addCirclePeer('peerB');
     const spy = vi.spyOn(a.householdSync.mirror, 'publishItem');
     await a.callSkill('household', 'addItem', { type: 'shopping', text: 'Buy milk' });
-    expect(spy).toHaveBeenCalled();
-    expect(spy.mock.calls[0][0]?.text).toBe('Buy milk');   // the RAW item, with its id
-    expect(spy.mock.calls[0][0]?.id).toBeTruthy();
+    expect(spy).not.toHaveBeenCalled();
   });
 });
 
@@ -384,11 +387,5 @@ describe('createRealHouseholdAgent — L3 uniform wired path (default; legacy re
     expect(open.items.map((i) => i.label).sort()).toEqual(['Milk', 'Post a parcel', 'Vacuum living room']);
   });
 
-  it('a write PUBLISHES to the per-circle peer mirror (no-pod sync, publish side)', async () => {
-    const a = await createRealHouseholdAgent();
-    const spy = vi.spyOn(a.householdSync.mirror, 'publishItem');   // the circle 'household' mirror
-    await a.callSkill('household', 'addItem', { type: 'shopping', text: 'milk' });
-    expect(spy).toHaveBeenCalled();                                // the CircleItemStore write fanned out
-    expect(spy.mock.calls[0][0]?.text).toBe('milk');              // …with the stored item
-  });
+
 });

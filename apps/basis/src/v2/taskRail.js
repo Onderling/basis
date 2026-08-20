@@ -11,7 +11,7 @@
  * republished head remains as valid as a fresh write.
  *
  * This lane replaces the unsigned peer-mirror carry for task items (per-type one-path): the store's publish
- * hook routes task types here and everything else to the legacy mirror — see `routeTaskMirror`.
+ * hook routes every circle-content publish onto the lane — see `routeTaskMirror` (unsigned carry deleted).
  */
 import { signSpine, authorHead, frontier } from '@onderling/core';
 import { makeCircleEntryRail } from './circleEntryRail.js';
@@ -163,22 +163,22 @@ export function makeTaskEmitter({ rail, fan = null }) {
 }
 
 /**
- * The publish valve (mirror-shaped, so `wireStoreMirror` wraps it unchanged). Since the lane set closed
- * over every store type, the routing is per COMPOSITION, not per type: with a lane emitter (a device log
- * was composed — every production shell) EVERYTHING publishes as a signed lane statement and the legacy
- * mirror is never touched; without one (legacy/test compositions) the mirror stays the only carry.
+ * The publish valve (mirror-shaped, so `wireStoreMirror` wraps it unchanged). The unsigned mirror carry
+ * is DELETED: with a lane emitter (a device log was composed — every production shell) everything
+ * publishes as a signed lane statement; without one there is NO peer fan at all — content convergence
+ * between devices requires the signed lane, and a composition that wants it composes a device log
+ * (as every converted test does, through a real join).
  *
- * `requireSigned` closes the downgrade window. The emitter is handed over AFTER boot, while this valve is
- * wired when a circle opens — so a write in between would have taken the unsigned mirror silently, on a
- * composition that had asked for signed lanes. A composition that carries a device log therefore REFUSES
- * to publish rather than quietly falling back to an unsigned carry.
+ * `requireSigned` closes the downgrade window LOUDLY. The emitter is handed over AFTER boot, while this
+ * valve is wired when a circle opens — a write in between must fail visibly on a composition that asked
+ * for signed lanes, never silently not-fan.
  */
-export function routeTaskMirror({ circleId, mirror, emitter, requireSigned = false } = {}) {
+export function routeTaskMirror({ circleId, emitter, requireSigned = false } = {}) {
   const noDowngrade = () => {
     if (requireSigned && !emitter) {
       throw new Error(
         `routeTaskMirror(${circleId}): a signed lane was required but no emitter is wired yet — `
-        + 'refusing to fall back to the unsigned mirror carry',
+        + 'refusing to publish (the unsigned mirror carry is deleted)',
       );
     }
   };
@@ -186,14 +186,12 @@ export function routeTaskMirror({ circleId, mirror, emitter, requireSigned = fal
     publishItem(item) {
       noDowngrade();
       if (emitter && item) return emitter.snapshot(circleId, item);
-      return mirror?.publishItem?.(item);
+      return undefined;   // no lane → no fan (the write stays local)
     },
-    publishItemRemoved(id, removedItem) {
+    publishItemRemoved(id) {
       noDowngrade();
-      // A removal needs only the id on the lane; the removed item's type (when the store could still
-      // supply it) is informational. Idempotent on every receiver.
       if (emitter) return emitter.remove(circleId, id);
-      return mirror?.publishItemRemoved?.(id);
+      return undefined;
     },
   };
 }

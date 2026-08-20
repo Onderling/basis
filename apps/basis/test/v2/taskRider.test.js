@@ -59,15 +59,10 @@ async function device(ref, rosterAll, wire) {
     rail,
     fan: (circleId, statement) => wire.push({ from: ref, circleId, statement }),
   });
-  const mirrorCalls = [];
-  const legacyMirror = {
-    publishItem:        (i)  => mirrorCalls.push(['item', i.type]),
-    publishItemRemoved: (id) => mirrorCalls.push(['removed', id]),
-  };
   const store = stores.getStore(CIRCLE);
-  wireStoreMirror(store, routeTaskMirror({ circleId: CIRCLE, mirror: legacyMirror, emitter }));
+  wireStoreMirror(store, routeTaskMirror({ circleId: CIRCLE, emitter }));
   const receiver = makeTaskPeerHandler({ rail });
-  return { ref, cid, eventLog, store, rail, emitter, receiver, mirrorCalls };
+  return { ref, cid, eventLog, store, rail, emitter, receiver };
 }
 
 /** Deliver every queued statement to every OTHER device (the live fan). */
@@ -91,7 +86,6 @@ describe('the task lane — snapshots on the device log, heads causally merged',
     const [task] = await addTasks(ada.store, [{ text: 'fix the gate' }], { actor: 'webid:ada' });
     await settle();
     expect(ada.eventLog.entries).toHaveLength(1);                       // the lane entry, on the writer's own log
-    expect(ada.mirrorCalls.find(([, t]) => t === 'task')).toBeUndefined();   // the valve: no mirror carry for tasks
 
     await pump(wire, [ada, bo]);
     const boHead = await bo.store.get(task.id);
@@ -104,11 +98,9 @@ describe('the task lane — snapshots on the device log, heads causally merged',
     // data — ContactBook, roster — never was store cargo), so NO type reaches the legacy mirror.
     await ada.store.put({ id: 'shop-1', type: 'shopping', text: 'milk' }, { by: 'webid:ada' });
     await settle();
-    expect(ada.mirrorCalls.find(([, t]) => t === 'shopping')).toBeUndefined();
     expect(ada.eventLog.entries).toHaveLength(2);                       // the shopping snapshot joined the lane
     await ada.store.put({ id: 'c-1', type: 'contact', displayName: 'bea' }, { by: 'webid:ada' });
     await settle();
-    expect(ada.mirrorCalls).toHaveLength(0);                            // the mirror carries NOTHING now
     expect(ada.eventLog.entries).toHaveLength(3);                       // the contact snapshot joined the lane
   });
 
@@ -226,19 +218,27 @@ describe('the task lane — snapshots on the device log, heads causally merged',
     expect((await cato.store.get('task-old'))?.text).toBe('ancient but open');   // the aged-out head still arrived
   });
 
-  it('THE VALVE, CLOSED: every store type rides the lane — the legacy mirror carries nothing', () => {
-    const laneCalls = []; const mirrorCalls = [];
+  it('THE VALVE, CLOSED: every store type rides the lane — the unsigned mirror carry is DELETED', () => {
+    const laneCalls = [];
     const valve = routeTaskMirror({
       circleId: 'circle-v',
       emitter: { snapshot: (cid, it) => laneCalls.push(it.type), remove: (cid, id) => laneCalls.push(`rm:${id}`) },
-      mirror: { publishItem: (it) => mirrorCalls.push(it.type), publishItemRemoved: (id) => mirrorCalls.push(`rm:${id}`) },
     });
     for (const type of ['task', 'shopping', 'errand', 'repair', 'schedule', 'note', 'contact']) {
       valve.publishItem({ id: `i-${type}`, type });
     }
-    valve.publishItemRemoved('i-shopping', { id: 'i-shopping', type: 'shopping' });
-    valve.publishItemRemoved('i-contact', { id: 'i-contact', type: 'contact' });
+    valve.publishItemRemoved('i-shopping');
+    valve.publishItemRemoved('i-contact');
     expect(laneCalls).toEqual(['task', 'shopping', 'errand', 'repair', 'schedule', 'note', 'contact', 'rm:i-shopping', 'rm:i-contact']);
-    expect(mirrorCalls).toEqual([]);
+
+    // No emitter + not required (a composition without a lane): a publish is a NO-OP — there is no
+    // unsigned fallback left to take. The write stays local; convergence needs the lane.
+    const bare = routeTaskMirror({ circleId: 'circle-v' });
+    expect(bare.publishItem({ id: 'i-x', type: 'task' })).toBeUndefined();
+    expect(bare.publishItemRemoved('i-x')).toBeUndefined();
+
+    // Required + no emitter (a device-log composition before the emitter lands): LOUD refusal.
+    const strict = routeTaskMirror({ circleId: 'circle-v', requireSigned: true });
+    expect(() => strict.publishItem({ id: 'i-y', type: 'task' })).toThrow(/unsigned mirror carry is deleted/);
   });
 });

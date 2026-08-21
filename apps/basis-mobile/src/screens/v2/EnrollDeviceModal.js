@@ -7,7 +7,7 @@
  * record, reopen, re-announce).
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
+import { Modal, View, Text, TextInput, Pressable, StyleSheet, Share } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { QrCodeView } from '@onderling/react-native/qr/view';
 import { createFlowRunner, renderFlow } from '@onderling/app-manifest';
@@ -88,6 +88,15 @@ export default function EnrollDeviceModal({ visible, callSkill, onClose }) {
                 </View>
               )}
               <View style={styles.row}>
+                {!offerView.error ? (
+                  <Pressable
+                    style={styles.button}
+                    onPress={() => { Share.share({ message: offerView.uri }).catch(() => {}); }}
+                    testID="enroll-offer-share"
+                  >
+                    <Text style={styles.buttonText}>{t('circle.enroll.offer_share')}</Text>
+                  </Pressable>
+                ) : null}
                 <Pressable style={styles.cancel} onPress={() => setOfferView(null)} testID="enroll-offer-back">
                   <Text style={styles.cancelText}>{t('circle.enroll.offer_back')}</Text>
                 </Pressable>

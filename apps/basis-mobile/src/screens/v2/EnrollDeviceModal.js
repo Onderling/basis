@@ -8,8 +8,11 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { QrCodeView } from '@onderling/react-native/qr/view';
 import { createFlowRunner, renderFlow } from '@onderling/app-manifest';
 import { householdManifest } from '../../../../household/manifest.js';
+import { stashEnrollOffer } from '../../../../basis/src/v2/enrollOffer.js';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
 
@@ -21,6 +24,12 @@ export default function EnrollDeviceModal({ visible, callSkill, onClose }) {
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [inst, setInst] = useState(null);
   const [drafts, setDrafts] = useState({});
+  // The add-device offer (`onderling-enroll://`): the paste half (this = the NEW device) + the
+  // show half (this = the EXISTING device). Public data — relay hint + per-circle addresses;
+  // the phrase never rides it.
+  const [offerDraft, setOfferDraft] = useState('');
+  const [offerInvalid, setOfferInvalid] = useState(false);
+  const [offerView, setOfferView] = useState(null);   // null | {uri} | {error}
   const runnerRef = useRef(null);
 
   useEffect(() => {
@@ -38,23 +47,67 @@ export default function EnrollDeviceModal({ visible, callSkill, onClose }) {
   const view = inst ? renderFlow(FLOW, inst, { ops: OPS }) : null;
   const outcome = inst?.steps?.ceremony?.outcome;
 
-  const submit = () => {
+  const submit = async () => {
     const runner = runnerRef.current;
     if (!runner || !inst) return;
+    // A pasted offer must parse before the ceremony proceeds — a person who pasted one MEANT to
+    // use it, and a silent drop would strand the new device unreachable. Empty = fine.
+    setOfferInvalid(false);
+    const pasted = offerDraft.trim();
+    if (pasted) {
+      const stashed = await stashEnrollOffer(AsyncStorage, pasted).catch(() => ({ ok: false }));
+      if (!stashed.ok) { setOfferInvalid(true); return; }
+    }
     runner.resume(FLOW, inst, { input: drafts })
       .then((r) => setInst(r))
       .catch(() => { setInst(null); onClose?.(); });
   };
-  const finish = () => { setInst(null); onClose?.(); };
+  const showOffer = () => {
+    Promise.resolve(callSkill('household', 'buildEnrollOffer', {}))
+      .then((r) => setOfferView(r?.ok && r.uri ? { uri: r.uri } : { error: true }))
+      .catch(() => setOfferView({ error: true }));
+  };
+  const finish = () => { setInst(null); setOfferView(null); setOfferDraft(''); onClose?.(); };
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={finish}>
       <View style={styles.backdrop}>
         <View style={styles.card}>
-          <Text style={styles.title}>{t('circle.enroll.title')}</Text>
-          {view?.status === 'awaiting-input' && view.form ? (
+          <Text style={styles.title}>{offerView ? t('circle.enroll.offer_title') : t('circle.enroll.title')}</Text>
+          {offerView ? (
+            <View>
+              {offerView.error ? (
+                <Text style={styles.body}>{t('circle.enroll.offer_error')}</Text>
+              ) : (
+                <View>
+                  <Text style={styles.body}>{t('circle.enroll.offer_hint')}</Text>
+                  <View style={styles.qrBox} testID="enroll-offer-qr">
+                    <QrCodeView value={offerView.uri} size={220} />
+                  </View>
+                  <Text style={styles.offerUri} selectable numberOfLines={3}>{offerView.uri}</Text>
+                </View>
+              )}
+              <View style={styles.row}>
+                <Pressable style={styles.cancel} onPress={() => setOfferView(null)} testID="enroll-offer-back">
+                  <Text style={styles.cancelText}>{t('circle.enroll.offer_back')}</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : view?.status === 'awaiting-input' && view.form ? (
             <View>
               <Text style={styles.body}>{t('circle.enroll.body')}</Text>
+              <TextInput
+                style={styles.input}
+                placeholder={t('circle.enroll.offer_paste_label')}
+                placeholderTextColor={theme.color.inkSoft}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="off"
+                value={offerDraft}
+                onChangeText={(v) => { setOfferDraft(v); setOfferInvalid(false); }}
+                testID="enroll-offer-paste"
+              />
+              {offerInvalid ? <Text style={styles.offerErr}>{t('circle.enroll.offer_paste_invalid')}</Text> : null}
               {view.form.params.map((param) => (
                 <TextInput
                   key={param.name}
@@ -78,6 +131,9 @@ export default function EnrollDeviceModal({ visible, callSkill, onClose }) {
                   <Text style={styles.cancelText}>{t('circle.confirm.cancel', { defaultValue: 'Annuleren' })}</Text>
                 </Pressable>
               </View>
+              <Pressable style={styles.offerToggle} onPress={showOffer} testID="enroll-offer-show">
+                <Text style={styles.cancelText}>{t('circle.enroll.offer_toggle')}</Text>
+              </Pressable>
             </View>
           ) : view ? (
             <View>
@@ -121,6 +177,10 @@ const makeStyles = (theme) => StyleSheet.create({
   body: { fontSize: 14, color: theme.color.ink, marginBottom: 10 },
   input: { borderWidth: 1, borderColor: theme.color.line, borderRadius: 8, padding: 8, color: theme.color.ink, marginBottom: 8 },
   secret: { minHeight: 72, textAlignVertical: 'top' },
+  offerErr: { fontSize: 13, color: theme.color.danger ?? theme.color.ink, marginBottom: 8 },
+  offerToggle: { marginTop: 10, paddingVertical: 6 },
+  qrBox: { alignSelf: 'center', padding: 8, backgroundColor: '#fff', borderRadius: 8, marginVertical: 8 }, // hex-ok: QR scanner contrast
+  offerUri: { fontSize: 11, color: theme.color.inkSoft, marginBottom: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
   button: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: theme.color.line },
   buttonText: { color: theme.color.ink, fontSize: 14 },

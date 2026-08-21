@@ -68,6 +68,7 @@ import { makeGovernanceRail } from '../../../basis/src/v2/governanceAppWiring.js
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../../basis/src/v2/membershipRail.js';
 import { GRANTS_BROADCAST } from '../../../basis/src/v2/grantsRail.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../../basis/src/v2/rulesUpdateLane.js';
+import { consumeEnrollOffer } from '../../../basis/src/v2/enrollOffer.js';
 import { makeTaskPeerHandler, TASK_BROADCAST, TASK_CATCHUP_SUBTYPES } from '../../../basis/src/v2/taskRail.js';
 import { makeFrontierReplay } from '../../../basis/src/v2/frontierReplay.js';
 import { makeChatPeerHandler, makePodChatCatchUp, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../../basis/src/v2/chatRail.js';
@@ -722,6 +723,23 @@ export default function ChatScreen({
         if (grantsCatchUp && !globalThis.__onderlingGrantsCatchUpKicked) {
           globalThis.__onderlingGrantsCatchUpKicked = true;
           setTimeout(() => { grantsCatchUp.requestFromSiblings().catch(() => {}); }, 2500);
+        }
+        // The enroll-offer consume (once per app launch, no-op when nothing is stashed): the first
+        // boot after an add-device ceremony bootstraps every circle from the scanned offer — same
+        // wiring as the web shell.
+        if (bundle?.agent && !globalThis.__onderlingEnrollOfferConsumed) {
+          globalThis.__onderlingEnrollOfferConsumed = true;
+          setTimeout(() => {
+            consumeEnrollOffer({
+              agent: bundle.agent,
+              callSkill: bundle.callSkill,
+              sendPeerMessage: (to, payload, opts2) => bundle.agent.sendPeerMessage(to, payload, opts2),
+              storage: AsyncStorage,
+              registerCirclePresence: (ids) => bundle.registerCirclePresence?.(ids),
+            }).then((r) => {
+              if (r?.consumed) console.log('[enroll-offer] bootstrap:', JSON.stringify(r.circles?.map((c) => ({ id: c.circleId, ok: c.ok, steps: c.steps }))));
+            }).catch(() => { /* retried next launch — the stash only clears on full success */ });
+          }, 3000);
         }
         // The task lane (the content re-root): the fan receiver verifies at the agent's rail and causally
         // merges the snapshot into the circle's store head; the catch-up is the windowed FRONTIER REPLAY —

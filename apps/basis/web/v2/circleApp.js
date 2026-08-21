@@ -172,6 +172,7 @@ import { makeGovernanceCatchUp } from '../../src/v2/governanceCatchUp.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../src/v2/membershipRail.js';
 import { GRANTS_BROADCAST } from '../../src/v2/grantsRail.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
+import { stashEnrollOffer, consumeEnrollOffer } from '../../src/v2/enrollOffer.js';
 import { makeTaskPeerHandler, TASK_BROADCAST, TASK_CATCHUP_SUBTYPES } from '../../src/v2/taskRail.js';
 import { makeFrontierReplay } from '../../src/v2/frontierReplay.js';
 import { makeChatPeerHandler, makePodChatCatchUp, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../src/v2/chatRail.js';
@@ -4476,6 +4477,55 @@ function showEnrollDeviceFlow() {
   const { card, close } = _restoreOverlay();
   let inst = null;
 
+  // The EXISTING-device view: this device's add-device offer (`onderling-enroll://`) as a QR +
+  // copyable code. Public by design — relay hint + per-circle addresses, never the phrase.
+  const paintOffer = async () => {
+    card.innerHTML = '';
+    const h = document.createElement('h3');
+    h.textContent = t('circle.enroll.offer_title');
+    card.appendChild(h);
+    const back = document.createElement('button');
+    back.type = 'button';
+    back.className = 'cc-btn cc-btn--quiet';
+    back.textContent = t('circle.enroll.offer_back');
+    back.addEventListener('click', () => paint());
+    const built = await rawCallSkill('household', 'buildEnrollOffer', { relayUrl: CIRCLE_RELAY_URL || undefined }).catch(() => null);
+    if (!built?.ok || !built.uri) {
+      const err = document.createElement('p');
+      err.textContent = t('circle.enroll.offer_error');
+      card.append(err, back);
+      return;
+    }
+    const hint = document.createElement('p');
+    hint.textContent = t('circle.enroll.offer_hint');
+    card.appendChild(hint);
+    const canvas = document.createElement('canvas');
+    canvas.width = 220; canvas.height = 220;
+    canvas.style.cssText = 'display:block;max-width:220px;margin:8px 0;background:#fff'; // hex-ok: QR scanner contrast
+    card.appendChild(canvas);
+    import('qrcode').then((mod) => {
+      (mod.default ?? mod).toCanvas(canvas, built.uri, { width: 220, margin: 1, errorCorrectionLevel: 'M' }, () => {});
+    }).catch(() => { canvas.remove(); });   // the copyable text below stays the fallback
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:.4rem;margin:.4rem 0;';
+    const uriInput = document.createElement('input');
+    uriInput.type = 'text';
+    uriInput.readOnly = true;
+    uriInput.value = built.uri;
+    uriInput.style.cssText = 'flex:1;';
+    const copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.className = 'cc-btn cc-btn--quiet';
+    copyBtn.textContent = t('circle.pairedDevices.copy');
+    copyBtn.addEventListener('click', () => {
+      try { navigator.clipboard?.writeText(built.uri); } catch { /* the input stays selectable */ }
+      copyBtn.textContent = t('circle.pairedDevices.copied');
+      setTimeout(() => { copyBtn.textContent = t('circle.pairedDevices.copy'); }, 1500);
+    });
+    row.append(uriInput, copyBtn);
+    card.append(row, back);
+  };
+
   const paint = () => {
     const view = renderFlow(FLOW, inst, { ops: OPS });
     card.innerHTML = '';
@@ -4487,6 +4537,19 @@ function showEnrollDeviceFlow() {
       const p = document.createElement('p');
       p.textContent = t('circle.enroll.body');
       card.appendChild(p);
+      // The enroll OFFER paste (optional, the NEW-device half of the add-device QR): the
+      // transport bootstrap from the person's existing device. Stashed in PLAIN storage — it is
+      // public data — and consumed by the first boot after the ceremony's reload.
+      const offerInput = document.createElement('input');
+      offerInput.type = 'text';
+      offerInput.placeholder = t('circle.enroll.offer_paste_label');
+      offerInput.style.cssText = 'display:block;width:100%;margin:.4rem 0;';
+      offerInput.autocomplete = 'off';
+      card.appendChild(offerInput);
+      const offerErr = document.createElement('p');
+      offerErr.style.cssText = 'color:var(--cc-danger, #b00020);margin:.2rem 0;display:none;'; // hex-ok: fallback only
+      offerErr.textContent = t('circle.enroll.offer_paste_invalid');
+      card.appendChild(offerErr);
       const values = {};
       for (const param of view.form.params) {
         const input = document.createElement(param.kind === 'secret' ? 'textarea' : 'input');
@@ -4500,7 +4563,15 @@ function showEnrollDeviceFlow() {
       const go = document.createElement('button');
       go.type = 'button';
       go.textContent = t('circle.enroll.submit');
-      go.addEventListener('click', () => {
+      go.addEventListener('click', async () => {
+        // A pasted code must parse before the ceremony proceeds — a person who pasted one MEANT
+        // to use it, and a silent drop would strand the new device unreachable. Empty = fine.
+        offerErr.style.display = 'none';
+        const pasted = offerInput.value.trim();
+        if (pasted) {
+          const stashed = await stashEnrollOffer(window.localStorage, pasted).catch(() => ({ ok: false }));
+          if (!stashed.ok) { offerErr.style.display = 'block'; return; }
+        }
         runner.resume(FLOW, inst, { input: values }).then((r) => { inst = r; paint(); }).catch(() => close());
       });
       card.appendChild(go);
@@ -4510,6 +4581,15 @@ function showEnrollDeviceFlow() {
       cancel.style.cssText = 'margin-left:.6rem;';
       cancel.addEventListener('click', () => { runner.cancel(inst); close(); });
       card.appendChild(cancel);
+      // The EXISTING-device half: show THIS device's offer as a QR + copyable code — the person
+      // adding a new device is standing at this same screen on the device they already have.
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.textContent = t('circle.enroll.offer_toggle');
+      toggle.className = 'cc-btn cc-btn--quiet';
+      toggle.style.cssText = 'display:block;margin-top:.8rem;';
+      toggle.addEventListener('click', () => paintOffer());
+      card.appendChild(toggle);
       return;
     }
 
@@ -7712,6 +7792,18 @@ async function boot() {
         // The grants lane's pull: my own devices — a revoke made elsewhere while this device was
         // offline binds at this door now, before a stale view is served.
         agent.grantsCatchUp?.requestFromSiblings().catch(() => {});
+        // The enroll-offer consume (once per boot, no-op when nothing is stashed): the first boot
+        // after an add-device ceremony bootstraps every circle from the scanned offer — the
+        // registry membership record, the announce to the sibling, the catch-up pulls.
+        consumeEnrollOffer({
+          agent,
+          callSkill: rawCallSkill,
+          sendPeerMessage: (to, payload, opts2) => agent.sendPeerMessage(to, payload, opts2),
+          storage: window.localStorage,
+          registerCirclePresence: (ids) => registerCirclePresence(agent, ids),
+        }).then((r) => {
+          if (r?.consumed) console.log('[enroll-offer] bootstrap:', JSON.stringify(r.circles?.map((c) => ({ id: c.circleId, ok: c.ok, steps: c.steps }))));
+        }).catch(() => { /* retried on the next boot — the stash only clears on full success */ });
         taskCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         chatCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         // The pod read-back kick: same reconnect moment, per live circle (the circles list is loaded here).

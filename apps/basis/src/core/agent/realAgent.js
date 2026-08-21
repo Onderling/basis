@@ -58,6 +58,9 @@ import {
 // new doc + version reach every member peer-to-peer (pod-free — V1 closing wave row 2).
 import { makeGovernanceRail } from '../../v2/governanceAppWiring.js';
 import { makeRulesUpdateEmitter } from '../../v2/rulesUpdateLane.js';
+// The add-a-device offer (`onderling-enroll://`): the transport bootstrap the existing device
+// shows as a QR and the freshly enrolled device consumes after its ceremony (#54 tail).
+import { encodeEnrollOffer } from '../../v2/enrollOffer.js';
 import { SURFACE_NUDGE_SUBTYPE } from '../../v2/surfaceNudge.js'; // the reading half's contentless re-pull signal
 import { CONNECTION_GRANT_SUBTYPE } from '../../v2/connectionPairing.js';   // pairing: how the grant reaches the view that asked for it
 import { paramsManifest } from '../../v2/paramsManifest.js';   // #36 — the params op contract (gates the waist branch)
@@ -1577,6 +1580,35 @@ export async function createRealHouseholdAgent(opts = {}) {
   hostAgent.register('listSurfaceGrants', async () =>
     [DataPart({ ok: true, surfaces: surfaceGrants.list() })],
   { visibility: 'trusted' });
+
+  hostAgent.register('buildEnrollOffer', async ({ parts }) => {
+    // The add-a-device OFFER (`onderling-enroll://`) this EXISTING device shows: relay hint +
+    // per-circle {id, handle, this device's own per-circle address} — the transport bootstrap the
+    // freshly enrolled device consumes after its phrase ceremony. Public by design: no secret and
+    // no phrase ride here; holding the offer lets you ask nothing (enrolling IS the phrase).
+    const relayUrl = typeof parts?.[0]?.data?.relayUrl === 'string' && parts[0].data.relayUrl ? parts[0].data.relayUrl : null;
+    try {
+      const memberships = await readSelfCircleMemberships().catch(() => ({}));
+      const ids = Object.keys(memberships);
+      try {
+        const r = await callSkill('stoop', 'listMyCircles', {});
+        for (const c of (Array.isArray(r?.circles) ? r.circles : [])) {
+          const id = typeof c === 'string' ? c : (c?.groupId ?? c?.id);
+          if (typeof id === 'string' && id && !ids.includes(id)) ids.push(id);
+        }
+      } catch { /* the registry set alone still serves */ }
+      const circles = [];
+      for (const id of ids) {
+        if (!id || id === 'household' || id === tasksPrimaryCircleId) continue;   // same exclusions as reopen
+        const address = circleAddressFor(id);
+        if (!address) continue;
+        circles.push({ id, handle: memberships[id]?.handle ?? null, address });
+      }
+      if (circles.length === 0) return [DataPart({ ok: false, error: 'no-circles' })];
+      const uri = encodeEnrollOffer({ relays: relayUrl ? [relayUrl] : [], circles });
+      return [DataPart({ ok: true, uri, circles: circles.length })];
+    } catch (e) { return [DataPart({ ok: false, error: e?.message ?? 'offer-failed' })]; }
+  }, { visibility: 'trusted' });   // enumerates the person's circles: owner-only
 
   hostAgent.register('enrollDevice', async ({ parts }) => {
     // The ENROLLMENT CEREMONY (add-a-device): the phrase is typed on THIS — the NEW — device,

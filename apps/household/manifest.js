@@ -323,6 +323,19 @@ export const householdManifest = {
       surfaces: {},
     },
     {
+      id:   'buildEnrollOffer',
+      verb: 'get',
+      // The add-a-device OFFER (`onderling-enroll://`) shown on the EXISTING device as a QR/copy
+      // string: relay hint + per-circle {id, handle, this device's per-circle address} — the
+      // transport bootstrap the freshly enrolled device consumes after its ceremony. PUBLIC BY
+      // DESIGN (no secret, no phrase — enrolling still takes the phrase, typed on the new device).
+      params: [
+        { name: 'relayUrl', kind: 'string' },
+      ],
+      // Reached from the my-data screen beside the enroll ceremony; not a chat/slash act.
+      surfaces: {},
+    },
+    {
       id:   'revealOwnerPhrase',
       verb: 'reveal-owner-phrase',
       // Shows the owner recovery phrase to the person already holding the device. Takes nothing:

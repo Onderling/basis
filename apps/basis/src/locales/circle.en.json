@@ -5101,7 +5101,14 @@
     "reload": "Reload now",
     "invalid_phrase": "That is not a valid recovery phrase.",
     "failed": "Enrolling failed.",
-    "retry": "Try again"
+    "retry": "Try again",
+    "offer_toggle": "Adding a NEW device? Show this device's code",
+    "offer_title": "Add-device code",
+    "offer_hint": "Scan or paste this code on the new device, then type the recovery phrase there. The code is not a secret — the phrase stays the only key.",
+    "offer_error": "Could not build the code (this device is not in any circle yet).",
+    "offer_paste_label": "Code from your current device (optional)",
+    "offer_paste_invalid": "That is not a valid add-device code.",
+    "offer_back": "Back"
   },
   "revoke": {
     "title": "Remove a device",

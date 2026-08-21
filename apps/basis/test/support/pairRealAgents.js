@@ -502,6 +502,11 @@ export async function joinExistingCircle(admin, joiner, { groupId = 'peer-circle
     sendPeerRedeem: joiner.sendPeerRedeem,
     handle,
     rulesAccepted: true,   // task #80 — the harness join IS "the person ticked the rules"
+    // The two seams the shells pass (write-on-join records the registry membership {handle,
+    // address} through the first; the link proof rides the second). Without them the harness
+    // joiner silently skipped the registry record the restore/enroll paths read.
+    circleAddressFor: (cid) => joiner.agent.circleAddressFor?.(cid) ?? null,
+    signCircleLink: (src, dst, addr) => joiner.agent.signCircleLink?.(src, dst, addr) ?? null,
   });
   return { invite, joined, groupId };
 }

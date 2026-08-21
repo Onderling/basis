@@ -4154,6 +4154,49 @@ export function buildSkills({
     }),
 
     /**
+     * recordRosterSeed({groupId, rows})
+     *   — the roster-seed rider's LOCAL write (PLAN-podless-enroll-completeness S1): land the
+     *   sibling-served membership-redemption trail rows id-preserved, so the per-circle roster
+     *   projection has the head it folds statements onto. The DEVICE-SET authority (the parcel's
+     *   signature + delegation chain) is verified at the caller (`makeRosterSeedReceiver`) — this
+     *   skill guards only SHAPE + idempotency: redemption rows for THIS circle, first-write-wins
+     *   by item id (an existing row is never overwritten — trail history cannot be rewritten by a
+     *   later parcel).
+     */
+    defineSkill('recordRosterSeed', async ({ parts, from }) => {
+      const a = dataArgs(parts);
+      if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
+      if (!Array.isArray(a.rows) || a.rows.length === 0) return { error: 'rows required' };
+      // Redemption-SHAPED rows only: what `projectCircleRoster` consumes is the source facet
+      // (groupId + redeemedBy), while the ITEM type is the legacy 'post' with kind
+      // 'membership-redemption' — validate the facts the fold reads, not the storage-era label.
+      const rows = a.rows.filter((r) => r
+        && typeof r.id === 'string' && r.id
+        && typeof r.text === 'string' && r.text
+        && (r.type === 'membership-redemption' || r.kind === 'membership-redemption'
+          || typeof r.source?.redeemedBy === 'string')
+        && r.source?.groupId === a.groupId);
+      if (rows.length === 0) return { error: 'no-valid-rows' };
+      if (typeof store.ingestItems !== 'function') return { error: 'store-cannot-ingest' };
+      const { ingested, skipped } = await store.ingestItems(rows, { actor: from, reason: 'roster-seed' });
+      // The MEMBER rows (display + authority facts): merged into the member map — the same
+      // back-compat source the founder derivation reads, which is how a circle's FOUNDER (who
+      // never redeems, so the trail cannot carry them) becomes visible on a seeded device. The
+      // SELF row is skipped: this device's own map row carries live local bindings.
+      let membersRecorded = 0;
+      if (Array.isArray(a.members) && members) {
+        for (const m of a.members) {
+          if (!m || typeof m.webid !== 'string' || !m.webid || m.webid === from) continue;
+          try { await members.addMember(m); membersRecorded += 1; } catch { /* per-row best-effort */ }
+        }
+      }
+      return { ok: true, ingested: ingested.length, skipped: skipped.length, membersRecorded };
+    }, {
+      description: 'Land sibling-served roster-seed rows locally (id-preserved, first-write-wins; device-set authority verified at the caller).',
+      visibility:  'authenticated',
+    }),
+
+    /**
      * getGroupRulesUpdateStatement({groupId})
      *   — the durable-head read for the rules-update rider's catch-up serve: the ORIGINAL signed
      *   `rules-update` statement preserved on the latest local `group-rules` item, for the case

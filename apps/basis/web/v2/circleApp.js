@@ -7670,6 +7670,12 @@ async function boot() {
             [agent.grantsCatchUp.subtypes.request]: agent.grantsCatchUp.onRequest,
             [agent.grantsCatchUp.subtypes.batch]:   agent.grantsCatchUp.onBatch,
           } : {}),
+          // The roster seed (pod-less enroll S1): serve a sibling's trail request; land a served
+          // parcel (both device-set verified inside the agent's handlers).
+          ...(agent.rosterSeed ? {
+            [agent.rosterSeed.subtypes.request]: agent.rosterSeed.onRequest,
+            [agent.rosterSeed.subtypes.batch]:   agent.rosterSeed.onBatch,
+          } : {}),
           // The task lane (the content re-root): the fan receiver verifies at the agent's rail AND causally
           // merges the snapshot into the circle's store head; the catch-up pair covers the offline device.
           ...(agent.taskRail ? { [TASK_BROADCAST]: makeTaskPeerHandler({ rail: agent.taskRail }) } : {}),

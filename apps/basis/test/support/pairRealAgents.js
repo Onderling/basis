@@ -271,6 +271,11 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
       [agent.grantsCatchUp.subtypes.request]: agent.grantsCatchUp.onRequest,
       [agent.grantsCatchUp.subtypes.batch]:   agent.grantsCatchUp.onBatch,
     } : {}),
+    // The roster seed (pod-less enroll S1) — the same registration both shells make.
+    ...(agent.rosterSeed ? {
+      [agent.rosterSeed.subtypes.request]: agent.rosterSeed.onRequest,
+      [agent.rosterSeed.subtypes.batch]:   agent.rosterSeed.onBatch,
+    } : {}),
   };
   const sendPeerRedeem = makeSendGroupRedeemRequest({
     sendPeer,

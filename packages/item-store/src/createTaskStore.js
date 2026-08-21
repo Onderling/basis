@@ -164,6 +164,36 @@ export function createTaskStore(circleStore, { rolePolicy, enforceDependencies }
       }
       return created;
     },
+    /**
+     * Ingest FULLY-FORMED items with their ids PRESERVED — the same contract as the classic
+     * `ItemStore.ingestItems` (trail-class rows carried between a person's own devices, where
+     * cross-device references point at item IDS). FIRST-WRITE-WINS: an id already held is
+     * skipped, never replaced — a later parcel must not rewrite trail history. Rides the
+     * underlying `CircleItemStore.put` with `{sync:false, origin:true}`: id + origin facts
+     * (`addedBy`/`addedAt`) stay the ORIGIN's, and the write never echoes back out as a fan.
+     */
+    ingestItems: async (items, ctx = {}) => {
+      if (!Array.isArray(items) || items.length === 0) return { ingested: [], skipped: [] };
+      const ingested = [];
+      const skipped = [];
+      for (const raw of items) {
+        if (!raw || typeof raw !== 'object' || typeof raw.id !== 'string' || !raw.id
+          || typeof raw.type !== 'string' || !raw.type) {
+          throw new TypeError('ingestItems: each item requires `id` and `type`');
+        }
+        const existing = await circleStore.get(raw.id);
+        if (existing) { skipped.push(raw.id); continue; }
+        const item = { ...raw };
+        await circleStore.put(item, { by: ctx.actor ?? 'substrate', sync: false, origin: true });
+        appendAudit({
+          itemId: item.id, action: 'ingest', ctx,
+          details: ctx.reason ? { reason: ctx.reason } : undefined,
+        });
+        emitter.emit('item-added', item);
+        ingested.push(item);
+      }
+      return { ingested, skipped };
+    },
     listOpen:   (filter) => listOpen(circleStore, filter),
     listClosed: (filter) => listClosed(circleStore, filter),
     getById:    (id) => getById(circleStore, id),

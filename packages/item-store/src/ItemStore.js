@@ -145,6 +145,49 @@ export class ItemStore extends Emitter {
   }
 
   /**
+   * Ingest FULLY-FORMED items with their ids preserved — the classic store's counterpart of
+   * `CircleItemStore.put` (which defined the semantics: same id on every device makes sync
+   * trivially idempotent). For trail-class rows carried between a person's OWN devices (the
+   * roster seed), where cross-device references point at item IDS (a join statement's
+   * `redemptionRef`), so minting fresh ids would sever them.
+   *
+   * FIRST-WRITE-WINS: an id already present is skipped, never replaced — these are trail rows,
+   * and an ingest that could overwrite one would let a later parcel rewrite history. Each item
+   * must already carry `id`, `type`, `text`; everything else is stored as given (`addedBy`/
+   * `addedAt` preserved when present — the ORIGIN's facts, not the ingester's). The `canAdd`
+   * gate still runs per item; the audit trail records the ingest under its own action.
+   *
+   * @param {import('./types.js').Item[]} items
+   * @param {object} ctx  `{ actor }` — the local recorder (audited; never stamped onto the item)
+   * @returns {Promise<{ingested: import('./types.js').Item[], skipped: string[]}>}
+   */
+  async ingestItems(items, ctx) {
+    if (!Array.isArray(items) || items.length === 0) return { ingested: [], skipped: [] };
+    const actor = this.#requireActor(ctx);
+    const ingested = [];
+    const skipped = [];
+    for (const raw of items) {
+      this.#validatePartial(raw);
+      if (typeof raw.id !== 'string' || !raw.id) throw new TypeError('ingestItems: each item requires its `id`');
+      const existing = await this.#readItem(raw.id);
+      if (existing) { skipped.push(raw.id); continue; }
+      const item = { ...raw };
+      this.#gate('canAdd', actor, item);
+      await this.#writeItem(item);
+      await this.#appendAudit({
+        id: ulid(), itemId: item.id,
+        action: 'ingest',
+        actor, actorDisplayName: ctx.actorDisplayName,
+        at: Date.now(),
+        ...(ctx.reason ? { details: { reason: ctx.reason } } : {}),
+      });
+      ingested.push(item);
+      this.emit('item-added', item);
+    }
+    return { ingested, skipped };
+  }
+
+  /**
    * List open items matching the filter.  "Open" = `completedAt` absent.
    * @param {import('./types.js').ListFilter} [filter]
    * @returns {Promise<import('./types.js').Item[]>}

@@ -1320,6 +1320,22 @@ export const stoopManifest = {
       },
     },
     {
+      // The roster-seed rider's local write (pod-less enroll S1): land sibling-served trail rows
+      // id-preserved so the roster projection has a head on a trail-less device. Device-set
+      // authority is verified at the receiving module; this op guards shape + idempotency.
+      id:   'recordRosterSeed', verb: 'update',
+      params: [
+        { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'rows',    kind: 'object', required: true },
+        { name: 'members', kind: 'object' },
+      ],
+      resolves: [{ field: 'rows', policy: 'content' }],
+      surfaces: {
+        chat: { hint: 'Plumbing: land roster-seed rows from a sibling device (not user-invoked).' },
+        ui:   { control: 'none' },
+      },
+    },
+    {
       // The rules-update rider's durable-head read: the preserved signed statement the catch-up
       // serves after the governance lane's audit window compacted the entry away.
       id:   'getGroupRulesUpdateStatement', verb: 'get',

@@ -208,6 +208,34 @@ export async function consumeEnrollOffer({ agent, callSkill, sendPeerMessage, st
       // 2 — identities + presence for THIS boot.
       try { await agent.installCircleIdentities?.([c.id]); row.steps.push('identity'); } catch { /* derive-only; boot heals */ }
       try { await registerCirclePresence?.([c.id]); } catch { /* alias binding is best-effort */ }
+      // 2b — THE ROSTER SEED (pod-less enroll S1): ask the sibling for the circle's trail rows —
+      // without them this device cannot project a roster, and the rails refuse every fanned
+      // statement for want of binding rows. Then WAIT (briefly) for the roster to derive before
+      // sending the pulls below, so the served statements bind on arrival instead of being
+      // refused and re-pulled on some later reconnect. Best-effort with a bounded wait: a seed
+      // that never comes must not hang the boot.
+      if (agent.rosterSeed && ownAddress) {
+        try {
+          const req = await agent.rosterSeed.buildRequest(c.id, ownAddress);
+          if (req) {
+            await sendPeerMessage(c.address, req, SEND);
+            row.steps.push('seed-requested');
+            const deadline = Date.now() + 8000;
+            let derived = false;
+            while (Date.now() < deadline) {
+              try {
+                const r = await callSkill('stoop', 'listGroupMembers', { groupId: c.id });
+                if ((Array.isArray(r?.members) ? r.members : []).some((m) => m?.circleAddress || m?.circleAddresses?.length)) {
+                  derived = true;
+                  break;
+                }
+              } catch { /* keep waiting */ }
+              await new Promise((resolve) => setTimeout(resolve, 250));
+            }
+            if (derived) row.steps.push('roster-derived');
+          }
+        } catch { /* the pulls below still go out; the next boot retries the seed */ }
+      }
       // 3 — announce our fresh per-circle address to the sibling (the proven-set growth).
       const mine = ownAnnouncementFor({ agent, circleId: c.id });
       if (mine) {

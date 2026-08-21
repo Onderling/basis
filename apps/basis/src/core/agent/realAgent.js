@@ -76,6 +76,11 @@ import { makeRulesUpdateEmitter } from '../../v2/rulesUpdateLane.js';
 // The add-a-device offer (`onderling-enroll://`): the transport bootstrap the existing device
 // shows as a QR and the freshly enrolled device consumes after its ceremony (#54 tail).
 import { encodeEnrollOffer } from '../../v2/enrollOffer.js';
+// The roster seed (pod-less enroll S1): a sibling serves its membership trail rows, device-set
+// verified, so a trail-less enrolled device can project rosters and fold statements.
+import {
+  ROSTER_SEED_SUBTYPES, buildRosterSeedRequest, makeRosterSeedServer, makeRosterSeedReceiver,
+} from '../../v2/rosterSeed.js';
 import { SURFACE_NUDGE_SUBTYPE } from '../../v2/surfaceNudge.js'; // the reading half's contentless re-pull signal
 import { CONNECTION_GRANT_SUBTYPE } from '../../v2/connectionPairing.js';   // pairing: how the grant reaches the view that asked for it
 import { paramsManifest } from '../../v2/paramsManifest.js';   // #36 — the params op contract (gates the waist branch)
@@ -1497,17 +1502,21 @@ export async function createRealHouseholdAgent(opts = {}) {
     } catch { /* degrade to the profile key below */ }
     return { identity: chatId, ref: chatId.pubKey };
   })();
+  // ONE device-set verifier instance — the trust base shared by every "my own devices" consumer
+  // (the grants lane, and the roster seed below). A second instance would be a second place for
+  // the rule to drift.
+  const deviceSetVerifier = deviceSetBindingVerifier({
+    selfPubKey: chatId.pubKey,
+    rootFingerprint,
+    // The registry supplies the deny-wins tombstone + the no-record fallback. Late-bound via the
+    // outer ref (null until the agents block runs) and best-effort: a degraded registry means the
+    // carried record alone binds.
+    lookupDelegations: async () => deviceDelegationsOf(await agentsRegistryRef?.lookup('default')),
+  });
   const grantsRail = makeGrantsRail({
     eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
     signerFor: () => grantsSignerPromise,
-    verifyBinding: deviceSetBindingVerifier({
-      selfPubKey: chatId.pubKey,
-      rootFingerprint,
-      // The registry supplies the deny-wins tombstone + the no-record fallback. Late-bound via the
-      // outer ref (null until the agents block runs) and best-effort: a degraded registry means the
-      // carried record alone binds.
-      lookupDelegations: async () => deviceDelegationsOf(await agentsRegistryRef?.lookup('default')),
-    }),
+    verifyBinding: deviceSetVerifier,
   });
   const grantsSiblings = () => siblingDeviceAddresses({
     callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
@@ -1547,6 +1556,32 @@ export async function createRealHouseholdAgent(opts = {}) {
   // Kick the first fold; the door refuses until it lands (`isRevoked` fails closed), so a boot
   // cannot race it.
   const surfaceGrantsReady = surfaceGrants.hydrate().catch(() => false);
+
+  // THE ROSTER SEED (pod-less enroll S1): a freshly enrolled sibling asks THIS device for a
+  // circle's membership-redemption trail rows — the head its roster projection folds statements
+  // onto. Both halves verify through the ONE device-set verifier above; the shells register the
+  // two subtypes and `consumeEnrollOffer` sends the request.
+  const rosterSeed = {
+    subtypes: ROSTER_SEED_SUBTYPES,
+    buildRequest: (circleId, replyTo) => buildRosterSeedRequest({
+      signer: grantsSignerPromise,
+      delegationRecord: enrolledDevice?.record ?? null,
+      circleId, replyTo,
+    }),
+    onRequest: makeRosterSeedServer({
+      callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
+      signerPromise: grantsSignerPromise,
+      delegationRecord: enrolledDevice?.record ?? null,
+      verifyDeviceSet: deviceSetVerifier,
+      selfPubKey: chatId.pubKey,
+      sendToPeer: (to, payload) => sa.peer.sendTo(to, payload, { guarantee: 'hold-forward' }),
+    }),
+    onBatch: makeRosterSeedReceiver({
+      callSkill: (...a) => callSkill(...a),
+      verifyDeviceSet: deviceSetVerifier,
+      selfPubKey: chatId.pubKey,
+    }),
+  };
 
   hostAgent.register('grantSurface', async ({ parts }) => {
     const d = parts?.[0]?.data ?? {};
@@ -4460,6 +4495,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     grantsRail,
     grantsPeerHandler,
     grantsCatchUp,
+    // The roster seed (pod-less enroll S1): the shells register `onRequest`/`onBatch` under its
+    // subtypes; `consumeEnrollOffer` sends `buildRequest` to the sibling.
+    rosterSeed,
     // The task lane's rail (same contract): the shells register circle-task-broadcast + its catch-up pair
     // over this instance; its ingest also causally merges the snapshot into the circle's store head.
     taskRail,

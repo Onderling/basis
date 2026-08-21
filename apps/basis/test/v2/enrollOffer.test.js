@@ -8,20 +8,25 @@
  * reopen), the announce to the sibling (the roster set grows — this device becomes reachable),
  * and the membership + governance catch-up pulls.
  *
- * Deliberately NOT asserted here: the fresh device's own derived roster projection — a pod-less
- * enrolled device holds no redemption trail and `projectCircleRoster` returns null without one
- * (the statement fold never runs). That is a standing gap of the enrolled-device story, filed on
- * the ledger, not a promise of this row.
+ * With the ROSTER SEED (pod-less enroll S1) the old gap is closed and ASSERTED here: the sibling
+ * serves its membership-redemption trail rows (device-set signed, id-preserved), the fresh
+ * device's projection derives a real roster, and fanned membership statements — refused before
+ * for want of binding rows — land and fold on top.
  */
 import { describe, it, expect, afterAll } from 'vitest';
-import { InternalTransport } from '@onderling/core';
+import { InternalTransport, AgentIdentity } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import {
   bootRealAgentNode, connectNodesOverBus, createCircle, joinExistingCircle, bindCircleAddresses,
   until, teardown,
 } from '../support/pairRealAgents.js';
 import { bindCircleAddressKeysFor } from '../../src/v2/householdRosterPairing.js';
-import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST } from '../../src/v2/membershipRail.js';
+import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../src/v2/membershipRail.js';
+import { makeGovernanceCatchUp } from '../../src/v2/governanceCatchUp.js';
+import {
+  ROSTER_SEED_VERSION, buildRosterSeedRequest, makeRosterSeedServer, makeRosterSeedReceiver,
+} from '../../src/v2/rosterSeed.js';
+
 import {
   ENROLL_SCHEME, encodeEnrollOffer, parseEnrollOffer, enrollOfferLink, enrollOfferFromLink,
   stashEnrollOffer, pendingEnrollOffer, clearEnrollOffer, consumeEnrollOffer,
@@ -44,6 +49,23 @@ function wireMembershipReceiver(node) {
   const inner = node._routerRef.fn;
   node._routerRef.fn = (env) => {
     if (env?.payload?.subtype === MEMBERSHIP_BROADCAST) { handler(env?.from, env.payload); return undefined; }
+    return inner?.(env);
+  };
+}
+
+/** The membership catch-up pair (serve + receive), wired per-test exactly as the shells wire it —
+ *  the consume's membership pull is answered through this. */
+function wireMembershipCatchUp(node) {
+  const cu = makeGovernanceCatchUp({
+    rail: node.agent.membershipRail,
+    sendToPeer: (addr, payload) => node.agent.sendPeerMessage(addr, payload),
+    subtypes: MEMBERSHIP_CATCHUP_SUBTYPES,
+  });
+  const inner = node._routerRef.fn;
+  node._routerRef.fn = (env) => {
+    const st = env?.payload?.subtype;
+    if (st === cu.subtypes.request) { cu.onRequest(env?.from, env.payload); return undefined; }
+    if (st === cu.subtypes.batch) { cu.onBatch(env?.from, env.payload); return undefined; }
     return inner?.(env);
   };
 }
@@ -124,12 +146,19 @@ describe('the enroll offer — the transport-bootstrap corridor over the real ha
       }),
     ]);
     bus = await connectNodesOverBus([B, A]);
-    for (const n of [B, A]) wireMembershipReceiver(n);
+    for (const n of [B, A]) { wireMembershipReceiver(n); wireMembershipCatchUp(n); }
     await createCircle(B, { groupId: CIRCLE, name: 'Enroll offer' });
     const okJoin = await joinExistingCircle(B, A, { groupId: CIRCLE, handle: 'anna' });
     expect(okJoin.joined?.ok, JSON.stringify(okJoin.joined)).toBe(true);
     await bindCircleAddresses([B, A], CIRCLE);
     await Promise.all([B, A].map((n) => bindCircleAddressKeysFor({ agent: n.agent, circleId: CIRCLE })));
+    // The join statement was fanned before A bound its per-circle address (the known
+    // send-into-the-void window; production closes it on the next presence re-fan) — hand-carry
+    // B's membership lane to A through the production ingest gate, so the SIBLING actually holds
+    // the statements A2's pull will ask it for.
+    for (const stmt of B.agent.membershipRail.storedStatements(CIRCLE)) {
+      await A.agent.membershipRail.ingest(CIRCLE, stmt);
+    }
 
     // The EXISTING device builds the offer: this circle, A's handle, A's per-circle address.
     const built = await A.agent.callSkill('household', 'buildEnrollOffer', { relayUrl: 'ws://relay.example' });
@@ -162,6 +191,7 @@ describe('the enroll offer — the transport-bootstrap corridor over the real ha
     A2._busTransport = tx;
     await bindCircleAddresses([A2], CIRCLE);
     wireMembershipReceiver(A2);
+    wireMembershipCatchUp(A2);
 
     // THE CONSUME — what the shells run once per boot.
     const consumed = await consumeEnrollOffer({
@@ -188,14 +218,79 @@ describe('the enroll offer — the transport-bootstrap corridor over the real ha
     expect(grew, 'the announce never grew the sibling\'s roster set').toBe(true);
 
     // (b) The registry membership record on the NEW device carries the handle + its OWN derived
-    // address — what reopenMemberCircles reads on every future boot. (The statement-verification
-    // side of a pod-less enrolled device — no roster without a trail, no trail without verified
-    // statements — is the standing gap on the ledger, deliberately not asserted here.)
+    // address — what reopenMemberCircles reads on every future boot.
     const props = await A2.agent.callSkill('agents', 'getProfileProperties', { id: 'default' });
     const membership = props?.properties?.circleMemberships?.value?.[CIRCLE]
       ?? props?.properties?.circleMemberships?.[CIRCLE] ?? null;
     expect(membership, JSON.stringify(props).slice(0, 300)).toBeTruthy();
     expect(membership.handle).toBe('anna');
     expect(membership.address).toBe(addrA2);
+
+    // (c) THE ROSTER SEED (pod-less enroll S1): the sibling served its trail rows and the
+    // TRAIL-LESS device now derives a REAL roster — both members, with the address facts the
+    // binding verifiers read. This is the circularity broken.
+    expect(report.steps, 'the seed was requested').toContain('seed-requested');
+    expect(report.steps, 'the roster derived from the seed before the pulls').toContain('roster-derived');
+    const rows = (await A2.agent.callSkill('stoop', 'listGroupMembers', { groupId: CIRCLE }))?.members ?? [];
+    const webids = rows.map((m) => m.webid ?? m.addr ?? m.ref);
+    expect(webids, 'the person\'s own row derives').toContain(A.pubKey);
+    expect(webids, 'the other member derives').toContain(B.pubKey);
+    expect(rows.some((m) => m.circleAddress || (m.circleAddresses ?? []).length > 0),
+      'the derived rows carry the address facts the binding gates read').toBe(true);
+
+    // (d) …and fanned membership statements — refused before for want of binding rows — now LAND:
+    // the membership pull (answered by the sibling's catch-up serve) folds on top of the seed.
+    const landed = await until(async () => {
+      const n = A2.agent.membershipRail ? A2.agent.membershipRail.storedStatements(CIRCLE).length : 0;
+      return n > 0 ? true : null;
+    }, { timeout: 15000, step: 100 });
+    expect(landed, 'no membership statement passed the ingest gate on the seeded device').toBe(true);
   }, 120_000);
+});
+
+describe('the roster seed — the device-set gate, unit-level', () => {
+  const mkIdentity = () => AgentIdentity.generate(new VaultMemory());
+
+  it('a stranger\'s request is refused without reply; a device-set request serves; tampering kills the parcel', async () => {
+    const self = await mkIdentity();       // the profile identity (both devices' floor)
+    const stranger = await mkIdentity();
+    const rows = [{ id: 'r1', type: 'membership-redemption', text: 'joined', source: { groupId: 'c1', redeemedBy: 'w1' } }];
+    const sent = [];
+    const server = makeRosterSeedServer({
+      callSkill: async (app, op) => (op === 'listOpen' ? { items: rows } : {}),
+      signerPromise: Promise.resolve({ identity: self }),
+      verifyDeviceSet: async ({ author }) => author === self.pubKey,   // the floor, stubbed
+      selfPubKey: self.pubKey,
+      sendToPeer: (to, payload) => { sent.push({ to, payload }); },
+    });
+
+    // The stranger: a WELL-FORMED, correctly SIGNED request — refused purely on the device set.
+    const forged = await buildRosterSeedRequest({ signer: { identity: stranger }, circleId: 'c1', replyTo: 'addr-x' });
+    await server('x', forged);
+    expect(sent).toHaveLength(0);
+
+    // The sibling: served, to the SIGNED replyTo, with the rows and a verifiable signature.
+    const good = await buildRosterSeedRequest({ signer: { identity: self }, circleId: 'c1', replyTo: 'addr-new' });
+    await server('x', good);
+    expect(sent).toHaveLength(1);
+    expect(sent[0].to).toBe('addr-new');
+    expect(sent[0].payload.body.rows).toHaveLength(1);
+
+    // The receiver: an untampered parcel applies; a tampered one (rows swapped after signing) is
+    // refused before any store write.
+    const applied = [];
+    const receiver = makeRosterSeedReceiver({
+      callSkill: async (app, op, args) => { applied.push({ op, args }); return { ok: true }; },
+      verifyDeviceSet: async ({ author }) => author === self.pubKey,
+      selfPubKey: self.pubKey,
+    });
+    const tampered = { ...sent[0].payload, body: { ...sent[0].payload.body, rows: [{ id: 'evil' }] } };
+    await receiver('x', tampered);
+    expect(applied).toHaveLength(0);
+    await receiver('x', sent[0].payload);
+    expect(applied).toHaveLength(1);
+    expect(applied[0].op).toBe('recordRosterSeed');
+    expect(applied[0].args.rows).toHaveLength(1);
+    expect(ROSTER_SEED_VERSION).toBe(sent[0].payload.body.v);
+  });
 });

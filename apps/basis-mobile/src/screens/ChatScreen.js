@@ -67,7 +67,7 @@ import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '..
 import { makeGovernanceRail } from '../../../basis/src/v2/governanceAppWiring.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../../basis/src/v2/membershipRail.js';
 import { GRANTS_BROADCAST } from '../../../basis/src/v2/grantsRail.js';
-import { applyRulesUpdates } from '../../../basis/src/v2/rulesUpdateLane.js';
+import { applyRulesUpdates, preservedRulesStatementsFor } from '../../../basis/src/v2/rulesUpdateLane.js';
 import { makeTaskPeerHandler, TASK_BROADCAST, TASK_CATCHUP_SUBTYPES } from '../../../basis/src/v2/taskRail.js';
 import { makeFrontierReplay } from '../../../basis/src/v2/frontierReplay.js';
 import { makeChatPeerHandler, makePodChatCatchUp, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../../basis/src/v2/chatRail.js';
@@ -697,6 +697,9 @@ export default function ChatScreen({
           rail: govRail,
           sendToPeer: (addr, payload) => bundle?.agent?.sendPeerMessage?.(addr, payload),
           onChange: govChanged,
+          // The durable-head serve (same wiring as the web shell): the preserved rules-update
+          // statement still reaches a member offline past the lane's audit window.
+          extraStatementsFor: (cid) => preservedRulesStatementsFor({ callSkill: bundle.callSkill, circleId: cid }),
         }) : null;
         if (govCatchUp && !globalThis.__onderlingGovCatchUpKicked) {
           globalThis.__onderlingGovCatchUpKicked = true;

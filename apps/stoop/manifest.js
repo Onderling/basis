@@ -825,7 +825,12 @@ export const stoopManifest = {
     {
       id:   'listGroupMembers', verb: 'list',
       appliesTo: { type: 'member' },
-      params: [],
+      params: [
+        // Internal (the rails' binding verifiers): fold the roster from the TRAIL + display cache
+        // only, skipping the signed-statement fold — the read the verifiers need, made explicit so
+        // verifying a statement never recurses through the very fold that verifies statements.
+        { name: 'spineless', kind: 'boolean' },
+      ],
       surfaces: {
         slash: { command: '/group-members' },
         chat:  { reply: 'list', hint: 'list members of your circle' },

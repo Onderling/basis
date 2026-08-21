@@ -822,9 +822,12 @@ async function listGroupMembersCore(scope, a, ctx) {
   // and passes the parsed args + carrier context.
   const { store, members, reveals, groupId, localActor, circleSignerFor, membershipRead } = scope;
   // Thread the circle-scoped signer resolver into the projection so it can verify THIS device's own
-  // circle-key↔ref binding when folding spine statements (see projectCircleRoster).
-  const project = (circleSignerFor || membershipRead)
-    ? ((a2) => projectCircleRoster({ ...a2, circleSignerFor, membershipRead }))
+  // circle-key↔ref binding when folding spine statements (see projectCircleRoster). `spineless`
+  // (the rails' binding verifiers) folds TRAIL + display only — verifying a statement must never
+  // recurse through the statement fold itself.
+  const skipSpine = a?.spineless === true;
+  const project = (circleSignerFor || membershipRead || skipSpine)
+    ? ((a2) => projectCircleRoster({ ...a2, circleSignerFor, membershipRead, skipSpine }))
     : projectCircleRoster;
   return listCircleMembers(
     {
@@ -857,7 +860,7 @@ async function listGroupMembersCore(scope, a, ctx) {
  * @returns {Promise<Array<object>|null>} the circle's members, or `null` when the
  *   circle has NO redemption trail (the caller keeps its pre-trail behaviour).
  */
-export async function projectCircleRoster({ store, groupId, memberMapList = [], circleSignerFor, membershipRead } = {}) {
+export async function projectCircleRoster({ store, groupId, memberMapList = [], circleSignerFor, membershipRead, skipSpine = false } = {}) {
   if (!store || typeof store.listOpen !== 'function' || !groupId) return null;
   const list = Array.isArray(memberMapList) ? memberMapList : [];
   let redemptions = [];
@@ -955,7 +958,11 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
     return null;   // claimed binding unverifiable on this device → ignore (never trust, never corrupt)
   };
   let spineStatements = [];
-  if (typeof membershipRead === 'function') {
+  if (skipSpine) {
+    // TRAIL + display only (the binding verifiers' read): no statement fold, no spine store —
+    // the trail carries the address facts a verifier needs, and reading the statements here
+    // would recurse into the very verification that asked.
+  } else if (typeof membershipRead === 'function') {
     // THE RAIL (the membership rider): statements live on the DEVICE LOG's membership lane — the injected
     // reader returns VERIFIED bodies with the key↔ref binding already resolved. Two fold-side gates apply
     // HERE (where the trail rows are at hand), per the join-proof decision:
@@ -4178,7 +4185,14 @@ export function buildSkills({
         && r.source?.groupId === a.groupId);
       if (rows.length === 0) return { error: 'no-valid-rows' };
       if (typeof store.ingestItems !== 'function') return { error: 'store-cannot-ingest' };
-      const { ingested, skipped } = await store.ingestItems(rows, { actor: from, reason: 'roster-seed' });
+      // Restore the STORED type before ingest: the serve reads rows through the skill's listOpen,
+      // whose canonical ADAPTER renders redemption rows as `type: 'post'` — ingesting that view
+      // raw would store them under the wrong type and the roster projection's typed read
+      // (`{type:'membership-redemption'}`) would never find them (found live 2026-08-21: the
+      // seeded device held the rows yet projected none).
+      const stored = rows.map((r) => (typeof r.source?.redeemedBy === 'string'
+        ? { ...r, type: 'membership-redemption' } : r));
+      const { ingested, skipped } = await store.ingestItems(stored, { actor: from, reason: 'roster-seed' });
       // The MEMBER rows (display + authority facts): merged into the member map — the same
       // back-compat source the founder derivation reads, which is how a circle's FOUNDER (who
       // never redeems, so the trail cannot carry them) becomes visible on a seeded device. The

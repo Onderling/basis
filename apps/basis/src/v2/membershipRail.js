@@ -24,17 +24,12 @@ export const MEMBERSHIP_CATCHUP_SUBTYPES = Object.freeze({
 
 /** The default key↔ref binding source: the roster's proof-checked circleAddress rows (shared with governance). */
 export function rosterBindingVerifier(callSkill) {
-  // RE-ENTRANCY BREAKER: the roster projection READS the membership rail, and this verifier is
-  // the rail's binding gate — so a binding check that projects the roster recurses back into
-  // itself, unboundedly, the first time a FOREIGN membership statement sits on the rail (a
-  // self-authored one passes the rail's self-check and never reaches here). On re-entry for the
-  // same circle we REFUSE the inner question: the inner projection then folds TRAIL-ONLY — and
-  // the trail carries the address facts this verifier needs (the primary + the announced set),
-  // so the OUTER check still decides against the right rows. Depth caps at two by construction.
-  const inFlight = new Set();
+  // NO re-entrancy breaker, BY CONSTRUCTION (2026-08-21): this verifier reads the roster
+  // SPINELESS (trail + display only), so verifying a statement never re-enters the statement
+  // fold — there is no recursion left to break. The old per-circle inFlight breaker could not
+  // tell recursion from CONCURRENT SIBLING reads and refused valid statements nondeterministically
+  // (roster stamps oscillated per read on a seeded device — the bug that forced this design).
   return async ({ author, ref, circleId }) => {
-    if (inFlight.has(circleId)) return false;
-    inFlight.add(circleId);
     try {
       // The DERIVED roster (`listGroupMembers`) is the projection that carries the address facts:
       // `webid` + the primary `circleAddress` + the proven `circleAddresses` SET (each entry
@@ -42,7 +37,10 @@ export function rosterBindingVerifier(callSkill) {
       // (`listGroupRoster`) this used to read carries NEITHER field — every foreign statement
       // failed the binding by shape, invisibly, because the test harness substituted its own
       // resolver: the three-device walk was the first thing to run the verifier for real.
-      const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+      // SPINELESS read (trail + display only): verifying a statement must never fold statements —
+      // the recursion the old breaker guarded is designed out, and the breaker itself is gone
+      // (it refused concurrent SIBLING reads as false recursion; found live 2026-08-21).
+      const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId, spineless: true });
       // SET-AWARE (add-a-device): a statement signed at ANY of the member's proven addresses
       // binds to the member; checking the primary alone would refuse every second device's
       // statements on every rail.
@@ -52,7 +50,6 @@ export function rosterBindingVerifier(callSkill) {
         && (m.circleAddress === author
           || (Array.isArray(m.circleAddresses) && m.circleAddresses.includes(author))));
     } catch { return false; }
-    finally { inFlight.delete(circleId); }
   };
 }
 
@@ -62,16 +59,15 @@ export function rosterBindingVerifier(callSkill) {
  * (custody D1): an `address-revoke` binds ONLY when signed by the row's `ceremonyAddress` — the
  * phrase-derived per-circle key no single device can mint once the custody cutover lands. A row
  * without one (the post-cutover join window, before the member's next ceremony re-binds) falls
- * back to the interim any-attested rule — the arc's named, shrinking window. Same re-entrancy
- * breaker as the base verifier (the roster projection reads this very lane).
+ * back to the interim any-attested rule — the arc's named, shrinking window. Spineless roster
+ * reads, like the base verifier (no recursion, no breaker).
  */
 export function membershipBindingVerifier(callSkill) {
-  const inFlight = new Set();
+  // Spineless read → no recursion → no breaker (see rosterBindingVerifier above).
   return async ({ author, ref, circleId, kind }) => {
-    if (inFlight.has(circleId)) return false;
-    inFlight.add(circleId);
     try {
-      const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+      // SPINELESS, for the same reason as the base verifier above.
+      const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId, spineless: true });
       const row = (Array.isArray(r?.members) ? r.members : [])
         .find((m) => m && (m.webid ?? m.addr ?? m.ref) === ref);
       if (!row) return false;
@@ -81,7 +77,6 @@ export function membershipBindingVerifier(callSkill) {
       return row.circleAddress === author
         || (Array.isArray(row.circleAddresses) && row.circleAddresses.includes(author));
     } catch { return false; }
-    finally { inFlight.delete(circleId); }
   };
 }
 

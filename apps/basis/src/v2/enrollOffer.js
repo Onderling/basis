@@ -220,7 +220,12 @@ export async function consumeEnrollOffer({ agent, callSkill, sendPeerMessage, st
           if (req) {
             await sendPeerMessage(c.address, req, SEND);
             row.steps.push('seed-requested');
-            const deadline = Date.now() + 8000;
+            // Wait for the roster to DERIVE (the seed applied and the projection has its head),
+            // not merely for any rows — the fallback display list also answers, addressless.
+            // RE-SEND the request while waiting: a single packet on a busy boot is exactly the
+            // kind of loss the first-write-wins ingest makes free to retry.
+            const deadline = Date.now() + 10000;
+            let nextResend = Date.now() + 2500;
             let derived = false;
             while (Date.now() < deadline) {
               try {
@@ -230,6 +235,10 @@ export async function consumeEnrollOffer({ agent, callSkill, sendPeerMessage, st
                   break;
                 }
               } catch { /* keep waiting */ }
+              if (Date.now() >= nextResend) {
+                nextResend = Date.now() + 2500;
+                try { await sendPeerMessage(c.address, req, SEND); } catch { /* next tick */ }
+              }
               await new Promise((resolve) => setTimeout(resolve, 250));
             }
             if (derived) row.steps.push('roster-derived');

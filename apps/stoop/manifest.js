@@ -1320,6 +1320,18 @@ export const stoopManifest = {
       },
     },
     {
+      // The rules-update rider's durable-head read: the preserved signed statement the catch-up
+      // serves after the governance lane's audit window compacted the entry away.
+      id:   'getGroupRulesUpdateStatement', verb: 'get',
+      params: [
+        { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
+      ],
+      surfaces: {
+        chat: { hint: 'Plumbing: read the preserved rules-update statement (not user-invoked).' },
+        ui:   { control: 'none' },
+      },
+    },
+    {
       id:   'postAnnouncement', verb: 'add',
       params: [
         { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },

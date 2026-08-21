@@ -4086,19 +4086,27 @@ export function buildSkills({
         if (!isAdmin) return { error: 'admin-only' };
       }
       const newVersion = (a.rules.version ?? 0) + 1;
+      // The rules-update rider: the new doc + version also ride the governance lane as a signed
+      // statement, so every member's device learns the CURRENT version peer-to-peer (their
+      // stale-banner lights without a pod). Emitted FIRST so the durable head below can PRESERVE
+      // the signed statement (`source.statement`): the lane's entry ages out with governance's
+      // audit window, but the head never does — the catch-up serves the preserved original to a
+      // member who was offline past the window, verifiable exactly like a live fan. Best-effort:
+      // no emitter / a failed emit still writes the head (store-local degrade, unchanged).
+      let statement = null;
+      if (typeof rulesUpdateEmit === 'function') {
+        try { statement = await rulesUpdateEmit({ groupId: a.groupId, rules: a.rules, version: newVersion }); }
+        catch { statement = null; /* the fan is best-effort — catch-up reconciles */ }
+      }
       const [item] = await store.addItems([{
         type:       'group-rules',
         text:       a.rules.name ?? a.groupId,
-        source:     { groupId: a.groupId, rules: a.rules, version: newVersion },
+        source:     {
+          groupId: a.groupId, rules: a.rules, version: newVersion,
+          ...(statement ? { statement } : {}),
+        },
         visibility: 'household',
       }], { actor: from });
-      // The rules-update rider: the new doc + version also ride the governance lane as a signed
-      // statement, so every member's device learns the CURRENT version peer-to-peer (their
-      // stale-banner lights without a pod). Best-effort — the local write above is the head.
-      if (typeof rulesUpdateEmit === 'function') {
-        try { await rulesUpdateEmit({ groupId: a.groupId, rules: a.rules, version: newVersion }); }
-        catch { /* the fan is best-effort — catch-up reconciles */ }
-      }
       return { rulesId: item.id, version: newVersion };
     }, {
       description: 'Admin-only: replace the group\'s rules with a new version.',
@@ -4121,21 +4129,46 @@ export function buildSkills({
       const latest = await _findLatestGroupRules(store, a.groupId);
       const localVersion = Number.parseInt(latest?.source?.version ?? latest?.source?.rules?.version ?? 0, 10) || 0;
       if (version <= localVersion) return { applied: false, version: localVersion };
+      const statement = (a.statement && typeof a.statement === 'object'
+        && a.statement.body && typeof a.statement.sig === 'string') ? a.statement : null;
       const [item] = await store.addItems([{
         type:       'group-rules',
         text:       a.rules.name ?? a.groupId,
         // `updatedBy` — the statement's verified admin author, carried so the roster's
         // founder-authority derivation has an authority fact on the RECEIVING device (whose only
         // rules item is this mirror; a mirror's `addedBy` is the local recorder, not the admin).
+        // `statement` — the ORIGINAL signed statement, preserved so this device can serve it at
+        // catch-up after the governance lane's audit window compacted the entry away: the final
+        // setting is never deletable, and it stays verifiable (never re-signed).
         source:     {
           groupId: a.groupId, rules: a.rules, version, mirrored: true,
           ...(typeof a.updatedBy === 'string' && a.updatedBy ? { updatedBy: a.updatedBy } : {}),
+          ...(statement ? { statement } : {}),
         },
         visibility: 'household',
       }], { actor: from });
       return { applied: true, rulesId: item.id, version };
     }, {
       description: 'Land a peer-carried rules-doc update locally (idempotent by version; authority verified at the statement).',
+      visibility:  'authenticated',
+    }),
+
+    /**
+     * getGroupRulesUpdateStatement({groupId})
+     *   — the durable-head read for the rules-update rider's catch-up serve: the ORIGINAL signed
+     *   `rules-update` statement preserved on the latest local `group-rules` item, for the case
+     *   where the governance lane's audit window already compacted the entry. `{}` when the head
+     *   carries none (a pre-rider circle, or the v1-at-creation doc that never had an update).
+     */
+    defineSkill('getGroupRulesUpdateStatement', async ({ parts }) => {
+      const a = dataArgs(parts);
+      if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
+      const latest = await _findLatestGroupRules(store, a.groupId);
+      const s = latest?.source?.statement;
+      if (!s || typeof s !== 'object' || !s.body || typeof s.sig !== 'string') return {};
+      return { statement: s, version: latest?.source?.version ?? null };
+    }, {
+      description: 'Read the preserved signed rules-update statement for a circle (the catch-up serve\'s durable head).',
       visibility:  'authenticated',
     }),
 

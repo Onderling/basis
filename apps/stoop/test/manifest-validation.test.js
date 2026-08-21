@@ -102,9 +102,11 @@ describe('stoop manifest — Slice D.1 structural invariants', () => {
   // still dispatches after the skill→offering op-id rename) → 34.
   // 2026-08-20: +2 for the rules-update rider — `recordGroupRulesUpdate` (the receive half —
   // plumbing, ui control 'none') and `broadcastCircleGovernance` (the fan, declared like its
-  // membership/chat/task siblings — it predated the callskill-literals guard undeclared) → 95.
-  it('ships the full chat+slash surface (one stoop manifest, 95 ops)', () => {
-    expect(stoopManifest.operations.length).toBe(95);
+  // membership/chat/task siblings — it predated the callskill-literals guard undeclared).
+  // 2026-08-21: +1 for `getGroupRulesUpdateStatement` (the durable-head read the catch-up serves
+  // after the lane's audit window — the final setting is never deletable) → 96.
+  it('ships the full chat+slash surface (one stoop manifest, 96 ops)', () => {
+    expect(stoopManifest.operations.length).toBe(96);
   });
 
   // No two ops may declare the same slash command (Part G hard guardrail

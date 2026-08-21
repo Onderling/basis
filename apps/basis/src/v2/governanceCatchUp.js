@@ -29,7 +29,7 @@ const MAX_BATCH = 500;
  *   known peer, and every statement is a SIGNED fact the receiver re-verifies; the residual exposure is the
  *   proposal/vote metadata itself, the same the live fan already carries). Wire a roster check to narrow.
  */
-export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, mayServe = null, subtypes = null } = {}) {
+export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, mayServe = null, subtypes = null, extraStatementsFor = null } = {}) {
   // Lane-parametrized: the governance pair by default; a second lane (membership) passes its own pair —
   // one mechanism, per-lane wire names. (Content lanes don't use this — they ride the windowed
   // `frontierReplay`; pull-all is for the small deny-wins lanes where completeness is the point.)
@@ -40,7 +40,10 @@ export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, maySe
   }
   if (typeof sendToPeer !== 'function') throw new Error('governanceCatchUp: sendToPeer required');
 
-  /** SERVE — a reconnecting peer asks for a circle's governance statements; reply with all of them. */
+  /** SERVE — a reconnecting peer asks for a circle's governance statements; reply with all of them.
+   *  `extraStatementsFor` adds DURABLE-HEAD statements whose lane entries aged out (the task-lane
+   *  relationship: the entry compacts, the head survives elsewhere and is still the ORIGINAL signed
+   *  statement — the receiver's ingest gate verifies it exactly like a live one). Deduped by hash. */
   async function onRequest(fromPeerAddr, payload) {
     if (!payload || payload.subtype !== REQ) return;
     const { circleId } = payload;
@@ -48,6 +51,17 @@ export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, maySe
     try {
       if (mayServe && !(await mayServe(fromPeerAddr, circleId))) return;
       const statements = rail.storedStatements(circleId).slice(0, MAX_BATCH);
+      if (typeof extraStatementsFor === 'function') {
+        const seen = new Set(statements.map((s) => s?.body?.hash).filter(Boolean));
+        try {
+          for (const s of (await extraStatementsFor(circleId)) ?? []) {
+            if (s?.body?.hash && s?.sig && !seen.has(s.body.hash) && statements.length < MAX_BATCH) {
+              seen.add(s.body.hash);
+              statements.push(s);
+            }
+          }
+        } catch { /* the durable-head read is best-effort */ }
+      }
       if (statements.length === 0) return;   // nothing to serve — silence, not an empty batch
       await sendToPeer(fromPeerAddr, { subtype: BATCH, circleId, statements });
     } catch { /* serving is best-effort — the requester retries on its next reconnect */ }

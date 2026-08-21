@@ -60,6 +60,26 @@ export function makeRulesUpdateEmitter({ rail, fan = null } = {}) {
 }
 
 /**
+ * The catch-up serve's durable-head hook: the preserved signed rules-update statement for a
+ * circle, as an array `makeGovernanceCatchUp({ extraStatementsFor })` appends to its batch. The
+ * final setting is never deletable — the lane's entry compacts with governance's audit window,
+ * but the head (the local `group-rules` item) carries the ORIGINAL statement forever, so a member
+ * offline past the window still converges, verifiably, from any peer.
+ *
+ * @param {object} a
+ * @param {Function} a.callSkill
+ * @param {string} a.circleId
+ * @returns {Promise<object[]>}
+ */
+export async function preservedRulesStatementsFor({ callSkill, circleId } = {}) {
+  if (typeof callSkill !== 'function' || typeof circleId !== 'string' || !circleId) return [];
+  try {
+    const r = await callSkill('stoop', 'getGroupRulesUpdateStatement', { groupId: circleId });
+    return (r?.statement?.body && typeof r.statement.sig === 'string') ? [r.statement] : [];
+  } catch { return []; }
+}
+
+/**
  * The read half: fold the lane's verified rules-update statements into the local store's
  * `group-rules` head. Idempotent and convergent — safe to call on every governance change signal.
  *
@@ -117,6 +137,14 @@ export async function applyRulesUpdates({ rail, callSkill, circleId } = {}) {
   });
   const winnerVersion = Number.parseInt(winner.payload.version, 10);
 
+  // The winner's ORIGINAL raw statement (the verified read resolves author→ref on the body; the
+  // stored form keeps the signature) — preserved on the mirror item so THIS device can serve it
+  // at catch-up after the lane's audit window compacts the entry away.
+  let rawStatement = null;
+  try {
+    rawStatement = rail.storedStatements(circleId).find((s) => s?.body?.hash === winner.hash) ?? null;
+  } catch { rawStatement = null; }
+
   // The version guard lives in ONE place — `recordGroupRulesUpdate` refuses anything at or below
   // the local head (idempotency + strictly-newer in the same owner; a second check here would be
   // the two-layers-one-fact drift). NB deliberately not `getGroupRules`: that op's answer is a
@@ -128,6 +156,7 @@ export async function applyRulesUpdates({ rail, callSkill, circleId } = {}) {
       // derivation works on THIS device too — the receiver's only rules item is the mirror, and an
       // authority fact from a signed, verified statement is exactly what that derivation wants.
       groupId: circleId, rules: winner.payload.rules, version: winnerVersion, updatedBy: winner.author,
+      ...(rawStatement ? { statement: rawStatement } : {}),
     });
     if (rec?.error || rec?.applied !== true) return { applied: false };
     return { applied: true, version: winnerVersion };

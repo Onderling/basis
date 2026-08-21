@@ -171,7 +171,7 @@ import { bindCircleGovernance, makeGovernanceRail, openPolicyProposals } from '.
 import { makeGovernanceCatchUp } from '../../src/v2/governanceCatchUp.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../src/v2/membershipRail.js';
 import { GRANTS_BROADCAST } from '../../src/v2/grantsRail.js';
-import { applyRulesUpdates } from '../../src/v2/rulesUpdateLane.js';
+import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
 import { makeTaskPeerHandler, TASK_BROADCAST, TASK_CATCHUP_SUBTYPES } from '../../src/v2/taskRail.js';
 import { makeFrontierReplay } from '../../src/v2/frontierReplay.js';
 import { makeChatPeerHandler, makePodChatCatchUp, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../src/v2/chatRail.js';
@@ -7355,6 +7355,9 @@ async function boot() {
         rail: govShellRail,
         sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
         onChange: govChanged,
+        // The durable-head serve: a member offline past the lane's audit window still receives the
+        // preserved (original, signed) rules-update statement — the final setting never deletes.
+        extraStatementsFor: (cid) => preservedRulesStatementsFor({ callSkill: rawCallSkill, circleId: cid }),
       }) : null;
       // The membership lane's catch-up: the same lane-parametrized mechanism over the agent's rail.
       memCatchUpShell = agent.membershipRail ? makeGovernanceCatchUp({

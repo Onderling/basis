@@ -172,16 +172,22 @@ const SEND = { guarantee: 'hold-forward' };
  *
  *   1. write the registry membership record (handle + THIS device's own derived address) through
  *      the waist — the standing reopenMemberCircles then owns every future boot;
- *   2. install the per-circle signing identity + open the circle (this boot);
+ *   2. install the per-circle signing identity + open the circle STORE (this boot — what the
+ *      restore path does on every later one), so pulled content merges into the head instead of
+ *      parking on the log until the next launch;
  *   3. announce this device's own per-circle address to the SIBLING — the roster-set growth that
  *      makes this device reachable (the boot re-announce reaches the rest as the roster hydrates);
  *   4. pull membership + governance catch-up from the sibling — the roster folds in, and the
- *      rules doc arrives (live or from the preserved head).
+ *      rules doc arrives (live or from the preserved head);
+ *   5. pull the CONTENT lanes (`contentPulls` — the shells hand in their task frontier-replay and
+ *      chat catch-up `requestFrom`s), aimed at the sibling by ADDRESS: the boot-time `requestAll`
+ *      kick walks the roster, which was still empty on this fresh device when it fired. Ordered
+ *      after the seed so the served statements bind on arrival.
  *
  * Best-effort per circle; the stash is CLEARED only when every circle bootstrapped without error,
  * so a half-failed boot retries on the next one. Returns an honest per-circle report.
  */
-export async function consumeEnrollOffer({ agent, callSkill, sendPeerMessage, storage, registerCirclePresence = null } = {}) {
+export async function consumeEnrollOffer({ agent, callSkill, sendPeerMessage, storage, registerCirclePresence = null, contentPulls = null } = {}) {
   if (!agent || typeof callSkill !== 'function' || typeof sendPeerMessage !== 'function' || !storage) {
     return { consumed: false, reason: 'unwired' };
   }
@@ -208,6 +214,11 @@ export async function consumeEnrollOffer({ agent, callSkill, sendPeerMessage, st
       // 2 — identities + presence for THIS boot.
       try { await agent.installCircleIdentities?.([c.id]); row.steps.push('identity'); } catch { /* derive-only; boot heals */ }
       try { await registerCirclePresence?.([c.id]); } catch { /* alias binding is best-effort */ }
+      // 2a — open the circle's STORE now (idempotent — the registry record above hands every
+      // FUTURE boot to the standing restore path; this is that path's per-circle call, run early).
+      // The content rails' storeFor only PEEKS: without an open store the pulled task snapshots
+      // park on the device log until the next launch instead of merging into the visible head.
+      try { await agent.ensureCircleSync?.(c.id); row.steps.push('store-open'); } catch { /* parked statements merge next boot */ }
       // 2b — THE ROSTER SEED (pod-less enroll S1): ask the sibling for the circle's trail rows —
       // without them this device cannot project a roster, and the rails refuse every fanned
       // statement for want of binding rows. Then WAIT (briefly) for the roster to derive before
@@ -258,6 +269,11 @@ export async function consumeEnrollOffer({ agent, callSkill, sendPeerMessage, st
       await sendPeerMessage(c.address, { subtype: MEMBERSHIP_CATCHUP_SUBTYPES.request, circleId: c.id }, SEND);
       await sendPeerMessage(c.address, { subtype: GOV_CATCHUP_REQUEST, circleId: c.id }, SEND);
       row.steps.push('catch-up');
+      // 5 — the CONTENT pulls (tasks + chat), targeted at the sibling — see the header. Best-effort:
+      // the statements bind against the freshly seeded roster; the reconnect requestAll retries.
+      if (typeof contentPulls === 'function') {
+        try { await contentPulls(c.id, c.address); row.steps.push('content'); } catch { /* reconnect retries */ }
+      }
     } catch (err) {
       row.ok = false;
       row.error = err?.message ?? String(err);

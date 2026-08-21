@@ -4195,13 +4195,41 @@ export function buildSkills({
       const { ingested, skipped } = await store.ingestItems(stored, { actor: from, reason: 'roster-seed' });
       // The MEMBER rows (display + authority facts): merged into the member map — the same
       // back-compat source the founder derivation reads, which is how a circle's FOUNDER (who
-      // never redeems, so the trail cannot carry them) becomes visible on a seeded device. The
-      // SELF row is skipped: this device's own map row carries live local bindings.
+      // never redeems, so the trail cannot carry them) becomes visible on a seeded device.
+      //
+      // The SELF row (same webid — every device of one person shares it) gets a NARROWER merge:
+      // only the ADDRESS facts, and only ADDITIVELY into the set. The sibling's per-circle
+      // address is the binding fact every statement it authored needs on this device (without it
+      // the content lanes refuse the sibling's tasks and messages as unbindable), but the full
+      // row must not land: `addMember` merges field-over-field, and the sibling's PRIMARY
+      // address would overwrite this device's own live local bindings.
       let membersRecorded = 0;
       if (Array.isArray(a.members) && members) {
         for (const m of a.members) {
-          if (!m || typeof m.webid !== 'string' || !m.webid || m.webid === from) continue;
-          try { await members.addMember(m); membersRecorded += 1; } catch { /* per-row best-effort */ }
+          if (!m || typeof m.webid !== 'string' || !m.webid) continue;
+          try {
+            if (m.webid === from) {
+              const mine = await members.resolveByWebid(from);
+              const set = new Set([
+                ...(Array.isArray(mine?.circleAddresses) ? mine.circleAddresses : []),
+                ...(typeof mine?.circleAddress === 'string' && mine.circleAddress ? [mine.circleAddress] : []),
+                ...(Array.isArray(m.circleAddresses) ? m.circleAddresses : []),
+                ...(typeof m.circleAddress === 'string' && m.circleAddress ? [m.circleAddress] : []),
+              ].filter(Boolean));
+              if (set.size === 0) continue;
+              await members.addMember({
+                webid: from,
+                circleAddresses: [...set],
+                // The ceremony key is phrase-derived — one per person per circle, identical on
+                // every device — so carrying it when this device has none adds a fact, not a claim.
+                ...(!mine?.ceremonyAddress && typeof m.ceremonyAddress === 'string' && m.ceremonyAddress
+                  ? { ceremonyAddress: m.ceremonyAddress } : {}),
+              });
+            } else {
+              await members.addMember(m);
+            }
+            membersRecorded += 1;
+          } catch { /* per-row best-effort */ }
         }
       }
       return { ok: true, ingested: ingested.length, skipped: skipped.length, membersRecorded };

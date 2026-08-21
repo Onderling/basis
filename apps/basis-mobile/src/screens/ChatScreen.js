@@ -736,6 +736,14 @@ export default function ChatScreen({
               sendPeerMessage: (to, payload, opts2) => bundle.agent.sendPeerMessage(to, payload, opts2),
               storage: AsyncStorage,
               registerCirclePresence: (ids) => bundle.registerCirclePresence?.(ids),
+              // The content lanes' targeted pulls (tasks + chat), aimed at the offer's sibling by
+              // address — the requestAll kicks walk the roster, still empty on an enrolling boot.
+              // (The replay instances are consts below in this same scope; this callback runs on
+              // the deferred consume, long after they exist.)
+              contentPulls: (circleId, siblingAddress) => Promise.allSettled([
+                taskCatchUp?.requestFrom(siblingAddress, circleId),
+                chatCatchUp?.requestFrom(siblingAddress, circleId),
+              ]),
             }).then((r) => {
               if (r?.consumed) console.log('[enroll-offer] bootstrap:', JSON.stringify(r.circles?.map((c) => ({ id: c.circleId, ok: c.ok, steps: c.steps }))));
             }).catch(() => { /* retried next launch — the stash only clears on full success */ });

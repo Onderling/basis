@@ -7837,6 +7837,12 @@ async function boot() {
           sendPeerMessage: (to, payload, opts2) => agent.sendPeerMessage(to, payload, opts2),
           storage: window.localStorage,
           registerCirclePresence: (ids) => registerCirclePresence(agent, ids),
+          // The content lanes' targeted pulls (tasks + chat), aimed at the offer's sibling by
+          // address — the requestAll kick below walks the roster, still empty on an enrolling boot.
+          contentPulls: (circleId, siblingAddress) => Promise.allSettled([
+            taskCatchUpShell?.requestFrom(siblingAddress, circleId),
+            chatCatchUpShell?.requestFrom(siblingAddress, circleId),
+          ]),
         }).then((r) => {
           if (r?.consumed) console.log('[enroll-offer] bootstrap:', JSON.stringify(r.circles?.map((c) => ({ id: c.circleId, ok: c.ok, steps: c.steps }))));
         }).catch(() => { /* retried on the next boot — the stash only clears on full success */ });

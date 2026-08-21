@@ -31,6 +31,7 @@
  * offer itself). The parcel is idempotent at ingest (first-write-wins by item id).
  */
 import { canonicalize, AgentIdentity, b64encode } from '@onderling/core';
+import { CIRCLE_ADDRESS_ANNOUNCE_KIND } from './circleAddressAnnounce.js';
 
 export const ROSTER_SEED_SUBTYPES = Object.freeze({
   request: 'roster-seed-request',
@@ -81,8 +82,11 @@ export async function buildRosterSeedRequest({ signer, delegationRecord = null, 
  *   the grants lane's `deviceSetBindingVerifier` instance — ONE trust base, not a second one
  * @param {string} a.selfPubKey   the profile's chat pubKey (the device set's ref)
  * @param {(to:string, payload:object) => Promise<*>|*} a.sendToPeer
+ * @param {(circleId:string) => (object|null)} [a.ownAnnouncement]
+ *   THIS device's own circle-address announcement ({circleId, memberWebid, circleAddress,
+ *   circleAddressProof}) — sent back alongside the parcel; see the introduce-back note below.
  */
-export function makeRosterSeedServer({ callSkill, signerPromise, delegationRecord = null, verifyDeviceSet, selfPubKey, sendToPeer } = {}) {
+export function makeRosterSeedServer({ callSkill, signerPromise, delegationRecord = null, verifyDeviceSet, selfPubKey, sendToPeer, ownAnnouncement = null } = {}) {
   return async function onRosterSeedRequest(_fromPeerAddr, payload) {
     if (!payload || payload.subtype !== ROSTER_SEED_SUBTYPES.request) return;
     const { body, sig, by } = payload;
@@ -129,6 +133,22 @@ export function makeRosterSeedServer({ callSkill, signerPromise, delegationRecor
         by: identity.pubKey,
         ...(delegationRecord ? { delegation: delegationRecord } : {}),
       });
+      // INTRODUCE THIS DEVICE BACK. A device never records its OWN per-circle address into the
+      // shared person-row — siblings learn it by ANNOUNCE, and this device announced long before
+      // the requester existed. Without this, the fresh device holds the person's row addressless
+      // and refuses every task/chat statement this device signs as unbindable (found live
+      // 2026-08-21). Same production door as any announce: the proof re-verifies at the ingest.
+      if (typeof ownAnnouncement === 'function') {
+        try {
+          const mine = await ownAnnouncement(body.circleId);
+          if (mine) {
+            await sendToPeer(body.replyTo, {
+              type: 'p2p-chat', subtype: CIRCLE_ADDRESS_ANNOUNCE_KIND, circleId: body.circleId,
+              msgId: `roster-seed-announce-${body.circleId}`, ts: Date.now(), announcements: [mine],
+            });
+          }
+        } catch { /* the announce also rides this device's next boot re-announce */ }
+      }
     } catch { /* serving is best-effort — the requester retries on its next boot */ }
   };
 }

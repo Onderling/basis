@@ -27,7 +27,7 @@ import {
   Agent, AgentIdentity, Bootstrap, InternalBus, InternalTransport, DataPart, TokenRegistry,
   PolicyEngine, TrustRegistry, deriveCircleAddress, circleAddressSigner, signCircleLinkFromSeed,
   circleIdentity, signDeviceDelegation, deviceDelegationPubKey, deriveDeviceSeed,
-  deriveVaultAtRestKeyFrom,
+  deriveVaultAtRestKeyFrom, ownCircleAddressAnnouncement,
 } from '@onderling/core';
 import {
   useCircleSigningIdentity, installCircleSigningIdentities,
@@ -1575,6 +1575,14 @@ export async function createRealHouseholdAgent(opts = {}) {
       verifyDeviceSet: deviceSetVerifier,
       selfPubKey: chatId.pubKey,
       sendToPeer: (to, payload) => sa.peer.sendTo(to, payload, { guarantee: 'hold-forward' }),
+      // The introduce-back (see the serve): the fresh sibling can only bind statements THIS
+      // device signs once it holds this device's per-circle address as a proven fact.
+      ownAnnouncement: (cid) => ownCircleAddressAnnouncement({
+        circleId: cid,
+        memberWebid: chatId.pubKey,
+        circleAddressFor,
+        signCircleAddress: (cid2, address) => signCircleLinkFromSeed(deviceDerivationSeed, cid2, cid2, address),
+      }),
     }),
     onBatch: makeRosterSeedReceiver({
       callSkill: (...a) => callSkill(...a),

@@ -23,10 +23,15 @@ import { InternalTransport } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 import {
   bootRealAgentNode, connectNodesOverBus, createCircle, joinExistingCircle, bindCircleAddresses,
-  until, teardown,
+  sendCircleChat, until, teardown,
 } from '../support/pairRealAgents.js';
 import { bindCircleAddressKeysFor } from '../../src/v2/householdRosterPairing.js';
-import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../src/v2/membershipRail.js';
+import {
+  makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES, rosterBindingVerifier,
+} from '../../src/v2/membershipRail.js';
+import { makeFrontierReplay } from '../../src/v2/frontierReplay.js';
+import { TASK_CATCHUP_SUBTYPES } from '../../src/v2/taskRail.js';
+import { CHAT_CATCHUP_SUBTYPES } from '../../src/v2/chatRail.js';
 import { makeGovernanceCatchUp } from '../../src/v2/governanceCatchUp.js';
 import { makeGovernanceRail } from '../../src/v2/governanceAppWiring.js';
 import { applyRulesUpdates } from '../../src/v2/rulesUpdateLane.js';
@@ -92,6 +97,38 @@ function wireGovernanceCatchUp(node) {
   };
 }
 
+/**
+ * The CONTENT catch-up pairs — the shells' exact wiring shape: the task lane over the agent's
+ * rail (serve set = catchUpStatements, so aged-out heads still serve), the chat lane over the
+ * node's rail. Returns the instances so the consume's `contentPulls` can aim `requestFrom` at
+ * the offer's sibling, exactly as the shells hand it in.
+ */
+function wireContentCatchUp(node) {
+  const taskCU = node.agent.taskRail ? makeFrontierReplay({
+    rail: node.agent.taskRail,
+    sendToPeer: (addr, payload) => node.agent.sendPeerMessage(addr, payload),
+    subtypes: TASK_CATCHUP_SUBTYPES,
+    statementsFor: (cid) => node.agent.taskRail.catchUpStatements(cid),
+  }) : null;
+  const chatCU = makeFrontierReplay({
+    rail: node.chatRail,
+    sendToPeer: (addr, payload) => node.agent.sendPeerMessage(addr, payload),
+    subtypes: CHAT_CATCHUP_SUBTYPES,
+  });
+  const inner = node._routerRef.fn;
+  node._routerRef.fn = (env) => {
+    const st = env?.payload?.subtype;
+    for (const cu of [taskCU, chatCU]) {
+      if (!cu) continue;
+      if (st === cu.subtypes.request) { Promise.resolve(cu.onRequest(env?.from, env.payload)).catch(() => {}); return undefined; }
+      if (st === cu.subtypes.batch) { Promise.resolve(cu.onBatch(env?.from, env.payload)).catch(() => {}); return undefined; }
+      if (st === cu.subtypes.offer) { Promise.resolve(cu.onOffer(env?.from, env.payload)).catch(() => {}); return undefined; }
+    }
+    return inner?.(env);
+  };
+  return { taskCU, chatCU };
+}
+
 describe('pod-less roster parity — the enrolled device sees what its sibling sees', () => {
   let B; let A; let A2; let bus;
   afterAll(async () => { await teardown(B, A, A2); });
@@ -105,7 +142,7 @@ describe('pod-less roster parity — the enrolled device sees what its sibling s
       }),
     ]);
     bus = await connectNodesOverBus([B, A]);
-    for (const n of [B, A]) { wireMembershipReceiver(n); wireMembershipCatchUp(n); wireGovernanceCatchUp(n); }
+    for (const n of [B, A]) { wireMembershipReceiver(n); wireMembershipCatchUp(n); wireGovernanceCatchUp(n); wireContentCatchUp(n); }
     await createCircle(B, { groupId: CIRCLE, name: 'Podless parity' });
     const okJoin = await joinExistingCircle(B, A, { groupId: CIRCLE, handle: 'anna' });
     expect(okJoin.joined?.ok, JSON.stringify(okJoin.joined)).toBe(true);
@@ -128,6 +165,12 @@ describe('pod-less roster parity — the enrolled device sees what its sibling s
     }, { timeout: 15000, step: 100 });
     expect(aHasV2, 'the v2 doc never reached the sibling — the parity source would be stale').toBe(true);
 
+    // The content the new device must INHERIT — a task and a chat message that exist BEFORE the
+    // second device does. S3's claim is inheritance through the targeted pulls, not the live fan.
+    const preTask = await A.agent.callSkill('tasks', 'addTask', { text: 'water the plants', circleId: CIRCLE });
+    expect(preTask?.itemId, JSON.stringify(preTask)).toBeTruthy();
+    await sendCircleChat(A, { groupId: CIRCLE, msgId: 'parity-m1', text: 'hoi van anna' });
+
     // A adds a second device: offer → ceremony → enrolled reboot → consume.
     const built = await A.agent.callSkill('household', 'buildEnrollOffer', {});
     expect(built.ok, JSON.stringify(built)).toBe(true);
@@ -140,6 +183,10 @@ describe('pod-less roster parity — the enrolled device sees what its sibling s
     await teardown(pre);
     A2 = await bootRealAgentNode('A2', {
       agentOpts: { ...vaults, deviceLog: new EventLog({ initial: [], muted: [] }) },
+      // No in-process omniscience for the NEW device's chat lane: its binding rides the DERIVED
+      // roster only — exactly what a real fresh install holds. (Deferred evaluation: the closure
+      // runs at ingest time, after this boot resolves.)
+      verifyChatBinding: (q) => rosterBindingVerifier((app, op, args) => A2.agent.callSkill(app, op, args))(q),
     });
     const tx = new InternalTransport(bus, A2.pubKey);
     await A2.agent.sa.addSecureTransport('relay', tx);
@@ -148,12 +195,18 @@ describe('pod-less roster parity — the enrolled device sees what its sibling s
     wireMembershipReceiver(A2);
     wireMembershipCatchUp(A2);
     wireGovernanceCatchUp(A2);
+    const a2Content = wireContentCatchUp(A2);
 
     const consumed = await consumeEnrollOffer({
       agent: A2.agent,
       callSkill: (app, op, args) => A2.agent.callSkill(app, op, args),
       sendPeerMessage: (to, payload, opts) => A2.agent.sendPeerMessage(to, payload, opts),
       storage,
+      // The shells' shape: the content lanes' requestFrom, aimed at the offer's sibling address.
+      contentPulls: (circleId, siblingAddress) => Promise.allSettled([
+        a2Content.taskCU?.requestFrom(siblingAddress, circleId),
+        a2Content.chatCU?.requestFrom(siblingAddress, circleId),
+      ]),
     });
     const report = consumed.circles?.find((c) => c.circleId === CIRCLE);
     expect(report?.ok, JSON.stringify(consumed)).toBe(true);
@@ -171,19 +224,9 @@ describe('pod-less roster parity — the enrolled device sees what its sibling s
     }, { timeout: 15000, step: 100 });
     expect(roleParity, 'roles never reached parity on the seeded device').toBe(true);
 
-    // The authoritative fold: A's SIGNED acceptance ('1' on the join statement) folds on A2 —
-    // the statements landed, bound against the seeded rows, and the fold went authoritative.
-    const aRed = await A.agent.callSkill('stoop', 'listOpen', { type: 'membership-redemption' });
-    const aRedRows = (aRed?.items ?? aRed ?? []);
-    {
-      const before = ((await A2.agent.callSkill('stoop', 'listOpen', { type: 'membership-redemption' }))?.items ?? []).length;
-      const handReq = await A2.agent.rosterSeed.buildRequest(CIRCLE, A2.agent.circleAddressFor(CIRCLE));
-      await A.agent.rosterSeed.onRequest('hand', handReq);
-      await new Promise((r) => setTimeout(r, 1000));
-      const after = ((await A2.agent.callSkill('stoop', 'listOpen', { type: 'membership-redemption' }))?.items ?? []).length;
-        const rowsNow = (await A2.agent.callSkill('stoop', 'listOpen', { type: 'membership-redemption' }))?.items ?? [];
-        const aRows = (await A.agent.callSkill('stoop', 'listOpen', { type: 'membership-redemption' }))?.items ?? [];
-      }
+    // The authoritative fold: A's SIGNED acceptance ('1' on the join statement) folds on the
+    // seeded device — the statements landed, bound against the seeded rows, and the fold went
+    // authoritative.
     const foldParity = await until(async () => {
       const rows = await rowsOn(A2);
       const self = rows.find((m) => m.webid === A.pubKey);
@@ -209,5 +252,24 @@ describe('pod-less roster parity — the enrolled device sees what its sibling s
     const selfOnA = paintedA.find((m) => m.id === A.pubKey);
     expect(selfOnA2?.rules, 'the banner state on the NEW device').toEqual({ accepted: '1', current: '2', stale: true });
     expect(selfOnA2?.rules, 'both devices paint the SAME banner').toEqual(selfOnA?.rules);
+
+    // ── The CONTENT the person already had, now on the new device (S3) ───────────────────────
+    expect(report.steps, 'the circle store opened THIS boot (content merges instead of parking)').toContain('store-open');
+    expect(report.steps, 'the targeted content pulls went out').toContain('content');
+
+    // Tasks: the pre-enroll task shows in the enrolled device's own task list — served over the
+    // frontier replay, verified at the rail against the seeded roster, merged into the open store.
+    const taskParity = await until(async () => {
+      const r = await A2.agent.callSkill('tasks', 'listOpen', { circleId: CIRCLE });
+      return (Array.isArray(r?.items) ? r.items : []).some((t2) => t2.id === preTask.itemId) ? true : null;
+    }, { timeout: 15000, step: 100 });
+    expect(taskParity, 'the pre-enroll task never reached the seeded device').toBe(true);
+
+    // Chat: the pre-enroll message landed on the new device's chat lane — its binding rode the
+    // DERIVED roster only (no test omniscience on this node), so this is the real fresh-install gate.
+    const chatParity = await until(() => A2.chatRail.storedStatements(CIRCLE)
+      .some((s) => s?.body?.subject === 'parity-m1' && s?.body?.payload?.text === 'hoi van anna') ? true : null,
+    { timeout: 15000, step: 100 });
+    expect(chatParity, 'the pre-enroll chat message never landed on the seeded device').toBe(true);
   }, 180_000);
 });

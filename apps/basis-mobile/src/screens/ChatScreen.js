@@ -840,6 +840,11 @@ export default function ChatScreen({
             [grantsCatchUp.subtypes.request]: grantsCatchUp.onRequest,
             [grantsCatchUp.subtypes.batch]:   grantsCatchUp.onBatch,
           } : {}),
+          // The roster seed (pod-less enroll S1) — same registration as the web shell.
+          ...(bundle?.agent?.rosterSeed ? {
+            [bundle.agent.rosterSeed.subtypes.request]: bundle.agent.rosterSeed.onRequest,
+            [bundle.agent.rosterSeed.subtypes.batch]:   bundle.agent.rosterSeed.onBatch,
+          } : {}),
           ...(taskRail ? { [TASK_BROADCAST]: makeTaskPeerHandler({ rail: taskRail }) } : {}),
           ...(taskCatchUp ? {
             [taskCatchUp.subtypes.request]: taskCatchUp.onRequest,

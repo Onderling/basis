@@ -5108,7 +5108,10 @@
     "offer_error": "Code maken lukte niet (dit apparaat zit nog in geen enkele kring).",
     "offer_paste_label": "Code van je huidige apparaat (optioneel)",
     "offer_paste_invalid": "Dat is geen geldige toevoeg-code.",
-    "offer_back": "Terug"
+    "offer_back": "Terug",
+    "offer_code_label": "Code:",
+    "offer_link_label": "Link:",
+    "offer_share": "Deel de code"
   },
   "revoke": {
     "title": "Apparaat intrekken",

@@ -23,7 +23,7 @@ import {
 import { bindCircleAddressKeysFor } from '../../src/v2/householdRosterPairing.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST } from '../../src/v2/membershipRail.js';
 import {
-  ENROLL_SCHEME, encodeEnrollOffer, parseEnrollOffer,
+  ENROLL_SCHEME, encodeEnrollOffer, parseEnrollOffer, enrollOfferLink, enrollOfferFromLink,
   stashEnrollOffer, pendingEnrollOffer, clearEnrollOffer, consumeEnrollOffer,
 } from '../../src/v2/enrollOffer.js';
 import { EventLog } from '../../src/eventLog.js';
@@ -68,6 +68,33 @@ describe('the enroll offer — encode/parse', () => {
     expect(parseEnrollOffer(ENROLL_SCHEME + btoa(JSON.stringify({ v: 9 })).replace(/=+$/, '')).reason).toBe('wrong-version');
     expect(parseEnrollOffer(ENROLL_SCHEME + btoa(JSON.stringify({ v: 1, c: [] })).replace(/=+$/, '')).reason).toBe('incomplete');
     expect(() => encodeEnrollOffer({ circles: [] })).toThrow();
+  });
+
+  it('the LINK form wraps the identical payload — the person chooses how to share', () => {
+    const uri = encodeEnrollOffer({ relays: ['ws://r'], circles: [{ id: 'c1', handle: 'anna', address: 'addr-1' }] });
+    const link = enrollOfferLink('https://app.onderling.example/basis/', uri);
+    expect(link.ok).toBe(true);
+    expect(link.link.startsWith('https://app.onderling.example/basis/#enroll=')).toBe(true);
+
+    // Recovered from the full href, from a bare hash, and from the raw code — one box takes all.
+    for (const input of [link.link, `#enroll=${link.link.split('#enroll=')[1]}`, uri]) {
+      const back = enrollOfferFromLink(input);
+      expect(back.ok, input.slice(0, 40)).toBe(true);
+      expect(back.uri).toBe(uri);
+      expect(back.circles[0]).toEqual({ id: 'c1', handle: 'anna', address: 'addr-1' });
+    }
+    expect(enrollOfferLink('not-a-url', uri).reason).toBe('bad-app-url');
+    expect(enrollOfferFromLink('https://app.example/#other=1').reason).toBe('not-an-enroll-link');
+    expect(enrollOfferFromLink('').reason).toBe('not-an-enroll-link');
+  });
+
+  it('the stash accepts BOTH forms and normalises to the raw code', async () => {
+    const storage = memStorage();
+    const uri = encodeEnrollOffer({ circles: [{ id: 'c1', handle: 'anna', address: 'addr-1' }] });
+    const { link } = enrollOfferLink('https://app.example/', uri);
+    expect((await stashEnrollOffer(storage, link)).ok).toBe(true);
+    expect((await pendingEnrollOffer(storage))?.circles?.[0]?.id).toBe('c1');
+    await clearEnrollOffer(storage);
   });
 
   it('the stash survives a parse-gate and clears', async () => {

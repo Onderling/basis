@@ -5108,7 +5108,10 @@
     "offer_error": "Could not build the code (this device is not in any circle yet).",
     "offer_paste_label": "Code from your current device (optional)",
     "offer_paste_invalid": "That is not a valid add-device code.",
-    "offer_back": "Back"
+    "offer_back": "Back",
+    "offer_code_label": "Code:",
+    "offer_link_label": "Link:",
+    "offer_share": "Share the code"
   },
   "revoke": {
     "title": "Remove a device",

@@ -172,7 +172,7 @@ import { makeGovernanceCatchUp } from '../../src/v2/governanceCatchUp.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../src/v2/membershipRail.js';
 import { GRANTS_BROADCAST } from '../../src/v2/grantsRail.js';
 import { applyRulesUpdates, preservedRulesStatementsFor } from '../../src/v2/rulesUpdateLane.js';
-import { stashEnrollOffer, consumeEnrollOffer } from '../../src/v2/enrollOffer.js';
+import { stashEnrollOffer, consumeEnrollOffer, enrollOfferLink, enrollOfferFromLink } from '../../src/v2/enrollOffer.js';
 import { makeTaskPeerHandler, TASK_BROADCAST, TASK_CATCHUP_SUBTYPES } from '../../src/v2/taskRail.js';
 import { makeFrontierReplay } from '../../src/v2/frontierReplay.js';
 import { makeChatPeerHandler, makePodChatCatchUp, CHAT_STATEMENT_BROADCAST, CHAT_CATCHUP_SUBTYPES } from '../../src/v2/chatRail.js';
@@ -4506,24 +4506,38 @@ function showEnrollDeviceFlow() {
     import('qrcode').then((mod) => {
       (mod.default ?? mod).toCanvas(canvas, built.uri, { width: 220, margin: 1, errorCorrectionLevel: 'M' }, () => {});
     }).catch(() => { canvas.remove(); });   // the copyable text below stays the fallback
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;gap:.4rem;margin:.4rem 0;';
-    const uriInput = document.createElement('input');
-    uriInput.type = 'text';
-    uriInput.readOnly = true;
-    uriInput.value = built.uri;
-    uriInput.style.cssText = 'flex:1;';
-    const copyBtn = document.createElement('button');
-    copyBtn.type = 'button';
-    copyBtn.className = 'cc-btn cc-btn--quiet';
-    copyBtn.textContent = t('circle.pairedDevices.copy');
-    copyBtn.addEventListener('click', () => {
-      try { navigator.clipboard?.writeText(built.uri); } catch { /* the input stays selectable */ }
-      copyBtn.textContent = t('circle.pairedDevices.copied');
-      setTimeout(() => { copyBtn.textContent = t('circle.pairedDevices.copy'); }, 1500);
-    });
-    row.append(uriInput, copyBtn);
-    card.append(row, back);
+    // The person chooses HOW to share: the QR above, the raw code, or — for anything with a
+    // browser at the other end — a clickable LINK wrapping the identical payload.
+    const copyRow = (value, label) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;gap:.4rem;margin:.4rem 0;align-items:center;';
+      if (label) {
+        const lab = document.createElement('span');
+        lab.textContent = label;
+        lab.style.cssText = 'white-space:nowrap;';
+        row.appendChild(lab);
+      }
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.readOnly = true;
+      input.value = value;
+      input.style.cssText = 'flex:1;';
+      const copyBtn = document.createElement('button');
+      copyBtn.type = 'button';
+      copyBtn.className = 'cc-btn cc-btn--quiet';
+      copyBtn.textContent = t('circle.pairedDevices.copy');
+      copyBtn.addEventListener('click', () => {
+        try { navigator.clipboard?.writeText(value); } catch { /* the input stays selectable */ }
+        copyBtn.textContent = t('circle.pairedDevices.copied');
+        setTimeout(() => { copyBtn.textContent = t('circle.pairedDevices.copy'); }, 1500);
+      });
+      row.append(input, copyBtn);
+      return row;
+    };
+    card.appendChild(copyRow(built.uri, t('circle.enroll.offer_code_label')));
+    const link = enrollOfferLink(`${window.location.origin}${window.location.pathname}`, built.uri);
+    if (link.ok) card.appendChild(copyRow(link.link, t('circle.enroll.offer_link_label')));
+    card.appendChild(back);
   };
 
   const paint = () => {
@@ -7792,6 +7806,22 @@ async function boot() {
         // The grants lane's pull: my own devices — a revoke made elsewhere while this device was
         // offline binds at this door now, before a stale view is served.
         agent.grantsCatchUp?.requestFromSiblings().catch(() => {});
+        // An ARRIVING enroll link (`…#enroll=<payload>` — the clickable form of the QR): stash the
+        // offer, scrub it from the address bar, and open the enroll flow so the person lands one
+        // step from typing the phrase. Runs before the consume below on purpose: a link opened on
+        // an already-enrolled device just re-stashes harmlessly (public data; consume is version-
+        // guarded at every write).
+        try {
+          const fromLink = enrollOfferFromLink(window.location.hash);
+          if (fromLink.ok) {
+            stashEnrollOffer(window.localStorage, fromLink.uri)
+              .then(() => {
+                try { window.history.replaceState(null, '', window.location.pathname + window.location.search); } catch { /* cosmetic */ }
+                showEnrollDeviceFlow();
+              })
+              .catch(() => { /* the paste field remains the door */ });
+          }
+        } catch { /* a malformed hash is not an error state */ }
         // The enroll-offer consume (once per boot, no-op when nothing is stashed): the first boot
         // after an add-device ceremony bootstraps every circle from the scanned offer — the
         // registry membership record, the announce to the sibling, the catch-up pulls.

@@ -95,15 +95,60 @@ export function parseEnrollOffer(uri) {
   return { ok: true, relays, circles };
 }
 
+/* ── The link form — the same offer as a clickable https URL ──────────────────────────────────
+ * A custom scheme is scannable but not clickable in a browser; the LINK form wraps the identical
+ * payload in the web app's own URL (`…/#enroll=<payload>`), so the person chooses how to share:
+ * scan the QR, or send the link. The web app reads the hash at load, stashes the offer, and opens
+ * the enroll flow. Same public-by-design posture — the link carries exactly what the QR carries. */
+
+export const ENROLL_LINK_PARAM = 'enroll';
+
+/**
+ * The clickable form of an offer URI.
+ * @param {string} appUrl  the web app's base URL (origin + path, no hash)
+ * @param {string} uri     an `onderling-enroll://…` offer (validated)
+ * @returns {{ok:true, link:string}|{ok:false, reason:string}}
+ */
+export function enrollOfferLink(appUrl, uri) {
+  const parsed = parseEnrollOffer(uri);
+  if (!parsed.ok) return parsed;
+  if (typeof appUrl !== 'string' || !/^https?:\/\//.test(appUrl)) return { ok: false, reason: 'bad-app-url' };
+  const base = appUrl.split('#')[0];
+  return { ok: true, link: `${base}#${ENROLL_LINK_PARAM}=${uri.trim().slice(ENROLL_SCHEME.length)}` };
+}
+
+/**
+ * Recover the offer from a link (or from a raw location hash). Accepts a full href, a bare
+ * `#enroll=…` hash, or — for one paste box that takes anything — a raw `onderling-enroll://` URI.
+ * @param {string} hrefOrHash
+ * @returns {{ok:true, uri:string, relays:string[], circles:object[]}|{ok:false, reason:string}}
+ */
+export function enrollOfferFromLink(hrefOrHash) {
+  if (typeof hrefOrHash !== 'string' || !hrefOrHash) return { ok: false, reason: 'not-an-enroll-link' };
+  const s = hrefOrHash.trim();
+  if (s.startsWith(ENROLL_SCHEME)) {
+    const parsed = parseEnrollOffer(s);
+    return parsed.ok ? { ...parsed, uri: s } : parsed;
+  }
+  const hashIdx = s.indexOf('#');
+  const hash = hashIdx >= 0 ? s.slice(hashIdx + 1) : s;
+  const m = new RegExp(`(?:^|&)${ENROLL_LINK_PARAM}=([^&]+)`).exec(hash);
+  if (!m) return { ok: false, reason: 'not-an-enroll-link' };
+  const uri = ENROLL_SCHEME + m[1];
+  const parsed = parseEnrollOffer(uri);
+  return parsed.ok ? { ...parsed, uri } : parsed;
+}
+
 /* ── The stash — the offer must survive the ceremony's reload ─────────────────────────────────
  * `storage` is duck-typed {getItem, setItem, removeItem} (localStorage on web, AsyncStorage on
  * mobile — both shapes work; results are awaited). Plain storage on purpose: the offer is public
  * data, and the sealed vaults are re-keyed mid-ceremony — exactly the wrong home for it. */
 
-export async function stashEnrollOffer(storage, uri) {
-  const parsed = parseEnrollOffer(uri);
+export async function stashEnrollOffer(storage, uriOrLink) {
+  // One paste box takes anything: the raw `onderling-enroll://` code OR the clickable link form.
+  const parsed = enrollOfferFromLink(uriOrLink);
   if (!parsed.ok) return parsed;
-  await storage.setItem(ENROLL_OFFER_STORAGE_KEY, uri.trim());
+  await storage.setItem(ENROLL_OFFER_STORAGE_KEY, parsed.uri);
   return parsed;
 }
 

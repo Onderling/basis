@@ -112,7 +112,7 @@ import { loadAuditLog }       from './auditLog.js';
  * @property {boolean|object} [auditLog]        true | { vaultKey, vault?, autoLog? }  exposes sa.audit
  * @property {boolean|object} [groupManager]    true | { vault } exposes sa.groups (auto-threaded into policy)
  * @property {boolean|object} [a2aTls]          true | { a2aAuth } exposes sa.a2aTls
- * @property {boolean|object} [rateLimit]       true | { perPeer, global } drops over-quota envelopes
+ * @property {boolean|object} [rateLimit]       true | { perPeer, global, exempt(env)→bool } drops over-quota envelopes (exempt passes legitimate bursts, e.g. catch-up batches)
  * @property {boolean|object} [usePerfectFwdSec] true | { vaultKeyPrefix, maxSkip } exposes sa.pfs
  *
  * @property {Function} [onPeerMessage]         ({from, payload, ts}) => void
@@ -605,12 +605,20 @@ export async function createSecureAgent(opts = {}) {
   // they reach onPeerMessage.  Default tuning is chat-pace; apps with
   // bursty traffic should pass explicit limits or false.
   let rateLimiter = null;
+  // `exempt(env) → boolean` — an INJECTED predicate for legitimate bursts (the app's catch-up
+  // replay batches: one reconnect serve is up to 1000 items, which the chat-pace buckets would
+  // silently discard). The vocabulary of WHICH subtypes are burst-legitimate belongs to the app,
+  // not this substrate, so it rides in rather than being read from a table here. An exempt
+  // envelope neither consumes tokens nor drops. The stated trade: exempted subtypes fall back to
+  // the verify gates behind them (signed-only ingest) instead of this bucket.
+  let rateLimitExempt = null;
   if (opts.rateLimit) {
     const rlOpts = (typeof opts.rateLimit === 'object') ? opts.rateLimit : {};
     rateLimiter = createRateLimiter({
       perPeer: rlOpts.perPeer,
       global:  rlOpts.global,
     });
+    rateLimitExempt = typeof rlOpts.exempt === 'function' ? rlOpts.exempt : null;
   }
 
   // ─── Perfect Forward Secrecy (A.8, partial Double-Ratchet) ──
@@ -1179,8 +1187,9 @@ export async function createSecureAgent(opts = {}) {
       if (await isInboundCircleBlocked(env)) return;
       // rate-limit drop.  Over-quota peers are silently
       // ignored at the receive boundary (no reciprocal HI either —
-      // we don't want them to make us spam them in return).
-      if (rateLimiter && !rateLimiter.check(env?._from)) return;
+      // we don't want them to make us spam them in return).  The injected
+      // exemption passes legitimate bursts (catch-up batches) untouched.
+      if (rateLimiter && !(rateLimitExempt?.(env)) && !rateLimiter.check(env?._from)) return;
       // v0.7.cc — record for /debug-dump.  Size is the JSON-
       // serialised length of the envelope; matches the wire bytes
       // the transport actually received.

@@ -44,15 +44,30 @@ import {
   probeSettingsMediumDetailed, isProbeSafeToAttach,
   computeSettingsConflicts, SETTINGS_SHARED_PROBE_PATH,
 } from '../../v2/settingsRestoreGate.js'; // #36/#44 — probe-before-flush (no cross-key clobber) + the restore choices
-import { makeMembershipRail, makeMembershipEmitter } from '../../v2/membershipRail.js'; // the membership rider — statements ride the device log
-import { makeTaskRail, makeTaskEmitter, routeTaskMirror } from '../../v2/taskRail.js'; // the content re-root — item snapshots ride the device log
-import { makeChatRail, makeChatEmitter, owedChatStatements } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
+import { makeMembershipRail, makeMembershipEmitter, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../v2/membershipRail.js'; // the membership rider — statements ride the device log
+import { makeTaskRail, makeTaskEmitter, routeTaskMirror, TASK_CATCHUP_SUBTYPES } from '../../v2/taskRail.js'; // the content re-root — item snapshots ride the device log
+import { makeChatRail, makeChatEmitter, owedChatStatements, CHAT_CATCHUP_SUBTYPES } from '../../v2/chatRail.js'; // the content re-root — chat messages ride the device log as signed render entries
+import { GOV_CATCHUP_BATCH } from '../../v2/governanceCatchUp.js'; // the governance catch-up's reply subtype (the rate-limit exemption set)
+
+/** The CATCH-UP REPLY subtypes — the legitimate reconnect bursts the rate limiter must not eat
+ *  (one replay serve is up to 1000 items against a burst-30 bucket). Replies only: requests and
+ *  every other envelope stay bucketed, and each exempted reply still faces its rail's full
+ *  verify-on-ingest gate. */
+const CATCHUP_REPLY_SUBTYPES = new Set([
+  GOV_CATCHUP_BATCH,
+  MEMBERSHIP_CATCHUP_SUBTYPES.batch,
+  GRANTS_CATCHUP_SUBTYPES.batch,
+  TASK_CATCHUP_SUBTYPES.batch,
+  TASK_CATCHUP_SUBTYPES.offer,
+  CHAT_CATCHUP_SUBTYPES.batch,
+  CHAT_CATCHUP_SUBTYPES.offer,
+]);
 import { createSurfaceGrants, compileReadFilter } from '../../v2/surfaceGrants.js';   // pair-a-view standing grants (the surface role) + the section→lane-filter compiler
 // The grants LANE (V1 closing wave row 1): grant/revoke statements ride the device log between the
 // owner's own devices; the registry above is a projection of this lane.
 import {
   makeGrantsRail, makeGrantsFan, makeGrantsCatchUp, makeGrantsPeerHandler,
-  deviceSetBindingVerifier, siblingDeviceAddresses,
+  deviceSetBindingVerifier, siblingDeviceAddresses, GRANTS_CATCHUP_SUBTYPES,
 } from '../../v2/grantsRail.js';
 // The rules-update rider: a rules-doc edit fans a signed statement on the governance lane so the
 // new doc + version reach every member peer-to-peer (pod-free — V1 closing wave row 2).
@@ -513,6 +528,26 @@ export async function createRealHouseholdAgent(opts = {}) {
       isRevoked: async (tokenId) =>
         Boolean(await agentsTokenRegistry?.isRevoked(tokenId))
         || Boolean(await surfaceGrants?.isRevoked(tokenId)),
+    },
+    // RATE LIMIT ON (the R1 go-live line, 2026-08-21) — the flood defence at the receive boundary,
+    // WITH the catch-up exemption that made turning it on safe: a reconnect replay legitimately
+    // serves up to 1000 items in one burst, which the chat-pace buckets would silently discard
+    // (the reason this sat OFF since 2026-07-30). The exemption passes exactly the DEDICATED
+    // catch-up REPLY subtypes — signed statements that still face their rails' full verify gates —
+    // while requests and ordinary traffic stay bucketed. Named residuals, on purpose: the
+    // noticeboard replay re-sends plain 'circle-post' envelopes (NOT exempt — a long backlog may
+    // throttle, and the hi-water design re-pulls on the next reconnect), and an exempt-subtype
+    // flood degrades to a verify-CPU cost instead of a bucket drop. Tests override via
+    // secureAgentOpts (spread below wins).
+    rateLimit: {
+      // Tuned ABOVE chat pace on purpose: the other legitimate burst — a hold-forward FLUSH of
+      // envelopes held while this device was offline — carries ordinary subtypes and cannot be
+      // subtype-exempted, so the buckets must absorb it. 120/20 per peer rides out a realistic
+      // flush; the global cap holds several peers reconnecting at once without letting a botnet
+      // of quiet senders flood in aggregate.
+      perPeer: { burst: 120, refillPerSec: 20 },
+      global:  { burst: 600, refillPerSec: 100 },
+      exempt: (env) => CATCHUP_REPLY_SUBTYPES.has(env?.payload?.subtype),
     },
     // THE SENDER OUTBOX is a PROJECTION, not a second store. basis deliberately passes NO `holdStore`:
     // the content a held envelope carries is ALREADY on the device log (the optimistic local append

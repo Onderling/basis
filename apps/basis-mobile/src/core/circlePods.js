@@ -86,6 +86,10 @@ export function recordCircleKeyEvent(groupId, event) {
   if (recorded) circleSealStrategies.delete(groupId);
   return recorded;
 }
+// The READ side for the roster-seed serve's key-chain replay: the circle's held group-key events,
+// handed to a device-set-verified sibling so the person's fresh device can open sealed content
+// (web parity — the web shell reads its store the same way).
+export function listCircleKeyEvents(groupId) { return circleKeyEventStore.list(groupId); }
 
 // The EMIT side's transport wiring — the peer sender + skill dispatch live in the agent bundle, which this
 // module doesn't own; the bundle injects them at boot (mirror of web's lazy `_peerAgent`/`rawCallSkill`

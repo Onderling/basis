@@ -1561,6 +1561,12 @@ export async function createRealHouseholdAgent(opts = {}) {
   // circle's membership-redemption trail rows — the head its roster projection folds statements
   // onto. Both halves verify through the ONE device-set verifier above; the shells register the
   // two subtypes and `consumeEnrollOffer` sends the request.
+  //
+  // The key-event PROVIDER is ref-indirected because the per-circle key-event store lives in the
+  // SHELL (session-scoped, next to its receive handler), which composes after this factory runs:
+  // the shell hands its reader in via `rosterSeed.provideKeyEvents` and the serve replays the
+  // circle's group-key chain to a verified sibling (sealed circles open on the new device).
+  const keyEventProvider = { fn: null };
   const rosterSeed = {
     subtypes: ROSTER_SEED_SUBTYPES,
     buildRequest: (circleId, replyTo) => buildRosterSeedRequest({
@@ -1583,12 +1589,14 @@ export async function createRealHouseholdAgent(opts = {}) {
         circleAddressFor,
         signCircleAddress: (cid2, address) => signCircleLinkFromSeed(deviceDerivationSeed, cid2, cid2, address),
       }),
+      keyEventsFor: (cid) => keyEventProvider.fn?.(cid) ?? [],
     }),
     onBatch: makeRosterSeedReceiver({
       callSkill: (...a) => callSkill(...a),
       verifyDeviceSet: deviceSetVerifier,
       selfPubKey: chatId.pubKey,
     }),
+    provideKeyEvents: (fn) => { keyEventProvider.fn = typeof fn === 'function' ? fn : null; },
   };
 
   hostAgent.register('grantSurface', async ({ parts }) => {

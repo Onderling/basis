@@ -89,7 +89,7 @@ import { makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin
 // log (circlePods' store); a content read folds it into the key chain. Same shared handler as web.
 import { makeHandleGroupKeyEvent }
                                from '../../../basis/src/core/handlers/groupKeyEvent.js';
-import { recordCircleKeyEvent } from '../core/circlePods.js';
+import { recordCircleKeyEvent, listCircleKeyEvents } from '../core/circlePods.js';
 import {
   makeRequestCatchUpFromKnownPeers,
 } from '../../../basis/src/core/handlers/catchUp.js';
@@ -848,7 +848,8 @@ export default function ChatScreen({
             [grantsCatchUp.subtypes.request]: grantsCatchUp.onRequest,
             [grantsCatchUp.subtypes.batch]:   grantsCatchUp.onBatch,
           } : {}),
-          // The roster seed (pod-less enroll S1) — same registration as the web shell.
+          // The roster seed (pod-less enroll S1) — same registration as the web shell. The serve's
+          // KEY-CHAIN replay reads this shell's key-event store (wired just below the map).
           ...(bundle?.agent?.rosterSeed ? {
             [bundle.agent.rosterSeed.subtypes.request]: bundle.agent.rosterSeed.onRequest,
             [bundle.agent.rosterSeed.subtypes.batch]:   bundle.agent.rosterSeed.onBatch,
@@ -888,6 +889,10 @@ export default function ChatScreen({
       updatePeerDisplay: renamePeer,
       t,
     });
+    // The roster-seed serve's KEY-CHAIN replay reads this shell's key-event store, so a verified
+    // sibling's fresh device receives the circle's group-key events (sealed circles open there —
+    // web parity).
+    bundle?.agent?.rosterSeed?.provideKeyEvents?.((cid) => listCircleKeyEvents(cid));
     return {
       onPeerMessage:  makePeerRouter({ handlers, defaultHandler }),
       // The neighbourhood-POST catch-up (a stoop noticeboard concern): the hi-water peer poll. Chat/tasks/

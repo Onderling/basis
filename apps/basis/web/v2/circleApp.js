@@ -7640,6 +7640,9 @@ async function boot() {
           ? agent.sendPeerMessage(addr, env)
           : Promise.reject(new Error('agent.sendPeerMessage unavailable'));
 
+      // The roster-seed serve's KEY-CHAIN replay reads this shell's key-event store, so a verified
+      // sibling's fresh device receives the circle's group-key events (sealed circles open there).
+      agent.rosterSeed?.provideKeyEvents?.((cid) => circleKeyEventStore.list(cid));
       const peerMessageRouter = makePeerRouter({
         handlers: {
           // The SIGNED chat lane: verify-at-the-rail receive + its windowed, consent-gated catch-up.

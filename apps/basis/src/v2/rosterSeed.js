@@ -85,8 +85,11 @@ export async function buildRosterSeedRequest({ signer, delegationRecord = null, 
  * @param {(circleId:string) => (object|null)} [a.ownAnnouncement]
  *   THIS device's own circle-address announcement ({circleId, memberWebid, circleAddress,
  *   circleAddressProof}) — sent back alongside the parcel; see the introduce-back note below.
+ * @param {(circleId:string) => (object[]|Promise<object[]>)} [a.keyEventsFor]
+ *   the circle's GROUP-KEY events this device holds (its local key-event log) — replayed to the
+ *   verified sibling alongside the parcel; see the key-chain replay note below.
  */
-export function makeRosterSeedServer({ callSkill, signerPromise, delegationRecord = null, verifyDeviceSet, selfPubKey, sendToPeer, ownAnnouncement = null } = {}) {
+export function makeRosterSeedServer({ callSkill, signerPromise, delegationRecord = null, verifyDeviceSet, selfPubKey, sendToPeer, ownAnnouncement = null, keyEventsFor = null } = {}) {
   return async function onRosterSeedRequest(_fromPeerAddr, payload) {
     if (!payload || payload.subtype !== ROSTER_SEED_SUBTYPES.request) return;
     const { body, sig, by } = payload;
@@ -148,6 +151,27 @@ export function makeRosterSeedServer({ callSkill, signerPromise, delegationRecor
             });
           }
         } catch { /* the announce also rides this device's next boot re-announce */ }
+      }
+      // THE KEY-CHAIN REPLAY (pod-less enroll, sealed circles): the group-key events this device
+      // holds for the circle, re-sent to the verified sibling through the ORDINARY
+      // `group-key-event` door — the same wire and record path every rotation fan already rides,
+      // de-duped by version at the receiver. This is a REPLAY, not a re-wrap: the events stay the
+      // sealed envelopes they always were (the group key is never unwrapped here), and the sibling
+      // opens them with the person's own sealing key, exactly as this device does. It happens ONLY
+      // inside this device-set-verified request path — a stranger's request never reaches here, so
+      // the chain's metadata (recipients, versions) discloses only to the person's own devices.
+      // Without it a freshly enrolled device verifies sealed content it can never open: the events
+      // were fanned before it existed, and with no pod there is nowhere to restore them from.
+      if (typeof keyEventsFor === 'function') {
+        try {
+          const events = (await keyEventsFor(body.circleId)) ?? [];
+          for (const event of events) {
+            if (!event) continue;
+            await sendToPeer(body.replyTo, {
+              type: 'group-key-event', subtype: 'group-key-event', groupId: body.circleId, event,
+            });
+          }
+        } catch { /* the requester's next boot re-request retries */ }
       }
     } catch { /* serving is best-effort — the requester retries on its next boot */ }
   };

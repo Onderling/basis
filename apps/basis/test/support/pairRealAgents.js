@@ -299,6 +299,8 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   });
 
   const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatInbox, chatRail, deviceLog, _routerRef: routerRef };
+  // The roster-seed serve's key-chain replay reads this node's key-event store (the shells' exact wiring).
+  agent.rosterSeed?.provideKeyEvents?.((cid) => keyEventStore.list(cid));
   LIVE_NODES.add(node);
   // Live view of the REAL ingested circle chats (the browser reads the same eventLog for its bubble list).
   Object.defineProperty(node, 'chatEvents', { enumerable: true, get: () => chatEventLog.query({ excludeMuted: true }) });

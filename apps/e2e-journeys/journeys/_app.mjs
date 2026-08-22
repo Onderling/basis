@@ -29,7 +29,9 @@ import {
 } from '../../basis/test/support/pairRealAgents.js';
 import { bindCircleAddressKeysFor } from '../../basis/src/v2/householdRosterPairing.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../basis/src/v2/membershipRail.js';
-import { makeGovernanceCatchUp } from '../../basis/src/v2/governanceCatchUp.js';
+import { makeGovernanceCatchUp, GOV_CATCHUP_REQUEST } from '../../basis/src/v2/governanceCatchUp.js';
+import { bindCircleGovernance, makeGovernanceRail } from '../../basis/src/v2/governanceAppWiring.js';
+import { makeCircleGovernancePeerHandler } from '../../basis/src/v2/circleLogReceiver.js';
 import { createCircleCacheMedium } from '../../basis/src/v2/circleCacheMedium.js';
 
 /**
@@ -71,6 +73,20 @@ const mediumFor = (label, pod, circleId) => (id) => (id === circleId
 /** Register the receive halves a shell registers, so fanned lane statements actually land. */
 function wireLanes(node) {
   const inner = node._routerRef.fn;
+  // GOVERNANCE — the rail a fanned decision statement must verify at before it lands, plus the
+  // pull-all catch-up. Built here rather than per journey because the shells build it once per boot.
+  const govRail = makeGovernanceRail({
+    eventLog: node.chatEventLog,
+    circleIdentityFor: node.agent.circleIdentityFor,
+    myRef: node.pubKey,
+    callSkill: (app, op, args) => node.agent.callSkill(app, op, args),
+  });
+  const govHandler = makeCircleGovernancePeerHandler({ eventLog: node.chatEventLog, rail: govRail, onChange: () => {} });
+  const govCatchUp = makeGovernanceCatchUp({
+    rail: govRail,
+    sendToPeer: (addr, payload) => node.agent.sendPeerMessage(addr, payload),
+  });
+  node._govRail = govRail;
   const membership = node.agent.membershipRail
     ? makeMembershipPeerHandler({ rail: node.agent.membershipRail })
     : null;
@@ -83,6 +99,9 @@ function wireLanes(node) {
     : null;
   node._routerRef.fn = (env) => {
     const st = env?.payload?.subtype;
+    if (st === 'circle-governance-broadcast') { govHandler(env?.from, env.payload); return undefined; }
+    if (st === GOV_CATCHUP_REQUEST) { govCatchUp.onRequest(env?.from, env.payload); return undefined; }
+    if (st === govCatchUp.subtypes.batch) { govCatchUp.onBatch(env?.from, env.payload); return undefined; }
     if (membership && st === MEMBERSHIP_BROADCAST) { membership(env?.from, env.payload); return undefined; }
     if (memCatchUp && st === memCatchUp.subtypes.request) { memCatchUp.onRequest(env?.from, env.payload); return undefined; }
     if (memCatchUp && st === memCatchUp.subtypes.batch) { memCatchUp.onBatch(env?.from, env.payload); return undefined; }
@@ -155,4 +174,32 @@ export async function untilTrue(pred, ms = 15000, step = 200) {
     await new Promise((r) => setTimeout(r, step));
   }
   return false;
+}
+
+
+/**
+ * The governance handle for one person, wired exactly as a shell wires it: events ride the device
+ * log's governance lane, are signed with the per-circle key, and fan through the real stoop op.
+ *
+ * `policy` lets a journey choose the decision-class map under test — the default map makes
+ * `removeMember` any-admin, which never needs a vote, so a journey that wants to exercise VOTING
+ * passes e.g. `{ governance: { removeMember: 'member-vote' } }`.
+ */
+export function governanceFor(node, { policy = {} } = {}) {
+  return bindCircleGovernance({
+    eventLog: node.chatEventLog,
+    callSkill: (app, op, args) => node.agent.callSkill(app, op, args),
+    getPolicy: () => policy,
+    myRef: node.pubKey,
+    genId: () => `gov-${Math.random().toString(36).slice(2, 10)}`,
+    circleIdentityFor: node.agent.circleIdentityFor,
+    broadcast: (channel, circleId, event) => {
+      const op = channel === 'report' ? 'broadcastCircleReport' : 'broadcastCircleGovernance';
+      node.agent.callSkill('stoop', op, {
+        groupId: circleId, event,
+        msgId: event?.body?.hash ? `gov:${event.body.hash}` : `gov-${Math.random().toString(36).slice(2, 10)}`,
+        ts: Date.now(),
+      }).catch(() => { /* the fan is best-effort; catch-up reconciles */ });
+    },
+  });
 }

@@ -23,7 +23,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { AgentIdentity } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
-import { startRelay } from '@onderling/relay';
+import { startJourneyRelay } from './support/testRelay.js';
 import { createSealedPodDataSource } from '@onderling/pod-client';
 import { memoryDataSource } from '@onderling/item-store';
 import { bootRealAgentNode, connectNodesOverRelay, teardown, until } from './support/pairRealAgents.js';
@@ -53,8 +53,8 @@ describe('the reading half over a REAL relay — the nudge crosses, the view re-
   let podMap; let log; let lane; let repulled; const crossed = [];
 
   beforeAll(async () => {
-    relay = await startRelay({ port: 0, log: false });
-    relayUrl = `ws://127.0.0.1:${relay.port}`;
+    relay = await startJourneyRelay();
+    relayUrl = relay.url;
 
     podMap = new Map();
     log = new EventLog({ initial: [], muted: [] });

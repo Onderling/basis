@@ -32,7 +32,7 @@
  * proofs. Two devices' views of them are checked, because they differ.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { startRelay } from '@onderling/relay';
+import { startJourneyRelay } from '../support/testRelay.js';
 import {
   bootRealAgentNode, connectNodesOverRelay, createCircle, joinExistingCircle,
   bindCircleAddresses, readRoster, until, teardown, sendCircleChat } from '../support/pairRealAgents.js';
@@ -76,8 +76,8 @@ describe('per-circle signing is enforced per member (real relay, fallback OFF)',
   let admin; let bram; let cato;
 
   beforeAll(async () => {
-    relay = await startRelay({ port: 0, log: false });
-    relayUrl = `ws://127.0.0.1:${relay.port}`;
+    relay = await startJourneyRelay();
+    relayUrl = relay.url;
 
     // "Rather undeliverable than routed over my one global key" — the product's private default.
     // With the fallback ON, a member whose per-circle address is unknown is quietly reached at their

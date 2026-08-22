@@ -11,7 +11,7 @@
  */
 import { describe, it, expect, afterAll } from 'vitest';
 import { VaultMemory } from '@onderling/vault';
-import { startRelay } from '@onderling/relay';
+import { startJourneyRelay } from '../support/testRelay.js';
 import {
   bootRealAgentNode, connectNodesOverRelay, createCircle, joinExistingCircle, bindCircleAddresses,
   sealCircleViaProducer, postSealed, readSealed, until, teardown,
@@ -38,8 +38,8 @@ describe('pod-less sealed parity over the RELAY — the marquee walk', () => {
   });
 
   it('the enrolled device opens pre-existing sealed content, every hop over the live relay', async () => {
-    relay = await startRelay({ port: 0, log: false });
-    const relayUrl = `ws://127.0.0.1:${relay.port}`;
+    relay = await startJourneyRelay();
+    const relayUrl = relay.url;
     [B, A] = await Promise.all([
       bootRealAgentNode('B'),
       bootRealAgentNode('A', {

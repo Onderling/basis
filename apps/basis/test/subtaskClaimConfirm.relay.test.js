@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 
-import { startRelay } from '@onderling/relay';
+import { startJourneyRelay } from './support/testRelay.js';
 import { bootRealAgentNode, connectNodesOverRelay, pairCircle, until, teardown } from './support/pairRealAgents.js';
 
 const CIRCLE_ID = 'relay-race-chores';
@@ -38,8 +38,8 @@ describe('subtask claim-confirmation race over a real relay (§7)', () => {
   let relay; let relayUrl; let A; let B;
 
   beforeAll(async () => {
-    relay = await startRelay({ port: 0, log: false });
-    relayUrl = `ws://127.0.0.1:${relay.port}`;
+    relay = await startJourneyRelay();
+    relayUrl = relay.url;
     [A, B] = await Promise.all([bootRealAgentNode('A', { taskLane: true }), bootRealAgentNode('B', { taskLane: true })]);
     await connectNodesOverRelay([A, B], { relayUrl });
     wireInboundLikeShell(A);

@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { VaultMemory } from '@onderling/vault';
 import { AgentIdentity, CIRCLE_ADDRESS_ANNOUNCE_KIND } from '@onderling/core';
-import { startRelay } from '@onderling/relay';
+import { startJourneyRelay } from './support/testRelay.js';
 import {
   bootRealAgentNode, connectNodesOverRelay, pairCircle, bindCircleAddresses, until, teardown,
 } from './support/pairRealAgents.js';
@@ -24,8 +24,8 @@ describe('grants lane over a real relay — paired on the phone, revoked for the
   let relay; let relayUrl; let P; let L; let B; let V;
 
   beforeAll(async () => {
-    relay = await startRelay({ port: 0, log: false });
-    relayUrl = `ws://127.0.0.1:${relay.port}`;
+    relay = await startJourneyRelay();
+    relayUrl = relay.url;
     V = await AgentIdentity.generate(new VaultMemory());
 
     P = await bootRealAgentNode('P', {

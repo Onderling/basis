@@ -26,7 +26,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 // Through the package barrel, not `packages/relay/src/server.js` — the four sibling relay tests all
 // reach into raw src and each is a `lint:deps` violation; a new file need not add a fifth.
-import { startRelay } from '@onderling/relay';
+import { startJourneyRelay } from '../support/testRelay.js';
 import {
   bootRealAgentNode, connectNodesOverRelay, createCircle, joinExistingCircle,
   bindCircleAddresses, readRoster, until, teardown, sendCircleChat } from '../support/pairRealAgents.js';
@@ -53,8 +53,8 @@ describe('B4 — a removed member is silenced in THAT circle only (real relay)',
   let admin; let bram; let cato;
 
   beforeAll(async () => {
-    relay = await startRelay({ port: 0, log: false });
-    relayUrl = `ws://127.0.0.1:${relay.port}`;
+    relay = await startJourneyRelay();
+    relayUrl = relay.url;
 
     // Fallback OFF — "rather undeliverable than routed over my one global key". With it ON a member
     // is quietly reached at their global address and half of what this file asserts would hold for
@@ -222,8 +222,8 @@ describe('B5 — the invite ceiling is refused by the ISSUER, over a real relay'
   const CIRCLE = 'circle-invite-ceiling';
 
   beforeAll(async () => {
-    relay = await startRelay({ port: 0, log: false });
-    relayUrl = `ws://127.0.0.1:${relay.port}`;
+    relay = await startJourneyRelay();
+    relayUrl = relay.url;
     [admin, one, two] = await Promise.all([
       bootRealAgentNode('admin'), bootRealAgentNode('one'), bootRealAgentNode('two'),
     ]);

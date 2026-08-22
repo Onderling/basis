@@ -19,7 +19,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { startRelay } from '@onderling/relay';
+import { startJourneyRelay } from '../support/testRelay.js';
 import { AgentIdentity, SecurityLayer, mkEnvelope, P } from '@onderling/core';
 // Relative, like `startRelay` above: `@onderling/transports` is not a dependency of this app (the
 // shells reach transports through the secure-agent facade, invariant 5). A test that needs to BE a
@@ -37,8 +37,8 @@ describe('a stranger cannot speak in a circle, however well they sign (real rela
   let relay, relayUrl, admin, joiner, joined;
 
   beforeAll(async () => {
-    relay = await startRelay({ port: 0, log: false });
-    relayUrl = `ws://127.0.0.1:${relay.port}`;
+    relay = await startJourneyRelay();
+    relayUrl = relay.url;
 
     admin  = await bootRealAgentNode('admin');
     joiner = await bootRealAgentNode('joiner');

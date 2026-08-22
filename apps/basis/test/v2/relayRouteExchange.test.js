@@ -11,7 +11,7 @@
 // (asyncStorageRelayIo `.save`, commit 7de8b661) let the phone actually dial the relay. This
 // guards the transport+propagation mechanism the phone shares — no phone/adb needed.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { startRelay } from '@onderling/relay';
+import { startJourneyRelay } from '../support/testRelay.js';
 import {
   bootRealAgentNode, connectAgentsOverRelay, pairCircle, until, teardown, sendCircleChat } from '../support/pairRealAgents.js';
 import { signSpine } from '@onderling/core';
@@ -26,8 +26,8 @@ describe('relay-route cross-device exchange (self-contained relay)', () => {
 
   beforeAll(async () => {
     // In-process relay on an OS-assigned port — no external :8787, no sqlite.
-    relay = await startRelay({ port: 0, log: false });
-    const relayUrl = `ws://127.0.0.1:${relay.port}`;
+    relay = await startJourneyRelay();
+    const relayUrl = relay.url;
 
     admin = await bootRealAgentNode('admin');
     // The legacy-group harness records no circleAddress roster rows (that trail binding lands with the

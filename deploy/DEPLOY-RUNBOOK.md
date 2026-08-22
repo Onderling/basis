@@ -269,6 +269,21 @@ The result:
 - media edge: **`https://<RELAY_DOMAIN>/blob-gate`**
 - pod: **`https://<POD_DOMAIN>/`** (equals `CSS_BASE_URL`)
 
+### B7a. Acceptance — run the real journeys against the deployment
+
+`deploy/smoke` proves the wire protocol. To prove **people's journeys** work over the new relay —
+circles, membership folds, sealed content, the enroll ceremony — point the existing relay walks at
+it with one env var (they default to an in-process relay, so this is the same suite either way):
+
+```bash
+cd apps/basis
+ONDERLING_RELAY_URL=wss://<RELAY_DOMAIN> npx vitest run relay
+```
+
+Rehearsed locally before any deploy (2026-08-22): green in-process, green against the containerised
+image over `ws://`, and green through Caddy over `wss://` — so a failure here points at the
+deployment (DNS, proxy, firewall), not at the code.
+
 ### B8. How the services are wired (already done for you)
 
 The overlay wires everything on the Docker network; you don't hand-edit these:

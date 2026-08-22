@@ -25,7 +25,7 @@
  * since a refused envelope simply never surfaces.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { startRelay } from '@onderling/relay';
+import { startJourneyRelay } from '../support/testRelay.js';
 import {
   bootRealAgentNode, connectNodesOverRelay, createCircle, joinExistingCircle,
   bindCircleAddresses, readRoster, until, teardown, sendCircleChat } from '../support/pairRealAgents.js';
@@ -48,8 +48,8 @@ describe('joiner ↔ joiner addressing in a three-member circle (real relay, fal
   let admin; let bram; let cato;
 
   beforeAll(async () => {
-    relay = await startRelay({ port: 0, log: false });
-    relayUrl = `ws://127.0.0.1:${relay.port}`;
+    relay = await startJourneyRelay();
+    relayUrl = relay.url;
 
     // The setting this test exists to honour. `false` = "rather undeliverable than routed over my
     // one global key" — the product's private default.

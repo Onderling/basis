@@ -14,7 +14,7 @@
  * Cast: Anna (admin) · Bram (releases his name to the circle) · Cato (must receive it).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { startRelay } from '@onderling/relay';
+import { startJourneyRelay } from '../support/testRelay.js';
 import {
   bootRealAgentNode, connectNodesOverRelay, createCircle, joinExistingCircle,
   bindCircleAddresses, readRoster, until, teardown,
@@ -34,8 +34,8 @@ describe('a released name reaches co-members (real relay, three devices)', () =>
   let admin; let bram; let cato;
 
   beforeAll(async () => {
-    relay = await startRelay({ port: 0, log: false });
-    relayUrl = `ws://127.0.0.1:${relay.port}`;
+    relay = await startJourneyRelay();
+    relayUrl = relay.url;
     [admin, bram, cato] = await Promise.all([
       bootRealAgentNode('admin'), bootRealAgentNode('bram'), bootRealAgentNode('cato'),
     ]);

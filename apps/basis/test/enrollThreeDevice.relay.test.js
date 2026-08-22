@@ -14,7 +14,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { VaultMemory } from '@onderling/vault';
-import { startRelay } from '@onderling/relay';
+import { startJourneyRelay } from './support/testRelay.js';
 import { CIRCLE_ADDRESS_ANNOUNCE_KIND } from '@onderling/core';
 import {
   bootRealAgentNode, connectNodesOverRelay, pairCircle, bindCircleAddresses, until, teardown,
@@ -30,8 +30,8 @@ describe('V1 walk — enroll a second device, announce over a real relay, the ro
   let relay; let relayUrl; let A; let B; let A2;
 
   beforeAll(async () => {
-    relay = await startRelay({ port: 0, log: false });
-    relayUrl = `ws://127.0.0.1:${relay.port}`;
+    relay = await startJourneyRelay();
+    relayUrl = relay.url;
     // B's chat binding is the PRODUCTION verifier — `rosterBindingVerifier`, the exact one both
     // shells wire on every rail: a statement's author key must be an attested address on the
     // claimed member's roster row (primary OR the proven set). The harness's own default instead

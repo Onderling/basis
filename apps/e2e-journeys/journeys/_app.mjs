@@ -34,6 +34,12 @@ import { bindCircleGovernance, makeGovernanceRail } from '../../basis/src/v2/gov
 import { makeCircleGovernancePeerHandler } from '../../basis/src/v2/circleLogReceiver.js';
 import { createCircleCacheMedium } from '../../basis/src/v2/circleCacheMedium.js';
 import { makeKeyEventLogSink, recipientAddrsFromRoster, recipientWebidsFromRoster } from '@onderling/kring-host/keyEventLogSink';
+import {
+  invokeAgentSkill, DataPart, InternalBus, InternalTransport,
+  Agent, AgentIdentity, PolicyEngine, TrustRegistry, defineSkill, PeerGraph,
+} from '@onderling/core';
+import { VaultMemory } from '@onderling/vault';
+import { RelayTransport } from '@onderling/transports';
 import { sealingPublicKeyFromNetworkKey } from '@onderling/pod-client';
 import { KEY_STATEMENT_BROADCAST, makeKeyPeerHandler } from '../../basis/src/v2/keyRail.js';
 import { CHAT_CATCHUP_SUBTYPES } from '../../basis/src/v2/chatRail.js';
@@ -293,6 +299,160 @@ export async function formCircle({ admin, joiners = [], circleId, handles = [] }
   await Promise.all(all.map((n) => bindCircleAddressKeysFor({ agent: n.agent, circleId })));
   return { circleId, people: all };
 }
+
+/* ─── THE PEER DOOR ───────────────────────────────────────────────────────────────────────────────
+ * Everything else in this harness reaches a device through `callSkill` — which is the LOCAL waist,
+ * i.e. the person acting on their own device. That can never test what a *peer* is allowed to make
+ * my device do, because it never crosses the door where that is decided.
+ *
+ * The door is `runGatedSkill` (`@onderling/core` protocol/taskExchange): it runs
+ * `PolicyEngine.checkInbound` — trust tier of the caller × visibility of the skill, failing closed in
+ * BOTH directions (an unknown caller drops to the lowest tier, an unknown visibility rises to the
+ * highest) — then the skill lookup, then the group-visibility gate. `invokeAgentSkill` is the caller
+ * side of exactly that path, so these helpers add no test-only door: they knock on the real one.
+ * ──────────────────────────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * A DOOR AGENT — a core agent standing on the real relay with a real `PolicyEngine`, so a journey
+ * can knock on it from another device and see what the gate does.
+ *
+ * This is the composition the door actually needs, and it is the one the reachability journey
+ * already uses for the same reason: a core Agent whose DEFAULT transport is the relay. The app's
+ * `realAgent` gives its core agents a device-local bus and routes inbound peer traffic to the app's
+ * message router, so a device-to-device A2A invocation never reaches a skill dispatcher there —
+ * which is why the app-composition journeys cannot ask this question and this helper exists.
+ *
+ * `skills` is a list of `defineSkill(...)` results; `trust` maps a peer pubKey to a tier, so a
+ * journey can set up "this caller is trusted, that one is a stranger" and watch the tier ladder work.
+ *
+ * @returns {{agent, address, pubKey, setTier, stop}}
+ */
+export async function bootDoorAgent({ relayUrl, skills = [], trust = {} } = {}) {
+  const identity = await AgentIdentity.generate(new VaultMemory());
+  const agent = new Agent({
+    identity, transport: new RelayTransport({ relayUrl, identity }), peers: new PeerGraph(),
+  });
+  for (const skill of skills) agent.register(skill.id, skill.handler, skill);
+  const trustRegistry = new TrustRegistry(new VaultMemory());
+  agent.policyEngine = new PolicyEngine({
+    trustRegistry,
+    skillRegistry: agent.skills,
+    agentPubKey: identity.pubKey,
+  });
+  for (const [pubKey, tier] of Object.entries(trust)) await trustRegistry.setTier(pubKey, tier);
+  await agent.start();
+  return {
+    agent,
+    address: agent.address,
+    pubKey: identity.pubKey,
+    setTier: (pubKey, tier) => trustRegistry.setTier(pubKey, tier),
+    stop: () => agent.stop?.().catch?.(() => {}) ?? agent.stop?.(),
+  };
+}
+
+/**
+ * Introduce door agents to each other. Without this every knock fails with "No pubKey registered
+ * for recipient — send HI first", which looks exactly like a refusal and would make a door journey
+ * pass for the wrong reason: the gate would never run at all.
+ */
+export function linkDoorAgents(...agents) {
+  for (const a of agents) {
+    for (const b of agents) {
+      if (a === b) continue;
+      a.agent.addPeer(b.address, b.address);
+    }
+  }
+}
+
+/** Knock on a door agent (or any core agent) directly, without a booted node in between. */
+export async function knockDirect(callerAgent, address, skillId, args = {}, { timeout = 8000 } = {}) {
+  try {
+    const task = invokeAgentSkill(callerAgent, address, skillId, [DataPart(args)], { timeout });
+    const res = await task.done();
+    if (res?.status && res.status !== 'completed') {
+      return { ok: false, error: String(res.error ?? res.status), status: res.status };
+    }
+    return { ok: true, result: res?.parts?.[0]?.data ?? null };
+  } catch (err) {
+    return { ok: false, error: String(err?.message ?? err) };
+  }
+}
+
+export { defineSkill };
+
+/**
+ * Put every node's CORE agent on one shared bus, so a peer can actually knock.
+ *
+ * Why this is needed: each device's `realAgent` builds its own in-process bus for its own agents
+ * (chat · host · household), so two booted devices' core agents cannot address each other even
+ * though their SECURE agents are talking happily over the relay. Without this, an A2A invocation
+ * just times out and a journey would read "the door refused me" when nothing ever reached a door.
+ *
+ * What this does and does not prove. The transport here is in-process — the same `InternalTransport`
+ * the harness's own `connectAgentsOverBus` and the reachability journey use. The GATE is not:
+ * `runGatedSkill` → `PolicyEngine.checkInbound` → the skill lookup → the group-visibility gate is
+ * the same code on any transport. So a journey built on this tests **who is allowed through the
+ * door**, which is transport-independent, and does not test the relay path to it.
+ */
+export async function connectCoreAgents(nodes, { transportName = 'a2a-bus' } = {}) {
+  const bus = new InternalBus({ presenceAware: true });
+  const cores = nodes.filter(Boolean).map(coreAgentOf).filter(Boolean);
+  for (const core of cores) core.addTransport(transportName, new InternalTransport(bus, core.address));
+  // A hello binds the peer to the transport that can reach it — without it the sender keeps routing
+  // over its own device-local default bus, where the other device does not exist, and every knock
+  // times out looking like a refusal.
+  for (const a of cores) {
+    for (const b of cores) {
+      if (a === b) continue;
+      try { await a.hello(b.address); } catch { /* best-effort, like the shells' own hello */ }
+    }
+  }
+  return bus;
+}
+
+/** The core Agent behind a booted node — the thing that actually holds skills and a policy engine. */
+export const coreAgentOf = (node) => node.agent?.sa?.agent ?? null;
+
+/** The address a peer addresses that node by. */
+export const addressOf = (node) => coreAgentOf(node)?.address ?? null;
+
+/**
+ * Knock on another device's door: invoke `skillId` on `target` AS `caller`, over the real transport
+ * and through the real inbound gate.
+ *
+ * Returns `{ok, result, error}` rather than throwing, because a refusal is the expected answer to
+ * most of these and a thrown refusal reads as a crash. `error` carries the door's own words
+ * (`Unknown skill: "x"`, a policy denial, a disabled skill) so a journey can assert WHICH refusal it
+ * got, not merely that something went wrong.
+ */
+export async function knockOn(caller, target, skillId, args = {}, { timeout = 8000 } = {}) {
+  const from = coreAgentOf(caller);
+  const to = addressOf(target);
+  if (!from || !to) return { ok: false, error: 'no-core-agent' };
+  try {
+    const task = invokeAgentSkill(from, to, skillId, [DataPart(args)], { timeout });
+    const res = await task.done();
+    if (res?.status && res.status !== 'completed') {
+      return { ok: false, error: String(res.error ?? res.status), status: res.status };
+    }
+    const data = res?.parts?.[0]?.data ?? res?.parts?.[0] ?? null;
+    return { ok: true, result: data, status: res?.status ?? 'completed' };
+  } catch (err) {
+    return { ok: false, error: String(err?.message ?? err) };
+  }
+}
+
+/** What that device is willing to expose to a peer at all. */
+export const skillIdsOf = (node) => {
+  const core = coreAgentOf(node);
+  const reg = core?.skills;
+  try {
+    if (typeof reg?.list === 'function') return reg.list().map((s) => s.id ?? s.skillId ?? s);
+    if (typeof reg?.keys === 'function') return [...reg.keys()];
+    if (typeof reg?.all === 'function') return reg.all().map((s) => s.id ?? s);
+  } catch { /* fall through */ }
+  return [];
+};
 
 /** The circle's roster as that person's own device projects it. */
 export async function rosterOf(node, circleId) {

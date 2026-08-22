@@ -47,8 +47,9 @@ import * as custody       from './journeys/custody.journey.mjs';
 import * as receipts      from './journeys/receipts.journey.mjs';
 import * as taskSession   from './journeys/taskSession.journey.mjs';
 import * as lastAdmin     from './journeys/lastAdmin.journey.mjs';
+import * as scope         from './journeys/scope.journey.mjs';
 
-const ALL = [twoParty, offline, circle, sealedInbox, noticeboard, companion, taskClaim, security, notifications, feedback, manage, bot, keyexchange, telegram, media, removal, mute, governance, reachability, membership, roles, offerings, appComposition, podModes, governanceVote, attachments, eviction, keyRotation, absence, custody, receipts, taskSession, lastAdmin];
+const ALL = [twoParty, offline, circle, sealedInbox, noticeboard, companion, taskClaim, security, notifications, feedback, manage, bot, keyexchange, telegram, media, removal, mute, governance, reachability, membership, roles, offerings, appComposition, podModes, governanceVote, attachments, eviction, keyRotation, absence, custody, receipts, taskSession, lastAdmin, scope];
 const KEY = (n) => n.split(' ')[0].toLowerCase().replace(/[^a-z-]/g, ''); // "two-party messaging" -> "two-party"
 
 const args = process.argv.slice(2);

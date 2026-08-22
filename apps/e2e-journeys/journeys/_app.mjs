@@ -275,6 +275,25 @@ export function keySinkFor(node, circleId) {
   return { sink, recorded };
 }
 
+/**
+ * Form ANOTHER circle out of nodes that are already booted and connected — so the same device can be
+ * in two circles, which is the only way to ask an unlinkability question honestly. (Booting a second
+ * `bootAppCircle` gives you a second SET of people; comparing their addresses proves nothing.)
+ */
+export async function formCircle({ admin, joiners = [], circleId, handles = [] }) {
+  await createCircle(admin, { groupId: circleId, name: circleId });
+  for (let i = 0; i < joiners.length; i += 1) {
+    const r = await joinExistingCircle(admin, joiners[i], {
+      groupId: circleId, handle: handles[i] ?? `member-${i}`,
+    });
+    if (!r?.joined?.ok) throw new Error(`join failed for ${circleId}: ${JSON.stringify(r?.joined)}`);
+  }
+  const all = [admin, ...joiners];
+  await bindCircleAddresses(all, circleId);
+  await Promise.all(all.map((n) => bindCircleAddressKeysFor({ agent: n.agent, circleId })));
+  return { circleId, people: all };
+}
+
 /** The circle's roster as that person's own device projects it. */
 export async function rosterOf(node, circleId) {
   const r = await node.agent.callSkill('stoop', 'listGroupMembers', { groupId: circleId });

@@ -20,7 +20,16 @@ import { PodClient, generateKeypair as podGenerateKeypair, SolidOidcAuth,
   sealingPublicKeyFromNetworkKey as podSealingPublicKeyFromNetworkKey } from '@onderling/pod-client';
 import { sealItem } from '@onderling/item-store';
 import { makeCircleLists } from '@onderling/kring-host/circleLists';
-import { makeKeyEventLogSink, recipientAddrsFromRoster } from '@onderling/kring-host/keyEventLogSink';
+import { makeKeyEventLogSink, recipientAddrsFromRoster, recipientWebidsFromRoster } from '@onderling/kring-host/keyEventLogSink';
+
+/** A circle's roster, for the key fan's recipient match (web parity). */
+const keyFanRoster = async (circleId) => {
+  if (typeof _keyEventWiring?.callSkill !== 'function') return [];
+  try {
+    const r = await _keyEventWiring.callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+    return Array.isArray(r?.members) ? r.members : [];
+  } catch { return []; }
+};
 import { createKeyEventStore, wrapStrategyWithKeyEventFold } from '../../../basis/src/v2/keyEventStore.js';
 import { KEY_STATEMENT_BROADCAST, projectKeyEventsIntoStore } from '../../../basis/src/v2/keyRail.js';
 import { createCirclePodProducer, createCircleControlAgentRouter, seedCircleRoster } from '../../../basis/src/v2/circlePodProducer.js';
@@ -120,20 +129,28 @@ function makeCircleKeyEventLog(circleId) {
       ? (_keyEventWiring.keyEmit(gid ?? circleId, event) ?? null)
       : undefined),
     statementSubtype: KEY_STATEMENT_BROADCAST,
+    // THE FAN — through the waist (web parity), so the statement leaves under this member's
+    // per-circle address. A direct peer send carries the canonical identity and is refused at
+    // every receiver inside a circle.
+    fanStatement: (gid, statement, only) => (typeof _keyEventWiring?.callSkill === 'function'
+      ? _keyEventWiring.callSkill('stoop', 'broadcastCircleKeyStatement', {
+        groupId: gid ?? circleId, event: statement,
+        msgId: `key:${statement?.body?.hash ?? statement?.body?.subject}`, ts: Date.now(),
+        ...(only ? { only } : {}),
+      })
+      : Promise.resolve()),
     sendPeer: (addr, payload, opts) => (typeof _keyEventWiring?.sendPeer === 'function'
       ? _keyEventWiring.sendPeer(addr, payload, opts)
       : Promise.resolve()),
     // Held (not lost) for an offline member, flushed on reconnect — the same channel content fans over.
     sendOptions: { hold: true, firstSendTimeoutMs: 0, retryDelays: [] },
-    resolveRecipientAddrs: async (event) => {
-      if (typeof _keyEventWiring?.callSkill !== 'function') return [];
-      let members = [];
-      try {
-        const r = await _keyEventWiring.callSkill('stoop', 'listGroupMembers', { groupId: circleId });
-        members = Array.isArray(r?.members) ? r.members : [];
-      } catch { return []; }
-      return recipientAddrsFromRoster(event, members);
-    },
+    resolveRecipientAddrs: async (event) => recipientAddrsFromRoster(
+      event, await keyFanRoster(circleId), { deriveSealingKey: podSealingPublicKeyFromNetworkKey },
+    ),
+    // The same recipients as webids — the key the fan-out core's `only` set matches on.
+    resolveRecipientWebids: async (event) => recipientWebidsFromRoster(
+      event, await keyFanRoster(circleId), { deriveSealingKey: podSealingPublicKeyFromNetworkKey },
+    ),
   });
 }
 
@@ -232,7 +249,10 @@ export const circleControlAgentRouter = createCircleControlAgentRouter((id) => c
 export async function seedCircleRosterFor({ circleId, policy, callSkill }) {
   const prod = await ensureCirclePod(circleId, policy);
   if (!prod?.controlAgent) return 0;
-  return seedCircleRoster({ callSkill, circleId, router: circleControlAgentRouter });
+  return seedCircleRoster({
+    callSkill, circleId, router: circleControlAgentRouter,
+    deriveSealingKey: podSealingPublicKeyFromNetworkKey,
+  });
 }
 
 /** Resolve (+ cache) a circle's content seal/open strategy via the device's own sealing identity. */

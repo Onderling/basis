@@ -201,7 +201,8 @@ export function makeFrontierReplay({
     try { circles = (await callSkill('stoop', 'listMyCircles', {}))?.circles ?? []; } catch { return { requested: 0 }; }
     let requested = 0;
     for (const b of circles) {
-      const circleId = b?.groupId ?? b?.id;
+      // `listMyCircles` answers with plain string ids — see the same branch in `governanceCatchUp`.
+      const circleId = typeof b === 'string' ? b : (b?.groupId ?? b?.id);
       if (typeof circleId !== 'string' || !circleId) continue;
       let members = [];
       try { members = (await callSkill('stoop', 'listGroupRoster', { groupId: circleId }))?.members ?? []; } catch { continue; }

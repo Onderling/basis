@@ -18,6 +18,7 @@
     "@onderling/transports": "workspace:*",
     "@onderling/vault": "workspace:*",
     "@onderling/pod-client": "workspace:*",
+    "@onderling/kring-host": "workspace:*",
     "@onderling/relay": "workspace:*",
     "@onderling/identity-resolver": "workspace:*",
     "@onderling-app/stoop": "workspace:*",

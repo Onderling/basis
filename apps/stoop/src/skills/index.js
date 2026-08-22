@@ -3766,6 +3766,28 @@ export function buildSkills({
      *   never wakes an offline device by itself (the roster converges via catch-up; principle: silent
      *   system lane).
      */
+    defineSkill('broadcastCircleKeyStatement', async ({ parts, from }) => {
+      const a = dataArgs(parts);
+      const _groupId = a.groupId ?? groupId;
+      if (!_groupId)                                                  return { error: 'groupId-required' };
+      if (!a.event || typeof a.event !== 'object')                    return { error: 'event-required' };
+      if (typeof a.msgId !== 'string' || !a.msgId)                    return { error: 'msgId-required' };
+      const ts = typeof a.ts === 'number' && Number.isFinite(a.ts) ? a.ts : Date.now();
+      const only = Array.isArray(a.only) && a.only.length ? a.only : null;
+      return broadcastToCircle({
+        circleId: _groupId, kind: 'circle-key-statement', from,
+        extras: { circleId: _groupId, msgId: a.msgId, ts, event: a.event },
+        metric: 'circle-key-statement-fanout',
+        // A key rotation is plumbing, not news: it must never wake a device on its own. The content
+        // that needs the new version wakes it when the content arrives.
+        noWake: true,
+        only,
+      });
+    }, {
+      description: 'Fan a signed group-key statement (establish/rotate) to a circle via subtype:circle-key-statement; receivers verify signature, chain and rotate authority at their key rail before it lands. Never wakes.',
+      visibility:  'authenticated',
+    }),
+
     defineSkill('broadcastCircleMembership', async ({ parts, from }) => {
       const a = dataArgs(parts);
       const _groupId = a.groupId ?? groupId;

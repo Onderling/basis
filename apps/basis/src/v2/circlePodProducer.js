@@ -187,15 +187,21 @@ export function createCircleControlAgentRouter(getProducer) {
 
 /**
  * Seed a sealed circle's group-key roster with members who joined BEFORE its producer was
- * live: list the circle's members (`listGroupMembers` now surfaces each joiner's
- * `sealingPublicKey` from the redemption trail) and route each through the control-agent
- * router so the group key is wrapped to them too. Idempotent-ish (re-wrapping an existing
- * recipient is harmless). Best-effort; needs a live producer for `circleId` in the router.
+ * live: list the circle's members and route each through the control-agent router so the group
+ * key is wrapped to them too. Idempotent-ish (re-wrapping an existing recipient is harmless).
+ * Best-effort; needs a live producer for `circleId` in the router.
  *
- * @param {{ callSkill:Function, circleId:string, router:{addMember:Function} }} a
+ * A roster row carries `sealingPublicKey` only when the joiner supplied one at redemption, which
+ * the live join flow does not — so this used to wrap the key for nobody and seed an empty roster.
+ * The sealing key is a deterministic function of the member's network key, so `deriveSealingKey`
+ * is INJECTED (the same shape `recipientAddrsFromRoster` and `shareRecipients` use) and fills in
+ * whenever the row has none.
+ *
+ * @param {{ callSkill:Function, circleId:string, router:{addMember:Function},
+ *          deriveSealingKey?:(networkKey:string)=>string }} a
  * @returns {Promise<number>} how many members were (re)wrapped.
  */
-export async function seedCircleRoster({ callSkill, circleId, router } = {}) {
+export async function seedCircleRoster({ callSkill, circleId, router, deriveSealingKey = null } = {}) {
   if (typeof callSkill !== 'function' || !circleId || typeof router?.addMember !== 'function') return 0;
   let members = [];
   try {
@@ -204,10 +210,15 @@ export async function seedCircleRoster({ callSkill, circleId, router } = {}) {
   } catch { return 0; }
   let n = 0;
   for (const m of members) {
-    if (m?.webid && m?.sealingPublicKey) {
-      try { await router.addMember({ webId: m.webid, publicKey: m.sealingPublicKey, role: m.role, groupId: circleId }); n += 1; }
-      catch { /* best-effort per member */ }
+    if (!m?.webid) continue;
+    let publicKey = m.sealingPublicKey ?? m.sealingPubKey ?? null;
+    if (!publicKey && typeof deriveSealingKey === 'function') {
+      const net = m.circleAddress ?? m.pubKey ?? m.webid;
+      try { publicKey = net ? deriveSealingKey(net) : null; } catch { publicKey = null; }
     }
+    if (!publicKey) continue;
+    try { await router.addMember({ webId: m.webid, publicKey, role: m.role, groupId: circleId }); n += 1; }
+    catch { /* best-effort per member */ }
   }
   return n;
 }

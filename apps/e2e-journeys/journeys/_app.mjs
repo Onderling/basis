@@ -33,10 +33,13 @@ import { makeGovernanceCatchUp, GOV_CATCHUP_REQUEST } from '../../basis/src/v2/g
 import { bindCircleGovernance, makeGovernanceRail } from '../../basis/src/v2/governanceAppWiring.js';
 import { makeCircleGovernancePeerHandler } from '../../basis/src/v2/circleLogReceiver.js';
 import { createCircleCacheMedium } from '../../basis/src/v2/circleCacheMedium.js';
-import { makeKeyEventLogSink, recipientAddrsFromRoster } from '../../../packages/kring-host/src/keyEventLogSink.js';
+import { makeKeyEventLogSink, recipientAddrsFromRoster, recipientWebidsFromRoster } from '@onderling/kring-host/keyEventLogSink';
+import { sealingPublicKeyFromNetworkKey } from '@onderling/pod-client';
 import { KEY_STATEMENT_BROADCAST, makeKeyPeerHandler } from '../../basis/src/v2/keyRail.js';
 import { CHAT_CATCHUP_SUBTYPES } from '../../basis/src/v2/chatRail.js';
 import { makeFrontierReplay } from '../../basis/src/v2/frontierReplay.js';
+import { TASK_CATCHUP_SUBTYPES } from '../../basis/src/v2/taskRail.js';
+import { applyRulesUpdates } from '../../basis/src/v2/rulesUpdateLane.js';
 
 /**
  * A CENTRAL POD every member's cache medium writes through — the "with a pod" half of the mode
@@ -74,21 +77,37 @@ const mediumFor = (label, pod, circleId) => (id) => (id === circleId
   })
   : null);
 
+/**
+ * THE ONE LANE LOG. A shell composes every lane over a single event log; the node harness happens to
+ * create two (`deviceLog` for the agent's own riders, `chatEventLog` for its internal rails). Rules
+ * updates are emitted by the agent onto the DEVICE log, so a governance rail built over the other
+ * one serves catch-up from a log the statements were never written to — the lane looks alive and
+ * replays nothing. Everything governance-shaped here uses the same log the agent does.
+ */
+const laneLog = (node) => node.deviceLog ?? node.chatEventLog;
+
 /** Register the receive halves a shell registers, so fanned lane statements actually land. */
 function wireLanes(node) {
   const inner = node._routerRef.fn;
   // GOVERNANCE — the rail a fanned decision statement must verify at before it lands, plus the
   // pull-all catch-up. Built here rather than per journey because the shells build it once per boot.
   const govRail = makeGovernanceRail({
-    eventLog: node.chatEventLog,
+    eventLog: laneLog(node),
     circleIdentityFor: node.agent.circleIdentityFor,
     myRef: node.pubKey,
     callSkill: (app, op, args) => node.agent.callSkill(app, op, args),
   });
-  const govHandler = makeCircleGovernancePeerHandler({ eventLog: node.chatEventLog, rail: govRail, onChange: () => {} });
+  const govChanged = (cid) => {
+    // The rules head is a FOLD over the governance lane — a rules-update statement that lands (live
+    // or by catch-up) only becomes the circle's rules once this runs. The shells wire it the same way.
+    applyRulesUpdates({ rail: govRail, callSkill: (a, o, args) => node.agent.callSkill(a, o, args), circleId: cid })
+      .catch(() => { /* best-effort; the next change re-folds */ });
+  };
+  const govHandler = makeCircleGovernancePeerHandler({ eventLog: laneLog(node), rail: govRail, onChange: govChanged });
   const govCatchUp = makeGovernanceCatchUp({
     rail: govRail,
     sendToPeer: (addr, payload) => node.agent.sendPeerMessage(addr, payload),
+    onChange: govChanged,
   });
   node._govRail = govRail;
   const membership = node.agent.membershipRail
@@ -114,6 +133,15 @@ function wireLanes(node) {
     })
     : null;
   node._chatReplay = chatReplay;
+  const taskReplay = node.agent.taskRail
+    ? makeFrontierReplay({
+      rail: node.agent.taskRail,
+      sendToPeer: (addr, payload) => node.agent.sendPeerMessage(addr, payload),
+      subtypes: TASK_CATCHUP_SUBTYPES,
+      statementsFor: (cid) => node.agent.taskRail.catchUpStatements(cid),
+    })
+    : null;
+  node._taskReplay = taskReplay;
 
   // KEYS — the receive half the shells register. Without it a fanned rotation has nowhere to land,
   // and a journey would be measuring the harness instead of the lane.
@@ -126,6 +154,9 @@ function wireLanes(node) {
     if (chatReplay && st === CHAT_CATCHUP_SUBTYPES.request) { chatReplay.onRequest(env?.from, env.payload); return undefined; }
     if (chatReplay && st === CHAT_CATCHUP_SUBTYPES.batch)   { chatReplay.onBatch(env?.from, env.payload); return undefined; }
     if (chatReplay && st === CHAT_CATCHUP_SUBTYPES.offer)   { chatReplay.onOffer(env?.from, env.payload); return undefined; }
+    if (taskReplay && st === TASK_CATCHUP_SUBTYPES.request) { taskReplay.onRequest(env?.from, env.payload); return undefined; }
+    if (taskReplay && st === TASK_CATCHUP_SUBTYPES.batch)   { taskReplay.onBatch(env?.from, env.payload); return undefined; }
+    if (taskReplay && st === TASK_CATCHUP_SUBTYPES.offer)   { taskReplay.onOffer(env?.from, env.payload); return undefined; }
     if (st === 'circle-governance-broadcast') { govHandler(env?.from, env.payload); return undefined; }
     if (st === GOV_CATCHUP_REQUEST) { govCatchUp.onRequest(env?.from, env.payload); return undefined; }
     if (st === govCatchUp.subtypes.batch) { govCatchUp.onBatch(env?.from, env.payload); return undefined; }
@@ -134,7 +165,9 @@ function wireLanes(node) {
     if (memCatchUp && st === memCatchUp.subtypes.batch) { memCatchUp.onBatch(env?.from, env.payload); return undefined; }
     return inner?.(env);
   };
-  return { memCatchUp };
+  node._memCatchUp = memCatchUp;
+  node._govCatchUp = govCatchUp;
+  return { memCatchUp, govCatchUp };
 }
 
 /**
@@ -212,6 +245,11 @@ export function goDark(node) {
  *
  * The journey drives `sink.append(event)` directly, which is exactly what the control agent does.
  */
+const keyFanRoster = async (node, circleId) => {
+  const r = await node.agent.callSkill('stoop', 'listGroupMembers', { groupId: circleId }).catch(() => null);
+  return Array.isArray(r?.members) ? r.members : [];
+};
+
 export function keySinkFor(node, circleId) {
   const recorded = [];
   const sink = makeKeyEventLogSink({
@@ -219,13 +257,20 @@ export function keySinkFor(node, circleId) {
     recordLocal: (event) => recorded.push(event),
     emitStatement: (gid, event) => node.agent.keyEmit?.(gid ?? circleId, event) ?? null,
     statementSubtype: KEY_STATEMENT_BROADCAST,
+    // Through the waist, exactly as both shells now do.
+    fanStatement: (gid, statement, only) => node.agent.callSkill('stoop', 'broadcastCircleKeyStatement', {
+      groupId: gid ?? circleId, event: statement,
+      msgId: `key:${statement?.body?.hash ?? statement?.body?.subject}`, ts: Date.now(),
+      ...(only ? { only } : {}),
+    }),
     sendPeer: (addr, payload, opts) => node.agent.sendPeerMessage(addr, payload, opts),
     sendOptions: { hold: true, firstSendTimeoutMs: 0, retryDelays: [] },
-    resolveRecipientAddrs: async (event) => {
-      const r = await node.agent.callSkill('stoop', 'listGroupMembers', { groupId: circleId })
-        .catch(() => null);
-      return recipientAddrsFromRoster(event, Array.isArray(r?.members) ? r.members : []);
-    },
+    resolveRecipientAddrs: async (event) => recipientAddrsFromRoster(
+      event, await keyFanRoster(node, circleId), { deriveSealingKey: sealingPublicKeyFromNetworkKey },
+    ),
+    resolveRecipientWebids: async (event) => recipientWebidsFromRoster(
+      event, await keyFanRoster(node, circleId), { deriveSealingKey: sealingPublicKeyFromNetworkKey },
+    ),
   });
   return { sink, recorded };
 }
@@ -260,7 +305,7 @@ export async function untilTrue(pred, ms = 15000, step = 200) {
  */
 export function governanceFor(node, { policy = {} } = {}) {
   return bindCircleGovernance({
-    eventLog: node.chatEventLog,
+    eventLog: laneLog(node),
     callSkill: (app, op, args) => node.agent.callSkill(app, op, args),
     getPolicy: () => policy,
     myRef: node.pubKey,

@@ -1451,6 +1451,25 @@ export const stoopManifest = {
       },
     },
     {
+      id:   'broadcastCircleKeyStatement', verb: 'share',
+      // The group-key lane's fan. Like the other lanes' broadcasts this goes through the circle
+      // fan-out core, so the statement leaves under the sender's PER-CIRCLE address — a raw
+      // sendPeerMessage signs with the canonical identity, which every receiver refuses inside a
+      // circle. `only` narrows the fan to the key-event's recipients, so a member the rotation is
+      // sealed away from is not sent a version they could not open anyway.
+      params: [
+        { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
+        { name: 'event',   kind: 'object', required: true },
+        { name: 'msgId',   kind: 'string' },
+        { name: 'ts',      kind: 'number' },
+        { name: 'only',    kind: 'object', schema: { type: 'array', items: { type: 'string' } } },
+      ],
+      surfaces: {
+        chat: { hint: 'Fan a signed group-key statement (establish/rotate) to a circle\u2019s current key recipients.' },
+        ui:   { control: 'page' },
+      },
+    },
+    {
       id:   'broadcastCircleMembership', verb: 'share',
       params: [
         { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },

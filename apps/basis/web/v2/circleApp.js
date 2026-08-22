@@ -258,7 +258,7 @@ import { EventLog } from '../../src/eventLog.js';
 import { createDeliveryStateMap } from '@onderling/kring-host/deliveryState';
 // Phase 2 — shared circle chat send primitives (optimistic event + best-effort fan-out), web + mobile.
 import { circleChatMessageEvent, broadcastCircleFanOut } from '@onderling/kring-host/circleBroadcast';
-import { makeKeyEventLogSink, recipientAddrsFromRoster } from '@onderling/kring-host/keyEventLogSink';
+import { makeKeyEventLogSink, recipientAddrsFromRoster, recipientWebidsFromRoster } from '@onderling/kring-host/keyEventLogSink';
 // "only you" vs "whole circle" — message scope (a data property; the badge renders it).
 import { scopeForReply } from '../../src/v2/messageScope.js';
 import {
@@ -1642,6 +1642,14 @@ async function ensureCirclePod(circleId, policy) {
     // content with no shared pod. The pod key resource is still written (defence-in-depth); the log is the
     // source for a no-pod circle. Lazy refs (rawCallSkill / _peerAgent are set at boot; the sink only fires
     // on a later membership change).
+    /** This circle's roster, for the key fan's recipient match. */
+    const keyFanRoster = async () => {
+      if (typeof rawCallSkill !== 'function') return [];
+      try {
+        const r = await rawCallSkill('stoop', 'listGroupMembers', { groupId: circleId });
+        return Array.isArray(r?.members) ? r.members : [];
+      } catch { return []; }
+    };
     const keyEventLog = makeKeyEventLogSink({
       groupId: circleId,
       // RECEIVE/READ side (now wired): record this device's OWN emitted key-events into the local per-circle
@@ -1653,20 +1661,25 @@ async function ensureCirclePod(circleId, policy) {
       // chain and rotateKey authority at their key rail. Fail-closed: no signer → no fan.
       emitStatement: (gid, event) => _peerAgent?.keyEmit?.(gid ?? circleId, event) ?? null,
       statementSubtype: KEY_STATEMENT_BROADCAST,
+      // THE FAN — through the waist, like every other lane, so the statement leaves under this
+      // member's per-circle address. A direct peer send is signed with the canonical identity and
+      // is refused at every receiver inside a circle.
+      fanStatement: (gid, statement, only) => rawCallSkill('stoop', 'broadcastCircleKeyStatement', {
+        groupId: gid ?? circleId, event: statement, msgId: `key:${statement?.body?.hash ?? statement?.body?.subject}`,
+        ts: Date.now(), ...(only ? { only } : {}),
+      }),
       sendPeer: (addr, payload, opts) => (typeof _peerAgent?.sendPeerMessage === 'function'
         ? _peerAgent.sendPeerMessage(addr, payload, opts)
         : Promise.resolve()),
       // Held (not lost) for an offline member, flushed on reconnect — the same channel content fans over.
       sendOptions: { hold: true, firstSendTimeoutMs: 0, retryDelays: [] },
-      resolveRecipientAddrs: async (event) => {
-        if (typeof rawCallSkill !== 'function') return [];
-        let members = [];
-        try {
-          const r = await rawCallSkill('stoop', 'listGroupMembers', { groupId: circleId });
-          members = Array.isArray(r?.members) ? r.members : [];
-        } catch { return []; }
-        return recipientAddrsFromRoster(event, members);
-      },
+      resolveRecipientAddrs: async (event) => recipientAddrsFromRoster(
+        event, await keyFanRoster(), { deriveSealingKey: podSealingPublicKeyFromNetworkKey },
+      ),
+      // The same recipients as webids — the key the fan-out core's `only` set matches on.
+      resolveRecipientWebids: async (event) => recipientWebidsFromRoster(
+        event, await keyFanRoster(), { deriveSealingKey: podSealingPublicKeyFromNetworkKey },
+      ),
     });
     const producer = await createCirclePodProducer({
       circleId, storagePosture, vault: circleVault, generateKeypair: podGenerateKeypair,
@@ -5444,7 +5457,7 @@ function showCircle(id, circle, policy) {
   // posture), then seed its group-key roster with members who joined before it was live.
   // Best-effort + fire-and-forget; never blocks the circle.
   ensureCirclePod(id, policy)
-    .then((prod) => { if (prod?.controlAgent) return seedCircleRoster({ callSkill: rawCallSkill, circleId: id, router: circleControlAgentRouter }); })
+    .then((prod) => { if (prod?.controlAgent) return seedCircleRoster({ callSkill: rawCallSkill, circleId: id, router: circleControlAgentRouter, deriveSealingKey: podSealingPublicKeyFromNetworkKey }); })
     .catch(() => { /* best-effort; plain shared path on failure */ });
   // media — resolve this circle's sealed-media composition (async: the seal strategy
   // rides the pod producer). Until it resolves — and for a p0/p1 circle FOREVER (null) —

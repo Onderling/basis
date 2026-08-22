@@ -49,7 +49,7 @@ export async function run({ relayUrl }) {
     }
     const task = await anne.agent.callSkill('tasks', 'addTask', { text: 'de heg knippen', circleId: CIRCLE });
     const rules = await call(anne, 'editGroupRules', {
-      groupId: CIRCLE, rules: { name: 'Huisregels', agreements: 'de heg wordt in mei geknipt' },
+      groupId: CIRCLE, rules: { name: 'Heggenregels', agreements: 'de heg wordt in mei geknipt' },
     });
     check('the circle kept living while the device was away',
       !!task?.itemId && !rules?.error);
@@ -64,35 +64,49 @@ export async function run({ relayUrl }) {
     comeBack();
     // The reconnect kick, as the shells drive it: ask every member of every circle for what this
     // device's frontier is missing. Nothing here is journey-only — it is `requestAll`, the same call.
-    //
-    // [F-013] …and it asks nobody. `listMyCircles` returns an array of STRING ids, while both
-    // `requestAll` implementations read `b?.groupId ?? b?.id` off each entry — undefined for a
-    // string — so the loop `continue`s past every circle and requests zero. Every red below is a
-    // consequence of this one line, on both shells, on every lane.
-    const asked = await cato._chatReplay
-      .requestAll({ callSkill: (app, op, args) => cato.agent.callSkill(app, op, args) })
-      .catch((e) => ({ error: String(e?.message ?? e) }));
-    check('[F-013] the returning device asks its circle for what it missed',
-      (asked?.requested ?? 0) > 0, JSON.stringify(asked));
+
+    // The shells kick EVERY lane on reconnect (governance, membership, keys, tasks, chat), so the
+    // journey does too — a device that came back is behind on all of them, not just the conversation.
+    const callSkill = (app, op, args) => cato.agent.callSkill(app, op, args);
+    const kicks = await Promise.all([
+      cato._chatReplay.requestAll({ callSkill }).catch((e) => ({ error: String(e?.message ?? e) })),
+      cato._govCatchUp?.requestAll({ callSkill }).catch(() => null) ?? null,
+      cato._memCatchUp?.requestAll({ callSkill }).catch(() => null) ?? null,
+      cato._taskReplay?.requestAll({ callSkill }).catch(() => null) ?? null,
+    ]);
+    const asked = kicks[0];
+    check('the returning device asks its circle for what it missed',
+      (asked?.requested ?? 0) > 0, JSON.stringify(kicks));
 
     // ── The claim: convergence ───────────────────────────────────────────────────────────────────
     const gotAll = await untilTrue(
       () => MISSED.every((_, i) => chatSubjects(cato).includes(`missed-${i}`)), 20000);
-    check('[F-013] THE CONVERSATION IS THERE — every message sent during the absence arrives', gotAll,
+    check('THE CONVERSATION IS THERE — every message sent during the absence arrives', gotAll,
       `${chatSubjects(cato).filter((s) => String(s).startsWith('missed-')).length}/${MISSED.length} recovered`);
 
     check('and the message from before the absence was not lost in the process',
       chatSubjects(cato).includes('before-1'));
 
-    check('[F-013] the task created while away is visible', await untilTrue(async () => {
+    check('the task created while away is visible', await untilTrue(async () => {
       const r = await cato.agent.callSkill('tasks', 'listOpen', { circleId: CIRCLE });
       return (r?.items ?? []).some((t) => t.id === task.itemId);
     }, 20000));
 
-    check('[F-013] the rules changed while away are the ones this device now sees', await untilTrue(async () => {
+    // Asserted on the NAME, because that is what `getGroupRules` projects — the agreements are not
+    // in its answer on any device, including the writer's (F-014). Convergence is still the claim:
+    // the returning device must end up with the same rules head the writer has.
+    check('the rules changed while away are the ones this device now sees', await untilTrue(async () => {
       const r = await call(cato, 'getGroupRules', { groupId: CIRCLE }).catch(() => null);
-      return JSON.stringify(r ?? {}).includes('in mei geknipt');
+      return JSON.stringify(r ?? {}).includes('Heggenregels');
     }, 20000));
+    const [mine, theirs] = await Promise.all([
+      call(anne, 'getGroupRules', { groupId: CIRCLE }),
+      call(cato, 'getGroupRules', { groupId: CIRCLE }),
+    ]);
+    check('…and its rules head matches the writer\'s exactly',
+      (mine?.rules ?? mine) === (theirs?.rules ?? theirs)
+      || JSON.stringify(mine?.rules) === JSON.stringify(theirs?.rules),
+      `${JSON.stringify(mine?.rules)} vs ${JSON.stringify(theirs?.rules)}`);
 
     check('the roster still agrees with the admin\'s',
       hasMember(await rosterOf(cato, CIRCLE), anne.pubKey)

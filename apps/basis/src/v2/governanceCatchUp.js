@@ -121,7 +121,10 @@ export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, maySe
     try { circles = (await callSkill('stoop', 'listMyCircles', {}))?.circles ?? []; } catch { return { requested: 0 }; }
     let requested = 0;
     for (const b of circles) {
-      const circleId = b?.groupId ?? b?.id;
+      // `listMyCircles` answers with plain string ids. Reading `.groupId`/`.id` off a string yields
+      // undefined, which the guard below then skips — so this walk used to request nothing at all,
+      // for every lane, on both shells. Same branch `circleSecurityPriming` and `realAgent` use.
+      const circleId = typeof b === 'string' ? b : (b?.groupId ?? b?.id);
       if (typeof circleId !== 'string' || !circleId) continue;
       let members = [];
       try { members = (await callSkill('stoop', 'listGroupRoster', { groupId: circleId }))?.members ?? []; } catch { continue; }

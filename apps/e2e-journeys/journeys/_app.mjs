@@ -25,7 +25,7 @@
 // works locally and against a deployment (`node run.mjs wss://relay.example.com`) unchanged.
 import {
   bootRealAgentNode, connectNodesOverRelay, createCircle, joinExistingCircle,
-  bindCircleAddresses, teardown,
+  bindCircleAddresses, teardown, sendCircleChat,
 } from '../../basis/test/support/pairRealAgents.js';
 import { bindCircleAddressKeysFor } from '../../basis/src/v2/householdRosterPairing.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../basis/src/v2/membershipRail.js';
@@ -156,6 +156,10 @@ export async function bootAppCircle({ relayUrl, circleId, handles, pod = null })
     close: () => teardown(...people),
   };
 }
+
+/** Send a circle chat message the way a shell does: append the signed render entry AND fan the
+ *  statement through the real stoop op. (`chatRail.appendMessage` alone only writes locally.) */
+export { sendCircleChat };
 
 /** The circle's roster as that person's own device projects it. */
 export async function rosterOf(node, circleId) {

@@ -39,8 +39,9 @@ import * as offerings     from './journeys/offerings.journey.mjs';
 import * as appComposition from './journeys/appComposition.journey.mjs';
 import * as podModes      from './journeys/podModes.journey.mjs';
 import * as governanceVote from './journeys/governanceVote.journey.mjs';
+import * as attachments   from './journeys/attachments.journey.mjs';
 
-const ALL = [twoParty, offline, circle, sealedInbox, noticeboard, companion, taskClaim, security, notifications, feedback, manage, bot, keyexchange, telegram, media, removal, mute, governance, reachability, membership, roles, offerings, appComposition, podModes, governanceVote];
+const ALL = [twoParty, offline, circle, sealedInbox, noticeboard, companion, taskClaim, security, notifications, feedback, manage, bot, keyexchange, telegram, media, removal, mute, governance, reachability, membership, roles, offerings, appComposition, podModes, governanceVote, attachments];
 const KEY = (n) => n.split(' ')[0].toLowerCase().replace(/[^a-z-]/g, ''); // "two-party messaging" -> "two-party"
 
 const args = process.argv.slice(2);

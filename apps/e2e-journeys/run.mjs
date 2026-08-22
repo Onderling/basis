@@ -35,8 +35,9 @@ import * as governance   from './journeys/governance.journey.mjs';
 import * as reachability  from './journeys/reachability.journey.mjs';
 import * as membership    from './journeys/membership.journey.mjs';
 import * as roles         from './journeys/roles.journey.mjs';
+import * as offerings     from './journeys/offerings.journey.mjs';
 
-const ALL = [twoParty, offline, circle, sealedInbox, noticeboard, companion, taskClaim, security, notifications, feedback, manage, bot, keyexchange, telegram, media, removal, mute, governance, reachability, membership, roles];
+const ALL = [twoParty, offline, circle, sealedInbox, noticeboard, companion, taskClaim, security, notifications, feedback, manage, bot, keyexchange, telegram, media, removal, mute, governance, reachability, membership, roles, offerings];
 const KEY = (n) => n.split(' ')[0].toLowerCase().replace(/[^a-z-]/g, ''); // "two-party messaging" -> "two-party"
 
 const args = process.argv.slice(2);

@@ -51,6 +51,13 @@ export default defineConfig({
           ],
           exclude: ['test-browser/**', 'node_modules/**'],
           fileParallelism: false,
+          // Booting a real agent (vaults, identities, a transport) takes seconds, and these files run
+          // while the parallel project loads the machine. vitest's 5s default then fails a test AT ITS
+          // BOOT LINE — a red that carries no information and passes when run alone (four seen in the
+          // week of 2026-08-22). Nothing loses the ability to fail: every walk bounds its own waits with
+          // `until(..., {timeout})`, and each `it` still carries its own explicit budget where it needs one.
+          testTimeout: 30_000,
+          hookTimeout: 30_000,
         },
       },
       {

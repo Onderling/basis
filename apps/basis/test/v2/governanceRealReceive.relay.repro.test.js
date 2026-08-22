@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { bootRealAgentNode, connectAgentsOverRelay, pairCircle, until, teardown, sendCircleChat } from '../support/pairRealAgents.js';
+import { startJourneyRelay } from '../support/testRelay.js';
 import { signSpine } from '@onderling/core';
 import { reportEntryId } from '../../src/v2/reportModel.js';
 
@@ -8,7 +9,12 @@ import { reportEntryId } from '../../src/v2/reportModel.js';
 // path that caught the broadcastToCircle webid→pubKey bug; the fix (route every broadcast
 // through the reliable sender) is confirmed here end-to-end. Verified manually 2026-07-25:
 // gov propose + report both ingest on B over the relay.
-const RELAY = process.env.PEER_TEST_RELAY || 'ws://127.0.0.1:8787';
+// The relay is STARTED by the suite (in-process, ephemeral port) instead of assumed to be running:
+// this file used to fall back to a hard-coded `ws://127.0.0.1:8787`, so on a machine with nothing on
+// that port it failed at connect and was read as a flake for weeks. `ONDERLING_RELAY_URL` still points
+// the whole set at an external or deployed relay.
+let relay = null;
+let RELAY = null;
 
 async function warmMesh(A, B) {
   const text = 'warmup-' + Math.random().toString(36).slice(2);
@@ -17,6 +23,9 @@ async function warmMesh(A, B) {
 }
 
 describe('governance/report propagation over a REAL relay', () => {
+  beforeAll(async () => { relay = await startJourneyRelay(); RELAY = relay.url; });
+  afterAll(async () => { await relay?.close?.(); });
+
   it('broadcastCircleGovernance A -> B ingests the vote event over the relay', async () => {
     const A = await bootRealAgentNode('A');
     const aCidHolder = {};

@@ -30,6 +30,43 @@ import {
 import { bindCircleAddressKeysFor } from '../../basis/src/v2/householdRosterPairing.js';
 import { makeMembershipPeerHandler, MEMBERSHIP_BROADCAST, MEMBERSHIP_CATCHUP_SUBTYPES } from '../../basis/src/v2/membershipRail.js';
 import { makeGovernanceCatchUp } from '../../basis/src/v2/governanceCatchUp.js';
+import { createCircleCacheMedium } from '../../basis/src/v2/circleCacheMedium.js';
+
+/**
+ * A CENTRAL POD every member's cache medium writes through — the "with a pod" half of the mode
+ * matrix. In-memory on purpose: the point of a mode journey is that the SAME corridor holds whether
+ * a circle keeps its content peer-to-peer or on a shared pod, not that CSS works (the `.css` tier
+ * covers that against a real server).
+ */
+/** The three methods a backend owes; written out rather than pulled from a package this app does
+ *  not depend on. */
+function memBackend() {
+  const store = new Map();
+  return {
+    store,
+    put:  async (uri, v) => { store.set(uri, v); },
+    get:  async (uri) => (store.has(uri) ? store.get(uri) : null),
+    list: async (prefix = '') => [...store.keys()].filter((k) => k.startsWith(prefix)),
+  };
+}
+
+export function makeSharedPod() {
+  const backend = memBackend();
+  return {
+    store: backend.store,
+    backend,
+    // A visible seal, so a journey can assert that what lands at rest is not plaintext.
+    strategy: { seal: (v) => `SEALED(${v})`, open: (v) => String(v).replace(/^SEALED\((.*)\)$/, '$1') },
+  };
+}
+
+const mediumFor = (label, pod, circleId) => (id) => (id === circleId
+  ? createCircleCacheMedium({
+    localBackend: memBackend(),
+    deviceId:     `${label}-${id}`,
+    resolvePod:   async () => ({ backend: pod.backend, sealed: true, strategy: pod.strategy }),
+  })
+  : null);
 
 /** Register the receive halves a shell registers, so fanned lane statements actually land. */
 function wireLanes(node) {
@@ -61,17 +98,33 @@ function wireLanes(node) {
  * @param {string} a.relayUrl
  * @param {string} a.circleId
  * @param {string[]} a.handles  one per person; the FIRST is the circle's creator/admin
- * @returns {Promise<{people: object[], admin: object, circleId: string, close: () => Promise<void>}>}
+ * @param {object|null} [a.pod]  a `makeSharedPod()` — every member's circle store then write-throughs
+ *   to it (the "with a central pod" mode). Omit for the pod-less mode.
+ * @returns {Promise<{people: object[], admin: object, circleId: string, pod: object|null, close: () => Promise<void>}>}
  */
-export async function bootAppCircle({ relayUrl, circleId, handles }) {
+export async function bootAppCircle({ relayUrl, circleId, handles, pod = null }) {
   const people = await Promise.all(
-    handles.map((h) => bootRealAgentNode(h, { taskLane: true })),   // taskLane composes the DEVICE LOG
+    handles.map((h) => bootRealAgentNode(h, {
+      taskLane: true,                                              // composes the DEVICE LOG
+      ...(pod ? { agentOpts: { provisionCircleMedium: mediumFor(h, pod, circleId) } } : {}),
+    })),
   );
   await connectNodesOverRelay(people, { relayUrl });
   for (const n of people) wireLanes(n);
 
   const [admin, ...joiners] = people;
-  await createCircle(admin, { groupId: circleId, name: circleId });
+  // A circle's storage mode is chosen AT CREATION — `setCircleStoragePolicy` cannot move an existing
+  // circle onto a pod (`storage-policy-writer-unavailable`; the code records why: "the only way a
+  // basis circle becomes pod-backed is to be CREATED that way"). So the pod mode creates it that way.
+  if (pod) {
+    const created = await admin.agent.callSkill('stoop', 'createGroupV2', {
+      groupId: circleId, name: circleId, rules: {},
+      storagePolicy: 'centralised', groupPodUri: `mem://${circleId}/`,
+    });
+    if (created?.error) throw new Error(`pod-backed create failed: ${JSON.stringify(created)}`);
+  } else {
+    await createCircle(admin, { groupId: circleId, name: circleId });
+  }
   for (let i = 0; i < joiners.length; i += 1) {
     const r = await joinExistingCircle(admin, joiners[i], { groupId: circleId, handle: handles[i + 1] });
     if (!r?.joined?.ok) throw new Error(`join failed for ${handles[i + 1]}: ${JSON.stringify(r?.joined)}`);
@@ -80,7 +133,7 @@ export async function bootAppCircle({ relayUrl, circleId, handles }) {
   await Promise.all(people.map((n) => bindCircleAddressKeysFor({ agent: n.agent, circleId })));
 
   return {
-    people, admin, circleId,
+    people, admin, circleId, pod,
     close: () => teardown(...people),
   };
 }

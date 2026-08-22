@@ -52,7 +52,10 @@ import { createCirclePodProducer, createCircleControlAgentRouter } from '../../s
 import { openerForIdentity } from '../../src/v2/sharedCopyOpener.js';
 import { createKeyEventStore, openViaKeyEvents } from '../../src/v2/keyEventStore.js';
 import { makePeerRouter } from '../../src/core/handlers/peerRouter.js';
-import { makeHandleGroupKeyEvent } from '../../src/core/handlers/groupKeyEvent.js';
+import {
+  makeKeyPeerHandler, KEY_STATEMENT_BROADCAST, KEY_CATCHUP_SUBTYPES, projectKeyEventsIntoStore,
+} from '../../src/v2/keyRail.js';
+import { makeGovernanceCatchUp } from '../../src/v2/governanceCatchUp.js';
 import {
   makeHandleGroupRedeemRequest,
   makeSendGroupRedeemRequest,
@@ -235,7 +238,23 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     // Sealed circle — the PRODUCTION receive handler records a fanned key-event into the PRODUCTION per-circle
     // key-event log (the no-pod key-chain carrier), de-duped by version. This is the real app's receive path,
     // dispatched by the real `makePeerRouter` — not a harness stand-in. Folding happens on read (`readSealed`).
-    'group-key-event': makeHandleGroupKeyEvent({ recordKeyEvent: (gid, event) => keyEventStore.record(gid, event), logger: QUIET }),
+    // The KEY LANE (the recorded spine route): a fanned key statement verifies at the agent's rail
+    // (signature + chain + rotateKey authority) and the node's key-event store refreshes as the
+    // lane's projection — the production shells' exact wiring.
+    ...(agent.keyRail ? (() => {
+      const refresh = (cid) => projectKeyEventsIntoStore({ rail: agent.keyRail, store: keyEventStore, circleId: cid }).catch(() => {});
+      const keyCU = makeGovernanceCatchUp({
+        rail: agent.keyRail,
+        sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
+        subtypes: KEY_CATCHUP_SUBTYPES,
+        onChange: refresh,
+      });
+      return {
+        [KEY_STATEMENT_BROADCAST]: makeKeyPeerHandler({ rail: agent.keyRail, onChange: refresh }),
+        [keyCU.subtypes.request]: keyCU.onRequest,
+        [keyCU.subtypes.batch]:   keyCU.onBatch,
+      };
+    })() : {}),
     // Sealed content still lands in a plain list (transport/hold-forward — out of scope for the key-event work).
     'sealed-content':  (_from, payload) => { if (payload?.env) sealedContent.push(payload); },
     // Wave C tail A — the REAL governance/report ingest handlers (the exact wiring the shells
@@ -299,8 +318,6 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
   });
 
   const node = { agent, pubKey, received, sendPeerRedeem, pendingMap, label, keyEventStore, sealedContent, circlePods, circleControlAgentRouter, chatEventLog, chatInbox, chatRail, deviceLog, _routerRef: routerRef };
-  // The roster-seed serve's key-chain replay reads this node's key-event store (the shells' exact wiring).
-  agent.rosterSeed?.provideKeyEvents?.((cid) => keyEventStore.list(cid));
   LIVE_NODES.add(node);
   // Live view of the REAL ingested circle chats (the browser reads the same eventLog for its bubble list).
   Object.defineProperty(node, 'chatEvents', { enumerable: true, get: () => chatEventLog.query({ excludeMuted: true }) });
@@ -543,10 +560,16 @@ export function memberOpener(node) {
 // Hold-forward on: a key-event/content send to an offline member is HELD (not lost), then flushed on reconnect.
 const SEALED_SEND = { hold: true, firstSendTimeoutMs: 0, retryDelays: [] };
 
-/** Fan a key-event to each recipient node over the real transport (offline recipients are held). */
-async function fanKeyEvent(from, toNodes, groupId, event) {
+/** Emit a key-event THROUGH THE LANE (sign + chain + append on the emitter's device log), refresh the
+ *  emitter's store from the lane projection, and fan the STATEMENT to each recipient node over the real
+ *  transport (offline recipients are held). The receivers verify at their own key rail — production shape. */
+async function emitAndFanKeyEvent(from, toNodes, groupId, event) {
+  const statement = await from.agent.keyEmit(groupId, event);
+  if (!statement) throw new Error('emitAndFanKeyEvent: the key lane refused to sign (no circle signer?)');
+  await projectKeyEventsIntoStore({ rail: from.agent.keyRail, store: from.keyEventStore, circleId: groupId });
   await Promise.all(toNodes.map((n) =>
-    from.agent.sendPeerMessage(n.pubKey, { type: 'group-key-event', subtype: 'group-key-event', groupId, event }, SEALED_SEND)));
+    from.agent.sendPeerMessage(n.pubKey, { subtype: KEY_STATEMENT_BROADCAST, circleId: groupId, event: statement }, SEALED_SEND)));
+  return statement;
 }
 
 /**
@@ -556,8 +579,7 @@ async function fanKeyEvent(from, toNodes, groupId, event) {
 export async function bootSealedCircle({ admin, members = [], groupId }) {
   const recipients = [memberSealingPubKey(admin), ...members.map(memberSealingPubKey)];
   const { event } = establishKeyEvent({ groupId, recipients });
-  admin.keyEventStore.record(groupId, event);
-  await fanKeyEvent(admin, members, groupId, event);
+  await emitAndFanKeyEvent(admin, members, groupId, event);
   return { groupId, recipients };
 }
 
@@ -607,6 +629,11 @@ export async function sealCircleViaProducer({ admin, members = [], groupId }) {
   const keyEventLog = makeKeyEventLogSink({
     groupId,
     recordLocal: (event) => { admin.keyEventStore.record(groupId, event); },
+    // THE SIGNED LANE (the production shells' wiring): the sink hands each key-event to the
+    // admin's key rail — signed, chained, appended — and fans the STATEMENT; receivers verify
+    // signature + chain + rotateKey authority at their own rail.
+    emitStatement: (gid, event) => admin.agent.keyEmit?.(gid ?? groupId, event) ?? null,
+    statementSubtype: KEY_STATEMENT_BROADCAST,
     sendPeer: (addr, payload, opts) => admin.agent.sendPeerMessage(addr, payload, opts),
     sendOptions: SEALED_SEND,
     resolveRecipientAddrs: (event) => {
@@ -639,8 +666,7 @@ export async function sealCircleViaProducer({ admin, members = [], groupId }) {
 export async function removeAndRotate({ admin, keep = [], groupId }) {
   const recipients = [memberSealingPubKey(admin), ...keep.map(memberSealingPubKey)];
   const { event } = rotateKeyEvent({ groupId, priorEvents: admin.keyEventStore.list(groupId), recipients });
-  admin.keyEventStore.record(groupId, event);
-  await fanKeyEvent(admin, keep, groupId, event);   // the removed member is NOT among the recipients of this fan
+  await emitAndFanKeyEvent(admin, keep, groupId, event);   // the removed member is NOT among the recipients of this fan
   return { event };
 }
 

@@ -81,13 +81,14 @@ describe('auditability and retention', () => {
     for (const k of ['governance', 'report', 'key-event', 'membership', 'agent-action', 'settings-change']) {
       expect(isAuditKind(k), k).toBe(true);
     }
-    for (const k of ['governance', 'report', 'key-event', 'agent-action', 'settings-change']) {
+    for (const k of ['governance', 'report', 'agent-action', 'settings-change']) {
       expect(retentionOf(k), k).toBe(RETAIN.AUDIT);   // audit kinds compact rather than drop
     }
   });
 
-  it('RECORD kinds never expire: membership (the roster refolds from it) and chat (the conversation)', () => {
+  it('RECORD kinds never expire: membership (the roster refolds from it), keys (the chain — a version that compacts away stops old sealed content opening) and chat (the conversation)', () => {
     expect(retentionOf('membership')).toBe(RETAIN.RECORD);
+    expect(retentionOf('key-event')).toBe(RETAIN.RECORD);
     expect(retentionOf('chat-message')).toBe(RETAIN.RECORD);
   });
 

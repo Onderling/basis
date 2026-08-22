@@ -18,6 +18,9 @@ export const GOV_CATCHUP_BATCH   = 'circle-governance-catchup-batch';
 
 /** Far above any real circle's decision count; a runaway/hostile batch is truncated, never trusted. */
 const MAX_BATCH = 500;
+/** One deferred re-ingest for batch statements refused at verify — long enough for the pull-burst's
+ *  sibling batches (membership roles/addresses) to fold, short enough to matter within one connect. */
+const RETRY_REFUSED_MS = 2000;
 
 /**
  * @param {object} deps
@@ -73,13 +76,35 @@ export function makeGovernanceCatchUp({ rail, sendToPeer, onChange = null, maySe
     const { circleId, statements } = payload;
     if (typeof circleId !== 'string' || !circleId || !Array.isArray(statements)) return;
     let landed = 0;
+    const refused = [];
     for (const s of statements.slice(0, MAX_BATCH)) {
-      try { if ((await rail.ingest(circleId, s))?.ok) landed += 1; } catch { /* one bad statement never blocks the rest */ }
+      try {
+        if ((await rail.ingest(circleId, s))?.ok) landed += 1;
+        else refused.push(s);
+      } catch { /* one bad statement never blocks the rest */ }
+    }
+    // ONE deferred re-ingest for refusals (idempotent, so a retry is free): a statement can be
+    // refused for a reason that is about to stop being true — a pull-burst's batches RACE each
+    // other, and a statement whose binding needs facts another lane's batch is still folding
+    // (roles, proven addresses) fails now and verifies moments later. Observed live on the relay
+    // walk (2026-08-22): the key lane's batch lost its race against the membership fold and the
+    // chain was silently dropped until the next boot. A forged statement stays refused — this
+    // retries the VERIFY, it never weakens it.
+    if (refused.length > 0) {
+      setTimeout(async () => {
+        let relanded = 0;
+        for (const s of refused) {
+          try { if ((await rail.ingest(circleId, s))?.ok) relanded += 1; } catch { /* still refused → next reconnect */ }
+        }
+        if (relanded > 0 && typeof onChange === 'function') {
+          try { onChange(circleId); } catch { /* re-render is best-effort */ }
+        }
+      }, RETRY_REFUSED_MS);
     }
     if (landed > 0 && typeof onChange === 'function') {
       try { onChange(circleId); } catch { /* re-render is best-effort */ }
     }
-    return { landed };
+    return { landed, refused: refused.length };
   }
 
   /** Ask one peer for one circle's governance statements. */

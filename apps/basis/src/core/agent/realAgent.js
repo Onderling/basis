@@ -61,6 +61,7 @@ const CATCHUP_REPLY_SUBTYPES = new Set([
   TASK_CATCHUP_SUBTYPES.offer,
   CHAT_CATCHUP_SUBTYPES.batch,
   CHAT_CATCHUP_SUBTYPES.offer,
+  KEY_CATCHUP_SUBTYPES.batch,
 ]);
 import { createSurfaceGrants, compileReadFilter } from '../../v2/surfaceGrants.js';   // pair-a-view standing grants (the surface role) + the section→lane-filter compiler
 // The grants LANE (V1 closing wave row 1): grant/revoke statements ride the device log between the
@@ -73,6 +74,7 @@ import {
 // new doc + version reach every member peer-to-peer (pod-free — V1 closing wave row 2).
 import { makeGovernanceRail } from '../../v2/governanceAppWiring.js';
 import { makeRulesUpdateEmitter } from '../../v2/rulesUpdateLane.js';
+import { makeKeyRail, makeKeyEmitter, KEY_CATCHUP_SUBTYPES } from '../../v2/keyRail.js';   // the group-key lane — sealed key events as signed spine statements
 // The add-a-device offer (`onderling-enroll://`): the transport bootstrap the existing device
 // shows as a QR and the freshly enrolled device consumes after its ceremony (#54 tail).
 import { encodeEnrollOffer } from '../../v2/enrollOffer.js';
@@ -1561,12 +1563,6 @@ export async function createRealHouseholdAgent(opts = {}) {
   // circle's membership-redemption trail rows — the head its roster projection folds statements
   // onto. Both halves verify through the ONE device-set verifier above; the shells register the
   // two subtypes and `consumeEnrollOffer` sends the request.
-  //
-  // The key-event PROVIDER is ref-indirected because the per-circle key-event store lives in the
-  // SHELL (session-scoped, next to its receive handler), which composes after this factory runs:
-  // the shell hands its reader in via `rosterSeed.provideKeyEvents` and the serve replays the
-  // circle's group-key chain to a verified sibling (sealed circles open on the new device).
-  const keyEventProvider = { fn: null };
   const rosterSeed = {
     subtypes: ROSTER_SEED_SUBTYPES,
     buildRequest: (circleId, replyTo) => buildRosterSeedRequest({
@@ -1589,14 +1585,12 @@ export async function createRealHouseholdAgent(opts = {}) {
         circleAddressFor,
         signCircleAddress: (cid2, address) => signCircleLinkFromSeed(deviceDerivationSeed, cid2, cid2, address),
       }),
-      keyEventsFor: (cid) => keyEventProvider.fn?.(cid) ?? [],
     }),
     onBatch: makeRosterSeedReceiver({
       callSkill: (...a) => callSkill(...a),
       verifyDeviceSet: deviceSetVerifier,
       selfPubKey: chatId.pubKey,
     }),
-    provideKeyEvents: (fn) => { keyEventProvider.fn = typeof fn === 'function' ? fn : null; },
   };
 
   hostAgent.register('grantSurface', async ({ parts }) => {
@@ -2180,6 +2174,20 @@ export async function createRealHouseholdAgent(opts = {}) {
       }).catch(() => { /* fan is best-effort — catch-up reconciles */ }),
     });
   }
+  // THE KEY LANE (the recorded spine route for key rotations, implemented 2026-08-22): the
+  // control agent's key-event sink hands every establish/rotation to `keyEmit`, which signs it
+  // with the circle key, chains it per author, and appends it to the device log; the SINK then
+  // fans the statement to the event's recipients. Receivers verify signature + chain + the
+  // rotateKey authority (L4 decision-class, default any-admin) at their own key rail before
+  // anything reaches their fold — and a forked rotator's statements are DISCOUNTED (L3). Without
+  // a device log the append lands on an ephemeral log — same honest degrade as the riders below.
+  const keyRail = makeKeyRail({
+    eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
+    circleIdentityFor,
+    myRef: chatId.pubKey,
+    callSkill: (...a) => callSkill(...a),   // lazy — the waist is composed later in this scope
+  });
+  const keyEmit = makeKeyEmitter({ rail: keyRail });
   // THE RULES-UPDATE RIDER: `editGroupRules` also fans the new doc + version as a signed statement
   // on the governance lane (this rail instance shares the device log with the shells' receive-side
   // rail — same lane, same declaration, the multi-instance shape governance already has). Without
@@ -4522,6 +4530,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     // the legacy append-then-fan pair.
     chatRail,
     chatEmit,
+    // The KEY lane's rail + emitter: the sink hands every establish/rotation to keyEmit (sign +
+    // chain + append) and fans the statement; the shells register circle-key-statement + the
+    // catch-up pair over the rail, and refresh their key-event store as the lane's projection.
+    keyRail,
+    keyEmit,
     registerSelfIdentity: (address, identity) => sa.registerSelfIdentity?.(address, identity) ?? false,
     forgetSelfIdentity:   (address) => sa.forgetSelfIdentity?.(address) ?? false,
     installCircleIdentities: (circleIds) => installCircleSigningIdentities({

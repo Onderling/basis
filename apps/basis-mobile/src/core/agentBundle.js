@@ -710,6 +710,9 @@ export async function bootAgentBundle(opts = {}) {
       ? agent.sendPeerMessage(addr, payload, sendOpts)
       : Promise.resolve()),
     callSkill,
+    // The KEY LANE's emit (web parity): the sink hands each key-event here to be signed, chained
+    // and appended to the device log; the returned statement is what fans.
+    keyEmit: (gid, event) => agent.keyEmit?.(gid, event) ?? null,
   });
 
   // OBJ-2 membership — ONE shared peer-redeem pending-map + sender. ChatScreen wires the response

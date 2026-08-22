@@ -16,7 +16,7 @@
  * the transport addressing (member nodes) and the in-memory pod — exactly the seams the browser supplies too.
  *
  * No stand-in on the RECEIVE path either: the fanned key-event reaches B through the REAL `makePeerRouter`
- * dispatch → the REAL `makeHandleGroupKeyEvent` handler → the REAL `createKeyEventStore` (the exact modules
+ * dispatch → the REAL key-lane statement handler → the REAL `createKeyEventStore` (the exact modules
  * circleApp.js wires). Nothing in the harness records the key-event on B's behalf — the production receive is
  * what makes B hold v2 and read post-removal content, and what keeps C (never a recipient) unable to.
  *

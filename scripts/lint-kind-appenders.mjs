@@ -42,7 +42,7 @@ export const APPENDERS = {
   report:            { file: 'apps/basis/src/feedback/feedbackSurface.js', needle: "'report'" },
   'roster-updated':  { file: 'packages/circles/src/circleRoster.js', needle: "'roster-updated'" },
   'delivery-state':  { file: 'apps/basis/src/v2/chatRail.js', needle: "'delivery-state'" },
-  'key-event':       { pending: 'RESERVED with no writer — the sealed-key flow rides an in-memory side store; the key-lane build (REMAINING-WORK ledger L33, the keys sitting) moves it onto the log and deletes this row.' },
+  'key-event':       { file: 'apps/basis/src/v2/keyRail.js', needle: 'KEY_LANE' },
   membership:        { file: 'apps/basis/src/v2/membershipRail.js', needle: 'MEMBERSHIP_LANE' },
   grants:            { file: 'apps/basis/src/v2/grantsRail.js', needle: 'GRANTS_LANE' },
   'agent-action':    { file: 'apps/basis/src/core/agent/realAgent.js', needle: 'agent-action' },

@@ -64,7 +64,7 @@ export const ENTRY_KINDS = Object.freeze({
   report:            K(LANE.SYSTEM, false, RETAIN.AUDIT, true),
   'roster-updated':  K(LANE.SYSTEM, false, RETAIN.SHORT, false),
   'delivery-state':  K(LANE.SYSTEM, false, RETAIN.SHORT, false),
-  'key-event':       K(LANE.SYSTEM, false, RETAIN.AUDIT, true),
+  'key-event':       K(LANE.SYSTEM, false, RETAIN.RECORD, true),  // the group-key chain refolds from these — a version that compacts away silently stops OLD sealed content opening
   membership:        K(LANE.SYSTEM, false, RETAIN.RECORD, true),   // the roster refolds from these — never drops
   grants:            K(LANE.SYSTEM, false, RETAIN.RECORD, true),   // the connection-grant set refolds from these — a revoke that compacts away silently re-admits a view
 
@@ -116,7 +116,7 @@ export function retentionOf(kind) { return entryKind(kind).retain; }
 export const RETENTION_DEFAULTS = Object.freeze({
   [RETAIN.SHORT]: param({ key: 'retention.short', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 7 * 24 * 60 * 60 * 1000 }),    // pure plumbing — roster pings, delivery state
   [RETAIN.CHAT]:  param({ key: 'retention.chat',  scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 14 * 24 * 60 * 60 * 1000 }),   // content whose durable head lives elsewhere
-  [RETAIN.AUDIT]: param({ key: 'retention.audit', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 14 * 24 * 60 * 60 * 1000 }),   // governance, reports, key events, the agent trail — DETAIL window
+  [RETAIN.AUDIT]: param({ key: 'retention.audit', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 14 * 24 * 60 * 60 * 1000 }),   // governance, reports, the agent trail — DETAIL window (key events moved to RECORD — the chain never drops)
 });
 
 /** The retention window (ms) for a RETAIN class (falls back to CHAT for an unknown class).

@@ -31,6 +31,7 @@
 import { CIRCLE_ADDRESS_ANNOUNCE_KIND, ownAnnouncementFor } from './circleAddressAnnounce.js';
 import { MEMBERSHIP_CATCHUP_SUBTYPES } from './membershipRail.js';
 import { GOV_CATCHUP_REQUEST } from './governanceCatchUp.js';
+import { KEY_CATCHUP_SUBTYPES } from './keyRail.js';
 
 /** The scheme. Distinct from `onderling-connect://` — see the header. */
 export const ENROLL_SCHEME = 'onderling-enroll://';
@@ -265,9 +266,12 @@ export async function consumeEnrollOffer({ agent, callSkill, sendPeerMessage, st
         }, SEND);
         row.steps.push('announce');
       }
-      // 4 — pull the circle's truth from the sibling.
+      // 4 — pull the circle's truth from the sibling: membership, governance, and the KEY lane
+      // (the group-key chain travels as signed statements like everything else — a sealed circle
+      // opens on this device once the chain folds; no side-channel replay).
       await sendPeerMessage(c.address, { subtype: MEMBERSHIP_CATCHUP_SUBTYPES.request, circleId: c.id }, SEND);
       await sendPeerMessage(c.address, { subtype: GOV_CATCHUP_REQUEST, circleId: c.id }, SEND);
+      await sendPeerMessage(c.address, { subtype: KEY_CATCHUP_SUBTYPES.request, circleId: c.id }, SEND);
       row.steps.push('catch-up');
       // 5 — the CONTENT pulls (tasks + chat), targeted at the sibling — see the header. Best-effort:
       // the statements bind against the freshly seeded roster; the reconnect requestAll retries.

@@ -22,6 +22,7 @@ import { sealItem } from '@onderling/item-store';
 import { makeCircleLists } from '@onderling/kring-host/circleLists';
 import { makeKeyEventLogSink, recipientAddrsFromRoster } from '@onderling/kring-host/keyEventLogSink';
 import { createKeyEventStore, wrapStrategyWithKeyEventFold } from '../../../basis/src/v2/keyEventStore.js';
+import { KEY_STATEMENT_BROADCAST, projectKeyEventsIntoStore } from '../../../basis/src/v2/keyRail.js';
 import { createCirclePodProducer, createCircleControlAgentRouter, seedCircleRoster } from '../../../basis/src/v2/circlePodProducer.js';
 import { realPodRouting } from '../../../basis/src/v2/circleRealPod.js';
 import { createCirclePodSharing } from '../../../basis/src/v2/circlePodSharing.js';
@@ -86,10 +87,13 @@ export function recordCircleKeyEvent(groupId, event) {
   if (recorded) circleSealStrategies.delete(groupId);
   return recorded;
 }
-// The READ side for the roster-seed serve's key-chain replay: the circle's held group-key events,
-// handed to a device-set-verified sibling so the person's fresh device can open sealed content
-// (web parity — the web shell reads its store the same way).
-export function listCircleKeyEvents(groupId) { return circleKeyEventStore.list(groupId); }
+// The lane-projection refresh (web parity): the local key-event store mirrors the KEY LANE's
+// verified, dispute-discounted statement set — called by the statement handler and the lane
+// catch-up's onChange in ChatScreen.
+export function refreshCircleKeyEventsFromLane(rail, groupId) {
+  return projectKeyEventsIntoStore({ rail, store: circleKeyEventStore, circleId: groupId })
+    .then((n) => { if (n) circleSealStrategies.delete(groupId); return n; });
+}
 
 // The EMIT side's transport wiring — the peer sender + skill dispatch live in the agent bundle, which this
 // module doesn't own; the bundle injects them at boot (mirror of web's lazy `_peerAgent`/`rawCallSkill`
@@ -107,6 +111,15 @@ function makeCircleKeyEventLog(circleId) {
     groupId: circleId,
     // Through recordCircleKeyEvent so the EMIT side also drops the cached seal strategy (see there).
     recordLocal: (event) => recordCircleKeyEvent(circleId, event),
+    // THE SIGNED LANE (web parity): each key-event is appended to the device log as a circle-signed,
+    // chained statement, and the STATEMENT is what fans — receivers verify signature, chain and
+    // rotateKey authority at their key rail. Contract with the sink: a wiring WITHOUT a key lane
+    // (stub boots, log-less tests) returns `undefined` → the raw degrade; a lane that refuses to
+    // sign returns `null` → fail closed, nothing fans bare.
+    emitStatement: (gid, event) => (_keyEventWiring?.keyEmit
+      ? (_keyEventWiring.keyEmit(gid ?? circleId, event) ?? null)
+      : undefined),
+    statementSubtype: KEY_STATEMENT_BROADCAST,
     sendPeer: (addr, payload, opts) => (typeof _keyEventWiring?.sendPeer === 'function'
       ? _keyEventWiring.sendPeer(addr, payload, opts)
       : Promise.resolve()),

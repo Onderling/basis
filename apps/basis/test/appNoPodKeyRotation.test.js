@@ -12,7 +12,7 @@
  * pattern) — A (admin) + B + C, a genuine circle join, real sealing openers derived from each agent's identity,
  * key-events + sealed content fanned over the real transport with real hold-forward. NO pod, NO browser, NO
  * relay/NKN — seconds, deterministic. The RECEIVE side is the production path: a fanned key-event is recorded by
- * the real `makeHandleGroupKeyEvent` handler (dispatched by the real `makePeerRouter`) into the real per-circle
+ * the real key-lane statement handler (dispatched by the real `makePeerRouter`) into the real per-circle
  * `createKeyEventStore`, and the read folds that store — no harness stand-in records or reads the key-events.
  *
  * Asserts:

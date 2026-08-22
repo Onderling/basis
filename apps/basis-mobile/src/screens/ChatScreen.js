@@ -87,9 +87,8 @@ import { makeCircleAddressAnnouncePeerHandler, propagateCircleAddressesAfterJoin
                                from '../../../basis/src/v2/circleAddressAnnounce.js';
 // G11 — no-pod group-key rotation, RECEIVE side: record an inbound key-event into the local per-circle
 // log (circlePods' store); a content read folds it into the key chain. Same shared handler as web.
-import { makeHandleGroupKeyEvent }
-                               from '../../../basis/src/core/handlers/groupKeyEvent.js';
-import { recordCircleKeyEvent, listCircleKeyEvents } from '../core/circlePods.js';
+import { refreshCircleKeyEventsFromLane } from '../core/circlePods.js';
+import { KEY_STATEMENT_BROADCAST, KEY_CATCHUP_SUBTYPES, makeKeyPeerHandler } from '../../../basis/src/v2/keyRail.js';
 import {
   makeRequestCatchUpFromKnownPeers,
 } from '../../../basis/src/core/handlers/catchUp.js';
@@ -558,8 +557,6 @@ export default function ChatScreen({
           groupId: circleId, publicKey: sealingPublicKeyFromNetworkKey(address),
         }),
       }),
-      // G11 — a group-key rotation fanned by another member lands in the local key-event log (web parity).
-      'group-key-event':       makeHandleGroupKeyEvent({ recordKeyEvent: recordCircleKeyEvent }),
       // a contact-bot's reply in its Contacten DM thread → the shared inbox
       // the open ContactThreadScreen subscribes to (cross-screen, like the circle
       // chat wire).  Guarded: the channel is absent in stub-mode boots.
@@ -821,6 +818,25 @@ export default function ChatScreen({
           globalThis.__onderlingChatCatchUpKicked = true;
           setTimeout(() => { chatCatchUp.requestAll({ callSkill: bundle.callSkill }).catch(() => {}); }, 3500);
         }
+        // The KEY lane (web parity): a group-key rotation lands as a SIGNED statement — the rail
+        // verifies signature + chain + rotateKey authority (a forked rotator is discounted) and
+        // the local key-event store refreshes as the lane's projection. Pull-all catch-up: a
+        // long-offline or freshly enrolled device converges on the circle's group-key chain.
+        const keyLaneRail = bundle?.agent?.keyRail ?? null;
+        const keyStatementHandler = keyLaneRail ? makeKeyPeerHandler({
+          rail: keyLaneRail,
+          onChange: (cid) => refreshCircleKeyEventsFromLane(keyLaneRail, cid).catch(() => {}),
+        }) : null;
+        const keyCatchUp = keyLaneRail ? makeGovernanceCatchUp({
+          rail: keyLaneRail,
+          sendToPeer: (addr, payload) => bundle?.agent?.sendPeerMessage?.(addr, payload),
+          subtypes: KEY_CATCHUP_SUBTYPES,
+          onChange: (cid) => refreshCircleKeyEventsFromLane(keyLaneRail, cid).catch(() => {}),
+        }) : null;
+        if (keyCatchUp && !globalThis.__onderlingKeyCatchUpKicked) {
+          globalThis.__onderlingKeyCatchUpKicked = true;
+          setTimeout(() => { keyCatchUp.requestAll({ callSkill: bundle.callSkill }).catch(() => {}); }, 3500);
+        }
         // Background-fetch (salvaged from tasks-mobile): when the OS grants a background slot,
         // run the SAME catch-ups the boot kicks run — pod chat read-back + frontier replay —
         // so messages land while the app is backgrounded. Best-effort; wired once per process.
@@ -848,8 +864,7 @@ export default function ChatScreen({
             [grantsCatchUp.subtypes.request]: grantsCatchUp.onRequest,
             [grantsCatchUp.subtypes.batch]:   grantsCatchUp.onBatch,
           } : {}),
-          // The roster seed (pod-less enroll S1) — same registration as the web shell. The serve's
-          // KEY-CHAIN replay reads this shell's key-event store (wired just below the map).
+          // The roster seed (pod-less enroll S1) — same registration as the web shell.
           ...(bundle?.agent?.rosterSeed ? {
             [bundle.agent.rosterSeed.subtypes.request]: bundle.agent.rosterSeed.onRequest,
             [bundle.agent.rosterSeed.subtypes.batch]:   bundle.agent.rosterSeed.onBatch,
@@ -865,6 +880,11 @@ export default function ChatScreen({
             [chatCatchUp.subtypes.request]: chatCatchUp.onRequest,
             [chatCatchUp.subtypes.batch]:   chatCatchUp.onBatch,
             [chatCatchUp.subtypes.offer]:   chatCatchUp.onOffer,
+          } : {}),
+          ...(keyStatementHandler ? { [KEY_STATEMENT_BROADCAST]: keyStatementHandler } : {}),
+          ...(keyCatchUp ? {
+            [keyCatchUp.subtypes.request]: keyCatchUp.onRequest,
+            [keyCatchUp.subtypes.batch]:   keyCatchUp.onBatch,
           } : {}),
           'circle-governance-broadcast': makeCircleGovernancePeerHandler({
             eventLog: eventLogRef.current,
@@ -889,10 +909,6 @@ export default function ChatScreen({
       updatePeerDisplay: renamePeer,
       t,
     });
-    // The roster-seed serve's KEY-CHAIN replay reads this shell's key-event store, so a verified
-    // sibling's fresh device receives the circle's group-key events (sealed circles open there —
-    // web parity).
-    bundle?.agent?.rosterSeed?.provideKeyEvents?.((cid) => listCircleKeyEvents(cid));
     return {
       onPeerMessage:  makePeerRouter({ handlers, defaultHandler }),
       // The neighbourhood-POST catch-up (a stoop noticeboard concern): the hi-water peer poll. Chat/tasks/

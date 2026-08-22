@@ -290,8 +290,8 @@ import { createActionFrequencyStore } from '../../src/v2/actionFrequency.js';
 import { makePeerRouter } from '../../src/core/handlers/peerRouter.js';
 // No-pod group-key rotation, RECEIVE side: record a fanned key-event into the local per-circle log +
 // fold the recorded events into the key chain on a content read (the counterpart to the key-event log sink).
-import { makeHandleGroupKeyEvent } from '../../src/core/handlers/groupKeyEvent.js';
 import { createKeyEventStore, wrapStrategyWithKeyEventFold } from '../../src/v2/keyEventStore.js';
+import { KEY_STATEMENT_BROADCAST, KEY_CATCHUP_SUBTYPES, makeKeyPeerHandler, projectKeyEventsIntoStore } from '../../src/v2/keyRail.js';
 // OBJ-2 membership — the peer-redeem handshake (joiner ⇄ admin) is shared core; v2 just wires the
 // same three factories the classic shells use (groupRedeem.js) into its peer router + join glue.
 import { makeHandleGroupRedeemRequest, makeHandleGroupRedeemResponse, makeSendGroupRedeemRequest } from '../../src/core/handlers/groupRedeem.js';
@@ -1229,7 +1229,8 @@ let pendingRestoreFlow = false;
 let circleIdentityForShell = null;   // the agent's per-circle signer resolver — governance signs circle-scoped
 let govShellRail = null;             // the governance rail for the RECEIVE side (verify-on-ingest)
 let govCatchUpShell = null;          // pull-all governance catch-up (the offline-device half of reliable)
-let memCatchUpShell = null;          // the membership lane's catch-up (same mechanism, its own subtypes)
+let memCatchUpShell = null;
+let keyCatchUpShell = null;          // pull-all key-lane catch-up (the group-key chain's offline half)          // the membership lane's catch-up (same mechanism, its own subtypes)
 let taskCatchUpShell = null;         // the task lane's catch-up (serves stored entries + signed live heads)
 let chatCatchUpShell = null;         // the chat lane's catch-up (windowed frontier replay + the consent rung)
 let podChatCatchUpShell = null;      // pod-only circles' statement read-back (the pod is the meeting point)
@@ -1645,8 +1646,13 @@ async function ensureCirclePod(circleId, policy) {
       groupId: circleId,
       // RECEIVE/READ side (now wired): record this device's OWN emitted key-events into the local per-circle
       // log so its key chain advances (it can seal + open the new version with no pod). Inbound events from
-      // other members land in the SAME store via the `group-key-event` peer handler; a content read folds both.
+      // other members land in the SAME store via the key lane's statement handler; a content read folds both.
       recordLocal: (event) => recordCircleKeyEvent(circleId, event),
+      // THE SIGNED LANE (the recorded spine route): each key-event is appended to the device log as a
+      // circle-signed, chained statement, and the STATEMENT is what fans — receivers verify signature,
+      // chain and rotateKey authority at their key rail. Fail-closed: no signer → no fan.
+      emitStatement: (gid, event) => _peerAgent?.keyEmit?.(gid ?? circleId, event) ?? null,
+      statementSubtype: KEY_STATEMENT_BROADCAST,
       sendPeer: (addr, payload, opts) => (typeof _peerAgent?.sendPeerMessage === 'function'
         ? _peerAgent.sendPeerMessage(addr, payload, opts)
         : Promise.resolve()),
@@ -7459,6 +7465,14 @@ async function boot() {
         sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
         subtypes: MEMBERSHIP_CATCHUP_SUBTYPES,
       }) : null;
+      // The KEY lane's catch-up (pull-all — one small statement per version): a long-offline or freshly
+      // enrolled device converges on the circle's group-key chain; the store refreshes as the projection.
+      keyCatchUpShell = agent.keyRail ? makeGovernanceCatchUp({
+        rail: agent.keyRail,
+        sendToPeer: (addr, payload) => agent.sendPeerMessage(addr, payload),
+        subtypes: KEY_CATCHUP_SUBTYPES,
+        onChange: (cid) => projectKeyEventsIntoStore({ rail: agent.keyRail, store: circleKeyEventStore, circleId: cid }).catch(() => {}),
+      }) : null;
       // The task lane's catch-up is the FRONTIER REPLAY (windowed, chunked — content lanes never pull-all):
       // the receiver sends its head hashes + a limit; the serve set is the stored entries PLUS signed
       // snapshots of live heads whose entries aged out (the store row outlives the 14-day lane window), so
@@ -7640,9 +7654,6 @@ async function boot() {
           ? agent.sendPeerMessage(addr, env)
           : Promise.reject(new Error('agent.sendPeerMessage unavailable'));
 
-      // The roster-seed serve's KEY-CHAIN replay reads this shell's key-event store, so a verified
-      // sibling's fresh device receives the circle's group-key events (sealed circles open there).
-      agent.rosterSeed?.provideKeyEvents?.((cid) => circleKeyEventStore.list(cid));
       const peerMessageRouter = makePeerRouter({
         handlers: {
           // The SIGNED chat lane: verify-at-the-rail receive + its windowed, consent-gated catch-up.
@@ -7754,11 +7765,20 @@ async function boot() {
               groupId: circleId, publicKey: podSealingPublicKeyFromNetworkKey(address),
             }),
           }),
-          // No-pod group-key rotation — RECEIVE side: a key-event fanned by the circle's key-event log sink
-          // (establish/grant/rotation) lands in this device's local per-circle key-event log. A removed member
-          // is never a recipient of the rotation fan → never records the new version → cannot open post-removal
-          // content (backward secrecy, no pod). Folding into the key chain happens on a content read.
-          'group-key-event':         makeHandleGroupKeyEvent({ recordKeyEvent: (gid, event) => recordCircleKeyEvent(gid, event) }),
+          // No-pod group-key rotation — RECEIVE side, on the KEY LANE: a fanned statement verifies at the
+          // rail (signature + chain + rotateKey authority; a forked rotator's statements are discounted)
+          // and the local key-event store refreshes as the lane's PROJECTION. A removed member is never a
+          // recipient of the rotation fan → never folds the new version → cannot open post-removal content.
+          ...(agent.keyRail ? {
+            [KEY_STATEMENT_BROADCAST]: makeKeyPeerHandler({
+              rail: agent.keyRail,
+              onChange: (cid) => projectKeyEventsIntoStore({ rail: agent.keyRail, store: circleKeyEventStore, circleId: cid }).catch(() => {}),
+            }),
+            ...(keyCatchUpShell ? {
+              [keyCatchUpShell.subtypes.request]: keyCatchUpShell.onRequest,
+              [keyCatchUpShell.subtypes.batch]:   keyCatchUpShell.onBatch,
+            } : {}),
+          } : {}),
           // personas#2 — post-join persona-property push: admin records the member's disclosure onto
           // the roster + acks; the member resolves the pending push on the ack.
           'persona-props-update':    makeHandlePersonaPropsUpdate({ callSkill: rawCallSkill, sendPeer: (addr, payload) => agent.sendPeerMessage(addr, payload), announceRosterUpdate }),
@@ -7812,6 +7832,7 @@ async function boot() {
         // Governance pull-all rides the same kick — any one complete peer suffices (idempotent ingest).
         govCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         memCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
+        keyCatchUpShell?.requestAll({ callSkill: rawCallSkill }).catch(() => {});
         // The grants lane's pull: my own devices — a revoke made elsewhere while this device was
         // offline binds at this door now, before a stale view is served.
         agent.grantsCatchUp?.requestFromSiblings().catch(() => {});

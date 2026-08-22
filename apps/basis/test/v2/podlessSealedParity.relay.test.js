@@ -3,7 +3,8 @@
  * corridor as `podlessSealedParity.test.js`, but every hop crosses the REAL transport seam — a
  * live WebSocket relay, per-circle alias binding with the real signed challenge, hold-forward
  * delivery. On a relay the shared profile key is one address, one socket, so the sibling paths
- * (seed request, parcel, announce-back, key-event replay) travel exactly the production shape.
+ * (seed request, parcel, announce-back, the key LANE's catch-up pull) travel exactly the
+ * production shape.
  *
  * The claim is the v1 gate again, on the wire people will actually use: a device enrolled by
  * phrase + offer, no pod anywhere, OPENS content sealed before it existed.

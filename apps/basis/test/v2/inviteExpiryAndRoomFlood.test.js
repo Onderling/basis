@@ -1,9 +1,12 @@
 /**
  * S6 · J-A6 / J-A8 / J-A11 / J-A14 — the expiry and flood attacks, walked 2026-07-29 from the desk.
  *
- * **These tests assert what the code does TODAY, and most of what they assert is WRONG.** They exist so the
- * findings are pinned somewhere that runs, and so that fixing any of them fails a test loudly rather than
- * silently changing behaviour nobody was watching. Each block says what the right behaviour would be.
+ * **HEADER CORRECTED 2026-08-23.** It used to read "most of what they assert is WRONG" — true when the
+ * attacks were walked on 2026-07-29, and stale from the next day: J-A6, J-A8, J-A11 and J-A14 were all
+ * FIXED on 2026-07-30 and these blocks were rewritten to assert the CORRECT behaviour (each describe
+ * says so). The stale sentence outlived the fixes and misled a later reader into re-reporting the holes
+ * as open, which is exactly the drift the pinning was meant to prevent. If you fix another one, rewrite
+ * its block AND this header in the same commit.
  *
  * Walked with real agents (`test/support/pairRealAgents.js`) and the production room modules; the full write-up
  * is in the session results. Nothing here needs a radio: an attacker needs a saved invite URI, or the ability

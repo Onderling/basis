@@ -98,3 +98,33 @@ refuses the global-key fallback. `help` lists the commands.
 - **This harness** — the full **SDK/app-level** journeys (real `Agent`, sealing,
   stoop). Richer; needs the workspace.
 - `packages/**/test`, `apps/*/test` — the hermetic unit/integration suites.
+
+## Two compositions — pick the right one for what you are asserting
+
+Journeys here can boot either of two stacks, and the choice decides what a result *means*.
+
+| | **stoop + substrate mirror** (the original journeys) | **the APP composition** (`journeys/_app.mjs`) |
+|---|---|---|
+| what it is | `createNeighbourhoodAgent` + `attachSubstrateMirror` | `createRealHouseholdAgent` — the same factory the web and mobile shells boot |
+| has a device log | ✗ | ✓ |
+| has the lanes (membership · governance · keys · tasks · chat) | ✗ | ✓ |
+| good for | transport, noticeboard, offerings, bots — anything that lives in the item store | anything lane-shaped: membership folds, rules propagation, key rotation, catch-up, enrolment |
+| runs against a deployed relay | ✓ | ✓ |
+
+**Why it matters (finding F-002).** A `leave` emits a signed membership statement; a statement needs a
+lane to travel on. In the mirror-only stack there is none, so the leaver's device prunes and the
+circle never hears — which looks exactly like a product bug and is not one. Asserting a lane
+behaviour against the mirror stack measures the harness. `J-app` is the standing proof: the same act,
+in the app composition, reaches the admin and the bystander.
+
+```js
+import { bootAppCircle, rosterOf, hasMember, untilTrue } from './_app.mjs';
+
+const circle = await bootAppCircle({ relayUrl, circleId: 'my-journey', handles: ['anne', 'bram'] });
+const [anne, bram] = circle.people;
+// …drive real ops through the waist: anne.agent.callSkill('stoop', 'listGroupMembers', { groupId })
+await circle.close();
+```
+
+No browser and no vitest are involved: the basis harness this builds on is vitest-free and imports
+under plain node, so `node run.mjs` boots the product's own stack directly.

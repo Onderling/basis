@@ -582,3 +582,36 @@ re-materialize it the same way, don't reinstall. The NATIVE halves need a fresh 
 they exist on device; until then `wireBackgroundSync` wires the JS side and reports `registered:false`
 (by design — vitest and stale dev clients stay green). The bundle-load task definition lives in
 `apps/basis-mobile/index.js` (`BASIS_BG_TASK_NAME`) and MUST stay at module load per Expo's TaskManager.
+
+## `file:../pkg` internal deps break a STANDALONE (Docker) install — the image builds, then dies at boot (2026-08-22)
+
+Found while bringing the relay up for a real VPS deploy: `deploy/relay/Dockerfile` **built fine**
+and the container **crashed on start** with
+`ERR_MODULE_NOT_FOUND: Cannot find package '@onderling/params' imported from
+/app/packages/relay/node_modules/@onderling/core/src/params.js`.
+
+**Why.** With `"@onderling/core": "file:../core"`, pnpm **copies** the package into the dependent's
+`node_modules` instead of symlinking it. The copy has no `node_modules` of its own, so Node's
+upward resolution from inside the copy never reaches `packages/core/node_modules/@onderling/params`
+— the dep core genuinely needs at runtime. In the DEV tree this is invisible: the flat hoisted
+layout puts everything within reach, so `file:` and `workspace:` behave identically there and only a
+focused/standalone install exposes the difference.
+
+**Fix (applied to the relay's runtime subtree only):** declare internal deps with
+`"workspace:*"`, which pnpm SYMLINKS — resolution then walks into the real package and finds its
+own `node_modules`. Changed: `packages/relay` (its runtime deps `core`/`vault`/`blob-gateway` also
+moved out of `peerDependencies`/`devDependencies` into `dependencies` — a deployable service must
+DECLARE what it runs on) and `packages/blob-gateway`. ~25 other packages still use `file:` for
+internal deps; converting them all is the scheduled workspace-protocol migration, not a drive-by.
+
+**The rule this implies:** any package that must run OUTSIDE the dev tree (a Docker image, a
+published tarball, a standalone host) needs `workspace:*` internal deps + its runtime deps in
+`dependencies`. Verify by BOOTING the image, never by building it — the build cannot catch this.
+
+**Also caught in the same pass:** `deploy/smoke/smoke.mjs` still spoke the pre-2026-07-31
+unauthenticated `register` handshake (see the challenge-first gotcha above) and sent envelopes with
+no `_from`, so it timed out against a current relay and looked like "the deployment is broken". It
+now generates real ed25519 identities (node:crypto — the one-dep promise holds), answers the
+`challenge` with a `register-proof`, and binds `_from`. Its header also claimed `ws` "resolves from
+the root" — this workspace installs per package and has NO root `node_modules`; run it from a
+package that has `ws` (`cd packages/relay && node ../../deploy/smoke/smoke.mjs <url>`).

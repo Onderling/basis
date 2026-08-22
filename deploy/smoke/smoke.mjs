@@ -6,19 +6,21 @@
  *
  * Validates the deployment over the relay's documented wire protocol
  * (register / send / message — see packages/relay/src/server.js):
- *   1. reachability        — wss:// TLS + WebSocket upgrade + register ack
+ *   1. reachability        — wss:// TLS + WebSocket upgrade + proof-bound register
  *   2. two-party delivery  — A↔B both directions
  *   3. offline hold        — messages to an offline peer are held + flushed on reconnect
  *   4. multi-party fan-out  — a small circle, one member offline, no loss / no cross-talk
  *
- * Portable on purpose: the only dependency is `ws` (in this monorepo it resolves
- * from the root; standalone, `npm i ws`). This checks the DEPLOYMENT — the full
+ * Portable on purpose: the only dependency is `ws` (ed25519 comes from node:crypto). This
+ * workspace installs PER PACKAGE — there is no root `node_modules` — so run it from a package
+ * that has `ws`, e.g. `cd packages/relay && node ../../deploy/smoke/smoke.mjs <url>`; standalone,
+ * `npm i ws` next to it. This checks the DEPLOYMENT — the full
  * Agent / envelope-security / sealed-inbox integration lives in the workspace
  * test suites (packages/**, apps/companion-node, j-offline).
  *
  * Exit code 0 = all passed, 1 = a check failed, 2 = usage error.
  */
-import { randomBytes } from 'node:crypto';
+import { generateKeyPairSync, sign as edSign } from 'node:crypto';
 
 const URL = process.argv[2] || process.env.RELAY_URL;
 if (!URL) {
@@ -28,7 +30,20 @@ if (!URL) {
 
 const WebSocket = (await import('ws')).default;
 const wait  = (ms) => new Promise(r => setTimeout(r, ms));
-const addr  = (name) => `smoke-${name}-${randomBytes(6).toString('hex')}`;
+
+/**
+ * A relay ADDRESS IS AN ED25519 PUBLIC KEY — registration is challenge-first and proof-bound
+ * (`register` → `challenge` → `register-proof` → `registered`), so a smoke client must actually
+ * hold the key behind the address it claims. Node's built-in ed25519 keeps the script's one-dep
+ * promise (`ws`); the wire encoding is base64url-unpadded, matching @onderling/core's b64.
+ */
+const POSSESSION_V1 = (address, nonce) => `onderling-address-possession-v1|${address}|${nonce}`;
+function makeIdentity() {
+  const { publicKey, privateKey } = generateKeyPairSync('ed25519');
+  const spki = publicKey.export({ type: 'spki', format: 'der' });
+  const address = Buffer.from(spki.subarray(spki.length - 32)).toString('base64url');
+  return { address, sign: (m) => edSign(null, Buffer.from(m, 'utf8'), privateKey).toString('base64url') };
+}
 const text  = (t) => ({ parts: [{ type: 'TextPart', text: t }], _p: 'OW' });
 const readText = (env) => env?.parts?.[0]?.text;
 
@@ -38,26 +53,39 @@ const check = (name, cond, detail = '') => {
   console.log(`${cond ? '✅' : '❌'} ${name}${detail ? '  — ' + detail : ''}`);
 };
 
-/** Minimal relay wire-protocol client: register by address, send/receive envelopes. */
+/** Minimal relay wire-protocol client: proof-bound register, send/receive envelopes. */
 class RelayClient {
-  constructor(url, address) { this.url = url; this.address = address; this.inbox = []; this._ws = null; }
+  constructor(url, identity) {
+    this.url = url; this.identity = identity; this.address = identity.address;
+    this.inbox = []; this._ws = null;
+  }
 
   connect() {
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(this.url);
       this._ws = ws;
-      const timer = setTimeout(() => reject(new Error(`register timeout (${this.address})`)), 10_000);
+      const timer = setTimeout(() => reject(new Error(`register timeout (${this.address.slice(0, 8)}…)`)), 10_000);
       ws.on('open', () => ws.send(JSON.stringify({ type: 'register', address: this.address })));
       ws.on('message', (raw) => {
         let msg; try { msg = JSON.parse(raw); } catch { return; }
+        // Step 2 of 2: sign the relay's single-use nonce with the key behind the address.
+        if (msg.type === 'challenge' && msg.address === this.address) {
+          ws.send(JSON.stringify({
+            type: 'register-proof', address: this.address, nonce: msg.nonce,
+            proof: this.identity.sign(POSSESSION_V1(this.address, msg.nonce)),
+          }));
+          return;
+        }
         if (msg.type === 'registered') { clearTimeout(timer); resolve(); return; }
+        if (msg.type === 'error') { clearTimeout(timer); reject(new Error(msg.message ?? 'relay error')); return; }
         if (msg.type === 'message' && msg.envelope) this.inbox.push(readText(msg.envelope));
       });
       ws.on('error', (e) => { clearTimeout(timer); reject(e); });
     });
   }
 
-  send(to, t) { this._ws.send(JSON.stringify({ type: 'send', to, envelope: text(t) })); }
+  // `_from` must be an address THIS socket proved (sender binding — an unbound sender is refused).
+  send(to, t) { this._ws.send(JSON.stringify({ type: 'send', to, envelope: { ...text(t), _from: this.address } })); }
   close() {
     return new Promise(res => {
       const ws = this._ws;
@@ -73,8 +101,8 @@ class RelayClient {
 console.log(`\n=== Relay smoke test → ${URL} ===\n`);
 
 // ── 1. Reachability ─────────────────────────────────────────────────────────
-const ann = new RelayClient(URL, addr('ann'));
-const bob = new RelayClient(URL, addr('bob'));
+const ann = new RelayClient(URL, makeIdentity());
+const bob = new RelayClient(URL, makeIdentity());
 let reachable = false;
 try { await ann.connect(); await bob.connect(); reachable = true; }
 catch (e) { check('reachable: wss:// upgrade + register', false, e.message); }
@@ -104,8 +132,8 @@ if (reachable) {
     gotAll && JSON.stringify(order) === JSON.stringify(held), `got=${JSON.stringify(order)}`);
 
   // ── 4. Multi-party fan-out with an offline member ─────────────────────────
-  const carol = new RelayClient(URL, addr('carol'));
-  const dave  = new RelayClient(URL, addr('dave'));
+  const carol = new RelayClient(URL, makeIdentity());
+  const dave  = new RelayClient(URL, makeIdentity());
   await carol.connect(); await dave.connect();
   const circle = [ann, bob, carol, dave];
   const bcast  = (from, t) => { for (const m of circle) if (m !== from) from.send(m.address, t); };

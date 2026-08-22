@@ -16,9 +16,15 @@ services:
   caddy:
     image: caddy:2
     restart: unless-stopped
+    # Only the relay is a boot dependency. Caddy resolves reverse-proxy upstreams per REQUEST, not
+    # at startup, so the pod/companion sites in the Caddyfile cost nothing while those services are
+    # down — and this is what makes a RELAY-ONLY bring-up possible with the stock command:
+    #   docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d --build caddy relay
+    # (a full-stack `up -d` still starts everything, unchanged). Certificates are issued per site
+    # from DNS + the ACME challenge, independent of whether an upstream is running — so create the
+    # pod A-record too and its cert is ready the day the pod starts.
     depends_on:
       - relay
-      - pod
     ports:
       - "80:80"
       - "443:443"

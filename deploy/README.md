@@ -10,14 +10,18 @@ stack in containers.
 
 | Service | Dir | Status | Persistent volume |
 |---|---|---|---|
-| **Relay** (messaging + media edge + push wake) | `relay/` | ✅ Docker build **verified** locally (boots + serves) | none required¹ |
+| **Relay** (messaging + media edge + push wake) | `relay/` | ✅ **build + BOOT + wire-protocol verified** 2026-08-22 (image boots; `deploy/smoke` 8/8 against the container: two-party delivery, offline hold + flush, fan-out) | none required¹ |
 | **Companion node** (folio agent over the mesh) | `companion-node/` | ✅ builds; uses the package's own `bin` | **yes** — identity vault |
 | **Solid pod** (Community Solid Server) | `css-pod/` | ✅ standalone CSS image (not the monorepo) | **yes** — pod data |
 | **llm-proxy** (confidential LLM) | `llm-proxy/` | ⛔ **no server to host** — see `llm-proxy/README.md` | — |
 
-¹ The relay's offline queue + push registry are in-memory (they don't survive a
-restart — this matches the current relay design). Durable offline delivery is a
-future item (`NOTE-offline-message-delivery.md`), not wired here.
+¹ The relay's offline queue is in-memory: **a relay restart drops whatever it was
+holding for offline devices.** Bounded in practice — the lanes' own catch-ups
+(membership/governance/keys pull-all, chat/tasks frontier replay) re-deliver from the
+SENDERS' logs when devices next meet, so the queue is an optimisation, not the record.
+A durable `SqliteQueueStore` class exists in the package but has **no consumer** —
+`ForwardQueue` takes no store (see REMAINING-WORK's ledger). The push-token registry
+DOES persist when you set `PUSH_TOKENS_DB`.
 
 ## The monorepo-in-Docker approach (why the Dockerfiles look the way they do)
 
@@ -44,6 +48,11 @@ The **CSS pod is different**: Community Solid Server is an independent npm packa
 ## Deploy order (do this top-to-bottom)
 
 The relay is the linchpin — everything else points at it. Deploy in this order.
+
+> **Self-hosting on your own VM/VPS?** This section is the PaaS path. For a VPS you get
+> root on (TransIP, Hetzner, Oracle, …) use `DEPLOY-RUNBOOK.md` **Path B** — Docker
+> Compose + the TLS overlay + Caddy/Let's Encrypt, with the provider deltas in **B0**
+> and a relay-only first bring-up in **B7**.
 
 ### 1. Relay (first — everything attaches to it)
 

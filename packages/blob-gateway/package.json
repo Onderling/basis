@@ -2,7 +2,7 @@
   "private": true,
   "name": "@onderling/blob-gateway",
   "version": "0.1.0",
-  "description": "Media substrate: client-side-encrypt a blob → untrusted bucket + a cross-pod-ref manifest line in the pod; a deny-by-default poortwachter (verifyToken → ACL → presigned URL). Bucket/token/acl are injected (cloud-agnostic).",
+  "description": "Media substrate: client-side-encrypt a blob \u2192 untrusted bucket + a cross-pod-ref manifest line in the pod; a deny-by-default poortwachter (verifyToken \u2192 ACL \u2192 presigned URL). Bucket/token/acl are injected (cloud-agnostic).",
   "type": "module",
   "main": "src/index.js",
   "exports": {
@@ -14,13 +14,13 @@
     "./http": "./src/httpGate.js"
   },
   "scripts": {
-    "test":       "vitest run",
+    "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@onderling/core": "file:../core",
-    "@onderling/oidc-session": "file:../oidc-session",
-    "@onderling/pod-client": "file:../pod-client"
+    "@onderling/core": "workspace:*",
+    "@onderling/oidc-session": "workspace:*",
+    "@onderling/pod-client": "workspace:*"
   },
   "devDependencies": {
     "vitest": "^2.1.0"

@@ -16,19 +16,16 @@
     "test": "vitest run",
     "test:watch": "vitest"
   },
-  "peerDependencies": {
-    "@onderling/core": "^0.1.0",
-    "@onderling/vault": "^0.1.0"
-  },
   "devDependencies": {
-    "@onderling/core": "file:../core",
-    "@onderling/transports": "file:../transports",
+    "@onderling/transports": "workspace:*",
     "selfsigned": "^5.5.0",
     "vitest": "^2.1.0",
     "ws": "^8.20.0"
   },
   "dependencies": {
-    "@onderling/blob-gateway": "file:../blob-gateway",
+    "@onderling/blob-gateway": "workspace:*",
+    "@onderling/core": "workspace:*",
+    "@onderling/vault": "workspace:*",
     "better-sqlite3": "^11.10.0",
     "ws": "^8.20.0"
   }

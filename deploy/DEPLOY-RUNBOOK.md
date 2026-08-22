@@ -111,6 +111,25 @@ same Docker + Caddy steps below.
 You run the full stack with `docker compose` + the TLS overlay in this repo, and
 **Caddy terminates TLS → public `wss://<RELAY_DOMAIN>`**.
 
+### B0. Provider deltas — TransIP VPS (or any plain VPS you get root on)
+
+Path B was written against Oracle Cloud, but only **provisioning** and the
+**firewall** are provider-specific. On a **TransIP VPS** — or any plain VPS with a
+public IPv4 — substitute these and everything from B4 on is identical:
+
+| Step | Oracle Cloud | TransIP (or any plain VPS) |
+|---|---|---|
+| **B1** provision | Always-Free ARM/AMD shape | Any VPS — the relay is tiny (1 vCPU / 2 GB is ample). Image: **Ubuntu 24.04 LTS**. Add your SSH key at order time, or under *VPS → Settings → SSH keys* (then reinstall/rescue to apply). |
+| **B2** DNS | your registrar, wherever it is | **TransIP is your registrar too** → Control panel → *Domains* → `<your-domain>` → *DNS*. Add the A-records there; same panel, no third party. |
+| **B3** firewall | security list **AND** OS firewall (the double gotcha) | **No security-list layer**, so the double gotcha halves. TransIP VPSes boot with an open OS firewall — usually nothing to do. Check only: (a) if you switched on the control panel's *firewall*, allow TCP **80** + **443** there; (b) if you enabled `ufw` on the box: `sudo ufw allow 80/tcp && sudo ufw allow 443/tcp`. |
+| **B4–B8** | — | identical, no changes |
+
+**IPv6:** TransIP assigns an IPv6 block. Adding `AAAA` records alongside the `A`
+records is optional; Caddy serves both and Let's Encrypt validates over either.
+
+**Sizing reality:** relay-only idles at a few tens of MB. The 2 GB tier only starts
+to matter when the CSS pod + companion join it later.
+
 ### B1. Provision the VM
 
 1. Create an Oracle Cloud account (needs a credit card for identity check; the
@@ -177,8 +196,15 @@ sudo usermod -aG docker "$USER"   # then log out/in so `docker` runs without sud
 
 ### B5. Get the code + set env
 
+> **Private repo → use a READ-ONLY deploy key.** The VM needs read access to clone.
+> On the VM: `ssh-keygen -t ed25519 -C "relay-vm" -f ~/.ssh/id_ed25519 -N ""`, then add
+> the printed `~/.ssh/id_ed25519.pub` at GitHub → the repo → *Settings → Deploy keys* →
+> *Add deploy key*, leaving **"Allow write access" OFF**. Then clone with the SSH URL.
+> The private plan/design corpus (`plans/`, `_archive/`, root `PLAN-*`) is gitignored, so
+> a deploy key exposes code only — never the private docs.
+
 ```bash
-git clone <this-repo-url> onderling-mono
+git clone git@github.com:Onderling/basis.git onderling-mono
 cd onderling-mono/deploy
 
 cp caddy/.env.example .env
@@ -212,10 +238,20 @@ To switch to ACP, override `CSS_CONFIG` on the `pod` service (add it to the
 
 ```bash
 # from onderling-mono/deploy, with .env filled and DNS + firewall done:
+
+# RELAY-ONLY (recommended first bring-up — the piece that gates client testing):
+docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d --build caddy relay
+
+# …or the FULL stack (relay + CSS pod + companion + Caddy):
 docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d --build
 ```
 
-This builds + starts **relay + CSS pod + companion + Caddy**. Caddy requests
+Relay-only still needs `POD_DOMAIN` set in `.env` (the Caddyfile names that site) —
+point its A-record at the same IP and Caddy simply holds a valid, unused certificate
+until the day you start the pod. Adding the pod later is then one command, no DNS or
+cert work.
+
+The full command builds + starts **relay + CSS pod + companion + Caddy**. Caddy requests
 Let's Encrypt certs for `RELAY_DOMAIN` and `POD_DOMAIN` on first boot (needs the
 DNS A-records live and 80/443 reachable — B2/B3). Certs + the ACME account key
 persist in the `caddy-data` volume, so restarts don't re-issue.

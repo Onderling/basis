@@ -35,6 +35,8 @@ import { makeCircleGovernancePeerHandler } from '../../basis/src/v2/circleLogRec
 import { createCircleCacheMedium } from '../../basis/src/v2/circleCacheMedium.js';
 import { makeKeyEventLogSink, recipientAddrsFromRoster } from '../../../packages/kring-host/src/keyEventLogSink.js';
 import { KEY_STATEMENT_BROADCAST, makeKeyPeerHandler } from '../../basis/src/v2/keyRail.js';
+import { CHAT_CATCHUP_SUBTYPES } from '../../basis/src/v2/chatRail.js';
+import { makeFrontierReplay } from '../../basis/src/v2/frontierReplay.js';
 
 /**
  * A CENTRAL POD every member's cache medium writes through — the "with a pod" half of the mode
@@ -99,6 +101,20 @@ function wireLanes(node) {
       subtypes: MEMBERSHIP_CATCHUP_SUBTYPES,
     })
     : null;
+  // CHAT CATCH-UP — the windowed frontier replay both shells wire, with the consent rung. This is how
+  // a device that missed a conversation asks for it back, so an absence journey needs it to exist.
+  const chatReplay = (node.chatRail ?? node.agent.chatRail)
+    ? makeFrontierReplay({
+      rail: node.chatRail ?? node.agent.chatRail,
+      sendToPeer: (addr, payload) => node.agent.sendPeerMessage(addr, payload),
+      subtypes: CHAT_CATCHUP_SUBTYPES,
+      // Auto-allow anything at journey scale — the consent rung has its own coverage; what is under
+      // test here is whether the backlog arrives at all.
+      onOffer: ({ allow }) => { try { allow(); } catch { /* the offer stands */ } },
+    })
+    : null;
+  node._chatReplay = chatReplay;
+
   // KEYS — the receive half the shells register. Without it a fanned rotation has nowhere to land,
   // and a journey would be measuring the harness instead of the lane.
   const keyHandler = node.agent.keyRail
@@ -107,6 +123,9 @@ function wireLanes(node) {
   node._routerRef.fn = (env) => {
     const st = env?.payload?.subtype;
     if (keyHandler && st === KEY_STATEMENT_BROADCAST) { keyHandler(env?.from, env.payload); return undefined; }
+    if (chatReplay && st === CHAT_CATCHUP_SUBTYPES.request) { chatReplay.onRequest(env?.from, env.payload); return undefined; }
+    if (chatReplay && st === CHAT_CATCHUP_SUBTYPES.batch)   { chatReplay.onBatch(env?.from, env.payload); return undefined; }
+    if (chatReplay && st === CHAT_CATCHUP_SUBTYPES.offer)   { chatReplay.onOffer(env?.from, env.payload); return undefined; }
     if (st === 'circle-governance-broadcast') { govHandler(env?.from, env.payload); return undefined; }
     if (st === GOV_CATCHUP_REQUEST) { govCatchUp.onRequest(env?.from, env.payload); return undefined; }
     if (st === govCatchUp.subtypes.batch) { govCatchUp.onBatch(env?.from, env.payload); return undefined; }
@@ -172,6 +191,18 @@ export async function bootAppCircle({ relayUrl, circleId, handles, pod = null, o
 /** Send a circle chat message the way a shell does: append the signed render entry AND fan the
  *  statement through the real stoop op. (`chatRail.appendMessage` alone only writes locally.) */
 export { sendCircleChat };
+
+/**
+ * Take a device DARK — inbound envelopes are dropped on the floor, exactly as they are for a phone
+ * that is off. Returns the function that brings it back. Deliberately NOT a socket close: a real
+ * absence outlasts the relay's hold window, so what must carry the backlog is the catch-up, and a
+ * held-message replay would quietly pass the test for the wrong reason.
+ */
+export function goDark(node) {
+  const live = node._routerRef.fn;
+  node._routerRef.fn = () => undefined;
+  return function comeBack() { node._routerRef.fn = live; };
+}
 
 /**
  * The circle's KEY SINK, wired exactly as `circleApp.js` wires it: every key-event the sealing

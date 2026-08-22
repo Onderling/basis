@@ -33,6 +33,8 @@ import { makeGovernanceCatchUp, GOV_CATCHUP_REQUEST } from '../../basis/src/v2/g
 import { bindCircleGovernance, makeGovernanceRail } from '../../basis/src/v2/governanceAppWiring.js';
 import { makeCircleGovernancePeerHandler } from '../../basis/src/v2/circleLogReceiver.js';
 import { createCircleCacheMedium } from '../../basis/src/v2/circleCacheMedium.js';
+import { makeKeyEventLogSink, recipientAddrsFromRoster } from '../../../packages/kring-host/src/keyEventLogSink.js';
+import { KEY_STATEMENT_BROADCAST, makeKeyPeerHandler } from '../../basis/src/v2/keyRail.js';
 
 /**
  * A CENTRAL POD every member's cache medium writes through — the "with a pod" half of the mode
@@ -97,8 +99,14 @@ function wireLanes(node) {
       subtypes: MEMBERSHIP_CATCHUP_SUBTYPES,
     })
     : null;
+  // KEYS — the receive half the shells register. Without it a fanned rotation has nowhere to land,
+  // and a journey would be measuring the harness instead of the lane.
+  const keyHandler = node.agent.keyRail
+    ? makeKeyPeerHandler({ rail: node.agent.keyRail })
+    : null;
   node._routerRef.fn = (env) => {
     const st = env?.payload?.subtype;
+    if (keyHandler && st === KEY_STATEMENT_BROADCAST) { keyHandler(env?.from, env.payload); return undefined; }
     if (st === 'circle-governance-broadcast') { govHandler(env?.from, env.payload); return undefined; }
     if (st === GOV_CATCHUP_REQUEST) { govCatchUp.onRequest(env?.from, env.payload); return undefined; }
     if (st === govCatchUp.subtypes.batch) { govCatchUp.onBatch(env?.from, env.payload); return undefined; }
@@ -164,6 +172,32 @@ export async function bootAppCircle({ relayUrl, circleId, handles, pod = null, o
 /** Send a circle chat message the way a shell does: append the signed render entry AND fan the
  *  statement through the real stoop op. (`chatRail.appendMessage` alone only writes locally.) */
 export { sendCircleChat };
+
+/**
+ * The circle's KEY SINK, wired exactly as `circleApp.js` wires it: every key-event the sealing
+ * machinery emits is signed on the key lane, appended to this device's log, and the STATEMENT is
+ * fanned to the event's recipients — who verify signature, chain and the rotateKey authority at
+ * their own rail before anything folds. Fail-closed: an event the lane will not sign is not fanned.
+ *
+ * The journey drives `sink.append(event)` directly, which is exactly what the control agent does.
+ */
+export function keySinkFor(node, circleId) {
+  const recorded = [];
+  const sink = makeKeyEventLogSink({
+    groupId: circleId,
+    recordLocal: (event) => recorded.push(event),
+    emitStatement: (gid, event) => node.agent.keyEmit?.(gid ?? circleId, event) ?? null,
+    statementSubtype: KEY_STATEMENT_BROADCAST,
+    sendPeer: (addr, payload, opts) => node.agent.sendPeerMessage(addr, payload, opts),
+    sendOptions: { hold: true, firstSendTimeoutMs: 0, retryDelays: [] },
+    resolveRecipientAddrs: async (event) => {
+      const r = await node.agent.callSkill('stoop', 'listGroupMembers', { groupId: circleId })
+        .catch(() => null);
+      return recipientAddrsFromRoster(event, Array.isArray(r?.members) ? r.members : []);
+    },
+  });
+  return { sink, recorded };
+}
 
 /** The circle's roster as that person's own device projects it. */
 export async function rosterOf(node, circleId) {

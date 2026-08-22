@@ -21,6 +21,33 @@ import { setOwn } from './profileProperties.js';
 export const DEVICE_DELEGATIONS_KEY = 'deviceDelegations';
 
 /**
+ * The GRANTS-FLOOR marker (its own property key, beside the map — a marker in the map would read
+ * as a malformed device record to every map consumer). The grants lane's device-set trust base
+ * accepts statements signed by the shared PROFILE key — "the floor" — because a person's first,
+ * un-enrolled device has no other key. The floor is also the one signature a revoked-but-stolen
+ * device still holds (the key cannot be tombstoned without re-keying the person). So THE FIRST
+ * DEVICE-REVOKE CEREMONY CLOSES IT: the ceremony proves the phrase and self-enrolls the running
+ * device into delegation custody, so at that moment every legitimate device signs with a
+ * revocable delegation key — and this marker tells every verifier the shared signature no longer
+ * counts. Closed is forever (deny-wins; there is no reopen — a later device joins by enrollment,
+ * which needs no floor).
+ */
+export const GRANTS_FLOOR_KEY = 'grantsFloor';
+
+/** Is the profile's grants floor closed? (Absent/malformed → open — the pre-ceremony default.) */
+export function grantsFloorClosedOf(entry) {
+  const cur = entry?.properties?.[GRANTS_FLOOR_KEY];
+  return cur?.mode === 'own' && cur.value?.closed === true;
+}
+
+/** Close the floor on a properties map (idempotent). Returns a NEW frozen map. */
+export function closeGrantsFloor(properties, { closedAt = null } = {}) {
+  return setOwn(properties ?? {}, GRANTS_FLOOR_KEY, {
+    closed: true, ...(closedAt ? { closedAt } : {}),
+  });
+}
+
+/**
  * True iff `v` is a well-formed delegation record: the root-signed statement fields plus local
  * bookkeeping. `label` is the human name the enroll UI collects ("Frits' telefoon"); `revoked`
  * marks a tombstone; `issuedAt` is informational (NOT part of the signed statement).

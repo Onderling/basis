@@ -44,6 +44,7 @@ export {
 export {
   DEVICE_DELEGATIONS_KEY, isDeviceDelegationRecord, normaliseDeviceDelegation,
   deviceDelegationsOf, deviceDelegationOf, setDeviceDelegation,
+  GRANTS_FLOOR_KEY, grantsFloorClosedOf, closeGrantsFloor,
 } from './src/deviceDelegations.js';
 // identity step 5A — encrypted-file/DB export of the profile set
 export { exportProfileRegistry, importProfileRegistry, restoreProfilesInto } from './src/exportRegistry.js';

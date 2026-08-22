@@ -903,8 +903,15 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
       if (typeof it?.addedBy === 'string' && it.addedBy) founderWebids.add(it.addedBy);
     }
   } catch { /* no rules item → the MemberMap-admin + trail paths still stand */ }
-  for (const m of list) {
-    if (m?.webid && isCircleAdmin(m.role)) founderWebids.add(m.webid);
+  // The display-cache fallback, NARROWED (Frits' ruling, 2026-08-23): a member-map admin row
+  // confers founder authority ONLY when the durable sources above yielded NOTHING — a true
+  // legacy circle with no rules-authorship facts at all. Authority comes from signatures; the
+  // map exists for showing names — and since the roster seed, a device-set parcel can write it,
+  // so the always-on fallback had quietly become a wire-reachable authority source.
+  if (founderWebids.size === 0) {
+    for (const m of list) {
+      if (m?.webid && isCircleAdmin(m.role)) founderWebids.add(m.webid);
+    }
   }
 
   // The membership SPINE — the per-author SIGNED statements (join/leave/evict) the roster folds

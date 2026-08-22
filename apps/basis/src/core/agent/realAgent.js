@@ -122,6 +122,7 @@ import {
   setCircleMembership as registrySetCircleMembership,
   circleMembershipsOf,
   deviceDelegationOf, deviceDelegationsOf, setDeviceDelegation as registrySetDeviceDelegation,
+  grantsFloorClosedOf, closeGrantsFloor,
   isRequestable,
   effectiveProperties,
 } from '@onderling/agent-registry';
@@ -1514,6 +1515,9 @@ export async function createRealHouseholdAgent(opts = {}) {
     // outer ref (null until the agents block runs) and best-effort: a degraded registry means the
     // carried record alone binds.
     lookupDelegations: async () => deviceDelegationsOf(await agentsRegistryRef?.lookup('default')),
+    // The grants-floor marker (L30's closer): the first device-revoke ceremony closes the shared
+    // profile-key floor — from then on only delegation-signed statements count on this lane.
+    floorClosed: async () => grantsFloorClosedOf(await agentsRegistryRef?.lookup('default')),
   });
   const grantsRail = makeGrantsRail({
     eventLog: opts.deviceLog ?? new EventLog({ initial: [], muted: [] }),
@@ -1759,19 +1763,25 @@ export async function createRealHouseholdAgent(opts = {}) {
         if (cur) {
           const rec = deviceDelegationOf(cur, deviceId);
           known = !!rec;
+          let props = cur.properties ?? {};
           if (!rec) {
             const minted = signDeviceDelegation(root.secret, {
               profileId: 'default', deviceId, pubKey: deviceDelegationPubKey(revokedSeed),
             });
-            await bounded(agentsRegistryRef.register({
-              ...cur,
-              properties: registrySetDeviceDelegation(cur.properties ?? {}, deviceId, { ...minted, revoked: true }),
-            }));
+            props = registrySetDeviceDelegation(props, deviceId, { ...minted, revoked: true });
           } else if (rec.revoked !== true) {
-            await bounded(agentsRegistryRef.register({
-              ...cur,
-              properties: registrySetDeviceDelegation(cur.properties ?? {}, deviceId, { revoked: true }),
-            }));
+            props = registrySetDeviceDelegation(props, deviceId, { revoked: true });
+          }
+          // THE FLOOR CLOSES with the first revoke ceremony (Frits' v1 ruling — L30's closer):
+          // the ceremony proved the phrase and (below) self-enrolls this device into delegation
+          // custody, so every legitimate device now signs with a revocable delegation key — the
+          // shared profile-key signature, the one thing the stolen device still holds, stops
+          // counting on the grants lane from here on. Closed is forever.
+          if (!grantsFloorClosedOf(cur)) {
+            props = closeGrantsFloor(props, { closedAt: new Date().toISOString() });
+          }
+          if (props !== (cur.properties ?? {})) {
+            await bounded(agentsRegistryRef.register({ ...cur, properties: props }));
           }
         }
       } catch { /* tombstone is best-effort bookkeeping — the statements below are the enforcement */ }

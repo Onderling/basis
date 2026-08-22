@@ -46,8 +46,13 @@ export const GRANTS_CATCHUP_SUBTYPES = Object.freeze({
  *   delegation custody carries it on the marker). Absent → carried records cannot bind (floor + registry only).
  * @param {(() => Promise<object>|object)|null} [a.lookupDelegations]  the owner's `{[deviceId]: record}`
  *   delegation map (best-effort; the registry). Source of the deny-wins tombstone and the no-record fallback.
+ * @param {(() => Promise<boolean>|boolean)|null} [a.floorClosed]  the registry's grants-floor marker
+ *   (`grantsFloorClosedOf`). Once the first device-revoke ceremony closes the floor, a statement
+ *   signed with the shared PROFILE key no longer counts — the one signature a revoked-but-stolen
+ *   device still holds (Frits' v1 ruling, 2026-08-23; L30's bounded closer). Absent/erroring →
+ *   the floor stays open, matching the tombstone's best-effort registry semantics.
  */
-export function deviceSetBindingVerifier({ selfPubKey, rootFingerprint = null, lookupDelegations = null } = {}) {
+export function deviceSetBindingVerifier({ selfPubKey, rootFingerprint = null, lookupDelegations = null, floorClosed = null } = {}) {
   if (typeof selfPubKey !== 'string' || !selfPubKey) {
     throw new Error('deviceSetBindingVerifier: selfPubKey required');
   }
@@ -57,8 +62,12 @@ export function deviceSetBindingVerifier({ selfPubKey, rootFingerprint = null, l
   return async ({ author, ref, payload }) => {
     // One person on this lane: every statement's ref IS the profile.
     if (ref !== selfPubKey) return false;
-    // The floor: the profile key itself — held only by the owner's devices (same-seed derivation).
-    if (author === selfPubKey) return true;
+    // The floor: the profile key itself — held only by the owner's devices (same-seed derivation),
+    // UNTIL the first revoke ceremony closes it (from then on, delegation-signed only).
+    if (author === selfPubKey) {
+      try { if (await floorClosed?.()) return false; } catch { /* registry degrade: the floor stays */ }
+      return true;
+    }
 
     const map = await delegations();
     // The carried record: root-signed, self-certifying against this device's own root fingerprint.

@@ -10,7 +10,8 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { VaultMemory } from '@onderling/vault';
-import { DEVICE_DELEGATIONS_KEY } from '@onderling/agent-registry';
+import { DEVICE_DELEGATIONS_KEY, GRANTS_FLOOR_KEY } from '@onderling/agent-registry';
+import { deviceSetBindingVerifier } from '../src/v2/grantsRail.js';
 import {
   bootRealAgentNode, connectNodesOverBus, pairCircle, until, teardown,
 } from './support/pairRealAgents.js';
@@ -144,6 +145,26 @@ describe('the device-revocation ceremony — the V2 stolen-device walk', () => {
     // idempotent: revoking again is still ok (the tombstone already stands)
     const again = await A.agent.callSkill('household', 'revokeDevice', { mnemonic: phrase, deviceId, circleIds: [GROUP] });
     expect(again.ok).toBe(true);
+
+    // ── THE FLOOR CLOSES (the stolen-device grants-door journey flips here): the first revoke
+    //    ceremony writes the grants-floor marker, and from then on the device-set verifier
+    //    refuses a statement signed with the SHARED profile key — the one signature the stolen
+    //    device still holds. Peacetime is untouched: the floor stays open until a theft response
+    //    actually happens. ──
+    const props2 = (await A.agent.callSkill('agents', 'getProfileProperties', { id: 'default' }))?.properties ?? {};
+    const floor = props2[GRANTS_FLOOR_KEY]?.value ?? props2[GRANTS_FLOOR_KEY];
+    expect(floor?.closed, 'the ceremony closed the grants floor').toBe(true);
+    // The verifier rule, pinned directly on the shared implementation: open floor admits the
+    // profile key; the marker refuses it; a foreign ref never binds either way.
+    let closed = false;
+    const verify = deviceSetBindingVerifier({ selfPubKey: 'profile-key', floorClosed: () => closed });
+    expect(await verify({ author: 'profile-key', ref: 'profile-key', payload: {} })).toBe(true);
+    closed = true;
+    expect(await verify({ author: 'profile-key', ref: 'profile-key', payload: {} }), 'closed floor refuses the shared signature').toBe(false);
+    expect(await verify({ author: 'profile-key', ref: 'someone-else', payload: {} })).toBe(false);
+    // A marker read that ERRORS keeps the floor (the tombstone's best-effort registry semantics).
+    const degraded = deviceSetBindingVerifier({ selfPubKey: 'profile-key', floorClosed: () => { throw new Error('registry down'); } });
+    expect(await degraded({ author: 'profile-key', ref: 'profile-key', payload: {} })).toBe(true);
 
     // ── THE WAR-PROOF (custody): the stolen device CANNOT counter-revoke. The enrolled second
     //    device's circle key is delegation-derived, NOT the ceremony key; it forges an

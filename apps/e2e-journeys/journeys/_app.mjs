@@ -119,11 +119,13 @@ function wireLanes(node) {
  * @param {string[]} a.handles  one per person; the FIRST is the circle's creator/admin
  * @param {object|null} [a.pod]  a `makeSharedPod()` — every member's circle store then write-throughs
  *   to it (the "with a central pod" mode). Omit for the pod-less mode.
- * @returns {Promise<{people: object[], admin: object, circleId: string, pod: object|null, close: () => Promise<void>}>}
+ * @param {string[]} [a.outsiders]  handles booted onto the same relay but NOT joined — the people a
+ *   safety journey needs in order to ask "what can someone who was never let in actually do?"
+ * @returns {Promise<{people: object[], admin: object, outsiders: object[], circleId: string, pod: object|null, close: () => Promise<void>}>}
  */
-export async function bootAppCircle({ relayUrl, circleId, handles, pod = null }) {
+export async function bootAppCircle({ relayUrl, circleId, handles, pod = null, outsiders = [] }) {
   const people = await Promise.all(
-    handles.map((h) => bootRealAgentNode(h, {
+    [...handles, ...outsiders].map((h) => bootRealAgentNode(h, {
       taskLane: true,                                              // composes the DEVICE LOG
       ...(pod ? { agentOpts: { provisionCircleMedium: mediumFor(h, pod, circleId) } } : {}),
     })),
@@ -131,7 +133,9 @@ export async function bootAppCircle({ relayUrl, circleId, handles, pod = null })
   await connectNodesOverRelay(people, { relayUrl });
   for (const n of people) wireLanes(n);
 
-  const [admin, ...joiners] = people;
+  const guests = people.slice(handles.length);   // on the relay, deliberately not in the circle
+  const members = people.slice(0, handles.length);
+  const [admin, ...joiners] = members;
   // A circle's storage mode is chosen AT CREATION — `setCircleStoragePolicy` cannot move an existing
   // circle onto a pod (`storage-policy-writer-unavailable`; the code records why: "the only way a
   // basis circle becomes pod-backed is to be CREATED that way"). So the pod mode creates it that way.
@@ -148,11 +152,11 @@ export async function bootAppCircle({ relayUrl, circleId, handles, pod = null })
     const r = await joinExistingCircle(admin, joiners[i], { groupId: circleId, handle: handles[i + 1] });
     if (!r?.joined?.ok) throw new Error(`join failed for ${handles[i + 1]}: ${JSON.stringify(r?.joined)}`);
   }
-  await bindCircleAddresses(people, circleId);
-  await Promise.all(people.map((n) => bindCircleAddressKeysFor({ agent: n.agent, circleId })));
+  await bindCircleAddresses(members, circleId);
+  await Promise.all(members.map((n) => bindCircleAddressKeysFor({ agent: n.agent, circleId })));
 
   return {
-    people, admin, circleId, pod,
+    people: members, admin, outsiders: guests, circleId, pod,
     close: () => teardown(...people),
   };
 }

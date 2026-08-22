@@ -43,8 +43,10 @@ import * as attachments   from './journeys/attachments.journey.mjs';
 import * as eviction      from './journeys/eviction.journey.mjs';
 import * as keyRotation   from './journeys/keyRotation.journey.mjs';
 import * as absence       from './journeys/absence.journey.mjs';
+import * as custody       from './journeys/custody.journey.mjs';
+import * as receipts      from './journeys/receipts.journey.mjs';
 
-const ALL = [twoParty, offline, circle, sealedInbox, noticeboard, companion, taskClaim, security, notifications, feedback, manage, bot, keyexchange, telegram, media, removal, mute, governance, reachability, membership, roles, offerings, appComposition, podModes, governanceVote, attachments, eviction, keyRotation, absence];
+const ALL = [twoParty, offline, circle, sealedInbox, noticeboard, companion, taskClaim, security, notifications, feedback, manage, bot, keyexchange, telegram, media, removal, mute, governance, reachability, membership, roles, offerings, appComposition, podModes, governanceVote, attachments, eviction, keyRotation, absence, custody, receipts];
 const KEY = (n) => n.split(' ')[0].toLowerCase().replace(/[^a-z-]/g, ''); // "two-party messaging" -> "two-party"
 
 const args = process.argv.slice(2);

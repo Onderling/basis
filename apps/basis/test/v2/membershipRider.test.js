@@ -33,14 +33,17 @@ function fakeEventLog() {
  * The circle store a device's roster projection reads: the redemption trail, PLUS the circle's own
  * `group-rules` item.
  *
- * The rules item is not decoration — it is where the FOUNDER comes from. `createGroupWithRules`
- * writes it with `{actor: from}` on every real circle, so `addedBy` is the creator, and the roster
- * projection derives founder authority from exactly that. This fixture used to omit it and let the
- * founder arrive through a MemberMap admin row instead, which was the display-cache fallback the
- * projection no longer has (M1a, 2026-08-23): authority comes from the circle's durable record, not
- * from a global cache that every device populates with itself.
+ * The rules item carries the circle's POLICY blob. It no longer carries authority: founders are
+ * derived from the admission trail's structure — the admitters (`confirmedBy`) who never redeemed —
+ * because a store row's `addedBy` is the local recorder on a mirror, not the author.
+ *
+ * Which is why every redemption row below names its admitter. A real one always does (measured on a
+ * live circle: every `channel: 'peer'` row carries `confirmedBy`), and a fixture that omits it is
+ * describing a circle nobody ever admitted anyone to.
  */
-function fakeStore(rows, founder = 'webid:admin') {
+const FOUNDER = 'webid:admin';
+
+function fakeStore(rows, founder = FOUNDER) {
   const rulesItem = {
     id: 'rules-1', type: 'group-rules', addedBy: founder, addedAt: 1,
     source: { groupId: CIRCLE, rules: { name: CIRCLE }, version: 1 },
@@ -86,7 +89,7 @@ describe('the membership rider — statements on the device log, roster folds th
     const wire = [];
     const admin = await device('webid:admin', rosterAll, wire);
     const mel = await device('webid:mel', rosterAll, wire);
-    const rows = [{ id: 'red-1', source: { groupId: CIRCLE, redeemedBy: 'webid:mel', redeemedAt: 1000 } }];
+    const rows = [{ id: 'red-1', source: { groupId: CIRCLE, redeemedBy: 'webid:mel', confirmedBy: FOUNDER, redeemedAt: 1000 } }];
     const memberMap = [{ webid: 'webid:admin', role: 'admin' }];
 
     // mel's join carries its redemption proof → admitted on her own device's fold.
@@ -109,8 +112,8 @@ describe('the membership rider — statements on the device log, roster folds th
     const admin = await device('webid:admin', rosterAll, wire);
     const bob = await device('webid:bob', rosterAll, wire);
     const rows = [
-      { id: 'red-mel', source: { groupId: CIRCLE, redeemedBy: 'webid:mel', redeemedAt: 1000 } },
-      { id: 'red-bob', source: { groupId: CIRCLE, redeemedBy: 'webid:bob', redeemedAt: 1000 } },
+      { id: 'red-mel', source: { groupId: CIRCLE, redeemedBy: 'webid:mel', confirmedBy: FOUNDER, redeemedAt: 1000 } },
+      { id: 'red-bob', source: { groupId: CIRCLE, redeemedBy: 'webid:bob', confirmedBy: FOUNDER, redeemedAt: 1000 } },
     ];
     const memberMap = [{ webid: 'webid:admin', role: 'admin' }];
 
@@ -146,8 +149,8 @@ describe('the membership rider — statements on the device log, roster folds th
     const admin = await device('webid:admin', rosterAll, wire);
     const cato = await device('webid:cato', rosterAll, wire);
     const rows = [
-      { id: 'red-mel', source: { groupId: CIRCLE, redeemedBy: 'webid:mel', redeemedAt: 1000 } },
-      { id: 'red-cato', source: { groupId: CIRCLE, redeemedBy: 'webid:cato', redeemedAt: 1000 } },
+      { id: 'red-mel', source: { groupId: CIRCLE, redeemedBy: 'webid:mel', confirmedBy: FOUNDER, redeemedAt: 1000 } },
+      { id: 'red-cato', source: { groupId: CIRCLE, redeemedBy: 'webid:cato', confirmedBy: FOUNDER, redeemedAt: 1000 } },
     ];
     const memberMap = [{ webid: 'webid:admin', role: 'admin' }];
 

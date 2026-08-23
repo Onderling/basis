@@ -866,7 +866,6 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
   let redemptions = [];
   try { redemptions = await store.listOpen({ type: 'membership-redemption' }); } catch { redemptions = []; }
   const forGroup = (redemptions ?? []).filter((i) => i?.source?.groupId === groupId);
-
   // Founder(s) — the creator never redeems their own code, so a circle whose only member is its
   // creator has an EMPTY redemption trail and must still project that one member. Derived from the
   // circle's own durable record: the `group-rules` author (skipping the joiner-side MIRROR, whose
@@ -874,7 +873,38 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
   // peer-carried rules UPDATE's verified `updatedBy`.
   //
   // There is deliberately NO fallback to the MemberMap here. See the absence rule below.
+  // FOUNDERS — derived from the trail's ADMISSION STRUCTURE, not from who recorded a rules item.
+  //
+  //     founders = { every non-null `confirmedBy` } minus { every `redeemedBy` }
+  //
+  // Two facts make this sound, and both hold on any device holding any part of the trail: the
+  // creator admitted people, so they appear as `confirmedBy`; and a founder never redeems their own
+  // code, so they never appear as `redeemedBy` — whereas a member's `redeemedBy` row IS their
+  // membership.
+  //
+  // A member cannot forge their way in. To be derived a founder they must appear as somebody's
+  // admitter AND nowhere as a redeemer, but their own membership row keeps them in the right-hand
+  // set; the subtraction removes them. Writing a row that names themselves as `confirmedBy` fails
+  // the same way. The forgery is refused on every device INCLUDING their own.
+  //
+  // Rows on the `intro` / `announce` channels carry no `confirmedBy` and contribute nothing: only a
+  // real admission names an admitter. And a promoted admin who then admits people appears in both
+  // sets, so promotion grants admin without ever granting foundership.
+  //
+  // What this replaces: harvesting `addedBy` off `group-rules` items. On a MIRRORED store `addedBy`
+  // is the local recorder rather than the author, so every device read itself as the circle's
+  // founder — and a member's own rules write promoted them to admin two steps later.
   const founderWebids = new Set();
+  {
+    const admitters = new Set();
+    const redeemers = new Set();
+    for (const it of forGroup) {
+      const src = it?.source ?? {};
+      if (typeof src.redeemedBy === 'string' && src.redeemedBy) redeemers.add(src.redeemedBy);
+      if (typeof src.confirmedBy === 'string' && src.confirmedBy) admitters.add(src.confirmedBy);
+    }
+    for (const w of admitters) if (!redeemers.has(w)) founderWebids.add(w);
+  }
   // The circle's policy blob rides the same read: the LATEST rules item's `source.rules`
   // (same tie-break as _findLatestGroupRules) feeds the fold's maxDevicesPerMember cap.
   let latestRulesItem = null;
@@ -889,17 +919,14 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
           latestRulesItem = it;
         }
       }
-      if (it?.source?.mirrored === true) {
-        // A MIRROR's `addedBy` is the local recorder, never the founder — but a peer-carried rules
-        // UPDATE stamps `source.updatedBy` with the statement's VERIFIED admin author (signed,
-        // binding-resolved, role-checked at apply), which is an authority fact of exactly the class
-        // the memberMap admin-role line below already admits. Without it a joiner's device holds NO
-        // founder-authority at all (its only rules item is the mirror), so every admin-authored
-        // join statement was founder-gated out and the authoritative fold never engaged there.
-        if (typeof it.source.updatedBy === 'string' && it.source.updatedBy) founderWebids.add(it.source.updatedBy);
-        continue;
-      }
-      if (typeof it?.addedBy === 'string' && it.addedBy) founderWebids.add(it.addedBy);
+      // NOTHING here confers founder authority any more — this read is for the POLICY BLOB alone
+      // (`latestRulesItem`, whose `rules` feeds the fold's device cap and rules gate).
+      //
+      // What used to be here: `addedBy` off every rules item, plus a mirror's `updatedBy`. On a
+      // mirrored store `addedBy` is the local recorder rather than the author, so a device could
+      // read ITSELF as the circle's founder — and since `editGroupRules` derives its version from
+      // the caller's input, a member's own rules write looked exactly like a creation. Founders now
+      // come from the admission structure above, where a member cannot put themselves.
     }
   } catch { /* no rules item → the trail path still stands, and absence stays absence */ }
 

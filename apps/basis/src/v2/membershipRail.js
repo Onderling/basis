@@ -37,10 +37,27 @@ export function rosterBindingVerifier(callSkill) {
       // (`listGroupRoster`) this used to read carries NEITHER field — every foreign statement
       // failed the binding by shape, invisibly, because the test harness substituted its own
       // resolver: the three-device walk was the first thing to run the verifier for real.
-      // SPINELESS read (trail + display only): verifying a statement must never fold statements —
-      // the recursion the old breaker guarded is designed out, and the breaker itself is gone
-      // (it refused concurrent SIBLING reads as false recursion; found live 2026-08-21).
-      const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId, spineless: true });
+      // THE FULL read — spine folded (F-019, 2026-08-23).
+      //
+      // This read used to be SPINELESS (trail + display only), to guarantee that verifying a
+      // statement never re-enters the statement fold. The guarantee is right; the scope was too
+      // wide. An EVICTION is a spine statement, so a spineless reader cannot see it — and a removed
+      // member therefore still bound, on every content lane. Measured: after a legitimate removal
+      // their fan resolved the remaining members, the send reported `{sent: 2, errors: []}`, and the
+      // statement landed and was stored at the bystander. The eviction did not hold on chat.
+      //
+      // Why folding here is safe, stated so the next reader does not have to re-derive it: the
+      // recursion risk is a lane verifying against ITS OWN lane. This verifier serves the CONTENT
+      // lanes (chat · tasks · governance), and it folds MEMBERSHIP — a different lane, no cycle. The
+      // chain terminates at the membership lane's own verifier (`membershipBindingVerifier` below),
+      // which keeps the spineless read and is the base case:
+      //
+      //   chat statement → this verifier → full roster → membership fold
+      //     → membershipBindingVerifier → SPINELESS roster → no fold. Terminates.
+      //
+      // The rule, in one line: a content lane verifies against the membership FOLD; the membership
+      // lane verifies against the TRAIL.
+      const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId });
       // SET-AWARE (add-a-device): a statement signed at ANY of the member's proven addresses
       // binds to the member; checking the primary alone would refuse every second device's
       // statements on every rail.

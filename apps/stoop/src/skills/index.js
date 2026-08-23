@@ -904,29 +904,30 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
       if (typeof src.confirmedBy === 'string' && src.confirmedBy) admitters.add(src.confirmedBy);
     }
     for (const w of admitters) if (!redeemers.has(w)) founderWebids.add(w);
-    // …AND the circle's own CREATION statement, corroborated. A brand-new circle has admitted
-    // nobody, so the structure above cannot name its creator — which locked that creator out of the
-    // circle they had just made. `create` says "I made this", signed with the per-circle key.
-    //
-    // It is accepted as foundership only where this device can already corroborate the author:
-    //   • the trail names them as somebody's admitter (they really did admit people here), or
-    //   • this device has NO trail for the circle at all — which is exactly what a new circle is,
-    //     and where the only holder of it is its creator.
-    // So on a circle with members, a member's self-signed `create` names an author the trail already
-    // places among the redeemers — it confers nothing. Deny-favouring: unverifiable ⇒ ignored.
-    if (typeof membershipRead === 'function' && !skipSpine) {
-      try {
-        const { bodies } = await membershipRead(groupId);
-        for (const b of bodies ?? []) {
-          if (b?.kind !== 'create' || typeof b.author !== 'string' || !b.author) continue;
-          if (b.author !== b.subject) continue;                     // self-subject only
-          if (forGroup.length === 0 || (admitters.has(b.author) && !redeemers.has(b.author))) {
-            founderWebids.add(b.author);
-          }
-        }
-      } catch { /* no lane in this composition — the structural derivation stands alone */ }
-    }
+    // The circle's own CREATION statement is folded in below, once the spine has been read — see
+    // `addGenesisFounders`. It has to wait for that read because a creation statement can arrive by
+    // EITHER route (the lane, or the store-spine in a log-less composition), and a founder that only
+    // one route can see is a founder half the compositions do not have.
   }
+  /**
+   * Fold the circle's CREATION statements into the founder set. A brand-new circle has admitted
+   * nobody, so the admission structure above cannot name its creator — which locked that creator out
+   * of the circle they had just made. `create` says "I made this", signed with the per-circle key.
+   *
+   * Accepted as foundership only where this device can already corroborate the author:
+   *   • the trail names them as somebody's admitter (they really did admit people here), or
+   *   • this device has NO trail for the circle at all — which is exactly what a new circle is, and
+   *     where the only holder of it is its creator.
+   * So on a circle with members, a member's self-signed `create` names an author the trail already
+   * places among the redeemers, and it confers nothing.
+   */
+  const addGenesisFounders = (bodies) => {
+    for (const b of bodies ?? []) {
+      if (b?.kind !== 'create' || typeof b.author !== 'string' || !b.author) continue;
+      if (b.author !== b.subject) continue;                       // self-subject only
+      if (forGroup.length === 0 || founderWebids.has(b.author)) founderWebids.add(b.author);
+    }
+  };
   // The circle's policy blob rides the same read: the LATEST rules item's `source.rules`
   // (same tie-break as _findLatestGroupRules) feeds the fold's maxDevicesPerMember cap.
   let latestRulesItem = null;
@@ -1033,6 +1034,7 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
     //     authority is the deferred causal-authority slice).
     try {
       const { bodies } = await membershipRead(groupId);
+      addGenesisFounders(bodies);          // creation first: the join filter below reads the result
       spineStatements = (bodies ?? []).filter((b) => {
         if (b.kind !== 'join') return true;
         if (b.author === b.subject) {
@@ -1055,6 +1057,10 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
         if (resolved) spineStatements.push(resolved);
       }
     }
+    // A log-less composition writes its spine to the STORE, so the creation statement arrives here
+    // rather than on the lane. Same corroboration, same result — otherwise a circle's creator would
+    // hold it only in compositions that happen to have a device log.
+    addGenesisFounders(spineStatements);
   } catch { spineStatements = []; }
   }
 
@@ -2430,13 +2436,15 @@ export function buildSkills({
       const a = dataArgs(parts);
       if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
       if (members) {
-        // NOT migrated to the folded head (2026-08-23). The invite/code/storage ops run at moments
-        // when the head cannot yet name the circle's admin — before its first join, in compositions
-        // with no spine emitter, so no creation statement — and migrating them locked the creator
-        // out of inviting anyone to the circle they had just made. They move once the creation
-        // statement is emitted wherever a circle is created; until then the ONE reader is used where
-        // it can answer (`editGroupRules`, `removeMember`, `setMemberRole`) and these keep the
-        // member-map read.
+        // NOT migrated to the folded head. These ops must work in compositions that have NO SPINE
+        // EMITTER at all (`bootRealAgentNode` without a device log, and the shells' pre-log paths):
+        // there the circle's creation statement is never written, on the lane or in the store, so
+        // nothing can name the creator and the head answers `null` for the very person who made the
+        // circle. Measured 2026-08-23: an admin was refused their own invite rotation.
+        //
+        // The member map is the net that currently covers them, which is also why its `role` cannot
+        // be stripped from the roster seed yet. Both move together, once a creation statement is
+        // written by every composition that creates a circle.
         const me = await members.resolveByWebid(from);
         const isAdmin = isCircleAdmin(me?.role);
         if (!isAdmin) return { error: 'admin-only' };
@@ -2493,13 +2501,15 @@ export function buildSkills({
       const a = dataArgs(parts);
       if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
       if (members) {
-        // NOT migrated to the folded head (2026-08-23). The invite/code/storage ops run at moments
-        // when the head cannot yet name the circle's admin — before its first join, in compositions
-        // with no spine emitter, so no creation statement — and migrating them locked the creator
-        // out of inviting anyone to the circle they had just made. They move once the creation
-        // statement is emitted wherever a circle is created; until then the ONE reader is used where
-        // it can answer (`editGroupRules`, `removeMember`, `setMemberRole`) and these keep the
-        // member-map read.
+        // NOT migrated to the folded head. These ops must work in compositions that have NO SPINE
+        // EMITTER at all (`bootRealAgentNode` without a device log, and the shells' pre-log paths):
+        // there the circle's creation statement is never written, on the lane or in the store, so
+        // nothing can name the creator and the head answers `null` for the very person who made the
+        // circle. Measured 2026-08-23: an admin was refused their own invite rotation.
+        //
+        // The member map is the net that currently covers them, which is also why its `role` cannot
+        // be stripped from the roster seed yet. Both move together, once a creation statement is
+        // written by every composition that creates a circle.
         const me = await members.resolveByWebid(from);
         const isAdmin = isCircleAdmin(me?.role);
         if (!isAdmin) return { error: 'admin-only' };
@@ -4180,13 +4190,15 @@ export function buildSkills({
       // admin list for the group.  V1 reads from `members`'s `role`
       // field; pre-Phase-11 entries default to non-admin.
       if (members) {
-        // NOT migrated to the folded head (2026-08-23). The invite/code/storage ops run at moments
-        // when the head cannot yet name the circle's admin — before its first join, in compositions
-        // with no spine emitter, so no creation statement — and migrating them locked the creator
-        // out of inviting anyone to the circle they had just made. They move once the creation
-        // statement is emitted wherever a circle is created; until then the ONE reader is used where
-        // it can answer (`editGroupRules`, `removeMember`, `setMemberRole`) and these keep the
-        // member-map read.
+        // NOT migrated to the folded head. These ops must work in compositions that have NO SPINE
+        // EMITTER at all (`bootRealAgentNode` without a device log, and the shells' pre-log paths):
+        // there the circle's creation statement is never written, on the lane or in the store, so
+        // nothing can name the creator and the head answers `null` for the very person who made the
+        // circle. Measured 2026-08-23: an admin was refused their own invite rotation.
+        //
+        // The member map is the net that currently covers them, which is also why its `role` cannot
+        // be stripped from the roster seed yet. Both move together, once a creation statement is
+        // written by every composition that creates a circle.
         const me = await members.resolveByWebid(from);
         const isAdmin = isCircleAdmin(me?.role);
         if (!isAdmin) return { error: 'admin-only' };
@@ -4716,13 +4728,15 @@ export function buildSkills({
       const a = dataArgs(parts);
       const _groupId = a.groupId ?? groupId;
       if (members) {
-        // NOT migrated to the folded head (2026-08-23). The invite/code/storage ops run at moments
-        // when the head cannot yet name the circle's admin — before its first join, in compositions
-        // with no spine emitter, so no creation statement — and migrating them locked the creator
-        // out of inviting anyone to the circle they had just made. They move once the creation
-        // statement is emitted wherever a circle is created; until then the ONE reader is used where
-        // it can answer (`editGroupRules`, `removeMember`, `setMemberRole`) and these keep the
-        // member-map read.
+        // NOT migrated to the folded head. These ops must work in compositions that have NO SPINE
+        // EMITTER at all (`bootRealAgentNode` without a device log, and the shells' pre-log paths):
+        // there the circle's creation statement is never written, on the lane or in the store, so
+        // nothing can name the creator and the head answers `null` for the very person who made the
+        // circle. Measured 2026-08-23: an admin was refused their own invite rotation.
+        //
+        // The member map is the net that currently covers them, which is also why its `role` cannot
+        // be stripped from the roster seed yet. Both move together, once a creation statement is
+        // written by every composition that creates a circle.
         const me = await members.resolveByWebid(from);
         const isAdmin = isCircleAdmin(me?.role);
         if (!isAdmin) return { error: 'admin-only' };

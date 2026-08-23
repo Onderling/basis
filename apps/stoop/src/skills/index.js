@@ -4142,7 +4142,15 @@ export function buildSkills({
       const a = dataArgs(parts);
       if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
       if (typeof a.rules !== 'object' || a.rules === null) return { error: 'rules object required' };
-      // F-010 — DELIBERATELY NOT GATED HERE, pending a decision (2026-08-23).
+      // The circle's admin gate. It reads the MemberMap, which is the wrong source — see F-010 and
+      // [ledger L35] — but it is the gate this op has always had, and REMOVING it is not the same as
+      // declining to improve it. (I deleted it by accident on 2026-08-23 while reverting a proposed
+      // replacement; J-roles caught it two checks later, and the cascade is written up as F-021.)
+      if (members) {
+        const me = await members.resolveByWebid(from);
+        if (!isCircleAdmin(me?.role)) return { error: 'admin-only' };
+      }
+      // WHY IT IS NOT REPLACED, pending a decision (2026-08-23).
       //
       // The gate that was here read the global MemberMap (`members.resolveByWebid(from)`) inside
       // `if (members)` — F-009's twin, and equally vacuous: every device holds itself there as admin

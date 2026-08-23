@@ -4307,6 +4307,17 @@ export function buildSkills({
       return removeMemberCore({
         store, members, isCircleAdmin, emitSpine, defaultGroupId: groupId,
         revokeKey: (opts) => revokePodAccess(controlAgent, { ...opts, metrics }),
+        // THE ONE MEMBERSHIP ANSWER (M1b/M2) — the caller's role IN THIS CIRCLE, from the same
+        // projection `listGroupMembers` and the circle fan-out read. No per-circle record ⇒ null ⇒
+        // the gate refuses, rather than falling through to a global cache that says everyone is an
+        // admin of everything.
+        circleRoleOf: async ({ circleId, webid }) => {
+          const rows = await projectCircleRoster({
+            store, groupId: circleId, memberMapList: (await members?.list?.()) ?? [],
+          });
+          if (!Array.isArray(rows)) return null;
+          return rows.find((r) => (r?.webid ?? r?.addr ?? r?.ref) === webid)?.role ?? null;
+        },
       }, { a: dataArgs(parts), from });
     }, {
       description: 'Admin-only: remove a member — record it + rotate the group key + drop them from the mesh (policy: graceful|ban).',

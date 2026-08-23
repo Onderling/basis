@@ -434,18 +434,30 @@ export async function leaveGroup({
  * @returns {Promise<{removalId, revoked, policy}|{error}>}
  */
 export async function removeMember({
-  store, members, revokeKey, isCircleAdmin, emitSpine, defaultGroupId = null,
+  store, members, revokeKey, isCircleAdmin, emitSpine, defaultGroupId = null, circleRoleOf = null,
 }, { a, from } = {}) {
   const _groupId = a.groupId ?? defaultGroupId;
   if (!_groupId) return { error: 'groupId required' };
   if (!a.memberStableId && !a.memberWebid) {
     return { error: 'memberStableId or memberWebid required' };
   }
-  if (members) {
-    const me = await members.resolveByWebid(from);
-    const isAdmin = isCircleAdmin(me?.role);
-    if (!isAdmin) return { error: 'admin-only' };
-  }
+  // THE AUTHORITY QUESTION (M2, 2026-08-23) — asked of THIS CIRCLE, and failing closed.
+  //
+  // This used to read `members.resolveByWebid(from)`: the global MemberMap, which holds one role per
+  // person with no circle in the key. Every device holds ITSELF there as admin of its own household,
+  // so the gate answered "yes" for everybody and never refused anyone — an ordinary member and a
+  // total stranger both got `{revoked: true}` back for removing someone from a circle they had no
+  // standing in. It was also wrapped in `if (members)`, so a composition without a MemberMap skipped
+  // the check entirely: absence failed OPEN, twice over.
+  //
+  // Now: the caller's role in this circle, from the circle's own projection, and no resolver means
+  // no removal. The gate runs BEFORE `revokeKey` below — an unauthorised call must not rotate a key
+  // on its way to being refused.
+  if (typeof circleRoleOf !== 'function') return { error: 'authority-unavailable' };
+  let role = null;
+  try { role = await circleRoleOf({ circleId: _groupId, webid: from }); }
+  catch { return { error: 'authority-unavailable' }; }
+  if (!isCircleAdmin(role)) return { error: 'admin-only' };
   // Resolve the target's webid (webid === signing key). Prefer an explicit webid; fall back to a
   // stableId resolver if the MemberMap offers one.
   let memberWebid = a.memberWebid ?? null;

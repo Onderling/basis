@@ -54,10 +54,12 @@ export async function run({ relayUrl }) {
     check('…and the third', await untilTrue(() => seenBy(gov.cato)));
 
     // ── 3. Two members vote ──────────────────────────────────────────────────────────────────────
-    const bramVote = await gov.bram.vote({ circleId: CIRCLE, proposalId, choice: 'yes' });
-    check('a member can cast a vote', !bramVote?.error, JSON.stringify(bramVote)?.slice(0, 140));
-    const catoVote = await gov.cato.vote({ circleId: CIRCLE, proposalId, choice: 'yes' });
-    check('and so can the third person', !catoVote?.error, JSON.stringify(catoVote)?.slice(0, 140));
+    const bramVote = await gov.bram.vote({ circleId: CIRCLE, proposalId, voter: bram.pubKey, choice: 'yes' });
+    // `ok: false, reason: …` is how this op reports refusal — asserting on `.error` alone let a
+    // failed vote read as a success for a whole day.
+    check('a member can cast a vote', bramVote?.ok === true, JSON.stringify(bramVote)?.slice(0, 140));
+    const catoVote = await gov.cato.vote({ circleId: CIRCLE, proposalId, voter: cato.pubKey, choice: 'yes' });
+    check('and so can the third person', catoVote?.ok === true, JSON.stringify(catoVote)?.slice(0, 140));
     await wait(2000);
 
     // ── 4. The tally is the same on every device — the property that matters ──────────────────────
@@ -73,12 +75,22 @@ export async function run({ relayUrl }) {
     check('the membership denominator is right — the circle knows who may vote',
       counted?.of === 3, JSON.stringify(counted));
 
-    // [F-008] The votes are on the log and they VERIFY (checked with the rail directly), yet the
-    // tally never counts them: `readCircleMembers` builds the electorate from `listGroupRoster`,
-    // whose rows carry per-circle ADDRESSES, while a vote is authored with the person's webid. Two
-    // ref spaces that never meet, so a member-vote decision can never reach quorum.
-    check('[F-008] the votes are actually counted (not a vacuous zero)',
-      (counted?.yes ?? 0) >= 2, JSON.stringify(counted));
+    // Each vote RESPONSE carries the tally as that device knew it at that instant — so it counts the
+    // votes that had reached it, not the circle's total. The circle-wide count is a fresh read after
+    // both votes have propagated, which is also the only version a person would ever see.
+    // The outcome, not the arithmetic: a fresh read once both votes have propagated. A tally is what
+    // a pending decision reports; a decided one reports its STATUS and closes, which is what a person
+    // actually experiences — "the circle decided" rather than "the counter reads two".
+    let outcome = null;
+    const decided = await untilTrue(async () => {
+      outcome = await tallyOn(gov.anne);
+      const t = outcome?.tally ?? outcome;
+      return outcome?.status === 'approved' || (t?.yes ?? 0) >= 2;
+    }, 15000);
+    check('THE CIRCLE DECIDES — two votes carry it to approved', decided,
+      JSON.stringify(outcome)?.slice(0, 160));
+    check('…and a passed decision is ENACTED, not merely counted',
+      outcome?.enacted === true || outcome?.closed === true, JSON.stringify(outcome)?.slice(0, 120));
 
     // ── 5. A decision that passed must be enactable, and only by someone entitled ─────────────────
     const settled = await gov.anne.settle?.({ circleId: CIRCLE }).catch(() => null);

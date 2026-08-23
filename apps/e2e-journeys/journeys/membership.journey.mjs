@@ -83,6 +83,15 @@ export async function run({ relayUrl }) {
   const removeDeps = (dev) => ({
     store: dev.store, members: null, revokeKey: noopKey, isCircleAdmin: () => true,
     emitSpine: dev.appendSpine, defaultGroupId: CIRCLE,
+    // The caller's role IN THIS CIRCLE (M2, 2026-08-23). These scenarios are about the SPINE — that
+    // real signed join/evict statements converge identically whatever order they arrive in — and
+    // alpha is the circle's admin by construction here, so the resolver says so directly.
+    //
+    // It has to be said now rather than assumed: the gate used to be skipped entirely when no
+    // MemberMap was passed (`if (members)`), so `members: null` meant "no authority check at all".
+    // Absence now refuses, which is the point, and a fixture that means "this caller is the admin"
+    // has to state it instead of relying on the check not running.
+    circleRoleOf: async () => 'admin',
   });
   const leaveDeps = (dev) => ({
     store: dev.store, simulateSync: () => ({}), notifier: null, revokeKey: noopKey, emitSpine: dev.appendSpine,

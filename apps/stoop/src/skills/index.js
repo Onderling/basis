@@ -1301,6 +1301,27 @@ export function buildSkills({
           ? createSpineAppender({ store, signer: _spineSigner })
           : undefined);
 
+  /* ─── THE ONE MEMBERSHIP ANSWER (M1b/M2, 2026-08-23) ──────────────────────────────────────────
+   * Every authority question in this file resolves through here: the caller's role IN THIS CIRCLE,
+   * from the same projection `listGroupMembers` and the circle fan-out read.
+   *
+   * It replaces `members.resolveByWebid(from)` — the global MemberMap, which holds one role per
+   * person with no circle in the key. Every device holds ITSELF there as admin of its own
+   * household, so that read answered "admin" for everybody, and the gates built on it never
+   * refused anyone. `null` means this device has no record of the circle, and every caller below
+   * treats that as a refusal rather than a pass.
+   */
+  const circleRoleOfCore = async (circleId, webid) => {
+    if (!circleId || !webid) return null;
+    const rows = await projectCircleRoster({
+      store, groupId: circleId, memberMapList: (await members?.list?.()) ?? [],
+    });
+    if (!Array.isArray(rows)) return null;
+    return rows.find((r) => (r?.webid ?? r?.addr ?? r?.ref) === webid)?.role ?? null;
+  };
+  /** "Is this caller an admin of THIS circle?" — the shape the role-gated skills ask. */
+  const isCircleAdminOfCircle = (circleId, webid) => circleRoleOfCore(circleId, webid);
+
   return [
     /**
      * postRequest({text, intent?, kind?, requiredSkills?, dueAt?, timeoutMs?, expectClaims?})
@@ -4121,11 +4142,22 @@ export function buildSkills({
       const a = dataArgs(parts);
       if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
       if (typeof a.rules !== 'object' || a.rules === null) return { error: 'rules object required' };
-      if (members) {
-        const me = await members.resolveByWebid(from);
-        const isAdmin = isCircleAdmin(me?.role);
-        if (!isAdmin) return { error: 'admin-only' };
-      }
+      // F-010 — DELIBERATELY NOT GATED HERE, pending a decision (2026-08-23).
+      //
+      // The gate that was here read the global MemberMap (`members.resolveByWebid(from)`) inside
+      // `if (members)` — F-009's twin, and equally vacuous: every device holds itself there as admin
+      // of its own household, so it refused nobody. Replacing it with the per-circle resolver was a
+      // two-line change and it worked (a removed member and a stranger both got `admin-only`).
+      //
+      // It was reverted because `rulesUpdatePropagation.test.js` asserts, in its own words, that
+      // "the local write is not the gate": a member-authored rules update is expected to WRITE
+      // locally and be refused at APPLY on every receiver. That is the enforceability principle
+      // working as intended — the real gate is where it binds — and a local gate is defence in
+      // depth, not the boundary. Adding one changes a tested decision, so it is Frits' to make.
+      //
+      // What stands meanwhile, measured: an outsider's rules edit never reaches a member
+      // (J-eviction asserts it), so the exposure is that the CALLER is told a version landed when
+      // the circle never took it — a divergence a shell would render as current.
       const newVersion = (a.rules.version ?? 0) + 1;
       // The rules-update rider: the new doc + version also ride the governance lane as a signed
       // statement, so every member's device learns the CURRENT version peer-to-peer (their
@@ -4311,13 +4343,7 @@ export function buildSkills({
         // projection `listGroupMembers` and the circle fan-out read. No per-circle record ⇒ null ⇒
         // the gate refuses, rather than falling through to a global cache that says everyone is an
         // admin of everything.
-        circleRoleOf: async ({ circleId, webid }) => {
-          const rows = await projectCircleRoster({
-            store, groupId: circleId, memberMapList: (await members?.list?.()) ?? [],
-          });
-          if (!Array.isArray(rows)) return null;
-          return rows.find((r) => (r?.webid ?? r?.addr ?? r?.ref) === webid)?.role ?? null;
-        },
+        circleRoleOf: async ({ circleId, webid }) => circleRoleOfCore(circleId, webid),
       }, { a: dataArgs(parts), from });
     }, {
       description: 'Admin-only: remove a member — record it + rotate the group key + drop them from the mesh (policy: graceful|ban).',

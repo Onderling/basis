@@ -237,4 +237,70 @@ describe('foldRoster — the rules gate (task #80, sitting-A decision 2026-08-20
     expect(after.members).not.toContain(bob.pubKey);
     expect(after.rulesAccepted[bob.pubKey]).toBeUndefined();
   });
+
+  // ── A circle with members always has an admin ───────────────────────────────────────────────────
+  // Promotion/demotion is a declared spine kind whose producer was never built (`setMemberRole`),
+  // so the fold's `role` handling had no coverage from a real writer. These pin the rule that makes
+  // the op safe to ship: authority can be handed over, but not switched off.
+
+  it('an admin promotes a member, and the new admin can then act', async () => {
+    const { founder, bob, mallory } = await ids();
+    const join   = body(bob, 'join', bob);
+    const joinM  = body(mallory, 'join', mallory);
+    // The founder promotes bob. `deps` carries what the author had SEEN, which is what puts the
+    // promotion at a shallower causal depth than bob's own later act.
+    const promote = body(founder, 'role', bob, { payload: { role: 'admin' }, deps: [join.hash, joinM.hash] });
+    const r = foldRoster([join, joinM, promote], { founders: [founder.pubKey] });
+    expect(r.admins).toContain(bob.pubKey);
+
+    // …and the promotion is real authority: bob's evict folds DEEPER than his own promotion, so he
+    // acts as an admin rather than as the member he was.
+    const evict = body(bob, 'evict', mallory, { parent: join.hash, deps: [promote.hash] });
+    const after = foldRoster([join, joinM, promote, evict], { founders: [founder.pubKey] });
+    expect(after.members).not.toContain(mallory.pubKey);
+  });
+
+  it('a MEMBER cannot promote — the fold is the gate, not the op', async () => {
+    const { founder, bob, mallory } = await ids();
+    const join  = body(bob, 'join', bob);
+    const joinM = body(mallory, 'join', mallory);
+    // bob is an ordinary member and signs a promotion for himself. The statement is well-formed and
+    // genuinely signed; it simply has no authority behind it.
+    const selfPromote = body(bob, 'role', bob, { payload: { role: 'admin' }, parent: join.hash });
+    const r = foldRoster([join, joinM, selfPromote], { founders: [founder.pubKey] });
+    expect(r.admins).not.toContain(bob.pubKey);
+    expect(r.members).toContain(bob.pubKey);               // still a member — refused, not evicted
+  });
+
+  it('THE LAST ADMIN CANNOT BE DEMOTED — a circle with members is never left unadministrable', async () => {
+    const { founder, bob } = await ids();
+    const join = body(bob, 'join', bob);
+    // The sole admin demotes themselves. Refused: no act would remain that could repair the circle.
+    const selfDemote = body(founder, 'role', founder, { payload: { role: 'member' }, deps: [join.hash] });
+    const r = foldRoster([join, selfDemote], { founders: [] , seed: { members: [founder.pubKey], admins: [founder.pubKey] } });
+    expect(r.admins).toContain(founder.pubKey);
+  });
+
+  it('…but demoting ONE of two admins is fine — handover is allowed, switching authority off is not', async () => {
+    const { founder, bob } = await ids();
+    const join    = body(bob, 'join', bob);
+    const promote = body(founder, 'role', bob, { payload: { role: 'admin' }, deps: [join.hash] });
+    // bob (now an admin) demotes the founder — allowed here only because the founder is not in
+    // `founders`; a real founder is non-demotable by construction, which is [ledger L36].
+    const demote  = body(bob, 'role', founder, { payload: { role: 'member' }, parent: join.hash, deps: [promote.hash] });
+    const r = foldRoster([join, promote, demote], {
+      founders: [], seed: { members: [founder.pubKey], admins: [founder.pubKey] },
+    });
+    expect(r.admins).toContain(bob.pubKey);
+    expect(r.admins).not.toContain(founder.pubKey);
+  });
+
+  it('a FOUNDER stays admin — demotion of a founder is refused whatever the demoter\'s authority', async () => {
+    const { founder, bob } = await ids();
+    const join    = body(bob, 'join', bob);
+    const promote = body(founder, 'role', bob, { payload: { role: 'admin' }, deps: [join.hash] });
+    const demote  = body(bob, 'role', founder, { payload: { role: 'member' }, parent: join.hash, deps: [promote.hash] });
+    const r = foldRoster([join, promote, demote], { founders: [founder.pubKey] });
+    expect(r.admins).toContain(founder.pubKey);
+  });
 });

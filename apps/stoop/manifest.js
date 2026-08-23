@@ -1249,6 +1249,31 @@ export const stoopManifest = {
       },
     },
     {
+      id:   'setMemberRole', verb: 'update',
+      // Promote a member to admin, or demote an admin back to member. The producer for the
+      // membership lane's `role` statement kind, which was declared with nothing writing it.
+      //
+      // The op's own check is the caller's convenience; the BINDING gate is the roster fold, which
+      // re-derives on every device whether the author was an admin at that point in the causal
+      // chain — so a client that skips the check emits a statement everyone else refuses. The fold
+      // also refuses demoting the last admin: a circle with members always has someone who can run
+      // it, and no later act could repair one that did not.
+      params: [
+        { name: 'groupId',      kind: 'string', required: true, ...ID_NONEMPTY  },
+        { name: 'memberWebid',  kind: 'string', required: true, ...STR_NONEMPTY },
+        { name: 'role',         kind: 'enum', of: ['admin', 'member'], required: true },
+      ],
+      // A role is a SPINE fact: equivocation is an attack (two conflicting promotions from one
+      // author are a fork-proof), and every device must fold the same answer to who runs the circle.
+      resolves: [{ field: 'role', policy: 'spine' }],
+      surfaces: {
+        chat: { hint: 'Admin-only: make a member an admin of this circle, or take that back.' },
+        // Handing someone authority over a circle is consequential and easy to do by accident from
+        // a list — the same confirm gate the task-scoped grant carries.
+        ui:   { confirm: { severity: 'warn' } },
+      },
+    },
+    {
       id:   'removeMember', verb: 'remove',
       // Logic: @onderling/circles. Admin-only, and NOT just a roster edit — it forces a key rotation and
       // reseal, so a removed member cannot read what comes next. The island guarantee.

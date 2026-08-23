@@ -151,6 +151,24 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
       else if (role === 'member' && !founderSet.has(s.subject)) demoted.add(s.subject);
     }
     for (const x of demoted) promoted.delete(x);                    // deny-wins: demote beats concurrent promote
+
+    // A CIRCLE WITH MEMBERS ALWAYS HAS AN ADMIN. Demotions that would empty the admin set are
+    // refused — all of them at this depth, so the outcome does not depend on which arrived first.
+    //
+    // This is not the deny-wins axis (that one asks "did someone lose a right"); it is the
+    // governance-liveness one: a circle nobody can administer cannot admit, evict, or change its own
+    // rules ever again, and there is no act left that could repair it. Refusing the last demotion is
+    // the only outcome every device computes identically without needing an authority that no longer
+    // exists.
+    //
+    // A last admin who LEAVES is deliberately not covered: `leave` is self-authored and always
+    // stands (you may always walk out), which is exactly the case the caretaker appointment exists
+    // for. Losing your only admin by accident is a bug; losing them because they left is a fact.
+    if (demoted.size > 0) {
+      const after = new Set([...admins, ...promoted]);
+      for (const x of demoted) after.delete(x);
+      if (after.size === 0) demoted.clear();
+    }
     const canEvict = (author) => canAct(author) && !demoted.has(author);  // a concurrent demotion voids authority
 
     const removed = new Set();

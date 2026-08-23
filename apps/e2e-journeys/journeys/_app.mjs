@@ -454,6 +454,12 @@ export const skillIdsOf = (node) => {
   return [];
 };
 
+/** The role a device projects for someone in a circle — the folded head, as that device sees it. */
+export async function roleOf(node, circleId, pubKey) {
+  const rows = await rosterOf(node, circleId);
+  return rows.find((m) => (m.webid ?? m.addr ?? m.ref) === pubKey)?.role ?? null;
+}
+
 /** The circle's roster as that person's own device projects it. */
 export async function rosterOf(node, circleId) {
   const r = await node.agent.callSkill('stoop', 'listGroupMembers', { groupId: circleId });

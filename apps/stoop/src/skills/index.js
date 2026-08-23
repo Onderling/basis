@@ -1313,8 +1313,15 @@ export function buildSkills({
    */
   const circleRoleOfCore = async (circleId, webid) => {
     if (!circleId || !webid) return null;
+    // THE FOLDED head, not the trail-only one: `circleSignerFor` + `membershipRead` are what let the
+    // projection fold the membership SPINE. Without them this reads the redemption trail alone and
+    // cannot see a promotion, a demotion or an eviction — so a freshly promoted admin was refused by
+    // the very gate that had just been told they were an admin, and every device's roster agreed
+    // they were. Same shape as the content lanes' spineless verifier: a gate must read the head that
+    // carries the authority it is checking.
     const rows = await projectCircleRoster({
       store, groupId: circleId, memberMapList: (await members?.list?.()) ?? [],
+      circleSignerFor, membershipRead,
     });
     if (!Array.isArray(rows)) return null;
     return rows.find((r) => (r?.webid ?? r?.addr ?? r?.ref) === webid)?.role ?? null;
@@ -4340,6 +4347,38 @@ export function buildSkills({
      *   Kit, V2).  In V1 the admin's local state notes the removal
      *   so the next group-rules push can include it.
      */
+    /**
+     * setMemberRole({groupId, memberWebid, role})
+     *   — promote a member to admin, or demote an admin to member. Emits the membership lane's
+     *   `role` statement: signed with the per-circle key, chained, fanned, and folded identically
+     *   on every device.
+     *
+     *   The check below is the caller's convenience — the BINDING gate is the fold, which re-derives
+     *   whether the author held admin authority at that point in the causal chain. A client that
+     *   skips this check emits a statement every other device refuses.
+     */
+    defineSkill('setMemberRole', async ({ parts, from }) => {
+      const a = dataArgs(parts);
+      const _groupId = a.groupId ?? groupId;
+      if (!_groupId) return { error: 'groupId required' };
+      if (typeof a.memberWebid !== 'string' || !a.memberWebid) return { error: 'memberWebid required' };
+      if (a.role !== 'admin' && a.role !== 'member') return { error: 'role must be admin or member' };
+      // Absence refuses. A composition that cannot answer "what is this caller's role in this
+      // circle" must not fall through to a yes.
+      if (typeof isCircleAdminOfCircle !== 'function') return { error: 'authority-unavailable' };
+      if (!isCircleAdmin(await isCircleAdminOfCircle(_groupId, from))) return { error: 'admin-only' };
+      if (typeof emitSpine !== 'function') return { error: 'spine-unavailable' };
+      const res = await emitSpine({
+        kind: 'role', circleId: _groupId, subject: a.memberWebid,
+        payload: { role: a.role }, actor: from,
+      });
+      if (!res) return { error: 'not-signed' };   // no per-circle signer → nothing lands unsigned
+      return { ok: true, groupId: _groupId, memberWebid: a.memberWebid, role: a.role, _sync: simulateSync() };
+    }, {
+      description: 'Admin-only: promote a member to admin or demote an admin to member; the roster fold on every device is the gate.',
+      visibility:  'authenticated',
+    }),
+
     defineSkill('removeMember', async ({ parts, from }) => {
       // Thin wrapper: the admin-only removal-state body lives in `@onderling/circles` (`removeMember`, §8c
       // slice-b). The closure `groupId` default is injected as `defaultGroupId`; the forced revoke+rotate+reseal

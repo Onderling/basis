@@ -85,7 +85,12 @@ export async function run({ relayUrl }) {
     await sendCircleChat(bram, { groupId: CIRCLE, msgId: 'ghost-1', text: 'ik ben er nog' }).catch(() => {});
     const ghostLanded = await untilTrue(async () => cato.chatRail.storedStatements(CIRCLE)
       .some((s) => s?.body?.subject === 'ghost-1'), 4000);
-    check('a REMOVED member cannot post into the circle — the rail refuses what they sign',
+    // [F-019] This was green until 2026-08-23, and green for the WRONG REASON: the removed member's
+    // fan was resolving nobody, so nothing arrived and no gate was ever consulted. Once the roster
+    // that fan reads was corrected (M1a), the message started arriving — and the receiver's binding
+    // verifier does not refuse it, because it reads the roster SPINELESS and an eviction is a spine
+    // statement. A removed member can post into the circle.
+    check('[F-019] a REMOVED member cannot post into the circle',
       !ghostLanded, `${cato.chatRail.storedStatements(CIRCLE).length - beforeCount} new statement(s) at the bystander`);
 
     const ghostPost = await call(bram, 'postRequest', { text: 'nog een poging', intent: 'ask' });

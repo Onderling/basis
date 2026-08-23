@@ -340,15 +340,19 @@ export async function listCircleMembers(
   // A foreign caller must PROVE membership of this circle from its durable trail — the fallback path
   // has no trail to prove it against, so a foreign caller there is refused (deny-by-default). A local
   // call keeps the fallback's pre-trail behaviour unchanged.
-  if (!scoped) {
-    if (foreign) return { groupId: _groupId, members: [], reason: 'not-a-member' };
-    // Legacy back-compat: a group with NO redemption trail (a seeded single-circle roster from before
-    // code-minting) falls back to the full MemberMap so those setups are unchanged. Still
-    // EXIT-FILTERED, or removal would silently do nothing on circles with no other representation.
-    const exits = await readCircleExits({ store, groupId: _groupId });
-    const kept = exits.size === 0 ? list : list.filter((m) => !isExited(exits, m?.webid ?? '', 0));
-    return { groupId: _groupId, members: withViewerReveals(kept) };
-  }
+  // THE ABSENCE RULE (M1a, 2026-08-23) — the projection returns null only when this device has NO
+  // durable record of the circle: no redemption trail and no derivable founder. That is "I do not
+  // know", and the honest answer to it is an empty roster, for every caller.
+  //
+  // What used to be here: a LOCAL caller fell back to the full MemberMap — the device's global
+  // display cache, holding every member of every circle it ever admitted, keyed by nothing. So
+  // asking about a circle you are not in returned exactly one member: yourself. It was labelled
+  // back-compat for pre-code-minting circles, and this project keeps no back-compat (2026-08-08).
+  //
+  // A founder-only circle is NOT this case: the creator never redeems their own code, so the trail
+  // is empty, but `projectCircleRoster` derives them from the circle's own rules authorship and
+  // answers with them. Absence here means absence of the circle, not absence of joiners.
+  if (!scoped) return { groupId: _groupId, members: [], reason: 'not-a-member' };
   if (foreign) {
     const gated = gateRosterReplyForPeer(scoped, caller);
     if (!gated.ok) return { groupId: _groupId, members: [], reason: 'not-a-member' };

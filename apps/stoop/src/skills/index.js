@@ -866,15 +866,14 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
   let redemptions = [];
   try { redemptions = await store.listOpen({ type: 'membership-redemption' }); } catch { redemptions = []; }
   const forGroup = (redemptions ?? []).filter((i) => i?.source?.groupId === groupId);
-  if (forGroup.length === 0) return null;
 
-  // Founder(s) — the creator never redeems their own code. Derive them from two
-  // sources so the roster survives a cold MemberMap:
-  //   1. durable — the circle's `group-rules` author (skip the joiner-side MIRROR,
-  //      whose `addedBy` is the joiner, not the founder — the joiner learns the
-  //      admin via `confirmedBy` instead).
-  //   2. back-compat — any admin/coordinator-role MemberMap entry (implicit
-  //      founder for legacy circles with no rules item; additive, never a filter).
+  // Founder(s) — the creator never redeems their own code, so a circle whose only member is its
+  // creator has an EMPTY redemption trail and must still project that one member. Derived from the
+  // circle's own durable record: the `group-rules` author (skipping the joiner-side MIRROR, whose
+  // `addedBy` is the joiner — the joiner learns the admin through `confirmedBy` instead), plus a
+  // peer-carried rules UPDATE's verified `updatedBy`.
+  //
+  // There is deliberately NO fallback to the MemberMap here. See the absence rule below.
   const founderWebids = new Set();
   // The circle's policy blob rides the same read: the LATEST rules item's `source.rules`
   // (same tie-break as _findLatestGroupRules) feeds the fold's maxDevicesPerMember cap.
@@ -902,17 +901,23 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
       }
       if (typeof it?.addedBy === 'string' && it.addedBy) founderWebids.add(it.addedBy);
     }
-  } catch { /* no rules item → the MemberMap-admin + trail paths still stand */ }
-  // The display-cache fallback, NARROWED (Frits' ruling, 2026-08-23): a member-map admin row
-  // confers founder authority ONLY when the durable sources above yielded NOTHING — a true
-  // legacy circle with no rules-authorship facts at all. Authority comes from signatures; the
-  // map exists for showing names — and since the roster seed, a device-set parcel can write it,
-  // so the always-on fallback had quietly become a wire-reachable authority source.
-  if (founderWebids.size === 0) {
-    for (const m of list) {
-      if (m?.webid && isCircleAdmin(m.role)) founderWebids.add(m.webid);
-    }
-  }
+  } catch { /* no rules item → the trail path still stands, and absence stays absence */ }
+
+  // THE ABSENCE RULE (M1a, 2026-08-23) — no durable record of this circle means "I do not know",
+  // never "fall back to everything I know globally".
+  //
+  // What used to be here: a member-map admin row conferred founder authority whenever the durable
+  // sources yielded nothing. It was narrowed once (to fire only on empty) and that was not enough,
+  // because empty is exactly the case it was wrong in. Every device holds ITSELF in its MemberMap
+  // as `role: 'admin'` (of its own household), so the fallback made every device an implicit
+  // founder of any circle whose founder it could not derive — measured on a plain three-person
+  // circle where each device saw itself as admin and the other two correctly. Since the roster
+  // seed, a device-set parcel can write that map, so it had also become wire-reachable.
+  //
+  // The architecture already said so: the roster is the fold of trail + spine, and the MemberMap
+  // "never decides existence". It is a display cache; it is left-joined for names below and
+  // decides nothing here.
+  if (forGroup.length === 0 && founderWebids.size === 0) return null;
 
   // The membership SPINE — the per-author SIGNED statements (join/leave/evict) the roster folds
   // deterministically (identical on every device, no wall-clock). Verified on read: only a genuine,

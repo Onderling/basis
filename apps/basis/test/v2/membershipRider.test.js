@@ -29,11 +29,26 @@ function fakeEventLog() {
   };
 }
 
-/** The circle store a device's roster projection reads: redemption trail rows (id-carrying). */
-function fakeStore(rows) {
+/**
+ * The circle store a device's roster projection reads: the redemption trail, PLUS the circle's own
+ * `group-rules` item.
+ *
+ * The rules item is not decoration — it is where the FOUNDER comes from. `createGroupWithRules`
+ * writes it with `{actor: from}` on every real circle, so `addedBy` is the creator, and the roster
+ * projection derives founder authority from exactly that. This fixture used to omit it and let the
+ * founder arrive through a MemberMap admin row instead, which was the display-cache fallback the
+ * projection no longer has (M1a, 2026-08-23): authority comes from the circle's durable record, not
+ * from a global cache that every device populates with itself.
+ */
+function fakeStore(rows, founder = 'webid:admin') {
+  const rulesItem = {
+    id: 'rules-1', type: 'group-rules', addedBy: founder, addedAt: 1,
+    source: { groupId: CIRCLE, rules: { name: CIRCLE }, version: 1 },
+  };
   return {
     async listOpen({ type } = {}) {
       if (type === 'membership-redemption') return rows;
+      if (type === 'group-rules') return [rulesItem];
       return [];
     },
   };

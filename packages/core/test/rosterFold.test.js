@@ -295,12 +295,37 @@ describe('foldRoster — the rules gate (task #80, sitting-A decision 2026-08-20
     expect(r.admins).not.toContain(founder.pubKey);
   });
 
-  it('a FOUNDER stays admin — demotion of a founder is refused whatever the demoter\'s authority', async () => {
+  // ── Founder permanence: relieved of running it, never put out of it ────────────────────────────
+  // Frits' call (2026-08-23): a founder is demotable once the circle has another admin. The organiser
+  // who moves away should be able to hand the street over, not hold it open forever.
+
+  it('a FOUNDER can be demoted once another admin exists — handing over is allowed', async () => {
     const { founder, bob } = await ids();
     const join    = body(bob, 'join', bob);
     const promote = body(founder, 'role', bob, { payload: { role: 'admin' }, deps: [join.hash] });
     const demote  = body(bob, 'role', founder, { payload: { role: 'member' }, parent: join.hash, deps: [promote.hash] });
     const r = foldRoster([join, promote, demote], { founders: [founder.pubKey] });
+    expect(r.admins).not.toContain(founder.pubKey);
+    expect(r.admins).toContain(bob.pubKey);
+    expect(r.members).toContain(founder.pubKey);      // still in the circle they made
+  });
+
+  it('…but the SOLE founder-admin cannot be demoted — there would be nobody left to run it', async () => {
+    const { founder, bob } = await ids();
+    const join   = body(bob, 'join', bob);
+    const demote = body(founder, 'role', founder, { payload: { role: 'member' }, deps: [join.hash] });
+    const r = foldRoster([join, demote], { founders: [founder.pubKey] });
     expect(r.admins).toContain(founder.pubKey);
+  });
+
+  it('a demoted founder is still not EVICTABLE — you cannot be put out of the circle you made', async () => {
+    const { founder, bob } = await ids();
+    const join    = body(bob, 'join', bob);
+    const promote = body(founder, 'role', bob, { payload: { role: 'admin' }, deps: [join.hash] });
+    const demote  = body(bob, 'role', founder, { payload: { role: 'member' }, parent: join.hash, deps: [promote.hash] });
+    const evict   = body(bob, 'evict', founder, { parent: demote.hash, deps: [promote.hash] });
+    const r = foldRoster([join, promote, demote, evict], { founders: [founder.pubKey] });
+    expect(r.admins).not.toContain(founder.pubKey);   // demoted…
+    expect(r.members).toContain(founder.pubKey);      // …but not removable
   });
 });

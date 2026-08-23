@@ -72,8 +72,11 @@ function depthOf(stmts) {
  *
  * @param {Array<object>} statements  VERIFIED spine bodies (verifySpine passed) for ONE circle.
  * @param {object} [opts]
- * @param {Array<string>} [opts.founders]  circle-scoped author keys that are admin + member by construction
- *                                         (the creators). Founders are not evictable (root of authority).
+ * @param {Array<string>} [opts.founders]  the circle's creators — admin + member by construction, and
+ *   the fold's starting authority. They are **not evictable**: you cannot be put out of a circle you
+ *   made. They ARE demotable once another admin exists (Frits, 2026-08-23), so a founder who steps
+ *   back hands over rather than holding the circle open forever; the last-admin rule is what supplies
+ *   the "once another admin exists" half.
  * @param {{ members?: string[], admins?: string[] }} [opts.seed]  the roster the spine folds ON TOP OF — the
  *   pre-spine materialised HEAD at cutover (the current trail-derived roster). Seed members/admins are the
  *   starting state; UNLIKE founders they are ordinary members (evictable, demotable). Absent (the default) the
@@ -148,7 +151,13 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
       if (s.kind !== 'role' || !canAct(s.author)) continue;
       const role = s.payload && typeof s.payload === 'object' ? s.payload.role : undefined;
       if (role === 'admin') promoted.add(s.subject);
-      else if (role === 'member' && !founderSet.has(s.subject)) demoted.add(s.subject);
+      // A FOUNDER IS DEMOTABLE (Frits, 2026-08-23) — once the circle has another admin, which the
+      // last-admin rule below supplies without a second condition here. The organiser who moves away
+      // hands the street over and stops running it; permanence was never the point, continuity was.
+      //
+      // They stay a MEMBER, though: `evict` below still exempts them. You cannot be put out of the
+      // circle you made — only relieved of running it.
+      else if (role === 'member') demoted.add(s.subject);
     }
     for (const x of demoted) promoted.delete(x);                    // deny-wins: demote beats concurrent promote
 

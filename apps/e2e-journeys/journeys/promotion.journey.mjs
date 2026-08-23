@@ -108,15 +108,43 @@ export async function run({ relayUrl }) {
       await untilTrue(async () => (await roleOf(anne, CIRCLE, bram.pubKey)) === 'member'),
       `admin sees: ${await roleOf(anne, CIRCLE, bram.pubKey)}`);
 
-    const lastOne = await call(anne, 'setMemberRole', {
+    // ── 6. THE ORGANISER MOVES AWAY — a founder hands the circle over ───────────────────────────
+    // Frits' call (2026-08-23): a founder is demotable once another admin exists. Permanence was
+    // never the point; continuity is. So promote someone first, then step back.
+    const handover = await call(anne, 'setMemberRole', {
+      groupId: CIRCLE, memberWebid: bram.pubKey, role: 'admin',
+    });
+    check('the founder promotes a successor', handover?.ok === true, JSON.stringify(handover)?.slice(0, 110));
+    await untilTrue(async () => (await roleOf(anne, CIRCLE, bram.pubKey)) === 'admin');
+
+    const stepBack = await call(anne, 'setMemberRole', {
       groupId: CIRCLE, memberWebid: anne.pubKey, role: 'member',
+    });
+    check('THE FOUNDER CAN STEP BACK once someone else can run it', stepBack?.ok === true,
+      JSON.stringify(stepBack)?.slice(0, 110));
+    check('…and every device agrees they are no longer an admin',
+      await untilTrue(async () => (await roleOf(bram, CIRCLE, anne.pubKey)) === 'member', 12000),
+      `successor sees the founder as: ${await roleOf(bram, CIRCLE, anne.pubKey)}`);
+    check('…but they are still IN the circle they made — stepping back is not being put out',
+      hasMember(await rosterOf(bram, CIRCLE), anne.pubKey));
+
+    // The successor now genuinely runs it.
+    const successorActs = await call(bram, 'editGroupRules', {
+      groupId: CIRCLE, rules: { name: 'Onder nieuw beheer', agreements: 'we gaan door' },
+    });
+    check('the successor can now run the circle', !successorActs?.error,
+      JSON.stringify(successorActs)?.slice(0, 110));
+
+    // ── 7. …BUT AUTHORITY CANNOT BE SWITCHED OFF ────────────────────────────────────────────────
+    const lastOne = await call(bram, 'setMemberRole', {
+      groupId: CIRCLE, memberWebid: bram.pubKey, role: 'member',
     });
     // The op may accept it — the fold is what must refuse, because that is the answer every device
     // computes without needing an authority that would no longer exist.
     await untilTrue(async () => false, 2000);
     check('THE LAST ADMIN CANNOT BE DEMOTED — a circle is never left unadministrable',
-      (await roleOf(anne, CIRCLE, anne.pubKey)) === 'admin',
-      `op said ${JSON.stringify(lastOne)?.slice(0, 80)}; roster says ${await roleOf(anne, CIRCLE, anne.pubKey)}`);
+      (await roleOf(bram, CIRCLE, bram.pubKey)) === 'admin',
+      `op said ${JSON.stringify(lastOne)?.slice(0, 80)}; roster says ${await roleOf(bram, CIRCLE, bram.pubKey)}`);
   } catch (err) {
     check('the promotion corridor completed', false, String(err?.message ?? err).slice(0, 250));
   } finally {

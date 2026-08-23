@@ -244,7 +244,13 @@ export function deriveRoster({
       }
       for (const webid of [...roster.keys()]) {
         if (!inMembers.has(webid)) roster.delete(webid);          // folded out (deny-wins)
-        else roster.get(webid).role = inAdmins.has(webid) ? 'admin' : roster.get(webid).role;
+        // THE FOLD'S ANSWER WINS, IN BOTH DIRECTIONS. This used to keep the trail-derived role when
+        // the fold said "not an admin" — `… : roster.get(webid).role` — which combined with the
+        // upsert's never-downgrade rule to make the projection admin-STICKY: a demotion folded
+        // correctly on every device and then could not be seen, because the row it had to change was
+        // pinned. A promotion is not more true than a demotion; on the authoritative path the fold
+        // is the head, and the head is what a row states.
+        else roster.get(webid).role = inAdmins.has(webid) ? 'admin' : 'member';
       }
     } else {
       // Legacy strengthen-only overlay: the spine may drop a member or promote to admin, never admit.

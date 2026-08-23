@@ -33,7 +33,9 @@ async function device(ref, rosterRows) {
   const circleId = await AgentIdentity.generate(new VaultMemory());
   const eventLog = fakeEventLog();
   const callSkill = async (origin, op) => {
-    if (op === 'listGroupRoster' || op === 'listGroupMembers') return { members: rosterRows.filter((m) => m.webid !== ref) };  // excludes caller (binding is consulted for FOREIGN authors only)
+    // listGroupMembers INCLUDES the caller (the derived roster does); listGroupRoster excludes them.
+    if (op === 'listGroupMembers') return { members: rosterRows };
+    if (op === 'listGroupRoster') return { members: rosterRows.filter((m) => m.webid !== ref) };
     if (op === 'removeMember') return { ok: true };
     return {};
   };
@@ -80,8 +82,11 @@ describe('slice 1 adoption — governance rides the rail', () => {
       { webid: 'webid:alice', role: 'admin',  circleAddress: aliceCid.pubKey },
       { webid: 'webid:bob',   role: 'member', circleAddress: bobCid.pubKey },
     ];
-    const mkCallSkill = (me) => async (o, op) => ((op === 'listGroupRoster' || op === 'listGroupMembers')
-      ? { members: rosterAll.filter((m) => m.webid !== me) } : { ok: true });
+    // listGroupMembers includes the caller; listGroupRoster excludes them (see the note above).
+    const mkCallSkill = (me) => async (o, op) => (
+      op === 'listGroupMembers' ? { members: rosterAll }
+        : op === 'listGroupRoster' ? { members: rosterAll.filter((m) => m.webid !== me) }
+          : { ok: true });
 
     const bobLog = fakeEventLog();
     const bobRail = makeGovernanceRail({
@@ -148,8 +153,11 @@ describe('the settings-consensus cutover — changePolicy on the log', () => {
       { webid: 'webid:alice', role: 'admin', circleAddress: aliceCid.pubKey },
       { webid: 'webid:bob',   role: 'admin', circleAddress: bobCid.pubKey },
     ];
-    const mkCallSkill = (me) => async (o, op) => ((op === 'listGroupRoster' || op === 'listGroupMembers')
-      ? { members: rosterAll.filter((m) => m.webid !== me) } : { ok: true });
+    // listGroupMembers includes the caller; listGroupRoster excludes them (see the note above).
+    const mkCallSkill = (me) => async (o, op) => (
+      op === 'listGroupMembers' ? { members: rosterAll }
+        : op === 'listGroupRoster' ? { members: rosterAll.filter((m) => m.webid !== me) }
+          : { ok: true });
     const policy = { admins: ['webid:alice', 'webid:bob'], consensusRequired: true, governance: { changePolicy: 'admin-quorum' } };
     const applied = [];
     // ONE shared log stands in for the fan (both admins' devices see the same events).

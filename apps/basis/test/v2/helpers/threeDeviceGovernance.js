@@ -58,12 +58,18 @@ export async function threeDevices({ policy = defaultPolicy(), clock = 1 } = {})
   const rosterRows = FULL.map((m) => (cids[m.addr]
     ? { ...m, circleAddress: cids[m.addr].pubKey }
     : { ...m }));
-  /** Mirrors `listGroupRoster`, which excludes the caller — the shape the wiring actually reads. */
+  // The two roster ops answer differently, and modelling them alike is what let a ref-space bug hide
+  // (F-020): `listGroupRoster` is the flat routing list and EXCLUDES the caller; `listGroupMembers`
+  // is the derived roster — webid-keyed, spine-folded — and INCLUDES them.
   const rosterExcluding = (ref) => ({ members: rosterRows.filter((m) => m.addr !== ref) });
+  const membersIncluding = () => ({ members: rosterRows.map((m) => ({ ...m, webid: m.webid ?? m.addr })) });
 
   for (const ref of DEVICE_REFS) {
     const log = new EventLog({ initial: [] });
-    const rosterCallSkill = async (app, op) => ((op === 'listGroupRoster' || op === 'listGroupMembers') ? rosterExcluding(ref) : { ok: true });
+    const rosterCallSkill = async (app, op) => (
+      op === 'listGroupMembers' ? membersIncluding()
+        : op === 'listGroupRoster' ? rosterExcluding(ref)
+          : { ok: true });
     const rail = makeGovernanceRail({
       eventLog: log, circleIdentityFor: async () => cids[ref], myRef: ref, callSkill: rosterCallSkill,
     });
@@ -118,7 +124,8 @@ export async function threeDevices({ policy = defaultPolicy(), clock = 1 } = {})
     d.gov = bindCircleGovernance({
       eventLog: d.log,
       callSkill: vi.fn(async (app, op, args) => {
-        if (op === 'listGroupRoster' || op === 'listGroupMembers') return rosterExcluding(ref);
+        if (op === 'listGroupMembers') return membersIncluding();
+        if (op === 'listGroupRoster') return rosterExcluding(ref);
         // Every non-roster op is a real-world side effect — record WHICH device performed it.
         d.enacted.push({ op, args });
         return { ok: true };

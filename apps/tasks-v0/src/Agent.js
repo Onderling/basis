@@ -244,6 +244,12 @@ export async function createTasksAgent({
       meshAgent: agent,
       bundleResolver: singleCircleResolver(circleState),
       members,
+      // ONE reader for every authority gate. A single-circle agent is composed with an EXPLICIT
+      // `roles` map — the caller stating who administers this circle — so that map is the honest
+      // answer here. A multi-circle host injects its own reader instead (the circle's folded
+      // roster). Either way the gate asks one question of one source and refuses when it has none,
+      // rather than reaching into whatever member list happens to be nearby.
+      circleRoleOf: async (_circleId, webid) => (webid ? (roles?.[webid] ?? null) : null),
     });
   }
 

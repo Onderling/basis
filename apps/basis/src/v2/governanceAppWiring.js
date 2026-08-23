@@ -47,29 +47,40 @@ import { makeCircleReports } from './reportHost.js';
 import { REPORT_KIND, REPORT_EVENT, reportEntryId } from './reportModel.js';
 
 /**
- * The FULL circle membership as `{ref, role}` — the roster's other members plus me.
- * Role is authoritative from `policy.admins` when present; otherwise the roster's own role,
- * with a sole-admin fallback (if no admin appears among the others, I am the admin).
+ * The circle's membership as `{ref, role}` — the electorate every governance fold counts against.
+ *
+ * ONE SOURCE, ONE REF SPACE. `ref` is a **webid**, because that is what a governance statement's
+ * `voter`/`by` carries. This used to read `listGroupRoster`, whose rows are per-circle ADDRESSES,
+ * and map them straight into `ref` — two spaces that never meet, so any comparison against an actor
+ * (`policy.admins`, an admin-vote's `isAdmin(v.voter)`) silently matched nobody. `listGroupMembers`
+ * is the DERIVED roster: it carries `webid`, it folds the membership spine, and it is the same
+ * source the rail's binding verifier and the rules-update apply gate read.
+ *
+ * The local person is NOT appended separately, and there is no "if no admin appears among the
+ * others, I am the admin" fallback. Both existed because `listGroupRoster` excludes the caller;
+ * `listGroupMembers` includes them, with the role the circle's own statements give them. Assuming
+ * your own authority when the roster is silent is the habit this whole arc exists to remove.
  */
 export async function readCircleMembers({ callSkill, circleId, myRef, getPolicy }) {
-  let others = [];
+  let members = [];
   try {
-    const r = await callSkill('stoop', 'listGroupRoster', { groupId: circleId });
-    others = (Array.isArray(r?.members) ? r.members : [])
-      .map((m) => ({ ref: m.addr ?? m.webid ?? m.ref, role: m.role === 'admin' ? 'admin' : 'member' }))
+    const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+    members = (Array.isArray(r?.members) ? r.members : [])
+      .map((m) => ({ ref: m.webid ?? m.pubKey ?? m.ref, role: m.role === 'admin' ? 'admin' : 'member' }))
       .filter((m) => m.ref);
-  } catch { others = []; }
+  } catch { members = []; }
 
+  // `policy.admins`, when a circle sets one, overrides the roster's role. It is compared against
+  // `ref`, so it must be written in the same webid space the rows now carry.
   let policy = {};
   try { policy = (await getPolicy(circleId)) ?? {}; } catch { policy = {}; }
   const admins = Array.isArray(policy.admins) ? policy.admins : [];
-  const applyPolicyRole = (m) => (admins.length ? { ...m, role: admins.includes(m.ref) ? 'admin' : 'member' } : m);
-  others = others.map(applyPolicyRole);
+  if (admins.length) {
+    members = members.map((m) => ({ ...m, role: admins.includes(m.ref) ? 'admin' : 'member' }));
+  }
 
-  const iAmAdmin = admins.length ? admins.includes(myRef) : !others.some((m) => m.role === 'admin');
-  const me = myRef ? [{ ref: myRef, role: iAmAdmin ? 'admin' : 'member' }] : [];
-  const seen = new Set(me.map((m) => m.ref));
-  return [...me, ...others.filter((m) => !seen.has(m.ref))];
+  const seen = new Set();
+  return members.filter((m) => (seen.has(m.ref) ? false : (seen.add(m.ref), true)));
 }
 
 /**

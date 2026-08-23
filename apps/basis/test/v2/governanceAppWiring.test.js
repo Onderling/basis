@@ -3,7 +3,7 @@
  *
  * Locks the substrate binding both shells depend on: governance events round-trip through
  * the EventLog (append as a governance-kind silent entry → read back by circle), and the
- * full membership is assembled from the roster op PLUS this device (which listGroupRoster
+ * membership is the DERIVED roster (`listGroupMembers`), which already includes this device (listGroupRoster
  * excludes), with roles honoured.
  */
 import { describe, it, expect, vi } from 'vitest';
@@ -17,22 +17,41 @@ import { VaultMemory } from '@onderling/vault';
 const mkCid = () => AgentIdentity.generate(new VaultMemory());
 
 describe('readCircleMembers', () => {
-  it('adds this device to the roster (which excludes the caller) and honours roles', async () => {
-    const callSkill = vi.fn(async () => ({ members: [{ addr: 'admin0', role: 'admin' }, { addr: 'm1', role: 'member' }] }));
+  // The DERIVED roster already contains this device, with the role the circle's own statements give
+  // it — so these read one source in one ref space (webid) and append nothing.
+  const derived = (rows) => vi.fn(async (origin, op) => (op === 'listGroupMembers' ? { members: rows } : { ok: true }));
+
+  it('reads the derived roster as-is — every member, in webid space', async () => {
+    const callSkill = derived([
+      { webid: 'admin0', role: 'admin' }, { webid: 'm1', role: 'member' }, { webid: 'me', role: 'member' },
+    ]);
     const members = await readCircleMembers({ callSkill, circleId: 'c1', myRef: 'me', getPolicy: async () => ({}) });
-    expect(members).toContainEqual({ ref: 'me', role: 'member' });      // I'm added (a member — an admin exists)
+    expect(members).toContainEqual({ ref: 'me', role: 'member' });
     expect(members).toContainEqual({ ref: 'admin0', role: 'admin' });
     expect(members).toHaveLength(3);
+    expect(callSkill).toHaveBeenCalledWith('stoop', 'listGroupMembers', { groupId: 'c1' });
   });
 
-  it('sole-admin fallback: if no admin appears among the others, I am the admin', async () => {
-    const callSkill = vi.fn(async () => ({ members: [{ addr: 'm1', role: 'member' }] }));
+  it('does NOT invent a seat: someone the roster omits is not a member, whoever is asking', async () => {
+    // The retired behaviour appended the caller unconditionally, so a device held an opinion about
+    // its own membership the circle did not share. Absence is the circle's answer, not a gap to fill.
+    const callSkill = derived([{ webid: 'm1', role: 'member' }]);
     const members = await readCircleMembers({ callSkill, circleId: 'c1', myRef: 'me', getPolicy: async () => ({}) });
-    expect(members.find((m) => m.ref === 'me').role).toBe('admin');
+    expect(members.find((m) => m.ref === 'me')).toBeUndefined();
+    expect(members).toHaveLength(1);
   });
 
-  it('policy.admins is authoritative when present', async () => {
-    const callSkill = vi.fn(async () => ({ members: [{ addr: 'm1', role: 'member' }] }));
+  it('does NOT make itself admin when the roster shows no admin', async () => {
+    // The retired sole-admin fallback: "if no admin appears among the others, I am the admin". An
+    // admin-less roster is a real state (it is what the caretaker exists for), not a cue to promote.
+    const callSkill = derived([{ webid: 'me', role: 'member' }, { webid: 'm1', role: 'member' }]);
+    const members = await readCircleMembers({ callSkill, circleId: 'c1', myRef: 'me', getPolicy: async () => ({}) });
+    expect(members.find((m) => m.ref === 'me').role).toBe('member');
+    expect(members.some((m) => m.role === 'admin')).toBe(false);
+  });
+
+  it('policy.admins is authoritative when present — compared in the SAME ref space as the rows', async () => {
+    const callSkill = derived([{ webid: 'm1', role: 'member' }, { webid: 'me', role: 'admin' }]);
     const members = await readCircleMembers({ callSkill, circleId: 'c1', myRef: 'me', getPolicy: async () => ({ admins: ['m1'] }) });
     expect(members.find((m) => m.ref === 'm1').role).toBe('admin');
     expect(members.find((m) => m.ref === 'me').role).toBe('member');   // not in policy.admins
@@ -44,6 +63,11 @@ describe('bindCircleGovernance — EventLog round-trip', () => {
     const eventLog = new EventLog({ initial: [] });
     const policy = normalizeCirclePolicy({ governance: { removeMember: 'any-admin' } });
     const callSkill = vi.fn(async (origin, op) => {
+      // admin0 is this circle's admin, and the DERIVED roster says so — it is no longer inferred
+      // from "nobody else looks like one".
+      if (op === 'listGroupMembers') {
+        return { members: [{ webid: 'admin0', role: 'admin' }, { webid: 'm1', role: 'member' }] };
+      }
       if (op === 'listGroupRoster') return { members: [{ addr: 'm1', role: 'member' }] };
       return { ok: true };   // removeMember enactor
     });
@@ -53,7 +77,7 @@ describe('bindCircleGovernance — EventLog round-trip', () => {
       eventLog, callSkill, getPolicy: async () => policy, myRef: 'admin0', genId: () => `p${(n += 1)}`, now: () => 1,
       circleIdentityFor: async () => cid,
     });
-    // admin0 is the sole admin (fallback) → any-admin removeMember enacts immediately
+    // admin0 is the circle's admin per the roster → any-admin removeMember enacts immediately
     const r = await gov.propose({ circleId: 'c1', action: 'removeMember', subject: 'm1', actor: { ref: 'admin0' } });
     expect(r.status).toBe(DECISION_STATUS.APPROVED);
     expect(callSkill).toHaveBeenCalledWith('stoop', 'removeMember', { groupId: 'c1', memberWebid: 'm1', policy: 'graceful' });
@@ -72,7 +96,14 @@ describe('bindCircleGovernance — EventLog round-trip', () => {
     // The rail's default binding is the DERIVED roster's set-aware verifier (listGroupMembers rows:
     // webid + proven circleAddress/set) — the same shape both shells project; listGroupRoster stays
     // the flat routing list the membership reader consumes.
-    const rosterRows = [{ addr: 'm0', webid: 'm0', role: 'member', circleAddress: m0cid.pubKey }, { addr: 'm1', webid: 'm1', role: 'member' }, { addr: 'm2', webid: 'm2', role: 'member' }];
+    // The DERIVED roster carries every member INCLUDING this device (admin0) — that is what makes
+    // the membership four, and it is stated here rather than reconstructed by the reader.
+    const rosterRows = [
+      { addr: 'admin0', webid: 'admin0', role: 'admin' },
+      { addr: 'm0', webid: 'm0', role: 'member', circleAddress: m0cid.pubKey },
+      { addr: 'm1', webid: 'm1', role: 'member' },
+      { addr: 'm2', webid: 'm2', role: 'member' },
+    ];
     const callSkill = vi.fn(async (origin, op) => (op === 'listGroupRoster' || op === 'listGroupMembers'
       ? { members: rosterRows }
       : { ok: true }));

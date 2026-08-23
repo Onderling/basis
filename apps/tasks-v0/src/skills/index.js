@@ -451,7 +451,17 @@ export const TASK_CORES = Object.freeze({
  *   (addTask, claimTask, etc.) still strict-null on miss.
  * @returns {Array<object>} array of `defineSkill` definitions
  */
-export function buildSkills({ bundleResolver, circlesProvider } = {}) {
+/**
+ * @param {object} [deps]
+ * @param {Function} [deps.bundleResolver]
+ * @param {Function} [deps.circlesProvider]
+ * @param {(circleId: string, webid: string) => Promise<string|null>} [deps.circleRoleOf]
+ *   The caller's role IN A CIRCLE, read from the host's membership head (the fold of the circle's
+ *   signed statements). Injected because this app must not reach into the host's roster itself.
+ *   Absent ⇒ the role half of an authority gate cannot be answered and the gate refuses; the
+ *   creator path (below) still stands on its own.
+ */
+export function buildSkills({ bundleResolver, circlesProvider, circleRoleOf = null } = {}) {
   if (typeof bundleResolver !== 'function') {
     throw new TypeError('buildSkills: bundleResolver(parts, ctx) required');
   }
@@ -605,12 +615,21 @@ export function buildSkills({ bundleResolver, circlesProvider } = {}) {
       const task   = [...open, ...closed].find((t) => t.id === taskId);
       if (!task) return { ok: false, error: 'task-not-found' };
 
-      // Gate (rides the same role map as the other admin-gated skills): only
-      // the task creator (addedBy / master) or a circle admin may attach.
-      const role = circle.liveCircle?.members?.find?.((m) => m.webid === from)?.role
-        ?? circle?.roles?.[from] ?? null;
+      // Gate: only the task's creator, or an ADMIN OF THE CIRCLE, may hand its authority to someone.
+      //
+      // The role comes from the host's membership head — the fold of the circle's signed statements
+      // — not from this bundle's own member list. That list is composed locally and carries the
+      // local device as admin, so reading it let any member attach a grant naming themselves: the
+      // escalation the manifest entry for this op explicitly says the vocabulary exists to prevent.
+      // Absence refuses; it never falls through to a yes.
       const isCreator = task.addedBy === from || task.master === from;
-      if (role !== 'admin' && !isCreator) return { ok: false, error: 'permission-denied' };
+      if (!isCreator) {
+        if (typeof circleRoleOf !== 'function') return { ok: false, error: 'authority-unavailable' };
+        let role = null;
+        try { role = await circleRoleOf(circle.circleId ?? circle.id ?? null, from); }
+        catch { return { ok: false, error: 'authority-unavailable' }; }
+        if (role !== 'admin') return { ok: false, error: 'permission-denied' };
+      }
 
       // Issue the attenuated, task-scoped grant. Attenuation / off-by-default
       // are enforced by the primitive; a grant wider than the granter throws.

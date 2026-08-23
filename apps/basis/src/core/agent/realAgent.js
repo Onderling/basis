@@ -1958,6 +1958,19 @@ export async function createRealHouseholdAgent(opts = {}) {
   const tasksCircle = await createBrowserMultiCircleTasksAgent({
     bus,
     identityVault: tasksIdentityVault,
+    // THE ONE MEMBERSHIP ANSWER for the tasks app's authority gates: this circle's folded roster,
+    // read through the waist. The tasks bundle composes its own member list locally (with this
+    // device as admin of its primary circle), so a gate reading that list let any member grant
+    // themselves a task-scoped authority. Asking the host instead means the answer is the circle's,
+    // not the device's.
+    circleRoleOf: async (circleId, webid) => {
+      if (!circleId || !webid) return null;
+      try {
+        const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+        const rows = Array.isArray(r?.members) ? r.members : [];
+        return rows.find((m) => (m?.webid ?? m?.pubKey) === webid)?.role ?? null;
+      } catch { return null; }
+    },
     primaryCircleConfig: opts.tasksCircleConfig ?? {
       circleId:  'cc-default',
       name:    'Onderling tasks',

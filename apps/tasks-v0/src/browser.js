@@ -156,6 +156,10 @@ export async function createBrowserMultiCircleTasksAgent({
   primaryCircleConfig,
   persistDb,
   label = 'TasksMeshAgent(cc)',
+  // The caller's role in a circle, answered by the HOST's membership head. Threaded to the
+  // authority gates; absent, they refuse rather than fall back to this bundle's own member list
+  // (which is composed locally and carries this device as admin).
+  circleRoleOf = null,
   // One-store-per-circle — the host's per-circle store factory, threaded to
   // every circle (primary + lazily-spawned). Absent ⇒ each circle self-wires
   // its own store, exactly as before.
@@ -250,6 +254,7 @@ export async function createBrowserMultiCircleTasksAgent({
     bundleResolver: ccBundleResolver,
     circlesProvider:  () => circlesMap.values(),
     members:        primaryBundle.members,
+    circleRoleOf,
   });
 
   for (const def of buildMultiCircleOnboardingSkills({ bundleResolver: ccBundleResolver })) {

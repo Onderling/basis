@@ -69,6 +69,9 @@ export function wireSkills({
   circlesProvider,
   members,
   getBundle,
+  // The caller's role in a circle, from the HOST's membership head. Threaded through to the
+  // authority gates that need it; absent, those gates refuse rather than guess.
+  circleRoleOf = null,
 } = {}) {
   if (!meshAgent?.skills?.register) {
     throw new TypeError('wireSkills: meshAgent (with skills registry) required');
@@ -101,7 +104,7 @@ export function wireSkills({
 
   const allBuilders = [
     buildIdentitySkills(idsArgs),
-    buildSkills({ bundleResolver, circlesProvider: cp }),
+    buildSkills({ bundleResolver, circlesProvider: cp, circleRoleOf }),
     buildProfileSkills({ bundleResolver }),
     buildAppealSkill({ bundleResolver }),
     buildChatSkills({ bundleResolver }),

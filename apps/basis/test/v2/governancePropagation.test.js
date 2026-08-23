@@ -28,7 +28,11 @@ async function mesh(refs = ['admin0', 'm0', 'm1']) {
     { addr: 'admin0', role: 'admin' }, { addr: 'm0', role: 'member' },
     { addr: 'm1', role: 'member' }, { addr: 'm2', role: 'member' },
   ].map((m) => (cids[m.addr] ? { ...m, circleAddress: cids[m.addr].pubKey } : m));
+  // The two roster ops answer DIFFERENTLY, and modelling them the same way is what hid F-020:
+  //   listGroupRoster  → flat routing rows, EXCLUDING the caller
+  //   listGroupMembers → the derived roster: `webid` + circleAddress, INCLUDING the caller
   const rosterExcluding = (ref) => ({ members: FULL.filter((m) => m.addr !== ref) });
+  const membersIncluding = () => ({ members: FULL.map((m) => ({ ...m, webid: m.addr })) });
 
   const devices = {};
   const fanTo = (fromRef, circleId, event) => {
@@ -40,7 +44,10 @@ async function mesh(refs = ['admin0', 'm0', 'm1']) {
   let n = 0;
   for (const ref of refs) {
     const log = new EventLog({ initial: [] });
-    const callSkill = vi.fn(async (o, op) => ((op === 'listGroupRoster' || op === 'listGroupMembers') ? rosterExcluding(ref) : { ok: true }));
+    const callSkill = vi.fn(async (o, op) => (
+      op === 'listGroupMembers' ? membersIncluding()
+        : op === 'listGroupRoster' ? rosterExcluding(ref)
+          : { ok: true }));
     const rail = makeGovernanceRail({ eventLog: log, circleIdentityFor: async () => cids[ref], myRef: ref, callSkill });
     devices[ref] = { ref, log, rail, callSkill };
     devices[ref].ingest = makeCircleGovernancePeerHandler({ eventLog: log, rail });

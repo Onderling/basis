@@ -142,17 +142,18 @@ describe('rules-update propagation — the doc travels the governance lane, pod-
     expect(await currentVersionOn(A), 'a member-authored update must never apply').toBe(3);
     expect(await rulesTextOn(A)).not.toContain('hostile takeover');
 
-    // And the full modified-client path: B runs editGroupRules for real. Its LOCAL store obeys
-    // (its own device, its own harm — the enforceability posture: a different app version could
-    // write its local store anyway), and the fanned statement carries B's member key — so A
-    // refuses it at apply exactly like the bare forgery. Deliberately LAST: B's local head is
-    // junk from here on.
+    // And the op itself now refuses (Frits, 2026-08-23 — local ops DO gate). This used to succeed:
+    // the posture was "its own device, its own harm", since a different app version could write its
+    // local store anyway. Both halves of that are still true — which is why the forgery above is the
+    // test that MATTERS, and why it stays first. What changed is that a member is no longer told a
+    // version landed when the circle will never take it; the op reads the circle's folded roster and
+    // says so at the door.
     const localEdit = await B.agent.callSkill('stoop', 'editGroupRules', {
       groupId: CIRCLE, rules: { name: 'my house my rules', purpose: 'my house my rules', version: 3 },
     });
-    expect(localEdit.version, 'the local write is not the gate').toBe(4);
+    expect(localEdit.error, 'a member\'s rules edit is refused at the op').toBe('admin-only');
     await new Promise((r) => setTimeout(r, 800));
-    expect(await currentVersionOn(A), 'the fanned member edit must not apply at the admin').toBe(3);
+    expect(await currentVersionOn(A), 'and nothing reached the admin either').toBe(3);
     expect(await rulesTextOn(A)).toContain('v3: quiet hours after ten');
   }, 60_000);
 

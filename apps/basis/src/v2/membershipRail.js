@@ -79,10 +79,21 @@ export function rosterBindingVerifier(callSkill) {
  * back to the interim any-attested rule — the arc's named, shrinking window. Spineless roster
  * reads, like the base verifier (no recursion, no breaker).
  */
-export function membershipBindingVerifier(callSkill) {
+export function membershipBindingVerifier(callSkill, { circleIdentityFor = null } = {}) {
   // Spineless read → no recursion → no breaker (see rosterBindingVerifier above).
   return async ({ author, ref, circleId, kind }) => {
     try {
+      // SELF-BINDING — a device can always verify its OWN key, with no roster involved. This is the
+      // only way out of a genuine circularity: the roster of a brand-new circle is empty, so the
+      // creator's own first statement could not bind, so the roster stayed empty. Proving "I signed
+      // this with my per-circle key for this circle" grants no authority — the fold still decides
+      // whether that ref may do anything — it only lets a device attest its own signature.
+      if (typeof circleIdentityFor === 'function') {
+        try {
+          const mine = await circleIdentityFor(circleId);
+          if (mine?.pubKey && mine.pubKey === author) return true;
+        } catch { /* fall through to the roster read */ }
+      }
       // SPINELESS, for the same reason as the base verifier above.
       const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId, spineless: true });
       const row = (Array.isArray(r?.members) ? r.members : [])
@@ -104,7 +115,7 @@ export function makeMembershipRail({ eventLog, circleIdentityFor, myRef, callSki
     signerFor: async (circleId) => ({ identity: await circleIdentityFor(circleId), ref: myRef }),
     entryKind: MEMBERSHIP_LANE,
     declaredKinds: MEMBERSHIP_RAIL_KINDS,
-    verifyBinding: verifyBinding ?? membershipBindingVerifier(callSkill),
+    verifyBinding: verifyBinding ?? membershipBindingVerifier(callSkill, { circleIdentityFor }),
   });
 }
 

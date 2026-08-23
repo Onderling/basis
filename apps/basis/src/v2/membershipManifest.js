@@ -17,6 +17,7 @@ export const membershipManifest = Object.freeze({
   itemTypes: [],
   nouns: {},
   operations: [
+    { id: 'membership.create', description: "The circle's creation — the creator's self-signed first statement, and the root of its authority. Folds as founder only where the trail corroborates it (or where there is no trail yet, which is what a brand-new circle is).", appends: [{ lane: MEMBERSHIP_LANE, kind: 'create' }] },
     { id: 'membership.join',  description: 'A member joins (self-authored with redemption proof, or admin-authored).', appends: [{ lane: MEMBERSHIP_LANE, kind: 'join' }] },
     { id: 'membership.leave', description: 'A member leaves (self-authored only — the fold enforces author == subject).', appends: [{ lane: MEMBERSHIP_LANE, kind: 'leave' }] },
     { id: 'membership.evict', description: 'An admin removes a member (authority checked at the fold, deny-wins).',       appends: [{ lane: MEMBERSHIP_LANE, kind: 'evict' }] },

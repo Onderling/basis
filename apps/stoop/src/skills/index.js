@@ -904,6 +904,28 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
       if (typeof src.confirmedBy === 'string' && src.confirmedBy) admitters.add(src.confirmedBy);
     }
     for (const w of admitters) if (!redeemers.has(w)) founderWebids.add(w);
+    // …AND the circle's own CREATION statement, corroborated. A brand-new circle has admitted
+    // nobody, so the structure above cannot name its creator — which locked that creator out of the
+    // circle they had just made. `create` says "I made this", signed with the per-circle key.
+    //
+    // It is accepted as foundership only where this device can already corroborate the author:
+    //   • the trail names them as somebody's admitter (they really did admit people here), or
+    //   • this device has NO trail for the circle at all — which is exactly what a new circle is,
+    //     and where the only holder of it is its creator.
+    // So on a circle with members, a member's self-signed `create` names an author the trail already
+    // places among the redeemers — it confers nothing. Deny-favouring: unverifiable ⇒ ignored.
+    if (typeof membershipRead === 'function' && !skipSpine) {
+      try {
+        const { bodies } = await membershipRead(groupId);
+        for (const b of bodies ?? []) {
+          if (b?.kind !== 'create' || typeof b.author !== 'string' || !b.author) continue;
+          if (b.author !== b.subject) continue;                     // self-subject only
+          if (forGroup.length === 0 || (admitters.has(b.author) && !redeemers.has(b.author))) {
+            founderWebids.add(b.author);
+          }
+        }
+      } catch { /* no lane in this composition — the structural derivation stands alone */ }
+    }
   }
   // The circle's policy blob rides the same read: the LATEST rules item's `source.rules`
   // (same tie-break as _findLatestGroupRules) feeds the fold's maxDevicesPerMember cap.
@@ -2332,7 +2354,7 @@ export function buildSkills({
     defineSkill('createGroupWithRules', async ({ parts, from }) => {
       // Thin wrapper: the write lives in `@onderling/circles` (`createGroupWithRules`, §8c slice-a). Stoop
       // injects the store + its `_sync` producer and passes the parsed args + carrier.
-      return createGroupWithRules({ store, simulateSync }, { a: dataArgs(parts), from });
+      return createGroupWithRules({ store, simulateSync, emitSpine }, { a: dataArgs(parts), from });
     }, {
       description: 'Persist a group\'s governance rules (V1 admin wizard output).',
       visibility:  'authenticated',
@@ -2357,7 +2379,7 @@ export function buildSkills({
       // invite-ceiling clamp + cap, and a best-effort pod-routing policy push (the closure carries the
       // optional chain over an absent bundle — legacy/test setups where podRouting isn't wired).
       return createGroupV2({
-        store, members, metrics, simulateSync,
+        store, members, metrics, simulateSync, emitSpine,
         clampInviteMaxRedemptions, INVITE_REDEMPTION_SYSTEM_CAP,
         validateStoragePolicy: _validateStoragePolicy,
         buildStoragePolicy:    _buildStoragePolicy,
@@ -2408,6 +2430,13 @@ export function buildSkills({
       const a = dataArgs(parts);
       if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
       if (members) {
+        // NOT migrated to the folded head (2026-08-23). The invite/code/storage ops run at moments
+        // when the head cannot yet name the circle's admin — before its first join, in compositions
+        // with no spine emitter, so no creation statement — and migrating them locked the creator
+        // out of inviting anyone to the circle they had just made. They move once the creation
+        // statement is emitted wherever a circle is created; until then the ONE reader is used where
+        // it can answer (`editGroupRules`, `removeMember`, `setMemberRole`) and these keep the
+        // member-map read.
         const me = await members.resolveByWebid(from);
         const isAdmin = isCircleAdmin(me?.role);
         if (!isAdmin) return { error: 'admin-only' };
@@ -2464,6 +2493,13 @@ export function buildSkills({
       const a = dataArgs(parts);
       if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
       if (members) {
+        // NOT migrated to the folded head (2026-08-23). The invite/code/storage ops run at moments
+        // when the head cannot yet name the circle's admin — before its first join, in compositions
+        // with no spine emitter, so no creation statement — and migrating them locked the creator
+        // out of inviting anyone to the circle they had just made. They move once the creation
+        // statement is emitted wherever a circle is created; until then the ONE reader is used where
+        // it can answer (`editGroupRules`, `removeMember`, `setMemberRole`) and these keep the
+        // member-map read.
         const me = await members.resolveByWebid(from);
         const isAdmin = isCircleAdmin(me?.role);
         if (!isAdmin) return { error: 'admin-only' };
@@ -2545,6 +2581,7 @@ export function buildSkills({
 
       let isAdmin = false;
       if (members) {
+        // See the note on the sibling gates above: not migrated yet.
         const me = await members.resolveByWebid(from);
         isAdmin = isCircleAdmin(me?.role);
       }
@@ -4143,6 +4180,13 @@ export function buildSkills({
       // admin list for the group.  V1 reads from `members`'s `role`
       // field; pre-Phase-11 entries default to non-admin.
       if (members) {
+        // NOT migrated to the folded head (2026-08-23). The invite/code/storage ops run at moments
+        // when the head cannot yet name the circle's admin — before its first join, in compositions
+        // with no spine emitter, so no creation statement — and migrating them locked the creator
+        // out of inviting anyone to the circle they had just made. They move once the creation
+        // statement is emitted wherever a circle is created; until then the ONE reader is used where
+        // it can answer (`editGroupRules`, `removeMember`, `setMemberRole`) and these keep the
+        // member-map read.
         const me = await members.resolveByWebid(from);
         const isAdmin = isCircleAdmin(me?.role);
         if (!isAdmin) return { error: 'admin-only' };
@@ -4176,14 +4220,19 @@ export function buildSkills({
       const a = dataArgs(parts);
       if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
       if (typeof a.rules !== 'object' || a.rules === null) return { error: 'rules object required' };
-      // The circle's admin gate. It reads the MemberMap, which is the wrong source — see F-010 and
-      // [ledger L35] — but it is the gate this op has always had, and REMOVING it is not the same as
-      // declining to improve it. (I deleted it by accident on 2026-08-23 while reverting a proposed
-      // replacement; J-roles caught it two checks later, and the cascade is written up as F-021.)
-      if (members) {
-        const me = await members.resolveByWebid(from);
-        if (!isCircleAdmin(me?.role)) return { error: 'admin-only' };
-      }
+      // THE CIRCLE'S ADMIN GATE, asked of the circle (Frits, 2026-08-23 — local ops DO gate).
+      //
+      // The binding gate is still the receiver's: `applyRulesUpdates` refuses a member-authored
+      // update on every device, and that is what actually protects the circle from a modified
+      // client. This one refuses the act at the door instead of accepting a write the circle will
+      // never take — the caller learns now rather than never.
+      //
+      // It reads the folded head, like every other authority question here, and refuses when it has
+      // no answer. It used to read the global MemberMap inside `if (members)`: one role per person
+      // with no circle in the key, skipped entirely when no map was present. Every device holds
+      // itself there as admin of its own household, so it refused nobody.
+      if (typeof isCircleAdminOfCircle !== 'function') return { error: 'authority-unavailable' };
+      if (!isCircleAdmin(await isCircleAdminOfCircle(a.groupId, from))) return { error: 'admin-only' };
       // WHY IT IS NOT REPLACED, pending a decision (2026-08-23).
       //
       // The gate that was here read the global MemberMap (`members.resolveByWebid(from)`) inside
@@ -4301,9 +4350,18 @@ export function buildSkills({
       const stored = rows.map((r) => (typeof r.source?.redeemedBy === 'string'
         ? { ...r, type: 'membership-redemption' } : r));
       const { ingested, skipped } = await store.ingestItems(stored, { actor: from, reason: 'roster-seed' });
-      // The MEMBER rows (display + authority facts): merged into the member map — the same
-      // back-compat source the founder derivation reads, which is how a circle's FOUNDER (who
-      // never redeems, so the trail cannot carry them) becomes visible on a seeded device.
+      // The MEMBER rows: merged into the member map for DISPLAY — names, avatars, addresses.
+      //
+      // `role` still rides along, and that is a known wart rather than a design: stripping it was
+      // tried on 2026-08-23 and reverted (28 test files). The seed's role is the net that currently
+      // covers a CREATOR in any composition where the spine emitter is not wired — there the circle
+      // has no creation statement, and before its first join it has no admissions either, so nothing
+      // else can name its founder and the creator is locked out of their own circle.
+      //
+      // It can be stripped once the creation statement is emitted in every composition that creates
+      // a circle. The narrow alternative — trusting a rules item's `addedBy` while the trail is empty
+      // — is not worth it: on a mirrored store `addedBy` is the local recorder, so a joiner whose
+      // trail has not synced yet would read itself as the founder.
       //
       // The SELF row (same webid — every device of one person shares it) gets a NARROWER merge:
       // only the ADDRESS facts, and only ADDITIVELY into the set. The sibling's per-circle
@@ -4658,6 +4716,13 @@ export function buildSkills({
       const a = dataArgs(parts);
       const _groupId = a.groupId ?? groupId;
       if (members) {
+        // NOT migrated to the folded head (2026-08-23). The invite/code/storage ops run at moments
+        // when the head cannot yet name the circle's admin — before its first join, in compositions
+        // with no spine emitter, so no creation statement — and migrating them locked the creator
+        // out of inviting anyone to the circle they had just made. They move once the creation
+        // statement is emitted wherever a circle is created; until then the ONE reader is used where
+        // it can answer (`editGroupRules`, `removeMember`, `setMemberRole`) and these keep the
+        // member-map read.
         const me = await members.resolveByWebid(from);
         const isAdmin = isCircleAdmin(me?.role);
         if (!isAdmin) return { error: 'admin-only' };

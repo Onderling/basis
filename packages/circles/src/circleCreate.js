@@ -16,7 +16,7 @@
  *
  * @returns {Promise<{rulesId, groupId, _sync}|{error:string}>}
  */
-export async function createGroupWithRules({ store, simulateSync }, { a, from } = {}) {
+export async function createGroupWithRules({ store, simulateSync, emitSpine = null }, { a, from } = {}) {
   if (typeof a?.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
   if (typeof a?.name    !== 'string' || !a.name)    return { error: 'name required' };
   if (typeof a?.rules   !== 'object' || a.rules === null) return { error: 'rules object required' };
@@ -29,6 +29,22 @@ export async function createGroupWithRules({ store, simulateSync }, { a, from } 
     }],
     { actor: from },
   );
+  // THE CIRCLE'S CREATION, on the membership spine — the creator's self-signed first statement and
+  // the root of its authority. Injected like the other spine hooks in this package: signing needs
+  // the acting device's circle-scoped identity, which must not enter a pure module.
+  //
+  // Why it exists at all: founders are otherwise derived from the admission trail (the admitters who
+  // never redeemed), and a brand-new circle has admitted nobody — so its creator could not be
+  // derived, and was locked out of the circle they had just made. This is the statement that says
+  // "I made this", signed, on the lane, and fanned to everyone who later joins.
+  //
+  // It is NOT a licence to self-appoint: a receiver folds it as foundership only where its own trail
+  // corroborates the author, or where it has no trail for the circle at all — which is exactly the
+  // brand-new case. Best-effort, like every other spine hook here: the circle still exists without it.
+  if (typeof emitSpine === 'function') {
+    try { await emitSpine({ kind: 'create', circleId: a.groupId, subject: from, payload: {}, actor: from }); }
+    catch { /* the typed item is written; the statement can be re-derived by a later ceremony */ }
+  }
   return { rulesId: item.id, groupId: a.groupId, _sync: simulateSync() };
 }
 
@@ -73,6 +89,9 @@ export async function createGroupV2({
   store, members, metrics, simulateSync,
   clampInviteMaxRedemptions, INVITE_REDEMPTION_SYSTEM_CAP,
   validateStoragePolicy, buildStoragePolicy, freshMembershipCode, setCirclePolicy,
+  // The circle's creation statement — see `createGroupWithRules` above for what it is and why a
+  // receiver cannot be crowned by one.
+  emitSpine = null,
 }, { a, from } = {}) {
   if (typeof a?.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
   if (typeof a?.name    !== 'string' || !a.name)    return { error: 'name required' };
@@ -144,6 +163,13 @@ export async function createGroupV2({
   try { await setCirclePolicy?.(a.groupId, storage); } catch { /* best-effort */ }
 
   metrics?.record?.('group-create-v2');
+  // The creation statement — the signed root of this circle's authority. See the note on
+  // `createGroupWithRules`: a receiver folds it as foundership only where its own trail corroborates
+  // the author, or where it has no trail for the circle at all.
+  if (typeof emitSpine === 'function') {
+    try { await emitSpine({ kind: 'create', circleId: a.groupId, subject: from, payload: {}, actor: from }); }
+    catch { /* best-effort, like every spine hook here */ }
+  }
   return {
     groupId:         a.groupId,
     rulesId:         rulesItem.id,

@@ -48,6 +48,10 @@ export function itemMatchesAppliesTo(appliesTo, item) {
     if (!types.includes('*') && !types.includes(item.type)) return false;
   }
 
+  if (appliesTo.kind !== undefined) {
+    const kinds = Array.isArray(appliesTo.kind) ? appliesTo.kind : [appliesTo.kind];
+    if (!kinds.includes('*') && !kinds.includes(item.kind)) return false;
+  }
   if (appliesTo.state !== undefined) {
     const states = Array.isArray(appliesTo.state) ? appliesTo.state : [appliesTo.state];
     // Honour an explicit `state` field if present (chat-style item);

@@ -239,12 +239,19 @@ export function renderChat(manifest, args, opts = {}) {
   };
 }
 
-function matchesAppliesTo(appliesTo, item) {
+export function matchesAppliesTo(appliesTo, item) {
   if (!appliesTo) return true;
   if (!item || typeof item !== 'object') return false;
   if (appliesTo.type !== undefined) {
     const types = Array.isArray(appliesTo.type) ? appliesTo.type : [appliesTo.type];
-    if (!types.includes(item.type)) return false;
+    // The `'*'` wildcard means every item type. The other two copies of this predicate have
+    // honoured it since the nav model landed; this one did not, so folio's four wildcard ops got
+    // their button on the web and in embeds and were silently absent from the chat keyboard.
+    if (!types.includes('*') && !types.includes(item.type)) return false;
+  }
+  if (appliesTo.kind !== undefined) {
+    const kinds = Array.isArray(appliesTo.kind) ? appliesTo.kind : [appliesTo.kind];
+    if (!kinds.includes('*') && !kinds.includes(item.kind)) return false;
   }
   if (appliesTo.state !== undefined) {
     // F-SP3-a (locked 2026-05-20): state may be a string OR an array of

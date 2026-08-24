@@ -720,6 +720,18 @@ function validateOperation(op, path, manifest, errors, idSet, opts = {}) {
   }
 
   if (op.appliesTo !== undefined) {
+    // An appliesTo may only carry discriminators the MATCHERS actually honour. `kind` was
+    // declared in five rows across two manifests while every matcher ignored it, so those rows
+    // read as narrow and behaved as wide — an approve-proposal action offered on every inbox
+    // item, a lend action on every offer. An unknown key is now an error rather than a no-op.
+    if (op.appliesTo && typeof op.appliesTo === 'object' && !Array.isArray(op.appliesTo)) {
+      const KNOWN = ['type', 'kind', 'state'];
+      Object.keys(op.appliesTo).forEach((k) => {
+        if (!KNOWN.includes(k)) {
+          errors.push({ path: `${path}/appliesTo/${k}`, message: `appliesTo.${k} is not a discriminator any matcher honours (known: ${KNOWN.join(', ')})` });
+        }
+      });
+    }
     if (op.appliesTo === null || typeof op.appliesTo !== 'object' || Array.isArray(op.appliesTo)) {
       errors.push({ path: `${path}/appliesTo`, message: 'appliesTo must be an object if present' });
     } else if (op.appliesTo.type !== undefined) {

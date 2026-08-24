@@ -77,13 +77,26 @@ export async function run({ relayUrl }) {
     check('host receives the reply privately (1:1 over relay)',
       (thread.messages ?? []).some((x) => (x.body ?? x.text ?? '').includes('kom maar langs')));
 
-    // ── removal (the coupling fix, live): the admin bans the stranger → dropped from the mesh ──
-    const inBefore = !!(await host.members?.resolveByWebid?.(STRANGER));
+    // ── removal (the coupling fix, live): the admin bans the stranger → nothing more reaches them ──
     const removal = await call(host, 'removeMember', { groupId: GROUP, memberWebid: STRANGER, policy: 'ban' }, HOST);
     check('admin removes the stranger (ban) → recorded + revoked',
       !!removal?.removalId && removal?.revoked === true && removal?.policy === 'ban');
-    const inAfter = !!(await host.members?.resolveByWebid?.(STRANGER));
-    check('the removed member is dropped from the MemberMap (fan-out stops targeting them)', inBefore && !inAfter);
+
+    // This asserts the OUTCOME — the removed person stops receiving — not the mechanism. It used to
+    // assert that the ban pruned the MemberMap, and failed permanently, because the system
+    // deliberately does not prune it: `members.removeMember(webId)` was there once and was itself
+    // the bug (see the note at stoop's removeMember). The MemberMap is a display cache; the fan
+    // projects the circle's roster and exit-filters, so a stale row there targets nobody. A check
+    // that pins the wrong layer stays red forever and stops anyone reading this journey's reds.
+    await wait(1200);
+    const after = await call(host, 'postRequest', { text: 'Nog iemand een zaag te leen?', intent: 'ask' }, HOST);
+    check('the ban is recorded before the next post', !!(after?.item?.id ?? after?.id ?? after?.requestId));
+    await wait(1800);
+    // The stranger's own store is the honest place to look: it is where the FIRST post landed
+    // (`listOpen` above found it), so if the ban holds, the second one is simply not there.
+    const strangerSees = await stranger.itemStore.listOpen({});
+    check('the removed member receives nothing the circle posts afterwards',
+      !strangerSees.some((i) => (i.text ?? '').includes('zaag')));
   } finally {
     for (const b of [host, stranger]) await b.agent.transport.disconnect().catch(() => {});
   }

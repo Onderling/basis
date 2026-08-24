@@ -147,12 +147,16 @@ export function actionsFor(embed, manifest) {
  * src/web/domAdapter.js' list rendering).  Same shape; pulled here
  * to avoid a circular dep on a private function.
  */
-function matchesAppliesTo(appliesTo, item) {
+export function matchesAppliesTo(appliesTo, item) {
   if (!appliesTo) return true;
   if (!item || typeof item !== 'object') return false;
   if (appliesTo.type !== undefined) {
     const types = Array.isArray(appliesTo.type) ? appliesTo.type : [appliesTo.type];
     if (!types.includes('*') && !types.includes(item.type)) return false;
+  }
+  if (appliesTo.kind !== undefined) {
+    const kinds = Array.isArray(appliesTo.kind) ? appliesTo.kind : [appliesTo.kind];
+    if (!kinds.includes('*') && !kinds.includes(item.kind)) return false;
   }
   if (appliesTo.state !== undefined) {
     const states = Array.isArray(appliesTo.state) ? appliesTo.state : [appliesTo.state];

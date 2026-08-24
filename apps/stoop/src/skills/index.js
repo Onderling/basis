@@ -762,6 +762,11 @@ async function cancelRequestCore(scope, a, ctx) {
   return { id, _sync: simulateSync() };
 }
 
+/** A lend, in the current vocabulary: an offer whose kind says it comes back. */
+function isLendItem(item) {
+  return item?.type === 'offer' && item?.kind === 'lend';
+}
+
 async function assignLendCore(scope, a, ctx) {
   const { store } = scope;
   if (typeof a.itemId        !== 'string' || !a.itemId)        return { error: 'itemId required' };
@@ -769,7 +774,11 @@ async function assignLendCore(scope, a, ctx) {
 
   const current = await store.getById(a.itemId);
   if (!current)              return { error: 'not-found' };
-  if (current.type !== 'lend') return { error: 'not-a-lend' };
+  // A lend is `{type: 'offer', kind: 'lend'}` — what `canonicalAdapter` has produced since the
+  // vocabulary refresh replaced supply-offer/demand-offer/lend-request with type+kind. This guard
+  // still read the retired flat `type: 'lend'`, which nothing creates, so it refused every lend the
+  // app itself had just written.
+  if (!isLendItem(current)) return { error: 'not-a-lend' };
   if (current.completedAt)   return { error: 'already-returned', current };
 
   const claimResult = await store.claim(a.itemId, { actor: a.borrowerWebid });

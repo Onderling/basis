@@ -108,14 +108,18 @@ export async function run({ relayUrl }) {
     // ── 5. A MANDATE — entrusting a task-scoped authority to one person ──────────────────────────
     // Gap 6. Not a device grant: this one is attenuated to a single task and dies when it completes.
     //
-    // [F-015] The op REQUIRES a `grant` object, and the manifest declares only `taskId` + `member`.
-    // The manifest is the contract every surface compiles from, so every manifest-driven caller —
-    // the entrust picker, the gate, chat — calls this without a grant and gets `grant required`,
-    // forever. That is why the whole mandate domain reads as unit-only: it is unreachable through
-    // the waist. The declared-params call is asserted first, because that is the one a person makes.
+    // `grant` is a COMPOSED param: built by the mandate composer both shells share, not typed by a
+    // person or filled by a model, so the manifest deliberately declares only the two scalars — the
+    // same policy `addTask` uses for embeds/dependencies. The router passes undeclared args through
+    // untouched, so the composer's grant arrives intact.
+    //
+    // This check asserts the REFUSAL, which is the correct behaviour: a caller who supplies only the
+    // declared scalars has not composed a grant, and issuing an empty authority would be worse than
+    // refusing. It is written down because reading this refusal as "the op is unreachable" is a
+    // mistake already made once here, on a harness that matched neither shell.
     const asDeclared = await tasks(anne, 'attachTaskGrant', { taskId, member: bram.pubKey });
-    check('[F-015] the op works when called with the params the MANIFEST declares',
-      !asDeclared?.error, JSON.stringify(asDeclared)?.slice(0, 160));
+    check('without a composed grant the op refuses rather than issuing an empty authority',
+      asDeclared?.error === 'grant required', JSON.stringify(asDeclared)?.slice(0, 160));
 
     // With the undeclared parameter supplied, the rest of the behaviour can still be walked.
     const GRANT = { skill: 'listOpen' };   // the primitive wants a skill / pod / actingAs

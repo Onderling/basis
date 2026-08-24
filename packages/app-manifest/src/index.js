@@ -122,7 +122,7 @@ import { renderMobile }      from './renderMobile.js';
 //                 peer of renderSlash. See renderAttachments.js.
 // Re-exported in `from`-form so a documentation generator resolves each
 // projector's own JSDoc at its defining module.
-export { renderChat } from './renderChat.js';
+export { renderChat, matchesAppliesTo as chatMatchesAppliesTo } from './renderChat.js';
 export { renderSlash } from './renderSlash.js';
 export { renderGate } from './renderGate.js';
 export { renderA2A, NEVER_DELEGABLE } from './renderA2A.js';

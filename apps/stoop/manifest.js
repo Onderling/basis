@@ -324,7 +324,7 @@ export const stoopManifest = {
     {
       id:        'assignLend',
       verb:      'reassign',  // canonical — assigns the borrower.
-      appliesTo: { type: 'lend' },
+      appliesTo: { type: 'offer', kind: 'lend' },
       params: [
         { name: 'itemId',        kind: 'string', required: true, ...ID_NONEMPTY  },
         { name: 'borrowerWebid', kind: 'string', required: true, ...STR_NONEMPTY },
@@ -348,7 +348,7 @@ export const stoopManifest = {
     {
       id:        'markReturned',
       verb:      'complete',  // canonical — marks the lend complete.
-      appliesTo: { type: 'lend' },
+      appliesTo: { type: 'offer', kind: 'lend' },
       params: [
         // Part G dissolve (2026-06-17) — `/lend-return` was declared in
         // BOTH manifests.  PARAM is the REAL skill's `requestId` (the

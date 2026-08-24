@@ -70,7 +70,7 @@ import { validateCanonical, isNoticeboardPost } from '@onderling/item-types';
 // The ONE release comparator (the disclosure home) — the roster gates its own writes on it so an
 // unchanged "share to this circle" never touches the row, never acks a change, never announces one.
 import { changedReleaseKeys } from '@onderling/agent-registry';
-import { treeOf, createCrossPodRefResolver, chatEnvelopeFromStoreItem, toWireEnvelope, toWireRefEnvelope } from '@onderling/item-store';
+import { itemTreeFor, chatEnvelopeFromStoreItem, toWireEnvelope, toWireRefEnvelope } from '@onderling/item-store';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
 // The circle fan-out CORE lives in the circles substrate now; stoop injects its deps + helpers.
 // The per-circle ADDRESS announce/record logic lives there too (same DI lift), as does the
@@ -1896,42 +1896,15 @@ export function buildSkills({
     // declares itemId required so wireSkill would THROW instead. Kept hand-written.
     defineSkill('getItemTree', async ({ parts }) => {
       const a = dataArgs(parts);
-      if (typeof a.itemId !== 'string' || !a.itemId) return { error: 'itemId required' };
-
-      // `treeOf` reads top-level `embeds`/`dependencies`; Stoop
-      // persists them under `source.*`. Bridge both shapes.
-      const getItem = async (id) => {
-        const it = await store.getById(id);
-        if (!it) return null;
-        return {
-          ...it,
-          embeds:       it.embeds       ?? it.source?.embeds       ?? [],
-          dependencies: it.dependencies ?? it.source?.dependencies ?? [],
-        };
-      };
-
-      const pseudoPodRead = typeof bundle?.pseudoPod?.read === 'function'
-        ? (ref) => bundle.pseudoPod.read(ref)
-        : undefined;
-
-      const resolveExternalRef = createCrossPodRefResolver({
-        getItem,
-        pseudoPodRead,
-        // V1 public fetch — ACP-protected refs return 401/403 →
-        // PERMISSION_DENIED placeholder (the designed 3-tier render).
-        podFetch: (url) => fetch(url, {
-          headers: { Accept: 'application/json, text/turtle;q=0.5' },
-        }),
+      // One implementation, in the package that owns `treeOf` — tasks has the same op and had a
+      // copy of this body.
+      return itemTreeFor({
+        itemId:        a.itemId,
+        getById:       (id) => store.getById(id),
+        pseudoPodRead: typeof bundle?.pseudoPod?.read === 'function' ? (ref) => bundle.pseudoPod.read(ref) : undefined,
       });
-
-      try {
-        const tree = await treeOf({ rootId: a.itemId, getItem, resolveExternalRef });
-        return { tree };
-      } catch (err) {
-        return { error: err?.message ?? String(err) };
-      }
     }, {
-      description: 'Walk an item\'s embeds/deps tree, materialising cross-pod refs (Phase 3.3c decentralised read path).',
+      description: 'Walk an item\'s embeds/deps tree, materialising cross-pod refs (the decentralised read path).',
       visibility:  'authenticated',
     }),
 
@@ -2116,15 +2089,15 @@ export function buildSkills({
     }),
 
     /**
-     * setMySkills({skills: [{categoryId, freeTags?, availability?, radius?, status?}, ...]})
-     *   — replace the calling actor's full skills array.  Each item
+     * setMyOfferings({skills: [{categoryId, freeTags?, availability?, radius?, status?}, ...]})
+     *   — replace the calling actor's full offerings array.  Each item
      *   picks a `categoryId` from the fixed taxonomy (Phase 12).
      *   `status` defaults to `'active'`.
      */
     // B★ B3 NOT wired (conflict c): the op declares `skills` as `kind:'string'`,
     // but the skill also accepts a raw array (web/mobile pass the array directly) —
     // wireSkill's string check would reject the array form. Kept hand-written.
-    ...withLegacyIds(defineSkill('setMyOfferings', async ({ parts, from }) => {
+    defineSkill('setMyOfferings', async ({ parts, from }) => {
       const a = dataArgs(parts);
       // 2026-05-27 slash audit close-out — the chat-shell's slash
       // surface declares `skills` as `kind: 'string'` (consumer
@@ -2148,7 +2121,7 @@ export function buildSkills({
     }, {
       description: 'Replace the calling actor\'s offerings array.',
       visibility:  'authenticated',
-    }), 'setMySkills'),
+    }),
 
     /**
      * addMyOffering({categoryId, freeTags?, availability?, radius?, status?})

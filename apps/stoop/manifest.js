@@ -69,7 +69,8 @@
 const STR_NONEMPTY = { schema: { minLength: 1 } };
 const ID_NONEMPTY  = { schema: { minLength: 1 } };
 
-// Stoop's full item-type vocabulary (from `src/lib/itemTypes.js`).
+// Stoop's full item-type vocabulary. The canonical registry is `@onderling/item-types`; this
+// list is the manifest's declaration of which of those types this app deals in.
 // All app-local — none are canonical in `@onderling/item-types` (F-SP1-a).
 const ITEM_TYPES = [
   'ask',
@@ -461,24 +462,6 @@ export const stoopManifest = {
         slash: {
           command: '/offerings',
           shape:   '/offerings <json-array-of-offering-entries>',
-        },
-      },
-    },
-    // Legacy alias of setMyOfferings — the op id was renamed skill→offering
-    // (2026-07-18).  This thin op keeps the old `/skills` slash trigger
-    // dispatching to the same handler (the `setMySkills` skill alias) so a
-    // stored slash or an un-migrated caller doesn't break.  No new behaviour.
-    {
-      id:   'setMySkills',
-      verb: 'set',
-      params: [
-        { name: 'skills', kind: 'string', required: true, ...STR_NONEMPTY },
-      ],
-      surfaces: {
-        chat:  { hint: "Replace the calling actor's offerings array (legacy alias of setMyOfferings)." },
-        slash: {
-          command: '/skills',
-          shape:   '/skills <json-array-of-offering-entries>',
         },
       },
     },

@@ -2,7 +2,7 @@
  * Stoop V1 — Phase 10 tests (closed-beta hardening).
  *
  * exportMyData snapshot, leaveGroup audit + optional self-deletion,
- * and the new ITEM_TYPES constants source-of-truth.
+ * and the leave marker's type.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -10,7 +10,6 @@ import { AgentIdentity, InternalBus, InternalTransport } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 
 import { createNeighbourhoodAgent } from '../src/index.js';
-import { ITEM_TYPES, NOTICEBOARD_KINDS } from '../src/lib/itemTypes.js';
 import { callSkill } from './util.js';
 
 const ANNE = 'https://id.example/anne';
@@ -70,7 +69,7 @@ describe('Stoop V1 — leaveGroup', () => {
     expect(r.deletedItems).toBe(0);
 
     const marker = await bundle.itemStore.getById(r.leaveMarkerId);
-    expect(marker.type).toBe(ITEM_TYPES.GROUP_LEAVE);
+    expect(marker.type).toBe('group-leave');
     expect(marker.source.groupId).toBe('oosterpoort');
     expect(marker.source.leftBy).toBe(ANNE);
 
@@ -104,18 +103,7 @@ describe('Stoop V1 — leaveGroup', () => {
   });
 });
 
-describe('Stoop V1 — ITEM_TYPES constants', () => {
-  it('exposes the V1 vocabulary', () => {
-    expect(ITEM_TYPES.ASK).toBe('ask');
-    expect(ITEM_TYPES.OFFER).toBe('offer');
-    expect(ITEM_TYPES.LEND).toBe('lend');
-    expect(ITEM_TYPES.REPORT).toBe('report');
-    expect(ITEM_TYPES.GROUP_RULES).toBe('group-rules');
-    expect(ITEM_TYPES.RULES_ACCEPT).toBe('rules-accept');
-    expect(ITEM_TYPES.GROUP_LEAVE).toBe('group-leave');
-  });
-
-  it('NOTICEBOARD_KINDS lists the three user-facing kinds', () => {
-    expect(NOTICEBOARD_KINDS).toEqual(['ask', 'offer', 'lend']);
-  });
-});
+// The `ITEM_TYPES` / `NOTICEBOARD_KINDS` block that stood here tested `src/lib/itemTypes.js` — a
+// SECOND item-type vocabulary that nothing but this test imported, and that still named `lend` as a
+// flat type long after the refresh made a lend an offer with a kind. The canonical registry in
+// `@onderling/item-types` is the one source; the module and its test are retired together.

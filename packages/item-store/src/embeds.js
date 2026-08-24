@@ -236,3 +236,55 @@ function _parseItem(bytes) {
     return null;
   }
 }
+
+/**
+ * The whole `getItemTree` op body, once — walk an item's embeds/deps tree and materialise the
+ * cross-pod refs in it.
+ *
+ * This existed TWICE, in stoop's skills and in tasks' workspace, the second copied from the first
+ * (its comment said so) along with a test described as an "analog" of the other. The two were
+ * identical but for which store they read, which is exactly the difference a parameter is for. Two
+ * copies of a decentralised READ path is a bad thing to let drift: it is the executable half of the
+ * `embeds: [{type, ref}]` convention, and a divergence between them is a divergence in what a
+ * cross-pod reference means.
+ *
+ * Both embeds shapes are bridged here — top-level (the canonical slot) and `source.embeds`, where
+ * items originating in a noticeboard put them — so neither caller has to know about the other's.
+ *
+ * @param {object} a
+ * @param {string} a.itemId                  the root
+ * @param {(id: string) => Promise<object|null>} a.getById   the caller's store read
+ * @param {(ref: string) => Promise<*>} [a.pseudoPodRead]    local pod-cache read, when wired
+ * @param {(url: string) => Promise<Response>} [a.podFetch]  cross-pod fetch (defaults to public GET)
+ * @returns {Promise<{tree: object}|{error: string}>}
+ */
+export async function itemTreeFor({ itemId, getById, pseudoPodRead, podFetch } = {}) {
+  if (typeof itemId !== 'string' || !itemId) return { error: 'itemId required' };
+  if (typeof getById !== 'function') return { error: 'store unavailable' };
+
+  const getItem = async (id) => {
+    const it = await Promise.resolve(getById(id)).catch(() => null);
+    if (!it) return null;
+    return {
+      ...it,
+      embeds:       it.embeds       ?? it.source?.embeds       ?? [],
+      dependencies: it.dependencies ?? it.source?.dependencies ?? [],
+    };
+  };
+
+  const resolveExternalRef = createCrossPodRefResolver({
+    getItem,
+    pseudoPodRead: typeof pseudoPodRead === 'function' ? pseudoPodRead : undefined,
+    // V1 public fetch — an ACP-protected ref answers 401/403 and becomes the PERMISSION_DENIED
+    // placeholder the three-tier render expects, rather than an error that loses the whole tree.
+    podFetch: podFetch ?? ((url) => fetch(url, {
+      headers: { Accept: 'application/json, text/turtle;q=0.5' },
+    })),
+  });
+
+  try {
+    return { tree: await treeOf({ rootId: itemId, getItem, resolveExternalRef }) };
+  } catch (err) {
+    return { error: err?.message ?? String(err) };
+  }
+}

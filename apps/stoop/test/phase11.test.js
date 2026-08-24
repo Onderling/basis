@@ -41,10 +41,10 @@ async function buildAgent({ members } = {}) {
 
 // ── Skill management ──────────────────────────────────────────────────────
 
-describe('Stoop V1 Phase 11 — setMySkills / addMySkill / removeMySkill', () => {
-  it('setMySkills replaces the full array', async () => {
+describe('Stoop V1 Phase 11 — setMyOfferings / addMySkill / removeMySkill', () => {
+  it('setMyOfferings replaces the full array', async () => {
     const bundle = await buildAgent();
-    const r = await callSkill(bundle.agent, 'setMySkills', {
+    const r = await callSkill(bundle.agent, 'setMyOfferings', {
       skills: [
         { categoryId: 'klusjes', freeTags: ['fiets'] },
         { categoryId: 'tuin' },
@@ -75,7 +75,7 @@ describe('Stoop V1 Phase 11 — setMySkills / addMySkill / removeMySkill', () =>
 
   it('rejects missing required args', async () => {
     const bundle = await buildAgent();
-    expect(await callSkill(bundle.agent, 'setMySkills', {})).toEqual({ error: 'skills array required' });
+    expect(await callSkill(bundle.agent, 'setMyOfferings', {})).toEqual({ error: 'skills array required' });
     expect(await callSkill(bundle.agent, 'addMySkill', {})).toEqual({ error: 'categoryId required' });
     expect(await callSkill(bundle.agent, 'removeMySkill', {})).toEqual({ error: 'categoryId required' });
   });

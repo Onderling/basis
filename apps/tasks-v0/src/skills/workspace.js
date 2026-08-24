@@ -28,7 +28,7 @@
 
 import { defineSkill } from '@onderling/core';
 
-import { computeStatus as itemStoreComputeStatus, treeOf as itemStoreTreeOf, createCrossPodRefResolver } from '@onderling/item-store';
+import { computeStatus as itemStoreComputeStatus, itemTreeFor } from '@onderling/item-store';
 import { treeOf } from '../dag-tree.js';
 import { effectiveStatus, unmetDeps } from '../dag.js';
 import { argsFromParts } from '../bundleResolver.js';
@@ -173,42 +173,15 @@ export function buildWorkspaceSkills({ bundleResolver } = {}) {
       const circle = bundleResolver(parts, { envelope, from });
       if (!circle) return { error: 'circleId required' };
       const a = argsFromParts(parts);
-      if (typeof a.itemId !== 'string' || !a.itemId) return { error: 'itemId required' };
-
-      // Bridge both embeds shapes: top-level (Tasks canonical) and
-      // source.embeds (Stoop-originated items embedded by reference).
-      const getItem = async (id) => {
-        const it = await circle.itemStore.getById(id).catch(() => null);
-        if (!it) return null;
-        return {
-          ...it,
-          embeds:       it.embeds       ?? it.source?.embeds       ?? [],
-          dependencies: it.dependencies ?? it.source?.dependencies ?? [],
-        };
-      };
-
-      const pseudoPodRead = typeof circle.pseudoPod?.read === 'function'
-        ? (ref) => circle.pseudoPod.read(ref)
-        : undefined;
-
-      const resolveExternalRef = createCrossPodRefResolver({
-        getItem,
-        pseudoPodRead,
-        // V1 public fetch — ACP-protected refs return 401/403 →
-        // PERMISSION_DENIED placeholder (the designed 3-tier render).
-        podFetch: (url) => fetch(url, {
-          headers: { Accept: 'application/json, text/turtle;q=0.5' },
-        }),
+      // One implementation, in the package that owns `treeOf` — stoop has the same op and this body
+      // was copied from it.
+      return itemTreeFor({
+        itemId:        a.itemId,
+        getById:       (id) => circle.itemStore.getById(id),
+        pseudoPodRead: typeof circle.pseudoPod?.read === 'function' ? (ref) => circle.pseudoPod.read(ref) : undefined,
       });
-
-      try {
-        const tree = await itemStoreTreeOf({ rootId: a.itemId, getItem, resolveExternalRef });
-        return { tree };
-      } catch (err) {
-        return { error: err?.message ?? String(err) };
-      }
     }, {
-      description: 'Walk a task\'s embeds/deps tree, materialising cross-pod refs (M4 Phase 3.3c decentralised read path).',
+      description: 'Walk a task\'s embeds/deps tree, materialising cross-pod refs (the decentralised read path).',
       visibility:  'authenticated',
     }),
   ];

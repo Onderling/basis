@@ -7,7 +7,7 @@
  *
  *   /lend-assign  → assignLend       (open → assigned)
  *   /lend-return  → markReturned     (assigned → returned)
- *   /skills       → setMySkills      (profile setup)
+ *   /offerings    → setMyOfferings   (profile setup)
  *   /leave-group  → leaveGroup       (destructive — confirm-gated in mock)
  *   /tree         → getItemTree      (read-only graph walk)
  *   sign-out → signOutOfPod (confirm-gated)
@@ -175,10 +175,11 @@ describe('CC-ST-audit — catalogue has all 8 audit slashes', () => {
   let ws;
   beforeEach(async () => { ws = await bootWorkspaceWithRealStoop(); });
 
-  it('commandMenu declares /lend-assign /lend-return /skills /leave-group /tree /sign-out /report /bulletin', () => {
+  it('commandMenu declares /lend-assign /lend-return /offerings /leave-group /tree /sign-out /report /bulletin', () => {
     const cmds = new Set(ws.catalogue().commandMenu.map((e) => e.command));
     for (const cmd of [
-      '/lend-assign', '/lend-return', '/skills', '/leave-group',
+      // `/skills` retired with the setMySkills alias — `/offerings` is the one route to that op.
+      '/lend-assign', '/lend-return', '/offerings', '/leave-group',
       '/tree', '/sign-out', '/report', '/bulletin',
     ]) {
       expect(cmds.has(cmd)).toBe(true);
@@ -188,7 +189,7 @@ describe('CC-ST-audit — catalogue has all 8 audit slashes', () => {
   it('every audit slash is owned by stoop', () => {
     const menu = ws.catalogue().commandMenu;
     const audit = [
-      '/lend-assign', '/lend-return', '/skills', '/leave-group',
+      '/lend-assign', '/lend-return', '/offerings', '/leave-group',
       '/tree', '/sign-out', '/report', '/bulletin',
     ];
     for (const cmd of audit) {
@@ -279,18 +280,21 @@ describe('CC-ST.A2 — /lend-return wires markReturned', () => {
 });
 
 /* ════════════════════════════════════════════════════════════
- * 3. /skills — setMySkills dispatch
+ * 3. /offerings — setMyOfferings dispatch
  *    Manifest declares one required string param (`skills`) that
  *    consumers pass as a JSON-encoded array.  body default 'match'
  *    → _match → skills.  Substrate parses the string and validates
  *    `Array.isArray`.
  * ══════════════════════════════════════════════════════════ */
 
-describe('CC-ST.A3 — /skills wires setMySkills', () => {
+// Was `/skills`, which dispatched to a `setMySkills` alias kept only so a stored slash from before
+// the skill→offering rename still resolved. That alias is retired (no back-compat is the standing
+// rule), and `/offerings` is the one route — the same op the alias always pointed at.
+describe('CC-ST.A3 — /offerings wires setMyOfferings', () => {
   let ws;
   beforeEach(async () => { ws = await bootWorkspaceWithRealStoop(); });
 
-  it('/skills <json-array> dispatches; substrate parses + validates', async () => {
+  it('/offerings <json-array> dispatches; substrate parses + validates', async () => {
     // The slash surface declares `skills` as a STRING param (the
     // consumer JSON-encodes the array).  The substrate skill itself
     // expects an actual array.  So this slash dispatch will get
@@ -300,7 +304,7 @@ describe('CC-ST.A3 — /skills wires setMySkills', () => {
     // surface per manifest header).  Either way, dispatch ran end-
     // to-end through the substrate.
     const body = JSON.stringify([{ categoryId: 'plumbing', status: 'active' }]);
-    const r = await ws.userInput(`/skills ${body}`);
+    const r = await ws.userInput(`/offerings ${body}`);
     if (r.error) {
       expect(String(r.error.message)).toMatch(/skills array required|skills/i);
     } else {
@@ -310,8 +314,8 @@ describe('CC-ST.A3 — /skills wires setMySkills', () => {
     }
   });
 
-  it('bare /skills → needsForm for skills param', async () => {
-    const r = await ws.userInput('/skills');
+  it('bare /offerings → needsForm for skills param', async () => {
+    const r = await ws.userInput('/offerings');
     expect(r.kind).toBe('needsForm');
     expect(r.missing).toContain('skills');
   });

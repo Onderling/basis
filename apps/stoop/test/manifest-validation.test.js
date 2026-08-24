@@ -100,6 +100,8 @@ describe('stoop manifest — Slice D.1 structural invariants', () => {
   // the op set grew from the D.1 ~14 to 33.  2026-07-18: +1 for the
   // legacy `setMySkills` alias op (kept so the old `/skills` slash trigger
   // still dispatches after the skill→offering op-id rename) → 34.
+  // 2026-08-24: -1, the legacy `setMySkills` alias retired (no back-compat; `/offerings` is the
+  // one route to the op it aliased) → 98.
   // 2026-08-20: +2 for the rules-update rider — `recordGroupRulesUpdate` (the receive half —
   // plumbing, ui control 'none') and `broadcastCircleGovernance` (the fan, declared like its
   // membership/chat/task siblings — it predated the callskill-literals guard undeclared).
@@ -109,8 +111,8 @@ describe('stoop manifest — Slice D.1 structural invariants', () => {
   // `broadcastCircleKeyStatement` (the key-rotation fan) and `setMemberRole` (promote/demote on the
   // spine) → 99. This number is a snapshot on purpose: adding an op to the waist should be a
   // deliberate act that someone updates a count for, not something that slips in unremarked.
-  it('ships the full chat+slash surface (one stoop manifest, 99 ops)', () => {
-    expect(stoopManifest.operations.length).toBe(99);
+  it('ships the full chat+slash surface (one stoop manifest, 98 ops)', () => {
+    expect(stoopManifest.operations.length).toBe(98);
   });
 
   // No two ops may declare the same slash command (Part G hard guardrail

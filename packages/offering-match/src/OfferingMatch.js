@@ -40,7 +40,7 @@
  *   via `addPeer({pubKey})` / `removePeer(pubKey)`.
  */
 
-import { publish, subscribe, unsubscribe, param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
+import { publish, subscribe, unsubscribe, dropSubscriber, param, PARAM_SCOPE, PARAM_KIND } from '@onderling/core';
 
 import { ulid } from './ulid.js';
 
@@ -391,5 +391,36 @@ export class OfferingMatch {
 
   #topic(suffix) {
     return `${this.#group}/${suffix}`;
+  }
+
+  /**
+   * Stop broadcasting THIS GROUP's topics to these addresses — the receive half of a removal.
+   *
+   * The subscriber registry lives on the publisher, so this is a decision we can actually make and
+   * not a request we have to hope is honoured. It had no maintenance at all: a removed member stayed
+   * registered and kept receiving everything the circle broadcast, which is how a banned neighbour
+   * went on reading the noticeboard.
+   *
+   * Scoped to this group's topic prefix, deliberately. Dropping the address everywhere would repeat
+   * the mistake the per-circle exit exists to undo — tidying up one circle severing the relationship
+   * in every circle you share with that person.
+   *
+   * Several addresses because a member is known by more than one: their webid and whatever
+   * per-circle address they subscribed under. We drop what we are given rather than guess which
+   * space the registration used.
+   *
+   * @param {string|string[]} addresses
+   * @returns {number} registrations dropped
+   */
+  dropSubscribers(addresses) {
+    const list = Array.isArray(addresses) ? addresses : [addresses];
+    const prefix = `${this.#group}/`;
+    let dropped = 0;
+    for (const a of list) {
+      if (typeof a !== 'string' || !a) continue;
+      dropped += dropSubscriber(this.#agent, a, { topicPrefix: prefix });
+      this.#peers.delete(a);          // and stop counting them as an audience for future claims
+    }
+    return dropped;
   }
 }

@@ -7,6 +7,18 @@
  * When a peer sends { type:'subscribe', topic } as OW, we add them.
  * When a peer sends { type:'unsubscribe', topic } as OW, we remove them.
  * publish() fans out to all registered subscribers.
+ *
+ * THE REGISTRY IS A MEMBERSHIP LIST, and it lives on the PUBLISHER. That is the useful part: who
+ * receives what we broadcast is our decision, not the subscriber's. It is also the part that was
+ * never maintained — a subscribe was registered unconditionally and nothing ever removed one, so a
+ * person removed from a circle kept receiving everything that circle broadcast, and a stranger who
+ * could reach our address could register for a circle topic and have its history replayed to them.
+ * Two things follow, and neither works without the other:
+ *
+ *   - `authorizeSubscribe` — an injected port, because the kernel does not know what a circle is.
+ *     Same shape and same rationale as the SecurityLayer's sender authorizer.
+ *   - `dropSubscriber` — so a removal reaches this list. Without the port a dropped subscriber
+ *     simply re-registers; without the drop the port only binds people who have not subscribed yet.
  */
 import { Parts } from '../Parts.js';
 
@@ -98,6 +110,70 @@ export async function publish(agent, topic, partsOrValue) {
 }
 
 /**
+ * Install the subscribe-authorization port: `(context) => boolean|Promise<boolean>`, asked of
+ * every inbound subscribe with `{topic, from}`. Returning false refuses the registration silently — the caller
+ * learns nothing about why, which is the same posture the sender authorizer takes.
+ *
+ * The kernel has no opinion about which topics are sensitive; an app that scopes topics to circles
+ * installs one that says so.
+ *
+ * @param {import('../Agent.js').Agent} agent
+ * @param {((c: {topic: string, from: string}) => boolean|Promise<boolean>)|null} authorizer
+ */
+export function setSubscribeAuthorizer(agent, authorizer) {
+  agent._authorizeSubscribe = typeof authorizer === 'function' ? authorizer : null;
+}
+
+/**
+ * Ask the port, failing OPEN when none is installed — and saying so once, loudly.
+ *
+ * Open is the right default for a kernel that is also used by test rigs and single-peer tools, and
+ * it is the wrong state for an app with circles. The SecurityLayer settled this exact question the
+ * same way, for the same reason, and the difference is invisible unless something says it out loud.
+ */
+async function askSubscribeAuthorizer(agent, context) {
+  const fn = agent._authorizeSubscribe;
+  if (typeof fn !== 'function') {
+    if (!agent._warnedNoSubscribeAuthorizer) {
+      agent._warnedNoSubscribeAuthorizer = true;
+      console.warn(
+        '[pubsub] NO SUBSCRIBE AUTHORIZER INSTALLED — any address that can reach this agent may '
+        + 'register for any topic and have its history replayed. Install one with '
+        + 'setSubscribeAuthorizer(agent, fn). This warning appears once per agent.',
+      );
+    }
+    return true;
+  }
+  try { return (await fn(context)) !== false; }
+  catch { return false; }   // a throwing authorizer refuses; it must never fail open
+}
+
+/**
+ * Remove one address from the subscriber registry — every topic, or only those under a prefix.
+ *
+ * `topicPrefix` is how a removal stays LOCAL to one circle. Circle topics are named
+ * `<circleId>/<suffix>`, so passing `` `${circleId}/` `` drops the departed from that circle's
+ * broadcasts and leaves every other circle you share with them untouched. Dropping them everywhere
+ * would repeat the mistake the per-circle exit was built to undo: tidying up one circle severing
+ * the relationship in all of them.
+ *
+ * @param {import('../Agent.js').Agent} agent
+ * @param {string} address
+ * @param {{topicPrefix?: string|null}} [opts]
+ * @returns {number} how many topic registrations were dropped
+ */
+export function dropSubscriber(agent, address, { topicPrefix = null } = {}) {
+  const reg = agent?._pubSubSubscribers;
+  if (!reg || typeof address !== 'string' || !address) return 0;
+  let dropped = 0;
+  for (const [topic, subs] of reg) {
+    if (topicPrefix && !String(topic).startsWith(topicPrefix)) continue;
+    if (subs.delete(address)) dropped += 1;
+  }
+  return dropped;
+}
+
+/**
  * Handle an inbound subscribe/unsubscribe/publish OW envelope.
  * Returns true if handled.
  *
@@ -109,25 +185,34 @@ export function handlePubSub(agent, envelope) {
 
   switch (type) {
     case 'subscribe': {
-      if (!agent._pubSubSubscribers) agent._pubSubSubscribers = new Map();
-      if (!agent._pubSubSubscribers.has(topic)) agent._pubSubSubscribers.set(topic, new Set());
-      agent._pubSubSubscribers.get(topic).add(envelope._from);
-      // Replay history to new subscriber.  Same per-peer routing
-      // fix as publish() — pick the right transport for the
-      // subscriber rather than blindly using the primary slot.
-      const history = agent._pubSubHistory?.get(topic);
-      if (history?.length) {
-        for (const parts of history) {
-          (async () => {
+      // THE GATE. `_authorizeSubscribe` answers "may this address receive what we publish here",
+      // and it is asked BEFORE the registration and therefore before the history replay — a refusal
+      // that happened after the replay would have handed over exactly what it was refusing.
+      //
+      // Handled either way; the DECISION may be asynchronous, because the honest answer to "is this
+      // address still a member" is a roster read, and pretending otherwise would force the app to
+      // keep a second membership copy — which is the shape of the bug this closes. Subscribes
+      // happen at setup, not per message, so the cost lands where it does not matter.
+      (async () => {
+        if (!(await askSubscribeAuthorizer(agent, { topic, from: envelope._from }))) return;
+        if (!agent._pubSubSubscribers) agent._pubSubSubscribers = new Map();
+        if (!agent._pubSubSubscribers.has(topic)) agent._pubSubSubscribers.set(topic, new Set());
+        agent._pubSubSubscribers.get(topic).add(envelope._from);
+        // Replay history to new subscriber.  Same per-peer routing
+        // fix as publish() — pick the right transport for the
+        // subscriber rather than blindly using the primary slot.
+        const history = agent._pubSubHistory?.get(topic);
+        if (history?.length) {
+          for (const parts of history) {
             try {
               const t = await agent.transportFor(envelope._from);
               await t.publishOneWay(envelope._from, topic, { type: 'publish', topic, parts });
             } catch (err) {
               agent.emit('error', err);
             }
-          })();
+          }
         }
-      }
+      })().catch((err) => agent.emit('error', err));
       return true;
     }
     case 'unsubscribe': {

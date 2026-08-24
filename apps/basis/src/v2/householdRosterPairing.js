@@ -34,10 +34,34 @@ export async function feedHouseholdRoster({ agent, circleId } = {}) {
   // (`agent._circleGroupsIndex`) so every existing call site feeds it without a signature change.
   const gidx = agent._circleGroupsIndex ?? null;
   let added = 0;
+  const want = new Set();
   for (const m of (Array.isArray(r?.members) ? r.members : [])) {
     // Per-circle (OBJ-2 Phase 6): pair the member into THIS circle's mirror, not a global roster.
-    if (m?.addr && m.addr !== self) { try { agent.addCirclePeer(circleId, m.addr); added += 1; } catch { /* */ } }
+    if (m?.addr && m.addr !== self) { want.add(m.addr); try { agent.addCirclePeer(circleId, m.addr); added += 1; } catch { /* */ } }
     if (m?.addr && gidx) { try { gidx.add(circleId, m.addr); } catch { /* the index must never break pairing */ } }
+  }
+
+  // ── AND UNPAIR WHOEVER THE ROSTER NO LONGER NAMES ───────────────────────────────────────────────
+  // This loop used to only ADD. The recipient set could therefore never shrink, so a removed member
+  // went on receiving everything the circle published — the removal reached the roster, the keys and
+  // the authorize snapshot, and stopped one step short of the list that decides who things are sent
+  // to. Nobody noticed because the leak is silent on the sending side and invisible on the receiving
+  // one: it just looks like the circle still talking to you.
+  //
+  // Reconciling here rather than in the removal op is deliberate. A removal happens on ONE admin's
+  // device; every OTHER member's device is fanning to that person too, and only a rule each device
+  // applies for itself can stop all of them. `listGroupRoster` already honours the circle's exits, so
+  // "no longer named" is derived from the circle's own record, on every device, at every circle-open.
+  //
+  // Guarded on a NON-EMPTY roster, which is the house rule for exactly this hazard (`recordCircleRoster`
+  // states it): an empty read is far more likely to be a failed skill call than a circle with nobody in
+  // it, and acting on one would unpair a healthy circle. Pairing is re-added on the next open either way.
+  if (want.size > 0 && typeof agent.listCirclePeers === 'function' && typeof agent.removeHouseholdPeer === 'function') {
+    try {
+      for (const addr of await agent.listCirclePeers(circleId)) {
+        if (addr && addr !== self && !want.has(addr)) await agent.removeHouseholdPeer(circleId, addr);
+      }
+    } catch { /* best-effort, like every other step here — a failure must not break pairing */ }
   }
   // OBJ-2 convergence — re-push our current items to all (now-paired) peers. The live publish-on-write
   // only reaches peers subscribed at write-time, and per-peer catch-up fires only on a FRESH pair; so

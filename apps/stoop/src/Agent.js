@@ -615,6 +615,18 @@ export async function createNeighbourhoodAgent({
     await agent.start();
   }
 
+  // NOT INSTALLED HERE, deliberately — see `setSubscribeAuthorizer` in @onderling/core.
+  //
+  // The kernel now has the gate and the drop, and the circle's roster is the right thing to answer
+  // with. What is missing is a trustworthy mapping between the two: a subscriber registers under a
+  // TRANSPORT address, and a roster row carries webids and per-circle addresses. In basis those
+  // meet (webid IS the secure-mesh signing address), but in this composition they do not, and a gate
+  // installed here refused legitimate members — three broadcast-reach tests, including the one
+  // written to catch exactly that regression.
+  //
+  // A gate that cannot tell a member from a stranger is worse than none: it breaks the circle while
+  // claiming to protect it. The mapping comes first.
+
   // Stoop V1 Phase 13.3 (2026-05-06): hop routing — opt the agent in
   // to content-blind sealed-forward for the configured group, so any
   // intermediate hop bridge sees opaque blobs only (`nacl.box`-sealed

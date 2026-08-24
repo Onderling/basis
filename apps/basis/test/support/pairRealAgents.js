@@ -200,7 +200,26 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     callSkill,
     verifyBinding: verifyChatBinding ?? (async (q) => {
       const { author, ref, circleId } = q ?? {};
-      // IN-PROCESS first: the test-process omniscience (ask the claimed member's OWN agent for its
+      // MEMBERSHIP FIRST, from the circle's own record — the same question production's verifier
+      // asks. A binding is two facts: this key belongs to this ref, AND this ref belongs to this
+      // circle. The in-process shortcut below answers only the first, and it used to answer the
+      // whole question, so a REMOVED member — who still holds their per-circle key — kept binding
+      // on every content lane. The harness could not show an eviction holding even once the
+      // production verifier was fixed to fold the spine; it was answering a different question.
+      //
+      // The shortcut only ever substituted for a missing ADDRESS row (the legacy pairing records
+      // rows without `circleAddress`), never for membership. So membership is checked here and the
+      // shortcut keeps the narrow job it was written for. A circle with NO roster rows at all is a
+      // composition that never recorded membership: there the roster has nothing to say and the
+      // shortcut stands alone, as before.
+      let roster = [];
+      try {
+        const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId });
+        roster = Array.isArray(r?.members) ? r.members : [];
+      } catch { roster = []; }
+      if (roster.length && !roster.some((m) => (m?.webid ?? m?.addr ?? m?.ref) === ref)) return false;
+
+      // IN-PROCESS: the test-process omniscience (ask the claimed member's OWN agent for its
       // circle key) — authoritative and constant-time for every node in THIS process, so the legacy
       // pairing tests keep their exact ingest timing (a variable-latency verify reorders a
       // concurrent flush burst — the offline-hold walk pinned that).

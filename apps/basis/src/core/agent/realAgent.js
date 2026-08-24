@@ -4314,6 +4314,12 @@ export async function createRealHouseholdAgent(opts = {}) {
       if (fresh) republishCircleItemsToNewPeer(id).catch(() => {});
       return mirror.listPeers?.() ?? [];
     },
+    /** This circle's current fan-out recipients — what `feedHouseholdRoster` reconciles against. */
+    listCirclePeers: async (circleId) => {
+      const id = (typeof circleId === 'string' && circleId) ? circleId : 'household';
+      const mirror = await ensureCircleMirror(id);
+      return mirror.listPeers?.() ?? [];
+    },
     removeHouseholdPeer: async (circleId, pubKey) => {
       if (pubKey === undefined) { pubKey = circleId; circleId = resolveCircleId({}); }
       const id = (typeof circleId === 'string' && circleId) ? circleId : 'household';

@@ -325,5 +325,25 @@ export async function wireSubstrateMirror({
     }
   }
 
-  return { addPeer, stop, listPeers, getPeers, backfillFrom };
+  /**
+   * Stop broadcasting this group's content to `pubKey` — the RECEIVE half of a removal.
+   *
+   * `recipients` is the set `publish` fans to, and until now it could only grow: `addPeer` existed,
+   * nothing removed one. So a person removed from the circle went on receiving every noticeboard
+   * post it made, in the clear. The eviction filter this mirror already had runs on the other
+   * direction — it drops posts FROM an evicted member — which is why the gap survived: the circle
+   * looked protected and was protected only one way round.
+   *
+   * Scoped by construction: a mirror belongs to ONE group, so this cannot touch another circle you
+   * share with the same person — the property the per-circle exit was built to preserve.
+   *
+   * @param {string} pubKey
+   * @returns {boolean} whether they were a recipient
+   */
+  function removePeer(pubKey) {
+    if (typeof pubKey !== 'string' || !pubKey) return false;
+    return recipients.delete(pubKey);
+  }
+
+  return { addPeer, removePeer, stop, listPeers, getPeers, backfillFrom };
 }

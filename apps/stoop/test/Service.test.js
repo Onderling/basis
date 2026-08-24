@@ -23,8 +23,11 @@ const ctx = (by = 'webid:alice') => ({ by });
 
 // Seed a legacy `type: 'lend'` item straight onto the bound store (assignLend requires `type === 'lend'`,
 // which the canonical postRequest translator stores as `type:'offer', kind:'lend'`, not `type:'lend'`).
+// A lend as the app actually writes one since the vocabulary refresh: an OFFER whose kind says it
+// comes back. This seeded `type: 'lend'` — a flat type nothing produces any more — which is why the
+// lend affordances could be addressed here while being unreachable from every real surface.
 const seedLend = (svc, text, by = 'webid:alice') =>
-  svc.store.addItems([{ type: 'lend', text, requiredSkills: [], visibility: 'household', source: {} }], { actor: by })
+  svc.store.addItems([{ type: 'offer', kind: 'lend', text, requiredSkills: [], visibility: 'household', source: {} }], { actor: by })
     .then(([i]) => i);
 
 describe('createStoopService — legacy callSkill (DataPart wrapper over buildSkills)', () => {
@@ -56,16 +59,18 @@ describe('createStoopService — callCapability atom-dispatch over the real skil
     expect(claimed).toMatchObject({ ok: true, via: 'op', opId: 'respondToItem' });
     expect(claimed.result).toMatchObject({ error: 'chat-not-wired' });    // real handler, no chat controller
 
-    // lend — reassign·lend → assignLend
+    // lend — reassign·offer → assignLend. The ATOM addresses `offer`, because that is the noun; a
+    // lend is a KIND of offer, and the capability layer resolves ops by noun alone. The op's own
+    // guard is what keeps it honest — `assignLend` refuses an offer that is not a lend.
     const lendA = await seedLend(svc, 'a ladder');
-    const reassigned = await svc.callCapability('reassign', 'lend', { itemId: lendA.id, borrowerWebid: 'webid:bob' }, c);
+    const reassigned = await svc.callCapability('reassign', 'offer', { itemId: lendA.id, borrowerWebid: 'webid:bob' }, c);
     expect(reassigned).toMatchObject({ ok: true, via: 'op', opId: 'assignLend' });
     expect(reassigned.result.error).toBeUndefined();
     expect(reassigned.result.item).toBeTruthy();
 
-    // lend — complete·lend → markReturned
+    // lend — complete·offer → markReturned, same reasoning as above.
     const lendB = await seedLend(svc, 'a hedge trimmer');
-    const returned = await svc.callCapability('complete', 'lend', { requestId: lendB.id }, c);
+    const returned = await svc.callCapability('complete', 'offer', { requestId: lendB.id }, c);
     expect(returned).toMatchObject({ ok: true, via: 'op', opId: 'markReturned' });
     expect(returned.result.item.completedAt).toBeTruthy();
 

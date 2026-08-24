@@ -112,14 +112,19 @@ describe('Stoop V2 Phase 25.4 — rotation + read', () => {
     expect(r2.code).not.toBe(c1);
   });
 
-  it('rotateMyGroupCode rejects non-admin', async () => {
-    const bundle = await buildBundle({ actor: ANNE, role: 'member' });
-    await callSkill(bundle.agent, 'createGroupV2', {
-      groupId: GROUP, name: 'X', rules: RULES,
-    }, ANNE);   // ANNE became admin via createGroupV2
-    // Demote ANNE to member to test admin-gate.
-    await bundle.members.addMember({ webid: ANNE, role: 'member' });
-    const r = await callSkill(bundle.agent, 'rotateMyGroupCode', { groupId: GROUP }, ANNE);
+  it('rotateMyGroupCode rejects a member of the circle', async () => {
+    // This used to "demote" Anne by writing `role: 'member'` into the MemberMap and then check she
+    // was refused. That map carries no authority any more — Anne made this circle, so she is its
+    // admin and a display row cannot say otherwise — which is the whole point of the change and why
+    // the old version of this test started passing the gate. The question it was asking is still
+    // worth asking, so it is asked of someone who really is not an admin: Bob, who joined.
+    const bundle = await buildBundle({ actor: ANNE });
+    await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES }, ANNE);
+    await bundle.itemStore.addItems([{
+      type: 'membership-redemption', text: `${BOB} joined`,
+      source: { groupId: GROUP, redeemedBy: BOB, confirmedBy: ANNE }, visibility: 'household',
+    }], { actor: ANNE });
+    const r = await callSkill(bundle.agent, 'rotateMyGroupCode', { groupId: GROUP }, BOB);
     expect(r).toEqual({ error: 'admin-only' });
   });
 

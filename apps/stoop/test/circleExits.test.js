@@ -187,23 +187,23 @@ describe('B4 — leaving a circle prunes it on the leaver\'s side', () => {
   });
 });
 
-describe('B4 — a circle with no redemption trail is still per-circle', () => {
-  it('the legacy MemberMap fallback honours this circle\'s removals', async () => {
-    // A seeded single-circle roster from before code-minting has no trail to project from, so the
-    // roster falls back to the whole MemberMap. That fallback used to be the ONLY place removal had
-    // an effect — via the global cache deletion, which was the bug. It is now exit-filtered per
-    // circle instead, so removal still works here and still cannot reach another circle.
+describe('B4 — a circle this device holds no record of', () => {
+  // This used to assert that such a circle fell back to the WHOLE MemberMap — the device's global
+  // display cache — and that removal was exit-filtered within that fallback. The fallback is gone:
+  // it answered a question about a circle you might not be in by listing everyone you had ever met,
+  // and naming you a member alongside them. What replaced it is the honest answer.
+  //
+  // The durable half of the old test — a removal in one circle never reaches another — is covered
+  // above by the two-circle cases, which use real circles rather than a cache standing in for one.
+  it('answers with nothing, rather than with the whole address book', async () => {
     const id = await AgentIdentity.generate(new VaultMemory());
     const bundle = await createNeighbourhoodAgent({
       identity: id, transport: new InternalTransport(new InternalBus(), id.pubKey),
       offeringMatch: { group: 'legacy-circle', localActor: ADMIN, peers: [] },
-      members: [{ webid: ADMIN, role: 'admin' }, { webid: BRAM, role: 'member' }, { webid: CATO, role: 'member' }],
+      members: [{ webid: ADMIN }, { webid: BRAM }, { webid: CATO }],
     });
     await bundle.offeringMatch.start();
-    expect(await webidsIn(bundle, 'legacy-circle')).toEqual([ADMIN, BRAM, CATO].sort());
-    await callSkill(bundle.agent, 'removeMember', { groupId: 'legacy-circle', memberWebid: BRAM });
-    expect(await webidsIn(bundle, 'legacy-circle')).toEqual([ADMIN, CATO].sort());
-    // …and a DIFFERENT legacy group on the same device is untouched.
-    expect(await webidsIn(bundle, 'other-legacy-circle')).toEqual([ADMIN, BRAM, CATO].sort());
+    expect(await webidsIn(bundle, 'legacy-circle')).toEqual([]);
+    expect(await webidsIn(bundle, 'other-legacy-circle')).toEqual([]);
   });
 });

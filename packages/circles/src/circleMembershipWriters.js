@@ -130,6 +130,15 @@ export async function redeemMembershipCode({
       code:      a.code,
       codeId:    valid.id,
       redeemedBy: from,
+      // WHO ADMITTED THEM — the admin who issued the code. The peer path has always recorded this;
+      // this one did not, and the roster derives a circle's FOUNDER structurally, as the people who
+      // confirmed admissions and never redeemed one themselves. So a circle joined through this path
+      // lost its creator from its own roster the moment anyone joined: the creation statement alone
+      // does not confer founder once a trail exists (a self-signed `create` would otherwise let any
+      // member crown themselves), and nothing else named them. Recording it here states a fact that
+      // was already true rather than widening what a `create` is trusted for.
+      ...(typeof valid?.source?.issuedBy === 'string' && valid.source.issuedBy
+        ? { confirmedBy: valid.source.issuedBy } : {}),
       redeemedAt: now,
       expiresAt:  valid.source.expiresAt,
       // Sealing public key the joiner publishes so the household control-agent can wrap the

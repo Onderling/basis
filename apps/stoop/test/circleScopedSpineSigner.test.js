@@ -71,12 +71,14 @@ describe('roster projection — verified author resolution (read side)', () => {
   it('SELF binding: a circle-key evict by this device folds after resolution via circleSignerFor', async () => {
     const myCircleId = await AgentIdentity.generate(new VaultMemory());
     const store = memStore();
-    // mel joined via the trail; the founder (webid:me) evicts, signed with the CIRCLE key.
-    await store.addItems([redemption('webid:mel', 1000)]);
+    // mel joined via the trail, admitted by webid:me — which is what makes webid:me the FOUNDER and
+    // therefore able to evict. This used to rely on an admin-role row in the MemberMap; that map
+    // carries no authority any more, so the circle's own record has to say who admitted whom.
+    await store.addItems([redemption('webid:mel', 1000, { confirmedBy: 'webid:me' })]);
     const emit = createSpineAppender({ store, signerFor: async () => ({ identity: myCircleId, ref: 'webid:me' }) });
     await emit({ kind: 'evict', circleId: CIRCLE, subject: 'webid:mel' });
 
-    const memberMapList = [{ webid: 'webid:me', role: 'admin' }];  // founder via the back-compat admin row
+    const memberMapList = [{ webid: 'webid:me' }];   // display only — authority comes from the trail
     const withResolver = await projectCircleRoster({
       store, groupId: CIRCLE, memberMapList,
       circleSignerFor: async () => ({ identity: myCircleId, ref: 'webid:me' }),
@@ -120,11 +122,13 @@ describe('roster projection — verified author resolution (read side)', () => {
   it('LEGACY statements (author == ref, no authorRef) fold exactly as before', async () => {
     const admin = await AgentIdentity.generate(new VaultMemory());
     const store = memStore();
-    await store.addItems([redemption('webid:mel', 1000)]);
+    // The admin is the founder because they admitted mel — the circle's own record, not a role on a
+    // display row. In the static-signer shape `author` IS the ref, so admin.pubKey is the webid here.
+    await store.addItems([redemption('webid:mel', 1000, { confirmedBy: admin.pubKey })]);
     const emit = createSpineAppender({ store, signer: admin });      // static: author IS the ref space
     await emit({ kind: 'evict', circleId: CIRCLE, subject: 'webid:mel' });
     const roster = await projectCircleRoster({
-      store, groupId: CIRCLE, memberMapList: [{ webid: admin.pubKey, role: 'admin' }],
+      store, groupId: CIRCLE, memberMapList: [{ webid: admin.pubKey }],
     });
     expect(roster.map((r) => r.webid)).not.toContain('webid:mel');
   });

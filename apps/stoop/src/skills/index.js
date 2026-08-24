@@ -835,8 +835,9 @@ async function listGroupMembersCore(scope, a, ctx) {
   // (the rails' binding verifiers) folds TRAIL + display only — verifying a statement must never
   // recurse through the statement fold itself.
   const skipSpine = a?.spineless === true;
-  const project = (circleSignerFor || membershipRead || skipSpine)
-    ? ((a2) => projectCircleRoster({ ...a2, circleSignerFor, membershipRead, skipSpine }))
+  const selfSigner = scope.selfSigner ?? null;
+  const project = (circleSignerFor || membershipRead || selfSigner || skipSpine)
+    ? ((a2) => projectCircleRoster({ ...a2, circleSignerFor, membershipRead, selfSigner, skipSpine }))
     : projectCircleRoster;
   return listCircleMembers(
     {
@@ -869,7 +870,7 @@ async function listGroupMembersCore(scope, a, ctx) {
  * @returns {Promise<Array<object>|null>} the circle's members, or `null` when the
  *   circle has NO redemption trail (the caller keeps its pre-trail behaviour).
  */
-export async function projectCircleRoster({ store, groupId, memberMapList = [], circleSignerFor, membershipRead, skipSpine = false } = {}) {
+export async function projectCircleRoster({ store, groupId, memberMapList = [], circleSignerFor, membershipRead, selfSigner = null, skipSpine = false } = {}) {
   if (!store || typeof store.listOpen !== 'function' || !groupId) return null;
   const list = Array.isArray(memberMapList) ? memberMapList : [];
   let redemptions = [];
@@ -1002,9 +1003,27 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
       if (id?.pubKey) selfBinding = { pubKey: id.pubKey, ref: r?.ref ?? id.pubKey };
     } catch { selfBinding = null; }
   }
+  // THE SAME RULE FOR THE LEGACY STORE PATH: a device can always verify its OWN key. Where there is
+  // no per-circle signer, statements are signed with the device's global identity, so `author` is
+  // that pubKey while `subject` is the person's webid. Those are the same string in basis (webid IS
+  // the signing address) and different strings wherever they are not — and the difference silently
+  // cost a creator their own circle, because the genesis derivation compares author to subject.
+  //
+  // Attesting our own signature grants nothing: the fold still decides what the statement means. It
+  // only lets this device say "that key is mine, and it speaks for this webid" about its own store —
+  // exactly the carve-out `membershipBindingVerifier` already makes, for the same reason.
+  if (!selfBinding && selfSigner?.pubKey && selfSigner?.ref) {
+    selfBinding = { pubKey: selfSigner.pubKey, ref: selfSigner.ref };
+  }
   const resolveAuthor = (body) => {
     const claimed = body?.payload?.authorRef;
-    if (typeof claimed !== 'string' || !claimed) return body;   // legacy: author is already the member ref
+    if (typeof claimed !== 'string' || !claimed) {
+      // Legacy: the author is already the member ref — UNLESS it is our own device key, which speaks
+      // for our own webid. Without this the two are different strings wherever webid is not the
+      // signing address, and every self-authored statement fails every author===subject test.
+      if (selfBinding && body?.author === selfBinding.pubKey) return { ...body, author: selfBinding.ref };
+      return body;
+    }
     if (selfBinding && body.author === selfBinding.pubKey && claimed === selfBinding.ref) {
       return { ...body, author: claimed };
     }
@@ -1219,8 +1238,14 @@ export function buildStoopScope(deps = {}) {
     store, offeringMatch, notifier, reveals, members, controlAgent,
     muted, localActor, groupId: explicitGroupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
   } = deps;
+  // This device's own key paired with the webid it speaks for. Derived HERE so both routes into the
+  // scope get it — the roster projection needs it to read back statements this same composition
+  // wrote with the global identity, where `author` is a pubKey and `subject` a webid.
+  const selfSigner = deps.selfSigner ?? ((bundle?.agent?.identity?.pubKey && localActor)
+    ? { pubKey: bundle.agent.identity.pubKey, ref: localActor } : null);
   const groupId = explicitGroupId ?? offeringMatch?.group ?? null;
   return {
+    selfSigner,
     store, offeringMatch, notifier, reveals, members, controlAgent,
     muted, localActor, groupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
   };
@@ -1316,9 +1341,15 @@ export function buildSkills({
   // `bundleResolver(parts,{envelope,from})`.  `wire(id, coreFn, opts)` looks the
   // op up in `stoopManifest`, generates the `defineSkill`-shaped handler via
   // `wireSkill`, and re-attaches the same description/visibility.
+  // This device's own key paired with the webid it speaks for. Derived once and shared with the
+  // scope: the roster projection and the role gate both need it to read back statements this
+  // composition wrote with the global identity (`author` a pubKey, `subject` a webid).
+  const selfSigner = (bundle?.agent?.identity?.pubKey && localActor)
+    ? { pubKey: bundle.agent.identity.pubKey, ref: localActor } : null;
   const scope = buildStoopScope({
     store, offeringMatch, notifier, reveals, members, controlAgent,
     muted, localActor, groupId, dataLocationConfig, chat, metrics, bundle, circleSignerFor, membershipRead,
+    selfSigner,
   });
   const storeFor = () => scope;
   const op = (id) => {
@@ -1392,9 +1423,13 @@ export function buildSkills({
     // the very gate that had just been told they were an admin, and every device's roster agreed
     // they were. Same shape as the content lanes' spineless verifier: a gate must read the head that
     // carries the authority it is checking.
+    // `selfSigner` rides along for the same reason: where there is no per-circle signer the
+    // statements this device wrote carry its global key as `author` and a webid as `subject`, and
+    // without the self-binding the fold cannot tell they are the same person — which locked a
+    // creator out of the circle they had just made.
     const rows = await projectCircleRoster({
       store, groupId: circleId, memberMapList: (await members?.list?.()) ?? [],
-      circleSignerFor, membershipRead,
+      circleSignerFor, membershipRead, selfSigner,
     });
     if (!Array.isArray(rows)) return null;
     return rows.find((r) => (r?.webid ?? r?.addr ?? r?.ref) === webid)?.role ?? null;

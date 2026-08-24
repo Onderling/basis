@@ -44,3 +44,4 @@ export { adaptForCanonical, makeValidateCanonical } from './src/adapter.js';
 
 /** Adapt + validate via the default registry. Returns `{ok, errors?}`. */
 export const validateCanonical = (item) => _defaultRegistry.validate(adaptForCanonical(item));
+export { INBOX_ITEM_SCHEMA, INBOX_KIND, isInboxItem } from './src/types/inbox-item.js';

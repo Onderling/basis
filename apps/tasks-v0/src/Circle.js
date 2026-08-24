@@ -42,7 +42,7 @@ import { wireTasksSubstrateMirror } from './substrateMirror.js';
 
 import { createTasksAgent } from './Agent.js';
 import { applyCustomRoles } from './skills/customRoles.js';
-import { REQUEST_TYPE as SUBTASK_REQUEST_TYPE, PROPOSAL_TYPE as SUBTASK_PROPOSAL_TYPE } from './skills/subtasks.js';
+import { REQUEST_KIND as SUBTASK_REQUEST_KIND, PROPOSAL_KIND as SUBTASK_PROPOSAL_KIND, isInbox } from './skills/subtasks.js';
 import { BotAgentRegistry } from './bot/BotAgentRegistry.js';
 import { wireCalendarEmission } from './calendar/wireCalendarEmission.js';
 import { recordInvoiceLine } from './skills/invoicing.js';
@@ -653,7 +653,7 @@ export async function createCircleAgent({
       }
 
       const subtaskListener = async (item) => {
-        if (item?.type !== SUBTASK_REQUEST_TYPE) return;
+        if (!isInbox(item, SUBTASK_REQUEST_KIND)) return;
         const adminWebids = Object.entries(roles)
           .filter(([, r]) => r === 'admin' || r === 'coordinator')
           .map(([webid]) => webid);
@@ -683,7 +683,7 @@ export async function createCircleAgent({
       // when a subtask-proposal is added, route it to the
       // parent's assignee's inbox with Approve/Decline buttons.
       const proposalListener = async (item) => {
-        if (item?.type !== SUBTASK_PROPOSAL_TYPE) return;
+        if (!isInbox(item, SUBTASK_PROPOSAL_KIND)) return;
         const target = item.source?.targetAssignee;
         if (!target) return;
         const b = ensureAdminBridge(target);

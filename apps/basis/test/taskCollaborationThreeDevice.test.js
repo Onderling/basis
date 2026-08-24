@@ -152,14 +152,25 @@ describe('the collaborative task corridor — three people, one circle', () => {
     }, 'the third person sees the work close — one circle, one state, not three');
   }, 180_000);
 
-  // QUARANTINED — finding F-004. The propose-flow is a declared op family (`proposeSubtask`,
-  // `approveSubtaskProposal`, `declineSubtaskProposal`, and the mirror-image request family) that
-  // CANNOT COMPLETE in this composition: `proposeSubtask` writes an item of type
-  // `subtask-proposal`, and `@onderling/item-types` does not register that type, so
-  // `CircleItemStore.put` refuses it with `unknown type: "subtask-proposal"`. The assertions below
-  // are what SHOULD happen and are left intact deliberately — un-skip this when the types are
-  // registered, and it becomes the regression pin.
-  it.skip('[F-004] the owner proposes extra work on submitted work, and the assignee consents', async () => {
+  // The regression pin for the propose-flow. It was quarantined while `proposeSubtask` wrote an
+  // item of type `subtask-proposal` that no registry knew, so `CircleItemStore.put` refused it —
+  // and the manifest had been declaring `{type: 'inbox-item', kind: 'subtask-proposal'}` for these
+  // ops the whole time. The noun is registered now and the writers, readers and gates all speak it.
+  it('the owner proposes extra work on submitted work, and the assignee consents', async () => {
+    // Its own task, carried to the SUBMITTED state the propose-flow applies to. The assertions below
+    // were written against the sibling test's `taskId` while this one was quarantined and never ran,
+    // so they never saw that a `const` in another `it()` is not in scope here.
+    const made = await A.agent.callSkill('tasks', 'addTask', { circleId: CIRCLE, text: 'de heg snoeien' });
+    const taskId = made?.itemId;
+    expect(taskId, JSON.stringify(made)).toBeTruthy();
+    await sees(B, (rows) => findById(rows, taskId), 'the worker sees the task to propose against');
+    const claimed = await B.agent.callSkill('tasks', 'claimTask', { circleId: CIRCLE, id: taskId });
+    expect(claimed?.error, JSON.stringify(claimed)).toBeUndefined();
+    const handedIn = await B.agent.callSkill('tasks', 'submitTask', { circleId: CIRCLE, id: taskId, note: 'klaar' });
+    expect(handedIn?.error, JSON.stringify(handedIn)).toBeUndefined();
+    await sees(A, (rows) => findById(rows, taskId)?.state === 'submitted',
+      'the owner sees the work handed in, which is what a proposal applies to');
+
     // ── 5. "Not quite done": the OWNER proposes extra work instead of approving ────────────────────
     // This is the propose-flow's real shape: `proposeSubtask` only applies to a SUBMITTED task with an
     // assignee, and only the master/admin may raise it — because it asks someone else to do more. The
@@ -169,11 +180,16 @@ describe('the collaborative task corridor — three people, one circle', () => {
       circleId: CIRCLE, parentTaskId: taskId, text: 'ook het tuinpad aanvegen',
     });
     expect(proposal?.error, JSON.stringify(proposal)).toBeUndefined();
-    const proposalId = proposal?.task?.id ?? proposal?.proposal?.id ?? proposal?.itemId ?? proposal?.id ?? null;
+    const proposalId = proposal?.proposalId ?? proposal?.proposal?.id ?? proposal?.itemId ?? proposal?.id ?? null;
     expect(proposalId, `the proposal has an id: ${JSON.stringify(proposal)?.slice(0, 200)}`).toBeTruthy();
 
-    // The ASSIGNEE consents — and only then is the extra work real.
-    const consent = await B.agent.callSkill('tasks', 'approveSubtaskProposal', { circleId: CIRCLE, id: proposalId });
+    // The ASSIGNEE consents — and only then is the extra work real. A retries until the proposal has
+    // replicated to B: it is written on the owner's device and has to cross the circle first, so
+    // "proposal not found" is a not-yet, not a no. Every other wait in this file is the same shape.
+    const consent = await until(async () => {
+      const r = await B.agent.callSkill('tasks', 'approveSubtaskProposal', { circleId: CIRCLE, proposalId });
+      return r?.error === 'proposal not found' ? null : r;
+    }, { timeout: 20000, step: 150 });
     expect(consent?.error, JSON.stringify(consent)).toBeUndefined();
 
     await sees(C, (rows) => rows.some((t) => (t.text ?? '').includes('tuinpad')),

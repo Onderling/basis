@@ -15,6 +15,7 @@ import { roleRank, ROLES } from '@onderling/core';
 // that set with a legacy fallback, so single-owner gating is byte-identical to the
 // old `item.assignee === actor` while a co-owner (not the mirror) is now allowed.
 import { isAssignee } from '@onderling/item-store';
+import { INBOX_KIND, isInboxItem } from '@onderling/item-types';
 
 /**
  * @typedef {'admin'|'coordinator'|'member'|'observer'|'external-volunteer'} StandardRole
@@ -118,7 +119,7 @@ export function buildStandardRolePolicy(roles, opts = {}) {
       if (isCoordinatorOrAbove(r)) return true;
       // narrow exception: the targetAssignee on a subtask-proposal
       // closes their own proposal via approve/decline.
-      if (item?.type === 'subtask-proposal'
+      if (isInboxItem(item, INBOX_KIND.SUBTASK_PROPOSAL)
           && item?.source?.targetAssignee === actor) {
         return true;
       }
@@ -167,7 +168,7 @@ export function buildStandardRolePolicy(roles, opts = {}) {
       // narrow exception: the targetAssignee on a subtask-proposal
       // can edit the proposal's notes (used by declineSubtaskProposal
       // to record the optional decline note).
-      if (item?.type === 'subtask-proposal'
+      if (isInboxItem(item, INBOX_KIND.SUBTASK_PROPOSAL)
           && item?.source?.targetAssignee === actor
           && patch && typeof patch === 'object'
           && Object.keys(patch).length === 1

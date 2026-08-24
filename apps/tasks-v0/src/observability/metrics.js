@@ -24,6 +24,7 @@
 
 import { UsageMetrics } from '@onderling/notifier';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+import { INBOX_KIND, isInboxItem } from '@onderling/item-types';
 
 // Parameter register (#36) — per-name latency reservoir size (scope:device, kind:internal).
 const DEFAULT_LATENCY_RESERVOIR = param({ key: 'tasksV0.latencyReservoir', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 200 });
@@ -63,7 +64,7 @@ export function buildMetrics({ itemStore, latencyReservoirSize, now } = {}) {
   const submitAtById = new Map();
 
   const onAdded = (item) => {
-    if (item?.type === 'subtask-request') {
+    if (isInboxItem(item, INBOX_KIND.SUBTASK_REQUEST)) {
       tracker.record(COUNTER_NAMES.SUBTASK_REQUEST);
       return;
     }
@@ -100,7 +101,7 @@ export function buildMetrics({ itemStore, latencyReservoirSize, now } = {}) {
   };
 
   const onCompleted = (item) => {
-    if (item?.type === 'subtask-request') {
+    if (isInboxItem(item, INBOX_KIND.SUBTASK_REQUEST)) {
       // Closing a subtask-request item via markComplete is how
       // approve/decline both terminate; differentiate via notes.
       if (typeof item.notes === 'string' && item.notes.startsWith('Declined')) {

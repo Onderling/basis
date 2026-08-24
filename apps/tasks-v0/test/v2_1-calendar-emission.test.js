@@ -50,7 +50,7 @@ describe('V2.1 — buildIcsFor', () => {
   it('emits one VEVENT per relevant task', () => {
     const tasks = [
       { id: 'task-1', text: 'Pay invoice', dueAt: 1715000000000, addedBy: ANNE, addedAt: 1714000000000 },
-      { id: 'task-2', text: 'Subtask request', type: 'subtask-request', dueAt: 1715000000000 },     // skipped
+      { id: 'task-2', text: 'Subtask request', type: 'inbox-item', kind: 'subtask-request', dueAt: 1715000000000 },     // skipped
       { id: 'task-3', text: 'No deadline', addedBy: ANNE },                                          // skipped
     ];
     const ics = buildIcsFor({ circleId: 'circle-x', circleName: 'X', member: ANNE, tasks });

@@ -106,7 +106,7 @@ describe('V2.7 — bot.* propose flow end-to-end', () => {
 
     // Pull the proposalId from the rendered text — short-id only;
     // resolve to the full id via getById prefix walk.
-    const open = await circle.itemStore.listOpen({ type: 'subtask-proposal' });
+    const open = await circle.itemStore.listOpen({ type: 'inbox-item' });
     const proposal = open[0];
 
     // Assignee approves via bot.
@@ -131,7 +131,7 @@ describe('V2.7 — bot.* propose flow end-to-end', () => {
     await call(circle, 'submitTask', { id: p.task.id }, KID);
     await call(circle, 'proposeSubtask',
       { parentTaskId: p.task.id, text: 'extra' }, ANNE);
-    const open = await circle.itemStore.listOpen({ type: 'subtask-proposal' });
+    const open = await circle.itemStore.listOpen({ type: 'inbox-item' });
     const proposal = open[0];
 
     const decline = circle.agent.skills.get('bot.declineProposal');

@@ -28,6 +28,7 @@ import { defineSkill } from '@onderling/core';
 
 import { argsFromParts } from '../bundleResolver.js';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+import { INBOX_KIND, isInboxItem } from '@onderling/item-types';
 
 /**
  * Default skill opts for every `bot.*` defineSkill call.
@@ -163,7 +164,7 @@ export function buildBotSkills({ bundleResolver } = {}) {
       if (!circle) return { text: 'circleId required' };
       const actor = effectiveActor({ from, envelope });
       const r = await callUnderlying(agent, 'listOpen', {}, actor, circle.circleId);
-      const items = (r?.items ?? []).filter((it) => it.type !== 'subtask-request').slice(0, 20);
+      const items = (r?.items ?? []).filter((it) => !isInboxItem(it, INBOX_KIND.SUBTASK_REQUEST)).slice(0, 20);
       if (items.length === 0) return { text: 'No open tasks.' };
       return { text: `*Open (${items.length}):*\n` + items.map(_formatItemLine).join('\n') };
     }, { ...BOT_SKILL_OPTS, description: 'Bot: list open tasks (chat-formatted).' }),
@@ -183,7 +184,7 @@ export function buildBotSkills({ bundleResolver } = {}) {
       if (!circle) return { text: 'circleId required' };
       const actor = effectiveActor({ from, envelope });
       const r = await callUnderlying(agent, 'listMyMasteredTasks', {}, actor, circle.circleId);
-      const items = (r?.items ?? []).filter((it) => it.type !== 'subtask-request').slice(0, 20);
+      const items = (r?.items ?? []).filter((it) => !isInboxItem(it, INBOX_KIND.SUBTASK_REQUEST)).slice(0, 20);
       if (items.length === 0) return { text: 'You don\'t master any open tasks.' };
       return { text: `*You master (${items.length}):*\n` + items.map(_formatItemLine).join('\n') };
     }, { ...BOT_SKILL_OPTS, description: 'Bot: list tasks where I am master.' }),
@@ -553,7 +554,8 @@ export function buildBotSkills({ bundleResolver } = {}) {
       const actor = effectiveActor({ from, envelope });
       // List subtask-proposal items targeting `actor`. Inline against the
       // resolved circle's itemStore.
-      const open = await circle.itemStore.listOpen({ type: 'subtask-proposal' });
+      const open = (await circle.itemStore.listOpen({ type: 'inbox-item' }))
+        .filter((i) => isInboxItem(i, INBOX_KIND.SUBTASK_PROPOSAL));
       const mine = open.filter((it) => it?.source?.targetAssignee === actor);
       if (mine.length === 0) {
         return { text: 'No subtask-proposals waiting on you. ✓' };

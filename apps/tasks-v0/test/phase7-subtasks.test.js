@@ -280,7 +280,7 @@ describe('Phase 7 — addSubtask (live, with depth threshold)', () => {
     const open = await circle.itemStore.listOpen();
     const grandchildren = open.filter((i) => i.parentTaskId === r1.task.id);
     expect(grandchildren).toHaveLength(0);
-    const requests = open.filter((i) => i.type === 'subtask-request');
+    const requests = open.filter((i) => i.type === 'inbox-item' && i.kind === 'subtask-request');
     expect(requests).toHaveLength(1);
   });
 });

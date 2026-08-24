@@ -21,6 +21,7 @@ import { VIEW_SCHEMA }              from './types/view.js';
 import { CIRCLE_SCHEMA }            from './types/circle.js';
 import { SHARED_REF_SCHEMA }        from './types/shared-ref.js';
 import { MEDIA_SCHEMA }             from './types/media.js';
+import { INBOX_ITEM_SCHEMA }        from './types/inbox-item.js';
 
 /**
  * Map of canonical name → schema. Useful for `Object.entries(...)`
@@ -54,6 +55,11 @@ export const CANONICAL_TYPES = Object.freeze({
   // Media Phase 1 (2026-07-09): canonical media noun — points at a
   // blob-gateway manifest line (or any embeds-shaped ref); no bytes.
   'media':              MEDIA_SCHEMA,
+  // The subtask negotiation's noun. Its two kinds were being written as bare TYPES
+  // (`subtask-request` / `subtask-proposal`), which no registry knew, so every "ask for a change
+  // instead of approving" failed at the store — while the manifest had been declaring
+  // `{type: 'inbox-item', kind: …}` for them all along. This is that declaration, made real.
+  'inbox-item':         INBOX_ITEM_SCHEMA,
 });
 
 /**

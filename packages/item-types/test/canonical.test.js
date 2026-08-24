@@ -37,7 +37,7 @@ function baseItem(type, extra = {}) {
 }
 
 describe('Canonical types — registration via default registry', () => {
-  it('the default registry has all 16 canonical types', () => {
+  it('the default registry has all 17 canonical types', () => {
     expect(list().sort()).toEqual([
       'announcement',
       'calendar-event',
@@ -46,6 +46,7 @@ describe('Canonical types — registration via default registry', () => {
       'circle',
       'claim',
       'contact',
+      'inbox-item',
       'media',
       'neighbourhood-job',
       'note',
@@ -69,11 +70,11 @@ describe('Canonical types — registration via default registry', () => {
   it('registerCanonicalTypes works on a fresh registry too', () => {
     const r = createRegistry();
     registerCanonicalTypes(r);
-    expect(r.list()).toHaveLength(16);
+    expect(r.list()).toHaveLength(17);
   });
 
   it('CANONICAL_TYPES exports the schema map', () => {
-    expect(Object.keys(CANONICAL_TYPES)).toHaveLength(16);
+    expect(Object.keys(CANONICAL_TYPES)).toHaveLength(17);
     expect(CANONICAL_TYPES.task).toBeTruthy();
     expect(CANONICAL_TYPES.note).toBeTruthy();
   });
@@ -101,6 +102,8 @@ describe('Canonical types — minimal valid + missing-required-field sweep', () 
     'shared-ref':        { sourceCircle: 'circle-a', sourceId: 'dec:item/task/abc' },
     // Media Phase 1 (2026-07-09): pointer-only media item.
     'media':             { source: { type: 'blob', ref: 'blob://abc123' } },
+    // The subtask negotiation's noun — `kind` is what it waits for, and is required.
+    'inbox-item':        { kind: 'subtask-proposal' },
   };
 
   for (const [name, extra] of Object.entries(MINIMAL)) {

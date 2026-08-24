@@ -34,6 +34,7 @@ import { effectiveStatus, unmetDeps } from '../dag.js';
 import { argsFromParts } from '../bundleResolver.js';
 // DESIGN gap #2 (2026-05-27) — `_sync` reply envelope for staleness hints.
 import { simulateSync, decorateWithLastSync } from './_syncEnvelope.js';
+import { INBOX_KIND, isInboxItem } from '@onderling/item-types';
 
 /**
  * @param {object} args
@@ -81,7 +82,8 @@ export function buildWorkspaceSkills({ bundleResolver } = {}) {
       if (role !== 'admin' && role !== 'coordinator') {
         return { error: 'admin or coordinator required' };
       }
-      const open = await circle.itemStore.listOpen({ type: 'subtask-request' });
+      const open = (await circle.itemStore.listOpen({ type: 'inbox-item' }))
+        .filter((i) => isInboxItem(i, INBOX_KIND.SUBTASK_REQUEST));
       return { items: open };
     }, {
       description: 'List pending subtask-request items (admin/coord only).',
@@ -103,7 +105,7 @@ export function buildWorkspaceSkills({ bundleResolver } = {}) {
       // No rootId → return one tree per top-level task (not contained by any parent). A task is a CHILD when
       // it carries the containment edge `containedBy`.
       const isChild = (t) => Array.isArray(t.containedBy) && t.containedBy.length > 0;
-      const tops = all.filter((t) => !isChild(t) && t.type !== 'subtask-request');
+      const tops = all.filter((t) => !isChild(t) && !isInboxItem(t, INBOX_KIND.SUBTASK_REQUEST));
       const trees = tops.map((t) => treeOf(t.id, all)).filter(Boolean);
       return { trees };
     }, {

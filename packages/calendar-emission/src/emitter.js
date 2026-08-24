@@ -176,7 +176,11 @@ export function diffRemoved(prev, next) {
 
 function _isCalendarRelevant(t, member) {
   if (!t || typeof t !== 'object') return false;
-  if (t.type === 'subtask-request') return false;
+  // No inbox item goes on a calendar — it is a decision waiting on a person, not an appointment.
+  // This used to name one kind (`subtask-request`) as a bare type, which stopped matching when the
+  // negotiation moved to `{type: 'inbox-item', kind}`; the noun is the right level to exclude at,
+  // and it needs nothing from the type package.
+  if (t.type === 'inbox-item') return false;
   if (typeof t.dueAt !== 'number' && typeof t.scheduledAt !== 'number') return false;
   // Only emit for tasks the member is involved with: assigned, mastered,
   // OR awaiting their approval. Other tasks would create noise in their

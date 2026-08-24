@@ -15,7 +15,10 @@
  * the busiest circles first. Pure — no I/O. Caller owns Circle lifecycle.
  */
 
-const SUBTASK_REQ = 'subtask-request';
+// The dashboard counts WORK. An inbox item is a decision waiting on a person, not work, so the
+// noun is excluded whole — the same level the calendar excludes at. This named one kind as a bare
+// type and stopped matching when the negotiation moved to `{type: 'inbox-item', kind}`.
+const INBOX_NOUN = 'inbox-item';
 
 /**
  * @typedef {object} CircleSummary
@@ -53,7 +56,7 @@ export function aggregateCircles({ circles, actor, roleOf, now = Date.now() }) {
     let mine = 0;
 
     for (const t of tasks) {
-      if (t?.type === SUBTASK_REQ) continue;
+      if (t?.type === INBOX_NOUN) continue;
       open++;
       if (Number.isFinite(t?.dueAt) && t.dueAt < now) overdue++;
       const isSubmitted = !!(t?.reviewLog ?? []).some((e) => e?.decision === 'submit') &&

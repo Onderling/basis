@@ -8,7 +8,7 @@
  *      sub-task's depth via `parentTaskId` walk; if depth >
  *      `circleConfig.subtasksAdminApprovalDepth` (default 3),
  *      INSTEAD of creating the sub-task immediately, files a
- *      `type: 'subtask-request'` item in the same item-store and
+ *      `{type: 'inbox-item', kind: 'subtask-request'}` item in the same item-store and
  *      returns `{queued: true, requestId}`. Circle admins receive
  *      an inbox notification (wired separately).
  *
@@ -40,9 +40,19 @@ import { defineSkill } from '@onderling/core';
 import { depthOf, wouldCreateParentCycle } from '../dag-tree.js';
 import { argsFromParts } from '../bundleResolver.js';
 import { param, PARAM_SCOPE, PARAM_KIND } from '@onderling/item-store';
+import { isInboxItem } from '@onderling/item-types';
 
-const REQUEST_TYPE = 'subtask-request';
-const PROPOSAL_TYPE = 'subtask-proposal';
+// ONE noun, two kinds — the vocabulary the manifest declares (`appliesTo: {type: 'inbox-item',
+// kind: …}`). These used to be written as bare types no registry knew, so the store refused them
+// and the negotiation was impossible; and because the kind lived under `source`, the manifest's
+// four rows could not have matched even once the type existed.
+const INBOX_TYPE = 'inbox-item';
+const REQUEST_KIND = 'subtask-request';
+const PROPOSAL_KIND = 'subtask-proposal';
+
+// The predicate lives with the type, in `@onderling/item-types`, so the packages that ask the
+// same question (calendar emission, the dashboards) get the same answer.
+const isInbox = isInboxItem;
 // Parameter register (#36) — subtask depth requiring admin approval (scope:device, kind:internal).
 const DEFAULT_ADMIN_APPROVAL_DEPTH = param({ key: 'tasksV0.adminApprovalDepth', scope: PARAM_SCOPE.DEVICE, kind: PARAM_KIND.INTERNAL, default: 3 });
 
@@ -142,10 +152,11 @@ export function buildSubtaskSkills({ bundleResolver } = {}) {
         // Past the approval depth — the verb HELD it; file the admin-approval request (its workflow item).
         const partial = { ...childArgs, parentTaskId: a.parentTaskId };
         const [request] = await itemStore.addItems([{
-          type:    REQUEST_TYPE,
+          type:    INBOX_TYPE,
+          kind:    REQUEST_KIND,
           text:    `Sub-task request: "${a.text}" under "${parent.text}"`,
           source: {
-            kind:           'subtask-request',
+            kind:           REQUEST_KIND,
             parentTaskId:   a.parentTaskId,
             requestedBy:    from,
             requestedDepth: spawnRes.depth,
@@ -184,7 +195,7 @@ export function buildSubtaskSkills({ bundleResolver } = {}) {
       const itemStore = circle.itemStore;
       const req = await itemStore.getById(a.requestId);
       if (!req) return { error: 'request not found', requestId: a.requestId };
-      if (req.type !== REQUEST_TYPE) {
+      if (!isInbox(req, REQUEST_KIND)) {
         return { error: 'item is not a subtask-request', requestId: a.requestId };
       }
       if (req.completedAt) {
@@ -235,7 +246,7 @@ export function buildSubtaskSkills({ bundleResolver } = {}) {
       const itemStore = circle.itemStore;
       const req = await itemStore.getById(a.requestId);
       if (!req) return { error: 'request not found', requestId: a.requestId };
-      if (req.type !== REQUEST_TYPE) {
+      if (!isInbox(req, REQUEST_KIND)) {
         return { error: 'item is not a subtask-request', requestId: a.requestId };
       }
       if (req.completedAt) return { error: 'request already resolved' };
@@ -303,10 +314,11 @@ export function buildSubtaskSkills({ bundleResolver } = {}) {
       };
 
       const [proposal] = await itemStore.addItems([{
-        type:    PROPOSAL_TYPE,
+        type:    INBOX_TYPE,
+        kind:    PROPOSAL_KIND,
         text:    `Sub-task proposal: "${a.text}" under "${parent.text}"`,
         source: {
-          kind:           'subtask-proposal',
+          kind:           PROPOSAL_KIND,
           parentTaskId:   a.parentTaskId,
           requestedBy:    from,
           targetAssignee: parent.assignee,
@@ -341,7 +353,7 @@ export function buildSubtaskSkills({ bundleResolver } = {}) {
       const itemStore = circle.itemStore;
       const prop = await itemStore.getById(a.proposalId);
       if (!prop) return { error: 'proposal not found', proposalId: a.proposalId };
-      if (prop.type !== PROPOSAL_TYPE) {
+      if (!isInbox(prop, PROPOSAL_KIND)) {
         return { error: 'item is not a subtask-proposal', proposalId: a.proposalId };
       }
       if (prop.completedAt) return { error: 'proposal already resolved' };
@@ -407,7 +419,7 @@ export function buildSubtaskSkills({ bundleResolver } = {}) {
       const itemStore = circle.itemStore;
       const prop = await itemStore.getById(a.proposalId);
       if (!prop) return { error: 'proposal not found', proposalId: a.proposalId };
-      if (prop.type !== PROPOSAL_TYPE) {
+      if (!isInbox(prop, PROPOSAL_KIND)) {
         return { error: 'item is not a subtask-proposal', proposalId: a.proposalId };
       }
       if (prop.completedAt) return { error: 'proposal already resolved' };
@@ -532,4 +544,4 @@ function _hasOpenSubmission(task) {
   return lastSubmit > lastVerdict;
 }
 
-export { REQUEST_TYPE, DEFAULT_ADMIN_APPROVAL_DEPTH, PROPOSAL_TYPE };
+export { INBOX_TYPE, REQUEST_KIND, PROPOSAL_KIND, DEFAULT_ADMIN_APPROVAL_DEPTH, isInbox };

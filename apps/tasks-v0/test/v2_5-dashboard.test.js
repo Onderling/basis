@@ -46,7 +46,7 @@ describe('V2.5 — aggregateCircles (pure)', () => {
           openTasks: [
             { id: '1', dueAt: now - 1000, assignee: ANNE },                // overdue + mine
             { id: '2', assignee: KID, reviewLog: [{ decision: 'submit' }] }, // submitted
-            { id: '3', type: 'subtask-request' },                           // ignored
+            { id: '3', type: 'inbox-item', kind: 'subtask-request' },                           // ignored
           ],
         },
       ],

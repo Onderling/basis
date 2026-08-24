@@ -967,7 +967,11 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
   // The architecture already said so: the roster is the fold of trail + spine, and the MemberMap
   // "never decides existence". It is a display cache; it is left-joined for names below and
   // decides nothing here.
-  if (forGroup.length === 0 && founderWebids.size === 0) return null;
+  //
+  // The check itself now runs AFTER the spine read below, because a brand-new circle's only record
+  // IS a spine statement — its creation — and deciding "I have no record of this circle" before
+  // reading the spine answered the question with half the evidence. That ordering is what kept a
+  // creator locked out of the circle they had just made even once the statement was being written.
 
   // The membership SPINE — the per-author SIGNED statements (join/leave/evict) the roster folds
   // deterministically (identical on every device, no wall-clock). Verified on read: only a genuine,
@@ -1063,6 +1067,11 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
     addGenesisFounders(spineStatements);
   } catch { spineStatements = []; }
   }
+
+  // NO RECORD AT ALL ⇒ NO ANSWER. Now that both the trail and the spine have been read: no
+  // admissions, no derivable founder, and no creation statement means this device genuinely does not
+  // hold this circle — and the honest answer to that is nothing, for every caller.
+  if (forGroup.length === 0 && founderWebids.size === 0) return null;
 
   return deriveRoster({
     redemptions: forGroup,
@@ -2436,17 +2445,9 @@ export function buildSkills({
       const a = dataArgs(parts);
       if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
       if (members) {
-        // NOT migrated to the folded head. These ops must work in compositions that have NO SPINE
-        // EMITTER at all (`bootRealAgentNode` without a device log, and the shells' pre-log paths):
-        // there the circle's creation statement is never written, on the lane or in the store, so
-        // nothing can name the creator and the head answers `null` for the very person who made the
-        // circle. Measured 2026-08-23: an admin was refused their own invite rotation.
-        //
-        // The member map is the net that currently covers them, which is also why its `role` cannot
-        // be stripped from the roster seed yet. Both move together, once a creation statement is
-        // written by every composition that creates a circle.
-        const me = await members.resolveByWebid(from);
-        const isAdmin = isCircleAdmin(me?.role);
+        // The folded head, like every other authority question here, refusing when it has no answer.
+        const isAdmin = isCircleAdmin(typeof isCircleAdminOfCircle === 'function'
+          ? await isCircleAdminOfCircle(a.groupId ?? groupId, from) : null);
         if (!isAdmin) return { error: 'admin-only' };
       }
       const err = _validateStoragePolicy(a.storagePolicy, a.groupPodUri);
@@ -2501,17 +2502,9 @@ export function buildSkills({
       const a = dataArgs(parts);
       if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
       if (members) {
-        // NOT migrated to the folded head. These ops must work in compositions that have NO SPINE
-        // EMITTER at all (`bootRealAgentNode` without a device log, and the shells' pre-log paths):
-        // there the circle's creation statement is never written, on the lane or in the store, so
-        // nothing can name the creator and the head answers `null` for the very person who made the
-        // circle. Measured 2026-08-23: an admin was refused their own invite rotation.
-        //
-        // The member map is the net that currently covers them, which is also why its `role` cannot
-        // be stripped from the roster seed yet. Both move together, once a creation statement is
-        // written by every composition that creates a circle.
-        const me = await members.resolveByWebid(from);
-        const isAdmin = isCircleAdmin(me?.role);
+        // The folded head, like every other authority question here, refusing when it has no answer.
+        const isAdmin = isCircleAdmin(typeof isCircleAdminOfCircle === 'function'
+          ? await isCircleAdminOfCircle(a.groupId ?? groupId, from) : null);
         if (!isAdmin) return { error: 'admin-only' };
       }
 
@@ -2591,9 +2584,8 @@ export function buildSkills({
 
       let isAdmin = false;
       if (members) {
-        // See the note on the sibling gates above: not migrated yet.
-        const me = await members.resolveByWebid(from);
-        isAdmin = isCircleAdmin(me?.role);
+        isAdmin = isCircleAdmin(typeof isCircleAdminOfCircle === 'function'
+          ? await isCircleAdminOfCircle(a.groupId ?? groupId, from) : null);
       }
       if (mode === 'admin-only' && !isAdmin) return { error: 'admin-only' };
 
@@ -4190,17 +4182,9 @@ export function buildSkills({
       // admin list for the group.  V1 reads from `members`'s `role`
       // field; pre-Phase-11 entries default to non-admin.
       if (members) {
-        // NOT migrated to the folded head. These ops must work in compositions that have NO SPINE
-        // EMITTER at all (`bootRealAgentNode` without a device log, and the shells' pre-log paths):
-        // there the circle's creation statement is never written, on the lane or in the store, so
-        // nothing can name the creator and the head answers `null` for the very person who made the
-        // circle. Measured 2026-08-23: an admin was refused their own invite rotation.
-        //
-        // The member map is the net that currently covers them, which is also why its `role` cannot
-        // be stripped from the roster seed yet. Both move together, once a creation statement is
-        // written by every composition that creates a circle.
-        const me = await members.resolveByWebid(from);
-        const isAdmin = isCircleAdmin(me?.role);
+        // The folded head, like every other authority question here, refusing when it has no answer.
+        const isAdmin = isCircleAdmin(typeof isCircleAdminOfCircle === 'function'
+          ? await isCircleAdminOfCircle(a.groupId ?? groupId, from) : null);
         if (!isAdmin) return { error: 'admin-only' };
       }
       const [item] = await store.addItems([{
@@ -4362,18 +4346,14 @@ export function buildSkills({
       const stored = rows.map((r) => (typeof r.source?.redeemedBy === 'string'
         ? { ...r, type: 'membership-redemption' } : r));
       const { ingested, skipped } = await store.ingestItems(stored, { actor: from, reason: 'roster-seed' });
-      // The MEMBER rows: merged into the member map for DISPLAY — names, avatars, addresses.
+      // The MEMBER rows — DISPLAY facts only. `role` is stripped: the seed carries names, avatars
+      // and addresses, never authority.
       //
-      // `role` still rides along, and that is a known wart rather than a design: stripping it was
-      // tried on 2026-08-23 and reverted (28 test files). The seed's role is the net that currently
-      // covers a CREATOR in any composition where the spine emitter is not wired — there the circle
-      // has no creation statement, and before its first join it has no admissions either, so nothing
-      // else can name its founder and the creator is locked out of their own circle.
-      //
-      // It can be stripped once the creation statement is emitted in every composition that creates
-      // a circle. The narrow alternative — trusting a rules item's `addedBy` while the trail is empty
-      // — is not worth it: on a mirrored store `addedBy` is the local recorder, so a joiner whose
-      // trail has not synced yet would read itself as the founder.
+      // It used to carry the role, because the founder derivation read it back out of the member map
+      // — and the two of them formed a loop with no ground truth, where a wrong role written by
+      // either became a wrong role in both. Authority now comes from the circle's own record: the
+      // admission trail, and the creation statement for a circle that has admitted nobody yet. A
+      // seeded device learns who runs a circle the way every other device does, by folding it.
       //
       // The SELF row (same webid — every device of one person shares it) gets a NARROWER merge:
       // only the ADDRESS facts, and only ADDITIVELY into the set. The sibling's per-circle
@@ -4404,7 +4384,8 @@ export function buildSkills({
                   ? { ceremonyAddress: m.ceremonyAddress } : {}),
               });
             } else {
-              await members.addMember(m);
+              const { role: _role, ...displayOnly } = m;
+              await members.addMember(displayOnly);
             }
             membersRecorded += 1;
           } catch { /* per-row best-effort */ }
@@ -4728,17 +4709,9 @@ export function buildSkills({
       const a = dataArgs(parts);
       const _groupId = a.groupId ?? groupId;
       if (members) {
-        // NOT migrated to the folded head. These ops must work in compositions that have NO SPINE
-        // EMITTER at all (`bootRealAgentNode` without a device log, and the shells' pre-log paths):
-        // there the circle's creation statement is never written, on the lane or in the store, so
-        // nothing can name the creator and the head answers `null` for the very person who made the
-        // circle. Measured 2026-08-23: an admin was refused their own invite rotation.
-        //
-        // The member map is the net that currently covers them, which is also why its `role` cannot
-        // be stripped from the roster seed yet. Both move together, once a creation statement is
-        // written by every composition that creates a circle.
-        const me = await members.resolveByWebid(from);
-        const isAdmin = isCircleAdmin(me?.role);
+        // The folded head, like every other authority question here, refusing when it has no answer.
+        const isAdmin = isCircleAdmin(typeof isCircleAdminOfCircle === 'function'
+          ? await isCircleAdminOfCircle(a.groupId ?? groupId, from) : null);
         if (!isAdmin) return { error: 'admin-only' };
       }
       const all = await store.listOpen({ type: 'report' });

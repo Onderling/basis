@@ -18,8 +18,9 @@
 // So this journey does not test the caretaker module — that is already tested. It measures what a
 // person gets today: the circle after its last admin leaves.
 //
-// WHAT IT FOUND, which reframes the whole question (F-018): every device projects ITSELF as an admin
-// of the circle. Measured on a plain three-person circle —
+// WHAT IT FOUND FIRST — every device projecting ITSELF as an admin of the circle — has since been
+// fixed: authority is one folded head now, and all three devices give the same answer. Measured
+// then, on a plain three-person circle, it looked like this:
 //
 //     anne sees: anne=admin   bram=member  cato=member    (correct — anne really is the admin)
 //     bram sees: bram=admin   anne=admin   cato=member
@@ -57,7 +58,7 @@ export async function run({ relayUrl }) {
       JSON.stringify(asAdmin.map((m) => [m.handle ?? m.webid?.slice(0, 6), m.role])));
 
     const before = await rosterOf(bram, CIRCLE);
-    check('[F-018] a MEMBER\'s device does not show that member as an admin',
+    check('a MEMBER\'s device does not show that member as an admin',
       roleOf(before, bram.pubKey) !== 'admin',
       JSON.stringify(before.map((m) => [m.handle ?? m.webid?.slice(0, 6), m.role])));
     check('a member\'s view of everyone ELSE is right — only the self-row is wrong',
@@ -68,7 +69,7 @@ export async function run({ relayUrl }) {
     const beforeRules = await call(bram, 'editGroupRules', {
       groupId: CIRCLE, rules: { agreements: 'mag dit?' },
     });
-    check('[F-018] a member cannot set the rules while an admin is present', !!beforeRules?.error,
+    check('a member cannot set the rules while an admin is present', !!beforeRules?.error,
       JSON.stringify(beforeRules)?.slice(0, 120));
 
     // ── The only admin walks out ─────────────────────────────────────────────────────────────────
@@ -87,14 +88,14 @@ export async function run({ relayUrl }) {
 
     // Trivially true while every device counts itself — recorded so the day the self-row is fixed,
     // this becomes the real caretaker question instead of silently starting to fail.
-    check('someone is admin after the departure (vacuous while F-018 stands: each device counts itself)',
+    check('someone is admin after the departure — THE OPEN QUESTION: today nobody is',
       admins.length >= 1, `${admins.length} admin(s) among ${after.length} member(s)`);
 
     // …and every device must agree on WHO, or the circle has two opinions about its own authority.
     const catoAfter = await rosterOf(cato, CIRCLE);
     const catoAdmins = catoAfter.filter((m) => m.role === 'admin').map((m) => m.webid ?? m.addr);
     const bramAdmins = admins.map((m) => m.webid ?? m.addr);
-    check('[F-018] …and both remaining devices agree on who it is',
+    check('…and both remaining devices agree on who it is',
       JSON.stringify(bramAdmins.sort()) === JSON.stringify(catoAdmins.sort()),
       `one device sees ${JSON.stringify(bramAdmins)}, the other ${JSON.stringify(catoAdmins)}`);
 
@@ -108,7 +109,7 @@ export async function run({ relayUrl }) {
       const r = await call(cato, 'getGroupRules', { groupId: CIRCLE }).catch(() => null);
       return JSON.stringify(r ?? {}).includes('samen verder');
     }, 8000);
-    check('[F-018] the circle can still change its own rules after its admin left', rulesReached,
+    check('the circle can still change its own rules after its admin left', rulesReached,
       `write said ${JSON.stringify(rulesNow)?.slice(0, 90)}`);
 
     // The sharpest one: a circle that can never remove anyone again has no way to protect itself.
@@ -117,7 +118,7 @@ export async function run({ relayUrl }) {
     });
     const removalTook = await untilTrue(
       async () => !hasMember(await rosterOf(cato, CIRCLE), cato.pubKey), 6000);
-    check('[F-018] the circle can still remove a member after its admin left', removalTook,
+    check('the circle can still remove a member after its admin left', removalTook,
       `op said ${JSON.stringify(removeNow)?.slice(0, 90)}`);
   } catch (err) {
     check('the last-admin corridor completed', false, String(err?.message ?? err).slice(0, 250));

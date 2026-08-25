@@ -1266,6 +1266,7 @@ snapshots:
       '@inrupt/solid-client': 3.0.0
       '@inrupt/solid-client-authn-node': 4.0.0
       '@noble/hashes': 2.2.0
+      '@onderling/params': link:../../packages/params
       '@scure/bip39': 2.2.0
       ed2curve: 0.3.0
       tweetnacl: 1.0.3
@@ -1276,6 +1277,7 @@ snapshots:
   '@onderling/pod-client@file:../../packages/pod-client':
     dependencies:
       '@inrupt/solid-client': 3.0.0
+      '@noble/hashes': 2.2.0
       '@onderling/core': link:../../packages/core
       '@onderling/logger': link:../../packages/logger
       '@onderling/oidc-session': link:../../packages/oidc-session
@@ -1283,9 +1285,13 @@ snapshots:
       ed2curve: 0.3.0
       tweetnacl: 1.0.3
 
-  '@onderling/pod-search@file:../../packages/pod-search': {}
+  '@onderling/pod-search@file:../../packages/pod-search':
+    dependencies:
+      '@onderling/params': link:../../packages/params
 
-  '@onderling/vault@file:../../packages/vault': {}
+  '@onderling/vault@file:../../packages/vault':
+    dependencies:
+      tweetnacl: 1.0.3
 
   '@paralleldrive/cuid2@2.3.1':
     dependencies:

@@ -18,6 +18,9 @@ importers:
       '@inrupt/solid-client-authn-node':
         specifier: 4.0.0
         version: 4.0.0
+      '@onderling/params':
+        specifier: workspace:*
+        version: link:../params
     devDependencies:
       '@onderling/core':
         specifier: workspace:^

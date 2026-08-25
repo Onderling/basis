@@ -24,12 +24,18 @@ importers:
       '@onderling/blob-gateway':
         specifier: workspace:*
         version: link:../../packages/blob-gateway
+      '@onderling/circles':
+        specifier: workspace:*
+        version: link:../../packages/circles
       '@onderling/core':
         specifier: workspace:*
         version: link:../../packages/core
       '@onderling/identity-resolver':
         specifier: workspace:*
         version: link:../../packages/identity-resolver
+      '@onderling/kring-host':
+        specifier: workspace:*
+        version: link:../../packages/kring-host
       '@onderling/pod-client':
         specifier: workspace:*
         version: link:../../packages/pod-client

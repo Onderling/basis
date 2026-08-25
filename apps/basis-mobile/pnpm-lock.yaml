@@ -35,7 +35,7 @@ importers:
         version: file:../../packages/app-manifest
       '@onderling/blob-gateway':
         specifier: file:../../packages/blob-gateway
-        version: file:../../packages/blob-gateway(@onderling/pseudo-pod@..+packages+pseudo-pod)
+        version: file:../../packages/blob-gateway
       '@onderling/core':
         specifier: file:../../packages/core
         version: file:../../packages/core
@@ -69,6 +69,9 @@ importers:
       '@onderling/secure-agent':
         specifier: file:../../packages/secure-agent
         version: file:../../packages/secure-agent
+      '@onderling/sync-engine-rn':
+        specifier: file:../../packages/sync-engine-rn
+        version: file:../../packages/sync-engine-rn(@onderling/core@file:../../packages/core)(@onderling/pod-client@..+packages+pod-client)(react@18.3.1)
       '@onderling/vault':
         specifier: file:../../packages/vault
         version: file:../../packages/vault
@@ -111,6 +114,9 @@ importers:
       expo-auth-session:
         specifier: ~6.0.3
         version: 6.0.3(expo@52.0.49(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@expo/metro-runtime@4.0.1(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)))(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))(react@18.3.1))(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))(react@18.3.1)
+      expo-background-fetch:
+        specifier: ~13.0.6
+        version: 13.0.6(expo@52.0.49(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@expo/metro-runtime@4.0.1(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)))(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))(react@18.3.1))(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))
       expo-camera:
         specifier: ~16.0.18
         version: 16.0.18(expo@52.0.49(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@expo/metro-runtime@4.0.1(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)))(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))(react@18.3.1))(react-native-web@0.19.13(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))(react@18.3.1)
@@ -141,6 +147,9 @@ importers:
       expo-status-bar:
         specifier: ~2.0.1
         version: 2.0.1(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))(react@18.3.1)
+      expo-task-manager:
+        specifier: ~12.0.6
+        version: 12.0.6(expo@52.0.49(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@expo/metro-runtime@4.0.1(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)))(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))(react@18.3.1))(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))
       expo-web-browser:
         specifier: ~14.0.2
         version: 14.0.2(expo@52.0.49(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@expo/metro-runtime@4.0.1(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)))(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))(react@18.3.1))(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))
@@ -1390,14 +1399,6 @@ packages:
   '@onderling/oidc-session@file:../../packages/oidc-session':
     resolution: {directory: ../../packages/oidc-session, type: directory}
 
-  '@onderling/pod-client@file:../../packages/pod-client':
-    resolution: {directory: ../../packages/pod-client, type: directory}
-    peerDependencies:
-      '@onderling/pseudo-pod': workspace:^
-    peerDependenciesMeta:
-      '@onderling/pseudo-pod':
-        optional: true
-
   '@onderling/react-native@file:../../packages/react-native':
     resolution: {directory: ../../packages/react-native, type: directory}
     peerDependencies:
@@ -1423,6 +1424,21 @@ packages:
 
   '@onderling/secure-agent@file:../../packages/secure-agent':
     resolution: {directory: ../../packages/secure-agent, type: directory}
+
+  '@onderling/sync-engine-rn@file:../../packages/sync-engine-rn':
+    resolution: {directory: ../../packages/sync-engine-rn, type: directory}
+    peerDependencies:
+      '@onderling/core': ^0.1.0
+      '@onderling/pod-client': ^0.1.0
+      '@onderling/sync-engine': workspace:*
+      react: '>=18'
+    peerDependenciesMeta:
+      '@onderling/pod-client':
+        optional: true
+      '@onderling/sync-engine':
+        optional: true
+      react:
+        optional: true
 
   '@onderling/vault@file:../../packages/vault':
     resolution: {directory: ../../packages/vault, type: directory}
@@ -2757,6 +2773,11 @@ packages:
       react: '*'
       react-native: '*'
 
+  expo-background-fetch@13.0.6:
+    resolution: {integrity: sha512-fhSpPA7U/CIuBwYbMVSbfPxczsvHKF8MWmFumfMgriDqop6bp/ccLbnpU1vPLQDPmRPS5dMdTz04KYIMdTpD9w==}
+    peerDependencies:
+      expo: '*'
+
   expo-camera@16.0.18:
     resolution: {integrity: sha512-NP5u2yyc+wZc9GdUXH+jcEytyXZwBnHxItMwXoZQQxi4wgltwvs4XfSWjBtRZe1LngnhpBfPyPJV0aShjWlLDg==}
     peerDependencies:
@@ -2867,6 +2888,12 @@ packages:
     resolution: {integrity: sha512-AkIPX7jWHRPp83UBZ1iXtVvyr0g+DgBVvIXTtlmPtmUsm8Vq9Bb5IGj86PW8osuFlgoTVAg7HI/+Ok7yEYwiRg==}
     peerDependencies:
       react: '*'
+      react-native: '*'
+
+  expo-task-manager@12.0.6:
+    resolution: {integrity: sha512-yGbS64OL95z7tAQAvryy0sGHuQgrcpvnJsdyuGL8MA9bcPtr+kytLZ4dOCDac7foQS7+FLDGgtiAR6v/64B5Pg==}
+    peerDependencies:
+      expo: '*'
       react-native: '*'
 
   expo-updates-interface@1.0.0:
@@ -5062,6 +5089,9 @@ packages:
     resolution: {integrity: sha512-hpbDzxUY9BFwX+UeBnxv3Sh1q7HFxj48DTmXchNgRa46lO8uj3/1iEn3MiNUYTg1g9ctIqXCCERn8gYZhHC5lQ==}
     engines: {node: '>=4'}
 
+  unimodules-app-loader@5.0.1:
+    resolution: {integrity: sha512-JI4dUMOovvLrZ1U/mrQrR73cxGH26H7NpfBxwE0hk59CBOyHO4YYpliI3hPSGgZzt+YEy2VZR6nrspSUXY8jyw==}
+
   unique-filename@3.0.0:
     resolution: {integrity: sha512-afXhuC55wkAmZ0P18QsVE6kp8JaxrEokN2HGIoIVv2ijHQd419H0+6EigAFcIzXeMIkcIkNBpB3L/DXB3cTS/g==}
     engines: {node: ^14.17.0 || ^16.13.0 || >=18.0.0}
@@ -6972,6 +7002,7 @@ snapshots:
       '@onderling/item-types': link:../../packages/item-types
       '@onderling/kring-host': link:../../packages/kring-host
       '@onderling/llm-client': link:../../packages/llm-client
+      '@onderling/local-store': link:../../packages/local-store
       '@onderling/logger': link:../../packages/logger
       '@onderling/manifest-host': link:../../packages/manifest-host
       '@onderling/oidc-session': link:../../packages/oidc-session
@@ -6994,19 +7025,18 @@ snapshots:
     dependencies:
       '@onderling/item-types': link:../../packages/item-types
 
-  '@onderling/blob-gateway@file:../../packages/blob-gateway(@onderling/pseudo-pod@..+packages+pseudo-pod)':
+  '@onderling/blob-gateway@file:../../packages/blob-gateway':
     dependencies:
-      '@onderling/core': file:../../packages/core
-      '@onderling/oidc-session': file:../../packages/oidc-session
-      '@onderling/pod-client': file:../../packages/pod-client(@onderling/pseudo-pod@..+packages+pseudo-pod)
-    transitivePeerDependencies:
-      - '@onderling/pseudo-pod'
+      '@onderling/core': link:../../packages/core
+      '@onderling/oidc-session': link:../../packages/oidc-session
+      '@onderling/pod-client': link:../../packages/pod-client
 
   '@onderling/core@file:../../packages/core':
     dependencies:
       '@inrupt/solid-client': 3.0.0
       '@inrupt/solid-client-authn-node': 4.0.0
       '@noble/hashes': 2.2.0
+      '@onderling/params': link:../../packages/params
       '@scure/bip39': 2.2.0
       ed2curve: 0.3.0
       tweetnacl: 1.0.3
@@ -7040,18 +7070,7 @@ snapshots:
   '@onderling/oidc-session@file:../../packages/oidc-session':
     dependencies:
       '@inrupt/solid-client-authn-node': 4.0.0
-
-  '@onderling/pod-client@file:../../packages/pod-client(@onderling/pseudo-pod@..+packages+pseudo-pod)':
-    dependencies:
-      '@inrupt/solid-client': 3.0.0
-      '@onderling/core': link:../../packages/core
-      '@onderling/logger': link:../../packages/logger
-      '@onderling/oidc-session': link:../../packages/oidc-session
-      '@onderling/vault': link:../../packages/vault
-      ed2curve: 0.3.0
-      tweetnacl: 1.0.3
-    optionalDependencies:
-      '@onderling/pseudo-pod': link:../../packages/pseudo-pod
+      '@onderling/params': link:../../packages/params
 
   '@onderling/react-native@file:../../packages/react-native(@onderling/core@file:../../packages/core)(@onderling/pod-client@..+packages+pod-client)(@onderling/transports@..+packages+transports)(@onderling/vault@file:../../packages/vault)(@react-native-async-storage/async-storage@1.24.0(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)))(@react-native-community/netinfo@11.4.1(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)))(buffer@6.0.3)(nkn-sdk@1.3.6)(react-native-ble-plx@3.5.1(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))(react@18.3.1))(react-native-get-random-values@1.11.0(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)))(react-native-keychain@10.0.0)':
     dependencies:
@@ -7072,11 +7091,21 @@ snapshots:
     dependencies:
       '@noble/hashes': 2.2.0
       '@onderling/core': link:../../packages/core
+      '@onderling/item-store': link:../../packages/item-store
       '@onderling/pod-client': link:../../packages/pod-client
       '@onderling/transports': link:../../packages/transports
       '@onderling/vault': link:../../packages/vault
 
-  '@onderling/vault@file:../../packages/vault': {}
+  '@onderling/sync-engine-rn@file:../../packages/sync-engine-rn(@onderling/core@file:../../packages/core)(@onderling/pod-client@..+packages+pod-client)(react@18.3.1)':
+    dependencies:
+      '@onderling/core': file:../../packages/core
+    optionalDependencies:
+      '@onderling/pod-client': link:../../packages/pod-client
+      react: 18.3.1
+
+  '@onderling/vault@file:../../packages/vault':
+    dependencies:
+      tweetnacl: 1.0.3
 
   '@onderling/versioning@file:../../packages/versioning': {}
 
@@ -8541,6 +8570,13 @@ snapshots:
       - expo
       - supports-color
 
+  expo-background-fetch@13.0.6(expo@52.0.49(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@expo/metro-runtime@4.0.1(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)))(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))(react@18.3.1))(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)):
+    dependencies:
+      expo: 52.0.49(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@expo/metro-runtime@4.0.1(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)))(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))(react@18.3.1)
+      expo-task-manager: 12.0.6(expo@52.0.49(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@expo/metro-runtime@4.0.1(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)))(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))(react@18.3.1))(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))
+    transitivePeerDependencies:
+      - react-native
+
   expo-camera@16.0.18(expo@52.0.49(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@expo/metro-runtime@4.0.1(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)))(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))(react@18.3.1))(react-native-web@0.19.13(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))(react@18.3.1):
     dependencies:
       expo: 52.0.49(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@expo/metro-runtime@4.0.1(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)))(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))(react@18.3.1)
@@ -8672,6 +8708,12 @@ snapshots:
     dependencies:
       react: 18.3.1
       react-native: 0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)
+
+  expo-task-manager@12.0.6(expo@52.0.49(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@expo/metro-runtime@4.0.1(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)))(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))(react@18.3.1))(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)):
+    dependencies:
+      expo: 52.0.49(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@expo/metro-runtime@4.0.1(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)))(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))(react@18.3.1)
+      react-native: 0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)
+      unimodules-app-loader: 5.0.1
 
   expo-updates-interface@1.0.0(expo@52.0.49(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@expo/metro-runtime@4.0.1(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1)))(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))(react@18.3.1)):
     dependencies:
@@ -11197,6 +11239,8 @@ snapshots:
   unicode-match-property-value-ecmascript@2.2.1: {}
 
   unicode-property-aliases-ecmascript@2.2.0: {}
+
+  unimodules-app-loader@5.0.1: {}
 
   unique-filename@3.0.0:
     dependencies:

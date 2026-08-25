@@ -21,6 +21,9 @@ importers:
       '@onderling/core':
         specifier: workspace:*
         version: link:../core
+      '@onderling/item-store':
+        specifier: workspace:*
+        version: link:../item-store
       '@onderling/pod-client':
         specifier: workspace:*
         version: link:../pod-client
@@ -31,6 +34,9 @@ importers:
         specifier: workspace:*
         version: link:../vault
     devDependencies:
+      tweetnacl:
+        specifier: ^1.0.3
+        version: 1.0.3
       vitest:
         specifier: ^3.0.0
         version: 3.2.4
@@ -515,6 +521,9 @@ packages:
     resolution: {integrity: sha512-azl+t0z7pw/z958Gy9svOTuzqIk6xq+NSheJzn5MMWtWTFywIacg2wUlzKFGtt3cthx0r2SxMK0yzJOR0IES7Q==}
     engines: {node: '>=14.0.0'}
 
+  tweetnacl@1.0.3:
+    resolution: {integrity: sha512-6rt+RN7aOi1nGMyC4Xa5DdYiukl2UWCbcJft7YhxReBGQD7OAM8Pbxw6YMo4r2diNEA8FEmu32YOn9rhaiE5yw==}
+
   vite-node@3.2.4:
     resolution: {integrity: sha512-EbKSKh+bh1E1IFxeO0pg1n4dvoOTt0UDiXMd/qn++r98+jPO1xtJilvXldeuQ8giIB5IkpjCgMleHMNEsGH6pg==}
     engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
@@ -952,6 +961,8 @@ snapshots:
   tinyrainbow@2.0.0: {}
 
   tinyspy@4.0.4: {}
+
+  tweetnacl@1.0.3: {}
 
   vite-node@3.2.4:
     dependencies:

@@ -74,7 +74,7 @@ importers:
         version: file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)
       '@onderling/relay':
         specifier: file:../../packages/relay
-        version: file:../../packages/relay(@onderling/core@file:../../packages/core)(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))(@onderling/vault@file:../../packages/vault)
+        version: file:../../packages/relay
       '@onderling/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk
@@ -277,9 +277,6 @@ packages:
   '@onderling/app-manifest@file:../../packages/app-manifest':
     resolution: {directory: ../../packages/app-manifest, type: directory}
 
-  '@onderling/blob-gateway@file:../../packages/blob-gateway':
-    resolution: {directory: ../../packages/blob-gateway, type: directory}
-
   '@onderling/chat-agent@file:../../packages/chat-agent':
     resolution: {directory: ../../packages/chat-agent, type: directory}
     peerDependencies:
@@ -357,9 +354,6 @@ packages:
   '@onderling/relay@file:../../packages/relay':
     resolution: {directory: ../../packages/relay, type: directory}
     hasBin: true
-    peerDependencies:
-      '@onderling/core': ^0.1.0
-      '@onderling/vault': ^0.1.0
 
   '@onderling/substrate-stack@file:../../packages/substrate-stack':
     resolution: {directory: ../../packages/substrate-stack, type: directory}
@@ -1146,14 +1140,6 @@ snapshots:
     dependencies:
       '@onderling/item-types': link:../../packages/item-types
 
-  '@onderling/blob-gateway@file:../../packages/blob-gateway(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))':
-    dependencies:
-      '@onderling/core': file:../../packages/core
-      '@onderling/oidc-session': file:../../packages/oidc-session
-      '@onderling/pod-client': file:../../packages/pod-client(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))
-    transitivePeerDependencies:
-      - '@onderling/pseudo-pod'
-
   '@onderling/chat-agent@file:../../packages/chat-agent':
     dependencies:
       '@onderling/core': file:../../packages/core
@@ -1171,6 +1157,7 @@ snapshots:
       '@inrupt/solid-client': 3.0.0
       '@inrupt/solid-client-authn-node': 4.0.0
       '@noble/hashes': 2.2.0
+      '@onderling/params': link:../../packages/params
       '@scure/bip39': 2.2.0
       ed2curve: 0.3.0
       tweetnacl: 1.0.3
@@ -1220,10 +1207,12 @@ snapshots:
   '@onderling/oidc-session@file:../../packages/oidc-session':
     dependencies:
       '@inrupt/solid-client-authn-node': 4.0.0
+      '@onderling/params': link:../../packages/params
 
   '@onderling/pod-client@file:../../packages/pod-client(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))':
     dependencies:
       '@inrupt/solid-client': 3.0.0
+      '@noble/hashes': 2.2.0
       '@onderling/core': link:../../packages/core
       '@onderling/logger': link:../../packages/logger
       '@onderling/oidc-session': link:../../packages/oidc-session
@@ -1241,15 +1230,14 @@ snapshots:
     dependencies:
       '@onderling/core': file:../../packages/core
 
-  '@onderling/relay@file:../../packages/relay(@onderling/core@file:../../packages/core)(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))(@onderling/vault@file:../../packages/vault)':
+  '@onderling/relay@file:../../packages/relay':
     dependencies:
-      '@onderling/blob-gateway': file:../../packages/blob-gateway(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))
-      '@onderling/core': file:../../packages/core
-      '@onderling/vault': file:../../packages/vault
+      '@onderling/blob-gateway': link:../../packages/blob-gateway
+      '@onderling/core': link:../../packages/core
+      '@onderling/vault': link:../../packages/vault
       better-sqlite3: 11.10.0
       ws: 8.20.1
     transitivePeerDependencies:
-      - '@onderling/pseudo-pod'
       - bufferutil
       - utf-8-validate
 
@@ -1262,7 +1250,9 @@ snapshots:
     transitivePeerDependencies:
       - '@onderling/core'
 
-  '@onderling/vault@file:../../packages/vault': {}
+  '@onderling/vault@file:../../packages/vault':
+    dependencies:
+      tweetnacl: 1.0.3
 
   '@onderling/versioning@file:../../packages/versioning': {}
 

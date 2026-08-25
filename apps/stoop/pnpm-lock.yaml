@@ -30,6 +30,9 @@ importers:
       '@onderling/chat-p2p':
         specifier: file:../../packages/chat-p2p
         version: file:../../packages/chat-p2p(@onderling/core@file:../../packages/core)(@onderling/identity-resolver@file:../../packages/identity-resolver(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)))(@onderling/item-store@file:../../packages/item-store)
+      '@onderling/circles':
+        specifier: file:../../packages/circles
+        version: file:../../packages/circles
       '@onderling/core':
         specifier: file:../../packages/core
         version: file:../../packages/core
@@ -74,7 +77,7 @@ importers:
         version: file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)
       '@onderling/relay':
         specifier: file:../../packages/relay
-        version: file:../../packages/relay(@onderling/core@file:../../packages/core)(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))(@onderling/vault@file:../../packages/vault)
+        version: file:../../packages/relay
       '@onderling/sdk':
         specifier: file:../../packages/sdk
         version: file:../../packages/sdk
@@ -96,7 +99,7 @@ importers:
     devDependencies:
       '@onderling/blob-gateway':
         specifier: file:../../packages/blob-gateway
-        version: file:../../packages/blob-gateway(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))
+        version: file:../../packages/blob-gateway
       fake-indexeddb:
         specifier: ^6.2.5
         version: 6.2.5
@@ -324,6 +327,9 @@ packages:
       '@onderling/item-store':
         optional: true
 
+  '@onderling/circles@file:../../packages/circles':
+    resolution: {directory: ../../packages/circles, type: directory}
+
   '@onderling/core@file:../../packages/core':
     resolution: {directory: ../../packages/core, type: directory}
 
@@ -381,9 +387,6 @@ packages:
   '@onderling/relay@file:../../packages/relay':
     resolution: {directory: ../../packages/relay, type: directory}
     hasBin: true
-    peerDependencies:
-      '@onderling/core': ^0.1.0
-      '@onderling/vault': ^0.1.0
 
   '@onderling/sdk@file:../../packages/sdk':
     resolution: {directory: ../../packages/sdk, type: directory}
@@ -1465,13 +1468,11 @@ snapshots:
     dependencies:
       '@onderling/item-types': link:../../packages/item-types
 
-  '@onderling/blob-gateway@file:../../packages/blob-gateway(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))':
+  '@onderling/blob-gateway@file:../../packages/blob-gateway':
     dependencies:
-      '@onderling/core': file:../../packages/core
-      '@onderling/oidc-session': file:../../packages/oidc-session
-      '@onderling/pod-client': file:../../packages/pod-client(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))
-    transitivePeerDependencies:
-      - '@onderling/pseudo-pod'
+      '@onderling/core': link:../../packages/core
+      '@onderling/oidc-session': link:../../packages/oidc-session
+      '@onderling/pod-client': link:../../packages/pod-client
 
   '@onderling/chat-agent@file:../../packages/chat-agent':
     dependencies:
@@ -1485,11 +1486,16 @@ snapshots:
       '@onderling/identity-resolver': file:../../packages/identity-resolver(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))
       '@onderling/item-store': file:../../packages/item-store
 
+  '@onderling/circles@file:../../packages/circles':
+    dependencies:
+      '@onderling/item-types': file:../../packages/item-types
+
   '@onderling/core@file:../../packages/core':
     dependencies:
       '@inrupt/solid-client': 3.0.0
       '@inrupt/solid-client-authn-node': 4.0.0
       '@noble/hashes': 2.2.0
+      '@onderling/params': link:../../packages/params
       '@scure/bip39': 2.2.0
       ed2curve: 0.3.0
       tweetnacl: 1.0.3
@@ -1539,10 +1545,12 @@ snapshots:
   '@onderling/oidc-session@file:../../packages/oidc-session':
     dependencies:
       '@inrupt/solid-client-authn-node': 4.0.0
+      '@onderling/params': link:../../packages/params
 
   '@onderling/pod-client@file:../../packages/pod-client(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))':
     dependencies:
       '@inrupt/solid-client': 3.0.0
+      '@noble/hashes': 2.2.0
       '@onderling/core': link:../../packages/core
       '@onderling/logger': link:../../packages/logger
       '@onderling/oidc-session': link:../../packages/oidc-session
@@ -1560,15 +1568,14 @@ snapshots:
     dependencies:
       '@onderling/core': file:../../packages/core
 
-  '@onderling/relay@file:../../packages/relay(@onderling/core@file:../../packages/core)(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))(@onderling/vault@file:../../packages/vault)':
+  '@onderling/relay@file:../../packages/relay':
     dependencies:
-      '@onderling/blob-gateway': file:../../packages/blob-gateway(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))
-      '@onderling/core': file:../../packages/core
-      '@onderling/vault': file:../../packages/vault
+      '@onderling/blob-gateway': link:../../packages/blob-gateway
+      '@onderling/core': link:../../packages/core
+      '@onderling/vault': link:../../packages/vault
       better-sqlite3: 11.10.0
       ws: 8.21.0
     transitivePeerDependencies:
-      - '@onderling/pseudo-pod'
       - bufferutil
       - utf-8-validate
 
@@ -1592,6 +1599,7 @@ snapshots:
     dependencies:
       '@onderling/core': link:../../packages/core
       '@onderling/logger': link:../../packages/logger
+      tweetnacl: 1.0.3
       ws: 8.21.0
     optionalDependencies:
       mqtt: 5.15.1
@@ -1603,7 +1611,9 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  '@onderling/vault@file:../../packages/vault': {}
+  '@onderling/vault@file:../../packages/vault':
+    dependencies:
+      tweetnacl: 1.0.3
 
   '@onderling/versioning@file:../../packages/versioning': {}
 

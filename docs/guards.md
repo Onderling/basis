@@ -7,11 +7,12 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 17
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 18
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
 | `callskill-literals` | — | a literal `callSkill('group', 'op')` must name an op some manifest declares |
+| `ci-runs-guards` | — | the mechanism that runs the checks is itself checked |
 | `circle-store-door` | G-C1 | one store per circle |
 | `codenames` | — | no internal PLANNING CODENAMES in public code comments or docs |
 | `dep-boundaries` | — | Dependency-boundary fitness function — CLAUDE.md invariant #5 |

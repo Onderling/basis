@@ -1072,6 +1072,7 @@ snapshots:
       '@inrupt/solid-client': 3.0.0
       '@inrupt/solid-client-authn-node': 4.0.0
       '@noble/hashes': 2.2.0
+      '@onderling/params': link:../../packages/params
       '@scure/bip39': 2.2.0
       ed2curve: 0.3.0
       tweetnacl: 1.0.3
@@ -1104,6 +1105,7 @@ snapshots:
   '@onderling/pod-client@file:../../packages/pod-client(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))':
     dependencies:
       '@inrupt/solid-client': 3.0.0
+      '@noble/hashes': 2.2.0
       '@onderling/core': link:../../packages/core
       '@onderling/logger': link:../../packages/logger
       '@onderling/oidc-session': link:../../packages/oidc-session
@@ -1130,7 +1132,9 @@ snapshots:
     transitivePeerDependencies:
       - '@onderling/core'
 
-  '@onderling/vault@file:../../packages/vault': {}
+  '@onderling/vault@file:../../packages/vault':
+    dependencies:
+      tweetnacl: 1.0.3
 
   '@onderling/versioning@file:../../packages/versioning': {}
 

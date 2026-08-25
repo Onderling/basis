@@ -1229,10 +1229,12 @@ packages:
   '@xmldom/xmldom@0.8.13':
     resolution: {integrity: sha512-KRYzxepc14G/CEpEGc3Yn+JKaAeT63smlDr+vjB8jRfgTBBI9wRj/nkQEO+ucV8p8I9bfKLWp37uHgFrbntPvw==}
     engines: {node: '>=10.0.0'}
+    deprecated: this version has critical issues, please update to the latest version
 
   '@xmldom/xmldom@0.9.10':
     resolution: {integrity: sha512-A9gOqLdi6cV4ibazAjcQufGj0B1y/vDqYrcuP6d/6x8P27gRS8643Dj9o1dEKtB6O7fwxb2FgBmJS2mX7gpvdw==}
     engines: {node: '>=14.6'}
+    deprecated: this version has critical issues, please update to the latest version
 
   abort-controller@3.0.0:
     resolution: {integrity: sha512-h8lQ8tacZYnR3vNQTgibj+tODHI5/+l06Au2Pcriv/Gmet0eaj4TwWH41sO9wnHDiQsEj19q0drzdWdeAHtweg==}
@@ -4220,6 +4222,7 @@ snapshots:
       '@inrupt/solid-client': 3.0.0
       '@inrupt/solid-client-authn-node': 4.0.0
       '@noble/hashes': 2.2.0
+      '@onderling/params': link:../../packages/params
       '@scure/bip39': 2.2.0
       ed2curve: 0.3.0
       tweetnacl: 1.0.3
@@ -4230,10 +4233,12 @@ snapshots:
   '@onderling/oidc-session@file:../../packages/oidc-session':
     dependencies:
       '@inrupt/solid-client-authn-node': 4.0.0
+      '@onderling/params': link:../../packages/params
 
   '@onderling/pod-client@file:../../packages/pod-client(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))':
     dependencies:
       '@inrupt/solid-client': 3.0.0
+      '@noble/hashes': 2.2.0
       '@onderling/core': link:../../packages/core
       '@onderling/logger': link:../../packages/logger
       '@onderling/oidc-session': link:../../packages/oidc-session
@@ -4243,7 +4248,9 @@ snapshots:
     optionalDependencies:
       '@onderling/pseudo-pod': file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)
 
-  '@onderling/pod-search@file:../../packages/pod-search': {}
+  '@onderling/pod-search@file:../../packages/pod-search':
+    dependencies:
+      '@onderling/params': link:../../packages/params
 
   '@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)':
     dependencies:
@@ -4267,7 +4274,9 @@ snapshots:
       expo-crypto: 55.0.15(expo@55.0.25)
       expo-file-system: 55.0.21(expo@55.0.25)(react-native@0.85.3(@babel/core@7.29.0)(react@19.2.6))
 
-  '@onderling/vault@file:../../packages/vault': {}
+  '@onderling/vault@file:../../packages/vault':
+    dependencies:
+      tweetnacl: 1.0.3
 
   '@onderling/versioning@file:../../packages/versioning': {}
 

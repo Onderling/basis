@@ -1,34 +1,45 @@
 # =============================================================================
-# @canopy — per-package test gating
+# onderling — CI
 # -----------------------------------------------------------------------------
-# Runs every PR (any branch) and every push to `master` / `track-H-folio`.
-# One job per package, in parallel, so a failure in one suite doesn't mask
-# regressions elsewhere — you see exactly which suite broke.
+# WHAT CHANGED (2026-08-24) and why, because the previous version of this file
+# gated nothing for two weeks while looking like it did:
 #
-# Matrix:
-#   - core               npm ci + vitest        (required)   --retry=2
-#   - pod-client         npm ci + vitest        (required)
-#   - relay              npm ci + vitest        (required)
-#   - react-native       npm ci + vitest        (informational; continue-on-error)
-#   - integration-tests  npm ci + vitest        (required)
-#   - folio              npm ci + vitest        (required)
+#   * INSTALL. Six jobs each ran `npm ci --prefix <dir>`, which cannot resolve
+#     pnpm's `workspace:` protocol (EUNSUPPORTEDPROTOCOL). This repo is ONE pnpm
+#     workspace; it installs at the root, once, with the pinned pnpm.
+#   * THE SECOND HALF OF INSTALLING. A clean `pnpm install` finishes with some
+#     workspace symlinks missing (measured: `packages/core/node_modules/
+#     @onderling/params` absent → the guards aggregate lands 17/18). Installing
+#     this repo is TWO commands; `relink-workspace` is not a repair here, it is
+#     step two. See docs/architecture.md § "How the monorepo resolves".
+#   * COVERAGE. It ran six suites and never ran the guards aggregate, basis,
+#     stoop or the journeys — so ~5k basis tests and every journey had never
+#     been a gate at all.
+#   * TRIGGER. It ran on push to master/track-H-folio only, so work on a feature
+#     branch had no CI even when CI worked. Now: every branch, every PR.
+#   * JOBS THAT CANNOT FAIL. `react-native` was continue-on-error for parser
+#     failures that no longer exist (measured: 396 pass, 0 fail). A check that
+#     cannot fail is not a check — it reports, and reporting is what produced
+#     the false confidence above. It now gates like the rest.
 #
-# Notes:
-#   * `react-native` is allowed to fail until the BleTransport.test.js +
-#     MdnsTransport.test.js parser failures are sorted. Treat it as yellow.
-#   * The `core` matrix entry uses vitest's `--retry=2` because of one known
-#     timing-flaky scenario:
-#       packages/core/test/integration/mesh-scenario.test.js
-#         > Group AB — rendezvous phase 10 (WebRTC auto-upgrade)
-#         > phase 10b: force-close the DataChannel
-#     If it fails 2 retries in a row, that's a real regression — investigate.
-#   * No phone hardware is touched. We only run vitest unit suites; nothing
-#     here invokes `expo run:android` or BLE/mDNS device APIs.
-#   * No secrets needed — every test runs offline / in-process.
+# TIERING follows the property class (plans/design/6_architecture_enforcement.md):
+# structural checks are cheap and deterministic, so they run first and fastest;
+# convergence-under-concurrency (the journeys) is slower and runs in its own lane.
 #
-# See `.github/workflows/README.md` for a quick "what runs when" reference.
-# Branch-protection rules (marking the required jobs as gating) are a separate
-# one-time admin step on the GitHub side.
+# ⚠ TWO GAPS, BOTH DELIBERATE AND BOTH LOUD RATHER THAN QUIET:
+#
+#   1. `apps/basis` — the LARGEST suite (~5,175 tests) — is NOT here. It cannot
+#      be built from this repository alone: `apps/basis/package.json` declares
+#      `"onderling-feedback": "link:../../../feedback"`, a SIBLING REPO outside
+#      the checkout, and three source files import `onderling-feedback/public`.
+#      Measured 2026-08-24 on a clean clone: install succeeds, then those files
+#      fail to resolve. `apps/basis-mobile` carries the same link.
+#      Fixing it is a decision, not a tweak — see the ledger. Landing CI without
+#      it is deliberate: a job that always fails teaches people to ignore red,
+#      which is the exact habit this rewrite exists to end.
+#
+#   2. ⚠ STILL A MANUAL STEP ON GITHUB: marking these jobs required in branch
+#      protection. Until that is done this file reports and does not gate.
 # =============================================================================
 
 name: tests
@@ -36,105 +47,94 @@ name: tests
 on:
   pull_request:
   push:
-    branches:
-      - master
-      - track-H-folio
+    branches: ['**']
 
-# Cancel superseded runs on the same PR/branch — saves CI minutes.
 concurrency:
   group: tests-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Every job installs the same way. Kept here so the recipe cannot drift
+  # between jobs — the drift class this file is being rewritten to end.
+  STORE_PATH: ~/.pnpm-store
+
 jobs:
-  test:
+  # ── Rung 2: structural checks. Cheap, deterministic, first to fail. ─────────
+  checks:
+    name: guards + doc lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - name: Install (root workspace)
+        run: pnpm install --frozen-lockfile
+      - name: Relink workspace (the second half of installing — see header)
+        run: node scripts/relink-workspace.mjs
+      - name: Guards aggregate
+        run: npm run guards
+      - name: Doc organisation lint
+        run: npm run lint:docs
+
+  # ── The unit + integration suites, in parallel so a failure names itself. ───
+  suites:
     name: ${{ matrix.suite.label }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    continue-on-error: ${{ matrix.suite.allow-failure }}
-
+    timeout-minutes: 30
     strategy:
-      # Don't bail out the whole matrix when one suite fails — we want to see
-      # every job's status on the PR.
       fail-fast: false
       matrix:
         suite:
-          - label: core
-            install-dir: packages/core
-            test-cmd: npm test --prefix packages/core -- --retry=2
-            allow-failure: false
-
-          - label: pod-client
-            install-dir: packages/pod-client
-            test-cmd: npm test --prefix packages/pod-client
-            allow-failure: false
-
-          - label: relay
-            install-dir: packages/relay
-            test-cmd: npm test --prefix packages/relay
-            allow-failure: false
-
-          # react-native: informational only — known parser failures in
-          # BleTransport.test.js + MdnsTransport.test.js. Flip allow-failure
-          # back to false once those are fixed.
-          - label: react-native
-            install-dir: packages/react-native
-            test-cmd: npm test --prefix packages/react-native
-            allow-failure: true
-
-          - label: integration-tests
-            install-dir: packages/integration-tests
-            test-cmd: npm test --prefix packages/integration-tests
-            allow-failure: false
-
-          - label: folio
-            install-dir: apps/folio
-            test-cmd: npm test --prefix apps/folio
-            allow-failure: false
-
+          # `core` keeps vitest's --retry=2 for one known timing-flaky scenario
+          # (mesh-scenario.test.js, WebRTC auto-upgrade phase 10b). Two retries
+          # failing in a row is a real regression.
+          - { label: core,              dir: packages/core,              args: '-- --retry=2' }
+          - { label: stoop,             dir: apps/stoop,                 args: '' }
+          - { label: tasks-v0,          dir: apps/tasks-v0,              args: '' }
+          - { label: item-store,        dir: packages/item-store,        args: '' }
+          - { label: circles,           dir: packages/circles,           args: '' }
+          - { label: pod-client,        dir: packages/pod-client,        args: '' }
+          - { label: relay,             dir: packages/relay,             args: '' }
+          - { label: integration-tests, dir: packages/integration-tests, args: '' }
+          - { label: folio,             dir: apps/folio,                 args: '' }
+          # react-native was `continue-on-error` for "known parser failures in
+          # BleTransport/MdnsTransport". Measured 2026-08-24: 396 pass, 1 skip,
+          # zero failures — the exemption outlived its reason by some margin.
+          - { label: react-native,      dir: packages/react-native,      args: '' }
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node 20
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          # Cache npm's global download cache. We track every package lockfile
-          # so a change in any one busts only that hash bucket.
-          cache: 'npm'
-          cache-dependency-path: |
-            packages/core/package-lock.json
-            packages/pod-client/package-lock.json
-            packages/relay/package-lock.json
-            packages/react-native/package-lock.json
-            packages/integration-tests/package-lock.json
-            apps/folio/package-lock.json
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - name: Install (root workspace)
+        run: pnpm install --frozen-lockfile
+      - name: Relink workspace
+        run: node scripts/relink-workspace.mjs
+      - name: ${{ matrix.suite.label }}
+        run: npm test --prefix ${{ matrix.suite.dir }} ${{ matrix.suite.args }}
 
-      # Each package has its own lockfile and its own `file:` deps on sibling
-      # packages — so we install per-package rather than at the monorepo root.
-      # `npm ci` is strict about the lockfile, which is what we want in CI.
-      - name: Install (${{ matrix.suite.label }})
-        run: npm ci --prefix ${{ matrix.suite.install-dir }}
-
-      - name: Run tests (${{ matrix.suite.label }})
-        run: ${{ matrix.suite.test-cmd }}
-
-  # Docs-vs-code organization guard (task #66). Fails if a public/tracked file
-  # links into a private/ignored path (plans/, _archive/, or outside the repo),
-  # or if anything private is tracked. No dependencies — Node built-ins only.
-  # See plans/PLAN-file-org-inventory.md (local) for the model.
-  lint-docs:
-    name: lint-docs
+  # ── Rung 5: convergence under concurrency. Its own lane because it is slow ──
+  # and because it is the only gate that crosses a real relay between agents.
+  journeys:
+    name: e2e journeys
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 45
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node 20
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-
-      - name: Doc-ref lint
-        run: node scripts/lint-doc-refs.mjs
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - name: Install (root workspace)
+        run: pnpm install --frozen-lockfile
+      - name: Relink workspace
+        run: node scripts/relink-workspace.mjs
+      - name: Journeys (starts its own local relay)
+        run: node apps/e2e-journeys/run.mjs

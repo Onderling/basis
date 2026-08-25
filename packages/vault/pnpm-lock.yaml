@@ -14,13 +14,14 @@ overrides:
 importers:
 
   .:
+    dependencies:
+      tweetnacl:
+        specifier: ^1.0.3
+        version: 1.0.3
     devDependencies:
       '@onderling/core':
         specifier: workspace:^
         version: link:../core
-      tweetnacl:
-        specifier: ^1.0.3
-        version: 1.0.3
       tweetnacl-util:
         specifier: ^0.15.1
         version: 0.15.1

@@ -14,6 +14,10 @@ overrides:
 importers:
 
   .:
+    dependencies:
+      '@onderling/params':
+        specifier: workspace:*
+        version: link:../params
     devDependencies:
       '@onderling/pseudo-pod':
         specifier: file:../pseudo-pod

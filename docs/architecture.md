@@ -613,10 +613,24 @@ pointing at the sibling `packages/item-store`, never a published copy. The tree 
 (`.npmrc` `node-linker=hoisted`, per-app lockfiles) because Metro/Vite + the relative cross-package imports
 need packages sitting at their real locations. Caveat worth knowing before you touch installs: a partial
 `pnpm install --filter …` can **shred those symlinks repo-wide** (replacing links with copies, pruning
-siblings you never named) — the deterministic fix is **`node scripts/relink-workspace.mjs`**, NOT a reinstall
+siblings you never named) — the deterministic fix is **`node scripts/relink-workspace.mjs`**, and inside a
+working tree that is the fix rather than reinstalling
 (full trap + tells in [`agent-notes-known-gotchas.md`](./agent-notes-known-gotchas.md)). A green test suite
 means the tree is healthy; a flood of "cannot resolve `@onderling/x`" in apps you did not change is the relink
-tell — not a "broken tree". Note many substrate packages are **pure DI** (they import almost nothing;
+tell — not a "broken tree".
+
+**The relink is part of INSTALLING, not just of repairing (measured 2026-08-24).** A full, clean
+`pnpm install` on a fresh clone of this repo also finishes with links missing — not only a partial
+`--filter` run. Measured: from a throwaway clone, `packages/core/node_modules/@onderling/params` is absent
+where the working tree has it as a symlink, and the guards aggregate lands 17/18 with
+`Cannot find package '@onderling/params'` until `relink-workspace` runs. So **the install step for this repo
+is two commands, not one** — `pnpm install` then `node scripts/relink-workspace.mjs` — and anything that
+installs from scratch (CI above all) must do both or it is testing a tree the developers never have.
+
+The same measurement narrows a warning that has been carried as absolute: this tree DOES survive a clean
+install (1m20s; `packages/core` then passes 1563/1563, identical to a working tree). "Never reinstall" is
+sound advice for a working tree, where a reinstall costs time and gains nothing — it is not a property of the
+repo, and reading it as one is what made CI look unfixable without a package-manager migration first. Note many substrate packages are **pure DI** (they import almost nothing;
 consumers inject the store/fan-out — e.g. `@onderling/circles`), so "this package doesn't resolve `@onderling/y`"
 usually means y is simply not its dependency, not that resolution is broken.
 

@@ -24,6 +24,9 @@ importers:
       '@noble/hashes':
         specifier: ^2.2.0
         version: 2.2.0
+      '@onderling/params':
+        specifier: workspace:*
+        version: link:../params
       '@scure/bip39':
         specifier: ^2.0.1
         version: 2.2.0

@@ -6888,6 +6888,7 @@ snapshots:
       '@inrupt/solid-client': 3.0.0
       '@inrupt/solid-client-authn-node': 4.0.0
       '@noble/hashes': 2.2.0
+      '@onderling/params': link:../../packages/params
       '@scure/bip39': 2.2.0
       ed2curve: 0.3.0
       tweetnacl: 1.0.3
@@ -6906,10 +6907,12 @@ snapshots:
   '@onderling/oidc-session@file:../../packages/oidc-session':
     dependencies:
       '@inrupt/solid-client-authn-node': 4.0.0
+      '@onderling/params': link:../../packages/params
 
   '@onderling/pod-client@file:../../packages/pod-client(@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core))':
     dependencies:
       '@inrupt/solid-client': 3.0.0
+      '@noble/hashes': 2.2.0
       '@onderling/core': link:../../packages/core
       '@onderling/logger': link:../../packages/logger
       '@onderling/oidc-session': link:../../packages/oidc-session
@@ -6919,7 +6922,9 @@ snapshots:
     optionalDependencies:
       '@onderling/pseudo-pod': file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)
 
-  '@onderling/pod-search@file:../../packages/pod-search': {}
+  '@onderling/pod-search@file:../../packages/pod-search':
+    dependencies:
+      '@onderling/params': link:../../packages/params
 
   '@onderling/pseudo-pod@file:../../packages/pseudo-pod(@onderling/core@file:../../packages/core)':
     dependencies:
@@ -6957,7 +6962,9 @@ snapshots:
       expo-crypto: 14.0.2(expo@52.0.49(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))(react@18.3.1))
       expo-file-system: 18.0.12(expo@52.0.49(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))(react@18.3.1))(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))
 
-  '@onderling/vault@file:../../packages/vault': {}
+  '@onderling/vault@file:../../packages/vault':
+    dependencies:
+      tweetnacl: 1.0.3
 
   '@onderling/versioning@file:../../packages/versioning': {}
 

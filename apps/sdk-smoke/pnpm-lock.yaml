@@ -102,7 +102,7 @@ importers:
         version: 7.29.7(@babel/core@7.29.7)
       '@onderling/relay':
         specifier: file:../../packages/relay
-        version: file:../../packages/relay(@onderling/core@file:../../packages/core)(@onderling/vault@file:../../packages/vault)
+        version: file:../../packages/relay
       '@react-native/babel-preset':
         specifier: 0.76.9
         version: 0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))
@@ -1078,14 +1078,8 @@ packages:
     resolution: {integrity: sha512-q9CRWjpHCMIh5sVyefoD1cA7PkvILqCZsnSOEUUivORLjxCO/Irmue2DprETiNgEqktDBZaM1Bi+jrarx1XdCg==}
     engines: {node: ^14.17.0 || ^16.13.0 || >=18.0.0}
 
-  '@onderling/blob-gateway@file:../../packages/blob-gateway':
-    resolution: {directory: ../../packages/blob-gateway, type: directory}
-
   '@onderling/core@file:../../packages/core':
     resolution: {directory: ../../packages/core, type: directory}
-
-  '@onderling/oidc-session@file:../../packages/oidc-session':
-    resolution: {directory: ../../packages/oidc-session, type: directory}
 
   '@onderling/pod-client@file:../../packages/pod-client':
     resolution: {directory: ../../packages/pod-client, type: directory}
@@ -1121,9 +1115,6 @@ packages:
   '@onderling/relay@file:../../packages/relay':
     resolution: {directory: ../../packages/relay, type: directory}
     hasBin: true
-    peerDependencies:
-      '@onderling/core': ^0.1.0
-      '@onderling/vault': ^0.1.0
 
   '@onderling/vault@file:../../packages/vault':
     resolution: {directory: ../../packages/vault, type: directory}
@@ -6405,19 +6396,12 @@ snapshots:
     dependencies:
       semver: 7.8.5
 
-  '@onderling/blob-gateway@file:../../packages/blob-gateway':
-    dependencies:
-      '@onderling/core': file:../../packages/core
-      '@onderling/oidc-session': file:../../packages/oidc-session
-      '@onderling/pod-client': file:../../packages/pod-client
-    transitivePeerDependencies:
-      - '@onderling/pseudo-pod'
-
   '@onderling/core@file:../../packages/core':
     dependencies:
       '@inrupt/solid-client': 3.0.0
       '@inrupt/solid-client-authn-node': 4.0.0
       '@noble/hashes': 2.2.0
+      '@onderling/params': link:../../packages/params
       '@scure/bip39': 2.2.0
       ed2curve: 0.3.0
       tweetnacl: 1.0.3
@@ -6425,13 +6409,10 @@ snapshots:
     optionalDependencies:
       node-datachannel: 0.32.3
 
-  '@onderling/oidc-session@file:../../packages/oidc-session':
-    dependencies:
-      '@inrupt/solid-client-authn-node': 4.0.0
-
   '@onderling/pod-client@file:../../packages/pod-client':
     dependencies:
       '@inrupt/solid-client': 3.0.0
+      '@noble/hashes': 2.2.0
       '@onderling/core': link:../../packages/core
       '@onderling/logger': link:../../packages/logger
       '@onderling/oidc-session': link:../../packages/oidc-session
@@ -6451,19 +6432,20 @@ snapshots:
       react-native-get-random-values: 1.11.0(react-native@0.76.9(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(react@18.3.1))
       react-native-keychain: 10.0.0
 
-  '@onderling/relay@file:../../packages/relay(@onderling/core@file:../../packages/core)(@onderling/vault@file:../../packages/vault)':
+  '@onderling/relay@file:../../packages/relay':
     dependencies:
-      '@onderling/blob-gateway': file:../../packages/blob-gateway
-      '@onderling/core': file:../../packages/core
-      '@onderling/vault': file:../../packages/vault
+      '@onderling/blob-gateway': link:../../packages/blob-gateway
+      '@onderling/core': link:../../packages/core
+      '@onderling/vault': link:../../packages/vault
       better-sqlite3: 11.10.0
       ws: 8.21.2
     transitivePeerDependencies:
-      - '@onderling/pseudo-pod'
       - bufferutil
       - utf-8-validate
 
-  '@onderling/vault@file:../../packages/vault': {}
+  '@onderling/vault@file:../../packages/vault':
+    dependencies:
+      tweetnacl: 1.0.3
 
   '@oxc-project/types@0.142.0': {}
 

@@ -950,6 +950,7 @@ snapshots:
       '@inrupt/solid-client': 3.0.0
       '@inrupt/solid-client-authn-node': 4.0.0
       '@noble/hashes': 2.2.0
+      '@onderling/params': link:../params
       '@scure/bip39': 2.2.0
       ed2curve: 0.3.0
       tweetnacl: 1.0.3
@@ -964,10 +965,12 @@ snapshots:
   '@onderling/oidc-session@file:../oidc-session':
     dependencies:
       '@inrupt/solid-client-authn-node': 4.0.0
+      '@onderling/params': link:../params
 
   '@onderling/pod-client@file:../pod-client(@onderling/pseudo-pod@file:../pseudo-pod(@onderling/core@file:../core))':
     dependencies:
       '@inrupt/solid-client': 3.0.0
+      '@noble/hashes': 2.2.0
       '@onderling/core': link:../core
       '@onderling/logger': link:../logger
       '@onderling/oidc-session': link:../oidc-session
@@ -985,7 +988,9 @@ snapshots:
     dependencies:
       '@onderling/core': file:../core
 
-  '@onderling/vault@file:../vault': {}
+  '@onderling/vault@file:../vault':
+    dependencies:
+      tweetnacl: 1.0.3
 
   '@onderling/webid-discovery@file:../webid-discovery': {}
 

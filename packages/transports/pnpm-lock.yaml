@@ -21,6 +21,9 @@ importers:
       '@onderling/logger':
         specifier: workspace:^
         version: link:../logger
+      tweetnacl:
+        specifier: ^1.0.3
+        version: 1.0.3
       ws:
         specifier: ^8.20.0
         version: 8.21.0
@@ -1832,8 +1835,7 @@ snapshots:
       safe-buffer: 5.2.1
     optional: true
 
-  tweetnacl@1.0.3:
-    optional: true
+  tweetnacl@1.0.3: {}
 
   typedarray@0.0.6:
     optional: true

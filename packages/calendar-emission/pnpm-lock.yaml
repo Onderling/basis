@@ -15,6 +15,9 @@ importers:
 
   .:
     dependencies:
+      '@onderling/params':
+        specifier: workspace:*
+        version: link:../params
       ical.js:
         specifier: ^2.2.1
         version: 2.2.1

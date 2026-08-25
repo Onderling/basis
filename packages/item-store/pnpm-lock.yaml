@@ -19,6 +19,9 @@ importers:
         specifier: workspace:^
         version: link:../core
     devDependencies:
+      '@onderling/item-types':
+        specifier: workspace:^
+        version: link:../item-types
       vitest:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@25.9.1)

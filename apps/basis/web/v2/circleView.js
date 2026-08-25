@@ -664,8 +664,10 @@ function renderTakenTab(body, { tasks = [], tr, onAction, onAddTask, viewerWebid
 /**
  * G16 — MEMBERS (members) tab body: one tappable row per member of the circle's
  * trail-roster (`normalizeCircleMembers` → canonical Member). A row shows the
- * member's handle + real name (whatever the roster carries); the viewer's own row
- * is badged "jij". Tapping a row calls `onMemberTap(member)` — the host opens the
+ * member's handle + real name (whatever the roster carries), the role badge for
+ * anyone who is not a plain member and HOW they came by it (made the circle ·
+ * appointed by an admin · took it over because the circle had none left); the
+ * viewer's own row is badged "jij". Tapping a row calls `onMemberTap(member)` — the host opens the
  * §2 card (persona for a member, self-view for your own row). Pure render: the
  * roster + the visibility logic live in shared code, this only draws + wires taps.
  *
@@ -736,6 +738,26 @@ function renderLedenTab(body, { members = null, selfWebid = null, revealPolicy =
       secondary.className = 'circle-view__member-secondary';
       secondary.textContent = label.secondary;
       row.appendChild(secondary);
+    }
+
+    // WHO RUNS THE CIRCLE, and how they came to. The role badge is the same rule the admin panel
+    // uses (anything but a plain member), and next to it the provenance clause: they made the
+    // circle, an admin appointed them, or — the one nobody chose — the circle was left without an
+    // admin and the projection handed it over. Both ride the normalised member (`m.role`,
+    // `m.admin`); shared code computes, this only paints. An admin whose provenance the projection
+    // cannot state shows the badge alone, never a borrowed reason. web ≡ mobile.
+    if (m.role && m.role !== 'member') {
+      const roleEl = document.createElement('span');
+      roleEl.className = 'circle-view__member-role';
+      roleEl.textContent = tr(`circle.admin.role.${m.role}`);
+      row.appendChild(roleEl);
+      if (m.admin) {
+        const via = document.createElement('span');
+        via.className = `circle-view__member-via circle-view__member-via--${m.admin.via}`;
+        via.dataset.adminVia = m.admin.via;
+        via.textContent = tr(m.admin.labelKey);
+        row.appendChild(via);
+      }
     }
 
     // Rules acceptance — which rules version this member's signed join/re-accept carries, against

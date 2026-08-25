@@ -272,13 +272,46 @@ describe('foldRoster — the rules gate (task #80, sitting-A decision 2026-08-20
     expect(r.members).toContain(bob.pubKey);               // still a member — refused, not evicted
   });
 
-  it('THE LAST ADMIN CANNOT BE DEMOTED — a circle with members is never left unadministrable', async () => {
+  it('THE LAST ADMIN STEPPING DOWN HANDS OVER — a circle with members is never left unadministrable', async () => {
     const { founder, bob } = await ids();
     const join = body(bob, 'join', bob);
-    // The sole admin demotes themselves. Refused: no act would remain that could repair the circle.
+    // The sole admin demotes themselves. This used to be REFUSED — the statement folded to nothing and
+    // the circle silently kept an admin who had said they were done. Now it stands and appoints, which
+    // is the same answer a DEPARTURE already got: one rule, one mechanism.
     const selfDemote = body(founder, 'role', founder, { payload: { role: 'member' }, deps: [join.hash] });
     const r = foldRoster([join, selfDemote], { founders: [] , seed: { members: [founder.pubKey], admins: [founder.pubKey] } });
-    expect(r.admins).toContain(founder.pubKey);
+    expect(r.admins).toEqual([bob.pubKey]);
+    expect(r.admins).not.toContain(founder.pubKey);            // the demotion actually happened
+    expect(r.members).toContain(founder.pubKey);               // still in the circle, just not running it
+    expect(r.adminProvenance[bob.pubKey]).toBe(`caretaker:${selfDemote.hash}`);
+  });
+
+  it('…and never back to the person who just stepped down — that would undo it while reporting success', async () => {
+    const { founder, bob, mallory } = await ids();
+    const joinB = body(bob, 'join', bob);
+    const joinM = body(mallory, 'join', mallory);
+    const selfDemote = body(founder, 'role', founder, {
+      payload: { role: 'member' }, deps: [joinB.hash, joinM.hash],
+    });
+    const r = foldRoster([joinB, joinM, selfDemote], {
+      founders: [], seed: { members: [founder.pubKey], admins: [founder.pubKey] },
+    });
+    expect(r.admins).toHaveLength(1);
+    expect(r.admins).not.toContain(founder.pubKey);
+    expect([bob.pubKey, mallory.pubKey]).toContain(r.admins[0]);
+  });
+
+  it('…but with NOBODY to hand to, the demotion cannot stand', async () => {
+    const { founder } = await ids();
+    // A circle of one. There is no candidate, and no authority could ever appoint one later, so the
+    // floor holds: the statement does not fold. This is the ONE case that still refuses, and it
+    // refuses because handing over is impossible rather than because demotion is forbidden.
+    const selfDemote = body(founder, 'role', founder, { payload: { role: 'member' } });
+    const r = foldRoster([selfDemote], {
+      founders: [], seed: { members: [founder.pubKey], admins: [founder.pubKey] },
+    });
+    expect(r.admins).toEqual([founder.pubKey]);
+    expect(r.adminProvenance[founder.pubKey]).toBe('founder');   // restored as it was, not re-titled
   });
 
   it('…but demoting ONE of two admins is fine — handover is allowed, switching authority off is not', async () => {
@@ -310,12 +343,14 @@ describe('foldRoster — the rules gate (task #80, sitting-A decision 2026-08-20
     expect(r.members).toContain(founder.pubKey);      // still in the circle they made
   });
 
-  it('…but the SOLE founder-admin cannot be demoted — there would be nobody left to run it', async () => {
+  it('…and the SOLE founder-admin steps down by handing over, not by being refused', async () => {
     const { founder, bob } = await ids();
     const join   = body(bob, 'join', bob);
     const demote = body(founder, 'role', founder, { payload: { role: 'member' }, deps: [join.hash] });
     const r = foldRoster([join, demote], { founders: [founder.pubKey] });
-    expect(r.admins).toContain(founder.pubKey);
+    expect(r.admins).toEqual([bob.pubKey]);
+    expect(r.members).toContain(founder.pubKey);      // still in the circle they made
+    expect(r.adminProvenance[bob.pubKey]).toBe(`caretaker:${demote.hash}`);
   });
 
   it('a demoted founder is still not EVICTABLE — you cannot be put out of the circle you made', async () => {
@@ -327,5 +362,78 @@ describe('foldRoster — the rules gate (task #80, sitting-A decision 2026-08-20
     const r = foldRoster([join, promote, demote, evict], { founders: [founder.pubKey] });
     expect(r.admins).not.toContain(founder.pubKey);   // demoted…
     expect(r.members).toContain(founder.pubKey);      // …but not removable
+  });
+});
+
+describe('foldRoster — how each admin came to hold it', () => {
+  /**
+   * Three ways to be an admin, and until now all three rendered as the same word. The one that most
+   * needs saying is the third: the log appointed you because the last admin walked out, and nobody
+   * asked you. A roster that cannot tell it apart cannot say it.
+   */
+  it('a founder holds it as founder; a promotion holds it as a decision someone took', async () => {
+    const { founder, bob } = await ids();
+    const join = body(bob, 'join', bob);
+    const promote = body(founder, 'role', bob, { payload: { role: 'admin' }, deps: [join.hash] });
+    const r = foldRoster([join, promote], { founders: [founder.pubKey] });
+
+    expect(r.admins).toEqual([founder.pubKey, bob.pubKey].sort());
+    expect(r.adminProvenance[founder.pubKey]).toBe('founder');
+    expect(r.adminProvenance[bob.pubKey]).toBe('role');
+  });
+
+  it('a caretaker holds it as `caretaker:<the departure that emptied the admin set>`', async () => {
+    const { founder, bob, mallory } = await ids();
+    const joinB = body(bob, 'join', bob);
+    const joinM = body(mallory, 'join', mallory);
+    const leave = body(founder, 'leave', founder, { deps: [joinB.hash, joinM.hash] });
+    const r = foldRoster([joinB, joinM, leave], { founders: [founder.pubKey] });
+
+    expect(r.admins).toHaveLength(1);
+    const [caretaker] = r.admins;
+    // Named after the statement that emptied the admin set — so every device gives the appointment the
+    // same name, and a LATER departure produces a different one.
+    expect(r.adminProvenance[caretaker]).toBe(`caretaker:${leave.hash}`);
+    expect(r.adminProvenance[caretaker]).not.toBe('founder');
+    expect(Object.keys(r.adminProvenance)).toEqual(r.admins);
+  });
+
+  it('provenance follows the roster: a demoted admin loses it, and a re-promotion reads as a decision', async () => {
+    const { founder, bob } = await ids();
+    const joinB   = body(bob, 'join', bob);
+    const promote = body(founder, 'role', bob, { payload: { role: 'admin' }, deps: [joinB.hash] });
+    const demote  = body(founder, 'role', bob, { payload: { role: 'member' }, parent: promote.hash });
+    const again   = body(founder, 'role', bob, { payload: { role: 'admin' }, parent: demote.hash });
+
+    const afterDemote = foldRoster([joinB, promote, demote], { founders: [founder.pubKey] });
+    expect(afterDemote.admins).toEqual([founder.pubKey]);
+    expect(afterDemote.adminProvenance[bob.pubKey]).toBeUndefined();   // no stale claim left behind
+
+    const afterAgain = foldRoster([joinB, promote, demote, again], { founders: [founder.pubKey] });
+    expect(afterAgain.adminProvenance[bob.pubKey]).toBe('role');
+  });
+
+  it('names only current admins — an evicted one leaves nothing behind', async () => {
+    const { founder, bob } = await ids();
+    const joinB   = body(bob, 'join', bob);
+    const promote = body(founder, 'role', bob, { payload: { role: 'admin' }, deps: [joinB.hash] });
+    const evict   = body(founder, 'evict', bob, { parent: promote.hash });
+    const r = foldRoster([joinB, promote, evict], { founders: [founder.pubKey] });
+
+    expect(r.members).toEqual([founder.pubKey]);
+    expect(Object.keys(r.adminProvenance)).toEqual([founder.pubKey]);
+  });
+
+  it('is a projection, not a store — the same statements give the same provenance on any device', async () => {
+    const { founder, bob, mallory } = await ids();
+    const joinB = body(bob, 'join', bob);
+    const joinM = body(mallory, 'join', mallory);
+    const leave = body(founder, 'leave', founder, { deps: [joinB.hash, joinM.hash] });
+    const stmts = [joinB, joinM, leave];
+
+    // Arrival order is not agreement; the fold is what makes them agree.
+    const a = foldRoster(stmts, { founders: [founder.pubKey] });
+    const b = foldRoster([...stmts].reverse(), { founders: [founder.pubKey] });
+    expect(b.adminProvenance).toEqual(a.adminProvenance);
   });
 });

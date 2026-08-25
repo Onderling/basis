@@ -17,8 +17,12 @@
 //      the spine, and it is asserted here against a hand-emitted statement rather than against a
 //      button nobody pressed.
 //
+//   3. AUTHORITY CANNOT BE SWITCHED OFF, BUT IT CAN BE PUT DOWN. The last admin stepping back does
+//      not get refused — the circle hands over to whoever the fold appoints, the same answer a
+//      departure already got. One rule: a circle with members always has an admin.
+//
 //   Anne — admin, hands over
-//   Bram — member, becomes admin, then acts as one
+//   Bram — member, becomes admin, acts as one, then steps down himself
 //   Cato — member throughout, and the third device the answer must match on
 import { checker } from './_util.mjs';
 import { bootAppCircle, rosterOf, hasMember, roleOf, untilTrue } from './_app.mjs';
@@ -135,16 +139,66 @@ export async function run({ relayUrl }) {
     check('the successor can now run the circle', !successorActs?.error,
       JSON.stringify(successorActs)?.slice(0, 110));
 
-    // ── 7. …BUT AUTHORITY CANNOT BE SWITCHED OFF ────────────────────────────────────────────────
+    // ── 7. …AND THE LAST ONE STEPS DOWN BY HANDING OVER, NOT BY BEING REFUSED ───────────────────
+    // This used to assert that the demotion was REFUSED. It was — and that was the worse of two
+    // answers the system gave to one question: walking OUT of a circle as its last admin appointed a
+    // successor, while stepping BACK from running it did nothing at all, silently, at exactly the
+    // moment the person stops watching whether it worked. Both hand over now.
     const lastOne = await call(bram, 'setMemberRole', {
       groupId: CIRCLE, memberWebid: bram.pubKey, role: 'member',
     });
-    // The op may accept it — the fold is what must refuse, because that is the answer every device
-    // computes without needing an authority that would no longer exist.
-    await untilTrue(async () => false, 2000);
-    check('THE LAST ADMIN CANNOT BE DEMOTED — a circle is never left unadministrable',
-      (await roleOf(bram, CIRCLE, bram.pubKey)) === 'admin',
-      `op said ${JSON.stringify(lastOne)?.slice(0, 80)}; roster says ${await roleOf(bram, CIRCLE, bram.pubKey)}`);
+    check('the last admin can step down at all (or is told why not)', true,
+      JSON.stringify(lastOne)?.slice(0, 110));
+
+    check('THE STEP-DOWN ACTUALLY HAPPENS — it is not silently swallowed',
+      await untilTrue(async () => (await roleOf(bram, CIRCLE, bram.pubKey)) === 'member', 12000),
+      `bram's own device says he is: ${await roleOf(bram, CIRCLE, bram.pubKey)}`);
+
+    // A circle with members always has an admin: the fold appoints one from whoever is left, and
+    // never the person who just stepped down.
+    const rosterNow = await rosterOf(bram, CIRCLE);
+    const adminsNow = rosterNow.filter((m) => m.role === 'admin');
+    check('…and the circle still has exactly one admin — someone else',
+      adminsNow.length === 1 && (adminsNow[0].webid ?? adminsNow[0].addr) !== bram.pubKey,
+      JSON.stringify(rosterNow.map((m) => [m.handle ?? (m.webid ?? m.addr)?.slice(0, 6), m.role])));
+
+    // …and the OTHER REMAINING MEMBER agrees WHO, or the circle has two opinions about its own
+    // authority. That is anne, not cato: bram removed cato back in step 4, so cato's device is an
+    // ex-member's and its roster is legitimately stale. Asking it anything here measures nothing —
+    // which cost a bisect to notice, and is worth the sentence.
+    const caretakerRef = adminsNow.map((m) => m.webid ?? m.addr)[0];
+    check('…and the other remaining member agrees who it is',
+      await untilTrue(async () => {
+        const asAnne = (await rosterOf(anne, CIRCLE)).filter((m) => m.role === 'admin')
+          .map((m) => m.webid ?? m.addr);
+        return asAnne.length === 1 && asAnne[0] === caretakerRef;
+      }, 15000),
+      `bram sees ${String(caretakerRef).slice(0, 8)}, anne sees ${JSON.stringify(
+        (await rosterOf(anne, CIRCLE)).filter((m) => m.role === 'admin').map((m) => (m.webid ?? m.addr)?.slice(0, 8)))}`);
+
+    // …and the appointment says WHY it happened, not merely that it did. A caretaker is the one kind
+    // of admin nobody chose, and that is exactly what a member needs to be able to read.
+    const caretakerRow = adminsNow[0];
+    check('…and the roster says it was a handover, not a decision someone took',
+      typeof caretakerRow?.adminVia === 'string' && caretakerRow.adminVia.startsWith('caretaker:'),
+      `the appointed admin's row says: ${JSON.stringify(caretakerRow?.adminVia)}`);
+
+    // THE ONE THAT MATTERS: the appointment is real authority, not a label. Ask whoever the fold
+    // picked to do a thing only an admin may do.
+    const successor = [anne, cato].find((n) => n.pubKey === caretakerRef) ?? anne;
+    const runsIt = await call(successor, 'editGroupRules', {
+      groupId: CIRCLE, rules: { name: 'Onder nieuw beheer', agreements: 'de kring loopt door' },
+    });
+    check('the appointed admin can genuinely run the circle', !runsIt?.error,
+      `write said ${JSON.stringify(runsIt)?.slice(0, 110)}`);
+    // Deliberately NOT asserted here: that the new rules text appears on the other device. A rules
+    // change is STAGED for the member to review and accept — that is what the rules-acceptance
+    // statement and the stale-rules banner are for — so it does not land in their store on arrival.
+    // A check that it does would be asserting a bug rather than a behaviour.
+    check('…and the person who stepped down keeps the circle — stepping back is not leaving',
+      hasMember(await rosterOf(bram, CIRCLE), bram.pubKey)
+      && (await roleOf(bram, CIRCLE, bram.pubKey)) === 'member',
+      `bram's own row: ${await roleOf(bram, CIRCLE, bram.pubKey)}`);
   } catch (err) {
     check('the promotion corridor completed', false, String(err?.message ?? err).slice(0, 250));
   } finally {

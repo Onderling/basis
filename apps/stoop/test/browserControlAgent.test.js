@@ -60,7 +60,10 @@ describe('createBrowserStoopAgent — control-agent seam (basis circle membershi
     await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
     await callSkill(bundle.agent, 'leaveGroup', { groupId: GROUP }, BOB);
 
-    expect(ca.removeMember).toHaveBeenCalledWith({ webId: BOB, force: false, policy: 'graceful', groupId: GROUP });
+    // `force: true` — a departure is not refusable, so the key custodian's ≥1-admin guard must not be
+    // what decides whether the leave rotates. See the note at the `revokeKey` call in
+    // `@onderling/circles` leaveGroup; the rotation itself is asserted in sealedPodMembership.test.js.
+    expect(ca.removeMember).toHaveBeenCalledWith({ webId: BOB, force: true, policy: 'graceful', groupId: GROUP });
   });
 
   it('gated: redeem WITHOUT a sealing key does not call the control-agent', async () => {

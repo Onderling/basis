@@ -389,7 +389,8 @@ export async function verifyMembershipCodeForPeer({
  * leaveGroup(deps, {a, from})
  *   — record a `group-leave` audit marker, revoke the leaver's pod ACL + rotate the group key (graceful:
  *   the leaver keeps content they already hold), then optionally delete the actor's own items + cancel any
- *   pending lend reminders. `from` is the leaving actor.
+ *   pending lend reminders. `from` is the leaving actor. The revoke is forced — see the note at the call:
+ *   a departure is never refusable, so the ≥1-admin guard must not be what decides whether it rotates.
  *
  * @returns {Promise<{leaveMarkerId, deletedItems, _sync}|{error}>}
  */
@@ -411,7 +412,19 @@ export async function leaveGroup({
   // Sealed household pod: revoke the leaver's ACL + rotate the group key (forward secrecy) + drop
   // them from the MemberMap so fan-out stops. A self-leave is 'graceful' — the leaver keeps access
   // to content they already had on their device.
-  await revokeKey({ webId: from, policy: 'graceful', groupId: a.groupId });
+  //
+  // WHY A LEAVE FORCES THE REVOKE. The key custodian refuses to remove the LAST ADMIN unless the caller
+  // forces it, so that nobody can strip a circle of its last admin by removing them. A leave is not that
+  // act. The person is walking out, and no layer here can refuse it: by the time this line runs the
+  // `group-leave` marker is already written, the signed `leave` goes onto the spine just below, and the
+  // roster fold answers a departure that empties the admin set by appointing a caretaker from whoever
+  // remains — the circle is never stranded by a departure. So the guard could not keep the admin; it only
+  // threw on the way past, and every layer above swallowed the throw. The leave reported success, the
+  // group key was NOT rotated, and the departed admin went on opening new content — forward secrecy
+  // failing on exactly the path where a circle changes hands. `force` carries the same meaning here as in
+  // `removeMember` below: the caller holds its own authority for this revoke. There it is the admin gate;
+  // here it is that the subject IS the actor.
+  await revokeKey({ webId: from, force: true, policy: 'graceful', groupId: a.groupId });
 
   // ALSO record the LEAVE on the circle's membership spine. A leave is always self-authored (the fold only
   // honours a leave whose author IS its subject), so the acting device signs `leave` with its own identity

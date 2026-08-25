@@ -117,10 +117,13 @@ function depthOf(stmts) {
  *   independently — the statement stays on the log as evidence, the joiner lands on nobody's roster.
  *   Founders and seed members never fold via `join`, so the gate cannot touch them. Absent (the
  *   default), joins fold exactly as before — the projector opts in, the kernel stays pure.
- * @returns {{ members: string[], admins: string[], rulesAccepted: Record<string,string> }}
+ * @returns {{ members: string[], admins: string[], rulesAccepted: Record<string,string>,
+ *   adminProvenance: Record<string,string>, caretakerAcknowledged: Record<string,string> }}
  *   sorted members/admins for a stable, comparable result, plus each member's latest accepted
  *   rules version (from the join's payload, superseded by later `rules-accept` statements — the
- *   per-member "accepted v1, current v2" visibility rides this map).
+ *   per-member "accepted v1, current v2" visibility rides this map), plus HOW each admin holds it:
+ *   `'founder'` · `'role'` · `` `caretaker:<hash>` `` (see the note where `adminVia` is built), plus
+ *   which caretakers have SIGNED for their own appointment (`caretakerAcknowledged`: ref → seed hash).
  */
 export function foldRoster(statements, { founders = [], seed = null, rulesGate = null } = {}) {
   const stmts = (Array.isArray(statements) ? statements : []).filter(
@@ -145,6 +148,43 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
   const members = new Set([...founderSet, ...asKeys(seed?.members)]);
   const admins  = new Set([...founderSet, ...asKeys(seed?.admins)]);
   const rulesAccepted = Object.create(null);   // subject → latest accepted rules version (fold-ordered)
+
+  // ── HOW EACH ADMIN CAME TO BE ONE ──────────────────────────────────────────────────────────────
+  // Three ways in, and until now all three rendered as the same word. `role: 'admin'` on a roster row
+  // could mean the person made the circle, that someone promoted them, or that the log appointed them
+  // because the last admin walked out and nobody was asked. The third is the one a person most needs
+  // told, and it was the one nothing could distinguish.
+  //
+  //   'founder'              they made the circle (or were seeded as admin at cutover)
+  //   'role'                 an admin promoted them — a decision someone took
+  //   `caretaker:<hash>`     the fold appointed them when a departure emptied the admin set; the hash
+  //                          is the statement that emptied it, so the same appointment has the same
+  //                          name on every device, and a NEW departure yields a NEW name (which is
+  //                          what lets a notice fire once per transition rather than once per fold).
+  //
+  // Derived, not stored: it is a projection of the same statements, so it cannot disagree with the
+  // roster it describes.
+  const adminVia = new Map();
+  for (const f of founderSet) adminVia.set(f, 'founder');
+  for (const a of asKeys(seed?.admins)) if (!adminVia.has(a)) adminVia.set(a, 'founder');
+
+  // ── AND WHO HAS ACKNOWLEDGED BEING ONE ─────────────────────────────────────────────────────────
+  // A caretaker appointment is the one authority change nobody performs: it is derived, so that every
+  // replica reaches it alone and offline. That makes it correct, and it also made it SILENT — there
+  // was no entry anywhere saying it happened, and no way to tell whether the person it happened to
+  // had noticed.
+  //
+  // So the appointee signs for it. A self-authored `role` statement with `payload
+  // { role: 'admin', caretakerFor: <the hash that emptied the admin set> }` is admissible ONLY when
+  // the fold has independently derived that same appointment with that same seed. It grants nothing —
+  // by the time it can be admitted the signer is already an admin — which is exactly the point: the
+  // derivation stays authoritative and the log gains the event, rather than the log becoming a second
+  // authority that could disagree with it.
+  //
+  // What it buys, beyond the record: the other members can see that the caretaker KNOWS. "The log says
+  // you are running this circle" and "you know you are running this circle" are different facts, and
+  // only the second one is any use to the people relying on it.
+  const caretakerAcknowledged = Object.create(null);   // ref → the seed hash they signed for
 
   // The rules gate (see the option's doc above). `versions` normalised once; empty set = presence-only.
   const gateVersions = rulesGate
@@ -174,10 +214,17 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
     const memberBefore = new Set(members);
     const canAct = (author) => adminBefore.has(author) && memberBefore.has(author);
 
+    const viaBefore = new Map(adminVia);
     const promoted = new Set(), demoted = new Set();
+    const demotedBy = new Map();   // subject → the hash of the statement that demoted them (a seed, like a departure)
     for (const s of batch) {
       if (s.kind !== 'role' || !canAct(s.author)) continue;
-      const role = s.payload && typeof s.payload === 'object' ? s.payload.role : undefined;
+      const p = s.payload && typeof s.payload === 'object' ? s.payload : {};
+      // An acknowledgement is not a promotion. Once a caretaker is admin, `canAct` passes for their own
+      // self-signed statement, and folding it as an ordinary promote would re-title them as `'role'` —
+      // erasing the very provenance the statement exists to record.
+      if (s.author === s.subject && typeof p.caretakerFor === 'string' && p.caretakerFor) continue;
+      const role = p.role;
       if (role === 'admin') promoted.add(s.subject);
       // A FOUNDER IS DEMOTABLE (Frits, 2026-08-23) — once the circle has another admin, which the
       // last-admin rule below supplies without a second condition here. The organiser who moves away
@@ -185,27 +232,25 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
       //
       // They stay a MEMBER, though: `evict` below still exempts them. You cannot be put out of the
       // circle you made — only relieved of running it.
-      else if (role === 'member') demoted.add(s.subject);
+      else if (role === 'member') { demoted.add(s.subject); demotedBy.set(s.subject, s.hash); }
     }
     for (const x of demoted) promoted.delete(x);                    // deny-wins: demote beats concurrent promote
 
-    // A CIRCLE WITH MEMBERS ALWAYS HAS AN ADMIN. Demotions that would empty the admin set are
-    // refused — all of them at this depth, so the outcome does not depend on which arrived first.
+    // A CIRCLE WITH MEMBERS ALWAYS HAS AN ADMIN — the one rule, and now it has one mechanism.
     //
     // This is not the deny-wins axis (that one asks "did someone lose a right"); it is the
     // governance-liveness one: a circle nobody can administer cannot admit, evict, or change its own
-    // rules ever again, and there is no act left that could repair it. Refusing the last demotion is
-    // the only outcome every device computes identically without needing an authority that no longer
-    // exists.
+    // rules ever again, and there is no act left that could repair it.
     //
-    // A last admin who LEAVES is deliberately not covered: `leave` is self-authored and always
-    // stands (you may always walk out), which is exactly the case the caretaker appointment exists
-    // for. Losing your only admin by accident is a bug; losing them because they left is a fact.
-    if (demoted.size > 0) {
-      const after = new Set([...admins, ...promoted]);
-      for (const x of demoted) after.delete(x);
-      if (after.size === 0) demoted.clear();
-    }
+    // A demotion that would empty the admin set used to be REFUSED, while a departure that emptied it
+    // appointed a caretaker. Two answers to one question, and the refusal was the worse of them: it
+    // told an organiser stepping back that their own act had simply not happened, silently, on a path
+    // where the very next thing they would do is stop paying attention. Both cases HAND OVER now —
+    // the caretaker block at the end of this depth does it, seeded by whichever statement emptied the
+    // set (a departure's hash or a demotion's), so the two paths cannot drift apart.
+    //
+    // The demotion only fails to stand when there is nobody to hand to (every remaining member was
+    // demoted at this same depth), and that case is restored there rather than pre-empted here.
     const canEvict = (author) => canAct(author) && !demoted.has(author);  // a concurrent demotion voids authority
 
     const removed = new Set();
@@ -224,10 +269,10 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
     }
 
     // Apply: removals win over same-depth joins/promotes (deny-wins).
-    for (const x of removed)  { members.delete(x); admins.delete(x); delete rulesAccepted[x]; }
+    for (const x of removed)  { members.delete(x); admins.delete(x); adminVia.delete(x); delete rulesAccepted[x]; }
     for (const x of joined)   if (!removed.has(x)) members.add(x);
-    for (const x of promoted) if (!removed.has(x)) { members.add(x); admins.add(x); }
-    for (const x of demoted)  admins.delete(x);
+    for (const x of promoted) if (!removed.has(x)) { members.add(x); admins.add(x); adminVia.set(x, 'role'); }
+    for (const x of demoted)  { admins.delete(x); adminVia.delete(x); }
 
     // `rules-accept` — re-acceptance after a rules change (task #80 slice d's statement kind; the fold
     // understands it from day one so catch-up replay is version-independent). SELF-only (author signs
@@ -268,17 +313,46 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
     //   · Skipping UNREACHABLE candidates (next-in-line) needs a live fact the log does not carry,
     //     so it is not done here. `appointCaretaker` in the app layer takes `unreachable` for that;
     //     this is the floor — a circle always has an admin — not the whole refinement.
-    if (members.size > 0 && admins.size === 0 && removed.size > 0) {
-      const seeds = [...removed].map((r) => removedBy.get(r)).filter((h) => typeof h === 'string' && h).sort();
-      const seed2 = seeds[seeds.length - 1];   // deterministic pick among same-depth departures
-      if (seed2) {
-        const [caretaker] = caretakerOrder([...members], seed2);
-        if (caretaker) admins.add(caretaker);
+    if (members.size > 0 && admins.size === 0) {
+      // Seeded by whatever emptied the set: a departure (leave/evict) or a demotion. Sorted so that
+      // several at the same depth pick the same one on every device.
+      const seeds = [
+        ...[...removed].map((r) => removedBy.get(r)),
+        ...[...demoted].map((d) => demotedBy.get(d)),
+      ].filter((h) => typeof h === 'string' && h).sort();
+      const seed2 = seeds[seeds.length - 1];
+      // Never the person just demoted. Appointing them back would undo the demotion while reporting
+      // that it worked — the one outcome worse than refusing it.
+      const candidates = [...members].filter((m) => !demoted.has(m));
+      const [caretaker] = (seed2 && candidates.length) ? caretakerOrder(candidates, seed2) : [];
+      if (caretaker) {
+        admins.add(caretaker);
+        adminVia.set(caretaker, `caretaker:${seed2}`);
+      } else if (demoted.size > 0) {
+        // Nobody to hand to — every remaining member was demoted at this depth. The demotion cannot
+        // stand: a circle whose only members have all stepped down has no act left that could repair
+        // it, and no authority exists that could appoint one later.
+        for (const x of demoted) { admins.add(x); adminVia.set(x, viaBefore.get(x) ?? 'role'); }
       }
     }
+
+    // ── THE CARETAKER'S OWN SIGNATURE ON IT ─────────────────────────────────────────────────────
+    // Admitted only where it MATCHES the derivation (see the note where `caretakerAcknowledged` is
+    // built). A statement naming a seed the fold did not derive — a stale one, a guessed one, a
+    // hostile one — records nothing; it stays on the log as evidence and moves no authority.
+    for (const s of batch) {
+      if (s.kind !== 'role' || s.author !== s.subject) continue;
+      const p = s.payload && typeof s.payload === 'object' ? s.payload : {};
+      if (p.role !== 'admin' || typeof p.caretakerFor !== 'string' || !p.caretakerFor) continue;
+      if (adminVia.get(s.subject) === `caretaker:${p.caretakerFor}`) caretakerAcknowledged[s.subject] = p.caretakerFor;
+    }
+    // Someone who is no longer an admin has nothing to have acknowledged.
+    for (const x of [...removed, ...demoted]) delete caretakerAcknowledged[x];
   }
 
-  return { members: [...members].sort(), admins: [...admins].sort(), rulesAccepted };
+  const adminProvenance = Object.create(null);
+  for (const a of [...admins].sort()) adminProvenance[a] = adminVia.get(a) ?? 'role';
+  return { members: [...members].sort(), admins: [...admins].sort(), rulesAccepted, adminProvenance, caretakerAcknowledged };
 }
 
 export default foldRoster;

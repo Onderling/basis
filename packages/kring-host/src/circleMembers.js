@@ -49,6 +49,8 @@
  * @property {string|null} displayName  the real/display name, or null. Recovered
  *   from a shape-2 `label` only when the label is DISTINCT from the handle/webid.
  * @property {string}      role         circle role; defaults to `'member'`.
+ * @property {string}      [adminVia]   HOW an admin holds the role — `'founder'` · `'role'` ·
+ *   `` `caretaker:<hash>` `` (see `memberAdminStatus`). Absent unless the roster projection can say.
  * @property {string[]}    reveals      pairwise reveal list; defaults to `[]`.
  * @property {string}      [circleAddress]  per-circle address (additive; absent
  *   for pre-substrate members).
@@ -93,7 +95,52 @@ export function memberFrom(entry) {
   // circles only. Carried so `memberRulesStatus` can compute the display state from the Member alone.
   if (m.rulesAccepted != null) out.rulesAccepted = String(m.rulesAccepted);
   if (m.rulesCurrentVersion != null) out.rulesCurrentVersion = String(m.rulesCurrentVersion);
+  // HOW this member came to be an admin — the fold's own word, stamped on the roster row by
+  // `deriveRoster` and carried so `memberAdminStatus` can compute the display line from the Member
+  // alone. Additive: absent on every member who is not an admin, and on every admin the projection
+  // cannot explain (an unexplained admin must not borrow someone else's reason).
+  if (m.adminVia != null) out.adminVia = String(m.adminVia);
   return out;
+}
+
+/**
+ * `memberAdminStatus` — HOW someone holds the admin role, for the one line both shells paint next
+ * to it (neither computes it). There are three ways in, and until now all three rendered as the
+ * same word "admin": you made the circle, someone decided to promote you, or the circle was left
+ * without an admin and the projection handed it to you. The third is the one nobody chose — not the
+ * person, not any admin — and it is the one most worth saying out loud.
+ *
+ * The roster row carries the projection's word; this turns it into the plain one, once:
+ *
+ *   'founder'           → `founder`    they made the circle
+ *   'role'              → `appointed`  an admin promoted them: a decision a person took
+ *   `caretaker:<hash>`  → `caretaker`  nobody appointed them; a departure or a step-down emptied the
+ *                                      admin set and the fold handed it over. `appointment` names the
+ *                                      statement that emptied it, so the same handover has the same
+ *                                      name on every device and a NEW one gets a NEW name.
+ *
+ * `null` when there is nothing to say: a plain member, an admin whose row carries no provenance
+ * (a circle this device can only read from its older records), or a word this version does not
+ * know. Absent beats guessed — an unexplained admin renders as an admin, never as a founder.
+ *
+ * @param {Member|object} member
+ * @returns {{ via: 'founder'|'appointed'|'caretaker', labelKey: string, appointment?: string }|null}
+ */
+export function memberAdminStatus(member) {
+  const m = member && typeof member === 'object' ? member : {};
+  const raw = typeof m.adminVia === 'string' ? m.adminVia : '';
+  if (!raw) return null;
+  if (raw === 'founder') return { via: 'founder', labelKey: 'circle.admin_via.founder' };
+  if (raw === 'role') return { via: 'appointed', labelKey: 'circle.admin_via.appointed' };
+  if (raw.startsWith('caretaker:')) {
+    const appointment = raw.slice('caretaker:'.length);
+    return {
+      via: 'caretaker',
+      labelKey: 'circle.admin_via.caretaker',
+      ...(appointment ? { appointment } : {}),
+    };
+  }
+  return null;
 }
 
 /**
@@ -170,6 +217,12 @@ export function memberToViewAs(member) {
     // ADDITIVE: the key exists only when there is something to show, so rows from ungated circles
     // (and every pre-acceptance consumer's expected shape) stay byte-identical.
     ...((() => { const r = memberRulesStatus(m); return r ? { rules: r } : {}; })()),
+    // WHO RUNS THE CIRCLE. The role was being dropped here, so a member list could not say who its
+    // admins were at all — the one governance fact a member looks at a member list to find. It rides
+    // only when it is not the default 'member', so every plain row stays byte-identical.
+    ...(m.role && m.role !== 'member' ? { role: m.role } : {}),
+    // …and HOW they came by it — present only where the projection can say (see memberAdminStatus).
+    ...((() => { const a = memberAdminStatus(m); return a ? { admin: a } : {}; })()),
   };
 }
 

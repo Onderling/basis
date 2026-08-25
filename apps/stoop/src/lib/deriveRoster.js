@@ -52,7 +52,9 @@ import { isExited } from './circleExits.js';
  *   THIS circle. When present, they are folded DENY-WINS on top of the trail-derived head — the spine may only
  *   STRENGTHEN it (drop a member, promote to admin), never re-admit or invent one (the safe cutover — see
  *   below). When absent, the trail projection stands alone (the legacy path).
- * @returns {Array<object>} one record per member, built from the trail + display left-join.
+ * @returns {Array<object>} one record per member, built from the trail + display left-join. An admin
+ *   row also carries `adminVia` — the fold's word for HOW they hold it (`'founder'` · `'role'` ·
+ *   `` `caretaker:<hash>` ``) — wherever the fold can say; absent otherwise, never guessed.
  */
 export function deriveRoster({
   redemptions = [],
@@ -259,6 +261,36 @@ export function deriveRoster({
         else if (inAdmins.has(webid)) roster.get(webid).role = 'admin';
       }
     }
+    // ── HOW EACH ADMIN CAME TO BE ONE ─────────────────────────────────────────────────────────────
+    // The fold names it (`adminProvenance`): they made the circle, an admin promoted them, or the
+    // circle was left without an admin and the fold handed it over. All three used to render as the
+    // same word, and the third — the one nobody chose — is the one a member most needs told. Riding
+    // the roster row puts it on `listGroupMembers`, which is what the member lists read.
+    //
+    // Two deliberate silences, both "absent beats guessed":
+    //   · Only a row the FOLD itself calls an admin gets one. The strengthen-only legacy overlay can
+    //     raise a trail row to admin without the fold having said why, and such a row keeps nothing.
+    //   · The fold reports a SEED admin as a founder — its seed IS the cutover roster. Here the seed
+    //     is the trail head, where whoever admitted someone is an admin whether they founded the
+    //     circle or were promoted into it. So `'founder'` is carried only for a DERIVED founder
+    //     (`founderWebids`, from the admission structure + the creation statement); a seeded admin
+    //     the trail cannot explain says nothing rather than claiming foundership.
+    const derivedFounders = new Set(founderWebids ?? []);
+    for (const [webid, via] of Object.entries(folded.adminProvenance ?? {})) {
+      const rec = roster.get(webid);
+      if (!rec || rec.role !== 'admin' || !inAdmins.has(webid)) continue;
+      if (via === 'founder' && !derivedFounders.has(webid)) continue;
+      rec.adminVia = via;
+      // …and whether a caretaker has SIGNED for the appointment nobody made. "The log says you run
+      // this circle" and "you know you run this circle" are different facts, and only the second is
+      // any use to the people relying on it. Stamped only when the signature names THIS appointment,
+      // so a signature for an older handover cannot vouch for the current one.
+      if (via.startsWith('caretaker:')
+        && folded.caretakerAcknowledged?.[webid] === via.slice('caretaker:'.length)) {
+        rec.adminViaAcknowledged = true;
+      }
+    }
+
     // Rules acceptance: the fold projects each member's latest accepted rules version (from the
     // signed join, superseded by rules-accept statements). Riding the roster row puts it on
     // `listGroupMembers`, which is what the member card reads — "accepted v1, current v2" is this field

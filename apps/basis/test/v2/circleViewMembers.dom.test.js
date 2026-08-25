@@ -67,6 +67,53 @@ describe('renderCircleView · MEMBERS tab', () => {
     expect(el.querySelector('.circle-view__member')).toBeNull();
   });
 
+  // ── HOW someone is an admin, on the row itself ──────────────────────────────────────────────
+  // Three ways in, one word until now. The caretaker — nobody asked them, the circle was simply
+  // left without an admin — is the one that must not read like a promotion.
+  describe('the admin badge + how it was come by', () => {
+    const withAdmins = [
+      { id: 'me', handle: 'Owl', realName: null, released: false, ownDisplayName: 'Frits',
+        role: 'admin', admin: { via: 'founder', labelKey: 'circle.admin_via.founder' } },
+      { id: 'bob', handle: 'Fox', realName: null, released: false, ownDisplayName: 'Bob',
+        role: 'admin', admin: { via: 'appointed', labelKey: 'circle.admin_via.appointed' } },
+      { id: 'cato', handle: 'Heron', realName: null, released: false, ownDisplayName: 'Cato',
+        role: 'admin', admin: { via: 'caretaker', labelKey: 'circle.admin_via.caretaker', appointment: 'h1' } },
+      { id: 'dana', handle: 'Wren', realName: null, released: false, ownDisplayName: 'Dana' },
+    ];
+    const rowFor = (el, id) => el.querySelector(`[data-member-id="${id}"]`);
+
+    it('every admin is badged, and each of the three reads DIFFERENTLY', () => {
+      const el = mount();
+      renderCircleView(el, { circle, rows: [], tabs, activeTab: 'members', members: withAdmins, selfWebid: 'me', t });
+      const via = (id) => rowFor(el, id).querySelector('.circle-view__member-via');
+      expect(rowFor(el, 'me').querySelector('.circle-view__member-role').textContent).toBe('circle.admin.role.admin');
+      expect(via('me').textContent).toBe('circle.admin_via.founder');
+      expect(via('bob').textContent).toBe('circle.admin_via.appointed');
+      expect(via('cato').textContent).toBe('circle.admin_via.caretaker');
+      // the three labels are three, not one — the failure this whole line exists to fix
+      expect(new Set([via('me').textContent, via('bob').textContent, via('cato').textContent]).size).toBe(3);
+      // …and the caretaker is distinguishable structurally too, not only by its words
+      expect(via('cato').dataset.adminVia).toBe('caretaker');
+      expect(via('cato').className).toContain('circle-view__member-via--caretaker');
+      expect(via('bob').className).not.toContain('circle-view__member-via--caretaker');
+    });
+
+    it('a plain member carries no badge and no clause', () => {
+      const el = mount();
+      renderCircleView(el, { circle, rows: [], tabs, activeTab: 'members', members: withAdmins, selfWebid: 'me', t });
+      expect(rowFor(el, 'dana').querySelector('.circle-view__member-role')).toBeNull();
+      expect(rowFor(el, 'dana').querySelector('.circle-view__member-via')).toBeNull();
+    });
+
+    it('an admin the projection cannot explain keeps the badge and borrows no reason', () => {
+      const el = mount();
+      const unexplained = [{ id: 'eve', handle: 'Elk', realName: null, released: false, role: 'admin' }];
+      renderCircleView(el, { circle, rows: [], tabs, activeTab: 'members', members: unexplained, selfWebid: 'me', t });
+      expect(rowFor(el, 'eve').querySelector('.circle-view__member-role').textContent).toBe('circle.admin.role.admin');
+      expect(rowFor(el, 'eve').querySelector('.circle-view__member-via')).toBeNull();
+    });
+  });
+
   it('shows an empty state when the roster loaded empty', () => {
     const el = mount();
     renderCircleView(el, { circle, rows: [], tabs, activeTab: 'members', members: [], t });

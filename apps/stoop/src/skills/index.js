@@ -561,7 +561,20 @@ async function revokePodAccess(controlAgent, { webId, force = false, policy = 'g
     // departed's prior access; ban strips it). See packages/pod-client controlAgent.removeMember.
     // Routed per circle by the control-agent ROUTER (`groupId`), so this half was already local.
     try { result = await controlAgent.removeMember({ webId, force, policy, groupId }); }
-    catch { metrics?.record?.('control-agent-revoke-failed'); }
+    catch (err) {
+      metrics?.record?.('control-agent-revoke-failed');
+      // BEST-EFFORT, BUT NOT SILENT. Key management is recoverable and the membership record is the
+      // source of truth, so a failure here must not fail the leave/removal — that part is deliberate.
+      // What was wrong was that it left NO trace a person could see: a counter nobody reads, and a
+      // caller that gets the same `{ok}` back either way. A revoke that failed and a revoke that
+      // worked were indistinguishable, while the difference between them is whether the departed
+      // member can still open the circle's new content. Say what did not happen, by name.
+      console.warn(
+        `[stoop] control-agent revoke failed for ${webId} in circle ${groupId ?? '(none given)'} `
+        + `→ the group key was NOT rotated; the departed can still open new content:`,
+        err?.message ?? err,
+      );
+    }
   }
   // B4 (2026-08-02) — what used to be here was `members.removeMember(webId)`, and it was the bug.
   // The MemberMap is ONE global display cache with no circle on a row, so dropping the departed
@@ -1436,6 +1449,18 @@ export function buildSkills({
   };
   /** "Is this caller an admin of THIS circle?" — the shape the role-gated skills ask. */
   const isCircleAdminOfCircle = (circleId, webid) => circleRoleOfCore(circleId, webid);
+
+  /** The caller's whole folded roster ROW — for the questions a bare role cannot answer, like HOW
+   *  they hold the role. Same projection, same head; only the projection out of it differs. */
+  const circleRowOf = async (circleId, webid) => {
+    if (!circleId || !webid) return null;
+    const rows = await projectCircleRoster({
+      store, groupId: circleId, memberMapList: (await members?.list?.()) ?? [],
+      circleSignerFor, membershipRead, selfSigner,
+    });
+    if (!Array.isArray(rows)) return null;
+    return rows.find((r) => (r?.webid ?? r?.addr ?? r?.ref) === webid) ?? null;
+  };
 
   return [
     /**
@@ -4471,6 +4496,43 @@ export function buildSkills({
      *   whether the author held admin authority at that point in the causal chain. A client that
      *   skips this check emits a statement every other device refuses.
      */
+    /**
+     * acknowledgeCaretaker({groupId})
+     *   — the caretaker signs for the appointment nobody made.
+     *
+     * When the last admin walks out, the roster fold appoints a successor. That has to be DERIVED —
+     * an offline device replaying the log alone must reach the same answer, with nobody to ask — and
+     * being derived, it happened in complete silence: no entry recorded it, and the person it
+     * happened to had no way to learn it except by noticing a button they had never had.
+     *
+     * So the appointee signs. The statement grants NOTHING: the fold admits it only where it has
+     * independently derived the same appointment with the same seed, by which point the signer is
+     * already an admin. The derivation stays authoritative and the log gains the event.
+     *
+     * THE SEED IS DERIVED HERE, NOT SUPPLIED. A caller that could name its own would be signing for
+     * an appointment of its choosing; the device reads the one its own fold reached, and if that is
+     * not a caretaker appointment held by this caller there is nothing to sign.
+     */
+    defineSkill('acknowledgeCaretaker', async ({ parts, from }) => {
+      const a = dataArgs(parts);
+      const _groupId = a.groupId ?? groupId;
+      if (!_groupId) return { ok: false, reason: 'groupId required' };
+      const row = await circleRowOf(_groupId, from);
+      if (!row) return { ok: false, reason: 'not-a-member' };
+      const via = typeof row.adminVia === 'string' ? row.adminVia : '';
+      if (!via.startsWith('caretaker:')) return { ok: false, reason: 'not-a-caretaker' };
+      if (row.adminViaAcknowledged === true) return { ok: false, reason: 'already-acknowledged' };
+      const seed = via.slice('caretaker:'.length);
+      if (!seed) return { ok: false, reason: 'not-a-caretaker' };
+      if (typeof emitSpine !== 'function') return { ok: false, reason: 'spine-unavailable' };
+      const res = await emitSpine({
+        kind: 'role', circleId: _groupId, subject: from,
+        payload: { role: 'admin', caretakerFor: seed }, actor: from,
+      });
+      if (!res) return { ok: false, reason: 'not-signed' };
+      return { ok: true, groupId: _groupId, seed, _sync: simulateSync() };
+    }),
+
     defineSkill('setMemberRole', async ({ parts, from }) => {
       const a = dataArgs(parts);
       const _groupId = a.groupId ?? groupId;

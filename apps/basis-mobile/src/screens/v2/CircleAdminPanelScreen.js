@@ -1,7 +1,8 @@
 /**
  * basis-mobile v2 — circle admin panel (RN, S3 parity).
  *
- * RN mirror of web's circleAdminPanel: member roster (+ remove), announcements,
+ * RN mirror of web's circleAdminPanel: member roster (+ remove, + the role and how it was come by),
+ * announcements,
  * and muted peers (+ unmute). Self-contained: loads listGroupMembers/listMutedPeers
  * + dispatches the admin-gated stoop ops via the injected `callSkill` (a refusal
  * surfaces a notice).
@@ -14,6 +15,10 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, StyleSheet } from 'react-native';
 import { t } from '../../core/localisation.js';
 import { removeCircleMember } from '../../../../basis/src/v2/circleMembershipHygiene.js';
+// The rows here are RAW `listGroupMembers` rows, so the admin provenance is read off the row
+// through the SAME shared compute web's panel and both members tabs paint — one answer to "how is
+// this person an admin", never a second one per surface.
+import { memberAdminStatus } from '@onderling/kring-host/circleMembers';
 import { useTheme } from './themeContext.js';
 
 export default function CircleAdminPanelScreen({ callSkill, agent = null, groupId, onBack }) {
@@ -79,6 +84,16 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
           <View key={m.webid || m.handle} style={styles.row} testID={`admin-member-${m.webid}`}>
             <Text style={styles.name}>{m.displayName || m.handle || m.webid}</Text>
             {m.role && m.role !== 'member' && <Text style={styles.role}>{t(`circle.admin.role.${m.role}`)}</Text>}
+            {/* …and HOW they came by it: they made the circle, an admin appointed them, or nobody
+                did — the circle was left without an admin and the projection handed it over. web≡mobile. */}
+            {(() => {
+              const via = m.role && m.role !== 'member' ? memberAdminStatus(m) : null;
+              return via ? (
+                <Text style={[styles.via, via.via === 'caretaker' ? styles.viaCaretaker : null]} numberOfLines={2}>
+                  {t(via.labelKey)}
+                </Text>
+              ) : null;
+            })()}
             <Pressable style={styles.secondary} onPress={() => remove(m)}><Text style={styles.secondaryText}>{t('circle.admin.remove')}</Text></Pressable>
           </View>
         ))}
@@ -126,6 +141,10 @@ const makeStyles = (theme) => StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   name: { flex: 1, fontSize: 14, color: theme.color.ink },
   role: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', color: theme.color.accent },
+  // A caretaker holds the circle because nobody else was left to — a state of the circle, not a
+  // title someone was given, so it reads softer than the badge beside it.
+  via: { fontSize: 12, color: theme.color.inkSoft, flexShrink: 1 },
+  viaCaretaker: { fontStyle: 'italic' },
   muted: { fontSize: 13, color: theme.color.inkSoft },
   area: { fontSize: 14, paddingVertical: 9, paddingHorizontal: 12, borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.md, color: theme.color.ink, backgroundColor: theme.color.white, minHeight: 56, textAlignVertical: 'top' },
   primary: { paddingVertical: 9, paddingHorizontal: 16, borderRadius: theme.radius.md, backgroundColor: theme.color.accent, alignSelf: 'flex-start' },

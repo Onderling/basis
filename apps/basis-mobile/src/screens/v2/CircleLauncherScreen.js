@@ -160,6 +160,9 @@ import { createAsBackend } from '@onderling/react-native/pseudo-pod-adapter';
 import { buildCircleEmbedProviders } from '../../../../basis/src/v2/circleEmbedProviders.js';
 import { resolveCircleEmbedder } from '../../../../basis/src/v2/embedPicker.js';
 import { circleGateRules } from '../../../../basis/src/v2/circleGate.js';
+// Telling someone the circle became theirs. The decision (WHO is told, and whether they have
+// signed for it yet) is shared; the shell only paints the line and carries the button.
+import { caretakerNotice } from '../../../../basis/src/v2/caretakerNotice.js';
 import { interpretToCommand } from '../../../../basis/src/v2/interpretCommand.js';
 import { scopeStoopCallSkill } from '../../../../basis/src/v2/circleStoopScope.js';
 // Sealed media (2026-07-11): the per-circle media composition is SHARED src/ (platform-neutral,
@@ -2418,6 +2421,9 @@ function CircleDetail({
   // for sender labels the moment it paints, not first when MEMBERS is opened.
   const [mandateViewer, setMandateViewer] = useState({ viewerWebid: null, isAdmin: false });
   const [tabMembers, setTabMembers] = useState(null);
+  // The RAW rows the same load returns. `normalizeCircleMembers` is the member-list projection and
+  // drops the acknowledgement flag; the caretaker notice is the one reader that needs it.
+  const [rosterRows, setRosterRows] = useState(null);
   const [mutedActors, setMutedActors] = useState(new Set());   // the person-mute hide set (web parity)
   const rows = useMemo(() => applyChatFilter({
     rows: chatRows({
@@ -2530,11 +2536,16 @@ function CircleDetail({
   useEffect(() => {
     if (!circle?.id || typeof rawCallSkill !== 'function') return undefined;
     let alive = true;
-    setTabMembers(null);
+    setTabMembers(null); setRosterRows(null);
     (async () => {
       let mem = [];
-      try { mem = normalizeCircleMembers(await rawCallSkill('stoop', 'listGroupMembers', { groupId: circle.id })); } catch { /* keep empty */ }
-      if (alive) setTabMembers(mem);
+      let raw = [];
+      try {
+        const res = await rawCallSkill('stoop', 'listGroupMembers', { groupId: circle.id });
+        raw = Array.isArray(res?.members) ? res.members : [];
+        mem = normalizeCircleMembers(res);
+      } catch { /* keep empty */ }
+      if (alive) { setTabMembers(mem); setRosterRows(raw); }
       // The person-mute set, resolved to actor refs against this roster (web parity: the chat
       // projection HIDES these — muted messages land, unmute restores). Rides the same effect because
       // the key→ref resolution needs the roster; `membersReloadTick` refreshes both together.
@@ -2701,6 +2712,40 @@ function CircleDetail({
     });
     return () => registerCircleBotSink(null);
   }, [registerCircleBotSink, appendCircleMessage]);
+
+  // When the last admin walks out, the roster fold appoints a successor. That is DERIVED — every
+  // device reaches it alone and offline, with nobody to ask — and so it happened in total silence.
+  // This is the line that breaks it, in the circle, at the moment they open it (web parity).
+  //
+  // WHO is told, and whether they have already signed for it, is the shared decision's call
+  // (`caretakerNotice`); the shell only paints. The one thing the shell owns is the memory of what it
+  // has already said, which here is "once per open" — the roster reloads on a `roster-updated` entry
+  // and after an acknowledgement, and three identical bubbles in one sitting reads as a bug. It is
+  // deliberately NOT a cooldown: until they sign, a later open says it again. `scope: 'self'` — the
+  // line is addressed to one person, and fanning it would announce it to the circle.
+  const caretakerSaidForRef = useRef(null);
+  useEffect(() => {
+    const notice = caretakerNotice({ members: rosterRows, myRef: mandateViewer.viewerWebid || '' });
+    if (!notice || caretakerSaidForRef.current === circle?.id) return;
+    caretakerSaidForRef.current = circle?.id ?? null;
+    appendCircleMessage({
+      actor: 'bot',
+      text: t(notice.key),
+      buttons: [{ id: 'caretaker:acknowledge', label: t('circle.caretaker.acknowledge') }],
+      scope: 'self',
+    });
+  }, [rosterRows, mandateViewer.viewerWebid, circle?.id, appendCircleMessage]);
+
+  // The act on that notice. Signing is what makes "acknowledged" mean the person SAW it, so it can
+  // only ever be a tap — never something the render did on their behalf. The op derives the
+  // appointment from this device's own fold (there is no seed to pass); the reload afterwards is what
+  // makes the member list say the appointment is acknowledged.
+  const acknowledgeCaretakerNotice = useCallback(async () => {
+    if (!circle?.id || typeof rawCallSkill !== 'function') return;
+    try { await rawCallSkill('stoop', 'acknowledgeCaretaker', { groupId: circle.id }); }
+    catch { /* the reload reflects the real state; an unsigned notice returns on a later open */ }
+    setMembersReloadTick((n) => n + 1);
+  }, [circle?.id, rawCallSkill]);
 
   // Build the co-hosted feedback surface + mount for a circle in a given language, over the given (cached) pods.
   // Factored out so a language switch can REBUILD reusing the same pods (local Stage-1 survives). Rich emit sink:
@@ -3150,6 +3195,8 @@ function CircleDetail({
   const onBubbleButton = useCallback((button) => {
     // One-tap fallback accept (the offer bubble's button) — App owns the store + offer.
     if (button?.id === 'delivery:allow-fallback') { onAcceptFallback?.(); return; }
+    // The caretaker signing for the appointment nobody made (the notice bubble's button).
+    if (button?.id === 'caretaker:acknowledge') { acknowledgeCaretakerNotice(); return; }
     // Task #13 — an onboarding option (onboarding:*) or help affordance (help:topic:* / help:consent:*)
     // routes to the shared onboarding/help handlers before anything else.
     if (typeof button?.id === 'string' && task13ButtonRef.current?.(button.id)) return;
@@ -3173,7 +3220,7 @@ function CircleDetail({
       return;
     }
     if (button?.id) clarify.pick(button.id, { id: circle?.id });
-  }, [clarify, circle?.id, catalogue, runCircleCommandResolved, switchCircleFeedbackLang, onAcceptFallback]);
+  }, [clarify, circle?.id, catalogue, runCircleCommandResolved, switchCircleFeedbackLang, onAcceptFallback, acknowledgeCaretakerNotice]);
 
   // B (two-level LLM policy) — the member's PERSONAL default, consulted when the circle policy is
   // 'user'. Persisted via AsyncStorage; seeded from the configured route until a settings UI lands
@@ -3816,6 +3863,23 @@ function CircleDetail({
                       const sec = revealedMemberLabel(m, { viewerId: mandateViewer.viewerWebid ?? null, policy: policy?.revealPolicy ?? 'pairwise' }).secondary;
                       return sec ? <Text style={styles.memberName} numberOfLines={1}>{sec}</Text> : null;
                     })()}
+                    {/* WHO RUNS THE CIRCLE, and how they came to: the role badge (the same rule
+                        the admin panel uses) plus the provenance clause — made the circle ·
+                        appointed by an admin · took it over because the circle had none left.
+                        Both ride the normalised member (m.role, m.admin), computed in shared
+                        code; an admin the projection cannot explain shows the badge alone,
+                        never a borrowed reason. web≡mobile. */}
+                    {m.role && m.role !== 'member' ? (
+                      <View style={styles.memberRoleLine}>
+                        <Text style={styles.memberRole} numberOfLines={1}>{t(`circle.admin.role.${m.role}`)}</Text>
+                        {m.admin ? (
+                          <Text
+                            style={[styles.memberVia, m.admin.via === 'caretaker' ? styles.memberViaCaretaker : null]}
+                            numberOfLines={2}
+                          >{t(m.admin.labelKey)}</Text>
+                        ) : null}
+                      </View>
+                    ) : null}
                     {/* Rules acceptance — computed in shared code (memberRulesStatus rides the
                         normalised member as m.rules); stale is visible-but-valid. web≡mobile. */}
                     {m.rules ? (
@@ -5130,6 +5194,12 @@ const makeStyles = (theme, insets = null) => StyleSheet.create({
   memberRow:        { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: theme.color.line },
   memberHandle:     { fontSize: 15, color: theme.color.ink, fontWeight: '600' },
   memberName:       { fontSize: 13, color: theme.color.inkSoft, marginTop: 1 },
+  memberRoleLine:   { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 6, marginTop: 2 },
+  memberRole:       { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, color: theme.color.accent },
+  // A caretaker holds the circle because nobody else was left to — a state of the circle, not a
+  // title someone was given, so it reads softer than the badge beside it.
+  memberVia:        { fontSize: 12, color: theme.color.inkSoft, flexShrink: 1 },
+  memberViaCaretaker: { fontStyle: 'italic' },
   memberRules:      { fontSize: 12, color: theme.color.inkSoft, marginTop: 1 },
   memberRulesStale: { color: theme.color.accent },
   rulesBanner:        { padding: 10, borderBottomWidth: 1, borderBottomColor: theme.color.line, gap: 8 },

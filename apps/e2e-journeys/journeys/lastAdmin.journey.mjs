@@ -108,6 +108,49 @@ export async function run({ relayUrl }) {
     // departure's hash, so naming one here would be asserting the dice rather than the rule.
     const caretakerWebid = admins.map((m) => m.webid ?? m.addr)[0];
     const caretaker = [bram, cato].find((n) => (n.webid ?? n.pubKey) === caretakerWebid) ?? bram;
+
+    // ── THE APPOINTMENT NOBODY MADE, SAID OUT LOUD ───────────────────────────────────────────────
+    // Being derived is what makes the appointment correct — every device reaches it alone, offline,
+    // with nobody to ask. It is also what made it SILENT: nothing recorded that it happened, and the
+    // person it happened to had no way to learn it except by noticing a button they had never had.
+    //
+    // So the roster says HOW the admin holds it, and the appointee signs for it. The signature grants
+    // nothing — by the time the fold can admit it the signer is already an admin — which is the point:
+    // the derivation stays authoritative and the log gains the event.
+    const caretakerRow = admins[0];
+    check('the roster says this admin was HANDED the circle, not chosen',
+      typeof caretakerRow?.adminVia === 'string' && caretakerRow.adminVia.startsWith('caretaker:'),
+      `their row says: ${JSON.stringify(caretakerRow?.adminVia)}`);
+    check('…and nobody has signed for it yet — an appointment is not the same as knowing about it',
+      caretakerRow?.adminViaAcknowledged !== true);
+
+    // Someone who is NOT the caretaker has nothing to sign for.
+    const otherMemberNode = caretaker === cato ? bram : cato;
+    const strangerAck = await call(otherMemberNode, 'acknowledgeCaretaker', { groupId: CIRCLE });
+    check('a member who was not appointed cannot sign for it',
+      strangerAck?.ok === false && strangerAck?.reason === 'not-a-caretaker',
+      JSON.stringify(strangerAck)?.slice(0, 110));
+
+    const ack = await call(caretaker, 'acknowledgeCaretaker', { groupId: CIRCLE });
+    check('THE CARETAKER CAN SIGN FOR IT', ack?.ok === true, JSON.stringify(ack)?.slice(0, 130));
+    check('…and the seed they signed for is the appointment the fold derived',
+      typeof ack?.seed === 'string' && caretakerRow.adminVia === `caretaker:${ack.seed}`,
+      `signed ${String(ack?.seed).slice(0, 12)}… against ${String(caretakerRow?.adminVia).slice(0, 22)}…`);
+
+    // THE ONE THAT MATTERS: the OTHER device sees that the new custodian knows. "The log says you run
+    // this circle" and "you know you run this circle" are different facts, and the circle acts on the
+    // second one.
+    check('…and the other member can see that the new custodian KNOWS',
+      await untilTrue(async () => {
+        const row = (await rosterOf(otherMemberNode, CIRCLE))
+          .find((m) => (m.webid ?? m.addr) === caretakerWebid);
+        return row?.adminViaAcknowledged === true;
+      }, 12000),
+      `the other device sees: ${JSON.stringify((await rosterOf(otherMemberNode, CIRCLE))
+        .find((m) => (m.webid ?? m.addr) === caretakerWebid)?.adminViaAcknowledged)}`);
+
+    check('…and signing twice is refused rather than duplicated',
+      (await call(caretaker, 'acknowledgeCaretaker', { groupId: CIRCLE }))?.reason === 'already-acknowledged');
     const rulesNow = await call(caretaker, 'editGroupRules', {
       groupId: CIRCLE, rules: { name: 'Huisregels', agreements: 'we doen het samen verder' },
     });

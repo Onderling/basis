@@ -72,6 +72,17 @@ describe('projectRosterRowForPeer — the allowlist', () => {
   it('the display cache never rides even when serialized whole', () => {
     expect(JSON.stringify(projectRosterRowForPeer(row()))).not.toContain('Bram de Wit');
   });
+
+  it('HOW an admin holds the role rides too — a co-member reads the fold they hold themselves', () => {
+    // Without it in the allowlist the field is stripped before any reader sees it, and every peer's
+    // member list is back to one word for three different things. It discloses nothing new: it is a
+    // projection of the same statements the peer already folds.
+    for (const via of ['founder', 'role', 'caretaker:abc123']) {
+      expect(projectRosterRowForPeer(row({ role: 'admin', adminVia: via })).adminVia).toBe(via);
+    }
+    // …and a member with no provenance still gets no phantom key.
+    expect(projectRosterRowForPeer(row())).not.toHaveProperty('adminVia');
+  });
 });
 
 describe('gateRosterReplyForPeer — the whole decision', () => {
@@ -92,5 +103,23 @@ describe('gateRosterReplyForPeer — the whole decision', () => {
     const r = gateRosterReplyForPeer(scoped, 'webid:stranger');
     expect(r.ok).toBe(false);
     expect(r.members).toEqual([]);
+  });
+});
+
+describe('the caretaker acknowledgement survives the peer allowlist', () => {
+  // An appointment nobody has acknowledged is a circle whose new custodian may not know they have it.
+  // That is the half a member acts on, so stripping it at the peer boundary would leave every remote
+  // reader unable to tell "handed over and taken up" from "handed over and unnoticed".
+  it('carries adminViaAcknowledged to a peer, alongside the provenance it qualifies', () => {
+    const out = projectRosterRowForPeer(row({
+      role: 'admin', adminVia: 'caretaker:abc123', adminViaAcknowledged: true,
+    }));
+    expect(out.adminVia).toBe('caretaker:abc123');
+    expect(out.adminViaAcknowledged).toBe(true);
+  });
+
+  it('…and invents nothing when the row does not carry it', () => {
+    const out = projectRosterRowForPeer(row({ role: 'admin', adminVia: 'founder' }));
+    expect('adminViaAcknowledged' in out).toBe(false);
   });
 });

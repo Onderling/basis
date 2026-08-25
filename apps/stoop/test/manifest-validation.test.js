@@ -111,8 +111,8 @@ describe('stoop manifest — Slice D.1 structural invariants', () => {
   // `broadcastCircleKeyStatement` (the key-rotation fan) and `setMemberRole` (promote/demote on the
   // spine) → 99. This number is a snapshot on purpose: adding an op to the waist should be a
   // deliberate act that someone updates a count for, not something that slips in unremarked.
-  it('ships the full chat+slash surface (one stoop manifest, 98 ops)', () => {
-    expect(stoopManifest.operations.length).toBe(98);
+  it('ships the full chat+slash surface (one stoop manifest, 99 ops)', () => {
+    expect(stoopManifest.operations.length).toBe(99);
   });
 
   // No two ops may declare the same slash command (Part G hard guardrail

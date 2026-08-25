@@ -7,6 +7,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { AgentIdentity, InternalBus, InternalTransport, DataPart } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
+import { createControlAgent, generateKeypair, unwrapGroupKey } from '@onderling/pod-client';
 import { createNeighbourhoodAgent } from '../src/index.js';
 
 const ADMIN = 'https://id.example/admin';
@@ -96,12 +97,92 @@ describe('sealed-pod membership — leave', () => {
     await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
     const r = await callSkill(bundle.agent, 'leaveGroup', { groupId: GROUP }, BOB);
     expect(r.leaveMarkerId).toBeTruthy();
-    expect(ca.removeMember).toHaveBeenCalledWith({ webId: BOB, force: false, policy: 'graceful', groupId: GROUP });
+    // `force: true` — a departure is not refusable, so the key custodian's ≥1-admin guard must not be
+    // what decides whether the leave rotates. See the note at the `revokeKey` call in
+    // `@onderling/circles` leaveGroup; the rotation itself is asserted at the bottom of this file.
+    expect(ca.removeMember).toHaveBeenCalledWith({ webId: BOB, force: true, policy: 'graceful', groupId: GROUP });
   });
 
   it('leaveGroup with no control-agent still works', async () => {
     const bundle = await buildBundle();
     const r = await callSkill(bundle.agent, 'leaveGroup', { groupId: GROUP }, BOB);
     expect(r.leaveMarkerId).toBeTruthy();
+  });
+});
+
+// ── The seam itself: a leave must ROTATE, not merely dispatch ────────────────────────────────────
+// The mocked cases above pin the DISPATCH ("removeMember was called with these args"). That is not
+// the property anyone relies on — forward secrecy is a property of the KEY, so this drives the real
+// `createControlAgent` behind the same production binding (`revokePodAccess`) and asserts the key
+// resource itself: a new version, sealed to whoever stays and NOT to whoever left.
+//
+// The last-admin case is the one that used to fail silently. The control-agent refuses to remove the
+// last admin unless the caller forces it, `leaveGroup` did not, and every layer between swallowed the
+// throw — so the leave "succeeded" with the group key untouched and the departed admin still holding it.
+describe('sealed-pod membership — a leave ROTATES the group key (forward secrecy)', () => {
+  function realControlAgent({ roster = [] } = {}) {
+    let stored = null;
+    const revokes = [];
+    const sharing = { grant: async () => {}, revoke: async (o) => { revokes.push(o); } };
+    const controllerKey = generateKeypair();
+    const keyStore = { read: async () => stored, write: async (r) => { stored = r; } };
+    const agent = createControlAgent({
+      sharing, containerUri: 'https://pod/circle/', keyStore, controllerKey, roster,
+    });
+    return { agent, revokes, current: () => stored };
+  }
+  const canUnwrap = (resource, privateKey) => {
+    try { return !!unwrapGroupKey(resource, privateKey); } catch { return false; }
+  };
+
+  /** ADMIN holds the circle (the only admin, as a freshly created circle's roster has it); BOB joins. */
+  async function circleWithAdminAndBob({ adminSeal, bobSeal }) {
+    const ca = realControlAgent({ roster: [{ webId: ADMIN, publicKey: adminSeal.publicKey, role: 'admin' }] });
+    await ca.agent.bootstrap();
+    const bundle = await buildBundle({ controlAgent: ca.agent });
+    const created = await callSkill(bundle.agent, 'createGroupV2', { groupId: GROUP, name: 'X', rules: RULES });
+    await callSkill(bundle.agent, 'redeemMembershipCode',
+      { rulesAccepted: '1', groupId: GROUP, code: created.code, sealingPublicKey: bobSeal.publicKey }, BOB);
+    return { ca, bundle };
+  }
+
+  it('an ordinary member leaving rotates the key away from them', async () => {
+    const adminSeal = generateKeypair();
+    const bobSeal = generateKeypair();
+    const { ca, bundle } = await circleWithAdminAndBob({ adminSeal, bobSeal });
+
+    const before = ca.current();
+    expect(before.version).toBe(1);
+    expect(canUnwrap(before, bobSeal.privateKey)).toBe(true);
+
+    const left = await callSkill(bundle.agent, 'leaveGroup', { groupId: GROUP }, BOB);
+    expect(left.leaveMarkerId).toBeTruthy();
+
+    const after = ca.current();
+    expect(after.version).toBe(before.version + 1);              // the key actually rotated
+    expect(canUnwrap(after, bobSeal.privateKey)).toBe(false);     // the departed opens no new content
+    expect(canUnwrap(after, adminSeal.privateKey)).toBe(true);    // whoever stays keeps reading
+    expect(ca.revokes.map((r) => r.agent)).toContain(BOB);        // ACL revoked as well
+  });
+
+  it('the LAST ADMIN leaving rotates it too — the ≥1-admin guard must not silently skip the rotation', async () => {
+    const adminSeal = generateKeypair();
+    const bobSeal = generateKeypair();
+    const { ca, bundle } = await circleWithAdminAndBob({ adminSeal, bobSeal });
+
+    const before = ca.current();
+    expect(before.version).toBe(1);
+    expect(canUnwrap(before, adminSeal.privateKey)).toBe(true);
+
+    // The circle's only admin walks out. The circle is not stranded — the roster fold appoints a
+    // caretaker from the remaining members — so there is nothing here to protect by refusing.
+    const left = await callSkill(bundle.agent, 'leaveGroup', { groupId: GROUP }, ADMIN);
+    expect(left.leaveMarkerId).toBeTruthy();
+
+    const after = ca.current();
+    expect(after.version).toBe(before.version + 1);               // ← this is what silently did not happen
+    expect(canUnwrap(after, adminSeal.privateKey)).toBe(false);    // the departed admin loses new content
+    expect(canUnwrap(after, bobSeal.privateKey)).toBe(true);       // the member who stays keeps reading
+    expect(ca.revokes.map((r) => r.agent)).toContain(ADMIN);
   });
 });

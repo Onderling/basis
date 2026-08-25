@@ -345,4 +345,94 @@ describe('deriveRoster', () => {
       expect(roster.map((m) => m.webid).sort()).toEqual(['B', 'NEW-MEMBER']);   // admitted, B kept
     });
   });
+
+  // ── HOW an admin came to be one, carried onto the row (`adminVia`) ────────────────────────────────
+  // Three ways in — you made the circle, an admin promoted you, or the circle was left without an
+  // admin and the fold handed it to you — and all three used to render as the same word. The third
+  // is the one nobody chose, and it is the one worth being able to say.
+  describe('admin provenance (adminVia)', () => {
+    const stmt = (id, kind, subject, payload) =>
+      signSpine(id, { kind, circleId: 'g1', subject, ...(payload ? { payload } : {}) }).body;
+
+    it('a FOUNDER admin says founder; a plain member says nothing at all', async () => {
+      const founder = await AgentIdentity.generate(new VaultMemory());
+      const bea = await AgentIdentity.generate(new VaultMemory());
+      const roster = deriveRoster({
+        redemptions: [redemption({ redeemedBy: bea.pubKey, signingPublicKey: bea.pubKey })],
+        founderWebids: [founder.pubKey],
+        spineStatements: [stmt(bea, 'join', bea.pubKey)],
+        foldAuthoritative: true,
+      });
+      expect(roster.find((m) => m.webid === founder.pubKey).adminVia).toBe('founder');
+      const member = roster.find((m) => m.webid === bea.pubKey);
+      expect(member.role).toBe('member');
+      expect(member.adminVia).toBeUndefined();
+    });
+
+    it('a PROMOTED admin says role — a decision a person took, told apart from founding', async () => {
+      const founder = await AgentIdentity.generate(new VaultMemory());
+      const bea = await AgentIdentity.generate(new VaultMemory());
+      const roster = deriveRoster({
+        redemptions: [redemption({ redeemedBy: bea.pubKey, signingPublicKey: bea.pubKey })],
+        founderWebids: [founder.pubKey],
+        spineStatements: [stmt(founder, 'role', bea.pubKey, { role: 'admin' })],
+        foldAuthoritative: true,
+      });
+      const promoted = roster.find((m) => m.webid === bea.pubKey);
+      expect(promoted.role).toBe('admin');
+      expect(promoted.adminVia).toBe('role');
+      // …and the founder beside them still reads as the founder — the two are distinguishable.
+      expect(roster.find((m) => m.webid === founder.pubKey).adminVia).toBe('founder');
+    });
+
+    it('a CARETAKER says caretaker:<hash> — nobody appointed them, the circle was left without one', async () => {
+      const founder = await AgentIdentity.generate(new VaultMemory());
+      const bea = await AgentIdentity.generate(new VaultMemory());
+      // The only admin walks out. The circle keeps a member, so the fold hands it to her: no vote,
+      // no decision, nobody asked. The hash names the departure that emptied the admin set, so the
+      // same handover has the same name on every device.
+      const departure = stmt(founder, 'leave', founder.pubKey);
+      const roster = deriveRoster({
+        redemptions: [redemption({ redeemedBy: bea.pubKey, signingPublicKey: bea.pubKey })],
+        founderWebids: [founder.pubKey],
+        spineStatements: [departure],
+        foldAuthoritative: true,
+      });
+      const caretaker = roster.find((m) => m.webid === bea.pubKey);
+      expect(caretaker.role).toBe('admin');
+      expect(caretaker.adminVia).toBe(`caretaker:${departure.hash}`);
+      // Distinguishable from BOTH the other two — which is the whole point of carrying it.
+      expect(caretaker.adminVia).not.toBe('founder');
+      expect(caretaker.adminVia).not.toBe('role');
+      expect(roster.find((m) => m.webid === founder.pubKey)).toBeUndefined();   // they did leave
+    });
+
+    it('an admin the TRAIL alone explains claims nothing — admitting people is not founding', async () => {
+      // The seed the spine folds onto is the trail head, where whoever admitted someone is an admin
+      // whether they founded the circle or were promoted into it. The fold calls every seeded admin
+      // a founder (its seed IS the cutover roster); here that would be a guess, so the row says
+      // nothing rather than claiming foundership.
+      const admitter = await AgentIdentity.generate(new VaultMemory());
+      const bea = await AgentIdentity.generate(new VaultMemory());
+      const roster = deriveRoster({
+        redemptions: [redemption({
+          redeemedBy: bea.pubKey, confirmedBy: admitter.pubKey, channel: 'peer', signingPublicKey: bea.pubKey,
+        })],
+        spineStatements: [stmt(bea, 'join', bea.pubKey)],
+        foldAuthoritative: true,
+      });
+      const a = roster.find((m) => m.webid === admitter.pubKey);
+      expect(a.role).toBe('admin');            // the trail still says they run the circle…
+      expect(a.adminVia).toBeUndefined();      // …but not why, and nothing here invents a reason
+    });
+
+    it('no statements at all ⇒ no provenance on anyone (the pre-spine roster is unchanged)', () => {
+      const roster = deriveRoster({
+        redemptions: [redemption({ redeemedBy: 'B', signingPublicKey: 'pkB' })],
+        founderWebids: ['A'],
+      });
+      expect(roster.every((m) => m.adminVia === undefined)).toBe(true);
+      expect(roster.find((m) => m.webid === 'A').role).toBe('admin');
+    });
+  });
 });

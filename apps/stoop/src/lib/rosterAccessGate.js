@@ -24,17 +24,29 @@
 
 /**
  * Fields a member peer may receive about another member: identity, the keys and address needed to
- * seal and route to them, their role (governance is a member concern), their pseudonym floor, and
- * their OWN release — the persona properties they chose to disclose to this circle. Everything else
- * (the local display cache `displayName`/`avatarUrl`, the viewer's "show me names" preference, the
- * viewer's relation/trust classification) is this device's private view and never rides the wire.
+ * seal and route to them, their role AND how they came by it (governance is a member concern, and
+ * "who runs this circle, and did anyone decide that" is the part of it a member reads), their
+ * pseudonym floor, and their OWN release — the persona properties they chose to disclose to this
+ * circle. Everything else (the local display cache `displayName`/`avatarUrl`, the viewer's "show me
+ * names" preference, the viewer's relation/trust classification) is this device's private view and
+ * never rides the wire.
  */
 export const PEER_ROSTER_FIELDS = Object.freeze([
   'webid', 'id', 'pubKey', 'sealingPublicKey', 'circleAddress', 'circleAddressProof',
   // The member's full proven address SET (primary first) — same functional class as
   // `circleAddress`: a co-member needs every address the member answers on to route + seal to them.
   'circleAddresses',
-  'role', 'handle', 'personaProperties',
+  'role',
+  // HOW an admin holds the role: `'founder'` · `'role'` (an admin promoted them) ·
+  // `` `caretaker:<hash>` `` (nobody appointed them — the circle was left without an admin). It is a
+  // projection of the same statements every member already folds for themselves, so it discloses
+  // nothing new; leaving it out of the allowlist would simply strip it before any reader saw it.
+  'adminVia',
+  // …and whether that caretaker has signed for it. Same class as `adminVia` — derived from statements
+  // the reader already folds — and it is the half a member actually acts on: an appointment nobody
+  // has acknowledged is a circle whose new custodian may not know they have it.
+  'adminViaAcknowledged',
+  'handle', 'personaProperties',
 ]);
 
 /**

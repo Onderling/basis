@@ -1232,6 +1232,36 @@ export const stoopManifest = {
       },
     },
     {
+      id:   'acknowledgeCaretaker', verb: 'update',
+      // The caretaker signs for the appointment nobody made. When the last admin leaves, the roster
+      // fold appoints a successor — derived, so that every device reaches it alone and offline, and
+      // therefore silently: nothing recorded that it happened. This is the record.
+      //
+      // It grants nothing. The fold admits the statement only where it derived the same appointment
+      // with the same seed, by which time the signer is already an admin. What it adds is that the
+      // circle can see the new custodian KNOWS — an appointment nobody has acknowledged is a circle
+      // whose custodian may not have noticed they have it.
+      //
+      // No `role` or seed parameter on purpose: a caller that could name the appointment it signs
+      // for would be choosing one. The device reads the one its own fold reached.
+      params: [
+        { name: 'groupId', kind: 'string', required: true, ...ID_NONEMPTY },
+      ],
+      // The acknowledgement rides the membership SPINE, like the role change it accompanies: two
+      // conflicting statements from one author are a fork-proof, and every device must fold the same
+      // answer to "does the person running this circle know that they are".
+      resolves: [{ field: 'adminViaAcknowledged', policy: 'spine' }],
+      surfaces: {
+        chat: { hint: 'Confirm that you have seen that this circle is now yours to run.' },
+        // A BUTTON, on the notice that tells them. The alternative — the device signing the moment it
+        // renders the line — would make "acknowledged" mean "a screen was drawn", and the whole value
+        // of the signature is that the circle can see the new custodian KNOWS. So it stays a person's
+        // act; until they take it the notice keeps saying so, which for "a circle became yours" is
+        // the right kind of persistence rather than nagging.
+        ui:   { control: 'button' },
+      },
+    },
+    {
       id:   'setMemberRole', verb: 'update',
       // Promote a member to admin, or demote an admin back to member. The producer for the
       // membership lane's `role` statement kind, which was declared with nothing writing it.
@@ -1239,8 +1269,9 @@ export const stoopManifest = {
       // The op's own check is the caller's convenience; the BINDING gate is the roster fold, which
       // re-derives on every device whether the author was an admin at that point in the causal
       // chain — so a client that skips the check emits a statement everyone else refuses. The fold
-      // also refuses demoting the last admin: a circle with members always has someone who can run
-      // it, and no later act could repair one that did not.
+      // also answers a step-down that would empty the admin set by HANDING OVER — appointing a
+      // caretaker from whoever is left — rather than by refusing it: a circle with members always
+      // has someone who can run it, and a refusal only made the gentler exit the one that failed.
       params: [
         { name: 'groupId',      kind: 'string', required: true, ...ID_NONEMPTY  },
         { name: 'memberWebid',  kind: 'string', required: true, ...STR_NONEMPTY },

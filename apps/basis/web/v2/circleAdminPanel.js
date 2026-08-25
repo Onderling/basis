@@ -1,8 +1,8 @@
 /**
  * basis v2 — circle admin panel (web DOM renderer, group ops #8).
  *
- * The per-circle admin surface off the `⋯` menu: the member roster (with role +
- * a remove action) and a post-announcement box. Pure render — the host
+ * The per-circle admin surface off the `⋯` menu: the member roster (with role,
+ * how that role was come by, + a remove action) and a post-announcement box. Pure render — the host
  * (`circleApp.js` showAdmin) loads `listGroupMembers` and dispatches the
  * admin-gated stoop ops (`removeMember`, `postAnnouncement`); a non-admin's
  * dispatch is refused server-side, surfaced as a notice.
@@ -11,6 +11,11 @@
  * governance "Decisions" panel's Reports section (file · dismiss · act→remove),
  * which supersedes the old read-only `listReports` view this panel used to carry.
  */
+
+// The rows here are RAW `listGroupMembers` rows (the host does not normalise them), so the admin
+// provenance is read off the row through the same shared compute the members tab paints — one
+// answer to "how is this person an admin", never a second one per surface.
+import { memberAdminStatus } from '@onderling/kring-host/circleMembers';
 
 export function renderCircleAdminPanel(container, {
   members = [],
@@ -83,6 +88,18 @@ export function renderCircleAdminPanel(container, {
         role.className = 'cc-admin__member-role';
         role.textContent = tr(`circle.admin.role.${m.role}`);
         li.appendChild(role);
+        // …and HOW they came by it: they made the circle, an admin appointed them, or nobody did —
+        // the circle was left without an admin and the projection handed it over. Computed once in
+        // shared code (`memberAdminStatus` over the roster row's `adminVia`); absent where the
+        // projection cannot say, and then the badge stands alone rather than borrowing a reason.
+        const via = memberAdminStatus(m);
+        if (via) {
+          const viaEl = document.createElement('span');
+          viaEl.className = `cc-admin__member-via cc-admin__member-via--${via.via}`;
+          viaEl.dataset.adminVia = via.via;
+          viaEl.textContent = tr(via.labelKey);
+          li.appendChild(viaEl);
+        }
       }
       const rm = document.createElement('button');
       rm.type = 'button';

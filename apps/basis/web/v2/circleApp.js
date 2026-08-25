@@ -100,6 +100,9 @@ import { createInputHistory } from '../../src/v2/commandSuggest.js';
 import { beginFollowUp, completeFollowUp, beginFormFollowUp, completeMultiFieldFollowUp } from '@onderling/kring-host/followUp';
 import { circleReplyText } from '../../src/v2/circleReply.js';
 import { oneToOneBotLabel } from '../../src/v2/botChat.js';
+// Telling someone the circle became theirs. The decision (WHO is told, and whether they have signed
+// for it yet) is shared; the shell only paints the line and carries the button.
+import { caretakerNotice } from '../../src/v2/caretakerNotice.js';
 import { scopeCatalogueToApps } from '../../src/v2/circleCatalogueScope.js';
 // the default-deny capability gate applied at the user-dispatch waist (dispatchReady).
 import { effectiveCapabilities, checkCapability } from '../../src/v2/capabilityGate.js';
@@ -5616,9 +5619,15 @@ function showCircle(id, circle, policy) {
   // the "View as…" screen (showViewAs) uses → one canonical Member, no second shape.
   async function loadRoster() {
     await ensureMyWebid();
+    // The RAW rows as well as the normalised ones: the normaliser is the member-list projection and
+    // drops the acknowledgement flag, and this is the one reader that needs it.
+    let rawRoster = [];
     try {
-      circleRoster = normalizeCircleMembers(await rawCallSkill('stoop', 'listGroupMembers', { groupId: id }));
+      const res = await rawCallSkill('stoop', 'listGroupMembers', { groupId: id });
+      rawRoster = Array.isArray(res?.members) ? res.members : [];
+      circleRoster = normalizeCircleMembers(res);
     } catch { circleRoster = []; }
+    tellCaretakerIfTheCircleBecameTheirs(rawRoster);
     // The person-mute set, resolved to actor refs against this roster — the chat projection hides these
     // (the sitting's rule: muted messages LAND, the view filters; unmute restores). Loaded with the
     // roster because the key→ref resolution needs it; refreshed by the mute/unmute actions.
@@ -5632,6 +5641,39 @@ function showCircle(id, circle, policy) {
       // materialize time, so blocks built BEFORE the roster landed must be rebuilt once it has.
       loadScreen().catch(() => {});
     }
+  }
+
+  // When the last admin walks out, the roster fold appoints a successor. That is DERIVED — every
+  // device reaches it alone and offline, with nobody to ask — and so it happened in total silence.
+  // This is the line that breaks it, in the circle, at the moment they open it.
+  //
+  // WHO is told, and whether they have already signed for it, is the shared decision's call
+  // (`caretakerNotice`); the shell only paints. The one thing the shell owns is the memory of what
+  // it has already said, which here is "once per open" — `loadRoster` also runs on the members tab,
+  // after a mute and after a rules-accept, and three identical bubbles in one sitting reads as a
+  // bug. It is deliberately NOT a cooldown: until they sign, a later open says it again.
+  let caretakerNoticeSaid = false;
+  function tellCaretakerIfTheCircleBecameTheirs(rawRoster) {
+    if (caretakerNoticeSaid) return;
+    const notice = caretakerNotice({ members: rawRoster, myRef: myWebid || '' });
+    if (!notice) return;
+    caretakerNoticeSaid = true;
+    // `scope: 'self'` — the line is addressed to ONE person; fanning it would announce the handover
+    // to the whole circle, which is the member list's job and in its own words.
+    _circleRender?.botBubble(t(notice.key), {
+      scope: 'self',
+      buttons: [{ id: 'caretaker:acknowledge', action: 'caretaker:acknowledge', label: t('circle.caretaker.acknowledge') }],
+    });
+  }
+
+  // The act on that notice. Signing is what makes "acknowledged" mean the person SAW it, so it can
+  // only ever be a tap — never something the render did on their behalf. The op derives the
+  // appointment from this device's own fold (there is no seed to pass); the reload afterwards is
+  // what makes the member list say the appointment is acknowledged.
+  async function acknowledgeCaretakerNotice() {
+    try { await rawCallSkill('stoop', 'acknowledgeCaretaker', { groupId: id }); }
+    catch { /* the reload reflects the real state; an unsigned notice returns on a later open */ }
+    await loadRoster();
   }
 
   // Add a task from the Taken tab. Routes through the SAME dispatch waist every op uses
@@ -5866,6 +5908,8 @@ function showCircle(id, circle, policy) {
         if (help) { handleHelpAction(id, help); return; }
         // One-tap fallback accept (the offer bubble's button).
         if (b?.action === 'delivery:allow-fallback') { acceptFallbackOffer(); return; }
+        // The caretaker signing for the appointment nobody made (the notice bubble's button).
+        if (b?.action === 'caretaker:acknowledge') { acknowledgeCaretakerNotice(); return; }
         circleEmbedButtonTap?.(b);
       },
       // tap a "See also" embed chip → open the screen where the item lives (S6.B panel).

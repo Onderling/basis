@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   normalizeCircleMembers, circleMemberCount,
-  memberFrom, memberToChatItem, memberToViewAs, memberRulesStatus,
+  memberFrom, memberToChatItem, memberToViewAs, memberRulesStatus, memberAdminStatus,
 } from '../src/circleMembers.js';
 
 describe('normalizeCircleMembers', () => {
@@ -17,7 +17,9 @@ describe('normalizeCircleMembers', () => {
     // only as `ownDisplayName`, usable for the viewer's own row alone — revealing is the
     // discloser's act, and these rows released nothing.
     expect(out).toEqual([
-      { id: 'did:anne', handle: '@anne', realName: null, released: false, ownDisplayName: 'Anne de Vries' },
+      // `role` rides for anyone who is not a plain member: it was dropped here, so a member list
+      // could not say who its admins were — the one governance fact you open a member list to find.
+      { id: 'did:anne', handle: '@anne', realName: null, released: false, ownDisplayName: 'Anne de Vries', role: 'admin' },
       { id: 'did:bob', handle: '@bob', realName: null, released: false, ownDisplayName: null },
     ]);
   });
@@ -120,6 +122,55 @@ describe('canonical Member projections', () => {
   it('chat-item round-trips through the Member for the fields it carries', () => {
     const item = { id: 'did:anne', type: 'member', webid: 'did:anne', label: 'Anne de Vries', handle: '@anne', role: 'admin', circleAddress: 'addr-1' };
     expect(memberToChatItem(memberFrom(item))).toEqual(item);
+  });
+});
+
+describe('memberAdminStatus — HOW someone is an admin (one compute, both shells paint)', () => {
+  it('the three ways in are three different answers — the caretaker most of all', () => {
+    expect(memberAdminStatus({ adminVia: 'founder' }))
+      .toEqual({ via: 'founder', labelKey: 'circle.admin_via.founder' });
+    expect(memberAdminStatus({ adminVia: 'role' }))
+      .toEqual({ via: 'appointed', labelKey: 'circle.admin_via.appointed' });
+    // Nobody appointed this one. The appointment names the statement that emptied the admin set, so
+    // the same handover has the same name everywhere and a NEW one gets a NEW name.
+    expect(memberAdminStatus({ adminVia: 'caretaker:h1' }))
+      .toEqual({ via: 'caretaker', labelKey: 'circle.admin_via.caretaker', appointment: 'h1' });
+    // Three DISTINCT labels — a caretaker must never read like someone a person chose.
+    const keys = ['founder', 'role', 'caretaker:h1'].map((v) => memberAdminStatus({ adminVia: v }).labelKey);
+    expect(new Set(keys).size).toBe(3);
+  });
+
+  it('a NEW handover is a new appointment name (a notice can fire once per transition)', () => {
+    expect(memberAdminStatus({ adminVia: 'caretaker:h1' }).appointment)
+      .not.toBe(memberAdminStatus({ adminVia: 'caretaker:h2' }).appointment);
+  });
+
+  it('says nothing rather than guessing: no provenance, a bare word, or a word it does not know', () => {
+    expect(memberAdminStatus({ webid: 'w' })).toBeNull();          // a plain member
+    expect(memberAdminStatus({ adminVia: '' })).toBeNull();
+    expect(memberAdminStatus({ adminVia: 'regent' })).toBeNull();  // a future kind: silence, not a guess
+    expect(memberAdminStatus(null)).toBeNull();
+    expect(memberAdminStatus({ adminVia: 'caretaker:' })).toEqual({   // no hash to name → still a caretaker
+      via: 'caretaker', labelKey: 'circle.admin_via.caretaker',
+    });
+  });
+
+  it('rides the normalised member: roster row → memberToViewAs carries `role` + the computed `admin`', () => {
+    const [caretaker] = normalizeCircleMembers({ members: [
+      { webid: 'w1', handle: 'ann', role: 'admin', adminVia: 'caretaker:h9' },
+    ] });
+    expect(caretaker.role).toBe('admin');
+    expect(caretaker.admin).toEqual({ via: 'caretaker', labelKey: 'circle.admin_via.caretaker', appointment: 'h9' });
+
+    // An admin the projection cannot explain keeps the badge and no reason — absent beats guessed.
+    const [unexplained] = normalizeCircleMembers({ members: [{ webid: 'w2', role: 'admin' }] });
+    expect(unexplained.role).toBe('admin');
+    expect('admin' in unexplained).toBe(false);
+
+    // And a plain member row stays byte-identical — no phantom keys.
+    const [plain] = normalizeCircleMembers({ members: [{ webid: 'w3', handle: 'bob' }] });
+    expect('role' in plain).toBe(false);
+    expect('admin' in plain).toBe(false);
   });
 });
 

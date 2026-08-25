@@ -331,6 +331,30 @@
     "text": "{{count}} members",
     "doc": "Member count on a circle tile; {{count}} interpolated."
   },
+  "admin_via": {
+    "founder": {
+      "text": "started this circle",
+      "doc": "How an admin holds the role — they made the circle (or were an admin when it was carried over). Shown next to the role badge in the MEMBERS tab + the admin panel; all three ways of being an admin used to render as the same word."
+    },
+    "appointed": {
+      "text": "appointed by an admin",
+      "doc": "How an admin holds the role — an admin promoted them: a decision a person took."
+    },
+    "caretaker": {
+      "text": "took over automatically \u2014 the circle had no admin left",
+      "doc": "How an admin holds the role — NOBODY appointed them. A departure or a step-down emptied the admin set and the fold handed the circle over, so that a circle with members always has an admin. The one of the three most worth saying: no one was asked."
+    }
+  },
+  "caretaker": {
+    "now_yours": {
+      "text": "This circle had no admin left, so running it has come to you: you can admit people, change the rules and remove someone. You did not ask for this, and nobody appointed you.",
+      "doc": "Said in the circle, to the ONE person the roster fold appointed when the last admin left. The appointment is DERIVED, so every device reaches it alone and offline \u2014 and so it happened in complete silence: nothing recorded it and the person it happened to had no way to learn it. This is the line that says it out loud. Three facts, none of them optional: the circle had no admin left; what running it now means (admit, change the rules, remove); and that nobody chose them. Shown again on a later open until they sign for it \u2014 for \u201ca circle became yours\u201d that is the right kind of persistence."
+    },
+    "acknowledge": {
+      "text": "Got it",
+      "doc": "The one button on the caretaker notice. Tapping it emits the caretaker\u2019s own signed statement (the acknowledgeCaretaker op), which is what stops the notice repeating. The device must never sign on render: the whole value of the signature is that it means the person SAW it, not that a screen was drawn."
+    }
+  },
   "members_tab": {
     "loading": {
       "text": "Loading members…",

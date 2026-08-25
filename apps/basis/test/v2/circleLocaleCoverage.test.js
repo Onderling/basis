@@ -18,6 +18,12 @@ import { DEFAULT_CIRCLE_ORIGINS } from '../../src/v2/circleSources.js';
 // Phase 4 §9 — the manifest-declared Connection & transport controls (source of truth, invariant #4).
 import { settingsControlsFromManifest } from '../../src/v2/circleSettingsControls.js';
 import { basisManifest } from '../../src/index.js';
+// The admin-provenance clause on a member row — the key comes from the shared compute, so a new
+// answer without its locale entries fails here rather than on someone's screen.
+import { memberAdminStatus } from '@onderling/kring-host/circleMembers';
+// The line a person is shown when a circle became theirs — the keys come from the shared decision,
+// so a new thing it can say without its two locale entries fails here rather than on their screen.
+import { CARETAKER_NOTICE_KEYS } from '../../src/v2/caretakerNotice.js';
 
 const SETTINGS_CONTROLS = settingsControlsFromManifest(basisManifest);
 
@@ -75,6 +81,35 @@ describe('circle settings/screen locale coverage', () => {
     it(`[${lang}] the SP-5b audience-scope caption resolves`, () => {
       // Non-dismissible caption a scoped list renders under its title.
       expect(resolve(tree, 'circle.screen.audience_scope'), 'circle.screen.audience_scope').toBeTypeOf('string');
+    });
+
+    it(`[${lang}] HOW an admin holds the role has a label for every answer the projection gives`, () => {
+      // The label KEY comes from the shared compute both shells paint through, not from a list
+      // copied into this test: add a way of becoming an admin without its two locale entries and
+      // this fails, instead of a member list showing a raw key where the reason should be.
+      const missing = [];
+      for (const raw of ['founder', 'role', 'caretaker:h1']) {
+        const status = memberAdminStatus({ adminVia: raw });
+        expect(status, `memberAdminStatus lost '${raw}'`).not.toBeNull();
+        if (typeof resolve(tree, status.labelKey) !== 'string') missing.push(status.labelKey);
+      }
+      expect(missing, `missing ${missing.join(', ')}`).toEqual([]);
+      // And the role badge each clause sits next to.
+      expect(resolve(tree, 'circle.admin.role.admin'), 'circle.admin.role.admin').toBeTypeOf('string');
+    });
+
+    it(`[${lang}] the caretaker notice + its one act have real words`, () => {
+      // The appointment nobody performed is the one authority change that happens in silence, and
+      // this is the only line that says it. A raw key here is the notice failing to say anything at
+      // the exact moment it matters, so both languages carry it or this fails.
+      const missing = [];
+      for (const key of [...Object.values(CARETAKER_NOTICE_KEYS), 'circle.caretaker.acknowledge']) {
+        if (typeof resolve(tree, key) !== 'string') missing.push(key);
+      }
+      expect(missing, `missing ${missing.join(', ')}`).toEqual([]);
+      // And it must actually SAY the three things it exists to say: the circle had no admin, what
+      // running it now means, and that nobody asked them. A one-word placeholder is not the notice.
+      expect(resolve(tree, CARETAKER_NOTICE_KEYS.mine).length).toBeGreaterThan(80);
     });
 
     it(`[${lang}] every §9 Connection control label/hint (+ option + disabled-hint) resolves`, () => {

@@ -1,22 +1,33 @@
 /**
- * basis v2 — last-admin caretaker appointment (Connectivity Phase 4 §5, L4).
+ * basis v2 — the last-admin caretaker, and the one thing this file still owns.
  *
- * If the LAST admin of a circle departs (self-removal or vote-out), the circle would be
- * left with no one who can rotate keys, approve joins, or remove members — frozen. So a
- * member is promoted immediately (not a fresh vote: a vote needs quorum and leaves an
- * adminless gap). The pick must be **deterministic**, never a locally-rolled random —
- * independent dice would diverge and the fix would itself be a fork. Every replica folds
- * the same departure event and computes the SAME order from it, so the appointment is
- * agreed with no coordination, even across a partition.
+ * If the LAST admin of a circle departs, the circle would be left with nobody who can rotate keys,
+ * approve joins or remove members — frozen. So a member is appointed immediately, rather than by a
+ * fresh vote: a vote needs quorum and leaves an adminless gap in the meantime. The pick must be
+ * DETERMINISTIC, never locally-rolled — independent dice diverge, and the fix would itself be a fork.
+ * Every replica folds the same departure and computes the same order from it, so the appointment is
+ * agreed with no coordination, even across a partition. (docs/decisions.md, 2026-07-25.)
  *
- * The order is a verifiable pseudo-random shuffle seeded by the departing admin's final
- * event hash: `sha256(departingHash | address)`, ascending. The per-circle address is
- * cryptographically derived (not vanity-chosen), so the pick can't be gamed by anyone
- * grinding an address, and join-timing doesn't help. `unreachable` members (offline or
- * declined) are skipped → next-in-line, so a dead first pick doesn't re-strand the circle.
- * The appointment is a CARETAKER — a member-vote circle can reassign admin afterward.
+ * ── WHERE THE APPOINTMENT ACTUALLY HAPPENS ───────────────────────────────────────────────────────
+ * In the roster fold, in the kernel — not here. That is the only place it can be, because the
+ * appointment has to hold for a device that is offline, alone, and replaying the log: anything that
+ * needed an app to run would leave such a device disagreeing about who is in charge.
  *
- * See docs/decisions.md (2026-07-25).
+ * This header used to describe the order as `sha256(departingHash | address)` over per-circle
+ * ADDRESSES, and this module used to compute it that way while the fold keyed on member REFS. Two
+ * orders for a decision whose entire purpose is that it cannot fork. There is exactly one now, in
+ * `@onderling/core`, and `caretakerOrder` below delegates to it.
+ *
+ * ── SO WHAT IS LEFT HERE ─────────────────────────────────────────────────────────────────────────
+ * One refinement the fold cannot make: SKIPPING an unreachable candidate. Reachability is a live
+ * fact about the world right now, and the log does not carry it — two devices asking "is she online?"
+ * can honestly disagree, which is precisely the disagreement the deterministic order exists to
+ * prevent. So the fold appoints the first-ranked candidate unconditionally (the floor: a circle always
+ * has an admin), and `appointCaretaker` here is the refinement for a caller that DOES hold a
+ * reachability fact and is willing to own the risk of acting on it.
+ *
+ * Worth knowing before you rely on it: nothing in production calls it. The appointment people actually
+ * get is the fold's.
  */
 import { caretakerOrder as coreCaretakerOrder } from '@onderling/core';
 

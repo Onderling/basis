@@ -157,30 +157,42 @@ export async function createCirclePodProducer({
  * @returns {{ addMember: Function, removeMember: Function }}
  */
 export function createCircleControlAgentRouter(getProducer) {
-  const route = async (groupId, fn) => {
+  // Best-effort, and LOUD when it fails. Sealing degrading gracefully is the intended posture — a
+  // membership event must not fail because a circle's pod is unreachable. But this catch sat between
+  // the caller and every key operation, so a control-agent that threw looked exactly like one that
+  // succeeded: the join/leave returned ok and nothing anywhere said the group key had not moved. It
+  // also swallowed the throw BEFORE the callers' own reporting could see it, which is why a warning
+  // belongs here and not only there. `what` names the operation that did not reach the key.
+  const route = async (groupId, fn, what) => {
     if (!groupId || typeof getProducer !== 'function') return;
     const prod = await getProducer(groupId);
     if (!prod?.controlAgent) return;                 // circle not sealed / producer not live → no-op
-    try { await fn(prod.controlAgent); await prod.persist?.(); } catch { /* best-effort; sealing degrades gracefully */ }
+    try { await fn(prod.controlAgent); await prod.persist?.(); }
+    catch (err) {
+      console.warn(
+        `[circlePods] ${what} did not reach circle ${groupId}'s group key → the key audience is unchanged:`,
+        err?.message ?? err,
+      );
+    }
   };
   return {
     async addMember({ webId, publicKey, role, groupId }) {
       if (!webId || !publicKey) return;
-      await route(groupId, (ca) => ca.addMember({ webId, publicKey, role }));
+      await route(groupId, (ca) => ca.addMember({ webId, publicKey, role }), `granting ${webId}`);
     },
     async removeMember({ webId, force, policy, groupId }) {
       if (!webId) return;
-      await route(groupId, (ca) => ca.removeMember({ webId, force, policy }));
+      await route(groupId, (ca) => ca.removeMember({ webId, force, policy }), `revoking ${webId}`);
     },
     // Device-grained audience surgery (the custody arc): the member stays; one of their devices'
     // sealing keys joins or leaves the group key's audience.
     async grantRecipient({ publicKey, groupId }) {
       if (!publicKey) return;
-      await route(groupId, (ca) => ca.grantRecipient?.({ publicKey }));
+      await route(groupId, (ca) => ca.grantRecipient?.({ publicKey }), 'enrolling a device');
     },
     async revokeRecipient({ publicKey, policy, groupId }) {
       if (!publicKey) return;
-      await route(groupId, (ca) => ca.revokeRecipient?.({ publicKey, policy }));
+      await route(groupId, (ca) => ca.revokeRecipient?.({ publicKey, policy }), 'revoking a device');
     },
   };
 }

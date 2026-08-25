@@ -54,9 +54,30 @@ import * as promotion     from './journeys/promotion.journey.mjs';
 const ALL = [twoParty, offline, circle, sealedInbox, noticeboard, companion, taskClaim, security, notifications, feedback, manage, bot, keyexchange, telegram, media, removal, mute, governance, reachability, membership, roles, offerings, appComposition, podModes, governanceVote, attachments, eviction, keyRotation, absence, custody, receipts, taskSession, lastAdmin, scope, doors, promotion];
 const KEY = (n) => n.split(' ')[0].toLowerCase().replace(/[^a-z-]/g, ''); // "two-party messaging" -> "two-party"
 
+const { readFile, writeFile } = await import('node:fs/promises');
+
 const args = process.argv.slice(2);
 const urlArg = args.find((a) => a.includes('://'));
-const filters = args.filter((a) => !a.includes('://')).map((s) => s.toLowerCase());
+const UPDATE_BASELINE = args.includes('--update-baseline');
+const filters = args.filter((a) => !a.includes('://') && !a.startsWith('--')).map((s) => s.toLowerCase());
+
+/**
+ * KNOWN FAILURES — the checks that are red because of an OPEN FINDING, not a regression.
+ *
+ * Without this the suite is red forever and CI teaches people to ignore it, which is the exact
+ * habit a gate exists to prevent. With it, red means "something changed", which is the only kind of
+ * red worth having. The file doubles as the open-findings list, in the words of the checks that
+ * prove them.
+ *
+ * It SHRINKS on its own: a baselined check that starts passing fails the run and asks to be
+ * removed. A baseline that only grows is debt with a green light on it.
+ *
+ * Refresh with `node run.mjs --update-baseline` — and read the diff before committing it.
+ */
+const BASELINE_PATH = new URL('./known-failures.json', import.meta.url);
+let BASELINE = {};
+try { BASELINE = JSON.parse(await readFile(BASELINE_PATH, 'utf8')); } catch { BASELINE = {}; }
+const baselinedFor = (journey) => new Set(BASELINE[journey] ? Object.keys(BASELINE[journey]) : []);
 const relayUrlGiven = urlArg || process.env.RELAY_URL;
 
 let selected = ALL;
@@ -93,10 +114,23 @@ for (const j of selected) {
     summary.push({ name: j.name, skipped: true });
     continue;
   }
-  for (const r of res) console.log(`   ${r.ok ? '✅' : '❌'} ${r.name}${r.detail ? '  — ' + r.detail : ''}`);
-  const passed = res.filter((r) => r.ok).length;
+  const known = baselinedFor(j.name);
+  for (const r of res) {
+    const mark = r.ok ? '✅' : (known.has(r.name) ? '🔸' : '❌');
+    const why  = (!r.ok && known.has(r.name)) ? `  [known: ${BASELINE[j.name][r.name]}]` : '';
+    console.log(`   ${mark} ${r.name}${r.detail ? '  — ' + r.detail : ''}${why}`);
+  }
+  const passed    = res.filter((r) => r.ok).length;
+  const surprises = res.filter((r) => !r.ok && !known.has(r.name)).map((r) => r.name);
+  // A baselined check that now PASSES is how the list shrinks — say so, and mean it.
+  const fixed     = res.filter((r) => r.ok && known.has(r.name)).map((r) => r.name);
   console.log(`   → ${passed}/${res.length}\n`);
-  summary.push({ name: j.name, passed, total: res.length, ok: passed === res.length && res.length > 0 });
+  summary.push({
+    name: j.name, passed, total: res.length,
+    ok: passed === res.length && res.length > 0,
+    surprises, fixed,
+    failures: Object.fromEntries(res.filter((r) => !r.ok).map((r) => [r.name, BASELINE[j.name]?.[r.name] ?? 'open finding — name it'])),
+  });
 }
 
 if (localRelay) await localRelay.stop().catch(() => {});
@@ -112,5 +146,40 @@ const totPass = ran.reduce((a, s) => a + s.passed, 0);
 const totAll  = ran.reduce((a, s) => a + s.total, 0);
 const allOk   = ran.every((s) => s.ok);
 const skipNote = skipped ? ` (${skipped} skipped)` : '';
-console.log(`\n  ${allOk ? '✅ ALL GREEN' : '❌ FAILURES'} — ${totPass}/${totAll} checks across ${ran.length} journeys${skipNote}\n`);
-process.exit(allOk ? 0 : 1);
+
+if (UPDATE_BASELINE) {
+  const next = {};
+  for (const s of ran) if (Object.keys(s.failures ?? {}).length) next[s.name] = s.failures;
+  await writeFile(BASELINE_PATH, JSON.stringify(next, null, 2) + '\n');
+  console.log(`\n  ✍️  baseline written — ${Object.values(next).reduce((a, o) => a + Object.keys(o).length, 0)} known failure(s).`);
+  console.log('     Read the diff before committing: every entry is a claim that a red is EXPECTED.\n');
+  process.exit(0);
+}
+
+const surprises = ran.flatMap((s) => (s.surprises ?? []).map((n) => `${s.name} → ${n}`));
+const fixed     = ran.flatMap((s) => (s.fixed ?? []).map((n) => `${s.name} → ${n}`));
+const surprisesEarly = ran.flatMap((s) => s.surprises ?? []);
+const fixedEarly     = ran.flatMap((s) => s.fixed ?? []);
+// The headline states the VERDICT, not the arithmetic: a red that is entirely known is not a
+// failure of this run, and saying "FAILURES" while exiting 0 is the mixed signal a gate must not
+// send. `allOk` still means every check passed; the middle state gets its own words.
+const verdict = allOk ? '✅ ALL GREEN'
+  : (surprisesEarly.length || fixedEarly.length) ? '❌ FAILURES'
+  : '🔸 NO REGRESSIONS';
+console.log(`\n  ${verdict} — ${totPass}/${totAll} checks across ${ran.length} journeys${skipNote}`);
+
+if (surprises.length) {
+  console.log(`\n  ❌ ${surprises.length} UNEXPECTED failure(s) — not on the known-failures list:`);
+  for (const n of surprises) console.log(`     • ${n}`);
+}
+if (fixed.length) {
+  console.log(`\n  🎉 ${fixed.length} known failure(s) now PASS — take them off the list:`);
+  for (const n of fixed) console.log(`     • ${n}`);
+  console.log('     (run with --update-baseline, then read the diff)');
+}
+const knownCount = totAll - totPass - surprises.length;
+if (!surprises.length && !fixed.length) {
+  console.log(knownCount ? `\n  🔸 ${knownCount} known failure(s), all accounted for by open findings.\n` : '\n');
+}
+// Red ONLY when something changed: a new failure, or a baselined one that started passing.
+process.exit(surprises.length || fixed.length ? 1 : 0);

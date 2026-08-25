@@ -808,8 +808,27 @@ other agents did with your things, and can always be rebuilt from one secret you
 24-word recovery phrase (the *herstelzin*). Every key the agent uses derives from it deterministically:
 the default profile's chat identity, a **distinct signing key per circle** (so two circles cannot
 correlate you by pubkey — see the Connectivity notes on the limits of this today), and the key that
-encrypts the agent's stored secrets at rest. Owning the phrase *is* owning the account; the phrase alone
-recovers the same identities, the same per-circle addresses, on any device.
+encrypts the agent's stored secrets at rest. Owning the phrase *is* owning the account, and the phrase
+alone rebuilds every one of those keys on any device.
+
+**But a device is not a clone of its owner — read this before reasoning about who did what.** The
+per-circle key derives from **this device's derivation root**, not from the profile's seed directly, and
+the two differ by design:
+
+- an **enrolled** device (added through the add-a-device ceremony) derives from its own device seed, so it
+  presents an *honestly distinct address in every circle*. Your phone and your laptop are separable inside
+  a circle — a member's roster row therefore holds an address **set**, one entry per device, and every
+  check that matches an author against a member reads that set rather than a single field;
+- an **unenrolled** first device derives from the profile's seed, so device and profile identity collapse —
+  correctly, since there is only one;
+- and the **custody ceremony** (revoking a device) signs with the profile-derived per-circle key
+  specifically, because a stolen device must not be able to mint a revocation.
+
+Two consequences worth stating rather than discovering. Unlinkability is **between circles, not between
+your own devices within one circle** — co-members can see how many devices you run, which is the price of
+each one being separately revocable. And a device's addresses **change** when it migrates derivation roots
+at enrollment, which is why that ceremony ends with a per-circle re-announce that lands the new addresses
+in every roster's set.
 
 **The phrase is never stored.** What a device persists is the 32-byte root **seed**, kept behind the
 strongest door the platform offers: the OS keystore on mobile (Android Keystore / iOS Keychain,

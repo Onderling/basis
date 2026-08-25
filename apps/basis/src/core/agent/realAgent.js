@@ -466,11 +466,22 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
   } catch { /* unenrolled */ }
 
-  // Decision 4 — the per-circle SIGNING identity, one per circle, memoised.
+  // The per-circle SIGNING identity, one per circle, memoised.
   //
-  // Deterministic from the profile seed, so the vault is deliberately EPHEMERAL: nothing here is
-  // worth persisting, and a per-circle key written to storage is one more copy of the thing we are
-  // trying not to spread. Re-derived on every boot; the same on every device the profile is on.
+  // Derived from `deviceDerivationSeed` — THIS DEVICE'S derivation root, set just above as
+  // `custodySeed ?? defaultProfileSeed`. Read that literally, because the two branches differ in a
+  // way that decides who can tell your devices apart:
+  //   • ENROLLED (custody seed present) → the device seed from the delegation blob, so this device
+  //     presents an honestly DISTINCT address per circle and the roster's address SET gains one
+  //     entry for it. Statements from your phone and your laptop are separable — by address.
+  //   • UNENROLLED first device → the profile's own seed, so device and profile identity collapse.
+  // (The custody CEREMONY key is a third case and is derived from the profile seed explicitly at
+  // its own call site — a stolen device must not be able to mint a revocation.)
+  //
+  // The vault is deliberately EPHEMERAL: nothing here is worth persisting, and a per-circle key
+  // written to storage is one more copy of the thing we are trying not to spread. Re-derived every
+  // boot — and re-derived DIFFERENTLY after a self-enroll cutover, which is why enrollment ends in
+  // a per-circle re-announce that lands the new addresses in every roster's set.
   const circleIdentities = new Map();   // circleId → Promise<AgentIdentity>
   const circleIdentityFor = (circleId) => {
     if (!circleIdentities.has(circleId)) {

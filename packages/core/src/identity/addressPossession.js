@@ -6,7 +6,7 @@
 // delivery and traffic analysis do not. This module is what closes that
 // (`plans/DESIGN-boundary-authentication.md` §7, Decision 3).
 //
-// WHY IT IS THIS SMALL: an address IS a public key. `deriveCircleAddress(profileSeed, circleId)`
+// WHY IT IS THIS SMALL: an address IS a public key. `deriveCircleAddress(derivationSeed, circleId)`
 // returns `AgentIdentity.pubKeyFromSeed(deriveCircleSeed(…))`, and a `RelayTransport`'s primary
 // address is `identity.pubKey`. So "prove you hold this address" is one signature verified against
 // the address itself. Nothing is minted, stored, distributed, renewed or revoked; there is no
@@ -88,26 +88,26 @@ export function signAddressPossession(identity, address, nonce) {
  * built, not a nonce, so the caller never has to know the registration protocol — only which circle
  * the address belongs to, which is the one thing only the caller knows.
  *
- * @param {Uint8Array} profileSeed
+ * @param {Uint8Array} derivationSeed  this device's derivation root (see circleAddress.js)
  * @param {string} circleId
  * @returns {(message: string) => string} sign(message) → base64url Ed25519 signature
  */
-export function circleAddressSigner(profileSeed, circleId) {
-  const kp = nacl.sign.keyPair.fromSeed(deriveCircleSeed(profileSeed, circleId));
+export function circleAddressSigner(derivationSeed, circleId) {
+  const kp = nacl.sign.keyPair.fromSeed(deriveCircleSeed(derivationSeed, circleId));
   return (message) => b64encode(nacl.sign.detached(new TextEncoder().encode(message), kp.secretKey));
 }
 
 /**
  * The same thing at the protocol's own level: sign THIS challenge for THIS per-circle address.
  * For callers that hold a nonce rather than a transport (another wire implementation, a test).
- * @param {Uint8Array} profileSeed
+ * @param {Uint8Array} derivationSeed  this device's derivation root (see circleAddress.js)
  * @param {string} circleId
  * @param {string} address  the per-circle address being registered (= `deriveCircleAddress(...)`)
  * @param {string} nonce
  * @returns {string} base64url Ed25519 signature
  */
-export function signAddressPossessionFromSeed(profileSeed, circleId, address, nonce) {
-  return circleAddressSigner(profileSeed, circleId)(addressPossessionMessage(address, nonce));
+export function signAddressPossessionFromSeed(derivationSeed, circleId, address, nonce) {
+  return circleAddressSigner(derivationSeed, circleId)(addressPossessionMessage(address, nonce));
 }
 
 /**

@@ -1,7 +1,7 @@
 // circleAddressAnnouncement.js — telling a circle which address you answer on, provably.
 //
 // ── The gap this closes ─────────────────────────────────────────────────────────────────────────
-// Every member has a DIFFERENT address in every circle (`deriveCircleAddress(profileSeed, circleId)`).
+// Every member has a DIFFERENT address in every circle (`deriveCircleAddress(derivationSeed, circleId)`).
 // A join teaches exactly two devices about each other: the joiner presents + proves its per-circle
 // address to the admin (`verifyMembershipCodeForPeer`), and the admin's proven address rides back on
 // the redeem response (`recordRemoteRedemption`). Nothing ever taught two JOINERS each other's
@@ -122,24 +122,24 @@ export function ownCircleAddressAnnouncement({
 }
 
 /**
- * Vault-free variant for a caller that holds the profile seed itself (a host without the agent
+ * Vault-free variant for a caller that holds the derivation seed itself (a host without the agent
  * seams, a test). Same output, same deny-by-default.
  *
  * @param {object} a
- * @param {Uint8Array} a.profileSeed
+ * @param {Uint8Array} a.derivationSeed  this device's derivation root (see circleAddress.js)
  * @param {string} a.circleId
  * @param {string} a.memberWebid
  * @param {string} [a.circleAddress]  defaults to the address the seed derives for this circle
  * @returns {{circleId, memberWebid, circleAddress, circleAddressProof}|null}
  */
 export function ownCircleAddressAnnouncementFromSeed({
-  profileSeed, circleId, memberWebid, circleAddress = null,
+  derivationSeed, circleId, memberWebid, circleAddress = null,
 } = {}) {
-  if (!profileSeed || typeof circleId !== 'string' || !circleId) return null;
+  if (!derivationSeed || typeof circleId !== 'string' || !circleId) return null;
   try {
-    const address = circleAddress ?? deriveCircleAddress(profileSeed, circleId);
+    const address = circleAddress ?? deriveCircleAddress(derivationSeed, circleId);
     if (typeof address !== 'string' || !address) return null;
-    const proof = signCircleLinkFromSeed(profileSeed, circleId, circleId, address);
+    const proof = signCircleLinkFromSeed(derivationSeed, circleId, circleId, address);
     return circleAddressAnnouncement({
       circleId, memberWebid, circleAddress: address, circleAddressProof: proof,
     });

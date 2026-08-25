@@ -46,7 +46,7 @@ describe('per-circle address announcement', () => {
       circleId: CIRCLE, memberWebid: 'webid:me', ...seamsFor(seed),
     });
     const viaSeed = ownCircleAddressAnnouncementFromSeed({
-      profileSeed: seed, circleId: CIRCLE, memberWebid: 'webid:me',
+      derivationSeed: seed, circleId: CIRCLE, memberWebid: 'webid:me',
     });
     expect(viaSeed).toEqual(viaSeams);
   });

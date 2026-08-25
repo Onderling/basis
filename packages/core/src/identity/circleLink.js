@@ -24,7 +24,7 @@ export function circleLinkMessage(groupId, address) {
 
 /**
  * Sign the link challenge with the SOURCE circle's identity → the base64url proof to present
- * alongside the address. `identity` is `circleIdentity(profileSeed, sourceCircleId, vault)`.
+ * alongside the address. `identity` is `circleIdentity(derivationSeed, sourceCircleId, vault)`.
  * @returns {string} base64url Ed25519 signature
  */
 export function signCircleLink(identity, groupId, address) {
@@ -37,8 +37,8 @@ export function signCircleLink(identity, groupId, address) {
  * the redeem seam so a joiner can prove control of the address they present.
  * @returns {string} base64url Ed25519 signature over `circleLinkMessage(groupId, address)`
  */
-export function signCircleLinkFromSeed(profileSeed, circleId, groupId, address) {
-  const kp = nacl.sign.keyPair.fromSeed(deriveCircleSeed(profileSeed, circleId));
+export function signCircleLinkFromSeed(derivationSeed, circleId, groupId, address) {
+  const kp = nacl.sign.keyPair.fromSeed(deriveCircleSeed(derivationSeed, circleId));
   return b64encode(nacl.sign.detached(new TextEncoder().encode(circleLinkMessage(groupId, address)), kp.secretKey));
 }
 

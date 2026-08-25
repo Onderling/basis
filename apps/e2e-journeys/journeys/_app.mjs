@@ -33,6 +33,11 @@ import { makeGovernanceCatchUp, GOV_CATCHUP_REQUEST } from '../../basis/src/v2/g
 import { bindCircleGovernance, makeGovernanceRail } from '../../basis/src/v2/governanceAppWiring.js';
 import { makeCircleGovernancePeerHandler } from '../../basis/src/v2/circleLogReceiver.js';
 import { createCircleCacheMedium } from '../../basis/src/v2/circleCacheMedium.js';
+// The REAL memory backend, not a hand-rolled one. A local backend must return `{etag, _v}` from
+// `put` — PseudoPod's versioned write destructures it — and the hand-rolled double here returned
+// nothing, so every pod-backed write threw before it reached the pod (F-007). The working recipe
+// (`apps/basis/test/circleCachePodTwoAgent.test.js`) always used this; the journey did not.
+import { createMemoryBackend } from '@onderling/pseudo-pod';
 import { makeKeyEventLogSink, recipientAddrsFromRoster, recipientWebidsFromRoster } from '@onderling/kring-host/keyEventLogSink';
 import {
   invokeAgentSkill, DataPart, InternalBus, InternalTransport,
@@ -70,14 +75,21 @@ export function makeSharedPod() {
   return {
     store: backend.store,
     backend,
-    // A visible seal, so a journey can assert that what lands at rest is not plaintext.
-    strategy: { seal: (v) => `SEALED(${v})`, open: (v) => String(v).replace(/^SEALED\((.*)\)$/, '$1') },
+    // A seal that actually HIDES, so "what lands at rest is not plaintext" is a real assertion.
+    // It used to wrap the bytes and leave them readable — `SEALED({"text":"de goot schoonmaken"})` —
+    // which makes the sealing visible and the assertion impossible to satisfy at the same time. The
+    // marker stays so a journey can still tell sealed from raw; base64 is not encryption and is not
+    // pretending to be, it is the cheapest thing that makes "is the plaintext there" answerable.
+    strategy: {
+      seal: (v) => `SEALED(${Buffer.from(String(v), 'utf8').toString('base64')})`,
+      open: (v) => Buffer.from(String(v).replace(/^SEALED\((.*)\)$/s, '$1'), 'base64').toString('utf8'),
+    },
   };
 }
 
 const mediumFor = (label, pod, circleId) => (id) => (id === circleId
   ? createCircleCacheMedium({
-    localBackend: memBackend(),
+    localBackend: createMemoryBackend(),
     deviceId:     `${label}-${id}`,
     resolvePod:   async () => ({ backend: pod.backend, sealed: true, strategy: pod.strategy }),
   })

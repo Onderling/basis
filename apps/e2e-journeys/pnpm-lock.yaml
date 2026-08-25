@@ -39,6 +39,9 @@ importers:
       '@onderling/pod-client':
         specifier: workspace:*
         version: link:../../packages/pod-client
+      '@onderling/pseudo-pod':
+        specifier: workspace:*
+        version: link:../../packages/pseudo-pod
       '@onderling/relay':
         specifier: workspace:*
         version: link:../../packages/relay

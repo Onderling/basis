@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "End-to-end user-journey harness \u2014 runs the flagship journeys against a live (deployed) or local relay, in one process, with real SDK + app code.",
+  "description": "End-to-end user-journey harness — runs the flagship journeys against a live (deployed) or local relay, in one process, with real SDK + app code.",
   "bin": {
     "onderling-e2e": "./run.mjs"
   },
@@ -13,17 +13,18 @@
     "three-party": "node three-party-circle.mjs"
   },
   "dependencies": {
-    "@onderling/core": "workspace:*",
-    "@onderling/circles": "workspace:*",
-    "@onderling/transports": "workspace:*",
-    "@onderling/vault": "workspace:*",
-    "@onderling/pod-client": "workspace:*",
-    "@onderling/kring-host": "workspace:*",
-    "@onderling/relay": "workspace:*",
-    "@onderling/identity-resolver": "workspace:*",
-    "@onderling-app/stoop": "workspace:*",
     "@onderling-app/companion-node": "workspace:*",
+    "@onderling-app/stoop": "workspace:*",
     "@onderling/blob-gateway": "workspace:*",
-    "@onderling/secure-agent": "workspace:*"
+    "@onderling/circles": "workspace:*",
+    "@onderling/core": "workspace:*",
+    "@onderling/identity-resolver": "workspace:*",
+    "@onderling/kring-host": "workspace:*",
+    "@onderling/pod-client": "workspace:*",
+    "@onderling/pseudo-pod": "workspace:*",
+    "@onderling/relay": "workspace:*",
+    "@onderling/secure-agent": "workspace:*",
+    "@onderling/transports": "workspace:*",
+    "@onderling/vault": "workspace:*"
   }
 }

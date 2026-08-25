@@ -2,11 +2,6 @@
   "J-circle (join → noticeboard → private chat)": {
     "the removed member receives nothing the circle posts afterwards": "F-022 / ledger L44 — the fan-out peer set is reconciled against the roster at circle-open; this composition has no webid↔address mapping at all, so it cannot demonstrate the fix"
   },
-  "J-podmodes (one corridor, run with and without a central pod)": {
-    "[F-007] [central pod] the other member reads it back — the mode does not change what a person sees": "F-007 — open finding, see plans/REPAIR-NOTES-open-findings.md",
-    "[F-007] [central pod] the other member reads the household item back": "F-007 — open finding, see plans/REPAIR-NOTES-open-findings.md",
-    "[F-007] [central pod] the circle's content actually reaches the pod": "F-007 — open finding, see plans/REPAIR-NOTES-open-findings.md"
-  },
   "J-lastadmin (the only admin leaves — can the circle still be run?)": {
     "someone is admin after the departure — THE OPEN QUESTION: today nobody is": "ledger L39 — the last admin can LEAVE and strand the circle, though they cannot be DEMOTED to the same place. A design decision, not a bug to patch",
     "the circle can still change its own rules after its admin left": "ledger L39 — follows from the above: with zero admins every admin-gated act refuses",

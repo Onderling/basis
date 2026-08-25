@@ -41,18 +41,23 @@ async function corridor({ relayUrl, circleId, pod, check, label }) {
       const r = await bram.agent.callSkill('tasks', 'listOpen', { circleId });
       return (r?.items ?? []).some((t) => t.id === created.itemId);
     });
-    check(`${pod ? '[F-007] ' : ''}[${label}] the other member reads it back — the mode does not change what a person sees`, readsIt);
+    check(`[${label}] the other member reads it back — the mode does not change what a person sees`, readsIt);
 
     // Narrowing which STORE the pod medium serves: the proven cache-mode recipe writes through the
     // HOUSEHOLD store, so ask both and let the answer be specific rather than "the pod mode is broken".
     const hh = await anne.agent.callSkill('household', 'addItem', { type: 'shopping', text: 'melk halen', circleId });
     check(`[${label}] a household item can be written`, !hh?.error, JSON.stringify(hh)?.slice(0, 120));
     const hhSeen = await untilTrue(async () => {
+      // With a pod, content is carried BY THE POD and the peer fan is deliberately skipped — so the
+      // reader converges when they open the circle, not the moment the write lands. Refreshing here
+      // is what a person does (re-enter the screen, pull to refresh); asserting without it would be
+      // asserting a reactive delivery this mode does not claim to have.
+      if (pod) await bram.agent.catchUpCircle?.(circleId);
       const r = await bram.agent.callSkill('household', 'listOpen', { circleId });
       const items = Array.isArray(r?.items) ? r.items : (Array.isArray(r) ? r : []);
       return items.some((i) => (i?.text ?? '') === 'melk halen');
     }, 10000);
-    check(`${pod ? '[F-007] ' : ''}[${label}] the other member reads the household item back`, hhSeen);
+    check(`[${label}] the other member reads the household item back`, hhSeen);
 
     // The rules doc is lane-shaped, so it exercises a different path than the item store.
     const edited = await anne.agent.callSkill('stoop', 'editGroupRules', {
@@ -81,7 +86,7 @@ export async function run({ relayUrl }) {
 
     // Where the modes SHOULD differ, say so: with a pod, content reaches it, and it is sealed at rest.
     const landed = await untilTrue(async () => pod.store.size > 0, 8000);
-    check('[F-007] [central pod] the circle\'s content actually reaches the pod', landed,
+    check('[central pod] the circle\'s content actually reaches the pod', landed,
       `${pod.store.size} object(s) at rest`);
 
     if (pod.store.size > 0) {

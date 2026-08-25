@@ -2877,12 +2877,20 @@ export async function createRealHouseholdAgent(opts = {}) {
       // calls leave circleId unset → resolver falls back to the primary
       // circle (legacy single-circle behaviour).  ensureCircle is idempotent.
       if (typeof realArgs.circleId === 'string' && realArgs.circleId) {
-        await tasksCircle.ensureCircle(realArgs.circleId);
-        // One-store-per-circle (G-C1): this circle's tasks live in the SAME
-        // CircleItemStore as its other items (injected via circleStoreFor), so
-        // the household store<->mirror sync is the single fan-out path. Wire it
-        // for this circle (idempotent per circle) — no separate tasks mirror.
+        // ORDER IS LOAD-BEARING: sync FIRST, then the tasks circle.
+        //
+        // `ensureCircleSync` provisions this circle's pod-cache MEDIUM, and the store is bound to
+        // its data source AT BUILD TIME (`dataSourceFor`). `ensureCircle` builds that store through
+        // the injected `circleStoreFor`. Run the other way round — as this did — and a pod-backed
+        // circle whose first touch is a task op gets a store on the LOCAL backing, permanently: the
+        // medium is then provisioned and used for nothing, so writes never reach the pod and the
+        // peer mirror is skipped as "pod-carried". Content goes nowhere (F-007).
+        //
+        // One-store-per-circle (G-C1): this circle's tasks live in the SAME CircleItemStore as its
+        // other items, so the household store<->mirror sync is the single fan-out path — no separate
+        // tasks mirror. Both calls are idempotent per circle.
         await ensureCircleSync(realArgs.circleId);
+        await tasksCircle.ensureCircle(realArgs.circleId);
       }
       const parts = [DataPart(realArgs)];
       const result = await chatAgent.invoke(tasksCircle.address, realOpId, parts);
@@ -4373,6 +4381,24 @@ export async function createRealHouseholdAgent(opts = {}) {
     // only on a FRESH pair — so without this, items added before the other side opened the
     // circle never arrive. The receiver de-dupes by etag/_v (idempotent), so re-push is safe.
     resyncHouseholdCircle: async (circleId) => { try { await republishCircleItemsToNewPeer(circleId); } catch { /* best-effort */ } },
+    /**
+     * Pull this circle's pod contents again — what "opening the circle" does, on demand.
+     *
+     * A pod-backed circle carries content THROUGH THE POD and skips the peer fan, and its catch-up
+     * ran exactly once: inside `ensureCircleSync`, behind a guard that returns early ever after. So
+     * a device that opened a circle and stayed open never saw another member's writes at all — not
+     * "no reactive delivery", which is the documented trade, but no delivery until the process
+     * restarted. Anything that refreshes a circle (pull-to-refresh, re-entering the screen, a
+     * journey asserting the other member can read it back) needs this.
+     *
+     * No-op for a circle with no pod medium: there the peer mirror is the carry and it is live.
+     */
+    catchUpCircle: async (circleId) => {
+      const id = (typeof circleId === 'string' && circleId) ? circleId : 'household';
+      const medium = circleMedia.get(id);
+      if (!medium || typeof medium.catchUp !== 'function') return false;
+      try { await medium.catchUp(); return true; } catch { return false; }
+    },
     // Sync seam (mirror + inbound handler) — used by S1d skill hooks + tests.
     householdSync: {
       mirror:        circleMirror,

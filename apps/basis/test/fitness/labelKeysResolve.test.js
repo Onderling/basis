@@ -17,6 +17,7 @@ import {
   NEARBY_ACTION_LABELS, NEARBY_ASK_LABELS, NEARBY_INVITE_LABELS,
 } from '../../src/v2/nearbyScreen.js';
 import { CIRCLE_KINDS }           from '../../src/v2/circleTemplates.js';
+import { ROLE_CONTROL_KEYS }      from '../../src/v2/circleRoleControl.js';
 
 /**
  * Vocabularies whose label keys are built by INTERPOLATION (`circle.kind.${k}`) rather than declared in
@@ -31,6 +32,7 @@ const DERIVED = {
 
 const MAPS = {
   DELIVERY_LABELS,
+  ROLE_CONTROL_KEYS,
   POINT_SOURCE_LABELS,
   NEARBY_ACTION_LABELS,
   NEARBY_ASK_LABELS,

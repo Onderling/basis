@@ -42,9 +42,10 @@
  *
  * Usage: node scripts/lint-journeys-reach-users.mjs [--update]   (runs inside `npm run guards`)
  */
-import { readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { walk, opsIn, reachedIn, findUnreached, verbsByOp } from './journeys-reach-users.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.dirname(HERE);
@@ -54,74 +55,6 @@ const UPDATE = process.argv.includes('--update');
 /** Where the journeys live, and where a person's corridor is composed. */
 const JOURNEYS = 'apps/e2e-journeys';
 const SHELLS = ['apps/basis/web', 'apps/basis-mobile/src', 'apps/basis/src'];
-
-const walk = (dir, out = []) => {
-  let names; try { names = readdirSync(dir); } catch { return out; }
-  for (const n of names) {
-    if (n === 'node_modules' || n === '.git') continue;
-    const f = path.join(dir, n);
-    let st; try { st = statSync(f); } catch { continue; }
-    if (st.isDirectory()) walk(f, out);
-    else if (/\.(js|mjs)$/.test(n)) out.push(f);
-  }
-  return out;
-};
-
-/** Comments do not dispatch anything — strip them before asking what a file CALLS. */
-const strip = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
-
-/**
- * The ops a file drives.
- *
- * Two idioms, both literal-only (a computed op is unknowable statically, and the generic dispatchers
- * legitimately compute one):
- *   · `callSkill('app', 'op', …)` and its aliases — anything ending in `skill`/`Skill`, which is how
- *     `rawCallSkill` and `skill` reach the same waist.
- *   · the journeys' own `call(node, 'op', …)` helper, whose app is fixed one line above it.
- */
-function opsIn(text, journeyApp = null) {
-  const s = strip(text);
-  const out = new Set();
-  for (const m of s.matchAll(/\b[A-Za-z_]*[sS]kill\(\s*['"]([\w-]+)['"]\s*,\s*['"]([\w.-]+)['"]/g)) {
-    out.add(`${m[1]}:${m[2]}`);
-  }
-  if (journeyApp) {
-    for (const m of s.matchAll(/\bcall\(\s*\w+\s*,\s*['"]([\w.-]+)['"]/g)) out.add(`${journeyApp}:${m[1]}`);
-  }
-  return out;
-}
-
-/** Bare op ids production code reaches — dispatched under ANY origin, or wired/registered as a handler. */
-function reachedIn(text) {
-  const s = strip(text);
-  const out = new Set();
-  for (const m of s.matchAll(/\b[A-Za-z_]*[sS]kill\(\s*['"][\w-]+['"]\s*,\s*['"]([\w.-]+)['"]/g)) out.add(m[1]);
-  for (const m of s.matchAll(/\b(?:register|wire)\(\s*['"]([\w.-]+)['"]/g)) out.add(m[1]);
-  return out;
-}
-
-/** Every op each app manifest declares, with its verb — the source of truth for "does this WRITE". */
-async function verbsByOp() {
-  const specs = [
-    ['basis',     'apps/basis/manifest.js',              'basisManifest'],
-    ['household', 'apps/household/manifest.js',          'householdManifest'],
-    ['stoop',     'apps/stoop/manifest.js',              'stoopManifest'],
-    ['folio',     'apps/folio/manifest.js',              'folioManifest'],
-    ['tasks-v0',  'apps/tasks-v0/manifest.js',           'tasksManifest'],
-  ];
-  const verbs = new Map();
-  for (const [, rel, pick] of specs) {
-    let mod; try { mod = await import(path.join(ROOT, rel)); } catch { continue; }
-    const manifest = mod[pick] ?? mod.default;
-    for (const op of manifest?.operations ?? []) {
-      if (op?.id && !verbs.has(op.id)) verbs.set(op.id, String(op.verb ?? ''));
-    }
-  }
-  return verbs;
-}
-
-/** The verbs that only LOOK. A journey driving one of these is asserting, not exercising a feature. */
-const READ_VERBS = new Set(['list', 'help', 'get', 'view', 'show']);
 
 const journeyOps = new Map();   // "app:op" → the journey files that drive it
 for (const f of walk(path.join(ROOT, JOURNEYS))) {
@@ -142,15 +75,7 @@ for (const dir of SHELLS) {
   }
 }
 
-const verbs = await verbsByOp();
-const writes = (key) => {
-  const verb = verbs.get(key.split(':')[1]);
-  return verb !== undefined && !READ_VERBS.has(verb);
-};
-
-const gap = [...journeyOps.keys()]
-  .filter((key) => writes(key) && !reached.has(key.split(':')[1]))
-  .sort();
+const gap = findUnreached({ journeyOps: journeyOps.keys(), reached, verbs: await verbsByOp(ROOT) });
 
 let baseline = {};
 try { baseline = JSON.parse(readFileSync(BASELINE, 'utf8')); } catch { /* first run */ }
@@ -169,9 +94,7 @@ const fixed = [...known].filter((op) => !gap.includes(op));
 
 if (fresh.length) {
   console.error(`✖ lint:journeys-reach-users — ${fresh.length} op(s) a journey walks that NOTHING a person uses can reach:\n`);
-  for (const op of fresh) {
-    console.error(`  • ${op}\n      walked by ${journeyOps.get(op).join(', ')}`);
-  }
+  for (const op of fresh) console.error(`  • ${op}\n      walked by ${journeyOps.get(op).join(', ')}`);
   console.error('\nA green journey over an op no shell reaches proves the mechanism, not the feature —');
   console.error('that is how a role system came to be fully built and completely unusable. Paint the');
   console.error('control, or record the gap on purpose: node scripts/lint-journeys-reach-users.mjs --update');

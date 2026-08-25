@@ -1,8 +1,8 @@
 /**
  * basis-mobile v2 — circle admin panel (RN, S3 parity).
  *
- * RN mirror of web's circleAdminPanel: member roster (+ remove, + the role and how it was come by),
- * announcements,
+ * RN mirror of web's circleAdminPanel: member roster (+ remove, + the role, how it was come by, and
+ * the control that changes it), announcements,
  * and muted peers (+ unmute). Self-contained: loads listGroupMembers/listMutedPeers
  * + dispatches the admin-gated stoop ops via the injected `callSkill` (a refusal
  * surfaces a notice).
@@ -12,13 +12,19 @@
  * which supersedes the old read-only `listReports` view this screen used to carry.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, TextInput, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, Pressable, TextInput, ScrollView, StyleSheet, Alert } from 'react-native';
 import { t } from '../../core/localisation.js';
 import { removeCircleMember } from '../../../../basis/src/v2/circleMembershipHygiene.js';
 // The rows here are RAW `listGroupMembers` rows, so the admin provenance is read off the row
 // through the SAME shared compute web's panel and both members tabs paint — one answer to "how is
 // this person an admin", never a second one per surface.
 import { memberAdminStatus } from '@onderling/kring-host/circleMembers';
+// …and whether THIS viewer may change that role, which way, and what taking it would do. One shared
+// decision (web ≡ mobile); the screen paints it and works nothing out for itself.
+import { roleControlFor, roleChangeConfirm } from '../../../../basis/src/v2/circleRoleControl.js';
+// The confirm the op declares, run through the SAME gate the chat path uses — Alert.alert is only
+// this platform's presenter.
+import { runConfirmGate, alertConfirmPresenter } from '../../core/confirmDispatch.js';
 import { useTheme } from './themeContext.js';
 
 export default function CircleAdminPanelScreen({ callSkill, agent = null, groupId, onBack }) {
@@ -26,15 +32,18 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [members, setMembers] = useState([]);
   const [muted, setMuted] = useState([]);
+  const [myWebid, setMyWebid] = useState('');   // whose row is mine — the role control is offered to an admin only
   const [announce, setAnnounce] = useState('');
   const [notice, setNotice] = useState(null);
 
   const load = useCallback(async () => {
     if (typeof callSkill !== 'function') return;
-    const [mem, mut] = await Promise.all([
+    const [mem, mut, who] = await Promise.all([
       callSkill('stoop', 'listGroupMembers', { groupId }).catch(() => null),
       callSkill('stoop', 'listMutedPeers', {}).catch(() => null),
+      callSkill('stoop', 'whoAmI', {}).catch(() => null),
     ]);
+    setMyWebid(who?.webid ?? who?.webId ?? '');
     setMembers(Array.isArray(mem?.members) ? mem.members : []);
     setMuted(Array.isArray(mut?.peers) ? mut.peers : []);   // reports moved to §8 governance Reports
   }, [callSkill, groupId]);
@@ -60,6 +69,27 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
     } catch { setNotice(t('circle.admin.refused')); }
     load();
   }, [agent, callSkill, groupId, load]);
+  // Make a member an admin, or step an admin back down (your own row included — that is how someone
+  // stops running a circle). The op's `ui.confirm` declaration is what puts a confirmation in front of
+  // it, carrying the consequence THIS change has: an ordinary demotion, a handover of the whole circle,
+  // or one the fold will not let stand. What that consequence is comes from the shared decision.
+  const setRole = useCallback(async (m, control) => {
+    const name = m.displayName || m.handle || m.webid;
+    await runConfirmGate({
+      request: roleChangeConfirm({ control, name, t }),
+      present: alertConfirmPresenter(Alert.alert),
+      execute: async () => {
+        setNotice(null);
+        try {
+          const r = await callSkill('stoop', 'setMemberRole', {
+            groupId, memberWebid: m.webid, role: control.role,
+          });
+          setNotice(r?.error ? t('circle.admin.refused') : t(control.noticeKey, { name }));
+        } catch { setNotice(t('circle.admin.refused')); }
+        load();
+      },
+    });
+  }, [callSkill, groupId, load]);
   const postAnnounce = useCallback(async () => {
     const text = announce.trim(); if (!text) return;
     setAnnounce(''); setNotice(null);
@@ -92,6 +122,16 @@ export default function CircleAdminPanelScreen({ callSkill, agent = null, groupI
                 <Text style={[styles.via, via.via === 'caretaker' ? styles.viaCaretaker : null]} numberOfLines={2}>
                   {t(via.labelKey)}
                 </Text>
+              ) : null;
+            })()}
+            {(() => {
+              // Next to the role it changes. Present only where the shared decision offers it, which
+              // is to an admin and nobody else.
+              const control = roleControlFor({ members, member: m, myRef: myWebid });
+              return control ? (
+                <Pressable style={styles.secondary} onPress={() => setRole(m, control)} testID={`admin-role-${m.webid}`}>
+                  <Text style={styles.secondaryText}>{t(control.labelKey)}</Text>
+                </Pressable>
               ) : null;
             })()}
             <Pressable style={styles.secondary} onPress={() => remove(m)}><Text style={styles.secondaryText}>{t('circle.admin.remove')}</Text></Pressable>

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "End-to-end user-journey harness — runs the flagship journeys against a live (deployed) or local relay, in one process, with real SDK + app code.",
+  "description": "End-to-end user-journey harness \u2014 runs the flagship journeys against a live (deployed) or local relay, in one process, with real SDK + app code.",
   "bin": {
     "onderling-e2e": "./run.mjs"
   },
@@ -15,6 +15,7 @@
   "dependencies": {
     "@onderling-app/companion-node": "workspace:*",
     "@onderling-app/stoop": "workspace:*",
+    "@onderling/app-manifest": "workspace:*",
     "@onderling/blob-gateway": "workspace:*",
     "@onderling/circles": "workspace:*",
     "@onderling/core": "workspace:*",

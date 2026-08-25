@@ -78,9 +78,37 @@ describe('stoop manifest — Slice D.1 structural invariants', () => {
         expect(op.surfaces.slash.command.startsWith('/'), `${op.id} command starts with /`).toBe(true);
       } else {
         // No slash → must have an alternate surface (button / page).
-        expect(op.surfaces.ui ?? op.surfaces.page, `${op.id} has a non-slash surface`).toBeTruthy();
+        //
+        // THE CONTROL, not merely a `ui` block. This read `op.surfaces.ui ?? op.surfaces.page` for a
+        // long time, and a bare `ui: { confirm }` satisfied it — so `setMemberRole` passed this very
+        // check while declaring how to ASK before an action nobody could take: no control, no slash,
+        // and therefore no way to reach the op except by asking the assistant in words. The rule's
+        // sentence was right and its test was one level too shallow, which is the most expensive kind
+        // of green there is. A confirm is a question about an act; it is not a way to perform one.
+        expect(
+          op.surfaces.ui?.control ?? op.surfaces.page,
+          `${op.id} declares no way IN: no slash command, and surfaces.ui carries no control `
+          + `(${JSON.stringify(op.surfaces.ui ?? null)}). A confirm is not a surface.`,
+        ).toBeTruthy();
       }
     }
+  });
+
+  it('and that rule BITES: a confirm-only op is not a way in', () => {
+    // The assertion above is the one that let `setMemberRole` ship unreachable, so it is worth
+    // proving that its replacement actually refuses the shape it used to accept — rather than
+    // trusting that a stricter-looking expression is stricter.
+    const confirmOnly = { chat: { hint: 'x' }, ui: { confirm: { severity: 'warn' } } };
+    const withControl = { chat: { hint: 'x' }, ui: { control: 'button', confirm: { severity: 'warn' } } };
+    const asPage      = { chat: { hint: 'x' }, page: 'somewhere' };
+
+    const oldRule = (sf) => !!(sf.ui ?? sf.page);
+    const newRule = (sf) => !!(sf.ui?.control ?? sf.page);
+
+    expect(oldRule(confirmOnly), 'the old rule accepted a confirm as a surface').toBe(true);
+    expect(newRule(confirmOnly), 'a confirm is a question about an act, not a way to perform one').toBe(false);
+    expect(newRule(withControl)).toBe(true);
+    expect(newRule(asPage)).toBe(true);
   });
 
   it("does not collide with household's slash commands (minimise-collision goal)", () => {

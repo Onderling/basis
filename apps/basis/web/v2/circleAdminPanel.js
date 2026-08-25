@@ -2,9 +2,9 @@
  * basis v2 — circle admin panel (web DOM renderer, group ops #8).
  *
  * The per-circle admin surface off the `⋯` menu: the member roster (with role,
- * how that role was come by, + a remove action) and a post-announcement box. Pure render — the host
- * (`circleApp.js` showAdmin) loads `listGroupMembers` and dispatches the
- * admin-gated stoop ops (`removeMember`, `postAnnouncement`); a non-admin's
+ * how that role was come by, a control that changes it, + a remove action) and a post-announcement
+ * box. Pure render — the host (`circleApp.js` showAdmin) loads `listGroupMembers` and dispatches the
+ * admin-gated stoop ops (`removeMember`, `setMemberRole`, `postAnnouncement`); a non-admin's
  * dispatch is refused server-side, surfaced as a notice.
  *
  * Reports are NOT here: moderation reports live on the ONE §8 surface — the
@@ -16,6 +16,9 @@
 // provenance is read off the row through the same shared compute the members tab paints — one
 // answer to "how is this person an admin", never a second one per surface.
 import { memberAdminStatus } from '@onderling/kring-host/circleMembers';
+// …and whether THIS viewer may change that role, which way, and what taking it would do. One shared
+// decision (web ≡ mobile); the panel paints it and works nothing out for itself.
+import { roleControlFor } from '../../src/v2/circleRoleControl.js';
 
 export function renderCircleAdminPanel(container, {
   members = [],
@@ -24,8 +27,10 @@ export function renderCircleAdminPanel(container, {
   outboundCanonical = false,
   busy = false,
   notice = null,
+  viewerWebid = null,
   t,
   onRemove,
+  onSetRole,
   onAnnounce,
   onUnmute,
   onStopShare,
@@ -100,6 +105,20 @@ export function renderCircleAdminPanel(container, {
           viaEl.textContent = tr(via.labelKey);
           li.appendChild(viaEl);
         }
+      }
+      // The role control sits NEXT TO the role it changes: make this member an admin, or step an
+      // admin back down (your own row included — that is how someone stops running a circle).
+      // Present only where the shared decision offers it, which is to an admin and nobody else.
+      const control = roleControlFor({ members, member: m, myRef: viewerWebid });
+      if (control) {
+        const setRole = document.createElement('button');
+        setRole.type = 'button';
+        setRole.className = 'cc-admin__member-role-set';
+        setRole.dataset.role = control.role;
+        setRole.dataset.consequence = control.consequence;
+        setRole.textContent = tr(control.labelKey);
+        setRole.addEventListener('click', () => { if (typeof onSetRole === 'function') onSetRole(m, control); });
+        li.appendChild(setRole);
       }
       const rm = document.createElement('button');
       rm.type = 'button';

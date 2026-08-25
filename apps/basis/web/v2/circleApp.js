@@ -89,6 +89,9 @@ import { createClarifyingDispatch } from '../../src/v2/clarifyingDispatch.js';
 // the shared confirm gate at the dispatch waist (web presenter: confirmDialog.js).
 import { runConfirmGate } from '../../src/v2/confirmGate.js';
 import { renderConfirmDialog } from './confirmDialog.js';
+// …and the confirmation the roster's role control puts in front of a promotion / a step-back, built
+// from the op's own declaration + the consequence THIS change carries (shared; mobile builds the same).
+import { roleChangeConfirm } from '../../src/v2/circleRoleControl.js';
 import { makeCircleLookup } from '../../src/v2/circleLookup.js';
 import { sectionForScreen } from '../../src/v2/pageProjection.js';
 // drill-down — selection-context detail screens (agents → agent-detail,
@@ -357,6 +360,25 @@ import { renderMandatePicker } from './mandatePicker.js';
 import { buildCircleShareEnforcement } from '../../src/v2/circleShareEnforcement.js';
 import { renderContainerCard } from './containerCard.js';      // the nested container card (web DOM)
 import { buildHouseholdDataSource } from '../../../household/src/storage/persist.js';  // portable persistent DataSource (IDB on web) — submodule import so basis's live path no longer loads the retired household skillRegistry/HouseholdAgent via index.js (L3)
+
+// The WEB confirm presenter: mount the dialog, resolve once on accept(true)/cancel(false), then remove
+// the overlay (catchUpChooserModal pattern). Accept-exactly-once / cancel-never-executes belong to the
+// shared `runConfirmGate`; this is only how the question gets asked on this platform. Module scope
+// because both callers need it — the chat/slash dispatch AND the admin panel's row controls, which
+// dispatch their ops directly; a second presenter beside it would be a second way to say yes.
+function openCircleConfirmDialog(request) {
+  return new Promise((resolve) => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    renderConfirmDialog(container, {
+      request,
+      onResolve: (accepted) => {
+        try { container.remove(); } catch { /* already gone */ }
+        resolve(accepted);
+      },
+    });
+  });
+}
 
 // (J4) — the ATTACHMENT projector's menu for the composer "+", projected ONCE from
 // the (static) basis manifest. Feeds BOTH the noticeboard + circle composers; each entry
@@ -2125,22 +2147,6 @@ function buildCircleBot(agent) {
       // already surfaced as a circle bubble above — this is an additive channel.
       return reply;
     }
-  }
-
-  // promise-wrap the web confirm presenter: mount the dialog, resolve once on
-  // accept(true)/cancel(false), then remove the overlay (catchUpChooserModal pattern).
-  function openCircleConfirmDialog(request) {
-    return new Promise((resolve) => {
-      const container = document.createElement('div');
-      document.body.appendChild(container);
-      renderConfirmDialog(container, {
-        request,
-        onResolve: (accepted) => {
-          try { container.remove(); } catch { /* already gone */ }
-          resolve(accepted);
-        },
-      });
-    });
   }
 
   // After /find returns, append (1) in-circle SKILL MATCHES for the query, and (2) a HOP PROMPT when the
@@ -6922,7 +6928,7 @@ async function showOverride(id) {
   rerender();
 }
 
-// group admin panel (member roster + remove + announcements). Reached from
+// group admin panel (member roster + role changes + remove + announcements). Reached from
 // the circle `⋯` menu. Ops are admin-gated server-side; a refusal surfaces a notice.
 async function showAdmin(id) {
   hideCircleTabBar(tabBarEl);
@@ -6932,12 +6938,15 @@ async function showAdmin(id) {
   let outboundCanonical = false;    // circle-level posture gate: only a `canonical` circle can revoke in place
   let busy = false;
   let notice = null;
+  let myWebid = '';                 // whose row is mine — the role control is offered to an admin only
 
   async function load() {
-    const [mem, mut] = await Promise.all([
+    const [mem, mut, who] = await Promise.all([
       rawCallSkill('stoop', 'listGroupMembers', { groupId: id }).catch(() => null),
       rawCallSkill('stoop', 'listMutedPeers', {}).catch(() => null),
+      rawCallSkill('stoop', 'whoAmI', {}).catch(() => null),
     ]);
+    myWebid = who?.webid ?? who?.webId ?? '';
     members = Array.isArray(mem?.members) ? mem.members : [];
     muted = Array.isArray(mut?.peers) ? mut.peers : [];   // reports moved to §8 governance Reports
     // objective L — enumerate what THIS circle has shared OUT (across the known circles) + whether its posture
@@ -6956,7 +6965,31 @@ async function showAdmin(id) {
   }
   const rerender = () => renderCircleAdminPanel(rootEl, {
     members, muted, outboundShares, outboundCanonical, busy, notice, t,
+    viewerWebid: myWebid,
     onBack: () => showDetail(id),
+    // Make a member an admin, or step an admin back down. The op's `ui.confirm` declaration is what
+    // puts a confirmation in front of it (the SAME gate the chat path runs — `runConfirmGate` with the
+    // web dialog as presenter), carrying the consequence THIS change has: an ordinary demotion, a
+    // handover of the whole circle, or one the fold will not let stand. What that consequence is comes
+    // from the shared decision, not from here.
+    onSetRole: async (m, control) => {
+      const name = m.displayName || m.handle || m.webid;
+      const request = roleChangeConfirm({ control, name, t });
+      await runConfirmGate({
+        request,
+        present: openCircleConfirmDialog,
+        execute: async () => {
+          notice = null; busy = true; rerender();
+          try {
+            const r = await rawCallSkill('stoop', 'setMemberRole', {
+              groupId: id, memberWebid: m.webid, role: control.role,
+            });
+            notice = r?.error ? t('circle.admin.refused') : t(control.noticeKey, { name });
+          } catch { notice = t('circle.admin.refused'); }
+          busy = false; await load();
+        },
+      });
+    },
     // objective L — "Stop sharing": revoke ONE canonical share in place (rotate key + ACP-revoke). Reuses the
     // same revoke path the /unshareitem slash uses (unshareItemFromCircle → revokeItemShare). Since a
     // shared-ref carries no per-recipient list, we drop the pointer + rotate to the remaining origin roster.

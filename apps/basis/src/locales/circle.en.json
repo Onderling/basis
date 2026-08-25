@@ -4380,6 +4380,50 @@
         "doc": "S3 — coordinator role badge."
       }
     },
+    "make_admin": {
+      "text": "Make admin",
+      "doc": "The roster control that promotes a member to admin (admin panel, next to the role it changes). Admin-only: shown only to someone the roster says runs this circle. The op is `setMemberRole`; the roster fold on every device is what actually decides, so this is a convenience, not the gate."
+    },
+    "make_member": {
+      "text": "Remove admin role",
+      "doc": "The same control the other way: an admin becomes a member again. Neutral wording on purpose — it sits on your OWN row too, which is how someone steps back from running a circle."
+    },
+    "role_confirm": {
+      "promote": {
+        "text": "{{name}} will be able to admit people, change the rules and remove members.",
+        "doc": "Confirm body before making someone an admin. Says what the role IS rather than that it is a role — the same three things the caretaker notice names, because they are what actually changes for the circle."
+      },
+      "demote": {
+        "text": "{{name}} will no longer run this circle. The other admins keep it.",
+        "doc": "Confirm body for an ordinary demotion — another admin remains, so nothing is handed over."
+      },
+      "handover": {
+        "text": "{{name}} is the only admin. After this nobody is running this circle, so it passes to one of the other members — which one follows from the log; nobody picks.",
+        "doc": "Confirm body when the LAST admin steps back. The fold answers this by handing over (appointing a caretaker from whoever is left), not by refusing it, so the person must be told that the circle changes hands. Deliberately does NOT name the successor: that is derived from the log and a shell guessing at it would give one circle two stories."
+      },
+      "no_one_else": {
+        "text": "{{name}} is the only admin and there is nobody else in this circle to take over, so this cannot take effect: {{name}} stays admin.",
+        "doc": "Confirm body when the last admin is also the only member. There is nobody to hand to, so the fold keeps the demotion from standing at all — said plainly here instead of a handover that cannot happen."
+      }
+    },
+    "role_notice": {
+      "promoted": {
+        "text": "{{name}} is now an admin of this circle.",
+        "doc": "Panel notice after a promotion."
+      },
+      "demoted": {
+        "text": "{{name}} is no longer an admin of this circle.",
+        "doc": "Panel notice after an ordinary demotion."
+      },
+      "handed_over": {
+        "text": "{{name}} is no longer an admin. The circle has passed to one of the other members.",
+        "doc": "Panel notice after the last admin stepped back — the same handover the confirm announced, restated as what happened. Names no successor: the member list shows who, once the roster reloads."
+      },
+      "no_one_else": {
+        "text": "{{name}} is still an admin: there is nobody else in this circle to take over.",
+        "doc": "Panel notice when the demotion could not stand — the circle would have been left with nobody to run it."
+      }
+    },
     "announce": {
       "text": "Announcement",
       "doc": "S3 — post-announcement section."

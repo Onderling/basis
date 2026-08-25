@@ -6,11 +6,12 @@ import { VaultMemory }             from '@onderling/vault';
 import { Reveals }                 from '@onderling/identity-resolver';
 import { RelayTransport }          from '@onderling/transports';
 import { createNeighbourhoodAgent, attachSubstrateMirror } from '@onderling-app/stoop';
-// By relative path, the way this corpus already reaches app internals (see the last-admin journey's
-// key-rail import): stoop does not export its manifest, and a journey is not a reason to widen an
-// app's public API.
+// stoop's manifest by relative path — the way this corpus already reaches APP internals (see the
+// last-admin journey's key-rail import), and a journey is not a reason to widen an app's public API.
+// `renderGate` is a different case: it is a PACKAGE, so it comes through the barrel like any other
+// consumer. Reaching its raw src was a layering violation, and the dep-boundaries guard said so.
 import { stoopManifest }       from '../../stoop/manifest.js';
-import { renderGate }          from '../../../packages/app-manifest/src/renderGate.js';
+import { renderGate }          from '@onderling/app-manifest';
 import { wait, checker }           from './_util.mjs';
 
 export const name = 'J-circle (join → noticeboard → private chat)';

@@ -1282,9 +1282,13 @@ export const stoopManifest = {
       resolves: [{ field: 'role', policy: 'spine' }],
       surfaces: {
         chat: { hint: 'Admin-only: make a member an admin of this circle, or take that back.' },
-        // Handing someone authority over a circle is consequential and easy to do by accident from
-        // a list — the same confirm gate the task-scoped grant carries.
-        ui:   { confirm: { severity: 'warn' } },
+        // A BUTTON on the member roster, and a confirm before it runs. The confirm was declared alone
+        // for a while, which is a declaration of how to ASK before doing something nobody could do:
+        // with no control and no slash command, the only way a person could reach this op at all was
+        // to ask the assistant for it in words. Handing someone authority over a circle is
+        // consequential and easy to do by accident from a list — hence the same confirm gate the
+        // task-scoped grant carries, now in front of a control that exists.
+        ui:   { control: 'button', confirm: { severity: 'warn' } },
       },
     },
     {

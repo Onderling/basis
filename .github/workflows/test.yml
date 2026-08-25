@@ -100,7 +100,13 @@ jobs:
           - { label: pod-client,        dir: packages/pod-client,        args: '' }
           - { label: relay,             dir: packages/relay,             args: '' }
           - { label: integration-tests, dir: packages/integration-tests, args: '' }
-          - { label: folio,             dir: apps/folio,                 args: '' }
+          # folio: --retry=2 for ONE load-sensitive test —
+          #   SyncEngine > "caps total wait at maxStableWaitMs for an ever-changing file".
+          # It writes every 10ms expecting to beat a 25ms stability window, which a contended
+          # runner cannot guarantee; it passed run 1 and failed run 2 on identical code, and
+          # passes 514/514 locally. Same rule as core: failing twice in a row is a real
+          # regression, not a flake — investigate rather than raising the retry count.
+          - { label: folio,             dir: apps/folio,                 args: '-- --retry=2' }
           # react-native was `continue-on-error` for "known parser failures in
           # BleTransport/MdnsTransport". Measured 2026-08-24: 396 pass, 1 skip,
           # zero failures — the exemption outlived its reason by some margin.

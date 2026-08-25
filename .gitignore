@@ -101,3 +101,6 @@ _archive/
 /BRIEF-*.md
 /REMAINING-WORK.md
 /PROGRESS.md
+
+# integration-test output logs (run-integration.mjs --provision writes the full vitest output here)
+.integration-logs/

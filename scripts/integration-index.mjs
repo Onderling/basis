@@ -20,19 +20,21 @@ import { fileURLToPath } from 'node:url';
 
 export const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
-/** The canonical list. `file` is repo-relative; `proves` is one honest line of what the live pod confirms. */
+/** The canonical list. `file` is repo-relative; `proves` is one honest line of what the live pod confirms.
+ *  `needs.acp` marks a row that can only be judged on an **ACP**-configured server (CSS defaults to WAC);
+ *  the runner boots a second CSS for those rather than letting them read red on the wrong model. */
 export const INTEGRATION_TESTS = [
   { file: 'packages/pod-client/test/PodClient.css.test.js',            proves: 'PodClient read/write/list against a real CSS pod over Solid-OIDC auth.' },
   { file: 'packages/pod-client/test/SolidPodSource.css.test.js',       proves: 'SolidPodSource (a core.DataSource) read/write/list on a real pod.' },
   { file: 'packages/pod-client/test/sealedPodDataSource.css.test.js',  proves: 'The sealed DataSource: write seals (pod holds ciphertext), read opens plaintext; list + delete. The exact shape the circle cache medium rides.' },
   { file: 'packages/pod-client/test/sharing/sharing.css.test.js',      proves: 'ACP sharing round-trip on a real pod — a grant makes a resource readable to the grantee, and no more.' },
-  { file: 'packages/pod-client/test/sharing/acpWriter.css.test.js',    proves: 'Writing ACP access-control resources against a real pod.' },
+  { file: 'packages/pod-client/test/sharing/acpWriter.css.test.js',    proves: 'Writing ACP access-control resources against a real pod.', needs: { acp: true } },
   { file: 'packages/pod-client/test/sharing/setResourceAccess.css.test.js', proves: 'Setting per-resource access (grant/revoke) on a real pod.' },
   { file: 'packages/oidc-session/test/SolidVault.css.test.js',         proves: 'SolidVault Solid-OIDC (DPoP) client-credentials login + authenticated fetch against a real IdP.' },
   { file: 'packages/pod-onboarding/test/resourceUri.css.test.js',      proves: 'The canonical pod storage-layout URIs resolve against a real pod.' },
   { file: 'apps/basis/test/circlePodProducer.css.test.js',            proves: 'Per-circle producer on a real pod: sealed round-trip + roster growth + survives-restart re-hydration (p2/p3).' },
   { file: 'apps/basis/test/circleSealing.css.test.js',                proves: 'Circle group key persists on the pod + sealed content round-trips; leave rotates the key (forward secrecy).' },
-  { file: 'apps/basis/test/circlePod2Pod.css.test.js',                proves: 'Cross-pod sealed circle delivery between two separate CSS accounts/pods.' },
+  { file: 'apps/basis/test/circlePod2Pod.css.test.js',                proves: 'Cross-pod sealed circle delivery between two separate CSS accounts/pods — a member reads with their OWN auth, so this is also the only proof the circle ACL grant is REAL.', needs: { acp: true } },
   { file: 'apps/basis-mobile/test/circleSealE2E.css.test.js',         proves: 'Mobile circle seal end-to-end against a real pod (the RN-side parity of the basis producer path).' },
   { file: 'apps/companion-node/test/companionAgentProxy.css.test.js', proves: 'The companion proxies a device\'s pod fetches to a real pod (holds no secret); out-of-scope is denied; revoke kills the grant.' },
   { file: 'apps/stoop/test/realPodAttach.css.test.js',                proves: 'Attaching a real Solid pod to stoop and reading/writing through the attachment.' },

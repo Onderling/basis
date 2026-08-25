@@ -50,6 +50,12 @@ beforeAll(async () => {
 });
 
 SUITE('acpWriter — CSS-ACP integration (direct .acr writer ENFORCES)', () => {
+  // The pod under test is the OWNER'S POD, not the server root. Addressing `CSS_URL` meant writing into
+  // the CSS root container, which the throwaway server leaves world-readable/writable/CONTROLLABLE — so
+  // "public" already held every mode before a single grant was made, and every grant/revoke assertion here
+  // was measuring the default ACL of a container nobody owns. `CSS_POD_ROOT` falls back to `CSS_URL` so an
+  // operator pointing this at an external CSS keeps the old behaviour.
+  const POD_BASE = process.env.CSS_POD_ROOT || CSS_URL;
   const scratch = process.env.CSS_SCRATCH ?? 'public/';
   const strangerWebId = process.env.CSS_STRANGER_WEBID || `${CSS_URL}stranger/profile/card#me`;
   const adminWebId    = process.env.CSS_ADMIN_WEBID    || `${CSS_URL}admin/profile/card#me`;
@@ -61,17 +67,17 @@ SUITE('acpWriter — CSS-ACP integration (direct .acr writer ENFORCES)', () => {
     return new PodClient({ podRoot, auth: new SolidOidcAuth({ vault: sv }) });
   }
   const owner = () => makeClient({
-    podRoot: CSS_URL,
+    podRoot: POD_BASE,
     webid: process.env.CSS_WEBID || `${CSS_URL}profile/card#me`,
     clientId: process.env.CSS_CLIENT_ID, clientSecret: process.env.CSS_CLIENT_SECRET,
   });
   const stranger = () => makeClient({
-    podRoot: CSS_URL,
+    podRoot: POD_BASE,
     webid: strangerWebId,
     clientId: process.env.CSS_STRANGER_ID, clientSecret: process.env.CSS_STRANGER_SECRET,
   });
   const admin = () => makeClient({
-    podRoot: CSS_URL,
+    podRoot: POD_BASE,
     webid: adminWebId,
     clientId: process.env.CSS_ADMIN_ID, clientSecret: process.env.CSS_ADMIN_SECRET,
   });
@@ -88,7 +94,7 @@ SUITE('acpWriter — CSS-ACP integration (direct .acr writer ENFORCES)', () => {
   it('is actually ACP (capability probe), and public-read + owner-write ENFORCES (unauth 200, stranger write 403, owner write ok)', async () => {
     const client = await owner();
 
-    const uri = `${CSS_URL}${scratch}acp-endorsements-${Date.now()}`;
+    const uri = `${POD_BASE}${scratch}acp-endorsements-${Date.now()}`;
     await client.write(uri, JSON.stringify({ v: 1, endorsements: [] }), { contentType: 'application/json', force: true });
 
     // Sanity: this CSS really is ACP for THIS resource (else the WAC path would
@@ -131,7 +137,7 @@ SUITE('acpWriter — CSS-ACP integration (direct .acr writer ENFORCES)', () => {
   it('agent grant: the GRANTED admin can write, a NON-granted stranger cannot (public-read stays)', async () => {
     if (!HAVE_ADMIN || !HAVE_STRANGER) return;               // needs both a granted + a non-granted account
     const client = await owner();
-    const uri = `${CSS_URL}${scratch}acp-community-${Date.now()}`;
+    const uri = `${POD_BASE}${scratch}acp-community-${Date.now()}`;
     await client.write(uri, JSON.stringify({ v: 1, endorsements: [] }), { contentType: 'application/json', force: true });
 
     const report = await setResourceAccess({

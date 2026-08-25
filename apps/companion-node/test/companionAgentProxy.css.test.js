@@ -194,6 +194,14 @@ SUITE('companion-node R3.2 — agent-proxy over a REAL CSS with a REAL on-device
       identityVault:  new VaultMemory(),
       gate:           false,                 // isolate the pod leg from the R2 skill gate
       podProxy:       true,                  // R3.0 agent-proxy swap on delegation
+      // Bypass the host's advisory local pre-filter. It is DEFAULT-ON in production and denies an
+      // out-of-scope request locally, with the deliberately distinct `POD_FORBIDDEN` — which is why
+      // case (d) below read red: it asserts the DEVICE's `FORBIDDEN`, and the host was answering
+      // first, so the proof it claims to make was not being made. The pre-filter is pure local
+      // logic — no pod, no transport — and is proven in the hermetic twin, which bypasses here for
+      // the same reason. What only THIS suite can prove is the device denying across a real relay
+      // with a real DPoP fetch, so that is what it is composed to prove.
+      podPreFilter:   false,
       podSource:      heldPodSource,         // supplies containerUri (= the CSS scratch container)
       podRoot,                               // token `pod` binding (acceptDelegation verify)
       podOwnerPubKey: owner.pubKey,          // trust root ⇒ fail-closed boot
@@ -362,7 +370,9 @@ SUITE('companion-node R3.2 — agent-proxy over a REAL CSS with a REAL on-device
       globalThis.fetch = realFetch;
     }
 
-    // Denied — opaque 403 → FORBIDDEN (CapabilityError), for both read and write.
+    // Denied by the DEVICE — opaque 403 → FORBIDDEN (CapabilityError), for both read and write.
+    // Distinct from the host pre-filter's POD_FORBIDDEN, so a host-side deny can never be mistaken
+    // for the device-authoritative one this case exists to prove.
     expect(readErr?.code).toBe('FORBIDDEN');
     expect(writeErr?.code).toBe('FORBIDDEN');
 

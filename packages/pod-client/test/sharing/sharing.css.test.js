@@ -50,6 +50,12 @@ beforeAll(async () => {
 });
 
 SUITE('client.sharing — CSS integration (ACP/WAC)', () => {
+  // The pod under test is the OWNER'S POD, not the server root. Addressing `CSS_URL` meant writing into
+  // the CSS root container, which the throwaway server leaves world-readable/writable/CONTROLLABLE — so
+  // "public" already held every mode before a single grant was made, and every grant/revoke assertion here
+  // was measuring the default ACL of a container nobody owns. `CSS_POD_ROOT` falls back to `CSS_URL` so an
+  // operator pointing this at an external CSS keeps the old behaviour.
+  const POD_BASE = process.env.CSS_POD_ROOT || CSS_URL;
   const scratch  = process.env.CSS_SCRATCH || 'scratch/';
   const grantee  = process.env.CSS_GRANTEE_WEBID || `${CSS_URL}grantee/profile/card#me`;
 
@@ -65,12 +71,12 @@ SUITE('client.sharing — CSS integration (ACP/WAC)', () => {
       clientSecret: process.env.CSS_CLIENT_SECRET,
       oidcIssuer:   process.env.CSS_OIDC_ISSUER || CSS_URL,
     });
-    return new PodClient({ podRoot: CSS_URL, auth: new SolidOidcAuth({ vault: sv }) });
+    return new PodClient({ podRoot: POD_BASE, auth: new SolidOidcAuth({ vault: sv }) });
   }
 
   it('capabilities() reports the pod auth model (records ACP vs WAC)', async () => {
     const client = await makeClient();
-    const uri = `${CSS_URL}${scratch}share-caps-${Date.now()}.txt`;
+    const uri = `${POD_BASE}${scratch}share-caps-${Date.now()}.txt`;
     await client.write(uri, 'caps', { contentType: 'text/plain', force: true });
 
     const caps = await client.sharing.capabilities({ resourceUri: uri });
@@ -86,7 +92,7 @@ SUITE('client.sharing — CSS integration (ACP/WAC)', () => {
 
   it('grant(read) → list reflects it → escalate → revoke clears it', async () => {
     const client = await makeClient();
-    const uri = `${CSS_URL}${scratch}share-rt-${Date.now()}.txt`;
+    const uri = `${POD_BASE}${scratch}share-rt-${Date.now()}.txt`;
     await client.write(uri, 'round-trip', { contentType: 'text/plain', force: true });
 
     const g = await client.sharing.grant({ resourceUri: uri, agent: grantee, modes: ['read'] });
@@ -111,7 +117,7 @@ SUITE('client.sharing — CSS integration (ACP/WAC)', () => {
 
   it('public grant → list shows a public entry → revoke clears it', async () => {
     const client = await makeClient();
-    const uri = `${CSS_URL}${scratch}share-pub-${Date.now()}.txt`;
+    const uri = `${POD_BASE}${scratch}share-pub-${Date.now()}.txt`;
     await client.write(uri, 'public', { contentType: 'text/plain', force: true });
 
     await client.sharing.grant({ resourceUri: uri, public: true, modes: ['read'] });

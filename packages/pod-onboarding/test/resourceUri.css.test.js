@@ -41,6 +41,12 @@ beforeAll(async () => {
 });
 
 SUITE('cluster-K pod-tier wiring — CSS grant→read round-trip', () => {
+  // The pod under test is the OWNER'S POD, not the server root. Addressing `CSS_URL` meant writing into
+  // the CSS root container, which the throwaway server leaves world-readable/writable/CONTROLLABLE — so
+  // "public" already held every mode before a single grant was made, and every grant/revoke assertion here
+  // was measuring the default ACL of a container nobody owns. `CSS_POD_ROOT` falls back to `CSS_URL` so an
+  // operator pointing this at an external CSS keeps the old behaviour.
+  const POD_BASE = process.env.CSS_POD_ROOT || CSS_URL;
   const scratch = process.env.CSS_SCRATCH || 'scratch/';
   const grantee = process.env.CSS_GRANTEE_WEBID || `${CSS_URL}grantee/profile/card#me`;
 
@@ -52,7 +58,7 @@ SUITE('cluster-K pod-tier wiring — CSS grant→read round-trip', () => {
       clientSecret: process.env.CSS_CLIENT_SECRET,
       oidcIssuer:   process.env.CSS_OIDC_ISSUER || CSS_URL,
     });
-    return new PodClient({ podRoot: CSS_URL, auth: new SolidOidcAuth({ vault: sv }) });
+    return new PodClient({ podRoot: POD_BASE, auth: new SolidOidcAuth({ vault: sv }) });
   }
 
   it('share grants read on the storage-layout URI → resolveSharedRef resolves; revoke → null', async () => {
@@ -64,7 +70,7 @@ SUITE('cluster-K pod-tier wiring — CSS grant→read round-trip', () => {
     const item = await stores.getStore('A').put({ type: 'task', text: 'secret plan' });
 
     // Point the resolver at the scratch container so the owner can write the ACP target.
-    const resolver = sharedRefResourceUri(makeResourceUriResolver({ podUri: `${CSS_URL}${scratch}` }));
+    const resolver = sharedRefResourceUri(makeResourceUriResolver({ podUri: `${POD_BASE}${scratch}` }));
 
     const seam = makeCircleShareEnforcement({
       sharing: client.sharing, resourceUriFor: resolver, recipient: grantee,

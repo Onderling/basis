@@ -3,8 +3,17 @@
  * producer, writing Solid **ACP** Access Control Resources (`.acr`) directly over
  * the owner's authenticated fetch. No Inrupt SDK dependency (the pod-client's
  * `createClientSharing` needs `@inrupt/solid-client` + has a documented silent
- * no-op against CSS+ACP). ACP is the default access model on modern CSS (the
- * control resource is `<container>.acr`, advertised via the `rel="acl"` Link).
+ * no-op against CSS+ACP). The control resource is `<container>/.acr`.
+ *
+ * ⚠ THIS REQUIRES AN **ACP** POD. A previous version of this comment said ACP was
+ * "the default access model on modern CSS". It is not: CSS 7.x ships WAC in both
+ * `@css:config/default.json` and `@css:config/file.json`, and only `file-acp.json`
+ * serves ACP. That matters more than a footnote, because on a WAC pod a PUT of
+ * `<container>/.acr` SUCCEEDS — the server stores it as an ordinary file, since the
+ * control resource it actually honours is `<container>/.acl` — so every grant here
+ * would report success and authorize nothing. It fails closed (a member is denied
+ * rather than over-exposed), but silently, which is its own defect: the app believes
+ * the circle is shared. `assertAcpPod` below turns that into a loud error.
  *
  * Implements the `{ grant, revoke }` shape `controlAgent` calls:
  *   grant({ containerUri, agent, modes })  · revoke({ containerUri, agent, modes })
@@ -83,7 +92,36 @@ export function createCirclePodSharing({ fetch, ownerWebId, logger = console } =
     return `${lines.join('\n')}\n`;
   }
 
+  /**
+   * Refuse to pretend. A WAC pod advertises its control resource as `<container>/.acl` in a
+   * `rel="acl"` Link header; an ACP pod does not. So POSITIVE evidence of `.acl` means every `.acr`
+   * we write is inert, and the caller must know that rather than watch grants quietly do nothing.
+   *
+   * Only positive evidence throws: an absent or unreadable Link header proceeds, because guessing
+   * "not ACP" from a missing header would break real ACP pods that simply do not advertise one.
+   * Checked once per container.
+   */
+  const acpChecked = new Set();
+  async function assertAcpPod(containerUri) {
+    if (acpChecked.has(containerUri)) return;
+    acpChecked.add(containerUri);
+    let link = '';
+    try {
+      const head = await fetch(containerUri, { method: 'HEAD' });
+      link = head?.headers?.get?.('link') ?? '';
+    } catch { return; }                                     // unreachable → let the PUT report it
+    const acl = /<([^>]+)>\s*;\s*rel="acl"/i.exec(link)?.[1];
+    if (acl && !acl.endsWith('.acr')) {
+      throw new Error(
+        `createCirclePodSharing: "${containerUri}" is served by a WAC pod (its control resource is `
+        + `${acl}), and this writes ACP .acr resources — every grant would report success and `
+        + 'authorize nothing. Host the pod with an ACP configuration (CSS: @css:config/file-acp.json).',
+      );
+    }
+  }
+
   async function writeAcr(containerUri) {
+    await assertAcpPod(containerUri);
     const roster = rosters.get(containerUri) ?? new Map();
     const res = await fetch(acrUriFor(containerUri), {
       method: 'PUT', headers: { 'content-type': 'text/turtle' }, body: buildAcr(roster),

@@ -358,8 +358,21 @@ export class SolidVault extends EventEmitter {
   /* ── Refresh ───────────────────────────────────────────────────────────── */
 
   /**
-   * Force a refresh of the access token using the stored refresh token.
-   * Concurrent calls are coalesced into a single in-flight refresh.
+   * Force a refresh of the access token.  Concurrent calls are coalesced into a
+   * single in-flight refresh.
+   *
+   * TWO renewal paths, because there are two kinds of session here:
+   *
+   *   - **authorization-code** sessions carry a refresh token; renewal re-logs in
+   *     with it, as the Inrupt docs recommend for extending a Node session past
+   *     its access token's lifetime.
+   *   - **client-credentials** sessions — the kind every pod in this repo uses —
+   *     are issued no refresh token at all.  The grant IS the credential: renewal
+   *     means presenting `clientId`/`clientSecret` again.  This used to throw
+   *     `NO_REFRESH_TOKEN`, and `getAuthenticatedFetch` swallows a failed
+   *     pre-emptive refresh ("the request will likely 401"), so a hosted pod
+   *     session simply began 401ing at access-token expiry and never recovered
+   *     until something called `login()` by hand.  Nothing did.
    *
    * Emits `'auth-state'` with `'refreshed'` on success or `'expired'` on
    * failure (after which `isAuthenticated()` returns false).
@@ -371,16 +384,7 @@ export class SolidVault extends EventEmitter {
         if (!this.#session) {
           // If we have stored credentials, do a fresh login from refresh token.
           await this.login({});
-        } else {
-          // Issue a re-login from the refresh token in-place.  This is what
-          // the Inrupt docs recommend for Node when you want to extend a
-          // session beyond its access token's lifetime.
-          if (!this.#refreshToken) {
-            throw Object.assign(
-              new Error('SolidVault.refresh: no refresh token available'),
-              { code: 'NO_REFRESH_TOKEN' },
-            );
-          }
+        } else if (this.#refreshToken) {
           await this.#session.login({
             oidcIssuer:   this.#oidcIssuer,
             clientId:     this.#clientId,
@@ -389,6 +393,26 @@ export class SolidVault extends EventEmitter {
             handleRedirect: () => {},
           });
           await this.#captureSessionState();
+        } else if (this.#clientId && this.#clientSecret && this.#oidcIssuer) {
+          // Client-credentials renewal: re-run the grant. A fresh session object,
+          // because a logged-in Inrupt session will not re-login in place.
+          const session = await this.#newSession();
+          session.events?.on?.('newTokens', (tokenSet) => {
+            this.#absorbTokenSet(tokenSet).catch(() => { /* swallow */ });
+          });
+          await session.login({
+            oidcIssuer:   this.#oidcIssuer,
+            clientId:     this.#clientId,
+            clientSecret: this.#clientSecret,
+            handleRedirect: () => {},
+          });
+          this.#session = session;
+          await this.#captureSessionState();
+        } else {
+          throw Object.assign(
+            new Error('SolidVault.refresh: no refresh token and no client credentials to renew with'),
+            { code: 'NO_REFRESH_TOKEN' },
+          );
         }
         this.emit('auth-state', 'refreshed');
       } catch (err) {

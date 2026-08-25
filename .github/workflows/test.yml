@@ -14,7 +14,8 @@
 #     step two. See docs/architecture.md § "How the monorepo resolves".
 #   * COVERAGE. It ran six suites and never ran the guards aggregate, basis,
 #     stoop or the journeys — so ~5k basis tests and every journey had never
-#     been a gate at all.
+#     been a gate at all. (2026-08-25: the live-pod tier joined too — fifteen
+#     `*.css.test.js` suites that nothing had run since they were written.)
 #   * TRIGGER. It ran on push to master/track-H-folio only, so work on a feature
 #     branch had no CI even when CI worked. Now: every branch, every PR.
 #   * JOBS THAT CANNOT FAIL. `react-native` was continue-on-error for parser
@@ -124,6 +125,41 @@ jobs:
         run: node scripts/relink-workspace.mjs
       - name: ${{ matrix.suite.label }}
         run: npm test --prefix ${{ matrix.suite.dir }} ${{ matrix.suite.args }}
+
+  # ── The live-pod tier. Its own lane because it boots real servers. ─────────
+  # These are the `*.css.test.js` suites: each needs a real Solid pod and self-skips without one, so
+  # nothing in the ordinary lanes touches them. Until now nothing ANYWHERE touched them — which is
+  # how six of the fifteen came to be red, one of them silently skipping, for reasons that turned out
+  # to be four wrong base URIs, a moved import and a wrong server config rather than any pod defect.
+  # A gated suite that nothing triggers is a suite that rots; that is precisely why the index exists,
+  # and an index nothing runs is the same wish one level up.
+  #
+  # The runner boots its own throwaway Community Solid Server(s) via npx and mints the accounts the
+  # suites need, so the only external requirement is network access to the npm registry.
+  pod:
+    name: live-pod integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - name: Install (root workspace)
+        run: pnpm install --frozen-lockfile
+      - name: Relink workspace
+        run: node scripts/relink-workspace.mjs
+      - name: Integration suites (boots its own CSS pods)
+        run: npm run test:integration:provision
+      - name: Keep the failure readable
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-logs
+          path: .integration-logs/
+          if-no-files-found: ignore
 
   # ── Rung 5: convergence under concurrency. Its own lane because it is slow ──
   # and because it is the only gate that crosses a real relay between agents.

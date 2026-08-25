@@ -58,7 +58,7 @@ for (const f of files) {
   for (let i = 0; i < marks.length; i++) {
     const name = marks[i][1];
     const block = body.slice(marks[i].index, i + 1 < marks.length ? marks[i + 1].index : undefined);
-    const runsSomething = /npm test|vitest|run\.mjs/.test(block);
+    const runsSomething = /npm test|vitest|run\.mjs|test:integration/.test(block);
     if (!runsSomething) continue;
     if (!/pnpm install/.test(block)) {
       problems.push(`${f} · job "${name}" runs a suite without \`pnpm install\` — it cannot have installed this workspace`);

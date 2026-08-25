@@ -241,6 +241,47 @@ describe('SolidVault — refresh', () => {
     expect(await vault.get(`solid-oidc:${WEBID}:access_token`)).toBe('a-2');
   });
 
+  // A client-credentials session is issued NO refresh token — the grant itself is the credential.
+  // This is the shape every pod in this repo logs in with, and `refresh()` used to throw
+  // NO_REFRESH_TOKEN for it. Because `getAuthenticatedFetch` swallows a failed pre-emptive refresh,
+  // the symptom was not an error but a pod session that quietly started 401ing at token expiry.
+  it('renews a CLIENT-CREDENTIALS session, which carries no refresh token', async () => {
+    const vault = new VaultMemory();
+    const noRefreshToken = (accessToken) => ({
+      accessToken, refreshToken: undefined, idToken: 'i', expiresAt: Math.floor(Date.now() / 1000) + 3600,
+    });
+    const logins = [];
+    // ONE spool across sessions: the renewal builds a fresh session (a logged-in Inrupt session
+    // will not re-login in place), so a per-session spool would hand out the same first token twice
+    // and the assertion below would pass without anything having been renewed.
+    const spool = [noRefreshToken('cc-1'), noRefreshToken('cc-2')];
+    _setSessionFactory(() => {
+      const fs = new FakeSession({ _tokenSpool: spool });
+      const inner = fs.login.bind(fs);
+      fs.login = async (opts) => { logins.push(opts); return inner(opts); };
+      return fs;
+    });
+
+    const sv = new SolidVault({ webid: WEBID, oidcIssuer: ISSUER, vault });
+    await sv.login({ clientId: 'c', clientSecret: 's' });
+    expect(await vault.get(`solid-oidc:${WEBID}:refresh_token`)).toBeFalsy();
+
+    const events = [];
+    sv.on('auth-state', (st) => events.push(st));
+    await expect(sv.refresh()).resolves.toBeUndefined();
+    expect(events).toContain('refreshed');
+    expect(events).not.toContain('expired');
+    expect(sv.isAuthenticated()).toBe(true);
+
+    // It re-presented the credentials rather than a refresh token — that IS the renewal.
+    const renewal = logins.at(-1);
+    expect(renewal.clientId).toBe('c');
+    expect(renewal.clientSecret).toBe('s');
+    expect(renewal.refreshToken).toBeUndefined();
+    // …and the new access token replaced the old one.
+    expect(await vault.get(`solid-oidc:${WEBID}:access_token`)).toBe('cc-2');
+  });
+
   it('automatic refresh kicks in when the token is within REFRESH_LEEWAY_MS of expiry', async () => {
     const vault = new VaultMemory();
     // First "login" returns a token that expires *now*, forcing a refresh.

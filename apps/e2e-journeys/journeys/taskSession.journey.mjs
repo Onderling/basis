@@ -49,10 +49,10 @@ export async function run({ relayUrl }) {
 
     check('it reaches the second person\'s device',
       await untilTrue(async () => (await openIds(bram)).includes(taskId)));
-    // [F-016] The last person to join intermittently never receives work created in the moments
-    // after they joined — observed in 3 of 4 runs, and in one of them a task catch-up did not
-    // recover it either. A second task made seconds later reaches everyone.
-    check('[F-016] …and the third\'s — one circle, one list',
+    // Was F-016: a task created in the moments after cato joined never reached them. The statement
+    // arrived and was stored on their rail; the head apply found no circle store yet and returned
+    // silently, and nothing re-applied it. Fixed by rebuilding the head when a circle opens.
+    check('a task created just after someone joins reaches them too — one circle, one list',
       await untilTrue(async () => (await openIds(cato)).includes(taskId)));
 
     // "What does done mean" travels with the work, or the definition is decoration.

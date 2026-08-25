@@ -242,3 +242,74 @@ describe('the task lane — snapshots on the device log, heads causally merged',
     expect(() => strict.publishItem({ id: 'i-y', type: 'task' })).toThrow(/unsigned mirror carry is deleted/);
   });
 });
+
+/**
+ * The parked-statement convergence (was F-016).
+ *
+ * `storeFor` peeks and never builds, so a statement for a circle this device has not opened yet
+ * parks on the log — deliberate, because a store built without its pod medium is worse than a
+ * delay. What was missing is the other half: the store is a PROJECTION, so opening one must rebuild
+ * it from the lane instead of starting empty next to a log that already holds the answer.
+ *
+ * Left unbuilt, a task created in the moments after someone joined was lost to them permanently:
+ * verified, chained, stored on their rail, never applied. Catch-up could not heal it either —
+ * catch-up fetches what the rail LACKS, and the rail had it.
+ */
+describe('taskRail.rebuildHead — the head a circle already owes itself', () => {
+  it('applies statements that arrived before the store existed, and is idempotent', async () => {
+    const roster = [{ webid: 'anne' }, { webid: 'cato' }];
+    const wire = [];
+    const anne = await device('anne', roster, wire);
+
+    // CATO's device, composed the way realAgent composes it: `storeFor` PEEKS — it hands back a
+    // store only once the circle has been opened. Until then a statement has nowhere to land.
+    const catoId = await AgentIdentity.generate(new VaultMemory());
+    roster.find((m) => m.webid === 'cato').circleAddress = catoId.pubKey;
+    const registry = createRegistry();
+    registerCanonicalTypes(registry);
+    const catoStores = createCircleStores({ dataSource: memoryDataSource(), registry });
+    let circleOpen = false;
+    const catoRail = makeTaskRail({
+      eventLog: fakeEventLog(),
+      circleIdentityFor: async () => catoId,
+      myRef: 'cato',
+      callSkill: async () => ({}),
+      storeFor: (cid) => (circleOpen ? catoStores.getStore(cid) : null),
+      verifyBinding: async ({ author, ref: r }) => roster.some((m) => m.circleAddress === author && m.webid === r),
+    });
+    const catoReceiver = makeTaskPeerHandler({ rail: catoRail });
+
+    // Anne writes while cato's circle is still closed — the join-window this reproduces.
+    await anne.store.put({ id: 'task-1', type: 'task', text: 'de schuur opruimen' });
+    await settle();
+    await pump(wire, [anne, { ref: 'cato', receiver: catoReceiver }]);
+    await settle();
+
+    // It verified and landed on cato's RAIL, and applied to nothing.
+    expect((await catoRail.readVerifiedBodies(CIRCLE)).bodies.length).toBeGreaterThan(0);
+
+    // The circle opens. This is the moment the head must catch up with the log.
+    circleOpen = true;
+    const catoStore = catoStores.getStore(CIRCLE);
+    expect(await catoStore.get('task-1')).toBeFalsy();
+
+    expect(await catoRail.rebuildHead(CIRCLE)).toBeGreaterThan(0);
+    expect((await catoStore.get('task-1'))?.text).toBe('de schuur opruimen');
+
+    // Idempotent — a re-applied snapshot re-merges to the same result, so re-opening is harmless.
+    await catoRail.rebuildHead(CIRCLE);
+    expect((await catoStore.get('task-1'))?.text).toBe('de schuur opruimen');
+  });
+
+  it('does nothing, without throwing, while the store is still absent', async () => {
+    const cid = await AgentIdentity.generate(new VaultMemory());
+    const rail = makeTaskRail({
+      eventLog: fakeEventLog(),
+      circleIdentityFor: async () => cid,
+      myRef: 'nobody',
+      callSkill: async () => ({}),
+      storeFor: () => null,
+    });
+    expect(await rail.rebuildHead(CIRCLE)).toBe(0);
+  });
+});

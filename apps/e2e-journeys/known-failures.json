@@ -11,9 +11,6 @@
     "[F-011] the REMOVED person's own device learns it as well": "F-011 — open finding, see plans/REPAIR-NOTES-open-findings.md",
     "[F-011] a removed member can no longer read the circle's roster": "F-011 — open finding, see plans/REPAIR-NOTES-open-findings.md"
   },
-  "J-tasksession (a task with an attachment, shared in a circle, worked on by three)": {
-    "[F-016] …and the third's — one circle, one list": "F-016 — open finding, see plans/REPAIR-NOTES-open-findings.md"
-  },
   "J-lastadmin (the only admin leaves — can the circle still be run?)": {
     "someone is admin after the departure — THE OPEN QUESTION: today nobody is": "ledger L39 — the last admin can LEAVE and strand the circle, though they cannot be DEMOTED to the same place. A design decision, not a bug to patch",
     "the circle can still change its own rules after its admin left": "ledger L39 — follows from the above: with zero admins every admin-gated act refuses",

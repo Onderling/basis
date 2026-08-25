@@ -158,13 +158,22 @@ if (UPDATE_BASELINE) {
 
 const surprises = ran.flatMap((s) => (s.surprises ?? []).map((n) => `${s.name} → ${n}`));
 const fixed     = ran.flatMap((s) => (s.fixed ?? []).map((n) => `${s.name} → ${n}`));
+// A baselined entry that matches NO check any more — the check was renamed or deleted. Silent rot:
+// the entry stops describing anything and nothing notices, which is how a baseline outlives its
+// reason. Only meaningful on a FULL run; a filtered run legitimately does not see most journeys.
+const stale = filters.length ? [] : Object.entries(BASELINE).flatMap(([j, checks]) => {
+  const s = ran.find((r) => r.name === j);
+  if (!s) return [`${j} (journey no longer runs)`];
+  const names = new Set(Object.keys(s.failures ?? {}).concat((s.fixed ?? [])));
+  return Object.keys(checks).filter((c) => !names.has(c)).map((c) => `${j} → ${c}`);
+});
 const surprisesEarly = ran.flatMap((s) => s.surprises ?? []);
 const fixedEarly     = ran.flatMap((s) => s.fixed ?? []);
 // The headline states the VERDICT, not the arithmetic: a red that is entirely known is not a
 // failure of this run, and saying "FAILURES" while exiting 0 is the mixed signal a gate must not
 // send. `allOk` still means every check passed; the middle state gets its own words.
 const verdict = allOk ? '✅ ALL GREEN'
-  : (surprisesEarly.length || fixedEarly.length) ? '❌ FAILURES'
+  : (surprisesEarly.length || fixedEarly.length || stale.length) ? '❌ FAILURES'
   : '🔸 NO REGRESSIONS';
 console.log(`\n  ${verdict} — ${totPass}/${totAll} checks across ${ran.length} journeys${skipNote}`);
 
@@ -177,9 +186,14 @@ if (fixed.length) {
   for (const n of fixed) console.log(`     • ${n}`);
   console.log('     (run with --update-baseline, then read the diff)');
 }
+if (stale.length) {
+  console.log(`\n  🧹 ${stale.length} baseline entry(ies) match no check any more — renamed or deleted:`);
+  for (const n of stale) console.log(`     • ${n}`);
+  console.log('     (run with --update-baseline, then read the diff)');
+}
 const knownCount = totAll - totPass - surprises.length;
-if (!surprises.length && !fixed.length) {
+if (!surprises.length && !fixed.length && !stale.length) {
   console.log(knownCount ? `\n  🔸 ${knownCount} known failure(s), all accounted for by open findings.\n` : '\n');
 }
 // Red ONLY when something changed: a new failure, or a baselined one that started passing.
-process.exit(surprises.length || fixed.length ? 1 : 0);
+process.exit(surprises.length || fixed.length || stale.length ? 1 : 0);

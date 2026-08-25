@@ -120,9 +120,38 @@ export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, st
     return [...stored, ...synthesized];
   }
 
+  /**
+   * Re-apply every statement this device ALREADY HOLDS for a circle to that circle's head.
+   *
+   * `storeFor` peeks and never builds (see the realAgent comment where this rail is composed): a
+   * statement that arrives for a circle whose store is not open yet PARKS on the log, and the head
+   * is supposed to converge "when the circle opens and catch-up runs". It did not. `applyToHead`
+   * returned silently on the missing store, nothing re-applied the parked statement, and catch-up
+   * could not heal it either — catch-up re-delivers statements the rail does not have, and the rail
+   * HAD this one. Permanent loss, deterministic, in the window right after someone joins (F-016).
+   *
+   * This is the convergence that was described and never wired. It belongs here rather than in a
+   * caller because the rail is what knows which statements it holds — and it costs nothing when a
+   * head is already current: a re-applied snapshot re-merges to the same result, and a re-applied
+   * remove re-deletes nothing (the same idempotence `ingest` already relies on).
+   *
+   * @returns {Promise<number>} statements applied (0 when the store still is not there)
+   */
+  async function rebuildHead(circleId) {
+    if (!storeFor(circleId)) return 0;
+    let bodies = [];
+    try { ({ bodies = [] } = await base.readVerifiedBodies(circleId)); } catch { return 0; }
+    let applied = 0;
+    for (const body of bodies) {
+      try { await applyToHead(circleId, body); applied += 1; } catch { /* one bad body must not stop the rest */ }
+    }
+    return applied;
+  }
+
   return {
     ...base,
     catchUpStatements,
+    rebuildHead,
     /** The full gate (signature + declared kind + key↔ref binding), then the head apply. */
     async ingest(circleId, statement) {
       const res = await base.ingest(circleId, statement);

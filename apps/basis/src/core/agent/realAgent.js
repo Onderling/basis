@@ -810,6 +810,19 @@ export async function createRealHouseholdAgent(opts = {}) {
     try {
       // getStore builds+caches this circle's store (over the cache medium if pod-backed) — do it either way.
       const circleStore = householdService.stores.getStore(id);
+      // THE HEAD THIS CIRCLE ALREADY OWES ITSELF. `storeFor` peeks and never builds, so a task
+      // statement that arrived before this circle was opened PARKED on the log — that is deliberate
+      // (a store built without its pod medium would be worse). What was missing is the other half:
+      // the store is a PROJECTION, so opening one must rebuild it from the lane rather than start
+      // empty beside a log that already holds the answer.
+      //
+      // Without this a task created in the moments after someone joined was lost to them for good:
+      // verified, chained, stored on their rail, and never applied — and catch-up could not heal it,
+      // because catch-up fetches what the rail LACKS and the rail had it (F-016, deterministic).
+      // Idempotent by construction: a re-applied snapshot re-merges to the same result.
+      if (taskRail?.rebuildHead) {
+        try { await taskRail.rebuildHead(id); } catch { /* best-effort — never block opening a circle */ }
+      }
       // Compose the peer seam BY POSTURE — avoid the double-carry. A POD-BACKED circle (a cache medium was
       // provisioned) carries content THROUGH THE POD (write-through on send + catch-up on open), so it must
       // NOT also full-body peer-fan the same items. A no-pod circle has the peer mirror as its ONLY carry, so

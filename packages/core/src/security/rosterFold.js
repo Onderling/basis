@@ -26,6 +26,8 @@
 import { parentsOf } from './authorChain.js';
 
 /** Kinds this fold understands; anything else is ignored (a future kind folds where its own head does). */
+import { hashHex } from '../hashHex.js';
+
 const MEMBERSHIP_KINDS = new Set(['join', 'leave', 'evict', 'role', 'rules-accept']);
 
 /** Authors that equivocated (two statements off the same parent with different content) — discount them all. */
@@ -181,9 +183,10 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
     const canEvict = (author) => canAct(author) && !demoted.has(author);  // a concurrent demotion voids authority
 
     const removed = new Set();
+    const removedBy = new Map();   // subject → the hash of the statement that removed them (the seed)
     for (const s of batch) {
-      if (s.kind === 'leave' && s.author === s.subject) removed.add(s.subject);
-      else if (s.kind === 'evict' && canEvict(s.author) && !founderSet.has(s.subject)) removed.add(s.subject);
+      if (s.kind === 'leave' && s.author === s.subject) { removed.add(s.subject); removedBy.set(s.subject, s.hash); }
+      else if (s.kind === 'evict' && canEvict(s.author) && !founderSet.has(s.subject)) { removed.add(s.subject); removedBy.set(s.subject, s.hash); }
     }
     const joined = new Set();
     for (const s of batch) {
@@ -213,6 +216,41 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
       if (p.authorRef !== s.subject) continue;             // self-only
       if (!members.has(s.subject)) continue;               // members only
       rulesAccepted[s.subject] = v;
+    }
+
+    // ── THE LAST-ADMIN CARETAKER ────────────────────────────────────────────────────────────────
+    // If this depth left the circle with members but no admin, appoint one HERE — before the next
+    // depth folds, so a later statement finds an authority to check against.
+    //
+    // Why the fold and not an op: the appointment must be AGREED without coordination, and the only
+    // thing every replica provably shares is the log. Decided 2026-07-25 (docs/decisions.md,
+    // "Last-admin"): a deterministic caretaker rather than a fresh vote, because a vote needs quorum
+    // and leaves an adminless gap — and rather than a local random pick, because independent dice
+    // diverge and the FIX would itself be a fork. `hashHex` lives in the kernel for exactly this
+    // (its own header says so).
+    //
+    // This is why `leave` is deliberately unconditional above: you may always walk out. The circle
+    // is not left unadministrable, because the walking-out appoints a successor. Without this half
+    // wired, a founder leaving stranded the circle permanently — every appointing act is admin-gated
+    // and admin is only ever granted at creation.
+    //
+    // SEEDED BY THE DEPARTURE, ordered `hashHex(seed|candidate)` ascending. Two deliberate notes:
+    //   · The decision names the member's PER-CIRCLE ADDRESS as the hash input; the fold speaks REFS
+    //     and has no address map. In basis the ref IS the derived signing key, so they coincide;
+    //     where they do not, the ref is the identifier every replica provably shares, and
+    //     agreeing-without-forking is the property the decision cares most about.
+    //   · Skipping UNREACHABLE candidates (next-in-line) needs a live fact the log does not carry,
+    //     so it is not done here. `appointCaretaker` in the app layer takes `unreachable` for that;
+    //     this is the floor — a circle always has an admin — not the whole refinement.
+    if (members.size > 0 && admins.size === 0 && removed.size > 0) {
+      const seeds = [...removed].map((r) => removedBy.get(r)).filter((h) => typeof h === 'string' && h).sort();
+      const seed2 = seeds[seeds.length - 1];   // deterministic pick among same-depth departures
+      if (seed2) {
+        const caretaker = [...members]
+          .map((ref) => ({ ref, key: hashHex(`${seed2}|${ref}`) }))
+          .sort((x, y) => (x.key < y.key ? -1 : x.key > y.key ? 1 : (x.ref < y.ref ? -1 : 1)))[0];
+        if (caretaker) admins.add(caretaker.ref);
+      }
     }
   }
 

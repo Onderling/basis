@@ -3995,7 +3995,17 @@ export async function createRealHouseholdAgent(opts = {}) {
         ?? null;
       if (!rulesText && rulesObj) {
         const parts = [];
+        // THE AGREEMENTS FIRST, and the rest of the question set that `circleRules.js` actually
+        // defines. This summary used to list the POLICY fields only — access, leave, conflict — and
+        // silently dropped `agreements`, `admission`, `leaving` and `responsibility`. The agreements
+        // are the part a person reads, and the part a joiner is asked to ACCEPT, so a rules document
+        // that answers without them answers with the machinery and not the meaning (F-014).
         if (rulesObj.purpose)        parts.push(`Purpose: ${rulesObj.purpose}`);
+        if (rulesObj.agreements)     parts.push(`Agreements: ${rulesObj.agreements}`);
+        if (rulesObj.admission)      parts.push(`Admission: ${rulesObj.admission}`);
+        if (rulesObj.leaving)        parts.push(`Leaving: ${rulesObj.leaving}`);
+        if (rulesObj.responsibility) parts.push(`Responsibility: ${rulesObj.responsibility}`);
+        if (rulesObj.conflict)       parts.push(`Conflict: ${rulesObj.conflict}`);
         if (rulesObj.accessPolicy)   parts.push(`Access: ${rulesObj.accessPolicy}`);
         if (rulesObj.leavePolicy)    parts.push(`Leave: ${rulesObj.leavePolicy}`);
         if (rulesObj.conflictPolicy) parts.push(`Conflict resolution: ${rulesObj.conflictPolicy}`);
@@ -4017,6 +4027,10 @@ export async function createRealHouseholdAgent(opts = {}) {
         groupId: item?.source?.groupId ?? args?.groupId ?? '(unknown)',
         rules:   rulesText,
         addedAt: item?.addedAt ? new Date(item.addedAt).toISOString() : null,
+        // The STRUCTURED document alongside the rendered text — additive, so every consumer reading
+        // `rules` keeps working, and anything that needs a field rather than a paragraph (a joiner
+        // being asked to accept, a screen showing one section) can reach it without re-parsing prose.
+        ...(rulesObj ? { doc: rulesObj, version: item?.source?.version ?? rulesObj.version ?? null } : {}),
       };
     }
     // leaveGroup: real returns {ok} or {error}. Confirm-gated

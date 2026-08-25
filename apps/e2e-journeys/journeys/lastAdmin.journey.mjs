@@ -86,9 +86,9 @@ export async function run({ relayUrl }) {
     check('the circle still has the two remaining people', after.length >= 2,
       JSON.stringify(after.map((m) => [m.handle ?? m.webid?.slice(0, 6), m.role])));
 
-    // Trivially true while every device counts itself — recorded so the day the self-row is fixed,
-    // this becomes the real caretaker question instead of silently starting to fail.
-    check('someone is admin after the departure — THE OPEN QUESTION: today nobody is',
+    // THE CARETAKER. A circle is never left unadministrable: the departure itself appoints a
+    // successor, folded identically on every device from the log (docs/decisions.md 2026-07-25).
+    check('someone is admin after the departure — the caretaker',
       admins.length >= 1, `${admins.length} admin(s) among ${after.length} member(s)`);
 
     // …and every device must agree on WHO, or the circle has two opinions about its own authority.
@@ -100,24 +100,31 @@ export async function run({ relayUrl }) {
       `one device sees ${JSON.stringify(bramAdmins)}, the other ${JSON.stringify(catoAdmins)}`);
 
     // ── What it costs, in acts rather than roles ─────────────────────────────────────────────────
-    // Whether or not a role was written, the practical question is whether the circle can still be
-    // run. Each of these is an admin act the remaining people may now legitimately need.
-    const rulesNow = await call(bram, 'editGroupRules', {
+    // The practical question is whether the circle can still be RUN. Each of these is an admin act
+    // the remaining people may legitimately need — asked of whoever the fold appointed, not of a
+    // person the journey picked in advance: which member becomes caretaker is derived from the
+    // departure's hash, so naming one here would be asserting the dice rather than the rule.
+    const caretakerWebid = admins.map((m) => m.webid ?? m.addr)[0];
+    const caretaker = [bram, cato].find((n) => (n.webid ?? n.pubKey) === caretakerWebid) ?? bram;
+    const rulesNow = await call(caretaker, 'editGroupRules', {
       groupId: CIRCLE, rules: { name: 'Huisregels', agreements: 'we doen het samen verder' },
     });
     const rulesReached = await untilTrue(async () => {
-      const r = await call(cato, 'getGroupRules', { groupId: CIRCLE }).catch(() => null);
+      const other = caretaker === cato ? bram : cato;
+      const r = await call(other, 'getGroupRules', { groupId: CIRCLE }).catch(() => null);
       return JSON.stringify(r ?? {}).includes('samen verder');
     }, 8000);
     check('the circle can still change its own rules after its admin left', rulesReached,
       `write said ${JSON.stringify(rulesNow)?.slice(0, 90)}`);
 
     // The sharpest one: a circle that can never remove anyone again has no way to protect itself.
-    const removeNow = await call(bram, 'removeMember', {
-      groupId: CIRCLE, memberWebid: cato.pubKey, reason: 'test',
+    // The caretaker removes the OTHER remaining member — whoever that is.
+    const removed = caretaker === cato ? bram : cato;
+    const removeNow = await call(caretaker, 'removeMember', {
+      groupId: CIRCLE, memberWebid: removed.pubKey, reason: 'test',
     });
     const removalTook = await untilTrue(
-      async () => !hasMember(await rosterOf(cato, CIRCLE), cato.pubKey), 6000);
+      async () => !hasMember(await rosterOf(caretaker, CIRCLE), removed.pubKey), 6000);
     check('the circle can still remove a member after its admin left', removalTook,
       `op said ${JSON.stringify(removeNow)?.slice(0, 90)}`);
   } catch (err) {

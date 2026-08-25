@@ -1,10 +1,5 @@
 {
   "J-circle (join → noticeboard → private chat)": {
     "the removed member receives nothing the circle posts afterwards": "F-022 / ledger L44 — the fan-out peer set is reconciled against the roster at circle-open; this composition has no webid↔address mapping at all, so it cannot demonstrate the fix"
-  },
-  "J-lastadmin (the only admin leaves — can the circle still be run?)": {
-    "someone is admin after the departure — THE OPEN QUESTION: today nobody is": "ledger L39 — the last admin can LEAVE and strand the circle, though they cannot be DEMOTED to the same place. A design decision, not a bug to patch",
-    "the circle can still change its own rules after its admin left": "ledger L39 — follows from the above: with zero admins every admin-gated act refuses",
-    "the circle can still remove a member after its admin left": "ledger L39 — same cause"
   }
 }

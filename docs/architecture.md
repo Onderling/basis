@@ -63,6 +63,7 @@ per-operation surface hints. It is the single source of truth every surface read
 | `renderGate` | deterministic pre-LLM token-gate rules (from each op's `surfaces.slash.match` verbs) | affordance |
 | `renderSlash` | `/commands` + grammar | affordance |
 | `renderAttachments` | the attach ("+") menu (from each op's `surfaces.attach`) | affordance |
+| `renderA2A` | the ops **another agent** may invoke, one kernel skill per op (`app.opId`) | affordance |
 | `renderWeb` | DOM pages + forms | shell |
 | `renderMobile` | a React Native NavModel (screens/nav) | shell |
 
@@ -71,13 +72,20 @@ per-operation surface hints. It is the single source of truth every surface read
 Read the projectors as **two families, not a flat list** — the flat list quietly mixes two categories, which
 is what makes a reader ask "why is `renderAttachments` a peer of the chat shell?" It isn't:
 
-- **Affordance projectors** (`renderChat` · `renderSlash` · `renderGate` · `renderAttachments`) turn ops into
-  **one invocation surface each**. A tool-call, a `/command`, a gate phrase, or an attach-menu tap all compile
-  to the same `{opId, args}` → `callSkill` — the surfaces are interchangeable at the waist (this *is* the
-  `web ≡ mobile` invariant on the input side). `renderAttachments` sits **next to `renderSlash`**: an
-  attach-menu entry fires exactly like a slash command ("attach a photo" = the `embed-file` op), driven by a
-  `surfaces.attach` declaration that mirrors `surfaces.slash`. One op declaration → chat + slash + attach-menu
-  automatically.
+- **Affordance projectors** (`renderChat` · `renderSlash` · `renderGate` · `renderAttachments` · `renderA2A`)
+  turn ops into **one invocation surface each**. A tool-call, a `/command`, a gate phrase, an attach-menu tap
+  or *another agent's invocation* all compile to the same `{opId, args}` → `callSkill` — the surfaces are
+  interchangeable at the waist (this *is* the `web ≡ mobile` invariant on the input side).
+  `renderAttachments` sits **next to `renderSlash`**: an attach-menu entry fires exactly like a slash command
+  ("attach a photo" = the `embed-file` op), driven by a `surfaces.attach` declaration that mirrors
+  `surfaces.slash`. One op declaration → chat + slash + attach-menu automatically.
+  **`renderA2A` is the same idea pointed outward**: the declaration that becomes a chat tool also becomes the
+  op a *peer* may call. Registration is per-op (`app.opId`), so a capability token for one op cannot name
+  another — the existing token scoping does the work, and no second dispatch path is invented. Ops that must
+  never be delegated carry `policy: 'never'` and refuse before a token is read, which is what turns a menu
+  that merely omitted them into a gate. It is inert until a shell passes a manifest list, so nothing is
+  exposed to a peer by default; today both shells pass the same deliberately narrow list. This is why a
+  connection, a paired view and an external agent all arrive at **one** door rather than three.
 - **Shell projectors** (`renderWeb` · `renderMobile`) render the **whole platform UI** — screens and nav —
   from the same manifest. `renderMobile` is literally a re-export of `renderWeb`'s NavModel, differing only in
   the platform adapter.
@@ -669,10 +677,12 @@ strategy off the same posture):
 - **`pod-only`** (pod-only) — the row is written and *no* fan happens; members read the pod on catch-up.
 
 **Honest degrade — read this before assuming pod-signal is on.** `pod-signal`/`pod-only` take effect only when
-a real shared-pod writer is wired *and* the write succeeds. That writer is wired in the **web** shell today
-(`circleApp.js`, over a per-circle `podStorageBackend` with **live member-side key custody** — this device's
-vault-backed X25519 identity unwraps the circle group key); **mobile is not wired and stays on `fan-out-full`**.
-The write is **seal-or-refuse**: a sealed circle whose group key can't be resolved *throws* rather than write
+a real shared-pod writer is wired *and* the write succeeds. **Both shells wire it** (2026-08-24), over one
+shared custody resolver rather than a per-platform copy: `circlePodCustody.js` resolves the per-circle
+`{backend, sealed, strategy}` triple with **live member-side key custody** — this device's vault-backed X25519
+identity unwraps the circle group key — and each shell supplies only its own `ensureCirclePod` seam (web from
+`circleApp.js`, mobile from `circlePods.js`) before handing the resolved data-move to the agent. The write is
+**seal-or-refuse**: a sealed circle whose group key can't be resolved *throws* rather than write
 plaintext (invariant #7). Whenever the writer is absent, the pod has no backend, or the seal is unavailable, the
 branch **degrades loudly to `fan-out-full`** (logged, never silent) so the message still reaches every member.
 The pod round-trip is proven against a MockPod and with live member keys in tests; on-device verification against
@@ -911,12 +921,13 @@ error is never treated as a mismatch. When both sides hold different values, the
 *Everything a person (or model) touches compiles to the same `{opId, args}` — the manifest is the
 contract, and every surface is a projection of it.*
 
-**One declaration, five projections.** An app's manifest declares its operations once; pure projectors
+**One declaration, six projections.** An app's manifest declares its operations once; pure projectors
 turn that declaration into the chat tool, the slash command, the deterministic gate verbs, the attach
-menu, and the web/mobile screens. Neither AI nor GUI is privileged — both are compilers to the waist.
-Screens, list→detail drill-downs, and record views render generically from the declaration; a
-capability matrix (circle policy × app) decides what shows. The coverage snapshot records which op has
-which surface, and CI fails when it drifts from the manifests.
+menu, the ops another agent may invoke, and the web/mobile screens. Neither AI nor GUI is privileged —
+both are compilers to the waist, and so is a peer. Screens, list→detail drill-downs, and record views
+render generically from the declaration; a capability matrix (circle policy × app) decides what shows.
+The coverage snapshot records which op has which surface, and its guard fails when it drifts from the
+manifests (the guard is in the `npm run guards` aggregate; wiring that aggregate into CI is open work).
 
 **Every op has a default place, by construction.** An op with no bespoke screen is still visible and
 reachable: the **advanced surface** (Mij → Geavanceerd, both platforms) lists exactly the
@@ -1023,9 +1034,12 @@ ship — the locale file is the fastest index of what already exists.
 
 ### Where this is going
 
-> **The five-homes reorganisation has begun** (§5): the system's description by *place* — Agent · Circle ·
-> Pod · Surfaces · Connectivity, plus the shared type dictionary. Chapters land **only as each matches the
-> running code** — the Agent home is written; the rest follow, and this pointer goes when the last one does.
+> **The five-homes description is complete** (§5): Agent · Circle · Pod · Surfaces · Connectivity, plus the
+> shared type dictionary — each chapter written only once it matched the running code. What is *not* complete
+> is the mapping of code onto those homes: much of `apps/basis/src/v2` is home code still living in the app,
+> the circle engine still sits in `apps/stoop`, and the event log is app code that belongs in a package. That
+> migration rides ordinary work — boundaries before directories, nothing relocated just to relocate — and no
+> guard yet fails a module for living outside its home, so this paragraph is the honest record of it.
 
 Two directions are settled and already shaping the work described above:
 

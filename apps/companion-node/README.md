@@ -67,8 +67,17 @@ No user-facing surface ⇒ no localisation section.
 | Slice | Status | What it delivers |
 |---|---|---|
 | **R1 — the host process** | ✅ **done (this app)** | Boot relay (or connect) → build the Node `store` → register `buildFolioSkills` → connect `RelayTransport` → `registerFolioAgent`. A device discovers the host in the registry and invokes its `listFiles`/`readNote`/`searchNotes` over the **real** wire, getting **real** pod content back. **No PolicyEngine** (trusted LAN). |
-| **R2 — inbound capability-token gate** | ⏳ pending | Attach `PolicyEngine` + `TrustRegistry`; mark pod-file skills `requires-token`; the device mints a skill-scoped `CapabilityToken`; the host verifies subject/scope/issuer-trust/revocation. First real activation of the parked gate. Marker: `// R2: attach PolicyEngine here` in `src/index.js`. |
-| **R3 — BYO real-Solid pod (`agent-proxy`)** | ⏳ pending | Pod HTTP proxied back through the user's device OIDC session over the relay — no pod secret leaves the device. |
+| **R2 — inbound capability-token gate** | ✅ **done**, on by default | `PolicyEngine` + `TrustRegistry` + `TokenRegistry` attached; pod-file skills require a token; the device mints a skill-scoped `CapabilityToken`; the host verifies subject/scope/issuer-trust/revocation. Pass `gate: false` for R1's trusted-LAN mode. |
+| **R2b — scoped pod delegation** | ✅ **done** | The pod OWNER mints a `PodCapabilityToken` naming the host as subject and delivers it over the wire (`authorizePod` → the host's `pod.acceptDelegation`); the host verifies signature + subject + issuer before installing, and `ScopedPodClient` enforces the scope in-process. A real delegation boundary — not yet a network-adversary one. |
+| **R3.0 — BYO real-Solid pod (`agent-proxy`)** | ✅ **built**, opt-in (`podProxy: true`) | The host runs a real `PodClient` whose only proxied seam is `fetch`: every pod HTTP request is shipped back to the owning device, which holds the OIDC session and is the authoritative scope check, so no pod secret ever reaches the host. Deny-by-default with opaque 403s. **DPoP is mocked at this stage**; a live-pod verification is the remaining step. |
+
+**Reached-ness, stated honestly (2026-08-24).** All of the above is exercised by the journey layer
+(`J-manage` walks the management surface over a real relay, 14/14) — but **nothing in `apps/basis`
+reaches it**. Neither shell has a "connect to my companion" affordance, the journeys play the device
+role themselves, and the `companion` rung in `RoutingStrategy.routeLadder` still reports itself
+unavailable because its adapter is unbuilt. The design question that was blocking adoption ("is the
+companion a device of yours, or a blind holder?") was answered — *it is a device of yours, enrolled
+with add-a-device* — so this is scheduling work, not design work.
 
 ### What's REAL vs STUBBED in R1
 
@@ -82,17 +91,16 @@ No user-facing surface ⇒ no localisation section.
   container via `listPodFolio` (a file that lives **only** in the pod backend).
 - `PodCapabilityToken` issuance via folio's `autoShare` (the `shareFolder` core).
 
-**Stubbed / deferred (documented in code):**
-- **Pod auth/delegation** — the host holds folio's dev pod client
-  (`FsBackedMockPodClient`) directly; no `CapabilityAuth` `pod-direct`
-  `PodCapabilityToken` delegation yet (R1.5/R2). See `src/podSource.js`.
-- **Registry storage** — an in-memory `Map` (`src/registryPod.js`), not a
-  pod-backed resource; the two in-process agents share it as the honest analog
-  of a shared pod resource. Real pod-backed mirror is later.
-- **Inbound gate** — none (R2).
-- **Media edge** — the `blobGate` option is passed **through** to `startRelay`
-  (so the media edge can compose into this same process later) but nothing is
-  wired in R1.
+**Stubbed / deferred (documented in code) — updated 2026-08-24:**
+- **The default pod source** — without `podProxy`, the host still holds folio's dev pod client
+  (`FsBackedMockPodClient`) directly. See `src/podSource.js`. The delegated paths (R2b's
+  `ScopedPodClient`, R3.0's proxied `fetch`) are the ones that carry a real boundary.
+- **DPoP in the proxy path** — minted on-device but **mocked** in R3.0; a live-pod run is the
+  remaining verification.
+- **Registry storage** — still an in-memory `Map` (`src/registryPod.js`), not a pod-backed
+  resource; the registry LOGIC is real, only the storage is not. Real pod-backed mirror is later.
+- **Media edge** — `buildDevMediaEdge` composes into this process now (`src/mediaEdge.js`), with
+  `blobGate` still accepted as the real-infra injection that wins over it.
 
 ## What's in here
 

@@ -6,6 +6,11 @@ import { VaultMemory }             from '@onderling/vault';
 import { Reveals }                 from '@onderling/identity-resolver';
 import { RelayTransport }          from '@onderling/transports';
 import { createNeighbourhoodAgent, attachSubstrateMirror } from '@onderling-app/stoop';
+// By relative path, the way this corpus already reaches app internals (see the last-admin journey's
+// key-rail import): stoop does not export its manifest, and a journey is not a reason to widen an
+// app's public API.
+import { stoopManifest }       from '../../stoop/manifest.js';
+import { renderGate }          from '../../../packages/app-manifest/src/renderGate.js';
 import { wait, checker }           from './_util.mjs';
 
 export const name = 'J-circle (join → noticeboard → private chat)';
@@ -56,7 +61,31 @@ export async function run({ relayUrl }) {
     check('stranger joined via admin-verified invite code', !!v?.redemptionId && !!m?.redemptionId);
     await wait(700);
 
-    const posted = await call(host, 'postRequest', { text: 'Iemand een boormachine te leen?', intent: 'ask' }, HOST);
+    // ── THE CORRIDOR A PERSON ACTUALLY WALKS ─────────────────────────────────────────────────────
+    // Everything else in this file reaches the waist by NAME — it hands over an opId, which is the
+    // one thing no person can do. A person types words, and a projector compiles them; naming the op
+    // skips exactly the step that decides whether the feature is reachable at all. That is how a
+    // fully-built role system came to have no way in, with a green journey over it.
+    //
+    // `renderGate` IS that compiler for the deterministic half of the chat surface — manifest →
+    // rules, rules → `{opId, args}` — and it involves no model, so a journey can walk it. So: type
+    // the sentence, let the manifest compile it, and dispatch WHAT CAME OUT rather than what we
+    // meant. If the manifest ever stops projecting this op, this goes red where a hand-written opId
+    // would sail on.
+    //
+    // This is the template for the rest of the corpus, not a one-off: a journey is only evidence
+    // about a person to the extent that it enters the way a person enters.
+    const typed = 'vraag Iemand een boormachine te leen?';
+    const gate = renderGate(stoopManifest);
+    const compiled = gate.map((rule) => rule.command(typed)).find(Boolean);
+    check('what a person TYPES compiles to an op — the manifest is the way in',
+      compiled?.opId === 'postRequest' && compiled?.appOrigin === 'stoop'
+      && typeof compiled?.args?.text === 'string' && compiled.args.text.includes('boormachine'),
+      `"${typed}" → ${JSON.stringify(compiled)?.slice(0, 120)}`);
+
+    // …and the dispatch takes the COMPILED op, not the one we would have written by hand.
+    const posted = await call(host, compiled?.opId ?? 'postRequest',
+      { ...(compiled?.args ?? { text: 'Iemand een boormachine te leen?' }), intent: 'ask' }, HOST);
     check('host posted to the noticeboard', !!(posted?.item?.id ?? posted?.id ?? posted?.requestId));
     await wait(1800);
 

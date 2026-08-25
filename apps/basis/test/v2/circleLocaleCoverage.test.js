@@ -88,9 +88,17 @@ describe('circle settings/screen locale coverage', () => {
       // copied into this test: add a way of becoming an admin without its two locale entries and
       // this fails, instead of a member list showing a raw key where the reason should be.
       const missing = [];
-      for (const raw of ['founder', 'role', 'caretaker:h1']) {
-        const status = memberAdminStatus({ adminVia: raw });
-        expect(status, `memberAdminStatus lost '${raw}'`).not.toBeNull();
+      const cases = [
+        { adminVia: 'founder' },
+        { adminVia: 'role' },
+        // A caretaker reads differently depending on whether they have signed for it, so BOTH are
+        // answers the projection gives and both need words.
+        { adminVia: 'caretaker:h1' },
+        { adminVia: 'caretaker:h1', adminViaAcknowledged: true },
+      ];
+      for (const row of cases) {
+        const status = memberAdminStatus(row);
+        expect(status, `memberAdminStatus lost '${JSON.stringify(row)}'`).not.toBeNull();
         if (typeof resolve(tree, status.labelKey) !== 'string') missing.push(status.labelKey);
       }
       expect(missing, `missing ${missing.join(', ')}`).toEqual([]);

@@ -133,11 +133,32 @@ describe('memberAdminStatus — HOW someone is an admin (one compute, both shell
       .toEqual({ via: 'appointed', labelKey: 'circle.admin_via.appointed' });
     // Nobody appointed this one. The appointment names the statement that emptied the admin set, so
     // the same handover has the same name everywhere and a NEW one gets a NEW name.
-    expect(memberAdminStatus({ adminVia: 'caretaker:h1' }))
-      .toEqual({ via: 'caretaker', labelKey: 'circle.admin_via.caretaker', appointment: 'h1' });
+    expect(memberAdminStatus({ adminVia: 'caretaker:h1', adminViaAcknowledged: true }))
+      .toEqual({ via: 'caretaker', acknowledged: true, labelKey: 'circle.admin_via.caretaker', appointment: 'h1' });
     // Three DISTINCT labels — a caretaker must never read like someone a person chose.
     const keys = ['founder', 'role', 'caretaker:h1'].map((v) => memberAdminStatus({ adminVia: v }).labelKey);
     expect(new Set(keys).size).toBe(3);
+  });
+
+  it('a caretaker who has not signed for it reads differently from one who has', () => {
+    // Being handed a circle says nothing about whether the person NOTICED. A member who can see
+    // "nobody has confirmed this" can go and tell them, which is the only repair available to them.
+    const unseen = memberAdminStatus({ adminVia: 'caretaker:h1' });
+    const seen   = memberAdminStatus({ adminVia: 'caretaker:h1', adminViaAcknowledged: true });
+
+    expect(unseen.acknowledged).toBe(false);
+    expect(seen.acknowledged).toBe(true);
+    expect(unseen.labelKey).not.toBe(seen.labelKey);
+    // …but it is the same WAY of holding it, and the same appointment.
+    expect(unseen.via).toBe('caretaker');
+    expect(seen.via).toBe('caretaker');
+    expect(unseen.appointment).toBe(seen.appointment);
+  });
+
+  it('only a literal true counts as signed — an absent or truthy-ish field is not a signature', () => {
+    for (const v of [undefined, false, null, 'yes', 1]) {
+      expect(memberAdminStatus({ adminVia: 'caretaker:h1', adminViaAcknowledged: v }).acknowledged).toBe(false);
+    }
   });
 
   it('a NEW handover is a new appointment name (a notice can fire once per transition)', () => {
@@ -151,7 +172,7 @@ describe('memberAdminStatus — HOW someone is an admin (one compute, both shell
     expect(memberAdminStatus({ adminVia: 'regent' })).toBeNull();  // a future kind: silence, not a guess
     expect(memberAdminStatus(null)).toBeNull();
     expect(memberAdminStatus({ adminVia: 'caretaker:' })).toEqual({   // no hash to name → still a caretaker
-      via: 'caretaker', labelKey: 'circle.admin_via.caretaker',
+      via: 'caretaker', acknowledged: false, labelKey: 'circle.admin_via.caretaker_unseen',
     });
   });
 
@@ -160,7 +181,19 @@ describe('memberAdminStatus — HOW someone is an admin (one compute, both shell
       { webid: 'w1', handle: 'ann', role: 'admin', adminVia: 'caretaker:h9' },
     ] });
     expect(caretaker.role).toBe('admin');
-    expect(caretaker.admin).toEqual({ via: 'caretaker', labelKey: 'circle.admin_via.caretaker', appointment: 'h9' });
+    expect(caretaker.admin).toEqual({
+      via: 'caretaker', acknowledged: false, labelKey: 'circle.admin_via.caretaker_unseen', appointment: 'h9',
+    });
+
+    // …and the SIGNED state survives the same normalisation. If `adminViaAcknowledged` were dropped
+    // here, every member list would permanently read "has not confirmed it yet" — describing the one
+    // circle where the custodian has, in fact, confirmed it.
+    const [signed] = normalizeCircleMembers({ members: [
+      { webid: 'w1', handle: 'ann', role: 'admin', adminVia: 'caretaker:h9', adminViaAcknowledged: true },
+    ] });
+    expect(signed.admin).toEqual({
+      via: 'caretaker', acknowledged: true, labelKey: 'circle.admin_via.caretaker', appointment: 'h9',
+    });
 
     // An admin the projection cannot explain keeps the badge and no reason — absent beats guessed.
     const [unexplained] = normalizeCircleMembers({ members: [{ webid: 'w2', role: 'admin' }] });

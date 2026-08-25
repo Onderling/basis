@@ -341,18 +341,22 @@
       "doc": "How an admin holds the role — an admin promoted them: a decision a person took."
     },
     "caretaker": {
-      "text": "took over automatically \u2014 the circle had no admin left",
+      "text": "took over automatically — the circle had no admin left",
       "doc": "How an admin holds the role — NOBODY appointed them. A departure or a step-down emptied the admin set and the fold handed the circle over, so that a circle with members always has an admin. The one of the three most worth saying: no one was asked."
+    },
+    "caretaker_unseen": {
+      "text": "took over automatically — the circle had no admin left, and has not confirmed it yet",
+      "doc": "How an admin holds the role — the circle handed it to them and they have not signed for it, so they may not know. The one state another member can act on: go and tell them."
     }
   },
   "caretaker": {
     "now_yours": {
       "text": "This circle had no admin left, so running it has come to you: you can admit people, change the rules and remove someone. You did not ask for this, and nobody appointed you.",
-      "doc": "Said in the circle, to the ONE person the roster fold appointed when the last admin left. The appointment is DERIVED, so every device reaches it alone and offline \u2014 and so it happened in complete silence: nothing recorded it and the person it happened to had no way to learn it. This is the line that says it out loud. Three facts, none of them optional: the circle had no admin left; what running it now means (admit, change the rules, remove); and that nobody chose them. Shown again on a later open until they sign for it \u2014 for \u201ca circle became yours\u201d that is the right kind of persistence."
+      "doc": "Said in the circle, to the ONE person the roster fold appointed when the last admin left. The appointment is DERIVED, so every device reaches it alone and offline — and so it happened in complete silence: nothing recorded it and the person it happened to had no way to learn it. This is the line that says it out loud. Three facts, none of them optional: the circle had no admin left; what running it now means (admit, change the rules, remove); and that nobody chose them. Shown again on a later open until they sign for it — for “a circle became yours” that is the right kind of persistence."
     },
     "acknowledge": {
       "text": "Got it",
-      "doc": "The one button on the caretaker notice. Tapping it emits the caretaker\u2019s own signed statement (the acknowledgeCaretaker op), which is what stops the notice repeating. The device must never sign on render: the whole value of the signature is that it means the person SAW it, not that a screen was drawn."
+      "doc": "The one button on the caretaker notice. Tapping it emits the caretaker’s own signed statement (the acknowledgeCaretaker op), which is what stops the notice repeating. The device must never sign on render: the whole value of the signature is that it means the person SAW it, not that a screen was drawn."
     }
   },
   "members_tab": {

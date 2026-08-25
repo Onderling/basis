@@ -100,6 +100,10 @@ export function memberFrom(entry) {
   // alone. Additive: absent on every member who is not an admin, and on every admin the projection
   // cannot explain (an unexplained admin must not borrow someone else's reason).
   if (m.adminVia != null) out.adminVia = String(m.adminVia);
+  // …and whether a caretaker has signed for the appointment. An appointment nobody has acknowledged
+  // is a circle whose new custodian may not know they have it, which is the half another member can
+  // actually act on — they can go and tell them.
+  if (m.adminViaAcknowledged === true) out.adminViaAcknowledged = true;
   return out;
 }
 
@@ -124,7 +128,11 @@ export function memberFrom(entry) {
  * know. Absent beats guessed — an unexplained admin renders as an admin, never as a founder.
  *
  * @param {Member|object} member
- * @returns {{ via: 'founder'|'appointed'|'caretaker', labelKey: string, appointment?: string }|null}
+ * A caretaker's label also depends on whether they have SIGNED for the appointment
+ * (`adminViaAcknowledged`): handed the circle and knowing it, versus handed it and possibly not.
+ *
+ * @returns {{ via: 'founder'|'appointed'|'caretaker', labelKey: string, acknowledged?: boolean,
+ *   appointment?: string }|null}
  */
 export function memberAdminStatus(member) {
   const m = member && typeof member === 'object' ? member : {};
@@ -134,9 +142,14 @@ export function memberAdminStatus(member) {
   if (raw === 'role') return { via: 'appointed', labelKey: 'circle.admin_via.appointed' };
   if (raw.startsWith('caretaker:')) {
     const appointment = raw.slice('caretaker:'.length);
+    // TWO caretaker labels, because there are two states worth telling apart. The circle handing
+    // itself to someone says nothing about whether that someone has noticed — and a member who can
+    // see "nobody has confirmed this" can go and tell them, which is the only repair available.
+    const acknowledged = m.adminViaAcknowledged === true;
     return {
       via: 'caretaker',
-      labelKey: 'circle.admin_via.caretaker',
+      acknowledged,
+      labelKey: acknowledged ? 'circle.admin_via.caretaker' : 'circle.admin_via.caretaker_unseen',
       ...(appointment ? { appointment } : {}),
     };
   }

@@ -3154,7 +3154,14 @@ export function buildSkills({
       // shared exit + foreign-caller helpers, and its `_sync` producer, and passes the
       // parsed args + carrier context.
       return listCircleRoster(
-        { store, readCircleExits, isExited, rosterCallerIsForeign, simulateSync },
+        {
+          store, readCircleExits, isExited, rosterCallerIsForeign, simulateSync,
+          // The SAME folded projection every other authority answer here reads, spine and all — so
+          // "am I still in this circle" gets the same answer at this door as at every other.
+          projectCircleRoster: ({ groupId: gid }) => projectCircleRoster({
+            store, groupId: gid, memberMapList: [], circleSignerFor, membershipRead, selfSigner,
+          }),
+        },
         { a: dataArgs(parts), from, localActor },
       );
     }, {
@@ -3911,14 +3918,26 @@ export function buildSkills({
       if (!a.event || typeof a.event !== 'object')                    return { error: 'event-required' };
       if (typeof a.msgId !== 'string' || !a.msgId)                    return { error: 'msgId-required' };
       const ts = typeof a.ts === 'number' && Number.isFinite(a.ts) ? a.ts : Date.now();
+      // AN EVICTION GOES TO THE PERSON IT IS ABOUT, TOO. By the time this fans, the roster no longer
+      // holds them — so a fan that resolves members reaches everyone EXCEPT the one who most needs
+      // it, and the removed device kept showing a circle that had already closed behind it (F-011).
+      // The statement is signed and already says what happened; the only thing missing was delivery.
+      //
+      // BOTH policies tell (Frits, 2026-08-24): `graceful` and `ban` differ in what the departed may
+      // still OPEN, not in whether they may know they were removed.
+      //
+      // Derived from the statement rather than passed in, so no caller can forget it and no new op
+      // param can drift out of step with the statement it describes.
+      const evictedSubject = a.event?.body?.kind === 'evict' ? a.event.body.subject : null;
       return broadcastToCircle({
         circleId: _groupId, kind: 'circle-membership-broadcast', from,
         extras: { circleId: _groupId, msgId: a.msgId, ts, event: a.event },
         metric: 'circle-membership-fanout',
         noWake: true,
+        ...(typeof evictedSubject === 'string' && evictedSubject ? { alsoTo: [evictedSubject] } : {}),
       });
     }, {
-      description: 'Fan a signed membership statement (join/leave/evict/role) to every other member via subtype:circle-membership-broadcast; receivers verify at their membership rail before it lands. Never wakes.',
+      description: 'Fan a signed membership statement (join/leave/evict/role) to every other member via subtype:circle-membership-broadcast — and, for an evict, to the removed member as well, so a device learns it was removed. Receivers verify at their membership rail before it lands. Never wakes.',
       visibility:  'authenticated',
     }),
 

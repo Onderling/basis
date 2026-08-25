@@ -51,7 +51,7 @@
  * @returns {Promise<object>} `{ groupId, members:[{addr, role}], _sync }` | `{ error }` | `{ groupId, members:[], reason }`.
  */
 export async function listCircleRoster(
-  { store, readCircleExits, isExited, rosterCallerIsForeign, simulateSync },
+  { store, readCircleExits, isExited, rosterCallerIsForeign, simulateSync, projectCircleRoster = null },
   { a, from, localActor },
 ) {
   if (typeof a.groupId !== 'string' || !a.groupId) return { error: 'groupId required' };
@@ -72,6 +72,37 @@ export async function listCircleRoster(
   // The same per-circle exit rule the roster projection uses. Without it, household-sync
   // pairing keeps re-adding a removed member as a peer for this circle on every circle-open.
   const exits = await readCircleExits({ store, groupId: a.groupId });
+
+  // ── A CIRCLE YOU ARE NO LONGER IN ANSWERS YOU LIKE ONE YOU NEVER JOINED ──────────────────────
+  // Once the circle's own record says this device's person left or was removed, this device stops
+  // serving that circle's live roster — the same `not-a-member` a stranger gets. Not because the
+  // history can be taken away: it is on this disk and it stays (principle 2, "verwijderen kun je
+  // vragen, niet afdwingen"). What ends is STANDING. The projection's contract is "who is in this
+  // circle now", and that is no longer a question this person is owed an answer to.
+  //
+  // Until this, a removed device kept listing the circle's members — including, at the top, the
+  // admin who removed them — from a projection it had no part in any more (F-011). Delivering the
+  // eviction fixed the other half: they now know. This is what knowing should change.
+  //
+  // `joinedAt: 0` deliberately: an exit recorded at ANY time closes the read. The wall-clock
+  // comparison the member list uses exists to place an exit against a RE-join; a caller asking
+  // about their own standing has no such ambiguity to resolve.
+  // Read from the FOLD, not from the exit items: the typed `group-removal` row is written on the
+  // admin's device, while the person it removed learns it as a signed statement on their membership
+  // lane. Asking the items here would answer "no exit" on the one device that most needs a yes.
+  const selfWebid = localActor ?? from;
+  if (selfWebid && typeof projectCircleRoster === 'function') {
+    let folded = null;
+    try { folded = await projectCircleRoster({ groupId: a.groupId }); } catch { folded = null; }
+    const stillIn = Array.isArray(folded)
+      && folded.some((r) => (r?.webid ?? r?.addr ?? r?.ref) === selfWebid);
+    // Only when the circle HAS a folded answer: a null projection means this device holds no record
+    // of the circle at all, which the paths below already answer, and must not be read as an exit.
+    if (Array.isArray(folded) && folded.length > 0 && !stillIn) {
+      return { groupId: a.groupId, members: [], reason: 'not-a-member' };
+    }
+  }
+
   const joinedAt = new Map();
   for (const it of forGroup) {
     const w = it?.source?.redeemedBy;

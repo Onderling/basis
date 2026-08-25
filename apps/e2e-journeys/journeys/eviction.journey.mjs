@@ -74,9 +74,10 @@ export async function run({ relayUrl }) {
       await untilTrue(async () => !hasMember(await rosterOf(cato, CIRCLE), bram.pubKey)));
     check('the bystander is untouched by someone else\'s removal',
       hasMember(await rosterOf(anne, CIRCLE), cato.pubKey));
-    // [F-011] The removed device is never told. Its own roster still lists it as a member, so the
-    // person keeps seeing a circle that has already closed behind them.
-    check('[F-011] the REMOVED person\'s own device learns it as well',
+    // The removal reaches the person it is about. The evict statement is fanned to the subject as
+    // well as to the circle — by then they are off the roster, so the member fan alone reached
+    // everyone except the one who most needed it (was F-011).
+    check('the REMOVED person\'s own device learns it as well',
       await untilTrue(async () => !hasMember(await rosterOf(bram, CIRCLE), bram.pubKey)));
 
     // ── 3. AFTERMATH — the removed device still holds its old keys. Can it talk its way back? ─────
@@ -103,7 +104,10 @@ export async function run({ relayUrl }) {
       JSON.stringify(ghostPost)?.slice(0, 120));
 
     const ghostRoster = await call(bram, 'listGroupRoster', { groupId: CIRCLE });
-    check('[F-011] a removed member can no longer read the circle\'s roster',
+    // …and knowing changes what their device will answer: a circle you are no longer in answers you
+    // like one you never joined. The history stays on their disk — it cannot be taken away — but the
+    // live roster is no longer a question they are owed an answer to.
+    check('a removed member can no longer read the circle\'s roster',
       !!ghostRoster?.error || (ghostRoster?.roster ?? ghostRoster?.members ?? []).length === 0,
       JSON.stringify(ghostRoster)?.slice(0, 150));
 

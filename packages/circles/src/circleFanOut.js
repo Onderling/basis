@@ -69,7 +69,7 @@ export function createCircleFanOut({
     } catch { return 'fan-out-full'; }
   }
 
-  async function broadcastToCircle({ circleId, kind, from, body = '', extras = {}, metric = null, envelope = null, noWake = false, only = null }) {
+  async function broadcastToCircle({ circleId, kind, from, body = '', extras = {}, metric = null, envelope = null, noWake = false, only = null, alsoTo = null }) {
     // Relay wake-gate (§ residual server-side wake work): a broadcast marked
     // `noWake` is hold-forwarded to offline members but must NOT fire an OS push
     // wake — routine governance events (individual votes/resolves) and reports
@@ -115,6 +115,27 @@ export function createCircleFanOut({
           resolveByWebid: (w) => members.resolveByWebid(w),
         }
         : members);
+
+    // ── ONE RECIPIENT WHO IS DELIBERATELY NOT ON THE ROSTER ────────────────
+    // `only` narrows the fan; this widens it, by exactly the addresses the caller names. The case
+    // it exists for is an EVICTION: the statement that removes someone is the one message they most
+    // need, and by the time it goes out the roster no longer contains them — so the fan that
+    // resolves members would reach everyone EXCEPT the person it is about (F-011).
+    //
+    // Kept narrow on purpose. This is not a general "send to anyone" door: the caller supplies a
+    // webid it has just written a signed statement about, and the receiver still verifies that
+    // statement at its own rail before anything lands.
+    const extraTo = (Array.isArray(alsoTo) ? alsoTo : []).filter((w) => typeof w === 'string' && w && w !== from);
+    const fanTargets = extraTo.length
+      ? {
+        list: async () => {
+          const base = (await fanMembers.list()) ?? [];
+          const seen = new Set(base.map((m) => (typeof m === 'string' ? m : (m?.webid ?? m?.webId))));
+          return [...base, ...extraTo.filter((w) => !seen.has(w)).map((webid) => ({ webid }))];
+        },
+        resolveByWebid: (w) => fanMembers.resolveByWebid(w),
+      }
+      : fanMembers;
 
     // ── The data-move branch ───────────────────────────────────────────────
     // The circle's data-policy (`policy.pod`) decides HOW a message moves; we
@@ -162,8 +183,8 @@ export function createCircleFanOut({
           // `preferCircleAddress`, so unlike the full fan below it still routes to members' GLOBAL
           // keys rather than their per-circle addresses.
           const refFan = reliableSend
-            ? await fanOutViaReliableSend({ members: fanMembers, reliableSend, selfWebid: from, envelope: refEnvelope })
-            : await fanOutToMembers({ members: fanMembers, chat, selfWebid: from, subtype: kind, threadId: circleId, body: '', extras: { ...extras, ref } });
+            ? await fanOutViaReliableSend({ members: fanTargets, reliableSend, selfWebid: from, envelope: refEnvelope })
+            : await fanOutToMembers({ members: fanTargets, chat, selfWebid: from, subtype: kind, threadId: circleId, body: '', extras: { ...extras, ref } });
           if (metric) metrics?.record?.(metric);
           return { sent: refFan.sent, attempted: refFan.attempted, errors: refFan.errors, podSignal: true, ref };
         }
@@ -180,10 +201,10 @@ export function createCircleFanOut({
     const wire = envelope ?? { subtype: kind, ...extras };
     const { sent, attempted, errors } = reliableSend
       ? await fanOutViaReliableSend({
-        members: fanMembers, reliableSend, selfWebid: from, envelope: wire, only, circleId, preferCircleAddress,
+        members: fanTargets, reliableSend, selfWebid: from, envelope: wire, only, circleId, preferCircleAddress,
         allowFallback: allowAddressFallback,
       })
-      : await fanOutToMembers({ members: fanMembers, chat, selfWebid: from, subtype: kind, threadId: circleId, body, extras, only });
+      : await fanOutToMembers({ members: fanTargets, chat, selfWebid: from, subtype: kind, threadId: circleId, body, extras, only });
     if (metric) metrics?.record?.(metric);
     return { sent, attempted, errors };
   }

@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 18
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 19
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -20,6 +20,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `doc-refs` | — | Fitness function for the task #66 file-org model |
 | `duplicate-vocab` | — | a shared VOCABULARY is defined in exactly ONE place |
 | `integration-index` | — | the integration index stays in sync with reality |
+| `journeys-reach-users` | — | a journey walks a corridor a PERSON can walk |
 | `kind-appenders` | — | every declared entry kind must have a production APPENDER |
 | `ledger` | — | Fitness function for the open-questions ledger in REMAINING-WORK.md |
 | `resolution-policy` | G-L23 | the DECLARATION LAYER is complete + has no SECOND ordering mechanism |

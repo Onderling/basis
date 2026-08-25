@@ -18,12 +18,9 @@
  *
  * See docs/decisions.md (2026-07-25).
  */
-import { hashHex } from '@onderling/core';
+import { caretakerOrder as coreCaretakerOrder } from '@onderling/core';
 
-/** The deterministic seed key for one candidate: sha256(departingHash | address), hex. */
-function seedKey(departingHash, address) {
-  return hashHex(`${String(departingHash)}|${address}`);
-}
+
 
 /**
  * True when a caretaker MUST be appointed: after the departure the roster still has
@@ -42,12 +39,14 @@ export function needsCaretaker(membersAfter) {
  * @returns {Array<{ref:string, address:string}>}
  */
 export function caretakerOrder({ candidates = [], departingHash = '' } = {}) {
-  const pool = (Array.isArray(candidates) ? candidates : [])
-    .filter((c) => c && typeof c.ref === 'string' && typeof c.address === 'string' && c.address);
-  return pool
-    .map((c) => ({ c, key: seedKey(departingHash, c.address) }))
-    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : (a.c.address < b.c.address ? -1 : 1)))
-    .map(({ c }) => c);
+  // DELEGATES to the kernel's one implementation. This used to compute its own order, keyed on the
+  // per-circle ADDRESS, while the fold — which is what actually appoints — keys on the member REF.
+  // Two orders for one "can never itself fork" decision is the fork it was written to prevent, so
+  // there is now exactly one, in core, and this adds only the `unreachable` refinement below (a live
+  // fact the log does not carry, which is why that half cannot live in the fold).
+  const pool = (Array.isArray(candidates) ? candidates : []).filter((c) => c && typeof c.ref === 'string');
+  const byRef = new Map(pool.map((c) => [c.ref, c]));
+  return coreCaretakerOrder([...byRef.keys()], departingHash).map((ref) => byRef.get(ref));
 }
 
 /**

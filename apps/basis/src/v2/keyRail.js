@@ -47,7 +47,19 @@ export const KEY_CATCHUP_SUBTYPES = Object.freeze({
 export function keyBindingVerifier(callSkill, { rotateClassFor = null } = {}) {
   return async ({ author, ref, circleId, kind, payload }) => {
     try {
-      const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId, spineless: true });
+      // THE FULL READ — spine folded. This asked for the roster `spineless: true` (trail + display
+      // only), and that is the right rule for exactly one verifier: the MEMBERSHIP lane's own, where
+      // folding would re-enter the fold that is asking. The key lane is a DIFFERENT lane, so there is
+      // no cycle — the chain terminates at the membership verifier, which keeps the spineless read.
+      // Same correction as F-019 made for the content lanes, and here it is not a nicety:
+      //
+      // a CARETAKER admin exists only in the FOLD. When the last admin departs, the successor is
+      // derived from the log rather than written as a role statement (docs/decisions.md 2026-07-25),
+      // so a spineless reader still sees them as a member and refuses their rotations. Measured: the
+      // caretaker's own rail took version 2 and the other member's rail held nothing — the caretaker
+      // could remove someone but not rotate the key, which is the half that stops the departed
+      // opening new content. Backward secrecy silently broken, on a circle that looked administered.
+      const r = await callSkill('stoop', 'listGroupMembers', { groupId: circleId });
       const row = (Array.isArray(r?.members) ? r.members : [])
         .find((m) => m && (m.webid ?? m.addr ?? m.ref) === ref);
       if (!row) return false;

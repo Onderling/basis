@@ -27,8 +27,18 @@ const CIRCLE = 'key-lane-circle';
 const evt = (version, extra = {}) => ({ kind: KEY_EVENT_KIND, version, sealed: `sealed-v${version}`, members: 2, recipients: ['r1', 'r2'], groupId: CIRCLE, ...extra });
 
 /** A stub roster read: rows shaped like the spineless projection. */
+// The key lane reads the FULL roster — spine folded — and this stub pins that, because the previous
+// version pinned the opposite. A spineless read is right for exactly one verifier, the membership
+// lane's own, where folding would re-enter the fold that is asking; the key lane is a different lane
+// and there is no cycle. It matters concretely: a CARETAKER admin (appointed by the fold when the
+// last admin departs) is invisible to a spineless reader, so their key rotations were refused at
+// every receiver while their removals went through — backward secrecy broken on a circle that looked
+// administered.
 const rosterSkill = (rows) => async (app, op, args) => {
-  if (app === 'stoop' && op === 'listGroupMembers' && args?.spineless === true) return { members: rows };
+  if (app === 'stoop' && op === 'listGroupMembers') {
+    if (args?.spineless === true) throw new Error('key lane must read the FOLDED roster — a caretaker exists only in the fold');
+    return { members: rows };
+  }
   throw new Error(`unexpected callSkill ${app}.${op}`);
 };
 

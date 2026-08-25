@@ -109,7 +109,7 @@ export {
 // The WRITE side: append a signed spine statement to a circle's store, chained to its author's own frontier.
 export { createSpineAppender, SPINE_STATEMENT_ITEM } from './security/spineAppender.js';
 // The membership HEAD folded from the spine chain (deny-wins, deterministic; who is member / who is admin).
-export { foldRoster }                        from './security/rosterFold.js';
+export { foldRoster, caretakerOrder }        from './security/rosterFold.js';
 export {
   signEviction,
   verifyEviction,

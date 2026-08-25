@@ -42,11 +42,16 @@ describe('2.5 — two devices independently land on the same caretaker', () => {
   });
 
   it('a DIFFERENT departing admin can yield a different caretaker — the hash really is an input', () => {
-    const a = appointCaretaker({ candidates, departingHash: 'h-anna' });
-    const b = appointCaretaker({ candidates, departingHash: 'h-someone-else' });
-    expect(caretakerOrder({ candidates, departingHash: 'h-anna' }))
-      .not.toEqual(caretakerOrder({ candidates, departingHash: 'h-someone-else' }));
-    expect([a, b].every(Boolean)).toBe(true);
+    // Asserted over SEVERAL seeds rather than two named ones. Three candidates permit six orders, so
+    // any particular pair collides about one time in six — the old version compared exactly two
+    // hashes and was one coincidence away from failing for a reason that says nothing about the
+    // rule. The claim is that the seed is an input at all, so ask whether the seed ever changes the
+    // answer, not whether these two happen to differ.
+    const seeds = ['h-anna', 'h-someone-else', 'h-third', 'h-fourth', 'h-fifth', 'h-sixth', 'h-seventh'];
+    const orders = new Set(seeds.map((h) => caretakerOrder({ candidates, departingHash: h })
+      .map((c) => c.ref).join(',')));
+    expect(orders.size).toBeGreaterThan(1);
+    expect(seeds.every((h) => appointCaretaker({ candidates, departingHash: h }))).toBe(true);
   });
 
   it('an UNREACHABLE first choice still resolves identically on both devices', () => {

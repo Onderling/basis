@@ -28,6 +28,32 @@ import { parentsOf } from './authorChain.js';
 /** Kinds this fold understands; anything else is ignored (a future kind folds where its own head does). */
 import { hashHex } from '../hashHex.js';
 
+/**
+ * THE caretaker succession order — one implementation, exported so nothing computes a second one.
+ *
+ * A deterministic shuffle of the candidates seeded by the departing admin's final event hash:
+ * `hashHex(seed|candidate)` ascending, ties broken on the candidate itself. Every replica computes
+ * the same order from the same log, which is the whole point — a locally-rolled pick would diverge
+ * and the FIX would itself be a fork (docs/decisions.md 2026-07-25).
+ *
+ * KEYED ON THE MEMBER REF, not the per-circle address the decision names. The fold speaks refs and
+ * holds no address map; in basis the ref IS the derived signing key, so they coincide, and where
+ * they do not the ref is the identifier every replica provably shares — agreeing-without-forking is
+ * the property the decision cares about. Grinding an identifier to win buys nothing either way: the
+ * seed is a departure hash nobody can know before joining.
+ *
+ * @param {string[]} candidates
+ * @param {string} seed  the departing admin's final event hash
+ * @returns {string[]} the candidates, in succession order
+ */
+export function caretakerOrder(candidates, seed) {
+  return (Array.isArray(candidates) ? candidates : [])
+    .filter((c) => typeof c === 'string' && c)
+    .map((ref) => ({ ref, key: hashHex(`${String(seed)}|${ref}`) }))
+    .sort((x, y) => (x.key < y.key ? -1 : x.key > y.key ? 1 : (x.ref < y.ref ? -1 : 1)))
+    .map(({ ref }) => ref);
+}
+
 const MEMBERSHIP_KINDS = new Set(['join', 'leave', 'evict', 'role', 'rules-accept']);
 
 /** Authors that equivocated (two statements off the same parent with different content) — discount them all. */
@@ -246,10 +272,8 @@ export function foldRoster(statements, { founders = [], seed = null, rulesGate =
       const seeds = [...removed].map((r) => removedBy.get(r)).filter((h) => typeof h === 'string' && h).sort();
       const seed2 = seeds[seeds.length - 1];   // deterministic pick among same-depth departures
       if (seed2) {
-        const caretaker = [...members]
-          .map((ref) => ({ ref, key: hashHex(`${seed2}|${ref}`) }))
-          .sort((x, y) => (x.key < y.key ? -1 : x.key > y.key ? 1 : (x.ref < y.ref ? -1 : 1)))[0];
-        if (caretaker) admins.add(caretaker.ref);
+        const [caretaker] = caretakerOrder([...members], seed2);
+        if (caretaker) admins.add(caretaker);
       }
     }
   }

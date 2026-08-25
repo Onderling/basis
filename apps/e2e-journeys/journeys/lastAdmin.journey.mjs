@@ -31,7 +31,9 @@
 // the roster has "members but no admin among them", and no device can ever see that: it always sees
 // at least one admin, itself.
 import { checker } from './_util.mjs';
-import { bootAppCircle, rosterOf, hasMember, untilTrue } from './_app.mjs';
+import { bootAppCircle, rosterOf, hasMember, untilTrue, keySinkFor } from './_app.mjs';
+import { establishKeyEvent, rotateKeyEvent, sealingPublicKeyFromNetworkKey } from '@onderling/pod-client';
+import { keyEventsFromRail } from '../../basis/src/v2/keyRail.js';
 
 export const name = 'J-lastadmin (the only admin leaves — can the circle still be run?)';
 
@@ -117,6 +119,37 @@ export async function run({ relayUrl }) {
     check('the circle can still change its own rules after its admin left', rulesReached,
       `write said ${JSON.stringify(rulesNow)?.slice(0, 90)}`);
 
+    // ── AND THE ONE AN ADMIN CANNOT DO WITHOUT ───────────────────────────────────────────────────
+    // Removing someone is only half a removal: rotate-on-remove is what stops the departed opening
+    // NEW content. So a caretaker who can remove but cannot rotate leaves backward secrecy broken —
+    // and a caretaker exists only in the FOLD, while some gates read the roster spineless.
+    const versionsAt = async (node) => (await keyEventsFromRail(node.agent.keyRail, CIRCLE)
+      .catch(() => [])).map((e) => e?.version).filter((v) => typeof v === 'number');
+    const seal = (m) => {
+      const stored = m?.sealingPublicKey ?? m?.sealingPubKey ?? m?.publicKey;
+      if (stored) return stored;
+      const net = m?.circleAddress ?? m?.pubKey ?? m?.webid;
+      try { return net ? sealingPublicKeyFromNetworkKey(net) : null; } catch { return null; }
+    };
+    const rows = (await call(caretaker, 'listGroupMembers', { groupId: CIRCLE }))?.members ?? [];
+    const recipients = rows.map(seal).filter(Boolean);
+    const caretakerSink = keySinkFor(caretaker, CIRCLE);
+    const { event: kv1 } = establishKeyEvent({ groupId: CIRCLE, recipients });
+    await caretakerSink.sink.append(kv1);
+    const { event: kv2 } = rotateKeyEvent({ groupId: CIRCLE, priorEvents: [kv1], fromVersion: 1, recipients });
+    await caretakerSink.sink.append(kv2);
+    check('the caretaker can rotate the circle key — the act removal depends on',
+      await untilTrue(async () => (await versionsAt(caretaker)).includes(2), 6000),
+      `caretaker holds ${JSON.stringify(await versionsAt(caretaker))}`);
+    // THE ONE THAT MATTERS. A rail accepts its own append; the gate runs at the RECEIVER. If the
+    // other member's rail refuses the caretaker's rotation, the circle has two key states and the
+    // caretaker's authority is a local belief — which is exactly what a spineless roster read at
+    // that gate would produce, since a caretaker exists only in the fold.
+    const otherMember = caretaker === cato ? bram : cato;
+    check('…and the OTHER device accepts it — the caretaker\'s authority is not a local belief',
+      await untilTrue(async () => (await versionsAt(otherMember)).includes(2), 8000),
+      `the other device holds ${JSON.stringify(await versionsAt(otherMember))}`);
+
     // The sharpest one: a circle that can never remove anyone again has no way to protect itself.
     // The caretaker removes the OTHER remaining member — whoever that is.
     const removed = caretaker === cato ? bram : cato;
@@ -127,6 +160,8 @@ export async function run({ relayUrl }) {
       async () => !hasMember(await rosterOf(caretaker, CIRCLE), removed.pubKey), 6000);
     check('the circle can still remove a member after its admin left', removalTook,
       `op said ${JSON.stringify(removeNow)?.slice(0, 90)}`);
+
+
   } catch (err) {
     check('the last-admin corridor completed', false, String(err?.message ?? err).slice(0, 250));
   } finally {

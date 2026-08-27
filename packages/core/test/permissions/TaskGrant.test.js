@@ -11,7 +11,7 @@
  *   4. two tasks are revoked INDEPENDENTLY;
  *   5. OFF BY DEFAULT — nothing is granted without an explicit attachGrant.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 import { TaskGrantManager } from '../../src/permissions/TaskGrant.js';
 import { CapabilityToken }  from '../../src/permissions/CapabilityToken.js';
@@ -153,7 +153,7 @@ describe('TaskGrantManager.revokeTaskGrants — grants expire with the task', ()
       .resolves.toMatchObject({ allowed: true });
 
     // Task completes → revoke its grants.
-    const { revokedTokenIds } = mgr.revokeTaskGrants('task-1');
+    const { revokedTokenIds } = await mgr.revokeTaskGrants('task-1');
     expect(revokedTokenIds).toEqual([token.id]);
     expect(mgr.isRevoked(token.id)).toBe(true);
     expect(mgr.tokensForTask('task-1')).toEqual([]);
@@ -178,7 +178,7 @@ describe('TaskGrantManager.revokeTaskGrants — grants expire with the task', ()
     const tokB = await mgr.attachGrant({ taskId: 'task-B', memberPubKey: B, grant: { skill: 'predict.run' } });
 
     // Revoke only task-A.
-    mgr.revokeTaskGrants('task-A');
+    await mgr.revokeTaskGrants('task-A');
     expect(mgr.isRevoked(tokA.id)).toBe(true);
     expect(mgr.isRevoked(tokB.id)).toBe(false);
 
@@ -196,7 +196,7 @@ describe('TaskGrantManager — OFF by default', () => {
     const mgr = new TaskGrantManager({ identity: granter.identity });
     // No implicit / default grant.
     expect(mgr.tokensForTask('any-task')).toEqual([]);
-    expect(mgr.revokeTaskGrants('any-task')).toEqual({ revokedTokenIds: [] });
+    expect(await mgr.revokeTaskGrants('any-task')).toEqual({ revokedTokenIds: [] });
     expect(mgr.isRevoked('whatever')).toBe(false);
   });
 
@@ -205,5 +205,83 @@ describe('TaskGrantManager — OFF by default', () => {
     const mgr = new TaskGrantManager({ identity: granter.identity });
     await expect(mgr.attachGrant({ taskId: 't', memberPubKey: 'm', grant: {} }))
       .rejects.toThrow(/at least one of skill \/ pod \/ actingAs/);
+  });
+});
+
+describe('TaskGrantManager — a revocation must outlive the process', () => {
+  /**
+   * The defect this closes: `#revoked` was a plain in-process Set, so a revoked task grant came back
+   * to life on restart while the token itself stayed signed and unexpired — the issuer re-admitted a
+   * holder it had already cut off, until TTL. `RoleGrantManager` had taken a `{get,set}` store since
+   * it was written; this class had not, and its own header called the bare Set "the single revocation
+   * enforcement point".
+   *
+   * A restart is modelled the only honest way: build a SECOND manager over the same store and ask it.
+   * Asserting against the first instance would prove nothing about durability.
+   */
+  const memStore = () => {
+    const m = new Map();
+    return { get: async (k) => m.get(k) ?? null, set: async (k, v) => void m.set(k, v), _m: m };
+  };
+
+  it('a revoked grant is still revoked after a restart', async () => {
+    const store = memStore();
+    const identity = await AgentIdentity.generate(new VaultMemory());
+
+    const before = new TaskGrantManager({ identity, store });
+    const token = await before.attachGrant({
+      taskId: 'task-1', memberPubKey: 'member-pub', grant: { skill: 'echo' },
+    });
+    await before.revokeTaskGrants('task-1');
+    expect(before.isRevoked(token.id)).toBe(true);
+
+    // The restart.
+    const after = new TaskGrantManager({ identity, store });
+    await after.whenReady();
+    expect(after.isRevoked(token.id)).toBe(true);
+  });
+
+  it('a LIVE grant also survives, so a later revoke can still find its tokens', async () => {
+    // Persisting only the revocation set would leave a restarted manager unable to revoke: the
+    // task→tokens index it needs would be empty, and `revokeTaskGrants` would revoke nothing while
+    // reporting success.
+    const store = memStore();
+    const identity = await AgentIdentity.generate(new VaultMemory());
+
+    const before = new TaskGrantManager({ identity, store });
+    const token = await before.attachGrant({
+      taskId: 'task-2', memberPubKey: 'member-pub', grant: { skill: 'echo' },
+    });
+
+    const after = new TaskGrantManager({ identity, store });
+    await after.whenReady();
+    expect(after.tokensForTask('task-2').map((t) => t.id)).toEqual([token.id]);
+
+    const { revokedTokenIds } = await after.revokeTaskGrants('task-2');
+    expect(revokedTokenIds).toEqual([token.id]);
+    expect(after.isRevoked(token.id)).toBe(true);
+  });
+
+  it('without a store it still works, and says out loud that revocations are not durable', async () => {
+    // Degrading quietly is what made this defect survive: nothing looked different.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const identity = await AgentIdentity.generate(new VaultMemory());
+    const mgr = new TaskGrantManager({ identity });
+
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/MEMORY-ONLY|not survive a restart/));
+    const token = await mgr.attachGrant({ taskId: 't', memberPubKey: 'm', grant: { skill: 'echo' } });
+    await mgr.revokeTaskGrants('t');
+    expect(mgr.isRevoked(token.id)).toBe(true);      // still correct in-process
+    warn.mockRestore();
+  });
+
+  it('a corrupt blob starts empty rather than throwing at construction', async () => {
+    const store = memStore();
+    store._m.set('task-grants', '{not json');
+    const identity = await AgentIdentity.generate(new VaultMemory());
+
+    const mgr = new TaskGrantManager({ identity, store });
+    await expect(mgr.whenReady()).resolves.toBeUndefined();
+    expect(mgr.isRevoked('anything')).toBe(false);
   });
 });

@@ -103,6 +103,9 @@ function normaliseTaskGrant(g) {
   return out;
 }
 
+/** Vault key holding the serialized revocation set + task index. */
+const STORE_KEY = 'task-grants';
+
 /**
  * Materialize task-scoped capability tokens for a member, attenuated from the
  * granter's OWN authority and revocable with the task.
@@ -119,6 +122,10 @@ export class TaskGrantManager {
   #revoked = new Set();
   /** taskId → CapabilityToken[] materialized for that task. */
   #grants = new Map();
+  /** Optional `{get,set}` persistence port — the same one `RoleGrantManager` takes. */
+  #store = null;
+  /** Resolves once the persisted state has loaded; already-resolved when there is no store. */
+  #ready = Promise.resolve();
 
   /**
    * @param {object} opts
@@ -128,14 +135,63 @@ export class TaskGrantManager {
    * @param {CapabilityToken|object} [opts.parentToken] — the granter's OWN token to attenuate FROM.
    *   When supplied, every grant is issued as a chained sub-token (`parentId`) and must be
    *   equal-or-narrower than it (`verifyChain`). Omit for a direct issue bounded by the granter's identity.
+   * @param {{get:(k:string)=>Promise<string|null>, set:(k:string,v:string)=>Promise<*>}} [opts.store]
+   *   — persistence for the revocation set + the task→tokens index. WITHOUT it both are memory-only,
+   *   so a restart forgets every revocation while the tokens themselves stay signed and unexpired: the
+   *   process re-admits holders it had already cut off, until TTL. `RoleGrantManager` has taken this
+   *   same port since it was written; this class did not, and its header called its bare Set "the
+   *   single revocation enforcement point". Omitting the store WARNS rather than degrading quietly.
+   *   A PORT, not an adapter — the kernel never imports a concrete vault (invariant 5).
    */
-  constructor({ identity, agentId, parentToken } = {}) {
+  constructor({ identity, agentId, parentToken, store = null } = {}) {
     if (!identity) throw new Error('TaskGrantManager requires identity');
     this.#identity = identity;
     this.#agentId  = agentId ?? identity.pubKey;
+    if (store && typeof store.get === 'function' && typeof store.set === 'function') {
+      this.#store = store;
+      this.#ready = this.#load();
+    } else if (typeof console !== 'undefined') {
+      console.warn(
+        '[TaskGrantManager] no store — revocations are MEMORY-ONLY and will not survive a restart. '
+        + 'Pass { store } (a vault-shaped {get,set}) to make revoke-wins durable.',
+      );
+    }
     this.#parentToken = parentToken
       ? (parentToken instanceof CapabilityToken ? parentToken : CapabilityToken.fromJSON(parentToken))
       : null;
+  }
+
+  /**
+   * Await hydration. A composer that builds the `PolicyEngine` at boot should await this BEFORE the
+   * engine can be asked anything: `isRevoked` is synchronous, so a check racing the load would report
+   * "not revoked" for a token that is. (`RoleGrantManager` carries the same race and no seam to wait
+   * on; worth closing there too.)
+   * @returns {Promise<void>}
+   */
+  whenReady() { return this.#ready; }
+
+  /** Hydrate the revocation set + the task index. Best-effort: a corrupt blob starts empty. */
+  async #load() {
+    try {
+      const raw = await this.#store.get(STORE_KEY);
+      if (!raw) return;
+      const { revoked = [], grants = [] } = JSON.parse(raw);
+      for (const id of revoked) this.#revoked.add(id);
+      for (const [taskId, tokens] of grants) {
+        this.#grants.set(taskId, tokens.map((t) => CapabilityToken.fromJSON(t)));
+      }
+    } catch { /* unreadable → start empty; the writes below re-establish it */ }
+  }
+
+  /** Persist after any mutation. Best-effort: a failed write must not fail the grant or the revoke. */
+  async #persist() {
+    if (!this.#store) return;
+    try {
+      await this.#store.set(STORE_KEY, JSON.stringify({
+        revoked: [...this.#revoked],
+        grants:  [...this.#grants.entries()].map(([taskId, tokens]) => [taskId, tokens.map((t) => t.toJSON())]),
+      }));
+    } catch { /* best-effort */ }
   }
 
   /**
@@ -194,6 +250,7 @@ export class TaskGrantManager {
     const list = this.#grants.get(taskId) ?? [];
     list.push(token);
     this.#grants.set(taskId, list);
+    await this.#persist();
     return token;
   }
 
@@ -206,7 +263,7 @@ export class TaskGrantManager {
    * @param {string} taskId
    * @returns {{ revokedTokenIds: string[] }}
    */
-  revokeTaskGrants(taskId) {
+  async revokeTaskGrants(taskId) {
     const tokens = this.#grants.get(taskId) ?? [];
     const revokedTokenIds = [];
     for (const tok of tokens) {
@@ -214,6 +271,9 @@ export class TaskGrantManager {
       revokedTokenIds.push(tok.id);
     }
     this.#grants.delete(taskId);
+    // The in-memory effect is immediate — the await is the DURABILITY, which is the whole point of
+    // this step: before it, a revoke survived exactly as long as the process did.
+    await this.#persist();
     return { revokedTokenIds };
   }
 

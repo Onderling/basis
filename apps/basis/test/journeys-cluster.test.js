@@ -481,7 +481,7 @@ describe('J8 — task-scoped grant (GREEN: off-by-default, attenuated, revoked-o
     expect(revokedCheck(token.id)).toBe(false); // live before complete → checkInbound would allow
 
     // complete/cancel the task → every grant it carried is revoked.
-    mgr.revokeTaskGrants('task-1');
+    await mgr.revokeTaskGrants('task-1');
     expect(mgr.isRevoked(token.id)).toBe(true);
     expect(revokedCheck(token.id)).toBe(true); // the source now rejects it → checkInbound would deny
     expect(mgr.tokensForTask('task-1')).toEqual([]); // tracking dropped

@@ -167,7 +167,11 @@ export async function createTasksAgent({
   // explicit attach. The manager is a revocation SOURCE: the agent's PolicyEngine reads it through
   // this circle's CircleState (see the `circleStates` provider above), so a revoked grant fails
   // `checkInbound` at the verifier even if the holder still has the token stored.
-  const taskGrantManager = new TaskGrantManager({ identity: id });
+  // `store: vault` is what makes a revoke outlive the process. Without it the manager keeps its
+  // revocation set in memory only, so a restart re-admits holders it had already cut off while their
+  // tokens are still signed and unexpired — and it says so loudly on construction rather than
+  // degrading in silence.
+  const taskGrantManager = new TaskGrantManager({ identity: id, store: vault });
 
   // OfferingMatch (Phase 4.2 — composes core.Agent + pubSub directly).
   let offeringMatch = null;

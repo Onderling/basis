@@ -149,7 +149,7 @@ describe('two sources, two different revocations — BOTH bind', () => {
     await expect(present(pe, 'bot-pk',      fromBot)).resolves.toMatchObject({ allowed: true });
 
     // Revoke through EACH source independently.
-    taskGrants.revokeTaskGrants('task-1');
+    await taskGrants.revokeTaskGrants('task-1');
     botTokens.add(fromBot.id);
 
     await expect(present(pe, 'assignee-pk', fromTask)).rejects.toMatchObject({ code: 'INVALID_TOKEN' });
@@ -172,7 +172,7 @@ describe('two sources, two different revocations — BOTH bind', () => {
     const grant = await lateSource.attachGrant({
       taskId: 't', memberPubKey: 'holder-pk', grant: { skill: SKILL },
     });
-    lateSource.revokeTaskGrants('t');
+    await lateSource.revokeTaskGrants('t');
 
     await expect(present(pe, 'holder-pk', grant)).rejects.toMatchObject({ code: 'INVALID_TOKEN' });
   });

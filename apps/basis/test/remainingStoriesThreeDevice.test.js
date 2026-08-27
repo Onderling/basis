@@ -180,7 +180,7 @@ describe('1.7 — a mandate does not outlive its task', () => {
     const forT1 = await mgr.attachGrant({ taskId: 't1', memberPubKey: bram.pubKey, grant: { skill: 'calendar.write' } });
     const forT2 = await mgr.attachGrant({ taskId: 't2', memberPubKey: cato.pubKey, grant: { skill: 'calendar.write' } });
 
-    const { revokedTokenIds } = mgr.revokeTaskGrants('t1');
+    const { revokedTokenIds } = await mgr.revokeTaskGrants('t1');
     expect(revokedTokenIds).toContain(forT1.id);
     expect(revokedTokenIds).not.toContain(forT2.id);      // the bystander task is untouched
   });

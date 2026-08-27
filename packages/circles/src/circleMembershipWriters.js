@@ -506,20 +506,42 @@ export async function removeMember({
     },
   }], { actor: from });
 
-  // ACTUALLY revoke (not just record intent): rotate the group key + re-seal history per policy +
-  // drop the member from the MemberMap (fan-out stops). `force` — an admin removal overrides the
-  // ≥1-admin guard for a non-self target; the op's own admin-gate above is the authority.
+  // ACTUALLY remove (not just record intent): tell the person, then rotate the group key + re-seal
+  // history per policy + drop them from the MemberMap so the fan-out stops. Both steps below, in that
+  // order — see why immediately inside.
   let revoked = false;
+  let told = false;
   if (memberWebid) {
+    // TELL THEM FIRST, THEN CLOSE THE DOOR. The EVICT statement is recorded on the circle's membership
+    // spine — the admin authored the removal (their admin gate above is the authority) and signs it with
+    // their own identity (author = admin, subject = the removed member); every device's roster fold
+    // re-derives who may evict, deny-wins, from the same statements. Its fan carries `alsoTo: [subject]`
+    // precisely so the person it is about learns it.
+    //
+    // THE ORDER IS THE POINT (2026-08-27, walked). `revokeKey` also drops the member from the MemberMap
+    // — which is where their per-circle address lives. Emitting after it meant the fan had no address
+    // for them, and routing over someone's GLOBAL key is refused by the privacy default, so the notice
+    // was not merely late: `resolveMemberAddress` returned `blocked-by-setting` and nothing was sent.
+    // The removed device showed an unchanged circle, an unchanged roster and a working composer, and
+    // its console showed nothing at all, because nothing had reached it.
+    //
+    // Emitting first grants the removed member nothing: the statement is signed, the fold decides, and
+    // the key they still hold for the next few milliseconds is one they already had. The failure modes
+    // are not symmetric either — a notice sent whose rotation then fails is recoverable and every
+    // device already folds them as out; a rotation with nobody told is the state we were shipping.
+    //
+    // Best-effort, and REPORTED: a removal must complete even when the notice cannot be delivered, but
+    // the caller is told which happened rather than being left to assume the good case.
+    try { told = !!(await emitSpine?.({ kind: 'evict', circleId: _groupId, subject: memberWebid, actor: from })); }
+    catch { told = false; }
+
+    // Now close it: rotate the key + drop them from the MemberMap, so the fan-out stops and what comes
+    // next is unreadable to them. `force` — an admin removal overrides the ≥1-admin guard for a
+    // non-self target; the op's own admin gate above is the authority.
     await revokeKey({ webId: memberWebid, force: true, policy, groupId: _groupId });
     revoked = true;
-    // ALSO record the EVICT on the circle's membership spine. The admin authored the removal (their admin gate
-    // above is the authority); they sign `evict` with their own identity (author = admin, subject = the removed
-    // member). The roster fold re-derives WHO may evict (deny-wins) from the same statements on every device.
-    // Additive to the typed `group-removal` item; optional hook. Only when the target webid resolved.
-    await emitSpine?.({ kind: 'evict', circleId: _groupId, subject: memberWebid, actor: from });
   }
-  return { removalId: item.id, revoked, policy };
+  return { removalId: item.id, revoked, policy, told };
 }
 
 /**

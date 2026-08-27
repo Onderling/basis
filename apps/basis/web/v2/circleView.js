@@ -785,6 +785,71 @@ function renderLedenTab(body, { members = null, selfWebid = null, revealPolicy =
   body.appendChild(wrap);
 }
 
+/**
+ * The delivery chip for one message — ONE builder, used by the initial render and by the targeted
+ * repaint below, so a state can never look different depending on which drew it.
+ *
+ * @returns {HTMLElement|null} null when the state renders nothing (`show: false`, or no state yet).
+ */
+function buildDeliveryChip(state, { tr, onRetryDelivery = null, rowId = null } = {}) {
+  const p = deliveryPresentation(state);
+  if (!p) return null;
+  const label = tr(p.labelKey);
+  const el = document.createElement(p.retryable ? 'button' : 'span');
+  el.className = `circle-view__bubble-delivery circle-view__bubble-delivery--${p.state}`;
+  el.dataset.deliveryState = p.state;
+  el.setAttribute('aria-label', label);
+  el.title = label;
+  el.textContent = p.glyph;
+  if (p.retryable) {
+    el.type = 'button';
+    el.addEventListener('click', () => { if (typeof onRetryDelivery === 'function') onRetryDelivery(rowId); });
+  } else {
+    el.setAttribute('role', 'status');
+  }
+  return el;
+}
+
+/**
+ * Repaint ONE message's delivery chip in place.
+ *
+ * ── Why this exists ─────────────────────────────────────────────────────────────────────────────
+ * The delivery ladder computes honest states — `failed` when the relay or the local hold queue gives
+ * up, `stored` when the recipient's app confirms — and web painted almost none of them. The map's
+ * subscriber rebuilt the whole circle view, which rebuilds the COMPOSER, so an input mid-sentence
+ * lost what was typed into it. That was survivable only by narrowing the subscription to one state,
+ * and the cost was the important one: a message the system had given up on kept its optimistic chip
+ * indefinitely. Someone watched four messages get dropped by the relay while their screen said
+ * nothing was wrong.
+ *
+ * Replacing one chip touches neither the composer nor the scroll position, so the narrowing is no
+ * longer needed and every state can paint the moment it changes.
+ *
+ * A row that is not on screen (another circle open, not yet rendered) is a silent no-op — the next
+ * full render reads the same map and gets the same answer.
+ *
+ * @param {ParentNode} root       the circle view container
+ * @param {string} rowId          the message id
+ * @param {string|null} state     the new delivery state
+ * @returns {boolean} whether a chip was found or placed
+ */
+export function paintDeliveryChip(root, rowId, state, { tr, onRetryDelivery = null } = {}) {
+  if (!root || !rowId || typeof tr !== 'function') return false;
+  const bubble = root.querySelector(`.circle-view__bubble[data-row-id="${CSS.escape(String(rowId))}"]`);
+  if (!bubble) return false;
+  const existing = bubble.querySelector('.circle-view__bubble-delivery');
+  const next = buildDeliveryChip(state, { tr, onRetryDelivery, rowId });
+  if (!next) { existing?.remove(); return true; }   // a state that shows nothing must CLEAR the old chip
+  if (existing) existing.replaceWith(next);
+  else {
+    // No chip yet (the message was sent in a state that shows nothing). It belongs at the end of the
+    // bottom meta line, which is where the initial render puts it.
+    const meta = bubble.querySelector('.circle-view__bubble-meta') ?? bubble;
+    meta.appendChild(next);
+  }
+  return true;
+}
+
 function renderBubble(row, {
   tr, onAction,
   // δ.2 — delivery-icon plumbing; all three are optional.
@@ -1037,26 +1102,8 @@ function renderBubble(row, {
   // — `reached-device`, `stored` — as silence, in the one place they are worth showing.
   let deliveryEl = null;
   if (typeof deliveryStateFor === 'function' && isMine) {
-    const p = deliveryPresentation(deliveryStateFor(row.id));
-    if (p) {
-      const label = tr(p.labelKey);
-      const el2 = document.createElement(p.retryable ? 'button' : 'span');
-      el2.className = `circle-view__bubble-delivery circle-view__bubble-delivery--${p.state}`;
-      el2.dataset.deliveryState = p.state;
-      el2.setAttribute('aria-label', label);
-      el2.title = label;
-      el2.textContent = p.glyph;
-      if (p.retryable) {
-        el2.type = 'button';
-        el2.addEventListener('click', () => {
-          if (typeof onRetryDelivery === 'function') onRetryDelivery(row.id);
-        });
-      } else {
-        el2.setAttribute('role', 'status');
-      }
-      deliveryEl = el2;
-    }
     // States marked `show: false` render nothing — the happy path stays clean.
+    deliveryEl = buildDeliveryChip(deliveryStateFor(row.id), { tr, onRetryDelivery, rowId: row.id });
   }
 
   // Bottom meta line (the site's `.msg .src` pattern): ONE small mono line with

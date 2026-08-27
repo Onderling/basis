@@ -25,7 +25,7 @@
  * a harness artifact.
  */
 
-import { renderWeb, affordanceTreatment, canonicalAtom } from '@onderling/app-manifest';
+import { renderWeb, renderAttachments, affordanceTreatment, canonicalAtom } from '@onderling/app-manifest';
 import { itemRowButtons } from '@onderling/app-manifest';
 import { circleActions } from './actionProjection.js';
 
@@ -98,7 +98,8 @@ function globalActionsOf(manifest, appOrigin, capabilityMatrix) {
  *   one error this seam must never make, since a walk would then call an affordance nobody has.
  * @param {string} [o.platform]
  * @param {Function} [o.renderer] the projector; `renderMobile` is `renderWeb`, so this seam serves both.
- * @returns {{where: object, apps: string[], pages: object[], actions: object[], nav: object[], rows: object[]}}
+ * @returns {{where: object, apps: string[], pages: object[], actions: object[], nav: object[],
+ *            attach: object[], rows: object[]}}
  */
 export function probeSurface({
   manifestsByOrigin = {},
@@ -139,6 +140,27 @@ export function probeSurface({
     });
   }
 
+  // The composer's ATTACH menu — Card · File · Appointment, projected by `renderAttachments` from the
+  // same manifests. It belongs here because it is an affordance a person taps and the walk found it
+  // dead-ending: both entries answered "I couldn't turn that into an action", and the probe had no way
+  // to say what they even were. Each entry names the op behind it, so a walk can check that the op
+  // exists and what it needs rather than guessing from a label.
+  const attach = [];
+  for (const appOrigin of apps) {
+    let menu = [];
+    try { menu = renderAttachments(manifestsByOrigin[appOrigin])?.attachMenu ?? []; } catch { menu = []; }
+    for (const entry of menu) {
+      const op = (manifestsByOrigin[appOrigin]?.operations ?? []).find((o) => o?.id === entry.opId) ?? null;
+      attach.push({
+        appOrigin,
+        ...entry,
+        // What a tap will need before it can do anything — the walk's "why did this dead-end?".
+        ...(op?.params?.some((pr) => pr?.required) ? { needsArgs: op.params.filter((pr) => pr?.required).map((pr) => pr.name) } : {}),
+        ...(op ? {} : { missingOp: true }),
+      });
+    }
+  }
+
   // The ⋯ roster: projected from the manifest, gated by policy/platform, then narrowed to what the
   // host actually wired. Both halves are required for the report to match the screen — `collectMoreActions`
   // in the web shell applies exactly this pair, and mobile projects the same roster.
@@ -149,7 +171,7 @@ export function probeSurface({
         .map((a) => ({ id: a.id, labelKey: a.labelKey ?? null, target: a.target ?? null }))
     : [];
 
-  return { where: { ...where }, apps, pages, actions, nav, rows };
+  return { where: { ...where }, apps, pages, actions, nav, attach, rows };
 }
 
 export default probeSurface;

@@ -345,7 +345,7 @@ import {
   removeScreen as removeUserScreen, setActiveScreen, getActiveScreen, updateScreen,
 } from '../../src/v2/userScreens.js';
 import { materializeScreen } from '../../src/v2/userScreenBlocks.js';
-import { renderCircleView } from './circleView.js';
+import { renderCircleView, paintDeliveryChip } from './circleView.js';
 import { makeCircleLists } from '@onderling/kring-host/circleLists';  // composable lists (shared web≡mobile)
 // the app-level cross-circle SHARE op. The {onShare, policy} binder + resource-URI resolver are
 // pod-layer, composed at the pod site below; the op logic itself is shared (web≡mobile) in circleShare.js.
@@ -1192,9 +1192,17 @@ const deliveryStateMap = createDeliveryStateMap();
 // DOM, composer included, and an input element rebuilt mid-sentence loses what was typed into it. A
 // repaint here is not free the way a React tick is, which is why mobile's equivalent can be unconditional
 // (it also has an out-of-screen writer for `failed`; web has none).
-deliveryStateMap.subscribe((_msgId, state) => {
-  if (state !== 'stored') return;
-  try { _circleRender?.rerender?.(); } catch { /* no open circle */ }
+deliveryStateMap.subscribe((msgId, state) => {
+  // Repaint the ONE chip that changed. This used to rebuild the whole circle view, which rebuilds the
+  // composer too — an input rebuilt mid-sentence loses what was typed — so it had to be narrowed to
+  // `stored` and every other transition was computed and never shown. That is how four messages the
+  // relay had given up on kept their optimistic chip while the person watched (2026-08-27, walked).
+  //
+  // A chip swap touches neither the composer nor the scroll position, so the narrowing is gone and
+  // every state paints the moment the ladder reaches it — `failed` and `undeliverable` included, which
+  // are the ones worth seeing. A row that is not on screen returns false and nothing happens; the next
+  // full render reads the same map.
+  try { _circleRender?.paintDelivery?.(msgId, state); } catch { /* no open circle */ }
 });
 // Delivery honesty (receiver half) — who is ALLOWED to tell us a message arrived. The shared receiver
 // resolves the message's circle off the log and only lets someone that circle's ROSTER knows advance it;
@@ -6361,6 +6369,17 @@ function showCircle(id, circle, policy) {
     // Repaint without appending a bubble — used when module-level circle state changes outside a message
     // (e.g. a multi-field needsForm sets `circlePendingFormFollowUp` and the inline form must appear).
     rerender: () => rerender(),
+    // Targeted delivery repaint — the delivery-state subscriber's whole path. Bound here because the
+    // container, the translator and the retry handler all live in this scope.
+    paintDelivery: (msgId, state) => paintDeliveryChip(rootEl, msgId, state, {
+      tr: t,
+      onRetryDelivery: (retryId) => {
+        const evt = eventLog.query({ excludeMuted: true }).find((e) => e.id === retryId);
+        const text = evt?.payload?.text;
+        if (typeof text !== 'string' || !text) return;
+        broadcastFanOut({ msgId: retryId, text, ts: evt?.ts ?? Date.now(), media: evt?.payload?.media });
+      },
+    }),
     // Profile-update propagation — the PULL half: re-read this circle's roster rows (the same op
     // + normaliser the MEMBERS tab uses) after a silent `roster-updated` entry says a row moved.
     refreshRoster: () => loadRoster(),

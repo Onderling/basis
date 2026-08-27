@@ -134,7 +134,26 @@ export function makeMembershipEmitter({ rail, myRef, fan = null }) {
     const res = await rail.append(circleId, { kind, subject, payload, actor, signer });
     if (!res) return null;
     if (typeof fan === 'function') {
-      try { fan(circleId, res.statement); } catch { /* fan is best-effort — never block the writer */ }
+      // Fire-and-forget, EXCEPT for an eviction. A slow fan must never block a local write, which is
+      // right for every kind but one: `evict` is the only statement whose recipient is about to become
+      // unreachable. `removeMember` emits it and then rotates the key and drops the member from the
+      // MemberMap — and the fan resolves its addresses when it finally runs, by which point the person
+      // it is about is gone from the map it resolves against. `resolveMemberAddress` then returns
+      // `blocked-by-setting` (no per-circle address, and routing over a global key is refused by the
+      // privacy default) and the notice is not sent at all.
+      //
+      // That is why a removed member's device showed an unchanged circle, an unchanged roster and a
+      // working composer, with nothing in its console: nothing had reached it (walked 2026-08-27).
+      // Reordering the caller does not fix it — the race is here, not there.
+      //
+      // So an evict WAITS for its fan. It costs one send on the one path where a person is being told
+      // something they cannot be told later, and the caller still completes if it fails: the await is
+      // wrapped, and `removeMember` reports `told` either way.
+      if (kind === 'evict') {
+        try { await fan(circleId, res.statement); } catch { /* reported by the caller as told:false */ }
+      } else {
+        try { fan(circleId, res.statement); } catch { /* fan is best-effort — never block the writer */ }
+      }
     }
     return res.statement;
   };

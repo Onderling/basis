@@ -126,12 +126,47 @@ export function createCircleFanOut({
     // webid it has just written a signed statement about, and the receiver still verifies that
     // statement at its own rail before anything lands.
     const extraTo = (Array.isArray(alsoTo) ? alsoTo : []).filter((w) => typeof w === 'string' && w && w !== from);
+
+    // A WEBID IS NOT AN ADDRESS. The widening above used to hand the fan a bare `{ webid }`, and a row
+    // with no `circleAddress` sends `resolveMemberAddress` down to its `resolveByWebid` rung — the
+    // MemberMap, which by this point no longer holds the person being removed. With no per-circle
+    // address and the global-key fallback refused by the privacy default, it answered
+    // `blocked-by-setting`, the fan reported `recipient-pubkey-unknown`, and the eviction notice was
+    // not merely late — it was never sent.
+    //
+    // So the widening was real and the delivery was not: an evicted device showed an unchanged circle,
+    // an unchanged roster and a working composer, with NOTHING in its console (walked 2026-08-27).
+    //
+    // The address is not missing, only filtered. This device holds the person's trail row with the
+    // per-circle address they PROVED on joining — the roster projection simply drops them once they
+    // are exited, which is right for the roster and wrong for the one message that has to outlive it.
+    // So read the trail directly for these recipients, and keep every field the ladder uses.
+    const extraRows = new Map();
+    if (extraTo.length) {
+      try {
+        const rows = (await store.listOpen({ type: 'membership-redemption' })) ?? [];
+        for (const it of rows) {
+          const src = it?.source ?? {};
+          if (src.groupId !== circleId) continue;
+          const who = src.redeemedBy;
+          if (typeof who !== 'string' || !extraTo.includes(who)) continue;
+          const prev = extraRows.get(who) ?? { webid: who };
+          extraRows.set(who, {
+            ...prev,
+            circleAddress:      prev.circleAddress ?? src.circleAddress ?? null,
+            circleAddresses:    prev.circleAddresses ?? src.circleAddresses ?? null,
+            circleAddressProof: prev.circleAddressProof ?? src.circleAddressProof ?? null,
+          });
+        }
+      } catch { /* no trail readable → the bare row below, exactly as before */ }
+    }
+
     const fanTargets = extraTo.length
       ? {
         list: async () => {
           const base = (await fanMembers.list()) ?? [];
           const seen = new Set(base.map((m) => (typeof m === 'string' ? m : (m?.webid ?? m?.webId))));
-          return [...base, ...extraTo.filter((w) => !seen.has(w)).map((webid) => ({ webid }))];
+          return [...base, ...extraTo.filter((w) => !seen.has(w)).map((webid) => extraRows.get(webid) ?? { webid })];
         },
         resolveByWebid: (w) => fanMembers.resolveByWebid(w),
       }

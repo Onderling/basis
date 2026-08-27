@@ -41,8 +41,8 @@ export function buildDefaultPolicy({ anchorPodUri, deviceId }) {
     // when there's no anchor pod, or centralised on the anchor pod
     // when there is one.
     circlePolicyDefault: hasPod
-      ? { policy: 'centralised', groupPodUri: anchorPodUri }
-      : { policy: 'no-pod' },
+      ? { policy: 'shared', groupPodUri: anchorPodUri }
+      : { policy: 'none' },
   };
 }
 

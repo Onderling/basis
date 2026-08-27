@@ -255,7 +255,7 @@ export async function bootRealAgentNode(label = 'agent', { redeemTimeoutMs = 800
     // authorize snapshot from one roster read.
     'circle-address-announce': makeCircleAddressAnnouncePeerHandler({ agent, logger: QUIET }),
     // Sealed circle — the PRODUCTION receive handler records a fanned key-event into the PRODUCTION per-circle
-    // key-event log (the no-pod key-chain carrier), de-duped by version. This is the real app's receive path,
+    // key-event log (the none key-chain carrier), de-duped by version. This is the real app's receive path,
     // dispatched by the real `makePeerRouter` — not a harness stand-in. Folding happens on read (`readSealed`).
     // The KEY LANE (the recorded spine route): a fanned key statement verifies at the agent's rail
     // (signature + chain + rotateKey authority) and the node's key-event store refreshes as the
@@ -562,7 +562,7 @@ export async function joinExistingCircle(admin, joiner, { groupId = 'peer-circle
 // (`openerForIdentity` → AgentIdentity.sharedCopyOpener) — the exact app seam, no secret ever surfaced. Key
 // establishment/rotation ride the log as key-events fanned over `sendPeerMessage` (real hold-forward when a peer
 // is offline); content is sealed by the seal resolver under the current version and fanned the same way. This is
-// the no-pod key-rotation mechanism end-to-end, with the harness standing in only for the stoop skill that would
+// the none key-rotation mechanism end-to-end, with the harness standing in only for the stoop skill that would
 // emit/record the events (as it already stands in for the browser's connectPeerTransport wiring).
 
 /** A member's stable sealing PUBLIC key — derived from its published network key (deterministic, no trail dependency). */
@@ -689,7 +689,7 @@ export async function removeAndRotate({ admin, keep = [], groupId }) {
   return { event };
 }
 
-/** A member reads a sealed envelope across the versions it holds: the PRODUCTION no-pod reader folds its
+/** A member reads a sealed envelope across the versions it holds: the PRODUCTION none reader folds its
  *  per-circle key-event log (`keyEventStore`) into the key chain and opens by authenticated trial. */
 export function readSealed(node, env, groupId) {
   return openViaKeyEvents(env, { events: node.keyEventStore.list(groupId), groupId, opener: memberOpener(node) });

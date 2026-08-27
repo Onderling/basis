@@ -5,10 +5,10 @@
  *   - `addTask({embeds: [{type, ref}, ...]})` persists embeds on the
  *     stored task; cap of 8; validates entries.
  *   - `circleConfig.storage` carries the §II.2 policy. Default
- *     `'no-pod'`. Centralised/hybrid honour a `groupPodUri`.
+ *     `'none'`. Centralised/hybrid honour a `groupPodUri`.
  *   - `getCircleStoragePolicy` reads from `liveCircle.storage`.
  *   - `setCircleStoragePolicy` upgrades the policy; admin-only; one-way
- *     (rejects downgrade to no-pod once pod-having).
+ *     (rejects downgrade to none once pod-having).
  */
 
 import { describe, it, expect } from 'vitest';
@@ -110,26 +110,26 @@ describe('Tasks V2 — addTask embeds', () => {
 });
 
 describe('Tasks V2 — circleConfig.storage', () => {
-  it('defaults to no-pod when storage is omitted', async () => {
+  it('defaults to none when storage is omitted', async () => {
     const { circle } = await makeCircle();
     expect(circle.bundle?.circleState ?? circle.circleState ?? {}).toBeTruthy();
     const r = await callSkill(circle.agent, 'getCircleStoragePolicy', { circleId: 'oss-tools' });
-    expect(r).toEqual({ policy: 'no-pod', groupPodUri: null });
+    expect(r).toEqual({ policy: 'none', groupPodUri: null });
   });
 
-  it('honours centralised + groupPodUri from the config', async () => {
+  it('honours shared + groupPodUri from the config', async () => {
     const { circle } = await makeCircle({
-      policy:      'centralised',
+      policy:      'shared',
       groupPodUri: 'https://circle.pod/',
     });
     const r = await callSkill(circle.agent, 'getCircleStoragePolicy', { circleId: 'oss-tools' });
-    expect(r).toEqual({ policy: 'centralised', groupPodUri: 'https://circle.pod/' });
+    expect(r).toEqual({ policy: 'shared', groupPodUri: 'https://circle.pod/' });
   });
 
-  it('forward-additive: unknown policies fall back to no-pod silently', async () => {
+  it('forward-additive: unknown policies fall back to none silently', async () => {
     const { circle } = await makeCircle({ policy: 'fancy-future-mode' });
     const r = await callSkill(circle.agent, 'getCircleStoragePolicy', { circleId: 'oss-tools' });
-    expect(r.policy).toBe('no-pod');
+    expect(r.policy).toBe('none');
   });
 });
 
@@ -324,7 +324,7 @@ describe('Tasks V2 — provisionMyCircle', () => {
     expect(raw).toBeTruthy();
     const cfg = typeof raw === 'string' ? JSON.parse(raw) : raw;
     expect(cfg.circleId).toBe('fresh-circle');
-    expect(cfg.storage).toEqual({ policy: 'no-pod' });
+    expect(cfg.storage).toEqual({ policy: 'none' });
   });
 
   it('honours storagePolicy + groupPodUri', async () => {
@@ -333,20 +333,20 @@ describe('Tasks V2 — provisionMyCircle', () => {
       circleId:        'pod-circle',
       name:          'Pod Circle',
       kind:          'team',
-      storagePolicy: 'centralised',
+      storagePolicy: 'shared',
       groupPodUri:   'https://team.pod/',
     });
-    expect(r.storage).toEqual({ policy: 'centralised', groupPodUri: 'https://team.pod/' });
+    expect(r.storage).toEqual({ policy: 'shared', groupPodUri: 'https://team.pod/' });
   });
 
-  it('rejects centralised without groupPodUri', async () => {
+  it('rejects shared without groupPodUri', async () => {
     const { circle } = await makeCircle();
     const r = await callSkill(circle.agent, 'provisionMyCircle', {
       circleId:        'no-uri',
       name:          'X',
-      storagePolicy: 'centralised',
+      storagePolicy: 'shared',
     });
-    expect(r?.error).toMatch(/storage-policy-needs-groupPodUri:centralised/);
+    expect(r?.error).toMatch(/storage-policy-needs-groupPodUri:shared/);
   });
 
   it('rejects malformed circleId', async () => {
@@ -407,26 +407,26 @@ describe('Tasks V2 — provisionMyCircle', () => {
 });
 
 describe('Tasks V2 — setCircleStoragePolicy', () => {
-  it('upgrades no-pod → centralised', async () => {
+  it('upgrades none → shared', async () => {
     const { circle } = await makeCircle();
     const r = await callSkill(circle.agent, 'setCircleStoragePolicy', {
       circleId:        'oss-tools',
-      storagePolicy: 'centralised',
+      storagePolicy: 'shared',
       groupPodUri:   'https://anne.pod/',
     });
-    expect(r.storage).toEqual({ policy: 'centralised', groupPodUri: 'https://anne.pod/' });
+    expect(r.storage).toEqual({ policy: 'shared', groupPodUri: 'https://anne.pod/' });
     const after = await callSkill(circle.agent, 'getCircleStoragePolicy', { circleId: 'oss-tools' });
-    expect(after.policy).toBe('centralised');
+    expect(after.policy).toBe('shared');
   });
 
-  it('rejects downgrade to no-pod', async () => {
+  it('rejects downgrade to none', async () => {
     const { circle } = await makeCircle({
-      policy:      'centralised',
+      policy:      'shared',
       groupPodUri: 'https://anne.pod/',
     });
     const r = await callSkill(circle.agent, 'setCircleStoragePolicy', {
       circleId:        'oss-tools',
-      storagePolicy: 'no-pod',
+      storagePolicy: 'none',
     });
     expect(r?.error).toBe('storage-policy-downgrade-not-supported');
   });
@@ -435,18 +435,18 @@ describe('Tasks V2 — setCircleStoragePolicy', () => {
     const { circle } = await makeCircle();
     const r = await callSkill(circle.agent, 'setCircleStoragePolicy', {
       circleId:        'oss-tools',
-      storagePolicy: 'centralised',
+      storagePolicy: 'shared',
       groupPodUri:   'https://anne.pod/',
     }, BOB);
     expect(r?.error).toBe('admin-only');
   });
 
-  it('rejects centralised without groupPodUri', async () => {
+  it('rejects shared without groupPodUri', async () => {
     const { circle } = await makeCircle();
     const r = await callSkill(circle.agent, 'setCircleStoragePolicy', {
       circleId:        'oss-tools',
-      storagePolicy: 'centralised',
+      storagePolicy: 'shared',
     });
-    expect(r?.error).toMatch(/storage-policy-needs-groupPodUri:centralised/);
+    expect(r?.error).toMatch(/storage-policy-needs-groupPodUri:shared/);
   });
 });

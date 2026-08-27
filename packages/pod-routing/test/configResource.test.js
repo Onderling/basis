@@ -49,14 +49,14 @@ describe('readConfig / writeConfig', () => {
       config: {
         version: CONFIG_VERSION,
         mappings:    { 'sharing/*': 'pseudo-pod://d1/sharing/' },
-        circlePolicies: { 'circle-a': { policy: 'no-pod' } },
+        circlePolicies: { 'circle-a': { policy: 'none' } },
       },
     });
     const got = await readConfig({ pseudoPod, uri });
     expect(got).toBeTruthy();
     expect(got.version).toBe(CONFIG_VERSION);
     expect(got.mappings).toEqual({ 'sharing/*': 'pseudo-pod://d1/sharing/' });
-    expect(got.circlePolicies).toEqual({ 'circle-a': { policy: 'no-pod' } });
+    expect(got.circlePolicies).toEqual({ 'circle-a': { policy: 'none' } });
     expect(typeof got.updatedAt).toBe('string');
   });
 

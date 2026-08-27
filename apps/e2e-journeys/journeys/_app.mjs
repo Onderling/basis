@@ -220,7 +220,7 @@ export async function bootAppCircle({ relayUrl, circleId, handles, pod = null, o
   if (pod) {
     const created = await admin.agent.callSkill('stoop', 'createGroupV2', {
       groupId: circleId, name: circleId, rules: {},
-      storagePolicy: 'centralised', groupPodUri: `mem://${circleId}/`,
+      storagePolicy: 'shared', groupPodUri: `mem://${circleId}/`,
     });
     if (created?.error) throw new Error(`pod-backed create failed: ${JSON.stringify(created)}`);
   } else {

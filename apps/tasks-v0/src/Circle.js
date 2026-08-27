@@ -50,6 +50,8 @@ import { buildMetrics } from './observability/metrics.js';
 import { wireIssuerNotifications } from './notifications/wireIssuerNotifications.js';
 import { InAppInboxBridge } from './bridges/InAppInboxBridge.js';
 import { loadSettings, updateSettings } from './storage/settings.js';
+import { CIRCLE_STORAGE_POSTURE_NAMES, DEFAULT_CIRCLE_STORAGE_POSTURE,
+  normaliseCircleStoragePosture, posturePodUriRequired } from '@onderling/pod-routing';
 
 // ── Config defaults ────────────────────────────────────────────────────────
 
@@ -90,18 +92,15 @@ export const IMPLICIT_HOUSEHOLD_CONFIG = Object.freeze({
   members:                      [],
   customRoles:                  [],
   subtasksAdminApprovalDepth:   3,
-  // Tasks V2 standardisation adoption (2026-05-14) — storage
-  // policy mirrors Stoop V2's A3 picker. `no-pod` keeps V1 UX
-  // parity. Centralised/hybrid need `groupPodUri` set on the circle
-  // (validated by the V2 createCircleAgent / setCircleStoragePolicy
-  // path). §II.2 of the standardisation plan.
-  storage:                      Object.freeze({ policy: 'no-pod' }),
+  // Where this circle's content lives. `none` keeps the local-first default; `shared` and `hybrid`
+  // need a `groupPodUri` on the circle (validated on the create / set-policy path). The vocabulary
+  // is `@onderling/pod-routing`'s — this app used to carry its own copy in other words.
+  storage:                      Object.freeze({ policy: DEFAULT_CIRCLE_STORAGE_POSTURE }),
 });
 
-/** Storage policies recognised on `circleConfig.storage`. */
-export const CIRCLE_STORAGE_POLICIES = Object.freeze(
-  ['no-pod', 'centralised', 'decentralised', 'hybrid'],
-);
+/** Storage policies recognised on `circleConfig.storage` — re-exported from the ONE vocabulary in
+ *  `@onderling/pod-routing`, not a second copy of it. */
+export const CIRCLE_STORAGE_POLICIES = CIRCLE_STORAGE_POSTURE_NAMES;
 
 /** Per-kind defaults for circle creation wizards. */
 export const KIND_DEFAULTS = Object.freeze({
@@ -172,7 +171,7 @@ function _normaliseConfig(raw) {
   }
   const kind = KIND_DEFAULTS[raw.kind] ? raw.kind : 'household';
   // V2 standardisation adoption — `storage` carries one of four
-  // §II.2 policies. Default `'no-pod'`. Centralised/hybrid validate
+  // Default `'none'`. `shared`/`hybrid` validate
   // a `groupPodUri` (validation lives at the skill boundary so the
   // config loader doesn't reject older saved files).
   const storage = _normaliseStorage(raw.storage);
@@ -227,15 +226,15 @@ function _normaliseConfig(raw) {
 /**
  * Normalise the optional `storage` field of a CircleConfig. Tasks V2
  * standardisation adoption (2026-05-14). Pre-V2 configs that omit
- * the field default to `'no-pod'`. Unknown / malformed policies fall
- * back to `'no-pod'` (forward-additive policy).
+ * the field default to `'none'`. Unknown / malformed policies fall
+ * back to `'none'` — never assume a pod exists.
  */
 function _normaliseStorage(raw) {
   if (!raw || typeof raw !== 'object') {
-    return Object.freeze({ policy: 'no-pod' });
+    return Object.freeze({ policy: DEFAULT_CIRCLE_STORAGE_POSTURE });
   }
-  const policy = CIRCLE_STORAGE_POLICIES.includes(raw.policy) ? raw.policy : 'no-pod';
-  if (policy === 'centralised' || policy === 'hybrid') {
+  const policy = normaliseCircleStoragePosture(raw.policy);
+  if (posturePodUriRequired(policy)) {
     const groupPodUri = typeof raw.groupPodUri === 'string' && raw.groupPodUri.length > 0
       ? raw.groupPodUri
       : null;

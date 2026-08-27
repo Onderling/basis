@@ -432,7 +432,7 @@ describe('createGroupState', () => {
     expect(s.step).toBe(1);
     expect(s.accessPolicy).toBe('invite-only');
     expect(s.conflictPolicy).toBe('mediation');
-    expect(s.storagePolicy).toBe('no-pod');
+    expect(s.storagePolicy).toBe('none');
     expect(s.keyRotationMode).toBe('admin-only');
   });
 
@@ -543,14 +543,14 @@ describe('createGroupState', () => {
     expect(args.groupId).toBe('b1');
     expect(args.name).toBe('Circle 1');
     expect(args.rules.purpose).toBe('Test');
-    expect(args.storagePolicy).toBe('no-pod');
+    expect(args.storagePolicy).toBe('none');
     expect(args.groupPodUri).toBeUndefined();
   });
 
   it('finalSubmit includes groupPodUri only when set', async () => {
     const state = CG.initialState();
     state.groupId = 'b1';
-    state.storagePolicy = 'centralised';
+    state.storagePolicy = 'shared';
     state.groupPodUri = 'https://pods.example/circle-1/';
     const callSkill = vi.fn().mockResolvedValue({ ok: true });
     await CG.finalSubmit({ state, callSkill });

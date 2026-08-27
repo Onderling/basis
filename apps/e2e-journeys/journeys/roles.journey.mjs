@@ -99,7 +99,7 @@ export async function run({ relayUrl }) {
     const adminOnly = [
       { op: 'rotateMyGroupCode',      args: { groupId: GROUP },                              label: 'rotate the invite code' },
       { op: 'editGroupRules',         args: { groupId: GROUP, rules: { name: 'Huisregels', purpose: 'proef', agreements: 'wees aardig' } }, label: 'edit the circle rules' },
-      { op: 'setCircleStoragePolicy', args: { groupId: GROUP, policy: 'no-pod' },            label: 'change the storage policy' },
+      { op: 'setCircleStoragePolicy', args: { groupId: GROUP, policy: 'none' },            label: 'change the storage policy' },
     ];
     for (const { op, args, label } of adminOnly) {
       const byMember = await call(bram, op, args, BRAM);

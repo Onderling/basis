@@ -47,7 +47,7 @@ async function createPodCircle(admin, { groupId, groupPodUri }) {
   state.groupId = groupId;
   state.name = groupId;
   state.purpose = 'pod-backed circle walk';
-  state.storagePolicy = 'centralised';   // = the `shared` pod axis = podBacked
+  state.storagePolicy = 'shared';   // = the `shared` pod axis = podBacked
   state.groupPodUri = groupPodUri;
   const { result, state: out } = await createGroupFinalSubmit({ state, callSkill });
   if (!result) throw new Error(`createGroupV2 failed: ${out?.submitError ?? 'unknown'}`);

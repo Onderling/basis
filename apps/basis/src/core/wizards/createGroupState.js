@@ -7,6 +7,8 @@
  * keeps the DOM construction (5 steps + success screen);
  * basis-mobile's RN wizard imports these helpers verbatim.
  */
+import { CIRCLE_STORAGE_POSTURE_NAMES, DEFAULT_CIRCLE_STORAGE_POSTURE } from '@onderling/pod-routing';
+
 
 // 5.5a — Step 3 captures the structured v2 rules doc instead of a
 // single free-text field.  The renderers iterate `RULES_QUESTIONS`
@@ -46,12 +48,20 @@ export const CONFLICT_POLICIES = Object.freeze([
   { id: 'vote',          label: 'Member vote' },
 ]);
 
-export const STORAGE_POLICIES = Object.freeze([
-  { id: 'no-pod',        label: 'No pod (local state only — simplest)' },
-  { id: 'decentralised', label: 'Decentralised (per-member pods sync)' },
-  { id: 'centralised',   label: 'Centralised (one group pod — needs URI)' },
-  { id: 'hybrid',        label: 'Hybrid (per-member + group pod — needs URI)' },
-]);
+/**
+ * The wizard's storage choices. The IDS are not written here — they are the canonical posture names,
+ * so a posture added to the vocabulary cannot be silently missing from the picker, and one removed
+ * cannot linger in it. Only the wording is this file's.
+ */
+const STORAGE_POLICY_LABELS = {
+  none:     'No pod (local only — simplest)',
+  personal: 'Personal pods (each member keeps their own)',
+  shared:   'One shared circle pod (needs a URI)',
+  hybrid:   'Hybrid (per-member + circle pod — needs a URI)',
+};
+export const STORAGE_POLICIES = Object.freeze(
+  CIRCLE_STORAGE_POSTURE_NAMES.map((id) => Object.freeze({ id, label: STORAGE_POLICY_LABELS[id] ?? id })),
+);
 
 export const KEY_ROTATION_MODES = Object.freeze([
   { id: 'admin-only',         label: 'Admin-only (rotation requires admin action)' },
@@ -248,7 +258,7 @@ export function initialState() {
     // picking a kind gets, and it is deliberately the same number the substrate falls back to for a
     // circle whose rules say nothing. One meaning of "nobody chose", not two.
     inviteMaxRedemptions:  INVITE_CEILING_FALLBACK,
-    storagePolicy:         'no-pod',
+    storagePolicy:         DEFAULT_CIRCLE_STORAGE_POSTURE,
     groupPodUri:           '',
     // Submission
     submitting:            false,

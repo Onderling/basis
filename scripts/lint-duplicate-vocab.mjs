@@ -29,6 +29,11 @@ export const VOCABULARIES = [
     keys: ['audit', 'chat', 'named', 'record', 'short'],   // the RETAIN classes (the home's literal keys — computed-key TABLES over them are references, not copies)
   },
   {
+    name: 'circle-storage-postures',
+    home: 'packages/pod-routing/src/circleStoragePosture.js',
+    keys: ['hybrid', 'none', 'personal', 'shared'],   // where a circle's content lives — was written out FOUR times, in two vocabularies that disagreed, one of them a translation table between the other two
+  },
+  {
     name: 'delivery-ladder',
     home: 'packages/kring-host/src/deliveryState.js',
     keys: ['failed', 'maybe', 'pending', 'stored', 'undeliverable'],   // DELIVERY — the one delivery vocabulary (the substrate-audit extraction)

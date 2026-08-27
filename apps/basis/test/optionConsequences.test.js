@@ -32,7 +32,7 @@ describe('hasConsequence', () => {
 
 describe('consequenceKeyFor', () => {
   it('derives consequence.<group>.<option> for registered options', () => {
-    expect(consequenceKeyFor('storagePolicy', 'no-pod')).toBe('consequence.storagePolicy.no-pod');
+    expect(consequenceKeyFor('storagePolicy', 'none')).toBe('consequence.storagePolicy.none');
     expect(consequenceKeyFor('conflictPolicy', 'vote')).toBe('consequence.conflictPolicy.vote');
   });
   it('returns null for unregistered options', () => {

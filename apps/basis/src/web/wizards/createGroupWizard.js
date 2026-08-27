@@ -344,7 +344,7 @@ function renderTechStep(container, doc, state, onNext, onBack, onCancel, rerende
     (v) => { state.storagePolicy = v; rerender(); }, { consequenceGroup: 'storagePolicy' });
 
   // Conditional pod URI field for centralised/hybrid.
-  if (state.storagePolicy === 'centralised' || state.storagePolicy === 'hybrid') {
+  if (state.storagePolicy === 'shared' || state.storagePolicy === 'hybrid') {
     appendField(wrap, doc, 'Group pod URI *', 'groupPodUri',
       state.groupPodUri, (v) => { state.groupPodUri = v; },
       { placeholder: 'https://group-pod.example/onderling/circle/',
@@ -367,7 +367,7 @@ function renderTechStep(container, doc, state, onNext, onBack, onCancel, rerende
     { type: 'number',
       hint: 'How often the circle-wide encryption key rotates. 30 d default suits most circles; drop lower for higher-sensitivity groups. (Invite expiry is configured separately in Governance.)' });
 
-  const needsUri = (state.storagePolicy === 'centralised' || state.storagePolicy === 'hybrid');
+  const needsUri = (state.storagePolicy === 'shared' || state.storagePolicy === 'hybrid');
   const uriOk    = !needsUri || /^https?:\/\//.test(state.groupPodUri.trim());
 
   container.appendChild(wrap);

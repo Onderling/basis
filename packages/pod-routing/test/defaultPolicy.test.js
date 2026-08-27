@@ -1,5 +1,5 @@
 /**
- * defaultPolicy — build defaults for pod-having and no-pod users.
+ * defaultPolicy — build defaults for pod-having and none users.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -21,13 +21,13 @@ describe('buildDefaultPolicy — pod-having user', () => {
     expect(p.mappings['group/*']).toBe('pseudo-pod://laptop-anne/group/');
   });
 
-  it('default circle policy is centralised on the anchor pod', () => {
+  it('default circle policy is shared on the anchor pod', () => {
     const p = buildDefaultPolicy({
       anchorPodUri: 'https://anne.pod',
       deviceId:     'laptop-anne',
     });
     expect(p.circlePolicyDefault).toEqual({
-      policy:      'centralised',
+      policy:      'shared',
       groupPodUri: 'https://anne.pod',
     });
   });
@@ -41,32 +41,32 @@ describe('buildDefaultPolicy — pod-having user', () => {
   });
 });
 
-describe('buildDefaultPolicy — no-pod user', () => {
+describe('buildDefaultPolicy — none user', () => {
   it('routes everything to the device-local pseudo-pod', () => {
     const p = buildDefaultPolicy({
       anchorPodUri: null,
-      deviceId:     'laptop-no-pod',
+      deviceId:     'laptop-none',
     });
     expect(p.mappings).toMatchObject({
-      'private/*':              'pseudo-pod://laptop-no-pod/private/',
-      'sharing/*':              'pseudo-pod://laptop-no-pod/sharing/',
-      'sharing/profile-public': 'pseudo-pod://laptop-no-pod/sharing/public/profile-card',
-      'group/*':                'pseudo-pod://laptop-no-pod/group/',
-      'personal-in-group/*':    'pseudo-pod://laptop-no-pod/personal-in-group/',
+      'private/*':              'pseudo-pod://laptop-none/private/',
+      'sharing/*':              'pseudo-pod://laptop-none/sharing/',
+      'sharing/profile-public': 'pseudo-pod://laptop-none/sharing/public/profile-card',
+      'group/*':                'pseudo-pod://laptop-none/group/',
+      'personal-in-group/*':    'pseudo-pod://laptop-none/personal-in-group/',
     });
   });
 
-  it('default circle policy is no-pod', () => {
+  it('default circle policy is none', () => {
     const p = buildDefaultPolicy({
       anchorPodUri: null,
-      deviceId:     'laptop-no-pod',
+      deviceId:     'laptop-none',
     });
-    expect(p.circlePolicyDefault).toEqual({ policy: 'no-pod' });
+    expect(p.circlePolicyDefault).toEqual({ policy: 'none' });
   });
 
   it('treats undefined anchorPodUri the same as null', () => {
     const p = buildDefaultPolicy({ deviceId: 'd' });
-    expect(p.circlePolicyDefault).toEqual({ policy: 'no-pod' });
+    expect(p.circlePolicyDefault).toEqual({ policy: 'none' });
     expect(p.mappings['private/*']).toBe('pseudo-pod://d/private/');
   });
 });

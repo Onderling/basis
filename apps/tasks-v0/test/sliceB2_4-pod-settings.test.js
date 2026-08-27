@@ -64,11 +64,11 @@ describe('Slice B.2.4: pod-settings V0.4-adopt manifest declaration', () => {
     const view = tasksManifest.views.find((v) => v.id === 'pod-settings');
     const byName = Object.fromEntries(view.fields.map((f) => [f.name, f]));
 
-    // policy — enum {centralised, decentralised, hybrid} (no-pod
+    // policy — enum {shared, personal, hybrid} (none
     // intentionally omitted — the skill rejects downgrade).
     expect(byName.policy).toBeTruthy();
     expect(byName.policy.type).toBe('enum');
-    expect(byName.policy.choices).toEqual(['centralised', 'decentralised', 'hybrid']);
+    expect(byName.policy.choices).toEqual(['shared', 'personal', 'hybrid']);
     expect(byName.policy.patch).toEqual({
       opId: 'setCircleStoragePolicy', argName: 'storagePolicy',
     });
@@ -87,10 +87,10 @@ describe('Slice B.2.4: pod-settings V0.4-adopt manifest declaration', () => {
 
     // adoption (2026-05-20) — groupPodUri declares a
     // conditional-display gate: only meaningful when policy is
-    // 'centralised' or 'hybrid'.  Auto-rendered consumers hide the
+    // 'shared' or 'hybrid'.  Auto-rendered consumers hide the
     // field otherwise; hand-coded pages enforce the same rule.
     expect(byName.groupPodUri.requiresField).toEqual({
-      policy: ['centralised', 'hybrid'],
+      policy: ['shared', 'hybrid'],
     });
     // policy itself has no gate.
     expect(byName.policy).not.toHaveProperty('requiresField');
@@ -117,7 +117,7 @@ describe('Slice B.2.4: pod-settings V0.4-adopt manifest declaration', () => {
     // requiresField gate survives projection (defensive
     // copy of the value array).
     expect(byName.groupPodUri.requiresField).toEqual({
-      policy: ['centralised', 'hybrid'],
+      policy: ['shared', 'hybrid'],
     });
     // No creative-verb affordances surface here — getCircleStoragePolicy
     // and setCircleStoragePolicy are NOT in manifest.operations[] (they're

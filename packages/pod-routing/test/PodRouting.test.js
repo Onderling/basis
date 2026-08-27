@@ -32,7 +32,7 @@ describe('createPodRouting — construction', () => {
   });
 });
 
-describe('podRouting.resolve — defaults (no-pod)', () => {
+describe('podRouting.resolve — defaults (none)', () => {
   it('resolves private/* to the pseudo-pod', () => {
     const r = createPodRouting({ pseudoPod: mkPod(), deviceId: 'd' });
     expect(r.resolve('private/identity-vault')).toBe('pseudo-pod://d/private/identity-vault');
@@ -54,12 +54,12 @@ describe('podRouting.resolve — defaults (no-pod)', () => {
   });
 });
 
-describe('podRouting.setAnchor — no-pod → pod and back', () => {
+describe('podRouting.setAnchor — none → pod and back', () => {
   it('re-points defaults + config URI when an anchor is set, and reverts on null', () => {
     const r = createPodRouting({ pseudoPod: mkPod(), deviceId: 'd' });
-    // starts no-pod
+    // starts none
     expect(r.resolve('private/identity-vault')).toBe('pseudo-pod://d/private/identity-vault');
-    expect(r.circlePolicy('c')).toEqual({ policy: 'no-pod' });
+    expect(r.circlePolicy('c')).toEqual({ policy: 'none' });
 
     // attach a pod → defaults + circle policy re-point to the anchor.
     // (configResourceUri is intentionally anchor-independent in V0 —
@@ -67,14 +67,14 @@ describe('podRouting.setAnchor — no-pod → pod and back', () => {
     // setAnchor returns it for forward-compat.)
     const cfg = r.setAnchor('https://anne.pod');
     expect(r.resolve('private/identity-vault')).toBe('https://anne.pod/private/identity-vault');
-    expect(r.circlePolicy('c')).toEqual({ policy: 'centralised', groupPodUri: 'https://anne.pod' });
+    expect(r.circlePolicy('c')).toEqual({ policy: 'shared', groupPodUri: 'https://anne.pod' });
     expect(r.anchorPodUri).toBe('https://anne.pod');
     expect(cfg).toBe(r.configResourceUri);
 
-    // revert to no-pod
+    // revert to none
     r.setAnchor(null);
     expect(r.resolve('private/identity-vault')).toBe('pseudo-pod://d/private/identity-vault');
-    expect(r.circlePolicy('c')).toEqual({ policy: 'no-pod' });
+    expect(r.circlePolicy('c')).toEqual({ policy: 'none' });
     expect(r.anchorPodUri).toBe(null);
   });
 
@@ -103,60 +103,60 @@ describe('podRouting.resolve — defaults (pod-having)', () => {
     expect(r.resolve('sharing/tasks/abc')).toBe('https://anne.pod/sharing/tasks/abc');
   });
 
-  it('default circle policy is centralised on the anchor pod', () => {
+  it('default circle policy is shared on the anchor pod', () => {
     const r = createPodRouting({
       pseudoPod:    mkPod(),
       deviceId:     'd',
       anchorPodUri: 'https://anne.pod',
     });
     expect(r.circlePolicy('any-circle')).toEqual({
-      policy:      'centralised',
+      policy:      'shared',
       groupPodUri: 'https://anne.pod',
     });
   });
 });
 
 describe('podRouting.resolve — group routing via circle policy', () => {
-  it('centralised circle resolves to groupPodUri', async () => {
+  it('shared circle resolves to groupPodUri', async () => {
     const r = createPodRouting({
       pseudoPod:    mkPod('d'),
       deviceId:     'd',
       anchorPodUri: 'https://anne.pod',
     });
     await r.setCirclePolicy('circle-abc', {
-      policy:      'centralised',
+      policy:      'shared',
       groupPodUri: 'https://anne.pod',
     });
     expect(r.resolve('group/circle-abc/tasks/x'))
       .toBe('https://anne.pod/circle-abc/tasks/x');
   });
 
-  it('no-pod circle resolves to pseudo-pod replication-ring path', async () => {
+  it('none circle resolves to pseudo-pod replication-ring path', async () => {
     const r = createPodRouting({ pseudoPod: mkPod('d'), deviceId: 'd' });
-    await r.setCirclePolicy('household-xyz', { policy: 'no-pod' });
+    await r.setCirclePolicy('household-xyz', { policy: 'none' });
     expect(r.resolve('group/household-xyz/tasks/x'))
       .toBe('pseudo-pod://d/group/household-xyz/tasks/x');
   });
 
-  it('decentralised circle resolves to the user’s OWN anchor pod (circle-scoped)', async () => {
+  it('personal circle resolves to the user’s OWN anchor pod (circle-scoped)', async () => {
     const r = createPodRouting({
       pseudoPod:    mkPod('d'),
       deviceId:     'd',
       anchorPodUri: 'https://me.pod',
     });
-    await r.setCirclePolicy('nb', { policy: 'decentralised' });
+    await r.setCirclePolicy('nb', { policy: 'personal' });
     expect(r.resolve('group/nb/items/1.json'))
       .toBe('https://me.pod/nb/items/1.json');
   });
 
-  it('decentralised with NO anchor pod falls back to the replication ring', async () => {
+  it('personal with NO anchor pod falls back to the replication ring', async () => {
     const r = createPodRouting({ pseudoPod: mkPod('d'), deviceId: 'd' });
-    await r.setCirclePolicy('nb', { policy: 'decentralised' });
+    await r.setCirclePolicy('nb', { policy: 'personal' });
     expect(r.resolve('group/nb/items/1.json'))
       .toBe('pseudo-pod://d/group/nb/items/1.json');
   });
 
-  it('hybrid ledger resolves to the shared group pod (== centralised for circle data)', async () => {
+  it('hybrid ledger resolves to the shared group pod (== shared for circle data)', async () => {
     const r = createPodRouting({ pseudoPod: mkPod('d'), deviceId: 'd' });
     await r.setCirclePolicy('hh', { policy: 'hybrid', groupPodUri: 'https://grp.pod' });
     expect(r.resolve('group/hh/items/1.json'))
@@ -187,7 +187,7 @@ describe('podRouting.resolve — group routing via circle policy', () => {
   it('group routing uses the explicit policy.groupPodUri', async () => {
     const r = createPodRouting({ pseudoPod: mkPod('d'), deviceId: 'd' });
     await r.setCirclePolicy('circle-x', {
-      policy:      'centralised',
+      policy:      'shared',
       groupPodUri: 'https://bob.pod',
     });
     expect(r.resolve('group/circle-x/notes/n1'))

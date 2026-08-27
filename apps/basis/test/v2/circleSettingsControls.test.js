@@ -60,7 +60,7 @@ describe('§7 route × capability — the enabledWhen fold', () => {
     }
   });
 
-  it('a no-pod circle with NKN-only still has no relay route → private disabled', () => {
+  it('a none circle with NKN-only still has no relay route → private disabled', () => {
     const out = resolveControlEnablement(CONTROLS, {
       policy: { pod: 'none' }, transport: { mode: 'nkn', relayUrl: '' },
     });

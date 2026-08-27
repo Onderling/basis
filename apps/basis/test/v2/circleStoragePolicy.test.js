@@ -1,44 +1,55 @@
 /**
- * circleStoragePolicy — the bridge from the circle `pod` axis to stoop's
- * authoritative four-tier circle storage policy. Pure mapping + call
- * orchestration over a fake callSkill (no pod, no network).
+ * circleStoragePolicy — the calls that drive stoop's authoritative circle storage policy, over a fake
+ * callSkill (no pod, no network).
+ *
+ * This file used to test a TRANSLATION: basis said `none|shared|personal|hybrid`, stoop said
+ * `no-pod|centralised|decentralised|hybrid`, and the module mapped between them. Its round-trip test
+ * proved the map was lossless — which was also the proof the two vocabularies were one thing, sitting
+ * here unread while "do they cut the space differently?" stayed open. Both sides speak one vocabulary
+ * now, so the translation is deleted rather than kept as a no-op, and what is tested is what remains:
+ * that a posture crosses the seam UNCHANGED.
  */
 import { describe, it, expect, vi } from 'vitest';
-import {
-  POD_TO_TIER, TIER_TO_POD, podAxisToTier, tierToPodAxis,
-  loadCircleStoragePod, pushCircleStoragePolicy,
-} from '../../src/v2/circleStoragePolicy.js';
+import { loadCircleStoragePod, pushCircleStoragePolicy } from '../../src/v2/circleStoragePolicy.js';
+import { CIRCLE_STORAGE_POSTURE_NAMES } from '@onderling/pod-routing';
 
-describe('pod ↔ tier mapping', () => {
-  it('maps the four pod values to the four stoop tiers (1:1, round-trips)', () => {
-    expect(POD_TO_TIER).toEqual({ none: 'no-pod', shared: 'centralised', personal: 'decentralised', hybrid: 'hybrid' });
-    for (const pod of Object.keys(POD_TO_TIER)) {
-      expect(tierToPodAxis(podAxisToTier(pod))).toBe(pod);
-    }
-    for (const tier of Object.keys(TIER_TO_POD)) {
-      expect(podAxisToTier(tierToPodAxis(tier))).toBe(tier);
+describe('the seam no longer translates', () => {
+  it('every posture crosses to stoop unchanged', async () => {
+    for (const posture of CIRCLE_STORAGE_POSTURE_NAMES) {
+      const callSkill = vi.fn(async () => ({ storage: { policy: posture } }));
+      await pushCircleStoragePolicy({ callSkill, circleId: 'c-1', pod: posture });
+      expect(callSkill.mock.calls[0][2].storagePolicy, posture).toBe(posture);
     }
   });
-  it('defaults unknown values safely', () => {
-    expect(podAxisToTier('bogus')).toBe('no-pod');
-    expect(tierToPodAxis('bogus')).toBe('none');
+
+  it('and comes back unchanged', async () => {
+    for (const posture of CIRCLE_STORAGE_POSTURE_NAMES) {
+      const callSkill = vi.fn(async () => ({ policy: posture, groupPodUri: null }));
+      expect((await loadCircleStoragePod({ callSkill, circleId: 'c-1' })).pod).toBe(posture);
+    }
+  });
+
+  it('a retired word from stoop reads as no pod, never as one', async () => {
+    // Downward is the safe direction: assuming a pod means writing somewhere nobody agreed to.
+    const callSkill = vi.fn(async () => ({ policy: 'centralised', groupPodUri: 'https://pod/' }));
+    expect((await loadCircleStoragePod({ callSkill, circleId: 'c-1' })).pod).toBe('none');
   });
 });
 
 describe('pushCircleStoragePolicy', () => {
-  it('calls stoop.setCircleStoragePolicy with the mapped tier + circleId as groupId', async () => {
-    const callSkill = vi.fn(async () => ({ groupId: 'c-1', storage: { policy: 'centralised', groupPodUri: 'https://pod/' } }));
+  it('calls stoop.setCircleStoragePolicy with the posture + circleId as groupId', async () => {
+    const callSkill = vi.fn(async () => ({ groupId: 'c-1', storage: { policy: 'shared', groupPodUri: 'https://pod/' } }));
     const r = await pushCircleStoragePolicy({ callSkill, circleId: 'c-1', pod: 'shared', groupPodUri: 'https://pod/' });
     expect(callSkill).toHaveBeenCalledWith('stoop', 'setCircleStoragePolicy', {
-      groupId: 'c-1', storagePolicy: 'centralised', groupPodUri: 'https://pod/',
+      groupId: 'c-1', storagePolicy: 'shared', groupPodUri: 'https://pod/',
     });
-    expect(r).toEqual({ ok: true, storage: { policy: 'centralised', groupPodUri: 'https://pod/' } });
+    expect(r).toEqual({ ok: true, storage: { policy: 'shared', groupPodUri: 'https://pod/' } });
   });
 
-  it('omits groupPodUri when not supplied (e.g. decentralised)', async () => {
-    const callSkill = vi.fn(async () => ({ storage: { policy: 'decentralised' } }));
+  it('omits groupPodUri when not supplied (e.g. personal)', async () => {
+    const callSkill = vi.fn(async () => ({ storage: { policy: 'personal' } }));
     await pushCircleStoragePolicy({ callSkill, circleId: 'c-1', pod: 'personal' });
-    expect(callSkill).toHaveBeenCalledWith('stoop', 'setCircleStoragePolicy', { groupId: 'c-1', storagePolicy: 'decentralised' });
+    expect(callSkill).toHaveBeenCalledWith('stoop', 'setCircleStoragePolicy', { groupId: 'c-1', storagePolicy: 'personal' });
   });
 
   it('surfaces the one-way downgrade rejection verbatim', async () => {
@@ -68,7 +79,7 @@ describe('pushCircleStoragePolicy', () => {
 
 describe('loadCircleStoragePod', () => {
   it('reads stoop.getCircleStoragePolicy and hydrates the pod axis', async () => {
-    const callSkill = vi.fn(async () => ({ policy: 'decentralised', groupPodUri: null }));
+    const callSkill = vi.fn(async () => ({ policy: 'personal', groupPodUri: null }));
     const r = await loadCircleStoragePod({ callSkill, circleId: 'c-1' });
     expect(callSkill).toHaveBeenCalledWith('stoop', 'getCircleStoragePolicy', { groupId: 'c-1' });
     expect(r).toEqual({ pod: 'personal', groupPodUri: null });

@@ -38,15 +38,15 @@
     }
   },
   "storagePolicy": {
-    "no-pod": {
+    "none": {
       "text": "Everything lives in local app state only. Simplest to start; nothing syncs across your devices and there is no backup.",
       "doc": "N2 — consequence note for a radio option (Gevolgen als je dit kiest)."
     },
-    "decentralised": {
+    "personal": {
       "text": "Each member keeps their own pod and they sync. Resilient + private, but every member needs a pod set up.",
       "doc": "N2 — consequence note for a radio option (Gevolgen als je dit kiest)."
     },
-    "centralised": {
+    "shared": {
       "text": "One shared group pod holds everything (you provide its URI). Easy to back up, but one party hosts the data.",
       "doc": "N2 — consequence note for a radio option (Gevolgen als je dit kiest)."
     }

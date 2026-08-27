@@ -8,6 +8,8 @@
  * (pod `shared.json` per the cross-app-settings convention) is wired by
  * the host on top — kept out of here so it stays unit-testable + portable.
  */
+import { CIRCLE_STORAGE_POSTURE_NAMES } from '@onderling/pod-routing';
+
 
 export const CIRCLE_FEATURES = [
   'chat', 'noticeboard', 'tasks', 'lists', 'calendar', 'notes', 'houseRules', 'memberDirectory',
@@ -129,7 +131,10 @@ export const CIRCLE_POLICY_ENUMS = {
   governanceEnactment:  ['settle', 'auto'],
   agents:               ['yes', 'admin-approval', 'no'],
   revealPolicy:         ['pairwise', 'open'],
-  pod:                  ['none', 'shared', 'personal', 'hybrid'],
+  // Where this circle's content lives. NOT a literal — stoop and tasks-v0 speak the same list, and
+  // when it was written out four times in two vocabularies a circle mode read as unestablishable
+  // through three attempts. One source (`@onderling/pod-routing`, which owns the persisted shape).
+  pod:                  [...CIRCLE_STORAGE_POSTURE_NAMES],
   // ε.6 — per-circle chooser policy for negotiated catch-up.  'auto'
   // (default) keeps the ε.4 first-offer-wins behaviour byte-for-byte;
   // 'prompt' surfaces the multi-offer chooser modal so the user picks

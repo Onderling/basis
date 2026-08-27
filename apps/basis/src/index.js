@@ -118,7 +118,7 @@ export {
   ROLE_TEMPLATES, ROLE_TEMPLATE_IDS, roleTemplateById, applyRoleTemplates,
 } from './v2/roleTemplates.js';
 export {
-  eventCircleId, buildCircleStream,
+  eventCircleId,
   // circle-scoped stream + chip filters.
   buildCircleStream, CIRCLE_STREAM_KIND_FILTERS,
   projectEntries, allCircleRows, circleRows, chatRows, agentTrailRows, mutedActorSet,

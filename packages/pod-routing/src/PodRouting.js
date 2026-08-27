@@ -100,11 +100,11 @@ export function createPodRouting({
           return joinUriTail(substituteVars(explicit.uri, vars), substituteVars(explicit.tail, vars));
         }
         const policy = circlePolicy(circleId);
-        if (policy.policy === 'centralised' && policy.groupPodUri) {
+        if (policy.policy === 'shared' && policy.groupPodUri) {
           const base = _stripTrailingSlash(policy.groupPodUri) + `/${circleId}/`;
           return joinUriTail(base, tail);
         }
-        if (policy.policy === 'decentralised') {
+        if (policy.policy === 'personal') {
           // Each member keeps the circle's data on THEIR OWN pod;
           // cross-member reads ride cross-pod `embeds` refs (the
           // read/index path — Phase 3.3, `conventions/
@@ -132,7 +132,7 @@ export function createPodRouting({
           }
           return `pseudo-pod://${deviceId}/group/${circleId}/${tail}`;
         }
-        if (policy.policy === 'no-pod') {
+        if (policy.policy === 'none') {
           // Replication-ring (eager P2P fan-out; the groupMirror
           // substitute). No pod involved by design.
           return `pseudo-pod://${deviceId}/group/${circleId}/${tail}`;

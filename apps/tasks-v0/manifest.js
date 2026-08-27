@@ -1227,7 +1227,7 @@ export const tasksManifest = {
           // Mirrors the page's <select> options (no-pod intentionally
           // omitted — the skill rejects downgrade once a pod-having
           // policy is active).
-          choices: ['centralised', 'decentralised', 'hybrid'],
+          choices: ['shared', 'personal', 'hybrid'],
           // Flat patch — dispatch is
           // `setCircleStoragePolicy({circleId, storagePolicy: <value>})`.
           // No `argWrapper` (skill takes flat args, not `{patch: ...}`).
@@ -1238,14 +1238,14 @@ export const tasksManifest = {
           type:  'string',
           label: 'Pod URI',
           // (adopted 2026-05-20) — conditional-display gate:
-          // groupPodUri is only meaningful when policy ∈ {centralised,
+          // groupPodUri is only meaningful when policy ∈ {shared,
           // hybrid}.  Auto-rendered consumers hide the field for
-          // policy='decentralised' (own pod, no group URI).  The
+          // policy='personal' (own pod, no group URI).  The
           // hand-coded page enforces the same rule via a separate
           // show/hide branch; the manifest now declares it once.
           // B.2.4 was the originating signal; closed the
           // substrate gap.
-          requiresField: { policy: ['centralised', 'hybrid'] },
+          requiresField: { policy: ['shared', 'hybrid'] },
           patch: { opId: 'setCircleStoragePolicy', argName: 'groupPodUri' },
         },
       ],

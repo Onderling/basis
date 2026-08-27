@@ -21,3 +21,13 @@ export {
   readConfig,
   writeConfig,
 }                                       from './src/configResource.js';
+export {
+  // The ONE vocabulary for "where does this circle's content live" — see the module header for why
+  // it lives here and what the four former copies cost.
+  CIRCLE_STORAGE_POSTURES,
+  CIRCLE_STORAGE_POSTURE_NAMES,
+  DEFAULT_CIRCLE_STORAGE_POSTURE,
+  isCircleStoragePosture,
+  normaliseCircleStoragePosture,
+  posturePodUriRequired,
+}                                       from './src/circleStoragePosture.js';

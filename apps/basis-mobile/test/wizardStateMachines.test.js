@@ -37,7 +37,7 @@ describe('Bundle F P2 — createGroup state machine', () => {
     s.additionalAdmins  = 'https://alice.example/#me';
     s.accessPolicy      = 'request';
     s.conflictPolicy    = 'mediation';
-    s.storagePolicy     = 'no-pod';
+    s.storagePolicy     = 'none';
     const { result }    = await createGroupState.finalSubmit({ state: { ...s }, callSkill });
     expect(result?.ok).toBe(true);
     expect(calls).toHaveLength(1);

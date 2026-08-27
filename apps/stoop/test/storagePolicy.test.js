@@ -2,12 +2,12 @@
  * A3 / A5 (substrate-adoption) — storage-policy skills.
  *
  * V2 web functional design §4a/§4c. Four §II.2 policies on the
- * circle level: `no-pod` (V1 parity default) / `centralised` /
- * `decentralised` / `hybrid`.
+ * circle level: `none` (V1 parity default) / `shared` /
+ * `personal` / `hybrid`.
  *
  * Covers:
- *   - createGroupV2 accepts `storagePolicy`; default is `no-pod`.
- *   - centralised + hybrid require `groupPodUri`.
+ *   - createGroupV2 accepts `storagePolicy`; default is `none`.
+ *   - shared + hybrid require `groupPodUri`.
  *   - getCircleStoragePolicy reads from pod-routing → rules-item → default.
  *   - setCircleStoragePolicy is admin-only and one-way (no downgrade).
  */
@@ -47,40 +47,40 @@ async function callSkill(agent, skillId, args, asWebid = ANNE) {
 }
 
 describe('A3 — createGroupV2 storage policy', () => {
-  it('defaults to no-pod when storagePolicy is omitted', async () => {
+  it('defaults to none when storagePolicy is omitted', async () => {
     const bundle = await makeBundle();
     const r = await callSkill(bundle.agent, 'createGroupV2', {
       groupId: 'g-1',
       name:    'Test',
       rules:   {},
     });
-    expect(r.storage).toEqual({ policy: 'no-pod' });
+    expect(r.storage).toEqual({ policy: 'none' });
     const rulesItem = (await bundle.itemStore.listOpen({ type: 'group-rules' }))
       .find(i => i.source?.groupId === 'g-1');
-    expect(rulesItem?.source?.rules?.storage).toEqual({ policy: 'no-pod' });
+    expect(rulesItem?.source?.rules?.storage).toEqual({ policy: 'none' });
   });
 
-  it('accepts centralised with groupPodUri', async () => {
+  it('accepts shared with groupPodUri', async () => {
     const bundle = await makeBundle();
     const r = await callSkill(bundle.agent, 'createGroupV2', {
       groupId:       'g-2',
       name:          'Test',
       rules:         {},
-      storagePolicy: 'centralised',
+      storagePolicy: 'shared',
       groupPodUri:   'https://circle.pod/',
     });
-    expect(r.storage).toEqual({ policy: 'centralised', groupPodUri: 'https://circle.pod/' });
+    expect(r.storage).toEqual({ policy: 'shared', groupPodUri: 'https://circle.pod/' });
   });
 
-  it('rejects centralised without groupPodUri', async () => {
+  it('rejects shared without groupPodUri', async () => {
     const bundle = await makeBundle();
     const r = await callSkill(bundle.agent, 'createGroupV2', {
       groupId:       'g-3',
       name:          'Test',
       rules:         {},
-      storagePolicy: 'centralised',
+      storagePolicy: 'shared',
     });
-    expect(r?.error).toMatch(/storage-policy-needs-groupPodUri:centralised/);
+    expect(r?.error).toMatch(/storage-policy-needs-groupPodUri:shared/);
   });
 
   it('rejects hybrid without groupPodUri', async () => {
@@ -94,23 +94,23 @@ describe('A3 — createGroupV2 storage policy', () => {
     expect(r?.error).toMatch(/storage-policy-needs-groupPodUri:hybrid/);
   });
 
-  it('decentralised + no-pod ignore groupPodUri', async () => {
+  it('personal + none ignore groupPodUri', async () => {
     const bundle = await makeBundle();
     const r1 = await callSkill(bundle.agent, 'createGroupV2', {
       groupId:       'g-5',
       name:          'Test',
       rules:         {},
-      storagePolicy: 'decentralised',
+      storagePolicy: 'personal',
       groupPodUri:   'https://ignored.pod/',
     });
-    expect(r1.storage).toEqual({ policy: 'decentralised' });
+    expect(r1.storage).toEqual({ policy: 'personal' });
     const r2 = await callSkill(bundle.agent, 'createGroupV2', {
       groupId:       'g-6',
       name:          'Test',
       rules:         {},
-      storagePolicy: 'no-pod',
+      storagePolicy: 'none',
     });
-    expect(r2.storage).toEqual({ policy: 'no-pod' });
+    expect(r2.storage).toEqual({ policy: 'none' });
   });
 
   it('rejects unknown policy', async () => {
@@ -130,18 +130,18 @@ describe('A3 — createGroupV2 storage policy', () => {
       groupId:       'g-8',
       name:          'Test',
       rules:         {},
-      storagePolicy: 'decentralised',
+      storagePolicy: 'personal',
     });
     const policy = bundle.podRouting.circlePolicy('g-8');
-    expect(policy.policy).toBe('decentralised');
+    expect(policy.policy).toBe('personal');
   });
 });
 
 describe('A3 — getCircleStoragePolicy', () => {
-  it('returns no-pod default when nothing is configured', async () => {
+  it('returns none default when nothing is configured', async () => {
     const bundle = await makeBundle();
     const r = await callSkill(bundle.agent, 'getCircleStoragePolicy', { groupId: 'never-created' });
-    expect(r).toEqual({ policy: 'no-pod', groupPodUri: null });
+    expect(r).toEqual({ policy: 'none', groupPodUri: null });
   });
 
   it('returns the live pod-routing policy after createGroupV2', async () => {
@@ -150,16 +150,16 @@ describe('A3 — getCircleStoragePolicy', () => {
       groupId:       'g-live',
       name:          'Test',
       rules:         {},
-      storagePolicy: 'centralised',
+      storagePolicy: 'shared',
       groupPodUri:   'https://circle.pod/',
     });
     const r = await callSkill(bundle.agent, 'getCircleStoragePolicy', { groupId: 'g-live' });
-    expect(r).toEqual({ policy: 'centralised', groupPodUri: 'https://circle.pod/' });
+    expect(r).toEqual({ policy: 'shared', groupPodUri: 'https://circle.pod/' });
   });
 });
 
 describe('A5 — setCircleStoragePolicy', () => {
-  it('upgrades no-pod → centralised', async () => {
+  it('upgrades none → shared', async () => {
     const bundle = await makeBundle();
     await callSkill(bundle.agent, 'createGroupV2', {
       groupId: 'g-upgrade',
@@ -168,25 +168,25 @@ describe('A5 — setCircleStoragePolicy', () => {
     });
     const r = await callSkill(bundle.agent, 'setCircleStoragePolicy', {
       groupId:       'g-upgrade',
-      storagePolicy: 'centralised',
+      storagePolicy: 'shared',
       groupPodUri:   'https://anne.pod/',
     });
-    expect(r.storage).toEqual({ policy: 'centralised', groupPodUri: 'https://anne.pod/' });
-    expect(bundle.podRouting.circlePolicy('g-upgrade').policy).toBe('centralised');
+    expect(r.storage).toEqual({ policy: 'shared', groupPodUri: 'https://anne.pod/' });
+    expect(bundle.podRouting.circlePolicy('g-upgrade').policy).toBe('shared');
   });
 
-  it('rejects downgrade to no-pod', async () => {
+  it('rejects downgrade to none', async () => {
     const bundle = await makeBundle();
     await callSkill(bundle.agent, 'createGroupV2', {
       groupId:       'g-locked',
       name:          'Test',
       rules:         {},
-      storagePolicy: 'centralised',
+      storagePolicy: 'shared',
       groupPodUri:   'https://anne.pod/',
     });
     const r = await callSkill(bundle.agent, 'setCircleStoragePolicy', {
       groupId:       'g-locked',
-      storagePolicy: 'no-pod',
+      storagePolicy: 'none',
     });
     expect(r?.error).toBe('storage-policy-downgrade-not-supported');
   });
@@ -203,7 +203,7 @@ describe('A5 — setCircleStoragePolicy', () => {
     });
     const r = await callSkill(bundle.agent, 'setCircleStoragePolicy', {
       groupId:       'g-perm',
-      storagePolicy: 'centralised',
+      storagePolicy: 'shared',
       groupPodUri:   'https://anne.pod/',
     }, BOB);
     expect(r?.error).toBe('admin-only');

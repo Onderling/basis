@@ -49,6 +49,7 @@ import { simulateSync, decorateWithLastSync } from './_syncEnvelope.js';
 import { validateCanonical } from '@onderling/item-types';
 import { saveCircleConfig, loadCircleConfig, KIND_DEFAULTS } from '../Circle.js';
 import { tasksManifest } from '../../manifest.js';
+import { isCircleStoragePosture, normaliseCircleStoragePosture, posturePodUriRequired } from '@onderling/pod-routing';
 import {
   startPodSignIn      as _startPodSignIn,
   completePodSignIn   as _completePodSignIn,
@@ -73,16 +74,14 @@ function _validateEmbed(e) {
 }
 
 /**
- * Tasks V2 (2026-05-14) — circle storage policies (§II.2 of the
- * standardisation plan). Mirror of Stoop's A3 picker.
+ * Where a circle's content lives. The vocabulary is `@onderling/pod-routing`'s — this file used to
+ * carry a third copy of it, in words that disagreed with basis's.
  */
-const CIRCLE_STORAGE_POLICIES = ['no-pod', 'centralised', 'decentralised', 'hybrid'];
-
 function _validateStoragePolicy(storagePolicy, groupPodUri) {
   if (typeof storagePolicy === 'undefined' || storagePolicy === null) return null;
   if (typeof storagePolicy !== 'string') return 'storage-policy-not-string';
-  if (!CIRCLE_STORAGE_POLICIES.includes(storagePolicy)) return `storage-policy-unknown:${storagePolicy}`;
-  if (storagePolicy === 'centralised' || storagePolicy === 'hybrid') {
+  if (!isCircleStoragePosture(storagePolicy)) return `storage-policy-unknown:${storagePolicy}`;
+  if (posturePodUriRequired(storagePolicy)) {
     if (typeof groupPodUri !== 'string' || groupPodUri.length === 0) {
       return `storage-policy-needs-groupPodUri:${storagePolicy}`;
     }
@@ -91,10 +90,8 @@ function _validateStoragePolicy(storagePolicy, groupPodUri) {
 }
 
 function _buildStoragePolicy(storagePolicy, groupPodUri) {
-  const policy = (typeof storagePolicy === 'string' && CIRCLE_STORAGE_POLICIES.includes(storagePolicy))
-    ? storagePolicy
-    : 'no-pod';
-  if (policy === 'centralised' || policy === 'hybrid') {
+  const policy = normaliseCircleStoragePosture(storagePolicy);
+  if (posturePodUriRequired(policy)) {
     return { policy, groupPodUri };
   }
   return { policy };
@@ -878,7 +875,7 @@ export function buildSkills({ bundleResolver, circlesProvider, circleRoleOf = nu
      * getCircleStoragePolicy({circleId})
      *   — Tasks V2 standardisation adoption (2026-05-14). Returns the
      *   circle's storage policy `{policy, groupPodUri?}` from its
-     *   `circleConfig.storage`. Defaults to `'no-pod'`.
+     *   `circleConfig.storage`. Defaults to `'none'`.
      *
      * NOT wired: no `operations[]` declaration (pod-plumbing skill,
      * referenced only via a `pod-settings` dataSource.skillId).
@@ -886,9 +883,9 @@ export function buildSkills({ bundleResolver, circlesProvider, circleRoleOf = nu
     defineSkill('getCircleStoragePolicy', async ({ parts, from, envelope }) => {
       const circle = bundleResolver(parts, { envelope, from });
       if (!circle) return { error: 'circleId required' };
-      const storage = circle.liveCircle?.storage ?? { policy: 'no-pod' };
+      const storage = circle.liveCircle?.storage ?? { policy: 'none' };
       return {
-        policy:      storage.policy ?? 'no-pod',
+        policy:      storage.policy ?? 'none',
         groupPodUri: storage.groupPodUri ?? null,
       };
     }, {
@@ -900,7 +897,7 @@ export function buildSkills({ bundleResolver, circlesProvider, circleRoleOf = nu
      * setCircleStoragePolicy({circleId, storagePolicy, groupPodUri?})
      *   — Tasks V2 standardisation adoption (2026-05-14). Admin /
      *   coordinator only. **One-way**: rejects downgrade to
-     *   `'no-pod'` once a pod-having policy is active (substrate-
+     *   `'none'` once a pod-having policy is active (substrate-
      *   side data migration is the user's job, per
      *   `Substrates/storage-migration-design-2026-05-14.md`).
      *
@@ -920,8 +917,8 @@ export function buildSkills({ bundleResolver, circlesProvider, circleRoleOf = nu
       const err = _validateStoragePolicy(a.storagePolicy, a.groupPodUri);
       if (err) return { error: err };
       const next = _buildStoragePolicy(a.storagePolicy, a.groupPodUri);
-      const current = circle.liveCircle?.storage ?? { policy: 'no-pod' };
-      if (current.policy && current.policy !== 'no-pod' && next.policy === 'no-pod') {
+      const current = circle.liveCircle?.storage ?? { policy: 'none' };
+      if (current.policy && current.policy !== 'none' && next.policy === 'none') {
         return { error: 'storage-policy-downgrade-not-supported' };
       }
       // Apply via the frozen-copy mutator (circleState.circleMutator).
@@ -1118,7 +1115,7 @@ export function buildSkills({ bundleResolver, circlesProvider, circleRoleOf = nu
             circleId:  cfg.circleId,
             name:    cfg.name ?? cfg.circleId,
             kind:    cfg.kind ?? 'household',
-            storage: cfg.storage ?? { policy: 'no-pod' },
+            storage: cfg.storage ?? { policy: 'none' },
             members: Array.isArray(cfg.members)
               ? cfg.members.map(m => ({ webid: m.webid, displayName: m.displayName ?? null, role: m.role ?? 'member' }))
               : [],

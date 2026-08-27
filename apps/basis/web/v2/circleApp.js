@@ -2735,7 +2735,7 @@ async function attachFeedbackProject({ projectId, code = null, open = true } = {
 
   let groupId;
   try {
-    // Create the circle — the caller becomes role:'admin' (stoop createGroupV2), storagePolicy 'no-pod'.
+    // Create the circle — the caller becomes role:'admin' (stoop createGroupV2), storagePolicy 'none'.
     // groupId is a deterministic slug of the name, so a reload's re-create lands on the same id.
     const name = t('circle.feedback.circle_name', { project: projectId, defaultValue: `Feedback · ${projectId}` });
     const res = await quickCreateCircle({ callSkill: rawCallSkill, name });

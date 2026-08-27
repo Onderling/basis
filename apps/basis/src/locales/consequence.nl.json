@@ -38,15 +38,15 @@
     }
   },
   "storagePolicy": {
-    "no-pod": {
+    "none": {
       "text": "Alles staat alleen in lokale app-status. Simpelste start; niets synct tussen je apparaten en er is geen back-up.",
       "doc": "N2 — consequence note for a radio option (Gevolgen als je dit kiest)."
     },
-    "decentralised": {
+    "personal": {
       "text": "Elk lid houdt een eigen pod en die synchroniseren. Robuust + privé, maar elk lid heeft een pod nodig.",
       "doc": "N2 — consequence note for a radio option (Gevolgen als je dit kiest)."
     },
-    "centralised": {
+    "shared": {
       "text": "Eén gedeelde groeps-pod bewaart alles (jij geeft de URI). Makkelijk te back-uppen, maar één partij host de data.",
       "doc": "N2 — consequence note for a radio option (Gevolgen als je dit kiest)."
     }

@@ -342,7 +342,7 @@ export default function CreateGroupWizardModal({
                   onChange={(v) => setState((s) => ({ ...s, storagePolicy: v }))}
                   consequenceLabel={t('common.consequences')}
                 />
-                {(state.storagePolicy === 'centralised' || state.storagePolicy === 'hybrid') && (
+                {(state.storagePolicy === 'shared' || state.storagePolicy === 'hybrid') && (
                   <>
                     <Field
                       label="Group pod URI"

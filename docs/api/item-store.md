@@ -1472,13 +1472,13 @@ and routes peer `callSkill`s to them — see the HOST-WIRING TODO seam in the mo
 
 **Kind:** constant · **Import:** `RESOLUTION` from `'@onderling/item-store'`
 
-The resolution policies (the CRDT-system names — §5).
+The resolution policies, under their CRDT-system names.
 
 ### `DELIVERY`
 
 **Kind:** constant · **Import:** `DELIVERY` from `'@onderling/item-store'`
 
-The delivery-reliability tiers (§5 — the policy IMPLIES a transport guarantee; declared together).
+The delivery-reliability tiers — a policy IMPLIES a transport guarantee, so they are declared together.
 
 ### `deliveryForResolution`
 
@@ -1519,7 +1519,7 @@ onto it.
 defaultResolutionRegistry()
 ```
 
-The built-in SAFE DEFAULT registry — the "code default per type" (§6). Behaviour-preserving: task's whole
+The built-in SAFE DEFAULT registry — the "code default per type". Behaviour-preserving: task's whole
 claim cluster (`CLAIM_FIELDS`) resolves `claim` (first-wins), everything else falls to the content default.
 Reuses `causalMerge`'s `CLAIM_FIELDS` so there is no second definition of what the claim cluster is.
 
@@ -2124,7 +2124,7 @@ no confirmed claimant, or the signature does not check out. A no-op-safe read �
 isClaimExpired(item, now = 0)
 ```
 
-True iff the task's claim has LAPSED under its lease (§2.8): the issuer set a `claimLease` (duration in ms)
+True iff the task's claim has LAPSED under its lease: the issuer set a `claimLease` (duration in ms)
 at creation and `claimedAt + claimLease` is in the past. A lapsed claim returns the node to claimable — an
 unfinished claim no longer freezes its subtree. DETERMINISTIC: computed identically on every device from the
 item's own fields + a `now` the caller supplies (principle 10 — nothing decided locally). No lease (the

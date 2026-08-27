@@ -88,12 +88,12 @@ function reaches(byHash, fromHash, targetHash) {
 }
 
 /**
- * Causal label of event `aHash` relative to `bHash` over the deps-DAG (DESIGN §2):
+ * Causal label of event `aHash` relative to `bHash` over the deps-DAG:
  *   'before'     — a is an ancestor of b (a happened-before b)
  *   'later'      — b is an ancestor of a (a happened-after b)
  *   'concurrent' — neither is an ancestor of the other (genuinely concurrent; also for a === b)
  * Cross-author, exact. Bounded by concurrency, not history length in the common (adjacent) case; a per-writer
- * vector cache is a later O(1) optimisation (DESIGN §3) — never carried on the wire. Domain-independent.
+ * vector cache is a later O(1) optimisation — never carried on the wire. Domain-independent.
  */
 export function reachability(events, aHash, bHash) {
   const byHash = new Map((Array.isArray(events) ? events : []).filter(isChained).map((e) => [e.hash, e]));

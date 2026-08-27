@@ -1528,7 +1528,7 @@ combination, defined once so the deny-wins semantics are identical wherever it h
 
   • sources are asked IN ORDER and the first truthy answer short-circuits (already revoked);
   • a source that THROWS propagates, and `checkInbound` turns that into a denial — a broken
-    revocation source must never read as "not revoked" (safety over liveness, principles §10);
+    revocation source must never read as "not revoked" (safety over liveness);
   • `null` / `undefined` entries are skipped, so a composer can write a conditional source; any
     other non-function is a TypeError HERE, at compose time, rather than a silently missing
     source discovered at verify time.
@@ -2804,12 +2804,12 @@ and the remaining tips (concurrent other-author branches) as `deps`. Domain-inde
 reachability(events, aHash, bHash)
 ```
 
-Causal label of event `aHash` relative to `bHash` over the deps-DAG (DESIGN §2):
+Causal label of event `aHash` relative to `bHash` over the deps-DAG:
   'before'     — a is an ancestor of b (a happened-before b)
   'later'      — b is an ancestor of a (a happened-after b)
   'concurrent' — neither is an ancestor of the other (genuinely concurrent; also for a === b)
 Cross-author, exact. Bounded by concurrency, not history length in the common (adjacent) case; a per-writer
-vector cache is a later O(1) optimisation (DESIGN §3) — never carried on the wire. Domain-independent.
+vector cache is a later O(1) optimisation — never carried on the wire. Domain-independent.
 
 ### `authorHead`
 

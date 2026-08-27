@@ -34,7 +34,7 @@ export class PolicyDeniedError extends Error {
  *
  *   • sources are asked IN ORDER and the first truthy answer short-circuits (already revoked);
  *   • a source that THROWS propagates, and `checkInbound` turns that into a denial — a broken
- *     revocation source must never read as "not revoked" (safety over liveness, principles §10);
+ *     revocation source must never read as "not revoked" (safety over liveness);
  *   • `null` / `undefined` entries are skipped, so a composer can write a conditional source; any
  *     other non-function is a TypeError HERE, at compose time, rather than a silently missing
  *     source discovered at verify time.
@@ -327,7 +327,7 @@ export class PolicyEngine {
     // A THROWING check counts as REVOKED (2026-08-19). It used to be swallowed into
     // `revoked = false`, which meant an unreachable or broken revocation source admitted every token
     // it was supposed to be guarding — the one failure mode this list exists to prevent, and silent.
-    // Safety over liveness (principles §10): for a security boundary, deny wins. A caller whose
+    // Safety over liveness: for a security boundary, deny wins. A caller whose
     // revocation source is flaky sees denials, which is loud and fixable; the alternative was
     // admitting revoked tokens, which is neither.
     if (this.#isRevoked) {

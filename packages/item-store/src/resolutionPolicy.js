@@ -37,10 +37,10 @@
 
 import { CLAIM_FIELDS } from './causalMerge.js';
 
-/** The resolution policies (the CRDT-system names — §5). */
+/** The resolution policies, under their CRDT-system names. */
 export const RESOLUTION = Object.freeze({ CONTENT: 'content', CLAIM: 'claim', SPINE: 'spine' });
 
-/** The delivery-reliability tiers (§5 — the policy IMPLIES a transport guarantee; declared together). */
+/** The delivery-reliability tiers — a policy IMPLIES a transport guarantee, so they are declared together. */
 export const DELIVERY = Object.freeze({
   BEST_EFFORT:   'best-effort',    // content — a dropped edit heals on the next merge
   AT_LEAST_ONCE: 'at-least-once',  // claim   — wants idempotent redelivery
@@ -136,7 +136,7 @@ export function createResolutionRegistry() {
 }
 
 /**
- * The built-in SAFE DEFAULT registry — the "code default per type" (§6). Behaviour-preserving: task's whole
+ * The built-in SAFE DEFAULT registry — the "code default per type". Behaviour-preserving: task's whole
  * claim cluster (`CLAIM_FIELDS`) resolves `claim` (first-wins), everything else falls to the content default.
  * Reuses `causalMerge`'s `CLAIM_FIELDS` so there is no second definition of what the claim cluster is.
  */

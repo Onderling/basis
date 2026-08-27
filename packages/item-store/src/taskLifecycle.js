@@ -177,7 +177,7 @@ export function verifyClaimConfirmation(item, verify) {
 }
 
 /**
- * True iff the task's claim has LAPSED under its lease (§2.8): the issuer set a `claimLease` (duration in ms)
+ * True iff the task's claim has LAPSED under its lease: the issuer set a `claimLease` (duration in ms)
  * at creation and `claimedAt + claimLease` is in the past. A lapsed claim returns the node to claimable — an
  * unfinished claim no longer freezes its subtree. DETERMINISTIC: computed identically on every device from the
  * item's own fields + a `now` the caller supplies (principle 10 — nothing decided locally). No lease (the

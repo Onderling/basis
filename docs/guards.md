@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 20
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 21
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -27,6 +27,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `retired-modules` | — | a RETIRED module must stay dead (the legacy-deletion-after-cutover discipline) |
 | `revocation-resolver` | — | a revocation resolver is taken at CONSTRUCTION; nothing may replace one later |
 | `scope-leaks` | — | no CROSS-SCOPE REFERENCE LEAKS in the RN shell screens |
+| `searchable-sources` | — | every source file must be findable by search |
 | `stale-params` | — | a REGISTERED param that NOTHING reads is dead (the #36 fork of lint-unreached-exports) |
 | `unconstructed-classes` | — | an exported class that nothing ever `new`s is a liability, not an asset |
 | `ungoverned-user-params` | — | a `kind:user` param that NO register governs advertises settability it |

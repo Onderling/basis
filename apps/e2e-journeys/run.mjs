@@ -59,6 +59,19 @@ const { readFile, writeFile } = await import('node:fs/promises');
 const args = process.argv.slice(2);
 const urlArg = args.find((a) => a.includes('://'));
 const UPDATE_BASELINE = args.includes('--update-baseline');
+/**
+ * `--pod` — boot a throwaway Solid pod for the run.
+ *
+ * Three journeys need real infrastructure and SELF-SKIP without it. That is correct behaviour and it
+ * read terribly: "3 skipped" sat in every summary looking like three gaps in the product, when two of
+ * the three were healthy and merely un-provisioned — given a pod they pass 8/8 each. Booting one is
+ * the same job the integration tier already does, so it shares that harness rather than growing a
+ * second one (`scripts/css-harness.mjs`).
+ *
+ * Not the default: it costs a CSS boot (~20s) and needs the npm registry, and most journeys have
+ * nothing to do with a pod. `CSS_URL` already set → we use that and boot nothing.
+ */
+const WANT_POD = args.includes('--pod');
 const filters = args.filter((a) => !a.includes('://') && !a.startsWith('--')).map((s) => s.toLowerCase());
 
 /**
@@ -89,6 +102,21 @@ if (filters.length) {
   }
 }
 
+// The pod, if asked for. Booted BEFORE the journeys so `CSS_URL` is set by the time a journey's
+// module-level reachability check runs.
+let localPod = null;
+if (WANT_POD && !process.env.CSS_URL) {
+  const { bootCss, provisionAll, teardown: podTeardown } = await import('../../scripts/css-harness.mjs');
+  const port = Number(process.env.CSS_PORT) || 3001;
+  const base = `http://localhost:${port}/`;
+  localPod = { proc: await bootCss({ port, base }), teardown: podTeardown };
+  const { env } = await provisionAll(base, `j${Date.now().toString(36)}`);
+  Object.assign(process.env, env);
+  console.log(`(--pod → booted a throwaway pod at ${base} and minted its identities)`);
+} else if (WANT_POD) {
+  console.log(`(--pod → CSS_URL already set to ${process.env.CSS_URL}; using it, booting nothing)`);
+}
+
 let localRelay = null;
 let relayUrl = relayUrlGiven;
 if (!relayUrl) {
@@ -111,7 +139,7 @@ for (const j of selected) {
   }
   if (res && !Array.isArray(res) && res.skipped) {
     console.log(`   ⏭️  skipped — ${res.reason}\n`);
-    summary.push({ name: j.name, skipped: true });
+    summary.push({ name: j.name, skipped: true, reason: res.reason });
     continue;
   }
   const known = baselinedFor(j.name);
@@ -134,10 +162,13 @@ for (const j of selected) {
 }
 
 if (localRelay) await localRelay.stop().catch(() => {});
+if (localPod) localPod.teardown(localPod.proc);
 
 console.log('══ summary ══');
 for (const s of summary) {
-  if (s.skipped) { console.log(`  ⏭️  ${s.name}: skipped`); continue; }
+  // Name the REASON. "3 skipped" with no reason is what made two healthy journeys look like gaps
+  // for months; a skip is a missing setup, and the line should say which.
+  if (s.skipped) { console.log(`  ⏭️  ${s.name}: skipped — ${s.reason ?? 'no reason given'}`); continue; }
   console.log(`  ${s.ok ? '✅' : '❌'} ${s.name}: ${s.passed}/${s.total}`);
 }
 const ran     = summary.filter((s) => !s.skipped);

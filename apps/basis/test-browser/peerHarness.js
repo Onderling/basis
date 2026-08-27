@@ -385,9 +385,23 @@ export async function readRoster(page) {
  * the URI string (or null if the invite surface / code is missing). Dismisses the modal.
  */
 export async function getInvite(page, tag = 'invite') {
-  if (!(await openMore(page, 'invite'))) return null;
+  if (!(await openMore(page, 'invite'))) { log('getInvite', 'BLOCKED', 'no "invite" item in the ⋯ menu'); return null; }
+  // WAIT for the code, do not glance at it. The modal opens immediately, but its body renders only
+  // after `getCurrentMembershipCode` resolves — so a fixed sleep raced the fetch and read an empty
+  // card. That returned null, which this helper also returns when the MENU ITEM is missing, and the
+  // two causes were indistinguishable: a slow code read as "the app offers no way to invite anyone".
+  // Both branches now say which one happened (2026-08-27, cost an hour of chasing a live selector
+  // that was never wrong).
   const codeEl = page.locator('.cc-mydata-modal code, .cc-mydata-modal__card code');
-  const uri = (await codeEl.count()) ? (await codeEl.first().innerText()).trim() : null;
+  let uri = null;
+  try {
+    await codeEl.first().waitFor({ state: 'attached', timeout: 15_000 });
+    uri = (await codeEl.first().innerText()).trim();
+  } catch {
+    // The modal renders a `<p>` instead of a `<code>` when the app refuses — admin-only, or no code yet.
+    const why = await page.locator('.cc-mydata-modal__card p').first().innerText().catch(() => '');
+    log('getInvite', 'BLOCKED', `modal opened but showed no invite code${why ? ` — it said: "${why.trim()}"` : ''}`);
+  }
   await shot(page, `${tag}`);
   await page.mouse.click(5, 5).catch(() => {});   // dismiss modal
   await page.waitForTimeout(500);

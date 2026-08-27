@@ -937,16 +937,38 @@ export async function projectCircleRoster({ store, groupId, memberMapList = [], 
    *
    * Accepted as foundership only where this device can already corroborate the author:
    *   • the trail names them as somebody's admitter (they really did admit people here), or
-   *   • this device has NO trail for the circle at all — which is exactly what a new circle is, and
-   *     where the only holder of it is its creator.
+   *   • this device holds NO ADMISSIONS for the circle — which is exactly what a new circle is, and
+   *     where the only holder of it is its creator. Admissions, not rows: a device writes rows about
+   *     ITSELF (an `announce` of its own per-circle address) that admit nobody, and counting those
+   *     closed this window on the founder's own first act (L52).
    * So on a circle with members, a member's self-signed `create` names an author the trail already
    * places among the redeemers, and it confers nothing.
    */
   const addGenesisFounders = (bodies) => {
+    // WHICH rows count as "this device has a trail". Only an ADMISSION can corroborate an author, and
+    // only `confirmedBy` names an admitter — the same rule the founder derivation above states. The
+    // gate used to count EVERY row in `forGroup`, and that is what locked founders out of their own
+    // circles (L52, found by walking the real app 2026-08-27):
+    //
+    //   create the circle                → 0 rows  → the creation statement folds, founder derived ✓
+    //   this device announces ITS OWN     → 1 row   → `forGroup.length === 0` is now false, and an
+    //   per-circle address (channel                   announce row carries no `confirmedBy`, so the
+    //   'announce', redeemedBy = me)                  admission derivation yields nothing either
+    //                                    → founder LOST, permanently: not admin, cannot invite,
+    //                                      cannot promote anyone, in a circle they just made.
+    //
+    // The window closed on a row the founder wrote about THEMSELVES. Counting admissions keeps the
+    // anti-forgery property exactly as it was — the moment real admissions exist, a self-signed
+    // `create` must still be corroborated by the trail, and a member's own row places them among the
+    // redeemers where the subtraction removes them.
+    const admissions = forGroup.filter((it) => {
+      const c = it?.source?.confirmedBy;
+      return typeof c === 'string' && !!c;
+    });
     for (const b of bodies ?? []) {
       if (b?.kind !== 'create' || typeof b.author !== 'string' || !b.author) continue;
       if (b.author !== b.subject) continue;                       // self-subject only
-      if (forGroup.length === 0 || founderWebids.has(b.author)) founderWebids.add(b.author);
+      if (admissions.length === 0 || founderWebids.has(b.author)) founderWebids.add(b.author);
     }
   };
   // The circle's policy blob rides the same read: the LATEST rules item's `source.rules`

@@ -94,6 +94,7 @@ import { renderConfirmDialog } from './confirmDialog.js';
 import { roleChangeConfirm } from '../../src/v2/circleRoleControl.js';
 import { makeCircleLookup } from '../../src/v2/circleLookup.js';
 import { sectionForScreen } from '../../src/v2/pageProjection.js';
+import { probeSurface } from '../../src/v2/surfaceProbe.js';
 // drill-down — selection-context detail screens (agents → agent-detail,
 // data-versions → data-version-detail): the shared mapping + fetch seam.
 import {
@@ -1487,6 +1488,66 @@ let circleManifestsByOrigin = {}; // {appOrigin → manifest}, module-scoped for
 let circleActiveApps = null;     // S6.C deep — the active circle's policy.apps (null = all); narrows the catalogue
 let circleRescopeCatalogue = null; // re-scope the catalogue to circleActiveApps (set in buildCircleBot, called by showCircle)
 let circleDispatchReady = null;  // buildCircleBot's dispatchReady({opId,args}) — used to run a completed follow-up
+// The ⋯ ids this shell actually wired, captured where the bag is BUILT rather than restated here — a
+// second list would drift, and the walk seam's whole value is that it cannot report an affordance the
+// person does not have.
+let circleWiredMoreIds = null;
+
+// ── THE WALK SEAM — a computer-readable GUI (2026-08-27) ─────────────────────────────────────────
+// Published beside the existing `window.onderling*` e2e seams, and for the same reason: driving the
+// real app beats reproducing it. A two-peer walk used to have two options, and both were bad — click
+// DOM selectors (brittle, and it cannot answer "what am I offered?"), or hand-assemble the agent in
+// node (which drifts from this shell, and then measures itself; that is exactly what cost a day here).
+//
+// This is the third option and it adds no logic: `probeSurface` calls the SAME projector the screens
+// call and applies the SAME capability gate the buttons apply. So a button missing from the probe is
+// missing from the screen — which is what turns "the member card offers nothing" from a harness
+// artifact into a finding. Pair it with `onderlingDispatch` and a walk does what a person does: read
+// what is offered, then invoke one of those ops through the waist.
+if (typeof window !== 'undefined') {
+  /** @param {object[]} [items] the rows in front of the walker, if it is looking at a list. */
+  window.onderlingSurface = async (items = []) => {
+    const circleId = getActiveCircle();
+    let capabilityMatrix = [];
+    try {
+      if (circleId) {
+        const pol = (await policyStore.get(circleId)) ?? {};
+        const ovr = (await overrideStore.get(circleId)) ?? {};
+        capabilityMatrix = buildCapabilityMatrix(circleBaseSources, {
+          enabledApps: Array.isArray(pol.apps) && pol.apps.length ? pol.apps : null,
+          template: pol.capabilities || {}, optOuts: ovr.capabilityOptOuts || [],
+        });
+      }
+    } catch { /* best-effort, exactly as the inline button path treats it — an ungated read still
+                 reports what is DECLARED, and reporting more than the person sees is the one error
+                 this seam must never make silently. */ }
+    let policy = null;
+    try { policy = circleId ? ((await policyStore.get(circleId)) ?? null) : null; } catch { /* ungated */ }
+    return probeSurface({
+      manifestsByOrigin: circleManifestsByOrigin, capabilityMatrix, items, where: { circleId },
+      // The ⋯ roster, reported exactly as `collectMoreActions` computes it: manifest-projected,
+      // policy/platform gated, and narrowed to the ids this shell wired a callback for.
+      navManifest: basisManifest, policy, wiredActionIds: circleWiredMoreIds, platform: 'web',
+    });
+  };
+  /**
+   * Read the app's own answer to a question, unrendered. `onderlingDispatch` returns what a TAP
+   * produces — a bot reply, shaped for a person — which is the right thing to assert on when the
+   * question is "what does someone see", and useless when the question is "what does the roster say".
+   * A walk needs both, so both are published rather than one pretending to be the other.
+   */
+  window.onderlingCall = (appOrigin, opId, args = {}) => (
+    typeof rawCallSkill === 'function'
+      ? Promise.resolve(rawCallSkill(appOrigin, opId, args)).catch((e) => ({ error: String(e?.message ?? e) }))
+      : Promise.resolve({ error: 'callSkill-not-ready' })
+  );
+  /** Invoke one of the ops the surface offers — the same `{opId, args}` a tap compiles to. */
+  window.onderlingDispatch = (opId, args = {}) => (
+    typeof circleDispatchReady === 'function'
+      ? circleDispatchReady({ opId, args })
+      : Promise.resolve({ error: 'dispatch-not-ready' })
+  );
+}
 let circleApplyUserLlm = null;   // (cfg) => {ok,mode}|{ok:false,error} — rebuild the live LLM/embed providers from the member's settings
 let circleEmbedButtonTap = null; // S6.A — dispatch an inline embed button {opId,itemId} from a bot reply
 let circleSyncFolioNoteEmbedder = null; // 52.25 — re-wire folio /zoek's embedder from the active circle's embed policy
@@ -5431,6 +5492,7 @@ function showCircle(id, circle, policy) {
     // Wave C §5 — the governance surface (open decisions + votes + who-decides settings).
     governance: () => showGovernance(id),
   };
+  circleWiredMoreIds = Object.keys(more);   // the walk seam reads what was wired, never a copy of it
   // per-circle bottom tabs derived from policy.features.
   const tabs = buildCircleTabs(policy, t);
   let activeTab = DEFAULT_CIRCLE_TAB;

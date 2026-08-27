@@ -122,6 +122,9 @@ async function main() {
   auth                    what my membership check actually enforces
   offline | online        drop / restore my transport
   log                     messages received since the last log
+  role <circleId> <webid> <admin|member>   promote someone, or step yourself back
+  ack <circleId>          sign for a caretaker appointment that landed on me
+  call <app> <op> [json]  any declared op, for a walk the harness has no verb for yet
   quit`);
     },
 
@@ -199,6 +202,42 @@ async function main() {
       if (!circles.length) console.log('(none)');
       for (const c of circles) console.log(`  ${c.id}  ${c.name ?? ''}`);
       return { circles: circles.map((c) => ({ id: c.id, name: c.name ?? null })) };
+    },
+
+    /**
+     * Promote a member, or step yourself back. The handover path — a step-down that would empty the
+     * admin set hands the circle to whoever the fold appoints, and the appointee is told.
+     */
+    async role(circleId, memberWebid, role) {
+      if (!circleId || !memberWebid || !role) {
+        console.log('usage: role <circleId> <memberWebid> <admin|member>'); return { error: 'usage' };
+      }
+      const r = await call('stoop', 'setMemberRole', { groupId: circleId, memberWebid, role });
+      console.log(r?.error ? `refused: ${r.error}` : `ok: ${memberWebid.slice(0, 12)}… is now ${role}`);
+      return r ?? {};
+    },
+
+    /** Sign for a caretaker appointment — the circle can then see that I know it landed on me. */
+    async ack(circleId) {
+      if (!circleId) { console.log('usage: ack <circleId>'); return { error: 'usage' }; }
+      const r = await call('stoop', 'acknowledgeCaretaker', { groupId: circleId });
+      console.log(r?.ok ? `signed for ${r.seed?.slice(0, 12)}…` : `not signed: ${r?.reason}`);
+      return r ?? {};
+    },
+
+    /**
+     * The escape hatch. A walk should never stall because this harness lacks a verb — that is a gap in
+     * the harness, not a finding about the product, and discovering it mid-walk costs a restart, which
+     * costs the circle (everything here is in-memory).
+     */
+    async call(app, op, ...rest) {
+      if (!app || !op) { console.log('usage: call <app> <op> [json]'); return { error: 'usage' }; }
+      let args = {};
+      const raw = rest.join(' ').trim();
+      if (raw) { try { args = JSON.parse(raw); } catch { console.log('args must be JSON'); return { error: 'bad-json' }; } }
+      const r = await call(app, op, args);
+      console.log(JSON.stringify(r, null, 1)?.slice(0, 600));
+      return { result: r ?? null };
     },
 
     async members(circleId) {

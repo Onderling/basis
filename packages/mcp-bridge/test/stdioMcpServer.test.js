@@ -28,7 +28,6 @@ import {
 import {
   RemoteHandlerRegistry,
   grantRemoteCapability,
-  enableIssuerRevocation,
 } from '@onderling/secure-agent';
 import {
   createStdioMcpServer,
@@ -66,9 +65,13 @@ async function makeStdioTier() {
     return [TextPart(`ran:${args.text ?? ''}`)];
   }, { visibility: 'authenticated', policy: 'requires-token' });
 
-  const pe = new PolicyEngine({ trustRegistry: trB, skillRegistry: bob.skills, agentPubKey: bob.pubKey });
+  // Issuer-side revocation is CONSTRUCTED into the engine — there is no setter, so Bob's list is
+  // named where the gate is built and nothing can replace it later.
+  const pe = new PolicyEngine({
+    trustRegistry: trB, skillRegistry: bob.skills, agentPubKey: bob.pubKey,
+    isRevoked: (id) => bobRevocations.isRevoked(id),
+  });
   Object.defineProperty(bob, 'policyEngine', { get: () => pe, configurable: true });
-  enableIssuerRevocation(pe, bobRevocations);
   await trB.setTier(alice.pubKey, 'authenticated');
   await trB.setTier(bob.pubKey,   'trusted');
 

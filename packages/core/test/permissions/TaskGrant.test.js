@@ -35,10 +35,12 @@ async function makeGranter() {
  * A PolicyEngine wired to verify tokens whose `agentId` == `agentPubKey`, with
  * the issuer marked 'trusted' so a presented token clears the issuer-trust gate.
  */
-async function setupPolicy(agentPubKey, issuerPubKey) {
+async function setupPolicy(agentPubKey, issuerPubKey, isRevoked = null) {
   const tr = new TrustRegistry(new VaultMemory());
   const sr = new SkillRegistry();
-  const pe = new PolicyEngine({ trustRegistry: tr, skillRegistry: sr, agentPubKey });
+  // The revocation resolver is CONSTRUCTED in — a PolicyEngine has no setter, so a manager reaches
+  // the gate by being read from here, exactly as it does in production.
+  const pe = new PolicyEngine({ trustRegistry: tr, skillRegistry: sr, agentPubKey, ...(isRevoked ? { isRevoked } : {}) });
   await tr.setTier(issuerPubKey, 'trusted');
   return { tr, sr, pe };
 }
@@ -46,15 +48,16 @@ async function setupPolicy(agentPubKey, issuerPubKey) {
 describe('TaskGrantManager.attachGrant — issues a task-scoped, verifiable token', () => {
   it('stamps constraints.task, verifies, and passes PolicyEngine.checkInbound', async () => {
     const granter = await makeGranter();
-    const { sr, pe } = await setupPolicy(granter.identity.pubKey, granter.identity.pubKey);
+    const mgr = new TaskGrantManager({ identity: granter.identity });
+    const { sr, pe } = await setupPolicy(
+      granter.identity.pubKey, granter.identity.pubKey, (id) => mgr.isRevoked(id),
+    );
     // A token-gated skill — proves the task grant is what authorises the call.
     sr.register(defineSkill('predict.run', () => 'ok', {
       visibility: 'authenticated', policy: 'requires-token',
     }));
 
     const MEMBER = 'assignee-pubkey';
-    const mgr = new TaskGrantManager({ identity: granter.identity });
-    mgr.installRevocationCheck(pe);
 
     const token = await mgr.attachGrant({
       taskId: 'task-1', memberPubKey: MEMBER,
@@ -131,14 +134,15 @@ describe('TaskGrantManager — attenuation (can only grant what you hold)', () =
 describe('TaskGrantManager.revokeTaskGrants — grants expire with the task', () => {
   it('revoked tokens fail checkInbound afterwards', async () => {
     const granter = await makeGranter();
-    const { sr, pe } = await setupPolicy(granter.identity.pubKey, granter.identity.pubKey);
+    const mgr = new TaskGrantManager({ identity: granter.identity });
+    const { sr, pe } = await setupPolicy(
+      granter.identity.pubKey, granter.identity.pubKey, (id) => mgr.isRevoked(id),
+    );
     sr.register(defineSkill('predict.run', () => 'ok', {
       visibility: 'authenticated', policy: 'requires-token',
     }));
 
     const MEMBER = 'assignee-pk';
-    const mgr = new TaskGrantManager({ identity: granter.identity });
-    mgr.installRevocationCheck(pe);
     const token = await mgr.attachGrant({
       taskId: 'task-1', memberPubKey: MEMBER, grant: { skill: 'predict.run' },
     });
@@ -161,13 +165,14 @@ describe('TaskGrantManager.revokeTaskGrants — grants expire with the task', ()
 
   it('revokes two tasks independently', async () => {
     const granter = await makeGranter();
-    const { sr, pe } = await setupPolicy(granter.identity.pubKey, granter.identity.pubKey);
+    const mgr = new TaskGrantManager({ identity: granter.identity });
+    const { sr, pe } = await setupPolicy(
+      granter.identity.pubKey, granter.identity.pubKey, (id) => mgr.isRevoked(id),
+    );
     sr.register(defineSkill('predict.run', () => 'ok', {
       visibility: 'authenticated', policy: 'requires-token',
     }));
     const A = 'assignee-a', B = 'assignee-b';
-    const mgr = new TaskGrantManager({ identity: granter.identity });
-    mgr.installRevocationCheck(pe);
 
     const tokA = await mgr.attachGrant({ taskId: 'task-A', memberPubKey: A, grant: { skill: 'predict.run' } });
     const tokB = await mgr.attachGrant({ taskId: 'task-B', memberPubKey: B, grant: { skill: 'predict.run' } });

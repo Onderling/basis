@@ -149,6 +149,12 @@ export async function createTasksAgent({
     localStoreBundle,
     identityVault,
     label,
+    // This circle's issuer-side revocation truth (its taskGrantManager + the botAgentRegistry
+    // Circle.js parks on it later) reaches the engine THROUGH the CircleState, which is built a
+    // little further down — hence the provider. With a shared agent this is ignored on purpose:
+    // that agent's engine was built by the multi-circle host over ITS map of circle states, which
+    // this circle joins.
+    circleStates: () => [circleState],
     agent: sharedAgent,
   });
 
@@ -158,13 +164,10 @@ export async function createTasksAgent({
   // completeTask/removeTask revoke every grant materialized for the task, so a
   // grant's authority expires WITH the task. OFF BY DEFAULT: a freshly-built
   // manager has granted nothing — a task carries authority ONLY after an
-  // explicit attach. `installRevocationCheck` feeds the manager's revocation
-  // set into PolicyEngine so a revoked grant fails `checkInbound` at the
-  // verifier even if the holder still has the token stored.
+  // explicit attach. The manager is a revocation SOURCE: the agent's PolicyEngine reads it through
+  // this circle's CircleState (see the `circleStates` provider above), so a revoked grant fails
+  // `checkInbound` at the verifier even if the holder still has the token stored.
   const taskGrantManager = new TaskGrantManager({ identity: id });
-  if (typeof agent.policyEngine?.setRevocationCheck === 'function') {
-    taskGrantManager.installRevocationCheck(agent.policyEngine);
-  }
 
   // OfferingMatch (Phase 4.2 — composes core.Agent + pubSub directly).
   let offeringMatch = null;

@@ -198,10 +198,14 @@ describe('RoleGrantManager.grant — materializes the bundle', () => {
 
 // ── Enforcement stays PolicyEngine (no second gate) ──────────────────────────
 
-async function setupPolicy(groupManager, agentPubKey) {
+async function setupPolicy(groupManager, agentPubKey, isRevoked = null) {
   const tr = new TrustRegistry(new VaultMemory());
   const sr = new SkillRegistry();
-  const pe = new PolicyEngine({ trustRegistry: tr, skillRegistry: sr, agentPubKey, groupManager });
+  // The revocation resolver is CONSTRUCTED in — a PolicyEngine has no setter, so a manager reaches
+  // the gate by being read from here, exactly as it does in production.
+  const pe = new PolicyEngine({
+    trustRegistry: tr, skillRegistry: sr, agentPubKey, groupManager, ...(isRevoked ? { isRevoked } : {}),
+  });
   return { tr, sr, pe };
 }
 
@@ -236,7 +240,10 @@ describe('RoleBundle enforcement — through PolicyEngine, not an inline check',
 
   it('a materialized token verifies through checkInbound, then FAILS after revoke', async () => {
     const admin = await makeAdmin();
-    const { tr, sr, pe } = await setupPolicy(admin.gm, admin.identity.pubKey);
+    const mgr = new RoleGrantManager({ identity: admin.identity, groupManager: admin.gm });
+    // The manager is the engine's revocation SOURCE, named at construction (BotAgentRegistry-style
+    // wiring, minus the push-in: an engine's resolver cannot be replaced after it is built).
+    const { tr, sr, pe } = await setupPolicy(admin.gm, admin.identity.pubKey, (id) => mgr.isRevoked(id));
     // The bundle-granted skill is token-gated (requires-token) — proves the
     // materialized token is what authorises the call.
     sr.register(defineSkill('emergency.trigger', () => 'ok', {
@@ -248,8 +255,6 @@ describe('RoleBundle enforcement — through PolicyEngine, not an inline check',
     await admin.gm.issueProof(W, GROUP, { role: 'member' });
     await tr.setTier(admin.identity.pubKey, 'trusted');   // issuer must be trusted to present tokens
 
-    const mgr = new RoleGrantManager({ identity: admin.identity, groupManager: admin.gm });
-    mgr.installRevocationCheck(pe);                        // BotAgentRegistry-style wiring
     const { tokens } = await mgr.grant({ memberPubKey: W, groupId: GROUP, roleId: 'warden' });
     const token = tokens[0].toJSON();
 
@@ -273,12 +278,13 @@ describe('RoleBundle enforcement — through PolicyEngine, not an inline check',
 
   it('re-granting a narrower role revokes the previous materialized tokens', async () => {
     const admin = await makeAdmin();
-    const { pe } = await setupPolicy(admin.gm, admin.identity.pubKey);
+    const mgr = new RoleGrantManager({ identity: admin.identity, groupManager: admin.gm });
+    // Built over this manager as its revocation source (the production shape); what this test
+    // asserts is the manager's own bookkeeping, not the gate.
+    await setupPolicy(admin.gm, admin.identity.pubKey, (id) => mgr.isRevoked(id));
     registerRoleBundle({ id: 'warden', rank: 70, grants: [{ skill: 'emergency.trigger' }] });
     const W = 'w-pk';
     await admin.gm.issueProof(W, GROUP, { role: 'member' });
-    const mgr = new RoleGrantManager({ identity: admin.identity, groupManager: admin.gm });
-    mgr.installRevocationCheck(pe);
 
     const first  = await mgr.grant({ memberPubKey: W, groupId: GROUP, roleId: 'warden' });
     const second = await mgr.grant({ memberPubKey: W, groupId: GROUP, roleId: 'warden' });

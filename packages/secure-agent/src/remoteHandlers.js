@@ -21,7 +21,7 @@
  *      caller's held token (`agent.tokenRegistry.get(peer, skill)`) and the
  *      remote agent's `PolicyEngine.checkInbound` verifies it. **The grant
  *      IS the gate** for remote handlers. Revoking the grant — issuer-side
- *      (`PolicyEngine.isRevoked`, wired here via `enableIssuerRevocation`) or
+ *      (the host engine's `isRevoked`, composed when that engine is built) or
  *      holder-side (`TokenRegistry.revoke`, which makes `.get` skip it) —
  *      makes the same dispatch deny.
  *
@@ -152,32 +152,4 @@ export async function grantRemoteCapability({ hostAgent, callerAgent, skillId, e
   });
   await callerAgent.tokenRegistry.store(token);
   return token;
-}
-
-/**
- * Wire issuer-side revocation into a remote (host) agent's PolicyEngine.
- *
- * After this call, `PolicyEngine.checkInbound` consults `revocationList` for
- * every verified token; a revoked token id is rejected as
- * `INVALID_TOKEN: revoked` even when the holder still has it stored. The host
- * revokes a grant end-to-end by calling `revocationList.revoke(tokenId)`
- * (a `TokenRegistry` serves as the revocation list — it has `revoke` /
- * `isRevoked`).
- *
- * This is the end-to-end revoke→deny hook: it makes the same remote dispatch
- * that succeeded now DENY, driven purely from the kernel's PolicyEngine.
- *
- * @param {import('@onderling/core').PolicyEngine} policyEngine — the host agent's PolicyEngine
- * @param {{ isRevoked: (id: string) => boolean|Promise<boolean> }} revocationList
- * @returns {{ isRevoked: (id: string) => boolean|Promise<boolean> }} the revocationList (for chaining)
- */
-export function enableIssuerRevocation(policyEngine, revocationList) {
-  if (!policyEngine?.setRevocationCheck) {
-    throw new Error('enableIssuerRevocation: policyEngine must expose setRevocationCheck');
-  }
-  if (typeof revocationList?.isRevoked !== 'function') {
-    throw new Error('enableIssuerRevocation: revocationList must expose isRevoked(id)');
-  }
-  policyEngine.setRevocationCheck((id) => revocationList.isRevoked(id));
-  return revocationList;
 }

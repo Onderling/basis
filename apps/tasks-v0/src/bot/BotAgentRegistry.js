@@ -80,6 +80,8 @@ export class BotAgentRegistry {
    */
   constructor({ bus, tasksAgent, dataSource, circleId }) {
     if (!bus) throw new TypeError('BotAgentRegistry: bus required');
+    // The engine is what ENFORCES the tokens this registry issues (verify + revocation); a registry
+    // whose agent has no gate would mint authority nothing checks. It is not wired here — see `isRevoked`.
     if (!tasksAgent?.policyEngine) {
       throw new TypeError('BotAgentRegistry: tasksAgent must have a PolicyEngine wired');
     }
@@ -87,15 +89,17 @@ export class BotAgentRegistry {
     this.#tasksAgent = tasksAgent;
     this.#dataSource = dataSource ?? null;
     this.#circleId     = circleId     ?? null;
-    // follow-up C — feed the tasks agent's PolicyEngine our
-    // local revocation set so revoked tokens fail at the verifier
-    // even if the holder still has the blob stored.
-    if (typeof tasksAgent.policyEngine?.setRevocationCheck === 'function') {
-      tasksAgent.policyEngine.setRevocationCheck((tokenId) => this.#revoked.has(tokenId));
-    }
   }
 
-  /** True iff the given tokenId has been revoked on this side. */
+  /**
+   * True iff the given tokenId has been revoked on this side.
+   *
+   * This registry is a revocation SOURCE, not a gate. It used to push this set into the tasks
+   * agent's PolicyEngine from its own constructor, which REPLACED whatever revocation truth the
+   * engine already had — the last registry built silently disarmed every earlier one. The engine
+   * now takes one resolver at construction and `MeshAgent.buildMeshAgent` unions this source in
+   * alongside every other circle's, so a second registry can no longer cancel the first.
+   */
   isRevoked(tokenId) { return this.#revoked.has(tokenId); }
 
   /** True when `dataSource` was supplied — bindings will be persisted. */

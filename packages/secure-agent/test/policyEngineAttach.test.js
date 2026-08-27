@@ -3,7 +3,7 @@
  * a silent no-op that looks like enforcement.
  *
  * The bug (pre-fix): createSecureAgent built the PolicyEngine and exposed it as
- * `sa.policy`, and realAgent.js even wired `sa.policy.setRevocationCheck(...)` —
+ * `sa.policy`, and realAgent.js even pushed a revocation check into it afterwards —
  * but `sa.agent.policyEngine` stayed null (Agent's field was getter-only, set at
  * construction, and the PE is built afterwards). So `runGatedSkill`'s
  * `if (agent.policyEngine)` was always false: nothing was ever gated. The fix

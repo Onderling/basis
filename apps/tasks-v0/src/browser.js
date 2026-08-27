@@ -190,6 +190,10 @@ export async function createBrowserMultiCircleTasksAgent({
     transport: new InternalTransport(bus, identity.pubKey),
     localStoreBundle,
     label,
+    // The agent's revocation truth: every circle in the map, asked at verify time. The engine takes
+    // ONE resolver at construction, so a circle spawned later must be REACHABLE from it rather than
+    // pushing itself in — the map is that reach.
+    circleStates: () => circlesMap.values(),
   });
 
   const primaryBundle = await createCircleAgent({

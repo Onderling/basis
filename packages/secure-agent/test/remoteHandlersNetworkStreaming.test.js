@@ -33,7 +33,6 @@ import {
 import { createNetworkTransport } from '@onderling/transports';
 import {
   grantRemoteCapability,
-  enableIssuerRevocation,
 } from '../src/index.js';
 
 /**
@@ -92,13 +91,15 @@ async function makeStreamingNetworkTier({ skillId = 'remote.stream' } = {}) {
     for (let i = 1; i <= n; i++) yield [TextPart(`chunk-${i}`)];
   }, { visibility: 'authenticated', policy: 'requires-token' });
 
+  // Issuer-side revocation is CONSTRUCTED into the engine — there is no setter, so Bob's list is
+  // named where the gate is built and nothing can replace it later.
   const pe = new PolicyEngine({
     trustRegistry: trB,
     skillRegistry: bob.skills,
     agentPubKey:   bob.pubKey,
+    isRevoked:     (id) => bobRevocations.isRevoked(id),
   });
   Object.defineProperty(bob, 'policyEngine', { get: () => pe, configurable: true });
-  enableIssuerRevocation(pe, bobRevocations);
 
   await trB.setTier(alice.pubKey, 'authenticated');
   await trB.setTier(bob.pubKey,   'trusted');

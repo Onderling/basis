@@ -38,11 +38,14 @@ async function makePair() {
  * Install a PolicyEngine on bob AFTER skills have been registered, so that
  * the PE's skillRegistry references the already-populated registry.
  */
-function installPE(bob, tr) {
+function installPE(bob, tr, isRevoked = null) {
+  // `isRevoked` is CONSTRUCTED in — there is no setter, so a test wires its revocation source the
+  // same way production does.
   const pe = new PolicyEngine({
     trustRegistry: tr,
     skillRegistry: bob.skills,
     agentPubKey:   bob.pubKey,
+    ...(isRevoked ? { isRevoked } : {}),
   });
   Object.defineProperty(bob, 'policyEngine', { get: () => pe, configurable: true });
   return pe;
@@ -206,8 +209,7 @@ describe('invoke-time token enforcement', () => {
     const { alice, bob, idB, tr, aliceTokens } = await makePairAliceHoldsTokens();
     bob.register('vip', async () => [TextPart('vip')], { visibility: 'authenticated', policy: 'on-request' });
     const revoked = new Set();
-    const pe = installPE(bob, tr);
-    pe.setRevocationCheck((id) => revoked.has(id));
+    installPE(bob, tr, (id) => revoked.has(id));
     await tr.setTier(alice.pubKey, 'authenticated');
     await tr.setTier(idB.pubKey, 'trusted'); // a PRESENTED token's issuer must be trusted
 
@@ -230,8 +232,7 @@ describe('invoke-time token enforcement', () => {
   it('an ABSENT token on an on-request skill still passes — trusted internal routing untouched', async () => {
     const { alice, bob, tr } = await makePair(); // alice holds no tokens → none attached
     bob.register('vip', async () => [TextPart('vip')], { visibility: 'authenticated', policy: 'on-request' });
-    const pe = installPE(bob, tr);
-    pe.setRevocationCheck(() => true); // even a revoke-ALL check can't touch a token-less call
+    installPE(bob, tr, () => true); // even a revoke-ALL check can't touch a token-less call
     await tr.setTier(alice.pubKey, 'authenticated');
 
     expect(Parts.text(await alice.invoke(bob.address, 'vip', []))).toBe('vip');

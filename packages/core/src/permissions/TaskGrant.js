@@ -2,7 +2,7 @@
  * TaskGrant — "authority travels with the task" (task-scoped delegation).
  *
  * Generalizes the working `BotAgentRegistry` pattern (a per-binding, scoped,
- * revocable "act-AS" cap-token wired into `PolicyEngine.setRevocationCheck`)
+ * revocable "act-AS" cap-token this manager holds as issuer-side truth)
  * into a REUSABLE primitive: when a task needs the assignee (bot or human) to
  * reach a pod, an agent, or a skill it otherwise couldn't, the assigner attaches
  * a **task-scoped grant** — exactly what the task needs, no more — and it is
@@ -36,7 +36,9 @@
  * `BotAgentRegistry` revocation pattern):
  *   • CapabilityToken.issue      — the grant substrate (attenuated sub-tokens)
  *   • CapabilityToken.verifyChain — the narrower-only attenuation check
- *   • #revoked Set + setRevocationCheck — the single revocation enforcement point
+ *   • #revoked Set + `isRevoked` — this manager is a revocation SOURCE, not a gate: the site
+ *     that builds the agent's `PolicyEngine` unions it (with `anyRevoked`) into the ONE resolver
+ *     the engine takes at construction. There is no way to push it in afterwards, on purpose.
  *
  * Enforcement is UNCHANGED and has NO second gate: a materialized token is
  * checked through the existing `PolicyEngine.checkInbound` / cap-token verify
@@ -137,18 +139,6 @@ export class TaskGrantManager {
   }
 
   /**
-   * Wire this manager's revocation set into a PolicyEngine, so any token it
-   * revoked fails `checkInbound` at the verifier. Same wiring as
-   * `RoleGrantManager.installRevocationCheck` / `BotAgentRegistry`.
-   * @param {import('./PolicyEngine.js').PolicyEngine} policyEngine
-   */
-  installRevocationCheck(policyEngine) {
-    if (typeof policyEngine?.setRevocationCheck === 'function') {
-      policyEngine.setRevocationCheck((tokenId) => this.#revoked.has(tokenId));
-    }
-  }
-
-  /**
    * Attach ONE task-scoped grant: issue an attenuated CapabilityToken for
    * `memberPubKey` scoped to the task's need, stamped `constraints.task = taskId`
    * for provenance + revocation targeting, and tracked under `taskId`.
@@ -232,6 +222,10 @@ export class TaskGrantManager {
     return [...(this.#grants.get(taskId) ?? [])];
   }
 
-  /** @returns {boolean} whether `tokenId` has been revoked on this side. */
+  /**
+   * Issuer-side revocation truth for this manager, and the seam a `PolicyEngine` composer reads:
+   * `anyRevoked([(id) => mgr.isRevoked(id), …])` at engine construction.
+   * @returns {boolean} whether `tokenId` has been revoked on this side.
+   */
   isRevoked(tokenId) { return this.#revoked.has(tokenId); }
 }

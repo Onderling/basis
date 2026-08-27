@@ -468,17 +468,12 @@ export async function createCircleAgent({
           circleId:     liveCircle.circleId,
         })
       : null;
+    // Parking the registry on the CircleState IS the wiring: the agent's PolicyEngine was built with
+    // a resolver that walks the live circle states and asks each one's `botAgentRegistry` /
+    // `taskGrantManager` (see `buildMeshAgent`). No re-install here — this block used to re-union the
+    // two sources because the registry's constructor had just clobbered the task-grant check, and a
+    // union that has to be re-applied after every new source is one forgotten call from disarmed.
     circleState.botAgentRegistry = botAgentRegistry;
-    // BotAgentRegistry's constructor calls `policyEngine.setRevocationCheck`,
-    // which CLOBBERS the task-grant revocation check createTasksAgent wired.
-    // Re-install a UNION so BOTH bot-token and task-grant revocations are
-    // honoured at the verifier (a single PolicyEngine has one revocation hook).
-    const tgm = circleState.taskGrantManager;
-    if (botAgentRegistry && tgm && typeof bundle.agent.policyEngine?.setRevocationCheck === 'function') {
-      bundle.agent.policyEngine.setRevocationCheck(
-        (tokenId) => botAgentRegistry.isRevoked(tokenId) || tgm.isRevoked(tokenId),
-      );
-    }
     if (botAgentRegistry?.persisting) {
       try {
         const r = await botAgentRegistry.restoreAll();

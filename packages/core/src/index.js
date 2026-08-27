@@ -211,7 +211,7 @@ export { StateManager } from './state/StateManager.js';
 
 // ── Permissions ───────────────────────────────────────────────────────────────
 export { TrustRegistry, TIER_LEVEL } from './permissions/TrustRegistry.js';
-export { PolicyEngine }     from './permissions/PolicyEngine.js';
+export { PolicyEngine, anyRevoked } from './permissions/PolicyEngine.js';
 export { CapabilityToken, offeringMatches, skillAttenuates } from './permissions/CapabilityToken.js';
 export { PodCapabilityToken } from './permissions/PodCapabilityToken.js';
 export { pathScopeCovers } from './permissions/pathScope.js';

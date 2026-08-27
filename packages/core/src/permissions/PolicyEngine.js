@@ -25,10 +25,52 @@ export class PolicyDeniedError extends Error {
 }
 
 /**
+ * Union several revocation sources into the ONE resolver a `PolicyEngine` takes at construction.
+ *
+ * A `PolicyEngine` holds exactly one revocation resolver and it is fixed at construction, so a
+ * composer that has several sources of revocation truth — a grants lane, an issuer-side
+ * `TokenRegistry`, a bot registry, a task-grant manager — has to combine them itself. This is that
+ * combination, defined once so the deny-wins semantics are identical wherever it happens:
+ *
+ *   • sources are asked IN ORDER and the first truthy answer short-circuits (already revoked);
+ *   • a source that THROWS propagates, and `checkInbound` turns that into a denial — a broken
+ *     revocation source must never read as "not revoked" (safety over liveness, principles §10);
+ *   • `null` / `undefined` entries are skipped, so a composer can write a conditional source; any
+ *     other non-function is a TypeError HERE, at compose time, rather than a silently missing
+ *     source discovered at verify time.
+ *
+ * Sources are FUNCTIONS, not objects, on purpose: most real sources are built after the engine is,
+ * so a composer passes a thunk that reads the variable when the check actually runs
+ * (`(id) => registry?.isRevoked(id)`).
+ *
+ * @param {Array<((tokenId: string) => boolean | Promise<boolean>) | null | undefined>} sources
+ * @returns {(tokenId: string) => Promise<boolean>} the resolver to pass as `isRevoked`
+ */
+export function anyRevoked(sources) {
+  if (!Array.isArray(sources)) {
+    throw new TypeError('anyRevoked: expected an array of revocation sources');
+  }
+  const fns = [];
+  for (const s of sources) {
+    if (s == null) continue;
+    if (typeof s !== 'function') {
+      throw new TypeError('anyRevoked: every revocation source must be a function (tokenId) => boolean|Promise<boolean>');
+    }
+    fns.push(s);
+  }
+  return async (tokenId) => {
+    for (const fn of fns) {
+      if (await fn(tokenId)) return true;
+    }
+    return false;
+  };
+}
+
+/**
  * Central inbound permission gate. `checkInbound()` resolves the caller's trust tier
  * via the TrustRegistry, then checks it against the skill's visibility and policy,
- * honouring capability tokens, group roles (when a GroupManager is wired), and an
- * optional issuer-side revocation callback. Throws PolicyDeniedError on any denial;
+ * honouring capability tokens, group roles (when a GroupManager is wired), and the
+ * issuer-side revocation resolver it was constructed with. Throws PolicyDeniedError on any denial;
  * returns { tier, allowed: true } otherwise.
  */
 export class PolicyEngine {
@@ -47,12 +89,20 @@ export class PolicyEngine {
    * @param {string} [opts.agentPubKey]  — this agent's Ed25519 pubKey (base64url)
    * @param {import('./GroupManager.js').GroupManager} [opts.groupManager]  — enables `requiredRole` checks
    * @param {(tokenId: string) => boolean | Promise<boolean>} [opts.isRevoked]
-   *   Optional issuer-side revocation check. When supplied,
-   *   `checkInbound` calls it after the token's signature/expiry/
-   *   subject/skill/issuer-trust checks pass; if it returns truthy
-   *   the token is rejected as `INVALID_TOKEN: revoked`. Lets agents
-   *   maintain a local revocation list independent of the holder's
-   *   `TokenRegistry.revoke` (which only protects the holder side).
+   *   The issuer-side revocation resolver, and the ONLY way one gets in —
+   *   an engine's revocation truth is fixed at construction and cannot be
+   *   swapped afterwards. When supplied, `checkInbound` calls it after the
+   *   token's signature/expiry/subject/skill/issuer-trust checks pass; if
+   *   it returns truthy the token is rejected as `INVALID_TOKEN: revoked`.
+   *   Lets an agent maintain a local revocation list independent of the
+   *   holder's `TokenRegistry.revoke` (which only protects the holder side).
+   *
+   *   ONE engine, ONE resolver — when several sources hold revocation truth
+   *   (a grants lane, a bot registry, a task-grant manager), the site that
+   *   BUILDS the engine unions them with `anyRevoked` and passes the result
+   *   here. There is deliberately no setter: a settable resolver is
+   *   last-writer-wins, and on 2026-08-19 that silently disarmed connection
+   *   revocation — unpairing left the connection working.
    * @param {import('./ActorResolver.js').ActorResolver} [opts.actorResolver]
    *   Phase 50.9.1 — optional resolver mapping any of pubKey / webid /
    *   agentUri to an `ActorRecord`. Core defines the interface but never
@@ -101,15 +151,6 @@ export class PolicyEngine {
 
   /** Phase 50.9.1 — read-only access to the injected resolver (or null). */
   get actorResolver() { return this.#actorResolver; }
-
-  /**
-   * Replace the revocation-check callback at runtime. Pass `null` to
-   * remove. Useful when the registry that owns the revocation list is
-   * built after the PolicyEngine itself.
-   */
-  setRevocationCheck(fn) {
-    this.#isRevoked = typeof fn === 'function' ? fn : null;
-  }
 
   /**
    * Check whether a peer is allowed to call a skill.

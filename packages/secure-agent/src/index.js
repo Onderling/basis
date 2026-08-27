@@ -59,7 +59,6 @@ export {
   RemoteHandlerRegistry,
   dispatchRemoteOp,
   grantRemoteCapability,
-  enableIssuerRevocation,
   NOT_REMOTE,
 } from './remoteHandlers.js';
 

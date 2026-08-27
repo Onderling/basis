@@ -161,7 +161,10 @@ if (values['circle-list']) {
   }
 
   // ONE meshAgent for the whole process.
-  const { meshAgent } = await buildMeshAgent({ label: 'TasksMeshAgent(multi)' });
+  // `circleStates` is the agent's revocation truth (one resolver, taken at construction). These
+  // smoke-path CircleStates carry no grant manager or bot registry, so nothing is ever revoked —
+  // stated by passing the map rather than left to look like an oversight.
+  const { meshAgent } = await buildMeshAgent({ label: 'TasksMeshAgent(multi)', circleStates: () => circles.values() });
 
   // Build a minimal CircleState per circleConfig — same shape as
   // test/v2_8-single-agent.test.js fixture (no per-circle V1+ wiring;
@@ -340,6 +343,10 @@ if (values.circle) {
       transport,
       localStoreBundle,
       label:           `Tasks-MultiCircle-${values.actor}`,
+      // The agent's revocation truth: every circle in the map, asked at verify time. The engine
+      // takes ONE resolver at construction, so a circle spawned later must be REACHABLE from it
+      // rather than pushing itself in — the map is that reach.
+      circleStates:    () => circlesMap.values(),
     });
 
     bundle = await createCircleAgent({

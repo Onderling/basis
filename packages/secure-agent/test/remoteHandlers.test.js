@@ -21,7 +21,6 @@ import {
   RemoteHandlerRegistry,
   dispatchRemoteOp,
   grantRemoteCapability,
-  enableIssuerRevocation,
   NOT_REMOTE,
 } from '../src/index.js';
 
@@ -60,14 +59,15 @@ async function makeTier({ skillId = 'remote.compute' } = {}) {
   }, { visibility: 'authenticated', policy: 'requires-token' });
 
   // Install Bob's PolicyEngine AFTER the skill is registered so it references
-  // the populated skill registry. Wire issuer-side revocation to Bob's list.
+  // the populated skill registry. Issuer-side revocation is CONSTRUCTED in — there is no setter,
+  // so Bob's list is named where the gate is built and nothing can replace it later.
   const pe = new PolicyEngine({
     trustRegistry: trB,
     skillRegistry: bob.skills,
     agentPubKey:   bob.pubKey,
+    isRevoked:     (id) => bobRevocations.isRevoked(id),
   });
   Object.defineProperty(bob, 'policyEngine', { get: () => pe, configurable: true });
-  enableIssuerRevocation(pe, bobRevocations);
 
   // Trust: Alice is authenticated (passes visibility); Bob (the issuer) is
   // trusted in his own registry so his self-issued grant is accepted.

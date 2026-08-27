@@ -22,7 +22,7 @@
  *     meshAgent transparently.
  */
 
-import { Agent, AgentIdentity, InternalBus, InternalTransport, TrustRegistry, PolicyEngine } from '@onderling/core';
+import { Agent, AgentIdentity, InternalBus, InternalTransport, TrustRegistry, PolicyEngine, anyRevoked } from '@onderling/core';
 import { VaultMemory } from '@onderling/vault';
 
 const DEFAULT_IDENTITY_VAULT_PATH = 'mem://tasks/process/agent-identity-vault.json';
@@ -37,6 +37,13 @@ const DEFAULT_IDENTITY_VAULT_PATH = 'mem://tasks/process/agent-identity-vault.js
  *   survives CLI restarts. (mechanism, lifted to process scope.)
  * @param {string} [args.identityVault=mem://tasks/process/agent-identity-vault.json]
  * @param {string} [args.label='TasksMeshAgent']
+ * @param {() => Iterable<object>} [args.circleStates]
+ *   The live CircleStates this agent serves — the agent's REVOCATION TRUTH. A PolicyEngine takes
+ *   one revocation resolver at construction and it can never be replaced, so this is where the
+ *   sources are unioned: every circle's `taskGrantManager` (task-scoped grants) and
+ *   `botAgentRegistry` (bot cap-tokens). Passed as a PROVIDER because the circles are built after
+ *   the agent is, and because the multi-circle runtime adds more of them while the process runs.
+ *   Omitted → no revocation source, so no token is ever rejected as revoked.
  * @returns {Promise<{
  *   meshAgent:       object,
  *   vault:           object,
@@ -52,6 +59,7 @@ export async function buildMeshAgent({
   localStoreBundle,
   identityVault = DEFAULT_IDENTITY_VAULT_PATH,
   label = 'TasksMeshAgent',
+  circleStates,
   agent: existingAgent,
 } = {}) {
   // Multi-circle runtime (2026-05-14, Tasks V2 sixth slice) — when a
@@ -111,10 +119,27 @@ export async function buildMeshAgent({
   // PolicyEngine wires SkillRegistry (already on agent.skills) + the
   // trust registry above. Same pattern as Circle.js — shadow the
   // read-only getter on the instance with an own property.
+  //
+  // ONE revocation resolver, composed HERE, because that is the only place a PolicyEngine will take
+  // one. Each circle owns its own issuer-side revocation truth (task grants, bot cap-tokens); asking
+  // ALL of them means a second circle can no longer disarm the first — which is what happened while
+  // each source pushed itself in and the last writer won. A source that throws propagates, and
+  // `checkInbound` turns that into a denial.
   const policyEngine = new PolicyEngine({
     trustRegistry,
     skillRegistry: agent.skills,
     agentPubKey:   id.pubKey,
+    isRevoked: anyRevoked([
+      typeof circleStates === 'function'
+        ? async (tokenId) => {
+          for (const cs of circleStates() ?? []) {
+            if (await cs?.taskGrantManager?.isRevoked(tokenId)) return true;
+            if (await cs?.botAgentRegistry?.isRevoked(tokenId)) return true;
+          }
+          return false;
+        }
+        : null,
+    ]),
   });
   Object.defineProperty(agent, 'policyEngine', { value: policyEngine, configurable: true });
 

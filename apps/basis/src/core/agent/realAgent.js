@@ -25,7 +25,7 @@
 
 import {
   Agent, AgentIdentity, Bootstrap, InternalBus, InternalTransport, DataPart, TokenRegistry,
-  PolicyEngine, TrustRegistry, deriveCircleAddress, circleAddressSigner, signCircleLinkFromSeed,
+  PolicyEngine, anyRevoked, TrustRegistry, deriveCircleAddress, circleAddressSigner, signCircleLinkFromSeed,
   circleIdentity, signDeviceDelegation, deviceDelegationPubKey, deriveDeviceSeed,
   deriveVaultAtRestKeyFrom, ownCircleAddressAnnouncement,
 } from '@onderling/core';
@@ -490,6 +490,16 @@ export async function createRealHouseholdAgent(opts = {}) {
     return circleIdentities.get(circleId);
   };
   const circleAddressFor = (circleId) => deriveCircleAddress(deviceDerivationSeed, circleId);
+
+  // A caller's own `policyEngine` opts, pulled out BEFORE the spread so its `isRevoked` can be
+  // unioned into this factory's rather than replacing it (see the composition below). `false` is
+  // honoured as "no gate at all"; `true` carries no options to merge.
+  const callerPolicyEngine = opts.secureAgentOpts?.policyEngine;
+  const callerPolicyEngineOpts = callerPolicyEngine === false
+    ? false
+    : ((callerPolicyEngine && typeof callerPolicyEngine === 'object') ? callerPolicyEngine : null);
+  const callerIsRevoked = (callerPolicyEngineOpts && callerPolicyEngineOpts.isRevoked) || null;
+
   const sa = await createSecureMeshAgent({
     bus,
     vault:               chatVault,
@@ -535,19 +545,6 @@ export async function createRealHouseholdAgent(opts = {}) {
     // surfaced as a decryption error the moment a walk did a ceremony and a grant in one account.
     // Mirrors the host gate, which already keeps `cc-host-trust:` separate.
     trustRegistry: { vault: opts.peerTrustVault ?? makeBrowserVault('cc-peer-trust:') },
-    policyEngine: {
-      // BOTH revocation lists, or unpairing does not unpair. `agentsTokenRegistry` holds the ops-side
-      // grants; `surfaceGrants` holds the CONNECTION grants, and revoking a connection marks it only
-      // there. While a bespoke door consulted surfaceGrants directly that was fine; once acting moved
-      // to A2A, this engine became the only thing standing between a revoked connection and the waist —
-      // and it was consulting the wrong list. Caught by the revocation-durability walk during the
-      // migration, which is what that walk is for. Late-bound: both are built further down this factory.
-      // `surfaceGrants.isRevoked` is ASYNC (it awaits the grants lane's fold — fail-closed until
-      // the first fold lands), so it must be awaited: Boolean(promise) is true for every token.
-      isRevoked: async (tokenId) =>
-        Boolean(await agentsTokenRegistry?.isRevoked(tokenId))
-        || Boolean(await surfaceGrants?.isRevoked(tokenId)),
-    },
     // RATE LIMIT ON (the R1 go-live line, 2026-08-21) — the flood defence at the receive boundary,
     // WITH the catch-up exemption that made turning it on safe: a reconnect replay legitimately
     // serves up to 1000 items in one burst, which the chat-pace buckets would silently discard
@@ -577,6 +574,35 @@ export async function createRealHouseholdAgent(opts = {}) {
     // that idempotent. The `holdStore` port itself stays in the substrate for consumers that have no
     // log (a companion node, a headless agent).
     ...(opts.secureAgentOpts ?? {}),
+    // THE revocation gate for the externally reachable agent — composed LAST, after the caller
+    // spread, because it must not be overridable. THREE lists, all of them consulted:
+    // `agentsTokenRegistry` holds the ops-side grants; `surfaceGrants` holds the CONNECTION grants
+    // (revoking a connection marks it only there); a caller may add its own. While a bespoke door
+    // consulted surfaceGrants directly that was fine; once acting moved to A2A this engine became
+    // the only thing standing between a revoked connection and the waist — and it was consulting
+    // the wrong list. Caught by the revocation-durability walk during the migration, which is what
+    // that walk is for.
+    //
+    // This used to be TWO half-answers that fought: an `isRevoked` here (which any caller passing
+    // `secureAgentOpts.policyEngine` replaced wholesale) and a second, wider union pushed in
+    // afterwards. The push-in silently clobbered the constructor's check the day this agent gained
+    // an engine, and unpairing left the connection working over A2A. The engine now takes one
+    // resolver, once, and this is the only site that composes it.
+    //
+    // All three are late-bound thunks: every source is built further down this same factory, and
+    // the check only runs at inbound-verify time. `surfaceGrants.isRevoked` is ASYNC (it awaits the
+    // grants lane's fold — fail-closed until the first fold lands), so it must be AWAITED:
+    // Boolean(promise) is true for every token. A source that throws denies (deny-wins).
+    ...(callerPolicyEngineOpts === false ? { policyEngine: false } : {
+      policyEngine: {
+        ...(callerPolicyEngineOpts ?? {}),
+        isRevoked: anyRevoked([
+          async (tokenId) => Boolean(await agentsTokenRegistry?.isRevoked(tokenId)),
+          async (tokenId) => Boolean(await surfaceGrants?.isRevoked(tokenId)),
+          async (tokenId) => (typeof callerIsRevoked === 'function' ? Boolean(await callerIsRevoked(tokenId)) : false),
+        ]),
+      },
+    }),
   });
   const chatAgent = sa.agent;
   const chatId    = chatAgent.identity;
@@ -1100,16 +1126,15 @@ export async function createRealHouseholdAgent(opts = {}) {
 
     /* control ops — LIVE token binding (2026-07-09). hostAgent (the skills' home)
      * is the ISSUER: `issueCapabilityToken` signs with its identity and needs no other
-     * machinery.  Neither hostAgent nor the default chat secure-agent composes a
-     * TokenRegistry/PolicyEngine in this factory (hostAgent is built bare at the top;
-     * sa.policy is null unless the caller opts in via secureAgentOpts.policyEngine), so
+     * machinery.  Neither agent composes a TOKEN REGISTRY in this factory (hostAgent is
+     * built bare at the top; the chat agent gets a gate but no issuer-side list), so
      * the issuer-side revocation list is built HERE: a real vault-backed `TokenRegistry`
      * (BotAgentRegistry precedent — issue → store; revoke flips `isRevoked`, the truth
-     * any enforcement gate consults).  When a PolicyEngine IS composed (caller opt-in),
-     * feed its revocation check from this registry, COMPOSING with a caller-supplied
-     * `isRevoked` rather than clobbering it (nothing else in this file calls
-     * setRevocationCheck).  Best-effort: any failure falls back to registry-only
-     * (`tokenBacked: false`, the pre-binding behaviour) — never breaks boot. */
+     * any enforcement gate consults).  It reaches the chat agent's PolicyEngine by being
+     * PUBLISHED as `agentsTokenRegistry`, which that engine's constructed resolver reads —
+     * this block does not (and cannot) push a check into an engine.  Best-effort: any
+     * failure falls back to registry-only (`tokenBacked: false`, the pre-binding
+     * behaviour) — never breaks boot. */
     let agentsTokens = null;
     try {
       const tokenVault = await sealedVault(opts.agentsTokenVault ?? makeBrowserVault('cc-agent-tokens:'));
@@ -1124,20 +1149,10 @@ export async function createRealHouseholdAgent(opts = {}) {
         },
         revoke: (tokenId) => tokenRegistry.revoke(tokenId),
       };
-      if (typeof sa.policy?.setRevocationCheck === 'function') {
-        const callerIsRevoked = opts.secureAgentOpts?.policyEngine?.isRevoked;
-        // THREE lists, and all three must be consulted, because setRevocationCheck REPLACES whatever the
-        // engine was constructed with rather than adding to it. This block predates the engine being
-        // composed at all — it was written for a caller opting in via secureAgentOpts — so when the
-        // reachable agent gained an engine (2026-08-19), it silently clobbered the constructor's check
-        // and CONNECTION revocations stopped being consulted: unpairing left the connection working over
-        // A2A. The revocation-durability walk caught it. `surfaceGrants` is named explicitly here rather
-        // than relied on from the constructor, precisely because this call overwrites that.
-        sa.policy.setRevocationCheck(async (tokenId) =>
-          (await tokenRegistry.isRevoked(tokenId))
-          || Boolean(await surfaceGrants?.isRevoked(tokenId))
-          || (typeof callerIsRevoked === 'function' ? Boolean(await callerIsRevoked(tokenId)) : false));
-      }
+      // `agentsTokenRegistry` IS this registry, and the chat agent's engine was already constructed
+      // with a resolver that reads it (together with `surfaceGrants` and any caller-supplied list).
+      // Publishing it here is therefore the whole wiring: there is no second place that pushes a
+      // revocation check into an engine, and there can't be — the engine has no setter.
       agentsTokenRegistry = tokenRegistry;
     } catch { agentsTokens = null; agentsTokenRegistry = null; }
 

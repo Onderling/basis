@@ -988,10 +988,20 @@ through the one kind-gated `set-param` (which refuses internal params and unknow
 new value to its scope's sync home). A registered param nobody reads fails CI; so does a user-facing
 param with no UX home.
 
-**Parity is structural, not disciplined.** Web and mobile shells are thin composition-and-paint layers
-over shared projections — the same rows, the same locale source (every user-facing string through
-`t()`, Dutch and English), the same manifest. A capability that exists on one shell and not the other
-is a finding, not an idiom.
+**Parity is structural for the MODEL, disciplined for the PAINT** (measured 2026-08-27; this paragraph
+previously said "structural, not disciplined" without qualifying which half). Web and mobile share the
+model by construction and at scale — ~171 modules under `apps/basis/src/` are imported directly by
+`apps/basis-mobile/src/`, plus one locale source (every user-facing string through `t()`, Dutch and
+English) and one manifest. `renderMobile` is literally `export { renderWeb as renderMobile }`, so
+anything reaching a shell through the NavModel cannot differ between them.
+
+The **widgets**, though, are written twice: each shell paints its own, and what keeps them in step is a
+fitness test per capability, added after each incident (`apps/basis/test/fitness/shells*.test.js`).
+Those tests are grep-over-source guards — a control deleted from mobile leaves web fine and, since
+`src/screens/**` has no runtime test coverage, a guard is all that stands between a removed line and a
+platform going quiet. So a capability on one shell and not the other is still a finding rather than an
+idiom, but it is caught by inspection, not prevented by construction. The distinction matters when
+judging what a green suite is evidence of.
 
 
 **Connections — a screen that is yours, somewhere else.** A paired view (a browser tab, a client on a machine

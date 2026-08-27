@@ -20,18 +20,18 @@ Recorded gaps are allowlisted in `scripts/api-doc-gaps.json`; new undocumented e
 
 | Package | Reference | Public exports | Documented | Coverage | Recorded gaps |
 | --- | --- | ---: | ---: | ---: | --- |
-| `@onderling/sdk` | [sdk.md](sdk.md) | 292 | 292 | 100% | — |
-| `@onderling/core` | [core.md](core.md) | 174 | 174 | 100% | — |
-| `@onderling/transports` | [transports.md](transports.md) | 9 | 9 | 100% | — |
-| `@onderling/vault` | [vault.md](vault.md) | 7 | 7 | 100% | — |
-| `@onderling/pod-client` | [pod-client.md](pod-client.md) | 110 | 110 | 100% | — |
+| `@onderling/sdk` | [sdk.md](sdk.md) | 370 | 363 | 98% | `DEFAULT_ORIGIN_WINDOW_MS`, `EVICTION_STMT_VERSION`, `MAX_ENVELOPE_BYTES`, `RoleGrantManager`, `SCOPED_SEAL_SCHEMES`, `createCanonicalShare` … (7 total) |
+| `@onderling/core` | [core.md](core.md) | 249 | 244 | 98% | `DEFAULT_ORIGIN_WINDOW_MS`, `EVICTION_STMT_VERSION`, `MAX_ENVELOPE_BYTES`, `RoleGrantManager`, `createNearbyPeerSource` |
+| `@onderling/transports` | [transports.md](transports.md) | 12 | 12 | 100% | — |
+| `@onderling/vault` | [vault.md](vault.md) | 20 | 15 | 75% | `RootKeyStoreWebCrypto`, `VaultEncrypted`, `assertSeed`, `seedFromString`, `seedToString` |
+| `@onderling/pod-client` | [pod-client.md](pod-client.md) | 113 | 111 | 98% | `SCOPED_SEAL_SCHEMES`, `createCanonicalShare` |
 | `@onderling/redaction` | [redaction.md](redaction.md) | 8 | 8 | 100% | — |
 | `@onderling/pseudo-pod` | [pseudo-pod.md](pseudo-pod.md) | 8 | 8 | 100% | — |
-| `@onderling/item-types` | [item-types.md](item-types.md) | 13 | 13 | 100% | — |
-| `@onderling/item-store` | [item-store.md](item-store.md) | 88 | 88 | 100% | — |
-| `@onderling/app-manifest` | [app-manifest.md](app-manifest.md) | 52 | 52 | 100% | — |
+| `@onderling/item-types` | [item-types.md](item-types.md) | 18 | 17 | 94% | `INBOX_ITEM_SCHEMA` |
+| `@onderling/item-store` | [item-store.md](item-store.md) | 130 | 128 | 98% | `CLAIM_FIELDS`, `deliveryForResolution` |
+| `@onderling/app-manifest` | [app-manifest.md](app-manifest.md) | 60 | 56 | 93% | `chatMatchesAppliesTo`, `createFlowRunner`, `renderA2A`, `renderFlow` |
 | `@onderling/app-scaffold` | [app-scaffold.md](app-scaffold.md) | 4 | 4 | 100% | — |
 | `@onderling/attribute-charter` | [attribute-charter.md](attribute-charter.md) | 20 | 20 | 100% | — |
-| `@onderling/logger` | [logger.md](logger.md) | 7 | 7 | 100% | — |
+| `@onderling/logger` | [logger.md](logger.md) | 8 | 7 | 88% | `REDACTED` |
 | `@onderling/oidc-session` | [oidc-session.md](oidc-session.md) | 10 | 10 | 100% | — |
-| `@onderling/agent-registry` | [agent-registry.md](agent-registry.md) | 113 | 113 | 100% | — |
+| `@onderling/agent-registry` | [agent-registry.md](agent-registry.md) | 143 | 143 | 100% | — |

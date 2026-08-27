@@ -670,18 +670,7 @@ returning the same `{ seal, open }` shape:
 createCanonicalShare({ sharing, keyStore, controllerKey, resourceUri, resourceUriFor, mode = 'read' } = {})
 ```
 
-Build a canonical-share controller for a single sealed resource. Pure orchestration — pod I/O is injected
-exactly as `createControlAgent` injects it:
-
-**Parameters**
-
-- `a` `object`
-- `a.sharing` `{ grant: Function, revoke: Function }` — the ACP surface (client.sharing) — grant/revoke already enforce the SHARING_GRANT_NOOP / SHARING_REVOKE_NOOP contract (a no-op throws).
-- `a.keyStore` `{ read: () => any, write: (res:any) => any }` — reads/writes the item's group-key resource on the pod (e.g. `/.keys/<item>-vN.json`).
-- `a.controllerKey` `{ publicKey: string, privateKey: string }` — the origin-side granter's keypair. It is always a recipient of the key resource, so it can unwrap-to-re-wrap on every grant/rotate.
-- `[a.resourceUri]` `string` — the canonical item's pod resource URI (the ACP target). May instead be supplied per-call, or derived via `resourceUriFor(ref)`.
-- `[a.resourceUriFor]` `(ref:object)=>(string|null)` — maps a shared-ref → the canonical resource URI.
-- `[a.mode='read']` `string` — the ACP mode granted/revoked (canonical sharing is read-only by design).
+_No JSDoc block in the source (recorded gap — see the coverage table)._
 
 ## `src/sealing/controlAgent.js`
 
@@ -1291,6 +1280,54 @@ holder never has to know the two-step shape.
 - `opts.sealed` `string` — the host-blind sealed body from `sealResource`.
 
 **Returns:** `string` — the plaintext.
+
+## `src/sealing/scopedSchemes.js`
+
+### `SCOPED_SEAL_SCHEMES`
+
+**Kind:** constant · **Import:** `SCOPED_SEAL_SCHEMES` from `'@onderling/pod-client'`
+
+_No JSDoc block in the source (recorded gap — see the coverage table)._
+
+### `assertScopedScheme`
+
+**Kind:** function · **Import:** `assertScopedScheme` from `'@onderling/pod-client'`
+
+```js
+assertScopedScheme(scheme)
+```
+
+D2 gate — assert a seal scheme may have its audience extended by a grant. DENY-BY-DEFAULT: an absent /
+unknown scheme throws rather than defaulting to "allowed", so a caller that forgets to say which scheme
+it is sealing under cannot silently widen a group-key audience.
+
+**Parameters**
+
+- `scheme` `string|null|undefined` — a `SEAL_SCHEMES` value.
+
+**Returns:** `string` — the validated scheme.
+
+### `needsCopyToLeaveAudience`
+
+**Kind:** function · **Import:** `needsCopyToLeaveAudience` from `'@onderling/pod-client'`
+
+```js
+needsCopyToLeaveAudience(scheme)
+```
+
+The D2 ROUTER predicate (Frits 2026-08-06) — true iff content under this scheme must LEAVE its audience as a
+re-sealed COPY rather than an in-place grant. That is EXACTLY `group-key`: an in-place grant of group-key
+content hands the grantee the one key to the WHOLE audience's content, so a cross-circle or out-of-circle
+share of it becomes a copy instead. A SCOPED scheme (`PAIRWISE` | `PER_RESOURCE_CEK`) grants only its own
+per-recipient/per-resource audience → in-place is fine. Absent/unknown/sealed-forward is NEITHER copy nor
+in-place: it stays REFUSED by the throwing gate (`assertScopedScheme`), deny-by-default — a caller that can't
+name its scheme must not silently share. Narrow on purpose (group-key only), so nothing else changes.
+
+**Parameters**
+
+- `scheme` `string|null|undefined` — a `SEAL_SCHEMES` value.
+
+**Returns:** `boolean`
 
 ## `src/sealing/sealResolver.js`
 

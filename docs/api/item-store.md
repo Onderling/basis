@@ -7,6 +7,70 @@ Open/closed items in a hybrid pod — attribution, audit, per-field merge contra
 
 README: [`packages/item-store/README.md`](../../packages/item-store/README.md) · Index: [docs/api/README.md](README.md)
 
+## `../params/src/params.js`
+
+### `PARAM_SCOPE`
+
+**Kind:** constant · **Import:** `PARAM_SCOPE` from `'@onderling/item-store'`
+
+The sync scope — decides where a set value routes (decision B/C).
+
+### `PARAM_KIND`
+
+**Kind:** constant · **Import:** `PARAM_KIND` from `'@onderling/item-store'`
+
+The security kind — the set-op gate (decision B/E). `internal` is immutable by construction.
+
+### `param`
+
+**Kind:** function · **Import:** `param` from `'@onderling/item-store'`
+
+```js
+param(spec)
+```
+
+`param(spec)` — the declaration-site helper (decision A). Validates the spec and RETURNS its code default,
+so `export const X = param({ … })` is the value at the use site AND the greppable, uniform declaration the
+stale-param guard's static scan reads. Pure: it registers nothing at runtime (no import-order hazard).
+
+### `createParamRegistry`
+
+**Kind:** function · **Import:** `createParamRegistry` from `'@onderling/item-store'`
+
+```js
+createParamRegistry()
+```
+
+The runtime PARAMETER REGISTER — a plain instance (Map + `declare()` + accessors), the sibling shape of
+`createResolutionRegistry()`. Populated by DI at composition (injected down) with the params it governs;
+`valueOf` gives the live value, `setValue`/`setParam` route by scope, and kind is the settability gate.
+
+### `setParam`
+
+**Kind:** function · **Import:** `setParam` from `'@onderling/item-store'`
+
+```js
+async setParam(register, { key, value } = {}, { homes } = {})
+```
+
+THE `set-param` OP (decision D) — the ONE generic security chokepoint. It reads the register and enforces
+`kind`: it sets ONLY a kind:user param (scope-appropriate) and REFUSES a kind:internal one (and an unknown
+key). One gate where it binds beats replicating the check per set-op (enforceability). On success it routes
+the value to the EXISTING sync home for the param's scope (decision C) via the injected `homes` writers —
+`device`/`agent`/`circle` → the writer the composition wired to `devices/<id>.json` / `shared.json` /
+circle policy. The register never persists; it declares + routes.
+
+**Parameters**
+
+- `register` `object` — a param register (createParamRegistry)
+- `arg` `object`
+- `arg.key` `string` — the param key to set
+- `arg.value` `*` — the new value
+- `[opts]` `object`
+- `[opts.homes]` `Record<'device'|'agent'|'circle', (p:{key,value,scope,spec})=>void>` — scope → home writer
+
+**Returns:** `{ok:boolean, key?:string, value?:*, scope?:string, home?:string, error?:string}`
+
 ## `src/CircleItemStore.js`
 
 ### `CircleItemStore`
@@ -15,7 +79,7 @@ README: [`packages/item-store/README.md`](../../packages/item-store/README.md) �
 
 ```js
 class CircleItemStore
-new CircleItemStore({ dataSource, rootContainer, registry } = {})
+new CircleItemStore({ dataSource, rootContainer, registry, resolution } = {})
 ```
 
 Generic, per-circle, type-indexed item store over an injected `core.DataSource`: typed
@@ -45,7 +109,7 @@ by the injected role policy, and cross-store sync ingestion (`applySync` / `remo
 Extends core `Emitter` and emits per-action item events. See the module doc for the per-field
 merge contracts.
 
-**Methods:** `addItems()` · `listOpen()` · `listClosed()` · `getById()` · `markComplete()` · `applySync()` · `removeSync()` · `removeItems()` · `claim()` · `reassign()` · `update()` · `auditLog()` · `submit()` · `approve()` · `reject()` · `revoke()` · `setApprovalMode()` · `_assertDepsClosed()`
+**Methods:** `addItems()` · `ingestItems()` · `listOpen()` · `listClosed()` · `getById()` · `markComplete()` · `applySync()` · `removeSync()` · `removeItems()` · `claim()` · `reassign()` · `update()` · `auditLog()` · `submit()` · `approve()` · `reject()` · `revoke()` · `setApprovalMode()` · `_assertDepsClosed()`
 
 ## `src/addressedDeliver.js`
 
@@ -248,8 +312,7 @@ causalRank(item)
 ```
 
 The causal coordinate of an item: `{ at, by }`.
-  at — numeric origin clock parsed from `updatedAt` (epoch number as-is, ISO string via Date.parse);
-       `NaN` when absent/unparseable (⇒ "no comparable clock").
+  at — the item's Lamport `clock` (an integer); `NaN` when absent (⇒ "no comparable clock").
   by — writer id (`updatedBy`) used only as the concurrency tiebreak; `''` when absent.
 
 **Parameters**
@@ -270,18 +333,62 @@ Decide which side to keep when an inbound item meets the local copy.
 
 **Parameters**
 
-- `local` `object|null|undefined` — the currently-stored item (has a stamped `updatedAt`), or null/absent
-- `incoming` `object` — the inbound PAYLOAD (its `updatedAt` is the origin clock, if present)
+- `local` `object|null|undefined` — the currently-stored item (has a stamped `clock`), or null/absent
+- `incoming` `object` — the inbound PAYLOAD (its `clock` is the origin Lamport clock, if present)
 
-**Returns:** `'incoming'|'local'` — no local → 'incoming' (first arrival / create) - incoming has no comparable clock → 'incoming' (backward-compat last-received-wins) - local has no comparable clock → 'incoming' (local predates metadata; accept the clock-bearing update) - incoming.updatedAt > local → 'incoming' (causally newer wins) - incoming.updatedAt < local → 'local' (causally OLDER inbound must NOT clobber) - equal updatedAt, higher writer id → 'incoming' (deterministic concurrency tiebreak) - otherwise (fully equal / lower) → 'local' (idempotent: no rewrite, no churn)
+**Returns:** `'incoming'|'local'` — no local → 'incoming' (first arrival / create) - incoming has no comparable clock → 'incoming' (last-received-wins fallback for a clockless item) - local has no comparable clock → 'incoming' (local predates the clock; accept the clock-bearing update) - incoming.clock > local → 'incoming' (causally newer wins) - incoming.clock < local → 'local' (causally OLDER inbound must NOT clobber) - equal clock, higher writer id → 'incoming' (deterministic concurrency tiebreak) - otherwise (fully equal / lower) → 'local' (idempotent: no rewrite, no churn)
+
+### `CLAIM_FIELDS`
+
+**Kind:** constant · **Import:** `CLAIM_FIELDS` from `'@onderling/item-store'`
+
+_No JSDoc block in the source (recorded gap — see the coverage table)._
+
+### `reconcileClaim`
+
+**Kind:** function · **Import:** `reconcileClaim` from `'@onderling/item-store'`
+
+```js
+reconcileClaim(local, incoming)
+```
+
+The winning claim cluster to OVERLAY onto the content winner, or null when neither side carries a claim
+(non-task items are unaffected). See the rule above.
+
+**Parameters**
+
+- `local` `object|null|undefined`
+- `incoming` `object`
+
+**Returns:** `object|null`
+
+### `applyClaimOverlay`
+
+**Kind:** function · **Import:** `applyClaimOverlay` from `'@onderling/item-store'`
+
+```js
+applyClaimOverlay(base, bundle)
+```
+
+Replace the claim cluster of `base` with `bundle` (absent fields are deleted, so nothing stale lingers).
+
+### `claimClusterEqual`
+
+**Kind:** function · **Import:** `claimClusterEqual` from `'@onderling/item-store'`
+
+```js
+claimClusterEqual(a, b)
+```
+
+True iff two items carry the SAME claim cluster (used to keep an origin merge idempotent — no churn).
 
 ## `src/chatEnvelope.js`
 
-### `KRING_CHAT_KIND`
+### `CIRCLE_CHAT_KIND`
 
-**Kind:** constant · **Import:** `KRING_CHAT_KIND` from `'@onderling/item-store'`
+**Kind:** constant · **Import:** `CIRCLE_CHAT_KIND` from `'@onderling/item-store'`
 
-The kring chat message subtype/kind.
+The circle chat message subtype/kind.
 
 ### `chatEnvelopeFromStoreItem`
 
@@ -291,13 +398,13 @@ The kring chat message subtype/kind.
 chatEnvelopeFromStoreItem(item, { groupId = null, lenient = false } = {})
 ```
 
-`fromItem` — project a durable itemStore `kring-chat-message` item onto the
+`fromItem` — project a durable itemStore `circle-chat-message` item onto the
 WIRE/inbox chat envelope shape that `chatMessageInbox.ingestChatMessage`
 consumes:  `{ subtype, circleId, msgId, ts, text, fromActor, media? }`.
 
 This replaces the two hand-maintained reshapers that read a stored item's
 `source` and re-emit the envelope — `stoop getMessagesSince`'s `.map(...)`
-and `basis kringChatRehydrate.itemToEnvelope`. They differ only in their
+and `basis circleChatRehydrate.itemToEnvelope`. They differ only in their
 leniency toward malformed items, expressed here as one explicit flag rather
 than as two silently-drifting copies:
 
@@ -328,12 +435,12 @@ toEventLogItem({ msgId, ts, circleId, actor, text, senderDisplay, buttons, scope
 EventLog render event. This is the ONE builder behind all three former
 hand-copies:
 
-  - the optimistic local append (`kring-host kringChatMessageEvent`) — passes
+  - the optimistic local append (`kring-host circleChatMessageEvent`) — passes
     the LOCAL-ONLY presentation fields (buttons/scope/embeds/review/
     provenance/consent) and NO `senderDisplay`;
   - the received append (`basis chatMessageInbox`) — passes `senderDisplay`
     + an already-guarded `media`;
-  - the rehydrate legacy append (`basis kringChatRehydrate`) — passes only
+  - the rehydrate legacy append (`basis circleChatRehydrate`) — passes only
     `senderDisplay`.
 
 The optional keys are appended in the SAME order and under the SAME
@@ -382,12 +489,12 @@ toWireEnvelope({ circleId, msgId, ts, text, fromActor, fromWebid, media })
 ```
 
 `toWire` — project the canonical fields onto the peer fan-out WIRE
-envelope that `stoop broadcastKringMessage` sends over the reliable
+envelope that `stoop broadcastCircleMessage` sends over the reliable
 transport:
-  `{ type:'p2p-chat', subtype:'kring-chat-message', circleId, msgId, ts, text, fromActor, fromWebid, media? }`
+  `{ type:'p2p-chat', subtype:'circle-chat-message', circleId, msgId, ts, text, fromActor, fromWebid, media? }`
 
-The media wire-allowlist (`kring-host mediaForKringWire`) runs UPSTREAM
-inside `broadcastKringFanOut` before the pointer reaches this projection,
+The media wire-allowlist (`kring-host mediaForCircleWire`) runs UPSTREAM
+inside `broadcastCircleFanOut` before the pointer reaches this projection,
 so `media` here is already the whitelisted, circle-safe shape (sender-local
 fields such as `stored` / device paths already dropped). This projector
 only re-emits it; it never re-admits a raw embed. Absent → byte-identical
@@ -410,7 +517,7 @@ either way).
 **Kind:** function · **Import:** `toWireRefEnvelope` from `'@onderling/item-store'`
 
 ```js
-toWireRefEnvelope({ circleId, msgId, ts, ref, fromActor, fromWebid, media })
+toWireRefEnvelope({ circleId, msgId, ts, ref, fromActor, fromWebid, media, subtype })
 ```
 
 `toWire` (REF variant) — the pod-signal projection of the canonical
@@ -519,7 +626,7 @@ back to last-received-wins so pre-metadata peers still ingest. See `causalMerge.
 **Kind:** function · **Import:** `createCircleStores` from `'@onderling/item-store'`
 
 ```js
-createCircleStores({ dataSource, registry, rootPrefix = 'mem://circles/', onStore } = {})
+createCircleStores({ dataSource, registry, resolution, rootPrefix = 'mem://circles/', onStore, dataSourceFor } = {})
 ```
 
 Lazy per-circle registry of `CircleItemStore`s over ONE shared `dataSource`: `getStore(circleId)`
@@ -837,6 +944,203 @@ a missing ref → `null` → `NOT_FOUND` placeholder.
 - `[deps.podFetch]` `(ref:string)=>Promise<{ok?:boolean,status?:number,text?:Function}>`
 
 **Returns:** `(ref:string)=>Promise<{item:object}|null>`
+
+### `itemTreeFor`
+
+**Kind:** function · **Import:** `itemTreeFor` from `'@onderling/item-store'`
+
+```js
+async itemTreeFor({ itemId, getById, pseudoPodRead, podFetch } = {})
+```
+
+The whole `getItemTree` op body, once — walk an item's embeds/deps tree and materialise the
+cross-pod refs in it.
+
+This existed TWICE, in stoop's skills and in tasks' workspace, the second copied from the first
+(its comment said so) along with a test described as an "analog" of the other. The two were
+identical but for which store they read, which is exactly the difference a parameter is for. Two
+copies of a decentralised READ path is a bad thing to let drift: it is the executable half of the
+`embeds: [{type, ref}]` convention, and a divergence between them is a divergence in what a
+cross-pod reference means.
+
+Both embeds shapes are bridged here — top-level (the canonical slot) and `source.embeds`, where
+items originating in a noticeboard put them — so neither caller has to know about the other's.
+
+**Parameters**
+
+- `a` `object`
+- `a.itemId` `string` — the root
+- `a.getById` `(id: string) => Promise<object|null>` — the caller's store read
+- `[a.pseudoPodRead]` `(ref: string) => Promise<*>` — local pod-cache read, when wired
+- `[a.podFetch]` `(url: string) => Promise<Response>` — cross-pod fetch (defaults to public GET)
+
+**Returns:** `Promise<{tree: object}|{error: string}>`
+
+## `src/entryKindDeclarations.js`
+
+### `createEntryKindRegistry`
+
+**Kind:** function · **Import:** `createEntryKindRegistry` from `'@onderling/item-store'`
+
+```js
+createEntryKindRegistry()
+```
+
+A mutable `lane → Set(kind)` registry with the declare/read accessors the rail consults.
+
+### `declareManifestEntryKinds`
+
+**Kind:** function · **Import:** `declareManifestEntryKinds` from `'@onderling/item-store'`
+
+```js
+declareManifestEntryKinds(registry, manifest)
+```
+
+Populate a registry from an app manifest's DECLARED appends (the DI seam — the app declares INTO the
+substrate registry). Reads `operations[{ appends: [{ lane, kind }] }]`. An op with no `appends` declares
+nothing; malformed rows are skipped (the rail's loud gate catches an op appending an undeclared kind).
+
+### `entryKindRegistryFromManifests`
+
+**Kind:** function · **Import:** `entryKindRegistryFromManifests` from `'@onderling/item-store'`
+
+```js
+entryKindRegistryFromManifests(...manifests)
+```
+
+Build the effective registry for one or more manifests — what a composition root hands the rail(s).
+
+## `src/entryKinds.js`
+
+### `LANE`
+
+**Kind:** constant · **Import:** `LANE` from `'@onderling/item-store'`
+
+Which surface an entry belongs to. `human` shows in a conversation; `system` is plumbing.
+
+### `RETAIN`
+
+**Kind:** constant · **Import:** `RETAIN` from `'@onderling/item-store'`
+
+Retention classes. Durations are a per-user setting; these are the buckets they apply to.
+
+### `ENTRY_KINDS`
+
+**Kind:** constant · **Import:** `ENTRY_KINDS` from `'@onderling/item-store'`
+
+The table. A kind absent from it is treated as `system / never wakes / short / not auditable` — the
+conservative reading, so an unregistered kind cannot wake a phone or masquerade as conversation.
+
+### `UNKNOWN_KIND`
+
+**Kind:** constant · **Import:** `UNKNOWN_KIND` from `'@onderling/item-store'`
+
+The conservative default for an unregistered kind — never wakes, never reads as conversation.
+
+### `entryKind`
+
+**Kind:** function · **Import:** `entryKind` from `'@onderling/item-store'`
+
+```js
+entryKind(kind)
+```
+
+Look a kind up. Always returns a descriptor.
+
+### `isSystemKind`
+
+**Kind:** function · **Import:** `isSystemKind` from `'@onderling/item-store'`
+
+```js
+isSystemKind(kind)
+```
+
+Is this kind system plumbing rather than conversation?
+
+### `conversationKinds`
+
+**Kind:** function · **Import:** `conversationKinds` from `'@onderling/item-store'`
+
+```js
+conversationKinds()
+```
+
+Kinds a conversation surface shows. Derived, so adding a human kind cannot forget the chat surface.
+
+### `isAuditKind`
+
+**Kind:** function · **Import:** `isAuditKind` from `'@onderling/item-store'`
+
+```js
+isAuditKind(kind)
+```
+
+Is this kind auditable — immutable once written (invariant 4b)?
+
+### `retentionOf`
+
+**Kind:** function · **Import:** `retentionOf` from `'@onderling/item-store'`
+
+```js
+retentionOf(kind)
+```
+
+Retention class for a kind.
+
+### `RETENTION_DEFAULTS`
+
+**Kind:** constant · **Import:** `RETENTION_DEFAULTS` from `'@onderling/item-store'`
+
+The retention window PER class, as a DURATION in ms — the ONE table both audit records read: `sa.audit`
+(the signed security log, in secure-agent) and the agent trail (in basis's `eventLog`). It lives HERE, in
+the substrate, precisely so both can import it — secure-agent cannot import the basis app, so a copy in
+`eventLog.js` (where it used to live) could never be the shared source. Durations are a per-user setting;
+these are the shared DEFAULTS. Past its window an AUDIT entry COMPACTS into an `audit-summary` (never
+drops); short/chat past theirs are dropped. The audit-retention agreement guard holds both records to reading THIS table.
+
+### `retentionWindowFor`
+
+**Kind:** function · **Import:** `retentionWindowFor` from `'@onderling/item-store'`
+
+```js
+retentionWindowFor(retainClass)
+```
+
+The retention window (ms) for a RETAIN class (falls back to CHAT for an unknown class).
+ `record` deliberately has no entry here — callers must branch on the class BEFORE asking for a window.
+
+### `kindWakes`
+
+**Kind:** function · **Import:** `kindWakes` from `'@onderling/item-store'`
+
+```js
+kindWakes(kind, payload = null)
+```
+
+May an entry of this kind wake an offline device?
+
+`payload` is consulted ONLY for kinds whose table entry is not the whole story — today just `governance`,
+where a decision opening wakes and the votes that follow do not. Keeping that exception here, next to the
+table, is what lets stoop and basis stop each deriving it.
+
+**Parameters**
+
+- `kind` `string`
+- `[payload]` `object` — the entry's payload, when the kind needs it
+
+**Returns:** `boolean`
+
+### `governanceWakes`
+
+**Kind:** function · **Import:** `governanceWakes` from `'@onderling/item-store'`
+
+```js
+governanceWakes(event)
+```
+
+The governance exception: only a decision OPENING (`propose`) may wake. An individual vote or resolve is
+routine, and a circle that buzzes on every vote gets muted — after which the decision that mattered is
+missed anyway.
 
 ## `src/errors.js`
 
@@ -1162,6 +1466,87 @@ and routes peer `callSkill`s to them — see the HOST-WIRING TODO seam in the mo
 
 **Returns:** `Array<{id:string, humanInTheLoop:'required', posture:'negotiable', offering:object, handler:Function}>`
 
+## `src/resolutionPolicy.js`
+
+### `RESOLUTION`
+
+**Kind:** constant · **Import:** `RESOLUTION` from `'@onderling/item-store'`
+
+The resolution policies (the CRDT-system names — §5).
+
+### `DELIVERY`
+
+**Kind:** constant · **Import:** `DELIVERY` from `'@onderling/item-store'`
+
+The delivery-reliability tiers (§5 — the policy IMPLIES a transport guarantee; declared together).
+
+### `deliveryForResolution`
+
+**Kind:** function · **Import:** `deliveryForResolution` from `'@onderling/item-store'`
+
+```js
+deliveryForResolution(resolution)
+```
+
+_No JSDoc block in the source (recorded gap — see the coverage table)._
+
+### `DEFAULT_RESOLUTION`
+
+**Kind:** constant · **Import:** `DEFAULT_RESOLUTION` from `'@onderling/item-store'`
+
+The conservative default for an UNREGISTERED (item-type, field): content-LWW. The safest reading — an
+undeclared field heals on merge rather than being treated as a claim or a spine aspect (spine aspects,
+being on a separate path, default to their own deny — never reachable as an accidental content merge here).
+
+### `createResolutionRegistry`
+
+**Kind:** function · **Import:** `createResolutionRegistry` from `'@onderling/item-store'`
+
+```js
+createResolutionRegistry()
+```
+
+A mutable (item-type, field) → resolution registry with `resolutionOf` / `deliveryOf` accessors (mirrors
+`entryKinds`' `retentionOf` / `kindWakes`) plus the `hasChannel` selector the put dispatch reads. Start
+from `defaultResolutionRegistry()` (or `createResolutionRegistry()` for an empty one) and `declare(...)`
+onto it.
+
+### `defaultResolutionRegistry`
+
+**Kind:** function · **Import:** `defaultResolutionRegistry` from `'@onderling/item-store'`
+
+```js
+defaultResolutionRegistry()
+```
+
+The built-in SAFE DEFAULT registry — the "code default per type" (§6). Behaviour-preserving: task's whole
+claim cluster (`CLAIM_FIELDS`) resolves `claim` (first-wins), everything else falls to the content default.
+Reuses `causalMerge`'s `CLAIM_FIELDS` so there is no second definition of what the claim cluster is.
+
+### `declareManifestPolicies`
+
+**Kind:** function · **Import:** `declareManifestPolicies` from `'@onderling/item-store'`
+
+```js
+declareManifestPolicies(registry, manifest)
+```
+
+Populate a registry from an app manifest's DECLARED per-op field policies (the DI seam — invariant 5: the
+app declares its policy INTO the substrate registry, never an up-import). Reads
+`operations[{ appliesTo.type, resolves: [{ field, policy }] }]`. An op with no `resolves` declares nothing.
+
+### `resolutionRegistryFromManifests`
+
+**Kind:** function · **Import:** `resolutionRegistryFromManifests` from `'@onderling/item-store'`
+
+```js
+resolutionRegistryFromManifests(...manifests)
+```
+
+Build the effective registry for one or more app manifests: the safe default floor
+(`defaultResolutionRegistry`) with each manifest's declarations layered on. This is what a composition root
+injects into `createCircleStores({ resolution })`.
+
 ## `src/shareContainerTree.js`
 
 ### `collectSubtree`
@@ -1423,7 +1808,7 @@ read grant on `resourceUriFor(ref)`?"; this hook is what PUTS that grant there. 
 **Kind:** function · **Import:** `makeCanonicalShareHook` from `'@onderling/item-store'`
 
 ```js
-makeCanonicalShareHook({ canonicalShare, currentRecipients } = {})
+makeCanonicalShareHook({ canonicalShare, currentRecipients, grantRecipients, revokeRecipients, revokedKeysFor } = {})
 ```
 
 CANONICAL share hook (objective L) — the WRITE-side companion for the `canonical` posture. Where
@@ -1441,7 +1826,9 @@ recipient loop and the roster bookkeeping the substrate's `grantMember`/`rotate`
 
 - `opts` `object`
 - `opts.canonicalShare` `{ share:Function, revoke:Function }` — a `createCanonicalShare(...)` controller.
-- `[opts.currentRecipients]` `string[]|(()=>string[]|Promise<string[]>)` — the EXISTING roster's sealing PUBLIC KEYS (the origin circle's members already holding the group key). Passed to `grantMember` so a grant re-wraps the SAME key to the roster PLUS the new recipient — omitting it would drop the origin members from the resource. A thunk is resolved at share time (the live roster). Default: none.
+- `[opts.currentRecipients]` `string[]|(()=>string[]|Promise<string[]>)` — the EXISTING roster's sealing PUBLIC KEYS (the origin circle's members already holding the group key). Passed to `grantMember` so a grant re-wraps the SAME key to the roster PLUS the new recipient — omitting it would drop the origin members from the resource. A thunk is resolved at share time (the live roster). Default: none. ALSO the revoke-side FALLBACK when no `revokeRecipients` is given — so it must NOT include anyone revocable.
+- `[opts.grantRecipients]` `string[]|(()=>string[]|Promise<string[]>)` — GRANT-side base, when it should be WIDER than the roster: "everyone who currently holds this item's key" (roster ∪ the key resource's own `recipients`), so an earlier out-of-circle grantee survives a later grant. Defaults to `currentRecipients`.
+- `[opts.revokeRecipients]` `(revokeeWebids: string[]) => (string[]|Promise<string[]>)` — REVOKE-side base: given the WebIDs being revoked, return the sealing keys that should KEEP the key — i.e. every current holder MINUS the revokee(s). Lets a revoke evict exactly the named party instead of rotating to the roster and collaterally evicting unrelated out-of-circle grantees. Absent → `currentRecipients`.
 
 **Returns:** `{ onShare: Function, revoke: Function }`
 
@@ -1450,7 +1837,7 @@ recipient loop and the roster bookkeeping the substrate's `grantMember`/`rotate`
 **Kind:** function · **Import:** `makeCircleShareEnforcement` from `'@onderling/item-store'`
 
 ```js
-makeCircleShareEnforcement({ sharing, resourceUriFor, recipient, open, seal, canonicalShare, currentRecipients, mode = 'read' } = {})
+makeCircleShareEnforcement({ sharing, resourceUriFor, recipient, open, seal, canonicalShare, currentRecipients, grantRecipients, revokeRecipients, revokedKeysFor, mode = 'read' } = {})
 ```
 
 ONE-CALL pod-tier wiring for the cross-circle share (the composition seam). Binds the
@@ -1477,7 +1864,9 @@ fields the caller routes to only for `sharePosture === 'canonical'`.
 - `[opts.open]` `(text:string)=>string|Promise<string>` — sealing open (read side).
 - `[opts.seal]` `(item:object, ctx:object)=>object|Promise<object>` — optional re-seal (write side).
 - `[opts.canonicalShare]` `{ share:Function, revoke:Function }` — a `createCanonicalShare(...)` controller (objective L). Injected from the SAME pod site; enables the canonical grant/revoke hooks.
-- `[opts.currentRecipients]` `string[]|(()=>string[]|Promise<string[]>)` — origin roster sealing keys for the canonical hook (see makeCanonicalShareHook).
+- `[opts.currentRecipients]` `string[]|(()=>string[]|Promise<string[]>)` — origin roster sealing keys for the canonical hook (see makeCanonicalShareHook). Also the revoke-side default.
+- `[opts.grantRecipients]` `string[]|(()=>string[]|Promise<string[]>)` — optional WIDER grant-side base (roster ∪ the key resource's current recipients) so earlier out-of-circle grantees aren't dropped.
+- `[opts.revokeRecipients]` `(revokeeWebids: string[]) => (string[]|Promise<string[]>)` — optional precise revoke-side base (current holders MINUS the named revokee(s)); see makeCanonicalShareHook.
 - `[opts.mode='read']` `string` — the access mode granted + required. Must match on both sides.
 
 **Returns:** `{ onShare: Function, policy: { checkGrant: Function, open?: Function }, onShareCanonical?: Function, revokeCanonical?: Function }`
@@ -1651,6 +2040,101 @@ isAssignee(item, actor)
 
 True iff `actor` is one of the task's co-owners (membership, not equality).
 
+### `confirmationModeOf`
+
+**Kind:** function · **Import:** `confirmationModeOf` from `'@onderling/item-store'`
+
+```js
+confirmationModeOf(item)
+```
+
+The confirmation mode of a task — `'explicit'` iff set so, else `'auto'` (the least-friction default).
+
+### `confirmedClaimOf`
+
+**Kind:** function · **Import:** `confirmedClaimOf` from `'@onderling/item-store'`
+
+```js
+confirmedClaimOf(item)
+```
+
+The confirmed claimant's id, or null when the claim is still pending / the task is unclaimed.
+
+### `isConfirmedClaimant`
+
+**Kind:** function · **Import:** `isConfirmedClaimant` from `'@onderling/item-store'`
+
+```js
+isConfirmedClaimant(item, actor)
+```
+
+True iff `actor` holds the CONFIRMED claim (not merely a pending one).
+
+### `claimState`
+
+**Kind:** function · **Import:** `claimState` from `'@onderling/item-store'`
+
+```js
+claimState(item)
+```
+
+The claim state of a task, for projections/UX: `'unclaimed' | 'pending' | 'confirmed'`. A `pending` claim
+has a claimant but no confirmation yet (explicit mode, awaiting the authority) — the "not yet yours" state.
+
+### `claimConfirmationStatement`
+
+**Kind:** function · **Import:** `claimConfirmationStatement` from `'@onderling/item-store'`
+
+```js
+claimConfirmationStatement({ taskId, confirmedAssignee, confirmedAt, claimSeq } = {})
+```
+
+The canonical string a confirmer SIGNS to make a `claim-confirmed` authoritative — the facts that identify
+exactly which claim, on which task, at which sequence. Stable + delimiter-separated so two devices produce
+the same bytes. (The signing/verifying keys live in the identity layer, NOT here — this substrate only
+canonicalises + carries `confirmedSig`; sign/verify are injected. Enforcement rides eviction-as-signed-
+statement, task #2.)
+
+**Parameters**
+
+- `facts` `{taskId?:string, confirmedAssignee?:string, confirmedAt?:number, claimSeq?:number}`
+
+### `verifyClaimConfirmation`
+
+**Kind:** function · **Import:** `verifyClaimConfirmation` from `'@onderling/item-store'`
+
+```js
+verifyClaimConfirmation(item, verify)
+```
+
+Verify a task's `confirmedSig` against its confirmation facts, using an injected `verify(message, sig)` (the
+identity layer's Ed25519 verify bound to the confirmer's pubkey). Returns false when there is no signature /
+no confirmed claimant, or the signature does not check out. A no-op-safe read — no crypto in the substrate.
+
+**Parameters**
+
+- `item` `object`
+- `verify` `(message:string, sig:string)=>boolean`
+
+### `isClaimExpired`
+
+**Kind:** function · **Import:** `isClaimExpired` from `'@onderling/item-store'`
+
+```js
+isClaimExpired(item, now = 0)
+```
+
+True iff the task's claim has LAPSED under its lease (§2.8): the issuer set a `claimLease` (duration in ms)
+at creation and `claimedAt + claimLease` is in the past. A lapsed claim returns the node to claimable — an
+unfinished claim no longer freezes its subtree. DETERMINISTIC: computed identically on every device from the
+item's own fields + a `now` the caller supplies (principle 10 — nothing decided locally). No lease (the
+default) ⇒ never expires (manual release only). A completed task never expires.
+
+**Parameters**
+
+- `item` `object`
+- `[now]` `number` — epoch ms (caller-supplied so the fn stays pure/testable)
+
 ### `claim`
 
 **Kind:** function · **Import:** `claim` from `'@onderling/item-store'`
@@ -1677,6 +2161,28 @@ Maintains the `assignee = assignees[0]` mirror + `claimedAt`.
 - `ctx` `object` — see module doc (`actor` required; `rolePolicy`, `expectedEtag`, `emit` optional).
 
 **Returns:** `Promise<object | {error:'already-claimed', current: object|null}>`
+
+### `confirmClaim`
+
+**Kind:** function · **Import:** `confirmClaim` from `'@onderling/item-store'`
+
+```js
+async confirmClaim(store, id, ctx = {})
+```
+
+Confirm a claim — AUTHORITATIVE (CAS). The authority (task master, or admin/coordinator via `rolePolicy`)
+turns a PENDING claim into a real one: the confirmed claimant becomes the SINGLE writer of the subtree, so
+`spawnSubtask` unlocks (see `canSpawnSubtask`). Confirms `ctx.assignee` when given, else the current sole
+claimant; collapses the co-owner set to the confirmed claimant (confirmation RESOLVES a contested claim to
+one). Emits `claim-confirmed`. Idempotent-safe: re-confirming the same claimant just re-stamps.
+
+**Parameters**
+
+- `store` `import('./CircleItemStore.js').CircleItemStore`
+- `id` `string`
+- `ctx` `object` — `actor` required; `assignee` (the claim to confirm), `rolePolicy`, `expectedEtag`, `emit` optional.
+
+**Returns:** `Promise<object | {error:'conflict', current: object|null} | {error:'no-claim', current: object}>`
 
 ### `reassign`
 

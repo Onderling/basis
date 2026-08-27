@@ -7,6 +7,12 @@ Privacy-first structured logging facade + on-device ring buffer (web ≡ mobile)
 
 README: [`packages/logger/README.md`](../../packages/logger/README.md) · Index: [docs/api/README.md](README.md)
 
+### `REDACTED`
+
+**Kind:** constant · **Import:** `REDACTED` from `'@onderling/logger'`
+
+_No JSDoc block in the source (recorded gap — see the coverage table)._
+
 ### `log`
 
 **Kind:** constant · **Import:** `log` from `'@onderling/logger'`

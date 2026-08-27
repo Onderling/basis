@@ -158,7 +158,7 @@ backoff (capped at 30s) until `disconnect()`. Also supports the relay's opt-in p
 protocol (`registerPushToken`/`unregisterPushToken`). Uses `ws` in Node.js and falls back to
 `globalThis.WebSocket` in browsers.
 
-**Methods:** `canReach()` · `connect()` · `disconnect()` · `_put()` · `registerPushToken()` · `unregisterPushToken()` · `forgetPeer()`
+**Methods:** `_bindAddress()` · `_unbindAddress()` · `canReach()` · `connect()` · `disconnect()` · `_put()` · `registerPushToken()` · `unregisterPushToken()` · `forgetPeer()`
 
 ## `src/RendezvousTransport.js`
 
@@ -178,3 +178,63 @@ React Native need an injected `rtcLib` polyfill. Use `RendezvousTransport.isSupp
 guard instantiation where WebRTC globals may be missing.
 
 **Methods:** `connect()` · `disconnect()` · `connectToPeer()` · `hasOpenChannelTo()` · `canReach()` · `_put()`
+
+## `src/nknSenderBinding.js`
+
+### `stripSubClientPrefix`
+
+**Kind:** function · **Import:** `stripSubClientPrefix` from `'@onderling/transports'`
+
+```js
+stripSubClientPrefix(addr)
+```
+
+Drop a `__N__.` multiclient sub-client prefix so an address is comparable with `client.addr`.
+
+### `nknAuthenticatedSender`
+
+**Kind:** function · **Import:** `nknAuthenticatedSender` from `'@onderling/transports'`
+
+```js
+nknAuthenticatedSender(msg)
+```
+
+The `authenticatedSender` port for nkn: who does nkn itself say sent this frame?
+
+── The unencrypted case, and why the frame is refused rather than checked ──────────────────────
+nkn authenticates `src` only for END-TO-END-ENCRYPTED frames: the payload is opened with a shared key
+derived from the sender ADDRESS's public key (nkn-sdk `client.js` `_decryptPayload` →
+`message.addrToPubkey(srcAddr)`), so a frame that decrypts could only have come from the holder of that
+address's key. For `encrypted: false` frames, `src` is just a field on the inbound protobuf, relayed by
+a node we do not trust, and checking it would be exactly the vacuous check this work exists to remove —
+an attacker who can set `src` sets it to match `_from` and sails through. So an unencrypted frame is
+refused. Neither adapter ever SENDS one (`_put` uses nkn's default `encrypt: true`, `consts.js`), so
+this costs no legitimate traffic and closes the obvious way around the check.
+
+A frame with NO `src` at all cannot be checked either way. nkn always supplies one; a frame without it
+is a test double or a library we do not know, so `null` is returned — the shared rule passes it through
+UNCHECKED and announces the absence, because "no src" is a hole, not a pass.
+
+**Parameters**
+
+- `msg` `{src?: string, isEncrypted?: boolean}` — the raw nkn frame
+
+**Returns:** `string|null|{refuse: string}`
+
+### `nknSenderVerdict`
+
+**Kind:** function · **Import:** `nknSenderVerdict` from `'@onderling/transports'`
+
+```js
+nknSenderVerdict(msg, envelope)
+```
+
+Is this inbound nkn frame allowed to speak as the sender its envelope claims?
+The shared rule, asked with nkn's port.
+
+**Parameters**
+
+- `msg` `{src?: string, isEncrypted?: boolean}` — the raw nkn frame
+- `envelope` `object` — the parsed envelope
+
+**Returns:** `{ok: boolean, reason: string, claimed: string|null, authenticated: string|null}`

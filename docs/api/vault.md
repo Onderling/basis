@@ -47,6 +47,122 @@ half of the token-refresh policy.
 
 **Returns:** `(input: RequestInfo|string, init?: RequestInit) => Promise<Response>`
 
+## `src/RootKeyStore.js`
+
+### `RootKeyStore`
+
+**Kind:** class · **Import:** `RootKeyStore` from `'@onderling/vault'`
+
+```js
+class RootKeyStore
+new RootKeyStore()
+```
+
+RootKeyStore — where a device keeps the owner-root SEED between launches.
+
+The recovery phrase itself is never persisted (it lives in the user's hands); what a
+device may hold is the 32-byte seed the phrase encodes, in the most protected place the
+platform offers. This contract is that place, behind one interface:
+
+  • mobile   — the OS keystore (expo-secure-store → Android Keystore / iOS Keychain),
+               gated by the device unlock. Adapter lives with the app shell, which owns
+               the native dependency.
+  • web      — `RootKeyStoreWebCrypto`: the seed at rest only AES-GCM-wrapped under a
+               NON-EXTRACTABLE WebCrypto key in IndexedDB.
+  • Node /
+    fallback — `RootKeyStoreVault`: the seed in a plain Vault. No stronger door exists
+               on these hosts; the honest gain over the old phrase-at-rest is containment
+               (see below), not secrecy.
+
+Why store the SEED and not the phrase, when they encode the same secret: uniformity of
+treatment. The phrase is the human artifact ("24 woorden = je sleutel") and the promise
+is that it exists only on paper/in memory; the seed is the machine artifact and goes in
+the machine's key place. `Bootstrap.toMnemonic()` re-renders the phrase from the seed
+when the user asks to see it — one secret, two encodings, each kept where it belongs.
+
+**Methods:** `getSeed()` · `setSeed()` · `deleteSeed()`
+
+### `assertSeed`
+
+**Kind:** function · **Import:** `assertSeed` from `'@onderling/vault'`
+
+```js
+assertSeed(seed, who)
+```
+
+_No JSDoc block in the source (recorded gap — see the coverage table)._
+
+### `seedToString`
+
+**Kind:** function · **Import:** `seedToString` from `'@onderling/vault'`
+
+```js
+seedToString(seed)
+```
+
+_No JSDoc block in the source (recorded gap — see the coverage table)._
+
+### `seedFromString`
+
+**Kind:** function · **Import:** `seedFromString` from `'@onderling/vault'`
+
+```js
+seedFromString(s)
+```
+
+_No JSDoc block in the source (recorded gap — see the coverage table)._
+
+### `RootKeyStoreMemory`
+
+**Kind:** class · **Import:** `RootKeyStoreMemory` from `'@onderling/vault'`
+
+```js
+class RootKeyStoreMemory extends RootKeyStore
+new RootKeyStoreMemory()
+```
+
+In-memory store — tests and ephemeral agents.
+
+**Methods:** `getSeed()` · `setSeed()` · `deleteSeed()`
+
+### `ROOT_SEED_VAULT_KEY`
+
+**Kind:** constant · **Import:** `ROOT_SEED_VAULT_KEY` from `'@onderling/vault'`
+
+The Vault-backed key the seed is stored under.
+
+### `RootKeyStoreVault`
+
+**Kind:** class · **Import:** `RootKeyStoreVault` from `'@onderling/vault'`
+
+```js
+class RootKeyStoreVault extends RootKeyStore
+new RootKeyStoreVault({ vault } = {})
+```
+
+Fallback store over any Vault, for hosts without a platform key door (Node processes,
+a browser without IndexedDB/WebCrypto, tests over VaultMemory). At-rest protection is
+whatever the backing vault provides — the gain over the retired phrase-at-rest is that
+what sits on disk is one device's seed encoding, no longer the user-facing recovery
+artifact the product promises exists only in their hands.
+
+**Methods:** `getSeed()` · `setSeed()` · `deleteSeed()`
+
+## `src/RootKeyStoreWebCrypto.js`
+
+### `RootKeyStoreWebCrypto`
+
+**Kind:** class · **Import:** `RootKeyStoreWebCrypto` from `'@onderling/vault'`
+
+```js
+class RootKeyStoreWebCrypto extends RootKeyStore
+new RootKeyStoreWebCrypto()
+```
+
+_No JSDoc block in the source (recorded gap — see the coverage table)._
+
+**Methods:** `getSeed()` · `setSeed()` · `deleteSeed()`
+
 ## `src/Vault.js`
 
 ### `Vault`
@@ -71,6 +187,101 @@ Key naming conventions (all vaults use these):
   'solid-pod-token'           — Solid OIDC token
 
 **Methods:** `get()` · `set()` · `delete()` · `has()` · `list()`
+
+## `src/VaultEncrypted.js`
+
+### `VAULT_ENC_SENTINEL_KEY`
+
+**Kind:** constant · **Import:** `VAULT_ENC_SENTINEL_KEY` from `'@onderling/vault'`
+
+The reserved backing-store key that marks a store as fully migrated to at-rest
+encryption. Stored as a PLAIN value (it gates decryption, so it cannot itself be
+encrypted) and hidden from `list()`.
+
+### `VAULT_ENC_VERSION`
+
+**Kind:** constant · **Import:** `VAULT_ENC_VERSION` from `'@onderling/vault'`
+
+The sentinel value written by the current migration.
+
+### `VaultEncrypted`
+
+**Kind:** class · **Import:** `VaultEncrypted` from `'@onderling/vault'`
+
+```js
+class VaultEncrypted extends Vault
+new VaultEncrypted({ backing, key } = {})
+```
+
+_No JSDoc block in the source (recorded gap — see the coverage table)._
+
+**Methods:** `get()` · `set()` · `delete()` · `has()` · `list()`
+
+### `migrateVaultToEncrypted`
+
+**Kind:** function · **Import:** `migrateVaultToEncrypted` from `'@onderling/vault'`
+
+```js
+async migrateVaultToEncrypted({ backing, key, drop = [], fingerprint } = {})
+```
+
+One-time, idempotent, crash-resumable migration of a plaintext vault to at-rest
+encryption.
+
+The SENTINEL — not per-value trial decryption — decides which path a boot takes: absent
+means "plaintext store, migrate on this unlock"; present means "everything is encrypted,
+read through VaultEncrypted". So a store is never read ambiguously half-and-half.
+
+Order of operations (deliberate):
+  1. every entry is re-written encrypted (already-encrypted entries are skipped, which is
+     what makes a crash mid-migration resumable — rerun and it completes);
+  2. the sentinel is written — only when every entry is sealed;
+  3. the `drop` keys are deleted LAST (the owner-phrase: after this, the phrase exists
+     only in the user's hands). A crash before step 3 loses nothing.
+
+With a `fingerprint` (a stable, non-secret identifier of the ROOT the key derives from —
+`Bootstrap.fingerprint()`), the sentinel binds the vault to that root: `v1:<fingerprint>`.
+A boot under a DIFFERENT root (the user restored another phrase — a deliberate identity
+switch) then finds a mismatched sentinel and RESETS the vault: every entry is deleted and
+the vault starts clean under the new root. That is the designed semantic, not data loss —
+entries sealed to the old root are undecryptable garbage to the new one, and the previous
+person's device secrets (identity seeds, capability tokens, mute lists) must not carry
+over to the restored person. Without a fingerprint the sentinel is bare `v1` (no binding).
+
+**Parameters**
+
+- `o` `object`
+- `o.backing` `Vault` — the plaintext vault to migrate in place.
+- `o.key` `Uint8Array` — 32-byte at-rest key (see VaultEncrypted).
+- `[o.drop]` `string[]` — keys to REMOVE rather than encrypt (secrets that must not persist at all, e.g. the recovery phrase the key derives from — keeping an encrypted copy of that would be circular).
+- `[o.fingerprint]` `string` — root identifier to bind the sentinel to (see above).
+
+**Returns:** `Promise<{migrated: boolean, sealed: number, dropped: number, reset?: true}>` — `migrated: false` when the sentinel already matched (nothing touched); `reset: true` when a root switch wiped the vault.
+
+### `resealVault`
+
+**Kind:** function · **Import:** `resealVault` from `'@onderling/vault'`
+
+```js
+async resealVault({ backing, oldKey, newKey } = {})
+```
+
+RESEAL a fully-encrypted vault from one at-rest key to another, in place (the custody
+migration: the sealing root moves from the owner root to the device's delegation seed; the
+sentinel — bound to the ROOT's fingerprint, the same person — stays as it is).
+
+Crash-resumable per entry: an entry that already opens under the NEW key is skipped, so a
+rerun after a mid-reseal crash completes the job. An entry that opens under NEITHER key is a
+genuine fault and throws — silently dropping it would be data loss wearing a success face.
+
+**Parameters**
+
+- `o` `object`
+- `o.backing` `Vault` — the encrypted vault (sentinel present).
+- `o.oldKey` `Uint8Array`
+- `o.newKey` `Uint8Array`
+
+**Returns:** `Promise<{resealed: number, skipped: number}>`
 
 ## `src/VaultIndexedDB.js`
 

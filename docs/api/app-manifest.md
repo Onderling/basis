@@ -33,10 +33,10 @@ point at: a `manifest.nouns[noun].atoms` entry that is not one of these
 is a rogue verb and fails the guard.
 
 It is the AUTHORITATIVE SUPERSET: every atom any app manifest declares today
-is a subset of this list (add/list/get/update/remove/complete/claim/reassign/
-submit/approve/reject/revoke/archive/unarchive/share/move). Adding a new
-canonical verb to the algebra = adding one `Atom` to `ATOMS` above (with its
-category/aliases/semantics), which flows here automatically.
+is a subset of this list (add/list/get/update/remove/complete/claim/confirm/
+reassign/submit/approve/reject/revoke/archive/unarchive/share/move). Adding a
+new canonical verb to the algebra = adding one `Atom` to `ATOMS` above (with
+its category/aliases/semantics), which flows here automatically.
 
 Alias to `ATOM_VERBS` so there is ONE source (CLAUDE.md invariant #3) — this
 name exists to make the CONVENTION greppable under the `CANONICAL_ATOMS`
@@ -262,6 +262,68 @@ bespoke behaviour or free CRUD — "declare a noun, get CRUD". `generic` is the 
 
 **Returns:** `Promise<{ok:true, via:'op'|'generic', opId?:string, atom?:string, result:any} | {ok:false, code:'unimplemented'|'no-dispatch'|'no-generic', opId?:string, atom?:string, noun?:string}>`
 
+## `src/flowRunner.js`
+
+### `createFlowRunner`
+
+**Kind:** function · **Import:** `createFlowRunner` from `'@onderling/app-manifest'`
+
+```js
+createFlowRunner({ callSkill, saveInstance, genId, isSecretKind, flowById, ops } = {})
+```
+
+_No JSDoc block in the source (recorded gap — see the coverage table)._
+
+**Parameters**
+
+- `deps` `object`
+- `deps.callSkill` `(opId: string, args: object) => Promise<any>` — bound to the owning app
+- `[deps.saveInstance]` `(instance: object) => Promise<void>|void` — persistence seam — called after every step and on every terminal status; never receives secrets
+- `[deps.genId]` `() => string`
+- `[deps.isSecretKind]` `(kind: string) => boolean`
+- `[deps.flowById]` `(flowId: string) => import('./flows.js').Flow|undefined` — for flow-ref steps
+- `[deps.ops]` `Map<string,object>|Object<string,object>` — opId → operation — enables the awaiting-input round-trip (required declared params the bindings did not satisfy)
+
+## `src/flows.js`
+
+### `verifyFlow`
+
+**Kind:** function · **Import:** `verifyFlow` from `'@onderling/app-manifest'`
+
+```js
+verifyFlow(flow, { ops, flows, isSecretKind } = {})
+```
+
+Verify ONE flow against its manifest context. Pure; returns every problem, not the first.
+
+**Parameters**
+
+- `flow` `Flow`
+- `ctx` `object`
+- `ctx.ops` `Map<string, object>|Object<string,object>` — opId → operation (the manifest's, already composed — the verifier does not resolve app prefixes)
+- `[ctx.flows]` `Map<string, Flow>|Object<string,Flow>` — flowId → flow (for flow-ref steps)
+- `[ctx.isSecretKind]` `(kind: string) => boolean` — default: kind === 'secret'
+
+**Returns:** `{ok: boolean, problems: string[]}`
+
+### `verifyFlows`
+
+**Kind:** function · **Import:** `verifyFlows` from `'@onderling/app-manifest'`
+
+```js
+verifyFlows(manifest, opts = {})
+```
+
+Verify a manifest's whole `flows[]` block (ids unique across the block; each flow verified
+with the block as the flow-ref index).
+
+**Parameters**
+
+- `manifest` `{operations?: object[], flows?: Flow[]}`
+- `[opts]` `object` — forwarded to verifyFlow (isSecretKind)
+
+**Returns:** `{ok: boolean, problems: string[]}`
+
 ## `src/freedom.js`
 
 ### `FREEDOM_LEVELS`
@@ -417,6 +479,35 @@ cf. internal/order.js).
 
 **Returns:** `{ type: 'object', properties: object, required: string[] }`
 
+## `src/renderA2A.js`
+
+### `NEVER_DELEGABLE`
+
+**Kind:** constant · **Import:** `NEVER_DELEGABLE` from `'@onderling/app-manifest'`
+
+Ops that may never be reached by an external caller, whatever token it presents.
+
+### `renderA2A`
+
+**Kind:** function · **Import:** `renderA2A` from `'@onderling/app-manifest'`
+
+```js
+renderA2A(manifestOrList, args, opts = {})
+```
+
+_No JSDoc block in the source (recorded gap — see the coverage table)._
+
+**Parameters**
+
+- `manifestOrList` `import('./schema.js').Manifest|import('./schema.js').Manifest[]`
+- `args` `object`
+- `args.callSkill` `(appOrigin:string, opId:string, args:object)=>Promise<any>` — the waist
+- `[opts]` `object`
+- `[opts.isNeverDelegable]` `(opId:string)=>boolean` — override the withhold predicate (tests)
+- `[opts.readArgs]` `(parts:any)=>object` — how to read args off the inbound Parts
+
+**Returns:** `Array<{id:string, handler:Function, visibility:string, policy:string, description:string}>` — Skill definitions, ready for `SkillRegistry.register`. NOT registered here — this is a projector, and deciding WHICH agent exposes them is the composing app's call, not the manifest's.
+
 ## `src/renderAttachments.js`
 
 ### `renderAttachments`
@@ -480,6 +571,53 @@ outputs follow manifest declaration order. Throws when `manifest`, `skillRegistr
 
 **Returns:** `{toolCatalogue: Array<object>, toolHandlers: Record<string, function>, systemPrompt: string, commandMenu: Array<object>, inlineKeyboardFor: function, replyShapeFor: function, followUpsFor: function, runtimeFor: function, embedSnapshotFor: function, briefFor: function, searchFor: function}`
 
+### `itemRowButtons`
+
+**Kind:** function · **Import:** `itemRowButtons` from `'@onderling/app-manifest'`
+
+```js
+itemRowButtons(manifest, item)
+```
+
+The buttons an ITEM ROW gets: `surfaces.ui.control === 'button'` ops whose gate matches the item.
+One implementation, because the chat keyboard and the embed cards must offer the same set — the
+manifest is platform-neutral and `appliesTo` is the gate, full stop. `apps/basis` kept a private
+copy of this walk (plus a copy of the predicate below, minus its wildcard) until 2026-08-27.
+
+── A GATE-LESS BUTTON OP IS NOT AN ITEM ACTION ──────────────────────────────────────────────────
+`matchesAppliesTo` answers "does this gate admit this item", and its documented contract is that
+an ABSENT gate admits everything. That is right for a predicate and wrong as a rule for choosing
+item-row buttons: an op declaring a button and no `appliesTo` is a global or settings affordance
+(`signOutOfPod`, `restoreFromMnemonic`, `setMemberRole`), and "no gate" was being read as "belongs
+on every row". Measured on 2026-08-27: one open noticeboard post computed 27 buttons, among them
+`removeMember` and `encryptedBackup`.
+
+`renderWeb` never had this problem because it builds item actions per VIEW and requires a type
+match, so there is always something to gate against. This selects the same way, explicitly, and
+the predicate below is left exactly as it is — changing what an absent gate MEANS would reach far
+past this bug, into every other caller of a shared contract.
+
+An op that genuinely belongs on every row says so: `appliesTo: { type: '*' }`.
+
+**Parameters**
+
+- `manifest` `object`
+- `item` `object` — `{id, type, state, kind?}`
+
+**Returns:** `Array<{opId: string, label: string, callbackData: string}>`
+
+### `chatMatchesAppliesTo`
+
+**Kind:** function · **Import:** `chatMatchesAppliesTo` from `'@onderling/app-manifest'`
+
+Defined as `matchesAppliesTo` in the source module.
+
+```js
+matchesAppliesTo(appliesTo, item)
+```
+
+_No JSDoc block in the source (recorded gap — see the coverage table)._
+
 ## `src/renderCoverage.js`
 
 ### `renderCoverage`
@@ -519,6 +657,27 @@ formatCoverageMarkdown(coverage, { mark = '✅', blank = '·' } = {})
 ```
 
 Render the matrix as a scannable markdown table (grouped by app).
+
+## `src/renderFlow.js`
+
+### `renderFlow`
+
+**Kind:** function · **Import:** `renderFlow` from `'@onderling/app-manifest'`
+
+```js
+renderFlow(flow, instance, { ops } = {})
+```
+
+_No JSDoc block in the source (recorded gap — see the coverage table)._
+
+**Parameters**
+
+- `flow` `import('./flows.js').Flow`
+- `instance` `object|null` — a flowRunner instance (null = not started)
+- `[ctx]` `object`
+- `[ctx.ops]` `Map<string,object>|Object<string,object>` — opId → operation, for param labelKeys
+
+**Returns:** `{ id: string, labelKey: string, status: string, progress: Array<{id: string, labelKey: string, state: 'done'|'current'|'pending'|'skipped'}>, form: null|{step: string, params: Array<{name: string, kind?: string, labelKey: string, required: boolean}>}, actions: {canSubmit: boolean, canCancel: boolean, canRestart: boolean}, reason: string|null, produces: object|null, }`
 
 ## `src/renderGate.js`
 

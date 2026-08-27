@@ -12,6 +12,70 @@ README: [`packages/core/README.md`](../../packages/core/README.md) · Index: [do
 - `'@onderling/core'`
 - `'@onderling/core/conformance'` — could not be imported outside its peer context (Vitest failed to access its internal state.); analysed statically
 
+## `../params/src/params.js`
+
+### `PARAM_SCOPE`
+
+**Kind:** constant · **Import:** `PARAM_SCOPE` from `'@onderling/core'`
+
+The sync scope — decides where a set value routes (decision B/C).
+
+### `PARAM_KIND`
+
+**Kind:** constant · **Import:** `PARAM_KIND` from `'@onderling/core'`
+
+The security kind — the set-op gate (decision B/E). `internal` is immutable by construction.
+
+### `param`
+
+**Kind:** function · **Import:** `param` from `'@onderling/core'`
+
+```js
+param(spec)
+```
+
+`param(spec)` — the declaration-site helper (decision A). Validates the spec and RETURNS its code default,
+so `export const X = param({ … })` is the value at the use site AND the greppable, uniform declaration the
+stale-param guard's static scan reads. Pure: it registers nothing at runtime (no import-order hazard).
+
+### `createParamRegistry`
+
+**Kind:** function · **Import:** `createParamRegistry` from `'@onderling/core'`
+
+```js
+createParamRegistry()
+```
+
+The runtime PARAMETER REGISTER — a plain instance (Map + `declare()` + accessors), the sibling shape of
+`createResolutionRegistry()`. Populated by DI at composition (injected down) with the params it governs;
+`valueOf` gives the live value, `setValue`/`setParam` route by scope, and kind is the settability gate.
+
+### `setParam`
+
+**Kind:** function · **Import:** `setParam` from `'@onderling/core'`
+
+```js
+async setParam(register, { key, value } = {}, { homes } = {})
+```
+
+THE `set-param` OP (decision D) — the ONE generic security chokepoint. It reads the register and enforces
+`kind`: it sets ONLY a kind:user param (scope-appropriate) and REFUSES a kind:internal one (and an unknown
+key). One gate where it binds beats replicating the check per set-op (enforceability). On success it routes
+the value to the EXISTING sync home for the param's scope (decision C) via the injected `homes` writers —
+`device`/`agent`/`circle` → the writer the composition wired to `devices/<id>.json` / `shared.json` /
+circle policy. The register never persists; it declares + routes.
+
+**Parameters**
+
+- `register` `object` — a param register (createParamRegistry)
+- `arg` `object`
+- `arg.key` `string` — the param key to set
+- `arg.value` `*` — the new value
+- `[opts]` `object`
+- `[opts.homes]` `Record<'device'|'agent'|'circle', (p:{key,value,scope,spec})=>void>` — scope → home writer
+
+**Returns:** `{ok:boolean, key?:string, value?:*, scope?:string, home?:string, error?:string}`
+
 ## `src/Agent.js`
 
 ### `Agent`
@@ -242,7 +306,7 @@ the SecurityLayer interface expected by Transport (encrypt / decryptAndVerify)
 with pass-throughs, while also providing HTTP-level auth helpers used
 directly by A2ATransport.
 
-**Methods:** `encrypt()` · `decryptAndVerify()` · `registerPeer()` · `wrapOutbound()` · `validateInbound()`
+**Methods:** `encrypt()` · `decryptAndVerify()` · `registerPeer()` · `learnPeerKey()` · `wrapOutbound()` · `validateInbound()`
 
 ## `src/a2a/A2ATransport.js`
 
@@ -595,7 +659,7 @@ Backoff sequence (in units of the base interval):
 **Kind:** function · **Import:** `peerFacade` from `'@onderling/core'`
 
 ```js
-peerFacade({ trailRoster = [], memberMap = [], peerGraph = [], circleId } = {})
+peerFacade({ trailRoster = [], memberMap = [], peerGraph = [], circleId, revealPolicy = 'pairwise' } = {})
 ```
 
 Project one circle's membership into per-(circle,member) `Peer` records.
@@ -606,7 +670,8 @@ Project one circle's membership into per-(circle,member) `Peer` records.
 - `o.trailRoster` `Array<object>` — The derived roster for ONE circle (deriveRoster output / listGroupMembers). The SOURCE OF MEMBERSHIP + per-circle crypto. One entry per member.
 - `[o.memberMap]` `Array<object>` — `MemberMap.list()` output — the display/identity cache, joined by `webid`. Display-only; never consulted for member existence.
 - `[o.peerGraph]` `Array<object>` — `PeerGraph.all()` / `.export()` output — liveness records, joined by the trail member's signing `pubKey` (PeerGraph's primary key).
-- `[o.circleId]` `string` — The circle this projection is for. The trail is already scoped to it; carried for legibility / assertion, not used to filter (the trail is the membership authority).
+- `[o.circleId]` `string` — The circle this projection is for. The trail is already scoped to it (not used to filter — the trail is the membership authority); it IS the CONTEXT id under which each `Peer.revealState` disclosure policy is keyed.
+- `[o.revealPolicy='pairwise']` `'open'|'pairwise'` — The circle's real-name reveal policy, an injected per-circle scalar (keeps the projection pure). Under `'open'` the circle discloses real names to members, so `revealState` marks `realName` enabled for every member; under `'pairwise'` a member's `realName` is enabled only when they've revealed it to ≥1 peer (the per-row `reveals[]` list). The per-PEER selection (revealed to whom) is not a per-circle bit and stays with the viewer/view-as gate, not here.
 
 **Returns:** `Peer[]` — one `Peer` per trail member, keyed by `circleAddress`.
 
@@ -632,6 +697,25 @@ the direct peer itself, and any record that is already direct (hops:0).
 - `[opts.timeout=5000]` `number`
 
 **Returns:** `Promise<number>` — number of records upserted; 0 when the peer is unreachable
+
+## `src/hashHex.js`
+
+### `hashHex`
+
+**Kind:** function · **Import:** `hashHex` from `'@onderling/core'`
+
+```js
+hashHex(input)
+```
+
+SHA-256 of a UTF-8 string (or bytes), as lowercase hex. Deterministic and identical on
+every platform — safe to use where independent replicas must agree without coordinating.
+
+**Parameters**
+
+- `input` `string|Uint8Array`
+
+**Returns:** `string` — 64-char lowercase hex
 
 ## `src/identity/AgentIdentity.js`
 
@@ -669,7 +753,24 @@ Construct via `Bootstrap.create()`, `Bootstrap.fromSeed(bytes)`, or
 `Bootstrap.fromMnemonic(phrase)`.  Direct `new Bootstrap(...)` is
 possible but the static factories validate inputs.
 
-**Methods:** `toMnemonic()` · `deriveResourceKey()` · `deriveAgentSeed()` · `derivedPubKey()` · `fingerprint()` · `onKeyRotated()` · `notifyKeyRotated()`
+**Methods:** `toMnemonic()` · `deriveResourceKey()` · `deriveAgentSeed()` · `deriveVaultAtRestKey()` · `derivedPubKey()` · `fingerprint()` · `onKeyRotated()` · `notifyKeyRotated()`
+
+### `deriveVaultAtRestKeyFrom`
+
+**Kind:** function · **Import:** `deriveVaultAtRestKeyFrom` from `'@onderling/core'`
+
+```js
+deriveVaultAtRestKeyFrom(seed)
+```
+
+The ONE vault-at-rest derivation (module-level so both custody modes share it byte-for-byte):
+root custody feeds the root secret; delegation custody feeds the device's delegation seed.
+
+**Parameters**
+
+- `seed` `Uint8Array` — 32 bytes.
+
+**Returns:** `Uint8Array` — 32-byte key.
 
 ## `src/identity/CloudAdapter.js`
 
@@ -799,6 +900,128 @@ validateMnemonic(mnemonic)
 
 Return true if the mnemonic is a valid 24-word BIP39 string.
 
+## `src/identity/addressPossession.js`
+
+### `ADDRESS_NONCE_BYTES`
+
+**Kind:** constant · **Import:** `ADDRESS_NONCE_BYTES` from `'@onderling/core'`
+
+Bytes of entropy in a registration nonce. 32 = the same order as a key; guessing is not a path.
+
+### `ADDRESS_CHALLENGE_TTL_MS`
+
+**Kind:** constant · **Import:** `ADDRESS_CHALLENGE_TTL_MS` from `'@onderling/core'`
+
+How long a challenge stays answerable. Long enough for a slow phone on a slow network to sign
+and reply; short enough that a nonce sitting in a relay's memory is not a lasting object. The
+single-use rule does the real work — this only bounds the state a connection can hold.
+
+### `newAddressChallenge`
+
+**Kind:** function · **Import:** `newAddressChallenge` from `'@onderling/core'`
+
+```js
+newAddressChallenge()
+```
+
+A fresh, single-use challenge nonce (base64url). Verifier-side; never generated by a client.
+
+### `addressPossessionMessage`
+
+**Kind:** function · **Import:** `addressPossessionMessage` from `'@onderling/core'`
+
+```js
+addressPossessionMessage(address, nonce)
+```
+
+The canonical message a holder signs. Binds the ADDRESS being claimed to THIS nonce, so a proof
+cannot be lifted onto a different address or replayed against a different challenge.
+
+**Parameters**
+
+- `address` `string`
+- `nonce` `string`
+
+**Returns:** `string`
+
+### `signAddressPossession`
+
+**Kind:** function · **Import:** `signAddressPossession` from `'@onderling/core'`
+
+```js
+signAddressPossession(identity, address, nonce)
+```
+
+Sign the challenge with an `AgentIdentity` whose `pubKey` IS the address.
+
+**Parameters**
+
+- `identity` `import('./AgentIdentity.js').AgentIdentity`
+- `address` `string`
+- `nonce` `string`
+
+**Returns:** `string` — base64url Ed25519 signature
+
+### `circleAddressSigner`
+
+**Kind:** function · **Import:** `circleAddressSigner` from `'@onderling/core'`
+
+```js
+circleAddressSigner(derivationSeed, circleId)
+```
+
+The signer for ONE per-circle address, vault-free — exactly as `signCircleLinkFromSeed` is. This
+is what makes the alias case cheap: a device registering N per-circle addresses on one socket
+signs N challenges without touching a vault N times.
+
+It is shaped for `Transport.addAddress(address, { sign })`: it takes the MESSAGE the adapter
+built, not a nonce, so the caller never has to know the registration protocol — only which circle
+the address belongs to, which is the one thing only the caller knows.
+
+**Parameters**
+
+- `derivationSeed` `Uint8Array` — this device's derivation root (see circleAddress.js)
+- `circleId` `string`
+
+**Returns:** `(message: string) => string` — sign(message) → base64url Ed25519 signature
+
+### `signAddressPossessionFromSeed`
+
+**Kind:** function · **Import:** `signAddressPossessionFromSeed` from `'@onderling/core'`
+
+```js
+signAddressPossessionFromSeed(derivationSeed, circleId, address, nonce)
+```
+
+The same thing at the protocol's own level: sign THIS challenge for THIS per-circle address.
+For callers that hold a nonce rather than a transport (another wire implementation, a test).
+
+**Parameters**
+
+- `derivationSeed` `Uint8Array` — this device's derivation root (see circleAddress.js)
+- `circleId` `string`
+- `address` `string` — the per-circle address being registered (= `deriveCircleAddress(...)`)
+- `nonce` `string`
+
+**Returns:** `string` — base64url Ed25519 signature
+
+### `verifyAddressPossession`
+
+**Kind:** function · **Import:** `verifyAddressPossession` from `'@onderling/core'`
+
+```js
+verifyAddressPossession({ address, nonce, proof } = {})
+```
+
+Verify a presented proof against the address itself — deny-by-default: anything missing,
+malformed or unparseable is `false`, never a throw the caller might treat as "unknown".
+
+**Parameters**
+
+- `a` `{address?: string, nonce?: string, proof?: string}`
+
+**Returns:** `boolean`
+
 ## `src/identity/circleAddress.js`
 
 ### `deriveCircleSeed`
@@ -806,14 +1029,14 @@ Return true if the mnemonic is a valid 24-word BIP39 string.
 **Kind:** function · **Import:** `deriveCircleSeed` from `'@onderling/core'`
 
 ```js
-deriveCircleSeed(profileSeed, circleId)
+deriveCircleSeed(derivationSeed, circleId)
 ```
 
 Derive a distinct 32-byte per-circle Ed25519 seed from a profile seed.
 
 **Parameters**
 
-- `profileSeed` `Uint8Array` — the profile's 32-byte seed (= Bootstrap.deriveAgentSeed(profileId)).
+- `derivationSeed` `Uint8Array` — this device's 32-byte derivation root: the profile's seed on an unenrolled device, the device seed (`deriveDeviceSeed`) on an enrolled one.
 - `circleId` `string`
 
 **Returns:** `Uint8Array` — 32-byte seed.
@@ -823,15 +1046,15 @@ Derive a distinct 32-byte per-circle Ed25519 seed from a profile seed.
 **Kind:** function · **Import:** `deriveCircleAddress` from `'@onderling/core'`
 
 ```js
-deriveCircleAddress(profileSeed, circleId)
+deriveCircleAddress(derivationSeed, circleId)
 ```
 
-The per-circle ADDRESS (pubKey) a profile presents in a circle — vault-free, deterministic,
+The per-circle ADDRESS (pubKey) this device presents in a circle — vault-free, deterministic,
 same encoding as `AgentIdentity.pubKey`.
 
 **Parameters**
 
-- `profileSeed` `Uint8Array`
+- `derivationSeed` `Uint8Array` — this device's derivation root — see the header.
 - `circleId` `string`
 
 **Returns:** `string` — base64 pubKey.
@@ -841,21 +1064,302 @@ same encoding as `AgentIdentity.pubKey`.
 **Kind:** function · **Import:** `circleIdentity` from `'@onderling/core'`
 
 ```js
-circleIdentity(profileSeed, circleId, vault)
+circleIdentity(derivationSeed, circleId, vault)
 ```
 
-The per-circle SIGNING identity — the AgentIdentity a profile uses INSIDE a circle (step 5B/C).
+The per-circle SIGNING identity — the AgentIdentity this device uses INSIDE a circle.
 Its `pubKey` is the per-circle address (what the roster records + what peers route to); sign
 circle messages with it so members/observers see an unrelated identity per circle. Deterministic
-and re-derivable from the profile seed, so `vault` may be ephemeral (a `VaultMemory`).
+and re-derivable from the derivation seed, so `vault` may be ephemeral (a `VaultMemory`).
 
 **Parameters**
 
-- `profileSeed` `Uint8Array`
+- `derivationSeed` `Uint8Array` — this device's derivation root — see the header.
 - `circleId` `string`
 - `vault` `import('./Vault.js').Vault`
 
 **Returns:** `Promise<AgentIdentity>`
+
+## `src/identity/circleAddressAnnouncement.js`
+
+### `CIRCLE_ADDRESS_ANNOUNCE_KIND`
+
+**Kind:** constant · **Import:** `CIRCLE_ADDRESS_ANNOUNCE_KIND` from `'@onderling/core'`
+
+The ONE name for this signal — the peer wire subtype AND the fan-out `kind`. One string, imported
+by the substrate that fans it and the app that receives it, so the two cannot drift.
+
+### `circleAddressAnnouncement`
+
+**Kind:** function · **Import:** `circleAddressAnnouncement` from `'@onderling/core'`
+
+```js
+circleAddressAnnouncement({ circleId, memberWebid, circleAddress, circleAddressProof, personaProperties, } = {})
+```
+
+Shape one announcement — a WHITELIST, like `rosterUpdatedPayload`: anything a caller passes that
+is not one of these fields is dropped here, at the boundary, rather than travelling.
+
+`personaProperties` (optional) is the member's per-circle RELEASE — what they chose to disclose to
+THIS circle. It rides the announcement so a released name reaches co-members, completing the roster
+projection that already shares the address. It is NOT proof-bound (unlike the address): it is a
+roster-level claim, carried under exactly the same residual trust the `memberWebid` attribution
+already carries (see the header). The SOURCE gate is structural: a carrier fans it from a member's
+own roster row, which holds only what that member released — a member who released nothing has an
+empty release, so nothing travels. A future hardening could sign the release; recorded as such.
+
+**Parameters**
+
+- `a` `object`
+- `a.circleId` `string`
+- `a.memberWebid` `string` — whose address this is (the member's canonical signing key)
+- `a.circleAddress` `string` — the address they answer on IN THIS CIRCLE
+- `a.circleAddressProof` `string` — `signCircleLink(circleIdentity, circleId, circleAddress)`
+- `[a.personaProperties]` `object` — the member's per-circle release (optional; a plain object)
+
+**Returns:** `{circleId, memberWebid, circleAddress, circleAddressProof, personaProperties?}`
+
+### `ownCircleAddressAnnouncement`
+
+**Kind:** function · **Import:** `ownCircleAddressAnnouncement` from `'@onderling/core'`
+
+```js
+ownCircleAddressAnnouncement({ circleId, memberWebid, circleAddressFor, signCircleAddress, } = {})
+```
+
+Mint this device's own announcement for one circle, from the seams every host already exposes.
+
+Deny-by-default in the OUTBOUND direction too: an address this device cannot sign for is not
+announced at all, rather than announced unproven for a receiver to drop.
+
+**Parameters**
+
+- `a` `object`
+- `a.circleId` `string`
+- `a.memberWebid` `string`
+- `a.circleAddressFor` `(circleId: string) => (string|null)`
+- `a.signCircleAddress` `(circleId: string, address: string) => (string|null)`
+
+**Returns:** `{circleId, memberWebid, circleAddress, circleAddressProof}|null`
+
+### `ownCircleAddressAnnouncementFromSeed`
+
+**Kind:** function · **Import:** `ownCircleAddressAnnouncementFromSeed` from `'@onderling/core'`
+
+```js
+ownCircleAddressAnnouncementFromSeed({ derivationSeed, circleId, memberWebid, circleAddress = null, } = {})
+```
+
+Vault-free variant for a caller that holds the derivation seed itself (a host without the agent
+seams, a test). Same output, same deny-by-default.
+
+**Parameters**
+
+- `a` `object`
+- `a.derivationSeed` `Uint8Array` — this device's derivation root (see circleAddress.js)
+- `a.circleId` `string`
+- `a.memberWebid` `string`
+- `[a.circleAddress]` `string` — defaults to the address the seed derives for this circle
+
+**Returns:** `{circleId, memberWebid, circleAddress, circleAddressProof}|null`
+
+### `verifyCircleAddressAnnouncement`
+
+**Kind:** function · **Import:** `verifyCircleAddressAnnouncement` from `'@onderling/core'`
+
+```js
+verifyCircleAddressAnnouncement(announcement, expectedCircleId = null)
+```
+
+Verify ONE announcement. Deny-by-default: anything missing, malformed, or whose proof does not
+check out against the address itself returns `null` — never a partial record a caller might store.
+
+The `circleId` a caller is EXPECTING is passed separately on purpose. An announcement's proof is
+bound to the circle it names, so an announcement for circle Y that arrives on circle X's fan is
+cryptographically valid and still wrong; requiring the caller to say which circle it asked about
+is what makes that a refusal rather than a cross-circle write.
+
+**Parameters**
+
+- `announcement` `object`
+- `[expectedCircleId]` `string` — when given, the announcement must name exactly this circle
+
+**Returns:** `{circleId, memberWebid, circleAddress, circleAddressProof}|null`
+
+### `verifyCircleAddressAnnouncements`
+
+**Kind:** function · **Import:** `verifyCircleAddressAnnouncements` from `'@onderling/core'`
+
+```js
+verifyCircleAddressAnnouncements(announcements, expectedCircleId = null)
+```
+
+Verify a LIST, keeping only what checks out. A malformed neighbour never costs a valid
+announcement its delivery — the same best-effort-per-row discipline `bindCircleAddressKeys` uses,
+for the same reason: a half-applied batch produces "some people can be messaged and some cannot"
+with no visible cause.
+
+**Parameters**
+
+- `announcements` `Array<object>`
+- `[expectedCircleId]` `string`
+
+**Returns:** `Array<{circleId, memberWebid, circleAddress, circleAddressProof}>`
+
+## `src/identity/circleLink.js`
+
+### `circleLinkMessage`
+
+**Kind:** function · **Import:** `circleLinkMessage` from `'@onderling/core'`
+
+```js
+circleLinkMessage(groupId, address)
+```
+
+The canonical challenge a linkable joiner signs. Deterministic; binds join + address.
+
+### `signCircleLink`
+
+**Kind:** function · **Import:** `signCircleLink` from `'@onderling/core'`
+
+```js
+signCircleLink(identity, groupId, address)
+```
+
+Sign the link challenge with the SOURCE circle's identity → the base64url proof to present
+alongside the address. `identity` is `circleIdentity(derivationSeed, sourceCircleId, vault)`.
+
+**Returns:** `string` — base64url Ed25519 signature
+
+### `signCircleLinkFromSeed`
+
+**Kind:** function · **Import:** `signCircleLinkFromSeed` from `'@onderling/core'`
+
+```js
+signCircleLinkFromSeed(derivationSeed, circleId, groupId, address)
+```
+
+Vault-free variant: sign the challenge straight from the profile seed + source circleId
+(the per-circle signing key is seed-derived, so no vault is needed). The host binds this on
+the redeem seam so a joiner can prove control of the address they present.
+
+**Returns:** `string` — base64url Ed25519 signature over `circleLinkMessage(groupId, address)`
+
+### `verifyCircleLink`
+
+**Kind:** function · **Import:** `verifyCircleLink` from `'@onderling/core'`
+
+```js
+verifyCircleLink({ groupId, address, proof } = {})
+```
+
+Verify a presented linkage: the proof must be a signature over the challenge by the private
+key behind `address`. Deny-by-default — anything missing or malformed is `false`.
+
+**Parameters**
+
+- `a` `{groupId:string, address:string, proof:string}`
+
+**Returns:** `boolean`
+
+## `src/identity/deviceDelegation.js`
+
+### `deriveDeviceSeed`
+
+**Kind:** function · **Import:** `deriveDeviceSeed` from `'@onderling/core'`
+
+```js
+deriveDeviceSeed(profileSeed, deviceId)
+```
+
+Derive a device's 32-byte derivation-root seed from a profile seed. Deterministic — the same
+phrase + profileId + deviceId reproduce the seed at any ceremony (that is what lets a
+revocation ceremony reason about an absent device's keys without the device).
+
+**Parameters**
+
+- `profileSeed` `Uint8Array` — the profile's 32-byte seed (= Bootstrap.deriveAgentSeed(profileId)).
+- `deviceId` `string` — the enrolling device's stable id.
+
+**Returns:** `Uint8Array` — 32-byte seed.
+
+### `deviceDelegationPubKey`
+
+**Kind:** function · **Import:** `deviceDelegationPubKey` from `'@onderling/core'`
+
+```js
+deviceDelegationPubKey(deviceSeed)
+```
+
+The delegation pubKey a device seed presents (same encoding as every identity pubKey).
+
+### `deviceDelegationMessage`
+
+**Kind:** function · **Import:** `deviceDelegationMessage` from `'@onderling/core'`
+
+```js
+deviceDelegationMessage(profileId, deviceId, pubKey)
+```
+
+The canonical statement the owner root signs. Deterministic; binds profile + device + key.
+
+### `signDeviceDelegation`
+
+**Kind:** function · **Import:** `signDeviceDelegation` from `'@onderling/core'`
+
+```js
+signDeviceDelegation(rootSecret, { profileId, deviceId, pubKey } = {})
+```
+
+Mint the root-signed delegation record for a device. Called at the enrollment ceremony, where
+the phrase (and so the root secret) is transiently present.
+
+**Parameters**
+
+- `rootSecret` `Uint8Array` — the owner root's 32-byte secret (Bootstrap#secret).
+- `a` `{profileId: string, deviceId: string, pubKey: string}` — pubKey = deviceDelegationPubKey(seed).
+
+**Returns:** `{profileId:string, deviceId:string, pubKey:string, by:string, sig:string}` — `by` = the root's derived pubKey (b64), `sig` = base64url Ed25519 over the statement.
+
+### `ownerRootFingerprint`
+
+**Kind:** function · **Import:** `ownerRootFingerprint` from `'@onderling/core'`
+
+```js
+ownerRootFingerprint(pubKeyB64)
+```
+
+The owner-root FINGERPRINT a signing key presents — the same 16-hex-char scheme as
+`Bootstrap.fingerprint` (first 16 hex chars of SHA-256 over the raw Ed25519 pubkey), computable
+from a record's `by` field alone. This is what lets a sibling device bind a carried delegation
+record to "the same owner as me" without the owner's registry: both custodies hold the root's
+fingerprint (root custody derives it; delegation custody carries it on the marker), and a record
+whose `by` does not hash to it belongs to some other root. Returns null for undecodable input.
+
+**Parameters**
+
+- `pubKeyB64` `string` — a base64(url) Ed25519 pubkey — e.g. a delegation record's `by`.
+
+**Returns:** `string|null` — the 16 hex-character fingerprint, or null.
+
+### `verifyDeviceDelegation`
+
+**Kind:** function · **Import:** `verifyDeviceDelegation` from `'@onderling/core'`
+
+```js
+verifyDeviceDelegation(record, ownerPubKey = null)
+```
+
+Verify a delegation record: the signature must cover the statement and verify under `by` —
+and, when the caller knows the owner's root pubKey, `by` must BE it (a record signed by some
+other root is not this owner's delegation). Deny-by-default.
+
+**Parameters**
+
+- `record` `{profileId:string, deviceId:string, pubKey:string, by:string, sig:string}`
+- `[ownerPubKey]` `string` — the owner root's pubKey (b64) when known — binds `by` to the owner.
+
+**Returns:** `boolean`
 
 ## `src/permissions/ActorResolver.js`
 
@@ -1007,6 +1511,38 @@ coverage rules; `fromJSON()` re-hydrates a stored or wire token.
 
 ## `src/permissions/PolicyEngine.js`
 
+### `anyRevoked`
+
+**Kind:** function · **Import:** `anyRevoked` from `'@onderling/core'`
+
+```js
+anyRevoked(sources)
+```
+
+Union several revocation sources into the ONE resolver a `PolicyEngine` takes at construction.
+
+A `PolicyEngine` holds exactly one revocation resolver and it is fixed at construction, so a
+composer that has several sources of revocation truth — a grants lane, an issuer-side
+`TokenRegistry`, a bot registry, a task-grant manager — has to combine them itself. This is that
+combination, defined once so the deny-wins semantics are identical wherever it happens:
+
+  • sources are asked IN ORDER and the first truthy answer short-circuits (already revoked);
+  • a source that THROWS propagates, and `checkInbound` turns that into a denial — a broken
+    revocation source must never read as "not revoked" (safety over liveness, principles §10);
+  • `null` / `undefined` entries are skipped, so a composer can write a conditional source; any
+    other non-function is a TypeError HERE, at compose time, rather than a silently missing
+    source discovered at verify time.
+
+Sources are FUNCTIONS, not objects, on purpose: most real sources are built after the engine is,
+so a composer passes a thunk that reads the variable when the check actually runs
+(`(id) => registry?.isRevoked(id)`).
+
+**Parameters**
+
+- `sources` `Array<((tokenId: string) => boolean | Promise<boolean>) | null | undefined>`
+
+**Returns:** `(tokenId: string) => Promise<boolean>` — the resolver to pass as `isRevoked`
+
 ### `PolicyEngine`
 
 **Kind:** class · **Import:** `PolicyEngine` from `'@onderling/core'`
@@ -1018,11 +1554,11 @@ new PolicyEngine({ trustRegistry, skillRegistry, agentPubKey = null, groupManage
 
 Central inbound permission gate. `checkInbound()` resolves the caller's trust tier
 via the TrustRegistry, then checks it against the skill's visibility and policy,
-honouring capability tokens, group roles (when a GroupManager is wired), and an
-optional issuer-side revocation callback. Throws PolicyDeniedError on any denial;
+honouring capability tokens, group roles (when a GroupManager is wired), and the
+issuer-side revocation resolver it was constructed with. Throws PolicyDeniedError on any denial;
 returns { tier, allowed: true } otherwise.
 
-**Methods:** `resolveActor()` · `setRevocationCheck()` · `checkInbound()` · `checkOutbound()`
+**Methods:** `resolveActor()` · `checkInbound()` · `checkOutbound()`
 
 ## `src/permissions/RoleBundle.js`
 
@@ -1169,14 +1705,12 @@ its own for a token-only materialization without touching governance).
 
 ```js
 class RoleGrantManager
-new RoleGrantManager({ identity, groupManager, agentId } = {})
+new RoleGrantManager({ identity, groupManager, agentId, store = null } = {})
 ```
 
-Grants a role to a member and materializes its bundle's capability tokens,
-tracking the issued token ids so revoking the role invalidates them through
-the PolicyEngine revocation hook.
+_No JSDoc block in the source (recorded gap — see the coverage table)._
 
-**Methods:** `installRevocationCheck()` · `isRevoked()` · `materializedTokenIds()` · `grant()` · `revoke()`
+**Methods:** `ready()` · `isRevoked()` · `materializedTokenIds()` · `grant()` · `revoke()`
 
 ## `src/permissions/Roles.js`
 
@@ -1341,7 +1875,7 @@ All known role ids (standard + registered custom), sorted by rank descending.
 
 ```js
 class TaskGrantManager
-new TaskGrantManager({ identity, agentId, parentToken } = {})
+new TaskGrantManager({ identity, agentId, parentToken, store = null } = {})
 ```
 
 Materialize task-scoped capability tokens for a member, attenuated from the
@@ -1350,7 +1884,7 @@ granter's OWN authority and revocable with the task.
 OFF BY DEFAULT: a freshly-constructed manager has granted nothing. Authority
 exists on a task ONLY after an explicit `attachGrant`.
 
-**Methods:** `installRevocationCheck()` · `attachGrant()` · `revokeTaskGrants()` · `tokensForTask()` · `isRevoked()`
+**Methods:** `whenReady()` · `attachGrant()` · `revokeTaskGrants()` · `tokensForTask()` · `isRevoked()`
 
 ## `src/permissions/TokenRegistry.js`
 
@@ -1734,6 +2268,50 @@ Uses OW (PB envelope type).
 - `agent` `import('../Agent.js').Agent`
 - `topic` `string`
 - `partsOrValue` `Array|*`
+
+### `setSubscribeAuthorizer`
+
+**Kind:** function · **Import:** `setSubscribeAuthorizer` from `'@onderling/core'`
+
+```js
+setSubscribeAuthorizer(agent, authorizer)
+```
+
+Install the subscribe-authorization port: `(context) => boolean|Promise<boolean>`, asked of
+every inbound subscribe with `{topic, from}`. Returning false refuses the registration silently — the caller
+learns nothing about why, which is the same posture the sender authorizer takes.
+
+The kernel has no opinion about which topics are sensitive; an app that scopes topics to circles
+installs one that says so.
+
+**Parameters**
+
+- `agent` `import('../Agent.js').Agent`
+- `authorizer` `((c: {topic: string, from: string}) => boolean|Promise<boolean>)|null`
+
+### `dropSubscriber`
+
+**Kind:** function · **Import:** `dropSubscriber` from `'@onderling/core'`
+
+```js
+dropSubscriber(agent, address, { topicPrefix = null } = {})
+```
+
+Remove one address from the subscriber registry — every topic, or only those under a prefix.
+
+`topicPrefix` is how a removal stays LOCAL to one circle. Circle topics are named
+`<circleId>/<suffix>`, so passing `` `${circleId}/` `` drops the departed from that circle's
+broadcasts and leaves every other circle you share with them untouched. Dropping them everywhere
+would repeat the mistake the per-circle exit was built to undo: tidying up one circle severing
+the relationship in all of them.
+
+**Parameters**
+
+- `agent` `import('../Agent.js').Agent`
+- `address` `string`
+- `[opts]` `{topicPrefix?: string|null}`
+
+**Returns:** `number` — how many topic registrations were dropped
 
 ### `handlePubSub`
 
@@ -2169,16 +2747,160 @@ Error thrown when an envelope fails a security check. Carries a machine-readable
 
 ```js
 class SecurityLayer
-new SecurityLayer({ identity })
+new SecurityLayer({ identity, authorizeSender = null, senderKeyLookup = null })
 ```
 
 Per-agent envelope crypto: `encrypt()` boxes + signs outbound envelopes and
-`decryptAndVerify()` validates inbound ones (replay window, dedup, signature, decrypt).
-Peer pubkeys are auto-registered from HI envelopes; HI itself is signed but plaintext.
+`decryptAndVerify()` validates inbound ones (replay window, dedup, signature, authorize, decrypt).
+Every outbound envelope carries the key that signed it, and every inbound one is verified against
+the key IT carries — never against a key looked up by the address it claims. Peer pubkeys are
+learned from HI envelopes — established when we hold none for that address, never replaced by one
+(that needs a rotation proof); HI itself is signed but plaintext.
 Also tracks key-rotation grace state so envelopes to/from a recently rotated key
 still validate, and can attach an inline rotation proof to outbound envelopes.
 
-**Methods:** `registerSelfRotation()` · `swapIdentity()` · `setInlineProof()` · `registerPeer()` · `getPeerKey()` · `unregisterPeer()` · `migratePeerKey()` · `encrypt()` · `decryptAndVerify()`
+**Methods:** `setSenderAuthorizer()` · `unregisterPeerIfEstablishedBy()` · `registerSelfRotation()` · `swapIdentity()` · `setInlineProof()` · `addSelfIdentity()` · `removeSelfIdentity()` · `selfIdentityFor()` · `ownAddressFor()` · `registerPeer()` · `learnPeerKey()` · `getPeerKey()` · `unregisterPeer()` · `migratePeerKey()` · `encrypt()` · `decryptAndVerify()`
+
+## `src/security/authorChain.js`
+
+### `isChained`
+
+**Kind:** function · **Import:** `isChained` from `'@onderling/core'`
+
+```js
+isChained(e)
+```
+
+True for an event carrying the chain fields (author + hash). Domain-independent.
+
+### `parentsOf`
+
+**Kind:** function · **Import:** `parentsOf` from `'@onderling/core'`
+
+```js
+parentsOf(e)
+```
+
+The parents of an event over the deps-DAG: its author's own previous head (`parentHash`) UNION the
+cross-author frontier (`deps`). This is the edge set reachability + causal depth walk. Domain-independent.
+
+### `frontier`
+
+**Kind:** function · **Import:** `frontier` from `'@onderling/core'`
+
+```js
+frontier(events)
+```
+
+The DAG frontier: the hashes of events NOT referenced as a parent (parentHash or deps) by any event in
+the set — the current tips across ALL authors. A new event by an author uses its own tip as `parentHash`
+and the remaining tips (concurrent other-author branches) as `deps`. Domain-independent.
+
+### `reachability`
+
+**Kind:** function · **Import:** `reachability` from `'@onderling/core'`
+
+```js
+reachability(events, aHash, bHash)
+```
+
+Causal label of event `aHash` relative to `bHash` over the deps-DAG (DESIGN §2):
+  'before'     — a is an ancestor of b (a happened-before b)
+  'later'      — b is an ancestor of a (a happened-after b)
+  'concurrent' — neither is an ancestor of the other (genuinely concurrent; also for a === b)
+Cross-author, exact. Bounded by concurrency, not history length in the common (adjacent) case; a per-writer
+vector cache is a later O(1) optimisation (DESIGN §3) — never carried on the wire. Domain-independent.
+
+### `authorHead`
+
+**Kind:** function · **Import:** `authorHead` from `'@onderling/core'`
+
+```js
+authorHead(events, author)
+```
+
+The author's current chain HEAD (the hash to use as the next event's parent) — the one of the
+author's events that no other of their events references as a parent. Null when the author has no
+chained events yet. Ambiguous under an active fork (returns the first leaf); callers should resolve
+the dispute before extending. Domain-independent (reads only the chain fields).
+
+### `makeForkProof`
+
+**Kind:** function · **Import:** `makeForkProof` from `'@onderling/core'`
+
+```js
+makeForkProof(a, b)
+```
+
+A fork-proof record: two of ONE author's events sharing a parent but differing in content.
+Self-verifying via a chain's `verifyForkProof`. Domain-independent.
+
+### `createAuthorChain`
+
+**Kind:** function · **Import:** `createAuthorChain` from `'@onderling/core'`
+
+```js
+createAuthorChain(serializeBody)
+```
+
+Bind the chain to a domain's body-serialization. Returns the hash-computing operations (chainEvent +
+the fork-proof verifier/detectors), plus the domain-independent helpers, as one import surface.
+
+**Parameters**
+
+- `serializeBody` `(event:object) => string` — deterministic serialization of an event's identity
+
+**Returns:** `{ isChained: Function, authorHead: Function, makeForkProof: Function, chainEvent: Function, verifyForkProof: Function, detectForks: Function, foldDisputes: Function }`
+
+## `src/security/evictionStatement.js`
+
+### `EVICTION_KIND`
+
+**Kind:** constant · **Import:** `EVICTION_KIND` from `'@onderling/core'`
+
+The spine kind for a member eviction.
+
+### `signEviction`
+
+**Kind:** function · **Import:** `signEviction` from `'@onderling/core'`
+
+```js
+signEviction(identity, { circleId, evicted, parent = null } = {})
+```
+
+Sign an eviction (the `evict` spine kind). `identity` is the issuer's CIRCLE-SCOPED signer.
+
+**Parameters**
+
+- `identity` `{ pubKey: string, sign: Function }`
+- `args` `{ circleId: string, evicted: string, parent?: string|null }` — `evicted` = the evicted member's circle-scoped id (never a global webid, per principle 5); `parent` = the issuer's previous spine head hash.
+
+**Returns:** `{ body: object, sig: string, by: string }`
+
+### `verifyEviction`
+
+**Kind:** function · **Import:** `verifyEviction` from `'@onderling/core'`
+
+```js
+verifyEviction(statement, opts = {})
+```
+
+Verify an eviction statement — a genuine, untampered, chain-consistent `evict`-kind signature. Durable; does
+NOT decide whether the author may evict, nor whether a concurrent demotion voids it (the fold's job).
+On success, `res.body.subject` is the evicted member.
+
+**Parameters**
+
+- `statement` `{ body: object, sig: string }`
+- `[opts]` `{ expectedCircleId?: string }`
+
+**Returns:** `{ ok: true, body: object } | { ok: false, reason: string }`
+
+### `EVICTION_STMT_VERSION`
+
+**Kind:** constant · **Import:** `EVICTION_STMT_VERSION` from `'@onderling/core'`
+
+_No JSDoc block in the source (recorded gap — see the coverage table)._
 
 ## `src/security/helloGates.js`
 
@@ -2217,6 +2939,33 @@ to one of `groupIds`.
 - `groupIds` `string[]`
 - `groupManager` `import('../permissions/GroupManager.js').GroupManager`
 
+### `firstContactRateGate`
+
+**Kind:** function · **Import:** `firstContactRateGate` from `'@onderling/core'`
+
+```js
+firstContactRateGate({ isKnown, maxPerWindow = 32, windowMs = 60_000, now = () => Date.now() } = {})
+```
+
+First-contact RATE bound — caps how fast NEW (not-yet-known) senders can register via hello, so a flood of
+stranger HIs on a local transport cannot grow the peer graph unboundedly. This bounds a RESOURCE, it is not
+an authorization gate (who-may-send binds at the receive-path roster-authorize + seal). Composed AND-wise
+into the always-on stack beside mute-block.
+
+A KNOWN peer re-helloing ALWAYS passes — the bound only limits NEW registrations. `isKnown(from)` must read
+the PEER GRAPH (not the key store): the SecurityLayer auto-registers the HI key BEFORE the gate runs, so a
+key-store check would see every first contact as already-known and the bound would never engage. A sliding
+window (`windowMs`) of accepted new-sender hellos is kept; once `maxPerWindow` is reached, further NEW
+senders are dropped until the window drains. Defaults are generous (normal pairing is 1–2): a flood is 100s.
+
+**Parameters**
+
+- `a` `object`
+- `a.isKnown` `(from:string)=>(boolean|Promise<boolean>)` — true ⇒ already-known peer ⇒ always accept.
+- `[a.maxPerWindow=32]` `number` — max NEW-sender hellos accepted per window.
+- `[a.windowMs=60000]` `number` — the sliding window.
+- `[a.now=Date.now]` `()=>number`
+
 ### `anyOf`
 
 **Kind:** function · **Import:** `anyOf` from `'@onderling/core'`
@@ -2238,14 +2987,15 @@ Short-circuits on the first accept.
 
 **Kind:** constant · **Import:** `ORIGIN_SIG_VERSION` from `'@onderling/core'`
 
-Version (`v` field) of the signed origin-signature body. `signOrigin` writes it;
-`verifyOrigin` rejects any other version.
+Version (`v` field) of the signed origin-signature body — a self-describing, namespaced STRING so an
+independent implementation knows the exact shape without our source (docs/conventions/signed-bodies.md).
+`signOrigin` writes it; `verifyOrigin` rejects any other version.
 
 ### `DEFAULT_ORIGIN_WINDOW_MS`
 
 **Kind:** constant · **Import:** `DEFAULT_ORIGIN_WINDOW_MS` from `'@onderling/core'`
 
-Default clock-skew window for verifyOrigin's timestamp check: ±10 minutes.
+_No JSDoc block in the source (recorded gap — see the coverage table)._
 
 ### `signOrigin`
 
@@ -2302,8 +3052,9 @@ Verify an origin signature.
 
 **Kind:** constant · **Import:** `CLAIM_VERSION` from `'@onderling/core'`
 
-Version (`v` field) of the signed reachability-claim body. Signing writes it;
-`verifyReachabilityClaim` rejects any other version.
+Version (`v` field) of the signed reachability-claim body — a self-describing, namespaced STRING so an
+independent implementation knows the exact shape without our source (docs/conventions/signed-bodies.md).
+Signing writes it; `verifyReachabilityClaim` rejects any other version.
 
 ### `DEFAULT_VERIFY_LIMITS`
 
@@ -2368,6 +3119,56 @@ callers take `newLastSeq` on success and store it themselves.
 
 **Returns:** `{ ok: true, newLastSeq: number } | { ok: false, reason: string }`
 
+## `src/security/rosterFold.js`
+
+### `caretakerOrder`
+
+**Kind:** function · **Import:** `caretakerOrder` from `'@onderling/core'`
+
+```js
+caretakerOrder(candidates, seed)
+```
+
+THE caretaker succession order — one implementation, exported so nothing computes a second one.
+
+A deterministic shuffle of the candidates seeded by the departing admin's final event hash:
+`hashHex(seed|candidate)` ascending, ties broken on the candidate itself. Every replica computes
+the same order from the same log, which is the whole point — a locally-rolled pick would diverge
+and the FIX would itself be a fork (docs/decisions.md 2026-07-25).
+
+KEYED ON THE MEMBER REF, not the per-circle address the decision names. The fold speaks refs and
+holds no address map; in basis the ref IS the derived signing key, so they coincide, and where
+they do not the ref is the identifier every replica provably shares — agreeing-without-forking is
+the property the decision cares about. Grinding an identifier to win buys nothing either way: the
+seed is a departure hash nobody can know before joining.
+
+**Parameters**
+
+- `candidates` `string[]`
+- `seed` `string` — the departing admin's final event hash
+
+**Returns:** `string[]` — the candidates, in succession order
+
+### `foldRoster`
+
+**Kind:** function · **Import:** `foldRoster` from `'@onderling/core'`
+
+```js
+foldRoster(statements, { founders = [], seed = null, rulesGate = null } = {})
+```
+
+Fold spine membership statements into the roster head.
+
+**Parameters**
+
+- `statements` `Array<object>` — VERIFIED spine bodies (verifySpine passed) for ONE circle.
+- `[opts]` `object`
+- `[opts.founders]` `Array<string>` — the circle's creators — admin + member by construction, and the fold's starting authority. They are **not evictable**: you cannot be put out of a circle you made. They ARE demotable once another admin exists (Frits, 2026-08-23), so a founder who steps back hands over rather than holding the circle open forever; the last-admin rule is what supplies the "once another admin exists" half.
+- `[opts.seed]` `{ members?: string[], admins?: string[] }` — the roster the spine folds ON TOP OF — the pre-spine materialised HEAD at cutover (the current trail-derived roster). Seed members/admins are the starting state; UNLIKE founders they are ordinary members (evictable, demotable). Absent (the default) the fold starts from the founders alone, exactly as before — so pure-spine callers are unchanged.
+- `[opts.rulesGate]` `{ versions?: string[]|Set<string> }` — RULES-GATED JOINS (task #80, sitting-A decision). When present, a `join` folds ONLY if its signed payload carries a non-empty `rulesAccepted` string — and, when `versions` is a non-empty set, one that is IN it (the set of rules-doc versions this circle has ever had; acceptance of a then-current version stays valid forever). Deny-favouring both ways: no acceptance → the join does not fold, on every device independently — the statement stays on the log as evidence, the joiner lands on nobody's roster. Founders and seed members never fold via `join`, so the gate cannot touch them. Absent (the default), joins fold exactly as before — the projector opts in, the kernel stays pure.
+
+**Returns:** `{ members: string[], admins: string[], rulesAccepted: Record<string,string>, adminProvenance: Record<string,string>, caretakerAcknowledged: Record<string,string> }` — sorted members/admins for a stable, comparable result, plus each member's latest accepted rules version (from the join's payload, superseded by later `rules-accept` statements — the per-member "accepted v1, current v2" visibility rides this map), plus HOW each admin holds it: `'founder'` · `'role'` · `` `caretaker:<hash>` `` (see the note where `adminVia` is built), plus which caretakers have SIGNED for their own appointment (`caretakerAcknowledged`: ref → seed hash).
+
 ## `src/security/sealedForward.js`
 
 ### `SEALED_VERSION`
@@ -2419,6 +3220,252 @@ Open a sealed payload.
 - `opts.senderPubKey` `string` — claimed sender pubkey, carried plaintext alongside the seal. Cross-checked against the inner `origin` field.
 
 **Returns:** `{ skill: string, parts: Array, origin: string, originSig: string, originTs: number }`
+
+## `src/security/senderAuthorization.js`
+
+### `SENDER_AUTHORIZATION`
+
+**Kind:** constant · **Import:** `SENDER_AUTHORIZATION` from `'@onderling/core'`
+
+Verdict reasons this module produces on its own. Implementations supply their own strings.
+
+### `allowSender`
+
+**Kind:** function · **Import:** `allowSender` from `'@onderling/core'`
+
+```js
+allowSender(reason)
+```
+
+The sender may speak here.
+
+**Parameters**
+
+- `reason` `string` — why — carried into diagnostics, never into a decision
+
+**Returns:** `{allow: true, reason: string}`
+
+### `refuseSender`
+
+**Kind:** function · **Import:** `refuseSender` from `'@onderling/core'`
+
+```js
+refuseSender(reason)
+```
+
+The sender may not. `SecurityLayer` turns this into a `SENDER_NOT_AUTHORIZED` refusal.
+
+**Parameters**
+
+- `reason` `string`
+
+**Returns:** `{allow: false, reason: string}`
+
+### `askSenderAuthorizer`
+
+**Kind:** function · **Import:** `askSenderAuthorizer` from `'@onderling/core'`
+
+```js
+askSenderAuthorizer(authorizer, context)
+```
+
+Ask an injected authorizer about one envelope, and normalise whatever comes back.
+
+Synchronous by construction: the receive path it sits on is synchronous, and making it async
+would mean either buffering unverified envelopes or letting them through while the answer is
+pending — both of which are the check not being a check. An implementation that needs I/O keeps
+a snapshot and refreshes it out of band; that is a real constraint on implementations and it is
+stated here rather than discovered.
+
+**Parameters**
+
+- `authorizer` `Function|null`
+- `context` `object`
+- `context.senderKey` `string` — the key that DEMONSTRABLY signed the envelope
+- `context.from` `string` — the claimed sender address — a routing hint, nothing more
+- `context.to` `string` — the envelope's `_to` (a key, for sealed traffic)
+- `context.ownAddress` `string|null` — which of OUR addresses `to` resolves to, when it is one of ours — the receiver-side handle an implementation maps to a circle. Null means the canonical identity, i.e. not circle-scoped.
+- `context.pattern` `string` — the envelope's `_p`
+
+**Returns:** `{allow: boolean, reason: string}`
+
+## `src/security/senderKey.js`
+
+### `SENDER_KEY_FIELD`
+
+**Kind:** constant · **Import:** `SENDER_KEY_FIELD` from `'@onderling/core'`
+
+The envelope header field that carries the credential.
+
+Named for what it says rather than for its type, so it stays honest under either L1 answer: a key
+id still says "signed by". Listed in the relay's routing-header allow-list
+(`packages/relay/src/verbose.js`) and in the privacy harness
+(`packages/relay/test/security/whatTheRelayMayLearn.js`), both of which fail if it appears
+without being declared.
+
+### `senderCredential`
+
+**Kind:** function · **Import:** `senderCredential` from `'@onderling/core'`
+
+```js
+senderCredential(identity)
+```
+
+What an outbound envelope must carry so a receiver can verify it without looking anything up.
+
+**Parameters**
+
+- `identity` `{pubKey: string}` — the identity that is about to sign
+
+**Returns:** `string|null` — the credential to stamp on the envelope, or null if there is nothing to say
+
+### `resolveSenderKey`
+
+**Kind:** function · **Import:** `resolveSenderKey` from `'@onderling/core'`
+
+```js
+resolveSenderKey(credential, { lookup = null } = {})
+```
+
+Resolve a carried credential to the Ed25519 public key the signature must verify against.
+
+Deny-by-default: anything that is not a well-formed key (or, under the key-id form, anything the
+lookup cannot resolve) returns `null`, and the caller refuses the envelope. A malformed value
+must never reach `AgentIdentity.verify`, which throws on a wrong-sized key — that would turn a
+refusable envelope into an exception on the receive path.
+
+**Parameters**
+
+- `credential` `string` — what the envelope carried
+- `[opts]` `object`
+- `[opts.lookup]` `(id: string) => (string|null)` — the key-id resolver. Unused by the full-key form and threaded anyway — it is the seam the key-id answer plugs into, and a seam nobody passes is a seam nobody wires (Decision 3's lesson).
+
+**Returns:** `string|null`
+
+### `isEd25519PubKey`
+
+**Kind:** function · **Import:** `isEd25519PubKey` from `'@onderling/core'`
+
+```js
+isEd25519PubKey(value)
+```
+
+Is this string a base64url Ed25519 public key?
+
+Checked on shape, not by decoding: the decoders in this repo are lenient about padding and
+alphabet, so a length + alphabet check is the stricter of the two and cannot throw.
+
+**Parameters**
+
+- `value` `string`
+
+**Returns:** `boolean`
+
+### `carriedSenderCredential`
+
+**Kind:** function · **Import:** `carriedSenderCredential` from `'@onderling/core'`
+
+```js
+carriedSenderCredential(envelope)
+```
+
+Read the credential off an envelope. One accessor so the field name appears in one place.
+
+**Parameters**
+
+- `envelope` `object`
+
+**Returns:** `string|null`
+
+## `src/security/spineAppender.js`
+
+### `SPINE_STATEMENT_ITEM`
+
+**Kind:** constant · **Import:** `SPINE_STATEMENT_ITEM` from `'@onderling/core'`
+
+The item type a signed spine statement is stored under on a circle's store (one filterable spine).
+
+### `createSpineAppender`
+
+**Kind:** function · **Import:** `createSpineAppender` from `'@onderling/core'`
+
+```js
+createSpineAppender({ store, signer, signerFor } = {})
+```
+
+Bind a spine appender to a store + the acting device's signer. The signer is the AUTHOR of every statement
+this emitter appends; `subject` (who/what the transition is about) is passed per call.
+
+TWO signer modes:
+  • `signer`    — one static identity for every circle (legacy: the device's global identity, whose pubKey
+                  IS the member's ref/webid in the basis binding — author and ref coincide).
+  • `signerFor` — a PER-CIRCLE resolver `(circleId) => { identity, ref } | identity` — the CIRCLE-SCOPED
+                  signer (principle 5: per-circle unlinkability; one global key across circles would re-link
+                  a person's memberships). `identity` signs; `ref` is the member ref (webid) the fold keys
+                  on. When they differ, the ref rides the SIGNED payload as `authorRef` — a claimed binding
+                  the READ side must verify (roster-row circleAddress, or the device's own binding) before
+                  folding; an unverifiable binding is ignored (strengthen-only), never trusted.
+
+**Parameters**
+
+- `deps` `object`
+- `deps.store` `{ listOpen: Function, addItems: Function }` — duck-typed circle store (not imported).
+- `[deps.signer]` `{ pubKey: string, sign: (bytes: Uint8Array) => Uint8Array }` — static acting identity.
+- `[deps.signerFor]` `(circleId: string) => Promise<object>` — per-circle signer resolver (see above).
+
+**Returns:** `(t: { kind: string, circleId: string, subject: string, payload?: object, actor?: string }) => Promise<{ body: object, sig: string, by: string } | null>` — appends + returns the signed statement.
+
+## `src/security/spineStatement.js`
+
+### `SPINE_STMT_VERSION`
+
+**Kind:** constant · **Import:** `SPINE_STMT_VERSION` from `'@onderling/core'`
+
+Version of the signed spine body — a self-describing namespaced STRING (docs/conventions/signed-bodies.md).
+
+### `signSpine`
+
+**Kind:** function · **Import:** `signSpine` from `'@onderling/core'`
+
+```js
+signSpine(identity, { kind, circleId, subject, payload, parent = null, deps = [] } = {})
+```
+
+Sign a spine statement of any `kind`. `identity` is the issuer's CIRCLE-SCOPED signer.
+
+**Parameters**
+
+- `identity` `{ pubKey: string, sign: (bytes: Uint8Array) => Uint8Array }` — the circle-scoped signer
+- `args` `object`
+- `args.kind` `string` — the spine event kind (e.g. 'evict' · 'leave' · 'join' · 'role' · 'key')
+- `args.circleId` `string` — the circle the entry applies to
+- `args.subject` `string` — who/what the entry is about (a circle-scoped id, per principle 5)
+- `[args.payload]` `object` — kind-specific fields (canonicalised into the hash + signature)
+- `[args.parent]` `string|null` — the issuer's previous spine-entry hash (null for their first)
+- `[args.deps]` `string[]` — the CROSS-AUTHOR frontier the issuer had SEEN (other authors' heads); normally empty. Bound into the hash + signature, excluded from the content serialization (a fork stays detectable).
+
+**Returns:** `{ body: object, sig: string, by: string }`
+
+### `verifySpine`
+
+**Kind:** function · **Import:** `verifySpine` from `'@onderling/core'`
+
+```js
+verifySpine(statement, opts = {})
+```
+
+Verify a spine statement is a genuine, untampered, chain-consistent signature by `body.author`. NO timestamp
+window (durable). Does NOT decide authority (who may issue this kind, or whether a concurrent change voids
+it) — that is the fold's deny-wins decision.
+
+**Parameters**
+
+- `statement` `{ body: object, sig: string }`
+- `[opts]` `object`
+- `[opts.expectedCircleId]` `string` — if given, `body.circleId` must match
+- `[opts.expectedKind]` `string` — if given, `body.kind` must match
+
+**Returns:** `{ ok: true, body: object } | { ok: false, reason: string }`
 
 ## `src/security/tunnelSeal.js`
 
@@ -2583,6 +3630,7 @@ Resolution for each option: explicit arg → `agent.config.get('oracle.<name>')`
 - `[opts.refreshBeforeMs]` `number`
 - `[opts.maxPeers]` `number`
 - `[opts.seqStore]` `object` — forwarded to signReachabilityClaim
+- `[opts.peerScope]` `(callerPubKey: string, peers: string[]) => string[]|Promise<string[]>` — Which of this device's direct peers THIS caller may learn about. Absent ⇒ none are disclosed (see the disclosure note above). Pass `(_caller, peers) => peers` to opt into the old open behaviour.
 
 ## `src/skills/relayForward.js`
 
@@ -2759,25 +3807,6 @@ traversal outside the configured root is required or enforced here.
 Every method is async (returns a Promise). Paths are opaque forward-slash keys.
 
 **Methods:** `read()` · `write()` · `delete()` · `list()` · `query()`
-
-## `src/storage/FederatedReader.js`
-
-### `FederatedReader`
-
-**Kind:** class · **Import:** `FederatedReader` from `'@onderling/core'`
-
-```js
-class FederatedReader
-new FederatedReader({ pods, mergeContract, failurePolicy = 'partial-success-with-flag' } = {})
-```
-
-Reads the same path from N pod clients in parallel and merges the successful
-results through an injected merge contract. Failure handling follows the
-failurePolicy: 'partial-success-with-flag' (default) and 'best-effort' resolve
-to { merged, failures }, while 'fail-on-any' throws FederatedReadError when
-any pod read fails.
-
-**Methods:** `read()`
 
 ## `src/storage/FileSystemSource.js`
 
@@ -3017,24 +4046,6 @@ list, or query to it.
 
 **Methods:** `getSource()` · `addSource()` · `removeSource()` · `read()` · `write()` · `delete()` · `list()` · `query()`
 
-## `src/transport/HubDelegateTransport.js`
-
-### `HubDelegateTransport`
-
-**Kind:** class · **Import:** `HubDelegateTransport` from `'@onderling/core'`
-
-```js
-class HubDelegateTransport extends Transport
-new HubDelegateTransport({ address, binder, identity } = {})
-```
-
-Transport that delegates all wire I/O to a duck-typed Hub binder — any object with
-`send(to, envelope)` and `onIncoming(callback)` (plus optional `close()`). Outbound
-envelopes go to `binder.send`; inbound envelopes from the binder are fed into
-`_receive`. Core stays ignorant of what the Hub actually is (AIDL on RN, fake in tests).
-
-**Methods:** `connect()` · `disconnect()` · `_put()`
-
 ## `src/transport/InternalTransport.js`
 
 ### `InternalBus`
@@ -3070,7 +4081,7 @@ In-process transport: all instances sharing one InternalBus can reach each other
 Delivery is deferred by a microtask, so it is asynchronous but near-instant. Used in
 unit tests and for running multiple agents inside the same JS process or browser tab.
 
-**Methods:** `peerTransport()` · `canReach()` · `connect()` · `disconnect()` · `_put()`
+**Methods:** `peerTransport()` · `canReach()` · `connect()` · `disconnect()` · `_bindAddress()` · `_unbindAddress()` · `_put()`
 
 ## `src/transport/LocalTransport.js`
 
@@ -3126,4 +4137,224 @@ interaction primitives (sendOneWay/sendAck/request/respond/sendHello), reply
 correlation, auto-ACK of AS envelopes, SecurityLayer wiring, and receive-handler
 dispatch. See the file header for the full port contract.
 
-**Methods:** `_setAddress()` · `useSecurityLayer()` · `setReceiveHandler()` · `connect()` · `disconnect()` · `canReach()` · `forgetPeer()` · `sendOneWay()` · `publishOneWay()` · `sendAck()` · `request()` · `respond()` · `sendHello()` · `publishEnvelope()` · `subscribeEnvelopes()` · `_put()` · `_receive()` · `_send()` · `_awaitReply()`
+**Methods:** `_setAddress()` · `addAddress()` · `removeAddress()` · `_rebindAddresses()` · `_bindAddress()` · `_unbindAddress()` · `setDiscoverability()` · `_applyDiscoverability()` · `reannounce()` · `_reannounce()` · `useSecurityLayer()` · `setReceiveHandler()` · `connect()` · `disconnect()` · `canReach()` · `forgetPeer()` · `sendOneWay()` · `publishOneWay()` · `sendAck()` · `request()` · `respond()` · `sendHello()` · `publishEnvelope()` · `subscribeEnvelopes()` · `_put()` · `_receive()` · `_send()` · `_awaitReply()`
+
+## `src/transport/discoverability.js`
+
+### `DISCOVERABILITY`
+
+**Kind:** constant · **Import:** `DISCOVERABILITY` from `'@onderling/core'`
+
+The three states.
+
+### `DISCOVERABILITY_ORDER`
+
+**Kind:** constant · **Import:** `DISCOVERABILITY_ORDER` from `'@onderling/core'`
+
+Exposure ORDER — low to high. A ladder, so "which of these two is more exposed" is answerable, which is
+what lets a surface aggregate several transports honestly (see `maxExposure`).
+
+### `isDiscoverability`
+
+**Kind:** function · **Import:** `isDiscoverability` from `'@onderling/core'`
+
+```js
+isDiscoverability(v)
+```
+
+Is `v` one of the three?
+
+### `normalizeDiscoverability`
+
+**Kind:** function · **Import:** `normalizeDiscoverability` from `'@onderling/core'`
+
+```js
+normalizeDiscoverability(v)
+```
+
+Coerce an untrusted value to a state.
+
+An unrecognised value resolves to `off` — deny-by-default, because the failure it guards against is a
+typo'd setting leaving a device announcing itself. The caller is told (`{ ok: false }`) rather than
+silently corrected, so a bug does not hide behind the safe answer.
+
+**Returns:** `{ ok: boolean, value: string, reason?: string }`
+
+### `publishes`
+
+**Kind:** function · **Import:** `publishes` from `'@onderling/core'`
+
+```js
+publishes(state)
+```
+
+Does this state announce us to others?
+
+### `browses`
+
+**Kind:** function · **Import:** `browses` from `'@onderling/core'`
+
+```js
+browses(state)
+```
+
+Does this state listen for others?
+
+### `maxExposure`
+
+**Kind:** function · **Import:** `maxExposure` from `'@onderling/core'`
+
+```js
+maxExposure(a, b)
+```
+
+The MORE exposed of two states.
+
+This is the aggregation rule for a surface that spans several transports, and it points the way it does
+on purpose: if you ask to be unlisted and one transport cannot comply, the honest answer to "am I
+visible?" is **yes** — because you are. Reporting the requested state, or the average, or the state of
+the transport that did comply, would each turn a partial failure into a false assurance.
+
+### `createDiscoverabilityControl`
+
+**Kind:** function · **Import:** `createDiscoverabilityControl` from `'@onderling/core'`
+
+```js
+createDiscoverabilityControl({ transports, onChange = null, onDegraded = null } = {})
+```
+
+THE SURFACE — one discoverability control over every transport a device discovers on.
+
+This is the object an app talks to. It exists so that "make me discoverable" is a single call with a
+single answer, rather than the app knowing which transports are present, which of them discover, and
+which one silently disagreed. Reaching past this to a transport is the signal that the surface is missing
+an affordance (`CLAUDE.md`).
+
+**The aggregate is the MOST exposed transport, not the requested state.** If mDNS cannot go browse-only
+and BLE can, you are still being announced — so `effective` says `browse+publish` and `degraded` is true.
+A surface that averaged, or reported the request, would let a user believe they were unlisted while a
+radio in their pocket said otherwise.
+
+**Parameters**
+
+- `deps` `object`
+- `deps.transports` `() => Record<string, object|null>` — named transports; re-read on every call, so a transport built later (or dropped) is picked up without re-creating the control
+- `[deps.onChange]` `(report: object) => void` — every applied change, degraded or not
+- `[deps.onDegraded]` `(report: object) => void` — only when the result is more exposed than requested
+
+**Returns:** `{set, state, requested, isPublishing, isBrowsing, report}`
+
+## `src/transport/envelopeSize.js`
+
+### `MAX_ENVELOPE_BYTES`
+
+**Kind:** constant · **Import:** `MAX_ENVELOPE_BYTES` from `'@onderling/core'`
+
+_No JSDoc block in the source (recorded gap — see the coverage table)._
+
+### `EnvelopeTooLargeError`
+
+**Kind:** class · **Import:** `EnvelopeTooLargeError` from `'@onderling/core'`
+
+```js
+class EnvelopeTooLargeError extends Error
+new EnvelopeTooLargeError(bytes, limit = MAX_ENVELOPE_BYTES)
+```
+
+Raised when an envelope is refused for size — typed so a caller can tell it from a disconnect.
+
+### `envelopeExceedsLimit`
+
+**Kind:** function · **Import:** `envelopeExceedsLimit` from `'@onderling/core'`
+
+```js
+envelopeExceedsLimit(envelope, limit = MAX_ENVELOPE_BYTES)
+```
+
+Measure an envelope the way the wire will carry it, and report whether it is over.
+
+Returns `null` when it is fine, so the call site reads as a guard. A value that cannot be measured
+(circular, unserialisable) is treated as fine rather than refused: this is a size limit, not a
+validator, and rejecting something we merely failed to measure would break sends for the wrong reason.
+
+**Parameters**
+
+- `envelope` `*`
+- `[limit]` `number`
+
+**Returns:** `{bytes: number, limit: number}|null`
+
+### `envelopeByteLength`
+
+**Kind:** function · **Import:** `envelopeByteLength` from `'@onderling/core'`
+
+```js
+envelopeByteLength(envelope)
+```
+
+Serialised byte length of an envelope, or null when it cannot be measured.
+
+## `src/transport/nearbyPeers.js`
+
+### `createNearbyPeerSource`
+
+**Kind:** function · **Import:** `createNearbyPeerSource` from `'@onderling/core'`
+
+```js
+createNearbyPeerSource({ transports, now = () => Date.now() } = {})
+```
+
+_No JSDoc block in the source (recorded gap — see the coverage table)._
+
+**Parameters**
+
+- `deps` `object`
+- `deps.transports` `() => Record<string, object|null>` — named transports; re-read on subscribe
+- `[deps.now]` `() => number`
+
+**Returns:** `{subscribe, list, forget, close}`
+
+## `src/transport/senderBinding.js`
+
+### `senderVerdict`
+
+**Kind:** function · **Import:** `senderVerdict` from `'@onderling/core'`
+
+```js
+senderVerdict(raw, envelope, authenticatedSender)
+```
+
+Is this inbound envelope allowed to speak as the sender it claims?
+
+**Parameters**
+
+- `raw` `*` — the transport's raw inbound frame, passed straight to the port
+- `envelope` `object` — the parsed envelope carrying the claim (`_from`)
+- `authenticatedSender` `AuthenticatedSender` — the per-transport port
+
+**Returns:** `{ok: boolean, reason: string, claimed: string|null, authenticated: string|string[]|null}` — `reason` is one of: `bound` · `sender-mismatch` · `no-transport-sender` · `no-claimed-sender`, or whatever reason the port refused with.
+
+### `createSenderBinding`
+
+**Kind:** function · **Import:** `createSenderBinding` from `'@onderling/core'`
+
+```js
+createSenderBinding({ transportName, authenticatedSender, onUnauthenticated })
+```
+
+Wrap `senderVerdict` so a transport that CANNOT authenticate says so — once, loudly — instead of
+quietly delivering unchecked envelopes forever.
+
+The failure this exists to prevent: an adapter wires up the check, its port returns `null` on every
+frame (wrong library, a test double, a transport that genuinely has no sender authentication), and the
+code reads as protected while nothing is being compared. One warning per transport instance is enough
+to make that visible in a log without drowning the receive path.
+
+**Parameters**
+
+- `opts` `object`
+- `opts.transportName` `string` — named in the warning, so the log says WHICH transport
+- `opts.authenticatedSender` `AuthenticatedSender`
+- `[opts.onUnauthenticated]` `(msg: string) => void` — called once, on the first unchecked frame
+
+**Returns:** `(raw: *, envelope: object) => {ok: boolean, reason: string, claimed: string|null, authenticated: string|string[]|null}`

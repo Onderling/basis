@@ -17,6 +17,7 @@ README: [`packages/sdk/README.md`](../../packages/sdk/README.md) · Index: [docs
 - `'@onderling/sdk/high'`
 - `'@onderling/sdk/requires'`
 - `'@onderling/sdk/testing'`
+- `'@onderling/sdk/skills'`
 
 ## Re-exported surface
 
@@ -29,29 +30,48 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `A2AAuth` | class | [`core.md`](core.md#a2aauth) |
 | `A2ATLSLayer` | class | [`core.md`](core.md#a2atlslayer) |
 | `A2ATransport` | class | [`core.md`](core.md#a2atransport) |
+| `ADDRESS_CHALLENGE_TTL_MS` | constant | [`core.md`](core.md#address_challenge_ttl_ms) |
+| `ADDRESS_NONCE_BYTES` | constant | [`core.md`](core.md#address_nonce_bytes) |
+| `addressPossessionMessage` | function | [`core.md`](core.md#addresspossessionmessage) |
 | `ADMIN_ROLE_BUNDLE` | constant | [`core.md`](core.md#admin_role_bundle) |
 | `Agent` | class | [`core.md`](core.md#agent) |
 | `AgentCardBuilder` | class | [`core.md`](core.md#agentcardbuilder) |
 | `AgentConfig` | class | [`core.md`](core.md#agentconfig) |
 | `AgentIdentity` | class | [`core.md`](core.md#agentidentity) |
+| `allowSender` | function | [`core.md`](core.md#allowsender) |
 | `anyOf` | function | [`core.md`](core.md#anyof) |
+| `anyRevoked` | function | [`core.md`](core.md#anyrevoked) |
 | `appendOnlyEventLog` | function | [`core.md`](core.md#appendonlyeventlog) |
+| `askSenderAuthorizer` | function | [`core.md`](core.md#asksenderauthorizer) |
 | `audienceFromHumanInTheLoop` | function | [`core.md`](core.md#audiencefromhumanintheloop) |
+| `authorHead` | function | [`core.md`](core.md#authorhead) |
 | `b64decode` | function | [`core.md`](core.md#b64decode) |
 | `b64encode` | function | [`core.md`](core.md#b64encode) |
 | `Bootstrap` | class | [`core.md`](core.md#bootstrap) |
+| `browses` | function | [`core.md`](core.md#browses) |
 | `buildSkillTopic` | function | [`core.md`](core.md#buildskilltopic) |
 | `bulkTransferSend` | function | [`core.md`](core.md#bulktransfersend) |
 | `canonicalize` | function | [`core.md`](core.md#canonicalize) |
 | `canPromote` | function | [`core.md`](core.md#canpromote) |
 | `CapabilityToken` | class | [`core.md`](core.md#capabilitytoken) |
+| `caretakerOrder` | function | [`core.md`](core.md#caretakerorder) |
+| `carriedSenderCredential` | function | [`core.md`](core.md#carriedsendercredential) |
+| `CIRCLE_ADDRESS_ANNOUNCE_KIND` | constant | [`core.md`](core.md#circle_address_announce_kind) |
+| `circleAddressAnnouncement` | function | [`core.md`](core.md#circleaddressannouncement) |
+| `circleAddressSigner` | function | [`core.md`](core.md#circleaddresssigner) |
 | `circleIdentity` | function | [`core.md`](core.md#circleidentity) |
+| `circleLinkMessage` | function | [`core.md`](core.md#circlelinkmessage) |
 | `CLAIM_VERSION` | constant | [`core.md`](core.md#claim_version) |
 | `CloudAdapter` | class | [`core.md`](core.md#cloudadapter) |
 | `CloudBackup` | class | [`core.md`](core.md#cloudbackup) |
 | `compareTiers` | function | [`core.md`](core.md#comparetiers) |
+| `createAuthorChain` | function | [`core.md`](core.md#createauthorchain) |
+| `createDiscoverabilityControl` | function | [`core.md`](core.md#creatediscoverabilitycontrol) |
 | `createInMemoryActorResolver` | function | [`core.md`](core.md#createinmemoryactorresolver) |
 | `createMemorySeqStore` | function | [`core.md`](core.md#creatememoryseqstore) |
+| `createNearbyPeerSource` | function | [`core.md`](core.md#createnearbypeersource) |
+| `createSenderBinding` | function | [`core.md`](core.md#createsenderbinding) |
+| `createSpineAppender` | function | [`core.md`](core.md#createspineappender) |
 | `DataPart` | function | [`core.md`](core.md#datapart) |
 | `DataSource` | class | [`core.md`](core.md#datasource) |
 | `DataSourceAccessDeniedError` | class | [`core.md`](core.md#datasourceaccessdeniederror) |
@@ -62,12 +82,26 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `defineSkill` | function | [`core.md`](core.md#defineskill) |
 | `deriveCircleAddress` | function | [`core.md`](core.md#derivecircleaddress) |
 | `deriveCircleSeed` | function | [`core.md`](core.md#derivecircleseed) |
+| `deriveDeviceSeed` | function | [`core.md`](core.md#derivedeviceseed) |
+| `deriveVaultAtRestKeyFrom` | function | [`core.md`](core.md#derivevaultatrestkeyfrom) |
+| `deviceDelegationMessage` | function | [`core.md`](core.md#devicedelegationmessage) |
+| `deviceDelegationPubKey` | function | [`core.md`](core.md#devicedelegationpubkey) |
 | `discoverA2A` | function | [`core.md`](core.md#discovera2a) |
+| `DISCOVERABILITY` | constant | [`core.md`](core.md#discoverability) |
+| `DISCOVERABILITY_ORDER` | constant | [`core.md`](core.md#discoverability_order) |
+| `dropSubscriber` | function | [`core.md`](core.md#dropsubscriber) |
 | `Emitter` | class | [`core.md`](core.md#emitter) |
+| `envelopeByteLength` | function | [`core.md`](core.md#envelopebytelength) |
+| `envelopeExceedsLimit` | function | [`core.md`](core.md#envelopeexceedslimit) |
+| `EnvelopeTooLargeError` | class | [`core.md`](core.md#envelopetoolargeerror) |
+| `EVICTION_KIND` | constant | [`core.md`](core.md#eviction_kind) |
+| `EVICTION_STMT_VERSION` | constant | [`core.md`](core.md#eviction_stmt_version) |
 | `FallbackTable` | class | [`core.md`](core.md#fallbacktable) |
-| `FederatedReader` | class | [`core.md`](core.md#federatedreader) |
 | `FilePart` | function | [`core.md`](core.md#filepart) |
 | `FileSystemSource` | class | [`core.md`](core.md#filesystemsource) |
+| `firstContactRateGate` | function | [`core.md`](core.md#firstcontactrategate) |
+| `foldRoster` | function | [`core.md`](core.md#foldroster) |
+| `frontier` | function | [`core.md`](core.md#frontier) |
 | `generateMnemonic` | function | [`core.md`](core.md#generatemnemonic) |
 | `generateTunnelKey` | function | [`core.md`](core.md#generatetunnelkey) |
 | `genId` | function | [`core.md`](core.md#genid) |
@@ -86,14 +120,17 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `handleStreamChunk` | function | [`core.md`](core.md#handlestreamchunk) |
 | `handleTaskOneWay` | function | [`core.md`](core.md#handletaskoneway) |
 | `handleTaskRequest` | function | [`core.md`](core.md#handletaskrequest) |
+| `hashHex` | function | [`core.md`](core.md#hashhex) |
 | `hasRoleBundle` | function | [`core.md`](core.md#hasrolebundle) |
-| `HubDelegateTransport` | class | [`core.md`](core.md#hubdelegatetransport) |
 | `ImagePart` | function | [`core.md`](core.md#imagepart) |
 | `IndexedDBSource` | class | [`core.md`](core.md#indexeddbsource) |
 | `InternalBus` | class | [`core.md`](core.md#internalbus) |
 | `InternalTransport` | class | [`core.md`](core.md#internaltransport) |
 | `invokeAgentSkill` | function | [`core.md`](core.md#invokeagentskill) |
 | `invokeWithHop` | function | [`core.md`](core.md#invokewithhop) |
+| `isChained` | function | [`core.md`](core.md#ischained) |
+| `isDiscoverability` | function | [`core.md`](core.md#isdiscoverability) |
+| `isEd25519PubKey` | function | [`core.md`](core.md#ised25519pubkey) |
 | `isEnvelope` | function | [`core.md`](core.md#isenvelope) |
 | `isKnownRole` | function | [`core.md`](core.md#isknownrole) |
 | `isStandardRole` | function | [`core.md`](core.md#isstandardrole) |
@@ -104,20 +141,29 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `LiveSyncSkill` | class | [`core.md`](core.md#livesyncskill) |
 | `LocalTransport` | class | [`core.md`](core.md#localtransport) |
 | `makeFetchResourceSkill` | function | [`core.md`](core.md#makefetchresourceskill) |
+| `makeForkProof` | function | [`core.md`](core.md#makeforkproof) |
 | `materializeBundle` | function | [`core.md`](core.md#materializebundle) |
+| `MAX_ENVELOPE_BYTES` | constant | [`core.md`](core.md#max_envelope_bytes) |
+| `maxExposure` | function | [`core.md`](core.md#maxexposure) |
 | `MemoryAdapter` | class | [`core.md`](core.md#memoryadapter) |
 | `MemorySource` | class | [`core.md`](core.md#memorysource) |
 | `MemoryStorageBackend` | class | [`core.md`](core.md#memorystoragebackend) |
 | `MergeContracts` | constant | [`core.md`](core.md#mergecontracts) |
 | `mkEnvelope` | function | [`core.md`](core.md#mkenvelope) |
 | `mnemonicToSeed` | function | [`core.md`](core.md#mnemonictoseed) |
+| `newAddressChallenge` | function | [`core.md`](core.md#newaddresschallenge) |
+| `normalizeDiscoverability` | function | [`core.md`](core.md#normalizediscoverability) |
 | `offeringMatches` | function | [`core.md`](core.md#offeringmatches) |
 | `OfflineTransport` | class | [`core.md`](core.md#offlinetransport) |
 | `openSealed` | function | [`core.md`](core.md#opensealed) |
 | `openTunnelOW` | function | [`core.md`](core.md#opentunnelow) |
 | `ORIGIN_SIG_VERSION` | constant | [`core.md`](core.md#origin_sig_version) |
+| `ownCircleAddressAnnouncement` | function | [`core.md`](core.md#owncircleaddressannouncement) |
+| `ownCircleAddressAnnouncementFromSeed` | function | [`core.md`](core.md#owncircleaddressannouncementfromseed) |
+| `ownerRootFingerprint` | function | [`core.md`](core.md#ownerrootfingerprint) |
 | `P` | constant | [`core.md`](core.md#p) |
 | `packSealed` | function | [`core.md`](core.md#packsealed) |
+| `parentsOf` | function | [`core.md`](core.md#parentsof) |
 | `Parts` | class | [`core.md`](core.md#parts) |
 | `pathScopeCovers` | function | [`core.md`](core.md#pathscopecovers) |
 | `PeerDiscovery` | class | [`core.md`](core.md#peerdiscovery) |
@@ -128,11 +174,14 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `PodCapabilityToken` | class | [`core.md`](core.md#podcapabilitytoken) |
 | `PolicyEngine` | class | [`core.md`](core.md#policyengine) |
 | `publish` | function | [`core.md`](core.md#publish) |
+| `publishes` | function | [`core.md`](core.md#publishes) |
 | `pullPeerList` | function | [`core.md`](core.md#pullpeerlist) |
+| `reachability` | function | [`core.md`](core.md#reachability) |
 | `REACHABILITY_ORACLE_TOPIC` | constant | [`core.md`](core.md#reachability_oracle_topic) |
 | `REACHABILITY_TIERS` | constant | [`core.md`](core.md#reachability_tiers) |
 | `ReachabilityOracle` | class | [`core.md`](core.md#reachabilityoracle) |
 | `ReachabilityTier` | constant | [`core.md`](core.md#reachabilitytier) |
+| `refuseSender` | function | [`core.md`](core.md#refusesender) |
 | `registerCapabilitiesSkill` | function | [`core.md`](core.md#registercapabilitiesskill) |
 | `registerCustomRole` | function | [`core.md`](core.md#registercustomrole) |
 | `registerReachablePeersSkill` | function | [`core.md`](core.md#registerreachablepeersskill) |
@@ -146,6 +195,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `REPLY_CODES` | constant | [`core.md`](core.md#reply_codes) |
 | `requestSkills` | function | [`core.md`](core.md#requestskills) |
 | `resetRoleBundles` | function | [`core.md`](core.md#resetrolebundles) |
+| `resolveSenderKey` | function | [`core.md`](core.md#resolvesenderkey) |
 | `RoleGrantManager` | class | [`core.md`](core.md#rolegrantmanager) |
 | `roleRank` | function | [`core.md`](core.md#rolerank) |
 | `ROLES` | constant | [`core.md`](core.md#roles) |
@@ -158,15 +208,29 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `seedToMnemonic` | function | [`core.md`](core.md#seedtomnemonic) |
 | `sendA2AStreamTask` | function | [`core.md`](core.md#senda2astreamtask) |
 | `sendA2ATask` | function | [`core.md`](core.md#senda2atask) |
+| `SENDER_AUTHORIZATION` | constant | [`core.md`](core.md#sender_authorization) |
+| `SENDER_KEY_FIELD` | constant | [`core.md`](core.md#sender_key_field) |
+| `senderCredential` | function | [`core.md`](core.md#sendercredential) |
+| `senderVerdict` | function | [`core.md`](core.md#senderverdict) |
 | `sendFile` | function | [`core.md`](core.md#sendfile) |
 | `sendHello` | function | [`core.md`](core.md#sendhello) |
 | `sendMessage` | function | [`core.md`](core.md#sendmessage) |
+| `setSubscribeAuthorizer` | function | [`core.md`](core.md#setsubscribeauthorizer) |
 | `setUnionWithDedupe` | function | [`core.md`](core.md#setunionwithdedupe) |
+| `signAddressPossession` | function | [`core.md`](core.md#signaddresspossession) |
+| `signAddressPossessionFromSeed` | function | [`core.md`](core.md#signaddresspossessionfromseed) |
+| `signCircleLink` | function | [`core.md`](core.md#signcirclelink) |
+| `signCircleLinkFromSeed` | function | [`core.md`](core.md#signcirclelinkfromseed) |
+| `signDeviceDelegation` | function | [`core.md`](core.md#signdevicedelegation) |
+| `signEviction` | function | [`core.md`](core.md#signeviction) |
 | `signOrigin` | function | [`core.md`](core.md#signorigin) |
 | `signReachabilityClaim` | function | [`core.md`](core.md#signreachabilityclaim) |
+| `signSpine` | function | [`core.md`](core.md#signspine) |
 | `skillAttenuates` | function | [`core.md`](core.md#skillattenuates) |
 | `SkillRegistry` | class | [`core.md`](core.md#skillregistry) |
 | `SkillsPubSub` | class | [`core.md`](core.md#skillspubsub) |
+| `SPINE_STATEMENT_ITEM` | constant | [`core.md`](core.md#spine_statement_item) |
+| `SPINE_STMT_VERSION` | constant | [`core.md`](core.md#spine_stmt_version) |
 | `STANDARD_RANKS` | constant | [`core.md`](core.md#standard_ranks) |
 | `StateManager` | class | [`core.md`](core.md#statemanager) |
 | `StorageBackend` | class | [`core.md`](core.md#storagebackend) |
@@ -190,9 +254,16 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `unregisterRoleBundle` | function | [`core.md`](core.md#unregisterrolebundle) |
 | `unsubscribe` | function | [`core.md`](core.md#unsubscribe) |
 | `validateMnemonic` | function | [`core.md`](core.md#validatemnemonic) |
+| `verifyAddressPossession` | function | [`core.md`](core.md#verifyaddresspossession) |
+| `verifyCircleAddressAnnouncement` | function | [`core.md`](core.md#verifycircleaddressannouncement) |
+| `verifyCircleAddressAnnouncements` | function | [`core.md`](core.md#verifycircleaddressannouncements) |
+| `verifyCircleLink` | function | [`core.md`](core.md#verifycirclelink) |
+| `verifyDeviceDelegation` | function | [`core.md`](core.md#verifydevicedelegation) |
+| `verifyEviction` | function | [`core.md`](core.md#verifyeviction) |
 | `verifyGroupProof` | function | [`core.md`](core.md#verifygroupproof) |
 | `verifyOrigin` | function | [`core.md`](core.md#verifyorigin) |
 | `verifyReachabilityClaim` | function | [`core.md`](core.md#verifyreachabilityclaim) |
+| `verifySpine` | function | [`core.md`](core.md#verifyspine) |
 
 ### From `@onderling/transports`
 
@@ -220,6 +291,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | Export | Kind | Reference |
 | --- | --- | --- |
 | `_setInruptModuleForTests` | function | [`pod-client.md`](pod-client.md#_setinruptmodulefortests) |
+| `assertScopedScheme` | function | [`pod-client.md`](pod-client.md#assertscopedscheme) |
 | `AsyncStorageTombstones` | class | [`pod-client.md`](pod-client.md#asyncstoragetombstones) |
 | `Auth` | class | [`pod-client.md`](pod-client.md#auth) |
 | `AuthError` | class | [`pod-client.md`](pod-client.md#autherror) |
@@ -269,6 +341,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `MemoryTombstones` | class | [`pod-client.md`](pod-client.md#memorytombstones) |
 | `messageRef` | function | [`pod-client.md`](pod-client.md#messageref) |
 | `migrateVaultToPod` | function | [`pod-client.md`](pod-client.md#migratevaulttopod) |
+| `needsCopyToLeaveAudience` | function | [`pod-client.md`](pod-client.md#needscopytoleaveaudience) |
 | `NetworkError` | class | [`pod-client.md`](pod-client.md#networkerror) |
 | `NotFoundError` | class | [`pod-client.md`](pod-client.md#notfounderror) |
 | `open` | function | [`pod-client.md`](pod-client.md#open) |
@@ -301,6 +374,7 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 | `resourcePathFromCacheKey` | function | [`pod-client.md`](pod-client.md#resourcepathfromcachekey) |
 | `rotateGroupKeyResource` | function | [`pod-client.md`](pod-client.md#rotategroupkeyresource) |
 | `rotateKeyEvent` | function | [`pod-client.md`](pod-client.md#rotatekeyevent) |
+| `SCOPED_SEAL_SCHEMES` | constant | [`pod-client.md`](pod-client.md#scoped_seal_schemes) |
 | `scopeForRequest` | function | [`pod-client.md`](pod-client.md#scopeforrequest) |
 | `seal` | function | [`pod-client.md`](pod-client.md#seal) |
 | `SEAL_SCHEMES` | constant | [`pod-client.md`](pod-client.md#seal_schemes) |
@@ -325,11 +399,75 @@ These exports are re-exported verbatim from other `@onderling/*` packages; each 
 
 ## Package-defined surface
 
+## `../params/src/params.js`
+
+### `PARAM_SCOPE`
+
+**Kind:** constant · **Import:** `PARAM_SCOPE` from `'@onderling/sdk'`, `'@onderling/sdk/core'`
+
+The sync scope — decides where a set value routes (decision B/C).
+
+### `PARAM_KIND`
+
+**Kind:** constant · **Import:** `PARAM_KIND` from `'@onderling/sdk'`, `'@onderling/sdk/core'`
+
+The security kind — the set-op gate (decision B/E). `internal` is immutable by construction.
+
+### `param`
+
+**Kind:** function · **Import:** `param` from `'@onderling/sdk'`, `'@onderling/sdk/core'`
+
+```js
+param(spec)
+```
+
+`param(spec)` — the declaration-site helper (decision A). Validates the spec and RETURNS its code default,
+so `export const X = param({ … })` is the value at the use site AND the greppable, uniform declaration the
+stale-param guard's static scan reads. Pure: it registers nothing at runtime (no import-order hazard).
+
+### `createParamRegistry`
+
+**Kind:** function · **Import:** `createParamRegistry` from `'@onderling/sdk'`, `'@onderling/sdk/core'`
+
+```js
+createParamRegistry()
+```
+
+The runtime PARAMETER REGISTER — a plain instance (Map + `declare()` + accessors), the sibling shape of
+`createResolutionRegistry()`. Populated by DI at composition (injected down) with the params it governs;
+`valueOf` gives the live value, `setValue`/`setParam` route by scope, and kind is the settability gate.
+
+### `setParam`
+
+**Kind:** function · **Import:** `setParam` from `'@onderling/sdk'`, `'@onderling/sdk/core'`
+
+```js
+async setParam(register, { key, value } = {}, { homes } = {})
+```
+
+THE `set-param` OP (decision D) — the ONE generic security chokepoint. It reads the register and enforces
+`kind`: it sets ONLY a kind:user param (scope-appropriate) and REFUSES a kind:internal one (and an unknown
+key). One gate where it binds beats replicating the check per set-op (enforceability). On success it routes
+the value to the EXISTING sync home for the param's scope (decision C) via the injected `homes` writers —
+`device`/`agent`/`circle` → the writer the composition wired to `devices/<id>.json` / `shared.json` /
+circle policy. The register never persists; it declares + routes.
+
+**Parameters**
+
+- `register` `object` — a param register (createParamRegistry)
+- `arg` `object`
+- `arg.key` `string` — the param key to set
+- `arg.value` `*` — the new value
+- `[opts]` `object`
+- `[opts.homes]` `Record<'device'|'agent'|'circle', (p:{key,value,scope,spec})=>void>` — scope → home writer
+
+**Returns:** `{ok:boolean, key?:string, value?:*, scope?:string, home?:string, error?:string}`
+
 ## `src/buildSkillsFromManifest.js`
 
 ### `buildSkillsFromManifest`
 
-**Kind:** function · **Import:** `buildSkillsFromManifest` from `'@onderling/sdk'`, `'@onderling/sdk/high'`
+**Kind:** function · **Import:** `buildSkillsFromManifest` from `'@onderling/sdk'`, `'@onderling/sdk/high'`, `'@onderling/sdk/skills'`
 
 ```js
 buildSkillsFromManifest({ operations, cores, storeFor, requireCore = true, visibilityFor, label = 'buildSkillsFromManifest', } = {})

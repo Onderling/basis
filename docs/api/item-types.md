@@ -169,6 +169,30 @@ types this client doesn't know about; the receiver renders
 them via the interface-registry's default permission-denied /
 unknown-type fallback.
 
+## `src/noticeboardPost.js`
+
+### `SYSTEM_STOOP_TYPES`
+
+**Kind:** constant · **Import:** `SYSTEM_STOOP_TYPES` from `'@onderling/item-types'`
+
+Stoop item types that are NOT user-facing noticeboard posts — the membership lifecycle + rules
+documents, and the circle chat lines.
+
+`circle-chat-message` earns its place here for the same reason the others do, but the symptom was
+louder: every line typed in a circle's Conversation also appeared on the Noticeboard — with a
+"Withdraw" action when it was yours — and, because a chat item carries its circle as
+`source.circleId` (a hint the circle-scope reader does not read), on EVERY circle's Noticeboard.
+
+### `isNoticeboardPost`
+
+**Kind:** function · **Import:** `isNoticeboardPost` from `'@onderling/item-types'`
+
+```js
+isNoticeboardPost(item)
+```
+
+True when `item` is a real noticeboard post (an ask/offer), not a system item.
+
 ## `src/registry.js`
 
 ### `createRegistry`
@@ -182,3 +206,31 @@ createRegistry()
 Create an independent registry instance. Most callers use the
 default canonical one (via the top-level `validate` etc.); apps
 that want a fresh registry for tests can call this.
+
+## `src/types/inbox-item.js`
+
+### `INBOX_ITEM_SCHEMA`
+
+**Kind:** constant · **Import:** `INBOX_ITEM_SCHEMA` from `'@onderling/item-types'`
+
+_No JSDoc block in the source (recorded gap — see the coverage table)._
+
+### `INBOX_KIND`
+
+**Kind:** constant · **Import:** `INBOX_KIND` from `'@onderling/item-types'`
+
+The two kinds, named once so no caller spells them as string literals.
+
+### `isInboxItem`
+
+**Kind:** function · **Import:** `isInboxItem` from `'@onderling/item-types'`
+
+```js
+isInboxItem(item, kind)
+```
+
+Is this the inbox item we mean — the noun AND the kind, never one without the other.
+
+Every caller wants both halves, and the half that used to be checked alone (`type ===
+'subtask-request'`) was checking a type that no longer exists, so it silently answered no
+everywhere. Exported from the type's own package because both apps and other packages ask.

@@ -25,7 +25,7 @@ createAgentRegistry({ pseudoPod, anchorPodUri, deviceId, preferPodUri = false, r
 
 Build the live agent-registry handle over an injected pseudo-pod: etag-CAS reads/writes of the
 registry resource with retry, plus optional per-write snapshots via a `versionStore`. Returns
-`{register, lookup, revoke, purge, updateCapabilities, applyGrant, revokeGrant, list, reload,
+`{register, lookup, revoke, purge, updateCapabilities, updateExposure, applyGrant, revokeGrant, list, reload,
 resourceUri}`. The resource URI resolves from the `resourceUri` override, else `deviceId`
 (pseudo-pod path), else `anchorPodUri`; throws INVALID_ARGUMENT without a usable `pseudoPod`.
 
@@ -49,7 +49,7 @@ resourceUri}`. The resource URI resolves from the `resourceUri` override, else `
 **Kind:** function · **Import:** `projectAgentCard` from `'@onderling/agent-registry'`
 
 ```js
-projectAgentCard(entry, { owner } = {})
+projectAgentCard(entry, { owner, circleId = null } = {})
 ```
 
 Project a registry agent entry to a frozen A2A Agent Card: the standard card fields plus the
@@ -57,11 +57,18 @@ Project a registry agent entry to a frozen A2A Agent Card: the standard card fie
 de-duplicated union of grant skills and coarse capabilities. Throws INVALID_ARGUMENT when
 `entry` / `entry.agentId` is missing.
 
+Skills the entry's `exposure` policy HIDES are left off the card — the card is what other people
+read, so this is where "hide a skill" takes effect. It is a discovery filter and nothing more: the
+grants that authorise a dispatch are unchanged and still listed, because a grant a reader holds is
+theirs to know about. Omitting a skill does not stop anyone who knows its id from calling it — the
+token check at dispatch does that (→ src/skillExposure.js).
+
 **Parameters**
 
 - `entry` `object` — a registry agent entry (v2 shape)
 - `[opts]` `object`
 - `[opts.owner]` `string` — owner webid/key; defaults to entry.webid
+- `[opts.circleId]` `string` — project the card AS SEEN IN this circle (applies that circle's narrowing on top of the agent-wide policy); omitted → agent-wide
 
 **Returns:** `object` — frozen A2A agent card
 
@@ -167,6 +174,125 @@ createCatalogueSource — a `{ list, get }` source over the endorsement graph.
 - `[opts.now]` `() => number` — injectable clock (expiry; tests)
 
 **Returns:** `{ list: () => Promise<object[]>, get: (id: string) => Promise<object|null> }`
+
+## `src/circleMembership.js`
+
+### `CIRCLE_MEMBERSHIPS_KEY`
+
+**Kind:** constant · **Import:** `CIRCLE_MEMBERSHIPS_KEY` from `'@onderling/agent-registry'`
+
+The canonical property key holding the `{ [circleId]: record }` map.
+
+### `isKeyRef`
+
+**Kind:** function · **Import:** `isKeyRef` from `'@onderling/agent-registry'`
+
+```js
+isKeyRef(v)
+```
+
+True iff `v` is a well-formed wrapped-key-resource POINTER: `{ ref: "<scheme>:<id>", posture? }`.
+The ref is a reference, never inline secret bytes; posture (optional) is one of p0–p3.
+
+**Parameters**
+
+- `v` `*`
+
+### `isCircleMembershipRecord`
+
+**Kind:** function · **Import:** `isCircleMembershipRecord` from `'@onderling/agent-registry'`
+
+```js
+isCircleMembershipRecord(v)
+```
+
+True iff `v` is a well-formed per-circle membership record. `handle` + `address` are required (who
+you are in the circle + where you are reachable); `proof`, `relays`, and `key` are optional facets.
+
+**Parameters**
+
+- `v` `*`
+
+### `normaliseCircleMembership`
+
+**Kind:** function · **Import:** `normaliseCircleMembership` from `'@onderling/agent-registry'`
+
+```js
+normaliseCircleMembership(v)
+```
+
+Freeze-normalise a record to exactly the known facets (drops unknown fields). Invalid → null.
+
+### `circleMembershipsOf`
+
+**Kind:** function · **Import:** `circleMembershipsOf` from `'@onderling/agent-registry'`
+
+```js
+circleMembershipsOf(entry)
+```
+
+Read the OWN `{ [circleId]: record }` map straight off one registry entry (no inherit chain).
+
+### `circleMembershipOf`
+
+**Kind:** function · **Import:** `circleMembershipOf` from `'@onderling/agent-registry'`
+
+```js
+circleMembershipOf(entry, circleId)
+```
+
+One circle's record off an entry, or null.
+
+### `circleKeyRefOf`
+
+**Kind:** function · **Import:** `circleKeyRefOf` from `'@onderling/agent-registry'`
+
+```js
+circleKeyRefOf(entry, circleId)
+```
+
+The wrapped-key-resource ref for a circle off an entry, or null — what a restored device resolves to
+OPEN pre-wipe content. The load-bearing read of the whole extension.
+
+### `circleMembershipsFromProperties`
+
+**Kind:** function · **Import:** `circleMembershipsFromProperties` from `'@onderling/agent-registry'`
+
+```js
+circleMembershipsFromProperties(getProfile, profileId, opts = {})
+```
+
+Resolve the `{ [circleId]: record }` map through the own/inherit profile graph (a persona inherits
+its memberships from the default profile unless it declares its own). Mirrors driversFromProperties.
+
+**Parameters**
+
+- `getProfile` `(id:string)=>({properties?:object}|null|undefined)`
+- `profileId` `string`
+- `[opts]` `{ defaultProfileId?: string|null }`
+
+### `setCircleMembership`
+
+**Kind:** function · **Import:** `setCircleMembership` from `'@onderling/agent-registry'`
+
+```js
+setCircleMembership(properties, circleId, patch)
+```
+
+Upsert one circle's membership record as an OWN property. Returns a NEW frozen properties map (other
+circles' records preserved). This is a FACET MERGE, not a replace: the given `patch` is merged onto any
+existing record for `circleId`, so a PARTIAL patch — e.g. adding the wrapped-key `{key}` pointer at
+circle-open, AFTER the `{handle,address}` write-on-join — keeps the facets it does not mention. The
+MERGED result must still be a valid record (handle + address); a key-only patch for a circle with no
+prior record throws (there is nothing to attach the key to — callers treat that best-effort). Throwing on
+an invalid result is deliberate: this is restore data, and an entry that silently vanished would reproduce
+the exact "nothing came back" failure.
+
+**Parameters**
+
+- `properties` `object` — the profile's current properties map
+- `circleId` `string`
+- `patch` `object` — any subset of { handle, address, proof, relays, key } to merge in
 
 ## `src/communityCatalogue.js`
 
@@ -291,6 +417,115 @@ profileCircleAddress(ownerRoot, profileId, circleId)
 The per-circle ADDRESS a profile presents in a circle (step 3 — unlinkable-by-default). Full chain
 from the owner root: root → profile seed → per-circle address. A distinct key per (profile, circle).
 
+## `src/deviceDelegations.js`
+
+### `DEVICE_DELEGATIONS_KEY`
+
+**Kind:** constant · **Import:** `DEVICE_DELEGATIONS_KEY` from `'@onderling/agent-registry'`
+
+The canonical property key holding the `{ [deviceId]: record }` map.
+
+### `GRANTS_FLOOR_KEY`
+
+**Kind:** constant · **Import:** `GRANTS_FLOOR_KEY` from `'@onderling/agent-registry'`
+
+The GRANTS-FLOOR marker (its own property key, beside the map — a marker in the map would read
+as a malformed device record to every map consumer). The grants lane's device-set trust base
+accepts statements signed by the shared PROFILE key — "the floor" — because a person's first,
+un-enrolled device has no other key. The floor is also the one signature a revoked-but-stolen
+device still holds (the key cannot be tombstoned without re-keying the person). So THE FIRST
+DEVICE-REVOKE CEREMONY CLOSES IT: the ceremony proves the phrase and self-enrolls the running
+device into delegation custody, so at that moment every legitimate device signs with a
+revocable delegation key — and this marker tells every verifier the shared signature no longer
+counts. Closed is forever (deny-wins; there is no reopen — a later device joins by enrollment,
+which needs no floor).
+
+### `grantsFloorClosedOf`
+
+**Kind:** function · **Import:** `grantsFloorClosedOf` from `'@onderling/agent-registry'`
+
+```js
+grantsFloorClosedOf(entry)
+```
+
+Is the profile's grants floor closed? (Absent/malformed → open — the pre-ceremony default.)
+
+### `closeGrantsFloor`
+
+**Kind:** function · **Import:** `closeGrantsFloor` from `'@onderling/agent-registry'`
+
+```js
+closeGrantsFloor(properties, { closedAt = null } = {})
+```
+
+Close the floor on a properties map (idempotent). Returns a NEW frozen map.
+
+### `isDeviceDelegationRecord`
+
+**Kind:** function · **Import:** `isDeviceDelegationRecord` from `'@onderling/agent-registry'`
+
+```js
+isDeviceDelegationRecord(v)
+```
+
+True iff `v` is a well-formed delegation record: the root-signed statement fields plus local
+bookkeeping. `label` is the human name the enroll UI collects ("Frits' telefoon"); `revoked`
+marks a tombstone; `issuedAt` is informational (NOT part of the signed statement).
+
+**Parameters**
+
+- `v` `*`
+
+### `normaliseDeviceDelegation`
+
+**Kind:** function · **Import:** `normaliseDeviceDelegation` from `'@onderling/agent-registry'`
+
+```js
+normaliseDeviceDelegation(v)
+```
+
+Freeze-normalise a record to exactly the known fields (drops unknown). Invalid → null.
+
+### `deviceDelegationsOf`
+
+**Kind:** function · **Import:** `deviceDelegationsOf` from `'@onderling/agent-registry'`
+
+```js
+deviceDelegationsOf(entry)
+```
+
+Read the OWN `{ [deviceId]: record }` map straight off one registry entry (no inherit chain).
+
+### `deviceDelegationOf`
+
+**Kind:** function · **Import:** `deviceDelegationOf` from `'@onderling/agent-registry'`
+
+```js
+deviceDelegationOf(entry, deviceId)
+```
+
+One device's record off an entry, or null.
+
+### `setDeviceDelegation`
+
+**Kind:** function · **Import:** `setDeviceDelegation` from `'@onderling/agent-registry'`
+
+```js
+setDeviceDelegation(properties, deviceId, patch)
+```
+
+Upsert one device's delegation record as an OWN property. Returns a NEW frozen properties map
+(other devices' records preserved). A REPLACE per device, not a facet merge — the record is a
+signed statement and partial edits would detach the signature from what it covers. The one
+sanctioned mutation of an existing record is the tombstone: `patch` may be `{revoked: true}`
+alone, which flips the flag and keeps the signed fields intact.
+
+**Parameters**
+
+- `properties` `object` — the profile's current properties map
+- `deviceId` `string`
+- `patch` `object` — a full record, or `{revoked: true}` for an existing one
+
 ## `src/disclosure.js`
 
 ### `createDisclosurePolicy`
@@ -393,6 +628,38 @@ rung. Everything else is ABSENT (default-withhold, no marker). Pure.
 - `[vocabulary]` `object` — a createVocabulary(...) — for coarsening (optional)
 
 **Returns:** `object` — { [key]: releasedValue } for enabled + resolvable keys only
+
+### `changedReleaseKeys`
+
+**Kind:** function · **Import:** `changedReleaseKeys` from `'@onderling/agent-registry'`
+
+```js
+changedReleaseKeys(before, after)
+```
+
+Which keys REALLY differ between two releases (two `releasedValues` results for the same
+context). Added, removed and edited keys all count. The comparator behind the profile-update
+propagation gate: an unchanged save yields `[]`, so nothing is written, sent or announced.
+
+An absent/`null` release and `{}` mean the same thing ("I share nothing here") — the roster
+normalises an empty disclosure to `null`, so this must treat them alike.
+
+**Parameters**
+
+- `before` `object|null`
+- `after` `object|null`
+
+**Returns:** `string[]` — changed keys, sorted (stable output for wires + tests)
+
+### `releaseUnchanged`
+
+**Kind:** function · **Import:** `releaseUnchanged` from `'@onderling/agent-registry'`
+
+```js
+releaseUnchanged(before, after)
+```
+
+True when two releases are the same — the no-op save.
 
 ### `releasedForMatching`
 
@@ -1197,6 +1464,69 @@ registry handle has no `lookup`.
 
 **Returns:** `ActorResolver`
 
+## `src/mediaProperty.js`
+
+### `PROFILE_PICTURE_KEY`
+
+**Kind:** constant · **Import:** `PROFILE_PICTURE_KEY` from `'@onderling/agent-registry'`
+
+The canonical profile-picture property key — a media-typed persona attribute.
+
+### `isSealedMediaRef`
+
+**Kind:** function · **Import:** `isSealedMediaRef` from `'@onderling/agent-registry'`
+
+```js
+isSealedMediaRef(v)
+```
+
+True iff `v` is a well-formed SEALED media ref — the value a media-typed property holds.
+Mirrors item-types' MEDIA_SCHEMA.source contract: an object with a non-empty string
+`type` + `ref`, plus `enc` sealing metadata whose `sealed` flag is `true` (a sealing
+envelope, never inline plaintext bytes). A full `media` item (`{type:'media', source}`)
+is unwrapped to its `source` line. Rejects strings/numbers/arrays, a plain object with
+no ref, an UNSEALED ref (`enc.sealed !== true` — inline/plaintext), and a ref missing
+its `enc` sealing line.
+
+This is the media type's VALIDATION — the counterpart to isDriverValue / isLocationValue.
+
+**Parameters**
+
+- `v` `*`
+
+**Returns:** `boolean`
+
+### `mediaDescriptor`
+
+**Kind:** function · **Import:** `mediaDescriptor` from `'@onderling/agent-registry'`
+
+```js
+mediaDescriptor(key, { sensitivity = 'normal' } = {})
+```
+
+A property-vocabulary descriptor for a media-typed key. Type `media`, NO coarseness
+ladder — a picture is all-or-nothing per context (you disclose the whole sealed ref or
+none of it; there is no "coarser" picture), like a driver. It flows through the profile
+own/inherit graph like any property and is disclosed by disclosure.js EXACTLY like a
+text attribute: `enabled` → the sealed ref is released whole (no coarsen fn → value
+as-is); withheld → ABSENT (default-withhold, no marker). `sensitivity` defaults to
+`normal` (a chosen presented self), overridable.
+
+**Parameters**
+
+- `key` `string`
+- `[opts]` `{sensitivity?:string}`
+
+### `profilePictureDescriptor`
+
+**Kind:** function · **Import:** `profilePictureDescriptor` from `'@onderling/agent-registry'`
+
+```js
+profilePictureDescriptor()
+```
+
+The descriptor for the canonical `profilePicture` property (media-typed).
+
 ## `src/offeringsTaxonomy.js`
 
 ### `OFFERINGS_TAXONOMY`
@@ -1344,7 +1674,12 @@ Flip a property to INHERIT (`from` optional → the default profile). Returns a 
 
 **Kind:** constant · **Import:** `PROPERTY_TYPES` from `'@onderling/agent-registry'`
 
-The valid property-descriptor types: coarse-enum, driver, coded, credential, scalar (frozen).
+The valid property-descriptor types (frozen):
+  coarse-enum · driver · coded · credential · scalar, plus
+  `media` — a property whose VALUE is a SEALED MEDIA REF (a pointer, not bytes), in
+  @onderling/item-types' canonical `media` item-type shape. The concrete descriptor +
+  value guard live in mediaProperty.js (like driver→drivers.js, coarse-enum place→
+  location.js); this layer only names the type so `descriptor({type:'media'})` validates.
 
 ### `isPropertyType`
 
@@ -1698,6 +2033,127 @@ pairwise machinery, not here). Never leaks a level the participant hasn't chosen
 **Parameters**
 
 - `self` `{talkId:string, side:string, level:string, persona:object|null}`
+
+## `src/skillExposure.js`
+
+### `EMPTY_EXPOSURE`
+
+**Kind:** constant · **Import:** `EMPTY_EXPOSURE` from `'@onderling/agent-registry'`
+
+The empty policy: nothing hidden anywhere.
+
+### `normalizeExposure`
+
+**Kind:** function · **Import:** `normalizeExposure` from `'@onderling/agent-registry'`
+
+```js
+normalizeExposure(stored)
+```
+
+Normalise a stored exposure policy into `{hidden: string[], perCircle: {circleId: string[]}}`.
+Anything unrecognised degrades to "nothing hidden" — a corrupt policy must not silently hide an
+agent's whole skill set (which would read as the agent being broken).
+
+**Parameters**
+
+- `[stored]` `object`
+
+**Returns:** `{hidden: string[], perCircle: object}`
+
+### `isSkillExposed`
+
+**Kind:** function · **Import:** `isSkillExposed` from `'@onderling/agent-registry'`
+
+```js
+isSkillExposed({ exposure, skillId, circleId = null } = {})
+```
+
+Is this skill advertised in this circle?
+
+Owner-hidden wins everywhere (the ceiling): a circle cannot un-hide it. A per-circle hide applies
+only there. `circleId` omitted ⇒ the agent-wide answer (used by surfaces that show the owner their
+own policy).
+
+**Parameters**
+
+- `a` `object`
+- `[a.exposure]` `object` — the agent's policy (any shape — normalised here)
+- `a.skillId` `string`
+- `[a.circleId]` `string`
+
+**Returns:** `boolean`
+
+### `filterExposedSkills`
+
+**Kind:** function · **Import:** `filterExposedSkills` from `'@onderling/agent-registry'`
+
+```js
+filterExposedSkills({ skills, exposure, circleId = null } = {})
+```
+
+Filter a skill list down to what is advertised in `circleId`. Accepts skill cards (`{id}`) or bare
+id strings and returns the same shape it was given, so it can sit directly in a card/catalogue
+projection.
+
+**Parameters**
+
+- `a` `object`
+- `a.skills` `Array<object|string>`
+- `[a.exposure]` `object`
+- `[a.circleId]` `string`
+
+**Returns:** `Array<object|string>`
+
+### `setSkillExposure`
+
+**Kind:** function · **Import:** `setSkillExposure` from `'@onderling/agent-registry'`
+
+```js
+setSkillExposure({ exposure, skillId, exposed, circleId = null, ownerFingerprint, bySigner, } = {})
+```
+
+The OWNER's edit: hide or expose a skill agent-wide, or within one circle.
+
+Gated on `bySigner` matching the agent's `ownerFingerprint` — the ownership rule. This is a real
+gate for the agent's own stored policy (its device refuses a change it cannot attribute to the owner
+key), and no more than that: it does not pretend to control what a modified client advertises about
+itself. Returns the NEW policy; never mutates.
+
+**Parameters**
+
+- `a` `object`
+- `[a.exposure]` `object` — current policy
+- `a.skillId` `string`
+- `a.exposed` `boolean` — true → advertise, false → hide
+- `[a.circleId]` `string` — scope the change to one circle (else agent-wide)
+- `a.ownerFingerprint` `string` — the agent's bound owner key fingerprint
+- `a.bySigner` `string` — the fingerprint that signed this change
+
+**Returns:** `{ok: true, exposure: object} | {ok: false, reason: string}`
+
+### `setCircleSkillExposure`
+
+**Kind:** function · **Import:** `setCircleSkillExposure` from `'@onderling/agent-registry'`
+
+```js
+setCircleSkillExposure({ exposure, skillId, exposed, circleId, isAdmin } = {})
+```
+
+A circle ADMIN's edit: hide a skill inside their own circle. Narrowing only — an admin asking to
+EXPOSE is refused (`cannot-widen`) rather than silently ignored, because a control that appears to
+work and does nothing is worse than one that says no. Un-hiding what the same circle hid is allowed
+(that is undoing their own narrowing, not widening past the owner).
+
+**Parameters**
+
+- `a` `object`
+- `[a.exposure]` `object`
+- `a.skillId` `string`
+- `a.exposed` `boolean`
+- `a.circleId` `string`
+- `a.isAdmin` `boolean` — the caller's admin role IN that circle (the existing role — not a new one)
+
+**Returns:** `{ok: true, exposure: object} | {ok: false, reason: string}`
 
 ## `src/subscriptions.js`
 

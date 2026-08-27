@@ -122,7 +122,9 @@ import { renderMobile }      from './renderMobile.js';
 //                 peer of renderSlash. See renderAttachments.js.
 // Re-exported in `from`-form so a documentation generator resolves each
 // projector's own JSDoc at its defining module.
-export { renderChat, matchesAppliesTo as chatMatchesAppliesTo } from './renderChat.js';
+export { renderChat, matchesAppliesTo as chatMatchesAppliesTo,
+  // The item-row button rule, shared with the embed cards so both surfaces offer one set.
+  itemRowButtons } from './renderChat.js';
 export { renderSlash } from './renderSlash.js';
 export { renderGate } from './renderGate.js';
 export { renderA2A, NEVER_DELEGABLE } from './renderA2A.js';

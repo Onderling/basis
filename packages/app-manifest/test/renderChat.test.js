@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { renderChat } from '../src/index.js';
+import { renderChat, itemRowButtons } from '../src/index.js';
 
 const baseManifest = {
   app:       'demo',
@@ -434,5 +434,52 @@ describe('renderChat — systemPrompt', () => {
     expect(out.systemPrompt).toBe(
       ['CUSTOM PREAMBLE', '', 'Available tools:', '[addTask]', '[claim]', '[help]', '', 'END'].join('\n'),
     );
+  });
+});
+
+describe('itemRowButtons — a gate-less button op is not an item action', () => {
+  /**
+   * The rule that decides which buttons an item row offers, kept beside the predicate it uses so the
+   * two cannot be confused. `matchesAppliesTo` says an ABSENT gate admits everything — correct for a
+   * predicate. Reading that as "belongs on every row" is what put 27 buttons on one noticeboard post,
+   * `removeMember` and `restoreFromMnemonic` among them.
+   */
+  const manifest = {
+    app: 'demo',
+    operations: [
+      { id: 'respond',  verb: 'add',    surfaces: { chat: { hint: 'h' }, ui: { control: 'button' } }, appliesTo: { type: 'post', state: ['open'] } },
+      { id: 'signOut',  verb: 'update', surfaces: { chat: { hint: 'h' }, ui: { control: 'button', label: 'Uitloggen' } } },
+      { id: 'anywhere', verb: 'update', surfaces: { chat: { hint: 'h' }, ui: { control: 'button' } }, appliesTo: { type: '*' } },
+      { id: 'noButton', verb: 'list',   surfaces: { chat: { hint: 'h' } }, appliesTo: { type: 'post' } },
+    ],
+  };
+  const idsFor = (item) => itemRowButtons(manifest, item).map((b) => b.opId);
+
+  it('leaves out a button op that declares no appliesTo — it is a global affordance', () => {
+    expect(idsFor({ id: 'p1', type: 'post', state: 'open' })).not.toContain('signOut');
+  });
+
+  it('keeps the ops whose gate actually matches, and only those', () => {
+    expect(idsFor({ id: 'p1', type: 'post', state: 'open' })).toEqual(['respond', 'anywhere']);
+    // Wrong state → the gated op drops out; the wildcard stays.
+    expect(idsFor({ id: 'p2', type: 'post', state: 'closed' })).toEqual(['anywhere']);
+    // Wrong type → only the wildcard.
+    expect(idsFor({ id: 'n1', type: 'note', state: 'open' })).toEqual(['anywhere']);
+  });
+
+  it('an op that BELONGS on every row says so, with the wildcard', () => {
+    // The escape hatch the rule leaves open, so "everywhere" stays expressible — declared, not implied.
+    for (const type of ['post', 'note', 'offer', 'anything']) {
+      expect(idsFor({ id: 'x', type })).toContain('anywhere');
+    }
+  });
+
+  it('ignores ops that declare no button at all', () => {
+    expect(idsFor({ id: 'p1', type: 'post', state: 'open' })).not.toContain('noButton');
+  });
+
+  it('carries the opId, so a caller need not parse it back out of callbackData', () => {
+    const [first] = itemRowButtons(manifest, { id: 'p1', type: 'post', state: 'open' });
+    expect(first).toEqual({ opId: 'respond', label: 'respond', callbackData: 'respond:p1' });
   });
 });

@@ -140,19 +140,8 @@ export function renderChat(manifest, args, opts = {}) {
   // per-item buttons.  callbackData carries `<opId>:<itemId>` (the
   // triple-in-text-form: a tap → callback_query → IncomingMessage →
   // ChatAgent's existing dispatch path).
-  const inlineKeyboardFor = (item) => {
-    const out = [];
-    for (const op of ops) {
-      const ui = op?.surfaces?.ui;
-      if (!ui || ui.control !== 'button') continue;
-      if (!matchesAppliesTo(op.appliesTo, item)) continue;
-      out.push({
-        label:        ui.label ?? op.id,
-        callbackData: `${op.id}:${item?.id ?? ''}`,
-      });
-    }
-    return out;
-  };
+  const inlineKeyboardFor = (item) => itemRowButtons(manifest, item)
+    .map(({ label, callbackData }) => ({ label, callbackData }));
 
   // (e) reply-shape lookup (basis v0.1, 2026-05-21). The
   // chat shell calls `replyShapeFor(opId)` to pick a renderer (text,
@@ -237,6 +226,48 @@ export function renderChat(manifest, args, opts = {}) {
     inlineKeyboardFor, replyShapeFor, followUpsFor, runtimeFor,
     embedSnapshotFor, briefFor, searchFor,
   };
+}
+
+/**
+ * The buttons an ITEM ROW gets: `surfaces.ui.control === 'button'` ops whose gate matches the item.
+ * One implementation, because the chat keyboard and the embed cards must offer the same set — the
+ * manifest is platform-neutral and `appliesTo` is the gate, full stop. `apps/basis` kept a private
+ * copy of this walk (plus a copy of the predicate below, minus its wildcard) until 2026-08-27.
+ *
+ * ── A GATE-LESS BUTTON OP IS NOT AN ITEM ACTION ──────────────────────────────────────────────────
+ * `matchesAppliesTo` answers "does this gate admit this item", and its documented contract is that
+ * an ABSENT gate admits everything. That is right for a predicate and wrong as a rule for choosing
+ * item-row buttons: an op declaring a button and no `appliesTo` is a global or settings affordance
+ * (`signOutOfPod`, `restoreFromMnemonic`, `setMemberRole`), and "no gate" was being read as "belongs
+ * on every row". Measured on 2026-08-27: one open noticeboard post computed 27 buttons, among them
+ * `removeMember` and `encryptedBackup`.
+ *
+ * `renderWeb` never had this problem because it builds item actions per VIEW and requires a type
+ * match, so there is always something to gate against. This selects the same way, explicitly, and
+ * the predicate below is left exactly as it is — changing what an absent gate MEANS would reach far
+ * past this bug, into every other caller of a shared contract.
+ *
+ * An op that genuinely belongs on every row says so: `appliesTo: { type: '*' }`.
+ *
+ * @param {object} manifest
+ * @param {object} item     `{id, type, state, kind?}`
+ * @returns {Array<{opId: string, label: string, callbackData: string}>}
+ */
+export function itemRowButtons(manifest, item) {
+  const ops = Array.isArray(manifest?.operations) ? manifest.operations : [];
+  const out = [];
+  for (const op of ops) {
+    const ui = op?.surfaces?.ui;
+    if (!ui || ui.control !== 'button') continue;
+    if (!op.appliesTo) continue;                       // global/settings affordance, not a row action
+    if (!matchesAppliesTo(op.appliesTo, item)) continue;
+    out.push({
+      opId:         op.id,
+      label:        ui.label ?? op.id,
+      callbackData: `${op.id}:${item?.id ?? ''}`,
+    });
+  }
+  return out;
 }
 
 export function matchesAppliesTo(appliesTo, item) {

@@ -940,6 +940,23 @@ is blind) or to a circle **group key** that is itself distributed by recipient-w
 O(1) per member, rotation on eviction. Portable crypto, one implementation across Node, browser, and
 mobile.
 
+**Access control is ACP, and only ACP (decided 2026-08-26).** A circle grants a member read access by
+writing a Solid **Access Control Resource** — `<container>/.acr` — directly, over the owner's
+authenticated fetch. Solid's older model, **WAC**, honours a different resource (`<container>/.acl`),
+and the two are not interchangeable: on a WAC-served pod the `.acr` write SUCCEEDS, because the server
+simply stores it as an ordinary file, and grants nothing. Members are then unable to read the circle
+they belong to. It fails closed rather than open, so nothing leaks — but it used to fail silently, and
+now refuses out loud when a container advertises a WAC control resource.
+
+**What this obliges, and it is a hosting fact rather than a code one:** a pod hosted for Onderling must
+be served with an ACP configuration. Community Solid Server ships WAC in its default configurations and
+serves ACP only from `@css:config/file-acp.json`, so this is a choice someone makes at provisioning
+time, alongside the TLS relay and the push credential. **There is deliberately no WAC compatibility
+path.** Carrying two access models would mean two implementations of every grant, revoke and rotation
+for the rest of the system's life, each able to drift from the other — for a case we control. The
+cross-pod integration proof (`apps/basis/test/circlePod2Pod.css.test.js`) declares that it needs an ACP
+server and fails on a WAC one, which is what keeps this honest rather than aspirational.
+
 **The store rides the pod as a cache feed.** A pod-backed circle's store attaches the pod as a
 read-through, write-behind medium: local is reality, the pod catches up. For the owner's own settings
 the same idea gets a **restoration gate**: before the attach's bulk flush may touch the pod, a

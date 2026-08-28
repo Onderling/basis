@@ -107,6 +107,7 @@ import { oneToOneBotLabel } from '../../src/v2/botChat.js';
 // Telling someone the circle became theirs. The decision (WHO is told, and whether they have signed
 // for it yet) is shared; the shell only paints the line and carries the button.
 import { caretakerNotice } from '../../src/v2/caretakerNotice.js';
+import { removalNotice } from '../../src/v2/removalNotice.js';
 import { scopeCatalogueToApps } from '../../src/v2/circleCatalogueScope.js';
 // the default-deny capability gate applied at the user-dispatch waist (dispatchReady).
 import { effectiveCapabilities, checkCapability } from '../../src/v2/capabilityGate.js';
@@ -5704,6 +5705,7 @@ function showCircle(id, circle, policy) {
       circleRoster = normalizeCircleMembers(res);
     } catch { circleRoster = []; }
     tellCaretakerIfTheCircleBecameTheirs(rawRoster);
+    tellIfIWasRemoved(rawRoster);   // …and the other direction: a circle that is no longer yours
     // The person-mute set, resolved to actor refs against this roster — the chat projection hides these
     // (the sitting's rule: muted messages LAND, the view filters; unmute restores). Loaded with the
     // roster because the key→ref resolution needs it; refreshed by the mute/unmute actions.
@@ -5740,6 +5742,38 @@ function showCircle(id, circle, policy) {
       scope: 'self',
       buttons: [{ id: 'caretaker:acknowledge', action: 'caretaker:acknowledge', label: t('circle.caretaker.acknowledge') }],
     });
+  }
+
+  // ── "you are no longer in this circle" ──────────────────────────────────────────────────────────
+  // Same shape as the caretaker notice next door and for the same reason (never change anything
+  // silently), but the failure it closes was worse: an evicted member's circle looked EXACTLY as it
+  // had a second before — same roster, same composer, same menu — and they went on typing into it.
+  //
+  // The statements are read, not skipped, because the roster alone cannot tell a removal from a
+  // departure: both look like absence. `readVerifiedBodies` is the same verified membership lane the
+  // fold consumes, so this asks the question where the answer actually is. Without the rail (a
+  // composition with no device log) the decision module degrades to saying something true but
+  // causeless, which is still better than silence — but on this shell we have it, so we use it.
+  //
+  // NOTHING is taken away here (decided 2026-08-28): their history stays theirs and the circle stays
+  // readable. A read-restriction would be a costume — the data is already on their disk and a client
+  // that does not hide it is trivial — while the gate that actually binds already held: the key
+  // rotated. Honesty is the deliverable, not restriction.
+  let removalNoticeSaid = false;
+  async function tellIfIWasRemoved(rawRoster) {
+    if (removalNoticeSaid) return;
+    let statements = null;
+    try {
+      const rail = _peerAgent?.membershipRail;
+      if (rail && typeof rail.readVerifiedBodies === 'function') {
+        statements = (await rail.readVerifiedBodies(id))?.bodies ?? null;
+      }
+    } catch { statements = null; }
+    const notice = removalNotice({ members: rawRoster, myRef: myWebid || '', statements });
+    if (!notice) return;
+    removalNoticeSaid = true;
+    // `scope: 'self'` — addressed to one person, and the circle it concerns can no longer hear us.
+    _circleRender?.botBubble(t(notice.key), { scope: 'self' });
   }
 
   // The act on that notice. Signing is what makes "acknowledged" mean the person SAW it, so it can

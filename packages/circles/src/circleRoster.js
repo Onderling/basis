@@ -91,8 +91,8 @@ export async function listCircleRoster(
   // admin's device, while the person it removed learns it as a signed statement on their membership
   // lane. Asking the items here would answer "no exit" on the one device that most needs a yes.
   const selfWebid = localActor ?? from;
+  let folded = null;
   if (selfWebid && typeof projectCircleRoster === 'function') {
-    let folded = null;
     try { folded = await projectCircleRoster({ groupId: a.groupId }); } catch { folded = null; }
     const stillIn = Array.isArray(folded)
       && folded.some((r) => (r?.webid ?? r?.addr ?? r?.ref) === selfWebid);
@@ -101,6 +101,33 @@ export async function listCircleRoster(
     if (Array.isArray(folded) && folded.length > 0 && !stillIn) {
       return { groupId: a.groupId, members: [], reason: 'not-a-member' };
     }
+  }
+
+  // ── ONE HEAD, TWO SHAPES ─────────────────────────────────────────────────────────────────────────
+  // This op answers the NARROW question — `{addr, role}` for everyone but the caller — and it used to
+  // answer it by recomputing membership from the redemption rows below. That recomputation is the same
+  // code as the head's trail half (`redeemedBy → member`, `confirmedBy` on the peer channel → `admin`),
+  // and it is also STRICTLY LESS: no founders, and no membership spine at all. So a role change or an
+  // eviction — both of which exist only as signed statements — were invisible here while the head had
+  // already folded them, and the two reads disagreed about the same circle on the same device:
+  //
+  //     promote B, then read both      listGroupRoster  → B = "member"
+  //                                    listGroupMembers → B = "admin"
+  //
+  // `catchUp` chooses the peers it asks from THIS read, which is how it kept asking a peer the spine
+  // had already removed. `architecture.md`: reading it back is a projection, never a second store.
+  //
+  // The caller exclusion is kept, and it is load-bearing rather than cosmetic: `personaPropsUpdate`
+  // reads "no admin in this list" as "the admin is me", and drives its local-vs-peer branch off it.
+  // The redemption path below stays as the fallback for a composition with no projection wired.
+  if (Array.isArray(folded)) {
+    const members = [];
+    for (const r of folded) {
+      const addr = r?.webid ?? r?.addr ?? r?.ref ?? null;
+      if (!addr || addr === selfWebid) continue;
+      members.push({ addr, role: r?.role === 'admin' ? 'admin' : 'member' });
+    }
+    return { groupId: a.groupId, members, _sync: simulateSync() };
   }
 
   const joinedAt = new Map();

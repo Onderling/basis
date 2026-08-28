@@ -149,6 +149,40 @@ Project-wide rules beyond the invariants — concise here, full detail in [`docs
   cross the real transport seam over relay + NKN. **A plan/architecture note saying a thing is "being
   completed" is NOT evidence it is unbuilt — verify against the real code.** Duplicating logic → STOP and
   consolidate, then leave a guard so it can't recur.
+- **PROVE THE HARNESS BEFORE YOU BLAME THE PRODUCT.** A harness that reassembles the app measures
+  itself. Before reporting any defect found through one, establish that it is composed the way a SHELL
+  composes it — same factory, same options, same lifecycle. *Cost (2026-08-27):* `walk-peer` boots
+  `bootRealAgentNode` without `taskLane: true`, so it has no device log, so no membership rider, so
+  nothing fans — by design. Two "product defects" diagnosed against it (a role change that never
+  propagated, items that never crossed) were both that. A day. The shells hand their device log
+  (`circleApp.js`); the journeys' shared boot asks for it (`_app.mjs:207`); the walk harness did not.
+  **Prefer driving the real app** (`test-browser/`, two Chromium contexts, `window.onderlingSurface` /
+  `onderlingDispatch` / `onderlingCall`) over any composition you assemble yourself.
+- **A COMMENT DESCRIBES WHAT IT DESCRIBES.** The repo's comments are unusually good, which makes them
+  unusually easy to over-read. A docstring about a projection's SHAPE is not a statement about its
+  SOURCE. Quote a comment as context; quote the IMPLEMENTATION as a finding. *Cost:* "the two roster
+  ops differ in shape, not source" — from a comment about `{addr, role}` vs rich rows — reported as a
+  verified difference. Reading both bodies showed the narrow one also lacks founders and the whole
+  spine fold. Same class as the plan-doc rule above, one level lower.
+- **AFTER THE SECOND WRONG READING, INSTRUMENT.** If two attempts to explain a behaviour from the code
+  have failed, stop reading and make the running system say what it is doing — a `console.info` in the
+  path, one run, then remove it. *Cost:* three readings produced three wrong mechanisms for the founder
+  lockout; one diagnostic produced the answer in a single run, and it was a state transition
+  (`trailRows: 0 → founders:[me]`, then `trailRows: 1 → founders:[]`) that no amount of reading was
+  going to surface.
+- **A PROBE THAT CANNOT NAME ITS BRANCH IS NOT EVIDENCE.** A helper returning `null` for two different
+  reasons will eventually report the wrong one as a product failure. Make every probe say WHICH branch
+  it took. *Cost:* `getInvite` returned `null` both when the ⋯ menu had no invite item and when the
+  modal had not yet rendered its code — an hour chasing a live selector that was never wrong, and the
+  refusal it was actually hitting turned out to be a real and larger defect.
+- **SUBTRACT THE DECLARED DIFFERENCES BEFORE CALLING IT A DISAGREEMENT.** Two views of one fact often
+  differ ON PURPOSE. Read what each declares it excludes and compare like with like. *Cost:*
+  `listGroupRoster` omits the CALLER by design; comparing it to `listGroupMembers` without subtracting
+  that produced a confidently-reported "the founder is missing from the roster" that was not true.
+- **A FIX NEEDS A TEST THAT IS RED FIRST.** Write the failing test, watch it fail for the reason you
+  claim, then fix. Without that, a fix is a story about a fix — and twice this week the red test
+  disagreed with the story and was right. This is DONE's missing half: *declared · implemented · tested
+  · REACHED* presumes the test could ever have failed.
 - **Grep every identifier you introduce against the file you put it in**, especially state setters and
   navigation helpers: they read plausibly and are named differently per screen. `src/screens/**` has no test
   coverage, so nothing else will catch a typo there (→ `docs/agent-notes-known-gotchas.md`).

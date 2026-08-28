@@ -359,6 +359,16 @@
       "doc": "The one button on the caretaker notice. Tapping it emits the caretaker’s own signed statement (the acknowledgeCaretaker op), which is what stops the notice repeating. The device must never sign on render: the whole value of the signature is that it means the person SAW it, not that a screen was drawn."
     }
   },
+  "membership": {
+    "you_were_removed": {
+      "text": "Je bent geen lid meer van deze kring. Een beheerder heeft je verwijderd. Wat er al stond blijft van jou en kun je hier blijven lezen; nieuwe berichten komen niet meer binnen.",
+      "doc": "Said in the circle, to the ONE person an admin removed, on their own device. Until 2026-08-27 this was said nowhere: the eviction was correct — signed, folded, key rotated — and their screen looked exactly as it had a second earlier, so they went on typing into a circle that could not hear them. Three facts, none optional: they are out; a person did it (not a fault or a glitch); and what they already have is not taken away, because it is theirs and a restriction there would be a costume anyway. The REASON the admin recorded is deliberately not shown — see SHOW_REMOVAL_REASON in removalNotice.js."
+    },
+    "you_were_removed_reason": {
+      "text": "Je bent geen lid meer van deze kring. Een beheerder heeft je verwijderd, met als reden: “{{reason}}”. Wat er al stond blijft van jou en kun je hier blijven lezen.",
+      "doc": "UNUSED while SHOW_REMOVAL_REASON is false (decided 2026-08-28). Kept written so flipping that flag is a one-line change rather than a translation task — and so the wording is decided in the calm rather than at the moment someone wants the feature. The reason was typed by one person ABOUT another and never for their eyes, and the removed member has no channel left to answer it."
+    }
+  },
   "members_tab": {
     "loading": {
       "text": "Leden laden…",

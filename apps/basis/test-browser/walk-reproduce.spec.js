@@ -189,3 +189,112 @@ test('5f.7 — the attach menu (Card / Appointment)', async ({ browser }) => {
     expect(Array.isArray(entries), 'the attach menu must be readable as data').toBe(true);
   } finally { await teardown(peers); }
 });
+
+test('RC1a — the two roster reads must agree about who is in the circle', async ({ browser }) => {
+  const peers = await bootPeers(browser, 2);
+  const [A, B] = peers;
+  try {
+    await gotoCircles(A.page);
+    const p = await pair(A, B, { name: 'Eens Kring', re: /eens.?kring/i });
+    test.skip(!p.joined, 'pairing failed');
+    const gid = await activeCircle(A.page);
+    const me = (await call(A.page, 'stoop', 'whoAmI', {}))?.webid ?? null;
+
+    // THE DIFFERENCE ONLY SHOWS AFTER A SPINE EVENT. On a fresh circle the two agree, because the
+    // founder's absence from the narrow read is just CALLER EXCLUSION — which is why comparing them
+    // without accounting for it made me report a disagreement that was not there (2026-08-27).
+    // `deriveRoster` folds the membership spine; `listCircleRoster` reads redemption rows only. So the
+    // question is what each says after a ROLE CHANGE, which exists only on the spine.
+    const bWebid = ((await call(A.page, 'stoop', 'listGroupMembers', { groupId: gid }))?.members ?? [])
+      .find((m) => m.role !== 'admin')?.webid ?? null;
+    await call(A.page, 'stoop', 'setMemberRole', { groupId: gid, memberWebid: bWebid, role: 'admin' });
+    await A.page.waitForTimeout(8000);
+
+    const roster  = await call(A.page, 'stoop', 'listGroupRoster',  { groupId: gid });
+    const members = await call(A.page, 'stoop', 'listGroupMembers', { groupId: gid });
+
+    // `listGroupRoster` answers the narrow `{addr, role}` question and EXCLUDES the caller — that
+    // exclusion is load-bearing (personaPropsUpdate reads "no admin in the list" as "the admin is me").
+    // Everything else about the two answers must match, because they answer the same question about the
+    // same circle on the same device, and `catchUp` picks the peers it asks from the narrow one.
+    const narrow = new Map((roster?.members ?? []).map((m) => [m.addr, m.role]));
+    const rich   = new Map((members?.members ?? []).filter((m) => m.webid !== me).map((m) => [m.webid, m.role]));
+
+    log('RC1a comparison', 'OBSERVED',
+      `narrow=${JSON.stringify([...narrow])} rich(minus caller)=${JSON.stringify([...rich])}`);
+
+    expect([...narrow.keys()].sort(), 'the two roster reads must contain the same people')
+      .toEqual([...rich.keys()].sort());
+    for (const [who, role] of rich) {
+      expect(narrow.get(who), `role disagreement for ${String(who).slice(0, 8)}`).toBe(role);
+    }
+  } finally { await teardown(peers); }
+});
+
+test('L51 — a removed member is told, on their own screen', async ({ browser }) => {
+  const peers = await bootPeers(browser, 2);
+  const [A, B] = peers;
+  try {
+    await gotoCircles(A.page);
+    const p = await pair(A, B, { name: 'Bericht Kring', re: /bericht.?kring/i });
+    test.skip(!p.joined, 'pairing failed');
+    await openCircleMatching(B.page, /bericht.?kring/i);
+    await toChat(B.page);
+    const gid = await activeCircle(A.page);
+
+    // Say something first: the notice PROMISES their history stays theirs, so the test has to hold the
+    // promise to account rather than only checking that the sentence appears.
+    await toChat(A.page);
+    await sendChat(A.page, 'HISTORIE-VOOR-VERWIJDERING');
+    await B.page.waitForTimeout(6000);
+    await toChat(B.page);
+
+    const before = await readBubbles(B.page);
+    const me = (await call(A.page, 'stoop', 'whoAmI', {}))?.webid ?? null;
+    const bWebid = ((await call(A.page, 'stoop', 'listGroupMembers', { groupId: gid }))?.members ?? [])
+      .map((m) => m.webid).find((w) => w !== me);
+
+    await call(A.page, 'stoop', 'removeMember', { groupId: gid, memberWebid: bWebid, reason: 'walk' });
+    await B.page.waitForTimeout(12000);
+    await toChat(B.page);
+
+    // Take the roster path the notice hangs off, the way a person glancing at the member list would.
+    // No reload: whether the circle still OPENS after a removal is a separate question, and using it
+    // here would confuse "we never told them" with "they could not get back in to be told".
+    const diag = [];
+    B.page.on('console', (m) => { const t = m.text(); if (/removal DIAG/i.test(t)) diag.push(t.slice(0, 300)); });
+    const membersTab = B.page.locator('.circle-view__tab[data-tab="members"]');
+    log('members tab reachable', (await membersTab.count()) ? 'PASS' : 'BLOCKED', String(await membersTab.count()));
+    if (await membersTab.count()) { await membersTab.first().click(); await B.page.waitForTimeout(6000); }
+    // BACK TO THE CONVERSATION TAB. `toChat` toggles the view MODE (chat vs screen), not the tab — so
+    // after visiting members it leaves you on members, and every bubble read there is empty. That read
+    // as "the removed member lost their whole history", which would have been a serious and false
+    // finding about a decision Frits had just made the other way.
+    const convTab = B.page.locator('.circle-view__tab[data-tab="conversation"]');
+    if (await convTab.count()) { await convTab.first().click(); await B.page.waitForTimeout(2500); }
+    await toChat(B.page);
+    log('B removal diagnostics', 'OBSERVED', diag.slice(0, 4).join(' | ') || '(none — the notice path never ran)');
+
+    const after = await readBubbles(B.page);
+    const fresh = after.filter((t) => !before.includes(t));
+    log('L51 notice', fresh.length ? 'PASS' : 'FINDING', JSON.stringify(fresh));
+    log('B all bubbles', 'OBSERVED', JSON.stringify(after.slice(0, 6)));
+    const dom = await B.page.evaluate(() => ({
+      bubbles: document.querySelectorAll('.circle-view__bubble').length,
+      texts: [...document.querySelectorAll('.circle-view__bubble')].map((e) => e.textContent.slice(0, 60)).slice(0, 6),
+    }));
+    log('B DOM bubbles', 'OBSERVED', JSON.stringify(dom));
+
+    // The statement now arrives and folds (the roster on their own device drops them). What must follow
+    // is that their SCREEN says so — Frits' rule: never change anything silently.
+    expect(fresh.length, 'a removed member must be told, in the circle, on their own device')
+      .toBeGreaterThan(0);
+
+    // Decided 2026-08-28 (the enforceability rule): nothing is taken away. A read-restriction would be
+    // a costume — the data is already on their disk — and the gate that binds is the key rotation.
+    const keptHistory = after.some((t) => /HISTORIE-VOOR-VERWIJDERING/.test(t));
+    log('history kept after removal', keptHistory ? 'PASS' : 'FINDING',
+      keptHistory ? 'what was already there is still readable' : 'the message they had is GONE — the notice promises otherwise');
+    expect(keptHistory, 'their history stays theirs — the notice says so in as many words').toBe(true);
+  } finally { await teardown(peers); }
+});

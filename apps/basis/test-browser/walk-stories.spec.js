@@ -295,7 +295,9 @@ test('story 5 — handing a circle over, and the last admin walking out', async 
 
     // Was the new admin TOLD? A change of who runs a circle that nobody announces is the silent-change
     // failure this project keeps finding.
-    await openCircleMatching(B.page, /overdracht.?kring/i).catch(() => {});
+    // By ID as well as name — B is a JOINER and has no name for this circle (L55), so a name-only
+    // match silently lands them in the help circle and every bubble read after it is about nothing.
+    await openCircleMatching(B.page, new RegExp(`overdracht.?kring|${gid}`, 'i')).catch(() => {});
     await toChat(B.page);
     const bubbles = await readBubbles(B.page);
     log('story 5 · is the new admin told?', bubbles.some((t) => /beheer|admin|kring/i.test(t)) ? 'OBSERVED' : 'FINDING',
@@ -330,9 +332,24 @@ test('story 5 — handing a circle over, and the last admin walking out', async 
       log('story 5 · who became the caretaker', target ? 'OBSERVED' : 'BLOCKED',
         `caretaker=${String(caretaker).slice(0, 8)} A=${String(aId).slice(0, 8)} C=${String(cId).slice(0, 8)}`);
       if (target) {
-        await openCircleMatching(target.page, /overdracht.?kring/i).catch(() => {});
+        // Match on the ID as well as the name: a JOINER has no name for the circle (L55), so a
+        // name-only match lands them in the help circle and every bubble read after it is meaningless.
+        // The cost of L55 is not cosmetic — you cannot even REFER to the circle you are in.
+        await openCircleMatching(target.page, new RegExp(`overdracht.?kring|${gid}`, 'i')).catch(() => {});
         await toChat(target.page);
         const bubbles2 = await readBubbles(target.page);
+        // Does a ROSTER RE-READ bring the notice out? `caretakerNotice` hangs off `loadRoster`, and the
+        // fold changed remotely (someone else left) — so "the notice does not fire" and "nothing
+        // re-reads the roster when authority changes underneath you" look identical from the chat.
+        const mtab = target.page.locator('.circle-view__tab[data-tab="members"]');
+        if (await mtab.count()) { await mtab.first().click(); await target.page.waitForTimeout(4000); }
+        const ctab = target.page.locator('.circle-view__tab[data-tab="conversation"]');
+        if (await ctab.count()) { await ctab.first().click(); await target.page.waitForTimeout(2500); }
+        await toChat(target.page);
+        const afterReread = await readBubbles(target.page);
+        log('story 5 · …and after a roster RE-READ?',
+          afterReread.length > bubbles2.length ? 'OBSERVED — it appears on a re-read' : 'FINDING — still nothing',
+          JSON.stringify(afterReread.slice(0, 2)));
         log('story 5 · is the CARETAKER told the circle became theirs?',
           bubbles2.some((t) => /beheer|kring|geen beheerder/i.test(t)) ? 'PASS' : 'FINDING',
           JSON.stringify(bubbles2.slice(0, 3)));

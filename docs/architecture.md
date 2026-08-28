@@ -376,6 +376,38 @@ The upshot: the **type axis** (item types), the **verb axis** (atoms), and the *
 — **storage, permissions, and surfaces are all projections of one `(circle, type, verb)` space.** That is why a
 new noun added to a manifest becomes storable, gate-able, and renderable at once.
 
+### Can this op happen here? — three layers, asked in order
+
+"May a person do this, in this circle, right now?" looks like one question and is three, asked by three
+different owners. Naming them is not pedantry: a surface that skips a layer offers something that cannot
+work, and a surface that conflates two gives the wrong reason for refusing.
+
+- **Structural — does this op exist on this surface at all?** Answered by the **manifest**, once, for
+  every surface: `surfaces.slash.command` puts an op in the slash-suggest pool, `surfaces.ui` makes it a
+  button or a page, `surfaces.attach` an attach-menu entry, `appliesTo` separates a row action from a
+  standing one, `platforms` separates web from mobile. This is the projection layer — `renderWeb`,
+  `renderChat`, `renderAttachments` — and it is settled: declared in one place and read by everyone.
+- **Contextual — given it exists here, may it happen now?** Answered by the **circle**, and composed by
+  `opAvailability`: is the op's app one this circle composes (`policy.apps` → the dispatch catalogue), is
+  its feature switched on (`requires`), and may this member do it (the capability matrix). Deny-wins;
+  hidden beats greyed. It returns a **reason**, not just a verdict, because "that app is not switched on
+  here" and "I do not know that word" are different things to be told and only one of them is about
+  anything the person did.
+- **Authorisation — may this *caller* invoke it?** Answered by the **peer relationship**: `PolicyEngine`
+  checks a skill's `visibility` (`public < authenticated < trusted < private`) against the caller's trust
+  tier, plus the CapabilityToken an A2A op carries. Deliberately not folded into the layer above: *this
+  circle does not do that* and *you may not ask me that* are different refusals.
+
+The order matters. A projector asks the manifest whether the op appears on its surface, then asks
+`opAvailability` whether it may happen; the authorisation layer applies at the door, to a caller, and
+never to the local person's own affordances.
+
+*Found the hard way (2026-08-28): the composer's attach menu did the structural layer and skipped the
+contextual one entirely — projected once at module load, offered whole, while dispatch resolved through
+a per-circle catalogue. Tapping an entry threw, and the shell answered "I couldn't turn that into an
+action": the app blaming a person for its own configuration. The fix was not a fourth gate but a layer
+that nobody was asking.*
+
 ### The data plane — circles, stores, items, verbs
 
 The algebra says which axes exist. The data plane is where they land in the running code. Parts 1 and 2

@@ -532,3 +532,108 @@ test('story 2 — a circle exists because two people are in it', async ({ browse
       JSON.stringify(aBubbles.slice(0, 3)));
   } finally { await teardown(peers); }
 });
+
+test('corpus 2.2 — joining while the admin is offline', async ({ browser }) => {
+  const peers = await bootPeers(browser, 2);
+  const [A, B] = peers;
+  try {
+    await gotoCircles(A.page);
+    await createCircle(A.page, 'Afwezig Kring');
+    await openCircleMatching(A.page, /afwezig.?kring/i);
+    const gid = await activeCircle(A.page);
+    const invite = await A.page.evaluate(async () => {
+      // Take the invite the way the shell does, before the admin disappears.
+      const more = document.querySelector('.circle-view__more');
+      if (more) more.click();
+      await new Promise((r) => setTimeout(r, 800));
+      const item = document.querySelector('.circle-view__more-item[data-action="invite"]');
+      if (item) item.click();
+      await new Promise((r) => setTimeout(r, 3000));
+      const code = document.querySelector('.cc-mydata-modal code, .cc-mydata-modal__card code');
+      const uri = code ? code.textContent.trim() : null;
+      document.body.click();
+      return uri;
+    });
+    log('corpus 2.2 · the invite, taken before the admin leaves', invite ? 'PASS' : 'BLOCKED',
+      invite ? `${String(invite).slice(0, 50)}…` : 'no invite');
+    test.skip(!invite, 'no invite to redeem');
+
+    // The admin disappears — the partition the story is about.
+    await A.context.setOffline(true);
+    await A.page.waitForTimeout(2000);
+    log('corpus 2.2 · the admin is offline', 'OBSERVED', 'redeeming now');
+
+    await gotoCircles(B.page);
+    const joined = await joinFromInvite(B.page, invite, { handle: 'cato', tag: 'c22' });
+    log('corpus 2.2 · does the join complete with nobody to confirm it?',
+      joined?.joined ? 'PASS' : 'FINDING', JSON.stringify(joined));
+
+    // …and the idempotency half: a retry while still partitioned must not create a second member.
+    await joinFromInvite(B.page, invite, { handle: 'cato', tag: 'c22-retry' }).catch(() => {});
+    await B.page.waitForTimeout(4000);
+
+    await A.context.setOffline(false);
+    await A.page.waitForTimeout(20000);
+
+    const rosterA = ((await call(A.page, 'stoop', 'listGroupMembers', { groupId: gid }))?.members ?? [])
+      .map((m) => String(m.webid).slice(0, 8));
+    const rosterB = ((await call(B.page, 'stoop', 'listGroupMembers', { groupId: gid }))?.members ?? [])
+      .map((m) => String(m.webid).slice(0, 8));
+    log('corpus 2.2 · after the admin returns, A sees', 'OBSERVED', JSON.stringify(rosterA));
+    log('corpus 2.2 · and B sees', 'OBSERVED', JSON.stringify(rosterB));
+
+    const dupes = rosterA.length !== new Set(rosterA).size;
+    log('corpus 2.2 · does the joiner appear exactly ONCE?', dupes ? 'FINDING — duplicated' : 'PASS',
+      dupes ? 'a retry created a second member row' : 'one row per person');
+    log('corpus 2.2 · did the join land on the admin at all?',
+      rosterA.length >= 2 ? 'PASS' : 'FINDING',
+      rosterA.length >= 2 ? 'the admin sees the joiner after reconnecting' : 'the admin never learned about the join');
+  } finally { await teardown(peers); }
+});
+
+test('corpus 6.1 — one person, two devices', async ({ browser }) => {
+  const peers = await bootPeers(browser, 2);
+  const [phone, laptop] = peers;
+  try {
+    // Anna sets up on her phone.
+    await gotoCircles(phone.page);
+    await createCircle(phone.page, 'Twee Apparaten');
+    await openCircleMatching(phone.page, /twee.?apparaten/i);
+    const gid = await activeCircle(phone.page);
+    const annaOnPhone = (await call(phone.page, 'stoop', 'whoAmI', {}))?.webid ?? null;
+
+    // …and takes her recovery phrase to the laptop. This is the only route one person has to two devices.
+    const m = await call(phone.page, 'stoop', 'getMnemonicOnce', {});
+    log('corpus 6.1 · can she get her recovery phrase?', m?.mnemonic ? 'PASS' : 'FINDING',
+      m?.mnemonic ? `${String(m.mnemonic).split(' ').length} words` : JSON.stringify(m));
+    test.skip(!m?.mnemonic, 'no mnemonic to carry to the second device');
+
+    const restored = await call(laptop.page, 'stoop', 'restoreFromMnemonic', { mnemonic: m.mnemonic, confirm: true });
+    log('corpus 6.1 · restoring it on the laptop', restored?.error ? 'FINDING' : 'OBSERVED',
+      JSON.stringify(restored)?.slice(0, 140));
+    await laptop.page.waitForTimeout(8000);
+    await laptop.page.reload();
+    await laptop.page.waitForTimeout(10000);
+
+    const annaOnLaptop = (await waitForAgent(laptop.page))?.webid ?? null;
+    log('corpus 6.1 · is she the same person on both?', annaOnLaptop === annaOnPhone ? 'PASS' : 'FINDING',
+      `phone=${String(annaOnPhone).slice(0, 12)} laptop=${String(annaOnLaptop).slice(0, 12)}`);
+
+    // Does the laptop know about the circle she made on the phone?
+    const laptopCircles = await call(laptop.page, 'stoop', 'listMyCircles', {});
+    log('corpus 6.1 · does the laptop see her circle?',
+      (laptopCircles?.circles ?? []).includes(gid) ? 'PASS' : 'FINDING',
+      JSON.stringify(laptopCircles?.circles));
+
+    // And can BOTH devices act as her — the double-action axis?
+    await toChat(phone.page);
+    await sendChat(phone.page, 'VANAF-DE-TELEFOON');
+    await laptop.page.waitForTimeout(8000);
+    await openCircleMatching(laptop.page, new RegExp(`twee.?apparaten|${gid}`, 'i')).catch(() => {});
+    await toChat(laptop.page);
+    const onLaptop = await readBubbles(laptop.page);
+    log('corpus 6.1 · does the laptop see what she said on the phone?',
+      onLaptop.some((t) => /VANAF-DE-TELEFOON/.test(t)) ? 'PASS' : 'FINDING',
+      `${onLaptop.length} bubble(s) on the laptop`);
+  } finally { await teardown(peers); }
+});

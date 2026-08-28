@@ -32,11 +32,15 @@ export function circleSourcesFromAgent({ callSkill, circlesStore, helpCircleName
       // returned the single active circle, so new circles never surfaced.
       const res = await call('listMyCircles');
       const circles = Array.isArray(res?.circles) ? res.circles : [];
+      const names = (res && typeof res.names === 'object' && res.names) ? res.names : {};
       const helpName = resolveHelpName();
       return circles.map((b) => {
-        const raw = (typeof b === 'string') ? { id: b, name: b } : { ...b };
-        // The help circle is a system circle whose title is localised chrome; listMyCircles
-        // only carries ids, so relabel it here — otherwise its tile/header shows the raw id.
+        // `names` carries what a PERSON called the circle (the rules item's text). Falling back to the
+        // id is now a genuine last resort rather than the normal case: it used to be invisible because
+        // an id was a slug of the name, and the moment ids became derived every tile showed hex.
+        const raw = (typeof b === 'string') ? { id: b, name: names[b] || b } : { ...b, name: b?.name ?? names[b?.id] ?? b?.id };
+        // The help circle is a system circle whose title is localised chrome, so its name comes from
+        // the locale rather than from what anyone typed.
         if (helpName && raw.id === HELP_CIRCLE_ID) raw.name = helpName;
         return raw;
       });

@@ -3117,10 +3117,23 @@ export function buildSkills({
         if (at > (myJoinedAt.get(gid) ?? 0)) myJoinedAt.set(gid, at);
       }
       const rules = await store.listOpen({ type: 'group-rules' });
+      /**
+       * groupId → the name a PERSON gave the circle. `createGroupV2` writes it as the rules item's
+       * `text`, and until now this op returned ids only — so every shell fell back to showing the id.
+       * That was invisible while an id was a slug of the name (it looked like a name); the moment ids
+       * became derived, circle headers and tiles started reading `9fccd3f727b081ab20566840`.
+       *
+       * Collected from EVERY rules row for the circle, not only the ones this device authored: a joiner
+       * holds the circle's rules without having written them, and they are owed its name just as much.
+       */
+      const names = new Map();
       for (const it of rules) {
-        if (it?.addedBy !== from) continue;
         const gid = it?.source?.groupId;
-        if (typeof gid === 'string' && gid) ids.add(gid);
+        if (typeof gid !== 'string' || !gid) continue;
+        const label = typeof it.text === 'string' ? it.text.trim() : '';
+        if (label && !names.has(gid)) names.set(gid, label);
+        if (it?.addedBy !== from) continue;
+        ids.add(gid);
       }
       // B4 — a circle I have LEFT (or been removed from, where that item reached this device) is not
       // one of "my circles". This is not cosmetic: this list drives `primeCircleSecurity` and the
@@ -3135,9 +3148,14 @@ export function buildSkills({
         const exits = collectCircleExits({ items: exitItems, groupId: gid });
         if (isExited(exits, from, myJoinedAt.get(gid) ?? 0)) ids.delete(gid);
       }
-      return { circles: [...ids], _sync: simulateSync() };
+      return {
+        circles: [...ids],
+        // Names alongside the ids, so a shell never has to show an identifier where a name belongs.
+        names: Object.fromEntries([...ids].filter((g) => names.has(g)).map((g) => [g, names.get(g)])),
+        _sync: simulateSync(),
+      };
     }, {
-      description: 'List the circle groupIds the calling actor is a member or admin of.',
+      description: 'List the circle groupIds the calling actor is a member or admin of, with the names people gave them.',
       visibility:  'authenticated',
     }),
 

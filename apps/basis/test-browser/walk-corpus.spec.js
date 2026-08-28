@@ -156,3 +156,69 @@ test('corpus 3.4 — two decisions at once', async ({ browser }) => {
       canOpen ? 'the screen offers something to start' : 'nothing on the screen starts a decision');
   } finally { await teardown(peers); }
 });
+
+test('corpus 9.1 / 9.2 / 10.x — personas across two circles, and drivers', async ({ browser }) => {
+  const peers = await bootPeers(browser, 3);
+  const [A, Bram, Cato] = peers;
+  try {
+    await gotoCircles(A.page);
+    const pX = await pair(A, Cato, { name: 'Persona X', re: /persona.?x/i, handle: 'cato' });
+    test.skip(!pX.joined, 'X pairing failed');
+    const gx = await activeCircle(A.page);
+
+    await gotoCircles(Bram.page);
+    await createCircle(Bram.page, 'Persona Y');
+    await openCircleMatching(Bram.page, /persona.?y/i);
+    const gy = await activeCircle(Bram.page);
+    const inviteY = await Bram.page.evaluate(async () => {
+      const more = document.querySelector('.circle-view__more'); if (more) more.click();
+      await new Promise((r) => setTimeout(r, 800));
+      const item = document.querySelector('.circle-view__more-item[data-action="invite"]'); if (item) item.click();
+      await new Promise((r) => setTimeout(r, 3000));
+      const code = document.querySelector('.cc-mydata-modal code, .cc-mydata-modal__card code');
+      const uri = code ? code.textContent.trim() : null; document.body.click(); return uri;
+    });
+    test.skip(!inviteY, 'no invite for Y');
+    await gotoCircles(Cato.page);
+    await joinFromInvite(Cato.page, inviteY, { handle: 'cato', tag: 'p91' });
+    await Cato.page.waitForTimeout(5000);
+
+    const cato = (await call(Cato.page, 'stoop', 'whoAmI', {}))?.webid ?? null;
+
+    // 9.2 — record a property in ONE circle, then look at both.
+    const rec = await call(Cato.page, 'stoop', 'recordMemberPersonaProperties', {
+      groupId: gx, personaProperties: { woont: 'in de straat', kanHelpenMet: 'tuin' },
+    });
+    log('corpus 9.2 · can a member record persona properties?', rec?.error || rec?.ok === false ? 'FINDING' : 'PASS',
+      JSON.stringify(rec)?.slice(0, 160));
+    await Cato.page.waitForTimeout(4000);
+
+    // 9.1 — the SAME persona, two circles: is the disclosure per-circle?
+    const viewX = await call(Cato.page, 'agents', 'getPersonaView', { id: cato, contextId: gx });
+    const viewY = await call(Cato.page, 'agents', 'getPersonaView', { id: cato, contextId: gy });
+    log('corpus 9.1 · the persona as seen in X', 'OBSERVED', JSON.stringify(viewX)?.slice(0, 200));
+    log('corpus 9.1 · …and in Y', 'OBSERVED', JSON.stringify(viewY)?.slice(0, 200));
+    const differs = JSON.stringify(viewX?.properties ?? {}) !== JSON.stringify(viewY?.properties ?? {});
+    log('corpus 9.1 · is disclosure PER-CIRCLE?', differs ? 'PASS' : 'FINDING',
+      differs ? 'the two circles see different properties' : 'both circles see the same thing — a property given to X shows in Y');
+
+    // …and can the OTHER circle's admin read what Cato gave X?
+    const bramSees = await call(Bram.page, 'agents', 'getPersonaView', { id: cato, contextId: gy });
+    log('corpus 9.1 · what Y\'s admin can read about Cato', 'OBSERVED', JSON.stringify(bramSees)?.slice(0, 200));
+
+    // 10.x — drivers
+    const set = await call(Cato.page, 'agents', 'setProfileDriver', {
+      id: cato, key: 'tuinhulp', kind: 'drive', text: 'buren helpen met de tuin', tags: 'tuin',
+    });
+    log('corpus 10.x · can a driver be set?', set?.error ? 'FINDING' : 'PASS', JSON.stringify(set)?.slice(0, 160));
+    const mine = await call(Cato.page, 'agents', 'getProfileDrivers', { id: cato });
+    log('corpus 10.x · …and read back by their owner?', JSON.stringify(mine ?? '').includes('tuin') ? 'PASS' : 'FINDING',
+      JSON.stringify(mine)?.slice(0, 200));
+
+    // 10.1's claim, re-checked from the other side: can ANYONE ELSE read them?
+    const bramReadsDrivers = await call(Bram.page, 'agents', 'getProfileDrivers', { id: cato });
+    const leaked = JSON.stringify(bramReadsDrivers ?? '').includes('tuin');
+    log('corpus 10.x · can another member read your drivers?', leaked ? 'FINDING — drivers are readable by others' : 'PASS',
+      JSON.stringify(bramReadsDrivers)?.slice(0, 180));
+  } finally { await teardown(peers); }
+});

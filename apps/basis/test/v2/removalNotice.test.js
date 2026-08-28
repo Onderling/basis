@@ -1,5 +1,5 @@
 /**
- * L51 — a removed member is told, on their own device.
+ * Telling someone they are no longer in a circle — on their own device.
  *
  * The decision this pins is not "does a string exist"; it is WHEN a person is told, and the three ways
  * that can go wrong: telling someone who left of their own accord, telling someone because a roster

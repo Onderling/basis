@@ -32,6 +32,7 @@ import { AgentIdentity } from './AgentIdentity.js';
 const HKDF_INFO_NS = 'onderling-identity-v1:';
 // FIXED domain-separation salt — permanent, never change (would re-key every per-circle address).
 const _CIRCLE_ADDR_SALT = new TextEncoder().encode('onderling-circle-addr-v1');
+const _CIRCLE_ID_SALT   = new TextEncoder().encode('onderling-circle-id-v1');
 
 /**
  * Derive a distinct 32-byte per-circle Ed25519 seed from a profile seed.
@@ -75,4 +76,61 @@ export function deriveCircleAddress(derivationSeed, circleId) {
  */
 export function circleIdentity(derivationSeed, circleId, vault) {
   return AgentIdentity.fromSeed(deriveCircleSeed(derivationSeed, circleId), vault);
+}
+
+/**
+ * A circle's IDENTITY — derived from the founder, never from what they typed.
+ *
+ * ── What this replaces, and why it is a security shape ───────────────────────────────────────────────
+ * A circle's id used to be a slug of its NAME. Two people who both call their circle "Proeftuin" — or
+ * "buurt", or "thuis" — therefore both hold `proeftuin`, and a device that learns of both MERGES them:
+ * one circle, two unrelated groups of people, one roster. Found by walking it with Frits on 2026-08-27:
+ * two independent peers created "Proeftuin" and both devices called it `proeftuin`, twenty minutes into
+ * the first session with a person on the real UI.
+ *
+ * That is not untidiness. Membership is meant to have exactly one door — being admitted — and a
+ * name-derived id adds a second: pick the right WORD and you are in someone's circle. Names are public,
+ * guessable and often obvious ("buurt"), so the second door is not even narrow.
+ *
+ * ── Why derivation rather than a collision check ─────────────────────────────────────────────────────
+ * A check detects the class; derivation makes it unrepresentable. Two founders collide only by finding
+ * two inputs with one SHA-256 digest — the assumption every signature in this system already rests on.
+ * Frits asked how we get to a 0% chance: there is no 0%, and this is the same "no" that key security
+ * gives, which is the strongest honest answer available.
+ *
+ * The NAME is not lost — it stays what people read, and the id becomes what machines match. The two
+ * were only ever conflated to save typing an identifier nobody looks at.
+ *
+ * ── Why the founder's device key, and not the per-circle key ─────────────────────────────────────────
+ * The per-circle identity is derived FROM the circle id (`deriveCircleSeed` above), so it cannot also
+ * produce it. The founder's own key can, and it carries the right meaning: this circle came from THIS
+ * device, and nobody else's naming can reach it. The nonce keeps one founder's two circles distinct
+ * even when they are made in the same second and named the same thing.
+ *
+ * @param {string} founderPubKey  the creating device's identity key (base64url)
+ * @param {Uint8Array|string} nonce  fresh per creation — 16 random bytes is plenty
+ * @param {number} [len=24]  hex characters to keep; 24 ≈ 96 bits
+ * @returns {string} an opaque, stable circle id — lowercase hex, so it satisfies the id rules an
+ *   id already had to satisfy (`isValidSlug`) and travels everywhere a slug travelled
+ */
+export function deriveCircleId(founderPubKey, nonce, len = 24) {
+  if (typeof founderPubKey !== 'string' || !founderPubKey) {
+    throw new Error('deriveCircleId: founderPubKey required — a circle id must come from its founder');
+  }
+  const enc = new TextEncoder();
+  const nonceBytes = typeof nonce === 'string' ? enc.encode(nonce) : (nonce ?? new Uint8Array(0));
+  if (!nonceBytes.length) {
+    // A missing nonce would make one founder's circles collide with each other, which is the same
+    // failure one layer in. Refuse rather than derive something quietly weaker.
+    throw new Error('deriveCircleId: a nonce is required — without one a founder collides with themselves');
+  }
+  const material = new Uint8Array(_CIRCLE_ID_SALT.length + founderPubKey.length + nonceBytes.length);
+  material.set(_CIRCLE_ID_SALT, 0);
+  material.set(enc.encode(founderPubKey), _CIRCLE_ID_SALT.length);
+  material.set(nonceBytes, _CIRCLE_ID_SALT.length + founderPubKey.length);
+  // Lowercase HEX rather than base64url: an id has always had to satisfy `isValidSlug`
+  // (`^[a-z0-9][a-z0-9_-]{1,28}[a-z0-9]$`), and every place an id travels — a URL query, a store key, a
+  // lane's `circleId` — was built for that shape. Keeping it means this change is the DERIVATION only,
+  // with no second change riding along in what an id may look like.
+  return [...sha256(material)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, len);
 }

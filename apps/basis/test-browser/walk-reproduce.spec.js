@@ -160,8 +160,12 @@ test('L49 — two people naming a circle the same thing', async ({ browser }) =>
     const bId = await activeCircle(B.page);
     log('circle ids for the same NAME', aId === bId ? 'FINDING' : 'PASS',
       aId === bId
-        ? `both devices call it "${aId}" — two unrelated circles share an identity (L49)`
+        ? `both devices call it "${aId}" — two unrelated circles share an identity`
         : `A=${aId} B=${bId} — distinct, as they should be`);
+    // Two unrelated people naming a circle the same thing must not end up in one circle. Names are
+    // public and often obvious ("buurt"), so a name-derived id is a second door into someone's roster.
+    expect(aId, 'two unrelated circles must not share an identity').not.toBe(bId);
+    expect(aId, 'and the id must not be derivable from the name anyone can guess').not.toMatch(/proeftuin/i);
   } finally { await teardown(peers); }
 });
 

@@ -41,6 +41,7 @@ import { RULES_QUESTIONS } from '../../v2/circleRules.js';
 import { createCirclePolicyStore, localStoragePolicyIo } from '../../v2/circlePolicyStore.js';
 import { consequenceKeyFor } from '../../v2/optionConsequences.js';
 import { t } from '../../localisation.js';
+import { deriveCircleId } from '@onderling/core';
 
 /**
  * N1+E8 — persist the wizard's chosen policy axes (features incl. the
@@ -70,10 +71,36 @@ async function persistCreatedCirclePolicy(groupId, state) {
  * @param {Function}    opts.onClose
  * @param {Function}    [opts.onDispatched]
  */
+/** 16 random bytes, so one founder's two circles differ even when named the same thing. */
+function freshNonce() {
+  const b = new Uint8Array(16);
+  (globalThis.crypto ?? {}).getRandomValues?.(b);
+  return b;
+}
+
 export function renderCreateGroupWizard(opts) {
   const { container, doc, callSkill, onClose, onDispatched, getMyPeerAddr } = opts;
 
   const state = initialState();
+
+  // The circle's identity, derived ONCE at mount from the founder — never from the name, and never
+  // from what a person types. See the note where the id field used to be. Derived here rather than in
+  // the name field because it must not change with every keystroke, and because this is the one scope
+  // that holds the founder's identity.
+  //
+  // The "Next" button is gated on a valid id, so the wizard simply waits if the identity is a moment
+  // late — which is honest: a circle with no derivable founder should not be created at all.
+  (async () => {
+    if (state.groupId) return;
+    let key = null;
+    try { key = getMyPeerAddr?.() ?? null; } catch { key = null; }
+    if (!key && typeof callSkill === 'function') {
+      try { key = (await callSkill('stoop', 'whoAmI', {}))?.webid ?? null; } catch { key = null; }
+    }
+    if (!key) return;                       // no founder → no id → the wizard cannot advance
+    state.groupId = deriveCircleId(key, freshNonce());
+    rerender();
+  })();
 
   rerender();
 
@@ -158,27 +185,31 @@ function renderIdentityStep(container, doc, state, onNext, onCancel, rerender) {
   // rerendering the panel (which would lose focus).  We grab a
   // direct reference to the groupId input after it's appended +
   // mutate its .value on each keystroke.
-  let groupIdInputRef = null;
   const refreshNextBtn = () => refreshActionsLocal(container, () =>
     !!state.name.trim() && isValidSlug(state.groupId));
 
+  // THE ID IS NOT A FIELD ANY MORE — and it is not derived from the name.
+  //
+  // It used to be `slugify(name)`, pre-filled into a required "Circle id" input. Two people who both
+  // called their circle "Proeftuin" — or "buurt", or "thuis" — therefore both held `proeftuin`, and a
+  // device that learned of both MERGED them: one roster, two unrelated groups of people. Frits and I
+  // walked into exactly that twenty minutes into the first session with a person on the real UI
+  // (2026-08-27).
+  //
+  // It is a security shape, not untidiness: membership is meant to have one door — being admitted — and
+  // a name-derived id adds a second, since names are public and often obvious. Deriving the id from the
+  // FOUNDER makes the collision unrepresentable rather than detectable, and asking a person to choose an
+  // identifier was always the wrong question: they are naming a circle, not addressing one.
+  //
+  // Derived once, on first sight of a name, and kept: re-deriving per keystroke would hand the same
+  // circle a new identity with every letter typed.
   appendField(wrap, doc, 'Name *', 'name',
     state.name, (v) => {
       state.name = v;
-      // Re-derive groupId only if user hasn't manually edited it.
-      const derived = slugify(v);
-      state.groupId = derived;
-      if (groupIdInputRef) groupIdInputRef.value = derived;
+      if (!state.groupId) state.groupId = deriveCircleId(founderKey(), freshNonce());
       refreshNextBtn();
     },
     { placeholder: 'e.g. Circle Westend' });
-  appendField(wrap, doc, 'Circle id *', 'groupId',
-    state.groupId, (v) => { state.groupId = v; refreshNextBtn(); },
-    { placeholder: 'auto-slugified from name', monospace: true,
-      hint: 'Lowercase letters, digits, hyphens. Must be unique.' });
-  // Capture a ref to the groupId input we just appended (it's the
-  // second `.cc-wizard-input` in the wrap).
-  groupIdInputRef = wrap.querySelectorAll('.cc-wizard-input')[1] ?? null;
 
   appendField(wrap, doc, 'Purpose', 'purpose',
     state.purpose, (v) => { state.purpose = v; },

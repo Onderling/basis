@@ -34,12 +34,15 @@ export function circleSlug(name) {
  * this helper keeps working when a step gains a field and fails loudly if a step gains a required one.
  */
 export async function createCircleViaWizard(page, name) {
-  const id = circleSlug(name);
   await page.locator('.circle-launcher__new').click();
   await page.waitForTimeout(3500);
   const inputs = page.locator('.cc-wizard-input:visible');
   await inputs.nth(0).fill(name);
-  await inputs.nth(1).fill(id);
+  // The id is NOT typed any more. It used to be `circleSlug(name)` filled into the wizard's second
+  // field — which meant this helper MANUFACTURED the very collision the L49 walk went on to report:
+  // two peers "independently" naming a circle the same thing shared an id because the harness had
+  // given them one. The wizard now derives the id from the founder, and a walk that types one is
+  // measuring itself (2026-08-28).
   for (let step = 0; step < 10; step += 1) {
     const advance = page.locator('.cc-wizard-btn:visible')
       .filter({ hasText: /next|review|create|maak/i });
@@ -55,7 +58,7 @@ export async function createCircleViaWizard(page, name) {
   // see — the confusing kind. Dismiss it so the caller lands back on the launcher.
   const done = page.locator('button:visible').filter({ hasText: /^(done|klaar)$/i });
   if (await done.count()) { await done.first().click(); await page.waitForTimeout(1500); }
-  return id;
+  return name;      // the id is the product's to derive; a caller matches on what a PERSON sees
 }
 
 /** Boot the v2 app and open a circle chat composer for OUR circle, creating it if needed.
@@ -84,7 +87,6 @@ export async function enableTasksFeature(page) {
 }
 
 export async function bootCircle(page, circleName = 'Test Circle', { tasks = false } = {}) {
-  const id = circleSlug(circleName);
   await page.goto('/');
   await page.waitForTimeout(2500);
   await page.locator('[data-tab="circles"]').click();
@@ -97,9 +99,11 @@ export async function bootCircle(page, circleName = 'Test Circle', { tasks = fal
   //     `if (no tiles) create` never fired and every spec silently ran inside Help — where the bot answers
   //     help topics and the deterministic gates do not apply;
   //   • circle creation became a wizard, so the `prompt()` these specs accepted is never raised.
-  // Selecting by id is also the stronger contract: a test that names its circle cannot be quietly
-  // re-pointed at a different one by anything the product adds later.
-  const mine = page.locator('.circle-tile', { hasText: id });
+  // Selecting by NAME is the contract now. It used to select by the slugified id, which worked only
+  // because the id WAS the name slugified — the very coupling that let two unrelated circles share an
+  // identity (fixed 2026-08-28: the id is derived from the founder). A test that names its circle still
+  // cannot be quietly re-pointed at a different one, which was the point.
+  const mine = page.locator('.circle-tile', { hasText: circleName });
   if (await mine.count() === 0) await createCircleViaWizard(page, circleName);
   await mine.first().click();
   await page.waitForTimeout(2500);

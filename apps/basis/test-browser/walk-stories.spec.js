@@ -15,7 +15,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { bootPeers, teardown, pair, toChat, sendChat, readBubbles, log,
-  gotoCircles, createCircle, openCircleMatching } from './peerHarness.js';
+  gotoCircles, createCircle, openCircleMatching, joinFromInvite } from './peerHarness.js';
 
 test.setTimeout(420_000);
 
@@ -23,6 +23,20 @@ const surface  = (page, items = []) => page.evaluate((its) => window.onderlingSu
 const call     = (page, app, opId, args = {}) =>
   page.evaluate(([a, o, g]) => window.onderlingCall?.(a, o, g), [app, opId, args]);
 const activeCircle = async (page) => (await surface(page))?.where?.circleId ?? null;
+
+/**
+ * Wait until the app can answer for itself. `window.onderlingCall` exists before the agent behind it
+ * does, so an early probe returns `undefined` — which reads exactly like "this person has no identity"
+ * and is really "the app has not finished booting". Two very different findings, one value.
+ */
+async function waitForAgent(page, { tries = 30, every = 1000 } = {}) {
+  for (let i = 0; i < tries; i += 1) {
+    const me = await page.evaluate(() => window.onderlingCall?.('stoop', 'whoAmI', {})).catch(() => null);
+    if (me?.webid) return me;
+    await page.waitForTimeout(every);
+  }
+  return null;
+}
 const tab = (page, id) => page.locator(`.circle-view__tab[data-tab="${id}"]`);
 
 test('story 4 — asking the circle for something', async ({ browser }) => {
@@ -192,5 +206,137 @@ test('story 9 — the infrastructure goes away mid-conversation', async ({ brows
                      delivery: e.querySelector('.circle-view__bubble-delivery')?.dataset.deliveryState ?? null })));
     log('story 9 · and what the sender says afterwards', 'OBSERVED',
       JSON.stringify(aAfter.find((b) => /TIJDENS/.test(b.text)) ?? 'gone'));
+  } finally { await teardown(peers); }
+});
+
+test('story 1 — the very first minutes, and are you still you afterwards?', async ({ browser }) => {
+  const peers = await bootPeers(browser, 1);
+  const [A] = peers;
+  try {
+    // A fresh profile: what does a person HAVE before they have done anything?
+    const before = await waitForAgent(A.page);
+    log('story 1 · you have an identity without asking for one', before?.webid ? 'PASS' : 'FINDING',
+      JSON.stringify(before)?.slice(0, 120));
+    if (!before?.webid) {
+      // "No identity" and "the app is waiting for something from you" look identical from outside, and
+      // the difference is the whole of this story: one is broken, the other is onboarding.
+      const seen = await A.page.evaluate(() => ({
+        text: document.body.innerText.replace(/\s+/g, ' ').slice(0, 300),
+        modal: !!document.querySelector('.cc-mydata-modal, .cc-wizard, [role="dialog"]'),
+        seam: typeof window.onderlingCall,
+      }));
+      log('story 1 · what is the app WAITING for?', 'OBSERVED', JSON.stringify(seen));
+    }
+
+    const mine = await call(A.page, 'stoop', 'listMyCircles', {});
+    log('story 1 · what a fresh profile already contains', 'OBSERVED', JSON.stringify(mine)?.slice(0, 180));
+
+    // Were they told about a recovery phrase, or shown one, or neither? The story's sharpest finding.
+    const s = await surface(A.page);
+    const custody = (s?.actions ?? []).filter((a) => /mnemonic|backup|restore/i.test(a.opId));
+    log('story 1 · custody affordances offered', custody.length ? 'OBSERVED' : 'FINDING',
+      custody.map((a) => a.opId).join(' · ') || 'none offered on this surface');
+
+    // Close the tab entirely and come back — the story's actual question.
+    const idBefore = before?.webid ?? null;
+    await A.page.goto('about:blank');
+    await A.page.waitForTimeout(1500);
+    await A.page.goto('/');
+    await A.page.waitForTimeout(9000);
+    const after = await waitForAgent(A.page);
+    log('story 1 · are you still you after a reopen?', after?.webid && after.webid === idBefore ? 'PASS' : 'FINDING',
+      `before=${String(idBefore).slice(0, 12)} after=${String(after?.webid).slice(0, 12)}`);
+    expect(after?.webid, 'an identity that does not survive a reopen is not an identity').toBe(idBefore);
+
+    const circlesAfter = await call(A.page, 'stoop', 'listMyCircles', {});
+    log('story 1 · and is your stuff still there?',
+      JSON.stringify(circlesAfter?.circles) === JSON.stringify(mine?.circles) ? 'PASS' : 'FINDING',
+      `${JSON.stringify(mine?.circles)} → ${JSON.stringify(circlesAfter?.circles)}`);
+  } finally { await teardown(peers); }
+});
+
+test('story 5 — handing a circle over, and the last admin walking out', async ({ browser }) => {
+  const peers = await bootPeers(browser, 3);
+  const [A, B, C] = peers;
+  try {
+    await gotoCircles(A.page);
+    const p1 = await pair(A, B, { name: 'Overdracht Kring', re: /overdracht.?kring/i });
+    test.skip(!p1.joined, 'first join failed');
+    // A third member, so "the last admin leaves" has somewhere to land.
+    // The third member joins the same way the second did — through the harness's own join flow rather
+    // than a hand-rolled copy of it. My copy timed out on the launcher's join button, which is the sort
+    // of thing that reads as a product failure and is a second implementation of a solved step.
+    await gotoCircles(C.page);          // `joinFromInvite` starts FROM the launcher — my edit had dropped this
+    const joined3 = await joinFromInvite(C.page, p1.inviteUri, { handle: 'derde', tag: 'story5-C' });
+    log('story 5 · a third person joins', joined3?.joined ? 'PASS' : 'BLOCKED', JSON.stringify(joined3));
+    await C.page.waitForTimeout(6000);
+
+    const gid = await activeCircle(A.page);
+    const roster = await call(A.page, 'stoop', 'listGroupMembers', { groupId: gid });
+    const who = (roster?.members ?? []).map((m) => `${String(m.webid).slice(0, 8)}=${m.role}${m.adminVia ? '/' + m.adminVia : ''}`);
+    log('story 5 · three in the circle?', (roster?.members ?? []).length >= 2 ? 'OBSERVED' : 'BLOCKED', JSON.stringify(who));
+
+    // Hand it over: make someone else an admin, then step back yourself.
+    const me = (await call(A.page, 'stoop', 'whoAmI', {}))?.webid ?? null;
+    const other = (roster?.members ?? []).find((m) => m.webid !== me && m.role !== 'admin')?.webid ?? null;
+    const promoted = await call(A.page, 'stoop', 'setMemberRole', { groupId: gid, memberWebid: other, role: 'admin' });
+    log('story 5 · promote someone else', promoted?.error ? 'FINDING' : 'PASS', JSON.stringify(promoted)?.slice(0, 100));
+    await A.page.waitForTimeout(8000);
+
+    const stepBack = await call(A.page, 'stoop', 'setMemberRole', { groupId: gid, memberWebid: me, role: 'member' });
+    log('story 5 · and step back yourself', stepBack?.error ? 'FINDING' : 'PASS', JSON.stringify(stepBack)?.slice(0, 100));
+    await A.page.waitForTimeout(8000);
+
+    for (const [peer, label] of [[A, 'A(was admin)'], [B, 'B'], [C, 'C']]) {
+      const r = await call(peer.page, 'stoop', 'listGroupMembers', { groupId: gid });
+      log(`story 5 · ${label} now sees`, 'OBSERVED',
+        JSON.stringify((r?.members ?? []).map((m) => `${String(m.webid).slice(0, 8)}=${m.role}${m.adminVia ? '/' + m.adminVia : ''}`)));
+    }
+
+    // Was the new admin TOLD? A change of who runs a circle that nobody announces is the silent-change
+    // failure this project keeps finding.
+    await openCircleMatching(B.page, /overdracht.?kring/i).catch(() => {});
+    await toChat(B.page);
+    const bubbles = await readBubbles(B.page);
+    log('story 5 · is the new admin told?', bubbles.some((t) => /beheer|admin|kring/i.test(t)) ? 'OBSERVED' : 'FINDING',
+      JSON.stringify(bubbles.slice(0, 3)));
+
+    // The sharper version from the story: the LAST admin leaves the circle entirely. The fold is
+    // supposed to hand it to somebody, and that somebody is supposed to be told — the one authority
+    // change nobody performs.
+    const nowAdmin = (await call(B.page, 'stoop', 'listGroupMembers', { groupId: gid }))?.members ?? [];
+    const lastAdmin = nowAdmin.find((m) => m.role === 'admin')?.webid ?? null;
+    const asB = lastAdmin && lastAdmin !== me;
+    if (asB) {
+      // The confirm gate is RIGHT and worth keeping — but read what it says to a person:
+      // "Re-run with --confirm=true to proceed." That is CLI vocabulary in a circle.
+      const guarded = await call(B.page, 'stoop', 'leaveGroup', { groupId: gid });
+      log('story 5 · what the confirm gate SAYS', 'OBSERVED', JSON.stringify(guarded)?.slice(0, 140));
+      const left = await call(B.page, 'stoop', 'leaveGroup', { groupId: gid, confirm: true });
+      log('story 5 · the last admin walks out', left?.error ? 'FINDING' : 'OBSERVED', JSON.stringify(left)?.slice(0, 140));
+      await A.page.waitForTimeout(12000);
+      for (const [peer, label] of [[A, 'A'], [C, 'C']]) {
+        const r = await call(peer.page, 'stoop', 'listGroupMembers', { groupId: gid });
+        log(`story 5 · who runs it now, per ${label}`, 'OBSERVED',
+          JSON.stringify((r?.members ?? []).map((m) => `${String(m.webid).slice(0, 8)}=${m.role}${m.adminVia ? '/' + m.adminVia : ''}`)));
+      }
+      // WHICH device is the caretaker? The notice is addressed to the ONE person it happened to, so
+      // reading the wrong screen would report "nobody was told" for a notice that was working.
+      const fold = (await call(A.page, 'stoop', 'listGroupMembers', { groupId: gid }))?.members ?? [];
+      const caretaker = fold.find((m) => String(m.adminVia ?? '').startsWith('caretaker:'))?.webid ?? null;
+      const whoIs = async (peer) => (await call(peer.page, 'stoop', 'whoAmI', {}))?.webid ?? null;
+      const aId = await whoIs(A); const cId = await whoIs(C);
+      const target = caretaker === aId ? A : (caretaker === cId ? C : null);
+      log('story 5 · who became the caretaker', target ? 'OBSERVED' : 'BLOCKED',
+        `caretaker=${String(caretaker).slice(0, 8)} A=${String(aId).slice(0, 8)} C=${String(cId).slice(0, 8)}`);
+      if (target) {
+        await openCircleMatching(target.page, /overdracht.?kring/i).catch(() => {});
+        await toChat(target.page);
+        const bubbles2 = await readBubbles(target.page);
+        log('story 5 · is the CARETAKER told the circle became theirs?',
+          bubbles2.some((t) => /beheer|kring|geen beheerder/i.test(t)) ? 'PASS' : 'FINDING',
+          JSON.stringify(bubbles2.slice(0, 3)));
+      }
+    }
   } finally { await teardown(peers); }
 });

@@ -22,6 +22,7 @@ import {
   mnemonicWordCount,
   submitRestore,
 } from '../../core/wizards/restoreFromMnemonicState.js';
+import { t } from '../../localisation.js';
 
 export function renderRestoreFromMnemonicWizard(opts) {
   const { container, doc, callSkill, onClose, onDispatched } = opts;
@@ -61,7 +62,7 @@ export function renderRestoreFromMnemonicWizard(opts) {
       'This OVERWRITES your current identity.  You will lose access to anything keyed to the old identity unless YOU still have its mnemonic.  Read carefully.');
     const warn = doc.createElement('div');
     warn.className = 'cc-wizard-warn';
-    warn.textContent = '⚠️ After clicking [Restore now], basis will use the new identity. Your current handle, contacts, group memberships, and pending invites bound to the old identity will appear lost (they aren\'t actually deleted, but you won\'t be able to act on them without the old mnemonic).';
+    warn.textContent = t('wizard.restore.identity_warning');
     body.appendChild(warn);
     mkCheck(body, doc, 'I understand this REPLACES my current identity.', state.understandsLoss, (v) => { state.understandsLoss = v; rerender(); });
     mkCheck(body, doc, 'I have saved my current mnemonic somewhere safe (or I don\'t need it).', state.confirmedNoUndo, (v) => { state.confirmedNoUndo = v; rerender(); });

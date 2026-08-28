@@ -14,10 +14,9 @@
  * so it starts green and can only ever catch a NEW one. A guard that begins with a debt list teaches
  * people to add to the debt list.
  *
- * The wider tree is not clean: `apps/basis/src/web/**` (the older adapter + wizards, still reached for
- * media cards) and `apps/folio/src/server/static/**` (an operator surface, not a member surface) hold
- * roughly a hundred between them. Widening SCOPE is the way to bring those in — one directory at a
- * time, each after it is cleaned — rather than admitting a baseline here.
+ * Still outside: `apps/folio/src/server/static/**`, an operator surface rather than a member one — in
+ * or out is a scoping call, not a baseline. Widening SCOPE is how anything joins: clean the directory,
+ * then add it here. Never by admitting a baseline.
  *
  * ── WHAT COUNTS, AND WHAT DELIBERATELY DOES NOT ──────────────────────────────────────────────────────
  * Only LITERAL PROSE reaching a user-facing sink. A template literal that composes values
@@ -28,9 +27,19 @@
 import { readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 
-/** The surfaces a circle member sees. Widen ONE directory at a time, each after it is clean. */
+/**
+ * The surfaces a circle member sees. Widen ONE directory at a time, each after it is clean.
+ *
+ * `src/web/**` was added 2026-08-28, after a scoping premise of mine turned out to be wrong: I had
+ * called it "the older adapter + wizards" and left it out, and it is in fact where the CREATE wizard
+ * lives — `circleApp.js` imports `renderCreateGroupWizard` from it and "+ new circle" mounts it. Two
+ * greps had "confirmed" the v2 shell did not use it; both excluded `src/web/` from the search, so they
+ * could only ever have said that. Thirty-two strings were shipping untranslated to the first screen a
+ * person sees when they make a circle.
+ */
 const SCOPE = [
   'apps/basis/web/v2/**/*.js',
+  'apps/basis/src/web/**/*.js',
   'apps/basis-mobile/src/**/*.js',
 ];
 

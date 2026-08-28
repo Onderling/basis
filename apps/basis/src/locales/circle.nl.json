@@ -5206,5 +5206,239 @@
     "submit": "Dit apparaat intrekken",
     "done": "Apparaat ingetrokken. Elke kring weigert nu zijn sleutels.",
     "failed": "Intrekken is mislukt."
+  },
+  "wizard": {
+    "create": {
+      "name": {
+        "text": "Naam *",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "purpose": {
+        "text": "Waarvoor is deze kring?",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "tags": {
+        "text": "Labels (komma-gescheiden)",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "extra_admins": {
+        "text": "Extra beheerders (webids, komma-gescheiden)",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "access": {
+        "text": "Wie mag erbij?",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "leave": {
+        "text": "Wie mag weggaan?",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "invite_expiry": {
+        "text": "Uitnodiging verloopt na (uren, 1-8760)",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "conflict": {
+        "text": "Hoe lossen jullie onenigheid op?",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "offering_name": {
+        "text": "Wat bied je aan?",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "storage": {
+        "text": "Waar staat wat jullie delen?",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "pod_uri": {
+        "text": "Pod-adres van de kring *",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "rotation_mode": {
+        "text": "Wanneer verandert de sleutel?",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "rotation_days": {
+        "text": "Sleutel verversen na (dagen, 1-365)",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "offering_remove": {
+        "text": "Weghalen",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "offering_add": {
+        "text": "+ Nog iets aanbieden",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "creating": {
+        "text": "Kring wordt gemaakt…",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "qr_hint": {
+        "text": "Scan de QR met de telefoon van degene die je uitnodigt, of kopieer de link hieronder.",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "copy_url": {
+        "text": "Link kopiëren",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "copied": {
+        "text": "Gekopieerd",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "share_parts": {
+        "text": "Of geef het kring-id en de code apart door:",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "copy_code": {
+        "text": "Code kopiëren",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "review_name": {
+        "text": "Naam",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "review_id": {
+        "text": "Kring-id",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "review_tags": {
+        "text": "Labels",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "review_admins": {
+        "text": "Extra beheerders",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "review_expiry": {
+        "text": "Uitnodiging verloopt",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "review_conflict": {
+        "text": "Bij onenigheid",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "review_offerings": {
+        "text": "Aanbod",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "review_storage": {
+        "text": "Opslag",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "review_pod": {
+        "text": "Pod-adres",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "review_rotation": {
+        "text": "Sleutel verversen",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "review_rotation_days": {
+        "text": "Verversen na (dagen)",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      }
+    },
+    "settings": {
+      "loading": {
+        "text": "Instellingen worden geladen…",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "close": {
+        "text": "Sluiten",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "general": {
+        "text": "Algemeen",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "circle": {
+        "text": "Kring",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "about": {
+        "text": "Over",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "language": {
+        "text": "Taal",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "transport": {
+        "text": "Verbinding",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "handle": {
+        "text": "Handle",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "handle_hint": {
+        "text": "kleine letters, cijfers, koppeltekens",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "save": {
+        "text": "Opslaan",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "display_name": {
+        "text": "Weergavenaam",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "display_hint": {
+        "text": "Hoe anderen je zien",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "holiday": {
+        "text": "Even niet bereikbaar",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      }
+    },
+    "backup": {
+      "passphrase_warning": {
+        "text": "Raak je het wachtwoord kwijt, dan is de back-up weg. Er is geen herstel. Schrijf het op.",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "download": {
+        "text": "Downloaden",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      }
+    },
+    "restore": {
+      "identity_warning": {
+        "text": "Na herstellen gebruikt de app de herstelde identiteit. Je huidige handle, contacten, kringen en openstaande uitnodigingen horen bij de oude identiteit en lijken dan weg. Ze zijn niet gewist, maar je kunt er niets mee zonder de oude herstelzin.",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      }
+    },
+    "audience": {
+      "max_distance": {
+        "text": "Tot hoever?",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      }
+    },
+    "dispute": {
+      "about": {
+        "text": "Je maakt bezwaar tegen dit bericht:",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "substrate_note": {
+        "text": "Dit legt het bezwaar vast als bericht. De volledige bemiddeling — bezwaar, voorstel, akkoord — komt later.",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "summary": {
+        "text": "Samenvatting",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "about_post": {
+        "text": "Over bericht",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "escalation": {
+        "text": "Escalatie",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "proposal": {
+        "text": "Voorgestelde oplossing",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      }
+    }
   }
 }

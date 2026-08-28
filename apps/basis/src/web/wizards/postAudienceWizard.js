@@ -27,6 +27,7 @@ import {
   TRUST_OPTS, DISTANCE_OPTS,
   initialState, canSubmit, loadAvailableCircles, submitPost,
 } from '../../core/wizards/postAudienceState.js';
+import { t } from '../../localisation.js';
 
 export function renderPostAudienceWizard(opts) {
   const { container, doc, args, callSkill, onClose, onDispatched } = opts;
@@ -75,7 +76,7 @@ export function renderPostAudienceWizard(opts) {
     // km distance grid
     const distLabel = doc.createElement('div');
     distLabel.className = 'cc-wizard-field-label';
-    distLabel.textContent = 'Max distance';
+    distLabel.textContent = t('wizard.audience.max_distance');
     body.appendChild(distLabel);
     const distGrid = doc.createElement('div');
     distGrid.className = 'cc-wizard-distance-grid';

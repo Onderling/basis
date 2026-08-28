@@ -5206,5 +5206,239 @@
     "submit": "Remove this device",
     "done": "Device removed. Every circle now refuses its keys.",
     "failed": "Removing failed."
+  },
+  "wizard": {
+    "create": {
+      "name": {
+        "text": "Name *",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "purpose": {
+        "text": "Purpose",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "tags": {
+        "text": "Tags (comma-separated)",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "extra_admins": {
+        "text": "Additional admins (webids, comma-separated)",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "access": {
+        "text": "Who may join?",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "leave": {
+        "text": "Who may leave?",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "invite_expiry": {
+        "text": "Invite expires after (hours, 1-8760)",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "conflict": {
+        "text": "How do you settle disagreements?",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "offering_name": {
+        "text": "What do you offer?",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "storage": {
+        "text": "Where does what you share live?",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "pod_uri": {
+        "text": "The circle's pod address *",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "rotation_mode": {
+        "text": "When does the key change?",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "rotation_days": {
+        "text": "Rotate the key after (days, 1-365)",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "offering_remove": {
+        "text": "Remove",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "offering_add": {
+        "text": "+ Add another offering",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "creating": {
+        "text": "Creating the circle…",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "qr_hint": {
+        "text": "Scan the QR with the phone of the person you're inviting, or copy the link below.",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "copy_url": {
+        "text": "Copy link",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "copied": {
+        "text": "Copied",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "share_parts": {
+        "text": "Or pass the circle id and the code separately:",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "copy_code": {
+        "text": "Copy code",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "review_name": {
+        "text": "Name",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "review_id": {
+        "text": "Circle id",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "review_tags": {
+        "text": "Tags",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "review_admins": {
+        "text": "Additional admins",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "review_expiry": {
+        "text": "Invite expires",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "review_conflict": {
+        "text": "On disagreement",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "review_offerings": {
+        "text": "Offerings",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "review_storage": {
+        "text": "Storage",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "review_pod": {
+        "text": "Pod address",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "review_rotation": {
+        "text": "Key rotation",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "review_rotation_days": {
+        "text": "Rotate after (days)",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      }
+    },
+    "settings": {
+      "loading": {
+        "text": "Loading settings…",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "close": {
+        "text": "Close",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "general": {
+        "text": "General",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "circle": {
+        "text": "Circle",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "about": {
+        "text": "About",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "language": {
+        "text": "Language",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "transport": {
+        "text": "Connection",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "handle": {
+        "text": "Handle",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "handle_hint": {
+        "text": "lowercase letters, digits, hyphens",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "save": {
+        "text": "Save",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "display_name": {
+        "text": "Display name",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "display_hint": {
+        "text": "How others see you",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "holiday": {
+        "text": "Away",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      }
+    },
+    "backup": {
+      "passphrase_warning": {
+        "text": "Lose the passphrase and the backup is gone. There is no recovery. Write it down.",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "download": {
+        "text": "Download",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      }
+    },
+    "restore": {
+      "identity_warning": {
+        "text": "After restoring, the app uses the recovered identity. Your current handle, contacts, circles and pending invites belong to the old identity and will appear gone. They are not deleted, but you cannot act on them without the old recovery phrase.",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      }
+    },
+    "audience": {
+      "max_distance": {
+        "text": "How far?",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      }
+    },
+    "dispute": {
+      "about": {
+        "text": "You are disputing this post:",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "substrate_note": {
+        "text": "This records the dispute as a post. The full mediation — raise, propose, accept — comes later.",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "summary": {
+        "text": "Summary",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "about_post": {
+        "text": "About post",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "escalation": {
+        "text": "Escalation",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      },
+      "proposal": {
+        "text": "Proposed resolution",
+        "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
+      }
+    }
   }
 }

@@ -190,7 +190,7 @@ function renderIdentityStep(container, doc, state, onNext, onCancel, rerender) {
 
   // THE ID IS NOT A FIELD ANY MORE — and it is not derived from the name.
   //
-  // It used to be `slugify(name)`, pre-filled into a required "Circle id" input. Two people who both
+  // It used to be `slugify(name)`, pre-filled into a required t('wizard.create.review_id') input. Two people who both
   // called their circle "Proeftuin" — or "buurt", or "thuis" — therefore both held `proeftuin`, and a
   // device that learned of both MERGED them: one roster, two unrelated groups of people. Frits and I
   // walked into exactly that twenty minutes into the first session with a person on the real UI
@@ -203,7 +203,7 @@ function renderIdentityStep(container, doc, state, onNext, onCancel, rerender) {
   //
   // Derived once, on first sight of a name, and kept: re-deriving per keystroke would hand the same
   // circle a new identity with every letter typed.
-  appendField(wrap, doc, 'Name *', 'name',
+  appendField(wrap, doc, t('wizard.create.name'), 'name',
     state.name, (v) => {
       state.name = v;
       if (!state.groupId) state.groupId = deriveCircleId(founderKey(), freshNonce());
@@ -211,10 +211,10 @@ function renderIdentityStep(container, doc, state, onNext, onCancel, rerender) {
     },
     { placeholder: 'e.g. Circle Westend' });
 
-  appendField(wrap, doc, 'Purpose', 'purpose',
+  appendField(wrap, doc, t('wizard.create.purpose'), 'purpose',
     state.purpose, (v) => { state.purpose = v; },
     { placeholder: 'One sentence: what is this circle for?' });
-  appendField(wrap, doc, 'Tags (CSV)', 'tags',
+  appendField(wrap, doc, t('wizard.create.tags'), 'tags',
     state.tags, (v) => { state.tags = v; },
     { placeholder: 'e.g. neighbourhood, tools, kids' });
 
@@ -238,16 +238,16 @@ function renderGovernanceStep(container, doc, state, onNext, onBack, onCancel, r
   const wrap = makeBody(doc, 'Members & governance',
     'Who runs the circle + how people join + how they leave.');
 
-  appendField(wrap, doc, 'Additional admins (CSV of webids)', 'additionalAdmins',
+  appendField(wrap, doc, t('wizard.create.extra_admins'), 'additionalAdmins',
     state.additionalAdmins, (v) => { state.additionalAdmins = v; },
     { placeholder: 'e.g. webid:anne,webid:karl',
       hint: 'You are admin by default. Add others now or invite later.' });
-  appendRadioField(wrap, doc, 'Access policy', state.accessPolicy, ACCESS_POLICIES,
+  appendRadioField(wrap, doc, t('wizard.create.access'), state.accessPolicy, ACCESS_POLICIES,
     (v) => { state.accessPolicy = v; rerender(); }, { consequenceGroup: 'accessPolicy' });
-  appendRadioField(wrap, doc, 'Leave policy', state.leavePolicy, LEAVE_POLICIES,
+  appendRadioField(wrap, doc, t('wizard.create.leave'), state.leavePolicy, LEAVE_POLICIES,
     (v) => { state.leavePolicy = v; rerender(); }, { consequenceGroup: 'leavePolicy' });
 
-  appendField(wrap, doc, 'Invite-code expiry (hours, 1-8760)', 'inviteExpiresInHours',
+  appendField(wrap, doc, t('wizard.create.invite_expiry'), 'inviteExpiresInHours',
     String(state.inviteExpiresInHours),
     (v) => {
       const n = parseInt(v, 10);
@@ -305,7 +305,7 @@ function renderRulesStep(container, doc, state, onNext, onBack, onCancel, rerend
     wrap.appendChild(ta);
   }
 
-  appendRadioField(wrap, doc, 'Conflict resolution policy', state.conflictPolicy, CONFLICT_POLICIES,
+  appendRadioField(wrap, doc, t('wizard.create.conflict'), state.conflictPolicy, CONFLICT_POLICIES,
     (v) => { state.conflictPolicy = v; rerender(); }, { consequenceGroup: 'conflictPolicy' });
 
   container.appendChild(wrap);
@@ -328,7 +328,7 @@ function renderOfferingsStep(container, doc, state, onNext, onBack, onCancel, re
     card.className = 'cc-wizard-offering-row';
     card.style.cssText = 'border:1px solid var(--cc-line,#d8d1bc);border-radius:6px;padding:10px;margin-bottom:10px';
 
-    appendField(card, doc, 'Offering name', `offering-${i}-name`,
+    appendField(card, doc, t('wizard.create.offering_name'), `offering-${i}-name`,
       row.name, (v) => { row.name = v; }, { placeholder: 'e.g. plumbing' });
 
     for (const axis of Object.keys(OFFERING_AXES)) {
@@ -340,7 +340,7 @@ function renderOfferingsStep(container, doc, state, onNext, onBack, onCancel, re
     const del = doc.createElement('button');
     del.type = 'button';
     del.className = 'cc-wizard-cta-secondary';
-    del.textContent = 'Remove offering';
+    del.textContent = t('wizard.create.offering_remove');
     del.addEventListener('click', () => {
       state.offerings.splice(i, 1);
       rerender();
@@ -352,7 +352,7 @@ function renderOfferingsStep(container, doc, state, onNext, onBack, onCancel, re
   const add = doc.createElement('button');
   add.type = 'button';
   add.className = 'cc-wizard-cta-secondary';
-  add.textContent = '+ Add offering';
+  add.textContent = t('wizard.create.offering_add');
   add.addEventListener('click', () => {
     state.offerings.push(newOfferingRow());
     rerender();
@@ -371,12 +371,12 @@ function renderTechStep(container, doc, state, onNext, onBack, onCancel, rerende
   const wrap = makeBody(doc, 'Tech & storage',
     'How the circle stores its data + how the encryption key rotates.');
 
-  appendRadioField(wrap, doc, 'Storage policy', state.storagePolicy, STORAGE_POLICIES,
+  appendRadioField(wrap, doc, t('wizard.create.storage'), state.storagePolicy, STORAGE_POLICIES,
     (v) => { state.storagePolicy = v; rerender(); }, { consequenceGroup: 'storagePolicy' });
 
   // Conditional pod URI field for centralised/hybrid.
   if (state.storagePolicy === 'shared' || state.storagePolicy === 'hybrid') {
-    appendField(wrap, doc, 'Group pod URI *', 'groupPodUri',
+    appendField(wrap, doc, t('wizard.create.pod_uri'), 'groupPodUri',
       state.groupPodUri, (v) => { state.groupPodUri = v; },
       { placeholder: 'https://group-pod.example/onderling/circle/',
         hint: 'Required for centralised + hybrid storage.', monospace: true });
@@ -389,10 +389,10 @@ function renderTechStep(container, doc, state, onNext, onBack, onCancel, rerende
     wrap.appendChild(podSees);
   }
 
-  appendRadioField(wrap, doc, 'Key rotation mode', state.keyRotationMode, KEY_ROTATION_MODES,
+  appendRadioField(wrap, doc, t('wizard.create.rotation_mode'), state.keyRotationMode, KEY_ROTATION_MODES,
     (v) => { state.keyRotationMode = v; rerender(); });
 
-  appendField(wrap, doc, 'Key rotation interval (days, 1-365)', 'rotationDays',
+  appendField(wrap, doc, t('wizard.create.rotation_days'), 'rotationDays',
     String(state.rotationDays),
     (v) => { state.rotationDays = Math.max(1, Math.min(365, parseInt(v, 10) || 30)); },
     { type: 'number',
@@ -414,14 +414,14 @@ function renderReviewStep(container, doc, state, onBack, onCancel, rerender, onS
 
   const dl = doc.createElement('dl');
   dl.className = 'cc-wizard-review';
-  appendReview(dl, doc, 'Name',           state.name);
-  appendReview(dl, doc, 'Circle id',       state.groupId);
-  if (state.purpose) appendReview(dl, doc, 'Purpose', state.purpose);
-  if (state.tags)    appendReview(dl, doc, 'Tags', state.tags);
-  if (state.additionalAdmins) appendReview(dl, doc, 'Additional admins', state.additionalAdmins);
-  appendReview(dl, doc, 'Access policy',   labelOf(ACCESS_POLICIES, state.accessPolicy));
-  appendReview(dl, doc, 'Leave policy',    labelOf(LEAVE_POLICIES, state.leavePolicy));
-  appendReview(dl, doc, 'Invite expiry',   `${state.inviteExpiresInHours} h`);
+  appendReview(dl, doc, t('wizard.create.review_name'),           state.name);
+  appendReview(dl, doc, t('wizard.create.review_id'),       state.groupId);
+  if (state.purpose) appendReview(dl, doc, t('wizard.create.purpose'), state.purpose);
+  if (state.tags)    appendReview(dl, doc, t('wizard.create.review_tags'), state.tags);
+  if (state.additionalAdmins) appendReview(dl, doc, t('wizard.create.review_admins'), state.additionalAdmins);
+  appendReview(dl, doc, t('wizard.create.access'),   labelOf(ACCESS_POLICIES, state.accessPolicy));
+  appendReview(dl, doc, t('wizard.create.leave'),    labelOf(LEAVE_POLICIES, state.leavePolicy));
+  appendReview(dl, doc, t('wizard.create.review_expiry'),   `${state.inviteExpiresInHours} h`);
   appendReview(dl, doc, t('circle.invite.ceiling_review'), String(state.inviteMaxRedemptions));
   // 5.5a — render each non-empty rules-doc field on its own row.
   for (const q of RULES_QUESTIONS) {
@@ -429,19 +429,19 @@ function renderReviewStep(container, doc, state, onBack, onCancel, rerender, onS
     const v = state.rulesDoc?.[q.key];
     if (v) appendReview(dl, doc, t(`circle.rules.q.${q.key}.text`), v, { pre: true });
   }
-  appendReview(dl, doc, 'Conflict policy', labelOf(CONFLICT_POLICIES, state.conflictPolicy));
+  appendReview(dl, doc, t('wizard.create.review_conflict'), labelOf(CONFLICT_POLICIES, state.conflictPolicy));
   // 5.5c — list named offerings with their axes.
   const namedOfferings = (state.offerings ?? []).filter((s) => s?.name?.trim());
   if (namedOfferings.length > 0) {
     const offeringsSummary = namedOfferings
       .map((s) => `${s.name} — ${s.openness}/${s.posture}/${s.status}/${s.radius}`)
       .join('\n');
-    appendReview(dl, doc, 'Offerings', offeringsSummary, { pre: true });
+    appendReview(dl, doc, t('wizard.create.review_offerings'), offeringsSummary, { pre: true });
   }
-  appendReview(dl, doc, 'Storage',        labelOf(STORAGE_POLICIES, state.storagePolicy));
-  if (state.groupPodUri) appendReview(dl, doc, 'Group pod URI', state.groupPodUri);
-  appendReview(dl, doc, 'Key rotation',   labelOf(KEY_ROTATION_MODES, state.keyRotationMode));
-  appendReview(dl, doc, 'Rotation days',  String(state.rotationDays));
+  appendReview(dl, doc, t('wizard.create.review_storage'),        labelOf(STORAGE_POLICIES, state.storagePolicy));
+  if (state.groupPodUri) appendReview(dl, doc, t('wizard.create.review_pod'), state.groupPodUri);
+  appendReview(dl, doc, t('wizard.create.review_rotation'),   labelOf(KEY_ROTATION_MODES, state.keyRotationMode));
+  appendReview(dl, doc, t('wizard.create.review_rotation_days'),  String(state.rotationDays));
   wrap.appendChild(dl);
 
   if (state.submitError) {
@@ -453,7 +453,7 @@ function renderReviewStep(container, doc, state, onBack, onCancel, rerender, onS
   if (state.submitting) {
     const status = doc.createElement('div');
     status.className = 'cc-wizard-submitting';
-    status.textContent = 'Creating circle…';
+    status.textContent = t('wizard.create.creating');
     wrap.appendChild(status);
   }
 
@@ -478,7 +478,7 @@ function renderSuccessStep(container, doc, state, onClose) {
   // ── QR block (primary on mobile — scan + done) ──
   const qrLabel = doc.createElement('div');
   qrLabel.className = 'cc-wizard-field-label';
-  qrLabel.textContent = 'Scan the QR with the invitee\'s phone (or copy the URL below)';
+  qrLabel.textContent = t('wizard.create.qr_hint');
   wrap.appendChild(qrLabel);
 
   const canvas = doc.createElement('canvas');
@@ -519,12 +519,12 @@ function renderSuccessStep(container, doc, state, onClose) {
   const copyUrlBtn = doc.createElement('button');
   copyUrlBtn.type = 'button';
   copyUrlBtn.className = 'cc-wizard-btn cc-wizard-btn-secondary';
-  copyUrlBtn.textContent = 'Copy URL';
+  copyUrlBtn.textContent = t('wizard.create.copy_url');
   copyUrlBtn.addEventListener('click', () => {
     try {
       void navigator.clipboard.writeText(inviteUrl);
-      copyUrlBtn.textContent = 'Copied!';
-      setTimeout(() => { copyUrlBtn.textContent = 'Copy URL'; }, 1500);
+      copyUrlBtn.textContent = t('wizard.create.copied');
+      setTimeout(() => { copyUrlBtn.textContent = t('wizard.create.copy_url'); }, 1500);
     } catch { /* clipboard API unavailable */ }
   });
   urlRow.appendChild(copyUrlBtn);
@@ -534,7 +534,7 @@ function renderSuccessStep(container, doc, state, onClose) {
   const codeLabel = doc.createElement('div');
   codeLabel.className = 'cc-wizard-field-label';
   codeLabel.style.marginTop = '0.8rem';
-  codeLabel.textContent = 'Or share groupId + code separately:';
+  codeLabel.textContent = t('wizard.create.share_parts');
   wrap.appendChild(codeLabel);
 
   const idRow = doc.createElement('div');
@@ -554,12 +554,12 @@ function renderSuccessStep(container, doc, state, onClose) {
   const copyCodeBtn = doc.createElement('button');
   copyCodeBtn.type = 'button';
   copyCodeBtn.className = 'cc-wizard-btn cc-wizard-btn-secondary';
-  copyCodeBtn.textContent = 'Copy code';
+  copyCodeBtn.textContent = t('wizard.create.copy_code');
   copyCodeBtn.addEventListener('click', () => {
     try {
       void navigator.clipboard.writeText(state.successResult.code);
-      copyCodeBtn.textContent = 'Copied!';
-      setTimeout(() => { copyCodeBtn.textContent = 'Copy code'; }, 1500);
+      copyCodeBtn.textContent = t('wizard.create.copied');
+      setTimeout(() => { copyCodeBtn.textContent = t('wizard.create.copy_code'); }, 1500);
     } catch { /* clipboard API unavailable */ }
   });
   codeRow.appendChild(copyCodeBtn);

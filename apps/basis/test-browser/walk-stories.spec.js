@@ -481,3 +481,54 @@ test('story 6 — someone has to go, and the island holds', async ({ browser }) 
     expect(bLater.some((t) => /NA-HET-VERTREK/.test(t)), 'a removed member must not receive new messages').toBe(false);
   } finally { await teardown(peers); }
 });
+
+test('story 2 — a circle exists because two people are in it', async ({ browser }) => {
+  const peers = await bootPeers(browser, 2);
+  const [A, B] = peers;
+  try {
+    await gotoCircles(A.page);
+    const p = await pair(A, B, { name: 'Buren Kring', re: /buren.?kring/i, handle: 'bram' });
+    log('story 2 · could the invite be handed over at all?', p.joined ? 'PASS' : 'FINDING', JSON.stringify(p.outcome));
+    test.skip(!p.joined, 'pairing failed');
+    const gid = await activeCircle(A.page);
+    const byId = new RegExp(`buren.?kring|${gid}`, 'i');
+
+    // 1 · the invite a person actually hands over
+    log('story 2 · what the inviter hands over', 'OBSERVED',
+      `${String(p.inviteUri).slice(0, 60)}… (${String(p.inviteUri).length} chars)`);
+    log('story 2 · is it something you can open?',
+      /^https?:\/\//.test(String(p.inviteUri)) ? 'PASS' : 'FINDING',
+      /^https?:\/\//.test(String(p.inviteUri)) ? 'a link a browser can open' : 'not a URL — a desktop cannot use it');
+
+    // 2 · BOTH devices show the same two people
+    await openCircleMatching(B.page, byId).catch(() => {});
+    const rosterOf = async (peer) => ((await call(peer.page, 'stoop', 'listGroupMembers', { groupId: gid }))?.members ?? [])
+      .map((m) => ({ who: String(m.webid).slice(0, 8), role: m.role, handle: m.handle ?? null, name: m.displayName ?? null }));
+    const rA = await rosterOf(A); const rB = await rosterOf(B);
+    log('story 2 · A sees', 'OBSERVED', JSON.stringify(rA));
+    log('story 2 · B sees', 'OBSERVED', JSON.stringify(rB));
+    const same = JSON.stringify(rA.map((m) => m.who).sort()) === JSON.stringify(rB.map((m) => m.who).sort());
+    log('story 2 · do the two rosters agree?', same ? 'PASS' : 'FINDING',
+      same ? 'both devices show the same two people' : 'the rosters disagree');
+    expect(same, 'two devices in one circle must agree on who is in it').toBe(true);
+
+    // 3 · …with the same NAMES. A roster of raw keys is not "seeing that the other is really there".
+    const named = (r) => r.every((m) => m.handle || m.name);
+    log('story 2 · can each of you see WHO the other is?', named(rA) && named(rB) ? 'PASS' : 'FINDING',
+      `A: ${JSON.stringify(rA.map((m) => m.handle ?? m.name ?? 'RAW-KEY'))} · B: ${JSON.stringify(rB.map((m) => m.handle ?? m.name ?? 'RAW-KEY'))}`);
+
+    // 4 · and can each of you name the CIRCLE you are in? (L55)
+    const titleOf = (page) => page.evaluate(() => document.querySelector('.circle-view__title')?.textContent ?? '');
+    await openCircleMatching(A.page, byId).catch(() => {});
+    const tA = await titleOf(A.page); const tB = await titleOf(B.page);
+    log('story 2 · can you both name the circle?', /buren/i.test(tA) && /buren/i.test(tB) ? 'PASS' : 'FINDING',
+      `inviter sees "${tA}" · joiner sees "${tB}"`);
+
+    // 5 · was the inviter told anyone arrived?
+    await toChat(A.page);
+    const aBubbles = await readBubbles(A.page);
+    log('story 2 · is the inviter told that someone joined?',
+      aBubbles.some((t) => /bram|lid|joined|erbij/i.test(t)) ? 'PASS' : 'FINDING',
+      JSON.stringify(aBubbles.slice(0, 3)));
+  } finally { await teardown(peers); }
+});

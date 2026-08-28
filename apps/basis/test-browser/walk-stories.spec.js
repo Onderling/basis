@@ -357,3 +357,127 @@ test('story 5 — handing a circle over, and the last admin walking out', async 
     }
   } finally { await teardown(peers); }
 });
+
+test('story 3 — saying something, and knowing it arrived', async ({ browser }) => {
+  const peers = await bootPeers(browser, 2);
+  const [A, B] = peers;
+  try {
+    await gotoCircles(A.page);
+    const p = await pair(A, B, { name: 'Bezorg Kring', re: /bezorg.?kring/i });
+    test.skip(!p.joined, 'pairing failed');
+    const gid = await activeCircle(A.page);
+    await openCircleMatching(B.page, new RegExp(`bezorg.?kring|${gid}`, 'i'));
+    await toChat(B.page);
+    await toChat(A.page);
+
+    const chipFor = (page, needle) => page.evaluate((n) => {
+      const b = [...document.querySelectorAll('.circle-view__bubble')].find((e) => e.textContent.includes(n));
+      return b ? (b.querySelector('.circle-view__bubble-delivery')?.dataset.deliveryState ?? null) : 'no-such-bubble';
+    }, needle);
+
+    await sendChat(A.page, 'BERICHT-EEN');
+    await A.page.waitForTimeout(4000);
+    log('story 3 · what the sender claims immediately', 'OBSERVED', String(await chipFor(A.page, 'BERICHT-EEN')));
+
+    await B.page.waitForTimeout(6000);
+    const got = await readBubbles(B.page);
+    expect(got.some((t) => /BERICHT-EEN/.test(t)), 'the baseline must cross').toBe(true);
+
+    // THE QUESTION: it arrived. Does the sender ever learn that? `stored` is the ladder's only positive
+    // rung and it needs a RECEIPT from the recipient. The receiver half is built; nothing seems to send.
+    await A.page.waitForTimeout(15000);
+    const afterArrival = await chipFor(A.page, 'BERICHT-EEN');
+    log('story 3 · …and after it demonstrably arrived', afterArrival === 'stored' ? 'PASS' : 'FINDING',
+      `the chip says "${afterArrival}" — ${afterArrival === 'stored' ? 'the receipt came back' : 'no receipt; "delivered" is unreachable'}`);
+
+    // Now the honest half: a peer that is dark. Does the sender say anything DIFFERENT?
+    await B.context.setOffline(true);
+    await B.page.waitForTimeout(2000);
+    await sendChat(A.page, 'BERICHT-TWEE-IN-HET-DONKER');
+    await A.page.waitForTimeout(8000);
+    const dark = await chipFor(A.page, 'BERICHT-TWEE');
+    log('story 3 · can the sender tell a dark peer from a live one?',
+      dark !== afterArrival ? 'PASS' : 'FINDING',
+      `live="${afterArrival}" dark="${dark}" — ${dark === afterArrival ? 'the same state for both, so the chip says nothing' : 'they differ'}`);
+
+    await B.context.setOffline(false);
+    await B.page.waitForTimeout(18000);
+    await toChat(B.page);
+    const flushed = await readBubbles(B.page);
+    log('story 3 · does the held message arrive on return?',
+      flushed.some((t) => /BERICHT-TWEE/.test(t)) ? 'PASS' : 'FINDING', `B has ${flushed.length} bubble(s)`);
+  } finally { await teardown(peers); }
+});
+
+test('story 6 — someone has to go, and the island holds', async ({ browser }) => {
+  const peers = await bootPeers(browser, 3);
+  const [A, B, C] = peers;
+  try {
+    await gotoCircles(A.page);
+    const p = await pair(A, B, { name: 'Eiland Kring', re: /eiland.?kring/i });
+    test.skip(!p.joined, 'pairing failed');
+    await gotoCircles(C.page);
+    await joinFromInvite(C.page, p.inviteUri, { handle: 'derde', tag: 'story6-C' });
+    await C.page.waitForTimeout(6000);
+    const gid = await activeCircle(A.page);
+    const byId = new RegExp(`eiland.?kring|${gid}`, 'i');
+
+    for (const peer of [B, C]) { await openCircleMatching(peer.page, byId).catch(() => {}); await toChat(peer.page); }
+    await toChat(A.page);
+
+    // Something to remember them by — the thing they must KEEP.
+    await sendChat(A.page, 'VOOR-JE-VERTREK');
+    await B.page.waitForTimeout(7000);
+    const bBefore = await readBubbles(B.page);
+    expect(bBefore.some((t) => /VOOR-JE-VERTREK/.test(t)), 'the baseline must cross').toBe(true);
+
+    const me = (await call(A.page, 'stoop', 'whoAmI', {}))?.webid ?? null;
+    const bId = (await call(B.page, 'stoop', 'whoAmI', {}))?.webid ?? null;
+    const removal = await call(A.page, 'stoop', 'removeMember', { groupId: gid, memberWebid: bId, reason: 'walk' });
+    log('story 6 · the removal', 'OBSERVED', JSON.stringify(removal)?.slice(0, 120));
+    await B.page.waitForTimeout(12000);
+
+    // 1 · they keep what they had
+    await openCircleMatching(B.page, byId).catch(() => {});
+    await toChat(B.page);
+    const bAfter = await readBubbles(B.page);
+    log('story 6 · do they keep what they already had?',
+      bAfter.some((t) => /VOOR-JE-VERTREK/.test(t)) ? 'PASS' : 'FINDING',
+      bAfter.some((t) => /VOOR-JE-VERTREK/.test(t)) ? 'their history is still theirs' : 'their history is GONE — the notice promises otherwise');
+
+    // 2 · and they were told
+    log('story 6 · were they told, sitting in the circle?', bAfter.some((t) => /geen lid meer/i.test(t)) ? 'PASS' : 'FINDING',
+      JSON.stringify(bAfter.filter((t) => !bBefore.includes(t)).slice(0, 2)));
+
+    // …and if not, does a ROSTER RE-READ bring it out? The notice hangs off `loadRoster`, and the fold
+    // changed because of a statement that arrived from somewhere else — so "the notice does not fire"
+    // and "nothing re-reads the roster when authority changes underneath you" look identical from a
+    // chair. They are very different bugs: one is missing, the other is merely never reached.
+    const mt = B.page.locator('.circle-view__tab[data-tab="members"]');
+    if (await mt.count()) { await mt.first().click(); await B.page.waitForTimeout(5000); }
+    const ct = B.page.locator('.circle-view__tab[data-tab="conversation"]');
+    if (await ct.count()) { await ct.first().click(); await B.page.waitForTimeout(2500); }
+    await toChat(B.page);
+    const bReread = await readBubbles(B.page);
+    log('story 6 · …and after a roster re-read?', bReread.some((t) => /geen lid meer/i.test(t)) ? 'OBSERVED — it appears' : 'FINDING — still nothing',
+      JSON.stringify(bReread.filter((t) => !bBefore.includes(t)).slice(0, 2)));
+
+    // 3 · the circle carries on WITHOUT a hitch for everyone else — the half nobody has checked
+    await toChat(A.page);
+    await sendChat(A.page, 'NA-HET-VERTREK');
+    await C.page.waitForTimeout(9000);
+    await openCircleMatching(C.page, byId).catch(() => {});
+    await toChat(C.page);
+    const cSees = await readBubbles(C.page);
+    log('story 6 · does the circle carry on for the others?',
+      cSees.some((t) => /NA-HET-VERTREK/.test(t)) ? 'PASS' : 'FINDING',
+      `C has ${cSees.length} bubble(s)`);
+
+    // 4 · and the removed person gets nothing new
+    const bLater = await readBubbles(B.page);
+    log('story 6 · does the removed person get anything NEW?',
+      bLater.some((t) => /NA-HET-VERTREK/.test(t)) ? 'FINDING — forward secrecy broken' : 'PASS',
+      bLater.some((t) => /NA-HET-VERTREK/.test(t)) ? 'they received a message sent after their removal' : 'nothing new reached them');
+    expect(bLater.some((t) => /NA-HET-VERTREK/.test(t)), 'a removed member must not receive new messages').toBe(false);
+  } finally { await teardown(peers); }
+});

@@ -7969,7 +7969,20 @@ async function boot() {
           // vote/report raised on another device shows here; re-render an open panel.
           ...(govCatchUpShell ? { [govCatchUpShell.subtypes.request]: govCatchUpShell.onRequest, [govCatchUpShell.subtypes.batch]: govCatchUpShell.onBatch } : {}),
           // The membership rider: the fan receiver (verify-on-ingest at the agent's rail) + its catch-up pair.
-          ...(agent.membershipRail ? { [MEMBERSHIP_BROADCAST]: makeMembershipPeerHandler({ rail: agent.membershipRail }) } : {}),
+          // …and REFRESH the open circle when one lands. The handler has taken an `onChange` since it
+          // was written and this call site never passed one, so a membership statement arriving from
+          // somebody else changed the fold and repainted nothing: the roster on screen stayed as it
+          // was, and every notice that hangs off `loadRoster` — you were removed, the circle became
+          // yours — waited for the person to navigate somewhere before it would speak.
+          //
+          // That is why three separate notices read as broken while being built, correct and localised
+          // (walked 2026-08-28). Same shape as the delivery chip the day before: the state was right
+          // and the screen was never told. `pullRosterForCircle` already does exactly this for the
+          // member-side pull and no-ops when the circle is not open.
+          ...(agent.membershipRail ? { [MEMBERSHIP_BROADCAST]: makeMembershipPeerHandler({
+            rail: agent.membershipRail,
+            onChange: (circleId) => { pullRosterForCircle({ circleId }).catch(() => { /* best-effort */ }); },
+          }) } : {}),
           ...(memCatchUpShell ? { [memCatchUpShell.subtypes.request]: memCatchUpShell.onRequest, [memCatchUpShell.subtypes.batch]: memCatchUpShell.onBatch } : {}),
           // The grants lane (connections belong to the person): a sibling device's grant/revoke
           // lands through the agent's ready-made receiver and refolds the door's grant set live.

@@ -217,6 +217,14 @@ export function chatRows(opts = {}) {
  *     (departed, or never resolved) gets `circle.chat.unknown_sender`, because a BLANK reads as "mine"
  *     and a raw id reads as noise. `t()` lives in the shells (invariant 8); this module stays pure.
  *
+ * THE APP IS NOT AN UNIDENTIFIED MEMBER. A bubble the app itself writes — a command reply, a caretaker
+ * notice, "you were removed" — carries the actor `'bot'`, which is not a webid, was never going to be on
+ * the roster, and so fell through to `unknown_sender`. Every line the circle said to a person was
+ * therefore headed "Onbekend lid": the app spoke to people as a stranger nobody could place, which is
+ * exactly the tone it must not have when the sentence underneath is "an admin removed you"
+ * (walked 2026-08-27, fixed 2026-08-28). The bot actor is now recognised BEFORE the roster lookup, so
+ * an unresolvable member and the app itself can never again render the same.
+ *
  * Matching: `row.actor` is the resolved webid where resolution succeeded, or the raw transport address
  * where it did not — so the index also carries `circleAddress`. That is a local lookup of a locally-held
  * roster row, NOT trusting the wire (the address was proven at join, G12).
@@ -225,6 +233,14 @@ export function chatRows(opts = {}) {
  * @param {{members: object[], viewerId?: ?string, policy?: 'open'|'pairwise'}} a
  * @returns {object[]} the same rows, sender-stamped
  */
+/**
+ * The actor a bubble carries when the APP wrote it rather than a person. A sentinel string, written by
+ * both shells (`circleApp.js` botBubble, `CircleLauncherScreen.js` appendCircleMessage) and read by the
+ * renderers for bubble chunking. Named here because this module is where mistaking it for a member had
+ * a visible cost.
+ */
+export const BOT_ACTOR = 'bot';
+
 export function stampSenderLabels(rows, { members = [], viewerId = null, policy = 'pairwise' } = {}) {
   const byKey = new Map();
   for (const m of members) {
@@ -235,6 +251,12 @@ export function stampSenderLabels(rows, { members = [], viewerId = null, policy 
     const actor = row?.actor ?? null;
     const self = viewerId != null && actor === viewerId;
     if (self) return { ...row, senderSelf: true, senderLabel: null, senderLabelKey: null };
+    // The app's own voice, before any roster lookup — `'bot'` is a sentinel, not a webid, so resolving
+    // it can only ever fail. `senderSelf` stays FALSE: these are not the viewer's own lines and the
+    // shells must not right-align them like one.
+    if (actor === BOT_ACTOR || row?.event?.actor === BOT_ACTOR) {
+      return { ...row, senderSelf: false, senderLabel: null, senderLabelKey: 'circle.chat.app_sender' };
+    }
     const member = actor != null ? byKey.get(actor) : null;
     if (!member) {
       return { ...row, senderSelf: false, senderLabel: null, senderLabelKey: 'circle.chat.unknown_sender' };

@@ -7,7 +7,7 @@
 Every guard is one machine-checked **design claim**. This index IS the map of what the system is
 designed to be — a claim without a guard is exactly where the code silently drifts from the design.
 
-## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 21
+## Tier-1 — script guards (`scripts/lint-*.mjs`, run by `npm run guards`) · 22
 
 | Guard | Id | Pins (the design claim) |
 |---|---|---|
@@ -19,6 +19,7 @@ designed to be — a claim without a guard is exactly where the code silently dr
 | `disclosure-exit` | G-A1 | the Agent membrane's disclosure gate is the ONLY exit for identity |
 | `doc-refs` | — | Fitness function for the task #66 file-org model |
 | `duplicate-vocab` | — | a shared VOCABULARY is defined in exactly ONE place |
+| `hardcoded-strings` | — | CLAIM: every word a person reads on a shipping surface comes from a locale |
 | `integration-index` | — | the integration index stays in sync with reality |
 | `journeys-reach-users` | — | a journey walks a corridor a PERSON can walk |
 | `kind-appenders` | — | every declared entry kind must have a production APPENDER |

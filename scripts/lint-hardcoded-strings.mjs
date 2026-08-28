@@ -1,0 +1,100 @@
+#!/usr/bin/env node
+/**
+ * lint-hardcoded-strings — CLAIM: every word a person reads on a shipping surface comes from a locale
+ * file, so switching language is a data change and never a code change.
+ *
+ * Onderling ships in Dutch and English from one codebase, and the locale files are already at exact
+ * parity (1252 keys each). What nothing checked was the other direction: a shell can always write a
+ * sentence straight into the DOM, and nothing fails when it does — it simply never translates, and the
+ * gap only shows up as one stubborn English line in an otherwise Dutch screen.
+ *
+ * ── WHY THIS GUARD HAS NO BASELINE ───────────────────────────────────────────────────────────────────
+ * Frits, 2026-08-28: *"a strict one that fails right away, baseline must become 0."* It can be strict
+ * because it is SCOPED to the surfaces a circle member actually sees, and those are already clean —
+ * so it starts green and can only ever catch a NEW one. A guard that begins with a debt list teaches
+ * people to add to the debt list.
+ *
+ * The wider tree is not clean: `apps/basis/src/web/**` (the older adapter + wizards, still reached for
+ * media cards) and `apps/folio/src/server/static/**` (an operator surface, not a member surface) hold
+ * roughly a hundred between them. Widening SCOPE is the way to bring those in — one directory at a
+ * time, each after it is cleaned — rather than admitting a baseline here.
+ *
+ * ── WHAT COUNTS, AND WHAT DELIBERATELY DOES NOT ──────────────────────────────────────────────────────
+ * Only LITERAL PROSE reaching a user-facing sink. A template literal that composes values
+ * (`` `${e.icon} ${typeText}: ${e.label}` ``) is not flagged: its words come from the pieces, and those
+ * are translated where they are made. Flagging those was the first version's mistake and it produced
+ * eight false positives on a surface with no real ones — a guard nobody can trust is worse than none.
+ */
+import { readFileSync } from 'node:fs';
+import { execSync } from 'node:child_process';
+
+/** The surfaces a circle member sees. Widen ONE directory at a time, each after it is clean. */
+const SCOPE = [
+  'apps/basis/web/v2/**/*.js',
+  'apps/basis-mobile/src/**/*.js',
+];
+
+/** Assignment to a sink a person reads. */
+const ASSIGN = /\.(textContent|innerText|placeholder|title|ariaLabel|alt)\s*=\s*(['"`])((?:\\.|(?!\2)[^\\])*)\2/g;
+/** …and the attribute form. */
+const ATTR = /setAttribute\(\s*['"](?:aria-label|title|placeholder|alt)['"]\s*,\s*(['"`])((?:\\.|(?!\1)[^\\])*)\1/g;
+
+/**
+ * Is this literal PROSE a person reads, rather than a key, a token or CSS?
+ *
+ * Deliberately generous toward "not prose": a false positive costs someone a confusing red build on a
+ * line that was fine, and this guard's whole value is that a red means something.
+ */
+export function isProse(text) {
+  if (typeof text !== 'string') return false;
+  if (text.includes('${')) return false;              // composed from values — translated at the pieces
+  const t = text.trim();
+  if (t.length < 3) return false;
+  if (!/[A-Za-z]{3}/.test(t)) return false;           // glyphs, punctuation, numbers
+  if (/^[a-z][a-zA-Z0-9]*(\.[a-z][a-zA-Z0-9_]*)+$/.test(t)) return false;   // a locale key
+  if (/^(https?:|data:|blob:|\/|#|\.|@)/.test(t)) return false;             // urls, paths, selectors, css-at
+  if (/[{};]|@keyframes|^[a-z-]+\s*:\s*[^ ]+$/i.test(t)) return false;      // css
+  if (/^[a-z][a-zA-Z0-9-]*$/.test(t)) return false;   // a single technical token (`button`, `aria-live`)
+  // Prose: either more than one word, or a capitalised word of real length. Trailing punctuation
+  // counts as part of the sentence — "Copied!" and "Close." are exactly the strings that get typed
+  // straight into a shell and never translated.
+  return /\s/.test(t) || /^[A-Z][a-zA-Z]{3,}[.!?…]*$/.test(t);
+}
+
+export function findHardcoded(files, read = (f) => readFileSync(f, 'utf8')) {
+  const hits = [];
+  for (const file of files) {
+    let src;
+    try { src = read(file); } catch { continue; }
+    for (const re of [ASSIGN, ATTR]) {
+      re.lastIndex = 0;
+      let m;
+      while ((m = re.exec(src))) {
+        const text = re === ASSIGN ? m[3] : m[2];
+        if (!isProse(text)) continue;
+        hits.push({ file, line: src.slice(0, m.index).split('\n').length, text });
+      }
+    }
+  }
+  return hits;
+}
+
+function tracked() {
+  return execSync(`git ls-files ${SCOPE.map((g) => `'${g}'`).join(' ')}`, { encoding: 'utf8' })
+    .split('\n').filter(Boolean).filter((f) => !/\.test\.|\/test\//.test(f));
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const hits = findHardcoded(tracked());
+  if (hits.length === 0) {
+    console.log('✓ lint-hardcoded-strings — every word on the shipping surfaces comes from a locale file');
+    process.exit(0);
+  }
+  console.error(`✖ lint-hardcoded-strings: ${hits.length} user-facing string(s) written in code:\n`);
+  for (const h of hits) console.error(`  ${h.file}:${h.line}\n    ${JSON.stringify(h.text)}`);
+  console.error(`
+Fix: add the sentence to apps/basis/src/locales/circle.{nl,en}.json and render it through t().
+Both languages, or the parity check fails next. A string in code ships untranslated to half the users
+and nothing else will ever tell you.`);
+  process.exit(1);
+}

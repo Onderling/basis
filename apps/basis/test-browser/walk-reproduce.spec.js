@@ -183,6 +183,19 @@ test('5f.7 — the attach menu (Card / Appointment)', async ({ browser }) => {
 
     // The dead-end Frits hit: an entry whose op needs arguments, tapped with none. Whether the shell
     // raises a form for them is the question — an entry that cannot ask is an entry that cannot work.
+    // Tap them for real and read what the circle says back. `dispatchReady` has exactly one path to
+    // "I couldn't turn that into an action" (`circle.bot.unknown`): `resolveDispatch` THROWING, i.e.
+    // the op is not in this circle's catalogue. Every other outcome is a prompt or a form.
+    const before = await readBubbles(A.page);
+    for (const e of entries) {
+      if (e.opId === 'embed-file') continue;            // routes through the media pipeline, not dispatch
+      await dispatch(A.page, e.opId, {});
+      await A.page.waitForTimeout(2500);
+    }
+    const said = (await readBubbles(A.page)).filter((t) => !before.includes(t));
+    log('what a tap actually says', said.length ? 'OBSERVED' : 'FINDING',
+      JSON.stringify(said.slice(0, 4)));
+
     const needy = entries.filter((e) => (e.needsArgs ?? []).length);
     log('entries needing a form', needy.length ? 'OBSERVED' : 'PASS',
       needy.map((e) => `${e.opId} needs ${e.needsArgs.join('+')}`).join(' · ') || 'none need arguments');

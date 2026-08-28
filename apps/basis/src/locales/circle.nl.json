@@ -531,6 +531,10 @@
     "unknown_sender": {
       "text": "Onbekend lid",
       "doc": "Wave 1 batch 4 — neutrale afzender voor een bericht waarvan de afzender niet (meer) op de ledenlijst staat. Leeg leest als 'van mij'; een ruwe id leest als ruis."
+    },
+    "app_sender": {
+      "text": "Onderling",
+      "doc": "The sender shown on a bubble the APP wrote — a command reply, a caretaker notice, \"you were removed\". Until 2026-08-28 these carried `unknown_sender` (\"Onbekend lid\"), because the bot actor is a sentinel and never resolves against the roster: the app spoke to people as a stranger nobody could place. The product's OWN NAME is used rather than \"de assistent\", because these lines are not all the assistant answering — a removal notice is the app telling you something, and attributing that to an assistant misdescribes who is speaking. If the assistant is later given its own voice, that is a second actor, not a rename of this one."
     }
   },
   "tabs": {

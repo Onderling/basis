@@ -45,6 +45,8 @@ export function renderAttachments(manifest) {
         ...(Array.isArray(op.params) && op.params.length ? { params: op.params } : {}),
         ...(itemType ? { itemType } : {}),
         ...(a.group ? { group: a.group } : {}),
+        // How the entry is invoked. `'media'` bypasses dispatch entirely; absent means the waist.
+        ...(a.via ? { via: a.via } : {}),
       };
     });
 

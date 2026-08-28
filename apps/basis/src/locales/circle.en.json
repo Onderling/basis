@@ -3573,6 +3573,20 @@
       "doc": "Circle-bot reply when the input didn't resolve to a known command."
     }
   },
+  "op": {
+    "not_in_this_circle": {
+      "text": "That is not something this circle does — the app it belongs to is not switched on here. An admin can turn it on in the settings.",
+      "doc": "Said when a person invokes an op whose APP this circle does not compose. It used to answer \"I couldn't turn that into an action\", which blames the person for the circle's configuration. Names what is wrong AND who can change it, because a refusal a person cannot act on is only slightly better than silence."
+    },
+    "feature_off": {
+      "text": "That is switched off in this circle. An admin can turn it on.",
+      "doc": "Said when the op exists here but its FEATURE is off (the circle's `requires` gate). Distinct from not_in_this_circle: the app is present, the circle has chosen not to use this part of it."
+    },
+    "not_yours": {
+      "text": "That is not something you can do here.",
+      "doc": "Said when the capability matrix refuses this member. Deliberately short and not apologetic: it is a statement about what this circle grants, not about the person. It does NOT say who could do it — that would name people to somebody who has just been refused."
+    }
+  },
   "nearby": {
     "label": {
       "text": "Nearby",

@@ -57,7 +57,7 @@ function pagesOf(manifest, renderer) {
  * apply to), and one that does not is a standing affordance. Same rule `itemRowButtons` uses, read
  * from the other side, so the two can never disagree about which is which.
  */
-function globalActionsOf(manifest, appOrigin, capabilityMatrix) {
+function globalActionsOf(manifest, appOrigin, capabilityMatrix, availability = null) {
   const out = [];
   for (const op of manifest?.operations ?? []) {
     const ui = op?.surfaces?.ui;
@@ -65,11 +65,14 @@ function globalActionsOf(manifest, appOrigin, capabilityMatrix) {
     if (op.appliesTo) continue;                       // a row action — reported per row instead
     const treatment = treatmentFor(capabilityMatrix, { appOrigin, verb: op.verb, noun: null });
     if (treatment === 'hide') continue;
+    const ctx = availability?.of?.(op.id) ?? null;
+    if (ctx?.state === 'hidden') continue;          // not offered here — do not report it as if it were
     out.push({
       appOrigin,
       opId:    op.id,
       label:   ui.label ?? op.id,
       control: ui.control ?? null,
+      ...(ctx?.reason ? { unavailable: ctx.reason } : {}),
       ...(op.params?.some((p) => p?.required) ? { needsArgs: true } : {}),
       ...(ui.confirm ? { confirms: ui.confirm.severity ?? true } : {}),
       ...(treatment === 'grey' ? { disabled: true } : {}),
@@ -96,6 +99,11 @@ function globalActionsOf(manifest, appOrigin, capabilityMatrix) {
  * @param {string[]|null} [o.wiredActionIds] the action ids the HOST actually wired a callback for. An
  *   action that is projected but unwired is not on screen, so it is not reported — over-reporting is the
  *   one error this seam must never make, since a walk would then call an affordance nobody has.
+ * @param {{of: (opId: string) => {state: string, reason: string|null}}|null} [o.availability]
+ *   the circle's CONTEXTUAL answer (`makeOpAvailability`). Given it, an affordance the circle cannot
+ *   actually dispatch is reported as unavailable WITH its reason, instead of being listed as if a tap
+ *   would work — which is what this probe got wrong about the attach menu, by composing gates by hand
+ *   instead of asking the one thing that composes them.
  * @param {string} [o.platform]
  * @param {Function} [o.renderer] the projector; `renderMobile` is `renderWeb`, so this seam serves both.
  * @returns {{where: object, apps: string[], pages: object[], actions: object[], nav: object[],
@@ -107,6 +115,7 @@ export function probeSurface({
   items = [],
   where = {},
   navManifest = null,
+  availability = null,
   policy = null,
   wiredActionIds = null,
   platform = 'web',
@@ -118,7 +127,7 @@ export function probeSurface({
   for (const appOrigin of apps) {
     const manifest = manifestsByOrigin[appOrigin];
     for (const p of pagesOf(manifest, renderer)) pages.push({ appOrigin, ...p });
-    actions.push(...globalActionsOf(manifest, appOrigin, capabilityMatrix));
+    actions.push(...globalActionsOf(manifest, appOrigin, capabilityMatrix, availability));
   }
 
   const rows = [];
@@ -151,9 +160,14 @@ export function probeSurface({
     try { menu = renderAttachments(manifestsByOrigin[appOrigin])?.attachMenu ?? []; } catch { menu = []; }
     for (const entry of menu) {
       const op = (manifestsByOrigin[appOrigin]?.operations ?? []).find((o) => o?.id === entry.opId) ?? null;
+      // `via: 'media'` bypasses dispatch, so the contextual answer does not apply to it — reporting it
+      // as unavailable would make this probe disagree with the shell about the same entry, which is the
+      // one error a probe may not make.
+      const ctx = entry.via === 'media' ? null : (availability?.of?.(entry.opId) ?? null);
       attach.push({
         appOrigin,
         ...entry,
+        ...(ctx ? { state: ctx.state, ...(ctx.reason ? { unavailable: ctx.reason } : {}) } : {}),
         // What a tap will need before it can do anything — the walk's "why did this dead-end?".
         ...(op?.params?.some((pr) => pr?.required) ? { needsArgs: op.params.filter((pr) => pr?.required).map((pr) => pr.name) } : {}),
         ...(op ? {} : { missingOp: true }),

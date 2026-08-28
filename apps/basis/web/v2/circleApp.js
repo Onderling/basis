@@ -95,6 +95,7 @@ import { roleChangeConfirm } from '../../src/v2/circleRoleControl.js';
 import { makeCircleLookup } from '../../src/v2/circleLookup.js';
 import { sectionForScreen } from '../../src/v2/pageProjection.js';
 import { probeSurface } from '../../src/v2/surfaceProbe.js';
+import { makeOpAvailability } from '../../src/v2/opAvailability.js';
 // drill-down — selection-context detail screens (agents → agent-detail,
 // data-versions → data-version-detail): the shared mapping + fetch seam.
 import {
@@ -1502,6 +1503,36 @@ let circleDispatchReady = null;  // buildCircleBot's dispatchReady({opId,args}) 
 // person does not have.
 let circleWiredMoreIds = null;
 
+/**
+ * "May this op happen in THIS circle, for THIS person?" — assembled once, asked by every surface that
+ * offers something. Before this each surface applied whichever gates its author knew about, and the
+ * composer's attach menu applied none: it offered ops the per-circle catalogue could not resolve, so a
+ * tap threw and the person was told the app did not understand them.
+ *
+ * The pieces were already here and already duplicated — the capability matrix is built from the same
+ * two stores in three places. This is the one that surfaces should use.
+ */
+async function circleOpAvailability(circleId) {
+  let policy = null;
+  let capabilityMatrix = [];
+  try {
+    const pol = (await policyStore.get(circleId)) ?? {};
+    const ovr = (await overrideStore.get(circleId)) ?? {};
+    policy = pol;
+    capabilityMatrix = buildCapabilityMatrix(circleBaseSources, {
+      enabledApps: Array.isArray(pol.apps) && pol.apps.length ? pol.apps : null,
+      template: pol.capabilities || {}, optOuts: ovr.capabilityOptOuts || [],
+    });
+  } catch { /* best-effort: an unresolved policy must not make everything look forbidden */ }
+  return makeOpAvailability({
+    catalogue: circleCatalogue, manifestsByOrigin: circleManifestsByOrigin, policy, capabilityMatrix,
+  });
+}
+
+// The attach menu, narrowed to what this circle can actually dispatch. Empty until the circle's
+// availability resolves — showing nothing briefly is honest; showing an entry that throws is not.
+let circleAttachMenu = [];
+
 // ── THE WALK SEAM — a computer-readable GUI (2026-08-27) ─────────────────────────────────────────
 // Published beside the existing `window.onderling*` e2e seams, and for the same reason: driving the
 // real app beats reproducing it. A two-peer walk used to have two options, and both were bad — click
@@ -1530,6 +1561,10 @@ if (typeof window !== 'undefined') {
     } catch { /* best-effort, exactly as the inline button path treats it — an ungated read still
                  reports what is DECLARED, and reporting more than the person sees is the one error
                  this seam must never make silently. */ }
+    // …and the CONTEXTUAL answer, so the probe reports what a person can actually invoke rather than
+    // what the manifests declare. Composing this by hand is what made the probe wrong about the attach
+    // menu: it folded two gates of three and could not know the entries would throw.
+    const availability = circleId ? await circleOpAvailability(circleId) : null;
     let policy = null;
     try { policy = circleId ? ((await policyStore.get(circleId)) ?? null) : null; } catch { /* ungated */ }
     return probeSurface({
@@ -1537,6 +1572,7 @@ if (typeof window !== 'undefined') {
       // The ⋯ roster, reported exactly as `collectMoreActions` computes it: manifest-projected,
       // policy/platform gated, and narrowed to the ids this shell wired a callback for.
       navManifest: basisManifest, policy, wiredActionIds: circleWiredMoreIds, platform: 'web',
+      availability,
     });
   };
   /**
@@ -2114,10 +2150,31 @@ function buildCircleBot(agent) {
   const lookup = makeCircleLookup({ getBase: () => [], appCallSkill: rawCallSkill, scopeId: () => getActiveCircle() });
 
   // Run a fully-resolved {opId,args} against the catalogue, scoped to the active circle, then post a reply.
+  /**
+   * The locale key to SAY when an op will not run here. Both refusal sites use it, because they are the
+   * same fact reached two ways — `resolveDispatch` throws for some and returns a non-ready route for
+   * others, and a person does not care which. Falls back to the honest shrug when the circle cannot say.
+   */
+  async function refusalKeyFor(opId) {
+    try {
+      const cid = getActiveCircle();
+      if (cid) return (await circleOpAvailability(cid)).keyFor(opId) ?? 'circle.bot.unknown';
+    } catch { /* fall through */ }
+    return 'circle.bot.unknown';
+  }
+
   async function dispatchReady({ opId, args, appOrigin }) {
     let route;
     try { route = resolveDispatch({ kind: 'slash', opId, args: args || {}, appOrigin, command: '(bot)', body: '' }, catalogue); }
-    catch { _circleRender?.botBubble(t('circle.bot.unknown')); return; }
+    catch {
+      // WHY it could not be dispatched, when the circle can say. `resolveDispatch` throws for an op the
+      // catalogue cannot resolve, and this used to answer "I couldn't turn that into an action" for all
+      // of them — the app blaming the person for its own configuration. `opAvailability` distinguishes
+      // "that isn't switched on in this circle" from "I don't know that word", which are different
+      // things to be told and the first is not the person's fault.
+      _circleRender?.botBubble(t(await refusalKeyFor(opId)));
+      return;
+    }
     if (route.kind === 'needsForm') {
       // Conversational elicitation (chat-native, parity with mobile): a single missing field → ask for
       // it in the circle and capture the user's NEXT message (onSend's pending-follow-up branch).
@@ -2148,7 +2205,16 @@ function buildCircleBot(agent) {
       });
       return gateReply;
     }
-    if (route.kind !== 'ready')     { _circleRender?.botBubble(t('circle.bot.unknown')); return; }
+    if (route.kind !== 'ready') {
+      // SAY WHY. `resolveDispatch` does not throw for an op the circle cannot dispatch — it returns a
+      // route that is simply not `ready`, and this line answered every one of them with "I couldn't
+      // turn that into an action". That is the app blaming the person for its own configuration, and it
+      // is what a tap on the attach menu produced. `opAvailability` distinguishes "that app is not
+      // switched on in this circle" from "I do not know that word": different facts, different
+      // sentences, and only the second is about anything the person did.
+      _circleRender?.botBubble(t(await refusalKeyFor(opId)));
+      return;
+    }
     return await executeResolved(route);
 
     // The execute tail every accepted route runs (direct 'ready' or confirmed 'needsConfirm' → 'ready').
@@ -5502,6 +5568,29 @@ function showCircle(id, circle, policy) {
     governance: () => showGovernance(id),
   };
   circleWiredMoreIds = Object.keys(more);   // the walk seam reads what was wired, never a copy of it
+
+  // The ATTACH menu, narrowed to what this circle can actually dispatch. It used to be
+  // `renderAttachments(basisManifest)` computed once at module load and offered whole — the manifest's
+  // structural answer ("this op has an attach surface") with none of the circle's contextual one ("and
+  // it is composed here"). Tapping an entry the catalogue could not resolve threw inside
+  // `resolveDispatch`, and the person was told "Ik kon daar geen actie van maken": the app saying it
+  // did not understand them, when the truth was that the entry should never have been offered.
+  //
+  // Resolved asynchronously, so the menu is briefly empty rather than briefly wrong.
+  circleAttachMenu = [];
+  (async () => {
+    try {
+      const av = await circleOpAvailability(id);
+      // An entry declaring `via: 'media'` is exempt, and that is the same rule read correctly rather
+      // than a special case: it never reaches `resolveDispatch` at all, so the catalogue has no say
+      // over whether it works. Gating it on the catalogue would hide a working affordance to guard
+      // against a failure it cannot have. The manifest declares this; the id is not hardcoded here.
+      circleAttachMenu = basisAttachMenu.filter(
+        (e) => e.via === 'media' || av.of(e.opId).state !== 'hidden',
+      );
+    } catch { circleAttachMenu = []; }
+    try { rerender(); } catch { /* the circle may have closed */ }
+  })();
   // per-circle bottom tabs derived from policy.features.
   const tabs = buildCircleTabs(policy, t);
   let activeTab = DEFAULT_CIRCLE_TAB;
@@ -6051,7 +6140,7 @@ function showCircle(id, circle, policy) {
       // (J4) — the projected attach menu for the chat composer's "+". The FILE
       // entry (embed-file) uses onAttachMedia above; every other entry dispatches
       // via onAttachCommand → dispatchReady (params gathered by the form machinery).
-      attachMenu: basisAttachMenu,
+      attachMenu: circleAttachMenu,
       attachFileOpId: 'embed-file',
       onAttachCommand: attachCommandDispatch,
       // S1 #1 — noticeboard surface for the noticeboard tab (the view only uses it when active).
@@ -6075,7 +6164,7 @@ function showCircle(id, circle, policy) {
         onViewAttachment: noticeboardViewAttachment,
         // (J4) — the projected attach menu for the noticeboard composer's "+".
         // File entry → the media pipeline (onAttach); other entries → dispatchReady.
-        attachMenu:       basisAttachMenu,
+        attachMenu:       circleAttachMenu,
         attachFileOpId:   'embed-file',
         onAttachCommand:  attachCommandDispatch,
       },

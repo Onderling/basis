@@ -183,7 +183,8 @@ test('5f.7 — the attach menu (Card / Appointment)', async ({ browser }) => {
     const s = await surface(A.page);
     const entries = s?.attach ?? [];
     log('attach menu', entries.length ? 'OBSERVED' : 'FINDING',
-      entries.map((e) => `${e.opId}(${(e.needsArgs ?? []).join(',') || 'no args'})${e.missingOp ? ' MISSING-OP' : ''}`).join(' · ') || 'nothing offered');
+      entries.map((e) => `${e.opId}(${(e.needsArgs ?? []).join(',') || 'no args'})[${e.state ?? 'no-verdict'}${e.unavailable ? ':' + e.unavailable : ''}]`).join(' · ') || 'nothing offered');
+    log('surface apps', 'OBSERVED', `apps=${(s?.apps ?? []).join(',')} actions=${(s?.actions ?? []).length}`);
 
     // The dead-end Frits hit: an entry whose op needs arguments, tapped with none. Whether the shell
     // raises a form for them is the question — an entry that cannot ask is an entry that cannot work.

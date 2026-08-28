@@ -196,7 +196,12 @@ export const basisManifest = {
         // ONE the web composer routes back through the media pipeline
         // (createMediaEmbed / sealed upload); every other entry dispatches
         // straight to callSkill. `itemType: 'file'` names the attachable noun.
-        attach: { label: 'circle.attach.file', itemType: 'file', group: 'media' },
+        // `via: 'media'` — this entry does NOT go through dispatch. The composer hands it to the media
+        // pipeline (`onAttachMedia`), so the circle's dispatch catalogue has no say over whether it
+        // works, and a surface gating attach entries on that catalogue must not hide this one.
+        // Declared here rather than hardcoding the op id in the shell + the probe, which had already
+        // begun to disagree about it (2026-08-28).
+        attach: { label: 'circle.attach.file', itemType: 'file', group: 'media', via: 'media' },
       },
     },
 

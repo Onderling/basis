@@ -388,6 +388,10 @@ export default function ChatScreen({
     let cancelled = false;
     const receive = (url) => {
       if (cancelled || !url) return;
+      // Said out loud (2026-08-29): an invite link that arrives and does nothing is indistinguishable
+      // from one that never arrived, and a device walk lost an hour to exactly that. Three lines tell
+      // the whole story of a link: received, parked-or-drained, and what it classified as.
+      console.info(`[link] received ${String(url).slice(0, 40)}… bootReady=${bootReadyRef.current}`);
       pendingLinkRef.current = String(url).trim();
       drainPendingLink();
     };
@@ -2076,11 +2080,13 @@ export default function ChatScreen({
    * by definition — the app was not running when they tapped it.
    */
   function drainPendingLink() {
-    if (!bootReadyRef.current) return;
+    if (!bootReadyRef.current) { if (pendingLinkRef.current) console.info('[link] parked — boot not ready'); return; }
     const url = pendingLinkRef.current;
     if (!url) return;
     pendingLinkRef.current = null;
-    onQrScanResult(classifyQrPayload(url, getBasisClassifiers()));
+    const res = classifyQrPayload(url, getBasisClassifiers());
+    console.info(`[link] drained → kind=${res?.kind ?? 'none'}`);
+    onQrScanResult(res);
   }
 
   async function onQrScanResult(res) {

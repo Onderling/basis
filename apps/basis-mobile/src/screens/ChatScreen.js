@@ -76,7 +76,6 @@ import { makeCirclePolicyStoreRN } from '../core/circleStoresRN.js';
 import { circleResolveRef, circlePodReadSince, circleSendDataMove, circleControlAgentRouter } from '../core/circlePods.js';
 import { sealingPublicKeyFromNetworkKey } from '@onderling/pod-client';
 import { makeGovernanceCatchUp } from '../../../basis/src/v2/governanceCatchUp.js';
-import { governanceEntryId } from '../../../basis/src/v2/governanceLog.js';
 import { makeHandleChatMessage }
                                from '../../../basis/src/core/handlers/chatMessage.js';
 import { makeHandleCirclePeerIntro }
@@ -901,14 +900,8 @@ export default function ChatScreen({
             eventLog: eventLogRef.current,
             rail: govRail,
             onChange: govChanged,
-            notify: (circleId, event) => {
-              try {
-                eventLogRef.current?.append({
-                  id: `gov-notif-${governanceEntryId(event)}`, ts: Date.now(), app: 'basis', type: 'notification', circleId,
-                  payload: { message: t('circle.governance.notify_vote_opened', { action: t(`circle.governance.action.${event.action}`) }) },
-                });
-              } catch { /* best-effort */ }
-            },
+            // "A decision opened" is RENDERED from the statement on the log (governanceNotices.js via
+            // chatRows) — the appended gov-notif nudge is retired, web parity (2-TER's rule).
           }),
         };
       })(),

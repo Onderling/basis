@@ -7,6 +7,7 @@
  * (claimed tasks / calendar → "My things").  Loads/saves through the
  * injected override store (AsyncStorage-backed).
  */
+import { noticeOverrideRows } from '../../../../basis/src/v2/noticeSettings.js';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, ScrollView, Switch, StyleSheet } from 'react-native';
 import { useTheme } from './themeContext.js';
@@ -98,6 +99,18 @@ export default function CircleOverrideScreen({ store, circleId, onBack, policySt
           </View>
         ))}
 
+        {/* Decision 4 — the lines the conversation renders, per kind: the circle's default and my private choice. */}
+        <Text style={styles.section}>{t('circle.override.notices')}</Text>
+        {noticeOverrideRows({ policy, override: working }).map((r) => (
+          <View key={r.kind} style={styles.row}>
+            <Text style={styles.rowLabel}>{t(r.labelKey)}</Text>
+            <Switch trackColor={{ true: theme.color.accent, false: theme.color.trackOff }} thumbColor={theme.color.white}
+              value={r.on}
+              onValueChange={() => patch({ notices: r.next })}
+              testID={`override-notice-${r.kind}`}
+            />
+          </View>
+        ))}
         <Text style={styles.section}>{t('circle.override.flowThrough')}</Text>
         {FLOW_TOGGLES.map((key) => (
           <View key={key} style={styles.row}>

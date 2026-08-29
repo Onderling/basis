@@ -38,7 +38,7 @@ import { loadRecipeForReview, applyReviewedRecipe } from '../../core/recipeConse
 // §4 storage-policy bridge — the circle `pod` axis drives stoop's authoritative
 // four-tier circle storage policy (shared with web; pure mapping + call).
 import { pushCircleStoragePolicy } from '../../../../basis/src/v2/circleStoragePolicy.js';
-import { conversationKindsRows } from '../../../../basis/src/v2/conversationKinds.js';
+import { multiControlRows } from '../../../../basis/src/v2/settingsMultiRows.js';
 // D / consumer-switch (MOBILE parity) — the screen header is sourced from
 // the manifest PAGE projection: the `settings` op declares `surfaces.page` with
 // a `labelKey`, renderMobile projects it into NavModel.pages[], and the label
@@ -500,10 +500,7 @@ export default function CircleSettingsScreen({
                   <View key={ctl.id} style={styles.controlRow} testID={`control-${ctl.id}`}>
                     <Text style={styles.rowLabel}>{t(ctl.labelKey)}</Text>
                     <View style={styles.chipRow}>
-                      {conversationKindsRows({
-                        circleSetting: working?.conversationKinds ?? null,
-                        templateKind:  working?.kind ?? null,
-                      }).map((r) => (
+                      {multiControlRows(ctl, working).map((r) => (
                         <Pressable key={r.kind} disabled={!cs.enabled}
                           onPress={() => patch({ [ctl.policyField]: r.next })}
                           style={[styles.chip, r.on && styles.chipOn, !cs.enabled && styles.chipDisabled]}

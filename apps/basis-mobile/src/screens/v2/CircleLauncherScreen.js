@@ -12,6 +12,7 @@
  * the shared helpers; otherwise the empty states show + create is a no-op.
  * Flagged for device verification.
  */
+import { noticeWants } from '../../../../basis/src/v2/noticeSettings.js';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, BackHandler, Modal, Alert, findNodeHandle } from 'react-native';
 import { useTheme } from './themeContext.js';
@@ -565,6 +566,8 @@ export default function CircleLauncherScreen({
   // selected circle's policy (loaded when `selected` changes); used
   // to gate detail action buttons on the Functies axis.
   const [selectedPolicy, setSelectedPolicy] = useState(null);
+  // Decision 4 — the open circle's member override (my private per-kind notice choices), read with the policy.
+  const [selectedOverride, setSelectedOverride] = useState(null);
   const [chatAi, setChatAi] = useState({ enriched: false, reason: 'no-provider' });   // S6.D — chat LLM enrichment for My-data
   // circle tile activity preview ({subtitle, ts, unread} per circle)
   // + seenAt persistence (the per-circle "last-open" marker that drives the
@@ -614,12 +617,13 @@ export default function CircleLauncherScreen({
     if (!selected?.id) { setSelectedPolicy(null); return; }
     let alive = true;
     (async () => {
-      let p = null;
+      let p = null; let o = null;
       try { p = await policyStore.get(selected.id); } catch { /* defaults */ }
-      if (alive) setSelectedPolicy(p);
+      try { o = await overrideStore.get(selected.id); } catch { /* defaults */ }
+      if (alive) { setSelectedPolicy(p); setSelectedOverride(o); }
     })();
     return () => { alive = false; };
-  }, [selected, policyStore]);
+  }, [selected, policyStore, overrideStore]);
 
   // S6.D — is the conversational "chat" projection LLM-enriched in the active circle?
   // (the circle's policy.llmTool + the member's loaded LLM + a configured provider).
@@ -1848,6 +1852,7 @@ export default function CircleLauncherScreen({
         }}
         catalogue={bundle?.catalogue}
         policy={selectedPolicy}
+        override={selectedOverride}
         peerGraph={bundle?.peerGraph ?? null}
         signChatStatement={(cid, mid) => bundle?.agent?.chatRail?.signEntry?.(cid, mid) ?? null}
         myListTasks={myListTasks}
@@ -2299,7 +2304,7 @@ function LauncherTile({ circle: c, preview, pending, isPinned = false, isMuted =
 // Added:/Completed: phrasing); web + mobile use it so add/complete no longer read identically.
 
 function CircleDetail({
-  circle, items, callSkill, rawCallSkill, catalogue: rawCatalogue, policy, myListTasks = [],
+  circle, items, callSkill, rawCallSkill, catalogue: rawCatalogue, policy, override = null, myListTasks = [],
   deliveryStateMap = null,
   registerCircleBotSink = null,
   onAcceptFallback = null,
@@ -2450,8 +2455,10 @@ function CircleDetail({
       circles,
       circleId:  circle?.id ?? null,
       kinds:     allowedKinds,
-      // Membership notices are RENDERED from the log by the shared projection (web≡mobile by construction).
+      // Membership + governance notices are RENDERED from the log by the shared projection (web≡mobile by
+      // construction); `wants` is the person's per-kind setting (decision 4: circle default, private override).
       t,
+      wants: noticeWants({ policy, override }),
       // Sender labels through the reveal ladder (batch 4, web≡mobile): the projector stamps
       // `senderLabel`/`senderLabelKey`, the view only paints. `tabMembers` is null until the
       // circle-open roster load resolves — rows stay unstamped for that window, never a wire name.

@@ -32,7 +32,10 @@ const SHELLS = {
  * Known gaps: `<module> → <shell>`. Each dated, each a defect on the plan. Shrinks only.
  */
 const KNOWN_GAPS = new Set([
-  'removalNotice → mobile',   // W23, 2026-08-29: the removed phone is told nothing. Plan Phase 2.
+  // Empty, and that is the point: `removalNotice → mobile` was the one entry (W23 — a removed phone was
+  // told nothing while the admin's app reported `told: true`). It was closed the same day by moving the
+  // decision AND the write into `sayRemovalNotice`, which both shells now call. An entry here is a defect
+  // with a date and a plan item, never a way to make this file green.
 ]);
 
 const noticeModules = readdirSync(NOTICE_DIR).filter((f) => /Notice\.js$/.test(f) && !f.endsWith('.test.js'));

@@ -30,6 +30,8 @@
  */
 
 /** The locale keys this module can ask for. Exported so a locale-coverage check can find them. */
+import { circleChatMessageEvent } from '@onderling/kring-host/circleBroadcast';
+
 export const REMOVAL_NOTICE_KEYS = Object.freeze({
   removed: 'circle.membership.you_were_removed',
   withReason: 'circle.membership.you_were_removed_reason',
@@ -132,6 +134,64 @@ export function removalNotice({ members, myRef, statements = null, reason = null
       : { key: REMOVAL_NOTICE_KEYS.removed, by: evicted.by };
   }
   return { key: REMOVAL_NOTICE_KEYS.removed, by: null };
+}
+
+/**
+ * Say it — the shared WRITE, so both shells tell a removed person the same thing.
+ *
+ * The decision above was always shared; the delivery was not, and that is the whole of W23 (2026-08-29):
+ * on a phone that had just been removed, nothing appeared at all, while the admin's `removeMember`
+ * reported `told: true`. Web computed the notice inside its own paint code behind a module-scoped
+ * `removalNoticeSaid`; mobile never computed it. A notice one shell can say and the other cannot is
+ * invariant 2 in its plainest form.
+ *
+ * So the write lives here, next to the decision, and both shells call it.
+ *
+ * ── THE ENTRY ID IS THE MEMORY ───────────────────────────────────────────────────────────────────────
+ * The line is an ordinary bot bubble — `circleChatMessageEvent`, the same entry kind both shells already
+ * append for every other thing the app says to one person (`scope: 'self'`). Deliberately NOT a second
+ * kind: `type: 'notification'` also exists and also lands in a circle, which is one concept with two
+ * vocabularies; which of the two is canonical is a decision on the ledger, and this uses the one the
+ * notices already use.
+ *
+ * Because the id is derived from the eviction rather than from a counter, saying it twice is impossible
+ * rather than merely unlikely: the second call finds its own entry and returns null. That replaces the
+ * shell boolean, and unlike a boolean it survives a reinstall — the log comes back, the line does not
+ * repeat, and a person who was removed while offline is still told when their device catches up.
+ *
+ * Honest limit: the statement bodies this module sees carry `kind`/`subject`/`author` and no stable
+ * hash, so the id is per (circle, remover). Removed by the same admin, re-invited, and removed again
+ * by that same admin ⇒ the second removal reuses the id and is not said twice. Rare, and the fix is a
+ * hash on the body rather than a counter here.
+ *
+ * @param {object} a
+ * @param {{append:Function, query:Function}} a.eventLog
+ * @param {string} a.circleId
+ * @param {Array<object>} a.members       roster rows as this device folds them
+ * @param {string} a.myRef
+ * @param {Array<object>|null} [a.statements]
+ * @param {(key:string)=>string} a.t      the shell's translator
+ * @param {() => number} [a.now]          injectable clock (tests)
+ * @returns {{ msgId: string, notice: object }|null}  null = nothing to say, or already said
+ */
+export function sayRemovalNotice({
+  eventLog, circleId, members, myRef, statements = null, reason = null, t, now = () => Date.now(),
+} = {}) {
+  if (!eventLog?.append || typeof circleId !== 'string' || !circleId || typeof t !== 'function') return null;
+  const notice = removalNotice({ members, myRef, statements, reason });
+  if (!notice) return null;
+
+  const msgId = `circle-${circleId}-removed-${notice.by ?? 'unknown'}`;
+  // The id is the memory: ask the log, not a boolean the next boot forgets.
+  try {
+    const said = (eventLog.query?.({}) ?? []).some((e) => e?.id === msgId || e?.payload?.msgId === msgId);
+    if (said) return null;
+  } catch { /* an unreadable log must not silence the notice — better said twice than never */ }
+
+  eventLog.append(circleChatMessageEvent({
+    msgId, ts: now(), circleId, actor: 'bot', text: t(notice.key), scope: 'self',
+  }));
+  return { msgId, notice };
 }
 
 export default removalNotice;

@@ -437,8 +437,12 @@ export default function App() {
           const { hydrated } = await wireEventLogPersistence({
             eventLog: eventLogRef.current, io: asyncStorageSnapshotIo(AsyncStorage),
           });
-          if (hydrated) dlog(`[device-log] hydrated ${hydrated} persisted entries`);
-        } catch (err) { dlog(`[device-log] persistence wiring failed: ${err?.message ?? err}`); }
+          // `dlog` is a channel object, not a function — calling it here threw, and so did the catch
+          // below, which turned one log line into "boot failed (App)" from the first launch that had
+          // anything to hydrate. Found on a device 2026-08-29; guarded by
+          // test/devLogIsNeverCalledAsAFunction.test.js.
+          if (hydrated) dlog.boot(`[device-log] hydrated ${hydrated} persisted entries`);
+        } catch (err) { dlog.warn(`[device-log] persistence wiring failed: ${err?.message ?? err}`); }
         const SEED_FLAG = 'cc.firstBootSeeded.v1';
         const alreadySeeded = await AsyncStorage.getItem(SEED_FLAG).catch(() => null) === '1';
         let eventSeq = 0;

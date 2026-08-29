@@ -6,7 +6,7 @@
  * read came back empty, and not telling someone who was actually removed.
  */
 import { describe, it, expect } from 'vitest';
-import { removalNotice, evictionOfMe, REMOVAL_NOTICE_KEYS } from '../../src/v2/removalNotice.js';
+import { removalNotice, evictionOfMe, REMOVAL_NOTICE_KEYS, sayRemovalNotice } from '../../src/v2/removalNotice.js';
 
 const ME = 'webid:me';
 const ADMIN = 'webid:admin';
@@ -82,5 +82,67 @@ describe('removalNotice', () => {
 
   it('refuses to guess without a ref', () => {
     expect(removalNotice({ members: rows(ADMIN), myRef: null })).toBe(null);
+  });
+});
+
+/**
+ * THE WRITE — 2026-08-29. The decision above was already shared; the DELIVERY was not, and that is the
+ * whole of W23: on a phone that had just been removed, nothing appeared, while the admin's `removeMember`
+ * reported `told: true`. Web computed the notice in its own paint code behind a `removalNoticeSaid`
+ * boolean; mobile never computed it at all.
+ *
+ * `sayRemovalNotice` moves decision AND write into shared code both shells call, and makes the ENTRY ID
+ * the memory: idempotent by construction, and it survives a reinstall in a way a module-scoped boolean
+ * never could.
+ */
+describe('sayRemovalNotice — the shared write', () => {
+  const fakeLog = () => {
+    const entries = [];
+    return { entries, append: (e) => { entries.push(e); return e; }, query: () => entries.slice() };
+  };
+  const t = (k) => `t:${k}`;
+  const ME = 'me-ref';
+  const OTHERS = [{ webid: 'admin-ref' }, { webid: 'someone-else' }];
+  const EVICTED = [{ kind: 'evict', subject: ME, author: 'admin-ref' }];
+
+  it('appends one bot line, addressed to this person only', () => {
+    const eventLog = fakeLog();
+    const r = sayRemovalNotice({ eventLog, circleId: 'kring-1', members: OTHERS, myRef: ME, statements: EVICTED, t });
+    expect(r, 'a removed person is told').not.toBeNull();
+    expect(eventLog.entries).toHaveLength(1);
+    // The canonical chat-message shape (`toEventLogItem`): the same entry kind every other bot line is,
+    // which is the point — both shells already paint it.
+    const [e] = eventLog.entries;
+    expect(e.id, 'the id is derived from the eviction, so it can be recognised again').toBe(r.msgId);
+    expect(e.type).toBe('chat-message');
+    expect(e.actor).toBe('bot');
+    expect(e.payload.circleId).toBe('kring-1');
+    expect(e.payload.text).toBe('t:circle.membership.you_were_removed');
+    // `scope: 'self'` — the circle it concerns can no longer hear us, and it is one person's business.
+    expect(e.payload.scope).toBe('self');
+  });
+
+  it('says it once — the entry id IS the memory, not a shell boolean', () => {
+    const eventLog = fakeLog();
+    const a = sayRemovalNotice({ eventLog, circleId: 'kring-1', members: OTHERS, myRef: ME, statements: EVICTED, t });
+    const b = sayRemovalNotice({ eventLog, circleId: 'kring-1', members: OTHERS, myRef: ME, statements: EVICTED, t });
+    expect(a).not.toBeNull();
+    expect(b, 'the second call finds its own entry and says nothing').toBeNull();
+    expect(eventLog.entries, 'exactly one line, however often the roster reloads').toHaveLength(1);
+  });
+
+  it('says nothing when the person is still in the circle', () => {
+    const eventLog = fakeLog();
+    const r = sayRemovalNotice({
+      eventLog, circleId: 'kring-1', members: [...OTHERS, { webid: ME }], myRef: ME, statements: EVICTED, t,
+    });
+    expect(r).toBeNull();
+    expect(eventLog.entries).toHaveLength(0);
+  });
+
+  it('says nothing on an empty roster (a read that has not landed is not a removal)', () => {
+    const eventLog = fakeLog();
+    expect(sayRemovalNotice({ eventLog, circleId: 'kring-1', members: [], myRef: ME, statements: EVICTED, t })).toBeNull();
+    expect(eventLog.entries).toHaveLength(0);
   });
 });

@@ -163,6 +163,9 @@ import { circleGateRules } from '../../../../basis/src/v2/circleGate.js';
 // Telling someone the circle became theirs. The decision (WHO is told, and whether they have
 // signed for it yet) is shared; the shell only paints the line and carries the button.
 import { caretakerNotice } from '../../../../basis/src/v2/caretakerNotice.js';
+// The removed-from-a-circle line: shared decision AND shared write, so both shells say the same thing
+// at the same moment (W23 — this shell used to say nothing at all).
+import { sayRemovalNotice } from '../../../../basis/src/v2/removalNotice.js';
 import { interpretToCommand } from '../../../../basis/src/v2/interpretCommand.js';
 import { scopeStoopCallSkill } from '../../../../basis/src/v2/circleStoopScope.js';
 // Sealed media (2026-07-11): the per-circle media composition is SHARED src/ (platform-neutral,
@@ -1836,6 +1839,13 @@ export default function CircleLauncherScreen({
         items={items}
         callSkill={callSkill}
         rawCallSkill={bundle?.callSkill}
+        // One function, not the whole bundle (this file's style, stated in CircleDetail's props): the
+        // removed-from-a-circle line reads the verified membership statements to name WHO removed you.
+        readMembershipStatements={async (cid) => {
+          const rail = bundle?.agent?.membershipRail;
+          if (!rail || typeof rail.readVerifiedBodies !== 'function') return null;
+          try { return (await rail.readVerifiedBodies(cid))?.bodies ?? null; } catch { return null; }
+        }}
         catalogue={bundle?.catalogue}
         policy={selectedPolicy}
         peerGraph={bundle?.peerGraph ?? null}
@@ -2297,6 +2307,9 @@ function CircleDetail({
   // The chat lane's sign-the-appended-entry hook (`agent.chatRail.signEntry`) — threaded narrowly, the
   // file's style: the fan needs one function, not the whole bundle.
   signChatStatement = null,
+  // Reads this circle's verified membership statements (one function, not the bundle). Absent → the
+  // removal line still says something true, it just cannot name who did it.
+  readMembershipStatements = null,
   eventLog,
   circles = [],
   recipeStore = null, onStoopEvent, sendPersonaUpdate, disclosureShareMemo = null, resealMediaForCircle = null, profilePicture = null, coreIdentity = null,
@@ -2735,6 +2748,40 @@ function CircleDetail({
       scope: 'self',
     });
   }, [rosterRows, mandateViewer.viewerWebid, circle?.id, appendCircleMessage]);
+
+  // …and the other membership line: you are no longer in this circle.
+  //
+  // W23 (2026-08-29): this shell said NOTHING. A phone removed from a circle received the eviction
+  // statement, folded it correctly, rotated past the key — and its screen did not change by one pixel,
+  // while the admin's `removeMember` reported `told: true`. Web had told people since 2026-08-28; the
+  // notice simply was never added here, which is what "parity is disciplined, not structural" costs
+  // when the discipline lapses.
+  //
+  // Unlike the caretaker line above, the shell owns NO memory here: `sayRemovalNotice` derives the
+  // entry id from the eviction and asks the log, so the line cannot repeat — across reloads, and across
+  // a reinstall. The statements settle WHY (they name the admin); without them the shared decision
+  // still says something true rather than staying quiet.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!eventLog?.append || !circle?.id) return;
+      let statements = null;
+      if (typeof readMembershipStatements === 'function') {
+        try { statements = await readMembershipStatements(circle.id); } catch { statements = null; }
+      }
+      if (cancelled) return;
+      const said = sayRemovalNotice({
+        eventLog,
+        circleId: circle.id,
+        members: rosterRows,
+        myRef: mandateViewer.viewerWebid || '',
+        statements,
+        t,
+      });
+      if (said) setStreamTick((n) => n + 1);
+    })();
+    return () => { cancelled = true; };
+  }, [rosterRows, mandateViewer.viewerWebid, circle?.id, eventLog, readMembershipStatements]);
 
   // The act on that notice. Signing is what makes "acknowledged" mean the person SAW it, so it can
   // only ever be a tap — never something the render did on their behalf. The op derives the

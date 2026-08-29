@@ -108,7 +108,7 @@ import { oneToOneBotLabel } from '../../src/v2/botChat.js';
 // Telling someone the circle became theirs. The decision (WHO is told, and whether they have signed
 // for it yet) is shared; the shell only paints the line and carries the button.
 import { caretakerNotice } from '../../src/v2/caretakerNotice.js';
-import { removalNotice } from '../../src/v2/removalNotice.js';
+import { sayRemovalNotice } from '../../src/v2/removalNotice.js';
 import { scopeCatalogueToApps } from '../../src/v2/circleCatalogueScope.js';
 // the default-deny capability gate applied at the user-dispatch waist (dispatchReady).
 import { effectiveCapabilities, checkCapability } from '../../src/v2/capabilityGate.js';
@@ -5848,9 +5848,12 @@ function showCircle(id, circle, policy) {
   // readable. A read-restriction would be a costume — the data is already on their disk and a client
   // that does not hide it is trivial — while the gate that actually binds already held: the key
   // rotated. Honesty is the deliverable, not restriction.
-  let removalNoticeSaid = false;
+  // The decision AND the write are shared (`sayRemovalNotice`), because a notice one shell can say and
+  // the other cannot is invariant 2 in its plainest form — and that is exactly what W23 was: this shell
+  // told a removed person, the phone told them nothing, and `removeMember` reported `told: true` either
+  // way. The `removalNoticeSaid` boolean that used to live here is gone: the entry id is the memory now,
+  // so it survives a reload and a reinstall instead of resetting with the module.
   async function tellIfIWasRemoved(rawRoster) {
-    if (removalNoticeSaid) return;
     let statements = null;
     try {
       const rail = _peerAgent?.membershipRail;
@@ -5858,11 +5861,10 @@ function showCircle(id, circle, policy) {
         statements = (await rail.readVerifiedBodies(id))?.bodies ?? null;
       }
     } catch { statements = null; }
-    const notice = removalNotice({ members: rawRoster, myRef: myWebid || '', statements });
-    if (!notice) return;
-    removalNoticeSaid = true;
-    // `scope: 'self'` — addressed to one person, and the circle it concerns can no longer hear us.
-    _circleRender?.botBubble(t(notice.key), { scope: 'self' });
+    const said = sayRemovalNotice({
+      eventLog, circleId: id, members: rawRoster, myRef: myWebid || '', statements, t,
+    });
+    if (said) _circleRender?.rerender?.();
   }
 
   // The act on that notice. Signing is what makes "acknowledged" mean the person SAW it, so it can

@@ -2798,6 +2798,8 @@ export function buildSkills({
           ...(verifiedAdminCircleAddress ? { confirmedByCircleAddress: verifiedAdminCircleAddress } : {}),
           // …and its proof, for the same relay reason as the joiner's own (2026-08-02).
           ...(verifiedAdminCircleAddress ? { confirmedByCircleAddressProof: a.confirmedByCircleAddressProof } : {}),
+          // …and the admin's display (W10): `deriveRoster` projects it as their handle on THIS device's roster.
+          ...(typeof a.confirmedByDisplay === 'string' && a.confirmedByDisplay ? { confirmedByDisplay: a.confirmedByDisplay } : {}),
           // Handle presented in THIS circle (Wave B) — recorded joiner-side so
           // `listMyHandles` can surface it as a prior handle later.
           ...(typeof a.peerDisplay === 'string' && a.peerDisplay ? { peerDisplay: a.peerDisplay } : {}),
@@ -2822,7 +2824,10 @@ export function buildSkills({
             text:       (typeof a.name === 'string' && a.name.trim())
               ? a.name.trim()
               : `Rules for ${a.groupId} (mirrored from invite)`,
-            source:     { groupId: a.groupId, rules: a.rules, version: 1, mirrored: true },
+            // The doc's OWN version, not a constant: the invite now carries the admin's current doc
+            // (L55), and a v3 doc stamped "version 1" made a fresh joiner read as three versions behind
+            // a head it already held.
+            source:     { groupId: a.groupId, rules: a.rules, version: Number.isFinite(a.rules?.version) ? a.rules.version : 1, mirrored: true },
             visibility: 'household',
           }], { actor: from });
         }

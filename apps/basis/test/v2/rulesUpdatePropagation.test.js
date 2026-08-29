@@ -181,7 +181,14 @@ describe('rules-update propagation — the doc travels the governance lane, pod-
     for (const stmt of A.agent.membershipRail.storedStatements(CIRCLE)) {
       await C.agent.membershipRail.ingest(CIRCLE, stmt);
     }
-    expect(await currentVersionOn(C)).toBe(0);
+    // Since the invite carries the circle's current rules doc (L55, 2026-08-29), a joiner is never a
+    // "device with no doc" any more — C lands holding the doc the invite embedded, at that doc's own
+    // version. What C still lacks is the SIGNED rules-update STATEMENT (the governance-lane fact behind
+    // the head), which is exactly what the aged-out serve below must deliver. So the premise shifts
+    // from "0 → 3" to "the invite's version → 3", and the convergence assertion keeps its meaning.
+    const atJoin = await currentVersionOn(C);
+    expect(atJoin, 'the joiner holds the doc the invite carried').toBeGreaterThan(0);
+    expect(atJoin, 'but not yet the head the admin has moved to').toBeLessThan(3);
 
     // THE AGED-OUT WORLD: A serves catch-up from an EMPTY lane (every governance entry compacted
     // away) — the ONLY thing left is the durable head's preserved statement, via the serve hook

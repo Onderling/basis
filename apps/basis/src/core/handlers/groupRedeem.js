@@ -32,7 +32,27 @@
  * @param {{info?, warn?, error?}}                                         [args.logger]
  * @returns {(fromAddr: string, payload: object) => Promise<void>}
  */
+/**
+ * The admin's own display name IN THIS CIRCLE, read the way every screen reads it: their row on the
+ * roster, found by the per-circle address they answer on. No profile store is consulted directly, so this
+ * cannot disagree with what the admin's own members list shows. Best-effort — a missing handle is a
+ * missing field on the reply, never a failed join.
+ */
+export async function ownDisplayInCircle(groupId, { callSkill, circleAddressFor } = {}) {
+  try {
+    const own = typeof circleAddressFor === 'function' ? circleAddressFor(groupId) : null;
+    if (!own) return null;
+    const r = await callSkill('stoop', 'listGroupMembers', { groupId });
+    const rows = Array.isArray(r?.members) ? r.members : [];
+    const me = rows.find((m) => m?.circleAddress === own
+      || (Array.isArray(m?.circleAddresses) && m.circleAddresses.includes(own)));
+    const h = me?.handle ?? me?.displayName ?? null;
+    return typeof h === 'string' && h.trim() ? h.trim() : null;
+  } catch { return null; }
+}
+
 export function makeHandleGroupRedeemRequest({
+  ownDisplayFor = null,
   callSkill, sendPeer, propagateMeshIntros, propagateCircleAddresses, publishEvent,
   circleAddressFor, signCircleAddress, logger = console,
 } = {}) {
@@ -83,6 +103,13 @@ export function makeHandleGroupRedeemRequest({
         // built here: it is the same mechanism as "re-announce", and the two belong together.)
         const own = ownProvenCircleAddress(groupId, { circleAddressFor, signCircleAddress });
         if (own) Object.assign(reply, own);
+        // …and the admin's display rides back beside their address (W10): the joiner's roster then
+        // names the person who admitted them instead of showing a key. Self-asserted, like the handle
+        // the joiner sent the other way; a receiver that already holds a handle for us keeps its own.
+        const display = typeof ownDisplayFor === 'function'
+          ? await ownDisplayFor(groupId)
+          : await ownDisplayInCircle(groupId, { callSkill, circleAddressFor });
+        if (typeof display === 'string' && display) reply.confirmedByDisplay = display;
       }
     } catch (err) {
       reply = { error: err?.message ?? String(err) };

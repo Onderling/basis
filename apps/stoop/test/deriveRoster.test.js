@@ -436,3 +436,35 @@ describe('deriveRoster', () => {
     });
   });
 });
+
+describe('W10 — a person\'s chosen handle reaches BOTH rosters (2026-08-29)', () => {
+  // The walk: the joiner typed "telefoon" in the wizard; the admin's roster showed a raw address, and
+  // the admin appeared on the joiner's phone as a raw uppercased key even though the admin's own row
+  // carries handle "nieuwe-buur". The redemption row on the admin DID carry `peerDisplay: 'handletest'`
+  // (measured against a live circle) — the fold simply never projected it onto the row.
+  it('projects the joiner\'s peerDisplay as their handle (self-asserted display, same trust as their address)', () => {
+    const roster = deriveRoster({
+      redemptions: [redemption({ redeemedBy: 'B', signingPublicKey: 'pkB', peerDisplay: 'handletest' })],
+    });
+    expect(roster.find((m) => m.webid === 'B')?.handle).toBe('handletest');
+  });
+
+  it('projects the admin\'s display that rode back on the redeem reply as the admin\'s handle', () => {
+    const roster = deriveRoster({
+      redemptions: [redemption({
+        redeemedBy: 'me', signingPublicKey: 'pkMe', channel: 'peer',
+        confirmedBy: 'A', confirmedByDisplay: 'nieuwe-buur',
+      })],
+    });
+    expect(roster.find((m) => m.webid === 'A')?.handle).toBe('nieuwe-buur');
+    expect(roster.find((m) => m.webid === 'A')?.role).toBe('admin');
+  });
+
+  it('a display from the trail never overrides a handle the MemberMap already holds', () => {
+    const roster = deriveRoster({
+      redemptions: [redemption({ redeemedBy: 'B', signingPublicKey: 'pkB', peerDisplay: 'old-handle' })],
+      memberMapForDisplay: [{ webid: 'B', handle: 'current-handle' }],
+    });
+    expect(roster.find((m) => m.webid === 'B')?.handle).toBe('current-handle');
+  });
+});

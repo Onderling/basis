@@ -193,3 +193,39 @@ describe('makeSendGroupRedeemRequest — Phase 4 (#271)', () => {
     expect(pendingMap.size).toBe(0);
   });
 });
+
+describe('W10 — the admin\'s display rides back on the redeem reply (2026-08-29)', () => {
+  it('carries confirmedByDisplay when the admin has a handle in this circle', async () => {
+    const d = reqDeps({ ownDisplayFor: vi.fn(async () => 'nieuwe-buur') });
+    const handle = makeHandleGroupRedeemRequest(d);
+    await handle('peer-A', validRequest({ peerDisplay: 'handletest' }));
+    expect(d.sendPeer).toHaveBeenCalledWith('peer-A', expect.objectContaining({
+      subtype: 'group-redeem-response', ok: true, confirmedByDisplay: 'nieuwe-buur',
+    }));
+  });
+
+  it('omits the field when there is none — a missing name is a missing field, never a failed join', async () => {
+    const d = reqDeps({ ownDisplayFor: vi.fn(async () => null) });
+    const handle = makeHandleGroupRedeemRequest(d);
+    await handle('peer-A', validRequest());
+    const [, reply] = d.sendPeer.mock.calls[0];
+    expect(reply.ok).toBe(true);
+    expect('confirmedByDisplay' in reply).toBe(false);
+  });
+
+  it('by default reads its OWN roster row by per-circle address (the same row the members list shows)', async () => {
+    const callSkill = vi.fn(async (app, op) => {
+      if (op === 'verifyMembershipCodeForPeer') return { codeId: 'c-1', validUntil: 9999999999 };
+      if (op === 'listGroupMembers') return { members: [
+        { webid: 'me', handle: 'nieuwe-buur', circleAddress: 'addr-me' },
+        { webid: 'peer-A', handle: null, circleAddress: 'addr-A' },
+      ] };
+      return {};
+    });
+    const d = reqDeps({ callSkill, circleAddressFor: () => 'addr-me' });
+    const handle = makeHandleGroupRedeemRequest(d);
+    await handle('peer-A', validRequest());
+    const [, reply] = d.sendPeer.mock.calls[0];
+    expect(reply.confirmedByDisplay).toBe('nieuwe-buur');
+  });
+});

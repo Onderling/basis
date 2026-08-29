@@ -139,6 +139,12 @@ export function deriveRoster({
       upsert(redeemedBy, role ?? 'member', {
         pubKey:            signingPublicKey,
         sealingPublicKey,
+        // The handle the person chose at join rides the redemption row as `peerDisplay` (self-asserted
+        // display, the same trust class as their circleAddress — the writer's own comment says so). It
+        // was written on every admin's row and never projected, so the admin's roster showed a raw
+        // address for someone who had typed a name (W10, measured on a live circle 2026-08-29). The
+        // MemberMap's display fields still win where present — `upsert` never overwrites a set field.
+        handle:            typeof src.peerDisplay === 'string' && src.peerDisplay ? src.peerDisplay : undefined,
         circleAddress,
         // THE CEREMONY ADDRESS (custody D1): the join-time address, pinned immutably — the key
         // class ceremony statements (address-revoke) must be signed with. An un-patched row's
@@ -165,6 +171,10 @@ export function deriveRoster({
     // The admin's address as recorded on the joiner side (peer-bridge only).
     if (confirmedBy && channel === 'peer') {
       upsert(confirmedBy, 'admin', {
+        // …and the admin's display, which rides BACK on the redeem reply exactly as their per-circle
+        // address does — so the joiner's roster names the person who let them in, instead of showing
+        // their key (the other half of W10).
+        handle:             typeof src.confirmedByDisplay === 'string' && src.confirmedByDisplay ? src.confirmedByDisplay : undefined,
         // The admin's PER-CIRCLE address, returned on the redeem response and proof-verified before it
         // was written (`recordRemoteRedemption`). This row is the joiner's ONLY view of the admin, so
         // without it every send to them falls through to the global signing key — refused outright when
@@ -330,7 +340,15 @@ export function deriveRoster({
   const out = [];
   for (const rec of roster.values()) {
     const disp = displayByWebid.get(rec.webid) ?? {};
-    const merged = { ...disp, ...rec };
+    // Trail keys override the display cache — EXCEPT the display fields themselves. The trail now
+    // carries the handle a person chose AT JOIN (`peerDisplay`); the MemberMap carries the handle they
+    // have NOW (renames land there). A person who renamed must not be shown their join-time name, so
+    // for `handle` / `displayName` a present cache value wins and the trail is the fallback.
+    const merged = {
+      ...disp, ...rec,
+      ...(typeof disp.handle === 'string' && disp.handle ? { handle: disp.handle } : {}),
+      ...(typeof disp.displayName === 'string' && disp.displayName ? { displayName: disp.displayName } : {}),
+    };
     // `circleAddresses` — the member's full proven address SET, primary first. `circleAddress`
     // stays the primary slot (every existing consumer keeps working); the set is what sender
     // authorization accepts and what delivery tries in order. The primary leads even when it has

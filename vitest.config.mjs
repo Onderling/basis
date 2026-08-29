@@ -7,9 +7,19 @@
 // ignore the aggregate. The bound below means "hung", not "busy". Apps keep their own configs.
 // A plain object, not `defineConfig`: the root has no vitest install of its own to import from (the
 // binary `npx vitest` finds lives in an app's node_modules), and vitest accepts the object as-is.
+// vitest looks UPWARD from the working directory for a config, so a package with no config of its own
+// (secure-agent, transports) would otherwise inherit this one and find "no test files" — which is what
+// happened the first hour this file existed. Scope the include to root-level runs only; the generous
+// timeout is harmless everywhere.
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+
+const ROOT = path.dirname(fileURLToPath(import.meta.url));
+const atRoot = path.resolve(process.cwd()) === ROOT;
+
 export default {
   test: {
-    include: ['scripts/**/*.test.mjs'],
+    ...(atRoot ? { include: ['scripts/**/*.test.mjs'] } : {}),
     testTimeout: 120_000,
     hookTimeout: 120_000,
   },

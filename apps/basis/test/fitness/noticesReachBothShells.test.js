@@ -58,6 +58,11 @@ function sourcesUnder(root) {
 const shellSource = Object.fromEntries(
   Object.entries(SHELLS).map(([name, roots]) => [name, roots.map(sourcesUnder).join('\n')]),
 );
+// The shared conversation projection both shells call (`chatRows` → membershipNotices). A notice module
+// consumed HERE reaches both shells by construction — the stronger form of the invariant — so it counts
+// for both, and a shell no longer has to import it at all.
+const PROJECTION = ['../../src/v2/membershipNotices.js', '../../src/v2/circleStream.js']
+  .map((rel) => readFileSync(dir(rel), 'utf8')).join('\n');
 
 describe('FITNESS — notices reach both shells', () => {
   it('finds the notice modules', () => {
@@ -69,7 +74,7 @@ describe('FITNESS — notices reach both shells', () => {
     for (const shell of Object.keys(SHELLS)) {
       const key = `${mod} → ${shell}`;
       it(`${key}`, () => {
-        const consumed = new RegExp(`\\b${mod}\\b`).test(shellSource[shell]);
+        const consumed = new RegExp(`\\b${mod}\\b`).test(shellSource[shell]) || new RegExp(`\\b${mod}\\b`).test(PROJECTION);
         if (KNOWN_GAPS.has(key)) {
           expect(consumed, `${key} is listed as a known gap but the shell consumes it now — remove it from KNOWN_GAPS`).toBe(false);
         } else {

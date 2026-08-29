@@ -13,6 +13,7 @@
 
 import { taskRowProvenance } from './streamActions.js';
 import { isSilentEntry } from '../eventLog.js';
+import { membershipNoticeRows } from './membershipNotices.js';
 import { revealedMemberLabel } from './circleViewAs.js';
 
 /**
@@ -197,8 +198,14 @@ export function circleRows(opts = {}) {
  * here. When it is, this wrapper is the only place that changes.
  */
 export function chatRows(opts = {}) {
-  const { members = null, viewerId = null, policy = 'pairwise', ...rest } = opts;
-  const rows = projectEntries({ ...rest, lane: 'human' });
+  const { members = null, viewerId = null, policy = 'pairwise', t = null, wants = null, ...rest } = opts;
+  let rows = projectEntries({ ...rest, lane: 'human' });
+  // The membership lines a person is owed — RENDERED from the statements already on the log, never
+  // appended (see membershipNotices.js). Conservation: a caller with no translator gets the old rows.
+  if (typeof t === 'function' && typeof viewerId === 'string' && viewerId && typeof rest.circleId === 'string') {
+    const notices = membershipNoticeRows({ events: rest.events, circleId: rest.circleId, viewerId, members, t, wants });
+    if (notices.length) rows = [...rows, ...notices].sort((a, b) => b.ts - a.ts);
+  }
   // Conservation: a caller that passes no roster gets exactly the pre-existing rows.
   if (!Array.isArray(members)) return rows;
   return stampSenderLabels(rows, { members, viewerId, policy });

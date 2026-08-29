@@ -263,3 +263,64 @@ describe('agentTrailRows — the trail is a lens, not a second store (J-L6/J-L7)
     expect(rows.map((r) => r.id)).toEqual(['t1']);
   });
 });
+
+// ── Membership notices are RENDERED from the log, never appended ──────────────────────────────────────
+// A removed member's device used to be told by a second entry that repeated what the evict statement
+// already said (and the phone never got even that). The statement IS the notice; the conversation
+// projection renders the ones that concern the viewer. Nothing is written, so nothing can be said twice.
+describe('chatRows — membership notices as rendered projections (2026-08-29)', () => {
+  const t = (key, args = {}) => `${key}${args.name ? `:${args.name}` : ''}`;
+  const membership = (id, body, ts = 100) => ({
+    id: `membership:${id}`, ts, app: 'basis', type: 'membership', circleId: 'k1',
+    payload: { body: { kind: body.kind, subject: body.subject, author: body.author, payload: body.payload ?? {} }, sig: 'x' },
+  });
+  const chat = { id: 'c1', ts: 50, app: 'circle', type: 'chat-message', actor: 'alice', payload: { circleId: 'k1', text: 'hoi', kind: 'chat-message' } };
+
+  it('renders "you were removed" for an evict whose subject is the viewer', () => {
+    const rows = chatRows({ events: [chat, membership('e1', { kind: 'evict', subject: 'me', author: 'admin' })], circleId: 'k1', viewerId: 'me', t });
+    const notice = rows.find((r) => r.actor === 'bot');
+    expect(notice, 'a bot row is projected from the evict statement').toBeTruthy();
+    expect(notice.event.payload.text).toBe('circle.membership.you_were_removed');
+    expect(notice.event.payload.scope).toBe('self');
+    expect(rows.some((r) => r.id === 'c1'), 'the chat row is still there').toBe(true);
+  });
+
+  it('says nothing about an evict of someone else, and nothing about my own leave', () => {
+    const rows = chatRows({ events: [
+      membership('e2', { kind: 'evict', subject: 'bob', author: 'admin' }),
+      membership('e3', { kind: 'evict', subject: 'me', author: 'me' }),
+    ], circleId: 'k1', viewerId: 'me', t });
+    expect(rows.filter((r) => r.actor === 'bot')).toEqual([]);
+  });
+
+  it('tells the viewer they were promoted / demoted', () => {
+    const rows = chatRows({ events: [
+      membership('r1', { kind: 'role', subject: 'me', author: 'admin', payload: { role: 'admin' } }, 10),
+      membership('r2', { kind: 'role', subject: 'me', author: 'admin', payload: { role: 'member' } }, 20),
+    ], circleId: 'k1', viewerId: 'me', t });
+    const texts = rows.filter((r) => r.actor === 'bot').map((r) => r.event.payload.text).sort();
+    expect(texts).toEqual(['circle.membership.you_are_no_longer_admin', 'circle.membership.you_are_now_admin']);
+  });
+
+  it('tells the ADMITTING admin that someone joined, naming them by handle', () => {
+    const rows = chatRows({
+      events: [membership('j1', { kind: 'join', subject: 'newbie', author: 'me' })],
+      circleId: 'k1', viewerId: 'me', t, members: [{ webid: 'newbie', handle: 'piet' }],
+    });
+    const notice = rows.find((r) => r.actor === 'bot');
+    expect(notice?.event.payload.text, 'named through the reveal ladder, in the app\'s own @handle form').toBe('circle.membership.someone_joined:@piet');
+  });
+
+  it('is derived, so it is idempotent by construction: the same log projects the same one row', () => {
+    const events = [membership('e1', { kind: 'evict', subject: 'me', author: 'admin' })];
+    const a = chatRows({ events, circleId: 'k1', viewerId: 'me', t });
+    const b = chatRows({ events, circleId: 'k1', viewerId: 'me', t });
+    expect(a.filter((r) => r.actor === 'bot')).toHaveLength(1);
+    expect(b.map((r) => r.id)).toEqual(a.map((r) => r.id));
+  });
+
+  it('conservation: a caller that passes no translator gets exactly the pre-existing rows', () => {
+    const rows = chatRows({ events: [chat, membership('e1', { kind: 'evict', subject: 'me', author: 'admin' })], circleId: 'k1', viewerId: 'me' });
+    expect(rows.filter((r) => r.actor === 'bot')).toEqual([]);
+  });
+});

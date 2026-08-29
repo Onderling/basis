@@ -108,7 +108,6 @@ import { oneToOneBotLabel } from '../../src/v2/botChat.js';
 // Telling someone the circle became theirs. The decision (WHO is told, and whether they have signed
 // for it yet) is shared; the shell only paints the line and carries the button.
 import { caretakerNotice } from '../../src/v2/caretakerNotice.js';
-import { sayRemovalNotice } from '../../src/v2/removalNotice.js';
 import { scopeCatalogueToApps } from '../../src/v2/circleCatalogueScope.js';
 // the default-deny capability gate applied at the user-dispatch waist (dispatchReady).
 import { effectiveCapabilities, checkCapability } from '../../src/v2/capabilityGate.js';
@@ -5848,24 +5847,9 @@ function showCircle(id, circle, policy) {
   // readable. A read-restriction would be a costume — the data is already on their disk and a client
   // that does not hide it is trivial — while the gate that actually binds already held: the key
   // rotated. Honesty is the deliverable, not restriction.
-  // The decision AND the write are shared (`sayRemovalNotice`), because a notice one shell can say and
-  // the other cannot is invariant 2 in its plainest form — and that is exactly what W23 was: this shell
-  // told a removed person, the phone told them nothing, and `removeMember` reported `told: true` either
-  // way. The `removalNoticeSaid` boolean that used to live here is gone: the entry id is the memory now,
-  // so it survives a reload and a reinstall instead of resetting with the module.
-  async function tellIfIWasRemoved(rawRoster) {
-    let statements = null;
-    try {
-      const rail = _peerAgent?.membershipRail;
-      if (rail && typeof rail.readVerifiedBodies === 'function') {
-        statements = (await rail.readVerifiedBodies(id))?.bodies ?? null;
-      }
-    } catch { statements = null; }
-    const said = sayRemovalNotice({
-      eventLog, circleId: id, members: rawRoster, myRef: myWebid || '', statements, t,
-    });
-    if (said) _circleRender?.rerender?.();
-  }
+  // Removal is no longer SAID here at all: the evict statement on the log is the notice, and `chatRows`
+  // renders it for the person it concerns (membershipNotices.js). The roster reload below still repaints.
+  async function tellIfIWasRemoved() { /* projection — nothing to write */ }
 
   // The act on that notice. Signing is what makes "acknowledged" mean the person SAW it, so it can
   // only ever be a tap — never something the render did on their behalf. The op derives the
@@ -6029,6 +6013,9 @@ function showCircle(id, circle, policy) {
           circles:   circlesCache,
           circleId:  id,
           kinds,
+          // Membership notices ("you were removed", "you are now an admin", "X joined") are RENDERED from
+          // the statements on the log by the shared projection; the translator is what lets it phrase them.
+          t,
           // The person-mute HIDE filter (mute lands + hides; unmute restores — the sitting's rule).
           excludeActors: circleMutedActors,
           // Sender labels through the reveal ladder (batch 4): the roster is the authority; the

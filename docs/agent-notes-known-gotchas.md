@@ -658,3 +658,20 @@ nothing else in the monorepo depends on falls through to the root lookup. Don't 
 → `200 47679663` in ~74 s cold. That separates "the bundle is broken" from "the device isn't connecting"
 before you touch a device.
 
+## vitest tolerates a MISSING named export that the browser refuses — a green suite over a page that will not boot
+
+Sibling of the Metro entry above, found the other way round (2026-08-29): `import { SHOW_REMOVAL_REASON }
+from './removalNotice.js'` where that name was a plain `const`, never exported. Every vitest suite that
+imported the module stayed green (46/46 in the file that used it), because vitest's ESM interop hands a
+missing named export back as `undefined`. Chromium does not: the page died at module load with
+
+    The requested module '/@fs/…/removalNotice.js' does not provide an export named 'SHOW_REMOVAL_REASON'
+
+and the web app never booted — `window.onderlingCall is not a function` from the walk harness was the
+only visible symptom, two layers away from the cause.
+
+**Consequences.** A suite cannot vouch for a module graph the browser will load; only a boot can. Before
+trusting a change that touches exports, load the page once and read the `pageerror` stream (the
+`bootProbe.mjs` idea: `page.on('pageerror', …)` + goto + 15s). The harness's `bootPeer` already refuses a
+dead boot, but only after the whole peer setup — the probe is 20 seconds and needs nothing else running.
+

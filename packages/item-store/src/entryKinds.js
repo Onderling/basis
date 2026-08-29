@@ -80,6 +80,14 @@ export const ENTRY_KINDS = Object.freeze({
   'audit-summary':   K(LANE.SYSTEM, false, RETAIN.AUDIT, true),
 });
 
+/**
+ * System-lane kinds a CONVERSATION still renders when an entry concerns the viewer — silent on the wire
+ * (`wakes: false` stands), shown to the one person it is about. "Silent" had been read as "invisible",
+ * and so a removed member was told nothing while every device held the signed statement that said so
+ * (2026-08-29). The conversation projection derives the line from the entry; nothing is appended.
+ */
+export const VIEWER_FACING_SYSTEM_KINDS = Object.freeze(['membership']);
+
 /** The conservative default for an unregistered kind — never wakes, never reads as conversation. */
 export const UNKNOWN_KIND = K(LANE.SYSTEM, false, RETAIN.SHORT, false);
 

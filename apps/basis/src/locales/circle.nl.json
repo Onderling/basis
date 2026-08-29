@@ -367,6 +367,18 @@
     "you_were_removed_reason": {
       "text": "Je bent geen lid meer van deze kring. Een beheerder heeft je verwijderd, met als reden: “{{reason}}”. Wat er al stond blijft van jou en kun je hier blijven lezen.",
       "doc": "UNUSED while SHOW_REMOVAL_REASON is false (decided 2026-08-28). Kept written so flipping that flag is a one-line change rather than a translation task — and so the wording is decided in the calm rather than at the moment someone wants the feature. The reason was typed by one person ABOUT another and never for their eyes, and the removed member has no channel left to answer it."
+    },
+    "you_are_now_admin": {
+      "text": "Je bent nu beheerder van deze kring.",
+      "doc": "Membership notice RENDERED from the log entry that concerns the viewer (no echo is written) — 2026-08-29."
+    },
+    "you_are_no_longer_admin": {
+      "text": "Je bent geen beheerder meer van deze kring.",
+      "doc": "Membership notice RENDERED from the log entry that concerns the viewer (no echo is written) — 2026-08-29."
+    },
+    "someone_joined": {
+      "text": "{{name}} is lid geworden van deze kring.",
+      "doc": "Membership notice RENDERED from the log entry that concerns the viewer (no echo is written) — 2026-08-29."
     }
   },
   "members_tab": {

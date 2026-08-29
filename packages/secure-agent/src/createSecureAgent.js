@@ -1041,6 +1041,24 @@ export async function createSecureAgent(opts = {}) {
     return { flushed };
   }
 
+  /**
+   * The CALLER's terms changed under the held messages — the address-fallback setting flipped, so a hold
+   * the circle's own scope caused (`no-eligible-route`) is now sendable. No peer event will ever flush
+   * that hold: the peer did not change, we did. Re-stamp every held entry's send options through
+   * `rescope` (the hold snapshots the scope it was sent under) and re-send them all.
+   */
+  async function flushHeld(rescope = null) {
+    let flushed = 0;
+    for (const [addr, q] of [...pendingHold]) {
+      if (typeof rescope === 'function') {
+        for (const entry of q.values()) {
+          try { entry.opts = rescope(entry.opts) ?? entry.opts; } catch { /* keep the terms it was held under */ }
+        }
+      }
+      flushed += (await flushPending(addr)).flushed;
+    }
+    return { flushed };
+  }
   async function flushPending(addr) {
     sweepExpiredHolds();
     const q = pendingHold.get(addr);
@@ -1650,7 +1668,20 @@ export async function createSecureAgent(opts = {}) {
       const name = pick === relayTransport ? 'relay'
         : pick === peerTransport ? 'nkn'
         : ([...extraTransports.entries()].find(([, t]) => t === pick)?.[0] ?? 'relay');
-      return { name, transport: pick, address: await addressFor(addr, name) };
+      // A transport that cannot carry per-circle addresses is only eligible here because the user
+      // accepted the address fallback. "Fallback" means exactly this: the bytes go to the PERSON's own
+      // address on that transport (the identity the roster bound the alias to); the envelope stays
+      // sealed to the alias, so what the recipient opens is unchanged. Aiming an alias-blind transport
+      // at the alias itself sends the message into the void — and NKN reports that as delivered.
+      const target = pick.supportsAliases === true ? addr : (peerIdentityOf.get(addr) ?? addr);
+      if (target !== addr && typeof console !== 'undefined') {
+        console.info(`[secure-agent] "${name}" cannot carry per-circle addresses — under the accepted fallback, `
+          + `${String(addr).slice(0, 16)}… goes to the person's own address ${String(target).slice(0, 16)}…`);
+      } else if (pick.supportsAliases !== true && typeof console !== 'undefined') {
+        console.warn(`[secure-agent] "${name}" cannot carry per-circle addresses and no identity is bound to `
+          + `${String(addr).slice(0, 16)}… — sending to the alias itself, which may reach nobody`);
+      }
+      return { name, transport: pick, address: await addressFor(target, name) };
     }
     return routeUnscoped(addr);
   }
@@ -1930,7 +1961,18 @@ export async function createSecureAgent(opts = {}) {
       console.warn(`[secure-agent] no identity registered for own address ${String(sendAs).slice(0, 16)}…`
         + ' — falling back to the canonical identity; per-circle signing is OFF for this send.');
     }
-    const speakAs = sendingIdentity ? sendAs : null;
+    // A transport that cannot carry per-circle addresses cannot carry one as the SENDER either: its
+    // authenticated wire sender is our canonical address, and it binds the envelope's `_from` to that
+    // (`senderBinding`) — a per-circle `_from` would be dropped on arrival as a spoof. Such a transport is
+    // only picked for circle traffic under the accepted address fallback, whose meaning is exactly this:
+    // on that transport the person speaks to the person. The payload is untouched — a circle statement
+    // inside it is still signed by the circle key and still verified against the roster on landing.
+    const aliasBlind = tx.supportsAliases !== true;
+    const speakAs = (sendingIdentity && !aliasBlind) ? sendAs : null;
+    if (sendingIdentity && aliasBlind && typeof console !== 'undefined') {
+      console.info(`[secure-agent] "${sel.name}" cannot carry per-circle addresses — speaking as the canonical `
+        + `identity for this send (the accepted address fallback), not as ${String(sendAs).slice(0, 16)}…`);
+    }
     if (!helloedPeers.has(helloKey(addr, speakAs))) {
       // The peer's key is known once its reciprocal HI has registered it at our
       // SecurityLayer.  Treated as "known" when there is no SecurityLayer to
@@ -1947,7 +1989,7 @@ export async function createSecureAgent(opts = {}) {
           // would make the peer file the wrong key under it and reject everything that follows.
           await tx.sendHello(
             wireAddr,
-            { pubKey: (sendingIdentity ?? identity).pubKey },
+            { pubKey: (speakAs ? sendingIdentity : identity).pubKey },
             speakAs ? { from: speakAs } : {},
           );
           if (typeof console !== 'undefined') {
@@ -2322,6 +2364,9 @@ export async function createSecureAgent(opts = {}) {
     // (0 when none) for diagnostics + tests.
     presenceSignal: (addr) => flushPresence(addr),
     heldFor: (addr) => pendingHold.get(addr)?.size ?? 0,
+    /** Our own terms changed (the address-fallback setting): re-stamp every held entry through `rescope`
+     *  and re-send it — see `flushHeld`. Resolves `{ flushed }` across all peers. */
+    flushHeld: ({ rescope = null } = {}) => flushHeld(rescope),
     /** Receipt-keyed removal: the peer's app confirmed `msgId` arrived, so every copy still held for
      *  them (any of their addresses) is obsolete. Per-peer, never global; not a drop, so not reported. */
     removeHeld: (a) => removeHeld(a),

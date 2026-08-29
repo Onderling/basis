@@ -774,9 +774,16 @@ addresses would mean one client per circle. Routing a circle over a transport th
 not fail loudly: it silently strips **member-level unlinkability**, since everyone in two of your circles
 would route to the same address. That is not a decision the router should take, so it is bound to the
 existing **per-user address fallback** (default off, offered with its cost): with the fallback off a circle
-whose points cannot carry per-circle addressing is honestly undeliverable; with it on, the user has
-accepted the trade and an NKN circle works. Same vocabulary as every other fallback in the product — no new
-concept, and the cost is stated where it is incurred.
+whose points cannot carry per-circle addressing is honestly undeliverable — and the person is *offered*
+the fallback the first time that holds a message, because holding silently is indistinguishable from the
+app being broken; with it on, the user has accepted the trade and an NKN circle works. Concretely, on such
+a transport the message goes **person to person on the wire** — to the identity the roster bound the
+member's alias to, and *from* the canonical identity, since the transport binds the sender it authenticated
+to the envelope's `_from` and would drop a per-circle one as a spoof — while the circle statement inside is
+still signed by the circle key and roster-verified on landing. Accepting also re-drives what was held under
+the old terms: those holds wait on *us*, not on the peer, so no presence signal would ever release them.
+Same vocabulary as every other fallback in the product — no new concept, and the cost is stated where it
+is incurred.
 
 **A different address is not enough on its own: a circle also signs with its own key.** A member holds a
 **per-circle identity** derived from the profile seed (`circleIdentity`), and it is that key — not the

@@ -274,8 +274,27 @@ test('transports 4 — the relay DIES mid-conversation (nothing reloaded)', asyn
       return;
     }
     await sendChat(A.page, 'NA-DE-DOOD');
-    // NKN is already connected here (both peers booted `both` and nothing reloaded), so this should not
-    // need a cold bootstrap. Poll long enough that a slow rung still counts, and report WHEN.
+    // The circle rides the relay; NKN cannot carry per-circle addresses; the address-fallback setting is
+    // off. So the send is HELD, on purpose — and the user's two existing choices settle what happens next:
+    // the sender must be OFFERED the fallback in the conversation, and accepting it must carry what was
+    // held. Silent holding is indistinguishable from the app being broken.
+    const OFFER = /Sommige berichten komen niet aan|Some messages are not getting through/;
+    let offerSeen = false;
+    for (let i = 0; i < 12 && !offerSeen; i += 1) {
+      await A.page.waitForTimeout(2500);
+      offerSeen = (await readBubbles(A.page)).some((t) => OFFER.test(t));
+    }
+    log('live-drop · is the sender OFFERED the fallback?', offerSeen ? 'PASS' : 'FINDING',
+      offerSeen ? 'the offer appeared in the conversation' : 'held silently — no offer within 30s');
+    expect(offerSeen, 'a hold the circle\'s own terms caused must be offered to the sender').toBe(true);
+    const sinceAccept = everything.length;
+    await A.page.locator('.circle-view__bubble-action', { hasText: /Terugval toestaan|Allow fallback/ }).first().click();
+    await A.page.waitForTimeout(10_000);
+    log('live-drop · what the sender sees after accepting', 'OBSERVED', JSON.stringify((await readBubbles(A.page)).slice(-3)));
+    log('live-drop · what the agents said after accepting', 'OBSERVED', everything.slice(sinceAccept)
+      .filter((t) => /secure-agent|security|addressing|failing over|flush|holding|Relay|nkn|NKN|fallback|reject|drop|verify/i.test(t)).slice(0, 30).join('\n'));
+    // Accepted. NKN is already connected here (both peers booted `both` and nothing reloaded), so this
+    // should not need a cold bootstrap. Poll long enough that a slow rung still counts, and report WHEN.
     let arrivedAfter = null;
     for (let i = 1; i <= 18; i += 1) {
       await B.page.waitForTimeout(5000);
@@ -285,8 +304,13 @@ test('transports 4 — the relay DIES mid-conversation (nothing reloaded)', asyn
     log('live-drop · does the ladder step down while the app is running?',
       arrivedAfter ? 'PASS' : 'FINDING',
       arrivedAfter
-        ? `it arrived after ~${arrivedAfter}s on NKN, with nothing reloaded`
-        : 'nothing in 90s — a live relay death is not survived, only a cold boot without one');
+        ? `it arrived after ~${arrivedAfter}s on NKN once the fallback was accepted, with nothing reloaded`
+        : 'nothing in 90s after accepting — the held message was not carried by the accepted fallback');
+    if (!arrivedAfter) {
+      log('live-drop · everything the agents said between accepting and giving up', 'OBSERVED', everything.slice(sinceAccept)
+        .filter((t) => /secure-agent|security|addressing|failing over|flush|holding|nkn|NKN|fallback|reject|drop|verify|peer\]/i.test(t)).slice(0, 40).join('\n'));
+    }
+    expect(arrivedAfter, 'accepting the fallback must carry the message that was held').not.toBeNull();
     // The transport's own words settle WHERE it stops: a send that throws produces "failing over"; a send
     // that reports success into a dead socket produces silence, and that is a different fix.
     const said = [...new Set(lines.filter((t) => /failing over|failed for|routing across|relay/i.test(t)))];
@@ -294,10 +318,12 @@ test('transports 4 — the relay DIES mid-conversation (nothing reloaded)', asyn
     // The unfiltered record, so the NEXT reading of this run can be from evidence rather than absence.
     log('live-drop · EVERY console line after the drop (both peers)', 'OBSERVED',
       `${everything.length} lines\n` + everything.slice(0, 80).join('\n'));
-    log('live-drop · did any send report a failure at all?',
-      said.some((t) => /failing over|failed for/i.test(t)) ? 'PASS' : 'FINDING',
+    // Settled 2026-08-29: nothing is sent INTO the dead relay at all. The circle's scoped route sees no
+    // eligible transport (the relay is down, NKN cannot carry per-circle addresses) and HOLDS — which is
+    // what the offer above is for. A "failing over" line here would mean something else changed.
+    log('live-drop · was the dead relay ever tried?', 'OBSERVED',
       said.some((t) => /failing over|failed for/i.test(t))
-        ? 'the send threw and the ladder was asked to step down'
-        : 'no failure line — the send into the dead relay reported success, so nothing asked the ladder');
+        ? 'a send threw and the ladder stepped down'
+        : 'no — the scoped route held instead of sending into it (by design; the offer is the recovery)');
   } finally { await teardown(peers); }
 });

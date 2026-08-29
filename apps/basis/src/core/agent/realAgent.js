@@ -225,6 +225,11 @@ const SEED_HOUSEHOLD_ITEMS = [
  * }>}
  */
 export async function createRealHouseholdAgent(opts = {}) {
+  /** The user's address-fallback setting, read LIVE (the host hands a getter) — every send asks, and so
+   *  does the re-drive of messages that were held under the previous answer. */
+  const addressFallbackOn = () => (typeof opts.allowAddressFallback === 'function'
+    ? opts.allowAddressFallback() !== false
+    : opts.allowAddressFallback !== false);
   // Part G household — REAL `apps/household` store.  `chores`-as-an-array is
   // gone; all household state now lives in this `ItemStore`-backed store
   // (shopping/errand/repair/schedule items + tasks + contacts).
@@ -2318,9 +2323,7 @@ export async function createRealHouseholdAgent(opts = {}) {
       const { circleId, ...rest } = sendOpts;
       if (circleId == null) return sa.peer.sendTo(to, envelope, { guarantee: 'hold-forward', ...rest });
       const points = opts.circlePointsFor?.(circleId) ?? [];
-      const fallbackOn = typeof opts.allowAddressFallback === 'function'
-        ? opts.allowAddressFallback() !== false
-        : opts.allowAddressFallback !== false;
+      const fallbackOn = addressFallbackOn();
       // Decision 4 — sign this circle's traffic as this circle's identity, not as the person.
       // `sendAs` is an ADDRESS of ours; the key behind it never leaves the SecurityLayer, and the
       // transport layer below never learns that a circle was involved. Installing here as well as at
@@ -4582,6 +4585,17 @@ export async function createRealHouseholdAgent(opts = {}) {
     /** Diagnostics: how many messages are currently held for a peer. */
     heldFor(targetAddress) {
       return sa.heldFor(targetAddress);
+    },
+    /**
+     * The address-fallback setting changed under held messages. A message held because its circle had no
+     * route it MAY use is waiting on us, not on the peer — no presence signal will release it. Re-stamp
+     * every hold with the terms as they are NOW (the same live read each send makes) and re-send.
+     */
+    retryHeldUnderCurrentTerms() {
+      const requireAliasCapable = !addressFallbackOn();
+      return sa.flushHeld?.({
+        rescope: (o) => (o?.scope ? { ...o, scope: { ...o.scope, requireAliasCapable } } : o),
+      }) ?? Promise.resolve({ flushed: 0 });
     },
     /** Receipt-keyed hold removal (per peer + msgId) — the receipt receiver's outbox hook. */
     removeHeld(a) {

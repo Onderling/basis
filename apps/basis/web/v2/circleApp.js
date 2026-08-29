@@ -143,7 +143,7 @@ import { renderCircleMyData } from './circleMyData.js';
 import { connectionRows, connectionOpChoices, connectionSectionChoices, compileConnectionGrant } from '../../src/v2/connections.js';
 import { parsePairingOffer } from '../../src/v2/connectionPairing.js';
 import {
-  createDeliverySettingsStore, localStorageDeliveryIo, withDelivery, makeReceiptSender, makeReceiptReceiver, rehydrateDeliveryState,
+  createDeliverySettingsStore, localStorageDeliveryIo, setDeliverySettingsChangedHook, withDelivery, makeReceiptSender, makeReceiptReceiver, rehydrateDeliveryState,
 } from '../../src/v2/deliverySettings.js';
 import { createFallbackOffer } from '../../src/v2/addressFallback.js';
 import { setAddressFallbackReportHook } from '@onderling-app/stoop';
@@ -1322,6 +1322,14 @@ let   deliverySettingsCache = { sendReceipts: true, allowFallback: false };
 // this cache (`allowAddressFallback` below); until now the cache refreshed only when My-data opened or
 // a toggle flipped, so a stored `allowFallback: true` did not reach the send path after a reload.
 deliverySettingsStore.get().then((s) => { deliverySettingsCache = s; }).catch(() => { /* keep defaults */ });
+// Whichever door flipped the setting (the offer's button, the My-data toggle): the cache the agent reads
+// follows, and a fallback that just came ON re-drives what was held under the old terms — those holds are
+// waiting on us, not on a peer, so nothing else would ever release them.
+setDeliverySettingsChangedHook((s) => {
+  const cameOn = s.allowFallback && !deliverySettingsCache.allowFallback;
+  deliverySettingsCache = s;
+  if (cameOn) Promise.resolve(_peerAgent?.retryHeldUnderCurrentTerms?.()).catch(() => { /* holds stay held */ });
+});
 // Per-message state lives in the SHARED map (δ.2, both shells) — see deliverySettings.js for why there is
 // no second store.
 const deliveryByMessageId  = { get: (id) => deliveryStateMap.get(id) };

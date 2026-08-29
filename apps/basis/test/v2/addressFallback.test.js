@@ -139,3 +139,18 @@ describe('the offer — rule 3: never the fix without its cost', () => {
     expect(offer.blockedPeers()).toBe(0);
   });
 });
+
+describe('the offer — a route the circle may NOT use is a standing fact, not a person being offline', () => {
+  it('offers on the FIRST person when the block is the circle having no eligible route', () => {
+    // Rule 1 counts PEOPLE because one unreachable person is usually just offline. A send that was held
+    // because the circle's own connection points cannot carry per-circle addressing — and the setting
+    // forbids the fallback — is not about the person at all: every message to everyone in that circle
+    // will hold the same way until the user decides. Waiting for a second person there means a
+    // two-person circle (the common one) is never offered anything, and holds silently forever.
+    const onOffer = vi.fn();
+    const offer = createFallbackOffer({ onOffer, now: () => T0 });
+    offer.report({ blocked: true, webid: 'ada', via: 'blocked-by-transport' });
+    expect(onOffer).toHaveBeenCalledTimes(1);
+    expect(onOffer.mock.calls[0][0].peers).toBe(1);
+  });
+});

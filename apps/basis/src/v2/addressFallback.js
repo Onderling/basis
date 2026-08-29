@@ -66,6 +66,11 @@ export function createFallbackOffer({
   /** Distinct peers we could not reach because the setting is off. Peers, not messages: ten to one person
    *  is one person being unreachable, and counting messages would fire on a single retry loop. */
   const blocked = new Set();
+  /** The block was the circle having NO route it may use (`via: 'blocked-by-transport'`). That is a standing
+   *  fact about this device's terms, not about the person — every message to everyone in that circle holds
+   *  the same way until the user decides — so one such report is evidence enough. Counting people here would
+   *  leave a two-person circle, the common one, holding silently forever. */
+  let standing = false;
   let declinedAt = typeof state?.declinedAt === 'number' ? state.declinedAt : 0;
   let offered = false;
 
@@ -78,6 +83,7 @@ export function createFallbackOffer({
       const who = info.webid ?? info.circleId ?? null;
       if (!who) return;
       blocked.add(who);
+      if (info.via === 'blocked-by-transport') standing = true;
       if (offered || !this.shouldOffer()) return;
       offered = true;
       try {
@@ -93,7 +99,7 @@ export function createFallbackOffer({
 
     /** Enough evidence, and not recently declined. */
     shouldOffer() {
-      if (blocked.size < afterPeers) return false;          // rule 1
+      if (blocked.size < afterPeers && !standing) return false;   // rule 1 — unless the block is standing
       return now() - declinedAt >= cooldownMs;              // rule 2
     },
 
@@ -101,12 +107,12 @@ export function createFallbackOffer({
     decline() { declinedAt = now(); offered = false; persist(); },
 
     /** They said yes. Clear the evidence; if it recurs, that is new information. */
-    accept() { blocked.clear(); declinedAt = 0; offered = false; persist(); },
+    accept() { blocked.clear(); standing = false; declinedAt = 0; offered = false; persist(); },
 
     /** Distinct peers currently unreachable because of the setting. */
     blockedPeers: () => blocked.size,
 
     /** Forget everything (a sign-out, a profile switch). */
-    reset() { blocked.clear(); offered = false; },
+    reset() { blocked.clear(); standing = false; offered = false; },
   };
 }

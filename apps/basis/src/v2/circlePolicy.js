@@ -8,6 +8,7 @@
  * (pod `shared.json` per the cross-app-settings convention) is wired by
  * the host on top — kept out of here so it stays unit-testable + portable.
  */
+import { DEFAULT_NOTICES, normalizeNotices, normalizeNoticeOverride } from './noticeSettings.js';
 import { CIRCLE_STORAGE_POSTURE_NAMES } from '@onderling/pod-routing';
 
 
@@ -206,6 +207,9 @@ export const DEFAULT_CIRCLE_POLICY = {
   // Phase 4 §5 (L4) — per-action decision-class map (admin-set). Absent action ⇒ its
   // DEFAULT_GOVERNANCE class. See governanceDecision.js for the resolver.
   governance:       { ...DEFAULT_GOVERNANCE },
+  // Decision 4 (2026-08-29) — which rendered notices (membership / governance) the conversation shows by
+  // default; every member may override privately per circle (`normalizeMemberOverride.notices`).
+  notices:          { ...DEFAULT_NOTICES },
   // Connectivity Phase 4 §7/§9 — member↔member private chat (noticeboard/DM). Off by default
   // (conservative); the settings surface only lets an admin enable it when the circle's route
   // supports a peer pairwise key (relay/rendezvous available), greyed under pod-only (no relay).
@@ -393,6 +397,7 @@ export function normalizeCirclePolicy(stored = {}) {
     // LEGACY LIFT (the decision-kind unification): a stored `consensusRequired: true` becomes
     // `changePolicy: 'admin-quorum'` unless the map already says otherwise — the boolean gated
     // exactly this question and is retired from the policy shape.
+    notices:            normalizeNotices(p.notices),
     governance:         normalizeGovernance(
       p.consensusRequired === true && !(p.governance && p.governance.changePolicy)
         ? { ...(p.governance ?? {}), changePolicy: 'admin-quorum' }
@@ -431,6 +436,7 @@ export function mergeCirclePolicy(base, patch = {}) {
 export const DEFAULT_MEMBER_OVERRIDE = {
   chatOff:            false,
   revealOpen:         false,
+  notices:            {},   // decision 4 — my private per-kind notice choices (partial)
   agentsMayContactMe: true,
   // per-circle push toggles. α.5b extends the v0
   // mention/message pair with two more types: noticeboard/agenda/task
@@ -459,6 +465,8 @@ export function normalizeMemberOverride(stored = {}) {
   return {
     chatOff:            !!o.chatOff,
     revealOpen:         !!o.revealOpen,
+    // Decision 4 — my private per-kind choice over the circle's notice defaults (partial: only what I set).
+    notices:            normalizeNoticeOverride(o.notices),
     agentsMayContactMe: typeof o.agentsMayContactMe === 'boolean' ? o.agentsMayContactMe : true,
     push: {
       onMention:      typeof ps.onMention      === 'boolean' ? ps.onMention      : true,
@@ -482,6 +490,7 @@ export function mergeMemberOverride(base, patch = {}) {
     ...b,
     ...patch,
     push:        { ...b.push,        ...(patch.push        || {}) },
+    notices:     { ...b.notices,     ...(patch.notices     || {}) },
     flowThrough: { ...b.flowThrough, ...(patch.flowThrough || {}) },
   });
 }

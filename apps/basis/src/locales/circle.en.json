@@ -2029,6 +2029,14 @@
     "governanceEnactment": {
       "text": "When is an approved decision carried out?",
       "doc": "Governance-enactment axis: who turns an approved vote into the real action, and when."
+    },
+    "notices": {
+      "text": "Lines the conversation shows",
+      "doc": "Circle settings: the admin default per rendered-notice kind (decision 4)."
+    },
+    "notices_hint": {
+      "text": "Rendered from the circle’s record, never sent. Members can turn any of these off for themselves.",
+      "doc": "Circle settings: the admin default per rendered-notice kind (decision 4)."
     }
   },
   "override": {
@@ -2075,6 +2083,10 @@
     "calendarToPersonal": {
       "text": "Calendar → my calendar",
       "doc": "Override: circle events also show in my calendar."
+    },
+    "notices": {
+      "text": "Lines I want to see",
+      "doc": "Member override: the private per-kind choice over the circle’s notice defaults (decision 4)."
     }
   },
   "member": {
@@ -5482,5 +5494,27 @@
   "boot_failed": {
     "text": "The app could not start ({reason}). Your data is still on this device — nothing here is empty, it is unread.",
     "doc": "Launcher: a failed agent boot is SAID where the person looks, instead of degrading into \"No circles yet.\" (the walk's W28/W29)."
+  },
+  "notices": {
+    "removed": {
+      "text": "You were removed",
+      "doc": "Decision 4 — a notice kind the conversation renders from the log; a toggle label in circle settings (admin default) and in the member override."
+    },
+    "promoted": {
+      "text": "You became an admin",
+      "doc": "Decision 4 — a notice kind the conversation renders from the log; a toggle label in circle settings (admin default) and in the member override."
+    },
+    "demoted": {
+      "text": "You are no longer an admin",
+      "doc": "Decision 4 — a notice kind the conversation renders from the log; a toggle label in circle settings (admin default) and in the member override."
+    },
+    "joined": {
+      "text": "Someone joined (admins)",
+      "doc": "Decision 4 — a notice kind the conversation renders from the log; a toggle label in circle settings (admin default) and in the member override."
+    },
+    "decisionOpened": {
+      "text": "A decision opened",
+      "doc": "Decision 4 — a notice kind the conversation renders from the log; a toggle label in circle settings (admin default) and in the member override."
+    }
   }
 }

@@ -187,6 +187,7 @@ import { makeChatPeerHandler, makePodChatCatchUp, CHAT_STATEMENT_BROADCAST, CHAT
 import { wireEventLogPersistence, backendSnapshotIo } from '../../src/v2/eventLogPersistence.js';
 import { buildSubjectLabeler } from '../../src/v2/governanceView.js';
 import { governanceEntryId, foldGovernance } from '../../src/v2/governanceLog.js';
+import { noticeWants } from '../../src/v2/noticeSettings.js';
 import { reportEntryId } from '../../src/v2/reportModel.js';
 import { makeCircleGovernancePeerHandler, makeCircleReportPeerHandler } from '../../src/v2/circleLogReceiver.js';
 import { renderGovernancePanel } from './circleGovernancePanel.js';
@@ -5535,6 +5536,8 @@ async function runHelpLlm(id, query) {
   postHelpTopicChips(id);
 }
 
+let _openOverride = {};   // the open circle's member override (my private per-circle choices), read at open
+
 async function showDetail(id) {
   hideCircleTabBar(tabBarEl);
   setActiveCircle(id);
@@ -5555,6 +5558,7 @@ async function showDetail(id) {
   let detailPolicy = null;
   try { detailPolicy = await policyStore.get(id); }
   catch { /* fresh circle / read failure → fall through */ }
+  try { _openOverride = (await overrideStore.get(id)) ?? {}; } catch { _openOverride = {}; }
   showCircle(id, circle, detailPolicy);
 }
 
@@ -6047,9 +6051,12 @@ function showCircle(id, circle, policy) {
           circles:   circlesCache,
           circleId:  id,
           kinds,
-          // Membership notices ("you were removed", "you are now an admin", "X joined") are RENDERED from
-          // the statements on the log by the shared projection; the translator is what lets it phrase them.
+          // Membership + governance notices ("you were removed", "you are now an admin", "X joined", "a
+          // decision opened") are RENDERED from the statements on the log by the shared projection; the
+          // translator is what lets it phrase them, and `wants` is the person's per-kind setting (decision 4:
+          // the circle's default, overridden privately).
           t,
+          wants: noticeWants({ policy, override: _openOverride }),
           // The person-mute HIDE filter (mute lands + hides; unmute restores — the sitting's rule).
           excludeActors: circleMutedActors,
           // Sender labels through the reveal ladder (batch 4): the roster is the authority; the
@@ -6978,17 +6985,9 @@ const resealPersonaMediaForCircle = makeResealMediaForCircle({
 // When the governance panel is open, an ingested peer event re-renders it live (set by
 // showGovernance's rerender; nulled on back). null ⇒ panel closed, nothing to refresh.
 let _govRerender = null;
-// In-app nudge when a DECISION OPENS on another device (governanceWakeHint gates this to
-// `propose`, not every vote). Lands in the /logs + Stream notification firehose. The OS
-// wake (backgrounded device) rides the relay fan separately (see REMAINING-WORK).
-function govNotify(circleId, event) {
-  try {
-    eventLog.append({
-      id: `gov-notif-${governanceEntryId(event)}`, ts: Date.now(), app: 'basis', type: 'notification', circleId,
-      payload: { message: t('circle.governance.notify_vote_opened', { action: t(`circle.governance.action.${event.action}`) }) },
-    });
-  } catch { /* best-effort */ }
-}
+// "A decision opened" is RENDERED from the proposal statement on the log (`governanceNotices.js`, through
+// `chatRows`) — the appended `gov-notif` nudge that used to live here is retired (2-TER's rule: no write
+// whose payload is derivable from an entry already on the log). `type: 'notification'` keeps its real job.
 function govBroadcast(channel, circleId, event, opts) {
   const op = channel === 'report' ? 'broadcastCircleReport' : 'broadcastCircleGovernance';
   const msgId = channel === 'report' ? reportEntryId(event) : (event?.body?.hash ? `gov:${event.body.hash}` : governanceEntryId(event));
@@ -7150,7 +7149,7 @@ async function showOverride(id) {
     policy: circlePolicy,
     onChange: (patch) => { working = mergeMemberOverride(working, patch); rerender(); },
     onBack: () => showDetail(id),
-    onSave: async () => { await overrideStore.update(id, working); showDetail(id); },
+    onSave: async () => { _openOverride = await overrideStore.update(id, working); showDetail(id); },
   });
   rerender();
 }
@@ -8033,7 +8032,7 @@ async function boot() {
             // pre-scan; no-op for vote churn), then re-render.
             applyRulesUpdates({ rail: govShellRail, callSkill: rawCallSkill, circleId: cid }).catch(() => {});
             if (getActiveCircle() === cid) _govRerender?.();
-          }, notify: govNotify }),
+          } }),
           'circle-report-broadcast':     makeCircleReportPeerHandler({ eventLog, onChange: (cid) => { if (getActiveCircle() === cid) _govRerender?.(); } }),
           // Calendar INBOUND — receive what the fan-out sends. invite persists
           // the event locally (→ shows on the calendar surface) + a circle

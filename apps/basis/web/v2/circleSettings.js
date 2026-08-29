@@ -19,7 +19,7 @@
  * `title` opt).
  */
 import { CIRCLE_FEATURES, CIRCLE_POLICY_ENUMS } from '../../src/v2/circlePolicy.js';
-import { conversationKindsRows } from '../../src/v2/conversationKinds.js';
+import { multiControlRows } from '../../src/v2/settingsMultiRows.js';
 import { renderThemeToggle } from './themeToggle.js';
 // Phase 4 §9 — the settings-surface CONTROLS + the `enabledWhen` fold (route × capability).
 import { resolveControlEnablement } from '../../src/v2/circleSettingsControls.js';
@@ -521,10 +521,7 @@ function renderConnectionControls(container, { controls, policy, transport, tr, 
       lab.className = 'circle-settings__control-label';
       lab.textContent = tr(ctl.labelKey);
       row.appendChild(lab);
-      for (const r of conversationKindsRows({
-        circleSetting: policy?.conversationKinds ?? null,
-        templateKind:  policy?.kind ?? null,
-      })) {
+      for (const r of multiControlRows(ctl, policy)) {
         const orow = document.createElement('label');
         orow.className = 'circle-settings__control-opt';
         const box = document.createElement('input');

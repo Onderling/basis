@@ -2029,6 +2029,14 @@
     "governanceEnactment": {
       "text": "Wanneer wordt een aangenomen besluit uitgevoerd?",
       "doc": "Uitvoerings-as: wie zet een aangenomen stemming om in de echte actie, en wanneer."
+    },
+    "notices": {
+      "text": "Regels die het gesprek laat zien",
+      "doc": "Circle settings: the admin default per rendered-notice kind (decision 4)."
+    },
+    "notices_hint": {
+      "text": "Afgeleid uit het kringdossier, nooit verstuurd. Leden kunnen elk hiervan voor zichzelf uitzetten.",
+      "doc": "Circle settings: the admin default per rendered-notice kind (decision 4)."
     }
   },
   "override": {
@@ -2075,6 +2083,10 @@
     "calendarToPersonal": {
       "text": "Agenda → mijn agenda",
       "doc": "Override: circle events also show in my calendar."
+    },
+    "notices": {
+      "text": "Regels die ik wil zien",
+      "doc": "Member override: the private per-kind choice over the circle’s notice defaults (decision 4)."
     }
   },
   "member": {
@@ -5482,5 +5494,27 @@
   "boot_failed": {
     "text": "De app kon niet starten ({reason}). Je gegevens staan nog op dit apparaat — er is niets weg, het is alleen niet ingelezen.",
     "doc": "Launcher: a failed agent boot is SAID where the person looks, instead of degrading into \"No circles yet.\" (the walk's W28/W29)."
+  },
+  "notices": {
+    "removed": {
+      "text": "Je bent verwijderd",
+      "doc": "Decision 4 — a notice kind the conversation renders from the log; a toggle label in circle settings (admin default) and in the member override."
+    },
+    "promoted": {
+      "text": "Je bent beheerder geworden",
+      "doc": "Decision 4 — a notice kind the conversation renders from the log; a toggle label in circle settings (admin default) and in the member override."
+    },
+    "demoted": {
+      "text": "Je bent geen beheerder meer",
+      "doc": "Decision 4 — a notice kind the conversation renders from the log; a toggle label in circle settings (admin default) and in the member override."
+    },
+    "joined": {
+      "text": "Iemand is erbij gekomen (beheerders)",
+      "doc": "Decision 4 — a notice kind the conversation renders from the log; a toggle label in circle settings (admin default) and in the member override."
+    },
+    "decisionOpened": {
+      "text": "Er is een besluit geopend",
+      "doc": "Decision 4 — a notice kind the conversation renders from the log; a toggle label in circle settings (admin default) and in the member override."
+    }
   }
 }

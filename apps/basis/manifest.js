@@ -637,6 +637,15 @@ export const basisManifest = {
           hintKey: 'circle.settings.conversationKinds_hint',
           enabledWhen: 'always',
         },
+        // Decision 4 — the per-kind "tell me" default for the lines the conversation renders from the
+        // log (removed / promoted / demoted / someone joined / a decision opened); members override privately.
+        {
+          id: 'notices', kind: 'multi', scope: 'circle', policyField: 'notices',
+          optionsFrom: 'notices', adminOnly: true,
+          labelKey: 'circle.settings.notices',
+          hintKey: 'circle.settings.notices_hint',
+          enabledWhen: 'always',
+        },
         // Member↔member private chat — circle-policy field; enabled only when a relay/rendezvous
         // route can carry the peer pairwise key (§7). Greys out under pod-only (no relay).
         {

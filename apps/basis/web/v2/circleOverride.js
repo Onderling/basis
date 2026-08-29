@@ -11,6 +11,7 @@
  * manifest `sources`, list the OPT-OUTABLE capabilities (admin freedom 'optional' or a privacy floor)
  * and let the member decline them. Declining writes `capabilityOptOuts`; the same gate then refuses them.
  */
+import { noticeOverrideRows } from '../../src/v2/noticeSettings.js';
 import { buildCapabilityMatrix } from '@onderling/app-manifest';
 
 const TOP_TOGGLES = ['chatOff', 'revealOpen', 'agentsMayContactMe'];
@@ -71,6 +72,24 @@ export function renderCircleOverride(container, { override, t, onChange, onBack,
     }));
   }
   container.appendChild(pushSec);
+  // Decision 4 — the lines the conversation renders from the log, per kind: the circle's default, and my
+  // private choice over it. `on` is the effective answer; the patch carries only the kind I touched.
+  const noticeSec = document.createElement('section');
+  noticeSec.className = 'circle-override__notices';
+  const noticeTitle = document.createElement('h3');
+  noticeTitle.className = 'circle-override__section-title';
+  noticeTitle.textContent = tr('circle.override.notices');
+  noticeSec.appendChild(noticeTitle);
+  for (const r of noticeOverrideRows({ policy, override })) {
+    noticeSec.appendChild(toggleRow({
+      cls: 'circle-override__notice-toggle',
+      key: r.kind,
+      checked: r.on,
+      label: tr(r.labelKey),
+      onToggle: () => emit({ notices: r.next }),
+    }));
+  }
+  container.appendChild(noticeSec);
 
   const flowSec = document.createElement('section');
   flowSec.className = 'circle-override__flow';

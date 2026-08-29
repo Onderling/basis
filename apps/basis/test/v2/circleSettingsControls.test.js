@@ -15,7 +15,7 @@ const CONTROLS = settingsControlsFromManifest(basisManifest);
 describe('§9 settings controls — declared on the manifest (invariant #4)', () => {
   it('the settings op carries its controls, declared in the manifest', () => {
     const ids = CONTROLS.map((c) => c.id);
-    expect(ids).toEqual(['transport-mode', 'relay-endpoint', 'wake-nudges', 'conversation-kinds', 'private-dm']);
+    expect(ids).toEqual(['transport-mode', 'relay-endpoint', 'wake-nudges', 'conversation-kinds', 'notices', 'private-dm']);
   });
 
   it('the conversation-kinds control resolves its options from the registry, not from the manifest', () => {
@@ -27,6 +27,10 @@ describe('§9 settings controls — declared on the manifest (invariant #4)', ()
       optionsFrom: 'conversationKinds', adminOnly: true,
     });
     expect(ck.of, 'a frozen option list would drift from the registry').toBeUndefined();
+  });
+  it('the notices control (decision 4) is a multi control over the shared notice-kind list', () => {
+    const n = CONTROLS.find((c) => c.id === 'notices');
+    expect(n).toMatchObject({ kind: 'multi', scope: 'circle', policyField: 'notices', optionsFrom: 'notices', adminOnly: true });
   });
   it('the private-DM control is a circle-policy toggle gated by the relayRoute predicate', () => {
     const dm = CONTROLS.find((c) => c.id === 'private-dm');

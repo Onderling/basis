@@ -14,6 +14,7 @@
 import { taskRowProvenance } from './streamActions.js';
 import { isSilentEntry } from '../eventLog.js';
 import { membershipNoticeRows } from './membershipNotices.js';
+import { governanceNoticeRows } from './governanceNotices.js';
 import { revealedMemberLabel } from './circleViewAs.js';
 
 /**
@@ -203,7 +204,10 @@ export function chatRows(opts = {}) {
   // The membership lines a person is owed — RENDERED from the statements already on the log, never
   // appended (see membershipNotices.js). Conservation: a caller with no translator gets the old rows.
   if (typeof t === 'function' && typeof viewerId === 'string' && viewerId && typeof rest.circleId === 'string') {
-    const notices = membershipNoticeRows({ events: rest.events, circleId: rest.circleId, viewerId, members, t, wants });
+    const notices = [
+      ...membershipNoticeRows({ events: rest.events, circleId: rest.circleId, viewerId, members, t, wants }),
+      ...governanceNoticeRows({ events: rest.events, circleId: rest.circleId, viewerId, t, wants }),
+    ];
     if (notices.length) rows = [...rows, ...notices].sort((a, b) => b.ts - a.ts);
   }
   // Conservation: a caller that passes no roster gets exactly the pre-existing rows.

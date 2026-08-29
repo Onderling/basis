@@ -23,13 +23,21 @@ import App from './App.js';
 // resolves null and the task reports NoData — a safe miss, retried next interval.
 export const BASIS_BG_TASK_NAME = 'basis-mobile-sync-background';
 
-// Guarded AND lazy: a dev client built BEFORE expo-task-manager was added has no native module
-// for it, and Expo modules can throw at IMPORT time — so both the import and the definition sit
-// behind the guard. Degrades to a no-op (foreground sync unaffected); a dev-client rebuild
-// enables the OS schedule. Expo registers bundle-load tasks before any headless launch uses
-// them, and this IIFE runs in the same tick, so the "define at bundle load" contract holds.
+// Guarded, lazy, AND probed: a dev client built BEFORE expo-task-manager was added has no native module
+// for it, and Expo modules can throw at IMPORT time — so both the import and the definition sit behind
+// the guard. The try/catch is not enough on its own: a missing native module is reported by the NATIVE
+// layer, so the JS catch runs (its warn is in logcat) and the dev client STILL shows a full-screen redbox
+// on every launch. `requireOptionalNativeModule` answers null instead of throwing, and nothing is
+// reported — which is what "degrades to a no-op" was always meant to mean. Foreground sync is unaffected;
+// a dev-client rebuild enables the OS schedule. Expo registers bundle-load tasks before any headless
+// launch uses them, and this IIFE runs in the same tick, so the "define at bundle load" contract holds.
 (async () => {
   try {
+    const { requireOptionalNativeModule } = await import('expo-modules-core');
+    if (!requireOptionalNativeModule('ExpoTaskManager')) {
+      console.log('[bg-fetch] task definition skipped (native module absent — rebuild the dev client to enable)');
+      return;
+    }
     const TaskManager = await import('expo-task-manager');
     const { defineBackgroundTask, bgRunOnce } = await import('@onderling/sync-engine-rn');
     defineBackgroundTask({ TaskManager, taskName: BASIS_BG_TASK_NAME, runOnce: bgRunOnce });

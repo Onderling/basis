@@ -27,6 +27,14 @@ export async function wireBackgroundSync({ runOnce } = {}) {
   if (typeof runOnce !== 'function') throw new Error('wireBackgroundSync: runOnce function required');
   setBgRunOnce(runOnce);
   try {
+    // Probe before importing. `expo-background-fetch` pulls in the native TaskManager, and a MISSING
+    // native module is reported by the NATIVE layer — so the catch below swallows the throw while the
+    // dev client still shows a full-screen redbox on every launch (2026-08-29, on the first device run
+    // after the peer-wiring fix let this line be reached at all). A null probe is silent, which is what
+    // "swallowed, not fatal" was always meant to mean. Under vitest/node the probe import itself throws
+    // and the catch answers the same `registered: false`.
+    const { requireOptionalNativeModule } = await import('expo-modules-core');
+    if (!requireOptionalNativeModule('ExpoTaskManager')) return { wired: true, registered: false };
     const BackgroundFetch = await import('expo-background-fetch');
     await registerBackgroundFetch({ BackgroundFetch, taskName: BASIS_BG_TASK_NAME });
     return { wired: true, registered: true };

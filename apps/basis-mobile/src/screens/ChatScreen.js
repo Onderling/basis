@@ -462,7 +462,14 @@ export default function ChatScreen({
   // inbound peer-router (port of web/main.js:346) +
   // catch-up trigger (port of main.js:1338), built over the live agent
   // + callSkill.
-  const buildPeerWiring = useCallback(({ agent, callSkill, contactChannel, pendingPeerRedeems, pendingPersonaProps, sharedWithMeStore }) => {
+  // `bundle` is a PARAMETER, not the prop. This callback has an empty dep array on purpose — the wiring
+  // is built once and attached once — which means anything it reads from the enclosing scope is frozen at
+  // the FIRST render, where the `bundle` prop is still null (App.js has not booted the agent yet). Reading
+  // it there gave every lane below a null rail; the governance one throws on a null rail by design, inside
+  // this handler map, in an effect with no try/catch — so the router was never attached and the device
+  // received nothing while looking perfectly healthy. Taking it as an argument is what keeps the empty dep
+  // array honest.
+  const buildPeerWiring = useCallback(({ bundle, agent, callSkill, contactChannel, pendingPeerRedeems, pendingPersonaProps, sharedWithMeStore }) => {
     const sendPeer = (addr, payload) => agent.sendPeerMessage(addr, payload);
     const getMyPubKey = () =>
       agent?.identity?.chat?.pubKey ?? agent?.identity?.host?.webid ?? null;
@@ -926,7 +933,7 @@ export default function ChatScreen({
       appOrigins: [...bootState.bundle.catalogue.appOrigins],
       opCount:    bootState.bundle.catalogue.opsById?.size ?? 0,
     });
-    bootState.bundle.attachPeerWiring?.(buildPeerWiring({ agent, callSkill, contactChannel: bootState.bundle.contactChannel, pendingPeerRedeems: bootState.bundle.pendingPeerRedeems, pendingPersonaProps: bootState.bundle.pendingPersonaProps, sharedWithMeStore: bootState.bundle.sharedWithMeStore }));
+    bootState.bundle.attachPeerWiring?.(buildPeerWiring({ bundle: bootState.bundle, agent, callSkill, contactChannel: bootState.bundle.contactChannel, pendingPeerRedeems: bootState.bundle.pendingPeerRedeems, pendingPersonaProps: bootState.bundle.pendingPersonaProps, sharedWithMeStore: bootState.bundle.sharedWithMeStore }));
   }, [bootState, buildPeerWiring]);
 
   // Auto-scroll on every new message in the active thread.

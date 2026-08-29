@@ -13,6 +13,7 @@
  * Run: `--project=nkn` for 1, `--project=relay` (with PEER_TEST_RELAY armed) for 2 and 3.
  */
 import { test, expect } from '@playwright/test';
+import { execSync } from 'node:child_process';
 import { bootPeers, teardown, pair, toChat, sendChat, readBubbles, log,
   gotoCircles, openCircleMatching } from './peerHarness.js';
 
@@ -182,5 +183,104 @@ test('transports 3 — the relay goes away mid-conversation, NKN stays', async (
       arrivedAfter ? `the ladder fell back — it arrived after ~${arrivedAfter}s` : `${after.length} bubble(s) — nothing in 90s`);
     log('failover · what the transports said while it happened', 'OBSERVED',
       JSON.stringify([...new Set(lines.filter((t) => /failing over|failed for|routing across/i.test(t)))].slice(0, 4)));
+  } finally { await teardown(peers); }
+});
+
+/**
+ * I3 — THE RELAY DIES MID-CONVERSATION, WITH NOTHING RELOADED.
+ *
+ * Test 3 above answers a different question than it looks like it answers. `routeWebSocket` intercepts
+ * NEW connections, so an already-open relay socket survives it — which is why that test reloads both
+ * peers, and why what it really measures is "can the app BOOT and carry a message with the relay already
+ * unreachable". A reload rebuilds every transport from scratch; the ladder is never asked to step down.
+ *
+ * The ladder's actual job is the case no test covered: two peers mid-conversation, sockets open, and the
+ * relay goes away underneath them. `onTransportFailure` only fires when a send THROWS
+ * (`createSecureAgent.js`), so the open question is whether a send into a dead relay throws at all, or
+ * reports success into a socket nobody is reading.
+ *
+ * Killing the relay PROCESS is the honest way to ask: it is a real outage rather than a simulated one,
+ * and it is the only thing that takes an open socket away without touching NKN. The fixture attaches to
+ * an already-listening relay and leaves it alone on teardown, so the port belongs to whoever started it.
+ */
+test('transports 4 — the relay DIES mid-conversation (nothing reloaded)', async ({ browser }) => {
+  const relayUrl = process.env.PEER_TEST_RELAY || '';
+  const relayPort = (relayUrl.match(/:(\d+)/) ?? [])[1] ?? null;
+  test.skip(!relayPort, 'needs PEER_TEST_RELAY — this test is about losing a relay that exists');
+
+  const peers = await bootPeers(browser, 2, { transportMode: 'both' });
+  const [A, B] = peers;
+  const lines = [];
+  listen(A, lines); listen(B, lines);
+  try {
+    await gotoCircles(A.page);
+    const p = await pair(A, B, { name: 'Dode Relay Kring', re: /dode.?relay/i, handle: 'sanne' });
+    test.skip(!p.joined, 'pairing failed');
+    const gid = await activeCircle(A.page);
+    const byId = new RegExp(`dode.?relay|${gid}`, 'i');
+    await openCircleMatching(B.page, byId).catch(() => {});
+    await toChat(B.page); await toChat(A.page);
+
+    await sendChat(A.page, 'RELAY-LEEFT-NOG');
+    await B.page.waitForTimeout(8000);
+    expect((await readBubbles(B.page)).some((t) => /RELAY-LEEFT-NOG/.test(t)), 'the baseline must cross').toBe(true);
+    log('live-drop · baseline while the relay lives', 'PASS', 'a message crosses');
+
+    // THE DROP. No reload, no navigation: the process simply stops answering, exactly as an outage would.
+    let killed = false;
+    try {
+      // `-sTCP:LISTEN` matters: a bare `lsof -ti:PORT` also matches every CLIENT socket on that port,
+      // which here includes the browsers themselves — the first run of this test killed a peer's own
+      // process and reported the resulting blank page as "the app dies when the relay dies". Kill the
+      // listener, nothing else.
+      const pids = execSync(`lsof -ti:${relayPort} -sTCP:LISTEN || true`, { encoding: 'utf8' }).trim().split('\n').filter(Boolean);
+      for (const pid of pids) { try { execSync(`kill ${pid}`); killed = true; } catch { /* already gone */ } }
+    } catch { /* reported below */ }
+    log('live-drop · was the relay actually killed?', killed ? 'PASS' : 'BLOCKED', `port ${relayPort}`);
+    test.skip(!killed, 'could not kill the relay process');
+    await A.page.waitForTimeout(4000);   // let the socket death reach the app
+
+    // Does the SENDER still have a composer once the relay dies? The first run of this test failed here
+    // with "waiting for .circle-view__composer-input" — which is either a real finding (the screen
+    // changes under you when a transport dies) or the view simply not being in chat mode. A probe that
+    // cannot tell those apart is not evidence, so ask, say which, and then carry on either way.
+    const composerStillThere = await A.page.locator('.circle-view__composer-input').count() > 0;
+    log('live-drop · can the sender still type after the relay dies?',
+      composerStillThere ? 'PASS' : 'FINDING',
+      composerStillThere ? 'the composer is still on screen' : 'the composer is GONE without any reload');
+    if (!composerStillThere) {
+      const seen = await A.page.evaluate(() => document.body.innerText.replace(/\s+/g, ' ').slice(0, 200));
+      log('live-drop · what the sender sees instead', 'OBSERVED', seen);
+      await gotoCircles(A.page).catch(() => {});
+      await openCircleMatching(A.page, byId).catch(() => {});
+      await toChat(A.page).catch(() => {});
+    }
+    if (!(await A.page.locator('.circle-view__composer-input').count())) {
+      log('live-drop · could the walk get back to a composer at all?', 'BLOCKED', 'no composer after re-navigating');
+      return;
+    }
+    await sendChat(A.page, 'NA-DE-DOOD');
+    // NKN is already connected here (both peers booted `both` and nothing reloaded), so this should not
+    // need a cold bootstrap. Poll long enough that a slow rung still counts, and report WHEN.
+    let arrivedAfter = null;
+    for (let i = 1; i <= 18; i += 1) {
+      await B.page.waitForTimeout(5000);
+      await toChat(B.page).catch(() => {});
+      if ((await readBubbles(B.page)).some((t) => /NA-DE-DOOD/.test(t))) { arrivedAfter = i * 5; break; }
+    }
+    log('live-drop · does the ladder step down while the app is running?',
+      arrivedAfter ? 'PASS' : 'FINDING',
+      arrivedAfter
+        ? `it arrived after ~${arrivedAfter}s on NKN, with nothing reloaded`
+        : 'nothing in 90s — a live relay death is not survived, only a cold boot without one');
+    // The transport's own words settle WHERE it stops: a send that throws produces "failing over"; a send
+    // that reports success into a dead socket produces silence, and that is a different fix.
+    const said = [...new Set(lines.filter((t) => /failing over|failed for|routing across|relay/i.test(t)))];
+    log('live-drop · what the transports said', 'OBSERVED', JSON.stringify(said.slice(0, 6)));
+    log('live-drop · did any send report a failure at all?',
+      said.some((t) => /failing over|failed for/i.test(t)) ? 'PASS' : 'FINDING',
+      said.some((t) => /failing over|failed for/i.test(t))
+        ? 'the send threw and the ladder was asked to step down'
+        : 'no failure line — the send into the dead relay reported success, so nothing asked the ladder');
   } finally { await teardown(peers); }
 });

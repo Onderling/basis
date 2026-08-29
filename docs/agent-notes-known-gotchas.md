@@ -615,3 +615,46 @@ now generates real ed25519 identities (node:crypto — the one-dep promise holds
 `challenge` with a `register-proof`, and binds `_from`. Its header also claimed `ws` "resolves from
 the root" — this workspace installs per package and has NO root `node_modules`; run it from a
 package that has `ws` (`cd packages/relay && node ../../deploy/smoke/smoke.mjs <url>`).
+
+## Metro won't start: `open: <root>/node_modules/eld` — a `link:` dep's own dependency, missing at the hoisted root
+
+`npx expo start` in `apps/basis-mobile` exits (code 7) before it ever serves:
+
+```
+Error: std::system_error: open: <repo>/node_modules/eld: No such file or directory
+```
+
+With watchman off `PATH` the same failure appears as a plain Node ENOENT carrying `path:` / `filename:` —
+which is the honest form of it.
+
+**Cause.** `apps/basis-mobile/package.json` has `"onderling-feedback": "link:../../../feedback"` (the
+split-out repo, and `metro.config.js` maps `onderling-feedback/public` + `/testing` deliberately). That repo
+declares `eld` among its OWN dependencies. Under this repo's flat/hoisted layout Metro resolves a linked
+package's deps at the **monorepo root**, where `eld` was never installed — the only copy is
+`~/expotest/feedback/node_modules/eld`.
+
+**Fix** — the single-package symlink this repo already prescribes; do NOT reinstall anything:
+
+```sh
+ln -s ../../feedback/node_modules/eld node_modules/eld
+```
+
+Then `expo start` serves. The other eight feedback deps look "missing at the root" too but resolve per-app
+(`@onderling/*` are workspace links, `zod` etc. come from the app's own tree) — only a plain npm dep that
+nothing else in the monorepo depends on falls through to the root lookup. Don't pre-emptively symlink them.
+
+**Two traps inside the trap:**
+
+- **The watchman error is a messenger, not the cause.** It names the missing path because Metro asked it
+  about that path. `watchman watch-del` + `shutdown-server` does not help, and a manual `watch-project` +
+  `query` on the same root succeeds — that success is the tell that watchman is healthy and the missing
+  file is real. (Two restarts were spent on this before the plain-ENOENT form gave it away.)
+- **Metro's server root here is the WORKSPACE root, not the app.** The bundle URL is
+  `/apps/basis-mobile/index.bundle?platform=android&dev=true`; plain `/index.bundle` 404s with *"Unable to
+  resolve module ./index from `<repo>/.`"*, which reads like a broken entry point and is not one.
+
+**You can prove the mobile harness without a phone:** with Metro up,
+`curl -o /dev/null -w '%{http_code} %{size_download}' "http://127.0.0.1:8081/apps/basis-mobile/index.bundle?platform=android&dev=true"`
+→ `200 47679663` in ~74 s cold. That separates "the bundle is broken" from "the device isn't connecting"
+before you touch a device.
+

@@ -11,6 +11,7 @@ import { View, Text, TextInput, Pressable, ScrollView, StyleSheet } from 'react-
 import { advancedOpRows, advancedParamRows } from '@onderling-app/basis';
 import { useTheme } from './themeContext.js';
 import { t } from '../../core/localisation.js';
+import OpPageModal from './OpPageModal.js';
 
 export default function CircleAdvancedScreen({ manifestsByOrigin = {}, callSkill }) {
   const theme = useTheme();
@@ -19,6 +20,12 @@ export default function CircleAdvancedScreen({ manifestsByOrigin = {}, callSkill
   const [params, setParams] = useState([]);
   const [drafts, setDrafts] = useState({});
   const [flash, setFlash] = useState({});
+  // An argument-taking op opens as a FORM of its own (the shared page paint) — never only "in chat".
+  const [openRow, setOpenRow] = useState(null);
+  const opFor = (o) => {
+    const manifest = manifestsByOrigin?.[o.app];
+    return manifest?.operations?.find((x) => x.id === o.op) ?? { id: o.op, params: o.params, description: o.description };
+  };
 
   useEffect(() => {
     let alive = true;
@@ -84,13 +91,27 @@ export default function CircleAdvancedScreen({ manifestsByOrigin = {}, callSkill
                 <Text style={styles.btnText}>{flash[key] ?? t('circle.advanced.run')}</Text>
               </Pressable>
             ) : (
-              <Text style={styles.hint}>
-                {o.slash ? t('circle.advanced.via_chat', { slash: o.slash }) : t('circle.advanced.via_chat_generic')}
-              </Text>
+              <View style={styles.opRight}>
+                <Pressable style={styles.btn} onPress={() => setOpenRow(o)} testID={`advanced-open-${o.op}`}>
+                  <Text style={styles.btnText}>{t('circle.advanced.open')}</Text>
+                </Pressable>
+                {o.slash ? <Text style={styles.hint}>{t('circle.advanced.via_chat', { slash: o.slash })}</Text> : null}
+              </View>
             )}
           </View>
         );
       })}
+      <OpPageModal
+        visible={!!openRow}
+        appOrigin={openRow?.app}
+        op={openRow ? opFor(openRow) : null}
+        callSkill={callSkill}
+        onClose={() => setOpenRow(null)}
+        onDispatched={() => {
+          const key = openRow ? `${openRow.app}:${openRow.op}` : null;
+          if (key) { setFlash((f) => ({ ...f, [key]: t('circle.advanced.ran') })); setTimeout(() => setFlash((f) => ({ ...f, [key]: null })), 1500); }
+        }}
+      />
     </ScrollView>
   );
 }
@@ -104,6 +125,7 @@ const makeStyles = (theme) => StyleSheet.create({
   code:     { fontSize: 13, color: theme.color.ink, fontFamily: 'monospace' },
   controls: { flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 4 },
   input:    { flex: 1, borderWidth: 1, borderColor: theme.color.line, borderRadius: 6, padding: 6, color: theme.color.ink, fontSize: 13 },
+  opRight: { alignItems: 'flex-end', gap: 4 },
   opLeft:   { marginBottom: 4 },
   btn:      { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: theme.color.line },
   btnText:  { fontSize: 13, color: theme.color.ink },

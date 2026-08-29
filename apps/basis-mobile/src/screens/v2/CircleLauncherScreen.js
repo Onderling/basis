@@ -398,6 +398,9 @@ export default function CircleLauncherScreen({
   // owned by App.js).  Receiver writes; rules editor reads on mount +
   // clears after the γ.4 resolver applies / discards.
   circleRulesPendingStore = null,
+  // A failed agent boot, said HERE (web parity: `bootFailure` on the launcher). App.js used to hand it
+  // only to the hidden ChatScreen, so the person saw "No circles yet." and concluded their data was gone.
+  bootError = null,
   // γ-next.policy — per-circle pending-policy cache (AsyncStorage-backed,
   // owned by App.js).  Receiver writes; settings editor reads on mount +
   // clears after the γ.4 resolver applies / discards.  Completes the
@@ -1963,7 +1966,12 @@ export default function CircleLauncherScreen({
             {/* β.1 — Nearby + Mijn dingen launcher shortcuts removed.
                 Nearby lives under the Mij tab; My-things is a seeded screen
                 under the Screens tab. */}
-            {circles.length === 0 ? (
+            {bootError ? (
+              <Text style={styles.bootFailed} accessibilityRole="alert" testID="launcher-boot-failed">
+                {t('circle.boot_failed', { reason: String(bootError) })}
+              </Text>
+            ) : null}
+            {circles.length === 0 && !bootError ? (
               <Text style={styles.muted}>{t('circle.empty')}</Text>
             ) : (
               renderLauncherGroups(circles, {
@@ -5118,6 +5126,7 @@ const makeStyles = (theme, insets = null) => StyleSheet.create({
   // Launcher shortcut button row (Nearby, Mijn dingen).
   shortcut:     { paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1, borderColor: theme.color.line, borderRadius: 16, backgroundColor: theme.color.card, marginBottom: 6, alignSelf: 'flex-start' },
   shortcutText: { fontSize: 13, color: theme.color.ink },
+  bootFailed: { color: theme.color.ink, fontSize: 14, marginVertical: 10, lineHeight: 20 },
   muted:      { color: theme.color.inkSoft, fontStyle: 'italic', paddingVertical: 10 },
   newBtn:     { marginTop: 12, padding: 12, borderWidth: 1, borderStyle: 'dashed', borderColor: theme.color.line, borderRadius: 8, alignItems: 'center' },
   newText:    { color: theme.color.inkSoft },

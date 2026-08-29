@@ -727,6 +727,7 @@ export default function App() {
         </View>
         <CircleLauncherScreen
           bundle={bundle}
+          bootError={bootError}
           deliveryStateMap={deliveryStateMapRef.current}
           registerCircleBotSink={registerCircleBotSink}
           onAcceptFallback={acceptFallbackOffer}

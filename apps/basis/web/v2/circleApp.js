@@ -3321,6 +3321,8 @@ function launcherPinMuteSignature() {
 // re-scheduling — so it's safe to call from the pins/mutes refresh `.then` WITHOUT re-entering
 // showLauncher (which would re-schedule that refresh and loop forever; that infinite re-render
 // starved the main thread and hung the headless e2e, 2026-06-11).
+let _bootFailure = null;   // the agent boot's error, if it died — painted on the launcher
+
 function paintLauncher() {
   // project the EventLog into per-circle previews; tiles show a
   // chat-style subtitle + unread badge when there's recent activity.
@@ -3336,6 +3338,7 @@ function paintLauncher() {
     proposals: launcherProposals,
     pinnedMap: launcherPinnedMap,
     mutedMap:  launcherMutedMap,
+    bootFailure: _bootFailure,
     t,
     onOpenCircle: showDetail,
     onNewCircle:  createCircle,
@@ -4041,17 +4044,46 @@ async function showAdvanced() {
       });
       right.appendChild(run);
     } else {
-      const via = document.createElement('span');
-      via.className = 'muted';
-      via.textContent = o.slash
-        ? t('circle.advanced.via_chat', { slash: o.slash })
-        : t('circle.advanced.via_chat_generic');
-      right.appendChild(via);
+      // An argument-taking op gets a FORM of its own — the same docked page panel `set-relay` uses,
+      // built from the op's params (mobile paints the same form as a sheet). The slash stays a hint.
+      const open = document.createElement('button');
+      open.type = 'button';
+      open.textContent = t('circle.advanced.open');
+      open.addEventListener('click', () => {
+        const manifest = circleManifestsByOrigin?.[o.app];
+        const declared = manifest?.operations?.find((x) => x.id === o.op) ?? { id: o.op, params: o.params, description: o.description };
+        const op = { ...declared, surfaces: { ...(declared.surfaces ?? {}), page: { kind: 'side-panel', title: `${o.app}:${o.op}`, ...(declared.surfaces?.page ?? {}) } } };
+        openPagePanel({
+          container: ensurePagePanel(), doc: document, op, appOrigin: o.app, callSkill: rawCallSkill,
+          onClose: () => {}, onDispatched: () => {}, t,
+        });
+      });
+      right.appendChild(open);
+      if (o.slash) {
+        const via = document.createElement('span');
+        via.className = 'muted';
+        via.style.marginLeft = '.5rem';
+        via.textContent = t('circle.advanced.via_chat', { slash: o.slash });
+        right.appendChild(via);
+      }
     }
     row.append(left, right);
     wrap.appendChild(row);
   }
   rootEl.appendChild(wrap);
+}
+
+/** The one docked <aside> every page form opens in (the relay panel, an advanced-tab form, …). */
+function ensurePagePanel() {
+  let panel = document.getElementById('page-panel');
+  if (!panel) {
+    panel = document.createElement('aside');
+    panel.id = 'page-panel';
+    panel.className = 'cc-page-panel';
+    panel.hidden = true;
+    document.body.appendChild(panel);
+  }
+  return panel;
 }
 
 async function showMyData() {
@@ -4140,14 +4172,7 @@ async function showMyData() {
   const setRelayOp = basisManifest.operations.find((o) => o.id === 'set-relay');
   const openRelayPanel = () => {
     if (!setRelayOp) return;
-    let panel = document.getElementById('page-panel');
-    if (!panel) {
-      panel = document.createElement('aside');
-      panel.id = 'page-panel';
-      panel.className = 'cc-page-panel';
-      panel.hidden = true;
-      document.body.appendChild(panel);
-    }
+    const panel = ensurePagePanel();
     // Localise the panel title via the op's labelKey without mutating the shared
     // manifest (openPagePanel's simple-form reads surfaces.page.title verbatim).
     const pg = setRelayOp.surfaces.page;
@@ -8220,7 +8245,9 @@ async function boot() {
       }
     }
   } catch (err) {
-    console.warn('[circleApp] agent boot failed — showing empty launcher', err);
+    // Said on the launcher too (`bootFailure`): a dead boot must not paint as an empty account.
+    _bootFailure = err;
+    console.warn('[circleApp] agent boot failed — the launcher says so', err);
   }
 
   try {

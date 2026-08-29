@@ -180,3 +180,16 @@ describe('matchable-aware matcher (P4c) — profile↔profile on the matchable s
     expect(await matchProfilesMatchable({ properties: myProperties, candidateMatchable: {} })).toEqual([]);
   });
 });
+
+describe('reading drivers back from a profile — the stored shape is mode-wrapped', () => {
+  it('driversFromProperties reads VALUES: a driver set with setOwn is only visible after effectiveProperties', async () => {
+    // `setDriver` stores `{ mode: 'own', value: driver }` like any property. Handing that raw map to
+    // `driversFromProperties` yields `{}` — the composition an app must use is resolve-then-filter.
+    const { driversFromProperties, createDriver, setOwn, effectiveProperties } = await import('../index.js');
+    const driver = createDriver({ kind: 'need', text: 'een boormachine lenen', tags: ['tools'] });
+    const profile = { agentId: 'p1', properties: setOwn({}, 'tuinhulp', driver) };
+    expect(driversFromProperties(profile.properties)).toEqual({});                       // the raw map: nothing
+    const resolved = effectiveProperties((id) => (id === 'p1' ? profile : null), 'p1');
+    expect(Object.keys(driversFromProperties(resolved))).toEqual(['tuinhulp']);        // resolved: the driver
+  });
+});

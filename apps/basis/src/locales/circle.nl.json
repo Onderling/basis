@@ -917,6 +917,18 @@
     "save": {
       "text": "Opslaan",
       "doc": "Geavanceerd: één waarde opslaan via set-param."
+    },
+    "open": {
+      "text": "Openen",
+      "doc": "Advanced tab: open the form an op declares as its page (side-panel on web, a sheet on mobile)."
+    },
+    "submit": {
+      "text": "Verstuur",
+      "doc": "The page form: dispatch the op with the filled-in params."
+    },
+    "cancel": {
+      "text": "Annuleer",
+      "doc": "The page form: close without dispatching."
     }
   },
   "settings_restore": {
@@ -5466,5 +5478,9 @@
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
       }
     }
+  },
+  "boot_failed": {
+    "text": "De app kon niet starten ({reason}). Je gegevens staan nog op dit apparaat — er is niets weg, het is alleen niet ingelezen.",
+    "doc": "Launcher: a failed agent boot is SAID where the person looks, instead of degrading into \"No circles yet.\" (the walk's W28/W29)."
   }
 }

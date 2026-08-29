@@ -45,10 +45,14 @@ export function advancedOpRows({ manifests = [] } = {}) {
         description: typeof op?.description === 'string' ? op.description
           : typeof op?.surfaces?.chat?.hint === 'string' ? op.surfaces.chat.hint : '',
         slash,
+        params,
         requiredParams: required,
-        // Runnable directly = nothing the user must supply; everything else routes via
-        // its chat form (the slash template names the args).
+        // Runnable directly = nothing the user must supply. Everything else gets a FORM of its own, built
+        // from these params on every shell (web: the docked page panel; mobile: a sheet) — the slash
+        // template stays as a hint, never the only door: a device with no circle has no chat to type in.
         runnable: required.length === 0,
+        /** How a shell lets the person run it: `run` (no input) · `form` (its params, as a page). */
+        via: required.length === 0 ? 'run' : 'form',
       };
     });
 }

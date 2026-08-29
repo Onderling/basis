@@ -917,6 +917,18 @@
     "save": {
       "text": "Save",
       "doc": "Advanced tab: write one param via set-param."
+    },
+    "open": {
+      "text": "Open",
+      "doc": "Advanced tab: open the form an op declares as its page (side-panel on web, a sheet on mobile)."
+    },
+    "submit": {
+      "text": "Submit",
+      "doc": "The page form: dispatch the op with the filled-in params."
+    },
+    "cancel": {
+      "text": "Cancel",
+      "doc": "The page form: close without dispatching."
     }
   },
   "settings_restore": {
@@ -5466,5 +5478,9 @@
         "doc": "Create/settings wizard — keyed 2026-08-28 when the guard learned these surfaces ship to members."
       }
     }
+  },
+  "boot_failed": {
+    "text": "The app could not start ({reason}). Your data is still on this device — nothing here is empty, it is unread.",
+    "doc": "Launcher: a failed agent boot is SAID where the person looks, instead of degrading into \"No circles yet.\" (the walk's W28/W29)."
   }
 }

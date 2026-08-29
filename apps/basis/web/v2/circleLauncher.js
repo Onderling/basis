@@ -44,6 +44,9 @@ export function renderCircleLauncher(container, {
   // memberOverride store (chatOff flag); absent = treat as unmuted.
   mutedMap = {},
   loading = false,
+  // A failed agent boot, said HERE — the surface a person is looking at. Without it a dead boot and an
+  // empty account paint the same "No circles yet.", and people conclude their data is gone.
+  bootFailure = null,
 } = {}) {
   const tr = typeof t === 'function' ? t : (k) => k;
   container.innerHTML = '';
@@ -65,7 +68,14 @@ export function renderCircleLauncher(container, {
     return container;
   }
 
-  if (!circles.length) {
+  if (bootFailure) {
+    const failed = document.createElement('div');
+    failed.className = 'circle-launcher__boot-failed';
+    failed.setAttribute('role', 'alert');
+    failed.textContent = tr('circle.boot_failed', { reason: String(bootFailure?.message ?? bootFailure) });
+    container.appendChild(failed);
+  }
+  if (!circles.length && !bootFailure) {
     const empty = document.createElement('div');
     empty.className = 'circle-launcher__empty';
     empty.textContent = tr('circle.empty');

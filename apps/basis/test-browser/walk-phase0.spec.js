@@ -38,9 +38,15 @@ test('I5 — drivers and persona properties: one store or two, and keyed how?', 
 
     const byWebid = await call(A.page, 'agents', 'getProfileDrivers', { id: webid });
     const byPub   = pubKey ? await call(A.page, 'agents', 'getProfileDrivers', { id: pubKey }) : null;
-    const n = (r) => (Array.isArray(r?.drivers) ? r.drivers.length : (Array.isArray(r?.items) ? r.items.length : (r?.error ? `err:${r.error}` : 0)));
+    // `drivers` is a MAP (key → driver), not an array — the first version of this probe counted only arrays and
+    // would have called a populated map "0". A probe that cannot name its branch is not evidence.
+    const n = (r) => (r?.drivers && typeof r.drivers === 'object' ? Object.keys(r.drivers).length
+      : (Array.isArray(r?.items) ? r.items.length : (r?.error ? `err:${r.error}` : 0)));
     log('I5 · read back by webid', n(byWebid) ? 'PASS' : 'FINDING', `${n(byWebid)} · ${JSON.stringify(byWebid)?.slice(0, 140)}`);
-    log('I5 · read back by pubKey', n(byPub) ? 'PASS' : 'FINDING', `${n(byPub)} · ${JSON.stringify(byPub)?.slice(0, 140)}`);
+    // The chat pubKey is the CHAT agent's key, not the profile's id — reading a profile by it answers about a
+    // different (empty) profile. Observed, not a finding: the profile is keyed by the id the caller writes with.
+    log('I5 · read back by pubKey', 'OBSERVED', `${n(byPub)} · ${JSON.stringify(byPub)?.slice(0, 140)}`);
+    expect(n(byWebid), 'a driver its owner just set must be readable by the same id').toBeGreaterThan(0);
     log('I5 · VERDICT — same id writes and reads?',
       n(byWebid) ? 'PASS' : (n(byPub) ? 'FINDING' : 'FINDING'),
       n(byWebid) ? 'one store, keyed by the id the caller passes'
@@ -57,10 +63,17 @@ test('I5 — drivers and persona properties: one store or two, and keyed how?', 
       groupId: gid, memberWebid: webid, personaProperties: { mobility: 'walks' },
     });
     log('I5 · recordMemberPersonaProperties', recorded?.error ? 'FINDING' : 'OBSERVED', JSON.stringify(recorded)?.slice(0, 140));
+    // Two different facts, two different reads — settled 2026-08-29. `recordMemberPersonaProperties` records what
+    // a MEMBER disclosed to THIS circle, onto the circle's roster; the read for that is the roster row.
+    // `getPersonaView` is the person's own profile (properties + per-context disclosure policy) in the agents
+    // registry — it never held the roster record and is not supposed to.
+    const roster = await call(A.page, 'stoop', 'listGroupMembers', { groupId: gid });
+    const mine = (roster?.members ?? []).find((m) => m?.webid === webid) ?? null;
+    log('I5 · the roster row carries the disclosed property?',
+      mine?.personaProperties?.mobility === 'walks' ? 'PASS' : 'FINDING', JSON.stringify(mine?.personaProperties ?? null));
+    expect(mine?.personaProperties?.mobility, 'the disclosure must land on the member\'s roster row').toBe('walks');
     const view = await call(A.page, 'agents', 'getPersonaView', { id: webid });
-    log('I5 · getPersonaView(webid) sees it?',
-      JSON.stringify(view ?? {}).includes('mobility') ? 'PASS' : 'FINDING',
-      JSON.stringify(view)?.slice(0, 180));
+    log('I5 · getPersonaView is the profile, not the roster (as designed)', 'OBSERVED', JSON.stringify(view)?.slice(0, 180));
   } finally { await teardown(peers); }
 });
 

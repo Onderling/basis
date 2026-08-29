@@ -1274,7 +1274,19 @@ export async function createRealHouseholdAgent(opts = {}) {
         await agentsRegistry.register({ ...cur, properties: setOwn(cur.properties ?? {}, key, driver) });
         return { ok: true };
       },
-      getDrivers: async ({ profileId }) => driversFromProperties((await agentsRegistry.lookup(profileId))?.properties ?? {}),
+      // Drivers are stored like every property — mode-wrapped (`{ mode: 'own', value }`, or an inherit
+      // pointer) — and `driversFromProperties` reads VALUES. Handing it the raw map returned `{}` for every
+      // profile that had drivers (the walk's "written and cannot be read back by its own owner"). Resolve
+      // the effective values first, which also honours a named profile inheriting from the default one.
+      getDrivers: async ({ profileId }) => {
+        const entries = await agentsRegistry.list();
+        const byId = new Map();
+        for (const e of entries ?? []) { for (const k of [e?.agentId, e?.pubKey, e?.webid]) if (k) byId.set(k, e); }
+        const self = byId.get(profileId) ?? null;
+        if (!self) return {};
+        const getProfile = (id) => byId.get(id) ?? null;
+        return driversFromProperties(effectiveProperties(getProfile, self.agentId, { defaultProfileId: 'default' }));
+      },
       // Circle membership (registry restore-data) — carry a per-circle { handle, address, … } record on the
       // profile so a restored device knows its circles + the handle it used. Merge via the pure setter (keeps
       // the other circles' records), then re-register the FULL entry (preserves key/role/grants/disclosure).

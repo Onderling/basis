@@ -13,6 +13,10 @@ import { surfaceCoverage, shellSizes } from './health.mjs';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 describe('health', () => {
+  // health.mjs runs the whole guard suite. Its own bound was 30s and it MEASURES ~30s on this machine,
+  // so the test went red the moment anything else ran beside it (a Metro bundle build, 2026-08-29) — a
+  // guard whose self-test fails on machine load is a false alarm, not a guard. The bound is now generous
+  // enough to mean "hung", not "busy".
   it('runs and reports all three tiers', () => {
     const r = spawnSync(process.execPath, [path.join(HERE, 'health.mjs')], { encoding: 'utf8' });
     const out = r.stdout + r.stderr;
@@ -20,7 +24,7 @@ describe('health', () => {
     expect(out).toMatch(/SURFACES ·/);
     expect(out).toMatch(/SHELLS ·/);
     expect([0, 1], 'exit reflects guard health, never a crash').toContain(r.status);
-  }, 30000);   // /health runs every guard — allow for the full aggregate
+  }, 180_000);   // /health runs every guard — allow for the full aggregate on a loaded machine
 
   it('shellSizes returns the largest shell files, descending', () => {
     const s = shellSizes(3);

@@ -221,8 +221,11 @@ export default function App() {
   if (!chatReceiptSenderRef.current) {
     chatReceiptSenderRef.current = makeReceiptSender({
       getSettings: () => deliverySettingsStoreRef.current.get(),
-      sendTo: (to, payload) => (typeof bundleRef.current?.sendPeer === 'function'
-        ? bundleRef.current.sendPeer(to, payload)
+      // The bundle has no `sendPeer` — it never had; every mobile receipt was rejected here with "no peer
+      // send yet" and nobody's chip ever reached `stored`. The agent's `sendPeerMessage` is the send seam
+      // (web parity), and it takes the circle scope so the receipt leaves as the per-circle identity.
+      sendTo: (to, payload, opts = {}) => (typeof bundleRef.current?.agent?.sendPeerMessage === 'function'
+        ? bundleRef.current.agent.sendPeerMessage(to, payload, opts)
         : Promise.reject(new Error('no peer send yet'))),
     });
   }

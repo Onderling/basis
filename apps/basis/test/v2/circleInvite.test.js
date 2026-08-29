@@ -196,3 +196,57 @@ describe('joinCircleFromInvite', () => {
     expect('circleAddressProof' in redeemArgs()).toBe(false);
   });
 });
+
+describe('L55 — the ⋯ invite carries the circle\'s NAME and RULES (2026-08-29)', () => {
+  const decode = (uri) => JSON.parse(Buffer.from(
+    uri.replace(/^onderling-invite:\/\//, '').replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString());
+  // `getGroupRules` answers in two shapes: the raw row from the skill, or the projected reply through the
+  // app's waist. The name has ONE source either way — `listMyCircles`'s names — so the invite cannot
+  // disagree with the tile.
+  const skills = ({ names = {}, rulesReply = {} } = {}) => vi.fn(async (app, op) => {
+    if (op === 'getCurrentMembershipCode') return { code: 'C', expiresAt: 1 };
+    if (op === 'listMyCircles') return { circles: [], names };
+    if (op === 'getGroupRules') return rulesReply;
+    return {};
+  });
+  const DOC = { purpose: 'lenen en delen', admission: 'invite-only' };
+
+  it('embeds the name (from listMyCircles) and the rules doc — raw-row shape', async () => {
+    const r = await buildCircleInviteUri({
+      callSkill: skills({ names: { c: 'Prikbord Kring' }, rulesReply: { rules: { text: 'Prikbord Kring', source: { groupId: 'c', rules: DOC } } } }),
+      circleId: 'c', adminPeerAddr: 'A',
+    });
+    const d = decode(r.uri);
+    expect(d.name, 'the joiner must be able to name the circle from the invite alone').toBe('Prikbord Kring');
+    expect(d.rules?.purpose, 'the joiner reads the rules BEFORE joining, from the invite').toBe('lenen en delen');
+  });
+
+  it('…and the projected shape the web waist actually returns ({rules:<text>, doc})', async () => {
+    // This is the shape the first live invite met, and it carried neither field: the builder read the
+    // row's `text` as the name, which on this path is a rendered summary, not a name.
+    const r = await buildCircleInviteUri({
+      callSkill: skills({ names: { c: 'Naam Kring' }, rulesReply: { title: 'Group rules', groupId: 'c', rules: 'Naam Kring', doc: DOC, version: 1 } }),
+      circleId: 'c', adminPeerAddr: 'A',
+    });
+    const d = decode(r.uri);
+    expect(d.name).toBe('Naam Kring');
+    expect(d.rules?.admission).toBe('invite-only');
+  });
+
+  it('omits both when the circle has no name and no rules yet (older-invite shape, nothing invented)', async () => {
+    const r = await buildCircleInviteUri({ callSkill: skills(), circleId: 'c', adminPeerAddr: 'A' });
+    const d = decode(r.uri);
+    expect('name' in d).toBe(false);
+    expect('rules' in d).toBe(false);
+  });
+
+  it('a rules read that FAILS does not fail the invite (the code is the invite; the name is a courtesy)', async () => {
+    const callSkill = vi.fn(async (app, op) => {
+      if (op === 'getCurrentMembershipCode') return { code: 'C', expiresAt: 1 };
+      if (op === 'getGroupRules' || op === 'listMyCircles') throw new Error('store offline');
+      return {};
+    });
+    const r = await buildCircleInviteUri({ callSkill, circleId: 'c', adminPeerAddr: 'A' });
+    expect(r.uri).toMatch(/^onderling-invite:\/\//);
+  });
+});

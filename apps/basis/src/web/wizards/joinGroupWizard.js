@@ -150,7 +150,8 @@ function renderRulesStep(container, doc, state, onNext, onCancel, rerender) {
   wrap.className = 'cc-wizard-body';
 
   const heading = doc.createElement('h3');
-  heading.textContent = t('circle.join.wizard.rules.title', { circle: state.invite?.groupId ?? '(unknown)' });
+  // The circle's name when the invite carries it (L55); the id is the honest fallback for older invites.
+  heading.textContent = t('circle.join.wizard.rules.title', { circle: state.invite?.name || state.invite?.groupId || '(unknown)' });
   wrap.appendChild(heading);
 
   const blurb = doc.createElement('p');

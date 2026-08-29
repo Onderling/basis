@@ -944,6 +944,7 @@ async function runFinalSubmitChain(state, callSkill, sendPeerRedeem, circleAddre
         ...circleAddressArg,
         ...(state.handle ? { peerDisplay: state.handle } : {}),
         ...(inv.rules && typeof inv.rules === 'object' ? { rules: inv.rules } : {}),
+        ...(typeof inv.name === 'string' && inv.name.trim() ? { name: inv.name.trim() } : {}),
       });
       return {
         ok:      true,

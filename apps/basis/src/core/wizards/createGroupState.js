@@ -337,6 +337,9 @@ export function encodeMembershipCodeUrl(result) {
     // redeem to the admin (the pubKey adminPeerAddr isn't NKN-routable). Additive.
     ...(result.adminNknAddr ? { adminNknAddr: result.adminNknAddr } : {}),
     ...(result.rules    ? { rules:    result.rules    } : {}),
+    // The circle's NAME (L55): the joiner names their circle from the invite alone. This whitelist
+    // silently drops any field it does not know — that is the gotcha in the notes — so it goes here too.
+    ...(typeof result.name === 'string' && result.name.trim() ? { name: result.name.trim() } : {}),
     // embed the circle's freedom template so the joiner can review + opt out of
     // OPT-OUTABLE capabilities at join (see circleConsent.js). Symmetric with the embedded rules doc.
     ...(result.capabilities && typeof result.capabilities === 'object' && !Array.isArray(result.capabilities) && Object.keys(result.capabilities).length

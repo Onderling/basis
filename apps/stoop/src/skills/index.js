@@ -2813,9 +2813,15 @@ export function buildSkills({
         const existing = await store.listOpen({ type: 'group-rules' });
         const already = existing.find(i => i?.source?.groupId === a.groupId);
         if (!already) {
+          // `text` is what `listMyCircles` reads back as the circle's NAME — for the admin it is the
+          // name they typed (createGroupV2 writes it there). A joiner's copy used to carry a synthetic
+          // label, so a joined circle could never read as anything but its id even once the rules had
+          // arrived. The invite now carries the name (L55); it lands here, and the tile names itself.
           await store.addItems([{
             type:       'group-rules',
-            text:       `Rules for ${a.groupId} (mirrored from invite)`,
+            text:       (typeof a.name === 'string' && a.name.trim())
+              ? a.name.trim()
+              : `Rules for ${a.groupId} (mirrored from invite)`,
             source:     { groupId: a.groupId, rules: a.rules, version: 1, mirrored: true },
             visibility: 'household',
           }], { actor: from });

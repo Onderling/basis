@@ -118,7 +118,7 @@ export default function JoinGroupWizardModal({
           <ScrollView style={styles.scroll}>
             {state.step === 1 && (
               <Body
-                title={t('circle.join.wizard.rules.title', { circle: state.invite?.groupId ?? '' })}
+                title={t('circle.join.wizard.rules.title', { circle: state.invite?.name || state.invite?.groupId || '' })}
                 intro={t('circle.join.wizard.rules.intro')}
               >
                 {/* NKN+pod circle (J-NP3) — the pod-host disclosure BEFORE redeeming, mirroring web:

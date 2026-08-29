@@ -73,8 +73,36 @@ export async function buildCircleInviteUri({ callSkill, circleId, adminPeerAddr 
     maxRedemptions  = typeof rot.maxRedemptions === 'number' ? rot.maxRedemptions : null;
     redemptionsUsed = 0;
   }
+  // The circle's NAME and RULES ride the invite (L55, Frits 2026-08-29: "must be part of the invite;
+  // otherwise how can the joiner decide?"). The creation-time invite always embedded `rules`; this one —
+  // the ⋯ invite both shells actually ship — never asked for them, so every joiner saw "(no rules set)"
+  // under a hex id. The name IS the rules row's `text` (that is where `createGroupV2` puts it, and where
+  // `listMyCircles` reads it back), so one local read gives both. Best-effort: the code is the invite,
+  // the name is a courtesy — a failed rules read must not fail the invite.
+  //
+  // Two reads, because the two facts have two honest sources. The NAME comes from `listMyCircles`'s
+  // `names` — the one place the app already derives "the name a person gave the circle" for every tile
+  // and header, so the invite can never disagree with the screen. The RULES come from `getGroupRules`,
+  // which answers in two shapes depending on the path: the raw row (`{rules: item}` with the doc under
+  // `item.source.rules`) from the skill itself, or the projected reply (`{rules: <text>, doc}`) through
+  // the app's waist. Reading the row's `text` as the name was wrong on the projected path — it is a
+  // rendered summary there — which is why the first live invite carried neither.
+  let name = null;
+  try {
+    const mine = await callSkill('stoop', 'listMyCircles', {});
+    const n = mine?.names?.[circleId] ?? mine?.names?.get?.(circleId) ?? null;
+    name = typeof n === 'string' && n.trim() ? n.trim() : null;
+  } catch { name = null; }
+  let rules = null;
+  try {
+    const res = await callSkill('stoop', 'getGroupRules', { groupId: circleId });
+    const doc = res?.doc ?? res?.rules?.source?.rules ?? null;
+    rules = doc && typeof doc === 'object' ? doc : null;
+  } catch { rules = null; }
   const invite = {
     groupId: circleId, code, expiresAt,
+    ...(name  ? { name }  : {}),
+    ...(rules ? { rules } : {}),
     ...(adminPeerAddr ? { adminPeerAddr } : {}),
     // B2 — the NKN native address, so a pure-NKN joiner can route the redeem to
     // the admin (the pubKey alone isn't NKN-routable). Additive; absent = pubKey-only.

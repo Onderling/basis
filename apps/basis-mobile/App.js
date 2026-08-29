@@ -156,7 +156,13 @@ export default function App() {
   const deliverySettingsCacheRef = useRef({ sendReceipts: true, allowFallback: false });
   if (!deliverySettingsStoreRef.current) {
     deliverySettingsStoreRef.current = createDeliverySettingsStore(asyncStorageDeliveryIo(AsyncStorage));
-    setDeliverySettingsChangedHook((s) => { deliverySettingsCacheRef.current = s; });
+    // Whichever door flipped it (the offer's button, the My-data toggle): the cache follows, and a fallback
+    // that just came ON re-drives what was held under the old terms (parity with web circleApp).
+    setDeliverySettingsChangedHook((s) => {
+      const cameOn = s.allowFallback && !deliverySettingsCacheRef.current.allowFallback;
+      deliverySettingsCacheRef.current = s;
+      if (cameOn) Promise.resolve(bundleRef.current?.agent?.retryHeldUnderCurrentTerms?.()).catch(() => { /* holds stay held */ });
+    });
     deliverySettingsStoreRef.current.get()
       .then((s) => { deliverySettingsCacheRef.current = s; })
       .catch(() => { /* keep defaults */ });

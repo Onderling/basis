@@ -236,9 +236,23 @@ test('transports 4 — the relay DIES mid-conversation (nothing reloaded)', asyn
       const pids = execSync(`lsof -ti:${relayPort} -sTCP:LISTEN || true`, { encoding: 'utf8' }).trim().split('\n').filter(Boolean);
       for (const pid of pids) { try { execSync(`kill ${pid}`); killed = true; } catch { /* already gone */ } }
     } catch { /* reported below */ }
-    log('live-drop · was the relay actually killed?', killed ? 'PASS' : 'BLOCKED', `port ${relayPort}`);
-    test.skip(!killed, 'could not kill the relay process');
-    await A.page.waitForTimeout(4000);   // let the socket death reach the app
+    // "kill returned 0" is not "the relay is gone" — a probe that cannot name its branch is not
+    // evidence. Wait until NOTHING listens on the port, and say so; and from here on capture EVERY
+    // console line on both peers, unfiltered, because the question is precisely what the transport
+    // said (or did not say) while the socket died under it.
+    let portClosed = false;
+    for (let i = 0; i < 20 && !portClosed; i += 1) {
+      const still = execSync(`lsof -ti:${relayPort} -sTCP:LISTEN || true`, { encoding: 'utf8' }).trim();
+      if (!still) portClosed = true; else await A.page.waitForTimeout(500);
+    }
+    log('live-drop · was the relay actually killed?', killed && portClosed ? 'PASS' : 'BLOCKED',
+      killed && portClosed ? `port ${relayPort} has no listener` : `kill=${killed} portClosed=${portClosed}`);
+    test.skip(!(killed && portClosed), 'could not take the relay away');
+    const everything = [];
+    for (const peer of peers) {
+      peer.page.on('console', (m) => everything.push(`[${peer.label}] ${m.type()} ${m.text().slice(0, 160)}`));
+    }
+    await A.page.waitForTimeout(6000);   // let the socket death reach the app
 
     // Does the SENDER still have a composer once the relay dies? The first run of this test failed here
     // with "waiting for .circle-view__composer-input" — which is either a real finding (the screen
@@ -277,6 +291,9 @@ test('transports 4 — the relay DIES mid-conversation (nothing reloaded)', asyn
     // that reports success into a dead socket produces silence, and that is a different fix.
     const said = [...new Set(lines.filter((t) => /failing over|failed for|routing across|relay/i.test(t)))];
     log('live-drop · what the transports said', 'OBSERVED', JSON.stringify(said.slice(0, 6)));
+    // The unfiltered record, so the NEXT reading of this run can be from evidence rather than absence.
+    log('live-drop · EVERY console line after the drop (both peers)', 'OBSERVED',
+      `${everything.length} lines\n` + everything.slice(0, 80).join('\n'));
     log('live-drop · did any send report a failure at all?',
       said.some((t) => /failing over|failed for/i.test(t)) ? 'PASS' : 'FINDING',
       said.some((t) => /failing over|failed for/i.test(t))

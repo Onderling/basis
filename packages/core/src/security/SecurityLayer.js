@@ -676,8 +676,14 @@ export class SecurityLayer {
       // because a counter survives a lost console and a warning survives an unread counter.
       if (!this.#warnedNoAuthorizer) {
         this.#warnedNoAuthorizer = true;
+        // NAME the layer. A shell boots several agents — the wire-facing peer agent and a handful of
+        // in-process app agents on an internal bus — and every one has its own SecurityLayer. Five
+        // identical warnings at boot (2026-08-29, on a phone) read as "the wire is unguarded" when
+        // they were the in-process layers, which face no wire; the guarded one was the peer agent.
+        // A warning that cannot say WHICH layer it is about is a warning nobody can act on.
+        const who = typeof this.#identity?.pubKey === 'string' ? this.#identity.pubKey.slice(0, 12) + '…' : 'unnamed';
         console.warn(
-          '[security] NO ROSTER AUTHORIZER INSTALLED — envelopes are being accepted from any key that '
+          `[security] NO ROSTER AUTHORIZER INSTALLED on layer ${who} — envelopes are being accepted from any key that `
           + 'signs them correctly, with nothing checking whether that key belongs to anyone you know. '
           + 'Install one with setSenderAuthorizer(fn). This warning appears once per SecurityLayer.',
         );

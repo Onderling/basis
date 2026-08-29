@@ -738,6 +738,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     ),
   });
   sa.setSenderAuthorizer?.(circleSenders.authorizeSender);
+  // Say the wire-facing fact out loud, once, on both shells: the in-process app agents each print a
+  // "NO ROSTER AUTHORIZER" warning (they face no wire), and without this line a reader cannot tell
+  // whether the one agent that DOES face the wire is guarded. It is — and this is the line that proves
+  // it on a device, not only in a fitness test.
+  console.info(`[security] roster authorizer on the peer agent ${String(chatId?.pubKey ?? '').slice(0, 12)}…: ${sa.senderAuthorizerInstalled === true ? 'INSTALLED' : 'MISSING'}`);
 
   /* ─── OBJ-2 (S1a/S1c) — household no-pod peer item-sync ─────────────────────
    * Wire the in-process household store into the substrate mirror over the REAL

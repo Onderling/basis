@@ -87,6 +87,7 @@ export async function createBrowserTasksAgent({
   const circle = await createCircleAgent({
     circleConfig,
     localStoreBundle,
+    vault: identityVault,   // persistent on both shells — the grant managers' durable store
     // 2026-05-24 — flipped to true so basis's /invite + /redeem-invite
     // slashes (A9) and /join-group wizard (C2) actually reach
     // registered issueInvite / redeemInvite skills.  Earlier comment
@@ -199,6 +200,7 @@ export async function createBrowserMultiCircleTasksAgent({
   const primaryBundle = await createCircleAgent({
     circleConfig:           primaryCircleConfig,
     localStoreBundle,
+    vault:                  identityVault,   // persistent on both shells — the grant managers' durable store
     identity,
     transport:            meshAgent.transport,
     agent:                meshAgent,

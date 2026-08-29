@@ -12,7 +12,7 @@
  *
  * Shares src/core/wizards/createGroupState.js with web.
  */
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { Modal, View, ScrollView, StyleSheet, Pressable, Text } from 'react-native';
 
 import {
@@ -37,6 +37,7 @@ import {
   Steps, Body, Field, Textarea, RadioGroup, Checkbox,
   Actions, ErrorBanner, Submitting, ReviewList, Warn,
 } from './_kit.js';
+import { wizardPalette } from './_palette.js';
 
 export default function CreateGroupWizardModal({
   visible, callSkill, onClose, onDispatched, t,
@@ -47,7 +48,10 @@ export default function CreateGroupWizardModal({
   // N1+E8 — optional (groupId, patch) => Promise persister; writes the
   // wizard's chosen policy (incl. neighbourhood chat-off) onto the new circle.
   persistPolicy,
+  // The host's theme (optional) — the sheet and its kit follow it; absent ⇒ the previous light values.
+  theme,
 }) {
+  const styles = useMemo(() => sheetStyles(theme), [theme]);
   const [state, setState] = useState(() => initialState());
   const setStep = useCallback((n) => setState((s) => ({ ...s, step: n })), []);
   const updateName = useCallback((name) => {
@@ -427,10 +431,17 @@ export default function CreateGroupWizardModal({
   );
 }
 
-const styles = StyleSheet.create({
+/**
+ * The sheet follows the host's theme the way the join wizard's does (one palette, `wizardPalette`): a
+ * module-level light StyleSheet here painted the create sheet WHITE on a dark app (W26, 2026-08-29).
+ * Absent theme ⇒ the previous light values.
+ */
+function sheetStyles(theme) {
+  const p = wizardPalette(theme);
+  return StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16,
+    backgroundColor: p.card ?? '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16,
     maxHeight: '92%', minHeight: '60%',
   },
   scroll: { flexGrow: 1 },
@@ -443,3 +454,4 @@ const styles = StyleSheet.create({
   // disclosure. It matches `roleHint` deliberately.
   podDisclosure: { fontSize: 12, lineHeight: 17, color: '#777', marginTop: 6, marginBottom: 6 },
 });
+}

@@ -357,6 +357,9 @@ export async function createCircleAgent({
   const bundle = await createTasksAgent({
     roles,
     members:    circle.members,
+    // The vault doubles as the grant managers' durable store (`store: vault` → revoke-wins survives a
+    // restart). Without it every boot warned "revocations are MEMORY-ONLY" — on the phone too (W19).
+    vault:      v,
     localStoreBundle,
     offeringMatch,
     notifier,

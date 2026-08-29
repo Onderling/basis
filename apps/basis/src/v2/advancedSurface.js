@@ -28,7 +28,7 @@ export function advancedOpRows({ manifests = [] } = {}) {
   const cov = renderCoverage(list);
   const opIndex = new Map();
   for (const m of list) {
-    const app = m.appId ?? m.id ?? '';
+    const app = m.appId ?? m.app ?? m.id ?? '';
     for (const op of m.operations) opIndex.set(`${app}:${op.id}`, op);
   }
   return cov.rows

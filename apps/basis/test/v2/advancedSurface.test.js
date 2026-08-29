@@ -53,6 +53,19 @@ describe('advancedOpRows', () => {
   });
 });
 
+describe('advancedOpRows — the app an op belongs to', () => {
+  it("reads the manifest's `app` field (what the real manifests declare), so two apps' `listOpen` are two rows with two keys", () => {
+    // Every real manifest says `app: 'stoop'`, not `appId`. Reading only `appId` made every row's app ''
+    // — stoop and household both declaring `listOpen` collided as the same React key (a redbox on the
+    // phone, W25) and Run dispatched to app ''.
+    const rows = advancedOpRows({ manifests: [
+      { app: 'stoop', operations: [{ id: 'listOpen', verb: 'list', params: [] }] },
+      { app: 'household', operations: [{ id: 'listOpen', verb: 'list', params: [] }] },
+    ] });
+    expect(rows.map((r) => `${r.app}:${r.op}`).sort()).toEqual(['household:listOpen', 'stoop:listOpen']);
+  });
+});
+
 describe('advancedParamRows', () => {
   it('reshapes the list-user-params reply; garbage in → empty out', () => {
     const rows = advancedParamRows({ ok: true, params: [{ key: 'a.b', scope: 'device', value: 5, default: 3, home: 'x' }] });

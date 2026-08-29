@@ -41,7 +41,7 @@ export function renderCoverage(manifestOrList) {
   const manifests = Array.isArray(manifestOrList) ? manifestOrList : [manifestOrList];
   const rows = [];
   for (const m of manifests.filter(Boolean)) {
-    const app = m.appId ?? m.id ?? '';
+    const app = m.appId ?? m.app ?? m.id ?? '';
     for (const op of (Array.isArray(m.operations) ? m.operations : [])) {
       const s = op.surfaces ?? {};
       const row = { app, op: op.id, verb: op.verb ?? '' };
@@ -55,7 +55,7 @@ export function renderCoverage(manifestOrList) {
   // records which processes exist, their scope, and their declared effects.
   const flows = [];
   for (const m of manifests.filter(Boolean)) {
-    const app = m.appId ?? m.id ?? '';
+    const app = m.appId ?? m.app ?? m.id ?? '';
     for (const f of (Array.isArray(m.flows) ? m.flows : [])) {
       flows.push({
         app,

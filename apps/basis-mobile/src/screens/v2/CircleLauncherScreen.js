@@ -2057,6 +2057,7 @@ export default function CircleLauncherScreen({
             visible
             callSkill={bundle?.callSkill}
             t={t}
+            theme={theme}
             getMyPeerAddr={() => bundle?.agent?.peer?.address ?? null}
             persistPolicy={(groupId, patch) => policyStore.update?.(groupId, patch)}
             onClose={() => setCreating(false)}
@@ -5176,7 +5177,8 @@ const makeStyles = (theme, insets = null) => StyleSheet.create({
   bubbleMine:       { backgroundColor: theme.color.meBg, borderWidth: 0, alignSelf: 'flex-end', maxWidth: '74%' },
   // LLM-forward consent/handoff card — a bot bubble variant: dashed rust border, peach fill, full width.
   bubbleConsent:    { alignSelf: 'stretch', maxWidth: '100%', backgroundColor: theme.color.consentBg, borderWidth: 1.5, borderColor: theme.color.accentInk, borderStyle: 'dashed' },
-  bubbleSender:     { fontSize: 11, color: theme.color.inkSoft, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2 },
+  // No uppercase on a sender: a handle is a name, not a heading — and it made a raw key SHOUT (W10).
+  bubbleSender:     { fontSize: 11, color: theme.color.inkSoft, letterSpacing: 0.3, marginBottom: 2 },
   // Per-answer transparency badge (web parity, site .msg .src) — one small mono line.
   bubbleProvenance: { marginTop: 5, fontFamily: theme.font.mono, fontSize: 10.5, color: theme.color.inkSoft },
   bubbleScope:      { alignSelf: 'flex-start', fontSize: 10, fontWeight: '600', paddingHorizontal: 7, paddingVertical: 1, borderRadius: 9, marginBottom: 3, overflow: 'hidden' },

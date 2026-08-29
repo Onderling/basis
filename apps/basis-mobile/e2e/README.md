@@ -84,3 +84,18 @@ this suite sat unused.
 
 **If a journey is not expressible here, that is a gap in the harness worth closing** — extend the suite
 rather than reaching for `adb`, so the next person inherits a harness instead of a transcript.
+
+## The device's own console is an instrument — read it before concluding anything
+
+The shells log richly (`[cc/boot]`, `[circle-sync]`, `[secure-agent]`, `[a2a] … declared ops exposed to
+peers`, `[link] received/parked/drained`), and nothing forwards it — but a walk can read it directly:
+
+```sh
+PID=$(adb -s <serial> shell pidof org.onderling.basis | tr -d '\r')
+adb -s <serial> logcat -d --pid=$PID | grep -E "boot failed|bundle ready|\[link\]|\[circle-sync\]|\[secure-agent\]"
+```
+
+`bundle ready (App)` ⇒ the app booted and what you see is data. `boot failed (App)` ⇒ stop: the launcher
+now says so on screen too, and nothing after it is about the product. A deep link that never logs
+`[link] received` never reached JS — do not tap blind (dev-client launches need an explicit
+`am start -n org.onderling.basis/.MainActivity` first).

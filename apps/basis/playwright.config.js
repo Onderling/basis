@@ -91,7 +91,13 @@ export default defineConfig({
   /* Boot the dev server automatically.  The reuseExistingServer flag
    * lets a manually-started `pnpm dev` survive across test runs. */
   webServer: {
-    command: `pnpm dev -- --port ${PORT} --strictPort`,
+    // `pnpm dev -- --port X` does NOT reach vite as a port: the `--` is passed straight through, vite
+    // treats everything after it as positional, and serves on its own default instead. Playwright then
+    // waits on the port it asked for until the 240s timeout and reports "Timed out waiting from
+    // config.webServer" — so PEER_TEST_PORT has never actually worked, and every green matrix run to
+    // date quietly reused a warm :5173 (which the note above half-admits). `pnpm exec vite` takes its
+    // flags directly.
+    command: `pnpm exec vite --port ${PORT} --strictPort`,
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     /* Cold-boot of this large app on a fresh dedicated port (PEER_TEST_PORT) needs well over 60s —

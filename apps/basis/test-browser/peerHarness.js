@@ -110,8 +110,17 @@ export async function bootPeer(browser, label, opts = {}) {
   });
 
   const page = await context.newPage();
+  // A BOOT THAT DIED LOOKS EXACTLY LIKE A BOOT WITH NO DATA (2026-08-29). On the phone, one bad log line
+  // turned every launch-with-history into `boot failed`, the agent bundle never came up, and the screen
+  // said "No circles yet." — which reads as data loss, not as a crash. Nothing in any harness noticed,
+  // because nothing ever asked whether the boot finished. Now every peer records it, and `bootPeer`
+  // refuses to hand back a peer whose agent never booted: a walk that measures a dead app measures
+  // nothing, and says so instead of reporting product findings.
+  const bootLog = { failed: null, ready: false };
   page.on('console', (m) => {
     const t = m.text();
+    if (/boot failed|agent boot failed/i.test(t)) bootLog.failed = t.slice(0, 200);
+    if (/bundle ready|agent ready|\[cc\/boot\]/i.test(t)) bootLog.ready = true;
     if (INTERESTING.test(t)) console.log(`[${label} console] ${t}`);
   });
   page.on('pageerror', (e) => console.log(`[${label} pageerror] ${e.message.split('\n')[0]}`));
@@ -121,7 +130,11 @@ export async function bootPeer(browser, label, opts = {}) {
   const dest = effRelay ? `/?relay=${encodeURIComponent(effRelay)}` : '/';
   await page.goto(dest);
   await page.waitForTimeout(4000);
-  return { context, page, label, mode: { transportMode: effTransport || 'nkn', relayUrl: effRelay, pod } };
+  if (bootLog.failed) {
+    // Loud on purpose: every finding downstream of a dead boot is noise.
+    throw new Error(`[${label}] the app's boot FAILED — nothing measured after this is about the product: ${bootLog.failed}`);
+  }
+  return { context, page, label, boot: bootLog, mode: { transportMode: effTransport || 'nkn', relayUrl: effRelay, pod } };
 }
 
 /**

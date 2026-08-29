@@ -22,17 +22,13 @@ import { rosterBindingVerifier } from './membershipRail.js';
 /** The statement kinds the task lane carries — DERIVED from the manifest's declared appends. */
 export const TASK_RAIL_KINDS = entryKindRegistryFromManifests(taskManifest).kindsFor(TASK_LANE);
 
-/** The item TYPES that ride the lane instead of the legacy mirror. Tasks came first (the claim cluster
- *  needs the writer-computed snapshot); the mirror-cargo inventory then moved the four household LIST
- *  types and the generic `note` over — same mechanics (full-item snapshot + the store's causal merge; no
- *  claim cluster involved). `contact` closed the set: the held question ("does an identity-adjacent type
- *  belong on a signed lane?") dissolved on inspection — the contact ITEM is a plain name record (the
- *  register-a-name op writes it), while the actual identity data (the ContactBook MemberMap, the roster)
- *  never was store cargo on any carry. With every store type on the lane, the legacy mirror carries
- *  nothing — its cargo plumbing can retire. */
-export const TASK_LANE_TYPES = Object.freeze(new Set([
-  'task', 'shopping', 'errand', 'repair', 'schedule', 'note', 'contact',
-]));
+/*
+ * There is deliberately NO list of item types here. Whatever the circle's store holds rides this lane: the
+ * store's registry already decided what may be written, and a second list at the valve could only disagree
+ * with it — a type the registry accepted but the list did not know (an announcement, a calendar entry, the
+ * next feature's rows) silently never reached a device that was away. The publish valve has no type gate
+ * either (`routeTaskMirror`); catch-up below serves every row the store has a head for.
+ */
 
 /** The wire subtypes for the task lane's fan + catch-up (the governance/membership pairs' sibling). */
 export const TASK_BROADCAST = 'circle-task-broadcast';
@@ -100,7 +96,7 @@ export function makeTaskRail({ eventLog, circleIdentityFor, myRef, callSkill, st
     }
     let rows = [];
     try { rows = (await store.list()) ?? []; } catch { return stored; }
-    const uncovered = rows.filter((it) => it && TASK_LANE_TYPES.has(it.type) && typeof it.id === 'string' && !covered.has(it.id));
+    const uncovered = rows.filter((it) => it && typeof it.id === 'string' && !covered.has(it.id));
     if (uncovered.length === 0) return stored;
     let resolved = null;
     try { resolved = await circleIdentityFor(circleId); } catch { return stored; }

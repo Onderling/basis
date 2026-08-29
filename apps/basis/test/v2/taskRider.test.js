@@ -62,7 +62,7 @@ async function device(ref, rosterAll, wire) {
   const store = stores.getStore(CIRCLE);
   wireStoreMirror(store, routeTaskMirror({ circleId: CIRCLE, emitter }));
   const receiver = makeTaskPeerHandler({ rail });
-  return { ref, cid, eventLog, store, rail, emitter, receiver };
+  return { registry, ref, cid, eventLog, store, rail, emitter, receiver };
 }
 
 /** Deliver every queued statement to every OTHER device (the live fan). */
@@ -216,6 +216,28 @@ describe('the task lane — snapshots on the device log, heads causally merged',
 
     expect((await cato.store.get(t1.id))?.text).toBe('recent task');
     expect((await cato.store.get('task-old'))?.text).toBe('ancient but open');   // the aged-out head still arrived
+  });
+
+  it('catch-up synthesizes a head of ANY type the store holds — no hand-written type list decides', async () => {
+    // "Whatever the store holds is what syncs to the circle's other members." The store's registry already
+    // decided what may be written; a second list of types at the catch-up valve can only disagree with it —
+    // a type the registry accepted but the list did not know silently never reached a device that was away.
+    const rosterAll = [{ webid: 'webid:ada', role: 'admin' }, { webid: 'webid:cato', role: 'member' }];
+    const wire = [];
+    const ada  = await device('webid:ada',  rosterAll, wire);
+    const cato = await device('webid:cato', rosterAll, wire);
+    ada.registry.registerType('plant', { type: 'object', properties: { type: { const: 'plant' }, text: { type: 'string' } }, required: ['type', 'text'] });
+    await ada.store.put({ id: 'plant-1', type: 'plant', text: 'water the fern' }, { by: 'webid:ada' });
+    await settle();
+    ada.eventLog.entries.splice(ada.eventLog.entries.findIndex((e) => e.payload?.body?.subject === 'plant-1'), 1);
+    const batches = [];
+    const serve = makeFrontierReplay({
+      rail: ada.rail, sendToPeer: (a, p) => batches.push(p),
+      subtypes: TASK_CATCHUP_SUBTYPES, statementsFor: (cid) => ada.rail.catchUpStatements(cid),
+    });
+    const pull = makeFrontierReplay({ rail: cato.rail, sendToPeer: () => {}, subtypes: TASK_CATCHUP_SUBTYPES });
+    await serve.onRequest('peer:cato', { subtype: TASK_CATCHUP_SUBTYPES.request, circleId: CIRCLE, frontier: pull.localFrontier(CIRCLE) });
+    expect(batches[0]?.statements.map((st) => st.body.payload?.item?.type), 'the plant row must be served').toContain('plant');
   });
 
   it('THE VALVE, CLOSED: every store type rides the lane — the unsigned mirror carry is DELETED', () => {

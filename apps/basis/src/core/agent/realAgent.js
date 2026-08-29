@@ -91,6 +91,7 @@ import { wireSkill } from '@onderling/sdk';
 import { createSecureMeshAgent } from '@onderling/secure-agent';
 import { createBrowserMultiCircleTasksAgent } from '@onderling-app/tasks/browser';
 import { createBrowserStoopAgent } from '@onderling-app/stoop/browser';
+import { shouldFanNoticeboardItem, noticeboardFanPayload, noticeboardItemCircle } from '../../v2/noticeboardFan.js';
 import { createBrowserFolioAgent } from '@onderling-app/folio/browser';
 // agents — the read-only "your agents" surface (2026-07-09). buildAgentSkills
 // derives the two defineSkill-shaped handlers (listAgents / viewAgent) from
@@ -2277,6 +2278,39 @@ export async function createRealHouseholdAgent(opts = {}) {
       groupId: circleId, event: statement, msgId: `rules:${statement.body.hash}`, ts: Date.now(),
     }).catch(() => { /* fan is best-effort — catch-up reconciles */ }),
   });
+  /**
+   * THE circle-scoped send — every piece of circle traffic leaves through it: the chat/noticeboard fan
+   * (stoop's `reliableSend`) AND the shells' `sendPeerMessage` (delivery receipts, replies). With a
+   * `circleId` the envelope is signed as the circle identity and routed over the circle's own points;
+   * without one it is an ordinary hold-forward send. A second sender that did not know about circles
+   * is how the receipt left as the canonical identity and was refused on arrival (2026-08-29).
+   */
+  async function sendCircleScoped(to, envelope, sendOpts = {}) {
+    // Circle-scoped routing (2026-07-29): map the circle to its CONNECTION POINTS and hand those down.
+    // The app owns points; the transport layer owns transports; neither learns the other's vocabulary.
+    // `requireAliasCapable` is the user's address-fallback setting inverted — with the fallback OFF we
+    // would rather be undeliverable than route a circle over a transport that cannot carry per-circle
+    // addressing, because that silently strips member-level unlinkability. With it ON, an NKN circle
+    // works on terms the user accepted. → plans/NOTE-circle-scoped-routing.md
+    const { circleId, ...rest } = sendOpts;
+    if (circleId == null) return sa.peer.sendTo(to, envelope, { guarantee: 'hold-forward', ...rest });
+    const points = opts.circlePointsFor?.(circleId) ?? [];
+    const fallbackOn = addressFallbackOn();
+    // Decision 4 — sign this circle's traffic as this circle's identity, not as the person.
+    // `sendAs` is an ADDRESS of ours; the key behind it never leaves the SecurityLayer, and the
+    // transport layer below never learns that a circle was involved. Installing here as well as at
+    // boot is deliberate: the send path must not depend on a boot step having happened first.
+    const sendAs = await useCircleSigningIdentity({
+      circleId, circleAddressFor, circleIdentityFor,
+      registerSelfIdentity: (address, id) => sa.registerSelfIdentity(address, id),
+    });
+    return sa.peer.sendTo(to, envelope, {
+      guarantee: 'hold-forward',
+      ...rest,
+      scope: { points, requireAliasCapable: !fallbackOn },
+      ...(sendAs ? { sendAs } : {}),
+    });
+  }
   const stoopAgent = await createBrowserStoopAgent({
     bus,
     identityVault: stoopIdentityVault,
@@ -2313,32 +2347,7 @@ export async function createRealHouseholdAgent(opts = {}) {
     // `chat.send` transport (stoop's own in-process agent) never had. The stoop skill builds a
     // conforming `circle-chat-message` envelope and calls this per recipient; a briefly-offline
     // member has the message HELD and flushed on reconnect, exactly like a task/noticeboard fan.
-    reliableSend: async (to, envelope, sendOpts = {}) => {
-      // Circle-scoped routing (2026-07-29): map the circle to its CONNECTION POINTS and hand those down.
-      // The app owns points; the transport layer owns transports; neither learns the other's vocabulary.
-      // `requireAliasCapable` is the user's address-fallback setting inverted — with the fallback OFF we
-      // would rather be undeliverable than route a circle over a transport that cannot carry per-circle
-      // addressing, because that silently strips member-level unlinkability. With it ON, an NKN circle
-      // works on terms the user accepted. → plans/NOTE-circle-scoped-routing.md
-      const { circleId, ...rest } = sendOpts;
-      if (circleId == null) return sa.peer.sendTo(to, envelope, { guarantee: 'hold-forward', ...rest });
-      const points = opts.circlePointsFor?.(circleId) ?? [];
-      const fallbackOn = addressFallbackOn();
-      // Decision 4 — sign this circle's traffic as this circle's identity, not as the person.
-      // `sendAs` is an ADDRESS of ours; the key behind it never leaves the SecurityLayer, and the
-      // transport layer below never learns that a circle was involved. Installing here as well as at
-      // boot is deliberate: the send path must not depend on a boot step having happened first.
-      const sendAs = await useCircleSigningIdentity({
-        circleId, circleAddressFor, circleIdentityFor,
-        registerSelfIdentity: (address, id) => sa.registerSelfIdentity(address, id),
-      });
-      return sa.peer.sendTo(to, envelope, {
-        guarantee: 'hold-forward',
-        ...rest,
-        scope: { points, requireAliasCapable: !fallbackOn },
-        ...(sendAs ? { sendAs } : {}),
-      });
-    },
+    reliableSend: (to, envelope, sendOpts = {}) => sendCircleScoped(to, envelope, sendOpts),
     // Connectivity Phase 3 — LIVE shared-pod key-custody seams (host-injected by circleApp over each
     // circle's per-circle StorageBackend + its live group-key {seal,open}). All keyed by circleId so the
     // ONE stoop agent resolves each circle's member-side custody per call (invariant #6):
@@ -2359,6 +2368,11 @@ export async function createRealHouseholdAgent(opts = {}) {
     allowAddressFallback: opts.allowAddressFallback,
     label:      'StoopAgent(cc)',
   });
+  // Every noticeboard item the stoop store ACCEPTS fans to its circle — a request, an offer, an
+  // announcement, and the next kind — through the one `circle-post` door (`noticeboardFan.js` decides from
+  // the item; a received item never echoes). Installed on the store event, so no op has to remember.
+  try { stoopAgent.bundle?.itemStore?.on?.('item-added', (item) => { fanNoticeboardItem(item); }); }
+  catch (err) { if (typeof console !== 'undefined') console.warn('[realAgent] noticeboard fan not installed:', err?.message ?? err); }
   await chatAgent.hello(stoopAgent.address);
 
   // Pre-seed the local actor's stoop handle + displayName so
@@ -2586,6 +2600,49 @@ export async function createRealHouseholdAgent(opts = {}) {
     }
   }
 
+  /**
+   * Fan a noticeboard item to the circle's roster as a `circle-post` envelope (the receiver's
+   * `ingestRemotePost` dedupes on the item id). Which items, and what payload, is `noticeboardFan.js`'s
+   * decision; this only resolves the circle(s) and delivers through the hold-forward sender.
+   */
+  async function fanNoticeboardItem(item) {
+    if (!shouldFanNoticeboardItem(item)) return;
+    if (sa?.peer?.status !== 'connected') {
+      if (typeof console !== 'undefined') console.warn('[realAgent] noticeboard fan skipped — peer transport not connected (status=' + sa?.peer?.status + ')');
+      return;
+    }
+    try {
+      const explicit = noticeboardItemCircle(item);
+      const circleIds = explicit ? [explicit] : await _listMyKnownCircles();
+      if (circleIds.length === 0) {
+        if (typeof console !== 'undefined') console.warn('[realAgent] noticeboard fan: the item names no circle and none is known — it stays local');
+        return;
+      }
+      const sent = new Set();
+      for (const groupId of circleIds) {
+        const rosterReply = await chatAgent.invoke(stoopAgent.address, 'listGroupRoster', [DataPart({ groupId })]);
+        const roster = rosterReply?.[0]?.data?.members ?? [];
+        if (roster.length === 0) continue;
+        const payload = noticeboardFanPayload(item, { from: chatId.pubKey, groupId });
+        for (const m of roster) {
+          if (!m?.addr || sent.has(m.addr)) continue;
+          sent.add(m.addr);
+          try {
+            await _saSendWithRetry(sa, m.addr, {
+              type: 'p2p-chat', subtype: 'circle-post', groupId, fromPubKey: chatId.pubKey, payload, sentAt: Date.now(),
+            });
+          } catch (err) {
+            if (typeof console !== 'undefined') console.warn('[realAgent] circle-post fan failed for', String(m.addr).slice(0, 16), err?.message ?? err);
+          }
+        }
+      }
+      if (typeof console !== 'undefined') {
+        console.info(`[realAgent] circle-post fanned ${item.type} ${item.id} to ${sent.size} peer(s) across ${circleIds.length} circle(s)`);
+      }
+    } catch (err) {
+      if (typeof console !== 'undefined') console.warn('[realAgent] noticeboard fan failed', err);
+    }
+  }
   async function _listMyKnownCircles() {
     try {
       const result = await chatAgent.invoke(
@@ -3094,112 +3151,8 @@ export async function createRealHouseholdAgent(opts = {}) {
       const first  = Array.isArray(result) ? result[0] : null;
       const reply  = first?.data ?? null;
 
-      // cross-instance fan-out (chat-layer bridge).
-      // After a local postRequest succeeds, look up the circle roster
-      // (peers we know via membership-redemption items) + fan out a
-      // 'circle-post' envelope over NKN.  Each recipient's onPeerMessage
-      // handler in main.js calls stoop.ingestRemotePost to write the
-      // payload into THEIR feed.  Reuses the existing broadcast payload
-      // shape (Phase 52.7.2) so a future substrate-multi-transport
-      // slice can drop this bridge without protocol changes.
-      if (realOpId === 'postRequest' && reply?.requestId) {
-        if (sa?.peer?.status !== 'connected') {
-          if (typeof console !== 'undefined') {
-            console.warn('[realAgent] postRequest fan-out skipped — peer transport not connected (status=' + sa?.peer?.status + ')');
-          }
-        }
-      }
-      if (realOpId === 'postRequest' && reply?.requestId && sa?.peer?.status === 'connected') {
-        // follow-up. The substrate bundle's
-        // group is a hardcoded 'cc-default-circle' from bundle bring-
-        // up, but real circles (the ones users /create- or /join-) are
-        // tagged on membership-redemption items with their REAL
-        // groupId (e.g. 'westend').  Caller-explicit > targets-derived
-        // > '_any-known' fallback (= all circles the user has peer-
-        // confirmed memberships in).
-        const explicitGroupId = realArgs.groupId
-          ?? (Array.isArray(realArgs.targets)
-              ? realArgs.targets.find(t => t?.kind === 'group')?.groupId
-              : null)
-          ?? null;
-        // Fire-and-forget: don't block the user on remote delivery.
-        (async () => {
-          try {
-            // Resolve the target circle(s).  Explicit takes precedence;
-            // otherwise list-all-my-circles from membership-redemption
-            // items so cross-instance posts reach the right peers
-            // regardless of the substrate's static bundle group.
-            const circleIds = explicitGroupId
-              ? [explicitGroupId]
-              : await _listMyKnownCircles();
-            if (typeof console !== 'undefined') {
-              console.info('[realAgent] postRequest fan-out: explicitGroupId=' + explicitGroupId
-                + ' circleIds=' + JSON.stringify(circleIds));
-            }
-            if (circleIds.length === 0) {
-              if (typeof console !== 'undefined') {
-                console.warn('[realAgent] postRequest fan-out: no circles to address. '
-                  + 'Posts from outside a circle-scoped thread + with no targets arg fall here. '
-                  + 'Post from inside the Circle:<id> thread (Slice 3) or pass --targets.');
-              }
-              return;
-            }
-            const sent = new Set();   // dedupe addrs across multiple circles
-            for (const groupId of circleIds) {
-              const rosterReply = await chatAgent.invoke(
-                stoopAgent.address, 'listGroupRoster',
-                [DataPart({ groupId })],
-              );
-              const roster = rosterReply?.[0]?.data?.members ?? [];
-              if (typeof console !== 'undefined') {
-                console.info('[realAgent] fan-out: groupId=' + groupId
-                  + ' roster=' + JSON.stringify(roster.map(m => ({ addr: m?.addr?.slice(0, 16) + '…', role: m?.role }))));
-              }
-              if (roster.length === 0) continue;
-              const payload = {
-                requestId:      reply.requestId,
-                text:           realArgs.text ?? '',
-                from:           chatId.pubKey,
-                type:           realArgs.type ?? 'request',
-                kind:           realArgs.kind ?? null,
-                dueAt:          typeof realArgs.dueAt === 'number' ? realArgs.dueAt : null,
-                categoryId:     realArgs.categoryId ?? null,
-                skillTags:      Array.isArray(realArgs.skillTags) ? realArgs.skillTags : [],
-                requiredSkills: realArgs.requiredSkills ?? [],
-                targets:        Array.isArray(realArgs.targets) ? realArgs.targets : [{ kind: 'group', groupId }],
-                attachments:    Array.isArray(realArgs.attachments) ? realArgs.attachments : [],
-                ...(Array.isArray(realArgs.embeds) && realArgs.embeds.length > 0
-                  ? { embeds: realArgs.embeds } : {}),
-              };
-              for (const m of roster) {
-                if (!m?.addr || sent.has(m.addr)) continue;
-                sent.add(m.addr);
-                try {
-                  await _saSendWithRetry(sa, m.addr, {
-                    type:    'p2p-chat',
-                    subtype: 'circle-post',
-                    groupId,
-                    fromPubKey: chatId.pubKey,
-                    payload,
-                    sentAt: Date.now(),
-                  });
-                } catch (err) {
-                  if (typeof console !== 'undefined') {
-                    console.warn('[realAgent] circle-post fan-out failed for', m.addr, err);
-                  }
-                }
-              }
-            }
-            if (typeof console !== 'undefined') {
-              console.info(`[realAgent] circle-post fanned out to ${sent.size} peer(s) across ${circleIds.length} circle(s)`);
-            }
-          } catch (err) {
-            if (typeof console !== 'undefined') {
-              console.warn('[realAgent] postRequest fan-out failed', err);
-            }
-          }
-        })();
-      }
+      // The circle fan for a noticeboard write no longer hangs off this op by name: it rides the stoop
+      // store's `item-added` event (`fanNoticeboardItem` below), derived from the item that was written.
 
       return adaptStoopReply(opId, reply, realArgs);
     }
@@ -4569,7 +4522,7 @@ export async function createRealHouseholdAgent(opts = {}) {
      * (returns a `{ held: true, ... }` result rather than throwing).
      */
     async sendPeerMessage(targetAddress, payload, opts = {}) {
-      return sa.peer.sendTo(targetAddress, payload, opts);
+      return sendCircleScoped(targetAddress, payload, opts);
     },
 
     /**

@@ -75,6 +75,7 @@ test('story 4 — asking the circle for something', async ({ browser }) => {
     // circle's items), and `listCirclePostsSince` is the catch-up read, not the board. The shell scopes
     // `listOpen` through `stoopCall`, so the only honest instrument is the screen itself.
     const boardText = async (page) => {
+      await toChat(page);   // a circle opens in SCREEN mode by default; the tabs (the board among them) live in chat mode
       const t = page.locator('.circle-view__tab[data-tab="noticeboard"]');
       if (await t.count()) { await t.first().click(); await page.waitForTimeout(2500); }
       return page.evaluate(() => document.body.innerText.slice(0, 4000));
@@ -100,6 +101,8 @@ test('story 4 — asking the circle for something', async ({ browser }) => {
       aSees.onScreen ? 'it is on their noticeboard' : `not on their own board — the board shows: ${aBoard.replace(/\s+/g, ' ').slice(0, 160)}`);
     log('story 4 · does it reach the other person?', bSees.onScreen ? 'PASS' : 'FINDING',
       bSees.onScreen ? 'it is on their board too' : `not on their board — it shows: ${bBoard.replace(/\s+/g, ' ').slice(0, 160)}`);
+    expect(aSees.onScreen, 'the asker must see their own ask').toBe(true);
+    expect(bSees.onScreen, 'a noticeboard post must reach the other member').toBe(true);
 
     // And can they respond to it — the half that makes it a conversation rather than a broadcast?
     const bSurface = await surface(B.page, [{ id: 'p1', type: 'post', label: 'boormachine' }]);
@@ -389,6 +392,7 @@ test('story 3 — saying something, and knowing it arrived', async ({ browser })
     const afterArrival = await chipFor(A.page, 'BERICHT-EEN');
     log('story 3 · …and after it demonstrably arrived', afterArrival === 'stored' ? 'PASS' : 'FINDING',
       `the chip says "${afterArrival}" — ${afterArrival === 'stored' ? 'the receipt came back' : 'no receipt; "delivered" is unreachable'}`);
+    expect(afterArrival, 'a message that demonstrably arrived must reach `stored` — the receipt must come back').toBe('stored');
 
     // Now the honest half: a peer that is dark. Does the sender say anything DIFFERENT?
     await B.context.setOffline(true);

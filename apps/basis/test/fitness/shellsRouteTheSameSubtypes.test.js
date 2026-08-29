@@ -33,10 +33,10 @@ const MOBILE = readFileSync(dir('../../../basis-mobile/src/screens/ChatScreen.js
  */
 const KNOWN_DIFFERENCES = {
   // Mobile-only, all four from the retired `tasks-mobile` salvage: the peer-intro handshake and the
-  // `circle-post` / `help-with-*` subtypes have no web sender or receiver at all. Deleting them from
+  // `help-with-*` subtypes have no web sender or receiver at all (`circle-post` DID have a shared sender —
+  // realAgent fans it on postRequest — and web now receives it too). Deleting them from
   // mobile is the parity move; until someone does, they are recorded here rather than hidden.
   'circle-peer-intro':    'mobile-only (tasks-mobile salvage; no web counterpart) — 2026-08-29',
-  'circle-post':          'mobile-only (tasks-mobile salvage; no web counterpart) — 2026-08-29',
   'help-with-accepted':   'mobile-only (tasks-mobile salvage; no web counterpart) — 2026-08-29',
   'help-with-response':   'mobile-only (tasks-mobile salvage; no web counterpart) — 2026-08-29',
 };

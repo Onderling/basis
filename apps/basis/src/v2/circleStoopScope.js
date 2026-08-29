@@ -25,7 +25,17 @@ import { openThumbnail } from '@onderling/blob-gateway';
 import { itemCircleId } from './circleScope.js';
 import { createMediaEmbed } from '../core/handlers/mediaEmbed.js';
 
-/** stoop ops whose created/mutated item belongs to / routes to the active circle. */
+/**
+ * stoop ops whose created/mutated item belongs to / routes to the active circle.
+ *
+ * Still a hand-written list, on purpose for now: its job is to inject the active circle into an op's ARGS
+ * (and seal the text) BEFORE the op runs, and nothing in the stoop manifest yet declares which item type
+ * an op writes — `postRequest` deliberately carries no `appliesTo.type` (it spans three), and `add` is
+ * also the verb of contact/offering ops that must NOT be circle-scoped. Deriving this needs the op to
+ * declare what it writes; until it does, the list is the declaration. What no longer depends on a list:
+ * the FAN of a written item (`noticeboardFan.js` reads the stored item) and the task lane's catch-up
+ * (every row the circle store holds).
+ */
 export const SCOPED_WRITE_OPS = new Set([
   'postRequest', 'respondToItem', 'cancelRequest', 'markReturned', 'assignLend', 'reportPost',
 ]);

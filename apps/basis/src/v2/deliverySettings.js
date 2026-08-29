@@ -198,7 +198,7 @@ export function deliveryPresentation(state, { mine = true } = {}) {
  * @returns {(stored: { msgId, fromPeerAddr, source }) => Promise<void>}
  */
 export function makeReceiptSender({ getSettings, sendTo, logger = console } = {}) {
-  return async function onStored({ msgId, fromPeerAddr, source } = {}) {
+  return async function onStored({ msgId, fromPeerAddr, source, circleId = null } = {}) {
     if (source !== 'receiver' || !msgId || !fromPeerAddr) return;
     // If the settings cannot be READ, no receipt goes out. The store's default is ON, but "we could not
     // check" is not "on": a user who turned receipts off and then hit a broken store would otherwise start
@@ -207,7 +207,11 @@ export function makeReceiptSender({ getSettings, sendTo, logger = console } = {}
     try { settings = await (typeof getSettings === 'function' ? getSettings() : getSettings); }
     catch { return; }
     if (!settings || !shouldSendReceipt(settings)) return;
-    try { await sendTo(fromPeerAddr, { subtype: RECEIPT_MESSAGE, messageId: msgId }); }
+    // The receipt goes back INSIDE the circle the message arrived in: with `circleId` the agent signs it as
+    // the per-circle identity and routes it over the circle's own points. Unscoped it would leave as the
+    // canonical identity, and the recipient's roster authorizer refuses that from a member who has a
+    // per-circle address — verified, dropped, and the sender's chip stuck at `maybe-received` forever.
+    try { await sendTo(fromPeerAddr, { subtype: RECEIPT_MESSAGE, messageId: msgId }, circleId ? { circleId } : {}); }
     catch (err) { logger?.warn?.('[delivery] receipt send failed (best-effort):', err?.message ?? err); }
   };
 }

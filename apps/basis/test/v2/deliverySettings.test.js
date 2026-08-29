@@ -146,9 +146,18 @@ describe('the receipt sender (inbox onStored → wire)', () => {
   it('confirms a live receive when the setting is on', async () => {
     const sendTo = vi.fn(async () => {});
     await makeReceiptSender({ getSettings: () => ({ sendReceipts: true }), sendTo })(stored());
-    expect(sendTo).toHaveBeenCalledWith('peer-a', { subtype: RECEIPT_MESSAGE, messageId: 'm1' });
+    expect(sendTo).toHaveBeenCalledWith('peer-a', { subtype: RECEIPT_MESSAGE, messageId: 'm1' }, {});
   });
 
+  it('goes back INSIDE the circle it confirms — the send carries the circleId, so it leaves as the per-circle identity', async () => {
+    // Unscoped, the receipt leaves as the canonical identity: the recipient's roster authorizer refuses a
+    // canonical key from a member who has a per-circle address ("inside a circle only the per-circle key
+    // may speak"), so the receipt verified, was dropped, and the sender's chip stayed `maybe-received`
+    // forever (the walk's story 3). Scoped, it signs as the circle identity and rides the circle's points.
+    const sendTo = vi.fn(async () => {});
+    await makeReceiptSender({ getSettings: () => ({ sendReceipts: true }), sendTo })(stored({ circleId: 'c1' }));
+    expect(sendTo).toHaveBeenCalledWith('peer-a', { subtype: RECEIPT_MESSAGE, messageId: 'm1' }, { circleId: 'c1' });
+  });
   it('THE REPLAY RULE: rehydrate / catch-up / pod inserts send NOTHING', async () => {
     // Receipts there would confirm months of history to peers on every boot — and to people long gone.
     const sendTo = vi.fn(async () => {});

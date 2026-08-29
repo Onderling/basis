@@ -213,6 +213,7 @@ import { enrichEmbedsWithTitles } from '../../src/v2/embedResolve.js';
 import { makeHandleCalendarInvite } from '../../src/core/handlers/calendarInvite.js';
 import { makeHandleFileShare }      from '../../src/core/handlers/fileShare.js';
 import { makeHandleCalendarRsvp }   from '../../src/core/handlers/calendarRsvp.js';
+import { makeHandleCirclePost }     from '../../src/core/handlers/circlePost.js';
 import { makeHandleCalendarCancel } from '../../src/core/handlers/calendarCancel.js';
 // Theme B — the settings chatbot: template-driven guided setup (remote-loadable, bundled fallback).
 import { renderGuidedSetup } from './guidedSetupPanel.js';
@@ -7838,8 +7839,8 @@ async function boot() {
           try { _circleRender?.rerender?.(); } catch { /* no open circle */ }
         })(makeReceiptSender({
           getSettings: () => deliverySettingsStore.get(),
-          sendTo: (to, payload) => (typeof _peerAgent?.sendPeerMessage === 'function'
-            ? _peerAgent.sendPeerMessage(to, payload)
+          sendTo: (to, payload, opts = {}) => (typeof _peerAgent?.sendPeerMessage === 'function'
+            ? _peerAgent.sendPeerMessage(to, payload, opts)
             : Promise.reject(new Error('no peer agent'))),
         }));
       const circleChatInbox = createChatMessageInbox({
@@ -8022,6 +8023,9 @@ async function boot() {
             publishEvent:  publishEventToLog,
           }),
           'calendar-rsvp':           makeHandleCalendarRsvp({ callSkill: rawCallSkill, publishEvent: publishEventToLog }),
+          // A noticeboard post from another member. The sender side is shared (`realAgent` fans `circle-post`
+          // on postRequest), the receiver was mobile-only — so on web a post reached nobody but its author.
+          'circle-post':             makeHandleCirclePost({ callSkill: rawCallSkill, publishEvent: publishEventToLog }),
           'calendar-cancel':         makeHandleCalendarCancel({ callSkill: rawCallSkill, publishEvent: publishEventToLog }),
           // a peer shared a file → announce it in the circle with a [Download] button (bytes ride in the
           // embed; we stash them so the tap can save). Classic parity (handleFileShare).

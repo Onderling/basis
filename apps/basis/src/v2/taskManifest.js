@@ -12,9 +12,9 @@
  * (`causalMerge`: content LWW on the Lamport clock + the claim fold). Two kinds suffice: a write is a
  * snapshot, a hard-delete is a remove.
  *
- * The lane is TYPE-GENERAL by the same token: the snapshot carries the item's own `type`, and the
- * mirror-cargo retirement moved the household list types + the generic note onto it beside tasks (the
- * valve set is `TASK_LANE_TYPES` in taskRail.js). The kinds don't change per type — a shopping row is
+ * The lane is TYPE-GENERAL by the same token: the snapshot carries the item's own `type`, and whatever the
+ * circle's store holds rides it — there is no list of types at the valve or at catch-up (the store's
+ * registry is the only gate on what may be written). The kinds don't change per type — a shopping row is
  * just a snapshot the causal merge judges.
  */
 

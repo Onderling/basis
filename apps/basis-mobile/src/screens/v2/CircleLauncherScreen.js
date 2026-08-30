@@ -651,19 +651,11 @@ export default function CircleLauncherScreen({
   // row hides via the `bundle?.mdns` gate at render time.
   const [nearbyCount, setNearbyCount] = useState(0);
   useEffect(() => {
-    const mdns = bundle?.mdns;
-    if (!mdns) return;
-    const sync = () => {
-      const n = mdns.connectionCount;
-      setNearbyCount(typeof n === 'number' ? n : 0);
-    };
-    sync();
-    mdns.on?.('peer-discovered',   sync);
-    mdns.on?.('peer-disconnected', sync);
-    return () => {
-      mdns.off?.('peer-discovered',   sync);
-      mdns.off?.('peer-disconnected', sync);
-    };
+    // The count comes from the SURFACE (every discovering transport, merged), not from one adapter's
+    // connection count — the same source the Nearby screen lists, so the row and the room agree.
+    const src = bundle?.nearbyPeers;
+    if (!src?.subscribe) return undefined;
+    return src.subscribe((rows) => setNearbyCount(Array.isArray(rows) ? rows.length : 0));
   }, [bundle]);
 
   // M3 — AsyncStorage-backed circle stores (keys match web's localStorage

@@ -97,6 +97,7 @@ import { makeHandleCalendarRsvp }
 import { makeHandleCalendarCancel }
                                from '../../../basis/src/core/handlers/calendarCancel.js';
 import { makeHandleCirclePost } from '../../../basis/src/core/handlers/circlePost.js';
+import { landedNoticeboardHandler } from '../../../basis/src/v2/noticeboardCarry.js';
 import {
   makeHandleGroupRedeemRequest,
   makeHandleGroupRedeemResponse,
@@ -474,6 +475,12 @@ export default function ChatScreen({
   // array honest.
   const buildPeerWiring = useCallback(({ bundle, agent, callSkill, contactChannel, pendingPeerRedeems, pendingPersonaProps, sharedWithMeStore }) => {
     const sendPeer = (addr, payload) => agent.sendPeerMessage(addr, payload);
+    // A noticeboard post from another member LANDS in the circle store through the task lane (one carry,
+    // web parity); the shell bridges it into stoop's index + the notification through the same handler.
+    agent.setNoticeboardLandedHook?.(landedNoticeboardHandler({
+      handleCirclePost: makeHandleCirclePost({ callSkill, publishEvent }),
+      self: agent.identity?.pubKey ?? null,
+    }));
     const getMyPubKey = () =>
       agent?.identity?.chat?.pubKey ?? agent?.identity?.host?.webid ?? null;
 
@@ -578,7 +585,6 @@ export default function ChatScreen({
       } : {}),
       'calendar-rsvp':         makeHandleCalendarRsvp({ callSkill, publishEvent }),
       'calendar-cancel':       makeHandleCalendarCancel({ callSkill, publishEvent }),
-      'circle-post':            makeHandleCirclePost({ callSkill, publishEvent }),
       'group-redeem-request':  makeHandleGroupRedeemRequest({
         callSkill, sendPeer, publishEvent,
         // …and return OUR per-circle address for the circle being joined, proven the same way the joiner

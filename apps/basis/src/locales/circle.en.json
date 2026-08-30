@@ -2903,6 +2903,22 @@
     "delivery_fallback_note": {
       "text": "Reaching someone whose per-circle address you don't have yet uses your main address, so a relay you both use can tell those circles belong to one person. Choosing this per circle is coming; for now it always happens.",
       "doc": "The consequence, stated where it is incurred. Replaces the toggle: a control that changes nothing is a stronger false claim than a sentence, so the button is gone until the setting is wired."
+    },
+    "answer_placeholder": {
+      "text": "Your answer",
+      "doc": "The composer when ANSWERING an ask (it used to say \"What do you need right now?\")."
+    },
+    "answer_send": {
+      "text": "Send answer",
+      "doc": "The composer button when answering (it used to say \"Ask\")."
+    },
+    "answering_to": {
+      "text": "Answering: “{{text}}”",
+      "doc": "Quoted above the answer field so the person sees what they are answering."
+    },
+    "ask_expires_in": {
+      "text": "{{min}} min left",
+      "doc": "The clock on an ask: minutes until it lapses."
     }
   },
   "viewAsSplit": {

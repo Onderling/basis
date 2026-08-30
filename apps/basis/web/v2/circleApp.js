@@ -3617,7 +3617,7 @@ function showNearby() {
     if (action !== 'answer-ask') return;
 
     const text = typeof window !== 'undefined' && typeof window.prompt === 'function'
-      ? window.prompt(t('circle.nearbyScreen.ask_placeholder'))
+      ? window.prompt(t('circle.nearbyScreen.answer_placeholder'))
       : null;
     if (!text || !text.trim()) return;          // cancelling must not disclose
 

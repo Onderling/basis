@@ -146,12 +146,6 @@ export function renderCircleNearby(container, {
 
       // Rule (b): a stranger you can see is still a stranger. Say so, rather than
       // letting the absence of an "open" button be the only hint.
-      if (row.note === 'nearby-not-member') {
-        const note = document.createElement('div');
-        note.className = 'circle-nearby__note';
-        note.textContent = tr('circle.nearbyScreen.not_member_note');
-        el.appendChild(note);
-      }
 
       const actions = Array.isArray(row.actions) ? row.actions : [];
       if (actions.length) {
@@ -182,6 +176,14 @@ export function renderCircleNearby(container, {
   // ── Asks (step F) ──────────────────────────────────────────────────────────
   // Every live ask is shown, matching or not. Filtering the room to what resonates with me would make it a
   // recommender — and would leak my own drivers into what I am able to see.
+  // Rule (b), said ONCE for the room rather than under every stranger: a person you can see is still a
+  // stranger.
+  if (rows.some((row) => row?.note === 'nearby-not-member')) {
+    const note = document.createElement('div');
+    note.className = 'circle-nearby__note';
+    note.textContent = tr('circle.nearbyScreen.not_member_note');
+    container.appendChild(note);
+  }
   const asksBlock = document.createElement('div');
   asksBlock.className = 'circle-nearby__asks';
 
@@ -267,6 +269,12 @@ export function renderCircleNearby(container, {
       disclosure.className = 'circle-nearby__ask-disclosure';
       disclosure.textContent = tr('circle.nearbyScreen.ask_disclosure');
       el.appendChild(disclosure);
+      if (typeof entry.ask?.expiresAt === 'number') {
+        const clock = document.createElement('div');
+        clock.className = 'circle-nearby__ask-clock';
+        clock.textContent = tr('circle.nearbyScreen.ask_expires_in', { min: Math.max(1, Math.ceil((entry.ask.expiresAt - Date.now()) / 60_000)) });
+        el.appendChild(clock);
+      }
 
       const bar = document.createElement('div');
       bar.className = 'circle-nearby__ask-actions';

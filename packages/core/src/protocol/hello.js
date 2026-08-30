@@ -153,12 +153,15 @@ export async function handleHello(agent, envelope) {
   // Respond with our own hello if this is the initial (non-ack) announcement.
   if (!ack) {
     const t = await agent.transportFor(envelope._from);
+    // The ack names what it answers (`re`). A peer that reciprocates every HI it cannot tie to one of
+    // its own (the secure agent does) would otherwise answer this ack with a fresh HI, which we would
+    // ack again — a hello storm at round-trip cadence (seen phone↔companion over mDNS, 2026-08-30).
     await t.sendHello(envelope._from, {
       pubKey:       agent.pubKey,
       label:        agent.label ?? null,
       ack:          true,
       capabilities: _selfCapabilities(agent),
-    }).catch(err => agent.emit('error', err));
+    }, { re: envelope._id ?? null }).catch(err => agent.emit('error', err));
   }
 }
 

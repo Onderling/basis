@@ -52,7 +52,7 @@
  *            CapabilityAuth pod-direct token) and the registry *storage* (an
  *            in-memory Map, not a pod-backed resource).  Both are R1.5/R2.
  */
-import { Agent, AgentIdentity, Parts, PodCapabilityToken,
+import { Agent, AgentIdentity, Parts, PodCapabilityToken, RoutingStrategy,
          PolicyEngine, TrustRegistry, TokenRegistry, CapabilityToken } from '@onderling/core';
 import { RelayTransport }              from '@onderling/transports';
 import { startRelay }                  from '@onderling/relay';
@@ -373,7 +373,12 @@ export async function startCompanionNode(opts = {}) {
 
   // ── 4. Compose folio's relocatable agent (byte-identical to browser.js) ───
   const transport = new RelayTransport({ relayUrl, identity });
-  const agent = new Agent({ identity, transport, label });
+  // The ordinary routed agent — the same `RoutingStrategy` every other agent carries, nothing
+  // companion-specific. Without it a second transport (nearby mDNS) is registered but never CHOSEN:
+  // `routeFor()` falls back to the default relay for a peer standing on the same Wi-Fi, and the hello
+  // never crosses (story 8, N2). With it the strategy picks by priority + reachability (mdns > relay).
+  const routing = new RoutingStrategy({ transports: new Map([['relay', transport]]) });
+  const agent = new Agent({ identity, transport, label, routing });
 
   // R2: when the gate is ON, every relocatable pod-file skill is marked
   //     `requires-token` — the PolicyEngine (attached below) reads this `policy`
@@ -700,7 +705,7 @@ export async function startCompanionNode(opts = {}) {
       const { startNearbyMdns, normaliseNearbyOption } = await import('./nearbyMdns.js');
       const normalised = normaliseNearbyOption(nearbyOpt);
       if (normalised) {
-        nearbyMdns = await startNearbyMdns({ identity, opts: normalised });
+        nearbyMdns = await startNearbyMdns({ identity, opts: normalised, discovery: normalised.discovery ?? null });
         agent.addTransport?.('mdns', nearbyMdns.transport);
       }
     } catch (err) {

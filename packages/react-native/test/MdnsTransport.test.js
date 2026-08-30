@@ -146,6 +146,17 @@ describe('MdnsTransport', () => {
     expect(transport._hasPeer(remoteHigher)).toBe(true);
   });
 
+  it('initiator path: the peer we just dialled is REACHABLE — dialling is activity', async () => {
+    // Only the responder path stamped activity before, so the initiator answered `canReach() === false`
+    // for a peer it had connected to seconds ago, and the router fell back to the relay (story 8).
+    await transport.connect();
+    const discovered = new Promise((res) => transport.once('peer-discovered', res));
+    fireMdns('MdnsServiceDiscovered', { host: '192.168.1.5', port: 8080, pubKey: remoteHigher });
+    await discovered;
+    expect(transport.canReach(remoteHigher)).toBe(true);
+    expect(transport.connectedPeers()).toEqual([remoteHigher]);
+  });
+
   it('inbound connection identified by a hello frame → peer-discovered', async () => {
     await transport.connect();
     const discovered = new Promise((res) => transport.once('peer-discovered', res));
@@ -156,6 +167,31 @@ describe('MdnsTransport', () => {
     });
     expect(await discovered).toBe(remoteLower);
     expect(transport._hasPeer(remoteLower)).toBe(true);
+  });
+
+  it('a fresh hello from a peer we still map to an OLD connection re-maps to the new one', async () => {
+    // A peer that restarted dials again before its dead socket's close reaches us. Ignoring the second
+    // hello left the live connection unmapped: their envelopes arrived, every reply went to the dead
+    // socket ("no connection to …"). Story 8, the companion restarted under the phone.
+    await transport.connect();
+    fireMdns('MdnsClientConnected', { connectionId: 'in-1' });
+    fireMdns('MdnsDataReceived', { connectionId: 'in-1', data: b64json({ _mdns_hello: true, _from: remoteLower }) });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(transport._hasPeer(remoteLower)).toBe(true);
+
+    fireMdns('MdnsClientConnected', { connectionId: 'in-2' });
+    fireMdns('MdnsDataReceived', { connectionId: 'in-2', data: b64json({ _mdns_hello: true, _from: remoteLower }) });
+    await new Promise((r) => setTimeout(r, 0));
+    const env = { _v: 1, _p: 'OW', _id: 'x', _from: identity.pubKey, _to: remoteLower, _ts: Date.now(), _sig: null, payload: null };
+    await transport._put(remoteLower, env);
+    const lastSend = h.native.send.mock.calls.at(-1);
+    expect(lastSend[0]).toBe('in-2');                      // replies go to the live socket
+
+    // The old socket closing late must not unmap the live one.
+    fireMdns('MdnsClientDisconnected', { connectionId: 'in-1' });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(transport._hasPeer(remoteLower)).toBe(true);
+    expect(transport.canReach(remoteLower)).toBe(true);
   });
 
   it('_put throws when there is no connection to the peer', async () => {

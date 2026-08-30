@@ -339,11 +339,18 @@ export class MdnsTransport extends Transport {
         if (this.#pending.has(connectionId)) {
           if (envelope._mdns_hello) {
             const peerKey = envelope._from;
-            if (peerKey && !this.#pubKeyToConn.has(peerKey)) {
+            if (peerKey) {
+              // A hello on a NEW connection from a peer we already map: the new socket is the live one (a
+              // peer that restarted dials again before its dead socket's close ever reaches us). Re-map
+              // rather than ignore — ignoring left this connection unmapped, so every reply went to the
+              // dead socket ("no connection to …") while their envelopes kept arriving here. The old
+              // connection is NOT closed: when both sides dialled at once this "old" one is the peer's
+              // live inbound, and closing it from both ends leaves nobody connected. It stays readable
+              // (`#connToPubKey`) and its late close cannot unmap the live one (see the guard below).
+              const previous = this.#pubKeyToConn.get(peerKey);
               this.#pending.delete(connectionId);
               this.#registerConn(connectionId, peerKey);
-              this.#lastActivity.set(peerKey, Date.now());
-              this.emit('peer-discovered', peerKey);
+              if (!previous) this.emit('peer-discovered', peerKey);
             }
             return; // internal frame — don't pass upstream
           }
@@ -363,9 +370,13 @@ export class MdnsTransport extends Transport {
         const pubKey = this.#connToPubKey.get(connectionId);
         if (pubKey) {
           this.#connToPubKey.delete(connectionId);
-          this.#pubKeyToConn.delete(pubKey);
-          this.#lastActivity.delete(pubKey);
-          this.emit('peer-disconnected', pubKey);
+          // Only forget the peer if THIS was still their live connection — a replaced socket closing late
+          // must not unmap the one that replaced it.
+          if (this.#pubKeyToConn.get(pubKey) === connectionId) {
+            this.#pubKeyToConn.delete(pubKey);
+            this.#lastActivity.delete(pubKey);
+            this.emit('peer-disconnected', pubKey);
+          }
         }
       }),
 
@@ -378,6 +389,10 @@ export class MdnsTransport extends Transport {
   #registerConn(connId, pubKey) {
     this.#connToPubKey.set(connId, pubKey);
     this.#pubKeyToConn.set(pubKey, connId);
+    // A connection we just opened IS activity. Only the responder path stamped this before, so the
+    // initiator's `canReach()` said false to a peer it had dialled seconds ago — until that peer spoke
+    // first — and the router fell back to the relay for someone on the same Wi-Fi.
+    this.#lastActivity.set(pubKey, Date.now());
   }
 }
 

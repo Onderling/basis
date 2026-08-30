@@ -83,3 +83,28 @@ describe('hello handshake', () => {
     expect(Parts.text(result.parts)).toBe('hello world');
   });
 });
+
+describe('the ack names what it answers', () => {
+  it('the responder\'s ack HI carries `_re` = the id of the HI it answers', async () => {
+    // A peer that reciprocates every HI it cannot tie to one of its own (the secure agent) would otherwise
+    // answer the ack with a fresh HI, which we would ack again — a hello storm at round-trip cadence.
+    const bus = new InternalBus();
+    class Capturing extends InternalTransport {
+      constructor(...a) { super(...a); this.puts = []; }
+      async _put(to, env) { this.puts.push(env); return super._put(to, env); }
+    }
+    const idA = await AgentIdentity.generate(new VaultMemory());
+    const idB = await AgentIdentity.generate(new VaultMemory());
+    const txA = new Capturing(bus, idA.pubKey);
+    const txB = new Capturing(bus, idB.pubKey);
+    const a = new Agent({ identity: idA, transport: txA });
+    const b = new Agent({ identity: idB, transport: txB });
+    await a.start(); await b.start();
+    await a.hello(idB.pubKey);
+    const firstHi = txA.puts.find((e) => e._p === 'HI');
+    const ack = txB.puts.find((e) => e._p === 'HI');
+    expect(ack.payload.ack).toBe(true);
+    expect(ack._re).toBe(firstHi._id);
+    await a.stop(); await b.stop();
+  });
+});

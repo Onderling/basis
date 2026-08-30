@@ -129,3 +129,26 @@ describe('a non-HI envelope still gets one reciprocal HI, not one per message', 
     expect(tx.hellos.length).toBeGreaterThan(afterMessage);
   });
 });
+
+describe('interop with the core hello protocol (its answer says `ack`, not `_re`)', () => {
+  it('an inbound HI that says ack:true is a reply — NOT answered again', async () => {
+    // Phone (secure agent) ↔ companion (core Agent) over mDNS, 2026-08-30: the core acked our reciprocal
+    // HI with `ack:true` and no `_re`; we took it for a fresh HI and reciprocated; the core acked that…
+    // 263 HIs in a minute.
+    const tx = fakeTransport();
+    const sa = await agentOn(tx);
+    await tx.inbound({ _from: 'p', _id: 'core-ack-1', _p: 'HI', _re: null, payload: { pubKey: 'pk-p', ack: true } });
+    expect(tx.hellos).toHaveLength(0);
+    await sa.shutdown();
+  });
+
+  it('our reciprocal HI says ack:true too, so a core peer does not ack it', async () => {
+    const tx = fakeTransport();
+    const sa = await agentOn(tx);
+    await tx.inbound(HI('p'));
+    expect(tx.hellos).toHaveLength(1);
+    expect(tx.hellos[0].payload.ack).toBe(true);
+    expect(tx.hellos[0].opts.re).toBe('env-p-in');
+    await sa.shutdown();
+  });
+});

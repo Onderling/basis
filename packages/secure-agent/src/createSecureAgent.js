@@ -1243,7 +1243,9 @@ export async function createSecureAgent(opts = {}) {
         const inboundIsHi    = env?._p === 'HI';
         // A reply is an HI that names the HI it answers (`_re`) — the envelope's own reply-to atom, not a
         // flag we invented. A reply never provokes a reply, so an exchange terminates in one round.
-        const inboundIsReply = inboundIsHi && !!env?._re;
+        // …or one that SAYS it is an answer (`payload.ack`, the core hello protocol's reply). Treating a
+        // core ack as a fresh HI reciprocated it, the core acked that, and so on at round-trip cadence.
+        const inboundIsReply = inboundIsHi && (!!env?._re || env?.payload?.ack === true);
         const owePeerAnHi    = inboundIsHi ? !inboundIsReply : !reciprocatedPeers.has(env._from);
         if (owePeerAnHi) {
           if (typeof console !== 'undefined') {
@@ -1263,7 +1265,7 @@ export async function createSecureAgent(opts = {}) {
           // `from` — answer AS the address they dialled (G13), or a handshake to a per-circle address
           // can never complete. `re` — name the envelope we are answering, which is what makes this a
           // REPLY and therefore unanswerable; no new wire field is needed for that.
-          const helloArgs = [env._from, { pubKey: answerKey }, { from: env._to, re: env._id ?? null }];
+          const helloArgs = [env._from, { pubKey: answerKey, ack: true }, { from: env._to, re: env._id ?? null }];
           try {
             await tx.sendHello(...helloArgs);
             // NOT `helloedPeers` — answering someone is not the same as having announced ourselves to them,

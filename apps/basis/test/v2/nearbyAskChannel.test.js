@@ -28,7 +28,7 @@ describe('broadcasting', () => {
   it('fans out to every visible peer — there is no room server', async () => {
     const { ch, sendTo } = build();
     const r = await ch.broadcast(liveAsk());
-    expect(r).toEqual({ sent: 2, failed: 0, peers: 2 });
+    expect(r).toEqual({ sent: 2, failed: 0, reached: 0, peers: 2 });
     expect(sendTo).toHaveBeenCalledWith('a', { subtype: ASK_MESSAGE, ask: expect.any(Object) });
   });
 
@@ -36,18 +36,18 @@ describe('broadcasting', () => {
     // Reaching most of a café is the normal outcome, not an error state.
     const sendTo = vi.fn(async (addr) => { if (addr === 'a') throw new Error('gone'); });
     const { ch } = build({ sendTo });
-    expect(await ch.broadcast(liveAsk())).toEqual({ sent: 1, failed: 1, peers: 2 });
+    expect(await ch.broadcast(liveAsk())).toEqual({ sent: 1, failed: 1, reached: 0, peers: 2 });
   });
 
   it('refuses to broadcast an expired ask', async () => {
     const { ch, sendTo } = build();
-    expect(await ch.broadcast(liveAsk({ expiresAt: T0 - 1 }))).toEqual({ sent: 0, failed: 0, peers: 0 });
+    expect(await ch.broadcast(liveAsk({ expiresAt: T0 - 1 }))).toEqual({ sent: 0, failed: 0, reached: 0, peers: 0 });
     expect(sendTo).not.toHaveBeenCalled();
   });
 
   it('an empty room is not an error', async () => {
     const { ch } = build({ peers: [] });
-    expect(await ch.broadcast(liveAsk())).toEqual({ sent: 0, failed: 0, peers: 0 });
+    expect(await ch.broadcast(liveAsk())).toEqual({ sent: 0, failed: 0, reached: 0, peers: 0 });
   });
 });
 

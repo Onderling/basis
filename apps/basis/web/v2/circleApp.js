@@ -1403,11 +1403,23 @@ function ensureNearbyRoom(agent = _peerAgent) {
     sendPeerMessage: (addr, payload) => agent.sendPeerMessage(addr, payload),
     listPeers: () => [],
     myAddress: () => agent.identity?.pubKey ?? agent.peer?.address ?? null,
+    myFace: async () => {
+      try {
+        const r = await agent.callSkill?.('stoop', 'getMyProfile', {});   // → { entry: MemberMap row }
+        const e = r?.entry ?? {};
+        const label = e.displayName ?? e.handle ?? null;
+        return label ? { label: String(label) } : null;
+      } catch { return null; }
+    },
     onError: (err, phase) => console.warn(`[nearby] ${phase}:`, err?.message ?? err),
   });
   // An answer to MY ask is the start of a direct conversation: open the transient thread, as the
   // answerer's side does.
-  _nearbyRoom.subscribeToAnswers((answer) => { if (answer?.from) openNearbyThread(nearbyThreadDescriptor(answer.from)); });
+  _nearbyRoom.subscribeToAnswers((answer) => {
+    if (!answer?.from) return;
+    const face = _nearbyRoom.presenceOf?.(answer.from)?.label ?? null;
+    openNearbyThread(nearbyThreadDescriptor(answer.from, { label: face }), [{ origin: 'bot', text: answer.text ?? '' }]);
+  });
   return _nearbyRoom;
 }
 let   _peerRouter          = null;
@@ -3545,6 +3557,7 @@ function showNearby() {
   const mesh = null;
   nearbyScreen = createNearbyScreen({
     ...(ensureNearbyRoom()?.screenDeps() ?? {}),
+    allows:             readNearbyAllows(),   // per device, kept across opens
     control:            mesh?.discoverability ?? null,
     subscribeToPeers:   mesh?.nearbyPeers ? (fn) => mesh.nearbyPeers.subscribe(fn) : null,
     subscribeToNetwork: (fn) => subscribeToNetworkChange(fn),
@@ -3574,7 +3587,7 @@ function showNearby() {
       draw(nearbyScreen.model());
     },
     onAskAction: handleNearbyAskAction,
-    onToggleAllow: (key, value) => { nearbyScreen.setAllow(key, value); notice = null; draw(nearbyScreen.model()); },
+    onToggleAllow: (key, value) => { nearbyScreen.setAllow(key, value); writeNearbyAllows(nearbyScreen.model().allows); notice = null; draw(nearbyScreen.model()); },
     onSubmitCard: async (fields) => {
       const r = await nearbyScreen.showCard(fields);
       // The real reach, like an ask — "shown to 3 of 5" rather than "saved".
@@ -3606,7 +3619,13 @@ function showNearby() {
 
     notice = { key: 'answer_sent' };
     draw(nearbyScreen.model());
-    if (r.thread) openNearbyThread(r.thread);
+    if (r.thread) {
+      const face = _nearbyRoom?.presenceOf?.(r.peer)?.label ?? null;
+      openNearbyThread({ ...r.thread, label: face ?? r.thread.label }, [
+        ...(ask?.text ? [{ origin: 'bot', text: ask.text }] : []),
+        { origin: 'user', text: text.trim() },
+      ]);
+    }
   }
 
   nearbyScreen.subscribe(draw);
@@ -3622,17 +3641,32 @@ function showNearby() {
  * deliberate exchange of the transport→address map that the user has not made yet. Saving a café encounter
  * into the contact list would climb a rung nobody chose.
  */
-function openNearbyThread(thread) {
+function openNearbyThread(thread, seed = []) {
   if (!thread?.peerAddress) return;
   if (!contactThreads.has(thread.peerAddress)) {
     contactThreads.set(thread.peerAddress, {
       name: thread.label, peerAddr: thread.peerAddress, messages: [], transient: true,
     });
   }
+  // The thread opens WITH its first lines (the ask, the answer), not as an empty box after the fact.
+  const t = contactThreads.get(thread.peerAddress);
+  for (const m of seed) t.messages.push({ origin: m.origin ?? 'bot', text: m.text ?? '' });
+  // Frits, 2026-08-30: a person you start talking to from the room becomes a contact row that links back
+  // to this chat. Marked `nearby` so the list can say where you met.
+  try {
+    circlePeerGraph?.upsert?.({ type: 'native', pubKey: thread.peerAddress, name: thread.label, reachable: true, nearby: true })
+      ?.catch?.(() => {});
+  } catch { /* the thread opens regardless */ }
   closeNearby();
   showContactThread(thread.peerAddress);
 }
 
+// The room's per-device allows (card / chat) — kept across opens, this browser only.
+function readNearbyAllows() { try { const raw = localStorage.getItem('basis.nearbyAllows'); return raw ? JSON.parse(raw) : null; } catch { return null; } }
+function writeNearbyAllows(next) {
+  if (!next || typeof next !== 'object') return;
+  try { localStorage.setItem('basis.nearbyAllows', JSON.stringify({ card: next.card === true, chat: next.chat === true })); } catch { /* best-effort */ }
+}
 function closeNearby() {
   if (!nearbyScreen) return;
   nearbyScreen.close();

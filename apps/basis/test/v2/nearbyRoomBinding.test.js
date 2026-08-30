@@ -193,3 +193,74 @@ describe('through the controller — the screen actually asks the room', () => {
     screenA.close(); screenB.close();
   });
 });
+
+describe('the room outlives the screen, and re-tells itself to a newcomer', () => {
+  /** Two bindings with a shared, mutable room list and a peer feed each side can be told about. */
+  function roomOf() {
+    const nodes = {}; const feeds = {};
+    const peers = { a: [], b: [] };
+    const make = (addr, face) => createNearbyRoomBinding({
+      sendPeerMessage: async (to, payload) => { nodes[to]?.onPeerMessage(addr, JSON.parse(JSON.stringify(payload))); return { delivered: true }; },
+      listPeers: () => peers[addr],
+      subscribeToPeers: (fn) => { feeds[addr] = fn; return () => { feeds[addr] = null; }; },
+      myAddress: () => addr, myFace: () => face, now,
+    });
+    nodes.a = make('a', { label: 'Anna' });
+    nodes.b = make('b', { label: 'Bram' });
+    const arrive = async (who, other) => { peers[who] = [{ pubKey: other }]; feeds[who]?.(peers[who]); await nodes[who].settled(); };
+    return { ...nodes, arrive, peers };
+  }
+
+  it('a card and a chat line shown while the screen was away are there when it comes back', async () => {
+    const { a, b, arrive } = roomOf();
+    await arrive('a', 'b'); await arrive('b', 'a');
+    await a.askChannel.broadcastKind('nearby-card', { card: createCard({ label: 'Anna', line: 'ladder', from: 'a', now }).card });
+    await a.askChannel.broadcastKind('nearby-chat', { message: createChatMessage({ text: 'hi room', from: 'a', allows: roomAllows({ chat: true }), now }).message });
+    const cards = []; const chat = [];
+    b.subscribeToCards((c) => cards.push(c));   // the screen opens AFTER both arrived
+    b.subscribeToChat((m) => chat.push(m));
+    expect(cards.map((c) => c.label)).toEqual(['Anna']);
+    expect(chat.map((m) => m.text)).toEqual(['hi room']);
+  });
+
+  it('a newcomer is told my live ask, my card and my face — not the chat', async () => {
+    const { a, b, arrive } = roomOf();
+    // a is alone in the room and says things into it; b is not there yet.
+    await a.askChannel.broadcast(createAsk({ text: 'ladder?', from: 'a', now }).ask);
+    await a.askChannel.broadcastKind('nearby-card', { card: createCard({ label: 'Anna', line: 'x', from: 'a', now }).card });
+    await a.askChannel.broadcastKind('nearby-chat', { message: createChatMessage({ text: 'old line', from: 'a', allows: roomAllows({ chat: true }), now }).message });
+    // Nothing reached b (b was nowhere). Then b walks in: the handshake lists each on the other's side,
+    // and a greets the newcomer.
+    const asks = []; const cards = []; const chat = []; const faces = [];
+    b.subscribeToAsks((x) => asks.push(x)); b.subscribeToCards((x) => cards.push(x));
+    b.subscribeToChat((x) => chat.push(x)); b.subscribeToPresence((x) => faces.push(x));
+    await arrive('b', 'a');
+    await arrive('a', 'b');
+    expect(asks.map((x) => x.text)).toEqual(['ladder?']);
+    expect(cards.map((x) => x.label)).toEqual(['Anna']);
+    expect(faces.map((x) => x.label)).toEqual(['Anna']);
+    expect(chat).toHaveLength(0);
+    expect(b.presenceOf('a')?.label).toBe('Anna');
+  });
+
+  it('a peer who leaves takes their card and face with them; an empty room forgets the chat', async () => {
+    const { a, b, arrive, peers } = roomOf();
+    await arrive('a', 'b'); await arrive('b', 'a');
+    await a.askChannel.broadcastKind('nearby-card', { card: createCard({ label: 'Anna', line: 'x', from: 'a', now }).card });
+    await a.askChannel.broadcastKind('nearby-chat', { message: createChatMessage({ text: 'hi', from: 'a', allows: roomAllows({ chat: true }), now }).message });
+    expect(b.heldCards()).toHaveLength(1);
+    peers.b = [];                                               // a left b's room
+    expect(b.heldCards()).toHaveLength(0);
+    expect(b.heldChat()).toHaveLength(0);
+  });
+
+  it('reach counts what the transport handed over, not what was attempted', async () => {
+    let n = 0;
+    const b = createNearbyRoomBinding({
+      sendPeerMessage: async () => ({ delivered: (n++ % 2) === 0 }),
+      listPeers: () => [{ pubKey: 'x' }, { pubKey: 'y' }, { pubKey: 'z' }], now,
+    });
+    const r = await b.askChannel.broadcast(createAsk({ text: 'q', from: 'me', now }).ask);
+    expect(r).toMatchObject({ sent: 3, failed: 0, reached: 2, peers: 3 });
+  });
+});

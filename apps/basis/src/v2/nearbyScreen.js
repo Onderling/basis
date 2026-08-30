@@ -118,6 +118,7 @@ export function createNearbyScreen({
   subscribeToCards = null,
   subscribeToChat = null,
   subscribeToInvites = null,
+  subscribeToPresence = null,
   invitePublish = null,
   myRoomAddress = () => null,
   getDrivers = null,
@@ -180,6 +181,8 @@ export function createNearbyScreen({
   let allows = roomAllows(allowsInput);
   /** peer address → their card. One card per person; a new one replaces. */
   const cards = new Map();
+  const faces = new Map();   // peer → { label } from nearby-presence
+  let unsubscribePresence = null;
   const chat = createRoomChat();
   let unsubscribeCards = null;
   let unsubscribeChat = null;
@@ -292,7 +295,11 @@ export function createNearbyScreen({
 
   function model() {
     const built = buildNearbyModel({
-      peers: session.peers(),
+      // A face on the row where the room told us one (`nearby-presence`): a label, never an identifier.
+      peers: session.peers().map((p) => {
+        const face = faces.get(p?.pubKey ?? p?.id);
+        return face?.label ? { ...p, label: face.label } : p;
+      }),
       mySkills: safeCall(mySkills, []),
       myPseudonym,
       t,
@@ -374,6 +381,13 @@ export function createNearbyScreen({
       }
       // Invites are RECEIVED regardless of what I publish — the same asymmetry as cards. Seeing that a
       // circle exists is not publishing one of mine.
+      if (typeof subscribeToPresence === 'function' && !unsubscribePresence) {
+        try {
+          unsubscribePresence = subscribeToPresence((face) => {
+            if (face?.from) { faces.set(face.from, face); emit(); }
+          }) ?? null;
+        } catch (err) { unsubscribePresence = null; try { onError?.(err, 'subscribeToPresence'); } catch { /* */ } }
+      }
       if (typeof subscribeToInvites === 'function' && !unsubscribeInvites) {
         try {
           unsubscribeInvites = subscribeToInvites((invite) => {
@@ -409,7 +423,7 @@ export function createNearbyScreen({
       // strangers needed is a quiet record of where someone has been.
       asks.clear();
       for (const [unsub, name] of [
-        [unsubscribeCards, 'cards'], [unsubscribeChat, 'chat'], [unsubscribeInvites, 'invites'],
+        [unsubscribeCards, 'cards'], [unsubscribeChat, 'chat'], [unsubscribeInvites, 'invites'], [unsubscribePresence, 'presence'],
       ]) {
         if (!unsub) continue;
         try { unsub(); } catch (err) { try { onError?.(err, `unsubscribe:${name}`); } catch { /* */ } }
@@ -417,6 +431,7 @@ export function createNearbyScreen({
       unsubscribeCards = null;
       unsubscribeChat = null;
       unsubscribeInvites = null;
+      unsubscribePresence = null;
       cards.clear();
       roomInvites.clear();
       chat.clear();     // leaving the room forgets the conversation — there is no history to come back to

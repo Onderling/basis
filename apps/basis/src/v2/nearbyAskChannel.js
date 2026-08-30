@@ -52,7 +52,7 @@ export function createAskChannel({ listPeers = () => [], sendTo, now = () => Dat
      * @returns {Promise<{sent: number, failed: number, peers: number}>}
      */
     async broadcast(ask) {
-      if (!ask?.id || !isAskLive(ask, now)) return { sent: 0, failed: 0, peers: 0 };
+      if (!ask?.id || !isAskLive(ask, now)) return { sent: 0, failed: 0, reached: 0, peers: 0 };
       return this.broadcastKind(ASK_MESSAGE, { ask });
     },
 
@@ -68,14 +68,19 @@ export function createAskChannel({ listPeers = () => [], sendTo, now = () => Dat
      */
     async broadcastKind(subtype, body) {
       const peers = listPeers() ?? [];
-      let sent = 0; let failed = 0;
+      let sent = 0; let failed = 0; let reached = 0;
       for (const peer of peers) {
         const address = peer?.pubKey ?? peer?.id ?? null;
         if (!address || typeof sendTo !== 'function') { failed += 1; continue; }
-        try { await sendTo(address, { subtype, ...body }); sent += 1; }
-        catch (err) { failed += 1; report(err, `broadcast:${subtype}`); }
+        try {
+          const r = await sendTo(address, { subtype, ...body });
+          sent += 1;
+          // `reached` is what the transport confirms it handed over (`delivered`), not what we attempted:
+          // a send that is HELD for an unreachable peer is a send, not a room that heard.
+          if (r?.delivered === true) reached += 1;
+        } catch (err) { failed += 1; report(err, `broadcast:${subtype}`); }
       }
-      return { sent, failed, peers: peers.length };
+      return { sent, failed, reached, peers: peers.length };
     },
 
     /**

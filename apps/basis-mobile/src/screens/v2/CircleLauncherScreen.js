@@ -16,7 +16,7 @@ import { noticeWants } from '../../../../basis/src/v2/noticeSettings.js';
 import { nearbyThreadDescriptor } from '../../../../basis/src/v2/nearbyAsks.js';
 import { readNearbyAllows, writeNearbyAllows } from '../../core/nearbyAllowsStore.js';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, BackHandler, Modal, Alert, findNodeHandle } from 'react-native';
+import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, BackHandler, Modal, Alert, findNodeHandle, NativeModules } from 'react-native';
 import { useTheme } from './themeContext.js';
 // The status bar overlaps a full-screen View on Android/iOS. Every screen in this file draws its own
 // header bar at the very top of `styles.page`, so the inset belongs to that style — see `makeStyles`.
@@ -4515,10 +4515,16 @@ let _netSource = null;
 function subscribeToNetworkChange(fn) {
   if (!_netSource) {
     let netinfo = null;
-    try {
-      // eslint-disable-next-line global-require
-      netinfo = require('@onderling/react-native/netinfo').subscribeToNetInfo;
-    } catch { netinfo = null; }
+    // Ask the native side FIRST: on a binary that predates the module, requiring the JS package throws at
+    // module load, and Metro's dev overlay reports that throw on every open of Nearby even though it is
+    // caught here (seen on a phone with an older APK, 2026-08-30). A missing native module is simply
+    // "no network-change signal" — the AppState source alone.
+    if (NativeModules?.RNCNetInfo) {
+      try {
+        // eslint-disable-next-line global-require
+        netinfo = require('@onderling/react-native/netinfo').subscribeToNetInfo;
+      } catch { netinfo = null; }
+    }
     _netSource = netinfo ? combineSources([subscribeAppState, netinfo]) : subscribeAppState;
   }
   return _netSource(fn);

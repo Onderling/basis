@@ -196,7 +196,7 @@ export function createNearbyRoomBinding({
   };
   const gated = (fn) => (from, payload) => {
     if (inRoom(from)) fn(from, payload);
-    else report(new Error(`not in the room: ${String(from).slice(0, 12)}`), `refuse:${payload?.subtype}`);
+    else report(new Error(`not in the room: ${String(from).slice(0, 12)} (room: ${peersNow().map((p) => String(peerId(p)).slice(0, 8)).join(',') || 'empty'})`), `refuse:${payload?.subtype}`);
   };
   const handlers = {
     [ASK_MESSAGE]:      gated((from, payload) => land('ask',      askChannel.receiveAsk(payload, from), from, payload)),

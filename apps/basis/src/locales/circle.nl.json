@@ -2967,6 +2967,10 @@
     "reach_back_no": {
       "text": "Nu niet",
       "doc": "Decline the ask-back; the bar goes away, their card stays."
+    },
+    "my_ask_row": {
+      "text": "Jouw vraag · door {{heard}} gehoord · nog {{min}} min",
+      "doc": "The row for an ask I sent: the receipt count (same delivery receipt chat uses) and the clock (L66c)."
     }
   },
   "viewAsSplit": {

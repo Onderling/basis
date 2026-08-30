@@ -250,6 +250,14 @@ export function renderCircleNearby(container, {
     asksBlock.appendChild(el);
   }
 
+  for (const e of Array.isArray(model?.myAsks) ? model.myAsks : []) {
+    const mineRow = document.createElement('div');
+    mineRow.className = 'circle-nearby__my-ask';
+    mineRow.textContent = tr('circle.nearbyScreen.my_ask_row', {
+      heard: e.heard, min: Math.max(1, Math.ceil(((e.ask?.expiresAt ?? Date.now()) - Date.now()) / 60_000)),
+    });
+    asksBlock.appendChild(mineRow);
+  }
   if (!asks.length) {
     const none = document.createElement('div');
     none.className = 'circle-nearby__asks-empty';
@@ -396,6 +404,8 @@ export function renderCircleNearby(container, {
   // ── Your side, folded (sketch §2): the allows, the card, what others see — one row that opens ──────
   const mine = document.createElement('details');
   mine.className = 'circle-nearby__mine';
+  // "You here" opens on the FIRST-ever open only (L66a).
+  try { if (!localStorage.getItem('basis.nearbyMineSeen')) { mine.open = true; localStorage.setItem('basis.nearbyMineSeen', '1'); } } catch { /* folded */ }
   const mineSummary = document.createElement('summary');
   mineSummary.className = 'circle-nearby__mine-summary';
   const mineChips = [allows.card ? tr('circle.nearbyScreen.mine_card_on') : null, allows.chat ? tr('circle.nearbyScreen.mine_chat_on') : null].filter(Boolean);

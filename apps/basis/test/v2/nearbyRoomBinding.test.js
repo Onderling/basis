@@ -211,7 +211,7 @@ describe('the room outlives the screen, and re-tells itself to a newcomer', () =
     return { ...nodes, arrive, peers };
   }
 
-  it('a card and a chat line shown while the screen was away are there when it comes back', async () => {
+  it('a card shown while the screen was away is there when it comes back; chat is live-only (L65)', async () => {
     const { a, b, arrive } = roomOf();
     await arrive('a', 'b'); await arrive('b', 'a');
     await a.askChannel.broadcastKind('nearby-card', { card: createCard({ label: 'Anna', line: 'ladder', from: 'a', now }).card });
@@ -220,7 +220,7 @@ describe('the room outlives the screen, and re-tells itself to a newcomer', () =
     b.subscribeToCards((c) => cards.push(c));   // the screen opens AFTER both arrived
     b.subscribeToChat((m) => chat.push(m));
     expect(cards.map((c) => c.label)).toEqual(['Anna']);
-    expect(chat.map((m) => m.text)).toEqual(['hi room']);
+    expect(chat).toHaveLength(0);               // "don't record anything, they just miss out" — Frits
   });
 
   it('a newcomer is told my live ask, my card and my face — not the chat', async () => {
@@ -251,7 +251,6 @@ describe('the room outlives the screen, and re-tells itself to a newcomer', () =
     expect(b.heldCards()).toHaveLength(1);
     peers.b = [];                                               // a left b's room
     expect(b.heldCards()).toHaveLength(0);
-    expect(b.heldChat()).toHaveLength(0);
   });
 
   it('reach counts what the transport handed over, not what was attempted', async () => {
@@ -363,5 +362,16 @@ describe('rung 4 — the deliberate reach exchange', () => {
     expect(b.pendingReachFrom('a')).toBeNull();
     const none = createNearbyRoomBinding({ sendPeerMessage: async () => {}, listPeers: () => [{ pubKey: 'x' }], now });
     expect(await none.shareReach('x')).toMatchObject({ ok: false, reason: 'nothing-to-share' });
+  });
+});
+
+describe('my asks carry their heard counts (the ask row)', () => {
+  it('myAsks() lists what I asked, and the count moves with the receipts', async () => {
+    const { a } = pair();
+    const ask = createAsk({ text: 'ladder?', from: 'a', now }).ask;
+    await a.askChannel.broadcast(ask);
+    expect(a.myAsks()).toMatchObject([{ ask: { id: ask.id }, heard: 0 }]);
+    a.onReceipt('b', { subtype: 'delivery-receipt', messageId: ask.id });
+    expect(a.myAsks()[0].heard).toBe(1);
   });
 });

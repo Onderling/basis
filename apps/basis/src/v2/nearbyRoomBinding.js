@@ -51,7 +51,7 @@
  */
 import { createAskChannel, ASK_MESSAGE, ANSWER_MESSAGE } from './nearbyAskChannel.js';
 import { isAskLive } from './nearbyAsks.js';
-import { receiveCard, receiveChatMessage, CARD_MESSAGE, CHAT_MESSAGE, CHAT_MAX_KEPT, ASKS_MAX_KEPT } from './nearbyRoom.js';
+import { receiveCard, receiveChatMessage, CARD_MESSAGE, CHAT_MESSAGE, ASKS_MAX_KEPT } from './nearbyRoom.js';
 import { receiveInvite, isInviteLive, prepareBroadcastInvite, INVITE_MESSAGE } from './nearbyInvites.js';
 import { receiveReceipt, deliveryAfterSend } from './deliveryState.js';
 
@@ -121,7 +121,6 @@ export function createNearbyRoomBinding({
   // ── The held room ─────────────────────────────────────────────────────────────────────────────────────
   const heldAsks    = new Map();   // ask.id → ask (theirs)
   const heldCards   = new Map();   // from → card
-  const heldChat    = [];          // recent lines
   const heldInvites = new Map();   // circleId → invite
   const presence    = new Map();   // from → { label }
   const pendingReach = new Map();  // from → the reach they sent (held until the shell shows/acts on it)
@@ -135,7 +134,6 @@ export function createNearbyRoomBinding({
     for (const [cid, inv] of mine.invites) if (!isInviteLive(inv, now)) mine.invites.delete(cid);
     for (const from of heldCards.keys()) if (!listed.has(from)) heldCards.delete(from);
     for (const from of presence.keys())  if (!listed.has(from)) presence.delete(from);
-    if (listed.size === 0) heldChat.length = 0;    // the room emptied: leaving forgets
   };
 
   // ── Outbound ──────────────────────────────────────────────────────────────────────────────────────────
@@ -185,7 +183,8 @@ export function createNearbyRoomBinding({
 
   // ── Subscribers ───────────────────────────────────────────────────────────────────────────────────────
   const subs = { ask: new Set(), answer: new Set(), card: new Set(), chat: new Set(), invite: new Set(), presence: new Set(), reach: new Set() };
-  const replay = { ask: () => [...heldAsks.values()], card: () => [...heldCards.values()], chat: () => [...heldChat],
+  // Chat is LIVE-ONLY by Frits' call (L65, 2026-08-31): "don't record anything, they just miss out."
+  const replay = { ask: () => [...heldAsks.values()], card: () => [...heldCards.values()], chat: () => [],
     invite: () => [...heldInvites.values()], presence: () => [...presence.values()], answer: () => [],
     reach: () => [...pendingReach.values()] };
   const subscribe = (kind) => (fn) => {
@@ -201,7 +200,7 @@ export function createNearbyRoomBinding({
   const hold = {
     ask:      (a) => { sweep(); heldAsks.set(a.id, a); while (heldAsks.size > ASKS_MAX_KEPT) heldAsks.delete(heldAsks.keys().next().value); },
     card:     (c) => { heldCards.set(c.from, c); },
-    chat:     (m) => { heldChat.push(m); while (heldChat.length > CHAT_MAX_KEPT) heldChat.shift(); },
+    chat:     () => {},   // live-only: delivered to whoever listens now, held for nobody
     invite:   (i) => { heldInvites.set(i.circleId, i); },
     presence: (p) => { presence.set(p.from, p); },
   };
@@ -295,6 +294,8 @@ export function createNearbyRoomBinding({
         subscribeToChat:     this.subscribeToChat,
         subscribeToInvites:  this.subscribeToInvites,
         subscribeToPresence: this.subscribeToPresence,
+        subscribeToHeard:    (fn) => this.subscribeToHeard(fn),
+        myAsks:              () => this.myAsks(),
         myRoomAddress:       this.myRoomAddress,
       };
     },
@@ -359,18 +360,22 @@ export function createNearbyRoomBinding({
     },
     /** How many peers confirmed a room msgId so far. */
     heardBy: (msgId) => heard.get(msgId)?.size ?? 0,
+    /** My live asks with their heard counts — what the ask row renders (L66c). */
+    myAsks() {
+      sweep();
+      return [...mine.asks.values()].map((ask) => ({ ask, heard: heard.get(ask.id)?.size ?? 0 }));
+    },
     subscribeToHeard(fn) { if (typeof fn !== 'function') return () => {}; heardSubs.add(fn); return () => { heardSubs.delete(fn); }; },
     /** Diagnostics / tests. */
     heldAsks:  () => { sweep(); return [...heldAsks.values()]; },
     heldCards: () => { sweep(); return [...heldCards.values()]; },
-    heldChat:  () => { sweep(); return [...heldChat]; },
     presenceOf: (from) => presence.get(from) ?? null,
     /** Wait for in-flight newcomer greetings (tests). */
     settled: () => greetChain,
     close() {
       try { unsubscribePeers?.(); } catch { /* best-effort */ }
       for (const s of Object.values(subs)) s.clear();
-      heldAsks.clear(); heldCards.clear(); heldChat.length = 0; heldInvites.clear(); presence.clear(); known.clear();
+      heldAsks.clear(); heldCards.clear(); heldInvites.clear(); presence.clear(); known.clear();
       heard.clear(); heardSubs.clear(); pendingReach.clear();
     },
   };

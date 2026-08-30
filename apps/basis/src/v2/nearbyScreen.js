@@ -120,6 +120,8 @@ export function createNearbyScreen({
   subscribeToChat = null,
   subscribeToInvites = null,
   subscribeToPresence = null,
+  subscribeToHeard = null,
+  myAsks = null,
   invitePublish = null,
   myRoomAddress = () => null,
   getDrivers = null,
@@ -184,6 +186,7 @@ export function createNearbyScreen({
   const cards = new Map();
   const faces = new Map();   // peer → { label } from nearby-presence
   let unsubscribePresence = null;
+  let unsubscribeHeard = null;
   const chat = createRoomChat();
   let unsubscribeCards = null;
   let unsubscribeChat = null;
@@ -328,6 +331,9 @@ export function createNearbyScreen({
     });
     // Live asks only, newest first. An expired one is not "greyed out" — it is gone, because the room has
     // moved on and an answer to it would arrive to nobody.
+    // My own asks do not echo into the room list, but they DO get a row of their own: the question I
+    // put out, how long it still stands, and how many rooms confirmed it (L66c).
+    const myAskRows = safeCall(myAsks, []).filter((e) => isAskLive(e?.ask, now));
     const askRows = [...asks.values()]
       .filter((entry) => isAskLive(entry.ask, now))
       .sort((a, b) => b.ask.createdAt - a.ask.createdAt)
@@ -350,6 +356,7 @@ export function createNearbyScreen({
       ...built,
       rows: withCards,
       asks: askRows,
+      myAsks: myAskRows,
       // How many asks this device declined to process, because one sender was flooding. Reported so a
       // surface can be honest about a partial view rather than presenting a filtered room as the room.
       asksIgnored,
@@ -387,6 +394,10 @@ export function createNearbyScreen({
       }
       // Invites are RECEIVED regardless of what I publish — the same asymmetry as cards. Seeing that a
       // circle exists is not publishing one of mine.
+      if (typeof subscribeToHeard === 'function' && !unsubscribeHeard) {
+        try { unsubscribeHeard = subscribeToHeard(() => emit()) ?? null; }
+        catch (err) { unsubscribeHeard = null; try { onError?.(err, 'subscribeToHeard'); } catch { /* */ } }
+      }
       if (typeof subscribeToPresence === 'function' && !unsubscribePresence) {
         try {
           unsubscribePresence = subscribeToPresence((face) => {
@@ -429,7 +440,7 @@ export function createNearbyScreen({
       // strangers needed is a quiet record of where someone has been.
       asks.clear();
       for (const [unsub, name] of [
-        [unsubscribeCards, 'cards'], [unsubscribeChat, 'chat'], [unsubscribeInvites, 'invites'], [unsubscribePresence, 'presence'],
+        [unsubscribeCards, 'cards'], [unsubscribeChat, 'chat'], [unsubscribeInvites, 'invites'], [unsubscribePresence, 'presence'], [unsubscribeHeard, 'heard'],
       ]) {
         if (!unsub) continue;
         try { unsub(); } catch (err) { try { onError?.(err, `unsubscribe:${name}`); } catch { /* */ } }
@@ -438,6 +449,7 @@ export function createNearbyScreen({
       unsubscribeChat = null;
       unsubscribeInvites = null;
       unsubscribePresence = null;
+      unsubscribeHeard = null;
       cards.clear();
       roomInvites.clear();
       chat.clear();     // leaving the room forgets the conversation — there is no history to come back to

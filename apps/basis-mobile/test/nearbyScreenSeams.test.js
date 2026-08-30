@@ -85,7 +85,7 @@ describe('NEARBY_ACTION_LABELS — one definition, resolvable in both languages'
             // NKN+pod circle
             'point_kind_pod', 'point_pod_host_sees', 'join_no_admin']
           .map((k) => `circle.nearbyScreen.${k}`),
-        ...['visible', 'hidden', 'still_visible', 'unavailable']
+        ...['visible', 'hidden', 'still_visible', 'unavailable', 'becoming_visible']
           .flatMap((k) => [`circle.nearbyScreen.${k}_title`, `circle.nearbyScreen.${k}_body`]),
         'circle.nearbyScreen.not_member_note',
       ];

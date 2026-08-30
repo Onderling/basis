@@ -16,7 +16,7 @@ import { noticeWants } from '../../../../basis/src/v2/noticeSettings.js';
 import { nearbyThreadDescriptor } from '../../../../basis/src/v2/nearbyAsks.js';
 import { readNearbyAllows, writeNearbyAllows } from '../../core/nearbyAllowsStore.js';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, BackHandler, Modal, Alert, findNodeHandle, NativeModules } from 'react-native';
+import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, BackHandler, Modal, Alert, findNodeHandle, NativeModules, AppState } from 'react-native';
 import { useTheme } from './themeContext.js';
 // The status bar overlaps a full-screen View on Android/iOS. Every screen in this file draws its own
 // header bar at the very top of `styles.page`, so the inset belongs to that style — see `makeStyles`.
@@ -4715,6 +4715,16 @@ function NearbyScreenHost({ bundle, onBack, onAction, onOpenThread, onJoinInvite
     const off = screen.subscribe(setModel);
     screen.open();
     return () => { off(); screen.close(); };
+  }, [screen]);
+  // J-N5 — backgrounding stops advertising. The screen stays mounted when the app goes to the background,
+  // so nothing closed the session and the phone kept announcing for as long as it was in a pocket (wire
+  // check, 2026-08-30). The room is "while this screen is open" — a screen you cannot see is not open.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') screen.open();
+      else if (state === 'background' || state === 'inactive') screen.close();
+    });
+    return () => { try { sub?.remove?.(); } catch { /* best-effort */ } };
   }, [screen]);
   // An answer to MY ask is the start of a direct conversation: open the transient thread, as the
   // answerer's side does.

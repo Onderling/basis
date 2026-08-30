@@ -6,37 +6,44 @@
   "type": "module",
   "main": "index.js",
   "exports": {
-    ".": "./index.js",
-    "./metro-preset": "./metro-preset.cjs",
+    ".":                              "./index.js",
+    "./metro-preset":                 "./metro-preset.cjs",
     "./platform/polyfills": {
       "react-native": "./src/platform/polyfills.rn.js",
-      "default": "./src/platform/polyfills.js"
+      "default":      "./src/platform/polyfills.js"
     },
-    "./platform/service-factory": "./src/platform/service-factory.js",
+    "./platform/service-factory":     "./src/platform/service-factory.js",
     "./platform/shims/node-builtins": "./src/platform/shims/node-builtins.js",
-    "./platform/shims/path": "./src/platform/shims/path.js",
-    "./platform/shims/util": "./src/platform/shims/util.js",
-    "./platform/shims/ws": "./src/platform/shims/ws.js",
-    "./ports": "./src/ports/index.js",
-    "./identity": "./src/identity/index.js",
-    "./identity/bootstrap": "./src/identity/bootstrapIdentity.js",
-    "./identity/VaultAsyncStorage": "./src/identity/VaultAsyncStorage.js",
-    "./push": "./src/push/index.js",
-    "./storage": "./src/storage/index.js",
-    "./storage/AsyncStorageAdapter": "./src/storage/AsyncStorageAdapter.js",
-    "./pseudo-pod-adapter": "./src/pseudo-pod-adapter/index.js",
-    "./hub-discovery": "./src/hub-discovery/index.js",
-    "./hub-binding": "./src/hub-binding/index.js",
-    "./picker": "./src/picker/index.js",
-    "./qr": "./src/qr/index.js",
-    "./qr/view": "./src/qr/QrCodeView.jsx",
-    "./mnemonic": "./src/mnemonic/index.js",
-    "./mnemonic/view": "./src/mnemonic/MnemonicView.jsx",
+    "./platform/shims/path":          "./src/platform/shims/path.js",
+    "./platform/shims/util":          "./src/platform/shims/util.js",
+    "./platform/shims/ws":            "./src/platform/shims/ws.js",
+
+    "./ports":                        "./src/ports/index.js",
+
+    "./identity":                     "./src/identity/index.js",
+    "./identity/bootstrap":           "./src/identity/bootstrapIdentity.js",
+    "./identity/VaultAsyncStorage":   "./src/identity/VaultAsyncStorage.js",
+
+    "./push":                         "./src/push/index.js",
+
+    "./storage":                      "./src/storage/index.js",
+    "./storage/AsyncStorageAdapter":  "./src/storage/AsyncStorageAdapter.js",
+    "./pseudo-pod-adapter":           "./src/pseudo-pod-adapter/index.js",
+    "./hub-discovery":                "./src/hub-discovery/index.js",
+    "./hub-binding":                  "./src/hub-binding/index.js",
+
+    "./picker":                       "./src/picker/index.js",
+    "./qr":                           "./src/qr/index.js",
+    "./qr/view":                      "./src/qr/QrCodeView.jsx",
+    "./mnemonic":                     "./src/mnemonic/index.js",
+    "./mnemonic/view":                "./src/mnemonic/MnemonicView.jsx",
+    "./push":                         "./src/push/index.js",
     "./netinfo": "./src/netinfoSource.js",
-    "./localisation": "./src/localisation/index.js",
-    "./deepLinks": "./src/deepLinks/index.js",
-    "./theme": "./src/theme/index.js",
-    "./components": "./src/components/index.js"
+    "./localisation":                         "./src/localisation/index.js",
+
+    "./deepLinks":                    "./src/deepLinks/index.js",
+    "./theme":                        "./src/theme/index.js",
+    "./components":                   "./src/components/index.js"
   },
   "scripts": {
     "test": "vitest run",
@@ -57,38 +64,20 @@
     "nkn-sdk": "*"
   },
   "peerDependenciesMeta": {
-    "@react-native-async-storage/async-storage": {
-      "optional": false
-    },
-    "react-native-ble-plx": {
-      "optional": false
-    },
-    "@react-native-community/netinfo": {
-      "optional": true
-    },
-    "react-native-keychain": {
-      "optional": false
-    },
-    "react-native-get-random-values": {
-      "optional": false
-    },
-    "buffer": {
-      "optional": false
-    },
-    "nkn-multiclient": {
-      "optional": true
-    },
-    "nkn-sdk": {
-      "optional": true
-    }
+    "@react-native-async-storage/async-storage": { "optional": false },
+    "react-native-ble-plx": { "optional": false },
+    "@react-native-community/netinfo": { "optional": true },
+    "react-native-keychain": { "optional": false },
+    "react-native-get-random-values": { "optional": false },
+    "buffer": { "optional": false },
+    "nkn-multiclient": { "optional": true },
+    "nkn-sdk": { "optional": true }
   },
   "devDependencies": {
     "@onderling/core": "file:../core",
     "@onderling/pod-client": "file:../pod-client",
+    "@onderling/transports": "file:../transports",
     "react": "^19.0.0",
     "vitest": "^2.1.0"
-  },
-  "dependencies": {
-    "@onderling/transports": "workspace:*"
   }
 }

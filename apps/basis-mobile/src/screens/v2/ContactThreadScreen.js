@@ -25,7 +25,8 @@ export default function ContactThreadScreen({ bundle, contact, onBack }) {
   // the bot via the registry, distinct from a conversational turn).
   const skills = registry?.skillsFor?.(contactId) ?? [];
 
-  const [messages, setMessages] = useState([]);
+  // A thread may open WITH its first lines — the ask that was answered and the answer (Nearby).
+  const [messages, setMessages] = useState(() => (Array.isArray(contact?.seed) ? contact.seed : []));
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);

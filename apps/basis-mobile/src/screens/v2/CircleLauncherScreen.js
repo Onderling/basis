@@ -14,6 +14,7 @@
  */
 import { noticeWants } from '../../../../basis/src/v2/noticeSettings.js';
 import { nearbyThreadDescriptor } from '../../../../basis/src/v2/nearbyAsks.js';
+import { readNearbyAllows, writeNearbyAllows } from '../../core/nearbyAllowsStore.js';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { View, Text, Pressable, ScrollView, TextInput, StyleSheet, BackHandler, Modal, Alert, findNodeHandle } from 'react-native';
 import { useTheme } from './themeContext.js';
@@ -1238,16 +1239,24 @@ export default function CircleLauncherScreen({
    * "I can reach you from home", and that is a deliberate exchange of the transport→address map the user
    * has not made. Persisting a café encounter into the contact list climbs a rung nobody chose.
    */
-  const openNearbyThread = useCallback((thread) => {
+  const openNearbyThread = useCallback((thread, seed = []) => {
     if (!thread?.peerAddress) return;
+    // Frits, 2026-08-30 (after the two-phone walk): a person you start talking to from the room DOES
+    // become a contact — a row in Contacts that links back to this chat — rather than a thread that
+    // exists only while the screen does. Marked `nearby` so the list can say where you met.
+    try {
+      bundle?.peerGraph?.upsert?.({ type: 'native', pubKey: thread.peerAddress, name: thread.label, reachable: true, nearby: true })
+        ?.catch?.(() => {});
+    } catch { /* the thread opens regardless */ }
     setContactThread({
       contactId: thread.peerAddress,
       name: thread.label,
       peerAddr: thread.peerAddress,
       transient: true,
+      seed: seed.map((m, i) => ({ id: `seed-${i}`, ...m })),
     });
     setView('contacten');
-  }, []);
+  }, [bundle]);
 
   // Nearby row actions (Nearby step E, host wiring).
   //
@@ -4662,6 +4671,7 @@ function NearbyScreenHost({ bundle, onBack, onAction, onOpenThread, onJoinInvite
 
   const screen = useMemo(() => createNearbyScreen({
     ...(bundle?.nearbyRoom?.screenDeps?.() ?? {}),
+    allows:             readNearbyAllows(),   // per device, kept across opens
     control:            bundle?.discoverability ?? null,
     subscribeToPeers:   bundle?.nearbyPeers ? (fn) => bundle.nearbyPeers.subscribe(fn) : null,
     subscribeToNetwork: (fn) => subscribeToNetworkChange(fn),
@@ -4683,7 +4693,12 @@ function NearbyScreenHost({ bundle, onBack, onAction, onOpenThread, onJoinInvite
   useEffect(() => {
     const sub = bundle?.nearbyRoom?.subscribeToAnswers;
     if (typeof sub !== 'function') return undefined;
-    return sub((answer) => { if (answer?.from) onOpenThread?.(nearbyThreadDescriptor(answer.from)); });
+    return sub((answer) => {
+      if (!answer?.from) return;
+      // The thread opens WITH the answer in it — the reply is the first line, not a lost opening.
+      const face = bundle?.nearbyRoom?.presenceOf?.(answer.from)?.label ?? null;
+      onOpenThread?.(nearbyThreadDescriptor(answer.from, { label: face }), [{ origin: 'bot', text: answer.text ?? '' }]);
+    });
   }, [bundle, onOpenThread]);
 
   const submitAsk = useCallback(async (text) => {
@@ -4708,7 +4723,7 @@ function NearbyScreenHost({ bundle, onBack, onAction, onOpenThread, onJoinInvite
     if (action === 'answer-ask')  { setNotice(null); setAnswering(ask?.id ?? null); }
   }, [screen]);
 
-  const toggleAllow = useCallback((key, value) => { screen.setAllow(key, value); setNotice(null); }, [screen]);
+  const toggleAllow = useCallback((key, value) => { screen.setAllow(key, value); writeNearbyAllows(screen.model().allows); setNotice(null); }, [screen]);
 
   const submitCard = useCallback(async (fields) => {
     const r = await screen.showCard(fields);

@@ -437,7 +437,17 @@ export async function bootAgentBundle(opts = {}) {
   const nearbyRoom = createNearbyRoomBinding({
     sendPeerMessage: (addr, payload) => agent.sendPeerMessage(addr, payload),
     listPeers: () => nearbyPeers.list(),
+    subscribeToPeers: (fn) => nearbyPeers.subscribe(fn),   // a newcomer is told the room as it stands
     myAddress: () => agent?.sa?.agent?.identity?.pubKey ?? null,
+    // The face this device presents in the room: the person's display name or handle, a label only.
+    myFace: async () => {
+      try {
+        const r = await agent.callSkill?.('stoop', 'getMyProfile', {});   // → { entry: MemberMap row }
+        const e = r?.entry ?? {};
+        const label = e.displayName ?? e.handle ?? null;
+        return label ? { label: String(label) } : null;
+      } catch { return null; }
+    },
     onError: (err, phase) => console.warn(`[nearby] ${phase}:`, err?.message ?? err),
   });
 

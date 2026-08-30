@@ -17,6 +17,13 @@
  *     subscribed. An unknown subtype is not ours: `onPeerMessage` returns false and the shell's other
  *     handlers get their turn.
  *
+ * Who may speak in the room. No roster vouches for a stranger, and the circle sender authorisation lets
+ * anything correctly signed through to the canonical address by design (that door is how a stranger ever
+ * becomes a contact). The room's own rule is proximity, decided on THIS device from THIS device's peer
+ * list: a `nearby-*` payload is delivered only if its wire `from` is someone the surface lists right now.
+ * Enforceable here because the list is ours (enforceability.md); everything else a stranger could do is
+ * bounded by the modules — field caps, expiry, the per-author ask budget, `nearbyActions`, the join gate.
+ *
  * Answers have no subscriber on the controller — an answer is the start of a direct conversation, so the
  * SHELL subscribes (`subscribeToAnswers`) and opens the transient thread, the same way it does for the
  * answerer's side (`nearbyThreadDescriptor`).
@@ -69,6 +76,14 @@ export function createNearbyRoomBinding({
 
   // Subtype → (validate through the owning module, then deliver). Null from a validator = refused; a
   // refused payload is handled (it was ours) and simply dropped.
+  const inRoom = (from) => {
+    if (typeof from !== 'string' || !from) return false;
+    let peers = [];
+    try { peers = listPeers() ?? []; } catch { return false; }
+    return peers.some((p) => (p?.pubKey ?? p?.id) === from);
+  };
+
+  const gated = (fn) => (from, payload) => { if (inRoom(from)) fn(from, payload); else report(new Error(`not in the room: ${String(from).slice(0, 12)}`), `refuse:${payload?.subtype}`); };
   const handlers = {
     [ASK_MESSAGE]:    (from, payload) => { const a = askChannel.receiveAsk(payload, from);    if (a) deliver('ask', a); },
     [ANSWER_MESSAGE]: (from, payload) => { const a = askChannel.receiveAnswer(payload, from); if (a) deliver('answer', a); },
@@ -76,6 +91,8 @@ export function createNearbyRoomBinding({
     [CHAT_MESSAGE]:   (from, payload) => { const m = receiveChatMessage(payload, from, now);  if (m) deliver('chat', m); },
     [INVITE_MESSAGE]: (from, payload) => { const i = receiveInvite(payload, from, now);       if (i) deliver('invite', i); },
   };
+
+  for (const k of Object.keys(handlers)) handlers[k] = gated(handlers[k]);
 
   return {
     askChannel,
@@ -97,6 +114,11 @@ export function createNearbyRoomBinding({
     onPeerMessage(from, payload) {
       const h = handlers[payload?.subtype];
       if (!h) return false;
+      // The room is the people the surface lists RIGHT NOW. A room payload from anyone else — a key that
+      // reached this address over the relay or NKN, someone who left the LAN a minute ago — is not from
+      // the room and is dropped. This is the one authorisation a room has: no roster vouches for a
+      // stranger, but proximity is decided on THIS device, from THIS device's list, which is what makes
+      // it enforceable here (enforceability.md). Handled (it was ours), never delivered.
       try { h(from, payload); } catch (err) { report(err, `receive:${payload.subtype}`); }
       return true;
     },

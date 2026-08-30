@@ -88,6 +88,25 @@ describe('cards, chat, invites ride the same binding', () => {
   });
 });
 
+describe('who may speak — the room is who the surface lists', () => {
+  it('a room payload from a key the surface does not list is dropped (handled, never delivered)', async () => {
+    const seen = [];
+    const refused = [];
+    const b = createNearbyRoomBinding({
+      sendPeerMessage: async () => {}, listPeers: () => [{ pubKey: 'a' }], now,
+      onError: (err, phase) => refused.push(phase),
+    });
+    b.subscribeToAsks((ask) => seen.push(ask));
+    const ask = createAsk({ text: 'from afar', from: 'z', now }).ask;
+    expect(b.onPeerMessage('z', { subtype: 'nearby-ask', ask })).toBe(true);     // ours, refused
+    expect(b.handlers['nearby-ask']('z', { subtype: 'nearby-ask', ask })).toBeUndefined();
+    expect(seen).toHaveLength(0);
+    expect(refused).toEqual(['refuse:nearby-ask', 'refuse:nearby-ask']);
+    b.onPeerMessage('a', { subtype: 'nearby-ask', ask });                           // listed → delivered
+    expect(seen).toHaveLength(1);
+  });
+});
+
 describe('the router', () => {
   it('claims exactly the room\'s subtypes and leaves the rest to other handlers', () => {
     const { b } = pair();
